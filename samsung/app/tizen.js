@@ -51,6 +51,11 @@
     (m.ids || []).forEach(function (id) { byTizen[id] = pkg; });
     if (m.app) byTizen[m.app] = pkg;
   });
+  // Tizen lists hundreds of system parts as apps (a 2021 TV: 437). Apps from Samsung's store have a
+  // 10 character package id (Tubi is 3KA0pm7a7V); system ones are org.tizen.* or com.samsung.*.
+  // A few store-installed extras are Samsung's own and stay hidden.
+  var STORE = /^[A-Za-z0-9]{10}$/;
+  var HIDE = /^(e-Manual|Security Center|Samsung Promotion|Smarthub Connection Test)$/i;
   var byPkg = {}, shown = [];
   tizenApps.forEach(function (a) {
     if (a.id === SELF || a.packageId === SELF.split(".")[0]) return;
@@ -58,7 +63,7 @@
     if (pkg && !byPkg[pkg]) {
       byPkg[pkg] = a;
       shown.push({ package: pkg, label: MAP[pkg].name || a.name });
-    } else if (!pkg && a.show && !byPkg[a.id]) {
+    } else if (!pkg && a.show && STORE.test(a.packageId || "") && !HIDE.test(a.name || "") && !byPkg[a.id]) {
       byPkg[a.id] = a;
       shown.push({ package: a.id, label: a.name });
     }

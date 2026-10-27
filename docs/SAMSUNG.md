@@ -27,9 +27,14 @@ TV on the computer:
   "play Stranger Things" (DIAL into Netflix) all reach the TV as the real one expects them.
 - **In a browser, with Tizen's calls stood in:** the app starts, lists the TV's apps with their
   logos, moves with the arrows and opens the focused app with OK.
-- **Not yet seen on the real TV:** the app installed and on screen, the remote's keys driving it,
-  the hook after a real power press, and whether Netflix and YouTube take the title from DIAL.
-  This page is updated when that test is done.
+- **On the real TV, 27 October 2026 (TV muted):** the app installed in 6 seconds with a Samsung
+  certificate and opened; it listed the TV's 23 store apps, with the usual ones first in the dock;
+  arrows and OK sent from the bridge moved round it and opened Netflix and YouTube; Home from the
+  phone brought it back; pressing power to leave Art Mode made the hook open couch-tv about 7
+  seconds later. The TV accepted the Netflix and YouTube title links (DIAL answered 201 and 200),
+  but nobody was watching the screen, so whether the title itself came up is not yet seen.
+- **Opening apps** goes through the TV's REST call: this Frame ignored the remote's
+  `ed.apps.launch`, for store apps and for couch-tv alike, while taking keys on that channel.
 - **Wake-on-LAN** did not wake the test Frame from its "room is empty" sleep over Wi-Fi.
 
 ## What works and what does not
@@ -138,8 +143,8 @@ Reading the TV (power, which app is open, the volume) needs no Allow. Keys and o
 - A Frame also keeps the art channel open, which says when Art Mode goes on and off.
 
 When the TV goes from off (or Art Mode) to on, the bridge waits a moment, and if no app is on
-screen (the TV is on live TV, an HDMI input or Samsung's menu) it opens couch-tv through the network
-remote (`ed.apps.launch`). If the TV came back straight into an app (some TVs reopen the last app),
+screen (the TV is on live TV, an HDMI input or Samsung's menu) it opens couch-tv with the TV's REST call
+(`POST http://<tv>:8001/api/v2/applications/<app id>`; the remote's `ed.apps.launch` is the fallback). If the TV came back straight into an app (some TVs reopen the last app),
 it is left alone. Anything the phone remote or Claude just asked for also wins: the hook stays quiet
 for 20 seconds after any command. `"open_on_power_on": false` in `config.json` turns the hook off.
 

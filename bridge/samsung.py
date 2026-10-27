@@ -480,15 +480,28 @@ class SamsungTV:
         await self._send({"method": "ms.remote.control", "params": {"TypeOfRemote": "SendInputEnd"}})
 
     async def _launch_tizen(self, tizen_id, meta=""):
+        """Open an app. The TV's REST call (port 8001, no pairing) is what works: on a 2021 Frame
+        the remote's ed.apps.launch was ignored, for store apps and sideloaded ones alike, while
+        the same TV took keys on that channel. The remote call stays as the fallback."""
         self.quiet_until = time.monotonic() + 20
+        try:
+            s = await self._http()
+            async with s.post(f"http://{self.ip}:8001/api/v2/applications/{quote(tizen_id)}",
+                              timeout=aiohttp.ClientTimeout(total=5)) as r:
+                if r.status == 200 and (await r.text()).strip() == "true":
+                    return
+        except Exception as e:
+            self.log.info("REST launch of %s failed: %s", tizen_id, e)
         await self._send({"method": "ms.channel.emit", "params": {
             "event": "ed.apps.launch", "to": "host",
             "data": {"appId": tizen_id, "action_type": "DEEP_LINK", "metaTag": meta}}})
 
     async def _dial(self, name, body):
         s = await self._http()
-        async with s.post(f"http://{self.ip}:8080/ws/apps/{name}", data=body.encode(),
-                          headers={"Content-Type": "text/plain; charset=utf-8"},
+        headers = {"Content-Type": "text/plain; charset=utf-8"}
+        if name == "YouTube":
+            headers["Origin"] = "https://www.youtube.com"   # without it the TV answers 403
+        async with s.post(f"http://{self.ip}:8080/ws/apps/{name}", data=body.encode(), headers=headers,
                           timeout=aiohttp.ClientTimeout(total=8)) as r:
             if r.status not in (200, 201):
                 raise RuntimeError(f"DIAL {name} said {r.status}")

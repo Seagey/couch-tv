@@ -35,7 +35,8 @@ HAS_GIT=0
 
 FOUND=0
 note() { echo "  $*"; FOUND=$((FOUND + 1)); }
-EXCL=(--exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.venv --exclude-dir=dist --exclude-dir=build --exclude-dir=__pycache__ --exclude-dir=.gradle)
+# --exclude=.git: in a git worktree, .git is a one-line file naming the main repo (never committed)
+EXCL=(--exclude-dir=.git --exclude=.git --exclude-dir=node_modules --exclude-dir=.venv --exclude-dir=dist --exclude-dir=build --exclude-dir=__pycache__ --exclude-dir=.gradle)
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/privacy-scan.XXXXXX") || exit 2
 trap 'rm -f "$TMP"/history.txt; rmdir "$TMP" 2> /dev/null' EXIT
 

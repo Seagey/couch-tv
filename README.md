@@ -48,7 +48,7 @@ actually watch.
 | **Nvidia Shield** | Yes (not tested) | Yes | Yes (not tested) |
 | **Fire TV on Fire OS** (Fire TV Stick 4K Max, Fire TV Cube) | Partial. Workarounds only, and Amazon's home flashes up first | Partial | Yes |
 | **Fire TV on Vega OS** (newer Fire TV sticks) | No | No | No |
-| **Samsung** (Tizen) | App only, opened from Samsung's app row | Built, testing on a real Samsung: an app that opens itself each time the TV comes on, not a true home screen ([how](docs/SAMSUNG.md)) | No |
+| **Samsung** (Tizen) | App only, opened from Samsung's app row | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
 | **LG** (webOS) | Possible, untested ([research](docs/LG.md)) | Possible, untested | No |
 | **Roku, Apple TV, Hisense with VIDAA** | No | No | No |
 
