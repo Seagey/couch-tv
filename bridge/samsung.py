@@ -121,6 +121,7 @@ class SamsungTV:
         self._art_task = None
         self._tasks = []
         self.quiet_until = 0.0      # the hook leaves the TV alone until then (a command just ran)
+        self._hook_at = -60.0
         self.hook_log = []          # (time, what) for the last few hook decisions, for /api/tvs
 
     # ---------- shape shared with tv.TV ----------
@@ -321,6 +322,9 @@ class SamsungTV:
         """The TV just came on. If nothing else is on screen, open couch-tv."""
         if not self.open_on_power_on:
             return
+        if time.monotonic() - self._hook_at < 15:
+            return   # the art channel and the watcher both saw the same switch-on
+        self._hook_at = time.monotonic()
         if time.monotonic() < self.quiet_until:
             self._note("TV came on, left alone (a command is running)")
             return
@@ -365,8 +369,11 @@ class SamsungTV:
                         elif "wakeup" in sub:
                             await ask()
                         if new != self.art_mode:
+                            left = self.art_mode is True and new is False
                             self.art_mode = new
                             self.log.info("Art Mode %s", "on" if new else "off")
+                            if left and self.power == "on":
+                                asyncio.create_task(self._hook())   # straight away, not on the next tick
         except asyncio.CancelledError:
             raise
         except Exception as e:
