@@ -48,8 +48,8 @@ actually watch.
 | **Nvidia Shield** | Yes (not tested) | Yes | Yes (not tested) |
 | **Fire TV on Fire OS** (Fire TV Stick 4K Max, Fire TV Cube) | Partial. Workarounds only, and Amazon's home flashes up first | Partial | Yes |
 | **Fire TV on Vega OS** (newer Fire TV sticks) | No | No | No |
-| **Samsung** (Tizen) | No | No | No |
-| **LG** (webOS) | No | No | No |
+| **Samsung** (Tizen) | App only, opened from Samsung's app row | Built, testing on a real Samsung: an app that opens itself each time the TV comes on, not a true home screen ([how](docs/SAMSUNG.md)) | No |
+| **LG** (webOS) | Possible, untested ([research](docs/LG.md)) | Possible, untested | No |
 | **Roku, Apple TV, Hisense with VIDAA** | No | No | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
@@ -65,12 +65,17 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   the YouTube button on the remote can stop working once the Google home is switched off.
 - **Fire TV (Fire OS):** the phone remote and app launching work. Amazon does not let another home
   screen take over, so you keep Amazon's home.
-- **Samsung and LG:** they do not run Android apps and they lock their home screens, so there is no
-  new home screen and no app to install. Both can be controlled over Wi-Fi with their own protocols,
-  so a phone remote is possible in theory, but couch-tv does not do it.
+- **Samsung:** it does not run Android apps and it locks its home screen, so couch-tv goes on as a
+  Samsung app (you install it with a free tool and your own Samsung sign-in), and the bridge opens
+  it every time the TV is switched on. Samsung's own Home button still opens Samsung's menu. The
+  phone remote works; finding and playing shows opens the title in Netflix and YouTube, and just
+  the app in the others. No "what is playing" and no screenshots. Setup and limits:
+  [docs/SAMSUNG.md](docs/SAMSUNG.md).
+- **LG:** the same approach should work (LG has a Developer Mode and a network remote), but nobody
+  has tried it yet: [docs/LG.md](docs/LG.md).
 - **Roku, Apple TV, VIDAA and Vega OS Fire TV:** closed. Nothing here works on them.
 
-**Have a Samsung, LG or another TV that says no?** Plug in a Google TV box (for example the Google
+**Want everything on a Samsung, LG or another TV?** Plug in a Google TV box (for example the Google
 TV Streamer) and set couch-tv up on that. You then get everything, on any TV with an HDMI port.
 
 **Test your own TV** (changes nothing on it, and installs nothing outside this folder):

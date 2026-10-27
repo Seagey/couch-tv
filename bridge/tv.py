@@ -98,6 +98,12 @@ def intent_package(uri):
 
 
 class TV:
+    kind = "android"
+    can_read_media = True   # what is playing, from the media session (ADB)
+
+    def can_deeplink(self, app):
+        return True
+
     def __init__(self, cfg):
         self.id = cfg["id"]
         self.log = logging.getLogger(f"tv.{self.id}")

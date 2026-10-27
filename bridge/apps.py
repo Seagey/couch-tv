@@ -61,7 +61,36 @@ APPS = [
      "jw": [], "deeplink": "app"},
 ]
 
+# Samsung (Tizen) app ids, for a TV with "kind": "samsung" (bridge/samsung.py, docs/SAMSUNG.md).
+# "ids": the ids the Samsung network remote opens, the one newer TVs use first. "app": the same
+# app's Tizen id as a TV lists it (couch-tv's TV app matches on either). Checked on a 2021 Samsung
+# (Tizen 6.0) in Australia in October 2026, except the two marked "checked": False (from public
+# app lists, not installed on the test TV). Ids can change between TV years: the bridge asks the
+# TV which ones it has and only uses those.
+TIZEN = {
+    "netflix": {"ids": ["3201907018807", "11101200001"], "app": "org.tizen.netflix-app"},
+    "youtube": {"ids": ["111299001912"], "app": "9Ur5IzDKqV.TizenYouTube"},
+    "prime-video": {"ids": ["3201910019365", "3201512006785"], "app": "org.tizen.primevideo"},
+    "disney-plus": {"ids": ["3201901017640", "3202009021709", "3202204027038"], "app": "MCmYXNxgcu.DisneyPlus"},
+    "apple-tv": {"ids": ["3201807016597"], "app": "com.samsung.tv.aria-video"},
+    "stan": {"ids": ["3201606009798"], "app": "73iTZRTc34.Stan"},
+    "binge": {"ids": ["3202010022098"], "app": "as6cYRgkPy.Binge"},
+    "abc-iview": {"ids": ["3201812017479"], "checked": False},
+    "sbs-on-demand": {"ids": ["3201510005981"], "checked": False},
+    "9now": {"ids": ["3201607010031"], "app": "Ne2ZsPWdKl.9NOW"},
+    "7plus": {"ids": ["3201803015934"], "app": "icp4AvUPiA.7plus"},
+    "10play": {"ids": ["3201704012147"], "app": "KaLitts8bq.tenplaySamsungTizen"},
+    "kayo": {"ids": ["3201910019354"], "app": "eYuOiOLYQX.KayoSports"},
+    "foxtel-go": {"ids": ["3201910019449"], "app": "AtbFvatetY.FoxtelTizenApp"},
+    "paramount-plus": {"ids": ["3202110025305", "3201710014981"], "app": "rJyOSqC6Up.PPlusIntl"},
+    "hbo-max": {"ids": ["3202301029760", "3201601007230"], "app": "5b8c3eb16b.BeamCTVDev"},
+    "twitch": {"ids": ["3202203026841"], "app": "Jz7aUrV2Q4.Twitch"},
+    "spotify": {"ids": ["3201606009684"], "app": "rJeHak5zRg.Spotify"},
+}
+
 BY_ID = {a["id"]: a for a in APPS}
+TIZEN_TO_PACKAGE = {tid: BY_ID[aid]["package"] for aid, t in TIZEN.items()
+                    for tid in t["ids"] + ([t["app"]] if t.get("app") else [])}
 BY_PACKAGE = {a["package"]: a for a in APPS}
 BY_JW = {jw: a for a in APPS for jw in a["jw"]}
 

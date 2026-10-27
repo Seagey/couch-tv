@@ -17,8 +17,8 @@ by the author. Everything else is what the sources say, not tested.
 | Onn (Google TV) | Yes | Yes | Partial |
 | Fire TV on Fire OS (Stick 4K Max, Cube) | Partial | Partial | Yes |
 | Fire TV on Vega OS (Stick 4K Select, Stick HD 2026, 4K gen 3) | No | No | No |
-| Samsung (Tizen) | No | No | No |
-| LG (webOS) | No (root only, fragile) | No | No |
+| Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
+| LG (webOS) | Home screen: root only, fragile. As an app: possible, untested ([LG.md](LG.md)) | Possible, untested | No |
 | Roku, Apple TV, Hisense VIDAA | No | No | No |
 
 ## Notes
@@ -48,8 +48,11 @@ by the author. Everything else is what the sources say, not tested.
   Amazon's home flashes up. ADB works. The Android TV Remote protocol is not confirmed on Fire TV.
 - **Vega OS** is Amazon's newer Linux system. It has no sideloading. Amazon says future Fire TV
   sticks will run it.
-- **Samsung and LG** do not run Android apps. LG's home screen can only be touched on a rooted TV,
-  and the known root methods are being patched. Not recommended.
+- **Samsung and LG** do not run Android apps or let an app replace their home screen. On a Samsung,
+  couch-tv runs as a sideloaded app that the bridge opens when the TV comes on
+  ([SAMSUNG.md](SAMSUNG.md)). LG should allow the same through its Developer Mode, untested
+  ([LG.md](LG.md)). LG's home screen itself can only be touched on a rooted TV, and the known root
+  methods are being patched. Not recommended.
 - **Google developer verification (2026).** Google's FAQ says apps installed with ADB do not need
   verification, and enforcement outside Google Play covers phones and tablets. couch-tv installs
   over ADB. [FAQ](https://developer.android.com/developer-verification/guides/faq).

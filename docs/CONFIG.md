@@ -29,6 +29,10 @@ brackets, which is how couch-tv behaved before the key existed. So an older `con
 | `keep_disabled` | The keep-off list for this TV (see `bridge/API.md`). |
 | `quick` [`["sleep"]`, plus `"picture"` when the TV has a `picture` entry] | The quick buttons on the TV home, in this order. See below. |
 | `picture` | Only used when `"picture"` is in `quick`. See below. |
+| `kind` [`"android"`] | `"samsung"` for a Samsung TV (Tizen). The bridge then uses `bridge/samsung.py` instead of ADB and the Android remote. See [SAMSUNG.md](SAMSUNG.md). |
+| `open_on_power_on` [true] | Samsung only: open the couch-tv app whenever the TV is switched on and nothing else is on screen. |
+| `app_id` [`"CouchTVApp.Home"`] | Samsung only: the couch-tv app's id on the TV, if you changed it in `samsung/app/config.xml`. |
+| `remote_name` [`client_name`] | Samsung only: the name the TV shows when it asks to Allow the remote. |
 
 ### Quick buttons (`quick`)
 

@@ -81,7 +81,21 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
 - **Google TV or Android TV** (Sony, TCL, Hisense Google TV, Philips, Xiaomi, Chromecast with
   Google TV, Google TV Streamer, Nvidia Shield, Onn): supported.
 - **Fire TV on Fire OS** (Stick 4K Max, Cube): partly. Say what will not work before going on.
-- **Samsung, LG, Roku, Apple TV, Hisense VIDAA, Fire TV on Vega OS:** not supported. Say so kindly,
+- **Samsung (Tizen):** do not say no. Offer the Samsung path in
+  [docs/SAMSUNG.md](docs/SAMSUNG.md), with its honest limits, in plain words: "couch-tv goes on
+  your Samsung as an app, and a computer at home that stays on opens it every time the TV is
+  switched on. It is not a true home screen: the remote's Home button still opens Samsung's menu.
+  The phone remote works. Netflix and YouTube open the show; other apps open on their own page.
+  There is no 'what is playing' and no screenshots. You will sign in to your own Samsung account
+  once on this computer, and press Allow on the TV once." Without a computer that stays on, only
+  the app itself is possible (opened from Samsung's app row). Also offer the Google TV box as the
+  way to get everything. If they choose Samsung, follow docs/SAMSUNG.md for steps 2 to 4 (most
+  questions in step 2 still apply; skip picture mode, apply.sh and ADB).
+- **LG (webOS):** possible but untested. Say so plainly: "An LG should be able to do what the
+  Samsung does, but nobody has tried it yet, so I can't promise it." Point to
+  [docs/LG.md](docs/LG.md) and offer the Google TV box. Do not attempt it unless they want to be
+  the first to try, and then tell them nothing is tested.
+- **Roku, Apple TV, Hisense VIDAA, Fire TV on Vega OS:** not supported. Say so kindly,
   explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
   round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets
   them everything. If they do not want a box, stop. Do not suggest rooting the TV.

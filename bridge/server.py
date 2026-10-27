@@ -22,6 +22,7 @@ import history_import
 import store
 import taste
 from tv import TV, TVUnavailable, intent_to_link
+import samsung
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -37,7 +38,14 @@ log = logging.getLogger("bridge")
 # Every request runs for one TV: ?tv= or "tv" in the body, default the living room. The names
 # below (tv, playing, media_now, ...) always mean "the TV this request or loop is for".
 TV_CONFIG = {"default": config.DEFAULT_TV, "tvs": config.TVS}
-TVS = {c["id"]: TV(c) for c in TV_CONFIG["tvs"]}
+
+
+def make_tv(cfg):
+    """A Samsung ("kind": "samsung", bridge/samsung.py) or an Android or Google TV (tv.py)."""
+    return samsung.SamsungTV(cfg) if cfg.get("kind") == "samsung" else TV(cfg)
+
+
+TVS = {c["id"]: make_tv(c) for c in TV_CONFIG["tvs"]}
 DEFAULT_TV = TV_CONFIG["default"]
 _current = contextvars.ContextVar("tv", default=DEFAULT_TV)
 
@@ -388,7 +396,7 @@ SEARCH_LINKS = {
 async def search_in_app(app, title):
     """Open the app on its search with the title typed in, or just the app."""
     from urllib.parse import quote
-    link = SEARCH_LINKS.get(app["id"])
+    link = SEARCH_LINKS.get(app["id"]) if tv.kind == "android" else None
     if link:
         await tv.start_intent(link.format(q=quote(title)), app["package"])
         if await tv.wait_for_app({app["package"]}, timeout=8):
@@ -479,7 +487,7 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
         link = resume_link(app["id"], link, best["title"])
 
     method, started = None, None
-    if app["deeplink"] == "jw" and link:
+    if app["deeplink"] == "jw" and link and tv.can_deeplink(app):
         cold = app.get("cold")
         if cold == "background":
             cold = await tv.front_package() != app["package"]
@@ -489,7 +497,7 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
                 method = "deeplink"
         except Exception as e:
             log.warning("deep link failed for %s: %s", app["id"], e)
-        if method and app.get("verify"):
+        if method and app.get("verify") and tv.can_read_media:
             started = await wait_until_playing(app["package"])
             log.info("play %s in %s: %s", best["title"], app["name"],
                      "playing" if started else "not playing yet")
@@ -1659,8 +1667,11 @@ async def h_tvs(request):
     out = []
     for tv_id, t in TVS.items():
         on = t.is_on
-        out.append({"id": tv_id, "name": t.name, "paired": t.paired, "picture": bool(t.picture_cfg), "connected": t.connected,
-                    "adb": t.adb_ok, "power": "unknown" if on is None else ("on" if on else "off")})
+        row = {"id": tv_id, "name": t.name, "kind": t.kind, "paired": t.paired, "picture": bool(t.picture_cfg),
+               "connected": t.connected, "adb": t.adb_ok, "power": "unknown" if on is None else ("on" if on else "off")}
+        if t.kind == "samsung":
+            row |= {"art_mode": t.art_mode, "hook": [f"{w} {what}" for w, what in t.hook_log]}
+        out.append(row)
     return ok(default=DEFAULT_TV, tvs=out)
 
 

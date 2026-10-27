@@ -212,7 +212,7 @@
 
   function iconUrl(pkg) {
     if (!pkg) return null;
-    if (TV) return "http://tvos.invalid/icon/" + pkg;
+    if (TV) return TV.iconUrl ? TV.iconUrl(pkg) : "http://tvos.invalid/icon/" + pkg;   // Samsung: samsung/app/tizen.js
     return window.MOCK_ICON ? window.MOCK_ICON(pkg) : null;
   }
 
@@ -865,7 +865,7 @@
     if (it.kind === "screen") face = '<div class="face tool">' + ICONS.screen + "</div>";
     else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
     else if (it.package === SETTINGS_PKG) face = '<div class="face tool">' + ICONS.gear + "</div>";
-    else if (iconUrl(it.package)) face = '<div class="face"><img src="' + esc(iconUrl(it.package)) + '" alt="" decoding="async"></div>';
+    else if (iconUrl(it.package)) face = '<div class="face"><img src="' + esc(iconUrl(it.package)) + '" alt="" decoding="async" onerror="this.parentNode.className=\'face word\';this.parentNode.textContent=this.getAttribute(\'data-name\')" data-name="' + esc(it.name) + '"></div>';
     else if (it.store) face = '<div class="face tool">' + ICONS.store + "</div>";
     else face = '<div class="face word">' + esc(it.name) + "</div>";
     var cls = "tile app dock-ic" + (lift && it.package === lift.pkg ? " lifted" : "");
@@ -1125,7 +1125,7 @@
     Up: [0, -1], Down: [0, 1], Left: [-1, 0], Right: [1, 0] };
   var ARROW_CODES = { 38: [0, -1], 40: [0, 1], 37: [-1, 0], 39: [1, 0], 19: [0, -1], 20: [0, 1], 21: [-1, 0], 22: [1, 0] };
   function isOk(e) { return OK_KEYS.indexOf(e.key) >= 0 || e.keyCode === 13 || e.keyCode === 23 || e.keyCode === 32; }
-  function isBack(e) { return BACK_KEYS.indexOf(e.key) >= 0 || e.keyCode === 27 || e.keyCode === 8; }
+  function isBack(e) { return BACK_KEYS.indexOf(e.key) >= 0 || e.keyCode === 27 || e.keyCode === 8 || e.keyCode === 10009; }   // 10009: Samsung
   function isMenu(e) { return e.key === "ContextMenu" || e.key === "Menu" || e.keyCode === 93 || e.keyCode === 82; }
   function arrowOf(e) { return ARROWS[e.key] || (e.key === "Unidentified" || !e.key ? ARROW_CODES[e.keyCode] : null) || null; }
 
@@ -1174,7 +1174,7 @@
     try { list = JSON.parse(TV.apps()); } catch (e) { return null; }
     return list.map(function (a) {
       return { kind: "app", name: RENAME[a.package] || a.label, package: a.package,
-        banner: "http://tvos.invalid/banner/" + a.package };   // the launcher makes one when the app has none
+        banner: TV.bannerUrl ? TV.bannerUrl(a.package) : "http://tvos.invalid/banner/" + a.package };   // the launcher makes one when the app has none
     });
   }
   function sortApps(list) {

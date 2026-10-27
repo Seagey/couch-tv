@@ -30,8 +30,8 @@ good sign. A Fire TV, Alexa-only or Roku button means it does not.
 | Metz, Grundig | Some Android or Google TV (not confirmed) | Fire TV, VIDAA, Saphi and others | No brand-wide rule: check the model |
 | Nokia, Motorola (licensed brands) | Android TV in some countries | Not confirmed | Made by different companies in each country |
 | Vizio | No | SmartCast, now Vizio OS | Never Google TV |
-| Samsung | No | Tizen only | |
-| LG | No | webOS only | |
+| Samsung | No | Tizen only | couch-tv as an app: [SAMSUNG.md](SAMSUNG.md) |
+| LG | No | webOS only | As an app: possible, untested, [LG.md](LG.md) |
 
 Have a TV that says no? A Google TV box (for example the Google TV Streamer) plugged into any HDMI
 port gets you everything.
