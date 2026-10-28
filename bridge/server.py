@@ -9,6 +9,7 @@ import logging
 import mimetypes
 import os
 import re
+import socket
 import time
 from collections.abc import MutableMapping
 from datetime import datetime, timezone
@@ -865,6 +866,18 @@ PLACEHOLDER = """<!doctype html><meta charset=utf-8><meta name=viewport content=
 <h1>{name}</h1><p>Not built yet. The bridge API is live at <a style="color:#8cf" href="/api/now">/api/now</a>.</p>"""
 
 
+def lan_ipv4():
+    """This computer's home network IPv4 (a UDP connect sends nothing, it only picks the route)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.0.2.1", 9))   # a documentation address: never sent, only routed
+        return s.getsockname()[0]
+    except OSError:
+        return ""
+    finally:
+        s.close()
+
+
 def static_handler(folder, name):
     async def handler(request):
         rel = request.match_info.get("path", "")
@@ -881,6 +894,17 @@ def static_handler(folder, name):
                     return web.Response(text=PLACEHOLDER.format(name=name), content_type="text/html")
                 raise web.HTTPNotFound()
             target = index
+        if os.path.basename(target) == "index.html":
+            # Tell the page this computer's number address (the one the phone reached), so a page
+            # opened by the .local name can move to it before the icon is added.
+            sock = request.transport.get_extra_info("sockname") if request.transport else None
+            ip = (sock[0] if sock else "").removeprefix("::ffff:")
+            if ip.count(".") != 3 and not ip.startswith("::1"):
+                ip = lan_ipv4()   # the phone came in over IPv6: hand it the IPv4 instead
+            if ip.count(".") == 3 and not ip.startswith("127."):
+                with open(target, encoding="utf-8") as f:
+                    html = f.read().replace("<head>", '<head>\n  <meta name="lan-ip" content="%s">' % ip, 1)
+                return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
         ctype = mimetypes.guess_type(target)[0] or "application/octet-stream"
         if target.endswith(".webmanifest"):
             ctype = "application/manifest+json"
