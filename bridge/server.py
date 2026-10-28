@@ -490,21 +490,77 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
                 method = "deeplink"
         except Exception as e:
             log.warning("deep link failed for %s: %s", app["id"], e)
-        if method and app.get("verify"):
-            started = await wait_until_playing(app["package"])
-            log.info("play %s in %s: %s", best["title"], app["name"],
-                     "playing" if started else "not playing yet")
+        if method:
+            started, picked = await get_it_playing(app, link, who or store.current_who())
+            log.info("play %s in %s: %s%s", best["title"], app["name"],
+                     "playing" if started else "not playing yet", f" (profile {picked})" if picked else "")
             if started:
-                note = f"{best['title']} is playing in {app['name']}."
+                note = f"{best['title']} is playing in {app['name']}" + (f", on {picked}'s profile." if picked else ".")
             else:
-                note = (f"{app['name']} is open, but {best['title']} has not started. If it asks "
-                        "who is watching, pick a profile, then ask again.")
+                note = (f"{app['name']} is open on {best['title']}, but it has not started playing. "
+                        "Press OK on the remote to start it.")
     if method is None:
         method, note = await search_in_app(app, best["title"])
     result = finish_play(best, app, method, note, season, episode, who)
     if started is not None:
         result["started"] = started
     return result
+
+
+# ---------- "Who's watching?" ----------
+WHO_SCREEN = re.compile(r"who.?s watching|who is watching|choose (?:a |your )?profile|select (?:a )?profile", re.I)
+PLAY_BUTTONS = ("play", "watch", "watch now", "resume", "continue watching", "start watching", "play movie",
+                "watch movie", "play episode", "start")
+
+
+def profile_order(who):
+    """Profile names to look for, best first: the watcher's own (people[].app_profiles, else their
+    name), then app_profile_fallback, then everyone else's."""
+    def names(p):
+        return p.get("app_profiles") or [p["name"]]
+    me = next((p for p in config.PEOPLE if p["id"] == who), None)
+    order = (names(me) if me else []) + config.APP_PROFILE_FALLBACK
+    order += [n for p in config.PEOPLE if p is not me for n in names(p)]
+    return list(dict.fromkeys(order))
+
+
+async def get_it_playing(app, link, who):
+    """After a deep link: pass a "Who's watching?" screen with the right profile, open the link
+    again, and press Play if the app stops on the title page. Returns (started, profile)."""
+    pkg = app["package"]
+    # Short waits: a profile screen or a title page never plays by itself, and each screen read
+    # costs 3 to 4 s already (first real run, Stan, 29 Oct: 36 s from ask to playing).
+    if await wait_until_playing(pkg, timeout=1.5):
+        return True, None
+    picked = None
+    for _ in range(2):
+        try:
+            items = await agentic.ui_items()
+        except Exception:
+            break
+        if any(WHO_SCREEN.search(i["label"]) for i in items):
+            names = [i for i in items if i["label"] and not WHO_SCREEN.search(i["label"])]
+            hit = next((i for n in profile_order(who) for i in names
+                        if agentic._norm(i["label"]) == agentic._norm(n)), None)
+            if not hit:
+                log.info("profile screen in %s, none of %s on it", app["name"], profile_order(who))
+                return False, None
+            await tv.adb("shell", f"input tap {hit['x']} {hit['y']}", timeout=8)
+            picked = hit["label"]
+            log.info("profile screen in %s: picked %s", app["name"], picked)
+            await asyncio.sleep(1.2)
+            await tv.start_intent(link, pkg, cold=False)
+            await tv.wait_for_app({pkg}, timeout=8)
+            if await wait_until_playing(pkg, timeout=1.5):
+                return True, picked
+            continue   # read the screen again: now it is the title page
+        button = agentic._button(items, *PLAY_BUTTONS)
+        if button and not agentic.stop_labels([button]):
+            await tv.adb("shell", f"input tap {button['x']} {button['y']}", timeout=8)
+            log.info("pressed %s in %s", button["label"], app["name"])
+            return await wait_until_playing(pkg, timeout=15), picked
+        break
+    return await wait_until_playing(pkg, timeout=6), picked
 
 
 async def wait_until_playing(pkg, timeout=30):

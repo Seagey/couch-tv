@@ -141,6 +141,10 @@ recommend C (A if they only want the home screen). Write the choice down; the re
   One person: no switcher. Two: a switch at the top left. Three or more: a round head icon at the
   top left that opens a list.
 - "What order should the names go in?" (They can change it later from the phone or the TV remote.)
+- Option B: "When Netflix, Stan or another app asks who's watching, which profile is yours?" Ask
+  each person for every name they use across their apps (it is often different per app), and which
+  profile to fall back on if theirs is not there. They go in `app_profiles` and
+  `app_profile_fallback` ([docs/CONFIG.md](docs/CONFIG.md), People).
 - "Any kids or guest profiles?" Mark them in `config.json` with `"kid": true` or `"guest": true`.
   Option B: they are left out of the household's taste, so the shared picks are not full of
   cartoons or a visitor's shows. They still have their own row. Imported Netflix Kids profiles are

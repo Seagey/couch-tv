@@ -80,6 +80,22 @@ the names must match. Test it once from the phone (TV, Picture) before you rely 
 Any number, up to 12. `name` is needed; `id` is made from the name if you leave it out; `colour`
 (a hex colour) is optional, otherwise each person gets one from a fixed set.
 
+**Profiles inside the apps (option B).** When "put on X" opens Netflix, Stan, Disney+ or any app
+that stops on "Who's watching?", the bridge presses the profile of whoever is watching, opens the
+show again, and presses Play if it stops on the show's page. List each person's profile names
+across all their apps, best first, in `app_profiles` (without it, their `name` is tried). Then
+`app_profile_fallback` is tried, then everyone else's names:
+
+```json
+"people": [
+  { "id": "sam", "name": "Sam", "app_profiles": ["Sam", "Samuel", "Sammy"] },
+  { "id": "alex", "name": "Alex" }
+],
+"app_profile_fallback": ["Alex", "Family"]
+```
+
+If none of the names is on the screen, nothing is pressed and the app is left on its profile screen.
+
 `"kid": true` and `"guest": true` (both optional) keep that person out of the household's taste:
 the shared "everyone" picks and what Claude is told the house likes. They still get their own
 Keep watching row and their own picks. Imported Netflix profiles with "Kids" in the name are left
