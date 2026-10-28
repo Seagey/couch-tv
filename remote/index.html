@@ -39,6 +39,15 @@
       var q = location.search;
       var standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || /[?&]standalone=1/.test(q);
       var ios = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || /[?&]ios=1/.test(q);
+      // Opened in the browser by the computer's .local name: move to its number address before anyone
+      // adds the icon. A home screen icon keeps the address it was added from forever, and a .local
+      // name is sometimes not found after the phone wakes (and never over a VPN), which shows white.
+      var lan = document.querySelector('meta[name="lan-ip"]');
+      if (lan && lan.content && /\.local$/i.test(location.hostname) && !standalone) {
+        location.replace(location.protocol + '//' + lan.content + (location.port ? ':' + location.port : '') +
+          location.pathname + location.search + location.hash);
+        return;
+      }
       if (standalone) d.classList.add('standalone');
       if (ios) d.classList.add('ios');
       // Test hook: ?insets=top,right,bottom,left (points) stands in for the phone's real safe areas.

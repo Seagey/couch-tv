@@ -11,7 +11,7 @@
 //   scenes=fog,dawn     home.scenes     secs=8      home.scene_seconds
 //   newapp=1            an app turns up that this TV has not seen before (the New dot)
 //   down                the bridge is not answering      offline=1   the saved copy, no bridge at all
-//   reset=1             forget everything this preview saved (orders, people, the look)
+//   reset=1             forget everything this preview saved (orders, people, the look, Home settings)
 (function () {
   var q = location.search;
   var arg = function (name) { var m = q.match(new RegExp("[?&]" + name + "=([^&]*)")); return m ? decodeURIComponent(m[1]) : null; };
@@ -120,6 +120,11 @@
             apps: o.order.map(function (p) { return { package: p, name: p }; }) });
         }
         if (path.indexOf("/api/who") === 0) return resolve({ ok: true, who: null });
+        if (path.indexOf("/api/settings") === 0) {
+          if (method === "POST") store.set("api.settings", { settings: body.settings || {}, updated: new Date().toISOString() });
+          var st = store.get("api.settings") || { settings: {}, updated: null };
+          return resolve({ ok: true, settings: st.settings, updated: st.updated });
+        }
         if (path.indexOf("/api/sleep") === 0) {
           if (method === "POST") sleepEnds = body.minutes ? new Date(Date.now() + body.minutes * 60000).toISOString() : null;
           return resolve({ ok: true, ends: sleepEnds });

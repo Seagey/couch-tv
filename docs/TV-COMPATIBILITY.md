@@ -13,6 +13,7 @@ by the author. Everything else is what the sources say, not tested.
 |---|---|---|---|
 | Google TV (Chromecast with Google TV, Google TV Streamer, Sony, TCL, Hisense) | Yes | Yes | Partial |
 | Older Android TV (Android 9 to 11) | Yes | Yes | Yes |
+| Xiaomi TV Stick 4K (Android TV 11) | Yes (reported by a user, not tested by us) | Not reported | Not reported |
 | Nvidia Shield | Yes (not tested) | Yes | Yes (not tested) |
 | Onn (Google TV) | Yes | Yes | Partial |
 | Fire TV on Fire OS (Stick 4K Max, Cube) | Partial | Partial | Yes |
@@ -20,6 +21,15 @@ by the author. Everything else is what the sources say, not tested.
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
 | LG (webOS) | Home screen: root only, fragile. As an app: possible, untested ([LG.md](LG.md)) | Possible, untested | No |
 | Roku, Apple TV, Hisense VIDAA | No | No | No |
+
+## Reported by people using it
+
+Not tested by the author. Each line is what someone said worked on their own device.
+
+- **Xiaomi TV Stick 4K: works**, reported by a user. They installed `couch-tv-home.apk` from the
+  Releases page (option A) and asked for the settings screen and the Spanish that are now in Home
+  settings ([issue #1](https://github.com/Seagey/couch-tv/issues/1)). It runs Android TV 11, so
+  use the Android TV 9 to 11 menus (Settings, Device Preferences).
 
 ## Notes
 
@@ -35,8 +45,9 @@ by the author. Everything else is what the sources say, not tested.
 - **Where the settings are.** Google TV: Settings, System, About (and Developer options under
   System). Android TV 9 to 11: Settings, Device Preferences, About (and Developer options under
   Device Preferences).
-- **ADB port.** Most Android TVs and Google TV boxes offer Network debugging on the fixed port 5555,
-  which every couch-tv script uses. Some Android 11 and newer Google TVs only offer Wireless
+- **ADB port.** Most Android TVs and Google TV boxes open the fixed port 5555, which every couch-tv
+  script uses: with a Network debugging switch, or on some TVs (a TCL with Android TV 11) with USB
+  debugging alone. Some Android 11 and newer Google TVs only offer Wireless
   debugging (pairing code, random port). For options A and B, open port 5555 once with Google's
   platform-tools (`adb pair`, `adb connect`, `adb tcpip 5555`, README step 1); on some TVs it
   closes again after a restart. `scripts/check-tv.py` says which kind your TV has.

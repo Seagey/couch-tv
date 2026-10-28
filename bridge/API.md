@@ -421,6 +421,41 @@ first in More apps) are never in the list.
 With no bridge the TV keeps the order itself and sends it with this `POST` the next time the
 bridge answers.
 
+### Home settings: `GET /api/settings` and `POST /api/settings`
+The settings made on the TV with its gear tile (Home settings), per TV (add `?tv=` or `"tv"`). The
+TV home keeps them itself and hands the bridge a copy, so the phone remote and the TV agree (the
+phone's "Same as the TV" language comes from here) and a TV whose storage was cleared gets them
+back. Kept in `data/settings.<tv>.json`. The bridge checks their shape and stores them; it does not
+act on them (the TV home does). On that TV they win over `config.json` (docs/CONFIG.md).
+
+```json
+{"ok": true, "updated": "2030-01-01T19:31:00+10:00",
+ "settings": {"lang": "es-MX", "place": {"name": "Sydney", "lat": -33.87, "lon": 151.21, "timezone": "Australia/Sydney"},
+              "wx_show": true, "wx_unit": "c", "wx_every": 30, "look": "night",
+              "scene_order": ["dawn", "night", "golden", "water", "fog", "p-a1"], "scenes_off": ["fog"],
+              "scene_seconds": 20, "clock": "24h", "photos": [{"id": "a1", "url": "https://example.org/beach.jpg"}],
+              "hidden_apps": ["com.example.tvhelp"], "quick": ["sleep", "look"]}}
+```
+`settings` is `{}` and `updated` is `null` until the TV sends some. `POST` takes
+`{"settings": {...}}` (the whole object, it replaces the old one) and answers like `GET`. Every key
+is optional:
+
+| Key | What it is |
+|---|---|
+| `lang` | `en`, `es` or `es-MX`. |
+| `place` | The weather's place: `name`, `lat`, `lon` (rounded to two decimals, a town, never a house), `timezone`. |
+| `wx_show`, `wx_unit`, `wx_every` | Weather on or off, `c` or `f`, minutes between checks (15, 30 or 60). |
+| `look` | `night` or `classic`. |
+| `scene_order`, `scenes_off` | Every scene in order, and the ones switched off. Ids are the five scene names and `p-<id>` for a photo. |
+| `scene_seconds`, `clock` | 5 to 3600; `12h` or `24h`. |
+| `photos` | Up to 20: `{"id", "url"}` for a photo on the web, or `{"id", "file"}` for one the TV's file picker copied into the app (`p....jpg`, kept on the TV only). |
+| `hidden_apps` | Packages hidden from the home and More apps on this TV. |
+| `quick` | The quick buttons, in order: any of `sleep`, `picture`, `look`, `input`. |
+
+Unknown keys and wrong shapes are dropped. Larger than 32 KB answers `413`. With no bridge (option
+A) the TV keeps them alone. The on-TV app (option C) keeps them in its own `/api/settings` under
+the same `settings` key, next to its setup settings.
+
 ### `GET /api/history`
 ```json
 {"ok": true, "items": [{"title": "Bluey", "service": "abc-iview", "who": "person1",
@@ -591,6 +626,9 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- `GET|POST /api/settings` (Home settings made on the TV: language, weather place and units,
+  look, scenes, photos, quick buttons, hidden apps). `home.language` in `/api/config` and
+  `/tv/config.js`.
 - `GET|POST /api/people` (any number of people, ordered, edited from the phone and the
   TV remote). `/api/config` and `/tv/config.js` gained `home`, `tvs[].quick`,
   `tvs[].picture_modes`, `ask` and `phone_remote`. Picture modes are any two names

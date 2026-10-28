@@ -269,6 +269,13 @@ class MainActivity : Activity() {
                 val u = req.url
                 if (u.host == OFFLINE_HOST) return offlineFile(u.path ?: "")
                 if (u.host != "tvos.invalid") return null
+                if (u.pathSegments.firstOrNull() == "photo") {
+                    // the household's own photos (Home settings), copied in by the file picker
+                    val f = photoFile(u.lastPathSegment ?: "") ?: return null
+                    return WebResourceResponse("image/jpeg", null, f.inputStream()).apply {
+                        responseHeaders = mapOf("Cache-Control" to "max-age=86400")
+                    }
+                }
                 val pkg = u.lastPathSegment ?: return null
                 val isIcon = u.pathSegments.firstOrNull() == "icon"
                 val img = (if (isIcon) iconImage(pkg) else bannerImage(pkg)) ?: return null
@@ -457,6 +464,101 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun kept(key: String): String? = getSharedPreferences("page", MODE_PRIVATE).getString(key, null)
+
+        // Home settings, "Your photos": the TV's own file picker, where it has one. Many Android TV
+        // and Google TV builds ship without one, and then the page offers a web address instead.
+        @JavascriptInterface
+        fun canPickPhotos(): Boolean = pickIntent() != null
+
+        @JavascriptInterface
+        fun pickPhotos(): Boolean {
+            val i = pickIntent() ?: return false
+            main.post {
+                try {
+                    startActivityForResult(i, PICK_PHOTOS)
+                } catch (e: Exception) {
+                    js("window.tv && tv.photosAdded('[]')")
+                }
+            }
+            return true
+        }
+
+        @JavascriptInterface
+        fun removePhoto(name: String) {
+            photoFile(name)?.delete()
+        }
+    }
+
+    // ---------------------------------------------------------------- the household's own photos
+
+    /** Android's "open a document" screen, else any app that hands out pictures. Null: none. */
+    private fun pickIntent(): Intent? {
+        val open = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/jpeg", "image/png", "image/webp"))
+        if (packageManager.resolveActivity(open, 0) != null) return open
+        val get = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        return if (packageManager.resolveActivity(get, 0) != null) get else null
+    }
+
+    private val photoDir get() = java.io.File(filesDir, "photos").apply { mkdirs() }
+
+    /** Only names this app made (letters, numbers, dashes, .jpg), so a page cannot reach other files. */
+    private fun photoFile(name: String): java.io.File? {
+        if (!Regex("[A-Za-z0-9_-]{1,64}\\.jpg").matches(name)) return null
+        return java.io.File(photoDir, name).takeIf { it.isFile }
+    }
+
+    // The framework's own result callback (this app has no AndroidX, so no result API).
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != PICK_PHOTOS) return
+        val uris = mutableListOf<android.net.Uri>()
+        if (resultCode == RESULT_OK && data != null) {
+            data.clipData?.let { c -> for (k in 0 until c.itemCount) uris.add(c.getItemAt(k).uri) }
+            if (uris.isEmpty()) data.data?.let { uris.add(it) }
+        }
+        io.execute {
+            val names = JSONArray()
+            for (u in uris.take(20)) copyPhoto(u)?.let { names.put(it) }
+            main.post { js("window.tv && tv.photosAdded(" + JSONObject.quote(names.toString()) + ")") }
+        }
+    }
+
+    /**
+     * One chosen photo, copied into the app: turned the right way up (the camera's EXIF note) and made
+     * no bigger than it needs to be to fill a 1920x1080 screen, as a JPEG. Returns its file name.
+     */
+    private fun copyPhoto(uri: android.net.Uri): String? {
+        try {
+            val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= 1920 && bounds.outHeight / (sample * 2) >= 1080) sample *= 2
+            val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+            val raw = contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, opts) } ?: return null
+            val turn = try {
+                contentResolver.openInputStream(uri)?.use {
+                    when (android.media.ExifInterface(it).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) {
+                        6 -> 90f; 3 -> 180f; 8 -> 270f; else -> 0f
+                    }
+                } ?: 0f
+            } catch (e: Exception) { 0f }
+            val w = if (turn == 90f || turn == 270f) raw.height else raw.width
+            val h = if (turn == 90f || turn == 270f) raw.width else raw.height
+            val scale = minOf(1f, maxOf(1920f / w, 1080f / h))
+            val m = android.graphics.Matrix().apply { postRotate(turn); postScale(scale, scale) }
+            val bmp = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, m, true)
+            val name = "p" + System.currentTimeMillis().toString(36) + "-" + (1000 + (Math.random() * 9000).toInt()) + ".jpg"
+            java.io.File(photoDir, name).outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+            if (bmp !== raw) bmp.recycle()
+            raw.recycle()
+            return name
+        } catch (e: Exception) {
+            return null   // not a picture, or the drive went away: skipped
+        }
     }
 
     /**
@@ -688,6 +790,7 @@ class MainActivity : Activity() {
         private const val OFFLINE_HOST = "home.tvos.invalid"
         private const val BUNDLED = "www/tv"   // the built-in copy, in the app's assets
         private const val SLOW_MS = 2_500L
+        private const val PICK_PHOTOS = 41
         private const val MATCH_W = ViewGroup.LayoutParams.MATCH_PARENT
         private val MATCH = FrameLayout.LayoutParams(MATCH_W, MATCH_W)
         private val GROUND = Color.parseColor("#0D1E19")

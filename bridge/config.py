@@ -126,6 +126,11 @@ def clean_people(items):
         for flag in ("kid", "guest"):
             if p.get(flag) is True:
                 item[flag] = True
+        # Their profile names inside Netflix, Stan, Disney+ and the rest, best first, for the
+        # "Who's watching?" screen. Without it their own name is tried.
+        names = [" ".join(str(n).split())[:40] for n in p.get("app_profiles") or [] if isinstance(n, str)]
+        if [n for n in names if n]:
+            item["app_profiles"] = [n for n in names if n][:10]
         out.append(item)
         if len(out) >= MAX_PEOPLE:
             break
@@ -146,6 +151,9 @@ PEOPLE = clean_people(CONFIG["people"]) if isinstance(CONFIG.get("people"), list
 _saved = _saved_people()
 if _saved is not None and os.path.exists(PEOPLE_FILE):
     PEOPLE = _saved
+# Profile names to try on a "Who's watching?" screen when none of the watcher's own are there.
+APP_PROFILE_FALLBACK = [" ".join(str(n).split())[:40] for n in CONFIG.get("app_profile_fallback") or []
+                        if isinstance(n, str) and n.strip()][:10]
 # These two lists are changed in place by set_people, so every module that holds them sees edits.
 PEOPLE_IDS = [p["id"] for p in PEOPLE]
 
@@ -195,6 +203,8 @@ def _home(h):
         "scene_seconds": _int(h.get("scene_seconds"), 20, 5, 3600),
         "clock": "24h" if str(h.get("clock")).lower() == "24h" else "12h",
         "dock_size": _int(h.get("dock_size"), DOCK_LIMIT, 1, DOCK_LIMIT),
+        # the TV home's language until someone picks one in Home settings: en, es or es-MX
+        "language": h.get("language") if h.get("language") in ("en", "es", "es-MX") else "en",
     }
 
 

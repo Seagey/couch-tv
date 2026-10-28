@@ -64,6 +64,7 @@ export const api = {
   getPicture: () => call('GET', '/api/picture'),
   people: () => call('GET', '/api/people'),
   savePeople: (people) => call('POST', '/api/people', { people }),
+  settings: () => call('GET', '/api/settings'),   // the TV home's Home settings (its language)
 };
 
 // Live TV state: server-sent events, with a slow poll as the fallback when the stream drops.

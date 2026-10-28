@@ -8,7 +8,14 @@
      macOS asks once for Local Network access the first time it talks to the TV. Say yes.
      launchd starts programs with a bare PATH, so the Claude ask (optional) needs CLAUDE_BIN set
      to where `claude` is (run `command -v claude` to see it). Leave it as it is if you do not use
-     the ask. Never add ANTHROPIC_API_KEY here: the ask runs on your Claude plan. -->
+     the ask. Never add ANTHROPIC_API_KEY here: the ask runs on your Claude plan.
+     Before you bootstrap it, stop any bridge you started by hand (it holds port 5400, and the
+     service then exits 1 with "address already in use"). Check it really started:
+       launchctl print gui/$(id -u)/app.couchtv.bridge | grep -E "state =|last exit"
+     "last exit code = 78: EX_CONFIG" with nothing in the log means launchd could not open the
+     log file, usually because another program (a terminal, an agent) created it first. Delete
+     /tmp/couch-tv-bridge.log, or give the two log paths below a new name, then bootout and
+     bootstrap again. -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>app.couchtv.bridge</string>

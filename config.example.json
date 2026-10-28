@@ -30,7 +30,8 @@
     "scene_seconds": 20,
     "clock": "12h",
     "dock_size": 10,
-    "hide_packages": []
+    "hide_packages": [],
+    "language": "en"
   },
   "phone_remote": true,
   "ask": { "enabled": false },

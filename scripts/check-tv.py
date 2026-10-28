@@ -24,7 +24,7 @@ ADB_PORT = int(os.environ.get("ADB_PORT") or 5555)
 PORTS = {
     6466: "Android TV remote (control)",
     6467: "Android TV remote (pairing)",
-    ADB_PORT: "ADB over the network (Network debugging)",
+    ADB_PORT: "ADB over the network (USB or Network debugging)",
     8009: "Google Cast",
     8001: "Samsung Tizen remote",
     8002: "Samsung Tizen remote (secure)",
@@ -129,7 +129,7 @@ def main():
     adb_open = open_ports[ADB_PORT]
     wireless = None if adb_open else wireless_debugging_port(ip)
     if adb_open:
-        print(f"  ADB: Network debugging is on (port {ADB_PORT}). couch-tv can use it as it is.")
+        print(f"  ADB: open on port {ADB_PORT} (Network debugging, or USB debugging on TVs that open it by itself). couch-tv can use it as it is.")
     elif wireless:
         print(f"  ADB: only Wireless debugging is on (port {wireless}, it changes on restart). couch-tv's")
         print("  scripts need the fixed port: pair once with Android platform-tools (README step 1,")
@@ -139,8 +139,8 @@ def main():
     lg = open_ports[3000] or open_ports[3001]
     facts = adb_facts(ip) if want_adb and adb_open else None
     if want_adb and not adb_open and not wireless:
-        print(f"  ADB is not open on port {ADB_PORT}. Switch on Developer options, then USB debugging and")
-        print("  Network debugging (or Wireless debugging), and try again.")
+        print(f"  ADB is not open on port {ADB_PORT}. Switch on Developer options, then USB debugging, and if the")
+        print("  TV also has a Network debugging (or Wireless debugging) switch, that too. Then try again.")
     if facts:
         if "error" in facts:
             print("  " + facts["error"])

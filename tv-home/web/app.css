@@ -283,6 +283,9 @@ body {
   text-shadow: 0 0.125rem 1.125rem rgba(0, 0, 0, 0.25); transition: opacity 600ms ease-in-out;
 }
 .theme-night .date .wx { color: rgba(255, 255, 255, 0.78); font-weight: 400; }
+.theme-night .date { white-space: nowrap; }
+/* fitDate() in app.js: not enough room between the people switch and the quick buttons */
+.theme-night .date.tight .ww, .theme-night .date.tighter .wx { display: none; }
 /* the date sits just above each scene's clock; it fades out while the scenes swap */
 .theme-night .date.swap { opacity: 0; }
 .scene-night .date { color: rgba(255, 232, 238, 0.92); }
@@ -395,4 +398,113 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .prow.lifted, .theme-night .app.lifted .face { animation: none; }
+}
+
+/* ================= the household's own photos as scenes (Home settings, Your photos) =================
+   No cut-out and no glass copy: the clock's fill is the photo itself, lifted a little so it reads. */
+.s-own .shade { background: linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 45%); }
+.s-own .gclock .fill { filter: brightness(1.4) saturate(1.15); opacity: 0.88; }
+.s-own .gclock .rim { -webkit-text-stroke-color: rgba(255, 255, 255, 0.7); }
+
+/* ================= the gear tile's menu: Home settings or TV settings ================= */
+.gear-pop {
+  display: none; position: fixed; z-index: 15; width: max-content; max-width: 42rem; padding: 0.625rem;
+  border-radius: 2rem; background: rgba(28, 24, 30, 0.74); -webkit-backdrop-filter: blur(1.75rem) saturate(170%); backdrop-filter: blur(1.75rem) saturate(170%);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 220, 230, 0.16), 0 1.5rem 3.75rem rgba(0, 0, 0, 0.45); text-shadow: none;
+}
+.gear-pop.on { display: block; }
+/* the cards step aside while the menu is open, as they do for the move hint */
+.theme-night.gearing .shelf { opacity: 0; }
+.grow {
+  display: flex; align-items: center; gap: 1.25rem; padding: 0.875rem 1.75rem 0.875rem 0.875rem; border-radius: 1.5rem;
+  color: rgba(255, 255, 255, 0.92); transition: transform 200ms var(--ease), background 200ms var(--ease);
+}
+.grow + .grow { margin-top: 0.25rem; }
+.grow i { display: flex; flex: none; align-items: center; justify-content: center; width: 3.5rem; height: 3.5rem; border-radius: 1rem; background: rgba(255, 255, 255, 0.12); }
+.grow svg { width: 2rem; height: 2rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.grow b { display: block; font-size: 1.6875rem; line-height: 2.125rem; font-weight: 620; }
+.grow small { display: block; font-size: 1.1875rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.62); }
+.grow.focus { background: #fff; color: #111; transform: scale(1.04); box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.35); }
+.grow.focus i { background: rgba(0, 0, 0, 0.07); }
+.grow.focus small { color: rgba(0, 0, 0, 0.6); }
+
+/* ================= Home settings: a tvOS style list, sections left, rows right ================= */
+.settings {
+  display: none; position: fixed; inset: 0; z-index: 30; grid-template-columns: 36rem minmax(0, 1fr); column-gap: 4rem;
+  padding: var(--safe-y) var(--safe-x); text-shadow: none;
+  background: rgba(10, 8, 12, 0.8); -webkit-backdrop-filter: blur(2.5rem) saturate(140%); backdrop-filter: blur(2.5rem) saturate(140%);
+}
+.settings.on { display: grid; }
+/* the home underneath stays still while the list is open */
+.setting .tile.focus .face, .setting .tile.focus .face::after { animation: none; }
+.set-side { display: flex; flex-direction: column; min-height: 0; }
+.set-title { margin: 2.25rem 0 2.5rem 1.25rem; font-size: 2.875rem; line-height: 3.75rem; font-weight: 700; letter-spacing: -0.022em; white-space: nowrap; }
+.set-secs { display: flex; flex-direction: column; gap: 0.375rem; }
+.ssec {
+  display: flex; align-items: center; gap: 1.25rem; min-height: 4.75rem; padding: 0.5rem 1.5rem 0.5rem 0.875rem; border-radius: 1.5rem;
+  font-size: 1.75rem; line-height: 2.25rem; font-weight: 600; color: rgba(255, 255, 255, 0.76);
+  transition: transform 200ms var(--ease), background 200ms var(--ease), box-shadow 200ms var(--ease);
+}
+.ssec i { display: flex; flex: none; align-items: center; justify-content: center; width: 3.25rem; height: 3.25rem; border-radius: 1rem; background: rgba(255, 255, 255, 0.1); }
+.ssec svg { width: 1.875rem; height: 1.875rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.ssec.on { background: rgba(255, 255, 255, 0.13); color: #fff; }
+.ssec.focus { background: #fff; color: #111; transform: scale(1.04); box-shadow: 0 1rem 2.25rem rgba(0, 0, 0, 0.45); }
+.ssec.focus i { background: rgba(0, 0, 0, 0.07); }
+
+.set-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.set-crumb { height: 2rem; margin: 0.75rem 0 0 1.75rem; font-size: 1.3125rem; line-height: 2rem; font-weight: 600; color: rgba(255, 255, 255, 0.5); }
+.set-head { margin: 0.25rem 0 1.5rem 1.75rem; font-size: 2.375rem; line-height: 3rem; font-weight: 680; letter-spacing: -0.015em; }
+.set-rows {
+  position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0.5rem;
+  margin: -1rem -1.75rem; padding: 1rem 1.75rem 3rem; overflow: hidden; scroll-behavior: smooth;
+  /* a long list fades out at its edges instead of being cut */
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 1rem, #000 calc(100% - 3rem), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 1rem, #000 calc(100% - 3rem), transparent 100%);
+}
+.srow {
+  flex: none; display: flex; align-items: center; gap: 1.25rem; min-height: 4.75rem; padding: 0.75rem 1.75rem; border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.08); font-size: 1.75rem; line-height: 2.25rem; color: rgba(255, 255, 255, 0.92);
+  transition: transform 200ms var(--ease), background 200ms var(--ease), box-shadow 200ms var(--ease);
+}
+.srow .sl { flex: 1; min-width: 0; }
+.srow .sl b { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.srow .sl small { display: block; margin-top: 0.125rem; font-size: 1.25rem; line-height: 1.625rem; color: rgba(255, 255, 255, 0.6); }
+.srow .sv { flex: none; max-width: 48%; text-align: right; font-weight: 500; color: rgba(255, 255, 255, 0.62); overflow-wrap: anywhere; }
+.srow.focus { background: #fff; color: #111; transform: scale(1.02); box-shadow: 0 1.25rem 2.5rem rgba(0, 0, 0, 0.45); }
+.srow.focus .sl small, .srow.focus .sv { color: rgba(0, 0, 0, 0.6); }
+.srow.k-info { min-height: 0; padding: 0.5rem 1.75rem; background: none; font-size: 1.4375rem; line-height: 1.875rem; color: rgba(255, 255, 255, 0.68); }
+.srow.k-info .sl b { font-weight: 500; }
+.srow.k-info .sl small { font-size: 1.25rem; }
+.srow.danger .sl b { color: #ff7b72; }
+.srow.danger.focus .sl b { color: #c4271b; }
+.srow.lifted { transform: scale(1.04) translateX(0.75rem); box-shadow: 0 1.25rem 2.5rem rgba(0, 0, 0, 0.5); animation: wiggle 0.32s ease-in-out infinite alternate; }
+.shead { flex: none; margin: 1.125rem 0 0.125rem 1.75rem; font-size: 1.25rem; line-height: 1.75rem; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); }
+.shead:first-child { margin-top: 0; }
+.smark { display: flex; flex: none; font-style: normal; }
+.smark svg { width: 1.875rem; height: 1.875rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.smark.dim { opacity: 0.45; }
+.sbox { display: flex; flex: none; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; box-shadow: inset 0 0 0 0.1875rem rgba(255, 255, 255, 0.42); }
+.sbox.on { background: #30d158; box-shadow: none; color: #fff; }
+.sbox svg { width: 1.375rem; height: 1.375rem; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+.srow.focus .sbox:not(.on) { box-shadow: inset 0 0 0 0.1875rem rgba(0, 0, 0, 0.32); }
+.sicon { flex: none; width: 3rem; height: 3rem; border-radius: 0.75rem; object-fit: cover; }
+.sicon.none { display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.14); font-size: 1.375rem; font-weight: 700; }
+.sicon.none svg { width: 1.75rem; height: 1.75rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.srow.focus .sicon.none { background: rgba(0, 0, 0, 0.08); }
+.sthumb { flex: none; width: 5.5rem; height: 3.125rem; border-radius: 0.625rem; object-fit: cover; background: rgba(255, 255, 255, 0.08); }
+.srow .avatar { width: 3rem; height: 3rem; font-size: 1.375rem; }
+/* the text box for a place, a name or a photo's address */
+.set-type { display: none; flex: none; margin: 0 0 1.25rem; padding: 0.875rem 1.75rem 1rem; border-radius: 1.5rem; background: rgba(255, 255, 255, 0.12); box-shadow: inset 0 0 0 0.1875rem #fff; }
+.set-type.on { display: block; }
+.set-type-label { display: block; margin-bottom: 0.25rem; font-size: 1.3125rem; line-height: 1.75rem; font-weight: 600; color: rgba(255, 255, 255, 0.7); }
+.set-type input {
+  width: 100%; padding: 0; border: 0; outline: 0; background: transparent; color: #fff; caret-color: #0a84ff;
+  font: inherit; font-size: 2.25rem; line-height: 3rem; font-weight: 500; user-select: text; -webkit-user-select: text;
+}
+.set-msg { flex: none; min-height: 2rem; margin: 1.5rem 0 0 1.75rem; font-size: 1.4375rem; line-height: 2rem; font-weight: 550; color: #8fd3ff; }
+.set-hint { flex: none; margin: 0.25rem 0 0 1.75rem; font-size: 1.25rem; line-height: 1.75rem; color: rgba(255, 255, 255, 0.5); }
+@media (prefers-reduced-motion: reduce) {
+  .srow, .ssec, .grow { transition: none; }
+  .srow.lifted { animation: none; }
+  .set-rows { scroll-behavior: auto; }
 }

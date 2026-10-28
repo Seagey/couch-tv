@@ -47,12 +47,35 @@
     <div class="shelf-track" id="shelf"></div>
   </section>
 
-  <section class="apps" aria-label="Apps">
+  <section class="apps" id="apps-section" aria-label="Apps">
     <p class="hint" id="hint" aria-live="polite"></p>
     <div class="grid" id="grid"></div>
   </section>
 </main>
 
+<!-- the gear tile's menu (Home settings or TV settings), drawn by app.js -->
+<div class="gear-pop" id="gear-pop" role="menu"></div>
+
+<!-- Home settings: couch-tv's own settings screen, drawn by app.js ("home settings") -->
+<div class="settings" id="settings" role="dialog" aria-modal="true" aria-label="Home settings">
+  <div class="set-side">
+    <h1 class="set-title" id="set-title"></h1>
+    <div class="set-secs" id="set-secs"></div>
+  </div>
+  <div class="set-main">
+    <p class="set-crumb" id="set-crumb"></p>
+    <h2 class="set-head" id="set-head"></h2>
+    <div class="set-type" id="set-type">
+      <label class="set-type-label" id="set-type-label" for="set-input"></label>
+      <input id="set-input" type="text" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="set-rows" id="set-rows"></div>
+    <p class="set-msg" id="set-msg" aria-live="polite"></p>
+    <p class="set-hint" id="set-hint"></p>
+  </div>
+</div>
+
+<script src="i18n.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 </body>

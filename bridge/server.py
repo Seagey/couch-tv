@@ -8,6 +8,8 @@ import json
 import logging
 import mimetypes
 import os
+import re
+import socket
 import time
 from collections.abc import MutableMapping
 from datetime import datetime, timezone
@@ -497,15 +499,17 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
                 method = "deeplink"
         except Exception as e:
             log.warning("deep link failed for %s: %s", app["id"], e)
-        if method and app.get("verify") and tv.can_read_media:
-            started = await wait_until_playing(app["package"])
-            log.info("play %s in %s: %s", best["title"], app["name"],
-                     "playing" if started else "not playing yet")
+        if method and tv.can_read_media:
+            started, picked = await get_it_playing(app, link, who or store.current_who())
+            log.info("play %s in %s: %s%s", best["title"], app["name"],
+                     "playing" if started else "not playing yet", f" (profile {picked})" if picked else "")
             if started:
-                note = f"{best['title']} is playing in {app['name']}."
+                note = f"{best['title']} is playing in {app['name']}" + (f", on {picked}'s profile." if picked else ".")
             else:
-                note = (f"{app['name']} is open, but {best['title']} has not started. If it asks "
-                        "who is watching, pick a profile, then ask again.")
+                note = (f"{app['name']} is open on {best['title']}, but it has not started playing. "
+                        "Press OK on the remote to start it.")
+    if method and tv.kind == "samsung" and app["id"] == "netflix":
+        note = f"Opened {best['title']} in Netflix and pressed Play. If it is not playing, press OK on the remote."
     if method is None and tv.kind == "samsung" and pick.get("tizen"):
         # Samsung's own title link, handed over by the couch-tv app on the TV (samsung.py open_title)
         try:
@@ -535,6 +539,62 @@ async def h_tizen_answer(request):
     if tv.kind == "samsung" and data.get("id"):
         tv.tizen_answer(data["id"], {"ok": bool(data.get("ok")), "error": data.get("error")})
     return ok()
+
+
+# ---------- "Who's watching?" ----------
+WHO_SCREEN = re.compile(r"who.?s watching|who is watching|choose (?:a |your )?profile|select (?:a )?profile", re.I)
+PLAY_BUTTONS = ("play", "watch", "watch now", "resume", "continue watching", "start watching", "play movie",
+                "watch movie", "play episode", "start")
+
+
+def profile_order(who):
+    """Profile names to look for, best first: the watcher's own (people[].app_profiles, else their
+    name), then app_profile_fallback, then everyone else's."""
+    def names(p):
+        return p.get("app_profiles") or [p["name"]]
+    me = next((p for p in config.PEOPLE if p["id"] == who), None)
+    order = (names(me) if me else []) + config.APP_PROFILE_FALLBACK
+    order += [n for p in config.PEOPLE if p is not me for n in names(p)]
+    return list(dict.fromkeys(order))
+
+
+async def get_it_playing(app, link, who):
+    """After a deep link: pass a "Who's watching?" screen with the right profile, open the link
+    again, and press Play if the app stops on the title page. Returns (started, profile)."""
+    pkg = app["package"]
+    # Short waits: a profile screen or a title page never plays by itself, and each screen read
+    # costs 3 to 4 s already (first real run, Stan, 29 Oct: 36 s from ask to playing).
+    if await wait_until_playing(pkg, timeout=1.5):
+        return True, None
+    picked = None
+    for _ in range(2):
+        try:
+            items = await agentic.ui_items()
+        except Exception:
+            break
+        if any(WHO_SCREEN.search(i["label"]) for i in items):
+            names = [i for i in items if i["label"] and not WHO_SCREEN.search(i["label"])]
+            hit = next((i for n in profile_order(who) for i in names
+                        if agentic._norm(i["label"]) == agentic._norm(n)), None)
+            if not hit:
+                log.info("profile screen in %s, none of %s on it", app["name"], profile_order(who))
+                return False, None
+            await tv.adb("shell", f"input tap {hit['x']} {hit['y']}", timeout=8)
+            picked = hit["label"]
+            log.info("profile screen in %s: picked %s", app["name"], picked)
+            await asyncio.sleep(1.2)
+            await tv.start_intent(link, pkg, cold=False)
+            await tv.wait_for_app({pkg}, timeout=8)
+            if await wait_until_playing(pkg, timeout=1.5):
+                return True, picked
+            continue   # read the screen again: now it is the title page
+        button = agentic._button(items, *PLAY_BUTTONS)
+        if button and not agentic.stop_labels([button]):
+            await tv.adb("shell", f"input tap {button['x']} {button['y']}", timeout=8)
+            log.info("pressed %s in %s", button["label"], app["name"])
+            return await wait_until_playing(pkg, timeout=15), picked
+        break
+    return await wait_until_playing(pkg, timeout=6), picked
 
 
 async def wait_until_playing(pkg, timeout=30):
@@ -842,6 +902,18 @@ PLACEHOLDER = """<!doctype html><meta charset=utf-8><meta name=viewport content=
 <h1>{name}</h1><p>Not built yet. The bridge API is live at <a style="color:#8cf" href="/api/now">/api/now</a>.</p>"""
 
 
+def lan_ipv4():
+    """This computer's home network IPv4 (a UDP connect sends nothing, it only picks the route)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.0.2.1", 9))   # a documentation address: never sent, only routed
+        return s.getsockname()[0]
+    except OSError:
+        return ""
+    finally:
+        s.close()
+
+
 def static_handler(folder, name):
     async def handler(request):
         rel = request.match_info.get("path", "")
@@ -858,6 +930,17 @@ def static_handler(folder, name):
                     return web.Response(text=PLACEHOLDER.format(name=name), content_type="text/html")
                 raise web.HTTPNotFound()
             target = index
+        if os.path.basename(target) == "index.html":
+            # Tell the page this computer's number address (the one the phone reached), so a page
+            # opened by the .local name can move to it before the icon is added.
+            sock = request.transport.get_extra_info("sockname") if request.transport else None
+            ip = (sock[0] if sock else "").removeprefix("::ffff:")
+            if ip.count(".") != 3 and not ip.startswith("::1"):
+                ip = lan_ipv4()   # the phone came in over IPv6: hand it the IPv4 instead
+            if ip.count(".") == 3 and not ip.startswith("127."):
+                with open(target, encoding="utf-8") as f:
+                    html = f.read().replace("<head>", '<head>\n  <meta name="lan-ip" content="%s">' % ip, 1)
+                return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
         ctype = mimetypes.guess_type(target)[0] or "application/octet-stream"
         if target.endswith(".webmanifest"):
             ctype = "application/manifest+json"
@@ -1048,6 +1131,100 @@ async def h_app_order_set(request):
     record_action(request, "app-order", {"line": line, "count": len(order)}, True)
     apps, line, saved = effective_order()
     return ok(apps=apps, line=line, saved=saved, dock_max=DOCK_MAX)
+
+
+# ---------- Home settings made on the TV (the gear tile on the home) ----------
+# The TV home keeps its own settings (language, weather place and units, look, scenes, photos,
+# quick buttons, hidden apps) and hands the bridge a copy, so the phone remote and the TV agree and
+# a TV whose storage was cleared gets them back. One file per TV: data/settings.<tv>.json. They win
+# over config.json on that TV (docs/CONFIG.md). The bridge only checks their shape; it does not act
+# on them. Anything it does not know is dropped.
+SETTINGS_MAX = 32 * 1024
+SETTINGS_LANGS = ("en", "es", "es-MX")
+_PHOTO_FILE = re.compile(r"[A-Za-z0-9_-]{1,64}\.jpg")
+_PACKAGE = re.compile(r"[A-Za-z0-9_.:-]{1,200}")
+
+
+def _settings_path():
+    return os.path.join(store.DATA, f"settings.{_current.get()}.json")
+
+
+def home_settings():
+    data = store._read(_settings_path(), None)
+    if isinstance(data, dict) and isinstance(data.get("settings"), dict):
+        return {"settings": data["settings"], "updated": data.get("updated")}
+    return {"settings": {}, "updated": None}
+
+
+def _num(v, lo, hi):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and lo <= v <= hi
+
+
+def _ids(v, limit=40):
+    if not isinstance(v, list):
+        return None
+    return [x for x in dict.fromkeys(v) if isinstance(x, str) and 0 < len(x) <= 40][:limit]
+
+
+def clean_settings(s):
+    """The keys the TV home knows, each in the shape it writes them."""
+    out = {}
+    if s.get("lang") in SETTINGS_LANGS:
+        out["lang"] = s["lang"]
+    p = s.get("place")
+    if isinstance(p, dict) and _num(p.get("lat"), -90, 90) and _num(p.get("lon"), -180, 180):
+        # two decimals is the town, never the house
+        out["place"] = {"name": str(p.get("name") or "")[:80], "lat": round(p["lat"], 2), "lon": round(p["lon"], 2),
+                        "timezone": str(p.get("timezone") or "auto")[:64]}
+    if isinstance(s.get("wx_show"), bool):
+        out["wx_show"] = s["wx_show"]
+    if s.get("wx_unit") in ("c", "f"):
+        out["wx_unit"] = s["wx_unit"]
+    if s.get("wx_every") in (15, 30, 60):
+        out["wx_every"] = s["wx_every"]
+    if s.get("look") in ("night", "classic"):
+        out["look"] = s["look"]
+    for k in ("scene_order", "scenes_off"):
+        ids = _ids(s.get(k))
+        if ids is not None:
+            out[k] = ids
+    if _num(s.get("scene_seconds"), 5, 3600):
+        out["scene_seconds"] = int(s["scene_seconds"])
+    if s.get("clock") in ("12h", "24h"):
+        out["clock"] = s["clock"]
+    if isinstance(s.get("photos"), list):
+        photos = []
+        for ph in s["photos"][:20]:
+            if not isinstance(ph, dict) or not isinstance(ph.get("id"), str) or not 0 < len(ph["id"]) <= 32:
+                continue
+            if isinstance(ph.get("file"), str) and _PHOTO_FILE.fullmatch(ph["file"]):
+                photos.append({"id": ph["id"], "file": ph["file"]})
+            elif isinstance(ph.get("url"), str) and re.match(r"https?://", ph["url"]) and len(ph["url"]) <= 2000:
+                photos.append({"id": ph["id"], "url": ph["url"]})
+        out["photos"] = photos
+    if isinstance(s.get("hidden_apps"), list):
+        out["hidden_apps"] = [x for x in dict.fromkeys(s["hidden_apps"]) if isinstance(x, str) and _PACKAGE.fullmatch(x)][:200]
+    if isinstance(s.get("quick"), list):
+        out["quick"] = [x for x in dict.fromkeys(s["quick"]) if x in config.QUICK_IDS]
+    return out
+
+
+async def h_settings_get(request):
+    return ok(**home_settings())
+
+
+async def h_settings_set(request):
+    data = await body(request)
+    s = data.get("settings")
+    if not isinstance(s, dict):
+        raise ApiError(400, "settings (an object) is required")
+    if len(json.dumps(s)) > SETTINGS_MAX:
+        raise ApiError(413, "settings are too big")
+    cleaned = clean_settings(s)
+    updated = now_iso()
+    store._write(_settings_path(), {"settings": cleaned, "updated": updated})
+    record_action(request, "settings", {"keys": sorted(cleaned)}, True)
+    return ok(settings=cleaned, updated=updated)
 
 
 async def h_sleep_get(request):
@@ -1733,6 +1910,8 @@ def make_app():
     r.add_post("/api/home-apps", h_home_apps)
     r.add_get("/api/app-order", h_app_order_get)
     r.add_post("/api/app-order", h_app_order_set)
+    r.add_get("/api/settings", h_settings_get)
+    r.add_post("/api/settings", h_settings_set)
     r.add_get("/api/continue", h_continue)
     r.add_post("/api/continue/open", h_continue_open)
     r.add_get("/api/sleep", h_sleep_get)

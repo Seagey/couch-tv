@@ -23,6 +23,53 @@ the clock behind your own photo, make a transparent cut-out of everything in fro
 Shown with sample shows and sample people. On your TV, "keep watching" fills from what you
 actually watch.
 
+## Settings on the TV
+
+No computer and no `config.json` needed for the everyday settings. Press down to the dock and
+pick the gear, **Settings** (just before More apps). OK opens a small menu: **Home settings** is
+couch-tv's own list, **TV settings** is Android's own (Wi-Fi, picture, sound).
+
+![Home settings on the TV](docs/screens/home-settings.jpg)
+
+Any remote works: up and down move, right or OK opens a section, OK changes a row, holding OK on a
+scene, an app, a person or a quick button picks it up so up and down move it, and Back steps back
+and then closes. What you change shows when the list closes.
+
+- **Language:** English, Español, Español (México).
+- **Location:** type a town or city with the TV's on-screen keyboard (or the phone remote's Type),
+  pick it from the places found. It sets the weather's place and time zone. The place search is
+  Open-Meteo's, free and with no key.
+- **Weather:** show or hide it, °C or °F, check every 15, 30 or 60 minutes. Open-Meteo is the only
+  weather provider for now.
+- **Look and scenes:** Night scenes or Classic; which scenes take turns, in what order, how many
+  seconds each; a 12 or 24 hour clock; your own photos (below).
+- **Apps:** every app on the TV. OK moves it between home, More apps and hidden; hold OK to change
+  the order. The same order as holding OK on the dock and the phone's Arrange apps.
+- **People:** add, rename, remove and reorder who is watching.
+- **Quick buttons:** which of the sleep timer, picture mode, look and input buttons show, in what
+  order.
+- **About:** the version, the GitHub address (github.com/Seagey/couch-tv), where the settings are
+  kept, and Reset.
+
+**Your own photos.** On a TV with a file picker, **Add photos from a USB drive or this TV** opens it
+and copies the photos you choose into the app (turned the right way up and sized for the screen).
+Many Android TV and Google TV builds have no file picker; then the list says so and you add a photo
+from a web address instead (a JPEG or PNG on the internet, which the TV loads each time). The on-TV
+app (option C) only takes web addresses. Your photos take turns with the scenes and replace the
+Classic look's own. Videos are not supported: a looping video under the glass clock and the
+blurred dock is heavy work for a small TV stick, and the clock's frosted fill is cut from a still
+photo.
+
+**Where they are kept.** On the TV, and with option B on the computer too, so the phone agrees and a
+reset TV gets them back. They win over `config.json` on that TV; About, Reset home settings goes
+back to it. [docs/CONFIG.md](docs/CONFIG.md) has the details.
+
+**Languages.** The TV home and the phone remote both speak English, Spanish (`es`, for Spain and
+everyone else) and Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest).
+The phone has its own choice (TV menu, Language), "Same as the TV" by default. Messages that come
+from the bridge itself (an error, a note about how a show opened) and some screen reader labels on
+the phone are still in English.
+
 ## Three ways to run it
 
 - **A. TV home only.** The new home screen, nothing else. You use your normal TV remote and no
@@ -157,9 +204,12 @@ Do this on the TV itself.
    countdown appears, then "You are now a developer!".
 3. Go back. There is a new menu called **Developer options** (under System, or Device Preferences).
 4. Find **USB debugging** and switch it on.
-5. Look for **Network debugging** (also called ADB over network or ADB debugging). If it is there,
-   switch it on: it uses the fixed port 5555 and everything in this repo works with it as it is.
-   If your TV only has **Wireless debugging**, see the box below.
+5. If there is also a **Network debugging** switch (also called ADB over network or ADB
+   debugging), switch it on too. Some TVs have no such switch: on a TCL with Android TV 11, USB
+   debugging alone opened the network port. Either way, check from the computer:
+   `.venv/bin/python scripts/check-tv.py <tv address>`. If it says ADB is open on port 5555,
+   everything in this repo works as it is. If it says only Wireless debugging is on, see the box
+   below.
 6. Find the TV's address: **Settings, Network and Internet, your Wi-Fi** (or **Settings, Network,
    your Wi-Fi, details**). It looks like four numbers with dots. Give the TV a fixed address in your
    router if you can, so it never changes.
@@ -183,12 +233,21 @@ and press **Allow**. You never see it again.
 > 2. On the computer: `adb pair <tv address>:<pairing port> <code>`.
 > 3. Back on the Wireless debugging screen, note the port under "IP address and port", then
 >    `adb connect <tv address>:<that port>`.
-> 4. `adb tcpip 5555`. Port 5555 is now open and `check-tv.py` should say "Network debugging is on".
+> 4. `adb tcpip 5555`. Port 5555 is now open and `check-tv.py` should say ADB is open on port 5555.
 >
 > On some TVs port 5555 closes again after a restart. Then run steps 2 to 4 again (option B's
 > daily guard and the remote need it open). If your TV keeps a different fixed port open, set
 > `"adb_port"` on that TV in `config.json` (or `ADB_PORT=<port>` for the scripts). The Wireless
 > debugging port itself needs Google's `adb`; couch-tv cannot use it directly.
+
+> **Mac: "allow devices on your local network".** macOS asks once per program before it lets it
+> talk to devices at home. Say **Allow** for Terminal (or the app your AI agent runs in). A program
+> that is new to the Mac, like Google's `adb` straight after downloading it, can be blocked
+> silently: it then cannot reach the TV although everything else can. couch-tv's own tools
+> (`tv-home/tools/tvadb.py`, `on-tv/scripts/real-tv.py`, `check-tv.py`) are plain Python and run
+> inside the Python you have already allowed, so use them for everything except the one-off
+> Wireless debugging pairing above. If `adb` is blocked: System Settings, Privacy and Security,
+> Local Network, and switch on the app it runs in.
 
 ### Step 2. Get the code and set up Python (every option)
 
@@ -280,8 +339,8 @@ Get `couch-tv-home.apk` from the GitHub Releases page (or build it, below). Look
 TV_IP=<your tv address> .venv/bin/python tv-home/tools/survey-tv.py
 ```
 
-If it prints a **WARNING** about the setup wizard owning the Wi-Fi, read "If something is stuck" in
-[docs/UNINSTALL.md](docs/UNINSTALL.md) first, and consider `KEEP_SETUP=1` below.
+It also reminds you that switching the setup wizard off makes some TVs forget their Wi-Fi. Nothing
+can tell in advance which TVs, so plan for it on any TV: have the TV remote ready.
 
 Then install it. **Option A** (no computer stays on):
 
@@ -301,8 +360,12 @@ screens are left alone; the TV's default home is set to couch-tv instead. Nothin
 It also hands the app your `config.json` settings (people, weather, clock, look, quick buttons)
 for its built-in copy. **Read the Undo section before you run it.**
 
-- `KEEP_SETUP=1` leaves the setup wizard on. Use it if the survey warned about the Wi-Fi. On some
-  TVs the wizard then keeps winning the Home button; if it does, the wizard has to go off.
+The setup wizard goes off last, after everything else is done. If the TV then forgets its Wi-Fi,
+`apply.sh` says so: join the Wi-Fi again at the TV (Settings, Network and Internet) and run the
+same command again. It is safe to run as often as you like.
+
+- `KEEP_SETUP=1` leaves the setup wizard on, so the Wi-Fi is never at risk. On some TVs the
+  wizard then keeps winning the Home button; if it does, the wizard has to go off.
 - **A Google TV update can switch the Google home back on.** With option B the bridge checks once
   a day and switches it off again. With option A there is no bridge: run `apply.sh` again after an
   update (and after you change `config.json`).
@@ -312,7 +375,12 @@ for its built-in copy. **Read the Undo section before you run it.**
 You need **JDK 21** and the **Android SDK** with platform 34 and build tools 34. Gradle is not
 needed: `tv-home/android/gradlew` fetches Gradle 8.11.1 by itself.
 
-1. JDK 21: macOS `brew install --cask temurin@21`, Linux `sudo apt install openjdk-21-jdk`.
+1. JDK 21. The simplest way, with no password needed: download the Temurin 21 JDK `.tar.gz`
+   for your computer from [adoptium.net](https://adoptium.net/temurin/releases/?version=21), unpack
+   it into a folder you own (for example `couch-tv/build/jdk`, which git ignores) and point
+   `JAVA_HOME` at it (on macOS the `Contents/Home` folder inside). Or install it system-wide:
+   macOS `brew install --cask temurin@21` (asks for your password), Linux
+   `sudo apt install openjdk-21-jdk`.
 2. The Android SDK command line tools: download "Command line tools only" from
    [developer.android.com/studio](https://developer.android.com/studio), unzip into
    `~/Library/Android/sdk/cmdline-tools/latest` (macOS) or `~/Android/Sdk/cmdline-tools/latest`
@@ -327,7 +395,9 @@ needed: `tv-home/android/gradlew` fetches Gradle 8.11.1 by itself.
    JAVA_HOME=/path/to/jdk-21 ANDROID_HOME=/path/to/android-sdk sh scripts/build-apk.sh
    ```
    It prints where the APKs are (`dist/couch-tv-home.apk`, plus `dist/couch-tv-ontv.apk` for
-   option C when `on-tv/` is there). Pass `APK=dist/couch-tv-home.apk` to `apply.sh`.
+   option C). The on-TV app carries the phone remote inside it, so for that one the script builds
+   `remote/` first, which needs **Node 20 or newer**. `apply.sh` finds `dist/couch-tv-home.apk`
+   by itself.
 
 The release APK is signed with your local debug key, which is fine for your own TV. The built-in
 copy uses `config.example.json` unless you pass `CONFIG=config.json`; `apply.sh` hands the TV your
@@ -399,6 +469,7 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
 - A Google TV update can switch the Google home back on. Option B's bridge checks once a day and
   switches it off again; with option A, run `apply.sh` again.
 - Some apps will not open a show directly. They open the app instead. See `bridge/DEEPLINKS.md`.
+- The bridge's own messages (errors, notes) are in English in every language.
 - No support promise. It works on the TVs it was built on. Your TV may differ.
 
 ## Credits

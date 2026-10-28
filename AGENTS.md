@@ -31,12 +31,32 @@ The README's steps are numbered 1 to 6. Option A uses steps 1, 2 and 6. Option B
    python.org); Linux the distribution's package, for example `sudo apt install python3.11
    python3.11-venv`. On a Mac the first `python3` or `git` may pop up "install the command line
    developer tools": tell them to press Install and wait a few minutes. That is normal.
-2. Note what else the computer has: macOS or Linux, Node 20+ (option B), and only if they will
-   build the TV app themselves, JDK 21 and the Android SDK (platform 34). Most people should
-   **download `couch-tv-home.apk` from the GitHub Releases page** instead of building it. Building
-   is in the README ("Building the app"); `scripts/build-apk.sh` does it.
-3. Windows is not supported for the bridge (option B); it can still install the app if Python is
+2. **Get the TV apps from the Releases page first.** Download `couch-tv-home.apk` (options A
+   and B) and `couch-tv-ontv.apk` (option C) from
+   [the GitHub Releases page](https://github.com/Seagey/couch-tv/releases) into `dist/` (git
+   ignores it), for example `curl -fL -o dist/couch-tv-home.apk
+   https://github.com/Seagey/couch-tv/releases/latest/download/couch-tv-home.apk`. Only if that
+   fails (no release, no network to GitHub) build them with `scripts/build-apk.sh` (README,
+   "Building the app").
+3. Note what else the computer has: macOS or Linux, and Node 20+ (option B, and a build of the
+   option C app). A build also needs JDK 21 and the Android SDK (platform 34), installed only
+   after the yes (step 3). If a JDK is needed, do **not** use `brew install --cask temurin@21` or `sudo`: they ask for a password the agent
+   cannot type. Download the Temurin 21 `.tar.gz` from Adoptium
+   (`https://api.adoptium.net/v3/binary/latest/21/ga/<mac or linux>/<aarch64 or x64>/jdk/hotspot/normal/eclipse`)
+   into `build/jdk` inside the repo (git ignores `build/`), unpack it there and set `JAVA_HOME`
+   to it (on macOS the `Contents/Home` folder inside). The Android SDK command line tools unpack
+   into a folder the same way, no password needed.
+4. Windows is not supported for the bridge (option B); it can still install the app if Python is
    there.
+5. **Mac: Local Network permission.** macOS asks once per program before it may talk to devices
+   at home ("allow ... to find devices on your local network"). Tell them to say **Allow** for
+   Terminal or for the app you run in. A program new to the Mac, such as Google's `adb` just
+   downloaded, can be blocked without any prompt, and then cannot reach the TV although Python
+   can. So use the repo's pure-Python tools for everything (`tv-home/tools/tvadb.py`,
+   `on-tv/scripts/real-tv.py`, `scripts/check-tv.py`): they run inside the Python that is already
+   allowed. Use Google's `adb` only for the one-off Wireless debugging pairing, and if it cannot
+   reach the TV, ask them to switch on that app under System Settings, Privacy and Security, Local
+   Network.
 
 ## 1. Find the TV
 
@@ -69,9 +89,9 @@ If nothing Android is found, or they are not sure what they have:
   - **LG:** Settings, Network (or All Settings, General, Network), Wi-Fi Connection, the connected
     network, Advanced Wi-Fi Settings, the IP address.
   - **Google TV or Android TV:** Settings, Network and Internet, the Wi-Fi network.
-- Ask them to open **Settings, System, About** (Google TV) or **Settings, Device Preferences,
-  About** (Android TV 9 to 11) and read you the model and the "Android TV OS" line. No such line
-  usually means it is not Android.
+- Ask them to open **Settings, Device Preferences, About** (older Android TV) or **Settings,
+  System, About** (Google TV) and read you the model and the "Android TV OS" line. Until you know
+  which they have, give both. No such line usually means it is not Android.
 - Common reasons a Google TV is not found: TV asleep, TV or computer on a guest Wi-Fi, the router
   keeps devices apart ("client isolation"), or macOS's Local Network permission was refused
   (System Settings, Privacy and Security, Local Network). Phone, TV and computer must all be on the
@@ -135,6 +155,10 @@ recommend C (A if they only want the home screen). Write the choice down; the re
   One person: no switcher. Two: a switch at the top left. Three or more: a round head icon at the
   top left that opens a list.
 - "What order should the names go in?" (They can change it later from the phone or the TV remote.)
+- Option B: "When Netflix, Stan or another app asks who's watching, which profile is yours?" Ask
+  each person for every name they use across their apps (it is often different per app), and which
+  profile to fall back on if theirs is not there. They go in `app_profiles` and
+  `app_profile_fallback` ([docs/CONFIG.md](docs/CONFIG.md), People).
 - "Any kids or guest profiles?" Mark them in `config.json` with `"kid": true` or `"guest": true`.
   Option B: they are left out of the household's taste, so the shared picks are not full of
   cartoons or a visitor's shows. They still have their own row. Imported Netflix Kids profiles are
@@ -207,7 +231,8 @@ Before you touch the TV, say back, in one short list: the TV, the option, the pe
 the apps first in line, the quick settings, and what will be switched off on the TV. Then explain
 exactly what changes:
 
-- Developer options and USB debugging go on (README step 1), plus Network debugging. The TV asks
+- Developer options and USB debugging go on (README step 1), plus Network debugging if the TV
+  has that switch (many do not: on some, USB debugging alone opens the network port). The TV asks
   "Allow USB debugging?" once per computer. They tick Always allow.
 - If `check-tv.py` said the TV only has Wireless debugging: you will pair once with Google's
   platform-tools and run `adb tcpip 5555` (README step 1, "Only Wireless debugging?"). On some TVs
@@ -216,29 +241,41 @@ exactly what changes:
   setup wizard and any ad tracker you agree to. Nothing is deleted. Other makers' own homes are
   left alone. Warn them:
   - Some Google Home features and the YouTube button on the remote may stop working.
-  - On some TVs, switching the setup wizard off made the TV forget its Wi-Fi. If that happens,
-    they re-join the Wi-Fi at the TV. Have the TV remote ready.
+  - On some TVs, switching the setup wizard off makes the TV forget its Wi-Fi. **Nothing can
+    tell in advance which TVs**: it happened on a TCL where `survey-tv.py` saw nothing risky, so
+    say it may happen on theirs. `apply.sh` does everything else first and switches the wizard off
+    last. If the TV drops off the Wi-Fi, `apply.sh` says so: they re-join the Wi-Fi at the TV
+    (Settings, Network and Internet) and you run `apply.sh` again (it is safe to repeat). Have the
+    TV remote ready. `KEEP_SETUP=1` leaves the wizard on if they would rather not risk it.
   - Option A: after a Google TV update brings the Google home back, `apply.sh` has to run again.
     Option B's bridge does that check every day.
-- **If `survey-tv.py` printed its Wi-Fi WARNING** (the setup wizard owns the saved Wi-Fi): tell
-  them before they say yes that switching the wizard off may drop the TV off the Wi-Fi, and then
-  the computer undo cannot reach the TV; the fix is the TV-remote route in
-  [docs/UNINSTALL.md](docs/UNINSTALL.md). Recommend leaving the wizard on (`KEEP_SETUP=1`) if they
-  prefer, and say that on some TVs the Google home then keeps the Home button. You can run
-  `survey-tv.py` only after the yes (it uses ADB), so if the warning appears then, stop and ask
-  again before `apply.sh`.
+- While the TV is off the Wi-Fi the computer undo cannot reach it either; the fix is to re-join
+  the Wi-Fi, or the TV-remote route in [docs/UNINSTALL.md](docs/UNINSTALL.md). With
+  `KEEP_SETUP=1`, on some TVs the old home then keeps the Home button.
 - Show them the undo ([docs/UNINSTALL.md](docs/UNINSTALL.md)) before you start.
 
 Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
 
 ## 4. Set it up, then check it
 
-1. Install what was missing in step 0 (say what you are installing). Prefer the release APK
-   (`couch-tv-home.apk` from the GitHub Releases page) over building.
+1. Install what was missing in step 0 (say what you are installing). Use the release APKs you
+   downloaded into `dist/` in step 0; build only if that download failed.
 2. Write `config.json` from their answers. Never commit it.
-3. Developer options on (README step 1). Then, while they stand at the TV, run
+3. Developer options on (README step 1). Tell them: switch on **USB debugging**; if there is
+   also a **Network debugging** (or Wireless debugging) switch, switch that on too. Do not insist
+   on Network debugging: some TVs have no such switch and USB debugging alone opens port 5555 (a
+   TCL with Android TV 11 did). Then check with `.venv/bin/python scripts/check-tv.py <tv address>`
+   whether ADB answers on 5555. Then, while they stand at the TV, run
    `.venv/bin/python scripts/check-tv.py <tv address> --adb` and have them tick **Always allow**
    and press Allow. Now settle B or C from its Android version.
+   **Use the Android version from `--adb` to pick your words from now on:**
+   - **Android TV 9, 10 or 11** (an Android TV, not Google TV): menus are **Settings, Device
+     Preferences, About** and **Settings, Device Preferences, Developer options**.
+   - **Google TV, Android 12 or newer:** **Settings, System, About** and **Settings, System,
+     Developer options**.
+   - Say "Google TV home" only if the home it reports is `com.google.android.apps.tv.launcherx`.
+     Otherwise (for example `com.google.android.tvlauncher`, or a maker's own home) call it **the
+     TV's own home screen**.
 4. **Allow every computer and app before `apply.sh`.** Seen on one Google TV (Android 14): once the
    Google TV home and the setup app were switched off, the TV stopped showing "Allow USB
    debugging?" for any new key; computers allowed before kept working. So, before step 5, make
@@ -246,12 +283,22 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
    app's **Connect ADB** has been allowed.
 5. Follow the README for their option (A: steps 1, 2 and 6; B: steps 1 to 6;
    C: [on-tv/README.md](on-tv/README.md)). Run `tv-home/tools/survey-tv.py` before `apply.sh`.
-   Option A: run `apply.sh` with no `BRIDGE_URL`. Option B: with `BRIDGE_URL`.
+   Option A: run `apply.sh` with no `BRIDGE_URL`. Option B: with `BRIDGE_URL`. It copies the app
+   with `tvadb.py`, which falls back to a slower copy by itself if the TV stalls; let it finish.
+   If it ends with "this computer can no longer reach it", the TV forgot its Wi-Fi: ask them to
+   re-join it at the TV, then run the same `apply.sh` command again.
    - **Pairing (option B, README step 3):** you cannot type into `pair_tv.py`. Run
      `.venv/bin/python bridge/pair_tv.py <tv id>` in the background, ask them to read you the code
      on the TV, then run `.venv/bin/python bridge/pair_tv.py <tv id> --code <code>`. It prints
      `ok: ... is paired` and exits 0, or says the TV refused the code (then start again: each
      pairing shows a fresh code).
+   - **Keeping the bridge running (option B, README step 5):** if you started the bridge by hand to
+     test it, stop it before installing the service (it holds the port), and never point your
+     hand-started copy's output at the service's log file. After `launchctl bootstrap`, check
+     `launchctl print gui/$(id -u)/app.couchtv.bridge` says `state = running`. Exit code 78
+     (EX_CONFIG) with an empty log means launchd could not open a log file another program made:
+     delete it or rename the log paths, then bootout and bootstrap again
+     (`bridge/examples/couch-tv-bridge.plist.example`). Seen on a real Mac.
 6. Check, with them watching the TV: press Home (the new home shows), open two apps, the sleep
    timer, the profile switch, and for B and C one press on the phone remote.
 7. Hand over in plain words: how to rearrange apps (phone, or hold OK on the TV), how to add apps

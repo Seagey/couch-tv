@@ -320,6 +320,9 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
 .more-block h3 { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--ink-2); margin-bottom: 10px; }
 .chips-row { display: flex; gap: 6px; }
 .chips-row .chip { flex: 1; min-width: 0; padding: 0; font-size: 14px; font-variant-numeric: tabular-nums; }
+/* the phone's language: longer names, so they wrap onto a second row instead of squeezing */
+.chips-row.chips-wrap { flex-wrap: wrap; }
+.chips-row.chips-wrap .chip { flex: 1 1 auto; padding: 0 14px; white-space: nowrap; }
 .note { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
 .more-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 6px; }
 .tile { height: 76px; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-weight: 600; font-size: 14px; }

@@ -26,6 +26,7 @@ export const More = (p) => <I {...p}><circle cx="5.5" cy="12" r="1.2" fill="curr
 export const Remote = (p) => <I {...p}><rect x="6" y="2.5" width="12" height="19" rx="5" /><circle cx="12" cy="8.5" r="2.5" /><path d="M12 15v2" /></I>;
 export const Grid = (p) => <I {...p}><rect x="3.5" y="3.5" width="7" height="7" rx="2" /><rect x="13.5" y="3.5" width="7" height="7" rx="2" /><rect x="3.5" y="13.5" width="7" height="7" rx="2" /><rect x="13.5" y="13.5" width="7" height="7" rx="2" /></I>;
 export const Moon = (p) => <I d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" {...p} />;
+export const Globe = (p) => <I {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.8 2.6 4 5.6 4 9s-1.2 6.4-4 9c-2.8-2.6-4-5.6-4-9s1.2-6.4 4-9z" /></I>;
 export const Keyboard = (p) => <I {...p}><rect x="2.5" y="6" width="19" height="12" rx="3" /><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7.5 14h9" /></I>;
 export const Captions = (p) => <I {...p}><rect x="2.5" y="5" width="19" height="14" rx="3" /><path d="M10 10.2a2.4 2.4 0 1 0 0 3.6M17 10.2a2.4 2.4 0 1 0 0 3.6" /></I>;
 export const Input = (p) => <I {...p}><rect x="2.5" y="4" width="19" height="13" rx="2.5" /><path d="M8 21h8M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5" /></I>;

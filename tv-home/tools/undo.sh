@@ -1,7 +1,8 @@
 #!/bin/sh
 # Puts a TV's own home screen back (see docs/UNINSTALL.md). Switches back on exactly what apply.sh
 # switched off on that TV (tv-home/tvs/<TV_NAME>.disabled), then makes the home the TV had before
-# (tv-home/tvs/<TV_NAME>.home, else Google TV) the home again. Stops on the first ADB failure.
+# (tv-home/tvs/<TV_NAME>.home, else Google TV) the home again. Stops on the first ADB failure
+# (each ADB call already reconnects and retries, see tvadb.py).
 #
 # Option B: stop the bridge first (docs/UNINSTALL.md). This empties its keep-off list as well.
 #
@@ -50,6 +51,7 @@ if [ -n "$HOME_ACT" ]; then
 else
   echo "No Google home on this TV and no saved home: the TV will ask which home to use."
 fi
-"$PY" "$T" keys HOME
-NOW=$("$PY" "$T" shell "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME")
+# The rest only shows the result, so a TV that stops answering here does not fail the undo.
+"$PY" "$T" keys HOME || echo "(could not press Home: press it on the remote)"
+NOW=$("$PY" "$T" shell "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME" || true)
 echo "home screen now: $(echo "$NOW" | tail -1)"

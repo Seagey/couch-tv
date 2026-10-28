@@ -4,6 +4,7 @@ import { usePushUp } from './gestures.js';
 import { tick } from './haptics.js';
 import { api } from './api.js';
 import { logoFor } from './appLogos.js';
+import { t, LANGS, choice, setChoice, locale } from './i18n.js';
 
 export const Sheet = forwardRef(function Sheet({ open, onClose, title, children, className = '', fromTop = false, closeDrag, extra = null }, ref) {
   return (
@@ -15,7 +16,7 @@ export const Sheet = forwardRef(function Sheet({ open, onClose, title, children,
         <header className="sheet-head">
           <h2>{title}</h2>
           {extra}
-          <button className="round glass small" aria-label="Close" onClick={onClose}><Ic.Close size={18} /></button>
+          <button className="round glass small" aria-label={t('close')} onClick={onClose}><Ic.Close size={18} /></button>
         </header>
         {children}
         {fromTop && <div className="grabber-zone" {...closeDrag}><div className="grabber" /></div>}
@@ -42,7 +43,7 @@ const loadThread = () => {
   } catch { return []; }
 };
 const saveThread = (items) => { try { sessionStorage.setItem(THREAD_KEY, JSON.stringify({ at: Date.now(), items })); } catch { /* private mode */ } };
-const friendly = (msg) => (msg === 'Can’t reach the bridge' ? 'Can’t reach the TV. Is your phone on the home Wi-Fi?' : msg);
+const friendly = (msg) => (msg === 'Can’t reach the bridge' ? t('cant_reach_wifi') : msg);
 
 export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAsk, onDone }, inputRef) {
   const [text, setText] = useState('');
@@ -111,7 +112,7 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
       // only on the X, the scrim, Escape or Back; the answer stays in the thread.
       if (c === chat.current) tick();
     } catch (e) {
-      reply = { text: friendly(e.message), err: true, options: [{ label: 'Try again', text: ask }] };
+      reply = { text: friendly(e.message), err: true, options: [{ label: t('try_again'), text: ask }] };
     }
     if (c !== chat.current) return;
     lastAt.current = Date.now();
@@ -144,7 +145,7 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
     tick();
     if (listening) { rec.current?.stop(); return; }
     const r = new Speech();
-    r.lang = 'en-AU'; r.interimResults = true; r.maxAlternatives = 1;
+    r.lang = locale(); r.interimResults = true; r.maxAlternatives = 1;
     r.onresult = (e) => { const t = Array.from(e.results).map((x) => x[0].transcript).join(''); setText(t); if (e.results[e.results.length - 1].isFinal) { r.stop(); submit(t); } };
     r.onend = () => setListening(false);
     r.onerror = () => setListening(false);
@@ -153,17 +154,17 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
 
   const first = recs?.continue?.[0]?.title;
   const ideas = [
-    first ? `Keep watching ${first}` : 'Put on Bluey',
-    'Recommend something for tonight',
-    'Something funny, under an hour',
-    'What’s new on Stan?',
+    first ? t('idea_keep', { title: first }) : t('idea_bluey'),
+    t('idea_tonight'),
+    t('idea_funny'),
+    t('idea_new'),
   ];
   const last = thread[thread.length - 1];
   const chips = last && !last.me && !last.pending ? last.options || [] : [];
 
   return (
-    <Sheet open={open} onClose={onClose} title="Ask for a show" className="ask-sheet"
-      extra={thread.length > 0 && <button type="button" className="pill glass new-chat" onClick={newChat}>New chat</button>}>
+    <Sheet open={open} onClose={onClose} title={t('ask_for_show')} className="ask-sheet"
+      extra={thread.length > 0 && <button type="button" className="pill glass new-chat" onClick={newChat}>{t('new_chat')}</button>}>
       {thread.length > 0 ? (
         <div className="thread" ref={list} role="log" aria-live="polite" aria-label="Conversation with Claude">
           {thread.map((m) => (m.me ? (
@@ -172,11 +173,11 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
             <div key={m.id} className="bubble claude pending" role="status">
               <span className="sr-only">Claude is working on it.</span>
               <span className="dots" aria-hidden="true"><i /><i /><i /></span>
-              <small>Claude is finding it{secs > 3 ? ` · ${secs}s` : ''}. Usually 5 to 20 seconds.</small>
+              <small>{t('finding')}{secs > 3 ? ` · ${secs}s` : ''}. {t('usually')}</small>
             </div>
           ) : (
             <p key={m.id} className={`bubble claude ${m.err ? 'err' : ''}`}><span className="sr-only">Claude: </span>{m.text}
-              {m.still && <small>It carries on by itself. Watch the TV.</small>}</p>
+              {m.still && <small>{t('carries_on')}</small>}</p>
           )))}
           {chips.length > 0 && (
             <div className="replies" aria-label="Quick replies">
@@ -193,7 +194,7 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
       )}
       <form className="ask-field glass" onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <input ref={inputRef} value={text} onChange={onType} onKeyDown={onKey} enterKeyHint="send"
-          placeholder={thread.length ? 'Reply…' : 'Put on…'} aria-label={thread.length ? 'Reply to Claude' : 'What do you want to watch?'} autoComplete="off" autoCorrect="on" />
+          placeholder={thread.length ? t('reply') : t('put_on')} aria-label={thread.length ? 'Reply to Claude' : 'What do you want to watch?'} autoComplete="off" autoCorrect="on" />
         {canListen && <button type="button" className={`round glass ask-mic ${listening ? 'listening' : ''}`} aria-label={listening ? 'Stop listening' : 'Speak'}
           onPointerDown={(e) => e.preventDefault()} onClick={listen}><Ic.Mic size={20} /></button>}
         <button type="submit" className="round solid ask-send" aria-label="Send" disabled={!text.trim() || busy}
@@ -203,12 +204,12 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
         <button type="button" className="autosend" aria-live="polite" onPointerDown={(e) => e.preventDefault()}
           onClick={() => { tick(); burst.current = false; cancelAuto(); }}>
           <span className="autosend-bar" key={text} />
-          <span>Sending in {countdown} s</span><b>Keep editing</b>
+          <span>{t('sending_in', { n: countdown })}</span><b>{t('keep_editing')}</b>
         </button>
       )}
       {!canListen && countdown === 0 && thread.length === 0 && (
         <p className="tip talk-tip"><span className="talk-mic"><Ic.Mic size={18} /></span>
-          <span><b>Tap the mic on your keyboard and speak.</b> It sends by itself when you stop.</span></p>
+          <span><b>{t('talk_tip')}</b> {t('talk_tip_more')}</span></p>
       )}
     </Sheet>
   );
@@ -245,8 +246,8 @@ export function ArrangeSheet({ open, onClose, tvName }) {
     if (at > max) {   // the dock is full: the line moves up to just under the last dock app
       r = r.filter((p) => p !== LINE); r.splice(max, 0, LINE); at = max;
       setRows(r);
-      setMsg(`The dock holds ${max} apps, so the ones under it moved behind More apps.`);
-    } else setMsg('Saved. Press Home on the TV to see it.');
+      setMsg(t('dock_full', { max }));
+    } else setMsg(t('saved_home'));
     api.saveAppOrder(r.filter((p) => p !== LINE), at).catch((e) => setMsg(e.message));
   };
 
@@ -273,14 +274,14 @@ export function ArrangeSheet({ open, onClose, tvName }) {
   const end = () => { if (drag) { setDrag(null); save(rows); } };
 
   return (
-    <Sheet ref={sheet} open={open} onClose={onClose} title="Arrange apps" className="arrange-sheet">
-      <p className="note arrange-lede">{tvName ? `${tvName}. ` : ''}Drag an app by its handle. Apps above the line are in the TV's dock (up to {max}); the rest are behind More apps. Settings is always last.</p>
-      {rows === null && <p className="note">Loading the TV's apps…</p>}
-      {rows && rows.length === 0 && !msg && <p className="note">This TV has not told the bridge its apps yet. Press Home on the TV, then open this again.</p>}
+    <Sheet ref={sheet} open={open} onClose={onClose} title={t('arrange_apps')} className="arrange-sheet">
+      <p className="note arrange-lede">{tvName ? `${tvName}. ` : ''}{t('arrange_lede', { max })}</p>
+      {rows === null && <p className="note">{t('loading_apps')}</p>}
+      {rows && rows.length === 0 && !msg && <p className="note">{t('no_apps_yet')}</p>}
       <ol className="arrange" ref={list} onPointerMove={move} onPointerUp={end} onPointerCancel={end}>
         {(rows || []).map((p, i) => p === LINE ? (
           <li key={LINE} className={`arrange-line ${drag === LINE ? 'lifted' : ''}`}>
-            <span>More apps</span>
+            <span>{t('more_apps')}</span>
             <button className="grip" aria-label="Move the More apps line" onPointerDown={(e) => start(e, LINE)}><Ic.Grip size={20} /></button>
           </li>
         ) : (
@@ -324,7 +325,7 @@ export function PeopleSheet({ open, onClose, onSaved }) {
   const save = (next, done) => {
     // someone new has no id until the bridge gives one, so they show once it answers
     if (next.every((p) => p.id)) setRows(next);
-    api.savePeople(next).then((d) => { setRows(d.people); onSaved?.(d.people); setMsg(done || 'Saved. Press Home on the TV to see it.'); })
+    api.savePeople(next).then((d) => { setRows(d.people); onSaved?.(d.people); setMsg(done || t('saved_home')); })
       .catch((e) => setMsg(e.message));
   };
   const rename = (id, name) => {
@@ -333,13 +334,13 @@ export function PeopleSheet({ open, onClose, onSaved }) {
     if (!clean || !was || clean === was.name) { setRows(rows.slice()); return; }
     save(rows.map((p) => (p.id === id ? { ...p, name: clean } : p)));
   };
-  const remove = (p) => { tick(); save(rows.filter((x) => x.id !== p.id), `Removed ${p.name}. Their watch history stays on the bridge.`); };
+  const remove = (p) => { tick(); save(rows.filter((x) => x.id !== p.id), t('removed', { name: p.name })); };
   const add = (e) => {
     e.preventDefault();
     const name = adding.replace(/\s+/g, ' ').trim();
     if (!name) return;
     tick(); setAdding('');
-    save([...(rows || []), { name }], `Added ${name}.`);
+    save([...(rows || []), { name }], t('added', { name }));
   };
 
   const start = (e, id) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); tick(); setDrag(id); };
@@ -355,10 +356,10 @@ export function PeopleSheet({ open, onClose, onSaved }) {
   const end = () => { if (drag) { setDrag(null); save(rows); } };
 
   return (
-    <Sheet ref={sheet} open={open} onClose={onClose} title="People" className="arrange-sheet people-sheet">
-      <p className="note arrange-lede">In the order the TV shows them. Drag the handle to move someone, tap a name to change it.</p>
-      {rows === null && <p className="note">Loading…</p>}
-      {rows && rows.length === 0 && <p className="note">Nobody yet. The TV shows everything until you add someone.</p>}
+    <Sheet ref={sheet} open={open} onClose={onClose} title={t('people')} className="arrange-sheet people-sheet">
+      <p className="note arrange-lede">{t('people_lede')}</p>
+      {rows === null && <p className="note">{t('loading')}</p>}
+      {rows && rows.length === 0 && <p className="note">{t('nobody')}</p>}
       <ol className="arrange" ref={list} onPointerMove={move} onPointerUp={end} onPointerCancel={end}>
         {(rows || []).map((p) => (
           <li key={p.id} className={`arrange-row glass ${drag === p.id ? 'lifted' : ''}`}>
@@ -373,7 +374,7 @@ export function PeopleSheet({ open, onClose, onSaved }) {
       </ol>
       {rows && rows.length < 12 && (
         <form className="ask-field glass person-add" onSubmit={add}>
-          <input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="Add a person" maxLength={40} enterKeyHint="done" aria-label="New person's name" />
+          <input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder={t('add_person')} maxLength={40} enterKeyHint="done" aria-label="New person's name" />
           <button type="submit" className="round solid small" aria-label="Add" disabled={!adding.trim()}><Ic.Plus size={18} /></button>
         </form>
       )}
@@ -390,23 +391,23 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
   const endsAt = sleepEnds ? new Date(sleepEnds) : null;
   const left = endsAt ? Math.max(0, Math.round((endsAt - Date.now()) / 60000)) : 0;
   return (
-    <Sheet ref={setRefs} open={open} onClose={onClose} title="TV" fromTop closeDrag={closeDrag} className="more-sheet">
+    <Sheet ref={setRefs} open={open} onClose={onClose} title={t('tv')} fromTop closeDrag={closeDrag} className="more-sheet">
       {tvs?.length > 1 && (
         <section className="more-block first">
-          <h3><Ic.Screen size={16} /> Which TV</h3>
-          <div className="chips-row" role="radiogroup" aria-label="Which TV">
-            {tvs.map((t) => (
-              <button key={t.id} role="radio" aria-checked={t.id === tvId} className={`chip glass ${t.id === tvId ? 'on' : ''}`} onClick={() => onTv(t.id)}>
-                {t.name}{t.paired === false ? ' (not set up)' : ''}
+          <h3><Ic.Screen size={16} /> {t('which_tv')}</h3>
+          <div className="chips-row" role="radiogroup" aria-label={t('which_tv')}>
+            {tvs.map((tv) => (
+              <button key={tv.id} role="radio" aria-checked={tv.id === tvId} className={`chip glass ${tv.id === tvId ? 'on' : ''}`} onClick={() => onTv(tv.id)}>
+                {tv.name}{tv.paired === false ? t('not_set_up_short') : ''}
               </button>
             ))}
           </div>
         </section>
       )}
 
-      {tvs?.find((t) => t.id === tvId)?.picture && (
+      {tvs?.find((tv) => tv.id === tvId)?.picture && (
         <section className="more-block">
-          <h3><Ic.Sparkle size={16} /> Picture</h3>
+          <h3><Ic.Sparkle size={16} /> {t('picture')}</h3>
           <div className="chips-row" role="radiogroup" aria-label="Picture mode">
             {(pictureInfo?.modes?.length ? pictureInfo.modes.map((x) => [x.id, x.name]) : [['calibrated', 'Calibrated'], ['dynamic', 'Dynamic']]).map(([m, label]) => {
               const cur = pictureInfo?.mode ?? picture;
@@ -416,37 +417,49 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
               );
             })}
           </div>
-          {!pictureInfo?.can_set && <p className="note">Picture mode works once this TV is set up.</p>}
+          {!pictureInfo?.can_set && <p className="note">{t('picture_later')}</p>}
         </section>
       )}
 
       <section className={`more-block ${tvs?.length > 1 ? '' : 'first'}`}>
-        <h3><Ic.Moon size={16} /> Sleep timer</h3>
+        <h3><Ic.Moon size={16} /> {t('sleep_timer')}</h3>
         <div className="chips-row">
           {SLEEP.map((m) => (
-            <button key={m} className={`chip glass ${(m === 0 && !endsAt) ? 'on' : ''}`} onClick={() => { tick(); onSleep(m); }}>{m ? `${m} min` : 'Off'}</button>
+            <button key={m} className={`chip glass ${(m === 0 && !endsAt) ? 'on' : ''}`} onClick={() => { tick(); onSleep(m); }}>{m ? t('n_min', { n: m }) : t('sleep_chip_off')}</button>
           ))}
         </div>
-        <p className="note">{sleepError || (endsAt ? `The TV turns off at ${endsAt.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })} (${left} min).` : 'Turns the TV off for you, even if your phone is locked.')}</p>
+        <p className="note">{sleepError || (endsAt ? t('turns_off_at', { time: endsAt.toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' }), n: left }) : t('sleep_note'))}</p>
       </section>
 
       <section className="more-block">
-        <h3><Ic.Keyboard size={16} /> Type on the TV</h3>
+        <h3><Ic.Keyboard size={16} /> {t('type_on_tv')}</h3>
         <form className="ask-field glass" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { tick(); onText(typed.trim()); setTyped(''); } }}>
-          <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="For a search box on the TV" enterKeyHint="send" aria-label="Text to type on the TV" />
-          <button type="submit" className="round solid small" aria-label="Send to TV" disabled={!typed.trim()}><Ic.Send size={18} /></button>
+          <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={t('type_placeholder')} enterKeyHint="send" aria-label="Text to type on the TV" />
+          <button type="submit" className="round solid small" aria-label={t('send_to_tv')} disabled={!typed.trim()}><Ic.Send size={18} /></button>
         </form>
       </section>
 
       <div className="more-grid">
-        <button className="tile glass" onClick={() => { tick(); onKey('captions'); }}><Ic.Captions /> Subtitles</button>
-        <button className="tile glass" onClick={() => { tick(); onKey('input'); }}><Ic.Input /> Input</button>
-        <button className="tile glass" onClick={() => { tick(); onKey('settings'); }}><Ic.Gear /> Settings</button>
+        <button className="tile glass" onClick={() => { tick(); onKey('captions'); }}><Ic.Captions /> {t('subtitles')}</button>
+        <button className="tile glass" onClick={() => { tick(); onKey('input'); }}><Ic.Input /> {t('input')}</button>
+        <button className="tile glass" onClick={() => { tick(); onKey('settings'); }}><Ic.Gear /> {t('settings')}</button>
       </div>
       <div className="arrange-pair">
-        <button className="pill glass arrange-open" onClick={() => { tick(); onArrange(); }}><Ic.Grid size={18} /> Arrange apps</button>
-        <button className="pill glass arrange-open" onClick={() => { tick(); onPeople(); }}><Ic.People size={18} /> People</button>
+        <button className="pill glass arrange-open" onClick={() => { tick(); onArrange(); }}><Ic.Grid size={18} /> {t('arrange_apps')}</button>
+        <button className="pill glass arrange-open" onClick={() => { tick(); onPeople(); }}><Ic.People size={18} /> {t('people')}</button>
       </div>
+
+      {/* this phone's language: "Same as the TV" follows the TV home's Home settings */}
+      <section className="more-block">
+        <h3><Ic.Globe size={16} /> {t('language')}</h3>
+        <div className="chips-row chips-wrap" role="radiogroup" aria-label={t('language')}>
+          {[{ id: 'auto', name: t('same_as_tv') }, ...LANGS].map((l) => (
+            <button key={l.id} role="radio" aria-checked={choice() === l.id} lang={l.locale} className={`chip glass ${choice() === l.id ? 'on' : ''}`}
+              onClick={() => { tick(); setChoice(l.id); }}>{l.name}</button>
+          ))}
+        </div>
+        <p className="note">{t('language_note')}</p>
+      </section>
     </Sheet>
   );
 });
@@ -456,8 +469,8 @@ export function Onboarding({ onPick, standalone, people }) {
     <div className="onboard">
       <div className="onboard-inner">
         <img className="onboard-icon" src="/icons/icon-192.png" alt="" />
-        <h1>Who’s this phone for?</h1>
-        <p>“Keep watching” and suggestions follow whoever is watching. You can swap at the top any time.</p>
+        <h1>{t('whos_phone')}</h1>
+        <p>{t('onboard_note')}</p>
         <div className="onboard-pick">
           {(people || []).map((p) => (
             <button key={p.id} className="pill solid big" onClick={() => { tick(); onPick(p.id); }}>{p.name}</button>
@@ -465,8 +478,8 @@ export function Onboarding({ onPick, standalone, people }) {
         </div>
         {!standalone && (
           <div className="install glass">
-            <b>Put it on your home screen</b>
-            <span>In Safari, tap Share <ShareGlyph />, then <b>Add to Home Screen</b>.</span>
+            <b>{t('home_screen')}</b>
+            <span>{t('home_screen_how').split('{icon}')[0]}<ShareGlyph />{t('home_screen_how').split('{icon}')[1].split('{add}')[0]}<b>{t('add_to_home')}</b>{t('home_screen_how').split('{add}')[1]}</span>
           </div>
         )}
       </div>

@@ -203,6 +203,10 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 json(200, ok().put("note", "started; read GET /api/adb/diag or logcat -s couchtv.adb"))
             }
             "GET /api/adb/diag" -> json(200, ok().put("running", AdbDiag.running).put("lines", JSONArray(AdbDiag.lines)))
+            // The TV home's people list (the same one /setup edits): the home's Home settings adds,
+            // renames, removes and reorders people with it, as it does with the computer bridge.
+            "GET /api/people" -> json(200, ok().put("people", Store.people()))
+            "POST /api/people" -> { savePeople(body(s)); json(200, ok().put("people", Store.people())) }
             "GET /api/settings" -> json(200, settings())
             "POST /api/settings" -> { saveSettings(body(s)); json(200, settings()) }
             "POST /api/phones/forget" -> { Auth.forgetAll(); json(200, ok().put("note", "Every phone must pair again.")) }
@@ -269,11 +273,40 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
     }
 
     private fun settings(): JSONObject = ok()
+        // the TV home's own Home settings (language, place, look...), kept here as they come
+        .put("settings", Store.readJson("home-settings.json") as? JSONObject ?: JSONObject())
+        .put("updated", Store.str("home_settings_updated") ?: JSONObject.NULL)
         .put("people", Store.people()).put("weather", Store.weather()).put("country", Store.country()).put("tv_name", Store.tvName())
         .put("ask", JSONObject().put("enabled", Store.bool("ask_enabled")).put("has_key", !Store.str("ask_key").isNullOrEmpty()).put("model", Ask.MODEL))
         .put("phones", Auth.phoneCount()).put("port", Store.port).put("adb", JSONObject(Adb.status()))
 
+    /** {"people": [...]} replaces the list; {"order": [ids]} only reorders it. */
+    private fun savePeople(b: JSONObject) {
+        val list = b.optJSONArray("people") ?: run {
+            val order = b.optJSONArray("order") ?: throw ApiError(400, "people (a list) or order (a list of ids) is required")
+            val now = Store.people()
+            val by = (0 until now.length()).associate { now.getJSONObject(it).optString("id") to now.getJSONObject(it) }
+            val out = JSONArray(); val seen = HashSet<String>()
+            for (i in 0 until order.length()) by[order.optString(i)]?.let { if (seen.add(order.optString(i))) out.put(it) }
+            by.forEach { (id, p) -> if (id !in seen) out.put(p) }
+            out
+        }
+        val clean = JSONArray()
+        for (i in 0 until minOf(list.length(), 12)) {
+            val p = list.optJSONObject(i) ?: continue
+            val name = p.optString("name").trim().take(40)
+            if (name.isNotEmpty()) clean.put(JSONObject().put("id", p.optString("id").ifEmpty { "person${i + 1}" }.take(32)).put("name", name))
+        }
+        Store.putStr("people", clean.toString())
+        Now.push()
+    }
+
     private fun saveSettings(b: JSONObject) {
+        b.optJSONObject("settings")?.let {
+            if (it.toString().length > 32_000) throw ApiError(413, "settings are too big")
+            Store.writeJson("home-settings.json", it)
+            Store.putStr("home_settings_updated", Now.iso())
+        }
         b.optJSONArray("people")?.let { arr ->
             val clean = JSONArray()
             for (i in 0 until minOf(arr.length(), 8)) {

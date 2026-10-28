@@ -18,7 +18,8 @@ for the pairing that showed it, so never reuse one from an earlier run. Makes a 
 this computer on first use (bridge/data/cert.pem), then marks the TV "paired": true in config.json.
 
 Step 2, ADB (optional, for opening shows by deep link, screenshots, picture mode, now playing):
-Developer options and Network debugging on (README step 1), then re-run with --adb: the TV asks
+Developer options and USB debugging on, plus Network debugging if the TV has that switch (README
+step 1), then re-run with --adb: the TV asks
 "Allow USB debugging?"; tick "Always allow from this computer" and press OK. The port is the TV's
 "adb_port" in config.json, else ADB_PORT, else 5555.
 
@@ -182,7 +183,7 @@ async def adb_check(cfg):
     try:
         ok = await dev.connect(rsa_keys=[signer], auth_timeout_s=60)
     except Exception as e:
-        print(f"ADB did not connect on port {port} ({type(e).__name__}). Is Network debugging on? "
+        print(f"ADB did not connect on port {port} ({type(e).__name__}). Is USB debugging on (and Network debugging, if the TV has it)? "
               "TVs with only Wireless debugging: see README step 1.")
         return False
     if ok:

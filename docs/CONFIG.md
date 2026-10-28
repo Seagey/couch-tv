@@ -11,6 +11,10 @@ Every key below is optional unless it says otherwise. Leave a key out and you ge
 brackets, which is how couch-tv behaved before the key existed. So an older `config.json` with no
 `home` or `quick` keys looks and works exactly as it did.
 
+Most of what the home shows can also be changed on the TV itself, with the gear tile (Home
+settings), and what is chosen there wins on that TV. See
+[Settings made on the TV](#settings-made-on-the-tv-home-settings) at the end.
+
 ## The TVs
 
 `tvs` is a list, one entry per TV. `default_tv` is the `id` used when a request names no TV.
@@ -53,6 +57,8 @@ TVs that have an input screen the launcher can open.
 "quick": ["sleep", "look", "input"]
 ```
 
+Home settings on the TV (gear tile, Quick buttons) can choose and order them too, for that TV.
+
 ### Picture mode (`picture`)
 
 ```json
@@ -78,6 +84,22 @@ the names must match. Test it once from the phone (TV, Picture) before you rely 
 Any number, up to 12. `name` is needed; `id` is made from the name if you leave it out; `colour`
 (a hex colour) is optional, otherwise each person gets one from a fixed set.
 
+**Profiles inside the apps (option B).** When "put on X" opens Netflix, Stan, Disney+ or any app
+that stops on "Who's watching?", the bridge presses the profile of whoever is watching, opens the
+show again, and presses Play if it stops on the show's page. List each person's profile names
+across all their apps, best first, in `app_profiles` (without it, their `name` is tried). Then
+`app_profile_fallback` is tried, then everyone else's names:
+
+```json
+"people": [
+  { "id": "sam", "name": "Sam", "app_profiles": ["Sam", "Samuel", "Sammy"] },
+  { "id": "alex", "name": "Alex" }
+],
+"app_profile_fallback": ["Alex", "Family"]
+```
+
+If none of the names is on the screen, nothing is pressed and the app is left on its profile screen.
+
 `"kid": true` and `"guest": true` (both optional) keep that person out of the household's taste:
 the shared "everyone" picks and what Claude is told the house likes. They still get their own
 Keep watching row and their own picks. Imported Netflix profiles with "Kids" in the name are left
@@ -98,8 +120,9 @@ The list order is the order on screen. After the first start the bridge keeps th
 up and down to move it, OK to drop) both change it. To start again from `config.json`, delete
 `bridge/data/people.json` and restart the bridge.
 
-With no bridge (option A) there is no phone to edit people, but the order chosen with the TV remote
-is kept on the TV.
+With no bridge (option A) there is no phone to edit people, but Home settings on the TV (gear tile,
+People) adds, renames, removes and reorders them, and the TV keeps the list itself. With a bridge,
+Home settings saves to the same `bridge/data/people.json` the phone uses.
 
 ## The home's look (`home`)
 
@@ -110,7 +133,8 @@ is kept on the TV.
   "scene_seconds": 20,
   "clock": "12h",
   "dock_size": 10,
-  "hide_packages": []
+  "hide_packages": [],
+  "language": "en"
 }
 ```
 
@@ -122,6 +146,7 @@ is kept on the TV.
 | `clock` ["12h"] | `12h` (5:30 pm) or `24h` (17:30). |
 | `hide_packages` [none] | Android package names never shown on the home or in More apps, for a maker's own clutter (help apps, file browsers, screen sharing tools). `survey-tv.py` lists every TV app with its package name. For example `["com.example.tvhelp"]`. |
 | `dock_size` [10] | How many apps sit in the Night dock before Settings and More apps. 1 to 10. Everything else is behind More apps. The phone's Arrange apps keeps to the same number. |
+| `language` ["en"] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish) or `es-MX` (Mexican Spanish). The phone remote has its own choice, "Same as the TV" by default. |
 
 ## Apps on the home
 
@@ -132,6 +157,9 @@ remote:
   Left and right move it, down sends it behind More apps, OK or Back puts it down.
 - **Bring one back:** open More apps, hold OK on an app, and it goes to the end of the dock. If the
   dock is full, the dock's last app moves behind More apps to make room.
+- **Home settings, Apps** (gear tile) lists every app: OK moves one between home, More apps and
+  hidden (hidden apps are not shown anywhere on that TV until you bring them back there), holding
+  OK picks it up to change the order with up and down.
 - **New apps:** the Play Store is the **App Store** tile, first in More apps. An app installed later
   goes to the end of the dock if there is room, otherwise first in More apps, with a small blue dot
   until it is opened once.
@@ -160,10 +188,44 @@ their default order.
 | `client_name` ["Couch TV bridge"] | The name the TV shows for the bridge in its list of paired remotes. Set it before `pair_tv.py`; changing it later means pairing again. |
 | `screens` [] | Extra screens the TV can open, for example a computer through Moonlight. |
 
+## Settings made on the TV (Home settings)
+
+The gear tile in the dock (Settings) opens a small menu: **Home settings** (couch-tv's own) or
+**TV settings** (Android's). Home settings changes, with the TV remote alone: the language, the
+weather's place (a town search), weather on or off, °C or °F and how often it is checked, the look,
+which scenes take turns and in what order, how long each stays, the clock, your own photos, the
+apps (home, More apps or hidden, and their order), the people, and the quick buttons. README,
+"Settings on the TV", says how to use it.
+
+**Which wins**, lowest first:
+
+1. The defaults in the brackets above.
+2. `config.js`: the parts of `config.json` the TV home reads. With a bridge (option B) it comes from
+   the bridge; with no bridge (option A) it is what `apply.sh` handed the app, or the copy built
+   into it.
+3. **Home settings made on this TV.** They win over `config.json`, key by key: a key never touched
+   on the TV still follows `config.json`. With a bridge they are also kept on the computer
+   (`bridge/data/settings.<tv>.json`, see `GET|POST /api/settings` in bridge/API.md), so the phone
+   and the TV agree and a TV whose storage was cleared gets them back. A change made on the TV while
+   the computer is off is handed to the bridge the next time it answers. With no bridge they live on
+   the TV only (the page's storage and the launcher's own store).
+4. `?theme=` and the other preview settings in the address, for a preview only.
+
+People and the app order are not part of Home settings' file: they use the lists they always had
+(`bridge/data/people.json` and `bridge/data/app-order.<tv>.json` with a bridge, the TV's own copy
+without one), so the phone's People and Arrange apps and the TV always show the same thing. Apps
+hidden in Home settings are hidden on that TV only and are left out of what the TV tells the phone.
+
+To go back to `config.json`: Home settings, About, **Reset home settings** (OK twice). It resets
+everything except the people and the apps. Changing `config.json` later does not override a choice
+already made on the TV.
+
 ## Trying settings without a TV
 
 Serve the repo folder with any static server and open the home with `?mock=1`, for example
 `python3 -m http.server 8000`, then `http://127.0.0.1:8000/tv-home/web/index.html?mock=1`.
 `tv-home/web/mock.js` lists the preview settings: `people=4`, `quick=sleep,look,input`,
 `picture=1`, `look=classic`, `clock=24h`, `dock=6`, `scenes=fog,dawn`, `secs=8`, `newapp=1`,
-`offline=1`, `down`, and `reset=1` to forget what a preview saved.
+`offline=1`, `down`, and `reset=1` to forget what a preview saved (Home settings included). A
+preview keeps its Home settings apart from a real TV's (they start with `mock:`). `?scene=own`
+starts on the first of your own photos.

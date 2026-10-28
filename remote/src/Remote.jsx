@@ -3,6 +3,7 @@ import * as Ic from './icons.jsx';
 import { tick } from './haptics.js';
 import { logoFor } from './appLogos.js';
 import { Sheet, personColour } from './Sheets.jsx';
+import { t } from './i18n.js';
 
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
@@ -12,10 +13,10 @@ const SEG_MAX = 3;
 function WhoSwitch({ people, who, setWho }) {
   const [open, setOpen] = useState(false);
   const list = people || [];
-  const options = [...list.map((p) => ({ id: p.id, name: p.name, colour: personColour(p) })), { id: 'both', name: 'Both' }];
+  const options = [...list.map((p) => ({ id: p.id, name: p.name, colour: personColour(p) })), { id: 'both', name: t('both') }];
   if (options.length <= SEG_MAX) {
     return (
-      <div className="seg glass" role="tablist" aria-label="Who's watching">
+      <div className="seg glass" role="tablist" aria-label={t('whos_watching')}>
         {options.map((o) => (
           <button key={o.id} role="tab" aria-selected={who === o.id} className={who === o.id ? 'on' : ''}
             onClick={() => { tick(); setWho(o.id); }}>{o.name}</button>
@@ -27,12 +28,12 @@ function WhoSwitch({ people, who, setWho }) {
   const pick = (id) => { tick(); setWho(id); setOpen(false); };
   return (
     <>
-      <button className="round glass who-btn" aria-haspopup="dialog" aria-label={`Who's watching: ${cur.name}. Change`}
+      <button className="round glass who-btn" aria-haspopup="dialog" aria-label={t('whos_watching_change', { name: cur.name })}
         onClick={() => { tick(); setOpen(true); }}>
         <span className="person-dot who-dot" style={{ background: cur.colour || 'rgba(255,255,255,0.28)' }}>{cur.id === 'both' ? <Ic.People size={18} /> : cur.name.slice(0, 1).toUpperCase()}</span>
       </button>
-      <Sheet open={open} onClose={() => setOpen(false)} title="Who's watching" className="who-sheet">
-        <div role="radiogroup" aria-label="Who's watching">
+      <Sheet open={open} onClose={() => setOpen(false)} title={t('whos_watching')} className="who-sheet">
+        <div role="radiogroup" aria-label={t('whos_watching')}>
           {options.map((o) => (
             <button key={o.id} role="radio" aria-checked={who === o.id} className={`who-row ${who === o.id ? 'on' : ''}`} onClick={() => pick(o.id)}>
               <span className="person-dot" style={{ background: o.colour || 'rgba(255,255,255,0.28)' }}>{o.id === 'both' ? <Ic.People size={18} /> : o.name.slice(0, 1).toUpperCase()}</span>
@@ -47,13 +48,13 @@ function WhoSwitch({ people, who, setWho }) {
 }
 
 export function TopBar({ people, tvName, who, setWho, tv, appInfo, reach, sleepLeft, onPower, onMore }) {
-  const status = reach === false ? 'Not connected'
-    : !tv ? 'Connecting…'
-      : !tv.tv_connected ? 'TV not connected'
-        : tv.waking ? 'Waking…'
-        : tv.power === 'off' ? 'Off'
-          : tv.app?.id === 'home' ? 'Home'
-            : appInfo?.name || 'On';
+  const status = reach === false ? t('not_connected')
+    : !tv ? t('connecting')
+      : !tv.tv_connected ? t('tv_not_connected')
+        : tv.waking ? t('waking')
+        : tv.power === 'off' ? t('off')
+          : tv.app?.id === 'home' ? t('home')
+            : appInfo?.name || t('on');
   // The now playing row names the app, and the pad says Off, Waking or can't reach, so the bar
   // only speaks up for the home screen, connecting and the sleep timer.
   const isApp = !(reach !== false && tv?.tv_connected && tv.power === 'on' && !tv.waking && tv.app?.id === 'home');
@@ -66,18 +67,18 @@ export function TopBar({ people, tvName, who, setWho, tv, appInfo, reach, sleepL
     <header className="topbar">
       <WhoSwitch people={people} who={who} setWho={setWho} />
       <div className={`tvname ${parts.length ? '' : 'is-app'}`}>
-        <b>{tvName || 'TV'}</b>
+        <b>{tvName || t('tv')}</b>
         <span>{parts.length ? parts.reduce((acc, p, i) => (i ? [...acc, ' · ', p] : [p]), []) : status}</span>
       </div>
-      <button className="round glass" aria-label="More controls" onClick={() => { tick(); onMore(); }}><Ic.More /></button>
-      <button className={`round glass power ${tv?.power === 'on' ? 'is-on' : ''}`} aria-label={tv?.power === 'on' ? 'Turn TV off' : 'Turn TV on'}
+      <button className="round glass" aria-label={t('more_controls')} onClick={() => { tick(); onMore(); }}><Ic.More /></button>
+      <button className={`round glass power ${tv?.power === 'on' ? 'is-on' : ''}`} aria-label={tv?.power === 'on' ? t('turn_off') : t('turn_on')}
         onClick={() => { tick(); onPower(); }}><Ic.Power /></button>
     </header>
   );
 }
 
 // "7 min in", never a bare 7:38 that reads as the time of day.
-const minsIn = (ms) => (ms < 60000 ? 'Just started' : `${Math.floor(ms / 60000)} min in`);
+const minsIn = (ms) => (ms < 60000 ? t('just_started') : t('min_in', { n: Math.floor(ms / 60000) }));
 
 // Where the show is up to. The bridge reads the app's own position every few seconds; between reads
 // the clock runs on here while it plays. The TV gives no length and cannot jump to a time, so the
@@ -92,12 +93,12 @@ function Progress({ p, appName }) {
   }, [playing]);
   const since = playing && p.updated ? Math.max(0, now - new Date(p.updated).getTime()) : 0;
   const pos = Math.min(p.duration_ms || Infinity, (p.position_ms || 0) + since);
-  const word = { playing: 'Playing', paused: 'Paused', buffering: 'Loading', stopped: 'Stopped' }[p.state];
+  const word = { playing: t('st_playing'), paused: t('st_paused'), buffering: t('st_buffering'), stopped: t('st_stopped') }[p.state];
   if (!p.duration_ms) {
     return (
       <div className="scrub-elapsed">
         <span className="scrub-clock">{minsIn(pos)}</span>
-        {word && <span className={`scrub-state ${p.state}`}>{word}{appName ? ` on ${appName}` : ''}</span>}
+        {word && <span className={`scrub-state ${p.state}`}>{word}{appName ? t('on_app', { app: appName }) : ''}</span>}
       </div>
     );
   }
@@ -112,7 +113,7 @@ function Progress({ p, appName }) {
       <div className="scrub-times">
         <span>{minsIn(pos)}</span>
         {appName && <span className="scrub-app">{appName}</span>}
-        <span>{p.duration_source === 'justwatch' ? `about ${Math.max(1, Math.round(left / 60000))} min left` : `${Math.max(1, Math.round(left / 60000))} min left`}</span>
+        <span>{t(p.duration_source === 'justwatch' ? 'about_left' : 'min_left', { n: Math.max(1, Math.round(left / 60000)) })}</span>
       </div>
     </div>
   );
@@ -129,7 +130,7 @@ export function NowPlaying({ tv, appInfo, onKey, roomy }) {
       ? <img className="art-logo" src={logoFor(appInfo)} alt="" />
       : <div className="art-app" style={{ background: appInfo?.colour }} />;
     title = p.title;
-    sub = [p.season && `Season ${p.season}`, p.episode && `Episode ${p.episode}`].filter(Boolean).join(' · ') || null;
+    sub = [p.season && t('season', { n: p.season }), p.episode && t('episode', { n: p.episode })].filter(Boolean).join(' · ') || null;
     epTitle = p.episode_title || null;
     if (!sub && !epTitle) sub = appInfo?.name || tv.app?.name;
   } else if (!off && appInfo && tv.app.id !== 'home') {
@@ -138,13 +139,13 @@ export function NowPlaying({ tv, appInfo, onKey, roomy }) {
       ? <img className="art-logo" src={logoFor(appInfo)} alt="" />
       : <div className="art-app" style={{ background: appInfo.colour || '#3a3a3c' }}>{appInfo.name}</div>;
     title = appInfo.name;
-    sub = `${appInfo.name} is open`;
+    sub = t('app_open', { app: appInfo.name });
   } else {
     return null;
   }
   const key = (k) => () => { tick(); onKey(k); };
   return (
-    <section className={`now ${open ? 'open' : ''}`} aria-label="Now on the TV">
+    <section className={`now ${open ? 'open' : ''}`} aria-label={t('now_on_tv')}>
       <div className="now-head">
         <span className="now-art">{art}</span>
         <span className="now-text"><span className="now-title">{title}</span>{sub && <span className="now-sub">{sub}</span>}{epTitle && <span className="now-ep">{epTitle}</span>}</span>
@@ -239,26 +240,26 @@ export function Pad({ onKey, offState, wakeError, onWake, onRetry, tvName, onLiv
   };
   const cancel = (e) => { const s = g.current; if (!s || e.pointerId !== s.id) return; stopTimers(s); g.current = null; setSpot(null); };
 
-  let overlay = <p className="hint">Tap the middle to select</p>;
+  let overlay = <p className="hint">{t('tap_middle')}</p>;
   if (offState === 'unpaired') {
     overlay = (
       <div className="pad-msg" aria-live="polite">
-        <p><b>The {(tvName || 'this').toLowerCase()} TV isn’t set up yet.</b> It needs a one-time setup at that TV.</p>
-        <button className="pill glass" onClick={onLivingRoom}>Use the living room TV</button>
+        <p><b>{t('not_set_up_tv', { name: (tvName || t('this')).toLowerCase() })}</b> {t('not_set_up_tv_more')}</p>
+        <button className="pill glass" onClick={onLivingRoom}>{t('use_living_room')}</button>
       </div>
     );
   } else if (offState === 'unreachable') {
     overlay = (
       <div className="pad-msg" aria-live="polite">
-        <p><b>Can’t reach the TV.</b> Is your phone on the home Wi-Fi?</p>
-        <button className="pill glass" onClick={() => { tick(); onRetry(); }}>Try again</button>
+        <p><b>{t('cant_reach')}</b> {t('home_wifi')}</p>
+        <button className="pill glass" onClick={() => { tick(); onRetry(); }}>{t('try_again')}</button>
       </div>
     );
   } else if (offState) {
     overlay = (
       <div className="pad-msg" aria-live="polite">
         <button className="wake solid" disabled={offState === 'waking'} onClick={() => { tick(); onWake(); }}>
-          {offState === 'waking' ? <><span className="spinner dark" /> Waking the TV…</> : <><Ic.Power size={20} /> Turn on the TV</>}
+          {offState === 'waking' ? <><span className="spinner dark" /> {t('waking_tv')}</> : <><Ic.Power size={20} /> {t('turn_on_tv')}</>}
         </button>
         {wakeError && offState !== 'waking' && <p className="wake-err">{wakeError}</p>}
       </div>
@@ -324,17 +325,17 @@ export function Controls({ tv, onKey, onVolume }) {
   const downR = useRepeat(() => onVolume('down'));
   return (
     <div className="controls">
-      <button className="round big glass" aria-label="Back" onClick={() => { tick(); onKey('back'); }}><Ic.Back /></button>
-      <button className="round big glass" aria-label="Home" onClick={() => { tick(); onKey('home'); }}><Ic.Home /></button>
-      <button className="round big glass" aria-label={st === 'playing' ? 'Pause' : st === 'paused' ? 'Play' : 'Play or pause'}
+      <button className="round big glass" aria-label={t('back')} onClick={() => { tick(); onKey('back'); }}><Ic.Back /></button>
+      <button className="round big glass" aria-label={t('home')} onClick={() => { tick(); onKey('home'); }}><Ic.Home /></button>
+      <button className="round big glass" aria-label={st === 'playing' ? t('pause') : st === 'paused' ? t('play') : t('play_pause')}
         onClick={() => { tick(); onKey('play_pause'); }}>
         {st === 'playing' ? <Ic.Pause /> : st === 'paused' ? <Ic.Play /> : <Ic.PlayPause />}
       </button>
-      <div className="volume glass" role="group" aria-label="Volume">
+      <div className="volume glass" role="group" aria-label={t('volume')}>
         <button aria-label="Volume down" {...downR}><Ic.Minus /></button>
         <button className="vol-mid" aria-label={v?.muted ? 'Unmute' : 'Mute'} onClick={() => { tick(); onVolume('mute'); }}>
           {v?.muted ? <Ic.Muted size={20} /> : <Ic.Speaker size={20} />}
-          {(v?.muted || v?.known) && <span>{v?.muted ? 'Muted' : v.level}</span>}
+          {(v?.muted || v?.known) && <span>{v?.muted ? t('muted') : v.level}</span>}
         </button>
         <button aria-label="Volume up" {...upR}><Ic.Plus /></button>
       </div>
@@ -345,7 +346,7 @@ export function Controls({ tv, onKey, onVolume }) {
 export function AskButton({ onAsk, quiet }) {
   return (
     <button className={`ask ${quiet ? 'quiet' : ''}`} onClick={onAsk}>
-      <Ic.Mic size={22} /> Ask for a show
+      <Ic.Mic size={22} /> {t('ask_for_show')}
     </button>
   );
 }
