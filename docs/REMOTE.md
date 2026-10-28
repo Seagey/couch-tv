@@ -43,8 +43,9 @@ The `.local` name works through a Wi-Fi lookup service that sometimes has not wo
 phone has just woken from sleep. In that moment the icon opens a blank page. The numeric address does
 not need that lookup, so it opens straight away every time.
 
-If you only have the `.local` name working, it is fine to try it first. Switch to the address if you
-ever see a blank page right after unlocking the phone.
+You can still open the `.local` name in the browser: the remote moves itself to the numeric address
+straight away, so the icon you add from there gets the address. An icon added before that change
+keeps the `.local` name. If it ever opens a blank page, remove it and add it again from the browser.
 
 ## iPhone (Safari)
 
