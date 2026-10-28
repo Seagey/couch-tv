@@ -482,7 +482,10 @@ class SamsungTV:
             "Cmd": cmd, "DataOfCmd": code, "Option": "false", "TypeOfRemote": "SendRemoteKey"}})
 
     async def key(self, name, hold=False):
-        self.quiet_until = time.monotonic() + 20
+        # A power press from the phone should land on couch-tv, like one from the TV's own remote
+        # (29 Oct: off and on from the phone left the Frame on Samsung's home).
+        power = isinstance(name, str) and resolve_key(name) == "KEY_POWER" and not hold
+        self.quiet_until = 0.0 if power else time.monotonic() + 20
         if isinstance(name, str) and name.strip().lower() == "home":
             # couch-tv's Home is our app; Samsung's own menu is "smart_hub".
             await self._launch_tizen(self.app_id)
