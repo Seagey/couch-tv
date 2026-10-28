@@ -278,6 +278,13 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
      on the TV, then run `.venv/bin/python bridge/pair_tv.py <tv id> --code <code>`. It prints
      `ok: ... is paired` and exits 0, or says the TV refused the code (then start again: each
      pairing shows a fresh code).
+   - **Keeping the bridge running (option B, README step 5):** if you started the bridge by hand to
+     test it, stop it before installing the service (it holds the port), and never point your
+     hand-started copy's output at the service's log file. After `launchctl bootstrap`, check
+     `launchctl print gui/$(id -u)/app.couchtv.bridge` says `state = running`. Exit code 78
+     (EX_CONFIG) with an empty log means launchd could not open a log file another program made:
+     delete it or rename the log paths, then bootout and bootstrap again
+     (`bridge/examples/couch-tv-bridge.plist.example`). Seen on a real Mac.
 6. Check, with them watching the TV: press Home (the new home shows), open two apps, the sleep
    timer, the profile switch, and for B and C one press on the phone remote.
 7. Hand over in plain words: how to rearrange apps (phone, or hold OK on the TV), how to add apps
