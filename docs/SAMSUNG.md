@@ -36,6 +36,15 @@ TV on the computer:
 - **Opening apps** goes through the TV's REST call: this Frame ignored the remote's
   `ed.apps.launch`, for store apps and for couch-tv alike, while taking keys on that channel.
 - **Wake-on-LAN** did not wake the test Frame from its "room is empty" sleep over Wi-Fi.
+- **On the real TV, 29 October 2026 (TV muted, someone watching):** asked in plain words for "that
+  show that has a lawyer and the lawyer never went to university", the assistant found Suits on
+  Netflix and it started playing by itself, about 13 seconds after the ask. Netflix's link lands on
+  the show's card: one OK opens it full screen, a second OK plays. Prime Video was handed No Time to
+  Die through the couch-tv app and came up in 9 seconds; it was not signed in, so the title page is
+  not yet seen. Turning the TV off and on from the phone opened couch-tv about 6 seconds later.
+  Mute from the phone works (over UPnP: this Frame ignores the remote's mute key). The TV home
+  needed one fix for the Frame's older browser (no `inset` in CSS), which showed no photos and two
+  clocks before it.
 
 ## What works and what does not
 
@@ -44,8 +53,10 @@ TV on the computer:
 | couch-tv home as an app, apps in your order, the remote's arrows, OK and Back | Yes |
 | Opens by itself when the TV is switched on | Yes, with the bridge running |
 | Samsung's own Home button | Still opens Samsung's menu. Press Back or open couch-tv from the app row |
-| Phone remote: keys, volume, open an app | Yes (the TV asks to Allow the remote once) |
-| "Put on Bluey" (find and play) | Netflix and YouTube open the title. Every other app opens on its home page and the reply says to pick the show there |
+| Phone remote: keys, volume, mute, open an app | Yes (the TV asks to Allow the remote once). Mute goes over UPnP |
+| More than one TV on one phone remote | Yes: one bridge runs Google TVs and Samsungs together (several entries in `config.json`), the remote's TV menu switches between them |
+| "Put on Bluey" (find and play) | Netflix: opens the show and presses Play (tested). YouTube: opens the video. Prime Video, Stan, Binge, Paramount+, Apple TV: the couch-tv app hands them the title, then Play is pressed by timing (Prime seen opening, the title page not yet confirmed). Disney+ and others: open on their home page and the reply says to pick the show there |
+| "Who's watching?" in an app | OK is pressed, which takes the highlighted profile (usually the first). It cannot pick yours by name: Samsung gives no way to read the screen |
 | Typing into the TV from the phone | Only while the TV shows its own keyboard |
 | Turning the TV on from the phone | Only if the TV allows it over the network (see "Turning it on") |
 | What is playing, a progress bar, screenshots, the Claude ask's "look at the screen" | No. Samsung gives none of these to the network remote |
@@ -89,10 +100,12 @@ It should say "ready", Developer mode on, and your computer's address as the hos
 ### 2. Build the app
 
 ```sh
-.venv/bin/python samsung/build.py --bridge http://<bridge computer>.local:5400
+.venv/bin/python samsung/build.py --bridge http://<bridge computer's address>:5400
 ```
 
-With more than one TV in `config.json`, add `--tv <id>` for this TV. This makes
+Use the computer's number address (for example `http://192.0.2.20:5400`), not its `.local` name:
+the TV looks the name up only now and then and can miss it. With more than one TV in
+`config.json`, add `--tv <id>` for this TV. This makes
 `build/samsung/CouchTV.wgt`. It holds the TV home, the app ids for Samsung, and a copy of your
 settings for when the computer is off. No passwords or keys go in it.
 
@@ -146,10 +159,22 @@ When the TV goes from off (or Art Mode) to on, the bridge waits a moment, and if
 screen (the TV is on live TV, an HDMI input or Samsung's menu) it opens couch-tv with the TV's REST call
 (`POST http://<tv>:8001/api/v2/applications/<app id>`; the remote's `ed.apps.launch` is the fallback). If the TV came back straight into an app (some TVs reopen the last app),
 it is left alone. Anything the phone remote or Claude just asked for also wins: the hook stays quiet
-for 20 seconds after any command. `"open_on_power_on": false` in `config.json` turns the hook off.
+for 20 seconds after any command, except a power press, so turning the TV on from the phone also
+lands on couch-tv. `"open_on_power_on": false` in `config.json` turns the hook off.
 
 Netflix and YouTube titles open through DIAL (port 8080, the protocol phones use to cast), which
-needs no pairing. Every other Samsung app only takes "open", not a link to a show.
+needs no pairing.
+
+Other apps take a title the way Samsung's own Universal Guide gives one: an app id plus
+`action_data` (Prime Video a `gti`, Stan a `guid`, Binge an `EventId`, Paramount+ a URL). JustWatch
+lists these for each title (`deeplinkURL(platform: TIZENOS)`, `bridge/finder.py`). A 2021 Frame
+ignores them over the network remote, but an app on the TV may pass them on: the couch-tv app
+collects the job from the bridge (`/api/tizen/next`) and calls `tizen.application.launchAppControl`
+with the operation `http://samsung.com/appcontrol/operation/eden_resume` and
+`PAYLOAD = {"values": <action_data>}`. The couch-tv app only runs while it is on screen, so the
+bridge brings it forward first. Then it presses OK by timing (`BLIND` in `bridge/samsung.py`):
+on a fresh start once for the profile screen, then for Play. Only Netflix's timing has been checked
+on a real TV; if an app ends up on the show's page without playing, press OK.
 
 ## Turning it on
 

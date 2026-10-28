@@ -105,7 +105,9 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   [docs/SAMSUNG.md](docs/SAMSUNG.md), with its honest limits, in plain words: "couch-tv goes on
   your Samsung as an app, and a computer at home that stays on opens it every time the TV is
   switched on. It is not a true home screen: the remote's Home button still opens Samsung's menu.
-  The phone remote works. Netflix and YouTube open the show; other apps open on their own page.
+  The phone remote works. Netflix plays the show by itself and YouTube opens the video; Prime,
+  Stan, Binge, Paramount+ and Apple TV are handed the show, and the others open on their own page.
+  On a 'who's watching' screen it picks the first profile, not yours by name.
   There is no 'what is playing' and no screenshots. You will sign in to your own Samsung account
   once on this computer, and press Allow on the TV once." Without a computer that stays on, only
   the app itself is possible (opened from Samsung's app row). Also offer the Google TV box as the

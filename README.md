@@ -1,8 +1,52 @@
 # couch-tv
 
-Your own home screen and phone remote for a Google TV. No ads on the home screen. Open source (MIT).
+Your own home screen and phone remote for a Google TV, and now a Samsung TV. No ads on the home
+screen. Open source (MIT).
 
 ![The Night home screen](docs/screens/home-night.jpg)
+
+## Updates
+
+**29 October 2026: Samsung TVs.** couch-tv now works on Samsung TVs too. It was tested on a 2021
+Samsung Frame. It is the same link and the same setup: give this repo to your agent and it offers
+the Samsung path when it finds a Samsung.
+
+What is the same on a Samsung: the home (scenes, clock, weather, your apps in your order), the phone
+remote, and the Claude assistant. "Put on that show about the lawyer who never went to law school"
+finds Suits and plays it.
+
+What is different on a Samsung:
+
+- **You need a computer that stays on at home** (a Mac, a Linux box or a Raspberry Pi on the same
+  Wi-Fi, option B below). It opens couch-tv every time the TV is switched on, and it is what the
+  phone remote and the assistant talk to. Without it you can only open couch-tv yourself from
+  Samsung's app row.
+- **It is an app that opens itself, not a true home screen.** Samsung does not let any app replace
+  its home. The TV remote's own Home button still opens Samsung's menu; Home on the phone remote
+  brings couch-tv back.
+- **Playing a show.** Netflix opens the show and starts it by itself. YouTube opens the video.
+  Prime Video, Stan, Binge, Paramount+ and Apple TV are handed the title by the couch-tv app on the
+  TV, the way Samsung's own guide does it; so far Prime has been seen opening, the title page itself
+  is still to be confirmed. Disney+ and the rest open on their home page and you pick the show.
+- **No reading the screen.** Samsung gives no screenshots and no "what is playing" to the network.
+  So Play is pressed by timing, not by looking (only Netflix's timing is tested so far), and on a
+  "Who's watching?" screen couch-tv takes the highlighted profile, usually the first, rather than
+  yours by name.
+- **You install the app yourself**, with a free tool and your own Samsung account sign-in, after
+  turning on the TV's Developer Mode. A firmware update can turn Developer Mode off again; then you
+  repeat one step.
+- No picture mode switch and no ADB tools (those are Android only).
+
+One bridge can run your Google TVs and your Samsung together, and the phone remote switches between
+them. Full guide, limits and undo: [docs/SAMSUNG.md](docs/SAMSUNG.md).
+
+**28 to 29 October 2026, every TV:**
+
+- "Put on X" now gets past "Who's watching?" on Android TVs: it presses your profile (you list your
+  names per person, [docs/CONFIG.md](docs/CONFIG.md)) and then Play.
+- The phone remote no longer opens to a white page when the phone has just woken up
+  ([docs/REMOTE.md](docs/REMOTE.md)).
+- The TV home works on older TV browsers too (the 2021 Frame showed no photos and two clocks).
 
 ## Home backgrounds
 
@@ -114,10 +158,11 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   screen take over, so you keep Amazon's home.
 - **Samsung:** it does not run Android apps and it locks its home screen, so couch-tv goes on as a
   Samsung app (you install it with a free tool and your own Samsung sign-in), and the bridge opens
-  it every time the TV is switched on. Samsung's own Home button still opens Samsung's menu. The
-  phone remote works; finding and playing shows opens the title in Netflix and YouTube, and just
-  the app in the others. No "what is playing" and no screenshots. Setup and limits:
-  [docs/SAMSUNG.md](docs/SAMSUNG.md).
+  it every time the TV is switched on, so it needs a computer that stays on. Samsung's own Home
+  button still opens Samsung's menu. The phone remote and the assistant work: Netflix plays the
+  show by itself, YouTube opens the video, Prime Video, Stan, Binge, Paramount+ and Apple TV are
+  handed the title, and other apps open on their home page. No "what is playing" and no
+  screenshots. Setup and limits: [docs/SAMSUNG.md](docs/SAMSUNG.md).
 - **LG:** the same approach should work (LG has a Developer Mode and a network remote), but nobody
   has tried it yet: [docs/LG.md](docs/LG.md).
 - **Roku, Apple TV, VIDAA and Vega OS Fire TV:** closed. Nothing here works on them.
