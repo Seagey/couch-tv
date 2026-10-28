@@ -245,13 +245,28 @@ class SamsungTV:
         results = await asyncio.gather(*(self._app_state(t) for t in ids))
         return next((t for t, r in zip(ids, results) if r and r.get("visible")), None)
 
+    @staticmethod
+    def _soap(action, extra=""):
+        return ('<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
+                's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>'
+                f'<u:{action} xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1">'
+                f'<InstanceID>0</InstanceID><Channel>Master</Channel>{extra}'
+                f'</u:{action}></s:Body></s:Envelope>')
+
+    async def set_mute(self, on):
+        """Mute on or off over UPnP. The remote's KEY_MUTE is ignored by a 2021 Frame (seen 29 Oct:
+        four presses, still unmuted), and a set cannot leave it the wrong way round like a toggle."""
+        s = await self._http()
+        async with s.post(f"http://{self.ip}:9197/upnp/control/RenderingControl1",
+                          data=self._soap("SetMute", "<DesiredMute>%d</DesiredMute>" % (1 if on else 0)),
+                          headers={"Content-Type": 'text/xml; charset="utf-8"',
+                                   "SOAPACTION": '"urn:schemas-upnp-org:service:RenderingControl:1#SetMute"'},
+                          timeout=aiohttp.ClientTimeout(total=3)) as r:
+            await r.text()
+        await self._read_volume()
+
     async def _read_volume(self):
-        def soap(action):
-            return ('<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
-                    's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>'
-                    f'<u:{action} xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1">'
-                    '<InstanceID>0</InstanceID><Channel>Master</Channel>'
-                    f'</u:{action}></s:Body></s:Envelope>')
+        soap = self._soap
         s = await self._http()
         out = {}
         for action, tag, key in (("GetVolume", "CurrentVolume", "level"), ("GetMute", "CurrentMute", "muted")):

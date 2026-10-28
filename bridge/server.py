@@ -758,6 +758,9 @@ async def h_volume(request):
         if action not in keys:
             raise ApiError(400, "action must be up, down or mute, or send level")
         steps = 1 if action == "mute" else max(1, min(int(data.get("steps", 1)), 20))
+        if action == "mute" and hasattr(tv, "set_mute") and tv.volume["known"]:
+            await tv.set_mute(not tv.volume["muted"])   # Samsung: set over UPnP, its mute key is ignored
+            steps = 0
         for _ in range(steps):
             await tv.key(keys[action])
             await asyncio.sleep(0.08)
