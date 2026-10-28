@@ -130,8 +130,50 @@
     }
   }, true);
 
+  // ---------- jobs only an app on the TV may do (bridge/samsung.py open_title) ----------
+  // The bridge cannot open a title in Prime, Stan and the rest itself: a Samsung app passes the
+  // title on with launchAppControl (operation eden_resume, PAYLOAD {"values": <JustWatch's
+  // action_data>}). This asks the bridge for jobs while couch-tv is on screen.
+  var polling = false;
+  function answer(id, ok, error) {
+    try {
+      var x = new XMLHttpRequest();
+      x.open("POST", BRIDGE + "/api/tizen/answer");
+      x.setRequestHeader("Content-Type", "application/json");
+      x.send(JSON.stringify({ tv: TV_ID || undefined, id: id, ok: ok, error: error || null }));
+    } catch (e) {}
+  }
+  function run(job) {
+    send("log", "job " + JSON.stringify(job));
+    if (job.do !== "appcontrol") { answer(job.id, false, "unknown job " + job.do); return; }
+    try {
+      var data = [new tizen.ApplicationControlData("PAYLOAD", [JSON.stringify({ values: job.data })])];
+      var ctl = new tizen.ApplicationControl("http://samsung.com/appcontrol/operation/eden_resume", null, null, null, data);
+      tizen.application.launchAppControl(ctl, job.app,
+        function () { answer(job.id, true); },
+        function (e) { answer(job.id, false, (e && e.name) + ": " + (e && e.message)); });
+    } catch (e) { answer(job.id, false, String(e)); }
+  }
+  function jobs() {
+    if (!BRIDGE || document.hidden) { polling = false; return; }
+    polling = true;
+    var x = new XMLHttpRequest();
+    x.open("GET", BRIDGE + "/api/tizen/next" + (TV_ID ? "?tv=" + TV_ID : ""));
+    x.timeout = 35000;
+    x.onload = function () {
+      var job = null;
+      try { job = JSON.parse(x.responseText).job; } catch (e) {}
+      if (job) run(job);
+      setTimeout(jobs, 50);
+    };
+    x.onerror = x.ontimeout = function () { setTimeout(jobs, 3000); };
+    x.send();
+  }
+  jobs();
+
   // coming back to the app (after Netflix, say): read the lists again
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden && window.tv && window.tv.resume) window.tv.resume();
+    if (!document.hidden && !polling) jobs();
   });
 })();

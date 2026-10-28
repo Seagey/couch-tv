@@ -94,6 +94,10 @@ class SamsungTV:
         self.mac = cfg.get("mac")
         self.wake_on_lan = cfg.get("wake_on_lan", True) is not False
         self.app_id = cfg.get("app_id") or COUCH_APP
+        # Jobs for the couch-tv app on the TV (it collects them from /api/tizen/next): launching
+        # another app with Samsung's title data, which only an app on the TV may do.
+        self._tv_jobs = asyncio.Queue()
+        self._tv_answers = {}
         # Open couch-tv when the TV comes on ("open_on_power_on": false to stop it).
         self.open_on_power_on = cfg.get("open_on_power_on", True) is not False
         self.remote_name = cfg.get("remote_name") or config.CLIENT_NAME
@@ -547,7 +551,10 @@ class SamsungTV:
         pkg = package or apps.BY_ID.get("netflix" if netflix_id(uri) else "youtube" if youtube_id(uri) else "", {}).get("package")
         app = apps.BY_PACKAGE.get(pkg or "")
         if app and app["id"] == "netflix" and netflix_id(uri):
-            await self._dial("Netflix", f"m=https://api-global.netflix.com/catalog/titles/movies/{netflix_id(uri)}&source_type=4")
+            body = f"m=https://api-global.netflix.com/catalog/titles/movies/{netflix_id(uri)}&source_type=4"
+            cold = not ((await self._app_state(await self._installed_id(app, "Netflix")) or {}).get("running"))
+            await self._dial("Netflix", body)
+            await self.press_through(app, cold, lambda: self._dial("Netflix", body))
             return "dial"
         if app and app["id"] == "youtube" and youtube_id(uri):
             await self._dial("YouTube", f"v={youtube_id(uri)}")
@@ -556,6 +563,95 @@ class SamsungTV:
             raise ValueError("Samsung TVs only open links for Netflix and YouTube")
         await self.launch_package(pkg)
         return "app"
+
+    # ---------- titles through the couch-tv app on the TV ----------
+    # JustWatch gives Samsung title links as {"id", "action_data"} (finder.py). A 2021 Frame ignores
+    # them over the remote channel, but an app on the TV can pass them on with launchAppControl
+    # (operation eden_resume, PAYLOAD {"values": action_data}): field notes from a 2024 Samsung
+    # opened Prime titles that way. Without a screen to read, the profile screen and Play are
+    # pressed blind, timed per app (BLIND).
+    BLIND = {
+        # app id: (seconds to the profile screen on a cold start, [seconds before each OK after
+        # the title opens]). Netflix (his 2021 Frame, 29 Oct): the link lands on the show's card,
+        # OK opens it full screen, a second OK plays; an OK at 5 s came too early.
+        "prime-video": (9, [6]),
+        "stan": (8, []),          # Stan starts by itself with "play": true
+        "netflix": (8, [8, 3]),
+    }
+
+    async def tizen_next(self, wait=25):
+        """For the app on the TV: the next job, or None after `wait` seconds."""
+        try:
+            return await asyncio.wait_for(self._tv_jobs.get(), wait)
+        except asyncio.TimeoutError:
+            return None
+
+    def tizen_answer(self, job_id, answer):
+        fut = self._tv_answers.pop(job_id, None)
+        if fut and not fut.done():
+            fut.set_result(answer)
+
+    async def via_tv_app(self, job, timeout=8):
+        """Hand a job to the couch-tv app on the TV and wait for its answer."""
+        job = {"id": f"j{time.monotonic_ns()}", **job}
+        fut = asyncio.get_running_loop().create_future()
+        self._tv_answers[job["id"]] = fut
+        await self._tv_jobs.put(job)
+        try:
+            return await asyncio.wait_for(fut, timeout)
+        except asyncio.TimeoutError:
+            self._tv_answers.pop(job["id"], None)
+            return {"ok": False, "error": "the couch-tv app on the TV did not answer"}
+
+    async def _installed_id(self, app, given):
+        await self.refresh_installed()
+        ids = self._candidates(app["package"])
+        return next((i for i in ids if i in self.ids), None) or given
+
+    async def open_title(self, app, link, play=True):
+        """Open one title with Samsung's own link data, then pass the profile screen (the first
+        profile) and press Play, blind. Returns True once the app was handed the title."""
+        self.require()
+        self.quiet_until = time.monotonic() + 40
+        target = await self._installed_id(app, link["id"])
+        data = link.get("action_data") or ""
+        if app["id"] == "stan" and play:
+            data = data.replace('"play": false', '"play": true').replace('"play":false', '"play":true')
+        state = await self._app_state(target) or {}
+        cold = not state.get("running")
+        # The app on the TV only runs while it is in front, so bring couch-tv forward first.
+        if self.visible != self.app_id:
+            await self._launch_tizen(self.app_id)
+            await asyncio.sleep(2.5)
+        job = {"do": "appcontrol", "app": target, "data": data}
+        answer = await self.via_tv_app(job)
+        if not answer.get("ok"):
+            self.log.info("title link for %s refused: %s", app["id"], answer.get("error"))
+            return False
+        self.log.info("title link for %s handed to %s (%s)", app["id"], target, "cold" if cold else "warm")
+        if play:
+            async def again():
+                await self._launch_tizen(self.app_id)
+                await asyncio.sleep(2.5)
+                await self.via_tv_app(job)
+            await self.press_through(app, cold, again)
+        return True
+
+    async def press_through(self, app, cold, again):
+        """Blind: on a cold start take the profile screen with OK (the highlighted profile,
+        normally the first), open the title again, then OK on the title page's Play."""
+        blind = self.BLIND.get(app["id"])
+        if not blind:
+            return
+        to_profile, presses = blind
+        if cold:
+            await asyncio.sleep(to_profile)
+            await self._key("KEY_ENTER")
+            await asyncio.sleep(3)
+            await again()
+        for wait in presses:
+            await asyncio.sleep(wait)
+            await self._key("KEY_ENTER")
 
     async def front_package(self):
         if not self.connected:

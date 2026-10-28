@@ -4,6 +4,7 @@ JustWatch also gives Android TV deep links (intent:// URIs) per offer and per ep
 what the bridge opens on the TV.
 """
 import html
+import json
 import re
 
 import aiohttp
@@ -22,14 +23,19 @@ KIND_ORDER = {"free": 0, "subscription": 1, "rent": 2, "buy": 3}
 _OFFER = ("monetizationType deeplinkURL(platform: ANDROID_TV) standardWebURL "
           "package { clearName technicalName }")
 
+# Samsung TVs take a title as {"id": <Tizen app id>, "action_data": <what that app expects>}, the
+# form Samsung's own Universal Guide uses (Prime: a gti, Stan: a guid, Binge: an EventId, ...).
+_TIZEN_OFFER = "monetizationType deeplinkURL(platform: TIZENOS) package { technicalName }"
+
 SEARCH = """
 query($country: Country!, $language: Language!, $first: Int!, $filter: TitleFilter) {
   popularTitles(country: $country, first: $first, filter: $filter) {
     edges { node { id objectType
       content(country: $country, language: $language) {
         title originalReleaseYear posterUrl shortDescription runtime backdrops { backdropUrl } }
-      offers(country: $country, platform: ANDROID_TV) { %s } } } } }
-""" % _OFFER
+      offers(country: $country, platform: ANDROID_TV) { %s }
+      tizen: offers(country: $country, platform: TIZENOS) { %s } } } } }
+""" % (_OFFER, _TIZEN_OFFER)
 
 EPISODES = """
 query($country: Country!, $language: Language!, $id: ID!) {
@@ -70,8 +76,21 @@ def _norm(s):
     return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
 
 
-def _providers(offers):
+def _tizen_links(offers):
+    out = {}
+    for o in offers or []:
+        try:
+            d = json.loads(o.get("deeplinkURL") or "")
+        except ValueError:
+            continue
+        if isinstance(d, dict) and d.get("id"):
+            out.setdefault(o["package"]["technicalName"], {"id": d["id"], "action_data": d.get("action_data") or ""})
+    return out
+
+
+def _providers(offers, tizen_offers=None):
     """One entry per app, cheapest way to watch first. Unknown services are kept, unplayable."""
+    tizen = _tizen_links(tizen_offers)
     best = {}
     for o in offers or []:
         tech = o["package"]["technicalName"]
@@ -87,6 +106,7 @@ def _providers(offers):
             "kind": kind,
             "playable": bool(app and app["deeplink"] != "none"),
             "deeplink": o.get("deeplinkURL"),
+            "tizen": tizen.get(tech),
             "web": html.unescape(o.get("standardWebURL") or "") or None,
         }
     return sorted(best.values(), key=lambda p: (not p["playable"], KIND_ORDER.get(p["kind"], 9)))
@@ -103,7 +123,7 @@ def _shape(node):
         "backdrop": backdrop_url(c),
         "overview": c.get("shortDescription"),
         "runtime_min": c.get("runtime"),
-        "providers": _providers(node.get("offers")),
+        "providers": _providers(node.get("offers"), node.get("tizen")),
     }
 
 

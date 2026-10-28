@@ -506,12 +506,35 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
             else:
                 note = (f"{app['name']} is open, but {best['title']} has not started. If it asks "
                         "who is watching, pick a profile, then ask again.")
+    if method is None and tv.kind == "samsung" and pick.get("tizen"):
+        # Samsung's own title link, handed over by the couch-tv app on the TV (samsung.py open_title)
+        try:
+            if await tv.open_title(app, pick["tizen"]):
+                method = "deeplink"
+                note = (f"Opened {best['title']} in {app['name']} and pressed Play. If it is not playing, "
+                        "press OK on the remote.")
+        except Exception as e:
+            log.warning("samsung title link failed for %s: %s", app["id"], e)
     if method is None:
         method, note = await search_in_app(app, best["title"])
     result = finish_play(best, app, method, note, season, episode, who)
     if started is not None:
         result["started"] = started
     return result
+
+
+async def h_tizen_next(request):
+    """The couch-tv app on a Samsung TV asks here (long poll) for jobs only it can do."""
+    if tv.kind != "samsung":
+        raise ApiError(400, "only for Samsung TVs")
+    return ok(job=await tv.tizen_next())
+
+
+async def h_tizen_answer(request):
+    data = await body(request)
+    if tv.kind == "samsung" and data.get("id"):
+        tv.tizen_answer(data["id"], {"ok": bool(data.get("ok")), "error": data.get("error")})
+    return ok()
 
 
 async def wait_until_playing(pkg, timeout=30):
@@ -1693,6 +1716,8 @@ def make_app():
     r.add_get("/api/find", h_find)
     r.add_post("/api/play", h_play)
     r.add_post("/api/ask", h_ask)
+    r.add_get("/api/tizen/next", h_tizen_next)
+    r.add_post("/api/tizen/answer", h_tizen_answer)
     r.add_get("/api/recs", h_recs)
     r.add_get("/api/history", h_history)
     r.add_get("/api/taste", h_taste)
