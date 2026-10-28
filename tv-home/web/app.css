@@ -41,9 +41,9 @@ body {
 }
 
 /* ---------- the photo: full screen, drifting slowly, one place at a time ---------- */
-.bg { position: fixed; inset: 0; overflow: hidden; background: var(--bg); }
+.bg { position: fixed; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; background: var(--bg); }
 .bg img {
-  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover;
   opacity: 0; transition: opacity 1600ms ease-in-out;
 }
 .bg img.on { opacity: 1; animation: drift 70s ease-in-out infinite alternate; }
@@ -52,7 +52,7 @@ body {
 .night .bg img { filter: brightness(0.72); }
 /* darker at the top for the clock, much darker at the bottom for the apps */
 .scrim {
-  position: fixed; inset: 0; pointer-events: none;
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none;
   background:
     linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 26%),
     linear-gradient(180deg, rgba(0, 0, 0, 0) 32%, rgba(0, 0, 0, 0.5) 55%, rgba(0, 0, 0, 0.86) 100%);
@@ -140,7 +140,7 @@ body {
 .face img { display: block; width: 100%; height: 100%; object-fit: cover; }
 /* the light that slides across a focused tile */
 .face::after {
-  content: ""; position: absolute; inset: 0; opacity: 0; pointer-events: none;
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; opacity: 0; pointer-events: none;
   background: linear-gradient(115deg, rgba(255, 255, 255, 0) 35%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0) 65%);
   background-size: 250% 100%; background-position: 100% 0;
   transition: opacity 240ms var(--ease);
@@ -169,7 +169,7 @@ body {
 .show .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 0.375rem; background: rgba(0, 0, 0, 0.45); }
 .show .bar i { display: block; height: 100%; background: var(--text); }
 .show .no-art {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; padding: 1.5rem;
   font-size: 2.25rem; font-weight: 650; text-align: center; color: var(--text-2);
 }
 .caption {
@@ -224,13 +224,13 @@ body {
 /* Five scenes take turns every 20 s. Each scene is its own photo, glass
    clock and cut-out; only the one showing and the one coming next are drawn (.ready), to save memory. */
 .scenes { display: none; }
-.theme-night .scenes { display: block; position: fixed; inset: 0; pointer-events: none; }
+.theme-night .scenes { display: block; position: fixed; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
 .theme-night .bg { display: none; }
-.scene { position: absolute; inset: 0; display: none; opacity: 0; transition: opacity 1600ms ease-in-out; }
+.scene { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: none; opacity: 0; transition: opacity 1600ms ease-in-out; }
 .scene.ready { display: block; }
 .scene.on { opacity: 1; }
-.scene .sbg, .scene .fg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.scene .shade { position: absolute; inset: 0; }
+.scene .sbg, .scene .fg { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+.scene .shade { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
 .gclock {
   position: absolute; left: 0; right: 0; top: 9.375rem; text-align: center; white-space: nowrap;
   font-family: "Antonio", "Arial Narrow", sans-serif; font-weight: 300; font-size: 25rem; line-height: 0.82; letter-spacing: -0.02em;
@@ -240,9 +240,9 @@ body {
   display: block; padding: 0.2em 0; margin: -0.2em 0; color: transparent;
   -webkit-background-clip: text; background-clip: text; background-size: 100vw 100vh; background-repeat: no-repeat;
 }
-.gclock .rim { position: absolute; inset: 0; color: rgba(255, 255, 255, 0.1); -webkit-text-stroke: 0.09rem rgba(255, 255, 255, 0.55); }
+.gclock .rim { position: absolute; top: 0; right: 0; bottom: 0; left: 0; color: rgba(255, 255, 255, 0.1); -webkit-text-stroke: 0.09rem rgba(255, 255, 255, 0.55); }
 .gclock .sheen {
-  position: absolute; inset: 0; color: transparent; -webkit-background-clip: text; background-clip: text;
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0; color: transparent; -webkit-background-clip: text; background-clip: text;
   background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.22) 100%);
 }
 /* after 9 pm everything dims a little */
