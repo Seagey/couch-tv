@@ -18,6 +18,8 @@
 #   your config.json (passed to the TV now). Run this again after a Google TV update brings the
 #   Google home back, or after you change config.json.
 # Option B (computer bridge): set BRIDGE_URL so the home loads from the bridge.
+# Smart home (optional, either option): a "home_assistant" section in config.json and the token in
+#   .env (docs/CONFIG.md, Smart home). Without one nothing about it changes on the TV.
 #
 # Usage, from the repo root:
 #   TV_IP=<tv address> [BRIDGE_URL=http://<your-computer>:5400] [APK=couch-tv-home.apk]
@@ -88,7 +90,20 @@ echo "3/4  Making couch-tv the home and sending your settings"
 # Tell our home where the bridge is ("none" for option A) and hand it the settings from
 # config.json for its built-in copy. Force-stop first: a running home only reads "bridge".
 CFG64=$("$PY" "$HERE/home-config.py")
-"$PY" "$T" shell "am force-stop app.couchtv.launcher; am start -n $HOME_ACT --es bridge ${BRIDGE_URL:-none} --es config_b64 $CFG64 ${TV_ID:+--es tv $TV_ID}"
+# Smart home (optional, docs/CONFIG.md): the home_assistant section goes to the app on its own,
+# never into the page's settings, and is never printed (it holds the Home Assistant token).
+# "none" (no section, or it is switched off) switches smart home off on the TV.
+HA64=$("$PY" "$HERE/home-config.py" --ha)
+SMART=$("$PY" "$HERE/home-config.py" --ha --check)
+echo "     $(echo "$SMART" | head -1)"
+# The doorbell card shows over other apps, which needs "display over other apps". Only granted
+# when a doorbell is set up; taken back if one was set up before and is not any more.
+if echo "$SMART" | grep -qx doorbell; then
+  "$PY" "$T" shell "appops set app.couchtv.launcher SYSTEM_ALERT_WINDOW allow"
+elif "$PY" "$T" shell "appops get app.couchtv.launcher SYSTEM_ALERT_WINDOW" 2> /dev/null | grep -q allow; then
+  "$PY" "$T" shell "appops set app.couchtv.launcher SYSTEM_ALERT_WINDOW default"
+fi
+"$PY" "$T" shell "am force-stop app.couchtv.launcher; am start -n $HOME_ACT --es bridge ${BRIDGE_URL:-none} --es config_b64 $CFG64 --es ha_b64 $HA64 ${TV_ID:+--es tv $TV_ID}"
 
 # Tell the bridge's daily guard what to keep switched off (a Google TV update can switch it back
 # on). Option A has no bridge, so no guard: run this script again after an update.

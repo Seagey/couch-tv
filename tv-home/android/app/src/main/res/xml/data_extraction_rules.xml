@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and newer. The smart home settings hold a Home Assistant token: never in a backup
+     and never copied to another device. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="ha.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="ha.xml" />
+    </device-transfer>
+</data-extraction-rules>

@@ -508,3 +508,66 @@ body {
   .srow.lifted { animation: none; }
   .set-rows { scroll-behavior: auto; }
 }
+
+/* ================= Smart home (optional): rooms and scenes through Home Assistant =================
+   Only drawn when config.json has a home_assistant section (smarthome.js). Rooms are cards with a
+   dial; their four buttons (cooler, warmer, on or off, mode) and the scenes take the remote. */
+.smart {
+  display: none; position: fixed; inset: 0; z-index: 30; flex-direction: column;
+  padding: var(--safe-y) var(--safe-x); text-shadow: none;
+  background: rgba(10, 8, 12, 0.8); -webkit-backdrop-filter: blur(2.5rem) saturate(140%); backdrop-filter: blur(2.5rem) saturate(140%);
+}
+.smart.on { display: flex; }
+.smarting .tile.focus .face, .smarting .tile.focus .face::after { animation: none; }
+.sh-title { margin: 2.25rem 0 1.75rem 0.25rem; font-size: 2.875rem; line-height: 3.75rem; font-weight: 700; letter-spacing: -0.022em; }
+.sh-head { margin: 0 0 1rem 0.25rem; font-size: 1.25rem; line-height: 1.75rem; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); }
+.sh-note { margin: -0.25rem 0 1.25rem 0.25rem; font-size: 1.5rem; line-height: 2.125rem; color: var(--text-2); }
+.sh-note.warn { color: var(--warn); }
+.sh-view { overflow: hidden; margin: -1rem -1rem 1.75rem; padding: 1rem; }
+.sh-rooms { display: flex; gap: 2rem; transition: transform 300ms var(--ease); }
+.sh-room {
+  flex: 0 0 25.5rem; padding: 1.75rem 1.75rem 1.5rem; border-radius: 2rem; background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.1); transition: background 200ms var(--ease), transform 200ms var(--ease);
+}
+.sh-room.here { background: rgba(255, 255, 255, 0.14); }
+.sh-name { font-size: 1.875rem; line-height: 2.375rem; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sh-dial { position: relative; width: 13.5rem; height: 13.5rem; margin: 0.75rem auto 0.25rem; }
+.sh-dial svg { width: 100%; height: 100%; transform: rotate(135deg); }
+.sh-dial .track { fill: none; stroke: rgba(255, 255, 255, 0.14); stroke-width: 8; stroke-linecap: round; }
+.sh-dial .arc { fill: none; stroke: #9fd8ff; stroke-width: 8; stroke-linecap: round; transition: stroke-dasharray 300ms var(--ease), stroke 300ms; }
+.sh-room.heat .sh-dial .arc { stroke: #ffb46e; }
+.sh-room.off .sh-dial .arc, .sh-room.quiet .sh-dial .arc { stroke: rgba(255, 255, 255, 0.3); }
+.sh-val { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.sh-val b { font-family: "Antonio", "Inter", sans-serif; font-size: 5.5rem; line-height: 5.75rem; font-weight: 300; letter-spacing: -0.03em; }
+.sh-val span { font-size: 1.3125rem; line-height: 1.75rem; color: var(--text-2); }
+.sh-room.off .sh-val b, .sh-room.quiet .sh-val b { color: var(--text-2); }
+.sh-now { min-height: 2.125rem; text-align: center; font-size: 1.5rem; line-height: 2.125rem; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sh-ctl { display: flex; gap: 0.75rem; justify-content: center; margin-top: 1.25rem; }
+.sh-b {
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem; min-width: 4rem; height: 4rem; padding: 0 0.875rem;
+  border-radius: 2rem; background: rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.92);
+  transition: transform 200ms var(--ease), background 200ms var(--ease), box-shadow 200ms var(--ease);
+}
+.sh-b i { display: flex; }
+.sh-b svg { width: 1.875rem; height: 1.875rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sh-b span { font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; white-space: nowrap; max-width: 8rem; overflow: hidden; text-overflow: ellipsis; }
+.sh-room:not(.off):not(.quiet) .sh-power { background: rgba(159, 216, 255, 0.3); }
+.sh-room.heat:not(.off):not(.quiet) .sh-power { background: rgba(255, 180, 110, 0.32); }
+.smart .sh-room .sh-b.focus { background: #fff; color: #111; transform: scale(1.12); box-shadow: 0 0.75rem 1.75rem rgba(0, 0, 0, 0.45); }
+.sh-scenes { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+/* five to a line, the same width each, so up and down land where they look like they should */
+.sh-scene {
+  display: flex; flex: 0 0 20.75rem; align-items: center; gap: 1rem; height: 5rem; padding: 0 1.75rem 0 1rem; border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.92);
+  transition: transform 200ms var(--ease), background 200ms var(--ease), box-shadow 200ms var(--ease);
+}
+.sh-scene i { display: flex; align-items: center; justify-content: center; width: 3.25rem; height: 3.25rem; border-radius: 1rem; background: rgba(255, 255, 255, 0.12); }
+.sh-scene svg { width: 1.75rem; height: 1.75rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.sh-scene b { min-width: 0; font-size: 1.625rem; line-height: 2.125rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sh-scene.focus { background: #fff; color: #111; transform: scale(1.06); box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.45); }
+.sh-scene.focus i { background: rgba(0, 0, 0, 0.07); }
+.sh-msg { min-height: 2rem; margin: auto 0 0 0.25rem; font-size: 1.4375rem; line-height: 2rem; font-weight: 550; color: #8fd3ff; }
+.sh-hint { margin: 0.25rem 0 0 0.25rem; font-size: 1.25rem; line-height: 1.75rem; color: rgba(255, 255, 255, 0.5); }
+@media (prefers-reduced-motion: reduce) {
+  .sh-b, .sh-scene, .sh-room, .sh-rooms, .sh-dial .arc { transition: none; }
+}

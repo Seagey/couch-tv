@@ -227,6 +227,57 @@ have an input screen. Leave the rest off.
 Ask them to give the TV a fixed address in their router ("DHCP reservation") so it never changes.
 If they cannot, the setup still works but may need the new address later.
 
+### 2.9 Smart home (optional, options A and B)
+
+Off unless they say yes. Ask only once, near the end: "Do you use Home Assistant at home? If you
+do, the TV can show your air conditioning and a doorbell camera." No, or "what is that": leave it
+out entirely (no `home_assistant` section) and move on. Do not suggest installing Home Assistant
+just for this.
+
+If they say yes to the air conditioning or the doorbell card:
+
+1. Explain in plain words what it needs, and that nothing about it happens unless they want it:
+   > "Three things. Home Assistant has to be running at home, on the same Wi-Fi or home network as
+   > the TV. You make a separate Home Assistant user just for the TV, and a long-lived access token
+   > for that user: it is like a password that only lets the TV in, and you can delete it any time.
+   > And I need the names Home Assistant uses for each thing, which look like `climate.bedroom` or
+   > `camera.front_door`. It all stays off unless you say yes, and taking it out later is one
+   > change and one re-run."
+2. **Air conditioning:** "Which rooms?" Their `climate.*` entity names, up to 8, and the name to
+   show for each.
+3. **Doorbell:** "What rings, and which camera shows the door?" The doorbell is usually an
+   `event.*` entity (Ring, Reolink, Nest and most others make one per press); a `binary_sensor.*`
+   or an `input_boolean.*` that is on while it rings also works. The camera is a `camera.*`. Tell
+   them: "A card with a still picture of the door, new every two seconds, pops up at the top right
+   over whatever is on. Any button on the remote hides it. For it to show over Netflix and the
+   other apps, the TV has to allow couch-tv to 'display over other apps'. I only switch that on
+   because you want the doorbell, and the undo switches it off." There is no live video and no
+   sound.
+4. **Then always ask: "Are there any other smart home devices you want on the TV?"** Map what they
+   say to what couch-tv can do, and say plainly what it cannot:
+   - Lights, blinds, fans, a "movie night" mood, a "good night" routine: a **scene or script
+     tile**. If they have no scene for it yet, they make one in Home Assistant (Settings,
+     Automations and scenes) and give you its `scene.*` or `script.*` name. Up to 10 tiles.
+   - More air conditioners or heaters: more `climate` rooms.
+   - Other cameras: only the doorbell's camera, and only as stills. Say so.
+   - Locks, alarms, garage doors: **not supported, on purpose** (nothing that opens the house from
+     a TV remote). Say so.
+   - Anything that is not in Home Assistant (a separate app, a hub Home Assistant does not know):
+     not supported yet. Say so; it may work if they add it to Home Assistant first.
+5. Write it down for the plan. In step 3, read it back as one line ("Smart home: the living room
+   and bedroom air conditioning, the Movie night and Good night tiles, and the front door doorbell
+   card, which needs 'display over other apps' switched on"), along with everything else, and
+   wait for the same yes. Nothing about it changes on the TV before that yes.
+6. After the yes: they make the Home Assistant user and token themselves, on their own Home
+   Assistant (Settings, People, add a user that is not an administrator; log in as it; its
+   profile, Security, Long-lived access tokens). Ask them to paste the token into `.env` as
+   `HOME_ASSISTANT_TOKEN=...` themselves, or give it to you only to write it there. Never put it
+   in `config.json`, never repeat it back, never write it anywhere else. Add the
+   `home_assistant` section to `config.json` ([docs/CONFIG.md](docs/CONFIG.md), Smart home).
+   `apply.sh` hands it to the TV and prints one line ("smart home: 2 climate, 2 scenes,
+   doorbell"); check that line matches the plan. You never call Home Assistant yourself to test
+   it: they check on the TV that the rooms show and, if they want, ring the doorbell once.
+
 ## 3. Read the plan back and get a yes
 
 Before you touch the TV, say back, in one short list: the TV, the option, the people, the look,

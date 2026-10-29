@@ -52,6 +52,9 @@ To remove only one app by hand, without the rest:
   said "Always allow" to. Delete them if nothing else on the computer uses ADB (Android Studio
   and Google's `adb` use the same files). "Revoke USB debugging authorisations" below forgets it
   on the TV's side.
+- **Smart home (if you set it up).** `undo.sh` takes back "display over other apps" (the doorbell
+  card). In Home Assistant, delete the TV's long-lived access token (its user's profile, Security)
+  or the whole TV user. Removing the app from the TV removes its copy of the token too.
 - **The couch-tv folder.** Delete it if you want your watch history gone too (`bridge/data/` holds
   it, plus `config.json` and `.env`).
 - **Phones.** On each phone, press and hold the remote's icon and remove it.

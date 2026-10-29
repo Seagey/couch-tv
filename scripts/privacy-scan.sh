@@ -72,7 +72,7 @@ RULES=(
   "home-network-hostname|[A-Za-z0-9-]+\.(lan|home\.arpa|ts\.net)([^A-Za-z0-9.-]|$)"
 )
 # Text that is allowed to match (placeholders and public noreply addresses). Per line, extended regex.
-ALLOW='users\.noreply\.github\.com|@example\.(com|org)|your-computer\.local|my-computer\.local|example\.local|<your-computer>\.local|x@y\.z|@types/|@vitejs/|@rolldown/|@oxc-project/|@emnapi/|@napi-rs/|@tybys/|@babel/|@esbuild/|@rollup/|@img/|\.local\.(plist|service)|_tcp\.local\.'
+ALLOW='users\.noreply\.github\.com|@example\.(com|org)|your-computer\.local|homeassistant\.local|my-computer\.local|example\.local|<your-computer>\.local|x@y\.z|@types/|@vitejs/|@rolldown/|@oxc-project/|@emnapi/|@napi-rs/|@tybys/|@babel/|@esbuild/|@rollup/|@img/|\.local\.(plist|service)|_tcp\.local\.'
 
 echo "== 2. generic checks (private addresses, emails, phones, paths)"
 for rule in "${RULES[@]}"; do

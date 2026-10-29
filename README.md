@@ -104,6 +104,12 @@ Classic look's own. Videos are not supported: a looping video under the glass cl
 blurred dock is heavy work for a small TV stick, and the clock's frosted fill is cut from a still
 photo.
 
+**Smart home (optional).** If you already run Home Assistant, the home can show your air
+conditioning (each room's temperature, warmer, cooler, on, off and mode), your scenes and scripts
+as tiles, and a doorbell card with the door camera's picture over whatever is playing. It is off
+unless you add a `home_assistant` section to `config.json`; without it nothing changes.
+[docs/CONFIG.md](docs/CONFIG.md), Smart home, has the setup.
+
 **Where they are kept.** On the TV, and with option B on the computer too, so the phone agrees and a
 reset TV gets them back. They win over `config.json` on that TV; About, Reset home settings goes
 back to it. [docs/CONFIG.md](docs/CONFIG.md) has the details.
@@ -507,6 +513,10 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
   runs it before every commit.
 - Option B: anyone on your Wi-Fi can use the remote and the assistant (see step 5). The bridge only
   listens on your home network. Do not forward a port to it.
+- Smart home (optional, off unless you add it): the Home Assistant token goes in `.env`, then
+  only into the TV app's private storage. The home page never sees it, and the app only touches the
+  rooms, scenes and doorbell you list. Make a separate Home Assistant user for the TV
+  ([docs/CONFIG.md](docs/CONFIG.md), Smart home).
 
 ## Limits
 
@@ -526,5 +536,7 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
 - Fonts: Inter and Antonio (both SIL Open Font Licence).
 - Show data and posters: JustWatch (credit them if you publish anything built on this).
 - Weather: Open-Meteo.
+- The doorbell card and Home Assistant scenes on the TV started in the
+  [roliusz fork](https://github.com/roliusz/couch-tv).
 
 MIT licence, see `LICENSE`.

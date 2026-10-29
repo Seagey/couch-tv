@@ -173,6 +173,7 @@
     document.documentElement.classList.toggle("theme-night", NIGHT);
     GRID_COLS = NIGHT ? 12 : 8;
     DOCK_APPS = Math.max(1, Math.min(10, parseInt(HOME.dock_size, 10) || 10));
+    if (smartOn()) DOCK_APPS = Math.min(DOCK_APPS, 9);   // the Smart home tile takes one place in the dock
     CLOCK24 = (ST.clock || HOME.clock) === "24h";
     (Array.isArray(HOME.hide_packages) ? HOME.hide_packages : []).forEach(function (p) {
       if (typeof p === "string" && HIDDEN.indexOf(p) < 0) HIDDEN.push(p);
@@ -780,17 +781,22 @@
   // Home settings (this page's own) or TV settings (Android's).
   function gearItem() { return { kind: "gear", name: t("settings"), package: SETTINGS_PKG }; }
   function moreItem() { return { kind: "more", name: t("more_apps") }; }
+  // Smart home (optional, smarthome.js): its tile sits just before the gear tile, only when
+  // config.json has a home_assistant section with rooms or scenes. Otherwise nothing changes.
+  function smartOn() { return !!(window.smartHome && window.smartHome.available()); }
+  function smartItem() { return { kind: "smart", name: t("smart_home"), package: "smart:home" }; }
+  function toolItems() { return smartOn() ? [smartItem(), gearItem()] : [gearItem()]; }
   function gridList() {
     if (NIGHT) return dockList();
     var apps = shownApps().filter(function (a) { return a.package !== SETTINGS_PKG; });
     var list = apps.filter(function (a) { return !tucked(a); });
     var extra = apps.filter(tucked);
     data.screens.forEach(function (sc) { list.push({ kind: "screen", id: sc.id, name: sc.name, ready: sc.ready, note: sc.note }); });
-    if (expanded) return list.concat(extra, [gearItem()]);
-    if (extra.length || list.length > GRID_MAX - 1) {
-      list = list.slice(0, GRID_MAX - 2);
-      list.push(gearItem(), moreItem());
-    } else list.push(gearItem());
+    var tools = toolItems();
+    if (expanded) return list.concat(extra, tools);
+    if (extra.length || list.length > GRID_MAX - tools.length) {
+      list = list.slice(0, GRID_MAX - 1 - tools.length).concat(tools, [moreItem()]);
+    } else list = list.concat(tools);
     return list;
   }
 
@@ -824,7 +830,7 @@
     var arr = arrangeItems();
     var list = expanded ? arr.items.slice() : arr.items.slice(0, arr.line);
     if (expanded && store) list.unshift({ kind: "app", store: true, name: t("app_store"), package: STORE_PKG, id: store.id });
-    list.push(gearItem());
+    list = list.concat(toolItems());
     if (!expanded) list.push(moreItem());
     return list;
   }
@@ -882,7 +888,7 @@
   function holdApp() {
     var a = gridItems[g];
     if (!a || a.kind === "more") return false;
-    if (a.store || a.kind === "gear") { flash(t("stays_put", { name: a.name })); return true; }
+    if (a.store || a.kind === "gear" || a.kind === "smart") { flash(t("stays_put", { name: a.name })); return true; }
     var arr = arrangeItems();
     var idx = arr.items.map(function (it) { return it.package; }).indexOf(a.package);
     if (idx < 0) return false;
@@ -975,6 +981,7 @@
     if (it.kind === "screen") face = '<div class="face tool">' + ICONS.screen + "</div>";
     else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
     else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
+    else if (it.kind === "smart") face = '<div class="face tool">' + window.smartHome.icon + "</div>";
     else if (iconUrl(it.package)) face = '<div class="face"><img src="' + esc(iconUrl(it.package)) + '" alt="" decoding="async" onerror="this.parentNode.className=\'face word\';this.parentNode.textContent=this.getAttribute(\'data-name\')" data-name="' + esc(it.name) + '"></div>';
     else if (it.store) face = '<div class="face tool">' + ICONS.store + "</div>";
     else face = '<div class="face word">' + esc(it.name) + "</div>";
@@ -989,6 +996,7 @@
     if (it.kind === "screen") face = '<div class="face tool">' + ICONS.screen + "</div>";
     else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
     else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
+    else if (it.kind === "smart") face = '<div class="face tool">' + window.smartHome.icon + "</div>";
     else if (it.banner) face = '<div class="face"><img src="' + esc(it.banner) + '" alt="" decoding="async"></div>';
     else if (iconUrl(it.package)) face = '<div class="face icon" style="background:' + esc(it.colour || "#2a2a30") + '"><img src="' + esc(iconUrl(it.package)) + '" alt=""></div>';
     else face = '<div class="face word" style="background:' + esc(it.colour || "#2a2a30") + '">' + esc(it.name) + "</div>";
@@ -1033,6 +1041,7 @@
 
   function paintFocus() {
     if (zone === "settings") { renderSettings(); return; }
+    if (zone === "smart") { window.smartHome.paint(); return; }
     clearFocus();
     renderHint();
     if (zone === "gear") { if (gridEls[g]) gridEls[g].classList.add("focus"); renderGear(); return; }
@@ -1084,6 +1093,7 @@
   function move(dx, dy) {
     touched = true;
     if (zone === "settings") { setMove(dx, dy); return; }
+    if (zone === "smart") { window.smartHome.move(dx, dy); return; }
     if (zone === "gear") { if (dy) { gi = Math.max(0, Math.min(1, gi + dy)); renderGear(); } return; }
     if (lift) { moveLift(dx, dy); return; }
     // Night with More apps open: the cards step aside, so up and down skip them
@@ -1156,6 +1166,7 @@
 
   function goHome() {
     if (zone === "settings") { setBack(); return; }
+    if (zone === "smart") { closeSmart(); paintFocus(); return; }
     if (zone === "gear") { closeGear(); paintFocus(); return; }
     if (lift) { dropLift(); return; }   // BACK puts a picked-up app down where it is
     if (zone === "pmenu") { if (plift) dropPeople(); else closePop(); paintFocus(); return; }
@@ -1171,7 +1182,7 @@
   function hold() {
     touched = true;
     if (zone === "settings") return setHold();
-    if (zone === "gear") return false;
+    if (zone === "gear" || zone === "smart") return false;
     if (lift) { dropLift(); return true; }
     if (zone === "pmenu") {
       if (plift) dropPeople();
@@ -1185,6 +1196,7 @@
   function activate() {
     touched = true;
     if (zone === "settings") { setActivate(); return; }
+    if (zone === "smart") { window.smartHome.ok(); return; }
     if (zone === "gear") { if (gi === 0) openSettings(); else openTvSettings(); return; }
     if (lift) { dropLift(); return; }
     if (zone === "menu") { setSleep(SLEEP_CHOICES[menuI]); paintFocus(); return; }
@@ -1220,6 +1232,7 @@
     if (!a) return;
     if (a.kind === "more") { expanded = true; renderGrid(); paintFocus(); return; }
     if (a.kind === "gear") { openGear(); return; }
+    if (a.kind === "smart") { openSmart(); return; }
     if (a.kind === "screen") {
       if (!a.ready) { status(a.note || t("screen_not_set")); return; }
       el.classList.add("busy");
@@ -1236,6 +1249,10 @@
     if (TV && TV.launch(a.package)) return;
     api("POST", "/api/launch", { app: a.id || a.package }).catch(function (e) { status(e.message); });
   }
+
+  // ---------------- Smart home: the rooms and scenes screen (smarthome.js) ----------------
+  function openSmart() { zone = "smart"; clearFocus(); window.smartHome.open(); }
+  function closeSmart() { window.smartHome.close(); zone = "grid"; }
 
   // ---------------- the gear tile's menu: Home settings or the TV's own settings ----------------
   var gi = 0;
@@ -2080,7 +2097,7 @@
 
   function refresh() {
     // never reshuffle under something being moved, or under the settings screen
-    if (lift || zone === "pmenu" || zone === "settings" || zone === "gear") return Promise.resolve();
+    if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart") return Promise.resolve();
     if (OFFLINE) {
       // only the TV's own apps, in the order last saved; no shows, no Screens
       if (TV) data.apps = sortApps(nativeApps() || []);
@@ -2111,7 +2128,7 @@
     ];
     return Promise.all(jobs.map(function (p) { return p.then(function () { return true; }, function () { return false; }); }))
       .then(function (ok) {
-        if (lift || zone === "pmenu" || zone === "settings" || zone === "gear") return;
+        if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart") return;
         data.bridge = ok[0] || ok[2];
         var apps = TV ? nativeApps() : (window.MOCK_APPS ? window.MOCK_APPS.slice() : null);
         if (!apps) apps = (data.bridgeApps || []).filter(function (a) { return a.installed !== false && a.id !== "home"; })
