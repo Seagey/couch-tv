@@ -10,8 +10,8 @@ android {
         applicationId = "dev.couchtv.ontv"
         minSdk = 28          // Android 9. Wireless debugging pairing needs Android 11+ on the TV.
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
     }
     buildFeatures { buildConfig = true }
     buildTypes {
