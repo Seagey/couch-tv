@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -71,7 +72,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Lets a computer inspect the page over ADB (chrome://inspect). Only reachable with ADB access.
-        WebView.setWebContentsDebuggingEnabled(true)
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
         root = FrameLayout(this).apply { setBackgroundColor(GROUND) }
         setContentView(root)
         hideSystemBars()
@@ -157,13 +158,16 @@ class MainActivity : Activity() {
         i.getStringExtra("config_b64")?.let {
             try {
                 val json = String(android.util.Base64.decode(it, android.util.Base64.DEFAULT), Charsets.UTF_8)
-                JSONObject(json)   // only keep it if it is real JSON
-                e.putString("config", json)
+                // only keep it if it is real JSON, and keep org.json's own rewrite of it rather than
+                // the text as sent, so nothing its lenient parser lets through reaches the page script
+                e.putString("config", JSONObject(json).toString())
             } catch (x: Exception) {
                 // a broken value keeps the settings the app already had
             }
         }
-        i.getStringExtra("tv")?.let { e.putString("tv", it) }
+        i.getStringExtra("tv")?.trim()?.let {
+            if (it.isEmpty()) e.remove("tv") else if (TV_NAME.matches(it)) e.putString("tv", it)
+        }
         e.apply()
     }
 
@@ -772,13 +776,28 @@ class MainActivity : Activity() {
     }
 
     private fun hideSystemBars() {
-        window.decorView.windowInsetsController?.let {
-            it.hide(WindowInsets.Type.systemBars())
-            it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.decorView.windowInsetsController?.let {
+                it.hide(WindowInsets.Type.systemBars())
+                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            )
         }
     }
 
     companion object {
+        /** A TV's name, as apply.sh passes it: small letters, digits and dashes. */
+        private val TV_NAME = Regex("[a-z0-9-]{1,32}")
+
         private val INPUT_ACTIONS = listOf(
             "android.settings.TV_INPUT_SETTINGS",           // some Android TV builds
             "com.android.tv.action.VIEW_INPUTS",            // the Live Channels input picker
