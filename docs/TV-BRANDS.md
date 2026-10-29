@@ -20,7 +20,7 @@ good sign. A Fire TV, Alexa-only or Roku button means it does not.
 | TCL (and Ffalcon) | Google TV (most recent ranges), some Android TV | Roku TV (US), Fire TV (some models) | The listing's OS field, not the series name |
 | Philips | 2020 to 2025 Google TV and Android TV models | Titan OS on all 2026 models, some older budget models on Titan OS or Roku | A 2026 Philips will not work |
 | Panasonic | Google TV (some European models) | Fire TV (some UK models), Roku and TiVo (US), My Home Screen (older) | Model codes differ by region: check the OS field |
-| Sony | Google TV on every recent Bravia | None found | Bravia is enough |
+| Sony | Google TV or Android TV on most Bravias since 2015 | Sony's own Linux system on some cheaper Full HD Bravias, for example the 2018 W66F series (KDL-43W660F, KLV-50W662F) | "Android TV" or "Google TV" on the box or in Settings, About. A Linux Bravia cannot run couch-tv: use a Google TV box on HDMI |
 | Xiaomi | Google TV (most models) | Fire TV (some 2026 models in Europe, "FireTV" in the name) | "FireTV" in the name or a Fire TV button |
 | Kogan | Google TV (OLED and QLED ranges), older Android TV | Roku TV (some older models), basic "Smart TV" on cheaper models | The spec sheet. No webOS models found |
 | Onn | Google TV (newer models) | Roku TV (older), Vizio OS (some 2025 models) | A Google button on the remote |
