@@ -177,6 +177,91 @@ their default order.
 | `phone_remote` [true] | `false` says this house does not use the phone remote. The bridge still runs the API, because the TV home uses it, and still serves the phone page if someone opens it. Keep the bridge on the home network only. |
 | `ask` [`{"enabled": true}` when the Claude Code program is on the computer, otherwise false] | `config.example.json` sets `{"enabled": false}`: turn it on only once Claude Code is installed and logged in on the bridge computer. Off hides Ask on the phone and the bridge answers `/api/ask` with `409`. Ask runs `claude -p` on your own Claude plan and never uses an API key. Anyone on your Wi-Fi can use it. |
 
+## Smart home (optional, through Home Assistant)
+
+Off unless you add it. With no `home_assistant` section (or `"enabled": false`, as in
+`config.example.json`) nothing changes on anyone's TV: no tile, no calls to anything, no extra
+permission. It works with option A (no computer) and option B (bridge), because the TV app talks to
+Home Assistant itself; the bridge never reads this section and never passes it on.
+
+You need [Home Assistant](https://www.home-assistant.io/) already running at home, on the same home
+network as the TV. It is the hub that knows your air conditioner, doorbell and cameras (Daikin,
+Mitsubishi, AirTouch, Ring, Nest, Reolink and hundreds more); couch-tv only talks to Home Assistant.
+
+```json
+"home_assistant": {
+  "url": "http://homeassistant.local:8123",
+  "climate": [
+    { "entity": "climate.living_room", "name": "Living room" },
+    { "entity": "climate.bedroom", "name": "Bedroom" }
+  ],
+  "scenes": [
+    { "entity": "scene.movie_night", "name": "Movie night" },
+    { "entity": "script.good_night", "name": "Good night" }
+  ],
+  "doorbell": { "entity": "event.front_door_ding", "camera": "camera.front_door", "name": "Front door" }
+}
+```
+
+And the token in `.env` (never in the repo):
+
+```sh
+HOME_ASSISTANT_TOKEN=<the long-lived token>
+```
+
+| Key | What it does |
+|---|---|
+| `url` (needed) | Home Assistant's address as the TV reaches it, `http://` or `https://`, with the port. |
+| token (needed) | `HOME_ASSISTANT_TOKEN` in `.env`. A `"token"` key in this section also works, but `.env` keeps secrets out of `config.json`. |
+| `enabled` [true] | `false` switches smart home off and keeps the rest of the section for later. |
+| `climate` | Up to 8 air conditioners or heaters (`climate.*` entities), in the order shown. `name` is optional (else Home Assistant's own name). |
+| `scenes` | Up to 10 scenes or scripts (`scene.*`, `script.*`), shown as tiles that run on OK. This is also the way to put lights, blinds or anything else on the TV: make a scene or script for it in Home Assistant. |
+| `doorbell` | `entity`: what rings, one of `event.*` (most doorbells, a new event per press), `binary_sensor.*` or `input_boolean.*` (on while ringing). `camera` (optional): a `camera.*` for the still picture. `name` (optional): the card's title. |
+
+**Make a separate Home Assistant user for the TV**, and make the token as that user: in Home
+Assistant, Settings, People, add a user (not an administrator), log in as it once, then its
+profile, Security, Long-lived access tokens, Create token. If the TV is ever lost or reset, delete
+that token and nothing else changes. Even so, a token can do anything that user can do in Home
+Assistant, so treat it like a password.
+
+**What the TV does with it.** `apply.sh` hands the section to the TV app on its own (never in the
+page's settings, never printed). The app keeps it in its own private storage, left out of Android
+backups, and never logs the token. The home page never sees the address or the token: it asks the
+app, and the app only allows these, for the entities named here and nothing else:
+
+- read the state of a listed `climate` entity; change its temperature (inside its own limits), its
+  mode (only modes it lists), or switch it on or off
+- run a listed scene or script
+- for the doorbell: read the doorbell entity, and the named camera's still picture
+
+Every call goes to `url` only, never follows a redirect, and gives up after a few seconds, so a
+Home Assistant that is off never holds the TV up. Change `config.json` and run `apply.sh` again to
+change any of it; the whole section is replaced at once, and a section that is removed or does not
+check out switches smart home off on the TV.
+
+**On the TV.** A **Smart home** tile sits just before Settings in the dock (it takes one of the
+dock's places, so the dock holds nine apps). OK opens one screen: each room as a card with its set
+point, the temperature now and what it is doing, and four buttons (cooler, warmer, on or off, mode),
+then the scenes. Left and right move, up and down change rows, Back closes. The rooms are read again
+every 20 seconds while the screen is open, and never while it is closed. A doorbell alone has no
+tile.
+
+**The doorbell card.** While the TV screen is on, the app asks the doorbell entity every 3
+seconds (screen off: it asks nothing). When someone rings, a card with the camera's still picture,
+a new one every 2 seconds, slides in at the top right over whatever is playing. Any button on the
+remote hides it for that ring; otherwise it goes after 45 seconds. Over other apps it needs Android's
+"display over other apps", so `apply.sh` grants it over ADB, but only when a `doorbell` is set up,
+and takes it back if you remove the doorbell later. `undo.sh` takes it back too. There is no live
+video, only stills, and no sound. The card only shows while the couch-tv app is running, which is
+normally all the time because it is the home screen.
+
+**Not supported yet:** live camera video, locks and alarms (on purpose: nothing that opens the house
+from a TV remote), single lights or switches as their own buttons (use a scene or a script), and
+anything outside Home Assistant.
+
+Preview with no TV and no Home Assistant: `?mock=1&ha=1` (see the end of this page). The doorbell
+card is drawn by the app itself, so it cannot be previewed in a browser.
+
 ## Everything else
 
 | Key | What it does |
@@ -226,6 +311,8 @@ Serve the repo folder with any static server and open the home with `?mock=1`, f
 `python3 -m http.server 8000`, then `http://127.0.0.1:8000/tv-home/web/index.html?mock=1`.
 `tv-home/web/mock.js` lists the preview settings: `people=4`, `quick=sleep,look,input`,
 `picture=1`, `look=classic`, `clock=24h`, `dock=6`, `scenes=fog,dawn`, `secs=8`, `newapp=1`,
-`offline=1`, `down`, and `reset=1` to forget what a preview saved (Home settings included). A
+`offline=1`, `down`, `ha=1` (smart home with a pretend Home Assistant; `ha=down` when it is not
+answering, `ha=scenes` for scenes only), and `reset=1` to forget what a preview saved (Home
+settings included). A
 preview keeps its Home settings apart from a real TV's (they start with `mock:`). `?scene=own`
 starts on the first of your own photos.

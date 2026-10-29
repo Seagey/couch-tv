@@ -37,6 +37,8 @@ for p in $PKGS; do
     "$PY" "$T" shell "pm enable $p"
   fi
 done
+# Smart home's doorbell card: take back "display over other apps" if apply.sh granted it.
+"$PY" "$T" shell "appops set app.couchtv.launcher SYSTEM_ALERT_WINDOW default" > /dev/null 2>&1 || true
 HOME_ACT=""
 [ -f "$HERE/../tvs/$TV_NAME.home" ] && HOME_ACT=$(cat "$HERE/../tvs/$TV_NAME.home")
 if [ -z "$HOME_ACT" ]; then

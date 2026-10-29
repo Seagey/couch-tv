@@ -200,7 +200,44 @@
     kept_both: "On this TV and the computer",
     about_reset: "Reset home settings",
     about_reset_sub: "Language, place, weather, look, your photos and quick buttons go back to config.json. People and apps stay.",
-    reset_done: "Back to the settings from config.json."
+    reset_done: "Back to the settings from config.json.",
+    // ---- smart home (optional, smarthome.js) ----
+    smart_home: "Smart home",
+    sh_climate: "Air conditioning",
+    sh_scenes: "Scenes",
+    sh_checking: "Checking",
+    sh_down: "Home Assistant is not answering. Check it is on and on the same network as the TV.",
+    sh_room_quiet: "Not answering",
+    sh_set_to: "Set to",
+    sh_range: "Between",
+    sh_now: "Now {t}",
+    sh_off: "Off",
+    sh_mode: "Mode",
+    sh_mode_heat: "Heat",
+    sh_mode_cool: "Cool",
+    sh_mode_heat_cool: "Heat and cool",
+    sh_mode_auto: "Auto",
+    sh_mode_dry: "Dry",
+    sh_mode_fan_only: "Fan",
+    sh_act_heating: "Heating",
+    sh_act_cooling: "Cooling",
+    sh_act_drying: "Drying",
+    sh_act_fan: "Fan on",
+    sh_act_idle: "Resting",
+    sh_cooler: "Cooler",
+    sh_warmer: "Warmer",
+    sh_turn_on: "Turn on",
+    sh_turn_off: "Turn off",
+    sh_turned_on: "Turning {name} on",
+    sh_turned_off: "Turning {name} off",
+    sh_mode_now: "{name}: {mode}",
+    sh_no_setpoint: "This one is set from Home Assistant, not here.",
+    sh_no_modes: "This one has no modes to choose from.",
+    sh_starting: "Starting {name}",
+    sh_started: "{name}: done.",
+    sh_failed: "That did not work. Home Assistant may be busy, try again.",
+    sh_refused: "That is not one of the things this TV may change.",
+    sh_hint: "Left and right move, up and down change rows. OK presses. Back closes."
   };
 
   S.es = {
@@ -385,7 +422,44 @@
     kept_both: "En este televisor y en el ordenador",
     about_reset: "Restablecer los ajustes de inicio",
     about_reset_sub: "Idioma, lugar, tiempo, aspecto, tus fotos y botones rápidos vuelven a config.json. Los perfiles y las apps se quedan.",
-    reset_done: "Se han restablecido los ajustes de config.json."
+    reset_done: "Se han restablecido los ajustes de config.json.",
+    // ---- casa inteligente (opcional, smarthome.js) ----
+    smart_home: "Casa inteligente",
+    sh_climate: "Climatización",
+    sh_scenes: "Escenas",
+    sh_checking: "Comprobando",
+    sh_down: "Home Assistant no responde. Comprueba que está encendido y en la misma red que la TV.",
+    sh_room_quiet: "No responde",
+    sh_set_to: "Fijado en",
+    sh_range: "Entre",
+    sh_now: "Ahora {t}",
+    sh_off: "Apagado",
+    sh_mode: "Modo",
+    sh_mode_heat: "Calor",
+    sh_mode_cool: "Frío",
+    sh_mode_heat_cool: "Calor y frío",
+    sh_mode_auto: "Automático",
+    sh_mode_dry: "Deshumidificar",
+    sh_mode_fan_only: "Ventilador",
+    sh_act_heating: "Calentando",
+    sh_act_cooling: "Enfriando",
+    sh_act_drying: "Deshumidificando",
+    sh_act_fan: "Ventilador encendido",
+    sh_act_idle: "En reposo",
+    sh_cooler: "Más frío",
+    sh_warmer: "Más calor",
+    sh_turn_on: "Encender",
+    sh_turn_off: "Apagar",
+    sh_turned_on: "Encendiendo {name}",
+    sh_turned_off: "Apagando {name}",
+    sh_mode_now: "{name}: {mode}",
+    sh_no_setpoint: "Esto se ajusta desde Home Assistant, no desde aquí.",
+    sh_no_modes: "No tiene modos para elegir.",
+    sh_starting: "Activando {name}",
+    sh_started: "{name}: listo.",
+    sh_failed: "No funcionó. Puede que Home Assistant esté ocupado, inténtalo de nuevo.",
+    sh_refused: "Eso no es algo que esta TV pueda cambiar.",
+    sh_hint: "Izquierda y derecha para moverte, arriba y abajo para cambiar de fila. OK para pulsar. Atrás para cerrar."
   };
 
   // Only what Mexico says differently; everything else comes from es.
@@ -472,7 +546,13 @@
     kept_both: "En esta TV y en la computadora",
     about_reset: "Restablecer la configuración de inicio",
     about_reset_sub: "Idioma, lugar, clima, vista, tus fotos y botones rápidos vuelven a config.json. Los perfiles y las apps se quedan.",
-    reset_done: "Se restableció la configuración de config.json."
+    reset_done: "Se restableció la configuración de config.json.",
+    // ---- casa inteligente: en México el aire acondicionado es "el clima" ----
+    sh_climate: "Clima",
+    sh_checking: "Revisando",
+    sh_down: "Home Assistant no responde. Revisa que esté encendido y en la misma red que la TV.",
+    sh_failed: "No funcionó. Puede que Home Assistant esté ocupado, inténtalo otra vez.",
+    sh_hint: "Izquierda y derecha para moverte, arriba y abajo para cambiar de fila. OK para presionar. Atrás para cerrar."
   };
 
   var lang = "en";

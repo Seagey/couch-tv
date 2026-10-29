@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Android's Watch Next list: what each app says you are in the middle of (keep watching, no computer needed). -->
     <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+    <!-- Smart home, only with a doorbell set up: the doorbell card over whatever is playing.
+         Not granted on install: apply.sh grants it over ADB only when config.json has a doorbell. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -37,6 +40,8 @@
         android:banner="@drawable/banner"
         android:theme="@style/Home"
         android:usesCleartextTraffic="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:supportsRtl="false">
 
         <activity

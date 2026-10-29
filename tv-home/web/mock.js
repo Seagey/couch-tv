@@ -12,6 +12,8 @@
 //   newapp=1            an app turns up that this TV has not seen before (the New dot)
 //   down                the bridge is not answering      offline=1   the saved copy, no bridge at all
 //   reset=1             forget everything this preview saved (orders, people, the look, Home settings)
+//   ha=1                smart home: a pretend Home Assistant with two rooms and three scenes
+//                       (ha=down: it is not answering; ha=scenes: scenes only, no rooms)
 (function () {
   var q = location.search;
   var arg = function (name) { var m = q.match(new RegExp("[?&]" + name + "=([^&]*)")); return m ? decodeURIComponent(m[1]) : null; };
@@ -71,6 +73,40 @@
     return LOGOS.indexOf(pkg) >= 0 ? "../../remote/src/app-logos/" + pkg + ".png" : null;
   };
   window.MOCK_APPS = apps.map(function (a) { return { kind: "app", name: a[1], package: a[0], colour: a[2] }; });
+
+  // ---------- a pretend Home Assistant (smart home, smarthome.js) ----------
+  // Stands in for the launcher's window.TVHA. Made up rooms and scenes, nothing real is switched.
+  var ha = arg("ha");
+  if (ha) {
+    var rooms = [
+      { entity: "climate.living_room", name: "Living room", state: "cool", action: "cooling", current: 24.5, target: 22,
+        min: 16, max: 30, step: 0.5, modes: ["off", "cool", "heat", "dry", "fan_only", "auto"] },
+      { entity: "climate.bedroom", name: "Bedroom", state: "off", action: "off", current: 19, target: 21,
+        min: 16, max: 30, step: 0.5, modes: ["off", "cool", "heat", "auto"] }
+    ];
+    if (ha === "scenes") rooms = [];
+    var scenes = [{ entity: "scene.movie_night", name: "Movie night" }, { entity: "scene.lights_off", name: "Lights off" },
+      { entity: "script.good_morning", name: "Good morning" }];
+    var reply = function (id, r) { setTimeout(function () { if (window.smartHome) window.smartHome.reply(id, r); }, 150); };
+    var room = function (e) { return rooms.filter(function (r) { return r.entity === e; })[0]; };
+    window.TVHA = {
+      info: function () {
+        return JSON.stringify({ climate: rooms.map(function (r) { return { entity: r.entity, name: r.name }; }), scenes: scenes, doorbell: true });
+      },
+      request: function (id, action, entity, value) {
+        if (ha === "down") return reply(id, action === "climate"
+          ? { ok: true, rooms: rooms.map(function (r) { return { entity: r.entity, name: r.name, ok: false }; }) }
+          : { ok: false, error: "failed" });
+        var r = room(entity);
+        if (action === "climate") return reply(id, { ok: true, rooms: rooms.map(function (x) { return Object.assign({ ok: true }, x); }) });
+        if (action === "temp" && r) { r.target = Math.max(r.min, Math.min(r.max, parseFloat(value))); return reply(id, { ok: true }); }
+        if (action === "mode" && r && r.modes.indexOf(value) >= 0) { r.state = value; r.action = value === "heat" ? "heating" : value === "cool" ? "cooling" : "idle"; return reply(id, { ok: true }); }
+        if ((action === "on" || action === "off") && r) { r.state = action === "off" ? "off" : "cool"; r.action = action === "off" ? "off" : "cooling"; return reply(id, { ok: true }); }
+        if (action === "scene" && scenes.some(function (x) { return x.entity === entity; })) return reply(id, { ok: true });
+        reply(id, { ok: false, error: "refused" });
+      }
+    };
+  }
 
   // ---------- a pretend bridge ----------
   var jw = function (p) { return "https://images.justwatch.com/" + p + ".webp"; };

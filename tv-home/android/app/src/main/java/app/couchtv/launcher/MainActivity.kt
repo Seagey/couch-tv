@@ -79,6 +79,7 @@ class MainActivity : Activity() {
         intent?.let { readExtras(it) }
         io.execute { warmApps() }
         askWatchNextPermission()
+        Doorbell.start(this)   // smart home (optional): nothing happens unless a doorbell is set up
         // At power-on the page is often asked for before Wi-Fi is up: try again the moment it is.
         getSystemService(android.net.ConnectivityManager::class.java)?.registerDefaultNetworkCallback(
             object : android.net.ConnectivityManager.NetworkCallback() {
@@ -170,6 +171,7 @@ class MainActivity : Activity() {
             if (it.isEmpty()) e.remove("tv") else if (TV_NAME.matches(it)) e.putString("tv", it)
         }
         e.apply()
+        HomeAssistant.readExtras(this, i)   // smart home ("ha_b64"), kept apart from the page's settings
     }
 
     // ---------------------------------------------------------------- finding the bridge
@@ -248,6 +250,7 @@ class MainActivity : Activity() {
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.textZoom = 100
         addJavascriptInterface(Native(), "TVOS")
+        addJavascriptInterface(HomeAssistant.Page(this@MainActivity, this), "TVHA")   // smart home, see HomeAssistant.kt
         webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {
                 if (!loadFailed && url.startsWith("http")) {
