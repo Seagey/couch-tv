@@ -62,14 +62,15 @@ fi
 
 echo "1/4  Installing the app"
 "$PY" "$T" install "$APK"
-# Make couch-tv the home while the Google home is still on, and check it took, before anything is
-# switched off: on some Google TVs switching the Google home off first hands Home to the setup
-# wizard's recovery screen, which can crash-loop and take the Wi-Fi and ADB with it (seen by the
-# herocode1 fork).
+# Make couch-tv the chosen home while the Google home is still on, and check the TV took it, before
+# anything is switched off: on some Google TVs switching the Google home off first hands Home to the
+# setup wizard's recovery screen, which can crash-loop and take the Wi-Fi and ADB with it (seen by
+# the herocode1 fork). The Home key itself still opens Google's home until step 2 switches it off,
+# and resolve-activity keeps naming Google's, so the check asks for the chosen launcher instead.
 "$PY" "$T" shell "cmd package set-home-activity $HOME_ACT" > /dev/null
-NOW=$("$PY" "$T" shell "$RESOLVE" | tail -1)
+NOW=$("$PY" "$T" shell "cmd shortcut get-default-launcher" | grep -m1 Launcher || true)
 case "$NOW" in
-  app.couchtv.launcher/*) ;;
+  *app.couchtv.launcher/*) ;;
   *) echo "The TV did not take couch-tv as its home (it says: $NOW). Nothing was switched off."; exit 1 ;;
 esac
 # Keep watching with no computer reads Android's Watch Next list, which needs this permission.
