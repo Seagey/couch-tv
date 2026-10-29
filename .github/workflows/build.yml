@@ -36,7 +36,8 @@ jobs:
         run: python -m py_compile bridge/*.py scripts/*.py tv-home/tools/*.py
 
       - name: Shell scripts parse
-        run: for f in scripts/*.sh tv-home/tools/*.sh; do sh -n "$f"; done
+        # each with the shell its first line names (privacy-scan.sh is bash, the rest plain sh)
+        run: for f in scripts/*.sh tv-home/tools/*.sh; do if head -1 "$f" | grep -q bash; then bash -n "$f"; else sh -n "$f"; fi; done
 
       - name: Android platform 34
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0" > /dev/null
