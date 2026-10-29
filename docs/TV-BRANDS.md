@@ -26,6 +26,7 @@ good sign. A Fire TV, Alexa-only or Roku button means it does not.
 | Onn | Google TV (newer models) | Roku TV (older), Vizio OS (some 2025 models) | A Google button on the remote |
 | Element | Some Google TV models | Fire TV and Roku models | Retailer spec only |
 | Thomson | Google TV (recent models) | Older own "Smart TV" | Thomson Europe went bankrupt in 2026, so updates are uncertain |
+| Wansa | Google TV (for example WLE65NGT63, WLE75NGT63) and Android TV 11 (for example WUD58J0A63S) | Not confirmed: check older or cheaper models | Retailer listings only (Gulf retailers). "Android TV OS" in Settings, About means yes |
 | Hitachi, JVC, Insignia, Westinghouse, Haier | Not confirmed | Mostly Roku TV or Fire TV | Check the spec sheet |
 | Metz, Grundig | Some Android or Google TV (not confirmed) | Fire TV, VIDAA, Saphi and others | No brand-wide rule: check the model |
 | Nokia, Motorola (licensed brands) | Android TV in some countries | Not confirmed | Made by different companies in each country |
