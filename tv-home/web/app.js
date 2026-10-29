@@ -178,6 +178,7 @@
       if (typeof p === "string" && HIDDEN.indexOf(p) < 0) HIDDEN.push(p);
     });
     HIDDEN_TV = (Array.isArray(ST.hidden_apps) ? ST.hidden_apps : []).filter(function (p) { return typeof p === "string"; });
+    SCENE_LIB = BUILT_IN.concat(myScenes(HOME.my_scenes));
     var st = sceneState();
     SCENES = st.order.filter(function (id) { return st.off.indexOf(id) < 0; }).map(sceneById).filter(Boolean);
     if (!SCENES.length) SCENES = [SCENE_LIB[0]];
@@ -340,7 +341,8 @@
     //                as the clock's frosted fill (without it the fill is the photo itself)
     //   water: 0.55  the waterline, as a share of the screen height: above it the clock is sharp,
     //                below it a blurred copy shows like a reflection
-    // backgrounds/CREDITS.md says how to make the cut-out and the glass copy for your own photo.
+    // Your own scenes are not listed here: tools/make-scene.py makes them and home.my_scenes in
+    // config.json names them (myScenes() below, docs/MAKE-A-SCENE.md).
     // Each scene's clock and date positions are in app.css (.s-<id>, .scene-<id> .date).
     { id: "night", photo: "scene-night", fg: true, glass: true },
     { id: "golden", photo: "scene-golden", fg: true, glass: true },
@@ -348,8 +350,39 @@
     { id: "fog", photo: "scene-fog", fg: true, glass: true },
     { id: "dawn", photo: "scene-dawn", fg: true, glass: true }
   ];
+  var BUILT_IN = SCENE_LIB.slice();   // readConfig() adds your own scenes to SCENE_LIB
   var SCENES = SCENE_LIB.slice(), SCENE_MS = 20000;
   var scene = 0, sceneEls = [], glassShown = "";
+
+  // Your own scenes (home.my_scenes in config.json), made with tools/make-scene.py: the photo, glass
+  // copy and cut-out in backgrounds/mine/, and how its clock looks. Anything odd falls back to the
+  // built-in look, and the clock is kept above Keep watching and the dock whatever the numbers say.
+  // A scene whose photo is not on this TV leaves the turns by itself (lostScene below).
+  function myScenes(list) {
+    var taken = BUILT_IN.map(function (s) { return s.id; }).concat(["own", "mine"]), out = [];
+    var share = function (v, lo, hi, d) { return typeof v === "number" && isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
+    (Array.isArray(list) ? list : []).forEach(function (m) {
+      if (!m || typeof m.id !== "string" || !/^[a-z0-9]{1,24}$/.test(m.id) || taken.indexOf(m.id) >= 0) return;
+      taken.push(m.id);
+      var c = m.clock && typeof m.clock === "object" ? m.clock : {};
+      var size = share(c.size, 0.2, 0.45, 0.37);   // the digits' font size, as a share of the screen height
+      var below = m.date === "below", inter = c.font === "inter";
+      // the top of the clock, as a share of the screen height. The digits' ink ends 0.92 of the
+      // font size below it (Antonio; Inter 0.77), and must end above Keep watching, as on the
+      // waterline scene; with the date below, the date must fit too.
+      var y = share(c.y, 0.12, 0.6, 0.14);
+      y = Math.max(0.12, Math.min(y, 0.62 - (inter ? 0.77 : 0.92) * size - (below ? 0.06 : 0)));
+      // cutout: true only when make-scene.py made the cut-out (scene-<id>-fg.webp); without it the
+      // clock is simply drawn over the photo
+      out.push({ id: m.id, photo: "mine/scene-" + m.id, fg: m.cutout === true, glass: true, mine: true, n: out.length + 1,
+        name: typeof m.name === "string" ? m.name.slice(0, 40) : "",
+        x: ["left", "right"].indexOf(c.x) >= 0 ? c.x : "centre", y: y, size: size,
+        inter: inter, weight: Math.round(share(c.weight, 100, 900, 600) / 100) * 100,
+        below: below, dark: m.text === "dark" });
+    });
+    return out;
+  }
+  function sceneClass(s) { return s.own ? "own" : s.mine ? "mine" : s.id; }
 
   // The household's own photos (Home settings, "Your photos") are scenes too, with no cut-out and
   // no glass copy: the clock's fill is the photo itself, frosted in app.css (.s-own).
@@ -370,8 +403,10 @@
       order = order.concat(ids.filter(function (id) { return order.indexOf(id) < 0; }));
       off = (Array.isArray(ST.scenes_off) ? ST.scenes_off : []).filter(function (id) { return ids.indexOf(id) >= 0; });
     } else {
-      var builtIn = SCENE_LIB.map(function (x) { return x.id; });
-      var pick = (HOME.scenes || []).filter(function (id, i, a) { return builtIn.indexOf(id) >= 0 && a.indexOf(id) === i; });
+      // your own scenes (home.my_scenes) are always on: listed in home.scenes they go where they
+      // are listed, otherwise after the built-in ones
+      var lib = SCENE_LIB.map(function (x) { return x.id; }), builtIn = BUILT_IN.map(function (x) { return x.id; });
+      var pick = (HOME.scenes || []).filter(function (id, i, a) { return lib.indexOf(id) >= 0 && a.indexOf(id) === i; });
       if (!pick.length) pick = builtIn;
       order = pick.concat(ids.filter(function (id) { return pick.indexOf(id) < 0; }));
       off = builtIn.filter(function (id) { return pick.indexOf(id) < 0; });
@@ -384,12 +419,38 @@
     var box = $("scenes");
     sceneEls = SCENES.map(function (s) {
       var el = document.createElement("div");
-      el.className = "scene s-" + (s.own ? "own" : s.id);
+      el.className = "scene s-" + sceneClass(s);
       el.innerHTML = '<img class="sbg" alt=""><div class="shade"></div><div class="gclock"></div>' +
         (s.water ? '<div class="gclock under"></div>' : "") + (s.fg ? '<img class="fg" alt="">' : "");
+      if (s.mine) {   // your own scene: its clock from config.json (app.css, "your own scenes")
+        el.className += " x-" + s.x + (s.inter ? " f-inter" : "") + (s.dark ? " t-dark" : "");
+        el.style.setProperty("--my-top", s.y * 100 + "vh");
+        el.style.setProperty("--my-size", s.size * 100 + "vh");
+        el.style.setProperty("--my-weight", s.weight);
+        el.querySelector(".sbg").onerror = function () { lostScene(s); };
+        var fg = el.querySelector(".fg");
+        if (fg) fg.onerror = function () { fg.style.display = "none"; };   // "cutout": true but no file: the clock stays in front
+      }
       box.appendChild(el);
       return el;
     });
+  }
+
+  // An own scene whose photo is not on this TV (option A with an app built before the scene was
+  // made, or a scene named in config.json but not made yet) leaves the turns instead of showing black.
+  function lostScene(s) {
+    s.lost = true;
+    if (SCENES.every(function (x) { return x.lost; })) {
+      SCENES = [BUILT_IN[0]];
+      $("scenes").innerHTML = "";
+      buildScenes();
+      scene = 0;
+      showScene(0);
+    } else if (SCENES[scene] === s) showScene(nextFrom(scene));
+  }
+  function nextFrom(i) {
+    for (var k = 1; k <= SCENES.length; k++) if (!SCENES[(i + k) % SCENES.length].lost) return (i + k) % SCENES.length;
+    return i;
   }
 
   // draw a scene (load its pictures, place its clock) so it can fade in
@@ -435,7 +496,13 @@
     var date = $("date");
     date.classList.add("swap");
     setTimeout(function () {
-      document.documentElement.className = document.documentElement.className.replace(/\bscene-\w+/g, "").trim() + " scene-" + (SCENES[i].own ? "own" : SCENES[i].id);
+      var s = SCENES[i], root = document.documentElement, cls = " scene-" + sceneClass(s);
+      if (s.mine) {   // the date follows your own scene's clock
+        cls += " mine-" + s.x + (s.below ? " mine-below" : "") + (s.inter ? " mine-inter" : "") + (s.dark ? " mine-dark" : "");
+        root.style.setProperty("--my-top", s.y * 100 + "vh");
+        root.style.setProperty("--my-size", s.size * 100 + "vh");
+      }
+      root.className = root.className.replace(/\b(scene|mine)-\w+/g, "").replace(/\s+/g, " ").trim() + cls;
       date.classList.remove("swap");
       fitDate();
     }, 600);
@@ -443,7 +510,7 @@
     if (prev !== i) sceneEls[prev].classList.remove("on");
     // after the fade, stop drawing the old one and get the next one ready
     setTimeout(function () {
-      var next = (scene + 1) % SCENES.length;
+      var next = nextFrom(scene);
       sceneEls.forEach(function (el, k) { if (k !== scene && k !== next) el.classList.remove("ready"); });
       readyScene(next);
     }, 2000);
@@ -470,7 +537,7 @@
   }
 
   // the settings screen covers the scenes, so they wait (one less thing for a small TV stick to draw)
-  function nextScene() { if (zone !== "settings") showScene((scene + 1) % SCENES.length); }
+  function nextScene() { if (zone !== "settings") showScene(nextFrom(scene)); }
 
   // The bridge's reading for the place in config.json, or straight from Open-Meteo with no bridge
   // or when Home settings chose another place. Hidden when Home settings switched the weather off.
@@ -1502,7 +1569,8 @@
     st.order.forEach(function (id) {
       var sc = sceneById(id);
       if (!sc) return;
-      rows.push({ kind: "check", key: "scene:" + id, label: sc.own ? t("scene_photo", { n: sc.n }) : t("scene_" + id),
+      var label = sc.own ? t("scene_photo", { n: sc.n }) : sc.mine ? sc.name || t("scene_mine", { n: sc.n }) : t("scene_" + id);
+      rows.push({ kind: "check", key: "scene:" + id, label: label,
         thumb: sc.own ? sc.src : "backgrounds/" + sc.photo + ".jpg", checked: st.off.indexOf(id) < 0,
         act: function () { toggleScene(id); }, move: function (d) { moveScene(id, d); } });
     });
@@ -2148,8 +2216,9 @@
     setInterval(clock, 15000);
     if (NIGHT) {
       buildScenes();
-      // ?scene=fog starts on that scene, for previews (?scene=own: the first of the household's photos)
-      var first = (Q.match(/[?&]scene=([a-z]+)/) || [])[1];
+      // ?scene=fog starts on that scene, for previews (?scene=own: the first of the household's
+      // photos; ?scene=<id>: one of your own scenes)
+      var first = (Q.match(/[?&]scene=([a-z0-9]+)/) || [])[1];
       showScene(Math.max(0, SCENES.map(function (s) { return s.own ? "own" : s.id; }).indexOf(first)));
       if (SCENES.length > 1) setInterval(nextScene, SCENE_MS);
       // the clock font must be in before the glass is measured

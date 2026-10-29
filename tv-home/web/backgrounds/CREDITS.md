@@ -29,7 +29,12 @@ The files that go with them are made from those same generated scenes, so the sa
 
 ## Your own photo with the clock behind it
 
-1. Put the photo in this folder as a 1920x1080 JPEG and add it to `SCENES` in `../app.js`.
+The easy way: `tv-home/tools/make-scene.py` makes the photo and glass copy (and, if you want it,
+the cut-out) into `mine/`, and `home.my_scenes` in `config.json` designs the clock, with no code
+to edit.
+[docs/MAKE-A-SCENE.md](../../../docs/MAKE-A-SCENE.md) walks through it. By hand:
+
+1. Put the photo in this folder as a 1920x1080 JPEG and add it to `SCENE_LIB` in `../app.js`.
 2. The cut-out: in any background remover or image editor, delete the sky and keep everything in
    front of it (mountains, trees, buildings). Export it at the same size as a transparent WebP
    named `<photo>-fg.webp`, for example `cwebp -q 86 -alpha_q 100 -exact cutout.png -o

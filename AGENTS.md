@@ -180,6 +180,18 @@ recommend C (A if they only want the home screen). Write the choice down; the re
 - "What suburb or city for the weather?" Look up its latitude, longitude and time zone yourself.
 - "What country are you in?" (For where shows stream. Two letter code, for example AU, US, GB.)
 
+### 2.3.1 Your own background (optional)
+
+- "Want your own background? Describe a place, or give a photo." Any photo works, a landscape or
+  a personal one. If yes, follow [docs/MAKE-A-SCENE.md](docs/MAKE-A-SCENE.md) once the plan has
+  its yes: one command makes the photo and the clock's glass fill, and `home.my_scenes` designs the
+  clock over it (where it sits, size, font, the date, light or dark). Putting the clock behind the
+  skyline is an optional extra (step 6 there); offer it only for a photo with open sky.
+  Making a picture from a description with a paid image model costs money: ask before using one.
+- Option A: say plainly that their own scene needs the app built on this computer
+  (`scripts/build-apk.sh`, so JDK 21 and the Android SDK) instead of the one from Releases.
+- Their pictures stay in `tv-home/web/backgrounds/mine/`, which git ignores. Never commit them.
+
 ### 2.4 Apps
 
 - "Which apps do you use most? I'll put them first." The home shows 10 apps in a row, then

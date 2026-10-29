@@ -141,7 +141,8 @@ Home settings saves to the same `bridge/data/people.json` the phone uses.
 | Key | What it does |
 |---|---|
 | `look` ["night"] | `night`: the scenes with the big glass clock. `classic`: one photo, a grid of app banners. The `look` quick button overrides this on each TV, and `?theme=` overrides both for a preview. |
-| `scenes` [all five] | Which Night scenes take turns, and in what order. Any of `night`, `golden`, `water`, `fog`, `dawn`. One scene stays put. |
+| `scenes` [all five] | Which Night scenes take turns, and in what order. Any of `night`, `golden`, `water`, `fog`, `dawn`, and the ids of your own scenes. One scene stays put. |
+| `my_scenes` [none] | Your own scenes from any photo, each with its clock designed: where it sits, its size and font, the date above or below it, light or dark text, and `cutout` for the skyline in front of the clock. Made with `tv-home/tools/make-scene.py`; [MAKE-A-SCENE.md](MAKE-A-SCENE.md) has every key. They take turns after the scenes in `scenes` unless they are listed there. Option A needs the app rebuilt with the scene's pictures inside (that guide says how). |
 | `scene_seconds` [20] | How long each scene shows. 5 or more. |
 | `clock` ["12h"] | `12h` (5:30 pm) or `24h` (17:30). |
 | `hide_packages` [none] | Android package names never shown on the home or in More apps, for a maker's own clutter (help apps, file browsers, screen sharing tools). `survey-tv.py` lists every TV app with its package name. For example `["com.example.tvhelp"]`. |
@@ -228,4 +229,5 @@ Serve the repo folder with any static server and open the home with `?mock=1`, f
 `picture=1`, `look=classic`, `clock=24h`, `dock=6`, `scenes=fog,dawn`, `secs=8`, `newapp=1`,
 `offline=1`, `down`, and `reset=1` to forget what a preview saved (Home settings included). A
 preview keeps its Home settings apart from a real TV's (they start with `mock:`). `?scene=own`
-starts on the first of your own photos.
+starts on the first of your own photos. `myscenes=[...]` is `home.my_scenes` as JSON, and
+`?scene=<id>` starts on one of them ([MAKE-A-SCENE.md](MAKE-A-SCENE.md), step 5).

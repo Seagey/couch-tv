@@ -53,10 +53,9 @@ them. Full guide, limits and undo: [docs/SAMSUNG.md](docs/SAMSUNG.md).
 Five scenes take turns every 20 seconds, each with a big glass clock that sits just behind the
 scenery: the peaks, the volcano and the misty hills overlap the bottom of the digits, and on the
 waterline scene the clock floats on the lake with a blurred reflection under the surface. Your apps
-and "keep watching" stay put. Start on one with `?scene=<name>`, or swap in your own photos. To put
-the clock behind your own photo, make a transparent cut-out of everything in front of the sky
-(any background remover will do), save it next to the photo as `<photo>-fg.webp` and set
-`fg: true`; `tv-home/web/backgrounds/CREDITS.md` has the steps.
+and "keep watching" stay put. Start on one with `?scene=<name>`, or swap in your own photos.
+**Design your own scene** (any photo, or a place you describe, with your own clock and date over
+it, and the skyline in front of the clock if you like): [docs/MAKE-A-SCENE.md](docs/MAKE-A-SCENE.md).
 
 | Night | Golden hour | Waterline |
 |---|---|---|

@@ -37,3 +37,7 @@ platform-tools/
 *.bak-*
 *-backup-*
 .DS_Store
+
+# Your own home scenes (tv-home/tools/make-scene.py writes them here), and the originals
+tv-home/web/backgrounds/mine/*
+!tv-home/web/backgrounds/mine/.gitkeep

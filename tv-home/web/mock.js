@@ -9,6 +9,7 @@
 //   picture=1           this TV has a picture mode switch (Calibrated and Dynamic)
 //   look=classic        home.look       clock=24h   home.clock     dock=6   home.dock_size
 //   scenes=fog,dawn     home.scenes     secs=8      home.scene_seconds
+//   myscenes=[...]      home.my_scenes, as JSON (docs/MAKE-A-SCENE.md), for your own scenes
 //   newapp=1            an app turns up that this TV has not seen before (the New dot)
 //   down                the bridge is not answering      offline=1   the saved copy, no bridge at all
 //   reset=1             forget everything this preview saved (orders, people, the look, Home settings)
@@ -40,6 +41,7 @@
   if (arg("dock")) cfg.home.dock_size = parseInt(arg("dock"), 10);
   if (arg("scenes")) cfg.home.scenes = arg("scenes").split(",");
   if (arg("secs")) cfg.home.scene_seconds = parseInt(arg("secs"), 10);
+  if (arg("myscenes")) try { cfg.home.my_scenes = JSON.parse(arg("myscenes")); } catch (e) {}
   window.COUCH_CONFIG = cfg;
 
   // ---------- the TV's apps ----------

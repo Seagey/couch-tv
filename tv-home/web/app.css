@@ -406,6 +406,28 @@ body {
 .s-own .gclock .fill { filter: brightness(1.4) saturate(1.15); opacity: 0.88; }
 .s-own .gclock .rim { -webkit-text-stroke-color: rgba(255, 255, 255, 0.7); }
 
+/* ================= your own scenes (home.my_scenes, made with tools/make-scene.py) =================
+   app.js sets --my-top and --my-size (the clock's top and font size, from config.json) on the scene
+   and on the page, and the classes: x-left or x-right, f-inter, t-dark on the scene; mine-left,
+   mine-right, mine-below, mine-inter, mine-dark on the page for the date. Without them it is the built-in look. */
+.s-mine .shade { background: linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0) 40%); }
+.s-mine .gclock { top: var(--my-top, 9.375rem); font-size: var(--my-size, 25rem); }
+.s-mine.x-left .gclock { left: 6rem; right: auto; text-align: left; }
+.s-mine.x-right .gclock { left: auto; right: 6rem; text-align: right; }
+.s-mine.f-inter .gclock { font-family: "Inter", sans-serif; font-weight: var(--my-weight, 600); letter-spacing: -0.05em; line-height: 0.8; }
+.s-mine.t-dark .gclock { filter: none; }
+.s-mine.t-dark .gclock .fill { filter: brightness(0.46) saturate(0.8) contrast(1.1); opacity: 0.8; }
+.s-mine.t-dark .gclock .rim { color: transparent; -webkit-text-stroke-color: rgba(255, 255, 255, 0.6); }
+.s-mine.t-dark .gclock .sheen { display: none; }
+.scene-mine .date { top: calc(var(--my-top, 9.375rem) - 3.375rem); }
+/* below: under the digits' ink, which ends 0.92 of the font size down (Antonio), 0.77 (Inter) */
+.scene-mine.mine-below .date { top: calc(var(--my-top, 9.375rem) + var(--my-size, 25rem) * 0.92 + 1rem); }
+.scene-mine.mine-below.mine-inter .date { top: calc(var(--my-top, 9.375rem) + var(--my-size, 25rem) * 0.77 + 1rem); }
+.scene-mine.mine-left .date { left: 6.5rem; right: auto; text-align: left; }
+.scene-mine.mine-right .date { left: auto; right: 6.5rem; text-align: right; }
+.scene-mine.mine-dark .date { color: #16201d; text-shadow: none; }
+.scene-mine.mine-dark .date .wx { color: rgba(22, 32, 29, 0.72); }
+
 /* ================= the gear tile's menu: Home settings or TV settings ================= */
 .gear-pop {
   display: none; position: fixed; z-index: 15; width: max-content; max-width: 42rem; padding: 0.625rem;
