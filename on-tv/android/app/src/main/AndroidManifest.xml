@@ -20,6 +20,10 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
 
+    <!-- Fire TV home takeover without the TV's own ADB (some Fire OS builds block it): lets the
+         watcher see Amazon's home come forward. Optional, granted once over ADB from a computer. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
@@ -76,6 +80,19 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Local-network server for a phone remote control of this TV" />
+        </service>
+
+        <!-- Fire TV only, and only used when "Use as home screen" is on. Window-change events only:
+             it reads no screen content. FireHome switches it on with the secure-settings grant. -->
+        <service
+            android:name=".WatchService"
+            android:exported="false"
+            android:label="Couch TV home watch"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/watch_service" />
         </service>
 
         <receiver android:name=".BootReceiver" android:exported="true">

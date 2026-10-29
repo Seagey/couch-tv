@@ -50,7 +50,11 @@ object Store {
     fun publicConfig(): JSONObject = JSONObject()
         .put("people", people())
         .put("weather", weather())
-        .put("tvs", JSONArray().put(JSONObject().put("id", TV_ID).put("name", tvName())))
+        .put("tvs", JSONArray().put(JSONObject().put("id", TV_ID).put("name", tvName()).also {
+            // Only a Fire TV changes: its quick buttons gain Input (the TV's own HDMI picker).
+            // Every other TV keeps the home's default buttons, exactly as before.
+            if (FireHome.isFireTv) it.put("quick", JSONArray(listOf("sleep", "look", "input")))
+        }))
         .put("default_tv", TV_ID)
         .put("mode", "on-tv")
 

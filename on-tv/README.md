@@ -116,6 +116,41 @@ adb shell pm enable com.google.android.apps.tv.launcherx                  # undo
 Check the package name on your TV first (`adb shell pm list packages | grep launcher`). Some Google
 Home features stop working while it is off. The app never does this by itself.
 
+### Fire TV (Fire OS)
+
+Works on Fire TV sticks, Cubes and TVs that run **Fire OS** (7 on Android 9, 8 on Android 11). It does
+**not** work on the newer sticks that run **Vega OS**, which cannot sideload apps at all.
+
+Amazon's launcher cannot be switched off, and the Home key starts it by name, so no setting can
+hand the Home key to another app. Instead, with **Use as home screen** on, Couch TV notices
+Amazon's home coming on screen and puts its own home back on top. It does nothing on any other
+kind of TV. Two things to know:
+
+- **Amazon's home still flashes up for a moment** before Couch TV's comes back. Without root,
+  that is as good as Fire OS allows.
+- It needs two one-off grants, over ADB from a computer (they survive reboots, so the computer is
+  only needed once):
+
+```
+adb shell pm grant dev.couchtv.ontv android.permission.WRITE_SECURE_SETTINGS
+adb shell appops set dev.couchtv.ontv SYSTEM_ALERT_WINDOW allow
+```
+
+The first lets the app switch on its own small accessibility watcher (it sees which window came
+forward and reads nothing else) and switch it back on if an update turns it off. The second lets
+the app come forward from the background. If you would rather not use an accessibility service,
+grant usage access instead of the first line (`adb shell appops set dev.couchtv.ontv GET_USAGE_STATS allow`)
+and the app polls the system's usage events instead. Where a Fire OS build still lets the TV use its
+own ADB, the activity log is followed as a third option.
+
+On a Fire TV the quick buttons also gain **Input** (the TV's own HDMI picker). Some Fire OS builds
+block the TV's own ADB, and then the phone remote's keys, typing, power off and "what's playing"
+do not work; opening apps, playing a show by name, volume on the TV's own speaker and the sleep
+timer still do.
+
+Ported from the Fire TV work in [dlandman27's fork](https://github.com/dlandman27/couch-tv). Thanks
+to them.
+
 The home's gear tile opens **Home settings** here too (language, weather place and units, look,
 scenes, apps, people, quick buttons; README, "Settings on the TV"). They are kept in this app
 (`/api/settings`, next to the setup page's own settings), and the people list is the same one the

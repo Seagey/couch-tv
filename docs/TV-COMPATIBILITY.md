@@ -56,7 +56,8 @@ Not tested by the author. Each line is what someone said worked on their own dev
   fixed port 5555. The app has to pair with the TV once, and
   the port changes after a restart. See `on-tv/README.md` for how it handles that.
 - **Fire OS.** Amazon blocks real home screen replacement. The workarounds relaunch your app after
-  Amazon's home flashes up. ADB works. The Android TV Remote protocol is not confirmed on Fire TV.
+  Amazon's home flashes up; the on-TV app (option C) does this itself once two one-off ADB grants are
+  given (`on-tv/README.md`, "Fire TV (Fire OS)"). ADB works. The Android TV Remote protocol is not confirmed on Fire TV.
 - **Vega OS** is Amazon's newer Linux system. It has no sideloading. Amazon says future Fire TV
   sticks will run it.
 - **Samsung and LG** do not run Android apps or let an app replace their home screen. On a Samsung,
