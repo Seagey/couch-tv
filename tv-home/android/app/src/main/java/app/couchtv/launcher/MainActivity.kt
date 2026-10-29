@@ -78,6 +78,7 @@ class MainActivity : Activity() {
         hideSystemBars()
         intent?.let { readExtras(it) }
         io.execute { warmApps() }
+        askWatchNextPermission()
         // At power-on the page is often asked for before Wi-Fi is up: try again the moment it is.
         getSystemService(android.net.ConnectivityManager::class.java)?.registerDefaultNetworkCallback(
             object : android.net.ConnectivityManager.NetworkCallback() {
@@ -280,6 +281,12 @@ class MainActivity : Activity() {
                         responseHeaders = mapOf("Cache-Control" to "max-age=86400")
                     }
                 }
+                if (u.pathSegments.firstOrNull() == "art") {
+                    val b = watchNextArt(u.lastPathSegment ?: "") ?: return null
+                    return WebResourceResponse("image/jpeg", null, ByteArrayInputStream(b)).apply {
+                        responseHeaders = mapOf("Cache-Control" to "max-age=86400")
+                    }
+                }
                 val pkg = u.lastPathSegment ?: return null
                 val isIcon = u.pathSegments.firstOrNull() == "icon"
                 val img = (if (isIcon) iconImage(pkg) else bannerImage(pkg)) ?: return null
@@ -446,6 +453,14 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun launch(pkg: String): Boolean = launchPackage(pkg)
 
+        /** Android's Watch Next list (what each app says you are in the middle of), as JSON. */
+        @JavascriptInterface
+        fun watchNext(): String = readWatchNext().toString()
+
+        /** Opens one Watch Next item (its row id) in the app that owns it. */
+        @JavascriptInterface
+        fun openWatchNext(id: String): Boolean = openWatchNextItem(id)
+
         @JavascriptInterface
         fun openSettings(): Boolean = start(Intent(Settings.ACTION_SETTINGS))
 
@@ -605,6 +620,106 @@ class MainActivity : Activity() {
         val bytes = if (file.exists()) file.readBytes() else bannerBytes(ri)?.also { file.writeBytes(it) }
         if (bytes != null) banners[pkg] = bytes
         return bytes
+    }
+
+    // ------------------------------------------------------------ Watch Next (keep watching with no computer)
+
+    private val WATCH_NEXT = android.net.Uri.parse("content://android.media.tv/watch_next_program")
+    private val READ_TV = "android.permission.READ_TV_LISTINGS"
+    /** The picture addresses the Watch Next list gave us: the only ones the art route will fetch. */
+    private val watchNextArtSeen = java.util.Collections.synchronizedSet(HashSet<String>())
+
+    /** Asks once. Without it Android answers the Watch Next query with nothing. */
+    private fun askWatchNextPermission() {
+        if (checkSelfPermission(READ_TV) == PackageManager.PERMISSION_GRANTED) return
+        if (prefs.getBoolean("askedWatchNext", false)) return
+        prefs.edit().putBoolean("askedWatchNext", true).apply()
+        try { requestPermissions(arrayOf(READ_TV), 77) } catch (e: Exception) {}
+    }
+
+    private fun readWatchNext(): JSONArray {
+        val out = JSONArray()
+        if (checkSelfPermission(READ_TV) != PackageManager.PERMISSION_GRANTED) return out
+        try {
+            val cols = arrayOf("_id", "package_name", "title", "episode_title", "season_display_number",
+                "episode_display_number", "poster_art_uri", "thumbnail_uri", "last_playback_position_millis",
+                "duration_millis", "last_engagement_time_utc_millis")
+            contentResolver.query(WATCH_NEXT, cols, null, null, "last_engagement_time_utc_millis DESC")?.use { c ->
+                val perApp = HashMap<String, Int>()
+                while (c.moveToNext() && out.length() < 12) {
+                    val pkg = c.getString(1) ?: continue
+                    if (pkg == packageName) continue
+                    val n = (perApp[pkg] ?: 0) + 1
+                    if (n > 4) continue
+                    perApp[pkg] = n
+                    val art = c.getString(7)?.takeIf { it.isNotBlank() } ?: c.getString(6)?.takeIf { it.isNotBlank() }
+                    if (art != null) watchNextArtSeen.add(art)
+                    val label = try {
+                        packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+                    } catch (e: Exception) { pkg }
+                    val pos = c.getLong(8)
+                    val dur = c.getLong(9)
+                    out.put(JSONObject().apply {
+                        put("id", c.getLong(0).toString())
+                        put("wn", true)
+                        put("title", c.getString(2) ?: label)
+                        put("episode_title", c.getString(3) ?: "")
+                        put("season", c.getString(4) ?: "")
+                        put("episode", c.getString(5) ?: "")
+                        if (art != null) put("backdrop", "http://tvos.invalid/art/" + android.util.Base64.encodeToString(
+                            art.toByteArray(), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING))
+                        if (dur > 0 && pos > 0) put("progress", (pos.toDouble() / dur).coerceIn(0.0, 1.0))
+                        put("app", JSONObject().put("package", pkg).put("name", label))
+                    })
+                }
+            }
+        } catch (e: Exception) {
+            // no provider or no permission: an empty row, never a crash
+        }
+        return out
+    }
+
+    private fun openWatchNextItem(id: String): Boolean {
+        if (!Regex("[0-9]{1,18}").matches(id)) return false
+        try {
+            val cols = arrayOf("package_name", "intent_uri")
+            val uri = android.content.ContentUris.withAppendedId(WATCH_NEXT, id.toLong())
+            contentResolver.query(uri, cols, null, null, null)?.use { c ->
+                if (!c.moveToFirst()) return false
+                val pkg = c.getString(0) ?: return false
+                val raw = c.getString(1)
+                if (raw != null) {
+                    try {
+                        val i = Intent.parseUri(raw, Intent.URI_INTENT_SCHEME)
+                        // only ever open something in the app that owns the item
+                        if (i.component != null && i.component!!.packageName != pkg) i.component = null
+                        i.`package` = pkg
+                        i.selector = null
+                        if (i.resolveActivity(packageManager) != null && start(i)) return true
+                    } catch (e: Exception) {}
+                }
+                return launchPackage(pkg)
+            }
+        } catch (e: Exception) {}
+        return false
+    }
+
+    /** The picture behind a Watch Next card: a web address or a content address the page cannot read itself. */
+    private fun watchNextArt(token: String): ByteArray? {
+        return try {
+            val raw = String(android.util.Base64.decode(token, android.util.Base64.URL_SAFE))
+            if (raw !in watchNextArtSeen) return null
+            val u = android.net.Uri.parse(raw)
+            when (u.scheme) {
+                "http", "https" -> {
+                    val c = URL(raw).openConnection() as HttpURLConnection
+                    c.connectTimeout = 6000; c.readTimeout = 8000
+                    c.inputStream.use { it.readBytes() }
+                }
+                "content", "android.resource" -> contentResolver.openInputStream(u)?.use { it.readBytes() }
+                else -> null
+            }
+        } catch (e: Exception) { null }
     }
 
     private fun launchPackage(pkg: String): Boolean {

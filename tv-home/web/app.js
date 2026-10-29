@@ -1207,6 +1207,11 @@
       var it = data.shows[s];
       if (!it) return;
       status(it.app ? t("opening_in", { title: it.title, app: it.app.name }) : t("opening", { title: it.title }), true);
+      if (it.wn && TV && TV.openWatchNext) {
+        if (!TV.openWatchNext(String(it.id)) && it.app) TV.launch(it.app.package);
+        status("");
+        return;
+      }
       api("POST", "/api/continue/open", { id: it.id, who: NOBODY ? "both" : who }, 60000)
         .then(function (res) { status(res.note || ""); })
         .catch(function (e) {
@@ -2086,6 +2091,12 @@
       if (TV) data.apps = sortApps(nativeApps() || []);
       else if (window.MOCK_APPS) data.apps = sortApps(window.MOCK_APPS.slice());
       data.bridge = false;
+      // Keep watching with no computer: Android's own Watch Next list, the same for everyone in the house
+      if (TV && TV.watchNext) {
+        var wn = [];
+        try { wn = JSON.parse(TV.watchNext()) || []; } catch (e) {}
+        PEOPLE.forEach(function (p) { data.showsBy[p.id] = wn; });
+      }
       detectNew();
       status(ALONE ? "" : t("computer_off"), true);
       render();

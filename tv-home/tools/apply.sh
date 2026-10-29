@@ -62,6 +62,18 @@ fi
 
 echo "1/4  Installing the app"
 "$PY" "$T" install "$APK"
+# Make couch-tv the home while the Google home is still on, and check it took, before anything is
+# switched off: on some Google TVs switching the Google home off first hands Home to the setup
+# wizard's recovery screen, which can crash-loop and take the Wi-Fi and ADB with it (seen by the
+# herocode1 fork).
+"$PY" "$T" shell "cmd package set-home-activity $HOME_ACT" > /dev/null
+NOW=$("$PY" "$T" shell "$RESOLVE" | tail -1)
+case "$NOW" in
+  app.couchtv.launcher/*) ;;
+  *) echo "The TV did not take couch-tv as its home (it says: $NOW). Nothing was switched off."; exit 1 ;;
+esac
+# Keep watching with no computer reads Android's Watch Next list, which needs this permission.
+"$PY" "$T" shell "pm grant app.couchtv.launcher android.permission.READ_TV_LISTINGS" > /dev/null 2>&1 || true
 
 echo "2/4  Switching off the Google home and ambient mode"
 present=$("$PY" "$T" shell "pm list packages" | sed 's/package://')
