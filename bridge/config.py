@@ -191,9 +191,44 @@ def _int(value, default, lo, hi):
     return max(lo, min(hi, int(value)))
 
 
+def _share(value, lo, hi):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return round(max(lo, min(hi, float(value))), 3)
+
+
+def _my_scenes(items):
+    """home.my_scenes: your own scenes (tv-home/tools/make-scene.py, docs/MAKE-A-SCENE.md). Only the
+    keys the TV home reads, with safe values; the page checks them again."""
+    out, seen = [], set(SCENE_IDS) | {"own", "mine"}
+    for m in items if isinstance(items, list) else []:
+        if not isinstance(m, dict) or not isinstance(m.get("id"), str) or not re.fullmatch(r"[a-z0-9]{1,24}", m["id"]):
+            continue
+        if m["id"] in seen:
+            continue
+        seen.add(m["id"])
+        c = m.get("clock") if isinstance(m.get("clock"), dict) else {}
+        clock = {"x": c.get("x") if c.get("x") in ("left", "centre", "right") else "centre",
+                 "font": "inter" if c.get("font") == "inter" else "antonio"}
+        for key, lo, hi in (("y", 0.12, 0.6), ("size", 0.2, 0.45), ("weight", 100, 900)):
+            v = _share(c.get(key), lo, hi)
+            if v is not None:
+                clock[key] = v
+        item = {"id": m["id"], "clock": clock, "date": "below" if m.get("date") == "below" else "above",
+                "text": "dark" if m.get("text") == "dark" else "light", "cutout": m.get("cutout") is True}
+        if isinstance(m.get("name"), str) and m["name"].strip():
+            item["name"] = m["name"].strip()[:40]
+        out.append(item)
+        if len(out) >= 20:
+            break
+    return out
+
+
 def _home(h):
     h = h if isinstance(h, dict) else {}
-    scenes = [s for s in dict.fromkeys(h.get("scenes") or []) if s in SCENE_IDS] if isinstance(h.get("scenes"), list) else []
+    mine = _my_scenes(h.get("my_scenes"))
+    ids = SCENE_IDS + [m["id"] for m in mine]
+    scenes = [s for s in dict.fromkeys(h.get("scenes") or []) if s in ids] if isinstance(h.get("scenes"), list) else []
     hide = h.get("hide_packages") if isinstance(h.get("hide_packages"), list) else []
     return {
         # Android package names never shown on the home or in More apps (a maker's own clutter).
@@ -205,6 +240,8 @@ def _home(h):
         "dock_size": _int(h.get("dock_size"), DOCK_LIMIT, 1, DOCK_LIMIT),
         # the TV home's language until someone picks one in Home settings: en, es or es-MX
         "language": h.get("language") if h.get("language") in ("en", "es", "es-MX") else "en",
+        # your own scenes, in backgrounds/mine/ (docs/MAKE-A-SCENE.md)
+        "my_scenes": mine,
     }
 
 
