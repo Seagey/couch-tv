@@ -7,6 +7,43 @@ screen. Open source (MIT).
 
 ## Updates
 
+**30 October 2026: Fire TV sticks, older TVs, smart home and your own scenes.** Sixteen people
+have forked couch-tv so far, and six of them built something worth having. The best of it is now in
+the main repo, credited to each of them. Download the new apps from
+[the Releases page](https://github.com/Seagey/couch-tv/releases) (or ask your agent to update).
+
+- **Fire TV sticks and Fire TV Cube (Fire OS).** The "lives on the TV" app now takes the Home key
+  back: Amazon's own home cannot be switched off, so the app sees it come up and puts couch-tv's
+  home straight back on top. Amazon's home still flashes up for a moment first. It needs two
+  one-off grants from a computer: [on-tv/README.md](on-tv/README.md#fire-tv-fire-os). Not yet
+  tried on a real Fire TV by us: if you have one, an issue saying how it went helps everyone.
+- **Older TVs no longer crash on open.** Both TV apps used a part of Android that only Android 11
+  and newer have. On Android 9 and 10 (most Fire TV sticks, and many older Android TVs) the home
+  crashed as it opened. Fixed and checked on an Android 9 emulator: the old apps crash, the new
+  ones open.
+- **Keep watching with no computer.** With no bridge (option A), Keep watching now fills from
+  Android's own Watch Next list: what each app says you are part way through, with its picture
+  and how far in you are.
+- **Smart home, if you want it.** If you run Home Assistant, the home can show your air
+  conditioning (each room, warmer, cooler, on, off, mode), your scenes as tiles, and a doorbell
+  card with the door camera over whatever is playing. It is off for everyone unless they set it
+  up, and your agent asks first ([docs/CONFIG.md](docs/CONFIG.md), Smart home).
+- **Design your own scene.** Put the glass clock over any photo: a landscape, your own holiday
+  shot, anything. Optionally let the skyline sit in front of the clock, like the built-in scenes.
+  [docs/MAKE-A-SCENE.md](docs/MAKE-A-SCENE.md).
+- **Safer setup.** `apply.sh` now makes couch-tv the chosen home and checks the TV took it before
+  it switches anything off (on some TVs the other order can leave Home on a crash-looping setup
+  screen). The TV app also checks the settings it is handed more strictly.
+- **A build on every change.** GitHub now builds both TV apps for every push and pull request, so
+  a change that breaks the build shows straight away.
+
+Thank you to [fifarsi](https://github.com/fifarsi/couch-tv) and
+[ishanboss20](https://github.com/ishanboss20/couch-tv) (the Android 9 crash),
+[gurpritsingh81](https://github.com/gurpritsingh81/couch-tv) (Watch Next),
+[herocode1](https://github.com/herocode1/couch-tv-hero) (the safety fixes and the install order),
+[dlandman27](https://github.com/dlandman27/couch-tv) (Fire TV) and
+[roliusz](https://github.com/roliusz/couch-tv) (the doorbell, Home Assistant and own scenes).
+
 **29 October 2026: Samsung TVs.** couch-tv now works on Samsung TVs too. It was tested on a 2021
 Samsung Frame. It is the same link and the same setup: give this repo to your agent and it offers
 the Samsung path when it finds a Samsung.
@@ -522,7 +559,9 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
 
 ## Limits
 
-- Google TV and Android TV only. Developer mode has to be on.
+- Google TV and Android TV run everything. Fire TV (Fire OS) runs the on-TV app, with Amazon's
+  home flashing up first. Samsung runs it as an app, with a computer that stays on. Developer
+  mode has to be on.
 - A Google TV update can switch the Google home back on. Option B's bridge checks once a day and
   switches it off again; with option A, run `apply.sh` again.
 - Some apps will not open a show directly. They open the app instead. See `bridge/DEEPLINKS.md`.
