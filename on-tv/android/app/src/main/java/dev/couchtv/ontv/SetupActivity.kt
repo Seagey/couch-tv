@@ -58,7 +58,7 @@ class SetupActivity : Activity() {
         row.addView(connect)
         row.addView(button("New phone code") { Auth.newPin(); refresh() })
         row.addView(button("Developer options") { runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) } })
-        homeBtn = button("") { App.setHomeEnabled(this, !App.homeEnabled(this)); refresh() }
+        homeBtn = button("") { App.setHomeEnabled(this, !App.homeEnabled(this)); FireHome.poke(); refresh() }
         row.addView(homeBtn)
         row.addView(button("Forget phones") { Auth.forgetAll(); refresh() })
         col.addView(row)

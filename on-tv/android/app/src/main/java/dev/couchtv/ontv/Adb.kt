@@ -237,6 +237,7 @@ object Adb {
         io.execute {
             runCatching { shell("appops set ${BuildConfig.APPLICATION_ID} SYSTEM_ALERT_WINDOW allow", 8000) }
             if (Build.VERSION.SDK_INT >= 30) runCatching { shell("pm grant ${BuildConfig.APPLICATION_ID} android.permission.WRITE_SECURE_SETTINGS", 8000) }
+            FireHome.poke()
         }
         return true
     }
@@ -288,6 +289,16 @@ object Adb {
     // One ADB command at a time: the library numbers new streams without a lock, and two opened
     // at once (the now-playing poll and a launch check) got mixed up in testing.
     private val execLock = java.util.concurrent.locks.ReentrantLock(true)
+
+    /**
+     * A long-lived stream (a logcat follow, say). The caller owns it: reads it until it dies and
+     * closes it. The lock is held only while the stream opens, like the key shell.
+     */
+    fun stream(service: String): AdbStream {
+        if (!connected && (!(everAllowed || paired) || !ensure())) throw IllegalStateException("ADB is not connected")
+        if (!execLock.tryLock(15_000, TimeUnit.MILLISECONDS)) throw IllegalStateException("ADB is busy")
+        return try { mgr.openStream(service) } finally { execLock.unlock() }
+    }
 
     /** Binary output, for `exec:screencap -p`. */
     fun exec(service: String, timeoutMs: Long = 15_000): ByteArray {

@@ -137,7 +137,7 @@ the phone are still in English.
 | **Google TV box** (Google TV Streamer, Chromecast with Google TV, Onn) | Yes | Yes | Partial, as above |
 | **Older Android TV** (Android 9 to 11) | Yes | Yes | Yes |
 | **Nvidia Shield** | Yes (not tested) | Yes | Yes (not tested) |
-| **Fire TV on Fire OS** (Fire TV Stick 4K Max, Fire TV Cube) | Partial. Workarounds only, and Amazon's home flashes up first | Partial | Yes |
+| **Fire TV on Fire OS** (Fire TV Stick 4K Max, Fire TV Cube) | Partial. Workarounds only, and Amazon's home flashes up first | Partial | Yes, and it takes the Home key back ([how](on-tv/README.md#fire-tv-fire-os)) |
 | **Fire TV on Vega OS** (newer Fire TV sticks) | No | No | No |
 | **Samsung** (Tizen) | App only, opened from Samsung's app row | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
 | **LG** (webOS) | Possible, untested ([research](docs/LG.md)) | Possible, untested | No |
@@ -155,7 +155,9 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   order, the phone remote, finding and playing shows, the sleep timer. Some Google Home features and
   the YouTube button on the remote can stop working once the Google home is switched off.
 - **Fire TV (Fire OS):** the phone remote and app launching work. Amazon does not let another home
-  screen take over, so you keep Amazon's home.
+  screen replace its own, so the "lives on the TV" app (option C) watches for Amazon's home and puts
+  couch-tv's home back on top; Amazon's home still flashes up for a moment first. It needs two
+  one-off ADB grants: [on-tv/README.md](on-tv/README.md#fire-tv-fire-os).
 - **Samsung:** it does not run Android apps and it locks its home screen, so couch-tv goes on as a
   Samsung app (you install it with a free tool and your own Samsung sign-in), and the bridge opens
   it every time the TV is switched on, so it needs a computer that stays on. Samsung's own Home
