@@ -98,6 +98,10 @@ curl -X POST http://<stick-ip>:5400/api/pair -H 'Content-Type: application/json'
   not couch-tv.
 - **Uninstalling the app removes its watcher and grants.** After a reinstall, redo Install steps
   5 to 7. An update (`adb install -r`, same signing key) keeps everything.
+- **Restart the stick after an update if Home lands on Amazon's home.** Fire OS keeps the watcher
+  switched on but does not always reconnect it after the app is updated (seen on 8.1.8.5). A
+  restart reconnects it. To check: `adb shell dumpsys accessibility | grep "Bound services"`
+  should list "Couch TV home watch".
 - **The setup screen remembers which button had focus.** Count your D-pad presses from what is
   highlighted, not from the left: it is easy to press Forget phones by mistake.
 - **Weather defaults to Sydney** until you set a place in Home settings or through the API.
