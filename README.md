@@ -5,6 +5,21 @@ built and waiting for its first real LG. No ads on the home screen. Open source 
 
 ![The Night home screen](docs/screens/home-night.jpg)
 
+## This fork: Fire TV Stick
+
+This fork runs couch-tv as the home screen of a **Fire TV Stick 4K (2nd gen) on Fire OS 8.1.8.5**,
+tested on the stick itself. It adds:
+
+- **Bluetooth and Network buttons** on the home (Fire OS's long-press Home menu has neither).
+- **GitHub builds signed with one fixed key**, so a new build installs over the last one and keeps
+  its settings.
+
+![couch-tv on a Fire TV Stick, with the Bluetooth and Network buttons at the top right](docs/screens/firestick-home.jpg)
+
+Install steps, what works, and the things that will save you time:
+**[docs/FIRE-TV-STICK.md](docs/FIRE-TV-STICK.md)**. Everything else in this README is the upstream
+project's, and still applies.
+
 ## Updates
 
 **1 November 2026: LG TVs.** couch-tv now has an LG version, done the same way as the Samsung one:
