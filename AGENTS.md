@@ -321,6 +321,9 @@ exactly what changes:
 - While the TV is off the Wi-Fi the computer undo cannot reach it either; the fix is to re-join
   the Wi-Fi, or the TV-remote route in [docs/UNINSTALL.md](docs/UNINSTALL.md). With
   `KEEP_SETUP=1`, on some TVs the old home then keeps the Home button.
+- Options A and B: the TV home asks GitHub once a day whether a new couch-tv release is out
+  (switch it off in Home settings, Updates). It installs nothing unless someone at the TV says yes
+  on Android's own screen.
 - Show them the undo ([docs/UNINSTALL.md](docs/UNINSTALL.md)) before you start.
 
 Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
@@ -372,7 +375,9 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
    timer, the profile switch, and for B and C one press on the phone remote.
 7. Hand over in plain words: how to rearrange apps (phone, or hold OK on the TV), how to add apps
    (App Store tile), how to change profiles, where the undo is, and for option A that a Google TV
-   update may need `apply.sh` once more.
+   update may need `apply.sh` once more. Options A and B: a new couch-tv release shows up by itself
+   as a dot on the gear tile, and Home settings, Updates installs it (Android asks first, and once
+   asks to let Home install apps). The daily look can be switched off there.
 
 ## Rules while you work
 

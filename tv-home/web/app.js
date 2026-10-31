@@ -99,7 +99,8 @@
     apps: '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>',
     person: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c.8-3.9 3.7-6 7.5-6s6.7 2.1 7.5 6"/></svg>',
     bolt: '<svg viewBox="0 0 24 24"><path d="M13 2.8 5.5 13.2h5.8L10.5 21l8-10.6h-5.9z"/></svg>',
-    info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.2"/></svg>'
+    info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.2"/></svg>',
+    download: '<svg viewBox="0 0 24 24"><path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5"/><path d="M4.5 16v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V16"/></svg>'
   };
   // weather glyphs for the date line, by Open-Meteo's WMO code
   var WX = {
@@ -1056,8 +1057,7 @@
     else if (it.store) face = '<div class="face tool">' + ICONS.store + "</div>";
     else face = '<div class="face word">' + esc(it.name) + "</div>";
     var cls = "tile app dock-ic" + (lift && it.package === lift.pkg ? " lifted" : "");
-    return '<div class="' + cls + '">' + face + (isNew(it.package) ? '<i class="dot" aria-label="' + esc(t("new_app")) + '"></i>' : "") +
-      '<div class="label">' + esc(it.name) + "</div></div>";
+    return '<div class="' + cls + '">' + face + dotHTML(it) + '<div class="label">' + esc(it.name) + "</div></div>";
   }
 
   function appHTML(it) {
@@ -1070,8 +1070,13 @@
     else if (it.banner) face = '<div class="face"><img src="' + esc(it.banner) + '" alt="" decoding="async"></div>';
     else if (iconUrl(it.package)) face = '<div class="face icon" style="background:' + esc(it.colour || "#2a2a30") + '"><img src="' + esc(iconUrl(it.package)) + '" alt=""></div>';
     else face = '<div class="face word" style="background:' + esc(it.colour || "#2a2a30") + '">' + esc(it.name) + "</div>";
-    return '<div class="tile app">' + face + (isNew(it.package) ? '<i class="dot" aria-label="' + esc(t("new_app")) + '"></i>' : "") +
-      '<div class="label">' + esc(it.name) + "</div></div>";
+    return '<div class="tile app">' + face + dotHTML(it) + '<div class="label">' + esc(it.name) + "</div></div>";
+  }
+  // The small blue dot: an app not opened yet, or (on the gear tile) a new couch-tv release.
+  function dotHTML(it) {
+    if (isNew(it.package)) return '<i class="dot" aria-label="' + esc(t("new_app")) + '"></i>';
+    if (it.kind === "gear" && updReady()) return '<i class="dot" aria-label="' + esc(t("upd_gear", { v: UPD.latest })) + '"></i>';
+    return "";
   }
 
   function renderGrid() {
@@ -1337,7 +1342,8 @@
   }
   function renderGear() {
     var pop = $("gear-pop");
-    var items = [[ICONS.sliders, t("gear_home"), t("gear_home_sub")], [ICONS.gear, t("gear_tv"), t("gear_tv_sub")]];
+    var items = [[ICONS.sliders, t("gear_home"), updReady() ? t("upd_gear", { v: UPD.latest }) : t("gear_home_sub")],
+      [ICONS.gear, t("gear_tv"), t("gear_tv_sub")]];
     pop.innerHTML = items.map(function (it, i) {
       return '<div class="grow' + (i === gi ? " focus" : "") + '" role="menuitem"><i>' + it[0] + "</i><span><b>" + esc(it[1]) +
         "</b><small>" + esc(it[2]) + "</small></span></div>";
@@ -1465,6 +1471,7 @@
   function info(key, label, value, sub) { return { kind: "info", key: key, label: label, value: value, sub: sub }; }
 
   function sectionRows(id) {
+    if (id === "updates") return updateRows();
     if (id === "language") return languageRows();
     if (id === "location") return locationRows();
     if (id === "weather") return weatherRows();
@@ -1907,6 +1914,60 @@
         act: resetSettings }
     ];
   }
+  // ---- updates: couch-tv's own GitHub releases (the launcher's Updater.kt) ----
+  // The launcher looks once a day while the home is on screen (switch below); "Check now" looks
+  // straight away. A newer release puts a dot on the gear tile and says so on the home once.
+  // Installing always goes through Android's own "update this app?" screen, and keeps every
+  // setting. No launcher behind the page (a browser, a Samsung, the on-TV app, an older launcher):
+  // no Updates section at all. mock.js stands in for previews (?update=1).
+  var UPD = null;
+  function upd() { return window.TVUP || window.MOCK_UPDATER || null; }
+  function updRead() {
+    var u = upd();
+    UPD = null;
+    try { if (u) UPD = JSON.parse(u.state()); } catch (e) {}
+    return UPD;
+  }
+  function updReady() { return !!(UPD && UPD.available); }
+  // the launcher's news: a check finished, a download moved on, the installer answered
+  function updChanged(s) {
+    var was = updReady();
+    UPD = s && typeof s === "object" ? s : updRead();
+    if (zone === "settings") renderSettings();
+    else if (updReady() !== was) renderGrid();
+    updTell();
+  }
+  // Once per release, a line on the home; the gear tile's dot stays until it is installed.
+  function updTell() {
+    if (!updReady() || kept("tvhome.update.told") === UPD.latest) return;
+    keep("tvhome.update.told", UPD.latest);
+    status(t("upd_told", { v: UPD.latest }));
+  }
+  function updWhen(u) {
+    if (!u.checked) return t("upd_never");
+    var loc = window.I18N ? window.I18N.locale() : "en-AU";
+    var when = new Date(u.checked).toLocaleString(loc, { day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: !CLOCK24 });
+    return t("upd_last", { when: when });
+  }
+  function updateRows() {
+    var u = updRead() || {}, busy = u.busy || "";
+    var rows = [info("upd-ver", t("about_version"), u.current || "")];
+    if (u.available) {
+      rows.push({ kind: "action", key: "upd-install", label: t("upd_install", { v: u.latest }),
+        sub: busy === "downloading" ? t("upd_downloading", { p: u.progress || 0 }) : busy === "installing" ? t("upd_confirm") : u.title || "",
+        act: function () { if (!busy) upd().install(); } });
+    }
+    rows.push({ kind: "action", key: "upd-check", label: t("upd_check"), sub: busy === "checking" ? t("upd_checking") : updWhen(u),
+      act: function () { if (!busy) upd().check(); } });
+    if (u.error) rows.push(info("upd-err", t("upd_err_" + u.error)));
+    else if (u.refused) rows.push(info("upd-err", t("upd_err_other_key")));
+    else if (u.checked && !u.available && !busy) rows.push(info("upd-latest", t("upd_latest")));
+    rows.push({ kind: "toggle", key: "upd-auto", label: t("upd_auto"), value: u.auto ? t("on") : t("off"),
+      act: function () { upd().auto(!u.auto); } });
+    rows.push(info("upd-note", t("upd_note")));
+    return rows;
+  }
+
   // Back to config.json for everything but the people and the apps (which have their own lists).
   function resetSettings() {
     (Array.isArray(ST.photos) ? ST.photos : []).forEach(function (p) {
@@ -2265,12 +2326,16 @@
   window.tv = { back: goHome, home: function () { if (zone === "settings") closeSettings(); else goHome(); refresh(); },
     resume: function () { okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
-    photosAdded: function (names) { photosAdded(names); } };
+    photosAdded: function (names) { photosAdded(names); },
+    // the launcher's updater has news (Updater.kt)
+    update: function (state) { updChanged(state); } };
 
   function start() {
     readConfig();
     staticText();
     initSettings();
+    // Home settings gets an Updates section, before About, where the launcher can update itself
+    if (updRead() && UPD.supported) SECS.splice(SECS.length - 1, 0, ["updates", "download"]);
     mark("app-start");
     clock();
     setInterval(clock, 15000);
@@ -2300,7 +2365,7 @@
     if (cached || TV) { render(); mark("home-painted-from-cache"); }
     renderQuick();
     if (!OFFLINE) refreshQuick();
-    refresh().then(function () { mark("home-painted-live"); });
+    refresh().then(function () { mark("home-painted-live"); updTell(); });
   }
 
   if (MOCK || PREVIEW) {

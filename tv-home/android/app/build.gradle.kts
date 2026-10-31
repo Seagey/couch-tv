@@ -21,6 +21,10 @@ android {
         // with no address at all (option A) the copy of the home built into the app is the home.
         val urls = (project.findProperty("bridgeUrls") as String? ?: "").split(",").map { it.trim() }.filter { it.isNotEmpty() }
         buildConfigField("String[]", "BRIDGES", "{" + urls.joinToString(", ") { "\"" + it + "\"" } + "}")
+        // Whose GitHub releases Home settings, Updates offers: -PupdateRepo=owner/name for a fork
+        // with releases of its own, -PupdateRepo= (empty) for none. Updater.kt checks the format.
+        val updateRepo = (project.findProperty("updateRepo") as String? ?: "Seagey/couch-tv").trim()
+        buildConfigField("String", "UPDATE_REPO", "\"" + updateRepo.filter { it.isLetterOrDigit() || it in "/._-" } + "\"")
     }
     buildFeatures { buildConfig = true }
     // Test builds: when COUCHTV_KEYSTORE names a keystore (a debug-style key, alias androiddebugkey,

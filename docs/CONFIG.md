@@ -283,7 +283,10 @@ The gear tile in the dock (Settings) opens a small menu: **Home settings** (couc
 weather's place (a town search), weather on or off, °C or °F and how often it is checked, the look,
 which scenes take turns and in what order, how long each stays, the clock, your own photos, the
 apps (home, More apps or hidden, and their order), the people, and the quick buttons. README,
-"Settings on the TV", says how to use it.
+"Settings on the TV", says how to use it. Its **Updates** section (the TV home app only) looks for
+new couch-tv releases on GitHub, once a day or when asked, and installs one only after Android's own
+"update this app?" question. The daily look and its switch belong to the app on that TV: they are
+not in `config.json`, the bridge never sees them, and Reset home settings leaves them alone.
 
 **Which wins**, lowest first:
 
@@ -315,7 +318,8 @@ Serve the repo folder with any static server and open the home with `?mock=1`, f
 `tv-home/web/mock.js` lists the preview settings: `people=4`, `quick=sleep,look,input`,
 `picture=1`, `look=classic`, `clock=24h`, `lang=it`, `dock=6`, `scenes=fog,dawn`, `secs=8`,
 `newapp=1`, `offline=1`, `down`, `ha=1` (smart home with a pretend Home Assistant; `ha=down` when
-it is not answering, `ha=scenes` for scenes only), and `reset=1` to forget what a preview saved
-(Home settings included). A preview keeps its Home settings apart from a real TV's (they start with `mock:`). `?scene=own`
+it is not answering, `ha=scenes` for scenes only), `update=1` (Home settings, Updates, with a pretend
+0.4 waiting; `update=latest` and `update=allow` for the other cases), and `reset=1` to forget what a
+preview saved (Home settings included). A preview keeps its Home settings apart from a real TV's (they start with `mock:`). `?scene=own`
 starts on the first of your own photos. `myscenes=[...]` is `home.my_scenes` as JSON, and
 `?scene=<id>` starts on one of them ([MAKE-A-SCENE.md](MAKE-A-SCENE.md), step 5).

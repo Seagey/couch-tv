@@ -16,6 +16,8 @@
 //   reset=1             forget everything this preview saved (orders, people, the look, Home settings)
 //   ha=1                smart home: a pretend Home Assistant with two rooms and three scenes
 //                       (ha=down: it is not answering; ha=scenes: scenes only, no rooms)
+//   update=1            Home settings, Updates, with a pretend 0.4 waiting (update=latest: none
+//                       newer; update=allow: the TV has not let Home install apps yet)
 (function () {
   var q = location.search;
   var arg = function (name) { var m = q.match(new RegExp("[?&]" + name + "=([^&]*)")); return m ? decodeURIComponent(m[1]) : null; };
@@ -47,6 +49,36 @@
   if (arg("secs")) cfg.home.scene_seconds = parseInt(arg("secs"), 10);
   if (arg("myscenes")) try { cfg.home.my_scenes = JSON.parse(arg("myscenes")); } catch (e) {}
   window.COUCH_CONFIG = cfg;
+
+  // ---------- the launcher's updater (Updater.kt), for ?update= ----------
+  // Downloads in about three seconds, shows the installer's question for three more, then reports
+  // it cancelled: a preview never installs anything.
+  if (arg("update")) {
+    var kind = arg("update");
+    var up = { supported: true, current: "0.3", latest: kind === "latest" ? "0.3" : "0.4",
+      title: kind === "latest" ? "" : "0.4: a pretend release for the preview", available: kind !== "latest",
+      checked: Date.now() - 20 * 3600000, auto: true, busy: "", progress: 0, error: "" };
+    var tell = function () { if (window.tv && window.tv.update) window.tv.update(JSON.parse(JSON.stringify(up))); };
+    window.MOCK_UPDATER = {
+      state: function () { return JSON.stringify(up); },
+      check: function () {
+        up.busy = "checking"; up.error = ""; tell();
+        setTimeout(function () { up.busy = ""; up.checked = Date.now(); tell(); }, 900);
+      },
+      install: function () {
+        if (kind === "allow") { up.error = "allow"; tell(); return; }
+        up.busy = "downloading"; up.progress = 0; up.error = ""; tell();
+        var timer = setInterval(function () {
+          up.progress += 10;
+          if (up.progress < 100) { tell(); return; }
+          clearInterval(timer);
+          up.busy = "installing"; tell();
+          setTimeout(function () { up.busy = ""; up.progress = 0; up.error = "cancelled"; tell(); }, 3000);
+        }, 300);
+      },
+      auto: function (on) { up.auto = !!on; tell(); }
+    };
+  }
 
   // ---------- the TV's apps ----------
   var apps = [
