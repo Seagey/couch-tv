@@ -6,7 +6,9 @@
                                                                # Developer options and debugging on)
 
 The quick look knocks on the ports each kind of TV answers on (Android TV remote, ADB, Samsung,
-LG, Roku, Apple, Google Cast). --adb connects with ADB to read the Android version, the maker and
+LG, Roku, Apple, Google Cast). On an LG it also says hello to LG's network remote, which tells
+the webOS version without any prompt on the TV (the prompt only comes when couch-tv's bridge asks
+to control it). --adb connects with ADB to read the Android version, the maker and
 which home screen the TV runs. The first time, the TV asks "Allow USB debugging?". That prompt is
 the only thing that appears on screen, and saying no is fine. Run --adb only after Developer
 options are on (README step 1): it also saves this computer's ADB key in ~/.android/adbkey.
@@ -48,6 +50,34 @@ def knock(ip, port, timeout=1.0):
             return True
     except OSError:
         return False
+
+
+def lg_hello(ip):
+    """What an LG says about itself to a hello on its network remote (no pairing, nothing on
+    screen): {"os", "version"}, or None. Plain port 3000, else encrypted 3001."""
+    try:
+        import asyncio
+        import aiohttp
+    except ImportError:
+        return None
+
+    async def ask():
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as s:
+            for url in (f"ws://{ip}:3000", f"wss://{ip}:3001"):
+                try:
+                    async with s.ws_connect(url, ssl=False) as ws:
+                        await ws.send_json({"id": "hello", "type": "hello", "payload": {}})
+                        j = await ws.receive_json(timeout=4)
+                        p = j.get("payload") or {}
+                        return {"os": p.get("deviceOS"), "version": p.get("deviceOSReleaseVersion") or p.get("deviceOSVersion")}
+                except Exception:
+                    continue
+        return None
+
+    try:
+        return asyncio.run(ask())
+    except Exception:
+        return None
 
 
 def wireless_debugging_port(ip, wait=4.0):
@@ -138,6 +168,9 @@ def main():
     samsung = open_ports[8001] or open_ports[8002]
     lg = open_ports[3000] or open_ports[3001]
     facts = adb_facts(ip) if want_adb and adb_open else None
+    hello = lg_hello(ip) if lg and not android else None
+    if hello:
+        print(f"  LG network remote: {hello['os'] or 'webOS'} {hello['version'] or ''}".rstrip())
     if want_adb and not adb_open and not wireless:
         print(f"  ADB is not open on port {ADB_PORT}. Switch on Developer options, then USB debugging, and if the")
         print("  TV also has a Network debugging (or Wireless debugging) switch, that too. Then try again.")
@@ -152,7 +185,10 @@ def main():
     if samsung and not android:
         verdict = {"A": "no", "B": "no", "C": "no", "why": "Samsung Tizen: no Android apps and a locked home screen. Plug in a Google TV box to use couch-tv."}
     elif lg and not android:
-        verdict = {"A": "no", "B": "no", "C": "no", "why": "LG webOS: no Android apps and a locked home screen. Plug in a Google TV box to use couch-tv."}
+        verdict = {"A": "no", "B": "LG path (untested on a real LG): docs/LG.md", "C": "no",
+                   "why": "LG webOS: no Android apps and a locked home screen. couch-tv can go on as an LG app that a computer "
+                          "at home opens each time the TV comes on (docs/LG.md, built and tested against a stand-in, "
+                          "not yet on a real LG), or plug in a Google TV box for everything."}
     elif open_ports[8060] and not android:
         verdict = {"A": "no", "B": "no", "C": "no", "why": "Roku: closed system."}
     elif not android:

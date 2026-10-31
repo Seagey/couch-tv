@@ -35,10 +35,14 @@ settings), and what is chosen there wins on that TV. See
 | `keep_disabled` | The keep-off list for this TV (see `bridge/API.md`). |
 | `quick` [`["sleep"]`, plus `"picture"` when the TV has a `picture` entry] | The quick buttons on the TV home, in this order. See below. |
 | `picture` | Only used when `"picture"` is in `quick`. See below. |
-| `kind` [`"android"`] | `"samsung"` for a Samsung TV (Tizen). The bridge then uses `bridge/samsung.py` instead of ADB and the Android remote. See [SAMSUNG.md](SAMSUNG.md). |
-| `open_on_power_on` [true] | Samsung only: open the couch-tv app whenever the TV is switched on and nothing else is on screen. |
-| `app_id` [`"CouchTVApp.Home"`] | Samsung only: the couch-tv app's id on the TV, if you changed it in `samsung/app/config.xml`. |
+| `kind` [`"android"`] | `"samsung"` for a Samsung TV (Tizen), `"lg"` for an LG TV (webOS). The bridge then uses `bridge/samsung.py` or `bridge/lg.py` instead of ADB and the Android remote. See [SAMSUNG.md](SAMSUNG.md) and [LG.md](LG.md). |
+| `open_on_power_on` [true] | Samsung and LG only: open the couch-tv app whenever the TV is switched on and nothing else is on screen. |
+| `app_id` [`"CouchTVApp.Home"`, LG `"app.couchtv.home"`] | Samsung and LG only: the couch-tv app's id on the TV, if you changed it in `samsung/app/config.xml` or `lg/app/appinfo.json`. |
 | `remote_name` [`client_name`] | Samsung only: the name the TV shows when it asks to Allow the remote. |
+| `extend_devmode` [true] | LG only: press Developer Mode's Extend once a day while the TV is on, so the app is not removed. |
+| `ares_device` [the TV's `id`] | LG only: this TV's name in LG's ares tools (`ares-setup-device`). |
+| `ares_launch` [found on the PATH] | LG only: the full path to `ares-launch`, for a bridge that cannot find it (started by launchd, for example). |
+| `port` [3000, then 3001] | LG only: the network remote's port, if your TV only answers on one of them. |
 
 ### Quick buttons (`quick`)
 

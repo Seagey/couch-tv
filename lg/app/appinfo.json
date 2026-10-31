@@ -1,0 +1,13 @@
+{
+  "id": "app.couchtv.home",
+  "version": "1.0.0",
+  "vendor": "couch-tv",
+  "type": "web",
+  "main": "boot.html",
+  "title": "Couch TV",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#0b0d12",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true
+}

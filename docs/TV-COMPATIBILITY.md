@@ -19,7 +19,7 @@ by the author. Everything else is what the sources say, not tested.
 | Fire TV on Fire OS (Stick 4K Max, Cube, Stick 4K 2nd gen) | Partial | Partial | Yes (Stick 4K 2nd gen confirmed by a user) |
 | Fire TV on Vega OS (Stick 4K Select, Stick HD 2026, 4K gen 3) | No | No | No |
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
-| LG (webOS) | Home screen: root only, fragile. As an app: possible, untested ([LG.md](LG.md)) | Possible, untested | No |
+| LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, not yet tried on a real LG ([LG.md](LG.md)) | No |
 | Roku, Apple TV, Hisense VIDAA | No | No | No |
 
 ## Reported by people using it
@@ -62,8 +62,8 @@ Not tested by the author. Each line is what someone said worked on their own dev
   sticks will run it.
 - **Samsung and LG** do not run Android apps or let an app replace their home screen. On a Samsung,
   couch-tv runs as a sideloaded app that the bridge opens when the TV comes on
-  ([SAMSUNG.md](SAMSUNG.md)). LG should allow the same through its Developer Mode, untested
-  ([LG.md](LG.md)). LG's home screen itself can only be touched on a rooted TV, and the known root
+  ([SAMSUNG.md](SAMSUNG.md)). On an LG the same is built, through LG's Developer Mode, but not
+  yet tried on a real LG ([LG.md](LG.md)). LG's home screen itself can only be touched on a rooted TV, and the known root
   methods are being patched. Not recommended.
 - **Google developer verification (2026).** Google's FAQ says apps installed with ADB do not need
   verification, and enforcement outside Google Play covers phones and tablets. couch-tv installs

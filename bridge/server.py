@@ -25,6 +25,7 @@ import store
 import taste
 from tv import TV, TVUnavailable, intent_to_link
 import samsung
+import lg
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -43,8 +44,13 @@ TV_CONFIG = {"default": config.DEFAULT_TV, "tvs": config.TVS}
 
 
 def make_tv(cfg):
-    """A Samsung ("kind": "samsung", bridge/samsung.py) or an Android or Google TV (tv.py)."""
-    return samsung.SamsungTV(cfg) if cfg.get("kind") == "samsung" else TV(cfg)
+    """A Samsung ("kind": "samsung", bridge/samsung.py), an LG ("kind": "lg", bridge/lg.py) or an
+    Android or Google TV (tv.py)."""
+    if cfg.get("kind") == "samsung":
+        return samsung.SamsungTV(cfg)
+    if cfg.get("kind") == "lg":
+        return lg.LGTV(cfg)
+    return TV(cfg)
 
 
 TVS = {c["id"]: make_tv(c) for c in TV_CONFIG["tvs"]}
@@ -534,6 +540,13 @@ async def h_tizen_next(request):
     return ok(job=await tv.tizen_next())
 
 
+async def h_webos_apps(request):
+    """The couch-tv app on an LG TV asks here for the TV's apps (webOS may not tell the app)."""
+    if tv.kind != "lg":
+        raise ApiError(400, "only for LG TVs")
+    return ok(apps=await tv.apps_on_tv())
+
+
 async def h_tizen_answer(request):
     data = await body(request)
     if tv.kind == "samsung" and data.get("id"):
@@ -842,7 +855,7 @@ async def h_volume(request):
             raise ApiError(400, "action must be up, down or mute, or send level")
         steps = 1 if action == "mute" else max(1, min(int(data.get("steps", 1)), 20))
         if action == "mute" and hasattr(tv, "set_mute") and tv.volume["known"]:
-            await tv.set_mute(not tv.volume["muted"])   # Samsung: set over UPnP, its mute key is ignored
+            await tv.set_mute(not tv.volume["muted"])   # Samsung: set over UPnP, its mute key is ignored. LG: over SSAP
             steps = 0
         for _ in range(steps):
             await tv.key(keys[action])
@@ -1874,6 +1887,8 @@ async def h_tvs(request):
                "connected": t.connected, "adb": t.adb_ok, "power": "unknown" if on is None else ("on" if on else "off")}
         if t.kind == "samsung":
             row |= {"art_mode": t.art_mode, "hook": [f"{w} {what}" for w, what in t.hook_log]}
+        elif t.kind == "lg":
+            row |= {"devmode": t.devmode_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         out.append(row)
     return ok(default=DEFAULT_TV, tvs=out)
 
@@ -1895,6 +1910,7 @@ def make_app():
     r.add_post("/api/ask", h_ask)
     r.add_get("/api/tizen/next", h_tizen_next)
     r.add_post("/api/tizen/answer", h_tizen_answer)
+    r.add_get("/api/webos/apps", h_webos_apps)
     r.add_get("/api/recs", h_recs)
     r.add_get("/api/history", h_history)
     r.add_get("/api/taste", h_taste)

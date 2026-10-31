@@ -88,9 +88,26 @@ TIZEN = {
     "spotify": {"ids": ["3201606009684"], "app": "rJeHak5zRg.Spotify"},
 }
 
+# LG (webOS) app ids, for a TV with "kind": "lg" (bridge/lg.py, docs/LG.md). From public lists, not
+# checked on a real LG yet: Netflix, YouTube and Prime Video are the ids LG's own integration notes
+# and Connect SDK use; Disney+ is the least certain. Every other app is found on the TV by its name
+# (the TV lists its apps with their titles; "names" are other titles the same app goes by), so
+# this table only needs the ids a name would not find.
+WEBOS = {
+    "netflix": {"ids": ["netflix"]},
+    "youtube": {"ids": ["youtube.leanback.v4"]},
+    "prime-video": {"ids": ["amazon"], "names": ["Amazon Prime Video", "Prime Video"]},
+    "disney-plus": {"ids": ["com.disney.disneyplus-prod"]},
+    "apple-tv": {"ids": [], "names": ["Apple TV", "Apple TV+"]},
+    "abc-iview": {"ids": [], "names": ["ABC iview", "iview"]},
+    "sbs-on-demand": {"ids": [], "names": ["SBS On Demand"]},
+    "settings": {"ids": ["com.palm.app.settings"]},
+}
+
 BY_ID = {a["id"]: a for a in APPS}
 TIZEN_TO_PACKAGE = {tid: BY_ID[aid]["package"] for aid, t in TIZEN.items()
                     for tid in t["ids"] + ([t["app"]] if t.get("app") else [])}
+WEBOS_TO_PACKAGE = {lid: BY_ID[aid]["package"] for aid, w in WEBOS.items() for lid in w["ids"]}
 BY_PACKAGE = {a["package"]: a for a in APPS}
 BY_JW = {jw: a for a in APPS for jw in a["jw"]}
 

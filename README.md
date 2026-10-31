@@ -1,11 +1,17 @@
 # couch-tv
 
-Your own home screen and phone remote for a Google TV, and now a Samsung TV. No ads on the home
-screen. Open source (MIT).
+Your own home screen and phone remote for a Google TV, and now a Samsung TV, with an LG path
+built and waiting for its first real LG. No ads on the home screen. Open source (MIT).
 
 ![The Night home screen](docs/screens/home-night.jpg)
 
 ## Updates
+
+**1 November 2026: LG TVs.** couch-tv now has an LG version, done the same way as the Samsung one:
+it goes on your LG as an app through LG's Developer Mode, and the computer at home opens it every
+time the TV is switched on. It was built from LG's own documentation and tested against a stand-in,
+so if you have an LG, you would be among the first to run it: give this repo to your agent, and
+please open an issue saying how it went. Setup and limits: [docs/LG.md](docs/LG.md).
 
 **30 October 2026: Fire TV sticks, older TVs, smart home and your own scenes.** Sixteen people
 have forked couch-tv so far, and six of them built something worth having. The best of it is now in
@@ -196,7 +202,7 @@ some screen reader labels on the phone are still in English.
 | **Fire TV on Fire OS** (Fire TV Stick 4K Max, Fire TV Cube) | Partial. Workarounds only, and Amazon's home flashes up first | Partial | Yes, and it takes the Home key back ([how](on-tv/README.md#fire-tv-fire-os)) |
 | **Fire TV on Vega OS** (newer Fire TV sticks) | No | No | No |
 | **Samsung** (Tizen) | App only, opened from Samsung's app row | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
-| **LG** (webOS) | Possible, untested ([research](docs/LG.md)) | Possible, untested | No |
+| **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, not yet tried on a real LG ([how](docs/LG.md)) | No |
 | **Roku, Apple TV, Hisense with VIDAA** | No | No | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
@@ -221,12 +227,19 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   show by itself, YouTube opens the video, Prime Video, Stan, Binge, Paramount+ and Apple TV are
   handed the title, and other apps open on their home page. No "what is playing" and no
   screenshots. Setup and limits: [docs/SAMSUNG.md](docs/SAMSUNG.md).
-- **LG:** the same approach should work (LG has a Developer Mode and a network remote), but nobody
-  has tried it yet: [docs/LG.md](docs/LG.md).
+- **LG:** the same as the Samsung: couch-tv goes on as an LG app through LG's Developer Mode (free
+  tools and your own LG developer account), and the bridge opens it every time the TV is switched
+  on, and presses Developer Mode's Extend once a day so LG does not remove it. LG's own Home button
+  still opens LG's menu. The phone remote and the assistant work: Netflix opens the title, YouTube
+  opens the video, other apps open on their home page. No "what is playing" and no screenshots.
+  **It was built from LG's documentation and tested against a stand-in, not yet on a real LG**: if
+  you try it, please open an issue and say how it went. Setup and limits:
+  [docs/LG.md](docs/LG.md).
 - **Roku, Apple TV, VIDAA and Vega OS Fire TV:** closed. Nothing here works on them.
 
-**Want everything on a Samsung, LG or another TV?** Plug in a Google TV box (for example the Google
-TV Streamer) and set couch-tv up on that. You then get everything, on any TV with an HDMI port.
+**Want everything on a Samsung, LG or another TV?** The Samsung and LG apps cover the home and the
+phone remote, not everything. Plug in a Google TV box (for example the Google TV Streamer) and set
+couch-tv up on that, and you get everything, on any TV with an HDMI port.
 
 **Test your own TV** (changes nothing on it, and installs nothing outside this folder):
 
@@ -575,8 +588,8 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
 ## Limits
 
 - Google TV and Android TV run everything. Fire TV (Fire OS) runs the on-TV app, with Amazon's
-  home flashing up first. Samsung runs it as an app, with a computer that stays on. Developer
-  mode has to be on.
+  home flashing up first. Samsung runs it as an app, with a computer that stays on, and LG the
+  same way (not yet tried on a real LG). Developer mode has to be on.
 - A Google TV update can switch the Google home back on. Option B's bridge checks once a day and
   switches it off again; with option A, run `apply.sh` again.
 - Some apps will not open a show directly. They open the app instead. See `bridge/DEEPLINKS.md`.

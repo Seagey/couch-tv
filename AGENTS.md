@@ -82,7 +82,8 @@ It says which options (A, B, C) that TV can run, and whether it has Network debu
 yet: that comes in step 4, after Developer options are on, and that is when you settle B or C.
 
 If nothing Android is found, or they are not sure what they have:
-- `find-tvs.py` says "No Android TV found": for a Samsung, LG or another brand that is expected.
+- `find-tvs.py` lists an LG as "LG TV". It says "No Android TV found" for a Samsung or another
+  brand, and that is expected.
   Ask the brand and model. To confirm with `check-tv.py`, ask for the TV's address:
   - **Samsung:** Settings, General (or Connection), Network, Network Status (or Network
     Information), the IP address.
@@ -115,10 +116,22 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   the app itself is possible (opened from Samsung's app row). Also offer the Google TV box as the
   way to get everything. If they choose Samsung, follow docs/SAMSUNG.md for steps 2 to 4 (most
   questions in step 2 still apply; skip picture mode, apply.sh and ADB).
-- **LG (webOS):** possible but untested. Say so plainly: "An LG should be able to do what the
-  Samsung does, but nobody has tried it yet, so I can't promise it." Point to
-  [docs/LG.md](docs/LG.md) and offer the Google TV box. Do not attempt it unless they want to be
-  the first to try, and then tell them nothing is tested.
+- **LG (webOS):** do not say no. Offer the LG path in [docs/LG.md](docs/LG.md) the way you offer
+  the Samsung one, and say first, plainly, that it has not been tried on a real LG: "There is an
+  LG version of couch-tv. It was built from LG's own documentation and tested against a stand-in
+  on a computer, but nobody has run it on a real LG yet, so you would be the first, and some of it
+  may need fixing. Like the Samsung one, it goes on your LG as an app, and a computer at home that
+  stays on opens it every time the TV is switched on. It is not a true home screen: the remote's
+  Home button still opens LG's menu. It needs LG's Developer Mode, which means a free LG developer
+  account and LG's tools on this computer, and Developer Mode has to stay on, so the computer
+  presses its Extend button once a day for you. The phone remote works. Netflix opens the show and
+  YouTube the video; other apps open on their own page, and you press Play. There is no 'what is
+  playing' and no screenshots. You press Accept on the TV once." Without a computer that stays on,
+  only the app itself is possible, and LG removes it when Developer Mode runs out. Also offer the
+  Google TV box as the way to get everything. If they choose LG, follow docs/LG.md for steps 2 to
+  4 (most questions in step 2 still apply; skip picture mode, apply.sh and ADB). Afterwards ask
+  them to open an issue on GitHub saying how it went, and write down for them what worked and what
+  did not.
 - **Roku, Apple TV, Hisense VIDAA, Fire TV on Vega OS:** not supported. Say so kindly,
   explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
   round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets
