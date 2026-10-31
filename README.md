@@ -131,6 +131,14 @@ and then closes. What you change shows when the list closes.
 - **People:** add, rename, remove and reorder who is watching.
 - **Quick buttons:** which of the sleep timer, picture mode, look and input buttons show, in what
   order.
+- **Updates:** the TV home looks for a new couch-tv release on GitHub once a day while it is on
+  screen (switch it off here), and **Check for updates now** looks straight away. A new release
+  puts a small dot on the gear tile and a line on the home. **Update to ...** downloads it, checks
+  it, and hands it to Android, which asks "Do you want to update this app?" first. Your settings,
+  people, photos and apps stay. The first time, Android asks you to let Home install apps
+  (Settings, Security and restrictions, Unknown sources). Only the app from the Releases page
+  updates this way. A copy built on your own computer, for example with your own scenes, says so
+  and is updated the way you installed it. The on-TV app (option C) does not do this yet.
 - **About:** the version, the GitHub address (github.com/Seagey/couch-tv), where the settings are
   kept, and Reset.
 
@@ -494,7 +502,9 @@ needed: `tv-home/android/gradlew` fetches Gradle 8.11.1 by itself.
 
 The release APK is signed with your local debug key, which is fine for your own TV. The built-in
 copy uses `config.example.json` unless you pass `CONFIG=config.json`; `apply.sh` hands the TV your
-own settings either way.
+own settings either way. Home settings, Updates offers the releases of `Seagey/couch-tv`, which
+your own build cannot take (another key): a fork with releases of its own builds with
+`UPDATE_REPO=owner/name sh scripts/build-apk.sh`, and `UPDATE_REPO=` (empty) switches updates off.
 
 ## Undo: put the Google home screen back
 

@@ -7,3 +7,8 @@
 -keepclassmembers class app.couchtv.launcher.HomeAssistant$Page {
     @android.webkit.JavascriptInterface <methods>;
 }
+
+# Updates: the page calls these through window.TVUP (Updater.kt).
+-keepclassmembers class app.couchtv.launcher.Updater$Page {
+    @android.webkit.JavascriptInterface <methods>;
+}

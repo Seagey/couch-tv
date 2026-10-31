@@ -8,10 +8,12 @@
 #
 # Usage, from the repo root:
 #   [JAVA_HOME=/path/to/jdk-21] [ANDROID_HOME=/path/to/android-sdk] [CONFIG=config.json]
-#   [BRIDGE_URLS=http://my-computer.local:5400] sh scripts/build-apk.sh
+#   [BRIDGE_URLS=http://my-computer.local:5400] [UPDATE_REPO=owner/name] sh scripts/build-apk.sh
 # CONFIG is the settings file built into the home's own copy (default: config.example.json, so a
 # build is the same on every computer). apply.sh hands the TV your config.json at install time
 # anyway, so the default is fine for everyone.
+# UPDATE_REPO is whose GitHub releases Home settings, Updates offers (default Seagey/couch-tv):
+# a fork with releases of its own sets it, and UPDATE_REPO= (empty) switches updates off.
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 CONFIG=${CONFIG:-$ROOT/config.example.json}
@@ -35,6 +37,7 @@ GW="$ROOT/tv-home/android/gradlew"
 mkdir -p "$ROOT/dist"
 EXTRA=""
 [ -n "${BRIDGE_URLS:-}" ] && EXTRA="-PbridgeUrls=$BRIDGE_URLS"
+[ -n "${UPDATE_REPO+set}" ] && EXTRA="$EXTRA -PupdateRepo=$UPDATE_REPO"
 
 echo "Building the TV home (settings built in: $CONFIG)"
 "$GW" -p "$ROOT/tv-home/android" --no-daemon -q clean assembleRelease "-PconfigJson=$CONFIG" $EXTRA
