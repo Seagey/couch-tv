@@ -148,6 +148,7 @@ Home settings saves to the same `bridge/data/people.json` the phone uses.
 | `scene_seconds` [20] | How long each scene shows. 5 or more. |
 | `clock` [the language's usual clock: `24h` in Italian, `12h` in the others] | `12h` (5:30 pm) or `24h` (17:30). |
 | `hide_packages` [none] | Android package names never shown on the home or in More apps, for a maker's own clutter (help apps, file browsers, screen sharing tools). `survey-tv.py` lists every TV app with its package name. For example `["com.example.tvhelp"]`. |
+| `updates` [none: the TV asks once] | The answer to "tell you when a new couch-tv version is out?", asked at setup: `notify` (the TV home looks on GitHub once a week and puts a dot on the gear tile) or `manual` (nothing by itself; Home settings, Updates, Check for updates now). Used only until the TV has an answer; after that the switch in Home settings, Updates wins. Option C has no updates. |
 | `dock_size` [10] | How many apps sit in the Night dock before Settings and More apps. 1 to 10. Everything else is behind More apps. The phone's Arrange apps keeps to the same number. |
 | `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish) or `it` (Italian). The phone remote has its own choice, "Same as the TV" by default. |
 
@@ -284,9 +285,10 @@ weather's place (a town search), weather on or off, °C or °F and how often it 
 which scenes take turns and in what order, how long each stays, the clock, your own photos, the
 apps (home, More apps or hidden, and their order), the people, and the quick buttons. README,
 "Settings on the TV", says how to use it. Its **Updates** section (the TV home app only) looks for
-new couch-tv releases on GitHub, once a day or when asked, and installs one only after Android's own
-"update this app?" question. The daily look and its switch belong to the app on that TV: they are
-not in `config.json`, the bridge never sees them, and Reset home settings leaves them alone.
+new couch-tv releases on GitHub, once a week if the household said yes, or when asked, and installs
+one only after Android's own "update this app?" question. The weekly look and its switch belong to
+the app on that TV: `home.updates` only answers the first-time question, the bridge never sees the
+switch, and Reset home settings leaves it alone.
 
 **Which wins**, lowest first:
 

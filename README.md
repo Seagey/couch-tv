@@ -131,8 +131,10 @@ and then closes. What you change shows when the list closes.
 - **People:** add, rename, remove and reorder who is watching.
 - **Quick buttons:** which of the sleep timer, picture mode, look and input buttons show, in what
   order.
-- **Updates:** the TV home looks for a new couch-tv release on GitHub once a day while it is on
-  screen (switch it off here), and **Check for updates now** looks straight away. A new release
+- **Updates:** off until you say yes. The first time the home opens it asks once: "Tell you when a
+  new couch-tv version is out?" (setup can answer it for you, `home.updates`). With **Tell me about
+  new versions** on, the TV looks on GitHub once a week, so frequent releases never nag; with it off
+  nothing is checked by itself. **Check for updates now** looks straight away either way. A new release
   puts a small dot on the gear tile and a line on the home. **Update to ...** downloads it, checks
   it, and hands it to Android, which asks "Do you want to update this app?" first. Your settings,
   people, photos and apps stay. The first time, Android asks you to let Home install apps

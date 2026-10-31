@@ -17,7 +17,8 @@
 //   ha=1                smart home: a pretend Home Assistant with two rooms and three scenes
 //                       (ha=down: it is not answering; ha=scenes: scenes only, no rooms)
 //   update=1            Home settings, Updates, with a pretend 0.4 waiting (update=latest: none
-//                       newer; update=allow: the TV has not let Home install apps yet)
+//                       newer; update=allow: the TV has not let Home install apps yet;
+//                       update=ask: nobody has answered "tell you about new versions?" yet)
 (function () {
   var q = location.search;
   var arg = function (name) { var m = q.match(new RegExp("[?&]" + name + "=([^&]*)")); return m ? decodeURIComponent(m[1]) : null; };
@@ -57,7 +58,7 @@
     var kind = arg("update");
     var up = { supported: true, current: "0.3", latest: kind === "latest" ? "0.3" : "0.4",
       title: kind === "latest" ? "" : "0.4: a pretend release for the preview", available: kind !== "latest",
-      checked: Date.now() - 20 * 3600000, auto: true, busy: "", progress: 0, error: "" };
+      checked: Date.now() - 20 * 3600000, auto: kind !== "ask", answered: kind !== "ask", busy: "", progress: 0, error: "" };
     var tell = function () { if (window.tv && window.tv.update) window.tv.update(JSON.parse(JSON.stringify(up))); };
     window.MOCK_UPDATER = {
       state: function () { return JSON.stringify(up); },
@@ -76,7 +77,7 @@
           setTimeout(function () { up.busy = ""; up.progress = 0; up.error = "cancelled"; tell(); }, 3000);
         }, 300);
       },
-      auto: function (on) { up.auto = !!on; tell(); }
+      auto: function (on) { up.auto = !!on; up.answered = true; tell(); }
     };
   }
 

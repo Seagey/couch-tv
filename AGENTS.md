@@ -181,6 +181,9 @@ recommend C (A if they only want the home screen). Write the choice down; the re
 - "Which language for the home: English, Spanish, Mexican Spanish or Italian?" Leave
   `home.language` out to follow the TV's own language.
 - "12 hour or 24 hour clock?" (Left out: 24 hour in Italian, 12 hour otherwise.)
+- Options A and B: "Do you want the TV to tell you when a new couch-tv version is out? It looks
+  once a week and only shows a small dot. Or would you rather check yourself, in Home settings?"
+  `home.updates`: `notify` or `manual`. Left out, the TV asks once the first time the home opens.
 - "What suburb or city for the weather?" Look up its latitude, longitude and time zone yourself.
 - "What country are you in?" (For where shows stream. Two letter code, for example AU, US, GB.)
 
@@ -321,9 +324,10 @@ exactly what changes:
 - While the TV is off the Wi-Fi the computer undo cannot reach it either; the fix is to re-join
   the Wi-Fi, or the TV-remote route in [docs/UNINSTALL.md](docs/UNINSTALL.md). With
   `KEEP_SETUP=1`, on some TVs the old home then keeps the Home button.
-- Options A and B: the TV home asks GitHub once a day whether a new couch-tv release is out
-  (switch it off in Home settings, Updates). It installs nothing unless someone at the TV says yes
-  on Android's own screen.
+- Options A and B: with `home.updates` set to `notify`, the TV home asks GitHub once a week
+  whether a new couch-tv release is out; with `manual`, only when someone presses Check for updates
+  now (either can be changed in Home settings, Updates). It installs nothing unless someone at the
+  TV says yes on Android's own screen.
 - Show them the undo ([docs/UNINSTALL.md](docs/UNINSTALL.md)) before you start.
 
 Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
@@ -375,9 +379,10 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
    timer, the profile switch, and for B and C one press on the phone remote.
 7. Hand over in plain words: how to rearrange apps (phone, or hold OK on the TV), how to add apps
    (App Store tile), how to change profiles, where the undo is, and for option A that a Google TV
-   update may need `apply.sh` once more. Options A and B: a new couch-tv release shows up by itself
-   as a dot on the gear tile, and Home settings, Updates installs it (Android asks first, and once
-   asks to let Home install apps). The daily look can be switched off there.
+   update may need `apply.sh` once more. Options A and B: if they said yes to update news, a new
+   couch-tv release shows up as a dot on the gear tile within a week. Either way, Home settings,
+   Updates checks for one and installs it (Android asks first, and once asks to let Home install
+   apps), and the weekly look can be switched on or off there.
 
 ## Rules while you work
 

@@ -435,6 +435,11 @@ body {
   box-shadow: inset 0 0 0 0.0625rem rgba(255, 220, 230, 0.16), 0 1.5rem 3.75rem rgba(0, 0, 0, 0.45); text-shadow: none;
 }
 .gear-pop.on { display: block; }
+/* the same card, centred just above the dock (clear of the clock), for the one-time updates question */
+.gear-pop.ask { left: 50%; top: auto; bottom: 14rem; width: 46rem; max-width: 46rem; transform: translateX(-50%); padding: 1.25rem; }
+.ask-h { padding: 0.75rem 1rem 1.25rem; }
+.ask-h b { display: block; font-size: 2rem; line-height: 2.5rem; font-weight: 640; color: #fff; }
+.ask-h small { display: block; margin-top: 0.5rem; font-size: 1.25rem; line-height: 1.75rem; color: rgba(255, 255, 255, 0.7); }
 /* the cards step aside while the menu is open, as they do for the move hint */
 .theme-night.gearing .shelf { opacity: 0; }
 .grow {

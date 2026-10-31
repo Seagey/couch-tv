@@ -1120,6 +1120,7 @@
     clearFocus();
     renderHint();
     if (zone === "gear") { if (gridEls[g]) gridEls[g].classList.add("focus"); renderGear(); return; }
+    if (zone === "updask") { renderAsk(); return; }
     if (zone === "menu") { renderMenu(); return; }
     if (zone === "pmenu") { renderPop(); $("people").classList.add("focus"); return; }
     if (zone === "quick" && quickEls[qi]) {
@@ -1170,6 +1171,7 @@
     if (zone === "settings") { setMove(dx, dy); return; }
     if (zone === "smart") { window.smartHome.move(dx, dy); return; }
     if (zone === "gear") { if (dy) { gi = Math.max(0, Math.min(1, gi + dy)); renderGear(); } return; }
+    if (zone === "updask") { if (dy) { ai = Math.max(0, Math.min(1, ai + dy)); renderAsk(); } return; }
     if (lift) { moveLift(dx, dy); return; }
     // Night with More apps open: the cards step aside, so up and down skip them
     var cards = NIGHT && expanded ? [] : shelfEls;
@@ -1243,6 +1245,7 @@
     if (zone === "settings") { setBack(); return; }
     if (zone === "smart") { closeSmart(); paintFocus(); return; }
     if (zone === "gear") { closeGear(); paintFocus(); return; }
+    if (zone === "updask") { answerAsk(false); return; }   // BACK counts as "I'll check myself"
     if (lift) { dropLift(); return; }   // BACK puts a picked-up app down where it is
     if (zone === "pmenu") { if (plift) dropPeople(); else closePop(); paintFocus(); return; }
     if (zone === "menu") { closeMenu(); paintFocus(); return; }   // BACK just closes the sleep choices
@@ -1257,7 +1260,7 @@
   function hold() {
     touched = true;
     if (zone === "settings") return setHold();
-    if (zone === "gear" || zone === "smart") return false;
+    if (zone === "gear" || zone === "smart" || zone === "updask") return false;
     if (lift) { dropLift(); return true; }
     if (zone === "pmenu") {
       if (plift) dropPeople();
@@ -1273,6 +1276,7 @@
     if (zone === "settings") { setActivate(); return; }
     if (zone === "smart") { window.smartHome.ok(); return; }
     if (zone === "gear") { if (gi === 0) openSettings(); else openTvSettings(); return; }
+    if (zone === "updask") { answerAsk(ai === 0); return; }
     if (lift) { dropLift(); return; }
     if (zone === "menu") { setSleep(SLEEP_CHOICES[menuI]); paintFocus(); return; }
     if (zone === "pmenu") {
@@ -1943,6 +1947,39 @@
     keep("tvhome.update.told", UPD.latest);
     status(t("upd_told", { v: UPD.latest }));
   }
+  // Asked once: tell the household about new versions, or leave it to "Check for updates now"? Until
+  // they answer nothing is checked by itself, so frequent releases never nag anyone who did not ask.
+  // The setup's answer (home.updates in config.json) counts as the answer; Back counts as No.
+  var ai = 0;
+  function updAsk() {
+    if (!UPD || !UPD.supported || UPD.answered) return;
+    if (HOME.updates === "notify" || HOME.updates === "manual") { upd().auto(HOME.updates === "notify"); return; }
+    if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;
+    zone = "updask"; ai = 0;
+    clearFocus();
+    renderAsk();
+  }
+  function renderAsk() {
+    var pop = $("gear-pop");
+    var items = [[ICONS.download, t("upd_ask_yes"), t("upd_ask_yes_sub")], [ICONS.sliders, t("upd_ask_no"), t("upd_ask_no_sub")]];
+    pop.innerHTML = '<div class="ask-h"><b>' + esc(t("upd_ask")) + "</b><small>" + esc(t("upd_ask_sub")) + "</small></div>" +
+      items.map(function (it, i) {
+        return '<div class="grow' + (i === ai ? " focus" : "") + '" role="menuitem"><i>' + it[0] + "</i><span><b>" +
+          esc(it[1]) + "</b><small>" + esc(it[2]) + "</small></span></div>";
+      }).join("");
+    pop.style.left = pop.style.top = "";
+    pop.classList.add("on", "ask");
+    document.documentElement.classList.add("gearing");
+  }
+  function answerAsk(yes) {
+    $("gear-pop").classList.remove("on", "ask");
+    document.documentElement.classList.remove("gearing");
+    zone = "grid";
+    upd().auto(yes);
+    startFocus();
+    paintFocus();
+    status(t("upd_ask_done"));
+  }
   function updWhen(u) {
     if (!u.checked) return t("upd_never");
     var loc = window.I18N ? window.I18N.locale() : "en-AU";
@@ -2230,7 +2267,7 @@
   function render() {
     renderShelf();
     renderGrid();
-    if (!touched) startFocus();
+    if (!touched && zone !== "updask") startFocus();
     paintFocus();
   }
 
@@ -2263,7 +2300,7 @@
 
   function refresh() {
     // never reshuffle under something being moved, or under the settings screen
-    if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart") return Promise.resolve();
+    if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart" || zone === "updask") return Promise.resolve();
     if (OFFLINE) {
       // only the TV's own apps, in the order last saved; no shows, no Screens
       if (TV) data.apps = sortApps(nativeApps() || []);
@@ -2300,7 +2337,7 @@
     ];
     return Promise.all(jobs.map(function (p) { return p.then(function () { return true; }, function () { return false; }); }))
       .then(function (ok) {
-        if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart") return;
+        if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart" || zone === "updask") return;
         data.bridge = ok[0] || ok[2];
         var apps = TV ? nativeApps() : (window.MOCK_APPS ? window.MOCK_APPS.slice() : null);
         if (!apps) apps = (data.bridgeApps || []).filter(function (a) { return a.installed !== false && a.id !== "home"; })
@@ -2365,7 +2402,8 @@
     if (cached || TV) { render(); mark("home-painted-from-cache"); }
     renderQuick();
     if (!OFFLINE) refreshQuick();
-    refresh().then(function () { mark("home-painted-live"); updTell(); });
+    // once the home is up: the one-time "tell you about new versions?" question
+    refresh().then(function () { mark("home-painted-live"); updTell(); updAsk(); });
   }
 
   if (MOCK || PREVIEW) {

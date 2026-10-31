@@ -253,6 +253,10 @@ def _home(h):
         out["clock"] = clock
     if h.get("language") in LANGUAGES:
         out["language"] = h["language"]
+    # The setup's answer to "tell you when a new version is out?": notify (the TV looks once a week)
+    # or manual (only "Check for updates now"). Without it the TV home asks once on screen.
+    if h.get("updates") in ("notify", "manual"):
+        out["updates"] = h["updates"]
     return out
 
 

@@ -24,13 +24,14 @@ import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 /**
- * Updates from couch-tv's own GitHub releases (Home settings, Updates). Once a day, while the home
- * is on screen, the app asks GitHub which release is the latest (one request, no account, no key);
- * "Check now" in Home settings asks straight away. A release newer than this app puts a dot on the
- * gear tile and offers "Update to ...". Nothing is installed without the person at the TV: OK
- * downloads couch-tv-home.apk from that release, checks it, and hands it to Android's own
- * installer, which asks "Do you want to update this app?" first. The daily check can be switched
- * off there too.
+ * Updates from couch-tv's own GitHub releases (Home settings, Updates). Only when the household
+ * said yes (asked once, at setup or on the TV): once a week, while the home is on screen, the app
+ * asks GitHub which release is the latest (one request, no account, no key), so frequent releases
+ * never nag. Until then nothing is checked by itself; "Check now" in Home settings asks straight
+ * away either way. A release newer than this app puts a dot on the gear tile and offers
+ * "Update to ...". Nothing is installed without the person at the TV: OK downloads
+ * couch-tv-home.apk from that release, checks it, and hands it to Android's own installer, which
+ * asks "Do you want to update this app?" first. The weekly check can be switched on or off there.
  *
  * Before Android's installer ever sees the file:
  *   - it came over https from github.com and GitHub's own download hosts, and nowhere else;
@@ -48,8 +49,8 @@ import java.util.concurrent.Executors
 object Updater {
     private const val STORE = "update"
     private const val ASSET = "couch-tv-home.apk"
-    private const val DAY_MS = 24 * 60 * 60 * 1000L
-    private const val RETRY_MS = 60 * 60 * 1000L   // a daily check that failed (no Wi-Fi yet) tries again an hour later
+    private const val WEEK_MS = 7 * 24 * 60 * 60 * 1000L
+    private const val RETRY_MS = 60 * 60 * 1000L   // a weekly check that failed (no Wi-Fi yet) tries again an hour later
     private const val RESULT = "app.couchtv.launcher.UPDATE_RESULT"
     private const val OFFLINE_HOST = "home.tvos.invalid"   // the launcher's own copy of the page
     private val REPO = Regex("[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}")
@@ -104,7 +105,9 @@ object Updater {
             .put("available", offered)
             .put("refused", refused && newer(latest, current()))   // that release is signed with another key
             .put("checked", s.getLong("checked", 0L))
-            .put("auto", s.getBoolean("auto", true))
+            .put("auto", s.getBoolean("auto", false))
+            // the household has answered "tell me about new versions?" (on the TV or at setup)
+            .put("answered", s.contains("auto"))
             .put("busy", busy)
             .put("progress", progress)
             .put("error", error)
@@ -119,13 +122,14 @@ object Updater {
     fun setAuto(ctx: Context, on: Boolean) {
         store(ctx).edit().putBoolean("auto", on).apply()
         changed(ctx)
+        if (on) checkIfDue(ctx.applicationContext)   // a yes looks straight away, then weekly
     }
 
     /**
      * From MainActivity.onResume. The home is back in front: if Android's "update this app?" screen
      * closed without a word (some TVs say nothing when Back is pressed there), the update counts as
      * cancelled after a moment; back from Android's "install unknown apps" switch with it on, the
-     * note asking for it goes. Then the daily check, only when it is due and switched on.
+     * note asking for it goes. Then the weekly check, only when it is due and switched on.
      */
     fun resumed(ctx: Context) {
         val app = ctx.applicationContext
@@ -137,8 +141,8 @@ object Updater {
     private fun checkIfDue(ctx: Context) {
         val s = store(ctx)
         val now = System.currentTimeMillis()
-        if (repo() == null || !s.getBoolean("auto", true) || busy.isNotEmpty()) return
-        if (now - s.getLong("checked", 0L) < DAY_MS || now - s.getLong("tried", 0L) < RETRY_MS) return
+        if (repo() == null || !s.getBoolean("auto", false) || busy.isNotEmpty()) return
+        if (now - s.getLong("checked", 0L) < WEEK_MS || now - s.getLong("tried", 0L) < RETRY_MS) return
         check(ctx, false)
     }
 
