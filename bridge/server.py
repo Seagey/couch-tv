@@ -1140,7 +1140,7 @@ async def h_app_order_set(request):
 # over config.json on that TV (docs/CONFIG.md). The bridge only checks their shape; it does not act
 # on them. Anything it does not know is dropped.
 SETTINGS_MAX = 32 * 1024
-SETTINGS_LANGS = ("en", "es", "es-MX")
+SETTINGS_LANGS = config.LANGUAGES
 _PHOTO_FILE = re.compile(r"[A-Za-z0-9_-]{1,64}\.jpg")
 _PACKAGE = re.compile(r"[A-Za-z0-9_.:-]{1,200}")
 

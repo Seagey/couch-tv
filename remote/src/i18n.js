@@ -1,13 +1,14 @@
-// The phone remote's words in English, Spanish (es) and Mexican Spanish (es-MX, only where Mexico
-// says it differently). The choice is per phone (TV menu, Language): "Same as the TV" follows the
-// TV home's Home settings, read from the bridge (/api/settings). The same languages as
-// tv-home/web/i18n.js. Messages that come from the bridge itself (errors, notes) stay in English.
+// The phone remote's words in English, Spanish (es), Mexican Spanish (es-MX, only where Mexico
+// says it differently) and Italian (it). The choice is per phone (TV menu, Language): "Same as the
+// TV" follows the TV home's Home settings, read from the bridge (/api/settings). The same languages
+// as tv-home/web/i18n.js. Messages that come from the bridge itself (errors, notes) stay in English.
 import { useEffect, useState } from 'react';
 
 export const LANGS = [
   { id: 'en', name: 'English', locale: 'en-AU' },
   { id: 'es', name: 'Español', locale: 'es-ES' },
-  { id: 'es-MX', name: 'Español (México)', locale: 'es-MX' },
+  { id: 'es-MX', name: 'Español (México)', locale: 'es-MX', base: 'es' },
+  { id: 'it', name: 'Italiano', locale: 'it-IT' },
 ];
 
 const S = {};
@@ -344,6 +345,139 @@ S['es-MX'] = {
   reload: 'Volver a cargar el control',
 };
 
+S.it = {
+  both: 'Tutti',
+  whos_watching: 'Chi sta guardando',
+  whos_watching_change: 'Chi sta guardando: {name}. Cambia',
+  not_connected: 'Non collegato',
+  connecting: 'Collegamento…',
+  tv_not_connected: 'TV non collegata',
+  waking: 'Accensione…',
+  off: 'Spenta',
+  home: 'Home',
+  on: 'Accesa',
+  tv: 'TV',
+  more_controls: 'Altri comandi',
+  turn_off: 'Spegni la TV',
+  turn_on: 'Accendi la TV',
+  just_started: 'Appena iniziato',
+  min_in: 'Al minuto {n}',
+  st_playing: 'In riproduzione',
+  st_paused: 'In pausa',
+  st_buffering: 'Caricamento',
+  st_stopped: 'Fermo',
+  on_app: ' su {app}',
+  about_left: 'mancano circa {n} min',
+  min_left: 'mancano {n} min',
+  season: 'Stagione {n}',
+  episode: 'Episodio {n}',
+  app_open: '{app} è aperta',
+  now_on_tv: 'Ora sulla TV',
+  tap_middle: 'Tocca al centro per selezionare',
+  not_set_up_tv: 'La TV {name} non è ancora configurata.',
+  not_set_up_tv_more: 'Va configurata una volta, davanti a quella TV.',
+  use_living_room: 'Usa la TV del soggiorno',
+  cant_reach: 'Non riesco a raggiungere la TV.',
+  home_wifi: 'Il telefono è sul Wi-Fi di casa?',
+  try_again: 'Riprova',
+  waking_tv: 'Accendo la TV…',
+  turn_on_tv: 'Accendi la TV',
+  back: 'Indietro',
+  play_pause: 'Riproduci o metti in pausa',
+  pause: 'Pausa',
+  play: 'Riproduci',
+  volume: 'Volume',
+  muted: 'Audio disattivato',
+  ask_for_show: 'Chiedi un programma',
+  remote: 'Telecomando',
+  watch: 'Guarda',
+  this_tv: 'TV {name}',
+  this: 'di casa',
+  cant_tell_who: 'Non sono riuscito a dire alla TV chi sta guardando',
+  didnt_wake: 'Non si è accesa. Accendila con il suo telecomando.',
+  still_cant_reach: 'Ancora non riesco a raggiungere la TV',
+  not_on_tv: '{title} è su {service}, che questa TV non ha.',
+  starting: 'Metto {title}…',
+  is_on: 'Fatto: {title}',
+  opened: 'Aperta {app}',
+  opening: 'Apro {app}',
+  not_set_up: 'Non ancora configurata',
+  sleep_needs_update: 'Il timer di spegnimento ha bisogno del prossimo aggiornamento del computer.',
+  sleep_set: 'Timer di spegnimento: {n} minuti',
+  sleep_off: 'Timer di spegnimento tolto',
+  picture_now: 'Immagine: {mode}',
+  sent_to_tv: 'Inviato alla TV',
+  keep_watching: 'Continua a guardare',
+  couldnt_load: 'Non si è caricato. Riprova tra poco.',
+  shows_wait: 'Quello che guardi sulla TV ti aspetta qui.',
+  loading: 'Caricamento…',
+  apps: 'App',
+  couldnt_load_apps: 'Non sono riuscito a caricare le app. Riapri Guarda tra un momento.',
+  ideas_tonight: 'Idee per stasera',
+  suggest: 'Suggeriscimi qualcosa',
+  suggest_sub: 'Qualche programma per stasera, da quello che guardi',
+  no_ideas: 'Ancora nessuna idea. Prova Chiedi un programma.',
+  couldnt_load_ideas: 'Non sono riuscito a caricare le idee. Riprova tra poco.',
+  screens: 'Schermi',
+  screen_sub: 'Si vede sulla TV solo quando lo apri',
+  close: 'Chiudi',
+  which_tv: 'Quale TV',
+  not_set_up_short: ' (non configurata)',
+  picture: 'Immagine',
+  picture_later: 'La modalità immagine funziona quando questa TV è configurata.',
+  sleep_timer: 'Timer di spegnimento',
+  n_min: '{n} min',
+  sleep_chip_off: 'No',
+  turns_off_at: 'La TV si spegne alle {time} ({n} min).',
+  sleep_note: 'Spegne la TV al posto tuo, anche se il telefono è bloccato.',
+  type_on_tv: 'Scrivi sulla TV',
+  type_placeholder: 'Per una casella di ricerca sulla TV',
+  send_to_tv: 'Invia alla TV',
+  subtitles: 'Sottotitoli',
+  input: 'Ingresso',
+  settings: 'Impostazioni',
+  arrange_apps: 'Ordina le app',
+  people: 'Persone',
+  language: 'Lingua',
+  same_as_tv: 'Come la TV',
+  language_note: 'Solo per questo telefono. La TV sceglie la sua in Impostazioni della home (l’ingranaggio nella home della TV).',
+  new_chat: 'Nuova chat',
+  finding: 'Claude lo sta cercando',
+  usually: 'Di solito tra 5 e 20 secondi.',
+  carries_on: 'Va avanti da solo. Guarda la TV.',
+  idea_keep: 'Continua a guardare {title}',
+  idea_bluey: 'Metti Bluey',
+  idea_tonight: 'Consigliami qualcosa per stasera',
+  idea_funny: 'Qualcosa di divertente, meno di un’ora',
+  idea_new: 'Cosa c’è di nuovo su Netflix?',
+  reply: 'Rispondi…',
+  put_on: 'Metti…',
+  sending_in: 'Invio tra {n} s',
+  keep_editing: 'Continua a scrivere',
+  talk_tip: 'Tocca il microfono della tastiera e parla.',
+  talk_tip_more: 'Si invia da solo quando smetti.',
+  cant_reach_wifi: 'Non riesco a raggiungere la TV. Il telefono è sul Wi-Fi di casa?',
+  arrange_lede: 'Trascina un’app dalla maniglia. Le app sopra la linea sono nel dock della TV (fino a {max}); le altre sono in Altre app. Impostazioni resta sempre in fondo.',
+  loading_apps: 'Carico le app della TV…',
+  no_apps_yet: 'Questa TV non ha ancora mandato le sue app. Premi Home sulla TV, poi riapri qui.',
+  more_apps: 'Altre app',
+  dock_full: 'Nel dock stanno {max} app, quindi quelle sotto sono passate in Altre app.',
+  saved_home: 'Salvato. Premi Home sulla TV per vederlo.',
+  people_lede: 'Nell’ordine in cui le mostra la TV. Trascina la maniglia per spostare qualcuno, tocca un nome per cambiarlo.',
+  nobody: 'Ancora nessuno. La TV mostra tutto finché non aggiungi qualcuno.',
+  removed: 'Tolto {name}. La sua cronologia resta sul computer.',
+  added: 'Aggiunto {name}.',
+  add_person: 'Aggiungi una persona',
+  whos_phone: 'Di chi è questo telefono?',
+  onboard_note: '«Continua a guardare» e i suggerimenti seguono chi sta guardando. Puoi cambiarlo in alto quando vuoi.',
+  home_screen: 'Mettilo nella schermata Home',
+  home_screen_how: 'In Safari tocca Condividi {icon}, poi {add}.',
+  add_to_home: 'Aggiungi alla schermata Home',
+  snag: 'Il telecomando ha avuto un problema.',
+  snag_note: 'Sulla TV non è cambiato niente.',
+  reload: 'Ricarica il telecomando',
+};
+
 const KEY = 'tv.lang';          // this phone's choice: 'auto' (same as the TV) or a language
 const TV_KEY = 'tv.lang.tv';    // the TV's language, last read from the bridge
 const read = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -353,6 +487,7 @@ const known = (id) => LANGS.some((l) => l.id === id);
 function guess() {
   const n = (typeof navigator !== 'undefined' && navigator.language) || 'en';
   if (/^es-MX/i.test(n)) return 'es-MX';
+  if (/^it/i.test(n)) return 'it';
   return /^es/i.test(n) ? 'es' : 'en';
 }
 function resolve() {
@@ -379,7 +514,8 @@ export function setChoice(c) { write(KEY, known(c) ? c : 'auto'); apply(); }
 export function setTvLang(id) { if (known(id)) { write(TV_KEY, id); apply(); } }
 
 export function t(key, vars) {
-  let s = (lang === 'es-MX' && S['es-MX'][key]) || (lang !== 'en' && S.es[key]) || S.en[key];
+  const base = LANGS.find((l) => l.id === lang).base;
+  let s = S[lang][key] ?? (base && S[base][key]) ?? S.en[key];
   if (s == null) s = key;
   if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? vars[k] : m));
   return s;

@@ -232,16 +232,22 @@ object Doorbell {
         }.start()
     }
 
-    /** The card's words, in the language picked in Home settings (else home.language, else English). */
+    /**
+     * The card's words, in the language picked in Home settings (else home.language, else the TV's
+     * own language, as the home page does; English for any other).
+     */
     private fun words(c: Context): Pair<String, String> {
         val lang = try {
             c.getSharedPreferences("page", Context.MODE_PRIVATE).getString("tvhome.settings", null)
                 ?.let { JSONObject(it).optJSONObject("s")?.optString("lang") }?.takeIf { it.isNotEmpty() }
                 ?: c.getSharedPreferences("home", Context.MODE_PRIVATE).getString("config", null)
-                    ?.let { JSONObject(it).optJSONObject("home")?.optString("language") }
-        } catch (e: Exception) { null } ?: "en"
-        return if (lang.startsWith("es")) "Timbre" to "Hay alguien en la puerta"
-        else "Doorbell" to "Someone is at the door"
+                    ?.let { JSONObject(it).optJSONObject("home")?.optString("language") }?.takeIf { it.isNotEmpty() }
+        } catch (e: Exception) { null } ?: java.util.Locale.getDefault().language
+        return when {
+            lang.startsWith("es") -> "Timbre" to "Hay alguien en la puerta"
+            lang.startsWith("it") -> "Campanello" to "C'è qualcuno alla porta"
+            else -> "Doorbell" to "Someone is at the door"
+        }
     }
 
     private val CREAM = Color.parseColor("#F2EAD8")

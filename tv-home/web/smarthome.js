@@ -86,7 +86,8 @@
     S.timer = setTimeout(function () { load(); later(REFRESH_MS); }, ms);
   }
   function num(v) { return Math.round(v * 10) / 10; }
-  function deg(v) { return v == null || !isFinite(v) ? "" : num(v) + "°"; }
+  // with the language's decimal mark: 21.5° in English, 21,5° in Italian
+  function deg(v) { return v == null || !isFinite(v) ? "" : num(v).toLocaleString(window.I18N ? window.I18N.locale() : "en-AU") + "°"; }
   function isOff(room) { return room.state === "off"; }
   function modeWord(m) { return MODES.indexOf(m) >= 0 ? t("sh_mode_" + m) : m || ""; }
   function actionWord(room) {

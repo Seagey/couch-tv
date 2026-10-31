@@ -57,8 +57,13 @@ SCREENS = CONFIG.get("screens") or []
 BRIDGE = {"host": "your-computer.local", "port": 5400, "fallback_hosts": [], **(CONFIG.get("bridge") or {})}
 CLIENT_NAME = CONFIG.get("client_name", "Couch TV bridge")
 
+# The languages the TV home and the phone remote speak (tv-home/web/i18n.js, remote/src/i18n.js).
+LANGUAGES = ("en", "es", "es-MX", "it")
 # Where shows stream (JustWatch) and what the prompts call the country: "country" in config.json.
-COUNTRY = str(CONFIG.get("country") or "AU").upper()
+# Without it: the country of the home's language, where it has one of its own (Italian: IT), else AU.
+_LANGUAGE_COUNTRY = {"it": "IT"}
+_language = CONFIG["home"].get("language") if isinstance(CONFIG.get("home"), dict) else None
+COUNTRY = str(CONFIG.get("country") or _LANGUAGE_COUNTRY.get(str(_language)) or "AU").upper()
 _COUNTRY_NAMES = {
     "AU": "Australia", "NZ": "New Zealand", "US": "the United States", "GB": "the United Kingdom",
     "UK": "the United Kingdom", "IE": "Ireland", "CA": "Canada", "IN": "India", "ZA": "South Africa",
@@ -230,19 +235,25 @@ def _home(h):
     ids = SCENE_IDS + [m["id"] for m in mine]
     scenes = [s for s in dict.fromkeys(h.get("scenes") or []) if s in ids] if isinstance(h.get("scenes"), list) else []
     hide = h.get("hide_packages") if isinstance(h.get("hide_packages"), list) else []
-    return {
+    out = {
         # Android package names never shown on the home or in More apps (a maker's own clutter).
         "hide_packages": [p for p in dict.fromkeys(hide) if isinstance(p, str) and re.fullmatch(r"[A-Za-z0-9_.]{1,200}", p)],
         "look": h.get("look") if h.get("look") in ("night", "classic") else "night",
         "scenes": scenes or list(SCENE_IDS),
         "scene_seconds": _int(h.get("scene_seconds"), 20, 5, 3600),
-        "clock": "24h" if str(h.get("clock")).lower() == "24h" else "12h",
         "dock_size": _int(h.get("dock_size"), DOCK_LIMIT, 1, DOCK_LIMIT),
-        # the TV home's language until someone picks one in Home settings: en, es or es-MX
-        "language": h.get("language") if h.get("language") in ("en", "es", "es-MX") else "en",
         # your own scenes, in backgrounds/mine/ (docs/MAKE-A-SCENE.md)
         "my_scenes": mine,
     }
+    # Only when config.json gives them. Without "language" the TV home speaks the TV's own language
+    # (English if it is not one of LANGUAGES), and without "clock" it uses that language's usual
+    # clock (24 hour in Italian, else 12 hour). Home settings on the TV win over both.
+    clock = str(h.get("clock") or "").lower()
+    if clock in ("12h", "24h"):
+        out["clock"] = clock
+    if h.get("language") in LANGUAGES:
+        out["language"] = h["language"]
+    return out
 
 
 HOME = _home(CONFIG.get("home"))

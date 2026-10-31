@@ -1,15 +1,19 @@
 // The words on the TV home, in each language it speaks. app.js calls I18N.t("key", {vars}).
 // en is the base. es is Spanish for everyone (Spain and neutral); es-MX only lists the words that
 // are said differently in Mexico (computadora, celular, presionar, agregar, clima and the rest),
-// and falls back to es for everything else. To add a language: copy the es block, translate it,
-// add it to LANGS. Keep the {placeholders} as they are.
+// and falls back to es for everything else. it is Italian. To add a language: copy the es block,
+// translate it, add it to LANGS. Keep the {placeholders} as they are.
 (function () {
   "use strict";
 
+  // locale: how dates and numbers are written. base: where a missing word comes from before
+  // English. clock: the usual clock there, used when neither config.json nor Home settings picked
+  // one (else 12 hour). country: where the place search looks first.
   var LANGS = [
     { id: "en", name: "English", locale: "en-AU" },
     { id: "es", name: "Español", locale: "es-ES" },
-    { id: "es-MX", name: "Español (México)", locale: "es-MX" }
+    { id: "es-MX", name: "Español (México)", locale: "es-MX", base: "es" },
+    { id: "it", name: "Italiano", locale: "it-IT", clock: "24h", country: "IT" }
   ];
 
   var S = {};
@@ -557,6 +561,229 @@
     sh_hint: "Izquierda y derecha para moverte, arriba y abajo para cambiar de fila. OK para presionar. Atrás para cerrar."
   };
 
+  S.it = {
+    keep_watching: "Continua a guardare",
+    who_watching: "Chi sta guardando",
+    apps: "App",
+    more_apps: "Altre app",
+    app_store: "Store delle app",
+    settings: "Impostazioni",
+    new_app: "Nuova",
+    nothing_yet: "Ancora niente da continuare.",
+    nothing_for: "Ancora niente da continuare per {name}.",
+    everyone: "tutti",
+    off_in: "Si spegne tra {m} min",
+    off_in_night: "{m} min",
+    sleep_timer: "Timer",
+    switching: "Cambio…",
+    picture_mode: "Modalità immagine",
+    classic_look: "Aspetto classico",
+    night_look: "Aspetto notturno",
+    input: "Ingresso",
+    n_min: "{n} min",
+    timer_off: "Spento",
+    pic_not_ready: "Da qui non si può ancora cambiare la modalità immagine.",
+    no_inputs: "Questa TV non ha un elenco di ingressi da aprire.",
+    computer_off: "Il computer è spento, quindi i programmi non si vedono. Le app funzionano.",
+    computer_quiet: "Il computer non risponde. Le app funzionano.",
+    opening: "Apro {title}…",
+    opening_in: "Apro {title} su {app}…",
+    screen_not_set: "Quello schermo non è ancora configurato.",
+    bridge_no: "Il computer ha detto di no ({status}).",
+    bridge_down: "Il computer non risponde.",
+    bridge_slow: "Il computer ci ha messo troppo a rispondere.",
+    people_lift_hint: "Su e giù per spostare, OK per lasciare",
+    people_hold_hint: "Tieni premuto OK su un nome per spostarlo",
+    app_lift_hint: "Sinistra e destra per spostare, giù per metterla in Altre app, OK per lasciare",
+    app_add_hint: "Tieni premuto OK su un'app per aggiungerla alla home",
+    stays_put: "{name} resta sempre al suo posto.",
+    already_home: "{name} è già nella home.",
+    now_home: "Ora {name} è nella home.",
+    moved_more: "{name} è passata in Altre app.",
+    saved: "Salvato.",
+    that_app: "Quell'app",
+    photo_by: "Foto: {by}",
+    photo_albury: "Temporale al tramonto, Albury",
+    photo_aresquiers: "Spiaggia di Aresquiers, Francia",
+    am: "am",
+    pm: "pm",
+
+    wx_clear: "Sereno",
+    wx_mostly_clear: "Poco nuvoloso",
+    wx_partly: "Parzialmente nuvoloso",
+    wx_cloudy: "Nuvoloso",
+    wx_fog: "Nebbia",
+    wx_drizzle: "Pioviggine",
+    wx_light_rain: "Pioggia debole",
+    wx_rain: "Pioggia",
+    wx_heavy_rain: "Pioggia forte",
+    wx_showers: "Rovesci",
+    wx_heavy_showers: "Rovesci forti",
+    wx_storms: "Temporali",
+
+    gear_home: "Impostazioni della home",
+    gear_home_sub: "Lingua, meteo, scene, app e persone",
+    gear_tv: "Impostazioni della TV",
+    gear_tv_sub: "Wi-Fi, immagine, audio e il resto della TV",
+    tv_settings_none: "Non è stato possibile aprire le impostazioni della TV.",
+
+    set_title: "Impostazioni della home",
+    sec_language: "Lingua",
+    sec_location: "Località",
+    sec_weather: "Meteo",
+    sec_look: "Aspetto e scene",
+    sec_apps: "App",
+    sec_people: "Persone",
+    sec_quick: "Pulsanti rapidi",
+    sec_about: "Informazioni",
+    hint_secs: "Su e giù per scegliere, OK per aprire, Indietro per chiudere",
+    hint_rows: "OK per cambiare, Indietro per tornare",
+    hint_rows_move: "OK per cambiare, tieni premuto OK per spostare, Indietro per tornare",
+    hint_lift: "Su e giù per spostare, OK per lasciare",
+    hint_typing: "Scrivi con il telecomando o con la sua tastiera sullo schermo, poi OK. Indietro per annullare.",
+    on: "Sì",
+    off: "No",
+    confirm_remove: "Premi di nuovo OK per toglierlo",
+    confirm_reset: "Premi di nuovo OK per ripristinare",
+
+    lang_note: "Il telecomando sul telefono ha una sua impostazione della lingua.",
+
+    loc_now: "Località del meteo",
+    loc_unset: "Non impostata",
+    loc_search: "Cerca un comune o una città",
+    loc_type: "Scrivi un comune o una città, poi OK",
+    loc_searching: "Cerco…",
+    loc_none: "Nessun risultato per \"{q}\".",
+    loc_error: "Non riesco a raggiungere la ricerca delle località. Controlla il Wi-Fi.",
+    loc_set: "Ora il meteo è quello di {place}.",
+    loc_reset: "Torna alla località di config.json",
+    loc_results: "Località trovate",
+    loc_note: "Imposta la località e il fuso orario del meteo. Basta il comune o la frazione, mai un indirizzo di casa. Ricerca delle località di Open-Meteo.",
+
+    wx_show: "Mostra il meteo",
+    wx_units: "Unità",
+    wx_every: "Aggiorna ogni",
+    wx_provider: "Fornitore",
+    wx_provider_note: "Gratuito, senza account né chiave. Per ora è l'unico fornitore.",
+    wx_night_only: "Il meteo si vede con l'aspetto notturno, accanto alla data.",
+    every_min: "{n} minuti",
+
+    look_head: "Aspetto",
+    look_night: "Scene notturne",
+    look_night_sub: "Un grande orologio di vetro e scene che si alternano",
+    look_classic: "Classico",
+    look_classic_sub: "Una foto e una griglia di app",
+    scenes_head: "Scene",
+    scene_night: "Notte",
+    scene_golden: "Ora dorata",
+    scene_water: "A pelo d'acqua",
+    scene_fog: "Nebbia",
+    scene_dawn: "Alba nella foresta",
+    scene_photo: "La tua foto {n}",
+    scene_mine: "La tua scena {n}",
+    scene_secs: "Ogni scena resta",
+    n_secs: "{n} secondi",
+    clock: "Orologio",
+    clock_12: "12 ore",
+    clock_24: "24 ore",
+    one_scene: "Deve restare almeno una scena.",
+    photos_head: "Le tue foto",
+    photos_pick: "Aggiungi foto da una chiavetta USB o da questa TV",
+    photos_pick_sub: "Apre la scelta dei file della TV",
+    photos_no_pick: "Questa TV non ha una scelta dei file",
+    photos_no_pick_sub: "Aggiungi una foto da un indirizzo web.",
+    photos_url: "Aggiungi una foto da un indirizzo web",
+    photos_url_type: "Scrivi l'indirizzo di una foto JPEG o PNG, poi OK",
+    photos_checking: "Apro la foto…",
+    photos_bad: "Quell'indirizzo non si è aperto come foto.",
+    photos_added: "Foto aggiunta. Si vede come una scena.",
+    photos_added_n: "{n} foto aggiunte.",
+    photos_full: "Venti foto al massimo.",
+    photo_remove: "Togli la foto {n}",
+    photos_note: "Le tue foto si alternano con le scene, e l'aspetto classico mostra le tue al posto delle sue.",
+
+    apps_home: "Nella home ({n} di {max})",
+    apps_more: "In Altre app",
+    apps_hidden: "Nascoste",
+    app_on_home: "Nella home",
+    app_in_more: "Altre app",
+    app_hidden: "Nascosta",
+    apps_note: "OK sposta un'app tra la home, Altre app e nascoste. Tieni premuto OK per cambiare l'ordine.",
+    apps_none: "Ancora nessuna app.",
+    apps_classic: "L'aspetto classico ha un ordine suo. Nascondere funziona con tutti e due.",
+
+    people_add: "Aggiungi una persona",
+    people_type: "Scrivi un nome, poi OK",
+    people_full: "Dodici persone al massimo.",
+    people_none: "Ancora nessuno. Senza nessuno, Continua a guardare mostra tutto.",
+    people_note: "Una persona: nessun selettore. Due: un interruttore. Tre o più: un'icona rotonda con un elenco.",
+    person_name: "Nome",
+    person_rename_type: "Scrivi il nuovo nome, poi OK",
+    person_remove: "Togli {name}",
+    person_on: "Sta guardando",
+
+    quick_sleep: "Timer di spegnimento",
+    quick_picture: "Cambio della modalità immagine",
+    quick_look: "Cambio di aspetto",
+    quick_input: "Elenco degli ingressi",
+    quick_needs_bridge: "Serve il computer",
+    quick_needs_picture: "Servono il computer e un'impostazione dell'immagine",
+    quick_needs_inputs: "Serve il computer, o una TV con un elenco di ingressi",
+    quick_note: "OK mostra o nasconde un pulsante. Tieni premuto OK per cambiare l'ordine.",
+
+    about_version: "Versione",
+    about_web: "Anteprima web",
+    about_code: "couch-tv su GitHub",
+    about_running: "Modalità",
+    run_alone: "Da sola, senza computer",
+    run_bridge: "Con il computer",
+    run_off: "Computer spento",
+    run_quiet: "Il computer non risponde",
+    about_kept: "Le impostazioni sono salvate",
+    kept_tv: "Su questa TV",
+    kept_both: "Su questa TV e sul computer",
+    about_reset: "Ripristina le impostazioni della home",
+    about_reset_sub: "Lingua, località, meteo, aspetto, le tue foto e i pulsanti rapidi tornano a config.json. Persone e app restano.",
+    reset_done: "Tornato alle impostazioni di config.json.",
+    // ---- domotica (facoltativa, smarthome.js): le parole dell'interfaccia italiana di Home Assistant ----
+    smart_home: "Domotica",
+    sh_climate: "Clima",
+    sh_scenes: "Scene",
+    sh_checking: "Controllo",
+    sh_down: "Home Assistant non risponde. Controlla che sia acceso e sulla stessa rete della TV.",
+    sh_room_quiet: "Non risponde",
+    sh_set_to: "Impostata",
+    sh_range: "Tra",
+    sh_now: "Ora {t}",
+    sh_off: "Spento",
+    sh_mode: "Modalità",
+    sh_mode_heat: "Caldo",
+    sh_mode_cool: "Freddo",
+    sh_mode_heat_cool: "Caldo/Freddo",
+    sh_mode_auto: "Automatico",
+    sh_mode_dry: "Deumidificazione",
+    sh_mode_fan_only: "Solo ventilatore",
+    sh_act_heating: "Riscaldamento",
+    sh_act_cooling: "Raffreddamento",
+    sh_act_drying: "Deumidificazione",
+    sh_act_fan: "Ventilatore",
+    sh_act_idle: "Inattivo",
+    sh_cooler: "Più fresco",
+    sh_warmer: "Più caldo",
+    sh_turn_on: "Accendi",
+    sh_turn_off: "Spegni",
+    sh_turned_on: "Accendo {name}",
+    sh_turned_off: "Spengo {name}",
+    sh_mode_now: "{name}: {mode}",
+    sh_no_setpoint: "Questo si regola da Home Assistant, non da qui.",
+    sh_no_modes: "Non ha modalità da scegliere.",
+    sh_starting: "Avvio {name}",
+    sh_started: "{name}: fatto.",
+    sh_failed: "Non ha funzionato. Forse Home Assistant è occupato, riprova.",
+    sh_refused: "Questa TV non può cambiare questa cosa.",
+    sh_hint: "Sinistra e destra per spostarti, su e giù per cambiare riga. OK per premere. Indietro per chiudere."
+  };
+
   var lang = "en";
   function find(id) { return LANGS.filter(function (l) { return l.id === id; })[0] || null; }
 
@@ -566,8 +793,20 @@
     return lang;
   }
 
+  // The TV's own language, when it is one of these (es-MX, any other es, it), else English. Used
+  // when neither Home settings nor config.json picked a language.
+  function device() {
+    var n = "";
+    try { n = String(navigator.language || ""); } catch (e) {}
+    if (/^es-MX/i.test(n)) return "es-MX";
+    n = n.slice(0, 2).toLowerCase();
+    return find(n) ? n : "en";
+  }
+
   function t(key, vars) {
-    var s = (lang === "es-MX" && S["es-MX"][key]) || (lang !== "en" && S.es[key]) || S.en[key];
+    var l = find(lang), s = S[lang][key];
+    if (s == null && l.base) s = S[l.base][key];
+    if (s == null) s = S.en[key];
     if (s == null) s = key;
     if (vars) s = s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
     return s;
@@ -578,6 +817,9 @@
     set: set,
     lang: function () { return lang; },
     locale: function () { return find(lang).locale; },
+    clock: function () { return find(lang).clock || "12h"; },
+    country: function () { return find(lang).country || ""; },
+    device: device,
     langs: LANGS,
     strings: S
   };
