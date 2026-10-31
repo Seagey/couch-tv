@@ -2,6 +2,8 @@
 # breaks the build is seen straight away. The APKs it makes are test builds, signed with the
 # runner's own throwaway key: they install on a TV that has no couch-tv yet, but cannot update one
 # installed from the Releases page (Android refuses an update signed with a different key).
+# With the DEBUG_KEYSTORE secret set, every test build is signed with that one fixed key, so a test
+# build can update the previous test build (#4). Pull requests from forks never see the secret.
 # Several forks added a build like this (fifarsi, ishanboss20, gurpritsingh81, herocode1).
 name: Build
 
@@ -42,8 +44,20 @@ jobs:
       - name: Android platform 34
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0" > /dev/null
 
+      - name: Fixed test signing key (optional)
+        env:
+          DEBUG_KEYSTORE: ${{ secrets.DEBUG_KEYSTORE }}
+        run: |
+          if [ -n "$DEBUG_KEYSTORE" ]; then
+            printf '%s' "$DEBUG_KEYSTORE" | base64 -d > "$RUNNER_TEMP/ci.keystore"
+            echo "COUCHTV_KEYSTORE=$RUNNER_TEMP/ci.keystore" >> "$GITHUB_ENV"
+          fi
+
       - name: Build the TV apps
         run: sh scripts/build-apk.sh
+
+      - name: Signing fingerprints
+        run: for f in dist/*.apk; do echo "$f"; "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$f" | grep -i "SHA-256"; done
 
       - uses: actions/upload-artifact@v4
         with:

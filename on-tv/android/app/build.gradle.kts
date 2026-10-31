@@ -14,12 +14,23 @@ android {
         versionName = "0.3"
     }
     buildFeatures { buildConfig = true }
+    // Test builds: when COUCHTV_KEYSTORE names a keystore (a debug-style key, alias androiddebugkey,
+    // password android), release builds are signed with it, so one test build can update the last (#4).
+    val fixedKey = System.getenv("COUCHTV_KEYSTORE")?.let { file(it) }?.takeIf { it.isFile }
+    signingConfigs {
+        if (fixedKey != null) create("fixed") {
+            storeFile = fixedKey
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     buildTypes {
         release {
             // Not minified: libadb, Conscrypt and BouncyCastle use reflection, and the size saving is small.
             isMinifyEnabled = false
             // Signed with the local debug key so it installs without a keystore. Use your own key to publish.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("fixed") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {
