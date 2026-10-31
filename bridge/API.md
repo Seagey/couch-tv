@@ -442,7 +442,7 @@ is optional:
 
 | Key | What it is |
 |---|---|
-| `lang` | `en`, `es` or `es-MX`. |
+| `lang` | `en`, `es`, `es-MX` or `it`. |
 | `place` | The weather's place: `name`, `lat`, `lon` (rounded to two decimals, a town, never a house), `timezone`. |
 | `wx_show`, `wx_unit`, `wx_every` | Weather on or off, `c` or `f`, minutes between checks (15, 30 or 60). |
 | `look` | `night` or `classic`. |
@@ -626,6 +626,10 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- Italian: `lang` in `/api/settings` and `home.language` take `it`. `home.clock` and
+  `home.language` in `/api/config` and `/tv/config.js` are now there only when `config.json` sets
+  them; without them the TV home follows the TV's own language and that language's usual clock.
+  An older TV home reads a missing one as `12h` and `en`, as before.
 - `GET|POST /api/settings` (Home settings made on the TV: language, weather place and units,
   look, scenes, photos, quick buttons, hidden apps). `home.language` in `/api/config` and
   `/tv/config.js`.

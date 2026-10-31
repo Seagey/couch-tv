@@ -155,7 +155,8 @@
     CFG = window.COUCH_CONFIG || {};
     HOME = CFG.home || {};
     ST = loadSettings();
-    if (window.I18N) window.I18N.set(ST.lang || HOME.language || "en");
+    // the language: Home settings, then config.json, then the TV's own language if the home speaks it
+    if (window.I18N) window.I18N.set(ST.lang || HOME.language || window.I18N.device());
     if (CFG.weather) WXCFG = CFG.weather;
     var pl = ST.place;
     if (pl && isFinite(pl.lat) && isFinite(pl.lon)) WXCFG = { lat: pl.lat, lon: pl.lon, place: pl.name || "", timezone: pl.timezone || "auto" };
@@ -174,7 +175,7 @@
     GRID_COLS = NIGHT ? 12 : 8;
     DOCK_APPS = Math.max(1, Math.min(10, parseInt(HOME.dock_size, 10) || 10));
     if (smartOn()) DOCK_APPS = Math.min(DOCK_APPS, 9);   // the Smart home tile takes one place in the dock
-    CLOCK24 = (ST.clock || HOME.clock) === "24h";
+    CLOCK24 = clock24();
     (Array.isArray(HOME.hide_packages) ? HOME.hide_packages : []).forEach(function (p) {
       if (typeof p === "string" && HIDDEN.indexOf(p) < 0) HIDDEN.push(p);
     });
@@ -192,6 +193,8 @@
     newApps = kept("tvhome.apps.new") || [];
   }
   function lookSetting() { return ST.look || kept("tvhome.look") || HOME.look || "night"; }
+  // no clock in Home settings or config.json: the one usual for the language (24 hour in Italian)
+  function clock24() { return (ST.clock || HOME.clock || (window.I18N ? window.I18N.clock() : "12h")) === "24h"; }
 
   // ---------------- helpers ----------------
   function esc(v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
@@ -1477,6 +1480,7 @@
     var rows = L ? L.langs.map(function (l) {
       return { kind: "choice", key: "lang:" + l.id, label: l.name, lang: l.locale, checked: L.lang() === l.id, act: function () {
         ST.lang = l.id; L.set(l.id); saveSettings(); staticText();
+        if (CLOCK24 !== clock24()) { CLOCK24 = !CLOCK24; glassShown = ""; clock(); }
       } };
     }) : [];
     rows.push(info("lang-note", t("lang_note")));
@@ -1513,16 +1517,44 @@
     rows.push(info("loc-note", t("loc_note")));
     return rows;
   }
+  // In the home's language. A language with a country of its own (Italian: Italy) asks there too and
+  // lists those places first, so the small towns are not lost among bigger places abroad, while
+  // "Londra" still finds London. Either search may fail on its own.
   function geocode(q) {
-    var lang = (window.I18N ? window.I18N.lang() : "en").slice(0, 2);
+    var L = window.I18N, lang = (L ? L.lang() : "en").slice(0, 2), home = L ? L.country() : "";
     var url = "https://geocoding-api.open-meteo.com/v1/search?count=8&format=json&language=" + lang + "&name=" + encodeURIComponent(q);
-    return fetch(url).then(function (r) { if (!r.ok) throw new Error("place search " + r.status); return r.json(); }).then(function (j) {
-      return (j.results || []).filter(function (r) { return isFinite(r.latitude) && isFinite(r.longitude); }).map(function (r) {
+    var get = function (u) {
+      return fetch(u).then(function (r) { if (!r.ok) throw new Error("place search " + r.status); return r.json(); })
+        .then(null, function () { return null; });
+    };
+    return Promise.all(home ? [get(url + "&countryCode=" + home), get(url)] : [get(url)]).then(function (js) {
+      if (!js.some(Boolean)) throw new Error("place search");
+      var seen = {}, out = [];
+      js.forEach(function (j) {
+        ((j && j.results) || []).forEach(function (r) {
+          if (!isFinite(r.latitude) || !isFinite(r.longitude) || seen[r.id]) return;
+          seen[r.id] = true;
+          out.push(r);
+        });
+      });
+      return out.slice(0, 10).map(function (r) {
         // two decimals is about a kilometre: the town, never the house
-        return { name: r.name, area: [r.admin1, r.country].filter(Boolean).join(", "),
+        return { name: r.name, area: placeArea(r, home),
           lat: Math.round(r.latitude * 100) / 100, lon: Math.round(r.longitude * 100) / 100, timezone: r.timezone || "auto" };
       });
     });
+  }
+  // What tells places with the same name apart: the municipality it belongs to (Italy: the comune),
+  // then the province or county, then the region or state, and the country unless it is the
+  // language's own. Each one only once, and not when it is the place's own name.
+  function placeArea(r, home) {
+    var out = [];
+    [r.admin3, r.admin2, r.admin1].forEach(function (a) {
+      a = String(a || "").trim();
+      if (a && a.replace(/^Comune di /, "") !== r.name && out.indexOf(a) < 0) out.push(a);
+    });
+    if (r.country && r.country_code !== home) out.push(r.country);
+    return out.join(", ");
   }
   // While typing: a search half a second after the last key. OK: straight away, then onto the first place.
   function findPlaces(q, go) {
@@ -1882,7 +1914,7 @@
     });
     ST = Array.isArray(ST.hidden_apps) ? { hidden_apps: ST.hidden_apps } : {};
     keep("tvhome.look", null);
-    if (window.I18N) window.I18N.set(HOME.language || "en");
+    if (window.I18N) window.I18N.set(HOME.language || window.I18N.device());
     saveSettings();
     staticText();
     SET.msg = t("reset_done");

@@ -28,10 +28,8 @@
     "look": "night",
     "scenes": ["night", "golden", "water", "fog", "dawn"],
     "scene_seconds": 20,
-    "clock": "12h",
     "dock_size": 10,
-    "hide_packages": [],
-    "language": "en"
+    "hide_packages": []
   },
   "phone_remote": true,
   "ask": { "enabled": false },

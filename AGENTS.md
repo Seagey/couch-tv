@@ -178,7 +178,9 @@ recommend C (A if they only want the home screen). Write the choice down; the re
   some of them, your own photos, or the Classic look?" Own photos: 1920x1080 JPEGs into
   `tv-home/web/backgrounds/`.
 - "How long should each scene stay?" (20 seconds is the default.)
-- "12 hour or 24 hour clock?"
+- "Which language for the home: English, Spanish, Mexican Spanish or Italian?" Leave
+  `home.language` out to follow the TV's own language.
+- "12 hour or 24 hour clock?" (Left out: 24 hour in Italian, 12 hour otherwise.)
 - "What suburb or city for the weather?" Look up its latitude, longitude and time zone yourself.
 - "What country are you in?" (For where shows stream. Two letter code, for example AU, US, GB.)
 
