@@ -15,7 +15,7 @@ class WatchService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
-        if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && e.packageName?.toString() == FireHome.AMAZON_HOME)
+        if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && FireHome.isAmazonHome(e.packageName?.toString(), e.className?.toString()))
             FireHome.onAmazonHome()
     }
 

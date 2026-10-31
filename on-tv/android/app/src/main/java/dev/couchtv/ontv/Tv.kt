@@ -108,6 +108,16 @@ object Tv {
         }
     }
 
+    /**
+     * The TV's own settings. On Fire OS the plain Settings action goes through Amazon's home on its
+     * way there, which the Fire TV Home watcher sends straight back, so its Settings screen is
+     * opened by name.
+     */
+    fun openSettings() {
+        val fire = android.content.ComponentName("com.amazon.tv.launcher", "com.amazon.tv.launcher.ui.MainSettingsActivity")
+        start(if (FireHome.isFireTv) Intent().setComponent(fire) else Intent(Settings.ACTION_SETTINGS))
+    }
+
     fun startHome(): Boolean = try {
         start(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)); true
     } catch (e: Exception) { false }

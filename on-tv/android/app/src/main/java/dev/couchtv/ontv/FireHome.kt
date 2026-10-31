@@ -52,6 +52,12 @@ object FireHome {
     private val wanted: Boolean
         get() = isFireTv && App.homeEnabled(App.instance)
 
+    /**
+     * Amazon's launcher package also holds Fire OS's Settings screens (`.ui.MainSettingsActivity`
+     * and others), so only its other screens count as Amazon's home.
+     */
+    fun isAmazonHome(pkg: String?, cls: String?) = pkg == AMAZON_HOME && cls?.contains("Settings") != true
+
     /** The WatchService saw Amazon's home come on screen. */
     fun onAmazonHome() {
         if (wanted) jump()
@@ -123,9 +129,9 @@ object FireHome {
             while (events.getNextEvent(e)) {
                 if (e.eventType != UsageEvents.Event.MOVE_TO_FOREGROUND) continue
                 Log.i(TAG, "front: ${e.packageName}")
-                when (e.packageName) {
-                    AMAZON_HOME -> amazonInFront = true
-                    BuildConfig.APPLICATION_ID -> amazonInFront = false
+                when {
+                    isAmazonHome(e.packageName, e.className) -> amazonInFront = true
+                    e.packageName == BuildConfig.APPLICATION_ID || e.packageName == AMAZON_HOME -> amazonInFront = false
                 }
             }
             if (amazonInFront) { Log.i(TAG, "Amazon's home came forward, jumping"); jump() }
