@@ -11,7 +11,6 @@ import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsets
@@ -62,7 +61,9 @@ class HomeActivity : Activity() {
                     // The server may still be starting: try again shortly.
                     if (req.isForMainFrame) { ready = false; main.postDelayed({ load() }, 700) }
                 }
-                override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest) = true
+                // Only the home page itself may load here: its restart() (a new look, scenes, timer)
+                // reloads it with location.replace, which was cancelled along with everything else.
+                override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest) = !req.url.toString().startsWith("$base/tv/")
                 override fun shouldInterceptRequest(view: WebView, req: WebResourceRequest): WebResourceResponse? {
                     val u = req.url
                     if (u.host != "tvos.invalid") return null
@@ -125,7 +126,7 @@ class HomeActivity : Activity() {
             main.post { runCatching { startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
             return true
         }
-        @JavascriptInterface fun openSettings(): Boolean { main.post { runCatching { startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }; return true }
+        @JavascriptInterface fun openSettings(): Boolean = runCatching { Tv.openSettings() }.isSuccess
         @JavascriptInterface fun version(): String = BuildConfig.VERSION_NAME
         @JavascriptInterface fun keep(key: String, value: String) { getSharedPreferences("page", MODE_PRIVATE).edit().putString(key, value).apply() }
         @JavascriptInterface fun kept(key: String): String? = getSharedPreferences("page", MODE_PRIVATE).getString(key, null)

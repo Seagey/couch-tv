@@ -220,6 +220,10 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             Tv.startUri(target, Apps.packageForLink(target)?.takeIf { Tv.hasPackage(it) }); Thread.sleep(1500)
             return json(200, ok().put("app", Apps.describe(Tv.frontPackage())?.let { JSONObject(it) } ?: JSONObject.NULL))
         }
+        if (target == "settings" && FireHome.isFireTv) {
+            Tv.openSettings()
+            return json(200, ok())
+        }
         val app = Apps.BY_ID[target] ?: Apps.BY_PACKAGE[target]
         if (app?.id == "home") {
             if (Adb.connected) Tv.key("home") else App.openHome()
