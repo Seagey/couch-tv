@@ -148,6 +148,16 @@ block the TV's own ADB, and then the phone remote's keys, typing, power off and 
 do not work; opening apps, playing a show by name, volume on the TV's own speaker and the sleep
 timer still do.
 
+Confirmed on a **Fire TV Stick 4K (2nd gen, Fire OS 8.1, Android 11)** by
+[killy10o10](https://github.com/Seagey/couch-tv/issues/3), who also wrote a step-by-step setup guide:
+[FIRE-TV-STICK.md](https://github.com/killy10o10/couch-tv/blob/main/docs/FIRE-TV-STICK.md). Two tips
+from that report:
+
+- **After updating the app with `adb install -r`, restart the stick** if Home lands on Amazon's
+  home. Fire OS can leave the watcher switched on but not connected until a restart.
+- **Only one launcher can do this at a time.** If another launcher (Projectivy, for example) also
+  has its Home override on, the two fight. Turn the other one's override off.
+
 Ported from the Fire TV work in [dlandman27's fork](https://github.com/dlandman27/couch-tv). Thanks
 to them.
 

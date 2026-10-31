@@ -16,7 +16,7 @@ by the author. Everything else is what the sources say, not tested.
 | Xiaomi TV Stick 4K (Android TV 11) | Yes (reported by a user, not tested by us) | Not reported | Not reported |
 | Nvidia Shield | Yes (not tested) | Yes | Yes (not tested) |
 | Onn (Google TV) | Yes | Yes | Partial |
-| Fire TV on Fire OS (Stick 4K Max, Cube) | Partial | Partial | Yes |
+| Fire TV on Fire OS (Stick 4K Max, Cube, Stick 4K 2nd gen) | Partial | Partial | Yes (Stick 4K 2nd gen confirmed by a user) |
 | Fire TV on Vega OS (Stick 4K Select, Stick HD 2026, 4K gen 3) | No | No | No |
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
 | LG (webOS) | Home screen: root only, fragile. As an app: possible, untested ([LG.md](LG.md)) | Possible, untested | No |

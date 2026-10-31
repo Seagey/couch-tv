@@ -15,8 +15,8 @@ the main repo, credited to each of them. Download the new apps from
 - **Fire TV sticks and Fire TV Cube (Fire OS).** The "lives on the TV" app now takes the Home key
   back: Amazon's own home cannot be switched off, so the app sees it come up and puts couch-tv's
   home straight back on top. Amazon's home still flashes up for a moment first. It needs two
-  one-off grants from a computer: [on-tv/README.md](on-tv/README.md#fire-tv-fire-os). Not yet
-  tried on a real Fire TV by us: if you have one, an issue saying how it went helps everyone.
+  one-off grants from a computer: [on-tv/README.md](on-tv/README.md#fire-tv-fire-os). Confirmed
+  on a Fire TV Stick 4K (2nd gen, Fire OS 8) by [killy10o10](https://github.com/Seagey/couch-tv/issues/3).
 - **Older TVs no longer crash on open.** Both TV apps used a part of Android that only Android 11
   and newer have. On Android 9 and 10 (most Fire TV sticks, and many older Android TVs) the home
   crashed as it opened. Fixed and checked on an Android 9 emulator: the old apps crash, the new
