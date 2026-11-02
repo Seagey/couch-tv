@@ -8,7 +8,7 @@ android {
     compileSdk = 34
     defaultConfig {
         applicationId = "dev.couchtv.ontv"
-        minSdk = 28          // Android 9. Wireless debugging pairing needs Android 11+ on the TV.
+        minSdk = 25          // Android 7.1 (Fire OS 6). Wireless debugging pairing needs Android 11+ on the TV.
         targetSdk = 34
         versionCode = 3
         versionName = "0.3"

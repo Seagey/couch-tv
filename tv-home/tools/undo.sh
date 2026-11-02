@@ -39,6 +39,20 @@ for p in $PKGS; do
 done
 # Smart home's doorbell card: take back "display over other apps" if apply.sh granted it.
 "$PY" "$T" shell "appops set app.couchtv.launcher SYSTEM_ALERT_WINDOW default" > /dev/null 2>&1 || true
+# Fire TV: switch off the Home button watch apply.sh switched on, and leave any others alone.
+# The grant goes first, so the app cannot put the watch back.
+"$PY" "$T" shell "pm revoke app.couchtv.launcher android.permission.WRITE_SECURE_SETTINGS" > /dev/null 2>&1 || true
+CUR=$("$PY" "$T" shell "settings get secure enabled_accessibility_services" 2> /dev/null | tr -d '\r' || true)
+case "$CUR" in
+  *app.couchtv.launcher/*)
+    NEW=$(echo "$CUR" | tr ':' '\n' | grep -v '^app\.couchtv\.launcher/' | paste -sd: -)
+    if [ -n "$NEW" ]; then
+      "$PY" "$T" shell "settings put secure enabled_accessibility_services $NEW"
+    else
+      "$PY" "$T" shell "settings delete secure enabled_accessibility_services"
+    fi
+    echo "Fire TV: the Home button watch is off." ;;
+esac
 HOME_ACT=""
 [ -f "$HERE/../tvs/$TV_NAME.home" ] && HOME_ACT=$(cat "$HERE/../tvs/$TV_NAME.home")
 if [ -z "$HOME_ACT" ]; then

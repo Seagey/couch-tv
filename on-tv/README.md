@@ -34,7 +34,7 @@ home button unless you switch that on.
 ## Which TVs
 
 - **Yes:** Android TV and Google TV (Chromecast with Google TV, Google TV Streamer, Sony, TCL,
-  Hisense, Philips and other Google TV sets), Nvidia Shield, and Fire TV on Fire OS. Android 9 or newer.
+  Hisense, Philips and other Google TV sets), Nvidia Shield, and Fire TV on Fire OS. Android 7.1 or newer.
 - **No:** Samsung (Tizen), LG (webOS), Roku, Apple TV, Hisense VIDAA, and Fire TV sticks on Vega OS.
   These do not run Android apps. Use the computer bridge for those where it can reach them.
 
@@ -118,7 +118,9 @@ Home features stop working while it is off. The app never does this by itself.
 
 ### Fire TV (Fire OS)
 
-Works on Fire TV sticks, Cubes and TVs that run **Fire OS** (7 on Android 9, 8 on Android 11). It does
+Works on Fire TV sticks, Cubes and TVs that run **Fire OS** (6 on Android 7.1, 7 on Android 9, 8 on
+Android 11). Fire OS 6 (Fire TV Stick 4K 1st gen and older sticks) needs a release newer than 0.3,
+and network debugging on port 5555, because wireless pairing starts at Android 11. It does
 **not** work on the newer sticks that run **Vega OS**, which cannot sideload apps at all.
 
 Amazon's launcher cannot be switched off, and the Home key starts it by name, so no setting can
