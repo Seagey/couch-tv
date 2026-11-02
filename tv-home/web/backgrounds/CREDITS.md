@@ -1,7 +1,8 @@
 # Background photos
 
 From Wikimedia Commons, used under their Creative Commons licences. Resized and cropped to
-1920x1080 for the TV. The home screen shows each place and photographer under the clock.
+1920x1080 for the TV, and again at 3840x2160 from the same originals (`<name>@2x.jpg`, the same
+crop) for 4K screens. The home screen shows each place and photographer under the clock.
 
 | File | Place | Photographer | Licence | Source |
 |---|---|---|---|---|
@@ -26,6 +27,12 @@ The files that go with them are made from those same generated scenes, so the sa
   its clock sits on the water instead, with a blurred reflection under the surface.
 - `scene-<name>-glass.jpg`: a blurred, brightened copy of the scene, used as the clock's frosted
   glass fill.
+- The 4K copies a 4K screen loads, named like the scene and its cut-out with `@2x` added before
+  the extension. The scenes
+  were made at 1920x1080, so these were upscaled on a computer with Real-ESRGAN (x4plus model, run
+  locally, free), mixed with a plain upscale and a little grain so they keep their texture, and
+  the cut-out's transparency was scaled up from the 1080 cut-out so the two line up exactly. The
+  glass copy is a blur, so it has no 4K copy.
 
 ## Your own photo with the clock behind it
 

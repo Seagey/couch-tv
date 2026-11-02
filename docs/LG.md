@@ -25,9 +25,9 @@ so the app is removed when the session runs out.
 LG UHD TV on webOS 5.6.2 (2020/2021 firmware), Developer Mode with the Homebrew Channel, the bridge
 on a Mac. The app built with `lg/build.py` installed and opened, the TV asked to accept the remote
 straight away, and the weather, clock, dock, a custom dock tile and a translation all worked. It found
-three things. Two are fixed below: the packer (step 3) and the app row before the remote is
-accepted (Limits). The third is still open: the backgrounds are 1920x1080, so a 4K panel shows them
-a little soft.
+three things, all fixed now: the packer (step 3), the app row before the remote is accepted
+(Limits), and soft backgrounds on a 4K panel (a 4K screen now gets 3840x2160 copies of the built-in
+scenes and photos).
 
 Everything else was built from LG's documentation and the open source libraries that talk to LG
 TVs, and tested against a stand-in TV on a computer. If you run it on another LG, thank you: please

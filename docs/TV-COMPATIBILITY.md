@@ -19,7 +19,7 @@ by the author. Everything else is what the sources say, not tested.
 | Fire TV on Fire OS (Stick 4K Max, Cube, Stick 4K 2nd gen) | Partial | Partial | Yes (Stick 4K 2nd gen confirmed by a user) |
 | Fire TV on Vega OS (Stick 4K Select, Stick HD 2026, 4K gen 3) | No | No | No |
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
-| LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, not yet tried on a real LG ([LG.md](LG.md)) | No |
+| LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on one real LG so far ([LG.md](LG.md)) | No |
 | Roku, Apple TV, Hisense VIDAA | No | No | No |
 
 ## Reported by people using it

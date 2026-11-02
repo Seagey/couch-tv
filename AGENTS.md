@@ -117,10 +117,9 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   way to get everything. If they choose Samsung, follow docs/SAMSUNG.md for steps 2 to 4 (most
   questions in step 2 still apply; skip picture mode, apply.sh and ADB).
 - **LG (webOS):** do not say no. Offer the LG path in [docs/LG.md](docs/LG.md) the way you offer
-  the Samsung one, and say first, plainly, that it has not been tried on a real LG: "There is an
-  LG version of couch-tv. It was built from LG's own documentation and tested against a stand-in
-  on a computer, but nobody has run it on a real LG yet, so you would be the first, and some of it
-  may need fixing. Like the Samsung one, it goes on your LG as an app, and a computer at home that
+  the Samsung one, and say first, plainly, how little it has been tried: "There is an LG version
+  of couch-tv. It was built from LG's own documentation and has run on one real LG so far (a
+  2020/2021 model on webOS 5.6.2), so on other LG models some of it may still need fixing. Like the Samsung one, it goes on your LG as an app, and a computer at home that
   stays on opens it every time the TV is switched on. It is not a true home screen: the remote's
   Home button still opens LG's menu. It needs LG's Developer Mode, which means a free LG developer
   account and LG's tools on this computer, and Developer Mode has to stay on, so the computer
