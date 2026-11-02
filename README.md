@@ -13,6 +13,14 @@ time the TV is switched on. It was built from LG's own documentation and tested 
 so if you have an LG, you would be among the first to run it: give this repo to your agent, and
 please open an issue saying how it went. Setup and limits: [docs/LG.md](docs/LG.md).
 
+**3 November 2026: older Fire TV sticks (Fire OS 6).** Both TV apps now install on Android 7.1,
+so the Fire TV Stick 4K (1st gen) and other Fire OS 6 sticks can run them. Options A and B also
+take the Home key back on any Fire TV now, the way the "lives on the TV" app already did:
+`apply.sh` switches on a small Home button watch, and the undo switches it off. Checked on
+Android 7.1, 9 and 14 emulators with a stand-in for Amazon's home, not yet on a real Fire OS 6
+stick: if you have one, please open an issue saying how it went. It comes with the next release
+after 0.3.
+
 **30 October 2026: Fire TV sticks, older TVs, smart home and your own scenes.** Sixteen people
 have forked couch-tv so far, and six of them built something worth having. The best of it is now in
 the main repo, credited to each of them. Download the new apps from
@@ -197,9 +205,9 @@ some screen reader labels on the phone are still in English.
 |---|---|---|---|
 | **Google TV** (Sony, TCL, Hisense Google TV, Philips and others) | Yes | Yes | Partial. Newer models may ask for a pairing code again after a restart |
 | **Google TV box** (Google TV Streamer, Chromecast with Google TV, Onn) | Yes | Yes | Partial, as above |
-| **Older Android TV** (Android 9 to 11) | Yes | Yes | Yes |
+| **Older Android TV** (Android 7.1 to 11) | Yes | Yes | Yes |
 | **Nvidia Shield** | Yes (not tested) | Yes | Yes (not tested) |
-| **Fire TV on Fire OS** (Fire TV Stick 4K Max, Fire TV Cube) | Partial. Workarounds only, and Amazon's home flashes up first | Partial | Yes, and it takes the Home key back ([how](on-tv/README.md#fire-tv-fire-os)) |
+| **Fire TV on Fire OS** (Fire OS 6, 7 and 8: Fire TV Stick 4K 1st gen and newer, Stick 4K Max, Cube) | Partial. Takes the Home key back, but Amazon's home flashes up first | Partial | Yes, and it takes the Home key back ([how](on-tv/README.md#fire-tv-fire-os)) |
 | **Fire TV on Vega OS** (newer Fire TV sticks) | No | No | No |
 | **Samsung** (Tizen) | App only, opened from Samsung's app row | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
 | **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on one real LG so far ([how](docs/LG.md)) | No |
@@ -217,9 +225,10 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   order, the phone remote, finding and playing shows, the sleep timer. Some Google Home features and
   the YouTube button on the remote can stop working once the Google home is switched off.
 - **Fire TV (Fire OS):** the phone remote and app launching work. Amazon does not let another home
-  screen replace its own, so the "lives on the TV" app (option C) watches for Amazon's home and puts
-  couch-tv's home back on top; Amazon's home still flashes up for a moment first. It needs two
-  one-off ADB grants: [on-tv/README.md](on-tv/README.md#fire-tv-fire-os).
+  screen replace its own, so couch-tv watches for Amazon's home and puts its own home back on top;
+  Amazon's home still flashes up for a moment first. Options A and B: `apply.sh` switches the watch
+  on by itself. Option C needs two one-off ADB grants: [on-tv/README.md](on-tv/README.md#fire-tv-fire-os).
+  Fire OS 6 sticks (Android 7.1) need a release newer than 0.3.
 - **Samsung:** it does not run Android apps and it locks its home screen, so couch-tv goes on as a
   Samsung app (you install it with a free tool and your own Samsung sign-in), and the bridge opens
   it every time the TV is switched on, so it needs a computer that stays on. Samsung's own Home
@@ -280,7 +289,7 @@ needs the first's TV set up the same way (developer mode on).
 ## What you need
 
 **For every option:**
-- A **Google TV or Android TV** (Android 9 or newer) with Developer options and debugging on
+- A **Google TV or Android TV** (Android 7.1 or newer) with Developer options and debugging on
   (step 1).
 - A computer on the same Wi-Fi to set it up from: macOS or Linux with **Python 3.11 or newer**
   (`python3 --version`). Missing or older: on macOS `brew install python@3.11` or the installer

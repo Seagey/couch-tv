@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -11,6 +12,10 @@
     <!-- Updates (Home settings, Updates): hand a new release to Android's installer, which always
          asks the person at the TV first. Android also asks once to let this app install apps. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Fire TV only: keep the Home button watch on after updates and reboots (FireWatch.kt).
+         Never granted on install: apply.sh or guest-tv grants it over ADB on a Fire TV, undo takes it back. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -21,6 +26,8 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent>
+        <!-- Amazon's home, to tell a Fire TV apart (FireWatch.kt). -->
+        <package android:name="com.amazon.tv.launcher" />
         <!-- The TV's input list, for the Input quick button when there is no bridge. -->
         <intent><action android:name="android.settings.TV_INPUT_SETTINGS" /></intent>
         <intent><action android:name="com.android.tv.action.VIEW_INPUTS" /></intent>
@@ -77,5 +84,25 @@
         <!-- What Android's installer says about an update (Updater.kt). Only reachable through the
              app's own PendingIntent. -->
         <receiver android:name=".Updater$Result" android:exported="false" />
+
+        <!-- Fire TV only: puts this home back when the Home key opens Amazon's home (FireWatch.kt).
+             Off until a computer switches it on over ADB; it sees which window came forward and
+             reads no screen content. -->
+        <service
+            android:name=".FireWatch"
+            android:exported="false"
+            android:label="Home button watch"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/fire_watch" />
+        </service>
+        <receiver android:name=".FireWatch$Restore" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

@@ -154,7 +154,7 @@ class HomeActivity : Activity() {
         val n = 432
         val sq = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888)
         val sc = Canvas(sq)
-        if (icon is AdaptiveIconDrawable) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && icon is AdaptiveIconDrawable) {
             icon.background?.apply { setBounds(0, 0, n, n); draw(sc) }; icon.foreground?.apply { setBounds(0, 0, n, n); draw(sc) }
         } else { icon.setBounds(0, 0, n, n); icon.draw(sc) }
         val edge = sq.getPixel(2, n / 2)

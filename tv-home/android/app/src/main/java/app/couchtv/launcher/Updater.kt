@@ -134,7 +134,7 @@ object Updater {
     fun resumed(ctx: Context) {
         val app = ctx.applicationContext
         if (busy == "installing" && asking) main.postDelayed({ if (busy == "installing" && asking) finish(app, "cancelled") }, 4000)
-        if (error == "allow" && app.packageManager.canRequestPackageInstalls()) { error = ""; changed(app) }
+        if (error == "allow" && canInstall(app)) { error = ""; changed(app) }
         checkIfDue(app)
     }
 
@@ -199,7 +199,7 @@ object Updater {
         val latest = s.getString("latest", "") ?: ""
         if (busy.isNotEmpty() || repo() == null || url.isEmpty() || !newer(latest, current())) return
         val pm = app.packageManager
-        if (!pm.canRequestPackageInstalls()) {
+        if (!canInstall(app)) {
             // Android's "install unknown apps" switch for this app, where the TV has that screen.
             // Either way the page says where it is, and to press Update again afterwards.
             error = "allow"
@@ -321,7 +321,7 @@ object Updater {
         val theirs = pm.getPackageArchiveInfo(file.path, PackageManager.GET_SIGNING_CERTIFICATES) ?: return "bad"
         if (theirs.packageName != ctx.packageName) return "bad"
         // strictly newer, or the same app would be installed again and offered again forever
-        if (theirs.longVersionCode <= mine.longVersionCode) return "not_newer"
+        if (versionCode(theirs) <= versionCode(mine)) return "not_newer"
         val a = signers(mine) { pm.getPackageInfo(ctx.packageName, it) }
         val b = signers(theirs) { pm.getPackageArchiveInfo(file.path, it) }
         // Some Android 9 builds read no signer from a file that is not installed yet: then
@@ -332,10 +332,21 @@ object Updater {
 
     /** The signing certificates, the newer way first; the older way when that one reads nothing. */
     private fun signers(p: PackageInfo, again: (Int) -> PackageInfo?): Set<String> {
-        val list: Array<Signature>? = p.signingInfo?.apkContentsSigners
+        val list: Array<Signature>? = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) p.signingInfo?.apkContentsSigners else null)
             ?: try { @Suppress("DEPRECATION") again(PackageManager.GET_SIGNATURES)?.signatures } catch (e: Exception) { null }
         return list?.map { it.toCharsString() }?.toSet() ?: emptySet()
     }
+
+    /**
+     * May this app hand an update to Android's installer? Android 8 and newer ask per app. Android 7
+     * (Fire OS 6) has one switch for all apps, "Apps from Unknown Sources" in Developer options.
+     */
+    private fun canInstall(ctx: Context): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.packageManager.canRequestPackageInstalls()
+        else @Suppress("DEPRECATION") Settings.Secure.getInt(ctx.contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS, 0) == 1
+
+    private fun versionCode(p: PackageInfo): Long =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) p.longVersionCode else @Suppress("DEPRECATION") p.versionCode.toLong()
 
     private fun sha256(file: File): String {
         val md = MessageDigest.getInstance("SHA-256")

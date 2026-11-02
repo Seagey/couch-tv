@@ -80,6 +80,7 @@ class MainActivity : Activity() {
         io.execute { warmApps() }
         askWatchNextPermission()
         Doorbell.start(this)   // smart home (optional): nothing happens unless a doorbell is set up
+        FireWatch.ensure(this)   // Fire TV only, and only once a computer has switched it on
         // At power-on the page is often asked for before Wi-Fi is up: try again the moment it is.
         getSystemService(android.net.ConnectivityManager::class.java)?.registerDefaultNetworkCallback(
             object : android.net.ConnectivityManager.NetworkCallback() {
@@ -766,7 +767,7 @@ class MainActivity : Activity() {
         val n = 432
         val sq = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888)
         val sc = Canvas(sq)
-        if (icon is android.graphics.drawable.AdaptiveIconDrawable) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && icon is android.graphics.drawable.AdaptiveIconDrawable) {
             icon.background?.apply { setBounds(0, 0, n, n); draw(sc) }
             icon.foreground?.apply { setBounds(0, 0, n, n); draw(sc) }
         } else {

@@ -101,7 +101,8 @@ If nothing Android is found, or they are not sure what they have:
 Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
 - **Google TV or Android TV** (Sony, TCL, Hisense Google TV, Philips, Xiaomi, Chromecast with
   Google TV, Google TV Streamer, Nvidia Shield, Onn): supported.
-- **Fire TV on Fire OS** (Stick 4K Max, Cube): partly. Say what will not work before going on: Amazon's
+- **Fire TV on Fire OS** (Fire OS 6, 7 or 8: Stick 4K 1st gen and newer, Stick 4K Max, Cube): partly.
+  Fire OS 6 (Android 7.1) needs a release newer than 0.3, and port 5555 network debugging. Say what will not work before going on: Amazon's
   home still flashes up before couch-tv's comes back, and the on-TV app needs two one-off ADB grants
   (on-tv/README.md, "Fire TV (Fire OS)").
 - **Samsung (Tizen):** do not say no. Offer the Samsung path in

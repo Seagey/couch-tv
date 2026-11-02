@@ -12,11 +12,11 @@ by the author. Everything else is what the sources say, not tested.
 | Platform | A. Home | B. Computer bridge | C. On the TV |
 |---|---|---|---|
 | Google TV (Chromecast with Google TV, Google TV Streamer, Sony, TCL, Hisense) | Yes | Yes | Partial |
-| Older Android TV (Android 9 to 11) | Yes | Yes | Yes |
+| Older Android TV (Android 7.1 to 11) | Yes | Yes | Yes |
 | Xiaomi TV Stick 4K (Android TV 11) | Yes (reported by a user, not tested by us) | Not reported | Not reported |
 | Nvidia Shield | Yes (not tested) | Yes | Yes (not tested) |
 | Onn (Google TV) | Yes | Yes | Partial |
-| Fire TV on Fire OS (Stick 4K Max, Cube, Stick 4K 2nd gen) | Partial | Partial | Yes (Stick 4K 2nd gen confirmed by a user) |
+| Fire TV on Fire OS 6, 7 and 8 (Stick 4K 1st and 2nd gen, Stick 4K Max, Cube) | Partial | Partial | Yes (Stick 4K 2nd gen confirmed by a user) |
 | Fire TV on Vega OS (Stick 4K Select, Stick HD 2026, 4K gen 3) | No | No | No |
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on one real LG so far ([LG.md](LG.md)) | No |
@@ -56,8 +56,10 @@ Not tested by the author. Each line is what someone said worked on their own dev
   fixed port 5555. The app has to pair with the TV once, and
   the port changes after a restart. See `on-tv/README.md` for how it handles that.
 - **Fire OS.** Amazon blocks real home screen replacement. The workarounds relaunch your app after
-  Amazon's home flashes up; the on-TV app (option C) does this itself once two one-off ADB grants are
-  given (`on-tv/README.md`, "Fire TV (Fire OS)"). ADB works. The Android TV Remote protocol is not confirmed on Fire TV.
+  Amazon's home flashes up; for options A and B `apply.sh` switches that on, and the on-TV app
+  (option C) does it itself once two one-off ADB grants are given (`on-tv/README.md`, "Fire TV
+  (Fire OS)"). Fire OS 6 is Android 7.1 (Fire TV Stick 4K 1st gen); both apps run on it from the
+  release after 0.3, checked on an Android 7.1 emulator only. ADB works. The Android TV Remote protocol is not confirmed on Fire TV.
 - **Vega OS** is Amazon's newer Linux system. It has no sideloading. Amazon says future Fire TV
   sticks will run it.
 - **Samsung and LG** do not run Android apps or let an app replace their home screen. On a Samsung,

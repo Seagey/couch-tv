@@ -118,6 +118,23 @@ elif "$PY" "$T" shell "appops get app.couchtv.launcher SYSTEM_ALERT_WINDOW" 2> /
 fi
 "$PY" "$T" shell "am force-stop app.couchtv.launcher; am start -n $HOME_ACT --es bridge ${BRIDGE_URL:-none} --es config_b64 $CFG64 --es ha_b64 $HA64 ${TV_ID:+--es tv $TV_ID}"
 
+# Fire TV: Amazon's Home key ignores the default home, so the app's Home button watch goes on
+# (FireWatch.kt: it only sees which window came forward). After the force-stop above, because
+# Android drops a stopped app's watcher; the secure-settings grant lets the app put it back itself
+# after updates and reboots. undo.sh takes both away.
+FIRE_WATCH=app.couchtv.launcher/.FireWatch
+if "$PY" "$T" shell "pm list packages com.amazon.tv.launcher" | grep -q "package:com.amazon.tv.launcher"; then
+  "$PY" "$T" shell "pm grant app.couchtv.launcher android.permission.WRITE_SECURE_SETTINGS" > /dev/null 2>&1 || true
+  CUR=$("$PY" "$T" shell "settings get secure enabled_accessibility_services" | tr -d '\r')
+  case ":$CUR:" in
+    *":$FIRE_WATCH:"*) ;;
+    *) if [ -z "$CUR" ] || [ "$CUR" = null ]; then NEW=$FIRE_WATCH; else NEW="$CUR:$FIRE_WATCH"; fi
+       "$PY" "$T" shell "settings put secure enabled_accessibility_services $NEW" ;;
+  esac
+  "$PY" "$T" shell "settings put secure accessibility_enabled 1"
+  echo "     Fire TV: the Home button watch is on (Amazon's home flashes up, then couch-tv comes back)"
+fi
+
 # Tell the bridge's daily guard what to keep switched off (a Google TV update can switch it back
 # on). Option A has no bridge, so no guard: run this script again after an update.
 KEEP="$ROOT/bridge/data/keep-disabled.json"

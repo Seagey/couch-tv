@@ -123,7 +123,9 @@ object Doorbell {
             if (state == lastEvent) return
             lastEvent = state
             // the first look only learns the last press, unless that press was just now
-            val at = try { java.time.OffsetDateTime.parse(state).toInstant().toEpochMilli() } catch (e: Exception) { null }
+            // (java.time starts at Android 8, so on Android 7 the first look only learns the last press)
+            val at = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) null
+                else try { java.time.OffsetDateTime.parse(state).toInstant().toEpochMilli() } catch (e: Exception) { null }
             if (first && (at == null || System.currentTimeMillis() - at > FRESH_MS)) return
             ring(c, bell)
         } else {
