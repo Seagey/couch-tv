@@ -262,6 +262,13 @@
     { file: "vang-vieng-sunset", place: "Vang Vieng, Laos", by: "Basile Morin" }
   ];
   var PHOTO_MS = 90000;
+
+  // A 4K screen gets the 4K copies of the built-in pictures (the same names with @2x added before
+  // the extension). The
+  // page is laid out at 1920x1080 but drawn at devicePixelRatio 2 there, so the 1080 files were
+  // stretched and looked soft (couch-tv#8, a UHD LG). Your own scenes in mine/ have no 4K copy.
+  var HI_RES = (window.devicePixelRatio || 1) * window.innerWidth >= 3000;
+  function bgPath(name, ext, builtIn) { return "backgrounds/" + name + (HI_RES && builtIn !== false ? "@2x" : "") + ext; }
   var photo = 0, photoTimer = null, bgShown = null, bgLayer = 0, bgTicket = 0;
 
   function photoForHour(h) {   // sunrise in the morning, green by day, sunsets in the evening
@@ -301,7 +308,7 @@
   function showPhoto() {
     if (NIGHT) { $("place").textContent = ""; return; }   // the scenes carry their own photos
     var list = classicPhotos(), p = list[photo % list.length];
-    setBg(p.src || "backgrounds/" + p.file + ".jpg", false);
+    setBg(p.src || bgPath(p.file, ".jpg"), false);
     $("place").textContent = (p.key ? t(p.key) : p.place) + (p.by ? "  ·  " + t("photo_by", { by: p.by }) : "");
   }
 
@@ -462,8 +469,8 @@
   function readyScene(i) {
     var s = SCENES[i], el = sceneEls[i];
     if (!el.classList.contains("ready")) {
-      el.querySelector(".sbg").src = s.src || "backgrounds/" + s.photo + ".jpg";
-      if (s.fg) el.querySelector(".fg").src = "backgrounds/" + s.photo + "-fg.webp";
+      el.querySelector(".sbg").src = s.src || bgPath(s.photo, ".jpg", !s.mine);
+      if (s.fg) el.querySelector(".fg").src = bgPath(s.photo + "-fg", ".webp", !s.mine);
       el.classList.add("ready");
     }
     drawClocks(el, s, glassShown);
