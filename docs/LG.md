@@ -19,12 +19,20 @@ It needs a computer at home that stays on (option B). Without one you can still 
 and open it from LG's app row, but nothing opens it for you, and nothing extends Developer Mode,
 so the app is removed when the session runs out.
 
-## Test status: not yet tried on a real LG
+## Test status: one real LG so far
 
-**This was built from LG's documentation and the open source libraries that talk to LG TVs, and
-tested against a stand-in TV on a computer. Nobody has run it on a real LG yet.** If you are the
-first, thank you: please [open an issue](https://github.com/Seagey/couch-tv/issues) and say how it
-went (TV model and year, webOS version, what worked, what did not), even if everything worked.
+**First real LG, 2 November 2026** ([issue #8](https://github.com/Seagey/couch-tv/issues/8)): an
+LG UHD TV on webOS 5.6.2 (2020/2021 firmware), Developer Mode with the Homebrew Channel, the bridge
+on a Mac. The app built with `lg/build.py` installed and opened, the TV asked to accept the remote
+straight away, and the weather, clock, dock, a custom dock tile and a translation all worked. It found
+three things. Two are fixed below: the packer (step 3) and the app row before the remote is
+accepted (Limits). The third is still open: the backgrounds are 1920x1080, so a 4K panel shows them
+a little soft.
+
+Everything else was built from LG's documentation and the open source libraries that talk to LG
+TVs, and tested against a stand-in TV on a computer. If you run it on another LG, thank you: please
+[open an issue](https://github.com/Seagey/couch-tv/issues) and say how it went (TV model and year,
+webOS version, what worked, what did not), even if everything worked.
 
 What was checked, in November 2026:
 
@@ -46,7 +54,7 @@ What was checked, in November 2026:
   starts, lists the TV's apps with their logos, moves with the arrows, opens the focused app with
   OK and takes LG's Back key.
 
-Not checked anywhere real: the install, the prompt's wording, which app ids your TV uses, how long
+Not checked on a real LG yet: the prompt's exact wording, which app ids your TV uses, how long
 the Developer Mode session really lasts, whether the Extend over the network remote (without the
 ares tools) does anything, and Wake-on-LAN.
 
@@ -113,8 +121,10 @@ With more than one TV in `config.json`, add `--tv <id>` for this TV. This makes
 `build/lg/app.couchtv.home_1.0.0_all.ipk`. It holds the TV home, the LG app ids, and a copy of
 your settings for when the computer is off. No passwords or keys go in it.
 
-The `.ipk` is made with LG's `ares-package` when it is installed, else by `lg/build.py` itself
-(the same layout; `--packer python` or `--packer ares` picks one).
+`lg/build.py` packs the `.ipk` itself. Do not switch to LG's `ares-package` (`--packer ares`)
+unless you have a reason: on the first real LG (webOS 5.6.2) the TV refused the ares-package build
+with `com.webos.appInstallService failure: ipk verified failed`, and installed the one
+`lg/build.py` made.
 
 ### 4. Install it
 
@@ -222,8 +232,9 @@ the phone says so and you use the TV's remote.
 - App ids differ between TVs and years. The ones in `bridge/apps.py` (`WEBOS`) come from public
   lists, not a real LG, and every other app is found by its name. If an app does not open, find
   its id: `ares-install --device lounge --list`, and add it to that app's `ids`.
-- couch-tv on LG reads its app list from the TV when webOS allows it, else from the bridge. If the
-  bridge is off when the app starts the first time, the app row may be empty until it is on.
+- couch-tv on LG reads its app list from the TV when webOS allows it, else from the bridge. Some
+  firmware does not allow it (webOS 5.6.2 returns nothing), so there the app row stays empty until
+  the bridge is on **and** the TV has accepted the remote (step 6).
 - No screenshots, no "what is playing", no profile picking, no pressing Play inside other apps.
 
 ## Undo

@@ -15,10 +15,11 @@ config.example.json) as the copy the TV uses when the computer is off.
 --tv is the TV's id in config.json, for a house with more than one TV.
 --log-url sends the page's console and a copy of the screen's HTML to a computer, for testing.
 
-The .ipk is made with LG's `ares-package` when it is installed (npm install -g @webos-tools/cli),
-else by this script itself: an .ipk is a Debian-style "ar" archive (debian-binary, control.tar.gz,
-data.tar.gz) with the app under usr/palm/applications/<id>/, laid out the way ares-package does it.
---packer picks one (auto, ares or python).
+The .ipk is made by this script itself: an .ipk is a Debian-style "ar" archive (debian-binary,
+control.tar.gz, data.tar.gz) with the app under usr/palm/applications/<id>/, laid out the way
+ares-package does it. --packer ares uses LG's ares-package instead (npm install -g @webos-tools/cli),
+but the first real LG (webOS 5.6.2, couch-tv#8) refused that build with "ipk verified failed" and
+installed this script's. --packer auto is the old default: ares-package if installed.
 """
 import argparse
 import io
@@ -121,8 +122,9 @@ def main():
     ap.add_argument("--bridge", default="", help="the bridge's address, e.g. http://my-computer.local:5400")
     ap.add_argument("--tv", default="", help="this TV's id in config.json (only with more than one TV)")
     ap.add_argument("--log-url", default="", help="for testing: where the app sends its console")
-    ap.add_argument("--packer", choices=("auto", "ares", "python"), default="auto",
-                    help="make the .ipk with ares-package or with this script (auto: ares-package if installed)")
+    ap.add_argument("--packer", choices=("python", "ares", "auto"), default="python",
+                    help="make the .ipk with this script (default) or with LG's ares-package "
+                         "(auto: ares-package if installed)")
     a = ap.parse_args()
 
     stage = os.path.join(OUT, "app")
