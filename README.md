@@ -56,7 +56,7 @@ Thank you to [fifarsi](https://github.com/fifarsi/couch-tv) and
 [gurpritsingh81](https://github.com/gurpritsingh81/couch-tv) (Watch Next),
 [herocode1](https://github.com/herocode1/couch-tv-hero) (the safety fixes and the install order),
 [dlandman27](https://github.com/dlandman27/couch-tv) (Fire TV) and
-[roliusz](https://github.com/roliusz/couch-tv) (the doorbell, Home Assistant and own scenes).
+[roliusz](https://github.com/roliusz/couch-tv) (the doorbell, Home Assistant and own scenes) [udhava2](https://github.com/udhava2-stack).
 
 **29 October 2026: Samsung TVs.** couch-tv now works on Samsung TVs too. It was tested on a 2021
 Samsung Frame. It is the same link and the same setup: give this repo to your agent and it offers
@@ -193,12 +193,12 @@ some screen reader labels on the phone are still in English.
   home (a Mac, a Linux box or a Raspberry Pi) stays on and runs the bridge.
 - **C. Lives on the TV.** The home screen and the phone remote with no computer: the bridge runs
   inside an app on the TV. See [on-tv/README.md](on-tv/README.md).
-
+-**D runs by a apk and no phone or a computer after set up like a launcher 
 > **Pick your option, then follow only its steps**
 > - **A:** steps 1, 2 and 6 below.
 > - **B:** steps 1 to 6 below.
 > - **C:** [on-tv/README.md](on-tv/README.md) (it has its own developer mode and install steps).
-
+> - **D:** steps 1 and 7 below 
 ## Will it work on my TV?
 
 | Your TV | A. TV home only | B. Computer bridge | C. Lives on the TV |
@@ -468,6 +468,12 @@ It also reminds you that switching the setup wizard off makes some TVs forget th
 can tell in advance which TVs, so plan for it on any TV: have the TV remote ready.
 
 Then install it. **Option A** (no computer stays on):
+
+### step 7. You have already done USB debugging. Now there will be an APK file called coach.tv.home. Install that onto a pen drive and then install a file explorer app on your TV. You can do it remotely or through ADB.
+
+After installing the app insert the pen drive into the TV. The pen drive should have the APK file. Install the APK file on your TV. After this process the APK file will be installed on your TV.
+
+Right now you should be installing an app called TV Launcher Manager on your phone. If you install that it will ask some questions about what Wi-Fi you are on and all. Fill in those things and then in the bottom-left corner there will be Setup Launcher. In Setup Launcher you can select couch.tv and then your launcher will be set. Restart your TV and it will boot. 
 
 ```sh
 TV_IP=<your tv address> APK=couch-tv-home.apk sh tv-home/tools/apply.sh
