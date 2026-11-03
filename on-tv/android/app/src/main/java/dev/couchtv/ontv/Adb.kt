@@ -111,19 +111,27 @@ object Adb {
      */
     private fun tryTcp(): Boolean {
         val hosts = listOfNotNull("127.0.0.1", App.lanAddress()).distinct()
+        var fireBlocked = false
         for (host in hosts) {
             if (!portOpen(5555, host)) { Log.i(TAG, "tcp $host:5555 closed"); continue }
             val probe = probeCnxn(host, 5555, 5000)
             lastProbe = "$host:5555 $probe"
             Log.i(TAG, "tcp probe $host:5555 -> $probe")
             if (!probe.startsWith("AUTH") && !probe.startsWith("CNXN") && !probe.startsWith("STLS")) {
-                note("$host:5555 accepted the connection but adbd did not answer the handshake ($probe)")
+                // Fire OS 7.6.6.9 and 8.1.0.3 on hang up on an app's own CNXN (CVE-2024-27350, issue #12)
+                if (FireHome.isFireTv && probe.startsWith("closed by adbd")) fireBlocked = true
+                else note("$host:5555 accepted the connection but adbd did not answer the handshake ($probe)")
                 continue
             }
             if (connectWatched(host, 5555, "tcp")) return true
         }
+        if (fireBlocked) note(FIRE_BLOCKED)
         return false
     }
+
+    const val FIRE_BLOCKED = "This Fire OS blocks apps on the TV from using the TV's own ADB (Amazon's fix " +
+        "for CVE-2024-27350, in Fire OS 7.6.6.9 and 8.1.0.3 and newer). Nothing on the TV changes that. " +
+        "Keys and typing from the phone need option B, a computer at home that runs the bridge."
 
     /**
      * Runs the library's connect with our own watchdog (its timeout plus 10 s). If it hangs, the

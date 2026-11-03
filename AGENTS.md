@@ -104,7 +104,9 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
 - **Fire TV on Fire OS** (Fire OS 6, 7 or 8: Stick 4K 1st gen and newer, Stick 4K Max, Cube): partly.
   Fire OS 6 (Android 7.1) needs a release newer than 0.3, and port 5555 network debugging. Say what will not work before going on: Amazon's
   home still flashes up before couch-tv's comes back, and the on-TV app needs two one-off ADB grants
-  (on-tv/README.md, "Fire TV (Fire OS)").
+  (on-tv/README.md, "Fire TV (Fire OS)"). On Fire OS 7.6.6.9 and 8.1.0.3 and newer, option C's
+  phone remote cannot press keys or type, because Fire OS blocks an app from using the TV's own
+  ADB; option B can, so if they want the full phone remote on a Fire TV, recommend B.
 - **Samsung (Tizen):** do not say no. Offer the Samsung path in
   [docs/SAMSUNG.md](docs/SAMSUNG.md), with its honest limits, in plain words: "couch-tv goes on
   your Samsung as an app, and a computer at home that stays on opens it every time the TV is

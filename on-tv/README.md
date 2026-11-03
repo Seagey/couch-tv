@@ -145,10 +145,15 @@ grant usage access instead of the first line (`adb shell appops set dev.couchtv.
 and the app polls the system's usage events instead. Where a Fire OS build still lets the TV use its
 own ADB, the activity log is followed as a third option.
 
-On a Fire TV the quick buttons also gain **Input** (the TV's own HDMI picker). Some Fire OS builds
-block the TV's own ADB, and then the phone remote's keys, typing, power off and "what's playing"
-do not work; opening apps, playing a show by name, volume on the TV's own speaker and the sleep
-timer still do.
+On a Fire TV the quick buttons also gain **Input** (the TV's own HDMI picker).
+
+**Fire OS 7.6.6.9 and newer, and Fire OS 8.1.0.3 and newer, block apps on the TV from using the
+TV's own ADB** (Amazon's fix for CVE-2024-27350, 2024). So on an up to date Fire TV, **Connect ADB**
+cannot work, and the setup screen says so. The phone remote's keys, typing, power off and "what's
+playing" do not work there; opening apps, playing a show by name, volume on the TV's own speaker
+and the sleep timer still do. ADB from another computer is not blocked, so for the full phone
+remote on a Fire TV use option B (the bridge), or Amazon's own Fire TV phone app for the keys.
+Reported in [issue #12](https://github.com/Seagey/couch-tv/issues/12) (Fire TV Stick, Fire OS 7.7.1.7).
 
 Confirmed on a **Fire TV Stick 4K (2nd gen, Fire OS 8.1, Android 11)** by
 [killy10o10](https://github.com/Seagey/couch-tv/issues/3), who also wrote a step-by-step setup guide:
