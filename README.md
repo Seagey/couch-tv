@@ -195,7 +195,8 @@ some screen reader labels on the phone are still in English.
   inside an app on the TV. See [on-tv/README.md](on-tv/README.md).
 
 > **Pick your option, then follow only its steps**
-> - **A:** steps 1, 2 and 6 below.
+> - **A:** steps 1, 2 and 6 below. With no computer at all: step 1, then "Option A with no
+>   computer" in step 6.
 > - **B:** steps 1 to 6 below.
 > - **C:** [on-tv/README.md](on-tv/README.md) (it has its own developer mode and install steps).
 
@@ -495,6 +496,31 @@ same command again. It is safe to run as often as you like.
   a day and switches it off again. With option A there is no bridge: run `apply.sh` again after an
   update (and after you change `config.json`).
 
+**Option A with no computer** (reported by
+[udhava2-stack](https://github.com/udhava2-stack), not tested by us). Apps on the TV and the phone
+do the install instead of `apply.sh`:
+
+1. Do step 1 (developer mode and USB debugging). Step 2 is not needed.
+2. Copy `couch-tv-home.apk` from the Releases page onto a USB stick and plug it into the TV.
+3. Install a file manager on the TV, for example
+   [File Manager +](https://play.google.com/store/apps/details?id=com.alphainventor.filemanager).
+   Open the APK on the USB stick and install it. The TV may ask you to allow installs from the file
+   manager first.
+4. On your phone, install
+   [TV Launcher Manager](https://play.google.com/store/apps/details?id=com.tv.launcher.manager.adb.tvboxtools).
+   It connects to the TV over Wi-Fi with ADB, so the TV asks you to allow it. Open **Setup
+   Launcher**, pick couch-tv, then restart the TV.
+
+Good to know:
+
+- Neither app is part of couch-tv and we have not checked them. TV Launcher Manager gets the same
+  ADB access to your TV that a computer would.
+- It may not switch off everything `apply.sh` does (the Google home, ambient mode, the setup
+  wizard), and the app does not get your `config.json`. Change the look and the people in
+  [Settings on the TV](#settings-on-the-tv).
+- If a Google TV update brings the Google home back, run **Setup Launcher** again.
+- To undo, use the TV-remote steps in [Undo](#undo-put-the-google-home-screen-back).
+
 ### Building the app (instead of downloading it)
 
 You need **JDK 21** and the **Android SDK** with platform 34 and build tools 34. Gradle is not
@@ -616,5 +642,7 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
 - Weather: Open-Meteo.
 - The doorbell card and Home Assistant scenes on the TV started in the
   [roliusz fork](https://github.com/roliusz/couch-tv).
+- The no-computer install for option A came from
+  [udhava2-stack](https://github.com/Seagey/couch-tv/pull/14).
 
 MIT licence, see `LICENSE`.
