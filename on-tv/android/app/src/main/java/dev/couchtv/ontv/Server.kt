@@ -224,6 +224,10 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             Tv.openSettings()
             return json(200, ok())
         }
+        if (target == "bluetooth" || target == "network") {
+            Tv.openSettingsScreen(target)
+            return json(200, ok())
+        }
         val app = Apps.BY_ID[target] ?: Apps.BY_PACKAGE[target]
         if (app?.id == "home") {
             if (Adb.connected) Tv.key("home") else App.openHome()

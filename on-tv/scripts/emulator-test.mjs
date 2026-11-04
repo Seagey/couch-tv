@@ -154,6 +154,15 @@ async function main() {
     const r = await call('POST', '/api/launch', { app: 'settings' }, token); await sleep(1000);
     assert(r.status === 200 && front() === 'com.android.tv.settings', JSON.stringify(r.json)); return r.json.app;
   });
+  // The Google TV emulator has no Bluetooth screen another app may open, so there the button falls
+  // back to the main Settings (com.android.tv.settings).
+  for (const [which, act] of [['bluetooth', /BLUETOOTH|[Bb]luetooth|com\.android\.tv\.settings\//], ['network', /WIFI|[Ww]ifi|[Nn]etwork/]]) {
+    await check(`quick button: ${which} opens the TV's ${which} settings`, async () => {
+      const r = await call('POST', '/api/launch', { app: which }, token); await sleep(1500);
+      const top = adb('shell', 'dumpsys activity activities | grep -m1 topResumedActivity');
+      assert(r.status === 200 && act.test(top), JSON.stringify(r.json) + ' ' + top.trim()); return top.trim().split(' ').pop();
+    });
+  }
   await check('key press in another app: BACK closes the top Settings screen', async () => {
     // Earlier steps stack several Settings screens, so the check is that the screen on top changed
     // (a different activity record), not that Settings closed.

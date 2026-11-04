@@ -7,6 +7,21 @@ built and waiting for its first real LG. No ads on the home screen. Open source 
 
 ## Updates
 
+**4 November 2026: Fire TV extras, from a fork.** Thirty four people have forked couch-tv now. From
+[killy10o10](https://github.com/killy10o10/couch-tv), who runs it on a Fire TV Stick 4K (2nd gen):
+
+- **Bluetooth and Network buttons** at the top right of the home. Fire OS's long-press Home menu
+  has neither. On a Fire TV they open Amazon's own screens; any other TV gets Android's standard
+  ones. They need the "lives on the TV" app (option C): on a Fire TV they are on by default, on
+  other TVs switch them on in Home settings, quick buttons.
+- **Amazon's own YouTube app** on Fire TV is now recognised, with its logo, so it sorts and opens
+  like YouTube does everywhere else.
+- **A Fire TV Stick guide**, written on the stick itself: [docs/FIRE-TV-STICK.md](docs/FIRE-TV-STICK.md).
+
+And from [Justin1491](https://github.com/Justin1491/couch-tv): the bridge stops trying to reach a
+TV that has not been paired yet, instead of retrying in the background. The two buttons come with
+the next release after 0.4.
+
 **1 November 2026: LG TVs.** couch-tv now has an LG version, done the same way as the Samsung one:
 it goes on your LG as an app through LG's Developer Mode, and the computer at home opens it every
 time the TV is switched on. It was built from LG's own documentation and tested against a stand-in,
@@ -644,5 +659,8 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
   [roliusz fork](https://github.com/roliusz/couch-tv).
 - The no-computer install for option A came from
   [udhava2-stack](https://github.com/Seagey/couch-tv/pull/14).
+- The Bluetooth and Network buttons, Amazon YouTube support and the Fire TV Stick guide came from
+  the [killy10o10 fork](https://github.com/killy10o10/couch-tv); the unpaired TV guard from the
+  [Justin1491 fork](https://github.com/Justin1491/couch-tv).
 
 MIT licence, see `LICENSE`.

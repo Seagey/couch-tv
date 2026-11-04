@@ -324,6 +324,8 @@ class TV:
     async def _adb(self, *args, timeout=15, binary=False):
         """Mirror of the adb CLI forms we use ("shell ...", "exec-out ...", "get-state"), sent
         over the bridge's own ADB connection."""
+        if not self.paired:
+            raise TVUnavailable("TV is not paired yet")
         if args and args[0] == "get-state":
             return "device" if (self._dev and self._dev.available) else "offline"
         if not (self._dev and self._dev.available):
@@ -363,6 +365,8 @@ class TV:
         """Connect with this computer's adb key (the one the TV said "Always
         allow" to). Pure Python, inside the bridge process: the launchd python has macOS Local
         Network permission, the separate `adb` program does not ("No route to host")."""
+        if not self.paired:
+            return False
         try:
             if not self.ip:
                 await self._resolve()
@@ -424,6 +428,8 @@ class TV:
         return "remote"
 
     async def port_open(self, port=6466, timeout=1.0):
+        if not self.paired:
+            return False
         try:
             _, w = await asyncio.wait_for(asyncio.open_connection(self.ip or self.fallback_ip, port), timeout)
             w.close()
@@ -435,6 +441,8 @@ class TV:
         """Drop the library's own reconnect loop (it backs off to 30 s between tries) and connect
         straight away to the address we already know (no name lookup). Used when we know the TV
         just came back. Returns True when connected."""
+        if not self.paired:
+            return False
         if self._task and not self._task.done():
             self._task.cancel()
         try:
@@ -454,7 +462,7 @@ class TV:
     async def wake(self):
         """Wake-on-LAN. When the TV is off it leaves the network, so a magic packet is the only
         way to reach it. Works only if the TV keeps its network card awake in standby."""
-        if not self.mac or not self.wake_on_lan:
+        if not self.paired or not self.mac or not self.wake_on_lan:
             return
         mac = bytes.fromhex(self.mac.replace(":", ""))
         packet = b"\xff" * 6 + mac * 16
