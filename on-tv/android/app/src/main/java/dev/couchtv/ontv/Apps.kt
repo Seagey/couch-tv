@@ -6,17 +6,25 @@ package dev.couchtv.ontv
  * "app" = only the app opens. useWeb: open the JustWatch web link cut to the show page instead.
  * cold: restart the app first ("background" = only when it is not on screen). verify: wait until
  * the app reports it is really playing. See bridge/DEEPLINKS.md for how each was tested.
+ * alt: other packages of the same app (Fire TV has Amazon's own YouTube); pkg is whichever is
+ * installed, main first.
  */
 data class TvApp(
-    val id: String, val name: String, val pkg: String, val colour: String,
+    val id: String, val name: String, val main: String, val colour: String,
     val jw: List<String> = emptyList(), val deeplink: String = "app",
     val useWeb: Regex? = null, val cold: String? = null, val verify: Boolean = false,
-)
+    val alt: List<String> = emptyList(),
+) {
+    val pkgs get() = listOf(main) + alt
+    val pkg: String get() = if (alt.isEmpty() || Tv.hasPackage(main)) main else alt.firstOrNull { Tv.hasPackage(it) } ?: main
+}
 
 object Apps {
     val ALL = listOf(
         TvApp("netflix", "Netflix", "com.netflix.ninja", "#E50914", listOf("netflix", "netflixbasicwithads", "netflixkids"), "jw", cold = "background", verify = true),
-        TvApp("youtube", "YouTube", "com.google.android.youtube.tv", "#FF0000", listOf("youtubered", "youtube"), "jw"),
+        // Amazon's YouTube (Fire TV) takes the same youtube.com links as Google's.
+        TvApp("youtube", "YouTube", "com.google.android.youtube.tv", "#FF0000", listOf("youtubered", "youtube"), "jw",
+            alt = listOf("com.amazon.firetv.youtube")),
         TvApp("stan", "Stan", "au.com.stan.and", "#0072F5", listOf("stan"), "jw"),
         TvApp("binge", "Binge", "au.com.streamotion.ares.tv", "#1E1EFF", listOf("binge"), "search"),
         TvApp("abc-iview", "ABC iview", "au.net.abc.iview", "#00C3A5", listOf("iview"), "jw"),
@@ -41,7 +49,7 @@ object Apps {
         TvApp("home", "Home", BuildConfig.APPLICATION_ID, "#000000"),
     )
     val BY_ID = ALL.associateBy { it.id }
-    val BY_PACKAGE = ALL.associateBy { it.pkg }
+    val BY_PACKAGE = ALL.flatMap { a -> a.pkgs.map { it to a } }.toMap()
     val BY_JW = ALL.flatMap { a -> a.jw.map { it to a } }.toMap()
 
     /** Packages that mean "a home screen is in front". */
