@@ -121,17 +121,23 @@ object Tv {
     /**
      * The Bluetooth or network settings screen, for the home's quick buttons. Fire OS has no
      * Bluetooth settings action, so on a Fire TV its own screens are opened by name; any other TV
-     * gets the standard Android ones.
+     * gets the standard Android ones. Some Google TVs have no Bluetooth settings screen another app
+     * may open (the Android 14 Google TV emulator has none), so a TV with none of these gets its
+     * main Settings rather than an error.
      */
     fun openSettingsScreen(which: String) {
-        val fire = when (which) {
-            "bluetooth" -> "com.amazon.tv.settings.v2/.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity"
-            "network" -> "com.amazon.tv.settings.v2/.tv.network.NetworkActivity"
+        val byName = { s: String -> Intent().setComponent(android.content.ComponentName.unflattenFromString(s)) }
+        val tries = when (which) {
+            "bluetooth" -> listOf(
+                byName("com.amazon.tv.settings.v2/.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity"),
+                Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+            "network" -> listOf(
+                byName("com.amazon.tv.settings.v2/.tv.network.NetworkActivity"),
+                Intent(Settings.ACTION_WIFI_SETTINGS))
             else -> throw ApiError(400, "unknown settings screen: $which")
         }
-        val cn = android.content.ComponentName.unflattenFromString(fire)!!
-        start(if (hasPackage(cn.packageName)) Intent().setComponent(cn)
-            else Intent(if (which == "bluetooth") Settings.ACTION_BLUETOOTH_SETTINGS else Settings.ACTION_WIFI_SETTINGS))
+        start(tries.firstOrNull { ctx.packageManager.resolveActivity(it, 0)?.activityInfo?.exported == true }
+            ?: Intent(Settings.ACTION_SETTINGS))
     }
 
     fun startHome(): Boolean = try {
