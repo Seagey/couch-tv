@@ -1,20 +1,19 @@
 # couch-tv on a Fire TV Stick
 
-This fork runs couch-tv's on-TV app (`dev.couchtv.ontv`, option C) as the home screen of a
+Written by [killy10o10](https://github.com/killy10o10/couch-tv), who runs couch-tv's on-TV app
+(`dev.couchtv.ontv`, option C) as the home screen of a
 **Fire TV Stick 4K (2nd gen, model AFTKM) on Fire OS 8.1.8.5 (Android 11)**. Everything below was
 done on that stick. Other Fire OS 7 and 8 sticks should behave the same; sticks on **Vega OS**
 cannot sideload apps at all.
 
 ![couch-tv on the Fire TV Stick](screens/firestick-home.jpg)
 
-## What this fork adds
+## The Fire TV extras
 
 - **Bluetooth and Network buttons** at the top right of the home. Fire OS's long-press Home menu
   has neither. On a Fire TV they open Amazon's own screens (Fire OS has no Bluetooth settings
   action); other TVs get Android's standard ones.
-- **Builds that install over each other.** GitHub signs each build with a fixed key from the
-  `DEBUG_KEYSTORE` secret, so an update keeps the app's settings and grants
-  ([Signing](#signing-your-own-builds)).
+- **Amazon's YouTube app** (`com.amazon.firetv.youtube`) is recognised as YouTube.
 
 ## What works, and what does not
 
@@ -27,6 +26,7 @@ cannot sideload apps at all.
 | Network button | Yes |
 | Phone remote | Opening apps works without ADB. Keys, typing and "what's playing" need the TV's own ADB (Connect ADB in the app) |
 | Keep watching | Only fills from shows started from the phone remote |
+| Amazon's YouTube app | Yes, shown and sorted as YouTube |
 
 ## Install
 
@@ -42,7 +42,7 @@ network as the stick.
    ```sh
    adb connect <stick-ip>:5555
    ```
-4. **Install** `couch-tv-ontv.apk` (from this fork's Actions build, or the upstream Releases page):
+4. **Install** `couch-tv-ontv.apk` from [the Releases page](https://github.com/Seagey/couch-tv/releases):
    ```sh
    adb -s <stick-ip>:5555 install couch-tv-ontv.apk
    ```
@@ -105,32 +105,6 @@ curl -X POST http://<stick-ip>:5400/api/pair -H 'Content-Type: application/json'
 - **The setup screen remembers which button had focus.** Count your D-pad presses from what is
   highlighted, not from the left: it is easy to press Forget phones by mistake.
 - **Weather defaults to Sydney** until you set a place in Home settings or through the API.
-- **A fork's first GitHub build needs Actions switched on** (the fork's Actions tab, "I understand
-  my workflows"). Builds then run on every push.
-
-## Signing your own builds
-
-Android only installs an update signed with the same key as the app already on the TV. GitHub
-makes a new debug key for every run unless the fork has a fixed one:
-
-1. Make a key (any computer with `openssl`):
-   ```sh
-   openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 10950 -subj "/CN=Android Debug/O=Android/C=US"
-   openssl pkcs12 -export -inkey key.pem -in cert.pem -name androiddebugkey -passout pass:android -out couchtv.keystore
-   rm key.pem
-   base64 -i couchtv.keystore | tr -d '\n' | pbcopy      # macOS; on Linux: base64 -w0 couchtv.keystore
-   ```
-2. Add it to the fork: Settings, Secrets and variables, Actions, **New repository secret**, name
-   `DEBUG_KEYSTORE`. (It must be a repository secret, not an environment secret or a variable.)
-3. Push. The build log's **Which key signed them** step prints the fingerprint; it should match
-   `openssl x509 -in cert.pem -noout -fingerprint -sha256`.
-4. The first install signed with the new key has to replace the old one once
-   (`adb uninstall dev.couchtv.ontv`, then install). That clears the app's settings and the
-   `WRITE_SECURE_SETTINGS` grant, so redo Install steps 5 to 7. From then on, `adb install -r`
-   keeps everything.
-
-Keep the keystore out of the repo. Locally, `COUCHTV_KEYSTORE=/path/to/couchtv.keystore sh
-scripts/build-apk.sh` signs with the same key.
 
 ## Undo
 

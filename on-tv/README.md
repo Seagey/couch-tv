@@ -118,6 +118,8 @@ Home features stop working while it is off. The app never does this by itself.
 
 ### Fire TV (Fire OS)
 
+Step by step on a Fire TV Stick, with the things that will save you time: [docs/FIRE-TV-STICK.md](../docs/FIRE-TV-STICK.md).
+
 Works on Fire TV sticks, Cubes and TVs that run **Fire OS** (6 on Android 7.1, 7 on Android 9, 8 on
 Android 11). Fire OS 6 (Fire TV Stick 4K 1st gen and older sticks) needs a release newer than 0.3,
 and network debugging on port 5555, because wireless pairing starts at Android 11. It does

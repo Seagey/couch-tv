@@ -5,22 +5,22 @@ built and waiting for its first real LG. No ads on the home screen. Open source 
 
 ![The Night home screen](docs/screens/home-night.jpg)
 
-## This fork: Fire TV Stick
-
-This fork runs couch-tv as the home screen of a **Fire TV Stick 4K (2nd gen) on Fire OS 8.1.8.5**,
-tested on the stick itself. It adds:
-
-- **Bluetooth and Network buttons** on the home (Fire OS's long-press Home menu has neither).
-- **GitHub builds signed with one fixed key**, so a new build installs over the last one and keeps
-  its settings.
-
-![couch-tv on a Fire TV Stick, with the Bluetooth and Network buttons at the top right](docs/screens/firestick-home.jpg)
-
-Install steps, what works, and the things that will save you time:
-**[docs/FIRE-TV-STICK.md](docs/FIRE-TV-STICK.md)**. Everything else in this README is the upstream
-project's, and still applies.
-
 ## Updates
+
+**4 November 2026: Fire TV extras, from a fork.** Thirty four people have forked couch-tv now. From
+[killy10o10](https://github.com/killy10o10/couch-tv), who runs it on a Fire TV Stick 4K (2nd gen):
+
+- **Bluetooth and Network buttons** at the top right of the home. Fire OS's long-press Home menu
+  has neither. On a Fire TV they open Amazon's own screens; any other TV gets Android's standard
+  ones. They need the "lives on the TV" app (option C): on a Fire TV they are on by default, on
+  other TVs switch them on in Home settings, quick buttons.
+- **Amazon's own YouTube app** on Fire TV is now recognised, with its logo, so it sorts and opens
+  like YouTube does everywhere else.
+- **A Fire TV Stick guide**, written on the stick itself: [docs/FIRE-TV-STICK.md](docs/FIRE-TV-STICK.md).
+
+And from [Justin1491](https://github.com/Justin1491/couch-tv): the bridge stops trying to reach a
+TV that has not been paired yet, instead of retrying in the background. The two buttons come with
+the next release after 0.4.
 
 **1 November 2026: LG TVs.** couch-tv now has an LG version, done the same way as the Samsung one:
 it goes on your LG as an app through LG's Developer Mode, and the computer at home opens it every
@@ -631,5 +631,8 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
 - Weather: Open-Meteo.
 - The doorbell card and Home Assistant scenes on the TV started in the
   [roliusz fork](https://github.com/roliusz/couch-tv).
+- The Bluetooth and Network buttons, Amazon YouTube support and the Fire TV Stick guide came from
+  the [killy10o10 fork](https://github.com/killy10o10/couch-tv); the unpaired TV guard from the
+  [Justin1491 fork](https://github.com/Justin1491/couch-tv).
 
 MIT licence, see `LICENSE`.
