@@ -975,10 +975,74 @@
     renderHint();
     hintTimer = setTimeout(function () { hintFlash = ""; renderHint(); }, 4000);
   }
+  // Holding OK on a dock app opens a small menu (Move, Hide, Uninstall, App info). "Move" is the
+  // old pick-up-to-reorder behaviour, now in startMove(). Store/gear/smart/screen tiles stay put.
   function holdApp() {
     var a = gridItems[g];
     if (!a || a.kind === "more") return false;
-    if (a.store || a.kind === "gear" || a.kind === "smart") { flash(t("stays_put", { name: a.name })); return true; }
+    if (a.store || a.kind === "gear" || a.kind === "smart" || a.kind === "screen") { flash(t("stays_put", { name: a.name })); return true; }
+    if (a.kind !== "app") return startMove();
+    openAppMenu(a);
+    return true;
+  }
+
+  // ---------------- hold-OK app menu ----------------
+  var amI = 0, amItems = [], amApp = null;
+  function openAppMenu(a) {
+    amApp = a; amI = 0;
+    amItems = [{ act: "move", label: t("ctx_move") }, { act: "hide", label: t("ctx_hide") }];
+    if (TV && TV.uninstall) amItems.push({ act: "uninstall", label: t("ctx_uninstall") });
+    if (TV && TV.appInfo) amItems.push({ act: "info", label: t("ctx_info") });
+    zone = "appmenu";
+    renderAppMenu();
+  }
+  function renderAppMenu() {
+    var pop = $("app-pop");
+    pop.innerHTML = amItems.map(function (it, i) {
+      return '<div class="grow' + (i === amI ? " focus" : "") + '" role="menuitem"><span><b>' + esc(it.label) + "</b></span></div>";
+    }).join("");
+    pop.classList.add("on");
+    document.documentElement.classList.add("apping");
+    hintFlash = t("ctx_hint"); renderHint();
+    var el = gridEls[g], rem = innerWidth / 120;
+    if (el) {
+      var b = el.getBoundingClientRect(), w = pop.offsetWidth;
+      pop.style.left = Math.max(5 * rem, Math.min(innerWidth - w - 5 * rem, b.left + b.width / 2 - w / 2)) + "px";
+      pop.style.top = Math.max(3.75 * rem, b.top - pop.offsetHeight - 2.25 * rem) + "px";
+    }
+  }
+  function closeAppMenu() {
+    $("app-pop").classList.remove("on");
+    document.documentElement.classList.remove("apping");
+    hintFlash = "";
+    if (zone === "appmenu") zone = "grid";
+  }
+  function doAppMenu() {
+    var it = amItems[amI], a = amApp;
+    closeAppMenu();
+    if (!it || !a) { paintFocus(); return; }
+    if (it.act === "move") { startMove(); return; }
+    if (it.act === "hide") {
+      materialise();
+      var o = data.order, i = o.packages.indexOf(a.package);
+      if (i >= 0) { if (i < o.line) o.line -= 1; o.packages.splice(i, 1); }
+      setHidden(HIDDEN_TV.concat([a.package]));
+      persistOrder();
+      renderGrid();
+      g = Math.max(0, Math.min(g, gridEls.length - 1));
+      paintFocus();
+      flash(t("ctx_hidden"));
+      return;
+    }
+    if (it.act === "uninstall") { try { TV.uninstall(a.package); } catch (e) {} paintFocus(); return; }
+    if (it.act === "info") { try { TV.appInfo(a.package); } catch (e) {} paintFocus(); return; }
+    paintFocus();
+  }
+
+  // Pick an app up to move it (the old hold-OK behaviour), reached from the menu's "Move".
+  function startMove() {
+    var a = gridItems[g];
+    if (!a) return false;
     var arr = arrangeItems();
     var idx = arr.items.map(function (it) { return it.package; }).indexOf(a.package);
     if (idx < 0) return false;
@@ -1139,6 +1203,7 @@
     clearFocus();
     renderHint();
     if (zone === "gear") { if (gridEls[g]) gridEls[g].classList.add("focus"); renderGear(); return; }
+    if (zone === "appmenu") { if (gridEls[g]) gridEls[g].classList.add("focus"); renderAppMenu(); return; }
     if (zone === "updask") { renderAsk(); return; }
     if (zone === "menu") { renderMenu(); return; }
     if (zone === "pmenu") { renderPop(); $("people").classList.add("focus"); return; }
@@ -1190,6 +1255,7 @@
     if (zone === "settings") { setMove(dx, dy); return; }
     if (zone === "smart") { window.smartHome.move(dx, dy); return; }
     if (zone === "gear") { if (dy) { gi = Math.max(0, Math.min(1, gi + dy)); renderGear(); } return; }
+    if (zone === "appmenu") { if (dy) { amI = Math.max(0, Math.min(amItems.length - 1, amI + dy)); renderAppMenu(); } return; }
     if (zone === "updask") { if (dy) { ai = Math.max(0, Math.min(1, ai + dy)); renderAsk(); } return; }
     if (lift) { moveLift(dx, dy); return; }
     // Night with More apps open: the cards step aside, so up and down skip them
@@ -1264,6 +1330,7 @@
     if (zone === "settings") { setBack(); return; }
     if (zone === "smart") { closeSmart(); paintFocus(); return; }
     if (zone === "gear") { closeGear(); paintFocus(); return; }
+    if (zone === "appmenu") { closeAppMenu(); paintFocus(); return; }
     if (zone === "updask") { answerAsk(false); return; }   // BACK counts as "I'll check myself"
     if (lift) { dropLift(); return; }   // BACK puts a picked-up app down where it is
     if (zone === "pmenu") { if (plift) dropPeople(); else closePop(); paintFocus(); return; }
@@ -1295,6 +1362,7 @@
     if (zone === "settings") { setActivate(); return; }
     if (zone === "smart") { window.smartHome.ok(); return; }
     if (zone === "gear") { if (gi === 0) openSettings(); else openTvSettings(); return; }
+    if (zone === "appmenu") { doAppMenu(); return; }
     if (zone === "updask") { answerAsk(ai === 0); return; }
     if (lift) { dropLift(); return; }
     if (zone === "menu") { setSleep(SLEEP_CHOICES[menuI]); paintFocus(); return; }
@@ -2236,18 +2304,67 @@
   // and, later, the release. One press is one action: a pick-up never also opens the app.
   var okDown = false, okHeld = false, okTimer = null;
   function okReset() { okDown = false; okHeld = false; clearTimeout(okTimer); }
+
+  // A short navigation click on every arrow and OK, like the TV's own launcher.
+  var AC = null, SOUND = true;
+  function blip(dx, dy) {
+    if (!SOUND) return;
+    // On the TV: Android's own navigation sound (TVOS.tick), the one other TV launchers play.
+    // It follows the TV's "system sounds" switch. 1 up, 2 down, 3 left, 4 right, 0 OK.
+    if (TV && TV.tick) {
+      try { TV.tick(dy < 0 ? 1 : dy > 0 ? 2 : dx < 0 ? 3 : dx > 0 ? 4 : 0); } catch (e) {}
+      return;
+    }
+    // Anywhere else (a browser preview): a short tick synthesised with Web Audio, no sound file.
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      AC = AC || new Ctx();
+      if (AC.state === "suspended") AC.resume();
+      var now = AC.currentTime;
+      // A mid body (triangle, 520 -> 300 Hz) plus a faint bright transient, gone within ~60 ms.
+      var o = AC.createOscillator(), g = AC.createGain();
+      o.type = "triangle";
+      o.frequency.setValueAtTime(520, now);
+      o.frequency.exponentialRampToValueAtTime(300, now + 0.045);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.16, now + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+      o.connect(g); g.connect(AC.destination);
+      o.start(now); o.stop(now + 0.07);
+      var c = AC.createOscillator(), cg = AC.createGain();
+      c.type = "sine";
+      c.frequency.setValueAtTime(1800, now);
+      cg.gain.setValueAtTime(0.0001, now);
+      cg.gain.exponentialRampToValueAtTime(0.04, now + 0.002);
+      cg.gain.exponentialRampToValueAtTime(0.0001, now + 0.015);
+      c.connect(cg); cg.connect(AC.destination);
+      c.start(now); c.stop(now + 0.02);
+    } catch (e) {}
+  }
+
+  // The remote's own Settings/gear key (KEYCODE_SETTINGS = 176, or e.key "Settings"/"TvSettings").
+  // couch-tv has no system home behind it, so it opens couch-tv's own gear menu, like the gear tile.
+  function isSettings(e) { return e.key === "Settings" || e.key === "TvSettings" || e.keyCode === 176; }
+  function settingsKey() {
+    if (zone === "gear" || zone === "settings" || zone === "smart" || zone === "appmenu" || zone === "updask") { goHome(); return; }
+    openGear();
+  }
+
   document.addEventListener("keydown", function (e) {
     if (typingKey(e)) return;   // typing a place or a name: the keys belong to the text box
     if (isOk(e)) {
       e.preventDefault();
       if (e.repeat || okDown) return;   // a held key repeating: the timer is already running
       okDown = true; okHeld = false;
+      blip(0, 0);
       okTimer = setTimeout(function () { okHeld = true; if (!hold()) activate(); ensureFocus(); }, HOLD_MS);
       return;
     }
     var arrow = arrowOf(e);
-    if (arrow) move(arrow[0], arrow[1]);
+    if (arrow) { blip(arrow[0], arrow[1]); move(arrow[0], arrow[1]); }
     else if (isBack(e)) goHome();
+    else if (isSettings(e)) { if (!e.repeat) settingsKey(); }   // the remote's own Settings/gear key
     else if (isMenu(e)) { if (!e.repeat) hold(); }   // optional: many remotes have no Menu key
     else { ensureFocus(); return; }                   // anything else is not ours: Android gets it
     e.preventDefault();
@@ -2381,6 +2498,8 @@
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
   window.tv = { back: goHome, home: function () { if (zone === "settings") closeSettings(); else goHome(); refresh(); },
+    // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
+    settingsKey: function () { blip(0, 0); settingsKey(); },
     resume: function () { okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },

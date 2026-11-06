@@ -136,7 +136,8 @@ actually watch.
 
 No computer and no `config.json` needed for the everyday settings. Press down to the dock and
 pick the gear, **Settings** (just before More apps). OK opens a small menu: **Home settings** is
-couch-tv's own list, **TV settings** is Android's own (Wi-Fi, picture, sound).
+couch-tv's own list, **TV settings** is Android's own (Wi-Fi, picture, sound). The remote's own
+gear or Settings button opens the same menu ([docs/REMOTES.md](docs/REMOTES.md#the-gear-button)).
 
 ![Home settings on the TV](docs/screens/home-settings.jpg)
 
@@ -144,7 +145,7 @@ Any remote works: up and down move, right or OK opens a section, OK changes a ro
 scene, an app, a person or a quick button picks it up so up and down move it, and Back steps back
 and then closes. What you change shows when the list closes.
 
-- **Language:** English, Español, Español (México), Italiano. Until one is picked here (or in
+- **Language:** English, Español, Español (México), Italiano, Türkçe. Until one is picked here (or in
   `config.json`), the home speaks the TV's own language if it is one of these, else English.
 - **Location:** type a town or city with the TV's on-screen keyboard (or the phone remote's Type),
   pick it from the places found. It sets the weather's place and time zone. The place search is
@@ -197,7 +198,9 @@ everyone else), Mexican Spanish (`es-MX`: computadora, celular, presionar, clima
 Italian (`it`, with a 24 hour clock unless you pick 12 hour, and the smart home words Home
 Assistant uses in Italian). The phone has its own choice (TV menu, Language), "Same as the TV" by
 default. Messages that come from the bridge itself (an error, a note about how a show opened) and
-some screen reader labels on the phone are still in English.
+some screen reader labels on the phone are still in English. The TV home also speaks Turkish
+(`tr`, with a 24 hour clock unless you pick 12 hour); the phone remote does not yet, and with the
+TV home in Turkish it follows the phone's own language instead.
 
 ## Three ways to run it
 

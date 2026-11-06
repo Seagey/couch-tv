@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -102,6 +103,12 @@ class MainActivity : Activity() {
             connect()
             return
         }
+        // The remote's gear button, caught by KeyWatch: open the gear menu (a moment's wait in case
+        // we were just brought forward from another app and the page is still settling).
+        if (intent.getBooleanExtra("gear", false)) {
+            main.postDelayed({ js("window.tv && tv.settingsKey && tv.settingsKey()") }, 250)
+            return
+        }
         // HOME pressed while we are already in front: back to the first tile.
         js("window.tv && tv.home()")
     }
@@ -140,6 +147,12 @@ class MainActivity : Activity() {
         if (same != null) {
             return dispatchKeyEvent(KeyEvent(event.downTime, event.eventTime, event.action, same, event.repeatCount,
                 event.metaState, event.deviceId, event.scanCode, event.flags, event.source))
+        }
+        // The remote's Settings/gear key: couch-tv's own gear menu (Home settings or TV settings).
+        // The WebView does not pass KEYCODE_SETTINGS on to the page, so it is caught here.
+        if (event.keyCode == KeyEvent.KEYCODE_SETTINGS) {
+            if (event.action == KeyEvent.ACTION_UP && event.repeatCount == 0 && pageReady) js("window.tv && tv.settingsKey && tv.settingsKey()")
+            return true
         }
         // The home screen never exits on BACK; the page decides what BACK means.
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
@@ -469,6 +482,52 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun openSettings(): Boolean = start(Intent(Settings.ACTION_SETTINGS))
+
+        /** Holding OK on an app, "Uninstall": Android's own remove dialog. Never ourselves.
+         *  On TVs with no remove dialog, falls back to the app's details screen (it has Uninstall).
+         *  startActivity runs here with its own try/catch (start() posts async and can't report a
+         *  miss), so a missing remove dialog falls back cleanly instead of throwing on the main thread. */
+        @JavascriptInterface
+        fun uninstall(pkg: String): Boolean {
+            if (pkg.isBlank() || pkg == packageName) return false
+            main.post {
+                val del = Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                try {
+                    startActivity(del)
+                } catch (e: Exception) {
+                    try {
+                        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    } catch (e2: Exception) {}
+                }
+            }
+            return true
+        }
+
+        /** The navigation "tick": Android's own system sound effect, the same call other TV
+         *  launchers make (AudioManager.playSoundEffect, Effect_Tick.ogg on most TVs).
+         *  It follows the TV's "system sounds" switch. dir: 1 up, 2 down, 3 left, 4 right, 0 OK. */
+        @JavascriptInterface
+        fun tick(dir: Int): Boolean = try {
+            val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+            am.playSoundEffect(when (dir) {
+                1 -> android.media.AudioManager.FX_FOCUS_NAVIGATION_UP
+                2 -> android.media.AudioManager.FX_FOCUS_NAVIGATION_DOWN
+                3 -> android.media.AudioManager.FX_FOCUS_NAVIGATION_LEFT
+                4 -> android.media.AudioManager.FX_FOCUS_NAVIGATION_RIGHT
+                else -> android.media.AudioManager.FX_KEY_CLICK
+            })
+            true
+        } catch (e: Exception) {
+            false
+        }
+
+        /** Holding OK on an app, "App info": Android's app details screen for that package. */
+        @JavascriptInterface
+        fun appInfo(pkg: String): Boolean {
+            if (pkg.isBlank()) return false
+            return start(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg")))
+        }
 
         @JavascriptInterface
         fun version(): String = BuildConfig.VERSION_NAME
