@@ -198,7 +198,7 @@
     newApps = kept("tvhome.apps.new") || [];
   }
   function lookSetting() { return ST.look || kept("tvhome.look") || HOME.look || "night"; }
-  // no clock in Home settings or config.json: the one usual for the language (24 hour in Italian)
+  // no clock in Home settings or config.json: the one usual for the language (24 hour in Italian and German)
   function clock24() { return (ST.clock || HOME.clock || (window.I18N ? window.I18N.clock() : "12h")) === "24h"; }
 
   // ---------------- helpers ----------------

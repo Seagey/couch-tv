@@ -10,8 +10,8 @@ change people, weather, the look or the quick buttons.
 Every key below is optional unless it says otherwise. Leave a key out and you get the default in
 brackets, which is how couch-tv behaved before the key existed. So an older `config.json` with no
 `home` or `quick` keys looks and works exactly as it did, except one thing: with no
-`home.language`, a TV set to Spanish or Italian now shows the home in that language (and an Italian
-one with a 24 hour clock), where it used to be English.
+`home.language`, a TV set to Spanish, Italian or German now shows the home in that language (and an Italian or
+German one with a 24 hour clock), where it used to be English.
 
 Most of what the home shows can also be changed on the TV itself, with the gear tile (Home
 settings), and what is chosen there wins on that TV. See
@@ -150,11 +150,11 @@ Home settings saves to the same `bridge/data/people.json` the phone uses.
 | `scenes` [all five] | Which Night scenes take turns, and in what order. Any of `night`, `golden`, `water`, `fog`, `dawn`, and the ids of your own scenes. One scene stays put. |
 | `my_scenes` [none] | Your own scenes from any photo, each with its clock designed: where it sits, its size and font, the date above or below it, light or dark text, and `cutout` for the skyline in front of the clock. Made with `tv-home/tools/make-scene.py`; [MAKE-A-SCENE.md](MAKE-A-SCENE.md) has every key. They take turns after the scenes in `scenes` unless they are listed there. Option A needs the app rebuilt with the scene's pictures inside (that guide says how). |
 | `scene_seconds` [20] | How long each scene shows. 5 or more. |
-| `clock` [the language's usual clock: `24h` in Italian, `12h` in the others] | `12h` (5:30 pm) or `24h` (17:30). |
+| `clock` [the language's usual clock: `24h` in Italian and German, `12h` in the others] | `12h` (5:30 pm) or `24h` (17:30). |
 | `hide_packages` [none] | Android package names never shown on the home or in More apps, for a maker's own clutter (help apps, file browsers, screen sharing tools). `survey-tv.py` lists every TV app with its package name. For example `["com.example.tvhelp"]`. |
 | `updates` [none: the TV asks once] | The answer to "tell you when a new couch-tv version is out?", asked at setup: `notify` (the TV home looks on GitHub once a week and puts a dot on the gear tile) or `manual` (nothing by itself; Home settings, Updates, Check for updates now). Used only until the TV has an answer; after that the switch in Home settings, Updates wins. Option C has no updates. |
 | `dock_size` [10] | How many apps sit in the Night dock before Settings and More apps. 1 to 10. Everything else is behind More apps. The phone's Arrange apps keeps to the same number. |
-| `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish) or `it` (Italian). The phone remote has its own choice, "Same as the TV" by default. |
+| `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish), `it` (Italian) or `de` (German). The phone remote has its own choice, "Same as the TV" by default. |
 
 ## Apps on the home
 
@@ -276,7 +276,7 @@ card is drawn by the app itself, so it cannot be previewed in a browser.
 |---|---|
 | `bridge.host`, `bridge.port` [5400], `bridge.fallback_hosts` | Where the bridge runs. |
 | `weather` | `lat`, `lon`, `place`, `timezone`, for the weather on the home (Open-Meteo, no key). A suburb or city is enough; never a home address. `timezone` (for example `Europe/London`) is also the time zone the bridge writes times in. |
-| `country` [`IT` when `home.language` is `it`, else "AU"] | Two letter code, for where shows stream (JustWatch), the country in links to Apple TV and Prime Video, and the country Claude is told about. |
+| `country` [`IT` when `home.language` is `it`, `DE` when it is `de`, else "AU"] | Two letter code, for where shows stream (JustWatch), the country in links to Apple TV and Prime Video, and the country Claude is told about. |
 | `country_name` | Optional: what to call the country in Claude's prompts, if the built-in list does not know your code. |
 | `client_name` ["Couch TV bridge"] | The name the TV shows for the bridge in its list of paired remotes. Set it before `pair_tv.py`; changing it later means pairing again. |
 | `screens` [] | Extra screens the TV can open, for example a computer through Moonlight. |
