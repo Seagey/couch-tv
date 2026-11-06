@@ -11,6 +11,7 @@ import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.DisplayMetrics
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsets
@@ -143,8 +144,10 @@ class HomeActivity : Activity() {
         val bmp = Bitmap.createBitmap(640, 360, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         c.drawColor(FLAP)
-        val banner = ri.activityInfo.loadBanner(packageManager) ?: ri.activityInfo.applicationInfo.loadBanner(packageManager)
-        if (banner != null) { banner.setBounds(0, 0, 640, 360); banner.draw(c) } else iconTile(ri.loadIcon(packageManager), c)
+        val banner = sharp(ri.activityInfo.packageName, ri.activityInfo.bannerResource) ?: ri.activityInfo.loadBanner(packageManager)
+            ?: ri.activityInfo.applicationInfo.loadBanner(packageManager)
+        if (banner != null) { banner.setBounds(0, 0, 640, 360); banner.draw(c) }
+        else iconTile(sharp(ri.activityInfo.packageName, ri.activityInfo.iconResource) ?: ri.loadIcon(packageManager), c)
         val bytes = ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it); bmp.recycle() }.toByteArray()
         banners[pkg] = bytes
         return bytes
@@ -164,14 +167,28 @@ class HomeActivity : Activity() {
         sq.recycle()
     }
 
+    // The dock's app icons. Drawn at 256 px from the app's sharpest icon (xxxhdpi where it has one),
+    // not the TV's own density: a TV runs at xhdpi, where most icons are 96 px, and those looked soft
+    // stretched over a dock tile on a big 4K screen (issue #17).
     private fun iconImage(pkg: String): ByteArray? {
         icons[pkg]?.let { return it }
-        val d = try { packageManager.getApplicationIcon(pkg) } catch (e: Exception) { return null }
-        val bmp = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
-        d.setBounds(0, 0, 128, 128); d.draw(Canvas(bmp))
+        val ri = tvApps().firstOrNull { it.activityInfo.packageName == pkg }
+        val d = ri?.let { sharp(pkg, it.activityInfo.iconResource) }
+            ?: try { sharp(pkg, packageManager.getApplicationInfo(pkg, 0).icon) ?: packageManager.getApplicationIcon(pkg) } catch (e: Exception) { return null }
+        val n = 256
+        val bmp = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888)
+        d.setBounds(0, 0, n, n); d.draw(Canvas(bmp))
         val bytes = ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.PNG, 100, it); bmp.recycle() }.toByteArray()
         icons[pkg] = bytes
         return bytes
+    }
+
+    /** An app's drawable at the highest density it ships (null if it has none we can read). */
+    private fun sharp(pkg: String, res: Int): Drawable? {
+        if (res == 0) return null
+        return try {
+            packageManager.getResourcesForApplication(pkg).getDrawableForDensity(res, DisplayMetrics.DENSITY_XXXHIGH, null)
+        } catch (e: Exception) { null }
     }
 
     companion object {
