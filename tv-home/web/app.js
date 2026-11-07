@@ -1859,7 +1859,9 @@
         ST.video_url = u; ST.video = true; VIDEO_URL = u;
         saveSettings();
         SET.msg = t("video_added");
-      } else SET.msg = t("video_bad");
+      // Apple's own server (the tvOS aerials) uses a certificate from Apple's private CA, which
+      // Android and Chrome do not trust, so its links never load here whatever the format (#27).
+      } else SET.msg = t(/^https:\/\/sylvan\.apple\.com\//i.test(u) ? "video_apple" : "video_bad");
       if (zone === "settings") renderSettings();
     };
     var timer = setTimeout(function () { finish(false); }, 20000);

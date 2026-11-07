@@ -187,11 +187,14 @@ panels** puts clear, softly blurred panels with a light edge behind the clock, K
 the apps, so the background shows through. Blur is heavy work for an older TV, so **On, no blur**
 keeps the panels and their edges without it; a TV that cannot blur at all gets that by itself.
 **Video background** plays a short clip that loops, muted, in place of the photo, in both looks:
-**Video link** takes the address of an MP4 on the web or on a computer at home, and the switch
+**Video link** takes the address of an MP4 or MOV on the web or on a computer at home, and the switch
 turns it off again without losing the link. The photo stays until the clip plays, and comes back if
 it will not play. The video stops while an app is in front. Over a video, the Night clock is
 frosted white instead of cut from the photo. Both are heavier than the plain home, so on a small
-TV stick switch them off if the home feels slow. Thanks alonmustafa (#22).
+TV stick switch them off if the home feels slow. Thanks alonmustafa (#22). Links straight to
+Apple's own server (`sylvan.apple.com`, the tvOS aerials) never play: it uses a certificate from
+Apple's private authority, which Android and Chrome do not trust. Copies of the same aerials on
+other hosts, or saved on a computer at home, play fine as MOV (#27).
 
 **Smart home (optional).** If you already run Home Assistant, the home can show your air
 conditioning (each room's temperature, warmer, cooler, on, off and mode), your scenes and scripts

@@ -259,7 +259,7 @@ def _home(h):
     if h.get("updates") in ("notify", "manual"):
         out["updates"] = h["updates"]
     # Glass panels (on, or lite: no blur for slower TVs) and a looping video background, a link to
-    # an MP4. Both off unless config.json or Home settings on the TV switches them on.
+    # an MP4 or MOV. Both off unless config.json or Home settings on the TV switches them on.
     if h.get("glass") in ("off", "on", "lite"):
         out["glass"] = h["glass"]
     vid = h.get("video_url")
