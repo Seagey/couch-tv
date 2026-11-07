@@ -139,6 +139,19 @@ object Finder {
         return art
     }
 
+    private val artPending = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val artPool = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    /** The same, but never waits: what is cached now, with the lookup started in the background for
+     *  next time. The "what is playing" loop uses this, so a slow show finder can never hold it up
+     *  past the minute a show needs to count (seen in the emulator tests). */
+    fun artworkSoon(title: String?): Pair<String?, String?> {
+        if (title.isNullOrEmpty()) return null to null
+        artCache[norm(title)]?.let { return it }
+        if (artPending.add(norm(title))) artPool.execute { try { artwork(title) } finally { artPending.remove(norm(title)) } }
+        return null to null
+    }
+
     /** POST /api/play. Same order as the computer bridge: free, then subscription, then the rest. */
     fun play(title: String, season: Int?, episode: Int?, service: String?, who: String?, resume: Boolean = false): JSONObject {
         val installed = Tv.installed()

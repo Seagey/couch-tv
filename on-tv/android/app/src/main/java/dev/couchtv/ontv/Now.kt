@@ -99,7 +99,7 @@ object Now {
         var source = "tv"
         if (title == null && item != null) { title = item.optString("title"); source = "bridge" }
         val (poster, backdrop) = if (item != null && Finder.norm(item.optString("title")) == Finder.norm(title)) item.opt("poster") as? String to item.opt("backdrop") as? String
-            else Finder.artwork(title)
+            else Finder.artworkSoon(title)
         val sameAsPlayed = item != null && Finder.norm(item.optString("title")) == Finder.norm(title)
         return JSONObject().put("title", title ?: JSONObject.NULL)
             .put("episode_title", ownSubtitle ?: (if (sameAsPlayed) item!!.opt("episode_title") else null) ?: JSONObject.NULL)
@@ -129,7 +129,7 @@ object Now {
         val key = if (title == null) "" else pkg + "|" + Finder.norm(title) + "|" + (who ?: "")
         val now = System.currentTimeMillis()
         val after = (Store.testProp("seen_after_s") ?: 60L) * 1000
-        if (key != seenKey) { seenKey = key; seenSince = now; return }
+        if (key != seenKey) { seenKey = key; seenSince = now; if (key.isNotEmpty()) android.util.Log.i("couchtv.keep", "counting $title for ${who ?: "nobody"}"); return }
         if (key.isEmpty() || key == keptKey || now - seenSince < after) return
         // the app's own position has to be past the minute too, when it gives one: a preview that
         // autoplays on a browse screen starts at 0 each time
@@ -152,6 +152,7 @@ object Now {
             .put("poster", mm.opt("poster") ?: JSONObject.NULL).put("backdrop", mm.opt("backdrop") ?: JSONObject.NULL)
             .put("service", Apps.BY_PACKAGE[pkg]?.id ?: JSONObject.NULL).put("package", pkg)
             .put("who", who ?: JSONObject.NULL).put("when", iso(now)).put("method", "seen"))
+        android.util.Log.i("couchtv.keep", "kept $title for ${who ?: "nobody"}")
     }
 
     private val NOT_KEPT = setOf("youtube", "spotify", "twitch", "moonlight", "settings", "home")

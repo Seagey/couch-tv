@@ -1534,6 +1534,27 @@ def _fallback_title(pkg):
 
 
 art_cache = {}  # title -> {"poster", "backdrop"} from JustWatch
+art_pending = set()
+
+
+def artwork_soon(title):
+    """The picture if it is known now, else none, with the lookup started in the background. The
+    watch loop uses this, so a slow show finder never holds it up past the minute a show needs."""
+    key = (title or "").lower()
+    if not key:
+        return {}
+    if key in art_cache:
+        return art_cache[key]
+    if key not in art_pending:
+        art_pending.add(key)
+
+        async def fetch():
+            try:
+                await artwork(title)
+            finally:
+                art_pending.discard(key)
+        asyncio.ensure_future(fetch())
+    return {}
 
 
 async def artwork(title):
@@ -1593,7 +1614,7 @@ async def media_read(pkg, app):
     else:
         title, episode_title = _fallback_title(pkg)
         source_title = "bridge" if title else None
-    art = await artwork(title)
+    art = artwork_soon(title)
     new = {"title": title, "episode_title": ep.get("episode_title") or episode_title,
            "season": ep.get("season"), "episode": ep.get("episode"), "package": pkg,
            "state": state, "poster": art.get("poster"), "backdrop": art.get("backdrop"),
