@@ -9,6 +9,8 @@ import json
 import os
 import tempfile
 import threading
+import uuid
+from datetime import datetime, timedelta, timezone
 
 import config
 
@@ -87,8 +89,17 @@ def history():
 
 
 def add_history(item):
+    """Every new line gets its own id, so a Keep watching card always opens the line it shows."""
     _migrate()
-    _append(HISTORY, [item])
+    _append(HISTORY, [{"id": uuid.uuid4().hex[:16], **item}])
+
+
+def history_item(item_id):
+    """One history line by its id, or None."""
+    for h in history():
+        if h.get("id") == item_id:
+            return h
+    return None
 
 
 def imported():
@@ -150,16 +161,67 @@ def continue_watching(who=None, limit=12):
     return out
 
 
+# Keep watching: per TV and per person. Only lines that say which TV and which person count;
+# older lines (before 0.9) say neither and are kept for suggestions, never shown here.
+KEEP_MAX = 10
+KEEP_DAYS = 30
+
+
+def _when(h):
+    try:
+        t = datetime.fromisoformat(h.get("when") or "")
+    except (TypeError, ValueError):
+        return None
+    return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+
+
+def keep_watching(tv_id, who, now=None, limit=KEEP_MAX, days=KEEP_DAYS):
+    """What this person watched on this TV, one line per show (the latest), newest first, at most
+    `limit`, nothing older than `days` days."""
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=days)
+    seen, out = set(), []
+    for h in history():
+        if not h.get("id") or h.get("tv") != tv_id or h.get("who") != who:
+            continue
+        when = _when(h)
+        if when is None or when < cutoff:
+            continue
+        key = (h.get("title") or "").strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(h)
+        if len(out) >= limit:
+            break
+    return out
+
+
 WHO_FILE = os.path.join(DATA, "who.json")
 
 
-def current_who():
-    """Who is on the couch now (set from the TV home or the phone). None means not said."""
-    return _read(WHO_FILE, {}).get("who")
+def _whos():
+    data = _read(WHO_FILE, {})
+    tvs = data.get("tvs") if isinstance(data.get("tvs"), dict) else {}
+    return data.get("who"), tvs   # "who": the older one-for-the-house value
 
 
-def save_who(who):
-    _write(WHO_FILE, {"who": who})
+def current_who(tv_id=None):
+    """Who is on the couch at this TV (set from that TV's home or a phone). None means not said."""
+    old, tvs = _whos()
+    if tv_id is None:
+        return old
+    return tvs.get(tv_id, old)
+
+
+def save_who(who, tv_id=None):
+    old, tvs = _whos()
+    if tv_id is None:
+        old = who
+        tvs = {k: who for k in tvs}
+    else:
+        tvs[tv_id] = who
+    _write(WHO_FILE, {"who": old, "tvs": tvs})
 
 
 def _sleeps():
