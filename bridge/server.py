@@ -1199,6 +1199,8 @@ def clean_settings(s):
         out["look"] = s["look"]
     if s.get("glass") in ("off", "on", "lite"):
         out["glass"] = s["glass"]
+    if isinstance(s.get("glass_icons"), bool):
+        out["glass_icons"] = s["glass_icons"]
     if isinstance(s.get("video"), bool):
         out["video"] = s["video"]
     # "" means the video link was removed on the TV (it then wins over home.video_url)

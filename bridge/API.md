@@ -447,6 +447,7 @@ is optional:
 | `wx_show`, `wx_unit`, `wx_every` | Weather on or off, `c` or `f`, minutes between checks (15, 30 or 60). |
 | `look` | `night` or `classic`. |
 | `glass` | Glass panels: `off`, `on` or `lite` (no blur). |
+| `glass_icons` | Glass app icons: `true` or `false`. |
 | `video`, `video_url` | The video background on or off, and its link (`http://` or `https://`, an MP4 or MOV). `""` means the link was removed on the TV, and then wins over `home.video_url`. |
 | `scene_order`, `scenes_off` | Every scene in order, and the ones switched off. Ids are the five scene names and `p-<id>` for a photo. |
 | `scene_seconds`, `clock` | 5 to 3600; `12h` or `24h`. |

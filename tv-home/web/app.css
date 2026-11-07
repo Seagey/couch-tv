@@ -677,3 +677,22 @@ body {
 .glass:not(.theme-night) .app .face.tool,
 .glass:not(.theme-night) .app .face.word { background: var(--glass-solid); }
 }
+
+/* ================= Glass app icons (Home settings, Look, Glass; home.glass_icons) =================
+   After Apple's clear icons (#25): each app's own icon turns grey and half see-through on a frosted
+   glass tile, so the background shows through the dock. The focused (or lifted) app gets its own
+   colours back, so you can always tell what OK will open. Works with Glass panels on or off. */
+.glass-icons .app:not(.focus):not(.lifted) .face:not(.tool) {
+  /* !important: the Classic look paints each tile in the app's colour inline */
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.06) 45%, rgba(255, 255, 255, 0.12) 100%), rgba(20, 20, 28, 0.22) !important;
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.3), inset 0 0.125rem 0.0625rem -0.0625rem rgba(255, 255, 255, 0.65), 0 0.75rem 1.75rem rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(1.75rem) saturate(170%); backdrop-filter: blur(1.75rem) saturate(170%);
+}
+.glass-icons .app:not(.focus):not(.lifted) .face:not(.tool) img {
+  filter: grayscale(1) contrast(1.25) brightness(1.1); opacity: 0.55; mix-blend-mode: luminosity;
+}
+.glass-icons .app .face img { transition: filter 0.2s, opacity 0.2s; }
+.glass-icons.glass-lite .app:not(.focus):not(.lifted) .face:not(.tool) { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(36, 36, 44, 0.55) !important; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+.glass-icons .app:not(.focus):not(.lifted) .face:not(.tool) { background: rgba(36, 36, 44, 0.55) !important; }
+}

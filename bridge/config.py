@@ -262,6 +262,8 @@ def _home(h):
     # an MP4 or MOV. Both off unless config.json or Home settings on the TV switches them on.
     if h.get("glass") in ("off", "on", "lite"):
         out["glass"] = h["glass"]
+    if isinstance(h.get("glass_icons"), bool):
+        out["glass_icons"] = h["glass_icons"]
     vid = h.get("video_url")
     if isinstance(vid, str) and re.match(r"https?://", vid) and len(vid) <= 2000:
         out["video_url"] = vid

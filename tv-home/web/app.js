@@ -33,7 +33,7 @@
   var THEME = "night", NIGHT = true, CLOCK24 = false;
   // Glass panels ("off", "on", or "lite": no blur, for slower TVs) and the video background, from
   // Home settings, then home.glass and home.video_url. Both are off unless someone switches them on.
-  var GLASS = "off", VIDEO_ON = false, VIDEO_URL = "";
+  var GLASS = "off", GLASS_ICONS = false, VIDEO_ON = false, VIDEO_URL = "";
   // Home settings made on this TV with the gear tile (see "home settings" below). They win over
   // config.js. ST is the saved object; the rest are read from it in readConfig().
   var ST = {}, WX_SHOW = true, WX_F = false, WX_EVERY = 30, HIDDEN_TV = [];
@@ -183,6 +183,9 @@
     GLASS = glassSetting();
     document.documentElement.classList.toggle("glass", GLASS !== "off");
     document.documentElement.classList.toggle("glass-lite", GLASS === "lite");
+    // glass app icons (#25): set in Home settings, else home.glass_icons; off unless switched on
+    GLASS_ICONS = typeof ST.glass_icons === "boolean" ? ST.glass_icons : HOME.glass_icons === true;
+    document.documentElement.classList.toggle("glass-icons", GLASS_ICONS);
     // a link set in Home settings wins over home.video_url; one from config.json alone means on
     VIDEO_URL = typeof ST.video_url === "string" ? ST.video_url : typeof HOME.video_url === "string" ? HOME.video_url : "";
     VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true);
@@ -1780,7 +1783,10 @@
     rows.push({ kind: "cycle", key: "glass", label: t("glass"), value: GLASS === "lite" ? t("glass_lite") : GLASS === "on" ? t("on") : t("off"), act: function () {
       GLASS = GLASS === "off" ? "on" : GLASS === "on" ? "lite" : "off"; ST.glass = GLASS; saveSettings();
     } });
-    rows.push(info("glass-note", t("glass_note", { keep: t("keep_watching") })));
+    rows.push({ kind: "toggle", key: "glass-icons", label: t("glass_icons"), value: GLASS_ICONS ? t("on") : t("off"), act: function () {
+      GLASS_ICONS = !GLASS_ICONS; ST.glass_icons = GLASS_ICONS; saveSettings();
+    } });
+    rows.push(info("glass-note", t("glass_note", { keep: t("keep_watching") }) + " " + t("glass_icons_note")));
     // the video background: its switch only once there is a link
     rows.push(head(t("video_head")));
     if (VIDEO_URL) {

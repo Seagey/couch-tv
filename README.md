@@ -191,7 +191,9 @@ keeps the panels and their edges without it; a TV that cannot blur at all gets t
 turns it off again without losing the link. The photo stays until the clip plays, and comes back if
 it will not play. The video stops while an app is in front. Over a video, the Night clock is
 frosted white instead of cut from the photo. Both are heavier than the plain home, so on a small
-TV stick switch them off if the home feels slow. Thanks alonmustafa (#22). Links straight to
+TV stick switch them off if the home feels slow. Thanks alonmustafa (#22). **Glass app icons**
+(also under Look) turns the app icons grey on frosted glass, like Apple's clear icons, with the
+app you are on in its own colours (#25). Links straight to
 Apple's own server (`sylvan.apple.com`, the tvOS aerials) never play: it uses a certificate from
 Apple's private authority, which Android and Chrome do not trust. Copies of the same aerials on
 other hosts, or saved on a computer at home, play fine as MOV (#27).
