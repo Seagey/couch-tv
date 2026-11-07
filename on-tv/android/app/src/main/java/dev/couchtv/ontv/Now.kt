@@ -20,6 +20,10 @@ object Now {
     @Volatile private var front: String? = null
     @Volatile private var media: JSONObject? = null
     @Volatile private var lastSig = ""
+    // Keep watching from what the apps say is playing (see remember())
+    private var seenKey = ""
+    private var seenSince = 0L
+    private var keptKey = ""
 
     private val listeners = CopyOnWriteArraySet<(String) -> Unit>()
     private val loop = Executors.newSingleThreadScheduledExecutor()
@@ -64,7 +68,7 @@ object Now {
                 tick++
                 if (!Adb.connected && (Adb.everAllowed || Adb.paired) && tick % 15 == 1) runCatching { Adb.ensure() }
                 front = Tv.frontPackage()
-                if (tick % 2 == 0) media = readMedia()
+                if (tick % 2 == 0) { media = readMedia(); remember(media) }
                 val v = Tv.volume()
                 val sig = listOf(front, Tv.isOn, v["level"], v["muted"], media?.optString("title"), media?.optString("state"),
                     sleepEnds, who, Adb.connected).joinToString("|")
@@ -102,6 +106,36 @@ object Now {
     }
 
     // ---------------------------------------------------------------- keep watching
+
+    /**
+     * Puts what an app says it is playing into Keep watching, so the row fills without the phone
+     * starting the show (issue #17: before this, only shows started through the phone's search or
+     * Ask landed there, and Ask needs an API key in on-TV mode). It counts once a title has played
+     * for a minute, so a trailer that autoplays while browsing does not, once per show until
+     * something else plays, and only a title the show finder knows, so the tile can open it again. Needs ADB (the media sessions come from it) and an app that tells
+     * Android its title: YouTube, Netflix and most others do, a few say nothing.
+     */
+    private fun remember(m: JSONObject?) {
+        val pkg = front ?: return
+        val title = m?.optString("title")?.takeIf { m.optString("state") == "playing" && it.isNotEmpty() && it != "null" }
+        val key = if (title == null) "" else pkg + "|" + Finder.norm(title)
+        val now = System.currentTimeMillis()
+        if (key != seenKey) { seenKey = key; seenSince = now; return }
+        if (key.isEmpty() || key == keptKey || now - seenSince < 60_000) return
+        keptKey = key
+        val played = playedItem
+        // A show started from the phone is already in Keep watching (Finder.finish)
+        if (played != null && played.optString("package") == pkg && Finder.norm(played.optString("title")) == Finder.norm(title)) return
+        // Only a title the show finder knows (it found artwork for it), so the tile can open it again.
+        // A YouTube video or a song does not, and stays out.
+        if (m!!.opt("poster") !is String) return
+        Store.addHistory(JSONObject().put("title", title)
+            .put("episode_title", m.opt("episode_title") ?: JSONObject.NULL)
+            .put("season", m.opt("season") ?: JSONObject.NULL).put("episode", m.opt("episode") ?: JSONObject.NULL)
+            .put("poster", m.opt("poster") ?: JSONObject.NULL).put("backdrop", m.opt("backdrop") ?: JSONObject.NULL)
+            .put("service", Apps.BY_PACKAGE[pkg]?.id ?: JSONObject.NULL).put("package", pkg)
+            .put("who", who ?: JSONObject.NULL).put("when", iso(now)).put("method", "seen"))
+    }
 
     fun continueItems(whoFilter: String?): JSONArray {
         val h = Store.history()

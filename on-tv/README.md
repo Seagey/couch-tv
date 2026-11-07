@@ -22,7 +22,7 @@ home button unless you switch that on.
 | **Turn the TV on** | yes (Wake-on-LAN) | **no** | Once the TV sleeps, this app sleeps too. See "Power on" below. |
 | What is playing | yes | yes, with ADB | Same `dumpsys media_session` reading as the bridge. Apps that report no title show the app only. |
 | Play a show by name | yes | yes | Same JustWatch lookup and deep-link table as the bridge, no key needed. |
-| Keep watching | yes | partial | Built from what was started from the phone on this TV. No imported history. |
+| Keep watching | yes | partial, with ADB | Built on this TV: shows started from the phone, and shows an app says it is playing for a minute or more. No imported history, no progress bar. See "Keep watching and people". |
 | Sleep timer | yes | yes, with ADB | Pause, then off. |
 | Screenshot (`/api/screenshot`) | yes | yes, with ADB | |
 | Picks and taste profile | yes | no | Needs "ask". |
@@ -171,6 +171,33 @@ scenes, apps, people, quick buttons; README, "Settings on the TV"). They are kep
 setup page edits. One difference: this app has no file picker, so your own photos come from a web
 address.
 
+## Keep watching and people
+
+**Keep watching** fills itself on the TV. A show lands there when:
+
+- it was started from the phone (search, Ask, or a Keep watching tile), or
+- an app says it is playing it for a minute or more, however it was started (the TV remote, the
+  phone's arrow keys, the app's own menus). This needs ADB connected, because the TV reads it from
+  Android's media sessions, the same reading as "What is playing". Netflix, Disney+, Prime Video
+  and most others say what is playing; a few apps say nothing, and those cannot land there.
+
+Only titles the show finder knows go in (it found the show's artwork), so every tile can open the
+show again. YouTube videos and music stay out: YouTube keeps its own history. There is no progress
+bar and no imported history; those need the computer bridge (option B). Until this change, only
+shows started from the phone landed there, so the row stayed empty for anyone without Ask on.
+
+**People** (the names at the top left, set on the setup page or in Home settings) decide whose
+Keep watching row the home shows. In on-TV mode, switching person:
+
+- shows that person's Keep watching row, plus anything nobody was watching as;
+- tags what starts playing next as theirs, from the TV and from the phone (the phone remote follows
+  the TV's choice, and the other way round);
+- tells Ask who is watching, if Ask is on.
+
+It does not pick your profile inside Netflix or the other apps, and there are no picks per person;
+both need the computer bridge (`app_profiles` in [docs/CONFIG.md](../docs/CONFIG.md)). With one
+person or none, there is no switcher and Keep watching shows everything.
+
 ## Power on
 
 The TV cannot wake itself: in standby the app is not running. Use the TV's own remote, HDMI-CEC
@@ -209,6 +236,8 @@ out every computer, so reconnect yours afterwards).
 | Apps do not open from the phone | Android blocked an app start from the background. Connect ADB once: the app then has the permission it needs. |
 | Home button still goes to Google's home | See "Use it as the home screen". |
 | Server not answering after a TV update | Open Couch TV once; it also starts at boot. |
+| Keep watching stays empty | Connect ADB (the TV reads what is playing through it), then watch a show for a minute. Apps that do not say what is playing, YouTube and music never land there. See "Keep watching and people". |
+| App icons look soft on a big TV | Update the app: icons are now drawn at 256 px from the sharpest icon each app ships. Older versions drew them at the TV's own density, often 96 px. |
 
 ## How it works
 

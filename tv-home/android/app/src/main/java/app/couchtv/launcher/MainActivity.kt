@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.DisplayMetrics
 import android.provider.Settings
 import android.view.Gravity
 import android.view.KeyEvent
@@ -743,8 +744,17 @@ class MainActivity : Activity() {
         false
     }
 
+    /** An app's drawable at the highest density it ships (null if it has none we can read). */
+    private fun sharp(pkg: String, res: Int): android.graphics.drawable.Drawable? {
+        if (res == 0) return null
+        return try {
+            packageManager.getResourcesForApplication(pkg).getDrawableForDensity(res, DisplayMetrics.DENSITY_XXXHIGH, null)
+        } catch (e: Exception) { null }
+    }
+
     private fun bannerBytes(ri: ResolveInfo): ByteArray? {
-        val banner = ri.activityInfo.loadBanner(packageManager)
+        val banner = sharp(ri.activityInfo.packageName, ri.activityInfo.bannerResource)
+            ?: ri.activityInfo.loadBanner(packageManager)
             ?: ri.activityInfo.applicationInfo.loadBanner(packageManager)
         val bmp = Bitmap.createBitmap(640, 360, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
@@ -753,7 +763,7 @@ class MainActivity : Activity() {
             banner.setBounds(0, 0, 640, 360)
             banner.draw(c)
         } else {
-            iconTile(ri.loadIcon(packageManager), c)
+            iconTile(sharp(ri.activityInfo.packageName, ri.activityInfo.iconResource) ?: ri.loadIcon(packageManager), c)
         }
         return ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it); bmp.recycle() }.toByteArray()
     }
@@ -805,10 +815,12 @@ class MainActivity : Activity() {
     private fun iconImage(pkg: String): ByteArray? {
         icons[pkg]?.let { return it }
         val ri = tvApps().firstOrNull { it.activityInfo.packageName == pkg }
-        val d = ri?.loadIcon(packageManager)
+        // At 256 px from the sharpest icon the app ships: at the TV's own xhdpi most icons are 96 px
+        // and looked soft on a big 4K screen (issue #17).
+        val d = ri?.let { sharp(pkg, it.activityInfo.iconResource) } ?: ri?.loadIcon(packageManager)
             ?: try { packageManager.getApplicationIcon(pkg) } catch (e: Exception) { return null }
-        val bmp = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
-        d.setBounds(0, 0, 128, 128)
+        val bmp = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888)
+        d.setBounds(0, 0, 256, 256)
         d.draw(Canvas(bmp))
         val bytes = ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.PNG, 100, it); bmp.recycle() }.toByteArray()
         icons[pkg] = bytes
