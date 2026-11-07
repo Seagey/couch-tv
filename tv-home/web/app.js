@@ -37,6 +37,18 @@
   // Home settings made on this TV with the gear tile (see "home settings" below). They win over
   // config.js. ST is the saved object; the rest are read from it in readConfig().
   var ST = {}, WX_SHOW = true, WX_F = false, WX_EVERY = 30, HIDDEN_TV = [];
+  // WebViews before Chrome 84 (still on many Android 9 TVs) skip gap in a flex box, so icons touch
+  // their words and rows touch each other. html.no-flex-gap lets app.css put margins in instead (#26).
+  (function () {
+    var d = document.createElement("div");
+    d.style.cssText = "display:flex;flex-direction:column;row-gap:1px;position:absolute;visibility:hidden";
+    d.appendChild(document.createElement("div"));
+    d.appendChild(document.createElement("div"));
+    document.documentElement.appendChild(d);
+    var ok = d.scrollHeight === 1;
+    d.parentNode.removeChild(d);
+    document.documentElement.classList.toggle("no-flex-gap", !ok);
+  })();
 
   // What this TV keeps for itself (app order, people order, new apps, the look). Written to the
   // page's storage and to the launcher (TVOS.keep), so the live page and the saved copy share it.
