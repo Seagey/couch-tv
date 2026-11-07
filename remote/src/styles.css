@@ -498,17 +498,35 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
 .kb-open .ask-sheet .replies::-webkit-scrollbar { display: none; }
 .kb-open .ask-sheet .replies .reply-chip { flex: none; white-space: nowrap; }
 
-/* Glass app icons, when the TV home has them on (Home settings, Look; home.glass_icons, #25): each
-   app grey and half see-through on frosted glass, like the TV's dock. A press brings its colours
-   back. Reduce Transparency gets a solid tile and a clearer icon. */
-.glass-icons .app-icon {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.06) 45%, rgba(255, 255, 255, 0.12) 100%), rgba(20, 20, 28, 0.22);
-  -webkit-backdrop-filter: blur(20px) saturate(170%); backdrop-filter: blur(20px) saturate(170%);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 16px rgba(0, 0, 0, 0.3);
+/* Glass app icons, when the TV home has them on (Home settings, Look; home.glass_icons, #25):
+   Apple's clear icons, the app's symbol in light glass without its own background (clearicon.js,
+   shared with the TV), on a glass tile with a soft dimming layer and a rim of light. A press shows
+   the app's own icon. An icon that will not cut cleanly is grey and half see-through instead.
+   How clear (home.glass_amount, 1 to 5, #29) follows the TV. Reduce Transparency: solid tiles. */
+:root {
+  --gi-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.06) 45%, rgba(255, 255, 255, 0.12) 100%), rgba(20, 20, 28, 0.22);
+  --gi-blur: blur(20px) saturate(170%);
+  --gi-glyph: 0.92;
 }
-.glass-icons .app-icon img { filter: grayscale(1) contrast(1.25) brightness(1.1); opacity: 0.55; mix-blend-mode: luminosity; transition: filter 0.2s, opacity 0.2s; }
-.glass-icons .app-tile:active .app-icon img { filter: brightness(0.86); opacity: 1; mix-blend-mode: normal; transition: none; }
+.ga-1 { --gi-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.14) 45%, rgba(255, 255, 255, 0.2) 100%), rgba(24, 24, 32, 0.34); --gi-blur: blur(28px) saturate(160%); --gi-glyph: 0.97; }
+.ga-2 { --gi-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.1) 45%, rgba(255, 255, 255, 0.16) 100%), rgba(22, 22, 30, 0.28); --gi-blur: blur(24px) saturate(165%); --gi-glyph: 0.95; }
+.ga-4 { --gi-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.035) 45%, rgba(255, 255, 255, 0.08) 100%), rgba(18, 18, 26, 0.16); --gi-blur: blur(12px) saturate(175%); --gi-glyph: 0.9; }
+.ga-5 { --gi-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(255, 255, 255, 0.05) 100%), rgba(16, 16, 24, 0.11); --gi-blur: blur(5px) saturate(180%); --gi-glyph: 0.88; }
+.glass-icons .app-icon {
+  background: var(--gi-tint);
+  -webkit-backdrop-filter: var(--gi-blur); backdrop-filter: var(--gi-blur);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+.app-icon .glyph { display: none; }
+.glass-icons .app-icon.clear > img:not(.glyph) { display: none; }
+.glass-icons .app-icon.clear .glyph { display: block; object-fit: contain; opacity: var(--gi-glyph); filter: drop-shadow(0 0.5px 1px rgba(0, 0, 0, 0.3)); }
+.glass-icons .app-tile:active .app-icon.clear > img:not(.glyph) { display: block; filter: brightness(0.86); }
+.glass-icons .app-tile:active .app-icon.clear .glyph { display: none; }
+.glass-icons .app-tile:active .app-icon { background: var(--tile); }
+.glass-icons .app-icon:not(.clear) img { filter: grayscale(1) contrast(1.25) brightness(1.1); opacity: 0.55; mix-blend-mode: luminosity; transition: filter 0.2s, opacity 0.2s; }
+.glass-icons .app-tile:active .app-icon:not(.clear) img { filter: brightness(0.86); opacity: 1; mix-blend-mode: normal; transition: none; }
 @media (prefers-reduced-transparency: reduce) {
   .glass-icons .app-icon { background: rgba(58, 58, 64, 0.96); -webkit-backdrop-filter: none; backdrop-filter: none; }
-  .glass-icons .app-icon img { opacity: 0.85; mix-blend-mode: normal; }
+  .glass-icons .app-icon:not(.clear) img { opacity: 0.85; mix-blend-mode: normal; }
+  .glass-icons .app-icon.clear .glyph { opacity: 1; }
 }

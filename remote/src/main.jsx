@@ -4,6 +4,8 @@ import App from './App.jsx';
 import { watchLifecycle } from './lifecycle.js';
 import { t } from './i18n.js';
 import './styles.css';
+// the clear icon cutter, the same file the TV home uses (window.ClearIcon)
+import '../../tv-home/web/clearicon.js';
 
 // If anything in the app throws, show a calm dark screen with a way back, never a blank page.
 class Boundary extends Component {

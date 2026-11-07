@@ -12,7 +12,9 @@
 //   myscenes=[...]      home.my_scenes, as JSON (docs/MAKE-A-SCENE.md), for your own scenes
 //   lang=it             home.language (en, es, es-MX, it, de, tr); without it, the browser's own language
 //   glass=on            home.glass (on, lite: no blur)      video=<link>   home.video_url, an MP4 or MOV
-//   icons=glass         home.glass_icons: the app icons in grey on frosted glass
+//   icons=glass         home.glass_icons: Apple style clear app icons on glass
+//   amount=1..5         home.glass_amount, how clear the glass is (1 frosted, 3 the default, 5 very clear)
+//   clockstyle=liquid   home.clock_style: the Night clock as liquid glass
 //   newapp=1            an app turns up that this TV has not seen before (the New dot)
 //   down                the bridge is not answering      offline=1   the saved copy, no bridge at all
 //   reset=1             forget everything this preview saved (orders, people, the look, Home settings)
@@ -53,6 +55,8 @@
   if (arg("myscenes")) try { cfg.home.my_scenes = JSON.parse(arg("myscenes")); } catch (e) {}
   if (arg("glass")) cfg.home.glass = arg("glass");
   if (arg("icons") === "glass") cfg.home.glass_icons = true;
+  if (arg("amount")) cfg.home.glass_amount = parseInt(arg("amount"), 10);
+  if (arg("clockstyle")) cfg.home.clock_style = arg("clockstyle");
   if (arg("video")) cfg.home.video_url = arg("video");
   window.COUCH_CONFIG = cfg;
 

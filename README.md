@@ -192,8 +192,10 @@ turns it off again without losing the link. The photo stays until the clip plays
 it will not play. The video stops while an app is in front. Over a video, the Night clock is
 frosted white instead of cut from the photo. Both are heavier than the plain home, so on a small
 TV stick switch them off if the home feels slow. Thanks alonmustafa (#22). **Glass app icons**
-(also under Look) turns the app icons grey on frosted glass, like Apple's clear icons, with the
-app you are on in its own colours (#25). The phone remote's app grid follows the TV's choice. Links straight to
+(also under Look) shows each app's symbol in light glass without its own background, like Apple's
+clear icons, with the app you are on in its own colours (#25). **How clear** sets the glass from
+frosted to very clear in five steps (#29), and **Clock style, Liquid glass** draws the Night clock
+as clear glass digits that bend the photo behind them (#25). The phone remote follows the TV. Links straight to
 Apple's own server (`sylvan.apple.com`, the tvOS aerials) never play: it uses a certificate from
 Apple's private authority, which Android and Chrome do not trust. Copies of the same aerials on
 other hosts, or saved on a computer at home, play fine as MOV (#27).
