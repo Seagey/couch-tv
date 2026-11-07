@@ -44,7 +44,11 @@ object Store {
     fun weather(): JSONObject = (str("weather")?.let { runCatching { JSONObject(it) }.getOrNull() })
         ?: JSONObject().put("lat", -33.8688).put("lon", 151.2093).put("place", "Sydney").put("timezone", "Australia/Sydney")
 
-    fun country(): String = str("country", "AU") ?: "AU"
+    /** Where shows stream (JustWatch): the setup page's Country; without it, the TV's own region when
+     *  the TV is not in English (a German TV in Germany: DE, issue #23), else AU. */
+    fun country(): String = str("country")?.takeIf { Regex("[A-Z]{2}").matches(it) }
+        ?: java.util.Locale.getDefault().takeIf { it.language != "en" }?.country?.takeIf { Regex("[A-Z]{2}").matches(it) }
+        ?: "AU"
 
     /** The public config the TV home and the phone remote read (same shape as the computer bridge). */
     fun publicConfig(): JSONObject = JSONObject()

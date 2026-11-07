@@ -31,7 +31,7 @@ object Apps {
         TvApp("sbs-on-demand", "SBS On Demand", "com.sbs.ondemand.tv", "#FFCC00", listOf("sbsondemand"), "jw",
             useWeb = Regex("(https://www\\.sbs\\.com\\.au/ondemand/[^/]+/[^/?#]+)"), cold = "always"),
         TvApp("disney-plus", "Disney+", "com.disney.disneyplus", "#113CCF", listOf("disneyplus"), "jw"),
-        TvApp("prime-video", "Prime Video", "com.amazon.amazonvideo.livingroom", "#00A8E1", listOf("amazonprimevideo", "amazon"), "jw"),
+        TvApp("prime-video", "Prime Video", "com.amazon.amazonvideo.livingroom", "#00A8E1", listOf("amazonprimevideo", "amazonprime", "amazonprimevideowithads", "amazon"), "jw"),
         TvApp("apple-tv", "Apple TV", "com.apple.atve.androidtv.appletv", "#111111", listOf("appletvplus", "itunes"), "jw"),
         TvApp("paramount-plus", "Paramount+", "com.cbs.ca", "#0064FF", listOf("paramountplus", "paramountpluspremium", "paramountplusbasicwithads"), "jw"),
         TvApp("kayo", "Kayo", "au.com.kayosports.tv", "#00E676"),

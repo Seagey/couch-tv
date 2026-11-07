@@ -235,6 +235,7 @@ object Tv {
                 line.startsWith("active=") && cur != null -> cur!!.active = line.endsWith("true")
                 line.startsWith("state=PlaybackState") && cur != null -> {
                     cur!!.state = Regex("\\{state=([A-Z_]+)\\(").find(line)?.groupValues?.get(1)
+                        ?: Regex("\\{state=(\\d+)[,}]").find(line)?.groupValues?.get(1)?.toIntOrNull()?.let { STATE_NAMES.getOrNull(it) }
                     cur!!.position = Regex("[ {]position=(-?\\d+)").find(line)?.groupValues?.get(1)?.toLongOrNull()
                     cur!!.updated = Regex("[ {]updated=(-?\\d+)").find(line)?.groupValues?.get(1)?.toLongOrNull()
                     cur!!.speed = Regex("speed=([-\\d.]+)").find(line)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
@@ -253,6 +254,9 @@ object Tv {
         "FAST_FORWARDING" to "playing", "REWINDING" to "playing", "SKIPPING_TO_NEXT" to "buffering",
         "SKIPPING_TO_PREVIOUS" to "buffering", "SKIPPING_TO_QUEUE_ITEM" to "buffering", "STOPPED" to "stopped",
         "NONE" to "stopped", "ERROR" to "stopped")
+    /** PlaybackState's numbers, for older Android that prints `state=3` rather than `state=PLAYING(3)`. */
+    private val STATE_NAMES = listOf("NONE", "STOPPED", "PAUSED", "PLAYING", "FAST_FORWARDING", "REWINDING", "BUFFERING",
+        "ERROR", "CONNECTING", "SKIPPING_TO_PREVIOUS", "SKIPPING_TO_NEXT", "SKIPPING_TO_QUEUE_ITEM")
 
     /** True once the app's media session says PLAYING and its position moves on. */
     fun waitUntilPlaying(pkg: String, timeoutMs: Long = 30_000): Boolean {

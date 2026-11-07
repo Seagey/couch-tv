@@ -1486,6 +1486,10 @@ def _sessions(out):
         elif line.startswith("state=PlaybackState") and cur is not None:
             m = re.search(r"\{state=([A-Z_]+)\(", line)
             cur["state"] = m.group(1) if m else None
+            if not m:   # older Android prints a number: PlaybackState {state=3, ...}
+                m = re.search(r"\{state=(\d+)[,}]", line)
+                n = int(m.group(1)) if m else -1
+                cur["state"] = STATE_NAMES[n] if 0 <= n < len(STATE_NAMES) else None
             for key in ("position", "updated"):
                 m = re.search(rf"[ {{]{key}=(-?\d+)", line)
                 cur[key] = int(m.group(1)) if m else None
@@ -1503,6 +1507,9 @@ STATES = {"PLAYING": "playing", "PAUSED": "paused", "BUFFERING": "buffering",
           "SKIPPING_TO_NEXT": "buffering", "SKIPPING_TO_PREVIOUS": "buffering",
           "SKIPPING_TO_QUEUE_ITEM": "buffering", "STOPPED": "stopped", "NONE": "stopped",
           "ERROR": "stopped"}
+# PlaybackState's numbers, for older Android that prints state=3 rather than state=PLAYING(3)
+STATE_NAMES = ("NONE", "STOPPED", "PAUSED", "PLAYING", "FAST_FORWARDING", "REWINDING", "BUFFERING",
+               "ERROR", "CONNECTING", "SKIPPING_TO_PREVIOUS", "SKIPPING_TO_NEXT", "SKIPPING_TO_QUEUE_ITEM")
 
 
 def _fallback_title(pkg):
