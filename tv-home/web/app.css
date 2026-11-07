@@ -598,3 +598,73 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .sh-b, .sh-scene, .sh-room, .sh-rooms, .sh-dial .arc { transition: none; }
 }
+
+/* ================= the video background (Home settings, Look; home.video_url) =================
+   app.js adds html.has-video once the clip really plays. It sits over the Classic photo and under
+   the Night scenes, whose photos and cut-outs step aside so their glass clocks float over the video. */
+.bgvid {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover;
+  opacity: 0; pointer-events: none; transition: opacity 1600ms ease-in-out;
+}
+.has-video .bgvid { opacity: 1; }
+.night .bgvid { filter: brightness(0.72); }
+.has-video .scene .sbg, .has-video .scene .fg { display: none; }
+/* the clock's fill was the scene's own photo: over a video it is frosted white with a soft shadow,
+   so it reads from the couch over a bright sky and a dark night alike */
+.has-video .scene .gclock { filter: drop-shadow(0 0.25rem 1.5rem rgba(0, 0, 0, 0.42)) drop-shadow(0 0 0.1875rem rgba(0, 0, 0, 0.3)); }
+.has-video .gclock .fill { background-image: none !important; color: rgba(255, 255, 255, 0.72); filter: none; opacity: 1; }
+.has-video .s-fog .gclock .fill { color: rgba(255, 255, 255, 0.68); filter: none; opacity: 1; }
+
+/* ================= Glass panels (Home settings, Look, Glass; home.glass) =================
+   html.glass: clear, softly blurred panels with a light edge and a highlight along the top, so the
+   photo or the video shows through. Night: the dock, the Keep watching cards, the people switch,
+   the quick buttons and the date. Classic: the clock sits on a glass card, the plain tiles (App
+   Store, Settings, More apps) turn to glass and every tile gets a light edge; the photo stays clear.
+   html.glass-lite (On, no blur): the same panels and edges with no blur, for older or slower TVs.
+   A TV whose browser cannot blur at all gets the same, by itself (@supports at the end). */
+.glass {
+  --glass-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 42%, rgba(255, 255, 255, 0.09) 100%), rgba(22, 22, 30, 0.2);
+  --glass-solid: linear-gradient(160deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.07) 100%), rgba(24, 24, 32, 0.6);
+  --glass-edge: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.26), inset 0 0.125rem 0.0625rem -0.0625rem rgba(255, 255, 255, 0.6),
+    inset 0 -0.0625rem 0 rgba(255, 255, 255, 0.1), 0 1.5rem 3.5rem rgba(0, 0, 0, 0.3);
+  --glass-blur: blur(2.25rem) saturate(185%) brightness(1.06);
+}
+.glass.theme-night .people:not(.focus), .glass.theme-night .qbtn:not(.focus), .glass.theme-night .grid,
+.glass.theme-night .ncard:not(.focus), .glass.theme-night .date .dline,
+.glass:not(.theme-night) .clock, .glass:not(.theme-night) .people, .glass:not(.theme-night) .qbtn:not(.focus),
+.glass:not(.theme-night) .app .face.tool, .glass:not(.theme-night) .app .face.word {
+  background: var(--glass-tint); box-shadow: var(--glass-edge);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+}
+/* a focused card keeps its white ring, on glass */
+.glass.theme-night .ncard.focus { background: var(--glass-tint); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+/* Night: the date line becomes a small glass pill above the clock */
+.glass.theme-night .date .dline { display: inline-block; padding: 0.375rem 1.5rem; border-radius: 1.75rem; }
+/* Classic: a glass card behind the clock (the words stay where they were), a light edge on every tile */
+.glass:not(.theme-night) .clock { padding: 1.25rem 1.75rem 0.75rem 2.5rem; margin: -1.25rem -1.75rem 0 0; border-radius: 2.25rem; }
+.glass:not(.theme-night) .tile:not(.focus) .face { box-shadow: 0 0 0 0.0625rem rgba(255, 255, 255, 0.24), 0 0.75rem 1.75rem rgba(0, 0, 0, 0.35); }
+/* On, no blur: the panels stay, a little darker so words still read */
+.glass.glass-lite.theme-night .people:not(.focus),
+.glass.glass-lite.theme-night .qbtn:not(.focus),
+.glass.glass-lite.theme-night .grid,
+.glass.glass-lite.theme-night .ncard,
+.glass.glass-lite.theme-night .date .dline,
+.glass.glass-lite:not(.theme-night) .clock,
+.glass.glass-lite:not(.theme-night) .people,
+.glass.glass-lite:not(.theme-night) .qbtn:not(.focus),
+.glass.glass-lite:not(.theme-night) .app .face.tool,
+.glass.glass-lite:not(.theme-night) .app .face.word {
+  background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+.glass.theme-night .people:not(.focus),
+.glass.theme-night .qbtn:not(.focus),
+.glass.theme-night .grid,
+.glass.theme-night .ncard,
+.glass.theme-night .date .dline,
+.glass:not(.theme-night) .clock,
+.glass:not(.theme-night) .people,
+.glass:not(.theme-night) .qbtn:not(.focus),
+.glass:not(.theme-night) .app .face.tool,
+.glass:not(.theme-night) .app .face.word { background: var(--glass-solid); }
+}

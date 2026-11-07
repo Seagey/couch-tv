@@ -84,6 +84,8 @@ class HomeActivity : Activity() {
     private fun load() { web?.loadUrl("$base/tv/") }
 
     override fun onResume() { super.onResume(); hideBars(); if (ready) js("window.tv && tv.resume()") }
+    // the video background stops while an app is in front
+    override fun onPause() { super.onPause(); js("window.tv && tv.pause && tv.pause()") }
     override fun onNewIntent(i: Intent) { super.onNewIntent(i); js("window.tv && tv.home()") }
 
     override fun dispatchKeyEvent(e: KeyEvent): Boolean {

@@ -31,6 +31,9 @@
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
   var THEME = "night", NIGHT = true, CLOCK24 = false;
+  // Glass panels ("off", "on", or "lite": no blur, for slower TVs) and the video background, from
+  // Home settings, then home.glass and home.video_url. Both are off unless someone switches them on.
+  var GLASS = "off", VIDEO_ON = false, VIDEO_URL = "";
   // Home settings made on this TV with the gear tile (see "home settings" below). They win over
   // config.js. ST is the saved object; the rest are read from it in readConfig().
   var ST = {}, WX_SHOW = true, WX_F = false, WX_EVERY = 30, HIDDEN_TV = [];
@@ -177,6 +180,12 @@
     if (THEME !== "classic") THEME = "night";
     NIGHT = THEME === "night";
     document.documentElement.classList.toggle("theme-night", NIGHT);
+    GLASS = glassSetting();
+    document.documentElement.classList.toggle("glass", GLASS !== "off");
+    document.documentElement.classList.toggle("glass-lite", GLASS === "lite");
+    // a link set in Home settings wins over home.video_url; one from config.json alone means on
+    VIDEO_URL = typeof ST.video_url === "string" ? ST.video_url : typeof HOME.video_url === "string" ? HOME.video_url : "";
+    VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true);
     GRID_COLS = NIGHT ? 12 : 8;
     DOCK_APPS = Math.max(1, Math.min(10, parseInt(HOME.dock_size, 10) || 10));
     if (smartOn()) DOCK_APPS = Math.min(DOCK_APPS, 9);   // the Smart home tile takes one place in the dock
@@ -198,6 +207,7 @@
     newApps = kept("tvhome.apps.new") || [];
   }
   function lookSetting() { return ST.look || kept("tvhome.look") || HOME.look || "night"; }
+  function glassSetting() { var g = ST.glass || HOME.glass; return g === "on" || g === "lite" ? g : "off"; }
   // no clock in Home settings or config.json: the one usual for the language (24 hour in Italian and German)
   function clock24() { return (ST.clock || HOME.clock || (window.I18N ? window.I18N.clock() : "12h")) === "24h"; }
 
@@ -504,6 +514,37 @@
     glassShown = hm;
     sceneEls.forEach(function (el, i) { if (el.classList.contains("ready")) drawClocks(el, SCENES[i], hm); });
   }
+
+  // ---------------- the video background (Home settings, Look; home.video_url) ----------------
+  // A muted clip that loops in place of the photo, in both looks. The photo stays until the clip
+  // really plays, and comes back if it fails or has not started within 20 s. It pauses while the
+  // home is not on screen (the launcher calls tv.pause, and the page's own visibility).
+  var vidTimer = null;
+  function startVideo() {
+    var v = $("bgvid"), root = document.documentElement;
+    if (!VIDEO_ON) return;
+    if (v.getAttribute("src") !== VIDEO_URL) {
+      root.classList.remove("has-video");
+      v.onplaying = function () { clearTimeout(vidTimer); root.classList.add("has-video"); };
+      v.onerror = stopVideo;
+      v.src = VIDEO_URL;
+      clearTimeout(vidTimer);
+      vidTimer = setTimeout(function () { if (!root.classList.contains("has-video")) stopVideo(); }, 20000);
+    }
+    var p = v.play();
+    if (p && p.catch) p.catch(function () {});
+  }
+  function stopVideo() {
+    var v = $("bgvid");
+    clearTimeout(vidTimer);
+    VIDEO_ON = false;
+    document.documentElement.classList.remove("has-video");
+    v.pause();
+    v.removeAttribute("src");
+    try { v.load(); } catch (e) {}
+  }
+  function pauseVideo() { var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); }
+  document.addEventListener("visibilitychange", function () { if (document.hidden) pauseVideo(); else startVideo(); });
 
   function showScene(i) {
     var prev = scene;
@@ -1666,6 +1707,27 @@
     rows.push({ kind: "cycle", key: "clock", label: t("clock"), value: CLOCK24 ? t("clock_24") : t("clock_12"), act: function () {
       CLOCK24 = !CLOCK24; ST.clock = CLOCK24 ? "24h" : "12h"; saveSettings(); glassShown = ""; clock();
     } });
+    // glass panels: off, on, on with no blur (for slower TVs)
+    rows.push(head(t("glass_head")));
+    rows.push({ kind: "cycle", key: "glass", label: t("glass"), value: GLASS === "lite" ? t("glass_lite") : GLASS === "on" ? t("on") : t("off"), act: function () {
+      GLASS = GLASS === "off" ? "on" : GLASS === "on" ? "lite" : "off"; ST.glass = GLASS; saveSettings();
+    } });
+    rows.push(info("glass-note", t("glass_note", { keep: t("keep_watching") })));
+    // the video background: its switch only once there is a link
+    rows.push(head(t("video_head")));
+    if (VIDEO_URL) {
+      var vidOn = typeof ST.video === "boolean" ? ST.video : true;
+      rows.push({ kind: "toggle", key: "video", label: t("video"), value: vidOn ? t("on") : t("off"), act: function () {
+        ST.video = !vidOn; saveSettings();
+      } });
+    }
+    rows.push({ kind: "input", key: "video-url", label: t("video_url"), sub: VIDEO_URL || t("video_none"), act: function () {
+      startTyping({ label: t("video_url_type"), value: VIDEO_URL, url: true, submit: setVideoUrl });
+    } });
+    if (VIDEO_URL) rows.push({ kind: "action", key: "video-rm", label: t("video_remove"), danger: true, act: function () {
+      ST.video_url = ""; VIDEO_URL = ""; ST.video = false; saveSettings();
+    } });
+    rows.push(info("video-note", t("video_note")));
     rows.push(head(t("photos_head")));
     if (canPick()) rows.push({ kind: "action", key: "photo-pick", label: t("photos_pick"), sub: t("photos_pick_sub"), act: pickPhotos });
     else rows.push(info("photo-nopick", t("photos_no_pick"), "", t("photos_no_pick_sub")));
@@ -1711,6 +1773,33 @@
     saveSettings();
     SET.msg = n === 1 ? t("photos_added") : t("photos_added_n", { n: n });
     if (zone === "settings") renderSettings();
+  }
+  // The video background's link: checked by loading it once (muted), like a photo's address.
+  function setVideoUrl(u) {
+    u = (u || "").trim();
+    if (!u) return;
+    // a computer at home (typed as its number, or a name ending in .local) is usually plain http
+    if (!/^https?:\/\//i.test(u)) u = (/^(\d+\.){3}\d+|^[^\/]+\.local\b/i.test(u) ? "http://" : "https://") + u;
+    SET.msg = t("video_checking");
+    var v = document.createElement("video"), done = false;
+    var finish = function (good) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      v.removeAttribute("src");
+      if (good) {
+        ST.video_url = u; ST.video = true; VIDEO_URL = u;
+        saveSettings();
+        SET.msg = t("video_added");
+      } else SET.msg = t("video_bad");
+      if (zone === "settings") renderSettings();
+    };
+    var timer = setTimeout(function () { finish(false); }, 20000);
+    v.muted = true;
+    v.preload = "metadata";
+    v.onloadedmetadata = function () { finish(v.videoWidth > 0); };
+    v.onerror = function () { finish(false); };
+    v.src = u;
   }
   function addPhotoUrl(u) {
     u = (u || "").trim();
@@ -2381,7 +2470,9 @@
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
   window.tv = { back: goHome, home: function () { if (zone === "settings") closeSettings(); else goHome(); refresh(); },
-    resume: function () { okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); },
+    resume: function () { okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); },
+    // an app is in front: the video background stops until the home is back
+    pause: pauseVideo,
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
     // the launcher's updater has news (Updater.kt)
@@ -2410,6 +2501,7 @@
     }
     photo = photoForHour(new Date().getHours());
     showPhoto();
+    startVideo();
     photoTimer = setInterval(nextPhoto, PHOTO_MS);
     var cached = load();
     if (cached) { data.showsBy = cached.showsBy || data.showsBy; data.screens = cached.screens || []; data.order = cached.order || null; }
