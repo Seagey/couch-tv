@@ -1483,7 +1483,26 @@ def _sessions(out):
             parts = [p.strip() for p in line.split("description=", 1)[1].split(", ")]
             cur["title"] = parts[0] if parts and parts[0] != "null" else None
             cur["subtitle"] = parts[1] if len(parts) > 1 and parts[1] != "null" else None
+        elif line.startswith("queueTitle=") and cur is not None:
+            q = line.split("=", 1)[1].rsplit(", size=", 1)[0].strip()
+            cur["queue_title"] = q if q and q != "null" else None
     return found
+
+
+# What some apps report as the title while a film plays, or on their browse screen: their own
+# name ("PrimeVideo" on a Sony, issue #23) or a placeholder. Never a show to keep watching.
+GENERIC_TITLES = {"primevideo", "amazonprimevideo", "amazonvideo", "prime", "amazon", "netflix", "youtube", "disney",
+                  "advertisement", "ad", "ads", "sponsored", "trailer", "preview", "loading", "nowplaying",
+                  "unknown", "null", "untitled", "video", "tv", "live", "home"}
+
+
+def generic_title(title, pkg=None, app=None):
+    n = re.sub(r"[^a-z0-9]", "", (title or "").lower())
+    if not n or n in GENERIC_TITLES or n.isdigit():
+        return True
+    own = {re.sub(r"[^a-z0-9]", "", (x or "").lower())
+           for x in ((app or {}).get("name"), (app or {}).get("id"), pkg, (pkg or "").rsplit(".", 1)[-1])}
+    return n in own
 
 
 STATES = {"PLAYING": "playing", "PAUSED": "paused", "BUFFERING": "buffering",
@@ -1558,6 +1577,11 @@ async def media_read(pkg, app):
     if pos is not None and pos < 0:
         pos = None
     title, episode_title, source_title = s.get("title"), s.get("subtitle"), "app"
+    if generic_title(title, pkg, app):   # "PrimeVideo" while a film plays: try the queue's title
+        title = s.get("queue_title") if not generic_title(s.get("queue_title"), pkg, app) else None
+        if not title:
+            episode_title = None
+    s["title"] = title
     ep = {}
     if title:
         ep = await resolve_episode(title, episode_title)
@@ -1613,10 +1637,14 @@ async def media_watch_loop():
                 busy = True
                 s = await media_read(pkg, app)
                 key = (pkg, s["title"].lower()) if s and s.get("state") == "PLAYING" and s.get("title") else None
+                # the app's own position has to be past the minute too, when it gives one: a preview
+                # that autoplays on a browse screen starts at 0 each time
+                pos = media_now.get("position_ms")
+                young = pos is not None and pos < SEEN_AFTER_S * 1000
                 cand = seen_playing.get("_playing")
                 if key != (cand and cand[0]):
                     seen_playing["_playing"] = (key, time.time())   # something new (or nothing) playing
-                elif key and time.time() - cand[1] >= SEEN_AFTER_S and time.time() - seen_playing.get(key + (cur_who(),), 0) >= 1800:
+                elif key and not young and time.time() - cand[1] >= SEEN_AFTER_S and time.time() - seen_playing.get(key + (cur_who(),), 0) >= 1800:
                     seen_playing[key + (cur_who(),)] = time.time()
                     item = playing["item"]
                     # Our own /api/play already logged it if it is the same show, for the same person,

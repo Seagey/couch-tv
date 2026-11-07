@@ -220,7 +220,8 @@ object Tv {
 
     // ---------- what is playing (dumpsys media_session, same parsing as the computer bridge) ----------
     data class Session(val pkg: String, var active: Boolean = false, var state: String? = null, var position: Long? = null,
-                       var updated: Long? = null, var speed: Double = 0.0, var title: String? = null, var subtitle: String? = null)
+                       var updated: Long? = null, var speed: Double = 0.0, var title: String? = null, var subtitle: String? = null,
+                       var queueTitle: String? = null)
 
     fun sessions(): Pair<Long?, List<Session>> {
         if (!Adb.connected) return null to emptyList()
@@ -245,9 +246,25 @@ object Tv {
                     cur!!.title = parts.getOrNull(0)?.takeIf { it != "null" && it.isNotEmpty() }
                     cur!!.subtitle = parts.getOrNull(1)?.takeIf { it != "null" && it.isNotEmpty() }
                 }
+                line.startsWith("queueTitle=") && cur != null ->
+                    cur!!.queueTitle = line.substringAfter("=").substringBeforeLast(", size=").trim().takeIf { it != "null" && it.isNotEmpty() }
             }
         }
         return uptime to found
+    }
+
+    /** What some apps report as the title while a film plays, or on their browse screen: their own
+     *  name ("PrimeVideo" on a Sony, issue #23) or a placeholder. Never a show to keep watching. */
+    private val GENERIC = setOf("primevideo", "amazonprimevideo", "amazonvideo", "prime", "amazon", "netflix", "youtube", "disney",
+        "advertisement", "ad", "ads", "sponsored", "trailer", "preview", "loading", "nowplaying",
+        "unknown", "null", "untitled", "video", "tv", "live", "home")
+
+    fun genericTitle(title: String?, pkg: String?): Boolean {
+        val n = (title ?: "").lowercase().replace(Regex("[^a-z0-9]"), "")
+        if (n.isEmpty() || n in GENERIC || n.all { it.isDigit() }) return true
+        val app = pkg?.let { Apps.BY_PACKAGE[it] }
+        val own = listOfNotNull(app?.name, app?.id, pkg, pkg?.substringAfterLast('.')).map { it.lowercase().replace(Regex("[^a-z0-9]"), "") }
+        return n in own
     }
 
     val STATES = mapOf("PLAYING" to "playing", "PAUSED" to "paused", "BUFFERING" to "buffering", "CONNECTING" to "buffering",

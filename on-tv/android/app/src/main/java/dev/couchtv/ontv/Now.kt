@@ -93,14 +93,16 @@ object Now {
         if (pos != null && pos >= 0 && uptime != null && s.updated != null && state == "playing") pos += ((uptime - s.updated!!) * (if (s.speed == 0.0) 1.0 else s.speed)).toLong()
         if (pos != null && pos < 0) pos = null
         val item = playedItem?.takeIf { it.optString("package") == pkg }
-        var title = s.title
+        // "PrimeVideo" while a film plays (a Sony, issue #23) is no title: try the queue's title
+        var title = s.title?.takeIf { !Tv.genericTitle(it, pkg) } ?: s.queueTitle?.takeIf { !Tv.genericTitle(it, pkg) }
+        val ownSubtitle = if (title != null && title == s.title) s.subtitle else null
         var source = "tv"
         if (title == null && item != null) { title = item.optString("title"); source = "bridge" }
         val (poster, backdrop) = if (item != null && Finder.norm(item.optString("title")) == Finder.norm(title)) item.opt("poster") as? String to item.opt("backdrop") as? String
             else Finder.artwork(title)
         val sameAsPlayed = item != null && Finder.norm(item.optString("title")) == Finder.norm(title)
         return JSONObject().put("title", title ?: JSONObject.NULL)
-            .put("episode_title", s.subtitle ?: (if (sameAsPlayed) item!!.opt("episode_title") else null) ?: JSONObject.NULL)
+            .put("episode_title", ownSubtitle ?: (if (sameAsPlayed) item!!.opt("episode_title") else null) ?: JSONObject.NULL)
             .put("season", if (sameAsPlayed) item!!.opt("season") else JSONObject.NULL)
             .put("episode", if (sameAsPlayed) item!!.opt("episode") else JSONObject.NULL)
             .put("service", Apps.BY_PACKAGE[pkg]?.id ?: JSONObject.NULL)
@@ -122,12 +124,17 @@ object Now {
      */
     private fun remember(m: JSONObject?) {
         val pkg = front ?: return
-        val title = m?.optString("title")?.takeIf { m.optString("state") == "playing" && it.isNotEmpty() && it != "null" }
+        // only a title the app itself reports (not the last show couch-tv opened in it)
+        val title = m?.optString("title")?.takeIf { m.optString("state") == "playing" && m.optString("source") == "tv" && it.isNotEmpty() && it != "null" }
         val key = if (title == null) "" else pkg + "|" + Finder.norm(title) + "|" + (who ?: "")
         val now = System.currentTimeMillis()
         val after = (Store.testProp("seen_after_s") ?: 60L) * 1000
         if (key != seenKey) { seenKey = key; seenSince = now; return }
         if (key.isEmpty() || key == keptKey || now - seenSince < after) return
+        // the app's own position has to be past the minute too, when it gives one: a preview that
+        // autoplays on a browse screen starts at 0 each time
+        val pos = m!!.optLong("position_ms", -1L)
+        if (pos in 0 until after) return
         keptKey = key
         val played = playedItem
         // A show started from the phone for the same person in the last three hours is already in

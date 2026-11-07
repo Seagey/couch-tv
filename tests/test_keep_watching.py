@@ -106,5 +106,20 @@ class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((h["title"], h["poster"]), ("Dark", None))
 
 
+    def test_an_apps_own_name_is_not_a_title(self):
+        prime = {"id": "prime-video", "name": "Prime Video"}
+        for t in ("PrimeVideo", "Prime Video", "prime video ", "Netflix", "YouTube", "amazonvideo", "Advertisement", "", None):
+            self.assertTrue(server.generic_title(t, "com.amazon.amazonvideo.livingroom", prime), t)
+        for t in ("Man of Steel", "The Dark Knight", "Citadel: Diana"):
+            self.assertFalse(server.generic_title(t, "com.amazon.amazonvideo.livingroom", prime), t)
+
+    def test_queue_title_is_read(self):
+        out = ("12.5 1.0\n    package=com.amazon.amazonvideo.livingroom\n    active=true\n"
+               "    state=PlaybackState {state=PLAYING(3), position=90000, buffered position=0, speed=1.0, updated=1000}\n"
+               "    metadata: size=2, description=PrimeVideo, null, null\n    queueTitle=Man of Steel, size=0\n")
+        s = server._sessions(out)[0]
+        self.assertEqual((s["title"], s["queue_title"], s["state"]), ("PrimeVideo", "Man of Steel", "PLAYING"))
+
+
 if __name__ == "__main__":
     unittest.main()
