@@ -875,9 +875,11 @@
     renderPeople();
   }
 
+  // Keep watching shows up to ten per person; the row slides along under the remote.
+  var KEEP_MAX = 10;
   function renderShelf() {
     var track = $("shelf");
-    data.shows = data.showsBy[who] || [];
+    data.shows = (data.showsBy[who] || []).slice(0, KEEP_MAX);
     var anyone = PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
     // nobody has anything on the go: no empty box, the photo has the space
     $("shelf-section").classList.toggle("empty", !anyone);
@@ -890,8 +892,7 @@
       return;
     }
     if (NIGHT) {
-      // lock screen notifications: the first three shows as glass cards
-      data.shows = data.shows.slice(0, 3);
+      // lock screen notifications: glass cards, three in view, the row slides past the third
       track.innerHTML = data.shows.map(function (it) {
         var art = it.backdrop || it.poster, pkg = it.app && it.app.package;
         var ep = it.season && it.episode ? "S" + it.season + " E" + it.episode : (it.episode_title || "");
@@ -1244,7 +1245,11 @@
     var el = shelfEls[s];
     if (!el) { track.style.transform = ""; return; }
     var step = el.offsetWidth + parseFloat(getComputedStyle(track).columnGap || 0);
-    var first = Math.max(0, Math.min(s - 2, shelfEls.length - 5));   // keep up to five in view
+    // how many cards fit: three glass cards on the Night look, about five posters on Classic
+    var fit = Math.max(1, Math.floor((track.parentNode.clientWidth + step - el.offsetWidth) / step));
+    // Night: the row moves on once focus goes past the last card in view; Classic keeps it centred
+    var first = NIGHT ? s - fit + 1 : s - 2;
+    first = Math.max(0, Math.min(first, shelfEls.length - fit));
     track.style.transform = "translateX(" + (-first * step) + "px)";
   }
 
@@ -2567,7 +2572,7 @@
     var jobs = [
       people.then(function () {
         return Promise.all(PEOPLE.map(function (p) {
-          return api("GET", "/api/continue?who=" + p.id, null, 9000).then(function (j) { data.showsBy[p.id] = (j.items || []).slice(0, 12); });
+          return api("GET", "/api/continue?who=" + p.id, null, 9000).then(function (j) { data.showsBy[p.id] = (j.items || []).slice(0, KEEP_MAX); });
         }));
       }),
       api("GET", "/api/screens").then(function (j) { data.screens = j.screens || []; }),
@@ -2653,8 +2658,10 @@
     if (cached || TV) { render(); mark("home-painted-from-cache"); }
     renderQuick();
     if (!OFFLINE) refreshQuick();
-    // once the home is up: the one-time "tell you about new versions?" question
-    refresh().then(function () { mark("home-painted-live"); updTell(); updAsk(); });
+    // This TV says who is on its couch first, so what plays here is logged for them (each TV
+    // keeps its own); then the lists. Once the home is up: the one-time "tell you about new versions?" question.
+    var hello = OFFLINE ? Promise.resolve() : api("POST", "/api/who", { who: who }).catch(function () {});
+    hello.then(refresh).then(function () { mark("home-painted-live"); updTell(); updAsk(); });
   }
 
   if (MOCK || PREVIEW) {

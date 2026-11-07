@@ -176,6 +176,12 @@
           var w = (path.match(/who=([^&]+)/) || [])[1];
           var ids = people().map(function (p) { return p.id; }), at = ids.indexOf(w), count = Math.max(1, ids.length);
           var mine = empty ? [] : shows.filter(function (x, i) { return w === "both" || at < 0 || i % count === at || count > shows.length; });
+          // ?keep=11: that many shows for everyone (made-up titles over the four pictures), to see the row slide
+          var keepN = parseInt((q.match(/[?&]keep=(\d+)/) || [])[1], 10);
+          if (keepN) mine = Array.apply(null, Array(keepN)).map(function (_, i) {
+            var b = shows[i % shows.length];
+            return { id: "k" + i, title: "Show " + (i + 1), season: 1, episode: i + 1, app: b.app, backdrop: b.backdrop };
+          });
           return resolve({ ok: true, items: mine });
         }
         if (path.indexOf("/api/people") === 0) {
