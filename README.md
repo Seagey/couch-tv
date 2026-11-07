@@ -161,7 +161,10 @@ and then closes. What you change shows when the list closes.
   the order. The same order as holding OK on the dock and the phone's Arrange apps.
 - **People:** add, rename, remove and reorder who is watching.
 - **Quick buttons:** which of the sleep timer, picture mode, look and input buttons show, in what
-  order.
+  order. **Input** opens couch-tv's own menu where the TV lists its inputs: each HDMI port by the
+  TV's own name for it ("HDMI 3 (eARC)" where the TV labels it so) with what is plugged in behind it,
+  each one switching straight away, then Bluetooth and Network. A TV that lists no inputs gets its
+  own input screen, as before (#30).
 - **Updates:** off until you say yes. The first time the home opens it asks once: "Tell you when a
   new couch-tv version is out?" (setup can answer it for you, `home.updates`). With **Tell me about
   new versions** on, the TV looks on GitHub once a week, so frequent releases never nag; with it off

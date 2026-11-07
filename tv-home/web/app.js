@@ -763,10 +763,73 @@
   // The TV's own input list (HDMI, a console, a set top box): the TV_INPUT key through the bridge,
   // or straight from the launcher when there is no bridge (only where the TV has such a screen).
   function openInputs() {
+    // the TV lists its inputs: couch-tv's own menu, each one opening straight away (#30)
+    var list = inputList();
+    if (list.length) { openInputMenu(list); return; }
     var native = function () { try { return !!(TV && TV.openInputs && TV.openInputs()); } catch (e) { return false; } };
     if (OFFLINE) { if (!native()) note(t("no_inputs")); return; }
     api("POST", "/api/key", { key: "input" })
       .catch(function (e) { if (!native()) note(e.message); });
+  }
+  // ---------------- the Input menu (#30) ----------------
+  // The TV's own inputs, read by the launcher from Android's TV input list (TVOS.tvInputs): each HDMI
+  // port by the TV's own name for it (ARC or eARC only where that label says so; Android has no public
+  // way to read it), the devices HDMI-CEC found behind it, then Bluetooth and Network. A TV that lists
+  // no inputs keeps its own input screen. ?mock=1&inputs=4 stands in four ports for a preview.
+  var inI = 0, inItems = [];
+  function inputList() {
+    try {
+      if (TV && TV.tvInputs) return JSON.parse(TV.tvInputs()) || [];
+      if (window.MOCK_INPUTS) return window.MOCK_INPUTS;
+    } catch (e) {}
+    return [];
+  }
+  function openInputMenu(list) {
+    inItems = list.map(function (x) {
+      var kind = x.type === "hdmi" ? "HDMI" : t("input");
+      var sub = (x.devices || []).join(", ");
+      return { act: "input", id: x.id, icon: ICONS.input, label: x.label || kind, sub: sub };
+    });
+    if ((TV && TV.openSettingsScreen) || ON_TV || window.MOCK_INPUTS) {
+      inItems.push({ act: "bluetooth", icon: ICONS.bluetooth, label: t("bluetooth"), sub: t("bt_sub") });
+      inItems.push({ act: "network", icon: ICONS.network, label: t("network"), sub: t("net_sub") });
+    }
+    inI = 0; zone = "inputs";
+    renderInputMenu();
+  }
+  function renderInputMenu() {
+    var pop = $("inputs-pop");
+    pop.innerHTML = inItems.map(function (it, i) {
+      return '<div class="grow' + (i === inI ? " focus" : "") + '" role="menuitem"><i>' + it.icon + "</i><span><b>" + esc(it.label) +
+        "</b>" + (it.sub ? "<small>" + esc(it.sub) + "</small>" : "") + "</span></div>";
+    }).join("");
+    pop.classList.add("on");
+    hintFlash = t("inputs_hint"); renderHint();
+    // under the Input button, kept inside the screen's safe area
+    var el = quickEls[qi], rem = innerWidth / 120;
+    if (el) {
+      var b = el.getBoundingClientRect(), w = pop.offsetWidth;
+      pop.style.left = Math.max(5 * rem, Math.min(innerWidth - w - 5 * rem, b.right - w)) + "px";
+      pop.style.top = Math.max(3.75 * rem, Math.min(innerHeight - pop.offsetHeight - 3.75 * rem, b.bottom + 1.25 * rem)) + "px";
+    }
+  }
+  function closeInputMenu() {
+    $("inputs-pop").classList.remove("on");
+    hintFlash = "";
+    if (zone === "inputs") zone = "quick";
+  }
+  function doInputMenu() {
+    var it = inItems[inI];
+    closeInputMenu();
+    if (!it) return;
+    if (it.act === "input") {
+      var done = false;
+      try { done = !!(TV && TV.openInput && TV.openInput(it.id)); } catch (e) {}
+      if (!done) note(window.MOCK_INPUTS ? t("opening", { title: it.label }) : t("no_inputs"));
+      return;
+    }
+    if (TV && TV.openSettingsScreen) { try { TV.openSettingsScreen(it.act); } catch (e) {} }
+    else if (ON_TV) openSettingsScreen(it.act);
   }
   // The TV's Bluetooth or network settings, opened by the on-TV app (Tv.openSettingsScreen).
   function openSettingsScreen(which) {
@@ -1262,6 +1325,7 @@
     if (zone === "appmenu") { if (gridEls[g]) gridEls[g].classList.add("focus"); renderAppMenu(); return; }
     if (zone === "updask") { renderAsk(); return; }
     if (zone === "menu") { renderMenu(); return; }
+    if (zone === "inputs") { if (quickEls[qi]) quickEls[qi].classList.add("focus"); renderInputMenu(); return; }
     if (zone === "pmenu") { renderPop(); $("people").classList.add("focus"); return; }
     if (zone === "quick" && quickEls[qi]) {
       quickEls[qi].classList.add("focus");
@@ -1313,6 +1377,7 @@
     if (zone === "gear") { if (dy) { gi = Math.max(0, Math.min(1, gi + dy)); renderGear(); } return; }
     if (zone === "appmenu") { if (dy) { amI = Math.max(0, Math.min(amItems.length - 1, amI + dy)); renderAppMenu(); } return; }
     if (zone === "updask") { if (dy) { ai = Math.max(0, Math.min(1, ai + dy)); renderAsk(); } return; }
+    if (zone === "inputs") { if (dy) { inI = Math.max(0, Math.min(inItems.length - 1, inI + dy)); renderInputMenu(); } return; }
     if (lift) { moveLift(dx, dy); return; }
     // Night with More apps open: the cards step aside, so up and down skip them
     var cards = NIGHT && expanded ? [] : shelfEls;
@@ -1391,6 +1456,7 @@
     if (lift) { dropLift(); return; }   // BACK puts a picked-up app down where it is
     if (zone === "pmenu") { if (plift) dropPeople(); else closePop(); paintFocus(); return; }
     if (zone === "menu") { closeMenu(); paintFocus(); return; }   // BACK just closes the sleep choices
+    if (zone === "inputs") { closeInputMenu(); paintFocus(); return; }
     if (expanded) { expanded = false; renderGrid(); }
     startFocus();
     paintFocus();
@@ -1402,7 +1468,7 @@
   function hold() {
     touched = true;
     if (zone === "settings") return setHold();
-    if (zone === "gear" || zone === "smart" || zone === "updask") return false;
+    if (zone === "gear" || zone === "smart" || zone === "updask" || zone === "inputs") return false;
     if (lift) { dropLift(); return true; }
     if (zone === "pmenu") {
       if (plift) dropPeople();
@@ -1422,6 +1488,7 @@
     if (zone === "updask") { answerAsk(ai === 0); return; }
     if (lift) { dropLift(); return; }
     if (zone === "menu") { setSleep(SLEEP_CHOICES[menuI]); paintFocus(); return; }
+    if (zone === "inputs") { doInputMenu(); paintFocus(); return; }
     if (zone === "pmenu") {
       if (plift) { dropPeople(); return; }
       pickWho(PEOPLE[pmi].id);
@@ -2456,7 +2523,7 @@
   // couch-tv has no system home behind it, so it opens couch-tv's own gear menu, like the gear tile.
   function isSettings(e) { return e.key === "Settings" || e.key === "TvSettings" || e.keyCode === 176; }
   function settingsKey() {
-    if (zone === "gear" || zone === "settings" || zone === "smart" || zone === "appmenu" || zone === "updask") { goHome(); return; }
+    if (zone === "gear" || zone === "settings" || zone === "smart" || zone === "appmenu" || zone === "updask" || zone === "inputs") { goHome(); return; }
     openGear();
   }
 

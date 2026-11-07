@@ -13,6 +13,7 @@
 //   lang=it             home.language (en, es, es-MX, it, de, tr); without it, the browser's own language
 //   glass=on            home.glass (on, lite: no blur)      video=<link>   home.video_url, an MP4 or MOV
 //   icons=glass         home.glass_icons: the app icons in grey on frosted glass
+//   inputs=4            the Input button lists four HDMI ports (one eARC), as the launcher reads them
 //   newapp=1            an app turns up that this TV has not seen before (the New dot)
 //   down                the bridge is not answering      offline=1   the saved copy, no bridge at all
 //   reset=1             forget everything this preview saved (orders, people, the look, Home settings)
@@ -43,6 +44,14 @@
     });
   }
   if (arg("quick") !== null) cfg.tvs[0].quick = arg("quick").split(",").filter(Boolean);
+  if (arg("inputs")) {
+    window.MOCK_INPUTS = [
+      { id: "mock/hdmi1", label: "HDMI 1", type: "hdmi", devices: ["PlayStation 5"] },
+      { id: "mock/hdmi2", label: "HDMI 2", type: "hdmi", devices: [] },
+      { id: "mock/hdmi3", label: "HDMI 3 (eARC)", type: "hdmi", devices: ["Soundbar"] },
+      { id: "mock/hdmi4", label: "HDMI 4", type: "hdmi", devices: ["Apple TV"] }
+    ].slice(0, Math.max(1, Math.min(4, parseInt(arg("inputs"), 10) || 4)));
+  }
   if (arg("picture")) cfg.tvs[0].picture_modes = ["Calibrated", "Dynamic"];
   if (arg("look")) cfg.home.look = arg("look");
   if (arg("clock")) cfg.home.clock = arg("clock");

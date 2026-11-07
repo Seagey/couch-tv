@@ -36,6 +36,17 @@
         <intent><action android:name="com.android.tv.action.VIEW_INPUTS" /></intent>
         <intent><action android:name="com.google.android.tv.action.VIEW_INPUTS" /></intent>
         <intent><action android:name="android.media.tv.action.SETUP_INPUTS" /></intent>
+        <!-- The Input menu (#30): the TV's own app that plays an input when asked to view its
+             passthrough channel (content://android.media.tv/passthrough/<input>). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="content" android:host="android.media.tv" />
+        </intent>
+        <!-- The Input menu's Bluetooth and Network rows: the TV's own settings screens. -->
+        <intent><action android:name="android.settings.BLUETOOTH_SETTINGS" /></intent>
+        <intent><action android:name="android.settings.WIFI_SETTINGS" /></intent>
+        <intent><action android:name="android.settings.WIRELESS_SETTINGS" /></intent>
+        <intent><action android:name="android.settings.SETTINGS" /></intent>
         <!-- A file picker, for the photos in Home settings (many TVs have none). -->
         <intent>
             <action android:name="android.intent.action.OPEN_DOCUMENT" />
