@@ -12,6 +12,9 @@
     <!-- Updates (Home settings, Updates): hand a new release to Android's installer, which always
          asks the person at the TV first. Android also asks once to let this app install apps. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Holding OK on an app, "Uninstall": lets this app open Android's remove dialog. Without it
+         the package installer closes straight away (Android 9 and newer). It always asks first. -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- Fire TV only: keep the Home button watch on after updates and reboots (FireWatch.kt).
          Never granted on install: apply.sh or guest-tv grants it over ADB on a Fire TV, undo takes it back. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
@@ -45,6 +48,16 @@
         <!-- Android's "install unknown apps" switch for this app, before the first update. -->
         <intent>
             <action android:name="android.settings.MANAGE_UNKNOWN_APP_SOURCES" />
+            <data android:scheme="package" />
+        </intent>
+        <!-- Holding OK on an app, "Uninstall": Android's remove dialog (the package installer). -->
+        <intent>
+            <action android:name="android.intent.action.DELETE" />
+            <data android:scheme="package" />
+        </intent>
+        <!-- Holding OK on an app, "App info", and the uninstall fallback on TVs with no remove dialog. -->
+        <intent>
+            <action android:name="android.settings.APPLICATION_DETAILS_SETTINGS" />
             <data android:scheme="package" />
         </intent>
     </queries>
@@ -97,6 +110,18 @@
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/fire_watch" />
+        </service>
+        <!-- The remote's gear button on TVs that never hand it to an app (KeyWatch.kt). Off until the
+             person at the TV switches it on in Accessibility; it catches only that button and reads no screen content. -->
+        <service
+            android:name=".KeyWatch"
+            android:exported="false"
+            android:label="Home gear button"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/key_watch" />
         </service>
         <receiver android:name=".FireWatch$Restore" android:exported="true">
             <intent-filter>

@@ -12,6 +12,7 @@ nothing to set up.
 | Back | `BACK`, `ESCAPE`, `BUTTON_B` | `Escape`, `Backspace`, `GoBack`, `BrowserBack`, or key code 27 or 8 |
 | Up, down, left, right | `DPAD_UP`, `DPAD_DOWN`, `DPAD_LEFT`, `DPAD_RIGHT`, keyboard and controller arrows | `ArrowUp` and the rest (also the old `Up`, `Down`, `Left`, `Right`), or key code 19 to 22 or 37 to 40 |
 | Menu (optional) | `MENU` | `ContextMenu`, or key code 82 or 93 |
+| Settings (gear, optional) | `SETTINGS`, and on some TVs `BUTTON_14` through KeyWatch (below) | `Settings`, `TvSettings`, or key code 176 |
 | Home | `HOME` | Never reaches the page. Android handles it, and the launcher brings the home back to its first tile. |
 
 The launcher (`tv-home/android`, `MainActivity.dispatchKeyEvent`) turns `BUTTON_A`, `BUTTON_SELECT`
@@ -27,7 +28,12 @@ still get them, and they never move the focus.
 
 Holding OK for about half a second (600 ms) picks something up:
 
-- on an app in the dock: it lifts so you can move it (left, right, down to More apps, OK to drop);
+- on an app in the dock: a small menu opens (up and down, OK picks, Back closes it):
+  - **Move**: the app lifts so you can move it (left, right, down to More apps, OK to drop);
+  - **Hide from home**: the app is hidden on this TV (Home settings, Apps brings it back);
+  - **Uninstall**: Android's own remove dialog, which asks first. TVs without one get the app's
+    details screen, which has Uninstall;
+  - **App info**: Android's details screen for that app;
 - on an app in More apps: it goes on the home (the dock);
 - on a name in the people list: it lifts so you can move it (up, down, OK to drop).
 
@@ -39,6 +45,28 @@ still opens the app straight away.
 Where there is nothing to pick up (a show, a quick button), holding OK just does what OK does.
 
 Many remotes have no Menu key. Where there is one, Menu does the same as holding OK.
+
+## The gear button
+
+The remote's gear or Settings button opens the gear menu (Home settings or TV settings), the same as
+the gear tile in the dock. Pressed again, or from inside a menu, it goes back to the home.
+
+Most remotes send Android's `SETTINGS` key, and the launcher catches it
+(`MainActivity.dispatchKeyEvent`). Some do not: on an ONVO TV (MediaTek, Google TV, Android 14)
+the gear sends `BUTTON_14` (201), and Android's global-key table hands it to the maker's hot-key
+agent, so no app ever sees it. For those TVs the app has a small accessibility service, **Home gear
+button** (`KeyWatch.kt`). It catches only that button, passes every other key on, and reads no
+screen content. It is off until you switch it on at the TV: Settings, System (or Device
+Preferences), Accessibility, Home gear button. Android switches it off again whenever couch-tv is
+reinstalled or updated, so switch it back on after that. `undo.sh` switches it off.
+
+To find what your remote's gear sends: `adb logcat -s couchtv-keywatch` while the service is on.
+
+## Sound
+
+Every arrow and OK plays Android's own navigation sound (`AudioManager.playSoundEffect`), the
+one other TV launchers play. It follows the TV's system sounds switch. In a browser preview the page
+makes a short tick of its own.
 
 ## Focus
 

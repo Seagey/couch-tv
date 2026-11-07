@@ -442,7 +442,7 @@ is optional:
 
 | Key | What it is |
 |---|---|
-| `lang` | `en`, `es`, `es-MX`, `it` or `de`. |
+| `lang` | `en`, `es`, `es-MX`, `it`, `de` or `tr`. |
 | `place` | The weather's place: `name`, `lat`, `lon` (rounded to two decimals, a town, never a house), `timezone`. |
 | `wx_show`, `wx_unit`, `wx_every` | Weather on or off, `c` or `f`, minutes between checks (15, 30 or 60). |
 | `look` | `night` or `classic`. |

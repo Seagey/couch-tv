@@ -156,15 +156,16 @@ Home settings saves to the same `bridge/data/people.json` the phone uses.
 | `glass` [`off`] | Glass panels behind the clock, Keep watching and the apps: `on` (clear, softly blurred, with a light edge), `lite` (the same panels with no blur, for older or slower TVs) or `off`. Home settings, Look, Glass panels wins over it. |
 | `video_url` [none] | A looping, muted video background in place of the photo, in both looks: the address of an MP4 (`https://...`, or `http://` for a computer at home). Given here it is on; Home settings, Look switches it off or changes the link. The photo stays if the clip does not play. |
 | `dock_size` [10] | How many apps sit in the Night dock before Settings and More apps. 1 to 10. Everything else is behind More apps. The phone's Arrange apps keeps to the same number. |
-| `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish), `it` (Italian) or `de` (German). The phone remote has its own choice, "Same as the TV" by default. |
+| `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish), `it` (Italian), `de` (German) or `tr` (Turkish). The phone remote has its own choice, "Same as the TV" by default. |
 
 ## Apps on the home
 
 Nothing to set in `config.json`. Arrange them from the phone (TV, Arrange apps) or with the TV
 remote:
 
-- **Move an app:** on the dock, hold OK on it for about half a second. It lifts and wiggles.
-  Left and right move it, down sends it behind More apps, OK or Back puts it down.
+- **Move an app:** on the dock, hold OK on it for about half a second. A small menu opens: **Move**,
+  **Hide from home**, **Uninstall** (Android's own remove dialog, which asks first) and **App info**.
+  **Move** lifts the app and it wiggles. Left and right move it, down sends it behind More apps, OK or Back puts it down.
 - **Bring one back:** open More apps, hold OK on an app, and it goes to the end of the dock. If the
   dock is full, the dock's last app moves behind More apps to make room.
 - **Home settings, Apps** (gear tile) lists every app: OK moves one between home, More apps and
