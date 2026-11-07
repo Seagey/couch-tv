@@ -187,7 +187,9 @@ address.
   and most others say what is playing; a few apps say nothing, and those cannot land there.
 
 Only titles the show finder knows go in (it found the show's artwork), so every tile can open the
-show again. YouTube videos and music stay out: YouTube keeps its own history. There is no progress
+show again. The finder looks in the country on the setup page; left empty, that is the TV's own
+region when the TV is not in English (a German TV in Germany looks in DE), else AU. If the row stays
+empty for shows you know are playing, check that country first. YouTube videos and music stay out: YouTube keeps its own history. There is no progress
 bar and no imported history; those need the computer bridge (option B). Until this change, only
 shows started from the phone landed there, so the row stayed empty for anyone without Ask on.
 

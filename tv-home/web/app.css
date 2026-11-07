@@ -465,8 +465,10 @@ body {
 .grow.focus small { color: rgba(0, 0, 0, 0.6); }
 
 /* ================= Home settings: a tvOS style list, sections left, rows right ================= */
+/* top/right/bottom/left rather than inset: WebViews before Chrome 87 (still on many Android 9 TVs)
+   skip inset, and the list was drawn below the screen where nobody could see it (#26). */
 .settings {
-  display: none; position: fixed; inset: 0; z-index: 30; grid-template-columns: 36rem minmax(0, 1fr); column-gap: 4rem;
+  display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30; grid-template-columns: 36rem minmax(0, 1fr); column-gap: 4rem;
   padding: var(--safe-y) var(--safe-x); text-shadow: none;
   background: rgba(10, 8, 12, 0.8); -webkit-backdrop-filter: blur(2.5rem) saturate(140%); backdrop-filter: blur(2.5rem) saturate(140%);
 }
@@ -549,7 +551,7 @@ body {
    Only drawn when config.json has a home_assistant section (smarthome.js). Rooms are cards with a
    dial; their four buttons (cooler, warmer, on or off, mode) and the scenes take the remote. */
 .smart {
-  display: none; position: fixed; inset: 0; z-index: 30; flex-direction: column;
+  display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30; flex-direction: column;
   padding: var(--safe-y) var(--safe-x); text-shadow: none;
   background: rgba(10, 8, 12, 0.8); -webkit-backdrop-filter: blur(2.5rem) saturate(140%); backdrop-filter: blur(2.5rem) saturate(140%);
 }
@@ -573,7 +575,7 @@ body {
 .sh-dial .arc { fill: none; stroke: #9fd8ff; stroke-width: 8; stroke-linecap: round; transition: stroke-dasharray 300ms var(--ease), stroke 300ms; }
 .sh-room.heat .sh-dial .arc { stroke: #ffb46e; }
 .sh-room.off .sh-dial .arc, .sh-room.quiet .sh-dial .arc { stroke: rgba(255, 255, 255, 0.3); }
-.sh-val { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.sh-val { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .sh-val b { font-family: "Antonio", "Inter", sans-serif; font-size: 5.5rem; line-height: 5.75rem; font-weight: 300; letter-spacing: -0.03em; }
 .sh-val span { font-size: 1.3125rem; line-height: 1.75rem; color: var(--text-2); }
 .sh-room.off .sh-val b, .sh-room.quiet .sh-val b { color: var(--text-2); }

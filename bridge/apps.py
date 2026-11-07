@@ -30,7 +30,7 @@ APPS = [
     {"id": "disney-plus", "name": "Disney+", "package": "com.disney.disneyplus", "colour": "#113CCF",
      "jw": ["disneyplus"], "deeplink": "jw"},
     {"id": "prime-video", "name": "Prime Video", "package": "com.amazon.amazonvideo.livingroom",
-     "colour": "#00A8E1", "jw": ["amazonprimevideo", "amazon"], "deeplink": "jw"},
+     "colour": "#00A8E1", "jw": ["amazonprimevideo", "amazonprime", "amazonprimevideowithads", "amazon"], "deeplink": "jw"},
     {"id": "apple-tv", "name": "Apple TV", "package": "com.apple.atve.androidtv.appletv", "colour": "#111111",
      "jw": ["appletvplus", "itunes"], "deeplink": "jw"},
     {"id": "paramount-plus", "name": "Paramount+", "package": "com.cbs.ca", "colour": "#0064FF",
