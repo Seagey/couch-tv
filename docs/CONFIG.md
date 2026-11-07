@@ -53,7 +53,7 @@ The round buttons at the top right of the home. Any of these, in the order you l
 | `sleep` | Sleep timer: 15, 30, 60 or 90 minutes, then the TV turns off. | The bridge |
 | `picture` | Flips between the TV's two picture modes in `picture.modes`. | The bridge, ADB, and a `picture` entry |
 | `look` | Flips the home between the Night scenes and the Classic look. This TV remembers the choice. | Nothing |
-| `input` | Opens the TV's input list (HDMI, a games console, a set top box). With the bridge it presses the TV's Input key (`KEYCODE_TV_INPUT`); with no bridge the launcher opens the TV's own input screen if it has one. | The bridge, or a TV with an input screen |
+| `input` | couch-tv's own Input menu: the HDMI ports and other inputs Android lists for the TV, by the TV's own names (ARC or eARC shows where the TV's label says so; Android has no public way to read it), with the devices HDMI-CEC found behind each, then Bluetooth and Network. OK switches straight to that input. A TV that lists no inputs keeps today's behaviour: with the bridge it presses the TV's Input key (`KEYCODE_TV_INPUT`); with no bridge the launcher opens the TV's own input screen if it has one. | The TV home launcher, the bridge, or a TV with an input screen |
 
 A button that cannot work right now is left out, the same way the sleep timer always disappeared
 when the computer was off. With no bridge at all (option A), only `look` shows, plus `input` on

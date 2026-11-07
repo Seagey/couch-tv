@@ -98,7 +98,11 @@ WEBOS = {
     "youtube": {"ids": ["youtube.leanback.v4"]},
     "prime-video": {"ids": ["amazon"], "names": ["Amazon Prime Video", "Prime Video"]},
     "disney-plus": {"ids": ["com.disney.disneyplus-prod"]},
-    "apple-tv": {"ids": [], "names": ["Apple TV", "Apple TV+"]},
+    # Apple TV, HBO Max and Spotify: ids seen on a real LG OLED C1, webOS 6.5.3 (#28). Spotify's title
+    # there is "Spotify – Música y podcasts", so a name would miss it.
+    "apple-tv": {"ids": ["com.apple.appletv"], "names": ["Apple TV", "Apple TV+"]},
+    "hbo-max": {"ids": ["com.wbd.stream"]},
+    "spotify": {"ids": ["spotify-beehive"]},
     "abc-iview": {"ids": [], "names": ["ABC iview", "iview"]},
     "sbs-on-demand": {"ids": [], "names": ["SBS On Demand"]},
     "settings": {"ids": ["com.palm.app.settings"]},

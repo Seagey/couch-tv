@@ -10,6 +10,9 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.media.tv.TvContract
+import android.media.tv.TvInputInfo
+import android.media.tv.TvInputManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -537,10 +540,69 @@ class MainActivity : Activity() {
         // The TV's own input list (HDMI and the rest), for the Input quick button when there is no
         // bridge to press the TV_INPUT key. Only where the TV has a screen for it.
         @JavascriptInterface
-        fun canOpenInputs(): Boolean = inputsIntent() != null
+        fun canOpenInputs(): Boolean = inputsIntent() != null || passthroughInputs().isNotEmpty()
 
         @JavascriptInterface
         fun openInputs(): Boolean = inputsIntent()?.let { start(it) } ?: false
+
+        /**
+         * The TV's own inputs for couch-tv's Input menu (#30): every HDMI port and other passthrough
+         * input Android lists, with the TV's own name for it (a renamed port, or "HDMI 3 (eARC)" where
+         * the maker labels it so) and, behind it, the devices HDMI-CEC found (a console's name). Android
+         * has no public way to read ARC or eARC, so that shows only where the TV's own label says it.
+         * JSON: [{id, label, type, devices: [..]}]. An empty list means the TV lists none.
+         */
+        @JavascriptInterface
+        fun tvInputs(): String {
+            val out = JSONArray()
+            val all = passthroughInputs()
+            val ports = all.filter { it.parentId == null }
+            for (p in ports) {
+                val devices = JSONArray()
+                all.filter { it.parentId == p.id }.forEach { c -> inputLabel(c)?.let { devices.put(it) } }
+                out.put(JSONObject().apply {
+                    put("id", p.id)
+                    put("label", inputLabel(p) ?: "")
+                    put("type", when (p.type) {
+                        TvInputInfo.TYPE_HDMI -> "hdmi"
+                        TvInputInfo.TYPE_COMPONENT -> "component"
+                        TvInputInfo.TYPE_COMPOSITE -> "composite"
+                        TvInputInfo.TYPE_DISPLAY_PORT -> "displayport"
+                        TvInputInfo.TYPE_VGA -> "vga"
+                        TvInputInfo.TYPE_SVIDEO -> "svideo"
+                        TvInputInfo.TYPE_SCART -> "scart"
+                        TvInputInfo.TYPE_DVI -> "dvi"
+                        else -> "other"
+                    })
+                    put("devices", devices)
+                })
+            }
+            return out.toString()
+        }
+
+        /**
+         * Switch the TV to one input: Android's passthrough channel for it, which the TV's own input
+         * app plays. If nothing on this TV takes that, its input list screen instead (false: neither).
+         */
+        @JavascriptInterface
+        fun openInput(id: String): Boolean {
+            if (id.isBlank()) return false
+            val view = Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(id))
+            if (packageManager.resolveActivity(view, 0) != null) return start(view)
+            return inputsIntent()?.let { start(it) } ?: false
+        }
+
+        /** The TV's Bluetooth or network settings, for the Input menu (falls back to all Settings). */
+        @JavascriptInterface
+        fun openSettingsScreen(which: String): Boolean {
+            val actions = when (which) {
+                "bluetooth" -> listOf(Settings.ACTION_BLUETOOTH_SETTINGS)
+                "network" -> listOf(Settings.ACTION_WIFI_SETTINGS, Settings.ACTION_WIRELESS_SETTINGS)
+                else -> emptyList()
+            } + Settings.ACTION_SETTINGS
+            val i = actions.asSequence().map { Intent(it) }.firstOrNull { packageManager.resolveActivity(it, 0) != null }
+            return i?.let { start(it) } ?: false
+        }
 
         // The saved copy has its own web storage, so the page keeps what it needs offline here.
         @JavascriptInterface
@@ -654,6 +716,21 @@ class MainActivity : Activity() {
     private fun inputsIntent(): Intent? = INPUT_ACTIONS.asSequence()
         .map { Intent(it) }
         .firstOrNull { packageManager.resolveActivity(it, 0) != null }
+
+    /** HDMI and the other passthrough inputs Android lists, minus any the TV's owner hid. */
+    private fun passthroughInputs(): List<TvInputInfo> = try {
+        val tim = getSystemService(TV_INPUT_SERVICE) as? TvInputManager
+        tim?.tvInputList.orEmpty().filter { it.isPassthroughInput && !it.isHidden(this) }
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    /** The name the TV gives an input: the one its owner set, else the TV's own. */
+    private fun inputLabel(i: TvInputInfo): String? = try {
+        (i.loadCustomLabel(this) ?: i.loadLabel(this))?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+    } catch (e: Exception) {
+        null
+    }
 
     @Volatile private var appCache: List<Pair<ResolveInfo, String>>? = null
 

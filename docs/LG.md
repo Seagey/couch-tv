@@ -19,7 +19,7 @@ It needs a computer at home that stays on (option B). Without one you can still 
 and open it from LG's app row, but nothing opens it for you, and nothing extends Developer Mode,
 so the app is removed when the session runs out.
 
-## Test status: one real LG so far
+## Test status: two real LGs so far
 
 **First real LG, 2 November 2026** ([issue #8](https://github.com/Seagey/couch-tv/issues/8)): an
 LG UHD TV on webOS 5.6.2 (2020/2021 firmware), Developer Mode with the Homebrew Channel, the bridge
@@ -28,6 +28,16 @@ straight away, and the weather, clock, dock, a custom dock tile and a translatio
 three things, all fixed now: the packer (step 3), the app row before the remote is accepted
 (Limits), and soft backgrounds on a 4K panel (a 4K screen now gets 3840x2160 copies of the built-in
 scenes and photos).
+
+**Second real LG, 7 November 2026** ([issue #28](https://github.com/Seagey/couch-tv/issues/28)): an
+LG OLED55C1 (2021) on webOS 6.5.3, set up from Windows 11 with no bridge, the app opened from LG's
+app row. The Python packer built an .ipk that installed first time; the clock, the five scenes, the
+weather, Spanish from the TV's language, accepting the remote and opening apps from the dock all
+worked. The dock was empty: webOS 6.5.3 also refuses the app list to a Developer Mode app, and with
+no bridge there is nothing else to read it from. It also gave three more app ids (Apple TV, HBO Max,
+Spotify, now in `bridge/apps.py`) and these, which show by their own names: Jellyfin
+`org.jellyfin.webos`, DGO `com.directvgo.webostv-rt`, Win Play `com.toolboxott.winplay`, Claro Video
+`clarovideo.dla.1`.
 
 Everything else was built from LG's documentation and the open source libraries that talk to LG
 TVs, and tested against a stand-in TV on a computer. If you run it on another LG, thank you: please
@@ -230,11 +240,12 @@ the phone says so and you use the TV's remote.
   10 restarts with no network, a firmware update), couch-tv is removed: switch Developer Mode on
   again and rerun steps 2 and 4. Your settings live on the bridge, so nothing is lost.
 - App ids differ between TVs and years. The ones in `bridge/apps.py` (`WEBOS`) come from public
-  lists, not a real LG, and every other app is found by its name. If an app does not open, find
+  lists and the two real LGs above, and every other app is found by its name. If an app does not open, find
   its id: `ares-install --device lounge --list`, and add it to that app's `ids`.
 - couch-tv on LG reads its app list from the TV when webOS allows it, else from the bridge. Some
-  firmware does not allow it (webOS 5.6.2 returns nothing), so there the app row stays empty until
-  the bridge is on **and** the TV has accepted the remote (step 6).
+  firmware does not allow it (webOS 5.6.2 and 6.5.3 both refuse it), so there the app row stays empty
+  until the bridge is on **and** the TV has accepted the remote (step 6). With no bridge at all the
+  dock stays empty on those TVs for now; an app list built into the package is on the way (#28).
 - No screenshots, no "what is playing", no profile picking, no pressing Play inside other apps.
 
 ## Undo
