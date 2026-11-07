@@ -21,7 +21,7 @@ function Poster({ show, sub, onPlay, dim }) {
   );
 }
 
-export function Watch({ pull, people, who, recs, cont: contIn, apps, screens, serviceName, onPlay, onLaunch, onScreen, wide }) {
+export function Watch({ pull, people, who, recs, cont: contIn, apps, hidden, screens, serviceName, onPlay, onLaunch, onScreen, wide }) {
   const cont = contIn || [];
   const picks = (recs?.picks || []).filter((s) => s.playable !== false);
   const ready = (screens || []).filter((s) => s.ready);
@@ -46,7 +46,7 @@ export function Watch({ pull, people, who, recs, cont: contIn, apps, screens, se
         {apps === null && <p className="empty">{t('loading')}</p>}
         {apps === false && <p className="empty">{t('couldnt_load_apps')}</p>}
         <div className="apps">
-          {(apps || []).filter((a) => a.installed !== false && !['settings', 'home', 'moonlight'].includes(a.id)).map((a) => (
+          {(apps || []).filter((a) => a.installed !== false && !['settings', 'home', 'moonlight'].includes(a.id) && !(hidden || []).includes(a.package)).map((a) => (
             <button key={a.id} className="app-tile" style={{ '--tile': a.colour || '#3a3a3c' }} onClick={() => { tick(); onLaunch(a); }}>
               <span className="app-icon">{logoFor(a) ? <img src={logoFor(a)} alt="" /> : <span className="app-icon-name">{a.name}</span>}</span>
               <span className="app-label">{SHORT[a.id] || a.name}</span>
