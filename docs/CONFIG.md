@@ -153,6 +153,8 @@ Home settings saves to the same `bridge/data/people.json` the phone uses.
 | `clock` [the language's usual clock: `24h` in Italian and German, `12h` in the others] | `12h` (5:30 pm) or `24h` (17:30). |
 | `hide_packages` [none] | Android package names never shown on the home or in More apps, for a maker's own clutter (help apps, file browsers, screen sharing tools). `survey-tv.py` lists every TV app with its package name. For example `["com.example.tvhelp"]`. |
 | `updates` [none: the TV asks once] | The answer to "tell you when a new couch-tv version is out?", asked at setup: `notify` (the TV home looks on GitHub once a week and puts a dot on the gear tile) or `manual` (nothing by itself; Home settings, Updates, Check for updates now). Used only until the TV has an answer; after that the switch in Home settings, Updates wins. Option C has no updates. |
+| `glass` [`off`] | Glass panels behind the clock, Keep watching and the apps: `on` (clear, softly blurred, with a light edge), `lite` (the same panels with no blur, for older or slower TVs) or `off`. Home settings, Look, Glass panels wins over it. |
+| `video_url` [none] | A looping, muted video background in place of the photo, in both looks: the address of an MP4 (`https://...`, or `http://` for a computer at home). Given here it is on; Home settings, Look switches it off or changes the link. The photo stays if the clip does not play. |
 | `dock_size` [10] | How many apps sit in the Night dock before Settings and More apps. 1 to 10. Everything else is behind More apps. The phone's Arrange apps keeps to the same number. |
 | `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish), `it` (Italian) or `de` (German). The phone remote has its own choice, "Same as the TV" by default. |
 
@@ -286,7 +288,8 @@ card is drawn by the app itself, so it cannot be previewed in a browser.
 The gear tile in the dock (Settings) opens a small menu: **Home settings** (couch-tv's own) or
 **TV settings** (Android's). Home settings changes, with the TV remote alone: the language, the
 weather's place (a town search), weather on or off, °C or °F and how often it is checked, the look,
-which scenes take turns and in what order, how long each stays, the clock, your own photos, the
+which scenes take turns and in what order, how long each stays, the clock, glass panels, a video
+background, your own photos, the
 apps (home, More apps or hidden, and their order), the people, and the quick buttons. README,
 "Settings on the TV", says how to use it. Its **Updates** section (the TV home app only) looks for
 new couch-tv releases on GitHub, once a week if the household said yes, or when asked, and installs

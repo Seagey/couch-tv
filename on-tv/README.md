@@ -166,7 +166,7 @@ Ported from the Fire TV work in [dlandman27's fork](https://github.com/dlandman2
 to them.
 
 The home's gear tile opens **Home settings** here too (language, weather place and units, look,
-scenes, apps, people, quick buttons; README, "Settings on the TV"). They are kept in this app
+scenes, glass panels, a video background, apps, people, quick buttons; README, "Settings on the TV"). They are kept in this app
 (`/api/settings`, next to the setup page's own settings), and the people list is the same one the
 setup page edits. One difference: this app has no file picker, so your own photos come from a web
 address.

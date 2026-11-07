@@ -1197,6 +1197,13 @@ def clean_settings(s):
         out["wx_every"] = s["wx_every"]
     if s.get("look") in ("night", "classic"):
         out["look"] = s["look"]
+    if s.get("glass") in ("off", "on", "lite"):
+        out["glass"] = s["glass"]
+    if isinstance(s.get("video"), bool):
+        out["video"] = s["video"]
+    # "" means the video link was removed on the TV (it then wins over home.video_url)
+    if isinstance(s.get("video_url"), str) and (s["video_url"] == "" or (re.match(r"https?://", s["video_url"]) and len(s["video_url"]) <= 2000)):
+        out["video_url"] = s["video_url"]
     for k in ("scene_order", "scenes_off"):
         ids = _ids(s.get(k))
         if ids is not None:

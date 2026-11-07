@@ -11,6 +11,7 @@
 //   scenes=fog,dawn     home.scenes     secs=8      home.scene_seconds
 //   myscenes=[...]      home.my_scenes, as JSON (docs/MAKE-A-SCENE.md), for your own scenes
 //   lang=it             home.language (en, es, es-MX, it, de); without it, the browser's own language
+//   glass=on            home.glass (on, lite: no blur)      video=<link>   home.video_url, an MP4
 //   newapp=1            an app turns up that this TV has not seen before (the New dot)
 //   down                the bridge is not answering      offline=1   the saved copy, no bridge at all
 //   reset=1             forget everything this preview saved (orders, people, the look, Home settings)
@@ -49,6 +50,8 @@
   if (arg("scenes")) cfg.home.scenes = arg("scenes").split(",");
   if (arg("secs")) cfg.home.scene_seconds = parseInt(arg("secs"), 10);
   if (arg("myscenes")) try { cfg.home.my_scenes = JSON.parse(arg("myscenes")); } catch (e) {}
+  if (arg("glass")) cfg.home.glass = arg("glass");
+  if (arg("video")) cfg.home.video_url = arg("video");
   window.COUCH_CONFIG = cfg;
 
   // ---------- the launcher's updater (Updater.kt), for ?update= ----------

@@ -128,6 +128,7 @@ class MainActivity : Activity() {
     override fun onPause() {
         super.onPause()
         resumed = false
+        js("window.tv && tv.pause && tv.pause()")   // the video background stops while an app is in front
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {

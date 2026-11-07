@@ -154,7 +154,8 @@ and then closes. What you change shows when the list closes.
 - **Weather:** show or hide it, °C or °F, check every 15, 30 or 60 minutes. Open-Meteo is the only
   weather provider for now.
 - **Look and scenes:** Night scenes or Classic; which scenes take turns, in what order, how many
-  seconds each; a 12 or 24 hour clock; your own photos (below).
+  seconds each; a 12 or 24 hour clock; glass panels and a video background (below); your own
+  photos (below).
 - **Apps:** every app on the TV. OK moves it between home, More apps and hidden; hold OK to change
   the order. The same order as holding OK on the dock and the phone's Arrange apps.
 - **People:** add, rename, remove and reorder who is watching.
@@ -178,9 +179,18 @@ and copies the photos you choose into the app (turned the right way up and sized
 Many Android TV and Google TV builds have no file picker; then the list says so and you add a photo
 from a web address instead (a JPEG or PNG on the internet, which the TV loads each time). The on-TV
 app (option C) only takes web addresses. Your photos take turns with the scenes and replace the
-Classic look's own. Videos are not supported: a looping video under the glass clock and the
-blurred dock is heavy work for a small TV stick, and the clock's frosted fill is cut from a still
-photo.
+Classic look's own.
+
+**Glass panels and a video background (optional, both off to start).** Under Look, **Glass
+panels** puts clear, softly blurred panels with a light edge behind the clock, Keep watching and
+the apps, so the background shows through. Blur is heavy work for an older TV, so **On, no blur**
+keeps the panels and their edges without it; a TV that cannot blur at all gets that by itself.
+**Video background** plays a short clip that loops, muted, in place of the photo, in both looks:
+**Video link** takes the address of an MP4 on the web or on a computer at home, and the switch
+turns it off again without losing the link. The photo stays until the clip plays, and comes back if
+it will not play. The video stops while an app is in front. Over a video, the Night clock is
+frosted white instead of cut from the photo. Both are heavier than the plain home, so on a small
+TV stick switch them off if the home feels slow. Thanks alonmustafa (#22).
 
 **Smart home (optional).** If you already run Home Assistant, the home can show your air
 conditioning (each room's temperature, warmer, cooler, on, off and mode), your scenes and scripts

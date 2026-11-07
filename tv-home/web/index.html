@@ -10,6 +10,9 @@
 <body>
 <div class="bg" id="bg" aria-hidden="true"></div>
 <!-- Night look only: five scenes that take turns (photo, glass clock, the cut-out in front), built by app.js -->
+<!-- the video background, when one is set (Home settings, Look): app.js starts it, app.css shows it
+     once it plays. Over the photo, under the scenes' clocks (their photos step aside for it). -->
+<video class="bgvid" id="bgvid" muted loop playsinline preload="none" aria-hidden="true"></video>
 <div class="scenes" id="scenes" aria-hidden="true"></div>
 <div class="scrim" aria-hidden="true"></div>
 
