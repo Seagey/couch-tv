@@ -1,5 +1,5 @@
 // The phone remote's words in English, Spanish (es), Mexican Spanish (es-MX, only where Mexico
-// says it differently) and Italian (it). The choice is per phone (TV menu, Language): "Same as the
+// says it differently), Italian (it) and German (de). The choice is per phone (TV menu, Language): "Same as the
 // TV" follows the TV home's Home settings, read from the bridge (/api/settings). The same languages
 // as tv-home/web/i18n.js. Messages that come from the bridge itself (errors, notes) stay in English.
 import { useEffect, useState } from 'react';
@@ -9,6 +9,7 @@ export const LANGS = [
   { id: 'es', name: 'Español', locale: 'es-ES' },
   { id: 'es-MX', name: 'Español (México)', locale: 'es-MX', base: 'es' },
   { id: 'it', name: 'Italiano', locale: 'it-IT' },
+  { id: 'de', name: 'Deutsch', locale: 'de-DE' },
 ];
 
 const S = {};
@@ -478,6 +479,145 @@ S.it = {
   reload: 'Ricarica il telecomando',
 };
 
+S.de = {
+  both: 'Beide',
+  whos_watching: 'Wer schaut gerade',
+  whos_watching_change: 'Wer schaut gerade: {name}. Ändern',
+  not_connected: 'Nicht verbunden',
+  connecting: 'Verbinde…',
+  tv_not_connected: 'Fernseher nicht verbunden',
+  waking: 'Wird geweckt…',
+  off: 'Aus',
+  home: 'Home',
+  on: 'An',
+  tv: 'TV',
+  more_controls: 'Weitere Tasten',
+  turn_off: 'Fernseher ausschalten',
+  turn_on: 'Fernseher einschalten',
+  just_started: 'Gerade angefangen',
+  min_in: 'seit {n} Min.',
+  st_playing: 'Läuft',
+  st_paused: 'Pausiert',
+  st_buffering: 'Lädt',
+  st_stopped: 'Gestoppt',
+  on_app: ' auf {app}',
+  about_left: 'noch etwa {n} Min.',
+  min_left: 'noch {n} Min.',
+  season: 'Staffel {n}',
+  episode: 'Folge {n}',
+  app_open: '{app} ist geöffnet',
+  now_on_tv: 'Jetzt im Fernsehen',
+  tap_middle: 'Zum Auswählen in die Mitte tippen',
+  not_set_up_tv: 'Der Fernseher {name} ist noch nicht eingerichtet.',
+  not_set_up_tv_more: 'Er muss einmal direkt am Fernseher eingerichtet werden.',
+  use_living_room: 'Den Fernseher im Wohnzimmer nehmen',
+  cant_reach: 'Der Fernseher ist nicht erreichbar.',
+  home_wifi: 'Ist dein Handy im WLAN zu Hause?',
+  try_again: 'Noch einmal versuchen',
+  waking_tv: 'Fernseher wird geweckt…',
+  turn_on_tv: 'Fernseher einschalten',
+  back: 'Zurück',
+  play_pause: 'Wiedergabe oder Pause',
+  pause: 'Pause',
+  play: 'Wiedergabe',
+  volume: 'Lautstärke',
+  muted: 'Stumm',
+  ask_for_show: 'Nach einer Sendung fragen',
+  remote: 'Fernbedienung',
+  watch: 'Schauen',
+  this_tv: 'Fernseher {name}',
+  this: 'hier',
+  // toasts
+  cant_tell_who: 'Konnte dem Fernseher nicht sagen, wer schaut',
+  didnt_wake: 'Er ist nicht aufgewacht. Schalte ihn mit der Fernbedienung des Fernsehers ein.',
+  still_cant_reach: 'Der Fernseher ist immer noch nicht erreichbar',
+  not_on_tv: '{title} läuft auf {service}, und das hat dieser Fernseher nicht.',
+  starting: '{title} wird gestartet…',
+  is_on: '{title} läuft',
+  opened: '{app} geöffnet',
+  opening: '{app} wird geöffnet',
+  not_set_up: 'Noch nicht eingerichtet',
+  sleep_needs_update: 'Der Sleep-Timer braucht das nächste Bridge-Update.',
+  sleep_set: 'Sleep-Timer: {n} Minuten',
+  sleep_off: 'Sleep-Timer aus',
+  picture_now: 'Bild: {mode}',
+  sent_to_tv: 'An den Fernseher gesendet',
+  // Watch
+  keep_watching: 'Weiterschauen',
+  couldnt_load: 'Das ließ sich gerade nicht laden.',
+  shows_wait: 'Sendungen, die du am Fernseher schaust, warten hier.',
+  loading: 'Lädt…',
+  apps: 'Apps',
+  couldnt_load_apps: 'Die Apps ließen sich gerade nicht laden. Öffne Schauen gleich noch einmal.',
+  ideas_tonight: 'Ideen für heute Abend',
+  suggest: 'Etwas vorschlagen',
+  suggest_sub: 'Ein paar Sendungen für heute Abend, passend zu dem, was du schaust',
+  no_ideas: 'Noch keine Ideen. Versuch es mit Nach einer Sendung fragen.',
+  couldnt_load_ideas: 'Die Ideen ließen sich gerade nicht laden.',
+  screens: 'Bildschirme',
+  screen_sub: 'Erscheint nur am Fernseher, wenn du es öffnest',
+  // the TV menu
+  close: 'Schließen',
+  which_tv: 'Welcher Fernseher',
+  not_set_up_short: ' (nicht eingerichtet)',
+  picture: 'Bild',
+  picture_later: 'Der Bildmodus funktioniert, sobald dieser Fernseher eingerichtet ist.',
+  sleep_timer: 'Sleep-Timer',
+  n_min: '{n} Min.',
+  sleep_chip_off: 'Aus',
+  turns_off_at: 'Der Fernseher geht um {time} aus ({n} Min.).',
+  sleep_note: 'Schaltet den Fernseher für dich aus, auch wenn dein Handy gesperrt ist.',
+  type_on_tv: 'Am Fernseher tippen',
+  type_placeholder: 'Für ein Suchfeld am Fernseher',
+  send_to_tv: 'An den Fernseher senden',
+  subtitles: 'Untertitel',
+  input: 'Eingang',
+  settings: 'Einstellungen',
+  arrange_apps: 'Apps anordnen',
+  people: 'Personen',
+  language: 'Sprache',
+  same_as_tv: 'Wie der Fernseher',
+  language_note: 'Nur für dieses Handy. Der Fernseher wählt seine eigene in den Startbildschirm-Einstellungen (das Zahnrad auf dem Startbildschirm).',
+  // Ask
+  new_chat: 'Neuer Chat',
+  finding: 'Claude sucht es heraus',
+  usually: 'Meist 5 bis 20 Sekunden.',
+  carries_on: 'Es läuft von allein weiter. Schau auf den Fernseher.',
+  idea_keep: '{title} weiterschauen',
+  idea_bluey: 'Bluey anmachen',
+  idea_tonight: 'Empfiehl mir etwas für heute Abend',
+  idea_funny: 'Etwas Lustiges, unter einer Stunde',
+  idea_new: 'Was ist neu auf Netflix?',
+  reply: 'Antworten…',
+  put_on: 'Was möchtest du schauen?',
+  sending_in: 'Wird in {n} s gesendet',
+  keep_editing: 'Weiter bearbeiten',
+  talk_tip: 'Tippe auf das Mikrofon deiner Tastatur und sprich.',
+  talk_tip_more: 'Es wird von allein gesendet, wenn du aufhörst.',
+  cant_reach_wifi: 'Der Fernseher ist nicht erreichbar. Ist dein Handy im WLAN zu Hause?',
+  // Arrange apps and People
+  arrange_lede: 'Zieh eine App an ihrem Griff. Apps über der Linie sind im Dock des Fernsehers (bis zu {max}); der Rest liegt unter Weitere Apps. Einstellungen ist immer zuletzt.',
+  loading_apps: 'Die Apps des Fernsehers werden geladen…',
+  no_apps_yet: 'Dieser Fernseher hat der Bridge seine Apps noch nicht gemeldet. Drück am Fernseher auf Home und öffne das hier dann noch einmal.',
+  more_apps: 'Weitere Apps',
+  dock_full: 'Ins Dock passen {max} Apps, deshalb sind die darunter zu Weitere Apps gewandert.',
+  saved_home: 'Gespeichert. Drück am Fernseher auf Home, um es zu sehen.',
+  people_lede: 'In der Reihenfolge, in der der Fernseher sie zeigt. Zieh am Griff, um jemanden zu verschieben, tipp auf einen Namen, um ihn zu ändern.',
+  nobody: 'Noch niemand. Der Fernseher zeigt alles, bis du jemanden hinzufügst.',
+  removed: '{name} entfernt. Der Verlauf bleibt auf der Bridge.',
+  added: '{name} hinzugefügt.',
+  add_person: 'Person hinzufügen',
+  // first open
+  whos_phone: 'Wem gehört dieses Handy?',
+  onboard_note: '„Weiterschauen“ und Vorschläge richten sich danach, wer gerade schaut. Du kannst oben jederzeit wechseln.',
+  home_screen: 'Leg es auf deinen Home-Bildschirm',
+  home_screen_how: 'Tippe in Safari auf Teilen {icon}, dann auf {add}.',
+  add_to_home: 'Zum Home-Bildschirm',
+  snag: 'Die Fernbedienung hatte ein Problem.',
+  snag_note: 'Am Fernseher hat sich nichts geändert.',
+  reload: 'Fernbedienung neu laden',
+};
+
 const KEY = 'tv.lang';          // this phone's choice: 'auto' (same as the TV) or a language
 const TV_KEY = 'tv.lang.tv';    // the TV's language, last read from the bridge
 const read = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -488,6 +628,7 @@ function guess() {
   const n = (typeof navigator !== 'undefined' && navigator.language) || 'en';
   if (/^es-MX/i.test(n)) return 'es-MX';
   if (/^it/i.test(n)) return 'it';
+  if (/^de/i.test(n)) return 'de';
   return /^es/i.test(n) ? 'es' : 'en';
 }
 function resolve() {

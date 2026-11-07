@@ -248,6 +248,7 @@ object Doorbell {
         return when {
             lang.startsWith("es") -> "Timbre" to "Hay alguien en la puerta"
             lang.startsWith("it") -> "Campanello" to "C'è qualcuno alla porta"
+            lang.startsWith("de") -> "Türklingel" to "Jemand ist an der Tür"
             else -> "Doorbell" to "Someone is at the door"
         }
     }
