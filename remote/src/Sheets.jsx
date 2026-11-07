@@ -437,6 +437,7 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
           <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={t('type_placeholder')} enterKeyHint="send" aria-label="Text to type on the TV" />
           <button type="submit" className="round solid small" aria-label={t('send_to_tv')} disabled={!typed.trim()}><Ic.Send size={18} /></button>
         </form>
+        <p className="note">{t('type_note')}</p>
       </section>
 
       <div className="more-grid">
