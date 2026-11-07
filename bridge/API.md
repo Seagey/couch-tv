@@ -36,8 +36,9 @@ The bridge can run more than one TV. Every endpoint takes an optional TV id:
 - Leave it out and you get the default TV (`default_tv` in `config.json`). Nothing changes for clients
   that never send it.
 - TV ids are the `id` values in the `tvs` list in `config.json`. A TV that is not paired gives `503` "not paired yet".
-- `/api/events?tv=<id>` streams that TV. `who`, watch history, keep watching and picks are
-  shared by the household, not per TV; `playing`, `sleep` and `power` are per TV.
+- `/api/events?tv=<id>` streams that TV. `who` (the person on that TV's couch), keep watching,
+  `playing`, `sleep` and `power` are per TV; the watch history file and the picks are shared by
+  the household.
 
 ### `GET /api/tvs`
 ```json
@@ -120,12 +121,12 @@ Who is on the couch right now. The TV home and the phone send it when someone sw
 ```json
 {"ok": true, "who": "person2"}
 ```
-- It is also in `/api/now` and the events stream as `who` (`null` until someone sets it).
+- Each TV keeps its own (`?tv=` or `"tv"` in the body); the TV home sends its person when it
+  starts. It is also in `/api/now` and the events stream as `who` (`null` until someone sets it).
 - It is used whenever a request has no `who` of its own: `/api/play`, `/api/ask`,
   `/api/continue/open`, and shows started by hand on the TV (logged from the app's own
-  "now playing"). So once a person is set, what they start lands in their keep watching.
-- `both` still means everyone: `GET /api/continue?who=both` shows everything.
-- Plays logged before this existed, or with nobody set, count as shared (they show for both).
+  "now playing"). So once a person is set, what they start on that TV lands in their keep watching.
+- `both` is the household with no people set up: its own row, like a person.
 
 ### `GET /api/people` and `POST /api/people`
 The people (profiles), in the order the TV and the phone show them. Any number, up to 12, and none
@@ -335,12 +336,13 @@ Claude's picks plus continue watching. Optional `?who=person1`. Fast: it returns
 `title` (and `service` if you have it).
 
 ### `GET /api/continue`
-"Keep watching": the shows to carry on with, newest first. Optional `?who=`.
+"Keep watching" for one TV (`?tv=`) and one person (`?who=`, else the person on that TV's couch):
+one card per show (its latest episode), newest first, at most 10, nothing older than 30 days.
 ```json
 {
   "ok": true,
   "items": [
-    {"id": "h-0", "title": "Bluey", "episode_title": "Hammerbarn", "season": 3, "episode": 4,
+    {"id": "3f2a9c1e0b7d4a55", "title": "Bluey", "episode_title": "Hammerbarn", "season": 3, "episode": 4,
      "app": {"id": "abc-iview", "name": "ABC iview", "package": "au.net.abc.iview"},
      "service": "abc-iview", "poster": "https://...jpg", "backdrop": "https://...jpg",
      "progress": null, "kind": "continue", "last_played": "2030-01-01T19:31:00Z",
@@ -350,11 +352,15 @@ Claude's picks plus continue watching. Optional `?who=person1`. Fast: it returns
 ```
 - Built from the bridge's own history: everything played through `/api/play`, plus what any app
   reported as playing when started by hand (see `playing` above). So it covers every app that
-  reports its title, not only the ones we opened.
+  reports its title, not only the ones we opened. A title counts after a minute of the same title
+  playing (and the app's own position past a minute), so autoplay previews stay out; a title that
+  is only the app's own name ("PrimeVideo") never counts. History from before 0.9 has no TV and no
+  person on it and is not listed; imported history feeds the picks, not this row.
 - Android's own Watch Next list (what Google's home shows) is not readable on this TV: it needs a
   system permission that ADB does not have. If that ever changes, those rows appear here with
   `"source": "tv"` and a real `progress` (0 to 1). Until then `progress` is `null`.
-- Resume with `POST /api/continue/open {"id": "h-0"}`. It reopens the show in its app; the app
+- Resume with `POST /api/continue/open {"id": "3f2a9c1e0b7d4a55"}`. The id is the history line's
+  own, so it always opens that card's show (and season and episode). It reopens the show in its app; the app
   itself picks up where you left off (Netflix, Stan, iview and the rest remember the position).
   Response is the same as `POST /api/play`.
 
