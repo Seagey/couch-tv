@@ -146,10 +146,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "GET /api/continue" -> json(200, ok().put("items", Now.continueItems(q("who"))))
             "POST /api/continue/open" -> {
                 val b = body(s)
-                val idx = b.optString("id").removePrefix("h-").toIntOrNull() ?: throw ApiError(400, "id is required")
-                val h = Store.history()
-                if (idx !in 0 until h.length()) throw ApiError(404, "not in keep watching")
-                val it = h.getJSONObject(idx)
+                val id = b.optString("id").ifEmpty { throw ApiError(400, "id is required") }
+                val it = Store.historyItem(id) ?: throw ApiError(404, "not in keep watching")
                 json(200, ok(Finder.play(it.getString("title"), it.optInt("season").takeIf { s -> s > 0 }, it.optInt("episode").takeIf { s -> s > 0 },
                     it.optString("service").ifEmpty { null }, b.optString("who").ifEmpty { null }, resume = true)))
             }

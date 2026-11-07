@@ -70,8 +70,31 @@ object Store {
     // ---------- watch history (plays started from the phone, and what apps report) ----------
     @Synchronized fun history(): JSONArray = (readJson("history.json") as? JSONArray) ?: JSONArray()
 
+    @Synchronized fun historyItem(id: String): JSONObject? {
+        val h = history()
+        for (i in 0 until h.length()) h.optJSONObject(i)?.let { if (it.optString("id") == id) return it }
+        return null
+    }
+
+    /** Who is on the couch, kept across restarts (it was only in memory, so after a restart every
+     *  play was logged to nobody). */
+    fun who(): String? = str("who")
+    fun saveWho(v: String?) = putStr("who", v)
+
+    /** Test knobs for the emulator tests only, set with `adb shell setprop`; a TV never has them.
+     *  debug.couchtv.seen_after_s: seconds a title plays before it counts (default 60).
+     *  debug.couchtv.clock_offset_s: moves Keep watching's clock forward, to test the 30 day drop off. */
+    fun testProp(name: String): Long? = runCatching {
+        Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
+            .invoke(null, "debug.couchtv.$name") as String
+    }.getOrNull()?.trim()?.toLongOrNull()
+
+    /** Every new line gets its own id and this TV's id, so a Keep watching card opens the line it
+     *  shows and only lines made since 0.9 (which say who and where) are listed. */
     @Synchronized fun addHistory(item: JSONObject) {
         val old = history()
+        if (!item.has("id")) item.put("id", java.util.UUID.randomUUID().toString().replace("-", "").take(16))
+        if (!item.has("tv")) item.put("tv", TV_ID)
         val out = JSONArray().put(item)
         for (i in 0 until minOf(old.length(), 499)) out.put(old.get(i))
         writeJson("history.json", out)
