@@ -609,9 +609,11 @@ body {
 .has-video .bgvid { opacity: 1; }
 .night .bgvid { filter: brightness(0.72); }
 .has-video .scene .sbg, .has-video .scene .fg { display: none; }
-/* the clock's fill was the scene's own photo: over a video it is frosted white instead */
-.has-video .gclock .fill { background-image: none !important; color: rgba(255, 255, 255, 0.24); }
-.has-video .s-fog .gclock .fill { color: rgba(255, 255, 255, 0.18); filter: none; }
+/* the clock's fill was the scene's own photo: over a video it is frosted white with a soft shadow,
+   so it reads from the couch over a bright sky and a dark night alike */
+.has-video .scene .gclock { filter: drop-shadow(0 0.25rem 1.5rem rgba(0, 0, 0, 0.42)) drop-shadow(0 0 0.1875rem rgba(0, 0, 0, 0.3)); }
+.has-video .gclock .fill { background-image: none !important; color: rgba(255, 255, 255, 0.72); filter: none; opacity: 1; }
+.has-video .s-fog .gclock .fill { color: rgba(255, 255, 255, 0.68); filter: none; opacity: 1; }
 
 /* ================= Glass panels (Home settings, Look, Glass; home.glass) =================
    html.glass: clear, softly blurred panels with a light edge and a highlight along the top, so the
