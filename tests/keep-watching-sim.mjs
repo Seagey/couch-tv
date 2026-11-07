@@ -170,7 +170,7 @@ async function main() {
   const s4 = a.shot('night-row-card5');
   for (let i = 0; i < 6; i++) { a.key('DPAD_RIGHT'); await sleep(600); }
   const s9 = a.shot('night-row-card10');
-  record('Night row screenshots taken (look at them)', true, [s0, s4, s9]);
+  record('Night row screenshots taken (look at them)', true, [s0, s4, s9].map((f) => path.basename(f)));
   a.sh(`am start -n ${ONTV}/.SetupActivity`); await sleep(3000);
   if (turnedOn) await tapText(/^Stop being the home screen$/);
   a.sh('input keyevent KEYCODE_HOME');
