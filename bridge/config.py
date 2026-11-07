@@ -264,6 +264,11 @@ def _home(h):
         out["glass"] = h["glass"]
     if isinstance(h.get("glass_icons"), bool):
         out["glass_icons"] = h["glass_icons"]
+    # how clear the glass is, 1 (frosted) to 5 (very clear), and the Night clock's style
+    if isinstance(h.get("glass_amount"), int) and not isinstance(h.get("glass_amount"), bool) and 1 <= h["glass_amount"] <= 5:
+        out["glass_amount"] = h["glass_amount"]
+    if h.get("clock_style") in ("frosted", "liquid"):
+        out["clock_style"] = h["clock_style"]
     vid = h.get("video_url")
     if isinstance(vid, str) and re.match(r"https?://", vid) and len(vid) <= 2000:
         out["video_url"] = vid

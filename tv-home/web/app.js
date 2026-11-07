@@ -34,6 +34,10 @@
   // Glass panels ("off", "on", or "lite": no blur, for slower TVs) and the video background, from
   // Home settings, then home.glass and home.video_url. Both are off unless someone switches them on.
   var GLASS = "off", GLASS_ICONS = false, VIDEO_ON = false, VIDEO_URL = "";
+  // How clear the glass is, 1 (frosted) to 5 (very clear), and the Night clock's style ("frosted",
+  // the photo's frosted copy, or "liquid", clear glass digits): Home settings, Look, else
+  // home.glass_amount and home.clock_style (#25, #29).
+  var GLASS_AMT = 3, CLOCK_LIQUID = false;
   // Home settings made on this TV with the gear tile (see "home settings" below). They win over
   // config.js. ST is the saved object; the rest are read from it in readConfig().
   var ST = {}, WX_SHOW = true, WX_F = false, WX_EVERY = 30, HIDDEN_TV = [];
@@ -198,6 +202,9 @@
     // glass app icons (#25): set in Home settings, else home.glass_icons; off unless switched on
     GLASS_ICONS = typeof ST.glass_icons === "boolean" ? ST.glass_icons : HOME.glass_icons === true;
     document.documentElement.classList.toggle("glass-icons", GLASS_ICONS);
+    GLASS_AMT = glassAmount();
+    CLOCK_LIQUID = (ST.clock_style || HOME.clock_style) === "liquid";
+    glassClasses();
     // a link set in Home settings wins over home.video_url; one from config.json alone means on
     VIDEO_URL = typeof ST.video_url === "string" ? ST.video_url : typeof HOME.video_url === "string" ? HOME.video_url : "";
     VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true);
@@ -222,6 +229,15 @@
     newApps = kept("tvhome.apps.new") || [];
   }
   function lookSetting() { return ST.look || kept("tvhome.look") || HOME.look || "night"; }
+  function glassAmount() {
+    var n = parseInt(ST.glass_amount != null ? ST.glass_amount : HOME.glass_amount, 10);
+    return n >= 1 && n <= 5 ? n : 3;
+  }
+  function glassClasses() {
+    var r = document.documentElement;
+    for (var i = 1; i <= 5; i++) r.classList.toggle("ga-" + i, GLASS_AMT === i);
+    if (r.classList.contains("clock-liquid") !== CLOCK_LIQUID) { r.classList.toggle("clock-liquid", CLOCK_LIQUID); glassShown = ""; }
+  }
   function glassSetting() { var g = ST.glass || HOME.glass; return g === "on" || g === "lite" ? g : "off"; }
   // no clock in Home settings or config.json: the one usual for the language (24 hour in Italian and German)
   function clock24() { return (ST.clock || HOME.clock || (window.I18N ? window.I18N.clock() : "12h")) === "24h"; }
@@ -510,10 +526,21 @@
     var cs = el.querySelectorAll(".gclock");
     for (var k = 0; k < cs.length; k++) {
       var c = cs[k];
-      c.innerHTML = '<span class="fill">' + hm + '</span><span class="sheen">' + hm + '</span><span class="rim">' + hm + "</span>";
-      var f = c.firstChild;
-      f.style.backgroundImage = s.src ? cssUrl(s.src) : "url(backgrounds/" + s.photo + (s.glass ? "-glass" : "") + ".jpg)";
-      f.style.backgroundPosition = -(c.offsetLeft + f.offsetLeft) + "px " + -(c.offsetTop + f.offsetTop) + "px";
+      c.innerHTML = '<span class="edge">' + hm + '</span><span class="fill">' + hm + '</span><span class="sheen">' + hm + '</span><span class="rim">' + hm + "</span>";
+      var f = c.querySelector(".fill"), ex = c.offsetLeft + f.offsetLeft, ey = c.offsetTop + f.offsetTop;
+      if (CLOCK_LIQUID) {
+        // Liquid glass (#25): the sharp photo seen through the digits, magnified LENS times about
+        // the clock's middle, the way a thick clear glass bends what is behind it. Clear amounts
+        // 1 and 2 use the frosted copy instead, so the glass reads as frosted.
+        var cx = c.offsetLeft + c.offsetWidth / 2, cy = c.offsetTop + c.offsetHeight / 2, LENS = 1.07;
+        var frost = GLASS_AMT <= 2 && s.glass && !s.src;
+        f.style.backgroundImage = s.src ? cssUrl(s.src) : "url(backgrounds/" + s.photo + (frost ? "-glass" : "") + ".jpg)";
+        f.style.backgroundSize = LENS * 100 + "vw " + LENS * 100 + "vh";
+        f.style.backgroundPosition = (-ex - (LENS - 1) * cx) + "px " + (-ey - (LENS - 1) * cy) + "px";
+      } else {
+        f.style.backgroundImage = s.src ? cssUrl(s.src) : "url(backgrounds/" + s.photo + (s.glass ? "-glass" : "") + ".jpg)";
+        f.style.backgroundPosition = -ex + "px " + -ey + "px";
+      }
     }
     if (s.water) {   // above the waterline sharp, below it the blurred reflection
       // The digits hang below the clock's box (its line height is tight), so the clips reach past
@@ -1292,7 +1319,26 @@
     }
     $("grid").innerHTML = gridItems.map(appHTML).join("");
     gridEls = Array.prototype.slice.call($("grid").children);
+    clearIcons();
     renderHint();
+  }
+
+  // Glass app icons, Apple's clear style (#25): each icon's glyph without its background
+  // (clearicon.js), drawn light on the glass tile. The focused app shows its own icon. An icon that
+  // will not split cleanly keeps the grey version (app.css).
+  function clearIcons() {
+    if (!GLASS_ICONS || !window.ClearIcon) return;
+    Array.prototype.forEach.call($("grid").querySelectorAll(".app .face:not(.tool):not(.word) > img"), function (im) {
+      var face = im.parentNode, src = im.getAttribute("src");
+      if (!src || face.querySelector(".glyph")) return;
+      window.ClearIcon.get(src, function (g) {
+        if (!g || !face.parentNode || face.querySelector(".glyph")) return;
+        var gi = document.createElement("img");
+        gi.className = "glyph"; gi.alt = ""; gi.src = g;
+        face.appendChild(gi);
+        face.classList.add("clear");
+      });
+    });
   }
 
   // ---------------- focus ----------------
@@ -1864,8 +1910,22 @@
     } });
     rows.push({ kind: "toggle", key: "glass-icons", label: t("glass_icons"), value: GLASS_ICONS ? t("on") : t("off"), act: function () {
       GLASS_ICONS = !GLASS_ICONS; ST.glass_icons = GLASS_ICONS; saveSettings();
+      document.documentElement.classList.toggle("glass-icons", GLASS_ICONS);   // seen straight away
+      clearIcons();
     } });
-    rows.push(info("glass-note", t("glass_note", { keep: t("keep_watching") }) + " " + t("glass_icons_note")));
+    // how clear, 1 to 5 (#29): left and right on the row, or OK to step; seen straight away
+    var setAmt = function (n) {
+      n = Math.max(1, Math.min(5, n));
+      if (n === GLASS_AMT) return;
+      GLASS_AMT = n; ST.glass_amount = n; glassClasses(); glassShown = ""; saveSettings();
+    };
+    rows.push({ kind: "slider", key: "glass-amount", label: t("glass_amount"), value: t("glass_amt_" + GLASS_AMT), level: GLASS_AMT,
+      adjust: function (dx) { setAmt(GLASS_AMT + dx); }, act: function () { setAmt(GLASS_AMT === 5 ? 1 : GLASS_AMT + 1); } });
+    // the Night clock: frosted (the photo's frosted copy) or liquid glass (#25)
+    rows.push({ kind: "cycle", key: "clock-style", label: t("clock_style"), value: CLOCK_LIQUID ? t("clock_liquid") : t("clock_frosted"), act: function () {
+      CLOCK_LIQUID = !CLOCK_LIQUID; ST.clock_style = CLOCK_LIQUID ? "liquid" : "frosted"; glassClasses(); saveSettings();
+    } });
+    rows.push(info("glass-note", t("glass_note", { keep: t("keep_watching") }) + " " + t("glass_icons_note") + " " + t("glass_amount_note")));
     // the video background: its switch only once there is a link
     rows.push(head(t("video_head")));
     if (VIDEO_URL) {
@@ -2355,6 +2415,9 @@
     } else if (dy) {
       SET.ri = stepRow(rows, SET.ri, dy);
       SET.keyFocus = rows[SET.ri] ? rows[SET.ri].key : null;
+    } else if (dx && rows[SET.ri] && rows[SET.ri].adjust) {
+      rows[SET.ri].adjust(dx);
+      SET.keyFocus = rows[SET.ri].key;
     } else if (dx < 0) leaveRows();
     renderSettings();
   }
@@ -2411,6 +2474,10 @@
     else if (r.kind === "choice") tail = r.checked ? '<i class="smark">' + ICONS.check + "</i>" : "";
     else if (r.kind === "check") tail = '<i class="sbox' + (r.checked ? " on" : "") + '">' + (r.checked ? ICONS.check : "") + "</i>";
     else if (r.kind === "nav" || r.kind === "input") tail = '<i class="smark dim">' + ICONS.chevron + "</i>";
+    else if (r.kind === "slider") {
+      for (var lv = 1; lv <= 5; lv++) tail += '<i class="sstep' + (lv <= r.level ? " on" : "") + '"></i>';
+      tail = '<span class="sslide">' + tail + "</span>";
+    }
     var value = r.value != null && r.value !== "" ? '<span class="sv">' + esc(r.value) + "</span>" : "";
     var sub = r.sub ? "<small>" + esc(r.sub) + "</small>" : "";
     return '<div class="' + cls + '"' + (r.lang ? ' lang="' + esc(r.lang) + '"' : "") + ">" + lead +
@@ -2441,7 +2508,7 @@
     $("set-msg").textContent = SET.msg || "";
     var cur = rows[SET.ri];
     $("set-hint").textContent = SET.typing ? t("hint_typing") : SET.lift ? t("hint_lift") : SET.col === "secs" ? t("hint_secs") :
-      cur && cur.move ? t("hint_rows_move") : t("hint_rows");
+      cur && cur.move ? t("hint_rows_move") : SET.col === "rows" && cur && cur.adjust ? t("hint_slider") : t("hint_rows");
     // keep the focused row well inside the list (a quarter of it from either edge), scrolling only
     // when it gets closer, so short lists and their headings never move
     var f = box.querySelector(".srow.focus");

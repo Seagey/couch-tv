@@ -120,13 +120,19 @@ export default function App() {
   const [askOn, setAskOn] = useState(true);
   // Glass app icons, the same look as the TV home's dock (#25): its Home settings, Look, Glass app
   // icons wins, else home.glass_icons in config.json. Off unless the TV has it on.
-  const glass = useRef({ cfg: false, tv: null });
-  const showGlass = () => document.documentElement.classList.toggle('glass-icons', glass.current.tv ?? glass.current.cfg);
+  // How clear the glass is, 1 to 5, follows the TV the same way (#29).
+  const glass = useRef({ cfg: false, tv: null, amtCfg: 3, amtTv: null });
+  const showGlass = () => {
+    const r = document.documentElement, g = glass.current, amt = g.amtTv ?? g.amtCfg;
+    r.classList.toggle('glass-icons', g.tv ?? g.cfg);
+    for (let i = 1; i <= 5; i++) r.classList.toggle(`ga-${i}`, amt === i);
+  };
+  const amount = (n) => (Number.isInteger(n) && n >= 1 && n <= 5 ? n : null);
   // Apps hidden on the TV (hold OK on an app, Hide from home; or Home settings, Apps) stay hidden here too.
   const [hidden, setHidden] = useState([]);
   // nobody set up: no picker, the remote shows everything
   useEffect(() => { if (!who && people.length === 0) setWho('both'); }, [people]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { api.config().then((c) => { if (Array.isArray(c.people)) setPeople(c.people); if (c.ask && c.ask.enabled === false) setAskOn(false); glass.current.cfg = c.home?.glass_icons === true; showGlass(); }).catch(() => {}); }, []);
+  useEffect(() => { api.config().then((c) => { if (Array.isArray(c.people)) setPeople(c.people); if (c.ask && c.ask.enabled === false) setAskOn(false); glass.current.cfg = c.home?.glass_icons === true; glass.current.amtCfg = amount(c.home?.glass_amount) ?? 3; showGlass(); }).catch(() => {}); }, []);
   const [who, setWhoState] = useState(() => store.get('tv.who'));
   // Which TV this phone drives, remembered per phone. null is the bridge's default (living room).
   const [tvId, setTvIdState] = useState(() => { const id = store.get('tv.tv'); setTvId(id); return id; });
@@ -170,7 +176,8 @@ export default function App() {
   useEffect(() => { api.settings().then((d) => {
     const s = d.settings || {};
     setTvLang(s.lang);
-    glass.current.tv = typeof s.glass_icons === 'boolean' ? s.glass_icons : null; showGlass();
+    glass.current.tv = typeof s.glass_icons === 'boolean' ? s.glass_icons : null;
+    glass.current.amtTv = amount(s.glass_amount); showGlass();
     setHidden(Array.isArray(s.hidden_apps) ? s.hidden_apps : []);
   }).catch(() => {}); }, [reach, tvId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { api.apps().then((d) => setApps(d.apps)).catch(() => setApps((a) => a || false)); api.screens().then((d) => setScreens(d.screens)).catch(() => {}); }, [reach]);

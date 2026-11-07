@@ -315,7 +315,9 @@ class MainActivity : Activity() {
                 val isIcon = u.pathSegments.firstOrNull() == "icon"
                 val img = (if (isIcon) iconImage(pkg) else bannerImage(pkg)) ?: return null
                 return WebResourceResponse(if (isIcon) "image/png" else "image/jpeg", null, ByteArrayInputStream(img)).apply {
-                    responseHeaders = mapOf("Cache-Control" to "max-age=86400")
+                    // CORS: the page cuts each icon's glyph out on a canvas for Glass app icons
+                    // (clearicon.js), and the page is served from another host
+                    responseHeaders = mapOf("Cache-Control" to "max-age=86400", "Access-Control-Allow-Origin" to "*")
                 }
             }
 

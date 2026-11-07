@@ -690,17 +690,73 @@ body {
 .glass:not(.theme-night) .app .face.word { background: var(--glass-solid); }
 }
 
-/* ================= Glass app icons (Home settings, Look, Glass; home.glass_icons) =================
-   After Apple's clear icons (#25): each app's own icon turns grey and half see-through on a frosted
-   glass tile, so the background shows through the dock. The focused (or lifted) app gets its own
-   colours back, so you can always tell what OK will open. Works with Glass panels on or off. */
+/* ================= How clear the glass is (Home settings, Look, How clear; home.glass_amount) =================
+   #29: five steps from frosted to very clear, for the glass panels, the glass app icons and the
+   clocks. Step 3 is the look 0.6 shipped with. Apple's guidance: the clear material keeps a
+   dimming layer under it so what sits on it stays readable, so even step 5 keeps some. */
+:root {
+  --gi-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.06) 45%, rgba(255, 255, 255, 0.12) 100%), rgba(20, 20, 28, 0.22);
+  --gi-blur: blur(1.75rem) saturate(170%);
+  --gi-glyph: 0.92;
+  --gc-op: 1;
+  --lq-fill: 0.85;
+  --lq-rim: 0.8;
+}
+.ga-1 {
+  --gi-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.14) 45%, rgba(255, 255, 255, 0.2) 100%), rgba(24, 24, 32, 0.34);
+  --gi-blur: blur(2.5rem) saturate(160%); --gi-glyph: 0.97; --lq-fill: 0.95; --lq-rim: 0.85;
+}
+.ga-2 {
+  --gi-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.1) 45%, rgba(255, 255, 255, 0.16) 100%), rgba(22, 22, 30, 0.28);
+  --gi-blur: blur(2.125rem) saturate(165%); --gi-glyph: 0.95; --lq-fill: 0.9; --lq-rim: 0.82;
+}
+.ga-4 {
+  --gi-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.035) 45%, rgba(255, 255, 255, 0.08) 100%), rgba(18, 18, 26, 0.16);
+  --gi-blur: blur(1rem) saturate(175%); --gi-glyph: 0.9; --gc-op: 0.8; --lq-fill: 0.7; --lq-rim: 0.75;
+}
+.ga-5 {
+  --gi-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(255, 255, 255, 0.05) 100%), rgba(16, 16, 24, 0.11);
+  --gi-blur: blur(0.375rem) saturate(180%); --gi-glyph: 0.88; --gc-op: 0.6; --lq-fill: 0.55; --lq-rim: 0.7;
+}
+.glass.ga-1 {
+  --glass-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.1) 42%, rgba(255, 255, 255, 0.15) 100%), rgba(22, 22, 30, 0.34);
+  --glass-blur: blur(3.25rem) saturate(170%) brightness(1.06);
+}
+.glass.ga-2 {
+  --glass-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.075) 42%, rgba(255, 255, 255, 0.12) 100%), rgba(22, 22, 30, 0.27);
+  --glass-blur: blur(2.75rem) saturate(178%) brightness(1.06);
+}
+.glass.ga-4 {
+  --glass-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.03) 42%, rgba(255, 255, 255, 0.06) 100%), rgba(22, 22, 30, 0.13);
+  --glass-blur: blur(1.25rem) saturate(190%) brightness(1.05);
+}
+.glass.ga-5 {
+  --glass-tint: linear-gradient(160deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.015) 42%, rgba(255, 255, 255, 0.035) 100%), rgba(22, 22, 30, 0.08);
+  --glass-blur: blur(0.5rem) saturate(195%) brightness(1.04);
+}
+/* the frosted clock: steps 4 and 5 let more of the photo through */
+.theme-night .scene .gclock { opacity: var(--gc-op); }
+
+/* ================= Glass app icons (Home settings, Look, Glass app icons; home.glass_icons) =================
+   Apple's clear icons (#25): the app's symbol in light glass, its own background gone
+   (clearicon.js cuts it out once and keeps it), on a glass tile with a soft dimming layer, a rim
+   of light along the top and a deeper shadow on the focused app. The focused (or lifted) app shows
+   its own icon in colour, so you can always tell what OK will open. An icon that will not split
+   cleanly (a photo) is shown grey and half see-through instead. Works with Glass panels on or off. */
 .glass-icons .app:not(.focus):not(.lifted) .face:not(.tool) {
   /* !important: the Classic look paints each tile in the app's colour inline */
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.06) 45%, rgba(255, 255, 255, 0.12) 100%), rgba(20, 20, 28, 0.22) !important;
-  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.3), inset 0 0.125rem 0.0625rem -0.0625rem rgba(255, 255, 255, 0.65), 0 0.75rem 1.75rem rgba(0, 0, 0, 0.3);
-  -webkit-backdrop-filter: blur(1.75rem) saturate(170%); backdrop-filter: blur(1.75rem) saturate(170%);
+  background: var(--gi-tint) !important;
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.3), inset 0 0.125rem 0.0625rem -0.0625rem rgba(255, 255, 255, 0.7),
+    inset 0 -0.0625rem 0 rgba(255, 255, 255, 0.1), 0 0.75rem 1.75rem rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: var(--gi-blur); backdrop-filter: var(--gi-blur);
 }
-.glass-icons .app:not(.focus):not(.lifted) .face:not(.tool) img {
+.glass-icons .app .face .glyph { display: none; }
+.glass-icons .app:not(.focus):not(.lifted) .face.clear > img:not(.glyph) { display: none; }
+.glass-icons .app:not(.focus):not(.lifted) .face.clear .glyph {
+  display: block; object-fit: contain; opacity: var(--gi-glyph);
+  filter: drop-shadow(0 0.0625rem 0.125rem rgba(0, 0, 0, 0.28)) drop-shadow(0 0 0.375rem rgba(0, 0, 0, 0.12));
+}
+.glass-icons .app:not(.focus):not(.lifted) .face:not(.tool):not(.clear) img {
   filter: grayscale(1) contrast(1.25) brightness(1.1); opacity: 0.55; mix-blend-mode: luminosity;
 }
 .glass-icons .app .face img { transition: filter 0.2s, opacity 0.2s; }
@@ -708,6 +764,43 @@ body {
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
 .glass-icons .app:not(.focus):not(.lifted) .face:not(.tool) { background: rgba(36, 36, 44, 0.55) !important; }
 }
+
+/* ================= Liquid glass clock (Home settings, Look, Clock style; home.clock_style) =================
+   #25: the Night clock as clear glass. Through the digits the sharp photo shows, magnified a
+   little about the clock's middle (app.js, drawClocks), which is how a thick clear glass bends
+   what is behind it; a dark edge just outside the outline and a bright rim give it thickness,
+   and a sheen runs down from the top left. Old WebViews draw the same layers (no blur is used).
+   Over a video the digits are a pale glass with the same rim, so they still read. */
+.gclock .edge { display: none; }
+.clock-liquid .scene .gclock .edge {
+  display: block; position: absolute; top: 0; right: 0; bottom: 0; left: 0; color: transparent;
+  -webkit-text-stroke: 0.7rem rgba(0, 0, 0, 0.16); filter: blur(0.3rem);
+}
+.clock-liquid .scene .gclock .fill { filter: brightness(1.16) saturate(1.12) contrast(1.04); opacity: var(--lq-fill); }
+.clock-liquid .scene .gclock .rim {
+  color: transparent; -webkit-text-stroke: 0.16rem rgba(255, 255, 255, var(--lq-rim));
+}
+.clock-liquid .scene .gclock .sheen {
+  display: block;
+  background-image: linear-gradient(165deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.08) 26%, rgba(255, 255, 255, 0) 55%, rgba(255, 255, 255, 0) 76%, rgba(255, 255, 255, 0.3) 100%);
+}
+.clock-liquid .scene .gclock { opacity: 1; filter: drop-shadow(0 0.625rem 1.5rem rgba(0, 0, 0, 0.3)); }
+/* light scenes (fog, a light own scene): a darker edge and a slightly darker glass, so the
+   digits still stand out from a pale sky at every amount */
+.clock-liquid .s-fog .gclock .edge, .clock-liquid .s-mine.t-dark .gclock .edge { -webkit-text-stroke: 0.8rem rgba(0, 0, 0, 0.3); }
+.clock-liquid .s-fog .gclock .fill, .clock-liquid .s-mine.t-dark .gclock .fill { filter: brightness(0.82) contrast(1.12) saturate(1.1); opacity: 1; }
+.clock-liquid .s-fog .gclock .rim, .clock-liquid .s-mine.t-dark .gclock .rim { -webkit-text-stroke: 0.16rem rgba(255, 255, 255, 0.95); }
+.clock-liquid .s-fog .gclock .sheen, .clock-liquid .s-mine.t-dark .gclock .sheen { display: block; }
+.clock-liquid.night .scene .gclock { filter: drop-shadow(0 0.625rem 1.5rem rgba(0, 0, 0, 0.3)) brightness(0.8); }
+.clock-liquid.has-video .scene .gclock .fill { background-image: none !important; color: rgba(255, 255, 255, 0.2); filter: none; opacity: 1; }
+.clock-liquid.has-video .scene .gclock .edge { -webkit-text-stroke-color: rgba(0, 0, 0, 0.22); }
+
+/* a five step amount row in Home settings (How clear) */
+.srow .sslide { display: flex; align-items: center; flex: none; margin-left: 1rem; }
+.srow .sstep { display: block; width: 1.75rem; height: 0.5rem; margin-left: 0.3125rem; border-radius: 0.25rem; background: rgba(255, 255, 255, 0.2); }
+.srow .sstep.on { background: rgba(255, 255, 255, 0.85); }
+.srow.focus .sstep { background: rgba(0, 0, 0, 0.14); }
+.srow.focus .sstep.on { background: #111; }
 
 /* ================= Older WebViews: no gap in flex boxes (#26) =================
    Before Chrome 84 (still on many Android 9 TVs) gap is skipped in a flex box. app.js sets

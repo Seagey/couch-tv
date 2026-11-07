@@ -7,6 +7,23 @@ import { t } from './i18n.js';
 // Names that fit under an icon, like the iPhone home screen.
 const SHORT = { 'sbs-on-demand': 'SBS', 'prime-video': 'Prime Video', 'disney-plus': 'Disney+', 'paramount-plus': 'Paramount+', 'foxtel-go': 'Foxtel', 'hbo-max': 'HBO Max' };
 
+// An app's icon, plus its clear glyph (clearicon.js) for the glass look (#25): app.css shows the
+// glyph instead of the icon while Glass app icons is on, and the icon again while it is pressed.
+function AppIcon({ src }) {
+  const [glyph, setGlyph] = useState(() => window.ClearIcon?.cached(src) || '');
+  useEffect(() => {
+    let live = true;
+    window.ClearIcon?.get(src, (g) => { if (live) setGlyph(g || ''); });
+    return () => { live = false; };
+  }, [src]);
+  return (
+    <span className={'app-icon' + (glyph ? ' clear' : '')}>
+      <img src={src} alt="" />
+      {glyph && <img className="glyph" src={glyph} alt="" />}
+    </span>
+  );
+}
+
 function episode(s) {
   return [s.season && `S${s.season}`, s.episode && `E${s.episode}`].filter(Boolean).join(' · ');
 }
@@ -48,7 +65,7 @@ export function Watch({ pull, people, who, recs, cont: contIn, apps, hidden, scr
         <div className="apps">
           {(apps || []).filter((a) => a.installed !== false && !['settings', 'home', 'moonlight'].includes(a.id) && !(hidden || []).includes(a.package)).map((a) => (
             <button key={a.id} className="app-tile" style={{ '--tile': a.colour || '#3a3a3c' }} onClick={() => { tick(); onLaunch(a); }}>
-              <span className="app-icon">{logoFor(a) ? <img src={logoFor(a)} alt="" /> : <span className="app-icon-name">{a.name}</span>}</span>
+              {logoFor(a) ? <AppIcon src={logoFor(a)} /> : <span className="app-icon"><span className="app-icon-name">{a.name}</span></span>}
               <span className="app-label">{SHORT[a.id] || a.name}</span>
             </button>
           ))}

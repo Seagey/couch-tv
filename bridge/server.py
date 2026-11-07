@@ -1201,6 +1201,10 @@ def clean_settings(s):
         out["glass"] = s["glass"]
     if isinstance(s.get("glass_icons"), bool):
         out["glass_icons"] = s["glass_icons"]
+    if isinstance(s.get("glass_amount"), int) and not isinstance(s.get("glass_amount"), bool) and 1 <= s["glass_amount"] <= 5:
+        out["glass_amount"] = s["glass_amount"]
+    if s.get("clock_style") in ("frosted", "liquid"):
+        out["clock_style"] = s["clock_style"]
     if isinstance(s.get("video"), bool):
         out["video"] = s["video"]
     # "" means the video link was removed on the TV (it then wins over home.video_url)
