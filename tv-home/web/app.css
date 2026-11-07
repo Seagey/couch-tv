@@ -331,7 +331,13 @@ body {
   padding: 1.375rem 1.75rem; border-radius: 2.875rem;
 }
 .theme-night .app { width: 7rem; height: 7rem; }
-.theme-night .app .face { border-radius: 1.625rem; }
+/* Apple's app icon corner: a continuous curve (about 22.4% of the width, 60% smoothing). Measured
+   against that shape at 400 px: superellipse(1.3) at 26.5% is the closest CSS (0.12% of pixels off),
+   plain 22.5% the closest on WebViews without corner-shape (0.2% off). */
+.theme-night .app .face { border-radius: 22.5%; }
+@supports (corner-shape: superellipse(1.3)) {
+.theme-night .app .face { border-radius: 26.5%; corner-shape: superellipse(1.3); }
+}
 .theme-night .app:not(.focus) .face img { filter: brightness(0.82); }
 .theme-night .app.focus { transform: scale(1.16) translateY(-0.625rem); }
 .theme-night .app.focus .face { box-shadow: 0 0 0 0.25rem #fff, 0 1.125rem 2.5rem rgba(0, 0, 0, 0.4); }
