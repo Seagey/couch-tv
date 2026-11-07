@@ -193,7 +193,7 @@ it will not play. The video stops while an app is in front. Over a video, the Ni
 frosted white instead of cut from the photo. Both are heavier than the plain home, so on a small
 TV stick switch them off if the home feels slow. Thanks alonmustafa (#22). **Glass app icons**
 (also under Look) turns the app icons grey on frosted glass, like Apple's clear icons, with the
-app you are on in its own colours (#25). Links straight to
+app you are on in its own colours (#25). The phone remote's app grid follows the TV's choice. Links straight to
 Apple's own server (`sylvan.apple.com`, the tvOS aerials) never play: it uses a certificate from
 Apple's private authority, which Android and Chrome do not trust. Copies of the same aerials on
 other hosts, or saved on a computer at home, play fine as MOV (#27).
@@ -209,13 +209,11 @@ reset TV gets them back. They win over `config.json` on that TV; About, Reset ho
 back to it. [docs/CONFIG.md](docs/CONFIG.md) has the details.
 
 **Languages.** The TV home and the phone remote both speak English, Spanish (`es`, for Spain and
-everyone else), Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest) and
-Italian (`it`) and German (`de`), both with a 24 hour clock unless you pick 12 hour, and the smart
-home words Home Assistant uses in each. The phone has its own choice (TV menu, Language), "Same as the TV" by
-default. Messages that come from the bridge itself (an error, a note about how a show opened) and
-some screen reader labels on the phone are still in English. The TV home also speaks Turkish
-(`tr`, with a 24 hour clock unless you pick 12 hour); the phone remote does not yet, and with the
-TV home in Turkish it follows the phone's own language instead.
+everyone else), Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest),
+Italian (`it`), German (`de`) and Turkish (`tr`), all three with a 24 hour clock unless you pick 12
+hour, and the smart home words Home Assistant uses in each. The phone has its own choice (TV menu,
+Language), "Same as the TV" by default. Messages that come from the bridge itself (an error, a note
+about how a show opened) and some screen reader labels on the phone are still in English.
 
 ## Three ways to run it
 

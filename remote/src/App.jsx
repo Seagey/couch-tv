@@ -118,9 +118,15 @@ export default function App() {
   const [people, setPeople] = useState([{ id: 'person1', name: 'Person 1' }, { id: 'person2', name: 'Person 2' }]);
   // ask.enabled false in config.json hides Ask; people can be any number (none: everything shows as Both)
   const [askOn, setAskOn] = useState(true);
+  // Glass app icons, the same look as the TV home's dock (#25): its Home settings, Look, Glass app
+  // icons wins, else home.glass_icons in config.json. Off unless the TV has it on.
+  const glass = useRef({ cfg: false, tv: null });
+  const showGlass = () => document.documentElement.classList.toggle('glass-icons', glass.current.tv ?? glass.current.cfg);
+  // Apps hidden on the TV (hold OK on an app, Hide from home; or Home settings, Apps) stay hidden here too.
+  const [hidden, setHidden] = useState([]);
   // nobody set up: no picker, the remote shows everything
   useEffect(() => { if (!who && people.length === 0) setWho('both'); }, [people]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { api.config().then((c) => { if (Array.isArray(c.people)) setPeople(c.people); if (c.ask && c.ask.enabled === false) setAskOn(false); }).catch(() => {}); }, []);
+  useEffect(() => { api.config().then((c) => { if (Array.isArray(c.people)) setPeople(c.people); if (c.ask && c.ask.enabled === false) setAskOn(false); glass.current.cfg = c.home?.glass_icons === true; showGlass(); }).catch(() => {}); }, []);
   const [who, setWhoState] = useState(() => store.get('tv.who'));
   // Which TV this phone drives, remembered per phone. null is the bridge's default (living room).
   const [tvId, setTvIdState] = useState(() => { const id = store.get('tv.tv'); setTvId(id); return id; });
@@ -160,7 +166,13 @@ export default function App() {
   useEffect(() => { setTv(null); return subscribeNow(setTv, setReach); }, [tvId]);
   useEffect(() => { api.tvs().then((d) => setTvs(d.tvs || [])).catch(() => {}); }, [reach, tvId]);
   // "Same as the TV": the language picked in the TV home's Home settings
-  useEffect(() => { api.settings().then((d) => setTvLang(d.settings?.lang)).catch(() => {}); }, [reach, tvId]);
+  // and its look and hidden apps
+  useEffect(() => { api.settings().then((d) => {
+    const s = d.settings || {};
+    setTvLang(s.lang);
+    glass.current.tv = typeof s.glass_icons === 'boolean' ? s.glass_icons : null; showGlass();
+    setHidden(Array.isArray(s.hidden_apps) ? s.hidden_apps : []);
+  }).catch(() => {}); }, [reach, tvId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { api.apps().then((d) => setApps(d.apps)).catch(() => setApps((a) => a || false)); api.screens().then((d) => setScreens(d.screens)).catch(() => {}); }, [reach]);
   useEffect(() => { if (tab === 'watch' && apps === false) api.apps().then((d) => setApps(d.apps)).catch(() => {}); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   const whoNow = useRef(who);
@@ -321,7 +333,7 @@ export default function App() {
       {wide && askOn && <AskButton onAsk={openAsk} quiet={Boolean(offState)} />}
     </div>
   );
-  const watch = <Watch pull={pull} people={people} who={who || people[0]?.id || 'both'} recs={recs} cont={cont === undefined ? (recs === false ? false : recs?.continue) : cont} apps={apps} screens={screens} serviceName={serviceName} onPlay={onPlay} onLaunch={onLaunch} onScreen={onScreen} wide={wide} />;
+  const watch = <Watch pull={pull} people={people} who={who || people[0]?.id || 'both'} recs={recs} cont={cont === undefined ? (recs === false ? false : recs?.continue) : cont} apps={apps} hidden={hidden} screens={screens} serviceName={serviceName} onPlay={onPlay} onLaunch={onLaunch} onScreen={onScreen} wide={wide} />;
 
   return (
     <div className={`app ${wide ? 'is-wide' : ''} ${offState ? 'is-off' : ''}`}>
@@ -349,7 +361,7 @@ export default function App() {
       <MoreSheet ref={moreSheet} open={sheet === 'more'} tvs={tvs} tvId={tvId || 'living-room'} onTv={(id) => { tick(); chooseTv(id); }}
         picture={tv?.picture} pictureInfo={pictureInfo} onPicture={onPicture} onClose={() => setSheet(null)} sleepEnds={sleepEnds} sleepError={sleepError} onSleep={onSleep}
         onKey={onKey} onText={(text) => run(api.text(text), t('sent_to_tv'))} onArrange={() => setSheet('arrange')} onPeople={() => setSheet('people')} />
-      <ArrangeSheet open={sheet === 'arrange'} onClose={() => setSheet(null)} tvName={thisTv?.name} />
+      <ArrangeSheet open={sheet === 'arrange'} onClose={() => setSheet(null)} tvName={thisTv?.name} hidden={hidden} />
       <PeopleSheet open={sheet === 'people'} onClose={() => setSheet(null)} onSaved={(list) => { setPeople(list); if (who && who !== 'both' && !list.some((p) => p.id === who)) setWho(list[0]?.id || 'both'); }} />
       {!who && people.length > 0 && <Onboarding people={people} standalone={standalone} onPick={pickWho} />}
     </div>

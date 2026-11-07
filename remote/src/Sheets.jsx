@@ -220,7 +220,7 @@ const SLEEP = [0, 15, 30, 45, 60, 90];
 // Arrange apps: drag an app by its handle; the "More apps" line splits what the TV's dock
 // shows from what sits behind More apps. Saves on letting go. The TV picks it up on its next Home.
 const LINE = '__line__';
-export function ArrangeSheet({ open, onClose, tvName }) {
+export function ArrangeSheet({ open, onClose, tvName, hidden }) {
   const [rows, setRows] = useState(null);   // packages and the LINE marker, in order
   const [names, setNames] = useState({});
   const [max, setMax] = useState(10);
@@ -233,7 +233,7 @@ export function ArrangeSheet({ open, onClose, tvName }) {
     if (!open) return;
     setRows(null); setMsg('');
     api.appOrder().then((d) => {
-      const pk = (d.apps || []).map((a) => a.package);
+      const pk = (d.apps || []).map((a) => a.package).filter((p) => !(hidden || []).includes(p));
       setNames(Object.fromEntries((d.apps || []).map((a) => [a.package, a.name])));
       setMax(d.dock_max || 10);
       setRows(pk.length ? [...pk.slice(0, d.line), LINE, ...pk.slice(d.line)] : []);
@@ -437,6 +437,7 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
           <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={t('type_placeholder')} enterKeyHint="send" aria-label="Text to type on the TV" />
           <button type="submit" className="round solid small" aria-label={t('send_to_tv')} disabled={!typed.trim()}><Ic.Send size={18} /></button>
         </form>
+        <p className="note">{t('type_note')}</p>
       </section>
 
       <div className="more-grid">

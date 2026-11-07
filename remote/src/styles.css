@@ -491,3 +491,18 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
 .kb-open .ask-sheet .replies { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -4px; }
 .kb-open .ask-sheet .replies::-webkit-scrollbar { display: none; }
 .kb-open .ask-sheet .replies .reply-chip { flex: none; white-space: nowrap; }
+
+/* Glass app icons, when the TV home has them on (Home settings, Look; home.glass_icons, #25): each
+   app grey and half see-through on frosted glass, like the TV's dock. A press brings its colours
+   back. Reduce Transparency gets a solid tile and a clearer icon. */
+.glass-icons .app-icon {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.06) 45%, rgba(255, 255, 255, 0.12) 100%), rgba(20, 20, 28, 0.22);
+  -webkit-backdrop-filter: blur(20px) saturate(170%); backdrop-filter: blur(20px) saturate(170%);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+.glass-icons .app-icon img { filter: grayscale(1) contrast(1.25) brightness(1.1); opacity: 0.55; mix-blend-mode: luminosity; transition: filter 0.2s, opacity 0.2s; }
+.glass-icons .app-tile:active .app-icon img { filter: brightness(0.86); opacity: 1; mix-blend-mode: normal; transition: none; }
+@media (prefers-reduced-transparency: reduce) {
+  .glass-icons .app-icon { background: rgba(58, 58, 64, 0.96); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .glass-icons .app-icon img { opacity: 0.85; mix-blend-mode: normal; }
+}
