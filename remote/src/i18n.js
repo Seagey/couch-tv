@@ -1,5 +1,5 @@
 // The phone remote's words in English, Spanish (es), Mexican Spanish (es-MX, only where Mexico
-// says it differently), Italian (it) and German (de). The choice is per phone (TV menu, Language): "Same as the
+// says it differently), Italian (it), German (de) and Turkish (tr). The choice is per phone (TV menu, Language): "Same as the
 // TV" follows the TV home's Home settings, read from the bridge (/api/settings). The same languages
 // as tv-home/web/i18n.js. Messages that come from the bridge itself (errors, notes) stay in English.
 import { useEffect, useState } from 'react';
@@ -10,6 +10,7 @@ export const LANGS = [
   { id: 'es-MX', name: 'Español (México)', locale: 'es-MX', base: 'es' },
   { id: 'it', name: 'Italiano', locale: 'it-IT' },
   { id: 'de', name: 'Deutsch', locale: 'de-DE' },
+  { id: 'tr', name: 'Türkçe', locale: 'tr-TR' },
 ];
 
 const S = {};
@@ -618,6 +619,146 @@ S.de = {
   reload: 'Fernbedienung neu laden',
 };
 
+// Turkish. The words for the same things match the TV home's Turkish (tv-home/web/i18n.js).
+S.tr = {
+  both: 'İkisi',
+  whos_watching: 'Kim izliyor',
+  whos_watching_change: 'Kim izliyor: {name}. Değiştir',
+  not_connected: 'Bağlı değil',
+  connecting: 'Bağlanıyor…',
+  tv_not_connected: 'TV bağlı değil',
+  waking: 'Uyandırılıyor…',
+  off: 'Kapalı',
+  home: 'Ana ekran',
+  on: 'Açık',
+  tv: 'TV',
+  more_controls: 'Diğer kontroller',
+  turn_off: 'TV’yi kapat',
+  turn_on: 'TV’yi aç',
+  just_started: 'Yeni başladı',
+  min_in: '{n}. dakikada',
+  st_playing: 'Oynatılıyor',
+  st_paused: 'Duraklatıldı',
+  st_buffering: 'Yükleniyor',
+  st_stopped: 'Durduruldu',
+  on_app: ' ({app})',
+  about_left: 'yaklaşık {n} dk kaldı',
+  min_left: '{n} dk kaldı',
+  season: '{n}. sezon',
+  episode: '{n}. bölüm',
+  app_open: '{app} açık',
+  now_on_tv: 'Şu an TV’de',
+  tap_middle: 'Seçmek için ortaya dokun',
+  not_set_up_tv: '{name} TV’si henüz ayarlanmadı.',
+  not_set_up_tv_more: 'O TV’nin başında bir kez kurulum gerekiyor.',
+  use_living_room: 'Salondaki TV’yi kullan',
+  cant_reach: 'TV’ye ulaşılamıyor.',
+  home_wifi: 'Telefonun evdeki Wi-Fi’da mı?',
+  try_again: 'Tekrar dene',
+  waking_tv: 'TV uyandırılıyor…',
+  turn_on_tv: 'TV’yi aç',
+  back: 'Geri',
+  play_pause: 'Oynat ya da duraklat',
+  pause: 'Duraklat',
+  play: 'Oynat',
+  volume: 'Ses',
+  muted: 'Sessiz',
+  ask_for_show: 'Bir dizi ya da film iste',
+  remote: 'Kumanda',
+  watch: 'İzle',
+  this_tv: '{name} TV',
+  this: 'Bu',
+  // toasts
+  cant_tell_who: 'Kimin izlediği TV’ye iletilemedi',
+  didnt_wake: 'Uyanmadı. TV’nin kendi kumandasıyla aç.',
+  still_cant_reach: 'TV’ye hâlâ ulaşılamıyor',
+  not_on_tv: '{title}, {service} üzerinde ve bu TV’de o uygulama yok.',
+  starting: '{title} başlatılıyor…',
+  is_on: '{title} açıldı',
+  opened: '{app} açıldı',
+  opening: '{app} açılıyor',
+  not_set_up: 'Henüz ayarlanmadı',
+  sleep_needs_update: 'Uyku zamanlayıcısı için bilgisayardaki bir sonraki güncelleme gerekiyor.',
+  sleep_set: 'Uyku zamanlayıcısı: {n} dakika',
+  sleep_off: 'Uyku zamanlayıcısı kapalı',
+  picture_now: 'Resim: {mode}',
+  sent_to_tv: 'TV’ye gönderildi',
+  // Watch
+  keep_watching: 'İzlemeye devam et',
+  couldnt_load: 'Bu şu an yüklenemedi.',
+  shows_wait: 'TV’de izlediklerin burada seni bekler.',
+  loading: 'Yükleniyor…',
+  apps: 'Uygulamalar',
+  couldnt_load_apps: 'Uygulamalar şu an yüklenemedi. Birazdan İzle’yi yeniden aç.',
+  ideas_tonight: 'Bu akşam için fikirler',
+  suggest: 'Bir şey öner',
+  suggest_sub: 'İzlediklerine göre bu akşam için birkaç öneri',
+  no_ideas: 'Henüz fikir yok. Bir dizi ya da film iste’yi dene.',
+  couldnt_load_ideas: 'Fikirler şu an yüklenemedi.',
+  screens: 'Ekranlar',
+  screen_sub: 'Yalnızca sen açınca TV’de görünür',
+  // the TV menu
+  close: 'Kapat',
+  which_tv: 'Hangi TV',
+  not_set_up_short: ' (ayarlanmadı)',
+  picture: 'Resim',
+  picture_later: 'Resim modu bu TV ayarlanınca çalışır.',
+  sleep_timer: 'Uyku zamanlayıcısı',
+  n_min: '{n} dk',
+  sleep_chip_off: 'Kapalı',
+  turns_off_at: 'TV {time} saatinde kapanacak ({n} dk).',
+  sleep_note: 'Telefonun kilitli olsa bile TV’yi senin için kapatır.',
+  type_on_tv: 'TV’de yaz',
+  type_placeholder: 'TV’deki bir arama kutusu için',
+  send_to_tv: 'TV’ye gönder',
+  subtitles: 'Altyazılar',
+  input: 'Giriş',
+  settings: 'Ayarlar',
+  arrange_apps: 'Uygulamaları düzenle',
+  people: 'Kişiler',
+  language: 'Dil',
+  same_as_tv: 'TV ile aynı',
+  language_note: 'Yalnızca bu telefon için. TV kendi dilini Ana ekran ayarlarında seçer (TV ana ekranındaki dişli).',
+  // Ask
+  new_chat: 'Yeni sohbet',
+  finding: 'Claude arıyor',
+  usually: 'Genelde 5 ila 20 saniye.',
+  carries_on: 'Gerisini kendisi yapar. TV’ye bak.',
+  idea_keep: '{title} izlemeye devam et',
+  idea_bluey: 'Bluey’i aç',
+  idea_tonight: 'Bu akşam için bir şey öner',
+  idea_funny: 'Bir saatten kısa, komik bir şey',
+  idea_new: 'Netflix’te yeni ne var?',
+  reply: 'Yanıtla…',
+  put_on: 'Şunu aç…',
+  sending_in: '{n} sn içinde gönderiliyor',
+  keep_editing: 'Düzenlemeye devam et',
+  talk_tip: 'Klavyendeki mikrofona dokun ve konuş.',
+  talk_tip_more: 'Sen susunca kendisi gönderir.',
+  cant_reach_wifi: 'TV’ye ulaşılamıyor. Telefonun evdeki Wi-Fi’da mı?',
+  // Arrange apps and People
+  arrange_lede: 'Bir uygulamayı tutamağından sürükle. Çizginin üstündekiler TV’nin dock’unda (en fazla {max}); gerisi Diğer uygulamalar’da. Ayarlar her zaman sonda.',
+  loading_apps: 'TV’nin uygulamaları yükleniyor…',
+  no_apps_yet: 'Bu TV uygulamalarını bilgisayara henüz bildirmedi. TV’de Ana ekran’a bas, sonra bunu yeniden aç.',
+  more_apps: 'Diğer uygulamalar',
+  dock_full: 'Dock’a {max} uygulama sığıyor, bu yüzden altındakiler Diğer uygulamalar’a geçti.',
+  saved_home: 'Kaydedildi. Görmek için TV’de Ana ekran’a bas.',
+  people_lede: 'TV’nin gösterdiği sırayla. Birini taşımak için tutamağı sürükle, değiştirmek için ismine dokun.',
+  nobody: 'Henüz kimse yok. Birini ekleyene kadar TV her şeyi gösterir.',
+  removed: '{name} kaldırıldı. İzleme geçmişi bilgisayarda kalır.',
+  added: '{name} eklendi.',
+  add_person: 'Kişi ekle',
+  // first open
+  whos_phone: 'Bu telefon kimin?',
+  onboard_note: '“İzlemeye devam et” ve öneriler, kim izliyorsa ona göre değişir. Üstten istediğin zaman değiştirebilirsin.',
+  home_screen: 'Ana ekranına ekle',
+  home_screen_how: 'Safari’de Paylaş {icon} simgesine, sonra {add} seçeneğine dokun.',
+  add_to_home: 'Ana Ekrana Ekle',
+  snag: 'Kumandada bir sorun çıktı.',
+  snag_note: 'TV’de hiçbir şey değişmedi.',
+  reload: 'Kumandayı yeniden yükle',
+};
+
 const KEY = 'tv.lang';          // this phone's choice: 'auto' (same as the TV) or a language
 const TV_KEY = 'tv.lang.tv';    // the TV's language, last read from the bridge
 const read = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -629,6 +770,7 @@ function guess() {
   if (/^es-MX/i.test(n)) return 'es-MX';
   if (/^it/i.test(n)) return 'it';
   if (/^de/i.test(n)) return 'de';
+  if (/^tr/i.test(n)) return 'tr';
   return /^es/i.test(n) ? 'es' : 'en';
 }
 function resolve() {

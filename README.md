@@ -209,13 +209,11 @@ reset TV gets them back. They win over `config.json` on that TV; About, Reset ho
 back to it. [docs/CONFIG.md](docs/CONFIG.md) has the details.
 
 **Languages.** The TV home and the phone remote both speak English, Spanish (`es`, for Spain and
-everyone else), Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest) and
-Italian (`it`) and German (`de`), both with a 24 hour clock unless you pick 12 hour, and the smart
-home words Home Assistant uses in each. The phone has its own choice (TV menu, Language), "Same as the TV" by
-default. Messages that come from the bridge itself (an error, a note about how a show opened) and
-some screen reader labels on the phone are still in English. The TV home also speaks Turkish
-(`tr`, with a 24 hour clock unless you pick 12 hour); the phone remote does not yet, and with the
-TV home in Turkish it follows the phone's own language instead.
+everyone else), Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest),
+Italian (`it`), German (`de`) and Turkish (`tr`), all three with a 24 hour clock unless you pick 12
+hour, and the smart home words Home Assistant uses in each. The phone has its own choice (TV menu,
+Language), "Same as the TV" by default. Messages that come from the bridge itself (an error, a note
+about how a show opened) and some screen reader labels on the phone are still in English.
 
 ## Three ways to run it
 
