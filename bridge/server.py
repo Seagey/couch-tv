@@ -121,6 +121,11 @@ def now_iso():
     return datetime.now(HOME_TZ).isoformat(timespec="seconds")
 
 
+def cur_who():
+    """Who is on the couch at the TV this request or loop is for (each TV keeps its own)."""
+    return store.current_who(_current.get())
+
+
 class ApiError(Exception):
     def __init__(self, status, message):
         super().__init__(message)
@@ -225,7 +230,7 @@ def now_payload():
         playing["item"] = item = None
     out_playing = None
     if item:
-        out_playing = {k: v for k, v in item.items() if k != "package"} | {"source": "bridge"}
+        out_playing = {k: v for k, v in item.items() if k not in ("package", "ts", "who")} | {"source": "bridge"}
     if media_now and media_now.get("package") == pkg:
         live = {"state": media_now["state"], "position_ms": media_now["position_ms"],
                 "updated": datetime.fromtimestamp(media_now["read_at"], HOME_TZ).isoformat(
@@ -257,7 +262,7 @@ def now_payload():
         "playing": out_playing,
         "sleep": {"ends": sleep["ends"]},
         "waking": waking["on"],
-        "who": store.current_who(),
+        "who": cur_who(),
         "picture": picture_state.get("mode"),
     }
 
@@ -506,7 +511,7 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
         except Exception as e:
             log.warning("deep link failed for %s: %s", app["id"], e)
         if method and tv.can_read_media:
-            started, picked = await get_it_playing(app, link, who or store.current_who())
+            started, picked = await get_it_playing(app, link, who or cur_who())
             log.info("play %s in %s: %s%s", best["title"], app["name"],
                      "playing" if started else "not playing yet", f" (profile {picked})" if picked else "")
             if started:
@@ -642,11 +647,11 @@ def finish_play(best, app, method, note, season, episode, who, ep_info=None):
     item = {"title": best["title"], "year": best["year"], "type": best["type"],
             "poster": best["poster"], "backdrop": best["backdrop"], "service": app["id"],
             "season": season, "episode": episode, "started": now_iso(),
-            "package": app["package"]} | extra
+            "package": app["package"], "who": who, "ts": time.time()} | extra
     playing["item"] = item
     store.add_history({"title": best["title"], "year": best["year"], "type": best["type"],
                        "poster": best["poster"], "backdrop": best["backdrop"],
-                       "service": app["id"], "who": who,
+                       "service": app["id"], "who": who, "tv": _current.get(),
                        "season": season, "episode": episode,
                        "episode_title": extra.get("episode_title"),
                        "duration_ms": extra.get("duration_ms"), "when": item["started"],
@@ -665,7 +670,7 @@ async def h_play(request):
         raise ApiError(400, "title is required")
     # No season asked for: open the show where they are up to, never episode 1.
     result = await play(title, data.get("season"), data.get("episode"), data.get("service"),
-                        store.norm_who(data.get("who")) or store.current_who(),
+                        store.norm_who(data.get("who")) or cur_who(),
                         resume=not data.get("season"))
     record_action(request, "play", {k: data[k] for k in ("title", "season", "episode", "service")
                                     if data.get(k)}, True)
@@ -673,7 +678,7 @@ async def h_play(request):
 
 
 async def h_who_get(request):
-    return ok(who=store.current_who())
+    return ok(who=cur_who())
 
 
 async def h_who_set(request):
@@ -681,7 +686,7 @@ async def h_who_set(request):
     who = store.norm_who(data.get("who"))
     if not who:
         raise ApiError(400, "who must be " + ", ".join(config.PEOPLE_IDS) + " or both")
-    store.save_who(who)
+    store.save_who(who, _current.get())
     push_now()
     return ok(who=who)
 
@@ -713,8 +718,9 @@ async def h_people_set(request):
     people = [{**{k: old[i["id"]][k] for k in ("kid", "guest") if k in old.get(i.get("id"), {})}, **i}
               if isinstance(i, dict) and i.get("id") in old else i for i in people]
     config.set_people(people)
-    if store.current_who() not in (None, "both", *config.PEOPLE_IDS):
-        store.save_who(None)   # the person on the couch was removed
+    for tv_id in TVS:   # the person on the couch at a TV was removed
+        if store.current_who(tv_id) not in (None, "both", *config.PEOPLE_IDS):
+            store.save_who(None, tv_id)
     record_action(request, "people", {"count": len(config.PEOPLE)}, True)
     for tv_id in TVS:
         with_tv(tv_id, push_now)
@@ -889,7 +895,7 @@ async def h_ask(request):
     text = (data.get("text") or "").strip()
     if not text:
         raise ApiError(400, "text is required")
-    result = await claude.ask(text, store.norm_who(data.get("who")) or store.current_who(), asks,
+    result = await claude.ask(text, store.norm_who(data.get("who")) or cur_who(), asks,
                               _current.get())
     return ok(**result)
 
@@ -898,7 +904,7 @@ async def h_recs(request):
     who = store.norm_who(request.query.get("who"))
     picks, updated = await claude.cached_recs(who)
     return web.json_response({"ok": True, "updated": updated,
-                              "continue": store.continue_watching(who), "picks": picks})
+                              "continue": continue_items(who), "picks": picks})
 
 
 async def h_api_missing(request):
@@ -1280,7 +1286,6 @@ WATCH_NEXT_COLS = ["_id", "package_name", "title", "episode_title", "season_disp
                    "last_engagement_time_utc_millis", "last_playback_position_millis",
                    "duration_millis", "watch_next_type", "type", "browsable"]
 WATCH_NEXT_TYPES = {"0": "continue", "1": "next", "2": "new", "3": "watchlist"}
-continue_cache = {"items": [], "links": {}, "ts": 0.0}
 # Apps kept out of Keep watching (YouTube here: it can bury
 # everything else). The history is still recorded, it just is not listed.
 CONTINUE_SKIP = {"youtube"}
@@ -1343,62 +1348,39 @@ async def watch_next():
     return items
 
 
-async def continue_items(who=None):
-    # Android's Watch Next rows are not readable over ADB on this TV (needs a system
-    # permission), so the list is our own history only. watch_next() stays for a TV that allows it.
-    out, links, seen = [], {}, set()
-    for it in continue_cache["items"]:
-        if it.get("service") in CONTINUE_SKIP:
+def continue_items(who=None):
+    """Keep watching for the person on the couch (or `who`) at this TV: one card per show, newest
+    first, up to 10, nothing older than 30 days. A card's id is its history line's own id."""
+    who = who or cur_who()
+    out = []
+    for h in store.keep_watching(_current.get(), who):
+        if h.get("service") in CONTINUE_SKIP:
             continue
-        links[it["id"]] = ("link", it["_link"], it.get("app"))
-        seen.add(it["title"].lower())
-        out.append({k: v for k, v in it.items() if k != "_link"})
-    for n, h in enumerate(store.continue_watching(who, limit=60)):
-        if h["title"].lower() in seen or h.get("service") in CONTINUE_SKIP:
-            continue
-        hid = f"h-{n}"
-        links[hid] = ("play", h, None)
         app = apps.BY_ID.get(h.get("service"))
-        out.append({"id": hid, "title": h["title"], "episode_title": None,
+        out.append({"id": h["id"], "title": h["title"], "episode_title": h.get("episode_title"),
                     "season": h.get("season"), "episode": h.get("episode"),
                     "app": apps.describe_package(app["package"]) if app else None,
                     "service": h.get("service"), "poster": h.get("poster"),
                     "backdrop": h.get("backdrop"), "progress": None, "kind": "continue",
-                    "last_played": h.get("last_played"), "source": "bridge"})
-    out.sort(key=lambda i: i.get("last_played") or "", reverse=True)
-    continue_cache["links"] = links
+                    "last_played": h.get("when"), "source": "bridge"})
     return out
 
 
 async def h_continue(request):
     who = store.norm_who(request.query.get("who"))
-    return ok(items=await continue_items(who))
+    return ok(items=continue_items(who))
 
 
 async def h_continue_open(request):
     data = await body(request)
     cid = data.get("id")
-    if cid not in continue_cache["links"]:
-        await continue_items()
-    entry = continue_cache["links"].get(cid)
-    if not entry:
+    h = store.history_item(cid) if cid else None
+    if not h:
         raise ApiError(404, f"unknown continue item: {cid}")
-    kind, target, app = entry
-    if kind == "play":
-        result = await play(target["title"], target.get("season"), target.get("episode"),
-                            target.get("service"),
-                            store.norm_who(data.get("who")) or store.current_who(), resume=True)
-        record_action(request, "continue", {"id": cid}, True)
-        return ok(**result)
-    if not target:
-        if not app:
-            raise ApiError(409, "that item has no link to resume")
-        got, _ = await launch_app({"id": app["id"], "name": app["name"], "package": app["package"]})
-    else:
-        await tv.start_intent(target, app["package"] if app else None)
-        got = await tv.wait_for_app({app["package"]} if app else set(), timeout=8) if app else True
-    record_action(request, "continue", {"id": cid}, bool(got))
-    return ok(app=apps.describe_package(tv.current_package))
+    result = await play(h["title"], h.get("season"), h.get("episode"), h.get("service"),
+                        store.norm_who(data.get("who")) or cur_who(), resume=True)
+    record_action(request, "continue", {"id": cid}, True)
+    return ok(**result)
 
 
 # ---------- which episode, and how long (only when matched, never a guess) ----------
@@ -1505,7 +1487,26 @@ def _sessions(out):
             parts = [p.strip() for p in line.split("description=", 1)[1].split(", ")]
             cur["title"] = parts[0] if parts and parts[0] != "null" else None
             cur["subtitle"] = parts[1] if len(parts) > 1 and parts[1] != "null" else None
+        elif line.startswith("queueTitle=") and cur is not None:
+            q = line.split("=", 1)[1].rsplit(", size=", 1)[0].strip()
+            cur["queue_title"] = q if q and q != "null" else None
     return found
+
+
+# What some apps report as the title while a film plays, or on their browse screen: their own
+# name ("PrimeVideo" on a Sony, issue #23) or a placeholder. Never a show to keep watching.
+GENERIC_TITLES = {"primevideo", "amazonprimevideo", "amazonvideo", "prime", "amazon", "netflix", "youtube", "disney",
+                  "advertisement", "ad", "ads", "sponsored", "trailer", "preview", "loading", "nowplaying",
+                  "unknown", "null", "untitled", "video", "tv", "live", "home"}
+
+
+def generic_title(title, pkg=None, app=None):
+    n = re.sub(r"[^a-z0-9]", "", (title or "").lower())
+    if not n or n in GENERIC_TITLES or n.isdigit():
+        return True
+    own = {re.sub(r"[^a-z0-9]", "", (x or "").lower())
+           for x in ((app or {}).get("name"), (app or {}).get("id"), pkg, (pkg or "").rsplit(".", 1)[-1])}
+    return n in own
 
 
 STATES = {"PLAYING": "playing", "PAUSED": "paused", "BUFFERING": "buffering",
@@ -1537,6 +1538,27 @@ def _fallback_title(pkg):
 
 
 art_cache = {}  # title -> {"poster", "backdrop"} from JustWatch
+art_pending = set()
+
+
+def artwork_soon(title):
+    """The picture if it is known now, else none, with the lookup started in the background. The
+    watch loop uses this, so a slow show finder never holds it up past the minute a show needs."""
+    key = (title or "").lower()
+    if not key:
+        return {}
+    if key in art_cache:
+        return art_cache[key]
+    if key not in art_pending:
+        art_pending.add(key)
+
+        async def fetch():
+            try:
+                await artwork(title)
+            finally:
+                art_pending.discard(key)
+        asyncio.ensure_future(fetch())
+    return {}
 
 
 async def artwork(title):
@@ -1552,7 +1574,8 @@ async def artwork(title):
         else:
             try:
                 best, _ = await finder.find(title)
-                if best:
+                # a near name is another show: no picture beats the wrong one
+                if best and finder._norm(best["title"]) == finder._norm(title):
                     art_cache[key] = {"poster": best["poster"], "backdrop": best["backdrop"]}
             except Exception:
                 pass
@@ -1579,6 +1602,11 @@ async def media_read(pkg, app):
     if pos is not None and pos < 0:
         pos = None
     title, episode_title, source_title = s.get("title"), s.get("subtitle"), "app"
+    if generic_title(title, pkg, app):   # "PrimeVideo" while a film plays: try the queue's title
+        title = s.get("queue_title") if not generic_title(s.get("queue_title"), pkg, app) else None
+        if not title:
+            episode_title = None
+    s["title"] = title
     ep = {}
     if title:
         ep = await resolve_episode(title, episode_title)
@@ -1590,7 +1618,7 @@ async def media_read(pkg, app):
     else:
         title, episode_title = _fallback_title(pkg)
         source_title = "bridge" if title else None
-    art = await artwork(title)
+    art = artwork_soon(title)
     new = {"title": title, "episode_title": ep.get("episode_title") or episode_title,
            "season": ep.get("season"), "episode": ep.get("episode"), "package": pkg,
            "state": state, "poster": art.get("poster"), "backdrop": art.get("backdrop"),
@@ -1612,6 +1640,11 @@ async def media_read(pkg, app):
     return s
 
 
+# A title counts as watched (Keep watching) once it has played this long, so a trailer that
+# autoplays while browsing stays out. COUCHTV_SEEN_AFTER_S lowers it for the emulator tests.
+SEEN_AFTER_S = float(os.environ.get("COUCHTV_SEEN_AFTER_S") or 60)
+
+
 async def media_watch_loop():
     """Every 8 s while an app is in front (checks every 10 s otherwise): read what it says is playing, for
     /api/now (title, state, position) and to log shows started by hand."""
@@ -1628,42 +1661,56 @@ async def media_watch_loop():
                     and await tv.adb_ready()):
                 busy = True
                 s = await media_read(pkg, app)
-                if s and s.get("state") == "PLAYING" and s.get("title"):
-                    key = (pkg, s["title"].lower())
+                key = (pkg, s["title"].lower()) if s and s.get("state") == "PLAYING" and s.get("title") else None
+                # the app's own position has to be past the minute too, when it gives one: a preview
+                # that autoplays on a browse screen starts at 0 each time
+                pos = media_now.get("position_ms")
+                young = pos is not None and pos < SEEN_AFTER_S * 1000
+                cand = seen_playing.get("_playing")
+                if key != (cand and cand[0]):
+                    seen_playing["_playing"] = (key, time.time())   # something new (or nothing) playing
+                elif key and not young and time.time() - cand[1] >= SEEN_AFTER_S and time.time() - seen_playing.get(key + (cur_who(),), 0) >= 1800:
+                    seen_playing[key + (cur_who(),)] = time.time()
                     item = playing["item"]
-                    if time.time() - seen_playing.get(key, 0) >= 1800:
-                        seen_playing[key] = time.time()
-                        # Our own /api/play already logged it if it is the same show.
-                        if not (item and item["title"].lower() in
-                                (s["title"].lower(), (s.get("subtitle") or "").lower())):
-                            await log_seen(s["title"], s.get("subtitle"), app)
-            elif media_now:
-                media_now.clear()
-                push_now()
+                    # Our own /api/play already logged it if it is the same show, for the same person,
+                    # in the last three hours.
+                    if not (item and item.get("who") == cur_who() and item.get("ts", 0) > time.time() - 3 * 3600
+                            and item["title"].lower() in (s["title"].lower(), (s.get("subtitle") or "").lower())):
+                        await log_seen(s["title"], s.get("subtitle"), app, dict(media_now))
+            else:
+                seen_playing["_playing"] = (None, time.time())   # the minute starts again after a break
+                if media_now:
+                    media_now.clear()
+                    push_now()
         except Exception as e:
             log.warning("media watch skipped: %s: %s", type(e).__name__, e)
         await asyncio.sleep(8 if busy else 10)
 
 
-async def log_seen(title, subtitle, app):
+async def log_seen(title, subtitle, app, now=None):
+    """Log a show seen playing, with the season and episode media_read worked out (`now`, a copy of
+    media_now), on this TV for the person on the couch here. Only a show of the same name gets the
+    finder's title and picture; a near miss keeps the app's own title and no picture."""
+    now = now or {}
     poster = backdrop = year = kind = None
     show = title
     try:
+        names = [finder._norm(title)] + ([finder._norm(subtitle)] if subtitle else [])
         best, _ = await finder.find(title)
-        # an exact name match on either field wins over a near miss on the first one
-        if subtitle and (not best or finder._norm(best["title"]) != finder._norm(title)):
+        if subtitle and (not best or finder._norm(best["title"]) not in names):
             alt, _ = await finder.find(subtitle)
-            if alt and (not best or finder._norm(alt["title"]) == finder._norm(subtitle)):
+            if alt and finder._norm(alt["title"]) in names:
                 best = alt
-        if best:
+        if best and finder._norm(best["title"]) in names:
             show, poster, backdrop, year, kind = (best["title"], best["poster"], best["backdrop"],
                                                   best["year"], best["type"])
     except Exception:
         pass
     store.add_history({"title": show, "year": year, "type": kind, "poster": poster,
                        "backdrop": backdrop, "service": app["id"] or app["package"],
-                       "who": store.current_who(),
-                       "season": None, "episode": None, "episode_title": subtitle,
+                       "who": cur_who(), "tv": _current.get(),
+                       "season": now.get("season"), "episode": now.get("episode"),
+                       "episode_title": now.get("episode_title") or subtitle,
                        "when": now_iso(), "method": "seen"})
     log.info("logged %s on %s", show, app["name"])
 

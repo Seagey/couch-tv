@@ -130,7 +130,8 @@ it, and the skyline in front of the clock if you like): [docs/MAKE-A-SCENE.md](d
 | ![Fog](docs/screens/home-fog.jpg) | ![Dawn](docs/screens/home-dawn.jpg) | ![Classic](docs/screens/home-classic.jpg) |
 
 Shown with sample shows and sample people. On your TV, "keep watching" fills from what you
-actually watch.
+actually watch: per TV and per person (with options B and C), up to 10 shows, newest first.
+With option A it is Android's own Watch Next list, the same for everyone on that TV.
 
 ## Settings on the TV
 

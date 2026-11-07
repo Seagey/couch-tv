@@ -14,7 +14,12 @@ import java.util.concurrent.TimeUnit
  * to everyone listening (server-sent events and WebSockets).
  */
 object Now {
-    @Volatile var who: String? = null
+    @Volatile private var whoNow: String? = null
+    @Volatile private var whoRead = false
+    /** Who is on the couch at this TV, saved so a restart keeps it. */
+    var who: String?
+        get() { if (!whoRead) { whoNow = Store.who(); whoRead = true }; return whoNow }
+        set(v) { whoNow = v; whoRead = true; Store.saveWho(v) }
     @Volatile var playedItem: JSONObject? = null          // the last thing /api/play started
     @Volatile var sleepEnds: Long? = null
     @Volatile private var front: String? = null
@@ -88,14 +93,16 @@ object Now {
         if (pos != null && pos >= 0 && uptime != null && s.updated != null && state == "playing") pos += ((uptime - s.updated!!) * (if (s.speed == 0.0) 1.0 else s.speed)).toLong()
         if (pos != null && pos < 0) pos = null
         val item = playedItem?.takeIf { it.optString("package") == pkg }
-        var title = s.title
+        // "PrimeVideo" while a film plays (a Sony, issue #23) is no title: try the queue's title
+        var title = s.title?.takeIf { !Tv.genericTitle(it, pkg) } ?: s.queueTitle?.takeIf { !Tv.genericTitle(it, pkg) }
+        val ownSubtitle = if (title != null && title == s.title) s.subtitle else null
         var source = "tv"
         if (title == null && item != null) { title = item.optString("title"); source = "bridge" }
         val (poster, backdrop) = if (item != null && Finder.norm(item.optString("title")) == Finder.norm(title)) item.opt("poster") as? String to item.opt("backdrop") as? String
-            else Finder.artwork(title)
+            else Finder.artworkSoon(title)
         val sameAsPlayed = item != null && Finder.norm(item.optString("title")) == Finder.norm(title)
         return JSONObject().put("title", title ?: JSONObject.NULL)
-            .put("episode_title", s.subtitle ?: (if (sameAsPlayed) item!!.opt("episode_title") else null) ?: JSONObject.NULL)
+            .put("episode_title", ownSubtitle ?: (if (sameAsPlayed) item!!.opt("episode_title") else null) ?: JSONObject.NULL)
             .put("season", if (sameAsPlayed) item!!.opt("season") else JSONObject.NULL)
             .put("episode", if (sameAsPlayed) item!!.opt("episode") else JSONObject.NULL)
             .put("service", Apps.BY_PACKAGE[pkg]?.id ?: JSONObject.NULL)
@@ -117,45 +124,73 @@ object Now {
      */
     private fun remember(m: JSONObject?) {
         val pkg = front ?: return
-        val title = m?.optString("title")?.takeIf { m.optString("state") == "playing" && it.isNotEmpty() && it != "null" }
-        val key = if (title == null) "" else pkg + "|" + Finder.norm(title)
+        // only a title the app itself reports (not the last show couch-tv opened in it)
+        val title = m?.optString("title")?.takeIf { m.optString("state") == "playing" && m.optString("source") == "tv" && it.isNotEmpty() && it != "null" }
+        val key = if (title == null) "" else pkg + "|" + Finder.norm(title) + "|" + (who ?: "")
         val now = System.currentTimeMillis()
-        if (key != seenKey) { seenKey = key; seenSince = now; return }
-        if (key.isEmpty() || key == keptKey || now - seenSince < 60_000) return
+        val after = (Store.testProp("seen_after_s") ?: 60L) * 1000
+        if (key != seenKey) { seenKey = key; seenSince = now; if (key.isNotEmpty()) android.util.Log.i("couchtv.keep", "counting $title for ${who ?: "nobody"}"); return }
+        if (key.isEmpty() || key == keptKey || now - seenSince < after) return
+        // the app's own position has to be past the minute too, when it gives one: a preview that
+        // autoplays on a browse screen starts at 0 each time
+        val pos = m!!.optLong("position_ms", -1L)
+        if (pos in 0 until after) return
         keptKey = key
         val played = playedItem
-        // A show started from the phone is already in Keep watching (Finder.finish)
-        if (played != null && played.optString("package") == pkg && Finder.norm(played.optString("title")) == Finder.norm(title)) return
-        // Only a title the show finder knows (it found artwork for it), so the tile can open it again.
-        // A YouTube video or a song does not, and stays out.
-        if (m!!.opt("poster") !is String) return
+        // A show started from the phone for the same person in the last three hours is already in
+        // Keep watching (Finder.finish)
+        if (played != null && played.optString("package") == pkg && Finder.norm(played.optString("title")) == Finder.norm(title)
+            && played.optString("who") == (who ?: "") && now - played.optLong("ts") < 3 * 3600_000L) return
+        // Only the streaming apps couch-tv knows, never YouTube or music: a video or a song is not
+        // something to keep watching.
+        val app = Apps.BY_PACKAGE[pkg] ?: return
+        if (app.id in NOT_KEPT) return
+        val mm = m ?: return
         Store.addHistory(JSONObject().put("title", title)
-            .put("episode_title", m.opt("episode_title") ?: JSONObject.NULL)
-            .put("season", m.opt("season") ?: JSONObject.NULL).put("episode", m.opt("episode") ?: JSONObject.NULL)
-            .put("poster", m.opt("poster") ?: JSONObject.NULL).put("backdrop", m.opt("backdrop") ?: JSONObject.NULL)
+            .put("episode_title", mm.opt("episode_title") ?: JSONObject.NULL)
+            .put("season", mm.opt("season") ?: JSONObject.NULL).put("episode", mm.opt("episode") ?: JSONObject.NULL)
+            .put("poster", mm.opt("poster") ?: JSONObject.NULL).put("backdrop", mm.opt("backdrop") ?: JSONObject.NULL)
             .put("service", Apps.BY_PACKAGE[pkg]?.id ?: JSONObject.NULL).put("package", pkg)
             .put("who", who ?: JSONObject.NULL).put("when", iso(now)).put("method", "seen"))
+        android.util.Log.i("couchtv.keep", "kept $title for ${who ?: "nobody"}")
     }
 
+    private val NOT_KEPT = setOf("youtube", "spotify", "twitch", "moonlight", "settings", "home")
+    const val KEEP_MAX = 10
+    const val KEEP_DAYS = 30
+
+    /** Keep watching for one person at this TV: one card per show (the latest), newest first, up to
+     *  10, nothing older than 30 days. Only lines made since 0.9 (with an id, this TV and a person). */
     fun continueItems(whoFilter: String?): JSONArray {
+        val who = whoFilter?.takeIf { it.isNotEmpty() } ?: this.who ?: return JSONArray()
         val h = Store.history()
         val out = JSONArray()
         val seen = HashSet<String>()
+        val nowMs = System.currentTimeMillis() + (Store.testProp("clock_offset_s") ?: 0L) * 1000
+        val cutoff = nowMs - KEEP_DAYS * 24 * 3600_000L
         for (i in 0 until h.length()) {
             val it = h.getJSONObject(i)
-            val w = it.optString("who").takeIf { s -> s.isNotEmpty() && s != "null" }
-            if (whoFilter != null && whoFilter != "both" && w != null && w != whoFilter) continue
+            if (it.optString("id").isEmpty() || it.optString("tv") != Store.TV_ID || it.optString("who") != who) continue
+            val whenMs = parseIso(it.optString("when")) ?: continue
+            if (whenMs < cutoff) continue
             val key = Finder.norm(it.optString("title"))
             if (key.isEmpty() || !seen.add(key)) continue
-            val pkg = it.optString("package")
-            out.put(JSONObject().put("id", "h-$i").put("title", it.optString("title"))
+            val pkg = it.optString("package").ifEmpty { Apps.BY_ID[it.optString("service")]?.pkg ?: "" }
+            out.put(JSONObject().put("id", it.optString("id")).put("title", it.optString("title"))
                 .put("episode_title", it.opt("episode_title") ?: JSONObject.NULL).put("season", it.opt("season") ?: JSONObject.NULL)
                 .put("episode", it.opt("episode") ?: JSONObject.NULL).put("app", Apps.describe(pkg)?.let { d -> JSONObject(d) } ?: JSONObject.NULL)
                 .put("service", it.opt("service") ?: JSONObject.NULL).put("poster", it.opt("poster") ?: JSONObject.NULL)
                 .put("backdrop", it.opt("backdrop") ?: JSONObject.NULL).put("progress", JSONObject.NULL).put("kind", "continue")
                 .put("last_played", it.opt("when") ?: JSONObject.NULL).put("source", "bridge"))
-            if (out.length() >= 20) break
+            if (out.length() >= KEEP_MAX) break
         }
         return out
+    }
+
+    private fun parseIso(s: String?): Long? {
+        if (s.isNullOrEmpty()) return null
+        for (f in listOf("yyyy-MM-dd'T'HH:mm:ssXXX", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", "yyyy-MM-dd'T'HH:mm:ssX"))
+            runCatching { return SimpleDateFormat(f, Locale.US).parse(s)!!.time }
+        return null
     }
 }

@@ -133,9 +133,23 @@ object Finder {
     fun artwork(title: String?): Pair<String?, String?> {
         if (title.isNullOrEmpty()) return null to null
         artCache[norm(title)]?.let { return it }
-        val art = try { find(title).first?.let { it.poster to it.backdrop } ?: (null to null) } catch (e: Exception) { return null to null }
+        // only a show of the same name: a near miss is another show, and no picture beats the wrong one
+        val art = try { find(title).first?.takeIf { norm(it.title) == norm(title) }?.let { it.poster to it.backdrop } ?: (null to null) } catch (e: Exception) { return null to null }
         artCache[norm(title)] = art
         return art
+    }
+
+    private val artPending = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val artPool = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    /** The same, but never waits: what is cached now, with the lookup started in the background for
+     *  next time. The "what is playing" loop uses this, so a slow show finder can never hold it up
+     *  past the minute a show needs to count (seen in the emulator tests). */
+    fun artworkSoon(title: String?): Pair<String?, String?> {
+        if (title.isNullOrEmpty()) return null to null
+        artCache[norm(title)]?.let { return it }
+        if (artPending.add(norm(title))) artPool.execute { try { artwork(title) } finally { artPending.remove(norm(title)) } }
+        return null to null
     }
 
     /** POST /api/play. Same order as the computer bridge: free, then subscription, then the rest. */
@@ -208,8 +222,9 @@ object Finder {
             .put("poster", t.poster ?: JSONObject.NULL).put("backdrop", t.backdrop ?: JSONObject.NULL).put("service", app.id)
             .put("season", s ?: JSONObject.NULL).put("episode", e ?: JSONObject.NULL).put("episode_title", ep?.name ?: JSONObject.NULL)
             .put("package", app.pkg).put("started", now)
-        Now.playedItem = item
-        Store.addHistory(JSONObject(item.toString()).put("who", who ?: Now.who ?: JSONObject.NULL).put("when", now).put("method", method))
+        Now.playedItem = item.put("who", who ?: Now.who ?: "").put("ts", System.currentTimeMillis())
+        Store.addHistory(JSONObject(item.toString()).put("who", who ?: Now.who ?: JSONObject.NULL).put("when", now).put("method", method)
+            .apply { remove("ts") })
         Now.push()
         return JSONObject().put("title", t.title).put("year", t.year ?: JSONObject.NULL).put("type", t.type)
             .put("poster", t.poster ?: JSONObject.NULL).put("backdrop", t.backdrop ?: JSONObject.NULL).put("service", app.id)

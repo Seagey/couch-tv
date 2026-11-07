@@ -1,6 +1,7 @@
 # Bring in your past Netflix and YouTube history (option B)
 
-Optional. With your past viewing in, "keep watching" and the picks start smart instead of empty.
+Optional. With your past viewing in, the picks start smart instead of empty. (Keep watching fills
+from what is watched on each TV, per person; imported history does not go in it.)
 You download your own files from Netflix and Google and drop them in a folder on the bridge
 computer. **Nothing signs in to anything and nothing is sent anywhere**: the bridge only reads the
 files, and everything it learns stays in `bridge/data/` (ignored by git).

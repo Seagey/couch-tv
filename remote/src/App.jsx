@@ -189,7 +189,7 @@ export default function App() {
     const w = who;
     api.recs(w).then((d) => { if (whoNow.current === w) setRecs(d); }).catch(() => { if (whoNow.current === w) setRecs((r) => r || false); });
     api.continueList(w).then((d) => { if (whoNow.current === w) setCont(d.items); }).catch(() => { if (whoNow.current === w) setCont(undefined); });
-  }, [who]);
+  }, [who, tvId]); // each TV keeps its own Keep watching
   useEffect(() => { setRecs(null); setCont(null); loadRecs(); const t = setInterval(loadRecs, 10 * 60000); return () => clearInterval(t); }, [loadRecs]);
   useEffect(() => { if (reach && recs === false) loadRecs(); }, [reach]); // eslint-disable-line react-hooks/exhaustive-deps
   // Back from the lock screen: fetch the lists again, they may be hours old.

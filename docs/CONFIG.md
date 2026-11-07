@@ -116,7 +116,10 @@ out the same way. The phone's People sheet keeps these marks when it renames or 
 { "id": "visitor", "name": "Visitor", "guest": true }
 ```
 
-- **None or one person:** no switcher. Keep watching shows everything.
+- **None or one person:** no switcher. Keep watching shows everything watched on that TV.
+- **Keep watching is per TV and per person.** Each TV remembers who is on its couch, and each
+  person sees only what they watched on that TV: one card per show, newest first, up to 10, gone
+  after 30 days with no watching. A show counts after a minute of the same title playing.
 - **Two:** the pill switch at the top left.
 - **Three or more:** a round head icon with the person's initial. OK opens the list.
 

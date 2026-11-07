@@ -668,7 +668,7 @@ async def h_restart_app(request):
         result |= {"resumed": title, "note": f"Restarted YouTube and searched for {title}."}
     elif title and app.get("deeplink") == "jw":
         try:
-            r = await S.play(title, service=app["id"], who=S.store.current_who(), resume=True)
+            r = await S.play(title, service=app["id"], who=S.cur_who(), resume=True)
             result |= {"resumed": r["title"], "started": r.get("started"),
                        "note": f"Restarted {app['name']}. " + (r.get("note") or "")}
         except S.ApiError as e:
