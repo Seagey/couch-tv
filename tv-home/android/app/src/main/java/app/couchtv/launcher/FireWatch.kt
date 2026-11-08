@@ -36,6 +36,7 @@ class FireWatch : AccessibilityService() {
 
     override fun onServiceConnected() {
         connected = true
+        homeClasses = homeActivitiesOf(this)
         Log.i("couchtv.firewatch", "the Home button watch is connected")
         // The TV's own home can come up before this service is bound, and then its window event is
         // never seen (issue #44: Amazon's home sat on screen about 30 s at boot). The service has no
@@ -106,15 +107,30 @@ class FireWatch : AccessibilityService() {
         const val ANDROID_TV_HOME = "com.google.android.tvlauncher"
         private val STOCK_HOMES = listOf(AMAZON_HOME, GOOGLE_TV_HOME, ANDROID_TV_HOME)
 
+        /** The activities of the Google homes that the TV itself lists as a HOME screen (read when the service binds). */
+        @Volatile var homeClasses: Set<String> = emptySet()
+
+        /**
+         * Google TV's home is not always `.home.HomeActivity`: a TCL on Android TV 11 starts
+         * `.home.VanillaModeHomeActivity` (issue #51). Whatever the package declares as a HOME
+         * activity is the home; its profile, account and setup screens are not HOME activities.
+         */
+        fun homeActivitiesOf(c: Context): Set<String> = runCatching {
+            val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            c.packageManager.queryIntentActivities(q, 0)
+                .filter { it.activityInfo.packageName == GOOGLE_TV_HOME || it.activityInfo.packageName == ANDROID_TV_HOME }
+                .map { it.activityInfo.name }.toSet()
+        }.getOrDefault(emptySet())
+
         /**
          * The TV's own home screen, not its other screens. Amazon's launcher package also holds
          * Fire OS's Settings screens, and the Google TV home package holds profile, account and
          * setup screens: only the home itself is replaced.
          */
-        fun isStockHome(pkg: String?, cls: String?): Boolean = when (pkg) {
+        fun isStockHome(pkg: String?, cls: String?, homes: Set<String> = homeClasses): Boolean = when (pkg) {
             AMAZON_HOME -> cls?.contains("Settings") != true
-            GOOGLE_TV_HOME -> cls == "$GOOGLE_TV_HOME.home.HomeActivity"
-            ANDROID_TV_HOME -> cls == "$ANDROID_TV_HOME.MainActivity"
+            GOOGLE_TV_HOME -> cls == "$GOOGLE_TV_HOME.home.HomeActivity" || cls == "$GOOGLE_TV_HOME.home.VanillaModeHomeActivity" || (cls != null && cls in homes)
+            ANDROID_TV_HOME -> cls == "$ANDROID_TV_HOME.MainActivity" || (cls != null && cls in homes)
             else -> false
         }
 
