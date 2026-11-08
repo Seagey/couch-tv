@@ -816,6 +816,10 @@ class MainActivity : Activity() {
                             art.toByteArray(), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING))
                         if (dur > 0 && pos > 0) put("progress", (pos.toDouble() / dur).coerceIn(0.0, 1.0))
                         put("app", JSONObject().put("package", pkg).put("name", label))
+                        // for the bridge (POST /api/watch-next): which app, and when it was last watched,
+                        // to name a play the app itself gave no title for (Netflix, issue #23)
+                        put("package", pkg)
+                        put("engaged", c.getLong(10))
                     })
                 }
             }

@@ -1289,6 +1289,10 @@ WATCH_NEXT_TYPES = {"0": "continue", "1": "next", "2": "new", "3": "watchlist"}
 # Apps kept out of Keep watching (YouTube here: it can bury
 # everything else). The history is still recorded, it just is not listed.
 CONTINUE_SKIP = {"youtube"}
+# Never logged as watched at all: videos, music and streams are not shows to keep watching, and a
+# video title matched to a film would put that film in the household's taste (issue #23: a
+# Veritasium video logged as "Fear of Rain"). The on-TV app has the same list (Now.NOT_KEPT).
+NOT_KEPT = {"youtube", "spotify", "twitch", "moonlight"}
 
 
 def _parse_rows(out, cols):
@@ -1645,6 +1649,13 @@ async def media_read(pkg, app):
 SEEN_AFTER_S = float(os.environ.get("COUCHTV_SEEN_AFTER_S") or 60)
 
 
+def _blip(cand):
+    """A show is being counted and the last reading that showed it was under 12 s ago: a reading with
+    nothing playing (a slow dumpsys, the front app read as the home for a moment) is forgiven, as the
+    on-TV app does (Now.remember). Only a different title, or nothing for longer, starts it again."""
+    return bool(cand and cand[0]) and time.time() - seen_playing.get("_playing_last", 0) < 12
+
+
 async def media_watch_loop():
     """Every 8 s while an app is in front (checks every 10 s otherwise): read what it says is playing, for
     /api/now (title, state, position) and to log shows started by hand."""
@@ -1667,8 +1678,13 @@ async def media_watch_loop():
                 pos = media_now.get("position_ms")
                 young = pos is not None and pos < SEEN_AFTER_S * 1000
                 cand = seen_playing.get("_playing")
-                if key != (cand and cand[0]):
+                if key and key == (cand and cand[0]):
+                    seen_playing["_playing_last"] = time.time()
+                if key is None and _blip(cand):
+                    pass   # one reading with nothing playing does not start the minute again
+                elif key != (cand and cand[0]):
                     seen_playing["_playing"] = (key, time.time())   # something new (or nothing) playing
+                    seen_playing["_playing_last"] = time.time()
                 elif key and not young and time.time() - cand[1] >= SEEN_AFTER_S and time.time() - seen_playing.get(key + (cur_who(),), 0) >= 1800:
                     seen_playing[key + (cur_who(),)] = time.time()
                     item = playing["item"]
@@ -1677,21 +1693,130 @@ async def media_watch_loop():
                     if not (item and item.get("who") == cur_who() and item.get("ts", 0) > time.time() - 3 * 3600
                             and item["title"].lower() in (s["title"].lower(), (s.get("subtitle") or "").lower())):
                         await log_seen(s["title"], s.get("subtitle"), app, dict(media_now))
+                untitled_step(pkg, app, bool(s and s.get("state") == "PLAYING" and not s.get("title")), pos,
+                              titled=bool(s and s.get("state") == "PLAYING" and s.get("title")))
             else:
-                seen_playing["_playing"] = (None, time.time())   # the minute starts again after a break
+                if not _blip(seen_playing.get("_playing")):
+                    seen_playing["_playing"] = (None, time.time())   # the minute starts again after a break
+                untitled_step(None, None, False, None)
                 if media_now:
                     media_now.clear()
                     push_now()
+            await untitled_resolve()
         except Exception as e:
             log.warning("media watch skipped: %s: %s", type(e).__name__, e)
         await asyncio.sleep(8 if busy else 10)
 
 
-async def log_seen(title, subtitle, app, now=None):
+UNTITLED_KEEP_S = 3 * 3600   # how long after an untitled play its Watch Next row may still turn up
+OPENED_WINDOW_S = 600        # a show couch-tv opened this long before the play started covers it
+
+
+def untitled_step(pkg, app, untitled, pos, titled=False):
+    """Netflix sends no title while it plays and Prime only its own name (issue #23), so there is
+    nothing to log. Remember such a play here, per TV and with the person on the couch, once it has
+    played continuously for the minute (and, when the app gives a position, past the minute too).
+    untitled_resolve() then names it from Android's Watch Next row for that app."""
+    now = time.time()
+    u = seen_playing.get("_untitled")
+    if not untitled or not app or app["id"] in NOT_KEPT:
+        # a break before the minute starts it again; and once the same app names what it plays, a
+        # later Watch Next row would be that show, not the earlier unnamed one
+        if u and not u["done"] and (not u["qualified"] or (titled and pkg == u["pkg"])):
+            seen_playing["_untitled"] = None
+        return
+    if not u or u["pkg"] != pkg or u["who"] != cur_who() or (u["done"] and now - u["last"] > 600):
+        u = {"pkg": pkg, "app": app, "who": cur_who(), "since": now, "last": now,
+             "qualified": False, "done": False}
+        # A show couch-tv itself opened in this app just before (phone search, Ask, a Keep
+        # watching card) was logged when it was opened (play()): that already names this play.
+        item = playing["item"]
+        if (item and item.get("package") == pkg and item.get("who") == cur_who()
+                and now - OPENED_WINDOW_S <= item.get("ts", 0) <= now + 60):
+            u["done"], u["named_by"] = True, "opened"
+    u["last"] = now
+    if (not u["qualified"] and now - u["since"] >= SEEN_AFTER_S
+            and (pos is None or pos >= SEEN_AFTER_S * 1000)):
+        u["qualified"] = True
+        log.info("untitled play counted in %s for %s: looking for its Watch Next row",
+                 app["name"], u["who"] or "nobody")
+    seen_playing["_untitled"] = u
+
+
+def _wn_rows():
+    """Watch Next rows for this TV: from the TV home app (POST /api/watch-next; the launcher holds
+    READ_TV_LISTINGS, ADB's shell user cannot read other apps' rows) and from ADB where a TV allows it."""
+    return list(seen_playing.get("_wn_rows") or [])
+
+
+async def untitled_resolve():
+    u = seen_playing.get("_untitled")
+    if not u or u["done"] or not u["qualified"]:
+        return
+    now = time.time()
+    if now - u["last"] > UNTITLED_KEEP_S:
+        seen_playing["_untitled"] = None
+        return
+    rows = _wn_rows()
+    if now - seen_playing.get("_wn_adb_at", 0) > 60 and tv.connected and await tv.adb_ready():
+        seen_playing["_wn_adb_at"] = now
+        try:
+            for it in await watch_next():
+                pkg = (it.get("app") or {}).get("package")
+                when = it.get("last_played")
+                rows.append({"package": pkg, "title": it.get("title"), "episode_title": it.get("episode_title"),
+                             "season": it.get("season"), "episode": it.get("episode"),
+                             "poster": it.get("poster"),
+                             "engaged": datetime.fromisoformat(when).timestamp() if when else None})
+        except Exception:
+            pass
+    best = None
+    for r in rows:
+        if (r.get("package") == u["pkg"] and r.get("engaged") and r["engaged"] >= u["since"] - 120
+                and not generic_title(r.get("title"), u["pkg"], u["app"])):
+            if not best or r["engaged"] > best["engaged"]:
+                best = r
+    if not best:
+        return
+    u["done"], u["named_by"] = True, "watch-next"
+    seen_playing["_untitled"] = u
+    poster = best.get("poster") if str(best.get("poster") or "").startswith("https://") else None
+    await log_seen(best["title"], best.get("episode_title"), u["app"],
+                   {"season": best.get("season"), "episode": best.get("episode"),
+                    "episode_title": best.get("episode_title")},
+                   who=u["who"], method="watch-next", poster=poster)
+
+
+async def h_watch_next(request):
+    """The TV home app's copy of Android's Watch Next rows (it can read them, ADB cannot)."""
+    data = await body(request)
+    rows = []
+    for r in (data.get("rows") or [])[:40]:
+        if not isinstance(r, dict) or not isinstance(r.get("title"), str) or not isinstance(r.get("package"), str):
+            continue
+        try:
+            engaged = float(r.get("engaged") or 0) / 1000 or None
+        except (TypeError, ValueError):
+            engaged = None
+        rows.append({"package": r["package"][:200], "title": r["title"][:200],
+                     "episode_title": (r.get("episode_title") or None) and str(r["episode_title"])[:200],
+                     "season": str(r.get("season") or "")[:6] or None, "episode": str(r.get("episode") or "")[:6] or None,
+                     "poster": None, "engaged": engaged})
+    seen_playing["_wn_rows"] = rows
+    seen_playing["_wn_at"] = time.time()
+    await untitled_resolve()
+    return ok(rows=len(rows))
+
+
+async def log_seen(title, subtitle, app, now=None, who=None, method="seen", poster=None):
     """Log a show seen playing, with the season and episode media_read worked out (`now`, a copy of
-    media_now), on this TV for the person on the couch here. Only a show of the same name gets the
-    finder's title and picture; a near miss keeps the app's own title and no picture."""
+    media_now), on this TV for the person on the couch here (or `who`, the person picked when it
+    played). Only a show of the same name gets the finder's title and picture; a near miss keeps the
+    app's own title and no picture. Videos and music are never logged (NOT_KEPT)."""
+    if app.get("id") in NOT_KEPT:
+        return
     now = now or {}
+    fallback_poster = poster
     poster = backdrop = year = kind = None
     show = title
     try:
@@ -1706,13 +1831,13 @@ async def log_seen(title, subtitle, app, now=None):
                                                   best["year"], best["type"])
     except Exception:
         pass
-    store.add_history({"title": show, "year": year, "type": kind, "poster": poster,
+    store.add_history({"title": show, "year": year, "type": kind, "poster": poster or fallback_poster,
                        "backdrop": backdrop, "service": app["id"] or app["package"],
-                       "who": cur_who(), "tv": _current.get(),
+                       "who": who if who is not None else cur_who(), "tv": _current.get(),
                        "season": now.get("season"), "episode": now.get("episode"),
                        "episode_title": now.get("episode_title") or subtitle,
-                       "when": now_iso(), "method": "seen"})
-    log.info("logged %s on %s", show, app["name"])
+                       "when": now_iso(), "method": method})
+    log.info("logged %s on %s (%s)", show, app["name"], method)
 
 
 # ---------- picture mode: a switch between the TV's two modes in picture.modes ----------
@@ -1997,6 +2122,7 @@ def make_app():
     r.add_post("/api/settings", h_settings_set)
     r.add_get("/api/continue", h_continue)
     r.add_post("/api/continue/open", h_continue_open)
+    r.add_post("/api/watch-next", h_watch_next)
     r.add_get("/api/sleep", h_sleep_get)
     r.add_post("/api/sleep", h_sleep_set)
     r.add_get("/api/screens", h_screens)

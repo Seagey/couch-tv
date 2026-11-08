@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Tests only (README.md): a fake streaming app for the Keep watching simulation on an emulator. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Watch Next rows, as the real streaming apps write them -->
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
+    <!-- tests only: what another app's Watch Next rows look like to an app that holds this -->
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <application android:label="Fake player (test)" android:banner="@android:drawable/ic_media_play"
@@ -21,6 +25,7 @@
                 <data android:scheme="https" />
                 <data android:scheme="nflx" />
                 <data android:scheme="intent" />
+                <data android:scheme="fakeplayer" />
             </intent-filter>
         </activity>
     </application>

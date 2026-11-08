@@ -119,9 +119,14 @@ out the same way. The phone's People sheet keeps these marks when it renames or 
 - **None or one person:** no switcher. Keep watching shows everything watched on that TV.
 - **Keep watching is per TV and per person.** Each TV remembers who is on its couch, and each
   person sees only what they watched on that TV: one card per show, newest first, up to 10, gone
-  after 30 days with no watching. A show counts after a minute of the same title playing.
+  after 30 days with no watching. A show counts after a minute of the same title playing. An app
+  that gives Android no title (Netflix on some TVs) or only its own name (Prime on a Sony) is named
+  from its row in Android's "Continue watching" (Watch Next) instead: the TV home app reads those
+  rows and hands them to the bridge, because ADB cannot read them. Videos and music are never kept.
 - **Two:** the pill switch at the top left.
 - **Three or more:** a round head icon with the person's initial. OK opens the list.
+- With two or more people the switcher always shows, also before anyone has watched anything, so
+  you can say who is watching first.
 
 The list order is the order on screen. After the first start the bridge keeps the list in
 `bridge/data/people.json`, and that wins over `config.json` from then on, because the phone

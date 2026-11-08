@@ -16,6 +16,9 @@ object Store {
         dir = File(ctx.filesDir, "data").apply { mkdirs() }
     }
 
+    /** The app's context, for the few readers that need Android itself (WatchNext). */
+    fun context(): Context = ctx
+
     fun str(key: String, def: String? = null): String? = prefs.getString(key, def)
     fun putStr(key: String, v: String?) = prefs.edit().apply { if (v == null) remove(key) else putString(key, v) }.apply()
     fun bool(key: String, def: Boolean = false) = prefs.getBoolean(key, def)

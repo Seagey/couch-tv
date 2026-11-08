@@ -186,8 +186,12 @@ address.
   the app's own position has to pass a minute too, so a preview that autoplays on an app's browse
   screen never counts. This needs ADB connected, because the TV reads it from Android's media
   sessions, the same reading as "What is playing". Netflix, Disney+, Prime Video and most others
-  say what is playing; a few apps say nothing, and those cannot land there. Some say only their own
-  name ("PrimeVideo" while a film plays, seen on a Sony): that is never kept as a show.
+  say what is playing. Some say nothing (Netflix on some boxes) or only their own name ("PrimeVideo"
+  while a film plays, seen on a Sony): that is never kept as a show by itself. Instead the app reads
+  that app's row in Android's "Continue watching" (Watch Next), which Netflix and Prime keep up to
+  date, usually as you leave the show, and names the play from it, for the person picked when it
+  played. The app gives itself the permission to read those rows over its own ADB when it
+  connects. An app that says nothing and keeps no such row still cannot land there.
 
 Each card opens exactly the show it shows. One card per show (the latest episode), newest first,
 **up to 10**: the row slides along as you move right. A show drops off after **30 days** with no

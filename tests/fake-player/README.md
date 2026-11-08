@@ -22,6 +22,10 @@ Launch extras (`adb -s emulator-NNNN shell am start -n <package>/dev.couchtv.fak
 | `--es rotate "A\|B\|C" --ei rotate_s 15` | a new title every 15 s with the position back at 0 (autoplay previews) |
 | `--ei pos_s 120` | start at 2 minutes in |
 | `--ez stop true` | stop playing and release the session |
+| `--es wn "The Night Agent" --es wn_ep "Pilot" --ei wn_s 1 --ei wn_e 1` | write this app's one Watch Next row ("Continue watching"), as Netflix and Prime do |
+| `--ez wn_only true` | with `wn` or `wn_clear`: only change the Watch Next row, do not play |
+| `--ez wn_clear true` | remove this app's Watch Next rows |
+| `--ez wn_read true` | log every Watch Next row this app can see (with READ_TV_LISTINGS granted: other apps' rows too; ADB's shell user sees none) |
 
 Opening a link (`VIEW`, as couch-tv does to open a show) logs `fakeplayer opened <link>` and plays
 with no title, so couch-tv sees playback start but records nothing from it.

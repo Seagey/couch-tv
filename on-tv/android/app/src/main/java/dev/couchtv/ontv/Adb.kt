@@ -242,9 +242,11 @@ object Adb {
         // One-off grants that make the app work better, and keep working when ADB is off:
         //  - draw over other apps: lets the app open other apps with plain intents from the background
         //  - write secure settings: lets the app switch wireless debugging back on after a reboot
+        //  - read TV listings: lets Keep watching read Android's Watch Next rows (WatchNext.kt)
         io.execute {
             runCatching { shell("appops set ${BuildConfig.APPLICATION_ID} SYSTEM_ALERT_WINDOW allow", 8000) }
             if (Build.VERSION.SDK_INT >= 30) runCatching { shell("pm grant ${BuildConfig.APPLICATION_ID} android.permission.WRITE_SECURE_SETTINGS", 8000) }
+            runCatching { shell("pm grant ${BuildConfig.APPLICATION_ID} " + if (Build.VERSION.SDK_INT >= 29) "android.permission.READ_TV_LISTINGS" else "com.android.providers.tv.permission.READ_EPG_DATA", 8000) }
             FireHome.poke()
         }
         return true
