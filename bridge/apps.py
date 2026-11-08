@@ -108,6 +108,16 @@ WEBOS = {
     "settings": {"ids": ["com.palm.app.settings"]},
 }
 
+# LG apps with no Android twin in APPS (so no package to invent): LG id -> name. The LG app shows
+# them by that name and opens them by that id with no app list, and uses a bundled logo named
+# <LG id>.png from remote/src/app-logos when there is one. Seen on an LG OLED C4 in Italy, webOS 24 (#45).
+WEBOS_ONLY = {
+    "it.rainet.raiplay": "RaiPlay",
+    "com.atlas.tv": "NOW",
+    "dazn": "DAZN",
+    "com.crunchyroll.webapp": "Crunchyroll",
+}
+
 BY_ID = {a["id"]: a for a in APPS}
 TIZEN_TO_PACKAGE = {tid: BY_ID[aid]["package"] for aid, t in TIZEN.items()
                     for tid in t["ids"] + ([t["app"]] if t.get("app") else [])}
