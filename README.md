@@ -53,7 +53,7 @@ the main repo, credited to each of them. Download the new apps from
 
 - **Fire TV sticks and Fire TV Cube (Fire OS).** The "lives on the TV" app now takes the Home key
   back: Amazon's own home cannot be switched off, so the app sees it come up and puts couch-tv's
-  home straight back on top. Amazon's home still flashes up for a moment first. It needs two
+  home straight back on top. Amazon's home still flashes up for a moment first. It needs three
   one-off grants from a computer: [on-tv/README.md](on-tv/README.md#fire-tv-fire-os). Confirmed
   on a Fire TV Stick 4K (2nd gen, Fire OS 8) by [killy10o10](https://github.com/Seagey/couch-tv/issues/3).
 - **Older TVs no longer crash on open.** Both TV apps used a part of Android that only Android 11
@@ -287,7 +287,7 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
 - **Fire TV (Fire OS):** the phone remote and app launching work. Amazon does not let another home
   screen replace its own, so couch-tv watches for Amazon's home and puts its own home back on top;
   Amazon's home still flashes up for a moment first. Options A and B: `apply.sh` switches the watch
-  on by itself. Option C needs two one-off ADB grants: [on-tv/README.md](on-tv/README.md#fire-tv-fire-os).
+  on by itself. Option C needs three one-off ADB grants: [on-tv/README.md](on-tv/README.md#fire-tv-fire-os).
   Fire OS 6 sticks (Android 7.1) need a release newer than 0.3.
 - **Samsung:** it does not run Android apps and it locks its home screen, so couch-tv goes on as a
   Samsung app (you install it with a free tool and your own Samsung sign-in), and the bridge opens

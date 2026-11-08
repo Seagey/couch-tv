@@ -21,8 +21,10 @@ import android.util.Log
  *     from a computer, kept across reboots:
  *       adb shell pm grant dev.couchtv.ontv android.permission.WRITE_SECURE_SETTINGS
  *       adb shell appops set dev.couchtv.ontv SYSTEM_ALERT_WINDOW allow
- *  2. App-usage events, polled while the screen is on. Needs usage access instead of the first
- *     grant:
+ *     Fire OS 6 runs Amazon's own accessibility manager and never binds it (issue #50), so the
+ *     setting reads as on while nothing listens: the app then falls through to the next way.
+ *  2. App-usage events, polled while the screen is on. Needs usage access, the third grant (give it
+ *     on every Fire TV: it is only used where the watcher is not connected):
  *       adb shell appops set dev.couchtv.ontv GET_USAGE_STATS allow
  *  3. The activity log over the TV's own ADB, where that still works (no polling).
  *

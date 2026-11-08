@@ -62,10 +62,15 @@ esac
 HOME_ACT=""
 [ -f "$HERE/../tvs/$TV_NAME.home" ] && HOME_ACT=$(cat "$HERE/../tvs/$TV_NAME.home")
 if [ -z "$HOME_ACT" ]; then
+  # Ask the TV which activity its Google home has for HOME: it is not always .home.HomeActivity (a TCL
+  # with Android TV 11 has .home.VanillaModeHomeActivity, issue #51). The names are only a fallback.
+  HOMES=$("$PY" "$T" shell "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME" 2> /dev/null | tr -d '\r' | sed 's|^ *||' || true)
   if echo "$present" | grep -qx com.google.android.apps.tv.launcherx; then
-    HOME_ACT=com.google.android.apps.tv.launcherx/.home.HomeActivity
+    HOME_ACT=$(echo "$HOMES" | grep '^com\.google\.android\.apps\.tv\.launcherx/' | head -1)
+    [ -n "$HOME_ACT" ] || HOME_ACT=com.google.android.apps.tv.launcherx/.home.HomeActivity
   elif echo "$present" | grep -qx com.google.android.tvlauncher; then
-    HOME_ACT=com.google.android.tvlauncher/.MainActivity
+    HOME_ACT=$(echo "$HOMES" | grep '^com\.google\.android\.tvlauncher/' | head -1)
+    [ -n "$HOME_ACT" ] || HOME_ACT=com.google.android.tvlauncher/.MainActivity
   fi
 fi
 if [ -n "$HOME_ACT" ]; then

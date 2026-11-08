@@ -46,6 +46,10 @@ Not tested by the author. Each line is what someone said worked on their own dev
 - **Where the settings are.** Google TV: Settings, System, About (and Developer options under
   System). Android TV 9 to 11: Settings, Device Preferences, About (and Developer options under
   Device Preferences).
+- **TCL memory manager.** A TCL TV can trim couch-tv shortly after it starts (`com.tcl.guard`, log tag
+  `TGuardMemoryManagerTrimHandler`). No crash has come of it, and the home starts again when you press Home.
+  A TCL on Android TV 11 also starts its Google home as `.home.VanillaModeHomeActivity`, which the Home
+  button watch knows ([issue #51](https://github.com/Seagey/couch-tv/issues/51)).
 - **ADB port.** Most Android TVs and Google TV boxes open the fixed port 5555, which every couch-tv
   script uses: with a Network debugging switch, or on some TVs (a TCL with Android TV 11) with USB
   debugging alone. Some Android 11 and newer Google TVs only offer Wireless
@@ -58,12 +62,14 @@ Not tested by the author. Each line is what someone said worked on their own dev
   the port changes after a restart. See `on-tv/README.md` for how it handles that.
 - **Fire OS.** Amazon blocks real home screen replacement. The workarounds relaunch your app after
   Amazon's home flashes up; for options A and B `apply.sh` switches that on, and the on-TV app
-  (option C) does it itself once two one-off ADB grants are given (`on-tv/README.md`, "Fire TV
+  (option C) does it itself once three one-off ADB grants are given (`on-tv/README.md`, "Fire TV
   (Fire OS)"). Fire OS 6 is Android 7.1 (Fire TV Stick 4K 1st gen); both apps run on it from the
   release after 0.3, checked on an Android 7.1 emulator only. ADB from a computer works. Fire OS
-  7.6.6.9 and 8.1.0.3 and newer block an app on the TV from using the TV's own ADB, so on an up to
+  Current Fire OS (6.7.1.1, 7.6.6.9, 8.1.0.3 and newer) blocks an app on the TV from using the TV's own ADB, so on an up to
   date Fire TV option C's phone remote cannot press keys or type ([issue #12](https://github.com/Seagey/couch-tv/issues/12));
-  option B can. The Android TV Remote protocol is not confirmed on Fire TV.
+  option B can. Fire OS 6 never connects the accessibility watcher (it runs Amazon's own accessibility
+  manager), so there the Home button watch goes by usage access, the third grant. Seen on an Insignia Fire TV
+  Edition, Fire OS 6.7.1.1 ([issue #50](https://github.com/Seagey/couch-tv/issues/50)). The Android TV Remote protocol is not confirmed on Fire TV.
 - **Vega OS** is Amazon's newer Linux system. It has no sideloading. Amazon says future Fire TV
   sticks will run it.
 - **Samsung and LG** do not run Android apps or let an app replace their home screen. On a Samsung,
