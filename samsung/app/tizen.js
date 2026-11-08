@@ -84,6 +84,9 @@
     if (m) (m.ids || []).concat(m.app ? [m.app] : []).forEach(function (id) { if (ids.indexOf(id) < 0) ids.push(id); });
     if (!ids.length && /\./.test(pkg)) ids.push(pkg);
     if (!ids.length) return false;
+    // Some TVs list a "-dummy" placeholder for an app (Prime Video). It opens nothing, so try it last.
+    ids = ids.filter(function (id) { return !/-dummy$/.test(id); })
+      .concat(ids.filter(function (id) { return /-dummy$/.test(id); }));
     (function attempt(i) {
       if (i >= ids.length) { send("log", "launch failed for " + pkg + ", asking the bridge"); bridgeLaunch(pkg); return; }
       try {
