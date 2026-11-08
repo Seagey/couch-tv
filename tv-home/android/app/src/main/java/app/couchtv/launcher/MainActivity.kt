@@ -577,7 +577,7 @@ class MainActivity : Activity() {
         // albums are chosen. The dream service only lets the system start a dream, so the TV is
         // asked to nap in a few seconds instead and brings its own screensaver up.
         @JavascriptInterface
-        fun canStartScreensaver(): Boolean = true
+        fun canStartScreensaver(): Boolean = screensaverReady()
 
         @JavascriptInterface
         fun startScreensaver(): Boolean = startAmbientNow() || openAmbientSettings()
@@ -790,6 +790,25 @@ class MainActivity : Activity() {
                 .invoke(pm, android.os.SystemClock.uptimeMillis(), false)
         } catch (e: Exception) {
             android.util.Log.w("couch-tv", "userActivity refused: " + e)
+        }
+    }
+
+    /**
+     * Whether the button can work here: apply.sh granted "modify system settings", and the TV has a
+     * screensaver switched on whose app is installed and enabled. Without one, a short timeout
+     * only puts the TV to sleep (apply.sh switches Google TV's ambient mode off unless KEEP_AMBIENT=1).
+     */
+    private fun screensaverReady(): Boolean {
+        if (!Settings.System.canWrite(this)) return false
+        val cr = contentResolver
+        if (Settings.Secure.getInt(cr, "screensaver_enabled", 1) == 0) return false
+        val dream = Settings.Secure.getString(cr, "screensaver_components")
+            ?.split(",")?.firstOrNull()?.let { android.content.ComponentName.unflattenFromString(it) }
+            ?: return false
+        return try {
+            packageManager.getApplicationInfo(dream.packageName, 0).enabled
+        } catch (e: Exception) {
+            false
         }
     }
 
