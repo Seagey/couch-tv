@@ -29,7 +29,8 @@ The README's steps are numbered 1 to 6. Option A uses steps 1, 2 and 6. Option B
 1. Run `python3 --version`. It must be **3.11 or newer**. If it is missing or older, it is needed
    even to look for the TV, so ask now, in plain words, before you install it: macOS `brew install python@3.11` (or the installer from
    python.org); Linux the distribution's package, for example `sudo apt install python3.11
-   python3.11-venv`. On a Mac the first `python3` or `git` may pop up "install the command line
+   python3.11-venv`. Debian ships Python without venv: if `python3 -m venv .venv` fails, install
+   `python3-venv` or use `uv venv --seed .venv` instead. On a Mac the first `python3` or `git` may pop up "install the command line
    developer tools": tell them to press Install and wait a few minutes. That is normal.
 2. **Get the TV apps from the Releases page first.** Download `couch-tv-home.apk` (options A
    and B) and `couch-tv-ontv.apk` (option C) from

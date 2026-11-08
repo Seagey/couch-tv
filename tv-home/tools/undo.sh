@@ -6,14 +6,14 @@
 #
 # Option B: stop the bridge first (docs/UNINSTALL.md). This empties its keep-off list as well.
 #
-# Usage: TV_IP=<tv address> [TV_NAME=living-room] [ADB_PORT=5555] sh tv-home/tools/undo.sh
+# Usage: TV_IP=<tv address> [TV_ID=<id>] [TV_NAME=<name, defaults to TV_ID, else living-room>] [ADB_PORT=5555] sh tv-home/tools/undo.sh
 #   (run from the repo root)
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 PY="${PY:-$ROOT/.venv/bin/python}"
 T="$HERE/tvadb.py"
-TV_NAME=${TV_NAME:-living-room}
+TV_NAME=${TV_NAME:-${TV_ID:-living-room}}
 : "${TV_IP:?set TV_IP to the address of the TV}"
 export TV_IP
 "$PY" "$T" ping > /dev/null

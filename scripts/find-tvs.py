@@ -9,7 +9,8 @@ line per device: its name, address, model (when it says), and what it offers:
   cast    = Google Cast (almost every Google TV, also many speakers and Chromecasts)
   adb     = Wireless debugging is switched on (Android 11 and newer, Developer options)
 A TV that shows "remote" is a Google TV or Android TV. A "Cast device" only offers cast: it could
-be a speaker, an older Chromecast or a Fire TV (check-tv.py tells them apart).
+be a speaker, an older Chromecast or a Fire TV (check-tv.py tells them apart). A Cast device that
+also answers on port 8001 is a Samsung TV and is listed as "Samsung TV" (docs/SAMSUNG.md).
 LG TVs (webOS) answer a second question, the one LG's own phone app asks (SSDP, LG's "second
 screen" service), and are listed as "LG TV" (docs/LG.md). Samsung and other TVs that do not run
 Android are not listed at all.
@@ -97,6 +98,14 @@ class Found(ServiceListener):
         pass
 
 
+def knock(ip, port, timeout=1.0):
+    try:
+        with socket.create_connection((ip, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
 def main():
     wait = float(sys.argv[1]) if len(sys.argv) > 1 else 6
     zc = Zeroconf()
@@ -110,7 +119,9 @@ def main():
     for ip in lgs:
         tvs.pop(ip, None)
         others.pop(ip, None)
-    if not tvs and not lgs:
+    # A Samsung (Tizen) TV shows up only as a "Cast device" here. It also answers on port 8001.
+    samsungs = {ip: others.pop(ip) for ip in list(others) if ip not in tvs and knock(ip, 8001)}
+    if not tvs and not lgs and not samsungs:
         print("No Android TV found. If your TV is Samsung, LG or another brand, that is expected: tell your")
         print("agent the brand and model.")
         print("If it is a Google TV or Android TV: check it is on, awake and on the same Wi-Fi (not a guest")
@@ -121,6 +132,9 @@ def main():
         print(f"TV       {ip:15}  {' / '.join(sorted(d['names']))}  ({model})  offers: {', '.join(sorted(d['offers']))}")
     for ip, name in sorted(lgs.items()):
         print(f"LG TV    {ip:15}  {name or 'name not given'}  (webOS: see docs/LG.md, check-tv.py tells more)")
+    for ip, d in sorted(samsungs.items()):
+        model = ", ".join(sorted(d["models"])) or "model not given"
+        print(f"Samsung TV  {ip:15}  {' / '.join(sorted(d['names']))}  ({model})  (Tizen: see docs/SAMSUNG.md)")
     for ip, d in sorted(others.items()):
         model = ", ".join(sorted(d["models"])) or "model not given"
         print(f"Cast device {ip:15}  {' / '.join(sorted(d['names']))}  ({model})  "

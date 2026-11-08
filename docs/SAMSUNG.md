@@ -89,6 +89,23 @@ switching the TV on.
 4. **Restart the TV**: hold the power button until the TV switches off and on again (a short press
    only sends it to standby or Art Mode).
 
+**The Frame's slim remote has no number keys, and 12345 on it did nothing on a 2025 Frame.** The
+on-screen number pad on the Apps screen did not open the Developer Mode box either. What worked
+(reported by retr04ctive on a 2025 Frame, QN65LS03F, Tizen 9.0):
+
+1. Do "Tell the bridge about the TV" (further down) first: add the TV to `config.json` with `"open_on_power_on": false` (so the hook
+   does not fight you), and restart the bridge.
+2. Open **Apps** on the TV. From the computer, send the keys through the bridge, one at a time:
+   `curl -X POST http://<bridge computer's address>:5400/api/key -H 'Content-Type: application/json' -d '{"key":"1","tv":"<tv id>"}'`
+   then `2`, `3`, `4`, `5` (the bridge already knows the digit keys). Leave off `"tv"` if there is one TV.
+3. The first keys are eaten by the "Allow Couch TV bridge to connect?" prompt ("Allow the remote", below). Press
+   **Allow** on the TV, then send 1 to 5 again.
+
+**"Developer Mode looks right but the TV's install service is not running yet"** (the install port,
+26101, stays closed after enabling Developer Mode, a hold power restart or a one minute unplug).
+What fixed it on that Frame: Settings, Support, **Software Update**, then another one minute
+unplug of the power cable. After that `apps2samsung-cli tv <tv address>` said ready.
+
 Check from the computer:
 
 ```sh
@@ -116,7 +133,13 @@ apps2samsung-cli install build/samsung/CouchTV.wgt --tv <tv address>
 ```
 
 The first time, a browser opens for the Samsung account sign-in. After that the certificate is kept
-on the computer and later installs need nothing. The app appears on the TV's app row as
+on the computer and later installs need nothing.
+
+**Bridge computer with no screen or browser (a headless server or VM)?** `apps2samsung-cli cert
+--prepare` prints a sign-in URL that ends at `http://localhost:4794/signin/callback`, on the bridge
+computer. From the computer you are sitting at, run `ssh -L 4794:localhost:4794 <bridge computer>`,
+leave it open, and open the printed URL in your own browser. The callback then reaches the bridge
+computer and the certificate is made there. The app appears on the TV's app row as
 **Couch TV** and opens.
 
 ### 4. Tell the bridge about the TV
