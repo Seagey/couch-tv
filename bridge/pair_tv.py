@@ -36,6 +36,9 @@ from androidtvremote2 import AndroidTVRemote
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 import config
+# A fresh copy has no bridge/data/ yet, and writing the certificate there failed with
+# FileNotFoundError (issue #23). Private to this user: it holds the pairing key.
+os.makedirs(config.DATA, mode=0o700, exist_ok=True)
 CERT, KEY = os.path.join(config.DATA, "cert.pem"), os.path.join(config.DATA, "key.pem")
 WAIT_S = 600
 
