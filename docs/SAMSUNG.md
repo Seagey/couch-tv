@@ -69,7 +69,9 @@ switching the TV on.
 
 ## Before you start
 
-- The bridge running on a computer that stays on (README, option B).
+- The bridge running on a computer that stays on (README, option B). The app-only build
+  (`samsung/build.py` with no `--bridge`) needs no bridge. The bridge needs Python 3.11 or newer;
+  building the app alone ran on Python 3.9 (reported on an M1 Mac with the Mac's own Python).
 - The free **Apps2Samsung** tool: its command line, `apps2samsung-cli` (version 3, comes with the
   desktop app). It installs a `.wgt` app and signs it with **your own** Samsung certificate.
   Samsung's own Tizen Studio does the same job if you already have it.
@@ -100,6 +102,18 @@ on-screen number pad on the Apps screen did not open the Developer Mode box eith
    then `2`, `3`, `4`, `5` (the bridge already knows the digit keys). Leave off `"tv"` if there is one TV.
 3. The first keys are eaten by the "Allow Couch TV bridge to connect?" prompt ("Allow the remote", below). Press
    **Allow** on the TV, then send 1 to 5 again.
+
+**A 2025 Samsung OLED (S85F, Tizen 9.0), reported by Thesaudidrifter.** Four things differ:
+
+- On the 2025 UI, **Apps** is in the side menu, and the app store page is what takes the code.
+- Number keys sent through the bridge reached the TV (they typed into the Apps search box) but did
+  not open the Developer Mode box. Type the code by hand.
+- In the Developer Mode box, type the computer's address **without leading zeros**: type each
+  group as it is (a group of "1" is just 1) and press Right to move to the next. Padding the groups
+  with zeros (001 for 1) is saved padded, which the TV does not treat as the host, and
+  `apps2samsung-cli` stops with "IP Mismatch" or "Connection reset by peer". To check what was
+  stored, open `http://<tv address>:8001/api/v2/` and read `developerIP`.
+- `POST /api/text` does not type into that field (it does type into the Apps search box).
 
 **"Developer Mode looks right but the TV's install service is not running yet"** (the install port,
 26101, stays closed after enabling Developer Mode, a hold power restart or a one minute unplug).
@@ -162,6 +176,10 @@ General, External Device Manager, Device Connection Manager, Device List, and al
 
 Reading the TV (power, which app is open, the volume) needs no Allow. Keys and opening apps do.
 
+Before couch-tv is installed, the bridge's `"home"` key cannot be used to bring up the prompt,
+because it opens couch-tv. Send `smart_hub` instead (Samsung's KEY_HOME). If the first attempt
+says "Connection reset by peer" on port 8002, try again and the prompt shows.
+
 ### 6. Check it
 
 - Switch the TV off and on with its own remote. Within a few seconds couch-tv opens.
@@ -184,6 +202,15 @@ screen (the TV is on live TV, an HDMI input or Samsung's menu) it opens couch-tv
 it is left alone. Anything the phone remote or Claude just asked for also wins: the hook stays quiet
 for 20 seconds after any command, except a power press, so turning the TV on from the phone also
 lands on couch-tv. `"open_on_power_on": false` in `config.json` turns the hook off.
+
+The REST launch is tried up to three times, a second apart, because the first call just after
+power on can fail with "Server disconnected". The log then says whether couch-tv really came
+forward a few seconds later. A very quick off and on can go unseen: the TV may never report
+`standby`, so the hook has nothing to react to. A real standby (the TV leaves the network a few
+seconds after power off) is seen.
+
+**With no computer on at all:** Samsung's **Autorun Last App** setting reopens couch-tv when the TV
+comes on, if couch-tv was the last app used (reported by philehaynes on a 2023 CU8500, Tizen 9.0).
 
 Netflix and YouTube titles open through DIAL (port 8080, the protocol phones use to cast), which
 needs no pairing.

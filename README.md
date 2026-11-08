@@ -506,6 +506,17 @@ To keep the bridge running all the time, use `bridge/examples/couch-tv-bridge.pl
 (macOS) or `bridge/examples/couch-tv-bridge.service.example` (Linux). Both set `CLAUDE_BIN` and a
 `PATH`, because a background service does not see your shell's.
 
+If the macOS service logs `No route to host` while a bridge you start by hand works, that is
+macOS Local Network privacy, and the Local Network switch alone may not fix it for an interpreter
+that is ad-hoc signed with no app bundle (python-build-standalone, for one). Easiest: use a
+python.org or Homebrew Python for the venv. Otherwise copy the interpreter into a small app bundle
+with its own identity (an `Info.plist` with a `CFBundleIdentifier` and an
+`NSLocalNetworkUsageDescription`, then `codesign -s - --force` on the bundle) and point the plist
+at it, as described in issue #42.
+
+A laptop bridge must not sleep, or the bridge stops: Battery, Options, Prevent automatic sleeping
+on power adapter when the display is off, or `sudo pmset -c sleep 0`.
+
 **Anyone on your Wi-Fi can use the remote and the assistant.** The bridge has no password, so
 everyone on the network, kids included, can change the channel, turn the TV off or ask Claude for
 a show. Put visitors on a guest Wi-Fi network (most routers have one) so they cannot reach it. The
