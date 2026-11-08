@@ -120,6 +120,25 @@ Use the same name as the TV's `id` in `config.json` (here `lounge`), or set `are
 Check it with `ares-launch --device lounge com.palmdts.devmode`: the Developer Mode app opens on
 the TV.
 
+**An AI agent cannot type the passphrase** into `--getkey`'s prompt. Piping it in fetches the key but
+the passphrase is not stored, and ssh then fails ("All configured authentication methods failed",
+[#45](https://github.com/Seagey/couch-tv/issues/45)). Give it all at once instead:
+
+```sh
+ares-setup-device -m lounge -i "privatekey=lounge_webos" -i "passphrase=XXXXXX"
+```
+
+**Windows:** the Python is `.venv\Scripts\python.exe` wherever this page says `.venv/bin/python`.
+After `--getkey` the key at `%USERPROFILE%\.ssh\lounge_webos` can be left encrypted, and
+`ares-install` then fails with "Encrypted OpenSSH private key detected, but no passphrase given"
+([#40](https://github.com/Seagey/couch-tv/issues/40)). Either use the `ares-setup-device -m` line
+above, or take the passphrase off the key and point the tools at it:
+
+```
+ssh-keygen -p -P <passphrase> -N "" -f %USERPROFILE%\.ssh\lounge_webos
+ares-setup-device -m lounge -i "privatekey=lounge_webos"
+```
+
 ### 3. Build the app
 
 ```sh
@@ -135,6 +154,23 @@ your settings for when the computer is off. No passwords or keys go in it.
 unless you have a reason: on the first real LG (webOS 5.6.2) the TV refused the ares-package build
 with `com.webos.appInstallService failure: ipk verified failed`, and installed the one
 `lg/build.py` made.
+
+**No bridge (the app-only path)?** webOS 6.5.3 and 5.6.2 refuse the TV's app list to the app, so the
+dock would be empty. Build with the list baked in instead
+([#40](https://github.com/Seagey/couch-tv/issues/40), [#28](https://github.com/Seagey/couch-tv/issues/28)):
+
+```sh
+.venv/bin/python lg/build.py --apps my-tv-apps.json
+```
+
+`my-tv-apps.json` is a list of `{"id": "netflix", "title": "Netflix", "icon": ""}`: the apps on your
+TV (`ares-install --device lounge --list` gives the ids). If the TV has accepted the remote before
+(the bridge was run once with this TV and you pressed Accept), `--apps tv` reads the list from the TV
+itself over LG's network remote instead. The app seeds its dock from the list once per build, so a
+later reorder on the TV is kept, and the list goes stale when you install or remove an app: build
+again. The package also carries the app logos from `remote/src/app-logos`, because the icon
+addresses the TV gives are a 404 on several TVs; an app with no logo there shows its first letter.
+The app-only build also sets `handlesRelaunch` so reopening it does not flash black.
 
 ### 4. Install it
 
@@ -213,6 +249,10 @@ the TV comes on, just before couch-tv opens, so couch-tv covers whatever Develop
 TV that stays on all day it waits until couch-tv or live TV is in front, then puts that back. It
 never does it over another app.
 
+- With no bridge at all, the app can press Extend itself:
+  `com.webos.applicationManager/launch` with `{"id": "com.palmdts.devmode", "params": {"extend": true}}`
+  is the same call ([#40](https://github.com/Seagey/couch-tv/issues/40)). couch-tv does not do this
+  yet, so on the app-only path press Extend in the Developer Mode app within every session.
 - Without `ares-launch` on the bridge computer, the bridge opens Developer Mode with the same
   setting over the network remote instead. That way is **untested** and may only open the app.
   Install the ares tools.
@@ -220,7 +260,7 @@ never does it over another app.
   folder: then set `"ares_launch": "/full/path/to/ares-launch"` on the TV in `config.json` (or the
   `ARES_LAUNCH` environment variable). `which ares-launch` prints the path.
 - The last try, and whether it worked, is in `bridge/data/lg-<id>-devmode.json` and in
-  `/api/tvs`. A failed try is not repeated until the next day.
+  `/api/tvs`. A failed try does not count as the day's: it is tried again an hour later.
 - `"extend_devmode": false` in `config.json` stops it. Then press Extend yourself in the
   Developer Mode app now and then.
 
@@ -244,8 +284,12 @@ the phone says so and you use the TV's remote.
   its id: `ares-install --device lounge --list`, and add it to that app's `ids`.
 - couch-tv on LG reads its app list from the TV when webOS allows it, else from the bridge. Some
   firmware does not allow it (webOS 5.6.2 and 6.5.3 both refuse it), so there the app row stays empty
-  until the bridge is on **and** the TV has accepted the remote (step 6). With no bridge at all the
-  dock stays empty on those TVs for now; an app list built into the package is on the way (#28).
+  until the bridge is on **and** the TV has accepted the remote (step 6). With no bridge, build with
+  `--apps` (step 3) to bake the list in.
+- **webOS 4** (2018 and 2019 models) has no CSS grid or flex `gap`, so the app row and cards stack
+  badly; couch-tv does not have fallbacks for that yet ([#46](https://github.com/Seagey/couch-tv/issues/46)).
+  Its power on: webOS 4 has no `system/turnOn`, so the bridge tries `turnOnScreen` and then
+  Wake-on-LAN (with "Mobile TV On, Turn on via Wi-Fi" switched on).
 - No screenshots, no "what is playing", no profile picking, no pressing Play inside other apps.
 
 ## Undo
