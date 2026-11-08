@@ -325,21 +325,19 @@ exactly what changes:
 - If `check-tv.py` said the TV only has Wireless debugging: you will pair once with Google's
   platform-tools and run `adb tcpip 5555` (README step 1, "Only Wireless debugging?"). On some TVs
   that port closes after a restart and has to be opened again the same way.
-- Options A and B (`apply.sh`) switch off the Google TV home, ambient mode (the idle adverts), the
-  setup wizard and any ad tracker you agree to. Nothing is deleted. Other makers' own homes are
-  left alone. Warn them:
-  - Some Google Home features and the YouTube button on the remote may stop working.
-  - On some TVs, switching the setup wizard off makes the TV forget its Wi-Fi. **Nothing can
-    tell in advance which TVs**: it happened on a TCL where `survey-tv.py` saw nothing risky, so
-    say it may happen on theirs. `apply.sh` does everything else first and switches the wizard off
-    last. If the TV drops off the Wi-Fi, `apply.sh` says so: they re-join the Wi-Fi at the TV
-    (Settings, Network and Internet) and you run `apply.sh` again (it is safe to repeat). Have the
-    TV remote ready. `KEEP_SETUP=1` leaves the wizard on if they would rather not risk it.
-  - Option A: after a Google TV update brings the Google home back, `apply.sh` has to run again.
+- Options A and B (`apply.sh`) make couch-tv the home and switch off ambient mode (the idle
+  adverts) and any ad tracker you agree to. The TV's own home screen and setup app stay on, so the
+  TV always has them when it starts; a small Home button watch (an accessibility service that only sees which
+  window came forward) puts couch-tv on top when the TV opens its own home, which may flash up for
+  a moment. Nothing is deleted.
+  - **Never switch off the Google TV home (`launcherx`, `tvlauncher`) or the setup app
+    (`setupwraith`), by hand or through `EXTRA_OFF`.** couch-tv 0.10 and older did, and a Sony
+    Bravia Google TV then looped at every restart (README, "If your TV loops after a restart").
+    `apply.sh` refuses them and anything else the TV may need to start.
+  - If the TV was set up with couch-tv 0.10 or older, `apply.sh` switches those two back on: tell
+    them that is the fix, not a fault.
+  - Option A: after a Google TV update switches ambient mode back on, `apply.sh` can run again.
     Option B's bridge does that check every day.
-- While the TV is off the Wi-Fi the computer undo cannot reach it either; the fix is to re-join
-  the Wi-Fi, or the TV-remote route in [docs/UNINSTALL.md](docs/UNINSTALL.md). With
-  `KEEP_SETUP=1`, on some TVs the old home then keeps the Home button.
 - Options A and B: with `home.updates` set to `notify`, the TV home asks GitHub once a week
   whether a new couch-tv release is out; with `manual`, only when someone presses Check for updates
   now (either can be changed in Home settings, Updates). It installs nothing unless someone at the
@@ -368,17 +366,17 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
    - Say "Google TV home" only if the home it reports is `com.google.android.apps.tv.launcherx`.
      Otherwise (for example `com.google.android.tvlauncher`, or a maker's own home) call it **the
      TV's own home screen**.
-4. **Allow every computer and app before `apply.sh`.** Seen on one Google TV (Android 14): once the
-   Google TV home and the setup app were switched off, the TV stopped showing "Allow USB
-   debugging?" for any new key; computers allowed before kept working. So, before step 5, make
-   sure each computer that will talk to the TV has been allowed, and for option C that the on-TV
-   app's **Connect ADB** has been allowed.
+4. **Allow every computer and app before `apply.sh`.** Seen on one Google TV (Android 14) set up
+   by an older couch-tv: with the Google TV home and the setup app switched off, the TV stopped
+   showing "Allow USB debugging?" for any new key. The current `apply.sh` leaves both on, but make
+   sure each computer that will talk to the TV has been allowed first anyway, and for option C that
+   the on-TV app's **Connect ADB** has been allowed.
 5. Follow the README for their option (A: steps 1, 2 and 6; B: steps 1 to 6;
    C: [on-tv/README.md](on-tv/README.md)). Run `tv-home/tools/survey-tv.py` before `apply.sh`.
    Option A: run `apply.sh` with no `BRIDGE_URL`. Option B: with `BRIDGE_URL`. It copies the app
    with `tvadb.py`, which falls back to a slower copy by itself if the TV stalls; let it finish.
-   If it ends with "this computer can no longer reach it", the TV forgot its Wi-Fi: ask them to
-   re-join it at the TV, then run the same `apply.sh` command again.
+   If it ends with "this computer can no longer reach it", ask them to check the TV is on and on
+   the Wi-Fi, then run the same `apply.sh` command again.
    - **Pairing (option B, README step 3):** you cannot type into `pair_tv.py`. Run
      `.venv/bin/python bridge/pair_tv.py <tv id>` in the background, ask them to read you the code
      on the TV, then run `.venv/bin/python bridge/pair_tv.py <tv id> --code <code>`. It prints
@@ -408,6 +406,6 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
 - Option B runs `claude -p` with `ANTHROPIC_API_KEY` removed on purpose, so it uses their Claude
   plan, not a paid key. Leave that in place. Option C only uses an API key they typed in themselves.
 - If anything on the TV fails, stop and tell them what happened. Do not keep switching apps off to
-  make it work. The scripts stop on the first failure and say so in one line.
+  make it work, and never switch off a home screen, a setup app or a system app. The scripts stop on the first failure and say so in one line.
 - If they say "take it off" or "I broke it", go straight to [docs/UNINSTALL.md](docs/UNINSTALL.md).
   Option B: stop the bridge first.

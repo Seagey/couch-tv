@@ -651,7 +651,9 @@ off it tries again hourly.
 | default TV | `bridge/data/keep-disabled.json` |
 | any other TV | `bridge/data/keep-disabled.<tv id>.json` |
 
-`tv-home/tools/apply.sh` writes the list for the TV it sets up.
+`tv-home/tools/apply.sh` writes the list for the TV it sets up (ambient mode and any ad tracker).
+The guard never switches off the TV's own home screens or the setup wizard, even if an old list
+names them: with those off, some Google TVs loop at power on.
 
 A JSON array of package names. Undo for a TV: empty that TV's list first, then re-enable the
 apps (otherwise the guard switches them off again the next day). Each undo script empties only

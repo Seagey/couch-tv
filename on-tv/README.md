@@ -106,15 +106,18 @@ the TV, or on the setup page, signs every phone out.
 ## Use it as the home screen (optional)
 
 Switch on **Use as home screen** in Couch TV. On a plain Android TV that is enough. On Google TV the
-system launcher always wins the home button, so it also has to be switched off, from a computer:
+system launcher still wins the Home button, and **do not switch it off**: on some Google TVs (a
+Sony Bravia among them) the TV then loops at every restart
+([README](../README.md#if-your-tv-loops-after-a-restart)). Open Couch TV from the app row instead,
+or use option A's `apply.sh`, which takes the Home button with a watch and leaves the Google home on.
+If an older guide had you switch it off, switch it back on before the next restart:
 
 ```
-adb shell pm disable-user --user 0 com.google.android.apps.tv.launcherx   # Chromecast with Google TV and most Google TVs
-adb shell pm enable com.google.android.apps.tv.launcherx                  # undo
+adb shell pm enable com.google.android.apps.tv.launcherx
+adb shell pm enable com.google.android.tungsten.setupwraith
 ```
 
-Check the package name on your TV first (`adb shell pm list packages | grep launcher`). Some Google
-Home features stop working while it is off. The app never does this by itself.
+The app never switches anything off by itself.
 
 ### Fire TV (Fire OS)
 

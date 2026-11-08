@@ -29,8 +29,15 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent>
-        <!-- Amazon's home, to tell a Fire TV apart (FireWatch.kt). -->
+        <!-- The TV's own homes: the Home button watch looks for them (FireWatch.kt), and the crash
+             guard hands the screen to one if couch-tv keeps crashing (CrashGuard.kt). -->
         <package android:name="com.amazon.tv.launcher" />
+        <package android:name="com.google.android.apps.tv.launcherx" />
+        <package android:name="com.google.android.tvlauncher" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
         <!-- The TV's input list, for the Input quick button when there is no bridge. -->
         <intent><action android:name="android.settings.TV_INPUT_SETTINGS" /></intent>
         <intent><action android:name="com.android.tv.action.VIEW_INPUTS" /></intent>
@@ -74,6 +81,7 @@
     </queries>
 
     <application
+        android:name=".App"
         android:label="Home"
         android:icon="@drawable/icon"
         android:banner="@drawable/banner"
@@ -109,9 +117,10 @@
              app's own PendingIntent. -->
         <receiver android:name=".Updater$Result" android:exported="false" />
 
-        <!-- Fire TV only: puts this home back when the Home key opens Amazon's home (FireWatch.kt).
-             Off until a computer switches it on over ADB; it sees which window came forward and
-             reads no screen content. -->
+        <!-- The Home button watch: puts this home back when the Home key (or the TV at power on)
+             opens the TV's own home, which stays switched on (FireWatch.kt). Fire TV, Google TV and
+             Android TV. Off until a computer switches it on over ADB; it sees which window came
+             forward and reads no screen content. -->
         <service
             android:name=".FireWatch"
             android:exported="false"

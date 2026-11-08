@@ -1,9 +1,9 @@
 """Read-only check of a TV before our home screen goes on it. Changes nothing on the TV or its screen.
 
-Prints what the switch-over depends on: Android version, the home screen apps, which of the
-packages we switch off exist on this TV, any ad trackers (ACR), and who owns the saved Wi-Fi
-network. It cannot tell whether switching the setup wizard off will make the TV forget its Wi-Fi
-(that has happened on a TV where nothing looked risky), so it says so for every TV.
+Prints what the switch-over depends on: Android version, the home screen apps, the packages
+apply.sh keeps on or switches off, and any ad trackers (ACR). The TV's own home screens and setup
+app always stay on (switching them off can make a Google TV loop at every restart); if an older
+couch-tv switched them off, it says so, and apply.sh or undo.sh switches them back on.
 
 Usage: TV_IP=<tv address> [ADB_PORT=5555] .venv/bin/python tv-home/tools/survey-tv.py
 """
@@ -46,30 +46,29 @@ print(sh("pm query-activities --brief -a android.intent.action.MAIN -c android.i
 
 pkgs = set(l.replace("package:", "") for l in sh("pm list packages").splitlines())
 disabled = set(l.replace("package:", "") for l in sh("pm list packages -d").splitlines())
-WANT_OFF = {
+KEEP_ON = {
     "com.google.android.apps.tv.launcherx": "Google TV home",
     "com.google.android.tvlauncher": "older Android TV home",
-    "com.google.android.apps.tv.dreamx": "ambient mode (promos when idle)",
-    "com.google.android.tungsten.setupwraith": "setup wizard (its recovery home outranks ours)",
+    "com.google.android.tungsten.setupwraith": "setup wizard",
 }
-print("\npackages we switch off:")
-for p, what in WANT_OFF.items():
+print("\npackages that always stay on (the TV needs them to start):")
+old_off = []
+for p, what in KEEP_ON.items():
+    state = "not on this TV" if p not in pkgs else ("OFF" if p in disabled else "on")
+    if state == "OFF":
+        old_off.append(p)
+    print(f"  {p:45} {state:15} {what}")
+if old_off:
+    print("  Switched off, probably by couch-tv 0.10 or older. Some Google TVs loop at every restart")
+    print("  like this: run apply.sh or undo.sh before the TV next restarts (README, 'If your TV loops")
+    print("  after a restart').")
+print("\npackages apply.sh switches off:")
+for p, what in {"com.google.android.apps.tv.dreamx": "ambient mode (promos when idle)"}.items():
     state = "not on this TV" if p not in pkgs else ("already off" if p in disabled else "present")
     print(f"  {p:45} {state:15} {what}")
 
 acr = sorted(p for p in pkgs if re.search(r"acr|samba|alphonso|inscape|anoki|tvision|admob|\.ads?\b", p))
 print("\npossible ad trackers (check each before switching off):", ", ".join(acr) or "none found")
-
-wifi = sh("dumpsys wifi | grep -E 'SSID|creatorName|creatorUid' | head -40")
-creators = sorted(set(re.findall(r"creatorName[=:] ?(\S+)", wifi)))
-print("\nsaved Wi-Fi networks were created by:", ", ".join(creators) or "unknown (read it at the TV)")
-print("\nWi-Fi and the setup wizard: on some TVs, switching the setup wizard off makes the TV forget")
-print("  its Wi-Fi. This check cannot tell in advance: it happened on a TV where nothing here looked")
-print("  risky, so plan for it on any TV. apply.sh does everything else first and switches the wizard")
-print("  off last; if the TV then drops off the Wi-Fi, join it again at the TV (Settings, Network) and")
-print("  run apply.sh again. Have the TV remote ready. KEEP_SETUP=1 leaves the wizard on.")
-if any("setupwraith" in c for c in creators):
-    print("  On this TV the setup wizard owns a saved network, which makes the drop more likely.")
 
 apps = sh("pm query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER")
 print("\nTV apps:")
