@@ -519,6 +519,7 @@ at it, as described in issue #42.
 
 A laptop bridge must not sleep, or the bridge stops: Battery, Options, Prevent automatic sleeping
 on power adapter when the display is off, or `sudo pmset -c sleep 0`.
+A MacBook also sleeps when its lid is shut, even on power and with `caffeinate`: keep the lid open, or attach an external display.
 
 **Anyone on your Wi-Fi can use the remote and the assistant.** The bridge has no password, so
 everyone on the network, kids included, can change the channel, turn the TV off or ask Claude for

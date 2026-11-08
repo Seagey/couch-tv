@@ -57,26 +57,50 @@
   var STORE = /^[A-Za-z0-9]{10}$/;
   var HIDE = /^(e-Manual|Security Center|Samsung Promotion|Smarthub Connection Test)$/i;
   var byPkg = {}, shown = [];
-  tizenApps.forEach(function (a) {
-    if (a.id === SELF || a.packageId === SELF.split(".")[0]) return;
-    var pkg = byTizen[a.id] || byTizen[a.packageId];
-    if (pkg && !byPkg[pkg]) {
-      byPkg[pkg] = a;
-      shown.push({ package: pkg, label: MAP[pkg].name || a.name });
-    } else if (!pkg && a.show && STORE.test(a.packageId || "") && !HIDE.test(a.name || "") && !byPkg[a.id]) {
-      byPkg[a.id] = a;
-      shown.push({ package: a.id, label: a.name });
-    }
-  });
+  function sortOut() {
+    byPkg = {}; shown = [];
+    tizenApps.forEach(function (a) {
+      if (a.id === SELF || a.packageId === SELF.split(".")[0]) return;
+      var pkg = byTizen[a.id] || byTizen[a.packageId];
+      if (pkg && !byPkg[pkg]) {
+        byPkg[pkg] = a;
+        shown.push({ package: pkg, label: MAP[pkg].name || a.name });
+      } else if (!pkg && a.show && STORE.test(a.packageId || "") && !HIDE.test(a.name || "") && !byPkg[a.id]) {
+        byPkg[a.id] = a;
+        shown.push({ package: a.id, label: a.name });
+      }
+    });
+    if (SKY_PORT) shown.unshift({ package: SKY, label: "Sky" });
+  }
+  var SKY = "local.sky", SKY_PORT = parseInt(S.sky_hdmi, 10) || 0, skyOn = false;
+  sortOut();
   send("log", "apps on this TV: " + tizenApps.length + ", shown: " + shown.map(function (a) { return a.label; }).join(", "));
+
+  // The list in localStorage is last time's. Read it again a few seconds after the home is up (a TV
+  // with hundreds of apps takes several seconds to answer), save it, and reload the home only if the
+  // apps shown have changed (#53).
+  setTimeout(function () {
+    try {
+      tizen.application.getAppsInfo(function (list) {
+        var fresh = list.map(function (a) {
+          return { id: a.id, name: a.name, packageId: a.packageId, iconPath: a.iconPath, show: a.show };
+        });
+        var before = shown.map(function (a) { return a.package; }).join("|");
+        try { localStorage.setItem("couch.tizen.apps", JSON.stringify(fresh)); } catch (e) {}
+        tizenApps = fresh;
+        sortOut();
+        if (shown.map(function (a) { return a.package; }).join("|") !== before) {
+          send("log", "app list changed, reloading");
+          location.reload();
+        }
+      }, function () {});
+    } catch (e) {}
+  }, 4000);
 
   // ---------- a Sky box on an HDMI input ("sky_hdmi" in this TV's entry in config.json) ----------
   // tvwindow shows the input full screen in front of this app. The Sky remote talks to the box, so
   // it keeps working; Back on the Samsung remote closes the window and returns to the home.
   // With no "sky_hdmi", this TV has no Sky tile.
-  var SKY = "local.sky", SKY_PORT = parseInt(S.sky_hdmi, 10) || 0, skyOn = false;
-  if (SKY_PORT) shown.unshift({ package: SKY, label: "Sky" });
-
   function skyNote(text) {
     send("log", "sky: " + text);
     var n = document.getElementById("sky-note");

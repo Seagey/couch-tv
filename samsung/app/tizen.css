@@ -1,0 +1,7 @@
+/* Samsung only (build.py loads this after app.css). A 2022 TV froze on the full screen blur behind
+   Home settings and the smart home panel (#53), so those two get a solid background instead. */
+.settings, .smart {
+  background: rgba(10, 8, 12, 0.94);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}

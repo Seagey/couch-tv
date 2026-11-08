@@ -8,7 +8,7 @@ Then install it, which signs it with your own Samsung certificate (docs/SAMSUNG.
     apps2samsung-cli install build/samsung/CouchTV.wgt --tv <tv address>
 
 What goes in: the TV home (tv-home/web), samsung/app (the Samsung side), the app logos from the
-phone remote, the Samsung app ids from bridge/apps.py, and the bridge's settings (from config.json,
+phone remote (any of your own in samsung/my-logos/<package>.png replace them), the Samsung app ids from bridge/apps.py, and the bridge's settings (from config.json,
 else config.example.json) as the copy the TV uses when the computer is off.
 --tv is the TV's id in config.json, for a house with more than one TV.
 --log-url sends the page's console and a copy of the screen's HTML to a computer, for testing.
@@ -53,6 +53,14 @@ def main():
         if name.endswith(".png"):
             shutil.copy(os.path.join(LOGOS, name), os.path.join(stage, "logos", name))
             logos.add(name[:-4])
+    # Your own logo for an app (git ignored): samsung/my-logos/<package>.png beats the bundled one and
+    # the TV's own icon, for an app whose Tizen icon looks wrong on the home.
+    mine = os.path.join(HERE, "my-logos")
+    if os.path.isdir(mine):
+        for name in sorted(os.listdir(mine)):
+            if name.endswith(".png"):
+                shutil.copy(os.path.join(mine, name), os.path.join(stage, "logos", name))
+                logos.add(name[:-4])
 
     # index.html: the Samsung side loads before the bridge settings and app.js
     index = os.path.join(stage, "index.html")
@@ -61,6 +69,10 @@ def main():
     tag = '<script src="config.js"></script>'
     if tag not in html:
         raise SystemExit("tv-home/web/index.html no longer loads config.js; update samsung/build.py")
+    css = '<link rel="stylesheet" href="app.css">'
+    if css not in html:
+        raise SystemExit("tv-home/web/index.html no longer loads app.css; update samsung/build.py")
+    html = html.replace(css, css + '\n<link rel="stylesheet" href="tizen.css">')
     html = html.replace(tag, '<script src="$WEBAPIS/webapis/webapis.js"></script>\n'
                              '<script src="settings.js"></script>\n<script src="tizen-apps.js"></script>\n'
                              '<script src="tizen.js"></script>\n' + tag)
