@@ -226,6 +226,20 @@ bridge brings it forward first. Then it presses OK by timing (`BLIND` in `bridge
 on a fresh start once for the profile screen, then for Play. Only Netflix's timing has been checked
 on a real TV; if an app ends up on the show's page without playing, press OK.
 
+## A Sky box on an HDMI input
+
+Add the port to this TV's entry in `config.json`, then rebuild and reinstall the app:
+
+```json
+{ "id": "lounge", "name": "Lounge", "kind": "samsung", "ip": "<tv address>", "sky_hdmi": 2 }
+```
+
+A Sky tile then comes first in the dock. OK shows that input full screen, in front of couch-tv. The
+Sky remote talks to the box as usual, and Back on the Samsung remote returns to couch-tv. Turning
+the TV off and on comes back to couch-tv when Autorun Last App is on, because couch-tv is still the
+last app. Without `sky_hdmi` there is no tile. Tested on a 2023 CU8500 (Tizen 9.0) with a Sky Q Mini
+on HDMI 2, reported by philehaynes.
+
 ## Turning it on
 
 When a Samsung is properly off it leaves the network, and only a Wake-on-LAN packet can reach it,

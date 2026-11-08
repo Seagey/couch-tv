@@ -70,6 +70,67 @@
   });
   send("log", "apps on this TV: " + tizenApps.length + ", shown: " + shown.map(function (a) { return a.label; }).join(", "));
 
+  // ---------- a Sky box on an HDMI input ("sky_hdmi" in this TV's entry in config.json) ----------
+  // tvwindow shows the input full screen in front of this app. The Sky remote talks to the box, so
+  // it keeps working; Back on the Samsung remote closes the window and returns to the home.
+  // With no "sky_hdmi", this TV has no Sky tile.
+  var SKY = "local.sky", SKY_PORT = parseInt(S.sky_hdmi, 10) || 0, skyOn = false;
+  if (SKY_PORT) shown.unshift({ package: SKY, label: "Sky" });
+
+  function skyNote(text) {
+    send("log", "sky: " + text);
+    var n = document.getElementById("sky-note");
+    if (!n) {
+      n = document.createElement("div");
+      n.id = "sky-note";
+      n.style.cssText = "position:fixed;left:48px;bottom:48px;z-index:99999;max-width:1400px;padding:20px 28px;" +
+        "border-radius:12px;background:#111;color:#fff;font:28px sans-serif";
+      document.body.appendChild(n);
+    }
+    n.textContent = text;
+    clearTimeout(skyNote.t);
+    skyNote.t = setTimeout(function () { if (n.parentNode) n.parentNode.removeChild(n); }, 15000);
+  }
+
+  function errText(e) { return (e && e.name ? e.name + ": " : "") + ((e && e.message) || String(e)); }
+
+  function closeSky() {
+    skyOn = false;
+    try { tizen.tvwindow.hide(function () {}, function (e) { skyNote("Sky did not close. " + errText(e)); }); }
+    catch (e) { skyNote("Sky did not close. " + errText(e)); }
+  }
+
+  function openSky() {
+    function failed(step, e) { skyOn = false; skyNote("Sky did not open (" + step + "). " + errText(e)); }
+    try {
+      tizen.systeminfo.getPropertyValue("VIDEOSOURCE", function (info) {
+        var list = (info && info.connected) || [], src = null;
+        list.forEach(function (s) { if (s.type === "HDMI" && s.number === SKY_PORT) src = s; });
+        if (!src) {
+          failed("HDMI " + SKY_PORT + " not connected", "The TV lists: " +
+            (list.map(function (s) { return s.type + " " + s.number; }).join(", ") || "nothing"));
+          return;
+        }
+        tizen.tvwindow.setSource(src, function () {
+          try {
+            tizen.tvwindow.show(function () { skyOn = true; }, function (e) { failed("show", e); },
+              ["0", "0", "100%", "100%"], "MAIN", "FRONT");
+          } catch (e) { failed("show", e); }
+        }, function (e) { failed("setSource", e); });
+      }, function (e) { failed("list inputs", e); });
+    } catch (e) { failed("start", e); }
+    return true;
+  }
+
+  // Runs before app.js's own keys: with Sky on screen, the home must not move behind it.
+  document.addEventListener("keydown", function (e) {
+    if (!skyOn) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.keyCode === 10009) closeSky();
+  }, true);
+  document.addEventListener("visibilitychange", function () { if (document.hidden && skyOn) closeSky(); });
+
   function bridgeLaunch(pkg) {
     if (!BRIDGE) return;
     var x = new XMLHttpRequest();
@@ -79,6 +140,7 @@
   }
 
   function launch(pkg) {
+    if (pkg === SKY) return openSky();
     var a = byPkg[pkg], m = MAP[pkg];
     var ids = a ? [a.id] : [];
     if (m) (m.ids || []).concat(m.app ? [m.app] : []).forEach(function (id) { if (ids.indexOf(id) < 0) ids.push(id); });
@@ -95,6 +157,7 @@
   }
 
   function iconUrl(pkg) {
+    if (pkg === SKY) return "logo-sky.png";
     var m = MAP[pkg];
     if (m && m.logo) return "logos/" + pkg + ".png";
     var a = byPkg[pkg];
