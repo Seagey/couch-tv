@@ -146,7 +146,19 @@ if echo "$present" | grep -qx -E "com.google.android.apps.tv.launcherx|com.googl
   "$PY" "$T" shell "pm grant app.couchtv.launcher android.permission.WRITE_SECURE_SETTINGS" > /dev/null 2>&1 || true
   CUR=$("$PY" "$T" shell "settings get secure enabled_accessibility_services" | tr -d '\r')
   case ":$CUR:" in
-    *":$WATCH:"*|*":app.couchtv.launcher/app.couchtv.launcher.FireWatch:"*) ;;
+    *":$WATCH:"*|*":app.couchtv.launcher/app.couchtv.launcher.FireWatch:"*)
+       # Already listed, but the force-stop above leaves Android showing it as a crashed service that
+       # is never rebound (issue #37). Take it out of the list and put it back so Android binds it again.
+       REST=$(echo "$CUR" | tr ':' '\n' | grep -v -e FireWatch -e '^null$' -e '^$' | paste -sd: - || true)
+       if [ -z "$REST" ]; then
+         "$PY" "$T" shell "settings delete secure enabled_accessibility_services" > /dev/null
+         NEW=$WATCH
+       else
+         "$PY" "$T" shell "settings put secure enabled_accessibility_services $REST" > /dev/null
+         NEW="$REST:$WATCH"
+       fi
+       sleep 2
+       "$PY" "$T" shell "settings put secure enabled_accessibility_services $NEW" ;;
     *) if [ -z "$CUR" ] || [ "$CUR" = null ]; then NEW=$WATCH; else NEW="$CUR:$WATCH"; fi
        "$PY" "$T" shell "settings put secure enabled_accessibility_services $NEW" ;;
   esac
