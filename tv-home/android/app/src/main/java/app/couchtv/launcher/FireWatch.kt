@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -33,6 +34,27 @@ class FireWatch : AccessibilityService() {
 
     override fun onInterrupt() {}
 
+    override fun onServiceConnected() {
+        connected = true
+        Log.i("couchtv.firewatch", "the Home button watch is connected")
+        // The TV's own home can come up before this service is bound, and then its window event is
+        // never seen (issue #44: Amazon's home sat on screen about 30 s at boot). The service has no
+        // permission to read windows (that would be reading the screen), so it goes by the clock
+        // instead: bound in the first minutes after a restart, nothing but the TV's own home can be
+        // in front, so couch-tv goes on top once. Fire OS only: a Google TV can start on an HDMI
+        // input or live TV, and that must never be covered.
+        if (android.os.Build.MANUFACTURER.equals("Amazon", ignoreCase = true) &&
+            SystemClock.elapsedRealtime() < BOOT_WINDOW_MS && !CrashGuard.standingAside(this)) {
+            Log.i("couchtv.firewatch", "bound just after a restart: putting couch-tv in front")
+            runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        }
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        connected = false
+        return super.onUnbind(intent)
+    }
+
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         if (!isStockHome(e.packageName?.toString(), e.className?.toString())) return
@@ -52,6 +74,33 @@ class FireWatch : AccessibilityService() {
     }
 
     companion object {
+        /** Set while Android has this service bound. */
+        @Volatile var connected = false
+        private const val BOOT_WINDOW_MS = 2 * 60_000L
+
+        /**
+         * The watch listed as on in Settings but not bound (what a force-stop leaves behind, the same
+         * blind spot as issue #37): take it out of the list and put it back so Android binds it.
+         * Call a few seconds after the app starts, once Android has had its chance to bind it itself.
+         */
+        fun rebindIfUnbound(c: Context) {
+            if (connected) return
+            if (c.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") != PackageManager.PERMISSION_GRANTED) return
+            Thread {
+                runCatching {
+                    val cr = c.contentResolver
+                    val me = "${c.packageName}/${FireWatch::class.java.name}"
+                    val list = (Settings.Secure.getString(cr, "enabled_accessibility_services") ?: "").split(':').filter { it.isNotEmpty() && it != "null" }
+                    if (list.none { it == me || it == "${c.packageName}/.FireWatch" } || connected) return@runCatching
+                    Log.i("couchtv.firewatch", "listed but not bound: rebinding the Home button watch")
+                    val rest = list.filter { it != me && it != "${c.packageName}/.FireWatch" }
+                    Settings.Secure.putString(cr, "enabled_accessibility_services", rest.joinToString(":"))
+                    Thread.sleep(2000)
+                    Settings.Secure.putString(cr, "enabled_accessibility_services", (rest + me).joinToString(":"))
+                }
+            }.start()
+        }
+
         const val AMAZON_HOME = "com.amazon.tv.launcher"
         const val GOOGLE_TV_HOME = "com.google.android.apps.tv.launcherx"
         const val ANDROID_TV_HOME = "com.google.android.tvlauncher"

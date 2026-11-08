@@ -66,7 +66,7 @@ object CrashGuard {
     fun standingAside(c: Context): Boolean = runCatching {
         val now = System.currentTimeMillis()
         listOf("crashes", "starts").any { key ->
-            val recent = times(prefs(c).getString(key, "")).filter { now - it < WINDOW_MS + ASIDE_MS }
+            val recent = times(prefs(c).getString(key, "")).filter { it <= now && now - it < WINDOW_MS + ASIDE_MS }
             val burst = recent.filter { t -> recent.count { kotlin.math.abs(it - t) < WINDOW_MS } >= LIMIT }
             burst.size >= LIMIT && now - (burst.maxOrNull() ?: 0L) < ASIDE_MS
         }
@@ -100,7 +100,9 @@ object CrashGuard {
 
     private fun add(c: Context, key: String) {
         val now = System.currentTimeMillis()
-        val kept = times(prefs(c).getString(key, "")).filter { now - it < WINDOW_MS + ASIDE_MS } + now
+        // Fire OS starts about 12 days behind until network time syncs: a stamp from the future was
+        // written before the clock jumped forward (issue #44) and tells nothing, so it is dropped.
+        val kept = times(prefs(c).getString(key, "")).filter { it <= now && now - it < WINDOW_MS + ASIDE_MS } + now
         prefs(c).edit().putString(key, kept.takeLast(6).joinToString(",")).commit()
     }
 
