@@ -29,8 +29,9 @@ TV_IP=<your tv address> DEV_OFF=1 sh tv-home/tools/remove-all.sh
 It first checks the computer can still reach the TV. If it cannot, it changes nothing, prints the
 TV-remote steps below and stops. Otherwise it does all of this, in order, and stops at the first
 thing that fails:
-1. Switches the Google TV home, ambient mode, the setup wizard and anything else `apply.sh`
-   switched off back on, and makes the home the TV had before couch-tv the home again.
+1. Switches ambient mode and anything else `apply.sh` switched off back on (and the Google TV
+   home and setup app, which couch-tv 0.10 and older switched off), switches off the Home button
+   watch, and makes the home the TV had before couch-tv the home again.
 2. Removes the couch-tv apps (the home screen app `app.couchtv.launcher` and the "lives on the TV"
    app `dev.couchtv.ontv`).
 3. Switches off network debugging, USB debugging and Developer options. Leave out `DEV_OFF=1` to
@@ -64,8 +65,8 @@ To remove only one app by hand, without the rest:
 1. On the couch-tv home, open the **Settings** tile (the gear at the end of the app row; in the
    Classic look it is a tile in the grid). Or press the Settings button on your remote.
 2. **Apps**, then **See all apps**, then **Show system apps**.
-3. Open **Google TV Home** (it says Disabled) and press **Enable**. Do the same for **Setup**.
-   Ambient mode and the ad tracker are optional.
+3. If **Google TV Home** or **Setup** says Disabled (couch-tv 0.10 and older switched them off),
+   open it and press **Enable**. Ambient mode and the ad tracker are optional.
 4. Back in **Apps**, open the couch-tv **Home** app and press **Uninstall**. Do the same for
    **Couch TV** (the "lives on the TV" app) if you have it.
 5. Press the Home button. Google TV is back.
@@ -87,7 +88,12 @@ restart after step 3 is enough: nothing can connect any more.
 
 ## If something is stuck
 
-- **The TV forgot its Wi-Fi.** It can happen right after the setup wizard is switched off or on.
+- **The TV loops after a restart** (blank screen, restarts by itself, again and again). Seen on a
+  Sony Bravia Google TV set up with couch-tv 0.10 or older, which switched off the Google TV home
+  and the setup app. Steps: [README, If your TV loops after a restart](../README.md#if-your-tv-loops-after-a-restart).
+
+- **The TV forgot its Wi-Fi.** It could happen when couch-tv 0.10 or older switched the setup app
+  off, or when it is switched back on.
   Open Settings, Network, and join your Wi-Fi again. Your apps and logins are still there.
 - **The computer cannot reach the TV any more** (for example after the Wi-Fi was forgotten).
   The computer undo cannot work then. Use "With only the TV remote" above.
