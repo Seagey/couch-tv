@@ -2129,6 +2129,9 @@ NEVER_DISABLE = {"com.google.android.apps.tv.launcherx", "com.google.android.tvl
                  "com.google.android.tungsten.setupwraith"}
 
 
+stock_home_done = set()
+
+
 async def keep_disabled_loop():
     """Daily, per TV: re-disable packages listed in that TV's keep-disabled file (the living
     room's is data/keep-disabled.json, written by apply.sh: ambient mode and any ad tracker). A
@@ -2140,14 +2143,24 @@ async def keep_disabled_loop():
         path = os.path.join(HERE, tv.keep_disabled_file or "")
         try:
             with open(path) as f:
-                packages = [p for p in json.load(f) if p not in NEVER_DISABLE]
+                listed = json.load(f)
+            packages = [p for p in listed if p not in NEVER_DISABLE]
+            to_enable = [p for p in listed if p in NEVER_DISABLE]   # only what couch-tv's own file says it switched off
         except (FileNotFoundError, IsADirectoryError, json.JSONDecodeError, TypeError):
-            packages = []
-        if not packages:
+            packages, to_enable = [], []
+        if not packages and not to_enable:
             done = True
         elif tv.paired and await tv.adb_ready():
             try:
                 disabled = await tv.adb("shell", "pm", "list", "packages", "-d")
+                # One time, per TV: couch-tv 0.10 and older switched the TV's own homes and setup
+                # wizard off (that is the boot loop). Switch back on any that are installed and off.
+                if tv.id not in stock_home_done:
+                    for pkg in to_enable:
+                        if f"package:{pkg}" in disabled.split():
+                            await tv.adb("shell", "pm", "enable", pkg)
+                            log.warning("%s: switched %s back on (couch-tv 0.10 and older had switched it off)", tv.id, pkg)
+                    stock_home_done.add(tv.id)
                 for pkg in packages:
                     if f"package:{pkg}" not in disabled.split():
                         await tv.adb("shell", "pm", "disable-user", "--user", "0", pkg)

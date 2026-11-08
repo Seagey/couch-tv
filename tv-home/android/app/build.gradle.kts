@@ -13,8 +13,8 @@ android {
         applicationId = "app.couchtv.launcher"
         minSdk = 25          // Android 7.1, so Fire OS 6 sticks (Fire TV Stick 4K, 1st gen) install it
         targetSdk = 34
-        versionCode = 12
-        versionName = "0.10"
+        versionCode = 13
+        versionName = "0.11"
         // Where the bridge might be: ./gradlew assembleRelease -PbridgeUrls=http://my-computer.local:5400
         // (comma separated, more than one is fine). The last one that answered is remembered on the TV.
         // Without it, apply.sh tells the app the address when it installs (the "bridge" extra), and

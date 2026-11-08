@@ -3,6 +3,9 @@
 Your own home screen and phone remote for a Google TV, and now a Samsung TV, with an LG path
 built and waiting for its first real LG. No ads on the home screen. Open source (MIT).
 
+> Note for Google TV owners: 0.11 leaves the Google home and setup apps switched on. If you set
+> couch-tv up with 0.10 or older, see [If your TV loops after a restart](#if-your-tv-loops-after-a-restart).
+
 ![The Night home screen](docs/screens/home-night.jpg)
 
 ## Updates
@@ -10,8 +13,7 @@ built and waiting for its first real LG. No ads on the home screen. Open source 
 **8 November 2026: a restart could loop some Google TVs. Fixed.** A Sony Bravia Google TV owner
 found that after couch-tv went on, a restart left the TV going round: blank screen, restart, blank
 screen. couch-tv 0.10 and older switched off the Google TV home and the setup app, and on some
-Google TVs the TV cannot start without them. From the next release couch-tv never switches either
-off, and if couch-tv itself keeps crashing the TV's own home takes over. **If you set couch-tv up
+Google TVs the TV cannot start without them. From 0.11 couch-tv never switches either off, the updated app switches them back on by itself where it can, and if couch-tv itself keeps crashing the TV's own home takes over. **If you set couch-tv up
 with 0.10 or older, read [If your TV loops after a restart](#if-your-tv-loops-after-a-restart)
 before you next restart your TV.** Sorry, and thank you to the person who reported it.
 

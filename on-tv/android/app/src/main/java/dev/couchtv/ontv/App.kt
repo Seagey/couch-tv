@@ -147,8 +147,29 @@ class BridgeService : Service() {
         Now.start()
         Thread {
             runCatching { if (Adb.everAllowed || Adb.paired) Adb.ensure() }
+            reenableStockHome()
             FireHome.poke()   // Fire TV: keep this home on the Home key across reboots
         }.start()
+    }
+
+    /**
+     * couch-tv 0.10 and older switched off the TV's own home screens and setup wizard, which can leave
+     * a Google TV looping after a restart. Over the ADB connection this app already holds (nothing new
+     * is asked for), switch those three packages back on, once, only if installed and switched off.
+     * If ADB is not connected yet, the next start tries again.
+     */
+    private fun reenableStockHome() {
+        if (Store.bool("stock_home_reenabled") || !Adb.connected) return
+        runCatching {
+            val off = Adb.shell("pm list packages -d", 10_000).lines().map { it.removePrefix("package:").trim() }
+            for (p in listOf("com.google.android.apps.tv.launcherx", "com.google.android.tvlauncher", "com.google.android.tungsten.setupwraith")) {
+                if (p in off) {
+                    Adb.shell("pm enable $p", 10_000)
+                    Log.w("couchtv", "switched $p back on (couch-tv 0.10 and older had switched it off)")
+                }
+            }
+            Store.putBool("stock_home_reenabled", true)
+        }.onFailure { Log.w("couchtv", "stock home re-enable failed: ${it.message}") }
     }
 
     private fun startServer() {
