@@ -190,11 +190,25 @@ says "Connection reset by peer" on port 8002, try again and the prompt shows.
 
 `bridge/samsung.py` asks the TV every 2 seconds, on its own network ports, which need no pairing:
 
-- `http://<tv>:8001/api/v2/` gives the power state (`on` or `standby`).
+- `http://<tv>:8001/api/v2/` gives the power state (`on` or `standby`). This is the only thing read
+  on a timer.
 - `http://<tv>:8001/api/v2/applications/<app id>` says whether that app is on screen. Samsung
   removed the call that lists every app, so the bridge asks about each app it knows
-  (`TIZEN` in `bridge/apps.py`) every 30 minutes and remembers which are installed.
+  (`TIZEN` in `bridge/apps.py`) every 30 minutes and remembers which are installed. Which app is
+  in front is read only when something needs it: the hook, a launch waiting for its app, or a
+  title being opened.
+- The volume and mute (UPnP, port 9197) are read once when the bridge first sees the TV on, and
+  once after each volume or mute key.
 - A Frame also keeps the art channel open, which says when Art Mode goes on and off.
+
+**Why nothing else is on a timer (#53, reported on a 2022 Q60B).** Reading the volume every few
+seconds, and asking about every installed app every other tick (about ten requests every 4
+seconds), made that TV flash its volume bar and blip mute every 5 to 10 minutes. With the bridge off
+for 30 minutes there were none, and with only the power read running for 32 minutes there were
+none. What this costs: the phone remote's live "what's on" line on a Samsung (the app in front) is
+now only as fresh as the last time something asked, and it is blank when that was more than 30
+seconds ago. It was not reliable before either (some apps never report that they are on screen).
+Volume changed with the TV's own remote shows on the phone after the next volume key from the phone.
 
 When the TV goes from off (or Art Mode) to on, the bridge waits a moment, and if no app is on
 screen (the TV is on live TV, an HDMI input or Samsung's menu) it opens couch-tv with the TV's REST call
