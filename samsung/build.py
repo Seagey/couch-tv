@@ -73,7 +73,15 @@ def main():
                 "  try { t = localStorage.getItem(\"couch.configjs\"); } catch (e) {}\n"
                 "  if (t) try { (0, eval)(t); } catch (e) {}\n"
                 "  if (!window.COUCH_CONFIG) window.COUCH_CONFIG = " + json.dumps(config.public()) + ";\n})();\n")
-    settings = {"bridge": a.bridge.rstrip("/"), "tv": a.tv, "log": a.log_url.rstrip("/")}
+    # Per-TV settings, from this TV's entry in config.json.
+    tv_cfg = next((t for t in config.TVS if t["id"] == (a.tv or config.DEFAULT_TV)), None)
+    if a.tv and tv_cfg is None:
+        raise SystemExit(f"no TV called {a.tv} in config.json")
+    tv_cfg = tv_cfg or {}
+    sky = tv_cfg.get("sky_hdmi")
+    if sky is not None and (not isinstance(sky, int) or isinstance(sky, bool) or not 1 <= sky <= 4):
+        raise SystemExit(f"{tv_cfg['id']}: sky_hdmi must be a port number from 1 to 4, or left out")
+    settings = {"bridge": a.bridge.rstrip("/"), "tv": a.tv, "log": a.log_url.rstrip("/"), "sky_hdmi": sky}
     with open(os.path.join(stage, "settings.js"), "w") as f:
         f.write("window.COUCH_TIZEN = " + json.dumps(settings) + ";\n")
     table = {}
