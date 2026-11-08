@@ -1650,10 +1650,15 @@ SEEN_AFTER_S = float(os.environ.get("COUCHTV_SEEN_AFTER_S") or 60)
 
 
 def _blip(cand):
-    """A show is being counted and the last reading that showed it was under 12 s ago: a reading with
-    nothing playing (a slow dumpsys, the front app read as the home for a moment) is forgiven, as the
-    on-TV app does (Now.remember). Only a different title, or nothing for longer, starts it again."""
-    return bool(cand and cand[0]) and time.time() - seen_playing.get("_playing_last", 0) < 12
+    """A show is being counted: up to two readings in a row with nothing playing (a slow dumpsys, the
+    front app read as the home for a moment), within 40 s of the last reading that showed it, are
+    forgiven, as the on-TV app does (Now.remember). Only a different title, or nothing for longer,
+    starts it again. Counted here, so call it once per reading."""
+    if not (cand and cand[0]) or seen_playing.get("_empty_reads", 0) >= 2 \
+            or time.time() - seen_playing.get("_playing_last", 0) >= 40:
+        return False
+    seen_playing["_empty_reads"] = seen_playing.get("_empty_reads", 0) + 1
+    return True
 
 
 async def media_watch_loop():
@@ -1678,6 +1683,8 @@ async def media_watch_loop():
                 pos = media_now.get("position_ms")
                 young = pos is not None and pos < SEEN_AFTER_S * 1000
                 cand = seen_playing.get("_playing")
+                if key:
+                    seen_playing["_empty_reads"] = 0
                 if key and key == (cand and cand[0]):
                     seen_playing["_playing_last"] = time.time()
                 if key is None and _blip(cand):
@@ -1722,7 +1729,7 @@ def untitled_step(pkg, app, untitled, pos, titled=False):
     if not untitled or not app or app["id"] in NOT_KEPT:
         # a break before the minute starts it again; and once the same app names what it plays, a
         # later Watch Next row would be that show, not the earlier unnamed one
-        if u and not u["done"] and (not u["qualified"] or (titled and pkg == u["pkg"])):
+        if u and not u["done"] and ((not u["qualified"] and now - u["last"] >= 40) or (titled and pkg == u["pkg"])):
             seen_playing["_untitled"] = None
         return
     if not u or u["pkg"] != pkg or u["who"] != cur_who() or (u["done"] and now - u["last"] > 600):

@@ -86,7 +86,8 @@ object Store {
 
     /** Test knobs for the emulator tests only, set with `adb shell setprop`; a TV never has them.
      *  debug.couchtv.seen_after_s: seconds a title plays before it counts (default 60).
-     *  debug.couchtv.clock_offset_s: moves Keep watching's clock forward, to test the 30 day drop off. */
+     *  debug.couchtv.clock_offset_s: moves Keep watching's clock forward, to test the 30 day drop off.
+     *  debug.couchtv.keep_log: 1 logs every "what is playing" reading Keep watching sees (couchtv.keep). */
     fun testProp(name: String): Long? = runCatching {
         Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
             .invoke(null, "debug.couchtv.$name") as String

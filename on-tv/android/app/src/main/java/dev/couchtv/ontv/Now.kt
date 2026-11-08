@@ -29,6 +29,7 @@ object Now {
     private var seenKey = ""
     private var seenSince = 0L
     private var seenLast = 0L   // the last reading that still showed seenKey playing
+    private var emptyReads = 0  // readings in a row with nothing playing since then
     private var keptKey = ""
 
     private val listeners = CopyOnWriteArraySet<(String) -> Unit>()
@@ -124,6 +125,7 @@ object Now {
      * Android its title: YouTube, Netflix and most others do, a few say nothing.
      */
     private fun remember(m: JSONObject?) {
+        if (Store.testProp("keep_log") == 1L) android.util.Log.d("couchtv.keep", "read front=$front title=${m?.optString("title")} state=${m?.optString("state")} source=${m?.optString("source")} pos=${m?.optLong("position_ms", -1L)}")
         runCatching { untitledStep(front, m); untitledResolve() }.onFailure { android.util.Log.w("couchtv.keep", "untitled: ${it.message}") }
         val pkg = front ?: return
         // only a title the app itself reports (not the last show couch-tv opened in it)
@@ -131,10 +133,12 @@ object Now {
         val key = if (title == null) "" else pkg + "|" + Finder.norm(title) + "|" + (who ?: "")
         val now = System.currentTimeMillis()
         val after = (Store.testProp("seen_after_s") ?: 60L) * 1000
-        // One reading with nothing playing (a slow or failed dumpsys, the front app read as the home
-        // for a moment) does not start the minute again: only a different title, or nothing for
-        // over 12 s. Seen on the emulators under load: Lupin was counted twice and never kept.
-        if (key.isEmpty() && seenKey.isNotEmpty() && now - seenLast < 12_000) return
+        // Up to two readings in a row with nothing playing (a slow or failed dumpsys, the front app
+        // read as the home for a moment) do not start the minute again, within 40 s of the last good
+        // one: only a different title, or nothing for longer. Under load the readings came 16 to 20 s
+        // apart and one now and then came back empty mid-show, so shows were counted twice and missed.
+        if (key.isEmpty() && seenKey.isNotEmpty() && emptyReads < 2 && now - seenLast < 40_000) { emptyReads++; return }
+        emptyReads = 0
         if (key != seenKey) { seenKey = key; seenSince = now; seenLast = now; if (key.isNotEmpty()) android.util.Log.i("couchtv.keep", "counting $title for ${who ?: "nobody"}"); return }
         seenLast = now
         if (key.isEmpty() || key == keptKey || now - seenSince < after) return
@@ -189,8 +193,8 @@ object Now {
         if (!isUntitled) {
             // a break before the minute; or the same app now names what it plays, so a later Watch
             // Next row would be that show, not the earlier unnamed one
-            // (one reading with nothing playing is forgiven for 12 s, as for named shows)
-            if (u != null && !u.done && ((!u.qualified && now - u.last >= 12_000) || (ownTitle && pkg == u.pkg && m?.optString("state") == "playing"))) untitled = null
+            // (a short gap with nothing read is forgiven, as for named shows)
+            if (u != null && !u.done && ((!u.qualified && now - u.last >= 40_000) || (ownTitle && pkg == u.pkg && m?.optString("state") == "playing"))) untitled = null
             return
         }
         if (u == null || u.pkg != pkg || u.who != who || (u.done && now - u.last > 600_000)) {
