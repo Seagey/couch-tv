@@ -38,7 +38,7 @@ APPS = [
     # US apps, added from a 2022 Samsung Q60B (#53). No bundled logos yet: the TV's own icon is used.
     {"id": "peacock", "name": "Peacock", "package": "com.peacocktv.peacockandroid", "colour": "#111111",
      "jw": ["peacocktv", "peacocktvpremium"], "deeplink": "jw"},
-    {"id": "hulu", "name": "Hulu", "package": "com.hulu.livingroomplex", "colour": "#1CE783",
+    {"id": "hulu", "name": "Hulu", "package": "com.hulu.livingroomplus", "colour": "#1CE783",
      "jw": ["hulu"], "deeplink": "jw"},
     {"id": "youtube-tv", "name": "YouTube TV", "package": "com.google.android.youtube.tvunplugged",
      "colour": "#FF0000", "jw": ["youtubetv"], "deeplink": "jw"},
