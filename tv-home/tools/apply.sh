@@ -53,7 +53,11 @@ WIZARD=com.google.android.tungsten.setupwraith
 # Never switched off, and switched back on if an older couch-tv (0.10 and before) switched them off:
 # the TV's own home screens and the setup wizard. Without them some Google TVs crash at every start.
 NEVER_OFF="com.google.android.apps.tv.launcherx com.google.android.tvlauncher $WIZARD"
-WANT="com.google.android.apps.tv.dreamx ${EXTRA_OFF:-}"
+WANT=""
+# KEEP_AMBIENT=1 keeps Google TV's ambient mode (the screensaver, and the Google Photos albums
+# that come with it) switched on: it is the TV's own, and the screensaver quick button opens it.
+[ "${KEEP_AMBIENT:-0}" = 1 ] || WANT="com.google.android.apps.tv.dreamx"
+WANT="$WANT ${EXTRA_OFF:-}"
 HOME_ACT=app.couchtv.launcher/.MainActivity
 WATCH=app.couchtv.launcher/.FireWatch
 RESOLVE="cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
@@ -81,8 +85,11 @@ case "$NOW" in
 esac
 # Keep watching with no computer reads Android's Watch Next list, which needs this permission.
 "$PY" "$T" shell "pm grant app.couchtv.launcher android.permission.READ_TV_LISTINGS" > /dev/null 2>&1 || true
+# The screensaver quick button cuts the screen timeout for a moment (its own screensaver refuses
+# apps), which needs "modify system settings".
+"$PY" "$T" shell "appops set app.couchtv.launcher WRITE_SETTINGS allow" > /dev/null 2>&1 || true
 
-echo "2/4  Keeping the TV's own home and setup on, switching off ambient mode"
+echo "2/4  Keeping the TV's own home and setup on"
 present=$("$PY" "$T" shell "pm list packages" | sed 's/package://')
 disabled=$("$PY" "$T" shell "pm list packages -d" | sed 's/package://')
 # An older couch-tv switched these off. Switch them back on first: that is the boot loop fix.

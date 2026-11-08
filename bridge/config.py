@@ -58,7 +58,7 @@ BRIDGE = {"host": "your-computer.local", "port": 5400, "fallback_hosts": [], **(
 CLIENT_NAME = CONFIG.get("client_name", "Couch TV bridge")
 
 # The languages the TV home and the phone remote speak (tv-home/web/i18n.js, remote/src/i18n.js).
-LANGUAGES = ("en", "es", "es-MX", "it", "de", "tr")
+LANGUAGES = ("en", "es", "es-MX", "it", "de", "tr", "fr")
 # Where shows stream (JustWatch) and what the prompts call the country: "country" in config.json.
 # Without it: the country of the home's language, where it has one of its own (Italian: IT,
 # German: DE, Turkish: TR), else AU.
@@ -285,7 +285,7 @@ def _home(h):
 HOME = _home(CONFIG.get("home"))
 
 # ---------- quick settings (per TV) and picture modes ----------
-QUICK_IDS = ["sleep", "picture", "look", "input"]
+QUICK_IDS = ["sleep", "picture", "look", "input", "screensaver"]
 
 
 def quick_for(tv_cfg):

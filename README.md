@@ -171,11 +171,13 @@ and then closes. What you change shows when the list closes.
 - **Apps:** every app on the TV. OK moves it between home, More apps and hidden; hold OK to change
   the order. The same order as holding OK on the dock and the phone's Arrange apps.
 - **People:** add, rename, remove and reorder who is watching.
-- **Quick buttons:** which of the sleep timer, picture mode, look and input buttons show, in what
-  order. **Input** opens couch-tv's own menu where the TV lists its inputs: each HDMI port by the
+- **Quick buttons:** which of the sleep timer, picture mode, look, input and screensaver buttons
+  show, in what order. **Input** opens couch-tv's own menu where the TV lists its inputs: each HDMI port by the
   TV's own name for it ("HDMI 3 (eARC)" where the TV labels it so) with what is plugged in behind it,
   each one switching straight away, then Bluetooth and Network. A TV that lists no inputs gets its
-  own input screen, as before (#30).
+  own input screen, as before (#30). **Screensaver** starts the TV's own screensaver (Google TV's
+  Ambient mode, with the Google Photos albums, a few seconds later; its own screen for the albums
+  is just below, under Look).
 - **Updates:** off until you say yes. The first time the home opens it asks once: "Tell you when a
   new couch-tv version is out?" (setup can answer it for you, `home.updates`). With **Tell me about
   new versions** on, the TV looks on GitHub once a week, so frequent releases never nag; with it off
@@ -238,7 +240,8 @@ everyone else), Mexican Spanish (`es-MX`: computadora, celular, presionar, clima
 Italian (`it`), German (`de`) and Turkish (`tr`), all three with a 24 hour clock unless you pick 12
 hour, and the smart home words Home Assistant uses in each. The phone has its own choice (TV menu,
 Language), "Same as the TV" by default. Messages that come from the bridge itself (an error, a note
-about how a show opened) and some screen reader labels on the phone are still in English.
+about how a show opened) and some screen reader labels on the phone are still in English. The TV home also speaks French
+(`fr`, 24 hour clock); the phone remote has no French yet and shows English there.
 
 ## Three ways to run it
 

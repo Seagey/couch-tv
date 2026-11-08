@@ -10,8 +10,8 @@ change people, weather, the look or the quick buttons.
 Every key below is optional unless it says otherwise. Leave a key out and you get the default in
 brackets, which is how couch-tv behaved before the key existed. So an older `config.json` with no
 `home` or `quick` keys looks and works exactly as it did, except one thing: with no
-`home.language`, a TV set to Spanish, Italian or German now shows the home in that language (and an Italian or
-German one with a 24 hour clock), where it used to be English.
+`home.language`, a TV set to Spanish, Italian, German or French now shows the home in that language (and an
+Italian, German or French one with a 24 hour clock), where it used to be English.
 
 Most of what the home shows can also be changed on the TV itself, with the gear tile (Home
 settings), and what is chosen there wins on that TV. See
@@ -54,13 +54,19 @@ The round buttons at the top right of the home. Any of these, in the order you l
 | `picture` | Flips between the TV's two picture modes in `picture.modes`. | The bridge, ADB, and a `picture` entry |
 | `look` | Flips the home between the Night scenes and the Classic look. This TV remembers the choice. | Nothing |
 | `input` | couch-tv's own Input menu: the HDMI ports and other inputs Android lists for the TV, by the TV's own names (ARC or eARC shows where the TV's label says so; Android has no public way to read it), with the devices HDMI-CEC found behind each, then Bluetooth and Network. OK switches straight to that input. A TV that lists no inputs keeps today's behaviour: with the bridge it presses the TV's Input key (`KEYCODE_TV_INPUT`); with no bridge the launcher opens the TV's own input screen if it has one. | The TV home launcher, the bridge, or a TV with an input screen |
+| `screensaver` | Starts the TV's own screensaver: Google TV's Ambient mode, with the Google Photos
+albums. Android only lets the system start a dream, so the button cuts the screen timeout to a few
+seconds and nudges the idle timer until the TV naps by itself; the photos then come up a few seconds
+later and the timeout goes back to what it was the moment the screensaver covers the home. A second
+press can never leave the TV on the short timeout. | The TV home app on an Android TV or Google TV,
+and the "modify system settings" app-op that `apply.sh` grants |
 
 A button that cannot work right now is left out, the same way the sleep timer always disappeared
 when the computer was off. With no bridge at all (option A), only `look` shows, plus `input` on
 TVs that have an input screen the launcher can open.
 
 ```json
-"quick": ["sleep", "look", "input"]
+"quick": ["sleep", "look", "input", "screensaver"]
 ```
 
 Home settings on the TV (gear tile, Quick buttons) can choose and order them too, for that TV.
@@ -170,7 +176,7 @@ Home settings saves to the same `bridge/data/people.json` the phone uses.
 | `clock_style` [`frosted`] | The Night look's clock: `frosted` (the photo's frosted copy, as before) or `liquid` (clear glass digits that bend the photo behind them a little, with a bright rim and a soft edge). Home settings, Look, Clock style wins over it. |
 | `video_url` [none] | A looping, muted video background in place of the photo, in both looks: the address of an MP4 or MOV (`https://...`, or `http://` for a computer at home). Given here it is on; Home settings, Look switches it off or changes the link. The photo stays if the clip does not play. |
 | `dock_size` [10] | How many apps sit in the Night dock before Settings and More apps. 1 to 10. Everything else is behind More apps. The phone's Arrange apps keeps to the same number. |
-| `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish), `it` (Italian), `de` (German) or `tr` (Turkish). The phone remote has its own choice, "Same as the TV" by default. |
+| `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish), `it` (Italian), `de` (German), `tr` (Turkish) or `fr` (French). The phone remote has its own choice, "Same as the TV" by default. |
 
 ## Apps on the home
 

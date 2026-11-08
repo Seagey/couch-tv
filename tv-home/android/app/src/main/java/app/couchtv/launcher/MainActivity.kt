@@ -77,6 +77,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         CrashGuard.install(this)
+        restoreTimeout()   // a press left the screen timeout short: put it back
         // apply.sh starting the home on purpose (new settings) is always a fresh try.
         if (intent?.hasExtra("bridge") == true || intent?.hasExtra("config_b64") == true) CrashGuard.reset(this)
         // Crashed twice in the last few minutes: stand aside for the TV's own home rather than
@@ -133,6 +134,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         resumed = true
+        restoreTimeout()   // back in front: the normal screen timeout goes back
         hideSystemBars()
         if (pageReady && offline && alone()) {
             js("window.tv && tv.resume()")   // option A: the built-in copy is the home, keep it fresh
@@ -151,6 +153,7 @@ class MainActivity : Activity() {
     override fun onPause() {
         super.onPause()
         resumed = false
+        restoreTimeout(dream = true)   // the screensaver covered the home: timeout goes back
         js("window.tv && tv.pause && tv.pause()")   // the video background stops while an app is in front
     }
 
@@ -570,6 +573,23 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun openInputs(): Boolean = inputsIntent()?.let { start(it) } ?: false
 
+        // The TV's screensaver: Google TV's Ambient mode, where the source and the Google Photos
+        // albums are chosen. The dream service only lets the system start a dream, so the TV is
+        // asked to nap in a few seconds instead and brings its own screensaver up.
+        @JavascriptInterface
+        fun canStartScreensaver(): Boolean = true
+
+        @JavascriptInterface
+        fun startScreensaver(): Boolean = startAmbientNow() || openAmbientSettings()
+
+        /** Google TV's Ambient mode settings: the source, and the Google Photos albums. */
+        @JavascriptInterface
+        fun openAmbientSettings(): Boolean {
+            val i = Intent(AMBIENT_SETTINGS)
+            if (packageManager.resolveActivity(i, 0) == null) return false
+            return start(i)
+        }
+
         /**
          * The TV's own inputs for couch-tv's Input menu (#30): every HDMI port and other passthrough
          * input Android lists, with the TV's own name for it (a renamed port, or "HDMI 3 (eARC)" where
@@ -755,6 +775,89 @@ class MainActivity : Activity() {
         (i.loadCustomLabel(this) ?: i.loadLabel(this))?.toString()?.trim()?.takeIf { it.isNotEmpty() }
     } catch (e: Exception) {
         null
+    }
+
+
+    /**
+     * Resets the TV's idle timer, so the short screen timeout just set is the one that counts: the
+     * power manager only re-reads it when user activity comes in. userActivity() is hidden from
+     * the SDK, so it is called by reflection.
+     */
+    private fun resetIdleTimer() {
+        val pm = getSystemService(android.os.PowerManager::class.java) ?: return
+        try {
+            pm.javaClass.getMethod("userActivity", java.lang.Long.TYPE, java.lang.Boolean.TYPE)
+                .invoke(pm, android.os.SystemClock.uptimeMillis(), false)
+        } catch (e: Exception) {
+            android.util.Log.w("couch-tv", "userActivity refused: " + e)
+        }
+    }
+
+    /**
+     * Asks the TV to start its own screensaver. Only the system may start a dream on this build
+     * (WRITE_DREAM_STATE is signature only, and even `cmd dreams` wants root), so the screen
+     * timeout is cut to a few seconds for a moment and the idle timer reset again and again: the
+     * TV then naps by itself and Ambient mode (the Google Photos albums) comes up. The timeout goes
+     * back the moment this activity pauses, which is what the screensaver covering it does.
+     *
+     * The timeout kept to put back is the one the TV had before the first press: a second press
+     * while the TV is already napping must never save the five seconds it is set to, or the TV
+     * would keep five seconds for good (seen on a Thomson).
+     */
+    private fun startAmbientNow(): Boolean {
+        val now = try {
+            Settings.System.getInt(contentResolver, Settings.System.SCREEN_OFF_TIMEOUT)
+        } catch (e: Exception) {
+            return false
+        }
+        pressPending = true
+        if (prefs.getInt("timeout_saved", -1) <= 0) {
+            prefs.edit().putInt("timeout_saved", if (now > SHORT_MS) now else AMBIENT_RESTORE_MS).apply()
+        }
+        return try {
+            Settings.System.putInt(contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, AMBIENT_DELAY_MS)
+            android.util.Log.i("couch-tv", "screensaver: timeout " + now + " -> " + AMBIENT_DELAY_MS)
+            main.removeCallbacks(idleTick)
+            idleShots = 0
+            main.postDelayed(idleTick, 700)
+            main.postDelayed({ restoreTimeout() }, AMBIENT_WINDOW_MS)
+            true
+        } catch (e: Exception) {
+            android.util.Log.w("couch-tv", "screensaver refused: " + e)
+            restoreTimeout()
+            false
+        }
+    }
+
+    /** Puts back the screen timeout the TV had before the screensaver button shortened it. */
+    private fun restoreTimeout(dream: Boolean = false) {
+        val saved = prefs.getInt("timeout_saved", -1)
+        if (saved <= 0) return
+        val pressed = pressPending
+        pressPending = false
+        prefs.edit().remove("timeout_saved").apply()
+        main.removeCallbacks(idleTick)
+        val back = if (saved > SHORT_MS) saved else AMBIENT_RESTORE_MS
+        android.util.Log.i("couch-tv", "screensaver: timeout back to " + back + (if (dream) " (dream up)" else " (deadline)"))
+        if (pressed && !dream) js("window.tv && window.tv.noDream && window.tv.noDream()")   // the TV refused
+        try { Settings.System.putInt(contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, back) } catch (e: Exception) {}
+    }
+
+    // Holds the short timeout in place and nudges the idle timer until the TV naps by itself: the
+    // power manager may keep the old value for a moment, and it only re-reads it on user activity.
+    private var pressPending = false
+    private var idleShots = 0
+    private val idleTick = object : Runnable {
+        override fun run() {
+            if (prefs.getInt("timeout_saved", -1) <= 0) return
+            try {
+                if (Settings.System.getInt(contentResolver, Settings.System.SCREEN_OFF_TIMEOUT) != AMBIENT_DELAY_MS) {
+                    Settings.System.putInt(contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, AMBIENT_DELAY_MS)
+                }
+            } catch (e: Exception) {}
+            resetIdleTimer()
+            if (++idleShots < 40) main.postDelayed(this, 600)
+        }
     }
 
     @Volatile private var appCache: List<Pair<ResolveInfo, String>>? = null
@@ -1109,6 +1212,13 @@ class MainActivity : Activity() {
         private const val BUNDLED = "www/tv"   // the built-in copy, in the app's assets
         private const val SLOW_MS = 2_500L
         private const val PICK_PHOTOS = 41
+        // The screensaver: Google TV's Ambient mode settings (source and the Google Photos albums),
+        // the short screen timeout the home sets for a moment, and what to put back afterwards.
+        private const val AMBIENT_SETTINGS = "dreamx.two.panel.SETTINGS"
+        private const val AMBIENT_DELAY_MS = 5000
+        private const val SHORT_MS = 15_000
+        private const val AMBIENT_RESTORE_MS = 600_000
+        private const val AMBIENT_WINDOW_MS = 25_000L
         private const val MATCH_W = ViewGroup.LayoutParams.MATCH_PARENT
         private val MATCH = FrameLayout.LayoutParams(MATCH_W, MATCH_W)
         private val GROUND = Color.parseColor("#0D1E19")
