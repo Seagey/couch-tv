@@ -54,6 +54,9 @@ DEVMODE_APP = "com.palmdts.devmode"
 # Power states that mean off. "Active Standby" is "off" with Quick Start+ on: the TV still answers.
 OFF_STATES = {"Power Off", "Suspend", "Active Standby"}
 # What is on screen when no app is: LG's home, live TV, an input. Not checked on a real LG.
+# An HDMI or external input (leave_inputs), and LG's own home (back_to_couch).
+INPUT = re.compile(r"^com\.webos\.app\.(hdmi\d*|externalinput\..+)$")
+LG_HOME = re.compile(r"^com\.webos\.app\.(home|homeconnect|launcher)$")
 NOTHING = re.compile(r"^$|^com\.webos\.app\.(home|homeconnect|launcher|livetv|hdmi\d*|externalinput\..+|inputcommon)$")
 
 # Friendly key name -> the pointer socket's button name (aiowebostv's list).
@@ -133,6 +136,10 @@ class LGTV:
         # Press Developer Mode's Extend once a day ("extend_devmode": false to stop it). The name of
         # this TV in LG's ares tools (ares-setup-device) is "ares_device", else the TV's id.
         self.extend_devmode = cfg.get("extend_devmode", True) is not False
+        # true: an HDMI or external input counts as in use (a computer or console on it)
+        self.leave_inputs = cfg.get("leave_inputs", False) is True
+        # true: an app closing to LG's home reopens couch-tv. Home pressed from couch-tv is left alone.
+        self.back_to_couch = cfg.get("back_to_couch", False) is True
         self.ares_device = cfg.get("ares_device") or self.id
         self.ares_launch = cfg.get("ares_launch") or os.environ.get("ARES_LAUNCH") or None
         self.ports = [int(cfg["port"])] if cfg.get("port") else [3000, 3001]
@@ -482,7 +489,14 @@ class LGTV:
                             self.log.info("remote: %s", e)
                 if self.connected and self.registered:
                     await self._read_power()
+                    prev = self.visible
                     self.visible = await self._read_visible()
+                    if self.visible != prev and prev is not None and self.visible is not None:
+                        self.log.info("screen: %s -> %s", prev or "nothing", self.visible or "nothing")
+                        if (self.back_to_couch and was_on and LG_HOME.match(self.visible)
+                                and prev not in ("", self.app_id, DEVMODE_APP) and not NOTHING.match(prev)
+                                and not self._extending and time.monotonic() >= self.quiet_until):
+                            asyncio.create_task(self._back_to_couch(prev))
                     if self.is_on:
                         await self.refresh_installed()
                         if ticks % 3 == 0:
@@ -511,6 +525,17 @@ class LGTV:
             ticks += 1
             await asyncio.sleep(2)
 
+    async def _back_to_couch(self, came_from):
+        """An app closed to LG's home: put couch-tv back, unless something else came up."""
+        await asyncio.sleep(1)
+        if not LG_HOME.match(await self._read_visible() or ""):
+            return
+        try:
+            await self._launch(self.app_id, quiet=False)
+            self._note(f"{came_from} closed to LG home, reopened couch-tv")
+        except Exception as e:
+            self._note(f"{came_from} closed to LG home, could not reopen couch-tv: {e}")
+
     def _note(self, what):
         self.log.info("hook: %s", what)
         self.hook_log = (self.hook_log + [(time.strftime("%H:%M:%S"), what)])[-8:]
@@ -533,6 +558,9 @@ class LGTV:
             return
         if front is None:
             self._note("TV came on, could not read what is on screen, left alone")
+            return
+        if self.leave_inputs and INPUT.match(front):
+            self._note(f"TV came on in {front}, left alone (leave_inputs)")
             return
         if not NOTHING.match(front):
             self._note(f"TV came on in {self._package_of(front)}, left alone")
@@ -577,6 +605,8 @@ class LGTV:
         front = await self._read_visible()
         if front is None or not (front == self.app_id or NOTHING.match(front)):
             return   # an app is on screen: try again later
+        if self.leave_inputs and INPUT.match(front):
+            return   # an input in use: try again later
         await self.extend_devmode_now()
         await asyncio.sleep(2)
         now = await self._read_visible()
