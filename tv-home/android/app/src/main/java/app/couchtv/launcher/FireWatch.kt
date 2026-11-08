@@ -5,6 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
@@ -31,6 +33,14 @@ import android.view.accessibility.AccessibilityEvent
  */
 class FireWatch : AccessibilityService() {
     private var last = 0L
+    private val handler = Handler(Looper.getMainLooper())
+    /** True while the latest window change this service saw was the TV's own home (events only, no screen reading). */
+    private var stockInFront = false
+    private var recheckPending = false
+    private val recheck = Runnable {
+        recheckPending = false
+        if (stockInFront && !CrashGuard.standingAside(this)) bringBack()
+    }
 
     override fun onInterrupt() {}
 
@@ -53,16 +63,32 @@ class FireWatch : AccessibilityService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         connected = false
+        handler.removeCallbacks(recheck)
+        recheckPending = false
         return super.onUnbind(intent)
     }
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        if (!isStockHome(e.packageName?.toString(), e.className?.toString())) return
+        stockInFront = isStockHome(e.packageName?.toString(), e.className?.toString())
+        if (!stockInFront) return
         if (CrashGuard.standingAside(this)) return
-        val now = System.currentTimeMillis()
-        if (now - last < 1200) return   // one jump per press, not one per event
-        last = now
+        val wait = DEBOUNCE_MS - (System.currentTimeMillis() - last)
+        if (wait > 0) {
+            // Skipped as a repeat press. Some Google TVs (seen on a Xiaomi) keep the Google home as the
+            // resolved home, so quick Home presses can leave it in front with no further window event
+            // (issue #54): look once more when the debounce ends. One re-check at most, never a loop.
+            if (!recheckPending) {
+                recheckPending = true
+                handler.postDelayed(recheck, wait + 50)
+            }
+            return
+        }
+        bringBack()
+    }
+
+    private fun bringBack() {
+        last = System.currentTimeMillis()
         runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
@@ -77,6 +103,7 @@ class FireWatch : AccessibilityService() {
     companion object {
         /** Set while Android has this service bound. */
         @Volatile var connected = false
+        private const val DEBOUNCE_MS = 1200L   // one jump per press, not one per event
         private const val BOOT_WINDOW_MS = 2 * 60_000L
 
         /**
