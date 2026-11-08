@@ -12,6 +12,7 @@
 //   myscenes=[...]      home.my_scenes, as JSON (docs/MAKE-A-SCENE.md), for your own scenes
 //   lang=it             home.language (en, es, es-MX, it, de, tr); without it, the browser's own language
 //   glass=on            home.glass (on, lite: no blur)      video=<link>   home.video_url, an MP4 or MOV
+//   moving=off          home.moving_tiles: the focused tile's slow sway (off, or on)
 //   icons=glass         home.glass_icons: Apple style clear app icons on glass
 //   amount=1..5         home.glass_amount, how clear the glass is (1 frosted, 3 the default, 5 very clear)
 //   clockstyle=liquid   home.clock_style: the Night clock as liquid glass
@@ -65,6 +66,7 @@
   if (arg("secs")) cfg.home.scene_seconds = parseInt(arg("secs"), 10);
   if (arg("myscenes")) try { cfg.home.my_scenes = JSON.parse(arg("myscenes")); } catch (e) {}
   if (arg("glass")) cfg.home.glass = arg("glass");
+  if (arg("moving")) cfg.home.moving_tiles = arg("moving") !== "off";
   if (arg("icons") === "glass") cfg.home.glass_icons = true;
   if (arg("gfocus")) cfg.home.glass_focus = arg("gfocus");   // glass: the focused app stays glass (#32)
   if (arg("amount")) cfg.home.glass_amount = parseInt(arg("amount"), 10);

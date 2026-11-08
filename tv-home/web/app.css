@@ -210,6 +210,9 @@ body {
 .app .face.tool svg { width: 2.75rem; height: 2.75rem; stroke: var(--text); stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .app.busy .face { animation: none; opacity: 0.6; }
 
+/* Home settings, Look, Moving tiles: off (#52). The 3D sway gets its own layer, which flickers black on some slow GPUs. */
+html.still .tile.focus .face, html.still .tile.focus .face::after { animation: none; }
+
 @media (prefers-reduced-motion: reduce) {
   .tile.focus .face, .tile.focus .face::after { animation: none; }
   .tile, .shelf-track, .bg img, .hero { transition: none; }
