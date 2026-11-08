@@ -40,6 +40,8 @@ settings), and what is chosen there wins on that TV. See
 | `app_id` [`"CouchTVApp.Home"`, LG `"app.couchtv.home"`] | Samsung and LG only: the couch-tv app's id on the TV, if you changed it in `samsung/app/config.xml` or `lg/app/appinfo.json`. |
 | `remote_name` [`client_name`] | Samsung only: the name the TV shows when it asks to Allow the remote. |
 | `extend_devmode` [true] | LG only: press Developer Mode's Extend once a day while the TV is on, so the app is not removed. |
+| `leave_inputs` [false] | LG only: an HDMI or external input counts as in use (a computer or a console on it). The TV coming on there is left alone, and the daily Extend never switches away from it. |
+| `back_to_couch` [false] | LG only: when an app closes to LG's home (Back out of Netflix, say), couch-tv opens again a second later. Home pressed while couch-tv is open still reaches LG's home. |
 | `ares_device` [the TV's `id`] | LG only: this TV's name in LG's ares tools (`ares-setup-device`). |
 | `ares_launch` [found on the PATH] | LG only: the full path to `ares-launch`, for a bridge that cannot find it (started by launchd, for example). |
 | `port` [3000, then 3001] | LG only: the network remote's port, if your TV only answers on one of them. |
