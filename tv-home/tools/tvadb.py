@@ -31,6 +31,7 @@ import time
 TMP = "/data/local/tmp/tvhome"
 PART = 64 * 1024        # adb push part size
 B64_STEP = 32 * 1024    # base64 characters per shell command (a multiple of 4)
+B64_UNPACK = 64         # parts decoded per shell command: 2 MiB of base64, so a slow TV never hits the timeout
 TRIES = max(1, int(os.environ.get("TVADB_TRIES") or 3))
 SHELL_TIMEOUT = int(os.environ.get("TVADB_TIMEOUT") or 120)
 
@@ -139,15 +140,21 @@ def copy_by_push(tv, data, dest):
 
 def copy_by_base64(tv, data, dest):
     """Base64 text through plain shell commands, one file per chunk so a retried chunk is never
-    written twice, then decoded on the TV."""
+    written twice, then decoded on the TV in pieces of about 2 MB (one decode of a 48 MB app
+    outlasted the shell timeout on a slow Fire TV, issue #50)."""
     b64 = base64.b64encode(data).decode()
-    tv.shell(f"rm -rf {TMP}.b64 {dest}; mkdir -p {TMP}.b64")
+    tv.shell(f"rm -rf {TMP}.b64 {dest}; mkdir -p {TMP}.b64; : > {dest}")
     total = (len(b64) + B64_STEP - 1) // B64_STEP
     for n, i in enumerate(range(0, len(b64), B64_STEP), 1):
         tv.shell(f"echo -n '{b64[i:i + B64_STEP]}' > {TMP}.b64/{n:05d}")
         if n % 25 == 0 or n == total:
             say(f"copied {n}/{total} parts")
-    tv.shell(f"cat {TMP}.b64/* | base64 -d > {dest}; rm -rf {TMP}.b64", 120)
+    raw_piece = B64_UNPACK * B64_STEP // 4 * 3   # what one piece decodes to
+    for p in range(0, total, B64_UNPACK):
+        files = " ".join(f"{TMP}.b64/{n:05d}" for n in range(p + 1, min(p + B64_UNPACK, total) + 1))
+        # appends only when the file is exactly the size the earlier pieces make, so a retried piece is never written twice
+        tv.shell(f'[ "$(wc -c < {dest})" = {p // B64_UNPACK * raw_piece} ] && cat {files} | base64 -d >> {dest}', 120)
+    tv.shell(f"rm -rf {TMP}.b64")
 
 
 def install(tv, path):

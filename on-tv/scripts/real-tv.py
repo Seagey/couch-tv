@@ -50,6 +50,22 @@ def apk_package(path):
     return PKG if PKG in text else None
 
 
+def unpack_in_pieces(rsh, b64_len):
+    """Decodes /data/local/tmp/ontv.b64 into ontv.apk in pieces of about 2 MB: one `base64 -d` of the
+    whole 48 MB file outlasted the shell timeout on a slow Fire TV (issue #50). A piece only appends
+    when the file is exactly the size the earlier pieces make, so a retried piece is never written twice."""
+    blocks = 64                                   # dd blocks of 32768 b64 characters: 2 MiB, a multiple of 4
+    raw_piece = blocks * 32768 // 4 * 3           # what one piece decodes to
+    pieces = (b64_len + blocks * 32768 - 1) // (blocks * 32768)
+    rsh(": > /data/local/tmp/ontv.apk")
+    for k in range(pieces):
+        rsh(f'[ "$(wc -c < /data/local/tmp/ontv.apk)" = {k * raw_piece} ] && '
+            f"dd if=/data/local/tmp/ontv.b64 bs=32768 skip={k * blocks} count={blocks} 2>/dev/null | "
+            "base64 -d >> /data/local/tmp/ontv.apk", 120)
+        if (k + 1) % 5 == 0 or k + 1 == pieces:
+            print(f"  unpacked {k + 1}/{pieces} pieces")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ip", required=True)
@@ -107,7 +123,8 @@ def main():
                     rsh(f"echo -n '{b64[i:i + step]}' >> /data/local/tmp/ontv.b64")
                     if n % 100 == 0 or n == total:
                         print(f"  {n}/{total} chunks")
-                rsh("base64 -d /data/local/tmp/ontv.b64 > /data/local/tmp/ontv.apk; rm /data/local/tmp/ontv.b64", 120)
+                unpack_in_pieces(rsh, len(b64))
+                rsh("rm -f /data/local/tmp/ontv.b64")
             want = hashlib.md5(raw).hexdigest()
             got = (dev.shell("md5sum /data/local/tmp/ontv.apk", timeout_s=60).split() or [""])[0]
             if got != want:

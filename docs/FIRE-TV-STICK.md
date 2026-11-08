@@ -48,12 +48,15 @@ network as the stick.
    ```
 5. **Open Couch TV** on the stick and press **Use as home screen**. Skip Connect ADB unless you
    want the phone remote's keys.
-6. **Two grants** so it can take the Home key back (they survive restarts):
+6. **Three grants** so it can take the Home key back (they survive restarts):
    ```sh
    adb -s <stick-ip>:5555 shell pm grant dev.couchtv.ontv android.permission.WRITE_SECURE_SETTINGS
    adb -s <stick-ip>:5555 shell appops set dev.couchtv.ontv SYSTEM_ALERT_WINDOW allow
+   adb -s <stick-ip>:5555 shell appops set dev.couchtv.ontv GET_USAGE_STATS allow
    ```
-   (On Fire OS 8.1.8.5 the second was already `allow` after install; running it does no harm.)
+   (On Fire OS 8.1.8.5 the second was already `allow` after install; running it does no harm. The
+   third is for Fire OS 6, where the accessibility watcher never connects and the app watches usage
+   events instead; on 7 and 8 it is simply not used.)
 7. **Press "Use as home screen" after the grants** (if it was already on, press it off and on
    again). The app switches its accessibility watcher on when that switch is pressed and at every
    boot, and it needs the grant to be there first. Check it took:

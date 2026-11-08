@@ -118,7 +118,7 @@ object Adb {
             lastProbe = "$host:5555 $probe"
             Log.i(TAG, "tcp probe $host:5555 -> $probe")
             if (!probe.startsWith("AUTH") && !probe.startsWith("CNXN") && !probe.startsWith("STLS")) {
-                // Fire OS 7.6.6.9 and 8.1.0.3 on hang up on an app's own CNXN (CVE-2024-27350, issue #12)
+                // Fire OS 6.7.1.1, 7.6.6.9 and 8.1.0.3 on hang up on an app's own CNXN (CVE-2024-27350, issue #12)
                 if (FireHome.isFireTv && probe.startsWith("closed by adbd")) fireBlocked = true
                 else note("$host:5555 accepted the connection but adbd did not answer the handshake ($probe)")
                 continue
@@ -130,7 +130,7 @@ object Adb {
     }
 
     const val FIRE_BLOCKED = "This Fire OS blocks apps on the TV from using the TV's own ADB (Amazon's fix " +
-        "for CVE-2024-27350, in Fire OS 7.6.6.9 and 8.1.0.3 and newer). Nothing on the TV changes that. " +
+        "for CVE-2024-27350, in current Fire OS: 6.7.1.1, 7.6.6.9, 8.1.0.3 and newer). Nothing on the TV changes that. " +
         "Keys and typing from the phone need option B, a computer at home that runs the bridge."
 
     /**
@@ -242,9 +242,11 @@ object Adb {
         // One-off grants that make the app work better, and keep working when ADB is off:
         //  - draw over other apps: lets the app open other apps with plain intents from the background
         //  - write secure settings: lets the app switch wireless debugging back on after a reboot
+        //  - usage access: the Home button watch for Fire OS 6, which never connects the accessibility watcher (#50)
         //  - read TV listings: lets Keep watching read Android's Watch Next rows (WatchNext.kt)
         io.execute {
             runCatching { shell("appops set ${BuildConfig.APPLICATION_ID} SYSTEM_ALERT_WINDOW allow", 8000) }
+            runCatching { shell("appops set ${BuildConfig.APPLICATION_ID} GET_USAGE_STATS allow", 8000) }
             if (Build.VERSION.SDK_INT >= 30) runCatching { shell("pm grant ${BuildConfig.APPLICATION_ID} android.permission.WRITE_SECURE_SETTINGS", 8000) }
             runCatching { shell("pm grant ${BuildConfig.APPLICATION_ID} " + if (Build.VERSION.SDK_INT >= 29) "android.permission.READ_TV_LISTINGS" else "com.android.providers.tv.permission.READ_EPG_DATA", 8000) }
             FireHome.poke()
