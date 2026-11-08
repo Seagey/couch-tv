@@ -43,6 +43,7 @@ Not tested by the author. Each line is what someone said worked on their own dev
   maker's. The TV's default home is set to couch-tv with `cmd package set-home-activity`, the Home
   button watch covers TVs where the TV's own home still wins, and `undo.sh` puts back whichever
   home the TV had before.
+- **Google TV where the home choice does not stick.** On some boxes (a Xiaomi, issue #54) Google's home stays the resolved home after `apply.sh`, so every Home press opens it first and the Home button watch brings couch-tv back (a moment later, and again after the quick presses settle). `apply.sh` says so when it sees this. It is not an error.
 - **Where the settings are.** Google TV: Settings, System, About (and Developer options under
   System). Android TV 9 to 11: Settings, Device Preferences, About (and Developer options under
   Device Preferences).

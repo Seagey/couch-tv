@@ -132,6 +132,15 @@ done
 
 echo "3/4  Making couch-tv the home and sending your settings"
 "$PY" "$T" shell "cmd package set-home-activity $HOME_ACT"
+# Some Google TVs (seen on a Xiaomi, issue #54) keep their own home as the resolved home whatever is
+# set here. Say so plainly, since the Home button watch (below) is then what brings couch-tv back.
+# Only a note: the run carries on either way.
+RESOLVED=$("$PY" "$T" shell "$RESOLVE" | tr -d '\r' | tail -1)
+case "$RESOLVED" in
+  app.couchtv.launcher/*) echo "     the TV's Home key opens couch-tv itself" ;;
+  *) echo "     this TV kept its own home ($RESOLVED) as the one the Home key opens."
+     echo "     That is normal on some Google TVs: the Home button watch brings couch-tv back instead." ;;
+esac
 # Tell our home where the bridge is ("none" for option A) and hand it the settings from
 # config.json for its built-in copy. Force-stop first: a running home only reads "bridge".
 CFG64=$("$PY" "$HERE/home-config.py")
