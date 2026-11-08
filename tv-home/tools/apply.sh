@@ -109,7 +109,14 @@ for p in $WANT; do
   if ! echo "$present" | grep -qx "$p"; then
     continue
   elif needed "$p"; then
-    echo "     leaving $p on: the TV may need it to start"
+    if echo "$disabled" | grep -qx "$p"; then
+      # Refused now, but already switched off by an earlier run (issue #44): it cannot be switched
+      # off again here, yet it is still off, so it goes on the undo list and undo.sh turns it back on.
+      echo "$p" >> "$LIST"
+      echo "     $p is refused as something the TV may need, but it is already switched off from an earlier run: it stays on the undo list so undo.sh switches it back on"
+    else
+      echo "     leaving $p on: the TV may need it to start"
+    fi
   else
     "$PY" "$T" shell "pm disable-user --user 0 $p"
     echo "$p" >> "$LIST"

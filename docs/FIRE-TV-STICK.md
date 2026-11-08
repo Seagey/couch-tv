@@ -102,6 +102,9 @@ curl -X POST http://<stick-ip>:5400/api/pair -H 'Content-Type: application/json'
   switched on but does not always reconnect it after the app is updated (seen on 8.1.8.5). A
   restart reconnects it. To check: `adb shell dumpsys accessibility | grep "Bound services"`
   should list "Couch TV home watch".
+- **Prime Video crashes at boot if you switched it off.** With Prime Video (`com.amazon.firebat`)
+  disabled, Fire OS still starts it at boot and it crashes 2 to 3 times in the log. That is
+  Amazon's and harmless.
 - **The setup screen remembers which button had focus.** Count your D-pad presses from what is
   highlighted, not from the left: it is easy to press Forget phones by mistake.
 - **Weather defaults to Sydney** until you set a place in Home settings or through the API.
