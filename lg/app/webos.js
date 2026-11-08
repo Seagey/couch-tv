@@ -9,6 +9,7 @@
   "use strict";
   var S = window.COUCH_WEBOS || {};
   var MAP = window.COUCH_WEBOS_APPS || {};
+  var LOGOS = window.COUCH_WEBOS_LOGOS || {};   // logos bundled in the package: name -> true
   var SELF = "app.couchtv.home";
   var BRIDGE = ((location.search.match(/[?&]api=([^&]+)/) || [])[1] || "");
   BRIDGE = decodeURIComponent(BRIDGE);
@@ -110,8 +111,9 @@
   }
 
   function iconUrl(pkg) {
+    // a bundled logo first: the icon addresses the TV gives are a 404 on several TVs (#40, #45)
     var m = MAP[pkg];
-    if (m && m.logo) return "logos/" + pkg + ".png";
+    if ((m && m.logo) || LOGOS[pkg]) return "logos/" + pkg + ".png";
     var a = byPkg[pkg];
     if (a && a.icon) return /^[a-z]+:/.test(a.icon) ? a.icon : "file://" + a.icon;
     return null;

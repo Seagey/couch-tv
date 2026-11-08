@@ -556,8 +556,19 @@ class LGTV:
             return {}
 
     def _devmode_due(self):
-        """At most once a day (by the computer's date), only when switched on in config.json."""
-        return self.extend_devmode and self._devmode_state().get("date") != time.strftime("%Y-%m-%d")
+        """At most once a day (by the computer's date), only when switched on in config.json. A try
+        that failed does not count as the day's: it is tried again an hour later (couch-tv#45)."""
+        if not self.extend_devmode:
+            return False
+        s = self._devmode_state()
+        if s.get("date") != time.strftime("%Y-%m-%d"):
+            return True
+        if s.get("ok"):
+            return False
+        try:
+            return time.time() - time.mktime(time.strptime(s["at"], "%Y-%m-%dT%H:%M:%S")) >= 3600
+        except (KeyError, ValueError, OverflowError):
+            return True
 
     async def _daily_extend(self):
         """A TV left on: extend while couch-tv or live TV is in front, then put that back."""
@@ -679,7 +690,7 @@ class LGTV:
             if self.is_on:
                 await self._command("system/turnOff")
             else:
-                await self._request("system/turnOn")   # from Quick Start+ standby
+                await self._turn_on()   # from Quick Start+ standby
         elif code in ("VOLUMEUP", "VOLUMEDOWN"):
             await self._request("audio/volumeUp" if code == "VOLUMEUP" else "audio/volumeDown")
         elif code == "MUTE":
@@ -687,6 +698,21 @@ class LGTV:
         else:
             await self._button(code)
         return code
+
+    async def _turn_on(self):
+        """webOS 4 has no system/turnOn (404): try the power service's turnOnScreen, then
+        Wake-on-LAN (couch-tv#46)."""
+        try:
+            await self._request("system/turnOn")
+        except LGError as e:
+            if "404" not in str(e):
+                raise
+            try:
+                await self._request("com.webos.service.tvpower/power/turnOnScreen")
+            except LGError as e2:
+                if "404" not in str(e2):
+                    raise
+                await self.wake()
 
     async def text(self, text):
         """Types into the box on screen (only works while the TV shows its keyboard)."""

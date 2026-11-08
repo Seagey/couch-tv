@@ -9,6 +9,7 @@
 <body>
 <script src="settings.js"></script>
 <script src="webos-apps.js"></script>
+<script src="webos-tv-apps.js"></script>
 <script>
 // First page of the LG app. It notes which apps this TV has (the home page needs the list
 // straight away), asks the bridge for its settings, then opens the TV home (index.html): live
@@ -16,7 +17,9 @@
 //
 // The app list: webOS may refuse an app's own request for it (listLaunchPoints is not one of the
 // calls LG documents for apps), so the bridge's copy (/api/webos/apps, read over LG's network
-// remote) is asked for too, and the last good list is kept for when the computer is off.
+// remote) is asked for too, and the last good list is kept for when the computer is off. With no
+// bridge, a list baked in at build time (lg/build.py --apps, webos-tv-apps.js) seeds it once per
+// build, so the dock is not empty on firmware that refuses the list (webOS 5.6.2, 6.5.3).
 (function () {
   "use strict";
   var S = window.COUCH_WEBOS || {};
@@ -40,7 +43,15 @@
     })));
   }
 
-  // the apps on this TV, for the home's app row: the TV first, then the bridge
+  // the apps on this TV, for the home's app row: the baked list, then the TV, then the bridge
+  var BAKED = window.COUCH_WEBOS_TV_APPS || [];
+  var BAKED_V = window.COUCH_WEBOS_TV_APPS_VERSION || "";
+  try {
+    if (BAKED.length && localStorage.getItem("couch.webos.apps.v") !== BAKED_V) {
+      keepApps(BAKED);
+      store("couch.webos.apps.v", BAKED_V);
+    }
+  } catch (e) {}
   var appsDone = false, appsFromTv = false, bridgeAnswer = null;
   function next() { if (appsDone && bridgeAnswer !== null) go(bridgeAnswer); }
   var held = [];   // a service call is lost if nothing holds on to it until it answers
