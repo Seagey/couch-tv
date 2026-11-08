@@ -318,6 +318,10 @@ class SamsungTV:
                     await self._ws_close()
                 on = self.is_on
                 if on and was_on is False:
+                    # a kept-alive connection from before standby can be dead: start fresh
+                    old, self._session = self._session, None
+                    if old is not None:
+                        asyncio.create_task(old.close())
                     asyncio.create_task(self._hook())
                 if on is not None:
                     was_on = on
@@ -356,8 +360,12 @@ class SamsungTV:
             self._note(f"TV came on in {self._package_of(front)}, left alone")
             return
         try:
-            await self._launch_tizen(self.app_id)
-            self._note("TV came on, opened couch-tv")
+            how = await self._launch_tizen(self.app_id)
+            await asyncio.sleep(3)
+            if await self._read_visible() == self.app_id:
+                self._note(f"TV came on, opened couch-tv ({how})")
+            else:
+                self._note(f"TV came on, asked it to open couch-tv ({how}) but it is not on screen")
         except Exception as e:
             self._note(f"TV came on, could not open couch-tv: {e}")
 
@@ -513,17 +521,23 @@ class SamsungTV:
         the remote's ed.apps.launch was ignored, for store apps and sideloaded ones alike, while
         the same TV took keys on that channel. The remote call stays as the fallback."""
         self.quiet_until = time.monotonic() + 20
-        try:
-            s = await self._http()
-            async with s.post(f"http://{self.ip}:8001/api/v2/applications/{quote(tizen_id)}",
-                              timeout=aiohttp.ClientTimeout(total=5)) as r:
-                if r.status == 200 and (await r.text()).strip() == "true":
-                    return
-        except Exception as e:
-            self.log.info("REST launch of %s failed: %s", tizen_id, e)
+        # Retry: just after the TV comes on, the first call can fail with "Server disconnected"
+        # (a kept-alive connection from before standby, or the REST server still starting).
+        for attempt in range(3):
+            try:
+                s = await self._http()
+                async with s.post(f"http://{self.ip}:8001/api/v2/applications/{quote(tizen_id)}",
+                                  timeout=aiohttp.ClientTimeout(total=5)) as r:
+                    if r.status == 200 and (await r.text()).strip() == "true":
+                        return "rest"
+                    break   # the TV answered and said no: go to the fallback
+            except Exception as e:
+                self.log.info("REST launch of %s failed (try %d): %s", tizen_id, attempt + 1, e)
+                await asyncio.sleep(1.0)
         await self._send({"method": "ms.channel.emit", "params": {
             "event": "ed.apps.launch", "to": "host",
             "data": {"appId": tizen_id, "action_type": "DEEP_LINK", "metaTag": meta}}})
+        return "remote"
 
     async def _dial(self, name, body):
         s = await self._http()
