@@ -10,7 +10,7 @@
 (function () {
   var N = 192;               // working size, px
   var T0 = 16, T1 = 42;      // Lab distance: under T0 is background, over T1 is fully glyph
-  var VER = "clearicon.v1:";
+  var VER = "clearicon.v2:";
   var mem = {}, waiting = {};
 
   function lab(r, g, b) {
@@ -37,6 +37,8 @@
     var s = Math.min(N / w, N / h), dw = w * s, dh = h * s, ox = (N - dw) / 2, oy = (N - dh) / 2;
     x.drawImage(img, ox, oy, dw, dh);
     var d = x.getImageData(0, 0, N, N).data;   // throws on a tainted canvas: the caller falls back
+    var shape = shapeCut(x, d, ox, oy, dw, dh);
+    if (shape !== null) return shape;
 
     // the background: colours in a band just inside the edges, quantised, the common ones kept
     // (the outer 4%: wide wordmarks such as NETFLIX reach to about 8% from the edge)
@@ -140,6 +142,44 @@
     if (cover < 0.006 || cover > 0.62 || (edgeN && edgeHits / edgeN > 0.25)) return "";
     x.putImageData(out, 0, 0);
     return c.toDataURL("image/png");
+  }
+
+  // A logo that is itself a shape on a see-through square (YouTube's red rounded box): Apple's clear
+  // version keeps the shape as glass and cuts the play mark out of it as a hole (#32, #33, thanks
+  // alonmustafa). So when the edges are mostly see-through, the most used opaque colour is the glyph
+  // and every other colour inside it is a hole. null: not that kind of icon, go on with the usual cut.
+  function shapeCut(x, d, ox, oy, dw, dh) {
+    var band = Math.max(3, Math.round(Math.min(dw, dh) * 0.04)), clear = 0, n = 0, j, q;
+    var x0 = Math.round(ox), y0 = Math.round(oy), x1 = Math.round(ox + dw) - 1, y1 = Math.round(oy + dh) - 1;
+    for (var py = y0; py <= y1; py++) for (var px = x0; px <= x1; px++) {
+      if (Math.min(px - x0, x1 - px, py - y0, y1 - py) >= band) continue;
+      n++; if (d[(py * N + px) * 4 + 3] < 128) clear++;
+    }
+    if (!n || clear / n < 0.6) return null;
+    var bins = {}, best = null, bestN = 0;
+    for (j = 0; j < N * N; j++) {
+      q = j * 4;
+      if (d[q + 3] < 200) continue;
+      var k = (d[q] >> 4) + "," + (d[q + 1] >> 4) + "," + (d[q + 2] >> 4);
+      bins[k] = (bins[k] || 0) + 1;
+      if (bins[k] > bestN) { bestN = bins[k]; best = k; }
+    }
+    if (!best) return "";
+    var bp = best.split(","), D = lab(bp[0] * 16 + 8, bp[1] * 16 + 8, bp[2] * 16 + 8);
+    var out = x.createImageData(N, N), o = out.data, memo = {}, sum = 0;
+    for (j = 0; j < N * N; j++) {
+      q = j * 4;
+      var key = (d[q] >> 2) + "," + (d[q + 1] >> 2) + "," + (d[q + 2] >> 2), dd = memo[key];
+      if (dd === undefined) { var L = lab(d[q], d[q + 1], d[q + 2]); dd = memo[key] = Math.sqrt(Math.pow(L[0] - D[0], 2) + Math.pow(L[1] - D[1], 2) + Math.pow(L[2] - D[2], 2)); }
+      var a = Math.max(0, Math.min(1, (45 - dd) / 25)) * (d[q + 3] / 255);
+      o[q] = o[q + 1] = o[q + 2] = 255;
+      o[q + 3] = Math.round(a * 255);
+      sum += a;
+    }
+    var cover = sum / (N * N);
+    if (cover < 0.05 || cover > 0.95) return "";
+    x.putImageData(out, 0, 0);
+    return x.canvas.toDataURL("image/png");
   }
 
   function save(src, v) {

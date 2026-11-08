@@ -16,6 +16,8 @@
 //   amount=1..5         home.glass_amount, how clear the glass is (1 frosted, 3 the default, 5 very clear)
 //   clockstyle=liquid   home.clock_style: the Night clock as liquid glass
 //   inputs=4            the Input button lists four HDMI ports (one eARC), as the launcher reads them
+//   gfocus=glass        home.glass_focus: with glass app icons, the focused app stays glass
+//   music=1             Now playing: a pretend song in Spotify (music=paused: paused; music=noart: no cover)
 //   newapp=1            an app turns up that this TV has not seen before (the New dot)
 //   down                the bridge is not answering      offline=1   the saved copy, no bridge at all
 //   reset=1             forget everything this preview saved (orders, people, the look, Home settings)
@@ -64,6 +66,7 @@
   if (arg("myscenes")) try { cfg.home.my_scenes = JSON.parse(arg("myscenes")); } catch (e) {}
   if (arg("glass")) cfg.home.glass = arg("glass");
   if (arg("icons") === "glass") cfg.home.glass_icons = true;
+  if (arg("gfocus")) cfg.home.glass_focus = arg("gfocus");   // glass: the focused app stays glass (#32)
   if (arg("amount")) cfg.home.glass_amount = parseInt(arg("amount"), 10);
   if (arg("clockstyle")) cfg.home.clock_style = arg("clockstyle");
   if (arg("video")) cfg.home.video_url = arg("video");
@@ -179,11 +182,30 @@
 
   var sleepEnds = /[?&]sleep\b/.test(q) ? new Date(Date.now() + 42 * 60000).toISOString() : null;
   var picture = "calibrated";
+  // pretend songs for ?music= (made up, with the scenes as covers)
+  var SONGS = [["Golden Hour Drive", "The Weekend Shifts", "scene-golden"], ["Low Tide", "Saltwater Radio", "scene-water"],
+               ["Fog Lights", "Northern Rivers Club", "scene-fog"]];
+  var songAt = 0, songPlaying = arg("music") !== "paused";
+  function mockSong() {
+    var x = SONGS[songAt];
+    return { title: x[0], artist: x[1], album: null, state: songPlaying ? "playing" : "paused",
+             app: { id: "spotify", name: "Spotify", package: "com.spotify.tv.android" },
+             art: arg("music") === "noart" ? null : "backgrounds/" + x[2] + ".jpg" };
+  }
   window.MOCK_API = function (method, path, body) {
     var empty = /[?&]empty\b/.test(q), down = /[?&]down\b/.test(q);
     return new Promise(function (resolve, reject) {
       setTimeout(function () {
         if (down) return reject(new Error("The computer isn't answering."));
+        // Now playing (#31): ?music=1, a song that previous and next step through, play and pause toggle
+        if (path.indexOf("/api/music") === 0) return resolve({ ok: true, music: arg("music") ? mockSong() : null });
+        if (path.indexOf("/api/key") === 0) {
+          var k = body && body.key;
+          if (k === "play_pause") songPlaying = !songPlaying;
+          if (k === "next") songAt = (songAt + 1) % SONGS.length;
+          if (k === "previous") songAt = (songAt + SONGS.length - 1) % SONGS.length;
+          return resolve({ ok: true, key: k });
+        }
         if (path.indexOf("/api/continue/open") === 0) return resolve({ ok: true, note: "" });
         if (path.indexOf("/api/continue") === 0) {
           var w = (path.match(/who=([^&]+)/) || [])[1];

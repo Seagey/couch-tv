@@ -335,6 +335,17 @@ Claude's picks plus continue watching. Optional `?who=person1`. Fast: it returns
 `picks` can be empty on day one (no watch history yet). Play a pick with `POST /api/play` and its
 `title` (and `service` if you have it).
 
+### `GET /api/music`
+Now playing (#31): the song any app on that TV (`?tv=`) is playing, from its media sessions, for the
+home's card. A song stays for ten minutes after a pause. `art` is the cover from Apple's free iTunes
+search, or `null` until it is found. `music` is `null` when nothing is playing. The card's buttons
+are `POST /api/key` with `previous`, `play_pause` and `next`.
+```json
+{"ok": true, "music": {"title": "Golden Hour", "artist": "JVKE", "album": "this is what ____ feels like",
+ "state": "playing", "app": {"id": "spotify", "name": "Spotify", "package": "com.spotify.tv.android"},
+ "art": "https://is1-ssl.mzstatic.com/.../600x600bb.jpg"}}
+```
+
 ### `GET /api/continue`
 "Keep watching" for one TV (`?tv=`) and one person (`?who=`, else the person on that TV's couch):
 one card per show (its latest episode), newest first, at most 10, nothing older than 30 days.
@@ -456,6 +467,9 @@ is optional:
 | `glass_icons` | Glass app icons: `true` or `false`. |
 | `glass_amount` | How clear the glass is: `1` (frosted) to `5` (very clear). |
 | `clock_style` | The Night clock: `frosted` or `liquid`. |
+| `glass_focus` | Glass app icons, the focused app: `colour` or `glass`. |
+| `now_playing` | The Now playing card: `true` or `false`. |
+| `nav_sound` | The navigation sound: `system`, `soft` or `off`. |
 | `video`, `video_url` | The video background on or off, and its link (`http://` or `https://`, an MP4 or MOV). `""` means the link was removed on the TV, and then wins over `home.video_url`. |
 | `scene_order`, `scenes_off` | Every scene in order, and the ones switched off. Ids are the five scene names and `p-<id>` for a photo. |
 | `scene_seconds`, `clock` | 5 to 3600; `12h` or `24h`. |

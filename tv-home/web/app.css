@@ -84,14 +84,16 @@ body {
 .qbtn.set { background: rgba(16, 16, 20, 0.66); box-shadow: inset 0 0 0 0.125rem rgba(255, 255, 255, 0.5); }
 .qbtn.off { color: rgba(255, 255, 255, 0.55); }
 .qbtn.focus { background: #fff; color: #111; transform: scale(1.08); box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.35); }
+/* the sleep choices: a short list straight under the Sleep timer button (app.js sets its right edge) */
 .sleep-menu {
-  display: none; position: absolute; right: 0; top: calc(100% + 0.75rem); gap: 0.5rem; padding: 0.5rem;
-  border-radius: 2rem; background: rgba(28, 28, 32, 0.72); -webkit-backdrop-filter: blur(1.5rem); backdrop-filter: blur(1.5rem);
-  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.45); text-shadow: none;
+  display: none; position: absolute; right: 0; top: calc(100% + 0.75rem); z-index: 5; flex-direction: column; gap: 0.25rem;
+  min-width: 11rem; padding: 0.5rem; text-align: left;
+  border-radius: 1.75rem; background: rgba(28, 28, 32, 0.72); -webkit-backdrop-filter: blur(1.5rem); backdrop-filter: blur(1.5rem);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.14), 0 1rem 2.5rem rgba(0, 0, 0, 0.45); text-shadow: none;
 }
 .sleep-menu.on { display: flex; }
-.sleep-menu .opt { white-space: nowrap; padding: 0 1.25rem; border-radius: 1.5rem; font-size: 1.4375rem; line-height: 2.75rem; font-weight: 600; color: rgba(255, 255, 255, 0.85); transition: transform 200ms var(--ease); }
-.sleep-menu .opt.focus { background: #fff; color: #111; transform: scale(1.08); }
+.sleep-menu .opt { white-space: nowrap; padding: 0 1.25rem; border-radius: 1.25rem; font-size: 1.375rem; line-height: 2.75rem; font-weight: 600; color: rgba(255, 255, 255, 0.85); transition: transform 200ms var(--ease), background 200ms var(--ease); }
+.sleep-menu .opt.focus { background: #fff; color: #111; transform: scale(1.03); }
 .quick-note { margin-top: 0.5rem; font-size: 1.4375rem; color: var(--warn); min-height: 1.875rem; }
 
 .hero { max-width: 62rem; opacity: 0; transform: translateY(0.5rem); transition: opacity 400ms var(--ease), transform 400ms var(--ease); }
@@ -739,11 +741,16 @@ body {
 
 /* ================= Glass app icons (Home settings, Look, Glass app icons; home.glass_icons) =================
    Apple's clear icons (#25): the app's symbol in light glass, its own background gone
-   (clearicon.js cuts it out once and keeps it), on a glass tile with a soft dimming layer, a rim
-   of light along the top and a deeper shadow on the focused app. The focused (or lifted) app shows
-   its own icon in colour, so you can always tell what OK will open. An icon that will not split
-   cleanly (a photo) is shown grey and half see-through instead. Works with Glass panels on or off. */
-.glass-icons .app:not(.focus):not(.lifted) .face:not(.tool) {
+   (clearicon.js cuts it out once and keeps it), on a glass tile with a soft dimming layer and a rim
+   of light along the top. The focused (or lifted) app shows its own colours, so you can always
+   tell what OK will open; or, with "Focused app: Stays glass" (html.gi-stay, home.glass_focus,
+   #32, thanks alonmustafa), it stays glass like Apple's own clear icons, and the focus is the lift,
+   a brighter rim and a deeper shadow. An icon that will not split cleanly (a photo) is shown grey
+   and half see-through instead. Works with Glass panels on or off.
+   Each look is written twice, for the resting app and for a focused one that stays glass, so old
+   WebViews without :is() still read it. */
+.glass-icons .app:not(.focus):not(.lifted) .face:not(.tool),
+.glass-icons.gi-stay .app.focus .face:not(.tool), .glass-icons.gi-stay .app.lifted .face:not(.tool) {
   /* !important: the Classic look paints each tile in the app's colour inline */
   background: var(--gi-tint) !important;
   box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.3), inset 0 0.125rem 0.0625rem -0.0625rem rgba(255, 255, 255, 0.7),
@@ -751,18 +758,28 @@ body {
   -webkit-backdrop-filter: var(--gi-blur); backdrop-filter: var(--gi-blur);
 }
 .glass-icons .app .face .glyph { display: none; }
-.glass-icons .app:not(.focus):not(.lifted) .face.clear > img:not(.glyph) { display: none; }
-.glass-icons .app:not(.focus):not(.lifted) .face.clear .glyph {
+.glass-icons .app:not(.focus):not(.lifted) .face.clear > img:not(.glyph),
+.glass-icons.gi-stay .app.focus .face.clear > img:not(.glyph), .glass-icons.gi-stay .app.lifted .face.clear > img:not(.glyph) { display: none; }
+.glass-icons .app:not(.focus):not(.lifted) .face.clear .glyph,
+.glass-icons.gi-stay .app.focus .face.clear .glyph, .glass-icons.gi-stay .app.lifted .face.clear .glyph {
   display: block; object-fit: contain; opacity: var(--gi-glyph);
   filter: drop-shadow(0 0.0625rem 0.125rem rgba(0, 0, 0, 0.28)) drop-shadow(0 0 0.375rem rgba(0, 0, 0, 0.12));
 }
-.glass-icons .app:not(.focus):not(.lifted) .face:not(.tool):not(.clear) img {
+.glass-icons .app:not(.focus):not(.lifted) .face:not(.tool):not(.clear) img,
+.glass-icons.gi-stay .app.focus .face:not(.tool):not(.clear) img, .glass-icons.gi-stay .app.lifted .face:not(.tool):not(.clear) img {
   filter: grayscale(1) contrast(1.25) brightness(1.1); opacity: 0.55; mix-blend-mode: luminosity;
 }
 .glass-icons .app .face img { transition: filter 0.2s, opacity 0.2s; }
-.glass-icons.glass-lite .app:not(.focus):not(.lifted) .face:not(.tool) { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(36, 36, 44, 0.55) !important; }
+/* staying glass, the focused app is told by its lift, a bright rim and a deeper shadow */
+.glass-icons.gi-stay .app.focus .face:not(.tool), .glass-icons.gi-stay .app.lifted .face:not(.tool) {
+  box-shadow: inset 0 0 0 0.125rem rgba(255, 255, 255, 0.85), inset 0 0.1875rem 0.125rem -0.0625rem rgba(255, 255, 255, 0.75),
+    0 1.5rem 3rem rgba(0, 0, 0, 0.42);
+}
+.glass-icons.gi-stay .app.focus .face.clear .glyph { opacity: 1; }
+.glass-icons.glass-lite .app:not(.focus):not(.lifted) .face:not(.tool),
+.glass-icons.glass-lite.gi-stay .app.focus .face:not(.tool) { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(36, 36, 44, 0.55) !important; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-.glass-icons .app:not(.focus):not(.lifted) .face:not(.tool) { background: rgba(36, 36, 44, 0.55) !important; }
+.glass-icons .app:not(.focus):not(.lifted) .face:not(.tool), .glass-icons.gi-stay .app.focus .face:not(.tool) { background: rgba(36, 36, 44, 0.55) !important; }
 }
 
 /* ================= Liquid glass clock (Home settings, Look, Clock style; home.clock_style) =================
@@ -822,3 +839,90 @@ body {
 .no-flex-gap .srow > * + * { margin-left: 1.25rem; }
 .no-flex-gap .sh-rooms > * + * { margin-left: 2rem; }
 .no-flex-gap .sh-ctl > * + * { margin-left: 0.75rem; }
+
+/* ================= Now playing (#31) ================= */
+/* The song any app is playing behind the home, top right under the quick buttons: cover, title, artist and
+   the app, with previous, play or pause and next. A glass card in the same family as the menus. */
+.np {
+  display: none; align-items: center; gap: 1rem; width: 31rem; margin: 0.5rem 0 0 auto; padding: 0.75rem 0.875rem 0.75rem 0.75rem; text-align: left;
+  border-radius: 1.75rem; text-shadow: none;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 45%, rgba(255, 255, 255, 0.08) 100%), rgba(20, 18, 26, 0.5);
+  -webkit-backdrop-filter: blur(1.75rem) saturate(170%); backdrop-filter: blur(1.75rem) saturate(170%);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.18), inset 0 0.125rem 0.0625rem -0.0625rem rgba(255, 255, 255, 0.5), 0 1.25rem 3rem rgba(0, 0, 0, 0.3);
+}
+.np.on { display: flex; }
+.np-art { display: flex; flex: none; align-items: center; justify-content: center; width: 4.75rem; height: 4.75rem; border-radius: 0.875rem; object-fit: cover; background: rgba(255, 255, 255, 0.1); }
+.np-art.gone { visibility: hidden; }
+.np-art svg { width: 2rem; height: 2rem; fill: none; stroke: rgba(255, 255, 255, 0.8); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.np-t { flex: 1; min-width: 0; }
+.np-app { display: block; font-size: 0.9375rem; line-height: 1.25rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-t b { display: block; margin-top: 0.125rem; font-size: 1.375rem; line-height: 1.75rem; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-t small { display: block; font-size: 1.125rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.74); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-ctl { display: flex; flex: none; gap: 0.375rem; }
+.nb { display: flex; align-items: center; justify-content: center; width: 2.875rem; height: 2.875rem; border-radius: 50%; color: #fff; background: rgba(255, 255, 255, 0.1); transition: transform 220ms var(--ease), background 220ms var(--ease), color 220ms var(--ease); }
+.nb svg { width: 1.25rem; height: 1.25rem; fill: currentColor; stroke: none; }
+.nb.focus { background: #fff; color: #111; transform: scale(1.12); box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.35); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+.np { background: rgba(28, 26, 34, 0.92); }
+}
+.no-flex-gap .np > * + * { margin-left: 1rem; }
+.no-flex-gap .np-ctl > * + * { margin-left: 0.375rem; }
+.no-flex-gap .sleep-menu > * + * { margin-top: 0.25rem; }
+
+/* ================= Glass panels and menus, one treatment (#32, #33, thanks alonmustafa) =================
+   With Glass panels on, Home settings, the gear, app and Input menus and the sleep choices share
+   one material: clear glass with a dimming layer, a light rim and a highlight along the top, the
+   photo or video still showing behind. Focus stays a bright platter (it has to read from the couch)
+   but moves less: a small lift and a soft shadow instead of the big jump. Panels settle in gently,
+   and nothing moves at all with Reduce Motion. Old WebViews with no blur get solid panels. */
+.glass .settings { background: rgba(8, 8, 12, 0.42); }
+.glass .set-side, .glass .set-main {
+  padding: 1.5rem; border-radius: 2rem;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 45%, rgba(255, 255, 255, 0.06) 100%), rgba(18, 18, 24, 0.36);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.16), inset 0 0.125rem 0.0625rem -0.0625rem rgba(255, 255, 255, 0.4), 0 1.5rem 3.5rem rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(1.75rem) saturate(160%); backdrop-filter: blur(1.75rem) saturate(160%);
+}
+.glass .gear-pop, .glass .app-pop, .glass .sleep-menu {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 45%, rgba(255, 255, 255, 0.08) 100%), rgba(20, 18, 26, 0.5);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.2), inset 0 0.125rem 0.0625rem -0.0625rem rgba(255, 255, 255, 0.55), 0 1.5rem 3.75rem rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(1.75rem) saturate(170%); backdrop-filter: blur(1.75rem) saturate(170%);
+}
+.glass .srow:not(.k-info), .glass .ssec, .glass .grow { box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.08); }
+.glass .srow.focus, .glass .ssec.focus, .glass .grow.focus, .glass .sleep-menu .opt.focus {
+  background: rgba(255, 255, 255, 0.92); transform: translateY(-0.125rem) scale(1.01);
+  box-shadow: inset 0 0.0625rem 0 rgba(255, 255, 255, 1), 0 0.75rem 1.75rem rgba(0, 0, 0, 0.3);
+}
+.glass .srow, .glass .ssec, .glass .grow { transition: transform 260ms var(--ease), background 260ms var(--ease), box-shadow 260ms var(--ease); }
+/* calmer focus on the dock and the Keep watching cards: a lift and a deeper shadow, a thinner ring */
+.glass.theme-night .app.focus { transform: scale(1.1) translateY(-0.5rem); }
+.glass.theme-night .app.focus .face { box-shadow: 0 0 0 0.1875rem #fff, 0 1.5rem 3rem rgba(0, 0, 0, 0.45); }
+.glass .ncard.focus { transform: scale(1.03) translateY(-0.25rem); box-shadow: inset 0 0 0 0.125rem rgba(255, 255, 255, 0.85), 0 1.5rem 3rem rgba(0, 0, 0, 0.42); }
+.glass .settings.on .set-side, .glass .settings.on .set-main { animation: glass-settle 380ms var(--ease) both; }
+.glass .gear-pop.on, .glass .app-pop.on, .glass .sleep-menu.on { animation: glass-settle 260ms var(--ease) both; }
+@keyframes glass-settle { from { opacity: 0; transform: translateY(0.5rem); } to { opacity: 1; transform: none; } }
+/* the gear-pop for the updates question sits centred with its own transform: settle by fading only */
+.glass .gear-pop.ask.on { animation: glass-fade 260ms var(--ease) both; }
+@keyframes glass-fade { from { opacity: 0; } to { opacity: 1; } }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+.glass .settings { background: rgba(10, 8, 12, 0.96); }
+.glass .set-side, .glass .set-main, .glass .gear-pop, .glass .app-pop, .glass .sleep-menu { background: rgba(28, 26, 34, 0.97); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glass .settings.on .set-side, .glass .settings.on .set-main, .glass .gear-pop.on, .glass .app-pop.on, .glass .sleep-menu.on { animation: none; }
+  .glass .srow, .glass .ssec, .glass .grow, .nb, .sleep-menu .opt { transition: none; }
+  .glass .srow.focus, .glass .ssec.focus, .glass .grow.focus, .nb.focus, .glass .ncard.focus, .glass.theme-night .app.focus { transform: none; }
+}
+
+/* Night: Now playing is the first card of the Keep watching row (no scene's clock reaches the row);
+   the shows slide inside their own strip beside it. Classic keeps it top right. */
+.np-slot { display: none; }
+.theme-night .shelf-row { display: flex; align-items: stretch; gap: 1.375rem; }
+.theme-night .np-slot.on { display: flex; flex: none; }
+.theme-night .shelf-clip { flex: 1; min-width: 0; overflow: hidden; padding: 1.5rem; margin: -1.5rem; }
+.theme-night .np { width: 34rem; margin: 0; padding: 1rem; border-radius: 1.875rem; }
+.theme-night .np-art { width: 5.9375rem; height: 5.9375rem; border-radius: 1rem; }
+.theme-night .np-app { font-size: 1.1875rem; line-height: 1.5rem; }
+.theme-night .np-t b { margin-top: 0.375rem; font-size: 1.5625rem; line-height: 2rem; }
+.theme-night .np-t small { font-size: 1.25rem; line-height: 1.625rem; }
+.theme-night.gearing .np-slot, .theme-night.apping .np-slot { opacity: 0; }
+.no-flex-gap.theme-night .shelf-row > * + * { margin-left: 1.375rem; }

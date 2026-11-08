@@ -197,12 +197,21 @@ it will not play. The video stops while an app is in front. Over a video, the Ni
 frosted white instead of cut from the photo. Both are heavier than the plain home, so on a small
 TV stick switch them off if the home feels slow. Thanks alonmustafa (#22). **Glass app icons**
 (also under Look) shows each app's symbol in light glass without its own background, like Apple's
-clear icons, with the app you are on in its own colours (#25). **How clear** sets the glass from
+clear icons, and a logo that is itself a shape (YouTube) keeps the shape with its mark cut out (#25, #33). **Focused app** chooses whether the app you are on shows its own colours or stays glass like Apple's, shown by a lift and a brighter rim (#32). **How clear** sets the glass from
 frosted to very clear in five steps (#29), and **Clock style, Liquid glass** draws the Night clock
 as clear glass digits that bend the photo behind them (#25). The phone remote follows the TV. Links straight to
 Apple's own server (`sylvan.apple.com`, the tvOS aerials) never play: it uses a certificate from
 Apple's private authority, which Android and Chrome do not trust. Copies of the same aerials on
 other hosts, or saved on a computer at home, play fine as MOV (#27).
+
+**Now playing.** When Spotify or any other music app is playing behind the home, a card shows the
+song, the artist and its cover, with previous, play or pause and next (the remote's own media keys).
+In the Night look it is the first card of the Keep watching row; in Classic it sits under the quick
+buttons. A paused song stays for ten minutes. It needs option B or C: Android does not let an
+ordinary app see what other apps play, so option A has no card. Home settings, Look, Now playing
+switches it off. The cover comes from Apple's free music search. Thanks alonmustafa (#31).
+**Navigation sound** (Home settings, Look, Sound): the TV's own click, a soft tap, or none (#32).
+With Glass panels on, Home settings and the menus are glass too, and focus moves more calmly (#32, #33).
 
 **Smart home (optional).** If you already run Home Assistant, the home can show your air
 conditioning (each room's temperature, warmer, cooler, on, off and mode), your scenes and scripts

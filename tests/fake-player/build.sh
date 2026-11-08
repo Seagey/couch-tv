@@ -4,7 +4,7 @@
 set -eu
 here="$(cd "$(dirname "$0")" && pwd)"
 id="${1:-com.netflix.ninja}"
-case "$id" in com.netflix.ninja|com.amazon.amazonvideo.livingroom) ;; *) echo "unknown package: $id"; exit 2 ;; esac
+case "$id" in com.netflix.ninja|com.amazon.amazonvideo.livingroom|com.spotify.tv.android) ;; *) echo "unknown package: $id"; exit 2 ;; esac
 if [ -z "${JAVA_HOME:-}" ] && [ -x /usr/libexec/java_home ]; then JAVA_HOME=$(/usr/libexec/java_home -v 21 2>/dev/null || true); export JAVA_HOME; fi
 mkdir -p "$here/build"
 if [ ! -f "$here/build/fake.keystore" ]; then

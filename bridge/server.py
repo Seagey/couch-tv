@@ -1211,6 +1211,13 @@ def clean_settings(s):
         out["glass_amount"] = s["glass_amount"]
     if s.get("clock_style") in ("frosted", "liquid"):
         out["clock_style"] = s["clock_style"]
+    # Now playing on or off (#31), and the navigation sound: the TV's own, soft or off (#32)
+    if isinstance(s.get("now_playing"), bool):
+        out["now_playing"] = s["now_playing"]
+    if s.get("nav_sound") in ("system", "soft", "off"):
+        out["nav_sound"] = s["nav_sound"]
+    if s.get("glass_focus") in ("colour", "glass"):   # glass app icons: the focused app (#32)
+        out["glass_focus"] = s["glass_focus"]
     if isinstance(s.get("video"), bool):
         out["video"] = s["video"]
     # "" means the video link was removed on the TV (it then wins over home.video_url)
@@ -1366,6 +1373,75 @@ def continue_items(who=None):
     return out
 
 
+# ---------- now playing (#31): music any app is playing, for the home's card ----------
+# Read from the same `dumpsys media_session` as Keep watching, but not only the app in front: the
+# point is music (Spotify, YouTube Music) carrying on behind the home. A session counts while it
+# plays, and stays a while after a pause so the card's play button can start it again.
+MUSIC_PAUSE_KEEP = 600          # seconds a paused session stays on the card
+OWN_PACKAGES = {"app.couchtv.launcher", "dev.couchtv.ontv"}
+music_states = {}             # per TV: {"read_at", "item", "last"}
+music_art = {}                  # (artist, title) -> picture url or ""
+music_art_pending = set()
+
+
+async def _music_artwork(artist, title):
+    """The album picture from Apple's free iTunes search (no key), once per song."""
+    key = ((artist or "").lower(), (title or "").lower())
+    try:
+        import aiohttp
+        q = f"{artist or ''} {title or ''}".strip()
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as cs:
+            async with cs.get("https://itunes.apple.com/search", params={"term": q, "entity": "song", "limit": "1"},
+                              headers={"user-agent": "couch-tv-bridge/1"}) as r:
+                j = await r.json(content_type=None)
+        hit = (j.get("results") or [None])[0]
+        url = hit.get("artworkUrl100") if hit else None
+        music_art[key] = url.replace("100x100bb", "600x600bb") if url else ""
+    except Exception:
+        music_art[key] = ""
+    finally:
+        music_art_pending.discard(key)
+
+
+async def music_now():
+    """The song on the card: playing now, or paused in the last ten minutes. Cached for 3 s."""
+    music_state = music_states.setdefault(_current.get(), {"read_at": 0.0, "item": None, "last": None})
+    if time.time() - music_state["read_at"] < 3:
+        return music_state["item"]
+    music_state["read_at"] = time.time()
+    item = None
+    if tv.connected and tv.is_on and await tv.adb_ready():
+        try:
+            out = await tv.adb("shell", "cat /proc/uptime; dumpsys media_session", timeout=8)
+        except Exception:
+            return music_state["item"]   # ADB busy or away for a moment: keep the card as it was
+        found = [x for x in _sessions(out) if x.get("package") not in OWN_PACKAGES and x.get("title")]
+        playing = [x for x in found if x.get("state") == "PLAYING"]
+        playing.sort(key=lambda x: not x.get("active"))
+        last = music_state["last"]
+        pick = playing[0] if playing else None
+        if not pick and last and time.time() - last["seen"] < MUSIC_PAUSE_KEEP:
+            pick = next((x for x in found if x["package"] == last["package"] and x.get("state") in ("PAUSED", "STOPPED")), None)
+        if pick:
+            app = apps.describe_package(pick["package"]) or {"id": None, "name": pick["package"], "package": pick["package"]}
+            if not generic_title(pick["title"], pick["package"], app):
+                if pick.get("state") == "PLAYING":
+                    music_state["last"] = {"package": pick["package"], "seen": time.time()}
+                key = ((pick.get("subtitle") or "").lower(), pick["title"].lower())
+                if key not in music_art and key not in music_art_pending:
+                    music_art_pending.add(key)
+                    asyncio.ensure_future(_music_artwork(pick.get("subtitle"), pick["title"]))
+                item = {"title": pick["title"], "artist": pick.get("subtitle"), "album": pick.get("album"),
+                        "state": STATES.get(pick.get("state"), "stopped"), "app": app,
+                        "art": music_art.get(key) or None}
+    music_state["item"] = item
+    return item
+
+
+async def h_music(request):
+    return ok(music=await music_now())
+
+
 async def h_continue(request):
     who = store.norm_who(request.query.get("who"))
     return ok(items=continue_items(who))
@@ -1487,6 +1563,7 @@ def _sessions(out):
             parts = [p.strip() for p in line.split("description=", 1)[1].split(", ")]
             cur["title"] = parts[0] if parts and parts[0] != "null" else None
             cur["subtitle"] = parts[1] if len(parts) > 1 and parts[1] != "null" else None
+            cur["album"] = parts[2] if len(parts) > 2 and parts[2] != "null" else None
         elif line.startswith("queueTitle=") and cur is not None:
             q = line.split("=", 1)[1].rsplit(", size=", 1)[0].strip()
             cur["queue_title"] = q if q and q != "null" else None
@@ -1996,6 +2073,7 @@ def make_app():
     r.add_get("/api/settings", h_settings_get)
     r.add_post("/api/settings", h_settings_set)
     r.add_get("/api/continue", h_continue)
+    r.add_get("/api/music", h_music)
     r.add_post("/api/continue/open", h_continue_open)
     r.add_get("/api/sleep", h_sleep_get)
     r.add_post("/api/sleep", h_sleep_set)
