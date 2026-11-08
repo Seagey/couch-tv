@@ -10,9 +10,11 @@
 <script src="settings.js"></script>
 <script src="tizen-apps.js"></script>
 <script>
-// First page of the Samsung app. It notes which apps this TV has (the home page needs the list
-// straight away), asks the bridge for its settings, then opens the TV home (index.html): live
-// with the bridge, or the home's own offline copy when the computer is off.
+// First page of the Samsung app. It asks the bridge for its settings and opens the TV home
+// (index.html): live with the bridge, or the home's own offline copy when the computer is off.
+// The apps on this TV are read here too, but the home does not wait for them when it already has
+// the list from last time (a TV with 491 apps took 6.3 s to give it, #53): tizen.js reads it again
+// once the home is up.
 (function () {
   "use strict";
   var S = window.COUCH_TIZEN || {};
@@ -31,17 +33,22 @@
 
   function store(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
 
-  // the apps on this TV, for the home's app row
-  var appsDone = false, bridgeAnswer = null;
+  // the apps on this TV, for the home's app row. With a list saved from last time the home opens
+  // straight away and tizen.js refreshes the list; the first ever open waits for it.
+  var haveList = false;
+  try { haveList = !!localStorage.getItem("couch.tizen.apps"); } catch (e) {}
+  var appsDone = haveList, bridgeAnswer = null;
   function next() { if (appsDone && bridgeAnswer !== null) go(bridgeAnswer); }
-  try {
-    tizen.application.getAppsInfo(function (list) {
-      store("couch.tizen.apps", JSON.stringify(list.map(function (a) {
-        return { id: a.id, name: a.name, packageId: a.packageId, iconPath: a.iconPath, show: a.show };
-      })));
-      appsDone = true; next();
-    }, function () { appsDone = true; next(); });
-  } catch (e) { appsDone = true; }
+  if (!haveList) {
+    try {
+      tizen.application.getAppsInfo(function (list) {
+        store("couch.tizen.apps", JSON.stringify(list.map(function (a) {
+          return { id: a.id, name: a.name, packageId: a.packageId, iconPath: a.iconPath, show: a.show };
+        })));
+        appsDone = true; next();
+      }, function () { appsDone = true; next(); });
+    } catch (e) { appsDone = true; }
+  }
 
   // the bridge's settings (people, weather place, the look), kept for when it is off
   if (!BRIDGE) bridgeAnswer = false;
@@ -58,7 +65,7 @@
     x.send();
   }
   next();
-  setTimeout(function () { go(bridgeAnswer === true); }, 6000);   // never stuck on a black screen
+  setTimeout(function () { go(bridgeAnswer === true); }, 15000);   // never stuck on a black screen
 })();
 </script>
 </body>
