@@ -1,33 +1,35 @@
 #!/bin/sh
-# Installs our Home app on a TV and makes it the home screen. Switches off the Google TV home,
-# ambient mode, any extra packages named in EXTRA_OFF (e.g. an ACR ad tracker the survey found)
-# and, last of all, the setup wizard (its "recovery home" outranks any home app we can install).
-# Only packages that exist on that TV are touched, and the list of what was switched off is
-# written to tv-home/tvs/<TV_NAME>.disabled, which undo.sh reads. Run survey-tv.py first.
+# Installs our Home app on a TV and makes it the home screen. The TV's own home screen and its setup
+# wizard stay installed and switched ON: couch-tv is set as the chosen home, and a small Home button
+# watch puts couch-tv back whenever the TV opens its own home (at power on, or from the Home key on
+# TVs where the Google home outranks the chosen one). Only ambient mode (the idle adverts) and any
+# extra packages named in EXTRA_OFF (e.g. an ACR ad tracker the survey found) are switched off, and
+# the list of what was switched off is written to tv-home/tvs/<TV_NAME>.disabled, which undo.sh
+# reads. Run survey-tv.py first.
 #
-# Order matters. Everything that needs the network (install, switch-offs, setting the home,
-# sending config.json) happens first. The setup wizard goes off last, in one command that runs on
-# the TV by itself, because on some TVs switching it off makes the TV forget its Wi-Fi, and then
-# this computer can no longer reach it. Safe to run again: every step checks or repeats cleanly.
+# Why the TV's own home and setup wizard stay on: switching them off (what couch-tv 0.10 and older
+# did) can leave a Google TV in a boot loop after a restart (blank screen, restart, blank screen):
+# with no stock home and no setup wizard, the system process can crash at every start. Reported on
+# a Sony Bravia Google TV and on other Google TVs. Running this again on a TV set up by an older
+# couch-tv switches them back on. Nothing a TV needs at power on is ever switched off, and EXTRA_OFF
+# refuses any package with a home screen, a persistent process, or a core part of Android.
 #
-# Other makers' own home screens (survey-tv.py lists them) are left alone: the TV's default home
-# is set to couch-tv instead, with `cmd package set-home-activity`.
+# Safe to run again: every step checks or repeats cleanly. Other makers' own home screens
+# (survey-tv.py lists them) are left alone too.
 #
 # Option A (TV home only, no computer left on): leave BRIDGE_URL out. The app then shows the copy
 #   of the home it carries inside it, with the people, weather, clock, look and quick buttons from
-#   your config.json (passed to the TV now). Run this again after a Google TV update brings the
-#   Google home back, or after you change config.json.
+#   your config.json (passed to the TV now). Run this again after you change config.json.
 # Option B (computer bridge): set BRIDGE_URL so the home loads from the bridge.
 # Smart home (optional, either option): a "home_assistant" section in config.json and the token in
 #   .env (docs/CONFIG.md, Smart home). Without one nothing about it changes on the TV.
 #
 # Usage, from the repo root:
 #   TV_IP=<tv address> [BRIDGE_URL=http://<your-computer>:5400] [APK=couch-tv-home.apk]
-#     [TV_ID=<id>] [TV_NAME=<name, defaults to TV_ID, else living-room>] [EXTRA_OFF="pkg pkg"] [KEEP_SETUP=1] [ADB_PORT=5555]
+#     [TV_ID=<id>] [TV_NAME=<name, defaults to TV_ID, else living-room>] [EXTRA_OFF="pkg pkg"] [ADB_PORT=5555]
 #     sh tv-home/tools/apply.sh
-# APK defaults to the one scripts/build-apk.sh builds. KEEP_SETUP=1 leaves the setup wizard on.
-# On some TVs the wizard then keeps winning Home; if Home still shows Google TV afterwards, the
-# wizard has to go off.
+# APK defaults to the one scripts/build-apk.sh builds. KEEP_SETUP is no longer needed: the setup
+# wizard always stays on.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
@@ -48,8 +50,12 @@ fi
 mkdir -p "$HERE/../tvs"
 LIST="$HERE/../tvs/$TV_NAME.disabled"
 WIZARD=com.google.android.tungsten.setupwraith
-WANT="com.google.android.apps.tv.launcherx com.google.android.tvlauncher com.google.android.apps.tv.dreamx ${EXTRA_OFF:-}"
+# Never switched off, and switched back on if an older couch-tv (0.10 and before) switched them off:
+# the TV's own home screens and the setup wizard. Without them some Google TVs crash at every start.
+NEVER_OFF="com.google.android.apps.tv.launcherx com.google.android.tvlauncher $WIZARD"
+WANT="com.google.android.apps.tv.dreamx ${EXTRA_OFF:-}"
 HOME_ACT=app.couchtv.launcher/.MainActivity
+WATCH=app.couchtv.launcher/.FireWatch
 RESOLVE="cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
 
 # Remember the home the TV had, so undo.sh puts that one back (it may be the maker's own). Only
@@ -64,11 +70,9 @@ fi
 
 echo "1/4  Installing the app"
 "$PY" "$T" install "$APK"
-# Make couch-tv the chosen home while the Google home is still on, and check the TV took it, before
-# anything is switched off: on some Google TVs switching the Google home off first hands Home to the
-# setup wizard's recovery screen, which can crash-loop and take the Wi-Fi and ADB with it (seen by
-# the herocode1 fork). The Home key itself still opens Google's home until step 2 switches it off,
-# and resolve-activity keeps naming Google's, so the check asks for the chosen launcher instead.
+# Make couch-tv the chosen home and check the TV took it. On Google TV the Home key itself still
+# opens Google's home (it outranks the chosen one), and resolve-activity keeps naming Google's, so
+# the check asks for the chosen launcher instead; the Home button watch (step 3) does the rest.
 "$PY" "$T" shell "cmd package set-home-activity $HOME_ACT" > /dev/null
 NOW=$("$PY" "$T" shell "cmd shortcut get-default-launcher" | grep -m1 Launcher || true)
 case "$NOW" in
@@ -78,25 +82,39 @@ esac
 # Keep watching with no computer reads Android's Watch Next list, which needs this permission.
 "$PY" "$T" shell "pm grant app.couchtv.launcher android.permission.READ_TV_LISTINGS" > /dev/null 2>&1 || true
 
-echo "2/4  Switching off the Google home and ambient mode"
+echo "2/4  Keeping the TV's own home and setup on, switching off ambient mode"
 present=$("$PY" "$T" shell "pm list packages" | sed 's/package://')
 disabled=$("$PY" "$T" shell "pm list packages -d" | sed 's/package://')
+# An older couch-tv switched these off. Switch them back on first: that is the boot loop fix.
+for p in $NEVER_OFF; do
+  if echo "$disabled" | grep -qx "$p"; then
+    "$PY" "$T" shell "pm enable $p" > /dev/null
+    echo "     switched $p back on (an older couch-tv had switched it off)"
+  fi
+done
+# Anything the TV may need at power on is refused, even when EXTRA_OFF names it: a home screen, a
+# setup app, a persistent process or a core part of Android.
+homes=$("$PY" "$T" shell "pm query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME" | grep / | sed 's|^ *||; s|/.*||' | sort -u)
+needed() {
+  case " $NEVER_OFF " in *" $1 "*) return 0 ;; esac
+  case "$1" in
+    android|app.couchtv.*|com.android.*|com.google.android.gms|com.google.android.gsf|*webview*|com.google.android.trichromelibrary|com.google.android.tv.remote.service|com.google.android.katniss|com.google.android.permissioncontroller|com.google.android.packageinstaller|com.google.android.networkstack*|com.google.android.ext.*|com.google.android.providers.*|com.sony.dtv.sonysystemservice|com.sony.dtv.tvx|*setupwizard*|*.setup|*provision*) return 0 ;;
+  esac
+  echo "$homes" | grep -qx "$1" && return 0
+  "$PY" "$T" shell "dumpsys package $1" | grep -q -E "(pkgFlags|flags)=\[.*PERSISTENT" && return 0
+  return 1
+}
 : > "$LIST"
 for p in $WANT; do
-  if echo "$present" | grep -qx "$p"; then
+  if ! echo "$present" | grep -qx "$p"; then
+    continue
+  elif needed "$p"; then
+    echo "     leaving $p on: the TV may need it to start"
+  else
     "$PY" "$T" shell "pm disable-user --user 0 $p"
     echo "$p" >> "$LIST"
   fi
 done
-WIZARD_OFF=0
-if [ "${KEEP_SETUP:-0}" != 1 ] && echo "$present" | grep -qx "$WIZARD"; then
-  echo "$WIZARD" >> "$LIST"
-  if echo "$disabled" | grep -qx "$WIZARD"; then
-    echo "     the setup wizard is already off"
-  else
-    WIZARD_OFF=1
-  fi
-fi
 
 echo "3/4  Making couch-tv the home and sending your settings"
 "$PY" "$T" shell "cmd package set-home-activity $HOME_ACT"
@@ -118,25 +136,26 @@ elif "$PY" "$T" shell "appops get app.couchtv.launcher SYSTEM_ALERT_WINDOW" 2> /
 fi
 "$PY" "$T" shell "am force-stop app.couchtv.launcher; am start -n $HOME_ACT --es bridge ${BRIDGE_URL:-none} --es config_b64 $CFG64 --es ha_b64 $HA64 ${TV_ID:+--es tv $TV_ID}"
 
-# Fire TV: Amazon's Home key ignores the default home, so the app's Home button watch goes on
-# (FireWatch.kt: it only sees which window came forward). After the force-stop above, because
-# Android drops a stopped app's watcher; the secure-settings grant lets the app put it back itself
-# after updates and reboots. undo.sh takes both away.
-FIRE_WATCH=app.couchtv.launcher/.FireWatch
-if "$PY" "$T" shell "pm list packages com.amazon.tv.launcher" | grep -q "package:com.amazon.tv.launcher"; then
+# The Home button watch (FireWatch.kt: it only sees which window came forward). The TV's own home
+# stays on, so at power on, and from the Home key on Google TV and Fire TV, the TV opens its own
+# home; the watch puts couch-tv back on top (the TV's home flashes up for a moment). After the
+# force-stop above, because Android drops a stopped app's watcher; the secure-settings grant lets
+# the app put it back itself after updates and reboots. undo.sh takes both away. If couch-tv itself
+# keeps crashing, the watch stands aside and the TV's own home stays (CrashGuard.kt).
+if echo "$present" | grep -qx -E "com.google.android.apps.tv.launcherx|com.google.android.tvlauncher|com.amazon.tv.launcher"; then
   "$PY" "$T" shell "pm grant app.couchtv.launcher android.permission.WRITE_SECURE_SETTINGS" > /dev/null 2>&1 || true
   CUR=$("$PY" "$T" shell "settings get secure enabled_accessibility_services" | tr -d '\r')
   case ":$CUR:" in
-    *":$FIRE_WATCH:"*) ;;
-    *) if [ -z "$CUR" ] || [ "$CUR" = null ]; then NEW=$FIRE_WATCH; else NEW="$CUR:$FIRE_WATCH"; fi
+    *":$WATCH:"*|*":app.couchtv.launcher/app.couchtv.launcher.FireWatch:"*) ;;
+    *) if [ -z "$CUR" ] || [ "$CUR" = null ]; then NEW=$WATCH; else NEW="$CUR:$WATCH"; fi
        "$PY" "$T" shell "settings put secure enabled_accessibility_services $NEW" ;;
   esac
   "$PY" "$T" shell "settings put secure accessibility_enabled 1"
-  echo "     Fire TV: the Home button watch is on (Amazon's home flashes up, then couch-tv comes back)"
+  echo "     the Home button watch is on (the TV's own home may flash up, then couch-tv comes back)"
 fi
 
-# Tell the bridge's daily guard what to keep switched off (a Google TV update can switch it back
-# on). Option A has no bridge, so no guard: run this script again after an update.
+# Tell the bridge's daily guard what to keep switched off (a Google TV update can switch ambient
+# mode back on). Option A has no bridge, so no guard: run this script again after an update.
 KEEP="$ROOT/bridge/data/keep-disabled.json"
 [ "$TV_NAME" = living-room ] || KEEP="$ROOT/bridge/data/keep-disabled.$TV_NAME.json"
 if [ -n "${BRIDGE_URL:-}" ]; then
@@ -144,29 +163,26 @@ if [ -n "${BRIDGE_URL:-}" ]; then
   "$PY" -c 'import json,sys; print(json.dumps(sys.stdin.read().split()))' < "$LIST" > "$KEEP"
 fi
 
-if [ "$WIZARD_OFF" = 1 ]; then
-  echo "4/4  Switching off the setup wizard (last, because on some TVs this drops the Wi-Fi)"
-  # One command, so the TV finishes it by itself even if its Wi-Fi drops halfway. Setting the home
-  # again after the switch-off stops the wizard's recovery home winning.
-  "$PY" "$T" shell "pm disable-user --user 0 $WIZARD; cmd package set-home-activity $HOME_ACT; input keyevent KEYCODE_HOME" > /dev/null 2>&1 || true
-  sleep 5
-else
-  echo "4/4  Setup wizard: nothing to do"
-  "$PY" "$T" keys HOME || true
-fi
+echo "4/4  Pressing Home"
+"$PY" "$T" keys HOME || true
+sleep 3
 
 echo "switched off (undo list): $LIST"
 cat "$LIST"
 if "$PY" "$T" ping > /dev/null 2>&1; then
-  NOW=$("$PY" "$T" shell "$RESOLVE" || true)
-  echo "home screen now: $(echo "$NOW" | tail -1)"
-  echo "Done. The TV is still reachable."
+  FRONT=$("$PY" "$T" shell "dumpsys window | grep -m1 mCurrentFocus" || true)
+  case "$FRONT" in
+    *app.couchtv.launcher*) echo "home screen now: couch-tv" ;;
+    *) echo "home screen now: $(echo "$FRONT" | tr -s ' ' | cut -c1-120)"
+       echo "couch-tv is not in front yet. Press Home on the remote. If the TV's own home stays, open"
+       echo "Settings, Accessibility (under System or Device Preferences) and check Home button watch is on." ;;
+  esac
+  echo "Done. The TV is still reachable. Its own home screen and setup wizard are still on, so the"
+  echo "TV has them when it next starts."
 else
   echo
-  echo "Done on the TV, but this computer can no longer reach it. Switching the setup wizard off"
-  echo "can make a TV forget its Wi-Fi. At the TV: Settings, Network and Internet (or Network), pick"
-  echo "your Wi-Fi and join it again. Then run this same command again: it is safe to repeat, and"
-  echo "it checks everything is in place. If the TV will not rejoin, see \"If something is stuck\""
+  echo "Done on the TV, but this computer can no longer reach it. Check the TV is on and on the"
+  echo "Wi-Fi, then run this same command again: it is safe to repeat. See \"If something is stuck\""
   echo "in docs/UNINSTALL.md."
   exit 2
 fi

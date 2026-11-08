@@ -76,8 +76,21 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashGuard.install(this)
+        // apply.sh starting the home on purpose (new settings) is always a fresh try.
+        if (intent?.hasExtra("bridge") == true || intent?.hasExtra("config_b64") == true) CrashGuard.reset(this)
+        // Crashed twice in the last few minutes: stand aside for the TV's own home rather than
+        // crash again, so the TV is never stuck going round (CrashGuard.kt). It tries again later.
+        if (CrashGuard.standingAside(this) && CrashGuard.openStockHome(this)) {
+            finish()
+            return
+        }
+        CrashGuard.started(this)
+        main.postDelayed({ CrashGuard.settled(this) }, CrashGuard.SETTLE_MS)
         // Lets a computer inspect the page over ADB (chrome://inspect). Only reachable with ADB access.
-        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+        // Right after power on the TV's WebView can still be getting ready: never crash over it.
+        runCatching { WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG) }
+        CrashGuard.install(this)   // the WebView puts its own crash handler in front: ours goes first again
         root = FrameLayout(this).apply { setBackgroundColor(GROUND) }
         setContentView(root)
         hideSystemBars()
@@ -246,8 +259,18 @@ class MainActivity : Activity() {
 
     // ---------------------------------------------------------------- the page
 
+    /** The page's WebView, or null while the TV's WebView cannot start (then the app grid shows). */
+    private fun webView(): WebView? = web ?: try {
+        makeWebView().also { web = it; root.addView(it, 0, MATCH); CrashGuard.install(this) }
+    } catch (e: Throwable) {
+        android.util.Log.w("couchtv", "WebView not ready, showing the app grid: ${e.message}")
+        showFallback()
+        later(RETRY_MS)
+        null
+    }
+
     private fun showWeb(base: String) {
-        val w = web ?: makeWebView().also { web = it; root.addView(it, 0, MATCH) }
+        val w = webView() ?: return
         loadFailed = false
         offline = false
         pageReady = false
@@ -365,7 +388,7 @@ class MainActivity : Activity() {
      */
     private fun showOffline() {
         if (!hasOffline()) { showFallback(); return }
-        val w = web ?: makeWebView().also { web = it; root.addView(it, 0, MATCH) }
+        val w = webView() ?: return
         loadFailed = false
         offline = true
         val tv = prefs.getString("tv", null)

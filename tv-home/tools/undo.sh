@@ -21,11 +21,14 @@ LIST="$HERE/../tvs/$TV_NAME.disabled"
 if [ -f "$LIST" ]; then
   PKGS=$(cat "$LIST")
 else
-  # No list from apply.sh on this computer: the Google packages apply.sh always switches off.
+  # No list from apply.sh on this computer: ambient mode, which apply.sh always switches off.
   # Anything else (an ad tracker passed in EXTRA_OFF) is not known here: see survey-tv.py's list.
   echo "No $LIST on this computer, switching the standard Google packages back on."
-  PKGS="com.google.android.apps.tv.launcherx com.google.android.tvlauncher com.google.android.apps.tv.dreamx com.google.android.tungsten.setupwraith"
+  PKGS="com.google.android.apps.tv.dreamx"
 fi
+# The TV's own homes and the setup wizard always go back on, whatever the list says: couch-tv 0.10
+# and older switched them off, and without them some Google TVs loop at power on.
+PKGS="com.google.android.apps.tv.launcherx com.google.android.tvlauncher com.google.android.tungsten.setupwraith $PKGS"
 # Stop the bridge's daily guard switching them off again. One list per TV, owned by the bridge:
 # keep-disabled.json for the default TV, keep-disabled.<tv>.json for the others.
 KEEP="$ROOT/bridge/data/keep-disabled.json"
@@ -39,7 +42,8 @@ for p in $PKGS; do
 done
 # Smart home's doorbell card: take back "display over other apps" if apply.sh granted it.
 "$PY" "$T" shell "appops set app.couchtv.launcher SYSTEM_ALERT_WINDOW default" > /dev/null 2>&1 || true
-# Fire TV: switch off the Home button watch apply.sh switched on, and leave any others alone.
+# Switch off the Home button watch apply.sh switched on (any TV with a stock home), and leave any
+# other accessibility service alone.
 # The grant goes first, so the app cannot put the watch back.
 "$PY" "$T" shell "pm revoke app.couchtv.launcher android.permission.WRITE_SECURE_SETTINGS" > /dev/null 2>&1 || true
 CUR=$("$PY" "$T" shell "settings get secure enabled_accessibility_services" 2> /dev/null | tr -d '\r' || true)
@@ -51,7 +55,7 @@ case "$CUR" in
     else
       "$PY" "$T" shell "settings delete secure enabled_accessibility_services"
     fi
-    echo "Fire TV: the Home button watch is off." ;;
+    echo "The Home button watch is off." ;;
 esac
 HOME_ACT=""
 [ -f "$HERE/../tvs/$TV_NAME.home" ] && HOME_ACT=$(cat "$HERE/../tvs/$TV_NAME.home")
@@ -63,7 +67,7 @@ if [ -z "$HOME_ACT" ]; then
   fi
 fi
 if [ -n "$HOME_ACT" ]; then
-  "$PY" "$T" shell "cmd package set-home-activity $HOME_ACT"
+  "$PY" "$T" shell "cmd package set-home-activity $HOME_ACT" || true
 else
   echo "No Google home on this TV and no saved home: the TV will ask which home to use."
 fi
@@ -71,3 +75,9 @@ fi
 "$PY" "$T" keys HOME || echo "(could not press Home: press it on the remote)"
 NOW=$("$PY" "$T" shell "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME" || true)
 echo "home screen now: $(echo "$NOW" | tail -1)"
+case "$NOW" in
+  *app.couchtv.launcher*)
+    echo "The TV still picks couch-tv for Home (some Google TVs keep that choice while the app is on)."
+    echo "Its own home and setup app are back on for the next restart. To hand Home back fully,"
+    echo "remove the app: sh tv-home/tools/remove-all.sh" ;;
+esac

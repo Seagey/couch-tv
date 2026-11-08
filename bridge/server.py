@@ -2122,18 +2122,26 @@ async def h_taste(request):
 # ---------- keep the stock home screen off ----------
 
 
+# Never switched off by the guard, even when an old keep-disabled file lists them: couch-tv 0.10 and
+# older wrote the TV's own homes and the setup wizard there, and with them off some Google TVs loop
+# at power on (README, "If your TV loops after a restart").
+NEVER_DISABLE = {"com.google.android.apps.tv.launcherx", "com.google.android.tvlauncher",
+                 "com.google.android.tungsten.setupwraith"}
+
+
 async def keep_disabled_loop():
     """Daily, per TV: re-disable packages listed in that TV's keep-disabled file (the living
-    room's is data/keep-disabled.json, written by apply.sh when it switches the Google home screen
-    off). A Google TV update can switch them back on. If the TV is off, try again hourly."""
+    room's is data/keep-disabled.json, written by apply.sh: ambient mode and any ad tracker). A
+    Google TV update can switch them back on. If the TV is off, try again hourly. The TV's own home
+    screens and setup wizard are never switched off (NEVER_DISABLE)."""
     await asyncio.sleep(60)
     while True:
         done = False
         path = os.path.join(HERE, tv.keep_disabled_file or "")
         try:
             with open(path) as f:
-                packages = json.load(f)
-        except (FileNotFoundError, IsADirectoryError, json.JSONDecodeError):
+                packages = [p for p in json.load(f) if p not in NEVER_DISABLE]
+        except (FileNotFoundError, IsADirectoryError, json.JSONDecodeError, TypeError):
             packages = []
         if not packages:
             done = True
