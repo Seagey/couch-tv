@@ -620,7 +620,7 @@ your own build cannot take (another key): a fork with releases of its own builds
 the Google TV home and the Google TV setup app (`setupwraith`) to make couch-tv the home screen. On
 some Google TVs, a Sony Bravia among them, that leaves the TV unable to start: after a restart it
 shows a blank screen, restarts by itself, and goes round again. Because it keeps restarting, it may
-not stay on the Wi-Fi long enough for a computer to reach it. The next release no longer switches
+not stay on the Wi-Fi long enough for a computer to reach it. Version 0.11 no longer switches
 either of them off (below), and running its `apply.sh` on a TV set up by an older one switches them
 back on.
 
