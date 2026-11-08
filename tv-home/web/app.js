@@ -27,7 +27,7 @@
   // read in readConfig() once the page starts (mock.js fills them in for previews). See docs/CONFIG.md.
   var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [];
   var WXCFG = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
-  var QUICK_ALL = ["sleep", "picture", "look", "input", "bluetooth", "network"];
+  var QUICK_ALL = ["sleep", "picture", "look", "input", "bluetooth", "network", "screensaver"];
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
   var THEME = "night", NIGHT = true, CLOCK24 = false;
@@ -111,6 +111,7 @@
     gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
     look: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="3"/><path d="M2.5 16l5.5-5.5 4.5 4.5 3-3 6 6"/><circle cx="16.5" cy="8.8" r="1.6"/></svg>',
     input: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8 21h8M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5"/></svg>',
+    screensaver: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="14" rx="2.5"/><path d="M15.2 7.3a3.4 3.4 0 1 0 2.1 5 3.9 3.9 0 0 1-2.1-5z"/></svg>',
     bluetooth: '<svg viewBox="0 0 24 24"><path d="M6.5 7.5l11 9-5.5 4.5v-18l5.5 4.5-11 9"/></svg>',
     network: '<svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.7 12.5a9.5 9.5 0 0 1 12.6 0M8.9 16a4.8 4.8 0 0 1 6.2 0"/><circle cx="12" cy="19.3" r="1"/></svg>',
     store: '<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/></svg>',
@@ -753,12 +754,16 @@
   function nativeInputs() {
     try { return !!(TV && TV.canOpenInputs && TV.canOpenInputs()); } catch (e) { return false; }
   }
+  function nativeScreensaver() {
+    try { return !!(TV && TV.canStartScreensaver && TV.canStartScreensaver()); } catch (e) { return false; }
+  }
   function quickVisible() {
     return QUICK.filter(function (q) {
       if (q === "sleep") return !OFFLINE;
       if (q === "picture") return !OFFLINE && picShown;
       if (q === "look") return true;
       if (q === "input") return !OFFLINE || nativeInputs();
+      if (q === "screensaver") return nativeScreensaver();
       if (q === "bluetooth" || q === "network") return ON_TV && !OFFLINE;
       return false;
     });
@@ -794,6 +799,8 @@
         el.innerHTML = ICONS.look + "<span>" + esc(NIGHT ? t("classic_look") : t("night_look")) + "</span>";
       } else if (q === "input") {
         el.innerHTML = ICONS.input + "<span>" + esc(t("input")) + "</span>";
+      } else if (q === "screensaver") {
+        el.innerHTML = ICONS.screensaver + "<span>" + esc(t("quick_screensaver")) + "</span>";
       } else if (q === "bluetooth" || q === "network") {
         el.innerHTML = ICONS[q] + "<span>" + esc(t(q)) + "</span>";
       }
@@ -927,12 +934,25 @@
   function openSettingsScreen(which) {
     api("POST", "/api/launch", { app: which }).catch(function (e) { note(e.message); });
   }
+  // The TV's own screensaver (Google TV's Ambient mode: the Google Photos albums are chosen there).
+  function startScreensaver() {
+    var ok = false;
+    try { ok = !!(TV && TV.startScreensaver && TV.startScreensaver()); } catch (e) {}
+    if (!ok) note(t("no_screensaver"));
+  }
+  // Google TV's own Ambient mode settings: where the source and the Google Photos albums are picked.
+  function openAmbientSettings() {
+    var ok = false;
+    try { ok = !!(TV && TV.openAmbientSettings && TV.openAmbientSettings()); } catch (e) {}
+    if (!ok) { SET.msg = t("no_screensaver"); renderSettings(); }
+  }
   function quickAction() {
     var q = quickVisible()[qi];
     if (q === "sleep") openMenu();
     else if (q === "picture") togglePicture();
     else if (q === "look") toggleLook();
     else if (q === "input") openInputs();
+    else if (q === "screensaver") startScreensaver();
     else if (q === "bluetooth" || q === "network") openSettingsScreen(q);
   }
   function refreshQuick() {
@@ -2010,6 +2030,10 @@
     rows.push({ kind: "cycle", key: "clock", label: t("clock"), value: CLOCK24 ? t("clock_24") : t("clock_12"), act: function () {
       CLOCK24 = !CLOCK24; ST.clock = CLOCK24 ? "24h" : "12h"; saveSettings(); glassShown = ""; clock();
     } });
+    // the TV's own screensaver (Google TV's Ambient mode) and the albums it shows
+    rows.push(head(t("ambient_head")));
+    rows.push({ kind: "action", key: "ambient", label: t("ambient_settings"), sub: t("ambient_settings_sub"),
+      act: function () { openAmbientSettings(); } });
     // glass panels: off, on, on with no blur (for slower TVs)
     rows.push(head(t("glass_head")));
     rows.push({ kind: "cycle", key: "glass", label: t("glass"), value: GLASS === "lite" ? t("glass_lite") : GLASS === "on" ? t("on") : t("off"), act: function () {
@@ -2337,6 +2361,7 @@
     if (q === "sleep" && OFFLINE) return t("quick_needs_bridge");
     if (q === "picture" && (OFFLINE || !picShown)) return t("quick_needs_picture");
     if (q === "input" && OFFLINE && !nativeInputs()) return t("quick_needs_inputs");
+    if (q === "screensaver" && !nativeScreensaver()) return t("quick_needs_tv_app");
     if ((q === "bluetooth" || q === "network") && (!ON_TV || OFFLINE)) return t("quick_needs_tv_app");
     return "";
   }
@@ -2899,6 +2924,7 @@
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
   window.tv = { back: goHome, home: function () { if (zone === "settings") closeSettings(); else goHome(); refresh(); },
+    noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
     resume: function () { okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); },

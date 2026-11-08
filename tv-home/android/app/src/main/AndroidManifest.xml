@@ -18,6 +18,10 @@
     <!-- Fire TV only: keep the Home button watch on after updates and reboots (FireWatch.kt).
          Never granted on install: apply.sh or guest-tv grants it over ADB on a Fire TV, undo takes it back. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <!-- The screensaver quick button shortens the screen timeout for a moment so the TV starts
+         its own screensaver; the TV allows that with a "modify system settings" app-op that
+         apply.sh grants once over ADB. -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
