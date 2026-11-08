@@ -155,10 +155,42 @@ async def phase_play(server):
         steps.append("L p2 Prime previews rotating every 30 s for 3 min (should stay out)")
         lv.play(NETFLIX, nometa=True); await advance(120); lv.home(); await advance(20)
         steps.append("L p2 Netflix with no metadata 2 min (should stay out)")
+
+        async def watch_next(tv_id, rows):
+            """The TV home app posting its Watch Next rows (POST /api/watch-next)."""
+            server._current.set(tv_id)
+            with patch.object(server, "body", new=AsyncMock(return_value={"rows": rows})):
+                await server.h_watch_next(SimpleNamespace(headers={}))
+        # issue #23 round 2: the app gives no title, its Watch Next row names the play
+        old = (CLOCK.now - 3600) * 1000
+        lv.play(NETFLIX, nometa=True); await advance(90); lv.home(); await advance(20)
+        await watch_next(L, [{"package": NETFLIX, "title": "Bodies", "engaged": old},          # older than the play
+                             {"package": PRIME, "title": "Fallout", "engaged": CLOCK.now * 1000}])  # another app
+        await advance(30)
+        await watch_next(L, [{"package": NETFLIX, "title": "The Night Agent", "episode_title": "Pilot",
+                              "season": "1", "episode": "1", "engaged": CLOCK.now * 1000}])
+        await advance(20)
+        steps.append("L p2 Netflix with no metadata 90 s, its Watch Next row arrives after it stops")
+        lv.play(PRIME, "PrimeVideo"); await advance(90)
+        await watch_next(L, [{"package": PRIME, "title": "PrimeVideo", "engaged": CLOCK.now * 1000}])   # a placeholder row
+        await advance(10); lv.home(); await advance(20)
+        await watch_next(L, [{"package": PRIME, "title": "Fallout", "episode_title": "The End", "season": "1",
+                              "episode": "1", "engaged": CLOCK.now * 1000}])
+        await advance(20)
+        steps.append("L p2 Prime says 'PrimeVideo' 90 s, then its Watch Next row says Fallout")
+        lv.play("com.google.android.youtube.tv", "I finally saw quantum physics with my own eyes", "Veritasium")
+        await advance(120); lv.home(); await advance(20)
+        steps.append("L p2 a YouTube video 2 min (never logged)")
         # both TVs at once, different people
         lv.play(NETFLIX, "The Crown", "Wolferton Splash"); bd.play(NETFLIX, "Ozark", "Sugarwood")
         await advance(90); lv.home(); bd.home(); await advance(20)
         steps.append("L p2 The Crown and B p1 Ozark at the same time")
+        # a 6 s blip with nothing playing (the front app read as the home for a moment) in the middle
+        # of a show: its minute carries on (it restarted, and on the emulators Lupin was never kept)
+        who(B, P2)
+        bd.play(NETFLIX, "Lupin", "Chapter 1"); await advance(40); bd.home(); await advance(6)
+        bd.play(NETFLIX, "Lupin", "Chapter 1", pos_s=46); await advance(26); bd.home(); await advance(20)
+        steps.append("B p2 Lupin 40 s, a 6 s blip, 26 s more (72 s in all, no 60 s stretch)")
         who(L, P1)
         for title in SHOWS[:11]:
             if title in ("The Crown", "Ozark", "Stranger Things", "Wednesday"):
@@ -186,18 +218,24 @@ def phase_check(server):
 
     hist = store.history()
     check("every history line made in the run has an id and a TV", all(h.get("id") and h.get("tv") for h in hist), f"{len(hist)} lines")
-    check("who is kept per TV after a restart", (store.current_who(L), store.current_who(B)) == (P1, P1),
+    check("who is kept per TV after a restart", (store.current_who(L), store.current_who(B)) == (P1, P2),
           f"{store.current_who(L)}, {store.current_who(B)}")
     lp1, lp2, bp1, bp2 = cards(L, P1), cards(L, P2), cards(B, P1), cards(B, P2)
     t = lambda cs: [c["title"] for c in cs]
-    check("living room, person 2: only what they watched there", t(lp2) == ["The Crown", "Man of Steel"], t(lp2))
+    check("living room, person 2: only what they watched there, two named from Watch Next",
+          t(lp2) == ["The Crown", "Fallout", "The Night Agent", "Man of Steel"], t(lp2))
+    fallout = next((c for c in lp2 if c["title"] == "Fallout"), {})
+    check("a Watch Next card keeps its season and episode", (str(fallout.get("season")), str(fallout.get("episode"))) == ("1", "1"), str(fallout)[:160])
+    check("no YouTube video was logged at all", not any(h.get("service") == "youtube" for h in hist), "")
+    check("Watch Next lines say so", sum(h.get("method") == "watch-next" for h in hist) == 2, "")
     check("bedroom, person 1: only what they watched there", t(bp1) == ["Ozark"], t(bp1))
-    check("bedroom, person 2: nothing", t(bp2) == [], t(bp2))
+    check("bedroom, person 2: Lupin, counted through a 6 s blip", t(bp2) == ["Lupin"], t(bp2))
     check("living room, person 1: 10 cards, newest first", len(lp1) == 10 and lp1[0]["title"] == "Dark", t(lp1))
     check("the oldest of person 1's 13 shows dropped off the 10", "Stranger Things" not in t(lp1), t(lp1))
     every = t(lp1) + t(lp2) + t(bp1) + t(bp2)
     check("one card per show", len(every) == len(set((c["title"], i) for i, c in enumerate(lp1 + lp2 + bp1 + bp2))) and len(t(lp1)) == len(set(t(lp1))), "")
-    for bad in ("Wednesday", "PrimeVideo", "Citadel: Diana", "Reacher", "The Boys", "Netflix", "Dark Matter"):
+    for bad in ("Wednesday", "PrimeVideo", "Citadel: Diana", "Reacher", "The Boys", "Netflix", "Dark Matter", "Bodies",
+                "I finally saw quantum physics with my own eyes"):
         check(f"'{bad}' is not in anyone's row", bad not in every)
     dark = lp1[0]
     check("a near name keeps the app's title and no picture", dark["title"] == "Dark" and not dark.get("poster"), json.dumps(dark)[:120])
@@ -209,7 +247,7 @@ def phase_check(server):
     async def press_all():
         play = AsyncMock(side_effect=lambda title, *a, **k: {"title": title})
         with patch.object(server, "play", new=play):
-            for tv_id, who, cs in ((L, P1, lp1), (L, P2, lp2), (B, P1, bp1)):
+            for tv_id, who, cs in ((L, P1, lp1), (L, P2, lp2), (B, P1, bp1), (B, P2, bp2)):
                 for c in cs:
                     server._current.set(tv_id)
                     with patch.object(server, "body", new=AsyncMock(return_value={"id": c["id"], "who": who})):
@@ -218,7 +256,7 @@ def phase_check(server):
                     opened.append((c["title"], a[0], c.get("season"), a[1], c.get("episode"), a[2]))
     asyncio.run(press_all())
     wrong = [o for o in opened if o[0] != o[1] or o[2] != o[3] or o[4] != o[5]]
-    check("every card opens the show, season and episode it shows", not wrong and len(opened) == 13, f"{len(opened)} pressed, wrong: {wrong}")
+    check("every card opens the show, season and episode it shows", not wrong and len(opened) == 16, f"{len(opened)} pressed, wrong: {wrong}")
     # the clock moves on
     real = datetime.now(timezone.utc)
 
@@ -232,7 +270,7 @@ def phase_check(server):
         Later.offset = timedelta(days=29)
         check("29 days later: still there", len(cards(L, P1)) == 10)
         Later.offset = timedelta(days=31)
-        check("31 days later: dropped off", cards(L, P1) == [] and cards(B, P1) == [])
+        check("31 days later: dropped off", cards(L, P1) == [] and cards(B, P1) == [] and cards(B, P2) == [])
     return results
 
 

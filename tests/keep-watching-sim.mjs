@@ -10,7 +10,8 @@
 // then plays scripted shows in the fake player for different people on each TV, restarts the app, and
 // checks Keep watching per TV and per person, the 10 card limit, trailers, "PrimeVideo" placeholders,
 // rotating previews, Netflix with no metadata, every card opening its own title, the 30 day drop off
-// (debug.couchtv.clock_offset_s) and the Night row sliding (screenshots in on-tv/test-output/keep-watching/).
+// (debug.couchtv.clock_offset_s), the Night row sliding (screenshots in on-tv/test-output/keep-watching/), and plays
+// named from Android's Watch Next rows when the app gives no title (Netflix) or only its own name (Prime).
 // A title counts after 20 s here (debug.couchtv.seen_after_s), not the real 60 s, so a run takes about 30 minutes.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -53,6 +54,13 @@ class Emu {
     if (x.rotate) c += ` --es rotate ${q(x.rotate.join('|'))} --ei rotate_s ${x.every || 10}`;
     this.sh(c);
   }
+  // the app's Watch Next row, as Netflix and Prime write it (usually when you leave the show)
+  watchNext(pkg, title, ep, s, e) {
+    let c = `am start -n ${pkg}/dev.couchtv.fakeplayer.Player --ez wn_only true --es wn ${q(title)}`;
+    if (ep) c += ` --es wn_ep ${q(ep)}`;
+    if (s) c += ` --ei wn_s ${s} --ei wn_e ${e}`;
+    this.sh(c);
+  }
   stop(pkg) { this.sh(`am force-stop ${pkg}`); this.sh('input keyevent KEYCODE_HOME'); }
   async who(p) { return (await this.call('POST', '/api/who', { who: p })).json; }
   async list(p) { return ((await this.call('GET', `/api/continue?who=${p}`)).json || {}).items || []; }
@@ -61,6 +69,8 @@ class Emu {
     for (const apk of [path.join(ROOT, 'dist/couch-tv-ontv.apk'), path.join(ROOT, `tests/fake-player/build/fake-${NETFLIX}.apk`), path.join(ROOT, `tests/fake-player/build/fake-${PRIME}.apk`)])
       this.adb('install', '-r', apk);
     this.sh(`pm clear ${ONTV}`);
+    // no Watch Next rows left from an earlier run
+    for (const p of [NETFLIX, PRIME]) { this.sh(`am start -n ${p}/dev.couchtv.fakeplayer.Player --ez wn_clear true --ez wn_only true`); await sleep(1500); this.sh(`am force-stop ${p}`); }
     // ADB on port 5555, as a TV with network debugging has it (an emulator can start with it closed)
     if (!/5555/.test(this.sh('getprop service.adb.tcp.port'))) { this.adb('tcpip', '5555'); await sleep(4000); this.adb('wait-for-device'); }
     this.adb('forward', `tcp:${this.port}`, 'tcp:5400');
@@ -90,6 +100,9 @@ class Emu {
     }
     const adbOk = (await this.call('GET', '/api/adb')).json?.connected;
     if (!adbOk) throw new Error(`${this.name}: ADB did not connect`);
+    await sleep(3000);
+    const perm = /READ_TV_LISTINGS: granted=true|READ_EPG_DATA: granted=true/.test(this.sh(`dumpsys package ${ONTV}`));
+    record(`${this.name}: the app granted itself the Watch Next read over ADB`, perm);
     await this.call('POST', '/api/people', { people: [{ id: 'person1', name: 'Person 1' }, { id: 'person2', name: 'Person 2' }] });
     this.sh('input keyevent KEYCODE_HOME');
   }
@@ -120,7 +133,13 @@ async function main() {
   await watch(a, PRIME, { title: 'PrimeVideo' }, PLAY + 10);                                        // only the app's name
   await watch(a, PRIME, { title: 'PrimeVideo', queue: 'Man of Steel' }, PLAY);                     // the film is in the queue title
   await watch(a, PRIME, { rotate: ['Citadel: Diana', 'Reacher', 'The Boys'], every: 12 }, 3 * 12 * 2); // autoplay previews
-  await watch(a, NETFLIX, { nometa: true }, PLAY + 10);                                             // no metadata at all
+  await watch(a, NETFLIX, { nometa: true }, PLAY + 10);                                             // no metadata, no Watch Next: nothing
+  // issue #23 round 2: no metadata (Netflix on a Xiaomi box) or only "PrimeVideo", but the app keeps a
+  // Watch Next row, written as you leave the show: named from that row, for the person picked
+  a.play(NETFLIX, { nometa: true }); await sleep((PLAY + 10) * 1000);
+  a.watchNext(NETFLIX, 'The Night Agent', 'Pilot', 1, 1); await sleep(2000); a.stop(NETFLIX); await sleep(40000);
+  a.play(PRIME, { title: 'PrimeVideo' }); await sleep((PLAY + 10) * 1000);
+  a.watchNext(PRIME, 'Fallout', 'The End', 1, 1); await sleep(2000); a.stop(PRIME); await sleep(40000);
   // ---------- both TVs at once, different people ----------
   await b.who('person1');
   a.play(NETFLIX, { title: 'The Crown', subtitle: 'Wolferton Splash' }); b.play(NETFLIX, { title: 'Ozark', subtitle: 'Sugarwood' });
@@ -139,7 +158,9 @@ async function main() {
   const t = (l) => l.map((c) => c.title);
   const a1 = await a.list('person1'), a2 = await a.list('person2'), b1 = await b.list('person1'), b2 = await b.list('person2');
   writeFileSync(path.join(OUT, 'rows.json'), JSON.stringify({ tv1_person1: a1, tv1_person2: a2, tv2_person1: b1, tv2_person2: b2 }, null, 1));
-  record('TV 1, person 2: only The Crown and Man of Steel', JSON.stringify(t(a2)) === JSON.stringify(['The Crown', 'Man of Steel']), t(a2));
+  record('TV 1, person 2: The Crown, then Fallout and The Night Agent from Watch Next, then Man of Steel', JSON.stringify(t(a2)) === JSON.stringify(['The Crown', 'Fallout', 'The Night Agent', 'Man of Steel']), t(a2));
+  const fallout = a2.find((c) => c.title === 'Fallout') || {};
+  record('a Watch Next card keeps its season and episode', String(fallout.season) === '1' && String(fallout.episode) === '1', fallout);
   record('TV 2, person 1: only Ozark', JSON.stringify(t(b1)) === JSON.stringify(['Ozark']), t(b1));
   record('TV 2, person 2: nothing', b2.length === 0, t(b2));
   record('TV 1, person 1: 10 cards, newest first', a1.length === 10 && a1[0].title === 'Sex Education', t(a1));
@@ -188,11 +209,11 @@ async function main() {
   writeFileSync(path.join(OUT, 'pressed.json'), JSON.stringify(pressed, null, 1));
   const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const wrong = pressed.filter((p) => norm(p.card) !== norm(p.opened));
-  record('every card opens the title it shows', pressed.length === 13 && wrong.length === 0, { pressed: pressed.length, wrong });
+  record('every card opens the title it shows', pressed.length === 15 && wrong.length === 0, { pressed: pressed.length, wrong });
 
   // ---------- the clock moves on ----------
   a.sh(`setprop debug.couchtv.clock_offset_s ${29 * 86400}`); b.sh(`setprop debug.couchtv.clock_offset_s ${29 * 86400}`);
-  record('29 days later: still there', (await a.list('person2')).length === 2 && (await b.list('person1')).length === 1);
+  record('29 days later: still there', (await a.list('person2')).length === 4 && (await b.list('person1')).length === 1);
   a.sh(`setprop debug.couchtv.clock_offset_s ${31 * 86400}`); b.sh(`setprop debug.couchtv.clock_offset_s ${31 * 86400}`);
   record('31 days later: dropped off', (await a.list('person2')).length === 0 && (await b.list('person1')).length === 0);
   a.sh('setprop debug.couchtv.clock_offset_s 0'); b.sh('setprop debug.couchtv.clock_offset_s 0');

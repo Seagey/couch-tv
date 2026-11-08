@@ -16,6 +16,9 @@ object Store {
         dir = File(ctx.filesDir, "data").apply { mkdirs() }
     }
 
+    /** The app's context, for the few readers that need Android itself (WatchNext). */
+    fun context(): Context = ctx
+
     fun str(key: String, def: String? = null): String? = prefs.getString(key, def)
     fun putStr(key: String, v: String?) = prefs.edit().apply { if (v == null) remove(key) else putString(key, v) }.apply()
     fun bool(key: String, def: Boolean = false) = prefs.getBoolean(key, def)
@@ -83,7 +86,8 @@ object Store {
 
     /** Test knobs for the emulator tests only, set with `adb shell setprop`; a TV never has them.
      *  debug.couchtv.seen_after_s: seconds a title plays before it counts (default 60).
-     *  debug.couchtv.clock_offset_s: moves Keep watching's clock forward, to test the 30 day drop off. */
+     *  debug.couchtv.clock_offset_s: moves Keep watching's clock forward, to test the 30 day drop off.
+     *  debug.couchtv.keep_log: 1 logs every "what is playing" reading Keep watching sees (couchtv.keep). */
     fun testProp(name: String): Long? = runCatching {
         Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
             .invoke(null, "debug.couchtv.$name") as String

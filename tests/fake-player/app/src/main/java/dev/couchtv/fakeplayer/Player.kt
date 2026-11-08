@@ -1,6 +1,8 @@
 package dev.couchtv.fakeplayer
 
 import android.app.Activity
+import android.content.ContentValues
+import android.media.tv.TvContract
 import android.content.Intent
 import android.graphics.Color
 import android.media.AudioAttributes
@@ -69,6 +71,14 @@ class Player : Activity() {
             return
         }
         if (i.getBooleanExtra("stop", false)) { release(); label.text = "stopped"; return }
+        // Watch Next (Android's "Continue watching" row, as Netflix and Prime fill it): `--es wn "Title"`
+        // adds or replaces this app's one row; `--ez wn_clear true` removes it. With nometa it copies
+        // Netflix on a Xiaomi box (issue #23): playing, no metadata, a Watch Next row.
+        if (i.getBooleanExtra("wn_clear", false)) clearWatchNext()
+        i.getStringExtra("wn")?.let { putWatchNext(it, i.getStringExtra("wn_ep"), i.getIntExtra("wn_s", 0), i.getIntExtra("wn_e", 0), i.getIntExtra("wn_pos_s", 600)) }
+        if (i.getBooleanExtra("wn_only", false)) { label.text = "watch next set"; return }
+        // `--ez wn_read true`: logs every Watch Next row this app can see (tests what READ_TV_LISTINGS allows)
+        if (i.getBooleanExtra("wn_read", false)) { readWatchNext(); return }
         val rotate = i.getStringExtra("rotate")?.split("|")?.filter { it.isNotBlank() }
         if (rotate != null && rotate.isNotEmpty()) {
             val every = i.getIntExtra("rotate_s", 15) * 1000L
@@ -135,6 +145,42 @@ class Player : Activity() {
         s.isActive = true
         label.text = if (noMeta) "playing (no metadata)" else "playing $title" + (subtitle?.let { " · $it" } ?: "") + (queue?.let { " [queue: $it]" } ?: "")
         Log.i(TAG, "fakeplayer playing title=$title subtitle=$subtitle queue=$queue nometa=$noMeta pos=$posMs")
+    }
+
+    private fun readWatchNext() {
+        val rows = ArrayList<String>()
+        runCatching {
+            contentResolver.query(TvContract.WatchNextPrograms.CONTENT_URI, arrayOf("package_name", "title"), null, null, null)?.use { c ->
+                while (c.moveToNext()) rows.add("${c.getString(0)}:${c.getString(1)}")
+            }
+        }.onFailure { Log.w(TAG, "fakeplayer watch next read failed: ${it.message}") }
+        Log.i(TAG, "fakeplayer watch next read ${rows.size} rows: $rows")
+        label.text = "read ${rows.size} rows"
+    }
+
+    private fun clearWatchNext() {
+        runCatching { contentResolver.delete(TvContract.WatchNextPrograms.CONTENT_URI, null, null) }
+            .onFailure { Log.w(TAG, "fakeplayer watch next clear: ${it.message}") }
+    }
+
+    private fun putWatchNext(title: String, ep: String?, season: Int, episode: Int, posS: Int) {
+        clearWatchNext()
+        val v = ContentValues().apply {
+            put(TvContract.WatchNextPrograms.COLUMN_TYPE, if (season > 0) TvContract.WatchNextPrograms.TYPE_TV_EPISODE else TvContract.WatchNextPrograms.TYPE_MOVIE)
+            put(TvContract.WatchNextPrograms.COLUMN_WATCH_NEXT_TYPE, TvContract.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
+            put(TvContract.WatchNextPrograms.COLUMN_TITLE, title)
+            if (ep != null) put(TvContract.WatchNextPrograms.COLUMN_EPISODE_TITLE, ep)
+            if (season > 0) put(TvContract.WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER, season.toString())
+            if (episode > 0) put(TvContract.WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER, episode.toString())
+            put(TvContract.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS, System.currentTimeMillis())
+            put(TvContract.WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS, posS * 1000L)
+            put(TvContract.WatchNextPrograms.COLUMN_DURATION_MILLIS, 45 * 60_000L)
+            put(TvContract.WatchNextPrograms.COLUMN_INTENT_URI, "fakeplayer://resume/" + android.net.Uri.encode(title))
+            put(TvContract.WatchNextPrograms.COLUMN_INTERNAL_PROVIDER_ID, "fake-" + title.hashCode())
+        }
+        runCatching { contentResolver.insert(TvContract.WatchNextPrograms.CONTENT_URI, v) }
+            .onSuccess { Log.i(TAG, "fakeplayer watch next $title -> $it") }
+            .onFailure { Log.w(TAG, "fakeplayer watch next failed: ${it.message}") }
     }
 
     private fun release() {

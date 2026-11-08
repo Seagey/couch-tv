@@ -436,7 +436,8 @@ Edit `config.json` (it is private, it never gets committed):
 
 - `tvs`: put your TV's address in `ip`. Give it a name. Add more TVs by adding more entries.
 - `people`: the names that show on the "who is watching" switch, any number. None or one: no
-  switch. Two: a switch. Three or more: a round head icon that opens a list. Mark children with
+  switch. Two: a switch. Three or more: a round head icon that opens a list. It shows even before
+  anyone has watched anything. Mark children with
   `"kid": true` and visitors with `"guest": true` so they stay out of the household's picks.
 - `weather`: your latitude, longitude, place name and time zone (Open-Meteo, free, no key). A
   suburb or city, never a home address.

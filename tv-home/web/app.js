@@ -1036,9 +1036,10 @@
     var track = $("shelf");
     data.shows = (data.showsBy[who] || []).slice(0, KEEP_MAX);
     var anyone = PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
-    // nobody has anything on the go: no empty box, the photo has the space
+    // nobody has anything on the go: no empty box, the photo has the space (unless Now playing
+    // is up at night). The people switcher stays: with nothing yet (Netflix tells Android nothing on
+    // some TVs, issue #23) it is the only way to say who is watching before anything is played.
     $("shelf-section").classList.toggle("empty", !anyone && !(NIGHT && npVisible()));
-    $("people").classList.toggle("empty", !anyone);
     renderPeople();
     if (!data.shows.length) {
       var name = PEOPLE[whoIndex()].name;
@@ -1428,8 +1429,8 @@
   }
 
   function shelfOn() { return !$("shelf-section").classList.contains("empty"); }
-  // the switcher shows for two or more people, and only while someone has something on the go
-  function peopleOn() { return peopleCount() >= 2 && shelfOn(); }
+  // the switcher shows for two or more people, also while nobody has anything yet (issue #23)
+  function peopleOn() { return peopleCount() >= 2; }
   function toPeople() { zone = "people"; pi = whoIndex(); }
 
   function paintFocus() {
@@ -2821,6 +2822,17 @@
     }
   }
 
+  function sendWatchNext() {
+    if (!TV || !TV.watchNext) return Promise.resolve();
+    var rows = [];
+    try { rows = JSON.parse(TV.watchNext()) || []; } catch (e) {}
+    rows = rows.filter(function (r) { return r.package && r.title; }).map(function (r) {
+      return { package: r.package, title: r.title, episode_title: r.episode_title || null,
+        season: r.season || null, episode: r.episode || null, engaged: r.engaged || 0 };
+    });
+    return api("POST", "/api/watch-next", { rows: rows });
+  }
+
   function refresh() {
     // never reshuffle under something being moved, or under the settings screen
     if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart" || zone === "updask") return Promise.resolve();
@@ -2856,7 +2868,10 @@
       // the order arranged on the phone (or with this TV's remote)
       NIGHT ? api("GET", "/api/app-order").then(bridgeOrder) : Promise.resolve(),
       // Home settings: the bridge keeps a copy, so the phone and this TV agree
-      syncSettings()
+      syncSettings(),
+      // Android's Watch Next rows: this app may read them, the bridge's ADB may not. They name a
+      // play an app gave no title for (Netflix sends none, Prime only its own name, issue #23).
+      sendWatchNext()
     ];
     return Promise.all(jobs.map(function (p) { return p.then(function () { return true; }, function () { return false; }); }))
       .then(function (ok) {

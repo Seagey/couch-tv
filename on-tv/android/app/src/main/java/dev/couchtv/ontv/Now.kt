@@ -28,6 +28,8 @@ object Now {
     // Keep watching from what the apps say is playing (see remember())
     private var seenKey = ""
     private var seenSince = 0L
+    private var seenLast = 0L   // the last reading that still showed seenKey playing
+    private var emptyReads = 0  // readings in a row with nothing playing since then
     private var keptKey = ""
 
     private val listeners = CopyOnWriteArraySet<(String) -> Unit>()
@@ -123,13 +125,22 @@ object Now {
      * Android its title: YouTube, Netflix and most others do, a few say nothing.
      */
     private fun remember(m: JSONObject?) {
+        if (Store.testProp("keep_log") == 1L) android.util.Log.d("couchtv.keep", "read front=$front title=${m?.optString("title")} state=${m?.optString("state")} source=${m?.optString("source")} pos=${m?.optLong("position_ms", -1L)}")
+        runCatching { untitledStep(front, m); untitledResolve() }.onFailure { android.util.Log.w("couchtv.keep", "untitled: ${it.message}") }
         val pkg = front ?: return
         // only a title the app itself reports (not the last show couch-tv opened in it)
         val title = m?.optString("title")?.takeIf { m.optString("state") == "playing" && m.optString("source") == "tv" && it.isNotEmpty() && it != "null" }
         val key = if (title == null) "" else pkg + "|" + Finder.norm(title) + "|" + (who ?: "")
         val now = System.currentTimeMillis()
         val after = (Store.testProp("seen_after_s") ?: 60L) * 1000
-        if (key != seenKey) { seenKey = key; seenSince = now; if (key.isNotEmpty()) android.util.Log.i("couchtv.keep", "counting $title for ${who ?: "nobody"}"); return }
+        // Up to two readings in a row with nothing playing (a slow or failed dumpsys, the front app
+        // read as the home for a moment) do not start the minute again, within 40 s of the last good
+        // one: only a different title, or nothing for longer. Under load the readings came 16 to 20 s
+        // apart and one now and then came back empty mid-show, so shows were counted twice and missed.
+        if (key.isEmpty() && seenKey.isNotEmpty() && emptyReads < 2 && now - seenLast < 40_000) { emptyReads++; return }
+        emptyReads = 0
+        if (key != seenKey) { seenKey = key; seenSince = now; seenLast = now; if (key.isNotEmpty()) android.util.Log.i("couchtv.keep", "counting $title for ${who ?: "nobody"}"); return }
+        seenLast = now
         if (key.isEmpty() || key == keptKey || now - seenSince < after) return
         // the app's own position has to be past the minute too, when it gives one: a preview that
         // autoplays on a browse screen starts at 0 each time
@@ -153,6 +164,74 @@ object Now {
             .put("service", Apps.BY_PACKAGE[pkg]?.id ?: JSONObject.NULL).put("package", pkg)
             .put("who", who ?: JSONObject.NULL).put("when", iso(now)).put("method", "seen"))
         android.util.Log.i("couchtv.keep", "kept $title for ${who ?: "nobody"}")
+    }
+
+    // ---------------------------------------------------------------- plays with no title of their own
+
+    /** A play whose app gives Android no usable title: Netflix sends none on some TVs, Prime only its
+     *  own name (issue #23). Counted like any other play (a minute of continuous playing, and past the
+     *  minute when the app gives a position), for the person picked when it played, then named from
+     *  that app's Watch Next row (WatchNext.kt) once one turns up, which can be after it stops. */
+    private class Untitled(val pkg: String, val who: String?, val since: Long) {
+        var last = since; var qualified = false; var done = false; var namedBy = ""; var lastCheck = 0L
+    }
+    @Volatile private var untitled: Untitled? = null
+    private const val UNTITLED_KEEP_MS = 3 * 3600_000L   // how long after the play its row may turn up
+    private const val OPENED_WINDOW_MS = 10 * 60_000L    // a show couch-tv opened this soon before covers it
+
+    private fun untitledStep(pkg: String?, m: JSONObject?) {
+        val now = System.currentTimeMillis()
+        val after = (Store.testProp("seen_after_s") ?: 60L) * 1000
+        val app = pkg?.let { Apps.BY_PACKAGE[it] }
+        // a title the app named itself has source "tv"; no title (Netflix with no metadata) or one
+        // borrowed from what couch-tv last opened is a play with no title of its own
+        val t = m?.optString("title")
+        val ownTitle = m?.optString("source") == "tv" && !t.isNullOrEmpty() && t != "null"
+        val isUntitled = pkg != null && app != null && app.id !in NOT_KEPT && m != null &&
+            m.optString("state") == "playing" && !ownTitle
+        var u = untitled
+        if (!isUntitled) {
+            // a break before the minute; or the same app now names what it plays, so a later Watch
+            // Next row would be that show, not the earlier unnamed one
+            // (a short gap with nothing read is forgiven, as for named shows)
+            if (u != null && !u.done && ((!u.qualified && now - u.last >= 40_000) || (ownTitle && pkg == u.pkg && m?.optString("state") == "playing"))) untitled = null
+            return
+        }
+        if (u == null || u.pkg != pkg || u.who != who || (u.done && now - u.last > 600_000)) {
+            u = Untitled(pkg!!, who, now)
+            // A show couch-tv itself opened in this app just before (phone search, Ask, a Keep
+            // watching card) was logged when it was opened (Finder.finish), which already names this play.
+            val played = playedItem
+            if (played != null && played.optString("package") == pkg && played.optString("who") == (who ?: "")
+                && played.optLong("ts") in (now - OPENED_WINDOW_MS)..(now + 60_000)) { u.done = true; u.namedBy = "opened" }
+            untitled = u
+        }
+        u.last = now
+        val pos = m!!.optLong("position_ms", -1L)
+        if (!u.qualified && now - u.since >= after && (pos < 0 || pos >= after)) {
+            u.qualified = true
+            android.util.Log.i("couchtv.keep", "untitled play counted in $pkg for ${who ?: "nobody"}" + if (u.done) " (opened by couch-tv)" else "")
+        }
+    }
+
+    private fun untitledResolve() {
+        val u = untitled ?: return
+        if (u.done || !u.qualified) return
+        val now = System.currentTimeMillis()
+        if (now - u.last > UNTITLED_KEEP_MS) { untitled = null; return }
+        if (now - u.lastCheck < 30_000) return
+        u.lastCheck = now
+        val row = WatchNext.rows(u.pkg).filter { it.engaged >= u.since - 120_000 && !Tv.genericTitle(it.title, u.pkg) }
+            .maxByOrNull { it.engaged } ?: return
+        u.done = true; u.namedBy = "watch-next"
+        val (poster, backdrop) = Finder.artworkSoon(row.title)   // an exact match only, else none
+        Store.addHistory(JSONObject().put("title", row.title)
+            .put("episode_title", row.episodeTitle ?: JSONObject.NULL)
+            .put("season", row.season ?: JSONObject.NULL).put("episode", row.episode ?: JSONObject.NULL)
+            .put("poster", poster ?: row.poster ?: JSONObject.NULL).put("backdrop", backdrop ?: JSONObject.NULL)
+            .put("service", Apps.BY_PACKAGE[u.pkg]?.id ?: JSONObject.NULL).put("package", u.pkg)
+            .put("who", u.who ?: JSONObject.NULL).put("when", iso(now)).put("method", "watch-next"))
+        android.util.Log.i("couchtv.keep", "kept ${row.title} for ${u.who ?: "nobody"} (watch next)")
     }
 
     private val NOT_KEPT = setOf("youtube", "spotify", "twitch", "moonlight", "settings", "home")

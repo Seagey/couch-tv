@@ -128,6 +128,18 @@ Who is on the couch right now. The TV home and the phone send it when someone sw
   "now playing"). So once a person is set, what they start on that TV lands in their keep watching.
 - `both` is the household with no people set up: its own row, like a person.
 
+### `POST /api/watch-next`
+The TV home app's copy of Android's Watch Next rows ("Continue watching"), sent each time the home
+refreshes. The launcher holds READ_TV_LISTINGS (`apply.sh` grants it); ADB's shell user cannot read
+other apps' rows. When an app plays for a minute with no title of its own (Netflix sends none on
+some TVs, Prime only "PrimeVideo"), the newest row for that app written after the play started names
+it in Keep watching, for the person picked when it played, up to 3 hours later.
+```json
+{"tv": "living-room", "rows": [{"package": "com.netflix.ninja", "title": "The Night Agent",
+  "episode_title": "Pilot", "season": "1", "episode": "1", "engaged": 1794100000000}]}
+```
+`engaged` is the row's last engagement time in milliseconds. Answers `{"ok": true, "rows": 1}`.
+
 ### `GET /api/people` and `POST /api/people`
 The people (profiles), in the order the TV and the phone show them. Any number, up to 12, and none
 is fine (then nobody is picked and everything shows). Seeded from `people` in `config.json`; once

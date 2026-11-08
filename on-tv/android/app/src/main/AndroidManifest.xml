@@ -18,6 +18,12 @@
          draw over apps lets it open apps from the background with plain intents;
          write secure settings lets it switch wireless debugging back on after a reboot. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Keep watching: read Android's Watch Next rows ("Continue watching"), which name a play when
+         the app's own media session gives no title (Netflix sends none, Prime only its own name,
+         issue #23). Granted over the app's own ADB once it connects; Android 9 and older use the
+         TV provider's permission instead. Read only: the app never writes these rows. -->
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+    <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
 
     <!-- Fire TV home takeover without the TV's own ADB (some Fire OS builds block it): lets the
