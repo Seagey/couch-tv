@@ -17,6 +17,7 @@ ADB is looked for on ADB_PORT (5555 unless set). When that is closed it also lis
 "Wireless debugging" announcement from the TV and says which of the two cases this TV is.
 """
 import os
+import re
 import socket
 import sys
 import time
@@ -138,6 +139,7 @@ def adb_facts(ip):
         "home": sh("cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME | tail -1"),
         "homes": [p for p in HOMES if f"package:{p}" in sh("pm list packages")],
         "adb_wifi": sh("settings get global adb_wifi_enabled"),
+        "remote_service": sh("dumpsys package com.google.android.tv.remote.service | grep -m1 versionName").replace("versionName=", "").strip(),
     }
     dev.close()
     return facts
@@ -180,10 +182,20 @@ def main():
         else:
             homes = ", ".join(HOMES[h] for h in facts["homes"]) or "unknown"
             print(f"  {facts['maker']} {facts['model']}, Android {facts['android']} (API {facts['sdk']}), TV: {facts['tv']}, home apps: {homes}")
+            rs = facts.get("remote_service") or ""
+            if rs:
+                print(f"  Android TV Remote Service: {rs}")
+                m = re.match(r"(\d+)", rs)
+                if m and int(m.group(1)) < 3:
+                    print("  That is old. One Sony Bravia on 2.2 could not pair (the pairing run died with ConnectionClosed")
+                    print("  or CannotConnect) until the app was updated from the Play Store (7.x worked). On the TV open")
+                    print("  the Play Store, search for Android TV Remote Service and update it, then pair again.")
 
     print()
     if samsung and not android:
-        verdict = {"A": "no", "B": "no", "C": "no", "why": "Samsung Tizen: no Android apps and a locked home screen. Plug in a Google TV box to use couch-tv."}
+        verdict = {"A": "no", "B": "Samsung path (works on a 2021 and a 2025 Frame): docs/SAMSUNG.md", "C": "no",
+                   "why": "Samsung Tizen: no Android apps and a locked home screen. couch-tv goes on as a Samsung app that a "
+                          "computer at home opens each time the TV comes on (docs/SAMSUNG.md), or plug in a Google TV box for everything."}
     elif lg and not android:
         verdict = {"A": "no", "B": "LG path (untested on a real LG): docs/LG.md", "C": "no",
                    "why": "LG webOS: no Android apps and a locked home screen. couch-tv can go on as an LG app that a computer "

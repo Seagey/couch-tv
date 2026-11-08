@@ -23,7 +23,7 @@
 #
 # Usage, from the repo root:
 #   TV_IP=<tv address> [BRIDGE_URL=http://<your-computer>:5400] [APK=couch-tv-home.apk]
-#     [TV_NAME=living-room] [TV_ID=<id>] [EXTRA_OFF="pkg pkg"] [KEEP_SETUP=1] [ADB_PORT=5555]
+#     [TV_ID=<id>] [TV_NAME=<name, defaults to TV_ID, else living-room>] [EXTRA_OFF="pkg pkg"] [KEEP_SETUP=1] [ADB_PORT=5555]
 #     sh tv-home/tools/apply.sh
 # APK defaults to the one scripts/build-apk.sh builds. KEEP_SETUP=1 leaves the setup wizard on.
 # On some TVs the wizard then keeps winning Home; if Home still shows Google TV afterwards, the
@@ -33,7 +33,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 PY="${PY:-$ROOT/.venv/bin/python}"
 T="$HERE/tvadb.py"
-TV_NAME=${TV_NAME:-living-room}
+TV_NAME=${TV_NAME:-${TV_ID:-living-room}}
 : "${TV_IP:?set TV_IP to the address of the TV}"
 export TV_IP
 APK=${APK:-$ROOT/dist/couch-tv-home.apk}

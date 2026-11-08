@@ -341,7 +341,8 @@ needs the first's TV set up the same way (developer mode on).
 - A computer on the same Wi-Fi to set it up from: macOS or Linux with **Python 3.11 or newer**
   (`python3 --version`). Missing or older: on macOS `brew install python@3.11` or the installer
   from python.org; on Linux your distribution's package (for example `sudo apt install python3.11
-  python3.11-venv`). On a Mac the first `python3` or `git` may ask to install the developer tools:
+  python3.11-venv`; Debian ships Python without the venv part, so if `python3 -m venv .venv` fails
+  install `python3-venv`, or use `uv venv --seed .venv`). On a Mac the first `python3` or `git` may ask to install the developer tools:
   say Install, it takes a few minutes. For option A that computer can go back in the cupboard
   afterwards.
 - The TV app, `couch-tv-home.apk`: **download it from the GitHub Releases page**, or build it
@@ -378,7 +379,8 @@ Do this on the TV itself.
 4. Find **USB debugging** and switch it on.
 5. If there is also a **Network debugging** switch (also called ADB over network or ADB
    debugging), switch it on too. Some TVs have no such switch: on a TCL with Android TV 11, USB
-   debugging alone opened the network port. Either way, check from the computer:
+   debugging alone opened the network port. The opposite happened on a 2015 Sony Bravia (Android
+   8.0): port 5555 only opened after **Network debugging** was switched on as well. Either way, check from the computer:
    `.venv/bin/python scripts/check-tv.py <tv address>`. If it says ADB is open on port 5555,
    everything in this repo works as it is. If it says only Wireless debugging is on, see the box
    below.

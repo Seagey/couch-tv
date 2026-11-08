@@ -119,6 +119,7 @@ def give_code(cfg, code):
 async def pair(cfg):
     code_file, waiting, result = files(cfg["id"])
     host = resolve(cfg)
+    os.makedirs(config.DATA, exist_ok=True)  # a fresh clone has no bridge/data yet
     remote = AndroidTVRemote(config.CLIENT_NAME, CERT, KEY, host)
     await remote.async_generate_cert_if_missing()
     name, mac = await remote.async_get_name_and_mac()

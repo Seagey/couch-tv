@@ -16,6 +16,9 @@ Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 Environment=CLAUDE_BIN=%h/.local/bin/claude
 ExecStart=%h/couch-tv/.venv/bin/python %h/couch-tv/bridge/server.py
 Restart=always
+# The bridge can take a long time to exit on SIGTERM (one Debian setup waited the default 90 s
+# before systemd killed it). Harmless, but this makes a restart quick.
+TimeoutStopSec=10
 RestartSec=5
 
 [Install]
