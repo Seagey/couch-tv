@@ -144,6 +144,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             }
             "GET /api/recs" -> json(200, ok().put("updated", Now.iso()).put("continue", Now.continueItems(q("who"))).put("picks", JSONArray()))
             "GET /api/continue" -> json(200, ok().put("items", Now.continueItems(q("who"))))
+            "GET /api/music" -> json(200, ok().put("music", Music.now() ?: JSONObject.NULL))
             "POST /api/continue/open" -> {
                 val b = body(s)
                 val id = b.optString("id").ifEmpty { throw ApiError(400, "id is required") }

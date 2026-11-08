@@ -269,6 +269,13 @@ def _home(h):
         out["glass_amount"] = h["glass_amount"]
     if h.get("clock_style") in ("frosted", "liquid"):
         out["clock_style"] = h["clock_style"]
+    # Now playing on or off (#31), and the navigation sound: the TV's own, soft or off (#32)
+    if isinstance(h.get("now_playing"), bool):
+        out["now_playing"] = h["now_playing"]
+    if h.get("nav_sound") in ("system", "soft", "off"):
+        out["nav_sound"] = h["nav_sound"]
+    if h.get("glass_focus") in ("colour", "glass"):   # glass app icons: the focused app (#32)
+        out["glass_focus"] = h["glass_focus"]
     vid = h.get("video_url")
     if isinstance(vid, str) and re.match(r"https?://", vid) and len(vid) <= 2000:
         out["video_url"] = vid

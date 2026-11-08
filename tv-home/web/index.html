@@ -38,6 +38,9 @@
       <div class="sleep-menu" id="sleep-menu"></div>
     </div>
     <p class="quick-note" id="quick-note"></p>
+    <!-- Now playing (#31): the song any app is playing behind the home, drawn by app.js. Top right,
+         under the quick buttons, where no scene puts its clock -->
+    <div class="np" id="np" aria-live="polite"></div>
   </div>
 </header>
 
@@ -47,7 +50,8 @@
       <h2 id="shelf-title">Keep watching</h2>
       <p class="status" id="status"></p>
     </header>
-    <div class="shelf-track" id="shelf"></div>
+    <!-- Night look: Now playing (#31) moves into this slot, the first card of the row -->
+    <div class="shelf-row"><div class="np-slot" id="np-slot"></div><div class="shelf-clip"><div class="shelf-track" id="shelf"></div></div></div>
   </section>
 
   <section class="apps" id="apps-section" aria-label="Apps">

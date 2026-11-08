@@ -38,6 +38,9 @@ object Tv {
         val code = Keys.resolve(name) ?: throw ApiError(400, "unknown key: $name")
         if (!Adb.connected && code == "KEYCODE_HOME" && startHome()) return code
         if (!Adb.connected && code in VOLUME_CODES) { volumeLocal(code); return code }
+        // media keys always go Android's own way to the session that is playing (no ADB needed, and
+        // the ADB key shell was seen holding a key back until the next one on an Android 14 emulator)
+        if (code in MEDIA_CODES) { mediaLocal(code); return code }
         needAdb("Pressing keys")
         Adb.quick(if (hold) "input keyevent --longpress $code" else "input keyevent $code")
         return code
@@ -166,6 +169,16 @@ object Tv {
 
     // ---------- volume ----------
     private val VOLUME_CODES = setOf("KEYCODE_VOLUME_UP", "KEYCODE_VOLUME_DOWN", "KEYCODE_VOLUME_MUTE")
+    // Now playing (#31): play, pause and skip go to the active media session through AudioManager,
+    // which needs no ADB and no permission.
+    private val MEDIA_CODES = mapOf("KEYCODE_MEDIA_PLAY_PAUSE" to android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+        "KEYCODE_MEDIA_PLAY" to android.view.KeyEvent.KEYCODE_MEDIA_PLAY, "KEYCODE_MEDIA_PAUSE" to android.view.KeyEvent.KEYCODE_MEDIA_PAUSE,
+        "KEYCODE_MEDIA_NEXT" to android.view.KeyEvent.KEYCODE_MEDIA_NEXT, "KEYCODE_MEDIA_PREVIOUS" to android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+    private fun mediaLocal(code: String) {
+        val k = MEDIA_CODES[code] ?: return
+        audio.dispatchMediaKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, k))
+        audio.dispatchMediaKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, k))
+    }
 
     fun volume(): Map<String, Any?> {
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
@@ -221,7 +234,7 @@ object Tv {
     // ---------- what is playing (dumpsys media_session, same parsing as the computer bridge) ----------
     data class Session(val pkg: String, var active: Boolean = false, var state: String? = null, var position: Long? = null,
                        var updated: Long? = null, var speed: Double = 0.0, var title: String? = null, var subtitle: String? = null,
-                       var queueTitle: String? = null)
+                       var queueTitle: String? = null, var album: String? = null)
 
     fun sessions(): Pair<Long?, List<Session>> {
         if (!Adb.connected) return null to emptyList()
@@ -245,6 +258,7 @@ object Tv {
                     val parts = line.substringAfter("description=").split(", ").map { it.trim() }
                     cur!!.title = parts.getOrNull(0)?.takeIf { it != "null" && it.isNotEmpty() }
                     cur!!.subtitle = parts.getOrNull(1)?.takeIf { it != "null" && it.isNotEmpty() }
+                    cur!!.album = parts.getOrNull(2)?.takeIf { it != "null" && it.isNotEmpty() }
                 }
                 line.startsWith("queueTitle=") && cur != null ->
                     cur!!.queueTitle = line.substringAfter("=").substringBeforeLast(", size=").trim().takeIf { it != "null" && it.isNotEmpty() }
