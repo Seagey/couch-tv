@@ -91,6 +91,9 @@ switching the TV on.
 4. **Restart the TV**: hold the power button until the TV switches off and on again (a short press
    only sends it to standby or Art Mode).
 
+**2022 and newer (the One UI home):** typing 12345 on the Apps screen may do nothing. Scroll to the bottom of
+the Apps tab and open **App Settings**: the code box opens from there (reported on a 2022 Q60B, #53).
+
 **The Frame's slim remote has no number keys, and 12345 on it did nothing on a 2025 Frame.** The
 on-screen number pad on the Apps screen did not open the Developer Mode box either. What worked
 (reported by retr04ctive on a 2025 Frame, QN65LS03F, Tizen 9.0):
