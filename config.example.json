@@ -29,6 +29,7 @@
     "scenes": ["night", "golden", "water", "fog", "dawn"],
     "scene_seconds": 20,
     "dock_size": 10,
+    "sun_sync": false,
     "hide_packages": []
   },
   "phone_remote": true,

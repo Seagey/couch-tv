@@ -240,6 +240,7 @@
     SCENES = st.order.filter(function (id) { return st.off.indexOf(id) < 0; }).map(sceneById).filter(Boolean);
     if (!SCENES.length) SCENES = [SCENE_LIB[0]];
     SCENE_MS = Math.max(5, parseInt(ST.scene_seconds || HOME.scene_seconds, 10) || 20) * 1000;
+    SUN_SYNC = typeof ST.sun_sync === "boolean" ? ST.sun_sync : !!HOME.sun_sync;
     var people = CFG.people || [{ id: "person1", name: "Person 1" }, { id: "person2", name: "Person 2" }];
     // people added, renamed or removed in Home settings with no bridge to keep them
     var lst = kept("tvhome.people.list");
@@ -402,7 +403,7 @@
       '<span class="ww"> ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
     fitDate();
     document.body.classList.toggle("night", h >= 21 || h < 6);
-    if (NIGHT) glassClock(hm);
+    if (NIGHT) { glassClock(hm); if (SUN_SYNC) applySunSync(); }
     if (quickReady) renderQuick();
   }
 
@@ -431,7 +432,7 @@
     { id: "dawn", photo: "scene-dawn", fg: true, glass: true }
   ];
   var BUILT_IN = SCENE_LIB.slice();   // readConfig() adds your own scenes to SCENE_LIB
-  var SCENES = SCENE_LIB.slice(), SCENE_MS = 20000;
+  var SCENES = SCENE_LIB.slice(), SCENE_MS = 20000, SUN_SYNC = false;
   var scene = 0, sceneEls = [], glassShown = "";
 
   // Your own scenes (home.my_scenes in config.json), made with tools/make-scene.py: the photo, glass
@@ -658,8 +659,73 @@
     if (d.scrollWidth > d.clientWidth + 1) d.classList.add("tighter");
   }
 
+  // Sun-synchronized day/night calculation (astronomical solar altitude from lat, lon and time)
+  function solarAltitude(lat, lon, d) {
+    d = d || new Date();
+    var start = new Date(Date.UTC(d.getUTCFullYear(), 0, 0));
+    var dayOfYear = Math.floor((d - start) / 86400000);
+    var b = (360 / 365.25) * (dayOfYear - 81) * (Math.PI / 180);
+    var eot = 9.87 * Math.sin(2 * b) - 7.53 * Math.cos(b) - 1.5 * Math.sin(b);
+    var decl = 23.45 * Math.sin(b) * (Math.PI / 180);
+    var utcHours = d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600;
+    var solarTime = (utcHours + (lon / 15) + (eot / 60) + 24) % 24;
+    var hourAngle = (solarTime - 12) * 15 * (Math.PI / 180);
+    var latRad = lat * (Math.PI / 180);
+    var sinAlt = Math.sin(latRad) * Math.sin(decl) + Math.cos(latRad) * Math.cos(decl) * Math.cos(hourAngle);
+    var alt = Math.asin(Math.max(-1, Math.min(1, sinAlt))) * (180 / Math.PI);
+    return { alt: alt, hourAngle: hourAngle * (180 / Math.PI) };
+  }
+
+  function sunTargetScene() {
+    var st = sceneState();
+    var available = st.order.filter(function (id) { return st.off.indexOf(id) < 0; });
+    var pick = function (preferred, fallback) {
+      if (available.indexOf(preferred) >= 0) return preferred;
+      for (var i = 0; i < fallback.length; i++) if (available.indexOf(fallback[i]) >= 0) return fallback[i];
+      return available[0] || "night";
+    };
+
+    if (!WXCFG || WXCFG.lat == null || WXCFG.lon == null || !isFinite(WXCFG.lat) || !isFinite(WXCFG.lon)) {
+      var h = new Date().getHours();
+      if (h >= 5 && h < 8) return pick("dawn", ["golden", "water", "fog", "night"]);
+      if (h >= 8 && h < 16) return pick("water", ["fog", "golden", "dawn", "night"]);
+      if (h >= 16 && h < 19) return pick("golden", ["dawn", "water", "fog", "night"]);
+      return pick("night", ["fog", "water", "golden", "dawn"]);
+    }
+
+    var pos = solarAltitude(Number(WXCFG.lat), Number(WXCFG.lon), new Date());
+    if (pos.alt < -6) {
+      return pick("night", ["fog", "water", "golden", "dawn"]);
+    }
+    if (pos.alt < 10) {
+      return pos.hourAngle < 0
+        ? pick("dawn", ["golden", "water", "fog", "night"])
+        : pick("golden", ["dawn", "water", "fog", "night"]);
+    }
+    // Daytime (sun altitude >= 10 deg): pick fog for overcast/rainy weather, otherwise water
+    var code = data.weather && data.weather.code;
+    var isFoggy = code != null && [3, 45, 48, 51, 53, 55, 61, 63, 65, 80, 81, 82].indexOf(code) >= 0;
+    return isFoggy
+      ? pick("fog", ["water", "golden", "dawn", "night"])
+      : pick("water", ["fog", "golden", "dawn", "night"]);
+  }
+
+  function applySunSync() {
+    if (!NIGHT || !SUN_SYNC || !SCENES.length) return;
+    var targetId = sunTargetScene();
+    var idx = SCENES.map(function (s) { return s.id; }).indexOf(targetId);
+    if (idx >= 0 && idx !== scene) {
+      showScene(idx);
+    }
+  }
+
   // the settings screen covers the scenes, so they wait (one less thing for a small TV stick to draw)
-  function nextScene() { if (zone !== "settings") showScene(nextFrom(scene)); }
+  function nextScene() {
+    if (zone !== "settings") {
+      if (SUN_SYNC) applySunSync();
+      else showScene(nextFrom(scene));
+    }
+  }
 
   // The bridge's reading for the place in config.json, or straight from Open-Meteo with no bridge
   // or when Home settings chose another place. Hidden when Home settings switched the weather off.
@@ -2030,6 +2096,9 @@
         thumb: sc.own ? sc.src : "backgrounds/" + sc.photo + ".jpg", checked: st.off.indexOf(id) < 0,
         act: function () { toggleScene(id); }, move: function (d) { moveScene(id, d); } });
     });
+    rows.push({ kind: "toggle", key: "sun-sync", label: t("sun_sync"), sub: t("sun_sync_sub"), value: SUN_SYNC ? t("on") : t("off"), act: function () {
+      SUN_SYNC = !SUN_SYNC; ST.sun_sync = SUN_SYNC; saveSettings(); if (SUN_SYNC) applySunSync();
+    } });
     var secs = Math.round(SCENE_MS / 1000);
     rows.push({ kind: "cycle", key: "scene-secs", label: t("scene_secs"), value: t("n_secs", { n: secs }), act: function () {
       var i = SECS_STEPS.indexOf(secs), n = i < 0 ? 20 : SECS_STEPS[(i + 1) % SECS_STEPS.length];
@@ -2961,6 +3030,7 @@
       // ?scene=fog starts on that scene, for previews (?scene=own: the first of the household's
       // photos; ?scene=<id>: one of your own scenes)
       var first = (Q.match(/[?&]scene=([a-z0-9]+)/) || [])[1];
+      if (!first && SUN_SYNC) first = sunTargetScene();
       showScene(Math.max(0, SCENES.map(function (s) { return s.own ? "own" : s.id; }).indexOf(first)));
       if (SCENES.length > 1) setInterval(nextScene, SCENE_MS);
       // the clock font must be in before the glass is measured
