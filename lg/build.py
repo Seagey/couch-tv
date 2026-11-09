@@ -166,6 +166,9 @@ def fetch_tv_icons(baked, logos_dir, logos):
         key = by_lg.get(a["id"]) or by_name.get(_plain(a["title"])) or a["id"]
         if key in logos:
             continue
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", key):   # the id becomes a file name
+            failed.append(f"{a['title']} (unusual app id)")
+            continue
         try:
             with urllib.request.urlopen(icon, timeout=5, context=insecure) as r:
                 data = r.read(2_000_001)
