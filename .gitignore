@@ -1,5 +1,6 @@
 # Your own settings and secrets
 config.json
+sync-delays.json
 .env
 *.pem
 *.key
