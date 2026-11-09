@@ -19,7 +19,7 @@ It needs a computer at home that stays on (option B). Without one you can still 
 and open it from LG's app row, but nothing opens it for you, and nothing extends Developer Mode,
 so the app is removed when the session runs out.
 
-## Test status: three real LGs so far
+## Test status: five real LGs so far
 
 **First real LG, 2 November 2026** ([issue #8](https://github.com/Seagey/couch-tv/issues/8)): an
 LG UHD TV on webOS 5.6.2 (2020/2021 firmware), Developer Mode with the Homebrew Channel, the bridge
@@ -39,7 +39,17 @@ Spotify, now in `bridge/apps.py`) and these, which show by their own names: Jell
 `org.jellyfin.webos`, DGO `com.directvgo.webostv-rt`, Win Play `com.toolboxott.winplay`, Claro Video
 `clarovideo.dla.1`.
 
-**Third real LG, 9 November 2026** ([issue #56](https://github.com/Seagey/couch-tv/issues/56),
+**Third real LG, 9 November 2026** ([issue #45](https://github.com/Seagey/couch-tv/issues/45)): an
+LG OLED65C4 (2024) on webOS 24, in Italy, with the bridge on an Intel Mac mini. Claude Code did the
+whole setup from the repo link; the person only did the steps that need hands on the TV. The `.ipk`
+installed first time, the remote was accepted, and power and the app on screen read fine.
+
+**Fourth real LG, 9 November 2026** ([issue #46](https://github.com/Seagey/couch-tv/issues/46)): an
+LG on webOS 4.10.2 (2018/2019 firmware), with the bridge on a Windows 11 laptop. The clock, weather,
+scenes, the profile switch, the dock and the phone remote (off and on too) worked, with the
+reporter's own layout fallbacks for the older browser, which are not in couch-tv yet (see Limits).
+
+**Fifth real LG, 9 November 2026** ([issue #56](https://github.com/Seagey/couch-tv/issues/56),
 reported by ChrisFWCB): an LG OLED77GXPUA (2020, US) on webOS 5.6.2, firmware 04.64.00, wired
 Ethernet, set up from Windows 11, with the bridge running in Docker on a Synology DS1019+ (DSM 7.2).
 `check-tv.py` recognised it, the `.ipk` built with `--apps` installed first time, and the clock,
@@ -312,7 +322,7 @@ the phone says so and you use the TV's remote.
   10 restarts with no network, a firmware update), couch-tv is removed: switch Developer Mode on
   again and rerun steps 2 and 4. Your settings live on the bridge, so nothing is lost.
 - App ids differ between TVs and years. The ones in `bridge/apps.py` (`WEBOS`) come from public
-  lists and the three real LGs above, and every other app is found by its name. If an app does not open, find
+  lists and the real LGs above, and every other app is found by its name. If an app does not open, find
   its id (see "Finding app ids" in step 3), and add it to that app's `ids`.
 - couch-tv on LG reads its app list from the TV when webOS allows it, else from the bridge. Some
   firmware does not allow it (webOS 5.6.2 and 6.5.3 both refuse it), so there the app row stays empty
@@ -326,7 +336,7 @@ the phone says so and you use the TV's remote.
 
 ## The bridge in Docker on a NAS
 
-The third real LG ran its bridge in Docker on a Synology (a `node:22-bookworm-slim` image with
+The fifth real LG ran its bridge in Docker on a Synology (a `node:22-bookworm-slim` image with
 python3 and `@webos-tools/cli`, the repo mounted at `/app`, `network_mode: host`, an entrypoint that
 copies the Developer Mode key into `/root/.ssh` and runs `ares-setup-device` with the passphrase
 from an environment variable). ChrisFWCB offered a Dockerfile and compose file in
