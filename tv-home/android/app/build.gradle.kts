@@ -11,7 +11,7 @@ android {
     compileSdk = 34
     defaultConfig {
         applicationId = "app.couchtv.launcher"
-        minSdk = 25          // Android 7.1, so Fire OS 6 sticks (Fire TV Stick 4K, 1st gen) install it
+        minSdk = 23          // Android 6.0 (older Mi TVs); Fire OS 6 (7.1) sticks install it too
         targetSdk = 34
         versionCode = 14
         versionName = "0.12"

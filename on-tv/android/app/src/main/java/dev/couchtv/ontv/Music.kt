@@ -20,7 +20,7 @@ object Music {
     private var item: JSONObject? = null
     private var last: Pair<String, Long>? = null          // package, when it was last seen playing
     private val art = ConcurrentHashMap<String, String>()  // "artist\ntitle" -> picture url, or "" for none
-    private val pending = ConcurrentHashMap.newKeySet<String>()
+    private val pending = java.util.Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val pool = Executors.newSingleThreadExecutor()
 
     @Synchronized

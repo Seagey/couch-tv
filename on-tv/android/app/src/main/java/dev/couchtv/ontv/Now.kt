@@ -40,7 +40,9 @@ object Now {
     fun unlisten(fn: (String) -> Unit) = listeners.remove(fn)
 
     fun iso(t: Long = System.currentTimeMillis()): String =
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US).format(Date(t))
+        // "XXX" (a +11:00 offset) needs Android 7; Android 6 has "Z" (+1100), so put the colon in by hand
+        if (android.os.Build.VERSION.SDK_INT >= 24) SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US).format(Date(t))
+        else SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US).format(Date(t)).let { it.substring(0, it.length - 2) + ":" + it.substring(it.length - 2) }
 
     fun payload(): JSONObject {
         val p = media
