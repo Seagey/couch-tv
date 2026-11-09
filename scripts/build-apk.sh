@@ -2,6 +2,7 @@
 # Builds the couch-tv TV apps (release APKs) and prints where they are.
 #   dist/couch-tv-home.apk    the TV home (options A and B), from tv-home/android
 #   dist/couch-tv-ontv.apk    the "lives on the TV" app (option C), from on-tv/android, if present
+#   dist/couch-tv-sync.apk    the two TVs in sync helper (experimental, docs/SYNC.md), from sync/android, if present
 #
 # Needs JDK 21 and the Android SDK with platform 34 and build tools 34 (README, "Building the
 # app"). Gradle itself is not needed: the Gradle wrapper (tv-home/android/gradlew) fetches 8.11.1.
@@ -66,6 +67,14 @@ if [ -f "$ROOT/on-tv/android/settings.gradle.kts" ] || [ -f "$ROOT/on-tv/android
     OUT="$OUT
 $ROOT/dist/couch-tv-ontv.apk"
   fi
+fi
+
+if [ -f "$ROOT/sync/android/settings.gradle.kts" ]; then
+  echo "Building the sync helper (two TVs in sync, experimental)"
+  "$GW" -p "$ROOT/sync/android" --no-daemon -q clean assembleRelease
+  cp "$ROOT/sync/android/app/build/outputs/apk/release/app-release.apk" "$ROOT/dist/couch-tv-sync.apk"
+  OUT="$OUT
+$ROOT/dist/couch-tv-sync.apk"
 fi
 
 echo "Built:"

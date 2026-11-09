@@ -4,6 +4,10 @@ A spike, not a feature. It answers one question: how close can two Android TVs p
 streaming app be put, using only what Android lets an ordinary app and ADB do? Background and the
 research are in `SYNC-TWO-TVS.md` (kept next to the repo, not in it).
 
+**Using it? Read [docs/SYNC.md](../docs/SYNC.md).** It has the steps (`sync/install.sh`, then
+`sync.py calibrate`, then `sync.py play`), the undo and the honest numbers. This file is the tester's
+notes: how it works inside and every measurement.
+
 Aim: within one video frame (about 20 to 40 ms). Perfect zero is not on offer: two TVs are two
 separate players on two separate streams. See "What limits the precision".
 
@@ -51,8 +55,10 @@ sync/build.sh test             # sync/build/synctest-player.apk  (emulator only)
 
 ## Install and grant (per TV, needs the TV's yes)
 
-Use the repo's pure Python ADB so a Mac needs no new Local Network permission. `TV_IP` is the TV's
-address (keep it out of anything you commit).
+`sh sync/install.sh <tv address>` does all three steps below and checks the result (and
+`sh sync/install.sh --undo <tv address>` takes it off). By hand, it is this: the repo's pure Python ADB
+means a Mac needs no new Local Network permission. `TV_IP` is the TV's address (keep it out of anything
+you commit).
 
 ```sh
 export TV_IP=<tv address>
@@ -64,10 +70,18 @@ export TV_IP=<tv address>
 The last line should print `data="{"sdk":...}"`. Undo: `tvadb.py shell "pm uninstall dev.couchtv.sync"`
 (removing the app removes the listener grant with it).
 
-Android 14 and newer may need the listener allowed once in Settings if `allow_listener` is refused;
-the bedroom (Android 11) accepted it. The living room (Android 14) has not been tried.
+Android 14 and newer may need the listener allowed once in Settings if `allow_listener` is refused
+(`install.sh` checks and prints where). The bedroom (Android 11) accepted the command. Both of our TVs,
+the living room being Android 14, now list the helper as an enabled listener; we did not record whether
+the Android 14 one took the command or was switched on by hand.
 
 ## Commands
+
+For people: `calibrate` (about six plain syncs, saves each TV's play delay to `sync-delays.json` next to
+`config.json`, keyed by package and TV id) and `play` (starts both with the saved delays and redoes until
+under `--target`, then says "In sync, about N ms apart"). `sync` also reads the saved delays now; an
+explicit `--delay label=ms` wins. The sums and the saved file are covered by
+`tests/test_sync_calibrate.py`. The commands below are for testers.
 
 `--tv` takes an id or name from `config.json` (set `COUCH_CONFIG` or `--config` if it is not in the
 repo root), or `[label=]host[:adbport[:udpport]]`. `--pkg` is the streaming app's package name
@@ -250,9 +264,8 @@ These are guesses with reasons, not measurements, until the live test:
 - Then whatever the two TVs' picture and audio paths add, which can be as large again.
 - Drift over an hour: unknown. Clocks alone would move about 0.1 s per hour; stalls matter more.
 
-If the live test shows a stable gap (say, 80 ms every time, the same direction), the fix is a fixed
-offset on the timed play for the slower TV, which the script does not do yet (a `--skew` option would
-be the next small step).
+If the live test shows a stable gap, the fix is a fixed offset on the timed play for the TV that starts
+sooner. That is `--delay`, and `calibrate` now measures and saves it.
 
 ## Not done
 

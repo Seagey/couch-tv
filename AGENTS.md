@@ -398,6 +398,15 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
    Updates checks for one and installs it (Android asks first, and once asks to let Home install
    apps), and the weekly look can be switched on or off there.
 
+## Two TVs in sync (only if they ask)
+
+If someone asks for two TVs to play the same show together, read [docs/SYNC.md](docs/SYNC.md) and
+follow it, including its section for you. It is experimental: say so, say how little it has been
+tried, and say that Samsung, LG, VIDAA and Roku cannot do it (a Google TV box or Fire TV stick
+plugged in fixes that). It needs the same read back and the same clear yes as everything else
+before it touches a TV: `sync/install.sh` changes each TV, and `calibrate` and `play` make both TVs
+pause, jump and play. `sync.py dry` only reads and is fine before the yes.
+
 ## Rules while you work
 
 - `config.json`, `.env` and `bridge/data/` hold their settings and history. Git ignores them.

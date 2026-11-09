@@ -3,7 +3,12 @@
 
 Pure Python ADB (adb_shell, the key in ~/.android/adbkey), the same as the bridge and
 tv-home/tools/tvadb.py, so it needs no `adb` binary and no new Local Network permission on a Mac.
-Run it with the bridge's virtual environment:
+Run it with the bridge's virtual environment. For people (docs/SYNC.md):
+
+  .venv/bin/python sync/sync.py calibrate --tv living-room --tv bedroom --pkg <package>   (once per app)
+  .venv/bin/python sync/sync.py play      --tv living-room --tv bedroom --pkg <package>   (every time)
+
+For testers:
 
   .venv/bin/python sync/sync.py dry   --tv living-room --tv bedroom
   .venv/bin/python sync/sync.py state --tv living-room --tv bedroom --pkg <package>
@@ -13,7 +18,7 @@ Run it with the bridge's virtual environment:
 --tv takes an id or name from config.json ("tvs"), or [label=]host[:adbport[:udpport]]. Nothing about addresses
 is kept in this file.
 
-What changes a TV: only the sync and firetest commands (pause, seek, play, speed on the target
+What changes a TV: only the play, calibrate, sync and firetest commands (pause, seek, play, speed on the target
 app, through the helper app). `dry` and `state` only read: `cat /proc/uptime`, `dumpsys
 media_session`, and with --helper the helper's state op and its UDP clock.
 
@@ -560,6 +565,161 @@ def cmd_firetest(a, tvs):
         print(f"skew between TVs (via clock offsets): median {statistics.median(skew):.2f} ms, max {max(skew):.2f} ms")
 
 
+# ---------- saved delays, calibrate and play (the commands for people) ----------
+DELAYS_NAME = "sync-delays.json"
+MAX_SANE_GAP_MS = 1000.0   # a gap bigger than this is a stall or a bad read, not the TVs' steady difference
+
+
+def delays_path(config_path):
+    """The saved delays live next to config.json (and git ignores them)."""
+    return os.path.join(os.path.dirname(os.path.abspath(config_path)), DELAYS_NAME)
+
+
+def load_delays(path, pkg):
+    """{tv id: ms} saved for this app, or {} (no file, no entry, or a file that is not readable)."""
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        return {str(k): float(v) for k, v in (data.get(pkg) or {}).items()}
+    except (OSError, ValueError, AttributeError, TypeError):
+        return {}
+
+
+def save_delays(path, pkg, delays):
+    """Add or replace this app's entry, keep every other app's. Written in one step so a crash
+    cannot leave half a file."""
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, ValueError):
+        data = {}
+    data.setdefault(pkg, {}).update({k: round(v) for k, v in delays.items()})
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2, sort_keys=True)
+        f.write("\n")
+    os.replace(tmp, path)
+
+
+def summarise_gaps(gaps):
+    """Signed gaps from the rounds. Drops anything missing or bigger than MAX_SANE_GAP_MS (a stall).
+    Returns (kept, median or None)."""
+    kept = [g for g in gaps if g is not None and abs(g) <= MAX_SANE_GAP_MS]
+    return kept, (statistics.median(kept) if kept else None)
+
+
+def delays_from_gap(first, second, gap):
+    """gap = first minus second, positive when `first` is ahead. The one that is ahead starts later
+    by the gap; the other has no delay."""
+    return {first: max(gap, 0.0), second: max(-gap, 0.0)}
+
+
+def choose_delays(saved, explicit, labels):
+    """Saved delays for these TVs, then --delay on top (an explicit value always wins, 0 included)."""
+    out = {k: v for k, v in saved.items() if k in labels}
+    out.update(explicit)
+    return out
+
+
+def prepare(a, tvs):
+    """Connect, check the helper, line up the clocks and read both TVs, stopping with a plain
+    sentence when something is not ready. Returns the states."""
+    for t in tvs:
+        try:
+            t.connect()
+        except Exception as e:
+            sys.exit(f"Cannot reach {t.label} ({t.host}). Is it on, on the same Wi-Fi, with ADB debugging allowed for this computer? ({type(e).__name__})")
+        if not t.detect_helper():
+            sys.exit(f"{t.label} does not have the sync helper set up. Run sync/install.sh with that TV's address first (docs/SYNC.md, step 1).")
+    for t in tvs:
+        measure(t, n_adb=a.samples, use_udp=not a.no_udp)
+        print(f"{t.label}: clock lined up to within {t.offset.unc:.1f} ms ({t.offset.method})")
+    states = read_all(tvs, a.pkg)
+    for t, s in zip(tvs, states):
+        if "error" in s:
+            sys.exit(f"{t.label}: {a.pkg} has no show open. Open the same show on both TVs, press play once, then run this again. ({s['error'][:90]})")
+        if not s.get("can_seek"):
+            sys.exit(f"{t.label}: {a.pkg} does not let another app move its place in the show, so it cannot be synced.")
+    return states
+
+
+def start_position(a, tvs, states):
+    return a.pos if a.pos is not None else int(position_at(tvs[0], states[0], mac_ms()))
+
+
+def ahead_text(tvs, g):
+    ahead, behind = (tvs[0], tvs[-1]) if g > 0 else (tvs[-1], tvs[0])
+    return f"{ahead.label} is {abs(g):.0f} ms ahead of {behind.label}"
+
+
+def cmd_calibrate(a, tvs):
+    """Plain timed syncs (no delay), median signed gap, saved as each TV's play delay."""
+    PLAY_DELAY.clear()
+    states = prepare(a, tvs)
+    target = start_position(a, tvs, states)
+    first, last = tvs[0].label, tvs[-1].label
+    print(f"Calibrating {a.pkg} on {first} and {last}: {a.rounds} plain syncs, roughly {a.rounds * 12} seconds. "
+          f"Both TVs will pause, jump back and play a few times. Keep both on the same show.")
+    gaps = []
+    for i in range(1, a.rounds + 1):
+        g, _, ok = start_together(a, tvs, target)
+        gaps.append(g)
+        print(f"  round {i}: " + ("could not read the gap" if g is None else ahead_text(tvs, g) if abs(g) >= 1 else "dead level"), flush=True)
+    kept, med = summarise_gaps(gaps)
+    if len(kept) < 3:
+        sys.exit(f"Not enough good readings ({len(kept)} of {a.rounds}), so nothing was saved. Check both TVs are playing "
+                 f"and not buffering, then run calibrate again.")
+    spread = max(kept) - min(kept)
+    delays = delays_from_gap(first, last, med)
+    path = a.delays_file or delays_path(a.config)
+    save_delays(path, a.pkg, delays)
+    dropped = len(gaps) - len(kept)
+    print(f"Found: {len(kept)} good readings" + (f" ({dropped} thrown away, a stall or a bad read)" if dropped else "")
+          + f", from {min(kept):+.0f} to {max(kept):+.0f} ms, middle value {med:+.0f} ms.")
+    if abs(med) < 5:
+        print(f"{first} and {last} start together already, so no delay is needed.")
+    else:
+        slow = first if med > 0 else last
+        print(f"{ahead_text(tvs, med)} when it starts (the middle of the readings). From now on {slow} starts {abs(med):.0f} ms later.")
+    if spread > 50:
+        print("The readings jump around a fair bit. Run calibrate again if play does not settle quickly.")
+    print(f"Saved to {path}. Both TVs are still playing. Next: sync.py play --tv {first} --tv {last} --pkg {a.pkg}")
+
+
+def cmd_play(a, tvs):
+    """Start both together using the saved delays, and redo until under --target."""
+    if PLAY_DELAY:
+        print("Using delays: " + ", ".join(f"{k} {v:.0f} ms" for k, v in PLAY_DELAY.items()) + (" (saved by calibrate)" if a.saved_used else ""))
+    else:
+        print(f"No saved delays for {a.pkg} yet. It will still work, but may take more tries. "
+              f"Run calibrate once to make it quicker (docs/SYNC.md, step 3).")
+    states = prepare(a, tvs)
+    target = start_position(a, tvs, states)
+    print(f"Pausing both TVs, jumping to {target / 1000:.0f} s into the show, and pressing play together.")
+    gaps = []
+    for n in range(1, a.tries + 1):
+        g, _, ok = start_together(a, tvs, target)
+        if g is None:
+            print(f"  try {n}: could not read where one TV is up to")
+        else:
+            gaps.append(g)
+            print(f"  try {n}: {abs(g):.0f} ms apart" + ("" if ok else " (a TV got the start message late)"), flush=True)
+            if abs(g) <= a.target and ok:
+                print(f"In sync, about {abs(g):.0f} ms apart. Both TVs are playing.")
+                print("That is what the two apps report for their own position. Picture and sound delays inside each TV are not counted.")
+                return 0
+    if not gaps:
+        print(f"Could not tell how far apart the TVs are, so it cannot say they are in sync. Check both are still playing {a.pkg}.")
+        return 1
+    best = min(gaps, key=abs)
+    print(f"Not in sync after {a.tries} tries: the closest was {abs(best):.0f} ms apart (wanted under {a.target:.0f}). "
+          f"Both TVs are playing, a little out. Common causes: a TV buffering or on weak Wi-Fi, or delays that are out of date "
+          f"(run calibrate again).")
+    return 1
+
+
 # ---------- plumbing ----------
 def resolve_tv(spec, cfg):
     """id or name from config.json, or [label=]host[:adbport[:udpport]]."""
@@ -581,7 +741,7 @@ def resolve_tv(spec, cfg):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("cmd", choices=["dry", "state", "sync", "firetest"])
+    p.add_argument("cmd", choices=["calibrate", "play", "dry", "state", "sync", "firetest"])
     p.add_argument("--tv", action="append", required=True, help="id or name from config.json, or [label=]host[:adbport[:udpport]]; give two or more")
     p.add_argument("--config", default=os.environ.get("COUCH_CONFIG") or os.path.join(HERE, "..", "config.json"))
     p.add_argument("--pkg", help="the streaming app's package name")
@@ -594,31 +754,49 @@ def main():
     p.add_argument("--lead", type=float, default=1500, help="sync: ms between arming play and the moment (default 1500)")
     p.add_argument("--threshold", type=float, default=15, help="sync: stop when the gap is under this many ms (default 15)")
     p.add_argument("--trim", action="store_true", help="sync: after the timed play, try to close the gap with a speed nudge or a small seek (off by default, see README)")
-    p.add_argument("--tries", type=int, default=None, help="sync: with --trim, trim attempts (default 4); with --retry, attempts in all, the first start included (default 6)")
+    p.add_argument("--tries", type=int, default=None, help="sync: with --trim, trim attempts (default 4); with --retry or play, attempts in all, the first start included (default 6)")
     p.add_argument("--no-speed", dest="speed", action="store_false", help="sync: trim by seeking even if the app takes a speed change")
     p.add_argument("--seek-min", type=float, default=100, help="sync: when the app takes no speed change, do not trim by seeking a gap smaller than this many ms (default 100)")
-    p.add_argument("--delay", action="append", default=[], help="sync: label=ms, start that TV's play this much later (a TV that is always ahead)")
+    p.add_argument("--delay", action="append", default=[], help="sync, play: label=ms, start that TV's play this much later (a TV that is always ahead). Beats the saved delays")
     p.add_argument("--settle", type=float, default=1.5, help="sync: seconds to wait before reading the gap (default 1.5)")
     p.add_argument("--retry", action="store_true", help="sync: read the gap after the timed play and correct it until it is under --target (see --fix, --tries)")
     p.add_argument("--target", type=float, default=20, help="sync --retry: good enough, in ms (default 20)")
     p.add_argument("--fix", choices=["redo", "trim"], default="redo", help="sync --retry: redo = pause, seek and timed play again; trim = pause only the TV that is ahead and resume it later (default redo)")
     p.add_argument("--runs", type=int, default=1, help="sync --retry: repeat the whole sync this many times and summarise")
     p.add_argument("--log", help="sync --retry: append one JSON line per run to this file")
+    p.add_argument("--rounds", type=int, default=6, help="calibrate: how many plain syncs to measure (default 6)")
+    p.add_argument("--delays-file", help="calibrate, play, sync: where the saved delays live (default: sync-delays.json next to config.json)")
     p.add_argument("--count", type=int, default=10, help="firetest: how many fires (default 10)")
     p.add_argument("--op", default="seek", choices=["seek", "speed", "pause"], help="firetest: the command to arm (default seek to where it already is)")
     a = p.parse_args()
+    explicit = {}
     for d in a.delay:
         lab, _, ms = d.partition("=")
-        PLAY_DELAY[lab] = float(ms)
+        explicit[lab] = float(ms)
     try:
         cfg = json.load(open(a.config))
     except (OSError, ValueError):
         cfg = {}
     tvs = [resolve_tv(s, cfg) for s in a.tv]
-    if a.cmd in ("state", "sync", "firetest") and not a.pkg:
+    if a.cmd in ("state", "sync", "firetest", "play", "calibrate") and not a.pkg:
         sys.exit("--pkg is needed for this command")
-    if a.cmd in ("sync",) and len(tvs) < 2:
-        sys.exit("sync needs two --tv")
+    if a.cmd in ("sync", "play", "calibrate") and len(tvs) < 2:
+        sys.exit(f"{a.cmd} needs two --tv")
+    if a.cmd in ("play", "calibrate") and len(tvs) != 2:
+        sys.exit(f"{a.cmd} works on exactly two TVs")
+    # delays: what calibrate saved (sync and play only), then --delay on top
+    saved = {}
+    if a.cmd in ("sync", "play"):
+        saved = load_delays(a.delays_file or delays_path(a.config), a.pkg)
+    a.saved_used = any(t.label in saved and t.label not in explicit for t in tvs)
+    PLAY_DELAY.update(choose_delays(saved, explicit, [t.label for t in tvs]))
+    if a.cmd == "calibrate":
+        return cmd_calibrate(a, tvs)
+    if a.cmd == "play":
+        a.tries = a.tries or 6
+        sys.exit(cmd_play(a, tvs))
+    if a.cmd == "sync" and PLAY_DELAY:
+        print("play delays in use: " + ", ".join(f"{k} {v:.0f} ms" for k, v in PLAY_DELAY.items()))
     if a.cmd == "sync" and a.retry:
         a.tries = a.tries or 6
         return cmd_retry(a, tvs)

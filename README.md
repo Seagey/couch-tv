@@ -630,7 +630,8 @@ needed: `tv-home/android/gradlew` fetches Gradle 8.11.1 by itself.
    JAVA_HOME=/path/to/jdk-21 ANDROID_HOME=/path/to/android-sdk sh scripts/build-apk.sh
    ```
    It prints where the APKs are (`dist/couch-tv-home.apk`, plus `dist/couch-tv-ontv.apk` for
-   option C). The on-TV app carries the phone remote inside it, so for that one the script builds
+   option C, and `dist/couch-tv-sync.apk`, the experimental two TV sync helper,
+   [docs/SYNC.md](docs/SYNC.md)). The on-TV app carries the phone remote inside it, so for that one the script builds
    `remote/` first, which needs **Node 20 or newer**. `apply.sh` finds `dist/couch-tv-home.apk`
    by itself.
 
@@ -733,6 +734,13 @@ works.
 
 If the TV ever lost its saved Wi-Fi after an older couch-tv switched the setup app off, enable
 **Setup** again (step 3) and set the Wi-Fi from there.
+
+## Two TVs, one show (experimental)
+
+Two Android TVs or Google TVs can be started on the same show within a few hundredths of a second of
+each other, so two rooms do not echo. It needs a small helper app on each TV and a computer to run
+one command. It has only been tried on two TVs, with YouTube and Netflix, and Samsung, LG and VIDAA
+cannot do it. Read [docs/SYNC.md](docs/SYNC.md) first.
 
 ## How it fits together
 
