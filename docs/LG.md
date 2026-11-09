@@ -317,6 +317,20 @@ never does it over another app.
 - `"extend_devmode": false` in `config.json` stops it. Then press Extend yourself in the
   Developer Mode app now and then.
 
+**How much time is left.** Every 6 hours while the TV is on, the bridge reads the real countdown:
+it reads the session token from the TV over Developer Mode's ssh (`ares-novacom`), and asks LG's
+own session check (`developer.lge.com/secure/CheckDevModeSession.dev`), the same one the
+Developer Mode app uses. The token is never logged or kept. The hours left (999 after an Extend on
+this C4) are in `/api/tvs` (`devmode.hours_left`) and in `bridge/data/lg-<id>-devleft.json`.
+
+The TV home (LG only) and the phone remote then show a plain warning when couch-tv is at risk:
+
+- **red:** couch-tv is no longer installed, or fewer than 7 days are left;
+- **amber:** fewer than 900 hours are left (the Extends are not working), or, when the countdown
+  cannot be read, no Extend has worked for 3 days.
+
+They go away by themselves after the next Extend that works.
+
 ## Turning it on
 
 With **Quick Start+** on (Settings, General), an LG that is "off" stays on the network, and the

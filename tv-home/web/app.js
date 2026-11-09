@@ -315,6 +315,13 @@
     });
   }
 
+  function devWarn(d) {
+    var el = $("devwarn");
+    if (!d || !d.warning) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement("div"); el.id = "devwarn"; document.body.appendChild(el); }
+    el.className = "devwarn " + (d.level || "warn");
+    el.textContent = d.warning;
+  }
   function status(text, sticky) {
     clearTimeout(statusTimer);
     $("status").textContent = text || "";
@@ -2971,6 +2978,12 @@
       return Promise.resolve();
     }
     var people = api("GET", "/api/people").then(bridgePeople, function () {});
+    // LG: a warning when Developer Mode (and so couch-tv) is at risk, from the bridge
+    if (window.COUCH_WEBOS) api("GET", "/api/tvs").then(function (j) {
+      var id = TV_ID || j["default"], me = null;
+      (j.tvs || []).forEach(function (x) { if (x.id === id || (!me && (j.tvs || []).length === 1)) me = x; });
+      devWarn(me && me.devmode);
+    }, function () {});
     var jobs = [
       people.then(function () {
         return Promise.all(PEOPLE.map(function (p) {

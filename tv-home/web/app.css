@@ -951,3 +951,9 @@ html.lighter .gear-pop, html.lighter .app-pop, html.lighter .people-pop, html.li
 html.lighter.theme-night .people, html.lighter.theme-night .qbtn:not(.focus), html.lighter.theme-night .grid, html.lighter.theme-night .ncard:not(.focus),
 html.lighter.theme-night .hint.on { background: rgba(30, 20, 28, 0.62); box-shadow: inset 0 0 0 0.0625rem rgba(255, 210, 220, 0.16); }
 html.lighter.glass { --glass-edge: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.26); }
+
+/* LG: Developer Mode at risk (from the bridge), on the left under the people switch, clear of the clock and the dock */
+.devwarn { position: fixed; left: 5rem; top: 9rem; max-width: 26vw; padding: 0.75rem 1.25rem; border-radius: 1rem;
+  font-size: 1.25rem; line-height: 1.35; z-index: 50; background: rgba(60, 38, 0, 0.82); color: #ffd28a;
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 159, 10, 0.5); }
+.devwarn.alert { background: rgba(70, 10, 6, 0.85); color: #ffb3ad; box-shadow: inset 0 0 0 0.0625rem rgba(255, 69, 58, 0.6); }

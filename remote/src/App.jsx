@@ -172,7 +172,13 @@ export default function App() {
   useEffect(() => { if (!toast) return undefined; const t = setTimeout(() => setToast(null), toast.text.length > 40 ? 4500 : 2600); return () => clearTimeout(t); }, [toast]);
 
   useEffect(() => { setTv(null); return subscribeNow(setTv, setReach); }, [tvId]);
-  useEffect(() => { api.tvs().then((d) => setTvs(d.tvs || [])).catch(() => {}); }, [reach, tvId]);
+  useEffect(() => {
+    const load = () => api.tvs().then((d) => setTvs(d.tvs || [])).catch(() => {});
+    load();
+    // also every 10 minutes, so a Developer Mode warning shows without reopening the app
+    const iv = setInterval(load, 600000);
+    return () => clearInterval(iv);
+  }, [reach, tvId]);
   // "Same as the TV": the language picked in the TV home's Home settings
   // and its look and hidden apps
   useEffect(() => { api.settings().then((d) => {
@@ -333,6 +339,7 @@ export default function App() {
   const remote = (
     <div className="remote-col">
       <div className="pull-zone" {...pull}>
+      {(() => { const d = (thisTv || (tvs.length === 1 ? tvs[0] : null))?.devmode; return d?.warning ? <div className={`devwarn ${d.level || 'warn'}`} role="alert">{d.warning}</div> : null; })()}
       <TopBar people={people} tvName={thisTv?.name} who={who} setWho={pickWho} tv={tv} appInfo={appById[tv?.app?.id]} reach={reach} sleepLeft={sleepLeft} onPower={onPower} onMore={() => setSheet('more')} />
       {tvId && <button className="tv-chip glass" onClick={() => { tick(); setSheet('more'); }}><Ic.Screen size={15} /> {t('this_tv', { name: thisTv?.name || t('this') })}</button>}
       <NowPlaying tv={tv} appInfo={appById[tv?.app?.id]} onKey={onKey} roomy={h >= 760} />

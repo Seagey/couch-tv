@@ -50,6 +50,16 @@ from tv import TVUnavailable
 COUCH_APP = "app.couchtv.home"
 HOME_PACKAGE = "app.couchtv.launcher"
 DEVMODE_APP = "com.palmdts.devmode"
+# How often the Developer Mode countdown is read from LG (it needs the TV on).
+LEFT_EVERY_HOURS = 6
+
+
+def _ts(iso):
+    """A local "YYYY-MM-DDTHH:MM:SS" as seconds since the epoch, or None."""
+    try:
+        return time.mktime(time.strptime(iso[:19], "%Y-%m-%dT%H:%M:%S"))
+    except (TypeError, ValueError):
+        return None
 
 # Power states that mean off. "Active Standby" is "off" with Quick Start+ on: the TV still answers.
 OFF_STATES = {"Power Off", "Suspend", "Active Standby"}
@@ -145,6 +155,7 @@ class LGTV:
         self.ports = [int(cfg["port"])] if cfg.get("port") else [3000, 3001]
         self.key_file = os.path.join(config.DATA, f"lg-{self.id}-key.txt")
         self.devmode_file = os.path.join(config.DATA, f"lg-{self.id}-devmode.json")
+        self.devleft_file = os.path.join(config.DATA, f"lg-{self.id}-devleft.json")
         # Paired means the TV accepted the remote once (a client key is kept). Unlike a Samsung, an
         # LG answers nothing before that, so the watcher asks for it (see _watch).
         self.paired = True
@@ -511,6 +522,9 @@ class LGTV:
                       and ticks >= 30 and time.monotonic() - self._hook_at > 30):
                     # a TV left on: every 30 s, from a minute after the bridge starts
                     asyncio.create_task(self._daily_extend())
+                if on and ticks % 300 == 45 and not self._extending:
+                    # the countdown, read at most every LEFT_EVERY_HOURS (it needs the TV on)
+                    asyncio.create_task(self.check_devmode_left())
                 if on is not None:
                     was_on = on
                 elif not self.connected:
@@ -646,6 +660,12 @@ class LGTV:
             state["error"] = f"{type(e).__name__}: {e}"[:200]
         finally:
             self._extending = False
+        prev = self._devmode_state()
+        state["last_ok_at"] = state["at"] if state["ok"] else (
+            prev.get("last_ok_at") or (prev.get("at") if prev.get("ok") else None))
+        state["fails"] = 0 if state["ok"] else int(prev.get("fails") or 0) + 1
+        if state["ok"]:
+            asyncio.create_task(self.check_devmode_left(force=True))
         try:
             os.makedirs(os.path.dirname(self.devmode_file), exist_ok=True)
             with open(self.devmode_file, "w") as f:
@@ -656,10 +676,90 @@ class LGTV:
                    else f"Developer Mode extend failed ({state.get('how')}): {state.get('error')}")
         return state["ok"]
 
+    # ---------- Developer Mode health ----------
+    def _left_state(self):
+        try:
+            with open(self.devleft_file) as f:
+                return json.load(f)
+        except (FileNotFoundError, ValueError):
+            return {}
+
+    async def check_devmode_left(self, force=False):
+        """Read the Developer Mode countdown, at most every LEFT_EVERY_HOURS: the session token from the
+        TV (over Developer Mode's ssh, with LG's ares tools), then LG's own session check.
+        The token is never logged or kept."""
+        last = self._left_state()
+        if not force and time.time() - (_ts(last.get("at")) or 0) < LEFT_EVERY_HOURS * 3600:
+            return last
+        out = {"at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        try:
+            ares = shutil.which("ares-novacom", path=os.path.dirname(self.ares_launch)) if self.ares_launch else None
+            ares = ares or shutil.which("ares-novacom")
+            if not ares:
+                raise RuntimeError("ares-novacom not found")
+            proc = await asyncio.create_subprocess_exec(
+                ares, "--device", self.ares_device, "--run", "cat /var/luna/preferences/devmode_enabled",
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+            raw, _ = await asyncio.wait_for(proc.communicate(), 60)
+            token = "".join(l for l in raw.decode(errors="replace").splitlines() if not l.startswith("[")).strip()
+            if not re.fullmatch(r"[0-9A-Za-z]{16,128}", token):
+                raise RuntimeError("no session token on the TV")
+            async with aiohttp.ClientSession() as s:
+                async with s.get("https://developer.lge.com/secure/CheckDevModeSession.dev",
+                                 params={"sessionToken": token}, timeout=aiohttp.ClientTimeout(total=20)) as r:
+                    j = await r.json(content_type=None)
+            m = re.fullmatch(r"(\d+):(\d+):(\d+)", str(j.get("errorMsg", "")))
+            if j.get("result") != "success" or not m:
+                raise RuntimeError(f"LG answered {j.get('errorCode')}: {str(j.get('errorMsg'))[:60]}")
+            out["hours"] = round(int(m.group(1)) + int(m.group(2)) / 60, 1)
+        except Exception as e:
+            out["error"] = f"{type(e).__name__}: {e}"[:160]
+            out["hours"] = last.get("hours")
+            out["hours_at"] = last.get("hours_at")
+        else:
+            out["hours_at"] = out["at"]
+        try:
+            with open(self.devleft_file, "w") as f:
+                json.dump(out, f)
+        except OSError:
+            pass
+        self.log.info("Developer Mode left: %s", out.get("hours") if "error" not in out else out["error"])
+        return out
+
+    def devmode_warning(self):
+        """A plain sentence when couch-tv is at risk, else None. ("alert" or "warn", text)"""
+        ids = {p.get("id") for p in self.launch_points}
+        if self.launch_points and self.app_id not in ids:
+            return ("alert", "couch-tv is no longer installed on the TV. Developer Mode probably ran out. "
+                             "Switch Developer Mode on again and ask Claude to reinstall couch-tv.")
+        if not self.extend_devmode:
+            return None
+        left = self._left_state()
+        h, h_at = left.get("hours"), _ts(left.get("hours_at"))
+        if h is not None and h_at:
+            h -= (time.time() - h_at) / 3600   # it keeps counting down since it was read
+            if h < 168:
+                return ("alert", f"Developer Mode runs out in {max(0, int(h // 24))} days, and then LG removes couch-tv. "
+                                 "Turn the TV on for a minute so it can be renewed, or press Extend in the "
+                                 "Developer Mode app on the TV.")
+            if h < 900:
+                return ("warn", f"Developer Mode has not been renewed for {int((999 - h) // 24)} days "
+                                f"({int(h // 24)} days left). It renews the next time the TV is on.")
+            return None
+        st = self._devmode_state()
+        ok_at = _ts(st.get("last_ok_at") or (st.get("at") if st.get("ok") else None))
+        if ok_at and time.time() - ok_at > 3 * 86400:
+            return ("warn", f"Developer Mode has not been renewed for {int((time.time() - ok_at) // 86400)} days. "
+                            "It renews the next time the TV is on.")
+        return None
+
     def devmode_status(self):
         s = self._devmode_state()
+        left, w = self._left_state(), self.devmode_warning()
         return {"on": self.extend_devmode, "last": s.get("at"), "ok": s.get("ok"), "how": s.get("how"),
-                "error": s.get("error")}
+                "error": s.get("error"), "last_ok": s.get("last_ok_at") or (s.get("at") if s.get("ok") else None), "fails": s.get("fails", 0),
+                "hours_left": left.get("hours"), "hours_read": left.get("hours_at"),
+                "warning": w[1] if w else None, "level": w[0] if w else None}
 
     # ---------- the remote ----------
     async def _pointer(self):
