@@ -270,7 +270,7 @@ about how a show opened) and some screen reader labels on the phone are still in
 | **Fire TV on Fire OS** (Fire OS 6, 7 and 8: Fire TV Stick 4K 1st gen and newer, Stick 4K Max, Cube) | Partial. Takes the Home key back, but Amazon's home flashes up first | Partial | Yes, and it takes the Home key back ([how](on-tv/README.md#fire-tv-fire-os)) |
 | **Fire TV on Vega OS** (newer Fire TV sticks) | No | No | No |
 | **Samsung** (Tizen) | App only, opened from Samsung's app row | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
-| **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on two real LGs so far ([how](docs/LG.md)) | No |
+| **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on three real LGs so far ([how](docs/LG.md)) | No |
 | **Roku, Apple TV, Hisense with VIDAA** | No | No | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
@@ -739,7 +739,7 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
 
 - Google TV and Android TV run everything. Fire TV (Fire OS) runs the on-TV app, with Amazon's
   home flashing up first. Samsung runs it as an app, with a computer that stays on, and LG the
-  same way (run on two real LGs so far). Developer mode has to be on.
+  same way (run on three real LGs so far). Developer mode has to be on.
 - A Google TV update can switch the Google home back on. Option B's bridge checks once a day and
   switches it off again; with option A, run `apply.sh` again.
 - Some apps will not open a show directly. They open the app instead. See `bridge/DEEPLINKS.md`.

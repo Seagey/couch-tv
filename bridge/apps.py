@@ -42,6 +42,10 @@ APPS = [
      "jw": ["hulu"], "deeplink": "jw"},
     {"id": "youtube-tv", "name": "YouTube TV", "package": "com.google.android.youtube.tvunplugged",
      "colour": "#FF0000", "jw": ["youtubetv"], "deeplink": "jw"},
+    # Plex has no JustWatch intent here, so only the app opens. Listed so it ranks with the known apps
+    # and is not pushed behind More apps (#56).
+    {"id": "plex", "name": "Plex", "package": "com.plexapp.android", "colour": "#E5A00D",
+     "jw": ["plex"], "deeplink": "app"},
     {"id": "kayo", "name": "Kayo", "package": "au.com.kayosports.tv", "colour": "#00E676",
      "jw": [], "deeplink": "app"},
     {"id": "foxtel-go", "name": "Foxtel Go", "package": "au.com.foxtel.atv", "colour": "#F05A28",
@@ -117,6 +121,10 @@ WEBOS = {
     "abc-iview": {"ids": [], "names": ["ABC iview", "iview"]},
     "sbs-on-demand": {"ids": [], "names": ["SBS On Demand"]},
     "settings": {"ids": ["com.palm.app.settings"]},
+    # US apps, seen on an LG OLED77GX, webOS 5.6.2 (#56).
+    "plex": {"ids": ["cdp-30"]},
+    "youtube-tv": {"ids": ["youtube.leanback.ytv.v1"]},
+    "peacock": {"ids": ["com.peacock.tv"]},
 }
 
 # LG apps with no Android twin in APPS (so no package to invent): LG id -> name. The LG app shows
