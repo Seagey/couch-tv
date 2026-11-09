@@ -304,10 +304,13 @@ def cmd_state(a, tvs):
     report_gap(tvs, a.pkg)
 
 
+PLAY_DELAY = {}   # --delay label=ms: start this TV's play later, for a TV whose player starts sooner
+
+
 def schedule_all(tvs, op, pkg, at_mac, **extras):
     """Arm `op` on every TV for one Mac instant. Returns [(tv, reply, reply_arrived_in_time)]."""
     def one(t):
-        at_tv = at_mac + t.offset.off
+        at_tv = at_mac + t.offset.off + (PLAY_DELAY.get(t.label, 0.0) if op == "play" else 0.0)
         r, t0, t1 = t.op(op, pkg=pkg, at_elapsed_ms=f"{at_tv:.3f}", **extras)
         # the reply carries the TV's clock when it answered: that must be before the moment
         return t, r, ("error" not in r and r.get("elapsed_ms", 1e18) < at_tv)
@@ -499,10 +502,14 @@ def main():
     p.add_argument("--tries", type=int, default=4, help="sync: trim attempts with --trim (default 4)")
     p.add_argument("--no-speed", dest="speed", action="store_false", help="sync: trim by seeking even if the app takes a speed change")
     p.add_argument("--seek-min", type=float, default=100, help="sync: when the app takes no speed change, do not trim by seeking a gap smaller than this many ms (default 100)")
+    p.add_argument("--delay", action="append", default=[], help="sync: label=ms, start that TV's play this much later (a TV that is always ahead)")
     p.add_argument("--settle", type=float, default=1.5, help="sync: seconds to wait before reading the gap (default 1.5)")
     p.add_argument("--count", type=int, default=10, help="firetest: how many fires (default 10)")
     p.add_argument("--op", default="seek", choices=["seek", "speed", "pause"], help="firetest: the command to arm (default seek to where it already is)")
     a = p.parse_args()
+    for d in a.delay:
+        lab, _, ms = d.partition("=")
+        PLAY_DELAY[lab] = float(ms)
     try:
         cfg = json.load(open(a.config))
     except (OSError, ValueError):
