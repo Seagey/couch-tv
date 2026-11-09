@@ -1214,6 +1214,8 @@ def clean_settings(s):
         out["glass_icons"] = s["glass_icons"]
     if isinstance(s.get("moving_tiles"), bool):   # the focused tile's slow sway (#52)
         out["moving_tiles"] = s["moving_tiles"]
+    if isinstance(s.get("tile_shadows"), bool):   # every tile's drop shadow (#58)
+        out["tile_shadows"] = s["tile_shadows"]
     if isinstance(s.get("glass_amount"), int) and not isinstance(s.get("glass_amount"), bool) and 1 <= s["glass_amount"] <= 5:
         out["glass_amount"] = s["glass_amount"]
     if s.get("clock_style") in ("frosted", "liquid"):
