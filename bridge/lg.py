@@ -725,7 +725,9 @@ class LGTV:
                 raise RuntimeError(f"LG answered {j.get('errorCode')}: {str(j.get('errorMsg'))[:60]}")
             out["hours"] = round(int(m.group(1)) + int(m.group(2)) / 60, 1)
         except Exception as e:
-            out["error"] = f"{type(e).__name__}: {e}"[:160]
+            # only the bridge's own messages: an aiohttp error's text can carry the request address,
+            # and with it the session token
+            out["error"] = (str(e) if isinstance(e, RuntimeError) else type(e).__name__)[:160]
             out["hours"] = last.get("hours")
             out["hours_at"] = last.get("hours_at")
         else:
