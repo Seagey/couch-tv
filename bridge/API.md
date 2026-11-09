@@ -478,6 +478,7 @@ is optional:
 | `glass` | Glass panels: `off`, `on` or `lite` (no blur). |
 | `glass_icons` | Glass app icons: `true` or `false`. |
 | `moving_tiles` | The focused tile's slow sway: `true` or `false`. |
+| `lighter` | Lighter home for a slow box (no blur, no soft shadows, a still photo, smaller pictures): `true` or `false`. |
 | `glass_amount` | How clear the glass is: `1` (frosted) to `5` (very clear). |
 | `clock_style` | The Night clock: `frosted` or `liquid`. |
 | `glass_focus` | Glass app icons, the focused app: `colour` or `glass`. |

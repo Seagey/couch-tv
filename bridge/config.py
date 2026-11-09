@@ -267,6 +267,9 @@ def _home(h):
     # the focused tile's slow sway (#52): on, or off for a TV that flickers
     if isinstance(h.get("moving_tiles"), bool):
         out["moving_tiles"] = h["moving_tiles"]
+    # lighter home for a slow box (#58): no blur, no soft shadows, a still photo, smaller pictures
+    if isinstance(h.get("lighter"), bool):
+        out["lighter"] = h["lighter"]
     # how clear the glass is, 1 (frosted) to 5 (very clear), and the Night clock's style
     if isinstance(h.get("glass_amount"), int) and not isinstance(h.get("glass_amount"), bool) and 1 <= h["glass_amount"] <= 5:
         out["glass_amount"] = h["glass_amount"]

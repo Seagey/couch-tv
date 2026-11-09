@@ -48,6 +48,8 @@
   // The focused tile's slow sway and glint: Home settings, Look, Moving tiles, else home.moving_tiles,
   // else on, except with glass "lite" (a slower TV), where it is off (#52)
   var MOVING = true;
+  // Lighter home (#58): no blur, no soft shadows, a photo that holds still, smaller pictures. For a slow box.
+  var LIGHTER = false;
   // WebViews before Chrome 84 (still on many Android 9 TVs) skip gap in a flex box, so icons touch
   // their words and rows touch each other. html.no-flex-gap lets app.css put margins in instead (#26).
   (function () {
@@ -213,6 +215,8 @@
     GLASS = glassSetting();
     document.documentElement.classList.toggle("glass", GLASS !== "off");
     document.documentElement.classList.toggle("glass-lite", GLASS === "lite");
+    LIGHTER = typeof ST.lighter === "boolean" ? ST.lighter : HOME.lighter === true;
+    document.documentElement.classList.toggle("lighter", LIGHTER);
     movingTiles();
     // glass app icons (#25): set in Home settings, else home.glass_icons; off unless switched on
     GLASS_ICONS = typeof ST.glass_icons === "boolean" ? ST.glass_icons : HOME.glass_icons === true;
@@ -258,9 +262,11 @@
     if (r.classList.contains("clock-liquid") !== CLOCK_LIQUID) { r.classList.toggle("clock-liquid", CLOCK_LIQUID); glassShown = ""; }
   }
   function movingTiles() {
-    MOVING = typeof ST.moving_tiles === "boolean" ? ST.moving_tiles : typeof HOME.moving_tiles === "boolean" ? HOME.moving_tiles : GLASS !== "lite";
+    MOVING = LIGHTER ? false : typeof ST.moving_tiles === "boolean" ? ST.moving_tiles : typeof HOME.moving_tiles === "boolean" ? HOME.moving_tiles : GLASS !== "lite";
     document.documentElement.classList.toggle("still", !MOVING);
   }
+  // Lighter home: ask for the 640 px size of a Keep watching picture, not the 1440 px one (a card is about 500 px wide)
+  function slim(u) { return LIGHTER && typeof u === "string" ? u.replace("/s1440/", "/s640/") : u; }
   function glassSetting() { var g = ST.glass || HOME.glass; return g === "on" || g === "lite" ? g : "off"; }
   // no clock in Home settings or config.json: the one usual for the language (24 hour in Italian and German)
   function clock24() { return (ST.clock || HOME.clock || (window.I18N ? window.I18N.clock() : "12h")) === "24h"; }
@@ -1078,7 +1084,7 @@
     if (NIGHT) {
       // lock screen notifications: glass cards, three in view, the row slides past the third
       track.innerHTML = data.shows.map(function (it) {
-        var art = it.backdrop || it.poster, pkg = it.app && it.app.package;
+        var art = slim(it.backdrop || it.poster), pkg = it.app && it.app.package;
         var ep = it.season && it.episode ? "S" + it.season + " E" + it.episode : (it.episode_title || "");
         return '<div class="tile ncard">' +
           (art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async">' : '<span class="thumb none"></span>') +
@@ -1090,7 +1096,7 @@
       return;
     }
     track.innerHTML = data.shows.map(function (it) {
-      var art = it.backdrop || it.poster;
+      var art = slim(it.backdrop || it.poster);
       var pkg = it.app && it.app.package;
       var badge = pkg && iconUrl(pkg) ? '<span class="badge"><img src="' + esc(iconUrl(pkg)) + '" alt="" onerror="this.parentNode.remove()"></span>' : "";
       var bar = it.progress ? '<span class="bar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "";
@@ -2049,7 +2055,13 @@
     } });
     // the focused tile's slow sway: off by itself with glass "lite", and here for a TV that flickers (#52)
     rows.push({ kind: "toggle", key: "moving-tiles", label: t("moving_tiles"), value: MOVING ? t("on") : t("off"), act: function () {
+      if (LIGHTER) return;   // held still while Lighter home is on
       MOVING = !MOVING; ST.moving_tiles = MOVING; saveSettings(); movingTiles();
+    } });
+    // a slow box (#58): no blur, no soft shadows, a still photo and smaller pictures, all in one switch
+    rows.push({ kind: "toggle", key: "lighter", label: t("lighter"), value: LIGHTER ? t("on") : t("off"), act: function () {
+      LIGHTER = !LIGHTER; ST.lighter = LIGHTER; saveSettings();
+      document.documentElement.classList.toggle("lighter", LIGHTER); movingTiles(); renderShelf(); paintFocus();
     } });
     rows.push({ kind: "toggle", key: "glass-icons", label: t("glass_icons"), value: GLASS_ICONS ? t("on") : t("off"), act: function () {
       GLASS_ICONS = !GLASS_ICONS; ST.glass_icons = GLASS_ICONS; saveSettings();
@@ -2074,7 +2086,7 @@
     rows.push({ kind: "cycle", key: "clock-style", label: t("clock_style"), value: CLOCK_LIQUID ? t("clock_liquid") : t("clock_frosted"), act: function () {
       CLOCK_LIQUID = !CLOCK_LIQUID; ST.clock_style = CLOCK_LIQUID ? "liquid" : "frosted"; glassClasses(); saveSettings();
     } });
-    rows.push(info("glass-note", t("glass_note", { keep: t("keep_watching") }) + " " + t("glass_icons_note") + " " + t("glass_amount_note") + " " + t("moving_tiles_note")));
+    rows.push(info("glass-note", t("glass_note", { keep: t("keep_watching") }) + " " + t("glass_icons_note") + " " + t("glass_amount_note") + " " + t("moving_tiles_note") + " " + t("lighter_note")));
     // the sound on every arrow and OK (#32): the TV's own, a softer one, or none
     rows.push(head(t("sound_head")));
     rows.push({ kind: "cycle", key: "nav-sound", label: t("nav_sound"), value: t("nav_sound_" + SOUND_STYLE), act: function () {

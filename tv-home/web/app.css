@@ -929,3 +929,25 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .theme-night .np-t small { font-size: 1.25rem; line-height: 1.625rem; }
 .theme-night.gearing .np-slot, .theme-night.apping .np-slot { opacity: 0; }
 .no-flex-gap.theme-night .shelf-row > * + * { margin-left: 1.375rem; }
+
+/* ================= Lighter home (Home settings, Look, Lighter home; home.lighter) =================
+   #58: for a slow box (a Xiaomi Mi Box, a Fire stick). Nothing is blurred, no tile casts a soft
+   shadow, the photo holds still instead of drifting behind the glass, and the focused tile does not
+   sway. The layout, the colours and the focus rings stay as they are. Pictures are asked for at a
+   smaller size by app.js. */
+html.lighter *, html.lighter *::before, html.lighter *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+html.lighter .bg img.on { animation: none; transform: scale(1.04); }
+html.lighter .tile .face { box-shadow: none; transition: none; }
+html.lighter .tile.focus .face { box-shadow: 0 0 0 0.0625rem rgba(255, 255, 255, 0.3); }
+html.lighter .show .badge { box-shadow: none; }
+html.lighter .person.focus, html.lighter .people.head.focus, html.lighter.theme-night .people.head.focus { box-shadow: 0 0 0 0.1875rem #fff; }
+html.lighter .qbtn.focus { box-shadow: none; }
+html.lighter .ncard.focus { box-shadow: 0 0 0 0.1875rem #fff; }
+html.lighter.theme-night .app.focus .face { box-shadow: 0 0 0 0.25rem #fff; }
+html.lighter .shelf-track, html.lighter .tile, html.lighter .ncard { transition-duration: 160ms; }
+/* panels that leaned on the blur to stay readable get a darker ground, and no soft shadow, instead */
+html.lighter .settings, html.lighter .smart { background: rgba(10, 8, 12, 0.94); }
+html.lighter .gear-pop, html.lighter .app-pop, html.lighter .people-pop, html.lighter .sleep-menu, html.lighter .qbtn.set { background: rgba(28, 24, 30, 0.97); box-shadow: inset 0 0 0 0.0625rem rgba(255, 220, 230, 0.16); }
+html.lighter.theme-night .people, html.lighter.theme-night .qbtn:not(.focus), html.lighter.theme-night .grid, html.lighter.theme-night .ncard:not(.focus),
+html.lighter.theme-night .hint.on { background: rgba(30, 20, 28, 0.62); box-shadow: inset 0 0 0 0.0625rem rgba(255, 210, 220, 0.16); }
+html.lighter.glass { --glass-edge: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.26); }
