@@ -173,6 +173,7 @@ class LGTV:
         self._prompt_at = -3600.0
         self._tasks = []
         self.quiet_until = 0.0      # the hook leaves the TV alone until then (a command just ran)
+        self.home_on_wake_until = 0.0   # switched on from the phone: the hook opens couch-tv even if quiet
         self._hook_at = -60.0
         self._extending = False
         self.hook_log = []          # (time, what) for the last few hook decisions, for /api/tvs
@@ -546,7 +547,11 @@ class LGTV:
         # Only the watcher calls this, once per switch-on (a Samsung also has its art channel, so it
         # skips a second call within 15 s; an LG switched off and on quickly should still get it).
         self._hook_at = time.monotonic()
-        if time.monotonic() < self.quiet_until:
+        if time.monotonic() < self.home_on_wake_until:
+            # switched on from the phone: the home, even if a command (a Home press, an app opened
+            # just before it went off) still holds the quiet time
+            self.home_on_wake_until = 0.0
+        elif time.monotonic() < self.quiet_until:
             self._note("TV came on, left alone (a command is running)")
             return
         await asyncio.sleep(1.5)   # let the TV settle on whatever it opens by itself
@@ -708,6 +713,8 @@ class LGTV:
         # A power press from the phone should land on couch-tv, like one from the TV's own remote.
         power = isinstance(name, str) and resolve_key(name) == "POWER"
         self.quiet_until = 0.0 if power else time.monotonic() + 20
+        if power and not self.is_on:
+            self.home_on_wake_until = time.monotonic() + 90
         if isinstance(name, str) and name.strip().lower() == "home":
             # couch-tv's Home is our app; LG's own menu is "smart_hub".
             await self._launch(self.app_id)
@@ -731,18 +738,16 @@ class LGTV:
 
     async def _turn_on(self):
         """webOS 4 has no system/turnOn (404): try the power service's turnOnScreen, then
-        Wake-on-LAN (couch-tv#46)."""
-        try:
-            await self._request("system/turnOn")
-        except LGError as e:
-            if "404" not in str(e):
-                raise
+        Wake-on-LAN (couch-tv#46). Any failure on the way ends in Wake-on-LAN, never an error: a
+        remote connection that went stale while the TV slept raises "Cannot write to closing
+        transport" (ClientConnectionResetError), not a 404, and a TV in standby can refuse both."""
+        for uri in ("system/turnOn", "com.webos.service.tvpower/power/turnOnScreen"):
             try:
-                await self._request("com.webos.service.tvpower/power/turnOnScreen")
-            except LGError as e2:
-                if "404" not in str(e2):
-                    raise
-                await self.wake()
+                await self._request(uri, timeout=3)
+                return
+            except Exception as e:
+                self.log.info("power on: %s did not take (%s)", uri, type(e).__name__)
+        await self.wake()
 
     async def text(self, text):
         """Types into the box on screen (only works while the TV shows its keyboard)."""
@@ -866,6 +871,7 @@ class LGTV:
         if not self.mac or not self.wake_on_lan:
             return
         self.quiet_until = 0.0   # a wake from the phone should land on couch-tv
+        self.home_on_wake_until = time.monotonic() + 90
         mac = bytes.fromhex(self.mac.replace(":", "").replace("-", ""))
         packet = b"\xff" * 6 + mac * 16
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

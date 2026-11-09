@@ -763,12 +763,45 @@ async def h_screens_open(request):
 
 
 # ---------- power and volume ----------
+power_off_at = {}   # per TV: when the phone last turned it off
+
+
+async def _home_after_wake(t):
+    """LG, after a power-on from the phone: if the power-on hook did not run (off and on again
+    quicker than the watcher reads the TV), open couch-tv anyway. An input is left alone with
+    leave_inputs, as the hook does."""
+    await asyncio.sleep(6)
+    if not (t.is_on and t.home_on_wake_until and t.visible is not None and t.visible != t.app_id):
+        return
+    if t.leave_inputs and lg.INPUT.match(t.visible):
+        return
+    t.home_on_wake_until = 0.0
+    try:
+        await t._launch(t.app_id, quiet=False)
+        t._note("switched on from the phone, opened couch-tv")
+    except Exception as e:
+        log.warning("home after wake: %s", e)
+
+
 async def h_power(request):
     data = await body(request)
     state = data.get("state")
     if state not in ("on", "off", "toggle"):
         raise ApiError(400, "state must be on, off or toggle")
     started = time.monotonic()
+    if hasattr(tv, "home_on_wake_until") and tv.connected:
+        # LG: the phone's idea of on or off can be seconds behind (Quick Start+ standby still
+        # answers). Read the TV now; and a second "off" just after it went off means "on again":
+        # the button was pressed to wake it.
+        try:
+            await tv._read_power()
+        except Exception:
+            pass
+        if state == "off" and tv.is_on is False and time.monotonic() - power_off_at.get(_current.get(), -99) < 20:
+            log.info("power off asked again just after it went off: turning it on")
+            state = "on"
+        elif state == "toggle":
+            state = "off" if tv.is_on else "on"
     log.info("power %s requested (connected=%s, is_on=%s)", state, tv.connected, tv.is_on)
     if state == "on":
         waking["on"] = True
@@ -778,6 +811,8 @@ async def h_power(request):
         finally:
             waking["on"] = False
             push_now()
+        if hasattr(tv, "home_on_wake_until"):
+            asyncio.create_task(_home_after_wake(TVS[_current.get()]))
     else:
         tv.require()
         cur = tv.is_on
@@ -788,6 +823,8 @@ async def h_power(request):
                 await asyncio.sleep(0.25)
                 if tv.is_on == target:
                     break
+    if state == "off":
+        power_off_at[_current.get()] = time.monotonic()
     record_action(request, "power", {"state": state}, True)
     on = tv.is_on
     log.info("power %s done in %.1fs (connected=%s, is_on=%s)", state,
