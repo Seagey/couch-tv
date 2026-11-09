@@ -62,6 +62,21 @@ Plex (`cdp-30`), YouTube TV (`youtube.leanback.ytv.v1`) and Peacock (`com.peacoc
 `bridge/apps.py`; Pluto TV `com.plutotv.app`, Tubi `com.tubitv.ott.tubi`, LG Channels `lgchannels.us`
 and IMDb TV (Freevee) `imdbtv` show by their own names.
 
+**The same OLED65C4 after the webOS 26 upgrade, 10 November 2026**
+([issue #61](https://github.com/Seagey/couch-tv/issues/61)): LG's Re:New offered webOS 26 in Italy
+(firmware 43.21.96, a 1.7 GB background download). Developer Mode, its key and passphrase, the
+couch-tv app, the saved remote key (no new Allow prompt), the pointer socket, screenshots and the
+power state all survived. The app ids couch-tv relies on (`com.webos.app.home`, `livetv`, the HDMI
+inputs) did not change. Power on from the phone still works through Wake-on-LAN. One change: backing
+out of Disney+ now passes through an empty screen for about 2 seconds before LG's home, so the hook
+can miss it and leave you on LG's home; the reporter has a fix and is sending it as a PR.
+
+If you take the webOS 26 upgrade:
+
+- Stop the bridge first, and start it again when the TV has finished. Otherwise, when the TV restarts
+  in the middle of the update, the hook opens couch-tv over LG's setup screens.
+- Afterwards, Netflix and Prime Video open the LG Content Store until you update them there.
+
 Everything else was built from LG's documentation and the open source libraries that talk to LG
 TVs, and tested against a stand-in TV on a computer. If you run it on another LG, thank you: please
 [open an issue](https://github.com/Seagey/couch-tv/issues) and say how it went (TV model and year,

@@ -937,7 +937,7 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
    smaller size by app.js. */
 html.lighter *, html.lighter *::before, html.lighter *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 html.lighter .bg img.on { animation: none; transform: scale(1.04); }
-html.lighter .tile .face { box-shadow: none; transition: none; }
+html.lighter .tile .face, html.lighter .app .face { box-shadow: none; transition: none; }   /* every tile and app face: their soft shadow was most of the drawing cost (atishay-kasliwal, #62) */
 html.lighter .tile.focus .face { box-shadow: 0 0 0 0.0625rem rgba(255, 255, 255, 0.3); }
 html.lighter .show .badge { box-shadow: none; }
 html.lighter .person.focus, html.lighter .people.head.focus, html.lighter.theme-night .people.head.focus { box-shadow: 0 0 0 0.1875rem #fff; }
