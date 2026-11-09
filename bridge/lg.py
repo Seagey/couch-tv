@@ -157,6 +157,7 @@ class LGTV:
         self.connected = False      # the TV answers on the network (its remote port is open)
         self.power = None           # the TV's power state, "?" on a webOS too old to say, None unknown
         self.visible = None         # the LG id of the app on screen ("" for none), None when unknown
+        self._left_app = (None, 0.0)   # (LG id, when) the last app that went to an empty screen
         self.ids = {}               # LG id -> android-style package, for what is installed
         self.launch_points = []     # every app the TV lists: {"id", "title", "icon"}
         self._ids_checked = 0.0
@@ -493,10 +494,16 @@ class LGTV:
                     self.visible = await self._read_visible()
                     if self.visible != prev and prev is not None and self.visible is not None:
                         self.log.info("screen: %s -> %s", prev or "nothing", self.visible or "nothing")
+                        came = prev
+                        # webOS 26 closes some apps (Disney+) through an empty screen: app -> "" -> LG home
+                        if self.visible == "" and prev and not NOTHING.match(prev):
+                            self._left_app = (prev, time.monotonic())
+                        elif prev == "" and time.monotonic() - self._left_app[1] < 6:
+                            came = self._left_app[0]
                         if (self.back_to_couch and was_on and LG_HOME.match(self.visible)
-                                and prev not in ("", self.app_id, DEVMODE_APP) and not NOTHING.match(prev)
+                                and came not in ("", self.app_id, DEVMODE_APP) and not NOTHING.match(came)
                                 and not self._extending and time.monotonic() >= self.quiet_until):
-                            asyncio.create_task(self._back_to_couch(prev))
+                            asyncio.create_task(self._back_to_couch(came))
                     if self.is_on:
                         await self.refresh_installed()
                         if ticks % 3 == 0:

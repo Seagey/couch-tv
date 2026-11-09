@@ -69,7 +69,8 @@ couch-tv app, the saved remote key (no new Allow prompt), the pointer socket, sc
 power state all survived. The app ids couch-tv relies on (`com.webos.app.home`, `livetv`, the HDMI
 inputs) did not change. Power on from the phone still works through Wake-on-LAN. One change: backing
 out of Disney+ now passes through an empty screen for about 2 seconds before LG's home, so the hook
-can miss it and leave you on LG's home; the reporter has a fix and is sending it as a PR.
+could miss it and leave you on LG's home. `back_to_couch` now treats an app going to an empty screen,
+then LG's home within 6 seconds, as that app closing.
 
 If you take the webOS 26 upgrade:
 
