@@ -2921,6 +2921,9 @@
   }
   if (HAS_POINTER) {
     document.addEventListener("mousemove", function (e) {
+      // Chrome sends a mousemove with no movement after the page moves under a parked pointer:
+      // that must not pull focus back from the arrow keys
+      if (e.movementX === 0 && e.movementY === 0) return;
       var p = pointAt(e.target);
       if (p) { touched = true; pointTo(p); }
     });
