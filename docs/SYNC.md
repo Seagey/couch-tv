@@ -84,9 +84,9 @@ Do not copy our delay numbers. They belong to our two TVs. Measure yours with `c
 
 Each TV is changed in step 1. Nothing else on the TV is touched. You can undo it (below).
 
-**1. Put the helper on each TV.** Get `couch-tv-sync.apk` from
-[the Releases page](https://github.com/Seagey/couch-tv/releases) into `dist/` (once a release carries
-it), or build it with `sync/build.sh`. Then, for each TV:
+**1. Put the helper on each TV.** Download `couch-tv-sync.apk` into `dist/`:
+`curl -fL -o dist/couch-tv-sync.apk https://github.com/Seagey/couch-tv/releases/latest/download/couch-tv-sync.apk`
+(or build it yourself with `sync/build.sh`). Then, for each TV:
 
 ```sh
 sh sync/install.sh <tv address>
