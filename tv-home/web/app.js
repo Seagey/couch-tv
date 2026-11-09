@@ -2856,6 +2856,103 @@
     openGear();
   }
 
+  // ---------------- a pointer (LG's Magic Remote, or the phone's touchpad on an LG) ----------------
+  // Pointing at a tile moves the focus there; a click opens it, as OK would. Only on webOS, where the
+  // TV has a pointer; elsewhere the home stays arrows only.
+  var HAS_POINTER = !!window.COUCH_WEBOS;
+  if (HAS_POINTER) document.documentElement.classList.add("has-pointer");
+  function inList(list, el) {
+    for (; el && el !== document.body; el = el.parentNode) { var i = list.indexOf(el); if (i >= 0) return i; }
+    return -1;
+  }
+  // What the pointer is over: {zone, i}, or null.
+  function kids(id, sel) { return Array.prototype.slice.call(sel ? $(id).querySelectorAll(sel) : $(id).children); }
+  function pointAt(el) {
+    var i;
+    if (zone === "menu") { i = inList(kids("sleep-menu"), el); return i >= 0 ? { zone: "menu", i: i } : null; }
+    if (zone === "gear" || zone === "updask") { i = inList(kids("gear-pop", ".grow"), el); return i >= 0 ? { zone: zone, i: i } : null; }
+    if (zone === "appmenu") { i = inList(kids("app-pop", ".grow"), el); return i >= 0 ? { zone: "appmenu", i: i } : null; }
+    if (zone === "settings") {
+      if (SET.typing || SET.lift) return null;
+      if ((i = inList(kids("set-secs"), el)) >= 0) return { zone: "settings", sec: i };
+      if ((i = inList(kids("set-rows"), el)) >= 0 && focusable(rowsNow()[i])) return { zone: "settings", i: i };
+      return null;
+    }
+    if (zone === "inputs") { i = inList(Array.prototype.slice.call($("inputs-pop").children), el); return i >= 0 ? { zone: "inputs", i: i } : null; }
+    if (zone === "pmenu") { i = inList(Array.prototype.slice.call($("people-pop").querySelectorAll(".prow")), el); return i >= 0 ? { zone: "pmenu", i: i } : null; }
+    if (["grid", "shelf", "quick", "people", "np"].indexOf(zone) < 0 || lift) return null;
+    if ((i = inList(gridEls, el)) >= 0) return { zone: "grid", i: i };
+    if ((i = inList(shelfEls, el)) >= 0) return { zone: "shelf", i: i };
+    if ((i = inList(quickEls, el)) >= 0) return { zone: "quick", i: i };
+    if (peopleOn() && !isHead() && (i = inList(Array.prototype.slice.call($("people").children), el)) >= 0) return { zone: "people", i: i };
+    if (peopleOn() && isHead() && inList([$("people")], el) >= 0) return { zone: "people", i: 0 };
+    return null;
+  }
+  function pointTo(p, clicked) {
+    if (p.zone === "menu") { if (menuI === p.i) return false; menuI = p.i; renderMenu(); return true; }
+    if (p.zone === "gear") { if (gi === p.i) return false; gi = p.i; renderGear(); return true; }
+    if (p.zone === "updask") { if (ai === p.i) return false; ai = p.i; renderAsk(); return true; }
+    if (p.zone === "appmenu") { if (amI === p.i) return false; amI = p.i; renderAppMenu(); return true; }
+    if (p.zone === "settings") {
+      if (p.sec !== undefined) {   // a section changes the page only on a click, so passing over the list is harmless
+        if (!clicked) return false;
+        if (SET.sec !== p.sec) { SET.sec = p.sec; SET.sub = null; SET.msg = ""; SET.keyFocus = null; SET.ri = 0; }
+        SET.col = "secs"; SET.confirm = null;
+        renderSettings();
+        return true;
+      }
+      if (SET.col === "rows" && SET.ri === p.i) return false;
+      var rows = rowsNow(), box = $("set-rows"), keep = box.scrollTop;
+      SET.col = "rows"; SET.ri = p.i; SET.keyFocus = rows[p.i] ? rows[p.i].key : null; SET.confirm = null;
+      renderSettings();
+      // the row is already under the pointer: the list stays where it is
+      box.style.scrollBehavior = "auto"; box.scrollTop = keep; box.style.scrollBehavior = "";
+      return true;
+    }
+    if (p.zone === "inputs") { if (inI === p.i) return false; inI = p.i; renderInputMenu(); return true; }
+    if (p.zone === "pmenu") { if (pmi === p.i) return false; pmi = p.i; renderPop(); return true; }
+    var same = zone === p.zone && ((p.zone === "grid" && g === p.i) || (p.zone === "shelf" && s === p.i) ||
+      (p.zone === "quick" && qi === p.i) || (p.zone === "people" && pi === p.i));
+    if (same) return false;
+    zone = p.zone;
+    if (p.zone === "grid") g = p.i; else if (p.zone === "shelf") s = p.i; else if (p.zone === "quick") qi = p.i; else pi = p.i;
+    paintFocus();
+    return true;
+  }
+  if (HAS_POINTER) {
+    document.addEventListener("mousemove", function (e) {
+      var p = pointAt(e.target);
+      if (p) { touched = true; pointTo(p); }
+    });
+    // the wheel (or two fingers on the phone's touchpad) scrolls Home settings' list
+    document.addEventListener("wheel", function (e) {
+      if (zone !== "settings" || SET.typing) return;
+      var box = $("set-rows");
+      var d = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? box.clientHeight : 1);
+      if (!d) return;
+      e.preventDefault();
+      box.style.scrollBehavior = "auto";
+      box.scrollTop += d;
+      box.style.scrollBehavior = "";
+    }, { passive: false });
+    document.addEventListener("click", function (e) {
+      var p = pointAt(e.target);
+      if (!p) {
+        // a click beside an open menu closes it, as Back does
+        if (["menu", "gear", "appmenu", "inputs", "pmenu"].indexOf(zone) >= 0) {
+          e.preventDefault();
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        }
+        return;
+      }
+      e.preventDefault();
+      touched = true;
+      pointTo(p, true);
+      if (p.zone === "settings" && p.sec !== undefined) return;   // choosing a section is the whole click
+      activate();
+    });
+  }
+
   document.addEventListener("keydown", function (e) {
     if (typingKey(e)) return;   // typing a place or a name: the keys belong to the text box
     if (isOk(e)) {

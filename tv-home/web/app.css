@@ -951,3 +951,14 @@ html.lighter .gear-pop, html.lighter .app-pop, html.lighter .people-pop, html.li
 html.lighter.theme-night .people, html.lighter.theme-night .qbtn:not(.focus), html.lighter.theme-night .grid, html.lighter.theme-night .ncard:not(.focus),
 html.lighter.theme-night .hint.on { background: rgba(30, 20, 28, 0.62); box-shadow: inset 0 0 0 0.0625rem rgba(255, 210, 220, 0.16); }
 html.lighter.glass { --glass-edge: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.26); }
+
+/* webOS: LG's pointer is shown over the home (elsewhere the home is arrows only) */
+html.has-pointer body { cursor: default; }
+html.has-pointer .grid > *, html.has-pointer .quick > *, html.has-pointer .people > *, html.has-pointer .app-pop > *, html.has-pointer #sleep-menu > *, html.has-pointer #set-secs > *, html.has-pointer #set-rows > .srow { cursor: pointer; }
+/* webOS pointer: the settings sections light up under the pointer like the focused one (a click opens it) */
+html.has-pointer .ssec:hover { background: #fff; color: #111; transform: scale(1.04); box-shadow: 0 1rem 2.25rem rgba(0, 0, 0, 0.45); }
+html.has-pointer .ssec:hover i { background: rgba(0, 0, 0, 0.07); }
+html.has-pointer.glass .ssec:hover {
+  background: rgba(255, 255, 255, 0.92); transform: translateY(-0.125rem) scale(1.01);
+  box-shadow: inset 0 0.0625rem 0 rgba(255, 255, 255, 1), 0 0.75rem 1.75rem rgba(0, 0, 0, 0.3);
+}
