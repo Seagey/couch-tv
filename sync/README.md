@@ -87,6 +87,15 @@ repo root), or `[label=]host[:adbport[:udpport]]`. `--pkg` is the streaming app'
 .venv/bin/python sync/sync.py firetest --tv bedroom --pkg <package> --count 10
 ```
 
+```sh
+# Retry mode: after the timed play, read the gap and redo until it is under --target (default 20 ms),
+# at most --tries starts in all (default 6, the first start counts). --runs repeats and summarises.
+# --delay label=ms starts that TV's play later (a TV that is always ahead). --log appends JSON per run.
+.venv/bin/python sync/sync.py sync --retry --tv living-room --tv bedroom --pkg <package> \
+    --pos 60000 --runs 10 --delay living-room=60 --log runs.jsonl
+# The same with the cheaper correction (pause only the TV that is ahead): --fix trim (worse, see Real TVs)
+```
+
 `sync` has options for the target position (`--pos`), the lead time (`--lead`), and `--trim`
 (try to close what is left; off by default, see below).
 
@@ -143,7 +152,7 @@ the one to start the show.
 
 ## Measured numbers
 
-Everything below is from this build, 10 Nov 2026. Nothing was played on either real TV.
+Everything below up to "Real TVs" is from this build, 10 Nov 2026, with nothing played on either real TV. The "Real TVs" section below is from a later run the same day with YouTube and Netflix actually playing (both muted).
 
 **Clock offset on the real TVs, from this Mac over Wi-Fi.**
 
@@ -177,6 +186,57 @@ TVs is what makes the timing target reachable.
   published position is not accurate to better than about 60 ms, so the loop "converged" on its own
   readings and left a real gap of 60 ms or more (60 to 125 ms in the runs). That is why `--trim` is off by default. A different player
   (ExoPlayer based apps report position more carefully) might trim well; that is untested.
+
+### Real TVs: YouTube and Netflix, retry mode (10 Nov 2026, evening)
+
+Living room (Android 14) and bedroom (Android 11), both muted, same home Wi-Fi, helper UDP clocks good to
+about 1 ms. Gap = what each app reports for its position, moved onto one Mac instant (living room minus
+bedroom, so positive means the living room is ahead). **No camera or microphone was used, so these are the
+apps' own numbers, not what is on the screens.** Each run is a fresh sync to the same position, then retries
+until under 20 ms or 6 starts. YouTube was Big Buck Bunny (aqz-KE-bpKQ) as a guest; Netflix was Ozark
+S1E10.
+
+**Finding 1: the gap is mostly a steady bias, not luck.** Without any delay the living room was ahead on
+nearly every start: 61 starts over 12 runs, none negative, median 68 ms. YouTube's resume latency is random
+per start, but the living room's is consistently about 60 to 70 ms shorter than the bedroom's. So
+`--delay living-room=60` (start its play 60 ms later) is the single biggest win. (An earlier test found a fixed
+`--delay` did not help; that was a handful of single syncs spread over -192 to +722 ms, too few to see a
+bias of this size under the noise.) Whether the bias is the players or the
+apps' position reports cannot be told without a camera.
+
+**YouTube, 12 runs each, `--pos 60000`, final gap |ms|, sorted:**
+
+| Mode | Final gaps | Within 20 ms | Starts per run | Time per run |
+| --- | --- | --- | --- | --- |
+| redo, no delay | 5 9 14 27 32 53 67 70 71 74 100 100 | 3 of 12 | 5.1 mean (gave up at 6 starts in 8 runs) | 26 s median |
+| redo, `--delay living-room=60` | 2 5 6 7 8 10 11 11 12 14 14 18 | 12 of 12 | 2.1 mean, 1 to 5 | 9 s median |
+| pause-trim, `--delay living-room=60` | 1 2 3 6 8 8 9 12 12 14 14 14 | 12 of 12 | 3.3 mean, 1 to 6 | 11 s median |
+
+The first start with the delay: median 33 ms, 5 of 11 under 20 ms (one start came out +2169 ms from a stall
+and is left out). So expect to need one or two corrections.
+
+**Redo against pause-trim, per correction.** Per correction attempt, a full redo (pause, seek, timed play)
+landed under 20 ms 7 of 12 times (median 16 ms). A pause-trim (pause only the TV that is ahead at an exact
+moment, resume it `gap` ms later) landed under 20 ms 7 of 28 times (median 36 ms). Pause-trim loses: the
+paused TV loses the pause length plus its own resume latency, about 90 ms, so it overshoots any gap under
+about 90 ms and swings from ahead to behind (for example +42, -47, +41, +29, +8). The per TV bias it learns
+stops that only slowly, and a pause cannot be shorter than nothing. A redo has the same random latency but
+no systematic overshoot, and with the delay it centres on zero. Verdict: use redo. Pause-trim is kept as
+`--fix trim` for gaps over about 150 ms only.
+
+**Netflix.** It obeys the helper: pause, seek and timed play all worked, the seek lands within about a second
+and the timed play fires within 0.03 ms. Differences from YouTube: a seek while paused is applied but the
+reported position does not change until the next play (so `settle` waits its 10 s timeout and a try costs
+about 14 s, not 4 s), and the position updates about every 2 s. The same bias showed (no delay, 2 runs: gaps
++47 to +121 ms, never negative). With `--delay living-room=70`, 8 runs: final gaps 0 4 6 9 14 15 67 165 ms,
+6 of 8 under 20 ms, median 11 ms, 2.9 starts per run, 35 s median. The two failures hit all 6 starts, with
+gaps jumping between +40 and +165, so Netflix is rougher than YouTube.
+
+**Honest best.** About 10 ms median, 20 ms or better most of the time (12 of 12 on YouTube, 6 of 8 on
+Netflix) with `--retry` and a per TV `--delay`, as the apps report it. One hundredth of a second (10 ms) is
+reachable on a good run (best runs 0 to 5 ms) but not guaranteed on any one try. Anything under a frame is
+below what the apps' own position reports can be trusted for, and the TVs' picture and sound delays are not
+in these numbers at all. The delay value is specific to this pair of TVs and apps: measure it, do not copy it.
 
 ## Honest expected numbers on the real TVs
 

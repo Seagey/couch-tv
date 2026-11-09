@@ -251,11 +251,13 @@ def read_all(tvs, pkg):
         return list(ex.map(lambda t: read_state(t, pkg), tvs))
 
 
-def report_gap(tvs, pkg, label="gap"):
+def report_gap(tvs, pkg, label="gap", quiet=False):
     """Read every TV, extrapolate to one Mac instant, print the gap (first TV minus last TV)."""
     states = read_all(tvs, pkg)
     at = mac_ms()
     g, pos = gaps_text(tvs, states, at)
+    if quiet:
+        return g, states
     show_states(tvs, states)
     if g is None:
         print(f"  {label}: cannot compute")
@@ -398,7 +400,7 @@ def cmd_sync(a, tvs):
     if not a.trim and g is not None and abs(g) > a.threshold:
         print(f"gap is over {a.threshold:.0f} ms; add --trim to try to close it (read the README first: on the emulator test "
               f"player a trim made the real gap worse, because the app's position report is not trustworthy to that level)")
-    for attempt in range(1, a.tries + 1):
+    for attempt in range(1, (a.tries or 4) + 1):
         if not a.trim or g is None or abs(g) <= a.threshold:
             break
         ahead, behind = (tvs[0], tvs[-1]) if g > 0 else (tvs[-1], tvs[0])
@@ -431,6 +433,99 @@ def cmd_sync(a, tvs):
     if g is not None:
         verdict = "within" if abs(g) <= a.threshold else "NOT within"
         print(f"result: {g:+.1f} ms, {verdict} {a.threshold} ms")
+
+
+# ---------- retry mode ----------
+def start_together(a, tvs, target):
+    """One full start: pause both, seek both to `target`, wait for the seeks, timed play on both,
+    wait, read the gap. Returns (gap ms, states, armed_ok)."""
+    with ThreadPoolExecutor(len(tvs)) as ex:
+        list(ex.map(lambda t: t.op("pause", pkg=a.pkg), tvs))
+        time.sleep(0.3)
+        list(ex.map(lambda t: t.op("seek", pkg=a.pkg, pos_ms=target), tvs))
+        list(ex.map(lambda t: settle(t, a.pkg, target), tvs))
+    at = mac_ms() + a.lead
+    armed = schedule_all(tvs, "play", a.pkg, at)
+    ok = all(good for _, _, good in armed)
+    time.sleep(max(0.0, (at - mac_ms()) / 1000) + a.settle)
+    g, states = report_gap(tvs, a.pkg, quiet=True)
+    return g, states, ok
+
+
+def pause_trim(a, tvs, g, bias):
+    """The cheap correction: pause only the TV that is ahead at one exact moment and play it again
+    `gap + bias` ms later (both armed on its own clock, so the pause length is exact). The TV loses
+    that long plus its own resume latency, so `bias` (learnt per TV from the last residual) is
+    normally negative. A pause cannot be shorter than nothing, so a gap smaller than the resume
+    latency cannot be fixed this way. Returns (gap, states, armed_ok)."""
+    ahead = tvs[0] if g > 0 else tvs[-1]
+    dur = max(0.0, abs(g) + bias.get(ahead.label, 0.0))
+    at = mac_ms() + 800
+    armed = schedule_all([ahead], "pause", a.pkg, at)
+    saved = dict(PLAY_DELAY)
+    PLAY_DELAY.clear()
+    armed += schedule_all([ahead], "play", a.pkg, at + dur)
+    PLAY_DELAY.update(saved)
+    ok = all(good for _, _, good in armed)
+    time.sleep(max(0.0, (at + dur - mac_ms()) / 1000) + a.settle)
+    g2, states = report_gap(tvs, a.pkg, quiet=True)
+    if g2 is not None:
+        resid = g2 if ahead is tvs[0] else -g2   # >0: the paused TV is still ahead, it was paused too briefly
+        bias[ahead.label] = bias.get(ahead.label, 0.0) + 0.5 * resid
+    return g2, states, ok, dur
+
+
+def cmd_retry(a, tvs):
+    """sync --retry: start both together, read the gap, and while it is over --target correct it
+    (--fix redo: pause + seek + timed play again; --fix trim: pause-trim the TV that is ahead),
+    up to --tries attempts in all (the first start counts as one). --runs repeats the whole thing."""
+    for t in tvs:
+        t.connect()
+        if not t.detect_helper():
+            sys.exit(f"{t.label}: the helper app is not installed or not granted (README: Install). Sync needs it.")
+    log = open(a.log, "a") if a.log else None
+    results = []
+    for run in range(1, a.runs + 1):
+        for t in tvs:
+            measure(t, n_adb=a.samples, use_udp=not a.no_udp)
+        states = read_all(tvs, a.pkg)
+        for t, s in zip(tvs, states):
+            if "error" in s:
+                sys.exit(f"{t.label}: {s['error']}")
+            if not s.get("can_seek"):
+                sys.exit(f"{t.label}: {a.pkg} does not advertise SEEK_TO")
+        target = a.pos if a.pos is not None else int(position_at(tvs[0], states[0], mac_ms()))
+        bias, tries, t0 = {}, [], time.time()
+        g, states, ok = start_together(a, tvs, target)
+        tries.append(("start", g, time.time() - t0))
+        while g is not None and abs(g) > a.target and len(tries) < a.tries:
+            if a.fix == "trim" and abs(g) <= 3000:
+                g, states, ok, dur = pause_trim(a, tvs, g, bias)
+                tries.append((f"trim{dur:.0f}", g, time.time() - t0))
+            else:
+                g, states, ok = start_together(a, tvs, target)
+                tries.append(("redo", g, time.time() - t0))
+            if g is None:
+                break
+        gaps = [x[1] for x in tries if x[1] is not None]
+        best = min(gaps, key=abs) if gaps else None
+        rec = {"run": run, "fix": a.fix, "target": a.target, "tries": [[k, None if x is None else round(x, 1), round(s, 1)] for k, x, s in tries],
+               "n": len(tries), "first": gaps[0] if gaps else None, "final": g, "best": best, "secs": round(time.time() - t0, 1), "armed_ok": ok}
+        results.append(rec)
+        print(f"run {run}/{a.runs} [{a.fix}]: " + "  ".join(f"{k}:{x:+.0f}" if x is not None else f"{k}:?" for k, x, _ in tries)
+              + f"  -> final {g:+.1f} ms after {len(tries)} tries, best {best:+.1f}, {rec['secs']} s", flush=True)
+        if log:
+            log.write(json.dumps(rec) + "\n")
+            log.flush()
+    ok_runs = [r for r in results if r["final"] is not None]
+    if ok_runs:
+        fin = sorted(abs(r["final"]) for r in ok_runs)
+        first = sorted(abs(r["first"]) for r in ok_runs)
+        q = lambda v, f: v[min(len(v) - 1, int(f * len(v)))]
+        print(f"summary [{a.fix}] over {len(ok_runs)} runs: |first gap| median {statistics.median(first):.0f} ms; "
+              f"|final gap| median {statistics.median(fin):.0f}, p90 {q(fin, 0.9):.0f}, max {fin[-1]:.0f} ms; "
+              f"within {a.target:.0f} ms: {sum(1 for x in fin if x <= a.target)}/{len(fin)}; "
+              f"tries median {statistics.median(r['n'] for r in ok_runs):.0f}; seconds median {statistics.median(r['secs'] for r in ok_runs):.0f}")
 
 
 def cmd_firetest(a, tvs):
@@ -499,11 +594,16 @@ def main():
     p.add_argument("--lead", type=float, default=1500, help="sync: ms between arming play and the moment (default 1500)")
     p.add_argument("--threshold", type=float, default=15, help="sync: stop when the gap is under this many ms (default 15)")
     p.add_argument("--trim", action="store_true", help="sync: after the timed play, try to close the gap with a speed nudge or a small seek (off by default, see README)")
-    p.add_argument("--tries", type=int, default=4, help="sync: trim attempts with --trim (default 4)")
+    p.add_argument("--tries", type=int, default=None, help="sync: with --trim, trim attempts (default 4); with --retry, attempts in all, the first start included (default 6)")
     p.add_argument("--no-speed", dest="speed", action="store_false", help="sync: trim by seeking even if the app takes a speed change")
     p.add_argument("--seek-min", type=float, default=100, help="sync: when the app takes no speed change, do not trim by seeking a gap smaller than this many ms (default 100)")
     p.add_argument("--delay", action="append", default=[], help="sync: label=ms, start that TV's play this much later (a TV that is always ahead)")
     p.add_argument("--settle", type=float, default=1.5, help="sync: seconds to wait before reading the gap (default 1.5)")
+    p.add_argument("--retry", action="store_true", help="sync: read the gap after the timed play and correct it until it is under --target (see --fix, --tries)")
+    p.add_argument("--target", type=float, default=20, help="sync --retry: good enough, in ms (default 20)")
+    p.add_argument("--fix", choices=["redo", "trim"], default="redo", help="sync --retry: redo = pause, seek and timed play again; trim = pause only the TV that is ahead and resume it later (default redo)")
+    p.add_argument("--runs", type=int, default=1, help="sync --retry: repeat the whole sync this many times and summarise")
+    p.add_argument("--log", help="sync --retry: append one JSON line per run to this file")
     p.add_argument("--count", type=int, default=10, help="firetest: how many fires (default 10)")
     p.add_argument("--op", default="seek", choices=["seek", "speed", "pause"], help="firetest: the command to arm (default seek to where it already is)")
     a = p.parse_args()
@@ -519,6 +619,9 @@ def main():
         sys.exit("--pkg is needed for this command")
     if a.cmd in ("sync",) and len(tvs) < 2:
         sys.exit("sync needs two --tv")
+    if a.cmd == "sync" and a.retry:
+        a.tries = a.tries or 6
+        return cmd_retry(a, tvs)
     {"dry": cmd_dry, "state": cmd_state, "sync": cmd_sync, "firetest": cmd_firetest}[a.cmd](a, tvs)
 
 
