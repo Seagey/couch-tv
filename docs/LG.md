@@ -19,7 +19,7 @@ It needs a computer at home that stays on (option B). Without one you can still 
 and open it from LG's app row, but nothing opens it for you, and nothing extends Developer Mode,
 so the app is removed when the session runs out.
 
-## Test status: two real LGs so far
+## Test status: five real LGs so far
 
 **First real LG, 2 November 2026** ([issue #8](https://github.com/Seagey/couch-tv/issues/8)): an
 LG UHD TV on webOS 5.6.2 (2020/2021 firmware), Developer Mode with the Homebrew Channel, the bridge
@@ -38,6 +38,29 @@ no bridge there is nothing else to read it from. It also gave three more app ids
 Spotify, now in `bridge/apps.py`) and these, which show by their own names: Jellyfin
 `org.jellyfin.webos`, DGO `com.directvgo.webostv-rt`, Win Play `com.toolboxott.winplay`, Claro Video
 `clarovideo.dla.1`.
+
+**Third real LG, 9 November 2026** ([issue #45](https://github.com/Seagey/couch-tv/issues/45)): an
+LG OLED65C4 (2024) on webOS 24, in Italy, with the bridge on an Intel Mac mini. Claude Code did the
+whole setup from the repo link; the person only did the steps that need hands on the TV. The `.ipk`
+installed first time, the remote was accepted, and power and the app on screen read fine.
+
+**Fourth real LG, 9 November 2026** ([issue #46](https://github.com/Seagey/couch-tv/issues/46)): an
+LG on webOS 4.10.2 (2018/2019 firmware), with the bridge on a Windows 11 laptop. The clock, weather,
+scenes, the profile switch, the dock and the phone remote (off and on too) worked, with the
+reporter's own layout fallbacks for the older browser, which are not in couch-tv yet (see Limits).
+
+**Fifth real LG, 9 November 2026** ([issue #56](https://github.com/Seagey/couch-tv/issues/56),
+reported by ChrisFWCB): an LG OLED77GXPUA (2020, US) on webOS 5.6.2, firmware 04.64.00, wired
+Ethernet, set up from Windows 11, with the bridge running in Docker on a Synology DS1019+ (DSM 7.2).
+`check-tv.py` recognised it, the `.ipk` built with `--apps` installed first time, and the clock,
+scenes, weather, people switch, opening apps from the dock, the power-on hook (3 out of 3), the daily
+Extend and phone power off and on (Wake-on-LAN, about 5 s) all worked. It found four things: Plex
+hidden behind More apps, no icons for apps without a bundled logo (see "Icons for apps with no bundled
+logo" below), no way to default to Fahrenheit from `config.json` (`home.wx_unit` now does), and a 500
+from the phone's power button while the TV was still starting (fixed). It also gave the app ids for
+Plex (`cdp-30`), YouTube TV (`youtube.leanback.ytv.v1`) and Peacock (`com.peacock.tv`), now in
+`bridge/apps.py`; Pluto TV `com.plutotv.app`, Tubi `com.tubitv.ott.tubi`, LG Channels `lgchannels.us`
+and IMDb TV (Freevee) `imdbtv` show by their own names.
 
 Everything else was built from LG's documentation and the open source libraries that talk to LG
 TVs, and tested against a stand-in TV on a computer. If you run it on another LG, thank you: please
@@ -172,6 +195,19 @@ again. The package also carries the app logos from `remote/src/app-logos`, becau
 addresses the TV gives are a 404 on several TVs; an app with no logo there shows its first letter.
 The app-only build also sets `handlesRelaunch` so reopening it does not flash black.
 
+**Finding app ids.** `ares-install --device lounge --list` only lists Developer Mode apps, not the
+store apps, so it cannot find ids on every TV (ChrisFWCB, [#56](https://github.com/Seagey/couch-tv/issues/56)).
+LG's `listLaunchPoints` over the network remote gives every app and its id, once the TV has accepted the
+remote (step 6). `--apps tv` uses it.
+
+**Icons for apps with no bundled logo.** Some TVs give icon addresses like
+`https://<tv>:3001/resources/<hash>/Plex_80x80.png`. That is the TV's self-signed secure port, so the
+page cannot load them and the tile shows a letter instead. A workaround that worked on an LG OLED77GX
+(ChrisFWCB, #56): from the computer, with certificate checks off, ask the TV for its launch points
+over `listLaunchPoints`, fetch each one's `largeIcon`, and save it as
+`remote/src/app-logos/<package>.png` before running `lg/build.py`. Having `lg/build.py --apps tv`
+do this by itself is not built yet.
+
 ### 4. Install it
 
 ```sh
@@ -275,13 +311,19 @@ the phone says so and you use the TV's remote.
 
 ## Limits to know
 
-- LG's Home button and the app row are LG's. couch-tv cannot hide LG's ads or menu.
+- LG's Home button and the app row are LG's. couch-tv cannot hide LG's ads or menu. Leaving couch-tv
+  with the Home button is expected. For an app-only setup (no bridge), LG's Quick Access can pin it:
+  hold a number key on the remote while couch-tv is in front, and that key opens it from then on
+  (ChrisFWCB, #56).
+- **If the ThinQ Home Dashboard is in front,** `ares-launch --device lounge app.couchtv.home` for an
+  already running couch-tv can report success without bringing it forward. Close it first with
+  `ares-launch --device lounge --close app.couchtv.home`, then launch it again (ChrisFWCB, #56).
 - **Developer Mode must stay on.** If it goes off (the session ran out while the bridge was down,
   10 restarts with no network, a firmware update), couch-tv is removed: switch Developer Mode on
   again and rerun steps 2 and 4. Your settings live on the bridge, so nothing is lost.
 - App ids differ between TVs and years. The ones in `bridge/apps.py` (`WEBOS`) come from public
-  lists and the two real LGs above, and every other app is found by its name. If an app does not open, find
-  its id: `ares-install --device lounge --list`, and add it to that app's `ids`.
+  lists and the real LGs above, and every other app is found by its name. If an app does not open, find
+  its id (see "Finding app ids" in step 3), and add it to that app's `ids`.
 - couch-tv on LG reads its app list from the TV when webOS allows it, else from the bridge. Some
   firmware does not allow it (webOS 5.6.2 and 6.5.3 both refuse it), so there the app row stays empty
   until the bridge is on **and** the TV has accepted the remote (step 6). With no bridge, build with
@@ -291,6 +333,15 @@ the phone says so and you use the TV's remote.
   Its power on: webOS 4 has no `system/turnOn`, so the bridge tries `turnOnScreen` and then
   Wake-on-LAN (with "Mobile TV On, Turn on via Wi-Fi" switched on).
 - No screenshots, no "what is playing", no profile picking, no pressing Play inside other apps.
+
+## The bridge in Docker on a NAS
+
+The fifth real LG ran its bridge in Docker on a Synology (a `node:22-bookworm-slim` image with
+python3 and `@webos-tools/cli`, the repo mounted at `/app`, `network_mode: host`, an entrypoint that
+copies the Developer Mode key into `/root/.ssh` and runs `ares-setup-device` with the passphrase
+from an environment variable). ChrisFWCB offered a Dockerfile and compose file in
+[#56](https://github.com/Seagey/couch-tv/issues/56) as an example for NAS owners; they are not in the
+repo yet.
 
 ## Undo
 

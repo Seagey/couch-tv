@@ -830,10 +830,15 @@ async def power_on():
         if tv.is_on or loop.time() >= end:
             break
         log.info("power on: TV in standby, trying %s", step)
-        if step == "wol":
-            await tv.wake()
-        else:
-            await tv.key(step)
+        try:
+            if step == "wol":
+                await tv.wake()
+            else:
+                await tv.key(step)
+        except Exception as e:
+            # An LG woken by Wake-on-LAN refuses POWER while it is still starting up. Keep waiting
+            # for it to say it is on instead of failing the request (#56).
+            log.info("power on: %s press failed (%s), still waiting", step, e)
         for _ in range(16):
             await asyncio.sleep(0.25)
             if tv.is_on:
