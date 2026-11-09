@@ -2183,6 +2183,38 @@ def _maybe_refresh_installed():
         asyncio.ensure_future(installed_packages(wait=False))
 
 
+# ---------- close apps when the TV turns off ----------
+# Some apps refresh their sign-in the moment the TV wakes, before its Wi-Fi is back, and sign out
+# when that fails (Disney+ 26.20, November 2026: the network returned 1 s after it gave up). Apps
+# listed in "close_on_off" for a TV in config.json are force-stopped when that TV turns off, so
+# the next time they open they start fresh, with the network already up.
+_last_on = {}
+
+
+def _close_on_off():
+    t = TVS[_current.get()]
+    on, was = t.is_on, _last_on.get(t.id)
+    if on is not None:
+        _last_on[t.id] = on
+    if was is True and on is False and t.kind == "android":
+        cfg = next((c for c in config.TVS if c["id"] == t.id), {})
+        packages = [p for p in cfg.get("close_on_off") or [] if isinstance(p, str) and p]
+        if packages:
+            asyncio.ensure_future(_force_stop(t, packages))
+
+
+async def _force_stop(t, packages):
+    try:
+        if not (t.paired and await t.adb_ready()):
+            log.info("%s: turned off, could not reach ADB to close %s", t.id, ", ".join(packages))
+            return
+        for pkg in packages:
+            await t.adb("shell", "am", "force-stop", pkg)
+        log.info("%s: turned off, closed %s", t.id, ", ".join(packages))
+    except Exception as e:
+        log.warning("%s: closing apps on turn off failed: %s", t.id, e)
+
+
 async def h_tvs(request):
     out = []
     for tv_id, t in TVS.items():
@@ -2259,6 +2291,7 @@ def make_app():
         for tv_id, t in TVS.items():
             t.on_change(lambda tv_id=tv_id: with_tv(tv_id, push_now))
             t.on_change(lambda tv_id=tv_id: with_tv(tv_id, _maybe_refresh_installed))
+            t.on_change(lambda tv_id=tv_id: with_tv(tv_id, _close_on_off))
             ends = store.sleep_ends(tv_id)
             if ends and datetime.fromisoformat(ends).timestamp() > time.time():
                 with_tv(tv_id, _sleep_set, ends)

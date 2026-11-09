@@ -670,6 +670,24 @@ later, so a broken couch-tv cannot hold the TV in a loop either. Only ambient mo
 adverts) and any ad tracker you name are switched off, and `apply.sh` refuses to switch off anything
 the TV may need to start: a home screen, a setup app, a persistent system app or part of Android.
 
+## If Disney+ (or another app) signs you out after the TV turns off
+
+This is not couch-tv, and changing your password does not fix it. Seen on an Android TV with Disney+
+26.20 (November 2026): turn the TV off with Disney+ open, turn it on later, and Disney+ tries to
+refresh your sign-in within 2 seconds of waking, before the TV is back on the Wi-Fi. That fails, and
+it signs you out. In the TV's log the network came back 1 second after the sign-out.
+
+**Option B fix:** list the app in `close_on_off` for that TV in `config.json`, and restart the bridge:
+
+```json
+{ "id": "bedroom", "name": "Bedroom", "ip": "<tv address>", "close_on_off": ["com.disney.disneyplus"] }
+```
+
+When the TV turns off, the bridge closes the app completely. The next time you open it, it starts
+fresh with the Wi-Fi already up, and you stay signed in. Sign in once more after adding it. Without a
+bridge (options A and C), close the app before you turn the TV off (Settings, Apps, the app, Force
+stop).
+
 ## Undo: put the Google home screen back
 
 The full guide, with the TV-remote-only way and what to do if something is stuck:

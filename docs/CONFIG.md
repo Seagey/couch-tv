@@ -33,6 +33,7 @@ settings), and what is chosen there wins on that TV. See
 | `wake_on_lan` [true] | `false` stops the bridge sending Wake-on-LAN packets to this TV, even with a `mac`. |
 | `paired` | Set by `bridge/pair_tv.py`. Leave it alone. |
 | `keep_disabled` | The keep-off list for this TV (see `bridge/API.md`). |
+| `close_on_off` | Android TVs, option B: apps the bridge force-stops when this TV turns off, for example `["com.disney.disneyplus"]`. For an app that signs you out when it wakes before the TV is back on the Wi-Fi. |
 | `quick` [`["sleep"]`, plus `"picture"` when the TV has a `picture` entry] | The quick buttons on the TV home, in this order. See below. |
 | `picture` | Only used when `"picture"` is in `quick`. See below. |
 | `kind` [`"android"`] | `"samsung"` for a Samsung TV (Tizen), `"lg"` for an LG TV (webOS). The bridge then uses `bridge/samsung.py` or `bridge/lg.py` instead of ADB and the Android remote. See [SAMSUNG.md](SAMSUNG.md) and [LG.md](LG.md). |
