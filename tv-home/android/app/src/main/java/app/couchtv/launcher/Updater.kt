@@ -288,7 +288,7 @@ object Updater {
     private fun download(ctx: Context, url: String, file: File, size: Long) {
         val c = connect(url, false)
         try {
-            val total = if (size > 0) size else c.contentLengthLong
+            val total = if (size > 0) size else if (Build.VERSION.SDK_INT >= 24) c.contentLengthLong else c.contentLength.toLong()
             var done = 0L
             var shown = -1
             c.inputStream.use { inp ->

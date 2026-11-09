@@ -102,12 +102,15 @@ class MainActivity : Activity() {
         FireWatch.ensure(this)   // Fire TV only, and only once a computer has switched it on
         main.postDelayed({ FireWatch.rebindIfUnbound(applicationContext) }, 10_000L)   // listed but not bound after a force-stop
         // At power-on the page is often asked for before Wi-Fi is up: try again the moment it is.
-        getSystemService(android.net.ConnectivityManager::class.java)?.registerDefaultNetworkCallback(
-            object : android.net.ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: android.net.Network) {
-                    main.post { if (loadFailed || offline) connect() }
-                }
-            })
+        val netBack = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                main.post { if (loadFailed || offline) connect() }
+            }
+        }
+        val cm = getSystemService(android.net.ConnectivityManager::class.java)
+        if (Build.VERSION.SDK_INT >= 24) cm?.registerDefaultNetworkCallback(netBack)
+        else cm?.registerNetworkCallback(   // Android 6: no "default network" call, ask for any network with internet
+            android.net.NetworkRequest.Builder().addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), netBack)
         // Load the last bridge that worked straight away; only probe the others if it fails.
         val saved = prefs.getString("bridge", null)
         if (saved != null) showWeb(saved) else connect()
@@ -735,7 +738,12 @@ class MainActivity : Activity() {
             val raw = contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, opts) } ?: return null
             val turn = try {
                 contentResolver.openInputStream(uri)?.use {
-                    when (android.media.ExifInterface(it).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) {
+                    val exif = if (Build.VERSION.SDK_INT >= 24) android.media.ExifInterface(it) else {
+                        // Android 6: ExifInterface only reads a file path, so use a short lived copy
+                        val tmp = java.io.File.createTempFile("exif", ".jpg", cacheDir)
+                        try { tmp.outputStream().use { o -> it.copyTo(o) }; android.media.ExifInterface(tmp.path) } finally { tmp.delete() }
+                    }
+                    when (exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) {
                         6 -> 90f; 3 -> 180f; 8 -> 270f; else -> 0f
                     }
                 } ?: 0f
@@ -766,14 +774,14 @@ class MainActivity : Activity() {
     /** HDMI and the other passthrough inputs Android lists, minus any the TV's owner hid. */
     private fun passthroughInputs(): List<TvInputInfo> = try {
         val tim = getSystemService(TV_INPUT_SERVICE) as? TvInputManager
-        tim?.tvInputList.orEmpty().filter { it.isPassthroughInput && !it.isHidden(this) }
+        tim?.tvInputList.orEmpty().filter { it.isPassthroughInput && (Build.VERSION.SDK_INT < 24 || !it.isHidden(this)) }
     } catch (e: Exception) {
         emptyList()
     }
 
     /** The name the TV gives an input: the one its owner set, else the TV's own. */
     private fun inputLabel(i: TvInputInfo): String? = try {
-        (i.loadCustomLabel(this) ?: i.loadLabel(this))?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+        ((if (Build.VERSION.SDK_INT >= 24) i.loadCustomLabel(this) else null) ?: i.loadLabel(this))?.toString()?.trim()?.takeIf { it.isNotEmpty() }
     } catch (e: Exception) {
         null
     }

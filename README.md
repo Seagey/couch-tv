@@ -38,6 +38,15 @@ time the TV is switched on. It was built from LG's own documentation and tested 
 so if you have an LG, you would be among the first to run it: give this repo to your agent, and
 please open an issue saying how it went. Setup and limits: [docs/LG.md](docs/LG.md).
 
+**10 November 2026: Android 6 (experimental).** Both TV apps now install on Android 6.0 (a Xiaomi
+Mi TV 4A with PatchWall, for example, [issue #59](https://github.com/Seagey/couch-tv/issues/59)).
+Checked on an Android 6 emulator only, not a real TV. There both apps install and open, but that
+emulator's built in browser engine (Chrome 44, the oldest a TV can ship) lays the home out badly:
+the shelf stacks up instead of running across. A TV whose engine is newer may look right. The
+on-TV app (option C) cannot pair by Wi-Fi on Android 6 (that needs Android 11): set it up from a
+computer with USB or network debugging (port 5555), as the README steps already do. If you try it,
+please open an issue saying what you see.
+
 **3 November 2026: older Fire TV sticks (Fire OS 6).** Both TV apps now install on Android 7.1,
 so the Fire TV Stick 4K (1st gen) and other Fire OS 6 sticks can run them. Options A and B also
 take the Home key back on any Fire TV now, the way the "lives on the TV" app already did:
@@ -266,6 +275,7 @@ about how a show opened) and some screen reader labels on the phone are still in
 | **Google TV** (Sony, TCL, Hisense Google TV, Philips and others) | Yes | Yes | Partial. Newer models may ask for a pairing code again after a restart |
 | **Google TV box** (Google TV Streamer, Chromecast with Google TV, Onn) | Yes | Yes | Partial, as above |
 | **Older Android TV** (Android 7.1 to 11) | Yes | Yes | Yes |
+| **Android 6 TV** (Xiaomi Mi TV 4A, PatchWall) | Experimental: opens, layout may break on an old browser engine | Not tested | Experimental, set up from a computer (no Wi-Fi pairing) |
 | **Nvidia Shield** | Yes (not tested) | Yes | Yes (not tested) |
 | **Fire TV on Fire OS** (Fire OS 6, 7 and 8: Fire TV Stick 4K 1st gen and newer, Stick 4K Max, Cube) | Partial. Takes the Home key back, but Amazon's home flashes up first | Partial | Yes, and it takes the Home key back ([how](on-tv/README.md#fire-tv-fire-os)) |
 | **Fire TV on Vega OS** (newer Fire TV sticks) | No | No | No |
@@ -349,7 +359,7 @@ needs the first's TV set up the same way (developer mode on).
 ## What you need
 
 **For every option:**
-- A **Google TV or Android TV** (Android 7.1 or newer) with Developer options and debugging on
+- A **Google TV or Android TV** (Android 7.1 or newer, Android 6 experimental) with Developer options and debugging on
   (step 1).
 - A computer on the same Wi-Fi to set it up from: macOS or Linux with **Python 3.11 or newer**
   (`python3 --version`). Missing or older: on macOS `brew install python@3.11` or the installer
