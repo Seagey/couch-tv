@@ -19,6 +19,8 @@ services:
       - ../..:/app
     environment:
       - TZ=${TZ:-UTC}
+      # Android and Google TV: the ADB key the TV trusts, kept in bridge/data/ so a rebuild keeps it.
+      - ADB_KEY=/app/bridge/data/adbkey
       # LG only: the TV's address, the ares device name (as in config.json) and the passphrase.
       - TV_IP=${TV_IP:-}
       - ARES_DEVICE=${ARES_DEVICE:-lounge}

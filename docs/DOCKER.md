@@ -18,6 +18,11 @@ The container uses host networking, so Wake-on-LAN and finding TVs work. The bri
    Set `bridge.host` in `config.json` to the Docker host's name or address.
 2. Pair the TV (step 3) so that `bridge/data/` holds its keys. You can run `bridge/pair_tv.py`
    on the Docker host's copy of the repo, or copy `bridge/data/` across after pairing elsewhere.
+   **Android and Google TV:** the bridge also talks to the TV over ADB, with the key in
+   `bridge/data/adbkey` inside the container. Copy `~/.android/adbkey` and `~/.android/adbkey.pub`
+   from the computer you set the TV up with into `bridge/data/`, since the TV already trusts that
+   key. If you do not, the bridge makes a new key and the TV asks "Allow USB debugging?" once more:
+   tick Always allow.
 3. **LG only.** Put the TV's Developer Mode key at `lg-key/<ares_device>_webos` in the repo
    ([LG.md](LG.md), step 2). `lg-key/` is in `.gitignore`.
 4. Copy `examples/docker/.env.example` to `examples/docker/.env`, fill it in and run
