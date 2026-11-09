@@ -567,6 +567,9 @@ to a TV that is on does nothing. `on` only answers once the TV says it is on: ab
 the first minute after "off" (standby, still on the network), about 2 s after that (the TV has
 left the network; the bridge sends Wake-on-LAN and reconnects the moment it is back). It gives up
 after 32 s with `503`: then show "Turn the TV on with its own remote".
+LG only: an `off` sent again within 20 s of the TV going off counts as `on` (the phone's state can
+lag behind Quick Start+ standby, so a second press means "wake it"). A script or agent that repeats
+`off` should wait 20 s or check `power` first.
 ```json
 {"ok": true, "power": "on"}
 ```
