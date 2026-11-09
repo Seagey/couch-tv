@@ -962,3 +962,8 @@ html.has-pointer.glass .ssec:hover {
   background: rgba(255, 255, 255, 0.92); transform: translateY(-0.125rem) scale(1.01);
   box-shadow: inset 0 0.0625rem 0 rgba(255, 255, 255, 1), 0 0.75rem 1.75rem rgba(0, 0, 0, 0.3);
 }
+/* LG: Developer Mode at risk (from the bridge), on the left under the people switch, clear of the clock and the dock */
+.devwarn { position: fixed; left: 5rem; top: 9rem; max-width: 26vw; padding: 0.75rem 1.25rem; border-radius: 1rem;
+  font-size: 1.25rem; line-height: 1.35; z-index: 50; background: rgba(60, 38, 0, 0.82); color: #ffd28a;
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 159, 10, 0.5); }
+.devwarn.alert { background: rgba(70, 10, 6, 0.85); color: #ffb3ad; box-shadow: inset 0 0 0 0.0625rem rgba(255, 69, 58, 0.6); }

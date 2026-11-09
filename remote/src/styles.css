@@ -533,3 +533,8 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
   .glass-icons .app-icon:not(.clear) img { opacity: 0.85; mix-blend-mode: normal; }
   .glass-icons .app-icon.clear .glyph { opacity: 1; }
 }
+
+/* LG Developer Mode at risk: a plain banner above the top bar */
+.devwarn { margin: 8px 16px 0; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.35;
+  background: rgba(255, 159, 10, 0.18); color: #ffd28a; border: 1px solid rgba(255, 159, 10, 0.45); }
+.devwarn.alert { background: rgba(255, 69, 58, 0.2); color: #ffb3ad; border-color: rgba(255, 69, 58, 0.55); }
