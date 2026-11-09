@@ -533,3 +533,9 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
   .glass-icons .app-icon:not(.clear) img { opacity: 0.85; mix-blend-mode: normal; }
   .glass-icons .app-icon.clear .glyph { opacity: 1; }
 }
+
+/* LG pointer mode on the pad: a small toggle in the corner */
+.pad .pointer-toggle { position: absolute; top: 10px; left: 10px; width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--ink); opacity: 0.45; background: transparent; border: 0; z-index: 2; }
+.pad .pointer-toggle.on { opacity: 1; background: rgba(255,255,255,0.16); }
+.pad.pointer-mode { touch-action: none; }

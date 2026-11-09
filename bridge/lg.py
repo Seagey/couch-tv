@@ -692,6 +692,30 @@ class LGTV:
         if self._pointer_ws is ws:
             self._pointer_ws = None
 
+    async def pointer(self, dx=0, dy=0, click=False, scroll=0):
+        """LG's pointer, over the same socket as the buttons: move by (dx, dy), click, or scroll."""
+        self.quiet_until = time.monotonic() + 20
+        msgs = []
+        if dx or dy:
+            msgs.append(f"type:move\ndx:{int(dx)}\ndy:{int(dy)}\ndown:0\n\n")
+        if scroll:
+            msgs.append(f"type:scroll\ndx:0\ndy:{int(scroll)}\n\n")
+        if click:
+            msgs.append("type:click\n\n")
+        if not msgs:
+            return
+        async with self._pointer_lock:
+            for attempt in (1, 2):
+                ws = await self._pointer()
+                try:
+                    for m in msgs:
+                        await ws.send_str(m)
+                    return
+                except Exception:
+                    self._pointer_ws = None
+                    if attempt == 2:
+                        raise
+
     async def _button(self, name):
         async with self._pointer_lock:
             for attempt in (1, 2):
