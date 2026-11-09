@@ -278,6 +278,8 @@ def _home(h):
     # Now playing on or off (#31), and the navigation sound: the TV's own, soft or off (#32)
     if isinstance(h.get("now_playing"), bool):
         out["now_playing"] = h["now_playing"]
+    if isinstance(h.get("sun_sync"), bool):
+        out["sun_sync"] = h["sun_sync"]
     if h.get("nav_sound") in ("system", "soft", "off"):
         out["nav_sound"] = h["nav_sound"]
     if h.get("glass_focus") in ("colour", "glass"):   # glass app icons: the focused app (#32)

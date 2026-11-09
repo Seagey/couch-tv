@@ -1221,6 +1221,8 @@ def clean_settings(s):
     # Now playing on or off (#31), and the navigation sound: the TV's own, soft or off (#32)
     if isinstance(s.get("now_playing"), bool):
         out["now_playing"] = s["now_playing"]
+    if isinstance(s.get("sun_sync"), bool):
+        out["sun_sync"] = s["sun_sync"]
     if s.get("nav_sound") in ("system", "soft", "off"):
         out["nav_sound"] = s["nav_sound"]
     if s.get("glass_focus") in ("colour", "glass"):   # glass app icons: the focused app (#32)

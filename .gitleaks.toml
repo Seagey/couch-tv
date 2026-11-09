@@ -1,0 +1,7 @@
+[allowlist]
+paths = [
+  '''.venv''',
+  '''dist''',
+  '''build''',
+  '''node_modules'''
+]
