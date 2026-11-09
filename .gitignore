@@ -44,3 +44,6 @@ tv-home/web/backgrounds/mine/*
 
 # Your own app logos for the Samsung home (samsung/build.py)
 samsung/my-logos/
+
+# LG Developer Mode key for the Docker example (examples/docker)
+lg-key/

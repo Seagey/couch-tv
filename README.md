@@ -508,6 +508,7 @@ Open `http://your-computer.local:5400` on your phone (same Wi-Fi). Add it to you
 To keep the bridge running all the time, use `bridge/examples/couch-tv-bridge.plist.example`
 (macOS) or `bridge/examples/couch-tv-bridge.service.example` (Linux). Both set `CLAUDE_BIN` and a
 `PATH`, because a background service does not see your shell's.
+To run it in Docker on a NAS instead, see [docs/DOCKER.md](docs/DOCKER.md).
 
 If the macOS service logs `No route to host` while a bridge you start by hand works, that is
 macOS Local Network privacy, and the Local Network switch alone may not fix it for an interpreter

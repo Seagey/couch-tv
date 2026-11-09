@@ -1,0 +1,27 @@
+# couch-tv bridge in Docker. Run from the repo root:
+#   docker compose -f examples/docker/compose.yaml up -d --build
+# On a Synology, Container Manager > Project can use this file too (set the path to the repo).
+# Based on a setup by ChrisFWCB (issue #56).
+services:
+  couch-tv:
+    build:
+      context: ../..
+      dockerfile: examples/docker/Dockerfile
+    image: couch-tv-bridge:local
+    container_name: couch-tv
+    # Host networking, so the bridge can send Wake-on-LAN and find TVs on the home network.
+    # The bridge listens on port 5400 on the host (change it with PORT in the environment).
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      # The repo, with config.json, remote/dist built, and (LG) lg-key/<ares_device>_webos.
+      # bridge/data/ keeps the pairing keys, so they survive a rebuild.
+      - ../..:/app
+    environment:
+      - TZ=${TZ:-UTC}
+      # Android and Google TV: the ADB key the TV trusts, kept in bridge/data/ so a rebuild keeps it.
+      - ADB_KEY=/app/bridge/data/adbkey
+      # LG only: the TV's address, the ares device name (as in config.json) and the passphrase.
+      - TV_IP=${TV_IP:-}
+      - ARES_DEVICE=${ARES_DEVICE:-lounge}
+      - LG_PASSPHRASE=${LG_PASSPHRASE:-}
