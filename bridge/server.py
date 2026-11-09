@@ -321,6 +321,17 @@ async def h_key(request):
     return ok(key=key)
 
 
+async def h_pointer(request):
+    """LG only: move the TV's pointer ({"dx", "dy"}), click ({"click": true}) or scroll ({"scroll": dy})."""
+    data = await body(request)
+    if not hasattr(tv, "pointer"):
+        raise ApiError(400, "only an LG TV has a pointer")
+    tv.require()
+    clamp = lambda v: max(-400, min(400, int(v or 0)))
+    await tv.pointer(clamp(data.get("dx")), clamp(data.get("dy")), bool(data.get("click")), clamp(data.get("scroll")))
+    return ok()
+
+
 async def h_text(request):
     data = await body(request)
     text = data.get("text")
@@ -2279,6 +2290,7 @@ def make_app():
     r.add_get("/api/now", h_now)
     r.add_get("/api/events", h_events)
     r.add_post("/api/key", h_key)
+    r.add_post("/api/pointer", h_pointer)
     r.add_post("/api/text", h_text)
     r.add_get("/api/apps", h_apps)
     r.add_post("/api/launch", h_launch)

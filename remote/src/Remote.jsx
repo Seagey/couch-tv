@@ -184,7 +184,32 @@ function zoneAt(r, x, y) {
 const stopTimers = (s) => { if (s) { clearTimeout(s.timer); clearInterval(s.timer); } };
 
 // `offState` is null when the TV can be driven, else 'off' | 'waking' | 'unreachable'.
-export function Pad({ onKey, offState, wakeError, onWake, onRetry, tvName, onLivingRoom }) {
+// LG's pointer from the pad: a drag moves it, a tap clicks, two fingers scroll. Moves are added up
+// and sent one request at a time, so a slow answer never queues a backlog.
+const GAIN = 1.8; const SCROLL_GAIN = 1.2; const TAP_MS = 300; const TAP_MOVE = 8;
+function usePointerPad(onPointer) {
+  const acc = useRef({ dx: 0, dy: 0, scroll: 0, click: false });
+  const busy = useRef(false);
+  const flush = () => {
+    if (busy.current) return;
+    const a = acc.current;
+    if (!a.dx && !a.dy && !a.scroll && !a.click) return;
+    const d = { dx: Math.round(a.dx), dy: Math.round(a.dy), scroll: Math.round(a.scroll), click: a.click };
+    acc.current = { dx: a.dx - d.dx, dy: a.dy - d.dy, scroll: a.scroll - d.scroll, click: false };
+    busy.current = true;
+    Promise.resolve(onPointer(d)).catch(() => {}).finally(() => { busy.current = false; flush(); });
+  };
+  const add = (k, v) => { acc.current[k] = k === 'click' ? true : acc.current[k] + v; flush(); };
+  return add;
+}
+
+export function Pad({ onKey, offState, wakeError, onWake, onRetry, tvName, onLivingRoom, onPointer }) {
+  const [pointerOn, setPointerOn] = useState(() => { try { return localStorage.getItem('tv.pointer') === '1'; } catch (e) { return false; } });
+  const togglePointer = () => { const v = !pointerOn; setPointerOn(v); try { localStorage.setItem('tv.pointer', v ? '1' : '0'); } catch (e) { /* */ } };
+  const addPointer = usePointerPad(onPointer || (() => {}));
+  const touches = useRef(new Map());
+  const pg = useRef(null);
+  const usePointerMode = Boolean(onPointer) && pointerOn;
   const ref = useRef(null);
   const g = useRef(null);
   const [lit, setLit] = useState(null);
@@ -194,6 +219,35 @@ export function Pad({ onKey, offState, wakeError, onWake, onRetry, tvName, onLiv
 
   const flash = (dir) => { setLit(dir); clearTimeout(flash.t); flash.t = setTimeout(() => setLit(null), 140); };
   const send = (dir) => { onKey(dir); flash(dir); };
+
+  const pDown = (e) => {
+    if (e.target.closest?.('.pointer-toggle, .pad-msg')) return;
+    ref.current.setPointerCapture(e.pointerId);
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.current.size === 1) pg.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: Date.now(), moved: false, two: false };
+    else if (pg.current) pg.current.two = true;
+    const r = ref.current.getBoundingClientRect();
+    setSpot({ x: e.clientX - r.left, y: e.clientY - r.top });
+  };
+  const pMove = (e) => {
+    const last = touches.current.get(e.pointerId); const s = pg.current;
+    if (!last || !s) return;
+    const dx = e.clientX - last.x; const dy = e.clientY - last.y;
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > TAP_MOVE) s.moved = true;
+    if (e.pointerId !== s.id) return;   // with two fingers, the first one drives the scroll
+    const r = ref.current.getBoundingClientRect();
+    setSpot({ x: e.clientX - r.left, y: e.clientY - r.top });
+    if (s.two) addPointer('scroll', dy * SCROLL_GAIN);
+    else { addPointer('dx', dx * GAIN); addPointer('dy', dy * GAIN); }
+  };
+  const pUp = (e) => {
+    touches.current.delete(e.pointerId);
+    const s = pg.current;
+    if (touches.current.size) return;
+    pg.current = null; setSpot(null);
+    if (s && !s.moved && !s.two && Date.now() - s.t < TAP_MS) { addPointer('click'); flash('ok'); tick(); }
+  };
 
   const down = (e) => {
     if (disabled || g.current || !e.isPrimary || e.target.closest?.('.pad-msg, .sr-only')) return;
@@ -240,7 +294,7 @@ export function Pad({ onKey, offState, wakeError, onWake, onRetry, tvName, onLiv
   };
   const cancel = (e) => { const s = g.current; if (!s || e.pointerId !== s.id) return; stopTimers(s); g.current = null; setSpot(null); };
 
-  let overlay = <p className="hint">{t('tap_middle')}</p>;
+  let overlay = <p className="hint">{usePointerMode ? t('pointer_hint') : t('tap_middle')}</p>;
   if (offState === 'unpaired') {
     overlay = (
       <div className="pad-msg" aria-live="polite">
@@ -267,9 +321,15 @@ export function Pad({ onKey, offState, wakeError, onWake, onRetry, tvName, onLiv
   }
 
   return (
-    <div ref={ref} className={`pad glass ${disabled ? 'is-off' : ''}`} role="group"
-      aria-label="Swipe pad. Swipe or tap an arrow to move, tap the middle to select."
-      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel}>
+    <div ref={ref} className={`pad glass ${disabled ? 'is-off' : ''} ${usePointerMode && !disabled ? 'pointer-mode' : ''}`} role="group"
+      aria-label={usePointerMode ? 'Touchpad. Drag to move the TV pointer, tap to click, two fingers to scroll.' : 'Swipe pad. Swipe or tap an arrow to move, tap the middle to select.'}
+      onPointerDown={usePointerMode && !disabled ? pDown : down} onPointerMove={usePointerMode && !disabled ? pMove : move}
+      onPointerUp={usePointerMode && !disabled ? pUp : up} onPointerCancel={usePointerMode && !disabled ? pUp : cancel}>
+      {onPointer && !disabled && (
+        <button type="button" className={`pointer-toggle ${pointerOn ? 'on' : ''}`} aria-pressed={pointerOn}
+          aria-label={pointerOn ? 'Pointer on: tap for arrows' : 'Arrows: tap for the TV pointer'}
+          onPointerDown={(e) => e.stopPropagation()} onClick={() => { tick(); togglePointer(); }}><Ic.Cursor size={18} /></button>
+      )}
       {!disabled && (
         <div className="sr-only">
           {[['up', 'Up'], ['left', 'Left'], ['ok', 'Select'], ['right', 'Right'], ['down', 'Down']].map(([k, label]) => (
@@ -277,8 +337,8 @@ export function Pad({ onKey, offState, wakeError, onWake, onRetry, tvName, onLiv
           ))}
         </div>
       )}
-      {['up', 'down', 'left', 'right'].map((d) => <Ic.Chevron key={d} className={`chev ${d} ${lit === d ? 'lit' : ''}`} />)}
-      <div className={`ring ${lit === 'ok' ? 'lit' : ''}`} />
+      {!usePointerMode && ['up', 'down', 'left', 'right'].map((d) => <Ic.Chevron key={d} className={`chev ${d} ${lit === d ? 'lit' : ''}`} />)}
+      {!usePointerMode && <div className={`ring ${lit === 'ok' ? 'lit' : ''}`} />}
       {spot && <div className="spot" style={{ transform: `translate(${spot.x}px, ${spot.y}px)` }} />}
       {overlay}
     </div>

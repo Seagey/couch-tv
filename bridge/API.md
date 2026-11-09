@@ -182,6 +182,14 @@ Each message is `event: now` with the same JSON as `GET /api/now`. Sent once on 
 on every change (app, power, volume, connection). A comment line is sent every 20 s to keep it
 open. Use this instead of polling.
 
+### `POST /api/pointer`
+LG only: the TV's pointer (the Magic Remote's cursor), as the phone's touchpad drives it.
+```json
+{"dx": 12, "dy": -4}
+```
+moves it by that many pixels; `{"click": true}` clicks where it is; `{"scroll": 40}` scrolls.
+They can be combined in one request. Each value is clamped to ±400. Other TVs answer 400.
+
 ### `POST /api/key`
 ```json
 {"key": "ok"}

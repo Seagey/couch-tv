@@ -51,6 +51,7 @@ export const api = {
   key: (key, hold = false) => call('POST', '/api/key', hold ? { key, hold: true } : { key }),
   text: (text) => call('POST', '/api/text', { text }),
   launch: (app) => call('POST', '/api/launch', { app }),
+  pointer: (d) => call('POST', '/api/pointer', d, 5000),
   play: (show, who) => call('POST', '/api/play', { ...show, who }, 60000),
   ask: (text, who) => call('POST', '/api/ask', { text, who }, 90000),
   power: (state) => call('POST', '/api/power', { state }, 40000),
