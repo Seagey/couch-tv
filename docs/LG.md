@@ -205,8 +205,10 @@ remote (step 6). `--apps tv` uses it.
 page cannot load them and the tile shows a letter instead. A workaround that worked on an LG OLED77GX
 (ChrisFWCB, #56): from the computer, with certificate checks off, ask the TV for its launch points
 over `listLaunchPoints`, fetch each one's `largeIcon`, and save it as
-`remote/src/app-logos/<package>.png` before running `lg/build.py`. Having `lg/build.py --apps tv`
-do this by itself is not built yet.
+`remote/src/app-logos/<package>.png` before running `lg/build.py`. `lg/build.py --apps` now does
+this by itself: for each app in the list with no bundled logo, it downloads the icon address the TV
+gave, with certificate checks off, into the package (not into `remote/src/app-logos`). An icon it
+cannot fetch is listed when the build ends, and that tile shows its letter as before.
 
 ### 4. Install it
 
