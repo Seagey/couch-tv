@@ -207,6 +207,8 @@
     note: '<svg viewBox="0 0 24 24"><path d="M9 18V6l11-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
     updown: '<svg viewBox="0 0 24 24"><path d="M8 9.5l4-4 4 4M8 14.5l4 4 4-4"/></svg>',
     sliders: '<svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>',
+    expand: '<svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
+    launch: '<svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>',
     chevron: '<svg viewBox="0 0 24 24"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg>',
     // the settings screen's sections
     globe: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.5 3.8 5.3 3.8 8.5s-1.2 6-3.8 8.5c-2.6-2.5-3.8-5.3-3.8-8.5s1.2-6 3.8-8.5z"/></svg>',
@@ -1001,11 +1003,16 @@
 
   function renderAmbientControls() {
     var playing = music && music.state === "playing";
-    var pBtn = $("amb-prev"), plBtn = $("amb-play"), nBtn = $("amb-next");
+    var pBtn = $("amb-prev"), plBtn = $("amb-play"), nBtn = $("amb-next"), oBtn = $("amb-open");
     if (!pBtn || !plBtn || !nBtn) return;
     pBtn.innerHTML = ICONS.prev;
     plBtn.innerHTML = playing ? ICONS.pause : ICONS.play;
     nBtn.innerHTML = ICONS.next;
+    if (oBtn) {
+      var appName = (music && music.app && music.app.name) || "";
+      oBtn.innerHTML = ICONS.launch + '<span class="amb-open-txt">' + esc(appName || t("ambient_open_app")) + "</span>";
+      oBtn.classList.toggle("focus", zone === "ambient" && ambI === 3);
+    }
     pBtn.classList.toggle("focus", zone === "ambient" && ambI === 0);
     plBtn.classList.toggle("focus", zone === "ambient" && ambI === 1);
     nBtn.classList.toggle("focus", zone === "ambient" && ambI === 2);
@@ -1057,6 +1064,11 @@
 
   function ambPress() {
     if (!music) return;
+    if (ambI === 3) {
+      var pkg = (music.app && (music.app.package || music.app.id)) || null;
+      if (pkg) api("POST", "/api/launch", { app: pkg }).catch(function (e) { note(e.message); });
+      return;
+    }
     var key = ["previous", "play_pause", "next"][ambI];
     if (key === "play_pause") {
       music.state = music.state === "playing" ? "paused" : "playing";
@@ -1082,6 +1094,7 @@
     var art = music.art ? '<img class="np-art" src="' + esc(music.art) + '" alt="" decoding="async" onerror="this.className=\'np-art gone\'">' :
       '<span class="np-art">' + ICONS.note + "</span>";
     var btns = [["prev", t("np_prev")], [playing ? "pause" : "play", playing ? t("np_pause") : t("np_play")], ["next", t("np_next")]];
+    if (AMBIENT_MUSIC) btns.push(["expand", t("np_expand")]);
     el.innerHTML = art + '<div class="np-t"><span class="np-app">' + esc((music.app && music.app.name) || t("np_head")) + "</span>" +
       "<b>" + esc(music.title) + "</b><small>" + esc(music.artist || music.album || "") + "</small></div>" +
       '<div class="np-ctl">' + btns.map(function (b, i) {
@@ -1129,6 +1142,15 @@
   }
   function npPress() {
     if (!music) return;
+    if (npI === 3 && AMBIENT_MUSIC) {
+      ambientOpen = true;
+      ambientDismissed = false;
+      zone = "ambient";
+      ambI = 1;
+      paintFocus();
+      renderAmbientMusic();
+      return;
+    }
     var key = ["previous", "play_pause", "next"][npI];
     if (key === "play_pause") {
       music.state = music.state === "playing" ? "paused" : "playing";
@@ -1139,10 +1161,22 @@
     setTimeout(refreshMusic, key === "play_pause" ? 1500 : 900);
   }
 
+  var idleAmbientSec = 0;
   setInterval(function () {
     if (music && music.state === "playing" && ambientOpen) {
       curProgress += 1;
       updateProgressUI();
+    } else if (music && music.state === "playing" && AMBIENT_MUSIC && !ambientOpen && !ambientDismissed && !document.hidden) {
+      if (zone === "grid" || zone === "shelf" || zone === "np") {
+        idleAmbientSec += 1;
+        if (idleAmbientSec >= 30) {
+          ambientOpen = true;
+          zone = "ambient";
+          ambI = 1;
+          paintFocus();
+          renderAmbientMusic();
+        }
+      }
     }
   }, 1000);
 
@@ -2137,6 +2171,7 @@
 
   function move(dx, dy) {
     touched = true;
+    idleAmbientSec = 0;
     if (zone === "settings") { setMove(dx, dy); return; }
     if (zone === "smart") { window.smartHome.move(dx, dy); return; }
     if (zone === "gear") { if (dy) { gi = Math.max(0, Math.min(1, gi + dy)); renderGear(); } return; }
@@ -2147,8 +2182,8 @@
     if (lift) { moveLift(dx, dy); return; }
     if (zone === "ambient") {
       if (dx < 0) ambI = Math.max(0, ambI - 1);
-      else if (dx > 0) ambI = Math.min(2, ambI + 1);
-      else if (dy > 0) {
+      else if (dx > 0) ambI = Math.min(3, ambI + 1);
+      else if (dy > 0 || dy < 0) {
         ambientDismissed = true;
         ambientOpen = false;
         zone = "grid";
@@ -2176,10 +2211,11 @@
       return;
     }
     if (zone === "np") {
+      var maxNp = AMBIENT_MUSIC ? 3 : 2;
       if (NIGHT) {
         // the first card of the row: right past the last button goes on to the shows
-        if (dx > 0 && npI === 2) { if (cards.length) { zone = "shelf"; s = 0; } }
-        else if (dx) npI = Math.max(0, Math.min(2, npI + dx));
+        if (dx > 0 && npI === maxNp) { if (cards.length) { zone = "shelf"; s = 0; } }
+        else if (dx) npI = Math.max(0, Math.min(maxNp, npI + dx));
         else if (dy < 0) { if (peopleOn()) toPeople(); else if (hasQuick()) { zone = "quick"; qi = 0; } }
         else if (dy > 0 && gridEls.length) {
           var nb = $("np").getBoundingClientRect();
@@ -2188,7 +2224,7 @@
         }
       } else {
         // Classic: top right, under the quick buttons
-        if (dx) npI = Math.max(0, Math.min(2, npI + dx));
+        if (dx) npI = Math.max(0, Math.min(maxNp, npI + dx));
         else if (dy < 0) { if (hasQuick()) zone = "quick"; else if (peopleOn()) toPeople(); }
         else if (dy > 0) {
           if (cards.length) zone = "shelf";
@@ -3521,10 +3557,19 @@
     if ((i = inList(quickEls, el)) >= 0) return { zone: "quick", i: i };
     if (peopleOn() && !isHead() && (i = inList(Array.prototype.slice.call($("people").children), el)) >= 0) return { zone: "people", i: i };
     if (peopleOn() && isHead() && inList([$("people")], el) >= 0) return { zone: "people", i: 0 };
+    var npBtns = kids("np", ".nb");
+    if ((i = inList(npBtns, el)) >= 0) return { zone: "np", i: i };
     if (AMBIENT_MUSIC && inList([$("np"), $("np-slot")], el) >= 0) return { zone: "ambient_open", i: 1 };
     return null;
   }
   function pointTo(p, clicked) {
+    if (p.zone === "np") {
+      if (npI === p.i && zone === "np") return false;
+      zone = "np";
+      npI = p.i;
+      paintFocus();
+      return true;
+    }
     if (p.zone === "ambient") {
       if (ambI === p.i) return false;
       ambI = p.i;
