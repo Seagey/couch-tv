@@ -19,6 +19,8 @@ import time
 import urllib.parse
 from datetime import datetime, timedelta
 
+from tv import check_package
+
 S = None  # the server module (set by server.py)
 log = logging.getLogger("agentic")
 
@@ -217,6 +219,8 @@ async def install_app(name=None, package=None, wait_s=150):
     if pkg and pkg in before:
         return {"installed": True, "already": True, "package": pkg, "name": shown,
                 "note": f"{shown} is already on the TV."}
+    if pkg:
+        check_package(pkg)
     link = (f"market://details?id={pkg}" if pkg
             else "market://search?q=" + urllib.parse.quote(name or "") + "&c=apps")
     await S.tv.adb("shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", f"'{link}'", timeout=15)
@@ -317,7 +321,7 @@ async def h_uninstall(request):
         raise S.ApiError(403, f"{shown} came with the TV and cannot be removed")
     if pkg not in await _packages():
         return S.ok(uninstalled=False, note=f"{shown} is not on the TV.")
-    out = await S.tv.adb("shell", f"pm uninstall {pkg}", timeout=30)
+    out = await S.tv.adb("shell", f"pm uninstall {check_package(pkg)}", timeout=30)
     done = "Success" in out
     await S.installed_packages(max_age=0)
     S.record_action(request, "uninstall_app", {"name": shown}, done)
@@ -660,7 +664,7 @@ async def h_restart_app(request):
                 if when and datetime.now(when.tzinfo) - when < timedelta(hours=3):
                     title, season, episode = h["title"], h.get("season"), h.get("episode")
                 break
-    await S.tv.adb("shell", f"am force-stop {pkg}", timeout=15)
+    await S.tv.adb("shell", f"am force-stop {check_package(pkg)}", timeout=15)
     await asyncio.sleep(1.5)
     result = {"restarted": app["name"], "resumed": None, "started": None}
     if title and app["id"] == "youtube":
