@@ -962,7 +962,6 @@ class MainActivity : Activity() {
                 null
             }
             val skipSet = HashSet<String>().apply {
-                add("com.tcl.browser")
                 homeCfg?.optJSONArray("skip_watch_next")?.let { arr ->
                     for (i in 0 until arr.length()) {
                         val p = arr.optString(i)?.trim()
