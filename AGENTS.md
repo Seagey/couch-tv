@@ -352,8 +352,8 @@ exactly what changes:
   that port closes after a restart and has to be opened again the same way.
 - Options A and B (`apply.sh`) make couch-tv the home and switch off ambient mode (the idle
   adverts) and any ad tracker you agree to. The TV's own home screen and setup app stay on, so the
-  TV always has them when it starts; a small Home button watch (an accessibility service that only sees which
-  window came forward) puts couch-tv on top when the TV opens its own home, which may flash up for
+  TV always has them when it starts; a small Home button watch (an accessibility service that only looks at which
+  window came forward; it declares the screen reading capability only because some TVs send events to nothing else, and never reads the screen) puts couch-tv on top when the TV opens its own home, which may flash up for
   a moment. Nothing is deleted.
   - **Never switch off the Google TV home (`launcherx`, `tvlauncher`) or the setup app
     (`setupwraith`), by hand or through `EXTRA_OFF`.** couch-tv 0.10 and older did, and a Sony
