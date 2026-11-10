@@ -63,7 +63,6 @@ body {
   position: fixed; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none;
   opacity: 0;
   transition: opacity 2.5s cubic-bezier(0.4, 0, 0.2, 1), background 2.5s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: opacity;
   z-index: 0;
 }
 .ambient-lighting.has-weather-tint {
@@ -88,7 +87,8 @@ body {
   pointer-events: none;
   z-index: 0;
 }
-.lighter .weather-canvas {
+.lighter .weather-canvas, .lighter .ambient-lighting,
+.old-engine .weather-canvas, .old-engine .ambient-lighting {
   display: none !important;
 }
 

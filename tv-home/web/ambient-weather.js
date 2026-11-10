@@ -11,8 +11,8 @@
   var running = false;
   var rafId = null;
   var isPaused = false;
-  var enabled = true;
-  var sunGradeEnabled = true;
+  var enabled = false;      // off until the home says so (Home settings, Weather)
+  var sunGradeEnabled = false;
   var lighterMode = false;
 
   var currentType = "clear"; // "rain", "snow", "fog", "storm", "clear"
@@ -97,37 +97,34 @@
     p.splash = 0;
   }
 
-  function setWeatherType(type) {
-    if (currentType === type) return;
-    currentType = type;
+  // Draws (or clears) the current weather: called when the weather, or a setting that gates it, changes.
+  function applyType() {
+    stopLoop();
+    if (ctx) ctx.clearRect(0, 0, W, H);
+    if (lightingEl) lightingEl.classList.remove("has-weather-tint", "wx-rain-tint", "wx-snow-tint", "wx-fog-tint", "wx-storm-tint");
+    if (!canvas || !ctx || currentType === "clear" || !enabled || lighterMode) return;
 
-    if (!canvas || !ctx) return;
-
-    if (type === "clear" || !enabled || lighterMode) {
-      stopLoop();
-      ctx.clearRect(0, 0, W, H);
-      if (lightingEl) lightingEl.classList.remove("has-weather-tint", "wx-rain-tint", "wx-snow-tint", "wx-fog-tint", "wx-storm-tint");
-      return;
-    }
-
-    // Re-initialize particles for new type
-    var count = type === "snow" ? MAX_SNOW : MAX_RAIN;
+    // Re-initialize particles for the type
+    var count = currentType === "snow" ? MAX_SNOW : MAX_RAIN;
     for (var i = 0; i < count; i++) {
-      if (type === "snow") resetSnowParticle(particles[i], true);
+      if (currentType === "snow") resetSnowParticle(particles[i], true);
       else resetRainParticle(particles[i], true);
     }
 
-    if (lightingEl) {
-      lightingEl.classList.remove("wx-rain-tint", "wx-snow-tint", "wx-fog-tint", "wx-storm-tint");
-      lightingEl.classList.add("has-weather-tint", "wx-" + type + "-tint");
-    }
+    if (lightingEl) lightingEl.classList.add("has-weather-tint", "wx-" + currentType + "-tint");
 
-    if (type === "storm") {
+    if (currentType === "storm") {
       nextFlashTime = Date.now() + randomRange(8000, 18000);
       flashAlpha = 0;
     }
 
     startLoop();
+  }
+
+  function setWeatherType(type) {
+    if (currentType === type) return;
+    currentType = type;
+    applyType();
   }
 
   function startLoop() {
@@ -149,16 +146,22 @@
     if (!running) return;
 
     var now = Date.now();
+    // 30 frames a second is plenty for slow rain and snow, and half the work for a weak box
+    if (now - lastTime < 32) {
+      rafId = root.requestAnimationFrame(renderLoop);
+      return;
+    }
     var dt = (now - lastTime) / 1000;
     if (dt > 0.1) dt = 0.1; // clamp delta during lag spikes
     lastTime = now;
+    var k = dt * 60; // movement is per 60th of a second, so the speed is the same at any frame rate
 
     ctx.clearRect(0, 0, W, H);
 
     var windAngle = 0.16; // gentle diagonal tilt ~9 degrees
 
     if (currentType === "rain" || currentType === "storm") {
-      var rainCount = lighterMode ? 25 : MAX_RAIN;
+      var rainCount = MAX_RAIN;
       ctx.lineWidth = 1.4;
 
       for (var r = 0; r < rainCount; r++) {
@@ -174,8 +177,8 @@
             resetRainParticle(rp, false);
           }
         } else {
-          rp.y += rp.speed;
-          rp.x += rp.speed * windAngle;
+          rp.y += rp.speed * k;
+          rp.x += rp.speed * k * windAngle;
 
           var bottomBound = H - randomRange(10, 80);
           if (rp.y >= bottomBound) {
@@ -207,12 +210,12 @@
         }
       }
     } else if (currentType === "snow") {
-      var snowCount = lighterMode ? 18 : MAX_SNOW;
+      var snowCount = MAX_SNOW;
       for (var s = 0; s < snowCount; s++) {
         var sp = particles[s];
-        sp.wobble += sp.wobbleSpeed;
-        sp.y += sp.speedY;
-        sp.x += Math.sin(sp.wobble) * 0.75 + sp.speedX;
+        sp.wobble += sp.wobbleSpeed * k;
+        sp.y += sp.speedY * k;
+        sp.x += (Math.sin(sp.wobble) * 0.75 + sp.speedX) * k;
 
         if (sp.y > H + 10 || sp.x < -20 || sp.x > W + 20) {
           resetSnowParticle(sp, false);
@@ -226,7 +229,7 @@
     } else if (currentType === "fog") {
       for (var f = 0; f < fogNodes.length; f++) {
         var fn = fogNodes[f];
-        fn.x += fn.speed;
+        fn.x += fn.speed * k;
         if (fn.speed > 0 && fn.x - fn.radius > W) fn.x = -fn.radius;
         if (fn.speed < 0 && fn.x + fn.radius < 0) fn.x = W + fn.radius;
 
@@ -301,6 +304,7 @@
         ctx = canvas.getContext("2d");
         initParticlePool();
       }
+      applyType();   // the weather may have been set before the canvas was
 
       // Check test overrides
       var testWx = getQueryParam("test_wx");
@@ -350,13 +354,10 @@
     },
 
     setEnabled: function (val) {
-      enabled = !!val;
-      if (!enabled) {
-        stopLoop();
-        if (ctx) ctx.clearRect(0, 0, W, H);
-      } else {
-        if (!isPaused && currentType !== "clear") startLoop();
-      }
+      val = !!val;
+      if (val === enabled) return;
+      enabled = val;
+      applyType();
     },
 
     setSunGradeEnabled: function (val) {
@@ -368,13 +369,10 @@
     },
 
     setLighter: function (val) {
-      lighterMode = !!val;
-      if (lighterMode) {
-        stopLoop();
-        if (ctx) ctx.clearRect(0, 0, W, H);
-      } else {
-        if (!isPaused && currentType !== "clear" && enabled) startLoop();
-      }
+      val = !!val;
+      if (val === lighterMode) return;
+      lighterMode = val;
+      applyType();
     },
 
     getType: function () {

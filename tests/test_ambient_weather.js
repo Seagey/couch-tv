@@ -70,6 +70,23 @@ AmbientWeather.init(canvas, lighting);
 assert.strictEqual(canvas.width, 1920, "Canvas width should be initialized to 1920");
 assert.strictEqual(canvas.height, 1080, "Canvas height should be initialized to 1080");
 
+// Test 1b: off until the home switches it on (Home settings, Weather)
+AmbientWeather.setWeather({ code: 63, temp: 18 }, { alt: 30, hourAngle: 0 });
+assert(!lighting._classes.has("has-weather-tint"), "No weather tint while the effects are off");
+assert.strictEqual(lighting.style.backgroundImage, "", "No sun grade while it is off");
+// switching it on afterwards draws the weather already known, not only the next change
+AmbientWeather.setEnabled(true);
+assert(lighting._classes.has("wx-rain-tint"), "Switching the effects on applies the rain already reported");
+AmbientWeather.setLighter(true);
+assert(!lighting._classes.has("has-weather-tint"), "Lighter home removes the tint");
+AmbientWeather.setLighter(false);
+assert(lighting._classes.has("wx-rain-tint"), "Leaving Lighter home brings it back");
+AmbientWeather.setEnabled(false);
+assert(!lighting._classes.has("has-weather-tint"), "Switching off removes the tint");
+AmbientWeather.setEnabled(true);
+AmbientWeather.setSunGradeEnabled(true);
+AmbientWeather.setWeather({ code: 0, temp: 18 }, null);
+
 // Test 2: WMO Weather Code Mapping
 // Rain codes: 61 (light rain), 63 (rain), 65 (heavy rain), 51 (drizzle)
 AmbientWeather.setWeather({ code: 61, temp: 18 }, null);

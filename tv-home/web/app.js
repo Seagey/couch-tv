@@ -281,13 +281,8 @@
     WX_SHOW = ST.wx_show !== false;
     WX_F = (ST.wx_unit || HOME.wx_unit) === "f";   // Home settings, else home.wx_unit in config.json
     WX_EVERY = [15, 30, 60].indexOf(ST.wx_every) >= 0 ? ST.wx_every : 30;
-    WX_AMBIENT = typeof ST.ambient_weather === "boolean" ? ST.ambient_weather : (typeof HOME.ambient_weather === "boolean" ? HOME.ambient_weather : true);
-    WX_SUN_GRADE = typeof ST.ambient_sun_grade === "boolean" ? ST.ambient_sun_grade : (typeof HOME.ambient_sun_grade === "boolean" ? HOME.ambient_sun_grade : true);
-    if (window.AmbientWeather) {
-      window.AmbientWeather.setEnabled(WX_AMBIENT && WX_SHOW);
-      window.AmbientWeather.setSunGradeEnabled(WX_SUN_GRADE);
-      window.AmbientWeather.setLighter(LIGHTER);
-    }
+    WX_AMBIENT = typeof ST.ambient_weather === "boolean" ? ST.ambient_weather : HOME.ambient_weather === true;   // off unless chosen
+    WX_SUN_GRADE = typeof ST.ambient_sun_grade === "boolean" ? ST.ambient_sun_grade : HOME.ambient_sun_grade === true;
     var mine = TV_ID || CFG.default_tv;
     TVCFG = (CFG.tvs || []).filter(function (t) { return t.id === mine; })[0] || (CFG.tvs || [])[0] || {};
     // no "quick" from an older bridge: the sleep timer, and the picture switch where the TV has one
@@ -306,6 +301,7 @@
     // CSS grid (Android 6 and older, a 1 GB box), where blur, soft shadows and drift make it crawl (#59).
     LIGHTER = typeof ST.lighter === "boolean" ? ST.lighter : typeof HOME.lighter === "boolean" ? HOME.lighter : OLD_ENGINE;
     document.documentElement.classList.toggle("lighter", LIGHTER);
+    ambientSync();
     movingTiles();
     // glass app icons (#25): set in Home settings, else home.glass_icons; off unless switched on
     GLASS_ICONS = typeof ST.glass_icons === "boolean" ? ST.glass_icons : HOME.glass_icons === true;
@@ -724,7 +720,7 @@
     try { v.load(); } catch (e) {}
   }
   function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); }
-  document.addEventListener("visibilitychange", function () { if (document.hidden) pauseVideo(); else startVideo(); });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) pauseVideo(); else { startVideo(); if (window.AmbientWeather) window.AmbientWeather.resume(); } });
 
   function showScene(i) {
     var prev = scene;
@@ -849,6 +845,17 @@
     var alt = (h >= 6 && h < 18) ? 35 : -20;
     var hourAngle = (h - 12) * 15;
     return { alt: alt, hourAngle: hourAngle };
+  }
+
+  // The ambient weather effects follow the settings: off unless chosen, never under Lighter home or
+  // on an old engine (the slow boxes Lighter home is for), and not while an app or Settings is up.
+  function ambientSync() {
+    var a = window.AmbientWeather;
+    if (!a) return;
+    a.setLighter(LIGHTER || OLD_ENGINE);
+    a.setEnabled(WX_AMBIENT && WX_SHOW);
+    a.setSunGradeEnabled(WX_SUN_GRADE && !LIGHTER && !OLD_ENGINE);
+    updateAmbientWeather();
   }
 
   function updateAmbientWeather() {
@@ -2660,12 +2667,11 @@
       } },
       { kind: "toggle", key: "wx-ambient", label: t("wx_ambient"), sub: t("wx_ambient_sub"), value: WX_AMBIENT ? t("on") : t("off"), act: function () {
         WX_AMBIENT = !WX_AMBIENT; ST.ambient_weather = WX_AMBIENT; saveSettings();
-        if (window.AmbientWeather) window.AmbientWeather.setEnabled(WX_AMBIENT && WX_SHOW);
+        ambientSync();
       } },
       { kind: "toggle", key: "wx-sun-grade", label: t("wx_sun_grade"), sub: t("wx_sun_grade_sub"), value: WX_SUN_GRADE ? t("on") : t("off"), act: function () {
         WX_SUN_GRADE = !WX_SUN_GRADE; ST.ambient_sun_grade = WX_SUN_GRADE; saveSettings();
-        if (window.AmbientWeather) window.AmbientWeather.setSunGradeEnabled(WX_SUN_GRADE);
-        updateAmbientWeather();
+        ambientSync();
       } },
       { kind: "cycle", key: "wx-unit", label: t("wx_units"), value: WX_F ? "°F (Fahrenheit)" : "°C (Celsius)", act: function () {
         WX_F = !WX_F; ST.wx_unit = WX_F ? "f" : "c"; saveSettings(); clock();
@@ -2751,7 +2757,7 @@
     // a slow box (#58): no blur, no soft shadows, a still photo and smaller pictures, all in one switch
     rows.push({ kind: "toggle", key: "lighter", label: t("lighter"), value: LIGHTER ? t("on") : t("off"), act: function () {
       LIGHTER = !LIGHTER; ST.lighter = LIGHTER; saveSettings();
-      document.documentElement.classList.toggle("lighter", LIGHTER); movingTiles(); renderShelf(); paintFocus();
+      document.documentElement.classList.toggle("lighter", LIGHTER); ambientSync(); movingTiles(); renderShelf(); paintFocus();
     } });
     rows.push({ kind: "toggle", key: "glass-icons", label: t("glass_icons"), value: GLASS_ICONS ? t("on") : t("off"), act: function () {
       GLASS_ICONS = !GLASS_ICONS; ST.glass_icons = GLASS_ICONS; saveSettings();
@@ -3808,9 +3814,7 @@
     if (NIGHT) {
       if (window.AmbientWeather) {
         window.AmbientWeather.init($("weather-canvas"), $("ambient-lighting"));
-        window.AmbientWeather.setEnabled(WX_AMBIENT && WX_SHOW);
-        window.AmbientWeather.setSunGradeEnabled(WX_SUN_GRADE);
-        window.AmbientWeather.setLighter(LIGHTER);
+        ambientSync();
       }
       buildScenes();
       // ?scene=fog starts on that scene, for previews (?scene=own: the first of the household's
