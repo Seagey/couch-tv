@@ -234,7 +234,8 @@ object Tv {
     // ---------- what is playing (dumpsys media_session, same parsing as the computer bridge) ----------
     data class Session(val pkg: String, var active: Boolean = false, var state: String? = null, var position: Long? = null,
                        var updated: Long? = null, var speed: Double = 0.0, var title: String? = null, var subtitle: String? = null,
-                       var queueTitle: String? = null, var album: String? = null)
+                       var queueTitle: String? = null, var album: String? = null, var duration: Long? = null,
+                       var pos_s: Double? = null, var dur_s: Double? = null)
 
     fun sessions(): Pair<Long?, List<Session>> {
         if (!Adb.connected) return null to emptyList()
@@ -259,9 +260,30 @@ object Tv {
                     cur!!.title = parts.getOrNull(0)?.takeIf { it != "null" && it.isNotEmpty() }
                     cur!!.subtitle = parts.getOrNull(1)?.takeIf { it != "null" && it.isNotEmpty() }
                     cur!!.album = parts.getOrNull(2)?.takeIf { it != "null" && it.isNotEmpty() }
+                    val mDur = Regex("(?:duration|DURATION)=(\\d+)").find(line)
+                    if (mDur != null) {
+                        cur!!.duration = mDur.groupValues[1].toLongOrNull()
+                        cur!!.dur_s = cur!!.duration?.let { Math.round(it / 100.0) / 10.0 }
+                    }
+                }
+                cur != null && (line.contains("duration", ignoreCase = true) || line.contains("android.media.metadata.duration", ignoreCase = true)) -> {
+                    val mDur = Regex("(?:duration|DURATION)=(\\d+)").find(line)
+                    if (mDur != null) {
+                        cur!!.duration = mDur.groupValues[1].toLongOrNull()
+                        cur!!.dur_s = cur!!.duration?.let { Math.round(it / 100.0) / 10.0 }
+                    }
                 }
                 line.startsWith("queueTitle=") && cur != null ->
                     cur!!.queueTitle = line.substringAfter("=").substringBeforeLast(", size=").trim().takeIf { it != "null" && it.isNotEmpty() }
+            }
+        }
+        for (s in found) {
+            if (s.position != null && s.position!! >= 0) {
+                val delta = if (uptime != null && s.updated != null && s.updated!! >= 0 && s.state == "PLAYING")
+                    Math.max(0L, uptime - s.updated!!)
+                else 0L
+                val posMs = s.position!! + (delta * s.speed).toLong()
+                s.pos_s = Math.max(0.0, Math.round(posMs / 100.0) / 10.0)
             }
         }
         return uptime to found

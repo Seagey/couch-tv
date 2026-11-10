@@ -1,7 +1,7 @@
 # couch-tv
 
 Your own home screen and phone remote for a Google TV, and now a Samsung TV, and an LG
-version that has run on seven real LGs so far. No ads on the home screen. Open source (MIT).
+version that has run on nine real LGs so far. No ads on the home screen. Open source (MIT).
 
 > Note for Google TV owners: 0.11 leaves the Google home and setup apps switched on. If you set
 > couch-tv up with 0.10 or older, see [If your TV loops after a restart](#if-your-tv-loops-after-a-restart).
@@ -288,7 +288,7 @@ about how a show opened) and some screen reader labels on the phone are still in
 | **Fire TV on Fire OS** (Fire OS 6, 7 and 8: Fire TV Stick 4K 1st gen and newer, Stick 4K Max, Cube) | Partial. Takes the Home key back, but Amazon's home flashes up first | Partial | Yes, and it takes the Home key back ([how](on-tv/README.md#fire-tv-fire-os)) |
 | **Fire TV on Vega OS** (newer Fire TV sticks) | No | No | No |
 | **Samsung** (Tizen) | App only, opened from Samsung's app row | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
-| **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on seven real LGs so far ([how](docs/LG.md)) | No |
+| **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on nine real LGs so far ([how](docs/LG.md)) | No |
 | **Roku** (TV or box) | App only, a sideloaded channel opened from Roku's home row, while Developer Mode is on | With a computer at home: as a channel that opens itself, not a true home screen. Built from Roku's documentation, not yet tried on a real Roku ([how](docs/ROKU.md)) | No |
 | **Apple TV, Hisense with VIDAA** | No | No | No |
 
@@ -320,7 +320,7 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   on, and presses Developer Mode's Extend once a day so LG does not remove it. LG's own Home button
   still opens LG's menu. The phone remote and the assistant work: Netflix opens the title, YouTube
   opens the video, other apps open on their home page. No "what is playing" and no screenshots.
-  It has run on seven real LGs so far (webOS 4.10 to a 2025 QNED on webOS 10.3.2): if you try it on another model, please
+  It has run on nine real LGs so far (webOS 4.10 to a 2025 QNED on webOS 10.3.2): if you try it on another model, please
   open an issue and say how it went. Setup and limits:
   [docs/LG.md](docs/LG.md).
 - **Roku:** the same idea as the LG, with the home drawn again as a Roku channel (Roku channels are not web
@@ -807,7 +807,7 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
 
 - Google TV and Android TV run everything. Fire TV (Fire OS) runs the on-TV app, with Amazon's
   home flashing up first. Samsung runs it as an app, with a computer that stays on, and LG the
-  same way (run on seven real LGs so far). Developer mode has to be on.
+  same way (run on nine real LGs so far). Developer mode has to be on.
 - A Google TV update can switch the Google home back on. Option B's bridge checks once a day and
   switches it off again; with option A, run `apply.sh` again.
 - Some apps will not open a show directly. They open the app instead. See `bridge/DEEPLINKS.md`.
