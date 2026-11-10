@@ -1,0 +1,26 @@
+{
+  "extends": "recommended",
+  "rules": {
+    "no-print": "error",
+    "unused-variable": "error",
+    "inline-if-style": "off",
+    "block-if-style": "off",
+    "condition-style": "off",
+    "else-if-style": "off",
+    "aa-comma-style": "off",
+    "function-style": "off",
+    "type-annotations": "off",
+    "no-assocarray-component-field-type": "error",
+    "no-optional-chaining": "off",
+    "color-format": "off",
+    "name-shadowing": "error",
+    "unreachable-code": "error",
+    "case-sensitivity": "error",
+    "consistent-return": "error",
+    "named-function-style": "off",
+    "anon-function-style": "off",
+    "eol-last": "off",
+    "no-todo": "off",
+    "no-stop": "error"
+  }
+}

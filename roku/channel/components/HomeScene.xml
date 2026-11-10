@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- The couch-tv home: a photo scene with the clock in it, the date and weather, the people, Keep watching
+     and the apps. The pieces are made in HomeScene.brs; this file only holds what never changes. -->
+<component name="HomeScene" extends="Scene">
+    <script type="text/brightscript" uri="pkg:/components/HomeScene.brs" />
+    <children>
+        <Rectangle id="base" width="1920" height="1080" color="0x0B0D12FF" />
+        <Poster id="bgA" width="1920" height="1080" loadDisplayMode="scaleToZoom" />
+        <Poster id="bgB" width="1920" height="1080" loadDisplayMode="scaleToZoom" opacity="0" />
+        <Label id="clock" wrap="false" />
+        <Poster id="fgA" />
+        <Poster id="fgB" opacity="0" />
+        <Poster id="scrim" uri="pkg:/images/ui/scrim.png" width="1920" height="1080" loadDisplayMode="scaleToFill" />
+        <Group id="top" />
+        <Group id="shelf" />
+        <Group id="dock" />
+        <Poster id="focus" uri="pkg:/images/ui/focus.9.png" visible="false" />
+        <Label id="status" wrap="false" horizAlign="center" translation="[0, 846]" width="1920" height="36" />
+        <Animation id="fade" duration="1.6" easeFunction="inOutCubic">
+            <FloatFieldInterpolator id="fadeBg" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="bgB.opacity" />
+            <FloatFieldInterpolator id="fadeFg" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="fgB.opacity" />
+            <FloatFieldInterpolator id="fadeClock" key="[0.0, 0.45, 0.55, 1.0]" keyValue="[1.0, 0.0, 0.0, 1.0]" fieldToInterp="clock.opacity" />
+        </Animation>
+        <Timer id="tick" repeat="true" duration="5" />
+        <Timer id="turn" repeat="true" duration="20" />
+        <Timer id="swap" repeat="false" duration="0.8" />
+        <Timer id="refresh" repeat="true" duration="60" />
+        <Timer id="msg" repeat="false" duration="4" />
+    </children>
+</component>

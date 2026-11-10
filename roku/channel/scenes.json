@@ -1,0 +1,120 @@
+{
+ "scenes": [
+  {
+   "id": "night",
+   "photo": "pkg:/images/scenes/night.jpg",
+   "fg": {
+    "uri": "pkg:/images/scenes/night-fg.png",
+    "x": 460,
+    "y": 150,
+    "w": 1000,
+    "h": 400
+   },
+   "clock": {
+    "top": 150,
+    "size": 400,
+    "x": "centre"
+   },
+   "date": {
+    "y": 96,
+    "x": "centre"
+   },
+   "ink": "E8C8DC",
+   "alpha": 0.62,
+   "bright": 0.86,
+   "text": "FFE8EE"
+  },
+  {
+   "id": "golden",
+   "photo": "pkg:/images/scenes/golden.jpg",
+   "fg": {
+    "uri": "pkg:/images/scenes/golden-fg.png",
+    "x": 472,
+    "y": 152,
+    "w": 975,
+    "h": 390
+   },
+   "clock": {
+    "top": 152,
+    "size": 390,
+    "x": "centre"
+   },
+   "date": {
+    "y": 106,
+    "x": "centre"
+   },
+   "ink": "FFE2B8",
+   "alpha": 0.72,
+   "bright": 1.0,
+   "text": "FFFFFF"
+  },
+  {
+   "id": "water",
+   "photo": "pkg:/images/scenes/water.jpg",
+   "fg": null,
+   "clock": {
+    "top": 268,
+    "size": 420,
+    "x": "centre"
+   },
+   "date": {
+    "y": 216,
+    "x": "centre"
+   },
+   "ink": "CFF3FF",
+   "alpha": 0.62,
+   "bright": 1.0,
+   "text": "FFFFFF"
+  },
+  {
+   "id": "fog",
+   "photo": "pkg:/images/scenes/fog.jpg",
+   "fg": {
+    "uri": "pkg:/images/scenes/fog-fg.png",
+    "x": 96,
+    "y": 172,
+    "w": 1034,
+    "h": 470
+   },
+   "clock": {
+    "top": 172,
+    "size": 470,
+    "x": "left",
+    "left": 96
+   },
+   "date": {
+    "y": 116,
+    "x": "left",
+    "left": 104
+   },
+   "ink": "26322E",
+   "alpha": 0.6,
+   "bright": 1.0,
+   "text": "16201D"
+  },
+  {
+   "id": "dawn",
+   "photo": "pkg:/images/scenes/dawn.jpg",
+   "fg": {
+    "uri": "pkg:/images/scenes/dawn-fg.png",
+    "x": 460,
+    "y": 230,
+    "w": 1000,
+    "h": 400
+   },
+   "clock": {
+    "top": 230,
+    "size": 400,
+    "x": "centre"
+   },
+   "date": {
+    "y": 176,
+    "x": "centre"
+   },
+   "ink": "FFE9D2",
+   "alpha": 0.74,
+   "bright": 1.0,
+   "text": "FFFFFF"
+  }
+ ]
+}

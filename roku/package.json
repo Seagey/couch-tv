@@ -1,0 +1,12 @@
+{
+  "name": "couch-tv-roku",
+  "private": true,
+  "description": "Lint and compile check for the couch-tv Roku channel (npm run check)",
+  "scripts": {
+    "check": "bsc"
+  },
+  "devDependencies": {
+    "@rokucommunity/bslint": "^0.8.0",
+    "brighterscript": "^0.70.0"
+  }
+}
