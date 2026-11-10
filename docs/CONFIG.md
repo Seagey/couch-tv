@@ -164,7 +164,7 @@ Home settings saves to the same `bridge/data/people.json` the phone uses.
 
 | Key | What it does |
 |---|---|
-| `look` ["night"] | `night`: the scenes with the big glass clock. `classic`: one photo, a grid of app banners. The `look` quick button overrides this on each TV, and `?theme=` overrides both for a preview. |
+| `look` ["night"] | `night`: the scenes with the big glass clock. `oled`: pure pitch-black background for OLEDs, glowing focus accents, and burn-in protection. `classic`: one photo, a grid of app banners. The `look` quick button cycles these on each TV, and `?theme=` overrides them for a preview. |
 | `scenes` [all five] | Which Night scenes take turns, and in what order. Any of `night`, `golden`, `water`, `fog`, `dawn`, and the ids of your own scenes. One scene stays put. |
 | `my_scenes` [none] | Your own scenes from any photo, each with its clock designed: where it sits, its size and font, the date above or below it, light or dark text, and `cutout` for the skyline in front of the clock. Made with `tv-home/tools/make-scene.py`; [MAKE-A-SCENE.md](MAKE-A-SCENE.md) has every key. They take turns after the scenes in `scenes` unless they are listed there. Option A needs the app rebuilt with the scene's pictures inside (that guide says how). |
 | `scene_seconds` [20] | How long each scene shows. 5 or more. |

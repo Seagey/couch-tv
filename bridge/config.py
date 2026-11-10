@@ -239,7 +239,7 @@ def _home(h):
     out = {
         # Android package names never shown on the home or in More apps (a maker's own clutter).
         "hide_packages": [p for p in dict.fromkeys(hide) if isinstance(p, str) and re.fullmatch(r"[A-Za-z0-9_.]{1,200}", p)],
-        "look": h.get("look") if h.get("look") in ("night", "classic") else "night",
+        "look": h.get("look") if h.get("look") in ("night", "classic", "oled") else "night",
         "scenes": scenes or list(SCENE_IDS),
         "scene_seconds": _int(h.get("scene_seconds"), 20, 5, 3600),
         "dock_size": _int(h.get("dock_size"), DOCK_LIMIT, 1, DOCK_LIMIT),

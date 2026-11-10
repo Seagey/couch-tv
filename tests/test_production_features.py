@@ -47,6 +47,12 @@ class TestProductionFeatures(unittest.TestCase):
         self.assertIs(config._home({"bedtime_dim": "yes"})["bedtime_dim"], False)
         self.assertIs(config._home({"bedtime_dim": True})["bedtime_dim"], True)
 
+    def test_oled_look_option(self):
+        self.assertEqual(config._home({"look": "oled"})["look"], "oled")
+        self.assertEqual(config._home({"look": "night"})["look"], "night")
+        self.assertEqual(config._home({"look": "classic"})["look"], "classic")
+        self.assertEqual(config._home({"look": "invalid"})["look"], "night")
+
 
 if __name__ == "__main__":
     unittest.main()

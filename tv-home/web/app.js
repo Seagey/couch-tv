@@ -30,7 +30,17 @@
   var QUICK_ALL = ["sleep", "picture", "look", "input", "bluetooth", "network", "screensaver"];
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
-  var THEME = "night", NIGHT = true, CLOCK24 = false;
+  var THEME = "night", NIGHT = true, OLED = false, CLOCK24 = false;
+  // OLED burn-in protection: micro-shift (±2px) every 60 seconds
+  var OLED_SHIFT_STEPS = [[0,0], [1,1], [-1,1], [2,-1], [-1,-1], [1,-2], [-2,0], [0,1]];
+  var oledShiftIdx = 0;
+  function updateOledShift() {
+    if (!OLED) return;
+    oledShiftIdx = (oledShiftIdx + 1) % OLED_SHIFT_STEPS.length;
+    var pt = OLED_SHIFT_STEPS[oledShiftIdx];
+    document.documentElement.style.setProperty("--oled-shift-x", pt[0] + "px");
+    document.documentElement.style.setProperty("--oled-shift-y", pt[1] + "px");
+  }
   // Glass panels ("off", "on", or "lite": no blur, for slower TVs) and the video background, from
   // Home settings, then home.glass and home.video_url. Both are off unless someone switches them on.
   var GLASS = "off", GLASS_ICONS = false, VIDEO_ON = false, VIDEO_URL = "";
@@ -213,9 +223,11 @@
     QUICK = (Array.isArray(ST.quick) ? ST.quick : TVCFG.quick || ["sleep", "picture"])
       .filter(function (q, i, a) { return QUICK_ALL.indexOf(q) >= 0 && a.indexOf(q) === i; });
     THEME = (Q.match(/[?&]theme=([a-z]+)/) || [])[1] || lookSetting();
-    if (THEME !== "classic") THEME = "night";
+    if (THEME !== "classic" && THEME !== "oled") THEME = "night";
     NIGHT = THEME === "night";
+    OLED = THEME === "oled";
     document.documentElement.classList.toggle("theme-night", NIGHT);
+    document.documentElement.classList.toggle("theme-oled", OLED);
     GLASS = glassSetting();
     document.documentElement.classList.toggle("glass", GLASS !== "off");
     document.documentElement.classList.toggle("glass-lite", GLASS === "lite");
@@ -256,7 +268,10 @@
     setPeople(localPeopleOrder(people, OFFLINE));
     newApps = kept("tvhome.apps.new") || [];
   }
-  function lookSetting() { return ST.look || kept("tvhome.look") || HOME.look || "night"; }
+  function lookSetting() {
+    var l = ST.look || kept("tvhome.look") || HOME.look || "night";
+    return (l === "classic" || l === "oled") ? l : "night";
+  }
   function glassAmount() {
     var n = parseInt(ST.glass_amount != null ? ST.glass_amount : HOME.glass_amount, 10);
     return n >= 1 && n <= 5 ? n : 3;
@@ -910,7 +925,8 @@
         el.innerHTML = ICONS.picture + "<span>" + esc(picLabel()) + "</span>";
         el.classList.toggle("off", !picCanSet);
       } else if (q === "look") {
-        el.innerHTML = ICONS.look + "<span>" + esc(NIGHT ? t("classic_look") : t("night_look")) + "</span>";
+        var nextLbl = THEME === "night" ? t("oled_look") : (THEME === "oled" ? t("classic_look") : t("night_look"));
+        el.innerHTML = ICONS.look + "<span>" + esc(nextLbl) + "</span>";
       } else if (q === "input") {
         el.innerHTML = ICONS.input + "<span>" + esc(t("input")) + "</span>";
       } else if (q === "screensaver") {
@@ -970,7 +986,9 @@
   }
   // The look is kept on this TV; the page starts again in the other look.
   function toggleLook() {
-    ST.look = NIGHT ? "classic" : "night";
+    if (THEME === "night") ST.look = "oled";
+    else if (THEME === "oled") ST.look = "classic";
+    else ST.look = "night";
     keep("tvhome.look", ST.look);
     saveSettings();
     restart();
@@ -2293,8 +2311,8 @@
   // ---- look, scenes and the household's own photos ----
   var SECS_STEPS = [10, 15, 20, 30, 45, 60, 120];
   function lookRows() {
-    var look = lookSetting() === "classic" ? "classic" : "night", st = sceneState(), rows = [head(t("look_head"))];
-    ["night", "classic"].forEach(function (id) {
+    var look = lookSetting(), st = sceneState(), rows = [head(t("look_head"))];
+    ["night", "oled", "classic"].forEach(function (id) {
       rows.push({ kind: "choice", key: "look:" + id, label: t("look_" + id), sub: t("look_" + id + "_sub"), checked: look === id,
         act: function () { ST.look = id; keep("tvhome.look", id); saveSettings(); } });
     });
@@ -3396,6 +3414,10 @@
     if (!OFFLINE) refreshQuick();
     refreshMusic();
     setInterval(refreshMusic, 5000);
+    if (OLED) {
+      updateOledShift();
+      setInterval(updateOledShift, 60000);
+    }
     setInterval(function () { renderQuick(); refreshBedtimeDim(); }, 30000);
     // This TV says who is on its couch first, so what plays here is logged for them (each TV
     // keeps its own); then the lists. Once the home is up: the one-time "tell you about new versions?" question.
