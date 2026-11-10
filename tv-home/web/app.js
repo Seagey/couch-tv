@@ -836,13 +836,14 @@
     $("quick-note").textContent = text || "";
     if (text) noteTimer = setTimeout(function () { $("quick-note").textContent = ""; }, 6000);
   }
+  function bedtimeOn() { return HOME.bedtime_dim === true; }   // off unless config.json home.bedtime_dim is true
   function refreshBedtimeDim() {
     var m = minutesLeft();
-    var dim = m > 0 && m <= 15;
+    var dim = bedtimeOn() && m > 0 && m <= 15;
     document.documentElement.classList.toggle("bedtime-dim", dim);
   }
   function minutesLeft() {
-    if (!sleepEnds && TV && TV.getSleepRemainingMinutes) {
+    if (!sleepEnds && OFFLINE && TV && TV.getSleepRemainingMinutes) {
       try {
         var nativeMin = TV.getSleepRemainingMinutes();
         if (nativeMin > 0) sleepEnds = Date.now() + nativeMin * 60000;
@@ -858,7 +859,7 @@
       document.documentElement.classList.remove("bedtime-dim");
       return 0;
     }
-    var dim = m > 0 && m <= 15;
+    var dim = bedtimeOn() && m > 0 && m <= 15;
     document.documentElement.classList.toggle("bedtime-dim", dim);
     return m;
   }
@@ -941,7 +942,7 @@
   }
   function setSleep(minutes) {
     closeMenu();
-    if (TV && TV.setSleepTimer) {
+    if (OFFLINE && TV && TV.setSleepTimer) {   // no bridge: the launcher keeps the timer itself; with one, the bridge does
       try { TV.setSleepTimer(minutes); } catch (e) {}
     }
     sleepEnds = minutes ? Date.now() + minutes * 60000 : null;   // show it straight away
@@ -950,7 +951,7 @@
     if (!OFFLINE) {
       api("POST", "/api/sleep", { minutes: minutes })
         .then(function (j) { if (j.ends !== undefined) sleepEnds = j.ends ? Date.parse(j.ends) : null; renderQuick(); refreshBedtimeDim(); })
-        .catch(function (e) { if (!TV || !TV.setSleepTimer) note(e.message); refreshQuick(); });
+        .catch(function (e) { note(e.message); refreshQuick(); });
     }
   }
   function togglePicture() {
@@ -1286,8 +1287,10 @@
       return { kind: "screen", id: sc.id, name: sc.name, ready: sc.ready, note: sc.note, package: "screen:" + sc.id };
     });
     var inputs = resolveInputs();
-    var items = rest.filter(function (a) { return !tucked(a); }).concat(inputs, screens, rest.filter(tucked));
-    var line = Math.min(DOCK_APPS, rest.filter(function (a) { return !tucked(a); }).length + inputs.length);
+    var shown = rest.filter(function (a) { return !tucked(a); });
+    var keep = Math.max(0, DOCK_APPS - inputs.length);   // pinned inputs take dock places, so they are never pushed behind More apps
+    var items = shown.slice(0, keep).concat(inputs, shown.slice(keep), screens, rest.filter(tucked));
+    var line = Math.min(DOCK_APPS, shown.length + inputs.length);
     var o = data.order;
     if (o && o.saved) {
       var at = {};

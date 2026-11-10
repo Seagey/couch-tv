@@ -1,13 +1,16 @@
 import json
+import os
 import subprocess
+import sys
 import unittest
 
 
 class TestWatchNextLogic(unittest.TestCase):
     def test_home_config_serialization(self):
         """Verify home-config.py emits skip_watch_next and watch_next_per_app."""
+        root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
         res = subprocess.run(
-            [".venv/Scripts/python", "tv-home/tools/home-config.py", "--json"],
+            [sys.executable, os.path.join(root, "tv-home", "tools", "home-config.py"), "--json"],
             capture_output=True,
             text=True,
             check=True

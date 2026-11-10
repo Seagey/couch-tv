@@ -42,6 +42,11 @@ class TestProductionFeatures(unittest.TestCase):
         self.assertEqual(len(res["inputs"]), 1)
         self.assertEqual(res["inputs"][0]["label"], "PlayStation 5")
 
+    def test_bedtime_dim_is_off_unless_asked_for(self):
+        self.assertIs(config._home({})["bedtime_dim"], False)
+        self.assertIs(config._home({"bedtime_dim": "yes"})["bedtime_dim"], False)
+        self.assertIs(config._home({"bedtime_dim": True})["bedtime_dim"], True)
+
     def test_hidden_watch_next_simulation(self):
         """Simulate Watch Next dismissal using ID and composite (pkg|title) signature."""
         cursor_rows = [

@@ -517,7 +517,7 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun openWatchNext(id: String): Boolean = openWatchNextItem(id)
 
-        /** Dismiss a Watch Next item by ID, with optional package name and title for fallback blacklist. */
+        /** Hide a Watch Next card on this TV only: its id and package|title are remembered, the app's own row is never touched. */
         @JavascriptInterface
         fun dismissWatchNext(id: String, pkg: String, title: String): Boolean =
             dismissWatchNextItem(id, pkg, title)
@@ -1049,12 +1049,6 @@ class MainActivity : Activity() {
 
     private fun dismissWatchNextItem(id: String, pkg: String, title: String): Boolean {
         if (id.isBlank() && pkg.isBlank()) return false
-        if (id.matches(Regex("[0-9]{1,18}"))) {
-            try {
-                val uri = android.content.ContentUris.withAppendedId(WATCH_NEXT, id.toLong())
-                contentResolver.delete(uri, null, null)
-            } catch (_: Exception) {}
-        }
         return try {
             val hidden = prefs.getStringSet("hidden_watch_next_ids", emptySet())?.toMutableSet() ?: mutableSetOf()
             if (id.isNotBlank()) hidden.add(id)
