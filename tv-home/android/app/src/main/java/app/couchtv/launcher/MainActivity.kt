@@ -185,6 +185,13 @@ class MainActivity : Activity() {
             if (event.action == KeyEvent.ACTION_UP && event.repeatCount == 0 && pageReady) js("window.tv && tv.settingsKey && tv.settingsKey()")
             return true
         }
+        // The TV's own keys (TV/channels, guide, channel up and down, last channel, input): the home
+        // uses none of them, and the WebView would swallow them. Hand them back unhandled so the TV's
+        // own system gets them (Philips handles TV as an unhandled key fallback), for #90.
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_TV, KeyEvent.KEYCODE_GUIDE, KeyEvent.KEYCODE_CHANNEL_UP,
+            KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_LAST_CHANNEL, KeyEvent.KEYCODE_TV_INPUT -> return false
+        }
         // The home screen never exits on BACK; the page decides what BACK means.
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (event.action == KeyEvent.ACTION_UP && pageReady) js("window.tv && tv.back()")

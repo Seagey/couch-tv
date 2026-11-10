@@ -20,6 +20,9 @@ and `NUMPAD_ENTER` into OK, and `BUTTON_B` and `ESCAPE` into Back, before the pa
 game controller works the same as a remote. Back never leaves the home: the page decides what it
 means (close a list, put an app down, go back to the first tile).
 
+The TV's own keys (TV or channels, guide, channel up and down, last channel, input) are handed back to
+the TV untouched, so the TV's own app handles them.
+
 Every other key is left alone: play and pause, volume, numbers, the coloured buttons, voice, and
 the Netflix, YouTube and other app buttons. The page does not stop them, so Android and the apps
 still get them, and they never move the focus.
