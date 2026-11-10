@@ -144,6 +144,14 @@ it in Keep watching, for the person picked when it played, up to 3 hours later.
 ```
 `engaged` is the row's last engagement time in milliseconds. Answers `{"ok": true, "rows": 1}`.
 
+### `GET /api/watch-next`
+Read only, for finding out why a play never gets named (issue #23). Returns the rows the home last
+sent (`rows`, `received_s_ago`), the untitled play being waited on (`untitled`: its package, whether
+it has counted, how long ago it started) and `report`: how many rows from which apps, and for the
+app being played how each of its rows fails the match (`no engagement time`, `engaged N s before the
+play started`, `title is only the app's name`, or `matches`). The bridge log says the same once a
+minute while a play is still waiting.
+
 ### `GET /api/people` and `POST /api/people`
 The people (profiles), in the order the TV and the phone show them. Any number, up to 12, and none
 is fine (then nobody is picked and everything shows). Seeded from `people` in `config.json`; once

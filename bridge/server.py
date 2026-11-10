@@ -1923,6 +1923,41 @@ def _wn_rows():
     return list(seen_playing.get("_wn_rows") or [])
 
 
+def wn_report(rows, u, now):
+    """What the Watch Next matcher is looking at, for the log line and GET /api/watch-next: how many
+    rows the home sent, from which apps, and for the app being played how each row failed the match
+    (no engagement time, older than the play, or a title that is just the app's name)."""
+    pkgs = {}
+    for r in rows:
+        pkgs[r.get("package")] = pkgs.get(r.get("package"), 0) + 1
+    mine = []
+    for r in rows:
+        if u and r.get("package") == u["pkg"]:
+            eng = r.get("engaged")
+            if not eng:
+                why = "no engagement time"
+            elif eng < u["since"] - 120:
+                why = f"engaged {round(u['since'] - eng)} s before the play started"
+            elif generic_title(r.get("title"), u["pkg"], u["app"]):
+                why = "title is only the app's name"
+            else:
+                why = "matches"
+            mine.append({"title": r.get("title"), "engaged": eng, "why": why})
+    return {"rows": len(rows), "apps": pkgs, "for_this_app": mine}
+
+
+def _why_no_row(u, rows, now):
+    """One log line a minute while an untitled play still has no Watch Next row, so a TV where it
+    never arrives (couch-tv#23, Netflix on an Android 11 Xiaomi) says why instead of staying quiet."""
+    if now - u.get("logged_at", 0) < 60:
+        return
+    u["logged_at"] = now
+    rep = wn_report(rows, u, now)
+    log.info("untitled play in %s: no Watch Next row yet. The home sent %d rows from %d apps, %d for this app%s",
+             u["app"]["name"], rep["rows"], len(rep["apps"]), len(rep["for_this_app"]),
+             "".join(f"; '{m['title']}': {m['why']}" for m in rep["for_this_app"][:3]))
+
+
 async def untitled_resolve():
     u = seen_playing.get("_untitled")
     if not u or u["done"] or not u["qualified"]:
@@ -1951,6 +1986,7 @@ async def untitled_resolve():
             if not best or r["engaged"] > best["engaged"]:
                 best = r
     if not best:
+        _why_no_row(u, rows, now)
         return
     u["done"], u["named_by"] = True, "watch-next"
     seen_playing["_untitled"] = u
@@ -1980,6 +2016,20 @@ async def h_watch_next(request):
     seen_playing["_wn_at"] = time.time()
     await untitled_resolve()
     return ok(rows=len(rows))
+
+
+async def h_watch_next_get(request):
+    """What the home last sent, and how the matcher sees it, for finding out why an app's play never
+    gets named (couch-tv#23). Read only."""
+    u = seen_playing.get("_untitled")
+    rows = _wn_rows()
+    at = seen_playing.get("_wn_at")
+    return ok(received_s_ago=round(time.time() - at) if at else None,
+              untitled=None if not u else {"package": u["pkg"], "qualified": u["qualified"], "done": u["done"],
+                                           "named_by": u.get("named_by"),
+                                           "started_s_ago": round(time.time() - u["since"])},
+              report=wn_report(rows, u, time.time()),
+              rows=rows)
 
 
 async def log_seen(title, subtitle, app, now=None, who=None, method="seen", poster=None):
@@ -2356,6 +2406,7 @@ def make_app():
     r.add_get("/api/music", h_music)
     r.add_post("/api/continue/open", h_continue_open)
     r.add_post("/api/watch-next", h_watch_next)
+    r.add_get("/api/watch-next", h_watch_next_get)
     r.add_get("/api/sleep", h_sleep_get)
     r.add_post("/api/sleep", h_sleep_set)
     r.add_get("/api/screens", h_screens)
