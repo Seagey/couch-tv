@@ -133,6 +133,13 @@ out the same way. The phone's People sheet keeps these marks when it renames or 
   that gives Android no title (Netflix on some TVs) or only its own name (Prime on a Sony) is named
   from its row in Android's "Continue watching" (Watch Next) instead: the TV home app reads those
   rows and hands them to the bridge, because ADB cannot read them. Videos and music are never kept.
+- **With no computer (option A),** Keep watching is Android's own Watch Next list, plus the
+  Continue Watching channel of apps that put nothing in Watch Next but keep a home screen row of
+  their own instead: so far Stremio. Both are read the same read only way, with no account and no
+  sign in. A channel card has no time of its own, so couch-tv notes when it first sees each card as
+  it is now (its episode and how far in): what you just watched comes first. OK opens the app's own
+  link for it (Stremio picks up the episode). `skip_watch_next` and `watch_next_per_app` apply to
+  them too.
 - **Dismissing a show:** hold OK on any card in Keep watching to open the menu and choose **Remove from Keep watching**. The card animates away and is hidden on that TV across restarts. It only hides the card in couch-tv: the app's own Continue watching row is not changed, and a show hidden here still shows on the TV's own home.
 - **Two:** the pill switch at the top left.
 - **Three or more:** a round head icon with the person's initial. OK opens the list.
