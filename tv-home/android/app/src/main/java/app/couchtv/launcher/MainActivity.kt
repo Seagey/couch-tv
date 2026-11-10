@@ -517,6 +517,20 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun openWatchNext(id: String): Boolean = openWatchNextItem(id)
 
+        /** Hide a Watch Next card on this TV only: its id and package|title are remembered, the app's own row is never touched. */
+        @JavascriptInterface
+        fun dismissWatchNext(id: String, pkg: String, title: String): Boolean =
+            dismissWatchNextItem(id, pkg, title)
+
+        @JavascriptInterface
+        fun canSleep(): Boolean = true
+
+        @JavascriptInterface
+        fun setSleepTimer(minutes: Int): Boolean = setNativeSleepTimer(minutes)
+
+        @JavascriptInterface
+        fun getSleepRemainingMinutes(): Int = getNativeSleepMinutes()
+
         @JavascriptInterface
         fun openSettings(): Boolean = start(Intent(Settings.ACTION_SETTINGS))
 
@@ -941,22 +955,44 @@ class MainActivity : Activity() {
         val out = JSONArray()
         if (checkSelfPermission(READ_TV) != PackageManager.PERMISSION_GRANTED) return out
         try {
+            val homeCfg = try {
+                val raw = prefs.getString("config", null)
+                if (raw != null) JSONObject(raw).optJSONObject("home") else null
+            } catch (e: Exception) {
+                null
+            }
+            val skipSet = HashSet<String>().apply {
+                add("com.tcl.browser")
+                homeCfg?.optJSONArray("skip_watch_next")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val p = arr.optString(i)?.trim()
+                        if (!p.isNullOrEmpty()) add(p)
+                    }
+                }
+            }
+            val perAppLimit = (homeCfg?.optInt("watch_next_per_app", 5) ?: 5).coerceIn(1, 20)
+            val hiddenIds = prefs.getStringSet("hidden_watch_next_ids", emptySet()) ?: emptySet()
+
             val cols = arrayOf("_id", "package_name", "title", "episode_title", "season_display_number",
                 "episode_display_number", "poster_art_uri", "thumbnail_uri", "last_playback_position_millis",
                 "duration_millis", "last_engagement_time_utc_millis")
             contentResolver.query(WATCH_NEXT, cols, null, null, "last_engagement_time_utc_millis DESC")?.use { c ->
                 val perApp = HashMap<String, Int>()
-                while (c.moveToNext() && out.length() < 12) {
+                while (c.moveToNext() && out.length() < 20) {
+                    val rowId = c.getLong(0).toString()
                     val pkg = c.getString(1) ?: continue
-                    if (pkg == packageName) continue
-                    val n = (perApp[pkg] ?: 0) + 1
-                    if (n > 4) continue
-                    perApp[pkg] = n
-                    val art = c.getString(7)?.takeIf { it.isNotBlank() } ?: c.getString(6)?.takeIf { it.isNotBlank() }
-                    if (art != null) watchNextArtSeen.add(art)
                     val label = try {
                         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
                     } catch (e: Exception) { pkg }
+                    val rawTitle = c.getString(2) ?: ""
+                    val effectiveTitle = if (rawTitle.isNotBlank()) rawTitle else label
+                    if (rowId in hiddenIds || "$pkg|$effectiveTitle" in hiddenIds || (rawTitle.isNotBlank() && "$pkg|$rawTitle" in hiddenIds)) continue
+                    if (pkg == packageName || pkg in skipSet) continue
+                    val n = (perApp[pkg] ?: 0) + 1
+                    if (n > perAppLimit) continue
+                    perApp[pkg] = n
+                    val art = c.getString(7)?.takeIf { it.isNotBlank() } ?: c.getString(6)?.takeIf { it.isNotBlank() }
+                    if (art != null) watchNextArtSeen.add(art)
                     val pos = c.getLong(8)
                     val dur = c.getLong(9)
                     out.put(JSONObject().apply {
@@ -1006,6 +1042,51 @@ class MainActivity : Activity() {
             }
         } catch (e: Exception) {}
         return false
+    }
+
+    private var nativeSleepTimer: Runnable? = null
+    private var nativeSleepEndMs: Long = 0L
+
+    private fun dismissWatchNextItem(id: String, pkg: String, title: String): Boolean {
+        if (id.isBlank() && pkg.isBlank()) return false
+        return try {
+            val hidden = prefs.getStringSet("hidden_watch_next_ids", emptySet())?.toMutableSet() ?: mutableSetOf()
+            if (id.isNotBlank()) hidden.add(id)
+            if (pkg.isNotBlank() && title.isNotBlank()) hidden.add("$pkg|$title")
+            prefs.edit().putStringSet("hidden_watch_next_ids", hidden).apply()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun setNativeSleepTimer(minutes: Int): Boolean {
+        nativeSleepTimer?.let { main.removeCallbacks(it) }
+        nativeSleepTimer = null
+        if (minutes <= 0) {
+            nativeSleepEndMs = 0L
+            return true
+        }
+        nativeSleepEndMs = System.currentTimeMillis() + (minutes * 60 * 1000L)
+        val runnable = Runnable {
+            nativeSleepEndMs = 0L
+            main.post {
+                if (!startAmbientNow()) {
+                    val i = Intent(AMBIENT_SETTINGS)
+                    if (packageManager.resolveActivity(i, 0) != null) start(i)
+                }
+            }
+        }
+        nativeSleepTimer = runnable
+        main.postDelayed(runnable, minutes * 60 * 1000L)
+        return true
+    }
+
+    private fun getNativeSleepMinutes(): Int {
+        if (nativeSleepEndMs <= 0L) return 0
+        val diff = nativeSleepEndMs - System.currentTimeMillis()
+        if (diff <= 0L) return 0
+        return ((diff + 59999L) / 60000L).toInt()
     }
 
     /** The picture behind a Watch Next card: a web address or a content address the page cannot read itself. */

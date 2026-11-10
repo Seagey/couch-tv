@@ -22,12 +22,22 @@ def line(title, tv, who, days_ago=0.0, **extra):
 
 class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        import config
+        self._orig_people = config.PEOPLE
+        self._orig_people_ids = config.PEOPLE_IDS
+        config.PEOPLE = [{"id": "person1", "name": "Person 1"}, {"id": "person2", "name": "Person 2"}]
+        config.PEOPLE_IDS = ["person1", "person2"]
         for f in (store.HISTORY, store.WHO_FILE):
             if os.path.exists(f):
                 os.remove(f)
         store._cache.clear()
         self.tv = next(iter(server.TVS))
         server._current.set(self.tv)
+
+    def tearDown(self):
+        import config
+        config.PEOPLE = self._orig_people
+        config.PEOPLE_IDS = self._orig_people_ids
 
     def add(self, *items):
         for i in items:
