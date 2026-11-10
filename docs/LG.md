@@ -19,7 +19,7 @@ It needs a computer at home that stays on (option B). Without one you can still 
 and open it from LG's app row, but nothing opens it for you, and nothing extends Developer Mode,
 so the app is removed when the session runs out.
 
-## Test status: seven real LGs so far
+## Test status: nine real LGs so far
 
 **First real LG, 2 November 2026** ([issue #8](https://github.com/Seagey/couch-tv/issues/8)): an
 LG UHD TV on webOS 5.6.2 (2020/2021 firmware), Developer Mode with the Homebrew Channel, the bridge
@@ -134,6 +134,19 @@ App ids from this TV, all shown by their own names: Stremio `io.strem.tv`, JioHo
 `com.zee5.app`, SonyLIV `com.sonyliv2.tvapp`, Amazon Alexa `amazon.alexa.view`, LG Gaming Portal
 `com.twin.app.gamingportal`, Apple TV `com.apple.appletv`, Prime Video `amazon`, YouTube
 `youtube.leanback.v4`.
+
+**Eighth and ninth real LGs, 10 November 2026** ([issue #89](https://github.com/Seagey/couch-tv/issues/89),
+reported by BireshwarChakravarty): an LG QNED88T6A and an LG NANO83A6A (both 2025, webOS 10.3.2, Chrome
+120) on one bridge, on a Mac mini that stays on, set up following AGENTS.md and this page. Everything
+worked first time: `find-tvs.py` and `check-tv.py`, the key, `lg/build.py`, the Accept prompt, the
+power on hook, the daily Extend, the phone remote switching between the two TVs, and `--apps tv` icons.
+Developer Mode and couch-tv survived a firmware update from 10.3.1 to 10.3.2; only Key Server was off
+afterwards and had to be switched on again before `--getkey`. Measured on the TVs with `ares-inspect`:
+a key press took about 50 ms to reach the screen (up to 264 ms at worst on the NANO83), and about 16 ms
+with `home.lighter` on. The JavaScript is 1 to 2 ms; the cost is drawing, mostly the blur and the soft
+shadows. Both TVs draw at devicePixelRatio 2, so every frame is drawn at 4K. webOS closes couch-tv
+whenever another app opens, so every return is a cold start (about 0.8 s on the QNED88, 2.2 to 2.8 s on
+the NANO83).
 
 Everything else was built from LG's documentation and the open source libraries that talk to LG
 TVs, and tested against a stand-in TV on a computer. If you run it on another LG, thank you: please
@@ -422,6 +435,11 @@ the phone says so and you use the TV's remote.
   badly; couch-tv does not have fallbacks for that yet ([#46](https://github.com/Seagey/couch-tv/issues/46)).
   Its power on: webOS 4 has no `system/turnOn`, so the bridge tries `turnOnScreen` and then
   Wake-on-LAN (with "Mobile TV On, Turn on via Wi-Fi" switched on).
+- **A new input tile can be hidden by a saved app order.** If you have already arranged your apps
+  (`data.order`), a tile added later through `home.inputs` lands below the More apps line. Move it
+  into the dock with Arrange apps (or `POST /api/app-order`) (#89).
+- **A slow LG?** Switch on `home.lighter` first: on two 2025 LGs it took a key press from about 50 ms
+  to 16 ms (#89). `home.hi_res: false` also shrinks the app from 22 MB to under 6 MB.
 - No screenshots, no "what is playing", no profile picking, no pressing Play inside other apps.
 
 ## The bridge in Docker on a NAS
