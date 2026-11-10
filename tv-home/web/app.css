@@ -58,6 +58,40 @@ body {
     linear-gradient(180deg, rgba(0, 0, 0, 0) 32%, rgba(0, 0, 0, 0.5) 55%, rgba(0, 0, 0, 0.86) 100%);
 }
 
+/* ================= Ambient Weather & Solar Color Grading ================= */
+.ambient-lighting {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none;
+  opacity: 0;
+  transition: opacity 2.5s cubic-bezier(0.4, 0, 0.2, 1), background 2.5s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 0;
+}
+.ambient-lighting.has-weather-tint {
+  opacity: 1 !important;
+}
+.ambient-lighting.wx-rain-tint {
+  background: linear-gradient(180deg, rgba(16, 26, 42, 0.18) 0%, rgba(10, 18, 30, 0.28) 100%) !important;
+}
+.ambient-lighting.wx-snow-tint {
+  background: linear-gradient(180deg, rgba(220, 235, 255, 0.10) 0%, rgba(180, 205, 235, 0.16) 100%) !important;
+}
+.ambient-lighting.wx-fog-tint {
+  background: linear-gradient(180deg, rgba(200, 215, 225, 0.18) 0%, rgba(185, 200, 215, 0.25) 100%) !important;
+}
+.ambient-lighting.wx-storm-tint {
+  background: linear-gradient(180deg, rgba(12, 16, 28, 0.28) 0%, rgba(8, 10, 20, 0.38) 100%) !important;
+}
+
+.weather-canvas {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+.lighter .weather-canvas, .lighter .ambient-lighting,
+.old-engine .weather-canvas, .old-engine .ambient-lighting {
+  display: none !important;
+}
+
 /* ---------- clock, and the focused show's title ---------- */
 .top {
   position: fixed; top: var(--safe-y); left: var(--safe-x); right: var(--safe-x); z-index: 2;
@@ -1065,6 +1099,8 @@ html.theme-oled, html.theme-oled body {
 .theme-oled .bg,
 .theme-oled .bgvid,
 .theme-oled .scenes,
+.theme-oled .ambient-lighting,
+.theme-oled .weather-canvas,
 .theme-oled .scrim {
   display: none !important;
 }
