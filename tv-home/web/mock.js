@@ -5,9 +5,10 @@
 //
 // Presets for previews, all optional (see docs/CONFIG.md for what each setting means):
 //   people=0..8         that many sample people (default: Person 1 and Person 2)
-//   quick=sleep,look    tvs[].quick, in order (sleep, picture, look, input)
+//   quick=sleep,look    tvs[].quick, in order (sleep, picture, look, soundscape, input)
+//   soundscape=rain     home.soundscape: the sound its button starts with (rain, fire, waves, brown)
 //   picture=1           this TV has a picture mode switch (Calibrated and Dynamic)
-//   look=classic        home.look       clock=24h   home.clock     dock=6   home.dock_size
+//   look=oled           home.look (night, oled, classic)       clock=24h   home.clock     dock=6   home.dock_size
 //   scenes=fog,dawn     home.scenes     secs=8      home.scene_seconds     sunsync=1   home.sun_sync
 //   myscenes=[...]      home.my_scenes, as JSON (docs/MAKE-A-SCENE.md), for your own scenes
 //   lang=it             home.language (en, es, es-MX, it, de, tr); without it, the browser's own language
@@ -61,6 +62,7 @@
   }
   if (arg("picture")) cfg.tvs[0].picture_modes = ["Calibrated", "Dynamic"];
   if (arg("look")) cfg.home.look = arg("look");
+  if (arg("soundscape")) cfg.home.soundscape = arg("soundscape");
   if (arg("clock")) cfg.home.clock = arg("clock");
   if (arg("lang")) cfg.home.language = arg("lang");
   if (arg("dock")) cfg.home.dock_size = parseInt(arg("dock"), 10);

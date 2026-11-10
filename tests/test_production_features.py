@@ -47,6 +47,49 @@ class TestProductionFeatures(unittest.TestCase):
         self.assertIs(config._home({"bedtime_dim": "yes"})["bedtime_dim"], False)
         self.assertIs(config._home({"bedtime_dim": True})["bedtime_dim"], True)
 
+    def test_oled_look_option(self):
+        self.assertEqual(config._home({"look": "oled"})["look"], "oled")
+        self.assertEqual(config._home({"look": "night"})["look"], "night")
+        self.assertEqual(config._home({"look": "classic"})["look"], "classic")
+        self.assertEqual(config._home({"look": "invalid"})["look"], "night")
+
+    def test_soundscape_validation(self):
+        # String shorthand
+        res = config._home({"soundscape": "rain"})
+        self.assertEqual(res["soundscape"], {"type": "rain", "volume": 0.5, "fade_with_sleep": True})
+
+        # Detailed dict
+        res2 = config._home({"soundscape": {"type": "waves", "volume": 0.75, "fade_with_sleep": False}})
+        self.assertEqual(res2["soundscape"], {"type": "waves", "volume": 0.75, "fade_with_sleep": False})
+
+        # Clamped volume
+        res3 = config._home({"soundscape": {"type": "fire", "volume": 1.5}})
+        self.assertEqual(res3["soundscape"]["volume"], 1.0)
+
+        # Invalid type ignored
+        self.assertNotIn("soundscape", config._home({"soundscape": "invalid_ambient"}))
+        self.assertNotIn("soundscape", config._home({"soundscape": {"type": "invalid"}}))
+
+    def test_soundscape_quick_button(self):
+        q = config.quick_for({"quick": ["sleep", "soundscape", "look"]})
+        self.assertEqual(q, ["sleep", "soundscape", "look"])
+
+    def test_home_settings_keep_oled_and_soundscape(self):
+        # what the TV saves from Home settings must survive the bridge's check
+        import server
+        self.assertEqual(server.clean_settings({"look": "oled"})["look"], "oled")
+        self.assertNotIn("look", server.clean_settings({"look": "black"}))
+        got = server.clean_settings({"soundscape": {"type": "rain", "volume": 7, "fade_with_sleep": False}, "quick": ["soundscape", "x"]})
+        self.assertEqual(got["soundscape"], {"type": "rain", "volume": 1.0, "fade_with_sleep": False})
+        self.assertEqual(got["quick"], ["soundscape"])
+        self.assertNotIn("soundscape", server.clean_settings({"soundscape": {"type": "thunder"}}))
+
+    def test_no_soundscape_or_oled_by_default(self):
+        h = config._home({})
+        self.assertNotIn("soundscape", h)
+        self.assertEqual(h["look"], "night")
+        self.assertNotIn("soundscape", config.quick_for({}))
+
 
 if __name__ == "__main__":
     unittest.main()

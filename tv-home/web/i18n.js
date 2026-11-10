@@ -22,6 +22,12 @@
   var S = {};
 
   S.en = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv is no longer installed on the TV. Developer Mode probably ran out. Switch Developer Mode on again and ask Claude to reinstall couch-tv.",
+    devmode_runs_out: "Developer Mode runs out in {days} days, and then LG removes couch-tv. Turn the TV on for a minute so it can be renewed, or press Extend in the Developer Mode app on the TV.",
+    devmode_not_renewed_left: "Developer Mode has not been renewed for {days} days ({left} days left). It renews the next time the TV is on.",
+    devmode_not_renewed: "Developer Mode has not been renewed for {days} days. It renews the next time the TV is on.",
+
     // ---- the home ----
     keep_watching: "Keep watching",
     who_watching: "Who is watching",
@@ -39,12 +45,20 @@
     switching: "Switching…",
     picture_mode: "Picture mode",
     classic_look: "Classic look",
+    oled_look: "OLED Cinema look",
     night_look: "Night look",
     input: "Input",
     bluetooth: "Bluetooth",
     network: "Network",
     n_min: "{n} min",
     timer_off: "Off",
+    soundscape: "Soundscape",
+    sound_off: "Off",
+    sound_rain: "Gentle rain",
+    sound_fire: "Fireplace",
+    sound_waves: "Ocean waves",
+    sound_brown: "Brown noise",
+    sound_volume: "Soundscape volume",
     pic_not_ready: "Switching picture mode from here isn't ready yet.",
     no_inputs: "This TV has no input list to open.",
     inputs_hint: "Up and down to choose, OK to switch, Back to close",
@@ -149,6 +163,8 @@
     look_head: "Look",
     look_night: "Night scenes",
     look_night_sub: "A big glass clock, scenes taking turns",
+    look_oled: "OLED Cinema",
+    look_oled_sub: "Pitch-black background for OLEDs, glowing focus, burn-in protection",
     look_classic: "Classic",
     look_classic_sub: "One photo and a grid of app banners",
     scenes_head: "Scenes",
@@ -253,6 +269,7 @@
     quick_sleep: "Sleep timer",
     quick_picture: "Picture mode switch",
     quick_look: "Look switch",
+    quick_soundscape: "Soundscape",
     quick_input: "Input list",
     quick_screensaver: "Screensaver",
     no_screensaver: "This TV has no screensaver to open.",
@@ -349,6 +366,12 @@
   };
 
   S.es = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv ya no está instalado en el televisor. Seguramente se acabó Developer Mode. Vuelve a activar Developer Mode y pídele a Claude que reinstale couch-tv.",
+    devmode_runs_out: "Developer Mode se acaba en {days} días y entonces LG quita couch-tv. Enciende el televisor un minuto para que se renueve, o pulsa Extend en la app Developer Mode del televisor.",
+    devmode_not_renewed_left: "Developer Mode lleva {days} días sin renovarse (quedan {left} días). Se renueva la próxima vez que el televisor esté encendido.",
+    devmode_not_renewed: "Developer Mode lleva {days} días sin renovarse. Se renueva la próxima vez que el televisor esté encendido.",
+
     keep_watching: "Seguir viendo",
     who_watching: "Quién está viendo",
     apps: "Apps",
@@ -365,12 +388,20 @@
     switching: "Cambiando…",
     picture_mode: "Modo de imagen",
     classic_look: "Aspecto clásico",
+    oled_look: "Aspecto OLED Cinema",
     night_look: "Aspecto nocturno",
     input: "Entrada",
     bluetooth: "Bluetooth",
     network: "Red",
     n_min: "{n} min",
     timer_off: "Quitar",
+    soundscape: "Sonidos ambientales",
+    sound_off: "Desactivado",
+    sound_rain: "Lluvia suave",
+    sound_fire: "Chimenea",
+    sound_waves: "Olas del mar",
+    sound_brown: "Ruido marrón",
+    sound_volume: "Volumen de sonido",
     pic_not_ready: "Todavía no se puede cambiar el modo de imagen desde aquí.",
     no_inputs: "Este televisor no tiene una lista de entradas que abrir.",
     inputs_hint: "Arriba y abajo para elegir, OK para cambiar, Atrás para cerrar",
@@ -472,6 +503,8 @@
     look_head: "Aspecto",
     look_night: "Escenas nocturnas",
     look_night_sub: "Un gran reloj de cristal y escenas que se turnan",
+    look_oled: "OLED Cinema",
+    look_oled_sub: "Fondo negro puro para pantallas OLED, acentos luminosos y protección contra quemados",
     look_classic: "Clásico",
     look_classic_sub: "Una foto y una cuadrícula de apps",
     scenes_head: "Escenas",
@@ -576,6 +609,7 @@
     quick_sleep: "Temporizador",
     quick_picture: "Cambio de modo de imagen",
     quick_look: "Cambio de aspecto",
+    quick_soundscape: "Sonidos ambientales",
     quick_input: "Lista de entradas",
     quick_screensaver: "Protector de pantalla",
     no_screensaver: "Este televisor no tiene un protector de pantalla que abrir.",
@@ -672,8 +706,15 @@
 
   // Only what Mexico says differently; everything else comes from es.
   S["es-MX"] = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv ya no está instalado en la TV. Seguramente se acabó Developer Mode. Vuelve a activar Developer Mode y pídele a Claude que reinstale couch-tv.",
+    devmode_runs_out: "Developer Mode se acaba en {days} días y entonces LG quita couch-tv. Prende la TV un minuto para que se renueve, o presiona Extend en la app Developer Mode de la TV.",
+    devmode_not_renewed_left: "Developer Mode lleva {days} días sin renovarse (quedan {left} días). Se renueva la próxima vez que la TV esté prendida.",
+    devmode_not_renewed: "Developer Mode lleva {days} días sin renovarse. Se renueva la próxima vez que la TV esté prendida.",
+
     settings: "Configuración",
     classic_look: "Vista clásica",
+    oled_look: "Vista OLED Cinema",
     night_look: "Vista nocturna",
     no_inputs: "Esta TV no tiene una lista de entradas para abrir.",
     computer_off: "La computadora está apagada, así que no se ven los programas. Las apps sí funcionan.",
@@ -802,6 +843,12 @@
   };
 
   S.it = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv non è più installata sulla TV. Probabilmente la Developer Mode è scaduta. Riattiva la Developer Mode e chiedi a Claude di reinstallare couch-tv.",
+    devmode_runs_out: "La Developer Mode scade tra {days} giorni, e poi LG rimuove couch-tv. Accendi la TV per un minuto così si rinnova, oppure premi Extend nell’app Developer Mode sulla TV.",
+    devmode_not_renewed_left: "La Developer Mode non si rinnova da {days} giorni (ne restano {left}). Si rinnova la prossima volta che la TV è accesa.",
+    devmode_not_renewed: "La Developer Mode non si rinnova da {days} giorni. Si rinnova la prossima volta che la TV è accesa.",
+
     keep_watching: "Continua a guardare",
     who_watching: "Chi sta guardando",
     apps: "App",
@@ -818,12 +865,20 @@
     switching: "Cambio…",
     picture_mode: "Modalità immagine",
     classic_look: "Aspetto classico",
+    oled_look: "Aspetto OLED Cinema",
     night_look: "Aspetto notturno",
     input: "Ingresso",
     bluetooth: "Bluetooth",
     network: "Rete",
     n_min: "{n} min",
     timer_off: "Spento",
+    soundscape: "Suoni ambientali",
+    sound_off: "Disattivato",
+    sound_rain: "Pioggia leggera",
+    sound_fire: "Caminetto",
+    sound_waves: "Onde dell'oceano",
+    sound_brown: "Rumore marrone",
+    sound_volume: "Volume suoni",
     pic_not_ready: "Da qui non si può ancora cambiare la modalità immagine.",
     no_inputs: "Questa TV non ha un elenco di ingressi da aprire.",
     inputs_hint: "Su e giù per scegliere, OK per passare, Indietro per chiudere",
@@ -925,6 +980,8 @@
     look_head: "Aspetto",
     look_night: "Scene notturne",
     look_night_sub: "Un grande orologio di vetro e scene che si alternano",
+    look_oled: "OLED Cinema",
+    look_oled_sub: "Sfondo nero puro per OLED, dettagli luminosi e protezione burn-in",
     look_classic: "Classico",
     look_classic_sub: "Una foto e una griglia di app",
     scenes_head: "Scene",
@@ -1029,6 +1086,7 @@
     quick_sleep: "Timer di spegnimento",
     quick_picture: "Cambio della modalità immagine",
     quick_look: "Cambio di aspetto",
+    quick_soundscape: "Suoni ambientali",
     quick_input: "Elenco degli ingressi",
     quick_screensaver: "Salvaschermo",
     no_screensaver: "Questo televisore non ha un salvaschermo da aprire.",
@@ -1125,6 +1183,12 @@
 
   // German. The air conditioning words are the ones Home Assistant's German interface uses.
   S.de = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv ist nicht mehr auf dem Fernseher installiert. Wahrscheinlich ist der Developer Mode abgelaufen. Schalte den Developer Mode wieder ein und bitte Claude, couch-tv neu zu installieren.",
+    devmode_runs_out: "Der Developer Mode läuft in {days} Tagen ab, dann entfernt LG couch-tv. Schalte den Fernseher für eine Minute ein, damit er verlängert wird, oder drücke Extend in der App Developer Mode auf dem Fernseher.",
+    devmode_not_renewed_left: "Der Developer Mode wurde seit {days} Tagen nicht verlängert (noch {left} Tage). Er wird verlängert, sobald der Fernseher das nächste Mal an ist.",
+    devmode_not_renewed: "Der Developer Mode wurde seit {days} Tagen nicht verlängert. Er wird verlängert, sobald der Fernseher das nächste Mal an ist.",
+
     // ---- the home ----
     keep_watching: "Weiterschauen",
     who_watching: "Wer schaut gerade",
@@ -1142,12 +1206,20 @@
     switching: "Wird umgeschaltet…",
     picture_mode: "Bildmodus",
     classic_look: "Klassische Ansicht",
+    oled_look: "OLED-Kinoansicht",
     night_look: "Nachtansicht",
     input: "Eingang",
     bluetooth: "Bluetooth",
     network: "Netzwerk",
     n_min: "{n} Min.",
     timer_off: "Aus",
+    soundscape: "Klanglandschaft",
+    sound_off: "Aus",
+    sound_rain: "Sanfter Regen",
+    sound_fire: "Kaminfeuer",
+    sound_waves: "Meereswellen",
+    sound_brown: "Braunes Rauschen",
+    sound_volume: "Klang-Lautstärke",
     pic_not_ready: "Den Bildmodus von hier aus zu wechseln geht noch nicht.",
     no_inputs: "Dieser Fernseher hat keine Eingangsliste zum Öffnen.",
     inputs_hint: "Hoch und runter zum Auswählen, OK zum Umschalten, Zurück zum Schließen",
@@ -1252,6 +1324,8 @@
     look_head: "Ansicht",
     look_night: "Nachtszenen",
     look_night_sub: "Eine große Glasuhr, die Szenen wechseln sich ab",
+    look_oled: "OLED Cinema",
+    look_oled_sub: "Tiefschwarzer Hintergrund für OLEDs, leuchtende Fokus-Akzente, Einbrennschutz",
     look_classic: "Klassisch",
     look_classic_sub: "Ein Foto und ein Raster mit App-Bannern",
     scenes_head: "Szenen",
@@ -1356,6 +1430,7 @@
     quick_sleep: "Sleep-Timer",
     quick_picture: "Bildmodus-Schalter",
     quick_look: "Ansicht-Schalter",
+    quick_soundscape: "Klanglandschaft",
     quick_input: "Eingangsliste",
     quick_screensaver: "Bildschirmschoner",
     no_screensaver: "Dieser Fernseher hat keinen Bildschirmschoner zum Öffnen.",
@@ -1452,6 +1527,12 @@
   };
 
   S.tr = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv artık TV’de yüklü değil. Developer Mode’un süresi büyük olasılıkla doldu. Developer Mode’u yeniden aç ve Claude’dan couch-tv’yi yeniden yüklemesini iste.",
+    devmode_runs_out: "Developer Mode’un süresi {days} gün içinde doluyor, ardından LG couch-tv’yi kaldırır. Yenilenmesi için TV’yi bir dakikalığına aç ya da TV’deki Developer Mode uygulamasında Extend’e bas.",
+    devmode_not_renewed_left: "Developer Mode {days} gündür yenilenmedi ({left} gün kaldı). TV bir sonraki açılışında yenilenir.",
+    devmode_not_renewed: "Developer Mode {days} gündür yenilenmedi. TV bir sonraki açılışında yenilenir.",
+
     // ---- the home ----
     keep_watching: "İzlemeye devam et",
     who_watching: "Kim izliyor",
@@ -1469,12 +1550,20 @@
     switching: "Değiştiriliyor…",
     picture_mode: "Resim modu",
     classic_look: "Klasik görünüm",
+    oled_look: "OLED Sinema görünümü",
     night_look: "Gece görünümü",
     input: "Giriş",
     bluetooth: "Bluetooth",
     network: "Ağ",
     n_min: "{n} dk",
     timer_off: "Kapat",
+    soundscape: "Ortam sesleri",
+    sound_off: "Kapalı",
+    sound_rain: "Hafif yağmur",
+    sound_fire: "Şömine",
+    sound_waves: "Okyanus dalgaları",
+    sound_brown: "Kahverengi gürültü",
+    sound_volume: "Ses seviyesi",
     pic_not_ready: "Resim modunu buradan değiştirmek henüz hazır değil.",
     no_inputs: "Bu TV'nin açılacak bir giriş listesi yok.",
     inputs_hint: "Seçmek için yukarı/aşağı, geçmek için OK, kapatmak için Geri",
@@ -1579,6 +1668,8 @@
     look_head: "Görünüm",
     look_night: "Gece sahneleri",
     look_night_sub: "Büyük cam saat, sırayla değişen sahneler",
+    look_oled: "OLED Cinema",
+    look_oled_sub: "OLED için saf siyah arka plan, parlak odak ve ekran yanması koruması",
     look_classic: "Klasik",
     look_classic_sub: "Tek fotoğraf ve uygulama afişlerinden bir ızgara",
     scenes_head: "Sahneler",
@@ -1683,6 +1774,7 @@
     quick_sleep: "Uyku zamanlayıcısı",
     quick_picture: "Resim modu değiştirici",
     quick_look: "Görünüm değiştirici",
+    quick_soundscape: "Ortam sesleri",
     quick_input: "Giriş listesi",
     quick_bluetooth: "Bluetooth cihazları",
     quick_network: "Ağ",
@@ -1774,6 +1866,12 @@
 
   // French. Not in the upstream repo yet; added here so the home speaks French.
   S.fr = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv n’est plus installé sur la télé. Le Developer Mode a sûrement expiré. Réactive le Developer Mode et demande à Claude de réinstaller couch-tv.",
+    devmode_runs_out: "Le Developer Mode expire dans {days} jours, et LG supprimera alors couch-tv. Allume la télé une minute pour qu’il soit renouvelé, ou appuie sur Extend dans l’appli Developer Mode de la télé.",
+    devmode_not_renewed_left: "Le Developer Mode n’a pas été renouvelé depuis {days} jours (il reste {left} jours). Il sera renouvelé la prochaine fois que la télé sera allumée.",
+    devmode_not_renewed: "Le Developer Mode n’a pas été renouvelé depuis {days} jours. Il sera renouvelé la prochaine fois que la télé sera allumée.",
+
     // ---- the home ----
     keep_watching: "Reprendre",
     who_watching: "Qui regarde",
@@ -1791,12 +1889,20 @@
     switching: "Changement…",
     picture_mode: "Mode image",
     classic_look: "Look Classic",
+    oled_look: "Look OLED Cinéma",
     night_look: "Look nuit",
     input: "Entrées",
     bluetooth: "Bluetooth",
     network: "Réseau",
     n_min: "{n} min",
     timer_off: "Désactivé",
+    soundscape: "Ambiance sonore",
+    sound_off: "Désactivé",
+    sound_rain: "Pluie douce",
+    sound_fire: "Feu de cheminée",
+    sound_waves: "Vagues de l'océan",
+    sound_brown: "Bruit brun",
+    sound_volume: "Volume d'ambiance",
     pic_not_ready: "Changer le mode image depuis ici n'est pas encore prêt.",
     no_inputs: "Cette TV n'a pas de liste d'entrées à ouvrir.",
     computer_off: "L'ordinateur est éteint, donc les séries sont masquées. Les applis marchent.",
@@ -1889,6 +1995,8 @@
     look_head: "Look",
     look_night: "Scènes de nuit",
     look_night_sub: "Une grande horloge en verre, des scènes qui défilent",
+    look_oled: "OLED Cinema",
+    look_oled_sub: "Fond noir absolu pour OLED, accents lumineux et protection anti-marquage",
     look_classic: "Classic",
     look_classic_sub: "Une photo et une grille de bannières d'applis",
     scenes_head: "Scènes",
@@ -1963,6 +2071,7 @@
     quick_sleep: "Minuteur de sommeil",
     quick_picture: "Changement de mode image",
     quick_look: "Changement de look",
+    quick_soundscape: "Ambiance sonore",
     quick_input: "Liste des entrées",
     quick_bluetooth: "Appareils Bluetooth",
     quick_network: "Réseau",

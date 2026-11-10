@@ -1,5 +1,6 @@
 """LG Developer Mode health: the warning sentences from the countdown and the last good Extend."""
 import json
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -64,6 +65,33 @@ class Warning(unittest.TestCase):
         t = make_tv(left={"hours": 10.0, "hours_at": iso(0), "at": iso(0)})
         t.extend_devmode = False
         self.assertIsNone(t.devmode_warning())
+
+
+class Translatable(unittest.TestCase):
+    """The warning also goes out as a key and numbers, and every language has the four sentences."""
+
+    def test_status_has_the_key_and_numbers(self):
+        t = make_tv(left={"hours": 100.0, "hours_at": iso(0), "at": iso(0)})
+        st = t.devmode_status()
+        self.assertEqual((st["level"], st["warning_key"], st["warning_vars"]), ("alert", "devmode_runs_out", {"days": 4}))
+        self.assertIn("4 days", st["warning"])
+
+    def test_no_warning_no_key(self):
+        st = make_tv(devmode={"ok": True, "at": iso(3600)}).devmode_status()
+        self.assertIsNone(st["warning"])
+        self.assertIsNone(st["warning_key"])
+
+    def test_every_language_has_the_sentences(self):
+        root = Path(__file__).parents[1]
+        for f in ("tv-home/web/i18n.js", "remote/src/i18n.js"):
+            src = (root / f).read_text()
+            for key, english in lg.LGTV.DEVMODE_WARNINGS.items():
+                found = re.findall(r"\b%s: ['\"](.+?)['\"],\n" % key, src)
+                langs = 7 if f.startswith("tv-home") else 6
+                self.assertEqual(len(found), langs, (f, key))
+                self.assertEqual(found[0], english, (f, key))   # en comes first, same words as the bridge
+                for said in found:
+                    self.assertEqual(set(re.findall(r"\{\w+\}", said)), set(re.findall(r"\{\w+\}", english)), (f, key, said))
 
 
 if __name__ == "__main__":

@@ -1016,3 +1016,63 @@ html.has-pointer.glass .ssec:hover {
   overflow: hidden !important;
   transition: transform 220ms var(--ease), opacity 200ms var(--ease), max-width 240ms var(--ease), margin 240ms var(--ease) !important;
 }
+
+/* ================= OLED Cinema Mode =================
+   Pure #000000 pitch-black background to deactivate OLED pixels,
+   luminous glowing focus rings, obsidian panels, and burn-in shift. */
+html.theme-oled, html.theme-oled body {
+  background: #000000 !important;
+  background-color: #000000 !important;
+}
+.theme-oled .bg,
+.theme-oled .bgvid,
+.theme-oled .scenes,
+.theme-oled .scrim {
+  display: none !important;
+}
+.theme-oled .top,
+.theme-oled .shelf,
+.theme-oled .apps {
+  transform: translate(var(--oled-shift-x, 0px), var(--oled-shift-y, 0px));
+  transition: transform 1.5s ease-in-out;
+}
+.theme-oled .people,
+.theme-oled .qbtn:not(.focus):not(.set),   /* the focused button keeps its white face, or its dark text vanishes */
+.theme-oled .grid,
+.theme-oled .ncard {
+  background: rgba(14, 14, 18, 0.95);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.12);
+}
+.theme-oled .tile.focus .face,
+.theme-oled .app.focus .face {
+  box-shadow: 0 0 1.5rem rgba(120, 190, 255, 0.55), 0 0 0 0.2rem #ffffff !important;
+  transform: scale(1.05);
+}
+.theme-oled .qbtn.focus,
+.theme-oled .person.focus,
+.theme-oled .ncard.focus {
+  box-shadow: 0 0 1.25rem rgba(120, 190, 255, 0.5), 0 0 0 0.1875rem #ffffff !important;
+}
+.theme-oled .shelf-head h2,
+.theme-oled .time {
+  color: #ffffff;
+  text-shadow: 0 0 1.5rem rgba(255, 255, 255, 0.25);
+}
+.theme-oled .date,
+.theme-oled .place,
+.theme-oled .shelf-head .status {
+  color: rgba(255, 255, 255, 0.72);
+}
+.theme-oled .settings,
+.theme-oled .smart {
+  background: #060608;
+  box-shadow: 0 0 3.5rem rgba(0, 0, 0, 0.95);
+}
+.theme-oled .gear-pop,
+.theme-oled .app-pop,
+.theme-oled .people-pop,
+.theme-oled .sleep-menu {
+  background: rgba(18, 18, 24, 0.98);
+  box-shadow: 0 0 2rem rgba(0, 0, 0, 0.85), inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.18);
+}
+

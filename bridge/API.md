@@ -197,7 +197,7 @@ copy. All keys are explained in `docs/CONFIG.md`.
  "default_tv": "living-room", "ask": {"enabled": true}, "phone_remote": true}
 ```
 `tvs[].quick` is the quick buttons for that TV, in order: any of `sleep`, `picture`, `look`,
-`input`. `picture_modes` is the two mode names for the picture button (empty without a `picture`
+`soundscape`, `input`. `picture_modes` is the two mode names for the picture button (empty without a `picture`
 entry). The home itself hides a button that cannot work at the moment.
 
 ### `GET /api/events`
@@ -517,7 +517,7 @@ is optional:
 | `lang` | `en`, `es`, `es-MX`, `it`, `de` or `tr`. |
 | `place` | The weather's place: `name`, `lat`, `lon` (rounded to two decimals, a town, never a house), `timezone`. |
 | `wx_show`, `wx_unit`, `wx_every` | Weather on or off, `c` or `f`, minutes between checks (15, 30 or 60). |
-| `look` | `night` or `classic`. |
+| `look` | `night`, `oled` (the Classic grid on pure black) or `classic`. |
 | `glass` | Glass panels: `off`, `on` or `lite` (no blur). |
 | `glass_icons` | Glass app icons: `true` or `false`. |
 | `moving_tiles` | The focused tile's slow sway: `true` or `false`. |
@@ -533,7 +533,8 @@ is optional:
 | `sun_sync` | Follow the sun on or off: `true` or `false`. |
 | `photos` | Up to 20: `{"id", "url"}` for a photo on the web, or `{"id", "file"}` for one the TV's file picker copied into the app (`p....jpg`, kept on the TV only). |
 | `hidden_apps` | Packages hidden from the home and More apps on this TV. |
-| `quick` | The quick buttons, in order: any of `sleep`, `picture`, `look`, `input`. |
+| `soundscape` | Ambient sleep sound: `{"type": "rain", "volume": 0.5, "fade_with_sleep": true}`. `type` is `off`, `rain`, `fire`, `waves` or `brown`, `volume` 0 to 1. It never plays by itself: it starts only when someone presses the Soundscape button or the row in Home settings. |
+| `quick` | The quick buttons, in order: any of `sleep`, `picture`, `look`, `soundscape`, `input`. |
 
 Unknown keys and wrong shapes are dropped. Larger than 32 KB answers `413`. With no bridge (option
 A) the TV keeps them alone. The on-TV app (option C) keeps them in its own `/api/settings` under

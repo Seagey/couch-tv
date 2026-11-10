@@ -793,12 +793,26 @@ class LGTV:
         self.log.info("Developer Mode left: %s", out.get("hours") if "error" not in out else out["error"])
         return out
 
-    def devmode_warning(self):
-        """A plain sentence when couch-tv is at risk, else None. ("alert" or "warn", text)"""
+    # The warning as a key and numbers, so the TV home and the phone can say it in their language
+    # (devmode_* in tv-home/web/i18n.js and remote/src/i18n.js). The English text below is also sent,
+    # for a TV home or phone that is older than these keys.
+    DEVMODE_WARNINGS = {
+        "devmode_gone": "couch-tv is no longer installed on the TV. Developer Mode probably ran out. "
+                        "Switch Developer Mode on again and ask Claude to reinstall couch-tv.",
+        "devmode_runs_out": "Developer Mode runs out in {days} days, and then LG removes couch-tv. "
+                            "Turn the TV on for a minute so it can be renewed, or press Extend in the "
+                            "Developer Mode app on the TV.",
+        "devmode_not_renewed_left": "Developer Mode has not been renewed for {days} days ({left} days left). "
+                                    "It renews the next time the TV is on.",
+        "devmode_not_renewed": "Developer Mode has not been renewed for {days} days. "
+                               "It renews the next time the TV is on.",
+    }
+
+    def devmode_warning_parts(self):
+        """(level, key, vars) when couch-tv is at risk, else None. level is "alert" or "warn"."""
         ids = {p.get("id") for p in self.launch_points}
         if self.launch_points and self.app_id not in ids:
-            return ("alert", "couch-tv is no longer installed on the TV. Developer Mode probably ran out. "
-                             "Switch Developer Mode on again and ask Claude to reinstall couch-tv.")
+            return ("alert", "devmode_gone", {})
         if not self.extend_devmode:
             return None
         left = self._left_state()
@@ -806,27 +820,30 @@ class LGTV:
         if h is not None and h_at:
             h -= (time.time() - h_at) / 3600   # it keeps counting down since it was read
             if h < 168:
-                return ("alert", f"Developer Mode runs out in {max(0, int(h // 24))} days, and then LG removes couch-tv. "
-                                 "Turn the TV on for a minute so it can be renewed, or press Extend in the "
-                                 "Developer Mode app on the TV.")
+                return ("alert", "devmode_runs_out", {"days": max(0, int(h // 24))})
             if h < 900:
-                return ("warn", f"Developer Mode has not been renewed for {int((999 - h) // 24)} days "
-                                f"({int(h // 24)} days left). It renews the next time the TV is on.")
+                return ("warn", "devmode_not_renewed_left", {"days": int((999 - h) // 24), "left": int(h // 24)})
             return None
         st = self._devmode_state()
         ok_at = _ts(st.get("last_ok_at") or (st.get("at") if st.get("ok") else None))
         if ok_at and time.time() - ok_at > 3 * 86400:
-            return ("warn", f"Developer Mode has not been renewed for {int((time.time() - ok_at) // 86400)} days. "
-                            "It renews the next time the TV is on.")
+            return ("warn", "devmode_not_renewed", {"days": int((time.time() - ok_at) // 86400)})
         return None
+
+    def devmode_warning(self):
+        """A plain English sentence when couch-tv is at risk, else None. ("alert" or "warn", text)"""
+        w = self.devmode_warning_parts()
+        return (w[0], self.DEVMODE_WARNINGS[w[1]].format(**w[2])) if w else None
 
     def devmode_status(self):
         s = self._devmode_state()
-        left, w = self._left_state(), self.devmode_warning()
+        left, w = self._left_state(), self.devmode_warning_parts()
+        text = self.DEVMODE_WARNINGS[w[1]].format(**w[2]) if w else None
         return {"on": self.extend_devmode, "last": s.get("at"), "ok": s.get("ok"), "how": s.get("how"),
                 "error": s.get("error"), "last_ok": s.get("last_ok_at") or (s.get("at") if s.get("ok") else None), "fails": s.get("fails", 0),
                 "hours_left": left.get("hours"), "hours_read": left.get("hours_at"),
-                "warning": w[1] if w else None, "level": w[0] if w else None}
+                "warning": text, "level": w[0] if w else None,
+                "warning_key": w[1] if w else None, "warning_vars": w[2] if w else None}
 
     # ---------- the remote ----------
     async def _pointer(self):

@@ -1415,7 +1415,7 @@ def clean_settings(s):
         out["wx_unit"] = s["wx_unit"]
     if s.get("wx_every") in (15, 30, 60):
         out["wx_every"] = s["wx_every"]
-    if s.get("look") in ("night", "classic"):
+    if s.get("look") in ("night", "oled", "classic"):
         out["look"] = s["look"]
     if s.get("glass") in ("off", "on", "lite"):
         out["glass"] = s["glass"]
@@ -1465,6 +1465,10 @@ def clean_settings(s):
         out["hidden_apps"] = [x for x in dict.fromkeys(s["hidden_apps"]) if isinstance(x, str) and _PACKAGE.fullmatch(x)][:200]
     if isinstance(s.get("quick"), list):
         out["quick"] = [x for x in dict.fromkeys(s["quick"]) if x in config.QUICK_IDS]
+    sc = s.get("soundscape")
+    if isinstance(sc, dict) and sc.get("type") in config.SOUNDSCAPE_TYPES:
+        out["soundscape"] = {"type": sc["type"], "volume": config._float(sc.get("volume"), 0.5, 0.0, 1.0),
+                             "fade_with_sleep": sc.get("fade_with_sleep") is not False}
     return out
 
 
