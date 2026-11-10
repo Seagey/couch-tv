@@ -36,16 +36,16 @@ settings), and what is chosen there wins on that TV. See
 | `close_on_off` | Android TVs, option B: apps the bridge force-stops when this TV turns off, for example `["com.disney.disneyplus"]`. For an app that signs you out when it wakes before the TV is back on the Wi-Fi. |
 | `quick` [`["sleep"]`, plus `"picture"` when the TV has a `picture` entry] | The quick buttons on the TV home, in this order. See below. |
 | `picture` | Only used when `"picture"` is in `quick`. See below. |
-| `kind` [`"android"`] | `"samsung"` for a Samsung TV (Tizen), `"lg"` for an LG TV (webOS). The bridge then uses `bridge/samsung.py` or `bridge/lg.py` instead of ADB and the Android remote. See [SAMSUNG.md](SAMSUNG.md) and [LG.md](LG.md). |
-| `open_on_power_on` [true] | Samsung and LG only: open the couch-tv app whenever the TV is switched on and nothing else is on screen. |
-| `app_id` [`"CouchTVApp.Home"`, LG `"app.couchtv.home"`] | Samsung and LG only: the couch-tv app's id on the TV, if you changed it in `samsung/app/config.xml` or `lg/app/appinfo.json`. |
+| `kind` [`"android"`] | `"samsung"` for a Samsung TV (Tizen), `"lg"` for an LG TV (webOS), `"roku"` for a Roku TV or box. The bridge then uses `bridge/samsung.py`, `bridge/lg.py` or `bridge/roku.py` instead of ADB and the Android remote. See [SAMSUNG.md](SAMSUNG.md), [LG.md](LG.md) and [ROKU.md](ROKU.md). |
+| `open_on_power_on` [true] | Samsung, LG and Roku only: open the couch-tv app whenever the TV is switched on and nothing else is on screen. |
+| `app_id` [`"CouchTVApp.Home"`, LG `"app.couchtv.home"`, Roku `"dev"`] | Samsung, LG and Roku only: the couch-tv app's id on the TV, if you changed it in `samsung/app/config.xml` or `lg/app/appinfo.json`. On a Roku a sideloaded channel is always `dev`. |
 | `remote_name` [`client_name`] | Samsung only: the name the TV shows when it asks to Allow the remote. |
 | `extend_devmode` [true] | LG only: press Developer Mode's Extend once a day while the TV is on, so the app is not removed. |
-| `leave_inputs` [false] | LG only: an HDMI or external input counts as in use (a computer or a console on it). The TV coming on there is left alone, and the daily Extend never switches away from it. |
+| `leave_inputs` [false] | LG and Roku only: an HDMI or external input counts as in use (a computer or a console on it). The TV coming on there is left alone, and the daily Extend never switches away from it. |
 | `back_to_couch` [false] | LG only: when an app closes to LG's home (Back out of Netflix, say), couch-tv opens again a second later. Home pressed while couch-tv is open still reaches LG's home. |
 | `ares_device` [the TV's `id`] | LG only: this TV's name in LG's ares tools (`ares-setup-device`). |
 | `ares_launch` [found on the PATH] | LG only: the full path to `ares-launch`, for a bridge that cannot find it (started by launchd, for example). |
-| `port` [3000, then 3001] | LG only: the network remote's port, if your TV only answers on one of them. |
+| `port` [LG 3000, then 3001; Roku 8060] | LG and Roku only: the network remote's port, if your TV only answers on one of them (a Roku's is 8060 unless something else changed it). |
 
 ### Quick buttons (`quick`)
 

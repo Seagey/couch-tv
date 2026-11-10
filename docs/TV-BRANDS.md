@@ -33,6 +33,7 @@ good sign. A Fire TV, Alexa-only or Roku button means it does not.
 | Vizio | No | SmartCast, now Vizio OS | Never Google TV |
 | Samsung | No | Tizen only | couch-tv as an app: [SAMSUNG.md](SAMSUNG.md) |
 | LG | No | webOS only | couch-tv as an app (built, run on five real LGs so far): [LG.md](LG.md) |
+| Any brand's Roku TV (TCL, Hisense, Sharp, Onn, Philips and others that sell one) | No | Roku OS only | couch-tv as a channel (built, not yet run on a real Roku): [ROKU.md](ROKU.md) |
 
 Have a TV that says no? A Google TV box (for example the Google TV Streamer) plugged into any HDMI
 port gets you everything.

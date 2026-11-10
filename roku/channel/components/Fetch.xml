@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- One web request, run on a task (a Roku scene may not make them itself). Set url, method, body and tag,
+     then control = "run"; read status and response when "done" changes. status is -1 when nothing answered. -->
+<component name="Fetch" extends="Task">
+    <interface>
+        <field id="url" type="string" />
+        <field id="method" type="string" value="GET" />
+        <field id="body" type="string" />
+        <field id="tag" type="string" />
+        <field id="status" type="integer" />
+        <field id="response" type="string" />
+        <field id="done" type="boolean" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/Fetch.brs" />
+</component>
