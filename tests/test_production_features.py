@@ -83,6 +83,8 @@ class TestProductionFeatures(unittest.TestCase):
         self.assertEqual(got["soundscape"], {"type": "rain", "volume": 1.0, "fade_with_sleep": False})
         self.assertEqual(got["quick"], ["soundscape"])
         self.assertNotIn("soundscape", server.clean_settings({"soundscape": {"type": "thunder"}}))
+        self.assertIs(server.clean_settings({"ambient_music": True})["ambient_music"], True)
+        self.assertIs(server.clean_settings({"ambient_music": False})["ambient_music"], False)
 
     def test_no_soundscape_or_oled_by_default(self):
         h = config._home({})

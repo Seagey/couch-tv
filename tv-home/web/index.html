@@ -44,6 +44,36 @@
   </div>
 </header>
 
+<!-- Ambient Music Art Screen: large album cover, dynamic ambient backlight, and remote media controls -->
+<div class="ambient-music" id="ambient-music" aria-live="polite">
+  <div class="ambient-glow" id="ambient-glow"></div>
+  <div class="ambient-stage" id="ambient-stage">
+    <div class="ambient-art-wrap" id="ambient-art-wrap">
+      <img class="ambient-art" id="ambient-art" src="" alt="" decoding="async">
+      <div class="ambient-art-fallback" id="ambient-art-fallback"></div>
+      <div class="ambient-vinyl" id="ambient-vinyl"></div>
+    </div>
+    <div class="ambient-meta">
+      <span class="ambient-app" id="ambient-app"></span>
+      <h1 class="ambient-title" id="ambient-title"></h1>
+      <p class="ambient-artist" id="ambient-artist"></p>
+      <div class="ambient-progress" id="ambient-progress">
+        <span class="ambient-time ambient-time-cur" id="ambient-time-cur">0:00</span>
+        <div class="ambient-bar-track">
+          <div class="ambient-bar-fill" id="ambient-bar-fill"></div>
+        </div>
+        <span class="ambient-time ambient-time-total" id="ambient-time-total">0:00</span>
+      </div>
+      <div class="ambient-controls" id="ambient-controls">
+        <span class="amb-btn" id="amb-prev" role="button" aria-label="Previous"></span>
+        <span class="amb-btn" id="amb-play" role="button" aria-label="Play or Pause"></span>
+        <span class="amb-btn" id="amb-next" role="button" aria-label="Next"></span>
+      </div>
+      <p class="ambient-hint" id="ambient-hint"></p>
+    </div>
+  </div>
+</div>
+
 <main class="home">
   <section class="shelf" id="shelf-section" aria-labelledby="shelf-title">
     <header class="shelf-head">

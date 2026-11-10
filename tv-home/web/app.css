@@ -1106,3 +1106,298 @@ html.theme-oled, html.theme-oled body {
   box-shadow: 0 0 2rem rgba(0, 0, 0, 0.85), inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.18);
 }
 
+/* ================= Ambient Music Art Screen =================
+   When background music is streaming (Spotify, YouTube Music, Plex),
+   couch-tv transforms into an ambient album display with dynamic color glow. */
+:root {
+  --ambient-glow-1: rgba(60, 90, 180, 0.5);
+  --ambient-glow-2: rgba(140, 50, 160, 0.35);
+}
+
+.ambient-music {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms cubic-bezier(0.16, 1, 0.3, 1), transform 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform: scale(0.97);
+}
+
+html.ambient-active .ambient-music {
+  display: flex;
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+html.ambient-active .home {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(3rem);
+  transition: opacity 350ms ease, transform 350ms ease;
+}
+
+html.ambient-active.ambient-minimized .ambient-music {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.95);
+}
+
+html.ambient-active.ambient-minimized .home {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.ambient-glow {
+  position: absolute;
+  inset: -15%;
+  background: radial-gradient(circle at 35% 45%, var(--ambient-glow-1) 0%, transparent 55%),
+              radial-gradient(circle at 65% 55%, var(--ambient-glow-2) 0%, transparent 60%);
+  filter: blur(100px);
+  opacity: 0.7;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  transition: background 1.5s ease-in-out, opacity 1s ease;
+  animation: ambient-breathe 8s ease-in-out infinite alternate;
+}
+
+@keyframes ambient-breathe {
+  0% { transform: scale(1); opacity: 0.65; }
+  100% { transform: scale(1.08); opacity: 0.85; }
+}
+
+.ambient-stage {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 5rem;
+  max-width: 82rem;
+  padding: 3rem 4rem;
+  box-sizing: border-box;
+}
+
+.ambient-art-wrap {
+  position: relative;
+  flex: none;
+  width: 25rem;
+  height: 25rem;
+  border-radius: 2rem;
+  box-shadow: 0 2rem 4.5rem rgba(0, 0, 0, 0.7), inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.15);
+}
+
+.ambient-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 2rem;
+  display: block;
+  background: #111116;
+  transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ambient-art.gone {
+  display: none;
+}
+
+.ambient-art-fallback {
+  display: none;
+  width: 100%;
+  height: 100%;
+  border-radius: 2rem;
+  background: linear-gradient(135deg, rgba(40, 40, 55, 0.95), rgba(20, 20, 30, 0.95));
+  align-items: center;
+  justify-content: center;
+}
+
+.ambient-art.gone + .ambient-art-fallback {
+  display: flex;
+}
+
+.ambient-art-fallback svg {
+  width: 8rem;
+  height: 8rem;
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 1.5;
+}
+
+.ambient-vinyl {
+  position: absolute;
+  top: 1rem;
+  right: -3rem;
+  width: 23rem;
+  height: 23rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, #080808 30%, #151518 45%, #080808 60%, #1c1c20 75%, #080808 90%);
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.6);
+  z-index: -1;
+  opacity: 0.85;
+  transition: transform 800ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.ambient-playing .ambient-vinyl {
+  transform: translateX(2.5rem) rotate(45deg);
+}
+
+.ambient-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ambient-app {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.35rem 1rem;
+  border-radius: 9999px;
+  margin-bottom: 1.25rem;
+  backdrop-filter: blur(10px);
+}
+
+.ambient-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 3.25rem;
+  line-height: 3.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 0.25rem 1.5rem rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ambient-artist {
+  margin: 0 0 2rem 0;
+  font-size: 1.875rem;
+  line-height: 2.375rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ambient-progress {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 2.25rem;
+}
+
+.ambient-time {
+  font-size: 1.25rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 3.5rem;
+}
+
+.ambient-time-total {
+  text-align: right;
+}
+
+.ambient-bar-track {
+  position: relative;
+  flex: 1;
+  height: 0.625rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.ambient-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: #ffffff;
+  border-radius: 9999px;
+  box-shadow: 0 0 0.75rem rgba(255, 255, 255, 0.6);
+  transition: width 350ms linear;
+}
+
+.ambient-controls {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.amb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.25rem;
+  height: 4.25rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(15px);
+  cursor: pointer;
+  outline: none;
+  transition: transform 200ms ease, background 200ms ease, box-shadow 200ms ease;
+}
+
+.amb-btn svg {
+  width: 2rem;
+  height: 2rem;
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.amb-btn#amb-play {
+  width: 5rem;
+  height: 5rem;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.amb-btn#amb-play svg {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.amb-btn.focus {
+  background: #ffffff !important;
+  transform: scale(1.12);
+  box-shadow: 0 0 2rem rgba(255, 255, 255, 0.7), 0 0 0 0.25rem #ffffff;
+}
+
+.amb-btn.focus svg {
+  stroke: #0a0a0f !important;
+}
+
+.ambient-hint {
+  margin: 0;
+  font-size: 1.125rem;
+  color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* OLED adjustments */
+.theme-oled .ambient-glow {
+  opacity: 0.35;
+  filter: blur(70px);
+}
+.theme-oled .ambient-art-wrap {
+  box-shadow: 0 1.5rem 3.5rem rgba(0, 0, 0, 0.95), inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.2);
+}
+.theme-oled .amb-btn.focus {
+  box-shadow: 0 0 2rem rgba(120, 190, 255, 0.7), 0 0 0 0.25rem #ffffff !important;
+}
+

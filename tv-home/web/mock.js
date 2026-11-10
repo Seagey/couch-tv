@@ -199,7 +199,8 @@
     var x = SONGS[songAt];
     return { title: x[0], artist: x[1], album: null, state: songPlaying ? "playing" : "paused",
              app: { id: "spotify", name: "Spotify", package: "com.spotify.tv.android" },
-             art: arg("music") === "noart" ? null : "backgrounds/" + x[2] + ".jpg" };
+             art: arg("music") === "noart" ? null : "backgrounds/" + x[2] + ".jpg",
+             position: 45, duration: 210 };
   }
   window.MOCK_API = function (method, path, body) {
     var empty = /[?&]empty\b/.test(q), down = /[?&]down\b/.test(q);

@@ -300,6 +300,7 @@
     // glass app icons (#25): set in Home settings, else home.glass_icons; off unless switched on
     GLASS_ICONS = typeof ST.glass_icons === "boolean" ? ST.glass_icons : HOME.glass_icons === true;
     NP_ON = typeof ST.now_playing === "boolean" ? ST.now_playing : HOME.now_playing !== false;
+    AMBIENT_MUSIC = typeof ST.ambient_music === "boolean" ? ST.ambient_music : HOME.ambient_music !== false;
     GLASS_FOCUS = (ST.glass_focus || HOME.glass_focus) === "glass" ? "glass" : "colour";
     document.documentElement.classList.toggle("gi-stay", GLASS_FOCUS === "glass");
     SOUND_STYLE = ["system", "soft", "off"].indexOf(ST.nav_sound || HOME.nav_sound) >= 0 ? (ST.nav_sound || HOME.nav_sound) : "system";
@@ -866,9 +867,165 @@
   // media keys. A paused song stays for ten minutes so play can start it again. No computer and no
   // on-TV app (option A): Android lets no ordinary app read other apps' sessions, so no card.
   var music = null, npI = 1;
+  var AMBIENT_MUSIC = true, ambientOpen = false, ambientDismissed = false, ambI = 1;
+  var lastTrackKey = "", paletteCache = {}, curProgress = 0, curDuration = 0;
+
   function npVisible() { return NP_ON && !!music && !OFFLINE; }
   // reachable with the remote: in the Night look it steps aside with the cards while More apps is open
   function npReach() { return npVisible() && !(NIGHT && expanded); }
+
+  function formatTime(sec) {
+    if (isNaN(sec) || sec == null || sec < 0) return "0:00";
+    var m = Math.floor(sec / 60);
+    var s = Math.floor(sec % 60);
+    return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function extractPalette(url, title, artist, cb) {
+    var key = url || ((title || "") + "\n" + (artist || ""));
+    if (paletteCache[key]) { cb(paletteCache[key]); return; }
+    function fallback() {
+      var str = (title || "") + (artist || "");
+      var h = 0;
+      for (var i = 0; i < str.length; i++) {
+        h = ((h << 5) - h) + str.charCodeAt(i);
+        h |= 0;
+      }
+      var hue = Math.abs(h) % 360;
+      var c1 = "hsl(" + hue + ", 75%, 45%)";
+      var c2 = "hsl(" + ((hue + 45) % 360) + ", 65%, 25%)";
+      paletteCache[key] = [c1, c2];
+      cb([c1, c2]);
+    }
+    if (!url) { fallback(); return; }
+    var img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = function () {
+      try {
+        var canvas = document.createElement("canvas");
+        canvas.width = 16;
+        canvas.height = 16;
+        var ctx = canvas.getContext("2d");
+        if (!ctx) { fallback(); return; }
+        ctx.drawImage(img, 0, 0, 16, 16);
+        var imgData = ctx.getImageData(0, 0, 16, 16).data;
+        var rSum = 0, gSum = 0, bSum = 0, count = 0;
+        var maxSat = -1, bestR = 60, bestG = 90, bestB = 180;
+        for (var i = 0; i < imgData.length; i += 4) {
+          var r = imgData[i], g = imgData[i + 1], b = imgData[i + 2];
+          rSum += r; gSum += g; bSum += b; count++;
+          var maxC = Math.max(r, g, b), minC = Math.min(r, g, b);
+          var sat = maxC === 0 ? 0 : (maxC - minC) / maxC;
+          if (sat > maxSat && maxC > 40 && minC < 230) {
+            maxSat = sat;
+            bestR = r; bestG = g; bestB = b;
+          }
+        }
+        var avgR = count ? Math.round(rSum / count) : 40;
+        var avgG = count ? Math.round(gSum / count) : 50;
+        var avgB = count ? Math.round(bSum / count) : 80;
+        var col1 = "rgb(" + bestR + ", " + bestG + ", " + bestB + ")";
+        var col2 = "rgb(" + avgR + ", " + avgG + ", " + avgB + ")";
+        paletteCache[key] = [col1, col2];
+        cb([col1, col2]);
+      } catch (e) {
+        fallback();
+      }
+    };
+    img.onerror = fallback;
+    img.src = url;
+  }
+
+  function updateProgressUI() {
+    var curEl = $("ambient-time-cur");
+    var totEl = $("ambient-time-total");
+    var fillEl = $("ambient-bar-fill");
+    if (!curEl || !totEl || !fillEl) return;
+    if (curDuration > 0) {
+      curEl.textContent = formatTime(curProgress);
+      totEl.textContent = formatTime(curDuration);
+      var pct = Math.min(100, Math.max(0, (curProgress / curDuration) * 100));
+      fillEl.style.width = pct + "%";
+      totEl.style.display = "";
+    } else if (curProgress > 0) {
+      curEl.textContent = formatTime(curProgress);
+      totEl.style.display = "none";
+      fillEl.style.width = "40%";
+    } else {
+      curEl.textContent = "0:00";
+      totEl.style.display = "none";
+      fillEl.style.width = "0%";
+    }
+  }
+
+  function renderAmbientControls() {
+    var playing = music && music.state === "playing";
+    var pBtn = $("amb-prev"), plBtn = $("amb-play"), nBtn = $("amb-next");
+    if (!pBtn || !plBtn || !nBtn) return;
+    pBtn.innerHTML = ICONS.prev;
+    plBtn.innerHTML = playing ? ICONS.pause : ICONS.play;
+    nBtn.innerHTML = ICONS.next;
+    pBtn.classList.toggle("focus", zone === "ambient" && ambI === 0);
+    plBtn.classList.toggle("focus", zone === "ambient" && ambI === 1);
+    nBtn.classList.toggle("focus", zone === "ambient" && ambI === 2);
+  }
+
+  function renderAmbientMusic() {
+    var on = npVisible() && AMBIENT_MUSIC && ambientOpen;
+    document.documentElement.classList.toggle("ambient-active", on);
+    document.documentElement.classList.toggle("ambient-minimized", !ambientOpen);
+    if (!npVisible() || !AMBIENT_MUSIC) {
+      document.documentElement.classList.remove("ambient-active", "ambient-playing", "ambient-minimized");
+      return;
+    }
+    var playing = music.state === "playing";
+    document.documentElement.classList.toggle("ambient-playing", playing);
+
+    var appName = (music.app && music.app.name) || t("np_head");
+    var title = music.title || "";
+    var artist = music.artist || "";
+    if (music.album) artist += (artist ? " — " : "") + music.album;
+
+    $("ambient-app").textContent = appName;
+    $("ambient-title").textContent = title;
+    $("ambient-artist").textContent = artist;
+    $("ambient-hint").textContent = "▼ " + t("ambient_down_hint");
+
+    var artImg = $("ambient-art");
+    if (music.art) {
+      artImg.className = "ambient-art";
+      if (artImg.src !== music.art) { artImg.src = music.art; }
+      artImg.onerror = function () { artImg.className = "ambient-art gone"; };
+    } else {
+      artImg.className = "ambient-art gone";
+    }
+
+    var fallbackEl = $("ambient-art-fallback");
+    if (fallbackEl) fallbackEl.innerHTML = ICONS.note;
+
+    extractPalette(music.art, music.title, music.artist, function (colors) {
+      document.documentElement.style.setProperty("--ambient-glow-1", colors[0]);
+      document.documentElement.style.setProperty("--ambient-glow-2", colors[1]);
+    });
+
+    if (music.position != null) curProgress = Number(music.position);
+    if (music.duration != null) curDuration = Number(music.duration);
+    updateProgressUI();
+    renderAmbientControls();
+  }
+
+  function ambPress() {
+    if (!music) return;
+    var key = ["previous", "play_pause", "next"][ambI];
+    if (key === "play_pause") {
+      music.state = music.state === "playing" ? "paused" : "playing";
+      renderAmbientMusic();
+      renderNp();
+    }
+    api("POST", "/api/key", { key: key }).catch(function (e) { note(e.message); });
+    setTimeout(refreshMusic, key === "play_pause" ? 1500 : 900);
+  }
+
   function renderNp() {
     var el = $("np"), on = npVisible();
     el.classList.toggle("on", on);
@@ -891,21 +1048,61 @@
       }).join("") + "</div>";
   }
   function refreshMusic() {
-    if (!NP_ON || OFFLINE || document.hidden) { if (music) { music = null; renderNp(); } return; }
+    if (!NP_ON || OFFLINE || document.hidden) {
+      if (music) { music = null; ambientOpen = false; renderNp(); renderAmbientMusic(); }
+      return;
+    }
     api("GET", "/api/music", null, 5000).then(function (j) {
       var had = !!music;
       music = j.music || null;
+      if (music && AMBIENT_MUSIC) {
+        var trackKey = (music.title || "") + " - " + (music.artist || "");
+        if (trackKey !== lastTrackKey) {
+          lastTrackKey = trackKey;
+          ambientDismissed = false;
+          ambientOpen = true;
+          if (zone === "grid" || zone === "shelf" || zone === "np") {
+            zone = "ambient";
+            ambI = 1;
+          }
+        }
+      } else if (!music) {
+        ambientOpen = false;
+        lastTrackKey = "";
+        if (zone === "ambient") { zone = "grid"; paintFocus(); }
+      }
       renderNp();
-      if (had !== !!music && zone === "np" && !music) paintFocus();   // the card went away under the focus
-    }, function () { if (music) { music = null; renderNp(); if (zone === "np") paintFocus(); } });
+      renderAmbientMusic();
+      if (had !== !!music && (zone === "np" || zone === "ambient") && !music) paintFocus();
+    }, function () {
+      if (music) {
+        music = null;
+        ambientOpen = false;
+        lastTrackKey = "";
+        renderNp();
+        renderAmbientMusic();
+        if (zone === "np" || zone === "ambient") paintFocus();
+      }
+    });
   }
   function npPress() {
     if (!music) return;
     var key = ["previous", "play_pause", "next"][npI];
-    if (key === "play_pause") { music.state = music.state === "playing" ? "paused" : "playing"; renderNp(); }   // straight away
+    if (key === "play_pause") {
+      music.state = music.state === "playing" ? "paused" : "playing";
+      renderNp();
+      renderAmbientMusic();
+    }
     api("POST", "/api/key", { key: key }).catch(function (e) { note(e.message); });
     setTimeout(refreshMusic, key === "play_pause" ? 1500 : 900);
   }
+
+  setInterval(function () {
+    if (music && music.state === "playing" && ambientOpen) {
+      curProgress += 1;
+      updateProgressUI();
+    }
+  }, 1000);
 
   // ---------------- quick buttons: from tvs[].quick in config.json, in that order ----------------
   // sleep: the sleep timer. picture: flip between the TV's two picture modes. look: Night scenes or
@@ -1833,6 +2030,7 @@
   function paintFocus() {
     if (zone === "settings") { renderSettings(); return; }
     if (zone === "smart") { window.smartHome.paint(); return; }
+    if (zone === "ambient") { renderAmbientMusic(); return; }
     clearFocus();
     renderHint();
     if (npVisible()) renderNp();   // its buttons carry the focus only while zone is "np"
@@ -1904,6 +2102,20 @@
     if (zone === "updask") { if (dy) { ai = Math.max(0, Math.min(1, ai + dy)); renderAsk(); } return; }
     if (zone === "inputs") { if (dy) { inI = Math.max(0, Math.min(inItems.length - 1, inI + dy)); renderInputMenu(); } return; }
     if (lift) { moveLift(dx, dy); return; }
+    if (zone === "ambient") {
+      if (dx < 0) ambI = Math.max(0, ambI - 1);
+      else if (dx > 0) ambI = Math.min(2, ambI + 1);
+      else if (dy > 0) {
+        ambientDismissed = true;
+        ambientOpen = false;
+        zone = "grid";
+        paintFocus();
+        renderAmbientMusic();
+        return;
+      }
+      renderAmbientControls();
+      return;
+    }
     // Night with More apps open: the cards step aside, so up and down skip them
     var cards = NIGHT && expanded ? [] : shelfEls;
     if (zone === "menu") {
@@ -1979,7 +2191,18 @@
         if (nx >= 0 && nx < gridEls.length && Math.floor(nx / GRID_COLS) === row) g = nx;
       } else if (dy < 0 && row === 0) {
         if (cards.length) zone = "shelf";
-        else if (npReach()) zone = "np";
+        else if (npReach()) {
+          if (AMBIENT_MUSIC && music) {
+            ambientOpen = true;
+            ambientDismissed = false;
+            zone = "ambient";
+            ambI = 1;
+            renderAmbientMusic();
+            paintFocus();
+            return;
+          }
+          zone = "np";
+        }
         else if (peopleOn()) toPeople();
         else if (hasQuick()) zone = "quick";   // offline the sleep and picture buttons are hidden
       } else if (dy < 0) {
@@ -1999,6 +2222,14 @@
   }
 
   function goHome() {
+    if (zone === "ambient") {
+      ambientDismissed = true;
+      ambientOpen = false;
+      zone = "grid";
+      paintFocus();
+      renderAmbientMusic();
+      return;
+    }
     if (zone === "settings") { setBack(); return; }
     if (zone === "smart") { closeSmart(); paintFocus(); return; }
     if (zone === "gear") { closeGear(); paintFocus(); return; }
@@ -2043,6 +2274,7 @@
     if (lift) { dropLift(); return; }
     if (zone === "menu") { setSleep(SLEEP_CHOICES[menuI]); paintFocus(); return; }
     if (zone === "inputs") { doInputMenu(); paintFocus(); return; }
+    if (zone === "ambient") { ambPress(); return; }
     if (zone === "np") { npPress(); return; }
     if (zone === "pmenu") {
       if (plift) { dropPeople(); return; }
@@ -2521,6 +2753,9 @@
     rows.push(head(t("np_head")));
     rows.push({ kind: "toggle", key: "now-playing", label: t("np_show"), value: NP_ON ? t("on") : t("off"), act: function () {
       NP_ON = !NP_ON; ST.now_playing = NP_ON; saveSettings(); refreshMusic();
+    } });
+    rows.push({ kind: "toggle", key: "ambient-music", label: t("ambient_music"), value: AMBIENT_MUSIC ? t("on") : t("off"), act: function () {
+      AMBIENT_MUSIC = !AMBIENT_MUSIC; ST.ambient_music = AMBIENT_MUSIC; saveSettings(); renderAmbientMusic();
     } });
     rows.push(info("np-note", t(OFFLINE ? "np_note_offline" : "np_note")));
     rows.push(head(t("photos_head")));
@@ -3209,6 +3444,11 @@
   function kids(id, sel) { return Array.prototype.slice.call(sel ? $(id).querySelectorAll(sel) : $(id).children); }
   function pointAt(el) {
     var i;
+    if (zone === "ambient") {
+      var ambBtns = kids("ambient-controls", ".amb-btn");
+      i = inList(ambBtns, el);
+      return i >= 0 ? { zone: "ambient", i: i } : null;
+    }
     if (zone === "menu") { i = inList(kids("sleep-menu"), el); return i >= 0 ? { zone: "menu", i: i } : null; }
     if (zone === "gear" || zone === "updask") { i = inList(kids("gear-pop", ".grow"), el); return i >= 0 ? { zone: zone, i: i } : null; }
     if (zone === "appmenu") { i = inList(kids("app-pop", ".grow"), el); return i >= 0 ? { zone: "appmenu", i: i } : null; }
@@ -3226,9 +3466,25 @@
     if ((i = inList(quickEls, el)) >= 0) return { zone: "quick", i: i };
     if (peopleOn() && !isHead() && (i = inList(Array.prototype.slice.call($("people").children), el)) >= 0) return { zone: "people", i: i };
     if (peopleOn() && isHead() && inList([$("people")], el) >= 0) return { zone: "people", i: 0 };
+    if (AMBIENT_MUSIC && inList([$("np"), $("np-slot")], el) >= 0) return { zone: "ambient_open", i: 1 };
     return null;
   }
   function pointTo(p, clicked) {
+    if (p.zone === "ambient") {
+      if (ambI === p.i) return false;
+      ambI = p.i;
+      renderAmbientControls();
+      return true;
+    }
+    if (p.zone === "ambient_open") {
+      ambientOpen = true;
+      ambientDismissed = false;
+      zone = "ambient";
+      ambI = 1;
+      paintFocus();
+      renderAmbientMusic();
+      return true;
+    }
     if (p.zone === "menu") { if (menuI === p.i) return false; menuI = p.i; renderMenu(); return true; }
     if (p.zone === "gear") { if (gi === p.i) return false; gi = p.i; renderGear(); return true; }
     if (p.zone === "updask") { if (ai === p.i) return false; ai = p.i; renderAsk(); return true; }
