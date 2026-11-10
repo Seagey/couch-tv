@@ -33,6 +33,17 @@ Not tested by the author. Each line is what someone said worked on their own dev
   Releases page (option A) and asked for the settings screen and the Spanish that are now in Home
   settings ([issue #1](https://github.com/Seagey/couch-tv/issues/1)). It runs Android TV 11, so
   use the Android TV 9 to 11 menus (Settings, Device Preferences).
+- **Samsung Smart Monitor M8 (LS32BM801UUXEN, Tizen 6.5): works as an app with no computer
+  left running**, reported by a user. They built it with `samsung/build.py` without `--bridge` and
+  installed it with Apps2Samsung. couch-tv opened YouTube and Netflix, and Samsung's Autorun Last
+  App brought it back after the monitor was switched off and on. The install stopped printing at
+  65% but the app was there. If the install service is unreachable after Developer Mode, unplug
+  the monitor for a minute ([issue #93](https://github.com/Seagey/couch-tv/issues/93)).
+- **LG QNED88T6A and NANO83A6A (2025, webOS 10.3): both work on one bridge**, reported by a user
+  who followed [LG.md](LG.md) and measured key presses on the TVs. Lighter home brought a key press
+  from about 50 ms to 16 ms on both. Developer Mode and couch-tv survived a firmware update; only
+  Key Server had to be switched on again
+  ([issue #89](https://github.com/Seagey/couch-tv/issues/89)).
 
 ## Notes
 
