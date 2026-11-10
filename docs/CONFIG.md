@@ -324,6 +324,68 @@ is the safe way to use the phone remote away from home.
 | `client_name` ["Couch TV bridge"] | The name the TV shows for the bridge in its list of paired remotes. Set it before `pair_tv.py`; changing it later means pairing again. |
 | `screens` [] | Extra screens the TV can open, for example a computer through Moonlight. |
 
+### Switching the pairing key on
+
+By default, the bridge requires no password on your home Wi-Fi network. Setting `"pairing_key"` under `"bridge"` in `config.json` secures the bridge so that only paired devices and TV apps with the key can control the TV or read its state.
+
+#### Why set a pairing key? (The "Origin: null" loophole)
+The bridge restricts CORS requests to known local origins and the TV apps' origins. However, the front-end apps running on TV platforms (such as Android WebView, LG webOS, and Samsung Tizen) run from local files and send an `Origin: null` header to the bridge.
+
+Because any web page on the internet can also emit an `Origin: null` request (for example, inside a sandboxed `<iframe>`), the CORS origin check alone **cannot** distinguish between a legitimate local TV WebView and a malicious website visited by a browser on your local network.
+
+**Only the pairing key (`pairing_key`) protects the bridge from malicious web pages sending `Origin: null` requests.** When the key is set:
+- Protected API endpoints require `Authorization: Bearer <key>`, `X-API-Key: <key>`, or `?token=<key>`.
+- Wrong keys are rate-limited across every endpoint (after 5 failed attempts in 60 seconds, requests are rejected with HTTP 429 Too Many Requests).
+- Host headers are validated against local addresses and configured host names to prevent DNS rebinding (HTTP 403 Forbidden).
+- Disallowed origins are rejected before any handler runs (HTTP 403 Forbidden).
+
+#### How to switch the key on
+
+1. **Add `pairing_key` to `config.json`:**
+   ```json
+   "bridge": {
+     "host": "your-computer.local",
+     "port": 5400,
+     "pairing_key": "choose-a-strong-secret-key-here"
+   }
+   ```
+   The key must be at least 12 characters long, using letters, digits, hyphens, and underscores. Restart the bridge.
+
+2. **Update your TV apps:**
+   Because the bridge will now reject commands without the key, each TV app must be updated:
+   - **Android TV / Google TV / Fire TV:**
+     Make sure your TV is running a `couch-tv-home.apk` build that supports passing the pairing key (version 0.12 or newer). Then run `apply.sh` again from this computer:
+     ```sh
+     TV_IP=<tv address> sh tv-home/tools/apply.sh
+     ```
+     `apply.sh` automatically reads the key from `config.json` and configures the TV app.
+   - **LG webOS:**
+     Rebuild the `.ipk` package so the key is baked in, and reinstall it:
+     ```sh
+     .venv/bin/python lg/build.py --bridge http://<your-computer>.local:5400
+     ares-install --device <tv name> build/lg/app.couchtv.home_*.ipk
+     ```
+   - **Samsung (Tizen):**
+     Rebuild the `.wgt` package and reinstall it:
+     ```sh
+     .venv/bin/python samsung/build.py --bridge http://<your-computer>.local:5400
+     tizen install -s <tv target> -p build/samsung/app.couchtv.home.wgt
+     ```
+   - **Roku:**
+     Rebuild the channel package and sideload it to the Roku:
+     ```sh
+     .venv/bin/python roku/build.py --bridge http://<your-computer>.local:5400
+     ```
+     Then upload the generated zip from `build/roku/` through the Roku Application Installer web page.
+
+3. **Pair your phones and remotes:**
+   - When you open the phone remote (`http://<your-computer>.local:5400`), a pairing screen will appear asking for the pairing key. Type the key once to pair the phone.
+   - Alternatively, open the pairing link directly on the phone:
+     ```
+     http://<your-computer>.local:5400/?pair=<your-pairing-key>
+     ```
+   - If you use Claude Code or the MCP tools (`mcp_server.py`), they read `pairing_key` from `config.json` automatically.
+
 ## Settings made on the TV (Home settings)
 
 The gear tile in the dock (Settings) opens a small menu: **Home settings** (couch-tv's own) or

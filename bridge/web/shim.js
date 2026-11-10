@@ -8,10 +8,11 @@
   try {
     token = localStorage.getItem(KEY) || localStorage.getItem('couchtv.token');
   } catch (e) { /* private mode fallback */ }
-  if (!token) {
-    var m = document.cookie.match(/(?:^|; )couchtv_key=([^;]+)/) || document.cookie.match(/(?:^|; )couchtv_token=([^;]+)/);
-    if (m) token = decodeURIComponent(m[1]);
-  }
+  try {
+    if (document.cookie.indexOf('couchtv_key=') >= 0) {
+      document.cookie = 'couchtv_key=; path=/; max-age=0; SameSite=Strict';
+    }
+  } catch (e) {}
 
   // Auto-pair if ?pair=<key> or ?key=<key> was passed in the URL
   try {
@@ -77,7 +78,11 @@
   function save(t) {
     token = t;
     try { localStorage.setItem(KEY, t); } catch (e) {}
-    document.cookie = 'couchtv_key=' + encodeURIComponent(t) + '; path=/; max-age=31536000; SameSite=Strict';
+    try {
+      if (document.cookie.indexOf('couchtv_key=') >= 0) {
+        document.cookie = 'couchtv_key=; path=/; max-age=0; SameSite=Strict';
+      }
+    } catch (e) {}
   }
 
   var shown = false;

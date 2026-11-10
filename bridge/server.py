@@ -154,6 +154,44 @@ def lan_ipv4():
         s.close()
 
 
+def allowed_hosts():
+    """Hostnames and IPs allowed to connect to the bridge (Host header check & CORS)."""
+    hosts = {"127.0.0.1", "localhost", "::1", "[::1]"}
+    cfg_host = (config.BRIDGE.get("host") or "").strip().lower()
+    if cfg_host:
+        hosts.add(cfg_host)
+    for fb in config.BRIDGE.get("fallback_hosts") or []:
+        fb_s = str(fb).strip().lower()
+        if fb_s:
+            hosts.add(fb_s)
+    ip = lan_ipv4()
+    if ip:
+        hosts.add(ip.lower())
+    try:
+        h = socket.gethostname().strip().lower()
+        if h:
+            hosts.add(h)
+            hosts.add(f"{h}.local")
+    except Exception:
+        pass
+    return hosts
+
+
+def is_allowed_host(request):
+    """Check Host header against the allowed hosts to protect against DNS rebinding (couch-tv#73)."""
+    host_hdr = (request.headers.get("Host") or getattr(request, "host", "") or "").strip()
+    if not host_hdr:
+        return False
+    try:
+        parsed = urllib.parse.urlsplit(f"//{host_hdr}")
+        hostname = (parsed.hostname or "").strip().lower()
+        if not hostname:
+            return False
+        return hostname in allowed_hosts()
+    except Exception:
+        return False
+
+
 def is_allowed_origin(request, origin):
     """Origin allowlist for CORS (couch-tv#73): the bridge's own origins and TV front-end origins."""
     if not origin:
@@ -161,6 +199,9 @@ def is_allowed_origin(request, origin):
     clean = origin.rstrip("/").lower()
     # 1. Front-end origins used by the TV apps:
     # "null" is sent by browsers for local file:// WebViews (Android WebView, webOS, Tizen).
+    # NOTE: Because any website can emit Origin: null (e.g. from a sandboxed iframe),
+    # Origin: null is allowed for the TV apps, but only the pairing key (config.PAIRING_KEY)
+    # protects against malicious websites sending Origin: null.
     # "file://" is sent literally by some embedded Chromium / WebViews.
     # "http(s)://home.tvos.invalid" is used by couch-tv's Android TV offline launcher.
     if clean == "null" or clean.startswith("file:") or clean in ("http://home.tvos.invalid", "https://home.tvos.invalid"):
@@ -169,24 +210,16 @@ def is_allowed_origin(request, origin):
         return True
 
     # 2. Bridge's own origins:
-    allowed_hosts = {"127.0.0.1", "localhost", "[::1]"}
-    cfg_host = (config.BRIDGE.get("host") or "").strip().lower()
-    if cfg_host:
-        allowed_hosts.add(cfg_host)
-    for fb in config.BRIDGE.get("fallback_hosts") or []:
-        fb_s = str(fb).strip().lower()
-        if fb_s:
-            allowed_hosts.add(fb_s)
-    ip = lan_ipv4()
-    if ip:
-        allowed_hosts.add(ip.lower())
-
+    hosts = allowed_hosts()
     try:
         parsed = urllib.parse.urlsplit(clean)
         if parsed.scheme in ("http", "https"):
             parsed_host = (parsed.hostname or "").lower()
             parsed_port = parsed.port or (443 if parsed.scheme == "https" else 80)
-            if parsed_host in allowed_hosts and parsed_port in (PORT, 5173, 5400):
+            allowed_ports = {PORT, 5173, 5400}
+            if request and hasattr(request, "url") and request.url.port:
+                allowed_ports.add(request.url.port)
+            if parsed_host in hosts and parsed_port in allowed_ports:
                 return True
     except Exception:
         pass
@@ -224,6 +257,62 @@ def key_matches(given):
     return hmac.compare_digest(str(given).encode(), config.PAIRING_KEY.encode())
 
 
+_failed_attempts = {}
+RATE_LIMIT_MAX = 5
+RATE_LIMIT_WINDOW = 60.0
+
+
+def client_ip(request):
+    if hasattr(request, "remote") and request.remote:
+        return request.remote
+    transport = getattr(request, "transport", None)
+    if transport:
+        sock = transport.get_extra_info("peername")
+        if sock:
+            return (sock[0] or "").removeprefix("::ffff:")
+    return "unknown"
+
+
+def is_rate_limited(ip, now=None):
+    if not ip or ip == "unknown":
+        return False
+    if now is None:
+        now = time.time()
+    attempts = _failed_attempts.get(ip)
+    if not attempts:
+        return False
+    cutoff = now - RATE_LIMIT_WINDOW
+    valid = [t for t in attempts if t > cutoff]
+    if len(valid) != len(attempts):
+        if valid:
+            _failed_attempts[ip] = valid
+        else:
+            _failed_attempts.pop(ip, None)
+    return len(valid) >= RATE_LIMIT_MAX
+
+
+def record_failed_attempt(ip, now=None):
+    if not ip or ip == "unknown":
+        return
+    if now is None:
+        now = time.time()
+    cutoff = now - RATE_LIMIT_WINDOW
+    attempts = [t for t in _failed_attempts.get(ip, []) if t > cutoff]
+    attempts.append(now)
+    if len(_failed_attempts) > 1000:
+        for k in list(_failed_attempts.keys()):
+            v = [t for t in _failed_attempts[k] if t > cutoff]
+            if v:
+                _failed_attempts[k] = v
+            else:
+                _failed_attempts.pop(k, None)
+    _failed_attempts[ip] = attempts
+
+
+def clear_failed_attempts(ip):
+    _failed_attempts.pop(ip, None)
+
+
 async def body(request):
     if not request.body_exists:
         return {}
@@ -248,25 +337,40 @@ OPEN_PATHS = {"/api/health", "/api/pair"}
 
 @web.middleware
 async def middleware(request, handler):
+    # 1. Host header validation against DNS rebinding (couch-tv#73)
+    if not is_allowed_host(request):
+        return web.Response(status=403, text="forbidden host")
+
+    # 2. Origin check: requests from disallowed origins must not run (couch-tv#73)
     origin = request.headers.get("Origin")
     origin_ok = is_allowed_origin(request, origin) if origin else False
+    if origin and not origin_ok:
+        return web.Response(status=403, text="forbidden origin")
 
     if request.method == "OPTIONS":
-        if origin and not origin_ok:
-            return web.Response(status=403, text="forbidden origin")
         resp = web.Response(status=204)
     else:
         try:
-            # 1. Refuse POST without application/json (couch-tv#73)
+            # 3. Refuse POST without application/json (couch-tv#73)
             if request.method == "POST" and request.content_type != "application/json":
                 raise ApiError(415, "Content-Type must be application/json")
 
-            # 2. Check pairing key authentication for protected API endpoints (couch-tv#73)
+            # 4. Check pairing key authentication & rate limiting for protected API endpoints (couch-tv#73)
             path = request.path
             is_api = path.startswith("/api/")
-            if is_api and path not in OPEN_PATHS and config.PAIRING_KEY and not is_authed(request):
+            if is_api and path not in OPEN_PATHS and config.PAIRING_KEY:
+                ip = client_ip(request)
+                if is_rate_limited(ip):
+                    raise ApiError(429, "Too many wrong pairing keys. Please wait a minute.")
                 key = extract_auth_key(request)
-                raise ApiError(401, "invalid pairing key" if key else "pairing key required")
+                if key:
+                    if not key_matches(key):
+                        record_failed_attempt(ip)
+                        await asyncio.sleep(0.3)
+                        raise ApiError(401, "invalid pairing key")
+                    clear_failed_attempts(ip)
+                else:
+                    raise ApiError(401, "pairing key required")
 
             tv_id = request.query.get("tv")
             if not tv_id and request.method == "POST" and request.body_exists:
@@ -391,6 +495,9 @@ async def h_health(request):
 
 
 async def h_pair(request):
+    ip = client_ip(request)
+    if is_rate_limited(ip):
+        raise ApiError(429, "Too many wrong pairing keys. Please wait a minute.")
     b = await body(request)
     given = str(b.get("key") or "").strip()
     if not config.PAIRING_KEY:
@@ -398,8 +505,10 @@ async def h_pair(request):
     if not given:
         raise ApiError(400, "pairing key is required")
     if not key_matches(given):
+        record_failed_attempt(ip)
         await asyncio.sleep(0.3)
         raise ApiError(401, "That pairing key is not right. Check config.json.")
+    clear_failed_attempts(ip)
     return ok(paired=True, token=config.PAIRING_KEY, note="paired")
 
 
