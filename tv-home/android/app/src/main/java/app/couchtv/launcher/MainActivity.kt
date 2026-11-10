@@ -122,13 +122,13 @@ class MainActivity : Activity() {
     }
 
     // Load the last bridge that worked straight away; only probe the others if it fails.
-    private val firstLoad = Runnable {
+    private val firstLoad: Runnable = Runnable {
         waitingForNet = false
         main.removeCallbacks(firstLoadLater)
         val saved = prefs.getString("bridge", null)
         if (saved != null) showWeb(saved) else connect()
     }
-    private val firstLoadLater = Runnable { if (waitingForNet) firstLoad.run() }
+    private val firstLoadLater: Runnable = Runnable { if (waitingForNet) firstLoad.run() }
 
     /** A network that says it reaches the internet (or no way to tell, with no ConnectivityManager). */
     private fun online(cm: android.net.ConnectivityManager?): Boolean {
