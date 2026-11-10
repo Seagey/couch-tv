@@ -203,6 +203,12 @@ def _share(value, lo, hi):
     return round(max(lo, min(hi, float(value))), 3)
 
 
+def _float(value, default, lo, hi):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return default
+    return round(max(lo, min(hi, float(value))), 2)
+
+
 def _my_scenes(items):
     """home.my_scenes: your own scenes (tv-home/tools/make-scene.py, docs/MAKE-A-SCENE.md). Only the
     keys the TV home reads, with safe values; the page checks them again."""
@@ -296,6 +302,21 @@ def _home(h):
     skip_wn = h.get("skip_watch_next") if isinstance(h.get("skip_watch_next"), list) else []
     out["skip_watch_next"] = [p for p in dict.fromkeys(skip_wn) if isinstance(p, str) and re.fullmatch(r"[A-Za-z0-9_.]{1,200}", p)]
     out["bedtime_dim"] = h.get("bedtime_dim") is True
+    soundscape = h.get("soundscape")
+    if isinstance(soundscape, dict):
+        snd_type = soundscape.get("type")
+        if snd_type in ("off", "rain", "fire", "waves", "brown"):
+            out["soundscape"] = {
+                "type": snd_type,
+                "volume": _float(soundscape.get("volume"), 0.5, 0.0, 1.0),
+                "fade_with_sleep": soundscape.get("fade_with_sleep") is not False,
+            }
+    elif isinstance(soundscape, str) and soundscape in ("off", "rain", "fire", "waves", "brown"):
+        out["soundscape"] = {
+            "type": soundscape,
+            "volume": 0.5,
+            "fade_with_sleep": True,
+        }
     out["watch_next_per_app"] = _int(h.get("watch_next_per_app"), 5, 1, 20)
     if "inputs" in h:
         out["inputs"] = _inputs(h.get("inputs"))
@@ -335,7 +356,7 @@ def _inputs(raw_list):
 HOME = _home(CONFIG.get("home"))
 
 # ---------- quick settings (per TV) and picture modes ----------
-QUICK_IDS = ["sleep", "picture", "look", "input", "screensaver"]
+QUICK_IDS = ["sleep", "picture", "look", "soundscape", "input", "screensaver"]
 
 
 def quick_for(tv_cfg):

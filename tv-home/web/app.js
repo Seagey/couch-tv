@@ -27,7 +27,7 @@
   // read in readConfig() once the page starts (mock.js fills them in for previews). See docs/CONFIG.md.
   var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [];
   var WXCFG = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
-  var QUICK_ALL = ["sleep", "picture", "look", "input", "bluetooth", "network", "screensaver"];
+  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "input", "bluetooth", "network", "screensaver"];
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
   var THEME = "night", NIGHT = true, CLOCK24 = false;
@@ -43,6 +43,31 @@
   var ST = {}, WX_SHOW = true, WX_F = false, WX_EVERY = 30, HIDDEN_TV = [];
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
   var NP_ON = true, SOUND_STYLE = "system";
+  // Ambient sleep soundscapes (rain, fire, waves, brown noise)
+  var SOUND_TYPE = "off", SOUND_VOL = 0.5, SOUND_FADE_SLEEP = true;
+  function initSoundscape() {
+    var sc = ST.soundscape || HOME.soundscape || {};
+    if (typeof sc === "string") sc = { type: sc };
+    SOUND_TYPE = sc.type || "off";
+    SOUND_VOL = typeof sc.volume === "number" ? Math.max(0, Math.min(1, sc.volume)) : 0.5;
+    SOUND_FADE_SLEEP = sc.fade_with_sleep !== false;
+    if (window.Soundscape && SOUND_TYPE !== "off") {
+      window.Soundscape.play(SOUND_TYPE, SOUND_VOL);
+    }
+  }
+  function cycleSoundscape() {
+    if (!window.Soundscape) return;
+    var types = window.Soundscape.TYPES;
+    var cur = window.Soundscape.current();
+    var idx = types.indexOf(cur);
+    var next = types[(idx + 1) % types.length];
+    window.Soundscape.play(next, SOUND_VOL);
+    SOUND_TYPE = next;
+    ST.soundscape = { type: next, volume: SOUND_VOL, fade_with_sleep: SOUND_FADE_SLEEP };
+    saveSettings();
+    renderQuick();
+    note(t("soundscape") + ": " + (next === "off" ? t("timer_off") : t("sound_" + next)));
+  }
   // glass app icons: the focused app in its own colours, or staying glass (#32)
   var GLASS_FOCUS = "colour";
   // The focused tile's slow sway and glint: Home settings, Look, Moving tiles, else home.moving_tiles,
@@ -115,6 +140,7 @@
     more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>',
     gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
     look: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="3"/><path d="M2.5 16l5.5-5.5 4.5 4.5 3-3 6 6"/><circle cx="16.5" cy="8.8" r="1.6"/></svg>',
+    soundscape: '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
     input: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8 21h8M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5"/></svg>',
     ps5: '<svg viewBox="0 0 24 24"><path d="M7 6v12M17 6v12M7 10h10M7 14h10"/><circle cx="12" cy="12" r="8.5"/></svg>',
     xbox: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M7.5 7.5c2.5 2.5 6.5 2.5 9 0M7.5 16.5c2.5-2.5 6.5-2.5 9 0M7 8c2 3.5 2 4.5 0 8M17 8c-2 3.5-2 4.5 0 8"/></svg>',
@@ -237,6 +263,7 @@
     VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true);
     GRID_COLS = NIGHT ? 12 : 8;
     DOCK_APPS = Math.max(1, Math.min(10, parseInt(HOME.dock_size, 10) || 10));
+    initSoundscape();
     if (smartOn()) DOCK_APPS = Math.min(DOCK_APPS, 9);   // the Smart home tile takes one place in the dock
     CLOCK24 = clock24();
     (Array.isArray(HOME.hide_packages) ? HOME.hide_packages : []).forEach(function (p) {
@@ -843,6 +870,16 @@
     var m = minutesLeft();
     var dim = bedtimeOn() && m > 0 && m <= 15;
     document.documentElement.classList.toggle("bedtime-dim", dim);
+    if (window.Soundscape && window.Soundscape.current() !== "off" && SOUND_FADE_SLEEP) {
+      if (m > 0 && m <= 15) {
+        var scaled = SOUND_VOL * (m / 15);
+        window.Soundscape.setVolume(scaled);
+      } else if (m === 0 && sleepEnds) {
+        window.Soundscape.stop();
+      } else if (m > 15) {
+        window.Soundscape.setVolume(SOUND_VOL);
+      }
+    }
   }
   function minutesLeft() {
     if (!sleepEnds && OFFLINE && TV && TV.getSleepRemainingMinutes) {
@@ -876,6 +913,7 @@
       if (q === "sleep") return !OFFLINE || !!(TV && TV.canSleep && TV.canSleep());
       if (q === "picture") return !OFFLINE && picShown;
       if (q === "look") return true;
+      if (q === "soundscape") return true;
       if (q === "input") return !OFFLINE || nativeInputs();
       if (q === "screensaver") return nativeScreensaver();
       if (q === "bluetooth" || q === "network") return ON_TV && !OFFLINE;
@@ -911,6 +949,12 @@
         el.classList.toggle("off", !picCanSet);
       } else if (q === "look") {
         el.innerHTML = ICONS.look + "<span>" + esc(NIGHT ? t("classic_look") : t("night_look")) + "</span>";
+      } else if (q === "soundscape") {
+        var curSound = window.Soundscape ? window.Soundscape.current() : "off";
+        var isPlaying = curSound !== "off";
+        var lbl = isPlaying ? (t("sound_" + curSound) || curSound) : t("soundscape");
+        el.innerHTML = ICONS.soundscape + "<span>" + esc(lbl) + "</span>";
+        el.classList.toggle("set", isPlaying);
       } else if (q === "input") {
         el.innerHTML = ICONS.input + "<span>" + esc(t("input")) + "</span>";
       } else if (q === "screensaver") {
@@ -1071,6 +1115,7 @@
     if (q === "sleep") openMenu();
     else if (q === "picture") togglePicture();
     else if (q === "look") toggleLook();
+    else if (q === "soundscape") cycleSoundscape();
     else if (q === "input") openInputs();
     else if (q === "screensaver") startScreensaver();
     else if (q === "bluetooth" || q === "network") openSettingsScreen(q);
@@ -2322,6 +2367,34 @@
     rows.push(head(t("ambient_head")));
     rows.push({ kind: "action", key: "ambient", label: t("ambient_settings"), sub: t("ambient_settings_sub"),
       act: function () { openAmbientSettings(); } });
+    rows.push(head(t("soundscape")));
+    var curSound = window.Soundscape ? window.Soundscape.current() : SOUND_TYPE;
+    rows.push({
+      kind: "cycle",
+      key: "soundscape",
+      label: t("soundscape"),
+      value: curSound === "off" ? t("timer_off") : (t("sound_" + curSound) || curSound),
+      act: function () {
+        cycleSoundscape();
+        renderSettings();
+      }
+    });
+    var volSteps = [0.2, 0.4, 0.6, 0.8, 1.0];
+    var volPct = Math.round(SOUND_VOL * 100) + "%";
+    rows.push({
+      kind: "cycle",
+      key: "soundscape-vol",
+      label: t("sound_volume"),
+      value: volPct,
+      act: function () {
+        var vi = volSteps.indexOf(Math.round(SOUND_VOL * 10) / 10);
+        SOUND_VOL = vi < 0 ? 0.6 : volSteps[(vi + 1) % volSteps.length];
+        if (window.Soundscape) window.Soundscape.setVolume(SOUND_VOL);
+        ST.soundscape = { type: window.Soundscape ? window.Soundscape.current() : SOUND_TYPE, volume: SOUND_VOL, fade_with_sleep: SOUND_FADE_SLEEP };
+        saveSettings();
+        renderSettings();
+      }
+    });
     // glass panels: off, on, on with no blur (for slower TVs)
     rows.push(head(t("glass_head")));
     rows.push({ kind: "cycle", key: "glass", label: t("glass"), value: GLASS === "lite" ? t("glass_lite") : GLASS === "on" ? t("on") : t("off"), act: function () {
