@@ -1,0 +1,6 @@
+[allowlist]
+paths = [
+    '''^\.venv/''',
+    '''^build/''',
+    '''^dist/'''
+]
