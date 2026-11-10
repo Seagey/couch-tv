@@ -375,7 +375,7 @@ exactly what changes:
     allow` once, then switching both services on from the TV's own Settings, Accessibility with the
     remote (not by writing the setting over ADB) survived a real power cut, and TCL kept AUTO_START
     allowed. Which step matters is unknown, so on a TCL do both after `apply.sh`, and walk them
-    through the Accessibility switches on the TV. Fallback from a
+    through the Accessibility switches on the TV. If the services are missing from that menu, launch the app once, then set the app op and write the settings over ADB: on that TCL they only appeared in the menu once bound. Also seen there: installing or removing any app made Android drop couch-tv as the preferred home (role holder unchanged); `cmd package set-home-activity` again fixed it, so re-assert it after installing anything. Fallback from a
     computer after each reboot, if that fails: `cmd package set-home-activity
     app.couchtv.launcher/.MainActivity`, start the app, `appops set app.couchtv.launcher AUTO_START
     allow`, then rewrite `enabled_accessibility_services` and `accessibility_enabled 1`. Separate and
