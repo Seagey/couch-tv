@@ -57,6 +57,7 @@
   // Home settings made on this TV with the gear tile (see "home settings" below). They win over
   // config.js. ST is the saved object; the rest are read from it in readConfig().
   var ST = {}, WX_SHOW = true, WX_F = false, WX_EVERY = 30, HIDDEN_TV = [];
+  var WX_AMBIENT = true, WX_SUN_GRADE = true;
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
   var NP_ON = true, SOUND_STYLE = "system";
   // Ambient sleep soundscapes (rain, fire, waves, brown noise)
@@ -280,6 +281,13 @@
     WX_SHOW = ST.wx_show !== false;
     WX_F = (ST.wx_unit || HOME.wx_unit) === "f";   // Home settings, else home.wx_unit in config.json
     WX_EVERY = [15, 30, 60].indexOf(ST.wx_every) >= 0 ? ST.wx_every : 30;
+    WX_AMBIENT = typeof ST.ambient_weather === "boolean" ? ST.ambient_weather : (typeof HOME.ambient_weather === "boolean" ? HOME.ambient_weather : true);
+    WX_SUN_GRADE = typeof ST.ambient_sun_grade === "boolean" ? ST.ambient_sun_grade : (typeof HOME.ambient_sun_grade === "boolean" ? HOME.ambient_sun_grade : true);
+    if (window.AmbientWeather) {
+      window.AmbientWeather.setEnabled(WX_AMBIENT && WX_SHOW);
+      window.AmbientWeather.setSunGradeEnabled(WX_SUN_GRADE);
+      window.AmbientWeather.setLighter(LIGHTER);
+    }
     var mine = TV_ID || CFG.default_tv;
     TVCFG = (CFG.tvs || []).filter(function (t) { return t.id === mine; })[0] || (CFG.tvs || [])[0] || {};
     // no "quick" from an older bridge: the sleep timer, and the picture switch where the TV has one
@@ -509,7 +517,7 @@
       '<span class="ww"> ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
     fitDate();
     document.body.classList.toggle("night", h >= 21 || h < 6);
-    if (NIGHT) { glassClock(hm); if (SUN_SYNC) applySunSync(); }
+    if (NIGHT) { glassClock(hm); if (SUN_SYNC) applySunSync(); updateAmbientWeather(); }
     if (quickReady) renderQuick();
   }
 
@@ -715,7 +723,7 @@
     v.removeAttribute("src");
     try { v.load(); } catch (e) {}
   }
-  function pauseVideo() { stopSoundscape(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); }
+  function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); }
   document.addEventListener("visibilitychange", function () { if (document.hidden) pauseVideo(); else startVideo(); });
 
   function showScene(i) {
@@ -833,12 +841,35 @@
     }
   }
 
+  function getSunPos() {
+    if (WXCFG && WXCFG.lat != null && isFinite(WXCFG.lat) && WXCFG.lon != null && isFinite(WXCFG.lon)) {
+      return solarAltitude(Number(WXCFG.lat), Number(WXCFG.lon), new Date());
+    }
+    var h = new Date().getHours();
+    var alt = (h >= 6 && h < 18) ? 35 : -20;
+    var hourAngle = (h - 12) * 15;
+    return { alt: alt, hourAngle: hourAngle };
+  }
+
+  function updateAmbientWeather() {
+    if (!window.AmbientWeather) return;
+    var pos = getSunPos();
+    window.AmbientWeather.setWeather(WX_SHOW ? data.weather : null, pos);
+  }
+
   // The bridge's reading for the place in config.json, or straight from Open-Meteo with no bridge
   // or when Home settings chose another place. Hidden when Home settings switched the weather off.
   function refreshWeather() {
-    if (!NIGHT || !WX_SHOW) return Promise.resolve();
+    if (!NIGHT || !WX_SHOW) {
+      updateAmbientWeather();
+      return Promise.resolve();
+    }
     var direct = OFFLINE || !!(ST.place && isFinite(ST.place.lat));
-    return (direct ? weatherDirect() : api("GET", "/api/weather")).then(function (j) { data.weather = j; clock(); }, function () {});
+    return (direct ? weatherDirect() : api("GET", "/api/weather")).then(function (j) {
+      data.weather = j;
+      clock();
+      updateAmbientWeather();
+    }, function () {});
   }
 
   // Open-Meteo (free, no key), the same call the bridge makes. The words come from i18n.js.
@@ -2461,6 +2492,7 @@
   function openSettings() {
     closeGear();
     zone = "settings";
+    if (window.AmbientWeather) window.AmbientWeather.pause();
     SET.col = "secs"; SET.sec = 0; SET.ri = 0; SET.keyFocus = null; SET.sub = null; SET.lift = null; SET.confirm = null; SET.msg = "";
     clearFocus();
     $("settings").classList.add("on");
@@ -2474,6 +2506,7 @@
     $("settings").classList.remove("on");
     document.documentElement.classList.remove("setting");
     zone = "grid";
+    if (window.AmbientWeather) window.AmbientWeather.resume();
     if (SET.dirty) { SET.dirty = false; restart(); return; }
     paintFocus();
   }
@@ -2622,7 +2655,17 @@
       { kind: "toggle", key: "wx-show", label: t("wx_show"), value: WX_SHOW ? t("on") : t("off"), act: function () {
         WX_SHOW = !WX_SHOW; ST.wx_show = WX_SHOW; saveSettings();
         if (WX_SHOW) refreshWeather();
+        else updateAmbientWeather();
         clock();
+      } },
+      { kind: "toggle", key: "wx-ambient", label: t("wx_ambient"), sub: t("wx_ambient_sub"), value: WX_AMBIENT ? t("on") : t("off"), act: function () {
+        WX_AMBIENT = !WX_AMBIENT; ST.ambient_weather = WX_AMBIENT; saveSettings();
+        if (window.AmbientWeather) window.AmbientWeather.setEnabled(WX_AMBIENT && WX_SHOW);
+      } },
+      { kind: "toggle", key: "wx-sun-grade", label: t("wx_sun_grade"), sub: t("wx_sun_grade_sub"), value: WX_SUN_GRADE ? t("on") : t("off"), act: function () {
+        WX_SUN_GRADE = !WX_SUN_GRADE; ST.ambient_sun_grade = WX_SUN_GRADE; saveSettings();
+        if (window.AmbientWeather) window.AmbientWeather.setSunGradeEnabled(WX_SUN_GRADE);
+        updateAmbientWeather();
       } },
       { kind: "cycle", key: "wx-unit", label: t("wx_units"), value: WX_F ? "°F (Fahrenheit)" : "°C (Celsius)", act: function () {
         WX_F = !WX_F; ST.wx_unit = WX_F ? "f" : "c"; saveSettings(); clock();
@@ -3745,7 +3788,7 @@
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); },
+    resume: function () { okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); if (window.AmbientWeather) window.AmbientWeather.resume(); },
     // an app is in front: the video background stops until the home is back
     pause: pauseVideo,
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
@@ -3763,6 +3806,12 @@
     clock();
     setInterval(clock, 15000);
     if (NIGHT) {
+      if (window.AmbientWeather) {
+        window.AmbientWeather.init($("weather-canvas"), $("ambient-lighting"));
+        window.AmbientWeather.setEnabled(WX_AMBIENT && WX_SHOW);
+        window.AmbientWeather.setSunGradeEnabled(WX_SUN_GRADE);
+        window.AmbientWeather.setLighter(LIGHTER);
+      }
       buildScenes();
       // ?scene=fog starts on that scene, for previews (?scene=own: the first of the household's
       // photos; ?scene=<id>: one of your own scenes)

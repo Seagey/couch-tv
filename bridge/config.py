@@ -303,6 +303,10 @@ def _home(h):
         out["ambient_music"] = h["ambient_music"]
     if isinstance(h.get("sun_sync"), bool):
         out["sun_sync"] = h["sun_sync"]
+    if isinstance(h.get("ambient_weather"), bool):
+        out["ambient_weather"] = h["ambient_weather"]
+    if isinstance(h.get("ambient_sun_grade"), bool):
+        out["ambient_sun_grade"] = h["ambient_sun_grade"]
     if h.get("nav_sound") in ("system", "soft", "off"):
         out["nav_sound"] = h["nav_sound"]
     if h.get("glass_focus") in ("colour", "glass"):   # glass app icons: the focused app (#32)
