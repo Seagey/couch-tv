@@ -90,6 +90,8 @@ If nothing Android is found, or they are not sure what they have:
     Information), the IP address.
   - **LG:** Settings, Network (or All Settings, General, Network), Wi-Fi Connection, the connected
     network, Advanced Wi-Fi Settings, the IP address.
+  - **Roku:** Settings, Network, About (the IP address). `find-tvs.py` does not list a Roku, but
+    `check-tv.py <address>` recognises one by its port 8060.
   - **Google TV or Android TV:** Settings, Network and Internet, the Wi-Fi network.
 - Ask them to open **Settings, Device Preferences, About** (older Android TV) or **Settings,
   System, About** (Google TV) and read you the model and the "Android TV OS" line. Until you know
@@ -135,7 +137,26 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   4 (most questions in step 2 still apply; skip picture mode, apply.sh and ADB). Afterwards ask
   them to open an issue on GitHub saying how it went, and write down for them what worked and what
   did not.
-- **Roku, Apple TV, Hisense VIDAA, Fire TV on Vega OS:** not supported. Say so kindly,
+- **Roku (TV or box):** do not say no. Offer the Roku path in [docs/ROKU.md](docs/ROKU.md) the way you offer
+  the LG one, and say first, and plainly, how little it has been tried: "There is a Roku version of
+  couch-tv. It was built from Roku's own documentation and tested against a pretend Roku on a computer and
+  a BrightScript simulator, and it has **not been run on a real Roku yet**, so you may be the first and
+  something may need fixing. Roku channels are not web pages, so the home is drawn again as a channel: the
+  scenes with the clock in them, the date and weather, your people, Keep watching and your apps. Like the
+  Samsung and LG ones it goes on as an app, and a computer at home that stays on opens it every time the TV
+  is switched on. It is not a true home screen: the remote's Home button still opens Roku's home. It needs
+  Roku's Developer Mode (a password you make up on the Roku, no account), and newer Roku OS also limits
+  remote control until Settings, System, Advanced system settings, Control by mobile apps, Network
+  access is set to Permissive or Enabled. The phone remote works. Netflix opens the show and YouTube the
+  video (the deep links are untested); other apps open on their own page, and you press Play. There is no
+  'what is playing' title and no screenshots. A Roku holds one sideloaded channel, so installing another
+  replaces couch-tv." Without a computer that stays on, only the channel itself is possible: it shows the
+  clock, the date and the Roku's own apps. Also offer the Google TV box as the way to get everything. If
+  they choose Roku, follow docs/ROKU.md for steps 2 to 4 (most questions in step 2 still apply; skip
+  picture mode, apply.sh, ADB and the quick buttons). The ids and deep links in its table are unverified:
+  if one does not open, find the Roku's real id with `query/apps` and say what you found. Afterwards ask
+  them to open an issue on GitHub saying how it went, and write down for them what worked and what did not.
+- **Apple TV, Hisense VIDAA, Fire TV on Vega OS:** not supported. Say so kindly,
   explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
   round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets
   them everything. If they do not want a box, stop. Do not suggest rooting the TV.

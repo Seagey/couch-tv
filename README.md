@@ -38,6 +38,14 @@ time the TV is switched on. It was built from LG's own documentation and tested 
 so if you have an LG, you would be among the first to run it: give this repo to your agent, and
 please open an issue saying how it went. Setup and limits: [docs/LG.md](docs/LG.md).
 
+**10 November 2026: Roku (built, not yet run on a real Roku).** couch-tv now has a Roku version. Roku
+channels are not web pages, so the home is drawn again as a native channel (the Night scenes with the clock
+in them, date and weather, the people switch, Keep watching and your apps), and the bridge talks to the
+Roku over its own network protocol and opens the channel every time the TV is switched on. It was built from
+Roku's documentation and tested against a test Roku and a BrightScript simulator. **Nobody has run it on a
+real Roku**, so if you have one, you would be the first: give this repo to your agent, and please open an
+issue saying how it went. Setup and limits: [docs/ROKU.md](docs/ROKU.md).
+
 **10 November 2026: Android 6 (experimental).** Both TV apps now install on Android 6.0 (a Xiaomi
 Mi TV 4A with PatchWall, for example, [issue #59](https://github.com/Seagey/couch-tv/issues/59)).
 Checked on an Android 6 emulator only, not a real TV. There both apps install and open, but that
@@ -281,7 +289,8 @@ about how a show opened) and some screen reader labels on the phone are still in
 | **Fire TV on Vega OS** (newer Fire TV sticks) | No | No | No |
 | **Samsung** (Tizen) | App only, opened from Samsung's app row | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
 | **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on five real LGs so far ([how](docs/LG.md)) | No |
-| **Roku, Apple TV, Hisense with VIDAA** | No | No | No |
+| **Roku** (TV or box) | App only, a sideloaded channel opened from Roku's home row, while Developer Mode is on | With a computer at home: as a channel that opens itself, not a true home screen. Built from Roku's documentation, not yet tried on a real Roku ([how](docs/ROKU.md)) | No |
+| **Apple TV, Hisense with VIDAA** | No | No | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
 not the brand. Their Google TV and Android TV models should work. Their VIDAA models run
@@ -314,9 +323,18 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   It has run on five real LGs so far (webOS 4 to webOS 24): if you try it on another model, please
   open an issue and say how it went. Setup and limits:
   [docs/LG.md](docs/LG.md).
-- **Roku, Apple TV, VIDAA and Vega OS Fire TV:** closed. Nothing here works on them.
+- **Roku:** the same idea as the LG, with the home drawn again as a Roku channel (Roku channels are not web
+  pages): you put couch-tv on as a sideloaded channel through Roku's Developer Mode (a password you make
+  up on the Roku, no account), and the bridge opens it every time the TV is switched on. Roku's own Home
+  button still opens Roku's home. The phone remote and the assistant work: Netflix opens the title,
+  YouTube opens the video, other apps open on their home page. No screenshots and no title for what is
+  playing. **It was built from Roku's documentation and tested against a test Roku and a simulator, and it
+  has not been run on a real Roku**, so expect to fix something. Newer Roku OS also limits remote control
+  until "Control by mobile apps" is switched to Permissive or Enabled. If you try it, please open an issue
+  and say how it went. Setup and limits: [docs/ROKU.md](docs/ROKU.md).
+- **Apple TV, VIDAA and Vega OS Fire TV:** closed. Nothing here works on them.
 
-**Want everything on a Samsung, LG or another TV?** The Samsung and LG apps cover the home and the
+**Want everything on a Samsung, LG, Roku or another TV?** The Samsung, LG and Roku apps cover the home and the
 phone remote, not everything. Plug in a Google TV box (for example the Google TV Streamer) and set
 couch-tv up on that, and you get everything, on any TV with an HDMI port.
 
@@ -739,7 +757,7 @@ If the TV ever lost its saved Wi-Fi after an older couch-tv switched the setup a
 
 Two Android TVs or Google TVs can be started on the same show within a few hundredths of a second of
 each other, so two rooms do not echo. It needs a small helper app on each TV and a computer to run
-one command. It has only been tried on two TVs, with YouTube and Netflix, and Samsung, LG and VIDAA
+one command. It has only been tried on two TVs, with YouTube and Netflix, and Samsung, LG, Roku and VIDAA
 cannot do it. Read [docs/SYNC.md](docs/SYNC.md) first.
 
 ## How it fits together

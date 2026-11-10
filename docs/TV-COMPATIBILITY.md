@@ -1,7 +1,8 @@
 # Which TVs work
 
 Research from public sources (linked below). Only Google TV has been tested
-by the author. Everything else is what the sources say, not tested.
+by the author. Everything else is what the sources say, not tested (Samsung and LG have since run on real
+TVs, see their pages; Roku has not).
 
 - **A. TV home only:** an app replaces the TV's home screen.
 - **B. Computer bridge:** a computer at home controls the TV with the Android TV Remote protocol
@@ -21,7 +22,8 @@ by the author. Everything else is what the sources say, not tested.
 | Fire TV on Vega OS (Stick 4K Select, Stick HD 2026, 4K gen 3) | No | No | No |
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on five real LGs so far ([LG.md](LG.md)) | No |
-| Roku, Apple TV, Hisense VIDAA | No | No | No |
+| Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation, **not yet tried on a real Roku** ([ROKU.md](ROKU.md)) | No |
+| Apple TV, Hisense VIDAA | No | No | No |
 
 ## Reported by people using it
 
@@ -74,6 +76,12 @@ Not tested by the author. Each line is what someone said worked on their own dev
   Edition, Fire OS 6.7.1.1 ([issue #50](https://github.com/Seagey/couch-tv/issues/50)). The Android TV Remote protocol is not confirmed on Fire TV.
 - **Vega OS** is Amazon's newer Linux system. It has no sideloading. Amazon says future Fire TV
   sticks will run it.
+- **Roku** channels are BrightScript and SceneGraph, not web pages, so the home is drawn again natively
+  (`roku/`) and the bridge talks to the Roku over its External Control Protocol on port 8060
+  (`bridge/roku.py`). Built from Roku's documentation, tested against a test Roku and a BrightScript
+  simulator, **never on a real Roku**. A sideloaded channel is always one at a time, and newer Roku OS limits
+  that protocol unless "Control by mobile apps" allows it ([ROKU.md](ROKU.md)). Roku's home screen cannot be
+  replaced.
 - **Samsung and LG** do not run Android apps or let an app replace their home screen. On a Samsung,
   couch-tv runs as a sideloaded app that the bridge opens when the TV comes on
   ([SAMSUNG.md](SAMSUNG.md)). On an LG the same is built, through LG's Developer Mode, but not
@@ -93,6 +101,9 @@ Not tested by the author. Each line is what someone said worked on their own dev
   [adb docs](https://developer.android.com/tools/adb)
 - Fire TV: [AFTVnews, launchers](https://www.aftvnews.com/?p=41438),
   [Android Authority, Vega OS](https://www.androidauthority.com/amazon-vega-os-fire-tv-stick-3602647/)
+- Roku: [External Control API](https://developer.roku.com/docs/developer-program/dev-tools/external-control-api.md),
+  [deep linking](https://developer.roku.com/docs/developer-program/discovery/implementing-deep-linking.md),
+  [developer setup](https://developer.roku.com/docs/developer-program/getting-started/developer-setup.md)
 - Samsung and LG: [Samsung developer forum](https://forum.developer.samsung.com/t/launch-application-automatically-on-boot-of-the-device/26398),
   [webOS developer mode](https://webostv.developer.lge.com/develop/getting-started/developer-mode-app),
   [webosbrew](https://www.webosbrew.org/devmode/)
