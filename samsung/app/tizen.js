@@ -160,6 +160,7 @@
     var x = new XMLHttpRequest();
     x.open("POST", BRIDGE + "/api/launch");
     x.setRequestHeader("Content-Type", "application/json");
+    if (S.key) x.setRequestHeader("Authorization", "Bearer " + S.key);
     x.send(JSON.stringify(TV_ID ? { app: pkg, tv: TV_ID } : { app: pkg }));
   }
 
@@ -230,6 +231,7 @@
       var x = new XMLHttpRequest();
       x.open("POST", BRIDGE + "/api/tizen/answer");
       x.setRequestHeader("Content-Type", "application/json");
+      if (S.key) x.setRequestHeader("Authorization", "Bearer " + S.key);
       x.send(JSON.stringify({ tv: TV_ID || undefined, id: id, ok: ok, error: error || null }));
     } catch (e) {}
   }
@@ -248,7 +250,10 @@
     if (!BRIDGE || document.hidden) { polling = false; return; }
     polling = true;
     var x = new XMLHttpRequest();
-    x.open("GET", BRIDGE + "/api/tizen/next" + (TV_ID ? "?tv=" + TV_ID : ""));
+    var url = BRIDGE + "/api/tizen/next" + (TV_ID ? "?tv=" + TV_ID : "");
+    if (S.key) url += (url.indexOf("?") < 0 ? "?" : "&") + "key=" + encodeURIComponent(S.key);
+    x.open("GET", url);
+    if (S.key) x.setRequestHeader("Authorization", "Bearer " + S.key);
     x.timeout = 35000;
     x.onload = function () {
       var job = null;

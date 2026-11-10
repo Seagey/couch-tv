@@ -91,6 +91,7 @@
     var x = new XMLHttpRequest();
     x.open("POST", BRIDGE + "/api/launch");
     x.setRequestHeader("Content-Type", "application/json");
+    if (S.key) x.setRequestHeader("Authorization", "Bearer " + S.key);
     x.send(JSON.stringify(TV_ID ? { app: pkg, tv: TV_ID } : { app: pkg }));
   }
 

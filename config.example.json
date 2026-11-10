@@ -2,7 +2,8 @@
   "bridge": {
     "host": "your-computer.local",
     "port": 5400,
-    "fallback_hosts": []
+    "fallback_hosts": [],
+    "pairing_key": ""
   },
   "default_tv": "living-room",
   "tvs": [

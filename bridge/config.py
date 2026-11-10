@@ -55,6 +55,7 @@ WEATHER = {"lat": -33.8688, "lon": 151.2093, "place": "Sydney", "timezone": "Aus
            **(CONFIG.get("weather") or {})}
 SCREENS = CONFIG.get("screens") or []
 BRIDGE = {"host": "your-computer.local", "port": 5400, "fallback_hosts": [], **(CONFIG.get("bridge") or {})}
+PAIRING_KEY = str(BRIDGE.get("pairing_key") or os.environ.get("BRIDGE_KEY") or "").strip()
 CLIENT_NAME = CONFIG.get("client_name", "Couch TV bridge")
 
 # The languages the TV home and the phone remote speak (tv-home/web/i18n.js, remote/src/i18n.js).

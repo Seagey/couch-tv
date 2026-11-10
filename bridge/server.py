@@ -4,6 +4,7 @@ Run: .venv/bin/python bridge/server.py   (settings come from config.json, see co
 """
 import asyncio
 import contextvars
+import hmac
 import json
 import logging
 import mimetypes
@@ -11,6 +12,7 @@ import os
 import re
 import socket
 import time
+import urllib.parse
 from collections.abc import MutableMapping
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -32,6 +34,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 REMOTE_DIR = os.path.join(ROOT, "remote", "dist")
 LAUNCHER_DIR = os.path.join(ROOT, "tv-home", "web")
+SHIM_PATH = os.path.join(HERE, "web", "shim.js")
 PORT = int(os.environ.get("PORT") or config.BRIDGE["port"])
 HOME_TZ = ZoneInfo(config.TIMEZONE)   # the home's time zone (weather.timezone in config.json)
 
@@ -139,6 +142,83 @@ def ok(**fields):
     return web.json_response({"ok": True, **fields})
 
 
+def lan_ipv4():
+    """This computer's home network IPv4 (a UDP connect sends nothing, it only picks the route)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.0.2.1", 9))   # a documentation address: never sent, only routed
+        return s.getsockname()[0]
+    except OSError:
+        return ""
+    finally:
+        s.close()
+
+
+def is_allowed_origin(request, origin):
+    """Origin allowlist for CORS (couch-tv#73): the bridge's own origins and TV front-end origins."""
+    if not origin:
+        return False
+    clean = origin.rstrip("/").lower()
+    # 1. Front-end origins used by the TV apps:
+    # "null" is sent by browsers for local file:// WebViews (Android WebView, webOS, Tizen).
+    # "file://" is sent literally by some embedded Chromium / WebViews.
+    # "http(s)://home.tvos.invalid" is used by couch-tv's Android TV offline launcher.
+    if clean == "null" or clean.startswith("file:") or clean in ("http://home.tvos.invalid", "https://home.tvos.invalid"):
+        return True
+    if clean.startswith(("widget:", "wgt:", "tizen:")):
+        return True
+
+    # 2. Bridge's own origins:
+    allowed_hosts = {"127.0.0.1", "localhost", "[::1]"}
+    cfg_host = (config.BRIDGE.get("host") or "").strip().lower()
+    if cfg_host:
+        allowed_hosts.add(cfg_host)
+    for fb in config.BRIDGE.get("fallback_hosts") or []:
+        fb_s = str(fb).strip().lower()
+        if fb_s:
+            allowed_hosts.add(fb_s)
+    ip = lan_ipv4()
+    if ip:
+        allowed_hosts.add(ip.lower())
+
+    try:
+        parsed = urllib.parse.urlsplit(clean)
+        if parsed.scheme in ("http", "https"):
+            parsed_host = (parsed.hostname or "").lower()
+            parsed_port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            if parsed_host in allowed_hosts and parsed_port in (PORT, 5173, 5400):
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
+def extract_auth_key(request):
+    """Extract pairing/API key from Authorization header, X-API-Key, or ?key= / ?token=."""
+    auth = request.headers.get("Authorization") or ""
+    if auth.startswith("Bearer "):
+        token = auth[7:].strip()
+        if token:
+            return token
+    api_key = (request.headers.get("X-API-Key") or "").strip()
+    if api_key:
+        return api_key
+    q_key = (request.query.get("key") or request.query.get("token") or "").strip()
+    if q_key:
+        return q_key
+    return None
+
+
+def is_authed(request):
+    if not config.PAIRING_KEY:
+        return True
+    key = extract_auth_key(request)
+    if not key:
+        return False
+    return hmac.compare_digest(key, config.PAIRING_KEY)
+
+
 async def body(request):
     if not request.body_exists:
         return {}
@@ -158,12 +238,31 @@ def record_action(request, tool, args, success):
 
 
 # ---------- middleware: CORS + errors ----------
+OPEN_PATHS = {"/api/health", "/api/pair"}
+
+
 @web.middleware
 async def middleware(request, handler):
+    origin = request.headers.get("Origin")
+    origin_ok = is_allowed_origin(request, origin) if origin else False
+
     if request.method == "OPTIONS":
+        if origin and not origin_ok:
+            return web.Response(status=403, text="forbidden origin")
         resp = web.Response(status=204)
     else:
         try:
+            # 1. Refuse POST without application/json (couch-tv#73)
+            if request.method == "POST" and request.content_type != "application/json":
+                raise ApiError(415, "Content-Type must be application/json")
+
+            # 2. Check pairing key authentication for protected API endpoints (couch-tv#73)
+            path = request.path
+            is_api = path.startswith("/api/")
+            if is_api and path not in OPEN_PATHS and config.PAIRING_KEY and not is_authed(request):
+                key = extract_auth_key(request)
+                raise ApiError(401, "invalid pairing key" if key else "pairing key required")
+
             tv_id = request.query.get("tv")
             if not tv_id and request.method == "POST" and request.body_exists:
                 try:
@@ -187,9 +286,13 @@ async def middleware(request, handler):
         except Exception as e:
             log.exception("handler failed")
             resp = web.json_response({"ok": False, "error": f"bridge error: {e}"}, status=500)
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Ask-Id"
+
+    # Set CORS headers only when origin is allowed (couch-tv#73)
+    if origin and origin_ok:
+        resp.headers["Access-Control-Allow-Origin"] = origin
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Ask-Id, Authorization, X-API-Key"
+        resp.headers["Vary"] = "Origin"
     return resp
 
 
@@ -272,7 +375,33 @@ def now_payload():
 
 # ---------- handlers ----------
 async def h_health(request):
-    return ok(tv_connected=tv.connected, adb=tv.adb_ok, version="1")
+    authed = is_authed(request)
+    return ok(
+        tv_connected=tv.connected,
+        adb=tv.adb_ok,
+        version="1",
+        auth="ok" if authed else "required",
+        paired=authed,
+    )
+
+
+async def h_pair(request):
+    b = await body(request)
+    given = str(b.get("key") or "").strip()
+    if not config.PAIRING_KEY:
+        return ok(paired=True, note="no pairing key required")
+    if not given:
+        raise ApiError(400, "pairing key is required")
+    if not hmac.compare_digest(given, config.PAIRING_KEY):
+        await asyncio.sleep(0.3)
+        raise ApiError(401, "That pairing key is not right. Check config.json.")
+    return ok(paired=True, token=config.PAIRING_KEY, note="paired")
+
+
+async def h_bridge_shim(request):
+    if not os.path.isfile(SHIM_PATH):
+        raise web.HTTPNotFound()
+    return web.FileResponse(SHIM_PATH, headers={"Cache-Control": "no-cache", "Content-Type": "application/javascript"})
 
 
 async def h_now(request):
@@ -1005,18 +1134,6 @@ PLACEHOLDER = """<!doctype html><meta charset=utf-8><meta name=viewport content=
 <h1>{name}</h1><p>Not built yet. The bridge API is live at <a style="color:#8cf" href="/api/now">/api/now</a>.</p>"""
 
 
-def lan_ipv4():
-    """This computer's home network IPv4 (a UDP connect sends nothing, it only picks the route)."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("192.0.2.1", 9))   # a documentation address: never sent, only routed
-        return s.getsockname()[0]
-    except OSError:
-        return ""
-    finally:
-        s.close()
-
-
 def static_handler(folder, name):
     async def handler(request):
         rel = request.match_info.get("path", "")
@@ -1040,10 +1157,16 @@ def static_handler(folder, name):
             ip = (sock[0] if sock else "").removeprefix("::ffff:")
             if ip.count(".") != 3 and not ip.startswith("::1"):
                 ip = lan_ipv4()   # the phone came in over IPv6: hand it the IPv4 instead
+            with open(target, encoding="utf-8") as f:
+                html = f.read()
+            tags = []
             if ip.count(".") == 3 and not ip.startswith("127."):
-                with open(target, encoding="utf-8") as f:
-                    html = f.read().replace("<head>", '<head>\n  <meta name="lan-ip" content="%s">' % ip, 1)
-                return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
+                tags.append('<meta name="lan-ip" content="%s">' % ip)
+            if folder == REMOTE_DIR:
+                tags.append('<script src="/bridge/shim.js"></script>')
+            if tags and "<head>" in html:
+                html = html.replace("<head>", "<head>\n  " + "\n  ".join(tags), 1)
+            return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
         ctype = mimetypes.guess_type(target)[0] or "application/octet-stream"
         if target.endswith(".webmanifest"):
             ctype = "application/manifest+json"
@@ -2319,6 +2442,8 @@ def make_app():
     app = web.Application(middlewares=[middleware])
     r = app.router
     r.add_get("/api/health", h_health)
+    r.add_post("/api/pair", h_pair)
+    r.add_get("/bridge/shim.js", h_bridge_shim)
     r.add_get("/api/tvs", h_tvs)
     r.add_get("/api/now", h_now)
     r.add_get("/api/events", h_events)

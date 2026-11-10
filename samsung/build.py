@@ -36,6 +36,7 @@ OUT = os.path.join(ROOT, "build", "samsung")
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--bridge", default="", help="the bridge's address, e.g. http://my-computer.local:5400")
+    ap.add_argument("--key", default="", help="pairing key for the bridge API (defaults to pairing_key in config.json)")
     ap.add_argument("--tv", default="", help="this TV's id in config.json (only with more than one TV)")
     ap.add_argument("--log-url", default="", help="for testing: where the app sends its console")
     a = ap.parse_args()
@@ -93,7 +94,8 @@ def main():
     sky = tv_cfg.get("sky_hdmi")
     if sky is not None and (not isinstance(sky, int) or isinstance(sky, bool) or not 1 <= sky <= 4):
         raise SystemExit(f"{tv_cfg['id']}: sky_hdmi must be a port number from 1 to 4, or left out")
-    settings = {"bridge": a.bridge.rstrip("/"), "tv": a.tv, "log": a.log_url.rstrip("/"), "sky_hdmi": sky}
+    key = a.key or config.PAIRING_KEY
+    settings = {"bridge": a.bridge.rstrip("/"), "tv": a.tv, "log": a.log_url.rstrip("/"), "sky_hdmi": sky, "key": key}
     with open(os.path.join(stage, "settings.js"), "w") as f:
         f.write("window.COUCH_TIZEN = " + json.dumps(settings) + ";\n")
     table = {}

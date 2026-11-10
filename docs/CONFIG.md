@@ -307,9 +307,14 @@ card is drawn by the app itself, so it cannot be previewed in a browser.
 
 ## Everything else
 
+**Never forward a port to the bridge.** The bridge is built for your home network only. Never expose it
+to the internet or forward port 5400 on your router. A private network app (VPN) like Tailscale or
+WireGuard is the safe way to use the phone remote away from home.
+
 | Key | What it does |
 |---|---|
 | `bridge.host`, `bridge.port` [5400], `bridge.fallback_hosts` | Where the bridge runs. |
+| `bridge.pairing_key` [""] | Optional API pairing key. Empty/unset by default. When set, clients (phone remote and TV front-ends) must authenticate with this key. |
 | `weather` | `lat`, `lon`, `place`, `timezone`, for the weather on the home (Open-Meteo, no key). A suburb or city is enough; never a home address. `timezone` (for example `Europe/London`) is also the time zone the bridge writes times in. |
 | `country` [`IT` when `home.language` is `it`, `DE` when it is `de`, else "AU"] | Two letter code, for where shows stream (JustWatch), the country in links to Apple TV and Prime Video, and the country Claude is told about. |
 | `country_name` | Optional: what to call the country in Claude's prompts, if the built-in list does not know your code. |

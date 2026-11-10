@@ -550,10 +550,17 @@ A laptop bridge must not sleep, or the bridge stops: Battery, Options, Prevent a
 on power adapter when the display is off, or `sudo pmset -c sleep 0`.
 A MacBook also sleeps when its lid is shut, even on power and with `caffeinate`: keep the lid open, or attach an external display.
 
-**Anyone on your Wi-Fi can use the remote and the assistant.** The bridge has no password, so
+**Anyone on your Wi-Fi can use the remote and the assistant.** By default the bridge has no password, so
 everyone on the network, kids included, can change the channel, turn the TV off or ask Claude for
-a show. Put visitors on a guest Wi-Fi network (most routers have one) so they cannot reach it. The
-bridge is for your home network only. Never put it on the internet or forward a port to it.
+a show. Put visitors on a guest Wi-Fi network (most routers have one) so they cannot reach it.
+
+To require a password on your home network, set `"pairing_key"` under `"bridge"` in `config.json`. The
+phone remote pairs once by typing it (or opening `http://your-computer.local:5400/?pair=<key>`), and the
+TV homes carry their key.
+
+**Never forward a port to the bridge.** The bridge is built for your home network only. Never expose it
+to the internet or forward port 5400 on your router. A private network app (VPN) like Tailscale or
+WireGuard is the safe way to use the phone remote away from home.
 
 `"phone_remote": false` is for a house that only wants the TV home and its quick settings from the
 bridge. The bridge still serves the API (the TV home needs it), and the phone page still loads if
@@ -783,8 +790,11 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
   You can also give it a file of your own words to block: `scripts/privacy-scan.sh my-denylist.txt`
   (one word per line, keep that file out of the repo). `scripts/install-hook.sh my-denylist.txt`
   runs it before every commit.
-- Option B: anyone on your Wi-Fi can use the remote and the assistant (see step 5). The bridge only
-  listens on your home network. Do not forward a port to it.
+- **Never forward a port to the bridge.** The bridge listens on your home network only. Never expose
+  it to the internet or forward a port to it on your router. Use a private network (VPN) if you want to
+  reach it away from home.
+- Option B pairing: anyone on your Wi-Fi can use the remote and the assistant unless you set a
+  `pairing_key` under `bridge` in `config.json` (see step 5).
 - Smart home (optional, off unless you add it): the Home Assistant token goes in `.env`, then
   only into the TV app's private storage. The home page never sees it, and the app only touches the
   rooms, scenes and doorbell you list. Make a separate Home Assistant user for the TV

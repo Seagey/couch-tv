@@ -262,9 +262,10 @@ have an input screen. Leave the rest off.
   home screen, no app store. Show each person how to add it.
 - Tell them: it works on the home Wi-Fi only. Option B, optional: a private network (VPN) app
   they run themselves can make it work away from home. Never open a router port for it.
-- Tell them plainly: **with option B there is no password, so anyone on the Wi-Fi can use the
-  remote and the assistant, kids and visitors included.** Suggest a guest Wi-Fi network for
-  visitors (most routers have one) so they cannot reach it. Option C asks for a PIN shown on the TV
+- Tell them plainly: **by default with option B there is no password, so anyone on the Wi-Fi can use the
+  remote and the assistant, kids and visitors included.** To require a password, set `bridge.pairing_key` in
+  `config.json`: the phone remote pairs once by typing it (or opening a `?pair=<key>` link). Suggest a guest
+  Wi-Fi network for visitors (most routers have one) so they cannot reach it. Option C asks for a PIN shown on the TV
   the first time.
 
 ### 2.7 Extras (option B)

@@ -133,6 +133,10 @@ function bridgeUrl(path as String) as String
         if Instr(1, url, "?") > 0 then url = url + "&" else url = url + "?"
         url = url + "tv=" + m.cfg.tv
     end if
+    if m.cfg.key <> invalid and m.cfg.key <> ""
+        if Instr(1, url, "?") > 0 then url = url + "&" else url = url + "?"
+        url = url + "key=" + m.cfg.key
+    end if
     return url
 end function
 
