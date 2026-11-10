@@ -48,6 +48,11 @@
         <intent><action android:name="android.service.dreams.DreamService" /></intent>
         <intent><action android:name="dreamx.two.panel.SETTINGS" /></intent>
         <package android:name="com.google.android.apps.tv.dreamx" />
+        <!-- Stremio's Continue Watching cards open the item in Stremio (Stremio.kt). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="stremio" />
+        </intent>
         <!-- The TV's input list, for the Input quick button when there is no bridge. -->
         <intent><action android:name="android.settings.TV_INPUT_SETTINGS" /></intent>
         <intent><action android:name="com.android.tv.action.VIEW_INPUTS" /></intent>

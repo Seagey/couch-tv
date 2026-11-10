@@ -97,6 +97,7 @@ class MainActivity : Activity() {
         hideSystemBars()
         intent?.let { readExtras(it) }
         io.execute { warmApps() }
+        refreshStremio()
         askWatchNextPermission()
         Doorbell.start(this)   // smart home (optional): nothing happens unless a doorbell is set up
         FireWatch.ensure(this)   // Fire TV only, and only once a computer has switched it on
@@ -151,6 +152,7 @@ class MainActivity : Activity() {
             }
         } else if (offline || fallback != null) connect()
         io.execute { warmApps() }
+        refreshStremio()   // back from an episode in Stremio: its row catches up a moment later
         Updater.resumed(this)   // the daily look for a new release (Home settings, Updates)
     }
 
@@ -215,6 +217,14 @@ class MainActivity : Activity() {
         }
         e.apply()
         HomeAssistant.readExtras(this, i)   // smart home ("ha_b64"), kept apart from the page's settings
+        Stremio.readExtras(this, i)   // Stremio's Continue Watching ("stremio_b64"), kept apart the same way
+    }
+
+    /** Stremio's Continue Watching (Stremio.kt): read again in the background, the row redrawn only when it changed. */
+    private fun refreshStremio() {
+        try {
+            Stremio.refresh(this) { main.post { js("window.tv && tv.shows && tv.shows()") } }
+        } catch (e: Exception) {}
     }
 
     // ---------------------------------------------------------------- finding the bridge
@@ -962,7 +972,64 @@ class MainActivity : Activity() {
         try { requestPermissions(arrayOf(READ_TV), 77) } catch (e: Exception) {}
     }
 
+    /**
+     * Keep watching with no computer: Android's Watch Next list, plus Stremio's own Continue
+     * Watching when the household linked it (Stremio.kt: Stremio puts nothing in Watch Next),
+     * together newest first.
+     */
     private fun readWatchNext(): JSONArray {
+        val android = readAndroidWatchNext()
+        val extra = stremioRows()
+        if (extra.isEmpty()) return android
+        val all = ArrayList<JSONObject>()
+        for (n in 0 until android.length()) android.optJSONObject(n)?.let { all.add(it) }
+        all.addAll(extra)
+        all.sortByDescending { it.optLong("engaged") }
+        val out = JSONArray()
+        all.take(20).forEach { out.put(it) }
+        return out
+    }
+
+    /** A Watch Next picture address as the page asks for it: through the art route, which fetches only addresses seen here. */
+    private fun artRoute(art: String): String = "http://tvos.invalid/art/" + android.util.Base64.encodeToString(
+        art.toByteArray(), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
+
+    /** Stremio's Continue Watching as Keep watching cards (ids "st:<library id>"), less the ones hidden on this TV. */
+    private fun stremioRows(): List<JSONObject> = try {
+        val items = Stremio.items(this)
+        val pkg = if (items.isEmpty()) null else Stremio.pkg(this)
+        val skip = try {
+            val arr = prefs.getString("config", null)?.let { JSONObject(it).optJSONObject("home")?.optJSONArray("skip_watch_next") }
+            (0 until (arr?.length() ?: 0)).map { arr!!.optString(it) }.toSet()
+        } catch (e: Exception) { emptySet<String>() }
+        if (pkg == null || pkg in skip) emptyList() else {
+            val hidden = prefs.getStringSet("hidden_watch_next_ids", emptySet()) ?: emptySet()
+            val label = try {
+                packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+            } catch (e: Exception) { "Stremio" }
+            items.mapNotNull { it ->
+                val id = Stremio.PREFIX + it.id
+                if (id in hidden || "$pkg|${it.name}" in hidden) return@mapNotNull null
+                it.art?.let { a -> watchNextArtSeen.add(a) }
+                it.fallbackArt?.let { a -> watchNextArtSeen.add(a) }
+                JSONObject().apply {
+                    put("id", id)
+                    put("wn", true)
+                    put("title", it.name)
+                    put("episode_title", "")
+                    put("season", it.season)
+                    put("episode", it.episode)
+                    if (it.art != null) put("backdrop", artRoute(it.art))
+                    if (it.progress > 0) put("progress", it.progress)
+                    put("app", JSONObject().put("package", pkg).put("name", label))
+                    put("package", pkg)
+                    put("engaged", it.engaged)
+                }
+            }
+        }
+    } catch (e: Exception) { emptyList() }
+
+    private fun readAndroidWatchNext(): JSONArray {
         val out = JSONArray()
         if (checkSelfPermission(READ_TV) != PackageManager.PERMISSION_GRANTED) return out
         try {
@@ -1030,6 +1097,11 @@ class MainActivity : Activity() {
     }
 
     private fun openWatchNextItem(id: String): Boolean {
+        // Stremio's own Continue Watching (Stremio.kt): its page for the item, at the episode
+        if (id.startsWith(Stremio.PREFIX)) {
+            val i = try { Stremio.intent(this, id) } catch (e: Exception) { null }
+            return if (i != null) start(i) else Stremio.pkg(this)?.let { launchPackage(it) } ?: false
+        }
         if (!Regex("[0-9]{1,18}").matches(id)) return false
         try {
             val cols = arrayOf("package_name", "intent_uri")
@@ -1101,9 +1173,14 @@ class MainActivity : Activity() {
 
     /** The picture behind a Watch Next card: a web address or a content address the page cannot read itself. */
     private fun watchNextArt(token: String): ByteArray? {
+        val raw = try { String(android.util.Base64.decode(token, android.util.Base64.URL_SAFE)) } catch (e: Exception) { return null }
+        if (raw !in watchNextArtSeen) return null
+        // A Stremio card's wide background may not exist for every show: then its own poster
+        return fetchArt(raw) ?: Stremio.fallbackArt(this, raw)?.takeIf { it in watchNextArtSeen }?.let { fetchArt(it) }
+    }
+
+    private fun fetchArt(raw: String): ByteArray? {
         return try {
-            val raw = String(android.util.Base64.decode(token, android.util.Base64.URL_SAFE))
-            if (raw !in watchNextArtSeen) return null
             val u = android.net.Uri.parse(raw)
             when (u.scheme) {
                 "http", "https" -> {

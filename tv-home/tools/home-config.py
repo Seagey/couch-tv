@@ -78,6 +78,20 @@ if "--key" in sys.argv:
     sys.exit(0)
 
 
+# Stremio's Continue Watching in Keep watching (Stremio.kt): the account key from STREMIO_AUTH_KEY in
+# .env (scripts/stremio-link.py makes it), base64 JSON for apply.sh to hand to the app on its own
+# ("stremio_b64"), or "none". Like the smart home token it is never printed by apply.sh.
+#   --stremio --check prints only "stremio: on" or "stremio: off".
+if "--stremio" in sys.argv:
+    st_key = (os.environ.get("STREMIO_AUTH_KEY") or "").strip()
+    ok = bool(re.fullmatch(r"[A-Za-z0-9._=+/-]{16,512}", st_key))   # base64 with "=" padding
+    if "--check" in sys.argv:
+        print("stremio: on" if ok else "stremio: off")
+    else:
+        print(base64.b64encode(json.dumps({"authKey": st_key}).encode()).decode() if ok else "none")
+    sys.exit(0)
+
+
 if "--ha" in sys.argv:
     ha = smart_home()
     if "--check" in sys.argv:
