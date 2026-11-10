@@ -41,10 +41,28 @@ def split_title(title):
             "episode_title": ep_title, "episode": ep_no, "kind": "episode", "title": m.group("show")}
 
 
-def _date(text):
-    """Netflix writes the date in the account's locale; Australian accounts use day first."""
+SLASH_RE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})$")
+
+
+def date_order(texts):
+    """'dmy' or 'mdy' for the dates written with slashes. A file is in one order, so one date whose
+    first number is over 12 (25/3/24) says day first, and one whose second number is over 12
+    (3/25/24, a Canadian export) says month first. Nothing settles it: day first, as before."""
+    first_big = second_big = False
+    for t in texts:
+        m = SLASH_RE.match((t or "").strip())
+        if m:
+            first_big |= int(m.group(1)) > 12
+            second_big |= int(m.group(2)) > 12
+    return "mdy" if second_big and not first_big else "dmy"
+
+
+def _date(text, order="dmy"):
+    """Netflix writes the date in the account's locale: Australian accounts use day first, a
+    Canadian or American one month first (order, from date_order)."""
     text = (text or "").strip()
-    for fmt in ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d", "%d.%m.%y", "%d.%m.%Y", "%m/%d/%y"):
+    slashes = ["%m/%d/%Y", "%m/%d/%y"] if order == "mdy" else ["%d/%m/%Y", "%d/%m/%y"]
+    for fmt in slashes + ["%Y-%m-%d", "%d.%m.%y", "%d.%m.%Y", "%d/%m/%Y", "%d/%m/%y", "%m/%d/%y", "%m/%d/%Y"]:
         try:
             return datetime.strptime(text, fmt).date().isoformat()
         except ValueError:
@@ -82,13 +100,17 @@ def parse(text, person_for):
     if not kind:
         return []
     header = [c.strip() for c in rows[0]]
+    order = "dmy"
+    if kind == "profile" and "Date" in header:
+        di = header.index("Date")
+        order = date_order(r[di] for r in rows[1:] if len(r) > di)
     out = []
     for raw in rows[1:]:
         if not raw or not any(raw):
             continue
         r = dict(zip(header, raw))
         if kind == "profile":
-            when = _date(r.get("Date"))
+            when = _date(r.get("Date"), order)
             if not when:
                 continue
             t = split_title(r.get("Title"))

@@ -259,7 +259,7 @@ out every computer, so reconnect yours afterwards).
 | "Allow debugging?" never appears | Network debugging is off, or the TV suppresses the question (seen on an Android 14 Google TV). Use wireless debugging pairing instead. |
 | Worked, then stopped after a restart | Port 5555 is often switched off by a restart. Pair wireless debugging once: the app then turns it back on and finds the new port after every restart. |
 | Wireless debugging will not switch on | The TV is on Ethernet. Android only allows it on Wi-Fi. |
-| The phone page does not load | Phone and TV must be on the same network. The address changes if the router gives the TV a new one; reserve it in the router. iPhone asks for Local Network access once. |
+| The phone page does not load | Phone and TV must be on the same network. The address changes if the router gives the TV a new one; reserve it in the router. iPhone asks for Local Network access once. On an Android 17 phone, Chrome showing `ERR_TOO_MANY_RETRIES` means Chrome needs Settings, Apps, Chrome, Permissions, Nearby devices, Allow. |
 | Apps do not open from the phone | Android blocked an app start from the background. Connect ADB once: the app then has the permission it needs. |
 | Home button still goes to Google's home | See "Use it as the home screen". |
 | Server not answering after a TV update | Open Couch TV once; it also starts at boot. |

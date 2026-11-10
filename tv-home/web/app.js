@@ -1153,6 +1153,23 @@
     if (!NOBODY) api("POST", "/api/who", { who: who }).catch(function () {});
     renderShelf();
   }
+  // A person switch made elsewhere (the phone, another TV): when the bridge's "who" changes, show
+  // that person here too.
+  var bridgeWho = null;
+  function followWho() {
+    if (NOBODY) return;
+    api("GET", "/api/who").then(function (j) {
+      var w = j && j.who;
+      if (!w || w === bridgeWho) return;
+      var first = bridgeWho === null;
+      bridgeWho = w;
+      if (first || w === who) return;   // the first answer only sets the baseline
+      if (!PEOPLE.some(function (p) { return p.id === w; })) return;
+      who = w; s = 0;
+      try { localStorage.setItem("tvhome.who", who); } catch (e) {}
+      renderShelf();
+    }, function () {});
+  }
   // The order of the names: kept by the bridge (the phone's People sheet uses the same list), or on
   // this TV when there is no bridge. "pending" means the bridge has not heard about it yet.
   function savePeopleOrder() {
@@ -3380,7 +3397,18 @@
     setInterval(function () { renderQuick(); refreshBedtimeDim(); }, 30000);
     // This TV says who is on its couch first, so what plays here is logged for them (each TV
     // keeps its own); then the lists. Once the home is up: the one-time "tell you about new versions?" question.
-    var hello = OFFLINE ? Promise.resolve() : api("POST", "/api/who", { who: who }).catch(function () {});
+    if (!OFFLINE) setInterval(followWho, 3000);
+    // The bridge's choice wins (a phone that just turned the TV on set it); this TV's own memory is
+    // only handed over when the bridge has nobody yet.
+    var hello = OFFLINE ? Promise.resolve() : api("GET", "/api/who").then(function (j) {
+      var w = j && j.who;
+      if (w && PEOPLE.some(function (p) { return p.id === w; })) {
+        bridgeWho = w;
+        if (w !== who) { who = w; try { localStorage.setItem("tvhome.who", who); } catch (e) {} }
+        return;
+      }
+      return api("POST", "/api/who", { who: who });
+    }).catch(function () {});
     hello.then(refresh).then(function () { mark("home-painted-live"); updTell(); updAsk(); });
   }
 

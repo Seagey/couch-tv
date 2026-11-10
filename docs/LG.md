@@ -19,7 +19,7 @@ It needs a computer at home that stays on (option B). Without one you can still 
 and open it from LG's app row, but nothing opens it for you, and nothing extends Developer Mode,
 so the app is removed when the session runs out.
 
-## Test status: five real LGs so far
+## Test status: six real LGs so far
 
 **First real LG, 2 November 2026** ([issue #8](https://github.com/Seagey/couch-tv/issues/8)): an
 LG UHD TV on webOS 5.6.2 (2020/2021 firmware), Developer Mode with the Homebrew Channel, the bridge
@@ -77,6 +77,42 @@ If you take the webOS 26 upgrade:
 - Stop the bridge first, and start it again when the TV has finished. Otherwise, when the TV restarts
   in the middle of the update, the hook opens couch-tv over LG's setup screens.
 - Afterwards, Netflix and Prime Video open the LG Content Store until you update them there.
+
+**Sixth real LG, 10 November 2026** ([issue #71](https://github.com/Seagey/couch-tv/issues/71),
+reported by wojowar): an LG 65QNED80 (2025) on webOS 10.3.2, with the bridge on a Mac mini that stays
+on, a cable box on HDMI 2 and an Apple TV on HDMI 3, set up by Claude Code following AGENTS.md. The
+newest model and firmware so far. It worked as documented: Developer Mode, LG's ares tools (kept in
+`build/ares`, not installed globally), `lg/build.py`, `ares-install` and `ares-launch`, pairing and the
+remote over the encrypted port, couch-tv opening when the TV comes on, Netflix opening the show,
+YouTube opening the video, the phone remote, the Netflix history import, and Developer Mode's Extend
+with `ares-launch`. What differs on webOS 10.3.2:
+
+- **Port 3000 always resets** (connection reset straight away). Only `wss` on 3001 works. The bridge
+  coped by trying 3001 next, but tried 3000 first after every restart. It now remembers, per TV, the
+  port that worked (`data/lg-<id>-port.json`) and goes straight to it. Older webOS, where 3000 works,
+  still tries 3000 first.
+- **No new remote connection while the TV is in standby** (Quick Start+ on): a new connection is
+  answered and closed straight away (code 1008). A connection opened while the TV was on stays up in
+  standby. So after a bridge restart with the TV off, the bridge sees nothing until the TV is switched on.
+- **A slow start from deep standby.** After a long standby the TV dropped off the network, and on
+  power on its remote port answered 15 to 22 seconds after the TV was back on the network.
+- **Developer Mode's own app takes about 5 seconds to appear after Extend.** The old fixed 2 second
+  wait put couch-tv back too early, so Developer Mode then covered it. The bridge now waits up to 20
+  seconds for it to appear before putting couch-tv back.
+- **LG's clock screensaver** shows over couch-tv after about 3 minutes idle. Not fixed yet.
+- **A cable box with SimpLink (CEC) Auto Power Sync on** switches the TV to its own input about 2
+  seconds after power on, while couch-tv is still loading (about 8 seconds). Not fixed yet.
+- **Disney+ and Prime Video** have no history the bridge can see or import on LG.
+
+Setup snags, nothing to do with webOS 10:
+
+- **launchd on an external drive.** launchd refused a plist kept on an external drive with ownership
+  ignored ("Bootstrap failed: 5"). The plist had to live in `/Library/LaunchAgents`.
+- **Google Takeout for YouTube history** failed on Google's side ("Service failed to retrieve this
+  item") and the zip held only `archive_browser.html`. The history was taken from My Activity instead,
+  and the importer read that JSON fine.
+- **Canadian Netflix exports** write dates month first (3/25/24). The importer now reads the whole file
+  and uses month first when a date proves it (a second number over 12), and day first otherwise.
 
 Everything else was built from LG's documentation and the open source libraries that talk to LG
 TVs, and tested against a stand-in TV on a computer. If you run it on another LG, thank you: please
@@ -271,7 +307,8 @@ accepted.
 
 `bridge/lg.py` checks the TV every 2 seconds over LG's network remote (SSAP, a websocket on port
 3000, or 3001 encrypted on newer firmware): the power state, and which app is in front. Every 30
-minutes it reads the TV's app list, and finds each app couch-tv knows by its LG id or its name.
+minutes it reads the TV's app list, and finds each app couch-tv knows by its LG id or its name. It
+keeps, per TV, which of the two ports answered and tries that one first after a restart.
 
 When the TV goes from off (gone from the network, or in Quick Start+ standby) to on, the bridge
 waits a moment, and if no app is in front (live TV, an HDMI input or LG's home) it opens couch-tv.

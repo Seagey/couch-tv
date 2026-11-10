@@ -157,6 +157,10 @@ class LGTV:
         self.key_file = os.path.join(config.DATA, f"lg-{self.id}-key.txt")
         self.devmode_file = os.path.join(config.DATA, f"lg-{self.id}-devmode.json")
         self.devleft_file = os.path.join(config.DATA, f"lg-{self.id}-devleft.json")
+        # The port that worked last time, kept per TV so a restart goes straight to it (newer webOS
+        # resets port 3000 and only answers on 3001, couch-tv#71).
+        self.port_file = os.path.join(config.DATA, f"lg-{self.id}-port.json")
+        self._port_seen = self._read_port()
         # Paired means the TV accepted the remote once (a client key is kept). Unlike a Samsung, an
         # LG answers nothing before that, so the watcher asks for it (see _watch).
         self.paired = True
@@ -278,12 +282,39 @@ class LGTV:
         except FileNotFoundError:
             return None
 
+    def _read_port(self):
+        try:
+            with open(self.port_file) as f:
+                p = int(json.load(f).get("port"))
+            return p if p in self.ports else None
+        except (OSError, ValueError, TypeError, AttributeError):
+            return None
+
+    def _keep_port(self, url):
+        """Remember which port answered, so the next start tries it first."""
+        try:
+            port = int(url.rsplit(":", 1)[1])
+        except (ValueError, IndexError):
+            return
+        if port == self._port_seen or len(self.ports) < 2:
+            return
+        self._port_seen = port
+        try:
+            os.makedirs(os.path.dirname(self.port_file), exist_ok=True)
+            with open(self.port_file, "w") as f:
+                json.dump({"port": port}, f)
+        except OSError as e:
+            self.log.warning("could not keep the remote port: %s", e)
+
     def _urls(self):
-        """Plain on 3000 first, then encrypted on 3001 (newer firmware refuses the plain one)."""
+        """Plain on 3000 first, then encrypted on 3001 (newer firmware refuses the plain one). The
+        one that worked last time, in this run or the last, goes first."""
         urls = [f"ws://{self.ip}:{p}" if p != 3001 else f"wss://{self.ip}:{p}" for p in self.ports]
-        if self._url in urls:
-            urls.remove(self._url)
-            urls.insert(0, self._url)
+        first = self._url if self._url in urls else next(
+            (u for u in urls if self._port_seen and u.endswith(f":{self._port_seen}")), None)
+        if first:
+            urls.remove(first)
+            urls.insert(0, first)
         return urls
 
     async def _remote(self, pairing_wait=30):
@@ -303,6 +334,7 @@ class LGTV:
                         url, ssl=False, heartbeat=20, max_msg_size=8 * 1024 * 1024,
                         timeout=aiohttp.ClientWSTimeout(ws_close=5)), 5)
                     self._url = url
+                    self._keep_port(url)
                     break
                 except Exception as e:
                     last = e
@@ -593,7 +625,8 @@ class LGTV:
             self._note(f"TV came on in {self._package_of(front)}, left alone")
             return
         if self._devmode_due():
-            await self.extend_devmode_now()
+            if await self.extend_devmode_now():
+                await self._wait_devmode_app()
         if not self.open_on_power_on:
             return
         try:
@@ -634,14 +667,33 @@ class LGTV:
             return   # an app is on screen: try again later
         if self.leave_inputs and INPUT.match(front):
             return   # an input in use: try again later
-        await self.extend_devmode_now()
-        await asyncio.sleep(2)
+        if await self.extend_devmode_now():
+            await self._wait_devmode_app()
+        else:
+            await asyncio.sleep(2)
         now = await self._read_visible()
         if front and now != front:
             try:
                 await self._launch(front, quiet=False)
             except Exception as e:
                 self.log.info("could not put %s back: %s", front, e)
+
+    async def _wait_devmode_app(self, timeout=20.0):
+        """After Extend, Developer Mode's own app takes a few seconds to come up (about 5 s on webOS
+        10) and covers whatever is on screen. Wait for it, up to timeout, so couch-tv goes back on
+        top of it and not underneath it (couch-tv#71). A TV where it never shows is waited on for the
+        full time, so the caller then carries on as before. Returns True when the app appeared."""
+        end = time.monotonic() + timeout
+        while True:
+            try:
+                if await self._read_visible() == DEVMODE_APP:
+                    await asyncio.sleep(0.5)
+                    return True
+            except Exception:
+                pass
+            if time.monotonic() >= end:
+                return False
+            await asyncio.sleep(0.5)
 
     async def extend_devmode_now(self):
         """Press Developer Mode's Extend. Returns True when it reported success."""
