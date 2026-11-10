@@ -188,6 +188,7 @@ body {
 .grid {
   display: grid; grid-template-columns: repeat(8, var(--app-w)); grid-auto-rows: var(--app-h);
   column-gap: var(--gap); row-gap: var(--app-row-gap);
+  grid-column-gap: var(--gap); grid-row-gap: var(--app-row-gap);   /* Chrome 57 to 65 only know the grid- names (#59) */
 }
 .app { width: var(--app-w); height: var(--app-h); }
 .app .face { border-radius: 0.625rem; }
@@ -333,6 +334,7 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .theme-night .apps { top: auto; bottom: 2.875rem; left: 50%; right: auto; transform: translateX(-50%); }
 .theme-night .grid {
   grid-template-columns: repeat(12, 7rem); grid-auto-rows: 7rem; column-gap: 1.625rem; row-gap: 3rem;
+  grid-column-gap: 1.625rem; grid-row-gap: 3rem;
   padding: 1.375rem 1.75rem; border-radius: 2.875rem;
 }
 .theme-night .app { width: 7rem; height: 7rem; }
@@ -479,7 +481,7 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 /* top/right/bottom/left rather than inset: WebViews before Chrome 87 (still on many Android 9 TVs)
    skip inset, and the list was drawn below the screen where nobody could see it (#26). */
 .settings {
-  display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30; grid-template-columns: 36rem minmax(0, 1fr); column-gap: 4rem;
+  display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30; grid-template-columns: 36rem minmax(0, 1fr); column-gap: 4rem; grid-column-gap: 4rem;
   padding: var(--safe-y) var(--safe-x); text-shadow: none;
   background: rgba(10, 8, 12, 0.8); -webkit-backdrop-filter: blur(2.5rem) saturate(140%); backdrop-filter: blur(2.5rem) saturate(140%);
 }
@@ -842,6 +844,34 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .no-flex-gap .srow > * + * { margin-left: 1.25rem; }
 .no-flex-gap .sh-rooms > * + * { margin-left: 2rem; }
 .no-flex-gap .sh-ctl > * + * { margin-left: 0.75rem; }
+
+/* smart home: the same stand-ins for the gaps in its flex boxes */
+.no-flex-gap .sh-b > * + * { margin-left: 0.5rem; }
+.no-flex-gap .sh-scene > * + * { margin-left: 1rem; }
+.no-flex-gap .sh-scenes { margin: 0 -1.25rem -1.25rem 0; }
+.no-flex-gap .sh-scene { margin: 0 1.25rem 1.25rem 0; }
+
+/* ================= Older WebViews: no CSS grid (#59) =================
+   Before Chrome 57 (a Mi TV 4A on Android 6 ships 56) display: grid is skipped, so every tile stacked
+   in one column down the middle. app.js sets html.old-engine there. The app tiles wrap in a flex box
+   instead, as wide as its columns (app.js sets the width), and the tiles that end a row or sit in the
+   last one drop their margin (.end-col, .end-row), so the sizes match the grid exactly. Home settings
+   is two flex columns. Plain rem values here, no var(): Chrome 48 and older lack custom properties too.
+   Chrome 57 to 65 do have grid, but only under the grid-column-gap names (added up in the rules above).
+   column-gap and row-gap are zeroed because a newer engine forced into this mode would add them to the margins. */
+.old-engine .grid { display: flex; flex-wrap: wrap; align-content: flex-start; column-gap: 0; row-gap: 0; }
+.old-engine .app { flex: none; margin: 0 2.5rem 3.5rem 0; }
+.old-engine.theme-night .app { margin: 0 1.625rem 3rem 0; }
+.old-engine .app.end-col, .old-engine.theme-night .app.end-col { margin-right: 0; }
+.old-engine .app.end-row, .old-engine.theme-night .app.end-row { margin-bottom: 0; }
+.old-engine .settings.on { display: flex; column-gap: 0; }
+.old-engine .set-side { flex: none; width: 36rem; margin-right: 4rem; }
+.old-engine .set-main { flex: 1; }
+/* overflow-wrap: anywhere and the rotate property (the wiggle) are newer than that too */
+.old-engine .srow .sl b, .old-engine .srow .sv { overflow-wrap: break-word; word-wrap: break-word; }
+@keyframes wiggle-old { from { transform: rotate(-2deg); } to { transform: rotate(2deg); } }
+.old-engine.theme-night .app.lifted .face { animation-name: wiggle-old; }
+@media (prefers-reduced-motion: reduce) { .old-engine.theme-night .app.lifted .face { animation: none; } }
 
 /* ================= Now playing (#31) ================= */
 /* The song any app is playing behind the home, top right under the quick buttons: cover, title, artist and

@@ -68,6 +68,15 @@
     d.parentNode.removeChild(d);
     document.documentElement.classList.toggle("no-flex-gap", !ok);
   })();
+  // WebViews before Chrome 57 (a Mi TV 4A on Android 6 ships Chrome 56) have no CSS grid at all, and
+  // the app row and Home settings collapsed into one column (#59). html.old-engine lets app.css
+  // lay those out with flexbox and margins instead. ?old-engine=1 forces it, to look at it in a browser.
+  var OLD_ENGINE = (function () {
+    var grid = false;
+    try { grid = !!(window.CSS && window.CSS.supports && window.CSS.supports("display", "grid")); } catch (e) {}
+    return !grid || /[?&]old-engine\b/.test(Q);
+  })();
+  document.documentElement.classList.toggle("old-engine", OLD_ENGINE);
 
   // What this TV keeps for itself (app order, people order, new apps, the look). Written to the
   // page's storage and to the launcher (TVOS.keep), so the live page and the saved copy share it.
@@ -1683,6 +1692,18 @@
     }
     $("grid").innerHTML = gridItems.map(appHTML).join("");
     gridEls = Array.prototype.slice.call($("grid").children);
+    if (OLD_ENGINE) {
+      // no grid: app.css wraps the tiles in a flex box. It is exactly as wide as GRID_COLS tiles and
+      // their gaps (the Night dock's padding too), and app.css needs to know which tiles end a row and
+      // which sit in the last one, to leave the gap off there. Plain rem here, not a custom property:
+      // WebViews this old may not have those either.
+      $("grid").style.width = (NIGHT ? GRID_COLS * 7 + (GRID_COLS - 1) * 1.625 + 3.5 : GRID_COLS * 11.5 + (GRID_COLS - 1) * 2.5) + "rem";
+      var lastRow = Math.floor((gridEls.length - 1) / GRID_COLS) * GRID_COLS;
+      gridEls.forEach(function (el, i) {
+        if (i % GRID_COLS === GRID_COLS - 1) el.classList.add("end-col");
+        if (i >= lastRow) el.classList.add("end-row");
+      });
+    }
     clearIcons();
     renderHint();
   }
