@@ -260,6 +260,9 @@ have an input screen. Leave the rest off.
 
 - "Who will use the phone remote, and are they on iPhone or Android?" It is a web page added to the
   home screen, no app store. Show each person how to add it.
+- On an Android 17 phone, Chrome may show `ERR_TOO_MANY_RETRIES` for the bridge's address until it has
+  Settings, Apps, Chrome, Permissions, Nearby devices, Allow. Tell them before they hit it, and if they
+  report that error, that is the fix.
 - Tell them: it works on the home Wi-Fi only. Option B, optional: a private network (VPN) app
   they run themselves can make it work away from home. Never open a router port for it.
 - Tell them plainly: **with option B there is no password, so anyone on the Wi-Fi can use the

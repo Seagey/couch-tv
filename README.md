@@ -533,6 +533,8 @@ cd ..
 ```
 
 Open `http://your-computer.local:5400` on your phone (same Wi-Fi). Add it to your home screen.
+On an Android 17 phone, if Chrome says `ERR_TOO_MANY_RETRIES` for that address, allow Chrome to reach
+devices on your network: Settings, Apps, Chrome, Permissions, Nearby devices, Allow (#69).
 To keep the bridge running all the time, use `bridge/examples/couch-tv-bridge.plist.example`
 (macOS) or `bridge/examples/couch-tv-bridge.service.example` (Linux). Both set `CLAUDE_BIN` and a
 `PATH`, because a background service does not see your shell's.

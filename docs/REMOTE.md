@@ -63,6 +63,12 @@ Use Safari for this step. Other iPhone browsers cannot add a Home Screen icon th
 
 Over plain `http`, Chrome may offer a shortcut rather than a full install. Either works for daily use.
 
+**Android 17: if Chrome says "This site can't be reached" with `ERR_TOO_MANY_RETRIES`.** Android 17 asks
+an app for permission before it may reach devices on your home network, and Chrome has not been given it.
+Open Settings, Apps, Chrome, Permissions, Nearby devices, and choose Allow. The remote opens straight
+away after that. It is not the address, the bridge or Chrome's "Always use secure connections" setting
+(reported on a Galaxy S25 Ultra, issue #69).
+
 ## Optional: a private network, for a real installed app, an offline copy and the mic
 
 If you want the remote to behave like a proper app, give the computer an `https` address that only
