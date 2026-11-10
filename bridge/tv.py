@@ -27,6 +27,22 @@ CERT, KEY = os.path.join(config.DATA, "cert.pem"), os.path.join(config.DATA, "ke
 ADB_KEY = os.path.expanduser(os.environ.get("ADB_KEY", "~/.android/adbkey"))
 
 
+# Android package names only: letters, digits and underscores, in two or more dot separated parts.
+# Anything that reaches `adb shell` as a package goes through this first, because adb_shell joins the
+# arguments into one line for the TV's shell (couch-tv#72: "a.b;touch /sdcard/proof" ran on the TV).
+PACKAGE_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+")
+
+
+class UnsafeInput(ValueError):
+    """A value that must never reach the TV's shell."""
+
+
+def check_package(package):
+    if not isinstance(package, str) or len(package) > 200 or not PACKAGE_RE.fullmatch(package):
+        raise UnsafeInput(f"refused unsafe app name: {str(package)[:80]!r}")
+    return package
+
+
 def ensure_adb_key(path=None):
     """Make the ADB key pair the TV will ask you to trust, if there is not one yet."""
     path = path or ADB_KEY
@@ -396,6 +412,7 @@ class TV:
 
     async def launch_package(self, package):
         """Open an app by package. ADB first (always works), then the remote protocol."""
+        check_package(package)
         if await self.adb_ready():
             await self.adb("shell", "monkey", "-p", package, "-c",
                            "android.intent.category.LEANBACK_LAUNCHER", "1")
@@ -407,6 +424,8 @@ class TV:
     async def start_intent(self, uri, package=None, cold=False):
         """Open a JustWatch intent:// link exactly (with ADB), else its plain-link form.
         cold=True restarts the app first (some apps ignore links when already open)."""
+        if package:
+            check_package(package)
         uri = uri.replace("'", "")
         # JustWatch sometimes names an inner screen that newer app versions no longer have
         # (SBS); naming just the app lets Android pick the screen that takes the link.
