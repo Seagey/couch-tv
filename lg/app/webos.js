@@ -40,7 +40,18 @@
         send("dom", "<!-- " + location.href + " -->\n" + document.documentElement.outerHTML);
       }, 9000);
     });
-    document.addEventListener("keydown", function (e) { send("log", "key " + e.keyCode + " " + e.key); }, true);
+    // and how long from each key press until the next frame is on screen, with the page's classes,
+    // to see what a slow TV stalls on (an LG 43SQ700S froze when Home settings opened)
+    document.addEventListener("keydown", function (e) {
+      var t0 = performance.now(), k = e.keyCode, key = e.key;
+      setTimeout(function () {
+        var js = performance.now() - t0;
+        requestAnimationFrame(function () { requestAnimationFrame(function () {
+          send("log", "key " + k + " " + key + ": js " + Math.round(js) + " ms, on screen " + Math.round(performance.now() - t0)
+            + " ms, " + document.documentElement.className);
+        }); });
+      }, 0);
+    }, true);
   }
 
   // ---------- webOS service calls ----------
