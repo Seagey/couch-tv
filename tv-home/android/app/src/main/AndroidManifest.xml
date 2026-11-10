@@ -42,6 +42,12 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />
         </intent>
+        <!-- The screensaver (#86): Screensaver quick button checks the TV's dream is enabled, and the
+             look settings open the ambient settings. Android 11+ hides these packages otherwise
+             (an onn 4K Pro, Android 14, showed no Screensaver button). -->
+        <intent><action android:name="android.service.dreams.DreamService" /></intent>
+        <intent><action android:name="dreamx.two.panel.SETTINGS" /></intent>
+        <package android:name="com.google.android.apps.tv.dreamx" />
         <!-- The TV's input list, for the Input quick button when there is no bridge. -->
         <intent><action android:name="android.settings.TV_INPUT_SETTINGS" /></intent>
         <intent><action android:name="com.android.tv.action.VIEW_INPUTS" /></intent>
