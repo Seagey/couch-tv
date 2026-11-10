@@ -247,7 +247,10 @@ def main():
     stage = os.path.join(OUT, "app")
     if os.path.isdir(stage):
         shutil.rmtree(stage)
-    shutil.copytree(WEB, stage, ignore=shutil.ignore_patterns("mock.js", ".*"))
+    skip = ["mock.js", ".*"]
+    if (config.HOME or {}).get("hi_res") is False:
+        skip.append("*@2x.*")    # home.hi_res false: the 4K copies are never shown, so leave them out
+    shutil.copytree(WEB, stage, ignore=shutil.ignore_patterns(*skip))
     for name in os.listdir(os.path.join(HERE, "app")):
         shutil.copy(os.path.join(HERE, "app", name), stage)
     os.makedirs(os.path.join(stage, "logos"))

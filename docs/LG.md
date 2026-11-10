@@ -19,7 +19,7 @@ It needs a computer at home that stays on (option B). Without one you can still 
 and open it from LG's app row, but nothing opens it for you, and nothing extends Developer Mode,
 so the app is removed when the session runs out.
 
-## Test status: six real LGs so far
+## Test status: seven real LGs so far
 
 **First real LG, 2 November 2026** ([issue #8](https://github.com/Seagey/couch-tv/issues/8)): an
 LG UHD TV on webOS 5.6.2 (2020/2021 firmware), Developer Mode with the Homebrew Channel, the bridge
@@ -113,6 +113,27 @@ Setup snags, nothing to do with webOS 10:
   and the importer read that JSON fine.
 - **Canadian Netflix exports** write dates month first (3/25/24). The importer now reads the whole file
   and uses month first when a date proves it (a second number over 12), and day first otherwise.
+
+**Seventh real LG, 10 November 2026** ([PR #77](https://github.com/Seagey/couch-tv/pull/77), by Akdex): an LG 43SQ700S-WB (a 2022 MyView smart monitor, 4K) on webOS
+22, firmware 03.07.00, in India, with the bridge in Docker on a Raspberry Pi 5 (Debian 13, arm64,
+`network_mode: host`, `@webos-tools/cli` in the image for the daily Extend). `find-tvs.py` listed it as
+"[LG] webOS Monitor SQ700S" and `check-tv.py` read webOS 7.0.0 on 3000 and 3001. The `.ipk` from
+`lg/build.py` installed first time, the remote was accepted, the daily Extend over `ares-launch`
+worked, and the Developer Mode countdown read 987 hours. It found two things:
+
+- **No icons for apps without a bundled logo** (Stremio, JioHotstar, ZEE5, SonyLIV, Amazon Alexa, LG
+  Gaming Portal): the same as #56. Fetching each launch point's `largeIcon` from the TV with
+  certificate checks off gave 130x130 PNGs for all six, which is what `lg/build.py` now does by itself.
+- **Slow on a weak chip with a 4K panel.** The home asked for the 3840x2160 copies of every photo, and
+  the full-screen blur behind Home settings froze it when Home settings opened. `home.hi_res: false` keeps
+  the 1080 copies (and the `.ipk` drops from 22 MB to under 6 MB). With every blur and the large soft
+  shadows taken out (a local patch much like `home.lighter`, which takes out the same blur), each key
+  press on the home was on screen in 6 to 47 ms.
+
+App ids from this TV, all shown by their own names: Stremio `io.strem.tv`, JioHotstar `hotstar`, ZEE5
+`com.zee5.app`, SonyLIV `com.sonyliv2.tvapp`, Amazon Alexa `amazon.alexa.view`, LG Gaming Portal
+`com.twin.app.gamingportal`, Apple TV `com.apple.appletv`, Prime Video `amazon`, YouTube
+`youtube.leanback.v4`.
 
 Everything else was built from LG's documentation and the open source libraries that talk to LG
 TVs, and tested against a stand-in TV on a computer. If you run it on another LG, thank you: please
