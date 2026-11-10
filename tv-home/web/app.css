@@ -867,6 +867,14 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .old-engine .settings.on { display: flex; column-gap: 0; }
 .old-engine .set-side { flex: none; width: 36rem; margin-right: 4rem; }
 .old-engine .set-main { flex: 1; }
+/* Home settings and Smart home sit over the home. With no blur (Chrome before 76) a see-through panel shows
+   the clock, the dock and the Keep watching cards ghosting behind its words, which read as a broken layout
+   on a Mi TV 4A (#59). So on these engines the panel is solid, with Lighter home on or off, Glass or not,
+   and OLED keeps its own pure black. The focused row's grey second line is darker too: a TV with a weak
+   contrast washed it out against the white row. */
+.old-engine .settings, .old-engine .smart, .old-engine.lighter .settings, .old-engine.lighter .smart, .old-engine.glass .settings { background: #0a080c; }
+.old-engine.theme-oled .settings, .old-engine.theme-oled .smart { background: #060608; }
+.old-engine .srow.focus .sl small, .old-engine .srow.focus .sv { color: rgba(0, 0, 0, 0.78); }
 /* overflow-wrap: anywhere and the rotate property (the wiggle) are newer than that too */
 .old-engine .srow .sl b, .old-engine .srow .sv { overflow-wrap: break-word; word-wrap: break-word; }
 @keyframes wiggle-old { from { transform: rotate(-2deg); } to { transform: rotate(2deg); } }

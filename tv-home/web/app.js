@@ -294,7 +294,9 @@
     GLASS = glassSetting();
     document.documentElement.classList.toggle("glass", GLASS !== "off");
     document.documentElement.classList.toggle("glass-lite", GLASS === "lite");
-    LIGHTER = typeof ST.lighter === "boolean" ? ST.lighter : HOME.lighter === true;
+    // Lighter home: what was chosen in Home settings, else home.lighter, else on for a WebView with no
+    // CSS grid (Android 6 and older, a 1 GB box), where blur, soft shadows and drift make it crawl (#59).
+    LIGHTER = typeof ST.lighter === "boolean" ? ST.lighter : typeof HOME.lighter === "boolean" ? HOME.lighter : OLD_ENGINE;
     document.documentElement.classList.toggle("lighter", LIGHTER);
     movingTiles();
     // glass app icons (#25): set in Home settings, else home.glass_icons; off unless switched on
@@ -1772,11 +1774,12 @@
     $("grid").innerHTML = gridItems.map(appHTML).join("");
     gridEls = Array.prototype.slice.call($("grid").children);
     if (OLD_ENGINE) {
-      // no grid: app.css wraps the tiles in a flex box. It is exactly as wide as GRID_COLS tiles and
-      // their gaps (the Night dock's padding too), and app.css needs to know which tiles end a row and
-      // which sit in the last one, to leave the gap off there. Plain rem here, not a custom property:
+      // no grid: app.css wraps the tiles in a flex box. The Night dock is exactly as wide as GRID_COLS
+      // tiles and their gaps (its padding too); Classic and OLED fill the width the grid would, as the
+      // row of eight fits it. app.css needs to know which tiles end a row and which sit in the last
+      // one, to leave the gap off there. Plain rem here, not a custom property:
       // WebViews this old may not have those either.
-      $("grid").style.width = (NIGHT ? GRID_COLS * 7 + (GRID_COLS - 1) * 1.625 + 3.5 : GRID_COLS * 11.5 + (GRID_COLS - 1) * 2.5) + "rem";
+      if (NIGHT) $("grid").style.width = (GRID_COLS * 7 + (GRID_COLS - 1) * 1.625 + 3.5) + "rem";
       var lastRow = Math.floor((gridEls.length - 1) / GRID_COLS) * GRID_COLS;
       gridEls.forEach(function (el, i) {
         if (i % GRID_COLS === GRID_COLS - 1) el.classList.add("end-col");
