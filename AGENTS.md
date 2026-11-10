@@ -370,8 +370,13 @@ exactly what changes:
     on a real TCL until the reporter tests it.** The app must be opened once after installing so the
     switch is made (Android keeps it across reboots). Not changed: FireWatch and KeyWatch are not
     marked `directBootAware`, because FireWatch reads CrashGuard's SharedPreferences (credential
-    encrypted storage) on every window event, which is not available before unlock. Fallback from a
-    computer after each reboot, until confirmed: `cmd package set-home-activity
+    encrypted storage) on every window event, which is not available before unlock. **Confirmed on
+    the reporter's real TCL (0.12, before the TV input):** `appops set app.couchtv.launcher AUTO_START
+    allow` once, then switching both services on from the TV's own Settings, Accessibility with the
+    remote (not by writing the setting over ADB) survived a real power cut, and TCL kept AUTO_START
+    allowed. Which step matters is unknown, so on a TCL do both after `apply.sh`, and walk them
+    through the Accessibility switches on the TV. Fallback from a
+    computer after each reboot, if that fails: `cmd package set-home-activity
     app.couchtv.launcher/.MainActivity`, start the app, `appops set app.couchtv.launcher AUTO_START
     allow`, then rewrite `enabled_accessibility_services` and `accessibility_enabled 1`. Separate and
     not fixed: a real double press of Home on that TCL remote stays on Google TV (injected keys do

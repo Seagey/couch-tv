@@ -716,7 +716,15 @@ On a TCL Google TV (reported on a TCL Smart TV Pro, Android 14) the TV's own boo
 the Home button watch from starting, so Home falls back to Google TV after each restart. couch-tv
 now adds an empty TV input on TCL TVs only, which TCL lets start at boot. Open the app once after
 installing so it is switched on. Other TVs are unchanged and show no new input. This is unconfirmed
-until it is tested on a real TCL. If Home still reverts, press Back twice to leave Google TV, and
+until it is tested on a real TCL.
+
+**A fix confirmed on a real TCL (0.12, without the TV input):** from a computer, once, run
+`adb shell appops set app.couchtv.launcher AUTO_START allow`, then on the TV itself open Settings,
+Accessibility and switch on **Home button watch** and **Home gear button** with the remote (not over
+ADB). After a real power cut at the wall the TV went straight to couch-tv with no flash of Google
+TV, and TCL kept AUTO_START allowed. It is not yet known which of the two steps does it, so do both.
+
+If Home still reverts, press Back twice to leave Google TV, and
 from a computer after each restart run: `cmd package set-home-activity
 app.couchtv.launcher/.MainActivity`, start the app, `appops set app.couchtv.launcher AUTO_START
 allow`, then write `enabled_accessibility_services` and `accessibility_enabled 1` again. On that TCL
