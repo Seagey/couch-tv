@@ -2,6 +2,7 @@ package app.couchtv.launcher
 
 import android.accessibilityservice.AccessibilityService
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -132,6 +133,8 @@ class FireWatch : AccessibilityService() {
         const val AMAZON_HOME = "com.amazon.tv.launcher"
         const val GOOGLE_TV_HOME = "com.google.android.apps.tv.launcherx"
         const val ANDROID_TV_HOME = "com.google.android.tvlauncher"
+        /** Fire OS's own Settings screen, opened by name (see [amazonSettings]). */
+        const val AMAZON_SETTINGS = "$AMAZON_HOME.ui.MainSettingsActivity"
         private val STOCK_HOMES = listOf(AMAZON_HOME, GOOGLE_TV_HOME, ANDROID_TV_HOME)
 
         /** The activities of the Google homes that the TV itself lists as a HOME screen (read when the service binds). */
@@ -159,6 +162,19 @@ class FireWatch : AccessibilityService() {
             GOOGLE_TV_HOME -> cls == "$GOOGLE_TV_HOME.home.HomeActivity" || cls == "$GOOGLE_TV_HOME.home.VanillaModeHomeActivity" || (cls != null && cls in homes)
             ANDROID_TV_HOME -> cls == "$ANDROID_TV_HOME.MainActivity" || (cls != null && cls in homes)
             else -> false
+        }
+
+        /**
+         * The TV's Settings, as an intent that does not go through Amazon's home. On Fire OS the plain
+         * Settings action goes through Amazon's home on its way there (`HomeActivity_vNext` draws the
+         * Settings panel inside itself), so [isStockHome] cannot tell it from a Home press and the
+         * Home button watch puts couch-tv straight back (issue #75, the same as #5 in the on-TV app).
+         * Fire OS's own Settings screen, started by name, stays on screen. Null on any other TV,
+         * which keeps the plain Settings action.
+         */
+        fun amazonSettings(pm: PackageManager): Intent? {
+            val i = Intent().setComponent(ComponentName(AMAZON_HOME, AMAZON_SETTINGS))
+            return if (runCatching { pm.getPackageInfo(AMAZON_HOME, 0) }.isSuccess && pm.resolveActivity(i, 0) != null) i else null
         }
 
         /** Puts the watcher back on, only where a computer granted secure settings and the TV has a stock home. */
