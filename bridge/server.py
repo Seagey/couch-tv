@@ -1432,6 +1432,8 @@ def clean_settings(s):
     # Now playing on or off (#31), and the navigation sound: the TV's own, soft or off (#32)
     if isinstance(s.get("now_playing"), bool):
         out["now_playing"] = s["now_playing"]
+    if isinstance(s.get("ambient_music"), bool):
+        out["ambient_music"] = s["ambient_music"]
     if isinstance(s.get("sun_sync"), bool):
         out["sun_sync"] = s["sun_sync"]
     if s.get("nav_sound") in ("system", "soft", "off"):
@@ -1662,6 +1664,10 @@ async def music_now():
                 item = {"title": pick["title"], "artist": pick.get("subtitle"), "album": pick.get("album"),
                         "state": STATES.get(pick.get("state"), "stopped"), "app": app,
                         "art": music_art.get(key) or None}
+                if pick.get("pos_s") is not None:
+                    item["position"] = pick["pos_s"]
+                if pick.get("dur_s") is not None:
+                    item["duration"] = pick["dur_s"]
     music_state["item"] = item
     return item
 
@@ -1763,11 +1769,16 @@ NOT_VIEWING = {"home", "settings", None}
 
 
 def _sessions(out):
-    """Pull package, state, position and title out of `cat /proc/uptime; dumpsys media_session`.
+    """Pull package, state, position, duration and title out of `cat /proc/uptime; dumpsys media_session`.
     PlaybackState `updated` is the TV's elapsed time since boot in ms, the same clock as the
     first number in /proc/uptime, so the position can be brought up to the moment of reading."""
     import re
     found, cur = [], None
+    try:
+        first_token = out.split()[0] if out else ""
+        uptime_ms = int(float(first_token) * 1000)
+    except (ValueError, IndexError):
+        uptime_ms = None
     for line in out.splitlines():
         line = line.strip()
         if line.startswith("package="):
@@ -1787,11 +1798,26 @@ def _sessions(out):
                 cur[key] = int(m.group(1)) if m else None
             m = re.search(r"speed=([-\d.]+)", line)
             cur["speed"] = float(m.group(1)) if m else 0.0
-        elif line.startswith("metadata:") and "description=" in line and cur is not None:
-            parts = [p.strip() for p in line.split("description=", 1)[1].split(", ")]
-            cur["title"] = parts[0] if parts and parts[0] != "null" else None
-            cur["subtitle"] = parts[1] if len(parts) > 1 and parts[1] != "null" else None
-            cur["album"] = parts[2] if len(parts) > 2 and parts[2] != "null" else None
+            pos = cur.get("position")
+            if pos is not None and pos >= 0:
+                if uptime_ms and cur.get("updated") and cur.get("state") == "PLAYING" and cur.get("speed", 0.0) > 0:
+                    pos = pos + int((uptime_ms - cur["updated"]) * cur["speed"])
+                cur["pos_s"] = round(pos / 1000.0, 1)
+        elif line.startswith("metadata:") and cur is not None:
+            if "description=" in line:
+                parts = [p.strip() for p in line.split("description=", 1)[1].split(", ")]
+                cur["title"] = parts[0] if parts and parts[0] != "null" else None
+                cur["subtitle"] = parts[1] if len(parts) > 1 and parts[1] != "null" else None
+                cur["album"] = parts[2] if len(parts) > 2 and parts[2] != "null" else None
+            m_dur = re.search(r"(?:duration|DURATION)=(\d+)", line)
+            if m_dur:
+                cur["duration"] = int(m_dur.group(1))
+                cur["dur_s"] = round(int(m_dur.group(1)) / 1000.0, 1)
+        elif cur is not None and ("duration" in line.lower() or "android.media.metadata.duration" in line.lower()):
+            m_dur = re.search(r"(?:duration|DURATION)=(\d+)", line)
+            if m_dur:
+                cur["duration"] = int(m_dur.group(1))
+                cur["dur_s"] = round(int(m_dur.group(1)) / 1000.0, 1)
         elif line.startswith("queueTitle=") and cur is not None:
             q = line.split("=", 1)[1].rsplit(", size=", 1)[0].strip()
             cur["queue_title"] = q if q and q != "null" else None

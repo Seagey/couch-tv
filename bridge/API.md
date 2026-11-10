@@ -392,13 +392,13 @@ Claude's picks plus continue watching. Optional `?who=person1`. Fast: it returns
 
 ### `GET /api/music`
 Now playing (#31): the song any app on that TV (`?tv=`) is playing, from its media sessions, for the
-home's card. A song stays for ten minutes after a pause. `art` is the cover from Apple's free iTunes
-search, or `null` until it is found. `music` is `null` when nothing is playing. The card's buttons
+home's card and ambient music art screen. A song stays for ten minutes after a pause. `art` is the cover from Apple's free iTunes
+search, or `null` until it is found. `position` and `duration` (in seconds) are included when reported by the media session. `music` is `null` when nothing is playing. The card's buttons
 are `POST /api/key` with `previous`, `play_pause` and `next`.
 ```json
 {"ok": true, "music": {"title": "Golden Hour", "artist": "JVKE", "album": "this is what ____ feels like",
  "state": "playing", "app": {"id": "spotify", "name": "Spotify", "package": "com.spotify.tv.android"},
- "art": "https://is1-ssl.mzstatic.com/.../600x600bb.jpg"}}
+ "art": "https://is1-ssl.mzstatic.com/.../600x600bb.jpg", "position": 42.5, "duration": 215.0}}
 ```
 
 ### `GET /api/continue`

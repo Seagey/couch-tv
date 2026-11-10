@@ -14,6 +14,7 @@
 //   lang=it             home.language (en, es, es-MX, it, de, tr); without it, the browser's own language
 //   glass=on            home.glass (on, lite: no blur)      video=<link>   home.video_url, an MP4 or MOV
 //   moving=off          home.moving_tiles: the focused tile's slow sway (off, or on)
+//   ambient=1           home.ambient_music: the full screen music view (needs music=1; ambient=off: off)
 //   lighter=1           home.lighter: Lighter home for a slow box (no blur, no soft shadows, a still photo)
 //   icons=glass         home.glass_icons: Apple style clear app icons on glass
 //   amount=1..5         home.glass_amount, how clear the glass is (1 frosted, 3 the default, 5 very clear)
@@ -73,6 +74,7 @@
   if (arg("glass")) cfg.home.glass = arg("glass");
   if (arg("moving")) cfg.home.moving_tiles = arg("moving") !== "off";
   if (arg("lighter")) cfg.home.lighter = arg("lighter") !== "off";
+  if (arg("ambient")) cfg.home.ambient_music = arg("ambient") !== "off";   // the full screen music view (off unless set)
   if (arg("icons") === "glass") cfg.home.glass_icons = true;
   if (arg("gfocus")) cfg.home.glass_focus = arg("gfocus");   // glass: the focused app stays glass (#32)
   if (arg("amount")) cfg.home.glass_amount = parseInt(arg("amount"), 10);
@@ -199,7 +201,8 @@
     var x = SONGS[songAt];
     return { title: x[0], artist: x[1], album: null, state: songPlaying ? "playing" : "paused",
              app: { id: "spotify", name: "Spotify", package: "com.spotify.tv.android" },
-             art: arg("music") === "noart" ? null : "backgrounds/" + x[2] + ".jpg" };
+             art: arg("music") === "noart" ? null : "backgrounds/" + x[2] + ".jpg",
+             position: 45, duration: 210 };
   }
   window.MOCK_API = function (method, path, body) {
     var empty = /[?&]empty\b/.test(q), down = /[?&]down\b/.test(q);
