@@ -47,6 +47,8 @@ object Music {
             .put("album", pick.album ?: JSONObject.NULL).put("state", Tv.STATES[pick.state] ?: "stopped")
             .put("app", Apps.describe(pick.pkg)?.let { JSONObject(it) } ?: JSONObject().put("name", pick.pkg).put("package", pick.pkg))
             .put("art", art[key]?.takeIf { it.isNotEmpty() } ?: JSONObject.NULL)
+        if (pick.pos_s != null) item!!.put("position", pick.pos_s)
+        if (pick.dur_s != null) item!!.put("duration", pick.dur_s)
         return item
     }
 

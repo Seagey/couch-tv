@@ -69,5 +69,19 @@ class TestAmbientMusic(unittest.TestCase):
         self.assertEqual(s["title"], "Radio Live Stream")
 
 
+    def test_ambient_music_web_templates_and_i18n(self):
+        """Verify web HTML templates and i18n dictionaries include equalizer wave and open app button."""
+        base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tv-home", "web")
+        with open(os.path.join(base, "index.html"), "r", encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn('class="ambient-wave"', html)
+        self.assertIn('id="amb-open"', html)
+
+        with open(os.path.join(base, "i18n.js"), "r", encoding="utf-8") as f:
+            i18n = f.read()
+        self.assertIn("ambient_open_app", i18n)
+        self.assertIn("np_expand", i18n)
+
+
 if __name__ == "__main__":
     unittest.main()
