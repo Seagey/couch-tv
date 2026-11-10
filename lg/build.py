@@ -234,6 +234,7 @@ def pack_ares(stage, ipk):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--bridge", default="", help="the bridge's address, e.g. http://my-computer.local:5400")
+    ap.add_argument("--key", default="", help="pairing key for the bridge API (defaults to pairing_key in config.json)")
     ap.add_argument("--tv", default="", help="this TV's id in config.json (only with more than one TV)")
     ap.add_argument("--apps", default="", metavar="FILE|tv",
                     help="bake this TV's app list into the app (a JSON file, or \"tv\" to read it from the TV)")
@@ -280,7 +281,8 @@ def main():
                 "  try { t = localStorage.getItem(\"couch.configjs\"); } catch (e) {}\n"
                 "  if (t) try { (0, eval)(t); } catch (e) {}\n"
                 "  if (!window.COUCH_CONFIG) window.COUCH_CONFIG = " + json.dumps(config.public()) + ";\n})();\n")
-    settings = {"bridge": a.bridge.rstrip("/"), "tv": a.tv, "log": a.log_url.rstrip("/")}
+    key = a.key or config.PAIRING_KEY
+    settings = {"bridge": a.bridge.rstrip("/"), "tv": a.tv, "log": a.log_url.rstrip("/"), "key": key}
     with open(os.path.join(stage, "settings.js"), "w") as f:
         f.write("window.COUCH_WEBOS = " + json.dumps(settings) + ";\n")
     table = {}

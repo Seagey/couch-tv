@@ -13,8 +13,10 @@ changes, the change is written here first, with a dated note at the bottom.
 | TV home screen | `/tv/` serves `tv-home/web/` |
 | API | everything under `/api/` |
 
-- Plain HTTP on the home network. No password (home network only). Never put the bridge on the internet.
-- CORS is open (`Access-Control-Allow-Origin: *`), so you can develop against it from another port.
+- Plain HTTP on the home network. Never put the bridge on the internet or forward a router port to it.
+- Optional pairing key: set `"pairing_key"` under `"bridge"` in `config.json`. When enabled, protected endpoints require `Authorization: Bearer <key>`, `X-API-Key: <key>`, or `?token=<key>`.
+- CORS is restricted to the bridge's own origin, local dev origins (5173), and the TV homes' origins (`null`, `file://`, `home.tvos.invalid`).
+- POST requests with a body must send `Content-Type: application/json` (otherwise rejected with `415`).
 - Use **relative URLs** (`/api/now`) in both front ends. Then they work from any device at home.
 - Static files are sent with `Cache-Control: no-cache`, so a rebuild shows on the next load.
 - Unknown paths under `/` and `/tv/` fall back to that folder's `index.html` (single page apps work).
@@ -57,10 +59,20 @@ setting is limiting remote control; `message` then says where to change it (docs
 ## Endpoints
 
 ### `GET /api/health`
+Open without authentication. Reports bridge and TV connectivity, and whether the bridge requires a pairing key (`auth: "ok"` or `"required"`):
 ```json
-{"ok": true, "tv_connected": true, "adb": false, "version": "1"}
+{"ok": true, "tv_connected": true, "adb": false, "version": "1", "auth": "ok", "paired": true}
 ```
 `adb` tells you if the ADB features (screenshot, deep links that need it) are switched on.
+
+### `POST /api/pair`
+Pair a phone remote or client with the bridge when `pairing_key` is set in `config.json`.
+Open without authentication.
+Request: `{"key": "<pairing_key>"}`
+```json
+{"ok": true, "paired": true, "token": "<key>", "note": "paired"}
+```
+Wrong key gives HTTP 401: `{"ok": false, "error": "That pairing key is not right. Check config.json."}`.
 
 ### `GET /api/now`
 What is on the TV right now.
@@ -702,6 +714,7 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- 2026-11-10: Optional pairing key (`bridge.pairing_key`), tighter CORS origin allowlist (bridge host and TV home origins only), Content-Type enforcement on POST bodies (HTTP 415), and `POST /api/pair` (#73).
 - Roku: `"kind": "roku"` in `config.json`, `GET /api/roku/apps`, `GET /api/roku/icon/<id>` and `ecp` and `hook` on a Roku in
   `GET /api/tvs`. `POST /api/key` takes Roku's own key names too (`InputHDMI1`, `Rev`, `Fwd`) and `roku_home` for Roku's Home;
   `home` opens the couch-tv channel.

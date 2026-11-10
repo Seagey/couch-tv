@@ -14,6 +14,11 @@ from mcp.server.fastmcp import FastMCP, Image
 BRIDGE = os.environ.get("BRIDGE_URL", "http://127.0.0.1:5400")
 ASK_ID = os.environ.get("ASK_ID")
 TV_ID = os.environ.get("TV_ID")  # set by /api/ask: the TV the person asked from
+try:   # the bridge's pairing key (bridge.pairing_key in config.json, or BRIDGE_KEY), if it has one
+    import config
+    KEY = config.PAIRING_KEY
+except (Exception, SystemExit):
+    KEY = os.environ.get("BRIDGE_KEY", "").strip()
 
 mcp = FastMCP("tv", instructions=(
     "Controls the living room Google TV through the bridge. "
@@ -29,6 +34,8 @@ def call(method, path, payload=None, raw=False, tv=None, timeout=60, headers_out
     req = urllib.request.Request(BRIDGE + path, method=method)
     if ASK_ID:
         req.add_header("X-Ask-Id", ASK_ID)
+    if KEY:
+        req.add_header("Authorization", f"Bearer {KEY}")
     data = None
     if payload is not None:
         data = json.dumps(payload).encode()

@@ -210,6 +210,9 @@ class MainActivity : Activity() {
         i.getStringExtra("tv")?.trim()?.let {
             if (it.isEmpty()) e.remove("tv") else if (TV_NAME.matches(it)) e.putString("tv", it)
         }
+        i.getStringExtra("key")?.trim()?.let {
+            if (it.isEmpty()) e.remove("pairing_key") else e.putString("pairing_key", it)
+        }
         e.apply()
         HomeAssistant.readExtras(this, i)   // smart home ("ha_b64"), kept apart from the page's settings
     }
@@ -282,7 +285,12 @@ class MainActivity : Activity() {
         offline = false
         pageReady = false
         val tv = prefs.getString("tv", null)
-        w.loadUrl(if (tv.isNullOrEmpty()) "$base/tv/" else "$base/tv/?tv=$tv")
+        val key = prefs.getString("pairing_key", null)
+        val q = mutableListOf<String>()
+        if (!tv.isNullOrEmpty()) q.add("tv=$tv")
+        if (!key.isNullOrEmpty()) q.add("key=$key")
+        val qs = if (q.isEmpty()) "" else "?" + q.joinToString("&")
+        w.loadUrl("$base/tv/$qs")
         // Never a blank screen: if the page is slow, show the app grid until it arrives.
         main.postDelayed({ if (!pageReady) showFallback() }, SLOW_MS)
     }

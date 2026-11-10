@@ -161,7 +161,9 @@ def _mcp_config(ask_id, tv_id=None):
         "type": "stdio",
         "command": sys.executable,
         "args": [os.path.join(HERE, "mcp_server.py")],
-        "env": {"BRIDGE_URL": BRIDGE_URL, "ASK_ID": ask_id, **({"TV_ID": tv_id} if tv_id else {})},
+        # COUCH_CONFIG (a path, never the key) so the tools read the same pairing key as the bridge
+        "env": {"BRIDGE_URL": BRIDGE_URL, "ASK_ID": ask_id, "COUCH_CONFIG": config.CONFIG_FILE,
+                **({"TV_ID": tv_id} if tv_id else {})},
     }}}
     with open(path, "w") as f:
         json.dump(cfg, f)

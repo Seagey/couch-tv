@@ -55,6 +55,12 @@ WEATHER = {"lat": -33.8688, "lon": 151.2093, "place": "Sydney", "timezone": "Aus
            **(CONFIG.get("weather") or {})}
 SCREENS = CONFIG.get("screens") or []
 BRIDGE = {"host": "your-computer.local", "port": 5400, "fallback_hosts": [], **(CONFIG.get("bridge") or {})}
+PAIRING_KEY = str(BRIDGE.get("pairing_key") or os.environ.get("BRIDGE_KEY") or "").strip()
+# The key travels in URLs (TV homes, Roku, the events stream) and on the TV's shell command line
+# (apply.sh), so it is letters, digits, - and _ only, and long enough that guessing it is no use.
+if PAIRING_KEY and not re.fullmatch(r"[A-Za-z0-9_-]{12,128}", PAIRING_KEY):
+    raise SystemExit("bridge.pairing_key: use 12 to 128 letters, digits, - or _ "
+                     "(for example: python3 -c 'import secrets; print(secrets.token_urlsafe(18))')")
 CLIENT_NAME = CONFIG.get("client_name", "Couch TV bridge")
 
 # The languages the TV home and the phone remote speak (tv-home/web/i18n.js, remote/src/i18n.js).

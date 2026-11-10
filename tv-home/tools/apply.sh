@@ -144,6 +144,7 @@ esac
 # Tell our home where the bridge is ("none" for option A) and hand it the settings from
 # config.json for its built-in copy. Force-stop first: a running home only reads "bridge".
 CFG64=$("$PY" "$HERE/home-config.py")
+PAIRING_KEY=$("$PY" "$HERE/home-config.py" --key)
 # Smart home (optional, docs/CONFIG.md): the home_assistant section goes to the app on its own,
 # never into the page's settings, and is never printed (it holds the Home Assistant token).
 # "none" (no section, or it is switched off) switches smart home off on the TV.
@@ -157,7 +158,7 @@ if echo "$SMART" | grep -qx doorbell; then
 elif "$PY" "$T" shell "appops get app.couchtv.launcher SYSTEM_ALERT_WINDOW" 2> /dev/null | grep -q allow; then
   "$PY" "$T" shell "appops set app.couchtv.launcher SYSTEM_ALERT_WINDOW default"
 fi
-"$PY" "$T" shell "am force-stop app.couchtv.launcher; am start -n $HOME_ACT --es bridge ${BRIDGE_URL:-none} --es config_b64 $CFG64 --es ha_b64 $HA64 ${TV_ID:+--es tv $TV_ID}"
+"$PY" "$T" shell "am force-stop app.couchtv.launcher; am start -n $HOME_ACT --es bridge ${BRIDGE_URL:-none} --es config_b64 $CFG64 --es ha_b64 $HA64 ${TV_ID:+--es tv $TV_ID} --es key \"${PAIRING_KEY:-}\""
 
 # The Home button watch (FireWatch.kt: it only sees which window came forward). The TV's own home
 # stays on, so at power on, and from the Home key on Google TV and Fire TV, the TV opens its own

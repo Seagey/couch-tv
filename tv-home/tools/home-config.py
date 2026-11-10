@@ -73,6 +73,11 @@ def smart_home():
     return out
 
 
+if "--key" in sys.argv:
+    print(config.PAIRING_KEY)
+    sys.exit(0)
+
+
 if "--ha" in sys.argv:
     ha = smart_home()
     if "--check" in sys.argv:

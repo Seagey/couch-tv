@@ -133,6 +133,15 @@ function bridgeUrl(path as String) as String
         if Instr(1, url, "?") > 0 then url = url + "&" else url = url + "?"
         url = url + "tv=" + m.cfg.tv
     end if
+    return withKey(url)
+end function
+
+' The bridge's pairing key, when it has one (config.json bridge.pairing_key, couch-tv#73).
+function withKey(url as String) as String
+    if m.cfg.key <> invalid and m.cfg.key <> ""
+        if Instr(1, url, "?") > 0 then url = url + "&" else url = url + "?"
+        url = url + "key=" + m.cfg.key
+    end if
     return url
 end function
 
@@ -681,7 +690,7 @@ function logoFor(a as Object) as String
     end if
     if a.icon <> invalid and a.icon <> ""
         if Left(a.icon, 4) = "http" then return a.icon
-        if hasBridge() then return m.cfg.bridge + a.icon
+        if hasBridge() then return withKey(m.cfg.bridge + a.icon)
     end if
     return ""
 end function
