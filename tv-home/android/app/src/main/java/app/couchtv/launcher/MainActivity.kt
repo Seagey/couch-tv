@@ -70,6 +70,7 @@ class MainActivity : Activity() {
     private var probing = false
     private var offline = false   // showing the saved copy because the computer is off
     private var resumed = false
+    private var waitingForNet = false   // just switched on, no Wi-Fi yet: the first load waits for it
     private val retry = Runnable { if (!pageReady || offline) connect() }
 
     private val prefs by lazy { getSharedPreferences("home", MODE_PRIVATE) }
@@ -104,16 +105,37 @@ class MainActivity : Activity() {
         // At power-on the page is often asked for before Wi-Fi is up: try again the moment it is.
         val netBack = object : android.net.ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: android.net.Network) {
-                main.post { if (loadFailed || offline) connect() }
+                main.post { if (waitingForNet) firstLoad.run() else if (loadFailed || offline) connect() }
             }
         }
         val cm = getSystemService(android.net.ConnectivityManager::class.java)
+        // No network yet (the TV just switched on): wait for Wi-Fi a moment before the first try,
+        // rather than flash "the bridge isn't answering" for the few seconds Wi-Fi takes.
+        if (!alone() && !online(cm)) {
+            waitingForNet = true
+            main.postDelayed(firstLoadLater, NET_WAIT_MS)
+        }
         if (Build.VERSION.SDK_INT >= 24) cm?.registerDefaultNetworkCallback(netBack)
         else cm?.registerNetworkCallback(   // Android 6: no "default network" call, ask for any network with internet
             android.net.NetworkRequest.Builder().addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), netBack)
-        // Load the last bridge that worked straight away; only probe the others if it fails.
+        if (!waitingForNet) firstLoad.run()
+    }
+
+    // Load the last bridge that worked straight away; only probe the others if it fails.
+    private val firstLoad = Runnable {
+        waitingForNet = false
+        main.removeCallbacks(firstLoadLater)
         val saved = prefs.getString("bridge", null)
         if (saved != null) showWeb(saved) else connect()
+    }
+    private val firstLoadLater = Runnable { if (waitingForNet) firstLoad.run() }
+
+    /** A network that says it reaches the internet (or no way to tell, with no ConnectivityManager). */
+    private fun online(cm: android.net.ConnectivityManager?): Boolean {
+        if (cm == null) return true
+        val n = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(n) ?: return false
+        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -1479,6 +1501,7 @@ class MainActivity : Activity() {
         private const val OFFLINE_HOST = "home.tvos.invalid"
         private const val BUNDLED = "www/tv"   // the built-in copy, in the app's assets
         private const val SLOW_MS = 2_500L
+        private const val NET_WAIT_MS = 15_000L   // at power-on, how long the first load waits for Wi-Fi
         private const val PICK_PHOTOS = 41
         // The screensaver: Google TV's Ambient mode settings (source and the Google Photos albums),
         // the short screen timeout the home sets for a moment, and what to put back afterwards.
