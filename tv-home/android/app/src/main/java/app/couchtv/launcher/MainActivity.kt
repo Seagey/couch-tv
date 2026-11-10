@@ -97,7 +97,6 @@ class MainActivity : Activity() {
         hideSystemBars()
         intent?.let { readExtras(it) }
         io.execute { warmApps() }
-        refreshStremio()
         askWatchNextPermission()
         Doorbell.start(this)   // smart home (optional): nothing happens unless a doorbell is set up
         FireWatch.ensure(this)   // Fire TV only, and only once a computer has switched it on
@@ -141,6 +140,12 @@ class MainActivity : Activity() {
         resumed = true
         restoreTimeout()   // back in front: the normal screen timeout goes back
         hideSystemBars()
+        // Back within a moment of opening a channel card: the app crashed on the way in (see
+        // openWatchNextItem). Open it once more; this time it starts cold.
+        channelOpened?.let { (at, i) ->
+            channelOpened = null
+            if (android.os.SystemClock.elapsedRealtime() - at < CHANNEL_RETRY_MS) start(i)
+        }
         if (pageReady && offline && alone()) {
             js("window.tv && tv.resume()")   // option A: the built-in copy is the home, keep it fresh
         } else if (pageReady && !offline) {
@@ -152,7 +157,6 @@ class MainActivity : Activity() {
             }
         } else if (offline || fallback != null) connect()
         io.execute { warmApps() }
-        refreshStremio()   // back from an episode in Stremio: its row catches up a moment later
         Updater.resumed(this)   // the daily look for a new release (Home settings, Updates)
     }
 
@@ -217,14 +221,6 @@ class MainActivity : Activity() {
         }
         e.apply()
         HomeAssistant.readExtras(this, i)   // smart home ("ha_b64"), kept apart from the page's settings
-        Stremio.readExtras(this, i)   // Stremio's Continue Watching ("stremio_b64"), kept apart the same way
-    }
-
-    /** Stremio's Continue Watching (Stremio.kt): read again in the background, the row redrawn only when it changed. */
-    private fun refreshStremio() {
-        try {
-            Stremio.refresh(this) { main.post { js("window.tv && tv.shows && tv.shows()") } }
-        } catch (e: Exception) {}
     }
 
     // ---------------------------------------------------------------- finding the bridge
@@ -964,6 +960,25 @@ class MainActivity : Activity() {
     /** The picture addresses the Watch Next list gave us: the only ones the art route will fetch. */
     private val watchNextArtSeen = java.util.Collections.synchronizedSet(HashSet<String>())
 
+    /** A Keep watching picture as the page asks for it: through the art route, which fetches only addresses seen here. */
+    private fun artRoute(art: String): String = "http://tvos.invalid/art/" + android.util.Base64.encodeToString(
+        art.toByteArray(), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
+
+    // Apps that put nothing in Watch Next but publish what you are part way through as a home screen
+    // channel of their own (Android TV's preview channels): package to that channel's internal
+    // provider id, which does not change with the TV's language. Stremio (com.stremio.one) keeps a
+    // "Continue Watching" channel. Read the same way as Watch Next: the TV provider, READ_TV_LISTINGS,
+    // read only, no account. Their cards have ids "ch:<the app's own id for the item>".
+    private val CONTINUE_CHANNELS = mapOf("com.stremio.one" to "continue_watching_channel")
+    private val TV_CHANNELS = android.net.Uri.parse("content://android.media.tv/channel")
+    private val PREVIEW_PROGRAMS = android.net.Uri.parse("content://android.media.tv/preview_program")
+    private val CHANNEL_CARD = "ch:"
+    /** The app's own id for a channel item (Stremio: the IMDb id), as a card id carries it. */
+    private val CHANNEL_ITEM = Regex("[A-Za-z0-9._-]{1,100}")
+    /** The channel card opened last and when, for one retry if the app crashes on the way in. */
+    @Volatile private var channelOpened: Pair<Long, Intent>? = null
+    private val CHANNEL_RETRY_MS = 3000L
+
     /** Asks once. Without it Android answers the Watch Next query with nothing. */
     private fun askWatchNextPermission() {
         if (checkSelfPermission(READ_TV) == PackageManager.PERMISSION_GRANTED) return
@@ -972,64 +987,7 @@ class MainActivity : Activity() {
         try { requestPermissions(arrayOf(READ_TV), 77) } catch (e: Exception) {}
     }
 
-    /**
-     * Keep watching with no computer: Android's Watch Next list, plus Stremio's own Continue
-     * Watching when the household linked it (Stremio.kt: Stremio puts nothing in Watch Next),
-     * together newest first.
-     */
     private fun readWatchNext(): JSONArray {
-        val android = readAndroidWatchNext()
-        val extra = stremioRows()
-        if (extra.isEmpty()) return android
-        val all = ArrayList<JSONObject>()
-        for (n in 0 until android.length()) android.optJSONObject(n)?.let { all.add(it) }
-        all.addAll(extra)
-        all.sortByDescending { it.optLong("engaged") }
-        val out = JSONArray()
-        all.take(20).forEach { out.put(it) }
-        return out
-    }
-
-    /** A Watch Next picture address as the page asks for it: through the art route, which fetches only addresses seen here. */
-    private fun artRoute(art: String): String = "http://tvos.invalid/art/" + android.util.Base64.encodeToString(
-        art.toByteArray(), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
-
-    /** Stremio's Continue Watching as Keep watching cards (ids "st:<library id>"), less the ones hidden on this TV. */
-    private fun stremioRows(): List<JSONObject> = try {
-        val items = Stremio.items(this)
-        val pkg = if (items.isEmpty()) null else Stremio.pkg(this)
-        val skip = try {
-            val arr = prefs.getString("config", null)?.let { JSONObject(it).optJSONObject("home")?.optJSONArray("skip_watch_next") }
-            (0 until (arr?.length() ?: 0)).map { arr!!.optString(it) }.toSet()
-        } catch (e: Exception) { emptySet<String>() }
-        if (pkg == null || pkg in skip) emptyList() else {
-            val hidden = prefs.getStringSet("hidden_watch_next_ids", emptySet()) ?: emptySet()
-            val label = try {
-                packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
-            } catch (e: Exception) { "Stremio" }
-            items.mapNotNull { it ->
-                val id = Stremio.PREFIX + it.id
-                if (id in hidden || "$pkg|${it.name}" in hidden) return@mapNotNull null
-                it.art?.let { a -> watchNextArtSeen.add(a) }
-                it.fallbackArt?.let { a -> watchNextArtSeen.add(a) }
-                JSONObject().apply {
-                    put("id", id)
-                    put("wn", true)
-                    put("title", it.name)
-                    put("episode_title", "")
-                    put("season", it.season)
-                    put("episode", it.episode)
-                    if (it.art != null) put("backdrop", artRoute(it.art))
-                    if (it.progress > 0) put("progress", it.progress)
-                    put("app", JSONObject().put("package", pkg).put("name", label))
-                    put("package", pkg)
-                    put("engaged", it.engaged)
-                }
-            }
-        }
-    } catch (e: Exception) { emptyList() }
-
-    private fun readAndroidWatchNext(): JSONArray {
         val out = JSONArray()
         if (checkSelfPermission(READ_TV) != PackageManager.PERMISSION_GRANTED) return out
         try {
@@ -1079,8 +1037,7 @@ class MainActivity : Activity() {
                         put("episode_title", c.getString(3) ?: "")
                         put("season", c.getString(4) ?: "")
                         put("episode", c.getString(5) ?: "")
-                        if (art != null) put("backdrop", "http://tvos.invalid/art/" + android.util.Base64.encodeToString(
-                            art.toByteArray(), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING))
+                        if (art != null) put("backdrop", artRoute(art))
                         if (dur > 0 && pos > 0) put("progress", (pos.toDouble() / dur).coerceIn(0.0, 1.0))
                         put("app", JSONObject().put("package", pkg).put("name", label))
                         // for the bridge (POST /api/watch-next): which app, and when it was last watched,
@@ -1090,40 +1047,150 @@ class MainActivity : Activity() {
                     })
                 }
             }
+            // and the apps whose Continue Watching is a home screen channel (Stremio), newest first together
+            val channel = channelCards(skipSet, perAppLimit, hiddenIds)
+            if (channel.isNotEmpty()) {
+                val all = (0 until out.length()).map { out.getJSONObject(it) } + channel
+                return JSONArray().apply { all.sortedByDescending { it.optLong("engaged") }.take(20).forEach { put(it) } }
+            }
         } catch (e: Exception) {
             // no provider or no permission: an empty row, never a crash
         }
         return out
     }
 
-    private fun openWatchNextItem(id: String): Boolean {
-        // Stremio's own Continue Watching (Stremio.kt): its page for the item, at the episode
-        if (id.startsWith(Stremio.PREFIX)) {
-            val i = try { Stremio.intent(this, id) } catch (e: Exception) { null }
-            return if (i != null) start(i) else Stremio.pkg(this)?.let { launchPackage(it) } ?: false
-        }
-        if (!Regex("[0-9]{1,18}").matches(id)) return false
-        try {
-            val cols = arrayOf("package_name", "intent_uri")
-            val uri = android.content.ContentUris.withAppendedId(WATCH_NEXT, id.toLong())
-            contentResolver.query(uri, cols, null, null, null)?.use { c ->
-                if (!c.moveToFirst()) return false
-                val pkg = c.getString(0) ?: return false
-                val raw = c.getString(1)
-                if (raw != null) {
-                    try {
-                        val i = Intent.parseUri(raw, Intent.URI_INTENT_SCHEME)
-                        // only ever open something in the app that owns the item
-                        if (i.component != null && i.component!!.packageName != pkg) i.component = null
-                        i.`package` = pkg
-                        i.selector = null
-                        if (i.resolveActivity(packageManager) != null && start(i)) return true
-                    } catch (e: Exception) {}
-                }
-                return launchPackage(pkg)
+    /** The channels of the apps in CONTINUE_CHANNELS that are on this TV: channel id to its app. */
+    private fun continueChannels(): Map<Long, String> {
+        val out = LinkedHashMap<Long, String>()
+        if (Build.VERSION.SDK_INT < 26) return out   // preview channels came with Android 8
+        contentResolver.query(TV_CHANNELS, arrayOf("_id", "package_name", "internal_provider_id"), null, null, null)?.use { c ->
+            while (c.moveToNext()) {
+                val pkg = c.getString(1) ?: continue
+                if (CONTINUE_CHANNELS[pkg] == c.getString(2)) out[c.getLong(0)] = pkg
             }
+        }
+        return out
+    }
+
+    private fun programsOf(channel: Long) =
+        PREVIEW_PROGRAMS.buildUpon().appendQueryParameter("channel", channel.toString()).build()
+
+    /**
+     * Keep watching cards from the apps in CONTINUE_CHANNELS: the programs of their own channel, in
+     * the app's order. A card's id is the app's own id for the item ("ch:tt0238784"), because the
+     * app rewrites its channel whenever it changes, with new program ids. A channel program has no
+     * "last watched" time, so the time a card was first seen as it is now (its episode and how far
+     * in) stands in for one, to place the row among the Watch Next cards: what was just watched
+     * moves the row to the front. Inside the row the app's own order wins.
+     */
+    private fun channelCards(skip: Set<String>, perAppLimit: Int, hidden: Set<String>): List<JSONObject> {
+        val channels = continueChannels().filterValues { it !in skip }
+        if (channels.isEmpty()) return emptyList()
+        val before = prefs.getString("channel_cards_seen", null)
+        val seen = try { JSONObject(before ?: "{}") } catch (e: Exception) { JSONObject() }
+        val now = System.currentTimeMillis()
+        val kept = JSONObject()
+        val out = ArrayList<JSONObject>()
+        val cols = arrayOf("title", "episode_title", "season_display_number", "episode_display_number",
+            "poster_art_uri", "thumbnail_uri", "last_playback_position_millis", "duration_millis", "internal_provider_id")
+        for ((channel, pkg) in channels) {
+            val label = try {
+                packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+            } catch (e: Exception) { pkg }
+            contentResolver.query(programsOf(channel), cols, null, null, "_id ASC")?.use { c ->
+                var place = 0
+                var shown = 0
+                var newer = Long.MAX_VALUE   // the app's own order wins inside its row
+                while (c.moveToNext()) {
+                    val title = c.getString(0)?.takeIf { it.isNotBlank() } ?: continue
+                    val item = c.getString(8)?.takeIf { CHANNEL_ITEM.matches(it) } ?: continue
+                    val key = "$pkg|$item"
+                    val state = listOf(c.getString(2), c.getString(3), c.getLong(6)).joinToString(":")
+                    val was = seen.optJSONObject(key)
+                    val first = if (was != null && was.optString("state") == state) was.optLong("t") else now - place
+                    place++
+                    kept.put(key, JSONObject().put("state", state).put("t", first))
+                    val engaged = minOf(first, newer - 1)
+                    newer = engaged
+                    val id = CHANNEL_CARD + item
+                    if (id in hidden || "$pkg|$title" in hidden || ++shown > perAppLimit) continue
+                    val art = c.getString(5)?.takeIf { it.isNotBlank() } ?: c.getString(4)?.takeIf { it.isNotBlank() }
+                    if (art != null) watchNextArtSeen.add(art)
+                    val pos = c.getLong(6)
+                    val dur = c.getLong(7)
+                    out.add(JSONObject().apply {
+                        put("id", id)
+                        put("wn", true)
+                        put("title", title)
+                        put("episode_title", c.getString(1) ?: "")
+                        put("season", c.getString(2) ?: "")
+                        put("episode", c.getString(3) ?: "")
+                        if (art != null) put("backdrop", artRoute(art))
+                        if (dur > 0 && pos > 0) put("progress", (pos.toDouble() / dur).coerceIn(0.0, 1.0))
+                        put("app", JSONObject().put("package", pkg).put("name", label))
+                        put("package", pkg)
+                        put("engaged", engaged)
+                    })
+                }
+            }
+        }
+        val after = kept.toString()
+        if (after != before) prefs.edit().putString("channel_cards_seen", after).apply()
+        return out
+    }
+
+    private fun openWatchNextItem(id: String): Boolean {
+        try {
+            // a card from an app's own Continue Watching channel (channelCards), or a Watch Next row
+            val fromChannel = id.startsWith(CHANNEL_CARD)
+            val (pkg, raw) = (if (fromChannel) channelItem(id.removePrefix(CHANNEL_CARD)) else watchNextRow(id)) ?: return false
+            if (raw != null) {
+                try {
+                    val i = Intent.parseUri(raw, Intent.URI_INTENT_SCHEME)
+                    // only ever open something in the app that owns the item
+                    if (i.component != null && i.component!!.packageName != pkg) i.component = null
+                    i.`package` = pkg
+                    i.selector = null
+                    // A channel card opens in a fresh task, and is remembered for one retry: Stremio
+                    // already running with a show open swaps its old screen out for a link, and on
+                    // an onn 4K Pro (Android 14, with the Home button watch on) that swap can crash
+                    // it in Android's accessibility code, which lands back here at once. Its next
+                    // start is a cold one, which opens the link cleanly (onResume).
+                    if (fromChannel) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                    if (i.resolveActivity(packageManager) != null && start(i)) {
+                        if (fromChannel) channelOpened = android.os.SystemClock.elapsedRealtime() to Intent(i)
+                        return true
+                    }
+                } catch (e: Exception) {}
+            }
+            return launchPackage(pkg)
         } catch (e: Exception) {}
         return false
+    }
+
+    /** A Watch Next row's app and link, by its row id. */
+    private fun watchNextRow(id: String): Pair<String, String?>? {
+        if (!Regex("[0-9]{1,18}").matches(id)) return null
+        val uri = android.content.ContentUris.withAppendedId(WATCH_NEXT, id.toLong())
+        contentResolver.query(uri, arrayOf("package_name", "intent_uri"), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0)?.let { return it to c.getString(1) }
+        }
+        return null
+    }
+
+    /**
+     * A channel card's app and link, by the app's own id for the item. The app rewrites its channel
+     * whenever it changes, so the item is looked up again as it opens, and the link is the app's
+     * current one for it (Stremio's resumes the episode where it stopped).
+     */
+    private fun channelItem(item: String): Pair<String, String?>? {
+        if (!CHANNEL_ITEM.matches(item)) return null
+        for ((channel, pkg) in continueChannels()) {
+            contentResolver.query(programsOf(channel), arrayOf("internal_provider_id", "intent_uri"), null, null, null)?.use { c ->
+                while (c.moveToNext()) if (c.getString(0) == item) return pkg to c.getString(1)
+            }
+        }
+        return null
     }
 
     private var nativeSleepTimer: Runnable? = null
@@ -1173,14 +1240,9 @@ class MainActivity : Activity() {
 
     /** The picture behind a Watch Next card: a web address or a content address the page cannot read itself. */
     private fun watchNextArt(token: String): ByteArray? {
-        val raw = try { String(android.util.Base64.decode(token, android.util.Base64.URL_SAFE)) } catch (e: Exception) { return null }
-        if (raw !in watchNextArtSeen) return null
-        // A Stremio card's wide background may not exist for every show: then its own poster
-        return fetchArt(raw) ?: Stremio.fallbackArt(this, raw)?.takeIf { it in watchNextArtSeen }?.let { fetchArt(it) }
-    }
-
-    private fun fetchArt(raw: String): ByteArray? {
         return try {
+            val raw = String(android.util.Base64.decode(token, android.util.Base64.URL_SAFE))
+            if (raw !in watchNextArtSeen) return null
             val u = android.net.Uri.parse(raw)
             when (u.scheme) {
                 "http", "https" -> {

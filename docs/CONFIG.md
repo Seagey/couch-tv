@@ -133,6 +133,13 @@ out the same way. The phone's People sheet keeps these marks when it renames or 
   that gives Android no title (Netflix on some TVs) or only its own name (Prime on a Sony) is named
   from its row in Android's "Continue watching" (Watch Next) instead: the TV home app reads those
   rows and hands them to the bridge, because ADB cannot read them. Videos and music are never kept.
+- **With no computer (option A),** Keep watching is Android's own Watch Next list, plus the
+  Continue Watching channel of apps that put nothing in Watch Next but keep a home screen row of
+  their own instead: so far Stremio. Both are read the same read only way, with no account and no
+  sign in. A channel card has no time of its own, so couch-tv notes when it first sees each card as
+  it is now (its episode and how far in): what you just watched comes first. OK opens the app's own
+  link for it (Stremio picks up the episode). `skip_watch_next` and `watch_next_per_app` apply to
+  them too.
 - **Dismissing a show:** hold OK on any card in Keep watching to open the menu and choose **Remove from Keep watching**. The card animates away and is hidden on that TV across restarts. It only hides the card in couch-tv: the app's own Continue watching row is not changed, and a show hidden here still shows on the TV's own home.
 - **Two:** the pill switch at the top left.
 - **Three or more:** a round head icon with the person's initial. OK opens the list.
@@ -310,40 +317,6 @@ anything outside Home Assistant.
 
 Preview with no TV and no Home Assistant: `?mock=1&ha=1` (see the end of this page). The doorbell
 card is drawn by the app itself, so it cannot be previewed in a browser.
-
-## Stremio in Keep watching (optional, the TV home app)
-
-Stremio puts nothing in Android's Watch Next list, so with no computer (option A) Keep watching
-never showed it. Once it is linked to your Stremio account, the TV home app reads Stremio's own
-Continue Watching instead and puts it in Keep watching with the other apps' shows, newest first (up
-to 10 from Stremio). Off unless you link it: nothing in `config.json`, no calls to Stremio.
-
-```sh
-.venv/bin/python scripts/stremio-link.py      # prints a link: open it, sign in to Stremio, allow it
-TV_IP=<tv address> sh tv-home/tools/apply.sh  # hands the key to the TV app
-```
-
-- `stremio-link.py` uses Stremio's own sign-in link, the one Stremio's TV app uses: it prints a
-  short link and code, you open the link on your phone or computer, sign in to Stremio there and
-  allow it, and the script saves the key Stremio hands back as `STREMIO_AUTH_KEY` in `.env`. It
-  never prints the key, and your Stremio password never passes through it. `--check` says how many
-  items Stremio's Continue Watching holds. The Stremio app on the TV has to be signed in to the same
-  account: without an account its Continue Watching stays on the TV, where no other app can read it.
-- `apply.sh` hands the key to the TV app on its own, like the smart home token (never in the page's
-  settings, never printed), and the app keeps it in its own private storage. It only ever sends it
-  to `api.strem.io`, to read your library: nothing is written to your account.
-- What shows: the items in Stremio's own Continue Watching row (anything part way through that is
-  not removed), with the show's picture, the season and episode, and how far in. The app reads the
-  list again in the background whenever the home comes forward (at most once a minute) and keeps the
-  last one, so the row shows at once after a restart.
-- OK on a card opens the item's page in Stremio at that episode (`stremio:///detail/...`), where you
-  pick the stream, as in Stremio's own row. It opens Stremio in a fresh task: Stremio already
-  running in the background restarts itself for a link, and on an onn 4K Pro (Android 14, with the
-  Home button watch on) that restart crashed it.
-- Hold OK, **Remove from Keep watching** hides one card on this TV, as for the other apps.
-  `home.skip_watch_next` with Stremio's package (`com.stremio.one`) hides all of them.
-- To unlink: delete the `STREMIO_AUTH_KEY` line from `.env` and run `apply.sh` again.
-- With a bridge (option B), Keep watching comes from the bridge, which does not read Stremio.
 
 ## Everything else
 
