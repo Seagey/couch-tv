@@ -967,3 +967,52 @@ html.has-pointer.glass .ssec:hover {
   font-size: 1.25rem; line-height: 1.35; z-index: 50; background: rgba(60, 38, 0, 0.82); color: #ffd28a;
   box-shadow: inset 0 0 0 0.0625rem rgba(255, 159, 10, 0.5); }
 .devwarn.alert { background: rgba(70, 10, 6, 0.85); color: #ffb3ad; box-shadow: inset 0 0 0 0.0625rem rgba(255, 69, 58, 0.6); }
+
+/* ================= Bedtime Amber Dimming ================= */
+.bedtime-overlay {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  pointer-events: none;
+  background: rgba(28, 14, 2, 0.45);
+  opacity: 0;
+  transition: opacity 2.5s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 999;
+}
+.bedtime-dim .bedtime-overlay {
+  opacity: 1;
+}
+
+/* ================= Input Tiles ================= */
+.tile.input-ic .face {
+  background: rgba(30, 28, 38, 0.85);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.12);
+}
+.tile.input-ic .face svg {
+  width: 3.2rem;
+  height: 3.2rem;
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tile.input-ic.ic-ps5.focus .face {
+  box-shadow: 0 0 0 0.1875rem #0070d1, 0 1.5rem 3rem rgba(0, 112, 209, 0.4);
+}
+.tile.input-ic.ic-xbox.focus .face {
+  box-shadow: 0 0 0 0.1875rem #107c10, 0 1.5rem 3rem rgba(16, 124, 16, 0.4);
+}
+.tile.input-ic.ic-switch.focus .face {
+  box-shadow: 0 0 0 0.1875rem #e60012, 0 1.5rem 3rem rgba(230, 0, 18, 0.4);
+}
+
+/* ================= Watch Next Card Dismissal ================= */
+.tile.collapsing {
+  transform: scale(0.8) !important;
+  opacity: 0 !important;
+  max-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  transition: transform 220ms var(--ease), opacity 200ms var(--ease), max-width 240ms var(--ease), margin 240ms var(--ease) !important;
+}

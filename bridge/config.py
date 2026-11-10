@@ -290,6 +290,41 @@ def _home(h):
     vid = h.get("video_url")
     if isinstance(vid, str) and re.match(r"https?://", vid) and len(vid) <= 2000:
         out["video_url"] = vid
+    skip_wn = h.get("skip_watch_next") if isinstance(h.get("skip_watch_next"), list) else ["com.tcl.browser"]
+    out["skip_watch_next"] = [p for p in dict.fromkeys(skip_wn) if isinstance(p, str) and re.fullmatch(r"[A-Za-z0-9_.]{1,200}", p)]
+    out["watch_next_per_app"] = _int(h.get("watch_next_per_app"), 5, 1, 20)
+    if "inputs" in h:
+        out["inputs"] = _inputs(h.get("inputs"))
+    return out
+
+
+def _inputs(raw_list):
+    if not isinstance(raw_list, list):
+        return []
+    valid_icons = {"ps5", "xbox", "switch", "hdmi", "cable", "pc"}
+    out = []
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label") or item.get("name") or "").strip()[:30]
+        if not label:
+            continue
+        icon = str(item.get("icon") or "").strip().lower()
+        if icon not in valid_icons:
+            icon = "hdmi"
+        entry = {"label": label, "icon": icon}
+        if "port" in item and isinstance(item["port"], int) and 1 <= item["port"] <= 8:
+            entry["port"] = item["port"]
+        if "match" in item and isinstance(item["match"], str) and item["match"].strip():
+            entry["match"] = item["match"].strip()[:50]
+        if "id" in item and isinstance(item["id"], str) and item["id"].strip():
+            entry["id"] = item["id"].strip()[:200]
+        if "device" in item and isinstance(item["device"], str) and item["device"].strip():
+            entry["device"] = item["device"].strip()[:50]
+        if "port" in entry or "match" in entry or "id" in entry or "device" in entry:
+            out.append(entry)
+        if len(out) >= 8:
+            break
     return out
 
 
