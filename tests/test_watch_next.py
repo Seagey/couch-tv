@@ -18,7 +18,7 @@ class TestWatchNextLogic(unittest.TestCase):
         data = json.loads(res.stdout)
         home = data.get("home", {})
         self.assertIn("skip_watch_next", home)
-        self.assertIn("com.tcl.browser", home["skip_watch_next"])
+        self.assertEqual(home["skip_watch_next"], [])   # empty unless config.json lists packages
         self.assertIn("watch_next_per_app", home)
         self.assertEqual(home["watch_next_per_app"], 5)
 

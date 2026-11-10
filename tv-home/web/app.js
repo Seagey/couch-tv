@@ -3249,13 +3249,13 @@
       if (TV && TV.watchNext) {
         var wn = [];
         try { wn = JSON.parse(TV.watchNext()) || []; } catch (e) {}
-        var skipPkgs = (window.COUCH_CONFIG && window.COUCH_CONFIG.home && window.COUCH_CONFIG.home.skip_watch_next) || ["com.tcl.browser"];
+        var skipPkgs = (window.COUCH_CONFIG && window.COUCH_CONFIG.home && window.COUCH_CONFIG.home.skip_watch_next) || [];
         var dismissed = kept("tvhome.dismissed_shows") || [];
         wn = wn.filter(function (it) {
           var pkg = (it.app && it.app.package) || it.package || "";
           var id = String(it.id || "");
           var sig = pkg + "|" + (it.title || "");
-          return pkg !== "com.tcl.browser" && skipPkgs.indexOf(pkg) === -1 && dismissed.indexOf(id) === -1 && dismissed.indexOf(sig) === -1;
+          return skipPkgs.indexOf(pkg) === -1 && dismissed.indexOf(id) === -1 && dismissed.indexOf(sig) === -1;
         });
         PEOPLE.forEach(function (p) { data.showsBy[p.id] = wn; });
       }
