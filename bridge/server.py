@@ -118,6 +118,7 @@ seen_playing = _StateProxy("seen_playing")
 sleep = _StateProxy("sleep")
 waking = _StateProxy("waking")
 picture_state = _StateProxy("picture")
+bluetooth_audio_state = _StateProxy("bluetooth_audio")
 asks = {}  # ask id -> list of actions Claude took through the MCP tools
 
 # Extra screens the TV can open (for example a computer through Moonlight). Empty by default;
@@ -510,6 +511,7 @@ def now_payload():
         "waking": waking["on"],
         "who": cur_who(),
         "picture": picture_state.get("mode"),
+        "bluetooth_audio": bluetooth_audio_state.get("info"),
     }
 
 
@@ -2433,6 +2435,56 @@ async def h_picture_set(request):
     return ok(mode=picture_state.get("mode"), can_set=True)
 
 
+async def h_bluetooth_audio_get(request):
+    try:
+        if hasattr(tv, "get_bluetooth_audio"):
+            res = await tv.get_bluetooth_audio()
+        else:
+            cfg_dev = getattr(tv, "bluetooth_audio_cfg", None)
+            res = {"supported": bool(cfg_dev), "connected": False, "connecting": False,
+                   "device": cfg_dev, "devices": [cfg_dev] if cfg_dev else []}
+    except Exception as e:
+        res = {"supported": False, "connected": False, "connecting": False, "error": str(e)}
+    bluetooth_audio_state["info"] = res
+    return ok(**res)
+
+
+async def h_bluetooth_audio_set(request):
+    data = await body(request)
+    action = data.get("action", "toggle")
+    mac = data.get("mac")
+    if action not in ("toggle", "connect", "disconnect"):
+        raise ApiError(400, "action must be toggle, connect, or disconnect")
+    tv.require()
+
+    cur_info = dict(bluetooth_audio_state.get("info") or {})
+    cur_info["connecting"] = True
+    bluetooth_audio_state["info"] = cur_info
+    push_now()
+
+    try:
+        if hasattr(tv, "set_bluetooth_audio"):
+            await tv.set_bluetooth_audio(action=action, target_mac=mac)
+        else:
+            raise ApiError(409, f"Bluetooth audio switching is not supported on this {tv.name} TV")
+        # Give system audio routing a moment to settle, then read status
+        await asyncio.sleep(0.3)
+        new_state = await tv.get_bluetooth_audio()
+        new_state["connecting"] = False
+        bluetooth_audio_state["info"] = new_state
+        push_now()
+        record_action(request, "bluetooth_audio", {"action": action, "connected": new_state.get("connected")}, True)
+        return ok(**new_state)
+    except Exception as e:
+        cur_info = dict(bluetooth_audio_state.get("info") or {})
+        cur_info["connecting"] = False
+        bluetooth_audio_state["info"] = cur_info
+        push_now()
+        if isinstance(e, ApiError):
+            raise
+        raise ApiError(500, f"Bluetooth audio switching failed: {e}")
+
+
 async def set_picture(mode):
     """Filled in once the switch method is tested on the TV (see API.md, picture mode)."""
     raise ApiError(409, "picture mode switching is not set up on this TV yet")
@@ -2698,6 +2750,8 @@ def make_app():
     r.add_post("/api/import", h_import)
     r.add_get("/api/picture", h_picture_get)
     r.add_post("/api/picture", h_picture_set)
+    r.add_get("/api/bluetooth-audio", h_bluetooth_audio_get)
+    r.add_post("/api/bluetooth-audio", h_bluetooth_audio_set)
     r.add_get("/api/people", h_people_get)
     r.add_post("/api/people", h_people_set)
     r.add_get("/api/who", h_who_get)

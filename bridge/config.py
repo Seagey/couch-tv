@@ -371,7 +371,7 @@ def _inputs(raw_list):
 HOME = _home(CONFIG.get("home"))
 
 # ---------- quick settings (per TV) and picture modes ----------
-QUICK_IDS = ["sleep", "picture", "look", "soundscape", "input", "screensaver"]
+QUICK_IDS = ["sleep", "picture", "look", "soundscape", "input", "screensaver", "headphones", "bluetooth_audio"]
 
 
 def quick_for(tv_cfg):
@@ -381,6 +381,24 @@ def quick_for(tv_cfg):
     if isinstance(q, list):
         return [x for x in dict.fromkeys(q) if x in QUICK_IDS]
     return ["sleep"] + (["picture"] if tv_cfg.get("picture") else [])
+
+
+def bluetooth_audio_for(tv_cfg):
+    """Normalize a TV's bluetooth_audio setting (e.g. {"name": "AirPods Pro", "mac": "..."} or "AirPods Pro")."""
+    if not isinstance(tv_cfg, dict):
+        return None
+    b = tv_cfg.get("bluetooth_audio")
+    if isinstance(b, str) and b.strip():
+        val = b.strip()
+        if re.match(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", val):
+            return {"name": "Headphones", "mac": val.upper()}
+        return {"name": val[:50], "mac": None}
+    if isinstance(b, dict):
+        name = str(b.get("name") or "").strip()[:50] or "Headphones"
+        mac_raw = str(b.get("mac") or "").strip().upper()
+        mac = mac_raw if re.match(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", mac_raw) else None
+        return {"name": name, "mac": mac}
+    return None
 
 
 def picture_cfg(pic):
@@ -431,5 +449,6 @@ def public():
     """The parts the TV home and the phone remote are allowed to see."""
     return {"people": PEOPLE, "weather": WEATHER, "home": HOME,
             "tvs": [{"id": t["id"], "name": t["name"], "quick": quick_for(t),
-                     "picture_modes": [m["name"] for m in picture_modes(t.get("picture"))]} for t in TVS],
+                     "picture_modes": [m["name"] for m in picture_modes(t.get("picture"))],
+                     "bluetooth_audio": bluetooth_audio_for(t)} for t in TVS],
             "default_tv": DEFAULT_TV, "ask": {"enabled": ASK_ENABLED}, "phone_remote": PHONE_REMOTE}

@@ -468,6 +468,31 @@ settings over ADB and picks the row with the other name.
 - A TV without a `picture` entry answers `{"ok": true, "mode": null, "supported": false,
   "can_set": false}` and `POST` answers `409`. The bridge never reads or changes its picture mode.
 
+### `GET /api/bluetooth-audio` and `POST /api/bluetooth-audio`
+Bluetooth headphones switcher ("Night Listening"), for the home screen's quick toggle and the phone remote.
+Inspects active audio routing (A2DP) and connects or disconnects paired Bluetooth headphones.
+```json
+GET /api/bluetooth-audio
+```
+Response:
+```json
+{
+  "ok": true,
+  "supported": true,
+  "connected": true,
+  "connecting": false,
+  "device": {"name": "AirPods Pro", "mac": "<mac-address>"},
+  "devices": [{"name": "AirPods Pro", "mac": "<mac-address>"}]
+}
+```
+Toggle or change connection:
+```json
+POST /api/bluetooth-audio
+{"action": "toggle"}
+```
+`action` can be `"toggle"`, `"connect"`, or `"disconnect"`. An optional `"mac"` can target a specific paired device address. When audio state changes, the updated state is broadcast to all clients in `/api/now` via SSE (`/api/events`).
+
+
 ### App order: `POST /api/home-apps`, `GET /api/app-order`, `POST /api/app-order`
 The order of the TV home's dock and where the More apps line sits, per TV (add `?tv=` or `"tv"`).
 The phone's Arrange apps and the TV remote (hold OK on an app) both save here, so they agree; the

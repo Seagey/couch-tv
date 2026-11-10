@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bridge"))
 import config
@@ -105,6 +106,22 @@ class TestProductionFeatures(unittest.TestCase):
         self.assertNotIn("soundscape", h)
         self.assertEqual(h["look"], "night")
         self.assertNotIn("soundscape", config.quick_for({}))
+
+    def test_headphones_quick_button(self):
+        q = config.quick_for({"quick": ["sleep", "headphones", "bluetooth_audio", "invalid"]})
+        self.assertEqual(q, ["sleep", "headphones", "bluetooth_audio"])
+
+    def test_clean_settings_quick_headphones(self):
+        import server
+        got = server.clean_settings({"quick": ["headphones", "bluetooth_audio", "invalid_btn"]})
+        self.assertEqual(got["quick"], ["headphones", "bluetooth_audio"])
+
+    def test_config_public_includes_bluetooth_audio(self):
+        tv_cfg = {"id": "tv1", "name": "TV 1", "bluetooth_audio": "AirPods Pro"}
+        with patch.object(config, "TVS", [tv_cfg]):
+            pub = config.public()
+            self.assertEqual(len(pub["tvs"]), 1)
+            self.assertEqual(pub["tvs"][0]["bluetooth_audio"], {"name": "AirPods Pro", "mac": None})
 
 
 if __name__ == "__main__":
