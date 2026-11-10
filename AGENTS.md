@@ -359,6 +359,23 @@ exactly what changes:
     (`setupwraith`), by hand or through `EXTRA_OFF`.** couch-tv 0.10 and older did, and a Sony
     Bravia Google TV then looped at every restart (README, "If your TV loops after a restart").
     `apply.sh` refuses them and anything else the TV may need to start.
+  - **TCL: Home goes back to Google TV after every restart (#94, TCL Smart TV Pro, Android 14).**
+    TCL's boot manager `TclAppBoot` blocks binding `FireWatch` and `KeyWatch` and the
+    BOOT_COMPLETED to `FireWatch$Restore`, because the app lacks TCL's AUTO_START app-op, which TCL
+    resets to ignore on every boot. The app now declares an empty placeholder TV input
+    (`TclPlaceholderInput.kt`, manifest `android:enabled="false"`) that `App.onCreate` switches on
+    only when `Build.MANUFACTURER` or `Build.BRAND` is TCL, so no other TV lists a new input. TCL is
+    reported to let any app that provides a TV input start at boot (the Haven launcher's trick; its
+    source was not found, so this was written from the Android docs, nothing copied). **Unconfirmed
+    on a real TCL until the reporter tests it.** The app must be opened once after installing so the
+    switch is made (Android keeps it across reboots). Not changed: FireWatch and KeyWatch are not
+    marked `directBootAware`, because FireWatch reads CrashGuard's SharedPreferences (credential
+    encrypted storage) on every window event, which is not available before unlock. Fallback from a
+    computer after each reboot, until confirmed: `cmd package set-home-activity
+    app.couchtv.launcher/.MainActivity`, start the app, `appops set app.couchtv.launcher AUTO_START
+    allow`, then rewrite `enabled_accessibility_services` and `accessibility_enabled 1`. Separate and
+    not fixed: a real double press of Home on that TCL remote stays on Google TV (injected keys do
+    not reproduce it); Back twice escapes.
   - If the TV was set up with couch-tv 0.10 or older, `apply.sh` switches those two back on: tell
     them that is the fix, not a fault.
   - Option A: after a Google TV update switches ambient mode back on, `apply.sh` can run again.

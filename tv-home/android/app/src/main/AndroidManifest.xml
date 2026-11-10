@@ -153,6 +153,20 @@
             </intent-filter>
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/key_watch" />
         </service>
+        <!-- TCL only (issue #94, TclPlaceholderInput.kt): an empty TV input that TCL's boot manager
+             counts as a reason to let this app start and bind its services at boot. Off here and
+             switched on at runtime on a TCL, so no other TV lists a new input. -->
+        <service
+            android:name=".TclPlaceholderInput"
+            android:enabled="false"
+            android:exported="true"
+            android:label="Home"
+            android:permission="android.permission.BIND_TV_INPUT">
+            <intent-filter>
+                <action android:name="android.media.tv.TvInputService" />
+            </intent-filter>
+            <meta-data android:name="android.media.tv.input" android:resource="@xml/tcl_placeholder_input" />
+        </service>
         <receiver android:name=".FireWatch$Restore" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
