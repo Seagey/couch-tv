@@ -26,6 +26,7 @@ import taste
 from tv import TV, TVUnavailable, intent_to_link
 import samsung
 import lg
+import roku
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -44,12 +45,14 @@ TV_CONFIG = {"default": config.DEFAULT_TV, "tvs": config.TVS}
 
 
 def make_tv(cfg):
-    """A Samsung ("kind": "samsung", bridge/samsung.py), an LG ("kind": "lg", bridge/lg.py) or an
-    Android or Google TV (tv.py)."""
+    """A Samsung ("kind": "samsung", bridge/samsung.py), an LG ("kind": "lg", bridge/lg.py), a Roku
+    ("kind": "roku", bridge/roku.py) or an Android or Google TV (tv.py)."""
     if cfg.get("kind") == "samsung":
         return samsung.SamsungTV(cfg)
     if cfg.get("kind") == "lg":
         return lg.LGTV(cfg)
+    if cfg.get("kind") == "roku":
+        return roku.RokuTV(cfg)
     return TV(cfg)
 
 
@@ -516,7 +519,8 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
         if cold == "background":
             cold = await tv.front_package() != app["package"]
         try:
-            await tv.start_intent(link, app["package"], cold=bool(cold))
+            extra = {"media_type": "series" if best["type"] == "tv" else "movie"} if tv.kind == "roku" else {}
+            await tv.start_intent(link, app["package"], cold=bool(cold), **extra)
             if await tv.wait_for_app({app["package"]}, timeout=10):
                 method = "deeplink"
         except Exception as e:
@@ -561,6 +565,33 @@ async def h_webos_apps(request):
     if tv.kind != "lg":
         raise ApiError(400, "only for LG TVs")
     return ok(apps=await tv.apps_on_tv())
+
+
+async def h_roku_apps(request):
+    """The couch-tv channel on a Roku asks here for the Roku's channels, in the order arranged from the
+    phone (the Roku has no app list a channel may read). Each has "icon", the bridge's copy of the Roku's
+    own icon, and "logo", true when the channel has a bundled one named after "package"."""
+    if tv.kind != "roku":
+        raise ApiError(400, "only for Roku TVs")
+    tv.require()
+    listed = await tv.apps_on_tv()
+    saved, _, was_saved = effective_order()
+    rank = {a["package"]: i for i, a in enumerate(saved)} if was_saved else {}
+    known = {a["package"]: i for i, a in enumerate(apps.APPS)}
+    listed.sort(key=lambda c: (rank.get(c["package"], 9999), known.get(c["package"], 9999), c["title"].lower()))
+    tv_q = "" if _current.get() == DEFAULT_TV else "?tv=" + _current.get()
+    return ok(apps=[{"id": c["id"], "title": c["title"], "package": c["package"],
+                     "icon": f"/api/roku/icon/{c['id']}{tv_q}"} for c in listed])
+
+
+async def h_roku_icon(request):
+    if tv.kind != "roku":
+        raise ApiError(400, "only for Roku TVs")
+    try:
+        data, kind = await tv.icon(request.match_info["id"])
+    except (roku.RokuError, ValueError, TVUnavailable) as e:
+        raise ApiError(404, str(e))
+    return web.Response(body=data, content_type=kind.split(";")[0], headers={"Cache-Control": "max-age=86400"})
 
 
 async def h_tizen_answer(request):
@@ -784,7 +815,7 @@ async def _home_after_wake(t):
     await asyncio.sleep(6)
     if not (t.is_on and t.home_on_wake_until and t.visible is not None and t.visible != t.app_id):
         return
-    if t.leave_inputs and lg.INPUT.match(t.visible):
+    if t.leave_inputs and t.INPUT.match(t.visible):
         return
     t.home_on_wake_until = 0.0
     try:
@@ -1842,7 +1873,7 @@ async def media_watch_loop():
                 if not _blip(seen_playing.get("_playing")):
                     seen_playing["_playing"] = (None, time.time())   # the minute starts again after a break
                 untitled_step(None, None, False, None)
-                if media_now:
+                if media_now and not getattr(tv, "native_media", False):   # a Roku fills media_now itself
                     media_now.clear()
                     push_now()
             await untitled_resolve()
@@ -2277,6 +2308,8 @@ async def h_tvs(request):
             row |= {"art_mode": t.art_mode, "hook": [f"{w} {what}" for w, what in t.hook_log]}
         elif t.kind == "lg":
             row |= {"devmode": t.devmode_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
+        elif t.kind == "roku":
+            row |= {"ecp": t.ecp_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         out.append(row)
     return ok(default=DEFAULT_TV, tvs=out)
 
@@ -2300,6 +2333,8 @@ def make_app():
     r.add_get("/api/tizen/next", h_tizen_next)
     r.add_post("/api/tizen/answer", h_tizen_answer)
     r.add_get("/api/webos/apps", h_webos_apps)
+    r.add_get("/api/roku/apps", h_roku_apps)
+    r.add_get("/api/roku/icon/{id}", h_roku_icon)
     r.add_get("/api/recs", h_recs)
     r.add_get("/api/history", h_history)
     r.add_get("/api/taste", h_taste)

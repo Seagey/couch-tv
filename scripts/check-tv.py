@@ -202,7 +202,10 @@ def main():
                           "at home opens each time the TV comes on (docs/LG.md, built and tested against a stand-in, "
                           "not yet on a real LG), or plug in a Google TV box for everything."}
     elif open_ports[8060] and not android:
-        verdict = {"A": "no", "B": "no", "C": "no", "why": "Roku: closed system."}
+        verdict = {"A": "no", "B": "Roku path (built, not yet tried on a real Roku): docs/ROKU.md", "C": "no",
+                   "why": "Roku: no Android apps and a locked home screen. couch-tv can go on as a Roku channel that a computer "
+                          "at home opens each time the TV comes on (docs/ROKU.md, built from Roku's documentation and tested "
+                          "against a stand-in, not yet on a real Roku), or plug in a Google TV box for everything."}
     elif not android:
         verdict = {"A": "no", "B": "no", "C": "no", "why": "Not an Android TV as far as the network shows (no Android TV remote, no ADB)."}
     else:

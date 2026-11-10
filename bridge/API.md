@@ -50,6 +50,10 @@ The bridge can run more than one TV. Every endpoint takes an optional TV id:
 ]}
 ```
 
+A Roku (`"kind": "roku"`) also has `ecp` and `hook`: `{"ecp": {"limited": false, "message": null}, "hook": ["13:02:11 TV came on, opened couch-tv"]}`.
+`ecp.limited` is `true` when the Roku answered a command with 403, which means its "Control by mobile apps"
+setting is limiting remote control; `message` then says where to change it (docs/ROKU.md).
+
 ## Endpoints
 
 ### `GET /api/health`
@@ -239,6 +243,17 @@ the known set.
 Known ids: `netflix` `youtube` `stan` `binge` `abc-iview` `sbs-on-demand` `disney-plus`
 `prime-video` `kayo` `foxtel-go` `9now` `7plus` `10play` `spotify` `plex` `moonlight`
 `settings` `home`. `installed` is `null` when the bridge cannot tell yet.
+
+### `GET /api/roku/apps` and `GET /api/roku/icon/<id>`
+Roku only (`400` for any other TV, `503` while the Roku is not answering). The couch-tv channel on the Roku
+asks here for its apps, because a Roku channel may not read the list itself. The Roku's channels in the
+order arranged from the phone, known apps first, then by name; `package` is the Android style package where
+couch-tv knows the app and `roku.<id>` where it does not (open either with `POST /api/launch`).
+```json
+{"ok": true, "apps": [{"id": "12", "title": "Netflix", "package": "com.netflix.ninja", "icon": "/api/roku/icon/12"}]}
+```
+`/api/roku/icon/<id>` is the Roku's own icon for that channel (from its `query/icon`), kept in memory.
+`404` when the Roku has none or refuses it (newer Roku OS needs "Control by mobile apps" on Enabled).
 
 ### `POST /api/launch`
 ```json
@@ -679,6 +694,9 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- Roku: `"kind": "roku"` in `config.json`, `GET /api/roku/apps`, `GET /api/roku/icon/<id>` and `ecp` and `hook` on a Roku in
+  `GET /api/tvs`. `POST /api/key` takes Roku's own key names too (`InputHDMI1`, `Rev`, `Fwd`) and `roku_home` for Roku's Home;
+  `home` opens the couch-tv channel.
 - German: `lang` in `/api/settings` and `home.language` take `de` (24 hour clock and `DE` as the
   country when they are not set).
 - Italian: `lang` in `/api/settings` and `home.language` take `it`. `home.clock` and

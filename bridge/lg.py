@@ -130,6 +130,7 @@ class LGError(RuntimeError):
 class LGTV:
     kind = "lg"
     can_read_media = False
+    INPUT = INPUT
 
     def __init__(self, cfg):
         self.id = cfg["id"]
