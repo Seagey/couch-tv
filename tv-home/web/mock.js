@@ -20,6 +20,9 @@
 //   amount=1..5         home.glass_amount, how clear the glass is (1 frosted, 3 the default, 5 very clear)
 //   clockstyle=liquid   home.clock_style: the Night clock as liquid glass
 //   unit=f              home.wx_unit: temperatures in Fahrenheit
+//   wxfx=1              home.ambient_weather: rain, snow and fog over the scenes (off unless set)
+//   sungrade=1          home.ambient_sun_grade: the sun's colour over the scenes (off unless set)
+//                       (also ?test_wx=<WMO code, 63 rain, 73 snow, 45 fog, 95 storm> and ?test_alt=<sun height, degrees>)
 //   inputs=4            the Input button lists four HDMI ports (one eARC), as the launcher reads them
 //   gfocus=glass        home.glass_focus: with glass app icons, the focused app stays glass
 //   music=1             Now playing: a pretend song in Spotify (music=paused: paused; music=noart: no cover)
@@ -79,6 +82,8 @@
   if (arg("gfocus")) cfg.home.glass_focus = arg("gfocus");   // glass: the focused app stays glass (#32)
   if (arg("amount")) cfg.home.glass_amount = parseInt(arg("amount"), 10);
   if (arg("clockstyle")) cfg.home.clock_style = arg("clockstyle");
+  if (arg("wxfx")) cfg.home.ambient_weather = arg("wxfx") !== "off";
+  if (arg("sungrade")) cfg.home.ambient_sun_grade = arg("sungrade") !== "off";
   if (arg("unit")) cfg.home.wx_unit = arg("unit");   // home.wx_unit: c or f (#56)
   if (arg("video")) cfg.home.video_url = arg("video");
   window.COUCH_CONFIG = cfg;
