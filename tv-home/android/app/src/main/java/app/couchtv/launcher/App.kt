@@ -7,5 +7,6 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         CrashGuard.install(this)
+        TclPlaceholderInput.enableIfTcl(this)   // TCL only, issue #94
     }
 }

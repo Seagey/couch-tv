@@ -710,6 +710,18 @@ later, so a broken couch-tv cannot hold the TV in a loop either. Only ambient mo
 adverts) and any ad tracker you name are switched off, and `apply.sh` refuses to switch off anything
 the TV may need to start: a home screen, a setup app, a persistent system app or part of Android.
 
+### TCL: Home goes back to Google TV after every restart
+
+On a TCL Google TV (reported on a TCL Smart TV Pro, Android 14) the TV's own boot manager can stop
+the Home button watch from starting, so Home falls back to Google TV after each restart. couch-tv
+now adds an empty TV input on TCL TVs only, which TCL lets start at boot. Open the app once after
+installing so it is switched on. Other TVs are unchanged and show no new input. This is unconfirmed
+until it is tested on a real TCL. If Home still reverts, press Back twice to leave Google TV, and
+from a computer after each restart run: `cmd package set-home-activity
+app.couchtv.launcher/.MainActivity`, start the app, `appops set app.couchtv.launcher AUTO_START
+allow`, then write `enabled_accessibility_services` and `accessibility_enabled 1` again. On that TCL
+a real double press of Home also stays on Google TV; Back twice escapes.
+
 ## If Disney+ (or another app) signs you out after the TV turns off
 
 This is not couch-tv, and changing your password does not fix it. Seen on an Android TV with Disney+
