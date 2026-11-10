@@ -47,27 +47,6 @@ class TestProductionFeatures(unittest.TestCase):
         self.assertIs(config._home({"bedtime_dim": "yes"})["bedtime_dim"], False)
         self.assertIs(config._home({"bedtime_dim": True})["bedtime_dim"], True)
 
-    def test_hidden_watch_next_simulation(self):
-        """Simulate Watch Next dismissal using ID and composite (pkg|title) signature."""
-        cursor_rows = [
-            {"id": "101", "pkg": "com.netflix.ninja", "title": "Stranger Things"},
-            {"id": "102", "pkg": "com.netflix.ninja", "title": "The Crown"},
-            {"id": "103", "pkg": "in.startv.hotstar", "title": "Special Ops"},
-        ]
-
-        # User dismissed row 101 by ID, and Special Ops by composite key
-        hidden_ids = {"101", "in.startv.hotstar|Special Ops"}
-
-        remaining = []
-        for r in cursor_rows:
-            composite = f"{r['pkg']}|{r['title']}"
-            if r["id"] in hidden_ids or composite in hidden_ids:
-                continue
-            remaining.append(r)
-
-        self.assertEqual(len(remaining), 1)
-        self.assertEqual(remaining[0]["title"], "The Crown")
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -532,7 +532,7 @@ class MainActivity : Activity() {
         fun getSleepRemainingMinutes(): Int = getNativeSleepMinutes()
 
         @JavascriptInterface
-        fun openSettings(): Boolean = start(Intent(Settings.ACTION_SETTINGS))
+        fun openSettings(): Boolean = start(tvSettingsIntent())
 
         /** Holding OK on an app, "Uninstall": Android's own remove dialog. Never ourselves.
          *  On TVs with no remove dialog, falls back to the app's details screen (it has Uninstall).
@@ -663,7 +663,10 @@ class MainActivity : Activity() {
                 "network" -> listOf(Settings.ACTION_WIFI_SETTINGS, Settings.ACTION_WIRELESS_SETTINGS)
                 else -> emptyList()
             } + Settings.ACTION_SETTINGS
-            val i = actions.asSequence().map { Intent(it) }.firstOrNull { packageManager.resolveActivity(it, 0) != null }
+            // Fire OS: every Settings action goes through Amazon's home, which the Home button watch puts
+            // couch-tv back over (#75). With the watch on, open Fire OS's own Settings screen by name.
+            val fire = if (FireWatch.connected) FireWatch.amazonSettings(packageManager) else null
+            val i = fire ?: actions.asSequence().map { Intent(it) }.firstOrNull { packageManager.resolveActivity(it, 0) != null }
             return i?.let { start(it) } ?: false
         }
 
@@ -962,7 +965,6 @@ class MainActivity : Activity() {
                 null
             }
             val skipSet = HashSet<String>().apply {
-                add("com.tcl.browser")
                 homeCfg?.optJSONArray("skip_watch_next")?.let { arr ->
                     for (i in 0 until arr.length()) {
                         val p = arr.optString(i)?.trim()
@@ -1114,6 +1116,9 @@ class MainActivity : Activity() {
         return start(i)
     }
 
+    /** The TV's Settings: Fire OS's own screen by name on a Fire TV (it stays open under the Home button watch, #75), else Android's Settings action. */
+    private fun tvSettingsIntent(): Intent = FireWatch.amazonSettings(packageManager) ?: Intent(Settings.ACTION_SETTINGS)
+
     private fun start(i: Intent): Boolean = try {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         main.post { startActivity(i) }
@@ -1241,7 +1246,7 @@ class MainActivity : Activity() {
                     (v.foreground as GradientDrawable).setStroke(if (has) px(3) else 0, AMBER)
                     v.elevation = if (has) px(8).toFloat() else 0f
                 }
-                setOnClickListener { if (ri == null) start(Intent(Settings.ACTION_SETTINGS)) else launchPackage(pkg) }
+                setOnClickListener { if (ri == null) start(tvSettingsIntent()) else launchPackage(pkg) }
             }
             if (ri != null) {
                 tile.addView(ImageView(this).apply {

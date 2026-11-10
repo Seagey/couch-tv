@@ -354,7 +354,9 @@
   // page is laid out at 1920x1080 but drawn at devicePixelRatio 2 there, so the 1080 files were
   // stretched and looked soft (couch-tv#8, a UHD LG). Your own scenes in mine/ have no 4K copy.
   var HI_RES = (window.devicePixelRatio || 1) * window.innerWidth >= 3000;
-  function bgPath(name, ext, builtIn) { return "backgrounds/" + name + (HI_RES && builtIn !== false ? "@2x" : "") + ext; }
+  // home.hi_res false keeps the 1080 copies on a 4K screen whose chip struggles with 3840x2160 photos
+  // (an LG 43SQ700S monitor): they are four times the pixels to decode and keep in memory.
+  function bgPath(name, ext, builtIn) { return "backgrounds/" + name + (HI_RES && HOME.hi_res !== false && builtIn !== false ? "@2x" : "") + ext; }
   var photo = 0, photoTimer = null, bgShown = null, bgLayer = 0, bgTicket = 0;
 
   function photoForHour(h) {   // sunrise in the morning, green by day, sunsets in the evening

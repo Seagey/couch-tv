@@ -270,6 +270,9 @@ def _home(h):
     # lighter home for a slow box (#58): no blur, no soft shadows, a still photo, smaller pictures
     if isinstance(h.get("lighter"), bool):
         out["lighter"] = h["lighter"]
+    # false: a 4K screen with a weak chip keeps the 1080 backgrounds (lg/build.py then leaves the 4K copies out)
+    if isinstance(h.get("hi_res"), bool):
+        out["hi_res"] = h["hi_res"]
     # how clear the glass is, 1 (frosted) to 5 (very clear), and the Night clock's style
     if isinstance(h.get("glass_amount"), int) and not isinstance(h.get("glass_amount"), bool) and 1 <= h["glass_amount"] <= 5:
         out["glass_amount"] = h["glass_amount"]
