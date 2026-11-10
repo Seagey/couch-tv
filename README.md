@@ -558,7 +558,8 @@ a show. Put visitors on a guest Wi-Fi network (most routers have one) so they ca
 
 To require a password on your home network, set `"pairing_key"` under `"bridge"` in `config.json`. The
 phone remote pairs once by typing it (or opening `http://your-computer.local:5400/?pair=<key>`), and the
-TV homes carry their key.
+TV homes carry their key. See [Switching the pairing key on](docs/CONFIG.md#switching-the-pairing-key-on)
+for how to switch it on and update your TVs.
 
 **Never forward a port to the bridge.** The bridge is built for your home network only. Never expose it
 to the internet or forward port 5400 on your router. A private network (VPN) app you run yourself

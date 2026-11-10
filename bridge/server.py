@@ -4,7 +4,9 @@ Run: .venv/bin/python bridge/server.py   (settings come from config.json, see co
 """
 import asyncio
 import contextvars
+import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import mimetypes
@@ -154,6 +156,62 @@ def lan_ipv4():
         s.close()
 
 
+def host_name(value):
+    """The name or address in a Host header or a config entry, lower case, without the port, the
+    IPv6 brackets or a trailing dot ("My-Computer.local:5400" -> "my-computer.local", "[::1]:5400" -> "::1")."""
+    value = str(value or "").strip().lower()
+    if "://" in value:
+        value = value.split("://", 1)[1]
+    value = value.split("/", 1)[0]
+    try:
+        return (urllib.parse.urlsplit(f"//{value}").hostname or "").rstrip(".")
+    except ValueError:
+        return ""
+
+
+def is_ip(name):
+    try:
+        ipaddress.ip_address(name)
+        return True
+    except ValueError:
+        return False
+
+
+def allowed_hosts():
+    """Names and addresses the bridge answers to (Host header check and CORS)."""
+    hosts = {"127.0.0.1", "localhost", "::1"}
+    for h in [config.BRIDGE.get("host")] + list(config.BRIDGE.get("fallback_hosts") or []):
+        h = host_name(h)
+        if h:
+            hosts.add(h)
+    ip = lan_ipv4()
+    if ip:
+        hosts.add(ip)
+    try:
+        h = host_name(socket.gethostname())
+        if h:
+            hosts.add(h)
+            hosts.add(h if h.endswith(".local") else f"{h}.local")
+    except OSError:
+        pass
+    return hosts
+
+
+def is_allowed_host(request):
+    """DNS rebinding guard (couch-tv#73). A rebinding page reaches the bridge under the attacker's own
+    name, so a Host the bridge does not know is refused. Any IP address passes (rebinding needs a
+    name; this also covers a computer with two network connections, and Docker), and so does any
+    .local name (only the home network answers for those). No Host header at all is a script, not a
+    browser, so it passes too."""
+    raw = request.headers.get("Host")
+    if raw is None:
+        return True
+    name = host_name(raw)
+    if not name:
+        return False
+    return is_ip(name) or name.endswith(".local") or name in allowed_hosts()
+
+
 def is_allowed_origin(request, origin):
     """Origin allowlist for CORS (couch-tv#73): the bridge's own origins and TV front-end origins."""
     if not origin:
@@ -161,6 +219,9 @@ def is_allowed_origin(request, origin):
     clean = origin.rstrip("/").lower()
     # 1. Front-end origins used by the TV apps:
     # "null" is sent by browsers for local file:// WebViews (Android WebView, webOS, Tizen).
+    # NOTE: Because any website can emit Origin: null (e.g. from a sandboxed iframe),
+    # Origin: null is allowed for the TV apps, but only the pairing key (config.PAIRING_KEY)
+    # protects against malicious websites sending Origin: null.
     # "file://" is sent literally by some embedded Chromium / WebViews.
     # "http(s)://home.tvos.invalid" is used by couch-tv's Android TV offline launcher.
     if clean == "null" or clean.startswith("file:") or clean in ("http://home.tvos.invalid", "https://home.tvos.invalid"):
@@ -168,25 +229,21 @@ def is_allowed_origin(request, origin):
     if clean.startswith(("widget:", "wgt:", "tizen:")):
         return True
 
-    # 2. Bridge's own origins:
-    allowed_hosts = {"127.0.0.1", "localhost", "[::1]"}
-    cfg_host = (config.BRIDGE.get("host") or "").strip().lower()
-    if cfg_host:
-        allowed_hosts.add(cfg_host)
-    for fb in config.BRIDGE.get("fallback_hosts") or []:
-        fb_s = str(fb).strip().lower()
-        if fb_s:
-            allowed_hosts.add(fb_s)
-    ip = lan_ipv4()
-    if ip:
-        allowed_hosts.add(ip.lower())
-
+    # 2. Bridge's own origins: the page came from the very address this request went to (the Host
+    # header passed the DNS rebinding check), or one of the bridge's known names.
+    hosts = allowed_hosts()
     try:
         parsed = urllib.parse.urlsplit(clean)
+        host_hdr = (request.headers.get("Host") or "").strip().lower() if request is not None else ""
+        if parsed.scheme in ("http", "https") and host_hdr and parsed.netloc == host_hdr and is_allowed_host(request):
+            return True
         if parsed.scheme in ("http", "https"):
             parsed_host = (parsed.hostname or "").lower()
             parsed_port = parsed.port or (443 if parsed.scheme == "https" else 80)
-            if parsed_host in allowed_hosts and parsed_port in (PORT, 5173, 5400):
+            allowed_ports = {PORT, 5173, 5400}
+            if request and hasattr(request, "url") and request.url.port:
+                allowed_ports.add(request.url.port)
+            if parsed_host in hosts and parsed_port in allowed_ports:
                 return True
     except Exception:
         pass
@@ -224,6 +281,67 @@ def key_matches(given):
     return hmac.compare_digest(str(given).encode(), config.PAIRING_KEY.encode())
 
 
+# Wrong pairing keys, per client address: {ip: [(time, fingerprint of the wrong key), ...]}.
+# Only DIFFERENT wrong keys count, so a phone or TV still holding an old key after the key changed
+# (polling every few seconds) never locks itself out, while guessing is limited to 5 keys a minute.
+# The address is the TCP peer (aiohttp's request.remote); X-Forwarded-For is never read.
+_failed_attempts = {}
+RATE_LIMIT_MAX = 5
+RATE_LIMIT_WINDOW = 60.0
+RATE_LIMIT_ADDRESSES = 1000   # memory bound: at most this many addresses are remembered
+
+
+def client_ip(request):
+    """The address to rate limit, or None for the computer itself (the MCP server, Claude, scripts:
+    anything on the bridge computer can read config.json anyway, and a local reverse proxy would
+    otherwise let one wrong key lock everyone out)."""
+    ip = (getattr(request, "remote", None) or "").removeprefix("::ffff:")
+    if not ip:
+        return None
+    try:
+        if ipaddress.ip_address(ip).is_loopback:
+            return None
+    except ValueError:
+        pass
+    return ip
+
+
+def _recent(ip, now):
+    cutoff = now - RATE_LIMIT_WINDOW
+    return [a for a in _failed_attempts.get(ip, []) if a[0] > cutoff]
+
+
+def is_rate_limited(ip, now=None):
+    if not ip:
+        return False
+    now = time.time() if now is None else now
+    recent = _recent(ip, now)
+    if recent:
+        _failed_attempts[ip] = recent
+    else:
+        _failed_attempts.pop(ip, None)
+    return len(recent) >= RATE_LIMIT_MAX
+
+
+def record_failed_attempt(ip, key, now=None):
+    if not ip:
+        return
+    now = time.time() if now is None else now
+    fp = hashlib.sha256(str(key).encode("utf-8", "replace")).hexdigest()[:16]
+    recent = _recent(ip, now)
+    if any(a[1] == fp for a in recent):
+        return                      # the same wrong key again: an old key, not a guess
+    recent.append((now, fp))
+    _failed_attempts.pop(ip, None)
+    _failed_attempts[ip] = recent   # newest last, so the oldest go first below
+    if len(_failed_attempts) > RATE_LIMIT_ADDRESSES:
+        for k in list(_failed_attempts):
+            if not _recent(k, now):
+                _failed_attempts.pop(k, None)
+        while len(_failed_attempts) > RATE_LIMIT_ADDRESSES:
+            _failed_attempts.pop(next(iter(_failed_attempts)))
+
+
 async def body(request):
     if not request.body_exists:
         return {}
@@ -248,25 +366,42 @@ OPEN_PATHS = {"/api/health", "/api/pair"}
 
 @web.middleware
 async def middleware(request, handler):
+    # 1. Host header validation against DNS rebinding (couch-tv#73)
+    if not is_allowed_host(request):
+        return web.Response(status=403, text=(
+            "forbidden host: the couch-tv bridge does not know the name this page was opened by. "
+            "Open it by the computer's number address or its .local name, or add this name to "
+            "bridge.fallback_hosts in config.json and restart the bridge."))
+
+    # 2. Origin check: requests from disallowed origins must not run (couch-tv#73)
     origin = request.headers.get("Origin")
     origin_ok = is_allowed_origin(request, origin) if origin else False
+    if origin and not origin_ok:
+        return web.Response(status=403, text="forbidden origin")
 
     if request.method == "OPTIONS":
-        if origin and not origin_ok:
-            return web.Response(status=403, text="forbidden origin")
         resp = web.Response(status=204)
     else:
         try:
-            # 1. Refuse POST without application/json (couch-tv#73)
+            # 3. Refuse POST without application/json (couch-tv#73)
             if request.method == "POST" and request.content_type != "application/json":
                 raise ApiError(415, "Content-Type must be application/json")
 
-            # 2. Check pairing key authentication for protected API endpoints (couch-tv#73)
+            # 4. Check pairing key authentication & rate limiting for protected API endpoints (couch-tv#73)
             path = request.path
             is_api = path.startswith("/api/")
-            if is_api and path not in OPEN_PATHS and config.PAIRING_KEY and not is_authed(request):
+            if is_api and path not in OPEN_PATHS and config.PAIRING_KEY:
+                ip = client_ip(request)
+                if is_rate_limited(ip):
+                    raise ApiError(429, "Too many wrong pairing keys. Please wait a minute.")
                 key = extract_auth_key(request)
-                raise ApiError(401, "invalid pairing key" if key else "pairing key required")
+                if key:
+                    if not key_matches(key):
+                        record_failed_attempt(ip, key)
+                        await asyncio.sleep(0.3)
+                        raise ApiError(401, "invalid pairing key")
+                else:
+                    raise ApiError(401, "pairing key required")
 
             tv_id = request.query.get("tv")
             if not tv_id and request.method == "POST" and request.body_exists:
@@ -395,9 +530,15 @@ async def h_pair(request):
     given = str(b.get("key") or "").strip()
     if not config.PAIRING_KEY:
         return ok(paired=True, note="no pairing key required")
+    # Checked after the body is read, with no await before the key is compared and the miss is
+    # recorded: checked before it, parallel requests could all pass while their bodies arrive.
+    ip = client_ip(request)
+    if is_rate_limited(ip):
+        raise ApiError(429, "Too many wrong pairing keys. Please wait a minute.")
     if not given:
         raise ApiError(400, "pairing key is required")
     if not key_matches(given):
+        record_failed_attempt(ip, given)
         await asyncio.sleep(0.3)
         raise ApiError(401, "That pairing key is not right. Check config.json.")
     return ok(paired=True, token=config.PAIRING_KEY, note="paired")

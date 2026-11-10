@@ -317,13 +317,67 @@ is the safe way to use the phone remote away from home.
 
 | Key | What it does |
 |---|---|
-| `bridge.host`, `bridge.port` [5400], `bridge.fallback_hosts` | Where the bridge runs. |
+| `bridge.host`, `bridge.port` [5400], `bridge.fallback_hosts` | Where the bridge runs. `fallback_hosts` lists other names the bridge may be opened by (see "Opening the bridge by another name" below). |
 | `bridge.pairing_key` [""] | Optional API pairing key. Empty/unset by default. When set, clients (phone remote and TV front-ends) must authenticate with this key. |
 | `weather` | `lat`, `lon`, `place`, `timezone`, for the weather on the home (Open-Meteo, no key). A suburb or city is enough; never a home address. `timezone` (for example `Europe/London`) is also the time zone the bridge writes times in. |
 | `country` [`IT` when `home.language` is `it`, `DE` when it is `de`, else "AU"] | Two letter code, for where shows stream (JustWatch), the country in links to Apple TV and Prime Video, and the country Claude is told about. |
 | `country_name` | Optional: what to call the country in Claude's prompts, if the built-in list does not know your code. |
 | `client_name` ["Couch TV bridge"] | The name the TV shows for the bridge in its list of paired remotes. Set it before `pair_tv.py`; changing it later means pairing again. |
 | `screens` [] | Extra screens the TV can open, for example a computer through Moonlight. |
+
+### Switching the pairing key on
+
+Out of the box the bridge has no password: anything on your home Wi-Fi can use it, and so can a web
+page open on any phone or computer at home. The bridge already refuses pages from other sites (it
+checks the `Origin` a browser sends, and the name the page used to reach it, which stops a trick
+called DNS rebinding). But the TV apps load from files and send `Origin: null`, so the bridge has to
+accept `null`, and any web page can send `null` too (from a sandboxed frame). So the origin check
+alone cannot tell the TV from a hostile page. **Only the pairing key closes that gap.** With it on:
+
+- every `/api/` call except `/api/health` and `/api/pair` needs the key
+  (`Authorization: Bearer <key>`, `X-API-Key: <key>` or `?token=<key>`);
+- after 5 different wrong keys from one address within a minute, that address gets HTTP 429 for the
+  rest of that minute, whatever key it sends. The same wrong key sent again does not count, so a phone
+  or TV still holding an old key does not lock itself out, and the bridge computer itself
+  (`127.0.0.1`, the MCP tools, Claude) is never limited.
+
+Switching it on means every TV and phone needs the key, so do all of this in one go:
+
+1. **Add the key to `config.json`** and restart the bridge. Use 12 to 128 letters, digits, `-` or `_`
+   (the bridge refuses to start otherwise), and make it long, for example 20 random characters:
+   ```json
+   "bridge": { "host": "your-computer.local", "port": 5400, "pairing_key": "<your key>" }
+   ```
+2. **Google TV, Android TV and Fire TV (option B):** the TV home needs a `couch-tv-home.apk` newer
+   than 0.12 (0.12 and older cannot carry a key; until a newer release is out, build it with
+   `scripts/build-apk.sh`). Then run `apply.sh` again for each TV, the same way as the first time.
+   It reads the key from `config.json` and hands it to the TV:
+   ```sh
+   TV_IP=<tv address> BRIDGE_URL=http://<your-computer>:5400 APK=dist/couch-tv-home.apk sh tv-home/tools/apply.sh
+   ```
+3. **LG, Samsung and Roku:** the key is built into the app, so build it again and install it again
+   (`build.py` reads the key from `config.json`, or pass `--key`). Use the computer's number address,
+   as in each guide:
+   - LG: `.venv/bin/python lg/build.py --bridge http://<computer's address>:5400`, then install the
+     `.ipk` as in [LG.md](LG.md).
+   - Samsung: `.venv/bin/python samsung/build.py --bridge http://<computer's address>:5400`, then
+     install the `.wgt` as in [SAMSUNG.md](SAMSUNG.md).
+   - Roku: `.venv/bin/python roku/build.py --bridge http://<computer's address>:5400 --install <roku address>`
+     ([ROKU.md](ROKU.md)).
+4. **Phones:** the phone remote shows a "Pair this phone" screen. Type the key once, or open
+   `http://<your-computer>.local:5400/?pair=<key>` on the phone. A phone that has the remote on its
+   home screen pairs from there the same way.
+5. **The MCP tools and Claude** read the key from `config.json` by themselves. Restart Claude Code (or
+   whatever runs `bridge/mcp_server.py`) so it picks the key up.
+6. **Your own scripts and Home Assistant** calls need `-H "Authorization: Bearer <key>"` (and, for a
+   POST, `-H "Content-Type: application/json"`).
+
+Option C (the on-TV app) has its own PIN and is not affected.
+
+**Opening the bridge by another name.** The bridge answers to any number address, any `.local` name,
+`localhost` and the names in `bridge.host` and `bridge.fallback_hosts`. A page opened by any other
+name (a router name such as `computer.home`, say) gets "forbidden host": add that name to
+`bridge.fallback_hosts` and restart the bridge.
 
 ## Settings made on the TV (Home settings)
 

@@ -14,9 +14,12 @@ let apiKey = null;
 try {
   apiKey = localStorage.getItem('couchtv.key') || localStorage.getItem('couchtv.token');
 } catch (e) { /* private mode */ }
-if (!apiKey && typeof document !== 'undefined') {
-  const m = document.cookie.match(/(?:^|; )couchtv_key=([^;]+)/) || document.cookie.match(/(?:^|; )couchtv_token=([^;]+)/);
-  if (m) apiKey = decodeURIComponent(m[1]);
+if (typeof document !== 'undefined') {
+  try {
+    if (document.cookie.indexOf('couchtv_key=') >= 0) {
+      document.cookie = 'couchtv_key=; path=/; max-age=0; SameSite=Strict';
+    }
+  } catch (e) {}
 }
 if (typeof window !== 'undefined' && window.location) {
   try {
@@ -25,7 +28,6 @@ if (typeof window !== 'undefined' && window.location) {
       apiKey = decodeURIComponent(q[1]);
       try {
         localStorage.setItem('couchtv.key', apiKey);
-        document.cookie = 'couchtv_key=' + encodeURIComponent(apiKey) + '; path=/; max-age=31536000; SameSite=Strict';
         const u = new URL(window.location.href);
         u.searchParams.delete('pair');
         u.searchParams.delete('key');
@@ -40,10 +42,12 @@ export const setApiKey = (key) => {
   try {
     if (key) {
       localStorage.setItem('couchtv.key', key);
-      document.cookie = 'couchtv_key=' + encodeURIComponent(key) + '; path=/; max-age=31536000; SameSite=Strict';
     } else {
       localStorage.removeItem('couchtv.key');
       localStorage.removeItem('couchtv.token');
+    }
+    if (typeof document !== 'undefined' && document.cookie.indexOf('couchtv_key=') >= 0) {
+      document.cookie = 'couchtv_key=; path=/; max-age=0; SameSite=Strict';
     }
   } catch (e) {}
 };

@@ -14,8 +14,10 @@ changes, the change is written here first, with a dated note at the bottom.
 | API | everything under `/api/` |
 
 - Plain HTTP on the home network. Never put the bridge on the internet or forward a router port to it.
-- Optional pairing key: set `"pairing_key"` under `"bridge"` in `config.json`. When enabled, protected endpoints require `Authorization: Bearer <key>`, `X-API-Key: <key>`, or `?token=<key>`.
-- CORS is restricted to the bridge's own origin, local dev origins (5173), and the TV homes' origins (`null`, `file://`, `home.tvos.invalid`).
+- Optional pairing key: set `"pairing_key"` under `"bridge"` in `config.json`. When enabled, protected endpoints require `Authorization: Bearer <key>`, `X-API-Key: <key>`, or `?token=<key>`. Wrong keys are limited on every endpoint, `/api/pair` included: after 5 different wrong keys from one address within 60 seconds, that address gets `429` for the rest of the minute. The same wrong key repeated counts once, and the bridge computer itself (loopback) is never limited. `X-Forwarded-For` is ignored.
+- DNS rebinding: a request whose `Host` is a name the bridge does not know gets `403`. Any IP address, any `.local` name, `localhost`, `bridge.host` and `bridge.fallback_hosts` are known; a request with no `Host` header (a script) passes.
+- CORS is restricted to the bridge's own origin, local dev origins (5173), and the TV homes' origins (`null`, `file://`, `home.tvos.invalid`). A page served by the bridge under the address the request went to counts as the bridge's own origin. Requests from any other origin get `403` and never reach a handler.
+- **Why "null" in the origin list matters:** TV apps (Android WebView, webOS, Tizen) load from local files and send `Origin: null`. Browsers also send `Origin: null` for requests from sandboxed `<iframe>` elements. Because of this browser behavior, an origin allowlist alone cannot block a malicious web page from sending `Origin: null` requests. The pairing key (`pairing_key`) is what truly protects the bridge from malicious cross-origin requests.
 - POST requests with a body must send `Content-Type: application/json` (otherwise rejected with `415`).
 - Use **relative URLs** (`/api/now`) in both front ends. Then they work from any device at home.
 - Static files are sent with `Cache-Control: no-cache`, so a rebuild shows on the next load.
@@ -715,7 +717,7 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
-- 2026-11-10: Optional pairing key (`bridge.pairing_key`), tighter CORS origin allowlist (bridge host and TV home origins only), Content-Type enforcement on POST bodies (HTTP 415), and `POST /api/pair` (#73).
+- 2026-11-10: Optional pairing key (`bridge.pairing_key`), rate limiting on wrong keys across all endpoints (HTTP 429), Host header allowlist against DNS rebinding (HTTP 403), disallowed origin rejection before handlers run (HTTP 403), dropping of couchtv_key cookie, tighter CORS origin allowlist (bridge host and TV home origins only), Content-Type enforcement on POST bodies (HTTP 415), and `POST /api/pair` (#73).
 - Roku: `"kind": "roku"` in `config.json`, `GET /api/roku/apps`, `GET /api/roku/icon/<id>` and `ecp` and `hook` on a Roku in
   `GET /api/tvs`. `POST /api/key` takes Roku's own key names too (`InputHDMI1`, `Rev`, `Fwd`) and `roku_home` for Roku's Home;
   `home` opens the couch-tv channel.
