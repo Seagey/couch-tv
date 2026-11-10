@@ -1161,22 +1161,10 @@
     setTimeout(refreshMusic, key === "play_pause" ? 1500 : 900);
   }
 
-  var idleAmbientSec = 0;
   setInterval(function () {
     if (music && music.state === "playing" && ambientOpen) {
       curProgress += 1;
       updateProgressUI();
-    } else if (music && music.state === "playing" && AMBIENT_MUSIC && !ambientOpen && !ambientDismissed && !document.hidden) {
-      if (zone === "grid" || zone === "shelf" || zone === "np") {
-        idleAmbientSec += 1;
-        if (idleAmbientSec >= 30) {
-          ambientOpen = true;
-          zone = "ambient";
-          ambI = 1;
-          paintFocus();
-          renderAmbientMusic();
-        }
-      }
     }
   }, 1000);
 
@@ -2171,7 +2159,6 @@
 
   function move(dx, dy) {
     touched = true;
-    idleAmbientSec = 0;
     if (zone === "settings") { setMove(dx, dy); return; }
     if (zone === "smart") { window.smartHome.move(dx, dy); return; }
     if (zone === "gear") { if (dy) { gi = Math.max(0, Math.min(1, gi + dy)); renderGear(); } return; }
