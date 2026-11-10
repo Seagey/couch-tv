@@ -331,7 +331,10 @@
     if (!d || !d.warning) { if (el) el.remove(); return; }
     if (!el) { el = document.createElement("div"); el.id = "devwarn"; document.body.appendChild(el); }
     el.className = "devwarn " + (d.level || "warn");
-    el.textContent = d.warning;
+    // the bridge sends a key and numbers (warning_key / warning_vars) so this is in the home's language;
+    // the English sentence is kept for a key this home does not know yet
+    var said = d.warning_key ? t(d.warning_key, d.warning_vars) : d.warning;
+    el.textContent = said === d.warning_key ? d.warning : said;
   }
   function status(text, sticky) {
     clearTimeout(statusTimer);

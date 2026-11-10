@@ -22,6 +22,12 @@
   var S = {};
 
   S.en = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv is no longer installed on the TV. Developer Mode probably ran out. Switch Developer Mode on again and ask Claude to reinstall couch-tv.",
+    devmode_runs_out: "Developer Mode runs out in {days} days, and then LG removes couch-tv. Turn the TV on for a minute so it can be renewed, or press Extend in the Developer Mode app on the TV.",
+    devmode_not_renewed_left: "Developer Mode has not been renewed for {days} days ({left} days left). It renews the next time the TV is on.",
+    devmode_not_renewed: "Developer Mode has not been renewed for {days} days. It renews the next time the TV is on.",
+
     // ---- the home ----
     keep_watching: "Keep watching",
     who_watching: "Who is watching",
@@ -349,6 +355,12 @@
   };
 
   S.es = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv ya no está instalado en el televisor. Seguramente se acabó Developer Mode. Vuelve a activar Developer Mode y pídele a Claude que reinstale couch-tv.",
+    devmode_runs_out: "Developer Mode se acaba en {days} días y entonces LG quita couch-tv. Enciende el televisor un minuto para que se renueve, o pulsa Extend en la app Developer Mode del televisor.",
+    devmode_not_renewed_left: "Developer Mode lleva {days} días sin renovarse (quedan {left} días). Se renueva la próxima vez que el televisor esté encendido.",
+    devmode_not_renewed: "Developer Mode lleva {days} días sin renovarse. Se renueva la próxima vez que el televisor esté encendido.",
+
     keep_watching: "Seguir viendo",
     who_watching: "Quién está viendo",
     apps: "Apps",
@@ -672,6 +684,12 @@
 
   // Only what Mexico says differently; everything else comes from es.
   S["es-MX"] = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv ya no está instalado en la TV. Seguramente se acabó Developer Mode. Vuelve a activar Developer Mode y pídele a Claude que reinstale couch-tv.",
+    devmode_runs_out: "Developer Mode se acaba en {days} días y entonces LG quita couch-tv. Prende la TV un minuto para que se renueve, o presiona Extend en la app Developer Mode de la TV.",
+    devmode_not_renewed_left: "Developer Mode lleva {days} días sin renovarse (quedan {left} días). Se renueva la próxima vez que la TV esté prendida.",
+    devmode_not_renewed: "Developer Mode lleva {days} días sin renovarse. Se renueva la próxima vez que la TV esté prendida.",
+
     settings: "Configuración",
     classic_look: "Vista clásica",
     night_look: "Vista nocturna",
@@ -802,6 +820,12 @@
   };
 
   S.it = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv non è più installata sulla TV. Probabilmente la Developer Mode è scaduta. Riattiva la Developer Mode e chiedi a Claude di reinstallare couch-tv.",
+    devmode_runs_out: "La Developer Mode scade tra {days} giorni, e poi LG rimuove couch-tv. Accendi la TV per un minuto così si rinnova, oppure premi Extend nell’app Developer Mode sulla TV.",
+    devmode_not_renewed_left: "La Developer Mode non si rinnova da {days} giorni (ne restano {left}). Si rinnova la prossima volta che la TV è accesa.",
+    devmode_not_renewed: "La Developer Mode non si rinnova da {days} giorni. Si rinnova la prossima volta che la TV è accesa.",
+
     keep_watching: "Continua a guardare",
     who_watching: "Chi sta guardando",
     apps: "App",
@@ -1125,6 +1149,12 @@
 
   // German. The air conditioning words are the ones Home Assistant's German interface uses.
   S.de = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv ist nicht mehr auf dem Fernseher installiert. Wahrscheinlich ist der Developer Mode abgelaufen. Schalte den Developer Mode wieder ein und bitte Claude, couch-tv neu zu installieren.",
+    devmode_runs_out: "Der Developer Mode läuft in {days} Tagen ab, dann entfernt LG couch-tv. Schalte den Fernseher für eine Minute ein, damit er verlängert wird, oder drücke Extend in der App Developer Mode auf dem Fernseher.",
+    devmode_not_renewed_left: "Der Developer Mode wurde seit {days} Tagen nicht verlängert (noch {left} Tage). Er wird verlängert, sobald der Fernseher das nächste Mal an ist.",
+    devmode_not_renewed: "Der Developer Mode wurde seit {days} Tagen nicht verlängert. Er wird verlängert, sobald der Fernseher das nächste Mal an ist.",
+
     // ---- the home ----
     keep_watching: "Weiterschauen",
     who_watching: "Wer schaut gerade",
@@ -1452,6 +1482,12 @@
   };
 
   S.tr = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv artık TV’de yüklü değil. Developer Mode’un süresi büyük olasılıkla doldu. Developer Mode’u yeniden aç ve Claude’dan couch-tv’yi yeniden yüklemesini iste.",
+    devmode_runs_out: "Developer Mode’un süresi {days} gün içinde doluyor, ardından LG couch-tv’yi kaldırır. Yenilenmesi için TV’yi bir dakikalığına aç ya da TV’deki Developer Mode uygulamasında Extend’e bas.",
+    devmode_not_renewed_left: "Developer Mode {days} gündür yenilenmedi ({left} gün kaldı). TV bir sonraki açılışında yenilenir.",
+    devmode_not_renewed: "Developer Mode {days} gündür yenilenmedi. TV bir sonraki açılışında yenilenir.",
+
     // ---- the home ----
     keep_watching: "İzlemeye devam et",
     who_watching: "Kim izliyor",
@@ -1774,6 +1810,12 @@
 
   // French. Not in the upstream repo yet; added here so the home speaks French.
   S.fr = {
+    // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+    devmode_gone: "couch-tv n’est plus installé sur la télé. Le Developer Mode a sûrement expiré. Réactive le Developer Mode et demande à Claude de réinstaller couch-tv.",
+    devmode_runs_out: "Le Developer Mode expire dans {days} jours, et LG supprimera alors couch-tv. Allume la télé une minute pour qu’il soit renouvelé, ou appuie sur Extend dans l’appli Developer Mode de la télé.",
+    devmode_not_renewed_left: "Le Developer Mode n’a pas été renouvelé depuis {days} jours (il reste {left} jours). Il sera renouvelé la prochaine fois que la télé sera allumée.",
+    devmode_not_renewed: "Le Developer Mode n’a pas été renouvelé depuis {days} jours. Il sera renouvelé la prochaine fois que la télé sera allumée.",
+
     // ---- the home ----
     keep_watching: "Reprendre",
     who_watching: "Qui regarde",

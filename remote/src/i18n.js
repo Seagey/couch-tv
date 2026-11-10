@@ -1,7 +1,8 @@
 // The phone remote's words in English, Spanish (es), Mexican Spanish (es-MX, only where Mexico
 // says it differently), Italian (it), German (de) and Turkish (tr). The choice is per phone (TV menu, Language): "Same as the
 // TV" follows the TV home's Home settings, read from the bridge (/api/settings). The same languages
-// as tv-home/web/i18n.js. Messages that come from the bridge itself (errors, notes) stay in English.
+// as tv-home/web/i18n.js. Messages that come from the bridge itself (errors, notes) stay in English, except the LG Developer Mode
+// warning, which the bridge sends as a key (devmode_*).
 import { useEffect, useState } from 'react';
 
 export const LANGS = [
@@ -15,6 +16,12 @@ export const LANGS = [
 
 const S = {};
 S.en = {
+  // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+  devmode_gone: 'couch-tv is no longer installed on the TV. Developer Mode probably ran out. Switch Developer Mode on again and ask Claude to reinstall couch-tv.',
+  devmode_runs_out: 'Developer Mode runs out in {days} days, and then LG removes couch-tv. Turn the TV on for a minute so it can be renewed, or press Extend in the Developer Mode app on the TV.',
+  devmode_not_renewed_left: 'Developer Mode has not been renewed for {days} days ({left} days left). It renews the next time the TV is on.',
+  devmode_not_renewed: 'Developer Mode has not been renewed for {days} days. It renews the next time the TV is on.',
+
   both: 'Both',
   whos_watching: 'Who’s watching',
   whos_watching_change: 'Who’s watching: {name}. Change',
@@ -156,6 +163,12 @@ S.en = {
 };
 
 S.es = {
+  // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+  devmode_gone: 'couch-tv ya no está instalado en el televisor. Seguramente se acabó Developer Mode. Vuelve a activar Developer Mode y pídele a Claude que reinstale couch-tv.',
+  devmode_runs_out: 'Developer Mode se acaba en {days} días y entonces LG quita couch-tv. Enciende el televisor un minuto para que se renueve, o pulsa Extend en la app Developer Mode del televisor.',
+  devmode_not_renewed_left: 'Developer Mode lleva {days} días sin renovarse (quedan {left} días). Se renueva la próxima vez que el televisor esté encendido.',
+  devmode_not_renewed: 'Developer Mode lleva {days} días sin renovarse. Se renueva la próxima vez que el televisor esté encendido.',
+
   both: 'Todos',
   whos_watching: 'Quién está viendo',
   whos_watching_change: 'Quién está viendo: {name}. Cambiar',
@@ -291,6 +304,12 @@ S.es = {
 };
 
 S['es-MX'] = {
+  // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+  devmode_gone: 'couch-tv ya no está instalado en la TV. Seguramente se acabó Developer Mode. Vuelve a activar Developer Mode y pídele a Claude que reinstale couch-tv.',
+  devmode_runs_out: 'Developer Mode se acaba en {days} días y entonces LG quita couch-tv. Prende la TV un minuto para que se renueve, o presiona Extend en la app Developer Mode de la TV.',
+  devmode_not_renewed_left: 'Developer Mode lleva {days} días sin renovarse (quedan {left} días). Se renueva la próxima vez que la TV esté prendida.',
+  devmode_not_renewed: 'Developer Mode lleva {days} días sin renovarse. Se renueva la próxima vez que la TV esté prendida.',
+
   tv_not_connected: 'TV sin conexión',
   tv: 'TV',
   turn_off: 'Apagar la TV',
@@ -353,6 +372,12 @@ S['es-MX'] = {
 };
 
 S.it = {
+  // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+  devmode_gone: 'couch-tv non è più installata sulla TV. Probabilmente la Developer Mode è scaduta. Riattiva la Developer Mode e chiedi a Claude di reinstallare couch-tv.',
+  devmode_runs_out: 'La Developer Mode scade tra {days} giorni, e poi LG rimuove couch-tv. Accendi la TV per un minuto così si rinnova, oppure premi Extend nell’app Developer Mode sulla TV.',
+  devmode_not_renewed_left: 'La Developer Mode non si rinnova da {days} giorni (ne restano {left}). Si rinnova la prossima volta che la TV è accesa.',
+  devmode_not_renewed: 'La Developer Mode non si rinnova da {days} giorni. Si rinnova la prossima volta che la TV è accesa.',
+
   both: 'Tutti',
   whos_watching: 'Chi sta guardando',
   whos_watching_change: 'Chi sta guardando: {name}. Cambia',
@@ -488,6 +513,12 @@ S.it = {
 };
 
 S.de = {
+  // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+  devmode_gone: 'couch-tv ist nicht mehr auf dem Fernseher installiert. Wahrscheinlich ist der Developer Mode abgelaufen. Schalte den Developer Mode wieder ein und bitte Claude, couch-tv neu zu installieren.',
+  devmode_runs_out: 'Der Developer Mode läuft in {days} Tagen ab, dann entfernt LG couch-tv. Schalte den Fernseher für eine Minute ein, damit er verlängert wird, oder drücke Extend in der App Developer Mode auf dem Fernseher.',
+  devmode_not_renewed_left: 'Der Developer Mode wurde seit {days} Tagen nicht verlängert (noch {left} Tage). Er wird verlängert, sobald der Fernseher das nächste Mal an ist.',
+  devmode_not_renewed: 'Der Developer Mode wurde seit {days} Tagen nicht verlängert. Er wird verlängert, sobald der Fernseher das nächste Mal an ist.',
+
   both: 'Beide',
   whos_watching: 'Wer schaut gerade',
   whos_watching_change: 'Wer schaut gerade: {name}. Ändern',
@@ -630,6 +661,12 @@ S.de = {
 
 // Turkish. The words for the same things match the TV home's Turkish (tv-home/web/i18n.js).
 S.tr = {
+  // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+  devmode_gone: 'couch-tv artık TV’de yüklü değil. Developer Mode’un süresi büyük olasılıkla doldu. Developer Mode’u yeniden aç ve Claude’dan couch-tv’yi yeniden yüklemesini iste.',
+  devmode_runs_out: 'Developer Mode’un süresi {days} gün içinde doluyor, ardından LG couch-tv’yi kaldırır. Yenilenmesi için TV’yi bir dakikalığına aç ya da TV’deki Developer Mode uygulamasında Extend’e bas.',
+  devmode_not_renewed_left: 'Developer Mode {days} gündür yenilenmedi ({left} gün kaldı). TV bir sonraki açılışında yenilenir.',
+  devmode_not_renewed: 'Developer Mode {days} gündür yenilenmedi. TV bir sonraki açılışında yenilenir.',
+
   both: 'İkisi',
   whos_watching: 'Kim izliyor',
   whos_watching_change: 'Kim izliyor: {name}. Değiştir',
