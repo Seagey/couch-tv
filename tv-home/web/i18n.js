@@ -158,6 +158,10 @@
     wx_provider: "Provider",
     wx_provider_note: "Free, no account or key. The only provider for now.",
     wx_night_only: "The weather shows on the Night look, next to the date.",
+    wx_ambient: "Ambient weather effects",
+    wx_ambient_sub: "Subtle rain, snow and fog over the scenes",
+    wx_sun_grade: "Sunlight color grading",
+    wx_sun_grade_sub: "Warm dawn and golden sunset tones matched to the sun",
     every_min: "{n} minutes",
 
     look_head: "Look",
@@ -500,6 +504,10 @@
     wx_provider: "Proveedor",
     wx_provider_note: "Gratis, sin cuenta ni clave. Por ahora es el único proveedor.",
     wx_night_only: "El tiempo se ve en el aspecto nocturno, junto a la fecha.",
+    wx_ambient: "Efectos ambientales del tiempo",
+    wx_ambient_sub: "Lluvia, nieve y niebla sutiles sobre las escenas",
+    wx_sun_grade: "Gradación de luz solar",
+    wx_sun_grade_sub: "Tonos cálidos de amanecer y atardecer según el sol",
     every_min: "{n} minutos",
 
     look_head: "Aspecto",
@@ -762,6 +770,10 @@
 
     wx_show: "Mostrar el clima",
     wx_night_only: "El clima se ve en la vista nocturna, junto a la fecha.",
+    wx_ambient: "Efectos ambientales del clima",
+    wx_ambient_sub: "Lluvia, nieve y niebla sutiles sobre las escenas",
+    wx_sun_grade: "Gradación de luz solar",
+    wx_sun_grade_sub: "Tonos cálidos de amanecer y atardecer según el sol",
 
     look_head: "Vista",
     look_night_sub: "Un reloj grande de vidrio y escenas que se van turnando",
@@ -979,6 +991,10 @@
     wx_provider: "Fornitore",
     wx_provider_note: "Gratuito, senza account né chiave. Per ora è l'unico fornitore.",
     wx_night_only: "Il meteo si vede con l'aspetto notturno, accanto alla data.",
+    wx_ambient: "Effetti meteo ambientali",
+    wx_ambient_sub: "Pioggia, neve e nebbia delicate sopra le scene",
+    wx_sun_grade: "Gradazione luce solare",
+    wx_sun_grade_sub: "Toni caldi di alba e tramonto sincronizzati col sole",
     every_min: "{n} minuti",
 
     look_head: "Aspetto",
@@ -1325,6 +1341,10 @@
     wx_provider: "Anbieter",
     wx_provider_note: "Kostenlos, ohne Konto oder Schlüssel. Zurzeit der einzige Anbieter.",
     wx_night_only: "Das Wetter erscheint in der Nachtansicht, neben dem Datum.",
+    wx_ambient: "Atmosphärische Wettereffekte",
+    wx_ambient_sub: "Sanfter Regen, Schnee und Nebel über den Szenen",
+    wx_sun_grade: "Sonnenlicht-Farbabstimmung",
+    wx_sun_grade_sub: "Warme Morgen- und Abendtöne abgestimmt auf den Sonnenstand",
     every_min: "{n} Minuten",
 
     look_head: "Ansicht",
@@ -1671,6 +1691,10 @@
     wx_provider: "Sağlayıcı",
     wx_provider_note: "Ücretsiz, hesap veya anahtar yok. Şimdilik tek sağlayıcı.",
     wx_night_only: "Hava durumu, Gece görünümünde tarihin yanında görünür.",
+    wx_ambient: "Ortam hava efektleri",
+    wx_ambient_sub: "Sahnelerin üzerinde hafif yağmur, kar ve sis",
+    wx_sun_grade: "Güneş ışığı renk tonlaması",
+    wx_sun_grade_sub: "Güneşe göre ayarlanan sıcak şafak ve gün batımı tonları",
     every_min: "{n} dakika",
 
     look_head: "Görünüm",
@@ -2000,6 +2024,10 @@
     wx_provider: "Fournisseur",
     wx_provider_note: "Gratuit, sans compte ni clé. Le seul fournisseur pour l'instant.",
     wx_night_only: "La météo s'affiche dans le look nuit, à côté de la date.",
+    wx_ambient: "Effets météo d'ambiance",
+    wx_ambient_sub: "Pluie, neige et brume subtiles sur les scènes",
+    wx_sun_grade: "Étalonnage de la lumière solaire",
+    wx_sun_grade_sub: "Tonalités chaudes d'aube et de crépuscule selon le soleil",
     every_min: "{n} minutes",
 
     look_head: "Look",

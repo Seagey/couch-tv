@@ -1577,6 +1577,10 @@ def clean_settings(s):
         out["ambient_music"] = s["ambient_music"]
     if isinstance(s.get("sun_sync"), bool):
         out["sun_sync"] = s["sun_sync"]
+    if isinstance(s.get("ambient_weather"), bool):
+        out["ambient_weather"] = s["ambient_weather"]
+    if isinstance(s.get("ambient_sun_grade"), bool):
+        out["ambient_sun_grade"] = s["ambient_sun_grade"]
     if s.get("nav_sound") in ("system", "soft", "off"):
         out["nav_sound"] = s["nav_sound"]
     if s.get("glass_focus") in ("colour", "glass"):   # glass app icons: the focused app (#32)

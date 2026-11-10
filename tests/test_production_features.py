@@ -85,6 +85,20 @@ class TestProductionFeatures(unittest.TestCase):
         self.assertNotIn("soundscape", server.clean_settings({"soundscape": {"type": "thunder"}}))
         self.assertIs(server.clean_settings({"ambient_music": True})["ambient_music"], True)
         self.assertIs(server.clean_settings({"ambient_music": False})["ambient_music"], False)
+        self.assertIs(server.clean_settings({"ambient_weather": True})["ambient_weather"], True)
+        self.assertIs(server.clean_settings({"ambient_weather": False})["ambient_weather"], False)
+        self.assertNotIn("ambient_weather", server.clean_settings({"ambient_weather": "yes"}))
+        self.assertIs(server.clean_settings({"ambient_sun_grade": True})["ambient_sun_grade"], True)
+        self.assertIs(server.clean_settings({"ambient_sun_grade": False})["ambient_sun_grade"], False)
+        self.assertNotIn("ambient_sun_grade", server.clean_settings({"ambient_sun_grade": 123}))
+
+    def test_ambient_weather_config_validation(self):
+        self.assertIs(config._home({"ambient_weather": True})["ambient_weather"], True)
+        self.assertIs(config._home({"ambient_weather": False})["ambient_weather"], False)
+        self.assertNotIn("ambient_weather", config._home({"ambient_weather": "yes"}))
+        self.assertIs(config._home({"ambient_sun_grade": True})["ambient_sun_grade"], True)
+        self.assertIs(config._home({"ambient_sun_grade": False})["ambient_sun_grade"], False)
+        self.assertNotIn("ambient_sun_grade", config._home({"ambient_sun_grade": 1}))
 
     def test_no_soundscape_or_oled_by_default(self):
         h = config._home({})
