@@ -308,8 +308,10 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
 
 **What you can and cannot do on each:**
 - **Google TV and Android TV:** everything in this repo. Your own home screen, your apps in your
-  order, the phone remote, finding and playing shows, the sleep timer. Some Google Home features and
-  the YouTube button on the remote can stop working once the Google home is switched off.
+  order, the phone remote, finding and playing shows, the sleep timer. couch-tv never switches the
+  Google home off (older versions did, and that is what broke some Google features and the remote's
+  YouTube button). It stays on, and a Home button watch (an accessibility service, switched on by
+  `apply.sh`) brings couch-tv to the front when you press Home.
 - **Fire TV (Fire OS):** the phone remote and app launching work. Amazon does not let another home
   screen replace its own, so couch-tv watches for Amazon's home and puts its own home back on top;
   Amazon's home still flashes up for a moment first. Options A and B: `apply.sh` switches the watch

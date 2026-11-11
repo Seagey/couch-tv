@@ -50,9 +50,9 @@ Not tested by the author. Each line is what someone said worked on their own dev
 - **Google TV, home screen.** Install the new home first, then switch the Google one off with
   `pm disable-user`. Package names differ by device. Do not: on some Google TVs (a Sony Bravia
   among them) the TV loops at every restart once the Google home and the setup app (`setupwraith`)
-  are off. couch-tv leaves both on and uses a Home button watch instead. Some Google Home
-  features and the YouTube button can stop working. `tv-home/tools/survey-tv.py` shows what your
-  TV has before anything changes.
+  are off, and some Google Home features and the remote's YouTube button stop working. couch-tv
+  leaves both on and uses a Home button watch instead, so those keep working.
+  `tv-home/tools/survey-tv.py` shows what your TV has before anything changes.
 - **Other makers' home screens.** `apply.sh` switches off no home screen at all, Google's or a
   maker's. The TV's default home is set to couch-tv with `cmd package set-home-activity`, the Home
   button watch covers TVs where the TV's own home still wins, and `undo.sh` puts back whichever
