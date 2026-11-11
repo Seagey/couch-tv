@@ -58,6 +58,7 @@ Not tested by the author. Each line is what someone said worked on their own dev
   button watch covers TVs where the TV's own home still wins, and `undo.sh` puts back whichever
   home the TV had before.
 - **Google TV where the home choice does not stick.** On some boxes (a Xiaomi, issue #54) Google's home stays the resolved home after `apply.sh`, so every Home press opens it first and the Home button watch brings couch-tv back (a moment later, and again after the quick presses settle). `apply.sh` says so when it sees this. It is not an error.
+- **Android TV 10 and newer, no computer (issue #98).** couch-tv can ask Android to make it the home (`RoleManager.ROLE_HOME`), which shows Android's own "default home app" screen; below Android 10 it opens Home settings or the "Select a home app" chooser. This is how a Haier on Android TV 11 with no computer gets a home. On Google TV the TV's own home can still win the Home key, so the Home button watch from `apply.sh` is needed there. Nothing here switches off the TV's own home.
 - **Where the settings are.** Google TV: Settings, System, About (and Developer options under
   System). Android TV 9 to 11: Settings, Device Preferences, About (and Developer options under
   Device Preferences).

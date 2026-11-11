@@ -21,6 +21,13 @@ Everything else waits for the yes, including `check-tv.py --adb` (it makes the T
 debugging?" and saves a key in `~/.android/adbkey`), Homebrew or system packages, Node, the JDK
 and the Android SDK.
 
+**No computer or a failed home step (issue #98).** If couch-tv installed as an app but is not the
+home (the person came without a computer, or `apply.sh` could not run), on a plain Android TV 10 or
+newer the app asks Android itself: it offers "Make couch-tv your home screen?" the first time it
+opens, and Home settings, About repeats it. The on-TV app does the same from **Use as home screen**.
+On Google TV that does not hold the Home key: run `apply.sh` from a computer for the Home button
+watch. Never switch off or uninstall the TV's own home to make this work.
+
 The README's steps are numbered 1 to 6. Option A uses steps 1, 2 and 6. Option B uses steps 1 to
 6. Option C follows [on-tv/README.md](on-tv/README.md) (the app `dev.couchtv.ontv`).
 
