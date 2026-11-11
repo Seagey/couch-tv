@@ -56,7 +56,7 @@ const sandbox = {
 };
 sandbox.window = sandbox;
 
-const code = fs.readFileSync("tv-home/web/ambient-weather.js", "utf8");
+const code = fs.readFileSync(require("path").join(__dirname, "..", "tv-home", "web", "ambient-weather.js"), "utf8");
 vm.createContext(sandbox);
 vm.runInContext(code, sandbox);
 
