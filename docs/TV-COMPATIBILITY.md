@@ -96,8 +96,8 @@ Not tested by the author. Each line is what someone said worked on their own dev
   replaced.
 - **Samsung and LG** do not run Android apps or let an app replace their home screen. On a Samsung,
   couch-tv runs as a sideloaded app that the bridge opens when the TV comes on
-  ([SAMSUNG.md](SAMSUNG.md)). On an LG the same is built, through LG's Developer Mode, but not
-  yet tried on a real LG ([LG.md](LG.md)). LG's home screen itself can only be touched on a rooted TV, and the known root
+  ([SAMSUNG.md](SAMSUNG.md)). On an LG the same is built, through LG's Developer Mode, and has run on
+  nine real LGs so far ([LG.md](LG.md)). LG's home screen itself can only be touched on a rooted TV, and the known root
   methods are being patched. Not recommended.
 - **Google developer verification (2026).** Google's FAQ says apps installed with ADB do not need
   verification, and enforcement outside Google Play covers phones and tablets. couch-tv installs

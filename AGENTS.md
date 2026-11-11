@@ -45,8 +45,9 @@ The README's steps are numbered 1 to 6. Option A uses steps 1, 2 and 6. Option B
    ignores it), for example `curl -fL -o dist/couch-tv-home.apk
    https://github.com/Seagey/couch-tv/releases/latest/download/couch-tv-home.apk`. Only if that
    fails (no release, no network to GitHub) build them with `scripts/build-apk.sh` (README,
-   "Building the app").
-3. Note what else the computer has: macOS or Linux, and Node 20+ (option B, and a build of the
+   "Building the app"). An Android 6 TV also needs a build: the 0.12 apps need Android 7.1, and
+   Android 6 support is on main for the next release.
+3. Note what else the computer has: macOS or Linux, and Node 20.19+ or 22.12+ (option B, and a build of the
    option C app). A build also needs JDK 21 and the Android SDK (platform 34), installed only
    after the yes (step 3). If a JDK is needed, do **not** use `brew install --cask temurin@21` or `sudo`: they ask for a password the agent
    cannot type. Download the Temurin 21 `.tar.gz` from Adoptium

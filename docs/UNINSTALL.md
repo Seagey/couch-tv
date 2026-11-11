@@ -5,8 +5,9 @@ deletes anything from the TV. It only switches things off, so everything can be 
 
 ## Option B: stop the bridge first
 
-The bridge checks once a day that the Google home is still off and switches it off again. Stop it
-**before** you touch the TV, or it can undo your undo.
+The bridge checks once a day that ambient mode (and any ad tracker `apply.sh` switched off) is
+still off and switches it off again. It never switches the Google home off. Stop it **before** you
+touch the TV, or it can undo your undo.
 
 - **macOS:** `launchctl bootout gui/$(id -u)/app.couchtv.bridge`, then delete
   `~/Library/LaunchAgents/app.couchtv.bridge.plist`.
@@ -63,7 +64,8 @@ To remove only one app by hand, without the rest:
 ## With only the TV remote (no computer)
 
 1. On the couch-tv home, open the **Settings** tile (the gear at the end of the app row; in the
-   Classic look it is a tile in the grid). Or press the Settings button on your remote.
+   Classic look it is a tile in the grid). Or press the Settings button on your remote. Then pick
+   **TV settings**.
 2. **Apps**, then **See all apps**, then **Show system apps**.
 3. If **Google TV Home** or **Setup** says Disabled (couch-tv 0.10 and older switched them off),
    open it and press **Enable**. Ambient mode and the ad tracker are optional.
