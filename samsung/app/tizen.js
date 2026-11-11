@@ -250,9 +250,7 @@
     if (!BRIDGE || document.hidden) { polling = false; return; }
     polling = true;
     var x = new XMLHttpRequest();
-    var url = BRIDGE + "/api/tizen/next" + (TV_ID ? "?tv=" + TV_ID : "");
-    if (S.key) url += (url.indexOf("?") < 0 ? "?" : "&") + "key=" + encodeURIComponent(S.key);
-    x.open("GET", url);
+    x.open("GET", BRIDGE + "/api/tizen/next" + (TV_ID ? "?tv=" + TV_ID : ""));
     if (S.key) x.setRequestHeader("Authorization", "Bearer " + S.key);
     x.timeout = 35000;
     x.onload = function () {
