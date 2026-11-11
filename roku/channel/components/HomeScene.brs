@@ -22,6 +22,7 @@ sub init()
     m.sceneIdx = -1
     m.sceneId = ""
     m.clock24 = false
+    m.keepOn = true
     m.fahrenheit = false
     m.people = []
     m.who = ""
@@ -169,17 +170,33 @@ sub loadAll()
         fetch("people", bridgeUrl("/api/people"))
         fetch("who", bridgeUrl("/api/who"))
         fetch("weather", bridgeUrl("/api/weather"))
-        fetch("continue", bridgeUrl("/api/continue"))
+        fetchContinue("/api/continue")
         fetch("apps", bridgeUrl("/api/roku/apps"))
     else
         fetchLocalApps()
     end if
 end sub
 
+' Keep watching can be switched off (home.keep_watching, or Home settings): then it is not asked for at all.
+sub fetchContinue(path as String)
+    if m.keepOn then fetch("continue", bridgeUrl(path))
+end sub
+
+sub setKeepOn(on as Boolean)
+    if on = m.keepOn then return
+    m.keepOn = on
+    if on
+        if hasBridge() then fetchContinue("/api/continue")
+    else
+        m.shelf = []
+        drawShelf()
+    end if
+end sub
+
 sub onRefresh()
     m.refreshCount = m.refreshCount + 1
     if hasBridge()
-        fetch("continue", bridgeUrl("/api/continue"))
+        fetchContinue("/api/continue")
         fetch("apps", bridgeUrl("/api/roku/apps"))
         fetch("who", bridgeUrl("/api/who"))
         if m.refreshCount mod 10 = 0 then fetch("weather", bridgeUrl("/api/weather"))
@@ -208,6 +225,7 @@ sub onFetched(event as Object)
 
     if tag = "config"
         if j <> invalid and j.home <> invalid
+            if j.home.keep_watching = false then setKeepOn(false)
             if j.home.clock = "24h" then m.clock24 = true
             if j.home.clock = "12h" then m.clock24 = false
             if j.home.scene_seconds <> invalid then setTurn(j.home.scene_seconds)
@@ -226,7 +244,7 @@ sub onFetched(event as Object)
             if m.who <> m.shownWho
                 m.shownWho = m.who
                 drawTop()
-                if hasBridge() then fetch("continue", bridgeUrl("/api/continue"))
+                if hasBridge() then fetchContinue("/api/continue")
             end if
         end if
     else if tag = "weather"
@@ -271,6 +289,7 @@ sub onFetched(event as Object)
 end sub
 
 sub applySettings(s as Object)
+    if s.keep_watching <> invalid then setKeepOn(s.keep_watching = true)
     if s.clock = "24h" then m.clock24 = true
     if s.clock = "12h" then m.clock24 = false
     if s.wx_unit = "f" then m.fahrenheit = true
@@ -568,7 +587,7 @@ sub drawShelf()
     g = m.top.findNode("shelf")
     clearGroup(g)
     m.zones.shelf = []
-    if m.shelf.count() = 0
+    if not m.keepOn or m.shelf.count() = 0
         placeFocus()
         return
     end if
@@ -818,6 +837,6 @@ sub choose()
         m.shownWho = it.id
         drawTop()
         fetch("whoset", bridgeUrl("/api/who"), "POST", FormatJson({ who: it.id }))
-        fetch("continue", bridgeUrl("/api/continue?who=" + it.id))
+        fetchContinue("/api/continue?who=" + it.id)
     end if
 end sub
