@@ -1509,14 +1509,19 @@
     $("sp-cards").innerHTML = spItems.map(function (it, i) {
       var x = G.x + (i % 2) * (G.w + G.gx), y = G.y + Math.floor(i / 2) * (G.h + G.gy);
       var st = "left:" + x + "rem;top:" + y + "rem;width:" + G.w + "rem;height:" + G.h + "rem";
-      return '<div class="sp-card' + (it.kind === "app" ? " is-app" : "") + '" data-i="' + i + '" style="' + st + '">' + spFace(it, false) + "</div>";
+      return '<div class="sp-card' + (it.kind === "app" ? " is-app" : "") + '" data-i="' + i + '" data-p="' + esc(it.pkg || "") + '" style="' + st + '">' + spFace(it, false) + "</div>";
     }).join("");
     spCollect();
   }
+  // Focus follows the thing, not its place in the list: the cards are redrawn whenever the lists
+  // refresh, and a position could then point at another card (focus seemed to wander by itself).
+  var spKey = "";
+  function keyOf(el) { return !el ? "" : el.hasAttribute("data-s") ? "s:" + el.getAttribute("data-s") : "c:" + el.getAttribute("data-p"); }
   function spCollect() {
     spEls = Array.prototype.slice.call($("sp-cards").children)
       .concat(Array.prototype.slice.call($("sp-music").querySelectorAll("[data-s]")));
-    si = Math.max(0, Math.min(si, spEls.length - 1));
+    var at = spKey ? spEls.map(keyOf).indexOf(spKey) : -1;
+    si = at >= 0 ? at : Math.max(0, Math.min(si, spEls.length - 1));
   }
   function toSpot(x) {
     zone = "spot";
@@ -1535,6 +1540,10 @@
   // made once and never redrawn, so the home's refreshes do not stop the song; it pauses when an app
   // opens. A song whose owner blocks playing outside YouTube is skipped.
   var ML = null, mi = -1, mState = -1, YTP = null, ytWait = [], ytErrs = 0, mTop = 0;
+  // The playing song's video behind the whole home, blurred, while the music card has focus: a second
+  // player, muted and tiny (so YouTube sends a small stream), stretched over the screen. Kept in step
+  // with the card's player, and paused whenever it is not showing.
+  var VBG = null, vbgOn = false, vbgSync = 0;
   function refreshPlaylist() {
     if (!SPOT) return Promise.resolve();
     return api("GET", "/api/playlist", null, 12000).then(function (j) {
@@ -1573,7 +1582,9 @@
   function scrollSongs() {
     var it = spItemAt(si), list = $("sp-songs");
     if (!it || it.kind !== "song") return;
-    var el = spEls[si], rowH = el.offsetHeight + 4, view = list.parentNode.clientHeight, top = el.offsetTop;
+    // the row's place within the list, from screen boxes (both move together, so mid-slide is fine)
+    var el = spEls[si], rowH = el.offsetHeight + 4, view = list.parentNode.clientHeight,
+      top = (el.getBoundingClientRect().top - list.getBoundingClientRect().top) / (list.getBoundingClientRect().height / list.offsetHeight || 1);
     if (top + mTop < 0) mTop = -top;
     else if (top + rowH + mTop > view) mTop = view - top - rowH;
     list.style.transform = "translateY(" + mTop + "px)";
@@ -1592,6 +1603,7 @@
     if (!m) return;
     mi = i; mState = 3; musicState();
     ytApi(function () {
+      if (VBG && VBG.loadVideoById) { VBG.loadVideoById(m.id); if (!vbgOn) VBG.pauseVideo(); }
       if (YTP && YTP.loadVideoById) { YTP.loadVideoById(m.id); return; }
       YTP = new window.YT.Player("sp-yt", { width: "100%", height: "100%", videoId: m.id,
         playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0, origin: location.origin },
@@ -1602,6 +1614,7 @@
             if (e.data === 1) ytErrs = 0;
             if (e.data === 0) nextSong();
             musicState();
+            videoBg();
           },
           onError: function () {
             if (ML.items[mi]) ML.items[mi].blocked = true;
@@ -1618,7 +1631,39 @@
       if (!ML.items[j].blocked) { playSong(j); return; }
     }
   }
-  function pauseSong() { if (YTP && YTP.pauseVideo && mState === 1) YTP.pauseVideo(); }
+  function pauseSong() { if (YTP && YTP.pauseVideo && mState === 1) YTP.pauseVideo(); vbgShow(false); }
+  // focus on the music card (its player or a song) while a song plays: the video behind everything
+  function videoBg() {
+    if (!SPOT) return;
+    var it = zone === "spot" ? spItemAt(si) : null;
+    vbgShow(!!it && (it.kind === "song" || it.kind === "np") && mState === 1 && mi >= 0);
+  }
+  function vbgShow(on) {
+    vbgOn = on;
+    document.documentElement.classList.toggle("sp-vid", on);
+    clearInterval(vbgSync);
+    if (!on) { if (VBG && VBG.pauseVideo) VBG.pauseVideo(); return; }
+    var m = ML && ML.items[mi];
+    if (!m) return;
+    var sync = function () {
+      if (!VBG || !VBG.getCurrentTime || !YTP || !YTP.getCurrentTime) return;
+      var t = YTP.getCurrentTime(), d = Math.abs(VBG.getCurrentTime() - t);
+      if (d > 1.5) VBG.seekTo(t + 0.3, true);
+      if (VBG.getPlayerState && VBG.getPlayerState() !== 1) VBG.playVideo();
+    };
+    if (!VBG) {
+      ytApi(function () {
+        if (VBG) return;
+        VBG = new window.YT.Player("sp-vbg-yt", { width: "100%", height: "100%", videoId: m.id,
+          playerVars: { autoplay: 1, mute: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0, origin: location.origin },
+          events: { onReady: function (e) { e.target.mute(); if (vbgOn) { sync(); e.target.playVideo(); } else e.target.pauseVideo(); } } });
+      });
+    } else {
+      if (VBG.getVideoData && VBG.getVideoData().video_id !== m.id) VBG.loadVideoById(m.id);
+      sync();
+    }
+    vbgSync = setInterval(sync, 8000);
+  }
   function toggleSong() {
     if (mi < 0 || !YTP || !YTP.playVideo) { playSong(mi >= 0 ? mi : 0); return; }
     if (mState === 1) YTP.pauseVideo(); else YTP.playVideo();
@@ -1771,6 +1816,7 @@
     if (zone === "settings") { renderSettings(); return; }
     if (zone === "smart") { window.smartHome.paint(); return; }
     clearFocus();
+    if (SPOT && vbgOn && zone !== "spot") vbgShow(false);   // the song's video backdrop is the music card's only
     renderHint();
     if (npVisible()) renderNp();   // its buttons carry the focus only while zone is "np"
     if (zone === "gear") { if (gridEls[g]) gridEls[g].classList.add("focus"); renderGear(); return; }
@@ -1781,7 +1827,7 @@
     if (zone === "pmenu") { renderPop(); $("people").classList.add("focus"); return; }
     if (zone === "rows") { if (paintRows()) return; zone = "grid"; }
     if (zone === "spot") {
-      if (spEls[si]) { spEls[si].classList.add("focus"); scrollSongs(); spBack(spArt(spItemAt(si))); return; }
+      if (spEls[si]) { spKey = keyOf(spEls[si]); spEls[si].classList.add("focus"); scrollSongs(); spBack(spArt(spItemAt(si))); videoBg(); return; }
       zone = "grid";
     }
     if (zone === "np") {

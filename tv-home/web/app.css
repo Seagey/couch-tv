@@ -1110,3 +1110,22 @@ body {
 .sp-music:not(.playing) .sp-eq span { animation-play-state: paused; }
 .sp-none { font-size: 1.25rem; color: rgba(255, 255, 255, 0.6); }
 @media (prefers-reduced-motion: reduce) { .sp-eq span { animation: none; } }
+
+/* the playing song's video behind the home while the music card has focus: a tiny muted player
+   (YouTube sends it a small stream), stretched to cover the screen, which blurs it almost for free */
+.sp-vbg { position: absolute; left: 50%; top: 50%; width: 16rem; height: 9rem; margin: -4.5rem 0 0 -8rem; opacity: 0; overflow: hidden;
+  transform: scale(8.75); filter: blur(0.1875rem); transition: opacity 900ms ease; pointer-events: none; }
+/* YouTube's own title bar and logo are cropped off, here as in the card */
+.sp-vbg iframe { position: absolute; left: -15%; top: -30%; width: 130% !important; height: 160% !important; border: 0; }
+.sp-vid .sp-vbg { opacity: 1; }
+.sp-vid .sp-l { opacity: 0 !important; }
+
+/* with video behind them, live frosted glass would re-blur on every video frame (too much for a TV's
+   GPU): the panels turn to plain tinted glass while the video shows */
+.theme-spot.sp-vid .sp-music, .theme-spot.sp-vid .people, .theme-spot.sp-vid .qbtn, .theme-spot.sp-vid .grid {
+  -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(18, 16, 26, 0.5);
+}
+.sp-vid .sp-vig { background: radial-gradient(120% 95% at 50% 45%, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.7) 85%); }
+/* the card's player: YouTube's title bar and logo cropped off the edges */
+.sp-ytw { overflow: hidden; }
+.sp-ytw iframe { position: absolute; left: -12%; top: -22%; width: 124% !important; height: 144% !important; }
