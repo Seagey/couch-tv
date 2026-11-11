@@ -287,6 +287,9 @@ out every computer, so reconnect yours afterwards).
   application/json` and a real `true` or `false` (anything else is a 400), switches only couch-tv's
   own home (never the TV's launcher or setup app), and answers 429 if asked to flip it again within
   two seconds.
+- A save from a phone or setup tool (`POST /api/settings`, `/api/app-order` or `/api/people`) shows
+  on the TV straight away: the home page reads them again as if it had just come back on screen.
+  Saves the home page makes itself are left alone.
 
 ## Tests
 
