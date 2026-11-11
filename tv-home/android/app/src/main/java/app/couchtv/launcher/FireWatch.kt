@@ -53,9 +53,12 @@ class FireWatch : AccessibilityService() {
         // never seen (issue #44: Amazon's home sat on screen about 30 s at boot). The service has no
         // permission to read windows (that would be reading the screen), so it goes by the clock
         // instead: bound in the first minutes after a restart, nothing but the TV's own home can be
-        // in front, so couch-tv goes on top once. Fire OS only: a Google TV can start on an HDMI
-        // input or live TV, and that must never be covered.
-        if (android.os.Build.MANUFACTURER.equals("Amazon", ignoreCase = true) &&
+        // in front, so couch-tv goes on top once. Fire OS, and TCL Google TVs (issue #94): TCL's own
+        // boot controller opens the Google home at power on before this service is bound, so its
+        // window event is never seen, and a Home press then changes nothing (the Google home is
+        // already in front). Other Google TVs are left alone: one can start on an HDMI input or
+        // live TV, and that must never be covered.
+        if ((android.os.Build.MANUFACTURER.equals("Amazon", ignoreCase = true) || TclPlaceholderInput.isTcl()) &&
             SystemClock.elapsedRealtime() < BOOT_WINDOW_MS && !CrashGuard.standingAside(this)) {
             Log.i("couchtv.firewatch", "bound just after a restart: putting couch-tv in front")
             runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
