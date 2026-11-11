@@ -196,6 +196,23 @@
   }
   $("ambient").addEventListener("change", refreshPlan);
 
+  // What to say after a check: couch-tv in front or not, the Home button watch running or not, and
+  // any other launcher whose own Home override would fight it.
+  function homeWords(r) {
+    var w = [];
+    if (r.watch_bound === false) {
+      w.push(state.facts && state.facts.fire ?
+        "The Home button watch is switched on, but Fire TV has not started it yet. Fire TV sometimes needs one restart for that: " +
+        "Settings, My Fire TV, Restart. When the TV is back on its home, press Check it again." :
+        "The Home button watch is switched on, but the TV has not started it yet. Restart the TV once. If Home still opens " +
+        "the TV's own home after that, open this app again and set it up again.");
+    } else if (!r.ok) {
+      w.push("The TV's own home was in front when this looked. Press Home on the remote once more.");
+    }
+    if (r.warning) w.push(r.warning);
+    return w.join(" ");
+  }
+
   $("place-go").addEventListener("click", function () {
     var box = $("places"); box.textContent = "Looking…";
     api("/api/place", { q: $("place-q").value }).then(function (r) {
@@ -229,8 +246,9 @@
     job("/api/setup", { ambient_off: $("ambient").checked, people: people, weather: state.weather }, working("Setting it up"))
       .then(function (r) {
         text("done-title", r.front ? "couch-tv is your home screen" : "couch-tv is on the TV");
-        text("done-line", (r.front ? "It is on the screen now. " : "It is installed, but the TV's own home was in front when this looked. ") +
-          "Version " + r.apk.version + ", checked against " + r.apk.checked + ".");
+        text("done-line", (r.front ? "It is on the screen now. " : "It is installed. ") +
+          "Version " + r.apk.version + ", checked against " + r.apk.checked + ". " +
+          homeWords({ ok: r.front, watch_bound: r.watch_bound, warning: r.warning }));
         $("remote-done").hidden = true;
         $("remote-adb-google").hidden = state.facts.fire;
         $("remote-adb-fire").hidden = !state.facts.fire;
@@ -243,8 +261,7 @@
 
   $("check-go").addEventListener("click", function () {
     job("/api/check").then(function (r) {
-      text("done-line", r.ok ? "couch-tv came up when Home was pressed." :
-        "The TV's own home stayed in front. Press Home on the remote once more. If it still stays, open Settings, Accessibility on the TV and check couch-tv's Home button watch is on.");
+      text("done-line", (r.ok && r.watch_bound !== false ? "couch-tv came up when Home was pressed. " : "") + homeWords(r));
     }, fail);
   });
 

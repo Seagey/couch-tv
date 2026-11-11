@@ -68,7 +68,7 @@ def facts(tv):
     model = tv.prop("ro.product.model")
     maker = tv.prop("ro.product.manufacturer")
     brand = tv.prop("ro.product.brand")
-    fire_os = tv.prop("ro.build.version.fireos")
+    fire_os = fire_os_version(tv)
     sdk = int(tv.prop("ro.build.version.sdk") or 0)
     release = tv.prop("ro.build.version.release")
     present = _packages(tv)
@@ -90,6 +90,17 @@ def facts(tv):
         "installed": {"home": app_version(tv, HOME_PKG), "ontv": app_version(tv, ONTV_PKG)},
         "supported": sdk >= 25,
     }
+
+
+def fire_os_version(tv):
+    """The Fire OS version as the TV shows it. ro.build.version.name has the full one ("Fire OS 8.1.8.5
+    (RS8185/3898)"); ro.build.version.fireos only says "8.0" on that same stick (reported by killy10o10)."""
+    m = re.search(r"Fire OS\s+([0-9][0-9.]*)", tv.prop("ro.build.version.name"))
+    return m.group(1) if m else tv.prop("ro.build.version.fireos")
+
+
+def is_fire(tv):
+    return tv.prop("ro.product.manufacturer").lower() == "amazon" or bool(fire_os_version(tv))
 
 
 def app_version(tv, pkg):
@@ -121,7 +132,31 @@ def plan(tv, f, ambient_off=True):
                  "Nothing is deleted.")
     if f.get("tcl"):
         items.append("TCL only: let couch-tv start by itself after a restart (TCL's AUTO_START setting).")
+    warn = watch_warning(other_watches(tv))
+    if warn:
+        items.append(warn)
     return items
+
+
+KNOWN_WATCHES = {"com.spocky.projengmenu": "Projectivy Launcher", "com.wolf.firelauncher": "Wolf Launcher"}
+
+
+def other_watches(tv):
+    """Other launchers with their own accessibility service switched on. Their Home override would fight
+    couch-tv's Home button watch. A launcher is anything with a HOME screen; plus a few known by name."""
+    cur = tv.shell("settings get secure enabled_accessibility_services").strip()
+    pkgs = {s.split("/", 1)[0] for s in cur.split(":") if "/" in s}
+    homes = {l.split("/", 1)[0] for l in _lines(tv.shell(QUERY_HOMES)) if "/" in l}
+    ours = {HOME_PKG, ONTV_PKG} | set(STOCK_HOMES) | set(NEVER_OFF)
+    found = sorted(p for p in pkgs if p not in ours and (p in KNOWN_WATCHES or p in homes))
+    return [KNOWN_WATCHES.get(p, p) for p in found]
+
+
+def watch_warning(names):
+    if not names:
+        return None
+    return (f"{' and '.join(names)} also takes over the Home button on this TV. The two will fight: switch its Home "
+            "override off in its own settings (it can stay installed).")
 
 
 # ---- records, on the TV and here ----
@@ -227,7 +262,10 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     done.append("installed")
     tv.shell(f"cmd package set-home-activity {HOME_ACT}")
     now = tv.shell("cmd shortcut get-default-launcher")
-    if f"{HOME_PKG}/" not in now:
+    fire = is_fire(tv)
+    # Fire OS keeps Amazon's home as the chosen one whatever is set (priority 950, seen by killy10o10 on a
+    # Fire TV Stick 4K 2nd gen): there the Home button watch is what brings couch-tv back, so carry on.
+    if f"{HOME_PKG}/" not in now and not fire:
         raise TvError("The TV did not take couch-tv as its home screen, so nothing was switched off. "
                       "Undo takes the app off again.", "home_refused")
     tv.shell(f"pm grant {HOME_PKG} android.permission.READ_TV_LISTINGS")
@@ -287,11 +325,44 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
         tv.shell("settings put secure accessibility_enabled 1")
         done.append("Home button watch on")
 
+    bound = None
+    if watch:
+        progress(0.92, "Checking the Home button watch is running")
+        bound = wait_watch_bound(tv)
     progress(0.95, "Pressing Home")
     result = check_home(tv)
     progress(1.0, "Done")
     return {"changed": done, "front": result["ok"], "home_key_opens": "couch-tv" if resolved.startswith(HOME_PKG + "/") else resolved,
-            "watch": watch, "disabled": rec["disabled"]}
+            "watch": watch, "watch_bound": bound, "fire": fire, "disabled": rec["disabled"],
+            "warning": watch_warning(other_watches(tv))}
+
+
+WATCH_LABEL = "Home button watch"   # FireWatch's android:label in tv-home's AndroidManifest.xml
+
+
+def bound_services(tv):
+    """The "Bound services" part of dumpsys accessibility, all of it: with more than one service bound
+    (Projectivy's, say) it runs over several lines (reported by killy10o10)."""
+    out = tv.shell("dumpsys accessibility")
+    if "Bound services:" not in out:
+        return ""
+    part = out.split("Bound services:", 1)[1]
+    for end in ("Enabled services:", "Binding services:", "Crashed services:"):
+        part = part.split(end, 1)[0]
+    return part
+
+
+def watch_bound(tv):
+    part = bound_services(tv)
+    return WATCH_LABEL in part or f"{HOME_PKG}/" in part
+
+
+def wait_watch_bound(tv, seconds=10):
+    for _ in range(seconds):
+        if watch_bound(tv):
+            return True
+        time.sleep(1)
+    return False
 
 
 def facts_tcl(tv):
@@ -311,12 +382,16 @@ def check_home(tv, pkg=HOME_PKG):
     tv.key("HOME")
     time.sleep(2)
     seen = ""
+    ok = False
     for _ in range(6):
         seen = front(tv)
         if pkg in seen:
-            return {"ok": True, "front": seen}
+            ok = True
+            break
         time.sleep(1)
-    return {"ok": False, "front": seen}
+    listed = WATCH in tv.shell("settings get secure enabled_accessibility_services")
+    return {"ok": ok, "front": seen, "watch_bound": watch_bound(tv) if listed else None,
+            "warning": watch_warning(other_watches(tv))}
 
 
 # ---- 3. the phone remote (the on-TV app, optional) ----

@@ -92,6 +92,16 @@ plainly, early and with nothing changed, that their TV cannot do it this way and
   check the Accessibility switches, from the TCL fix in AGENTS.md (#94).
 - **A TV already running couch-tv:** the plan warns that a bridge (option B) TV would be switched
   to the TV only home, and Undo says to stop the bridge first.
+- **Fire TV, from killy10o10's review on his Fire TV Stick 4K (2nd gen, Fire OS 8.1.8.5), 11 Nov:**
+  (1) Fire OS keeps Amazon's home as the chosen one, so the "did the TV take couch-tv as its home"
+  hard stop no longer applies on Fire OS: the Home button watch and the Home check decide there
+  (Google TV and Android TV still stop). (2) The Fire OS version comes from `ro.build.version.name`
+  (`ro.build.version.fireos` said 8.0 on 8.1.8.5). (3) After switching the watch on, the app reads
+  the whole "Bound services" list of `dumpsys accessibility` (it runs over several lines when
+  another service is bound) and, if the watch is not running yet, asks for one restart and a check
+  again. (4) Another launcher with its own accessibility service switched on (Projectivy, Wolf, or
+  any app with a home screen) gets a one line warning, in the plan and after setup; it is never
+  switched off.
 - **The Android 11 test TV result changed the "honest stop" wording:** see Verified. The stop screen still
   exists for TVs that never ask.
 
@@ -107,11 +117,11 @@ Run on 11 November 2026 on a Mac (macOS 27, Apple silicon), Python 3.11, with tw
 | Download and copy on that TV | `couch-tv-home.apk` v0.12 from Releases, SHA-256 checked against GitHub's digest (2.1 s); 21.8 MB pushed over TLS in 43.7 s; md5 matched on the TV; deleted | ok, nothing left in /data/local/tmp |
 | TV 2: an Android 11 TV with the Google TV home, port 5555 open | the app's new key over 5555 | **the TV showed "Allow USB debugging?"** (an earlier test that day saw none). Allowed for this session only (Always allow left unticked); connected in 25 s; facts, plan and undo plan read. Reconnecting after showed the prompt again, so nothing was kept. No install (live bridge TV) |
 | Not allowed in time | the same TV, prompt left unanswered | `not_allowed`, which shows the stop screen |
-| Unit tests | `python -m unittest discover -s setup-app/tests`: 44 tests, a pretend TV for every apply.sh and undo step, pairing client against server, a pretend Wireless debugging TV for the TLS upgrade, mDNS parsing, the release checks, the page server's locks | OK |
+| Unit tests | `python -m unittest discover -s setup-app/tests`: 51 tests, a pretend TV for every apply.sh and undo step, pairing client against server, a pretend Wireless debugging TV for the TLS upgrade, mDNS parsing, the release checks, the page server's locks | OK |
 | Clean install from hashes | `pip install --require-hashes -r requirements.txt` in a fresh venv, then the tests | OK |
 | Built app | PyInstaller 6.16.0 on this Mac; `--self-test` pairs with itself inside the bundle; `tests/smoke.py` | OK, 13.3 MB zip |
 | The repo's own checks | `py_compile` of bridge, scripts and tools; shell scripts parse; the repo's 169 Python tests | OK |
-| CI (`setup-app.yml`) | Apple silicon Mac, Intel Mac and Windows: hash checked install, 44 tests, PyInstaller build, `--self-test` and smoke test inside the built app | passed on the pull request |
+| CI (`setup-app.yml`) | Apple silicon Mac, Intel Mac and Windows: hash checked install, 51 tests, PyInstaller build, `--self-test` and smoke test inside the built app | passed on the pull request |
 | Privacy scan | `scripts/privacy-scan.sh` (working tree, as the pre-commit hook runs it) | 0 findings |
 
 Put back afterwards: TV 1's Wireless debugging off again (was off), YouTube in front as

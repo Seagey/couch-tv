@@ -33,7 +33,11 @@ class FakeTv:
         self.a11y = a11y
         self.files = {}
         self.front_pkg = self.home.split("/")[0]
-        self.refuse_home = False
+        # Fire OS keeps Amazon's home as the chosen one whatever set-home-activity says (killy10o10's stick)
+        self.refuse_home = kind == "fire"
+        self.binds = True            # False: Fire OS lists the watch but does not bind it until a restart
+        self.other_homes = []        # other launchers installed (Projectivy...), with their own watch
+        self.other_bound = []        # labels of other bound accessibility services
         self.fail_on = None
         self.keys = []
 
@@ -41,12 +45,13 @@ class FakeTv:
     def prop(self, name):
         return {"ro.product.model": "TV1", "ro.product.manufacturer": self.maker, "ro.product.brand": self.maker,
                 "ro.build.version.sdk": str(self.sdk), "ro.build.version.release": "14",
-                "ro.serialno": self.serial, "ro.build.version.fireos": "8.1" if self.maker == "Amazon" else ""}.get(name, "")
+                "ro.serialno": self.serial, "ro.build.version.fireos": "8.0" if self.maker == "Amazon" else "",
+                "ro.build.version.name": "Fire OS 8.1.8.5 (RS8185/3898)" if self.maker == "Amazon" else "14"}.get(name, "")
 
     def key(self, name):
         self.keys.append(name)
         if name == "HOME":
-            if "app.couchtv.launcher" in self.packages and (self.chosen or self._watch_on()):
+            if "app.couchtv.launcher" in self.packages and ((self.chosen and not self.refuse_home) or (self._watch_on() and self.binds)):
                 self.front_pkg = "app.couchtv.launcher"
             else:
                 self.front_pkg = self.home.split("/")[0]
@@ -82,7 +87,7 @@ class FakeTv:
                 return "priority=0\n" + self.chosen
             return "priority=0\n" + self.home
         if c.startswith("pm query-activities"):
-            homes = [self.home]
+            homes = [self.home] + [p + "/.Home" for p in self.other_homes]
             if "app.couchtv.launcher" in self.packages:
                 homes.append("app.couchtv.launcher/.MainActivity")
             return "\n".join(homes)
@@ -125,6 +130,14 @@ class FakeTv:
             return ""
         if c.startswith("appops get"):
             return "SYSTEM_ALERT_WINDOW: default"
+        if c == "dumpsys accessibility":
+            labels = list(self.other_bound)
+            if self.binds and "app.couchtv.launcher/.FireWatch" in self.a11y:
+                labels.append("Home button watch")
+            services = ",\n  ".join(f"Service[label={l}, feedbackType[FEEDBACK_GENERIC], capabilities=1, eventTypes=TYPES_ALL_MASK]"
+                                     for l in labels)
+            return ("ACCESSIBILITY MANAGER (dumpsys accessibility)\nUser state[\n  attributes:{id=0}\n"
+                    f"  Bound services:{{{services}}}\n  Enabled services:{{{{{self.a11y}}}}}\n  Binding services:{{}}\n]")
         if c.startswith("dumpsys window") or c.startswith("dumpsys activity"):
             return f"  mCurrentFocus=Window{{1 u0 {self.front_pkg}/x}}"
         m = re.match(r"cat (\S+) 2>/dev/null", c)

@@ -104,7 +104,7 @@ name to Open-Meteo for the weather. No accounts, no tracking, no AI.
 cd setup-app
 python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.txt
 .venv/bin/python -m couchtv_setup                    # opens the page
-.venv/bin/python -m unittest discover -s tests       # 44 tests, no TV needed
+.venv/bin/python -m unittest discover -s tests       # 51 tests, no TV needed
 .venv/bin/python couch-tv-setup.py --self-test       # pairs with itself, as the built app does in CI
 ```
 

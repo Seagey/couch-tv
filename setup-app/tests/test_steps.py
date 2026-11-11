@@ -133,6 +133,65 @@ class Setup(unittest.TestCase):
         self.assertEqual(len(cfg["people"]), 1)
 
 
+class FireTv(unittest.TestCase):
+    """killy10o10's four points from his Fire TV Stick 4K (2nd gen, Fire OS 8.1.8.5) on PR #97."""
+
+    def test_amazon_home_stays_chosen_but_setup_carries_on(self):
+        tv = FakeTv("fire")                      # set-home-activity is ignored, as on Fire OS
+        r = steps.make_home(tv, APK)
+        self.assertIn("app.couchtv.launcher/.FireWatch", tv.a11y)
+        self.assertTrue(r["fire"])
+        self.assertTrue(r["watch_bound"])
+        self.assertTrue(r["front"])              # the watch brings couch-tv back
+
+    def test_google_tv_that_refuses_still_stops(self):
+        tv = FakeTv("google")
+        tv.refuse_home = True
+        with self.assertRaises(TvError):
+            steps.make_home(tv, APK)
+
+    def test_fire_os_version_from_build_name(self):
+        f = steps.facts(FakeTv("fire"))
+        self.assertEqual(f["fire_os"], "8.1.8.5")    # ro.build.version.fireos says 8.0 on that stick
+
+    def test_watch_found_in_a_bound_list_over_several_lines(self):
+        tv = FakeTv("fire", installed={"com.spocky.projengmenu"})
+        tv.other_bound = ["Projectivy Launcher"]
+        steps.make_home(tv, APK)
+        out = tv.shell("dumpsys accessibility")
+        first = out.split("Bound services:", 1)[1].splitlines()[0]
+        self.assertNotIn("Home button watch", first)  # only a reader of the whole list sees it
+        self.assertTrue(steps.watch_bound(tv))
+
+    def test_not_bound_until_a_restart(self):
+        tv = FakeTv("fire")
+        tv.binds = False
+        r = steps.make_home(tv, APK)
+        self.assertFalse(r["watch_bound"])
+        self.assertFalse(r["front"])
+        self.assertFalse(steps.check_home(tv)["watch_bound"])
+        tv.binds = True                          # after the restart
+        c = steps.check_home(tv)
+        self.assertTrue(c["watch_bound"])
+        self.assertTrue(c["ok"])
+
+    def test_other_launcher_watch_is_warned_about(self):
+        tv = FakeTv("fire", installed={"com.spocky.projengmenu"}, a11y="com.spocky.projengmenu/.services.Watch")
+        tv.other_homes = ["com.spocky.projengmenu"]
+        items = steps.plan(tv, steps.facts(tv))
+        self.assertTrue(any("Projectivy Launcher" in i and "fight" in i for i in items))
+        r = steps.make_home(tv, APK)
+        self.assertIn("Projectivy Launcher", r["warning"])
+        self.assertIn("com.spocky.projengmenu/.services.Watch", tv.a11y)   # kept, never switched off
+
+    def test_unknown_launcher_with_a_watch_is_warned_about_by_package(self):
+        tv = FakeTv("google", installed={"com.example.launcher"}, a11y="com.example.launcher/.Svc")
+        tv.other_homes = ["com.example.launcher"]
+        self.assertEqual(steps.other_watches(tv), ["com.example.launcher"])
+        plain = FakeTv("google", a11y="com.example.reader/.Svc")      # a screen reader is not a launcher
+        self.assertEqual(steps.other_watches(plain), [])
+
+
 class Remote(unittest.TestCase):
     def test_phone_remote_grants_and_home_again(self):
         tv = FakeTv("google")
