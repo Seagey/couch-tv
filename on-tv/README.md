@@ -283,7 +283,10 @@ out every computer, so reconnect yours afterwards).
   it over ADB (`pm enable dev.couchtv.ontv/.HomeAlias` fails with "Shell cannot change component
   state"). Both answer `{"on", "held", "fire_tv", "watch"}`: `held` says whether Android already
   sends the Home key here (on a plain Android TV the person still answers Android's own chooser
-  once), `watch` whether the Home button watch is running.
+  once), `watch` whether the Home button watch is running. `POST` needs `Content-Type:
+  application/json` and a real `true` or `false` (anything else is a 400), switches only couch-tv's
+  own home (never the TV's launcher or setup app), and answers 429 if asked to flip it again within
+  two seconds.
 
 ## Tests
 

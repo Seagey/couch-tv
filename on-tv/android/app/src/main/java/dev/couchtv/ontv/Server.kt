@@ -213,10 +213,19 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             // held: whether Android itself already sends the Home key here (on a plain Android TV the
             // person still answers Android's own chooser once; a Fire TV relies on the watch instead).
             "GET /api/home" -> json(200, homeState())
+            // Only ever this app's own HomeAlias: nothing in the request names a package or component,
+            // and the TV's own launcher and setup app are never touched (AGENTS.md).
             "POST /api/home" -> {
-                val b = body(s)
-                if (!b.has("on")) throw ApiError(400, "on (true or false) is required")
-                App.setHomeEnabled(App.instance, b.optBoolean("on"))
+                if (s.headers["content-type"]?.substringBefore(';')?.trim()?.lowercase() != "application/json")
+                    throw ApiError(415, "send JSON (Content-Type: application/json)")
+                val on = body(s).opt("on") as? Boolean ?: throw ApiError(400, "on (true or false) is required")
+                if (on != App.homeEnabled(App.instance)) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastHomeChange < 2_000) throw ApiError(429, "too soon: wait a moment and try again")
+                    lastHomeChange = now
+                    App.setHomeEnabled(App.instance, on)
+                    Log.i(TAG, "use as home screen switched ${if (on) "on" else "off"} over the API from ${s.remoteIpAddress}")
+                }
                 FireHome.poke()
                 json(200, homeState())
             }
@@ -290,6 +299,9 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         by.forEach { (p, a) -> if (p !in inOrder) listed.put(a) }
         return ok().put("apps", listed).put("line", minOf(line, 10)).put("saved", true).put("dock_max", 10)
     }
+
+    /** When /api/home last switched the home on or off, so a client cannot flip it many times a second. */
+    @Volatile private var lastHomeChange = 0L
 
     private fun homeState(): JSONObject = ok()
         .put("on", App.homeEnabled(App.instance))
@@ -471,7 +483,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
     private class Status(private val code: Int) : Response.IStatus {
         override fun getRequestStatus() = code
         override fun getDescription() = "$code " + when (code) { 200 -> "OK"; 400 -> "Bad Request"; 401 -> "Unauthorized"; 404 -> "Not Found"
-            409 -> "Conflict"; 413 -> "Payload Too Large"; 501 -> "Not Implemented"; 502 -> "Bad Gateway"; 503 -> "Service Unavailable"; 504 -> "Gateway Timeout"; else -> "Status" }
+            409 -> "Conflict"; 413 -> "Payload Too Large"; 415 -> "Unsupported Media Type"; 429 -> "Too Many Requests";501 -> "Not Implemented"; 502 -> "Bad Gateway"; 503 -> "Service Unavailable"; 504 -> "Gateway Timeout"; else -> "Status" }
     }
 
     companion object { private const val TAG = "couchtv.server" }
