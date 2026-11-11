@@ -208,6 +208,18 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "POST /api/people" -> { savePeople(body(s)); json(200, ok().put("people", Store.people())) }
             "GET /api/settings" -> json(200, settings())
             "POST /api/settings" -> { saveSettings(body(s)); json(200, settings()) }
+            // "Use as home screen", for a paired phone or setup tool (#96). Fire OS refuses ADB's
+            // `pm enable` for the alias, so a computer cannot switch it on any other way.
+            // held: whether Android itself already sends the Home key here (on a plain Android TV the
+            // person still answers Android's own chooser once; a Fire TV relies on the watch instead).
+            "GET /api/home" -> json(200, homeState())
+            "POST /api/home" -> {
+                val b = body(s)
+                if (!b.has("on")) throw ApiError(400, "on (true or false) is required")
+                App.setHomeEnabled(App.instance, b.optBoolean("on"))
+                FireHome.poke()
+                json(200, homeState())
+            }
             "POST /api/phones/forget" -> { Auth.forgetAll(); json(200, ok().put("note", "Every phone must pair again.")) }
             else -> json(404, err("no such endpoint: $m $path"))
         }
@@ -278,6 +290,12 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         by.forEach { (p, a) -> if (p !in inOrder) listed.put(a) }
         return ok().put("apps", listed).put("line", minOf(line, 10)).put("saved", true).put("dock_max", 10)
     }
+
+    private fun homeState(): JSONObject = ok()
+        .put("on", App.homeEnabled(App.instance))
+        .put("held", HomeRole.held(App.instance))
+        .put("fire_tv", FireHome.isFireTv)
+        .put("watch", WatchService.connected)
 
     private fun settings(): JSONObject = ok()
         // the TV home's own Home settings (language, place, look...), kept here as they come
