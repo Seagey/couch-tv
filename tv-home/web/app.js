@@ -13,6 +13,20 @@
   // wins over a key an older build left in localStorage
   var KEY = decodeURIComponent((Q.match(/[?&]key=([^&]+)/) || [])[1] || "") ||
     (window.COUCH_WEBOS || window.COUCH_TIZEN || window.COUCH_SETTINGS || {}).key || "";
+  // A VIDAA TV is opened by the bridge with a one time code (?vidaa=), never the key: the page swaps
+  // it for the key once (bridge/vidaa.py), then the code is taken out of the address.
+  var ONCE = (Q.match(/[?&]vidaa=([A-Za-z0-9_-]{8,64})/) || [])[1];
+  if (ONCE && !KEY) {
+    try {
+      var cx = new XMLHttpRequest();
+      cx.open("POST", API + "/api/vidaa/claim", false);
+      cx.setRequestHeader("Content-Type", "application/json");
+      cx.send(JSON.stringify({ code: ONCE }));
+      var cj = JSON.parse(cx.responseText || "{}");
+      if (cj.ok && cj.key) KEY = cj.key;
+    } catch (e) {}
+    try { history.replaceState(null, "", location.pathname + location.search.replace(/([?&])vidaa=[^&]*&?/, "$1").replace(/[?&]$/, "") + location.hash); } catch (e) {}
+  }
   if (KEY) { try { localStorage.setItem("couchtv.key", KEY); } catch (e) {} }
   else { try { KEY = localStorage.getItem("couchtv.key") || ""; } catch (e) {} }
   // which TV this page is on (the launcher adds ?tv=<id> on any TV that is not the default); none = living room

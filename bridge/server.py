@@ -31,6 +31,7 @@ from tv import TV, TVUnavailable, intent_to_link
 import samsung
 import lg
 import roku
+import vidaa
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -51,13 +52,16 @@ TV_CONFIG = {"default": config.DEFAULT_TV, "tvs": config.TVS}
 
 def make_tv(cfg):
     """A Samsung ("kind": "samsung", bridge/samsung.py), an LG ("kind": "lg", bridge/lg.py), a Roku
-    ("kind": "roku", bridge/roku.py) or an Android or Google TV (tv.py)."""
+    ("kind": "roku", bridge/roku.py), a Hisense VIDAA ("kind": "vidaa", bridge/vidaa.py) or an Android
+    or Google TV (tv.py)."""
     if cfg.get("kind") == "samsung":
         return samsung.SamsungTV(cfg)
     if cfg.get("kind") == "lg":
         return lg.LGTV(cfg)
     if cfg.get("kind") == "roku":
         return roku.RokuTV(cfg)
+    if cfg.get("kind") == "vidaa":
+        return vidaa.VidaaTV(cfg)
     return TV(cfg)
 
 
@@ -361,7 +365,8 @@ def record_action(request, tool, args, success):
 
 
 # ---------- middleware: CORS + errors ----------
-OPEN_PATHS = {"/api/health", "/api/pair"}
+# /api/vidaa/claim swaps a one time code for the key (below), so it cannot need the key itself.
+OPEN_PATHS = {"/api/health", "/api/pair", "/api/vidaa/claim"}
 
 
 @web.middleware
@@ -878,6 +883,59 @@ async def h_roku_icon(request):
     except (roku.RokuError, ValueError, TVUnavailable) as e:
         raise ApiError(404, str(e))
     return web.Response(body=data, content_type=kind.split(";")[0], headers={"Cache-Control": "max-age=86400"})
+
+
+async def h_vidaa_pair(request):
+    """VIDAA pairing: {} asks the TV to show its PIN, {"pin": "1234"} sends it back (docs/VIDAA.md)."""
+    if tv.kind != "vidaa":
+        raise ApiError(400, "only for VIDAA TVs")
+    data = await body(request)
+    pin = data.get("pin")
+    if pin is None:
+        await tv.pair_start()
+        return ok(step="pin", note="The TV should now show a 4 digit PIN. Send it as {\"pin\": \"1234\"}.")
+    if not isinstance(pin, (str, int)) or not vidaa.PIN.match(str(pin).strip()):
+        raise ApiError(400, "pin is the 4 digits the TV shows")
+    try:
+        await tv.pair_finish(str(pin).strip())
+    except vidaa.VidaaError as e:
+        raise ApiError(409, str(e))
+    return ok(paired=True)
+
+
+async def h_vidaa_tile(request):
+    """VIDAA: ask the TV to add couch-tv to its app row. Newer firmware may refuse (docs/VIDAA.md)."""
+    if tv.kind != "vidaa":
+        raise ApiError(400, "only for VIDAA TVs")
+    added = await tv.install_tile()
+    return ok(tile=added, note=None if added else "The TV did not add the tile. The browser stays the way couch-tv opens.")
+
+
+async def h_vidaa_claim(request):
+    """The page a VIDAA TV opens carries a one time code (?vidaa=), not the pairing key, because the
+    TV's address bar and history are not private. The page swaps the code for the key here, once.
+    Open path: a wrong code counts towards the same rate limit as a wrong key."""
+    data = await body(request)
+    code = data.get("code")
+    ip = client_ip(request)
+    if is_rate_limited(ip):
+        raise ApiError(429, "Too many wrong codes. Please wait a minute.")
+    for tv_id, t in TVS.items():
+        if t.kind == "vidaa" and t.claim(code):
+            return ok(key=config.PAIRING_KEY, tv=tv_id)
+    record_failed_attempt(ip, str(code))
+    await asyncio.sleep(0.3)
+    raise ApiError(401, "that code is not valid (codes work once, for two minutes)")
+
+
+VIDAA_ICON = os.path.join(ROOT, "lg", "app", "largeIcon.png")
+
+
+async def h_vidaa_icon(request):
+    """couch-tv's icon for the VIDAA tile (the same picture as the LG app's)."""
+    if not os.path.isfile(VIDAA_ICON):
+        raise web.HTTPNotFound()
+    return web.FileResponse(VIDAA_ICON, headers={"Cache-Control": "max-age=86400"})
 
 
 async def h_tizen_answer(request):
@@ -2701,6 +2759,8 @@ async def h_tvs(request):
             row |= {"devmode": t.devmode_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         elif t.kind == "roku":
             row |= {"ecp": t.ecp_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
+        elif t.kind == "vidaa":
+            row |= {"vidaa": t.vidaa_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         out.append(row)
     return ok(default=DEFAULT_TV, tvs=out)
 
@@ -2728,6 +2788,9 @@ def make_app():
     r.add_get("/api/webos/apps", h_webos_apps)
     r.add_get("/api/roku/apps", h_roku_apps)
     r.add_get("/api/roku/icon/{id}", h_roku_icon)
+    r.add_post("/api/vidaa/pair", h_vidaa_pair)
+    r.add_post("/api/vidaa/tile", h_vidaa_tile)
+    r.add_post("/api/vidaa/claim", h_vidaa_claim)
     r.add_get("/api/recs", h_recs)
     r.add_get("/api/history", h_history)
     r.add_get("/api/taste", h_taste)
@@ -2762,6 +2825,7 @@ def make_app():
     agentic.routes(r)
     r.add_route("OPTIONS", "/api/{tail:.*}", h_options)
     r.add_route("*", "/api/{tail:.*}", h_api_missing)
+    r.add_get("/vidaa/icon.png", h_vidaa_icon)
     r.add_get("/tv", h_tv_redirect)
     r.add_get("/tv/manifest.json", h_tv_manifest)
     r.add_get("/tv/config.js", h_tv_config_js)
