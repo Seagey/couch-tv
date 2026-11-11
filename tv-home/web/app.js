@@ -366,7 +366,7 @@
   // Lighter home: ask for the 640 px size of a Keep watching picture, not the 1440 px one (a card is about 500 px wide)
   function slim(u) { return LIGHTER && typeof u === "string" ? u.replace("/s1440/", "/s640/") : u; }
   function glassSetting() { var g = ST.glass || HOME.glass; return g === "on" || g === "lite" ? g : "off"; }
-  // no clock in Home settings or config.json: the one usual for the language (24 hour in Italian and German)
+  // no clock in Home settings or config.json: the one usual for the language (24 hour in Italian, German, Turkish, French and Serbian)
   function clock24() { return (ST.clock || HOME.clock || (window.I18N ? window.I18N.clock() : "12h")) === "24h"; }
 
   // ---------------- helpers ----------------
