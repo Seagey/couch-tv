@@ -1054,6 +1054,42 @@ html.has-pointer.glass .ssec:hover {
   opacity: 1;
 }
 
+/* ================= Screen off / Audio-only Blackout Overlay ================= */
+.screen-off-overlay {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000000;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.screen-off-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+.screen-off-hint {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+  font-family: inherit;
+  user-select: none;
+  animation: screenOffHintFade 2.5s ease forwards;
+}
+@keyframes screenOffHintFade {
+  0% { opacity: 0; transform: translateY(4px); }
+  20% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* ================= Input Tiles ================= */
 .tile.input-ic .face {
   background: rgba(30, 28, 38, 0.85);
