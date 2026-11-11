@@ -160,6 +160,12 @@ Shown with sample shows and sample people. On your TV, "keep watching" fills fro
 actually watch: per TV and per person (with options B and C), up to 10 shows, newest first.
 With option A it is Android's own Watch Next list, the same for everyone on that TV.
 
+## Seeing every app
+
+Only part of your apps fit in the dock on some TVs. Press **Down** on the dock's bottom row to open
+the full apps view (the same one **More apps** opens), with the outline on the app you were on.
+Back returns to the dock on that app.
+
 ## Settings on the TV
 
 No computer and no `config.json` needed for the everyday settings. Press down to the dock and
