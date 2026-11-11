@@ -4,48 +4,30 @@ const assert = require('assert');
 
 console.log('Running Headphones UI tests...');
 
-// 1. Verify app.js
-const appJsPath = path.join(__dirname, '../tv-home/web/app.js');
-const appJsContent = fs.readFileSync(appJsPath, 'utf8');
+const web = path.join(__dirname, '../tv-home/web');
+const appJs = fs.readFileSync(path.join(web, 'app.js'), 'utf8');
+const i18n = fs.readFileSync(path.join(web, 'i18n.js'), 'utf8');
+const mockJs = fs.readFileSync(path.join(web, 'mock.js'), 'utf8');
 
-assert(appJsContent.includes('headphones'), 'app.js must include headphones keyword');
-assert(appJsContent.includes('"headphones"'), 'app.js must include "headphones" in QUICK_ALL');
-assert(appJsContent.includes('toggleHeadphones'), 'app.js must define toggleHeadphones');
-assert(appJsContent.includes('/api/bluetooth-audio'), 'app.js must call /api/bluetooth-audio');
+// 1. app.js: one "headphones" button that opens the Bluetooth screen, never on by default
+assert(/var QUICK_ALL = \[[^\]]*"headphones"/.test(appJs), 'QUICK_ALL must list "headphones"');
+assert(!appJs.includes('bluetooth_audio'), 'no bluetooth_audio alias');
+assert(appJs.includes("headphones: '<svg"), 'ICONS must have a headphones icon');
+assert(appJs.includes('function openBluetoothScreen'), 'app.js must define openBluetoothScreen');
+assert(appJs.includes('api("POST", "/api/bluetooth-audio")'), 'the bridge path posts to /api/bluetooth-audio');
+assert(!/api\("POST", "\/api\/bluetooth-audio", \{/.test(appJs), 'the POST carries no body of its own');
+const def = appJs.match(/TVCFG\.quick \|\| (\[[^\]]*\])/);
+assert(def && !def[1].includes('headphones'), 'headphones is not in the default quick buttons');
 
-// Check that ICONS has headphones SVG
-assert(appJsContent.includes('headphones: \'<svg'), 'ICONS must have headphones SVG');
-
-// 2. Verify app.css
-const appCssPath = path.join(__dirname, '../tv-home/web/app.css');
-const appCssContent = fs.readFileSync(appCssPath, 'utf8');
-
-assert(appCssContent.includes('#q-headphones'), 'app.css must have #q-headphones styles');
-assert(appCssContent.includes('.busy'), 'app.css must have .busy style');
-
-// 3. Verify i18n.js
-const i18nPath = path.join(__dirname, '../tv-home/web/i18n.js');
-const i18nContent = fs.readFileSync(i18nPath, 'utf8');
-
-const requiredKeys = [
-  'quick_headphones',
-  'quick_bluetooth_audio',
-  'headphones',
-  'headphones_on',
-  'headphones_off',
-  'headphones_connecting',
-  'headphones_not_found',
-  'quick_needs_bluetooth_audio'
-];
-
-requiredKeys.forEach(key => {
-  const count = (i18nContent.match(new RegExp('\\b' + key + ':', 'g')) || []).length;
-  assert(count >= 5, `Key ${key} must exist across localized languages (found ${count})`);
+// 2. i18n.js: all 7 languages (English, Spanish, Mexican Spanish, Italian, German, Turkish, French)
+// have the strings the button uses. Mexican Spanish is an overlay on Spanish, so it is counted by hand.
+const langs = 7;
+['quick_headphones', 'headphones', 'headphones_not_found'].forEach(function (key) {
+  const count = (i18n.match(new RegExp('\\b' + key + ':', 'g')) || []).length;
+  assert.strictEqual(count, langs, `${key} must exist in all ${langs} languages (found ${count})`);
 });
 
-// 4. Verify mock.js
-const mockJsPath = path.join(__dirname, '../tv-home/web/mock.js');
-const mockJsContent = fs.readFileSync(mockJsPath, 'utf8');
-assert(mockJsContent.includes('/api/bluetooth-audio'), 'mock.js must support /api/bluetooth-audio');
+// 3. mock.js answers the GET
+assert(mockJs.includes('/api/bluetooth-audio'), 'mock.js must support /api/bluetooth-audio');
 
 console.log('All Headphones UI tests passed successfully!');

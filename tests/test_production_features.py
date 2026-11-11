@@ -109,12 +109,13 @@ class TestProductionFeatures(unittest.TestCase):
 
     def test_headphones_quick_button(self):
         q = config.quick_for({"quick": ["sleep", "headphones", "bluetooth_audio", "invalid"]})
-        self.assertEqual(q, ["sleep", "headphones", "bluetooth_audio"])
+        self.assertEqual(q, ["sleep", "headphones"])
+        self.assertNotIn("headphones", config.quick_for({}))
 
     def test_clean_settings_quick_headphones(self):
         import server
         got = server.clean_settings({"quick": ["headphones", "bluetooth_audio", "invalid_btn"]})
-        self.assertEqual(got["quick"], ["headphones", "bluetooth_audio"])
+        self.assertEqual(got["quick"], ["headphones"])
 
 
 if __name__ == "__main__":
