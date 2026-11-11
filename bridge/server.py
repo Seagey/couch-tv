@@ -1524,6 +1524,9 @@ async def h_app_order_set(request):
 # on them. Anything it does not know is dropped.
 SETTINGS_MAX = 32 * 1024
 SETTINGS_LANGS = config.LANGUAGES
+# The most personal photos the home keeps. The TV home (tv-home/web/app.js MAX_PHOTOS) and the
+# launcher (MainActivity.kt MAX_PHOTOS) use the same number: change all three together.
+MAX_PHOTOS = 50
 _PHOTO_FILE = re.compile(r"[A-Za-z0-9_-]{1,64}\.jpg")
 _PACKAGE = re.compile(r"[A-Za-z0-9_.:-]{1,200}")
 
@@ -1609,7 +1612,7 @@ def clean_settings(s):
         out["clock"] = s["clock"]
     if isinstance(s.get("photos"), list):
         photos = []
-        for ph in s["photos"][:20]:
+        for ph in s["photos"][:MAX_PHOTOS]:
             if not isinstance(ph, dict) or not isinstance(ph.get("id"), str) or not 0 < len(ph["id"]) <= 32:
                 continue
             if isinstance(ph.get("file"), str) and _PHOTO_FILE.fullmatch(ph["file"]):

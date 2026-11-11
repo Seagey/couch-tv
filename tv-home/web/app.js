@@ -34,6 +34,8 @@
   var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [];
   var WXCFG = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
   var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "screensaver"];
+  // The most personal photos this TV keeps (also MAX_PHOTOS in bridge/server.py and MainActivity.kt).
+  var MAX_PHOTOS = 50;
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
   var THEME = "night", NIGHT = true, OLED = false, CLOCK24 = false;
@@ -2773,6 +2775,7 @@
         act: function () { ST.look = id; keep("tvhome.look", id); saveSettings(); } });
     });
     rows.push(head(t("scenes_head")));
+    rows.push(info("photos-count-look", photoCountText()));
     st.order.forEach(function (id) {
       var sc = sceneById(id);
       if (!sc) return;
@@ -2894,6 +2897,7 @@
     } });
     rows.push(info("np-note", t(OFFLINE ? "np_note_offline" : "np_note")));
     rows.push(head(t("photos_head")));
+    rows.push(info("photos-count", photoCountText()));
     if (canPick()) rows.push({ kind: "action", key: "photo-pick", label: t("photos_pick"), sub: t("photos_pick_sub"), act: pickPhotos });
     else rows.push(info("photo-nopick", t("photos_no_pick"), "", t("photos_no_pick_sub")));
     rows.push({ kind: "input", key: "photo-url", label: t("photos_url"), act: function () {
@@ -2904,6 +2908,7 @@
         act: function () { removePhoto(p.id); } });
     });
     rows.push(info("photos-note", t("photos_note")));
+    rows.push(info("photos-storage", t("photos_storage", { n: MAX_PHOTOS })));
     return rows;
   }
   function setScenes(st) { ST.scene_order = st.order; ST.scenes_off = st.off; saveSettings(); }
@@ -2922,6 +2927,7 @@
   }
   // The launcher's file picker (Android's "open a document" screen), where the TV has one.
   function canPick() { try { return !!(TV && TV.canPickPhotos && TV.canPickPhotos()); } catch (e) { return false; } }
+  function photoCountText() { return t("photos_count", { n: (Array.isArray(ST.photos) ? ST.photos : []).length, max: MAX_PHOTOS }); }
   function pickPhotos() {
     var ok = false;
     try { ok = !!TV.pickPhotos(); } catch (e) {}
@@ -2932,7 +2938,7 @@
     var list = [];
     try { list = typeof names === "string" ? JSON.parse(names) : names || []; } catch (e) { list = []; }
     var photos = Array.isArray(ST.photos) ? ST.photos.slice() : [], n = 0;
-    list.forEach(function (f) { if (typeof f === "string" && photos.length < 20) { photos.push({ id: uid(), file: f }); n++; } });
+    list.forEach(function (f) { if (typeof f === "string" && photos.length < MAX_PHOTOS) { photos.push({ id: uid(), file: f }); n++; } });
     if (!n) return;
     ST.photos = photos;
     saveSettings();
@@ -2972,7 +2978,7 @@
     u = (u || "").trim();
     if (!u) return;
     if (!/^https?:\/\//i.test(u)) u = "https://" + u;
-    if ((ST.photos || []).length >= 20) { SET.msg = t("photos_full"); return; }
+    if ((ST.photos || []).length >= MAX_PHOTOS) { SET.msg = t("photos_full", { n: MAX_PHOTOS }); return; }
     SET.msg = t("photos_checking");
     var im = new Image(), done = false;
     var finish = function (good) {

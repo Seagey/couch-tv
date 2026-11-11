@@ -396,7 +396,7 @@ The gear tile in the dock (Settings) opens a small menu: **Home settings** (couc
 **TV settings** (Android's). Home settings changes, with the TV remote alone: the language, the
 weather's place (a town search), weather on or off, °C or °F and how often it is checked, the look,
 which scenes take turns and in what order, how long each stays, the clock, glass panels, a video
-background, your own photos, the
+background, your own photos (up to 50; each one lives in the TV's own storage and is loaded into its memory when it shows, so an old or low memory TV is happier with fewer), the
 apps (home, More apps or hidden, and their order), the people, and the quick buttons. README,
 "Settings on the TV", says how to use it. Its **Updates** section (the TV home app only) looks for
 new couch-tv releases on GitHub, once a week if the household said yes, or when asked, and installs

@@ -814,7 +814,7 @@ class MainActivity : Activity() {
         }
         io.execute {
             val names = JSONArray()
-            for (u in uris.take(20)) copyPhoto(u)?.let { names.put(it) }
+            for (u in uris.take(MAX_PHOTOS)) copyPhoto(u)?.let { names.put(it) }
             main.post { js("window.tv && tv.photosAdded(" + JSONObject.quote(names.toString()) + ")") }
         }
     }
@@ -1532,6 +1532,7 @@ class MainActivity : Activity() {
             "com.google.android.tv.action.VIEW_INPUTS",
             "android.media.tv.action.SETUP_INPUTS"          // the system list of TV inputs
         )
+        private const val MAX_PHOTOS = 50   // same as MAX_PHOTOS in tv-home/web/app.js and bridge/server.py
         private const val RETRY_MS = 15_000L
         private const val OFFLINE_RETRY_MS = 60_000L   // looking for the bridge while the saved copy shows
         private const val OFFLINE_HOST = "home.tvos.invalid"

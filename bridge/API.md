@@ -558,7 +558,7 @@ is optional:
 | `scene_seconds`, `clock` | 5 to 3600; `12h` or `24h`. |
 | `sun_sync` | Follow the sun on or off: `true` or `false`. |
 | `ambient_weather`, `ambient_sun_grade` | Weather effects over the scenes, and the sun's colour grade: `true` or `false`, both off unless chosen. |
-| `photos` | Up to 20: `{"id", "url"}` for a photo on the web, or `{"id", "file"}` for one the TV's file picker copied into the app (`p....jpg`, kept on the TV only). |
+| `photos` | Up to 50 (`MAX_PHOTOS` in `server.py`; the rest are dropped). Each photo is kept on the TV and read into its memory when it shows, so a very old or low memory TV may stutter near the limit: `{"id", "url"}` for a photo on the web, or `{"id", "file"}` for one the TV's file picker copied into the app (`p....jpg`, kept on the TV only). |
 | `hidden_apps` | Packages hidden from the home and More apps on this TV. |
 | `soundscape` | Ambient sleep sound: `{"type": "rain", "volume": 0.5, "fade_with_sleep": true}`. `type` is `off`, `rain`, `fire`, `waves` or `brown`, `volume` 0 to 1. It never plays by itself: it starts only when someone presses the Soundscape button or the row in Home settings. |
 | `quick` | The quick buttons, in order: any of `sleep`, `picture`, `look`, `soundscape`, `input`. |

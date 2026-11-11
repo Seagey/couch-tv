@@ -82,6 +82,23 @@ class TestProductionFeatures(unittest.TestCase):
         cleaned = server.clean_settings({"quick": ["screen_off", "sleep", "invalid"]})
         self.assertEqual(cleaned["quick"], ["screen_off", "sleep"])
 
+    def test_photo_limit_is_fifty_and_trims(self):
+        import server
+        self.assertEqual(server.MAX_PHOTOS, 50)
+        many = [{"id": "p%d" % i, "url": "https://example.org/%d.jpg" % i} for i in range(80)]
+        cleaned = server.clean_settings({"photos": many})
+        self.assertEqual(len(cleaned["photos"]), 50)
+        self.assertEqual(cleaned["photos"][-1]["id"], "p49")
+        fifty = server.clean_settings({"photos": many[:50]})
+        self.assertEqual(len(fifty["photos"]), 50)
+
+    def test_photo_validation_still_drops_bad_entries(self):
+        import server
+        mixed = [{"id": "a", "file": "p1.jpg"}, {"id": "b", "file": "../x.jpg"}, {"id": "c", "url": "ftp://x"},
+                 {"id": "d", "url": "https://example.org/d.jpg"}, "junk", {"url": "https://example.org/e.jpg"}]
+        cleaned = server.clean_settings({"photos": mixed})
+        self.assertEqual([p["id"] for p in cleaned["photos"]], ["a", "d"])
+
     def test_home_settings_keep_oled_and_soundscape(self):
         # what the TV saves from Home settings must survive the bridge's check
         import server
