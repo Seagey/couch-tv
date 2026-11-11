@@ -1539,11 +1539,11 @@
   // The list comes from /api/playlist (the on-TV app reads the playlist's public feed). The player is
   // made once and never redrawn, so the home's refreshes do not stop the song; it pauses when an app
   // opens. A song whose owner blocks playing outside YouTube is skipped.
-  var ML = null, mi = -1, mState = -1, YTP = null, ytWait = [], ytErrs = 0, mTop = 0;
-  // The playing song's video behind the whole home, blurred, while the music card has focus: a second
-  // player, muted and tiny (so YouTube sends a small stream), stretched over the screen. Kept in step
-  // with the card's player, and paused whenever it is not showing.
-  var VBG = null, vbgOn = false, vbgSync = 0;
+  // One player only, behind the whole home: it plays the song (sound and picture), and its video
+  // shows there blurred while the music card has focus. The card itself shows the song's cover, our
+  // own progress bar and play state, so YouTube's title and controls never show and nothing can drift
+  // out of step. It is small, so YouTube sends a small video stream (the sound is unaffected).
+  var ML = null, mi = -1, mState = -1, YTP = null, ytWait = [], ytErrs = 0, mTop = 0, vbgOn = false, progT = 0;
   function refreshPlaylist() {
     if (!SPOT) return Promise.resolve();
     return api("GET", "/api/playlist", null, 12000).then(function (j) {
@@ -1577,6 +1577,16 @@
       el.classList.toggle("now", i === mi);
       el.classList.toggle("blocked", !!(ML.items[i] && ML.items[i].blocked));
     });
+    clearInterval(progT);
+    if (mState === 1) progT = setInterval(progress, 1000);
+    progress();
+  }
+  // the card's own progress bar (YouTube's never shows)
+  function progress() {
+    var bar = $("sp-prog");
+    if (!bar) return;
+    var d = YTP && YTP.getDuration ? YTP.getDuration() : 0, c = YTP && YTP.getCurrentTime ? YTP.getCurrentTime() : 0;
+    bar.style.width = d > 0 && mi >= 0 ? Math.min(100, c / d * 100).toFixed(2) + "%" : "0";
   }
   // keep the focused song in view inside the card
   function scrollSongs() {
@@ -1603,12 +1613,11 @@
     if (!m) return;
     mi = i; mState = 3; musicState();
     ytApi(function () {
-      if (VBG && VBG.loadVideoById) { VBG.loadVideoById(m.id); if (!vbgOn) VBG.pauseVideo(); }
       if (YTP && YTP.loadVideoById) { YTP.loadVideoById(m.id); return; }
-      YTP = new window.YT.Player("sp-yt", { width: "100%", height: "100%", videoId: m.id,
+      YTP = new window.YT.Player("sp-vbg-yt", { width: "100%", height: "100%", videoId: m.id,
         playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0, origin: location.origin },
         events: {
-          onReady: function (e) { e.target.playVideo(); },
+          onReady: function (e) { e.target.unMute(); e.target.setVolume(100); e.target.playVideo(); },
           onStateChange: function (e) {
             mState = e.data;
             if (e.data === 1) ytErrs = 0;
@@ -1632,37 +1641,16 @@
     }
   }
   function pauseSong() { if (YTP && YTP.pauseVideo && mState === 1) YTP.pauseVideo(); vbgShow(false); }
-  // focus on the music card (its player or a song) while a song plays: the video behind everything
+  // focus on the music card (its cover or a song) while a song plays: its video shows behind everything
   function videoBg() {
     if (!SPOT) return;
     var it = zone === "spot" ? spItemAt(si) : null;
     vbgShow(!!it && (it.kind === "song" || it.kind === "np") && mState === 1 && mi >= 0);
   }
   function vbgShow(on) {
+    if (on === vbgOn) return;
     vbgOn = on;
     document.documentElement.classList.toggle("sp-vid", on);
-    clearInterval(vbgSync);
-    if (!on) { if (VBG && VBG.pauseVideo) VBG.pauseVideo(); return; }
-    var m = ML && ML.items[mi];
-    if (!m) return;
-    var sync = function () {
-      if (!VBG || !VBG.getCurrentTime || !YTP || !YTP.getCurrentTime) return;
-      var t = YTP.getCurrentTime(), d = Math.abs(VBG.getCurrentTime() - t);
-      if (d > 1.5) VBG.seekTo(t + 0.3, true);
-      if (VBG.getPlayerState && VBG.getPlayerState() !== 1) VBG.playVideo();
-    };
-    if (!VBG) {
-      ytApi(function () {
-        if (VBG) return;
-        VBG = new window.YT.Player("sp-vbg-yt", { width: "100%", height: "100%", videoId: m.id,
-          playerVars: { autoplay: 1, mute: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0, origin: location.origin },
-          events: { onReady: function (e) { e.target.mute(); if (vbgOn) { sync(); e.target.playVideo(); } else e.target.pauseVideo(); } } });
-      });
-    } else {
-      if (VBG.getVideoData && VBG.getVideoData().video_id !== m.id) VBG.loadVideoById(m.id);
-      sync();
-    }
-    vbgSync = setInterval(sync, 8000);
   }
   function toggleSong() {
     if (mi < 0 || !YTP || !YTP.playVideo) { playSong(mi >= 0 ? mi : 0); return; }

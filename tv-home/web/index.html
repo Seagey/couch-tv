@@ -19,7 +19,7 @@
 <div class="sp-bg" id="sp-bg" aria-hidden="true">
   <div class="sp-l on"><canvas width="32" height="18"></canvas></div>
   <div class="sp-l"><canvas width="32" height="18"></canvas></div>
-  <!-- the playing song's video, muted and blurred, while the music card has focus (app.js) -->
+  <!-- the music card's player: plays the song, and shows its video here, blurred, while the card has focus (app.js) -->
   <div class="sp-vbg"><div id="sp-vbg-yt"></div></div>
   <div class="sp-vig"></div>
 </div>
@@ -58,7 +58,7 @@
   <!-- the music card: a YouTube (Music) playlist, played here in YouTube's player (made once by app.js) -->
   <div class="sp-music" id="sp-music">
     <div class="sp-mhead" id="sp-mhead"></div>
-    <div class="sp-np" data-s="np"><div class="sp-cover" id="sp-cover"></div><div class="sp-ytw"><div id="sp-yt"></div></div></div>
+    <div class="sp-np" data-s="np"><div class="sp-cover" id="sp-cover"></div><div class="sp-pbar"><i id="sp-prog"></i></div></div>
     <div class="sp-mnow" id="sp-mnow"></div>
     <div class="sp-list"><div class="sp-songs" id="sp-songs"></div></div>
   </div>

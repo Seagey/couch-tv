@@ -1083,10 +1083,6 @@ body {
 .sp-cover { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center; }
 .sp-cover::after { content: ""; position: absolute; left: 50%; top: 50%; width: 4.5rem; height: 4.5rem; margin: -2.25rem 0 0 -2.25rem; border-radius: 50%;
   background: rgba(255, 255, 255, 0.9) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z' fill='%23111'/%3E%3C/svg%3E") 55% 50% / 2.25rem no-repeat; }
-.sp-ytw { position: absolute; top: 0; right: 0; bottom: 0; left: 0; opacity: 0; transition: opacity 400ms ease; }
-.sp-ytw iframe { width: 100%; height: 100%; border: 0; pointer-events: none; }
-.sp-music.started .sp-ytw { opacity: 1; }
-.sp-music.started:not(.playing) .sp-ytw { opacity: 0.35; }
 .sp-mnow { flex: none; margin-top: 0.875rem; height: 3.5rem; }
 .sp-mnow b { display: block; font-size: 1.5rem; line-height: 1.875rem; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sp-mnow small { display: block; font-size: 1.1875rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.66); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1126,6 +1122,28 @@ body {
   -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(18, 16, 26, 0.5);
 }
 .sp-vid .sp-vig { background: radial-gradient(120% 95% at 50% 45%, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.7) 85%); }
-/* the card's player: YouTube's title bar and logo cropped off the edges */
-.sp-ytw { overflow: hidden; }
-.sp-ytw iframe { position: absolute; left: -12%; top: -22%; width: 124% !important; height: 144% !important; }
+
+/* ---- Spotlight, lighter for the TV's GPU ----
+   The backdrop behind everything is already a soft blurred wash, so live frosted glass (backdrop-filter,
+   recomputed whenever anything behind it changes) adds cost but little look: plain tinted glass instead.
+   No slow zoom on the focused card's picture, and lighter focus shadows. */
+.theme-spot .people, .theme-spot .qbtn, .theme-spot .grid, .theme-spot .sp-music, .theme-spot .sp-wxc, .theme-spot .sp-rl,
+.theme-spot.sp-vid .sp-music, .theme-spot.sp-vid .people, .theme-spot.sp-vid .qbtn, .theme-spot.sp-vid .grid {
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.theme-spot .people, .theme-spot .qbtn, .theme-spot .grid, .theme-spot .sp-music { background: rgba(255, 255, 255, 0.11); }
+.theme-spot.sp-vid .people, .theme-spot.sp-vid .qbtn, .theme-spot.sp-vid .grid, .theme-spot.sp-vid .sp-music { background: rgba(18, 16, 26, 0.45); }
+.theme-spot .sp-card.focus .sp-art { animation: none; }
+.theme-spot .sp-card { box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.14); }
+.theme-spot .sp-card.focus, .theme-spot .sp-np.focus { box-shadow: 0 0 0 0.3125rem #fff, 0 0.75rem 1.75rem rgba(0, 0, 0, 0.45); }
+.theme-spot .sp-card, .theme-spot .sp-np, .theme-spot .app { will-change: transform; }
+
+/* the music card: the song's cover, our own progress bar, and a play or pause mark (no YouTube overlay) */
+.sp-pbar { position: absolute; left: 1rem; right: 1rem; bottom: 0.875rem; height: 0.3125rem; border-radius: 0.2rem; background: rgba(255, 255, 255, 0.3); overflow: hidden; }
+.sp-pbar i { display: block; height: 100%; width: 0; background: #fff; transition: width 1s linear; }
+.sp-music:not(.started) .sp-pbar { display: none; }
+.sp-music.playing .sp-cover::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 5h3.5v14H7zM13.5 5H17v14h-3.5z' fill='%23111'/%3E%3C/svg%3E");
+  background-position: 50% 50%; opacity: 0; transition: opacity 200ms ease;
+}
+.sp-music.playing .sp-np.focus .sp-cover::after { opacity: 1; }
