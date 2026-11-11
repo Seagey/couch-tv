@@ -1,8 +1,9 @@
 // The phone remote's words in English, Spanish (es), Mexican Spanish (es-MX, only where Mexico
-// says it differently), Italian (it), German (de) and Turkish (tr). The choice is per phone (TV menu, Language): "Same as the
-// TV" follows the TV home's Home settings, read from the bridge (/api/settings). The same languages
-// as tv-home/web/i18n.js. Messages that come from the bridge itself (errors, notes) stay in English, except the LG Developer Mode
-// warning, which the bridge sends as a key (devmode_*).
+// says it differently), Italian (it), German (de), Turkish (tr) and Serbian Latin (sr-Latn-RS).
+// The choice is per phone (TV menu, Language): "Same as the TV" follows the TV home's Home
+// settings, read from the bridge (/api/settings). French is available on the TV home, not the
+// phone remote. Messages that come from the bridge itself stay in English, except LG Developer
+// Mode warnings, which the bridge sends as keys (devmode_*).
 import { useEffect, useState } from 'react';
 
 export const LANGS = [
@@ -12,6 +13,7 @@ export const LANGS = [
   { id: 'it', name: 'Italiano', locale: 'it-IT' },
   { id: 'de', name: 'Deutsch', locale: 'de-DE' },
   { id: 'tr', name: 'Türkçe', locale: 'tr-TR' },
+  { id: 'sr-Latn-RS', name: 'Srpski (latinica)', locale: 'sr-Latn-RS' },
 ];
 
 const S = {};
@@ -807,6 +809,153 @@ S.tr = {
   reload: 'Kumandayı yeniden yükle',
 };
 
+S['sr-Latn-RS'] = {
+  // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
+  devmode_gone: 'couch-tv više nije instaliran na televizoru. Verovatno je istekao Developer Mode. Ponovo uključi Developer Mode i zatraži da se couch-tv ponovo instalira.',
+  devmode_runs_out: 'Developer Mode ističe za {days} dana, nakon čega LG uklanja couch-tv. Uključi televizor na minut da bi se produžio ili pritisni Extend u aplikaciji Developer Mode na televizoru.',
+  devmode_not_renewed_left: 'Developer Mode nije obnovljen {days} dana ({left} dana je preostalo). Obnoviće se kada se televizor sledeći put uključi.',
+  devmode_not_renewed: 'Developer Mode nije obnovljen {days} dana. Obnoviće se kada se televizor sledeći put uključi.',
+
+  both: 'Oboje',
+  whos_watching: 'Ko gleda',
+  whos_watching_change: 'Ko gleda: {name}. Promeni',
+  not_connected: 'Nije povezano',
+  connecting: 'Povezivanje…',
+  tv_not_connected: 'TV nije povezan',
+  waking: 'Buđenje…',
+  off: 'Isključeno',
+  home: 'Početni ekran',
+  on: 'Uključeno',
+  tv: 'TV',
+  more_controls: 'Još kontrola',
+  turn_off: 'Isključi TV',
+  turn_on: 'Uključi TV',
+  just_started: 'Upravo počelo',
+  min_in: '{n} min od početka',
+  st_playing: 'Reprodukcija',
+  st_paused: 'Pauzirano',
+  st_buffering: 'Učitavanje',
+  st_stopped: 'Zaustavljeno',
+  on_app: ' u aplikaciji {app}',
+  about_left: 'preostalo je oko {n} min',
+  min_left: 'preostalo je {n} min',
+  season: '{n}. sezona',
+  episode: '{n}. epizoda',
+  app_open: 'Otvorena je aplikacija {app}',
+  now_on_tv: 'Sada na TV-u',
+  tap_middle: 'Dodirni sredinu za izbor',
+  pointer_hint: 'Prevuci za pokazivač · dodirni za klik · prevuci sa dva prsta za pomeranje',
+  not_set_up_tv: 'TV {name} još nije podešen.',
+  not_set_up_tv_more: 'Potrebno je jednokratno podešavanje na tom televizoru.',
+  use_living_room: 'Koristi TV u dnevnoj sobi',
+  cant_reach: 'Ne mogu da se povežem sa TV-om.',
+  home_wifi: 'Da li je telefon povezan na kućni Wi-Fi?',
+  try_again: 'Pokušaj ponovo',
+  waking_tv: 'Buđenje televizora…',
+  turn_on_tv: 'Uključi televizor',
+  back: 'Nazad',
+  play_pause: 'Reprodukuj ili pauziraj',
+  pause: 'Pauziraj',
+  play: 'Pusti',
+  volume: 'Jačina zvuka',
+  muted: 'Utišano',
+  ask_for_show: 'Zatraži predlog emisije',
+  remote: 'Daljinski',
+  watch: 'Gledaj',
+  this_tv: 'TV: {name}',
+  this: 'Ovaj',
+  // toasts
+  cant_tell_who: 'Nije uspelo obaveštavanje TV-a o tome ko gleda',
+  didnt_wake: 'TV se nije probudio. Uključi ga njegovim daljinskim upravljačem.',
+  still_cant_reach: 'I dalje ne mogu da se povežem sa TV-om',
+  not_on_tv: '{title} je na servisu {service}, koji nije dostupan na ovom TV-u.',
+  starting: 'Pokretanje: {title}…',
+  is_on: '{title} je uključen',
+  opened: 'Otvoreno: {app}',
+  opening: 'Otvaranje: {app}',
+  not_set_up: 'Još nije podešeno',
+  sleep_needs_update: 'Tajmer za isključivanje zahteva noviju verziju računarskog dela.',
+  sleep_set: 'Tajmer za isključivanje: {n} minuta',
+  sleep_off: 'Tajmer za isključivanje je ugašen',
+  picture_now: 'Slika: {mode}',
+  sent_to_tv: 'Poslato na TV',
+  // Watch
+  keep_watching: 'Nastavi gledanje',
+  couldnt_load: 'Sada nije moguće učitati sadržaj.',
+  shows_wait: 'Emisije koje gledaš na TV-u pojaviće se ovde.',
+  loading: 'Učitavanje…',
+  apps: 'Aplikacije',
+  couldnt_load_apps: 'Sada nije moguće učitati aplikacije. Otvori Gledaj ponovo za koji trenutak.',
+  ideas_tonight: 'Predlozi za večeras',
+  suggest: 'Predloži nešto',
+  suggest_sub: 'Nekoliko predloga za večeras, na osnovu onoga što gledaš',
+  no_ideas: 'Još nema predloga. Pokušaj da zatražiš neku emisiju.',
+  couldnt_load_ideas: 'Sada nije moguće učitati predloge.',
+  screens: 'Ekrani',
+  screen_sub: 'Prikazuje se na TV-u samo kada ga otvoriš',
+  // the TV menu
+  close: 'Zatvori',
+  which_tv: 'Koji TV',
+  not_set_up_short: ' (nije podešen)',
+  picture: 'Slika',
+  picture_later: 'Režim slike radi kada se ovaj TV podesi.',
+  sleep_timer: 'Tajmer za isključivanje',
+  n_min: '{n} min',
+  sleep_chip_off: 'Isključeno',
+  turns_off_at: 'TV se isključuje u {time} (za {n} min).',
+  sleep_note: 'Isključiće TV i kada je telefon zaključan.',
+  type_on_tv: 'Kucaj na TV-u',
+  type_placeholder: 'Za polje za pretragu na TV-u',
+  type_note: 'Najpre otvori polje za pretragu na TV-u. Tekst će biti unet u trenutno otvoreno polje.',
+  send_to_tv: 'Pošalji na TV',
+  subtitles: 'Titlovi',
+  input: 'Ulaz',
+  settings: 'Podešavanja',
+  arrange_apps: 'Rasporedi aplikacije',
+  people: 'Osobe',
+  language: 'Jezik',
+  same_as_tv: 'Kao na TV-u',
+  language_note: 'Podešava se samo za ovaj telefon. Jezik TV-a bira se u Podešavanjima početnog ekrana na televizoru.',
+  // Ask
+  new_chat: 'Novi razgovor',
+  finding: 'Claude traži predlog',
+  usually: 'Obično traje 5 do 20 sekundi.',
+  carries_on: 'Nastaviće sam. Gledaj TV.',
+  idea_keep: 'Nastavi gledanje: {title}',
+  idea_bluey: 'Pusti Bluey',
+  idea_tonight: 'Preporuči nešto za večeras',
+  idea_funny: 'Nešto smešno, kraće od sat vremena',
+  idea_new: 'Šta je novo na Stan-u?',
+  reply: 'Odgovori…',
+  put_on: 'Pusti…',
+  sending_in: 'Slanje za {n} s',
+  keep_editing: 'Nastavi uređivanje',
+  talk_tip: 'Dodirni mikrofon na tastaturi i govori.',
+  talk_tip_more: 'Poruka se šalje kada prestaneš da govoriš.',
+  cant_reach_wifi: 'Ne mogu da se povežem sa TV-om. Da li je telefon na kućnom Wi-Fi-ju?',
+  // Arrange apps and People
+  arrange_lede: 'Prevuci aplikaciju pomoću ručice. Aplikacije iznad linije su u traci TV-a (najviše {max}); ostale su u Ostalim aplikacijama. Podešavanja su uvek poslednja.',
+  loading_apps: 'Učitavanje aplikacija sa TV-a…',
+  no_apps_yet: 'TV još nije poslao spisak aplikacija računaru. Pritisni Home na TV-u pa otvori ovo ponovo.',
+  more_apps: 'Ostale aplikacije',
+  dock_full: 'U traku staje {max} aplikacija, pa su ostale premeštene u Ostale aplikacije.',
+  saved_home: 'Sačuvano. Pritisni Home na TV-u da vidiš promenu.',
+  people_lede: 'Redosled je isti kao na TV-u. Prevuci ručicu da pomeriš osobu ili dodirni ime da ga promeniš.',
+  nobody: 'Još nema osoba. Dok ih ne dodaš, TV prikazuje sve.',
+  removed: 'Uklonjeno: {name}. Istorija gledanja ostaje sačuvana na računaru.',
+  added: 'Dodato: {name}.',
+  add_person: 'Dodaj osobu',
+  // first open
+  whos_phone: 'Za koga je ovaj telefon?',
+  onboard_note: 'Red Nastavi gledanje i predlozi prate osobu koja gleda. Možeš je promeniti na vrhu u bilo kom trenutku.',
+  home_screen: 'Dodaj na početni ekran',
+  home_screen_how: 'U Safariju dodirni Deli {icon}, pa {add}.',
+  add_to_home: 'Dodaj na početni ekran',
+  snag: 'Daljinski upravljač je naišao na problem.',
+  snag_note: 'Ništa na TV-u nije promenjeno.',
+  reload: 'Ponovo učitaj daljinski'
+};
+
 const KEY = 'tv.lang';          // this phone's choice: 'auto' (same as the TV) or a language
 const TV_KEY = 'tv.lang.tv';    // the TV's language, last read from the bridge
 const read = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -816,6 +965,7 @@ const known = (id) => LANGS.some((l) => l.id === id);
 function guess() {
   const n = (typeof navigator !== 'undefined' && navigator.language) || 'en';
   if (/^es-MX/i.test(n)) return 'es-MX';
+  if (/^sr(?:-|$)/i.test(n)) return 'sr-Latn-RS';
   if (/^it/i.test(n)) return 'it';
   if (/^de/i.test(n)) return 'de';
   if (/^tr/i.test(n)) return 'tr';

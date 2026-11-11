@@ -260,11 +260,12 @@ back to it. [docs/CONFIG.md](docs/CONFIG.md) has the details.
 
 **Languages.** The TV home and the phone remote both speak English, Spanish (`es`, for Spain and
 everyone else), Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest),
-Italian (`it`), German (`de`) and Turkish (`tr`), all three with a 24 hour clock unless you pick 12
-hour, and the smart home words Home Assistant uses in each. The phone has its own choice (TV menu,
-Language), "Same as the TV" by default. Messages that come from the bridge itself (an error, a note
-about how a show opened) and some screen reader labels on the phone are still in English. The TV home also speaks French
-(`fr`, 24 hour clock); the phone remote has no French yet and shows English there.
+Italian (`it`), German (`de`), Turkish (`tr`) and Serbian Latin (`sr-Latn-RS`). Italian, German,
+Turkish and Serbian use a 24 hour clock by default unless you pick 12 hour. The optional smart-home
+controls are translated too. The phone has its own choice (TV menu, Language), "Same as the TV" by
+default. Messages that come from the bridge itself
+(an error, a note about how a show opened) and some screen reader labels on the phone are still in
+English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote has no French yet.
 
 ## Three ways to run it
 
