@@ -968,7 +968,7 @@
   // ---------------- who is watching: none, a pill switch for two, a head icon and a list for more ----------------
   var PALETTE = ["#ff9f0a", "#30b350", "#0a84ff", "#bf5af2", "#ff375f", "#00a5a8", "#5e5ce6", "#ac8e68"];
   function peopleCount() { return NOBODY ? 0 : PEOPLE.length; }
-  function isHead() { return peopleCount() >= 3; }
+  function isHead() { return peopleCount() >= (SPOT ? 2 : 3); }   // Spotlight: one small button even for two
   function colourOf(p) {
     if (p.colour) return p.colour;
     for (var h = 0, i = 0; i < p.id.length; i++) h = (h * 31 + p.id.charCodeAt(i)) >>> 0;
@@ -982,10 +982,10 @@
   function renderPeople() {
     var el = $("people"), n = peopleCount();
     el.classList.toggle("none", n < 2);
-    el.classList.toggle("head", n >= 3);
-    if (n >= 3) {
+    el.classList.toggle("head", isHead());
+    if (isHead()) {
       var cur = PEOPLE[whoIndex()];
-      el.innerHTML = avatarHTML(cur) + '<span class="sr">' + esc(cur.name) + "</span>";
+      el.innerHTML = avatarHTML(cur) + '<span class="' + (SPOT ? "pname" : "sr") + '">' + esc(cur.name) + "</span>";
     } else {
       el.innerHTML = PEOPLE.map(function (p) {
         return '<span class="person' + (p.id === who ? " on" : "") + '">' + esc(p.name) + "</span>";
@@ -3185,6 +3185,8 @@
     clock();
     setInterval(clock, 15000);
     if (SPOT) {
+      // the quick buttons (sleep timer) join the place, weather and people at the top right
+      document.querySelector(".top-left").appendChild($("quick"));
       refreshWeather();
       setInterval(refreshWeather, WX_EVERY * 60000);
     } else if (NIGHT) {

@@ -249,6 +249,7 @@ object Adb {
             runCatching { shell("pm grant ${BuildConfig.APPLICATION_ID} " + if (Build.VERSION.SDK_INT >= 29) "android.permission.READ_TV_LISTINGS" else "com.android.providers.tv.permission.READ_EPG_DATA", 8000) }
             FireHome.poke()
             GoogleHome.poke()
+            Voice.start()
         }
         return true
     }

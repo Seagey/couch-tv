@@ -76,6 +76,9 @@ object GoogleHome {
 
     private fun keptOff(): Set<String> = Store.str(KEY)?.split(',')?.filter { it in WATCHED }?.toSet() ?: emptySet()
 
+    /** This TV keeps that package off (Voice switches it on only for the Assistant's results). */
+    fun keepsOff(pkg: String): Boolean = wanted && (pkg in keptOff() || isOff(pkg) == true)
+
     /** null: not installed. */
     private fun isOff(pkg: String): Boolean? = try {
         val s = App.instance.packageManager.getApplicationEnabledSetting(pkg)
@@ -93,8 +96,10 @@ object GoogleHome {
         // Remember every Google home that is switched off while this app is the home.
         val kept = keptOff() + WATCHED.filter { isOff(it) == true }
         if (kept != keptOff()) Store.putStr(KEY, kept.joinToString(","))
-        val back = kept.filter { isOff(it) == false }
-        if (back.isEmpty()) { lastResult = "ok: ${kept.joinToString().ifEmpty { "nothing to keep off" }}"; return true }
+        Voice.start()
+        // Google's home is left on while the Assistant's results need it (Voice switches it back off)
+        val back = kept.filter { isOff(it) == false && !(it == HOMES[0] && Voice.active) }
+        if (back.isEmpty()) { lastResult = "ok: ${kept.joinToString().ifEmpty { "nothing to keep off" }}" + if (Voice.active) " (on for voice search)" else ""; return true }
 
         Log.w(TAG, "switched back on: $back")
         if (!(Adb.everAllowed || Adb.paired) || !Adb.ensure()) { lastResult = "waiting for ADB to switch off $back"; return false }

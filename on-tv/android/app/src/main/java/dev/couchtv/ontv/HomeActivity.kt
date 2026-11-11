@@ -89,10 +89,24 @@ class HomeActivity : Activity() {
     override fun onNewIntent(i: Intent) { super.onNewIntent(i); js("window.tv && tv.home()") }
 
     override fun dispatchKeyEvent(e: KeyEvent): Boolean {
+        // The remote's search or mic key on this home: Google's voice search, as on Google's own home
+        // (with it switched off nothing else answers these keys here). Inside apps they are the app's.
+        if (e.keyCode == KeyEvent.KEYCODE_SEARCH || e.keyCode == KeyEvent.KEYCODE_VOICE_ASSIST || e.keyCode == KeyEvent.KEYCODE_ASSIST) {
+            if (e.action == KeyEvent.ACTION_UP) startVoice()
+            return true
+        }
         if (e.keyCode == KeyEvent.KEYCODE_BACK) { if (e.action == KeyEvent.ACTION_UP && ready) js("window.tv && tv.back()"); return true }
         // Long press MENU opens setup, so the home screen can always reach it.
         if (e.keyCode == KeyEvent.KEYCODE_MENU && e.action == KeyEvent.ACTION_UP && e.isLongPress) { startActivity(Intent(this, SetupActivity::class.java)); return true }
         return super.dispatchKeyEvent(e)
+    }
+
+    private fun startVoice() {
+        Voice.started("key")
+        for (action in listOf(Intent.ACTION_ASSIST, "android.search.action.GLOBAL_SEARCH")) {
+            val ok = runCatching { startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true }.getOrDefault(false)
+            if (ok) return
+        }
     }
 
     private fun js(code: String) { web?.takeIf { ready }?.evaluateJavascript(code, null) }
