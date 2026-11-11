@@ -70,7 +70,7 @@ object Adb {
         "connected" to connected, "route" to route, "state" to state, "error" to lastError,
         "tls_paired" to paired, "tls_port" to tlsPort, "ever_allowed" to everAllowed,
         "can_self_enable" to canWriteSecure(), "overlay" to Settings.canDrawOverlays(ctx),
-        "sdk" to Build.VERSION.SDK_INT, "probe" to lastProbe,
+        "sdk" to Build.VERSION.SDK_INT, "probe" to lastProbe, "home_guard" to GoogleHome.status(),
     )
 
     /**
@@ -248,6 +248,7 @@ object Adb {
             if (Build.VERSION.SDK_INT >= 30) runCatching { shell("pm grant ${BuildConfig.APPLICATION_ID} android.permission.WRITE_SECURE_SETTINGS", 8000) }
             runCatching { shell("pm grant ${BuildConfig.APPLICATION_ID} " + if (Build.VERSION.SDK_INT >= 29) "android.permission.READ_TV_LISTINGS" else "com.android.providers.tv.permission.READ_EPG_DATA", 8000) }
             FireHome.poke()
+            GoogleHome.poke()
         }
         return true
     }

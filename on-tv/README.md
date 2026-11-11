@@ -114,7 +114,13 @@ adb shell pm enable com.google.android.apps.tv.launcherx                  # undo
 ```
 
 Check the package name on your TV first (`adb shell pm list packages | grep launcher`). Some Google
-Home features stop working while it is off. The app never does this by itself.
+Home features stop working while it is off. The app never switches it off the first time by itself.
+
+**After a Google TV update.** An update can switch Google's home back on. While **Use as home
+screen** is on, the app remembers which Google home was switched off on this TV and switches it off
+again over the TV's own ADB (`GoogleHome.kt`): at every boot, when that package is updated or
+changed, and every 6 hours. It needs ADB connected (see above). To undo, switch **Use as home
+screen** off first (that stops the check and forgets the list), then run the enable command above.
 
 ### Fire TV (Fire OS)
 

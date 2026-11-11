@@ -145,6 +145,7 @@ class BridgeService : Service() {
         multicast = runCatching { wm.createMulticastLock("couchtv-mdns").apply { setReferenceCounted(false); acquire() } }.getOrNull()
         startServer()
         Now.start()
+        GoogleHome.start(applicationContext)   // Google TV: keep Google's home off after updates
         Thread {
             runCatching { if (Adb.everAllowed || Adb.paired) Adb.ensure() }
             FireHome.poke()   // Fire TV: keep this home on the Home key across reboots
