@@ -63,6 +63,16 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
 
     private fun authed(s: IHTTPSession) = Auth.valid(tokenOf(s))
 
+    /**
+     * After a phone or setup tool saves settings, the app order or people, the home shows them at
+     * once (#96). Saves from the home page itself (on this TV, so from 127.0.0.1) are left alone:
+     * the page already has them, and refreshing it from its own save would only repeat work.
+     */
+    private fun refreshHomeAfter(s: IHTTPSession) {
+        val from = s.headers["remote-addr"] ?: return
+        if (from != "127.0.0.1" && from != "::1" && !from.startsWith("0:0:0:0:0:0:0:1")) HomeActivity.refresh()
+    }
+
     // ---------------------------------------------------------------- API
 
     private fun api(s: IHTTPSession): Response {
@@ -181,6 +191,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 val order = b.optJSONArray("order") ?: throw ApiError(400, "order must be a list of app packages")
                 if (!b.has("line")) throw ApiError(400, "line is required")
                 Store.writeJson("app-order.json", JSONObject().put("order", order).put("line", b.optInt("line").coerceIn(0, 10)))
+                refreshHomeAfter(s)
                 json(200, appOrder())
             }
             // ---- on-TV extras ----
@@ -205,9 +216,9 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             // The TV home's people list (the same one /setup edits): the home's Home settings adds,
             // renames, removes and reorders people with it, as it does with the computer bridge.
             "GET /api/people" -> json(200, ok().put("people", Store.people()))
-            "POST /api/people" -> { savePeople(body(s)); json(200, ok().put("people", Store.people())) }
+            "POST /api/people" -> { savePeople(body(s)); refreshHomeAfter(s); json(200, ok().put("people", Store.people())) }
             "GET /api/settings" -> json(200, settings())
-            "POST /api/settings" -> { saveSettings(body(s)); json(200, settings()) }
+            "POST /api/settings" -> { saveSettings(body(s)); refreshHomeAfter(s); json(200, settings()) }
             // "Use as home screen", for a paired phone or setup tool (#96). Fire OS refuses ADB's
             // `pm enable` for the alias, so a computer cannot switch it on any other way.
             // held: whether Android itself already sends the Home key here (on a plain Android TV the

@@ -76,6 +76,7 @@ class HomeActivity : Activity() {
             }
         }
         web = w
+        shown = java.lang.ref.WeakReference(this)
         setContentView(w)
         hideBars()
         load()
@@ -193,7 +194,24 @@ class HomeActivity : Activity() {
         } catch (e: Exception) { null }
     }
 
+    override fun onDestroy() {
+        if (shown?.get() === this) shown = null
+        super.onDestroy()
+    }
+
     companion object {
+        @Volatile private var shown: java.lang.ref.WeakReference<HomeActivity>? = null
+
+        /**
+         * Shows settings saved by a phone or a setup tool straight away (#96). The home page reads
+         * them again only in tv.resume(), when it comes back on screen, so after a save from
+         * another device the dock and weather stayed as they were until Home was pressed.
+         */
+        fun refresh() {
+            val a = shown?.get() ?: return
+            a.main.post { if (!a.isFinishing && !a.isDestroyed) a.js("window.tv && tv.resume()") }
+        }
+
         private val GROUND = Color.parseColor("#0D1E19")
         private val FLAP = Color.parseColor("#131614")
     }
