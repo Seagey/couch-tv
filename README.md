@@ -621,6 +621,21 @@ do the install instead of `apply.sh`:
    It connects to the TV over Wi-Fi with ADB, so the TV asks you to allow it. Open **Setup
    Launcher**, pick couch-tv, then restart the TV.
 
+**Option A with no computer at all, making it the home** (issue #98). If couch-tv installed and
+shows up as an app but the Home button still opens the TV's own home, there is no computer step
+left. On a plain Android TV 10 or newer, couch-tv asks Android to make it the home:
+
+- Open couch-tv. The first time, it asks "Make couch-tv your home screen?" Choose Yes, then pick
+  couch-tv in Android's own screen and press **Always**. Missed it? Home settings, About, **Make
+  couch-tv your home screen** asks again. (The on-TV app, option C, does the same when you press
+  **Use as home screen** on its setup screen.)
+- Some Android TV 11 builds also show **Select a home app** the first time you press Home. Pick
+  couch-tv and **Always**.
+- **Google TV is different.** Google's own home can keep the Home button, so asking Android is not
+  enough there. A computer runs `apply.sh` once, which switches on the Home button watch that
+  brings couch-tv back when Home opens Google's.
+- Never switch off or uninstall the TV's own home. couch-tv does not need that.
+
 Good to know:
 
 - Neither app is part of couch-tv and we have not checked them. TV Launcher Manager gets the same

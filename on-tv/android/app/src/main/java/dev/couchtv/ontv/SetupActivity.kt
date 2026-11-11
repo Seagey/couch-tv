@@ -27,6 +27,7 @@ class SetupActivity : Activity() {
     private lateinit var code: TextView
     private lateinit var adb: TextView
     private lateinit var homeBtn: Button
+    private lateinit var homeNote: TextView
     private val tick = object : Runnable { override fun run() { refresh(); main.postDelayed(this, 1500) } }
     private val pinListener: (String?) -> Unit = { main.post { refresh() } }
 
@@ -58,10 +59,17 @@ class SetupActivity : Activity() {
         row.addView(connect)
         row.addView(button("New phone code") { Auth.newPin(); refresh() })
         row.addView(button("Developer options") { runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) } })
-        homeBtn = button("") { App.setHomeEnabled(this, !App.homeEnabled(this)); FireHome.poke(); refresh() }
+        homeBtn = button("") {
+            val on = !App.homeEnabled(this)
+            App.setHomeEnabled(this, on); FireHome.poke()
+            // No computer: Android's own "default home app" request (plain Android TV 10+), else its Home chooser
+            if (on && !HomeRole.googleTv(this) && !HomeRole.held(this)) HomeRole.request(this)
+            refresh()
+        }
         row.addView(homeBtn)
         row.addView(button("Forget phones") { Auth.forgetAll(); refresh() })
         col.addView(row)
+        homeNote = text("", 14f, CREAM_2); col.addView(homeNote)
         col.addView(text((if (android.os.Build.VERSION.SDK_INT >= 33) "This TV runs Android 13 or newer, so use wireless debugging pairing (Connect ADB may never get an answer). " else "") +
             "Wireless debugging (Android 11 and newer, TV on Wi-Fi): Developer options > Wireless debugging > on, allow this network, then " +
             "Pair device with pairing code, and type that code on your phone at the setup page while the code stays on screen. " +
@@ -74,6 +82,9 @@ class SetupActivity : Activity() {
 
     override fun onResume() { super.onResume(); Auth.onPin(pinListener); main.post(tick) }
     override fun onPause() { super.onPause(); Auth.offPin(pinListener); main.removeCallbacks(tick) }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data); refresh()
+    }
     override fun onNewIntent(i: Intent) { super.onNewIntent(i); refresh() }
 
     private fun refresh() {
@@ -90,6 +101,12 @@ class SetupActivity : Activity() {
             else -> "off. Opening apps and volume still work; keys need ADB." + (Adb.lastError?.let { "\n($it)" } ?: "")
         } + "   Phones paired: ${Auth.phoneCount()}"
         homeBtn.text = if (App.homeEnabled(this)) "Stop being the home screen" else "Use as home screen"
+        homeNote.text = when {
+            !App.homeEnabled(this) -> "Use as home screen asks Android to make Couch TV your home. No computer needed on a plain Android TV."
+            HomeRole.held(this) -> "Couch TV is your home screen."
+            HomeRole.googleTv(this) -> "This is Google TV, which can keep its own home on the Home button. The Home button watch needs a computer once: see the README."
+            else -> "If Android showed a list, choose Couch TV and press Always. Press the button again to ask again."
+        }
     }
 
     companion object {

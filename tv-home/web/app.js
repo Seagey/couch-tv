@@ -3154,14 +3154,17 @@
     var ver = "";
     try { ver = TV && TV.version ? TV.version() : ""; } catch (e) {}
     var run = ALONE ? "run_alone" : OFFLINE ? "run_off" : data.bridge === false ? "run_quiet" : "run_bridge";
-    return [
+    var hs = homeState(), homeRows = [];
+    if (hs === "ask") homeRows.push({ kind: "action", key: "make-home", label: t("home_row"), sub: t("home_row_sub"), act: requestHome });
+    else if (hs === "google_tv") homeRows.push(info("make-home", t("home_row"), "", t("home_google_tv")));
+    return homeRows.concat([
       info("ver", t("about_version"), ver || t("about_web")),
       info("code", t("about_code"), REPO_URL),
       info("run", t("about_running"), t(run)),
       info("kept", t("about_kept"), t(OFFLINE || data.bridge === false ? "kept_tv" : "kept_both")),
       { kind: "action", key: "reset", label: t("about_reset"), sub: t("about_reset_sub"), danger: true, confirmText: t("confirm_reset"),
         act: resetSettings }
-    ];
+    ]);
   }
   // ---- updates: couch-tv's own GitHub releases (the launcher's Updater.kt) ----
   // The launcher looks once a day while the home is on screen (switch below); "Check now" looks
@@ -3195,8 +3198,9 @@
   // Asked once: tell the household about new versions, or leave it to "Check for updates now"? Until
   // they answer nothing is checked by itself, so frequent releases never nag anyone who did not ask.
   // The setup's answer (home.updates in config.json) counts as the answer; Back counts as No.
-  var ai = 0;
+  var ai = 0, askKind = "upd";
   function updAsk() {
+    askKind = "upd";
     if (!UPD || !UPD.supported || UPD.answered) return;
     if (HOME.updates === "notify" || HOME.updates === "manual") { upd().auto(HOME.updates === "notify"); return; }
     if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;
@@ -3206,8 +3210,9 @@
   }
   function renderAsk() {
     var pop = $("gear-pop");
-    var items = [[ICONS.download, t("upd_ask_yes"), t("upd_ask_yes_sub")], [ICONS.sliders, t("upd_ask_no"), t("upd_ask_no_sub")]];
-    pop.innerHTML = '<div class="ask-h"><b>' + esc(t("upd_ask")) + "</b><small>" + esc(t("upd_ask_sub")) + "</small></div>" +
+    var home = askKind === "home", k = home ? "home_ask" : "upd_ask";
+    var items = [[home ? ICONS.apps : ICONS.download, t(k + "_yes"), t(k + "_yes_sub")], [ICONS.sliders, t(k + "_no"), t(k + "_no_sub")]];
+    pop.innerHTML = '<div class="ask-h"><b>' + esc(t(k)) + "</b><small>" + esc(t(k + "_sub")) + "</small></div>" +
       items.map(function (it, i) {
         return '<div class="grow' + (i === ai ? " focus" : "") + '" role="menuitem"><i>' + it[0] + "</i><span><b>" +
           esc(it[1]) + "</b><small>" + esc(it[2]) + "</small></span></div>";
@@ -3220,10 +3225,40 @@
     $("gear-pop").classList.remove("on", "ask");
     document.documentElement.classList.remove("gearing");
     zone = "grid";
+    if (askKind === "home") {
+      keep("tvhome.home.asked", 1);
+      startFocus();
+      paintFocus();
+      if (yes) requestHome();
+      return;
+    }
     upd().auto(yes);
     startFocus();
     paintFocus();
     status(t("upd_ask_done"));
+  }
+  // ---- making couch-tv the home with no computer (issue #98) ----
+  // Plain Android TV 10+ lets an app ask Android to make it the home (the launcher's HomeRole.kt
+  // opens the system's own chooser). Asked once, and again any time from Home settings, About.
+  // Google TV can keep its own launcher on the Home key, so there the row explains the Home
+  // button watch instead. Nothing here shows when couch-tv already is the home.
+  function homeState() {
+    try { return TV && TV.homeState ? String(TV.homeState()) : "held"; } catch (e) { return "held"; }
+  }
+  function requestHome() {
+    try { if (TV && TV.requestHome) TV.requestHome(); } catch (e) {}
+  }
+  function homeAsk() {
+    if (kept("tvhome.home.asked")) return;
+    if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;
+    if (homeState() !== "ask") return;
+    askKind = "home"; zone = "updask"; ai = 0;
+    clearFocus();
+    renderAsk();
+  }
+  function homeAnswered(held) {
+    if (zone === "settings") renderSettings();
+    status(t(held ? "home_now" : "home_not_yet"));
   }
   function updWhen(u) {
     if (!u.checked) return t("upd_never");
@@ -3857,7 +3892,9 @@
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
     // the launcher's updater has news (Updater.kt)
-    update: function (state) { updChanged(state); } };
+    update: function (state) { updChanged(state); },
+    // Android's "default home app" chooser closed (HomeRole.kt, #98)
+    homeAnswered: function (held) { homeAnswered(held); } };
 
   function start() {
     readConfig();
@@ -3922,7 +3959,7 @@
       }
       return api("POST", "/api/who", { who: who });
     }).catch(function () {});
-    hello.then(refresh).then(function () { mark("home-painted-live"); updTell(); updAsk(); });
+    hello.then(refresh).then(function () { mark("home-painted-live"); updTell(); updAsk(); homeAsk(); });
   }
 
   if (MOCK || PREVIEW) {

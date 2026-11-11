@@ -552,6 +552,17 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun launch(pkg: String): Boolean = launchPackage(pkg)
 
+        /** Is couch-tv the home? "held", "google_tv" (explain the Home button watch) or "ask" (HomeRole.kt, #98). */
+        @JavascriptInterface
+        fun homeState(): String = HomeRole.state(this@MainActivity)
+
+        /** Asks Android to make couch-tv the home (its own chooser). False when this TV has none. */
+        @JavascriptInterface
+        fun requestHome(): Boolean {
+            main.post { if (!HomeRole.request(this@MainActivity)) js("window.tv && tv.homeAnswered && tv.homeAnswered(false)") }
+            return true
+        }
+
         /** Android's Watch Next list (what each app says you are in the middle of), as JSON. */
         @JavascriptInterface
         fun watchNext(): String = readWatchNext().toString()
@@ -770,6 +781,7 @@ class MainActivity : Activity() {
     // The framework's own result callback (this app has no AndroidX, so no result API).
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == HomeRole.REQUEST) { js("window.tv && tv.homeAnswered && tv.homeAnswered(" + HomeRole.held(this) + ")"); return }
         if (requestCode != PICK_PHOTOS) return
         val uris = mutableListOf<android.net.Uri>()
         if (resultCode == RESULT_OK && data != null) {
