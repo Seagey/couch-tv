@@ -272,6 +272,9 @@
           return resolve({ ok: true, mode: picture, supported: true, can_set: true,
             modes: [{ id: "calibrated", name: "Calibrated" }, { id: "dynamic", name: "Dynamic" }] });
         }
+        if (path.indexOf("/api/bluetooth-audio") === 0) {
+          return resolve({ ok: true, supported: true });
+        }
         if (path.indexOf("/api/screens/open") === 0) return resolve({ ok: true, note: "" });
         if (path.indexOf("/api/screens") === 0) return resolve({ ok: true, screens: screens });
         resolve({ ok: true });

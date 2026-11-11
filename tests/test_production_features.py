@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bridge"))
 import config
@@ -105,6 +106,16 @@ class TestProductionFeatures(unittest.TestCase):
         self.assertNotIn("soundscape", h)
         self.assertEqual(h["look"], "night")
         self.assertNotIn("soundscape", config.quick_for({}))
+
+    def test_headphones_quick_button(self):
+        q = config.quick_for({"quick": ["sleep", "headphones", "bluetooth_audio", "invalid"]})
+        self.assertEqual(q, ["sleep", "headphones"])
+        self.assertNotIn("headphones", config.quick_for({}))
+
+    def test_clean_settings_quick_headphones(self):
+        import server
+        got = server.clean_settings({"quick": ["headphones", "bluetooth_audio", "invalid_btn"]})
+        self.assertEqual(got["quick"], ["headphones"])
 
 
 if __name__ == "__main__":

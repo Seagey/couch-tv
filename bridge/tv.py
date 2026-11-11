@@ -52,6 +52,7 @@ def ensure_adb_key(path=None):
         keygen(path)
     return path
 
+
 CLIENT_NAME = config.CLIENT_NAME
 TV_BROADCAST = os.environ.get("TV_BROADCAST", "255.255.255.255")  # Wake-on-LAN; set to your subnet broadcast if it does not wake
 # Which TVs exist (host, last IP, MAC for Wake-on-LAN, paired or not): config.json.
@@ -512,6 +513,28 @@ class TV:
             return None
         out = await self.adb("shell", "pm", "list", "packages")
         return {line.split(":", 1)[1].strip() for line in out.splitlines() if ":" in line}
+
+    async def open_bluetooth_settings(self):
+        """Open Android's own Bluetooth settings screen over ADB with a fixed command."""
+        if not await self.adb_ready():
+            raise TVUnavailable("ADB is not on")
+        out = await self.adb("shell", "am", "start", "-a", "android.settings.BLUETOOTH_SETTINGS", timeout=5)
+        if "Error" in out or "unable to resolve" in out.lower() or "not found" in out.lower():
+            # Fallback for Fire OS or devices without standard Bluetooth settings action
+            await self.adb("shell", "am", "start", "-n",
+                           "com.amazon.tv.settings.v2/.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity",
+                           timeout=5)
+
+    async def open_settings_screen(self, which):
+        """Open the TV's Bluetooth or network settings screen."""
+        if which == "bluetooth":
+            await self.open_bluetooth_settings()
+        elif which == "network":
+            if not await self.adb_ready():
+                raise TVUnavailable("ADB is not on")
+            await self.adb("shell", "am", "start", "-a", "android.settings.WIFI_SETTINGS", timeout=5)
+        else:
+            raise ValueError(f"unknown settings screen: {which}")
 
 
 class TVUnavailable(Exception):

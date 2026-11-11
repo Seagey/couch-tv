@@ -650,6 +650,15 @@ async def h_launch(request):
         await asyncio.sleep(2)
         record_action(request, "launch", {"app": target}, True)
         return ok(app=apps.describe_package(tv.current_package))
+    if target in ("bluetooth", "network") and hasattr(tv, "open_settings_screen"):
+        try:
+            await tv.open_settings_screen(target)
+            record_action(request, "launch", {"app": target}, True)
+            return ok(app=target)
+        except TVUnavailable as e:
+            raise ApiError(503, str(e))
+        except Exception as e:
+            raise ApiError(500, f"could not open {target} settings: {e}")
     app = apps.BY_ID.get(target) or apps.BY_PACKAGE.get(target)
     if app is None:
         if "." not in target:
@@ -2433,6 +2442,25 @@ async def h_picture_set(request):
     return ok(mode=picture_state.get("mode"), can_set=True)
 
 
+async def h_bluetooth_audio_get(request):
+    supported = hasattr(tv, "open_bluetooth_settings") and bool(await tv.adb_ready())
+    return ok(supported=supported)
+
+
+async def h_bluetooth_audio_set(request):
+    tv.require()
+    if not hasattr(tv, "open_bluetooth_settings"):
+        raise ApiError(409, f"Bluetooth screen is not supported on this {tv.name} TV")
+    try:
+        await tv.open_bluetooth_settings()
+        record_action(request, "bluetooth_audio", {"action": "open_settings"}, True)
+        return ok()
+    except TVUnavailable as e:
+        raise ApiError(503, str(e))
+    except Exception as e:
+        raise ApiError(500, f"could not open Bluetooth settings: {e}")
+
+
 async def set_picture(mode):
     """Filled in once the switch method is tested on the TV (see API.md, picture mode)."""
     raise ApiError(409, "picture mode switching is not set up on this TV yet")
@@ -2698,6 +2726,8 @@ def make_app():
     r.add_post("/api/import", h_import)
     r.add_get("/api/picture", h_picture_get)
     r.add_post("/api/picture", h_picture_set)
+    r.add_get("/api/bluetooth-audio", h_bluetooth_audio_get)
+    r.add_post("/api/bluetooth-audio", h_bluetooth_audio_set)
     r.add_get("/api/people", h_people_get)
     r.add_post("/api/people", h_people_set)
     r.add_get("/api/who", h_who_get)

@@ -468,6 +468,30 @@ settings over ADB and picks the row with the other name.
 - A TV without a `picture` entry answers `{"ok": true, "mode": null, "supported": false,
   "can_set": false}` and `POST` answers `409`. The bridge never reads or changes its picture mode.
 
+### `GET /api/bluetooth-audio` and `POST /api/bluetooth-audio`
+Bluetooth settings screen opener, for the home screen's `headphones` quick button.
+Opens Android's own Bluetooth settings screen on the TV.
+```json
+GET /api/bluetooth-audio
+```
+Response:
+```json
+{
+  "ok": true,
+  "supported": true
+}
+```
+Open Bluetooth settings screen:
+```json
+POST /api/bluetooth-audio
+```
+Response:
+```json
+{"ok": true}
+```
+Runs the fixed command `am start -a android.settings.BLUETOOTH_SETTINGS` over ADB with no input from the request. No MAC addresses leave the bridge.
+
+
 ### App order: `POST /api/home-apps`, `GET /api/app-order`, `POST /api/app-order`
 The order of the TV home's dock and where the More apps line sits, per TV (add `?tv=` or `"tv"`).
 The phone's Arrange apps and the TV remote (hold OK on an app) both save here, so they agree; the

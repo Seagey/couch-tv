@@ -33,7 +33,7 @@
   // read in readConfig() once the page starts (mock.js fills them in for previews). See docs/CONFIG.md.
   var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [];
   var WXCFG = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
-  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "input", "bluetooth", "network", "screensaver"];
+  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "headphones", "input", "bluetooth", "network", "screensaver"];
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
   var THEME = "night", NIGHT = true, OLED = false, CLOCK24 = false;
@@ -195,6 +195,7 @@
     switch: '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="6" height="16" rx="3"/><rect x="13" y="4" width="6" height="16" rx="3"/><circle cx="8" cy="8" r="1" class="fill"/><circle cx="16" cy="14" r="1" class="fill"/></svg>',
     hdmi: '<svg viewBox="0 0 24 24"><path d="M4 8h16v5l-3 4H7l-3-4z"/><path d="M8 8v3M11 8v3M13 8v3M16 8v3"/></svg>',
     screensaver: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="14" rx="2.5"/><path d="M15.2 7.3a3.4 3.4 0 1 0 2.1 5 3.9 3.9 0 0 1-2.1-5z"/></svg>',
+    headphones: '<svg viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>',
     bluetooth: '<svg viewBox="0 0 24 24"><path d="M6.5 7.5l11 9-5.5 4.5v-18l5.5 4.5-11 9"/></svg>',
     network: '<svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.7 12.5a9.5 9.5 0 0 1 12.6 0M8.9 16a4.8 4.8 0 0 1 6.2 0"/><circle cx="12" cy="19.3" r="1"/></svg>',
     store: '<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/></svg>',
@@ -1176,6 +1177,7 @@
   var SLEEP_CHOICES = [15, 30, 60, 90, 0];   // 0 = off
   // picture mode only exists where the bridge says this TV supports it
   var sleepEnds = null, picMode = null, picCanSet = false, picShown = false, picBusy = false, picModes = null;
+  var btShown = false;   // the bridge can open the Bluetooth screen on this TV (GET /api/bluetooth-audio)
   var qi = 0, menuI = 0, noteTimer = null, quickReady = false, quickEls = [];
 
   function note(text) {
@@ -1223,6 +1225,7 @@
       if (q === "picture") return !OFFLINE && picShown;
       if (q === "look") return true;
       if (q === "soundscape") return true;
+      if (q === "headphones") return !!(TV && TV.openSettingsScreen) || (!OFFLINE && (ON_TV || btShown));
       if (q === "input") return !OFFLINE || nativeInputs();
       if (q === "screensaver") return nativeScreensaver();
       if (q === "bluetooth" || q === "network") return ON_TV && !OFFLINE;
@@ -1265,6 +1268,8 @@
         var lbl = isPlaying ? (t("sound_" + curSound) || curSound) : t("soundscape");
         el.innerHTML = ICONS.soundscape + "<span>" + esc(lbl) + "</span>";
         el.classList.toggle("set", isPlaying);
+      } else if (q === "headphones") {
+        el.innerHTML = ICONS.headphones + "<span>" + esc(t("headphones")) + "</span>";
       } else if (q === "input") {
         el.innerHTML = ICONS.input + "<span>" + esc(t("input")) + "</span>";
       } else if (q === "screensaver") {
@@ -1428,9 +1433,22 @@
     else if (q === "picture") togglePicture();
     else if (q === "look") toggleLook();
     else if (q === "soundscape") cycleSoundscape();
+    else if (q === "headphones") openBluetoothScreen();
     else if (q === "input") openInputs();
     else if (q === "screensaver") startScreensaver();
     else if (q === "bluetooth" || q === "network") openSettingsScreen(q);
+  }
+  // Headphones: the TV's own Bluetooth screen. The launcher opens it itself, the on-TV app through
+  // its /api/launch, and the bridge with a fixed ADB command (POST /api/bluetooth-audio, no body).
+  function openBluetoothScreen() {
+    if (TV && TV.openSettingsScreen) {
+      try { TV.openSettingsScreen("bluetooth"); return; } catch (e) {}
+    }
+    if (OFFLINE) { note(t("quick_needs_bridge")); return; }
+    if (ON_TV) { openSettingsScreen("bluetooth"); return; }
+    api("POST", "/api/bluetooth-audio").catch(function (e) {
+      note(e.message || t("headphones_not_found"));
+    });
   }
   function refreshQuick() {
     var jobs = [];
@@ -1443,6 +1461,11 @@
         picMode = j.mode || null; picCanSet = !!j.can_set;
         if (j.modes && j.modes.length) picModes = j.modes;
       }, function () { picShown = false; picCanSet = false; }));
+    }
+    if (QUICK.indexOf("headphones") >= 0 && !ON_TV && !OFFLINE) {
+      jobs.push(api("GET", "/api/bluetooth-audio").then(function (j) {
+        btShown = j.supported === true;
+      }, function () { btShown = false; }));
     }
     return Promise.all(jobs).then(renderQuick);
   }
@@ -3107,6 +3130,7 @@
   function quickNeeds(q) {
     if (q === "sleep" && OFFLINE) return t("quick_needs_bridge");
     if (q === "picture" && (OFFLINE || !picShown)) return t("quick_needs_picture");
+    if (q === "headphones" && OFFLINE && !(TV && TV.openSettingsScreen)) return t("quick_needs_bridge");
     if (q === "input" && OFFLINE && !nativeInputs()) return t("quick_needs_inputs");
     if (q === "screensaver" && !nativeScreensaver()) return t("quick_needs_tv_app");
     if ((q === "bluetooth" || q === "network") && (!ON_TV || OFFLINE)) return t("quick_needs_tv_app");
