@@ -59,6 +59,8 @@
   // Home settings made on this TV with the gear tile (see "home settings" below). They win over
   // config.js. ST is the saved object; the rest are read from it in readConfig().
   var ST = {}, WX_SHOW = true, WX_F = false, WX_EVERY = 30, HIDDEN_TV = [];
+  var IDLE_PHOTO_STEPS = [0, 5, 10, 15, 30, 60];
+  var IDLE_PHOTO_SECONDS = 0, idlePhotoTimer = null, idlePhotoActive = false;
   var WX_AMBIENT = true, WX_SUN_GRADE = true;
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
   var NP_ON = true, KW_ON = true, SOUND_STYLE = "system";
@@ -255,6 +257,41 @@
   var lift = null;                   // the dock app picked up to move: {pkg}
   var newApps = [];                  // apps installed since this TV first saw its apps, until opened once
 
+  // Optional clean photo display: after the chosen delay without input, fade out the home rows while
+  // leaving the clock, date/weather and rotating scene visible. The first remote input wakes the
+  // rows without activating the focused app.
+  function idlePhotoAllowed() {
+    return IDLE_PHOTO_SECONDS > 0 && !document.hidden && !screenOffActive && !expanded && !lift &&
+      ["grid", "shelf", "people", "quick", "np"].indexOf(zone) >= 0;
+  }
+  function resetIdlePhoto() {
+    clearTimeout(idlePhotoTimer);
+    idlePhotoTimer = null;
+    idlePhotoActive = false;
+    document.documentElement.classList.remove("idle-photo");
+    if (!idlePhotoAllowed()) return;
+    idlePhotoTimer = setTimeout(function () {
+      idlePhotoTimer = null;
+      if (!idlePhotoAllowed()) return;
+      idlePhotoActive = true;
+      document.documentElement.classList.add("idle-photo");
+    }, IDLE_PHOTO_SECONDS * 1000);
+  }
+  function idlePhotoInput(e) {
+    var wakeOnly = idlePhotoActive;
+    resetIdlePhoto();
+    if (wakeOnly && e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    return wakeOnly;
+  }
+  document.addEventListener("pointerdown", function (e) { idlePhotoInput(e); }, true);
+  document.addEventListener("pointermove", function (e) {
+    if (e.movementX || e.movementY) idlePhotoInput(e);
+  }, true);
+  document.addEventListener("touchstart", function (e) { idlePhotoInput(e); }, { capture: true, passive: false });
+
   function setPeople(list) {
     PEOPLE = (list || []).filter(function (p) { return p && p.id && p.name; });
     NOBODY = !PEOPLE.length;
@@ -279,6 +316,10 @@
     HOME = CFG.home || {};
     ON_TV = CFG.mode === "on-tv";
     ST = loadSettings();
+    var savedIdle = ST.idle_photo_seconds;
+    var configuredIdle = HOME.idle_photo_seconds;
+    IDLE_PHOTO_SECONDS = IDLE_PHOTO_STEPS.indexOf(savedIdle) >= 0 ? savedIdle :
+      (IDLE_PHOTO_STEPS.indexOf(configuredIdle) >= 0 ? configuredIdle : 0);
     // the language: Home settings, then config.json, then the TV's own language if the home speaks it
     if (window.I18N) window.I18N.set(ST.lang || HOME.language || window.I18N.device());
     if (CFG.weather) WXCFG = CFG.weather;
@@ -729,7 +770,10 @@
     try { v.load(); } catch (e) {}
   }
   function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); }
-  document.addEventListener("visibilitychange", function () { if (document.hidden) pauseVideo(); else { startVideo(); if (window.AmbientWeather) window.AmbientWeather.resume(); } });
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) pauseVideo();
+    else { startVideo(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); }
+  });
 
   function showScene(i) {
     var prev = scene;
@@ -1372,6 +1416,7 @@
       try { if (TV && TV.setScreenOff) TV.setScreenOff(false); } catch (e) {}
       paintFocus();
     }
+    resetIdlePhoto();
   }
   // The TV's own input list (HDMI, a console, a set top box): the TV_INPUT key through the bridge,
   // or straight from the launcher when there is no bridge (only where the TV has such a screen).
@@ -2621,6 +2666,7 @@
     if (window.AmbientWeather) window.AmbientWeather.resume();
     if (SET.dirty) { SET.dirty = false; restart(); return; }
     paintFocus();
+    resetIdlePhoto();
   }
 
   // ---- rows ----
@@ -2818,6 +2864,12 @@
     rows.push({ kind: "cycle", key: "clock", label: t("clock"), value: CLOCK24 ? t("clock_24") : t("clock_12"), act: function () {
       CLOCK24 = !CLOCK24; ST.clock = CLOCK24 ? "24h" : "12h"; saveSettings(); glassShown = ""; clock();
     } });
+    rows.push({ kind: "cycle", key: "idle-photo-seconds", label: t("idle_photo"), sub: t("idle_photo_sub"),
+      value: IDLE_PHOTO_SECONDS ? t("n_secs", { n: IDLE_PHOTO_SECONDS }) : t("off"), act: function () {
+        var i = IDLE_PHOTO_STEPS.indexOf(IDLE_PHOTO_SECONDS);
+        IDLE_PHOTO_SECONDS = IDLE_PHOTO_STEPS[(i + 1) % IDLE_PHOTO_STEPS.length];
+        ST.idle_photo_seconds = IDLE_PHOTO_SECONDS; saveSettings(); resetIdlePhoto();
+      } });
     // the TV's own screensaver (Google TV's Ambient mode) and the albums it shows
     rows.push(head(t("ambient_head")));
     rows.push({ kind: "action", key: "ambient", label: t("ambient_settings"), sub: t("ambient_settings_sub"),
@@ -3634,6 +3686,7 @@
   // couch-tv has no system home behind it, so it opens couch-tv's own gear menu, like the gear tile.
   function isSettings(e) { return e.key === "Settings" || e.key === "TvSettings" || e.keyCode === 176; }
   function settingsKey() {
+    if (idlePhotoInput(null)) return;
     if (zone === "gear" || zone === "settings" || zone === "smart" || zone === "appmenu" || zone === "shelfmenu" || zone === "updask" || zone === "inputs") { goHome(); return; }
     openGear();
   }
@@ -3771,6 +3824,7 @@
       pointTo(p, true);
       if (p.zone === "settings" && p.sec !== undefined) return;   // choosing a section is the whole click
       activate();
+      resetIdlePhoto();
     });
   }
 
@@ -3781,13 +3835,14 @@
       toggleScreenOff(false);
       return;
     }
+    if (idlePhotoInput(e)) return;
     if (typingKey(e)) return;   // typing a place or a name: the keys belong to the text box
     if (isOk(e)) {
       e.preventDefault();
       if (e.repeat || okDown) return;   // a held key repeating: the timer is already running
       okDown = true; okHeld = false;
       blip(0, 0);
-      okTimer = setTimeout(function () { okHeld = true; if (!hold()) activate(); ensureFocus(); }, HOLD_MS);
+      okTimer = setTimeout(function () { okHeld = true; if (!hold()) activate(); ensureFocus(); resetIdlePhoto(); }, HOLD_MS);
       return;
     }
     var arrow = arrowOf(e);
@@ -3798,6 +3853,7 @@
     else { ensureFocus(); return; }                   // anything else is not ours: Android gets it
     e.preventDefault();
     ensureFocus();
+    resetIdlePhoto();
   });
   document.addEventListener("keyup", function (e) {
     if (screenOffActive) {
@@ -3812,6 +3868,7 @@
     okReset();
     if (!held) activate();
     ensureFocus();
+    resetIdlePhoto();
   });
   window.addEventListener("blur", okReset);
 
@@ -3969,14 +4026,15 @@
 
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
-  window.tv = { back: goHome, home: function () { if (zone === "settings") closeSettings(); else goHome(); refresh(); },
+  window.tv = { back: function () { if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); },
+    home: function () { if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); },
     screenOff: function () { toggleScreenOff(true); },
     wakeScreen: function () { toggleScreenOff(false); },
     isScreenOff: function () { return screenOffActive; },
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { toggleScreenOff(false); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); if (window.AmbientWeather) window.AmbientWeather.resume(); },
+    resume: function () { toggleScreenOff(false); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
     pause: pauseVideo,
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
@@ -4060,6 +4118,7 @@
       return api("POST", "/api/who", { who: who });
     }).catch(function () {});
     hello.then(refresh).then(function () { mark("home-painted-live"); updTell(); updAsk(); homeAsk(); });
+    resetIdlePhoto();
   }
 
   if (MOCK || PREVIEW) {
