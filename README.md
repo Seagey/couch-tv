@@ -266,6 +266,7 @@ buttons. A paused song stays for ten minutes. It needs option B or C: Android do
 ordinary app see what other apps play, so option A has no card. Home settings, Look, Now playing
 switches it off. The cover comes from Apple's free music search. Thanks alonmustafa (#31). On main,
 in the next release: a full screen Now playing view with the album art, off to start (#84).
+**Show Keep watching** (Home settings, Look, or `home.keep_watching`, on main, in the next release): switch it off to hide the whole row and stop fetching it.
 **Navigation sound** (Home settings, Look, Sound): the TV's own click, a soft tap, or none (#32).
 With Glass panels on, Home settings and the menus are glass too, and focus moves more calmly (#32, #33).
 

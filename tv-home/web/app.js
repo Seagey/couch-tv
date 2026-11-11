@@ -61,7 +61,7 @@
   var ST = {}, WX_SHOW = true, WX_F = false, WX_EVERY = 30, HIDDEN_TV = [];
   var WX_AMBIENT = true, WX_SUN_GRADE = true;
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
-  var NP_ON = true, SOUND_STYLE = "system";
+  var NP_ON = true, KW_ON = true, SOUND_STYLE = "system";
   // Ambient sleep soundscapes (rain, fire, waves, brown noise)
   var SOUND_TYPE = "off", SOUND_VOL = 0.5, SOUND_FADE_SLEEP = true;
   function initSoundscape() {
@@ -312,6 +312,9 @@
     // glass app icons (#25): set in Home settings, else home.glass_icons; off unless switched on
     GLASS_ICONS = typeof ST.glass_icons === "boolean" ? ST.glass_icons : HOME.glass_icons === true;
     NP_ON = typeof ST.now_playing === "boolean" ? ST.now_playing : HOME.now_playing !== false;
+    // the Keep watching row: Home settings win over home.keep_watching; off hides it and stops fetching it
+    KW_ON = typeof ST.keep_watching === "boolean" ? ST.keep_watching : HOME.keep_watching !== false;
+    document.documentElement.classList.toggle("kw-off", !KW_ON);
     // the full screen music view is off until it is switched on in Home settings or home.ambient_music
     AMBIENT_MUSIC = typeof ST.ambient_music === "boolean" ? ST.ambient_music : HOME.ambient_music === true;
     GLASS_FOCUS = (ST.glass_focus || HOME.glass_focus) === "glass" ? "glass" : "colour";
@@ -1089,7 +1092,7 @@
     el.classList.toggle("on", on);
     if (NIGHT) {
       // the row shows while someone has a show on the go, or while a song plays
-      var anyone = PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
+      var anyone = KW_ON && PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
       $("shelf-section").classList.toggle("empty", !anyone && !on);
       $("np-slot").classList.toggle("on", on);
     }
@@ -1602,13 +1605,14 @@
   var KEEP_MAX = 10;
   function renderShelf() {
     var track = $("shelf");
-    data.shows = (data.showsBy[who] || []).slice(0, KEEP_MAX);
-    var anyone = PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
+    data.shows = KW_ON ? (data.showsBy[who] || []).slice(0, KEEP_MAX) : [];
+    var anyone = KW_ON && PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
     // nobody has anything on the go: no empty box, the photo has the space (unless Now playing
     // is up at night). The people switcher stays: with nothing yet (Netflix tells Android nothing on
     // some TVs, issue #23) it is the only way to say who is watching before anything is played.
     $("shelf-section").classList.toggle("empty", !anyone && !(NIGHT && npVisible()));
     renderPeople();
+    if (!KW_ON) { track.innerHTML = ""; shelfEls = []; return; }   // row switched off: nothing to draw, the section is closed up
     if (!data.shows.length) {
       var name = PEOPLE[whoIndex()].name;
       track.innerHTML = '<p class="shelf-none">' + esc(peopleCount() < 2 ? t("nothing_yet") : t("nothing_for", { name: name })) + "</p>";
@@ -2857,6 +2861,13 @@
       MOVING = !MOVING; ST.moving_tiles = MOVING; saveSettings(); movingTiles();
     } });
     // a slow box (#58): no blur, no soft shadows, a still photo and smaller pictures, all in one switch
+    // the whole Keep watching row, heading and all (home.keep_watching): off closes the gap and stops fetching it
+    rows.push({ kind: "toggle", key: "keep-watching", label: t("keep_show"), value: KW_ON ? t("on") : t("off"), act: function () {
+      KW_ON = !KW_ON; ST.keep_watching = KW_ON; saveSettings();
+      document.documentElement.classList.toggle("kw-off", !KW_ON);
+      if (!KW_ON) { data.shows = []; shelfEls = []; s = 0; }
+      renderShelf(); renderNp();
+    } });
     rows.push({ kind: "toggle", key: "lighter", label: t("lighter"), value: LIGHTER ? t("on") : t("off"), act: function () {
       LIGHTER = !LIGHTER; ST.lighter = LIGHTER; saveSettings();
       document.documentElement.classList.toggle("lighter", LIGHTER); ambientSync(); movingTiles(); renderShelf(); paintFocus();
@@ -3878,7 +3889,7 @@
       else if (window.MOCK_APPS) data.apps = sortApps(window.MOCK_APPS.slice());
       data.bridge = false;
       // Keep watching with no computer: Android's own Watch Next list, the same for everyone in the house
-      if (TV && TV.watchNext) {
+      if (TV && TV.watchNext && KW_ON) {
         var wn = [];
         try { wn = JSON.parse(TV.watchNext()) || []; } catch (e) {}
         var skipPkgs = (window.COUCH_CONFIG && window.COUCH_CONFIG.home && window.COUCH_CONFIG.home.skip_watch_next) || [];
@@ -3905,6 +3916,7 @@
     }, function () {});
     var jobs = [
       people.then(function () {
+        if (!KW_ON) return null;   // Keep watching is off: no calls for it
         return Promise.all(PEOPLE.map(function (p) {
           return api("GET", "/api/continue?who=" + p.id, null, 9000).then(function (j) {
             var dismissed = kept("tvhome.dismissed_shows") || [];
@@ -3930,7 +3942,7 @@
       syncSettings(),
       // Android's Watch Next rows: this app may read them, the bridge's ADB may not. They name a
       // play an app gave no title for (Netflix sends none, Prime only its own name, issue #23).
-      sendWatchNext()
+      KW_ON ? sendWatchNext() : Promise.resolve()
     ];
     return Promise.all(jobs.map(function (p) { return p.then(function () { return true; }, function () { return false; }); }))
       .then(function (ok) {

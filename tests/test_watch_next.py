@@ -39,6 +39,14 @@ class TestWatchNextLogic(unittest.TestCase):
         })
         self.assertEqual(res_custom["skip_watch_next"], ["com.tcl.browser", "com.example.spam"])
 
+    def test_keep_watching_toggle_validation(self):
+        """Verify home.keep_watching is only emitted for a real boolean."""
+        self.assertNotIn("keep_watching", config._home({}))
+        self.assertIs(config._home({"keep_watching": False})["keep_watching"], False)
+        self.assertIs(config._home({"keep_watching": True})["keep_watching"], True)
+        self.assertNotIn("keep_watching", config._home({"keep_watching": "no"}))
+        self.assertNotIn("keep_watching", config._home({"keep_watching": 0}))
+
     def test_watch_next_per_app_default_and_bounds(self):
         """Verify watch_next_per_app defaults to 5 and is clamped between 1 and 20."""
         self.assertEqual(config._home({})["watch_next_per_app"], 5)
