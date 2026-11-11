@@ -36,7 +36,10 @@ object Music {
         val l = last
         if (pick == null && l != null && System.currentTimeMillis() - l.second < PAUSE_KEEP_MS)
             pick = found.firstOrNull { it.pkg == l.first && (it.state == "PAUSED" || it.state == "STOPPED") }
-        if (pick == null || Tv.genericTitle(pick.title, pick.pkg)) return item
+        // A title made only of digits ("911", "1999") is a real song when the app names the artist
+        // too; genericTitle alone would drop it as a placeholder (seen with Damso's "911" on Spotify).
+        val numericSong = pick != null && !pick.subtitle.isNullOrBlank() && pick.title!!.trim().all { it.isDigit() }
+        if (pick == null || (!numericSong && Tv.genericTitle(pick.title, pick.pkg))) return item
         if (pick.state == "PLAYING") last = pick.pkg to System.currentTimeMillis()
         val key = "${(pick.subtitle ?: "").lowercase()}\n${pick.title!!.lowercase()}"
         if (!art.containsKey(key) && pending.add(key)) {
