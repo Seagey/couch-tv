@@ -162,6 +162,7 @@ Home settings saves to the same `bridge/data/people.json` the phone uses.
   "look": "night",
   "scenes": ["night", "golden", "water", "fog", "dawn"],
   "scene_seconds": 20,
+  "idle_photo_seconds": 0,
   "clock": "12h",
   "dock_size": 10,
   "hide_packages": [],
@@ -176,6 +177,7 @@ Home settings saves to the same `bridge/data/people.json` the phone uses.
 | `my_scenes` [none] | Your own scenes from any photo, each with its clock designed: where it sits, its size and font, the date above or below it, light or dark text, and `cutout` for the skyline in front of the clock. Made with `tv-home/tools/make-scene.py`; [MAKE-A-SCENE.md](MAKE-A-SCENE.md) has every key. They take turns after the scenes in `scenes` unless they are listed there. Option A needs the app rebuilt with the scene's pictures inside (that guide says how). |
 | `scene_seconds` [20] | How long each scene shows. 5 or more. |
 | `clock` [the language's usual clock: `24h` in Italian, German, Turkish, French and Serbian, `12h` in the others] | `12h` (5:30 pm) or `24h` (17:30). |
+| `idle_photo_seconds` [`0`] | `0` leaves rows on. `5`, `10`, `15`, `30` or `60` fades out the app dock, Keep watching and profile controls after that many seconds without input. The clock, weather and background scenes stay visible. Any remote button wakes the rows without opening the focused app. Home settings, Look, Hide rows when idle wins over it. |
 | `hide_packages` [none] | Android package names never shown on the home or in More apps, for a maker's own clutter (help apps, file browsers, screen sharing tools). `survey-tv.py` lists every TV app with its package name. For example `["com.example.tvhelp"]`. |
 | `updates` [none: the TV asks once] | The answer to "tell you when a new couch-tv version is out?", asked at setup: `notify` (the TV home looks on GitHub once a week and puts a dot on the gear tile) or `manual` (nothing by itself; Home settings, Updates, Check for updates now). Used only until the TV has an answer; after that the switch in Home settings, Updates wins. Option C has no updates. |
 | `glass` [`off`] | Glass panels behind the clock, Keep watching and the apps: `on` (clear, softly blurred, with a light edge), `lite` (the same panels with no blur, for older or slower TVs) or `off`. Home settings, Look, Glass panels wins over it. |

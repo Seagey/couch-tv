@@ -23,6 +23,7 @@
 //   wxfx=1              home.ambient_weather: rain, snow and fog over the scenes (off unless set)
 //   sungrade=1          home.ambient_sun_grade: the sun's colour over the scenes (off unless set)
 //                       (also ?test_wx=<WMO code, 63 rain, 73 snow, 45 fog, 95 storm> and ?test_alt=<sun height, degrees>)
+//   idle=<seconds|off>   home.idle_photo_seconds: hide the rows after 5, 10, 15, 30 or 60 seconds
 //   inputs=4            the Input button lists four HDMI ports (one eARC), as the launcher reads them
 //   gfocus=glass        home.glass_focus: with glass app icons, the focused app stays glass
 //   music=1             Now playing: a pretend song in Spotify (music=paused: paused; music=noart: no cover)
@@ -66,6 +67,7 @@
   }
   if (arg("picture")) cfg.tvs[0].picture_modes = ["Calibrated", "Dynamic"];
   if (arg("look")) cfg.home.look = arg("look");
+  if (arg("idle")) cfg.home.idle_photo_seconds = arg("idle") === "off" ? 0 : Number(arg("idle"));
   if (arg("soundscape")) cfg.home.soundscape = arg("soundscape");
   if (arg("clock")) cfg.home.clock = arg("clock");
   if (arg("lang")) cfg.home.language = arg("lang");
