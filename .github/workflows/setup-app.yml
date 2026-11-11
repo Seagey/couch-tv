@@ -1,0 +1,118 @@
+# Builds couch-tv Setup (setup-app/) for Apple silicon Macs, Intel Macs and Windows, and tests each
+# build: the unit tests, then the built app's own pairing self test and a start and stop.
+# When a couch-tv release is published, the three zips and their SHA256SUMS-setup.txt are added to
+# that same release, so the APKs and the setup app always come from one release (a separate setup
+# release would become "latest" and hide the APKs from the TV home's update check).
+#
+# Shape adapted from couch-tv-setup by killy10o10 (.github/workflows/build.yml, MIT,
+# Copyright (c) 2026 killy10o10). Actions are pinned to commits; Python packages to hashes.
+name: Setup app
+
+on:
+  push:
+    paths: ["setup-app/**", ".github/workflows/setup-app.yml"]
+  pull_request:
+    paths: ["setup-app/**", ".github/workflows/setup-app.yml"]
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: mac-apple-silicon
+            os: macos-14
+          - name: mac-intel
+            os: macos-15-intel
+          - name: windows
+            os: windows-2022
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: setup-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065   # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install (hash checked)
+        run: |
+          python -m pip install --disable-pip-version-check --require-hashes -r requirements.txt
+          python -m pip install --disable-pip-version-check pyinstaller==6.16.0
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Build
+        run: |
+          SEP=$(python -c "import os; print(os.pathsep)")
+          pyinstaller --noconfirm --windowed --name "couch-tv Setup" \
+            --osx-bundle-identifier app.couchtv.setup \
+            --add-data "couchtv_setup/web${SEP}couchtv_setup/web" \
+            --add-data "THIRD-PARTY.md${SEP}." \
+            --add-data "../LICENSE${SEP}." \
+            --collect-data certifi \
+            --copy-metadata adb-shell --copy-metadata cryptography --copy-metadata pyOpenSSL \
+            --copy-metadata rsa --copy-metadata pyasn1 --copy-metadata cffi --copy-metadata pycparser \
+            --copy-metadata typing_extensions --copy-metadata certifi \
+            couch-tv-setup.py
+
+      - name: Package (Mac)
+        if: runner.os == 'macOS'
+        run: |
+          APP="dist/couch-tv Setup.app"
+          # No Dock icon or window of its own: the setup is the browser page, and the app stops by
+          # itself on Close setup or a few minutes after the page is closed.
+          plutil -insert LSUIElement -bool true "$APP/Contents/Info.plist"
+          # Ad hoc signature only (no paid Apple account): macOS asks once, see setup-app/README.md.
+          codesign --force --deep --sign - "$APP"
+          echo "PROGRAM=$APP/Contents/MacOS/couch-tv Setup" >> "$GITHUB_ENV"
+          ditto -c -k --keepParent "$APP" "dist/couch-tv-Setup-${{ matrix.name }}.zip"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # A folder with "couch-tv Setup.exe" in it, not one big .exe: antivirus programs flag those far more.
+          echo "PROGRAM=dist/couch-tv Setup/couch-tv Setup.exe" >> "$GITHUB_ENV"
+          python -c "import shutil; shutil.make_archive('dist/couch-tv-Setup-${{ matrix.name }}', 'zip', 'dist', 'couch-tv Setup')"
+
+      - name: Smoke test the built app
+        run: python tests/smoke.py "$PROGRAM"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
+        with:
+          name: couch-tv-Setup-${{ matrix.name }}
+          path: setup-app/dist/couch-tv-Setup-${{ matrix.name }}.zip
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # only this job, only to add the zips to the release that was just published
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        with:
+          path: out
+          merge-multiple: true
+      - name: Add to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          cd out
+          sha256sum couch-tv-Setup-*.zip > SHA256SUMS-setup.txt
+          cat SHA256SUMS-setup.txt
+          gh release upload "$TAG" couch-tv-Setup-*.zip SHA256SUMS-setup.txt --repo "$GITHUB_REPOSITORY" --clobber

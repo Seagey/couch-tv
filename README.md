@@ -358,6 +358,25 @@ Later, once Developer options are on (step 1), `check-tv.py <tv address> --adb` 
 Android version and the maker. That one makes the TV ask "Allow USB debugging?" and saves this
 computer's key in `~/.android/adbkey`, so it waits until you have decided to go ahead.
 
+## The easy way: couch-tv Setup
+
+A free app for Mac and Windows that puts couch-tv's home screen on a **Google TV, Android TV or
+Fire TV** with no command line and no AI agent. It opens a page in your browser and walks you
+through it: Developer options with the TV remote, a 6 digit code (Google TV) or one Allow press,
+then it installs couch-tv from this repo's Releases, checks it, sets it up the way `apply.sh` does
+(option A), and can add the phone remote. It shows the plan and waits for your yes before it
+changes anything, and it can undo all of it. Download and how to open it the first time:
+[setup-app/README.md](setup-app/README.md). Samsung, LG and Roku still need the steps below.
+
+The Fire TV setup builds on couch-tv-setup by killy10o10.
+
+### Community tools
+
+Made by people outside this repo, not checked by us after the version named:
+- [couch-tv-setup](https://github.com/killy10o10/couch-tv-setup) by killy10o10: a setup app for
+  couch-tv's "lives on the TV" app on Fire TV sticks, with an optional switch off for Amazon's
+  advert and tracking apps (we reviewed v0.1.2: [setup-app/REVIEW-killy10o10.md](setup-app/REVIEW-killy10o10.md)).
+
 ## Setting it up with an AI agent
 
 Open this folder in Claude Code (or any coding agent) and say "set this up on my TV". It reads
@@ -852,5 +871,8 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
 - The Bluetooth and Network buttons, Amazon YouTube support and the Fire TV Stick guide came from
   the [killy10o10 fork](https://github.com/killy10o10/couch-tv); the unpaired TV guard from the
   [Justin1491 fork](https://github.com/Justin1491/couch-tv).
+- couch-tv Setup (`setup-app/`): the Fire TV setup builds on
+  [couch-tv-setup](https://github.com/killy10o10/couch-tv-setup) by killy10o10 (MIT); the reused
+  parts and their notice are in `setup-app/THIRD-PARTY.md`.
 
 MIT licence, see `LICENSE`.
