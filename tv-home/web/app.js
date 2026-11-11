@@ -1155,7 +1155,7 @@
   var SLEEP_CHOICES = [15, 30, 60, 90, 0];   // 0 = off
   // picture mode only exists where the bridge says this TV supports it
   var sleepEnds = null, picMode = null, picCanSet = false, picShown = false, picBusy = false, picModes = null;
-  var btAudioConnected = false, btAudioConnecting = false, btAudioDeviceName = null, btAudioSupported = false;
+  var btAudioSupported = false;
   var qi = 0, menuI = 0, noteTimer = null, quickReady = false, quickEls = [];
 
   function note(text) {
@@ -1204,7 +1204,7 @@
       if (q === "look") return true;
       if (q === "soundscape") return true;
       if (q === "headphones" || q === "bluetooth_audio") {
-        return !OFFLINE || (window.MOCK_HEADPHONES !== undefined) || !!(TV && TV.canBluetoothAudio && TV.canBluetoothAudio());
+        return !OFFLINE || (window.MOCK_HEADPHONES !== undefined) || !!(TV && TV.openSettingsScreen) || ON_TV;
       }
       if (q === "input") return !OFFLINE || nativeInputs();
       if (q === "screensaver") return nativeScreensaver();
@@ -1249,11 +1249,7 @@
         el.innerHTML = ICONS.soundscape + "<span>" + esc(lbl) + "</span>";
         el.classList.toggle("set", isPlaying);
       } else if (q === "headphones" || q === "bluetooth_audio") {
-        var devName = btAudioDeviceName || (TVCFG.bluetooth_audio && TVCFG.bluetooth_audio.name) || t("headphones");
-        var hLbl = btAudioConnecting ? t("headphones_connecting") : (btAudioConnected ? devName : (devName + ": " + t("timer_off")));
-        el.innerHTML = ICONS.headphones + "<span>" + esc(hLbl) + "</span>";
-        el.classList.toggle("set", !!btAudioConnected);
-        el.classList.toggle("busy", !!btAudioConnecting);
+        el.innerHTML = ICONS.headphones + "<span>" + esc(t("headphones")) + "</span>";
       } else if (q === "input") {
         el.innerHTML = ICONS.input + "<span>" + esc(t("input")) + "</span>";
       } else if (q === "screensaver") {
@@ -1417,38 +1413,28 @@
     else if (q === "picture") togglePicture();
     else if (q === "look") toggleLook();
     else if (q === "soundscape") cycleSoundscape();
-    else if (q === "headphones" || q === "bluetooth_audio") toggleHeadphones();
+    else if (q === "headphones" || q === "bluetooth_audio") openBluetoothScreen();
     else if (q === "input") openInputs();
     else if (q === "screensaver") startScreensaver();
     else if (q === "bluetooth" || q === "network") openSettingsScreen(q);
   }
-  function toggleHeadphones() {
+  function openBluetoothScreen() {
+    if (TV && TV.openSettingsScreen) {
+      try { TV.openSettingsScreen("bluetooth"); return; } catch (e) {}
+    }
     if (OFFLINE) {
       if (window.MOCK_HEADPHONES !== undefined) {
-        window.MOCK_HEADPHONES = !window.MOCK_HEADPHONES;
-        btAudioConnected = !!window.MOCK_HEADPHONES;
-        renderQuick();
+        note(t("headphones"));
         return;
       }
       note(t("quick_needs_bridge"));
       return;
     }
-    if (btAudioConnecting) return;
-    btAudioConnecting = true;
-    renderQuick();
-    api("POST", "/api/bluetooth-audio", { action: "toggle" }, 15000)
-      .then(function (j) {
-        btAudioConnecting = false;
-        if (j.connected !== undefined) btAudioConnected = !!j.connected;
-        if (j.device && j.device.name) btAudioDeviceName = j.device.name;
-        renderQuick();
-      })
-      .catch(function (e) {
-        btAudioConnecting = false;
-        renderQuick();
-        note(e.message || t("headphones_not_found"));
-      });
+    api("POST", "/api/bluetooth-audio").catch(function (e) {
+      note(e.message || t("headphones_not_found"));
+    });
   }
+  var toggleHeadphones = openBluetoothScreen;
   function refreshQuick() {
     var jobs = [];
     if (QUICK.indexOf("sleep") >= 0) {
@@ -1464,12 +1450,8 @@
     if (QUICK.indexOf("headphones") >= 0 || QUICK.indexOf("bluetooth_audio") >= 0) {
       jobs.push(api("GET", "/api/bluetooth-audio").then(function (j) {
         btAudioSupported = j.supported !== false;
-        btAudioConnected = !!j.connected;
-        btAudioConnecting = !!j.connecting;
-        if (j.device && j.device.name) btAudioDeviceName = j.device.name;
       }, function () {
         btAudioSupported = false;
-        btAudioConnected = false;
       }));
     }
     return Promise.all(jobs).then(renderQuick);

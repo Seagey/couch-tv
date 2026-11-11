@@ -469,8 +469,8 @@ settings over ADB and picks the row with the other name.
   "can_set": false}` and `POST` answers `409`. The bridge never reads or changes its picture mode.
 
 ### `GET /api/bluetooth-audio` and `POST /api/bluetooth-audio`
-Bluetooth headphones switcher ("Night Listening"), for the home screen's quick toggle and the phone remote.
-Inspects active audio routing (A2DP) and connects or disconnects paired Bluetooth headphones.
+Bluetooth settings screen opener, for the home screen's `headphones` quick button.
+Opens Android's own Bluetooth settings screen on the TV.
 ```json
 GET /api/bluetooth-audio
 ```
@@ -478,19 +478,18 @@ Response:
 ```json
 {
   "ok": true,
-  "supported": true,
-  "connected": true,
-  "connecting": false,
-  "device": {"name": "AirPods Pro", "mac": "<mac-address>"},
-  "devices": [{"name": "AirPods Pro", "mac": "<mac-address>"}]
+  "supported": true
 }
 ```
-Toggle or change connection:
+Open Bluetooth settings screen:
 ```json
 POST /api/bluetooth-audio
-{"action": "toggle"}
 ```
-`action` can be `"toggle"`, `"connect"`, or `"disconnect"`. An optional `"mac"` can target a specific paired device address. When audio state changes, the updated state is broadcast to all clients in `/api/now` via SSE (`/api/events`).
+Response:
+```json
+{"ok": true}
+```
+Runs the fixed command `am start -a android.settings.BLUETOOTH_SETTINGS` over ADB with no input from the request. No MAC addresses leave the bridge.
 
 
 ### App order: `POST /api/home-apps`, `GET /api/app-order`, `POST /api/app-order`

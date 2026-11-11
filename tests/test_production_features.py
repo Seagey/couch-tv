@@ -116,13 +116,6 @@ class TestProductionFeatures(unittest.TestCase):
         got = server.clean_settings({"quick": ["headphones", "bluetooth_audio", "invalid_btn"]})
         self.assertEqual(got["quick"], ["headphones", "bluetooth_audio"])
 
-    def test_config_public_includes_bluetooth_audio(self):
-        tv_cfg = {"id": "tv1", "name": "TV 1", "bluetooth_audio": "AirPods Pro"}
-        with patch.object(config, "TVS", [tv_cfg]):
-            pub = config.public()
-            self.assertEqual(len(pub["tvs"]), 1)
-            self.assertEqual(pub["tvs"][0]["bluetooth_audio"], {"name": "AirPods Pro", "mac": None})
-
 
 if __name__ == "__main__":
     unittest.main()

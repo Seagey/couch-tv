@@ -198,7 +198,6 @@
 
   var sleepEnds = /[?&]sleep\b/.test(q) ? new Date(Date.now() + 42 * 60000).toISOString() : null;
   var picture = "calibrated";
-  var mockHeadphonesConnected = arg("headphones") === "1" || arg("headphones") === "on";
   // pretend songs for ?music= (made up, with the scenes as covers)
   var SONGS = [["Golden Hour Drive", "The Weekend Shifts", "scene-golden"], ["Low Tide", "Saltwater Radio", "scene-water"],
                ["Fog Lights", "Northern Rivers Club", "scene-fog"]];
@@ -274,20 +273,7 @@
             modes: [{ id: "calibrated", name: "Calibrated" }, { id: "dynamic", name: "Dynamic" }] });
         }
         if (path.indexOf("/api/bluetooth-audio") === 0) {
-          if (method === "POST") {
-            if (body && body.action === "connect") mockHeadphonesConnected = true;
-            else if (body && body.action === "disconnect") mockHeadphonesConnected = false;
-            else mockHeadphonesConnected = !mockHeadphonesConnected;
-          }
-          var mockMac = ["AA", "BB", "CC", "DD", "EE", "FF"].join(":");
-          return resolve({
-            ok: true,
-            supported: true,
-            connected: mockHeadphonesConnected,
-            connecting: false,
-            device: { name: arg("headphones_name") || "AirPods Pro", mac: mockMac },
-            devices: [{ name: arg("headphones_name") || "AirPods Pro", mac: mockMac }]
-          });
+          return resolve({ ok: true, supported: true });
         }
         if (path.indexOf("/api/screens/open") === 0) return resolve({ ok: true, note: "" });
         if (path.indexOf("/api/screens") === 0) return resolve({ ok: true, screens: screens });

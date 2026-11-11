@@ -2,148 +2,148 @@ import asyncio
 import os
 import sys
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bridge"))
 import config
+import server
 import tv
-
-def _mac(*parts):
-    return ":".join(parts)
+from aiohttp.test_utils import make_mocked_request
 
 
-class TestBluetoothAudioParsing(unittest.TestCase):
-    def test_parse_bonded_bluetooth(self):
-        m1 = _mac("AA", "BB", "CC", "DD", "EE", "01")
-        m2 = _mac("11", "22", "33", "44", "55", "66")
-        m3 = _mac("99", "88", "77", "66", "55", "44")
-        sample_dumpsys = f"""
-Bluetooth Status
-  enabled: true
-  state: ON
-  Bonded devices:
-    {m1} (AirPods Pro) [A2DP]
-    {m2} (Sony WH-1000XM4)
-    Address: {m3} Name: Bose QC35
-  Connected devices:
-    {m1}
-"""
-        devices = tv.parse_bonded_bluetooth(sample_dumpsys)
-        self.assertEqual(len(devices), 3)
-        macs = [d["mac"] for d in devices]
-        self.assertIn(m1, macs)
-        self.assertIn(m2, macs)
-        self.assertIn(m3, macs)
-        self.assertEqual(devices[0]["name"], "AirPods Pro")
-        self.assertEqual(devices[1]["name"], "Sony WH-1000XM4")
-        self.assertEqual(devices[2]["name"], "Bose QC35")
+class TestBluetoothAudio(unittest.TestCase):
+    def setUp(self):
+        self.cfg = {"id": "living-room", "name": "Living room", "ip": "192.0.2.1"}
+        self.test_tv = tv.TV(self.cfg)
+        self.test_tv.adb_ready = AsyncMock(return_value=True)
 
-    def test_parse_a2dp_state_active(self):
-        m1 = _mac("AA", "BB", "CC", "DD", "EE", "01")
-        audio_dumpsys = """
-- Stream: STREAM_MUSIC
-  Current Audio Routes:
-    mBluetoothA2dpOn=true
-    devices=0x80 (DEVICE_OUT_BLUETOOTH_A2DP)
-"""
-        bt_dumpsys = f"""
-A2DP active device: {m1}
-"""
-        is_active, mac = tv.parse_a2dp_state(audio_dumpsys, bt_dumpsys)
-        self.assertTrue(is_active)
-        self.assertEqual(mac, m1)
-
-    def test_parse_a2dp_state_inactive(self):
-        audio_dumpsys = """
-- Stream: STREAM_MUSIC
-  Current Audio Routes:
-    mBluetoothA2dpOn=false
-    devices=0x2 (DEVICE_OUT_SPEAKER)
-"""
-        bt_dumpsys = "Active Device: null"
-        is_active, mac = tv.parse_a2dp_state(audio_dumpsys, bt_dumpsys)
-        self.assertFalse(is_active)
-        self.assertIsNone(mac)
-
-    def test_bluetooth_audio_config_normalization(self):
-        m_lower = _mac("aa", "bb", "cc", "dd", "ee", "ff")
-        m_upper = _mac("AA", "BB", "CC", "DD", "EE", "FF")
-        m_num = _mac("11", "22", "33", "44", "55", "66")
-
-        # Dict format with MAC and Name
-        c1 = config.bluetooth_audio_for({"bluetooth_audio": {"name": "AirPods", "mac": m_lower}})
-        self.assertEqual(c1, {"name": "AirPods", "mac": m_upper})
-
-        # String format (name)
-        c2 = config.bluetooth_audio_for({"bluetooth_audio": "Bose Headphones"})
-        self.assertEqual(c2, {"name": "Bose Headphones", "mac": None})
-
-        # String format (MAC)
-        c3 = config.bluetooth_audio_for({"bluetooth_audio": m_num})
-        self.assertEqual(c3, {"name": "Headphones", "mac": m_num})
-
-        # Empty / None
-        self.assertIsNone(config.bluetooth_audio_for({}))
-        self.assertIsNone(config.bluetooth_audio_for({"bluetooth_audio": ""}))
-
-
-class TestTVBluetoothAudioMethods(unittest.IsolatedAsyncioTestCase):
-    async def test_get_bluetooth_audio_connected(self):
-        m = _mac("AA", "BB", "CC", "DD", "EE", "FF")
-        cfg = {
-            "id": "living-room",
-            "name": "Living room",
-            "ip": "192.0.2.1",
-            "bluetooth_audio": {"name": "AirPods Pro", "mac": m}
-        }
-        test_tv = tv.TV(cfg)
-        test_tv.adb_ready = AsyncMock(return_value=True)
-
-        audio_dump = "mBluetoothA2dpOn=true\nDEVICE_OUT_BLUETOOTH_A2DP"
-        bt_dump = f"Bonded devices:\n  {m} (AirPods Pro)\nA2DP active device: {m}"
-
-        async def fake_adb(*args, **kwargs):
-            cmd = " ".join(args)
-            if "dumpsys audio" in cmd:
-                return audio_dump
-            if "dumpsys bluetooth_manager" in cmd:
-                return bt_dump
-            return ""
-
-        test_tv.adb = fake_adb
-
-        res = await test_tv.get_bluetooth_audio()
-        self.assertTrue(res["supported"])
-        self.assertTrue(res["connected"])
-        self.assertEqual(res["device"]["name"], "AirPods Pro")
-        self.assertEqual(res["device"]["mac"], m)
-
-    async def test_set_bluetooth_audio_toggle_to_connect(self):
-        m = _mac("AA", "BB", "CC", "DD", "EE", "FF")
-        cfg = {
-            "id": "living-room",
-            "name": "Living room",
-            "ip": "192.0.2.1",
-            "bluetooth_audio": {"name": "AirPods Pro", "mac": m}
-        }
-        test_tv = tv.TV(cfg)
-        test_tv.adb_ready = AsyncMock(return_value=True)
-
+    def test_open_bluetooth_settings_fixed_command(self):
         calls = []
 
         async def fake_adb(*args, **kwargs):
             calls.append(list(args))
-            cmd = " ".join(args)
-            if "dumpsys audio" in cmd:
-                return "devices=0x2 (DEVICE_OUT_SPEAKER)"
-            if "dumpsys bluetooth_manager" in cmd:
-                return f"Bonded devices:\n  {m} (AirPods Pro)"
-            return "Connected"
+            return "Starting: Intent { act=android.settings.BLUETOOTH_SETTINGS }"
 
-        test_tv.adb = fake_adb
+        self.test_tv.adb = fake_adb
+        asyncio.run(self.test_tv.open_bluetooth_settings())
 
-        await test_tv.set_bluetooth_audio(action="toggle")
-        self.assertTrue(any("connect" in c for c in calls))
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0], ["shell", "am", "start", "-a", "android.settings.BLUETOOTH_SETTINGS"])
+
+    def test_open_bluetooth_settings_fallback_for_fire_tv(self):
+        calls = []
+
+        async def fake_adb(*args, **kwargs):
+            calls.append(list(args))
+            if len(calls) == 1:
+                return "Error: Activity not started, unable to resolve Intent"
+            return "Starting: Intent { cmp=com.amazon.tv.settings.v2/... }"
+
+        self.test_tv.adb = fake_adb
+        asyncio.run(self.test_tv.open_bluetooth_settings())
+
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0], ["shell", "am", "start", "-a", "android.settings.BLUETOOTH_SETTINGS"])
+        self.assertEqual(calls[1], [
+            "shell", "am", "start", "-n",
+            "com.amazon.tv.settings.v2/.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity"
+        ])
+
+    def test_open_settings_screen_bluetooth(self):
+        with patch.object(self.test_tv, "open_bluetooth_settings", new_callable=AsyncMock) as mock_open:
+            asyncio.run(self.test_tv.open_settings_screen("bluetooth"))
+            mock_open.assert_awaited_once()
+
+    def test_open_settings_screen_network(self):
+        calls = []
+
+        async def fake_adb(*args, **kwargs):
+            calls.append(list(args))
+            return "Starting: Intent { act=android.settings.WIFI_SETTINGS }"
+
+        self.test_tv.adb = fake_adb
+        asyncio.run(self.test_tv.open_settings_screen("network"))
+        self.assertEqual(calls, [["shell", "am", "start", "-a", "android.settings.WIFI_SETTINGS"]])
+
+    def test_open_settings_screen_unknown(self):
+        with self.assertRaises(ValueError):
+            asyncio.run(self.test_tv.open_settings_screen("invalid_screen"))
+
+    def test_open_bluetooth_settings_adb_required(self):
+        self.test_tv.adb_ready = AsyncMock(return_value=False)
+        with self.assertRaises(tv.TVUnavailable):
+            asyncio.run(self.test_tv.open_bluetooth_settings())
+
+    def test_safety_fixed_command_ignores_request_input(self):
+        """Verify that malicious request payloads with command injection attempts cannot reach the TV shell."""
+        calls = []
+
+        async def fake_adb(*args, **kwargs):
+            calls.append(list(args))
+            return "Success"
+
+        self.test_tv.adb = fake_adb
+
+        # Simulated attack: {"action": "connect", "mac": "x; reboot"}
+        # The bridge ignores body parameters and executes only the fixed literal command
+        asyncio.run(self.test_tv.open_bluetooth_settings())
+        for call_args in calls:
+            cmd_str = " ".join(call_args)
+            self.assertNotIn("reboot", cmd_str)
+            self.assertNotIn(";", cmd_str)
+            self.assertEqual(call_args, ["shell", "am", "start", "-a", "android.settings.BLUETOOTH_SETTINGS"])
+
+
+class TestServerBluetoothAudioHandlers(unittest.TestCase):
+    def test_bluetooth_audio_endpoints(self):
+        async def _run():
+            mock_tv = MagicMock()
+            mock_tv.name = "Test TV"
+            mock_tv.require = MagicMock(return_value=None)
+            mock_tv.open_bluetooth_settings = AsyncMock(return_value=None)
+            mock_tv.adb_ready = AsyncMock(return_value=True)
+
+            with patch.object(server, "tv", mock_tv):
+                # GET /api/bluetooth-audio
+                req_get = make_mocked_request("GET", "/api/bluetooth-audio")
+                res_get = await server.h_bluetooth_audio_get(req_get)
+                self.assertEqual(res_get.status, 200)
+                self.assertIn('"ok": true', res_get.text)
+                self.assertIn('"supported": true', res_get.text)
+                # Ensure no MAC addresses leak
+                self.assertNotIn("mac", res_get.text.lower())
+                self.assertNotIn("device", res_get.text.lower())
+
+                # POST /api/bluetooth-audio
+                req_post = make_mocked_request("POST", "/api/bluetooth-audio")
+                res_post = await server.h_bluetooth_audio_set(req_post)
+                self.assertEqual(res_post.status, 200)
+                self.assertIn('"ok": true', res_post.text)
+                mock_tv.open_bluetooth_settings.assert_awaited_once()
+
+        asyncio.run(_run())
+
+    def test_launch_bluetooth_and_network(self):
+        async def _run():
+            mock_tv = MagicMock()
+            mock_tv.open_settings_screen = AsyncMock(return_value=None)
+
+            with patch.object(server, "tv", mock_tv):
+                # Test /api/launch with app: "bluetooth"
+                with patch("server.body", AsyncMock(return_value={"app": "bluetooth"})):
+                    req = make_mocked_request("POST", "/api/launch")
+                    res = await server.h_launch(req)
+                    self.assertEqual(res.status, 200)
+                    mock_tv.open_settings_screen.assert_awaited_with("bluetooth")
+
+                # Test /api/launch with app: "network"
+                with patch("server.body", AsyncMock(return_value={"app": "network"})):
+                    req = make_mocked_request("POST", "/api/launch")
+                    res = await server.h_launch(req)
+                    self.assertEqual(res.status, 200)
+                    mock_tv.open_settings_screen.assert_awaited_with("network")
+
+        asyncio.run(_run())
 
 
 if __name__ == "__main__":

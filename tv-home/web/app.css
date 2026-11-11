@@ -118,15 +118,7 @@ body {
 .qbtn.set { background: rgba(16, 16, 20, 0.66); box-shadow: inset 0 0 0 0.125rem rgba(255, 255, 255, 0.5); }
 .qbtn.off { color: rgba(255, 255, 255, 0.55); }
 .qbtn.busy { opacity: 0.7; }
-.qbtn#q-headphones.set, .qbtn#q-bluetooth_audio.set {
-  background: rgba(10, 132, 255, 0.28);
-  box-shadow: inset 0 0 0 0.125rem rgba(10, 132, 255, 0.65);
-  color: #fff;
-}
-.qbtn#q-headphones.set.focus, .qbtn#q-bluetooth_audio.set.focus {
-  background: #fff;
-  color: #0a84ff;
-}
+.qbtn#q-headphones, .qbtn#q-bluetooth_audio {}
 .qbtn.focus { background: #fff; color: #111; transform: scale(1.08); box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.35); }
 /* the sleep choices: a short list straight under the Sleep timer button (app.js sets its right edge) */
 .sleep-menu {

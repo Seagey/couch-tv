@@ -53,60 +53,6 @@ def ensure_adb_key(path=None):
     return path
 
 
-def parse_bonded_bluetooth(output):
-    """Extract bonded bluetooth devices (name and MAC) from dumpsys bluetooth_manager."""
-    if not output:
-        return []
-    devices = []
-    seen_macs = set()
-    mac_re = re.compile(r"([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})")
-    for line in output.splitlines():
-        m = mac_re.search(line)
-        if m:
-            mac = m.group(1).upper()
-            if mac in seen_macs:
-                continue
-            seen_macs.add(mac)
-            name = ""
-            for pat in [r"Name:\s*([^\],;\r\n]+)", r"\(([^)]+)\)", r"\[([^\]]+)\]"]:
-                nm = re.search(pat, line)
-                if nm and nm.group(1).strip() and not mac_re.search(nm.group(1)):
-                    name = nm.group(1).strip()
-                    break
-            if not name:
-                rest = line.replace(m.group(0), "").strip(" :()[]\t-")
-                clean_rest = re.sub(r"(Address|Device|Bonded|State|Type|mBondedDevices):?", "", rest, flags=re.I).strip(" :()[]\t-")
-                if clean_rest and len(clean_rest) < 50 and not mac_re.search(clean_rest):
-                    name = clean_rest
-            name = name or f"Bluetooth ({mac[-5:]})"
-            devices.append({"name": name, "mac": mac})
-    return devices
-
-
-def parse_a2dp_state(audio_out, bt_out):
-    """Detect whether Bluetooth A2DP audio is actively routed and which device if present."""
-    audio_out = audio_out or ""
-    bt_out = bt_out or ""
-    a2dp_on = False
-    active_mac = None
-
-    combined = audio_out + "\n" + bt_out
-    if re.search(r"mBluetoothA2dpOn\s*=\s*true", audio_out, re.I) or \
-       re.search(r"DEVICE_OUT_BLUETOOTH_A2DP", audio_out) or \
-       re.search(r"devices=0x80\b", audio_out) or \
-       re.search(r"devices=0x[0-9a-fA-F]*80\b", audio_out) or \
-       re.search(r"A2dp.*Connected.*true", bt_out, re.I) or \
-       (re.search(r"state:\s*connected", bt_out, re.I) and "a2dp" in bt_out.lower()):
-        a2dp_on = True
-
-    m_active = re.search(r"(?:Active Device|A2DP active device|Connected.*A2DP)[^\r\n]*?([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})", combined, re.I)
-    if m_active:
-        active_mac = m_active.group(1).upper()
-        a2dp_on = True
-
-    return a2dp_on, active_mac
-
-
 CLIENT_NAME = config.CLIENT_NAME
 TV_BROADCAST = os.environ.get("TV_BROADCAST", "255.255.255.255")  # Wake-on-LAN; set to your subnet broadcast if it does not wake
 # Which TVs exist (host, last IP, MAC for Wake-on-LAN, paired or not): config.json.
@@ -190,15 +136,12 @@ class TV:
         # Picture mode: which number in `settings get global picture_mode` is which mode, and
         # whether switching has been tested on this TV. Filled in config.json once found.
         self.picture_cfg = config.picture_cfg(cfg.get("picture"))
-        self.bluetooth_audio_cfg = config.bluetooth_audio_for(cfg)
         # Wake-on-LAN is tried when a mac is set, unless "wake_on_lan": false.
         self.wake_on_lan = cfg.get("wake_on_lan", True) is not False
         # Per-TV state the server keeps (what is playing, sleep timer, picture mode, ...).
         self.state = {"playing": {"item": None}, "media_now": {}, "seen_playing": {},
                       "sleep": {"ends": None, "handle": None}, "waking": {"on": False},
-                      "installed": {"packages": None, "checked": 0.0}, "picture": {},
-                      "bluetooth_audio": {"connected": False, "connecting": False,
-                                          "device": self.bluetooth_audio_cfg, "checked": 0.0}}
+                      "installed": {"packages": None, "checked": 0.0}, "picture": {}}
         self.remote = None
         self.connected = False
         self.adb_ok = False
@@ -571,101 +514,27 @@ class TV:
         out = await self.adb("shell", "pm", "list", "packages")
         return {line.split(":", 1)[1].strip() for line in out.splitlines() if ":" in line}
 
-    async def get_bluetooth_audio(self):
-        """Read Bluetooth audio status (active A2DP connection and paired devices)."""
-        cfg_dev = self.bluetooth_audio_cfg
-        if not await self.adb_ready():
-            return {
-                "supported": bool(cfg_dev),
-                "connected": False,
-                "connecting": False,
-                "device": cfg_dev,
-                "devices": [cfg_dev] if cfg_dev else []
-            }
-
-        try:
-            out_audio = await self.adb("shell", "dumpsys audio", timeout=5)
-        except Exception:
-            out_audio = ""
-
-        try:
-            out_bt = await self.adb("shell", "dumpsys bluetooth_manager", timeout=5)
-        except Exception:
-            out_bt = ""
-
-        bonded = parse_bonded_bluetooth(out_bt)
-        a2dp_connected, active_mac = parse_a2dp_state(out_audio, out_bt)
-
-        chosen_device = None
-        if cfg_dev:
-            for b in bonded:
-                if (cfg_dev.get("mac") and b.get("mac") == cfg_dev["mac"]) or \
-                   (cfg_dev.get("name") and cfg_dev["name"].lower() in b.get("name", "").lower()):
-                    chosen_device = b
-                    break
-            if not chosen_device:
-                chosen_device = cfg_dev
-        elif bonded:
-            chosen_device = bonded[0]
-
-        is_connected = False
-        if a2dp_connected:
-            if active_mac and chosen_device and chosen_device.get("mac"):
-                is_connected = (active_mac.upper() == chosen_device["mac"].upper())
-            else:
-                is_connected = True
-
-        st = self.state.setdefault("bluetooth_audio", {})
-        st["connected"] = is_connected
-        st["device"] = chosen_device
-
-        return {
-            "supported": True,
-            "connected": is_connected,
-            "connecting": bool(st.get("connecting", False)),
-            "device": chosen_device,
-            "devices": bonded
-        }
-
-    async def set_bluetooth_audio(self, action="toggle", target_mac=None):
-        """Connect, disconnect, or toggle Bluetooth headphones."""
+    async def open_bluetooth_settings(self):
+        """Open Android's own Bluetooth settings screen over ADB with a fixed command."""
         if not await self.adb_ready():
             raise TVUnavailable("ADB is not on")
+        out = await self.adb("shell", "am", "start", "-a", "android.settings.BLUETOOTH_SETTINGS", timeout=5)
+        if "Error" in out or "unable to resolve" in out.lower() or "not found" in out.lower():
+            # Fallback for Fire OS or devices without standard Bluetooth settings action
+            await self.adb("shell", "am", "start", "-n",
+                           "com.amazon.tv.settings.v2/.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity",
+                           timeout=5)
 
-        cur = await self.get_bluetooth_audio()
-        target = None
-        if target_mac:
-            target = {"mac": target_mac, "name": "Headphones"}
-        elif cur.get("device"):
-            target = cur["device"]
-        elif cur.get("devices"):
-            target = cur["devices"][0]
-
-        mac = target.get("mac") if target else None
-        want_connect = not cur.get("connected") if action == "toggle" else (action == "connect")
-
-        st = self.state.setdefault("bluetooth_audio", {})
-        st["connecting"] = True
-        try:
-            if want_connect:
-                if mac:
-                    res = await self.adb("shell", "cmd", "bluetooth", "connect", mac, timeout=10)
-                    if not res or "Error" in res or "not found" in res or "Unknown command" in res:
-                        await self.adb("shell", "service", "call", "bluetooth_a2dp", "1", "s16", mac, timeout=5)
-                else:
-                    await self.adb("shell", "am", "start", "-a", "android.settings.BLUETOOTH_SETTINGS", timeout=5)
-            else:
-                if mac:
-                    res = await self.adb("shell", "cmd", "bluetooth", "disconnect", mac, timeout=10)
-                    if not res or "Error" in res or "not found" in res or "Unknown command" in res:
-                        await self.adb("shell", "service", "call", "bluetooth_a2dp", "2", "s16", mac, timeout=5)
-                else:
-                    await self.adb("shell", "am", "start", "-a", "android.settings.BLUETOOTH_SETTINGS", timeout=5)
-            st["connected"] = want_connect
-            if target:
-                st["device"] = target
-        finally:
-            st["connecting"] = False
+    async def open_settings_screen(self, which):
+        """Open the TV's Bluetooth or network settings screen."""
+        if which == "bluetooth":
+            await self.open_bluetooth_settings()
+        elif which == "network":
+            if not await self.adb_ready():
+                raise TVUnavailable("ADB is not on")
+            await self.adb("shell", "am", "start", "-a", "android.settings.WIFI_SETTINGS", timeout=5)
+        else:
+            raise ValueError(f"unknown settings screen: {which}")
 
 
 class TVUnavailable(Exception):
