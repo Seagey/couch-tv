@@ -27,7 +27,7 @@ jobs:
       matrix:
         include:
           - name: mac-apple-silicon
-            os: macos-14
+            os: macos-15          # Apple silicon (macos-14 is retired)
           - name: mac-intel
             os: macos-15-intel
           - name: windows
