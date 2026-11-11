@@ -1058,3 +1058,55 @@ body {
 .theme-spot .top-left .quick { margin-top: 0; }
 .theme-spot .top-left .qbtn { min-width: 4.25rem; height: 4.25rem; padding: 0 1.25rem; border-radius: 2.125rem; }
 .theme-spot .top-left .qbtn svg { width: 1.875rem; height: 1.875rem; }
+
+/* Spotlight, round three: weather is a quiet line under the date; the four big apps in a 2x2; the
+   YouTube Music card on the right plays a playlist in place */
+.theme-spot .sp-wx { display: none; }
+.theme-spot .date { max-width: none; }
+.theme-spot .date .dline { display: block; }
+.sp-dwx { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.375rem; font-size: 1.5rem; line-height: 2rem; font-weight: 450; color: rgba(255, 255, 255, 0.7); white-space: nowrap; }
+.sp-dwx svg { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+.sp-music {
+  position: absolute; left: 84.5rem; top: 15.75rem; width: 28rem; height: 36rem; padding: 1.375rem 1.5rem; border-radius: 1.875rem;
+  display: flex; flex-direction: column; pointer-events: auto; overflow: hidden;
+  background: rgba(255, 255, 255, 0.1); -webkit-backdrop-filter: blur(1.75rem) saturate(170%); backdrop-filter: blur(1.75rem) saturate(170%);
+  box-shadow: inset 0 0.09rem 0 rgba(255, 255, 255, 0.36), inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.14), 0 1.5rem 3.5rem rgba(0, 0, 0, 0.3);
+}
+.sp-mhead { display: flex; align-items: center; gap: 0.875rem; height: 3rem; flex: none; }
+.sp-mhead img { width: 2.75rem; height: 2.75rem; border-radius: 0.75rem; }
+.sp-mhead b { display: block; font-size: 1.5rem; line-height: 1.75rem; font-weight: 640; }
+.sp-mhead small { display: block; font-size: 1.125rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 21rem; }
+.sp-np { position: relative; flex: none; margin-top: 1rem; height: 14rem; border-radius: 1.25rem; overflow: hidden; background: #000;
+  transition: transform 260ms var(--ease), box-shadow 260ms var(--ease); }
+.sp-np.focus { transform: scale(1.04); box-shadow: 0 0 0 0.3125rem #fff, 0 1.5rem 3rem rgba(0, 0, 0, 0.5); z-index: 2; }
+.sp-cover { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center; }
+.sp-cover::after { content: ""; position: absolute; left: 50%; top: 50%; width: 4.5rem; height: 4.5rem; margin: -2.25rem 0 0 -2.25rem; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z' fill='%23111'/%3E%3C/svg%3E") 55% 50% / 2.25rem no-repeat; }
+.sp-ytw { position: absolute; top: 0; right: 0; bottom: 0; left: 0; opacity: 0; transition: opacity 400ms ease; }
+.sp-ytw iframe { width: 100%; height: 100%; border: 0; pointer-events: none; }
+.sp-music.started .sp-ytw { opacity: 1; }
+.sp-music.started:not(.playing) .sp-ytw { opacity: 0.35; }
+.sp-mnow { flex: none; margin-top: 0.875rem; height: 3.5rem; }
+.sp-mnow b { display: block; font-size: 1.5rem; line-height: 1.875rem; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-mnow small { display: block; font-size: 1.1875rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.66); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-list { flex: 1; min-height: 0; margin: 0.75rem -0.625rem 0; padding: 0 0.625rem; overflow: hidden; }
+.sp-songs { transition: transform 300ms var(--ease); }
+.sp-song { display: flex; align-items: center; gap: 0.875rem; height: 3.75rem; padding: 0 0.625rem; margin: 0 -0.625rem 0.25rem; border-radius: 0.875rem;
+  transition: background 200ms ease, transform 200ms var(--ease); }
+.sp-song img { flex: none; width: 2.875rem; height: 2.875rem; border-radius: 0.5rem; object-fit: cover; }
+.sp-song div { flex: 1; min-width: 0; }
+.sp-song b { display: block; font-size: 1.3125rem; line-height: 1.625rem; font-weight: 580; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-song small { display: block; font-size: 1.0625rem; line-height: 1.375rem; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-song.focus { background: #fff; color: #111; transform: scale(1.02); }
+.sp-song.focus small { color: rgba(0, 0, 0, 0.6); }
+.sp-song.blocked { opacity: 0.45; }
+.sp-eq { display: none; align-items: flex-end; gap: 0.1875rem; width: 1.25rem; height: 1.125rem; }
+.sp-eq span { width: 0.25rem; height: 100%; background: currentColor; border-radius: 0.125rem; animation: speq 900ms ease-in-out infinite alternate; }
+.sp-eq span:nth-child(2) { animation-delay: -300ms; } .sp-eq span:nth-child(3) { animation-delay: -600ms; }
+@keyframes speq { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+.sp-eq span { transform-origin: bottom; }
+.sp-song.now .sp-eq { display: flex; }
+.sp-music:not(.playing) .sp-eq span { animation-play-state: paused; }
+.sp-none { font-size: 1.25rem; color: rgba(255, 255, 255, 0.6); }
+@media (prefers-reduced-motion: reduce) { .sp-eq span { animation: none; } }

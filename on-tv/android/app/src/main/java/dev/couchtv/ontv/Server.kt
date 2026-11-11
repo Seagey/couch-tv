@@ -171,6 +171,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "GET /api/screenshot" -> newFixedLengthResponse(Response.Status.OK, "image/png", Tv.screenshot().inputStream(), -1).noStore()
             "GET /api/weather" -> json(200, ok(Weather.get() ?: throw ApiError(503, "No weather right now.")))
             "GET /api/rows" -> json(200, ok(Rows.all()))
+            "GET /api/playlist" -> json(200, ok(Playlist.get()))
             "POST /api/rows/open" -> {
                 val id = body(s).optString("id").ifEmpty { throw ApiError(400, "id is required") }
                 if (!Rows.open(id)) throw ApiError(404, "That show can't be opened from here.")
@@ -334,6 +335,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 .put("place", w.optString("place").take(40)).put("timezone", w.optString("timezone", "UTC").take(40)).toString())
             Weather.clear()
         }
+        if (b.has("music_playlist")) Playlist.set(b.optString("music_playlist"))
         b.optString("country").takeIf { Regex("[A-Z]{2}").matches(it) }?.let { Store.putStr("country", it) }
         b.optString("tv_name").trim().takeIf { it.isNotEmpty() }?.let { Store.putStr("tv_name", it.take(30)) }
         if (b.has("ask_key")) Store.putStr("ask_key", b.optString("ask_key").trim().ifEmpty { null })

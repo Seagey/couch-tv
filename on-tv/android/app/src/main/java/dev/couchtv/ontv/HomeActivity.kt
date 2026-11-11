@@ -40,7 +40,9 @@ class HomeActivity : Activity() {
     private var ready = false
     private val banners = ConcurrentHashMap<String, ByteArray>()
     private val icons = ConcurrentHashMap<String, ByteArray>()
-    private val base get() = "http://127.0.0.1:${Store.port}"
+    // "localhost", not 127.0.0.1: YouTube's embedded player refuses most label music on a page whose
+    // address is a bare IP (error 150), and the Spotlight music card plays songs in that player.
+    private val base get() = "http://localhost:${Store.port}"
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)

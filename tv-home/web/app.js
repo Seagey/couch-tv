@@ -393,13 +393,18 @@
     var loc = window.I18N ? window.I18N.locale() : "en-AU";
     var day = d.toLocaleDateString(loc, { weekday: "long", day: "numeric", month: "long" }).replace(",", "");
     day = day.charAt(0).toUpperCase() + day.slice(1);   // "lunes 27 de octubre" starts a line on screen
-    var w = NIGHT && !SPOT && WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
+    var w = NIGHT && WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
+    if (SPOT) {   // one quiet line under the date: "☁ 25° Cloudy · Bangalore"
+      var pl = (w && w.place) || WXCFG.place || "";
+      $("date").innerHTML = '<span class="dline">' + esc(day) + "</span>" + (w ? '<span class="sp-dwx">' + wxIcon(w) + esc(tempText(w.temp)) +
+        " " + esc(wxText(w)) + (pl ? " · " + esc(pl) : "") + "</span>" : "");
+      w = null;
+    } else
     $("date").innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' + wxIcon(w) + esc(tempText(w.temp)) +
       '<span class="ww"> ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
     fitDate();
     document.body.classList.toggle("night", h >= 21 || h < 6);
     if (NIGHT && !SPOT) glassClock(hm);
-    if (SPOT) spotWeather();
     if (quickReady) renderQuick();
   }
 
@@ -1423,14 +1428,9 @@
   // and stretched over the screen: a soft wash of its colours that costs the TV almost nothing.
   var spEls = [], spItems = [], si = 2, spRows = [], ri = 0, ci = 0, rowsOpen = false, SPR = null;
   var spSrc = "", spLayer = 0, spLoad = 0;
-  // rem at 1920x1080 (1rem = 16px there)
-  var SP_SLOTS = [
-    { k: "wx", x: 7.5, y: 20.5, w: 25, h: 13.25 },
-    { k: 1, x: 7.5, y: 35.25, w: 25, h: 13.25 },
-    { k: 0, x: 35, y: 20.5, w: 50, h: 28, hero: true },
-    { k: 2, x: 87.5, y: 20.5, w: 25, h: 13.25 },
-    { k: 3, x: 87.5, y: 35.25, w: 25, h: 13.25 }
-  ];
+  // rem at 1920x1080 (1rem = 16px there): the four big apps in a 2x2, the music card on the right
+  var SP_APPS = ["com.netflix.ninja", "in.startv.hotstar", "com.amazon.amazonvideo.livingroom", "com.google.android.youtube.tv"];
+  var SP_GRID = { x: 7.5, y: 15.75, w: 36.5, h: 17, gx: 2, gy: 2 };
   function spTiles() {
     var out = [];
     spRows.forEach(function (r) { if (r.els) out = out.concat(r.els); });
@@ -1477,53 +1477,151 @@
       (it.progress ? '<span class="sp-bar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "") +
       (big ? '<span class="sp-pill">' + ICONS.play + esc(t("sp_resume")) + "</span>" : "") + "</div>";
   }
-  function spWxHTML() {
-    var w = WX_SHOW ? data.weather : null, place = (w && w.place) || WXCFG.place || "";
-    var h = '<div class="sp-k">' + esc(place || t("sp_weather")) + "</div>";
-    if (!w || w.temp == null) return h + '<div class="sp-wt"><b>–</b></div>';
-    return h + '<div class="sp-wt"><b>' + esc(tempText(w.temp)) + "</b>" + wxIcon(w) + "</div>" +
-      '<div class="sp-ws">' + esc(wxText(w)) + (w.high != null && w.low != null ?
-        " · " + esc(t("sp_hilo", { hi: tempText(w.high), lo: tempText(w.low) })) : "") + "</div>";
+  function spItemAt(i) {
+    var el = spEls[i];
+    if (!el) return null;
+    if (el.hasAttribute("data-s")) { var k = el.getAttribute("data-s"); return k === "np" ? { kind: "np" } : { kind: "song", idx: +k }; }
+    return spItems[+el.getAttribute("data-i")];
   }
-  // top right: "Bangalore · 27°" beside the people
-  function spotWeather() {
-    var w = WX_SHOW ? data.weather : null, place = (w && w.place) || WXCFG.place || "";
-    var el = $("sp-wx");
-    if (!el) return;
-    el.innerHTML = w && w.temp != null ? "<span>" + esc(place) + "</span>" + wxIcon(w) + "<span>" + esc(tempText(w.temp)) + "</span>" : esc(place);
-    el.classList.toggle("none", !place && !(w && w.temp != null));
-    var card = $("sp-cards").querySelector(".sp-wxc");
-    if (card) card.innerHTML = spWxHTML();
+  function spArt(it) {
+    if (!it) return "";
+    if (it.kind === "song") return ML && ML.items[it.idx] ? ML.items[it.idx].thumb : "";
+    if (it.kind === "np") { var c = ML && ML.items[mi >= 0 ? mi : 0]; return c ? c.thumb : ""; }
+    return it.art || (it.pkg ? iconUrl(it.pkg) : "");
   }
-  function spItemAt(i) { var el = spEls[i]; return el ? spItems[+el.getAttribute("data-i")] : null; }
-  function spArt(it) { return !it || it.kind === "wx" ? "" : it.art || (it.pkg ? iconUrl(it.pkg) : ""); }
-
+  // each of the four apps: what you were watching there, else what the app itself puts first, else the app
+  function bestFor(pkg, shows) {
+    var sh = shows.filter(function (x) { return x.pkg === pkg; })[0];
+    if (sh) return sh;
+    var row = ((SPR && SPR.apps) || []).filter(function (a) { return a.package === pkg; })[0], r = row && row.items && row.items[0];
+    if (r) return { kind: "row", title: r.title, sub: appNameOf(pkg), art: r.thumb || r.poster, pkg: pkg, id: r.id };
+    var ap = data.apps.filter(function (x) { return x.package === pkg; })[0];
+    return ap ? appCard(ap) : null;
+  }
+  function spApps() {
+    var have = SP_APPS.filter(function (p) { return data.apps.some(function (a) { return a.package === p; }); });
+    dockApps().forEach(function (a) { if (have.length < 4 && have.indexOf(a.package) < 0) have.push(a.package); });
+    return have.slice(0, 4);
+  }
   function renderSpot() {
-    var shows = spShows();
-    var pool = shows.concat(dockApps().filter(function (a) { return !shows.some(function (s) { return s.pkg === a.package; }); }).map(appCard));
-    spItems = SP_SLOTS.map(function (sl) { return sl.k === "wx" ? { kind: "wx" } : pool[sl.k] || null; });
-    $("sp-cards").innerHTML = SP_SLOTS.map(function (sl, i) {
-      var it = spItems[i];
-      if (!it) return "";
-      var st = "left:" + sl.x + "rem;top:" + sl.y + "rem;width:" + sl.w + "rem;height:" + sl.h + "rem";
-      if (it.kind === "wx") return '<div class="sp-card sp-wxc" data-i="' + i + '" style="' + st + '">' + spWxHTML() + "</div>";
-      return '<div class="sp-card' + (sl.hero ? " big" : "") + (it.kind === "app" ? " is-app" : "") + '" data-i="' + i + '" style="' + st + '">' + spFace(it, sl.hero) + "</div>";
+    var shows = spShows(), G = SP_GRID;
+    spItems = spApps().map(function (p) { return bestFor(p, shows); }).filter(Boolean);
+    $("sp-cards").innerHTML = spItems.map(function (it, i) {
+      var x = G.x + (i % 2) * (G.w + G.gx), y = G.y + Math.floor(i / 2) * (G.h + G.gy);
+      var st = "left:" + x + "rem;top:" + y + "rem;width:" + G.w + "rem;height:" + G.h + "rem";
+      return '<div class="sp-card' + (it.kind === "app" ? " is-app" : "") + '" data-i="' + i + '" style="' + st + '">' + spFace(it, false) + "</div>";
     }).join("");
-    spEls = Array.prototype.slice.call($("sp-cards").children);
+    spCollect();
+  }
+  function spCollect() {
+    spEls = Array.prototype.slice.call($("sp-cards").children)
+      .concat(Array.prototype.slice.call($("sp-music").querySelectorAll("[data-s]")));
     si = Math.max(0, Math.min(si, spEls.length - 1));
   }
   function toSpot(x) {
     zone = "spot";
-    var hero = -1;
-    spEls.forEach(function (el, i) { if (el.classList.contains("big")) hero = i; });
-    if (x == null) { si = hero >= 0 ? hero : 0; return; }
-    // from the dock: the card above that spot
+    if (x == null) { si = 0; return; }
+    // from the dock: the card or song above that spot, the lower ones first
     var best = 0, bd = Infinity;
     spEls.forEach(function (el, i) {
-      var b = el.getBoundingClientRect(), d = Math.abs(b.left + b.width / 2 - x) + (b.top > spEls[0].getBoundingClientRect().top + 4 ? 0 : 40);
-      if (d < bd) { bd = d; best = i; }
+      var b = el.getBoundingClientRect(), d = Math.abs(b.left + b.width / 2 - x) - b.bottom / 4;
+      if (b.height && d < bd) { bd = d; best = i; }
     });
     si = best;
+  }
+
+  // ---- the music card: a YouTube (Music) playlist, played right here in YouTube's own player ----
+  // The list comes from /api/playlist (the on-TV app reads the playlist's public feed). The player is
+  // made once and never redrawn, so the home's refreshes do not stop the song; it pauses when an app
+  // opens. A song whose owner blocks playing outside YouTube is skipped.
+  var ML = null, mi = -1, mState = -1, YTP = null, ytWait = [], ytErrs = 0, mTop = 0;
+  function refreshPlaylist() {
+    if (!SPOT) return Promise.resolve();
+    return api("GET", "/api/playlist", null, 12000).then(function (j) {
+      var key = JSON.stringify(j.items || []);
+      if (ML && ML.key === key) return;
+      ML = { title: j.title || "", items: j.items || [], key: key };
+      renderMusic();
+    }, function () { if (!ML) { ML = { title: "", items: [], key: "" }; renderMusic(); } });
+  }
+  function renderMusic() {
+    var box = $("sp-music");
+    $("sp-mhead").innerHTML = (iconUrl("com.google.android.youtube.tvmusic") ? '<img src="' + esc(iconUrl("com.google.android.youtube.tvmusic")) + '" alt="" onerror="this.remove()">' : "") +
+      "<div><b>" + esc(t("sp_music")) + "</b><small>" + esc(ML && ML.title ? ML.title : "") + "</small></div>";
+    $("sp-songs").innerHTML = ML && ML.items.length ? ML.items.map(function (m, i) {
+      return '<div class="sp-song" data-s="' + i + '"><img src="' + esc(m.thumb) + '" alt="" decoding="async"><div><b>' + esc(m.title) +
+        "</b><small>" + esc(m.blocked ? t("sp_cant_here") : m.artist) + '</small></div><i class="sp-eq"><span></span><span></span><span></span></i></div>';
+    }).join("") : '<p class="sp-none">' + esc(t("sp_music_none")) + "</p>";
+    box.classList.toggle("on", true);
+    musicState();
+    spCollect();
+    paintFocus();
+  }
+  function musicState() {
+    var cur = ML && ML.items[mi >= 0 ? mi : 0];
+    $("sp-cover").style.backgroundImage = cur ? cssUrl(cur.thumb) : "";
+    $("sp-mnow").innerHTML = cur ? "<b>" + esc(cur.title) + "</b><small>" + esc(mi >= 0 ? cur.artist : t("sp_pick_song")) + "</small>" : "";
+    $("sp-music").classList.toggle("playing", mState === 1);
+    $("sp-music").classList.toggle("started", mi >= 0);
+    Array.prototype.forEach.call($("sp-songs").children, function (el) {
+      var i = +el.getAttribute("data-s");
+      el.classList.toggle("now", i === mi);
+      el.classList.toggle("blocked", !!(ML.items[i] && ML.items[i].blocked));
+    });
+  }
+  // keep the focused song in view inside the card
+  function scrollSongs() {
+    var it = spItemAt(si), list = $("sp-songs");
+    if (!it || it.kind !== "song") return;
+    var el = spEls[si], rowH = el.offsetHeight + 4, view = list.parentNode.clientHeight, top = el.offsetTop;
+    if (top + mTop < 0) mTop = -top;
+    else if (top + rowH + mTop > view) mTop = view - top - rowH;
+    list.style.transform = "translateY(" + mTop + "px)";
+  }
+  function ytApi(cb) {
+    if (window.YT && window.YT.Player) { cb(); return; }
+    ytWait.push(cb);
+    if (ytWait.length > 1) return;
+    window.onYouTubeIframeAPIReady = function () { var w = ytWait; ytWait = []; w.forEach(function (f) { f(); }); };
+    var sc = document.createElement("script");
+    sc.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(sc);
+  }
+  function playSong(i) {
+    var m = ML && ML.items[i];
+    if (!m) return;
+    mi = i; mState = 3; musicState();
+    ytApi(function () {
+      if (YTP && YTP.loadVideoById) { YTP.loadVideoById(m.id); return; }
+      YTP = new window.YT.Player("sp-yt", { width: "100%", height: "100%", videoId: m.id,
+        playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0, origin: location.origin },
+        events: {
+          onReady: function (e) { e.target.playVideo(); },
+          onStateChange: function (e) {
+            mState = e.data;
+            if (e.data === 1) ytErrs = 0;
+            if (e.data === 0) nextSong();
+            musicState();
+          },
+          onError: function () {
+            if (ML.items[mi]) ML.items[mi].blocked = true;
+            renderMusic();
+            if (++ytErrs < 4) nextSong(); else { mState = -1; musicState(); }
+          }
+        } });
+    });
+  }
+  function nextSong() {
+    if (!ML || !ML.items.length) return;
+    for (var k = 1; k <= ML.items.length; k++) {
+      var j = (mi + k) % ML.items.length;
+      if (!ML.items[j].blocked) { playSong(j); return; }
+    }
+  }
+  function pauseSong() { if (YTP && YTP.pauseVideo && mState === 1) YTP.pauseVideo(); }
+  function toggleSong() {
+    if (mi < 0 || !YTP || !YTP.playVideo) { playSong(mi >= 0 ? mi : 0); return; }
+    if (mState === 1) YTP.pauseVideo(); else YTP.playVideo();
   }
   function overlap(a0, a1, b0, b1) { return Math.min(a1, b1) - Math.max(a0, b0) > 4; }
   function spotMove(dx, dy) {
@@ -1633,7 +1731,9 @@
   }
 
   function spOpen(it) {
-    if (!it || it.kind === "wx") return;
+    if (!it) return;
+    if (it.kind === "song") { if (it.idx === mi) toggleSong(); else playSong(it.idx); return; }
+    if (it.kind === "np") { toggleSong(); return; }
     if (it.kind === "app") { openApp(it.app || { package: it.pkg }); return; }
     if (it.kind === "keep") { openShow(it.src); return; }
     status(t("opening", { title: it.title }), true);
@@ -1681,7 +1781,7 @@
     if (zone === "pmenu") { renderPop(); $("people").classList.add("focus"); return; }
     if (zone === "rows") { if (paintRows()) return; zone = "grid"; }
     if (zone === "spot") {
-      if (spEls[si]) { spEls[si].classList.add("focus"); spBack(spArt(spItemAt(si))); return; }
+      if (spEls[si]) { spEls[si].classList.add("focus"); scrollSongs(); spBack(spArt(spItemAt(si))); return; }
       zone = "grid";
     }
     if (zone === "np") {
@@ -3169,7 +3269,7 @@
     settingsKey: function () { blip(0, 0); settingsKey(); },
     resume: function () { okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); },
     // an app is in front: the video background stops until the home is back
-    pause: pauseVideo,
+    pause: function () { pauseVideo(); pauseSong(); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
     // the launcher's updater has news (Updater.kt)
@@ -3187,6 +3287,8 @@
     if (SPOT) {
       // the quick buttons (sleep timer) join the place, weather and people at the top right
       document.querySelector(".top-left").appendChild($("quick"));
+      refreshPlaylist();
+      setInterval(refreshPlaylist, 30 * 60000);
       refreshWeather();
       setInterval(refreshWeather, WX_EVERY * 60000);
     } else if (NIGHT) {

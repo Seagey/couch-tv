@@ -52,7 +52,15 @@
 </header>
 
 <!-- Spotlight look only: the row of cards (Home) and the Shows page below the dock, drawn by app.js -->
-<section class="sp-home" id="sp-home" aria-label="Home"><div id="sp-cards"></div></section>
+<section class="sp-home" id="sp-home" aria-label="Home"><div id="sp-cards"></div>
+  <!-- the music card: a YouTube (Music) playlist, played here in YouTube's player (made once by app.js) -->
+  <div class="sp-music" id="sp-music">
+    <div class="sp-mhead" id="sp-mhead"></div>
+    <div class="sp-np" data-s="np"><div class="sp-cover" id="sp-cover"></div><div class="sp-ytw"><div id="sp-yt"></div></div></div>
+    <div class="sp-mnow" id="sp-mnow"></div>
+    <div class="sp-list"><div class="sp-songs" id="sp-songs"></div></div>
+  </div>
+</section>
 <section class="sp-rows" id="sp-rows" aria-label="Shows"><div class="sp-track" id="sp-track"></div></section>
 
 <main class="home">

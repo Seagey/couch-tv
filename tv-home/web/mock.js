@@ -255,6 +255,12 @@
           return resolve({ ok: true, mode: picture, supported: true, can_set: true,
             modes: [{ id: "calibrated", name: "Calibrated" }, { id: "dynamic", name: "Dynamic" }] });
         }
+        // Spotlight's music card: a playlist (the on-TV app's Playlist.kt; titles already tidied there)
+        if (path.indexOf("/api/playlist") === 0) return resolve({ ok: true, id: "RDCLAK5uy_kmPRjHDECIcuVwnKsx2Ng7fyNgFKWNJFs", title: "The Hit List", items: [
+          { id: "78wrful9cVU", title: "drop dead", artist: "Olivia Rodrigo" }, { id: "mw3kSNIxjqo", title: "Patient Zero", artist: "Taylor Swift" },
+          { id: "nUsrYVxrDwI", title: "Choosin' Texas", artist: "Ella Langley" }, { id: "ckPbVDXw9Gc", title: "BbY WOW", artist: "KAROL G, Judeline, rusowsky" },
+          { id: "dQw4w9WgXcQ", title: "Never Gonna Give You Up", artist: "Rick Astley" }
+        ].map(function (m) { m.thumb = "https://i.ytimg.com/vi/" + m.id + "/hqdefault.jpg"; return m; }) });
         // Spotlight's Shows page: what apps published to Android TV (the on-TV app's Rows.kt)
         if (path.indexOf("/api/rows/open") === 0) return resolve({ ok: true });
         if (path.indexOf("/api/rows") === 0) {
