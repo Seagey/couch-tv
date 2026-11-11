@@ -1,7 +1,8 @@
 # couch-tv
 
-Your own home screen and phone remote for a Google TV, and now a Samsung TV, and an LG
-version that has run on nine real LGs so far. No ads on the home screen. Open source (MIT).
+Your own home screen and phone remote for a Google TV, an Android TV or a Fire TV, with app
+versions for Samsung and LG (run on nine real LGs so far) and a Roku version not yet run on a real
+Roku. No ads on the home screen. Open source (MIT).
 
 > Note for Google TV owners: 0.11 leaves the Google home and setup apps switched on. If you set
 > couch-tv up with 0.10 or older, see [If your TV loops after a restart](#if-your-tv-loops-after-a-restart).
@@ -10,10 +11,35 @@ version that has run on nine real LGs so far. No ads on the home screen. Open so
 
 ## Updates
 
+The newest release is **0.12** (9 November 2026). The TV apps come from
+[the Releases page](https://github.com/Seagey/couch-tv/releases), so anything marked "on main, in
+the next release" below is not in those apps yet: build them yourself ("Building the app") if you
+want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
+so `git pull` brings their changes.
+
+**10 November 2026: Roku (built, not yet run on a real Roku).** couch-tv now has a Roku version. Roku
+channels are not web pages, so the home is drawn again as a native channel (the Night scenes with the clock
+in them, date and weather, the people switch, Keep watching and your apps), and the bridge talks to the
+Roku over its own network protocol and opens the channel every time the TV is switched on. It was built from
+Roku's documentation and tested against a test Roku and a BrightScript simulator. **Nobody has run it on a
+real Roku**, so if you have one, you would be the first: give this repo to your agent, and please open an
+issue saying how it went. Setup and limits: [docs/ROKU.md](docs/ROKU.md).
+
+**10 November 2026: Android 6 (experimental, on main, in the next release).** Both TV apps now
+install on Android 6.0 (a Xiaomi Mi TV 4A with PatchWall, for example,
+[issue #59](https://github.com/Seagey/couch-tv/issues/59)). The 0.12 apps on the Releases page still
+need Android 7.1, so for now build them yourself ("Building the app").
+Checked on an Android 6 emulator only, not a real TV. There both apps install and open, but that
+emulator's built in browser engine (Chrome 44, the oldest a TV can ship) lays the home out badly:
+the shelf stacks up instead of running across. A TV whose engine is newer may look right. The
+on-TV app (option C) cannot pair by Wi-Fi on Android 6 (that needs Android 11): set it up from a
+computer with USB or network debugging (port 5555), as the README steps already do. If you try it,
+please open an issue saying what you see.
+
 **8 November 2026: a restart could loop some Google TVs. Fixed.** A Sony Bravia Google TV owner
 found that after couch-tv went on, a restart left the TV going round: blank screen, restart, blank
 screen. couch-tv 0.10 and older switched off the Google TV home and the setup app, and on some
-Google TVs the TV cannot start without them. From 0.11 couch-tv never switches either off, the updated app switches them back on by itself where it can, and if couch-tv itself keeps crashing the TV's own home takes over. **If you set couch-tv up
+Google TVs the TV cannot start without them. From 0.11 couch-tv never switches either off, the updated on-TV app and the bridge switch them back on by themselves where they have ADB, and if couch-tv itself keeps crashing the TV's own home takes over. **If you set couch-tv up
 with 0.10 or older, read [If your TV loops after a restart](#if-your-tv-loops-after-a-restart)
 before you next restart your TV.** Sorry, and thank you to the person who reported it.
 
@@ -29,39 +55,22 @@ before you next restart your TV.** Sorry, and thank you to the person who report
 - **A Fire TV Stick guide**, written on the stick itself: [docs/FIRE-TV-STICK.md](docs/FIRE-TV-STICK.md).
 
 And from [Justin1491](https://github.com/Justin1491/couch-tv): the bridge stops trying to reach a
-TV that has not been paired yet, instead of retrying in the background. The two buttons come with
-the next release after 0.4.
-
-**1 November 2026: LG TVs.** couch-tv now has an LG version, done the same way as the Samsung one:
-it goes on your LG as an app through LG's Developer Mode, and the computer at home opens it every
-time the TV is switched on. It was built from LG's own documentation and tested against a stand-in,
-so if you have an LG, you would be among the first to run it: give this repo to your agent, and
-please open an issue saying how it went. Setup and limits: [docs/LG.md](docs/LG.md).
-
-**10 November 2026: Roku (built, not yet run on a real Roku).** couch-tv now has a Roku version. Roku
-channels are not web pages, so the home is drawn again as a native channel (the Night scenes with the clock
-in them, date and weather, the people switch, Keep watching and your apps), and the bridge talks to the
-Roku over its own network protocol and opens the channel every time the TV is switched on. It was built from
-Roku's documentation and tested against a test Roku and a BrightScript simulator. **Nobody has run it on a
-real Roku**, so if you have one, you would be the first: give this repo to your agent, and please open an
-issue saying how it went. Setup and limits: [docs/ROKU.md](docs/ROKU.md).
-
-**10 November 2026: Android 6 (experimental).** Both TV apps now install on Android 6.0 (a Xiaomi
-Mi TV 4A with PatchWall, for example, [issue #59](https://github.com/Seagey/couch-tv/issues/59)).
-Checked on an Android 6 emulator only, not a real TV. There both apps install and open, but that
-emulator's built in browser engine (Chrome 44, the oldest a TV can ship) lays the home out badly:
-the shelf stacks up instead of running across. A TV whose engine is newer may look right. The
-on-TV app (option C) cannot pair by Wi-Fi on Android 6 (that needs Android 11): set it up from a
-computer with USB or network debugging (port 5555), as the README steps already do. If you try it,
-please open an issue saying what you see.
+TV that has not been paired yet, instead of retrying in the background. The two buttons came in
+0.5.
 
 **3 November 2026: older Fire TV sticks (Fire OS 6).** Both TV apps now install on Android 7.1,
 so the Fire TV Stick 4K (1st gen) and other Fire OS 6 sticks can run them. Options A and B also
 take the Home key back on any Fire TV now, the way the "lives on the TV" app already did:
 `apply.sh` switches on a small Home button watch, and the undo switches it off. Checked on
 Android 7.1, 9 and 14 emulators with a stand-in for Amazon's home, not yet on a real Fire OS 6
-stick: if you have one, please open an issue saying how it went. It comes with the next release
-after 0.3.
+stick: if you have one, please open an issue saying how it went. It came in 0.4.
+
+**1 November 2026: LG TVs.** couch-tv now has an LG version, done the same way as the Samsung one:
+it goes on your LG as an app through LG's Developer Mode, and the computer at home opens it every
+time the TV is switched on. It was built from LG's own documentation and tested against a stand-in,
+so if you have an LG, you would be among the first to run it: give this repo to your agent, and
+please open an issue saying how it went. Setup and limits: [docs/LG.md](docs/LG.md). (It has since
+run on nine real LGs.)
 
 **30 October 2026: Fire TV sticks, older TVs, smart home and your own scenes.** Sixteen people
 have forked couch-tv so far, and six of them built something worth having. The best of it is now in
@@ -112,8 +121,9 @@ What is different on a Samsung:
 
 - **You need a computer that stays on at home** (a Mac, a Linux box or a Raspberry Pi on the same
   Wi-Fi, option B below). It opens couch-tv every time the TV is switched on, and it is what the
-  phone remote and the assistant talk to. Without it you can only open couch-tv yourself from
-  Samsung's app row.
+  phone remote and the assistant talk to. Without it you open couch-tv yourself from Samsung's app
+  row, or Samsung's Autorun Last App setting reopens it when the TV comes on (reported on a Samsung
+  Smart Monitor M8, [docs/SAMSUNG.md](docs/SAMSUNG.md)).
 - **It is an app that opens itself, not a true home screen.** Samsung does not let any app replace
   its home. The TV remote's own Home button still opens Samsung's menu; Home on the phone remote
   brings couch-tv back.
@@ -162,7 +172,7 @@ With option A it is Android's own Watch Next list, the same for everyone on that
 
 ## Seeing every app
 
-Only part of your apps fit in the dock on some TVs. Press **Down** on the dock's bottom row to open
+On main, in the next release. Only part of your apps fit in the dock on some TVs. Press **Down** on the dock's bottom row to open
 the full apps view (the same one **More apps** opens), with the outline on the app you were on.
 Back returns to the dock on that app.
 
@@ -179,7 +189,8 @@ Any remote works: up and down move, right or OK opens a section, OK changes a ro
 scene, an app, a person or a quick button picks it up so up and down move it, and Back steps back
 and then closes. What you change shows when the list closes.
 
-- **Language:** English, Español, Español (México), Italiano, Deutsch, Türkçe. Until one is picked here (or in
+- **Language:** English, Español, Español (México), Italiano, Deutsch, Français, Türkçe and Srpski
+  (latinica, on main, in the next release). Until one is picked here (or in
   `config.json`), the home speaks the TV's own language if it is one of these, else English.
 - **Location:** type a town or city with the TV's on-screen keyboard (or the phone remote's Type),
   pick it from the places found. It sets the weather's place and time zone. The place search is
@@ -187,20 +198,29 @@ and then closes. What you change shows when the list closes.
   province or county, and region), so towns with the same name can be told apart; in Italian the
   places in Italy come first, in German the places in Germany.
 - **Weather:** show or hide it, °C or °F, check every 15, 30 or 60 minutes. Open-Meteo is the only
-  weather provider for now.
+  weather provider for now. On main, in the next release: **Ambient weather effects** (light rain,
+  snow and fog over the scenes), off to start.
 - **Look and scenes:** Night scenes or Classic; which scenes take turns, in what order, how many
   seconds each; a 12 or 24 hour clock; glass panels and a video background (below); your own
-  photos (below).
+  photos (below). On main, in the next release: an **OLED Cinema** look (the Classic grid on pure
+  black), **Follow the sun** (the scene follows dawn, day, sunset and night where you are),
+  **Lighter home** for a slow box that stutters, and **Moving tiles** (switch it off if the slowly
+  swaying focused tile flickers on an older TV).
 - **Apps:** every app on the TV. OK moves it between home, More apps and hidden; hold OK to change
   the order. The same order as holding OK on the dock and the phone's Arrange apps.
 - **People:** add, rename, remove and reorder who is watching.
-- **Quick buttons:** which of the sleep timer, picture mode, look, input and screensaver buttons
-  show, in what order. **Input** opens couch-tv's own menu where the TV lists its inputs: each HDMI port by the
+- **Quick buttons:** which of the sleep timer, picture mode, look, input, Bluetooth, Network and
+  screensaver buttons show, in what order (Bluetooth and Network need the on-TV app). On main, in
+  the next release: **Soundscape** (rain, fireplace, ocean or brown noise made on the TV),
+  **Screen off** (the picture goes dark while sound and the sleep timer carry on) and **Bluetooth
+  headphones** (opens the TV's own Bluetooth screen). Every button and what it needs:
+  [docs/CONFIG.md](docs/CONFIG.md), Quick buttons. **Input** opens couch-tv's own menu where the TV lists its inputs: each HDMI port by the
   TV's own name for it ("HDMI 3 (eARC)" where the TV labels it so) with what is plugged in behind it,
   each one switching straight away, then Bluetooth and Network. A TV that lists no inputs gets its
   own input screen, as before (#30). **Screensaver** starts the TV's own screensaver (Google TV's
   Ambient mode, with the Google Photos albums, a few seconds later; its own screen for the albums
-  is just below, under Look).
+  is just below, under Look). It shows only when the TV has a screensaver switched on, and
+  `apply.sh` switches Google TV's ambient mode off unless you run it with `KEEP_AMBIENT=1`.
 - **Updates:** off until you say yes. The first time the home opens it asks once: "Tell you when a
   new couch-tv version is out?" (setup can answer it for you, `home.updates`). With **Tell me about
   new versions** on, the TV looks on GitHub once a week, so frequent releases never nag; with it off
@@ -219,7 +239,7 @@ and copies the photos you choose into the app (turned the right way up and sized
 Many Android TV and Google TV builds have no file picker; then the list says so and you add a photo
 from a web address instead (a JPEG or PNG on the internet, which the TV loads each time). The on-TV
 app (option C) only takes web addresses. Your photos take turns with the scenes and replace the
-Classic look's own.
+Classic look's own. The home keeps up to 20 photos (50 on main, in the next release).
 
 **Glass panels and a video background (optional, both off to start).** Under Look, **Glass
 panels** puts clear, softly blurred panels with a light edge behind the clock, Keep watching and
@@ -244,7 +264,8 @@ song, the artist and its cover, with previous, play or pause and next (the remot
 In the Night look it is the first card of the Keep watching row; in Classic it sits under the quick
 buttons. A paused song stays for ten minutes. It needs option B or C: Android does not let an
 ordinary app see what other apps play, so option A has no card. Home settings, Look, Now playing
-switches it off. The cover comes from Apple's free music search. Thanks alonmustafa (#31).
+switches it off. The cover comes from Apple's free music search. Thanks alonmustafa (#31). On main,
+in the next release: a full screen Now playing view with the album art, off to start (#84).
 **Navigation sound** (Home settings, Look, Sound): the TV's own click, a soft tap, or none (#32).
 With Glass panels on, Home settings and the menus are glass too, and focus moves more calmly (#32, #33).
 
@@ -260,7 +281,8 @@ back to it. [docs/CONFIG.md](docs/CONFIG.md) has the details.
 
 **Languages.** The TV home and the phone remote both speak English, Spanish (`es`, for Spain and
 everyone else), Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest),
-Italian (`it`), German (`de`), Turkish (`tr`) and Serbian Latin (`sr-Latn-RS`). Italian, German,
+Italian (`it`), German (`de`), Turkish (`tr`) and Serbian Latin (`sr-Latn-RS`, on main, in the next
+release). Italian, German,
 Turkish and Serbian use a 24 hour clock by default unless you pick 12 hour. The optional smart-home
 controls are translated too. The phone has its own choice (TV menu, Language), "Same as the TV" by
 default. Messages that come from the bridge itself
@@ -292,9 +314,9 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **Older Android TV** (Android 7.1 to 11) | Yes | Yes | Yes |
 | **Android 6 TV** (Xiaomi Mi TV 4A, PatchWall) | Experimental: opens, layout may break on an old browser engine | Not tested | Experimental, set up from a computer (no Wi-Fi pairing) |
 | **Nvidia Shield** | Yes (not tested) | Yes | Yes (not tested) |
-| **Fire TV on Fire OS** (Fire OS 6, 7 and 8: Fire TV Stick 4K 1st gen and newer, Stick 4K Max, Cube) | Partial. Takes the Home key back, but Amazon's home flashes up first | Partial | Yes, and it takes the Home key back ([how](on-tv/README.md#fire-tv-fire-os)) |
+| **Fire TV on Fire OS** (Fire OS 6, 7 and 8: Fire TV Stick 4K 1st gen and newer, Stick 4K Max, Cube) | Partial. Takes the Home key back, but Amazon's home flashes up first | Partial | Partial. It takes the Home key back, but on current Fire OS the phone remote cannot press keys or type ([why](on-tv/README.md#fire-tv-fire-os)) |
 | **Fire TV on Vega OS** (newer Fire TV sticks) | No | No | No |
-| **Samsung** (Tizen) | App only, opened from Samsung's app row | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
+| **Samsung** (Tizen) | App only, opened from Samsung's app row (or reopened by its Autorun Last App) | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
 | **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on nine real LGs so far ([how](docs/LG.md)) | No |
 | **Roku** (TV or box) | App only, a sideloaded channel opened from Roku's home row, while Developer Mode is on | With a computer at home: as a channel that opens itself, not a true home screen. Built from Roku's documentation, not yet tried on a real Roku ([how](docs/ROKU.md)) | No |
 | **Apple TV, Hisense with VIDAA** | No | No | No |
@@ -312,7 +334,9 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   Google home off (older versions did, and that is what broke some Google features and the remote's
   YouTube button). It stays on, and a Home button watch (an accessibility service, switched on by
   `apply.sh`) brings couch-tv to the front when you press Home.
-- **Fire TV (Fire OS):** the phone remote and app launching work. Amazon does not let another home
+- **Fire TV (Fire OS):** the phone remote and app launching work (with option C on current Fire OS,
+  the phone remote's keys and typing do not: Amazon blocks an app from using the TV's own ADB, so
+  use option B for the full remote). Amazon does not let another home
   screen replace its own, so couch-tv watches for Amazon's home and puts its own home back on top;
   Amazon's home still flashes up for a moment first. Options A and B: `apply.sh` switches the watch
   on by itself. Option C needs three one-off ADB grants: [on-tv/README.md](on-tv/README.md#fire-tv-fire-os).
@@ -329,7 +353,8 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   on, and presses Developer Mode's Extend once a day so LG does not remove it. LG's own Home button
   still opens LG's menu. The phone remote and the assistant work: Netflix opens the title, YouTube
   opens the video, other apps open on their home page. No "what is playing" and no screenshots.
-  It has run on nine real LGs so far (webOS 4.10 to a 2025 QNED on webOS 10.3.2): if you try it on another model, please
+  It has run on nine real LGs so far (from webOS 4.10 to 2025 models on webOS 10.3.2, and one
+  upgraded to webOS 26): if you try it on another model, please
   open an issue and say how it went. Setup and limits:
   [docs/LG.md](docs/LG.md).
 - **Roku:** the same idea as the LG, with the home drawn again as a Roku channel (Roku channels are not web
@@ -370,15 +395,16 @@ computer's key in `~/.android/adbkey`, so it waits until you have decided to go 
 ## Setting it up with an AI agent
 
 Open this folder in Claude Code (or any coding agent) and say "set this up on my TV". It reads
-[AGENTS.md](AGENTS.md) and asks you two things before it touches anything: which TV you have, and
-which option you want.
+[AGENTS.md](AGENTS.md), finds your TV, asks which option you want and a few questions (who
+watches, the look, your apps), reads the plan back, and changes nothing on the TV until you say
+yes.
 
 This repo is **two separate things**. You can use the first without the second, but the second
 needs the first's TV set up the same way (developer mode on).
 
 | | 1. The TV home | 2. The phone remote and bridge |
 |---|---|---|
-| What it is | An Android TV app that replaces the Google TV home screen. Scenes, clock, weather, your app row, "keep watching". | A phone web app (the remote) and a small Python service (the bridge) that runs on a computer at home and talks to the TV. |
+| What it is | An Android TV app that becomes the TV's home screen (the Google TV home stays installed and on behind it). Scenes, clock, weather, your app row, "keep watching". | A phone web app (the remote) and a small Python service (the bridge) that runs on a computer at home and talks to the TV. |
 | Where it lives | `tv-home/` (`android/` is the app, `web/` is its screen) | `remote/` (phone app) and `bridge/` (the service) |
 | Runs on | The TV | Your phone, plus a computer that stays on |
 | Options | A and B | B (C has its own app, in `on-tv/`) |
@@ -386,7 +412,7 @@ needs the first's TV set up the same way (developer mode on).
 ## What you need
 
 **For every option:**
-- A **Google TV or Android TV** (Android 7.1 or newer, Android 6 experimental) with Developer options and debugging on
+- A **Google TV or Android TV** (Android 7.1 or newer; Android 6 is experimental and needs apps built from main for now) with Developer options and debugging on
   (step 1).
 - A computer on the same Wi-Fi to set it up from: macOS or Linux with **Python 3.11 or newer**
   (`python3 --version`). Missing or older: on macOS `brew install python@3.11` or the installer
@@ -401,7 +427,7 @@ needs the first's TV set up the same way (developer mode on).
 **Option B also needs:**
 - An **always-on computer on the same Wi-Fi**: a Mac or a Linux box (a Raspberry Pi is fine).
   The bridge has to be running whenever you want the remote.
-- **Node 20 or newer**, once, to build the phone app.
+- **Node 20.19 or newer** (or 22.12 or newer), once, to build the phone app.
 - Optional, **Claude "ask"** ("put on something funny"): the Claude Code program, installed and
   logged in to your own Claude plan. It runs `claude -p` and strips `ANTHROPIC_API_KEY` from the
   environment first, so it never bills an API key. It is off in `config.example.json`; turn it on
@@ -409,7 +435,7 @@ needs the first's TV set up the same way (developer mode on).
 - Where a show streams: nothing to set up. The bridge asks JustWatch's public search (no key) for
   the country in `config.json` (`"country": "AU"`, or `"US"`, `"GB"` and so on).
 - A free **TMDB key is not needed** by this code. If you add your own poster lookup, put the key in
-  `.env` (see `env.example`). Never commit it.
+  `.env` (copied from `env.example`, which has no TMDB line of its own). Never commit it.
 
 **The home with the computer off (option B):** the app carries its own copy of the home and also
 keeps the bridge's latest copy. If the computer is off, the TV still shows the clock, the weather
@@ -441,10 +467,10 @@ Do this on the TV itself.
 The first time a computer connects, the TV asks "Allow USB debugging?". Tick **Always allow**
 and press **Allow**. You never see it again.
 
-> **Allow every computer before you switch the Google home off.** Seen on one Google TV
-> (Android 14): after `apply.sh` switched off the Google TV home and its setup app, the TV no longer
+> **Allow every computer before step 6.** Seen on one Google TV (Android 14) set up by couch-tv
+> 0.10 or older, whose `apply.sh` switched off the Google TV home and its setup app: the TV no longer
 > showed "Allow USB debugging?" for any new computer. Computers allowed before that kept working.
-> So connect each computer you will use (`check-tv.py <tv address> --adb`, and for option C the
+> The current `apply.sh` leaves both on, but to be safe connect each computer you will use (`check-tv.py <tv address> --adb`, and for option C the
 > app's **Connect ADB**) and press Allow **before** step 6. If it already happened, see "If
 > something is stuck" in [docs/UNINSTALL.md](docs/UNINSTALL.md).
 
@@ -497,7 +523,7 @@ Edit `config.json` (it is private, it never gets committed):
 - Option B: `bridge.host`, the name of the computer that runs the bridge, for example
   `my-computer.local`.
 - Optional: `home` (scenes, how long each stays, 12 or 24 hour clock, how many apps in the dock,
-  apps to hide), `quick` per TV (sleep timer, picture mode, look and input buttons), `ask` and
+  apps to hide), `quick` per TV (sleep timer, picture mode, look, input, screensaver and the other quick buttons), `ask` and
   `phone_remote`.
 
 Every key, with its default: [docs/CONFIG.md](docs/CONFIG.md). Which TV remotes work and which
@@ -567,7 +593,9 @@ a show. Put visitors on a guest Wi-Fi network (most routers have one) so they ca
 
 To require a password on your home network, set `"pairing_key"` under `"bridge"` in `config.json`. The
 phone remote pairs once by typing it (or opening `http://your-computer.local:5400/?pair=<key>`), and the
-TV homes carry their key. See [Switching the pairing key on](docs/CONFIG.md#switching-the-pairing-key-on)
+TV homes carry their key. On a Google TV, Android TV or Fire TV that needs a TV home app newer than
+0.12 (on main, in the next release: build it until then), and the Samsung, LG and Roku apps are built
+again with the key. See [Switching the pairing key on](docs/CONFIG.md#switching-the-pairing-key-on)
 for how to switch it on and update your TVs.
 
 **Never forward a port to the bridge.** The bridge is built for your home network only. Never expose it
@@ -578,7 +606,7 @@ is the safe way to use the phone remote away from home.
 bridge. The bridge still serves the API (the TV home needs it), and the phone page still loads if
 someone opens it, so the same rule applies.
 
-### Step 6. Put the TV home on the TV (options A and B; this replaces the Google home screen)
+### Step 6. Put the TV home on the TV (options A and B; it becomes the home, the Google home stays on)
 
 Get `couch-tv-home.apk` from the GitHub Releases page (or build it, below). Look at the TV first
 (it changes nothing):
@@ -630,7 +658,7 @@ do the install instead of `apply.sh`:
    It connects to the TV over Wi-Fi with ADB, so the TV asks you to allow it. Open **Setup
    Launcher**, pick couch-tv, then restart the TV.
 
-**Option A with no computer at all, making it the home** (issue #98). If couch-tv installed and
+**Option A with no computer at all, making it the home** (issue #98, on main, in the next release). If couch-tv installed and
 shows up as an app but the Home button still opens the TV's own home, there is no computer step
 left. On a plain Android TV 10 or newer, couch-tv asks Android to make it the home:
 
@@ -688,7 +716,7 @@ needed: `tv-home/android/gradlew` fetches Gradle 8.11.1 by itself.
    It prints where the APKs are (`dist/couch-tv-home.apk`, plus `dist/couch-tv-ontv.apk` for
    option C, and `dist/couch-tv-sync.apk`, the experimental two TV sync helper,
    [docs/SYNC.md](docs/SYNC.md)). The on-TV app carries the phone remote inside it, so for that one the script builds
-   `remote/` first, which needs **Node 20 or newer**. `apply.sh` finds `dist/couch-tv-home.apk`
+   `remote/` first, which needs **Node 20.19 or newer**. `apply.sh` finds `dist/couch-tv-home.apk`
    by itself.
 
 The release APK is signed with your local debug key, which is fine for your own TV. The built-in
@@ -741,8 +769,8 @@ the TV may need to start: a home screen, a setup app, a persistent system app or
 ### TCL: Home goes back to Google TV after every restart
 
 On a TCL Google TV (reported on a TCL Smart TV Pro, Android 14) the TV's own boot manager can stop
-the Home button watch from starting, so Home falls back to Google TV after each restart. couch-tv
-now adds an empty TV input on TCL TVs only, which TCL lets start at boot. Open the app once after
+the Home button watch from starting, so Home falls back to Google TV after each restart. On main, in
+the next release, couch-tv adds an empty TV input on TCL TVs only, which TCL lets start at boot. Open the app once after
 installing so it is switched on. Other TVs are unchanged and show no new input. This is unconfirmed
 until it is tested on a real TCL.
 
@@ -783,7 +811,7 @@ stop).
 The full guide, with the TV-remote-only way and what to do if something is stuck:
 [docs/UNINSTALL.md](docs/UNINSTALL.md). In short:
 
-1. **Option B: stop the bridge first**, or its daily guard switches the Google home off again
+1. **Option B: stop the bridge first**, or its daily check switches ambient mode off again
    (macOS: `launchctl bootout gui/$(id -u)/app.couchtv.bridge`; Linux:
    `systemctl --user disable --now couch-tv-bridge`).
 2. Everything off, including developer mode:
@@ -798,7 +826,7 @@ older couch-tv switched them off), and makes the home the TV had before the home
 With only the TV remote (no computer):
 
 1. On the couch-tv home, open the **Settings** tile (the gear at the end of the app row), or press
-   the Settings button on your remote.
+   the Settings button on your remote, and pick **TV settings**.
 2. **Apps**, then **See all apps**, then **Show system apps**.
 3. If **Google TV Home** or **Setup** (the Google TV setup app) says Disabled, open it and press
    **Enable** (couch-tv 0.10 and older switched them off). Ambient mode and the ad tracker are
@@ -829,6 +857,9 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
                               there is no bridge
 ```
 
+Samsung, LG and Roku are reached over their own network remotes instead of the Android TV Remote
+protocol and ADB.
+
 - API contract: [bridge/API.md](bridge/API.md).
 - How shows open in each streaming app: [bridge/DEEPLINKS.md](bridge/DEEPLINKS.md).
 - Watch history, taste and picks stay on your computer in `bridge/data/`. That folder is in
@@ -855,11 +886,13 @@ TV home (tv-home/)      --->  bridge (for shows and picks)               (Androi
 
 ## Limits
 
-- Google TV and Android TV run everything. Fire TV (Fire OS) runs the on-TV app, with Amazon's
+- Google TV and Android TV run everything. Fire TV (Fire OS) runs all three options, with Amazon's
   home flashing up first. Samsung runs it as an app, with a computer that stays on, and LG the
-  same way (run on nine real LGs so far). Developer mode has to be on.
-- A Google TV update can switch the Google home back on. Option B's bridge checks once a day and
-  switches it off again; with option A, run `apply.sh` again.
+  same way (run on nine real LGs so far). Roku is built the same way but not yet run on a real Roku.
+  Developer mode has to be on.
+- A Google TV update can switch ambient mode back on. Option B's bridge checks once a day and
+  switches it off again; with option A, run `apply.sh` again. couch-tv never switches the Google
+  home off.
 - Some apps will not open a show directly. They open the app instead. See `bridge/DEEPLINKS.md`.
 - The bridge's own messages (errors, notes) are in English in every language.
 - No support promise. It works on the TVs it was built on. Your TV may differ.

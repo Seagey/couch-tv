@@ -34,7 +34,8 @@ home button unless you switch that on.
 ## Which TVs
 
 - **Yes:** Android TV and Google TV (Chromecast with Google TV, Google TV Streamer, Sony, TCL,
-  Hisense, Philips and other Google TV sets), Nvidia Shield, and Fire TV on Fire OS. Android 7.1 or newer.
+  Hisense, Philips and other Google TV sets), Nvidia Shield, and Fire TV on Fire OS. Android 7.1 or newer
+  (Android 6 is experimental and needs the app built from main until the next release).
 - **No:** Samsung (Tizen), LG (webOS), Roku, Apple TV, Hisense VIDAA, and Fire TV sticks on Vega OS.
   These do not run Android apps. Use the computer bridge for those where it can reach them.
 

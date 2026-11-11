@@ -181,7 +181,7 @@ ares tools) does anything, and Wake-on-LAN.
 
 | | LG |
 |---|---|
-| couch-tv home as an app, apps in your order, the remote's arrows, OK and Back | Yes (built, not yet seen on a real LG) |
+| couch-tv home as an app, apps in your order, the remote's arrows, OK and Back | Yes (seen on real LGs, see Test status above) |
 | Opens by itself when the TV is switched on | Yes, with the bridge running |
 | LG's own Home button | Still opens LG's menu. Press Back or open couch-tv from the app row |
 | Phone remote: keys, volume, mute, open an app | Yes (the TV asks to accept the remote once) |
