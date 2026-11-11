@@ -15,9 +15,16 @@
 <video class="bgvid" id="bgvid" muted loop playsinline preload="none" aria-hidden="true"></video>
 <div class="scenes" id="scenes" aria-hidden="true"></div>
 <div class="scrim" aria-hidden="true"></div>
+<!-- Spotlight look only: the backdrop in the focused picture's colours (two small canvases, stretched) -->
+<div class="sp-bg" id="sp-bg" aria-hidden="true">
+  <div class="sp-l on"><canvas width="32" height="18"></canvas></div>
+  <div class="sp-l"><canvas width="32" height="18"></canvas></div>
+  <div class="sp-vig"></div>
+</div>
 
 <header class="top">
   <div class="top-left">
+    <div class="sp-wx none" id="sp-wx"></div>
     <div class="people-wrap">
       <div class="people" id="people"></div>
       <!-- three or more people: the list the head icon opens -->
@@ -43,6 +50,10 @@
     <div class="np" id="np" aria-live="polite"></div>
   </div>
 </header>
+
+<!-- Spotlight look only: the row of cards (Home) and the Shows page below the dock, drawn by app.js -->
+<section class="sp-home" id="sp-home" aria-label="Home"><div id="sp-cards"></div></section>
+<section class="sp-rows" id="sp-rows" aria-label="Shows"><div class="sp-track" id="sp-track"></div></section>
 
 <main class="home">
   <section class="shelf" id="shelf-section" aria-labelledby="shelf-title">

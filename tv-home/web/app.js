@@ -31,6 +31,9 @@
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
   var THEME = "night", NIGHT = true, CLOCK24 = false;
+  // Spotlight: the dock and people of the Night look, with widgets instead of the scenes, a Shows
+  // page below the dock, and a backdrop in the colours of whatever has focus. NIGHT stays true.
+  var SPOT = false;
   // Glass panels ("off", "on", or "lite": no blur, for slower TVs) and the video background, from
   // Home settings, then home.glass and home.video_url. Both are off unless someone switches them on.
   var GLASS = "off", GLASS_ICONS = false, VIDEO_ON = false, VIDEO_URL = "";
@@ -203,9 +206,11 @@
     QUICK = (Array.isArray(ST.quick) ? ST.quick : TVCFG.quick || ["sleep", "picture"])
       .filter(function (q, i, a) { return QUICK_ALL.indexOf(q) >= 0 && a.indexOf(q) === i; });
     THEME = (Q.match(/[?&]theme=([a-z]+)/) || [])[1] || lookSetting();
-    if (THEME !== "classic") THEME = "night";
-    NIGHT = THEME === "night";
+    if (THEME !== "classic" && THEME !== "spot") THEME = "night";
+    SPOT = THEME === "spot";
+    NIGHT = THEME === "night" || SPOT;
     document.documentElement.classList.toggle("theme-night", NIGHT);
+    document.documentElement.classList.toggle("theme-spot", SPOT);
     GLASS = glassSetting();
     document.documentElement.classList.toggle("glass", GLASS !== "off");
     document.documentElement.classList.toggle("glass-lite", GLASS === "lite");
@@ -388,12 +393,13 @@
     var loc = window.I18N ? window.I18N.locale() : "en-AU";
     var day = d.toLocaleDateString(loc, { weekday: "long", day: "numeric", month: "long" }).replace(",", "");
     day = day.charAt(0).toUpperCase() + day.slice(1);   // "lunes 27 de octubre" starts a line on screen
-    var w = NIGHT && WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
+    var w = NIGHT && !SPOT && WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
     $("date").innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' + wxIcon(w) + esc(tempText(w.temp)) +
       '<span class="ww"> ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
     fitDate();
     document.body.classList.toggle("night", h >= 21 || h < 6);
-    if (NIGHT) glassClock(hm);
+    if (NIGHT && !SPOT) glassClock(hm);
+    if (SPOT) spotWeather();
     if (quickReady) renderQuick();
   }
 
@@ -691,7 +697,7 @@
   var music = null, npI = 1;
   function npVisible() { return NP_ON && !!music && !OFFLINE; }
   // reachable with the remote: in the Night look it steps aside with the cards while More apps is open
-  function npReach() { return npVisible() && !(NIGHT && expanded); }
+  function npReach() { return npVisible() && !SPOT && !(NIGHT && expanded); }
   function renderNp() {
     var el = $("np"), on = npVisible();
     el.classList.toggle("on", on);
@@ -1035,6 +1041,7 @@
   function renderShelf() {
     var track = $("shelf");
     data.shows = (data.showsBy[who] || []).slice(0, KEEP_MAX);
+    if (SPOT) { shelfEls = []; track.innerHTML = ""; renderPeople(); return; }   // the cards carry the shows
     var anyone = PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
     // nobody has anything on the go: no empty box, the photo has the space (unless Now playing
     // is up at night). The people switcher stays: with nothing yet (Netflix tells Android nothing on
@@ -1408,9 +1415,236 @@
     });
   }
 
+  // ---------------- Spotlight: widgets, the Shows page, a backdrop in the focused colours ----------------
+  // Home: the clock top left, place and weather and people top right, one row of cards across the
+  // middle (weather, the show you were on as the big card, more shows), the dock below. Down from
+  // the dock: Shows, a row per dock app of what that app published to Android TV (Rows.kt in the
+  // on-TV app), its own tile first. The backdrop is the focused picture drawn onto a 48x27 canvas
+  // and stretched over the screen: a soft wash of its colours that costs the TV almost nothing.
+  var spEls = [], spItems = [], si = 2, spRows = [], ri = 0, ci = 0, rowsOpen = false, SPR = null;
+  var spSrc = "", spLayer = 0, spLoad = 0;
+  // rem at 1920x1080 (1rem = 16px there)
+  var SP_SLOTS = [
+    { k: "wx", x: 7.5, y: 20.5, w: 25, h: 13.25 },
+    { k: 1, x: 7.5, y: 35.25, w: 25, h: 13.25 },
+    { k: 0, x: 35, y: 20.5, w: 50, h: 28, hero: true },
+    { k: 2, x: 87.5, y: 20.5, w: 25, h: 13.25 },
+    { k: 3, x: 87.5, y: 35.25, w: 25, h: 13.25 }
+  ];
+  function spTiles() {
+    var out = [];
+    spRows.forEach(function (r) { if (r.els) out = out.concat(r.els); });
+    return out;
+  }
+  function dockApps() {
+    var arr = arrangeItems();
+    return arr.items.slice(0, arr.line).filter(function (a) { return a.kind === "app" && a.package; });
+  }
+  function appNameOf(pkg) {
+    var a = data.apps.filter(function (x) { return x.package === pkg; })[0];
+    return a ? a.name : "";
+  }
+  function rowSub(r, withApp) {
+    var ep = r.season && r.episode ? "S" + r.season + " · E" + r.episode : (r.episode_title || "");
+    return [ep, withApp ? appNameOf(r.package) : ""].filter(Boolean).join(" · ");
+  }
+  function appCard(a) { return { kind: "app", title: a.name, art: a.banner || iconUrl(a.package), pkg: a.package, app: a }; }
+  // Keep watching for whoever is picked, then the apps' own Continue watching (Watch Next), one per title
+  function spShows() {
+    var out = [], seen = {};
+    function add(it) {
+      var k = String(it.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (!k || seen[k]) return;
+      seen[k] = 1; out.push(it);
+    }
+    (data.showsBy[who] || []).forEach(function (it) {
+      add({ kind: "keep", title: it.title, sub: subtitle(it), art: it.backdrop || it.poster, pkg: it.app && it.app.package, progress: it.progress, src: it });
+    });
+    ((SPR && SPR.continue) || []).forEach(function (r) {
+      add({ kind: "row", title: r.title, sub: rowSub(r, true), art: r.thumb || r.poster, pkg: r.package, progress: r.progress, id: r.id });
+    });
+    return out;
+  }
+  function spFace(it, big, bare) {
+    if (it.kind === "app") return '<img class="sp-art" src="' + esc(it.art) + '" alt="" decoding="async">';
+    var h = it.art ? '<img class="sp-art" src="' + esc(it.art) + '" alt="" decoding="async" onerror="this.className=\'sp-art none\'">' :
+      '<span class="sp-art none"></span>';
+    if (!it.art && !bare) h += '<span class="sp-word">' + esc(it.title) + "</span>";
+    h += '<span class="sp-shade"></span>';
+    if (it.pkg && iconUrl(it.pkg)) h += '<span class="sp-badge"><img src="' + esc(iconUrl(it.pkg)) + '" alt="" onerror="this.parentNode.remove()"></span>';
+    if (bare) return h + (it.progress ? '<span class="sp-bar lone"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "");
+    return h + '<div class="sp-t"><b>' + esc(it.title) + "</b>" + (it.sub ? "<small>" + esc(it.sub) + "</small>" : "") +
+      (it.progress ? '<span class="sp-bar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "") +
+      (big ? '<span class="sp-pill">' + ICONS.play + esc(t("sp_resume")) + "</span>" : "") + "</div>";
+  }
+  function spWxHTML() {
+    var w = WX_SHOW ? data.weather : null, place = (w && w.place) || WXCFG.place || "";
+    var h = '<div class="sp-k">' + esc(place || t("sp_weather")) + "</div>";
+    if (!w || w.temp == null) return h + '<div class="sp-wt"><b>–</b></div>';
+    return h + '<div class="sp-wt"><b>' + esc(tempText(w.temp)) + "</b>" + wxIcon(w) + "</div>" +
+      '<div class="sp-ws">' + esc(wxText(w)) + (w.high != null && w.low != null ?
+        " · " + esc(t("sp_hilo", { hi: tempText(w.high), lo: tempText(w.low) })) : "") + "</div>";
+  }
+  // top right: "Bangalore · 27°" beside the people
+  function spotWeather() {
+    var w = WX_SHOW ? data.weather : null, place = (w && w.place) || WXCFG.place || "";
+    var el = $("sp-wx");
+    if (!el) return;
+    el.innerHTML = w && w.temp != null ? "<span>" + esc(place) + "</span>" + wxIcon(w) + "<span>" + esc(tempText(w.temp)) + "</span>" : esc(place);
+    el.classList.toggle("none", !place && !(w && w.temp != null));
+    var card = $("sp-cards").querySelector(".sp-wxc");
+    if (card) card.innerHTML = spWxHTML();
+  }
+  function spItemAt(i) { var el = spEls[i]; return el ? spItems[+el.getAttribute("data-i")] : null; }
+  function spArt(it) { return !it || it.kind === "wx" ? "" : it.art || (it.pkg ? iconUrl(it.pkg) : ""); }
+
+  function renderSpot() {
+    var shows = spShows();
+    var pool = shows.concat(dockApps().filter(function (a) { return !shows.some(function (s) { return s.pkg === a.package; }); }).map(appCard));
+    spItems = SP_SLOTS.map(function (sl) { return sl.k === "wx" ? { kind: "wx" } : pool[sl.k] || null; });
+    $("sp-cards").innerHTML = SP_SLOTS.map(function (sl, i) {
+      var it = spItems[i];
+      if (!it) return "";
+      var st = "left:" + sl.x + "rem;top:" + sl.y + "rem;width:" + sl.w + "rem;height:" + sl.h + "rem";
+      if (it.kind === "wx") return '<div class="sp-card sp-wxc" data-i="' + i + '" style="' + st + '">' + spWxHTML() + "</div>";
+      return '<div class="sp-card' + (sl.hero ? " big" : "") + (it.kind === "app" ? " is-app" : "") + '" data-i="' + i + '" style="' + st + '">' + spFace(it, sl.hero) + "</div>";
+    }).join("");
+    spEls = Array.prototype.slice.call($("sp-cards").children);
+    si = Math.max(0, Math.min(si, spEls.length - 1));
+  }
+  function toSpot(x) {
+    zone = "spot";
+    var hero = -1;
+    spEls.forEach(function (el, i) { if (el.classList.contains("big")) hero = i; });
+    if (x == null) { si = hero >= 0 ? hero : 0; return; }
+    // from the dock: the card above that spot
+    var best = 0, bd = Infinity;
+    spEls.forEach(function (el, i) {
+      var b = el.getBoundingClientRect(), d = Math.abs(b.left + b.width / 2 - x) + (b.top > spEls[0].getBoundingClientRect().top + 4 ? 0 : 40);
+      if (d < bd) { bd = d; best = i; }
+    });
+    si = best;
+  }
+  function overlap(a0, a1, b0, b1) { return Math.min(a1, b1) - Math.max(a0, b0) > 4; }
+  function spotMove(dx, dy) {
+    var cur = spEls[si];
+    if (!cur) { zone = "grid"; paintFocus(); return; }
+    var a = cur.getBoundingClientRect(), best = -1, bd = Infinity;
+    spEls.forEach(function (e, i) {
+      if (i === si) return;
+      var b = e.getBoundingClientRect(), d;
+      if (dx) {
+        if (!overlap(a.top, a.bottom, b.top, b.bottom) || (dx > 0 ? b.left < a.right - 4 : b.right > a.left + 4)) return;
+        d = dx > 0 ? b.left - a.right : a.left - b.right;
+      } else {
+        if (!overlap(a.left, a.right, b.left, b.right) || (dy > 0 ? b.top < a.bottom - 4 : b.bottom > a.top + 4)) return;
+        d = dy > 0 ? b.top - a.bottom : a.top - b.bottom;
+      }
+      d += Math.abs((b.top + b.bottom) - (a.top + a.bottom)) / 8;   // the nearer row first, from the big card
+      if (d < bd) { bd = d; best = i; }
+    });
+    if (best >= 0) si = best;
+    else if (dy < 0) { if (peopleOn()) toPeople(); else if (hasQuick()) { zone = "quick"; qi = 0; } }
+    else if (dy > 0 && gridEls.length) { g = nearestInRow(0, a.left + a.width / 2); zone = "grid"; }
+    paintFocus();
+  }
+
+  // the backdrop: two canvases, the new one fades in over the old
+  function spBack(src) {
+    if (!SPOT || !src || src === spSrc) return;
+    spSrc = src;
+    var n = ++spLoad, im = new Image();
+    im.onload = function () {
+      if (n !== spLoad) return;
+      var ls = $("sp-bg").querySelectorAll(".sp-l"), next = ls[1 - spLayer], c = next.querySelector("canvas"), x = c.getContext("2d");
+      var cw = c.width, ch = c.height, r = Math.max(cw / im.naturalWidth, ch / im.naturalHeight);
+      var w = im.naturalWidth * r, h = im.naturalHeight * r;
+      x.clearRect(0, 0, cw, ch);
+      try { x.filter = "blur(2.5px) saturate(1.5)"; } catch (e) {}
+      x.drawImage(im, (cw - w) / 2, (ch - h) / 2, w, h);
+      next.classList.add("on");
+      ls[spLayer].classList.remove("on");
+      spLayer = 1 - spLayer;
+    };
+    im.onerror = function () { if (n === spLoad) spSrc = ""; };
+    im.src = src;
+  }
+
+  // ---- the Shows page ----
+  function rowsData() {
+    var rows = [], cont = spShows();
+    if (cont.length) rows.push({ label: t("continue_watching"), items: cont });
+    var byPkg = {};
+    ((SPR && SPR.apps) || []).forEach(function (a) { byPkg[a.package] = a.items || []; });
+    dockApps().forEach(function (a) {
+      var items = [appCard(a)].concat((byPkg[a.package] || []).map(function (r) {
+        return { kind: "row", title: r.title, sub: rowSub(r, false), art: r.thumb || r.poster, pkg: r.package, progress: r.progress, id: r.id };
+      }));
+      rows.push({ pkg: a.package, label: a.name, items: items });
+    });
+    return rows;
+  }
+  function renderRows() {
+    spRows = rowsData();
+    $("sp-track").innerHTML = spRows.map(function (r) {
+      var lab = r.pkg && iconUrl(r.pkg) ? '<span class="sp-rl"><img src="' + esc(iconUrl(r.pkg)) + '" alt=""></span>' : '<span class="sp-rl play">' + ICONS.play + "</span>";
+      return '<div class="sp-row">' + lab + '<div class="sp-clip"><h3>' + esc(r.label) + '</h3><div class="sp-strip">' + r.items.map(function (it) {
+        return '<div class="sp-tile' + (it.kind === "app" ? " is-app" : "") + '"><div class="sp-in">' + spFace(it, false, true) + '</div><div class="sp-cap"><b>' +
+          esc(it.kind === "app" ? t("sp_open", { name: it.title }) : it.title) + "</b>" + (it.sub ? "<small>" + esc(it.sub) + "</small>" : "") + "</div></div>";
+      }).join("") + "</div></div></div>";
+    }).join("");
+    Array.prototype.forEach.call($("sp-track").children, function (row, i) {
+      spRows[i].el = row;
+      spRows[i].els = Array.prototype.slice.call(row.querySelectorAll(".sp-tile"));
+    });
+    ri = Math.max(0, Math.min(ri, spRows.length - 1));
+    if (spRows[ri]) ci = Math.min(ci, spRows[ri].items.length - 1);
+  }
+  function openRows() {
+    if (!spRows.length) return;
+    rowsOpen = true; zone = "rows"; ri = 0; ci = 0;
+    document.documentElement.classList.add("sp-rows-on");
+    paintFocus();
+  }
+  function closeRows() {
+    rowsOpen = false;
+    document.documentElement.classList.remove("sp-rows-on");
+    zone = "grid";
+  }
+  function rowsMove(dx, dy) {
+    var r = spRows[ri];
+    if (!r) { closeRows(); paintFocus(); return; }
+    if (dx) ci = Math.max(0, Math.min(r.items.length - 1, ci + dx));
+    else if (dy < 0 && ri === 0) { closeRows(); paintFocus(); return; }   // back up to the dock
+    else if (dy) { ri = Math.max(0, Math.min(spRows.length - 1, ri + dy)); ci = Math.min(ci, spRows[ri].items.length - 1); }
+    paintFocus();
+  }
+  function paintRows() {
+    var r = spRows[ri];
+    if (!rowsOpen || !r || !r.els || !r.els[ci]) return false;
+    var el = r.els[ci];
+    el.classList.add("focus");
+    // the focused show sits at the start of its row; the row sits near the top
+    var strip = el.parentNode;
+    strip.style.transform = "translateX(" + (-(el.offsetLeft - r.els[0].offsetLeft)) + "px)";
+    $("sp-track").style.transform = "translateY(" + (-r.el.offsetTop) + "px)";
+    spBack(spArt(r.items[ci]));
+    return true;
+  }
+
+  function spOpen(it) {
+    if (!it || it.kind === "wx") return;
+    if (it.kind === "app") { openApp(it.app || { package: it.pkg }); return; }
+    if (it.kind === "keep") { openShow(it.src); return; }
+    status(t("opening", { title: it.title }), true);
+    api("POST", "/api/rows/open", { id: it.id }, 10000)
+      .then(function () { status(""); })
+      .catch(function () { if (TV && it.pkg && TV.launch(it.pkg)) status(""); else status(t("sp_cant_open")); });
+  }
+
   // ---------------- focus ----------------
   function clearFocus() {
-    shelfEls.concat(gridEls, quickEls).forEach(function (el) { if (el) el.classList.remove("focus"); });
+    shelfEls.concat(gridEls, quickEls, spEls, spTiles()).forEach(function (el) { if (el) el.classList.remove("focus"); });
     $("people").classList.remove("focus");
     Array.prototype.forEach.call($("people").children, function (el) { el.classList.remove("focus"); });
   }
@@ -1445,6 +1679,11 @@
     if (zone === "menu") { renderMenu(); return; }
     if (zone === "inputs") { if (quickEls[qi]) quickEls[qi].classList.add("focus"); renderInputMenu(); return; }
     if (zone === "pmenu") { renderPop(); $("people").classList.add("focus"); return; }
+    if (zone === "rows") { if (paintRows()) return; zone = "grid"; }
+    if (zone === "spot") {
+      if (spEls[si]) { spEls[si].classList.add("focus"); spBack(spArt(spItemAt(si))); return; }
+      zone = "grid";
+    }
     if (zone === "np") {
       if (!npReach()) { zone = shelfEls.length ? "shelf" : "grid"; paintFocus(); return; }
       renderNp();
@@ -1479,6 +1718,7 @@
       zone = "grid";
       g = Math.max(0, Math.min(g, gridEls.length - 1));
       if (gridEls[g]) gridEls[g].classList.add("focus");
+      if (SPOT && gridItems[g] && gridItems[g].kind === "app") spBack(iconUrl(gridItems[g].package));
       hero(null);
       $("place").style.visibility = "";
       showPhoto();
@@ -1504,6 +1744,8 @@
     if (zone === "appmenu") { if (dy) { amI = Math.max(0, Math.min(amItems.length - 1, amI + dy)); renderAppMenu(); } return; }
     if (zone === "updask") { if (dy) { ai = Math.max(0, Math.min(1, ai + dy)); renderAsk(); } return; }
     if (zone === "inputs") { if (dy) { inI = Math.max(0, Math.min(inItems.length - 1, inI + dy)); renderInputMenu(); } return; }
+    if (zone === "spot") { spotMove(dx, dy); return; }
+    if (zone === "rows") { rowsMove(dx, dy); return; }
     if (lift) { moveLift(dx, dy); return; }
     // Night with More apps open: the cards step aside, so up and down skip them
     var cards = NIGHT && expanded ? [] : shelfEls;
@@ -1549,7 +1791,8 @@
       if (dx < 0 && qi === 0) { if (peopleOn()) toPeople(); }
       else if (dx) qi = Math.max(0, Math.min(nq - 1, qi + dx));
       else if (dy > 0) {
-        if (!NIGHT && npReach()) zone = "np";
+        if (SPOT && spEls.length) toSpot();
+        else if (!NIGHT && npReach()) zone = "np";
         else if (peopleOn()) toPeople();
         else if (cards.length) zone = "shelf";
         else { zone = "grid"; g = Math.min(GRID_COLS, gridEls.length) - 1; }
@@ -1562,7 +1805,10 @@
       else if (dx && !isHead()) {
         // moving across the names only moves the outline; OK picks (you have to click to select), so passing a name on the way to Sleep timer changes nothing
         pi = Math.max(0, Math.min(PEOPLE.length - 1, pi + dx));
-      } else if (dy > 0) zone = NIGHT && npReach() ? "np" : cards.length ? "shelf" : "grid";
+      } else if (dy > 0) {
+        if (SPOT && spEls.length) toSpot();
+        else zone = NIGHT && npReach() ? "np" : cards.length ? "shelf" : "grid";
+      }
     } else if (zone === "shelf") {
       if (dx < 0 && s === 0 && NIGHT && npReach()) { zone = "np"; npI = 2; }
       else if (dx) s = Math.max(0, Math.min(shelfEls.length - 1, s + dx));
@@ -1579,7 +1825,8 @@
         var nx = g + dx;
         if (nx >= 0 && nx < gridEls.length && Math.floor(nx / GRID_COLS) === row) g = nx;
       } else if (dy < 0 && row === 0) {
-        if (cards.length) zone = "shelf";
+        if (SPOT && !expanded && spEls.length) { var gb = gridEls[g].getBoundingClientRect(); toSpot(gb.left + gb.width / 2); }
+        else if (cards.length) zone = "shelf";
         else if (npReach()) zone = "np";
         else if (peopleOn()) toPeople();
         else if (hasQuick()) zone = "quick";   // offline the sleep and picture buttons are hidden
@@ -1587,6 +1834,9 @@
         g -= GRID_COLS;
       } else if (row < lastRow) {
         g = Math.min(g + GRID_COLS, gridEls.length - 1);
+      } else if (SPOT && !expanded) {
+        openRows();   // down from the dock: the Shows page
+        return;
       }
     }
     paintFocus();
@@ -1595,7 +1845,8 @@
   // Start on the people switch, so the first press picks who is watching.
   function startFocus() {
     s = 0; g = 0;
-    if (peopleOn()) toPeople();
+    if (SPOT && spEls.length) toSpot();   // Spotlight starts on the big card: one press to carry on watching
+    else if (peopleOn()) toPeople();
     else zone = shelfEls.length ? "shelf" : "grid";
   }
 
@@ -1609,6 +1860,7 @@
     if (zone === "pmenu") { if (plift) dropPeople(); else closePop(); paintFocus(); return; }
     if (zone === "menu") { closeMenu(); paintFocus(); return; }   // BACK just closes the sleep choices
     if (zone === "inputs") { closeInputMenu(); paintFocus(); return; }
+    if (rowsOpen) { closeRows(); paintFocus(); return; }
     if (expanded) { expanded = false; renderGrid(); }
     startFocus();
     paintFocus();
@@ -1650,6 +1902,8 @@
       paintFocus();
       return;
     }
+    if (zone === "spot") { spOpen(spItemAt(si)); return; }
+    if (zone === "rows") { var rw = spRows[ri]; spOpen(rw && rw.items[ci]); return; }
     if (zone === "quick") { quickAction(); return; }
     if (zone === "people") {
       if (isHead()) { openPop(); paintFocus(); return; }
@@ -1657,24 +1911,7 @@
       paintFocus();
       return;
     }
-    if (zone === "shelf") {
-      var it = data.shows[s];
-      if (!it) return;
-      status(it.app ? t("opening_in", { title: it.title, app: it.app.name }) : t("opening", { title: it.title }), true);
-      if (it.wn && TV && TV.openWatchNext) {
-        if (!TV.openWatchNext(String(it.id)) && it.app) TV.launch(it.app.package);
-        status("");
-        return;
-      }
-      api("POST", "/api/continue/open", { id: it.id, who: NOBODY ? "both" : who }, 60000)
-        .then(function (res) { status(res.note || ""); })
-        .catch(function (e) {
-          // the bridge can't help: at least open the app it was in
-          if (TV && it.app && TV.launch(it.app.package)) { status(""); return; }
-          status(e.message);
-        });
-      return;
-    }
+    if (zone === "shelf") { openShow(data.shows[s]); return; }
     var a = gridItems[g], el = gridEls[g];
     if (!a) return;
     if (a.kind === "more") { expanded = true; renderGrid(); paintFocus(); return; }
@@ -1692,9 +1929,30 @@
         .then(function () { el.classList.remove("busy"); });
       return;
     }
+    openApp(a);
+  }
+  function openApp(a) {
     opened(a.package);
     if (TV && TV.launch(a.package)) return;
     api("POST", "/api/launch", { app: a.id || a.package }).catch(function (e) { status(e.message); });
+  }
+  // A Keep watching show: the app's own Watch Next row when the launcher has it, else the bridge
+  // (or the on-TV app) finds and plays it, else at least its app opens.
+  function openShow(it) {
+      if (!it) return;
+      status(it.app ? t("opening_in", { title: it.title, app: it.app.name }) : t("opening", { title: it.title }), true);
+      if (it.wn && TV && TV.openWatchNext) {
+        if (!TV.openWatchNext(String(it.id)) && it.app) TV.launch(it.app.package);
+        status("");
+        return;
+      }
+      api("POST", "/api/continue/open", { id: it.id, who: NOBODY ? "both" : who }, 60000)
+        .then(function (res) { status(res.note || ""); })
+        .catch(function (e) {
+          // the bridge can't help: at least open the app it was in
+          if (TV && it.app && TV.launch(it.app.package)) { status(""); return; }
+          status(e.message);
+        });
   }
 
   // ---------------- Smart home: the rooms and scenes screen (smarthome.js) ----------------
@@ -1988,8 +2246,8 @@
   // ---- look, scenes and the household's own photos ----
   var SECS_STEPS = [10, 15, 20, 30, 45, 60, 120];
   function lookRows() {
-    var look = lookSetting() === "classic" ? "classic" : "night", st = sceneState(), rows = [head(t("look_head"))];
-    ["night", "classic"].forEach(function (id) {
+    var ls = lookSetting(), look = ls === "classic" || ls === "spot" ? ls : "night", st = sceneState(), rows = [head(t("look_head"))];
+    ["night", "spot", "classic"].forEach(function (id) {
       rows.push({ kind: "choice", key: "look:" + id, label: t("look_" + id), sub: t("look_" + id + "_sub"), checked: look === id,
         act: function () { ST.look = id; keep("tvhome.look", id); saveSettings(); } });
     });
@@ -2663,7 +2921,8 @@
   // Focus is never lost: after any key, if nothing shows focus, the first dock app gets it.
   function ensureFocus() {
     if (document.querySelector(".focus")) return;
-    zone = "grid"; g = 0;
+    if (SPOT && spEls.length && !rowsOpen) toSpot();
+    else { zone = "grid"; g = 0; }
     paintFocus();
   }
 
@@ -2791,6 +3050,7 @@
   function render() {
     renderShelf();
     renderGrid();
+    if (SPOT) { renderSpot(); renderRows(); }
     if (!touched && zone !== "updask") startFocus();
     paintFocus();
   }
@@ -2871,7 +3131,9 @@
       syncSettings(),
       // Android's Watch Next rows: this app may read them, the bridge's ADB may not. They name a
       // play an app gave no title for (Netflix sends none, Prime only its own name, issue #23).
-      sendWatchNext()
+      sendWatchNext(),
+      // Spotlight's Shows page: what each app published to Android TV (on-TV app only)
+      SPOT && (ON_TV || MOCK || PREVIEW) ? api("GET", "/api/rows", null, 9000).then(function (j) { SPR = j; }) : Promise.resolve()
     ];
     return Promise.all(jobs.map(function (p) { return p.then(function () { return true; }, function () { return false; }); }))
       .then(function (ok) {
@@ -2898,7 +3160,11 @@
 
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
-  window.tv = { back: goHome, home: function () { if (zone === "settings") closeSettings(); else goHome(); refresh(); },
+  window.tv = { back: goHome, home: function () {
+      if (zone === "settings") closeSettings();
+      else { if (rowsOpen) closeRows(); goHome(); }   // Home always lands on the home page itself
+      refresh();
+    },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
     resume: function () { okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); },
@@ -2918,7 +3184,10 @@
     mark("app-start");
     clock();
     setInterval(clock, 15000);
-    if (NIGHT) {
+    if (SPOT) {
+      refreshWeather();
+      setInterval(refreshWeather, WX_EVERY * 60000);
+    } else if (NIGHT) {
       buildScenes();
       // ?scene=fog starts on that scene, for previews (?scene=own: the first of the household's
       // photos; ?scene=<id>: one of your own scenes)

@@ -255,6 +255,21 @@
           return resolve({ ok: true, mode: picture, supported: true, can_set: true,
             modes: [{ id: "calibrated", name: "Calibrated" }, { id: "dynamic", name: "Dynamic" }] });
         }
+        // Spotlight's Shows page: what apps published to Android TV (the on-TV app's Rows.kt)
+        if (path.indexOf("/api/rows/open") === 0) return resolve({ ok: true });
+        if (path.indexOf("/api/rows") === 0) {
+          var row = function (pkg, base, n) {
+            return Array.apply(null, Array(n)).map(function (_, i) {
+              var b = shows[(base + i) % shows.length];
+              return { id: "p" + pkg.length + i, package: pkg, title: b.title + (i ? " " + (i + 1) : ""), season: null, episode: null,
+                poster: null, thumb: b.backdrop, progress: null, openable: true };
+            });
+          };
+          return resolve({ ok: true, continue: empty ? [] : [{ id: "w1", package: "com.netflix.ninja", title: "Kota Factory", season: "3", episode: "2",
+              poster: null, thumb: jw("backdrop/272750278/s1440/slow-horses"), progress: 0.4, openable: true }],
+            apps: [{ package: "com.netflix.ninja", items: row("com.netflix.ninja", 0, 5) },
+                   { package: "com.google.android.youtube.tv", items: row("com.google.android.youtube.tv", 2, 6) }] });
+        }
         if (path.indexOf("/api/screens/open") === 0) return resolve({ ok: true, note: "" });
         if (path.indexOf("/api/screens") === 0) return resolve({ ok: true, screens: screens });
         resolve({ ok: true });

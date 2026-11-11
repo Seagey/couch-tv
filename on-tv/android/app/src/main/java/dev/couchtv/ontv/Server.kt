@@ -170,6 +170,12 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "POST /api/volume" -> volume(body(s))
             "GET /api/screenshot" -> newFixedLengthResponse(Response.Status.OK, "image/png", Tv.screenshot().inputStream(), -1).noStore()
             "GET /api/weather" -> json(200, ok(Weather.get() ?: throw ApiError(503, "No weather right now.")))
+            "GET /api/rows" -> json(200, ok(Rows.all()))
+            "POST /api/rows/open" -> {
+                val id = body(s).optString("id").ifEmpty { throw ApiError(400, "id is required") }
+                if (!Rows.open(id)) throw ApiError(404, "That show can't be opened from here.")
+                json(200, ok())
+            }
             "POST /api/home-apps" -> {
                 val b = body(s)
                 Store.writeJson("home-apps.json", JSONObject().put("apps", b.optJSONArray("apps") ?: JSONArray()).put("line", b.optInt("line", 10)))

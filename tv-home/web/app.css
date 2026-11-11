@@ -926,3 +926,125 @@ body {
 .theme-night .np-t small { font-size: 1.25rem; line-height: 1.625rem; }
 .theme-night.gearing .np-slot, .theme-night.apping .np-slot { opacity: 0; }
 .no-flex-gap.theme-night .shelf-row > * + * { margin-left: 1.375rem; }
+
+/* ================= Spotlight: widgets, the Shows page, a backdrop in the focused colours =================
+   Built on the Night look (html.theme-night.theme-spot): its dock, people and quick buttons stay,
+   the scenes go. Layout after Sertan Helvacı's tvOS concept; the colour that follows focus after
+   Michael But's TV app preview (both on Dribbble). */
+.sp-bg, .sp-home, .sp-rows, .sp-wx { display: none; }
+.theme-spot .scenes, .theme-spot .bg, .theme-spot .bgvid, .theme-spot .scrim, .theme-spot .shelf,
+.theme-spot .hero, .theme-spot .place { display: none !important; }
+.theme-spot .sp-bg { display: block; position: fixed; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; background: #101015; }
+.sp-l { position: absolute; top: -4%; right: -4%; bottom: -4%; left: -4%; opacity: 0; transition: opacity 900ms ease; }
+.sp-l.on { opacity: 1; }
+.sp-l canvas { width: 100%; height: 100%; display: block; }
+.sp-vig {
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+  background:
+    radial-gradient(120% 95% at 70% 38%, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.62) 80%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0) 25%, rgba(0, 0, 0, 0) 62%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+/* top: the clock (your Antonio) and date at the left, place, weather and people at the right */
+.theme-spot .top { flex-direction: row-reverse; top: 4.25rem; left: 7.5rem; right: 7.5rem; }
+.theme-spot .clock { text-align: left; display: grid; grid-template-columns: auto auto; column-gap: 1.75rem; align-items: end; justify-content: start; }
+.theme-spot .time {
+  display: block; grid-row: 1; font-family: "Antonio", "Arial Narrow", sans-serif; font-weight: 300;
+  font-size: 10.5rem; line-height: 0.82; letter-spacing: -0.01em; color: rgba(255, 255, 255, 0.95);
+}
+.theme-spot .time small { font-family: "Inter", sans-serif; font-size: 1.75rem; font-weight: 500; margin-left: 0.5rem; letter-spacing: 0; }
+.theme-spot .date {
+  position: static; grid-row: 1; margin: 0 0 0.25rem; text-align: left; white-space: normal; max-width: 16rem;
+  font-size: 2.125rem; line-height: 2.5rem; font-weight: 500; color: rgba(255, 255, 255, 0.86);
+}
+.theme-spot .quick, .theme-spot .quick-note, .theme-spot .np { grid-column: 1 / span 2; }
+.theme-spot .quick { justify-content: flex-start; margin-top: 1.5rem; }
+.theme-spot .top-left { flex-direction: row; align-items: center; gap: 1rem; }
+.theme-spot .sp-wx {
+  display: flex; align-items: center; gap: 0.75rem; height: 4.25rem; padding: 0 1.75rem; border-radius: 2.125rem;
+  font-size: 1.625rem; font-weight: 520; white-space: nowrap; text-shadow: none;
+  background: rgba(255, 255, 255, 0.1); -webkit-backdrop-filter: blur(1.75rem) saturate(170%); backdrop-filter: blur(1.75rem) saturate(170%);
+  box-shadow: inset 0 0.09rem 0 rgba(255, 255, 255, 0.36), inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.14);
+}
+.theme-spot .sp-wx.none { display: none; }
+.sp-wx svg, .sp-wxc svg { width: 1.75rem; height: 1.75rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.sp-wx span:first-child::after { content: "·"; margin-left: 0.75rem; opacity: 0.6; }
+
+/* glass, a little clearer than the Night look's */
+.theme-spot .people, .theme-spot .qbtn, .theme-spot .grid {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0.09rem 0 rgba(255, 255, 255, 0.36), inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.14), 0 1.5rem 3.75rem rgba(0, 0, 0, 0.25);
+}
+
+/* Home: one row of cards across the middle */
+.theme-spot .sp-home { display: block; position: fixed; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; transition: opacity 400ms ease; }
+.theme-spot.expanded .sp-home, .theme-spot.sp-rows-on .sp-home { opacity: 0; }
+.sp-card {
+  position: absolute; border-radius: 1.875rem; overflow: hidden; background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.14), 0 1.5rem 3.5rem rgba(0, 0, 0, 0.3);
+  transition: transform 260ms var(--ease), box-shadow 260ms var(--ease);
+}
+.sp-card.focus { transform: scale(1.05); box-shadow: 0 0 0 0.3125rem #fff, 0 2.25rem 4.5rem rgba(0, 0, 0, 0.5); z-index: 2; }
+.sp-art { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+.sp-art.none { background: linear-gradient(150deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04)); }
+.sp-card.focus .sp-art { animation: spkb 16s ease-in-out infinite alternate; }
+@keyframes spkb { from { transform: scale(1); } to { transform: scale(1.1) translate(-2%, -1%); } }
+.sp-shade { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(0deg, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0) 60%); }
+.sp-word { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; padding: 0 1.5rem;
+  text-align: center; font-family: "Antonio", sans-serif; font-weight: 300; font-size: 3.25rem; line-height: 1; text-transform: uppercase; letter-spacing: 0.03em; }
+.sp-badge { position: absolute; left: 1.25rem; top: 1.25rem; width: 3.5rem; height: 3.5rem; border-radius: 0.875rem; overflow: hidden; box-shadow: 0 0.375rem 1rem rgba(0, 0, 0, 0.45); }
+.sp-badge img { width: 100%; height: 100%; display: block; }
+.sp-t { position: absolute; left: 1.625rem; right: 1.625rem; bottom: 1.375rem; text-shadow: 0 0.125rem 0.75rem rgba(0, 0, 0, 0.5); }
+.sp-t b { display: block; font-size: 1.875rem; line-height: 2.25rem; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-t small { display: block; margin-top: 0.125rem; font-size: 1.3125rem; line-height: 1.75rem; color: rgba(255, 255, 255, 0.76); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-bar { display: block; height: 0.375rem; margin-top: 0.75rem; border-radius: 0.2rem; background: rgba(255, 255, 255, 0.28); overflow: hidden; }
+.sp-bar i { display: block; height: 100%; background: #fff; }
+.sp-bar.lone { position: absolute; left: 1.125rem; right: 1.125rem; bottom: 1rem; margin: 0; }
+.sp-card.big .sp-t { left: 2.75rem; right: 2.75rem; bottom: 2.5rem; }
+.sp-card.big .sp-t b { font-size: 4.5rem; line-height: 5rem; font-weight: 680; letter-spacing: -0.02em; }
+.sp-card.big .sp-t small { font-size: 1.625rem; line-height: 2.125rem; }
+.sp-card.big .sp-word { font-size: 6rem; }
+.sp-pill { display: inline-flex; align-items: center; gap: 0.625rem; margin-top: 1.375rem; padding: 0.875rem 1.875rem; border-radius: 2rem;
+  background: #fff; color: #111; font-size: 1.5rem; font-weight: 620; text-shadow: none; }
+.sp-pill svg { width: 1.375rem; height: 1.375rem; fill: currentColor; }
+.sp-card.is-app { background: #1c1c21; }
+.sp-wxc { padding: 1.5rem 1.875rem; background: rgba(255, 255, 255, 0.1); -webkit-backdrop-filter: blur(1.75rem) saturate(170%); backdrop-filter: blur(1.75rem) saturate(170%);
+  box-shadow: inset 0 0.09rem 0 rgba(255, 255, 255, 0.36), inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.14), 0 1.5rem 3.5rem rgba(0, 0, 0, 0.25); }
+.sp-k { font-size: 1.3125rem; font-weight: 640; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255, 255, 255, 0.75); }
+.sp-wt { display: flex; align-items: center; justify-content: space-between; margin-top: 0.25rem; }
+.sp-wt b { font-size: 5rem; line-height: 5.75rem; font-weight: 240; letter-spacing: -0.03em; }
+.sp-wxc .sp-wt svg { width: 3.25rem; height: 3.25rem; }
+.sp-ws { font-size: 1.5rem; line-height: 2rem; color: rgba(255, 255, 255, 0.82); }
+
+/* the dock sits a touch lower and smaller on Spotlight, under the cards */
+.theme-spot .apps { bottom: 2.75rem; transition: opacity 400ms ease; }
+.theme-spot.sp-rows-on .apps, .theme-spot.sp-rows-on .top-left, .theme-spot.sp-rows-on .quick { opacity: 0; }
+
+/* Shows: a row per app, its icon at the start; the focused show grows and says what it is */
+.theme-spot .sp-rows { display: block; position: fixed; left: 0; right: 0; top: 17.5rem; bottom: 0; overflow: hidden; opacity: 0; pointer-events: none; transition: opacity 400ms ease; }
+.theme-spot.sp-rows-on .sp-rows { opacity: 1; }
+.sp-track { transition: transform 450ms var(--ease); }
+.sp-row { display: flex; align-items: flex-start; gap: 2.5rem; height: 26rem; padding-left: 7.5rem; }
+.sp-rl { flex: none; width: 5.75rem; height: 5.75rem; margin-top: 4.5rem; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.12); box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.35); }
+.sp-rl img { width: 100%; height: 100%; display: block; }
+.sp-rl svg { width: 2.25rem; height: 2.25rem; fill: #fff; }
+.sp-clip { flex: 1; min-width: 0; overflow: hidden; padding: 0.5rem 0 0 0.5rem; margin: -0.5rem 0 0 -0.5rem; }
+.sp-clip h3 { font-size: 1.625rem; line-height: 2.25rem; font-weight: 600; color: rgba(255, 255, 255, 0.78); margin-bottom: 1rem; }
+.sp-strip { display: flex; align-items: flex-start; gap: 1.75rem; transition: transform 380ms var(--ease); }
+.sp-tile { position: relative; flex: none; width: 23rem; }
+.sp-in { position: relative; width: 23rem; height: 12.9375rem; border-radius: 1.25rem; overflow: hidden; background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.12); transition: box-shadow 200ms ease; }
+.sp-tile.focus, .sp-tile.focus .sp-in { width: 28.75rem; }
+.sp-tile.focus .sp-in { height: 16.1875rem; box-shadow: 0 0 0 0.3125rem #fff, 0 1.75rem 3.5rem rgba(0, 0, 0, 0.5); }
+.sp-tile .sp-badge { width: 2.75rem; height: 2.75rem; left: 0.875rem; top: 0.875rem; border-radius: 0.6875rem; }
+.sp-tile.is-app .sp-badge { display: none; }
+.sp-cap { margin-top: 1rem; opacity: 0; transition: opacity 250ms ease; }
+.sp-tile.focus .sp-cap { opacity: 1; }
+.sp-cap b { display: block; font-size: 1.75rem; line-height: 2.25rem; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-cap small { display: block; font-size: 1.375rem; line-height: 1.875rem; color: rgba(255, 255, 255, 0.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-l, .sp-card, .sp-track, .sp-strip, .sp-home, .sp-rows { transition: none; }
+  .sp-card.focus .sp-art { animation: none; }
+}
