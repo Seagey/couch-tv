@@ -148,6 +148,14 @@ shadows. Both TVs draw at devicePixelRatio 2, so every frame is drawn at 4K. web
 whenever another app opens, so every return is a cold start (about 0.8 s on the QNED88, 2.2 to 2.8 s on
 the NANO83).
 
+**First non-LG brand, 11 November 2026** ([issue #112](https://github.com/Seagey/couch-tv/issues/112),
+reported by asadawar): an Infinix 43W1Q running webOS TV Lite 7.5.8 (the reduced webOS that other brands
+license; 1.5 GB RAM). App only path, no bridge: built with `--apps`, `home.lighter: true` and
+`home.hi_res: false` (the package dropped from 22 MB to 5.6 MB). It installed and opened first time, the
+home drew in full, and app tiles opened from the TV remote. `check-tv.py` saw it as an LG. As on webOS
+5.6.2 and 6.5.3, `listLaunchPoints` from inside the app returned nothing, so build with `--apps`. The
+bridge has not been tried on webOS TV Lite yet.
+
 Everything else was built from LG's documentation and the open source libraries that talk to LG
 TVs, and tested against a stand-in TV on a computer. If you run it on another LG, thank you: please
 [open an issue](https://github.com/Seagey/couch-tv/issues) and say how it went (TV model and year,

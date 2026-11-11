@@ -66,6 +66,10 @@ Not tested by the author. Each line is what someone said worked on their own dev
   `TGuardMemoryManagerTrimHandler`). No crash has come of it, and the home starts again when you press Home.
   A TCL on Android TV 11 also starts its Google home as `.home.VanillaModeHomeActivity`, which the Home
   button watch knows ([issue #51](https://github.com/Seagey/couch-tv/issues/51)).
+- **TCL after a restart.** TCL's boot controller opens the Google home before the Home button watch is running,
+  so on a TCL the watch puts couch-tv in front once in the first two minutes after a restart, as it does on
+  Fire OS ([issue #94](https://github.com/Seagey/couch-tv/issues/94), PR #114). A TCL set to power on to an
+  HDMI input or live TV is covered by couch-tv that one time: press Input to go back.
 - **ADB port.** Most Android TVs and Google TV boxes open the fixed port 5555, which every couch-tv
   script uses: with a Network debugging switch, or on some TVs (a TCL with Android TV 11) with USB
   debugging alone. Some Android 11 and newer Google TVs only offer Wireless
