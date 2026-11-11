@@ -594,7 +594,7 @@
   ];
   var BUILT_IN = SCENE_LIB.slice();   // readConfig() adds your own scenes to SCENE_LIB
   var SCENES = SCENE_LIB.slice(), SCENE_MS = 20000, SUN_SYNC = false;
-  var scene = 0, sceneEls = [], glassShown = "";
+  var scene = 0, sceneEls = [], glassShown = "", lastKeyAt = 0;
 
   // Your own scenes (home.my_scenes in config.json), made with tools/make-scene.py: the photo, glass
   // copy and cut-out in backgrounds/mine/, and how its clock looks. Anything odd falls back to the
@@ -702,6 +702,8 @@
       el.querySelector(".sbg").src = s.src || bgPath(s.photo, ".jpg", !s.mine);
       if (s.fg) el.querySelector(".fg").src = bgPath(s.photo + "-fg", ".webp", !s.mine);
       el.classList.add("ready");
+      // decoded now, while the scene waits at opacity 0, rather than when its fade starts
+      Array.prototype.forEach.call(el.querySelectorAll("img"), function (img) { if (img.decode && img.src) img.decode().catch(function () {}); });
     }
     drawClocks(el, s, glassShown);
   }
@@ -874,9 +876,24 @@
       : pick("water", ["fog", "golden", "dawn", "night"]);
   }
 
+  // Whether a scene may change now. A change costs a weak TV a visible stall (430 ms on an LG
+  // OLED55A2), so it should not land while someone is moving along the rows. lastKeyAt is
+  // Date.now() at the last key press (0 before any). A false here is not lost: the 20 s rotation
+  // and the clock tick (sun_sync) both ask again on their next turn.
+  var sceneHeldSince = 0;
+  function sceneMayChange() {
+    var now = Date.now();
+    if (now - lastKeyAt < 4000) {
+      sceneHeldSince = sceneHeldSince || now;
+      if (now - sceneHeldSince < 60000) return false;   // a minute of browsing still gets the next scene
+    }
+    sceneHeldSince = 0;
+    return true;
+  }
+
   function applySunSync() {
     // the clock ticks before buildScenes() has made the scenes: wait for them (sun_sync on in config.json)
-    if (!NIGHT || !SUN_SYNC || !SCENES.length || sceneEls.length !== SCENES.length) return;
+    if (!NIGHT || !SUN_SYNC || !SCENES.length || sceneEls.length !== SCENES.length || !sceneMayChange()) return;
     var targetId = sunTargetScene();
     var idx = SCENES.map(function (s) { return s.id; }).indexOf(targetId);
     if (idx >= 0 && idx !== scene) {
@@ -886,7 +903,7 @@
 
   // the settings screen covers the scenes, so they wait (one less thing for a small TV stick to draw)
   function nextScene() {
-    if (zone !== "settings") {
+    if (zone !== "settings" && sceneMayChange()) {
       if (SUN_SYNC) applySunSync();
       else showScene(nextFrom(scene));
     }
@@ -3830,6 +3847,7 @@
   }
 
   document.addEventListener("keydown", function (e) {
+    lastKeyAt = Date.now();
     if (screenOffActive) {
       e.preventDefault();
       e.stopPropagation();
