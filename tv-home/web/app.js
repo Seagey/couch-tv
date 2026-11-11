@@ -823,7 +823,8 @@
   }
 
   function applySunSync() {
-    if (!NIGHT || !SUN_SYNC || !SCENES.length) return;
+    // the clock ticks before buildScenes() has made the scenes: wait for them (sun_sync on in config.json)
+    if (!NIGHT || !SUN_SYNC || !SCENES.length || sceneEls.length !== SCENES.length) return;
     var targetId = sunTargetScene();
     var idx = SCENES.map(function (s) { return s.id; }).indexOf(targetId);
     if (idx >= 0 && idx !== scene) {
