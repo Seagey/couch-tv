@@ -69,7 +69,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
      * the page already has them, and refreshing it from its own save would only repeat work.
      */
     private fun refreshHomeAfter(s: IHTTPSession) {
-        val from = s.headers["remote-addr"] ?: return
+        // The socket's own address: a "remote-addr" header sent by the client replaces NanoHTTPD's.
+        val from = s.remoteIpAddress ?: return
         if (from != "127.0.0.1" && from != "::1" && !from.startsWith("0:0:0:0:0:0:0:1")) HomeActivity.refresh()
     }
 

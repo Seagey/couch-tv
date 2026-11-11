@@ -84,9 +84,10 @@ class HomeActivity : Activity() {
 
     private fun load() { web?.loadUrl("$base/tv/") }
 
-    override fun onResume() { super.onResume(); hideBars(); if (ready) js("window.tv && tv.resume()") }
+    override fun onResume() { super.onResume(); front = true; hideBars(); if (ready) js("window.tv && tv.resume()") }
     // the video background stops while an app is in front
-    override fun onPause() { super.onPause(); js("window.tv && tv.pause && tv.pause()") }
+    override fun onPause() { super.onPause(); front = false; js("window.tv && tv.pause && tv.pause()") }
+    @Volatile private var front = false
     override fun onNewIntent(i: Intent) { super.onNewIntent(i); js("window.tv && tv.home()") }
 
     override fun dispatchKeyEvent(e: KeyEvent): Boolean {
@@ -206,10 +207,19 @@ class HomeActivity : Activity() {
          * Shows settings saved by a phone or a setup tool straight away (#96). The home page reads
          * them again only in tv.resume(), when it comes back on screen, so after a save from
          * another device the dock and weather stayed as they were until Home was pressed.
+         * Only while the home is on screen: behind another app, tv.resume() would start the
+         * background video under it, and onResume reads everything again anyway. Saves that come
+         * close together (a phone saving several things) make one refresh, not one each.
          */
         fun refresh() {
-            val a = shown?.get() ?: return
-            a.main.post { if (!a.isFinishing && !a.isDestroyed) a.js("window.tv && tv.resume()") }
+            refresher.removeCallbacks(refreshNow)
+            refresher.postDelayed(refreshNow, 400)
+        }
+
+        private val refresher = Handler(Looper.getMainLooper())
+        private val refreshNow = Runnable {
+            val a = shown?.get()
+            if (a != null && a.front && !a.isFinishing && !a.isDestroyed) a.js("window.tv && tv.resume()")
         }
 
         private val GROUND = Color.parseColor("#0D1E19")
