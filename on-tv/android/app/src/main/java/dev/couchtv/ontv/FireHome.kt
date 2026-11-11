@@ -65,6 +65,28 @@ object FireHome {
         if (wanted) jump()
     }
 
+    /**
+     * Any other TV (a Haier, a TCL, Google TV, issue #98): the Home key can open the maker's own
+     * home by name and ignore the default home, so a home screen that is not this app coming
+     * forward gets this one put back on top. Only the activities the TV lists as a HOME screen
+     * count (never its Settings or setup screens), only with "Use as home screen" on, and only
+     * while the person has switched the Home watch on in Accessibility (or a computer did).
+     */
+    @Volatile private var homeClasses: Set<String> = emptySet()
+    fun readHomes() {
+        val c = App.instance
+        homeClasses = runCatching {
+            c.packageManager.queryIntentActivities(
+                android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME), 0)
+                .filter { it.activityInfo.packageName != c.packageName }
+                .map { it.activityInfo.name }.toSet()
+        }.getOrDefault(emptySet())
+    }
+    fun onOtherHome(pkg: String?, cls: String?) {
+        if (pkg == null || cls == null || pkg == BuildConfig.APPLICATION_ID) return
+        if (App.homeEnabled(App.instance) && cls in homeClasses) jump(force = true)
+    }
+
     /** Cheap to call often: starts the watcher once, only while it is wanted. */
     fun poke() {
         if (!wanted) return
@@ -164,8 +186,8 @@ object FireHome {
         }
     }
 
-    private fun jump() {
-        if (!wanted) return
+    private fun jump(force: Boolean = false) {
+        if (!force && !wanted) return
         val now = System.currentTimeMillis()
         if (now - lastJump < 1200) return   // one jump per press, not one per event
         lastJump = now
