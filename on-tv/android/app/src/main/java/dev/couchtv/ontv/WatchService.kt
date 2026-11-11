@@ -10,13 +10,14 @@ import android.view.accessibility.AccessibilityEvent
  * across reboots, so the Home key keeps landing on this app's home with no computer involved.
  */
 class WatchService : AccessibilityService() {
-    override fun onServiceConnected() { connected = true }
+    override fun onServiceConnected() { connected = true; FireHome.readHomes() }
     override fun onDestroy() { connected = false; super.onDestroy() }
     override fun onInterrupt() {}
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
-        if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && FireHome.isAmazonHome(e.packageName?.toString(), e.className?.toString()))
-            FireHome.onAmazonHome()
+        if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val pkg = e.packageName?.toString(); val cls = e.className?.toString()
+        if (FireHome.isAmazonHome(pkg, cls)) FireHome.onAmazonHome() else FireHome.onOtherHome(pkg, cls)
     }
 
     companion object { @Volatile var connected = false }

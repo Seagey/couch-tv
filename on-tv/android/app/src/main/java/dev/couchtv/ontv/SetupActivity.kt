@@ -67,6 +67,8 @@ class SetupActivity : Activity() {
             refresh()
         }
         row.addView(homeBtn)
+        // The Home key on some TVs opens the maker's own home and ignores the default home: this watch brings couch-tv back.
+        row.addView(button("Home button watch") { runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } })
         row.addView(button("Forget phones") { Auth.forgetAll(); refresh() })
         col.addView(row)
         homeNote = text("", 14f, CREAM_2); col.addView(homeNote)
@@ -105,7 +107,7 @@ class SetupActivity : Activity() {
             !App.homeEnabled(this) -> "Use as home screen asks Android to make Couch TV your home. No computer needed on a plain Android TV."
             HomeRole.held(this) -> "Couch TV is your home screen."
             HomeRole.googleTv(this) -> "This is Google TV, which can keep its own home on the Home button. The Home button watch needs a computer once: see the README."
-            else -> "If Android showed a list, choose Couch TV and press Always. Press the button again to ask again."
+            else -> "If Android showed a list, choose Couch TV and press Always. If Home still opens the TV's own home, press Home button watch and switch on Couch TV home watch."
         }
     }
 
