@@ -2212,6 +2212,9 @@
     return best;
   }
 
+  // which app a grid tile is, to find it again after the dock turns into the full apps view (#98)
+  var dockBack = null;
+  function gridKey(it) { return it ? it.kind + ":" + (it.package || it.id || it.name) : ""; }
   function move(dx, dy) {
     touched = true;
     if (zone === "settings") { setMove(dx, dy); return; }
@@ -2330,6 +2333,13 @@
         g -= GRID_COLS;
       } else if (row < lastRow) {
         g = Math.min(g + GRID_COLS, gridEls.length - 1);
+      } else if (dy > 0 && !expanded && gridItems.some(function (x) { return x.kind === "more"; })) {
+        // Down from the bottom row of the dock opens the full apps view (#98), on the same app
+        dockBack = gridKey(gridItems[g]);
+        expanded = true; renderGrid();
+        var at = -1;
+        gridItems.forEach(function (x, i) { if (at < 0 && gridKey(x) === dockBack) at = i; });
+        g = at >= 0 ? at : Math.min(g, gridEls.length - 1);
       }
     }
     paintFocus();
@@ -2366,7 +2376,16 @@
     if (zone === "pmenu") { if (plift) dropPeople(); else closePop(); paintFocus(); return; }
     if (zone === "menu") { closeMenu(); paintFocus(); return; }   // BACK just closes the sleep choices
     if (zone === "inputs") { closeInputMenu(); paintFocus(); return; }
-    if (expanded) { expanded = false; renderGrid(); }
+    if (expanded) {
+      expanded = false; renderGrid();
+      if (dockBack) {   // opened with Down from the dock: Back lands on that app in the dock again
+        var back = -1;
+        gridItems.forEach(function (x, i) { if (back < 0 && gridKey(x) === dockBack) back = i; });
+        dockBack = null;
+        if (back >= 0) { zone = "grid"; g = back; paintFocus(); return; }
+      }
+    }
+    dockBack = null;
     startFocus();
     paintFocus();
   }
@@ -2437,7 +2456,7 @@
     }
     var a = gridItems[g], el = gridEls[g];
     if (!a) return;
-    if (a.kind === "more") { expanded = true; renderGrid(); paintFocus(); return; }
+    if (a.kind === "more") { dockBack = null; expanded = true; renderGrid(); paintFocus(); return; }
     if (a.kind === "gear") { openGear(); return; }
     if (a.kind === "smart") { openSmart(); return; }
     if (a.kind === "input") {
