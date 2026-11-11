@@ -157,6 +157,13 @@ class MainActivity : Activity() {
     override fun onPause() {
         super.onPause()
         resumed = false
+        try {
+            val lp = window.attributes
+            if (lp.screenBrightness == 0.0f) {
+                lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                window.attributes = lp
+            }
+        } catch (_: Exception) {}
         restoreTimeout(dream = true)   // the screensaver covered the home: timeout goes back
         js("window.tv && tv.pause && tv.pause()")   // the video background stops while an app is in front
     }
@@ -598,6 +605,22 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun openInputs(): Boolean = inputsIntent()?.let { start(it) } ?: false
+
+        // Screen off / Audio-only mode: drops window backlight override to 0f on Android TV
+        // while soundscapes, Spotify or background media continue playing.
+        @JavascriptInterface
+        fun setScreenOff(off: Boolean): Boolean {
+            main.post {
+                try {
+                    val lp = window.attributes
+                    lp.screenBrightness = if (off) 0.0f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                    window.attributes = lp
+                } catch (e: Exception) {
+                    android.util.Log.w("couch-tv", "setScreenOff failed: $e")
+                }
+            }
+            return true
+        }
 
         // The TV's screensaver: Google TV's Ambient mode, where the source and the Google Photos
         // albums are chosen. The dream service only lets the system start a dream, so the TV is

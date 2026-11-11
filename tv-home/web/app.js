@@ -33,7 +33,7 @@
   // read in readConfig() once the page starts (mock.js fills them in for previews). See docs/CONFIG.md.
   var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [];
   var WXCFG = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
-  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "input", "bluetooth", "network", "screensaver"];
+  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "input", "bluetooth", "network", "screensaver"];
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
   var THEME = "night", NIGHT = true, OLED = false, CLOCK24 = false;
@@ -189,6 +189,7 @@
     gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
     look: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="3"/><path d="M2.5 16l5.5-5.5 4.5 4.5 3-3 6 6"/><circle cx="16.5" cy="8.8" r="1.6"/></svg>',
     soundscape: '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
+    screen_off: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4M3 3l18 18"/></svg>',
     input: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8 21h8M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5"/></svg>',
     ps5: '<svg viewBox="0 0 24 24"><path d="M7 6v12M17 6v12M7 10h10M7 14h10"/><circle cx="12" cy="12" r="8.5"/></svg>',
     xbox: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M7.5 7.5c2.5 2.5 6.5 2.5 9 0M7.5 16.5c2.5-2.5 6.5-2.5 9 0M7 8c2 3.5 2 4.5 0 8M17 8c-2 3.5-2 4.5 0 8"/></svg>',
@@ -1200,6 +1201,7 @@
       if (q === "picture") return !OFFLINE && picShown;
       if (q === "look") return true;
       if (q === "soundscape") return true;
+      if (q === "screen_off") return true;
       if (q === "input") return !OFFLINE || nativeInputs();
       if (q === "screensaver") return nativeScreensaver();
       if (q === "bluetooth" || q === "network") return ON_TV && !OFFLINE;
@@ -1242,6 +1244,8 @@
         var lbl = isPlaying ? (t("sound_" + curSound) || curSound) : t("soundscape");
         el.innerHTML = ICONS.soundscape + "<span>" + esc(lbl) + "</span>";
         el.classList.toggle("set", isPlaying);
+      } else if (q === "screen_off") {
+        el.innerHTML = ICONS.screen_off + "<span>" + esc(t("screen_off")) + "</span>";
       } else if (q === "input") {
         el.innerHTML = ICONS.input + "<span>" + esc(t("input")) + "</span>";
       } else if (q === "screensaver") {
@@ -1311,6 +1315,30 @@
   // Start the page again, so a new look or new settings take effect everywhere at once.
   function restart() {
     location.replace(location.href.replace(/([?&])theme=[a-z]+&?/, "$1").replace(/[?&]$/, ""));
+  }
+  // Screen off / Audio-only mode: turns off the display (pitch black canvas for OLEDs and hardware backlight floor)
+  // while sleep soundscapes, Spotify, and sleep timers continue playing in the dark.
+  var screenOffActive = false;
+  function toggleScreenOff(on) {
+    var overlay = $("screen-off-overlay");
+    screenOffActive = !!on;
+    if (screenOffActive) {
+      if (overlay) {
+        var hint = $("screen-off-hint");
+        if (hint) {
+          hint.textContent = t("screen_off_wake_hint");
+          hint.style.animation = "none";
+          void hint.offsetHeight;
+          hint.style.animation = "";
+        }
+        overlay.classList.add("active");
+      }
+      try { if (TV && TV.setScreenOff) TV.setScreenOff(true); } catch (e) {}
+    } else {
+      if (overlay) overlay.classList.remove("active");
+      try { if (TV && TV.setScreenOff) TV.setScreenOff(false); } catch (e) {}
+      paintFocus();
+    }
   }
   // The TV's own input list (HDMI, a console, a set top box): the TV_INPUT key through the bridge,
   // or straight from the launcher when there is no bridge (only where the TV has such a screen).
@@ -1405,6 +1433,7 @@
     else if (q === "picture") togglePicture();
     else if (q === "look") toggleLook();
     else if (q === "soundscape") cycleSoundscape();
+    else if (q === "screen_off") toggleScreenOff(true);
     else if (q === "input") openInputs();
     else if (q === "screensaver") startScreensaver();
     else if (q === "bluetooth" || q === "network") openSettingsScreen(q);
@@ -2266,6 +2295,10 @@
   }
 
   function goHome() {
+    if (screenOffActive) {
+      toggleScreenOff(false);
+      return;
+    }
     if (zone === "ambient") {
       ambientDismissed = true;
       ambientOpen = false;
@@ -3590,6 +3623,12 @@
       box.style.scrollBehavior = "";
     }, { passive: false });
     document.addEventListener("click", function (e) {
+      if (screenOffActive) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleScreenOff(false);
+        return;
+      }
       var p = pointAt(e.target);
       if (!p) {
         // a click beside an open menu closes it, as Back does
@@ -3608,6 +3647,12 @@
   }
 
   document.addEventListener("keydown", function (e) {
+    if (screenOffActive) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleScreenOff(false);
+      return;
+    }
     if (typingKey(e)) return;   // typing a place or a name: the keys belong to the text box
     if (isOk(e)) {
       e.preventDefault();
@@ -3627,6 +3672,11 @@
     ensureFocus();
   });
   document.addEventListener("keyup", function (e) {
+    if (screenOffActive) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (!isOk(e) || isTyping()) return;
     e.preventDefault();
     if (!okDown) return;
@@ -3791,10 +3841,13 @@
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
   window.tv = { back: goHome, home: function () { if (zone === "settings") closeSettings(); else goHome(); refresh(); },
+    screenOff: function () { toggleScreenOff(true); },
+    wakeScreen: function () { toggleScreenOff(false); },
+    isScreenOff: function () { return screenOffActive; },
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); if (window.AmbientWeather) window.AmbientWeather.resume(); },
+    resume: function () { toggleScreenOff(false); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); if (window.AmbientWeather) window.AmbientWeather.resume(); },
     // an app is in front: the video background stops until the home is back
     pause: pauseVideo,
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
@@ -3805,6 +3858,14 @@
   function start() {
     readConfig();
     staticText();
+    var ov = $("screen-off-overlay");
+    if (ov) {
+      ov.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleScreenOff(false);
+      });
+    }
     initSettings();
     // Home settings gets an Updates section, before About, where the launcher can update itself
     if (updRead() && UPD.supported) SECS.splice(SECS.length - 1, 0, ["updates", "download"]);

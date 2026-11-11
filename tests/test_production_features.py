@@ -74,6 +74,13 @@ class TestProductionFeatures(unittest.TestCase):
         q = config.quick_for({"quick": ["sleep", "soundscape", "look"]})
         self.assertEqual(q, ["sleep", "soundscape", "look"])
 
+    def test_screen_off_quick_button(self):
+        q = config.quick_for({"quick": ["sleep", "soundscape", "screen_off", "look"]})
+        self.assertEqual(q, ["sleep", "soundscape", "screen_off", "look"])
+        import server
+        cleaned = server.clean_settings({"quick": ["screen_off", "sleep", "invalid"]})
+        self.assertEqual(cleaned["quick"], ["screen_off", "sleep"])
+
     def test_home_settings_keep_oled_and_soundscape(self):
         # what the TV saves from Home settings must survive the bridge's check
         import server
