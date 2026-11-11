@@ -51,7 +51,7 @@ plainly, early and with nothing changed, that their TV cannot do it this way and
 
 | | |
 |---|---|
-| Download | about 13 MB zipped (the Apple silicon build measured here, 32 MB unpacked). Intel and Windows: see the CI artefacts |
+| Download | about 13 to 14 MB zipped: Apple silicon 13 MB (built here, 32 MB unpacked), Intel Mac 14 MB and Windows 13 MB (CI) |
 | Time to set up | about 10 minutes: 5 at the TV with the remote (Developer options), pairing and connecting 4 s, the home app download 2 s and copy about 45 s over Wireless debugging (21.8 MB measured), the rest a minute |
 | Which TVs | Google TV on Android 11 and newer (pairing code); Android TV with Network or USB debugging on port 5555 (Allow prompt); Fire TV on Fire OS 6 to 8. Not: Samsung, LG, Roku (the bridge), Apple TV, VIDAA, Vega OS Fire TV |
 | What leaves the computer | the release download from GitHub; a typed place to Open-Meteo; nothing else |
@@ -110,8 +110,9 @@ Run on 11 November 2026 on a Mac (macOS 27, Apple silicon), Python 3.11, with tw
 | Unit tests | `python -m unittest discover -s setup-app/tests`: 44 tests, a pretend TV for every apply.sh and undo step, pairing client against server, a pretend Wireless debugging TV for the TLS upgrade, mDNS parsing, the release checks, the page server's locks | OK |
 | Clean install from hashes | `pip install --require-hashes -r requirements.txt` in a fresh venv, then the tests | OK |
 | Built app | PyInstaller 6.16.0 on this Mac; `--self-test` pairs with itself inside the bundle; `tests/smoke.py` | OK, 13.3 MB zip |
-| The repo's own checks | `py_compile` of bridge, scripts and tools; shell scripts parse | OK |
-| Privacy scan | `scripts/privacy-scan.sh` | see the pull request |
+| The repo's own checks | `py_compile` of bridge, scripts and tools; shell scripts parse; the repo's 169 Python tests | OK |
+| CI (`setup-app.yml`) | Apple silicon Mac, Intel Mac and Windows: hash checked install, 44 tests, PyInstaller build, `--self-test` and smoke test inside the built app | passed on the pull request |
+| Privacy scan | `scripts/privacy-scan.sh` (working tree, as the pre-commit hook runs it) | 0 findings |
 
 Put back afterwards: TV 1's Wireless debugging off again (was off), YouTube in front as
 before, Home and the Home button watch unchanged, the two keys this test paired forgotten under
