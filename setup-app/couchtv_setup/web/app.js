@@ -177,8 +177,8 @@
     var f = r.facts;
     if (!f.supported) {
       text("stop-title", "This TV is too old");
-      text("stop-text", "couch-tv needs Android 7.1 or newer, and this TV has Android " + f.android + ". A Google TV box plugged into the TV can run it.");
-      text("stop-more", "");
+      text("stop-text", "This app needs Android 7.1 or newer, and this TV has Android " + f.android + ". A Google TV box plugged into the TV can run couch-tv.");
+      text("stop-more", "On Android 6 (for example the Xiaomi Mi TV 4A), couch-tv is experimental and is set up from a computer with the guide on GitHub. Nothing was changed on the TV.");
       return show("stop");
     }
     if (state.mode === "undo") return undoPlan();

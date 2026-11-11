@@ -26,14 +26,24 @@
       <li><b>Your TV</b>, switched on, and its remote.</li>
       <li><b>This computer on the same Wi-Fi</b> as the TV.</li>
     </ul>
-    <h2>Which TVs work</h2>
+    <h2>Works with</h2>
     <ul class="tvs">
-      <li class="yes"><b>Google TV</b> (Sony, TCL, Hisense, Philips, Chromecast with Google TV, Google TV Streamer and others).</li>
-      <li class="yes"><b>Android TV</b>, if its Developer options have Wireless debugging or Network debugging.</li>
-      <li class="partly"><b>Fire TV</b> sticks and Cubes on Fire OS. Amazon's home flashes up for a moment before couch-tv comes back.</li>
-      <li class="no"><b>Samsung, LG and Roku</b> need a computer at home that stays on. This app cannot set those up: the guide on GitHub can.</li>
-      <li class="no"><b>Apple TV, Hisense VIDAA and the newest Fire TV sticks (Vega OS)</b> cannot run couch-tv. A Google TV box plugged into the TV can.</li>
+      <li class="yes"><b>Google TV</b> (Sony, TCL, Hisense, Philips, Panasonic Google TVs, Chromecast with Google TV, Google TV Streamer and others).</li>
+      <li class="yes"><b>Android TV</b> 7.1 and newer, if Developer options has Wireless debugging, or the TV asks "Allow USB debugging?" over Wi-Fi.</li>
+      <li class="partly"><b>Fire TV on Fire OS</b> (sticks, Cubes, and Fire TV TVs such as Panasonic's). Amazon's home flashes up for a moment before couch-tv comes back.</li>
     </ul>
+    <h2>Does not work with this app</h2>
+    <ul class="tvs">
+      <li class="no"><b>Samsung (Tizen)</b>, <b>LG (webOS)</b> and <b>Roku OS</b>. couch-tv still works on them through a computer at home that stays on (the bridge), just not through this app. The guides are on GitHub: docs/SAMSUNG.md, docs/LG.md and docs/ROKU.md.</li>
+      <li class="no"><b>VIDAA</b> (Hisense's own system).</li>
+      <li class="no"><b>Apple TV (tvOS)</b>.</li>
+      <li class="no"><b>Fire TV sticks on Vega OS</b> (Fire TV Stick 4K Select, Fire TV Stick HD 2026, Fire TV Stick 4K 3rd gen). They cannot install apps.</li>
+      <li class="no"><b>Panasonic with My Home Screen or TiVo OS</b>, and <b>TiVo OS</b> on any brand.</li>
+      <li class="no"><b>Philips with Saphi or Titan OS</b> (most 2025 and all 2026 Philips TVs).</li>
+      <li class="no"><b>Android 6 and 7.0 TVs</b> (for example the Xiaomi Mi TV 4A with PatchWall): experimental, set up from a computer with the GitHub guide.</li>
+      <li class="no"><b>Android TVs with no Wireless debugging that never ask</b> "Allow USB debugging?" over Wi-Fi: they need a computer with a USB cable once. The app checks and tells you.</li>
+    </ul>
+    <p class="small">Any of these can get everything by plugging a Google TV box (for example the Google TV Streamer) into the TV.</p>
     <p class="small">This computer is only needed today. Once it is set up, couch-tv runs on the TV by itself.
       Nothing is deleted from the TV, and nothing about you is sent anywhere.</p>
     <div class="actions">

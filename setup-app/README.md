@@ -9,13 +9,32 @@ on afterwards. It can add the phone remote too (the "lives on the TV" app).
 
 ## Which TVs
 
+**Works with:**
+
 | TV | |
 |---|---|
-| **Google TV** (Sony, TCL, Hisense, Philips, Chromecast with Google TV, Google TV Streamer and others) | Yes. You type a 6 digit code from the TV's Wireless debugging screen. |
-| **Android TV** | Yes if Developer options has Wireless debugging (then as above) or Network or USB debugging that opens the network port (then you press Allow on the TV). Some older Android TVs never ask to Allow a new computer over Wi-Fi: the app says so and stops, and those need a computer with a USB cable once. |
-| **Fire TV** on Fire OS 6, 7 and 8 | Yes, with ADB debugging and Allow. Amazon's home flashes up for a moment before couch-tv comes back. |
-| **Samsung, LG, Roku** | Not with this app. couch-tv runs on them with a computer at home that stays on: see the main README. |
-| **Apple TV, Hisense VIDAA, Fire TV on Vega OS** | No. A Google TV box plugged into the TV works. |
+| **Google TV** (Sony, TCL, Hisense, Philips, Panasonic Google TVs, Chromecast with Google TV, Google TV Streamer and others) | Yes. You type a 6 digit code from the TV's Wireless debugging screen. |
+| **Android TV** 7.1 and newer | Yes if Developer options has Wireless debugging (then as above), or if the TV asks "Allow USB debugging?" over Wi-Fi once Network or USB debugging is on (then you press Allow). |
+| **Fire TV on Fire OS** 6, 7 and 8 (sticks, Cubes, Fire TV TVs) | Yes, with ADB debugging and Allow. Amazon's home flashes up for a moment before couch-tv comes back. |
+
+**Does not work with this app:**
+
+| TV system | |
+|---|---|
+| **Samsung (Tizen)** | couch-tv still works, through a computer at home that stays on (the bridge): [docs/SAMSUNG.md](../docs/SAMSUNG.md). Not through this app. |
+| **LG (webOS)** | The same, through the bridge: [docs/LG.md](../docs/LG.md). Not through this app. |
+| **Roku OS** (Roku TVs and sticks) | The same, through the bridge: [docs/ROKU.md](../docs/ROKU.md) (not yet tried on a real Roku). Not through this app. |
+| **VIDAA** (Hisense's own system) | No. |
+| **Apple TV (tvOS)** | No. |
+| **Fire TV sticks on Vega OS** (Fire TV Stick 4K Select, Fire TV Stick HD 2026, Fire TV Stick 4K 3rd gen) | No: Vega OS cannot install apps. |
+| **Panasonic with My Home Screen or TiVo OS**, and **TiVo OS** on any brand | No. (Panasonic's Fire TV models run Fire OS and work like a Fire TV; its Google TV models work.) |
+| **Philips with Saphi or Titan OS** (most 2025 and all 2026 Philips TVs) | No. (Philips Google TV and Android TV models work.) |
+
+A Google TV box (for example the Google TV Streamer) plugged into any of these gets everything.
+
+**Android TVs that need a computer once, not this app:**
+- An Android TV with no Wireless debugging that never shows "Allow USB debugging?" for a new computer over Wi-Fi needs a computer with a USB cable once. The app checks and says so before it changes anything. (An Android 11 TV with only USB debugging did ask, so try first.)
+- Android 6 and 7.0 TVs (for example the Xiaomi Mi TV 4A with PatchWall): couch-tv is experimental there and is set up from a computer with the guide in this README. The app stops and says so.
 
 ## Get it
 
