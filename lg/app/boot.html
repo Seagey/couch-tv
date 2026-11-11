@@ -31,7 +31,6 @@
     done = true;
     var q = [];
     if (S.tv) q.push("tv=" + encodeURIComponent(S.tv));
-    if (S.key) q.push("key=" + encodeURIComponent(S.key));
     if (live) q.push("api=" + encodeURIComponent(BRIDGE));
     else { q.push("offline=1"); if (!BRIDGE) q.push("alone=1"); }
     location.replace("index.html?" + q.join("&"));
@@ -83,9 +82,7 @@
     x.onerror = x.ontimeout = function () { bridgeAnswer = false; next(); };
     x.send();
     var y = new XMLHttpRequest();
-    var appsUrl = BRIDGE + "/api/webos/apps" + (S.tv ? "?tv=" + encodeURIComponent(S.tv) : "");
-    if (S.key) appsUrl += (appsUrl.indexOf("?") < 0 ? "?" : "&") + "key=" + encodeURIComponent(S.key);
-    y.open("GET", appsUrl);
+    y.open("GET", BRIDGE + "/api/webos/apps" + (S.tv ? "?tv=" + encodeURIComponent(S.tv) : ""));
     if (S.key) y.setRequestHeader("Authorization", "Bearer " + S.key);
     y.timeout = 4000;
     y.onload = function () {

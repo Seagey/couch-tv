@@ -26,7 +26,6 @@
     done = true;
     var q = [];
     if (S.tv) q.push("tv=" + encodeURIComponent(S.tv));
-    if (S.key) q.push("key=" + encodeURIComponent(S.key));
     if (live) q.push("api=" + encodeURIComponent(BRIDGE));
     else { q.push("offline=1"); if (!BRIDGE) q.push("alone=1"); }
     location.replace("index.html?" + q.join("&"));

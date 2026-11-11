@@ -9,12 +9,12 @@
   var MOCK = /[?&]mock\b/.test(Q);
   var PREVIEW = /[?&]preview\b/.test(Q);
   var API = decodeURIComponent((Q.match(/[?&]api=([^&]+)/) || [])[1] || "");
-  var KEY = decodeURIComponent((Q.match(/[?&]key=([^&]+)/) || [])[1] || "");
+  // the LG and Samsung apps build the key in rather than put it in the page's address, and theirs
+  // wins over a key an older build left in localStorage
+  var KEY = decodeURIComponent((Q.match(/[?&]key=([^&]+)/) || [])[1] || "") ||
+    (window.COUCH_WEBOS || window.COUCH_TIZEN || window.COUCH_SETTINGS || {}).key || "";
   if (KEY) { try { localStorage.setItem("couchtv.key", KEY); } catch (e) {} }
   else { try { KEY = localStorage.getItem("couchtv.key") || ""; } catch (e) {} }
-  if (!KEY && window.COUCH_SETTINGS && window.COUCH_SETTINGS.key) {
-    KEY = window.COUCH_SETTINGS.key;
-  }
   // which TV this page is on (the launcher adds ?tv=<id> on any TV that is not the default); none = living room
   var TV_ID = (Q.match(/[?&]tv=([a-z-]+)/) || [])[1] || "";
   // The launcher's saved copy of this page, opened when the computer is off (or when there is no
