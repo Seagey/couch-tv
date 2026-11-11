@@ -278,6 +278,9 @@ out every computer, so reconnect yours afterwards).
 - `web/setup.html`: the phone setup page (ADB, wireless debugging pairing, names, weather, ask).
 - Endpoints are those in `bridge/API.md`, plus `/api/pair`, `/api/pair/start`, `/api/adb`,
   `/api/adb/connect`, `/api/adb/pair`, `/api/settings`, `/api/phones/forget` and `/api/ws`.
+- A save from a phone or setup tool (`POST /api/settings`, `/api/app-order` or `/api/people`) shows
+  on the TV straight away: the home page reads them again as if it had just come back on screen.
+  Saves the home page makes itself are left alone.
 
 ## Tests
 
