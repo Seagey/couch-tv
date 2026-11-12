@@ -1194,15 +1194,21 @@
   function nativeScreensaver() {
     try { return !!(TV && TV.canStartScreensaver && TV.canStartScreensaver()); } catch (e) { return false; }
   }
+  function nativeSleep() {
+    try { return !!(TV && TV.canSleep && TV.canSleep()); } catch (e) { return false; }
+  }
+  function nativeSettingsScreen() {
+    try { return !!(TV && TV.openSettingsScreen); } catch (e) { return false; }
+  }
   function quickVisible() {
     return QUICK.filter(function (q) {
-      if (q === "sleep") return !OFFLINE || !!(TV && TV.canSleep && TV.canSleep());
+      if (q === "sleep") return !OFFLINE || nativeSleep();
       if (q === "picture") return !OFFLINE && picShown;
       if (q === "look") return true;
       if (q === "soundscape") return true;
       if (q === "input") return !OFFLINE || nativeInputs();
       if (q === "screensaver") return nativeScreensaver();
-      if (q === "bluetooth" || q === "network") return ON_TV && !OFFLINE;
+      if (q === "bluetooth" || q === "network") return nativeSettingsScreen() || (ON_TV && !OFFLINE);
       return false;
     });
   }
@@ -1380,12 +1386,16 @@
       if (!done) note(window.MOCK_INPUTS ? t("opening", { title: it.label }) : t("no_inputs"));
       return;
     }
-    if (TV && TV.openSettingsScreen) { try { TV.openSettingsScreen(it.act); } catch (e) {} }
-    else if (ON_TV) openSettingsScreen(it.act);
+    openSettingsScreen(it.act);
   }
-  // The TV's Bluetooth or network settings, opened by the on-TV app (Tv.openSettingsScreen).
+  // The TV's Bluetooth or network settings: native launcher bridge when available, else on-TV server.
   function openSettingsScreen(which) {
-    api("POST", "/api/launch", { app: which }).catch(function (e) { note(e.message); });
+    if (nativeSettingsScreen()) {
+      var ok = false;
+      try { ok = !!TV.openSettingsScreen(which); } catch (e) {}
+      if (ok) return;
+    }
+    if (ON_TV && !OFFLINE) api("POST", "/api/launch", { app: which }).catch(function (e) { note(e.message); });
   }
   // The TV's own screensaver (Google TV's Ambient mode: the Google Photos albums are chosen there).
   function startScreensaver() {
@@ -3081,11 +3091,11 @@
     return rows;
   }
   function quickNeeds(q) {
-    if (q === "sleep" && OFFLINE) return t("quick_needs_bridge");
+    if (q === "sleep" && OFFLINE && !nativeSleep()) return t("quick_needs_bridge");
     if (q === "picture" && (OFFLINE || !picShown)) return t("quick_needs_picture");
     if (q === "input" && OFFLINE && !nativeInputs()) return t("quick_needs_inputs");
     if (q === "screensaver" && !nativeScreensaver()) return t("quick_needs_tv_app");
-    if ((q === "bluetooth" || q === "network") && (!ON_TV || OFFLINE)) return t("quick_needs_tv_app");
+    if ((q === "bluetooth" || q === "network") && !nativeSettingsScreen() && (!ON_TV || OFFLINE)) return t("quick_needs_tv_app");
     return "";
   }
   function setQuick(list) { QUICK = list; ST.quick = list.slice(); saveSettings(); renderQuick(); }
