@@ -159,6 +159,11 @@ Home settings saves to the same `bridge/data/people.json` the phone uses.
 
 New, on main, in the next release. Idea from Natalie Bruss (@nataliebruss on Instagram).
 
+Optional, and off unless you set it up: a person with no `kids_mode` key is not a kids profile, and a
+`config.json` with no `kids_mode` anywhere works exactly as before. Nothing makes a kids profile or a
+PIN by itself; only `config.json`, the phone remote (TV, Kids mode) or the on-TV app's setup page do,
+and only when you ask them to.
+
 A person with `kids_mode` is a kids profile. While they are the one watching, the TV home is one
 shelf of big posters, only the shows you put on it, and OK opens each one straight into its show in
 its app. Under the shelf sit the apps you allow (up to six), if any. Nothing else: no other apps, no

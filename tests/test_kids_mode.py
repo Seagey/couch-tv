@@ -90,6 +90,26 @@ class KidsConfigTests(KidsBase, unittest.TestCase):
         self.assertIn("kids_mode", pub["ruby"])
         self.assertFalse(kids.is_kid("mum"))
 
+    def test_no_kids_mode_is_exactly_as_before(self):
+        # opt in: with no kids_mode anywhere nobody is a kids profile, the people are served as they
+        # were, and no kids file or salt is made
+        plain = [{"id": "mum", "name": "Mum"}, {"id": "ruby", "name": "Ruby", "kid": True}]
+        with patch.dict(config.CONFIG, {"people": plain}):
+            config.PEOPLE[:] = config.clean_people(plain)
+            self.assertEqual(kids.modes(), {})
+            self.assertEqual(config.public()["people"], config.clean_people(plain))
+            self.assertNotIn("kids_mode", server._config_js())
+            self.assertFalse(os.path.exists(kids.KIDS_FILE))
+
+    def test_setup_page_asks_and_only_acts_on_a_yes(self):
+        with open(os.path.join(ROOT, "on-tv", "web", "setup.html")) as f:
+            page = f.read()
+        self.assertIn("Kids mode (optional, off unless you say yes)", page)
+        self.assertIn('id="kids-form" style="display:none"', page)
+        self.assertEqual(page.count("'/api/kids'"), 1)   # only the Turn on button sends anything
+        with open(os.path.join(ROOT, "AGENTS.md")) as f:
+            self.assertIn("Any young kids who should only see shows you've\n  picked? I can set up a kids mode with a PIN.", f.read())
+
     def test_kids_mode_needs_a_good_pin(self):
         for bad in (None, "", "12", "123456789", "12ab", True, 12):
             with self.subTest(pin=bad):

@@ -21,7 +21,8 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
-**12 November 2026: Kids mode, New (on main, in the next release).** A kids profile's home shows only
+**12 November 2026: Kids mode, New and optional (on main, in the next release).** Off unless you
+switch it on for someone. A kids profile's home shows only
 a shelf of shows a parent picked, as big posters that open straight into each show, plus the few apps
 you allow. No other apps, no settings, no grown ups' Keep watching. Leaving it needs the parent PIN,
 typed with the remote's arrows. See [Kids mode](#kids-mode). Idea from Natalie Bruss (@nataliebruss on Instagram).
@@ -209,7 +210,8 @@ Back returns to the dock on that app.
 
 ## Kids mode
 
-New, on main, in the next release. Make someone a kids profile and their home becomes one shelf of
+New, on main, in the next release, and optional: it is off unless you set it up, and a household
+with no kids profile sees no change at all. Make someone a kids profile and their home becomes one shelf of
 shows you chose, from any of the streaming apps, as big posters. OK on a poster opens that show in its
 app (on the episode, if you named one). Under the shelf sit only the apps you allow, if any. There is
 no More apps, no Settings tile, no app store, no other people's Keep watching, and the phone remote's
@@ -223,8 +225,9 @@ moves the TV to the first grown up's profile; to go back, pick the child's name.
 
 ![The parent PIN](docs/screens/kids-pin.jpg)
 
-Set it up in `config.json` (every option), or from the phone remote (options B and C): TV, **Kids
-mode**, then the PIN, then search for a show and tap the app to add it.
+To set it up, add `kids_mode` to that person in `config.json` (every option), or use the phone
+remote (options B and C): TV, **Kids mode**, then the PIN, then search for a show and tap the app to
+add it. Option C's setup page on the TV also offers it, as an optional step.
 
 ```json
 { "id": "ruby", "name": "Ruby", "kid": true,
