@@ -119,6 +119,10 @@ In `config.json`, add the TV with `"kind": "vidaa"`:
   for "Browser", "Web Browser" and "Internet").
 - `home_url`: the address the TV should open, if the bridge picks the wrong one of this computer's
   addresses (for example `http://192.0.2.20:5400/tv/`).
+- `tile_id` (`app.couchtv.home`): the id the Couch TV tile is added under. VIDAA keeps the address a tile
+  was **first** added with: adding it again under the same id answers `"tile": true` but the tile still opens
+  the old address. To point the tile somewhere new (the standalone home below, or a new bridge address), set a
+  new id here (for example `app.couchtv.tv`), add the tile again, and remove the old one from the app row.
 - `keep_home` (false): opt in (Beta). When the TV falls back to VIDAA's own home, couch-tv opens again on top. A
   Home press from the phone remote is never bounced.
 - `uuid`: the identity the TV pairs with. It is kept automatically and rarely set by hand.
@@ -200,6 +204,83 @@ browser's address bar and history are not private. The page swaps the code for t
 Apps open only from the TV's own app list: the bridge sends back exactly the entry the TV gave it, and
 nothing typed on the phone goes into a message unchecked (keys come from a fixed list or the `KEY_` form,
 app ids must be in the TV's list, the PIN must be 4 digits).
+
+## No computer: a standalone home
+
+Everything above needs a computer that stays on. Without one, couch-tv's home can still live on the TV
+on its own, as a website the Couch TV tile opens. What you keep and what you lose:
+
+| | Standalone home |
+|---|---|
+| Clock, scenes or your own photos, weather, Home settings | Yes. Settings are kept in the TV's own storage |
+| Now playing (Spotify) and **Play on TV** | Yes, on Vercel, with the Spotify functions below |
+| The dock opening apps | **No**: a page on a VIDAA TV cannot open other apps (see below). Use the remote's app keys or VIDAA's home |
+| couch-tv opening at power on, and Home bringing it back | **No**: that is the bridge's watch. See "One press back" below |
+| Phone remote, Keep watching, the assistant | No (they are the bridge) |
+
+1. Build it: `scripts/build-standalone.sh` (it writes `build/standalone`: the page, your `config.json`
+   settings as `config.js` with the standalone switch on, the Spotify functions, a `noindex` header and
+   the tile's icon).
+2. Put it on a host. Vercel's free plan runs the Spotify functions too:
+   `cd build/standalone && npx vercel deploy --prod`. Any static host serves the page without them.
+   The address is public to anyone who has it (search engines are told to skip it), and the site carries
+   your own photos from `backgrounds/mine` if you have any.
+3. Point the tile at it, once, from any computer with the bridge set up: set `home_url` to the site's
+   address and a new `tile_id` (above), restart the bridge, `POST /api/vidaa/tile`. From then on the tile
+   opens the site and the computer can stay off. With a site key (Spotify, below), put it in the address:
+   `https://<your site>/?sk=<the key>`.
+
+### Spotify on the standalone home (optional)
+
+A TV remote can't type a Spotify password, so the login lives on the site, not the TV:
+
+1. developer.spotify.com, Dashboard, Create app (Web API), Redirect URI `https://<your site>/api/callback`.
+   Spotify needs the app owner on Premium for apps in Development Mode, and Play on TV needs Premium.
+2. On the host, add the environment variables `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` and
+   `COUCH_SITE_KEY` (a long random string, for example from `openssl rand -hex 24`), and deploy. With the
+   site key set, what's playing, the player's token and moving playback only answer a page opened with
+   `?sk=<the key>`, which is the tile's address; without it they answer anyone who learns the site's
+   address.
+3. On a phone or computer open `https://<your site>/api/login`, sign in, and copy the code it shows into a
+   third variable, `SPOTIFY_REFRESH_TOKEN`. Deploy once more.
+
+The Now playing card then shows what's playing on the account, on any device. Its **Play on TV** button
+moves it to the TV: first the page itself becomes a Spotify speaker called "Couch TV" (Spotify's Web
+Playback SDK; this works on a 55U7N on VIDAA 9), and if a TV's browser can't do that, the TV's Spotify app
+opens and the music is moved to it as soon as it shows up (that wait needs a function time limit over 25 s:
+`vercel.json` asks for 40, which Vercel's fluid compute, on by default for new projects, allows on the free
+plan).
+
+With the bridge instead, Spotify fills the same card for a song the TV's own media sessions can't see (a
+VIDAA, LG, Samsung or Roku, or music on a phone): a Spotify app with the Redirect URI
+`http://127.0.0.1:5400/api/spotify/callback`, its Client ID in `.env` as `SPOTIFY_CLIENT_ID` (no secret: the
+bridge uses PKCE), then `http://127.0.0.1:5400/api/spotify/login` on the bridge computer once
+(`bridge/spotify_now.py`). The card
+shows it without media buttons, since the TV's keys don't reach a phone.
+
+### One press back to couch-tv, without a computer
+
+- Many VIDAA remotes have a favourite key (a heart with a plus, ♡+, next to VIDAA Channels on a 2025
+  remote). Press and hold it, pick **Couch TV**, Save: one press then opens couch-tv from anywhere.
+- Settings, System, Advanced Settings, **Default Startup Page**: Last Accessed Source or Home. Whether
+  "Last Accessed Source" brings an app back at power on is not confirmed yet.
+- Put the Couch TV tile first in VIDAA's app row (Edit at the end of the row).
+
+### What a VIDAA TV's browser can do
+
+Measured on a 55U7N, VIDAA 9, build Q0705, from a page the tile opened:
+
+- Chromium 111 ("Odin"), drawing 1920x1080 at a pixel ratio of 1 on a 4K panel: 4K pictures only cost
+  memory there. No service worker. `backdrop-filter` works. `localStorage` works.
+- Spotify's Web Playback SDK plays (so the browser has the DRM it needs).
+- **No page can open another app.** The browser has `Hisense_Get*` getters, an OIPF object factory, and
+  `window.vowOS`, a local service at `https://localhost:9888/service/<module>` (`pkgmgr`, `hiutils`,
+  `tvinfo`) that the app store uses. It checks the calling app's identity natively (appconfig), so an
+  ordinary page gets read only answers; there is no launch call, and couch-tv does not try to get round
+  that. The TV's DIAL server (`:3366/dd.xml`, apps on `:3367`) launches Netflix and Prime Video for a
+  phone, but a page in the TV's browser can't reach it. Opening apps stays the bridge's job (MQTT).
+- Web apps that VIDAA itself runs as hosted pages (Disney+, Spotify's TV app) can be opened by going to
+  their address from the page, inside the tile.
 
 ## What still stands
 
