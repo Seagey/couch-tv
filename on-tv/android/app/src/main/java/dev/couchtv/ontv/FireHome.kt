@@ -82,6 +82,40 @@ object FireHome {
                 .map { it.activityInfo.name }.toSet()
         }.getOrDefault(emptySet())
     }
+    /**
+     * Xiaomi (opt-in, "patchwall_replace" on the setup page): Couch TV takes PatchWall's place.
+     * On Xiaomi's Android TV builds PatchWall (com.mitv.tvhome.atv) is a launcher app, not the HOME:
+     * the TV's partnercustomizer opens it by name from the remote's PatchWall button (KEYCODE_BUTTON_5,
+     * see WatchService.onKeyEvent) and when the screen comes on, so no intent filter can claim it.
+     * With the switch on, PatchWall coming forward (its tile, the button, power-on) opens Couch TV
+     * instead (its own Settings screens are left alone), and at power-on Couch TV opens unless the TV
+     * is going back to an HDMI or TV input. Tested on a Redmi MiTV-AXFR0 (Android 11).
+     */
+    const val PATCHWALL = "com.mitv.tvhome.atv"
+    private const val TV_APP = "com.android.tv"
+    val isXiaomi: Boolean = android.os.Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)
+    val replacePatchWall: Boolean get() = isXiaomi && Store.bool("patchwall_replace")
+
+    fun isPatchWall(pkg: String?, cls: String?) =
+        pkg == PATCHWALL && cls != null && cls.startsWith("com.mitv.") && !cls.contains("Settings", ignoreCase = true)
+    fun onPatchWall() { if (replacePatchWall) jump(force = true) }
+
+    // The last real screen that came forward (the watch sees them all), so power-on needs no extra calls.
+    private val notScreens = setOf("android", "com.android.systemui", "com.google.android.inputmethod.latin")
+    @Volatile private var lastPkg: String? = null
+    private val later = android.os.Handler(android.os.Looper.getMainLooper())
+    fun seen(pkg: String?) { if (pkg != null && pkg !in notScreens) lastPkg = pkg }
+
+    /** Screen on or boot. The 2 s wait lets the TV bring its input back first (1.1 s after screen-on on the MiTV-AXFR0). */
+    fun onScreenOn() {
+        if (!replacePatchWall) return
+        later.removeCallbacksAndMessages(null)
+        later.postDelayed({
+            if (lastPkg == TV_APP) Log.i(TAG, "screen on: the TV is going back to an input, Couch TV stays back")
+            else App.openHome()
+        }, 2_000)
+    }
+
     fun onOtherHome(pkg: String?, cls: String?) {
         if (pkg == null || cls == null || pkg == BuildConfig.APPLICATION_ID) return
         if (App.homeEnabled(App.instance) && cls in homeClasses) jump(force = true)

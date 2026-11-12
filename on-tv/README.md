@@ -200,6 +200,31 @@ scenes, glass panels, a video background, apps, people, quick buttons; README, "
 setup page edits. One difference: this app has no file picker, so your own photos come from a web
 address.
 
+### Xiaomi and Redmi (PatchWall)
+
+On Xiaomi's Android TV builds (seen on a Redmi MiTV-AXFR0, Android 11) the Home button opens
+Google's Android TV home, and PatchWall is a separate launcher app that Xiaomi opens by name: from
+the remote's PatchWall button and when the screen comes on. Android's default-home setting cannot
+reach either. If you would rather have Couch TV there, keep the Home button as it is and switch on
+**Couch TV in PatchWall's place** on the setup page (`http://<tv-ip>:5400/setup`; the card only
+shows on a Xiaomi). It needs the Home button watch (**Couch TV home watch** in Settings,
+Accessibility). Then:
+
+- **The PatchWall button opens Couch TV.** The remote sends `KEYCODE_BUTTON_5` (scan code 580), and
+  Xiaomi's `partnercustomizer` turns it into a start of PatchWall by name. The watch catches that
+  one key, opens Couch TV and swallows it. With the switch on it checks every remote key for it, at
+  about 2 to 4 ms per key press on that TV; with the switch off, or on any other TV, the watch does
+  not ask for keys at all. Keys sent with `adb shell input` skip this check (Android does not pass
+  injected keys to accessibility services), so test it with the real remote.
+- **PatchWall opens Couch TV instead**, from its tile too. Its own settings screens are left alone.
+- **Power on opens Couch TV**, about 2 seconds after the screen comes on, unless the TV is going back
+  to an HDMI or TV input (the TV app, `com.android.tv`), so a set-top box or console stays on screen.
+  After a full restart, Xiaomi hands apps the boot signal late: Couch TV came up about a minute after
+  the TV did.
+
+Nothing is switched off: PatchWall stays installed and on. The same Mi key on another Xiaomi
+(MiTV-MOOQ1, #54) opens Google TV's home instead, which the TV home app handles in #135.
+
 ## Keep watching and people
 
 **Keep watching** fills itself on the TV. A show lands there when:

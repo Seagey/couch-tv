@@ -144,6 +144,8 @@ class BridgeService : Service() {
         wifiLock = runCatching { wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "couchtv").apply { acquire() } }.getOrNull()
         multicast = runCatching { wm.createMulticastLock("couchtv-mdns").apply { setReferenceCounted(false); acquire() } }.getOrNull()
         startServer()
+        // Xiaomi: PatchWall opened itself whenever the screen came on (FireHome.onScreenOn checks the switch).
+        if (FireHome.isXiaomi) runCatching { registerReceiver(screenOn, android.content.IntentFilter(Intent.ACTION_SCREEN_ON)) }
         Now.start()
         Thread {
             runCatching { if (Adb.everAllowed || Adb.paired) Adb.ensure() }
@@ -182,7 +184,12 @@ class BridgeService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int { startServer(); return START_STICKY }
 
+    private val screenOn = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) { FireHome.onScreenOn() }
+    }
+
     override fun onDestroy() {
+        if (FireHome.isXiaomi) runCatching { unregisterReceiver(screenOn) }
         server?.stop(); server = null
         runCatching { wifiLock?.release() }; runCatching { multicast?.release() }
         super.onDestroy()
@@ -190,5 +197,9 @@ class BridgeService : Service() {
 }
 
 class BootReceiver : BroadcastReceiver() {
-    override fun onReceive(c: Context, i: Intent) { App.startService(c) }
+    override fun onReceive(c: Context, i: Intent) {
+        App.startService(c)
+        // Xiaomi with "Couch TV in PatchWall's place": after a restart too (the screen-on receiver is not running yet then).
+        if (i.action == Intent.ACTION_BOOT_COMPLETED) FireHome.onScreenOn()
+    }
 }
