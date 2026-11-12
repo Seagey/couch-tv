@@ -883,10 +883,14 @@
     var near = function (r) { return r && r.width > 0 && r.bottom > b.top && r.top < b.bottom; };
     var q = $("quick").classList.contains("none") ? null : $("qbtns").getBoundingClientRect();
     var p = $("people").getBoundingClientRect();
-    var hitQ = near(q) && b.right > q.left - rem, hitP = near(p) && b.left < p.right + rem;
-    if (!hitQ && !hitP) return;
-    if (hitQ) d.style.right = (innerWidth - q.left + 1.5 * rem) + "px";
-    if (hitP) d.style.left = (p.right + 1.5 * rem) + "px";
+    var rtl = document.documentElement.dir === "rtl";
+    var leftBox = rtl ? q : p;
+    var rightBox = rtl ? p : q;
+    var hitRight = near(rightBox) && b.right > rightBox.left - rem;
+    var hitLeft = near(leftBox) && b.left < leftBox.right + rem;
+    if (!hitRight && !hitLeft) return;
+    if (hitRight) d.style.right = (innerWidth - rightBox.left + 1.5 * rem) + "px";
+    if (hitLeft) d.style.left = (leftBox.right + 1.5 * rem) + "px";
     if (d.scrollWidth > d.clientWidth + 1) d.classList.add("tight");
     if (d.scrollWidth > d.clientWidth + 1) d.classList.add("tighter");
   }
@@ -1568,10 +1572,22 @@
     var menu = $("sleep-menu"), btn = $("q-sleep");
     menu.classList.add("on");
     renderMenu();
-    if (btn) menu.style.right = Math.max(0, $("quick").getBoundingClientRect().right - btn.getBoundingClientRect().right) + "px";
+    if (btn) {
+      var rtl = (document.documentElement.dir === "rtl" || document.documentElement.getAttribute("dir") === "rtl");
+      if (rtl) {
+        menu.style.right = "auto";
+        menu.style.left = Math.max(0, btn.getBoundingClientRect().left - $("quick").getBoundingClientRect().left) + "px";
+      } else {
+        menu.style.left = "auto";
+        menu.style.right = Math.max(0, $("quick").getBoundingClientRect().right - btn.getBoundingClientRect().right) + "px";
+      }
+    }
   }
   function closeMenu() {
-    $("sleep-menu").classList.remove("on");
+    var menu = $("sleep-menu");
+    menu.classList.remove("on");
+    menu.style.left = "";
+    menu.style.right = "";
     zone = "quick";
   }
   function setSleep(minutes) {
@@ -2559,7 +2575,8 @@
     // Night: the row moves on once focus goes past the last card in view; Classic keeps it centred
     var first = NIGHT ? s - fit + 1 : s - 2;
     first = Math.max(0, Math.min(first, shelfEls.length - fit));
-    track.style.transform = "translateX(" + (-first * step) + "px)";
+    var rtl = document.documentElement.dir === "rtl";
+    track.style.transform = "translateX(" + (rtl ? (first * step) : (-first * step)) + "px)";
   }
 
   function shelfOn() { return !$("shelf-section").classList.contains("empty"); }
@@ -2637,6 +2654,7 @@
   function gridKey(it) { return it ? it.kind + ":" + (it.package || it.id || it.name) : ""; }
   function move(dx, dy) {
     touched = true;
+    if (document.documentElement.dir === "rtl") dx = -dx;
     if (zone === "settings") { setMove(dx, dy); return; }
     if (zone === "smart") { window.smartHome.move(dx, dy); return; }
     if (zone === "gear") { if (dy) { gi = Math.max(0, Math.min(1, gi + dy)); renderGear(); } return; }
@@ -3941,7 +3959,7 @@
       SET.ri = stepRow(rows, SET.ri, dy);
       SET.keyFocus = rows[SET.ri] ? rows[SET.ri].key : null;
     } else if (dx && rows[SET.ri] && rows[SET.ri].adjust) {
-      rows[SET.ri].adjust(dx);
+      rows[SET.ri].adjust(document.documentElement.dir === "rtl" ? -dx : dx);
       SET.keyFocus = rows[SET.ri].key;
     } else if (dx < 0) leaveRows();
     renderSettings();

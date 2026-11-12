@@ -10,8 +10,8 @@ change people, weather, the look or the quick buttons.
 Every key below is optional unless it says otherwise. Leave a key out and you get the default in
 brackets, which is how couch-tv behaved before the key existed. So an older `config.json` with no
 `home` or `quick` keys looks and works exactly as it did, except one thing: with no
-`home.language`, a TV set to Spanish, Italian, German, French or Serbian now shows the home in that language
-(and an Italian, German, Turkish, French or Serbian one with a 24 hour clock), where it used to be English.
+`home.language`, a TV set to Spanish, Italian, German, French, Serbian or Hebrew now shows the home in that language
+(and an Italian, German, Turkish, French, Serbian or Hebrew one with a 24 hour clock), where it used to be English.
 
 Most of what the home shows can also be changed on the TV itself, with the gear tile (Home
 settings), and what is chosen there wins on that TV. See
@@ -424,7 +424,7 @@ is the safe way to use the phone remote away from home.
 | `bridge.host`, `bridge.port` [5400], `bridge.fallback_hosts` | Where the bridge runs. `fallback_hosts` lists other names the bridge may be opened by (see "Opening the bridge by another name" below). |
 | `bridge.pairing_key` [""] | Optional API pairing key. Empty/unset by default. When set, clients (phone remote and TV front-ends) must authenticate with this key. |
 | `weather` | `lat`, `lon`, `place`, `timezone`, for the weather on the home (Open-Meteo, no key). A suburb or city is enough; never a home address. `timezone` (for example `Europe/London`) is also the time zone the bridge writes times in. |
-| `country` [`IT` for Italian, `DE` for German, `BE` for Dutch, `RS` for Serbian, else `AU`] | Two letter code, for where shows stream (JustWatch), the country in links to Apple TV and Prime Video, and the country Claude is told about. |
+| `country` [`IT` for Italian, `DE` for German, `BE` for Dutch, `RS` for Serbian, `IL` for Hebrew, else `AU`] | Two letter code, for where shows stream (JustWatch), the country in links to Apple TV and Prime Video, and the country Claude is told about. |
 | `country_name` | Optional: what to call the country in Claude's prompts, if the built-in list does not know your code. |
 | `client_name` ["Couch TV bridge"] | The name the TV shows for the bridge in its list of paired remotes. Set it before `pair_tv.py`; changing it later means pairing again. |
 | `screens` [] | Extra screens the TV can open, for example a computer through Moonlight. |
