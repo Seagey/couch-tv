@@ -54,11 +54,12 @@
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
   var THEME = "night", NIGHT = true, OLED = false, CLOCK24 = false;
-  // OLED burn-in protection: micro-shift (±2px) every 60 seconds
-  var OLED_SHIFT_STEPS = [[0,0], [1,1], [-1,1], [2,-1], [-1,-1], [1,-2], [-2,0], [0,1]];
+  // OLED burn-in protection: micro-shift (±4px) every 60 seconds when OLED theme or idle ambient clock is active
+  var OLED_SHIFT_STEPS = [[0,0], [2,2], [-2,2], [4,-2], [-2,-2], [2,-4], [-4,0], [0,2]];
   var oledShiftIdx = 0;
+  var idleAmbientActive = false;
   function updateOledShift() {
-    if (!OLED) return;
+    if (!OLED && !idleAmbientActive) return;
     oledShiftIdx = (oledShiftIdx + 1) % OLED_SHIFT_STEPS.length;
     var pt = OLED_SHIFT_STEPS[oledShiftIdx];
     document.documentElement.style.setProperty("--oled-shift-x", pt[0] + "px");
@@ -71,6 +72,26 @@
   // the photo's frosted copy, or "liquid", clear glass digits): Home settings, Look, else
   // home.glass_amount and home.clock_style (#25, #29).
   var GLASS_AMT = 3, CLOCK_LIQUID = false;
+  var SMART_IDLE = { enabled: false, home_idle_minutes: 15, home_action: "ambient_clock", paused_idle_minutes: 30, quiet_hours: { enabled: false, start: "23:00", end: "06:00", idle_minutes: 15 } };
+  var SMART_IDLE_HOME_STEPS = [0, 5, 10, 15, 30, 60];
+  var SMART_IDLE_PAUSED_STEPS = [0, 10, 15, 20, 30, 45, 60];
+  var SMART_IDLE_ACTIONS = ["ambient_clock", "screen_off", "tv_off"];
+  function normSmartIdle(raw) {
+    var d = raw && typeof raw === "object" ? raw : {};
+    var qh = d.quiet_hours && typeof d.quiet_hours === "object" ? d.quiet_hours : {};
+    return {
+      enabled: !!d.enabled,
+      home_idle_minutes: SMART_IDLE_HOME_STEPS.indexOf(d.home_idle_minutes) >= 0 ? d.home_idle_minutes : 15,
+      home_action: SMART_IDLE_ACTIONS.indexOf(d.home_action) >= 0 ? d.home_action : "ambient_clock",
+      paused_idle_minutes: SMART_IDLE_PAUSED_STEPS.indexOf(d.paused_idle_minutes) >= 0 ? d.paused_idle_minutes : 30,
+      quiet_hours: {
+        enabled: !!qh.enabled,
+        start: typeof qh.start === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(qh.start) ? qh.start : "23:00",
+        end: typeof qh.end === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(qh.end) ? qh.end : "06:00",
+        idle_minutes: [5, 10, 15, 20, 30].indexOf(qh.idle_minutes) >= 0 ? qh.idle_minutes : 15
+      }
+    };
+  }
   // Home settings made on this TV with the gear tile (see "home settings" below). They win over
   // config.js. ST is the saved object; the rest are read from it in readConfig().
   var ST = {}, WX_SHOW = true, WX_F = false, WX_EVERY = 30, HIDDEN_TV = [];
@@ -337,6 +358,7 @@
     var configuredIdle = HOME.idle_photo_seconds;
     IDLE_PHOTO_SECONDS = IDLE_PHOTO_STEPS.indexOf(savedIdle) >= 0 ? savedIdle :
       (IDLE_PHOTO_STEPS.indexOf(configuredIdle) >= 0 ? configuredIdle : 0);
+    SMART_IDLE = normSmartIdle(ST.smart_idle || HOME.smart_idle);
     // the language: Home settings, then config.json, then the TV's own language if the home speaks it
     if (window.I18N) window.I18N.set(ST.lang || HOME.language || window.I18N.device());
     if (CFG.weather) WXCFG = CFG.weather;
@@ -589,6 +611,15 @@
     var w = NIGHT && WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
     $("date").innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' + wxIcon(w) + esc(tempText(w.temp)) +
       '<span class="ww"> ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
+    var ic = $("idle-clock"), idate = $("idle-date"), iwx = $("idle-wx");
+    if (ic) ic.innerHTML = hm + (CLOCK24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
+    if (idate) idate.textContent = day;
+    if (iwx) {
+      var wIdle = WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
+      iwx.textContent = wIdle ? (tempText(wIdle.temp) + " · " + wxText(wIdle)) : "";
+    }
+    var iov = $("idle-ambient-overlay");
+    if (iov) iov.classList.toggle("quiet-hours", isQuietHours(SMART_IDLE.quiet_hours));
     fitDate();
     document.body.classList.toggle("night", h >= 21 || h < 6);
     if (NIGHT) { glassClock(hm); if (SUN_SYNC) applySunSync(); updateAmbientWeather(); }
@@ -802,7 +833,7 @@
   function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); }
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) pauseVideo();
-    else { startVideo(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); }
+    else { setIdleAmbient(false); resetSmartIdle(); startVideo(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); }
   });
 
   function showScene(i) {
@@ -1468,6 +1499,73 @@
       paintFocus();
     }
     resetIdlePhoto();
+  }
+  // Smart Idle & OLED-safe Ambient Clock
+  var lastSmartActivityAt = Date.now();
+  function resetSmartIdle() {
+    lastSmartActivityAt = Date.now();
+  }
+  function isQuietHours(qh) {
+    if (!qh || !qh.enabled) return false;
+    var h, m;
+    try {
+      if (WXCFG && WXCFG.timezone && WXCFG.timezone !== "auto" && typeof Intl !== "undefined") {
+        var parts = new Intl.DateTimeFormat("en-GB", { timeZone: WXCFG.timezone, hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
+        for (var i = 0; i < parts.length; i++) {
+          if (parts[i].type === "hour") h = parseInt(parts[i].value, 10);
+          else if (parts[i].type === "minute") m = parseInt(parts[i].value, 10);
+        }
+      }
+    } catch (e) {}
+    if (typeof h !== "number" || isNaN(h) || typeof m !== "number" || isNaN(m)) {
+      var d = new Date(); h = d.getHours(); m = d.getMinutes();
+    }
+    var cur = (h % 24) * 60 + m;
+    var sp = (qh.start || "23:00").split(":"), ep = (qh.end || "06:00").split(":");
+    var start = (parseInt(sp[0], 10) || 0) * 60 + (parseInt(sp[1], 10) || 0);
+    var end = (parseInt(ep[0], 10) || 0) * 60 + (parseInt(ep[1], 10) || 0);
+    if (start === end) return true;
+    return start < end ? (cur >= start && cur < end) : (cur >= start || cur < end);
+  }
+  function setIdleAmbient(on) {
+    var ov = $("idle-ambient-overlay");
+    idleAmbientActive = !!on;
+    if (idleAmbientActive) {
+      clock();
+      updateOledShift();
+      if (ov) {
+        var hint = $("idle-wake-hint");
+        if (hint) {
+          hint.textContent = t("screen_off_wake_hint");
+          hint.style.animation = "none";
+          void hint.offsetHeight;
+          hint.style.animation = "";
+        }
+        ov.classList.toggle("quiet-hours", isQuietHours(SMART_IDLE.quiet_hours));
+        ov.classList.add("active");
+      }
+    } else if (ov) {
+      ov.classList.remove("active");
+    }
+  }
+  function checkSmartIdle() {
+    if (!SMART_IDLE.enabled || document.hidden || screenOffActive || idleAmbientActive) return;
+    var mins = isQuietHours(SMART_IDLE.quiet_hours) ? SMART_IDLE.quiet_hours.idle_minutes : SMART_IDLE.home_idle_minutes;
+    if (!mins && !window.MOCK_SMART_IDLE_MS) return;
+    var thresh = window.MOCK_SMART_IDLE_MS || (mins * 60000);
+    if (Date.now() - lastSmartActivityAt < thresh) return;
+    var act = SMART_IDLE.home_action || "ambient_clock";
+    if (act === "screen_off") {
+      toggleScreenOff(true);
+    } else if (act === "tv_off") {
+      var sndPlaying = window.Soundscape && window.Soundscape.current && window.Soundscape.current() !== "off";
+      if (sndPlaying && !sleepEnds) { setIdleAmbient(true); return; }
+      if (sleepEnds && !OFFLINE) api("POST", "/api/sleep", { minutes: 0 }).catch(function () {});
+      if (TV && TV.powerOff) { try { TV.powerOff(); return; } catch (e) {} }
+      if (!OFFLINE) api("POST", "/api/key", { key: "power" }).catch(function () {});
+    } else {
+      setIdleAmbient(true);
+    }
   }
   // The TV's own input list (HDMI, a console, a set top box): the TV_INPUT key through the bridge,
   // or straight from the launcher when there is no bridge (only where the TV has such a screen).
@@ -3008,6 +3106,36 @@
     rows.push(head(t("ambient_head")));
     rows.push({ kind: "action", key: "ambient", label: t("ambient_settings"), sub: t("ambient_settings_sub"),
       act: function () { openAmbientSettings(); } });
+    // Smart Idle & OLED-safe Ambient Mode
+    rows.push(head(t("smart_idle_head")));
+    rows.push({ kind: "toggle", key: "smart-idle-on", label: t("smart_idle_on"), sub: t("smart_idle_on_sub"),
+      value: SMART_IDLE.enabled ? t("on") : t("off"), act: function () {
+        SMART_IDLE.enabled = !SMART_IDLE.enabled;
+        ST.smart_idle = SMART_IDLE; saveSettings(); resetSmartIdle(); renderSettings();
+      } });
+    rows.push({ kind: "cycle", key: "smart-idle-home", label: t("smart_idle_home"),
+      value: SMART_IDLE.home_idle_minutes ? t("n_min", { n: SMART_IDLE.home_idle_minutes }) : t("off"), act: function () {
+        var i = SMART_IDLE_HOME_STEPS.indexOf(SMART_IDLE.home_idle_minutes);
+        SMART_IDLE.home_idle_minutes = SMART_IDLE_HOME_STEPS[(i + 1) % SMART_IDLE_HOME_STEPS.length];
+        ST.smart_idle = SMART_IDLE; saveSettings(); resetSmartIdle(); renderSettings();
+      } });
+    rows.push({ kind: "cycle", key: "smart-idle-action", label: t("smart_idle_action"),
+      value: t("smart_idle_act_" + SMART_IDLE.home_action), act: function () {
+        var i = SMART_IDLE_ACTIONS.indexOf(SMART_IDLE.home_action);
+        SMART_IDLE.home_action = SMART_IDLE_ACTIONS[(i + 1) % SMART_IDLE_ACTIONS.length];
+        ST.smart_idle = SMART_IDLE; saveSettings(); renderSettings();
+      } });
+    rows.push({ kind: "cycle", key: "smart-idle-paused", label: t("smart_idle_paused"), sub: t("smart_idle_paused_sub"),
+      value: SMART_IDLE.paused_idle_minutes ? t("n_min", { n: SMART_IDLE.paused_idle_minutes }) : t("off"), act: function () {
+        var i = SMART_IDLE_PAUSED_STEPS.indexOf(SMART_IDLE.paused_idle_minutes);
+        SMART_IDLE.paused_idle_minutes = SMART_IDLE_PAUSED_STEPS[(i + 1) % SMART_IDLE_PAUSED_STEPS.length];
+        ST.smart_idle = SMART_IDLE; saveSettings(); renderSettings();
+      } });
+    rows.push({ kind: "toggle", key: "smart-idle-quiet", label: t("smart_idle_quiet"), sub: t("smart_idle_quiet_sub"),
+      value: SMART_IDLE.quiet_hours.enabled ? t("on") : t("off"), act: function () {
+        SMART_IDLE.quiet_hours.enabled = !SMART_IDLE.quiet_hours.enabled;
+        ST.smart_idle = SMART_IDLE; saveSettings(); renderSettings();
+      } });
     rows.push(head(t("soundscape")));
     var curSound = window.Soundscape ? window.Soundscape.current() : SOUND_TYPE;
     rows.push({
@@ -3967,10 +4095,17 @@
 
   document.addEventListener("keydown", function (e) {
     lastKeyAt = Date.now();
+    resetSmartIdle();
     if (screenOffActive) {
       e.preventDefault();
       e.stopPropagation();
       toggleScreenOff(false);
+      return;
+    }
+    if (idleAmbientActive) {
+      e.preventDefault();
+      e.stopPropagation();
+      setIdleAmbient(false);
       return;
     }
     if (kidsOn()) { okReset(); if (window.KidsMode.key(e)) e.preventDefault(); return; }
@@ -3995,7 +4130,7 @@
     resetIdlePhoto();
   });
   document.addEventListener("keyup", function (e) {
-    if (screenOffActive) {
+    if (screenOffActive || idleAmbientActive) {
       e.preventDefault();
       e.stopPropagation();
       return;
@@ -4170,15 +4305,15 @@
 
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
-  window.tv = { back: function () { if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); },
-    home: function () { if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); },
+  window.tv = { back: function () { if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); resetSmartIdle(); },
+    home: function () { if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); resetSmartIdle(); },
     screenOff: function () { toggleScreenOff(true); },
     wakeScreen: function () { toggleScreenOff(false); },
     isScreenOff: function () { return screenOffActive; },
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { toggleScreenOff(false); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
+    resume: function () { toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
     pause: pauseVideo,
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
@@ -4203,6 +4338,17 @@
         toggleScreenOff(false);
       });
     }
+    var iov = $("idle-ambient-overlay");
+    if (iov) {
+      iov.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIdleAmbient(false);
+        resetSmartIdle();
+      });
+    }
+    document.addEventListener("pointerdown", resetSmartIdle, { passive: true });
+    document.addEventListener("wheel", resetSmartIdle, { passive: true });
     initSettings();
     // Home settings gets an Updates section, before About, where the launcher can update itself
     if (updRead() && UPD.supported) SECS.splice(SECS.length - 1, 0, ["updates", "download"]);
@@ -4244,10 +4390,9 @@
     if (!OFFLINE) refreshQuick();
     refreshMusic();
     setInterval(refreshMusic, 5000);
-    if (OLED) {
-      updateOledShift();
-      setInterval(updateOledShift, 60000);
-    }
+    updateOledShift();
+    setInterval(updateOledShift, 60000);
+    setInterval(checkSmartIdle, 10000);
     setInterval(function () { renderQuick(); refreshBedtimeDim(); }, 30000);
     // This TV says who is on its couch first, so what plays here is logged for them (each TV
     // keeps its own); then the lists. Once the home is up: the one-time "tell you about new versions?" question.

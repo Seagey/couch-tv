@@ -22,6 +22,10 @@ object Now {
         set(v) { whoNow = v; whoRead = true; Store.saveWho(v) }
     @Volatile var playedItem: JSONObject? = null          // the last thing /api/play started
     @Volatile var sleepEnds: Long? = null
+    @Volatile var idleEnds: Long? = null
+    @Volatile private var pausedSince: Long? = null
+    @Volatile private var pausedPkg: String? = null
+    @Volatile private var snoozedUntil: Long = 0L
     @Volatile private var front: String? = null
     @Volatile private var media: JSONObject? = null
     @Volatile private var lastSig = ""
@@ -54,6 +58,7 @@ object Now {
             .put("volume", JSONObject(Tv.volume()))
             .put("playing", p ?: JSONObject.NULL)
             .put("sleep", JSONObject().put("ends", sleepEnds?.let { iso(it) } ?: JSONObject.NULL))
+            .put("idle", idleEnds?.let { JSONObject().put("ends", iso(it)).put("reason", "paused") } ?: JSONObject.NULL)
             .put("waking", false)
             .put("who", who ?: JSONObject.NULL)
             .put("picture", JSONObject.NULL)
@@ -78,12 +83,66 @@ object Now {
                 if (!Adb.connected && (Adb.everAllowed || Adb.paired) && tick % 15 == 1) runCatching { Adb.ensure() }
                 front = Tv.frontPackage()
                 if (tick % 2 == 0) { media = readMedia(); remember(media) }
+                stepPausedIdle(media)
                 val v = Tv.volume()
                 val sig = listOf(front, Tv.isOn, v["level"], v["muted"], media?.optString("title"), media?.optString("state"),
-                    sleepEnds, who, Adb.connected).joinToString("|")
+                    sleepEnds, idleEnds, who, Adb.connected).joinToString("|")
                 if (sig != lastSig) { lastSig = sig; push() }
             } catch (e: Exception) { android.util.Log.w("couchtv", "now loop: ${e.message}") }
         }, 1, 4, TimeUnit.SECONDS)
+    }
+
+    fun resetPausedIdle() {
+        val had = idleEnds != null
+        pausedSince = null; pausedPkg = null; idleEnds = null
+        if (had) push()
+    }
+
+    fun cancelPausedIdle() {
+        val cfg = Store.smartIdle()
+        val qh = cfg.optJSONObject("quiet_hours")
+        val mins = if (qh != null && inQuietHours(qh)) qh.optInt("idle_minutes", 15) else cfg.optInt("paused_idle_minutes", 30)
+        snoozedUntil = System.currentTimeMillis() + maxOf(300, mins * 60) * 1000L
+        resetPausedIdle()
+    }
+
+    private fun inQuietHours(qh: JSONObject): Boolean {
+        if (!qh.optBoolean("enabled", false)) return false
+        val tzId = Store.weather().optString("timezone", "auto")
+        val tz = if (tzId.isNotEmpty() && tzId != "auto") java.util.TimeZone.getTimeZone(tzId) else java.util.TimeZone.getDefault()
+        val cal = java.util.Calendar.getInstance(tz)
+        val cur = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+        fun mins(s: String, def: Int) = Regex("([01]\\d|2[0-3]):([0-5]\\d)").matchEntire(s.trim())
+            ?.let { it.groupValues[1].toInt() * 60 + it.groupValues[2].toInt() } ?: def
+        val start = mins(qh.optString("start", "23:00"), 23 * 60)
+        val end = mins(qh.optString("end", "06:00"), 6 * 60)
+        if (start == end) return true
+        return if (start < end) cur in start until end else (cur >= start || cur < end)
+    }
+
+    private fun stepPausedIdle(m: JSONObject?) {
+        val cfg = Store.smartIdle()
+        val pkg = front
+        val now = System.currentTimeMillis()
+        if (!cfg.optBoolean("enabled", false) || !Tv.isOn || pkg == null || m?.optString("state") != "paused") {
+            if (pausedSince != null || idleEnds != null) { pausedSince = null; pausedPkg = null; idleEnds = null }
+            return
+        }
+        if (now < snoozedUntil) return
+        val qh = cfg.optJSONObject("quiet_hours")
+        val mins = if (qh != null && inQuietHours(qh)) qh.optInt("idle_minutes", 15) else cfg.optInt("paused_idle_minutes", 30)
+        if (mins <= 0) {
+            if (pausedSince != null || idleEnds != null) { pausedSince = null; pausedPkg = null; idleEnds = null }
+            return
+        }
+        if (pausedSince == null || pausedPkg != pkg) { pausedSince = now; pausedPkg = pkg }
+        val deadline = pausedSince!! + mins * 60_000L
+        idleEnds = if (deadline - now <= 300_000L) deadline else null
+        if (now < deadline) return
+        android.util.Log.i("couchtv", "smart idle: $pkg paused for $mins min, turning TV off")
+        pausedSince = null; pausedPkg = null; idleEnds = null
+        if (sleepEnds != null) App.setSleep(null)
+        runCatching { Tv.powerOff() }.onFailure { android.util.Log.w("couchtv", "smart idle powerOff: ${it.message}") }
     }
 
     private fun readMedia(): JSONObject? {

@@ -1054,6 +1054,69 @@ html.has-pointer.glass .ssec:hover {
   opacity: 1;
 }
 
+/* ================= OLED-safe Idle Ambient Clock Overlay ================= */
+.idle-ambient-overlay {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000000;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.8s ease, visibility 0.8s ease;
+  z-index: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.idle-ambient-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+.idle-ambient-inner {
+  text-align: center;
+  color: #ffffff;
+  opacity: 0.55;
+  transform: translate(var(--oled-shift-x, 0px), var(--oled-shift-y, 0px));
+  transition: transform 1.2s ease, opacity 0.8s ease;
+  user-select: none;
+}
+.idle-ambient-overlay.quiet-hours .idle-ambient-inner {
+  opacity: 0.35;
+}
+.idle-clock {
+  font-family: 'Antonio', sans-serif;
+  font-weight: 300;
+  font-size: 9.5rem;
+  line-height: 1;
+  letter-spacing: 0.03em;
+}
+.idle-clock small {
+  font-size: 2.2rem;
+  margin-left: 0.4rem;
+  opacity: 0.7;
+}
+.idle-date {
+  margin-top: 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 400;
+  opacity: 0.8;
+}
+.idle-wx {
+  margin-top: 0.45rem;
+  font-size: 1.25rem;
+  opacity: 0.7;
+}
+.idle-wake-hint {
+  margin-top: 2rem;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  opacity: 0;
+  animation: screenOffHintFade 3s ease forwards;
+}
+
 /* ================= Screen off / Audio-only Blackout Overlay ================= */
 .screen-off-overlay {
   position: fixed;

@@ -105,6 +105,7 @@ export const api = {
   power: (state) => call('POST', '/api/power', { state }, 40000),
   volume: (action, steps) => call('POST', '/api/volume', steps ? { action, steps } : { action }),
   setSleep: (minutes) => call('POST', '/api/sleep', { minutes }),
+  cancelIdle: () => call('POST', '/api/idle/cancel', {}),
   openScreen: (id) => call('POST', '/api/screens/open', { id }),
   tvs: () => call('GET', '/api/tvs'),
   picture: (mode) => call('POST', '/api/picture', { mode }, 20000),   // a picture switch can take several seconds

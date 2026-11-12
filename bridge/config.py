@@ -211,6 +211,40 @@ def _share(value, lo, hi):
 
 
 SOUNDSCAPE_TYPES = ("off", "rain", "fire", "waves", "brown")
+SMART_IDLE_ACTIONS = ("ambient_clock", "screen_off", "tv_off")
+
+
+def _int_choice(value, default, choices):
+    """Return int(value) if it is a non-bool number in choices, else default."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return default
+    v = int(value)
+    return v if v in choices else default
+
+
+def _hhmm(value, default):
+    """Validate a 24-hour HH:MM string, returning default if invalid."""
+    if isinstance(value, str) and re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", value.strip()):
+        return value.strip()
+    return default
+
+
+def _smart_idle(raw):
+    """Normalize home.smart_idle settings; 0 minutes disables that trigger."""
+    d = raw if isinstance(raw, dict) else {}
+    qh = d.get("quiet_hours") if isinstance(d.get("quiet_hours"), dict) else {}
+    return {
+        "enabled": bool(d.get("enabled", False)),
+        "home_idle_minutes": _int_choice(d.get("home_idle_minutes"), 15, (0, 5, 10, 15, 30, 60)),
+        "home_action": d.get("home_action") if d.get("home_action") in SMART_IDLE_ACTIONS else "ambient_clock",
+        "paused_idle_minutes": _int_choice(d.get("paused_idle_minutes"), 30, (0, 10, 15, 20, 30, 45, 60)),
+        "quiet_hours": {
+            "enabled": bool(qh.get("enabled", False)),
+            "start": _hhmm(qh.get("start"), "23:00"),
+            "end": _hhmm(qh.get("end"), "06:00"),
+            "idle_minutes": _int_choice(qh.get("idle_minutes"), 15, (5, 10, 15, 20, 30)),
+        },
+    }
 
 
 def _float(value, default, lo, hi):
@@ -342,6 +376,7 @@ def _home(h):
             "fade_with_sleep": True,
         }
     out["watch_next_per_app"] = _int(h.get("watch_next_per_app"), 5, 1, 20)
+    out["smart_idle"] = _smart_idle(h.get("smart_idle"))
     if "inputs" in h:
         out["inputs"] = _inputs(h.get("inputs"))
     return out

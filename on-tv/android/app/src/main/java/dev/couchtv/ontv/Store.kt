@@ -93,6 +93,21 @@ object Store {
     fun who(): String? = str("who")
     fun saveWho(v: String?) = putStr("who", v)
 
+    fun smartIdle(): JSONObject {
+        val hs = (readJson("home-settings.json") as? JSONObject)?.optJSONObject("smart_idle") ?: JSONObject()
+        val qh = hs.optJSONObject("quiet_hours") ?: JSONObject()
+        val paused = hs.optInt("paused_idle_minutes", 30).let { if (it in listOf(0, 10, 15, 20, 30, 45, 60)) it else 30 }
+        val qMin = qh.optInt("idle_minutes", 15).let { if (it in listOf(5, 10, 15, 20, 30)) it else 15 }
+        return JSONObject()
+            .put("enabled", hs.optBoolean("enabled", false))
+            .put("paused_idle_minutes", paused)
+            .put("quiet_hours", JSONObject()
+                .put("enabled", qh.optBoolean("enabled", false))
+                .put("start", qh.optString("start", "23:00"))
+                .put("end", qh.optString("end", "06:00"))
+                .put("idle_minutes", qMin))
+    }
+
     /** Test knobs for the emulator tests only, set with `adb shell setprop`; a TV never has them.
      *  debug.couchtv.seen_after_s: seconds a title plays before it counts (default 60).
      *  debug.couchtv.clock_offset_s: moves Keep watching's clock forward, to test the 30 day drop off.
