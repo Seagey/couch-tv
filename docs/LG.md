@@ -21,7 +21,7 @@ It needs a computer at home that stays on (option B). Without one you can still 
 and open it from LG's app row, and the app asks once a week whether to extend Developer Mode, but
 nothing opens couch-tv for you when the TV comes on.
 
-## Test status: ten real LGs so far
+## Test status: eleven real LGs so far
 
 **First real LG, 2 November 2026** ([issue #8](https://github.com/Seagey/couch-tv/issues/8)): an
 LG UHD TV on webOS 5.6.2 (2020/2021 firmware), Developer Mode with the Homebrew Channel, the bridge
@@ -163,6 +163,18 @@ press that came after the bridge had stopped waiting, a missing time zone databa
 the phone remote not built, and LG's device list hidden from the background bridge. Not checked yet on
 this TV: the daily Extend after the device list fix, and turning the TV on from the phone.
 
+**Eleventh real LG, 12 November 2026** (by owen282000): an LG OLED65B56LA (OLED B5,
+2025) on webOS 10.3, firmware 33.31.75, **rooted** with the Homebrew Channel, no Developer Mode and no
+bridge. Built on a Mac with `--apps`, `look: night`, `home.hi_res: false` and `extend_devmode: false`,
+in Dutch, and installed over the TV's own ssh as root (see "On a rooted LG" below). The clock and the
+Night scenes, the weather, the dock with 37 apps from the baked list, opening apps, the arrows and the
+Magic Remote pointer, and Home settings all worked. As expected without a bridge, Keep watching stays
+empty and there is no Smart home tile. On this TV `listLaunchPoints` gives the icons as file paths on
+the TV, not web addresses, so the build skips them; they were copied off the TV over ssh. A cold start
+took 4.1 s with the 4K copies and 0.9 s with `home.hi_res: false` (the package went from 23 MB to
+6 MB); bringing back a couch-tv that still runs took 0.2 s, and webOS closed it after about a minute in
+another app. With LG Input Hook the remote's Home button opens couch-tv (also in "On a rooted LG").
+
 **First non-LG brand, 11 November 2026** ([issue #112](https://github.com/Seagey/couch-tv/issues/112),
 reported by asadawar): an Infinix 43W1Q running webOS TV Lite 7.5.8 (the reduced webOS that other brands
 license; 1.5 GB RAM). App only path, no bridge: built with `--apps`, `home.lighter: true` and
@@ -206,7 +218,7 @@ ares tools) does anything, and Wake-on-LAN.
 |---|---|
 | couch-tv home as an app, apps in your order, the remote's arrows, OK and Back | Yes (seen on real LGs, see Test status above) |
 | Opens by itself when the TV is switched on | Yes, with the bridge running |
-| LG's own Home button | Still opens LG's menu. Press Back or open couch-tv from the app row |
+| LG's own Home button | Still opens LG's menu. Press Back or open couch-tv from the app row. On a rooted LG it can open couch-tv (see "On a rooted LG") |
 | Phone remote: keys, volume, mute, open an app | Yes (the TV asks to accept the remote once) |
 | More than one TV on one phone remote | Yes: one bridge runs Google TVs, Samsungs and LGs together (several entries in `config.json`) |
 | "Put on Bluey" (find and play) | Netflix opens the title, YouTube opens the video. Other apps open on their home page and the reply says to pick the show there. Nothing presses Play for you yet |
@@ -463,7 +475,7 @@ the phone says so and you use the TV's remote.
 - LG's Home button and the app row are LG's. couch-tv cannot hide LG's ads or menu. Leaving couch-tv
   with the Home button is expected. For an app-only setup (no bridge), LG's Quick Access can pin it:
   hold a number key on the remote while couch-tv is in front, and that key opens it from then on
-  (ChrisFWCB, #56).
+  (ChrisFWCB, #56). On a rooted LG the Home button itself can open couch-tv (see "On a rooted LG").
 - **If the ThinQ Home Dashboard is in front,** `ares-launch --device lounge app.couchtv.home` for an
   already running couch-tv can report success without bringing it forward. Close it first with
   `ares-launch --device lounge --close app.couchtv.home`, then launch it again (ChrisFWCB, #56).
@@ -487,6 +499,92 @@ the phone says so and you use the TV's remote.
 - **A slow LG?** Switch on `home.lighter` first: on two 2025 LGs it took a key press from about 50 ms
   to 16 ms (#89). `home.hi_res: false` also shrinks the app from 22 MB to under 6 MB.
 - No screenshots, no "what is playing", no profile picking, no pressing Play inside other apps.
+
+## On a rooted LG
+
+This part is only for a TV that is already rooted and has the Homebrew Channel with root status
+"ok". Rooting is not covered here, and it is not recommended for couch-tv (see
+[TV-COMPATIBILITY.md](TV-COMPATIBILITY.md)); see [webosbrew](https://www.webosbrew.org) if you want
+to know more. Tried on the eleventh LG above (OLED B5, 2025, webOS 10.3), with no bridge.
+
+**No Developer Mode needed.** A rooted TV installs couch-tv as an app that does not expire, so there
+is nothing to extend. Set `"extend_devmode": false` on the TV in `config.json` before you build, or
+the app asks every week to extend a Developer Mode that is not there.
+
+Install over the TV's own ssh as root:
+
+```sh
+cat build/lg/app.couchtv.home_1.0.0_all.ipk | ssh root@<tv> 'cat > /tmp/couchtv.ipk'
+ssh -tt root@<tv> 'luna-send -n 8 luna://com.webos.appInstallService/dev/install "{\"id\":\"com.ares.defaultName\",\"ipkUrl\":\"/tmp/couchtv.ipk\",\"subscribe\":true}"'
+```
+
+Use `ssh -tt`. Without a terminal `luna-send` prints nothing, and the install stops halfway without
+saying so.
+
+**The app list.** As root you can read the list yourself and bake it in with `--apps`:
+
+```sh
+ssh root@<tv> 'luna-send -n 1 -w 15000 luna://com.webos.applicationManager/listLaunchPoints "{}" > /tmp/apps.json; cat /tmp/apps.json' > my-tv-apps.json
+```
+
+On this TV the icons in that list are file paths on the TV (`/usr/palm/...`), not web addresses, so
+`lg/build.py` does not fetch them. Copy them off the TV over ssh if you want them.
+
+### The Home button opens couch-tv
+
+Two ways. The first is clean but changes how the TV reads the remote. The second changes nothing on
+the TV, but LG's home shows for a moment.
+
+**1. LG Input Hook** (`org.webosbrew.inputhook`, in the Homebrew Channel). It hooks into the TV's
+remote handling (here `lginput2` and `micomservice`) and can run a command for a key. Open the app
+once, and it starts itself at every boot after that. Its settings are in
+`.config/lginputhook/keybinds.json` in root's home folder, and it reloads them by itself:
+
+```json
+{"773": {"action": "exec", "command": "/var/lib/webosbrew/couchtv-homekey.sh"}}
+```
+
+Home is **773**. The log (`/tmp/lginput-hook-lginput2.log`) also shows `keyid=3` for Home, but the
+keybinds go by the `uinput_code`. A small script keeps a way back to LG's own home: one press opens
+couch-tv, two presses within 2 seconds open LG's home.
+
+```sh
+#!/bin/sh
+# /var/lib/webosbrew/couchtv-homekey.sh: 1x Home = couch-tv, 2x within 2 s = LG's home
+[ "${1:-1}" = "0" ] && exit 0                          # ignore a key release
+now=$(awk '{ printf "%d", $1 * 100 }' /proc/uptime)    # hundredths of a second
+last=$(cat /tmp/homekey.last 2>/dev/null || echo 0)
+[ "$last" -gt "$now" ] && last=0                       # the TV restarted
+echo "$now" > /tmp/homekey.last
+if [ $((now - last)) -lt 200 ]; then app=com.webos.app.home; else app=app.couchtv.home; fi
+luna-send -n 1 luna://com.webos.applicationManager/launch "{\"id\":\"$app\"}" > /dev/null 2>&1
+```
+
+**Mind the page it opens.** The Input Hook service also starts a settings page on port 1842,
+reachable from the whole network and guarded only by an 8 character password. That page can read
+and write files on the TV as root. `iptables` does not work on this TV (no kernel module), so
+restrict it in the service itself: in
+`/media/developer/apps/usr/palm/services/org.webosbrew.inputhook.service/service.js`, change
+`server.listen(1842);` to `server.listen(1842, "127.0.0.1");`. The app on the TV keeps working,
+because it already uses 127.0.0.1. Do this again after an update of Input Hook, and check it with
+`netstat -tln | grep 1842`.
+
+**2. A watcher, without a hook.** A small script follows which app is in front, and opens couch-tv
+when LG's home comes to the front:
+
+```sh
+luna-send -i luna://com.webos.applicationManager/getForegroundAppInfo '{"subscribe":true}'
+```
+
+When a line has `"appId":"com.webos.app.home"`, launch `app.couchtv.home`. Start it at boot from
+`/var/lib/webosbrew/init.d/` (a file name with no dot, or the TV skips it). LG's home shows for about
+half a second first. Leave a way back, for example: a second Home press within a few seconds leaves
+LG's home in front. The watcher also covers leaving an app and turning the TV on, so it is worth
+keeping next to the Input Hook.
+
+**Speed.** couch-tv came back in 0.2 s when it was still running. A cold start took 4.1 s, and 0.9 s
+with `home.hi_res: false`. webOS closed couch-tv after about a minute in another app, so most Home
+presses are a cold start.
 
 ## The bridge on Windows
 
