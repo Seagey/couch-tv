@@ -21,6 +21,11 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: quick Home presses on a Xiaomi TV (on main, in the next release).** On a Xiaomi
+TV the Home button watch now also catches the Home key and the Mi logo key as they are pressed, so
+pressing them quickly several times no longer leaves Google's home on screen (issue #54). Other
+TVs are not touched. Thanks AryanFelix (#135).
+
 **12 November 2026: Kids mode, New and optional (on main, in the next release).** Off unless you
 switch it on for someone. A kids profile's home shows only
 a shelf of shows a parent picked, as big posters that open straight into each show, plus the few apps
