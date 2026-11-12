@@ -305,7 +305,7 @@ class VidaaTV:
             ctx = self._ssl()
             user = self.mqtt_user if self.mqtt_user is not None else (self.client_id if self.token else None)
             password = self.mqtt_password if self.mqtt_password is not None else self.token
-            last = None
+            errors = []   # one entry per port tried, so a later port's failure never hides an earlier one's
             for port in self.ports:
                 c = Client(self.client_id, username=user, password=password, on_message=self._message)
                 try:
@@ -317,14 +317,15 @@ class VidaaTV:
                     self.log.info("connected on port %s%s", port, " with the client certificate" if ctx and self._have_cert() else "")
                     return c
                 except Refused as e:
-                    last = str(e) + (": check the certificate step and that the TV and this computer agree "
-                                     "on the time (docs/VIDAA.md)" if e.code in (4, 5) else "")
+                    errors.append((port, str(e) + (": check the certificate step and that the TV and this computer "
+                                                    "agree on the time (docs/VIDAA.md)" if e.code in (4, 5) else "")))
                 except ssl.SSLError as e:
-                    last = (f"the TV ended the secure handshake ({e.reason or type(e).__name__}): it probably wants "
-                            "the client certificate (docs/VIDAA.md, step 2)")
+                    errors.append((port, f"the TV ended the secure handshake ({e.reason or type(e).__name__}): it "
+                                          "probably wants the client certificate (docs/VIDAA.md, step 2)"))
                 except (MQTTError, OSError) as e:
-                    last = str(e) or type(e).__name__
+                    errors.append((port, str(e) or type(e).__name__))
                 await c.close()
+            last = "; ".join(f"port {port}: {msg}" for port, msg in errors)
             self.last_error = last
             self._retry_at = time.monotonic() + 30
             raise TVUnavailable(f"could not talk to the TV: {last}")
