@@ -92,7 +92,7 @@ OFF_STATES = {"fake_sleep_0", "fake_sleep_1"}
 NOTHING = re.compile(r"^(remote_launcher|livetv|sourceswitch)$")   # nothing of anyone's is on screen
 INPUT = re.compile(r"^sourceswitch$")
 
-# Friendly key name -> VIDAA key name. UNCONFIRMED on a real TV.
+# Friendly key name -> VIDAA key name. Confirmed on a Hisense 55U7N (VIDAA 9).
 KEYS = {
     "up": "KEY_UP", "down": "KEY_DOWN", "left": "KEY_LEFT", "right": "KEY_RIGHT",
     "ok": "KEY_OK", "select": "KEY_OK", "enter": "KEY_OK",
@@ -698,7 +698,7 @@ class VidaaTV:
             return                       # the phone remote's "vidaa_home" key asked for VIDAA's home
         if not self.open_on_power_on:
             return
-        # note: no quiet_until check here on purpose — couch-tv never lands the TV on VIDAA's own
+        # note: no quiet_until check here on purpose, couch-tv never lands the TV on VIDAA's own
         # home itself, so reaching LAUNCHER always means the Home button, which should bounce back.
         try:
             await self._launch(self.app_id, quiet=False)
