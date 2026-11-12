@@ -102,7 +102,8 @@ class HomeActivity : Activity() {
                 e.action == KeyEvent.ACTION_DOWN && e.repeatCount == 0 -> menuHeld = false
                 e.action == KeyEvent.ACTION_DOWN -> if (!menuHeld) {
                     menuHeld = true
-                    startActivity(Intent(this, SetupActivity::class.java))
+                    // Kids mode: a kids profile cannot reach setup; a parent switches profile with the PIN first
+                    if (!Kids.isKid(Now.who)) startActivity(Intent(this, SetupActivity::class.java))
                 }
                 e.action == KeyEvent.ACTION_UP && !menuHeld -> {
                     super.dispatchKeyEvent(KeyEvent.changeAction(e, KeyEvent.ACTION_DOWN))
