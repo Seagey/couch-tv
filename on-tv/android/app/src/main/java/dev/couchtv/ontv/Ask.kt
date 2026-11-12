@@ -3,7 +3,10 @@ package dev.couchtv.ontv
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.InetAddress
+import java.net.NetworkInterface
 import java.net.URL
+import java.net.UnknownHostException
 
 /**
  * OPTIONAL "ask" hook. OFF by default. There is no AI in on-TV mode unless the household adds its
@@ -99,7 +102,14 @@ object Ask {
     }
 
     private fun call(cfg: AskConfig, url: String, headers: Map<String, String>, body: JSONObject): JSONObject {
-        val c = URL(url).openConnection() as HttpURLConnection
+        val u = URL(url)
+        // Resolve the name now and refuse the TV itself, whatever it was spelled as (a number, a name that points at
+        // 127.0.0.1...). For https a name that changes its mind afterwards cannot reach the TV's own plain http services,
+        // because the certificate would not match; for http only home network names are allowed in the first place.
+        val own = try { NetworkInterface.getNetworkInterfaces()?.toList()?.flatMap { it.inetAddresses.toList() } ?: emptyList() } catch (e: Exception) { emptyList() }
+        val resolved = try { InetAddress.getAllByName(u.host).toList() } catch (e: UnknownHostException) { throw ApiError(502, "Could not find ${u.host}.") }
+        if (AskWire.pointsAtThisDevice(resolved, own)) throw ApiError(502, "${u.host} is the TV itself, so it is not used as an AI service.")
+        val c = u.openConnection() as HttpURLConnection
         // a model running on a computer at home can take a while to answer
         c.connectTimeout = 10_000; c.readTimeout = if (AskWire.isLocalUrl(cfg.base)) 180_000 else 60_000
         c.requestMethod = "POST"; c.doOutput = true

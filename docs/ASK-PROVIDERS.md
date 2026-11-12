@@ -54,10 +54,15 @@ rounds.
   (`localhost`, `10.x`, `192.168.x`, `172.16` to `172.31`, `169.254.x`, `*.local`, `*.lan`), so a key
   never crosses the internet unencrypted.
 - No name or password inside the address.
-- The address cannot be the TV itself (`localhost`, `127.x`, `::1`, `0.0.0.0`): its own services are not an
-  AI service. A computer on your network is fine.
+- The address cannot be the TV itself. The obvious spellings (`localhost`, `127.x`, `::1`, `0.0.0.0`) are
+  refused when you save. Every ask then resolves the name and refuses it again if any answer is loopback,
+  "any", or one of the TV's own network addresses, so a name that points at the TV does not get past it.
+  A computer on your network is fine. A name that changes its answer between that check and the connection
+  can only matter for plain `http://`, which is allowed for home network names only; over `https://` the
+  certificate would not match the TV's own plain http services.
 - When a service refuses a request, only its own JSON error message is shown (cut to 200 characters),
-  never anything else it sent back.
+  never anything else it sent back. A reply that is not in the expected shape produces one fixed sentence
+  that quotes nothing from it.
 - Claude always needs a key. An OpenAI compatible address on your own network may have none.
 - Ask is off for a kids profile, as before.
 

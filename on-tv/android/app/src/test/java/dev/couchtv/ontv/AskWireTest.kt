@@ -8,6 +8,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.InetAddress
 
 /** The "ask" hook's rules for each kind of AI service, with no network and no TV. */
 class AskWireTest {
@@ -283,6 +284,43 @@ class AskWireTest {
         assertFalse(AskWire.errorMessage(openai(), 200, "root:x:0:0:root:/root:/bin/sh").contains("root:"))
         assertFalse("JSON without an error is not echoed", AskWire.errorMessage(openai(), 404, """{"name":"internal","password":"hunter2"}""").contains("hunter2"))
         assertEquals("a long message is cut", 200, AskWire.errorMessage(openai(), 500, """{"error":{"message":"${"x".repeat(500)}"}}""").substringAfter("): ").length)
+    }
+
+    @Test fun aReplyInTheWrongShapeIsNeverQuotedBack() {
+        val odd = listOf(
+            """{"choices":"hunter2"}""", """{"choices":[{"message":"hunter2"}]}""", """{"choices":[]}""",
+            """{"content":"hunter2"}""", """{"name":"internal","password":"hunter2"}""",
+            """{"choices":[{"message":{"tool_calls":[{"id":"c","type":"function","function":"hunter2"}]}}]}""")
+        for (cfg in listOf(openai(), claude())) for (json in odd) {
+            try {
+                AskWire.run(AskWire.chat(cfg, "s", tools), "x", { _, _, _ -> JSONObject(json) }, { _, _ -> "" })
+                // a reply the reader could make sense of is fine, as long as nothing was quoted
+            } catch (e: ApiError) {
+                assertEquals(502, e.status)
+                assertFalse("quoted the reply: ${e.message}", e.message!!.contains("hunter2") || e.message!!.contains("password"))
+                assertTrue(e.message!!.contains(AskWire.host(cfg.base)!!))
+            }
+        }
+        // and the common bad shape really does end in that sentence, not in a raw JSON error
+        try { AskWire.run(AskWire.chat(openai(), "s", tools), "x", { _, _, _ -> JSONObject("""{"choices":"hunter2"}""") }, { _, _ -> "" }); org.junit.Assert.fail("should have thrown") }
+        catch (e: ApiError) { assertEquals("The AI service at api.openai.com answered in a format this TV does not understand.", e.message) }
+    }
+
+    // ---- the TV itself, checked on the addresses a name really resolved to
+
+    private fun ip(s: String) = InetAddress.getByAddress(s.split('.').map { it.toInt().toByte() }.toByteArray())
+
+    @Test fun theTvItselfIsCaughtOnTheResolvedAddress() {
+        val own = listOf(ip("192.168.1.50"))
+        assertTrue("loopback, however it was spelled", AskWire.pointsAtThisDevice(listOf(ip("127.0.0.1")), own))
+        assertTrue("any other 127.x", AskWire.pointsAtThisDevice(listOf(ip("127.9.8.7")), own))
+        assertTrue("0.0.0.0", AskWire.pointsAtThisDevice(listOf(ip("0.0.0.0")), own))
+        assertTrue("IPv6 loopback", AskWire.pointsAtThisDevice(listOf(InetAddress.getByName("::1")), own))
+        assertTrue("the TV's own address on the network", AskWire.pointsAtThisDevice(listOf(ip("192.168.1.50")), own))
+        assertTrue("one bad address among good ones (a name with several answers)", AskWire.pointsAtThisDevice(listOf(ip("8.8.8.8"), ip("127.0.0.1")), own))
+        assertFalse("another computer on the network", AskWire.pointsAtThisDevice(listOf(ip("192.168.1.20")), own))
+        assertFalse("the internet", AskWire.pointsAtThisDevice(listOf(ip("104.18.2.161")), own))
+        assertFalse("nothing resolved is not a hit", AskWire.pointsAtThisDevice(emptyList(), own))
     }
 
     // ---- where a key may go

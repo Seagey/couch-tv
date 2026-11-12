@@ -2,6 +2,7 @@ package dev.couchtv.ontv
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.InetAddress
 import java.net.URI
 
 /*
@@ -73,6 +74,15 @@ object AskWire {
     }
 
     /**
+     * True if any of the addresses a host name resolved to is the TV itself: loopback, "any", or one of the
+     * TV's own interface addresses. This is the real check, made when the TV is about to connect. [isThisDevice]
+     * only catches the obvious spellings when settings are saved, and misses numeric forms such as
+     * `https://2130706433/` and names that resolve to 127.0.0.1.
+     */
+    fun pointsAtThisDevice(resolved: Collection<InetAddress>, own: Collection<InetAddress>) =
+        resolved.any { it.isLoopbackAddress || it.isAnyLocalAddress || it in own }
+
+    /**
      * The saved key, if it may be used with the address now in use. A key saved before origins were
      * recorded ([keyOrigin] is null) was a Claude key, so it only works for Claude's own address.
      */
@@ -138,7 +148,12 @@ object AskWire {
         val actions = JSONArray()
         chat.addUser(text)
         for (round in 0 until maxRounds) {
-            val turn = chat.accept(transport(chat.url, chat.headers(), chat.body()))
+            val reply = transport(chat.url, chat.headers(), chat.body())
+            // A reply in the wrong shape makes the JSON reader throw, and its message can quote what it found.
+            // Nothing from it goes back to the caller: only that the format was not understood.
+            val turn = try { chat.accept(reply) } catch (e: Exception) {
+                throw ApiError(502, "The AI service at ${host(chat.cfg.base) ?: "that address"} answered in a format this TV does not understand.")
+            }
             if (turn.done) return AskOutcome(turn.text.ifEmpty { "Done." }, actions)
             val results = turn.calls.map { c ->
                 val (ok, out) = if (c.error != null) false to c.error
