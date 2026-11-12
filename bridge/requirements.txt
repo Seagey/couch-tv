@@ -1,6 +1,7 @@
 adb-shell[async]==0.4.4
 aiohttp==3.14.5
 androidtvremote2==0.3.2
+cryptography>=40.0.2
 mcp==1.30.0
 rsa==4.9.1
 zeroconf==0.151.5

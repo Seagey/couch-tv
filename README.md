@@ -321,7 +321,7 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on nine real LGs so far ([how](docs/LG.md)) | No |
 | **Roku** (TV or box) | App only, a sideloaded channel opened from Roku's home row, while Developer Mode is on | With a computer at home: as a channel that opens itself, not a true home screen. Built from Roku's documentation, not yet tried on a real Roku ([how](docs/ROKU.md)) | No |
 | **Hisense with VIDAA** | App only: a tile on the app row where the firmware allows it, else the TV's browser | With a computer at home: as a page that opens itself, not a true home screen. Tested against a stand-in only, not yet tried on a real VIDAA TV ([how](docs/VIDAA.md)) | No |
-| **Apple TV** | No | No | No |
+| **Apple TV** | No: Apple lets no app replace its home and tvOS has no web view | **New, Beta:** phone remote (keys, sleep and wake, open apps) with a computer at home, no payment or app needed. couch-tv's own home screen is not built for it yet ([how](docs/APPLE-TV.md)) | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
 not the brand. Their Google TV and Android TV models should work. Their VIDAA models run
@@ -376,7 +376,12 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   own copy of Hisense's phone app (couch-tv does not include it). **It was tested against a pretend VIDAA TV
   on a computer, and it has not been run on a real one**, so expect to fix something. If you try it, please
   open an issue and say how it went. Setup and limits: [docs/VIDAA.md](docs/VIDAA.md).
-- **Apple TV and Vega OS Fire TV:** closed. Nothing here works on them.
+- **Apple TV (New, Beta):** the phone remote works, with no app and no payment: the bridge pairs once with a PIN and
+  then sends the remote keys, sleep and wake, and opens any app on the Apple TV by its bundle id. couch-tv's home
+  screen itself does not run on it yet (tvOS has no web view, so it needs a new native app, and Apple lets no app
+  replace its own home). It was checked against a stand-in Apple TV on a computer; no real Apple TV has run it
+  yet, so please say how it goes. Limits and steps: [docs/APPLE-TV.md](docs/APPLE-TV.md).
+- **Vega OS Fire TV:** closed. Nothing here works on it.
 
 **Want everything on a Samsung, LG, Roku, VIDAA or another TV?** The Samsung, LG, Roku and VIDAA paths cover the home and the
 phone remote, not everything. Plug in a Google TV box (for example the Google TV Streamer) and set

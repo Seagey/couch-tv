@@ -31,6 +31,7 @@ from tv import TV, TVUnavailable, intent_to_link
 import samsung
 import lg
 import roku
+import appletv
 import vidaa
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -62,6 +63,8 @@ def make_tv(cfg):
         return roku.RokuTV(cfg)
     if cfg.get("kind") == "vidaa":
         return vidaa.VidaaTV(cfg)
+    if cfg.get("kind") == "appletv":
+        return appletv.AppleTV(cfg)
     return TV(cfg)
 
 
@@ -899,6 +902,24 @@ async def h_vidaa_pair(request):
     try:
         await tv.pair_finish(str(pin).strip())
     except vidaa.VidaaError as e:
+        raise ApiError(409, str(e))
+    return ok(paired=True)
+
+
+async def h_appletv_pair(request):
+    """Apple TV pairing: {} asks the Apple TV to show its PIN, {"pin": "1234"} sends it back (docs/APPLE-TV.md)."""
+    if tv.kind != "appletv":
+        raise ApiError(400, "only for Apple TVs")
+    data = await body(request)
+    pin = data.get("pin")
+    try:
+        if pin is None:
+            await tv.pair_start()
+            return ok(step="pin", note="The Apple TV should now show a 4 digit PIN. Send it as {\"pin\": \"1234\"}.")
+        if not isinstance(pin, (str, int)) or not re.fullmatch(r"\d{4}", str(pin).strip()):
+            raise ApiError(400, "pin is the 4 digits the Apple TV shows")
+        await tv.pair_finish(str(pin).strip())
+    except appletv.AppleTVError as e:
         raise ApiError(409, str(e))
     return ok(paired=True)
 
@@ -2761,6 +2782,8 @@ async def h_tvs(request):
             row |= {"ecp": t.ecp_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         elif t.kind == "vidaa":
             row |= {"vidaa": t.vidaa_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
+        elif t.kind == "appletv":
+            row |= {"appletv": t.status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         out.append(row)
     return ok(default=DEFAULT_TV, tvs=out)
 
@@ -2788,6 +2811,7 @@ def make_app():
     r.add_get("/api/webos/apps", h_webos_apps)
     r.add_get("/api/roku/apps", h_roku_apps)
     r.add_get("/api/roku/icon/{id}", h_roku_icon)
+    r.add_post("/api/appletv/pair", h_appletv_pair)
     r.add_post("/api/vidaa/pair", h_vidaa_pair)
     r.add_post("/api/vidaa/tile", h_vidaa_tile)
     r.add_post("/api/vidaa/claim", h_vidaa_claim)

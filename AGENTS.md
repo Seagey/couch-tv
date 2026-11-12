@@ -183,7 +183,14 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   first (it only reads, but it still waits for the yes in step 3), and never suggest or walk them
   through rooting the TV. Afterwards ask them to open an issue on GitHub with what `vidaa-check.py`
   printed, and write down for them what worked and what did not.
-- **Apple TV, Fire TV on Vega OS:** not supported. Say so kindly,
+- **Apple TV (New, Beta):** do not say no. Offer the remote path in [docs/APPLE-TV.md](docs/APPLE-TV.md), and say first, plainly:
+  "couch-tv's home screen does not run on an Apple TV (tvOS has no web view and Apple lets no app replace its
+  home), but the phone remote does, with a computer at home that stays on: arrows, OK, Back, Play, sleep and wake,
+  and opening any app. You type a PIN the Apple TV shows once. It was checked against a pretend Apple TV and has
+  not been run on a real one yet, so something may need fixing. Typing from the phone, what is playing and a
+  volume level are not available." Run `scripts/appletv-check.py` (read only) before the yes, pair only after
+  it. Afterwards ask them to open an issue with what it printed.
+- **Fire TV on Vega OS:** not supported. Say so kindly,
   explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
   round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets
   them everything. If they do not want a box, stop. Do not suggest rooting the TV.
