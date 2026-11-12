@@ -1,24 +1,27 @@
 package app.couchtv.launcher
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 
 /**
  * The Home button watch. The TV's own home stays installed and switched on (switching it off can
  * leave a Google TV in a boot loop, see README "If your TV loops after a restart"), so on many TVs
  * the Home key, and the TV at power on, still open that home. This watcher sees the TV's own home
- * come on screen and puts couch-tv back on top. The TV's home flashes up for a moment; without
- * root that is as good as Android allows.
+ * come on screen and puts couch-tv back on top. On a Xiaomi TV it also catches the Home and Mi
+ * keys as they are pressed; the window watch stays the fallback when the TV still starts its home.
  *
  * - Fire TV: Amazon's TVs start Amazon's launcher from the Home key by name.
  * - Google TV and Android TV: the Google home outranks the default-home setting.
@@ -45,8 +48,22 @@ class FireWatch : AccessibilityService() {
 
     override fun onInterrupt() {}
 
+    /** Xiaomi TVs only (issue #54): every other TV's Home key is left exactly as before. */
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (!isXiaomi()) return false
+        val homeKey = event.keyCode == KeyEvent.KEYCODE_HOME ||
+            (event.keyCode == KeyEvent.KEYCODE_BUTTON_5 && event.scanCode == XIAOMI_MI_SCAN)
+        if (!homeKey || CrashGuard.standingAside(this)) return false
+        if (event.action == KeyEvent.ACTION_UP && event.repeatCount == 0) bringBack()
+        return true
+    }
+
     override fun onServiceConnected() {
         connected = true
+        // Key filtering is switched on at run time and only on Xiaomi, so no other TV sees key presses here.
+        if (isXiaomi()) runCatching {
+            serviceInfo = serviceInfo.also { it.flags = it.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS }
+        }
         homeClasses = homeActivitiesOf(this)
         Log.i("couchtv.firewatch", "the Home button watch is connected")
         // The TV's own home can come up before this service is bound, and then its window event is
@@ -135,6 +152,9 @@ class FireWatch : AccessibilityService() {
         }
 
         const val AMAZON_HOME = "com.amazon.tv.launcher"
+        // MiTV-MOOQ1's Mi-logo key reports BUTTON_5 with this scan code, not KEYCODE_HOME.
+        private const val XIAOMI_MI_SCAN = 580
+        private fun isXiaomi() = Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)
         const val GOOGLE_TV_HOME = "com.google.android.apps.tv.launcherx"
         const val ANDROID_TV_HOME = "com.google.android.tvlauncher"
         /** Fire OS's own Settings screen, opened by name (see [amazonSettings]). */

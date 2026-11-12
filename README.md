@@ -26,6 +26,11 @@ Klette (#128) got couch-tv running on a real Hisense 55U7N (VIDAA 9): login, pai
 apps and a native Couch TV tile all work. New `keep_home` option (off by default) brings couch-tv back when
 the TV falls to VIDAA's home. Setup: [docs/VIDAA.md](docs/VIDAA.md). Thanks Matthew.
 
+**13 November 2026: quick Home presses on a Xiaomi TV (on main, in the next release).** On a Xiaomi
+TV the Home button watch now also catches the Home key and the Mi logo key as they are pressed, so
+pressing them quickly several times no longer leaves Google's home on screen (issue #54). Other
+TVs are not touched. Thanks AryanFelix (#135).
+
 **12 November 2026: Kids mode, New and optional (on main, in the next release).** Off unless you
 switch it on for someone. A kids profile's home shows only
 a shelf of shows a parent picked, as big posters that open straight into each show, plus the few apps
