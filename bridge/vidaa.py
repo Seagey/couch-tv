@@ -78,6 +78,7 @@ PROTOCOL = {
         "/remoteapp/mobile/{client}/ui_service/data/authentication",
         "/remoteapp/mobile/{client}/ui_service/data/authenticationcode",
         "/remoteapp/mobile/{client}/platform_service/data/tokenissuance",
+        "/remoteapp/mobile/{client}/platform_service/data/gettoken",   # older firmware's token answer
     ],
     "state_request": ("ui_service", "gettvstate"),     # CONFIRMED on a VIDAA 9 TV
     "key_service": "remote_service",                   # CONFIRMED (sendkey)
@@ -108,6 +109,7 @@ KEYS = {
 RAW_KEY = re.compile(r"^KEY_[A-Z0-9_]{1,24}$")
 SAFE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,80}$")       # an app id the TV listed, before it is sent back
 SAFE_CLIENT = re.compile(r"^[A-Za-z0-9._:$-]{4,80}$")  # no MQTT wildcards or slashes in a topic level (: is fine)
+SAFE_UUID = re.compile(r"^[A-Za-z0-9:._-]{4,40}$")    # goes into the client id and so into topic levels
 PIN = re.compile(r"^\d{4}$")
 BROWSER_NAMES = ("browser", "webbrowser", "internet", "web")
 
@@ -169,7 +171,11 @@ class VidaaTV:
         # Newer VIDAA firmware wants a client id in Hisense's own shape, built from a uuid that the
         # pairing is kept against. The uuid is ours (not the TV's) and stays for this TV.
         self.uuid = str(cfg.get("uuid") or stored.get("uuid") or vidaa_auth.new_uuid())
+        if not SAFE_UUID.match(self.uuid):
+            raise SystemExit(f"tvs[{self.id}].uuid: letters, digits and : . _ - only")
         self.auth_method = cfg.get("auth_method") or stored.get("auth_method")   # None: probe on connect
+        if self.auth_method is not None and self.auth_method not in vidaa_auth.ORDER:
+            raise SystemExit(f"tvs[{self.id}].auth_method: one of {', '.join(vidaa_auth.ORDER)}")
         cid = str(cfg.get("client_id") or stored.get("client_id") or vidaa_auth.client_id(self.uuid))
         if cid and not SAFE_CLIENT.match(cid):
             raise SystemExit(f"tvs[{self.id}].client_id: letters, digits and . _ : - $ only")
@@ -199,7 +205,8 @@ class VidaaTV:
         self.last_error = None      # why the last connection or pairing failed, in plain words
         self.pin_shown_at = 0.0
         self._hooked_at = 0.0       # debounce: the push path and the poll path both call _hook
-        self.keep_home = cfg.get("keep_home", True) is not False   # bounce VIDAA's home back to couch-tv
+        self.keep_home = cfg.get("keep_home", False) is True   # opt in: bounce VIDAA's home back to couch-tv
+        self._phone_home_at = 0.0   # when the phone remote last sent VIDAA's own Home key (never bounced)
         self._last_home = 0.0       # when the TV last landed on VIDAA's home (to catch a double press)
         self._home_pause_until = 0.0   # a double Home press parks the bounce so VIDAA home is reachable
         self.quiet_until = 0.0
@@ -311,8 +318,8 @@ class VidaaTV:
         if not self.trace:
             return
         text = payload.decode("utf-8", "replace") if isinstance(payload, bytes) else str(payload)
-        # never the PIN or the token in a log someone may paste into an issue
-        text = re.sub(r'("(?:%s|%s)"\s*:\s*)"[^"]*"' % (PROTOCOL["pin_field"], "|".join(PROTOCOL["token_fields"])),
+        # never the PIN or the token in a log someone may paste into an issue (the PIN now goes as a number)
+        text = re.sub(r'("(?:%s|%s)"\s*:\s*)(?:"[^"]*"|-?\d+)' % (PROTOCOL["pin_field"], "|".join(PROTOCOL["token_fields"])),
                       r'\1"(hidden)"', text)
         self.log.info("trace %s %s %s", way, topic, text[:600])
 
@@ -331,6 +338,8 @@ class VidaaTV:
             # (vidaa_auth). A tester who set mqtt_user/mqtt_password overrides that. The method is
             # the TV's transport era: the known one first, else probe newest to oldest.
             methods = [self.auth_method] if self.auth_method else list(vidaa_auth.ORDER)
+            if self.mqtt_user is not None:
+                methods = methods[:1]   # the tester's own login: the same pair every time, so try it once
             errors = []   # one entry per (port, scheme) tried, so a later failure never hides an earlier one
             for port in self.ports:
                 for method in methods:
@@ -686,6 +695,8 @@ class VidaaTV:
         await asyncio.sleep(0.1)         # the TV already reports it is on its home: bounce fast
         if self.statetype != LAUNCHER or time.monotonic() < self._home_pause_until:
             return                       # the user moved on, or asked for VIDAA's home
+        if time.monotonic() - self._phone_home_at < 20:
+            return                       # the phone remote's "vidaa_home" key asked for VIDAA's home
         if not self.open_on_power_on:
             return
         # note: no quiet_until check here on purpose — couch-tv never lands the TV on VIDAA's own
@@ -700,12 +711,12 @@ class VidaaTV:
         """The TV just came on. If it is on its own home or live TV, open couch-tv."""
         if time.monotonic() - self._hooked_at < 8:
             return                       # already opening from the other path
-        self._hooked_at = time.monotonic()
         if time.monotonic() < self.home_on_wake_until:
             self.home_on_wake_until = 0.0
         elif time.monotonic() < self.quiet_until:
             self._note("TV came on, left alone (a command is running)")
-            return
+            return                       # not stamped: a phone wake straight after still opens couch-tv
+        self._hooked_at = time.monotonic()
         await asyncio.sleep(SETTLE)   # let the TV settle on whatever it opens by itself
         # the TV pushes its state on the broadcast topic the moment it changes, so statetype is
         # already current; only fall back to a (short) read if we somehow have nothing.
@@ -741,6 +752,8 @@ class VidaaTV:
         if not code:
             raise ValueError(f"unknown key: {name}")
         self.require()
+        if code == "KEY_HOME":
+            self._phone_home_at = time.monotonic()   # keep_home must not bounce a home asked for on purpose
         if power and not self.is_on and not (self._mqtt and self._mqtt.alive):
             await self.wake()   # fully off: the broker is gone with it
             return code

@@ -203,7 +203,9 @@ class StandIn:
         elif name == "vidaa_app_connect":
             self.pin_shown = True
         elif name == "authenticationcode":
-            self.pin_ok = self.pin_shown and isinstance(data, dict) and data.get("authNum") == PIN
+            # a real VIDAA 9 TV wants the PIN as a number: a string is refused (PR #128)
+            num = data.get("authNum") if isinstance(data, dict) else None
+            self.pin_ok = self.pin_shown and isinstance(num, int) and num == int(PIN)
             await self.send(f"{mine}/ui_service/data/authenticationcode", {"result": 1 if self.pin_ok else 0})
         elif name == "gettoken":
             await self.send(f"{mine}/platform_service/data/gettoken", {"accesstoken": TOKEN} if self.pin_ok else {})
