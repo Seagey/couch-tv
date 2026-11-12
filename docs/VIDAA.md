@@ -1,12 +1,17 @@
 # couch-tv on a Hisense VIDAA TV
 
-## Test status: not yet run on a real VIDAA TV
+## Test status: confirmed on a real VIDAA TV
 
-**Nobody has run this on a real VIDAA TV.** It was written in November 2026 and tested only against a
-pretend VIDAA TV on a computer (`tests/vidaa_standin.py`). Hisense publishes nothing about how its TVs
-talk to a phone remote, so parts of `bridge/vidaa.py` are our best reading of it, not confirmed facts.
-Expect something to need fixing. If you have a VIDAA TV, you would be the first: please run the first
-test below and [open an issue](https://github.com/Seagey/couch-tv/issues) with what it printed.
+**Confirmed on a real VIDAA TV.** First confirmed set: a Hisense 55U7N on VIDAA 9 (software
+`V0002.09.61X.Q0705`, a July 2026 build), over Wi-Fi. On it, login, pairing, reading the TV's state
+and app list, the phone remote's keys, opening an app, and a native Couch TV tile on the app row all
+work. This firmware uses the newer "modern" transport: the login credentials are worked out from the
+clock afresh on every connect, the pairing is kept against the client's id (no token is issued), and
+the TV refuses `#` wildcard subscriptions, so `bridge/vidaa.py` now handles all three. Hisense still
+publishes nothing about any of this, so another model or firmware may still need fixing: if yours
+does, please [open an issue](https://github.com/Seagey/couch-tv/issues) with what the first test
+printed. The client certificate is still something each owner supplies from their own copy of
+Hisense's app (`scripts/vidaa-cert.py`); couch-tv does not ship it.
 
 Not technical? [VIDAA-TESTING.md](VIDAA-TESTING.md) is a step by step guide to the first test.
 
