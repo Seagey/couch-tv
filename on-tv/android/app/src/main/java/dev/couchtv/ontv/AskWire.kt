@@ -146,6 +146,7 @@ object AskWire {
     fun run(chat: AskChat, text: String, transport: (String, Map<String, String>, JSONObject) -> JSONObject,
             runTool: (String, JSONObject) -> String, maxRounds: Int = 5): AskOutcome {
         val actions = JSONArray()
+        val failures = ArrayList<String>()
         chat.addUser(text)
         for (round in 0 until maxRounds) {
             val reply = transport(chat.url, chat.headers(), chat.body())
@@ -154,16 +155,27 @@ object AskWire {
             val turn = try { chat.accept(reply) } catch (e: Exception) {
                 throw ApiError(502, "The AI service at ${host(chat.cfg.base) ?: "that address"} answered in a format this TV does not understand.")
             }
-            if (turn.done) return AskOutcome(turn.text.ifEmpty { "Done." }, actions)
+            if (turn.done) return AskOutcome(turn.text.ifEmpty { ending(actions, failures, false) }, actions)
             val results = turn.calls.map { c ->
                 val (ok, out) = if (c.error != null) false to c.error
                 else try { true to runTool(c.name, c.args) } catch (e: Exception) { false to (e.message ?: "failed") }
+                if (!ok) failures.add("${c.name}: ${out.take(160)}")
                 actions.put(JSONObject().put("tool", c.name).put("args", c.args).put("ok", ok))
                 AskResult(c.id, out, !ok)
             }
             chat.addResults(results)
         }
-        return AskOutcome("Done.", actions)
+        return AskOutcome(ending(actions, failures, true), actions)
+    }
+
+    /**
+     * What to say when the model gives no words of its own (it stopped, or it ran out of rounds). "Done." is
+     * only true when something was done: if every try failed, say so and give the last reason.
+     */
+    private fun ending(actions: JSONArray, failures: List<String>, ranOut: Boolean): String = when {
+        failures.isNotEmpty() -> (if (ranOut) "I could not finish that." else "That did not work.") + " Last problem: " + failures.last()
+        actions.length() == 0 -> "I did not catch that. Could you say it another way?"
+        else -> "Done."
     }
 }
 

@@ -48,6 +48,17 @@ not will answer in words and press nothing. A typical ask is a few short calls, 
 tokens and 1,200 output tokens in total, and a one or two sentence answer. The loop stops after five
 rounds.
 
+## What it does when asked
+
+- It is told which apps the TV has and may only open those. Without that list a model guesses at services for
+  the wrong country (it tried Netflix, Stan and ABC iview on a TV with none of them, failed five times, and the
+  app then said a bare "Done.").
+- A request for a suggestion or recommendation is answered in text, without tools.
+- If something fails it may try one other way, then says plainly what did not work. If it runs out of rounds, or
+  stops without words after a failure, the reply is the last reason (for example "I could not finish that. Last
+  problem: launch: com.netflix.ninja is not installed on the TV"). "Done." is only said when something was done.
+- Set the country on the setup page: it steers which streaming services a title is looked up for.
+
 ## Rules the app enforces
 
 - A web address must be `https://`. Plain `http://` is accepted only for a server on your own network
@@ -82,8 +93,9 @@ The app-side code for each wire format is in `on-tv/android/app/src/main/java/de
 
 ## Cost and privacy
 
-Each ask sends the question, the selected person's name if there is one, the country, the descriptions
-of the four tools, and what those tools return (for example what is playing now or the result of a
-search) to the service you chose. Nothing else is sent, and nothing is sent unless ask is on and someone
+Each ask sends the question, the selected person's name if there is one, the country, **the names of the
+apps installed on the TV** (so the model does not guess at apps you do not have), the descriptions of the
+four tools, and what those tools return (for example what is playing now or the result of a search) to
+the service you chose. Nothing else is sent, and nothing is sent unless ask is on and someone
 asks. The app does not follow redirects, so a service cannot pass your key on to another address. See
 your service's own terms for how it handles what it receives.

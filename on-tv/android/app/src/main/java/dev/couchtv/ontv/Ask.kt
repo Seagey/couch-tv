@@ -87,11 +87,27 @@ object Ask {
         if (!cfg.ready) throw ApiError(501, "Ask is off in on-TV mode.")
         val started = System.currentTimeMillis()
         val system = "You control a TV through tools. Do what the person asks with the fewest tool calls, then reply in one or two short plain sentences. " +
+            "Apps on this TV: ${installedApps()}. Only open apps from this list. " +
+            "If the person asks for a suggestion or recommendation, do not use tools: reply with two or three specific titles, each with one app from the list above that could play it. Never name an app that is not in the list. " +
+            "If something fails, try at most one other way, then say plainly what did not work. " +
             "Country: ${Store.country()}." + (who?.let { " Watching: $it." } ?: "")
         val out = AskWire.run(AskWire.chat(cfg, system, TOOLS), text, { url, headers, body -> call(cfg, url, headers, body) }, { name, a -> runTool(name, a, who) })
         return JSONObject().put("ok", true).put("reply", out.reply).put("actions", out.actions)
             .put("seconds", (System.currentTimeMillis() - started) / 1000.0)
     }
+
+    /**
+     * The apps this TV really has, so the model does not guess at ones it lacks (it used to try Netflix, Stan and
+     * ABC iview on a TV that has none of them). A known app is listed by its id, any other by its package name;
+     * the launch tool takes either.
+     */
+    private fun installedApps(): String = try {
+        val pm = Store.context().packageManager
+        Tv.tvLaunchables().map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
+            .filter { it.first != BuildConfig.APPLICATION_ID }.take(30)
+            .joinToString(", ") { (pkg, label) -> "$label (${Apps.BY_PACKAGE[pkg]?.id ?: pkg})" }
+            .ifEmpty { "unknown" }
+    } catch (e: Exception) { "unknown" }
 
     private fun runTool(name: String, a: JSONObject, who: String?): String = when (name) {
         "play" -> Finder.play(a.getString("title"), a.optInt("season").takeIf { it > 0 }, a.optInt("episode").takeIf { it > 0 }, a.optString("service").ifEmpty { null }, who).toString()

@@ -255,9 +255,45 @@ class AskWireTest {
         assertEquals(5, calls); assertEquals("Done.", out.reply); assertEquals(5, out.actions.length())
     }
 
-    @Test fun runLoopSaysDoneWhenTheModelSaysNothing() {
+    @Test fun runLoopDoesNotPretendWhenTheModelSaidAndDidNothing() {
         val out = AskWire.run(AskWire.chat(openai(), "s", tools), "x", { _, _, _ -> JSONObject("""{"choices":[{"message":{"content":""}}]}""") }, { _, _ -> "" })
+        assertEquals("I did not catch that. Could you say it another way?", out.reply)
+        assertEquals(0, out.actions.length())
+    }
+
+    @Test fun runLoopSaysDoneWhenToolsRanFineAndTheModelHadNoWords() {
+        val replies = listOf(
+            """{"choices":[{"message":{"tool_calls":[{"id":"c","type":"function","function":{"name":"key","arguments":"{\"key\":\"mute\"}"}}]}}]}""",
+            """{"choices":[{"message":{"content":""}}]}""")
+        var n = 0
+        val out = AskWire.run(AskWire.chat(openai(), "s", tools), "x", { _, _, _ -> JSONObject(replies[n++]) }, { _, _ -> "ok" })
         assertEquals("Done.", out.reply)
+    }
+
+    @Test fun runLoopExplainsWhenEveryTryFailedAndItRanOutOfRounds() {
+        // what happened on a TV with none of the apps the model guessed: five launches, five failures, then a bare "Done."
+        val reply = """{"choices":[{"message":{"tool_calls":[{"id":"c","type":"function","function":{"name":"key","arguments":"{\"key\":\"x\"}"}}]}}]}"""
+        val out = AskWire.run(AskWire.chat(openai(), "s", tools), "put on something funny", { _, _, _ -> JSONObject(reply) },
+            { _, _ -> throw IllegalStateException("com.netflix.ninja is not installed on the TV") })
+        assertTrue(out.reply, out.reply.startsWith("I could not finish that."))
+        assertTrue(out.reply, out.reply.contains("com.netflix.ninja is not installed on the TV"))
+        assertFalse(out.reply == "Done.")
+        assertEquals(5, out.actions.length())
+    }
+
+    @Test fun runLoopGivesTheReasonWhenAToolFailedAndTheModelStoppedWithoutWords() {
+        val replies = listOf(
+            """{"choices":[{"message":{"tool_calls":[{"id":"c","type":"function","function":{"name":"key","arguments":"{\"key\":\"zzz\"}"}}]}}]}""",
+            """{"choices":[{"message":{"content":""}}]}""")
+        var n = 0
+        val out = AskWire.run(AskWire.chat(openai(), "s", tools), "x", { _, _, _ -> JSONObject(replies[n++]) }, { _, _ -> throw IllegalArgumentException("unknown key zzz") })
+        assertEquals("That did not work. Last problem: key: unknown key zzz", out.reply)
+    }
+
+    @Test fun aLongToolErrorIsCutInTheReply() {
+        val reply = """{"choices":[{"message":{"tool_calls":[{"id":"c","type":"function","function":{"name":"key","arguments":"{}"}}]}}]}"""
+        val out = AskWire.run(AskWire.chat(openai(), "s", tools), "x", { _, _, _ -> JSONObject(reply) }, { _, _ -> throw IllegalStateException("e".repeat(1000)) })
+        assertTrue(out.reply.length < 260)
     }
 
     @Test fun runLoopDoesNotRunATool_WhenItsArgumentsWereBroken() {
