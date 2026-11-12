@@ -1,8 +1,8 @@
 # couch-tv on an Apple TV (Beta)
 
 **New, Beta.** Two parts: the phone remote (the bridge talks to the Apple TV) and **Couch TV**, couch-tv's home as an
-Apple TV app. Both were built and checked against a stand-in Apple TV and a stand-in bridge on a computer. No real
-Apple TV has run them yet, so expect something to need fixing. Please [open an issue](https://github.com/Seagey/couch-tv/issues)
+Apple TV app. Both were built and checked against a stand-in Apple TV and a stand-in bridge on a computer, and Couch TV also runs in
+the tvOS Simulator. No real Apple TV has run them yet, so expect something to need fixing. Please [open an issue](https://github.com/Seagey/couch-tv/issues)
 and say how it went (the Apple TV model, tvOS version, what worked and what did not), even if all of it worked.
 
 ## What you get, in plain words
@@ -153,8 +153,15 @@ anything else in couch-tv.
 ### Trying it without an Apple TV (for developers)
 
 - `tests/appletv_home_standin.py` runs the real bridge with a stand-in Apple TV, two people, Keep watching and the
-  weather, and prints a code. Build and run Couch TV in the tvOS Simulator (Xcode, the CouchTV scheme, an Apple TV
-  simulator), open Settings and type `127.0.0.1:5455` and the code. Every app it opens is printed.
+  weather, and prints a code (`--kids` makes a kids profile the one watching, parent PIN 2580). Build and run Couch TV
+  in the tvOS Simulator (Xcode, the CouchTV scheme, an Apple TV simulator), open Settings and type `127.0.0.1:5455`
+  and the code. Every app it opens is printed.
+- **Checked in the tvOS Simulator (12 Nov 2026, Xcode 27.2, tvOS 27.2, Apple TV 4K):** it builds and runs there, finds
+  the stand-in bridge from Settings, shows the home with Keep watching and the dock, opens Netflix and YouTube through
+  the bridge (the stand-in printed the launch), and Kids mode works end to end: the shelf, the PIN pad, a wrong PIN
+  refused and the right one moving to the grown up's home. The four digits submit as soon as the fourth is typed.
+  Xcode 27 has no Simulator window app, so keys were sent with an XCUITest (`XCUIRemote`) instead of by hand. Still
+  not run on a real Apple TV.
 - `tvos/preview/render.sh 127.0.0.1:5455 <code>` draws Couch TV's screens to PNG files on the Mac from the same
   SwiftUI code against that bridge, without the Simulator (no focus engine and no blur there).
 - `tvos/make-project.py` writes the Xcode project and `tvos/make-assets.py` the fonts and icons. Run them after adding
