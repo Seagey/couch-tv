@@ -130,6 +130,21 @@ body {
 .sleep-menu .opt.focus { background: #fff; color: #111; transform: scale(1.03); }
 .quick-note { margin-top: 0.5rem; font-size: 1.4375rem; color: var(--warn); min-height: 1.875rem; }
 
+/* a short confirmation in the middle of the top of the screen, for something that happened by itself
+   (the weekly Developer Mode extend) rather than a key press */
+.toast {
+  position: fixed; top: 2rem; left: 50%; z-index: 20; transform: translate(-50%, -1rem);
+  display: flex; align-items: center; gap: 0.75rem; max-width: 44rem;
+  padding: 0.875rem 1.5rem; border-radius: 2rem;
+  background: rgba(16, 16, 20, 0.86); color: var(--text);
+  font-size: 1.4375rem; line-height: 1.875rem; font-weight: 600;
+  box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.45);
+  opacity: 0; pointer-events: none;
+  transition: opacity 300ms var(--ease), transform 300ms var(--ease);
+}
+.toast.on { opacity: 1; transform: translate(-50%, 0); }
+.toast svg { flex: none; width: 1.625rem; height: 1.625rem; fill: none; stroke: #30d158; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+
 .hero { max-width: 62rem; opacity: 0; transform: translateY(0.5rem); transition: opacity 400ms var(--ease), transform 400ms var(--ease); }
 .hero.on { opacity: 1; transform: none; }
 .hero h1 { font-size: 3.75rem; line-height: 4.25rem; font-weight: 700; letter-spacing: -0.025em; }

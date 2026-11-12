@@ -21,6 +21,13 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: LG Developer Mode extend, five app logos and a Dutch home (on main, in the next release).**
+On an LG with no bridge, the home now asks once a week "Extend Developer Mode?" and stays on screen until answered,
+so LG does not remove couch-tv when the session runs out. There is an `extend` quick button (off until you add it)
+and a Dev mode tile in the dock that opens LG's own Developer Mode app. VTM GO, VRT MAX, Stremio, Amazon Alexa and
+YouTube Cobalt AdFree get their logos, and the TV home speaks Dutch (`nl`, Belgium). See [docs/LG.md](docs/LG.md).
+Thanks JensDevold (#142).
+
 **13 November 2026: a Hisense VIDAA home with no computer, and Spotify on the Now playing card (on
 main).** A VIDAA TV can now run couch-tv's home as a small website the Couch TV tile opens, so the
 clock, scenes or your photos, weather and Home settings keep working with the computer off
@@ -392,9 +399,9 @@ back to it. [docs/CONFIG.md](docs/CONFIG.md) has the details.
 
 **Languages.** The TV home and the phone remote both speak English, Spanish (`es`, for Spain and
 everyone else), Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest),
-Italian (`it`), German (`de`), Turkish (`tr`) and Serbian Latin (`sr-Latn-RS`, on main, in the next
+Italian (`it`), German (`de`), Turkish (`tr`), Serbian Latin (`sr-Latn-RS`) and Dutch (`nl`, TV home only for now, on main, in the next
 release). Italian, German,
-Turkish and Serbian use a 24 hour clock by default unless you pick 12 hour. The optional smart-home
+Turkish, Serbian and Dutch use a 24 hour clock by default unless you pick 12 hour. The optional smart-home
 controls are translated too. The phone has its own choice (TV menu, Language), "Same as the TV" by
 default. Messages that come from the bridge itself
 (an error, a note about how a show opened) and some screen reader labels on the phone are still in

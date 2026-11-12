@@ -12,12 +12,14 @@ an LG is **an app that opens itself, not a true home screen**, the same as on a
   Each time the TV is switched on and nothing else is on screen, it opens couch-tv within a few
   seconds. So the TV "looks for" couch-tv every time it comes on.
 - **Keeping it installed:** LG removes Developer Mode apps when the Developer Mode session runs
-  out. The bridge presses Developer Mode's **Extend** for you once a day while the TV is on.
+  out. The bridge presses Developer Mode's **Extend** for you once a day while the TV is on; with
+  no bridge, the app asks once a week with a question on screen, and its **Extend Developer Mode**
+  quick button does it on demand.
 - **The phone remote and the Claude ask** work against the LG through the same bridge.
 
 It needs a computer at home that stays on (option B). Without one you can still install the app
-and open it from LG's app row, but nothing opens it for you, and nothing extends Developer Mode,
-so the app is removed when the session runs out.
+and open it from LG's app row, and the app asks once a week whether to extend Developer Mode, but
+nothing opens couch-tv for you when the TV comes on.
 
 ## Test status: ten real LGs so far
 
@@ -409,10 +411,19 @@ the TV comes on, just before couch-tv opens, so couch-tv covers whatever Develop
 TV that stays on all day it waits until couch-tv or live TV is in front, then puts that back. It
 never does it over another app.
 
-- With no bridge at all, the app can press Extend itself:
-  `com.webos.applicationManager/launch` with `{"id": "com.palmdts.devmode", "params": {"extend": true}}`
-  is the same call ([#40](https://github.com/Seagey/couch-tv/issues/40)). couch-tv does not do this
-  yet, so on the app-only path press Extend in the Developer Mode app within every session.
+- With no bridge at all, the app asks once a week, on screen: **Extend Developer Mode?** with
+  **Extend now** and **Not now**. The question stays there until someone answers it with the remote:
+  this TV drops into LG's clock (a burn-in saver) when nobody touches it, and a question that timed
+  out would be missed. **Extend now** runs
+  `com.webos.applicationManager/launch` with `{"id": "com.palmdts.devmode", "params": {"extend": true}}`,
+  the same call ([#40](https://github.com/Seagey/couch-tv/issues/40)). LG's Developer Mode app comes
+  to the front and sends the Extend; on webOS 6.5.3 it stays in front, so press Home and open
+  couch-tv again, and it then says the Extend is done. webOS freezes a page's timers while another
+  app is in front, so the app cannot put itself back. **Not now** keeps the question quiet for a day,
+  and so does opening the dock's **Dev mode** tile, which only opens LG's Developer Mode app so
+  someone can extend by hand. The **Extend Developer Mode** quick button does the same on demand.
+  Nothing happens when `"extend_devmode": false` is set. The date of the last extend is kept on the
+  TV (`localStorage`, `tvhome.devmode.last`), so it survives the app restarting.
 - Without `ares-launch` on the bridge computer, the bridge opens Developer Mode with the same
   setting over the network remote instead. That way is **untested** and may only open the app.
   Install the ares tools.
@@ -421,8 +432,8 @@ never does it over another app.
   `ARES_LAUNCH` environment variable). `which ares-launch` prints the path.
 - The last try, and whether it worked, is in `bridge/data/lg-<id>-devmode.json` and in
   `/api/tvs`. A failed try does not count as the day's: it is tried again an hour later.
-- `"extend_devmode": false` in `config.json` stops it. Then press Extend yourself in the
-  Developer Mode app now and then.
+- `"extend_devmode": false` in `config.json` stops it, on the bridge and in the app. Then press
+  Extend yourself in the Developer Mode app now and then.
 
 **How much time is left.** Every 6 hours while the TV is on, the bridge reads the real countdown:
 it reads the session token from the TV over Developer Mode's ssh (`ares-novacom`), and asks LG's
