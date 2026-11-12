@@ -100,6 +100,8 @@ If nothing Android is found, or they are not sure what they have:
     network, Advanced Wi-Fi Settings, the IP address.
   - **Roku:** Settings, Network, About (the IP address). `find-tvs.py` does not list a Roku, but
     `check-tv.py <address>` recognises one by its port 8060.
+  - **Hisense VIDAA:** the IP address in the TV's network settings. `find-tvs.py` does not list one,
+    but `check-tv.py <address>` recognises it by its port 36669 (36668 on older builds).
   - **Google TV or Android TV:** Settings, Network and Internet, the Wi-Fi network.
 - Ask them to open **Settings, Device Preferences, About** (older Android TV) or **Settings,
   System, About** (Google TV) and read you the model and the "Android TV OS" line. Until you know
@@ -164,7 +166,24 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   picture mode, apply.sh, ADB and the quick buttons). The ids and deep links in its table are unverified:
   if one does not open, find the Roku's real id with `query/apps` and say what you found. Afterwards ask
   them to open an issue on GitHub saying how it went, and write down for them what worked and what did not.
-- **Apple TV, Hisense VIDAA, Fire TV on Vega OS:** not supported. Say so kindly,
+- **Hisense VIDAA:** do not say no. Offer the VIDAA path in [docs/VIDAA.md](docs/VIDAA.md) the way you
+  offer the Roku one, and say first, and plainly, that it is untested: "There is a VIDAA version of
+  couch-tv. It was tested against a pretend VIDAA TV on a computer and has **not been run on a real VIDAA
+  TV yet**, and Hisense documents none of this, so parts of it are our best reading and something will
+  probably need fixing. There is nothing to install on the TV: a computer at home that stays on opens
+  couch-tv's home in the TV's own browser every time the TV is switched on (on older firmware it may also
+  go on the app row as a tile). It is not a true home screen: the remote's Home button still opens VIDAA's
+  home, and that cannot change without rooting the TV, which couch-tv never does. The phone remote works:
+  keys, volume up and down, Home, opening apps. Apps open on their own page and you pick the show. There is
+  no 'what is playing', no volume level, no typing from the phone and no screenshots. You type a PIN the TV
+  shows once. Newer TVs (2024 on, most Australian Hisense TVs bought in 2025 or 2026) also need a
+  certificate you take from your own copy of Hisense's VIDAA phone app; couch-tv does not include it."
+  Without a computer that stays on, nothing is possible. Also offer the Google TV box as the way to get
+  everything. If they choose VIDAA, follow docs/VIDAA.md: run `scripts/vidaa-check.py <tv address>`
+  first (it only reads, but it still waits for the yes in step 3), and never suggest or walk them
+  through rooting the TV. Afterwards ask them to open an issue on GitHub with what `vidaa-check.py`
+  printed, and write down for them what worked and what did not.
+- **Apple TV, Fire TV on Vega OS:** not supported. Say so kindly,
   explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
   round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets
   them everything. If they do not want a box, stop. Do not suggest rooting the TV.

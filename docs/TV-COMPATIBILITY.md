@@ -2,7 +2,7 @@
 
 Research from public sources (linked below). Only Google TV has been tested
 by the author. Everything else is what the sources say, not tested (Samsung and LG have since run on real
-TVs, see their pages; Roku has not).
+TVs, see their pages; Roku and Hisense VIDAA have not).
 
 - **A. TV home only:** an app replaces the TV's home screen.
 - **B. Computer bridge:** a computer at home controls the TV with the Android TV Remote protocol
@@ -23,7 +23,8 @@ TVs, see their pages; Roku has not).
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on nine real LGs so far ([LG.md](LG.md)) | No |
 | Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation, **not yet tried on a real Roku** ([ROKU.md](ROKU.md)) | No |
-| Apple TV, Hisense VIDAA | No | No | No |
+| Hisense VIDAA | App only: a Couch TV tile on firmware that still allows it, else the TV's browser | As a page the bridge opens on power-on, like Samsung and LG. Tested against a stand-in only, **not yet tried on a real VIDAA TV** ([VIDAA.md](VIDAA.md)) | No |
+| Apple TV | No | No | No |
 
 ## Reported by people using it
 
@@ -98,6 +99,13 @@ Not tested by the author. Each line is what someone said worked on their own dev
   simulator, **never on a real Roku**. A sideloaded channel is always one at a time, and newer Roku OS limits
   that protocol unless "Control by mobile apps" allows it ([ROKU.md](ROKU.md)). Roku's home screen cannot be
   replaced.
+- **Hisense VIDAA** does not run Android apps or let an app replace its home screen. The bridge talks to the
+  TV the way Hisense's own phone app does (MQTT over TLS on port 36669, `bridge/vidaa.py`) and opens couch-tv's
+  home page in the TV's browser, or as a tile on firmware that still accepts one, each time the TV comes on.
+  Newer firmware (2024 on) needs a client certificate the owner takes from their own copy of Hisense's app;
+  couch-tv never ships it. Tested against a stand-in only, **never on a real VIDAA TV**, and parts of the
+  protocol are unconfirmed ([VIDAA.md](VIDAA.md)). VIDAA's Home button cannot be taken over without root, and
+  couch-tv never roots a TV.
 - **Samsung and LG** do not run Android apps or let an app replace their home screen. On a Samsung,
   couch-tv runs as a sideloaded app that the bridge opens when the TV comes on
   ([SAMSUNG.md](SAMSUNG.md)). On an LG the same is built, through LG's Developer Mode, and has run on
