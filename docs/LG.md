@@ -163,17 +163,18 @@ press that came after the bridge had stopped waiting, a missing time zone databa
 the phone remote not built, and LG's device list hidden from the background bridge. Not checked yet on
 this TV: the daily Extend after the device list fix, and turning the TV on from the phone.
 
-**Eleventh real LG, 12 November 2026** (by owen282000): an LG OLED65B56LA (OLED B5,
-2025) on webOS 10.3, firmware 33.31.75, **rooted** with the Homebrew Channel, no Developer Mode and no
-bridge. Built on a Mac with `--apps`, `look: night`, `home.hi_res: false` and `extend_devmode: false`,
-in Dutch, and installed over the TV's own ssh as root (see "On a rooted LG" below). The clock and the
-Night scenes, the weather, the dock with 37 apps from the baked list, opening apps, the arrows and the
-Magic Remote pointer, and Home settings all worked. As expected without a bridge, Keep watching stays
-empty and there is no Smart home tile. On this TV `listLaunchPoints` gives the icons as file paths on
-the TV, not web addresses, so the build skips them; they were copied off the TV over ssh. A cold start
-took 4.1 s with the 4K copies and 0.9 s with `home.hi_res: false` (the package went from 23 MB to
-6 MB); bringing back a couch-tv that still runs took 0.2 s, and webOS closed it after about a minute in
-another app. With LG Input Hook the remote's Home button opens couch-tv (also in "On a rooted LG").
+**Eleventh real LG, 12 November 2026** ([PR #165](https://github.com/Seagey/couch-tv/pull/165), by
+owen282000): an LG OLED65B56LA (OLED B5, 2025) on webOS 10.3, firmware 33.31.75, **rooted** with the
+Homebrew Channel, no Developer Mode and no bridge. Built on a Mac with `--apps`, `look: night`,
+`home.hi_res: false` and `extend_devmode: false`, in Dutch, and installed over the TV's own ssh as
+root (see "On a rooted LG" below). The clock and the Night scenes, the weather, the dock with 37
+apps from the baked list, opening apps, the arrows and the Magic Remote pointer, and Home settings
+all worked. As expected without a bridge, Keep watching stays empty and there is no Smart home tile.
+On this TV `listLaunchPoints` gives the icons as file paths on the TV, not web addresses, so the
+build skips them; they were copied off the TV over ssh. A cold start took 4.1 s with the 4K copies
+and 0.9 s with `home.hi_res: false` (the package went from 23 MB to 6 MB); bringing back a couch-tv
+that still runs took 0.2 s, and webOS closed it after about a minute in another app. With LG Input
+Hook the remote's Home button opens couch-tv (also in "On a rooted LG").
 
 **First non-LG brand, 11 November 2026** ([issue #112](https://github.com/Seagey/couch-tv/issues/112),
 reported by asadawar): an Infinix 43W1Q running webOS TV Lite 7.5.8 (the reduced webOS that other brands
