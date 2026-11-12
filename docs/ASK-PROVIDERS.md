@@ -64,7 +64,7 @@ rounds.
 - A web address must be `https://`. Plain `http://` is accepted only for a server on your own network
   (`localhost`, `10.x`, `192.168.x`, `172.16` to `172.31`, `169.254.x`, `*.local`, `*.lan`), so a key
   never crosses the internet unencrypted.
-- No name or password inside the address.
+- No name or password inside the address, and no `?` or `#`: it ends at the path.
 - The address cannot be the TV itself. The obvious spellings (`localhost`, `127.x`, `::1`, `0.0.0.0`) are
   refused when you save. Every ask then resolves the name and refuses it again if any answer is loopback,
   "any", or one of the TV's own network addresses, so a name that points at the TV does not get past it.

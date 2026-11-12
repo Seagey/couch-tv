@@ -111,6 +111,8 @@ object AskWire {
             if (u.scheme != "https" && u.scheme != "http") return "The web address must start with https:// (or http:// for a server at home)."
             if (u.host.isNullOrEmpty()) return "That web address has no host name."
             if (u.userInfo != null) return "Leave a name and password out of the web address. The key goes in its own box."
+            // the request goes to this address plus /chat/completions or /v1/messages: a ? or # would hide that ending
+            if (u.rawQuery != null || u.rawFragment != null || b.contains('?') || b.contains('#')) return "Leave ? and # out of the web address: it ends at the path, like https://api.openai.com/v1."
             if (isThisDevice(u.host)) return "That address is the TV itself. Use the address of your computer or of the AI service."
             if (u.scheme == "http" && !isLocalHost(u.host)) return "A key must not travel over plain http. Use https://, or a server on your own network."
         }

@@ -21,6 +21,15 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: Ask on the TV with more AI services (on main, in the next release).** On-TV mode's
+Ask is no longer Claude only: the setup page has a service picker for Claude, OpenAI, Google Gemini,
+OpenRouter, Groq, Mistral, another service that copies OpenAI's API, or a model on a computer at home
+(Ollama, LM Studio, llama.cpp). Claude Haiku 5.5 stays the default and an existing Claude key keeps
+working. A key only ever goes to the address it was saved for, `GET /api/settings` never returns it,
+plain http is allowed only on your home network, and Ask stays off for a kids profile. Ask is now told
+which apps the TV has, so it stops trying apps you do not have, and says what went wrong instead of a
+bare "Done.". See [docs/ASK-PROVIDERS.md](docs/ASK-PROVIDERS.md). Thanks iarhamanwaar (#140).
+
 **13 November 2026: Xiaomi TVs, Couch TV in PatchWall's place, and a lighter home page on 1 GB TVs (on main, in the next release).**
 In the on-TV app on a Xiaomi or Redmi TV, a setup page switch (off by default, Xiaomi only) makes the remote's PatchWall
 button, PatchWall's tile and power on open Couch TV, but never over an HDMI or TV input wake. The Home button is not

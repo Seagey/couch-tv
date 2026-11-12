@@ -389,6 +389,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
     }
 
     private fun saveSettings(b: JSONObject) {
+        Ask.save(b)   // first: a wrong Ask setting answers 400 before anything else in the request is saved
         b.optJSONObject("settings")?.let {
             if (it.toString().length > 32_000) throw ApiError(413, "settings are too big")
             Store.writeJson("home-settings.json", it)
@@ -410,7 +411,6 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         }
         b.optString("country").takeIf { Regex("[A-Z]{2}").matches(it) }?.let { Store.putStr("country", it) }
         b.optString("tv_name").trim().takeIf { it.isNotEmpty() }?.let { Store.putStr("tv_name", it.take(30)) }
-        Ask.save(b)
         if (b.has("patchwall_replace") && FireHome.isXiaomi) {
             Store.putBool("patchwall_replace", b.optBoolean("patchwall_replace"))
             WatchService.keyFilterChanged()

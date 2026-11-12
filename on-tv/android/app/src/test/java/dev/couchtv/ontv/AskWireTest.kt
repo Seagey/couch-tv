@@ -73,6 +73,8 @@ class AskWireTest {
     @Test fun checkRefusesWhatCouldLeakAKey() {
         assertNotNull("plain http to the internet", AskWire.check("openai", "http://api.example.com/v1", "m"))
         assertNotNull("name and password in the address", AskWire.check("openai", "https://user:pw@example.com/v1", "m"))
+        assertNotNull("a query hides the real path", AskWire.check("openai", "http://$HOME_PC/admin?cmd=reboot&x=", "m"))
+        assertNotNull("a fragment hides the real path", AskWire.check("openai", "https://api.example.com/v1#", "m"))
         assertNotNull("not http at all", AskWire.check("openai", "file:///etc/passwd", "m"))
         assertNotNull("not http at all", AskWire.check("openai", "javascript:alert(1)", "m"))
         assertNotNull("no host", AskWire.check("openai", "https:///v1", "m"))
