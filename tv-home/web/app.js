@@ -54,14 +54,17 @@
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
   var THEME = "night", NIGHT = true, OLED = false, CLOCK24 = false;
-  // OLED burn-in protection: micro-shift (±4px) every 60 seconds when OLED theme or idle ambient clock is active
-  var OLED_SHIFT_STEPS = [[0,0], [2,2], [-2,2], [4,-2], [-2,-2], [2,-4], [-4,0], [0,2]];
+  // OLED burn-in protection: micro-shift (±2px) every 60 seconds in the OLED look. The Smart Idle
+  // ambient clock uses wider steps (±4px) while it is on screen.
+  var OLED_SHIFT_STEPS = [[0,0], [1,1], [-1,1], [2,-1], [-1,-1], [1,-2], [-2,0], [0,1]];
+  var IDLE_SHIFT_STEPS = [[0,0], [2,2], [-2,2], [4,-2], [-2,-2], [2,-4], [-4,0], [0,2]];
   var oledShiftIdx = 0;
   var idleAmbientActive = false;
   function updateOledShift() {
     if (!OLED && !idleAmbientActive) return;
-    oledShiftIdx = (oledShiftIdx + 1) % OLED_SHIFT_STEPS.length;
-    var pt = OLED_SHIFT_STEPS[oledShiftIdx];
+    var steps = idleAmbientActive ? IDLE_SHIFT_STEPS : OLED_SHIFT_STEPS;
+    oledShiftIdx = (oledShiftIdx + 1) % steps.length;
+    var pt = steps[oledShiftIdx];
     document.documentElement.style.setProperty("--oled-shift-x", pt[0] + "px");
     document.documentElement.style.setProperty("--oled-shift-y", pt[1] + "px");
   }

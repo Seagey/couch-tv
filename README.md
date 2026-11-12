@@ -21,6 +21,13 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: Smart Idle, optional (on main, in the next release).** Off unless you switch it on
+in Home settings, under Look. After a wait on the home screen (5 minutes to an hour) it shows a dim,
+pure black clock that drifts a few pixels so nothing burns in, or turns the screen or the TV off. It can
+also turn the TV off after paused playback (Android TV and Roku; never an HDMI input or a game), with a
+"TV auto-off" warning and an "I'm still here" button on the phone remote for the last five minutes.
+Optional quiet hours shorten the wait overnight. See [docs/CONFIG.md](docs/CONFIG.md), `smart_idle`. Thanks ekagra-codes (#132).
+
 **13 November 2026: Hisense VIDAA, working on a real TV (Beta, on main, in the next release).** Matthew
 Klette (#128) got couch-tv running on a real Hisense 55U7N (VIDAA 9): login, pairing, the phone remote, opening
 apps and a native Couch TV tile all work. New `keep_home` option (off by default) brings couch-tv back when
