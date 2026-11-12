@@ -8,6 +8,8 @@ talk to a phone remote, so parts of `bridge/vidaa.py` are our best reading of it
 Expect something to need fixing. If you have a VIDAA TV, you would be the first: please run the first
 test below and [open an issue](https://github.com/Seagey/couch-tv/issues) with what it printed.
 
+Not technical? [VIDAA-TESTING.md](VIDAA-TESTING.md) is a step by step guide to the first test.
+
 ## What it is
 
 VIDAA (Hisense's own system, being renamed V or V Home OS on 2026 models) does not run Android apps and
