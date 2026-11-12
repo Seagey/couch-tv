@@ -32,7 +32,8 @@ query($country: Country!, $language: Language!, $first: Int!, $filter: TitleFilt
   popularTitles(country: $country, first: $first, filter: $filter) {
     edges { node { id objectType
       content(country: $country, language: $language) {
-        title originalReleaseYear posterUrl shortDescription runtime backdrops { backdropUrl } }
+        title originalReleaseYear posterUrl shortDescription runtime backdrops { backdropUrl }
+        externalIds { imdbId } }
       offers(country: $country, platform: ANDROID_TV) { %s }
       tizen: offers(country: $country, platform: TIZENOS) { %s } } } } }
 """ % (_OFFER, _TIZEN_OFFER)
@@ -123,6 +124,7 @@ def _shape(node):
         "backdrop": backdrop_url(c),
         "overview": c.get("shortDescription"),
         "runtime_min": c.get("runtime"),
+        "imdb": (c.get("externalIds") or {}).get("imdbId"),
         "providers": _providers(node.get("offers"), node.get("tizen")),
     }
 
