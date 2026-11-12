@@ -14,6 +14,9 @@
   range, and many 2023 to 2025 models below the flagships). Philips TVs are not a normal retail item in
   Australia; the only Titan OS model listed for Australia is a hotel TV.
 
+An older Philips that is not Android and not Titan OS (Saphi, about 2015 to 2019)? See
+[PHILIPS-SAPHI.md](PHILIPS-SAPHI.md).
+
 Want everything today? Plug a Google TV box (for example the Google TV Streamer) into the TV's HDMI and set
 couch-tv up on that.
 
@@ -148,7 +151,7 @@ You need a computer at home that stays on, running the bridge (README, option B)
 | `kind` | `"philips"` |
 | `ip` or `host` | The TV's address |
 | `mac` | For Wake on LAN from fully off (only if the TV allows waking over the network) |
-| `port` [1926], `tls` [true] | Older Philips TVs: `"port": 1925, "tls": false` |
+| `port` [1926], `tls` [true] | Older Philips TVs: `"saphi": true` ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)), or `"port": 1925, "tls": false` |
 | `api_version` | Found by itself (`6`, `5`, `1` or none). Set it only if the TV is slow to answer |
 | `home_app`, `home_keys` | The home, above. Leave them out for the phone remote only |
 | `open_on_power_on` [true] | Open `home_app` when the TV comes on and nothing else is in front |

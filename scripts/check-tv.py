@@ -8,7 +8,8 @@
 The quick look knocks on the ports each kind of TV answers on (Android TV remote, ADB, Samsung,
 LG, Roku, Hisense VIDAA, Philips JointSpace, Apple, Google Cast). On an LG it also says hello to LG's network remote, which tells
 the webOS version without any prompt on the TV (the prompt only comes when couch-tv's bridge asks
-to control it). --adb connects with ADB to read the Android version, the maker and
+to control it). On a Philips answering plain port 1925 it reads "system" (a read, no login, nothing on
+screen) for the API version and whether the TV lists a browser. --adb connects with ADB to read the Android version, the maker and
 which home screen the TV runs. The first time, the TV asks "Allow USB debugging?". That prompt is
 the only thing that appears on screen, and saying no is fine. Run --adb only after Developer
 options are on (README step 1): it also saves this computer's ADB key in ~/.android/adbkey.
@@ -37,7 +38,7 @@ PORTS = {
     36669: "Hisense VIDAA remote",
     36668: "Hisense VIDAA remote (older)",
     1926: "Philips JointSpace (secure, Titan OS and newer Philips)",
-    1925: "Philips JointSpace (older Philips)",
+    1925: "Philips JointSpace (plain, older Philips Linux TVs such as Saphi)",
     7000: "AirPlay (Apple TV and some TVs)",
 }
 
@@ -83,6 +84,29 @@ def lg_hello(ip):
         return asyncio.run(ask())
     except Exception:
         return None
+
+
+def philips_hello(ip, port=1925):
+    """What a Philips says on plain port 1925 to GET system (no login, nothing on screen): {"api", "model",
+    "browser"}, or None. "browser" is whether it lists a browser activity (docs/PHILIPS-SAPHI.md)."""
+    import json
+    import urllib.request
+
+    def lists_browser(d, depth=0):
+        if not isinstance(d, dict) or depth > 3:
+            return False
+        return any((k == "activities" and isinstance(v, list) and "browser" in [str(x).lower() for x in v])
+                   or (isinstance(v, dict) and lists_browser(v, depth + 1)) for k, v in d.items())
+
+    for v in ("6/", "5/", "1/", ""):
+        try:
+            with urllib.request.urlopen(f"http://{ip}:{port}/{v}system", timeout=3) as r:
+                d = json.loads(r.read(20000).decode("utf-8", "replace"))
+        except Exception:
+            continue
+        if isinstance(d, dict) and d:
+            return {"api": "/" + v, "model": d.get("model") or d.get("name"), "browser": lists_browser(d)}
+    return None
 
 
 def wireless_debugging_port(ip, wait=4.0):
@@ -177,6 +201,10 @@ def main():
     hello = lg_hello(ip) if lg and not android else None
     if hello:
         print(f"  LG network remote: {hello['os'] or 'webOS'} {hello['version'] or ''}".rstrip())
+    saphi = philips_hello(ip) if open_ports[1925] and not android else None
+    if saphi:
+        print(f"  Philips JointSpace on 1925: API {saphi['api']}, {saphi['model'] or 'model not given'}, "
+              f"browser listed: {'yes' if saphi['browser'] else 'no'}")
     if want_adb and not adb_open and not wireless:
         print(f"  ADB is not open on port {ADB_PORT}. Switch on Developer options, then USB debugging, and if the")
         print("  TV also has a Network debugging (or Wireless debugging) switch, that too. Then try again.")
@@ -215,6 +243,16 @@ def main():
                    "why": "Hisense VIDAA: no Android apps and a locked home screen. couch-tv can open itself in the TV's "
                           "browser each time the TV comes on, with a computer at home (docs/VIDAA.md, tested against a "
                           "stand-in only, not yet on a real VIDAA TV), or plug in a Google TV box for everything."}
+    elif open_ports[1925] and not open_ports[1926] and not android:
+        page = (saphi or {}).get("browser")
+        verdict = {"A": "no", "B": "Philips Saphi path, New (Beta): phone remote" + (
+                       ", and couch-tv's page opens in the TV's browser" if page else " only (no browser listed)")
+                   + ": docs/PHILIPS-SAPHI.md", "C": "no",
+                   "why": "An older Philips Linux TV (Saphi): no Android apps and a locked home screen. With a computer at "
+                          "home, the phone remote and the assistant drive it over plain port 1925"
+                          + (", and couch-tv's page opens in the TV's own browser when it comes on (not a true home "
+                             "screen: the browser's bar shows and Home still opens Philips's menu)" if page else "")
+                          + ". Run scripts/philips-check.py next. Plug in a Google TV box for everything."}
     elif (open_ports[1926] or open_ports[1925]) and not android:
         verdict = {"A": "no", "B": "Philips Titan OS path, phone remote only (built, not yet tried on a real Titan OS TV): "
                               "docs/PHILIPS-TITAN.md", "C": "no",

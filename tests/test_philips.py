@@ -502,7 +502,8 @@ class Endpoints(Base):
         row = (await r.json())["tvs"][0]
         self.assertEqual(row["kind"], "philips")
         self.assertEqual(set(row["philips"]), {"paired", "secret", "api", "power", "front", "front_readable", "apps",
-                                               "home_app", "model", "error"})
+                                               "home_app", "model", "error", "port", "no_login", "browser",
+                                               "home"})
 
     async def test_the_titan_start_page_is_served_without_the_key(self):
         r = await self.client.get("/titan/")

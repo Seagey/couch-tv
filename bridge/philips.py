@@ -28,6 +28,15 @@ pointed at it, docs/PHILIPS-TITAN.md). Set "home_app" to that app's name, or lea
 called "Couch TV" is used when the TV lists one. With neither, this is a phone remote only: Home
 presses the TV's own Home button and nothing opens at power on.
 
+Older Philips Linux TVs (Saphi, about 2015 to 2019; docs/PHILIPS-SAPHI.md), "saphi": true or "tls":
+false: some answer JointSpace on plain http port 1925 with no pairing and no login at all, some want the
+paired login, some have no JointSpace. So the plain port is tried first; when it answers a read without a
+login, nothing is paired. With "saphi": true (and no "tls" or "port"), a plain port that wants a login or
+does not answer hands over to the paired path on https 1926. Their home: when the TV reports a "browser"
+activity in "system", POST activities/browser {"url": ...} opens couch-tv's page in the TV's own browser
+at power on (a page that opens itself, browser chrome and all, not a true home screen). Without it, the
+phone remote only.
+
 Everything not written in Philips's own material, or not yet seen from a Titan OS TV, is in PROTOCOL
 below, marked UNCONFIRMED, so a tester's output can correct it in one place.
 """
@@ -68,6 +77,11 @@ PROTOCOL = {
     # What counts as "nothing in front": Philips's own home and live TV. UNCONFIRMED on Titan OS.
     "nothing": r"^$|launcher|home|playtv|watchtv|^tv$|^na$",
     "input": r"hdmi|^ext|^av|scart",
+    # Saphi and other non Android sets (docs/PHILIPS-SAPHI.md). All UNCONFIRMED on a real Saphi TV.
+    "open_probe": "audio/volume",   # a read Android sets guard with the login: answered without one = no pairing
+    "browser_activity": "browser",  # listed in "system" (an "activities" list) when the TV has a browser to open
+    "browser_open": "activities/browser",   # POST {"url": ...}: the browser opens that page
+    "no_powerstate_is_on": True,    # a set with no powerstate path counts as on while it answers at all
 }
 
 # Friendly key name -> JointSpace key name (the names in Philips's JointSpace documentation).
@@ -87,6 +101,8 @@ KEYS = {
 RAW_KEYS = {v.lower(): v for v in KEYS.values()} | {k.lower(): k for k in (
     "Dot", "Teletext", "Viewmode", "Record", "Online", "AmbilightOnOff")}
 SAFE_ID = re.compile(r"^[A-Za-z0-9 ._:/+-]{1,120}$")
+SAFE_URL = re.compile(r"^https?://[A-Za-z0-9.:\[\]_-]{1,100}(/[A-Za-z0-9._~/?&=%+-]{0,300})?$")
+BROWSER_FRONT = "couchtv.browser"   # what "in front" is set to just after couch-tv's page was opened in the browser
 PIN = re.compile(r"^\d{4,6}$")
 
 
@@ -123,6 +139,24 @@ class PhilipsError(RuntimeError):
 
 class NeedsLogin(PhilipsError):
     """The TV answered 401: it is there, but wants the login pairing gives."""
+
+
+class NotThere(PhilipsError):
+    """The TV answered 404: this path is not on this TV (older sets have fewer)."""
+
+
+def lists_browser(system, depth=0):
+    """Whether "system" lists a browser activity: an "activities" list holding "browser", at any depth up
+    to three (featuring.jsonfeatures.activities on the sets seen so far; UNCONFIRMED on a Saphi TV)."""
+    if not isinstance(system, dict) or depth > 3:
+        return False
+    for k, v in system.items():
+        if k == "activities" and isinstance(v, list) and any(
+                isinstance(x, str) and x.lower() == PROTOCOL["browser_activity"] for x in v):
+            return True
+        if isinstance(v, dict) and lists_browser(v, depth + 1):
+            return True
+    return False
 
 
 class Digest:
@@ -176,8 +210,19 @@ class PhilipsTV:
         self.ip = None
         self.mac = cfg.get("mac")
         self.wake_on_lan = cfg.get("wake_on_lan", True) is not False
-        self.tls = cfg.get("tls", True) is not False
+        # Saphi (or "tls": false): plain port 1925 first, no login when the TV answers without one.
+        self.saphi = cfg.get("saphi") is True or cfg.get("tls") is False
+        self.tls = cfg.get("tls", not self.saphi) is not False
         self.port = int(cfg.get("port") or (PORT_TLS if self.tls else PORT_PLAIN))
+        # "saphi": true with no "tls" or "port": a plain port that wants a login or is silent hands over to 1926
+        self.may_switch = self.saphi and "tls" not in cfg and not cfg.get("port")
+        self.open_api = None        # True: answers without a login, False: wants one, None: not known yet
+        self.has_browser = False    # "system" lists a browser activity
+        self.has_powerstate = True
+        self.browser_home = cfg.get("browser_home", True) is not False
+        self.home_url_cfg = (cfg.get("home_url") or "").strip() or None
+        if self.home_url_cfg and not SAFE_URL.match(self.home_url_cfg):
+            raise SystemExit(f"tvs[{self.id}].home_url: a plain http:// or https:// address")
         self.version = cfg.get("api_version")   # "6/" etc, else found from "system"
         if self.version is not None:
             self.version = str(self.version).strip("/") + "/" if str(self.version).strip("/") else ""
@@ -293,6 +338,8 @@ class PhilipsTV:
         return {"paired": self.paired, "secret": bool(self._secret()), "api": self.version,
                 "power": self.power, "front": self.visible, "front_readable": self.front_readable,
                 "apps": len(self.applist), "home_app": home["label"] if home else None,
+                "port": self.port, "no_login": self.open_api, "browser": self.has_browser,
+                "home": self._home_route(),
                 "model": self.system.get("model") or self.system.get("name"), "error": self.last_error}
 
     # ---------- HTTP ----------
@@ -329,15 +376,16 @@ class PhilipsTV:
                       r'\1"(hidden)"', text or "")
         self.log.info("trace %s %s %s", way, path, text[:600])
 
-    async def _call(self, method, path, payload=None, auth=None, timeout=5, version=None):
-        """One JointSpace request. auth: a Digest, else the kept login (when there is one)."""
+    async def _call(self, method, path, payload=None, auth=None, timeout=5, version=None, login=True):
+        """One JointSpace request. auth: a Digest, else the kept login (when there is one). login=False
+        sends none even when one is kept, so a 401 comes back as NeedsLogin."""
         if version is None and self.version is None:
             await self.find_version()
         s = await self._http()
         uri = "/" + (self.version if version is None else version or "") + path
         body = None if payload is None else json.dumps(payload, separators=(",", ":"))
         self._show("out", f"{method} {uri}", body)
-        digest = auth or self._login()
+        digest = auth or (self._login() if login else None)
         for attempt in range(2):
             headers = {"Content-Type": "application/json"} if body is not None else {}
             if digest and digest.challenge:
@@ -351,6 +399,8 @@ class PhilipsTV:
                     self._show("in ", f"{r.status} {uri}", text)
                     if r.status == 401:
                         raise NeedsLogin("the TV wants a login: pair first (docs/PHILIPS-TITAN.md, step 3)")
+                    if r.status == 404:
+                        raise NotThere(f"the TV has no {path} (it answered 404)")
                     if r.status >= 400:
                         raise PhilipsError(f"the TV answered {r.status} to {method} {path}")
                     if not text.strip():
@@ -364,9 +414,36 @@ class PhilipsTV:
         raise PhilipsError("the TV refused the login")
 
     async def find_version(self):
-        """The API version prefix this TV answers on (/6/, /5/, /1/ or none), from "system"."""
+        """The API version prefix this TV answers on (/6/, /5/, /1/ or none), from "system". On the
+        plain port it also settles whether the TV wants a login at all (open_api). A Saphi TV
+        ("saphi": true, no "tls" or "port") whose plain port wants a login or is silent is tried on
+        https 1926, the paired path; if that is silent too, the plain port is kept for the next try."""
         if self.version is not None:
             return self.version
+        try:
+            v = await self._find_here()
+            if self.tls or await self._answers_without_login() or not self.may_switch:
+                return v
+            why = NeedsLogin("the TV wants a login on port 1925")
+        except (PhilipsError, TVUnavailable) as e:
+            if not self.may_switch or self.tls:
+                raise
+            why = e
+        plain = (self.version, self.system, self.has_browser)
+        self.tls, self.port, self.version = True, PORT_TLS, None
+        try:
+            v = await self._find_here()
+            self.log.info("port 1925 %s: using the paired path on 1926", "wants a login" if isinstance(why, NeedsLogin)
+                          else "is silent")
+            return v
+        except (PhilipsError, TVUnavailable):
+            self.tls, self.port = False, PORT_PLAIN
+            self.version, self.system, self.has_browser = plain
+            if self.version is not None:
+                return self.version   # 1926 is silent: the login goes over the plain port instead
+            raise why from None
+
+    async def _find_here(self):
         for v in VERSIONS:
             try:
                 data = await self._call("GET", "system", version=v)
@@ -376,9 +453,28 @@ class PhilipsTV:
                 continue
             if isinstance(data, dict) and data:
                 self.version, self.system = v, ({} if data.get("login") else data)
-                self.log.info("JointSpace answers on /%s", v)
+                self.has_browser = lists_browser(self.system)
+                self.log.info("JointSpace answers on %s port %s /%s", "https" if self.tls else "http", self.port, v)
                 return v
         raise PhilipsError("the TV did not answer \"system\" on any API version")
+
+    async def _answers_without_login(self):
+        """Plain port only: one read that Android sets guard with the login (PROTOCOL["open_probe"]).
+        Answered without one: this TV needs no pairing (Saphi). A 404 did not ask for a login either."""
+        if self.tls:
+            return False
+        try:
+            await self._call("GET", PROTOCOL["open_probe"], login=False)
+            self.open_api = True
+        except NeedsLogin:
+            self.open_api = False
+        except NotThere:
+            self.open_api = True
+        except PhilipsError:
+            self.open_api = None
+        if self.open_api:
+            self.log.info("the TV answers without a login: nothing to pair")
+        return bool(self.open_api)
 
     # ---------- pairing ----------
     def _device(self, device_id):
@@ -391,6 +487,8 @@ class PhilipsTV:
         if not self._secret():
             raise PhilipsError("no pairing key saved yet: run scripts/philips-secret.py first (docs/PHILIPS-TITAN.md)")
         await self.find_version()
+        if self.open_api:
+            raise PhilipsError("this TV answers without pairing, so there is nothing to pair (docs/PHILIPS-SAPHI.md)")
         device_id = secrets.token_hex(8)
         got = await self._call("POST", "pair/request", {"scope": PROTOCOL["pair_scope"], "device": self._device(device_id)})
         if not isinstance(got, dict) or got.get("error_id") != PROTOCOL["pair_ok"] or not got.get("auth_key"):
@@ -422,12 +520,24 @@ class PhilipsTV:
             raise PhilipsError(self.last_error)
         self._keep(user=device_id, password=auth_key, pending=None)
         self._pairing, self._auth, self.last_error = None, None, None
+        self._ids_checked = 0.0   # the app list can be read now
         self.log.info("paired (login kept in %s)", os.path.basename(self.store_file))
         return True
 
     # ---------- reading the TV ----------
     async def _read_power(self):
-        data = await self._call("GET", "powerstate")
+        if not self.has_powerstate:
+            await self._call("GET", "system")   # answers, so it is on (PROTOCOL["no_powerstate_is_on"])
+            self.power = ON
+            return self.power
+        try:
+            data = await self._call("GET", "powerstate")
+        except NotThere:
+            if not (self.open_api and PROTOCOL["no_powerstate_is_on"]):
+                raise
+            self.has_powerstate, self.power = False, ON
+            self.log.info("no powerstate on this TV: on while it answers")
+            return self.power
         p = data.get("powerstate") if isinstance(data, dict) else None
         self.power = p if isinstance(p, str) and p else None
         return self.power
@@ -444,7 +554,7 @@ class PhilipsTV:
             return None
         comp = data.get("component") if isinstance(data.get("component"), dict) else {}
         front = comp.get("packageName") or data.get("id") or data.get("label") or ""
-        return str(front)
+        return str(front) if isinstance(front, (str, int)) else None   # some sets answer oddly: unknown
 
     async def read_volume(self):
         try:
@@ -456,13 +566,14 @@ class PhilipsTV:
         return self.volume
 
     async def refresh_installed(self, force=False):
-        """The apps the TV lists, every 30 minutes."""
-        if not force and time.time() - self._ids_checked < 1800 and self.applist:
+        """The apps the TV lists, every 30 minutes (every 5 while it has listed none: older sets have no list)."""
+        if not force and time.time() - self._ids_checked < (1800 if self.applist else 300):
             return self.ids
         try:
             data = await self._call("GET", "applications")
         except (PhilipsError, TVUnavailable) as e:
             self.log.info("app list: %s", e)
+            self._ids_checked = time.time()
             return self.ids
         rows = data.get("applications") if isinstance(data, dict) else data
         listed, found = [], {}
@@ -519,6 +630,8 @@ class PhilipsTV:
         return hit
 
     def _package_of(self, front):
+        if front == BROWSER_FRONT:
+            return HOME_PACKAGE
         if not front or self.NOTHING.search(front):
             return None
         hit = next((a for a in self.applist if a["id"] == front or a["label"] == front
@@ -532,13 +645,59 @@ class PhilipsTV:
         want = _plain(self.home_app or COUCH_LABEL)
         return next((a for a in self.applist if _plain(a["label"]) == want), None)
 
+    def _home_route(self):
+        """How couch-tv opens here: "app" (an app the TV lists shows it), "browser" (the TV reports a browser
+        activity, docs/PHILIPS-SAPHI.md), or None (the phone remote only)."""
+        if self._home_entry():
+            return "app"
+        if self.browser_home and self.has_browser:
+            return "browser"
+        return None
+
+    def home_url(self):
+        """couch-tv's start page as the TV reaches it: "home_url" in config.json, else the bridge's /titan/
+        page on this computer's address towards the TV (it asks for the pairing key once, with the remote,
+        then opens the home; the key is never in the address)."""
+        base = self.home_url_cfg
+        if not base:
+            port = int(os.environ.get("PORT") or config.BRIDGE.get("port") or 5400)
+            base = f"http://{self._my_address()}:{port}/titan/"
+        if self.id != config.DEFAULT_TV and re.fullmatch(r"[a-z-]{1,40}", self.id):
+            base += ("&" if "?" in base else "?") + "tv=" + self.id
+        return base
+
+    def _my_address(self):
+        """This computer's address towards the TV (a UDP socket sends nothing when it connects)."""
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect((self.ip or self.fallback_ip or "192.0.2.1", 9))
+            return s.getsockname()[0]
+        except OSError:
+            return "127.0.0.1"
+        finally:
+            s.close()
+
+    async def open_page(self, url):
+        """The TV's browser at one page: POST activities/browser {"url": ...}. Only when the TV listed a browser
+        activity, and only a plain http(s) address. UNCONFIRMED on a real Saphi TV."""
+        if not self.has_browser:
+            raise TVUnavailable("this TV reports no browser to open a page in")
+        if not isinstance(url, str) or not SAFE_URL.match(url):
+            raise ValueError("only a plain http:// or https:// address")
+        await self._call("POST", PROTOCOL["browser_open"], {"url": url}, timeout=8)
+        self.visible = BROWSER_FRONT
+
     async def open_home(self):
-        """Open the app that shows couch-tv, then press home_keys (DevView: into the couch-tv entry)."""
+        """Open the app that shows couch-tv, then press home_keys (DevView: into the couch-tv entry). With no
+        such app, a TV that reports a browser gets couch-tv's page in it."""
         await self.refresh_installed()
         entry = self._home_entry()
+        if not entry and self.browser_home and self.has_browser:
+            await self.open_page(self.home_url())
+            return
         if not entry:
-            raise TVUnavailable("this TV lists no app that shows couch-tv, so couch-tv cannot open on it "
-                                "(docs/PHILIPS-TITAN.md, \"The home\")")
+            raise TVUnavailable("this TV lists no app that shows couch-tv and reports no browser, so couch-tv "
+                                "cannot open on it (docs/PHILIPS-TITAN.md, \"The home\"; docs/PHILIPS-SAPHI.md)")
         await self._launch_entry(entry)
         for k in self.home_keys:
             await asyncio.sleep(1.0)
@@ -610,8 +769,9 @@ class PhilipsTV:
         if not self.open_on_power_on:
             return
         await self.refresh_installed()
-        if not self._home_entry():
-            self._note("TV came on, no couch-tv app on this TV (remote only)")
+        route = self._home_route()
+        if not route:
+            self._note("TV came on, no couch-tv app and no browser on this TV (remote only)")
             return
         if time.monotonic() < self.home_on_wake_until:
             self.home_on_wake_until = 0.0
@@ -627,15 +787,19 @@ class PhilipsTV:
         elif self.leave_inputs and self.INPUT.search(front):
             self._note(f"TV came on in {front}, left alone (leave_inputs)")
             return
-        elif _plain(front) in (_plain((self._home_entry() or {}).get("id")), _plain(self.home_app or COUCH_LABEL)):
+        elif front == BROWSER_FRONT or (route == "app" and _plain(front) in (
+                _plain((self._home_entry() or {}).get("id")), _plain(self.home_app or COUCH_LABEL))):
             self._note("TV came on, couch-tv already open")
+            return
+        elif route == "browser" and re.search(PROTOCOL["browser_activity"], front, re.I):
+            self._note("TV came on with its browser in front, left alone")
             return
         elif not self.NOTHING.search(front):
             self._note(f"TV came on in {self._package_of(front)}, left alone")
             return
         try:
             await self.open_home()
-            self._note("TV came on, opened couch-tv")
+            self._note("TV came on, opened couch-tv" + (" in the TV's browser" if route == "browser" else ""))
         except Exception as e:
             self._note(f"TV came on, could not open couch-tv: {e}")
 
@@ -647,7 +811,7 @@ class PhilipsTV:
         if isinstance(name, str) and name.strip().lower() == "home":
             # couch-tv's Home is couch-tv when the TV has an app for it, else the TV's own Home.
             await self.refresh_installed()
-            if self._home_entry():
+            if self._home_route():
                 await self.open_home()
                 return "couch-tv"
             code = "Home"
@@ -656,7 +820,10 @@ class PhilipsTV:
         self.require()
         if power:
             if self.is_on:
-                await self._call("POST", "powerstate", {"powerstate": "Standby"})
+                if self.has_powerstate:
+                    await self._call("POST", "powerstate", {"powerstate": "Standby"})
+                else:
+                    await self._call("POST", "input/key", {"key": "Standby"})   # no powerstate: the remote's own key
                 self.power = "Standby"
             else:
                 self.home_on_wake_until = time.monotonic() + 90
@@ -666,7 +833,9 @@ class PhilipsTV:
         return code
 
     async def _turn_on(self):
-        """From networked standby the TV takes powerstate On; fully off, it needs Wake on LAN."""
+        """From networked standby the TV takes powerstate On; fully off (no answer at all), it needs Wake on
+        LAN to the stored mac. The bridge's power on also sends Wake on LAN every 2 seconds while the TV is
+        silent (server.power_on)."""
         try:
             await self._call("POST", "powerstate", {"powerstate": ON})
         except (PhilipsError, TVUnavailable) as e:
