@@ -46,6 +46,11 @@ APPS = [
     # and is not pushed behind More apps (#56).
     {"id": "plex", "name": "Plex", "package": "com.plexapp.android", "colour": "#E5A00D",
      "jw": ["plex"], "deeplink": "app"},
+    # Nuvio, a Stremio-style player, is not on JustWatch. Listed so the shows it names in its media
+    # session reach Keep watching. A card opens the show's page by its IMDb id (TITLE_LINKS in
+    # server.py). Its Play Store build is com.nuvio.app (not read here).
+    {"id": "nuvio", "name": "Nuvio", "package": "com.nuvio.tv", "colour": "#111111",
+     "jw": [], "deeplink": "app"},
     {"id": "kayo", "name": "Kayo", "package": "au.com.kayosports.tv", "colour": "#00E676",
      "jw": [], "deeplink": "app"},
     {"id": "foxtel-go", "name": "Foxtel Go", "package": "au.com.foxtel.atv", "colour": "#F05A28",

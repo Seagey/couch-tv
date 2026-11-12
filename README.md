@@ -23,6 +23,15 @@ so `git pull` brings their changes.
 
 **13 November 2026: Home settings lists stay put on older Samsungs (on main, in the next release).** On a 2020 Samsung (Tizen 5.5), moving down a long Home settings list such as Apps flashed the list up to the top and back on every press. The list now keeps its place and only the step to the next row scrolls. Thanks vicenteveltri (#156).
 
+**13 November 2026: Nuvio in Keep watching (on main, the on-TV app in the next release).** Shows played in
+Nuvio, the Stremio-style player, now show as playing and count for Keep watching, with the bridge and in
+the on-TV app. A film played in Nuvio is no longer logged as the film "2012" or "1917": Nuvio sends the
+release year where other apps send the episode. With the bridge, a Nuvio card opens the show's page in
+Nuvio (by its IMDb id from JustWatch), where you pick the episode: Nuvio takes no episode links. In the
+on-TV app a Nuvio card opens Nuvio. With the bridge only Nuvio's GitHub build (`com.nuvio.tv`) is read,
+not the Play Store one (`com.nuvio.app`). Shows played in Nuvio can't reach Keep watching with option A,
+because Nuvio adds them to its own channel, not Android's Watch Next list. Thanks @NathanGlasby.
+
 **13 November 2026: Hebrew and right to left layout on the TV home (on main, in the next release).** The home now speaks
 Hebrew (עברית), including the TV's own `he` or older `iw` language setting. The layout mirrors for right to left: the settings
 list moves to the right, chevrons flip, popups open on the correct side, and the remote's left and right buttons move the way
