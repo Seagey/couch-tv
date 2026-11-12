@@ -92,10 +92,28 @@ class HomeActivity : Activity() {
 
     override fun dispatchKeyEvent(e: KeyEvent): Boolean {
         if (e.keyCode == KeyEvent.KEYCODE_BACK) { if (e.action == KeyEvent.ACTION_UP && ready) js("window.tv && tv.back()"); return true }
-        // Long press MENU opens setup, so the home screen can always reach it.
-        if (e.keyCode == KeyEvent.KEYCODE_MENU && e.action == KeyEvent.ACTION_UP && e.isLongPress) { startActivity(Intent(this, SetupActivity::class.java)); return true }
+        // Long press MENU opens setup, so the home screen can always reach it. Android marks a long
+        // press on the repeated key down while the button is held (repeat 1, FLAG_LONG_PRESS), never
+        // on the key up, so the old check on the key up never matched. The page opens a card's menu
+        // on a short MENU press, so the press is held back until it is known: held, setup opens and
+        // the page sees nothing; let go before that, the page gets the whole press then.
+        if (e.keyCode == KeyEvent.KEYCODE_MENU) {
+            when {
+                e.action == KeyEvent.ACTION_DOWN && e.repeatCount == 0 -> menuHeld = false
+                e.action == KeyEvent.ACTION_DOWN -> if (!menuHeld) {
+                    menuHeld = true
+                    startActivity(Intent(this, SetupActivity::class.java))
+                }
+                e.action == KeyEvent.ACTION_UP && !menuHeld -> {
+                    super.dispatchKeyEvent(KeyEvent.changeAction(e, KeyEvent.ACTION_DOWN))
+                    return super.dispatchKeyEvent(e)
+                }
+            }
+            return true
+        }
         return super.dispatchKeyEvent(e)
     }
+    private var menuHeld = false
 
     private fun js(code: String) { web?.takeIf { ready }?.evaluateJavascript(code, null) }
 
