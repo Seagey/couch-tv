@@ -192,6 +192,78 @@ class FireTv(unittest.TestCase):
         self.assertEqual(steps.other_watches(plain), [])
 
 
+class OnTvIsHome(unittest.TestCase):
+    """A stick that already has the on-TV app as its home (killy10o10, 12 Nov 2026)."""
+    ONTV_WATCH = "dev.couchtv.ontv/dev.couchtv.ontv.WatchService"
+
+    def stick(self):
+        tv = FakeTv("fire", installed={"dev.couchtv.ontv"}, a11y=self.ONTV_WATCH)
+        tv.ontv_alias = True
+        return tv
+
+    def test_detected_from_alias_or_watch(self):
+        self.assertTrue(steps.facts(self.stick())["ontv_home"]["takes_home"])
+        only_watch = FakeTv("fire", installed={"dev.couchtv.ontv"}, a11y=self.ONTV_WATCH)
+        self.assertTrue(steps.ontv_home(only_watch)["watch"])
+        plain = FakeTv("fire", installed={"dev.couchtv.ontv"})          # installed for the phone remote only
+        self.assertFalse(steps.ontv_home(plain)["takes_home"])
+        self.assertFalse(steps.facts(FakeTv("fire"))["ontv_home"]["installed"])
+
+    def test_plan_names_it_and_offers_both_ways(self):
+        tv = self.stick()
+        off = steps.plan(tv, steps.facts(tv))
+        self.assertTrue(any("on-TV app" in i and "switches its home and watch off" in i for i in off))
+        keep = steps.plan(tv, steps.facts(tv), ontv_home_off=False)
+        self.assertTrue(any("keeping it" in i for i in keep))
+        self.assertFalse(any("Put the couch-tv home" in i for i in keep))
+
+    def test_setup_switches_it_off_first_and_couch_tv_wins(self):
+        tv = self.stick()
+        r = steps.make_home(tv, APK)
+        self.assertFalse(tv.ontv_alias)
+        self.assertNotIn("dev.couchtv.ontv", tv.a11y)
+        self.assertIn("dev.couchtv.ontv", tv.packages)               # stays installed
+        self.assertIn("app.couchtv.launcher/.FireWatch", tv.a11y)
+        self.assertTrue(r["front"])
+        self.assertFalse(steps.ontv_home(tv)["takes_home"])
+        # Undo goes back to Amazon's home, never to the on-TV app it then removes
+        self.assertTrue(steps.record(tv)["home"].startswith("com.amazon.tv.launcher/"))
+        steps.undo(tv)
+        self.assertNotIn("dev.couchtv.ontv", tv.packages)
+        self.assertNotIn("app.couchtv.launcher", tv.packages)
+
+    def test_keeping_it_installs_nothing(self):
+        tv = self.stick()
+        r = steps.make_home(tv, APK, ontv_home_switch_off=False)
+        self.assertTrue(r["kept_ontv"])
+        self.assertNotIn("app.couchtv.launcher", tv.packages)
+        self.assertTrue(tv.ontv_alias)
+        self.assertEqual(tv.a11y, self.ONTV_WATCH)
+
+    def test_check_names_the_other_app_when_it_is_in_front(self):
+        tv = self.stick()
+        tv.packages.add("app.couchtv.launcher")
+        c = steps.check_home(tv)
+        self.assertFalse(c["ok"])
+        self.assertEqual(c["other_front"], "ontv")
+        self.assertIsNone(steps.check_home(FakeTv("fire"))["other_front"])
+
+
+class FriendlyNames(unittest.TestCase):
+    def test_homes_in_words(self):
+        self.assertEqual(steps.friendly_home("com.amazon.tv.launcher/.ui.HomeActivity_vNext"), "Amazon's home")
+        self.assertEqual(steps.friendly_home("com.google.android.apps.tv.launcherx/.home.HomeActivity"), "Google TV's home")
+        self.assertEqual(steps.friendly_home("com.vendor.home/.Main"), "the TV's own home")
+        self.assertEqual(steps.friendly_home(""), "the TV's own home")
+
+    def test_undo_plan_has_friendly_name_and_raw_detail(self):
+        tv = FakeTv("fire")
+        steps.make_home(tv, APK)
+        p = steps.undo_plan(tv)
+        self.assertEqual(p["home_name"], "Amazon's home")
+        self.assertIn("com.amazon.tv.launcher/", p["home"])
+
+
 class Remote(unittest.TestCase):
     def test_phone_remote_grants_and_home_again(self):
         tv = FakeTv("google")

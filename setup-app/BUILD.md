@@ -133,3 +133,11 @@ and port 5555 were only used, never changed.
 **Not verified yet (before a release):** a full install and Undo on a spare Google TV, an Android
 TV and a Fire TV (both test TVs run the live bridge); the Intel Mac and Windows builds on real
 machines (CI builds and smoke tests them); the page in a browser by a person.
+
+## Changes to the plan: killy10o10's second review (12 Nov 2026)
+
+- The kind question now defaults from what is known (a TV this app connected to before, then what it announces: Google TV and Android TV announce themselves, a Fire TV only has ADB on 5555) and focuses that button. In Undo, a TV answering on 5555 skips the question.
+- The device list shows the model once this app has connected to that TV (kept in known-tvs.json beside the ADB key).
+- Undo's plan says "Amazon's home" and so on; the raw component is in a details line.
+- A TV whose home is already the on-TV app (HomeAlias enabled, or its WatchService in enabled_accessibility_services): the plan says so and offers to switch that home and watch off (pm disable of the HomeAlias, watch taken out of the list, its WRITE_SECURE_SETTINGS grant revoked so it cannot put its watch back; the app stays installed). Untick it to keep the on-TV app as the home: nothing is installed. The post setup check names the on-TV app when it is what is in front.
+- Verified: unit tests (58) and the smoke test pass against the pretend TV. NOT verified on a real stick: that `pm disable` of the alias and the revoke behave on Fire OS, and that the on-TV app does not re-enable its own alias. That is the re-run asked of the tester.

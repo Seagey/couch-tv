@@ -23,6 +23,8 @@ HOME_PKG = "app.couchtv.launcher"
 HOME_ACT = f"{HOME_PKG}/.MainActivity"
 WATCH = f"{HOME_PKG}/.FireWatch"
 ONTV_PKG = "dev.couchtv.ontv"
+ONTV_ALIAS = f"{ONTV_PKG}/{ONTV_PKG}.HomeAlias"
+ONTV_WATCH = f"{ONTV_PKG}/{ONTV_PKG}.WatchService"
 WIZARD = "com.google.android.tungsten.setupwraith"
 NEVER_OFF = ["com.google.android.apps.tv.launcherx", "com.google.android.tvlauncher", WIZARD]
 AMBIENT = "com.google.android.apps.tv.dreamx"
@@ -39,6 +41,22 @@ HOMES = {
     "com.amazon.tv.launcher": "Fire TV home",
     "com.amazon.firehomestarter": "Fire TV home",
 }
+
+FRIENDLY_HOMES = {
+    "com.amazon.tv.launcher": "Amazon's home",
+    "com.amazon.firehomestarter": "Amazon's home",
+    "com.google.android.apps.tv.launcherx": "Google TV's home",
+    "com.google.android.tvlauncher": "Android TV's home",
+    ONTV_PKG: "couch-tv's other app (the on-TV app)",
+    HOME_PKG: "couch-tv's home app",
+}
+
+
+def friendly_home(component):
+    """A home screen component in words a person knows. The raw name goes in a details line only."""
+    pkg = (component or "").split("/", 1)[0]
+    return FRIENDLY_HOMES.get(pkg, "the TV's own home")
+
 
 # Fire TV model names, from couch-tv-setup by killy10o10 (MIT, Copyright (c) 2026 killy10o10).
 FIRE_MODELS = {
@@ -88,8 +106,38 @@ def facts(tv):
         "homes": [HOMES[p] for p in HOMES if p in present],
         "tcl": "tcl" in (maker + " " + brand).lower(),
         "installed": {"home": app_version(tv, HOME_PKG), "ontv": app_version(tv, ONTV_PKG)},
+        "ontv_home": ontv_home(tv, present),
+        "home_name": friendly_home(home_now),
         "supported": sdk >= 25,
     }
+
+
+def ontv_home(tv, present=None):
+    """Is the on-TV app (dev.couchtv.ontv) already this TV's home? Its HomeAlias is switched on (it shows
+    in the list of HOME screens) or its WatchService is in the enabled accessibility services. Two
+    couch-tv homes fight, and the one that was there first wins (reported by killy10o10)."""
+    present = _packages(tv) if present is None else present
+    if ONTV_PKG not in present:
+        return {"installed": False, "alias": False, "watch": False, "takes_home": False}
+    alias = any(l.startswith(ONTV_PKG + "/") for l in _lines(tv.shell(QUERY_HOMES)))
+    cur = tv.shell("settings get secure enabled_accessibility_services").strip()
+    watch = any(s.startswith(ONTV_PKG + "/") for s in cur.split(":"))
+    return {"installed": True, "alias": alias, "watch": watch, "takes_home": alias or watch}
+
+
+def ontv_home_off(tv):
+    """Takes the on-TV app's Home and Home button watch out. It stays installed. Its grant to change
+    secure settings is taken back too, so it cannot put its own watch on again by itself."""
+    tv.shell(f"pm disable {ONTV_ALIAS}")
+    cur = tv.shell("settings get secure enabled_accessibility_services").strip()
+    parts = [s for s in cur.split(":") if s and s != "null"]
+    keep = [s for s in parts if not s.startswith(ONTV_PKG + "/")]
+    if keep != parts:
+        if keep:
+            tv.shell(f"settings put secure enabled_accessibility_services {':'.join(keep)}")
+        else:
+            tv.shell("settings delete secure enabled_accessibility_services")
+    tv.shell(f"pm revoke {ONTV_PKG} android.permission.WRITE_SECURE_SETTINGS")
 
 
 def fire_os_version(tv):
@@ -109,11 +157,20 @@ def app_version(tv, pkg):
     return m.group(1) if m else None
 
 
-def plan(tv, f, ambient_off=True):
+def plan(tv, f, ambient_off=True, ontv_home_off=True):
     """What make_home would change, in plain words, for the read back before the yes."""
     present = _packages(tv)
     disabled = _packages(tv, "-d")
     items = []
+    ontv = f.get("ontv_home") or {}
+    if ontv.get("takes_home"):
+        if ontv_home_off:
+            items.append("couch-tv's other app (the on-TV app) is already this TV's home screen, with its own Home button "
+                         "watch. Two couch-tv homes would fight and the on-TV app would keep winning. This switches its "
+                         "home and watch off first (the on-TV app stays installed), then makes couch-tv's home app the home.")
+        else:
+            items.append("couch-tv's other app (the on-TV app) is already this TV's home screen, and you are keeping it "
+                         "that way. Nothing will be installed, because a second home would fight it.")
     if f["installed"]["home"]:
         items.append(f"couch-tv {f['installed']['home']} is already on this TV. If a computer at home runs it for you (the "
                      "bridge, option B), stop here: this app sets couch-tv up to run on the TV by itself, and the computer's "
@@ -135,6 +192,8 @@ def plan(tv, f, ambient_off=True):
     warn = watch_warning(other_watches(tv))
     if warn:
         items.append(warn)
+    if ontv.get("takes_home") and not ontv_home_off:
+        return items[:1] + ([warn] if warn else [])
     return items
 
 
@@ -247,13 +306,24 @@ def home_config(people=None, weather=None):
     return base64.b64encode(json.dumps(cfg, separators=(",", ":")).encode()).decode()
 
 
-def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progress=lambda f, msg=None: None):
+def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progress=lambda f, msg=None: None,
+              ontv_home_switch_off=True):
     done = []
+    ontv = ontv_home(tv)
+    if ontv["takes_home"]:
+        if not ontv_home_switch_off:
+            # The person keeps the on-TV app as the home: a second home would only fight it.
+            return {"changed": [], "front": False, "kept_ontv": True, "home_key_opens": "couch-tv's other app (the on-TV app)",
+                    "watch": False, "watch_bound": None, "fire": is_fire(tv), "disabled": record(tv)["disabled"],
+                    "warning": watch_warning(other_watches(tv))}
+        progress(0.01, "Switching off the on-TV app's home and Home button watch")
+        ontv_home_off(tv)
+        done.append("on-TV app's home and watch off")
     rec = record(tv)
     progress(0.02, "Noting the TV's own home, for Undo")
     if not rec["home"]:
         prev = (_lines(tv.shell(RESOLVE)) or [""])[-1]
-        if ACT_RE.match(prev) and not prev.startswith(HOME_PKG + "/") and not prev.startswith(WIZARD + "/"):
+        if ACT_RE.match(prev) and not prev.startswith((HOME_PKG + "/", ONTV_PKG + "/", WIZARD + "/")):
             rec["home"] = prev
     _write_record(tv, rec)
 
@@ -334,7 +404,7 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     progress(1.0, "Done")
     return {"changed": done, "front": result["ok"], "home_key_opens": "couch-tv" if resolved.startswith(HOME_PKG + "/") else resolved,
             "watch": watch, "watch_bound": bound, "fire": fire, "disabled": rec["disabled"],
-            "warning": watch_warning(other_watches(tv))}
+            "warning": watch_warning(other_watches(tv)), "other_front": result.get("other_front")}
 
 
 WATCH_LABEL = "Home button watch"   # FireWatch's android:label in tv-home's AndroidManifest.xml
@@ -390,8 +460,11 @@ def check_home(tv, pkg=HOME_PKG):
             break
         time.sleep(1)
     listed = WATCH in tv.shell("settings get secure enabled_accessibility_services")
+    # In front but not couch-tv's home: say which, so the page does not blame "the TV's own home" for
+    # couch-tv's other app (the on-TV app) holding the Home button.
+    other = "ontv" if (not ok and ONTV_PKG in seen) else None
     return {"ok": ok, "front": seen, "watch_bound": watch_bound(tv) if listed else None,
-            "warning": watch_warning(other_watches(tv))}
+            "warning": watch_warning(other_watches(tv)), "other_front": other}
 
 
 # ---- 3. the phone remote (the on-TV app, optional) ----
@@ -437,6 +510,7 @@ def undo_plan(tv):
     return {
         "home_installed": HOME_PKG in present, "ontv_installed": ONTV_PKG in present,
         "switch_back_on": sorted(set(back)), "home": rec["home"] or "the TV's own home",
+        "home_name": friendly_home(rec["home"]) if rec["home"] else "the TV's own home",
     }
 
 

@@ -25,7 +25,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import finder, pairing, release, steps
+from . import finder, pairing, paths, release, steps
 from .identity import Identity
 from .tv import Tv, TvError
 
@@ -111,7 +111,25 @@ def _attach(tv, ip, route):
         S.tv.close()
     S.tv, S.ip, S.route = tv, ip, route
     S.facts = steps.facts(tv)
+    _remember(ip, S.facts)
     return {"facts": S.facts, "route": route}
+
+
+def _known():
+    try:
+        return json.loads((paths.data() / "known-tvs.json").read_text())
+    except Exception:
+        return {}
+
+
+def _remember(ip, f):
+    """What this TV turned out to be, so the list and the kind question know it next time."""
+    k = _known()
+    k[ip] = {"name": f.get("name"), "kind": f.get("kind")}
+    try:
+        (paths.data() / "known-tvs.json").write_text(json.dumps(k))
+    except OSError:
+        pass
 
 
 def place_search(q):
@@ -151,10 +169,18 @@ def api(method, path, body):
     if path == "/api/job":
         return S.job
     if path == "/api/scan":
-        return run_job("scan", lambda p: {"tvs": finder.scan(), "networks": [str(n) for n in finder.home_networks()]})
+        def scan(p):
+            known = _known()
+            tvs = finder.scan()
+            for t in tvs:
+                t["known"] = known.get(t["ip"])
+            return {"tvs": tvs, "networks": [str(n) for n in finder.home_networks()]}
+        return run_job("scan", scan)
     if path == "/api/look":
         ip = home_ip(body)
-        return finder.look(ip)
+        r = finder.look(ip)
+        r["known"] = _known().get(ip)
+        return r
     if path == "/api/pairing-port":
         ip = home_ip(body)
         return {"port": finder.pairing_port(ip, 2.0)}
@@ -197,7 +223,8 @@ def api(method, path, body):
         return run_job("connect", connect)
     if path == "/api/plan":
         tv = need_tv()
-        return {"items": steps.plan(tv, S.facts, ambient_off=bool(body.get("ambient_off", True))), "facts": S.facts}
+        return {"items": steps.plan(tv, S.facts, ambient_off=bool(body.get("ambient_off", True)),
+                                    ontv_home_off=bool(body.get("ontv_home_off", True))), "facts": S.facts}
     if path == "/api/place":
         return place_search(body.get("q"))
     if path == "/api/setup":
@@ -205,11 +232,16 @@ def api(method, path, body):
         people = [str(x) for x in (body.get("people") or []) if isinstance(x, str)]
         weather = body.get("weather") if isinstance(body.get("weather"), dict) else None
         ambient_off = bool(body.get("ambient_off", True))
+        ontv_off = bool(body.get("ontv_home_off", True))
 
         def setup(progress):
+            if not ontv_off and steps.ontv_home(tv)["takes_home"]:
+                r = steps.make_home(tv, "", ontv_home_switch_off=False)
+                r["apk"] = {"version": "none", "sha256": "", "checked": "nothing installed"}
+                return r
             apk = release.get(release.HOME_APK, lambda f, m=None: progress(0.25 * f, m))
             r = steps.make_home(tv, apk["path"], ambient_off=ambient_off, people=people, weather=weather,
-                                progress=lambda f, m=None: progress(0.25 + 0.75 * f, m))
+                                ontv_home_switch_off=ontv_off, progress=lambda f, m=None: progress(0.25 + 0.75 * f, m))
             r["apk"] = {k: apk[k] for k in ("version", "sha256", "checked")}
             return r
         return run_job("setup", setup)

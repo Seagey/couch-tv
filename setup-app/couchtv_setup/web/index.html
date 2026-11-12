@@ -184,6 +184,7 @@
     <h1>Here is the plan</h1>
     <p class="lead" id="device-line"></p>
     <ul id="plan-list" class="plan"></ul>
+    <label class="tick" id="ontv-row" hidden><input type="checkbox" id="ontv-off" checked> Switch off the on-TV app's home and watch (it stays installed). Untick to keep it as the home: nothing is installed then.</label>
     <label class="tick"><input type="checkbox" id="ambient" checked> Switch off ambient mode (the adverts and photos when the TV is idle)</label>
     <h2>Make it yours (you can skip this)</h2>
     <label>Who watches? Names, with commas between<input id="people" autocomplete="off" placeholder="for example Sam, Alex"></label>
@@ -236,6 +237,7 @@
     <p class="lead">This puts the TV's own home back and removes the couch-tv apps. Your other apps, logins and settings stay as they are.</p>
     <p class="small">If a computer at home runs couch-tv for you (the bridge), stop it first, or it switches things back: see docs/UNINSTALL.md on GitHub.</p>
     <ul id="undo-list" class="plan"></ul>
+    <p class="small" id="undo-details"></p>
     <label class="tick"><input type="checkbox" id="undo-debug"> Also switch debugging off afterwards</label>
     <div class="actions">
       <button data-go="welcome">Not now</button>

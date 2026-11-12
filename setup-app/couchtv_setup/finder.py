@@ -128,7 +128,8 @@ def look(ip):
         kind = "silent"
     else:
         kind = "unknown"
-    return {"ip": ip, "kind": kind, "adb_5555": open_.get(5555, False)}
+    return {"ip": ip, "kind": kind, "adb_5555": open_.get(5555, False),
+            "android_remote": open_.get(6466, False) or open_.get(6467, False)}
 
 
 def pairing_port(ip, wait=3.0):

@@ -69,14 +69,26 @@
       tvs.forEach(function (t) {
         var b = document.createElement("button");
         var name = document.createElement("span");
-        name.textContent = t.name || (t.adb_5555 ? "A TV with debugging on" : "Android TV");
+        var model = t.known && t.known.name;
+        name.textContent = t.name || model || (t.adb_5555 ? "A TV with debugging on" : "Android TV");
         var small = document.createElement("small");
-        small.textContent = t.ip;
+        small.textContent = (t.name && model ? model + " · " : "") + t.ip;
         b.appendChild(name); b.appendChild(small);
         b.addEventListener("click", function () { pick(t.ip, t); });
         $("found").appendChild(b);
       });
     }, function (e) { fail(e); $("find-help").hidden = false; });
+  }
+
+  // What kind of TV it most likely is, from what we already know: a TV this app connected to before, then
+  // what it announces. Google TV and Android TV announce themselves; a Fire TV only has ADB on 5555.
+  function guessKind(seen, r) {
+    var known = (seen && seen.known) || r.known;
+    if (known && known.kind) return known.kind;
+    var named = (seen && (seen.name || seen.wireless_debugging)) || r.android_remote;
+    if (named) return "google";
+    if (r.kind === "silent" || (r.adb_5555 && r.kind === "android")) return "fire";
+    return null;
   }
 
   function pick(ip, seen) {
@@ -91,13 +103,29 @@
         text("stop-more", "Or plug a Google TV box (for example the Google TV Streamer) into the TV's HDMI: this app can set that up, and it gets everything.");
         return show("stop");
       }
-      var guess = seen && seen.name ? "google" : null;
-      if (seen && seen.wireless_debugging) guess = "google";
+      var guess = guessKind(seen, r);
+      if (state.mode === "undo") return undoShortcut(ip, seen, r, guess);
+      return askKind(r, guess);
+    }, fail);
+  }
+
+  // Undo on a TV this computer is already allowed on: no need to ask what it is again.
+  function undoShortcut(ip, seen, r, guess) {
+    api("/api/info").then(function (i) {
+      if (i.connected && i.ip === ip && i.facts) return connected({ facts: i.facts, route: i.route });
+      if (r.adb_5555) { state.kind = guess; return allow(); }
+      askKind(r, guess);
+    }, function () { askKind(r, guess); });
+  }
+
+  function askKind(r, guess) {
+    {
       text("kind-line", r.kind === "android" ? "It looks like an Android based TV." :
         "It is not answering yet. That is normal for a Fire TV before ADB debugging is on. Pick what it is.");
       document.querySelectorAll("[data-kind]").forEach(function (b) { b.classList.toggle("guess", b.dataset.kind === guess); });
       show("kind");
-    }, fail);
+      document.querySelectorAll("[data-kind]").forEach(function (b) { if (b.dataset.kind === guess) b.focus(); });
+    }
   }
 
   $("ip-go").addEventListener("click", function () { pick($("ip").value.trim(), null); });
@@ -182,6 +210,8 @@
       return show("stop");
     }
     if (state.mode === "undo") return undoPlan();
+    state.ontvTakes = !!(f.ontv_home && f.ontv_home.takes_home);
+    $("ontv-row").hidden = !state.ontvTakes;
     text("device-line", "Connected to your " + f.name + " (" + (f.fire ? "Fire OS " + (f.fire_os || "") : "Android " + f.android) + ").");
     $("tcl-note").hidden = !f.tcl;
     refreshPlan();
@@ -189,12 +219,13 @@
   }
 
   function refreshPlan() {
-    api("/api/plan", { ambient_off: $("ambient").checked }).then(function (p) {
+    api("/api/plan", { ambient_off: $("ambient").checked, ontv_home_off: $("ontv-off").checked }).then(function (p) {
       var ul = $("plan-list"); ul.textContent = "";
       p.items.forEach(function (t) { var li = document.createElement("li"); li.textContent = t; ul.appendChild(li); });
     }, fail);
   }
   $("ambient").addEventListener("change", refreshPlan);
+  $("ontv-off").addEventListener("change", refreshPlan);
 
   // What to say after a check: couch-tv in front or not, the Home button watch running or not, and
   // any other launcher whose own Home override would fight it.
@@ -206,6 +237,9 @@
         "Settings, My Fire TV, Restart. When the TV is back on its home, press Check it again." :
         "The Home button watch is switched on, but the TV has not started it yet. Restart the TV once. If Home still opens " +
         "the TV's own home after that, open this app again and set it up again.");
+    } else if (!r.ok && r.other_front === "ontv") {
+      w.push("couch-tv's other app (the on-TV app) was in front, not the TV's own home. It still has Home switched on: " +
+        "open it and press Stop being the home screen, or run Setup again and let it switch that off.");
     } else if (!r.ok) {
       w.push("The TV's own home was in front when this looked. Press Home on the remote once more.");
     }
@@ -243,12 +277,17 @@
 
   $("setup-go").addEventListener("click", function () {
     var people = $("people").value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
-    job("/api/setup", { ambient_off: $("ambient").checked, people: people, weather: state.weather }, working("Setting it up"))
+    job("/api/setup", { ambient_off: $("ambient").checked, ontv_home_off: $("ontv-off").checked, people: people, weather: state.weather }, working("Setting it up"))
       .then(function (r) {
-        text("done-title", r.front ? "couch-tv is your home screen" : "couch-tv is on the TV");
-        text("done-line", (r.front ? "It is on the screen now. " : "It is installed. ") +
-          "Version " + r.apk.version + ", checked against " + r.apk.checked + ". " +
-          homeWords({ ok: r.front, watch_bound: r.watch_bound, warning: r.warning }));
+        if (r.kept_ontv) {
+          text("done-title", "Left as it was");
+          text("done-line", "couch-tv's other app (the on-TV app) is still your home screen, and nothing was installed.");
+        } else {
+          text("done-title", r.front ? "couch-tv is your home screen" : "couch-tv is on the TV");
+          text("done-line", (r.front ? "It is on the screen now. " : "It is installed. ") +
+            "Version " + r.apk.version + ", checked against " + r.apk.checked + ". " +
+            homeWords({ ok: r.front, watch_bound: r.watch_bound, warning: r.warning, other_front: r.other_front }));
+        }
         $("remote-done").hidden = true;
         $("remote-adb-google").hidden = state.facts.fire;
         $("remote-adb-fire").hidden = !state.facts.fire;
@@ -297,11 +336,12 @@
       var ul = $("undo-list"); ul.textContent = "";
       var items = [];
       if (p.switch_back_on.length) items.push("Switch back on what couch-tv switched off (" + p.switch_back_on.length + ").");
-      items.push("Switch off couch-tv's Home button watch and make " + p.home + " the home again.");
+      items.push("Switch off couch-tv's Home button watch and make " + (p.home_name || "the TV's own home") + " the home again.");
       if (p.home_installed) items.push("Remove the couch-tv home app.");
       if (p.ontv_installed) items.push("Remove the couch-tv phone remote app.");
       if (!p.home_installed && !p.ontv_installed) items.push("couch-tv is not on this TV, so there is nothing to remove.");
       items.forEach(function (t) { var li = document.createElement("li"); li.textContent = t; ul.appendChild(li); });
+      text("undo-details", p.home && p.home.indexOf("/") > 0 ? "Details: the home it goes back to is " + p.home + "." : "");
       show("undo");
     }, fail);
   }

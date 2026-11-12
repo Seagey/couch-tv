@@ -36,6 +36,7 @@ class FakeTv:
         # Fire OS keeps Amazon's home as the chosen one whatever set-home-activity says (killy10o10's stick)
         self.refuse_home = kind == "fire"
         self.binds = True            # False: Fire OS lists the watch but does not bind it until a restart
+        self.ontv_alias = False      # the on-TV app's HomeAlias is switched on
         self.other_homes = []        # other launchers installed (Projectivy...), with their own watch
         self.other_bound = []        # labels of other bound accessibility services
         self.fail_on = None
@@ -51,6 +52,9 @@ class FakeTv:
     def key(self, name):
         self.keys.append(name)
         if name == "HOME":
+            if self.ontv_alias and "dev.couchtv.ontv" in self.packages:
+                self.front_pkg = "dev.couchtv.ontv"
+                return
             if "app.couchtv.launcher" in self.packages and ((self.chosen and not self.refuse_home) or (self._watch_on() and self.binds)):
                 self.front_pkg = "app.couchtv.launcher"
             else:
@@ -83,11 +87,15 @@ class FakeTv:
         if c.startswith("pm list features"):
             return "feature:android.software.leanback"
         if c.startswith("cmd package resolve-activity"):
+            if self.ontv_alias and "dev.couchtv.ontv" in self.packages:
+                return "priority=0\ndev.couchtv.ontv/dev.couchtv.ontv.HomeAlias"
             if self.chosen and self.chosen.split("/")[0] in self.packages:
                 return "priority=0\n" + self.chosen
             return "priority=0\n" + self.home
         if c.startswith("pm query-activities"):
             homes = [self.home] + [p + "/.Home" for p in self.other_homes]
+            if self.ontv_alias and "dev.couchtv.ontv" in self.packages:
+                homes.append("dev.couchtv.ontv/dev.couchtv.ontv.HomeAlias")
             if "app.couchtv.launcher" in self.packages:
                 homes.append("app.couchtv.launcher/.MainActivity")
             return "\n".join(homes)
@@ -98,6 +106,11 @@ class FakeTv:
             return "Success"
         if c.startswith("cmd shortcut get-default-launcher"):
             return "Launcher: ComponentInfo{" + (self.chosen or self.home) + "}"
+        if c.startswith("pm disable dev.couchtv.ontv/"):
+            self.ontv_alias = False
+            return "Component enabled state changed to disabled"
+        if c.startswith("pm revoke"):
+            return ""
         if c.startswith("pm disable-user"):
             p = c.split()[-1]
             self.disabled.add(p)
