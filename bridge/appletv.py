@@ -12,7 +12,8 @@ After pairing, the payloads are ChaCha20-Poly1305 sealed and carry a small binar
 What it can do (docs/APPLE-TV.md): remote keys, sleep and wake, which apps are installed, opening an app
 by its bundle id. What it cannot: type text, screenshots, what is playing, a volume level, and put
 anything in front of Apple's own home screen. tvOS lets nothing replace its home, so couch-tv on an
-Apple TV is an app that opens itself (when one is installed and named in "app_id"), not a home screen.
+Apple TV is an app that opens itself (couch-tv's tvOS app in tvos/, found by its bundle id or named in
+"app_id"), not a home screen.
 """
 import asyncio
 import hashlib
@@ -20,6 +21,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import secrets
 import struct
 import time
@@ -36,6 +38,9 @@ import config
 from tv import TVUnavailable
 
 HOME_PACKAGE = "app.couchtv.launcher"
+# couch-tv's own tvOS app (tvos/). A free Apple ID needs a bundle id nobody else has registered, so people
+# add their own ending (dev.couchtv.appletv.<something>); any id starting with this one counts as couch-tv.
+HOME_BUNDLE = "dev.couchtv.appletv"
 PIN_RE_LEN = 4
 
 # ---------- frames ----------
@@ -330,6 +335,9 @@ BUNDLE_IDS = {
 }
 
 
+BUNDLE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9.\-_]{2,149}")
+
+
 def _plain(name):
     return "".join(c for c in (name or "").lower() if c.isalnum())
 
@@ -505,8 +513,8 @@ class AppleTV:
         self.fallback_ip = self.ip
         self.mac = cfg.get("mac")
         self.port = int(cfg.get("port") or 49153)   # the Companion port is advertised on the network and can change
-        self.app_id = (cfg.get("app_id") or "").strip()    # bundle id of couch-tv's tvOS app, if one is installed
-        self.open_on_power_on = cfg.get("open_on_power_on", True) is not False and bool(self.app_id)
+        self.app_id = (cfg.get("app_id") or "").strip()    # bundle id of couch-tv's tvOS app; found by itself when left out
+        self.open_on_power_on = cfg.get("open_on_power_on", True) is not False
         self.store_file = os.path.join(config.DATA, f"appletv-{self.id}.json")
         self.picture_cfg = {}
         self.keep_disabled_file = None
@@ -570,7 +578,7 @@ class AppleTV:
 
     def status(self):
         """For /api/tvs, in plain words."""
-        return {"paired": self.paired, "port": self.port, "app_id": self.app_id or None,
+        return {"paired": self.paired, "port": self.port, "app_id": self.home_bundle(),
                 "note": None if self.paired else "Not paired yet: POST /api/appletv/pair, or run scripts/appletv-check.py --pair"}
 
     # ---------- the pairing, kept in bridge/data (git ignores it), never printed or logged ----------
@@ -681,13 +689,25 @@ class AppleTV:
             self.channels, self.ids, self._apps_checked = points, found, time.time()
         return self.ids
 
+    def home_bundle(self):
+        """The bundle id of couch-tv's own app on this Apple TV: app_id from config.json, else an installed app
+        whose id is dev.couchtv.appletv or starts with it (tvos/, docs/APPLE-TV.md). None when there is none."""
+        if self.app_id:
+            return self.app_id
+        for c in self.channels:
+            if c["id"] == HOME_BUNDLE or c["id"].startswith(HOME_BUNDLE + "."):
+                return c["id"]
+        return None
+
     async def apps_on_tv(self):
         await self.refresh_installed()
-        return [c for c in self.channels if c["id"] != self.app_id]
+        mine = self.home_bundle()
+        return [c for c in self.channels if c["id"] != mine]
 
     def _candidates(self, package):
-        if package in (HOME_PACKAGE, self.app_id):
-            return [self.app_id] if self.app_id else []
+        mine = self.home_bundle()
+        if package in (HOME_PACKAGE, mine) or (package and package == self.app_id):
+            return [mine] if mine else []
         if package and package.startswith("appletv."):
             return [package[len("appletv."):]]
         app = apps.BY_PACKAGE.get(package) or apps.BY_ID.get(package)
@@ -700,9 +720,20 @@ class AppleTV:
     async def _launch(self, bundle, quiet=True):
         if quiet:
             self.quiet_until = time.monotonic() + 20
-        if not isinstance(bundle, str) or not 3 <= len(bundle) <= 150 or not all(c.isalnum() or c in ".-_" for c in bundle):
+        if not isinstance(bundle, str) or not BUNDLE_RE.fullmatch(bundle):
             raise ValueError(f"not a bundle id: {bundle}")
         await self._ask("_launchApp", {"_bundleID": bundle})
+
+    async def open_bundle(self, bundle):
+        """Open an app by its bundle id, for couch-tv's own Apple TV app (it cannot open other apps itself).
+        When the Apple TV's app list is known, only an app on it."""
+        if not isinstance(bundle, str) or not BUNDLE_RE.fullmatch(bundle):
+            raise ValueError(f"not a bundle id: {bundle}")
+        self.require()
+        await self.refresh_installed()
+        if self.channels and bundle not in {c["id"] for c in self.channels}:
+            raise TVUnavailable(f"{bundle} is not installed on the Apple TV")
+        await self._launch(bundle)
 
     async def launch_package(self, package):
         self.require()
@@ -711,7 +742,7 @@ class AppleTV:
         if not ids:
             raise ValueError(f"no Apple TV bundle id known for {package}")
         listed = {c["id"] for c in self.channels}
-        usable = [i for i in ids if i in listed or i == self.app_id] if self.channels else ids
+        usable = [i for i in ids if i in listed or i == self.home_bundle()] if self.channels else ids
         if not usable:
             raise TVUnavailable(f"{package} is not installed on the Apple TV")
         last = None
@@ -749,9 +780,11 @@ class AppleTV:
         raw = (name or "").strip().lower() if isinstance(name, str) else ""
         self.quiet_until = 0.0 if raw in ("sleep", "power") else time.monotonic() + 20
         if raw == "home":
-            if not self.app_id:
-                raise ValueError("no couch-tv app is set for this Apple TV (app_id): use apple_home for Apple's own home")
-            await self._launch(self.app_id)
+            await self.refresh_installed()
+            mine = self.home_bundle()
+            if not mine:
+                raise ValueError("couch-tv's app is not on this Apple TV (tvos/, docs/APPLE-TV.md): use apple_home for Apple's own home")
+            await self._launch(mine)
             return "couch-tv"
         if raw == "power":
             self.require()
@@ -823,19 +856,23 @@ class AppleTV:
         self.hook_log = (self.hook_log + [(time.strftime("%H:%M:%S"), what)])[-8:]
 
     async def _hook(self):
-        """The Apple TV just woke. Open couch-tv's app, if one is named. The Companion link cannot say
+        """The Apple TV just woke. Open couch-tv's app, if it is installed. The Companion link cannot say
         which app is in front, so this opens it every time the Apple TV wakes (unless a command just ran)."""
         if time.monotonic() < self.home_on_wake_until:
             self.home_on_wake_until = 0.0
         elif time.monotonic() < self.quiet_until:
             self._note("Apple TV woke, left alone (a command is running)")
             return
-        if not self.open_on_power_on:
-            self._note("Apple TV woke, no couch-tv app set (app_id), left alone")
+        if self.open_on_power_on and not self.app_id:
+            await self.refresh_installed()
+        mine = self.home_bundle()
+        if not self.open_on_power_on or not mine:
+            self._note("Apple TV woke, no couch-tv app installed or set (app_id), left alone"
+                       if self.open_on_power_on else "Apple TV woke, open_on_power_on is off, left alone")
             return
         await asyncio.sleep(1.5)
         try:
-            await self._launch(self.app_id, quiet=False)
+            await self._launch(mine, quiet=False)
             self._note("Apple TV woke, opened couch-tv")
         except Exception as e:
             self._note(f"Apple TV woke, could not open couch-tv: {e}")

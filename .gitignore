@@ -48,3 +48,13 @@ samsung/my-logos/
 
 # LG Developer Mode key for the Docker example (examples/docker)
 lg-key/
+
+# Couch TV for Apple TV: your own signing settings (team id, bundle id) and Xcode's per user files
+tvos/Config/Signing.mine.xcconfig
+xcuserdata/
+*.xcuserstate
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.cer
+*.certSigningRequest

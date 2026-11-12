@@ -273,6 +273,207 @@ class Hook(Base):
             await tv._drop()
 
 
+MINE = "dev.couchtv.appletv.example"
+
+
+class OwnApp(Base):
+    """couch-tv's own tvOS app (tvos/): found by its bundle id without app_id, opened on wake and by Home."""
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        await self.pair()
+        self.s.apps[MINE] = "Couch TV"
+
+    async def test_found_by_its_bundle_id(self):
+        await self.tv.refresh_installed(force=True)
+        self.assertEqual(self.tv.home_bundle(), MINE)
+        self.assertNotIn(MINE, {c["id"] for c in await self.tv.apps_on_tv()})
+
+    async def test_app_id_wins(self):
+        tv = self.s.tv(self.d.name, app_id="app.couchtv.tvos")
+        try:
+            await tv.refresh_installed(force=True)
+            self.assertEqual(tv.home_bundle(), "app.couchtv.tvos")
+        finally:
+            await tv._drop()
+
+    async def test_a_lookalike_id_is_not_couch_tv(self):
+        del self.s.apps[MINE]
+        self.s.apps["dev.couchtv.appletvx"] = "Not us"
+        await self.tv.refresh_installed(force=True)
+        self.assertIsNone(self.tv.home_bundle())
+
+    async def test_wake_opens_it_without_app_id(self):
+        await self.tv._hook()
+        self.assertIn(("launch", MINE), self.s.log)
+        self.assertIn("opened couch-tv", self.tv.hook_log[-1][1])
+
+    async def test_wake_left_alone_when_switched_off(self):
+        tv = self.s.tv(self.d.name, open_on_power_on=False)
+        try:
+            await tv._hook()
+            self.assertNotIn(("launch", MINE), self.s.log)
+            self.assertIn("open_on_power_on is off", tv.hook_log[-1][1])
+        finally:
+            await tv._drop()
+
+    async def test_home_key_opens_it(self):
+        self.assertEqual(await self.tv.key("home"), "couch-tv")
+        self.assertIn(("launch", MINE), self.s.log)
+
+    async def test_open_bundle_only_opens_listed_apps(self):
+        await self.tv.open_bundle("com.netflix.Netflix")
+        self.assertIn(("launch", "com.netflix.Netflix"), self.s.log)
+        with self.assertRaises(TVUnavailable):
+            await self.tv.open_bundle("com.example.notinstalled")
+        with self.assertRaises(ValueError):
+            await self.tv.open_bundle("x;y")
+
+
+class HomeEndpoints(Base):
+    """The bridge endpoints couch-tv's Apple TV app uses, behind the real middleware, with a pairing key."""
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        await self.pair()
+        self.s.apps[MINE] = "Couch TV"
+        import server
+        from aiohttp import web
+        from aiohttp.test_utils import TestClient, TestServer
+        from unittest.mock import patch
+        self.server = server
+        self.other = server.make_tv({"id": "den", "name": "Den", "ip": "192.0.2.77"})      # an Android TV
+        self._p = [patch.multiple(server, TVS={"lounge": self.tv, "den": self.other}, DEFAULT_TV="den"),
+                   patch.object(A.config, "PAIRING_KEY", "couchpass123"),
+                   patch.object(server.store, "DATA", self.d.name)]
+        for p in self._p:
+            p.start()
+        server._failed_attempts.clear()
+        server.appletv_codes.clear()
+        app = web.Application(middlewares=[server.middleware])
+        for path, h in (("/api/appletv/hello", server.h_appletv_hello), ("/api/appletv/apps", server.h_appletv_apps)):
+            app.router.add_get(path, h)
+        for path, h in (("/api/appletv/open", server.h_appletv_open), ("/api/appletv/code", server.h_appletv_code),
+                        ("/api/appletv/claim", server.h_appletv_claim)):
+            app.router.add_post(path, h)
+        self.client = TestClient(TestServer(app, host="127.0.0.1"))
+        await self.client.start_server()
+
+    async def asyncTearDown(self):
+        await self.client.close()
+        for p in reversed(self._p):
+            p.stop()
+        self.server._failed_attempts.clear()
+        self.server.appletv_codes.clear()
+        await super().asyncTearDown()
+
+    KEY = {"Authorization": "Bearer couchpass123"}
+
+    def post(self, path, data, key=True):
+        h = {"Content-Type": "application/json", **(self.KEY if key else {})}
+        return self.client.post(path, headers=h, data=json.dumps(data))
+
+    async def test_everything_but_claim_needs_the_key(self):
+        for r in (await self.client.get("/api/appletv/hello"), await self.client.get("/api/appletv/apps?tv=lounge"),
+                  await self.post("/api/appletv/open?tv=lounge", {"bundle": "com.netflix.Netflix"}, key=False),
+                  await self.post("/api/appletv/code?tv=lounge", {}, key=False)):
+            self.assertEqual(r.status, 401)
+        self.assertNotIn("launch", [k for k, *_ in self.s.log])
+
+    async def test_hello_finds_the_apple_tv_by_its_address(self):
+        r = await self.client.get("/api/appletv/hello", headers=self.KEY)      # the stand-in is at 127.0.0.1
+        j = await r.json()
+        self.assertEqual((r.status, j["tv"], j["name"]), (200, "lounge", "Lounge"))
+
+    async def test_apps_leave_out_couch_tv_and_keep_bundle_ids(self):
+        r = await self.client.get("/api/appletv/apps?tv=lounge", headers=self.KEY)
+        j = await r.json()
+        ids = [a["id"] for a in j["apps"]]
+        self.assertNotIn(MINE, ids)
+        self.assertIn("com.netflix.Netflix", ids)
+        netflix = [a for a in j["apps"] if a["id"] == "com.netflix.Netflix"][0]
+        self.assertEqual(netflix["package"], "com.netflix.ninja")                # names the bundled logo
+        self.assertEqual(ids[-1], "com.example.other")                          # unknown apps after known ones
+
+    async def test_apps_follow_the_order_from_the_phone(self):
+        with open(os.path.join(self.d.name, "app-order.lounge.json"), "w") as f:
+            json.dump({"order": ["appletv.com.example.other", "com.netflix.ninja"], "line": 2}, f)
+        with open(os.path.join(self.d.name, "home-apps.lounge.json"), "w") as f:
+            json.dump({"apps": [{"package": "com.netflix.ninja", "name": "Netflix"},
+                                {"package": "appletv.com.example.other", "name": "Some Other App"}]}, f)
+        j = await (await self.client.get("/api/appletv/apps?tv=lounge", headers=self.KEY)).json()
+        self.assertEqual([a["id"] for a in j["apps"]][:2], ["com.example.other", "com.netflix.Netflix"])
+        self.assertEqual(j["line"], 2)
+
+    async def test_open_by_bundle_id(self):
+        r = await self.post("/api/appletv/open?tv=lounge", {"bundle": "com.netflix.Netflix"})
+        self.assertEqual(r.status, 200)
+        self.assertIn(("launch", "com.netflix.Netflix"), self.s.log)
+
+    async def test_open_refuses_bad_and_missing_apps(self):
+        r = await self.post("/api/appletv/open?tv=lounge", {"bundle": "com.netflix.Netflix; rm"})
+        self.assertEqual(r.status, 400)
+        r = await self.post("/api/appletv/open?tv=lounge", {"bundle": "com.example.gone"})
+        self.assertEqual(r.status, 503)
+        self.s.fail_launch.add("com.netflix.Netflix")
+        r = await self.post("/api/appletv/open?tv=lounge", {"bundle": "com.netflix.Netflix"})
+        self.assertEqual(r.status, 502)
+
+    async def test_not_for_other_tvs(self):
+        r = await self.post("/api/appletv/open?tv=den", {"bundle": "com.netflix.Netflix"})
+        self.assertEqual(r.status, 400)
+        r = await self.client.get("/api/appletv/apps", headers=self.KEY)      # the default TV is the Android one
+        self.assertEqual(r.status, 400)
+
+    async def test_code_is_swapped_for_the_key_once(self):
+        j = await (await self.post("/api/appletv/code?tv=lounge", {})).json()
+        self.assertRegex(j["code"], r"^\d{6}$")
+        r = await self.post("/api/appletv/claim", {"code": j["code"]}, key=False)
+        got = await r.json()
+        self.assertEqual((r.status, got["key"], got["tv"]), (200, "couchpass123", "lounge"))
+        r = await self.post("/api/appletv/claim", {"code": j["code"]}, key=False)
+        self.assertEqual(r.status, 401)
+
+    async def test_codes_run_out(self):
+        j = await (await self.post("/api/appletv/code?tv=lounge", {})).json()
+        exp, tv_id = self.server.appletv_codes[j["code"]]
+        self.server.appletv_codes[j["code"]] = (time.monotonic() - 1, tv_id)
+        r = await self.post("/api/appletv/claim", {"code": j["code"]}, key=False)
+        self.assertEqual(r.status, 401)
+
+    async def test_wrong_codes_are_rate_limited(self):
+        from unittest.mock import patch
+        good = (await (await self.post("/api/appletv/code?tv=lounge", {})).json())["code"]
+        with patch.object(self.server, "client_ip", return_value="192.0.2.50"):
+            for guess in [g for g in ("111111", "222222", "333333", "444444", "555555", "666666") if g != good][:5]:
+                r = await self.post("/api/appletv/claim", {"code": guess}, key=False)
+                self.assertEqual(r.status, 401)
+            r = await self.post("/api/appletv/claim", {"code": good}, key=False)
+            self.assertEqual(r.status, 429)
+
+
+class Bonjour(unittest.IsolatedAsyncioTestCase):
+    async def test_only_with_an_apple_tv_and_never_the_key(self):
+        import server
+        from unittest.mock import AsyncMock, patch
+        android = server.make_tv({"id": "den", "name": "Den", "ip": "192.0.2.77"})
+        with patch.multiple(server, TVS={"den": android}):
+            self.assertIsNone(await server.advertise_for_appletv())
+        atv = server.make_tv({"id": "x", "name": "X", "kind": "appletv", "ip": "192.0.2.9"})
+        zc = AsyncMock()
+        with patch.multiple(server, TVS={"x": atv}), patch.object(server, "_lan_address", return_value="192.0.2.10"), \
+                patch("zeroconf.asyncio.AsyncZeroconf", return_value=zc), patch.object(A.config, "PAIRING_KEY", "couchpass123"), \
+                patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("COUCHTV_NO_BONJOUR", None)
+            got = await server.advertise_for_appletv()
+        self.assertIsNotNone(got)
+        info = zc.async_register_service.call_args[0][0]
+        self.assertEqual(info.type, "_couchtv._tcp.local.")
+        props = {k.decode(): (v or b"").decode() for k, v in info.properties.items()}
+        self.assertEqual(props["ip"], "192.0.2.10")
+        self.assertNotIn("couchpass123", json.dumps(props))
+
+
 class Shape(unittest.TestCase):
     def test_server_builds_the_driver(self):
         import server

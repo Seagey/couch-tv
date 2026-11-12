@@ -39,6 +39,7 @@ class StandIn:
         self._server = None
         self.port = None
         self.connections = 0
+        self.apps = dict(APPS)      # what the Apple TV lists; a test can add couch-tv's own app
 
     async def __aenter__(self):
         self._server = await asyncio.start_server(self._conn, "127.0.0.1", 0)
@@ -183,13 +184,13 @@ class StandIn:
         if name == "_launchApp":
             b = c.get("_bundleID")
             self.log.append(("launch", b))
-            if b in self.fail_launch or b not in APPS:
+            if b in self.fail_launch or b not in self.apps:
                 return [{"_t": 4, "_x": xid, "_em": "no such app"}]
             return [{"_t": 3, "_x": xid, "_c": {}}]
         if name == "FetchAttentionState":
             return [{"_t": 3, "_x": xid, "_c": {"state": self.attention}}]
         if name == "FetchLaunchableApplicationsEvent":
-            return [{"_t": 3, "_x": xid, "_c": dict(APPS)}]
+            return [{"_t": 3, "_x": xid, "_c": dict(self.apps)}]
         if name == "_sessionStart":
             return [{"_t": 3, "_x": xid, "_c": {"_sid": 7}}]
         if name == "TVRCSessionStart":

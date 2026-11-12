@@ -183,13 +183,19 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   first (it only reads, but it still waits for the yes in step 3), and never suggest or walk them
   through rooting the TV. Afterwards ask them to open an issue on GitHub with what `vidaa-check.py`
   printed, and write down for them what worked and what did not.
-- **Apple TV (New, Beta):** do not say no. Offer the remote path in [docs/APPLE-TV.md](docs/APPLE-TV.md), and say first, plainly:
-  "couch-tv's home screen does not run on an Apple TV (tvOS has no web view and Apple lets no app replace its
-  home), but the phone remote does, with a computer at home that stays on: arrows, OK, Back, Play, sleep and wake,
-  and opening any app. You type a PIN the Apple TV shows once. It was checked against a pretend Apple TV and has
-  not been run on a real one yet, so something may need fixing. Typing from the phone, what is playing and a
-  volume level are not available." Run `scripts/appletv-check.py` (read only) before the yes, pair only after
-  it. Afterwards ask them to open an issue with what it printed.
+- **Apple TV (New, Beta):** do not say no. Offer the path in [docs/APPLE-TV.md](docs/APPLE-TV.md), and say first, plainly:
+  "With a computer at home that stays on, the phone remote works on an Apple TV: arrows, OK, Back, Play, sleep and
+  wake, and opening any app. You type a PIN the Apple TV shows once. couch-tv's home also comes as an Apple TV app,
+  Couch TV, with the same scenes, clock, Keep watching and apps, and the computer opens it whenever the Apple TV
+  wakes. Apple's own Home button still opens Apple's home: Apple lets no app replace it. Couch TV is put on the
+  Apple TV from a Mac with Xcode and your own Apple ID, free, but Apple makes that run out after 7 days, so the Mac
+  has to stay on and sign it again twice a week (a script does it), or you pay Apple US$99 a year for a one time
+  install. Both were checked against a pretend Apple TV and have not been run on a real one yet, so something may
+  need fixing. Typing from the phone, what is playing and a volume level are not available." Run
+  `scripts/appletv-check.py` (read only) before the yes, pair only after it. Couch TV needs a Mac: without one,
+  offer the remote only. Signing in to Xcode is theirs to do (never ask for the Apple ID password), and their team
+  id goes only in `tvos/Config/Signing.mine.xcconfig`, which git ignores. Afterwards ask them to open an issue
+  with what `appletv-check.py` printed and how Couch TV went.
 - **Fire TV on Vega OS:** not supported. Say so kindly,
   explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
   round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets

@@ -12,6 +12,7 @@ import logging
 import mimetypes
 import os
 import re
+import secrets
 import socket
 import time
 import urllib.parse
@@ -369,7 +370,7 @@ def record_action(request, tool, args, success):
 
 # ---------- middleware: CORS + errors ----------
 # /api/vidaa/claim swaps a one time code for the key (below), so it cannot need the key itself.
-OPEN_PATHS = {"/api/health", "/api/pair", "/api/vidaa/claim"}
+OPEN_PATHS = {"/api/health", "/api/pair", "/api/vidaa/claim", "/api/appletv/claim"}
 
 
 @web.middleware
@@ -922,6 +923,139 @@ async def h_appletv_pair(request):
     except appletv.AppleTVError as e:
         raise ApiError(409, str(e))
     return ok(paired=True)
+
+
+# ---------- couch-tv's own app on an Apple TV (tvos/, docs/APPLE-TV.md) ----------
+# The app finds the bridge on the network by itself (Bonjour, _couchtv._tcp). When the bridge has a pairing
+# key, the app asks for it once: someone gets a six digit code (scripts/appletv-home-code.py, or POST
+# /api/appletv/code from the phone remote) and types it on the Apple TV, which swaps it here for the key.
+APPLETV_CODE_SECS = 600
+appletv_codes = {}          # code -> (runs out at, monotonic; tv id)
+
+
+def _need_appletv():
+    if tv.kind != "appletv":
+        raise ApiError(400, "only for Apple TVs (add ?tv=<the Apple TV's id>)")
+
+
+async def h_appletv_code(request):
+    """A six digit code for couch-tv's Apple TV app, good once, for ten minutes. Needs the pairing key."""
+    _need_appletv()
+    now = time.monotonic()
+    for c, (exp, _) in list(appletv_codes.items()):
+        if exp <= now:
+            appletv_codes.pop(c, None)
+    while True:
+        code = f"{secrets.randbelow(10 ** 6):06d}"
+        if code not in appletv_codes:
+            break
+    appletv_codes[code] = (now + APPLETV_CODE_SECS, _current.get())
+    return ok(code=code, expires_in=APPLETV_CODE_SECS, tv=_current.get())
+
+
+async def h_appletv_claim(request):
+    """Open path: the Apple TV app swaps a six digit code for the pairing key, once. Wrong codes count
+    towards the same rate limit as a wrong key."""
+    data = await body(request)
+    code = str(data.get("code") or "").strip()
+    ip = client_ip(request)
+    if is_rate_limited(ip):
+        raise ApiError(429, "Too many wrong codes. Please wait a minute.")
+    found = appletv_codes.pop(code, None) if re.fullmatch(r"\d{6}", code) else None
+    if not found or found[0] <= time.monotonic() or found[1] not in TVS:
+        record_failed_attempt(ip, code)
+        await asyncio.sleep(0.3)
+        raise ApiError(401, "that code is not valid (a code works once, for ten minutes)")
+    t = TVS[found[1]]
+    return ok(key=config.PAIRING_KEY, tv=found[1], name=t.name)
+
+
+def appletv_for(named, ip):
+    """Which Apple TV a request is about: the one named (?tv=), else the one at the address the request
+    came from, else the first in config.json. None when config.json has no Apple TV."""
+    tvs = [i for i, t in TVS.items() if t.kind == "appletv"]
+    if named in tvs:
+        return named
+    for i in tvs:
+        if ip and ip in (TVS[i].ip, TVS[i].fallback_ip):
+            return i
+    return tvs[0] if tvs else None
+
+
+async def h_appletv_hello(request):
+    """The Apple TV app's first question: which TV am I. It needs the key, so it also checks the key."""
+    tv_id = appletv_for(request.query.get("tv"), (getattr(request, "remote", None) or "").removeprefix("::ffff:"))
+    if not tv_id:
+        raise ApiError(404, "no Apple TV in config.json (docs/APPLE-TV.md)")
+    t = TVS[tv_id]
+    return ok(tv=tv_id, name=t.name, home_bundle=t.home_bundle(), dock_max=DOCK_MAX)
+
+
+async def h_appletv_apps(request):
+    """The apps on this Apple TV for couch-tv's app, in the order arranged from the phone, without couch-tv
+    itself. "id" is the bundle id; "package" names the bundled logo when couch-tv knows the app."""
+    _need_appletv()
+    tv.require()
+    listed = await tv.apps_on_tv()
+    saved, line, was_saved = effective_order()
+    rank = {a["package"]: i for i, a in enumerate(saved)} if was_saved else {}
+    known = {a["package"]: i for i, a in enumerate(apps.APPS)}
+    listed = sorted(listed, key=lambda c: (rank.get(c["package"], 9999), known.get(c["package"], 9999), c["title"].lower()))
+    return ok(apps=[{"id": c["id"], "title": c["title"], "package": c["package"]} for c in listed],
+              line=line if was_saved else DOCK_MAX, dock_max=DOCK_MAX)
+
+
+async def h_appletv_open(request):
+    """Open an app on the Apple TV by its bundle id. A tvOS app cannot open another app by its id, so
+    couch-tv's app asks here and the bridge asks the Apple TV over the Companion link."""
+    _need_appletv()
+    data = await body(request)
+    bundle = data.get("bundle")
+    if not isinstance(bundle, str) or not appletv.BUNDLE_RE.fullmatch(bundle):
+        raise ApiError(400, "bundle is an app's bundle id, for example com.netflix.Netflix")
+    tv.require()
+    try:
+        await tv.open_bundle(bundle)
+    except appletv.AppleTVError as e:
+        raise ApiError(502, f"the Apple TV would not open {bundle}: {e}")
+    record_action(request, "launch", {"app": bundle}, True)
+    return ok(opened=bundle)
+
+
+def _lan_address():
+    """This computer's address on the home network (the one its default route uses), or None."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sk:
+            sk.connect(("192.0.2.1", 9))            # nothing is sent: it only picks the route
+            ip = sk.getsockname()[0]
+        return None if ipaddress.ip_address(ip).is_loopback else ip
+    except OSError:
+        return None
+
+
+async def advertise_for_appletv():
+    """Say on the network that a couch-tv bridge is here (Bonjour, _couchtv._tcp), so couch-tv's Apple TV
+    app finds it without anyone typing an address. Only when an Apple TV is in config.json. The record
+    carries the address and port, never the key."""
+    if not any(t.kind == "appletv" for t in TVS.values()) or os.environ.get("COUCHTV_NO_BONJOUR"):
+        return None
+    ip = _lan_address()
+    if not ip:
+        log.info("bonjour: no network address, the Apple TV app needs the bridge's address typed in")
+        return None
+    try:
+        from zeroconf import ServiceInfo
+        from zeroconf.asyncio import AsyncZeroconf
+        info = ServiceInfo("_couchtv._tcp.local.", "couch-tv bridge._couchtv._tcp.local.",
+                           addresses=[socket.inet_aton(ip)], port=PORT,
+                           properties={"ip": ip, "port": str(PORT), "v": "1"})
+        zc = AsyncZeroconf()
+        await zc.async_register_service(info, allow_name_change=True)
+        log.info("bonjour: couch-tv bridge at %s:%s for the Apple TV app", ip, PORT)
+        return zc, info
+    except Exception as e:
+        log.info("bonjour: not advertised (%s), the Apple TV app needs the bridge's address typed in", e)
+        return None
 
 
 async def h_vidaa_tile(request):
@@ -2812,6 +2946,11 @@ def make_app():
     r.add_get("/api/roku/apps", h_roku_apps)
     r.add_get("/api/roku/icon/{id}", h_roku_icon)
     r.add_post("/api/appletv/pair", h_appletv_pair)
+    r.add_post("/api/appletv/code", h_appletv_code)
+    r.add_post("/api/appletv/claim", h_appletv_claim)
+    r.add_get("/api/appletv/hello", h_appletv_hello)
+    r.add_get("/api/appletv/apps", h_appletv_apps)
+    r.add_post("/api/appletv/open", h_appletv_open)
     r.add_post("/api/vidaa/pair", h_vidaa_pair)
     r.add_post("/api/vidaa/tile", h_vidaa_tile)
     r.add_post("/api/vidaa/claim", h_vidaa_claim)
@@ -2870,10 +3009,15 @@ def make_app():
             await t.start()
             if t.paired:
                 app["loops"] += [for_tv(tv_id, keep_disabled_loop), for_tv(tv_id, media_watch_loop)]
+        app["bonjour"] = await advertise_for_appletv()
 
     async def on_cleanup(_):
         if finder._session and not finder._session.closed:
             await finder._session.close()
+        if app.get("bonjour"):
+            zc, info = app["bonjour"]
+            await zc.async_unregister_service(info)
+            await zc.async_close()
 
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)

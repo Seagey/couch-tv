@@ -13,7 +13,7 @@ speaks the Companion link the way the public protocol notes describe it. It cove
 - The app list, mapping to couch-tv's app names, opening by bundle id, an app that is not installed, a refused launch
   and bundle ids that could never be valid.
 - A dropped connection (it verifies again by itself), the wake hook, the quiet time after a phone command, and no hook
-  without an `app_id`.
+  without Couch TV installed or an `app_id`.
 
 Because the driver and the stand-in were written from the same notes, passing proves they agree with each other,
 not with a real Apple TV. **The most likely places for a surprise on a real one:**
@@ -26,7 +26,28 @@ not with a real Apple TV. **The most likely places for a surprise on a real one:
 - The bundle ids in the table (Netflix, YouTube, Disney+, Prime Video, Apple TV, Apple Music, Plex, Spotify). Others
   come from the Apple TV's own list by name.
 
-## First real test (about 10 minutes, changes nothing except adding a remote)
+## Couch TV, the home app (November 2026)
+
+- `tests/test_appletv.py` also covers the bridge side: finding Couch TV on the Apple TV by its bundle id without
+  `app_id` (and not a lookalike id), opening it on wake and from Home, `open_on_power_on` off, and the endpoints the
+  app uses behind the real middleware with a pairing key (`hello`, `apps` in the phone's order without Couch TV
+  itself, `open` by bundle id with bad, missing and refused apps, `code` and `claim` once only, codes that ran out,
+  wrong codes rate limited, other TVs refused) and the Bonjour record never carrying the key.
+- The app builds with Xcode 27.2 for the tvOS Simulator and for a real Apple TV (unsigned build).
+- `tvos/preview/render.sh` ran the app's own SwiftUI code on a Mac against `tests/appletv_home_standin.py` (the real
+  bridge with the stand-in Apple TV): it swapped a code for the key, read the people, weather, Keep watching and apps,
+  drew the home in each scene, focus on an app, a card, a person and Settings, the Settings screen and All apps, then
+  opened Disney+ from the dock and a Keep watching card through the bridge (the stand-in logged both launches).
+- **Not yet run in the tvOS Simulator or on a real Apple TV**, so the focus engine (moving with the Siri remote),
+  the blur behind the glass panels, Bonjour discovery and the keychain have not been seen working. Those are the
+  first things to check.
+
+First real test of Couch TV: follow "Install it free with your own Apple ID" in [APPLE-TV.md](APPLE-TV.md), then
+check that the home shows and the clock is right, the remote moves between the people, the cards and the dock, an
+app opens from the dock, a Keep watching card opens its app, Settings connects with a code, and that the Apple TV
+opens Couch TV after it wakes with the bridge running. Say which tvOS version and model.
+
+## First real test of the remote (about 10 minutes, changes nothing except adding a remote)
 
 1. Update the repo and run `.venv/bin/pip install -r bridge/requirements.txt`.
 2. Wake the Apple TV. `.venv/bin/python scripts/appletv-check.py` lists Apple TVs it can see (it only listens).

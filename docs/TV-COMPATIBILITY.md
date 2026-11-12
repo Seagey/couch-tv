@@ -24,7 +24,7 @@ TVs, see their pages; Roku and Hisense VIDAA have not).
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on nine real LGs so far ([LG.md](LG.md)) | No |
 | Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation, **not yet tried on a real Roku** ([ROKU.md](ROKU.md)) | No |
 | Hisense VIDAA | App only: a Couch TV tile on firmware that still allows it, else the TV's browser | As a page the bridge opens on power-on, like Samsung and LG. Tested against a stand-in only, **not yet tried on a real VIDAA TV** ([VIDAA.md](VIDAA.md)) | No |
-| Apple TV | No (tvOS has no web view; Apple lets no app replace its home) | **New, Beta:** phone remote and opening apps, no home screen yet ([APPLE-TV.md](APPLE-TV.md)) | No |
+| Apple TV | No (tvOS has no web view; Apple lets no app replace its home) | **New, Beta:** phone remote and opening apps, and Couch TV, the home as an app that opens itself, installed from a Mac with your own Apple ID ([APPLE-TV.md](APPLE-TV.md)) | No |
 
 ## Reported by people using it
 

@@ -1,0 +1,9 @@
+// Copy this file to Signing.mine.xcconfig in this folder and fill it in. Git ignores the copy, so your
+// team id never goes into the repo. docs/APPLE-TV.md, "The home app", has the steps.
+
+// Your team id: Xcode, Settings, Accounts, your Apple ID, the team's id (ten letters and numbers).
+// A free Apple ID works; it says "(Personal Team)".
+DEVELOPMENT_TEAM = YOURTEAMID
+
+// A bundle id nobody else has registered with Apple. Keep the start (the bridge looks for it), add your own ending.
+PRODUCT_BUNDLE_IDENTIFIER = dev.couchtv.appletv.yourname
