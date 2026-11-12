@@ -109,6 +109,8 @@ If nothing Android is found, or they are not sure what they have:
   - **VIZIO:** Menu (or Settings), Network, Network information, the IP address. `find-tvs.py` may list
     it only as a Cast device, but `check-tv.py <address>` recognises it by its SmartCast answer on port
     7345 (9000 on older firmware).
+  - **Panasonic Viera (My Home Screen or older):** Menu, Network, Network Status (the IP address).
+    `find-tvs.py` does not list one, but `check-tv.py <address>` recognises it by its port 55000.
   - **Google TV or Android TV:** Settings, Network and Internet, the Wi-Fi network.
 - Ask them to open **Settings, Device Preferences, About** (older Android TV) or **Settings,
   System, About** (Google TV) and read you the model and the "Android TV OS" line. Until you know
@@ -236,6 +238,20 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   for the yes in step 3). Do not set up the Cast experiment in VIZIO.md for them unless they ask and
   already run the tools it needs, and never open a router port. Afterwards ask them to open an issue on
   GitHub with what `vizio-check.py` printed ([docs/VIZIO-TESTING.md](docs/VIZIO-TESTING.md)).
+- **Panasonic Viera (My Home Screen, or older Vieras with network control):** do not say no. Offer the
+  Panasonic path in [docs/PANASONIC.md](docs/PANASONIC.md) and say plainly what it is: "There is a new
+  Panasonic version of couch-tv, in Beta. There is nothing to install on the TV: a computer at home that
+  stays on opens couch-tv's home in the TV's web browser a few seconds after the TV is switched on. It is
+  not a true home screen: the browser's own bar stays visible, and the remote's Home button still opens
+  Panasonic's home. The phone remote works: keys, the volume slider, Home, opening apps. Apps open on their
+  own page and you pick the show. There is no 'what is playing', no typing from the phone and no
+  screenshots. Newer sets (2018 on) show a PIN once to pair. Some parts can only be settled on a real TV,
+  so you may help us fix something." Without a computer that stays on, nothing is possible. Also offer the
+  Google TV box as the way to get everything. A Panasonic Google TV model is a normal couch-tv TV, not this
+  path. If they choose Panasonic, follow docs/PANASONIC.md: run `scripts/panasonic-check.py <tv address>`
+  first (it only reads and presses no key, but it still waits for the yes in step 3); pairing with
+  `--pair` makes the TV show a PIN, so that too waits for the yes. Afterwards ask them to open an issue on
+  GitHub with what `panasonic-check.py` printed, and write down for them what worked and what did not.
 - **Apple TV:** not supported. Say so kindly,
   explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
   round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets
@@ -529,7 +545,7 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
 
 If someone asks for two TVs to play the same show together, read [docs/SYNC.md](docs/SYNC.md) and
 follow it, including its section for you. It is experimental: say so, say how little it has been
-tried, and say that Samsung, LG, VIDAA, VIZIO and Roku cannot do it (a Google TV box or Fire TV stick
+tried, and say that Samsung, LG, VIDAA, VIZIO, Panasonic and Roku cannot do it (a Google TV box or Fire TV stick
 plugged in fixes that). It needs the same read back and the same clear yes as everything else
 before it touches a TV: `sync/install.sh` changes each TV, and `calibrate` and `play` make both TVs
 pause, jump and play. `sync.py dry` only reads and is fine before the yes.

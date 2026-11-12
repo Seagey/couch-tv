@@ -2,7 +2,7 @@
 
 Research from public sources (linked below). Only Google TV has been tested
 by the author. Everything else is what the sources say, not tested (Samsung and LG have since run on real
-TVs, see their pages; Roku, Hisense VIDAA, Philips Titan OS, Philips Saphi and VIZIO have not).
+TVs, see their pages; Roku, Hisense VIDAA, Philips Titan OS, Philips Saphi, VIZIO and Panasonic have not).
 
 - **A. TV home only:** an app replaces the TV's home screen.
 - **B. Computer bridge:** a computer at home controls the TV with the Android TV Remote protocol
@@ -27,6 +27,7 @@ TVs, see their pages; Roku, Hisense VIDAA, Philips Titan OS, Philips Saphi and V
 | Philips on Titan OS (mostly Europe, from 2023) | No | Phone remote only: power, keys, volume, inputs, opening apps. No couch-tv home without a Titan app (developer account or store listing). Tested against a stand in only, **not yet tried on a real Titan OS TV** ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)) | No |
 | Older Philips with Saphi (about 2015 to 2019, not Android) | No | New (Beta): phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen. Depends on the model and firmware ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)) | No |
 | VIZIO (SmartCast, VIZIO OS) | No | New (Beta): phone remote, power, volume, inputs and opening apps; couch-tv's home page does not open on the TV by itself. Tested against a stand in so far ([VIZIO.md](VIZIO.md)) | No |
+| Panasonic Viera (My Home Screen, older Vieras) | No | New: phone remote and a page that opens itself in the TV's browser, Beta ([PANASONIC.md](PANASONIC.md)) | No |
 | Apple TV | No | No | No |
 
 **VIZIO, what it cannot do.** couch-tv's home page does not open on a VIZIO by itself: VIZIO OS has no
@@ -110,6 +111,13 @@ Not tested by the author. Each line is what someone said worked on their own dev
   simulator, **never on a real Roku**. A sideloaded channel is always one at a time, and newer Roku OS limits
   that protocol unless "Control by mobile apps" allows it ([ROKU.md](ROKU.md)). Roku's home screen cannot be
   replaced.
+- **Panasonic Viera on My Home Screen** (Firefox OS) and older Vieras do not run Android apps or let an
+  app replace the home screen. The bridge talks to the TV over its network remote (SOAP on port 55000,
+  `bridge/panasonic.py`), and each time the TV comes on it opens couch-tv's home page in the TV's web
+  browser. New, Beta: the browser hand off and the standby behaviour are the parts a first owner's log
+  settles ([PANASONIC.md](PANASONIC.md)). Limits: the browser bar stays visible, Panasonic's Home button
+  still opens Panasonic's home, and the TV cannot say what is on screen, so couch-tv opens only just after
+  power on. 2018 and newer sets pair once with a PIN. Panasonic's Google TV models are normal couch-tv TVs.
 - **Hisense VIDAA** does not run Android apps or let an app replace its home screen. The bridge talks to the
   TV the way Hisense's own phone app does (MQTT over TLS on port 36669, `bridge/vidaa.py`) and opens couch-tv's
   home page in the TV's browser, or as a tile on firmware that still accepts one, each time the TV comes on.

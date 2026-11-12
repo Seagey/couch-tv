@@ -35,6 +35,7 @@ import vidaa
 import philips
 import vega
 import vizio
+import panasonic
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -57,8 +58,9 @@ TV_CONFIG = {"default": config.DEFAULT_TV, "tvs": config.TVS}
 def make_tv(cfg):
     """A Samsung ("kind": "samsung", bridge/samsung.py), an LG ("kind": "lg", bridge/lg.py), a Roku
     ("kind": "roku", bridge/roku.py), a Hisense VIDAA ("kind": "vidaa", bridge/vidaa.py), a Philips on
-    Titan OS ("kind": "philips", bridge/philips.py), an Amazon Fire TV on Vega OS ("kind": "vega",
-    bridge/vega.py), a VIZIO ("kind": "vizio", bridge/vizio.py) or an Android or Google TV (tv.py)."""
+    Titan OS or Saphi ("kind": "philips", bridge/philips.py), an Amazon Fire TV on Vega OS ("kind": "vega",
+    bridge/vega.py), a VIZIO ("kind": "vizio", bridge/vizio.py), a Panasonic Viera ("kind": "panasonic",
+    bridge/panasonic.py) or an Android or Google TV (tv.py)."""
     if cfg.get("kind") == "samsung":
         return samsung.SamsungTV(cfg)
     if cfg.get("kind") == "lg":
@@ -73,6 +75,8 @@ def make_tv(cfg):
         return vega.VegaTV(cfg)
     if cfg.get("kind") == "vizio":
         return vizio.VizioTV(cfg)
+    if cfg.get("kind") == "panasonic":
+        return panasonic.PanasonicTV(cfg)
     return TV(cfg)
 
 
@@ -937,7 +941,7 @@ async def h_vidaa_tile(request):
 
 
 async def h_vidaa_claim(request):
-    """The page a VIDAA TV opens carries a one time code (?vidaa=), not the pairing key, because the
+    """The page a VIDAA or Panasonic TV opens carries a one time code (?vidaa= or ?once=), not the pairing key, because the
     TV's address bar and history are not private. The page swaps the code for the key here, once.
     Open path: a wrong code counts towards the same rate limit as a wrong key."""
     data = await body(request)
@@ -946,7 +950,7 @@ async def h_vidaa_claim(request):
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong codes. Please wait a minute.")
     for tv_id, t in TVS.items():
-        if t.kind == "vidaa" and t.claim(code):
+        if t.kind in ("vidaa", "panasonic") and t.claim(code):
             return ok(key=config.PAIRING_KEY, tv=tv_id)
     record_failed_attempt(ip, str(code))
     await asyncio.sleep(0.3)
@@ -976,6 +980,26 @@ async def h_vizio_apps(request):
     if tv.kind != "vizio":
         raise ApiError(400, "only for VIZIO TVs")
     return ok(apps=await tv.apps_on_tv())
+
+
+async def h_panasonic_pair(request):
+    """Panasonic pairing, encrypted sets only: {} asks the TV to show its PIN, {"pin": "1234"} sends it
+    back (docs/PANASONIC.md). A set that needs no pairing answers step "none"."""
+    if tv.kind != "panasonic":
+        raise ApiError(400, "only for Panasonic TVs")
+    data = await body(request)
+    pin = data.get("pin")
+    try:
+        if pin is None:
+            if not await tv.pair_start():
+                return ok(step="none", note="This TV takes commands without pairing.")
+            return ok(step="pin", note="The TV should now show a PIN. Send it as {\"pin\": \"1234\"}.")
+        if not isinstance(pin, (str, int)) or not re.match(panasonic.PROTOCOL["pin"], str(pin).strip()):
+            raise ApiError(400, "pin is the digits the TV shows")
+        await tv.pair_finish(str(pin).strip())
+    except panasonic.PanasonicError as e:
+        raise ApiError(409, str(e))
+    return ok(paired=True)
 
 
 VIDAA_ICON = os.path.join(ROOT, "lg", "app", "largeIcon.png")
@@ -1378,6 +1402,10 @@ async def power_on():
 
 async def h_volume(request):
     data = await body(request)
+    if "level" in data and hasattr(tv, "set_volume"):
+        await tv.set_volume(max(0, min(100, int(data["level"]))))   # Panasonic: set over UPnP in one step
+        record_action(request, "volume", data, True)
+        return ok(volume=tv.volume)
     if "level" in data:
         vol = tv.volume
         if not vol["known"]:
@@ -2873,6 +2901,8 @@ async def h_tvs(request):
             row |= {"vega": t.vega_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         elif t.kind == "vizio":
             row |= {"vizio": t.vizio_status()}
+        elif t.kind == "panasonic":
+            row |= {"panasonic": t.panasonic_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         out.append(row)
     return ok(default=DEFAULT_TV, tvs=out)
 
@@ -2910,6 +2940,7 @@ def make_app():
     r.add_post("/api/philips/source", h_philips_source)
     r.add_post("/api/vizio/pair", h_vizio_pair)
     r.add_get("/api/vizio/apps", h_vizio_apps)
+    r.add_post("/api/panasonic/pair", h_panasonic_pair)
     r.add_get("/api/recs", h_recs)
     r.add_get("/api/history", h_history)
     r.add_get("/api/taste", h_taste)

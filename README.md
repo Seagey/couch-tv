@@ -334,6 +334,7 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **Philips with Titan OS** (mostly Europe) | No | Phone remote only (no couch-tv home without a Titan app). Tested against a stand in only, not yet tried on a real Titan OS TV ([how](docs/PHILIPS-TITAN.md)) | No |
 | **Older Philips with Saphi** (about 2015 to 2019, not Android) | No | New (Beta), with a computer at home: phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen ([how](docs/PHILIPS-SAPHI.md)) | No |
 | **VIZIO** (SmartCast, VIZIO OS) | No | New (Beta): phone remote, power, volume, inputs and opening apps; couch-tv's home page does not open on the TV by itself ([how](docs/VIZIO.md)) | No |
+| **Panasonic Viera** (My Home Screen and older Vieras) | No | New: phone remote and a page that opens itself in the TV's browser, Beta ([how](docs/PANASONIC.md)) | No |
 | **Apple TV** | No | No | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
@@ -415,6 +416,14 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   playing" title, no typing and no screenshots. You type a PIN the TV shows once. It has not been on a
   real VIZIO yet, so if you try it, please open an issue and say how it went. Setup and limits:
   [docs/VIZIO.md](docs/VIZIO.md).
+- **Panasonic Viera (My Home Screen, and older Vieras with network control):** new, Beta. Nothing to
+  install on the TV: the bridge talks to it the way Panasonic's own phone app does, and every time the TV is
+  switched on it opens couch-tv's home in the TV's web browser a few seconds later. The browser's own bar
+  stays visible and Panasonic's Home button still opens Panasonic's home. The phone remote works, with a
+  real volume level; apps open on their own page; no "what is playing" and no screenshots. 2018 and newer
+  sets pair once with a PIN on the TV. Panasonic's Google TV models are normal couch-tv TVs. Start with the
+  read only first test in [docs/PANASONIC.md](docs/PANASONIC.md), and please open an issue with what it
+  printed.
 - **Apple TV:** closed. Nothing here works on it.
 
 **Want everything on a Samsung, LG, Roku, VIDAA, Philips, VIZIO or another TV?** The Samsung, LG, Roku and VIDAA paths cover the home and the
