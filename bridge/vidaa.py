@@ -1,8 +1,8 @@
 """The connection to a Hisense VIDAA TV, for "kind": "vidaa" in config.json.
 
-NOT YET RUN ON A REAL VIDAA TV. Tested against a stand-in TV on the computer only
-(tests/vidaa_standin.py, docs/VIDAA.md). Hisense publishes nothing for this; expect the first
-tester to find something that needs fixing, and turn on "trace" (below) so the messages can be read.
+Confirmed on a real Hisense 55U7N (VIDAA 9, build Q0705) by Matthew Klette (#128), and tested against a
+stand-in TV on the computer (tests/vidaa_standin.py, docs/VIDAA.md). Hisense publishes nothing for this, so
+another model or firmware may need a fix: turn on "trace" (below) so the messages can be read.
 
 How a VIDAA TV is reached: an MQTT broker on the TV, over TLS, on port 36669 (36668 on older builds).
 The TV's own phone app speaks to it. Newer firmware (2024 on) wants a client certificate in the TLS
@@ -21,16 +21,15 @@ the TV answers on. <client> is this bridge's client id.
   /remoteapp/mobile/<client>/ui_service/data/state                where the TV is ("statetype")
   /remoteapp/mobile/broadcast/ui_service/state                    the same, sent to every client
 
-UNCONFIRMED, our best reading, the first things a tester's trace will settle (all in PROTOCOL below):
-the name of the request that asks for the state (gettvstate), that answers come back on
-/remoteapp/mobile/<client>/<service>/data/<name>, the service that takes keys (remote_service) and the
-key names (KEY_UP and so on), the field the PIN travels in, the field the token comes back in, and
-that the token is the MQTT password on later connections.
+Confirmed on the 55U7N: the state request, the answer topics, the key service and key names, and the PIN
+fields. Older firmware may differ, and the protocol details are all in PROTOCOL below, so a trace from
+another model can correct them in one place.
 
-The hook: a watcher checks the TV every 2 seconds. When the TV comes on and lands on its own home
+The hook: a watcher checks the TV every second (a power on is also pushed at once). When the TV comes on and lands on its own home
 ("statetype" remote_launcher) or live TV, the bridge opens couch-tv: its tile, if one was added
 (POST /api/vidaa/tile), else the TV's browser at the bridge's home page. It is a page that opens
-itself, not a true home screen: the remote's Home button still opens VIDAA's home. No root, ever.
+itself, not a true home screen: the remote's Home button still opens VIDAA's home unless "keep_home": true
+is set (opt in, Beta). No root, ever.
 
 What it cannot do (docs/VIDAA.md): read which app is in front, a volume level, typing, screenshots,
 deep links into a show, ADB tools.

@@ -3,11 +3,11 @@
 
     .venv/bin/python scripts/vidaa-check.py <tv address>                 # listen and read, 60 seconds
     .venv/bin/python scripts/vidaa-check.py <tv address> --pair          # the TV shows a PIN
-    .venv/bin/python scripts/vidaa-check.py <tv address> --pin 1234      # send the PIN, keep the token
+    .venv/bin/python scripts/vidaa-check.py <tv address> --pin 1234      # send the PIN, keep the pairing
 
 Listening connects to the TV's MQTT port the way the phone app does, asks where the TV is and which
 apps it has, and prints every message the TV sends for 60 seconds (press buttons on the TV's own
-remote meanwhile). It sends no key and opens nothing. The PIN and the token are never printed.
+remote meanwhile). It sends no key and opens nothing. The PIN and any token are never printed.
 Paste the output into a GitHub issue: it is what turns the guesses in bridge/vidaa.py into facts.
 """
 import argparse
@@ -41,14 +41,14 @@ async def main(a):
     try:
         if a.pin:
             await t.pair_finish(a.pin)
-            print("Paired: the token is kept in bridge/data (git ignores it).")
+            print("Paired: the pairing is kept in bridge/data (git ignores it).")
             return 0
         if a.pair:
             await t.pair_start()
             if sys.stdin.isatty():
                 pin = await asyncio.get_running_loop().run_in_executor(None, input, "The PIN on the TV: ")
                 await t.pair_finish(pin)
-                print("Paired: the token is kept in bridge/data (git ignores it).")
+                print("Paired: the pairing is kept in bridge/data (git ignores it).")
                 return 0
             print(f"Asked for a PIN. If the TV shows one, run: scripts/vidaa-check.py {a.address} --pin <the 4 digits>")
             await asyncio.sleep(5)
@@ -71,7 +71,7 @@ async def main(a):
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("address")
-    p.add_argument("--tv", default="vidaa", help="the TV's id in config.json, so the token is kept under it")
+    p.add_argument("--tv", default="vidaa", help="the TV's id in config.json, so the pairing is kept under it")
     p.add_argument("--port", type=int)
     p.add_argument("--pair", action="store_true")
     p.add_argument("--pin")

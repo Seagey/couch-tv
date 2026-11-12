@@ -21,6 +21,11 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: Hisense VIDAA, working on a real TV (Beta, on main, in the next release).** Matthew
+Klette (#128) got couch-tv running on a real Hisense 55U7N (VIDAA 9): login, pairing, the phone remote, opening
+apps and a native Couch TV tile all work. New `keep_home` option (off by default) brings couch-tv back when
+the TV falls to VIDAA's home. Setup: [docs/VIDAA.md](docs/VIDAA.md). Thanks Matthew.
+
 **12 November 2026: Kids mode, New and optional (on main, in the next release).** Off unless you
 switch it on for someone. A kids profile's home shows only
 a shelf of shows a parent picked, as big posters that open straight into each show, plus the few apps
@@ -389,7 +394,7 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **Samsung** (Tizen) | App only, opened from Samsung's app row (or reopened by its Autorun Last App) | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
 | **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on nine real LGs so far ([how](docs/LG.md)) | No |
 | **Roku** (TV or box) | App only, a sideloaded channel opened from Roku's home row, while Developer Mode is on | With a computer at home: as a channel that opens itself, not a true home screen. Built from Roku's documentation, first real Roku reports wanted ([how](docs/ROKU.md)) | No |
-| **Hisense with VIDAA** | App only: a tile on the app row where the firmware allows it, else the TV's browser | **Beta**, with a computer at home that stays on: a page that opens itself in the TV's browser. VIDAA's Home button still opens VIDAA's home ([how](docs/VIDAA.md)) | No |
+| **Hisense with VIDAA** | App only: a tile on the app row where the firmware allows it, else the TV's browser | **Beta**, with a computer at home that stays on: a page that opens itself in the TV's browser. VIDAA's Home button still opens VIDAA's home unless you opt in with `keep_home` ([how](docs/VIDAA.md)) | No |
 | **Philips with Titan OS** (mostly Europe) | Needs a Titan app: a Titan store app or Titan's DevView, not there yet | **Beta**, with a computer at home that stays on: the phone remote works now (power, keys, volume, inputs, apps). The home opens once there is a Titan app ([how](docs/PHILIPS-TITAN.md)) | No |
 | **Older Philips with Saphi** (about 2015 to 2019, not Android) | No | **Beta**, with a computer at home that stays on: phone remote, and couch-tv's page opens in the TV's browser if your set offers one. Philips's Home button still opens Philips's menu ([how](docs/PHILIPS-SAPHI.md)) | No |
 | **VIZIO** (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Beta, phone remote only**, with a computer at home that stays on: power, volume, inputs and opening apps ([how](docs/VIZIO.md)) | No |
@@ -444,12 +449,12 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, from public sou
   and say how it went. Setup and limits: [docs/ROKU.md](docs/ROKU.md).
 - **The Beta paths: Hisense VIDAA, Philips, Fire TV on Vega OS, VIZIO, Panasonic and Apple TV.** All of them need a
   **computer at home that stays on**, and on all of them **the maker's own Home button still opens the
-  maker's own home**: couch-tv opens itself on top, it does not replace that home. None of them has run on
-  a real TV yet, so if you try one, please open an issue and say how it went (each has a short read only
-  first test).
+  maker's own home**: couch-tv opens itself on top, it does not replace that home. VIDAA now runs on a real Hisense (Beta, below). The
+  others have not run on a real TV yet, so if you try one, please open an issue and say how it went (each has
+  a short read only first test).
 - **Hisense VIDAA (Beta):** no app to install: the bridge talks to the TV the way Hisense's own phone app
   does, and every time the TV is switched on it opens couch-tv's home in the TV's browser (or as a tile on
-  the app row, on older firmware that still accepts one). VIDAA's Home button still opens VIDAA's home, and
+  the app row, on older firmware that still accepts one). VIDAA's Home button still opens VIDAA's home unless you opt in with `keep_home: true` (Beta), and
   couch-tv never roots a TV. The phone remote works; apps open on their own page; no "what is playing" and
   no screenshots. Newer firmware needs a certificate you take from your own copy of Hisense's phone app
   (couch-tv does not include it). Setup and limits: [docs/VIDAA.md](docs/VIDAA.md).
