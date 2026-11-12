@@ -1,0 +1,53 @@
+# Privacy clean list (Beta). Read by apply.sh when PRIVACY=1. See docs/PRIVACY.md.
+#
+# Known tracking, telemetry, advertising and ACR (automatic content recognition) apps on Google TV,
+# Android TV and Fire TV. apply.sh switches off only the ones a TV actually has, with
+# `pm disable-user` (undo.sh switches them back on with `pm enable`), and only after the same safety
+# check as EXTRA_OFF: a home screen, a setup app, a persistent process or a core part of Android is
+# always left on, whatever this list says.
+#
+# Written for couch-tv from the sources named on each line (checked 13 November 2026). Nothing here
+# is copied from another project's code. Kept small on purpose: a package only goes on this list
+# when it is clearly tracking, ads or ACR, two sources or a debloat list rating agree it is safe to
+# switch off, and it is none of these: a launcher, setup, Play Services, Play Store, system UI, a
+# keyboard, the remote, voice, Bluetooth, HDMI CEC, TV inputs, the tuner or system updates. Packages
+# looked at and left off are listed in docs/PRIVACY.md with the reason.
+#
+# One app per line, five fields split by "|":
+#   package | brand | what it does | if it is off | source
+# Lines starting with # are notes. Only the first field is read by apply.sh.
+
+# Google TV and Android TV (any brand: Google's own packages)
+com.google.android.feedback | Google TV | Sends crash and feedback reports to Google | The "send feedback" option after an app crash stops sending | UAD-ng list (removal: Recommended)
+com.google.android.adservices.api | Google TV | Privacy Sandbox ad services (ad topics and ad measurement for apps) | Apps get no ad topics from the TV; nothing else depends on it | UAD-ng list (removal: Recommended); source.android.com/docs/core/ota/modular-system/adservices
+
+# ACR made by Alphonso, shipped on some budget Android TVs
+tv.alphonso.alphonso_eula | Android TV (some brands) | Alphonso ACR: recognises what is on screen for ad targeting | Alphonso "recommendations" stop | UAD-ng list (removal: Recommended)
+
+# Sony Bravia
+tv.samba.ssm | Sony Bravia | Samba TV ACR: recognises what is on screen, including HDMI inputs | Samba Interactive TV stops (also switch it off in the TV menu, docs/PRIVACY.md) | community.sony.es/t5/android-tv/disabling-system-apps-via-adb/td-p/2403349; Sony support article 00182856 (Samba Interactive TV)
+com.sony.dtv.promos | Sony Bravia | Sony promotions and offers | The Sony offers app goes | UAD-ng list (removal: Recommended)
+com.sony.dtv.sonyselect | Sony Bravia | Sony Select: promoted apps and services | The Sony Select row and app go | UAD-ng list (removal: Recommended)
+com.sony.dtv.notificationcenter | Sony Bravia | Notifications that push Sony's own apps and services | Those promo notifications stop; other notifications are unaffected | UAD-ng list (removal: Recommended)
+
+# Xiaomi Mi TV and Mi Box
+com.miui.tv.analytics | Xiaomi | Xiaomi TV analytics | Nothing reported | UAD-ng list (removal: Recommended)
+com.miui.analytics | Xiaomi | Xiaomi analytics service | Nothing reported | UAD-ng list (removal: Recommended)
+com.miui.msa.global | Xiaomi | MSA, Xiaomi's ad service (profiles use to show ads) | Xiaomi's own ads stop | UAD-ng list (removal: Recommended)
+
+# Amazon Fire TV (Fire OS 6 and 7). Some Amazon packages are protected and cannot be switched off;
+# those are left out (docs/PRIVACY.md).
+com.amazon.tv.acr | Fire TV | ACR: recognises what is on screen | Nothing reported | dumbtv.org/blocked (Safe); cleanyourtv.site/debloat-fire-tv; noted.lol/i-debloated-my-fire-tv
+com.amazon.hybridadidservice | Fire TV | Advertising ID service | Apps get no Amazon advertising ID | dumbtv.org/blocked (Safe); cleanyourtv.site/debloat-fire-tv; noted.lol/i-debloated-my-fire-tv
+com.amazon.privacypassservice | Fire TV | Ad token service | Nothing reported | dumbtv.org/blocked (Safe)
+com.amazon.hedwig | Fire TV | Watch time and engagement tracking | Nothing reported | dumbtv.org/blocked (Safe)
+com.amazon.sneakpeek | Fire TV | Autoplaying promos | Promo previews stop | dumbtv.org/blocked (Safe); cleanyourtv.site/debloat-fire-tv
+com.amazon.kso.blackbird | Fire TV | Ad sync for the sponsored banner and rows | The banner may still show (the launcher fetches it) | cleanyourtv.site/debloat-fire-tv
+com.amazon.wirelessmetrics.service | Fire TV | Wireless metrics | Nothing reported | dumbtv.org/blocked (Safe); cleanyourtv.site/debloat-fire-tv; noted.lol/i-debloated-my-fire-tv
+com.amazon.perfcollection | Fire TV | Performance data collection | Nothing reported | dumbtv.org/blocked (Safe); cleanyourtv.site/debloat-fire-tv
+com.amazon.tv.fw.metrics | Fire TV | Fire TV framework metrics | Nothing reported | dumbtv.org/blocked (Safe)
+com.amazon.dp.logger | Fire TV | Device logger | Nothing reported | dumbtv.org/blocked (Safe); noted.lol/i-debloated-my-fire-tv
+com.amazon.logan | Fire TV | Log collection | Nothing reported | dumbtv.org/blocked (Safe)
+com.amazon.neo.minerva.logcat | Fire TV | Log uploader | Nothing reported | dumbtv.org/blocked (Safe)
+com.amazon.ceviche | Fire TV | Analytics | Nothing reported | dumbtv.org/blocked (Safe)
+com.amazon.spiderpork | Fire TV | Metrics transport | Nothing reported | dumbtv.org/blocked (Safe)

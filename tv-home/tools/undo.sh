@@ -22,7 +22,8 @@ if [ -f "$LIST" ]; then
   PKGS=$(cat "$LIST")
 else
   # No list from apply.sh on this computer: ambient mode, which apply.sh always switches off.
-  # Anything else (an ad tracker passed in EXTRA_OFF) is not known here: see survey-tv.py's list.
+  # Anything else (an ad tracker passed in EXTRA_OFF, or an app from PRIVACY=1) is not known here:
+  # see survey-tv.py's list and tv-home/tools/privacy-list.txt.
   echo "No $LIST on this computer, switching the standard Google packages back on."
   PKGS="com.google.android.apps.tv.dreamx"
 fi

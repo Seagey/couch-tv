@@ -21,6 +21,8 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: Privacy clean, Beta (on main).** `apply.sh` has a new opt in step, `PRIVACY=1`, that switches off known tracking, ad and ACR (automatic content recognition) apps it can find on your TV, reversibly: Samba TV on Sony, Alphonso, Xiaomi analytics and ads, Fire TV's ACR, ad ID and metrics apps, and Google's feedback and ad services apps. It goes through the same safety check as everything else `apply.sh` switches off, so the TV's home, setup, the remote (Bluetooth, voice, HDMI CEC) and Keep watching (the TV provider that holds Watch Next) are never touched, and `undo.sh` switches it all back on. `PRIVACY=1 DRY_RUN=1` shows what it would do first. It cannot remove every bit of tracking, so [docs/PRIVACY.md](docs/PRIVACY.md) also lists the menu switches to turn off on each brand, Samsung and LG included. Nothing changes unless you set it. The step runs on your computer, so `git pull` brings it.
+
 **13 November 2026: Fire OS 7 brings Couch TV back without the 5 second wait (on main, in the next release).** On a Fire TV Cube (3rd gen, Fire OS 7.7.1.7), Amazon's home stayed up for 5 seconds after a Home press, and a second press could bury Couch TV for good. Android 9 and older hold an app's start for 5 seconds after Home, so on Fire TV the home's own task is now moved to the front instead, and a press inside the 1.2 second gap is looked at again. Fire OS Settings screens still stay open, and other TVs and Android 10 and newer are unchanged. Thanks to atul016 (#162).
 
 **13 November 2026: The Next song button skips the track again (on main, in the next release).** On a Mi Box (Google TV), Next on the ambient music screen and on the Spotify card in Keep watching opened the gear menu (Home settings or TV settings) instead of skipping. The home's check for the remote's Settings key (key code 176) also matched the media Next key, which a browser engine reports with the same code. The home now tells them apart, in Kids mode too. Thanks NathanGlasby (#158).
@@ -888,8 +890,9 @@ This installs the app and makes it the TV's home. The TV's own home screen (Goog
 maker's own) and the setup app stay installed and switched on, so the TV always has them when it starts: a small
 Home button watch puts couch-tv on top whenever the TV opens its own home, which may flash up for a
 moment first. Only ambient mode (the idle adverts) and any ad trackers you name in `EXTRA_OFF` are
-switched off, and `apply.sh` refuses to switch off anything the TV may need to start. Nothing is
-deleted. It also hands the app your `config.json` settings (people, weather, clock, look, quick
+switched off, and `apply.sh` refuses to switch off anything the TV may need to start. Add
+`PRIVACY=1` to also switch off the known tracking and ad apps it finds (Beta,
+[docs/PRIVACY.md](docs/PRIVACY.md)). Nothing is deleted. It also hands the app your `config.json` settings (people, weather, clock, look, quick
 buttons) for its built-in copy. **Read the Undo section before you run it.** It is safe to run as
 often as you like, and on a TV set up by couch-tv 0.10 or older it switches the Google TV home and
 the setup app back on ([why](#if-your-tv-loops-after-a-restart)).
@@ -1122,6 +1125,16 @@ protocol and ADB.
 
 ## Privacy and safety
 
+- **Privacy clean (Beta, opt in).** couch-tv replaces the ad filled home, and with `PRIVACY=1`
+  `apply.sh` also switches off known tracking, ad and ACR apps it can find on your TV, reversibly
+  (`pm disable-user`; `undo.sh` switches them back on). It never touches the TV's home, setup, the
+  remote or Keep watching. It does not remove all tracking: see [docs/PRIVACY.md](docs/PRIVACY.md)
+  for what it switches off by brand, what it cannot do, and the TV menu switches to turn off yourself.
+
+  ```sh
+  TV_IP=<your tv address> PRIVACY=1 DRY_RUN=1 sh tv-home/tools/apply.sh   # see what it would do
+  TV_IP=<your tv address> APK=couch-tv-home.apk PRIVACY=1 sh tv-home/tools/apply.sh
+  ```
 - Your settings are in `config.json`, your secrets in `.env`, your data in `bridge/data/`. All
   three are ignored by git.
 - Before you push a fork, run `scripts/privacy-scan.sh`. It checks for private addresses, emails,

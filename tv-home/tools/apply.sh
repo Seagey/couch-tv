@@ -30,17 +30,41 @@
 #     sh tv-home/tools/apply.sh
 # APK defaults to the one scripts/build-apk.sh builds. KEEP_SETUP is no longer needed: the setup
 # wizard always stays on.
+#
+# Privacy clean (Beta, opt in, docs/PRIVACY.md): PRIVACY=1 also switches off the known tracking, ad
+# and ACR apps from privacy-list.txt that this TV has, through the same safety check and undo list
+# as EXTRA_OFF. Without PRIVACY=1 nothing about it changes.
+# Dry run: DRY_RUN=1 only lists what would be switched off and left on, and why. It installs
+# nothing, switches nothing off and writes no files. Without TV_IP it prints the privacy list.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 PY="${PY:-$ROOT/.venv/bin/python}"
 T="$HERE/tvadb.py"
 TV_NAME=${TV_NAME:-${TV_ID:-living-room}}
+DRY=${DRY_RUN:-0}
+PRIVACY_LIST="$HERE/privacy-list.txt"
+# The privacy list: one app per line, "package | brand | what it does | if it is off | source".
+# Only names that look like an Android package are read, so nothing else can reach the TV's shell.
+PRIV_ALL=""
+if [ -f "$PRIVACY_LIST" ]; then
+  PRIV_ALL=$(grep -v '^[[:space:]]*#' "$PRIVACY_LIST" | cut -d'|' -f1 | tr -d ' \t\r' | grep -E '^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$' || true)
+fi
+if [ "${PRIVACY:-0}" = 1 ] && [ -z "$PRIV_ALL" ]; then
+  echo "PRIVACY=1, but no privacy list was found at $PRIVACY_LIST. Nothing was changed."
+  exit 1
+fi
+if [ "$DRY" = 1 ] && [ -z "${TV_IP:-}" ]; then
+  echo "Dry run with no TV_IP: the privacy list (PRIVACY=1 switches off the ones a TV has)."
+  grep -v '^[[:space:]]*#' "$PRIVACY_LIST" | grep '|' | awk -F'|' '{gsub(/^ +| +$/, "", $1); gsub(/^ +| +$/, "", $2); gsub(/^ +| +$/, "", $3); print "  " $2 ": " $1 " (" $3 ")"}'
+  echo "Set TV_IP to see which of these a TV has and which apply.sh would leave on."
+  exit 0
+fi
 : "${TV_IP:?set TV_IP to the address of the TV}"
 export TV_IP
 APK=${APK:-$ROOT/dist/couch-tv-home.apk}
 [ -f "$APK" ] || APK=$HERE/../android/app/build/outputs/apk/release/app-release.apk
-if [ ! -f "$APK" ]; then
+if [ ! -f "$APK" ] && [ "$DRY" != 1 ]; then
   echo "No app found (looked for dist/couch-tv-home.apk and the build output)."
   echo "Download couch-tv-home.apk from the GitHub Releases page and run again with APK=<that file>,"
   echo "or build it with: sh scripts/build-apk.sh"
@@ -58,9 +82,100 @@ WANT=""
 # that come with it) switched on: it is the TV's own, and the screensaver quick button opens it.
 [ "${KEEP_AMBIENT:-0}" = 1 ] || WANT="com.google.android.apps.tv.dreamx"
 WANT="$WANT ${EXTRA_OFF:-}"
+PRIV=""
+if [ "${PRIVACY:-0}" = 1 ]; then
+  for p in $PRIV_ALL; do
+    case " $WANT " in *" $p "*) ;; *) PRIV="$PRIV $p" ;; esac
+  done
+  WANT="$WANT $PRIV"
+fi
 HOME_ACT=app.couchtv.launcher/.MainActivity
 WATCH=app.couchtv.launcher/.FireWatch
 RESOLVE="cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
+
+# Anything the TV may need at power on is refused, even when EXTRA_OFF or the privacy list names
+# it: a home screen, a setup app, a persistent process or a core part of Android. ($homes is read
+# from the TV before this is used.)
+needed() {
+  case " $NEVER_OFF " in *" $1 "*) return 0 ;; esac
+  case "$1" in
+    android|app.couchtv.*|com.android.*|com.google.android.gms|com.google.android.gsf|*webview*|com.google.android.trichromelibrary|com.google.android.tv.remote.service|com.google.android.katniss|com.google.android.permissioncontroller|com.google.android.packageinstaller|com.google.android.networkstack*|com.google.android.ext.*|com.google.android.providers.*|com.sony.dtv.sonysystemservice|com.sony.dtv.tvx|*setupwizard*|*.setup|*provision*) return 0 ;;
+    # The remote (Bluetooth, pairing, voice, the Assistant, HDMI CEC, the keyboard) and Keep watching
+    # (the TV provider that holds Watch Next, TV inputs and listings) always stay on.
+    *bluetooth*|*pair*|*.ble*|*remote*|*rcu*|*voice*|*assistant*|*katniss*|*vizzini*|*cec*|*inputmethod*|*.ime|*inputdevice*|*providers.tv*|*tvinput*|*tvprovider*|*listings*|*watchnext*) return 0 ;;
+  esac
+  echo "$homes" | grep -qx "$1" && return 0
+  "$PY" "$T" shell "dumpsys package $1" | grep -q -E "(pkgFlags|flags)=\[.*PERSISTENT" && return 0
+  return 1
+}
+is_priv() { echo "$PRIV_ALL" | grep -qx "$1"; }
+# "brand: what it does" for a package on the privacy list.
+why() {
+  grep -v '^[[:space:]]*#' "$PRIVACY_LIST" | awk -F'|' -v p="$1" '{n=$1; gsub(/[ \t\r]/, "", n); if (n == p) {b=$2; w=$3; gsub(/^ +| +$/, "", b); gsub(/^ +| +$/, "", w); print b ": " w; exit}}'
+}
+# Works out what to switch off from WANT and does it (or, for a dry run, only says what it would
+# do). Reads $present, $disabled and $homes from the TV first, and $OLD (the last undo list).
+switch_off() {
+  if [ "$DRY" = 1 ]; then would="would leave"; else would="leaving"; fi
+  missing=0
+  done_priv=0
+  for p in $WANT; do
+    if ! echo "$present" | grep -qx "$p"; then
+      if is_priv "$p"; then missing=$((missing + 1)); fi
+      continue
+    elif needed "$p"; then
+      if echo "$disabled" | grep -qx "$p"; then
+        # Refused now, but already switched off by an earlier run (issue #44): it cannot be switched
+        # off again here, yet it is still off, so it goes on the undo list and undo.sh turns it back on.
+        [ "$DRY" = 1 ] || echo "$p" >> "$LIST"
+        echo "     $p is refused as something the TV may need, but it is already switched off from an earlier run: it stays on the undo list so undo.sh switches it back on"
+      else
+        echo "     $would $p on: the TV may need it to start"
+      fi
+    elif is_priv "$p" && echo "$disabled" | grep -qx "$p" && ! echo "$OLD" | grep -qx "$p"; then
+      # Off before couch-tv touched it (by hand, or by the maker): not ours to switch back on.
+      echo "     privacy: $p was already off before couch-tv, so it is left as it is and not put on the undo list"
+    elif [ "$DRY" = 1 ]; then
+      if is_priv "$p"; then echo "     privacy: would switch off $p ($(why "$p"))"; done_priv=$((done_priv + 1)); else echo "     would switch off $p"; fi
+    else
+      "$PY" "$T" shell "pm disable-user --user 0 $p"
+      echo "$p" >> "$LIST"
+      if is_priv "$p"; then echo "     privacy: switched off $p ($(why "$p"))"; done_priv=$((done_priv + 1)); fi
+    fi
+  done
+  # Privacy apps switched off by an earlier PRIVACY=1 run stay off, and stay on the undo list, when
+  # this run leaves PRIVACY out: a run without it never changes them, and undo.sh still finds them.
+  for p in $OLD; do
+    if is_priv "$p" && ! echo " $WANT " | grep -q " $p " && echo "$disabled" | grep -qx "$p"; then
+      [ "$DRY" = 1 ] || echo "$p" >> "$LIST"
+      echo "     privacy: $p stays off from an earlier PRIVACY=1 run, and stays on the undo list"
+    fi
+  done
+  if [ "${PRIVACY:-0}" = 1 ]; then
+    echo "     privacy: $missing apps on the privacy list are not on this TV (nothing to do for them)"
+    if [ "$DRY" = 1 ]; then
+      echo "     privacy: $done_priv would be switched off"
+    else
+      echo "     privacy: $done_priv switched off (undo.sh switches them back on)"
+    fi
+  fi
+}
+OLD=""
+[ -f "$HERE/../tvs/$TV_NAME.disabled" ] && OLD=$(cat "$HERE/../tvs/$TV_NAME.disabled")
+
+if [ "$DRY" = 1 ]; then
+  "$PY" "$T" ping > /dev/null
+  echo "Dry run: nothing is installed, switched off or written. This is what apply.sh would do."
+  present=$("$PY" "$T" shell "pm list packages" | sed 's/package://')
+  disabled=$("$PY" "$T" shell "pm list packages -d" | sed 's/package://')
+  homes=$("$PY" "$T" shell "pm query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME" | grep / | sed 's|^ *||; s|/.*||' | sort -u)
+  for p in $NEVER_OFF; do
+    if echo "$disabled" | grep -qx "$p"; then echo "     would switch $p back on (an older couch-tv had switched it off)"; fi
+  done
+  LIST=/dev/null
+  switch_off
+  exit 0
+fi
 
 # Remember the home the TV had, so undo.sh puts that one back (it may be the maker's own). Only
 # the first run writes it, so a re-run never replaces the original with something in between.
@@ -99,36 +214,11 @@ for p in $NEVER_OFF; do
     echo "     switched $p back on (an older couch-tv had switched it off)"
   fi
 done
-# Anything the TV may need at power on is refused, even when EXTRA_OFF names it: a home screen, a
-# setup app, a persistent process or a core part of Android.
+# What the TV may need at power on (needed(), above) is refused, even when EXTRA_OFF or the privacy
+# list names it.
 homes=$("$PY" "$T" shell "pm query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME" | grep / | sed 's|^ *||; s|/.*||' | sort -u)
-needed() {
-  case " $NEVER_OFF " in *" $1 "*) return 0 ;; esac
-  case "$1" in
-    android|app.couchtv.*|com.android.*|com.google.android.gms|com.google.android.gsf|*webview*|com.google.android.trichromelibrary|com.google.android.tv.remote.service|com.google.android.katniss|com.google.android.permissioncontroller|com.google.android.packageinstaller|com.google.android.networkstack*|com.google.android.ext.*|com.google.android.providers.*|com.sony.dtv.sonysystemservice|com.sony.dtv.tvx|*setupwizard*|*.setup|*provision*) return 0 ;;
-  esac
-  echo "$homes" | grep -qx "$1" && return 0
-  "$PY" "$T" shell "dumpsys package $1" | grep -q -E "(pkgFlags|flags)=\[.*PERSISTENT" && return 0
-  return 1
-}
 : > "$LIST"
-for p in $WANT; do
-  if ! echo "$present" | grep -qx "$p"; then
-    continue
-  elif needed "$p"; then
-    if echo "$disabled" | grep -qx "$p"; then
-      # Refused now, but already switched off by an earlier run (issue #44): it cannot be switched
-      # off again here, yet it is still off, so it goes on the undo list and undo.sh turns it back on.
-      echo "$p" >> "$LIST"
-      echo "     $p is refused as something the TV may need, but it is already switched off from an earlier run: it stays on the undo list so undo.sh switches it back on"
-    else
-      echo "     leaving $p on: the TV may need it to start"
-    fi
-  else
-    "$PY" "$T" shell "pm disable-user --user 0 $p"
-    echo "$p" >> "$LIST"
-  fi
-done
+switch_off
 
 echo "3/4  Making couch-tv the home and sending your settings"
 "$PY" "$T" shell "cmd package set-home-activity $HOME_ACT"

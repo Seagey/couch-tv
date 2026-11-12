@@ -479,6 +479,11 @@ exactly what changes:
   TV always has them when it starts; a small Home button watch (an accessibility service that only looks at which
   window came forward; it declares the screen reading capability only because some TVs send events to nothing else, and never reads the screen) puts couch-tv on top when the TV opens its own home, which may flash up for
   a moment. Nothing is deleted.
+  - **Privacy clean (Beta, opt in):** only if they ask, `PRIVACY=1` adds the apps in
+    `tv-home/tools/privacy-list.txt` that the TV has (ACR, ad and telemetry apps) to the switch off
+    set, through the same safety check. Run it with `DRY_RUN=1` first and show them the list. Never
+    tell them it removes all tracking; point them to docs/PRIVACY.md for the menu switches. Never add
+    a launcher, setup, remote, voice, Bluetooth, CEC, keyboard or TV provider package to that list.
   - **Never switch off the Google TV home (`launcherx`, `tvlauncher`) or the setup app
     (`setupwraith`), by hand or through `EXTRA_OFF`.** couch-tv 0.10 and older did, and a Sony
     Bravia Google TV then looped at every restart (README, "If your TV loops after a restart").
