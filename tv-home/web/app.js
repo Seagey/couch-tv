@@ -4029,7 +4029,19 @@
     $("set-crumb").textContent = SET.sub ? SET.sub.crumb : "";
     $("set-head").textContent = SET.sub ? SET.sub.title() : t("sec_" + SECS[SET.sec][0]);
     var box = $("set-rows");
+    // Rebuilding the rows drops the list back to the top on some TV engines (a 2020 Samsung,
+    // Tizen 5.5), and the smooth scroll below then ran from the top down to the row: every move
+    // past the first screen flashed up to the start and back. Put the list back where it was
+    // without animating, so only the small step to the next row is smooth. A different list
+    // (another section or page) starts at the top.
+    var listId = SET.sec + "|" + $("set-head").textContent + "|" + $("set-crumb").textContent;
+    var keep = box.getAttribute("data-list") === listId ? box.scrollTop : 0;
+    box.setAttribute("data-list", listId);
     box.innerHTML = rows.map(rowHTML).join("");
+    box.style.scrollBehavior = "auto";
+    box.scrollTop = keep;
+    void box.offsetHeight;   // apply the jump now, before smooth scrolling comes back on
+    box.style.scrollBehavior = "";
     $("set-msg").textContent = SET.msg || "";
     var cur = rows[SET.ri];
     $("set-hint").textContent = SET.typing ? t("hint_typing") : SET.lift ? t("hint_lift") : SET.col === "secs" ? t("hint_secs") :
