@@ -12,6 +12,12 @@ import sys
 import time
 import urllib.request
 
+# These scripts drive a REAL TV through a running bridge (they play shows and write watch history).
+# They refuse to run unless asked on purpose, so an agent running "all the tests" never fires them.
+if os.environ.get("COUCHTV_REAL_TV") != "1":
+    sys.exit("This drives a real TV. Set COUCHTV_REAL_TV=1 to run it on purpose.")
+
+
 BRIDGE = "http://127.0.0.1:5400"
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "deeplink-shots")
 
