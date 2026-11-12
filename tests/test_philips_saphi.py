@@ -417,5 +417,18 @@ class CheckTv(Base):
         self.assertNotIn("untested", text)
 
 
+    def test_titan_verdict_says_what_has_been_tried_on_a_real_tv(self):
+        mod = load_script("check-tv.py")
+        out = io.StringIO()
+        with patch.object(mod, "knock", lambda ip, port, timeout=1.0: port == 1926), \
+                patch.object(mod, "wireless_debugging_port", lambda ip: None), \
+                patch.object(sys, "argv", ["check-tv.py", "192.0.2.9"]), contextlib.redirect_stdout(out):
+            mod.main()
+        text = out.getvalue()
+        self.assertIn("Philips Titan OS path", text)
+        self.assertIn("read only check has run on one real TV, pairing has not", text)
+        self.assertNotIn("not yet tried on a real Titan OS TV", text)
+
+
 if __name__ == "__main__":
     unittest.main()

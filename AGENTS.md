@@ -103,7 +103,7 @@ If nothing Android is found, or they are not sure what they have:
   - **Hisense VIDAA:** the IP address in the TV's network settings. `find-tvs.py` does not list one,
     but `check-tv.py <address>` recognises it by its port 36669 (36668 on older builds).
   - **Philips on Titan OS:** Settings, Network (or Wireless and networks), Network status. `find-tvs.py`
-    does not list one, but `check-tv.py <address>` recognises it by its port 1926 when it is not Android.
+    lists one it hears announcing its network remote (as "Philips TV"; seen on one real TV), and `check-tv.py <address>` recognises it by its port 1926 when it is not Android.
   - **Older Philips with Saphi:** Settings, Wireless and networks (or Network), View network settings.
     `check-tv.py <address>` recognises it by plain port 1925 alone, and says whether it lists a browser.
   - **VIZIO:** Menu (or Settings), Network, Network information, the IP address. `find-tvs.py` may list

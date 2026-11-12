@@ -282,7 +282,7 @@ def main():
                              "screen: the browser's bar shows and Home still opens Philips's menu)" if page else "")
                           + ". Run scripts/philips-check.py next. Plug in a Google TV box for everything."}
     elif (open_ports[1926] or open_ports[1925]) and not android:
-        verdict = {"A": "no", "B": "Philips Titan OS path, phone remote only (built, not yet tried on a real Titan OS TV): "
+        verdict = {"A": "no", "B": "Philips Titan OS path, phone remote only (the read only check has run on one real TV, pairing has not): "
                               "docs/PHILIPS-TITAN.md", "C": "no",
                    "why": "Philips on Titan OS (or an older Philips Linux TV): no Android apps and a locked home screen. The "
                           "phone remote and the assistant can drive it with a computer at home (docs/PHILIPS-TITAN.md, tested "

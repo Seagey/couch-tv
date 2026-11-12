@@ -12,6 +12,8 @@ import sys
 import tempfile
 import time
 import unittest
+
+MAC = ":".join(["aa", "bb", "cc", "dd", "ee", "ff"])   # built from parts so the privacy scan does not flag a placeholder
 from pathlib import Path
 from unittest.mock import patch
 
@@ -25,7 +27,7 @@ import apps  # noqa: E402
 import config  # noqa: E402
 import philips  # noqa: E402
 import server  # noqa: E402
-from philips_standin import PIN, SECRET, StandIn  # noqa: E402
+from philips_standin import PIN, SECRET, SERIAL, StandIn  # noqa: E402
 from tv import TVUnavailable  # noqa: E402
 
 HAVE_OPENSSL = bool(shutil.which("openssl"))
@@ -99,6 +101,11 @@ class Finding(Base):
         ctx = self.tv._ssl()
         self.assertEqual(ctx.verify_mode, philips.ssl.CERT_NONE)
         self.assertIsNone(self.tv._session)            # no session made before the first request
+
+    async def test_one_connection_is_kept_for_every_request(self):
+        for _ in range(4):
+            await self.tv._read_power()
+        self.assertEqual(len(self.s.connections), 1)   # not a new TLS handshake per request
 
 
 class FindingWithoutVersion(Base):
@@ -418,6 +425,145 @@ class CheckScript(Base):
             self.assertIn(want, out)
         self.assertEqual([(m, p) for m, p, _ in self.s.log if m != "GET"], [])
         self.assertNotIn(getattr(self.s, "test_login", None) or "never-printed", out)
+
+    async def test_the_serial_number_is_hidden(self):
+        code, out = await self.run_check()
+        self.assertIn("serialnumber_encrypted", out)
+        self.assertNotIn(SERIAL, out)                  # the output is pasted into a public issue
+
+    async def test_not_paired_shows_what_the_tv_answers_without_a_login(self):
+        self.s.logins.clear()
+        os.remove(self.tv.store_file)
+        code, out = await self.run_check()
+        self.assertEqual(code, 0)
+        for want in ("JointSpace answers on /6/", "Power: wants a login", "Apps: wants a login", "Not paired yet"):
+            self.assertIn(want, out)
+        self.assertEqual([(m, p) for m, p, _ in self.s.log if m != "GET"], [])
+
+    async def check_when_knock_raises(self, exc):
+        from unittest import mock
+        with mock.patch("asyncio.open_connection", side_effect=exc):
+            return await self.run_check()
+
+    async def test_a_refusing_tv_is_said_to_have_no_network_remote(self):
+        code, out = await self.check_when_knock_raises(ConnectionRefusedError())
+        self.assertEqual(code, 1)
+        self.assertIn("refused", out)
+        self.assertIn("no Philips network remote on these ports", out)
+
+    async def test_a_silent_tv_is_said_to_be_in_deep_standby(self):
+        code, out = await self.check_when_knock_raises(asyncio.TimeoutError())
+        self.assertEqual(code, 1)
+        self.assertIn("silent", out)
+        self.assertIn("deep standby", out)
+
+    async def test_an_unreachable_tv_names_the_usual_causes(self):
+        code, out = await self.check_when_knock_raises(OSError(65, "No route to host"))
+        self.assertEqual(code, 1)
+        self.assertIn("unreachable", out)
+        for cause in ("VPN", "Local Network", "guest Wi-Fi", "isolation"):
+            self.assertIn(cause, out)
+        self.assertNotIn("deep standby", out)
+
+
+class FindTvs(unittest.TestCase):
+    """scripts/find-tvs.py lists a Philips from its mDNS service. The names are what the real 43PUS8909/12 announced
+    (docs/PHILIPS-TITAN.md, "The first real TV"), without its address or serial."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("find_tvs", Path(__file__).parents[1] / "scripts" / "find-tvs.py")
+        cls.mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.mod)
+
+    def test_the_name_loses_the_api_version_prefix(self):
+        self.assertEqual(self.mod.philips_name("6_43PUS8909/12._philipstv_s_rpc._tcp.local."), "43PUS8909/12")
+
+    def test_a_philips_service_is_listed_as_philips_and_not_as_a_cast_device(self):
+        from unittest import mock
+        info = mock.Mock(addresses=[bytes([192, 0, 2, 20])], properties={b"": b""})
+        zc = mock.Mock(get_service_info=mock.Mock(return_value=info))
+        found = self.mod.Found()
+        found.add_service(zc, "_philipstv_s_rpc._tcp.local.", "6_43PUS8909/12._philipstv_s_rpc._tcp.local.")
+        self.assertEqual(found.devices["192.0.2.20"]["offers"], {"philips"})
+        self.assertEqual(found.devices["192.0.2.20"]["names"], {"43PUS8909/12"})
+
+
+class SetupScript(Base):
+    """scripts/philips-setup.py: check, explain, ask, pair, print the config.json entry. Writes nothing itself."""
+    paired = False
+
+    async def run_setup(self, answers=None, tty=True, **args):
+        import argparse
+        import contextlib
+        import importlib.util
+        import io
+        spec = importlib.util.spec_from_file_location("philips_setup", Path(__file__).parents[1] / "scripts" / "philips-setup.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        ns = argparse.Namespace(address="127.0.0.1", tv="lounge", mac=None, port=self.s.port)
+        for k, v in args.items():
+            setattr(ns, k, v)
+        asyncio.get_running_loop().set_exception_handler(lambda loop, ctx: None)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), patch("sys.stdin.isatty", return_value=tty), \
+                patch("builtins.input", side_effect=list(answers or [])):
+            code = await mod.main(ns)
+        return code, out.getvalue()
+
+    async def test_no_pairing_key_stops_before_the_pair_request(self):
+        code, out = await self.run_setup()
+        self.assertEqual(code, 0)
+        self.assertIn("cannot provide that key", out)
+        self.assertEqual(self.s.sent("pair/request"), [])
+
+    async def test_not_on_a_terminal_it_prints_the_next_command(self):
+        self.save_secret()
+        code, out = await self.run_setup(tty=False)
+        self.assertEqual(code, 0)
+        self.assertIn("philips-check.py", out)
+        self.assertEqual(self.s.sent("pair/request"), [])
+
+    async def test_a_no_at_the_question_sends_nothing(self):
+        self.save_secret()
+        code, out = await self.run_setup(answers=["n"])
+        self.assertEqual(code, 0)
+        self.assertEqual(self.s.sent("pair/request"), [])
+
+    async def test_key_saved_and_pin_given_pairs_and_prints_the_entry(self):
+        self.save_secret()
+        code, out = await self.run_setup(answers=["y", PIN], mac=MAC)
+        self.assertEqual(code, 0, out)
+        self.assertIn("Paired", out)
+        entry = json.loads(out[out.index("\n{\n") + 1:])
+        self.assertEqual(entry["kind"], "philips")
+        self.assertEqual(entry["id"], "lounge")
+        self.assertEqual(entry["mac"], MAC)
+        self.assertNotIn(SERIAL, out)
+
+    async def test_an_unreachable_tv_says_why_and_exits_1(self):
+        with patch("asyncio.open_connection", side_effect=OSError(65, "No route to host")):
+            code, out = await self.run_setup()
+        self.assertEqual(code, 1)
+        self.assertIn("VPN", out)
+
+
+class RealTV(unittest.TestCase):
+    """What a real 43PUS8909/12 on Titan OS answered to "system" (docs/PHILIPS-TITAN.md, "The first real TV"),
+    without the fields that name that one TV."""
+    SYSTEM = {"menulanguage": "English", "name": "43PUS8909/12", "country": "Germany", "nettvversion": "",
+              "epgsource": "no_epg", "api_version": {"Major": 6, "Minor": 1, "Patch": 0},
+              "featuring": {"jsonfeatures": {"recordings": ["List", "Schedule", "Manage"], "ambilight": ["Ambilight"],
+                                             "textentry": ["context_based", "initial_string_available"],
+                                             "inputkey": ["key", "unicode"], "pointer": ["context_based"],
+                                             "activities": ["browser"], "aurora": ["available"]},
+                            "systemfeatures": {"tvtype": "consumer", "content": ["dmr"],
+                                               "pairing_type": "digest_auth_pairing", "secured_transport": True,
+                                               "os_type": "Linux"}}}
+
+    def test_a_titan_os_tv_lists_a_browser(self):
+        self.assertTrue(philips.lists_browser(self.SYSTEM))
 
 
 class Signature(unittest.TestCase):

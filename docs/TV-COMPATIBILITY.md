@@ -2,7 +2,7 @@
 
 Research from public sources (linked below). Only Google TV has been tested
 by the author. Everything else is what the sources say, not tested (Samsung and LG have since run on real
-TVs, see their pages, and so has Hisense VIDAA; Roku, Philips Titan OS, Philips Saphi, VIZIO and Panasonic have not).
+TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a read only check on one real TV but is not paired; Roku, Philips Saphi, VIZIO and Panasonic have not run on a real TV).
 
 - **A. TV home only:** an app replaces the TV's home screen.
 - **B. Computer bridge:** a computer at home controls the TV with the Android TV Remote protocol
@@ -24,7 +24,7 @@ TVs, see their pages, and so has Hisense VIDAA; Roku, Philips Titan OS, Philips 
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on ten real LGs so far ([LG.md](LG.md)) | No |
 | Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation, **not yet tried on a real Roku** ([ROKU.md](ROKU.md)) | No |
 | Hisense VIDAA | App only: a Couch TV tile on firmware that still allows it, else the TV's browser | **Beta**: a page the bridge opens on power-on, like Samsung and LG (VIDAA's Home button still opens VIDAA's home unless you turn on `keep_home`). Confirmed on a real Hisense 55U7N, VIDAA 9 ([VIDAA.md](VIDAA.md), #128) | No |
-| Philips on Titan OS (mostly Europe, from 2023) | Needs a Titan app (Titan's store or DevView), not there yet | **Beta**: the phone remote works now (power, keys, volume, inputs, opening apps); the home opens once there is a Titan app. Tested against a stand in so far ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)) | No |
+| Philips on Titan OS (mostly Europe, from 2023) | Needs a Titan app (Titan's store or DevView), not there yet | **Beta**: the phone remote works now (power, keys, volume, inputs, opening apps); the home opens once there is a Titan app. One real TV (a 43PUS8909/12) has answered the read only check; pairing and the rest are tested against a stand in so far ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)) | No |
 | Older Philips with Saphi (about 2015 to 2019, not Android) | No | **Beta**: phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen (Philips's Home button still opens Philips's menu). Depends on the model and firmware ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)) | No |
 | VIZIO (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Beta, phone remote only**: power, volume, inputs and opening apps; couch-tv's home page cannot open on the TV. Tested against a stand in so far ([VIZIO.md](VIZIO.md)) | No |
 | Panasonic Viera (My Home Screen, older Vieras) | No | **Beta**: phone remote and a page that opens itself in the TV's browser (Panasonic's Home button still opens Panasonic's home) ([PANASONIC.md](PANASONIC.md)) | No |
@@ -142,8 +142,10 @@ Not tested by the author. Each line is what someone said worked on their own dev
   port 1926, PIN pairing, `bridge/philips.py`): power, keys, volume, inputs and opening the apps it lists. The
   pairing needs a key from Philips's own TV Remote app that the owner saves themselves; couch-tv never ships
   it. couch-tv's home could only open through a published Titan app or Titan's DevView developer app, and
-  neither exists for couch-tv yet ([PHILIPS-TITAN.md](PHILIPS-TITAN.md), "The home"). Tested against a
-  stand in only, **never on a real Titan OS TV**. Titan OS is on Philips TVs sold in Europe from 2023.
+  neither exists for couch-tv yet ([PHILIPS-TITAN.md](PHILIPS-TITAN.md), "The home"). One real TV (a 43PUS8909/12,
+  read only, not paired) has answered the check: its JointSpace API, its mDNS announcement and its browser activity
+  are confirmed, but **pairing, keys, volume, inputs, apps and the home have not run on a real Titan OS TV**
+  (the rest is tested against a stand in). Titan OS is on Philips TVs sold in Europe from 2023.
 - **Older Philips with Saphi** (Philips's own Linux system, roughly 2015 to 2019) does not run Android apps or
   let an app replace its home screen. Some sets answer Philips's network remote on plain port 1925 with no
   pairing, one owner's set wanted a PIN and refused it, and some have no network remote at all. The bridge

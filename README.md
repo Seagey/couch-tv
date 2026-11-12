@@ -45,6 +45,13 @@ TV the Home button watch now also catches the Home key and the Mi logo key as th
 pressing them quickly several times no longer leaves Google's home on screen (issue #54). Other
 TVs are not touched. Thanks AryanFelix (#135).
 
+**13 November 2026: Philips Titan OS, first read only look at a real TV (on main, in the next release).**
+A 43PUS8909/12 answered the check: its remote API, its network announcement and a browser activity are real.
+Pairing, keys, volume, apps and the home have not run on it yet, so Titan OS stays Beta, phone remote only.
+Also better: connections are reused, a TV that does not answer now says why, and the serial number is hidden in
+what the check prints. `scripts/find-tvs.py` lists a Philips TV and `scripts/philips-setup.py <address>` goes from
+address to a config entry. See [docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md). Thanks googlarz (#144).
+
 **12 November 2026: Kids mode, New and optional (on main, in the next release).** Off unless you
 switch it on for someone. A kids profile's home shows only
 a shelf of shows a parent picked, as big posters that open straight into each show, plus the few apps
@@ -54,7 +61,7 @@ Natalie Bruss (@nataliebruss on Instagram).
 
 **12 November 2026: Philips, Panasonic and Fire TV on Vega OS, Beta.** Four more paths, each with a
 computer at home that stays on, and on each the maker's own Home button still opens the maker's home:
-- **Philips with Titan OS:** the phone remote (power, keys, volume, inputs, apps). couch-tv's home needs a
+- **Philips with Titan OS:** the phone remote (power, keys, volume, inputs, apps; one real TV has answered the read only check, pairing is still to be tried). couch-tv's home needs a
   Titan app, from Titan's store or its DevView developer app, which is not there yet
   ([docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md)).
 - **Older Philips with Saphi:** the phone remote, and couch-tv's page in the TV's browser where the set
