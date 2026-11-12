@@ -18,7 +18,9 @@ material. If it finds nothing, it says so and stops.
 import io
 import os
 import re
+import shutil
 import ssl
+import subprocess
 import sys
 import tempfile
 import zipfile
@@ -83,16 +85,40 @@ def open_pkcs12(body):
     """(certificate PEM, key PEM) from a PKCS#12 with no password or an empty one, else None."""
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.serialization import pkcs12
+    rejected = False
     for pw in (None, b""):
         try:
             key, cert, _ = pkcs12.load_key_and_certificates(body, pw)
         except (ValueError, TypeError):
+            rejected = True
             continue
         if key is None or cert is None:
             continue
         return (cert.public_bytes(serialization.Encoding.PEM).strip(),
                 key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
                                   serialization.NoEncryption()).strip())
+    return open_pkcs12_with_openssl(body) if rejected else None
+
+
+def open_pkcs12_with_openssl(body):
+    """Older keystores (RemoteNOW's remoteclientmobile.p12) use legacy encryption that newer `cryptography`
+    refuses. Ask the openssl command to open it with an empty password: `-legacy` first (OpenSSL 3 and later),
+    then without it (OpenSSL 1.1). A fixed argument list, no shell, the keystore on stdin, a time limit. A
+    keystore with a real password still fails here and stays locked."""
+    exe = shutil.which("openssl")
+    if not exe:
+        return None
+    for legacy in (["-legacy"], []):
+        try:
+            run = subprocess.run([exe, "pkcs12", "-nodes", "-passin", "pass:", *legacy], input=body,
+                                 capture_output=True, timeout=20, check=False)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if run.returncode != 0:
+            continue
+        cert, key = CERT.search(run.stdout), KEY.search(run.stdout)
+        if cert and key and b"ENCRYPTED" not in key.group(0):
+            return cert.group(0).strip(), key.group(0).strip()
     return None
 
 

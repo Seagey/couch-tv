@@ -49,6 +49,30 @@ It needs the computer that stays on. Without one there is nothing on the TV to o
 | Picture mode switch, ADB tools, switching the stock home off | No (Android only) |
 | Root | **Never.** couch-tv will not root a TV or walk you through it |
 
+## What to expect on older VIDAA firmware (field report, firmware P0218)
+
+(thanks trentosc, #131) On an older Hisense (firmware P0218) the whole path ran: connect, pairing, the phone
+remote's keys, the app list, and couch-tv's home showing in the TV Browser, opening itself when the TV is
+switched on. What an owner should know before investing an evening:
+
+- **The older TV Browser gives a page a mouse cursor only, never the D pad.** Its engine is a 2014 Firefox
+  build, and the page sees mouse moves and clicks, no key presses. So you navigate by pointing and clicking.
+- **couch-tv's own settings and app management can't be reached from the couch.** The gear tile needs the D
+  pad, and the phone remote's Settings key opens the TV's settings, not couch-tv's. Change the look and the
+  apps from a computer or phone instead.
+- **Loading is slow.** On switch on you see the browser's bookmark page first, then the dock, then the
+  background fills in while the TV's modest hardware catches up.
+- **Auto open on power on works through a saved bookmark.** Save couch-tv once as a bookmark in the TV Browser
+  (with the `http://` in front, otherwise the browser searches for it). The reported sequence on switch on is
+  Home (to leave live TV), open the TV Browser (app id 16), then OK on that bookmark. Firmware that refuses a
+  page address (`launchapp` with a URL, a web app, the tile install) needs this route. There is no
+  `open_sequence` setting on main yet, so today it is a sequence a tester sends by hand.
+- **The Hisense Home button still opens VIDAA's home**, as everywhere on VIDAA.
+- **For the full couch-tv experience on a Hisense VIDAA, plug in a Google TV streamer** (for example the
+  Google TV Streamer) on HDMI. VIDAA stays as a display and couch-tv runs natively on the streamer.
+
+The newer VIDAA 9 browser (Chromium 111, below) is a different story: there the arrows and OK reach the page.
+
 ## Which VIDAA versions should work
 
 Expected, from what owners of these TVs have reported about the TV's remote control, not from our own
@@ -111,6 +135,11 @@ emulator on your computer. There is no iPhone only path yet (thanks trentosc, #1
      certificate is in a locked keystore it can't open. It does not unlock anything, decompile or patch the
      app, and it never prints key material. If you get that message, please say so in an issue with the
      file name it printed: that is a gap, not something to work round.
+
+The keystore Hisense's app ships (`remoteclientmobile.p12`) can use legacy PKCS#12 encryption, which the
+`cryptography` library in this repo's `.venv` (version 50) refuses to read. If the script says it can't open
+the keystore, it tries `openssl pkcs12 -legacy` itself when `openssl` is installed. Failing that, `openssl` 1.1
+extracts it by hand (thanks trentosc, #131).
 
 Skip this step on older firmware. The first test (step 4) says whether the TV wants it.
 

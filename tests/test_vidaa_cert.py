@@ -9,7 +9,10 @@ import os
 import stat
 import sys
 import tempfile
+import shutil
+import subprocess
 import unittest
+import unittest.mock
 import zipfile
 from pathlib import Path
 
@@ -93,6 +96,46 @@ class VidaaCert(unittest.TestCase):
         self.assertIn("locked keystore", text)
         self.assertIn("docs/VIDAA.md", text)
         self.assertFalse(os.path.exists(self.out_path("client.pem")))
+
+    def test_legacy_p12_falls_back_to_openssl(self):
+        """cryptography refuses the keystore (as 50.x does a legacy one): the openssl command opens it."""
+        exe = shutil.which("openssl")
+        if not exe:
+            self.skipTest("no openssl command")
+        key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "test client")])
+        now = datetime.datetime.now(datetime.timezone.utc)
+        cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+                .serial_number(x509.random_serial_number()).not_valid_before(now)
+                .not_valid_after(now + datetime.timedelta(days=1)).sign(key, hashes.SHA256()))
+        pem_c, pem_k = os.path.join(self.tmp.name, "c.pem"), os.path.join(self.tmp.name, "k.pem")
+        with open(pem_c, "wb") as f:
+            f.write(cert.public_bytes(serialization.Encoding.PEM))
+        with open(pem_k, "wb") as f:
+            f.write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                      serialization.NoEncryption()))
+        made = None
+        for legacy in (["-legacy"], []):
+            run = subprocess.run([exe, "pkcs12", "-export", "-inkey", pem_k, "-in", pem_c, "-passout", "pass:",
+                                  *legacy], capture_output=True)
+            if run.returncode == 0:
+                made = run.stdout
+                break
+        if not made:
+            self.skipTest("this openssl cannot build a keystore")
+        with unittest.mock.patch.object(pkcs12, "load_key_and_certificates", side_effect=ValueError("legacy")):
+            code, text = self.run_script({"assets/remoteclientmobile.p12": made})
+        self.assertEqual(code, 0, text)
+        self.assertTrue(os.path.isfile(self.out_path("client.pem")))
+        with open(self.out_path("client.pem"), "rb") as pem, open(self.out_path("client.key"), "rb") as k:
+            self.assertTrue(self.mod.matches(pem.read().strip(), k.read().strip()))
+
+    def test_locked_p12_stays_locked_when_cryptography_refuses(self):
+        with unittest.mock.patch.object(pkcs12, "load_key_and_certificates", side_effect=ValueError("bad")):
+            code, text = self.run_script({"assets/remote.p12": make_p12(b"secret")})
+        self.assertEqual(code, 1)
+        self.assertIn("locked keystore", text)
+        self.assertFalse(os.path.exists(self.out_path("client.key")))
 
     def test_bks_is_named_and_left_locked(self):
         code, text = self.run_script({"res/raw/client.bks": b"\x00\x00\x00\x02fake keystore bytes"})

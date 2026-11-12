@@ -16,6 +16,7 @@ TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a 
 | Older Android TV (Android 7.1 to 11) | Yes | Yes | Yes |
 | Android 6 TV (Xiaomi Mi TV 4A, PatchWall) | Installs and opens, layout may break (experimental) | Not tested | Installs and opens, set up from a computer (experimental) |
 | Xiaomi TV Stick 4K (Android TV 11) | Yes (reported by a user, not tested by us) | Not reported | Not reported |
+| XGIMI projector (Android TV 11, XK03H) | Yes, through `apply.sh` (reported by a user, not tested by us) | Not reported | Yes (reported by a user: phone remote, keys, typing and apps; use `apply.sh` for the Home button) |
 | Nvidia Shield | Yes (not tested) | Yes | Yes (not tested) |
 | Onn (Google TV) | Yes | Yes | Partial |
 | Fire TV on Fire OS 6, 7 and 8 (Stick 4K 1st and 2nd gen, Stick 4K Max, Cube) | Partial | Partial | Partial (home screen confirmed on a Stick 4K 2nd gen by a user; phone remote keys blocked on current Fire OS) |
@@ -23,7 +24,7 @@ TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a 
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on ten real LGs so far ([LG.md](LG.md)) | No |
 | Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation. The channel has run on one real Roku TV (Roku OS 16, no bridge; Roku OS 16 refuses a channel's own ECP, so there the app list is baked in at build time with `--apps-from`). The bridge, the power on hook and deep links are **not yet seen on a real Roku** ([ROKU.md](ROKU.md)) | No |
-| Hisense VIDAA | App only: a Couch TV tile on firmware that still allows it, else the TV's browser | **Beta**: a page the bridge opens on power-on, like Samsung and LG (VIDAA's Home button still opens VIDAA's home unless you turn on `keep_home`). Confirmed on a real Hisense 55U7N, VIDAA 9 ([VIDAA.md](VIDAA.md), #128) | No |
+| Hisense VIDAA | App only: a Couch TV tile on firmware that still allows it, else the TV's browser | **Beta**: a page the bridge opens on power-on, like Samsung and LG (VIDAA's Home button still opens VIDAA's home unless you turn on `keep_home`). Confirmed on a real Hisense 55U7N, VIDAA 9 ([VIDAA.md](VIDAA.md), #128). On older firmware (P0218) it connects, pairs and opens itself from a saved browser bookmark, but that TV Browser gives the page a mouse cursor only, so you point and click, couch-tv's own settings and app management can't be reached from the couch and loading is slow; for the full experience plug in a Google TV streamer (thanks trentosc, #131) | No |
 | Philips on Titan OS (mostly Europe, from 2023) | Needs a Titan app (Titan's store or DevView), not there yet | **Beta**: the phone remote works now (power, keys, volume, inputs, opening apps); the home opens once there is a Titan app. One real TV (a 43PUS8909/12) has answered the read only check; pairing and the rest are tested against a stand in so far ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)) | No |
 | Older Philips with Saphi (about 2015 to 2019, not Android) | No | **Beta**: phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen (Philips's Home button still opens Philips's menu). Depends on the model and firmware ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)) | No |
 | VIZIO (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Beta, phone remote only**: power, volume, inputs and opening apps; couch-tv's home page cannot open on the TV. Tested against a stand in so far ([VIZIO.md](VIZIO.md)) | No |
@@ -64,6 +65,14 @@ Not tested by the author. Each line is what someone said worked on their own dev
   from about 50 ms to 16 ms on both. Developer Mode and couch-tv survived a firmware update; only
   Key Server had to be switched on again
   ([issue #89](https://github.com/Seagey/couch-tv/issues/89)).
+- **XGIMI XK03H projector (Android TV 11): works**, reported by nithinjak. The on-TV app's "Use as home
+  screen" alone did not take the Home button there: the projector still went back to Google's home. Use
+  `apply.sh` (option A), whose Home button watch works: a single Home press and a restart both come back to
+  couch-tv. The projector has no Wireless debugging, only USB debugging, and that alone opens ADB on port
+  5555, which `check-tv.py` reports (thanks nithinjak, [#159](https://github.com/Seagey/couch-tv/issues/159)).
+- **Hisense VIDAA, older firmware P0218: connects, pairs and opens couch-tv from a browser bookmark**, reported
+  by trentosc. Navigation there is point and click, because the older TV Browser never passes the D pad to a
+  page. Details: [VIDAA.md](VIDAA.md) (thanks trentosc, [#131](https://github.com/Seagey/couch-tv/issues/131)).
 - **Hisense 43A6N (VIDAA, firmware V0003.09.60A.Q0707, Germany): works with the bridge**, reported by
   Schielef. The modern login worked with the owner's own client certificate (from their copy of Hisense's
   app), PIN pairing held across later connections, the Couch TV tile went in and opened couch-tv, and the
