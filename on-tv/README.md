@@ -26,7 +26,7 @@ home button unless you switch that on.
 | Sleep timer | yes | yes, with ADB | Pause, then off. |
 | Screenshot (`/api/screenshot`) | yes | yes, with ADB | |
 | Picks and taste profile | yes | no | Needs "ask". |
-| Ask Claude | yes (computer's Claude Code) | **off by default** | Optional: your own Anthropic API key on the setup page. See below. |
+| Ask (AI assistant) | yes (computer's Claude Code) | **off by default** | Optional: your own API key on the setup page, for Claude, OpenAI, Gemini and others, or a model at home. See below. |
 | Picture mode, screens, Moonlight | yes | no | |
 | Home screen (TV home page) | yes | yes, optional | Same page, served from the app. Replacing Google's home needs one ADB command, see below. |
 | Live updates (`/api/events`) | yes | yes | Server-sent events, plus a WebSocket at `/api/ws`. |
@@ -249,11 +249,17 @@ a minute or so after "off", while the TV is still in light standby.
 
 ## Ask (optional, off by default)
 
-On-TV mode has no Claude unless you add your own Anthropic API key on the setup page and switch
-"ask" on. It uses Claude Haiku 5.5 with a few tools (play, open an app, press a key, what is on),
-about a fifth of a US cent per ask at October 2026 prices. Make a key just for the TV and set a
-monthly spend limit in the Anthropic Console: the key is stored on the TV, and anyone with ADB
-access to the TV could read it. Without a key, "Ask for a show" answers that ask is off.
+On-TV mode has no AI unless you pick a service on the setup page, add your own key and switch
+"ask" on. The default is Claude Haiku 5.5, and it can also use OpenAI, Google Gemini, OpenRouter,
+Groq, Mistral, or any service or home server that copies OpenAI's chat completions API (Ollama,
+LM Studio, llama.cpp and the like). It has a few tools (play, open an app, press a key, what is
+on). On Claude Haiku 5.5 that is about a fifth of a US cent per ask at October 2026 prices; other
+services and models price differently. Make a key just for the TV and set a monthly spend limit
+with the service: the key is stored on the TV, and anyone with ADB access to the TV could read it.
+A key is only ever sent to the service it was saved for: change the service and the saved key is
+removed. Without a key (or a home server that needs none), "Ask for a show" answers that ask is
+off. Details, the settings API and what a model must support are in
+[docs/ASK-PROVIDERS.md](../docs/ASK-PROVIDERS.md).
 
 ## Uninstall
 

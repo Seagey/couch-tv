@@ -1,0 +1,281 @@
+package dev.couchtv.ontv
+
+import org.json.JSONArray
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** The "ask" hook's rules for each kind of AI service, with no network and no TV. */
+class AskWireTest {
+    private val tools = listOf(
+        AskTool("key", "Press a remote key.", JSONObject().put("key", JSONObject().put("type", "string")), listOf("key")),
+        AskTool("now", "What is on.", JSONObject(), emptyList()))
+
+    private fun claude(key: String? = "sk-ant-x", model: String? = null, base: String? = null) = AskConfig.of(null, base, model, key)
+    private fun openai(base: String? = null, model: String? = "m1", key: String? = "sk-x") = AskConfig.of("openai", base, model, key)
+
+    // ---- settings and checks
+
+    @Test fun defaultsAreClaudeHaikuOnAnthropic() {
+        val c = AskConfig.of(null, null, null, "k")
+        assertEquals("anthropic", c.provider); assertEquals("https://api.anthropic.com", c.base); assertEquals("claude-haiku-5-5", c.model)
+        assertEquals("https://api.anthropic.com/v1/messages", AskWire.endpoint(c))
+    }
+
+    @Test fun openAiDefaultsToOpenAiButHasNoDefaultModel() {
+        val c = AskConfig.of("openai", "", "", "k")
+        assertEquals("https://api.openai.com/v1", c.base); assertEquals("", c.model)
+        assertFalse("no model, not ready", c.ready)
+        assertEquals("https://api.openai.com/v1/chat/completions", AskWire.endpoint(c.let { AskConfig.of("openai", null, "m", "k") }))
+    }
+
+    @Test fun aTrailingSlashOnTheAddressIsIgnored() {
+        assertEquals("https://openrouter.ai/api/v1/chat/completions", AskWire.endpoint(openai("https://openrouter.ai/api/v1/")))
+    }
+
+    @Test fun anUnknownProviderFallsBackToClaude() {
+        assertEquals("anthropic", AskConfig.of("gemini-native", null, null, "k").provider)
+    }
+
+    @Test fun readyNeedsAKeyUnlessItIsAServerAtHome() {
+        assertFalse(openai(key = null).ready)
+        assertFalse(openai("https://api.openai.com/v1", key = null).ready)
+        assertTrue(openai("http://192.168.1.20:11434/v1", key = null).ready)
+        assertTrue(openai("http://localhost:1234/v1", key = null).ready)
+        assertTrue(openai("http://mac-studio.local:8080/v1", key = null).ready)
+        assertFalse("Claude always needs a key", AskConfig.of(null, "http://192.168.1.20", null, null).ready)
+        assertTrue(claude().ready)
+    }
+
+    @Test fun localHostsAreOnlyHomeNetworkAddresses() {
+        for (h in listOf("localhost", "127.0.0.1", "10.1.2.3", "192.168.0.9", "172.16.0.1", "172.31.255.1", "169.254.1.1", "nas.local", "[::1]")) assertTrue(h, AskWire.isLocalHost(h))
+        for (h in listOf("api.openai.com", "8.8.8.8", "172.32.0.1", "172.15.0.1", "192.169.0.1", "11.0.0.1", "1.2.3", "10.0.0.256", "evil.com.local.example.com", "", null)) assertFalse(h.toString(), AskWire.isLocalHost(h))
+    }
+
+    @Test fun checkAcceptsGoodSettings() {
+        assertNull(AskWire.check("anthropic", "", ""))
+        assertNull(AskWire.check("openai", "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"))
+        assertNull(AskWire.check("openai", "http://192.168.1.20:11434/v1", "qwen2.5:7b"))
+        assertNull(AskWire.check("openai", "https://openrouter.ai/api/v1", "anthropic/claude-haiku-5-5"))
+    }
+
+    @Test fun checkRefusesWhatCouldLeakAKey() {
+        assertNotNull("plain http to the internet", AskWire.check("openai", "http://api.example.com/v1", "m"))
+        assertNotNull("name and password in the address", AskWire.check("openai", "https://user:pw@api.example.com/v1", "m"))
+        assertNotNull("not http at all", AskWire.check("openai", "file:///etc/passwd", "m"))
+        assertNotNull("not http at all", AskWire.check("openai", "javascript:alert(1)", "m"))
+        assertNotNull("no host", AskWire.check("openai", "https:///v1", "m"))
+        assertNotNull("not a web address", AskWire.check("openai", "not a url", "m"))
+        assertNotNull("too long", AskWire.check("openai", "https://a.example.com/" + "x".repeat(300), "m"))
+    }
+
+    @Test fun checkWantsAModelForOpenAiAndASaneName() {
+        assertNotNull(AskWire.check("openai", "", ""))
+        assertNotNull(AskWire.check("openai", "", "bad model name!"))
+        assertNotNull(AskWire.check("openai", "", "x".repeat(101)))
+        assertNotNull(AskWire.check("grok", "", "m"))
+    }
+
+    // ---- Claude (Anthropic)
+
+    @Test fun claudeRequestKeepsItsOldShape() {
+        val chat = AskWire.chat(claude(), "sys", tools)
+        chat.addUser("put on bluey")
+        val b = chat.body()
+        assertEquals("claude-haiku-5-5", b.getString("model")); assertEquals(1024, b.getInt("max_tokens")); assertEquals("sys", b.getString("system"))
+        assertEquals("auto", b.getJSONObject("tool_choice").getString("type"))
+        assertEquals("low", b.getJSONObject("output_config").getString("effort"))
+        val t = b.getJSONArray("tools").getJSONObject(0)
+        assertEquals("key", t.getString("name")); assertEquals("object", t.getJSONObject("input_schema").getString("type"))
+        assertEquals("key", t.getJSONObject("input_schema").getJSONArray("required").getString(0))
+        assertEquals("user", b.getJSONArray("messages").getJSONObject(0).getString("role"))
+        assertEquals("https://api.anthropic.com/v1/messages", chat.url)
+        assertEquals("sk-ant-x", chat.headers()["x-api-key"]); assertEquals("2023-06-01", chat.headers()["anthropic-version"])
+    }
+
+    @Test fun claudeEffortIsOnlySentToHaiku() {
+        val b = AskWire.chat(claude(model = "claude-sonnet-5-5"), "s", tools).body()
+        assertFalse(b.has("output_config")); assertEquals("claude-sonnet-5-5", b.getString("model"))
+    }
+
+    @Test fun claudeToolUseGoesRoundAndBack() {
+        val chat = AskWire.chat(claude(), "s", tools)
+        chat.addUser("louder")
+        val turn = chat.accept(JSONObject("""{"stop_reason":"tool_use","content":[{"type":"text","text":"ok"},{"type":"tool_use","id":"tu_1","name":"key","input":{"key":"volume_up"}}]}"""))
+        assertFalse(turn.done); assertEquals("ok", turn.text)
+        assertEquals("tu_1", turn.calls[0].id); assertEquals("volume_up", turn.calls[0].args.getString("key"))
+        chat.addResults(listOf(AskResult("tu_1", "pressed", false)))
+        val m = chat.body().getJSONArray("messages")
+        assertEquals(3, m.length())
+        assertEquals("assistant", m.getJSONObject(1).getString("role"))
+        val r = m.getJSONObject(2).getJSONArray("content").getJSONObject(0)
+        assertEquals("tool_result", r.getString("type")); assertEquals("tu_1", r.getString("tool_use_id")); assertFalse(r.getBoolean("is_error"))
+    }
+
+    @Test fun claudeEndTurnIsDone() {
+        val chat = AskWire.chat(claude(), "s", tools); chat.addUser("hi")
+        val t = chat.accept(JSONObject("""{"stop_reason":"end_turn","content":[{"type":"text","text":"Hello there"}]}"""))
+        assertTrue(t.done); assertEquals("Hello there", t.text)
+    }
+
+    // ---- OpenAI and everything like it
+
+    @Test fun openAiRequestUsesSystemMessageAndFunctionTools() {
+        val chat = AskWire.chat(openai(), "sys", tools)
+        chat.addUser("put on bluey")
+        val b = chat.body()
+        assertEquals("m1", b.getString("model")); assertEquals("auto", b.getString("tool_choice"))
+        val m = b.getJSONArray("messages")
+        assertEquals("system", m.getJSONObject(0).getString("role")); assertEquals("sys", m.getJSONObject(0).getString("content"))
+        assertEquals("user", m.getJSONObject(1).getString("role"))
+        val t = b.getJSONArray("tools").getJSONObject(0)
+        assertEquals("function", t.getString("type"))
+        val f = t.getJSONObject("function")
+        assertEquals("key", f.getString("name")); assertEquals("object", f.getJSONObject("parameters").getString("type"))
+        assertFalse("no Anthropic fields", b.has("system") || b.has("output_config"))
+        assertEquals("https://api.openai.com/v1/chat/completions", chat.url)
+        assertEquals("Bearer sk-x", chat.headers()["authorization"]); assertFalse(chat.headers().containsKey("x-api-key"))
+    }
+
+    @Test fun openAiTokenLimitNameDependsOnTheService() {
+        val official = AskWire.chat(openai("https://api.openai.com/v1"), "s", tools).body()
+        assertTrue(official.has("max_completion_tokens")); assertFalse(official.has("max_tokens"))
+        val other = AskWire.chat(openai("https://api.groq.com/openai/v1"), "s", tools).body()
+        assertTrue(other.has("max_tokens")); assertFalse(other.has("max_completion_tokens"))
+    }
+
+    @Test fun aServerAtHomeGetsNoAuthorizationHeader() {
+        val h = AskWire.chat(openai("http://192.168.1.20:11434/v1", key = null), "s", tools).headers()
+        assertFalse(h.containsKey("authorization"))
+    }
+
+    @Test fun openAiToolCallsAreReadAndEchoedBackCleanly() {
+        val chat = AskWire.chat(openai(), "s", tools); chat.addUser("louder")
+        val turn = chat.accept(JSONObject("""{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":null,"refusal":null,"reasoning_content":"thinking",
+            "tool_calls":[{"id":"call_a","type":"function","function":{"name":"key","arguments":"{\"key\":\"volume_up\"}"}}]}}]}"""))
+        assertFalse(turn.done); assertEquals("call_a", turn.calls[0].id); assertEquals("key", turn.calls[0].name); assertEquals("volume_up", turn.calls[0].args.getString("key"))
+        chat.addResults(listOf(AskResult("call_a", "pressed", false)))
+        val m = chat.body().getJSONArray("messages")
+        assertEquals(4, m.length())
+        val echoed = m.getJSONObject(2)
+        assertEquals("assistant", echoed.getString("role")); assertTrue(echoed.isNull("content"))
+        assertFalse("extras are not sent back", echoed.has("refusal") || echoed.has("reasoning_content"))
+        assertEquals("call_a", echoed.getJSONArray("tool_calls").getJSONObject(0).getString("id"))
+        assertEquals("{\"key\":\"volume_up\"}", echoed.getJSONArray("tool_calls").getJSONObject(0).getJSONObject("function").getString("arguments"))
+        val r = m.getJSONObject(3)
+        assertEquals("tool", r.getString("role")); assertEquals("call_a", r.getString("tool_call_id")); assertEquals("pressed", r.getString("content"))
+    }
+
+    @Test fun openAiToolErrorsGoBackAsErrors() {
+        val chat = AskWire.chat(openai(), "s", tools); chat.addUser("x")
+        chat.accept(JSONObject("""{"choices":[{"message":{"content":"","tool_calls":[{"id":"c1","type":"function","function":{"name":"key","arguments":"{}"}}]}}]}"""))
+        chat.addResults(listOf(AskResult("c1", "no such key", true)))
+        assertEquals("Error: no such key", chat.body().getJSONArray("messages").getJSONObject(3).getString("content"))
+    }
+
+    @Test fun openAiToleratesServicesThatBendTheRules() {
+        val chat = AskWire.chat(openai(), "s", tools); chat.addUser("x")
+        // no id, arguments as an object, finish_reason "stop" although tools were asked for (Gemini and Ollama do these)
+        val turn = chat.accept(JSONObject("""{"choices":[{"finish_reason":"stop","message":{"content":"on it","tool_calls":[{"type":"function","function":{"name":"key","arguments":{"key":"home"}}}]}}]}"""))
+        assertFalse("tools were asked for, so it is not done", turn.done)
+        assertTrue(turn.calls[0].id.isNotEmpty()); assertEquals("home", turn.calls[0].args.getString("key"))
+        val echoed = chat.body().getJSONArray("messages").getJSONObject(2)
+        assertEquals(turn.calls[0].id, echoed.getJSONArray("tool_calls").getJSONObject(0).getString("id"))
+        assertTrue("arguments go back as a string", echoed.getJSONArray("tool_calls").getJSONObject(0).getJSONObject("function").get("arguments") is String)
+    }
+
+    @Test fun openAiEmptyArgumentsAreAnEmptyObject() {
+        val chat = AskWire.chat(openai(), "s", tools); chat.addUser("x")
+        val t = chat.accept(JSONObject("""{"choices":[{"message":{"tool_calls":[{"id":"c","type":"function","function":{"name":"now","arguments":""}}]}}]}"""))
+        assertNull(t.calls[0].error); assertEquals(0, t.calls[0].args.length())
+    }
+
+    @Test fun openAiBrokenArgumentsAreReportedNotCrashed() {
+        val chat = AskWire.chat(openai(), "s", tools); chat.addUser("x")
+        val t = chat.accept(JSONObject("""{"choices":[{"message":{"tool_calls":[{"id":"c","type":"function","function":{"name":"key","arguments":"{not json"}}]}}]}"""))
+        assertNotNull(t.calls[0].error); assertEquals(0, t.calls[0].args.length())
+    }
+
+    @Test fun openAiTextCanComeAsParts() {
+        val chat = AskWire.chat(openai(), "s", tools); chat.addUser("x")
+        val t = chat.accept(JSONObject("""{"choices":[{"finish_reason":"stop","message":{"content":[{"type":"text","text":"Hello"},{"type":"text","text":"there"}]}}]}"""))
+        assertTrue(t.done); assertEquals("Hello there", t.text)
+    }
+
+    // ---- the whole loop
+
+    private fun claudeTransport(vararg replies: String): (String, Map<String, String>, JSONObject) -> JSONObject {
+        var i = 0; return { _, _, _ -> JSONObject(replies[i++]) }
+    }
+
+    @Test fun runLoopRunsToolsThenAnswers() {
+        val replies = listOf(
+            """{"choices":[{"message":{"content":null,"tool_calls":[{"id":"c1","type":"function","function":{"name":"key","arguments":"{\"key\":\"mute\"}"}}]}}]}""",
+            """{"choices":[{"finish_reason":"stop","message":{"content":"Muted."}}]}""")
+        var n = 0; val seen = ArrayList<JSONObject>()
+        val ran = ArrayList<String>()
+        val out = AskWire.run(AskWire.chat(openai(), "s", tools), "mute it", { url, h, body ->
+            assertEquals("https://api.openai.com/v1/chat/completions", url); assertEquals("Bearer sk-x", h["authorization"])
+            seen.add(JSONObject(body.toString())); JSONObject(replies[n++])
+        }, { name, a -> ran.add(name + ":" + a.getString("key")); "ok" })
+        assertEquals("Muted.", out.reply); assertEquals(listOf("key:mute"), ran)
+        assertEquals(1, out.actions.length()); assertTrue(out.actions.getJSONObject(0).getBoolean("ok"))
+        assertEquals("the second call carries the tool result", "tool", seen[1].getJSONArray("messages").let { it.getJSONObject(it.length() - 1) }.getString("role"))
+    }
+
+    @Test fun runLoopWorksTheSameForClaude() {
+        val tr = claudeTransport(
+            """{"stop_reason":"tool_use","content":[{"type":"tool_use","id":"t1","name":"now","input":{}}]}""",
+            """{"stop_reason":"end_turn","content":[{"type":"text","text":"Bluey is on."}]}""")
+        val out = AskWire.run(AskWire.chat(claude(), "s", tools), "what is on", tr, { _, _ -> "Bluey" })
+        assertEquals("Bluey is on.", out.reply); assertEquals(1, out.actions.length())
+    }
+
+    @Test fun runLoopTurnsAToolFailureIntoAnErrorTheModelSees() {
+        val seen = ArrayList<String>()
+        var n = 0
+        val replies = listOf(
+            """{"choices":[{"message":{"tool_calls":[{"id":"c1","type":"function","function":{"name":"key","arguments":"{\"key\":\"zzz\"}"}}]}}]}""",
+            """{"choices":[{"message":{"content":"That key does not exist."}}]}""")
+        val out = AskWire.run(AskWire.chat(openai(), "s", tools), "x", { _, _, body ->
+            seen.add(body.getJSONArray("messages").let { it.getJSONObject(it.length() - 1) }.optString("content")); JSONObject(replies[n++])
+        }, { _, _ -> throw IllegalArgumentException("unknown key zzz") })
+        assertEquals("That key does not exist.", out.reply)
+        assertEquals("Error: unknown key zzz", seen[1]); assertFalse(out.actions.getJSONObject(0).getBoolean("ok"))
+    }
+
+    @Test fun runLoopStopsAfterFiveRoundsAndSaysDone() {
+        var calls = 0
+        val reply = """{"choices":[{"message":{"tool_calls":[{"id":"c","type":"function","function":{"name":"now","arguments":"{}"}}]}}]}"""
+        val out = AskWire.run(AskWire.chat(openai(), "s", tools), "loop", { _, _, _ -> calls++; JSONObject(reply) }, { _, _ -> "x" })
+        assertEquals(5, calls); assertEquals("Done.", out.reply); assertEquals(5, out.actions.length())
+    }
+
+    @Test fun runLoopSaysDoneWhenTheModelSaysNothing() {
+        val out = AskWire.run(AskWire.chat(openai(), "s", tools), "x", { _, _, _ -> JSONObject("""{"choices":[{"message":{"content":""}}]}""") }, { _, _ -> "" })
+        assertEquals("Done.", out.reply)
+    }
+
+    @Test fun runLoopDoesNotRunATool_WhenItsArgumentsWereBroken() {
+        var ran = false; var n = 0
+        val replies = listOf(
+            """{"choices":[{"message":{"tool_calls":[{"id":"c","type":"function","function":{"name":"key","arguments":"{oops"}}]}}]}""",
+            """{"choices":[{"message":{"content":"Sorry."}}]}""")
+        val out = AskWire.run(AskWire.chat(openai(), "s", tools), "x", { _, _, _ -> JSONObject(replies[n++]) }, { _, _ -> ran = true; "x" })
+        assertFalse(ran); assertEquals("Sorry.", out.reply)
+    }
+
+    // ---- errors
+
+    @Test fun errorMessagesNameTheServiceAndTheReason() {
+        assertEquals("Claude API error 401: invalid x-api-key", AskWire.errorMessage(claude(), 401, """{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}"""))
+        assertEquals("AI service error 429 (api.openai.com): Rate limit", AskWire.errorMessage(openai(), 429, """{"error":{"message":"Rate limit","type":"x"}}"""))
+        assertEquals("AI service error 400 (openrouter.ai): bad model", AskWire.errorMessage(openai("https://openrouter.ai/api/v1"), 400, """{"error":"bad model"}"""))
+        assertTrue(AskWire.errorMessage(openai(), 502, "<html>Bad gateway</html>").endsWith("<html>Bad gateway</html>"))
+        assertEquals("120 at most", 120, AskWire.errorMessage(openai("https://api.openai.com/v1"), 500, "x".repeat(500)).substringAfter("): ").length)
+    }
+}

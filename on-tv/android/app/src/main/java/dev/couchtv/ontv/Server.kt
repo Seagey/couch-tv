@@ -152,7 +152,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             }
             "POST /api/ask" -> {
                 if (Kids.isKid(body(s).optString("who").ifEmpty { Now.who })) throw ApiError(403, "Ask is off for a kids profile.")
-                if (!Ask.enabled) throw ApiError(501, "Ask is off in on-TV mode. To switch it on, add your own Anthropic API key on the setup page (it costs a fraction of a cent per ask).")
+                if (!Ask.enabled) throw ApiError(501, "Ask is off in on-TV mode. To switch it on, add your own API key (Claude, OpenAI and others) or the address of a model at home on the setup page.")
                 val b = body(s)
                 json(200, Ask.ask(b.optString("text").ifEmpty { throw ApiError(400, "text is required") }, b.optString("who").ifEmpty { Now.who }))
             }
@@ -360,7 +360,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         .put("settings", Store.readJson("home-settings.json") as? JSONObject ?: JSONObject())
         .put("updated", Store.str("home_settings_updated") ?: JSONObject.NULL)
         .put("people", Store.people()).put("weather", Store.weather()).put("country", Store.country()).put("tv_name", Store.tvName())
-        .put("ask", JSONObject().put("enabled", Store.bool("ask_enabled")).put("has_key", !Store.str("ask_key").isNullOrEmpty()).put("model", Ask.MODEL))
+        .put("ask", Ask.status())
         .put("phones", Auth.phoneCount()).put("port", Store.port).put("adb", JSONObject(Adb.status()))
         .put("skip_watch_next", JSONArray(Store.skipWatchNext().sorted())).put("watch_next_per_app", Store.watchNextPerApp())
         .put("watch_next", JSONObject().put("granted", WatchNext.granted()).put("listed", WatchNext.listed()))
@@ -408,8 +408,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         }
         b.optString("country").takeIf { Regex("[A-Z]{2}").matches(it) }?.let { Store.putStr("country", it) }
         b.optString("tv_name").trim().takeIf { it.isNotEmpty() }?.let { Store.putStr("tv_name", it.take(30)) }
-        if (b.has("ask_key")) Store.putStr("ask_key", b.optString("ask_key").trim().ifEmpty { null })
-        if (b.has("ask_enabled")) Store.putBool("ask_enabled", b.optBoolean("ask_enabled"))
+        Ask.save(b)
         // Watch Next in Keep watching (#122): the TV home app's two settings, same names and limits
         b.optJSONArray("skip_watch_next")?.let { arr ->
             val clean = JSONArray()
