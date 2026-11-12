@@ -126,8 +126,9 @@ In `config.json`, add the TV with `"kind": "vidaa"`:
 ```
 
 - `mac` is for turning the TV on from fully off (leave it out if you do not want that).
-- `trace: true` logs every message to and from the TV, with the PIN and any token hidden. Leave it on for
-  the first weeks: it is what an issue needs.
+- `trace: true` logs every message to and from the TV, with the PIN and every token hidden (any field whose
+  name holds token, secret or password, so `refreshtoken` too). Leave it on for the first weeks: it is what
+  an issue needs.
 - `browser`: the name the TV lists its web browser under, if couch-tv cannot find it by itself (it looks
   for "Browser", "Web Browser" and "Internet").
 - `home_url`: the address the TV should open, if the bridge picks the wrong one of this computer's
@@ -137,7 +138,11 @@ In `config.json`, add the TV with `"kind": "vidaa"`:
   the old address. To point the tile somewhere new (the standalone home below, or a new bridge address), set a
   new id here (for example `app.couchtv.tv`), add the tile again, and remove the old one from the app row.
 - `keep_home` (false): opt in (Beta). When the TV falls back to VIDAA's own home, couch-tv opens again on top. A
-  Home press from the phone remote is never bounced.
+  Home press from the phone remote is never bounced, and after the phone remote's Input key it waits up to
+  30 seconds, or until a source is picked, so the source picker stays usable. The Input key on the TV's own
+  remote is not seen by the bridge: press Home twice to keep VIDAA's home up for a while instead.
+- `pointer` (false): opt in. In the TV Browser (not the tile) the arrows move a mouse cursor; with
+  `"pointer": true` the page takes that cursor: pointing at a tile moves the focus to it and a click opens it.
 - `uuid`: the identity the TV pairs with. It is kept automatically and rarely set by hand.
 - `auth_method`: optional override for how the login is worked out, if your firmware needs a different one.
 - `port` (36669, then 36668 on older builds), `tls` (true), `cert` and `cert_key` (the files from step 2),

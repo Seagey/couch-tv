@@ -25,6 +25,7 @@ import vidaa  # noqa: E402
 
 PIN = "4821"
 TOKEN = "standin-token-7f3a"
+REFRESH = "standin-refresh-9c1e"
 APPS = [
     {"appId": "1", "name": "Netflix", "url": "netflix", "urlType": 37, "storeType": 0},
     {"appId": "2", "name": "YouTube", "url": "youtube", "urlType": 37, "storeType": 0},
@@ -68,6 +69,7 @@ class StandIn:
         self.tile_allowed = True
         self.refuse = None                # a CONNACK code to refuse every login with
         self.want_token = False           # refuse (5) a login whose password is not the token
+        self.issue_token = False          # like a 43A6N (#145): push tokenissuance after the PIN, answer no gettoken
         self.silent = set()               # action names the TV does not answer
         self.log = []                     # (topic, payload text) of everything the bridge published
         self.logins = []                  # (client id, user, password)
@@ -207,6 +209,12 @@ class StandIn:
             num = data.get("authNum") if isinstance(data, dict) else None
             self.pin_ok = self.pin_shown and isinstance(num, int) and num == int(PIN)
             await self.send(f"{mine}/ui_service/data/authenticationcode", {"result": 1 if self.pin_ok else 0})
+            if self.pin_ok and self.issue_token:
+                await self.send(f"{mine}/platform_service/data/tokenissuance",
+                                {"accesstoken": TOKEN, "refreshtoken": REFRESH, "refresh_token": REFRESH,
+                                 "accesstoken_duration_day": 7})
+        elif name == "gettoken" and self.issue_token:
+            pass
         elif name == "gettoken":
             await self.send(f"{mine}/platform_service/data/gettoken", {"accesstoken": TOKEN} if self.pin_ok else {})
         elif name == "uievent" and isinstance(data, dict) and data.get("type") == "app_install" and self.tile_allowed:

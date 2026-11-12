@@ -21,6 +21,13 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: VIDAA fixes from a Hisense 43A6N (on main).** A VIDAA trace now hides the refresh
+token as well as the access token. With `keep_home` on, the phone remote's Input key no longer has
+couch-tv jump back over VIDAA's source picker. Pairing now keeps the token a TV sends on its
+`tokenissuance` answer instead of saying there was none. A new opt in `"pointer": true` lets the page
+take clicks from the TV Browser's mouse cursor. Thanks Schielef (#145), whose 43A6N is now on the
+compatibility list.
+
 **13 November 2026: the Screensaver button on Philips and similar TVs (on main, in the next release).** On a Philips
 43PUS8546/12 the TV home came back to the front half a second after the button cut the screen timeout and put it
 straight back, so the TV never napped and the button said "The TV did not start the photos". A return that soon is now

@@ -4141,9 +4141,10 @@
   }
 
   // ---------------- a pointer (LG's Magic Remote, or the phone's touchpad on an LG) ----------------
-  // Pointing at a tile moves the focus there; a click opens it, as OK would. Only on webOS, where the
-  // TV has a pointer; elsewhere the home stays arrows only.
-  var HAS_POINTER = !!window.COUCH_WEBOS;
+  // Pointing at a tile moves the focus there; a click opens it, as OK would. On webOS, where the TV has
+  // a pointer, and on a page opened with ?pointer=1 (a VIDAA TV with "pointer": true, whose TV Browser
+  // turns the arrows into a mouse cursor, #145); elsewhere the home stays arrows only.
+  var HAS_POINTER = !!window.COUCH_WEBOS || /[?&]pointer=1(?:&|$)/.test(Q);
   if (HAS_POINTER) document.documentElement.classList.add("has-pointer");
   function inList(list, el) {
     for (; el && el !== document.body; el = el.parentNode) { var i = list.indexOf(el); if (i >= 0) return i; }

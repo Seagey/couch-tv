@@ -59,6 +59,7 @@ PORTS = [36669, 36668]
 WATCH_EVERY = 1.0   # seconds between looks at the TV (the backup path; the push fires at once)
 SETTLE = 0.3        # seconds the hook lets the TV settle after it comes on
 HOME_PAUSE = 30     # seconds a double Home press keeps VIDAA's own home up before couch-tv returns
+INPUT_PAUSE = 30    # seconds after the Input key that keep_home leaves VIDAA's home alone (the source picker, #145)
 
 # Every topic and payload shape in one place, so a tester's trace can correct them here.
 PROTOCOL = {
@@ -84,7 +85,22 @@ PROTOCOL = {
     "pin_field": "authNum",                            # CONFIRMED (an integer, not a string)
     "app_connect": {"app_version": 2, "connect_result": 0, "device_type": "Mobile App"},  # CONFIRMED
     "token_fields": ("accesstoken", "access_token", "token"),   # only older firmware issues one
+    # where a token comes back: gettoken on older firmware; tokenissuance (with accesstoken and
+    # refreshtoken) on a 43A6N, VIDAA Q0707 (#145), sometimes before gettoken is even asked
+    "token_answers": ("gettoken", "tokenissuance"),
 }
+
+# What a trace hides: the PIN and the value of any key whose name holds token, secret or password
+# (accesstoken, refreshtoken, refresh_token, ...), whether the value is a string or a number.
+TRACE_HIDE = re.compile(r'("(?:%s|[^"]*(?:token|secret|passw(?:or)?d)[^"]*)"\s*:\s*)(?:"(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?)'
+                        % PROTOCOL["pin_field"], re.IGNORECASE)
+
+
+def _token_in(data):
+    """The access token in a gettoken or tokenissuance answer, or None."""
+    if not isinstance(data, dict):
+        return None
+    return next((data[f] for f in PROTOCOL["token_fields"] if isinstance(data.get(f), str) and data[f]), None)
 
 # statetype values (the home, live TV, an input, a settings menu, standby, waking).
 LAUNCHER, LIVE_TV, INPUT_STATE = "remote_launcher", "livetv", "sourceswitch"
@@ -160,6 +176,8 @@ class VidaaTV:
         self.leave_inputs = cfg.get("leave_inputs", False) is True
         self.browser = (cfg.get("browser") or "").strip() or None
         self.home_url_cfg = (cfg.get("home_url") or "").strip() or None
+        # opt in: the page takes clicks from the TV Browser's mouse cursor (the arrows move a cursor there, #145)
+        self.pointer = cfg.get("pointer", False) is True
         # The id couch-tv's tile is added under. VIDAA keeps the address a tile was first added with
         # (installing again under the same id does not change it), so moving the home elsewhere, for
         # example to a hosted standalone copy (docs/VIDAA.md), needs a new id here.
@@ -216,6 +234,8 @@ class VidaaTV:
         self.quiet_until = 0.0
         self.home_on_wake_until = 0.0
         self.hook_log = []
+        self._issued = (None, 0.0)     # (token, when) the last token the TV handed out, on either answer topic
+        self._input_until = 0.0        # the Input key was pressed: keep_home leaves VIDAA's home alone until then
 
     # ---------- what the bridge keeps for this TV ----------
     def _stored(self):
@@ -322,9 +342,10 @@ class VidaaTV:
         if not self.trace:
             return
         text = payload.decode("utf-8", "replace") if isinstance(payload, bytes) else str(payload)
-        # never the PIN or the token in a log someone may paste into an issue (the PIN now goes as a number)
-        text = re.sub(r'("(?:%s|%s)"\s*:\s*)(?:"[^"]*"|-?\d+)' % (PROTOCOL["pin_field"], "|".join(PROTOCOL["token_fields"])),
-                      r'\1"(hidden)"', text)
+        # never the PIN or any token in a log someone may paste into an issue (the PIN now goes as a
+        # number). tokenissuance carries refreshtoken next to accesstoken (#145), so any key with
+        # token, secret, password or passwd in its name is hidden, not only the ones we read.
+        text = TRACE_HIDE.sub(r'\1"(hidden)"', text)
         self.log.info("trace %s %s %s", way, topic, text[:600])
 
     async def _connection(self):
@@ -412,6 +433,8 @@ class VidaaTV:
             self.statetype = self.visible = new
             if NOTHING.match(new) or new in OFF_STATES:
                 self._front = (None, 0.0)
+            if new == INPUT_STATE:
+                self._input_until = 0.0   # a source was picked: Home bounces as usual again
             # Woke from standby straight onto VIDAA's own home: open couch-tv at once, the moment
             # the TV says so, instead of waiting for the next poll (the watch loop stays the backup).
             if old in OFF_STATES and NOTHING.match(new):
@@ -424,7 +447,10 @@ class VidaaTV:
             # Home presses park it for a minute, so VIDAA's own home and settings stay reachable.
             elif self.keep_home and old is not None and old not in OFF_STATES and new == LAUNCHER and new != old:
                 now = time.monotonic()
-                if now < self._home_pause_until:
+                if now < self._input_until:
+                    self._note("VIDAA home while choosing an input: left alone")
+                    now = self._last_home   # not a Home press: a Home straight after still bounces once
+                elif now < self._home_pause_until:
                     self._home_pause_until = 0.0     # parked on VIDAA; a further Home press = take me back
                     self._note("Home pressed again: returning to couch-tv")
                     self._bounce_home()
@@ -439,9 +465,16 @@ class VidaaTV:
                 else:
                     self._bounce_home()
                 self._last_home = now
-        for fut in self._waiters.pop(name, []):
-            if not fut.done():
-                fut.set_result(data)
+        names = (name,)
+        if name in PROTOCOL["token_answers"]:
+            names = PROTOCOL["token_answers"]   # a token on either topic answers the other's waiter too
+            tok = _token_in(data)
+            if tok:
+                self._issued = (tok, time.monotonic())
+        for n in names:
+            for fut in self._waiters.pop(n, []):
+                if not fut.done():
+                    fut.set_result(data)
 
     async def _publish(self, topic, payload):
         c = await self._connection()
@@ -485,19 +518,25 @@ class VidaaTV:
         if not PIN.match(pin):
             raise ValueError("the PIN is the 4 digits the TV shows")
         self.require()
+        asked = time.monotonic()
         ans = await self._ask("ui_service", "authenticationcode", {PROTOCOL["pin_field"]: int(pin)},
                               answer="authenticationcode")
         if not (isinstance(ans, dict) and ans.get("result") == 1):
             self.last_error = "the TV did not accept that PIN"
             raise VidaaError("the TV did not accept that PIN (it shows a fresh one each time: try again)")
-        token = None
-        try:   # older firmware sends a token; modern keeps the pairing against the uuid instead
-            got = await self._ask("platform_service", "gettoken", {}, answer="gettoken", timeout=4,
-                                  topic=PROTOCOL["token"].format(client=self.client_id))
-            if isinstance(got, dict):
-                token = next((got[f] for f in PROTOCOL["token_fields"] if isinstance(got.get(f), str) and got[f]), None)
-        except TVUnavailable:
-            pass
+
+        def issued():   # a token the TV pushed since the PIN went, on gettoken or tokenissuance
+            tok, at = self._issued
+            return tok if tok and at >= asked else None
+
+        token = issued()
+        if not token:
+            try:   # older firmware sends a token; modern keeps the pairing against the uuid instead
+                got = await self._ask("platform_service", "gettoken", {}, answer="gettoken", timeout=4,
+                                      topic=PROTOCOL["token"].format(client=self.client_id))
+                token = _token_in(got) or issued()
+            except TVUnavailable:
+                token = issued()
         self.paired = True
         self._keep(paired=True, auth_method=self.auth_method, **({"token": token} if token else {}))
         self.last_error = None
@@ -584,6 +623,8 @@ class VidaaTV:
         q = []
         if self.id != config.DEFAULT_TV:
             q.append("tv=" + quote(self.id, safe=""))
+        if self.pointer:
+            q.append("pointer=1")
         if code:
             q.append("vidaa=" + code)
         return base + (("&" if "?" in base else "?") + "&".join(q) if q else "")
@@ -706,6 +747,8 @@ class VidaaTV:
             return                       # the user moved on, or asked for VIDAA's home
         if time.monotonic() - self._phone_home_at < 20:
             return                       # the phone remote's "vidaa_home" key asked for VIDAA's home
+        if time.monotonic() < self._input_until:
+            return                       # the Input key: VIDAA's source picker sits on its home
         if not self.open_on_power_on:
             return
         # note: no quiet_until check here on purpose, couch-tv never lands the TV on VIDAA's own
@@ -763,6 +806,8 @@ class VidaaTV:
         self.require()
         if code == "KEY_HOME":
             self._phone_home_at = time.monotonic()   # keep_home must not bounce a home asked for on purpose
+        if code == "KEY_INPUT":
+            self._input_until = time.monotonic() + INPUT_PAUSE   # nor the source picker the Input key opens
         if power and not self.is_on and not (self._mqtt and self._mqtt.alive):
             await self.wake()   # fully off: the broker is gone with it
             return code

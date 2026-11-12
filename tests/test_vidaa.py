@@ -27,7 +27,7 @@ import tinymqtt  # noqa: E402
 import vidaa  # noqa: E402
 import vidaa_auth  # noqa: E402
 from tv import TVUnavailable  # noqa: E402
-from vidaa_standin import PIN, TOKEN, StandIn, server_tls, tls_pair  # noqa: E402
+from vidaa_standin import PIN, REFRESH, TOKEN, StandIn, server_tls, tls_pair  # noqa: E402
 
 
 class Base(unittest.IsolatedAsyncioTestCase):
@@ -329,6 +329,40 @@ class Pairing(Base):
         self.assertNotIn(TOKEN, out)
         await t._drop()
 
+    async def test_trace_hides_the_refresh_token_from_tokenissuance(self):
+        # a 43A6N (VIDAA Q0707) sends accesstoken and refreshtoken on tokenissuance (#145)
+        self.s.issue_token = True
+        t = self.s.tv(trace=True)
+        with self.assertLogs("vidaa.lounge", logging.INFO) as cm:
+            await t.pair_start()
+            await t.pair_finish(PIN)
+        out = "\n".join(cm.output)
+        self.assertIn("tokenissuance", out)
+        self.assertRegex(out, r'"refreshtoken": ?"\(hidden\)"')
+        self.assertNotIn(REFRESH, out)
+        self.assertNotIn(TOKEN, out)
+        self.assertNotIn(PIN, out)
+        await t._drop()
+
+    def test_trace_pattern_hides_every_token_like_key(self):
+        hide = lambda txt: vidaa.TRACE_HIDE.sub(r'\1"(hidden)"', txt)
+        out = hide('{"accesstoken":"a1","refresh_token":"r\\"2","RefreshToken":"r3","id_token":7,'
+                   '"client_secret":"s","password":"p","authNum":1234,"name":"tokenissuance","result":1}')
+        for secret in ('"a1"', 'r\\"2', '"r3"', ':7', '"s"', '"p"', '1234'):
+            self.assertNotIn(secret, out)
+        self.assertIn('"name":"tokenissuance"', out)    # a value that merely says token stays
+        self.assertIn('"result":1', out)
+
+    async def test_a_token_on_tokenissuance_is_kept(self):
+        # the TV pushes tokenissuance right after the PIN and never answers gettoken: still a token
+        self.s.issue_token = True
+        await self.tv.pair_start()
+        with self.assertLogs("vidaa.lounge", logging.INFO) as cm:
+            await self.tv.pair_finish(PIN)
+        self.assertEqual(self.tv.token, TOKEN)
+        self.assertIn("with a token", "\n".join(cm.output))
+        self.assertNotIn("no token on this firmware", "\n".join(cm.output))
+
 
 class Tile(Base):
     async def test_tile_added_then_home_opens_the_tile(self):
@@ -367,6 +401,13 @@ class Tile(Base):
         t = self.s.tv(home_url="http://192.0.2.20:5400/tv/", id="bedroom")
         self.assertEqual(t.home_url(), "http://192.0.2.20:5400/tv/?tv=bedroom")
         self.assertEqual(t.home_url("abc"), "http://192.0.2.20:5400/tv/?tv=bedroom&vidaa=abc")
+
+    async def test_pointer_is_opt_in(self):
+        # "pointer": true lets the page take the TV Browser's mouse clicks (#145); off, nothing changes
+        self.assertNotIn("pointer", self.s.tv(home_url="http://192.0.2.20:5400/tv/").home_url("abc"))
+        t = self.s.tv(home_url="http://192.0.2.20:5400/tv/", pointer=True)
+        self.assertEqual(t.home_url("abc"), "http://192.0.2.20:5400/tv/?pointer=1&vidaa=abc")
+        self.assertFalse(self.s.tv(pointer="yes").pointer)   # only a real true turns it on
 
 
 class OneTimeCodes(Base):
@@ -485,6 +526,31 @@ class KeepHome(Base):
         await self.s.broadcast_state("remote_launcher")
         await asyncio.sleep(0.3)
         self.assertEqual(await self.launches(), [])
+        await t._drop()
+
+    async def test_the_input_key_holds_the_bounce_until_a_source_is_picked(self):
+        # VIDAA's source picker sits on its own home: keep_home must not pull couch-tv over it (#145)
+        t = await self.watch(keep_home=True)
+        await t.key("input")
+        await self.s.broadcast_state("remote_launcher")
+        await asyncio.sleep(0.3)
+        self.assertEqual(await self.launches(), [])
+        await self.s.broadcast_state("sourceswitch")      # an input was picked: the hold ends
+        await self.settle()
+        self.assertEqual(t._input_until, 0.0)
+        await self.s.broadcast_state("remote_launcher")    # Home from the input bounces as usual
+        await asyncio.sleep(0.3)
+        self.assertEqual([l["appId"] for l in await self.launches()], ["77"])
+        await t._drop()
+
+    async def test_the_input_hold_runs_out(self):
+        t = await self.watch(keep_home=True)
+        with patch.object(vidaa, "INPUT_PAUSE", 0.1):
+            await t.key("input")
+        await asyncio.sleep(0.2)
+        await self.s.broadcast_state("remote_launcher")
+        await asyncio.sleep(0.3)
+        self.assertEqual([l["appId"] for l in await self.launches()], ["77"])
         await t._drop()
 
 

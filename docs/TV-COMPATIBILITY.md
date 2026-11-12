@@ -64,6 +64,12 @@ Not tested by the author. Each line is what someone said worked on their own dev
   from about 50 ms to 16 ms on both. Developer Mode and couch-tv survived a firmware update; only
   Key Server had to be switched on again
   ([issue #89](https://github.com/Seagey/couch-tv/issues/89)).
+- **Hisense 43A6N (VIDAA, firmware V0003.09.60A.Q0707, Germany): works with the bridge**, reported by
+  Schielef. The modern login worked with the owner's own client certificate (from their copy of Hisense's
+  app), PIN pairing held across later connections, the Couch TV tile went in and opened couch-tv, and the
+  app list came through. Their report led to `keep_home` leaving the source picker alone after the Input
+  key, the `pointer` option for the TV Browser, and the trace hiding the refresh token
+  ([issue #145](https://github.com/Seagey/couch-tv/issues/145)).
 
 ## Notes
 
@@ -134,8 +140,8 @@ Not tested by the author. Each line is what someone said worked on their own dev
   TV the way Hisense's own phone app does (MQTT over TLS on port 36669, `bridge/vidaa.py`) and opens couch-tv's
   home page in the TV's browser, or as a tile on firmware that still accepts one, each time the TV comes on.
   Newer firmware (2024 on) needs a client certificate the owner takes from their own copy of Hisense's app;
-  couch-tv never ships it. Tested against a stand-in only, **never on a real VIDAA TV**, and parts of the
-  protocol are unconfirmed ([VIDAA.md](VIDAA.md)). VIDAA's Home button cannot be taken over without root, and
+  couch-tv never ships it. Confirmed on a Hisense 55U7N (#128) and reported working on a 43A6N (#145); parts
+  of the protocol are still unconfirmed on other firmware ([VIDAA.md](VIDAA.md)). VIDAA's Home button cannot be taken over without root, and
   couch-tv never roots a TV.
 - **Philips on Titan OS** does not run Android apps, has no sideloading or developer mode switch, and runs a
   web page only as a Titan app. The bridge drives it with Philips's own network remote (JointSpace, HTTPS on
