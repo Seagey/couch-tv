@@ -529,6 +529,7 @@ class MainActivity : Activity() {
             "jpg", "jpeg" -> "image/jpeg"
             "png" -> "image/png"
             "webp" -> "image/webp"
+            "mp4" -> "video/mp4"   // a scene's own clip (home.my_scenes[].video)
             "svg" -> "image/svg+xml"
             "woff2" -> "font/woff2"
             else -> "application/octet-stream"
