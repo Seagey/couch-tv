@@ -165,6 +165,34 @@ def wireless_debugging_port(ip, wait=4.0):
     return found.get("port")
 
 
+# The first Fire OS builds that stop an app on the TV from using the TV's own ADB (Amazon's fix for
+# CVE-2024-27350), as on-tv/README.md lists them. UNCONFIRMED: that ro.build.version.fireos carries the
+# same number as Settings, About; a version this cannot read gets the cautious message instead.
+FIRE_ADB_BLOCK_FROM = {6: (6, 7, 1, 1), 7: (7, 6, 6, 9), 8: (8, 1, 0, 3)}
+
+
+def fire_adb_blocks(version):
+    """True: this Fire OS build blocks the TV's own ADB. False: an older build, it may still allow it.
+    None: the version could not be read (or is not four numbers)."""
+    parts = (version or "").split(".")
+    if len(parts) != 4 or not all(p.isdigit() for p in parts):
+        return None
+    got = tuple(int(p) for p in parts)
+    if got[0] > 8:
+        return True
+    return got >= FIRE_ADB_BLOCK_FROM[got[0]] if got[0] in FIRE_ADB_BLOCK_FROM else False
+
+
+FIRE_ADB_WARNING = {
+    True: " This Fire OS build blocks the TV's own ADB (Amazon's fix for CVE-2024-27350), so option C's phone remote "
+          "cannot press keys or type. For the full phone remote use option B (a computer at home that stays on).",
+    False: " This Fire OS build may still allow the TV's own ADB: the block was seen from 6.7.1.1, 7.6.6.9 and "
+           "8.1.0.3. If option C's phone remote cannot press keys after setup, use option B.",
+    None: " Recent Fire OS builds block the TV's own ADB, so option C's phone remote may not press keys or type "
+          "(this run could not read the Fire OS version). For the full phone remote use option B.",
+}
+
+
 def adb_facts(ip):
     try:
         from adb_shell.adb_device import AdbDeviceTcp
@@ -305,12 +333,17 @@ def main():
     else:
         fire = bool(facts and not facts.get("error") and (facts.get("fire_os") or "amazon" in facts.get("maker", "").lower()))
         sdk = int(facts["sdk"]) if facts and facts.get("sdk", "").isdigit() else None
+        blocks = fire_adb_blocks(facts.get("fire_os")) if fire else None
         verdict = {
             "A": "partly (workarounds only)" if fire else "yes",
             "B": "partly (no Android TV remote protocol)" if fire and not open_ports[6466] else "yes",
             "C": "yes" if (fire or (sdk is not None and sdk <= 30)) else ("likely, may need a pairing code after each restart" if sdk else "likely (switch on Developer options, then run with --adb to confirm)"),
             "why": "Android based." + ("" if facts else " Run with --adb for the Android version and maker."),
         }
+        if fire:
+            verdict["why"] += FIRE_ADB_WARNING[blocks]
+            if blocks:
+                verdict["C"] = "yes, but the phone remote cannot press keys or type"
         if not adb_open:
             verdict["why"] += " ADB on a fixed port is off for now: every option needs Developer options and debugging switched on (README step 1)."
     print(f"A. TV home only:            {verdict['A']}")
