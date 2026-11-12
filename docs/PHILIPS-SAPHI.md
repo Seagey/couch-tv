@@ -111,7 +111,7 @@ You need a computer at home that stays on, running the bridge (README, option B)
 
 **Security.** A set that answers without a login can already be driven by anything on your Wi-Fi; couch-tv
 does not change that and cannot switch it off. The bridge itself still asks for its own pairing key if you set
-one (README). A guest Wi-Fi for visitors keeps them off the TV's port.
+one ([SETUP.md step 5](SETUP.md#step-5-run-the-bridge-option-b)). A guest Wi-Fi for visitors keeps them off the TV's port.
 
 ## PROTOCOL: what is known, and from where
 

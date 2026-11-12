@@ -13,7 +13,7 @@ screen) for the API version and whether the TV lists a browser. On 7345 or 9000 
 prompt on the TV, no key). --adb connects with ADB to read the Android version, the maker and
 which home screen the TV runs. The first time, the TV asks "Allow USB debugging?". That prompt is
 the only thing that appears on screen, and saying no is fine. Run --adb only after Developer
-options are on (README step 1): it also saves this computer's ADB key in ~/.android/adbkey.
+options are on (docs/SETUP.md step 1): it also saves this computer's ADB key in ~/.android/adbkey.
 
 ADB is looked for on ADB_PORT (5555 unless set). When that is closed it also listens for a
 "Wireless debugging" announcement from the TV and says which of the two cases this TV is.
@@ -246,7 +246,7 @@ def main():
         print(f"  ADB: open on port {ADB_PORT} (Network debugging, or USB debugging on TVs that open it by itself). couch-tv can use it as it is.")
     elif wireless:
         print(f"  ADB: only Wireless debugging is on (port {wireless}, it changes on restart). couch-tv's")
-        print("  scripts need the fixed port: pair once with Android platform-tools (README step 1,")
+        print("  scripts need the fixed port: pair once with Android platform-tools (docs/SETUP.md step 1,")
         print("  \"Only Wireless debugging?\"), then run `adb tcpip 5555`.")
     android = open_ports[6466] or open_ports[6467] or adb_open or bool(wireless)
     samsung = open_ports[8001] or open_ports[8002]
@@ -353,7 +353,7 @@ def main():
             if blocks:
                 verdict["C"] = "yes, but the phone remote cannot press keys or type"
         if not adb_open:
-            verdict["why"] += " ADB on a fixed port is off for now: every option needs Developer options and debugging switched on (README step 1)."
+            verdict["why"] += " ADB on a fixed port is off for now: every option needs Developer options and debugging switched on (docs/SETUP.md step 1)."
     print(f"A. TV home only:            {verdict['A']}")
     print(f"B. Computer bridge:         {verdict['B']}")
     print(f"C. Lives on the TV:         {verdict['C']}")

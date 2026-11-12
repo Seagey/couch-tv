@@ -92,7 +92,7 @@ restart after step 3 is enough: nothing can connect any more.
 
 - **The TV loops after a restart** (blank screen, restarts by itself, again and again). Seen on a
   Sony Bravia Google TV set up with couch-tv 0.10 or older, which switched off the Google TV home
-  and the setup app. Steps: [README, If your TV loops after a restart](../README.md#if-your-tv-loops-after-a-restart).
+  and the setup app. Steps: [TROUBLESHOOTING.md, If your TV loops after a restart](TROUBLESHOOTING.md#if-your-tv-loops-after-a-restart).
 
 - **The TV forgot its Wi-Fi.** It could happen when couch-tv 0.10 or older switched the setup app
   off, or when it is switched back on.

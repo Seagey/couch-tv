@@ -77,14 +77,14 @@ it can switch wireless debugging back on after a restart, the way Shizuku does).
 
 1. **Download `couch-tv-ontv.apk` from the GitHub Releases page** (easiest), or build it from the
    repo root with `sh scripts/build-apk.sh` (JDK 21, the Android SDK and Node 20+, no Gradle
-   needed; README, "Building the app"). It builds the phone remote first if `remote/dist` is
+   needed; docs/SETUP.md, "Building the app"). It builds the phone remote first if `remote/dist` is
    missing, then copies the remote and the TV home page into the app, and leaves it at
    `dist/couch-tv-ontv.apk`.
 2. Install from a computer once (developer options and debugging must be on). With network
    debugging on port 5555, the repo's own helper needs nothing else installed, and copies the app
    in small pieces (some TVs stall on a normal push):
    ```
-   .venv/bin/python on-tv/scripts/real-tv.py --ip <tv-ip> install couch-tv-ontv.apk   # from the repo root, after README step 2
+   .venv/bin/python on-tv/scripts/real-tv.py --ip <tv-ip> install couch-tv-ontv.apk   # from the repo root, after docs/SETUP.md step 2
    ```
    If the TV only has **Wireless debugging** (many Android 13 and newer Google TVs), use Google's
    platform-tools once instead:
@@ -110,7 +110,7 @@ the TV, or on the setup page, signs every phone out.
 Switch on **Use as home screen** in Couch TV. On a plain Android TV that is enough. On Google TV the
 system launcher still wins the Home button, and **do not switch it off**: on some Google TVs (a
 Sony Bravia among them) the TV then loops at every restart
-([README](../README.md#if-your-tv-loops-after-a-restart)). The Couch TV tile in the app row opens
+([docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md#if-your-tv-loops-after-a-restart)). The Couch TV tile in the app row opens
 setup, so choose **Open the home** there to see the home (it appears when the Home button doesn't already open Couch TV), or use option A's `apply.sh`, which takes
 the Home button with a watch and leaves the Google home on.
 The **Couch TV home watch** accessibility service is for Fire TV only. On any other TV it switches

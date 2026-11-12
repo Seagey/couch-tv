@@ -28,7 +28,7 @@ opens, and Home settings, About repeats it. The on-TV app does the same from **U
 On Google TV that does not hold the Home key: run `apply.sh` from a computer for the Home button
 watch. Never switch off or uninstall the TV's own home to make this work.
 
-The README's steps are numbered 1 to 6. Option A uses steps 1, 2 and 6. Option B uses steps 1 to
+The steps in docs/SETUP.md are numbered 1 to 6. Option A uses steps 1, 2 and 6. Option B uses steps 1 to
 6. Option C follows [on-tv/README.md](on-tv/README.md) (the app `dev.couchtv.ontv`).
 
 ## 0. Before you start (quietly)
@@ -44,7 +44,7 @@ The README's steps are numbered 1 to 6. Option A uses steps 1, 2 and 6. Option B
    [the GitHub Releases page](https://github.com/Seagey/couch-tv/releases) into `dist/` (git
    ignores it), for example `curl -fL -o dist/couch-tv-home.apk
    https://github.com/Seagey/couch-tv/releases/latest/download/couch-tv-home.apk`. Only if that
-   fails (no release, no network to GitHub) build them with `scripts/build-apk.sh` (README,
+   fails (no release, no network to GitHub) build them with `scripts/build-apk.sh` (docs/SETUP.md,
    "Building the app"). An Android 6 TV also needs a build: the 0.12 apps need Android 7.1, and
    Android 6 support is on main for the next release.
 3. Note what else the computer has: macOS or Linux, and Node 20.19+ or 22.12+ (option B, and a build of the
@@ -468,11 +468,11 @@ Before you touch the TV, say back, in one short list: the TV, the option, the pe
 the apps first in line, the quick settings, and what will be switched off on the TV. Then explain
 exactly what changes:
 
-- Developer options and USB debugging go on (README step 1), plus Network debugging if the TV
+- Developer options and USB debugging go on (docs/SETUP.md step 1), plus Network debugging if the TV
   has that switch (many do not: on some, USB debugging alone opens the network port). The TV asks
   "Allow USB debugging?" once per computer. They tick Always allow.
 - If `check-tv.py` said the TV only has Wireless debugging: you will pair once with Google's
-  platform-tools and run `adb tcpip 5555` (README step 1, "Only Wireless debugging?"). On some TVs
+  platform-tools and run `adb tcpip 5555` (docs/SETUP.md step 1, "Only Wireless debugging?"). On some TVs
   that port closes after a restart and has to be opened again the same way.
 - Options A and B (`apply.sh`) make couch-tv the home and switch off ambient mode (the idle
   adverts) and any ad tracker you agree to. The TV's own home screen and setup app stay on, so the
@@ -481,7 +481,7 @@ exactly what changes:
   a moment. Nothing is deleted.
   - **Never switch off the Google TV home (`launcherx`, `tvlauncher`) or the setup app
     (`setupwraith`), by hand or through `EXTRA_OFF`.** couch-tv 0.10 and older did, and a Sony
-    Bravia Google TV then looped at every restart (README, "If your TV loops after a restart").
+    Bravia Google TV then looped at every restart (docs/TROUBLESHOOTING.md, "If your TV loops after a restart").
     `apply.sh` refuses them and anything else the TV may need to start.
   - **TCL: Home goes back to Google TV after every restart (#94, TCL Smart TV Pro, Android 14).**
     TCL's boot manager `TclAppBoot` blocks binding `FireWatch` and `KeyWatch` and the
@@ -522,7 +522,7 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
 1. Install what was missing in step 0 (say what you are installing). Use the release APKs you
    downloaded into `dist/` in step 0; build only if that download failed.
 2. Write `config.json` from their answers. Never commit it.
-3. Developer options on (README step 1). Tell them: switch on **USB debugging**; if there is
+3. Developer options on (docs/SETUP.md step 1). Tell them: switch on **USB debugging**; if there is
    also a **Network debugging** (or Wireless debugging) switch, switch that on too. Do not insist
    on Network debugging: some TVs have no such switch and USB debugging alone opens port 5555 (a
    TCL with Android TV 11 did). Then check with `.venv/bin/python scripts/check-tv.py <tv address>`
@@ -542,18 +542,18 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
    showing "Allow USB debugging?" for any new key. The current `apply.sh` leaves both on, but make
    sure each computer that will talk to the TV has been allowed first anyway, and for option C that
    the on-TV app's **Connect ADB** has been allowed.
-5. Follow the README for their option (A: steps 1, 2 and 6; B: steps 1 to 6;
+5. Follow docs/SETUP.md for their option (A: steps 1, 2 and 6; B: steps 1 to 6;
    C: [on-tv/README.md](on-tv/README.md)). Run `tv-home/tools/survey-tv.py` before `apply.sh`.
    Option A: run `apply.sh` with no `BRIDGE_URL`. Option B: with `BRIDGE_URL`. It copies the app
    with `tvadb.py`, which falls back to a slower copy by itself if the TV stalls; let it finish.
    If it ends with "this computer can no longer reach it", ask them to check the TV is on and on
    the Wi-Fi, then run the same `apply.sh` command again.
-   - **Pairing (option B, README step 3):** you cannot type into `pair_tv.py`. Run
+   - **Pairing (option B, docs/SETUP.md step 3):** you cannot type into `pair_tv.py`. Run
      `.venv/bin/python bridge/pair_tv.py <tv id>` in the background, ask them to read you the code
      on the TV, then run `.venv/bin/python bridge/pair_tv.py <tv id> --code <code>`. It prints
      `ok: ... is paired` and exits 0, or says the TV refused the code (then start again: each
      pairing shows a fresh code).
-   - **Keeping the bridge running (option B, README step 5):** if you started the bridge by hand to
+   - **Keeping the bridge running (option B, docs/SETUP.md step 5):** if you started the bridge by hand to
      test it, stop it before installing the service (it holds the port), and never point your
      hand-started copy's output at the service's log file. After `launchctl bootstrap`, check
      `launchctl print gui/$(id -u)/app.couchtv.bridge` says `state = running`. Exit code 78

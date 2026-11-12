@@ -72,11 +72,12 @@ Do not copy our delay numbers. They belong to our two TVs. Measure yours with `c
 
 ## What you need
 
-- A computer on the same Wi-Fi, set up as in the [README](../README.md) steps 1 and 2 (the Python
+- A computer on the same Wi-Fi, set up as in [SETUP.md](SETUP.md) steps 1 and 2 (the Python
   folder `.venv` with the packages in `bridge/requirements.txt`). It has to be on and awake whenever you
   press play. Once the show is playing it can go to sleep. This needs no couch-tv home screen and no
   bridge: the two TVs only need to be ready for ADB.
-- **ADB debugging switched on, and this computer allowed, on each TV** (README, step 1). The TV asks
+- **ADB debugging switched on, and this computer allowed, on each TV**
+  ([SETUP.md step 1](SETUP.md#step-1-developer-mode-on-the-tv-every-option)). The TV asks
   "Allow USB debugging?" once.
 - The same app on both TVs, signed in, with the same show open.
 

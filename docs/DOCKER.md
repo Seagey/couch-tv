@@ -13,7 +13,7 @@ The container uses host networking, so Wake-on-LAN and finding TVs work. The bri
 
 ## Set it up
 
-1. Follow the README steps up to the bridge for your TV (steps 1 to 4), on any computer, then copy
+1. Follow the [SETUP.md](SETUP.md) steps up to the bridge for your TV (steps 1 to 4), on any computer, then copy
    the repo to the Docker host with `config.json` and the phone remote built (`remote/dist`).
    Set `bridge.host` in `config.json` to the Docker host's name or address.
 2. Pair the TV (step 3) so that `bridge/data/` holds its keys. You can run `bridge/pair_tv.py`
@@ -39,7 +39,7 @@ The container uses host networking, so Wake-on-LAN and finding TVs work. The bri
 After you change `config.json` or the bridge's code, restart the container:
 `docker compose -f examples/docker/compose.yaml restart`.
 
-Everything in the README about who can reach the bridge still applies: it has no password, so keep
+Everything in [HOW-IT-WORKS.md](HOW-IT-WORKS.md#privacy-and-safety) about who can reach the bridge still applies: it has no password, so keep
 it on your home network and never forward a port to it.
 
 ## Synology note

@@ -39,7 +39,7 @@ def main():
     except urllib.error.HTTPError as e:
         sys.exit(f"the bridge said no ({e.code}): {e.read().decode(errors='replace')[:200]}")
     except OSError as e:
-        sys.exit(f"the bridge is not answering on port {port} ({e}). Start it first (README, step 5).")
+        sys.exit(f"the bridge is not answering on port {port} ({e}). Start it first (docs/SETUP.md, step 5).")
     code = j["code"]
     print(f"Code for Couch TV on the Apple TV: {code[:3]} {code[3:]}")
     print(f"It works once, for {j['expires_in'] // 60} minutes.")

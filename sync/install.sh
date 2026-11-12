@@ -25,7 +25,7 @@ export TV_IP
 tv() { "$PY" "$TVADB" "$@"; }
 
 echo "Checking the TV answers ..."
-tv ping > /dev/null || { echo "Cannot reach the TV. Is it on, on the same Wi-Fi, with ADB debugging switched on and allowed for this computer (README, step 1)?"; exit 1; }
+tv ping > /dev/null || { echo "Cannot reach the TV. Is it on, on the same Wi-Fi, with ADB debugging switched on and allowed for this computer (docs/SETUP.md, step 1)?"; exit 1; }
 
 if [ "$UNDO" = 1 ]; then
   tv shell "cmd notification disallow_listener $LISTENER; pm uninstall $PKG" || exit 1

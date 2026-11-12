@@ -27,7 +27,7 @@ committed):
 Plus one entry in `config.json` (`home.my_scenes`) that names the scene and designs its clock.
 
 `tv-home/tools/make-scene.py` makes the files. It needs Python 3 with numpy and Pillow, into the
-repo's `.venv` (README step 2 makes it):
+repo's `.venv` ([SETUP.md step 2](SETUP.md#step-2-get-the-code-and-set-up-python-every-option) makes it):
 
 ```sh
 .venv/bin/pip install numpy Pillow
@@ -141,9 +141,9 @@ press Home on the TV. The TV's copy for when the computer is off picks up the sc
 **Option A (no computer).** Here the home is the copy built *into* the app, and `apply.sh` can hand
 the app new settings but not new pictures. So:
 
-1. Build the app yourself with the scene in place: `sh scripts/build-apk.sh` (README, "Building
-   the app": JDK 21 and the Android SDK). The app downloaded from the Releases page does not have
-   your scene.
+1. Build the app yourself with the scene in place: `sh scripts/build-apk.sh`
+   ([SETUP.md, "Building the app"](SETUP.md#building-the-app-instead-of-downloading-it): JDK 21 and
+   the Android SDK). The app downloaded from the Releases page does not have your scene.
 2. Install it: `APK=dist/couch-tv-home.apk TV_IP=<tv address> sh tv-home/tools/apply.sh`.
 
 Changing only the clock or the name of a scene already built in needs no rebuild: edit
