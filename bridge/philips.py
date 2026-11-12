@@ -258,6 +258,7 @@ class PhilipsTV:
         self._ids_checked = 0.0
         self._listeners = set()
         self._session = None
+        self._ctx = None
         self._auth = None
         self._tasks = []
         self._pairing = None        # (device id, auth key, timestamp) between pair_start and pair_finish
@@ -348,10 +349,11 @@ class PhilipsTV:
         passed on its requests and nowhere else)."""
         if not self.tls:
             return False
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        return ctx
+        if self._ctx is None:   # one context, kept: aiohttp only reuses a connection made with the same one
+            self._ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            self._ctx.check_hostname = False
+            self._ctx.verify_mode = ssl.CERT_NONE
+        return self._ctx
 
     async def _http(self):
         if self._session is None or self._session.closed:
@@ -376,7 +378,7 @@ class PhilipsTV:
                       r'\1"(hidden)"', text or "")
         self.log.info("trace %s %s %s", way, path, text[:600])
 
-    async def _call(self, method, path, payload=None, auth=None, timeout=5, version=None, login=True):
+    async def _call(self, method, path, payload=None, auth=None, timeout=5, version=None, login=True, any_body=False):
         """One JointSpace request. auth: a Digest, else the kept login (when there is one). login=False
         sends none even when one is kept, so a 401 comes back as NeedsLogin."""
         if version is None and self.version is None:
@@ -408,6 +410,8 @@ class PhilipsTV:
                     try:
                         return json.loads(text)
                     except ValueError:
+                        if any_body:   # a 200 is the answer: the 43PUS8909/12 says "Ok" as a web page to activities/browser
+                            return {}
                         raise PhilipsError(f"the TV sent something that is not JSON for {path}") from None
             except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
                 raise TVUnavailable(f"the TV did not answer ({type(e).__name__})") from None
@@ -684,7 +688,7 @@ class PhilipsTV:
             raise TVUnavailable("this TV reports no browser to open a page in")
         if not isinstance(url, str) or not SAFE_URL.match(url):
             raise ValueError("only a plain http:// or https:// address")
-        await self._call("POST", PROTOCOL["browser_open"], {"url": url}, timeout=8)
+        await self._call("POST", PROTOCOL["browser_open"], {"url": url}, timeout=8, any_body=True)
         self.visible = BROWSER_FRONT
 
     async def open_home(self):

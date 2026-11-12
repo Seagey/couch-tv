@@ -2,9 +2,11 @@
 
 **Read this first.**
 
-- **Not run on a real Titan OS TV yet.** Everything here was tested against a pretend Philips TV on a
-  computer (`tests/philips_standin.py`). Philips does not publish the newer parts of its network remote,
-  so some of it is our best reading, and the first real TV will probably show something to fix.
+- **One real Titan OS TV has answered the read only check, and nothing more yet.** A 43PUS8909/12 (2024,
+  Germany), not paired: see "The first real TV" below. Everything else here was tested against a pretend
+  Philips TV on a computer (`tests/philips_standin.py`). Philips does not publish the newer parts of its
+  network remote, so some of it is our best reading, and pairing on a real TV will probably show something
+  to fix.
 - **Phone remote only, today.** The bridge can drive the TV: power, keys, volume, inputs, opening the TV's
   apps, and the Claude ask on top of those. **couch-tv's home does not open on a Titan OS TV**, because
   Titan OS only runs a web page that is a Titan app, and that needs either a Titan developer account
@@ -46,6 +48,32 @@ Google TV, and the full couch-tv works on it. A Philips with no Google button an
 "Lifestyle" rows is Titan OS. `scripts/check-tv.py <tv address>` says "Philips Titan OS path" when the TV
 answers on port 1926 and is not Android.
 
+## The first real TV
+
+`scripts/philips-check.py` against a 43PUS8909/12 on 12 November 2026, read only and not paired:
+
+- JointSpace answers on https port 1926 under `/6/` (API 6.1.0). Plain port 1925 is open too.
+- "system" answers without a login and says `"pairing_type": "digest_auth_pairing"` and `"os_type": "Linux"`.
+- "system" lists `"activities": ["browser"]`. So the bridge takes the browser route on this TV
+  ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)): once paired it will try to open couch-tv's page in the TV's browser
+  at power on, unless `"browser_home": false`. **Whether the TV really opens a page is not settled.** Unpaired,
+  `POST activities/browser` on 1926 answered 200 with the web page "Ok" (not JSON), but the owner saw nothing
+  open on the screen. Paired, it is untested. Plain port 1925 answers 403.
+- "system" also lists `"textentry"` and `"inputkey": ["key", "unicode"]`, so typing from the phone may be
+  possible. Not built, not tested.
+- Without a login, `powerstate`, `audio/volume` and `activities/current` answer 401 (they want the login).
+  `sources`, `sources/current` and `applications` answer 403. Whether they answer once paired is unknown.
+- Finding it on the network, with the TV on (read only, 12 November 2026). One SSDP search for `ssdp:all`
+  got no answer from the TV at all (only the router and one other device replied). Browsing mDNS for every service
+  type showed two from the TV: `_philipstv_s_rpc._tcp.local.` on port 1926, instance name `6_43PUS8909/12`
+  (the 6 is the API version), and `_secure-mqtt._tcp.titanos.local.` on port 8883 with `FriendlyName`
+  `43PUS8909/12` and a `mqttv_version` of `v2.11.3` (its serial-like `SN` property is left out here). So
+  `scripts/find-tvs.py` lists the TV from the `_philipstv_s_rpc` service as "Philips TV". The plain-port
+  counterpart (1925) was not seen announcing on this TV, so it is not looked for. Whether other Titan OS Philips
+  models announce the same is not verified.
+
+Pairing, keys, volume, inputs, apps and the home are still untested on a real TV.
+
 ## What works, and what does not
 
 Tested against the stand in only:
@@ -68,7 +96,8 @@ Not possible or not built: couch-tv's home (below), typing from the phone, openi
 Titan OS has no way to replace its home screen, no sideloading, no developer mode switch and, as far as
 we found, no web browser app. A web page only runs on the TV as a Titan app. So couch-tv's home can only
 open inside a Titan app that shows couch-tv's page, and the bridge then opens that app each time the TV is
-switched on, the way the Samsung and LG versions open theirs. Searched on 12 November 2026, these are the
+switched on, the way the Samsung and LG versions open theirs. (The first real TV does list a "browser"
+activity to its network remote, which may be a way round this: "The first real TV" above. Untested.) Searched on 12 November 2026, these are the
 routes, closest to "opens by itself at power on" first:
 
 1. **A couch-tv app in Titan's store.** A tile on every Titan OS TV, no account for anyone. Titan reviews
@@ -115,7 +144,17 @@ the TV's own Home.
 
 ## Setting it up
 
-You need a computer at home that stays on, running the bridge (README, option B). Then:
+You need a computer at home that stays on, running the bridge (README, option B). The short way, with the
+bridge stopped:
+
+```sh
+.venv/bin/python scripts/philips-setup.py <tv address>
+```
+
+It checks the TV answers, stops with an explanation if the pairing key (step 2 below) is not saved, asks before
+the TV shows a PIN, pairs, reads power, volume and apps, and prints the entry for `config.json` (it does not
+write the file; add `--mac <tv mac>` to have the MAC in it). Not tried on a paired real TV yet. The long way,
+step by step:
 
 1. **The TV's address.** Settings, Network (or Wireless and networks), Network status. Give it a fixed
    address in the router if you can.

@@ -38,6 +38,7 @@ import philips  # noqa: E402
 SECRET = base64.b64encode(b"stand in shared key, not Philips's").decode()   # a made up key for the tests
 PIN = "4821"
 REALM = "standin"
+SERIAL = "standin-serial-0001"   # what "system" gives as the TV's serial number: never to be printed
 APPS = [
     {"id": "netflix", "label": "Netflix", "type": "app"},
     {"id": "youtube", "label": "YouTube", "type": "app"},
@@ -72,6 +73,7 @@ class StandIn:
         self.has_applist = applist
         self.pages = []                 # the addresses activities/browser was asked to open
         self.authorization = []         # every Authorization header sent, None when there was none
+        self.connections = set()        # every connection a request came in on
         self.broken = set()             # paths that answer 500 with a page that is not JSON (unreliable sets)
         self.version = version          # the one API prefix this TV answers on
         self.power = "On"
@@ -145,6 +147,7 @@ class StandIn:
         raw = request.match_info["path"]
         text = await request.text()
         self.authorization.append(request.headers.get("Authorization"))
+        self.connections.add(request.transport)
         if not raw.startswith(self.version):
             return web.Response(status=404)
         path = raw[len(self.version):]
@@ -154,7 +157,7 @@ class StandIn:
             self.log.append((request.method, path, text))
         data = json.loads(text) if text else None
         if path == "system" and request.method == "GET":
-            about = {"name": "Stand in Philips", "model": "00XX0000/12",
+            about = {"name": "Stand in Philips", "model": "00XX0000/12", "serialnumber_encrypted": SERIAL,
                      "api_version": {"Major": int(self.version.strip("/") or 6), "Minor": 0}}
             if self.browser:
                 about["featuring"] = {"jsonfeatures": {"activities": ["browser"]}}
@@ -195,7 +198,8 @@ class StandIn:
             self.pages.append(url)
             if self.front is not None:
                 self.front = "browser"
-            return web.json_response({})
+            # what a real 43PUS8909/12 answers: 200 with a page, not JSON
+            return web.Response(text="<html><head><title>Ok</title></head><body>Ok</body></html>", content_type="text/html")
         if path == "powerstate":
             if request.method == "POST":
                 self.power = data["powerstate"]

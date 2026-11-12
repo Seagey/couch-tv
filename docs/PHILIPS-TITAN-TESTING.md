@@ -131,9 +131,16 @@ Replace `192.0.2.20` with your TV's address from step 1.
 
 What you might see:
 
-- `Nothing answers on port 1926 ...` Check the TV is on, the address is right and the computer is on the same
-  network, and run it again. If it still says that, that is a real result: please send it.
+- `Nothing answers on port 1926 ...` followed by one of three reasons. If it still says that after a retry, that
+  is a real result: please send it.
+  - `refused`: the TV is on the network but has no Philips network remote on these ports.
+  - `silent`: the TV is probably in deep standby. Switch it on with its own remote and run this again.
+  - `unreachable`: this computer cannot reach devices on the home network. The usual causes are a VPN app with a
+    kill switch, macOS Local Network permission refused (System Settings, Privacy and Security, Local Network),
+    a guest Wi-Fi, or router client isolation.
 - `JointSpace answers on /6/` and a line about the TV. That is the good result.
+- `What the TV answers without a login:` and a short list, mostly `wants a login`. Expected: it shows which
+  reads the TV guards.
 - `Not paired yet, so that is all it can read.` Expected. You can stop here and go to step 8, or carry on
   with step 6.
 
