@@ -7,6 +7,11 @@ a log of every request it was sent.
         t.power = "Standby"
         t.front = None                   # activities/current answers 404, as it may on Titan OS
 
+A Saphi mode (StandIn.saphi(folder)) is an older Philips Linux TV as some owners report it: plain http,
+no login on anything, API /1/, no powerstate and no app list, and a "browser" activity in "system" with
+activities/browser to open a page. Every part of that is UNCONFIRMED on a real Saphi TV
+(docs/PHILIPS-SAPHI.md).
+
 It answers only what the driver uses, in shapes that are partly our own reading (PROTOCOL in
 bridge/philips.py), so these tests prove the driver is consistent with itself and careful with what
 it sends, NOT that a real Titan OS TV answers the same way (docs/PHILIPS-TITAN.md).
@@ -57,9 +62,16 @@ def _md5(s):
 
 
 class StandIn:
-    def __init__(self, folder, version="6/", tls=True):
+    def __init__(self, folder, version="6/", tls=True, login=True, browser=False, powerstate=True, applist=True):
         self.folder = folder
         self.tls = tls
+        self.login = login              # False: everything answers without a login (Saphi)
+        self.browser = browser          # "system" lists a browser activity, and activities/browser opens a page
+        self.has_powerstate = powerstate
+        self.has_applist = applist
+        self.pages = []                 # the addresses activities/browser was asked to open
+        self.authorization = []         # every Authorization header sent, None when there was none
+        self.broken = set()             # paths that answer 500 with a page that is not JSON (unreliable sets)
         self.version = version          # the one API prefix this TV answers on
         self.power = "On"
         self.front = ""                 # the app id in front, "" for the home, None: activities/current is missing
@@ -73,6 +85,11 @@ class StandIn:
         self.nonce = "n0nce-1"
         self._runner = None
         self.port = None
+
+    @classmethod
+    def saphi(cls, folder, **kw):
+        return cls(folder, **({"version": "1/", "tls": False, "login": False, "browser": True, "powerstate": False,
+                               "applist": False} | kw))
 
     async def __aenter__(self):
         app = web.Application()
@@ -124,15 +141,21 @@ class StandIn:
     async def _handle(self, request):
         raw = request.match_info["path"]
         text = await request.text()
+        self.authorization.append(request.headers.get("Authorization"))
         if not raw.startswith(self.version):
             return web.Response(status=404)
         path = raw[len(self.version):]
+        if path in self.broken:
+            return web.Response(status=500, text="<html>error</html>")
         if path in ("system", "pair/request", "pair/grant"):
             self.log.append((request.method, path, text))
         data = json.loads(text) if text else None
         if path == "system" and request.method == "GET":
-            return web.json_response({"name": "Stand in Philips", "model": "00XX0000/12",
-                                      "api_version": {"Major": 6, "Minor": 2}})
+            about = {"name": "Stand in Philips", "model": "00XX0000/12",
+                     "api_version": {"Major": int(self.version.strip("/") or 6), "Minor": 0}}
+            if self.browser:
+                about["featuring"] = {"jsonfeatures": {"activities": ["browser"]}}
+            return web.json_response(about)
         if path == "pair/request" and request.method == "POST":
             dev = ((data or {}).get("device") or {}).get("id")
             if not dev or sorted((data or {}).get("scope") or []) != ["control", "read", "write"]:
@@ -155,9 +178,21 @@ class StandIn:
             self.logins[dev] = key
             self.pin_on_screen = False
             return web.json_response({"error_id": "SUCCESS"})
-        if not self._logged_in(request, self.logins):
+        if self.login and not self._logged_in(request, self.logins):
             return self._challenge()
         self.log.append((request.method, path, text))   # only what got past the login
+        if path == "powerstate" and not self.has_powerstate:
+            return web.Response(status=404)
+        if path == "applications" and not self.has_applist:
+            return web.Response(status=404)
+        if path == "activities/browser" and request.method == "POST":
+            url = (data or {}).get("url") if isinstance(data, dict) else None
+            if not self.browser or not isinstance(url, str) or not re.match(r"^https?://", url):
+                return web.Response(status=400 if self.browser else 404)
+            self.pages.append(url)
+            if self.front is not None:
+                self.front = "browser"
+            return web.json_response({})
         if path == "powerstate":
             if request.method == "POST":
                 self.power = data["powerstate"]
@@ -166,6 +201,8 @@ class StandIn:
         if path == "input/key" and request.method == "POST":
             if data.get("key") == "Home":
                 self.front = ""
+            if data.get("key") == "Standby":
+                self.power = "Standby"
             return web.json_response({})
         if path == "audio/volume":
             if request.method == "POST":
