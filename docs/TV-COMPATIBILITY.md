@@ -2,7 +2,7 @@
 
 Research from public sources (linked below). Only Google TV has been tested
 by the author. Everything else is what the sources say, not tested (Samsung and LG have since run on real
-TVs, see their pages; Roku has not).
+TVs, see their pages; Roku and Philips Titan OS have not).
 
 - **A. TV home only:** an app replaces the TV's home screen.
 - **B. Computer bridge:** a computer at home controls the TV with the Android TV Remote protocol
@@ -23,6 +23,7 @@ TVs, see their pages; Roku has not).
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on nine real LGs so far ([LG.md](LG.md)) | No |
 | Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation, **not yet tried on a real Roku** ([ROKU.md](ROKU.md)) | No |
+| Philips on Titan OS (mostly Europe, from 2023) | No | Phone remote only: power, keys, volume, inputs, opening apps. No couch-tv home without a Titan app (developer account or store listing). Tested against a stand in only, **not yet tried on a real Titan OS TV** ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)) | No |
 | Apple TV, Hisense VIDAA | No | No | No |
 
 ## Reported by people using it
@@ -98,6 +99,13 @@ Not tested by the author. Each line is what someone said worked on their own dev
   simulator, **never on a real Roku**. A sideloaded channel is always one at a time, and newer Roku OS limits
   that protocol unless "Control by mobile apps" allows it ([ROKU.md](ROKU.md)). Roku's home screen cannot be
   replaced.
+- **Philips on Titan OS** does not run Android apps, has no sideloading or developer mode switch, and runs a
+  web page only as a Titan app. The bridge drives it with Philips's own network remote (JointSpace, HTTPS on
+  port 1926, PIN pairing, `bridge/philips.py`): power, keys, volume, inputs and opening the apps it lists. The
+  pairing needs a key from Philips's own TV Remote app that the owner saves themselves; couch-tv never ships
+  it. couch-tv's home could only open through a published Titan app or Titan's DevView developer app, and
+  neither exists for couch-tv yet ([PHILIPS-TITAN.md](PHILIPS-TITAN.md), "The home"). Tested against a
+  stand in only, **never on a real Titan OS TV**. Titan OS is on Philips TVs sold in Europe from 2023.
 - **Samsung and LG** do not run Android apps or let an app replace their home screen. On a Samsung,
   couch-tv runs as a sideloaded app that the bridge opens when the TV comes on
   ([SAMSUNG.md](SAMSUNG.md)). On an LG the same is built, through LG's Developer Mode, and has run on
