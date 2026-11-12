@@ -39,6 +39,7 @@ import philips
 import vega
 import vizio
 import panasonic
+import spotify_now
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -387,7 +388,10 @@ def record_action(request, tool, args, success):
 
 # ---------- middleware: CORS + errors ----------
 # /api/vidaa/claim swaps a one time code for the key (below), so it cannot need the key itself.
-OPEN_PATHS = {"/api/health", "/api/pair", "/api/vidaa/claim", "/api/appletv/claim"}
+# The Spotify login (bridge/spotify_now.py) is opened in a browser on the bridge computer, and Spotify's
+# redirect back can't carry the pairing key: it is guarded by _loopback_only and a one-time state instead.
+OPEN_PATHS = {"/api/health", "/api/pair", "/api/vidaa/claim", "/api/appletv/claim",
+              "/api/spotify/login", "/api/spotify/callback"}
 
 
 @web.middleware
@@ -2547,12 +2551,58 @@ async def music_now():
                     item["position"] = pick["pos_s"]
                 if pick.get("dur_s") is not None:
                     item["duration"] = pick["dur_s"]
+    # Nothing from the TV's own media sessions (no ADB on VIDAA, LG, Samsung or Roku, or the music is
+    # playing on a phone): Spotify's Web API, when it has been set up (bridge/spotify_now.py)
+    if item is None:
+        item = await spotify_now.now_playing()
     music_state["item"] = item
     return item
 
 
 async def h_music(request):
     return ok(music=await music_now())
+
+
+# ---------- Spotify's now playing for the whole account (bridge/spotify_now.py, optional) ----------
+def _bridge_port(request):
+    return request.url.port or int(os.environ.get("PORT") or config.BRIDGE.get("port") or 5400)
+
+
+def _loopback_only(request):
+    """The Spotify login is for the bridge computer itself, never another device on the Wi-Fi. (Behind a
+    reverse proxy on the same computer every client would look local: couch-tv does not run behind one.)"""
+    ip = (request.remote or "").removeprefix("::ffff:")
+    try:
+        local = ipaddress.ip_address(ip).is_loopback
+    except ValueError:
+        local = False
+    if not local:
+        raise web.HTTPForbidden(text="Open this on the bridge computer: http://127.0.0.1:%s%s" % (_bridge_port(request), request.path))
+
+
+async def h_spotify_login(request):
+    _loopback_only(request)
+    try:
+        url = spotify_now.login_url("http://127.0.0.1:%s/api/spotify/callback" % _bridge_port(request))
+    except ValueError as e:
+        return web.Response(text=str(e), status=400)
+    raise web.HTTPFound(url)
+
+
+async def h_spotify_callback(request):
+    _loopback_only(request)
+    q = request.query
+    if q.get("error"):
+        return web.Response(text="Spotify said: " + q["error"], status=400)
+    try:
+        await spotify_now.finish_login(q.get("state"), q.get("code"))
+    except (ValueError, RuntimeError) as e:
+        return web.Response(text=str(e), status=400)
+    return web.Response(text="Spotify is connected to couch-tv. You can close this tab.")
+
+
+async def h_spotify_status(request):
+    return ok(**spotify_now.status())
 
 
 async def h_continue(request):
@@ -3527,6 +3577,9 @@ def make_app():
     r.add_post("/api/settings", h_settings_set)
     r.add_get("/api/continue", h_continue)
     r.add_get("/api/music", h_music)
+    r.add_get("/api/spotify/login", h_spotify_login)
+    r.add_get("/api/spotify/callback", h_spotify_callback)
+    r.add_get("/api/spotify/status", h_spotify_status)
     r.add_post("/api/continue/open", h_continue_open)
     r.add_post("/api/watch-next", h_watch_next)
     r.add_get("/api/watch-next", h_watch_next_get)
