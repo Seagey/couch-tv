@@ -21,6 +21,11 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: Hebrew and right to left layout on the TV home (on main, in the next release).** The home now speaks
+Hebrew (עברית), including the TV's own `he` or older `iw` language setting. The layout mirrors for right to left: the settings
+list moves to the right, chevrons flip, popups open on the correct side, and the remote's left and right buttons move the way
+the screen reads. English and the other languages are unchanged. Thanks YuvalHir (#153).
+
 **13 November 2026: Ask on the TV with more AI services (on main, in the next release).** On-TV mode's
 Ask is no longer Claude only: the setup page has a service picker for Claude, OpenAI, Google Gemini,
 OpenRouter, Groq, Mistral, another service that copies OpenAI's API, or a model on a computer at home
