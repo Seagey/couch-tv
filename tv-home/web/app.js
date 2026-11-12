@@ -4200,7 +4200,10 @@
 
   // The remote's own Settings/gear key (KEYCODE_SETTINGS = 176, or e.key "Settings"/"TvSettings").
   // couch-tv has no system home behind it, so it opens couch-tv's own gear menu, like the gear tile.
-  function isSettings(e) { return e.key === "Settings" || e.key === "TvSettings" || e.keyCode === 176; }
+  // keyCode 176 is also Chromium's code for the media Next track key (VK_MEDIA_NEXT_TRACK, e.key
+  // "MediaTrackNext"), which the bridge sends for the Next song button: that must skip the track, not
+  // open the gear menu (#158). So 176 only counts when the key is not a media key.
+  function isSettings(e) { return e.key === "Settings" || e.key === "TvSettings" || (e.keyCode === 176 && !/^Media/.test(e.key || "")); }
   function settingsKey() {
     if (kidsOn()) { window.KidsMode.askPin(); return; }
     if (idlePhotoInput(null)) return;

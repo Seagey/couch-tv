@@ -21,6 +21,8 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: The Next song button skips the track again (on main, in the next release).** On a Mi Box (Google TV), Next on the ambient music screen and on the Spotify card in Keep watching opened the gear menu (Home settings or TV settings) instead of skipping. The home's check for the remote's Settings key (key code 176) also matched the media Next key, which a browser engine reports with the same code. The home now tells them apart, in Kids mode too. Thanks NathanGlasby (#158).
+
 **13 November 2026: Your own scenes can move (on main, in the next release).** A scene in `home.my_scenes` can play a short looping clip behind its cut-out and the glass clock: add `"video": true` and put the clip at `backgrounds/mine/scene-<id>.mp4`. It is off unless you set it. Only the scene on screen plays, and it stops for an app, the ambient clock, screen off, Lighter home, the OLED and Classic looks, and the system's reduced motion setting; the photo stays if the clip cannot play. With option A the clip goes inside the app, so build it again (the built-in copy now serves `.mp4` as video). [MAKE-A-SCENE.md](docs/MAKE-A-SCENE.md) step 7 explains making and looping one. Thanks digitaldarkmatterltd (#155).
 
 **13 November 2026: Home settings lists stay put on older Samsungs (on main, in the next release).** On a 2020 Samsung (Tizen 5.5), moving down a long Home settings list such as Apps flashed the list up to the top and back on every press. The list now keeps its place and only the step to the next row scrolls. Thanks vicenteveltri (#156).
