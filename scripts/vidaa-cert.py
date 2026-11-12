@@ -8,9 +8,12 @@ not ship one: it is Hisense's, not ours to hand out. This script runs on your co
 the app you got yourself, and writes what it finds to bridge/data/vidaa/ (client.pem and client.key),
 which git ignores. Nothing is sent anywhere.
 
-It only reads plain PEM text inside the file ("-----BEGIN CERTIFICATE-----" and a matching private
-key). It does not take the app apart further than that. If it finds nothing, or the key is locked
-with a password, it says so and stops.
+It reads plain PEM text inside the file ("-----BEGIN CERTIFICATE-----" and a matching private key).
+Current RemoteNOW keeps the certificate in a keystore instead, so it also looks for keystore files
+inside the app (.p12, .pfx, .bks, .jks, .keystore, or PKCS#12 by content). A PKCS#12 keystore with no
+password is opened and written out the same way. A locked keystore, or a Java one (BKS, JKS), is named
+and left alone: the script does not unlock anything, decompile or patch the app, and never prints key
+material. If it finds nothing, it says so and stops.
 """
 import io
 import os
@@ -25,10 +28,38 @@ OUT = os.path.join(os.environ.get("COUCH_DATA") or os.path.join(ROOT, "bridge", 
 CERT = re.compile(rb"-----BEGIN CERTIFICATE-----\r?\n[A-Za-z0-9+/=\r\n]+?-----END CERTIFICATE-----")
 KEY = re.compile(rb"-----BEGIN ((?:RSA |EC |ENCRYPTED )?PRIVATE KEY)-----\r?\n[A-Za-z0-9+/=:,\- \r\n]+?-----END \1-----")
 BIGGEST = 20 * 1024 * 1024   # skip anything larger: certificates are a few kilobytes
+P12_EXT = (".p12", ".pfx")
+JAVA_EXT = (".bks", ".jks", ".keystore")
+JAVA_MAGIC = (b"\xfe\xed\xfe\xed", b"\xce\xce\xce\xce")   # JKS and JCEKS
+SKIP_EXT = (".dex", ".so", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".xml", ".arsc", ".ttf", ".otf",
+            ".mp3", ".mp4", ".ogg", ".wav", ".json", ".js", ".html", ".css", ".kotlin_module", ".version")
+LOCKED = ("The app keeps its certificate in a locked keystore ({names}) that this script can't open. "
+          "See docs/VIDAA.md.")
+
+
+def looks_pkcs12(body):
+    """PKCS#12 is a DER sequence whose first item is the integer 3 (the version)."""
+    if len(body) < 12 or body[0] != 0x30:
+        return False
+    n = body[1]
+    start = 2 + ((n & 0x7F) if n & 0x80 else 0)
+    return body[start:start + 3] == b"\x02\x01\x03"
+
+
+def store_kind(name, body):
+    """'p12', 'java' or None for one file inside the app."""
+    low = name.lower()
+    if low.endswith(P12_EXT):
+        return "p12"
+    if low.endswith(JAVA_EXT) or body[:4] in JAVA_MAGIC:
+        return "java"
+    if len(body) <= 256 * 1024 and not low.endswith(SKIP_EXT) and looks_pkcs12(body):
+        return "p12"
+    return None
 
 
 def blocks(data, found, depth=0):
-    """Every PEM certificate and key in a zip (an .apk is one), one level of zips inside it too."""
+    """Every PEM certificate and key, and every keystore file, in a zip (an .apk is one), one level of zips inside it too."""
     try:
         z = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
@@ -40,8 +71,39 @@ def blocks(data, found, depth=0):
         if depth == 0 and info.filename.lower().endswith((".apk", ".zip")):
             blocks(body, found, depth + 1)
             continue
+        kind = store_kind(info.filename, body)
+        if kind:
+            found["stores"].append((info.filename, body, kind))
+            continue
         found["certs"] += [(info.filename, m.group(0)) for m in CERT.finditer(body)]
         found["keys"] += [(info.filename, m.group(0)) for m in KEY.finditer(body)]
+
+
+def open_pkcs12(body):
+    """(certificate PEM, key PEM) from a PKCS#12 with no password or an empty one, else None."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.serialization import pkcs12
+    for pw in (None, b""):
+        try:
+            key, cert, _ = pkcs12.load_key_and_certificates(body, pw)
+        except (ValueError, TypeError):
+            continue
+        if key is None or cert is None:
+            continue
+        return (cert.public_bytes(serialization.Encoding.PEM).strip(),
+                key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                  serialization.NoEncryption()).strip())
+    return None
+
+
+def write_out(cert, key):
+    """client.pem and client.key into bridge/data/vidaa/, owner only. Returns where, for the message."""
+    os.makedirs(OUT, mode=0o700, exist_ok=True)
+    for name, body in (("client.pem", cert), ("client.key", key)):
+        path = os.path.join(OUT, name)
+        with open(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "wb") as f:
+            f.write(body + b"\n")
+    return os.path.relpath(OUT, ROOT) if OUT.startswith(ROOT + os.sep) else OUT
 
 
 def matches(cert, key):
@@ -64,27 +126,32 @@ def main():
         sys.exit(2)
     with open(sys.argv[1], "rb") as f:
         data = f.read()
-    found = {"certs": [], "keys": []}
+    found = {"certs": [], "keys": [], "stores": []}
     blocks(data, found)
+    pairs = [(cn, c, kn, k) for cn, c in found["certs"] for kn, k in found["keys"]
+             if b"ENCRYPTED" not in k and matches(c, k)]
+    if not pairs and found["stores"]:
+        for name, body, kind in found["stores"]:
+            opened = open_pkcs12(body) if kind == "p12" else None
+            if opened:
+                where = write_out(*opened)
+                print(f"ok: a certificate and its key from the keystore {name} written to {where}/ (git ignores it).")
+                print("Restart the bridge so it uses them.")
+                return
+        print(LOCKED.format(names=", ".join(n for n, _, _ in found["stores"])))
+        sys.exit(1)
     if not found["certs"] and not found["keys"]:
-        print("No PEM certificate or key in that file. This script stops there: it does not take the app apart.")
+        print("No PEM certificate, key or keystore in that file. This script stops there: it does not take the app apart.")
         sys.exit(1)
     if found["keys"] and all(b"ENCRYPTED" in k for _, k in found["keys"]):
         print("The only private keys in that file are locked with a password. This script does not unlock them.")
         sys.exit(1)
-    pairs = [(cn, c, kn, k) for cn, c in found["certs"] for kn, k in found["keys"]
-             if b"ENCRYPTED" not in k and matches(c, k)]
     if not pairs:
         print(f"Found {len(found['certs'])} certificate(s) and {len(found['keys'])} key(s), but no key that "
               "belongs to a certificate.")
         sys.exit(1)
     cn, c, kn, k = pairs[0]
-    where = os.path.relpath(OUT, ROOT) if OUT.startswith(ROOT + os.sep) else OUT
-    os.makedirs(OUT, mode=0o700, exist_ok=True)
-    for name, body in (("client.pem", c), ("client.key", k)):
-        path = os.path.join(OUT, name)
-        with open(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "wb") as f:
-            f.write(body + b"\n")
+    where = write_out(c, k)
     print(f"ok: a certificate ({cn}) and its key ({kn}) written to {where}/ "
           f"(git ignores it). {len(pairs) - 1} other matching pair(s) were left out." if len(pairs) > 1 else
           f"ok: a certificate ({cn}) and its key ({kn}) written to {where}/ (git ignores it).")

@@ -27,6 +27,11 @@ One honest caveat: some newer Hisense sets only let a phone remote in if it show
 If yours is one of those, the test will say it could not log in. That is a useful result, not a failure.
 Please still send it.
 
+The certificate comes from Hisense's Android app (RemoteNOW). You need an Android phone, or RemoteNOW from
+Google Play in an Android emulator on your computer: there is no iPhone only way yet. Current RemoteNOW keeps
+the certificate in a keystore, and `scripts/vidaa-cert.py` opens it when it has no password, or tells you
+plainly when it is locked (thanks trentosc, #131).
+
 ## What you need
 
 - A Mac, Windows or Linux computer on the **same Wi-Fi or network** as the TV.

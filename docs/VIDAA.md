@@ -88,21 +88,34 @@ Since about 2024, VIDAA only lets a phone remote in if it shows Hisense's client
 inside Hisense's own phone app. **couch-tv does not include it and never will**: it is Hisense's, not ours
 to hand out. You take it from your own copy of the app, on your own computer:
 
-1. Copy the VIDAA app's installer (`.apk`) off your own Android phone. On a computer with Android's
+This step needs the Android app. Use an Android phone, or install RemoteNOW from Google Play in an Android
+emulator on your computer. There is no iPhone only path yet (thanks trentosc, #131).
+
+1. Get the VIDAA app's installer (`.apk`). From your own Android phone, on a computer with Android's
    platform tools: `adb shell pm list packages | grep -i vidaa` finds the app's name, `adb shell pm path
-   <that name>` says where its `.apk` is, and `adb pull <that path>` copies it.
+   <that name>` says where its `.apk` is, and `adb pull <that path>` copies it. (Current RemoteNOW is
+   `com.universal.remote.ms`.)
 2. Run:
 
    ```sh
    .venv/bin/python scripts/vidaa-cert.py <the .apk you copied>
    ```
 
-   It looks for a plain certificate and its matching key inside the file and writes them to
-   `bridge/data/vidaa/` (`client.pem` and `client.key`), which git ignores. It does not take the app apart
-   any further than that. If it says it found nothing, or that the key is locked, stop there and say so in
-   an issue: that is a gap, not something to work round.
+   Current RemoteNOW (5.01.011) keeps the certificate in a binary keystore, not as plain text. The script
+   looks for a plain certificate and key first, then for keystore files inside the app (`.p12`, `.pfx`,
+   `.bks`, `.jks`, `.keystore`, or a PKCS#12 file by content):
+
+   - A PKCS#12 keystore that opens with no password is written to `bridge/data/vidaa/` (`client.pem` and
+     `client.key`), which git ignores.
+   - A keystore that needs a password, or a Java one (BKS, JKS), is named, and the script says the
+     certificate is in a locked keystore it can't open. It does not unlock anything, decompile or patch the
+     app, and it never prints key material. If you get that message, please say so in an issue with the
+     file name it printed: that is a gap, not something to work round.
 
 Skip this step on older firmware. The first test (step 4) says whether the TV wants it.
+
+A Hisense set on an older build (firmware P0218) connected once the certificate was in place, using the legacy
+login (the static `hisenseservice` one), per trentosc's report in #131. couch-tv tries that login last.
 
 ### 3. Tell the bridge about the TV
 

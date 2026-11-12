@@ -356,7 +356,9 @@ class VidaaTV:
                         continue
                     except ssl.SSLError as e:
                         errors.append((port, method, f"the TV ended the secure handshake ({e.reason or type(e).__name__}): "
-                                       "it probably wants the client certificate (docs/VIDAA.md, step 2)"))
+                                       "usually this means it wants the client certificate (docs/VIDAA.md, step 2). "
+                                       "It can also happen when the TV is busy after many attempts in a row "
+                                       "(wait a minute) or on firmware with an older TLS setup"))
                         await c.close()
                         break   # a cert problem: another credential scheme will not help
                     except (MQTTError, OSError) as e:
