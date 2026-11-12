@@ -2,7 +2,7 @@
 
 Your own home screen and phone remote for a Google TV, an Android TV or a Fire TV, with app
 versions for Samsung and LG (run on nine real LGs so far), a Roku version, and Beta versions for
-Hisense VIDAA, Philips, Panasonic, VIZIO and Fire TV on Vega OS
+Hisense VIDAA, Philips, Panasonic, VIZIO, Fire TV on Vega OS and Apple TV
 ([Will it work on my TV?](#will-it-work-on-my-tv)). No ads on the home screen. Open source (MIT).
 
 **Set it up the easy way: [couchtv.sites.underseage.studio](https://couchtv.sites.underseage.studio)**, from your phone, with the free Setup app
@@ -351,7 +351,7 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **Older Philips with Saphi** (about 2015 to 2019, not Android) | No | **Beta**, with a computer at home that stays on: phone remote, and couch-tv's page opens in the TV's browser if your set offers one. Philips's Home button still opens Philips's menu ([how](docs/PHILIPS-SAPHI.md)) | No |
 | **VIZIO** (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Beta, phone remote only**, with a computer at home that stays on: power, volume, inputs and opening apps ([how](docs/VIZIO.md)) | No |
 | **Panasonic Viera** (My Home Screen and older Vieras) | No | **Beta**, with a computer at home that stays on: phone remote, and a page that opens itself in the TV's browser. Panasonic's Home button still opens Panasonic's home ([how](docs/PANASONIC.md)) | No |
-| **Apple TV** | Home app coming | Phone remote: **Beta**, in review ([#117](https://github.com/Seagey/couch-tv/pull/117)) | No |
+| **Apple TV** | No: Apple lets no app replace its home | **Beta**, with a computer at home that stays on: phone remote (keys, sleep and wake, opening apps), and the couch-tv home as an Apple TV app, Couch TV (Beta, free with your own Apple ID and a Mac, reinstalled weekly by the computer at home). Apple's Home button still opens Apple's home ([how](docs/APPLE-TV.md)) | No |
 | **TiVo OS** | No known way yet | No known way yet | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
@@ -399,7 +399,7 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, from public sou
   has not been run on a real Roku**, so expect to fix something. Newer Roku OS also limits remote control
   until "Control by mobile apps" is switched to Permissive or Enabled. If you try it, please open an issue
   and say how it went. Setup and limits: [docs/ROKU.md](docs/ROKU.md).
-- **The Beta paths: Hisense VIDAA, Philips, Fire TV on Vega OS, VIZIO and Panasonic.** All of them need a
+- **The Beta paths: Hisense VIDAA, Philips, Fire TV on Vega OS, VIZIO, Panasonic and Apple TV.** All of them need a
   **computer at home that stays on**, and on all of them **the maker's own Home button still opens the
   maker's own home**: couch-tv opens itself on top, it does not replace that home. None of them has run on
   a real TV yet, so if you try one, please open an issue and say how it went (each has a short read only
@@ -441,9 +441,14 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, from public sou
   volume level; apps open on their own page; no "what is playing" and no screenshots. 2018 and newer sets
   pair once with a PIN on the TV. Panasonic's Google TV models are normal couch-tv TVs. Setup, limits and
   the read only first test: [docs/PANASONIC.md](docs/PANASONIC.md).
-- **Apple TV:** a phone remote is in Beta and in review
-  ([PR #117](https://github.com/Seagey/couch-tv/pull/117)), and a couch-tv home app for tvOS is coming.
-  Apple's own home cannot be replaced (tvOS does not allow it).
+- **Apple TV (Beta):** the phone remote works, with no app and no payment: the bridge pairs once with a PIN
+  and then sends the remote keys, sleep and wake, and opens any app on the Apple TV by its bundle id. tvOS
+  has no web view, so the home is drawn again as a native Apple TV app, **Couch TV** (`tvos/`): the scenes
+  with the glass clock, the date and weather, people, Keep watching and your apps, and the bridge opens it
+  every time the Apple TV wakes. Apple's own Home button still opens Apple's home. You put Couch TV on the
+  Apple TV yourself, free, with Xcode on a Mac and your own Apple ID; Apple makes that run out after 7 days,
+  so the computer at home reinstalls it each week with `scripts/appletv-resign.sh` (or once a year with
+  Apple's paid developer programme). Limits and steps: [docs/APPLE-TV.md](docs/APPLE-TV.md).
 - **TiVo OS:** no known way yet.
 
 **Want everything on a TV that is not Google TV or Android TV?** The Samsung, LG, Roku, VIDAA, Philips

@@ -1,0 +1,437 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2B42FD10A7A5E6E40E61D90C = {
+			isa = PBXBuildFile;
+			fileRef = A3CB2022DF88CD57B17A949E;
+		};
+		48941E0A3017E09001C924D9 = {
+			isa = PBXBuildFile;
+			fileRef = 88061402747C56CD1815B3DE;
+		};
+		4BC51BDBBA42A3D94CACBD99 = {
+			isa = PBXBuildFile;
+			fileRef = FD69F6CF63D9FD42F4B3BE1D;
+		};
+		57826D5332DD2C68172E794C = {
+			isa = PBXBuildFile;
+			fileRef = D0D4344AB022A0DCEEAB2CF0;
+		};
+		5830BC5CC0671EC6EE6E74AE = {
+			isa = PBXBuildFile;
+			fileRef = C129780D08ACFC477731A673;
+		};
+		696F194566E05EC5941B9F1A = {
+			isa = PBXBuildFile;
+			fileRef = D76F38428E4458A5BADC8840;
+		};
+		A99175E6AE5AD1839E781884 = {
+			isa = PBXBuildFile;
+			fileRef = B63A3D2233E44079D218AC4B;
+		};
+		BC9CEE9D0653DC00D6EDB61B = {
+			isa = PBXBuildFile;
+			fileRef = 587C68391026097D874BE662;
+		};
+		C7860487E49E95BBC5943648 = {
+			isa = PBXBuildFile;
+			fileRef = C3F9CF46B736425E72A5B26A;
+		};
+		C7D8F91960974694AB0DF15E = {
+			isa = PBXBuildFile;
+			fileRef = 81B537788A87C293D5E76E43;
+		};
+		E68F1143A2922C6493C86118 = {
+			isa = PBXBuildFile;
+			fileRef = 8BC23F47C56688F13F1A0124;
+		};
+		F0BE681D054846C6913F8FD2 = {
+			isa = PBXBuildFile;
+			fileRef = 10D819C9ED8F996417A65BA8;
+		};
+		FE75A1C5D9E1F26ECA8F2924 = {
+			isa = PBXBuildFile;
+			fileRef = 08F4A338ADCA43F223DEE485;
+		};
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		08F4A338ADCA43F223DEE485 = {
+			isa = PBXFileReference;
+			lastKnownFileType = file;
+			path = "CouchAntonio-Light.ttf";
+			sourceTree = "<group>";
+		};
+		10D819C9ED8F996417A65BA8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = HomeView.swift;
+			sourceTree = "<group>";
+		};
+		26858F66DF8624867574B286 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = Info.plist;
+			sourceTree = "<group>";
+		};
+		587C68391026097D874BE662 = {
+			isa = PBXFileReference;
+			lastKnownFileType = file;
+			path = "CouchInter-Regular.ttf";
+			sourceTree = "<group>";
+		};
+		81B537788A87C293D5E76E43 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = SettingsView.swift;
+			sourceTree = "<group>";
+		};
+		88061402747C56CD1815B3DE = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = Scenes.swift;
+			sourceTree = "<group>";
+		};
+		8BC23F47C56688F13F1A0124 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = Style.swift;
+			sourceTree = "<group>";
+		};
+		A3CB2022DF88CD57B17A949E = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = Models.swift;
+			sourceTree = "<group>";
+		};
+		AD09810C3AB8719D922F1CA0 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xcconfig;
+			path = Config/Signing.example.xcconfig;
+			name = Signing.example.xcconfig;
+			sourceTree = "<group>";
+		};
+		B63A3D2233E44079D218AC4B = {
+			isa = PBXFileReference;
+			lastKnownFileType = file;
+			path = "CouchInter-Medium.ttf";
+			sourceTree = "<group>";
+		};
+		BB483A4C24421090490C8FD3 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xcconfig;
+			path = Config/Base.xcconfig;
+			name = Base.xcconfig;
+			sourceTree = "<group>";
+		};
+		C129780D08ACFC477731A673 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = Bridge.swift;
+			sourceTree = "<group>";
+		};
+		C3F9CF46B736425E72A5B26A = {
+			isa = PBXFileReference;
+			lastKnownFileType = file;
+			path = "CouchInter-SemiBold.ttf";
+			sourceTree = "<group>";
+		};
+		D0D4344AB022A0DCEEAB2CF0 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.assetcatalog;
+			path = Assets.xcassets;
+			sourceTree = "<group>";
+		};
+		D76F38428E4458A5BADC8840 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = CouchTVApp.swift;
+			sourceTree = "<group>";
+		};
+		F5BF48AA40CAD7891EB709FC = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			path = CouchTV.app;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		FD69F6CF63D9FD42F4B3BE1D = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = HomeModel.swift;
+			sourceTree = "<group>";
+		};
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C18F88D444D8FE65E18D39E9 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1D5F545FBA1B7116946BB4C6 = {
+			isa = PBXGroup;
+			children = (
+				F5BF48AA40CAD7891EB709FC,
+			);
+			sourceTree = "<group>";
+			name = Products;
+		};
+		4898BA602D87BE762B0F8BD0 = {
+			isa = PBXGroup;
+			children = (
+				BB483A4C24421090490C8FD3,
+				AD09810C3AB8719D922F1CA0,
+			);
+			sourceTree = "<group>";
+			name = Config;
+		};
+		4EAE695AD1F489F78EA3E1C6 = {
+			isa = PBXGroup;
+			children = (
+				D36540CDAA07DF7F5828251E,
+				4898BA602D87BE762B0F8BD0,
+				1D5F545FBA1B7116946BB4C6,
+			);
+			sourceTree = "<group>";
+		};
+		D36540CDAA07DF7F5828251E = {
+			isa = PBXGroup;
+			children = (
+				C129780D08ACFC477731A673,
+				D76F38428E4458A5BADC8840,
+				FD69F6CF63D9FD42F4B3BE1D,
+				10D819C9ED8F996417A65BA8,
+				A3CB2022DF88CD57B17A949E,
+				88061402747C56CD1815B3DE,
+				81B537788A87C293D5E76E43,
+				8BC23F47C56688F13F1A0124,
+				26858F66DF8624867574B286,
+				D0D4344AB022A0DCEEAB2CF0,
+				D814D5CE3903E8C1C4F17D16,
+			);
+			sourceTree = "<group>";
+			path = CouchTV;
+		};
+		D814D5CE3903E8C1C4F17D16 = {
+			isa = PBXGroup;
+			children = (
+				08F4A338ADCA43F223DEE485,
+				B63A3D2233E44079D218AC4B,
+				587C68391026097D874BE662,
+				C3F9CF46B736425E72A5B26A,
+			);
+			sourceTree = "<group>";
+			path = Fonts;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		42AEFBAE01D2DFD981F7DA7D = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FF064009BFBAE8E986428C4F;
+			buildPhases = (
+				C4D5163706E5908DC9E032F3,
+				C18F88D444D8FE65E18D39E9,
+				4FDAD6DB49035FA75C21467D,
+				4C995E75939E8A04780726B3,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CouchTV;
+			productName = CouchTV;
+			productReference = F5BF48AA40CAD7891EB709FC;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		46F86FAA6BBF9AC94A7E4595 = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+			};
+			buildConfigurationList = A1806D8FE767B99D399E13F3;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 4EAE695AD1F489F78EA3E1C6;
+			productRefGroup = 1D5F545FBA1B7116946BB4C6;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				42AEFBAE01D2DFD981F7DA7D,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4FDAD6DB49035FA75C21467D = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				57826D5332DD2C68172E794C,
+				FE75A1C5D9E1F26ECA8F2924,
+				A99175E6AE5AD1839E781884,
+				BC9CEE9D0653DC00D6EDB61B,
+				C7860487E49E95BBC5943648,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		4C995E75939E8A04780726B3 = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			name = "Copy scenes and logos";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\ndest=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmkdir -p \"$dest\"\ncp \"${SRCROOT}/../tv-home/web/backgrounds/\"scene-*.jpg \"${SRCROOT}/../tv-home/web/backgrounds/\"scene-*.webp \"$dest/\"\ncp \"${SRCROOT}/../remote/src/app-logos/\"*.png \"$dest/\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C4D5163706E5908DC9E032F3 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5830BC5CC0671EC6EE6E74AE,
+				696F194566E05EC5941B9F1A,
+				4BC51BDBBA42A3D94CACBD99,
+				F0BE681D054846C6913F8FD2,
+				2B42FD10A7A5E6E40E61D90C,
+				48941E0A3017E09001C924D9,
+				C7D8F91960974694AB0DF15E,
+				E68F1143A2922C6493C86118,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		41EC14BFA61A85B336E4F999 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = CouchTV/Info.plist;
+				GENERATE_INFOPLIST_FILE = NO;
+				PRODUCT_NAME = CouchTV;
+				TARGETED_DEVICE_FAMILY = 3;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+			};
+			name = Debug;
+		};
+		6AFE22E70BE079CBB63426F8 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				SDKROOT = appletvos;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+				SWIFT_VERSION = 5.0;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+			baseConfigurationReference = BB483A4C24421090490C8FD3;
+		};
+		8668ED08E8535986A57FA16B = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = CouchTV/Info.plist;
+				GENERATE_INFOPLIST_FILE = NO;
+				PRODUCT_NAME = CouchTV;
+				TARGETED_DEVICE_FAMILY = 3;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+			};
+			name = Release;
+		};
+		D48F58F8CA231B2301441318 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				SDKROOT = appletvos;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+				SWIFT_VERSION = 5.0;
+				SWIFT_COMPILATION_MODE = singlefile;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ONLY_ACTIVE_ARCH = YES;
+				ENABLE_TESTABILITY = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				GCC_OPTIMIZATION_LEVEL = 0;
+			};
+			name = Debug;
+			baseConfigurationReference = BB483A4C24421090490C8FD3;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A1806D8FE767B99D399E13F3 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D48F58F8CA231B2301441318,
+				6AFE22E70BE079CBB63426F8,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FF064009BFBAE8E986428C4F = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				41EC14BFA61A85B336E4F999,
+				8668ED08E8535986A57FA16B,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 46F86FAA6BBF9AC94A7E4595;
+}

@@ -241,11 +241,19 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   pair." A Panasonic Google TV model is a normal couch-tv TV, not this path. Run
   `scripts/panasonic-check.py <tv address>` first (it presses no key); pairing with `--pair` makes the TV
   show a PIN.
-- **Apple TV:** the phone remote is in Beta and in review
-  ([PR #117](https://github.com/Seagey/couch-tv/pull/117)), not on main yet; a couch-tv home app for tvOS
-  is coming. Say so, and that Apple's home cannot be replaced (tvOS does not allow it). Until #117 is
-  merged, offer the way round it: a Google TV box (for example the Google TV Streamer) plugged into the
-  TV's HDMI gets them everything.
+- **Apple TV (Beta):** do not say no. Offer the path in [docs/APPLE-TV.md](docs/APPLE-TV.md), and say first,
+  plainly: "With a computer at home that stays on, the phone remote works on an Apple TV: arrows, OK, Back,
+  Play, sleep and wake, and opening any app. You type a PIN the Apple TV shows once. couch-tv's home also
+  comes as an Apple TV app, Couch TV, with the same scenes, clock, Keep watching and apps, and the computer
+  opens it whenever the Apple TV wakes. Apple's own Home button still opens Apple's home: Apple lets no app
+  replace it. Couch TV goes on the Apple TV free, from a Mac with Xcode and your own Apple ID, but Apple
+  makes that run out after 7 days, so the Mac at home has to stay on and reinstall it each week (a script
+  does it, twice a week to be safe), or you pay Apple US$99 a year for a one time install. Typing from the
+  phone, what is playing and a volume level are not available." Neither part has run on a real Apple TV
+  yet, so ask them to open an issue afterwards with what `scripts/appletv-check.py` printed and how Couch
+  TV went. Run `scripts/appletv-check.py` (read only) before the yes, pair only after it. Couch TV needs a
+  Mac: without one, offer the remote only. Signing in to Xcode is theirs to do (never ask for the Apple ID
+  password), and their team id goes only in `tvos/Config/Signing.mine.xcconfig`, which git ignores.
 - **TiVo OS:** no known way yet. Say so kindly and offer the Google TV box. If they do not want a box,
   stop. Do not suggest rooting the TV.
 

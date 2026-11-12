@@ -277,6 +277,33 @@ couch-tv knows the app and `roku.<id>` where it does not (open either with `POST
 `/api/roku/icon/<id>` is the Roku's own icon for that channel (from its `query/icon`), kept in memory.
 `404` when the Roku has none or refuses it (newer Roku OS needs "Control by mobile apps" on Enabled).
 
+### Couch TV on an Apple TV: `/api/appletv/...`
+For couch-tv's tvOS app (`tvos/`, [docs/APPLE-TV.md](../docs/APPLE-TV.md)). Apple TV only: `400` for any other TV,
+`503` while the Apple TV is not answering. The app sends `?tv=<id>` once it knows it.
+
+- `GET /api/appletv/hello` (needs the key): which Apple TV is asking, from `?tv=`, else the address the request came
+  from, else the first Apple TV in `config.json`. `{"ok": true, "tv": "lounge-appletv", "name": "Lounge Apple TV",
+  "home_bundle": "dev.couchtv.appletv.sam", "dock_max": 10}`. `home_bundle` is couch-tv's own app on that Apple TV,
+  `null` until it is installed.
+- `GET /api/appletv/apps`: the Apple TV's apps without couch-tv itself, in the order arranged from the phone, known apps
+  first, then by name. `id` is the bundle id; `package` names couch-tv's logo for it where couch-tv knows the app
+  (`appletv.<bundle id>` where it does not). `line` is how many go in the dock.
+  ```json
+  {"ok": true, "apps": [{"id": "com.netflix.Netflix", "title": "Netflix", "package": "com.netflix.ninja"}], "line": 10, "dock_max": 10}
+  ```
+- `POST /api/appletv/open` `{"bundle": "com.netflix.Netflix"}`: open an app by its bundle id (a tvOS app cannot open
+  another app by its id itself). `400` for something that is not a bundle id, `503` when the Apple TV does not list
+  it, `502` when the Apple TV refuses.
+- `POST /api/appletv/code` (needs the key): a six digit code for the app, good once for ten minutes.
+  `{"ok": true, "code": "481516", "expires_in": 600, "tv": "lounge-appletv"}`. `scripts/appletv-home-code.py` asks for one.
+- `POST /api/appletv/claim` `{"code": "481516"}` (open, no key): swaps the code for the pairing key, once.
+  `{"ok": true, "key": "<the pairing key>", "tv": "lounge-appletv", "name": "Lounge Apple TV"}`. A wrong code counts
+  towards the same limit as a wrong key (`401`, then `429`).
+
+When `config.json` has an Apple TV, the bridge also says on the network that it is there (Bonjour,
+`_couchtv._tcp`, with its address and port in the record, never the key), so the app finds it without an address
+being typed. `COUCHTV_NO_BONJOUR=1` in the environment switches that off.
+
 ### `POST /api/launch`
 ```json
 {"app": "netflix"}
@@ -742,6 +769,10 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- 2026-11-12: Couch TV for Apple TV (New, Beta): `GET /api/appletv/hello`, `GET /api/appletv/apps`,
+  `POST /api/appletv/open`, `POST /api/appletv/code` and `POST /api/appletv/claim` (open), and the bridge's Bonjour
+  record `_couchtv._tcp` when an Apple TV is configured. `app_id` on an Apple TV is now optional: an installed app
+  whose bundle id starts with `dev.couchtv.appletv` is found by itself.
 - 2026-11-10: Optional pairing key (`bridge.pairing_key`), rate limiting on wrong keys across all endpoints (HTTP 429), Host header allowlist against DNS rebinding (HTTP 403), disallowed origin rejection before handlers run (HTTP 403), dropping of couchtv_key cookie, tighter CORS origin allowlist (bridge host and TV home origins only), Content-Type enforcement on POST bodies (HTTP 415), and `POST /api/pair` (#73).
 - Roku: `"kind": "roku"` in `config.json`, `GET /api/roku/apps`, `GET /api/roku/icon/<id>` and `ecp` and `hook` on a Roku in
   `GET /api/tvs`. `POST /api/key` takes Roku's own key names too (`InputHDMI1`, `Rev`, `Fwd`) and `roku_home` for Roku's Home;

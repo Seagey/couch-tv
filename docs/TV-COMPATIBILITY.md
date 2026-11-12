@@ -28,7 +28,7 @@ TVs, see their pages; Roku, Hisense VIDAA, Philips Titan OS, Philips Saphi, VIZI
 | Older Philips with Saphi (about 2015 to 2019, not Android) | No | **Beta**: phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen (Philips's Home button still opens Philips's menu). Depends on the model and firmware ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)) | No |
 | VIZIO (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Beta, phone remote only**: power, volume, inputs and opening apps; couch-tv's home page cannot open on the TV. Tested against a stand in so far ([VIZIO.md](VIZIO.md)) | No |
 | Panasonic Viera (My Home Screen, older Vieras) | No | **Beta**: phone remote and a page that opens itself in the TV's browser (Panasonic's Home button still opens Panasonic's home) ([PANASONIC.md](PANASONIC.md)) | No |
-| Apple TV | Home app coming (tvOS) | Phone remote: **Beta**, in review ([#117](https://github.com/Seagey/couch-tv/pull/117)) | No |
+| Apple TV | No (Apple lets no app replace its home; tvOS has no web view) | **Beta**: phone remote and opening apps, and Couch TV, the home as an Apple TV app that opens itself, installed free from a Mac with your own Apple ID and reinstalled weekly by the computer at home (Apple's Home button still opens Apple's home) ([APPLE-TV.md](APPLE-TV.md)) | No |
 | TiVo OS | No known way yet | No known way yet | No |
 
 **VIZIO, what it cannot do.** couch-tv's home page does not open on a VIZIO by itself: VIZIO OS has no
