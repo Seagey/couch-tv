@@ -74,7 +74,8 @@ class FireWatch : AccessibilityService() {
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        stockInFront = isStockHome(e.packageName?.toString(), e.className?.toString())
+        stockInFront = isStockHome(e.packageName?.toString(), e.className?.toString()) &&
+            !(e.packageName?.toString() == AMAZON_HOME && settingsAllowed())
         if (!stockInFront) return
         if (CrashGuard.standingAside(this)) return
         val wait = DEBOUNCE_MS - (System.currentTimeMillis() - last)
@@ -138,6 +139,18 @@ class FireWatch : AccessibilityService() {
         const val ANDROID_TV_HOME = "com.google.android.tvlauncher"
         /** Fire OS's own Settings screen, opened by name (see [amazonSettings]). */
         const val AMAZON_SETTINGS = "$AMAZON_HOME.ui.MainSettingsActivity"
+        /** Fire OS's Settings app package (the plain Settings action goes through it too). */
+        const val AMAZON_SETTINGS_PKG = "com.amazon.tv.settings"
+        private const val SETTINGS_GRACE_MS = 8_000L
+        @Volatile private var settingsUntil = 0L
+
+        /**
+         * couch-tv just opened the TV's Settings itself (issue #123): for a few seconds Amazon's home
+         * coming forward is Settings being drawn, not a Home press, so the watch leaves it alone.
+         * Only Amazon's own windows are spared; the Google homes and a real Home press later are not.
+         */
+        fun allowSettingsNow() { settingsUntil = SystemClock.elapsedRealtime() + SETTINGS_GRACE_MS }
+        fun settingsAllowed(): Boolean = SystemClock.elapsedRealtime() < settingsUntil
         private val STOCK_HOMES = listOf(AMAZON_HOME, GOOGLE_TV_HOME, ANDROID_TV_HOME)
 
         /** The activities of the Google homes that the TV itself lists as a HOME screen (read when the service binds). */
