@@ -133,6 +133,10 @@ What you might see:
 
 - `Nothing answers on port ... Is the TV on (not fully off)?` Switch the TV fully on, check the address and
   that the computer is on the same network, and run it again.
+  If it still says nothing answers, check for a mesh Wi-Fi or a second router in router mode. The TV can
+  end up on its own network behind the main router, where a computer plugged into the main router cannot
+  reach it. Join the computer to the same Wi-Fi as the TV (or set the mesh to bridge mode) and try again.
+  Thanks to trentosc for spotting this (#131).
 - `Could not log in: ...` Copy it anyway. It tells us what the TV wants.
 - `Logged in as couchtv-...`, then a line for where the TV is and a list of apps. That is the good result.
 
