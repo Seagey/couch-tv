@@ -1,8 +1,8 @@
 """The connection to a Hisense VIDAA TV, for "kind": "vidaa" in config.json.
 
-NOT YET RUN ON A REAL VIDAA TV. Tested against a stand-in TV on the computer only
-(tests/vidaa_standin.py, docs/VIDAA.md). Hisense publishes nothing for this; expect the first
-tester to find something that needs fixing, and turn on "trace" (below) so the messages can be read.
+Confirmed on a real Hisense 55U7N (VIDAA 9, build Q0705) by Matthew Klette (#128), and tested against a
+stand-in TV on the computer (tests/vidaa_standin.py, docs/VIDAA.md). Hisense publishes nothing for this, so
+another model or firmware may need a fix: turn on "trace" (below) so the messages can be read.
 
 How a VIDAA TV is reached: an MQTT broker on the TV, over TLS, on port 36669 (36668 on older builds).
 The TV's own phone app speaks to it. Newer firmware (2024 on) wants a client certificate in the TLS
@@ -21,16 +21,15 @@ the TV answers on. <client> is this bridge's client id.
   /remoteapp/mobile/<client>/ui_service/data/state                where the TV is ("statetype")
   /remoteapp/mobile/broadcast/ui_service/state                    the same, sent to every client
 
-UNCONFIRMED, our best reading, the first things a tester's trace will settle (all in PROTOCOL below):
-the name of the request that asks for the state (gettvstate), that answers come back on
-/remoteapp/mobile/<client>/<service>/data/<name>, the service that takes keys (remote_service) and the
-key names (KEY_UP and so on), the field the PIN travels in, the field the token comes back in, and
-that the token is the MQTT password on later connections.
+Confirmed on the 55U7N: the state request, the answer topics, the key service and key names, and the PIN
+fields. Older firmware may differ, and the protocol details are all in PROTOCOL below, so a trace from
+another model can correct them in one place.
 
-The hook: a watcher checks the TV every 2 seconds. When the TV comes on and lands on its own home
+The hook: a watcher checks the TV every second (a power on is also pushed at once). When the TV comes on and lands on its own home
 ("statetype" remote_launcher) or live TV, the bridge opens couch-tv: its tile, if one was added
 (POST /api/vidaa/tile), else the TV's browser at the bridge's home page. It is a page that opens
-itself, not a true home screen: the remote's Home button still opens VIDAA's home. No root, ever.
+itself, not a true home screen: the remote's Home button still opens VIDAA's home unless "keep_home": true
+is set (opt in, Beta). No root, ever.
 
 What it cannot do (docs/VIDAA.md): read which app is in front, a volume level, typing, screenshots,
 deep links into a show, ADB tools.
@@ -50,24 +49,41 @@ import apps
 import config
 from tinymqtt import Client, MQTTError, Refused
 from tv import TVUnavailable
+import vidaa_auth
 
 HOME_PACKAGE = "app.couchtv.launcher"
 COUCH_APP = "couch-tv"           # what the hook opens; not an id on the TV (see open_home)
 TILE_ID = "app.couchtv.home"     # the id couch-tv's own tile is added under (POST /api/vidaa/tile)
 TILE_TITLE = "Couch TV"
 PORTS = [36669, 36668]
-WATCH_EVERY = 2.0   # seconds between looks at the TV
-SETTLE = 1.5        # seconds the hook lets the TV settle after it comes on
+WATCH_EVERY = 1.0   # seconds between looks at the TV (the backup path; the push fires at once)
+SETTLE = 0.3        # seconds the hook lets the TV settle after it comes on
+HOME_PAUSE = 30     # seconds a double Home press keeps VIDAA's own home up before couch-tv returns
 
 # Every topic and payload shape in one place, so a tester's trace can correct them here.
 PROTOCOL = {
     "action": "/remoteapp/tv/{service}/{client}/actions/{name}",
     "token": "/remoteapp/tv/platform_service/{client}/data/gettoken",
-    "listen": ["/remoteapp/mobile/{client}/#", "/remoteapp/mobile/broadcast/#"],
-    "state_request": ("ui_service", "gettvstate"),     # UNCONFIRMED name
-    "key_service": "remote_service",                   # UNCONFIRMED
-    "pin_field": "authNum",                            # UNCONFIRMED
-    "token_fields": ("accesstoken", "access_token", "token"),   # UNCONFIRMED: the first one present wins
+    # The TV refuses a # wildcard subscription, so every topic is named. It also refuses the data
+    # topics until this client is paired, and refuses the per-client state topic even then, so the
+    # driver subscribes one at a time and ignores a refusal. The broadcast state topic is the one
+    # the hook needs and it is allowed once paired. (Confirmed on a VIDAA 9 TV, docs/VIDAA.md.)
+    "state_broadcast": "/remoteapp/mobile/broadcast/ui_service/state",
+    "subscribe": [
+        "/remoteapp/mobile/broadcast/ui_service/state",
+        "/remoteapp/mobile/{client}/ui_service/data/state",
+        "/remoteapp/mobile/{client}/ui_service/data/applist",
+        "/remoteapp/mobile/{client}/ui_service/data/sourcelist",
+        "/remoteapp/mobile/{client}/ui_service/data/authentication",
+        "/remoteapp/mobile/{client}/ui_service/data/authenticationcode",
+        "/remoteapp/mobile/{client}/platform_service/data/tokenissuance",
+        "/remoteapp/mobile/{client}/platform_service/data/gettoken",   # older firmware's token answer
+    ],
+    "state_request": ("ui_service", "gettvstate"),     # CONFIRMED on a VIDAA 9 TV
+    "key_service": "remote_service",                   # CONFIRMED (sendkey)
+    "pin_field": "authNum",                            # CONFIRMED (an integer, not a string)
+    "app_connect": {"app_version": 2, "connect_result": 0, "device_type": "Mobile App"},  # CONFIRMED
+    "token_fields": ("accesstoken", "access_token", "token"),   # only older firmware issues one
 }
 
 # statetype values (the home, live TV, an input, a settings menu, standby, waking).
@@ -91,7 +107,8 @@ KEYS = {
 }
 RAW_KEY = re.compile(r"^KEY_[A-Z0-9_]{1,24}$")
 SAFE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,80}$")       # an app id the TV listed, before it is sent back
-SAFE_CLIENT = re.compile(r"^[A-Za-z0-9._$-]{4,64}$")   # no MQTT wildcards or slashes in a topic level
+SAFE_CLIENT = re.compile(r"^[A-Za-z0-9._:$-]{4,80}$")  # no MQTT wildcards or slashes in a topic level (: is fine)
+SAFE_UUID = re.compile(r"^[A-Za-z0-9:._-]{4,40}$")    # goes into the client id and so into topic levels
 PIN = re.compile(r"^\d{4}$")
 BROWSER_NAMES = ("browser", "webbrowser", "internet", "web")
 
@@ -150,12 +167,20 @@ class VidaaTV:
         self.cert_key = cfg.get("cert_key") or os.path.join(folder, "client.key")
         self.store_file = os.path.join(config.DATA, f"vidaa-{self.id}.json")
         stored = self._stored()
-        cid = str(cfg.get("client_id") or stored.get("client_id") or "")
+        # Newer VIDAA firmware wants a client id in Hisense's own shape, built from a uuid that the
+        # pairing is kept against. The uuid is ours (not the TV's) and stays for this TV.
+        self.uuid = str(cfg.get("uuid") or stored.get("uuid") or vidaa_auth.new_uuid())
+        if not SAFE_UUID.match(self.uuid):
+            raise SystemExit(f"tvs[{self.id}].uuid: letters, digits and : . _ - only")
+        self.auth_method = cfg.get("auth_method") or stored.get("auth_method")   # None: probe on connect
+        if self.auth_method is not None and self.auth_method not in vidaa_auth.ORDER:
+            raise SystemExit(f"tvs[{self.id}].auth_method: one of {', '.join(vidaa_auth.ORDER)}")
+        cid = str(cfg.get("client_id") or stored.get("client_id") or vidaa_auth.client_id(self.uuid))
         if cid and not SAFE_CLIENT.match(cid):
-            raise SystemExit(f"tvs[{self.id}].client_id: letters, digits and . _ - $ only")
-        self.client_id = cid or "couchtv-" + secrets.token_hex(6)
+            raise SystemExit(f"tvs[{self.id}].client_id: letters, digits and . _ : - $ only")
+        self.client_id = cid
         self.app_id = COUCH_APP
-        self.paired = True          # read and keys may work before pairing; vidaa_status() says more
+        self.paired = bool(stored.get("paired"))   # this firmware sends nothing until the PIN is done
         self.picture_cfg = {}
         self.keep_disabled_file = None
         self.adb_ok = False
@@ -178,6 +203,11 @@ class VidaaTV:
         self._tasks = []
         self.last_error = None      # why the last connection or pairing failed, in plain words
         self.pin_shown_at = 0.0
+        self._hooked_at = 0.0       # debounce: the push path and the poll path both call _hook
+        self.keep_home = cfg.get("keep_home", False) is True   # opt in: bounce VIDAA's home back to couch-tv
+        self._phone_home_at = 0.0   # when the phone remote last sent VIDAA's own Home key (never bounced)
+        self._last_home = 0.0       # when the TV last landed on VIDAA's home (to catch a double press)
+        self._home_pause_until = 0.0   # a double Home press parks the bounce so VIDAA home is reachable
         self.quiet_until = 0.0
         self.home_on_wake_until = 0.0
         self.hook_log = []
@@ -192,7 +222,7 @@ class VidaaTV:
             return {}
 
     def _keep(self, **changes):
-        d = self._stored() | {"client_id": self.client_id} | changes
+        d = self._stored() | {"client_id": self.client_id, "uuid": self.uuid} | changes
         os.makedirs(os.path.dirname(self.store_file), exist_ok=True)
         tmp = self.store_file + ".tmp"
         with open(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
@@ -287,8 +317,8 @@ class VidaaTV:
         if not self.trace:
             return
         text = payload.decode("utf-8", "replace") if isinstance(payload, bytes) else str(payload)
-        # never the PIN or the token in a log someone may paste into an issue
-        text = re.sub(r'("(?:%s|%s)"\s*:\s*)"[^"]*"' % (PROTOCOL["pin_field"], "|".join(PROTOCOL["token_fields"])),
+        # never the PIN or the token in a log someone may paste into an issue (the PIN now goes as a number)
+        text = re.sub(r'("(?:%s|%s)"\s*:\s*)(?:"[^"]*"|-?\d+)' % (PROTOCOL["pin_field"], "|".join(PROTOCOL["token_fields"])),
                       r'\1"(hidden)"', text)
         self.log.info("trace %s %s %s", way, topic, text[:600])
 
@@ -303,32 +333,58 @@ class VidaaTV:
             if time.monotonic() < self._retry_at:
                 raise TVUnavailable(self.last_error or "the TV refused the connection a moment ago")
             ctx = self._ssl()
-            user = self.mqtt_user if self.mqtt_user is not None else (self.client_id if self.token else None)
-            password = self.mqtt_password if self.mqtt_password is not None else self.token
-            errors = []   # one entry per port tried, so a later port's failure never hides an earlier one's
+            # The broker wants credentials worked out from the clock, a fresh pair every connect
+            # (vidaa_auth). A tester who set mqtt_user/mqtt_password overrides that. The method is
+            # the TV's transport era: the known one first, else probe newest to oldest.
+            methods = [self.auth_method] if self.auth_method else list(vidaa_auth.ORDER)
+            if self.mqtt_user is not None:
+                methods = methods[:1]   # the tester's own login: the same pair every time, so try it once
+            errors = []   # one entry per (port, scheme) tried, so a later failure never hides an earlier one
             for port in self.ports:
-                c = Client(self.client_id, username=user, password=password, on_message=self._message)
-                try:
-                    await c.connect(self.ip or self.fallback_ip, port, ssl=ctx)
-                    await c.subscribe([t.format(client=self.client_id) for t in PROTOCOL["listen"]])
+                for method in methods:
+                    if self.mqtt_user is not None:
+                        cid, user, password = self.client_id, self.mqtt_user, self.mqtt_password
+                    else:
+                        cid, user, password = vidaa_auth.credentials(self.uuid, method)
+                    c = Client(cid, username=user, password=password, on_message=self._message)
+                    try:
+                        await c.connect(self.ip or self.fallback_ip, port, ssl=ctx)
+                    except Refused as e:
+                        errors.append((port, method, str(e) + (": check the certificate step and that the TV and "
+                                       "this computer agree on the time (docs/VIDAA.md)" if e.code in (4, 5) else "")))
+                        await c.close()
+                        continue
+                    except ssl.SSLError as e:
+                        errors.append((port, method, f"the TV ended the secure handshake ({e.reason or type(e).__name__}): "
+                                       "it probably wants the client certificate (docs/VIDAA.md, step 2)"))
+                        await c.close()
+                        break   # a cert problem: another credential scheme will not help
+                    except (MQTTError, OSError) as e:
+                        errors.append((port, method, str(e) or type(e).__name__))
+                        await c.close()
+                        continue
+                    self.client_id = cid
+                    await self._subscribe(c)
                     self._mqtt, self.last_error = c, None
-                    if self._stored().get("client_id") != self.client_id:
-                        self._keep()   # the same client id next time, so a PIN and a token stay with it
-                    self.log.info("connected on port %s%s", port, " with the client certificate" if ctx and self._have_cert() else "")
+                    if self.auth_method != method or self._stored().get("client_id") != cid:
+                        self.auth_method = method
+                        self._keep(auth_method=method)   # the working scheme and uuid stay for next time
+                    self.log.info("connected on port %s (%s auth)%s", port, method,
+                                  " with the client certificate" if ctx and self._have_cert() else "")
                     return c
-                except Refused as e:
-                    errors.append((port, str(e) + (": check the certificate step and that the TV and this computer "
-                                                    "agree on the time (docs/VIDAA.md)" if e.code in (4, 5) else "")))
-                except ssl.SSLError as e:
-                    errors.append((port, f"the TV ended the secure handshake ({e.reason or type(e).__name__}): it "
-                                          "probably wants the client certificate (docs/VIDAA.md, step 2)"))
-                except (MQTTError, OSError) as e:
-                    errors.append((port, str(e) or type(e).__name__))
-                await c.close()
-            last = "; ".join(f"port {port}: {msg}" for port, msg in errors)
+            last = "; ".join(f"port {p} ({m}): {msg}" for p, m, msg in errors)
             self.last_error = last
             self._retry_at = time.monotonic() + 30
             raise TVUnavailable(f"could not talk to the TV: {last}")
+
+    async def _subscribe(self, c):
+        """Subscribe to the data topics one at a time. The TV refuses a # wildcard and refuses the
+        data topics until this client is paired, so a refusal here is expected and ignored."""
+        for tmpl in PROTOCOL["subscribe"]:
+            try:
+                await c.subscribe([tmpl.format(client=c.client_id)])
+            except MQTTError:
+                pass
 
     async def _drop(self):
         if self._mqtt:
@@ -343,11 +399,39 @@ class VidaaTV:
             data = payload.decode("utf-8", "replace")
         name = topic.rstrip("/").rsplit("/", 1)[-1]
         if name == "state" and isinstance(data, dict) and isinstance(data.get("statetype"), str):
-            if data["statetype"] != self.statetype:
-                self.log.info("screen: %s -> %s", self.statetype or "unknown", data["statetype"])
-            self.statetype = self.visible = data["statetype"]
-            if NOTHING.match(self.statetype) or self.statetype in OFF_STATES:
+            old, new = self.statetype, data["statetype"]
+            if new != old:
+                self.log.info("screen: %s -> %s", old or "unknown", new)
+            self.statetype = self.visible = new
+            if NOTHING.match(new) or new in OFF_STATES:
                 self._front = (None, 0.0)
+            # Woke from standby straight onto VIDAA's own home: open couch-tv at once, the moment
+            # the TV says so, instead of waiting for the next poll (the watch loop stays the backup).
+            if old in OFF_STATES and NOTHING.match(new):
+                try:
+                    asyncio.get_running_loop().create_task(self._hook())
+                except RuntimeError:
+                    pass
+            # Home button, pressed while the TV was on, lands on VIDAA's own home (not live TV or an
+            # input): bounce back to couch-tv, so Home feels like it belongs to couch-tv. Two quick
+            # Home presses park it for a minute, so VIDAA's own home and settings stay reachable.
+            elif self.keep_home and old is not None and old not in OFF_STATES and new == LAUNCHER and new != old:
+                now = time.monotonic()
+                if now < self._home_pause_until:
+                    self._home_pause_until = 0.0     # parked on VIDAA; a further Home press = take me back
+                    self._note("Home pressed again: returning to couch-tv")
+                    self._bounce_home()
+                elif now - self._last_home < 5:
+                    self._home_pause_until = now + HOME_PAUSE   # two quick presses: keep VIDAA up
+                    self._note("Home pressed twice: staying on VIDAA (couch-tv returns shortly, or at once "
+                               "from any VIDAA menu)")
+                    try:
+                        asyncio.get_running_loop().create_task(self._auto_return(HOME_PAUSE))
+                    except RuntimeError:
+                        pass
+                else:
+                    self._bounce_home()
+                self._last_home = now
         for fut in self._waiters.pop(name, []):
             if not fut.done():
                 fut.set_result(data)
@@ -383,29 +467,36 @@ class VidaaTV:
     async def pair_start(self):
         """Ask the TV to show its 4 digit PIN."""
         self.require()
-        await self._send("ui_service", "vidaa_app_connect", {"device_name": config.CLIENT_NAME})
+        await self._send("ui_service", "vidaa_app_connect", dict(PROTOCOL["app_connect"]))
         self.pin_shown_at = time.monotonic()
         return True
 
     async def pair_finish(self, pin):
-        """Send the PIN, then ask for the token and keep it (bridge/data, never in git)."""
+        """Send the PIN. The TV answers the authenticationcode with result 1 and binds this client's
+        uuid; modern firmware issues no token, so a token is kept only when one is sent."""
         pin = str(pin or "").strip()
         if not PIN.match(pin):
             raise ValueError("the PIN is the 4 digits the TV shows")
         self.require()
-        # what the TV answers to the PIN is not known yet: the token below is the test of it
-        await self._ask("ui_service", "authenticationcode", {PROTOCOL["pin_field"]: pin})
-        got = await self._ask("platform_service", "gettoken", {}, topic=PROTOCOL["token"].format(client=self.client_id))
+        ans = await self._ask("ui_service", "authenticationcode", {PROTOCOL["pin_field"]: int(pin)},
+                              answer="authenticationcode")
+        if not (isinstance(ans, dict) and ans.get("result") == 1):
+            self.last_error = "the TV did not accept that PIN"
+            raise VidaaError("the TV did not accept that PIN (it shows a fresh one each time: try again)")
         token = None
-        if isinstance(got, dict):
-            token = next((got[f] for f in PROTOCOL["token_fields"] if isinstance(got.get(f), str) and got[f]), None)
-        if not token:
-            self.last_error = "the TV accepted the PIN but sent no token"
-            raise VidaaError("the TV accepted the PIN but sent no token (turn on trace and send the log)")
-        self._keep(token=token)
+        try:   # older firmware sends a token; modern keeps the pairing against the uuid instead
+            got = await self._ask("platform_service", "gettoken", {}, answer="gettoken", timeout=4,
+                                  topic=PROTOCOL["token"].format(client=self.client_id))
+            if isinstance(got, dict):
+                token = next((got[f] for f in PROTOCOL["token_fields"] if isinstance(got.get(f), str) and got[f]), None)
+        except TVUnavailable:
+            pass
+        self.paired = True
+        self._keep(paired=True, auth_method=self.auth_method, **({"token": token} if token else {}))
         self.last_error = None
-        self.log.info("paired (token kept in %s)", os.path.basename(self.store_file))
-        await self._drop()   # the next connection uses the token
+        self.log.info("paired (kept in %s%s)", os.path.basename(self.store_file),
+                      ", with a token" if token else ", no token on this firmware")
+        await self._drop()   # reconnect as the paired uuid; the data topics then open
         return True
 
     # ---------- reading the TV ----------
@@ -415,8 +506,8 @@ class VidaaTV:
         try:
             data = await self._ask(service, name, {}, answer="state", timeout=timeout)
         except TVUnavailable:
-            return None
-        return data.get("statetype") if isinstance(data, dict) else None
+            return self.statetype   # the TV pushes state on the broadcast topic at connect; use that
+        return (data.get("statetype") if isinstance(data, dict) else None) or self.statetype
 
     async def refresh_installed(self, force=False):
         """The apps on the TV, every 30 minutes."""
@@ -467,7 +558,9 @@ class VidaaTV:
         want = _plain(self.browser) if self.browser else None
         for a in self.applist:
             n = _plain(a["name"])
-            if (want and n == want) or (not want and n in BROWSER_NAMES):
+            # with a name from config, match it exactly; otherwise take a known browser name, or any
+            # app whose name carries "browser" or "internet" (a VIDAA 9 set lists it as "TV Browser").
+            if (want and n == want) or (not want and (n in BROWSER_NAMES or "browser" in n or "internet" in n)):
                 return a
         return None
 
@@ -581,15 +674,52 @@ class VidaaTV:
         self.log.info("hook: %s", what)
         self.hook_log = (self.hook_log + [(time.strftime("%H:%M:%S"), what)])[-8:]
 
+    def _bounce_home(self):
+        try:
+            asyncio.get_running_loop().create_task(self._reopen())
+        except RuntimeError:
+            pass
+
+    async def _auto_return(self, after):
+        """After a double Home press parks us on VIDAA, come back on our own once the window is up,
+        unless the user is still inside a VIDAA menu or has already left the home screen."""
+        await asyncio.sleep(after)
+        if self.keep_home and self.statetype == LAUNCHER and time.monotonic() >= self._home_pause_until:
+            self._home_pause_until = 0.0
+            self._note("VIDAA window ended, returning to couch-tv")
+            await self._reopen()
+
+    async def _reopen(self):
+        """The Home button landed the TV on VIDAA's own home: bring couch-tv back."""
+        await asyncio.sleep(0.1)         # the TV already reports it is on its home: bounce fast
+        if self.statetype != LAUNCHER or time.monotonic() < self._home_pause_until:
+            return                       # the user moved on, or asked for VIDAA's home
+        if time.monotonic() - self._phone_home_at < 20:
+            return                       # the phone remote's "vidaa_home" key asked for VIDAA's home
+        if not self.open_on_power_on:
+            return
+        # note: no quiet_until check here on purpose — couch-tv never lands the TV on VIDAA's own
+        # home itself, so reaching LAUNCHER always means the Home button, which should bounce back.
+        try:
+            await self._launch(self.app_id, quiet=False)
+            self._note("Home pressed, reopened couch-tv")
+        except Exception as e:
+            self._note(f"Home pressed, could not reopen couch-tv: {e}")
+
     async def _hook(self):
         """The TV just came on. If it is on its own home or live TV, open couch-tv."""
+        if time.monotonic() - self._hooked_at < 8:
+            return                       # already opening from the other path
         if time.monotonic() < self.home_on_wake_until:
             self.home_on_wake_until = 0.0
         elif time.monotonic() < self.quiet_until:
             self._note("TV came on, left alone (a command is running)")
-            return
+            return                       # not stamped: a phone wake straight after still opens couch-tv
+        self._hooked_at = time.monotonic()
         await asyncio.sleep(SETTLE)   # let the TV settle on whatever it opens by itself
-        front = await self.read_state() or self.statetype
+        # the TV pushes its state on the broadcast topic the moment it changes, so statetype is
+        # already current; only fall back to a (short) read if we somehow have nothing.
+        front = self.statetype or await self.read_state(timeout=1.5)
         if front is None:
             self._note("TV came on, could not read where it is, left alone")
             return
@@ -621,6 +751,8 @@ class VidaaTV:
         if not code:
             raise ValueError(f"unknown key: {name}")
         self.require()
+        if code == "KEY_HOME":
+            self._phone_home_at = time.monotonic()   # keep_home must not bounce a home asked for on purpose
         if power and not self.is_on and not (self._mqtt and self._mqtt.alive):
             await self.wake()   # fully off: the broker is gone with it
             return code

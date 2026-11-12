@@ -1,12 +1,17 @@
 # couch-tv on a Hisense VIDAA TV
 
-## Test status: not yet run on a real VIDAA TV
+## Test status: confirmed on a real VIDAA TV
 
-**Nobody has run this on a real VIDAA TV.** It was written in November 2026 and tested only against a
-pretend VIDAA TV on a computer (`tests/vidaa_standin.py`). Hisense publishes nothing about how its TVs
-talk to a phone remote, so parts of `bridge/vidaa.py` are our best reading of it, not confirmed facts.
-Expect something to need fixing. If you have a VIDAA TV, you would be the first: please run the first
-test below and [open an issue](https://github.com/Seagey/couch-tv/issues) with what it printed.
+**Confirmed on a real VIDAA TV.** First confirmed set: a Hisense 55U7N on VIDAA 9 (software
+`V0002.09.61X.Q0705`, a July 2026 build), over Wi-Fi. On it, login, pairing, reading the TV's state
+and app list, the phone remote's keys, opening an app, and a native Couch TV tile on the app row all
+work. This firmware uses the newer "modern" transport: the login credentials are worked out from the
+clock afresh on every connect, the pairing is kept against the client's id (no token is issued), and
+the TV refuses `#` wildcard subscriptions, so `bridge/vidaa.py` now handles all three. Hisense still
+publishes nothing about any of this, so another model or firmware may still need fixing: if yours
+does, please [open an issue](https://github.com/Seagey/couch-tv/issues) with what the first test
+printed. The client certificate is still something each owner supplies from their own copy of
+Hisense's app (`scripts/vidaa-cert.py`); couch-tv does not ship it.
 
 Not technical? [VIDAA-TESTING.md](VIDAA-TESTING.md) is a step by step guide to the first test.
 
@@ -29,11 +34,11 @@ It needs the computer that stays on. Without one there is nothing on the TV to o
 
 | | VIDAA |
 |---|---|
-| couch-tv home, apps in your order, the remote's arrows and OK | In the TV's browser or a tile. Not yet seen on a real TV |
-| Opens by itself when the TV is switched on | Yes, with the bridge running (not yet seen on a real TV) |
-| VIDAA's own Home button | **Still opens VIDAA's home.** That cannot change without rooting the TV, and couch-tv never roots a TV. Press Home on the phone remote to get couch-tv back |
+| couch-tv home, apps in your order, the remote's arrows and OK | In the TV's browser or a tile. Confirmed on a Hisense 55U7N |
+| Opens by itself when the TV is switched on | Yes, with the bridge running |
+| VIDAA's own Home button | **Still opens VIDAA's home** unless `keep_home: true` is set (opt in, Beta). Without it that cannot change without rooting the TV, and couch-tv never roots a TV. Press Home on the phone remote to get couch-tv back |
 | A Couch TV tile on the app row | Only on firmware that still accepts it (below). Asked for once, from the phone, never by itself |
-| Phone remote: keys, volume up and down, mute, open an app | Built. The key names are unconfirmed |
+| Phone remote: keys, volume up and down, mute, open an app | Works |
 | More than one TV on one phone remote | Yes: one bridge runs Google TVs, Samsungs, LGs, Rokus and VIDAA TVs together |
 | "Put on Bluey" (find and play) | The app opens on its own page and the reply says to pick the show there. No deep link into a show is known on VIDAA |
 | Turning the TV on from the phone | From standby: a power key. From fully off: only with Wake on LAN switched on in the TV's network settings |
@@ -108,12 +113,16 @@ In `config.json`, add the TV with `"kind": "vidaa"`:
 ```
 
 - `mac` is for turning the TV on from fully off (leave it out if you do not want that).
-- `trace: true` logs every message to and from the TV, with the PIN and the token hidden. Leave it on for
+- `trace: true` logs every message to and from the TV, with the PIN and any token hidden. Leave it on for
   the first weeks: it is what an issue needs.
 - `browser`: the name the TV lists its web browser under, if couch-tv cannot find it by itself (it looks
   for "Browser", "Web Browser" and "Internet").
 - `home_url`: the address the TV should open, if the bridge picks the wrong one of this computer's
   addresses (for example `http://192.0.2.20:5400/tv/`).
+- `keep_home` (false): opt in (Beta). When the TV falls back to VIDAA's own home, couch-tv opens again on top. A
+  Home press from the phone remote is never bounced.
+- `uuid`: the identity the TV pairs with. It is kept automatically and rarely set by hand.
+- `auth_method`: optional override for how the login is worked out, if your firmware needs a different one.
 - `port` (36669, then 36668 on older builds), `tls` (true), `cert` and `cert_key` (the files from step 2),
   `mqtt_user`, `mqtt_password` and `client_id` are there for a tester who finds the defaults wrong.
 
@@ -133,7 +142,7 @@ opens nothing. Then pair:
 .venv/bin/python scripts/vidaa-check.py <tv address> --tv lounge --pair
 ```
 
-The TV shows a 4 digit PIN. Type it in when asked (or run it again with `--pin <the 4 digits>`). The token
+The TV shows a 4 digit PIN. Type it in when asked (or run it again with `--pin <the 4 digits>`). The pairing
 the TV gives back is kept in `bridge/data/vidaa-lounge.json`, which git ignores. With the bridge running,
 `POST /api/vidaa/pair` with `{}` and then `{"pin": "1234"}` does the same (it needs the pairing key like
 every other endpoint).
@@ -175,7 +184,7 @@ In this order, because each one needs the one before:
 ## How the hook works
 
 `bridge/vidaa.py` keeps one connection to the TV's MQTT service (port 36669 over TLS) and checks it every
-2 seconds. The TV says where it is in a field called `statetype`: `remote_launcher` (VIDAA's home),
+second, and a power on is pushed to it at once. The TV says where it is in a field called `statetype`: `remote_launcher` (VIDAA's home),
 `livetv`, `sourceswitch` (an input), `remote_setting` (a settings menu), `fake_sleep_0` (standby) and
 `fake_sleep_1` (waking). When the TV goes from off or standby to on, the bridge waits a moment, and if the
 TV is on its home or live TV it opens couch-tv: the tile when there is one, else the TV's browser at the
@@ -192,19 +201,16 @@ Apps open only from the TV's own app list: the bridge sends back exactly the ent
 nothing typed on the phone goes into a message unchecked (keys come from a fixed list or the `KEY_` form,
 app ids must be in the TV's list, the PIN must be 4 digits).
 
-## What is unconfirmed
+## What still stands
 
-These are written once, in `PROTOCOL` and `KEYS` at the top of `bridge/vidaa.py`, so a tester's trace can
-correct them in one place:
+This path was confirmed on a Hisense 55U7N, VIDAA 9, build Q0705, by Matthew Klette (#128). Two things still
+depend on your TV:
 
-- The name of the request that asks the TV where it is (`gettvstate`).
-- That answers come back on `/remoteapp/mobile/<client>/<service>/data/<name>`.
-- That keys go to `remote_service` as `sendkey`, and the key names (`KEY_UP`, `KEY_RETURNS` for Back and so
-  on).
-- The field the PIN travels in, the field the token comes back in, and that the token is the password on
-  later logins.
-- Which browser the TV lists, and whether `launchapp` opens the bridge's page in it when given its address.
-- Whether the tile, where it installs, survives a firmware update.
+- Which browser name the TV lists, so couch-tv can match it (set `browser` if it cannot).
+- The native Couch TV tile is only confirmed on newer firmware. Older builds may or may not take it.
+
+The protocol details are written once, in `PROTOCOL` and `KEYS` at the top of `bridge/vidaa.py`, so a
+tester's trace can correct them in one place.
 
 ## Limits to know
 
@@ -219,7 +225,7 @@ correct them in one place:
 ## Undo
 
 1. Take the TV out of `config.json` and restart the bridge.
-2. Delete `bridge/data/vidaa-<id>.json` (the token) and `bridge/data/vidaa/` (the certificate).
+2. Delete `bridge/data/vidaa-<id>.json` (the pairing) and `bridge/data/vidaa/` (the certificate).
 3. If you added the tile: remove it from the TV's app row the way the TV removes any app.
 
 Nothing else on the TV was changed.

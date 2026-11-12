@@ -25,6 +25,7 @@ import config  # noqa: E402
 import server  # noqa: E402
 import tinymqtt  # noqa: E402
 import vidaa  # noqa: E402
+import vidaa_auth  # noqa: E402
 from tv import TVUnavailable  # noqa: E402
 from vidaa_standin import PIN, TOKEN, StandIn, server_tls, tls_pair  # noqa: E402
 
@@ -64,10 +65,28 @@ class Base(unittest.IsolatedAsyncioTestCase):
 class Connecting(Base):
     async def test_logs_in_and_keeps_its_client_id(self):
         await self.tv._connection()
-        self.assertEqual(self.s.logins, [(self.tv.client_id, None, None)])   # no token yet: no password
+        self.assertEqual(len(self.s.logins), 1)                             # the first (modern) scheme got in
+        cid, user, password = self.s.logins[0]
+        self.assertEqual(cid, self.tv.client_id)
+        self.assertRegex(cid, r"^C8:F7:33(:[0-9A-F]{2}){3}\$his\$[0-9A-F]{6}_vidaacommon_001$")
+        self.assertRegex(user, r"^his\$\d+$")                               # worked out from the clock
+        self.assertRegex(password, r"^[0-9A-F]{32}$")
         kept = json.load(open(os.path.join(self.data, "vidaa-lounge.json")))
-        self.assertEqual(kept["client_id"], self.tv.client_id)
+        self.assertEqual((kept["client_id"], kept["uuid"], kept["auth_method"]),
+                         (self.tv.client_id, self.tv.uuid, vidaa_auth.MODERN))
         self.assertEqual(self.s.tv().client_id, self.tv.client_id)          # the next start uses the same one
+
+    async def test_a_tester_login_is_tried_once_per_port(self):
+        t = self.s.tv(mqtt_user="u", mqtt_password="p")
+        self.s.refuse = 5
+        with self.assertRaises(TVUnavailable):
+            await t._connection()
+        self.assertEqual(self.s.logins, [(t.client_id, "u", "p")])
+
+    async def test_a_bad_uuid_or_auth_method_in_config_is_refused(self):
+        for cfg in ({"uuid": "me/#"}, {"auth_method": "newest"}):
+            with self.assertRaises(SystemExit):
+                self.s.tv(**cfg)
 
     async def test_a_refused_login_is_explained_and_not_retried_at_once(self):
         self.s.refuse = 5
@@ -78,7 +97,7 @@ class Connecting(Base):
         self.assertIn("not authorised", self.tv.vidaa_status()["error"])
         with self.assertRaises(TVUnavailable):
             await self.tv._connection()
-        self.assertEqual(len(self.s.logins), 1)                            # waits 30 s before the next try
+        self.assertEqual(len(self.s.logins), len(vidaa_auth.ORDER))        # each scheme once, then waits 30 s
 
     async def test_a_client_id_with_mqtt_wildcards_is_refused(self):
         with self.assertRaises(SystemExit):
@@ -264,19 +283,26 @@ class Launching(Base):
 
 
 class Pairing(Base):
-    async def test_pin_then_token_then_the_token_logs_in(self):
+    async def test_pin_pairs_this_uuid_and_keeps_a_token_if_one_is_sent(self):
         await self.tv.pair_start()
         await self.settle()
         self.assertTrue(self.s.pin_shown)
+        self.assertEqual(json.loads(self.s.sent("vidaa_app_connect")[-1]), vidaa.PROTOCOL["app_connect"])
+        self.assertFalse(self.tv.paired)
         await self.tv.pair_finish(PIN)
-        self.assertEqual(self.tv.token, TOKEN)
+        self.assertEqual(json.loads(self.s.sent("authenticationcode")[-1]), {"authNum": int(PIN)})
+        self.assertTrue(self.tv.paired)
+        self.assertEqual(self.tv.token, TOKEN)            # older firmware sends one: it is kept
         path = os.path.join(self.data, "vidaa-lounge.json")
         self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
         self.assertTrue(self.tv.vidaa_status()["token"])
-        self.s.want_token = True                          # from now on the TV wants the token
-        t = self.s.tv()
+        t = self.s.tv()                                   # the next start: same uuid, still paired
+        self.assertTrue(t.paired)
+        self.assertEqual((t.uuid, t.client_id), (self.tv.uuid, self.tv.client_id))
         await t.read_state()
-        self.assertEqual(self.s.logins[-1], (t.client_id, t.client_id, TOKEN))
+        cid, user, _ = self.s.logins[-1]
+        self.assertEqual(cid, t.client_id)
+        self.assertRegex(user, r"^his\$\d+$")             # fresh clock credentials, not the token
         await t._drop()
 
     async def test_a_wrong_pin_keeps_no_token(self):
@@ -298,6 +324,7 @@ class Pairing(Base):
             await t.pair_finish(PIN)
         out = "\n".join(cm.output)
         self.assertIn("trace out", out)
+        self.assertIn('"authNum":"(hidden)"', out)        # the PIN goes as a number and is still hidden
         self.assertNotIn(PIN, out)
         self.assertNotIn(TOKEN, out)
         await t._drop()
@@ -417,8 +444,47 @@ class Hook(Base):
             self.s.statetype = "remote_launcher"
             await asyncio.sleep(0.4)
             task.cancel()
-        self.assertEqual(fired, [1])
+        self.assertTrue(fired)        # the state answer and the watcher may both call it: _hook keeps it to one
         self.assertTrue(t.is_on)
+        await t._drop()
+
+    async def test_two_calls_to_the_hook_open_couch_tv_once(self):
+        t = self.s.tv()
+        with patch.object(vidaa, "SETTLE", 0):
+            await asyncio.gather(t._hook(), t._hook())
+        self.assertEqual([l["appId"] for l in await self.launches()], ["77"])
+        await t._drop()
+
+
+class KeepHome(Base):
+    async def watch(self, **cfg):
+        t = self.s.tv(**cfg)
+        await t._connection()
+        await self.s.broadcast_state("livetv")
+        await self.settle()
+        return t
+
+    async def test_off_unless_asked_for(self):
+        self.assertFalse(self.s.tv().keep_home)
+        t = await self.watch()
+        await self.s.broadcast_state("remote_launcher")
+        await asyncio.sleep(0.3)
+        self.assertEqual(await self.launches(), [])
+        await t._drop()
+
+    async def test_vidaa_home_bounces_back_to_couch_tv(self):
+        t = await self.watch(keep_home=True)
+        await self.s.broadcast_state("remote_launcher")
+        await asyncio.sleep(0.3)
+        self.assertEqual([l["appId"] for l in await self.launches()], ["77"])
+        await t._drop()
+
+    async def test_the_phone_remotes_vidaa_home_key_is_not_bounced(self):
+        t = await self.watch(keep_home=True)
+        await t.key("vidaa_home")
+        await self.s.broadcast_state("remote_launcher")
+        await asyncio.sleep(0.3)
+        self.assertEqual(await self.launches(), [])
         await t._drop()
 
 

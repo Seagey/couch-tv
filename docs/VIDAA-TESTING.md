@@ -1,6 +1,6 @@
 # Testing couch-tv on a Hisense VIDAA TV
 
-Thank you for offering. Nobody has run couch-tv on a real VIDAA TV yet, so you would be the first. This
+Thank you for offering. couch-tv now runs on a real Hisense 55U7N (VIDAA 9). Your TV, on a different model or firmware, helps us make sure it works on yours too. This
 guide is the one safe test, and you do not need to be technical to do it. It takes about 15 minutes, most
 of it setting up.
 
