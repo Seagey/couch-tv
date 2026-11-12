@@ -120,6 +120,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "POST /api/key" -> {
                 val b = body(s)
                 val key = b.optString("key").ifEmpty { throw ApiError(400, "key is required") }
+                Now.resetPausedIdle()
                 Tv.key(key, b.optBoolean("hold"))
                 json(200, ok().put("key", key))
             }
@@ -145,6 +146,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "POST /api/play" -> {
                 val b = body(s)
                 val title = b.optString("title").trim().ifEmpty { throw ApiError(400, "title is required") }
+                Now.resetPausedIdle()
                 json(200, ok(Finder.play(title, b.optInt("season").takeIf { it > 0 }, b.optInt("episode").takeIf { it > 0 },
                     b.optString("service").ifEmpty { null }, b.optString("who").ifEmpty { null })))
             }
@@ -200,6 +202,10 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 if (min.isNaN() || min < 0 || min > 600) throw ApiError(400, "minutes must be 0 to 600")
                 App.setSleep(if (min > 0) System.currentTimeMillis() + (min * 60_000).toLong() else null)
                 json(200, ok().put("ends", Now.sleepEnds?.let { Now.iso(it) } ?: JSONObject.NULL))
+            }
+            "POST /api/idle/cancel" -> {
+                Now.cancelPausedIdle()
+                json(200, ok().put("snoozed", true))
             }
             "GET /api/picture" -> json(200, ok().put("mode", JSONObject.NULL).put("supported", false).put("can_set", false))
             "POST /api/picture" -> json(409, err("picture mode is not available in on-TV mode"))

@@ -525,6 +525,7 @@ def now_payload():
                            "poster": media_now.get("poster"), "backdrop": media_now.get("backdrop"),
                            "source": "tv"} | live
     on = tv.is_on
+    idle_st = _paused_idle_state()
     return {
         "tv_connected": tv.connected,
         "adb": tv.adb_ok,
@@ -533,6 +534,7 @@ def now_payload():
         "volume": tv.volume,
         "playing": out_playing,
         "sleep": {"ends": sleep["ends"]},
+        "idle": {"ends": idle_st["ends"], "reason": "paused"} if idle_st.get("ends") else None,
         "waking": waking["on"],
         "who": cur_who(),
         "picture": picture_state.get("mode"),
@@ -622,6 +624,7 @@ async def h_key(request):
     key = data.get("key")
     if not key:
         raise ApiError(400, "key is required")
+    _reset_paused_idle()
     await tv.key(str(key), hold=bool(data.get("hold")))
     record_action(request, "key", {"key": key}, True)
     return ok(key=key)
@@ -1475,6 +1478,7 @@ async def h_play(request):
     title = (data.get("title") or "").strip()
     if not title:
         raise ApiError(400, "title is required")
+    _reset_paused_idle()
     # No season asked for: open the show where they are up to, never episode 1.
     result = await play(title, data.get("season"), data.get("episode"), data.get("service"),
                         store.norm_who(data.get("who")) or cur_who(),
@@ -1972,6 +1976,94 @@ async def _sleep_fire():
     push_now()
 
 
+# ---------- smart idle (paused-media auto-off) ----------
+
+
+def _paused_idle_state():
+    return tv.state.setdefault("paused_idle", {"since": None, "pkg": None, "ends": None, "snoozed_until": 0.0})
+
+
+def _smart_idle_cfg():
+    raw = home_settings().get("settings", {}).get("smart_idle")
+    return config._smart_idle(raw if isinstance(raw, dict) else config.HOME.get("smart_idle"))
+
+
+def _in_quiet_hours(qh, now_dt=None):
+    if not isinstance(qh, dict) or not qh.get("enabled"):
+        return False
+    dt = now_dt or datetime.now(HOME_TZ)
+    cur = dt.hour * 60 + dt.minute
+    sh, sm = (int(x) for x in config._hhmm(qh.get("start"), "23:00").split(":"))
+    eh, em = (int(x) for x in config._hhmm(qh.get("end"), "06:00").split(":"))
+    start, end = sh * 60 + sm, eh * 60 + em
+    if start == end:
+        return True
+    return (start <= cur < end) if start < end else (cur >= start or cur < end)
+
+
+def _reset_paused_idle(snooze_seconds=0.0):
+    st = _paused_idle_state()
+    changed = st.get("ends") is not None
+    st["since"] = None
+    st["pkg"] = None
+    st["ends"] = None
+    if snooze_seconds > 0:
+        st["snoozed_until"] = time.time() + snooze_seconds
+    if changed:
+        push_now()
+
+
+async def _paused_idle_step(state_str, pkg, now_ts=None):
+    """Track paused playback and power off the TV when paused_idle_minutes elapses.
+    Never triggers when state_str is empty/None (e.g. HDMI inputs or games with no media session)."""
+    st = _paused_idle_state()
+    cfg = _smart_idle_cfg()
+    now_t = time.time() if now_ts is None else now_ts
+    if not cfg["enabled"] or not tv.connected or not tv.is_on or not pkg or state_str != "paused":
+        if st.get("since") is not None or st.get("ends") is not None:
+            _reset_paused_idle()
+        return False
+    if now_t < st.get("snoozed_until", 0.0):
+        return False
+    qh = cfg["quiet_hours"]
+    mins = qh["idle_minutes"] if _in_quiet_hours(qh) else cfg["paused_idle_minutes"]
+    if mins <= 0:
+        if st.get("since") is not None or st.get("ends") is not None:
+            _reset_paused_idle()
+        return False
+    if st.get("since") is None or st.get("pkg") != pkg:
+        st["since"] = now_t
+        st["pkg"] = pkg
+    deadline = st["since"] + mins * 60
+    new_ends = datetime.fromtimestamp(deadline, HOME_TZ).isoformat(timespec="seconds") if deadline - now_t <= 300 else None
+    if new_ends != st.get("ends"):
+        st["ends"] = new_ends
+        push_now()
+    if now_t < deadline:
+        return False
+    log.info("smart idle: %s paused for %d min, turning TV off", pkg, mins)
+    st["since"] = None
+    st["pkg"] = None
+    st["ends"] = None
+    if sleep.get("ends"):
+        _sleep_set(None)
+    try:
+        if tv.is_on:
+            await tv.key("power")
+    except Exception as e:
+        log.warning("smart idle could not turn TV off: %s", e)
+    push_now()
+    return True
+
+
+async def h_idle_cancel(request):
+    cfg = _smart_idle_cfg()
+    qh = cfg["quiet_hours"]
+    mins = qh["idle_minutes"] if _in_quiet_hours(qh) else cfg["paused_idle_minutes"]
+    _reset_paused_idle(snooze_seconds=max(300, mins * 60))
+    return ok(snoozed=True)
+
+
 # ---------- weather for the home (Open-Meteo: free, no account, no key) ----------
 # The place comes from "weather" in config.json. Fetched at most every 30 minutes.
 WEATHER_AT = {k: config.WEATHER[k] for k in ("lat", "lon", "place")}
@@ -2201,6 +2293,8 @@ def clean_settings(s):
     if isinstance(sc, dict) and sc.get("type") in config.SOUNDSCAPE_TYPES:
         out["soundscape"] = {"type": sc["type"], "volume": config._float(sc.get("volume"), 0.5, 0.0, 1.0),
                              "fade_with_sleep": sc.get("fade_with_sleep") is not False}
+    if isinstance(s.get("smart_idle"), dict):
+        out["smart_idle"] = config._smart_idle(s["smart_idle"])
     return out
 
 
@@ -2820,6 +2914,7 @@ async def media_watch_loop():
                             item["season"], item["episode"] = said
                 untitled_step(pkg, app, bool(s and s.get("state") == "PLAYING" and not s.get("title")), pos,
                               titled=bool(s and s.get("state") == "PLAYING" and s.get("title")))
+                await _paused_idle_step(media_now.get("state"), pkg)
             else:
                 if not _blip(seen_playing.get("_playing")):
                     seen_playing["_playing"] = (None, time.time())   # the minute starts again after a break
@@ -2827,6 +2922,7 @@ async def media_watch_loop():
                 if media_now and not getattr(tv, "native_media", False):   # a Roku fills media_now itself
                     media_now.clear()
                     push_now()
+                await _paused_idle_step(media_now.get("state") if getattr(tv, "native_media", False) else None, pkg)
             await untitled_resolve()
         except Exception as e:
             log.warning("media watch skipped: %s: %s", type(e).__name__, e)
@@ -3432,6 +3528,7 @@ def make_app():
     r.add_get("/api/watch-next", h_watch_next_get)
     r.add_get("/api/sleep", h_sleep_get)
     r.add_post("/api/sleep", h_sleep_set)
+    r.add_post("/api/idle/cancel", h_idle_cancel)
     r.add_get("/api/screens", h_screens)
     r.add_post("/api/screens/open", h_screens_open)
     r.add_post("/api/power", h_power)

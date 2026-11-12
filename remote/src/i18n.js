@@ -85,6 +85,9 @@ S.en = {
   sleep_needs_update: 'The sleep timer needs the next bridge update.',
   sleep_set: 'Sleep timer: {n} minutes',
   sleep_off: 'Sleep timer off',
+  idle_auto_off: 'TV auto-off in {n} min (paused)',
+  idle_still_here: 'I’m still here',
+  idle_snoozed: 'Auto-off cancelled',
   picture_now: 'Picture: {mode}',
   sent_to_tv: 'Sent to the TV',
   // Watch
