@@ -23,7 +23,7 @@ class WatchService : AccessibilityService() {
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = e.packageName?.toString(); val cls = e.className?.toString()
-        FireHome.seen(pkg)
+        FireHome.seen(pkg, cls)
         when {
             FireHome.isAmazonHome(pkg, cls) -> FireHome.onAmazonHome()
             FireHome.isPatchWall(pkg, cls) -> FireHome.onPatchWall()
