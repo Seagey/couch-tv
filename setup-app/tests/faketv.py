@@ -52,7 +52,9 @@ class FakeTv:
     def key(self, name):
         self.keys.append(name)
         if name == "HOME":
-            if self.ontv_alias and "dev.couchtv.ontv" in self.packages:
+            ontv_watch = "dev.couchtv.ontv" in self.a11y
+            # the alias alone only wins on a TV that lets it (Fire OS: only while its watch is on, seen on a real stick)
+            if self.ontv_alias and "dev.couchtv.ontv" in self.packages and (ontv_watch or not getattr(self, "refuse_alias", False)):
                 self.front_pkg = "dev.couchtv.ontv"
                 return
             if "app.couchtv.launcher" in self.packages and ((self.chosen and not self.refuse_home) or (self._watch_on() and self.binds)):
@@ -107,6 +109,8 @@ class FakeTv:
         if c.startswith("cmd shortcut get-default-launcher"):
             return "Launcher: ComponentInfo{" + (self.chosen or self.home) + "}"
         if c.startswith("pm disable dev.couchtv.ontv/"):
+            if getattr(self, "refuse_alias", False):
+                return "Exception occurred while executing 'disable':\njava.lang.SecurityException: Shell cannot change component state for dev.couchtv.ontv/dev.couchtv.ontv.HomeAlias to 2"
             self.ontv_alias = False
             return "Component enabled state changed to disabled"
         if c.startswith("pm revoke"):

@@ -10,6 +10,8 @@ import re
 import socket
 import subprocess
 import sys
+import time
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 from . import mdns
@@ -84,8 +86,9 @@ def scan(nets=None, wait=3.0):
     """Every likely TV: Google TV and Android TV by their own announcement (with the name the TV
     gives itself), plus anything with ADB open on 5555 (Fire TV and older Android TVs)."""
     found = {}
-    with ThreadPoolExecutor(max_workers=2) as two:
+    with ThreadPoolExecutor(max_workers=3) as two:
         heard = two.submit(mdns.browse, [ANDROID_REMOTE, ADB_CONNECT], wait)
+        dial = two.submit(dial_names, 2.0)
         hosts = [(h, p) for n in (nets or home_networks()) for h in n.hosts() for p in SCAN_PORTS]
         with ThreadPoolExecutor(max_workers=96) as pool:
             knocks = [hp for hp, ok in zip(hosts, pool.map(lambda hp: answers(*hp), hosts)) if ok]
@@ -101,10 +104,54 @@ def scan(nets=None, wait=3.0):
         t = found.setdefault(str(h), {"ip": str(h), "name": None, "ports": [], "wireless_debugging": None})
         t["ports"].append(p)
     out = list(found.values())
+    try:
+        dial_found = dial.result()
+    except Exception:
+        dial_found = {}
     for t in out:
+        t["announced"] = None if t["name"] else dial_found.get(t["ip"])
         t["adb_5555"] = 5555 in t["ports"]
         t["android"] = 6466 in t["ports"] or t["adb_5555"] or bool(t["wireless_debugging"]) or bool(t["name"])
     return sorted(out, key=lambda t: (t["name"] is None, socket.inet_aton(t["ip"])))
+
+
+DIAL_ST = "urn:dial-multiscreen-org:service:dial:1"
+
+
+def dial_names(wait=2.0):
+    """The friendly names TVs give themselves over DIAL (the cast-to-TV discovery a Fire TV answers, for
+    one): {ip: name}. It asks once over SSDP and reads each answer's device description. Only asks."""
+    msg = ("M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\n"
+           f"ST: {DIAL_ST}\r\n\r\n").encode()
+    locations = {}
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.settimeout(0.3)
+            sock.sendto(msg, ("239.255.255.250", 1900))
+            end = time.time() + wait
+            while time.time() < end:
+                try:
+                    data, src = sock.recvfrom(4096)
+                except socket.timeout:
+                    continue
+                m = re.search(rb"(?im)^location:\s*(http://[^\r\n]+)", data)
+                if m and is_home_address(src[0]):
+                    locations[src[0]] = m.group(1).decode(errors="replace").strip()
+    except OSError:
+        return {}
+    names = {}
+    for ip, url in locations.items():
+        try:
+            if (re.match(r"http://([0-9.]+)[:/]", url) or [None, None])[1] != ip:
+                continue   # the description must come from the address that answered
+            with urllib.request.urlopen(url, timeout=2) as r:
+                body = r.read(20000).decode(errors="replace")
+        except Exception:
+            continue
+        m = re.search(r"<friendlyName>([^<]{1,60})</friendlyName>", body)
+        if m and m.group(1).strip():
+            names[ip] = m.group(1).strip()
+    return names
 
 
 def look(ip):

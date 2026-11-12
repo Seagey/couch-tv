@@ -211,7 +211,9 @@ class OnTvIsHome(unittest.TestCase):
 
     def test_plan_names_it_and_offers_both_ways(self):
         tv = self.stick()
-        off = steps.plan(tv, steps.facts(tv))
+        google = FakeTv("google", installed={"dev.couchtv.ontv"}, a11y=self.ONTV_WATCH)
+        google.ontv_alias = True
+        off = steps.plan(google, steps.facts(google))
         self.assertTrue(any("on-TV app" in i and "switches its home and watch off" in i for i in off))
         keep = steps.plan(tv, steps.facts(tv), ontv_home_off=False)
         self.assertTrue(any("keeping it" in i for i in keep))
@@ -231,6 +233,55 @@ class OnTvIsHome(unittest.TestCase):
         steps.undo(tv)
         self.assertNotIn("dev.couchtv.ontv", tv.packages)
         self.assertNotIn("app.couchtv.launcher", tv.packages)
+
+    def test_fire_plan_is_honest_about_the_home_entry(self):
+        tv = self.stick()
+        item = steps.plan(tv, steps.facts(tv))[0]
+        self.assertIn("Fire OS won't let a computer switch its home entry off", item)
+        self.assertIn("without its watch it stays in the background", item)
+        self.assertNotIn("switches its home and watch off", item)
+
+    def test_refused_alias_disable_is_not_a_failure(self):
+        tv = self.stick()
+        tv.refuse_alias = True
+        r = steps.make_home(tv, APK)
+        self.assertTrue(r["front"])
+        self.assertTrue(r["ontv_alias_left"])
+        self.assertNotIn("dev.couchtv.ontv", tv.a11y)                 # watch still taken out
+        self.assertIn("pm revoke dev.couchtv.ontv android.permission.WRITE_SECURE_SETTINGS", tv.log)
+
+    def test_refused_alias_asks_the_app_over_its_api_when_it_has_a_token(self):
+        import http.server, threading, json as _json
+        seen = {}
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                seen["path"] = self.path
+                seen["auth"] = self.headers.get("Authorization")
+                seen["body"] = _json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                self.send_response(200); self.end_headers(); self.wfile.write(b"{}")
+
+            def log_message(self, *a):
+                pass
+        srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.handle_request, daemon=True).start()
+        real = steps.urllib.request.Request
+        port = srv.server_address[1]
+
+        def local(url, **kw):
+            return real(url.replace(":5400", f":{port}"), **kw)
+        tv = self.stick()
+        tv.refuse_alias = True
+        tv.ip, tv.ontv_token = "127.0.0.1", "tok"
+        steps.urllib.request.Request = local
+        try:
+            off = steps.ontv_home_off(tv)
+        finally:
+            steps.urllib.request.Request = real
+            srv.server_close()
+        self.assertTrue(off["alias_off_via_api"])
+        self.assertFalse(off["alias_left"])
+        self.assertEqual((seen["path"], seen["auth"], seen["body"]), ("/api/home", "Bearer tok", {"on": False}))
 
     def test_keeping_it_installs_nothing(self):
         tv = self.stick()

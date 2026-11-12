@@ -70,9 +70,9 @@
         var b = document.createElement("button");
         var name = document.createElement("span");
         var model = t.known && t.known.name;
-        name.textContent = t.name || model || (t.adb_5555 ? "A TV with debugging on" : "Android TV");
+        name.textContent = t.name || t.announced || model || (t.adb_5555 ? "A TV with debugging on" : "Android TV");
         var small = document.createElement("small");
-        small.textContent = (t.name && model ? model + " · " : "") + t.ip;
+        small.textContent = ((t.name || t.announced) && model ? model + " · " : "") + t.ip;
         b.appendChild(name); b.appendChild(small);
         b.addEventListener("click", function () { pick(t.ip, t); });
         $("found").appendChild(b);
@@ -120,7 +120,7 @@
 
   function askKind(r, guess) {
     {
-      text("kind-line", r.kind === "android" ? "It looks like an Android based TV." :
+      text("kind-line", guess === "fire" ? "It looks like a Fire TV." : r.kind === "android" ? "It looks like an Android based TV." :
         "It is not answering yet. That is normal for a Fire TV before ADB debugging is on. Pick what it is.");
       document.querySelectorAll("[data-kind]").forEach(function (b) { b.classList.toggle("guess", b.dataset.kind === guess); });
       show("kind");

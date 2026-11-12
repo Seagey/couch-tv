@@ -15,6 +15,7 @@ import base64
 import json
 import re
 import time
+import urllib.request
 
 from . import paths
 from .tv import TvError
@@ -125,10 +126,29 @@ def ontv_home(tv, present=None):
     return {"installed": True, "alias": alias, "watch": watch, "takes_home": alias or watch}
 
 
+def ontv_api_home_off(ip, token):
+    """Asks the on-TV app itself to stop being the home (POST /api/home {"on": false} on port 5400).
+    Needs a phone token: without one the app answers 401, so this only tries when it has one."""
+    if not token or not ip:
+        return False
+    req = urllib.request.Request(f"http://{ip}:5400/api/home", data=b'{"on": false}', method="POST",
+                                 headers={"Content-Type": "application/json", "Authorization": "Bearer " + token})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
 def ontv_home_off(tv):
     """Takes the on-TV app's Home and Home button watch out. It stays installed. Its grant to change
-    secure settings is taken back too, so it cannot put its own watch on again by itself."""
-    tv.shell(f"pm disable {ONTV_ALIAS}")
+    secure settings is taken back too, so it cannot put its own watch on again by itself.
+    Fire OS will not let a computer switch a component off ("Shell cannot change component state", seen
+    by killy10o10 on Fire OS 8.1.8.5): that refusal is not a failure. The on-TV app is asked to switch its
+    own home off when we hold a token for it, and otherwise it is left, harmless without its watch."""
+    out = tv.shell(f"pm disable {ONTV_ALIAS}") or ""
+    refused = bool(re.search(r"Shell cannot change component state|SecurityException", out))
+    via_api = ontv_api_home_off(getattr(tv, "ip", None), getattr(tv, "ontv_token", None)) if refused else False
     cur = tv.shell("settings get secure enabled_accessibility_services").strip()
     parts = [s for s in cur.split(":") if s and s != "null"]
     keep = [s for s in parts if not s.startswith(ONTV_PKG + "/")]
@@ -138,6 +158,7 @@ def ontv_home_off(tv):
         else:
             tv.shell("settings delete secure enabled_accessibility_services")
     tv.shell(f"pm revoke {ONTV_PKG} android.permission.WRITE_SECURE_SETTINGS")
+    return {"alias_refused": refused, "alias_off_via_api": via_api, "alias_left": refused and not via_api}
 
 
 def fire_os_version(tv):
@@ -164,7 +185,12 @@ def plan(tv, f, ambient_off=True, ontv_home_off=True):
     items = []
     ontv = f.get("ontv_home") or {}
     if ontv.get("takes_home"):
-        if ontv_home_off:
+        if ontv_home_off and f.get("fire"):
+            items.append("couch-tv's other app (the on-TV app) is already this TV's home screen, with its own Home button "
+                         "watch. This switches the on-TV app's Home button watch off and takes back its permission, then makes "
+                         "couch-tv's home app the home. Fire OS won't let a computer switch its home entry off, which is fine "
+                         "because without its watch it stays in the background. The on-TV app stays installed.")
+        elif ontv_home_off:
             items.append("couch-tv's other app (the on-TV app) is already this TV's home screen, with its own Home button "
                          "watch. Two couch-tv homes would fight and the on-TV app would keep winning. This switches its "
                          "home and watch off first (the on-TV app stays installed), then makes couch-tv's home app the home.")
@@ -310,6 +336,7 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
               ontv_home_switch_off=True):
     done = []
     ontv = ontv_home(tv)
+    alias_left = False
     if ontv["takes_home"]:
         if not ontv_home_switch_off:
             # The person keeps the on-TV app as the home: a second home would only fight it.
@@ -317,8 +344,9 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
                     "watch": False, "watch_bound": None, "fire": is_fire(tv), "disabled": record(tv)["disabled"],
                     "warning": watch_warning(other_watches(tv))}
         progress(0.01, "Switching off the on-TV app's home and Home button watch")
-        ontv_home_off(tv)
-        done.append("on-TV app's home and watch off")
+        off = ontv_home_off(tv)
+        alias_left = off["alias_left"]
+        done.append("on-TV app's watch off" if off["alias_left"] else "on-TV app's home and watch off")
     rec = record(tv)
     progress(0.02, "Noting the TV's own home, for Undo")
     if not rec["home"]:
@@ -404,7 +432,8 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     progress(1.0, "Done")
     return {"changed": done, "front": result["ok"], "home_key_opens": "couch-tv" if resolved.startswith(HOME_PKG + "/") else resolved,
             "watch": watch, "watch_bound": bound, "fire": fire, "disabled": rec["disabled"],
-            "warning": watch_warning(other_watches(tv)), "other_front": result.get("other_front")}
+            "warning": watch_warning(other_watches(tv)), "other_front": result.get("other_front"),
+            "ontv_alias_left": alias_left}
 
 
 WATCH_LABEL = "Home button watch"   # FireWatch's android:label in tv-home's AndroidManifest.xml
