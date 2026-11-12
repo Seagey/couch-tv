@@ -31,11 +31,13 @@ from tv import TV, TVUnavailable, intent_to_link
 import samsung
 import lg
 import roku
+import philips
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 REMOTE_DIR = os.path.join(ROOT, "remote", "dist")
 LAUNCHER_DIR = os.path.join(ROOT, "tv-home", "web")
+TITAN_DIR = os.path.join(ROOT, "titan")   # the start page a Titan OS app opens (docs/PHILIPS-TITAN.md)
 SHIM_PATH = os.path.join(HERE, "web", "shim.js")
 PORT = int(os.environ.get("PORT") or config.BRIDGE["port"])
 HOME_TZ = ZoneInfo(config.TIMEZONE)   # the home's time zone (weather.timezone in config.json)
@@ -51,13 +53,16 @@ TV_CONFIG = {"default": config.DEFAULT_TV, "tvs": config.TVS}
 
 def make_tv(cfg):
     """A Samsung ("kind": "samsung", bridge/samsung.py), an LG ("kind": "lg", bridge/lg.py), a Roku
-    ("kind": "roku", bridge/roku.py) or an Android or Google TV (tv.py)."""
+    ("kind": "roku", bridge/roku.py), a Philips on Titan OS ("kind": "philips", bridge/philips.py) or an
+    Android or Google TV (tv.py)."""
     if cfg.get("kind") == "samsung":
         return samsung.SamsungTV(cfg)
     if cfg.get("kind") == "lg":
         return lg.LGTV(cfg)
     if cfg.get("kind") == "roku":
         return roku.RokuTV(cfg)
+    if cfg.get("kind") == "philips":
+        return philips.PhilipsTV(cfg)
     return TV(cfg)
 
 
@@ -878,6 +883,64 @@ async def h_roku_icon(request):
     except (roku.RokuError, ValueError, TVUnavailable) as e:
         raise ApiError(404, str(e))
     return web.Response(body=data, content_type=kind.split(";")[0], headers={"Cache-Control": "max-age=86400"})
+
+
+async def h_philips_pair(request):
+    """Philips pairing: {} asks the TV to show its PIN, {"pin": "1234"} sends it back
+    (docs/PHILIPS-TITAN.md). Needs the pairing key saved first (scripts/philips-secret.py)."""
+    if tv.kind != "philips":
+        raise ApiError(400, "only for Philips TVs")
+    data = await body(request)
+    pin = data.get("pin")
+    try:
+        if pin is None:
+            await tv.pair_start()
+            return ok(step="pin", note="The TV should now show a PIN. Send it as {\"pin\": \"1234\"}.")
+        if not isinstance(pin, (str, int)) or not philips.PIN.match(str(pin).strip()):
+            raise ApiError(400, "pin is the digits the TV shows")
+        await tv.pair_finish(str(pin).strip())
+    except philips.PhilipsError as e:
+        raise ApiError(409, str(e))
+    return ok(paired=True)
+
+
+async def h_philips_apps(request):
+    """The apps a Philips TV lists, with the one couch-tv opens at power on (if any)."""
+    if tv.kind != "philips":
+        raise ApiError(400, "only for Philips TVs")
+    tv.require()
+    listed = await tv.apps_on_tv()
+    home = tv._home_entry()
+    return ok(apps=listed, home_app=home["label"] if home else None)
+
+
+async def h_philips_sources(request):
+    """A Philips TV's inputs, as the TV lists them."""
+    if tv.kind != "philips":
+        raise ApiError(400, "only for Philips TVs")
+    tv.require()
+    try:
+        return ok(sources=await tv.read_sources())
+    except philips.PhilipsError as e:
+        raise ApiError(409, str(e))
+
+
+async def h_philips_source(request):
+    """Switch a Philips TV to one of the inputs it listed: {"name": "HDMI 2"} (or its id)."""
+    if tv.kind != "philips":
+        raise ApiError(400, "only for Philips TVs")
+    data = await body(request)
+    name = data.get("name")
+    if not isinstance(name, str) or not name.strip():
+        raise ApiError(400, "name is required (an input the TV lists)")
+    try:
+        hit = await tv.switch_source(name)
+    except ValueError as e:
+        raise ApiError(404, str(e))
+    except philips.PhilipsError as e:
+        raise ApiError(409, str(e))
+    record_action(request, "input", {"name": name, "input": hit["name"]}, True)
+    return ok(input=hit["name"])
 
 
 async def h_tizen_answer(request):
@@ -2701,6 +2764,8 @@ async def h_tvs(request):
             row |= {"devmode": t.devmode_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         elif t.kind == "roku":
             row |= {"ecp": t.ecp_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
+        elif t.kind == "philips":
+            row |= {"philips": t.philips_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         out.append(row)
     return ok(default=DEFAULT_TV, tvs=out)
 
@@ -2728,6 +2793,10 @@ def make_app():
     r.add_get("/api/webos/apps", h_webos_apps)
     r.add_get("/api/roku/apps", h_roku_apps)
     r.add_get("/api/roku/icon/{id}", h_roku_icon)
+    r.add_post("/api/philips/pair", h_philips_pair)
+    r.add_get("/api/philips/apps", h_philips_apps)
+    r.add_get("/api/philips/sources", h_philips_sources)
+    r.add_post("/api/philips/source", h_philips_source)
     r.add_get("/api/recs", h_recs)
     r.add_get("/api/history", h_history)
     r.add_get("/api/taste", h_taste)
@@ -2762,6 +2831,7 @@ def make_app():
     agentic.routes(r)
     r.add_route("OPTIONS", "/api/{tail:.*}", h_options)
     r.add_route("*", "/api/{tail:.*}", h_api_missing)
+    r.add_get("/titan/{path:.*}", static_handler(TITAN_DIR, "Titan OS start page"))
     r.add_get("/tv", h_tv_redirect)
     r.add_get("/tv/manifest.json", h_tv_manifest)
     r.add_get("/tv/config.js", h_tv_config_js)

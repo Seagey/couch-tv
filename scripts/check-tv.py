@@ -6,7 +6,7 @@
                                                                # Developer options and debugging on)
 
 The quick look knocks on the ports each kind of TV answers on (Android TV remote, ADB, Samsung,
-LG, Roku, Apple, Google Cast). On an LG it also says hello to LG's network remote, which tells
+LG, Roku, Philips JointSpace, Apple, Google Cast). On an LG it also says hello to LG's network remote, which tells
 the webOS version without any prompt on the TV (the prompt only comes when couch-tv's bridge asks
 to control it). --adb connects with ADB to read the Android version, the maker and
 which home screen the TV runs. The first time, the TV asks "Allow USB debugging?". That prompt is
@@ -34,6 +34,8 @@ PORTS = {
     3000: "LG webOS remote",
     3001: "LG webOS remote (secure)",
     8060: "Roku",
+    1926: "Philips JointSpace (secure, Titan OS and newer Philips)",
+    1925: "Philips JointSpace (older Philips)",
     7000: "AirPlay (Apple TV and some TVs)",
 }
 
@@ -206,6 +208,13 @@ def main():
                    "why": "Roku: no Android apps and a locked home screen. couch-tv can go on as a Roku channel that a computer "
                           "at home opens each time the TV comes on (docs/ROKU.md, built from Roku's documentation and tested "
                           "against a stand-in, not yet on a real Roku), or plug in a Google TV box for everything."}
+    elif (open_ports[1926] or open_ports[1925]) and not android:
+        verdict = {"A": "no", "B": "Philips Titan OS path, phone remote only (built, not yet tried on a real Titan OS TV): "
+                              "docs/PHILIPS-TITAN.md", "C": "no",
+                   "why": "Philips on Titan OS (or an older Philips Linux TV): no Android apps and a locked home screen. The "
+                          "phone remote and the assistant can drive it with a computer at home (docs/PHILIPS-TITAN.md, tested "
+                          "against a stand in only). couch-tv's home cannot open on it without a Titan app, so plug in a "
+                          "Google TV box for everything."}
     elif not android:
         verdict = {"A": "no", "B": "no", "C": "no", "why": "Not an Android TV as far as the network shows (no Android TV remote, no ADB)."}
     else:

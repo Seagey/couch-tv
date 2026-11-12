@@ -1,0 +1,125 @@
+<!doctype html>
+<!--
+  couch-tv's start page for a Philips TV on Titan OS (docs/PHILIPS-TITAN.md, "The home").
+  NOT YET OPENED ON A REAL TITAN OS TV.
+
+  Titan OS only runs web pages that are Titan apps (a published app, or a sandbox app in Titan's
+  DevView developer app). This page is the address such an app is given. It works two ways:
+
+  1. Served by the bridge (http://<computer>:5400/titan/): checks the bridge's pairing key once
+     (typed with the TV remote, kept in this TV's browser storage, the same place couch-tv's home
+     reads it), then opens the home at /tv/.
+  2. Hosted anywhere else (for example a public https address, if Titan will not take a home network
+     address): needs the computer's address, from ?bridge=192.0.2.20:5400 in the app's address or
+     typed once, then moves to that computer's /titan/ page.
+
+  Written for old browsers on purpose (Titan OS ships Chrome 84 on 2020 to 2022 TVs): ES5, no fetch.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920">
+<title>Couch TV</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #101214; color: #f2f2f2;
+    font: 32px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { position: absolute; left: 50%; top: 50%; width: 1100px; margin: -220px 0 0 -550px; }
+  h1 { font-size: 64px; font-weight: 600; margin: 0 0 24px; }
+  p { margin: 0 0 24px; color: #c8c8c8; }
+  input { width: 100%; box-sizing: border-box; font: inherit; padding: 18px 24px; border-radius: 14px;
+    border: 3px solid #555; background: #1c1f22; color: #fff; outline: none; }
+  input:focus { border-color: #fff; }
+  .err { color: #ff9a8a; min-height: 45px; margin-top: 16px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Couch TV</h1>
+  <p id="msg">Opening couch-tv...</p>
+  <form id="form" class="hidden" autocomplete="off">
+    <input id="field" spellcheck="false">
+  </form>
+  <div id="err" class="err"></div>
+</main>
+<script>
+(function () {
+  "use strict";
+  var Q = location.search;
+  var KEY_STORE = "couchtv.key", BRIDGE_STORE = "couchtv.titan.bridge";
+  var TV = (Q.match(/[?&]tv=([a-z-]+)/) || [])[1] || "";
+  var msg = document.getElementById("msg"), form = document.getElementById("form"),
+      field = document.getElementById("field"), err = document.getElementById("err");
+
+  function get(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
+  function set(k, v) { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) {} }
+  if (/[?&]reset=1/.test(Q)) { set(KEY_STORE, ""); set(BRIDGE_STORE, ""); }
+
+  function ask(text, type, onDone) {
+    msg.textContent = text;
+    field.type = type;
+    field.value = "";
+    form.className = "";
+    field.focus();
+    form.onsubmit = function (e) { e.preventDefault(); onDone(field.value.trim()); };
+  }
+
+  // Is this page on the bridge? The bridge answers /api/health on the same address.
+  function health(key, done) {
+    var x = new XMLHttpRequest();
+    x.open("GET", "/api/health", true);
+    x.timeout = 4000;
+    if (key) x.setRequestHeader("Authorization", "Bearer " + key);
+    x.onload = function () {
+      var j = null;
+      try { j = JSON.parse(x.responseText); } catch (e) {}
+      done(j && j.ok ? j : null);
+    };
+    x.onerror = x.ontimeout = function () { done(null); };
+    x.send();
+  }
+
+  function openHome() {
+    msg.textContent = "Opening couch-tv...";
+    location.replace("/tv/" + (TV ? "?tv=" + TV : ""));
+  }
+
+  function onBridge(first) {
+    if (first.auth === "ok") return openHome();
+    var kept = get(KEY_STORE);
+    var tryKey = function (key) {
+      health(key, function (j) {
+        if (j && j.auth === "ok") { set(KEY_STORE, key); return openHome(); }
+        if (key === kept) set(KEY_STORE, "");
+        err.textContent = key && key !== kept ? "That is not the pairing key. Try again." : "";
+        ask("Type couch-tv's pairing key (bridge.pairing_key in config.json). You only do this once on this TV.",
+            "password", tryKey);
+      });
+    };
+    tryKey(kept);
+  }
+
+  // Hosted somewhere else: move to the bridge's own copy of this page.
+  var ADDR = /^[A-Za-z0-9.-]{1,253}(:\d{2,5})?$/;
+  function toBridge(addr) {
+    if (!ADDR.test(addr)) {
+      err.textContent = "Type the address like 192.0.2.20:5400.";
+      return ask("Type the address of the computer that runs couch-tv, for example 192.0.2.20:5400.", "text", toBridge);
+    }
+    if (addr.indexOf(":") < 0) addr += ":5400";
+    set(BRIDGE_STORE, addr);
+    msg.textContent = "Opening couch-tv on " + addr + "...";
+    location.replace("http://" + addr + "/titan/" + (TV ? "?tv=" + TV : ""));
+  }
+
+  health(get(KEY_STORE), function (j) {
+    if (j) return onBridge(j);
+    var given = decodeURIComponent((Q.match(/[?&]bridge=([^&]+)/) || [])[1] || "");
+    var addr = given || get(BRIDGE_STORE);
+    if (addr) return toBridge(addr);
+    ask("Type the address of the computer that runs couch-tv, for example 192.0.2.20:5400.", "text", toBridge);
+  });
+})();
+</script>
+</body>
+</html>
