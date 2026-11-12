@@ -117,8 +117,13 @@ object FireHome {
     // The last real screen that came forward (the watch sees them all), so power-on needs no extra calls.
     private val notScreens = setOf("android", "com.android.systemui", "com.google.android.inputmethod.latin")
     @Volatile private var lastPkg: String? = null
+    @Volatile private var amazonHomeInFront = false
     private val later = android.os.Handler(android.os.Looper.getMainLooper())
-    fun seen(pkg: String?) { if (pkg != null && pkg !in notScreens) lastPkg = pkg }
+    fun seen(pkg: String?, cls: String?) {
+        if (pkg == null || pkg in notScreens) return
+        lastPkg = pkg
+        amazonHomeInFront = isAmazonHome(pkg, cls)
+    }
 
     /** Screen on or boot. The 2 s wait lets the TV bring its input back first (1.1 s after screen-on on the MiTV-AXFR0). */
     fun onScreenOn() {
@@ -238,9 +243,42 @@ object FireHome {
     private fun jump(force: Boolean = false) {
         if (!force && !wanted) return
         val now = System.currentTimeMillis()
-        if (now - lastJump < 1200) return   // one jump per press, not one per event
+        if (now - lastJump < JUMP_GAP_MS) {
+            // One jump per press, not one per event. A second press inside the gap brings Amazon's home
+            // back with no later window event to react to, so look again once the gap is over.
+            recheck.removeCallbacks(again)
+            recheck.postDelayed(again, lastJump + JUMP_GAP_MS - now)
+            return
+        }
         lastJump = now
-        App.openHome()
+        bringForward()
+    }
+    private const val JUMP_GAP_MS = 1200L
+    private val recheck = android.os.Handler(android.os.Looper.getMainLooper())
+    private val again = Runnable { if (amazonHomeInFront) { Log.i(TAG, "Amazon's home still in front after the gap"); jump() } }
+
+    /**
+     * Fire TV on Android 9 and older: Android holds an app's activity starts for 5 s after a Home press
+     * (the app-switch delay). Seen on a Fire TV Cube (3rd gen, Fire OS 7.7.1.7): Amazon's home stayed up
+     * for 5 s, and another press in that time buried the held start under Amazon's home for good.
+     * Moving this app's own task to the front is not an activity start and was not held there. Only
+     * when the home is the top of that task (setup shares it). Before the home has ever opened, on
+     * Android 10 and newer (background start limits) and on other TVs: a normal start, as before.
+     */
+    private fun bringForward() {
+        if (android.os.Build.VERSION.SDK_INT >= 29 || !isFireTv) { App.openHome(); return }
+        val task = runCatching {
+            App.instance.getSystemService(android.app.ActivityManager::class.java).appTasks.firstOrNull {
+                it.taskInfo.topActivity?.className == HomeActivity::class.java.name
+            }
+        }.getOrNull()
+        if (task != null && runCatching { task.moveToFront() }.isSuccess) {
+            Log.i(TAG, "Amazon's home came forward: moved the home's task to the front")
+            HomeActivity.home()
+        } else {
+            Log.i(TAG, "Amazon's home came forward: starting the home")
+            App.openHome()
+        }
     }
 
     /** The home the system falls back to for everything that is not the Home key itself. Best-effort. */

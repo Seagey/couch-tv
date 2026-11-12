@@ -78,6 +78,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        shown = java.lang.ref.WeakReference(this)
         CrashGuard.install(this)
         restoreTimeout()   // a press left the screen timeout short: put it back
         // apply.sh starting the home on purpose (new settings) is always a fresh try.
@@ -1580,6 +1581,14 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        @Volatile private var shown: java.lang.ref.WeakReference<MainActivity>? = null
+
+        /** What onNewIntent does for a Home press, for when FireWatch brought the home back without a new intent. */
+        fun backToFirstTile() {
+            val a = shown?.get() ?: return
+            a.main.post { if (!a.isFinishing && !a.isDestroyed) a.js("window.tv && tv.home()") }
+        }
+
         /** A TV's name, as apply.sh passes it: small letters, digits and dashes. */
         private val TV_NAME = Regex("[a-z0-9-]{1,32}")
 

@@ -297,6 +297,11 @@ class HomeActivity : Activity() {
             refresher.postDelayed(refreshNow, 400)
         }
 
+        /** What onNewIntent does, for when the home came back without a new intent (FireHome.bringForward). */
+        fun home() {
+            refresher.post { shown?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }?.js("window.tv && tv.home()") }
+        }
+
         private val refresher = Handler(Looper.getMainLooper())
         private val refreshNow = Runnable {
             val a = shown?.get()
