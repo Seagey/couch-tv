@@ -1549,6 +1549,8 @@
         el.innerHTML = ICONS[q] + "<span>" + esc(t(q)) + "</span>";
       }
     });
+    var sv = $("q-screensaver");   // an icon only look (Night) still says what it is, to the eye and to a screen reader
+    if (sv) { sv.setAttribute("aria-label", t("quick_screensaver")); sv.setAttribute("title", t("quick_screensaver_sub")); }
     if (qi >= vis.length) qi = Math.max(0, vis.length - 1);
     fitDate();
   }
@@ -3672,7 +3674,7 @@
     if (q === "picture" && (OFFLINE || !picShown)) return t("quick_needs_picture");
     if (q === "headphones" && OFFLINE && !(TV && TV.openSettingsScreen)) return t("quick_needs_bridge");
     if (q === "input" && OFFLINE && !nativeInputs()) return t("quick_needs_inputs");
-    if (q === "screensaver" && !nativeScreensaver()) return t("quick_needs_tv_app");
+    if (q === "screensaver") return nativeScreensaver() ? t("quick_screensaver_sub") : t("quick_needs_tv_app");
     if ((q === "bluetooth" || q === "network") && !nativeSettingsScreen() && (!ON_TV || OFFLINE)) return t("quick_needs_tv_app");
     if (q === "extend" && !devCan()) return t("quick_needs_devmode");
     return "";

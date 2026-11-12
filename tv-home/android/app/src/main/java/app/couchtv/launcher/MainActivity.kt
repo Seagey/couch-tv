@@ -161,7 +161,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         resumed = true
-        restoreTimeout()   // back in front: the normal screen timeout goes back
+        restoreTimeout(resume = true)   // back in front: the normal screen timeout goes back (not for the first moments of a press, see ambientAt)
         hideSystemBars()
         // Back within a moment of opening a channel card: the app crashed on the way in (see
         // openWatchNextItem). Open it once more; this time it starts cold.
@@ -950,7 +950,9 @@ class MainActivity : Activity() {
             main.removeCallbacks(idleTick)
             idleShots = 0
             main.postDelayed(idleTick, 700)
-            main.postDelayed({ restoreTimeout() }, AMBIENT_WINDOW_MS)
+            ambientAt = android.os.SystemClock.elapsedRealtime()
+            main.removeCallbacks(ambientDeadline)   // a deadline left by an earlier press must not cut this one short
+            main.postDelayed(ambientDeadline, AMBIENT_WINDOW_MS)
             true
         } catch (e: Exception) {
             android.util.Log.w("couch-tv", "screensaver refused: " + e)
@@ -960,9 +962,18 @@ class MainActivity : Activity() {
     }
 
     /** Puts back the screen timeout the TV had before the screensaver button shortened it. */
-    private fun restoreTimeout(dream: Boolean = false) {
+    private fun restoreTimeout(dream: Boolean = false, resume: Boolean = false) {
         val saved = prefs.getInt("timeout_saved", -1)
         if (saved <= 0) return
+        // Some TVs (a Philips 43PUS8546, #146) bring this activity back to the front a moment after the
+        // timeout is cut, which used to put it straight back (about 0.5 s in) and report the TV as
+        // refusing. A resume that early is not the screensaver ending, so it is left alone: the
+        // screensaver ending (onPause), the deadline and a restart still restore it, so a TV is never
+        // left on five seconds.
+        if (resume && ambientAt > 0 && android.os.SystemClock.elapsedRealtime() - ambientAt < AMBIENT_EARLY_MS) {
+            android.util.Log.i("couch-tv", "screensaver: resume too soon after the press, timeout kept")
+            return
+        }
         val pressed = pressPending
         pressPending = false
         prefs.edit().remove("timeout_saved").apply()
@@ -976,6 +987,8 @@ class MainActivity : Activity() {
     // Holds the short timeout in place and nudges the idle timer until the TV naps by itself: the
     // power manager may keep the old value for a moment, and it only re-reads it on user activity.
     private var pressPending = false
+    private var ambientAt = 0L   // when the last press cut the timeout (elapsedRealtime), 0 for none
+    private val ambientDeadline = Runnable { restoreTimeout() }
     private var idleShots = 0
     private val idleTick = object : Runnable {
         override fun run() {
@@ -1590,6 +1603,7 @@ class MainActivity : Activity() {
         private const val SHORT_MS = 15_000
         private const val AMBIENT_RESTORE_MS = 600_000
         private const val AMBIENT_WINDOW_MS = 25_000L
+        private const val AMBIENT_EARLY_MS = 4_000L   // a resume inside this long after a press is not the screensaver ending
         private const val MATCH_W = ViewGroup.LayoutParams.MATCH_PARENT
         private val MATCH = FrameLayout.LayoutParams(MATCH_W, MATCH_W)
         private val GROUND = Color.parseColor("#0D1E19")

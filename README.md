@@ -21,6 +21,13 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: the Screensaver button on Philips and similar TVs (on main, in the next release).** On a Philips
+43PUS8546/12 the TV home came back to the front half a second after the button cut the screen timeout and put it
+straight back, so the TV never napped and the button said "The TV did not start the photos". A return that soon is now
+ignored (the screensaver ending, the 25 second deadline and a restart still put the timeout back, so a TV is never
+left on five seconds). The button also keeps its name under the Night look, has an accessible name, and says in
+Home settings that it starts the photo screensaver and is not the day and night switch. Thanks digitaldarkmatterltd (#146).
+
 **13 November 2026: LG Developer Mode extend, five app logos and a Dutch home (on main, in the next release).**
 On an LG with no bridge, the home now asks once a week "Extend Developer Mode?" and stays on screen until answered,
 so LG does not remove couch-tv when the session runs out. There is an `extend` quick button (off until you add it)

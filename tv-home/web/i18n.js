@@ -326,6 +326,7 @@
     quick_screen_off: "Screen off",
     quick_input: "Input list",
     quick_screensaver: "Screensaver",
+    quick_screensaver_sub: "Starts the TV's photo screensaver now. It is not the day and night switch.",
     no_screensaver: "This TV has no screensaver to open.",
     no_dream: "The TV did not start the photos. Try again, or restart the TV if it keeps happening.",
     ambient_head: "Screensaver",

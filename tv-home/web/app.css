@@ -360,7 +360,7 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .theme-night .qbtn span { display: none; }
 .theme-night .qbtn.set span { display: inline; }
 /* the picture button always says which mode the TV is in */
-.theme-night #q-picture span { display: inline; }
+.theme-night #q-picture span, .theme-night #q-screensaver span { display: inline; }
 .theme-night .qbtn.focus { background: #fff; color: #111; }
 
 /* Keep watching: three glass cards */
