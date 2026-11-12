@@ -2100,9 +2100,11 @@ def continue_items(who=None):
     first, up to 10, nothing older than 30 days. A card's id is its history line's own id."""
     who = who or cur_who()
     out = []
+    rows = _wn_rows()
     for h in store.keep_watching(_current.get(), who):
         if h.get("service") in CONTINUE_SKIP:
             continue
+        h = wn_fresher(h, rows)   # the app's own row, when it was watched after our line
         app = apps.BY_ID.get(h.get("service"))
         out.append({"id": h["id"], "title": h["title"], "episode_title": h.get("episode_title"),
                     "season": h.get("season"), "episode": h.get("episode"),
@@ -2111,6 +2113,55 @@ def continue_items(who=None):
                     "backdrop": h.get("backdrop"), "progress": None, "kind": "continue",
                     "last_played": h.get("when"), "source": "bridge"})
     return out
+
+
+def _wn_num(v):
+    """A Watch Next season or episode ("2", 2) as a whole number, or None."""
+    if isinstance(v, int) and not isinstance(v, bool):
+        return v if v > 0 else None
+    if isinstance(v, str) and v.strip().isdigit():
+        return int(v.strip()) or None
+    return None
+
+
+def wn_fresher(h, rows):
+    """A history line (Keep watching card or the line a card opens), brought up to date from this
+    TV's Watch Next rows. The app knows where a show is up to: a play couch-tv opened records the
+    episode it asked for, and then autoplay, the app's own Resume or watching on without couch-tv
+    moves on without us (12 Nov: Ozark stuck on season 1 episode 10 while Netflix's own row said
+    season 2 episode 3). So when the app's row for the same show, in the same app, was engaged after
+    the line was written and names a season and episode, those win, and the card's time is the
+    row's. Otherwise the line is returned as it is (apps with no Watch Next row change nothing)."""
+    if not h or not rows:
+        return h
+    try:
+        line_ts = datetime.fromisoformat(h.get("when") or "").timestamp()
+    except (TypeError, ValueError):
+        return h
+    title = finder._norm(h.get("title") or "")
+    service = h.get("service")
+    app = apps.BY_ID.get(service)
+    pkg = app["package"] if app else service
+    best = None
+    for r in rows:
+        eng = r.get("engaged")
+        if not isinstance(eng, (int, float)) or eng <= line_ts:
+            continue
+        if not title or r.get("package") != pkg or finder._norm(r.get("title") or "") != title:
+            continue
+        season, episode = _wn_num(r.get("season")), _wn_num(r.get("episode"))
+        if not (season and episode):
+            continue   # a row with no episode says nothing about where the show is up to
+        if not best or eng > best[0]:
+            best = (eng, season, episode, r.get("episode_title"))
+    if not best:
+        return h
+    eng, season, episode, ep_title = best
+    same = (_wn_num(h.get("season")), _wn_num(h.get("episode"))) == (season, episode)
+    return {**h, "season": season, "episode": episode,
+            "episode_title": h.get("episode_title") if same and not ep_title else ep_title,
+            "when": datetime.fromtimestamp(eng, HOME_TZ).isoformat(timespec="seconds"),
+            "from_watch_next": True}
 
 
 # ---------- now playing (#31): music any app is playing, for the home's card ----------
@@ -2197,6 +2248,9 @@ async def h_continue_open(request):
     h = store.history_item(cid) if cid else None
     if not h:
         raise ApiError(404, f"unknown continue item: {cid}")
+    # the episode the card shows: the app's own Watch Next row when it is newer than the line, so
+    # the play opens (and history records) where the show is really up to, not the stale episode
+    h = wn_fresher(h, _wn_rows())
     result = await play(h["title"], h.get("season"), h.get("episode"), h.get("service"),
                         store.norm_who(data.get("who")) or cur_who(), resume=True)
     record_action(request, "continue", {"id": cid}, True)
@@ -2534,9 +2588,16 @@ async def media_watch_loop():
                     item = playing["item"]
                     # Our own /api/play already logged it if it is the same show, for the same person,
                     # in the last three hours.
-                    if not (item and item.get("who") == cur_who() and item.get("ts", 0) > time.time() - 3 * 3600
-                            and item["title"].lower() in (s["title"].lower(), (s.get("subtitle") or "").lower())):
+                    # Unless the app says it is on another episode than the one that play logged
+                    # (a Keep watching card resumed somewhere else, or autoplay moved on).
+                    ours = (item and item.get("who") == cur_who() and item.get("ts", 0) > time.time() - 3 * 3600
+                            and item["title"].lower() in (s["title"].lower(), (s.get("subtitle") or "").lower()))
+                    said = (_wn_num(media_now.get("season")), _wn_num(media_now.get("episode")))
+                    moved = ours and all(said) and said != (_wn_num(item.get("season")), _wn_num(item.get("episode")))
+                    if not ours or moved:
                         await log_seen(s["title"], s.get("subtitle"), app, dict(media_now))
+                        if moved:
+                            item["season"], item["episode"] = said
                 untitled_step(pkg, app, bool(s and s.get("state") == "PLAYING" and not s.get("title")), pos,
                               titled=bool(s and s.get("state") == "PLAYING" and s.get("title")))
             else:
@@ -2569,15 +2630,19 @@ def untitled_step(pkg, app, untitled, pos, titled=False):
         if u and not u["done"] and ((not u["qualified"] and now - u["last"] >= 40) or (titled and pkg == u["pkg"])):
             seen_playing["_untitled"] = None
         return
-    if not u or u["pkg"] != pkg or u["who"] != cur_who() or (u["done"] and now - u["last"] > 600):
+    if not u or u["pkg"] != pkg or u["who"] != cur_who() or \
+            ((u["done"] or u.get("opened")) and now - u["last"] > 600):
         u = {"pkg": pkg, "app": app, "who": cur_who(), "since": now, "last": now,
              "qualified": False, "done": False}
         # A show couch-tv itself opened in this app just before (phone search, Ask, a Keep
-        # watching card) was logged when it was opened (play()): that already names this play.
+        # watching card) was logged when it was opened (play()): that already names the show. The
+        # episode it logged is the one it asked for, so untitled_resolve() still reads the app's
+        # Watch Next row for that show, and logs the episode the app says, if it is another one.
         item = playing["item"]
         if (item and item.get("package") == pkg and item.get("who") == cur_who()
                 and now - OPENED_WINDOW_S <= item.get("ts", 0) <= now + 60):
-            u["done"], u["named_by"] = True, "opened"
+            u["opened"], u["named_by"] = {"title": item.get("title"), "season": item.get("season"),
+                                          "episode": item.get("episode")}, "opened"
     u["last"] = now
     if (not u["qualified"] and now - u["since"] >= SEEN_AFTER_S
             and (pos is None or pos >= SEEN_AFTER_S * 1000)):
@@ -2649,15 +2714,27 @@ async def untitled_resolve():
                              "engaged": datetime.fromisoformat(when).timestamp() if when else None})
         except Exception:
             pass
+    opened = u.get("opened")
     best = None
     for r in rows:
         if (r.get("package") == u["pkg"] and r.get("engaged") and r["engaged"] >= u["since"] - 120
-                and not generic_title(r.get("title"), u["pkg"], u["app"])):
+                and not generic_title(r.get("title"), u["pkg"], u["app"])
+                and (not opened or finder._norm(r.get("title") or "") == finder._norm(opened.get("title") or ""))):
             if not best or r["engaged"] > best["engaged"]:
                 best = r
     if not best:
-        _why_no_row(u, rows, now)
+        if not opened:   # a play couch-tv opened is already logged: nothing to say while it waits
+            _why_no_row(u, rows, now)
         return
+    if opened:
+        season, episode = _wn_num(best.get("season")), _wn_num(best.get("episode"))
+        if not (season and episode) or (season, episode) == (_wn_num(opened.get("season")),
+                                                           _wn_num(opened.get("episode"))):
+            u["done"] = True   # the app agrees with what was logged when it was opened
+            seen_playing["_untitled"] = u
+            return
+        # the app resumed (or moved on to) another episode than the one couch-tv logged
+        best = {**best, "season": season, "episode": episode}
     u["done"], u["named_by"] = True, "watch-next"
     seen_playing["_untitled"] = u
     poster = best.get("poster") if str(best.get("poster") or "").startswith("https://") else None

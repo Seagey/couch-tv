@@ -454,6 +454,12 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
 - Android's own Watch Next list (what Google's home shows) is not readable on this TV: it needs a
   system permission that ADB does not have. If that ever changes, those rows appear here with
   `"source": "tv"` and a real `progress` (0 to 1). Until then `progress` is `null`.
+- The episode on a card is the app's own when it knows better: if the TV home's copy of Android's
+  Watch Next (`POST /api/watch-next`) has a row for the same show in the same app, engaged after the
+  history line and naming a season and episode, those win, for the card, for its `last_played` and
+  for what `/api/continue/open` plays. An app with no such row changes nothing. A play the bridge
+  opened in an app that names nothing (Netflix) is logged as the episode it asked for; when that
+  app's row then says another episode of the show, that episode is logged as well.
 - Resume with `POST /api/continue/open {"id": "3f2a9c1e0b7d4a55"}`. The id is the history line's
   own, so it always opens that card's show (and season and episode). It reopens the show in its app; the app
   itself picks up where you left off (Netflix, Stan, iview and the rest remember the position).
