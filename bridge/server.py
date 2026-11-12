@@ -739,9 +739,33 @@ SEARCH_LINKS = {
 }
 
 
-async def search_in_app(app, title):
-    """Open the app on its search with the title typed in, or just the app."""
+# Apps not on JustWatch that open a title's page by its IMDb id, tested on this TV (DEEPLINKS.md).
+# Nuvio takes only the show or film: "nuvio://series/tt22202452:1:8" is read as one id and fails.
+TITLE_LINKS = {
+    "nuvio": "nuvio://{type}/{imdb}",
+}
+
+
+def title_link(app, best):
+    """The app's own link to the title's page, or None."""
+    link = TITLE_LINKS.get(app["id"])
+    imdb = (best or {}).get("imdb") or ""
+    if not link or not re.fullmatch(r"tt\d+", imdb):
+        return None
+    return link.format(type="series" if best.get("type") == "tv" else "movie", imdb=imdb)
+
+
+async def search_in_app(app, title, best=None):
+    """Open the app on the title's page or its search with the title typed in, or just the app."""
     from urllib.parse import quote
+    link = title_link(app, best) if tv.kind == "android" else None
+    if link:
+        try:
+            await tv.start_intent(link, app["package"])
+            if await tv.wait_for_app({app["package"]}, timeout=8):
+                return "deeplink", f"Opened the {title} page in {app['name']}."
+        except Exception as e:
+            log.warning("title link failed for %s: %s", app["id"], e)
     link = SEARCH_LINKS.get(app["id"]) if tv.kind == "android" else None
     if link:
         await tv.start_intent(link.format(q=quote(title)), app["package"])
@@ -803,7 +827,7 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
             if not app:
                 raise ApiError(400, f"unknown service: {service}")
             # Not listed by JustWatch on that service: open it and search.
-            method, note = await search_in_app(app, best["title"])
+            method, note = await search_in_app(app, best["title"], best)
             return finish_play(best, app, method, note, season, episode, who, ep_info)
     if not candidates:
         where = ", ".join(p["name"] for p in providers) or f"nowhere in {config.COUNTRY_NAME} right now"
@@ -865,7 +889,7 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
         except Exception as e:
             log.warning("samsung title link failed for %s: %s", app["id"], e)
     if method is None:
-        method, note = await search_in_app(app, best["title"])
+        method, note = await search_in_app(app, best["title"], best)
     result = finish_play(best, app, method, note, season, episode, who)
     if started is not None:
         result["started"] = started
@@ -2668,7 +2692,8 @@ async def resolve_episode(title, subtitle):
     result = {}
     try:
         for show, other in ((title, subtitle), (subtitle, title)):
-            if not show:
+            # a bare number is no show name: Nuvio sends a film's year there ("2012" is a film)
+            if not show or (show is subtitle and generic_title(show)):
                 continue
             best, _ = await finder.find(show)
             if not best or finder._norm(best["title"]) != finder._norm(show):
@@ -3163,7 +3188,7 @@ async def log_seen(title, subtitle, app, now=None, who=None, method="seen", post
     try:
         names = [finder._norm(title)] + ([finder._norm(subtitle)] if subtitle else [])
         best, _ = await finder.find(title)
-        if subtitle and (not best or finder._norm(best["title"]) not in names):
+        if subtitle and not generic_title(subtitle) and (not best or finder._norm(best["title"]) not in names):
             alt, _ = await finder.find(subtitle)
             if alt and finder._norm(alt["title"]) in names:
                 best = alt
