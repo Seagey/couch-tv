@@ -32,6 +32,7 @@ import samsung
 import lg
 import roku
 import vidaa
+import vizio
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -52,8 +53,8 @@ TV_CONFIG = {"default": config.DEFAULT_TV, "tvs": config.TVS}
 
 def make_tv(cfg):
     """A Samsung ("kind": "samsung", bridge/samsung.py), an LG ("kind": "lg", bridge/lg.py), a Roku
-    ("kind": "roku", bridge/roku.py), a Hisense VIDAA ("kind": "vidaa", bridge/vidaa.py) or an Android
-    or Google TV (tv.py)."""
+    ("kind": "roku", bridge/roku.py), a Hisense VIDAA ("kind": "vidaa", bridge/vidaa.py), a VIZIO ("kind":
+    "vizio", bridge/vizio.py) or an Android or Google TV (tv.py)."""
     if cfg.get("kind") == "samsung":
         return samsung.SamsungTV(cfg)
     if cfg.get("kind") == "lg":
@@ -62,6 +63,8 @@ def make_tv(cfg):
         return roku.RokuTV(cfg)
     if cfg.get("kind") == "vidaa":
         return vidaa.VidaaTV(cfg)
+    if cfg.get("kind") == "vizio":
+        return vizio.VizioTV(cfg)
     return TV(cfg)
 
 
@@ -926,6 +929,31 @@ async def h_vidaa_claim(request):
     record_failed_attempt(ip, str(code))
     await asyncio.sleep(0.3)
     raise ApiError(401, "that code is not valid (codes work once, for two minutes)")
+
+
+async def h_vizio_pair(request):
+    """VIZIO pairing: {} asks the TV to show its PIN, {"pin": "1234"} sends it back (docs/VIZIO.md)."""
+    if tv.kind != "vizio":
+        raise ApiError(400, "only for VIZIO TVs")
+    data = await body(request)
+    pin = data.get("pin")
+    try:
+        if pin is None:
+            await tv.pair_start()
+            return ok(step="pin", note="The TV should now show a 4 digit PIN. Send it as {\"pin\": \"1234\"}.")
+        if not isinstance(pin, (str, int)) or not vizio.PIN.match(str(pin).strip()):
+            raise ApiError(400, "pin is the 4 digits the TV shows")
+        await tv.pair_finish(str(pin).strip())
+    except vizio.VizioError as e:
+        raise ApiError(409, str(e))
+    return ok(paired=True)
+
+
+async def h_vizio_apps(request):
+    """The apps couch-tv knows how to open on a VIZIO (the TV itself does not list them)."""
+    if tv.kind != "vizio":
+        raise ApiError(400, "only for VIZIO TVs")
+    return ok(apps=await tv.apps_on_tv())
 
 
 VIDAA_ICON = os.path.join(ROOT, "lg", "app", "largeIcon.png")
@@ -2761,6 +2789,8 @@ async def h_tvs(request):
             row |= {"ecp": t.ecp_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         elif t.kind == "vidaa":
             row |= {"vidaa": t.vidaa_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
+        elif t.kind == "vizio":
+            row |= {"vizio": t.vizio_status()}
         out.append(row)
     return ok(default=DEFAULT_TV, tvs=out)
 
@@ -2791,6 +2821,8 @@ def make_app():
     r.add_post("/api/vidaa/pair", h_vidaa_pair)
     r.add_post("/api/vidaa/tile", h_vidaa_tile)
     r.add_post("/api/vidaa/claim", h_vidaa_claim)
+    r.add_post("/api/vizio/pair", h_vizio_pair)
+    r.add_get("/api/vizio/apps", h_vizio_apps)
     r.add_get("/api/recs", h_recs)
     r.add_get("/api/history", h_history)
     r.add_get("/api/taste", h_taste)

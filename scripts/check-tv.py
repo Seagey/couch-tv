@@ -6,9 +6,10 @@
                                                                # Developer options and debugging on)
 
 The quick look knocks on the ports each kind of TV answers on (Android TV remote, ADB, Samsung,
-LG, Roku, Hisense VIDAA, Apple, Google Cast). On an LG it also says hello to LG's network remote, which tells
+LG, Roku, Hisense VIDAA, VIZIO, Apple, Google Cast). On an LG it also says hello to LG's network remote, which tells
 the webOS version without any prompt on the TV (the prompt only comes when couch-tv's bridge asks
-to control it). --adb connects with ADB to read the Android version, the maker and
+to control it). On 7345 or 9000 it asks whether the answer is a VIZIO's SmartCast (one read, no prompt
+on the TV, no key). --adb connects with ADB to read the Android version, the maker and
 which home screen the TV runs. The first time, the TV asks "Allow USB debugging?". That prompt is
 the only thing that appears on screen, and saying no is fine. Run --adb only after Developer
 options are on (README step 1): it also saves this computer's ADB key in ~/.android/adbkey.
@@ -36,6 +37,8 @@ PORTS = {
     8060: "Roku",
     36669: "Hisense VIDAA remote",
     36668: "Hisense VIDAA remote (older)",
+    7345: "VIZIO SmartCast (firmware 4.0 and newer, VIZIO OS)",
+    9000: "VIZIO SmartCast (older firmware), or something else",
     7000: "AirPlay (Apple TV and some TVs)",
 }
 
@@ -81,6 +84,29 @@ def lg_hello(ip):
         return asyncio.run(ask())
     except Exception:
         return None
+
+
+def smartcast(ip, port):
+    """True when the port answers like a VIZIO's SmartCast API: JSON with a STATUS block, over HTTPS
+    with the TV's own self signed certificate (accepted for this one read only). Sends no key."""
+    import json
+    import ssl
+    import urllib.error
+    import urllib.request
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    try:
+        with urllib.request.urlopen(f"https://{ip}:{port}/state/device/power_mode", context=ctx, timeout=4) as r:
+            text = r.read(4096)
+    except urllib.error.HTTPError as e:
+        text = e.read(4096)
+    except Exception:
+        return False
+    try:
+        return isinstance(json.loads(text).get("STATUS"), dict)
+    except (ValueError, AttributeError):
+        return False
 
 
 def wireless_debugging_port(ip, wait=4.0):
@@ -171,6 +197,9 @@ def main():
     android = open_ports[6466] or open_ports[6467] or adb_open or bool(wireless)
     samsung = open_ports[8001] or open_ports[8002]
     lg = open_ports[3000] or open_ports[3001]
+    vizio = not android and any(open_ports[p] and smartcast(ip, p) for p in (7345, 9000))
+    if vizio:
+        print("  SmartCast answered: this is a VIZIO")
     facts = adb_facts(ip) if want_adb and adb_open else None
     hello = lg_hello(ip) if lg and not android else None
     if hello:
@@ -213,6 +242,12 @@ def main():
                    "why": "Hisense VIDAA: no Android apps and a locked home screen. couch-tv can open itself in the TV's "
                           "browser each time the TV comes on, with a computer at home (docs/VIDAA.md, tested against a "
                           "stand-in only, not yet on a real VIDAA TV), or plug in a Google TV box for everything."}
+    elif vizio:
+        verdict = {"A": "no", "B": "VIZIO path, New (Beta): phone remote, power, volume, inputs and opening apps: "
+                              "docs/VIZIO.md", "C": "no",
+                   "why": "VIZIO SmartCast or VIZIO OS: no Android apps, no browser and a locked home screen. With a computer "
+                          "at home the phone remote and the assistant can drive it (docs/VIZIO.md, tested against a stand in "
+                          "so far). couch-tv's own home cannot open on a VIZIO, so plug in a Google TV box for everything."}
     elif not android:
         verdict = {"A": "no", "B": "no", "C": "no", "why": "Not an Android TV as far as the network shows (no Android TV remote, no ADB)."}
     else:

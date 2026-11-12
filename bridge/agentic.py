@@ -430,6 +430,8 @@ def pick_input(inputs, name):
 
 
 async def h_inputs(request):
+    if S.tv.kind == "vizio":   # the TV lists its own inputs (bridge/vizio.py)
+        return S.ok(inputs=await S.tv.read_sources(), remembered={})
     inputs = await list_inputs()
     saved = {k: next((i["name"] for i in inputs if i["id"] == v), v) for k, v in _saved_names().items()}
     return S.ok(inputs=inputs, remembered=saved)
@@ -444,6 +446,13 @@ async def h_input(request):
         await S.tv.key("home")
         S.record_action(request, "input", {"name": "home"}, True)
         return S.ok(input="home", note="Back to the home screen.")
+    if S.tv.kind == "vizio":   # an input the TV listed, by its name or label (bridge/vizio.py)
+        try:
+            src = await S.tv.switch_source(name)
+        except ValueError as e:
+            raise S.ApiError(404, str(e))
+        S.record_action(request, "input", {"name": name, "input": src["name"]}, True)
+        return S.ok(input=src["name"], how="listed", switched=True, note=f"Switched to {src['name']}.")
     inputs = await list_inputs()
     hit, how = pick_input(inputs, name)
     if not hit:
