@@ -2,7 +2,7 @@
 
 Research from public sources (linked below). Only Google TV has been tested
 by the author. Everything else is what the sources say, not tested (Samsung and LG have since run on real
-TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a read only check on one real TV but is not paired; Roku, Philips Saphi, VIZIO and Panasonic have not run on a real TV).
+TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a read only check on one real TV but is not paired; Roku has run as a channel on one real TV, with no bridge; Philips Saphi, VIZIO and Panasonic have not run on a real TV).
 
 - **A. TV home only:** an app replaces the TV's home screen.
 - **B. Computer bridge:** a computer at home controls the TV with the Android TV Remote protocol
@@ -22,7 +22,7 @@ TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a 
 | Fire TV on Vega OS (Stick 4K Select, Stick HD 2026, 4K gen 3) | App only: built with Amazon's free developer tools | **Beta**: an app the bridge opens when the stick comes up, not a home screen (Amazon's Home button still opens Amazon's home). Phone remote arrows and OK while couch-tv is in front ([FIRE-VEGA.md](FIRE-VEGA.md)) | No |
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on ten real LGs so far ([LG.md](LG.md)) | No |
-| Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation, **not yet tried on a real Roku** ([ROKU.md](ROKU.md)) | No |
+| Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation. The channel has run on one real Roku TV (Roku OS 16, no bridge; Roku OS 16 refuses a channel's own ECP, so there the app list is baked in at build time with `--apps-from`). The bridge, the power on hook and deep links are **not yet seen on a real Roku** ([ROKU.md](ROKU.md)) | No |
 | Hisense VIDAA | App only: a Couch TV tile on firmware that still allows it, else the TV's browser | **Beta**: a page the bridge opens on power-on, like Samsung and LG (VIDAA's Home button still opens VIDAA's home unless you turn on `keep_home`). Confirmed on a real Hisense 55U7N, VIDAA 9 ([VIDAA.md](VIDAA.md), #128) | No |
 | Philips on Titan OS (mostly Europe, from 2023) | Needs a Titan app (Titan's store or DevView), not there yet | **Beta**: the phone remote works now (power, keys, volume, inputs, opening apps); the home opens once there is a Titan app. One real TV (a 43PUS8909/12) has answered the read only check; pairing and the rest are tested against a stand in so far ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)) | No |
 | Older Philips with Saphi (about 2015 to 2019, not Android) | No | **Beta**: phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen (Philips's Home button still opens Philips's menu). Depends on the model and firmware ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)) | No |
@@ -126,7 +126,10 @@ Not tested by the author. Each line is what someone said worked on their own dev
 - **Roku** channels are BrightScript and SceneGraph, not web pages, so the home is drawn again natively
   (`roku/`) and the bridge talks to the Roku over its External Control Protocol on port 8060
   (`bridge/roku.py`). Built from Roku's documentation, tested against a test Roku and a BrightScript
-  simulator, **never on a real Roku**. A sideloaded channel is always one at a time, and newer Roku OS limits
+  simulator, then run as a channel on one real Roku TV (Roku OS 16.0.4, no bridge, thanks mjiles, #152); the
+  bridge path is still not seen on a real one. Roku OS 16 refuses a channel's own ECP (403), so with no
+  bridge `roku/build.py --apps-from <roku address>` copies the app list and icons in at build time and the
+  list is a snapshot. A sideloaded channel is always one at a time, and newer Roku OS limits
   that protocol unless "Control by mobile apps" allows it ([ROKU.md](ROKU.md)). Roku's home screen cannot be
   replaced.
 - **Panasonic Viera on My Home Screen** (Firefox OS) and older Vieras do not run Android apps or let an

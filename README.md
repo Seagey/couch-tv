@@ -138,12 +138,17 @@ outsiders). It is new and has not been on a real VIZIO yet: if you have one, the
 takes about 15 minutes ([docs/VIZIO-TESTING.md](docs/VIZIO-TESTING.md)). Setup and limits:
 [docs/VIZIO.md](docs/VIZIO.md).
 
-**10 November 2026: Roku (built, not yet run on a real Roku).** couch-tv now has a Roku version. Roku
+**10 November 2026: Roku (built; first real Roku TV ran the channel on 12 November).** couch-tv now has a Roku version. Roku
 channels are not web pages, so the home is drawn again as a native channel (the Night scenes with the clock
 in them, date and weather, the people switch, Keep watching and your apps), and the bridge talks to the
 Roku over its own network protocol and opens the channel every time the TV is switched on. It was built from
-Roku's documentation and tested against a test Roku and a BrightScript simulator. **Nobody has run it on a
-real Roku**, so if you have one, you would be the first: give this repo to your agent, and please open an
+Roku's documentation and tested against a test Roku and a BrightScript simulator. **Update, 13 November
+2026:** it has now run on a real Roku TV (an Element, Roku OS 16, channel only). Roku OS 16 refuses a
+channel's own network calls to its TV, so with no computer at home the app row came up empty. The build now
+has `roku/build.py --apps-from <roku address>`, which copies the Roku's apps and icons into the channel
+(rebuild after installing new apps; a computer at home does not have this limit), the dock opens apps
+directly when the Roku says no, and `--install` takes `--password` for Windows (thanks mjiles, #152). The
+bridge path and the power on hook are still not seen on a real Roku, so if you have one, please open an
 issue saying how it went. Setup and limits: [docs/ROKU.md](docs/ROKU.md).
 
 **10 November 2026: Android 6 (experimental, on main, in the next release).** Both TV apps now
@@ -526,8 +531,10 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, from public sou
   up on the Roku, no account), and the bridge opens it every time the TV is switched on. Roku's own Home
   button still opens Roku's home. The phone remote and the assistant work: Netflix opens the title,
   YouTube opens the video, other apps open on their home page. No screenshots and no title for what is
-  playing. **It was built from Roku's documentation and tested against a test Roku and a simulator, and it
-  has not been run on a real Roku**, so expect to fix something. Newer Roku OS also limits remote control
+  playing. **It was built from Roku's documentation and tested against a test Roku and a simulator, and the channel
+  has since run on one real Roku TV (Roku OS 16, no bridge); the bridge path has not been seen on a real
+  Roku**, so expect to fix something. Roku OS 16 blocks a channel's own remote calls, so with no bridge
+  build with `--apps-from` (docs/ROKU.md). Newer Roku OS also limits remote control
   until "Control by mobile apps" is switched to Permissive or Enabled. If you try it, please open an issue
   and say how it went. Setup and limits: [docs/ROKU.md](docs/ROKU.md).
 - **The Beta paths: Hisense VIDAA, Philips, Fire TV on Vega OS, VIZIO, Panasonic and Apple TV.** All of them need a
@@ -1104,7 +1111,7 @@ protocol and ADB.
 
 - Google TV and Android TV run everything. Fire TV (Fire OS) runs all three options, with Amazon's
   home flashing up first. Samsung runs it as an app, with a computer that stays on, and LG the
-  same way (run on ten real LGs so far). Roku is built the same way but not yet run on a real Roku.
+  same way (run on ten real LGs so far). Roku is built the same way and has run as a channel on one real Roku TV, but not yet with the bridge.
   Developer mode has to be on.
 - A Google TV update can switch ambient mode back on. Option B's bridge checks once a day and
   switches it off again; with option A, run `apply.sh` again. couch-tv never switches the Google

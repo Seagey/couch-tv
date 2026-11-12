@@ -131,6 +131,119 @@ class Sideload(unittest.TestCase):
         self.assertIn("Developer Mode", said)
 
 
+PNG = b"\x89PNG\r\n\x1a\n" + b"x" * 40
+APPS_XML = (
+    '<?xml version="1.0" encoding="UTF-8" ?><apps>'
+    '<app id="dev" type="appl" version="1.0.1">Couch TV</app>'
+    '<app id="837" type="appl" version="1.0">YouTube</app>'
+    '<app id="12" type="appl" version="4.1">Netflix &amp; Co</app>'
+    '<app id="tvinput.hdmi1" type="tvin" version="1.0">HDMI 1</app>'
+    '<app id="../../evil" type="appl" version="1">Bad</app>'
+    '<app id="a/b" type="appl" version="1">Bad</app>'
+    '<app id="12" type="appl" version="1">Netflix again</app>'
+    '<app id="plex_2" type="appl" version="1">Plex</app>'
+    '</apps>'
+)
+
+
+class AppSnapshot(unittest.TestCase):
+    """--apps-from: a fake ECP, no network. A hostile device on the LAN must not write outside images/roku-icons/."""
+
+    def fake(self, icons, xml=APPS_XML):
+        def get(url):
+            if url.endswith("/query/apps"):
+                return "text/xml", xml.encode()
+            return icons.get(url.rsplit("/", 1)[1], ("text/plain", b""))
+        return get
+
+    def test_parses_apps_and_skips_the_rest(self):
+        apps = build.parse_app_list(APPS_XML)
+        self.assertEqual([a["id"] for a in apps], ["837", "12", "plex_2"])
+        self.assertEqual(apps[1]["title"], "Netflix & Co")
+
+    def test_unsafe_ids_are_refused(self):
+        for bad in ("", "../x", "a/b", "a.b", "a-b", "a b", "x" * 41, "..", "C:\\x", "a\x00b"):
+            self.assertFalse(build.safe_app_id(bad), bad)
+        for good in ("837", "plex_2", "ABC"):
+            self.assertTrue(build.safe_app_id(good), good)
+
+    def test_icon_file_name_comes_from_the_id_and_a_fixed_extension(self):
+        self.assertEqual(build.icon_file("837", "image/png", PNG), "images/roku-icons/837.png")
+        self.assertEqual(build.icon_file("837", "image/png; charset=x", PNG), "images/roku-icons/837.png")
+        self.assertEqual(build.icon_file("837", "image/jpeg", b"\xff\xd8\xff" + b"x" * 9), "images/roku-icons/837.jpg")
+        self.assertIsNone(build.icon_file("../evil", "image/png", PNG))
+
+    def test_icon_content_type_size_and_bytes_are_checked(self):
+        self.assertIsNone(build.icon_file("837", "image/svg+xml", PNG))
+        self.assertIsNone(build.icon_file("837", "text/html", PNG))
+        self.assertIsNone(build.icon_file("837", "image/png", b"<html>not a png</html>"))
+        self.assertIsNone(build.icon_file("837", "image/png", b""))
+        self.assertIsNone(build.icon_file("837", "image/png", PNG + b"x" * build.ICON_MAX))
+
+    def test_snapshot_keeps_good_icons_only(self):
+        icons = {"837": ("image/png", PNG), "12": ("image/svg+xml", b"<svg/>")}
+        apps, files = build.snapshot_apps("192.0.2.30", get=self.fake(icons))
+        self.assertEqual(list(files), ["images/roku-icons/837.png"])
+        self.assertEqual(apps[0]["icon"], "pkg:/images/roku-icons/837.png")
+        self.assertNotIn("icon", apps[1])
+        for name in files:
+            self.assertRegex(name, r"^images/roku-icons/[A-Za-z0-9_]+\.(png|jpg|webp)$")
+
+    def test_hostile_ids_never_reach_a_file_name(self):
+        evil = APPS_XML + '<app id="..%2f..%2fx" type="appl">x</app>'
+        icons = {"../../evil": ("image/png", PNG)}
+        _, files = build.snapshot_apps("192.0.2.30", get=self.fake(icons, evil))
+        self.assertTrue(all(n.startswith("images/roku-icons/") and ".." not in n for n in files))
+
+    def test_oversized_list_is_refused(self):
+        big = "<apps>" + " " * (build.LIST_MAX + 10) + "</apps>"
+        with self.assertRaises(SystemExit):
+            build.snapshot_apps("192.0.2.30", get=self.fake({}, big))
+
+    def test_odd_roku_addresses_are_refused(self):
+        for bad in ("", "x/y", "a b", "192.0.2.30/../x", "http://192.0.2.30"):
+            with self.assertRaises(SystemExit):
+                build.check_host(bad)
+        self.assertEqual(build.check_host("192.0.2.30"), "192.0.2.30")
+
+    def test_zip_carries_apps_in_the_config_and_icons_under_the_icon_folder(self):
+        icons = {"837": ("image/png", PNG)}
+        orig = build.snapshot_apps
+        build.snapshot_apps = lambda host: orig(host, get=self.fake(icons))
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                path = build.build(out=d, apps_from="192.0.2.30")
+                with zipfile.ZipFile(path) as z:
+                    cfg = json.loads(z.read("config.json"))
+                    self.assertEqual([a["id"] for a in cfg["apps"]], ["837", "12", "plex_2"])
+                    self.assertEqual(z.read("images/roku-icons/837.png"), PNG)
+                    extra = [n for n in z.namelist() if n.startswith("images/roku-icons/")]
+                    self.assertEqual(extra, ["images/roku-icons/837.png"])
+                path = build.build(out=d)
+                with zipfile.ZipFile(path) as z:
+                    self.assertNotIn("apps", json.loads(z.read("config.json")))
+        finally:
+            build.snapshot_apps = orig
+
+
+class Password(unittest.TestCase):
+    def test_password_option_is_taken_without_a_prompt(self):
+        argv = [str(ROKU / "build.py"), "--install", "192.0.2.30", "--password", "pw"]
+        seen = {}
+        orig = (build.build, build.install, build.getpass.getpass, sys.argv)
+        build.build = lambda *a, **k: "x.zip"
+        build.install = lambda path, host, pw: (seen.update(pw=pw) or True, "installed")
+        build.getpass.getpass = lambda *a: self.fail("asked for a password")
+        sys.argv = argv
+        try:
+            with self.assertRaises(SystemExit) as e:
+                build.main()
+            self.assertEqual(e.exception.code, 0)
+        finally:
+            build.build, build.install, build.getpass.getpass, sys.argv = orig
+        self.assertEqual(seen["pw"], "pw")
+
+
 class BrightScript(unittest.TestCase):
     @unittest.skipUnless((ROKU / "node_modules" / ".bin" / "bsc").exists(), "run `npm install` in roku/ for the BrightScript check")
     def test_compiles_and_lints_clean(self):

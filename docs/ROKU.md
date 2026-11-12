@@ -20,11 +20,18 @@ watching and the phone remote. Without one you can still install the channel and
 home row: the clock, the date and the Roku's own apps still work, and OK opens an app through the Roku
 itself.
 
-## Test status: not yet on a real Roku
+## Test status: run on one real Roku TV, channel only
 
-**This was built from Roku's documentation and tested against a test Roku on a computer. It has not been
-run on a real Roku.** Nobody has tried it on a TV. Expect something to need fixing.
+**A real Roku TV has now run the channel** (an Element Roku TV, model E1AA32R, Roku OS 16.0.4, channel only
+with no bridge, built and sideloaded from a Windows PC; thanks mjiles, [#152](https://github.com/Seagey/couch-tv/issues/152)).
+It installed, opened as Couch TV, rotated the scenes and showed the clock and date with no BrightScript
+errors. **Roku OS 16 refuses a channel's own ECP calls** (`127.0.0.1:8060`, `query/apps` and `launch/<id>`
+answer 403 whatever Control by mobile apps is set to), so the no bridge dock was empty and apps would not
+open. That is fixed with `--apps-from` (step 3) and a direct launch. Everything below the line "Not checked
+on a real Roku" is still not seen on a real one, including the bridge path and the power on hook.
 
+Before that, it was built from Roku's documentation and tested against a test Roku on a computer. Expect
+something else to need fixing.
 What was checked, in November 2026:
 
 - **Against a test Roku** (`tests/roku_standin.py`, a small program that answers ECP the way Roku's
@@ -52,7 +59,7 @@ These two pictures come from that simulator, with made up shows and no real Roku
 
 ![Golden hour, Waterline, Fog and Dawn on a Roku, in a simulator](screens/roku-simulator-scenes.jpg)
 
-**Not checked on a real Roku**, and the most likely places for a surprise:
+**Not checked on a real Roku** (the first real TV ran the channel only, with no bridge), and the most likely places for a surprise:
 
 - Whether the app ids and deep links below open what they should. Only Netflix 12, YouTube 837, Hulu 2285
   and Prime Video 13 were confirmed to be ids from pages that were read, and no deep link has been tried.
@@ -75,7 +82,7 @@ model, Roku OS version, what worked and what did not), even if everything worked
 
 | | Roku |
 |---|---|
-| couch-tv home as a channel, apps in your order, the remote's arrows and OK | Built, not yet seen on a real Roku |
+| couch-tv home as a channel, apps in your order, the remote's arrows and OK | Seen on one real Roku TV (channel only, Roku OS 16). With no bridge the app list is a snapshot from the build (step 3) |
 | Opens by itself when the TV is switched on | Yes, with the bridge running (not yet seen on a real Roku) |
 | Roku's own Home button | Still opens Roku's home. Press the couch-tv tile on the home row, or let the phone remote's Home open it |
 | Phone remote: keys, volume, mute, open an app | Yes, when "Control by mobile apps" allows it (below). Volume and power keys work on a Roku TV, not on a box |
@@ -139,6 +146,20 @@ not resolve `.local`. With more than one TV in `config.json`, add `--tv <id>` fo
 `build/roku/couch-tv_<version>.zip`. It holds the channel, the five scene photos, the app logos and the
 bridge's address. No passwords or keys go in it.
 
+**No bridge, Roku OS 16 (channel only):** Roku OS 16 blocks a channel's own ECP, so the channel cannot read
+its Roku's app list or open apps through ECP. Add `--apps-from <roku address>` and the build reads the app
+list and the icons from the Roku over ECP (from the computer, which is allowed) and puts them in the zip:
+
+```sh
+.venv/bin/python roku/build.py --apps-from <roku address>
+```
+
+The dock then shows those apps, and OK opens one with the Roku's own app launcher instead of ECP. Two
+limits: the list is a snapshot, so **rebuild and install again after you install new apps** on the Roku,
+and the icons are limited to small PNG, JPEG or WebP pictures (anything else the Roku sends is skipped, and
+that app gets a letter). **The bridge does not have this limit**: with a bridge the dock is always current,
+so you do not need `--apps-from`.
+
 The pictures in the zip are made from the TV home's own by `roku/make-assets.py` (smaller photos, the
 cutouts only where they cross the clock, logos shrunk to tile size). They are committed, so a build needs
 only Python. Run `make-assets.py` yourself only to change the look (it needs ImageMagick, `dwebp` and
@@ -152,7 +173,10 @@ Either let the build do it:
 .venv/bin/python roku/build.py --bridge http://<bridge computer's address>:5400 --install <roku address>
 ```
 
-It asks for the developer password (or reads `ROKU_DEV_PASSWORD`), signs in to the Roku's developer
+It takes the developer password from `--password <password>`, else the `ROKU_DEV_PASSWORD` environment
+variable, else asks for it (the ask does not take typing in every Windows terminal, so use one of the first
+two there; the environment variable is the safer one, because `--password` shows in the process list). It
+is never printed or kept. It signs in to the Roku's developer
 installer with HTTP digest as `rokudev` and uploads the zip. It says "installed" or why not.
 
 Or by hand: open `http://<roku address>` in a browser on the same network, sign in as `rokudev` with the
@@ -254,8 +278,10 @@ If an app does not open, add its id to that app's `ids` in `bridge/apps.py`.
 - Developer Mode can be used by anyone on your network who knows the developer password, so make it one
   you do not use anywhere else.
 - A channel cannot read the Roku's app list itself, so the dock comes from the bridge (`/api/roku/apps`),
-  or, with the bridge off, from the Roku's own ECP at `127.0.0.1:8060` (the Roku may refuse that under
-  Control by mobile apps, and then the dock stays empty).
+  or, with the bridge off, from the list `--apps-from` put in the zip, or the Roku's own ECP at
+  `127.0.0.1:8060`. **Roku OS 16 blocks a channel's own ECP** (403, even on Permissive), so on Roku OS 16
+  with no bridge the dock comes from the `--apps-from` snapshot and does not follow newly installed apps
+  until you rebuild. The bridge does not have this limit.
 - The glass clock is a tinted number, not a picture seen through the digits: a Roku cannot cut a photo to
   the shape of text. The effect of the scenery overlapping the digits is kept.
 - No screenshots, no title or progress for what is playing, no profile picking, no pressing Play inside

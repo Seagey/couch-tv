@@ -206,7 +206,30 @@ sub onRefresh()
 end sub
 
 sub fetchLocalApps()
+    ' Roku OS 16 refuses a channel's own ECP (403), so build.py --apps-from can put the list in the zip
+    if m.apps.count() = 0 and m.cfg <> invalid and m.cfg.apps <> invalid and m.cfg.apps.count() > 0
+        list = []
+        for each a in m.cfg.apps
+            icon = ""
+            if a.icon <> invalid then icon = a.icon
+            list.push({ id: a.id, title: a.title, package: "", icon: icon })
+        end for
+        m.apps = list
+        m.localApps = true
+        drawDock()
+    end if
     fetch("localapps", "http://127.0.0.1:8060/query/apps")
+end sub
+
+' Open an app without ECP, for when the Roku refuses the channel's own ECP (403).
+sub launchDirect(id as String)
+    am = CreateObject("roAppManager")
+    if am <> invalid and FindMemberFunction(am, "LaunchApp") <> invalid
+        am.LaunchApp(id, "", {})
+        say("")
+    else
+        say("This Roku would not open that app from couch-tv.", true)
+    end if
 end sub
 
 sub onFetched(event as Object)
@@ -266,6 +289,8 @@ sub onFetched(event as Object)
         end if
     else if tag = "localapps"
         parseLocalApps(body)
+    else if tag = "localhome"
+        if status = 403 and m.pendingLocal <> invalid then launchDirect(m.pendingLocal)
     else if tag = "launch"
         if status = 200
             say("")
@@ -708,7 +733,7 @@ function logoFor(a as Object) as String
         if CreateObject("roFileSystem").exists(file) then return file
     end if
     if a.icon <> invalid and a.icon <> ""
-        if Left(a.icon, 4) = "http" then return a.icon
+        if Left(a.icon, 4) = "http" or Left(a.icon, 5) = "pkg:/" then return a.icon
         if hasBridge() then return withKey(m.cfg.bridge + a.icon)
     end if
     return ""
