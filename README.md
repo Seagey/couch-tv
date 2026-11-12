@@ -393,6 +393,45 @@ Later, once Developer options are on (step 1), `check-tv.py <tv address> --adb` 
 Android version and the maker. That one makes the TV ask "Allow USB debugging?" and saves this
 computer's key in `~/.android/adbkey`, so it waits until you have decided to go ahead.
 
+## The easy way: couch-tv Setup
+
+A free app for Mac and Windows that puts couch-tv's home screen on a **Google TV, Android TV or
+Fire TV** with no command line and no AI agent. It opens a page in your browser and walks you
+through it: Developer options with the TV remote, a 6 digit code (Google TV) or one Allow press,
+then it installs couch-tv from this repo's Releases, checks it, sets it up the way `apply.sh` does
+(option A), and can add the phone remote. It shows the plan and waits for your yes before it
+changes anything, and it can undo all of it. Download and how to open it the first time:
+[setup-app/README.md](setup-app/README.md).
+
+**Does not work with this app:**
+
+| TV system | |
+|---|---|
+| **Samsung (Tizen)** | couch-tv still works, through a computer at home that stays on (the bridge): [docs/SAMSUNG.md](docs/SAMSUNG.md). Not through this app. |
+| **LG (webOS)** | The same, through the bridge: [docs/LG.md](docs/LG.md). Not through this app. |
+| **Roku OS** (Roku TVs and sticks) | The same, through the bridge: [docs/ROKU.md](docs/ROKU.md) (not yet tried on a real Roku). Not through this app. |
+| **VIDAA** (Hisense's own system) | No. |
+| **Apple TV (tvOS)** | No. |
+| **Fire TV sticks on Vega OS** (Fire TV Stick 4K Select, Fire TV Stick HD 2026, Fire TV Stick 4K 3rd gen) | No: Vega OS cannot install apps. |
+| **Panasonic with My Home Screen or TiVo OS**, and **TiVo OS** on any brand | No. (Panasonic's Fire TV models run Fire OS and work like a Fire TV; its Google TV models work.) |
+| **Philips with Saphi or Titan OS** (most 2025 and all 2026 Philips TVs) | No. (Philips Google TV and Android TV models work.) |
+
+A Google TV box (for example the Google TV Streamer) plugged into any of these gets everything.
+
+**Android TVs that need a computer once, not this app:**
+- An Android TV with no Wireless debugging that never shows "Allow USB debugging?" for a new computer over Wi-Fi needs a computer with a USB cable once. The app checks and says so before it changes anything. (An Android 11 TV with only USB debugging did ask, so try first.)
+- Android 6 and 7.0 TVs (for example the Xiaomi Mi TV 4A with PatchWall): couch-tv is experimental there and is set up from a computer with the steps below. The app stops and says so.
+
+
+The Fire TV setup builds on couch-tv-setup by killy10o10.
+
+### Community tools
+
+Made by people outside this repo, not checked by us after the version named:
+- [couch-tv-setup](https://github.com/killy10o10/couch-tv-setup) by killy10o10: a setup app for
+  couch-tv's "lives on the TV" app on Fire TV sticks, with an optional switch off for Amazon's
+  advert and tracking apps (we reviewed v0.1.2: [setup-app/REVIEW-killy10o10.md](setup-app/REVIEW-killy10o10.md)).
+
 ## Setting it up with an AI agent
 
 Open this folder in Claude Code (or any coding agent) and say "set this up on my TV". It reads
@@ -914,5 +953,8 @@ protocol and ADB.
 - The Bluetooth and Network buttons, Amazon YouTube support and the Fire TV Stick guide came from
   the [killy10o10 fork](https://github.com/killy10o10/couch-tv); the unpaired TV guard from the
   [Justin1491 fork](https://github.com/Justin1491/couch-tv).
+- couch-tv Setup (`setup-app/`): the Fire TV setup builds on
+  [couch-tv-setup](https://github.com/killy10o10/couch-tv-setup) by killy10o10 (MIT); the reused
+  parts and their notice are in `setup-app/THIRD-PARTY.md`.
 
 MIT licence, see `LICENSE`.

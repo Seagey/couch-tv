@@ -1,0 +1,263 @@
+<!doctype html>
+<!-- The Fire TV steps, the "Look at your TV" Allow card and the Local Network hints are adapted
+     from couch-tv-setup by killy10o10 (MIT, Copyright (c) 2026 killy10o10). See THIRD-PARTY.md. -->
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>couch-tv Setup</title>
+<meta name="setup-key" content="__SETUP_KEY__">
+<meta name="setup-os" content="__SETUP_OS__">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <div class="logo">couch-tv <span>Setup</span></div>
+    <button id="close-top" class="link">Close setup</button>
+  </header>
+
+  <!-- welcome -->
+  <section data-step="welcome">
+    <h1>Put couch-tv on your TV</h1>
+    <p class="lead">A clean home screen with no adverts: your apps up front, the time, the weather and a
+      changing scene behind them. About ten minutes, most of it with the TV remote. You can undo all of it.</p>
+    <ul class="need">
+      <li><b>Your TV</b>, switched on, and its remote.</li>
+      <li><b>This computer on the same Wi-Fi</b> as the TV.</li>
+    </ul>
+    <h2>Works with</h2>
+    <ul class="tvs">
+      <li class="yes"><b>Google TV</b> (Sony, TCL, Hisense, Philips, Panasonic Google TVs, Chromecast with Google TV, Google TV Streamer and others).</li>
+      <li class="yes"><b>Android TV</b> 7.1 and newer, if Developer options has Wireless debugging, or the TV asks "Allow USB debugging?" over Wi-Fi.</li>
+      <li class="partly"><b>Fire TV on Fire OS</b> (sticks, Cubes, and Fire TV TVs such as Panasonic's). Amazon's home flashes up for a moment before couch-tv comes back.</li>
+    </ul>
+    <h2>Does not work with this app</h2>
+    <ul class="tvs">
+      <li class="no"><b>Samsung (Tizen)</b>, <b>LG (webOS)</b> and <b>Roku OS</b>. couch-tv still works on them through a computer at home that stays on (the bridge), just not through this app. The guides are on GitHub: docs/SAMSUNG.md, docs/LG.md and docs/ROKU.md.</li>
+      <li class="no"><b>VIDAA</b> (Hisense's own system).</li>
+      <li class="no"><b>Apple TV (tvOS)</b>.</li>
+      <li class="no"><b>Fire TV sticks on Vega OS</b> (Fire TV Stick 4K Select, Fire TV Stick HD 2026, Fire TV Stick 4K 3rd gen). They cannot install apps.</li>
+      <li class="no"><b>Panasonic with My Home Screen or TiVo OS</b>, and <b>TiVo OS</b> on any brand.</li>
+      <li class="no"><b>Philips with Saphi or Titan OS</b> (most 2025 and all 2026 Philips TVs).</li>
+      <li class="no"><b>Android 6 and 7.0 TVs</b> (for example the Xiaomi Mi TV 4A with PatchWall): experimental, set up from a computer with the GitHub guide.</li>
+      <li class="no"><b>Android TVs with no Wireless debugging that never ask</b> "Allow USB debugging?" over Wi-Fi: they need a computer with a USB cable once. The app checks and tells you.</li>
+    </ul>
+    <p class="small">Any of these can get everything by plugging a Google TV box (for example the Google TV Streamer) into the TV.</p>
+    <p class="small">This computer is only needed today. Once it is set up, couch-tv runs on the TV by itself.
+      Nothing is deleted from the TV, and nothing about you is sent anywhere.</p>
+    <div class="actions">
+      <button id="undo-start">Take couch-tv off a TV</button>
+      <button class="primary" id="setup-start">Start</button>
+    </div>
+  </section>
+
+  <!-- find -->
+  <section data-step="find">
+    <h1>Find your TV</h1>
+    <p class="lead" id="find-status">Looking on your Wi-Fi…</p>
+    <div id="found" class="list"></div>
+    <details id="manual">
+      <summary>Type the TV's address instead</summary>
+      <p class="small">Google TV: <b>Settings, Network and Internet</b>, then your Wi-Fi network.
+        Android TV: <b>Settings, Network</b>. Fire TV: <b>Settings, My Fire TV, About, Network</b>.
+        Type the <b>IP address</b> it shows.</p>
+      <div class="row"><input id="ip" placeholder="for example 192.0.2.10" inputmode="decimal" autocomplete="off"><button class="primary" id="ip-go">Use this</button></div>
+    </details>
+    <p class="hint" id="find-help" hidden>Nothing yet? Check the TV is on and on the same Wi-Fi as this computer.
+      <span data-os="mac">If the Mac asked to "find devices on your local network", it needs <b>Allow</b> (System Settings, Privacy and Security, Local Network).</span>
+      <span data-os="windows">If Windows asked whether to allow couch-tv Setup on networks, it needs <b>Allow</b>. A guest or "Public" Wi-Fi can keep devices apart: use your home Wi-Fi.</span>
+      A Fire TV only shows up once ADB debugging is on: pick <b>Type the TV's address</b>.</p>
+    <div class="actions">
+      <button data-go="welcome">Back</button>
+      <button id="rescan">Look again</button>
+    </div>
+  </section>
+
+  <!-- not this app -->
+  <section data-step="stop">
+    <h1 id="stop-title">This TV needs another way</h1>
+    <p class="lead" id="stop-text"></p>
+    <p id="stop-more" class="small"></p>
+    <div class="actions">
+      <button data-go="find">Pick another TV</button>
+      <a class="button" href="https://github.com/Seagey/couch-tv#will-it-work-on-my-tv" target="_blank" rel="noopener">The guide on GitHub</a>
+    </div>
+  </section>
+
+  <!-- what kind -->
+  <section data-step="kind">
+    <h1>What kind of TV is it?</h1>
+    <p class="lead" id="kind-line"></p>
+    <div class="choices">
+      <button data-kind="google"><b>Google TV</b><small>The home says Google TV, or Settings, System, About shows "Google TV".</small></button>
+      <button data-kind="android"><b>Android TV</b><small>An older Android TV: Settings has Device Preferences.</small></button>
+      <button data-kind="fire"><b>Fire TV</b><small>An Amazon Fire TV stick, Cube or Fire TV Edition TV.</small></button>
+    </div>
+    <p class="small">Not sure? On the TV open <b>Settings</b>, then <b>System, About</b> (or <b>Device Preferences, About</b>) and look for "Android TV OS" or "Google TV". Fire TV says Fire OS under <b>Settings, My Fire TV, About</b>.</p>
+    <div class="actions"><button data-go="find">Back</button></div>
+  </section>
+
+  <!-- Google TV: Wireless debugging and the code -->
+  <section data-step="dev-google">
+    <h1>Switch on Wireless debugging</h1>
+    <p class="lead">This lets this computer make the changes on the TV. With the TV remote:</p>
+    <ol class="howto">
+      <li><b>Settings, System, About</b> (older Android TV: <b>Settings, Device Preferences, About</b>). Press OK on <b>Android TV OS build</b> (or <b>Build</b>) <b>seven times</b>, until it says you are a developer. Press Back.</li>
+      <li><b>Settings, System, Developer options</b> (or <b>Device Preferences, Developer options</b>).</li>
+      <li>Go down to <b>Wireless debugging</b>, open it and switch it on. If it asks "Allow wireless debugging on this network?", tick <b>Always allow</b> and choose <b>Allow</b>.</li>
+      <li>Choose <b>Pair device with pairing code</b>. Leave that screen open.</li>
+    </ol>
+    <p class="warn"><b>Careful:</b> in that list, <b>Revoke USB debugging authorisations</b> sits right above Wireless debugging. Never press OK on it. Check what is highlighted before each OK.</p>
+    <p class="small">No Wireless debugging in the list? Go back and choose <b>Android TV</b>. The TV must be on Wi-Fi, not a cable: Android only allows Wireless debugging on Wi-Fi.</p>
+    <div class="code-box">
+      <label>The 6 numbers under <b>Wi-Fi pairing code</b><input id="code" inputmode="numeric" maxlength="7" autocomplete="off" placeholder="123456"></label>
+      <label>The port: the numbers after the colon under <b>IP address &amp; Port</b><input id="pair-port" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="looking…"></label>
+    </div>
+    <p class="hint" id="pair-status"></p>
+    <div class="actions">
+      <button data-go="kind">Back</button>
+      <button class="primary" id="pair-go">Pair</button>
+    </div>
+  </section>
+
+  <!-- the connect port, when the TV does not announce it -->
+  <section data-step="tls-port">
+    <h1>One more number</h1>
+    <p class="lead">Paired. Now go back one screen on the TV, to <b>Wireless debugging</b>, and type the port shown under
+      <b>IP address &amp; Port</b> (the numbers after the colon). It is a different port from the pairing one.</p>
+    <div class="row"><input id="tls-port" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="for example 41234"><button class="primary" id="tls-go">Connect</button></div>
+    <p class="hint" id="tls-status"></p>
+  </section>
+
+  <!-- Android TV and Fire TV: debugging on port 5555 and the Allow prompt -->
+  <section data-step="dev-classic">
+    <h1 id="classic-title">Switch on debugging</h1>
+    <p class="lead">This lets this computer make the changes on the TV. With the TV remote:</p>
+    <ol class="howto" id="howto-android">
+      <li><b>Settings, Device Preferences, About</b>. Press OK on <b>Build</b> <b>seven times</b>, until it says you are a developer. Press Back.</li>
+      <li><b>Settings, Device Preferences, Developer options</b>.</li>
+      <li>If you see <b>Wireless debugging</b>, go back and choose <b>Google TV</b> instead: that way is easier.</li>
+      <li>Switch on <b>USB debugging</b>. If there is also a <b>Network debugging</b> switch, switch that on too.</li>
+    </ol>
+    <ol class="howto" id="howto-fire">
+      <li>Open <b>Settings</b> (the gear at the right of the top row), then <b>My Fire TV</b>.</li>
+      <li>If you see <b>Developer options</b>, skip to step 4.</li>
+      <li>Open <b>About</b> and press select on your stick's name <b>seven times</b>. "You are now a developer" shows. Press Back.</li>
+      <li>Open <b>Developer options</b> and switch <b>ADB debugging</b> on. Say OK to the warning.</li>
+    </ol>
+    <p class="small" id="fire-note">On a Fire TV, Amazon's home still flashes up for a moment before couch-tv comes back. That is as good as Fire OS allows.</p>
+    <div class="actions">
+      <button data-go="kind">Back</button>
+      <button class="primary" id="connect-go">Done, connect</button>
+    </div>
+  </section>
+
+  <!-- the Allow prompt -->
+  <section data-step="allow">
+    <h1>Look at your TV</h1>
+    <div class="tvcard"><div class="tvprompt">Allow USB debugging?<small>☑ Always allow from this computer</small><span>Allow</span></div></div>
+    <p class="lead" id="allow-status">Tick <b>Always allow from this computer</b>, then press <b>Allow</b>.</p>
+    <div class="actions"><button data-go="dev-classic">Back</button><button id="allow-retry" class="primary" hidden>Try again</button></div>
+  </section>
+
+  <!-- no Allow prompt: the honest stop -->
+  <section data-step="no-allow">
+    <h1>This TV did not ask</h1>
+    <p class="lead">The TV did not let this computer in. If "Allow USB debugging?" never showed up, this TV may only
+      let a new computer in through a <b>USB cable</b>: some Android TVs without Wireless debugging work that way.
+      This app cannot do that, so it stops here. Nothing was changed on the TV.</p>
+    <p>What you can do:</p>
+    <ul>
+      <li>Set it up once from a computer with a USB cable plugged into the TV, with the guide on GitHub.</li>
+      <li>Or plug a Google TV box (for example the Google TV Streamer) into the TV, and set up that instead.</li>
+      <li>If you did not see the question because you were not watching, press <b>Try again</b> and look at the TV.</li>
+    </ul>
+    <div class="actions">
+      <button data-go="dev-classic">Try again</button>
+      <a class="button" href="https://github.com/Seagey/couch-tv#setup" target="_blank" rel="noopener">The guide on GitHub</a>
+    </div>
+  </section>
+
+  <!-- the plan, and the yes -->
+  <section data-step="plan">
+    <h1>Here is the plan</h1>
+    <p class="lead" id="device-line"></p>
+    <ul id="plan-list" class="plan"></ul>
+    <label class="tick"><input type="checkbox" id="ambient" checked> Switch off ambient mode (the adverts and photos when the TV is idle)</label>
+    <h2>Make it yours (you can skip this)</h2>
+    <label>Who watches? Names, with commas between<input id="people" autocomplete="off" placeholder="for example Sam, Alex"></label>
+    <label>Suburb or city, for the weather<span class="row"><input id="place-q" autocomplete="off" placeholder="for example Lismore"><button id="place-go">Look up</button></span></label>
+    <div id="places" class="list small"></div>
+    <p class="small">You can change all of this later on the TV, in couch-tv's Home settings (the gear tile).</p>
+    <p class="small" id="tcl-note" hidden><b>TCL:</b> after setting up, open the TV's <b>Settings, Accessibility</b> and check both couch-tv services are switched on. On TCL TVs that is what keeps couch-tv as the home after a restart.</p>
+    <div class="actions">
+      <button data-go="welcome">Not now</button>
+      <button class="primary" id="setup-go">Yes, set it up</button>
+    </div>
+  </section>
+
+  <!-- working -->
+  <section data-step="work">
+    <h1 id="work-title">Setting it up</h1>
+    <div class="bar"><i id="work-bar"></i></div>
+    <p class="lead" id="work-status">Starting…</p>
+    <p class="small">Keep the TV on. This takes a minute or two.</p>
+  </section>
+
+  <!-- done, check -->
+  <section data-step="done">
+    <h1 id="done-title">couch-tv is your home screen</h1>
+    <p class="lead" id="done-line"></p>
+    <p>Press <b>Home</b> on your TV remote. You should see couch-tv. On Google TV and Fire TV the TV's own home may flash up first: that is normal.</p>
+    <div class="actions"><button id="check-go">Check it again</button></div>
+    <h2>Phone remote (optional)</h2>
+    <p>Use your phone as the remote, and search for a show by name. It adds a second small app to the TV. No computer is needed afterwards.</p>
+    <div class="actions"><button class="primary" id="remote-go">Add the phone remote</button></div>
+    <div id="remote-done" hidden>
+      <p>On your phone (on the same Wi-Fi), open <b id="remote-addr"></b> and type the 6 numbers the TV shows.
+        Then add the page to the phone's home screen.</p>
+      <div class="actions"><button id="remote-code">Show a code on the TV</button></div>
+      <p class="small" id="remote-adb-google">To let the phone press keys and type, open <b id="remote-setup"></b> on the phone and follow the Wireless debugging steps there. It needs its own pairing code from the TV, the same screen as before.</p>
+      <p class="small" id="remote-adb-fire">On an up to date Fire TV, Amazon blocks the phone remote from pressing keys and typing. Opening apps and finding shows still work.</p>
+    </div>
+    <h2>Finish</h2>
+    <p id="debug-line">couch-tv does not need debugging any more. Switching it off is safest: <span id="debug-why"></span></p>
+    <div class="actions">
+      <button id="debug-off">Switch debugging off</button>
+      <button class="primary" id="close-go">Close setup</button>
+    </div>
+    <p class="small">To take couch-tv off again, open this app and choose <b>Take couch-tv off a TV</b>. Or by hand, with the remote: Settings, Apps, the couch-tv <b>Home</b> app, Uninstall.</p>
+  </section>
+
+  <!-- undo -->
+  <section data-step="undo">
+    <h1>Take couch-tv off this TV</h1>
+    <p class="lead">This puts the TV's own home back and removes the couch-tv apps. Your other apps, logins and settings stay as they are.</p>
+    <p class="small">If a computer at home runs couch-tv for you (the bridge), stop it first, or it switches things back: see docs/UNINSTALL.md on GitHub.</p>
+    <ul id="undo-list" class="plan"></ul>
+    <label class="tick"><input type="checkbox" id="undo-debug"> Also switch debugging off afterwards</label>
+    <div class="actions">
+      <button data-go="welcome">Not now</button>
+      <button class="primary" id="undo-go">Take it off</button>
+    </div>
+  </section>
+
+  <section data-step="undone">
+    <h1>Done</h1>
+    <p class="lead" id="undone-line">couch-tv is off this TV. Press Home on the remote: you should see the TV's own home.</p>
+    <p class="small">Want Developer options gone too? On the TV: Developer options, switch the switch at the top off.</p>
+    <div class="actions"><button class="primary" id="close-go2">Close setup</button></div>
+  </section>
+
+  <section data-step="closed">
+    <h1>Setup has stopped</h1>
+    <p class="lead">You can close this tab.</p>
+  </section>
+
+  <p class="error" id="error" hidden></p>
+  <footer>Free and open source. <a href="https://github.com/Seagey/couch-tv" target="_blank" rel="noopener">couch-tv on GitHub</a></footer>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

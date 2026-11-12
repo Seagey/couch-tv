@@ -24,6 +24,14 @@ TVs, see their pages; Roku has not).
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on nine real LGs so far ([LG.md](LG.md)) | No |
 | Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation, **not yet tried on a real Roku** ([ROKU.md](ROKU.md)) | No |
 | Apple TV, Hisense VIDAA | No | No | No |
+| Panasonic on My Home Screen or TiVo OS (Panasonic's Fire TV models run Fire OS, see Fire TV; its Google TV models, see Google TV) | No | No | No |
+| Philips on Saphi or Titan OS (most 2025 and all 2026 Philips TVs; Philips Google TV and Android TV models, see Google TV) | No | No | No |
+| TiVo OS on any brand | No | No | No |
+
+**couch-tv Setup** (the desktop app in `setup-app/`) does option A, plus the phone remote from option C, on
+Google TV, Android TV 7.1 and newer and Fire OS only. Samsung, LG and Roku work through the bridge (B), not
+through the app. An Android TV with no Wireless debugging that never asks "Allow USB debugging?" over Wi-Fi
+needs a computer with a USB cable once, and Android 6 and 7.0 TVs are set up from a computer (experimental).
 
 ## Reported by people using it
 
@@ -124,3 +132,8 @@ Not tested by the author. Each line is what someone said worked on their own dev
   [webOS developer mode](https://webostv.developer.lge.com/develop/getting-started/developer-mode-app),
   [webosbrew](https://www.webosbrew.org/devmode/)
 - Android TV Remote protocol: [androidtv-remote](https://github.com/kud/androidtv-remote)
+- Panasonic: [Expert Reviews, Fire TV and TiVo OS in the 2024 range](https://www.expertreviews.co.uk/tvs/panasonic-debuts-fire-tv-and-tivo-os-options),
+  [What Hi-Fi, Panasonic's switch to Fire OS](https://www.whathifi.com/features/panasonics-switch-to-fire-os-for-its-new-tvs-might-be-controversial-but-i-think-its-a-great-move)
+  (no Panasonic on Vega OS found, checked 11 Nov 2026)
+- Philips: [9to5Google, Titan OS on all 2026 Philips TVs](https://9to5google.com/2026/03/23/google-tv-just-lost-a-big-tv-brand-to-web-app-based-titan-os/),
+  [Expert Reviews, Titan OS](https://www.expertreviews.co.uk/technology/tvs-home-cinema/titan-os-hands-on-preview)
