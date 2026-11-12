@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 13 November 2026: Fire OS 7 brings Couch TV back without the 5 second wait (on main, in the next release)
+
+On a Fire TV Cube (3rd gen, Fire OS 7.7.1.7), Amazon's home stayed up for 5 seconds after a Home press, and a second press could bury Couch TV for good. Android 9 and older hold an app's start for 5 seconds after Home, so on Fire TV the home's own task is now moved to the front instead, and a press inside the 1.2 second gap is looked at again. Fire OS Settings screens still stay open, and other TVs and Android 10 and newer are unchanged. Thanks to atul016 (#162).
+
 ### 13 November 2026: The Next song button skips the track again (on main, in the next release)
 
 On a Mi Box (Google TV), Next on the ambient music screen and on the Spotify card in Keep watching opened the gear menu (Home settings or TV settings) instead of skipping. The home's check for the remote's Settings key (key code 176) also matched the media Next key, which a browser engine reports with the same code. The home now tells them apart, in Kids mode too. Thanks NathanGlasby (#158).

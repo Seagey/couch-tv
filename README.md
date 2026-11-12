@@ -41,11 +41,11 @@
 
 The newest release is **0.12** (9 November 2026), on [the Releases page](https://github.com/Seagey/couch-tv/releases). These are on main, in the next release:
 
+- **13 November:** on Fire OS 7 Couch TV comes back without the 5 second wait, thanks atul016 ([#162](docs/UPDATES.md#13-november-2026-fire-os-7-brings-couch-tv-back-without-the-5-second-wait-on-main-in-the-next-release))
 - **13 November:** the Next song button skips the track again on a Mi Box, thanks NathanGlasby ([#158](docs/UPDATES.md#13-november-2026-the-next-song-button-skips-the-track-again-on-main-in-the-next-release))
 - **13 November:** your own scenes can play a short looping clip, thanks digitaldarkmatterltd ([#155](docs/UPDATES.md#13-november-2026-your-own-scenes-can-move-on-main-in-the-next-release))
 - **13 November:** Nuvio shows count for Keep watching, thanks NathanGlasby ([#157](docs/UPDATES.md#13-november-2026-nuvio-in-keep-watching-on-main-the-on-tv-app-in-the-next-release))
 - **13 November:** the TV home speaks Hebrew, right to left, thanks YuvalHir ([#153](docs/UPDATES.md#13-november-2026-hebrew-and-right-to-left-layout-on-the-tv-home-on-main-in-the-next-release))
-- **13 November:** Ask works with OpenAI, Gemini and more, thanks iarhamanwaar ([#140](docs/UPDATES.md#13-november-2026-ask-on-the-tv-with-more-ai-services-on-main-in-the-next-release))
 
 Every change, with credits: [docs/UPDATES.md](docs/UPDATES.md).
 

@@ -41,6 +41,8 @@ class FireWatch : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     /** True while the latest window change this service saw was the TV's own home (events only, no screen reading). */
     private var stockInFront = false
+    /** That home is Amazon's: see [moveToFront]. */
+    private var amazonInFront = false
     private var recheckPending = false
     private val recheck = Runnable {
         recheckPending = false
@@ -94,6 +96,7 @@ class FireWatch : AccessibilityService() {
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         stockInFront = isStockHome(e.packageName?.toString(), e.className?.toString()) &&
             !(e.packageName?.toString() == AMAZON_HOME && settingsAllowed())
+        amazonInFront = stockInFront && e.packageName?.toString() == AMAZON_HOME
         if (!stockInFront) return
         if (CrashGuard.standingAside(this)) return
         val wait = DEBOUNCE_MS - (System.currentTimeMillis() - last)
@@ -112,7 +115,29 @@ class FireWatch : AccessibilityService() {
 
     private fun bringBack() {
         last = System.currentTimeMillis()
+        if (amazonInFront && moveToFront()) return
         runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    /**
+     * Fire TV on Android 9 and older: Android holds an app's activity starts for 5 s after a Home press
+     * (the app-switch delay). Seen with the on-TV app on a Fire TV Cube (3rd gen, Fire OS 7.7.1.7):
+     * Amazon's home stayed up for 5 s, and another press in that time buried the held start under
+     * Amazon's home for good. Moving couch-tv's own task to the front is not an activity start and was
+     * not held there. False (a normal start, as before) before the home has ever opened and on
+     * Android 10 and newer (background start limits).
+     */
+    private fun moveToFront(): Boolean {
+        if (Build.VERSION.SDK_INT >= 29) return false
+        val task = runCatching {
+            getSystemService(android.app.ActivityManager::class.java).appTasks.firstOrNull {
+                it.taskInfo.topActivity?.className == MainActivity::class.java.name
+            }
+        }.getOrNull() ?: return false
+        if (runCatching { task.moveToFront() }.isFailure) return false
+        Log.i("couchtv.firewatch", "Amazon's home came forward: moved couch-tv's task to the front")
+        MainActivity.backToFirstTile()
+        return true
     }
 
     /** After an update or a reboot: put the watcher back if it was switched on. */
