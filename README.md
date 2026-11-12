@@ -4,6 +4,9 @@ Your own home screen and phone remote for a Google TV, an Android TV or a Fire T
 versions for Samsung and LG (run on nine real LGs so far) and a Roku version not yet run on a real
 Roku. No ads on the home screen. Open source (MIT).
 
+**Set it up the easy way: [couchtv.sites.underseage.studio](https://couchtv.sites.underseage.studio)**, from your phone, with the free Setup app
+on a Mac or Windows computer, or with your AI agent. It also checks whether your TV will work.
+
 > Note for Google TV owners: 0.11 leaves the Google home and setup apps switched on. If you set
 > couch-tv up with 0.10 or older, see [If your TV loops after a restart](#if-your-tv-loops-after-a-restart).
 
