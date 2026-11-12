@@ -23,14 +23,14 @@ good sign. A Fire TV, Alexa-only or Roku button means it does not.
 | Sony | Google TV or Android TV on most Bravias since 2015 | Sony's own Linux system on some cheaper Full HD Bravias, for example the 2018 W66F series (KDL-43W660F, KLV-50W662F) | "Android TV" or "Google TV" on the box or in Settings, About. A Linux Bravia cannot run couch-tv: use a Google TV box on HDMI |
 | Xiaomi | Google TV (most models) | Fire TV (some 2026 models in Europe, "FireTV" in the name) | "FireTV" in the name or a Fire TV button |
 | Kogan | Google TV (OLED and QLED ranges), older Android TV | Roku TV (some older models), basic "Smart TV" on cheaper models | The spec sheet. No webOS models found |
-| Onn | Google TV (newer models) | Roku TV (older), Vizio OS (some 2025 models) | A Google button on the remote |
+| Onn | Google TV (newer models). VIZIO OS models (some 2025): New (Beta), the VIZIO phone remote ([VIZIO.md](VIZIO.md)) | Roku TV (older) | A Google button on the remote |
 | Element | Some Google TV models | Fire TV and Roku models | Retailer spec only |
 | Thomson | Google TV (recent models) | Older own "Smart TV" | Thomson Europe went bankrupt in 2026, so updates are uncertain |
 | Wansa | Google TV (for example WLE65NGT63, WLE75NGT63) and Android TV 11 (for example WUD58J0A63S) | Not confirmed: check older or cheaper models | Retailer listings only (Gulf retailers). "Android TV OS" in Settings, About means yes |
 | Hitachi, JVC, Insignia, Westinghouse, Haier | Not confirmed | Mostly Roku TV or Fire TV | Check the spec sheet |
 | Metz, Grundig | Some Android or Google TV (not confirmed) | Fire TV, VIDAA, Saphi and others | No brand-wide rule: check the model |
 | Nokia, Motorola (licensed brands) | Android TV in some countries | Not confirmed | Made by different companies in each country |
-| Vizio | No | SmartCast, now Vizio OS | Never Google TV |
+| Vizio | New (Beta): phone remote, power, volume, inputs and opening apps; couch-tv's home page does not open on the TV by itself ([VIZIO.md](VIZIO.md)) | The full couch-tv (no browser, no sideloading, a closed app programme) | SmartCast or VIZIO OS, never Google TV. `check-tv.py` recognises it by its SmartCast answer on port 7345 or 9000 |
 | Samsung | No | Tizen only | couch-tv as an app: [SAMSUNG.md](SAMSUNG.md) |
 | LG | No | webOS only | couch-tv as an app (built, run on nine real LGs so far): [LG.md](LG.md) |
 | Any brand's Roku TV (TCL, Hisense, Sharp, Onn, Philips and others that sell one) | No | Roku OS only | couch-tv as a channel (built, not yet run on a real Roku): [ROKU.md](ROKU.md) |

@@ -106,6 +106,9 @@ If nothing Android is found, or they are not sure what they have:
     does not list one, but `check-tv.py <address>` recognises it by its port 1926 when it is not Android.
   - **Older Philips with Saphi:** Settings, Wireless and networks (or Network), View network settings.
     `check-tv.py <address>` recognises it by plain port 1925 alone, and says whether it lists a browser.
+  - **VIZIO:** Menu (or Settings), Network, Network information, the IP address. `find-tvs.py` may list
+    it only as a Cast device, but `check-tv.py <address>` recognises it by its SmartCast answer on port
+    7345 (9000 on older firmware).
   - **Google TV or Android TV:** Settings, Network and Internet, the Wi-Fi network.
 - Ask them to open **Settings, Device Preferences, About** (older Android TV) or **Settings,
   System, About** (Google TV) and read you the model and the "Android TV OS" line. Until you know
@@ -220,6 +223,19 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   home, that the phone remote only works while couch-tv is in front (no volume, no power off), and that only
   Netflix and YouTube open from the phone. Follow docs/FIRE-VEGA-TESTING.md, and run `scripts/check-vega.py`
   (read only) first. Never root anything.
+- **VIZIO (SmartCast or VIZIO OS):** do not say no, and do not promise the home. Say first, and plainly:
+  "There is a VIZIO version of couch-tv. It is new (Beta) and it is the **phone remote only**: power, keys,
+  volume, switching inputs, opening apps such as Netflix and YouTube, and the assistant on top of those.
+  couch-tv's own home page **does not open on a VIZIO by itself**: VIZIO OS has no browser, takes no
+  outside apps, and its app programme is closed. It has **not been on a real VIZIO yet**, so something may
+  need fixing. Apps open on their own page and you pick the show; there is no 'what is playing' title, no
+  typing from the phone and no screenshots. You type a PIN the TV shows once." Without a computer that
+  stays on, nothing is possible. Also offer the Google TV box as the way to get everything, including the
+  home. If they choose the remote, follow [docs/VIZIO.md](docs/VIZIO.md): run
+  `scripts/vizio-check.py <tv address>` first (it only reads; `--pair` shows a PIN on the TV, so it waits
+  for the yes in step 3). Do not set up the Cast experiment in VIZIO.md for them unless they ask and
+  already run the tools it needs, and never open a router port. Afterwards ask them to open an issue on
+  GitHub with what `vizio-check.py` printed ([docs/VIZIO-TESTING.md](docs/VIZIO-TESTING.md)).
 - **Apple TV:** not supported. Say so kindly,
   explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
   round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets
@@ -513,7 +529,7 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
 
 If someone asks for two TVs to play the same show together, read [docs/SYNC.md](docs/SYNC.md) and
 follow it, including its section for you. It is experimental: say so, say how little it has been
-tried, and say that Samsung, LG, VIDAA and Roku cannot do it (a Google TV box or Fire TV stick
+tried, and say that Samsung, LG, VIDAA, VIZIO and Roku cannot do it (a Google TV box or Fire TV stick
 plugged in fixes that). It needs the same read back and the same clear yes as everything else
 before it touches a TV: `sync/install.sh` changes each TV, and `calibrate` and `play` make both TVs
 pause, jump and play. `sync.py dry` only reads and is fine before the yes.

@@ -20,6 +20,13 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**12 November 2026: VIZIO, New (Beta).** couch-tv can now drive a VIZIO on SmartCast or VIZIO OS from
+the phone remote: power, volume, inputs and opening apps, with a computer at home. couch-tv's own home page
+does not open on a VIZIO by itself (no browser, no sideloading, and VIZIO's app programme is closed to
+outsiders). It is new and has not been on a real VIZIO yet: if you have one, the first test only reads and
+takes about 15 minutes ([docs/VIZIO-TESTING.md](docs/VIZIO-TESTING.md)). Setup and limits:
+[docs/VIZIO.md](docs/VIZIO.md).
+
 **10 November 2026: Roku (built, not yet run on a real Roku).** couch-tv now has a Roku version. Roku
 channels are not web pages, so the home is drawn again as a native channel (the Night scenes with the clock
 in them, date and weather, the people switch, Keep watching and your apps), and the bridge talks to the
@@ -326,6 +333,7 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **Hisense with VIDAA** | App only: a tile on the app row where the firmware allows it, else the TV's browser | With a computer at home: as a page that opens itself, not a true home screen. Tested against a stand-in only, not yet tried on a real VIDAA TV ([how](docs/VIDAA.md)) | No |
 | **Philips with Titan OS** (mostly Europe) | No | Phone remote only (no couch-tv home without a Titan app). Tested against a stand in only, not yet tried on a real Titan OS TV ([how](docs/PHILIPS-TITAN.md)) | No |
 | **Older Philips with Saphi** (about 2015 to 2019, not Android) | No | New (Beta), with a computer at home: phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen ([how](docs/PHILIPS-SAPHI.md)) | No |
+| **VIZIO** (SmartCast, VIZIO OS) | No | New (Beta): phone remote, power, volume, inputs and opening apps; couch-tv's home page does not open on the TV by itself ([how](docs/VIZIO.md)) | No |
 | **Apple TV** | No | No | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
@@ -399,10 +407,18 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   when the stick comes up. Amazon's Home button still opens Amazon's home, the phone remote presses arrows and
   OK while couch-tv is in front but not volume or power off, and only Netflix and YouTube open from the phone.
   First reports from real sticks are wanted: [docs/FIRE-VEGA.md](docs/FIRE-VEGA.md).
+- **VIZIO (SmartCast and VIZIO OS):** New (Beta), and a phone remote only. With a computer at home the
+  bridge talks to the TV the way VIZIO's own phone app does: power, the remote's keys, volume, switching
+  inputs by name, and opening Netflix, YouTube, Prime Video, Disney+ and other apps on their own page.
+  couch-tv's home page does not open on the TV by itself: VIZIO OS has no browser, takes no sideloaded app,
+  and its app programme is a closed partner scheme. VIZIO's Home button opens VIZIO's home. No "what is
+  playing" title, no typing and no screenshots. You type a PIN the TV shows once. It has not been on a
+  real VIZIO yet, so if you try it, please open an issue and say how it went. Setup and limits:
+  [docs/VIZIO.md](docs/VIZIO.md).
 - **Apple TV:** closed. Nothing here works on it.
 
-**Want everything on a Samsung, LG, Roku, VIDAA, Philips or another TV?** The Samsung, LG, Roku and VIDAA paths cover the home and the
-phone remote, not everything. Plug in a Google TV box (for example the Google TV Streamer) and set
+**Want everything on a Samsung, LG, Roku, VIDAA, Philips, VIZIO or another TV?** The Samsung, LG, Roku and VIDAA paths cover the home and the
+phone remote, not everything, and the Philips Titan OS and VIZIO paths are the phone remote only. Plug in a Google TV box (for example the Google TV Streamer) and set
 couch-tv up on that, and you get everything, on any TV with an HDMI port.
 
 **Test your own TV** (changes nothing on it, and installs nothing outside this folder):
@@ -415,7 +431,7 @@ python3 -m venv .venv && .venv/bin/pip install -r bridge/requirements.txt
 .venv/bin/python scripts/check-tv.py <tv address>  # says which options that TV can run
 ```
 
-It knocks on the ports each kind of TV answers on (Android TV, Samsung, LG, Roku, Apple), so it
+It knocks on the ports each kind of TV answers on (Android TV, Samsung, LG, Roku, VIDAA, VIZIO, Apple), so it
 can tell a Samsung from a Google TV without touching anything. Or, by hand: on the TV open
 **Settings, System, About** (Google TV) or **Settings, Device Preferences, About** (Android TV 9 to
 11). If you see "Android TV OS", it works. Details and sources:

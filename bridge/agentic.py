@@ -432,6 +432,8 @@ def pick_input(inputs, name):
 async def h_inputs(request):
     if S.tv.kind == "philips":   # the TV lists its own inputs (bridge/philips.py)
         return S.ok(inputs=[{"id": x["id"], "name": x["name"]} for x in await S.tv.read_sources()], remembered={})
+    if S.tv.kind == "vizio":   # the TV lists its own inputs (bridge/vizio.py)
+        return S.ok(inputs=await S.tv.read_sources(), remembered={})
     inputs = await list_inputs()
     saved = {k: next((i["name"] for i in inputs if i["id"] == v), v) for k, v in _saved_names().items()}
     return S.ok(inputs=inputs, remembered=saved)
@@ -446,7 +448,7 @@ async def h_input(request):
         await S.tv.key("home")
         S.record_action(request, "input", {"name": "home"}, True)
         return S.ok(input="home", note="Back to the home screen.")
-    if S.tv.kind == "philips":   # an input the TV listed, by its name or id (bridge/philips.py)
+    if S.tv.kind in ("philips", "vizio"):   # an input the TV listed, by its name or id (bridge/philips.py, bridge/vizio.py)
         try:
             src = await S.tv.switch_source(name)
         except ValueError as e:

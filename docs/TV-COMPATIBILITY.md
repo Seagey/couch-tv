@@ -2,7 +2,7 @@
 
 Research from public sources (linked below). Only Google TV has been tested
 by the author. Everything else is what the sources say, not tested (Samsung and LG have since run on real
-TVs, see their pages; Roku, Hisense VIDAA, Philips Titan OS and Philips Saphi have not).
+TVs, see their pages; Roku, Hisense VIDAA, Philips Titan OS, Philips Saphi and VIZIO have not).
 
 - **A. TV home only:** an app replaces the TV's home screen.
 - **B. Computer bridge:** a computer at home controls the TV with the Android TV Remote protocol
@@ -26,7 +26,14 @@ TVs, see their pages; Roku, Hisense VIDAA, Philips Titan OS and Philips Saphi ha
 | Hisense VIDAA | App only: a Couch TV tile on firmware that still allows it, else the TV's browser | As a page the bridge opens on power-on, like Samsung and LG. Tested against a stand-in only, **not yet tried on a real VIDAA TV** ([VIDAA.md](VIDAA.md)) | No |
 | Philips on Titan OS (mostly Europe, from 2023) | No | Phone remote only: power, keys, volume, inputs, opening apps. No couch-tv home without a Titan app (developer account or store listing). Tested against a stand in only, **not yet tried on a real Titan OS TV** ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)) | No |
 | Older Philips with Saphi (about 2015 to 2019, not Android) | No | New (Beta): phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen. Depends on the model and firmware ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)) | No |
+| VIZIO (SmartCast, VIZIO OS) | No | New (Beta): phone remote, power, volume, inputs and opening apps; couch-tv's home page does not open on the TV by itself. Tested against a stand in so far ([VIZIO.md](VIZIO.md)) | No |
 | Apple TV | No | No | No |
+
+**VIZIO, what it cannot do.** couch-tv's home page does not open on a VIZIO by itself: VIZIO OS has no
+browser, no sideloading and a closed app programme, and its Chromecast built in only opens registered
+receivers. So option B on a VIZIO is the phone remote and the assistant, not a home. Testers who already use
+Home Assistant's Cast dashboards or a DashCast style tool can try showing couch-tv's page that way and report
+back ([VIZIO.md](VIZIO.md), "One open experiment"); couch-tv has no code for it.
 
 ## Reported by people using it
 
