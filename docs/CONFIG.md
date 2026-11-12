@@ -40,7 +40,7 @@ settings), and what is chosen there wins on that TV. See
 | `open_on_power_on` [true] | Samsung, LG, Roku, VIDAA, Philips, Panasonic and Apple TV only: open the couch-tv app whenever the TV is switched on and nothing else is on screen (on a Philips, only when it has a `home_app`, or lists a browser: [PHILIPS-SAPHI.md](PHILIPS-SAPHI.md); Panasonic cannot tell what is on screen: it opens a few seconds after power on). |
 | `app_id` [`"CouchTVApp.Home"`, LG `"app.couchtv.home"`, Roku `"dev"`] | Samsung, LG and Roku only: the couch-tv app's id on the TV, if you changed it in `samsung/app/config.xml` or `lg/app/appinfo.json`. On a Roku a sideloaded channel is always `dev`. |
 | `remote_name` [`client_name`] | Samsung only: the name the TV shows when it asks to Allow the remote. |
-| `extend_devmode` [true] | LG only: press Developer Mode's Extend once a day while the TV is on, so the app is not removed. |
+| `extend_devmode` [true] | LG only: press Developer Mode's Extend once a day while the TV is on, so the app is not removed. With no bridge, the couch-tv app asks once a week with a question on screen that stays until it is answered, and the `extend` quick button does it on demand. |
 | `leave_inputs` [false] | LG, Roku, VIDAA and Philips only: an HDMI or external input counts as in use (a computer or a console on it). The TV coming on there is left alone, and the daily Extend never switches away from it. |
 | `back_to_couch` [false] | LG only: when an app closes to LG's home (Back out of Netflix, say), couch-tv opens again a second later. Home pressed while couch-tv is open still reaches LG's home. |
 | `ares_device` [the TV's `id`] | LG only: this TV's name in LG's ares tools (`ares-setup-device`). |
@@ -63,10 +63,11 @@ The round buttons at the top right of the home. Any of these, in the order you l
 | `bluetooth` | Opens the TV's own Bluetooth settings (speakers, headphones and controllers). Not in the default buttons. | The on-TV app (option C) |
 | `network` | Opens the TV's own network settings (Wi-Fi and the network). Not in the default buttons. | The on-TV app (option C) |
 | `screensaver` | Starts the TV's own screensaver: Google TV's Ambient mode, with the Google Photos albums. Android only lets the system start a dream, so the button cuts the screen timeout to a few seconds and nudges the idle timer until the TV naps by itself; the photos then come up a few seconds later and the timeout goes back to what it was the moment the screensaver covers the home. A second press can never leave the TV on the short timeout. | The TV home app on an Android TV or Google TV, and the "modify system settings" app-op that `apply.sh` grants |
+| `extend` | LG only: presses Developer Mode's **Extend**, so LG does not remove couch-tv when the Developer Mode session runs out. The home also asks once a week whether to do it (see `extend_devmode`). It opens LG's Developer Mode app, which sends the Extend; press Home to come back to the home. | The couch-tv app on an LG TV |
 
 A button that cannot work right now is left out, the same way the sleep timer always disappeared
 when the computer was off. With no bridge at all (option A), only `look` shows, plus `input` on
-TVs that have an input screen the launcher can open.
+TVs that have an input screen the launcher can open, and `extend` on an LG TV.
 
 ```json
 "quick": ["sleep", "look", "input", "screensaver"]
@@ -295,7 +296,7 @@ release opens the app rather than the show.
 | `keep_watching` [`true`] | `false` hides the whole Keep watching row, heading and all: the layout closes the gap, the remote skips it and the home stops asking the bridge for it. A song still shows its Now playing card in the Night look. Home settings, Look, Show Keep watching wins over it. Works on the Android, LG, Samsung and Roku homes. |
 | `skip_watch_next` [none] | Package names never shown in the Keep watching row (e.g. `["com.google.android.youtube.tv"]`). |
 | `watch_next_per_app` [5] | The maximum number of Keep watching cards to show from any single app (1 to 20). |
-| `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish), `it` (Italian), `de` (German), `tr` (Turkish), `fr` (French) or `sr-Latn-RS` (Serbian Latin). The phone remote has its own choice, "Same as the TV" by default. |
+| `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish), `it` (Italian), `de` (German), `tr` (Turkish), `fr` (French), `sr-Latn-RS` (Serbian Latin) or `nl` (Dutch). The phone remote has its own choice, "Same as the TV" by default. |
 
 ## Apps on the home
 
@@ -423,7 +424,7 @@ is the safe way to use the phone remote away from home.
 | `bridge.host`, `bridge.port` [5400], `bridge.fallback_hosts` | Where the bridge runs. `fallback_hosts` lists other names the bridge may be opened by (see "Opening the bridge by another name" below). |
 | `bridge.pairing_key` [""] | Optional API pairing key. Empty/unset by default. When set, clients (phone remote and TV front-ends) must authenticate with this key. |
 | `weather` | `lat`, `lon`, `place`, `timezone`, for the weather on the home (Open-Meteo, no key). A suburb or city is enough; never a home address. `timezone` (for example `Europe/London`) is also the time zone the bridge writes times in. |
-| `country` [`IT` for Italian, `DE` for German, `RS` for Serbian, else `AU`] | Two letter code, for where shows stream (JustWatch), the country in links to Apple TV and Prime Video, and the country Claude is told about. |
+| `country` [`IT` for Italian, `DE` for German, `BE` for Dutch, `RS` for Serbian, else `AU`] | Two letter code, for where shows stream (JustWatch), the country in links to Apple TV and Prime Video, and the country Claude is told about. |
 | `country_name` | Optional: what to call the country in Claude's prompts, if the built-in list does not know your code. |
 | `client_name` ["Couch TV bridge"] | The name the TV shows for the bridge in its list of paired remotes. Set it before `pair_tv.py`; changing it later means pairing again. |
 | `screens` [] | Extra screens the TV can open, for example a computer through Moonlight. |

@@ -48,7 +48,7 @@
   // read in readConfig() once the page starts (mock.js fills them in for previews). See docs/CONFIG.md.
   var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [];
   var WXCFG = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
-  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "screensaver"];
+  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "screensaver", "extend"];
   // The most personal photos this TV keeps (also MAX_PHOTOS in bridge/server.py and MainActivity.kt).
   var MAX_PHOTOS = 50;
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
@@ -244,6 +244,7 @@
     network: '<svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.7 12.5a9.5 9.5 0 0 1 12.6 0M8.9 16a4.8 4.8 0 0 1 6.2 0"/><circle cx="12" cy="19.3" r="1"/></svg>',
     store: '<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/></svg>',
     check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    devmode: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 3.5V8h-4.5"/></svg>',
     // Now playing's buttons (filled shapes)
     prev: '<svg viewBox="0 0 24 24" class="solid"><path d="M7 6h2v12H7zM20 6v12l-9-6z"/></svg>',
     next: '<svg viewBox="0 0 24 24" class="solid"><path d="M15 6h2v12h-2zM4 6v12l9-6z"/></svg>',
@@ -1314,6 +1315,16 @@
     $("quick-note").textContent = text || "";
     if (text) noteTimer = setTimeout(function () { $("quick-note").textContent = ""; }, 6000);
   }
+  // A short confirmation in the middle of the top of the screen, for something that happened by
+  // itself (the weekly Developer Mode extend) rather than a key press.
+  var toastTimer = null;
+  function toast(text) {
+    var el = $("toast");
+    el.innerHTML = ICONS.check + "<span>" + esc(text) + "</span>";
+    el.classList.add("on");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove("on"); }, 9000);
+  }
   function bedtimeOn() { return HOME.bedtime_dim === true; }   // off unless config.json home.bedtime_dim is true
   function refreshBedtimeDim() {
     var m = minutesLeft();
@@ -1354,6 +1365,82 @@
   function nativeSettingsScreen() {
     try { return !!(TV && TV.openSettingsScreen); } catch (e) { return false; }
   }
+  // ---------------- Developer Mode (LG): extend the session, at most once a week ----------------
+  // LG removes an app installed in Developer Mode when the session runs out. The Extend button lives
+  // in LG's Developer Mode app, so the home opens that app with {"extend": true} for a moment (see
+  // lg/app/webos.js), then says it is done once the home is opened again. It is left out on every
+  // other TV.
+  var devBusy = false;
+  function devCan() { try { return !!(TV && TV.extendDevMode); } catch (e) { return false; } }
+  function devDue() {
+    if (!devCan() || TVCFG.extend_devmode === false) return false;
+    var last = parseInt(kept("tvhome.devmode.last"), 10) || 0;
+    return Date.now() - last > 7 * 24 * 3600 * 1000;
+  }
+  // The app may be restarted while the Developer Mode app is in front: a note kept before it opened
+  // tells the next start that the Extend was sent, so it can say so.
+  function devResume() {
+    // webOS stops the timers of a page that is behind another app, so the Extend's own answer never
+    // arrives while the Developer Mode app is in front: the button is put back here, the moment the
+    // home is on screen again.
+    if (devBusy) { devBusy = false; renderQuick(); }
+    var p = parseInt(kept("tvhome.devmode.pending"), 10) || 0;
+    if (p) {
+      keep("tvhome.devmode.pending", "");
+      note("");
+      if (Date.now() - p < 15 * 60 * 1000) {
+        keep("tvhome.devmode.last", String(p));
+        toast(t("dev_done"));
+      }
+    }
+    devAsk();
+  }
+  // Once a week the home asks, on screen, whether to extend Developer Mode. The question stays put
+  // until someone answers it with the remote: this TV drops into LG's clock (a burn-in saver) while
+  // nobody touches it, and a question that timed out would be missed. Answering No keeps it quiet for
+  // a day; opening the Developer Mode app by hand counts as having dealt with it for a day too.
+  function devAsk() {
+    if (!devDue()) return;
+    var asked = parseInt(kept("tvhome.devmode.asked"), 10) || 0;
+    if (Date.now() - asked < 24 * 3600 * 1000) return;
+    if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;
+    askKind = "dev";
+    ai = 0;
+    zone = "updask";
+    clearFocus();
+    renderAsk();
+  }
+  function devExtend() {
+    if (devBusy || !devCan()) return;
+    devBusy = true;
+    keep("tvhome.devmode.pending", String(Date.now()));
+    renderQuick();
+    note(t("dev_start"));
+    var started = true;
+    try {
+      started = TV.extendDevMode(function (ok) {
+        devBusy = false;
+        renderQuick();
+        if (ok) {
+          keep("tvhome.devmode.last", String(Date.now()));
+          keep("tvhome.devmode.pending", "");
+          toast(t("dev_done"));
+        } else {
+          keep("tvhome.devmode.pending", "");
+          note(t("dev_failed"));
+        }
+      });
+    } catch (e) { started = false; }
+    if (started === false) {   // still finishing the last press: nothing to say, nothing to keep
+      devBusy = false;
+      keep("tvhome.devmode.pending", "");
+      renderQuick();
+    }
+  }
+  // LG's webOSRelaunch is the reliable "the app is back" signal on webOS 6.5.3 (a page that is
+  // behind another app still says document.hidden === false there), so the note is read on both.
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) devResume(); });
+  document.addEventListener("webOSRelaunch", devResume);
   function quickVisible() {
     return QUICK.filter(function (q) {
       if (q === "sleep") return !OFFLINE || nativeSleep();
@@ -1365,6 +1452,7 @@
       if (q === "input") return !OFFLINE || nativeInputs();
       if (q === "screensaver") return nativeScreensaver();
       if (q === "bluetooth" || q === "network") return nativeSettingsScreen() || (ON_TV && !OFFLINE);
+      if (q === "extend") return devOn();
       return false;
     });
   }
@@ -1412,6 +1500,9 @@
         el.innerHTML = ICONS.input + "<span>" + esc(t("input")) + "</span>";
       } else if (q === "screensaver") {
         el.innerHTML = ICONS.screensaver + "<span>" + esc(t("quick_screensaver")) + "</span>";
+      } else if (q === "extend") {
+        el.innerHTML = ICONS.devmode + "<span>" + esc(t(devBusy ? "dev_extending" : "dev_extend")) + "</span>";
+        el.classList.toggle("set", devBusy);
       } else if (q === "bluetooth" || q === "network") {
         el.innerHTML = ICONS[q] + "<span>" + esc(t(q)) + "</span>";
       }
@@ -1671,6 +1762,7 @@
     else if (q === "screen_off") toggleScreenOff(true);
     else if (q === "input") openInputs();
     else if (q === "screensaver") startScreensaver();
+    else if (q === "extend") devExtend();
     else if (q === "bluetooth" || q === "network") openSettingsScreen(q);
   }
   // Headphones: the TV's own Bluetooth screen. The launcher opens it itself, the on-TV app through
@@ -1928,7 +2020,17 @@
   // config.json has a home_assistant section with rooms or scenes. Otherwise nothing changes.
   function smartOn() { return !!(window.smartHome && window.smartHome.available()); }
   function smartItem() { return { kind: "smart", name: t("smart_home"), package: "smart:home" }; }
-  function toolItems() { return smartOn() ? [smartItem(), gearItem()] : [gearItem()]; }
+  // LG's own Developer Mode app, as a dock tile: it opens the app itself, so the Extend button and
+  // the remaining days are there to use by hand (the quick button does the Extend for you).
+  function devOn() { return devCan() && TVCFG.extend_devmode !== false; }
+  function devItem() { return { kind: "devmode", name: t("dev_app"), package: "com.palmdts.devmode" }; }
+  function toolItems() {
+    var list = [];
+    if (smartOn()) list.push(smartItem());
+    if (devOn()) list.push(devItem());
+    list.push(gearItem());
+    return list;
+  }
 
   function resolveInputs() {
     var raw = HOME.inputs || (window.COUCH_CONFIG && window.COUCH_CONFIG.home && window.COUCH_CONFIG.home.inputs);
@@ -2073,7 +2175,7 @@
   function holdApp() {
     var a = gridItems[g];
     if (!a || a.kind === "more") return false;
-    if (a.store || a.kind === "gear" || a.kind === "smart" || a.kind === "screen") { flash(t("stays_put", { name: a.name })); return true; }
+    if (a.store || a.kind === "gear" || a.kind === "smart" || a.kind === "devmode" || a.kind === "screen") { flash(t("stays_put", { name: a.name })); return true; }
     if (a.kind !== "app") return startMove();
     openAppMenu(a);
     return true;
@@ -2319,6 +2421,7 @@
     else if (it.kind === "input") face = '<div class="face tool input-ic ic-' + esc(it.icon || "hdmi") + '">' + (ICONS[it.icon] || ICONS.hdmi || ICONS.input) + "</div>";
     else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
     else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
+    else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
     else if (it.kind === "smart") face = '<div class="face tool">' + window.smartHome.icon + "</div>";
     else if (iconUrl(it.package)) face = '<div class="face"><img src="' + esc(iconUrl(it.package)) + '" alt="" decoding="async" onerror="this.parentNode.className=\'face word\';this.parentNode.textContent=this.getAttribute(\'data-name\')" data-name="' + esc(it.name) + '"></div>';
     else if (it.store) face = '<div class="face tool">' + ICONS.store + "</div>";
@@ -2334,6 +2437,7 @@
     else if (it.kind === "input") face = '<div class="face tool input-ic ic-' + esc(it.icon || "hdmi") + '">' + (ICONS[it.icon] || ICONS.hdmi || ICONS.input) + "</div>";
     else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
     else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
+    else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
     else if (it.kind === "smart") face = '<div class="face tool">' + window.smartHome.icon + "</div>";
     else if (it.banner) face = '<div class="face"><img src="' + esc(it.banner) + '" alt="" decoding="async"></div>';
     else if (iconUrl(it.package)) face = '<div class="face icon" style="background:' + esc(it.colour || "#2a2a30") + '"><img src="' + esc(iconUrl(it.package)) + '" alt=""></div>';
@@ -2732,6 +2836,7 @@
     if (a.kind === "more") { dockBack = null; expanded = true; renderGrid(); paintFocus(); return; }
     if (a.kind === "gear") { openGear(); return; }
     if (a.kind === "smart") { openSmart(); return; }
+    if (a.kind === "devmode") { openDevMode(); return; }
     if (a.kind === "input") {
       var done = false;
       if (TV && TV.openInput) { try { done = !!TV.openInput(a.id); } catch (e) {} }
@@ -2768,6 +2873,13 @@
   function openGear() {
     zone = "gear"; gi = 0;
     renderGear();
+  }
+  // The dock's Developer Mode tile opens LG's own Developer Mode app, where the remaining days and its
+  // Extend button live. It counts as "handled by hand" for a day, so the weekly question does not pop
+  // up straight after someone has just extended it themselves.
+  function openDevMode() {
+    keep("tvhome.devmode.asked", String(Date.now()));
+    if (TV && TV.launch) TV.launch("com.palmdts.devmode");
   }
   function renderGear() {
     var pop = $("gear-pop");
@@ -3520,6 +3632,7 @@
     if (q === "input" && OFFLINE && !nativeInputs()) return t("quick_needs_inputs");
     if (q === "screensaver" && !nativeScreensaver()) return t("quick_needs_tv_app");
     if ((q === "bluetooth" || q === "network") && !nativeSettingsScreen() && (!ON_TV || OFFLINE)) return t("quick_needs_tv_app");
+    if (q === "extend" && !devCan()) return t("quick_needs_devmode");
     return "";
   }
   function setQuick(list) { QUICK = list; ST.quick = list.slice(); saveSettings(); renderQuick(); }
@@ -3584,21 +3697,39 @@
   // Asked once: tell the household about new versions, or leave it to "Check for updates now"? Until
   // they answer nothing is checked by itself, so frequent releases never nag anyone who did not ask.
   // The setup's answer (home.updates in config.json) counts as the answer; Back counts as No.
-  var ai = 0, askKind = "upd";
+  var ai = 0;
+  // Which question is on screen: "upd" (new versions, once), "home" (make couch-tv the home, once)
+  // or "dev" (extend Developer Mode, weekly).
+  var askKind = "upd";
   function updAsk() {
     askKind = "upd";
     if (!UPD || !UPD.supported || UPD.answered || kidsOn()) return;
     if (HOME.updates === "notify" || HOME.updates === "manual") { upd().auto(HOME.updates === "notify"); return; }
     if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;
+    askKind = "upd";
     zone = "updask"; ai = 0;
     clearFocus();
     renderAsk();
   }
+  function askRows() {
+    if (askKind === "dev") {
+      return [[ICONS.devmode, t("dev_ask_yes"), t("dev_ask_yes_sub")], [ICONS.sliders, t("dev_ask_no"), t("dev_ask_no_sub")]];
+    }
+    if (askKind === "home") {
+      return [[ICONS.apps, t("home_ask_yes"), t("home_ask_yes_sub")], [ICONS.sliders, t("home_ask_no"), t("home_ask_no_sub")]];
+    }
+    return [[ICONS.download, t("upd_ask_yes"), t("upd_ask_yes_sub")], [ICONS.sliders, t("upd_ask_no"), t("upd_ask_no_sub")]];
+  }
+  function askHead() {
+    if (askKind === "dev") return ["dev_ask", "dev_ask_sub"];
+    if (askKind === "home") return ["home_ask", "home_ask_sub"];
+    return ["upd_ask", "upd_ask_sub"];
+  }
   function renderAsk() {
     var pop = $("gear-pop");
-    var home = askKind === "home", k = home ? "home_ask" : "upd_ask";
-    var items = [[home ? ICONS.apps : ICONS.download, t(k + "_yes"), t(k + "_yes_sub")], [ICONS.sliders, t(k + "_no"), t(k + "_no_sub")]];
-    pop.innerHTML = '<div class="ask-h"><b>' + esc(t(k)) + "</b><small>" + esc(t(k + "_sub")) + "</small></div>" +
+    var head = askHead();
+    var items = askRows();
+    pop.innerHTML = '<div class="ask-h"><b>' + esc(t(head[0])) + "</b><small>" + esc(t(head[1])) + "</small></div>" +
       items.map(function (it, i) {
         return '<div class="grow' + (i === ai ? " focus" : "") + '" role="menuitem"><i>' + it[0] + "</i><span><b>" +
           esc(it[1]) + "</b><small>" + esc(it[2]) + "</small></span></div>";
@@ -3616,6 +3747,14 @@
       startFocus();
       paintFocus();
       if (yes) requestHome();
+      return;
+    }
+    if (askKind === "dev") {
+      keep("tvhome.devmode.asked", String(Date.now()));
+      startFocus();
+      paintFocus();
+      if (yes) devExtend();
+      else status(t("dev_ask_no_done"));
       return;
     }
     upd().auto(yes);
@@ -4397,6 +4536,10 @@
     setInterval(updateOledShift, 60000);
     setInterval(checkSmartIdle, 10000);
     setInterval(function () { renderQuick(); refreshBedtimeDim(); }, 30000);
+    // LG: the weekly Developer Mode extend. It asks on screen and stays until answered (this TV's
+    // clock screensaver would hide anything that timed out). devResume() records an extend that just
+    // happened, so the question is never asked twice.
+    setTimeout(devResume, 1500);
     // This TV says who is on its couch first, so what plays here is logged for them (each TV
     // keeps its own); then the lists. Once the home is up: the one-time "tell you about new versions?" question.
     if (!OFFLINE) setInterval(followWho, 3000);

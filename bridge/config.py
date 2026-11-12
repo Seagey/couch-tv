@@ -64,11 +64,11 @@ if PAIRING_KEY and not re.fullmatch(r"[A-Za-z0-9_-]{12,128}", PAIRING_KEY):
 CLIENT_NAME = CONFIG.get("client_name", "Couch TV bridge")
 
 # The languages the TV home and the phone remote speak (tv-home/web/i18n.js, remote/src/i18n.js).
-LANGUAGES = ("en", "es", "es-MX", "it", "de", "tr", "fr", "sr-Latn-RS")
+LANGUAGES = ("en", "es", "es-MX", "it", "de", "tr", "fr", "sr-Latn-RS", "nl")
 # Where shows stream (JustWatch) and what the prompts call the country: "country" in config.json.
 # Without it: the country of the home's language, where it has one of its own (Italian: IT,
-# German: DE, Turkish: TR, Serbian: RS), else AU.
-_LANGUAGE_COUNTRY = {"it": "IT", "de": "DE", "tr": "TR", "sr-Latn-RS": "RS"}
+# German: DE, Turkish: TR, Serbian: RS, Dutch: BE), else AU.
+_LANGUAGE_COUNTRY = {"it": "IT", "de": "DE", "tr": "TR", "sr-Latn-RS": "RS", "nl": "BE"}
 _language = CONFIG["home"].get("language") if isinstance(CONFIG.get("home"), dict) else None
 COUNTRY = str(CONFIG.get("country") or _LANGUAGE_COUNTRY.get(str(_language)) or "AU").upper()
 _COUNTRY_NAMES = {
@@ -415,7 +415,7 @@ def _inputs(raw_list):
 HOME = _home(CONFIG.get("home"))
 
 # ---------- quick settings (per TV) and picture modes ----------
-QUICK_IDS = ["sleep", "picture", "look", "soundscape", "screen_off", "input", "screensaver", "headphones"]
+QUICK_IDS = ["sleep", "picture", "look", "soundscape", "screen_off", "input", "screensaver", "headphones", "extend"]
 
 
 def quick_for(tv_cfg):
@@ -476,5 +476,6 @@ def public():
     import kids   # kids mode: the shelf and the PIN's hash (never the PIN) on each kids profile
     return {"people": kids.attach(PEOPLE), "weather": WEATHER, "home": HOME,
             "tvs": [{"id": t["id"], "name": t["name"], "quick": quick_for(t),
+                     "extend_devmode": t.get("extend_devmode", True) is not False,
                      "picture_modes": [m["name"] for m in picture_modes(t.get("picture"))]} for t in TVS],
             "default_tv": DEFAULT_TV, "ask": {"enabled": ASK_ENABLED}, "phone_remote": PHONE_REMOTE}

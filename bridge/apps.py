@@ -135,6 +135,13 @@ WEBOS_ONLY = {
     "com.atlas.tv": "NOW",
     "dazn": "DAZN",
     "com.crunchyroll.webapp": "Crunchyroll",
+    # Seen on an LG OLED C1 in Belgium, webOS 6.5.3 (#40). Alexa and the ad-free Cobalt YouTube are
+    # sideloaded there, so their titles differ from TV to TV; the id stays the same.
+    "be.vtmgo.app": "VTM GO",
+    "be.vrt.vrtmax": "VRT MAX",
+    "io.strem.tv": "Stremio",
+    "amazon.alexa.view": "Amazon Alexa",
+    "com.cobalt.youtube.adfree": "YouTube Cobalt AdFree",
 }
 
 # Roku channel ids, for a TV with "kind": "roku" (bridge/roku.py, docs/ROKU.md). Built from Roku's

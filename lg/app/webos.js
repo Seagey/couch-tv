@@ -131,11 +131,33 @@
     return null;
   }
 
+  // ---------- Developer Mode: press its own Extend ----------
+  // LG removes apps installed in Developer Mode when the session runs out. The Extend button is inside
+  // LG's Developer Mode app; the app is opened with {"extend": true} (the same as
+  // `ares-launch com.palmdts.devmode -p '{"extend":true}'`), which presses it on the way in. The
+  // Developer Mode app takes the screen; the home is opened again from the TV (Home, then couch-tv).
+  var DEVMODE = "com.palmdts.devmode";
+  var extendAt = 0;
+  // The Developer Mode app takes the screen and sends the Extend itself. webOS freezes this page's
+  // timers while another app is in front, so the home cannot bring itself back; app.js says the
+  // Extend is done when the home is opened again (devResume there, which reads its own note).
+  function extendDevMode(done) {
+    if (Date.now() - extendAt < 60000) return false;   // one press at a time
+    extendAt = Date.now();
+    luna("luna://com.webos.applicationManager/launch", { id: DEVMODE, params: { extend: true } }, function (r) {
+      var ok = !!(r && r.returnValue);
+      send("log", "devmode extend: " + (ok ? "launched" : (r ? r.errorText || r.errorCode : "no answer")));
+      if (!ok) { extendAt = 0; if (done) done(false); }
+    });
+    return true;
+  }
+
   window.TVOS = {
     apps: function () { return JSON.stringify(shown); },
     launch: launch,
     iconUrl: iconUrl,
     bannerUrl: function () { return null; },
+    extendDevMode: extendDevMode,
     kept: function (k) { try { return localStorage.getItem("tvos." + k); } catch (e) { return null; } },
     keep: function (k, v) { try { localStorage.setItem("tvos." + k, v); } catch (e) {} },
     // the input button goes through the bridge; a web app cannot open LG's input list
@@ -154,8 +176,18 @@
     }
   }, true);
 
+  // ---------- coming back to the app ----------
+  // appinfo.json sets handlesRelaunch, so opening the app again does not restart it (that restart
+  // was the black flash: the TV threw the page away and started a new one) and webOS sends
+  // webOSRelaunch instead. It does not bring the app forward by itself, though: on webOS 6.5.3 the
+  // home stayed behind whatever was on screen, and after the Developer Mode Extend the TV sat on
+  // the Developer Mode app. PalmSystem.activate() is LG's own call for that. On a TV without it the
+  // try/catch leaves everything as it was.
+  function activate() {
+    try { if (window.PalmSystem && PalmSystem.activate) PalmSystem.activate(); } catch (e) {}
+  }
   // coming back to the app (after Netflix, say, or the bridge opening it again): read the lists again
   function resume() { if (!document.hidden && window.tv && window.tv.resume) window.tv.resume(); }
+  document.addEventListener("webOSRelaunch", function () { activate(); resume(); });
   document.addEventListener("visibilitychange", resume);
-  document.addEventListener("webOSRelaunch", resume);
 })();
