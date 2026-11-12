@@ -2,7 +2,7 @@
 
 Research from public sources (linked below). Only Google TV has been tested
 by the author. Everything else is what the sources say, not tested (Samsung and LG have since run on real
-TVs, see their pages; Roku, Hisense VIDAA, Philips Titan OS, Philips Saphi, VIZIO and Panasonic have not).
+TVs, see their pages, and so has Hisense VIDAA; Roku, Philips Titan OS, Philips Saphi, VIZIO and Panasonic have not).
 
 - **A. TV home only:** an app replaces the TV's home screen.
 - **B. Computer bridge:** a computer at home controls the TV with the Android TV Remote protocol
@@ -23,7 +23,7 @@ TVs, see their pages; Roku, Hisense VIDAA, Philips Titan OS, Philips Saphi, VIZI
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on ten real LGs so far ([LG.md](LG.md)) | No |
 | Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation, **not yet tried on a real Roku** ([ROKU.md](ROKU.md)) | No |
-| Hisense VIDAA | App only: a Couch TV tile on firmware that still allows it, else the TV's browser | **Beta**: a page the bridge opens on power-on, like Samsung and LG (VIDAA's Home button still opens VIDAA's home). Tested against a stand-in so far ([VIDAA.md](VIDAA.md)) | No |
+| Hisense VIDAA | App only: a Couch TV tile on firmware that still allows it, else the TV's browser | **Beta**: a page the bridge opens on power-on, like Samsung and LG (VIDAA's Home button still opens VIDAA's home unless you turn on `keep_home`). Confirmed on a real Hisense 55U7N, VIDAA 9 ([VIDAA.md](VIDAA.md), #128) | No |
 | Philips on Titan OS (mostly Europe, from 2023) | Needs a Titan app (Titan's store or DevView), not there yet | **Beta**: the phone remote works now (power, keys, volume, inputs, opening apps); the home opens once there is a Titan app. Tested against a stand in so far ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)) | No |
 | Older Philips with Saphi (about 2015 to 2019, not Android) | No | **Beta**: phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen (Philips's Home button still opens Philips's menu). Depends on the model and firmware ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)) | No |
 | VIZIO (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Beta, phone remote only**: power, volume, inputs and opening apps; couch-tv's home page cannot open on the TV. Tested against a stand in so far ([VIZIO.md](VIZIO.md)) | No |
@@ -54,6 +54,11 @@ Not tested by the author. Each line is what someone said worked on their own dev
 - **LG OLED65C56LA (OLED C5, 2025, webOS 11.2, firmware 43.21.96): works**, reported by BlueSpark911 with
   the bridge on Windows 10. The first LG on webOS 11.2. The snags were Windows ones and are in
   [LG.md](LG.md) ([issue #136](https://github.com/Seagey/couch-tv/issues/136)).
+- **Nokia Streaming Box 8000 (Sagemcom, SEI600NK4, Android TV 14): works**, reported by lelijk1tje with
+  `apply.sh` and no computer left running (option A, `KEEP_AMBIENT=1`). The box keeps Google's home as
+  the Home key target, so the Home button watch brings couch-tv back after a Home press, and couch-tv
+  comes up by itself after a restart. Unlike the TiVo Stream 4K, the box's own service did not remove
+  it ([issue #139](https://github.com/Seagey/couch-tv/issues/139)).
 - **LG QNED88T6A and NANO83A6A (2025, webOS 10.3): both work on one bridge**, reported by a user
   who followed [LG.md](LG.md) and measured key presses on the TVs. Lighter home brought a key press
   from about 50 ms to 16 ms on both. Developer Mode and couch-tv survived a firmware update; only
