@@ -15,11 +15,9 @@ on a Mac or Windows computer, or with your AI agent. It also checks whether your
 
 ## Updates
 
-The newest release is **0.12** (9 November 2026). The TV apps come from
-[the Releases page](https://github.com/Seagey/couch-tv/releases), so anything marked "on main, in
-the next release" below is not in those apps yet: build them yourself ("Building the app") if you
-want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
-so `git pull` brings their changes.
+The newest release is **0.13**. The TV apps come from
+[the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the
+home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 **12 November 2026: Kids mode, New and optional (on main, in the next release).** Off unless you
 switch it on for someone. A kids profile's home shows only
@@ -58,10 +56,9 @@ Roku's documentation and tested against a test Roku and a BrightScript simulator
 real Roku**, so if you have one, you would be the first: give this repo to your agent, and please open an
 issue saying how it went. Setup and limits: [docs/ROKU.md](docs/ROKU.md).
 
-**10 November 2026: Android 6 (experimental, on main, in the next release).** Both TV apps now
+**10 November 2026: Android 6 (experimental, since 0.13).** Both TV apps now
 install on Android 6.0 (a Xiaomi Mi TV 4A with PatchWall, for example,
-[issue #59](https://github.com/Seagey/couch-tv/issues/59)). The 0.12 apps on the Releases page still
-need Android 7.1, so for now build them yourself ("Building the app").
+[issue #59](https://github.com/Seagey/couch-tv/issues/59)). The 0.12 apps and older need Android 7.1.
 Checked on an Android 6 emulator only, not a real TV. There both apps install and open, but that
 emulator's built in browser engine (Chrome 44, the oldest a TV can ship) lays the home out badly:
 the shelf stacks up instead of running across. A TV whose engine is newer may look right. The
@@ -205,7 +202,7 @@ With option A it is Android's own Watch Next list, the same for everyone on that
 
 ## Seeing every app
 
-On main, in the next release. Only part of your apps fit in the dock on some TVs. Press **Down** on the dock's bottom row to open
+Since 0.13. Only part of your apps fit in the dock on some TVs. Press **Down** on the dock's bottom row to open
 the full apps view (the same one **More apps** opens), with the outline on the app you were on.
 Back returns to the dock on that app.
 
@@ -259,7 +256,7 @@ scene, an app, a person or a quick button picks it up so up and down move it, an
 and then closes. What you change shows when the list closes.
 
 - **Language:** English, Español, Español (México), Italiano, Deutsch, Français, Türkçe and Srpski
-  (latinica, on main, in the next release). Until one is picked here (or in
+  (latinica, since 0.13). Until one is picked here (or in
   `config.json`), the home speaks the TV's own language if it is one of these, else English.
 - **Location:** type a town or city with the TV's on-screen keyboard (or the phone remote's Type),
   pick it from the places found. It sets the weather's place and time zone. The place search is
@@ -267,11 +264,11 @@ and then closes. What you change shows when the list closes.
   province or county, and region), so towns with the same name can be told apart; in Italian the
   places in Italy come first, in German the places in Germany.
 - **Weather:** show or hide it, °C or °F, check every 15, 30 or 60 minutes. Open-Meteo is the only
-  weather provider for now. On main, in the next release: **Ambient weather effects** (light rain,
+  weather provider for now. Since 0.13: **Ambient weather effects** (light rain,
   snow and fog over the scenes), off to start.
 - **Look and scenes:** Night scenes or Classic; which scenes take turns, in what order, how many
   seconds each; a 12 or 24 hour clock; glass panels and a video background (below); your own
-  photos (below). On main, in the next release: an **OLED Cinema** look (the Classic grid on pure
+  photos (below). Since 0.13: an **OLED Cinema** look (the Classic grid on pure
   black), **Follow the sun** (the scene follows dawn, day, sunset and night where you are),
   **Lighter home** for a slow box that stutters, and **Moving tiles** (switch it off if the slowly
   swaying focused tile flickers on an older TV).
@@ -279,8 +276,8 @@ and then closes. What you change shows when the list closes.
   the order. The same order as holding OK on the dock and the phone's Arrange apps.
 - **People:** add, rename, remove and reorder who is watching.
 - **Quick buttons:** which of the sleep timer, picture mode, look, input, Bluetooth, Network and
-  screensaver buttons show, in what order (Bluetooth and Network need the on-TV app). On main, in
-  the next release: **Soundscape** (rain, fireplace, ocean or brown noise made on the TV),
+  screensaver buttons show, in what order (Bluetooth and Network need the on-TV app). Since 0.13:
+  **Soundscape** (rain, fireplace, ocean or brown noise made on the TV),
   **Screen off** (the picture goes dark while sound and the sleep timer carry on) and **Bluetooth
   headphones** (opens the TV's own Bluetooth screen). Every button and what it needs:
   [docs/CONFIG.md](docs/CONFIG.md), Quick buttons. **Input** opens couch-tv's own menu where the TV lists its inputs: each HDMI port by the
@@ -308,7 +305,7 @@ and copies the photos you choose into the app (turned the right way up and sized
 Many Android TV and Google TV builds have no file picker; then the list says so and you add a photo
 from a web address instead (a JPEG or PNG on the internet, which the TV loads each time). The on-TV
 app (option C) only takes web addresses. Your photos take turns with the scenes and replace the
-Classic look's own. The home keeps up to 20 photos (50 on main, in the next release).
+Classic look's own. The home keeps up to 20 photos (50 since 0.13).
 
 **Glass panels and a video background (optional, both off to start).** Under Look, **Glass
 panels** puts clear, softly blurred panels with a light edge behind the clock, Keep watching and
@@ -333,9 +330,9 @@ song, the artist and its cover, with previous, play or pause and next (the remot
 In the Night look it is the first card of the Keep watching row; in Classic it sits under the quick
 buttons. A paused song stays for ten minutes. It needs option B or C: Android does not let an
 ordinary app see what other apps play, so option A has no card. Home settings, Look, Now playing
-switches it off. The cover comes from Apple's free music search. Thanks alonmustafa (#31). On main,
-in the next release: a full screen Now playing view with the album art, off to start (#84).
-**Show Keep watching** (Home settings, Look, or `home.keep_watching`, on main, in the next release): switch it off to hide the whole row and stop fetching it.
+switches it off. The cover comes from Apple's free music search. Thanks alonmustafa (#31). Since 0.13:
+a full screen Now playing view with the album art, off to start (#84).
+**Show Keep watching** (Home settings, Look, or `home.keep_watching`, since 0.13): switch it off to hide the whole row and stop fetching it.
 **Navigation sound** (Home settings, Look, Sound): the TV's own click, a soft tap, or none (#32).
 With Glass panels on, Home settings and the menus are glass too, and focus moves more calmly (#32, #33).
 
@@ -351,8 +348,7 @@ back to it. [docs/CONFIG.md](docs/CONFIG.md) has the details.
 
 **Languages.** The TV home and the phone remote both speak English, Spanish (`es`, for Spain and
 everyone else), Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest),
-Italian (`it`), German (`de`), Turkish (`tr`) and Serbian Latin (`sr-Latn-RS`, on main, in the next
-release). Italian, German,
+Italian (`it`), German (`de`), Turkish (`tr`) and Serbian Latin (`sr-Latn-RS`, since 0.13). Italian, German,
 Turkish and Serbian use a 24 hour clock by default unless you pick 12 hour. The optional smart-home
 controls are translated too. The phone has its own choice (TV menu, Language), "Same as the TV" by
 default. Messages that come from the bridge itself
@@ -721,8 +717,8 @@ a show. Put visitors on a guest Wi-Fi network (most routers have one) so they ca
 
 To require a password on your home network, set `"pairing_key"` under `"bridge"` in `config.json`. The
 phone remote pairs once by typing it (or opening `http://your-computer.local:5400/?pair=<key>`), and the
-TV homes carry their key. On a Google TV, Android TV or Fire TV that needs a TV home app newer than
-0.12 (on main, in the next release: build it until then), and the Samsung, LG and Roku apps are built
+TV homes carry their key. On a Google TV, Android TV or Fire TV that needs a TV home app of
+0.13 or newer, and the Samsung, LG and Roku apps are built
 again with the key. See [Switching the pairing key on](docs/CONFIG.md#switching-the-pairing-key-on)
 for how to switch it on and update your TVs.
 
@@ -786,7 +782,7 @@ do the install instead of `apply.sh`:
    It connects to the TV over Wi-Fi with ADB, so the TV asks you to allow it. Open **Setup
    Launcher**, pick couch-tv, then restart the TV.
 
-**Option A with no computer at all, making it the home** (issue #98, on main, in the next release). If couch-tv installed and
+**Option A with no computer at all, making it the home** (issue #98, since 0.13). If couch-tv installed and
 shows up as an app but the Home button still opens the TV's own home, there is no computer step
 left. On a plain Android TV 10 or newer, couch-tv asks Android to make it the home:
 
@@ -897,9 +893,8 @@ the TV may need to start: a home screen, a setup app, a persistent system app or
 ### TCL: Home goes back to Google TV after every restart
 
 On a TCL Google TV (reported on a TCL Smart TV Pro, Android 14) the TV's own boot manager can stop
-the Home button watch from starting, so Home falls back to Google TV after each restart. On main, in
-the next release, couch-tv adds an empty TV input on TCL TVs only, which TCL lets start at boot. Open the app once after
-installing so it is switched on. Other TVs are unchanged and show no new input. This is unconfirmed
+the Home button watch from starting, so Home falls back to Google TV after each restart. Since 0.13, couch-tv adds an empty TV input on TCL TVs only, which TCL lets
+start at boot. Open the app once after installing so it is switched on. Other TVs are unchanged and show no new input. This is unconfirmed
 until it is tested on a real TCL.
 
 **A fix confirmed on a real TCL (0.12, without the TV input):** from a computer, once, run
