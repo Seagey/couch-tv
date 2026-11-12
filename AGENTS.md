@@ -285,8 +285,9 @@ the right answer. Explain it like this, then ask which they want:
 > The computer (a Mac, a Linux box or a Raspberry Pi) has to stay on and awake. A laptop that
 > sleeps or leaves the house does not count.
 > **C. Home screen and phone remote, living on the TV.** No computer to keep on. The phone talks
-> straight to the TV. You lose turning the TV on from the phone, and the Claude assistant only
-> works if you add your own Anthropic API key, which costs a little per question. On newer Google
+> straight to the TV. You lose turning the TV on from the phone, and the AI assistant only
+> works if you add your own API key (Claude, OpenAI or another AI service, or a model on a
+> computer at home), which costs a little per question. On newer Google
 > TVs you may have to type a pairing code from the TV's settings again after the TV restarts."
 
 Then: "Do you have a computer that is always on at home?" If yes, B is the best tested. If no,

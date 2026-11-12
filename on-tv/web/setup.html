@@ -13,7 +13,7 @@
   h1 { font-size: 26px; margin: 0 0 4px; } h2 { font-size: 18px; margin: 0 0 8px; }
   p, li { color: var(--dim); } .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 16px 0; }
   label { display: block; font-size: 14px; color: var(--dim); margin: 10px 0 4px; }
-  input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: #0f0f12; color: var(--ink); font-size: 16px; }
+  input, select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: #0f0f12; color: var(--ink); font-size: 16px; }
   button { margin-top: 12px; padding: 12px 16px; border-radius: 12px; border: 0; background: #26262d; color: var(--ink); font-size: 16px; font-weight: 600; }
   button.go { background: var(--amber); color: #111; }
   .row { display: flex; gap: 10px; } .row > * { flex: 1; }
@@ -89,8 +89,13 @@
 
   <section class="card">
     <h2>Ask (optional, off by default)</h2>
-    <p>On-TV mode has no Claude unless you add your own Anthropic API key. Each ask uses Claude Haiku 5.5 and costs about a fifth of a US cent. Use a key made only for this TV, with a monthly spend limit set in the Anthropic Console: the key is stored on the TV, and anyone with ADB access to the TV could read it.</p>
-    <label for="ask-key">Anthropic API key (leave empty to keep the current one)</label><input id="ask-key" type="password" autocomplete="off">
+    <p>Ask lets you say "put on Bluey" and have an AI find it and press the buttons. On-TV mode has no AI until you pick a service and add your own key: Claude, OpenAI, Google Gemini, OpenRouter, Groq, Mistral, or a model running on a computer at home. Use a key made only for this TV, with a monthly spend limit set with the service: the key is stored on the TV, and anyone with ADB access to the TV could read it. Each ask is a few short model calls. On Claude Haiku 5.5 that costs about a fifth of a US cent; other services and models price differently.</p>
+    <label for="ask-service">AI service</label>
+    <select id="ask-service"></select>
+    <label for="ask-base">Web address</label><input id="ask-base" type="text" autocomplete="off" spellcheck="false">
+    <label for="ask-model">Model name</label><input id="ask-model" type="text" autocomplete="off" spellcheck="false">
+    <p id="ask-hint"></p>
+    <label for="ask-key">API key (leave empty to keep the current one)</label><input id="ask-key" type="password" autocomplete="off">
     <label class="check"><input type="checkbox" id="ask-on"> Switch ask on</label>
     <p id="ask-state"></p>
     <div class="row"><button class="go" id="ask-save">Save ask</button><button id="ask-clear">Remove key</button></div>
@@ -130,7 +135,7 @@
         $('pw-on').checked = !!j.patchwall_replace;
         $('pw-state').textContent = j.watch ? '' : 'The Home button watch is off: switch on Couch TV home watch in the TV\'s Settings, Accessibility.';
       }
-      $('ask-state').textContent = j.ask.has_key ? 'A key is saved. Model: ' + j.ask.model + '.' : 'No key saved.';
+      showAsk(j.ask);
       $('phones').textContent = j.phones + (j.phones === 1 ? ' phone is' : ' phones are') + ' paired with this TV.';
       showAdb(j.adb);
       // Android 13+ (most Google TVs): pairing first, 5555 second. Older TVs: the other way round.
@@ -173,10 +178,43 @@
       $('kids-msg').textContent = 'Kids mode is on for ' + name + '. Add their shows on the phone remote: TV, Kids mode.';
     }).catch(function (e) { $('kids-msg').textContent = e.message; });
   };
+  // Ask: which AI service. "provider" is the wire format the TV speaks: anthropic, or openai (OpenAI and every service that copies it).
+  var ASK = [
+    { id: 'anthropic', name: 'Claude (Anthropic)', provider: 'anthropic', base: 'https://api.anthropic.com', model: 'claude-haiku-5-5', hint: 'Get a key in the Anthropic Console. Claude Haiku 5.5 is the tested default.' },
+    { id: 'openai', name: 'OpenAI', provider: 'openai', base: 'https://api.openai.com/v1', model: '', hint: 'Get a key at platform.openai.com. Type a model name that can call tools.' },
+    { id: 'gemini', name: 'Google Gemini', provider: 'openai', base: 'https://generativelanguage.googleapis.com/v1beta/openai', model: '', hint: 'Get a key in Google AI Studio. This is Gemini\'s OpenAI compatible address.' },
+    { id: 'openrouter', name: 'OpenRouter (many models, one key)', provider: 'openai', base: 'https://openrouter.ai/api/v1', model: '', hint: 'Model names look like provider/model.' },
+    { id: 'groq', name: 'Groq', provider: 'openai', base: 'https://api.groq.com/openai/v1', model: '', hint: 'Pick a model that supports tool use.' },
+    { id: 'mistral', name: 'Mistral', provider: 'openai', base: 'https://api.mistral.ai/v1', model: '', hint: 'Get a key at console.mistral.ai.' },
+    { id: 'local', name: 'A model at home (Ollama, LM Studio, llama.cpp)', provider: 'openai', base: 'http://my-computer.local:11434/v1', model: '', hint: 'Change the address to your computer\'s. It needs no key, but only a model that supports tool calling will work. It must be on your home network.' },
+    { id: 'custom', name: 'Another service that copies OpenAI\'s API', provider: 'openai', base: '', model: '', hint: 'Type its web address, the one that ends in /v1, and its model name.' }
+  ];
+  function askById(id) { for (var i = 0; i < ASK.length; i++) if (ASK[i].id === id) return ASK[i]; return ASK[ASK.length - 1]; }
+  function askFor(a) {
+    if (a.provider === 'anthropic') return ASK[0];
+    for (var i = 1; i < ASK.length - 1; i++) if (ASK[i].base === a.base) return ASK[i];
+    return /^http:\/\//.test(a.base) ? askById('local') : askById('custom');
+  }
+  $('ask-service').innerHTML = ASK.map(function (p) { return '<option value="' + p.id + '">' + p.name.replace(/[&<>"]/g, '') + '</option>'; }).join('');
+  $('ask-service').onchange = function () {
+    var p = askById(this.value);
+    $('ask-base').value = p.base; $('ask-model').value = p.model; $('ask-hint').textContent = p.hint;
+    $('ask-model').placeholder = p.model ? '' : 'the model name your service gives you';
+  };
+  function showAsk(a) {
+    var p = askFor(a);
+    $('ask-service').value = p.id; $('ask-base').value = a.base || p.base; $('ask-model').value = a.model || ''; $('ask-hint').textContent = p.hint;
+    $('ask-model').placeholder = p.model ? '' : 'the model name your service gives you';
+    $('ask-state').textContent = (a.has_key ? 'A key is saved.' : (a.keyless_ok ? 'This server needs no key.' : 'No key saved.')) +
+      (a.ready ? ' Ready.' : (a.model ? '' : ' Type a model name.'));
+  }
   $('ask-save').onclick = function () {
-    var body = { ask_enabled: $('ask-on').checked };
+    var p = askById($('ask-service').value);
+    var body = { ask_enabled: $('ask-on').checked, ask_provider: p.provider, ask_base: p.provider === 'anthropic' && $('ask-base').value.trim() === p.base ? '' : $('ask-base').value.trim(), ask_model: $('ask-model').value.trim() };
     if ($('ask-key').value.trim()) body.ask_key = $('ask-key').value.trim();
-    api('POST', '/api/settings', body).then(function () { $('ask-key').value = ''; $('ask-msg').textContent = 'Saved.'; load(); }).catch(function (e) { $('ask-msg').textContent = e.message; });
+    api('POST', '/api/settings', body).then(function () {
+      $('ask-key').value = ''; $('ask-msg').textContent = 'Saved. If you changed the service, type its key too: a key is never sent to a different service.'; load();
+    }).catch(function (e) { $('ask-msg').textContent = e.message; });
   };
   $('pw-save').onclick = function () {
     api('POST', '/api/settings', { patchwall_replace: $('pw-on').checked }).then(function () { $('pw-msg').textContent = 'Saved.'; load(); }).catch(function (e) { $('pw-msg').textContent = e.message; });
