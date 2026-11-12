@@ -6,7 +6,7 @@
                                                                # Developer options and debugging on)
 
 The quick look knocks on the ports each kind of TV answers on (Android TV remote, ADB, Samsung,
-LG, Roku, Hisense VIDAA, Apple, Google Cast). On an LG it also says hello to LG's network remote, which tells
+LG, Roku, Hisense VIDAA, Panasonic Viera, Apple, Google Cast). On an LG it also says hello to LG's network remote, which tells
 the webOS version without any prompt on the TV (the prompt only comes when couch-tv's bridge asks
 to control it). --adb connects with ADB to read the Android version, the maker and
 which home screen the TV runs. The first time, the TV asks "Allow USB debugging?". That prompt is
@@ -36,6 +36,7 @@ PORTS = {
     8060: "Roku",
     36669: "Hisense VIDAA remote",
     36668: "Hisense VIDAA remote (older)",
+    55000: "Panasonic Viera remote",
     7000: "AirPlay (Apple TV and some TVs)",
 }
 
@@ -213,6 +214,12 @@ def main():
                    "why": "Hisense VIDAA: no Android apps and a locked home screen. couch-tv can open itself in the TV's "
                           "browser each time the TV comes on, with a computer at home (docs/VIDAA.md, tested against a "
                           "stand-in only, not yet on a real VIDAA TV), or plug in a Google TV box for everything."}
+    elif open_ports[55000] and not android:
+        verdict = {"A": "no", "B": "Panasonic path (New, Beta): docs/PANASONIC.md", "C": "no",
+                   "why": "Panasonic Viera (My Home Screen or older): no Android apps and a locked home screen. couch-tv "
+                          "can open itself in the TV's browser each time the TV comes on, with a computer at home, and the "
+                          "phone remote works (docs/PANASONIC.md, Beta: first run scripts/panasonic-check.py, it only reads). "
+                          "Or plug in a Google TV box for everything."}
     elif not android:
         verdict = {"A": "no", "B": "no", "C": "no", "why": "Not an Android TV as far as the network shows (no Android TV remote, no ADB)."}
     else:
