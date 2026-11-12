@@ -711,10 +711,6 @@
     var order, off;
     if (Array.isArray(ST.scene_order)) {
       order = ST.scene_order.filter(uniq);
-      // a scene added since the order was saved: one named in home.scenes leads, in that order
-      // (a newly made scene is the one you want to see); anything else goes at the end
-      var fresh = (HOME.scenes || []).filter(function (id) { return ids.indexOf(id) >= 0 && order.indexOf(id) < 0; }).filter(uniq);
-      order = fresh.concat(order);
       order = order.concat(ids.filter(function (id) { return order.indexOf(id) < 0; }));
       off = (Array.isArray(ST.scenes_off) ? ST.scenes_off : []).filter(function (id) { return ids.indexOf(id) >= 0; });
     } else {
@@ -854,8 +850,12 @@
 
   // A scene's own clip (home.my_scenes[].video): only the scene on screen plays, and only while the
   // home is showing. The photo under it stays until the clip really plays; a clip that fails just
-  // leaves the photo. Lighter home and the whole-home video (home.video_url) leave clips off.
+  // leaves the photo. Lighter home, the whole-home video (home.video_url), the OLED and Classic
+  // looks, the ambient clock, screen off and the system's reduced motion setting leave clips off.
   function sceneVideos(on) {
+    var calm = false;
+    try { calm = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (e) {}
+    on = on && NIGHT && !calm && !idleAmbientActive && !screenOffActive;
     sceneEls.forEach(function (el, k) {
       var v = el.querySelector(".svid");
       if (!v) return;
@@ -870,7 +870,7 @@
         if (p && p.catch) p.catch(function () {});
       } else if (v.getAttribute("src")) {
         v.pause();
-        if (k !== scene) {   // off screen: let go of the decoder and the memory
+        if (k !== scene || !NIGHT || calm) {   // off screen: let go of the decoder and the memory
           v.classList.remove("playing");
           v.removeAttribute("src");
           try { v.load(); } catch (e) {}
@@ -1688,6 +1688,7 @@
       try { if (TV && TV.setScreenOff) TV.setScreenOff(false); } catch (e) {}
       paintFocus();
     }
+    sceneVideos(!screenOffActive);
     resetIdlePhoto();
   }
   // Smart Idle & OLED-safe Ambient Clock
@@ -1737,6 +1738,7 @@
     } else if (ov) {
       ov.classList.remove("active");
     }
+    sceneVideos(!idleAmbientActive);   // no clip decoding behind the ambient clock
   }
   function checkSmartIdle() {
     if (!SMART_IDLE.enabled || document.hidden || screenOffActive || idleAmbientActive) return;
@@ -4083,7 +4085,19 @@
     $("set-crumb").textContent = SET.sub ? SET.sub.crumb : "";
     $("set-head").textContent = SET.sub ? SET.sub.title() : t("sec_" + SECS[SET.sec][0]);
     var box = $("set-rows");
+    // Rebuilding the rows drops the list back to the top on some TV engines (a 2020 Samsung,
+    // Tizen 5.5), and the smooth scroll below then ran from the top down to the row: every move
+    // past the first screen flashed up to the start and back. Put the list back where it was
+    // without animating, so only the small step to the next row is smooth. A different list
+    // (another section or page) starts at the top.
+    var listId = SET.sec + "|" + $("set-head").textContent + "|" + $("set-crumb").textContent;
+    var keep = box.getAttribute("data-list") === listId ? box.scrollTop : 0;
+    box.setAttribute("data-list", listId);
     box.innerHTML = rows.map(rowHTML).join("");
+    box.style.scrollBehavior = "auto";
+    box.scrollTop = keep;
+    void box.offsetHeight;   // apply the jump now, before smooth scrolling comes back on
+    box.style.scrollBehavior = "";
     $("set-msg").textContent = SET.msg || "";
     var cur = rows[SET.ri];
     $("set-hint").textContent = SET.typing ? t("hint_typing") : SET.lift ? t("hint_lift") : SET.col === "secs" ? t("hint_secs") :
