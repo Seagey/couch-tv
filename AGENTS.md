@@ -102,6 +102,8 @@ If nothing Android is found, or they are not sure what they have:
     `check-tv.py <address>` recognises one by its port 8060.
   - **Hisense VIDAA:** the IP address in the TV's network settings. `find-tvs.py` does not list one,
     but `check-tv.py <address>` recognises it by its port 36669 (36668 on older builds).
+  - **Philips on Titan OS:** Settings, Network (or Wireless and networks), Network status. `find-tvs.py`
+    does not list one, but `check-tv.py <address>` recognises it by its port 1926 when it is not Android.
   - **Google TV or Android TV:** Settings, Network and Internet, the Wi-Fi network.
 - Ask them to open **Settings, Device Preferences, About** (older Android TV) or **Settings,
   System, About** (Google TV) and read you the model and the "Android TV OS" line. Until you know
@@ -184,6 +186,21 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   through rooting the TV. Afterwards ask them to open an issue on GitHub with what `vidaa-check.py`
   printed, and write down for them what worked and what did not.
 - **Apple TV, Fire TV on Vega OS:** not supported. Say so kindly,
+- **Philips on Titan OS** (no Google button, a home of "Lifestyle" rows; mostly Europe): do not say no,
+  and do not promise the home. Say first, and plainly: "There is a Philips Titan OS version of couch-tv, and
+  it is the **phone remote only**: power, keys, volume, inputs, opening the TV's apps, and the assistant on
+  Titan app, and that needs a Titan developer account or a store listing that does not exist yet. It was
+  tested against a pretend Philips on a computer and has **not been run on a real Titan OS TV**, so
+  something will probably need fixing. You type a PIN the TV shows once, and pairing needs a key from
+  Philips's own TV Remote app that you save on this computer yourself; couch-tv does not include it."
+  Without a computer that stays on, nothing is possible. Also offer the Google TV box as the way to get
+  everything, including the home. If they choose the remote, follow
+  [docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md): run `scripts/philips-check.py <tv address>` first (it only
+  reads; pairing with `--pair` shows a PIN on the TV, so it waits for the yes in step 3). Never fetch,
+  paste or suggest a source for Philips's pairing key: they save their own with `scripts/philips-secret.py`.
+  Never use the TV's developer debug port. Afterwards ask them to open an issue on GitHub with what
+  `philips-check.py` printed ([docs/PHILIPS-TITAN-TESTING.md](docs/PHILIPS-TITAN-TESTING.md)).
+- **Apple TV, Hisense VIDAA, Fire TV on Vega OS:** not supported. Say so kindly,
   explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
   round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets
   them everything. If they do not want a box, stop. Do not suggest rooting the TV.

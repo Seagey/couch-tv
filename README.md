@@ -324,6 +324,7 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on nine real LGs so far ([how](docs/LG.md)) | No |
 | **Roku** (TV or box) | App only, a sideloaded channel opened from Roku's home row, while Developer Mode is on | With a computer at home: as a channel that opens itself, not a true home screen. Built from Roku's documentation, not yet tried on a real Roku ([how](docs/ROKU.md)) | No |
 | **Hisense with VIDAA** | App only: a tile on the app row where the firmware allows it, else the TV's browser | With a computer at home: as a page that opens itself, not a true home screen. Tested against a stand-in only, not yet tried on a real VIDAA TV ([how](docs/VIDAA.md)) | No |
+| **Philips with Titan OS** (mostly Europe) | No | Phone remote only (no couch-tv home without a Titan app). Tested against a stand in only, not yet tried on a real Titan OS TV ([how](docs/PHILIPS-TITAN.md)) | No |
 | **Apple TV** | No | No | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
@@ -379,9 +380,15 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   own copy of Hisense's phone app (couch-tv does not include it). **It was tested against a pretend VIDAA TV
   on a computer, and it has not been run on a real one**, so expect to fix something. If you try it, please
   open an issue and say how it went. Setup and limits: [docs/VIDAA.md](docs/VIDAA.md).
+- **Philips with Titan OS:** the phone remote only, with a computer at home: power, keys, volume, inputs,
+  opening the TV's apps and the assistant on top of those. **couch-tv's home does not open on it**: Titan OS
+  runs a web page only as a Titan app, which needs a Titan developer account or a store listing that does
+  not exist yet. Pairing needs a key from Philips's own phone app that you save yourself (couch-tv does not
+  include it). **Tested against a pretend TV on a computer, not yet on a real Titan OS TV.** Mostly Philips
+  TVs sold in Europe from 2023. Setup, limits and the home routes: [docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md).
 - **Apple TV and Vega OS Fire TV:** closed. Nothing here works on them.
 
-**Want everything on a Samsung, LG, Roku, VIDAA or another TV?** The Samsung, LG, Roku and VIDAA paths cover the home and the
+**Want everything on a Samsung, LG, Roku, VIDAA, Philips or another TV?** The Samsung, LG, Roku and VIDAA paths cover the home and the
 phone remote, not everything. Plug in a Google TV box (for example the Google TV Streamer) and set
 couch-tv up on that, and you get everything, on any TV with an HDMI port.
 
