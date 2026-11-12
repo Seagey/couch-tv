@@ -2,7 +2,7 @@
 
 Research from public sources (linked below). Only Google TV has been tested
 by the author. Everything else is what the sources say, not tested (Samsung and LG have since run on real
-TVs, see their pages; Roku and Hisense VIDAA have not).
+TVs, see their pages; Roku, Hisense VIDAA and VIZIO have not).
 
 - **A. TV home only:** an app replaces the TV's home screen.
 - **B. Computer bridge:** a computer at home controls the TV with the Android TV Remote protocol
@@ -24,7 +24,14 @@ TVs, see their pages; Roku and Hisense VIDAA have not).
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on nine real LGs so far ([LG.md](LG.md)) | No |
 | Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation, **not yet tried on a real Roku** ([ROKU.md](ROKU.md)) | No |
 | Hisense VIDAA | App only: a Couch TV tile on firmware that still allows it, else the TV's browser | As a page the bridge opens on power-on, like Samsung and LG. Tested against a stand-in only, **not yet tried on a real VIDAA TV** ([VIDAA.md](VIDAA.md)) | No |
+| VIZIO (SmartCast, VIZIO OS) | No | New (Beta): phone remote, power, volume, inputs and opening apps; couch-tv's home page does not open on the TV by itself. Tested against a stand in so far ([VIZIO.md](VIZIO.md)) | No |
 | Apple TV | No | No | No |
+
+**VIZIO, what it cannot do.** couch-tv's home page does not open on a VIZIO by itself: VIZIO OS has no
+browser, no sideloading and a closed app programme, and its Chromecast built in only opens registered
+receivers. So option B on a VIZIO is the phone remote and the assistant, not a home. Testers who already use
+Home Assistant's Cast dashboards or a DashCast style tool can try showing couch-tv's page that way and report
+back ([VIZIO.md](VIZIO.md), "One open experiment"); couch-tv has no code for it.
 
 ## Reported by people using it
 
