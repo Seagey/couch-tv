@@ -306,6 +306,7 @@ out every computer, so reconnect yours afterwards).
 |---|---|
 | Phone shows "Pair this phone" again | The token was cleared (new phone, private browsing, or Forget phones). Type a new code. |
 | "Pressing keys needs ADB on the TV" | ADB is not connected. Open Couch TV and press Connect ADB, or pair wireless debugging on the setup page. |
+| "App not installed" | An older Couch TV signed differently is on the TV (uninstall it first), the download was cut short (download it again), there is too little space (keep 100 MB free), or Play Protect blocked it: in Google Play, your profile, Play Protect, switch off "Scan apps with Play Protect" while you install, then switch it back on (thanks prabakaran-offc, #138). |
 | "Allow debugging?" never appears | Network debugging is off, or the TV suppresses the question (seen on an Android 14 Google TV). Use wireless debugging pairing instead. |
 | Worked, then stopped after a restart | Port 5555 is often switched off by a restart. Pair wireless debugging once: the app then turns it back on and finds the new port after every restart. |
 | Wireless debugging will not switch on | The TV is on Ethernet. Android only allows it on Wi-Fi. |
