@@ -33,6 +33,7 @@ import lg
 import roku
 import vidaa
 import philips
+import vega
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -55,7 +56,8 @@ TV_CONFIG = {"default": config.DEFAULT_TV, "tvs": config.TVS}
 def make_tv(cfg):
     """A Samsung ("kind": "samsung", bridge/samsung.py), an LG ("kind": "lg", bridge/lg.py), a Roku
     ("kind": "roku", bridge/roku.py), a Hisense VIDAA ("kind": "vidaa", bridge/vidaa.py), a Philips on
-    Titan OS ("kind": "philips", bridge/philips.py) or an Android or Google TV (tv.py)."""
+    Titan OS ("kind": "philips", bridge/philips.py), an Amazon Fire TV on Vega OS ("kind": "vega",
+    bridge/vega.py) or an Android or Google TV (tv.py)."""
     if cfg.get("kind") == "samsung":
         return samsung.SamsungTV(cfg)
     if cfg.get("kind") == "lg":
@@ -66,6 +68,8 @@ def make_tv(cfg):
         return vidaa.VidaaTV(cfg)
     if cfg.get("kind") == "philips":
         return philips.PhilipsTV(cfg)
+    if cfg.get("kind") == "vega":
+        return vega.VegaTV(cfg)
     return TV(cfg)
 
 
@@ -887,6 +891,20 @@ async def h_roku_icon(request):
     except (roku.RokuError, ValueError, TVUnavailable) as e:
         raise ApiError(404, str(e))
     return web.Response(body=data, content_type=kind.split(";")[0], headers={"Cache-Control": "max-age=86400"})
+
+
+async def h_vega_keys(request):
+    """The couch-tv app on a Vega stick asks here for the phone remote's keys (a long poll: it waits up to
+    20 seconds for a key, and the asking is how the bridge knows the page is in front). Vega has no way
+    for the network to press a key, so the page presses them on itself (tv-home/web/vega.js)."""
+    if tv.kind != "vega":
+        raise ApiError(400, "only for Fire TV on Vega OS")
+    try:
+        after = int(request.query.get("after") or 0)
+    except ValueError:
+        raise ApiError(400, "after must be a number")
+    keys, last = await tv.next_keys(after, timeout=20.0)
+    return ok(keys=keys, last=last)
 
 
 async def h_vidaa_pair(request):
@@ -2823,6 +2841,8 @@ async def h_tvs(request):
             row |= {"vidaa": t.vidaa_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         elif t.kind == "philips":
             row |= {"philips": t.philips_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
+        elif t.kind == "vega":
+            row |= {"vega": t.vega_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         out.append(row)
     return ok(default=DEFAULT_TV, tvs=out)
 
@@ -2850,6 +2870,7 @@ def make_app():
     r.add_get("/api/webos/apps", h_webos_apps)
     r.add_get("/api/roku/apps", h_roku_apps)
     r.add_get("/api/roku/icon/{id}", h_roku_icon)
+    r.add_get("/api/vega/keys", h_vega_keys)
     r.add_post("/api/vidaa/pair", h_vidaa_pair)
     r.add_post("/api/vidaa/tile", h_vidaa_tile)
     r.add_post("/api/vidaa/claim", h_vidaa_claim)

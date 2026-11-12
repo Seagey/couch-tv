@@ -319,7 +319,7 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **Android 6 TV** (Xiaomi Mi TV 4A, PatchWall) | Experimental: opens, layout may break on an old browser engine | Not tested | Experimental, set up from a computer (no Wi-Fi pairing) |
 | **Nvidia Shield** | Yes (not tested) | Yes | Yes (not tested) |
 | **Fire TV on Fire OS** (Fire OS 6, 7 and 8: Fire TV Stick 4K 1st gen and newer, Stick 4K Max, Cube) | Partial. Takes the Home key back, but Amazon's home flashes up first | Partial | Partial. It takes the Home key back, but on current Fire OS the phone remote cannot press keys or type ([why](on-tv/README.md#fire-tv-fire-os)) |
-| **Fire TV on Vega OS** (newer Fire TV sticks) | No | No | No |
+| **Fire TV on Vega OS** (Stick 4K Select and newer) | App only, built with Amazon's free developer tools. **New** | With a computer at home: as an app that opens itself, not a true home screen. Netflix and YouTube open from the phone ([how](docs/FIRE-VEGA.md)) | No |
 | **Samsung** (Tizen) | App only, opened from Samsung's app row (or reopened by its Autorun Last App) | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
 | **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on nine real LGs so far ([how](docs/LG.md)) | No |
 | **Roku** (TV or box) | App only, a sideloaded channel opened from Roku's home row, while Developer Mode is on | With a computer at home: as a channel that opens itself, not a true home screen. Built from Roku's documentation, not yet tried on a real Roku ([how](docs/ROKU.md)) | No |
@@ -394,7 +394,12 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   some have no network remote at all, so it depends on the model. A two minute test in a web browser tells
   you which: [docs/PHILIPS-SAPHI-TESTING.md](docs/PHILIPS-SAPHI-TESTING.md). Setup and limits:
   [docs/PHILIPS-SAPHI.md](docs/PHILIPS-SAPHI.md).
-- **Apple TV and Vega OS Fire TV:** closed. Nothing here works on them.
+- **Fire TV on Vega OS:** New. couch-tv goes on as an app you build once with Amazon's free developer tools
+  (a free Amazon Developer account, a Mac or Linux computer and a USB cable), and a computer at home opens it
+  when the stick comes up. Amazon's Home button still opens Amazon's home, the phone remote presses arrows and
+  OK while couch-tv is in front but not volume or power off, and only Netflix and YouTube open from the phone.
+  First reports from real sticks are wanted: [docs/FIRE-VEGA.md](docs/FIRE-VEGA.md).
+- **Apple TV:** closed. Nothing here works on it.
 
 **Want everything on a Samsung, LG, Roku, VIDAA, Philips or another TV?** The Samsung, LG, Roku and VIDAA paths cover the home and the
 phone remote, not everything. Plug in a Google TV box (for example the Google TV Streamer) and set
