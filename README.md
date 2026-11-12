@@ -321,6 +321,7 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on nine real LGs so far ([how](docs/LG.md)) | No |
 | **Roku** (TV or box) | App only, a sideloaded channel opened from Roku's home row, while Developer Mode is on | With a computer at home: as a channel that opens itself, not a true home screen. Built from Roku's documentation, not yet tried on a real Roku ([how](docs/ROKU.md)) | No |
 | **Philips with Titan OS** (mostly Europe) | No | Phone remote only (no couch-tv home without a Titan app). Tested against a stand in only, not yet tried on a real Titan OS TV ([how](docs/PHILIPS-TITAN.md)) | No |
+| **Older Philips with Saphi** (about 2015 to 2019, not Android) | No | New (Beta), with a computer at home: phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen ([how](docs/PHILIPS-SAPHI.md)) | No |
 | **Apple TV, Hisense with VIDAA** | No | No | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
@@ -374,6 +375,13 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   not exist yet. Pairing needs a key from Philips's own phone app that you save yourself (couch-tv does not
   include it). **Tested against a pretend TV on a computer, not yet on a real Titan OS TV.** Mostly Philips
   TVs sold in Europe from 2023. Setup, limits and the home routes: [docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md).
+- **Older Philips with Saphi** (Philips's own Linux system, roughly 2015 to 2019): New (Beta). The phone remote,
+  with a computer at home, and couch-tv's page opens in the TV's own browser each time it is switched on, if
+  your set offers a browser to the network remote. No real home screen: the browser's bar can show and the
+  remote's Home button still opens Philips's menu. Many of these sets need no pairing; some want a PIN and
+  some have no network remote at all, so it depends on the model. A two minute test in a web browser tells
+  you which: [docs/PHILIPS-SAPHI-TESTING.md](docs/PHILIPS-SAPHI-TESTING.md). Setup and limits:
+  [docs/PHILIPS-SAPHI.md](docs/PHILIPS-SAPHI.md).
 - **Apple TV, VIDAA and Vega OS Fire TV:** closed. Nothing here works on them.
 
 **Want everything on a Samsung, LG, Roku or another TV?** The Samsung, LG and Roku apps cover the home and the

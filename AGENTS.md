@@ -102,6 +102,8 @@ If nothing Android is found, or they are not sure what they have:
     `check-tv.py <address>` recognises one by its port 8060.
   - **Philips on Titan OS:** Settings, Network (or Wireless and networks), Network status. `find-tvs.py`
     does not list one, but `check-tv.py <address>` recognises it by its port 1926 when it is not Android.
+  - **Older Philips with Saphi:** Settings, Wireless and networks (or Network), View network settings.
+    `check-tv.py <address>` recognises it by plain port 1925 alone, and says whether it lists a browser.
   - **Google TV or Android TV:** Settings, Network and Internet, the Wi-Fi network.
 - Ask them to open **Settings, Device Preferences, About** (older Android TV) or **Settings,
   System, About** (Google TV) and read you the model and the "Android TV OS" line. Until you know
@@ -181,6 +183,19 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   paste or suggest a source for Philips's pairing key: they save their own with `scripts/philips-secret.py`.
   Never use the TV's developer debug port. Afterwards ask them to open an issue on GitHub with what
   `philips-check.py` printed ([docs/PHILIPS-TITAN-TESTING.md](docs/PHILIPS-TITAN-TESTING.md)).
+- **Older Philips with Saphi** (not Android, not Titan OS; roughly 2015 to 2019): do not say no, and do not
+  promise a home screen. Say first, and plainly: "There is a Saphi version of couch-tv. It is new, in Beta:
+  built from public notes and a pretend Philips on a computer, so on your set something may need fixing.
+  With a computer at home that stays on, you get the phone remote, and if your TV offers a browser to its
+  network remote, couch-tv's page opens in that browser every time the TV is switched on. It is not a real
+  home screen: the browser's bar can show and the remote's Home button still opens Philips's menu. Many of
+  these TVs need no pairing; some want a PIN, and some have no network remote at all." Run
+  `scripts/check-tv.py <tv address>` and `scripts/philips-check.py <tv address>` first (both only read).
+  If it wants a login, pairing is the Titan OS path above and waits for the yes in step 3. Also offer the
+  Google TV box as the way to get everything. If they choose it, follow
+  [docs/PHILIPS-SAPHI.md](docs/PHILIPS-SAPHI.md). Never send `activities/browser` before the yes: it opens a
+  page on the TV. Afterwards ask them to open an issue on GitHub with what the checks printed
+  ([docs/PHILIPS-SAPHI-TESTING.md](docs/PHILIPS-SAPHI-TESTING.md)).
 - **Apple TV, Hisense VIDAA, Fire TV on Vega OS:** not supported. Say so kindly,
   explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
   round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets

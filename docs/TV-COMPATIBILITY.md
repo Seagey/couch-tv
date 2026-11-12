@@ -2,7 +2,7 @@
 
 Research from public sources (linked below). Only Google TV has been tested
 by the author. Everything else is what the sources say, not tested (Samsung and LG have since run on real
-TVs, see their pages; Roku and Philips Titan OS have not).
+TVs, see their pages; Roku, Philips Titan OS and Philips Saphi have not).
 
 - **A. TV home only:** an app replaces the TV's home screen.
 - **B. Computer bridge:** a computer at home controls the TV with the Android TV Remote protocol
@@ -24,6 +24,7 @@ TVs, see their pages; Roku and Philips Titan OS have not).
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on nine real LGs so far ([LG.md](LG.md)) | No |
 | Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation, **not yet tried on a real Roku** ([ROKU.md](ROKU.md)) | No |
 | Philips on Titan OS (mostly Europe, from 2023) | No | Phone remote only: power, keys, volume, inputs, opening apps. No couch-tv home without a Titan app (developer account or store listing). Tested against a stand in only, **not yet tried on a real Titan OS TV** ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)) | No |
+| Older Philips with Saphi (about 2015 to 2019, not Android) | No | New (Beta): phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen. Depends on the model and firmware ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)) | No |
 | Apple TV, Hisense VIDAA | No | No | No |
 
 ## Reported by people using it
@@ -106,6 +107,13 @@ Not tested by the author. Each line is what someone said worked on their own dev
   it. couch-tv's home could only open through a published Titan app or Titan's DevView developer app, and
   neither exists for couch-tv yet ([PHILIPS-TITAN.md](PHILIPS-TITAN.md), "The home"). Tested against a
   stand in only, **never on a real Titan OS TV**. Titan OS is on Philips TVs sold in Europe from 2023.
+- **Older Philips with Saphi** (Philips's own Linux system, roughly 2015 to 2019) does not run Android apps or
+  let an app replace its home screen. Some sets answer Philips's network remote on plain port 1925 with no
+  pairing, one owner's set wanted a PIN and refused it, and some have no network remote at all. The bridge
+  tries 1925 first, needs no login when the TV asks for none, and falls back to the paired path when it does
+  (`bridge/philips.py`, `"saphi": true`). When the TV lists a browser, couch-tv's page opens in it at power on
+  (`activities/browser`); that is a page that opens itself, not a home screen. New (Beta): checked against a
+  stand in only, and every protocol detail is marked UNCONFIRMED in [PHILIPS-SAPHI.md](PHILIPS-SAPHI.md).
 - **Samsung and LG** do not run Android apps or let an app replace their home screen. On a Samsung,
   couch-tv runs as a sideloaded app that the bridge opens when the TV comes on
   ([SAMSUNG.md](SAMSUNG.md)). On an LG the same is built, through LG's Developer Mode, and has run on
