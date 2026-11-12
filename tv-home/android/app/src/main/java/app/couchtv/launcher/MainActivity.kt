@@ -579,6 +579,12 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun openWatchNext(id: String): Boolean = openWatchNextItem(id)
 
+        /** Kids mode with no computer (docs/CONFIG.md): open a show's own link (an intent:// or app
+         *  link that home-config.py looked up) in the app it belongs to, and only that app. False if
+         *  the app is not on this TV or will not take the link; the page then opens the app itself. */
+        @JavascriptInterface
+        fun openLink(uri: String, pkg: String): Boolean = openShowLink(uri, pkg)
+
         /** Hide a Watch Next card on this TV only: its id and package|title are remembered, the app's own row is never touched. */
         @JavascriptInterface
         fun dismissWatchNext(id: String, pkg: String, title: String): Boolean =
@@ -1319,6 +1325,26 @@ class MainActivity : Activity() {
                 else -> null
             }
         } catch (e: Exception) { null }
+    }
+
+    private fun openShowLink(uri: String, pkg: String): Boolean {
+        if (pkg.isBlank() || uri.length > 2000 || pkg == packageName) return false
+        try {
+            packageManager.getPackageInfo(pkg, 0)
+        } catch (e: Exception) {
+            return false
+        }
+        return try {
+            val i = if (uri.startsWith("intent:")) Intent.parseUri(uri, Intent.URI_INTENT_SCHEME)
+                    else Intent(Intent.ACTION_VIEW, Uri.parse(uri))
+            // the link opens in the app named for it, never anywhere else
+            if (i.component != null && i.component!!.packageName != pkg) i.component = null
+            i.`package` = pkg
+            i.selector = null
+            if (i.resolveActivity(packageManager) == null) false else start(i)
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun launchPackage(pkg: String): Boolean {

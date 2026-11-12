@@ -155,6 +155,94 @@ With no bridge (option A) there is no phone to edit people, but Home settings on
 People) adds, renames, removes and reorders them, and the TV keeps the list itself. With a bridge,
 Home settings saves to the same `bridge/data/people.json` the phone uses.
 
+## Kids mode
+
+New, on main, in the next release. Idea from Natalie Bruss (@nataliebruss on Instagram).
+
+Optional, and off unless you set it up: a person with no `kids_mode` key is not a kids profile, and a
+`config.json` with no `kids_mode` anywhere works exactly as before. Nothing makes a kids profile or a
+PIN by itself; only `config.json`, the phone remote (TV, Kids mode) or the on-TV app's setup page do,
+and only when you ask them to.
+
+A person with `kids_mode` is a kids profile. While they are the one watching, the TV home is one
+shelf of big posters, only the shows you put on it, and OK opens each one straight into its show in
+its app. Under the shelf sit the apps you allow (up to six), if any. Nothing else: no other apps, no
+More apps, no Settings tile, no app store, no Keep watching (theirs or anyone else's), no music
+screen, no update questions. The phone remote's Ask is off while that profile is chosen.
+
+```json
+"people": [
+  { "id": "mum", "name": "Mum" },
+  { "id": "ruby", "name": "Ruby", "kid": true,
+    "kids_mode": {
+      "pin": "2580",
+      "shows": [
+        "Bluey",
+        { "title": "Hey Duggee", "service": "abc-iview" },
+        { "title": "Peppa Pig", "service": "abc-iview", "season": 1, "episode": 3 }
+      ],
+      "apps": ["abc-iview", "youtube"]
+    } }
+]
+```
+
+| Key | What it does |
+|---|---|
+| `pin` (needed) | The parent PIN, 4 to 8 digits. Without a good one kids mode stays off for that person (the bridge says so once in its log). |
+| `shows` [none] | Up to 24. A plain title, or `title` with any of `service` (the app it opens in: an id from `bridge/apps.py`, such as `netflix`, `abc-iview`, `disney-plus`, `stan`, `prime-video`), `season` and `episode`. Without `service` the first free or subscription app it streams on is used, never a rent or buy page. Without `season` it opens the show's own page in the app; with one, that episode (or the season's first). |
+| `apps` [none] | Up to six apps shown under the shelf: app ids from `bridge/apps.py` or Android package names. Only apps installed on that TV show. Android's Settings is never allowed. |
+
+The poster on each tile comes from JustWatch, the same place Keep watching gets its pictures. `kid`
+is separate and optional: it keeps someone out of the household's taste, as before.
+
+**Going in and out.** Choosing the kids profile on the TV (or from the phone) goes straight into kids
+mode, no PIN needed. It stays on through Home, Back and a restart. **Grown ups** at the top right, the
+remote's Settings button or Menu button, or any number key opens the parent PIN: a number pad worked
+with the arrows and OK, or the remote's number keys. Typed digits show only as dots. The right PIN moves
+the TV to the first person who is not a kids profile (with no such person, it stays on the child's
+profile with kids mode off until someone else is chosen). Five wrong PINs in a minute and the pad waits
+a minute. With a bridge, it also checks the PIN before it lets the phone or the TV move away from a
+kids profile.
+
+**From the phone remote (options B and C).** TV, **Kids mode**: pick the person, type the PIN once,
+then search for a show and tap the app to add it, remove one with the cross, pick the allowed apps,
+change the PIN, or switch kids mode off. Someone who is not a kids profile yet can be made one there
+with a new PIN, which is how option C (no `config.json`) sets it up. The TV shows a change the next
+time Home is pressed. The PIN is never saved on the phone.
+
+**Where it is kept.** The bridge keeps changes made from the phone in `bridge/data/kids.json`, and
+that wins over `config.json` for that person from then on, like `people.json` does. A PIN typed into
+`config.json` is turned into a salted hash before anything leaves the computer: the TV page,
+`/tv/config.js`, `/api/config` and `/api/kids` carry only the hash, never the PIN. To start again from
+`config.json`, delete `bridge/data/kids.json` and restart the bridge. The on-TV app (option C) keeps
+the same thing in its own storage on the TV.
+
+**With no computer (option A).** `apply.sh` (through `tv-home/tools/home-config.py`) looks each show
+up on JustWatch from your computer while it installs, and hands the TV the link that opens it and its
+poster, because the TV has no bridge to ask later. Run `apply.sh` again after you change the shelf. A
+show it could not find still gets a tile; it opens its app instead of the show. The PIN and the
+shelf come from `config.json` only, as there is no phone remote. A TV home app older than this
+release opens the app rather than the show.
+
+**What it cannot do, said plainly:**
+
+- **Once a show is open, your child is inside that app** (Netflix, iview, Disney+ and the rest) and
+  can browse anything the app offers. couch-tv cannot see or limit what happens inside another app.
+  Pair kids mode with the app's own kids profile and limits: Netflix's Kids profile, maturity rating
+  and title blocking (Profile and Parental Controls, on the Netflix website), Disney+ Junior mode,
+  Prime Video's kids profile, YouTube Kids. With a bridge, list the app's kids profile name in that
+  person's `app_profiles` and the bridge picks it on the "Who's watching?" screen (People, above).
+- **The TV's own buttons.** On some TVs the remote's Home button, or a long press of it, can reach the
+  TV's own home or quick settings. On Android TV and Google TV the Home button watch (set up by
+  `apply.sh`) brings couch-tv back, and with it kids mode. Samsung, LG, Roku and the Beta paths keep
+  their maker's own Home button, so there a child can leave couch-tv that way.
+- **The phone remote is a grown up's tool.** It can still open any app or play any show. Keep it, and
+  the pairing key if you set one, away from the kids.
+- **The PIN is a lock for a child with a remote, not a password.** A four digit PIN behind a hash can
+  be worked out by someone with a computer on your Wi-Fi in seconds. A longer PIN helps a little.
+- The Roku channel and the Apple TV app (Couch TV) draw their own home, and do not have kids mode yet.
+  The Samsung and LG apps, and the pages the Beta paths open, are the same home page and do.
+
 ## The home's look (`home`)
 
 ```json

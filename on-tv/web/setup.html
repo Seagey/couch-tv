@@ -67,6 +67,18 @@
   </section>
 
   <section class="card">
+    <h2>Kids mode (optional, off unless you say yes)</h2>
+    <p>Any young kids who should only see shows you've picked? I can set up a kids mode with a PIN. Their TV home then shows only the shows you add, and leaving it needs the PIN. Skip this and nothing changes.</p>
+    <label class="check"><input type="checkbox" id="kids-yes"> Yes, set up kids mode</label>
+    <div id="kids-form" style="display:none">
+      <label for="kids-who">Whose home</label><select id="kids-who"></select>
+      <label for="kids-pin">Parent PIN, 4 to 8 digits</label><input id="kids-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off">
+      <button class="go" id="kids-save">Turn on kids mode</button>
+    </div>
+    <div class="msg" id="kids-msg" role="status"></div>
+  </section>
+
+  <section class="card">
     <h2>Ask (optional, off by default)</h2>
     <p>On-TV mode has no Claude unless you add your own Anthropic API key. Each ask uses Claude Haiku 5.5 and costs about a fifth of a US cent. Use a key made only for this TV, with a monthly spend limit set in the Anthropic Console: the key is stored on the TV, and anyone with ADB access to the TV could read it.</p>
     <label for="ask-key">Anthropic API key (leave empty to keep the current one)</label><input id="ask-key" type="password" autocomplete="off">
@@ -98,6 +110,9 @@
     api('GET', '/api/settings').then(function (j) {
       $('tv-name').value = j.tv_name || '';
       $('people').value = (j.people || []).map(function (p) { return p.name; }).join(', ');
+      $('kids-who').innerHTML = (j.people || []).map(function (p) {
+        return '<option value="' + String(p.id).replace(/[^A-Za-z0-9_-]/g, '') + '">' + String(p.name).replace(/[&<>"]/g, '') + '</option>';
+      }).join('');
       $('place').value = j.weather.place || ''; $('lat').value = j.weather.lat; $('lon').value = j.weather.lon;
       $('tz').value = j.weather.timezone || ''; $('country').value = j.country || '';
       $('ask-on').checked = !!j.ask.enabled;
@@ -132,6 +147,17 @@
     var lat = parseFloat($('lat').value), lon = parseFloat($('lon').value);
     if (!isNaN(lat) && !isNaN(lon)) body.weather = { lat: lat, lon: lon, place: $('place').value, timezone: $('tz').value || 'UTC' };
     api('POST', '/api/settings', body).then(function () { $('save-msg').textContent = 'Saved.'; load(); }).catch(function (e) { $('save-msg').textContent = e.message; });
+  };
+  // kids mode: only when they tick yes; the PIN goes to the TV once and is kept there as a hash
+  $('kids-yes').onchange = function () { $('kids-form').style.display = this.checked ? '' : 'none'; };
+  $('kids-save').onclick = function () {
+    var pin = $('kids-pin').value.replace(/\D/g, ''), sel = $('kids-who');
+    if (pin.length < 4 || pin.length > 8) { $('kids-msg').textContent = 'The PIN must be 4 to 8 digits.'; return; }
+    var name = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+    api('POST', '/api/kids', { who: sel.value, action: 'on', new_pin: pin }).then(function () {
+      $('kids-pin').value = '';
+      $('kids-msg').textContent = 'Kids mode is on for ' + name + '. Add their shows on the phone remote: TV, Kids mode.';
+    }).catch(function (e) { $('kids-msg').textContent = e.message; });
   };
   $('ask-save').onclick = function () {
     var body = { ask_enabled: $('ask-on').checked };

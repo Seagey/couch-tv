@@ -276,7 +276,7 @@
   // leaving the clock, date/weather and rotating scene visible. The first remote input wakes the
   // rows without activating the focused app.
   function idlePhotoAllowed() {
-    return IDLE_PHOTO_SECONDS > 0 && !document.hidden && !screenOffActive && !expanded && !lift &&
+    return IDLE_PHOTO_SECONDS > 0 && !kidsOn() && !document.hidden && !screenOffActive && !expanded && !lift &&
       ["grid", "shelf", "people", "quick", "np"].indexOf(zone) >= 0;
   }
   function resetIdlePhoto() {
@@ -1200,7 +1200,7 @@
           lastTrackKey = trackKey;
           ambientDismissed = false;
           // only take the screen from the home itself: never from Home settings, a menu or a pop-up
-          if (zone === "grid" || zone === "shelf" || zone === "np") {
+          if ((zone === "grid" || zone === "shelf" || zone === "np") && !kidsOn()) {
             ambientOpen = true;
             zone = "ambient";
             ambI = 1;
@@ -1646,6 +1646,7 @@
     try { localStorage.setItem("tvhome.who", who); } catch (e) {}
     if (!NOBODY) api("POST", "/api/who", { who: who }).catch(function () {});
     renderShelf();
+    kidSync();
   }
   // A person switch made elsewhere (the phone, another TV): when the bridge's "who" changes, show
   // that person here too.
@@ -1662,7 +1663,73 @@
       who = w; s = 0;
       try { localStorage.setItem("tvhome.who", who); } catch (e) {}
       renderShelf();
+      kidSync();
     }, function () {});
+  }
+
+  // ---------------- kids mode (kids.js, docs/CONFIG.md "Kids mode") ----------------
+  // A kids profile's home is kids.js's shelf, drawn over everything here. app.js keeps who is
+  // watching; kids.js shows or hides itself from that, and hands back here once the parent PIN is right.
+  function kidsOn() { return !!(window.KidsMode && window.KidsMode.active()); }
+  function kidSync() {
+    if (!window.KidsMode) return;
+    var p = NOBODY ? null : PEOPLE.filter(function (x) { return x.id === who; })[0] || null;
+    var was = kidsOn();
+    window.KidsMode.sync(p);
+    if (kidsOn() && !was) kidsCover();
+  }
+  // going into kids mode: whatever was open here closes first, so nothing is left behind the shelf
+  function kidsCover() {
+    if (zone === "settings") closeSettings();
+    else if (zone === "gear") closeGear();
+    else if (zone === "appmenu") closeAppMenu();
+    else if (zone === "shelfmenu") closeShelfMenu();
+    else if (zone === "pmenu") closePop();
+    else if (zone === "menu") closeMenu();
+    else if (zone === "inputs") closeInputMenu();
+    else if (zone === "smart") closeSmart();
+    else if (zone === "updask") { $("gear-pop").classList.remove("on", "ask"); document.documentElement.classList.remove("gearing"); }
+    else if (zone === "ambient") { ambientOpen = false; ambientDismissed = true; renderAmbientMusic(); }
+    if (lift) dropLift();
+    if (expanded) { expanded = false; renderGrid(); }
+    zone = "grid";
+    clearFocus();
+  }
+  // the PIN was right: this TV moves to the first grown up (the bridge checks the PIN again)
+  function kidsUnlocked(kid, code) {
+    var grown = PEOPLE.filter(function (x) { return !window.KidsMode.isKid(x); })[0];
+    touched = true;
+    if (grown) {
+      who = grown.id; s = 0;
+      try { localStorage.setItem("tvhome.who", who); } catch (e) {}
+      if (!OFFLINE) api("POST", "/api/who", { who: who, pin: code }).catch(function () {});
+    } else {
+      window.KidsMode.stayUnlocked(kid.id);
+    }
+    renderShelf();
+    startFocus();
+    paintFocus();
+  }
+  function kidsInit() {
+    if (!window.KidsMode) return;
+    window.KidsMode.init({
+      t: t, esc: esc, iconUrl: iconUrl, TV: TV, api: api, keep: keep, kept: kept,
+      clock24: function () { return CLOCK24; },
+      online: function () { return !OFFLINE && data.bridge !== false; },
+      colour: colourOf, avatar: avatarHTML,
+      appName: function (pkg) {
+        var a = (data.apps || []).filter(function (x) { return x.package === pkg; })[0];
+        return a ? a.name : pkg;
+      },
+      installed: function (pkg) { return !(data.apps || []).length || (data.apps || []).some(function (x) { return x.package === pkg; }); },
+      launch: function (pkg) {
+        opened(pkg);
+        if (TV && TV.launch(pkg)) return;
+        api("POST", "/api/launch", { app: pkg }).catch(function (e) { status(e.message); });
+      },
+      isOk: isOk, isBack: isBack, isMenu: isMenu, isSettings: isSettings, arrowOf: arrowOf,
+      unlocked: kidsUnlocked
+    });
   }
   // The order of the names: kept by the bridge (the phone's People sheet uses the same list), or on
   // this TV when there is no bridge. "pending" means the bridge has not heard about it yet.
@@ -2440,6 +2507,7 @@
       toggleScreenOff(false);
       return;
     }
+    if (kidsOn()) { window.KidsMode.home(); return; }
     if (zone === "ambient") {
       ambientDismissed = true;
       ambientOpen = false;
@@ -3355,7 +3423,7 @@
   var ai = 0, askKind = "upd";
   function updAsk() {
     askKind = "upd";
-    if (!UPD || !UPD.supported || UPD.answered) return;
+    if (!UPD || !UPD.supported || UPD.answered || kidsOn()) return;
     if (HOME.updates === "notify" || HOME.updates === "manual") { upd().auto(HOME.updates === "notify"); return; }
     if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;
     zone = "updask"; ai = 0;
@@ -3403,7 +3471,7 @@
     try { if (TV && TV.requestHome) TV.requestHome(); } catch (e) {}
   }
   function homeAsk() {
-    if (kept("tvhome.home.asked")) return;
+    if (kept("tvhome.home.asked") || kidsOn()) return;
     if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;
     if (homeState() !== "ask") return;
     askKind = "home"; zone = "updask"; ai = 0;
@@ -3719,6 +3787,7 @@
   // couch-tv has no system home behind it, so it opens couch-tv's own gear menu, like the gear tile.
   function isSettings(e) { return e.key === "Settings" || e.key === "TvSettings" || e.keyCode === 176; }
   function settingsKey() {
+    if (kidsOn()) { window.KidsMode.askPin(); return; }
     if (idlePhotoInput(null)) return;
     if (zone === "gear" || zone === "settings" || zone === "smart" || zone === "appmenu" || zone === "shelfmenu" || zone === "updask" || zone === "inputs") { goHome(); return; }
     openGear();
@@ -3822,6 +3891,7 @@
       // Chrome sends a mousemove with no movement after the page moves under a parked pointer:
       // that must not pull focus back from the arrow keys
       if (e.movementX === 0 && e.movementY === 0) return;
+      if (kidsOn()) return;
       var p = pointAt(e.target);
       if (p) { touched = true; pointTo(p); }
     });
@@ -3843,6 +3913,7 @@
         toggleScreenOff(false);
         return;
       }
+      if (kidsOn()) return;
       var p = pointAt(e.target);
       if (!p) {
         // a click beside an open menu closes it, as Back does
@@ -3869,6 +3940,7 @@
       toggleScreenOff(false);
       return;
     }
+    if (kidsOn()) { okReset(); if (window.KidsMode.key(e)) e.preventDefault(); return; }
     if (idlePhotoInput(e)) return;
     if (typingKey(e)) return;   // typing a place or a name: the keys belong to the text box
     if (isOk(e)) {
@@ -3895,6 +3967,7 @@
       e.stopPropagation();
       return;
     }
+    if (kidsOn()) { if (isOk(e)) e.preventDefault(); okReset(); return; }
     if (!isOk(e) || isTyping()) return;
     e.preventDefault();
     if (!okDown) return;
@@ -3931,6 +4004,8 @@
     renderGrid();
     if (!touched && zone !== "updask") startFocus();
     paintFocus();
+    kidSync();
+    if (kidsOn()) window.KidsMode.rerender();
   }
 
   // The bridge's people list (the phone edits it). An order made on this TV while the bridge was
@@ -4033,7 +4108,9 @@
       syncSettings(),
       // Android's Watch Next rows: this app may read them, the bridge's ADB may not. They name a
       // play an app gave no title for (Netflix sends none, Prime only its own name, issue #23).
-      KW_ON ? sendWatchNext() : Promise.resolve()
+      KW_ON ? sendWatchNext() : Promise.resolve(),
+      // kids mode: the shelves as the phone left them (kids.js)
+      window.KidsMode ? window.KidsMode.refresh() : Promise.resolve()
     ];
     return Promise.all(jobs.map(function (p) { return p.then(function () { return true; }, function () { return false; }); }))
       .then(function (ok) {
@@ -4080,6 +4157,8 @@
 
   function start() {
     readConfig();
+    kidsInit();
+    kidSync();   // a kids profile on the couch: its shelf before anything else shows
     staticText();
     // a page that loads (or reloads) always starts awake: never leave the backlight override behind
     try { if (TV && TV.setScreenOff) TV.setScreenOff(false); } catch (e) {}
