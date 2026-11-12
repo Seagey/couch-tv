@@ -192,7 +192,13 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   no 'what is playing', no volume level, no typing from the phone and no screenshots. You type a PIN the TV
   shows once. Newer TVs (2024 on, most Australian Hisense TVs bought in 2025 or 2026) also need a
   certificate you take from your own copy of Hisense's VIDAA phone app; couch-tv does not include it.
-  Hisense documents none of this, so on your TV something may need fixing." Run
+  Hisense documents none of this, so on your TV something may need fixing." If they have **no computer that
+  stays on**, VIDAA is the exception to "nothing works": offer the standalone home (docs/VIDAA.md, "No
+  computer: a standalone home"): the home as a website the Couch TV tile opens, with the clock, scenes or
+  photos, weather and Home settings, and on Vercel a Spotify Now playing card with Play on TV. Say plainly
+  what it lacks: the dock can't open apps (VIDAA lets no page do that), couch-tv doesn't open at power on
+  and Home doesn't bring it back (the remote's ♡+ key can be set to open it), and there is no phone remote.
+  A computer is still needed once, to point the tile at the site. Run
   `scripts/vidaa-check.py <tv address>` first, and never suggest or walk them through rooting the TV.
 - **Philips on Titan OS** (no Google button, a home of "Lifestyle" rows; mostly Europe): offer the remote now
   and do not promise the home yet. "There is a Philips Titan OS version of couch-tv, in Beta. The **phone
