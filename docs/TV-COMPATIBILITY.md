@@ -21,7 +21,7 @@ TVs, see their pages; Roku, Hisense VIDAA, Philips Titan OS, Philips Saphi, VIZI
 | Fire TV on Fire OS 6, 7 and 8 (Stick 4K 1st and 2nd gen, Stick 4K Max, Cube) | Partial | Partial | Partial (home screen confirmed on a Stick 4K 2nd gen by a user; phone remote keys blocked on current Fire OS) |
 | Fire TV on Vega OS (Stick 4K Select, Stick HD 2026, 4K gen 3) | App only: built with Amazon's free developer tools | **Beta**: an app the bridge opens when the stick comes up, not a home screen (Amazon's Home button still opens Amazon's home). Phone remote arrows and OK while couch-tv is in front ([FIRE-VEGA.md](FIRE-VEGA.md)) | No |
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
-| LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on nine real LGs so far ([LG.md](LG.md)) | No |
+| LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on ten real LGs so far ([LG.md](LG.md)) | No |
 | Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation, **not yet tried on a real Roku** ([ROKU.md](ROKU.md)) | No |
 | Hisense VIDAA | App only: a Couch TV tile on firmware that still allows it, else the TV's browser | **Beta**: a page the bridge opens on power-on, like Samsung and LG (VIDAA's Home button still opens VIDAA's home). Tested against a stand-in so far ([VIDAA.md](VIDAA.md)) | No |
 | Philips on Titan OS (mostly Europe, from 2023) | Needs a Titan app (Titan's store or DevView), not there yet | **Beta**: the phone remote works now (power, keys, volume, inputs, opening apps); the home opens once there is a Titan app. Tested against a stand in so far ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)) | No |
@@ -51,6 +51,9 @@ Not tested by the author. Each line is what someone said worked on their own dev
   App brought it back after the monitor was switched off and on. The install stopped printing at
   65% but the app was there. If the install service is unreachable after Developer Mode, unplug
   the monitor for a minute ([issue #93](https://github.com/Seagey/couch-tv/issues/93)).
+- **LG OLED65C56LA (OLED C5, 2025, webOS 11.2, firmware 43.21.96): works**, reported by BlueSpark911 with
+  the bridge on Windows 10. The first LG on webOS 11.2. The snags were Windows ones and are in
+  [LG.md](LG.md) ([issue #136](https://github.com/Seagey/couch-tv/issues/136)).
 - **LG QNED88T6A and NANO83A6A (2025, webOS 10.3): both work on one bridge**, reported by a user
   who followed [LG.md](LG.md) and measured key presses on the TVs. Lighter home brought a key press
   from about 50 ms to 16 ms on both. Developer Mode and couch-tv survived a firmware update; only
@@ -146,7 +149,7 @@ Not tested by the author. Each line is what someone said worked on their own dev
 - **Samsung and LG** do not run Android apps or let an app replace their home screen. On a Samsung,
   couch-tv runs as a sideloaded app that the bridge opens when the TV comes on
   ([SAMSUNG.md](SAMSUNG.md)). On an LG the same is built, through LG's Developer Mode, and has run on
-  nine real LGs so far ([LG.md](LG.md)). LG's home screen itself can only be touched on a rooted TV, and the known root
+  ten real LGs so far ([LG.md](LG.md)). LG's home screen itself can only be touched on a rooted TV, and the known root
   methods are being patched. Not recommended.
 - **Google developer verification (2026).** Google's FAQ says apps installed with ADB do not need
   verification, and enforcement outside Google Play covers phones and tablets. couch-tv installs

@@ -34,7 +34,7 @@ good sign. A Fire TV, Alexa-only or Roku button means it is another system: look
 | Nokia, Motorola (licensed brands) | Android TV in some countries | Not confirmed | Made by different companies in each country |
 | Vizio | No | SmartCast or VIZIO OS: Beta, phone remote only (power, volume, inputs and opening apps). couch-tv's home cannot open on it: no browser, no sideloading, a closed app programme ([VIZIO.md](VIZIO.md)) | SmartCast or VIZIO OS, never Google TV. `check-tv.py` recognises it by its SmartCast answer on port 7345 or 9000 |
 | Samsung | No | Tizen only | couch-tv as an app: [SAMSUNG.md](SAMSUNG.md) |
-| LG | No | webOS only | couch-tv as an app (built, run on nine real LGs so far): [LG.md](LG.md) |
+| LG | No | webOS only | couch-tv as an app (built, run on ten real LGs so far): [LG.md](LG.md) |
 | Any brand's Roku TV (TCL, Hisense, Sharp, Onn, Philips and others that sell one) | No | Roku OS only | couch-tv as a channel (built, first real Roku reports wanted): [ROKU.md](ROKU.md) |
 
 Have a TV with no known way yet, or want everything? A Google TV box (for example the Google TV Streamer) plugged into any HDMI

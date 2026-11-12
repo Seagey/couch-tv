@@ -19,7 +19,7 @@ It needs a computer at home that stays on (option B). Without one you can still 
 and open it from LG's app row, but nothing opens it for you, and nothing extends Developer Mode,
 so the app is removed when the session runs out.
 
-## Test status: nine real LGs so far
+## Test status: ten real LGs so far
 
 **First real LG, 2 November 2026** ([issue #8](https://github.com/Seagey/couch-tv/issues/8)): an
 LG UHD TV on webOS 5.6.2 (2020/2021 firmware), Developer Mode with the Homebrew Channel, the bridge
@@ -148,6 +148,19 @@ shadows. Both TVs draw at devicePixelRatio 2, so every frame is drawn at 4K. web
 whenever another app opens, so every return is a cold start (about 0.8 s on the QNED88, 2.2 to 2.8 s on
 the NANO83).
 
+**Tenth real LG, 12 November 2026** ([issue #136](https://github.com/Seagey/couch-tv/issues/136),
+reported by BlueSpark911): an LG OLED65C56LA (OLED C5, 2025) on webOS 11.2.0, firmware 43.21.96, in
+Qatar, on Wi-Fi, with the bridge on a Windows 10 PC (Python 3.11 from the Microsoft Store), set up by
+Claude Code in the Claude desktop app following AGENTS.md and this page. The first LG on webOS 11.2.
+`find-tvs.py` and `check-tv.py` recognised it, the `.ipk` installed first time, the remote was
+accepted, and the five scenes, clock, weather, people switch, the app list read from the TV, `home.inputs`
+tiles for a PS5 and a Switch 2, opening Netflix and YouTube, the input, screen off and soundscape quick
+buttons, couch-tv opening by itself when the TV comes on and the phone remote on an iPhone all worked.
+The snags were mostly Windows and are now in the steps and in "The bridge on Windows" below: the Accept
+press that came after the bridge had stopped waiting, a missing time zone database, a Wi-Fi marked Public,
+the phone remote not built, and LG's device list hidden from the background bridge. Not checked yet on
+this TV: the daily Extend after the device list fix, and turning the TV on from the phone.
+
 **First non-LG brand, 11 November 2026** ([issue #112](https://github.com/Seagey/couch-tv/issues/112),
 reported by asadawar): an Infinix 43W1Q running webOS TV Lite 7.5.8 (the reduced webOS that other brands
 license; 1.5 GB RAM). App only path, no bridge: built with `--apps`, `home.lighter: true` and
@@ -256,6 +269,15 @@ ssh-keygen -p -P <passphrase> -N "" -f %USERPROFILE%\.ssh\lounge_webos
 ares-setup-device -m lounge -i "privatekey=lounge_webos"
 ```
 
+**Windows, and an app's own terminal.** If you run `ares-setup-device` from inside an app that is
+installed as an MSIX package (the Claude desktop app is one), Windows keeps that app's files in a
+private copy of your profile, so the device list lands in
+`AppData\Local\Packages\<the app>\LocalCache\Roaming\.webos\tv\novacom-devices.json`. A bridge
+started on its own (Task Scheduler, a shortcut) cannot see that list, and its daily Extend fails with
+`ares-launch ERR! [Tips]: No matched device`. Make the bridge's own start script run
+`ares-setup-device -m` (see "The bridge on Windows" below) so the list is made where the bridge runs
+([#136](https://github.com/Seagey/couch-tv/issues/136)).
+
 ### 3. Build the app
 
 ```sh
@@ -327,7 +349,9 @@ bridge.
 ### 6. Accept the remote (someone at the TV, once)
 
 When the bridge starts, the TV shows a prompt asking to accept a remote control connection. Press
-**Accept** (or Yes). The TV gives the bridge a client key, kept in
+**Accept** (or Yes) within two minutes: the bridge waits that long, and if the press comes later no key is
+saved even though the prompt is still on the TV. Restart the bridge and the TV shows a fresh prompt
+([#136](https://github.com/Seagey/couch-tv/issues/136)). The TV gives the bridge a client key, kept in
 `bridge/data/lg-<id>-key.txt`, and never asks again. If nobody presses it, the bridge asks again at
 most every 10 minutes, or the next time someone presses a key on the phone remote. If the TV never
 asks, switch on **LG Connect Apps** in the TV's network settings (the name Home Assistant's guide
@@ -342,6 +366,9 @@ accepted.
 - Arrows and OK move around and open an app. Back inside couch-tv goes back to the start.
 - On the phone remote: volume, Home (opens couch-tv), and "put on" a YouTube video or a Netflix
   show.
+- Open the phone remote at `http://<bridge>:5400`. If it says **Not built yet**, build it once: in
+  `remote/` run `npm ci && npm run build` (README, step 4). It is easy to miss when you follow this
+  page alone.
 - `http://<bridge>:5400/api/tvs` shows the last few things the hook did and when Developer Mode
   was last extended (`devmode`).
 
@@ -449,6 +476,42 @@ the phone says so and you use the TV's remote.
 - **A slow LG?** Switch on `home.lighter` first: on two 2025 LGs it took a key press from about 50 ms
   to 16 ms (#89). `home.hi_res: false` also shrinks the app from 22 MB to under 6 MB.
 - No screenshots, no "what is playing", no profile picking, no pressing Play inside other apps.
+
+## The bridge on Windows
+
+From the tenth real LG ([#136](https://github.com/Seagey/couch-tv/issues/136), a Windows 10 PC):
+
+- **Make the Wi-Fi Private.** Windows treats a Wi-Fi marked Public as unsafe and blocks other devices
+  from reaching the bridge, so the TV home and the phones cannot connect. Settings, Network and
+  Internet, Wi-Fi, the network's properties, Network profile type: **Private**.
+- **Let the bridge's Python through Windows Firewall.** Allow `.venv\Scripts\python.exe` (Windows
+  Security, Firewall and network protection, Allow an app through firewall), or from an administrator
+  PowerShell, with your own folder:
+  `New-NetFirewallRule -DisplayName "couch-tv bridge" -Program "C:\couch-tv\.venv\Scripts\python.exe" -Direction Inbound -Action Allow -Profile Private`
+- **The time zone database.** Windows has none of its own for Python, so `bridge/requirements.txt`
+  now installs `tzdata` there. If the bridge stops at start with `ZoneInfoNotFoundError: No time zone
+  found with key`, run `.venv\Scripts\pip install tzdata`.
+- **Start it at logon.** launchd and systemd are for a Mac and Linux; on Windows a Task Scheduler task
+  that runs when you log on worked. Save a small script, for example `C:\couch-tv\start-bridge.ps1`:
+
+  ```powershell
+  # Put node and the ares tools on PATH (npm installs ares under %APPDATA%\npm), then start the bridge.
+  $env:Path = "C:\Program Files\nodejs;$env:APPDATA\npm;" + $env:Path
+  Set-Location C:\couch-tv
+  # Make LG's device list where this process can see it (see step 2, "Windows, and an app's own terminal").
+  ares-setup-device -m lounge -i "privatekey=lounge_webos" -i "passphrase=XXXXXX"
+  .\.venv\Scripts\python.exe bridge\server.py
+  ```
+
+  `lounge` and the passphrase are the ones from step 2. If the list is empty, `-m` has nothing to
+  modify: add the TV with the `-a` line from step 2 first. Then create the task, from a normal PowerShell:
+
+  ```powershell
+  schtasks /Create /TN "couch-tv bridge" /SC ONLOGON /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\couch-tv\start-bridge.ps1"
+  ```
+
+  The passphrase sits in that script in plain text, the same as on the TV's screen; keep the folder
+  to yourself.
 
 ## The bridge in Docker on a NAS
 

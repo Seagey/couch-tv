@@ -4,4 +4,5 @@ androidtvremote2==0.3.2
 cryptography>=40.0.2
 mcp==1.30.0
 rsa==4.9.1
+tzdata; sys_platform == "win32"
 zeroconf==0.151.5

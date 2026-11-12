@@ -143,8 +143,8 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   questions in step 2 still apply; skip picture mode, apply.sh and ADB).
 - **LG (webOS):** do not say no. Offer the LG path in [docs/LG.md](docs/LG.md) the way you offer
   the Samsung one, and say first, plainly, how little it has been tried: "There is an LG version
-  of couch-tv. It was built from LG's own documentation and has run on nine real LGs so far (from
-  a 2018/2019 model on webOS 4.10 to a 2025 QNED on webOS 10.3.2), so on other LG models some of it may still need fixing. Like the Samsung one, it goes on your LG as an app, and a computer at home that
+  of couch-tv. It was built from LG's own documentation and has run on ten real LGs so far (from
+  a 2018/2019 model on webOS 4.10 to a 2025 OLED on webOS 11.2), so on other LG models some of it may still need fixing. Like the Samsung one, it goes on your LG as an app, and a computer at home that
   stays on opens it every time the TV is switched on. It is not a true home screen: the remote's
   Home button still opens LG's menu. It needs LG's Developer Mode, which means a free LG developer
   account and LG's tools on this computer, and Developer Mode has to stay on, so the computer
@@ -374,7 +374,7 @@ have an input screen. Leave the rest off.
   they run themselves can make it work away from home. Never open a router port for it.
 - Tell them plainly: **by default with option B there is no password, so anyone on the Wi-Fi can use the
   remote and the assistant, kids and visitors included.** To require a password, set `bridge.pairing_key` in
-  `config.json`: the phone remote pairs once by typing it (or opening a `?pair=<key>` link). Suggest a guest
+  `config.json` (12 to 128 letters, digits, `-` or `_`; the bridge refuses a shorter one at start, so pick a long enough one first time): the phone remote pairs once by typing it (or opening a `?pair=<key>` link). Suggest a guest
   Wi-Fi network for visitors (most routers have one) so they cannot reach it. Option C asks for a PIN shown on the TV
   the first time.
 

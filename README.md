@@ -1,7 +1,7 @@
 # couch-tv
 
 Your own home screen and phone remote for a Google TV, an Android TV or a Fire TV, with app
-versions for Samsung and LG (run on nine real LGs so far), a Roku version, and Beta versions for
+versions for Samsung and LG (run on ten real LGs so far), a Roku version, and Beta versions for
 Hisense VIDAA, Philips, Panasonic, VIZIO, Fire TV on Vega OS and Apple TV
 ([Will it work on my TV?](#will-it-work-on-my-tv)). No ads on the home screen. Open source (MIT).
 
@@ -20,6 +20,13 @@ The newest release is **0.12** (9 November 2026). The TV apps come from
 the next release" below is not in those apps yet: build them yourself ("Building the app") if you
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
+
+**13 November 2026: smaller fixes (on main, in the next release).** The home's quick buttons for
+Bluetooth and Network now open the TV's settings straight from the launcher, and the sleep timer
+button no longer says it needs the computer when the launcher can do it itself. The doorbell card also
+shows on Android 6 and 7 (Fire OS 6), and a failed app launch no longer crashes the launcher.
+Thanks ekagra-codes (#137). The LG page and the bridge on Windows are better covered (a time zone
+package, the firewall, starting at logon, and two minutes to press Accept), thanks BlueSpark911 (#136).
 
 **13 November 2026: Smart Idle, optional (on main, in the next release).** Off unless you switch it on
 in Home settings, under Look. After a wait on the home screen (5 minutes to an hour) it shows a dim,
@@ -120,7 +127,7 @@ it goes on your LG as an app through LG's Developer Mode, and the computer at ho
 time the TV is switched on. It was built from LG's own documentation and tested against a stand-in,
 so if you have an LG, you would be among the first to run it: give this repo to your agent, and
 please open an issue saying how it went. Setup and limits: [docs/LG.md](docs/LG.md). (It has since
-run on nine real LGs.)
+run on ten real LGs.)
 
 **30 October 2026: Fire TV sticks, older TVs, smart home and your own scenes.** Sixteen people
 have forked couch-tv so far, and six of them built something worth having. The best of it is now in
@@ -404,7 +411,7 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **Fire TV on Fire OS** (Fire OS 6, 7 and 8: Fire TV Stick 4K 1st gen and newer, Stick 4K Max, Cube) | Partial. Takes the Home key back, but Amazon's home flashes up first | Partial | Partial. It takes the Home key back, but on current Fire OS the phone remote cannot press keys or type ([why](on-tv/README.md#fire-tv-fire-os)) |
 | **Fire TV on Vega OS** (Stick 4K Select and newer) | App only, built once with Amazon's free developer tools | **Beta**, with a computer at home that stays on: an app that opens itself when the stick comes up. Amazon's Home button still opens Amazon's home; the phone remote works while couch-tv is in front, and Netflix and YouTube open from the phone ([how](docs/FIRE-VEGA.md)) | No |
 | **Samsung** (Tizen) | App only, opened from Samsung's app row (or reopened by its Autorun Last App) | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
-| **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on nine real LGs so far ([how](docs/LG.md)) | No |
+| **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on ten real LGs so far ([how](docs/LG.md)) | No |
 | **Roku** (TV or box) | App only, a sideloaded channel opened from Roku's home row, while Developer Mode is on | With a computer at home: as a channel that opens itself, not a true home screen. Built from Roku's documentation, first real Roku reports wanted ([how](docs/ROKU.md)) | No |
 | **Hisense with VIDAA** | App only: a tile on the app row where the firmware allows it, else the TV's browser | **Beta**, with a computer at home that stays on: a page that opens itself in the TV's browser. VIDAA's Home button still opens VIDAA's home unless you opt in with `keep_home` ([how](docs/VIDAA.md)) | No |
 | **Philips with Titan OS** (mostly Europe) | Needs a Titan app: a Titan store app or Titan's DevView, not there yet | **Beta**, with a computer at home that stays on: the phone remote works now (power, keys, volume, inputs, apps). The home opens once there is a Titan app ([how](docs/PHILIPS-TITAN.md)) | No |
@@ -446,7 +453,7 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, from public sou
   on, and presses Developer Mode's Extend once a day so LG does not remove it. LG's own Home button
   still opens LG's menu. The phone remote and the assistant work: Netflix opens the title, YouTube
   opens the video, other apps open on their home page. No "what is playing" and no screenshots.
-  It has run on nine real LGs so far (from webOS 4.10 to 2025 models on webOS 10.3.2, and one
+  It has run on ten real LGs so far (from webOS 4.10 to 2025 models on webOS 10.3.2 and 11.2, and one
   upgraded to webOS 26): if you try it on another model, please
   open an issue and say how it went. Setup and limits:
   [docs/LG.md](docs/LG.md).
@@ -1033,7 +1040,7 @@ protocol and ADB.
 
 - Google TV and Android TV run everything. Fire TV (Fire OS) runs all three options, with Amazon's
   home flashing up first. Samsung runs it as an app, with a computer that stays on, and LG the
-  same way (run on nine real LGs so far). Roku is built the same way but not yet run on a real Roku.
+  same way (run on ten real LGs so far). Roku is built the same way but not yet run on a real Roku.
   Developer mode has to be on.
 - A Google TV update can switch ambient mode back on. Option B's bridge checks once a day and
   switches it off again; with option A, run `apply.sh` again. couch-tv never switches the Google

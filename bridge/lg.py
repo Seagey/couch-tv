@@ -529,7 +529,7 @@ class LGTV:
                     # prompt: asked again at most every 10 minutes, so nobody is pestered.
                     if self._key() or time.monotonic() - self._prompt_at > 600:
                         try:
-                            await self._remote(pairing_wait=60)
+                            await self._remote(pairing_wait=120)
                         except TVUnavailable as e:
                             self._prompt_at = time.monotonic()
                             self.log.info("remote: %s", e)
