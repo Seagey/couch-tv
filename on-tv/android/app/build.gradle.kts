@@ -51,6 +51,8 @@ dependencies {
     implementation("org.conscrypt:conscrypt-android:2.5.3")
     // Makes the self-signed certificate the ADB TLS handshake needs.
     implementation("org.bouncycastle:bcpkix-jdk15to18:1.81")
+    // Unit tests for the plain Kotlin rules (KeepMergeTest), run with testDebugUnitTest (EPL 1.0).
+    testImplementation("junit:junit:4.13.2")
 }
 
 // The phone remote and the TV home are built elsewhere in the repo. Copy them in before every build.

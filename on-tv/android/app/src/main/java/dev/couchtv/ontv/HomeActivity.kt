@@ -68,6 +68,11 @@ class HomeActivity : Activity() {
                 override fun shouldInterceptRequest(view: WebView, req: WebResourceRequest): WebResourceResponse? {
                     val u = req.url
                     if (u.host != "tvos.invalid") return null
+                    // a Watch Next card's picture the page cannot load itself (WatchNext.art, #122)
+                    if (u.pathSegments.firstOrNull() == "art") {
+                        val b = WatchNext.art(u.lastPathSegment ?: "") ?: return null
+                        return WebResourceResponse("image/jpeg", null, ByteArrayInputStream(b))
+                    }
                     val pkg = u.lastPathSegment ?: return null
                     val isIcon = u.pathSegments.firstOrNull() == "icon"
                     val img = (if (isIcon) iconImage(pkg) else bannerImage(pkg)) ?: return null
@@ -151,6 +156,8 @@ class HomeActivity : Activity() {
             return true
         }
         @JavascriptInterface fun openSettings(): Boolean = runCatching { Tv.openSettings() }.isSuccess
+        /** A Keep watching card from Android's Watch Next rows (#122): the page opens it here, as the TV home app does. */
+        @JavascriptInterface fun openWatchNext(id: String): Boolean = runCatching { WatchNext.open(id) }.getOrDefault(false)
         @JavascriptInterface fun version(): String = BuildConfig.VERSION_NAME
         @JavascriptInterface fun keep(key: String, value: String) { getSharedPreferences("page", MODE_PRIVATE).edit().putString(key, value).apply() }
         @JavascriptInterface fun kept(key: String): String? = getSharedPreferences("page", MODE_PRIVATE).getString(key, null)

@@ -56,6 +56,9 @@ jobs:
       - name: Build the TV apps
         run: sh scripts/build-apk.sh
 
+      - name: On-TV app unit tests
+        run: tv-home/android/gradlew -p on-tv/android --no-daemon -q testDebugUnitTest
+
       - name: Signing fingerprints
         run: for f in dist/*.apk; do echo "$f"; "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$f" | grep -i "SHA-256"; done
 

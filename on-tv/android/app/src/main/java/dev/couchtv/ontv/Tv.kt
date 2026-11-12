@@ -98,7 +98,7 @@ object Tv {
         return "intent"
     }
 
-    private fun start(i: Intent) {
+    fun start(i: Intent) {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         var err: Exception? = null
         val latch = java.util.concurrent.CountDownLatch(1)

@@ -160,6 +160,11 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "POST /api/continue/open" -> {
                 val b = body(s)
                 val id = b.optString("id").ifEmpty { throw ApiError(400, "id is required") }
+                // a card from Android's Watch Next rows (#122): its app opens it, as on the TV
+                if (id.startsWith(WatchNext.ID_PREFIX)) {
+                    if (!WatchNext.open(id)) throw ApiError(404, "not in keep watching")
+                    return json(200, ok())
+                }
                 val it = Store.historyItem(id) ?: throw ApiError(404, "not in keep watching")
                 json(200, ok(Finder.play(it.getString("title"), it.optInt("season").takeIf { s -> s > 0 }, it.optInt("episode").takeIf { s -> s > 0 },
                     it.optString("service").ifEmpty { null }, b.optString("who").ifEmpty { null }, resume = true)))
@@ -351,6 +356,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         .put("people", Store.people()).put("weather", Store.weather()).put("country", Store.country()).put("tv_name", Store.tvName())
         .put("ask", JSONObject().put("enabled", Store.bool("ask_enabled")).put("has_key", !Store.str("ask_key").isNullOrEmpty()).put("model", Ask.MODEL))
         .put("phones", Auth.phoneCount()).put("port", Store.port).put("adb", JSONObject(Adb.status()))
+        .put("skip_watch_next", JSONArray(Store.skipWatchNext().sorted())).put("watch_next_per_app", Store.watchNextPerApp())
+        .put("watch_next", JSONObject().put("granted", WatchNext.granted()).put("listed", WatchNext.listed()))
 
     /** {"people": [...]} replaces the list; {"order": [ids]} only reorders it. */
     private fun savePeople(b: JSONObject) {
@@ -397,6 +404,13 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         b.optString("tv_name").trim().takeIf { it.isNotEmpty() }?.let { Store.putStr("tv_name", it.take(30)) }
         if (b.has("ask_key")) Store.putStr("ask_key", b.optString("ask_key").trim().ifEmpty { null })
         if (b.has("ask_enabled")) Store.putBool("ask_enabled", b.optBoolean("ask_enabled"))
+        // Watch Next in Keep watching (#122): the TV home app's two settings, same names and limits
+        b.optJSONArray("skip_watch_next")?.let { arr ->
+            val clean = JSONArray()
+            (0 until minOf(arr.length(), 100)).map { arr.optString(it).trim() }.filter { Store.PACKAGE.matches(it) }.distinct().forEach { clean.put(it) }
+            Store.putStr("skip_watch_next", clean.toString())
+        }
+        if (b.has("watch_next_per_app")) Store.putStr("watch_next_per_app", b.optInt("watch_next_per_app", 5).coerceIn(1, 20).toString())
     }
 
     // ---------------------------------------------------------------- server-sent events

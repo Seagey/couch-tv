@@ -164,6 +164,19 @@ to date Fire TV, **Connect ADB** cannot work, and the setup screen says so. The 
 playing" do not work there; opening apps, playing a show by name, volume on the TV's own speaker
 and the sleep timer still do. ADB from another computer is not blocked, so for the full phone
 remote on a Fire TV use option B (the bridge), or Amazon's own Fire TV phone app for the keys.
+
+**Keep watching on such a Fire TV** comes from Android's own "Continue watching" (Watch Next) rows
+instead (#122), the way the TV home app (option A) does it: the shows each app keeps there, newest
+first, with how far in, and OK opens the app's own link. It needs one more grant from a computer:
+
+```
+adb shell pm grant dev.couchtv.ontv android.permission.READ_TV_LISTINGS
+```
+
+Only apps that keep Watch Next rows show (Nuvio does, on a Fire TV Stick 4K 2nd gen); the rows are
+the same for everyone at the TV (never on a kids profile). `skip_watch_next` and `watch_next_per_app` (POST /api/settings,
+the same names and limits as docs/CONFIG.md) hide an app or cap its cards. A TV whose app has ever
+connected its own ADB keeps Keep watching exactly as before.
 Reported in [issue #12](https://github.com/Seagey/couch-tv/issues/12) (Fire TV Stick, Fire OS 7.7.1.7)
 and [issue #50](https://github.com/Seagey/couch-tv/issues/50) (an Insignia Fire TV Edition on Fire OS 6.7.1.1,
 where Option C works as a home screen with the usage access grant).
@@ -265,7 +278,7 @@ out every computer, so reconnect yours afterwards).
 | Apps do not open from the phone | Android blocked an app start from the background. Connect ADB once: the app then has the permission it needs. |
 | Home button still goes to Google's home | See "Use it as the home screen". |
 | Server not answering after a TV update | Open Couch TV once; it also starts at boot. |
-| Keep watching stays empty | Connect ADB (the TV reads what is playing through it), then watch a show for a minute. Apps that do not say what is playing, YouTube and music never land there. See "Keep watching and people". |
+| Keep watching stays empty | Connect ADB (the TV reads what is playing through it), then watch a show for a minute. Apps that do not say what is playing, YouTube and music never land there. See "Keep watching and people". On a current Fire TV, where Connect ADB cannot work, grant READ_TV_LISTINGS instead (Fire TV (Fire OS), above). |
 | App icons look soft on a big TV | Update the app: icons are now drawn at 256 px from the sharpest icon each app ships. Older versions drew them at the TV's own density, often 96 px. |
 
 ## How it works
@@ -294,6 +307,9 @@ out every computer, so reconnect yours afterwards).
   Saves the home page makes itself are left alone.
 
 ## Tests
+
+`KeepMergeTest` (plain JUnit, `gradlew -p on-tv/android testDebugUnitTest`, run by CI) checks how
+Keep watching lists Android's Watch Next rows and merges them with this TV's own history.
 
 `scripts/emulator-test.mjs` drives an Android TV emulator end to end (pairing, 401s, loopback ADB
 with the real "Allow debugging?" dialog, keys, launch, deep link, volume, power, the phone page at
