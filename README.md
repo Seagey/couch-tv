@@ -21,6 +21,8 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: Home settings lists stay put on older Samsungs (on main, in the next release).** On a 2020 Samsung (Tizen 5.5), moving down a long Home settings list such as Apps flashed the list up to the top and back on every press. The list now keeps its place and only the step to the next row scrolls. Thanks vicenteveltri (#156).
+
 **13 November 2026: Hebrew and right to left layout on the TV home (on main, in the next release).** The home now speaks
 Hebrew (עברית), including the TV's own `he` or older `iw` language setting. The layout mirrors for right to left: the settings
 list moves to the right, chevrons flip, popups open on the correct side, and the remote's left and right buttons move the way
