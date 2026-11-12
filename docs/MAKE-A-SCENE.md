@@ -102,6 +102,7 @@ Add the scene to `home.my_scenes` in `config.json`:
 | `date` ["above"] | The date and weather line: `above` the clock or `below` it. It lines up with the clock's side. |
 | `text` ["light"] | `light`: white date, bright glass. `dark`: dark date and a smoky glass, for a pale picture. |
 | `cutout` [false] | `true` only when step 6 made `scene-<id>-fg.webp`. The tool prints it when it did. |
+| `video` [false] | `true` plays `scene-<id>.mp4`, a looping silent clip, over the photo ([step 7](#7-optional-a-moving-scene)). |
 
 The page keeps the clock above Keep watching and the dock whatever the numbers say, and the date
 moves aside if it would run into the people switch or the quick buttons.
@@ -224,6 +225,35 @@ cliff at the side of the picture; if a digit vanishes, move the clock.
 | A soft halo along the skyline | Route B: install pymatting for the exact edge (on by default once it is there). |
 | Route A says the edit moved the scene | Make the edit again; never raise `--limit` to force a cut-out that does not line up. |
 | Nothing works | Run step 2 again without `--depth` or `--sky-edit` and leave `cutout` out. The clock sits over the photo, which is fine. |
+
+## 7. Optional: a moving scene
+
+A scene can play its own short clip, looping and silent: a nebula drifting, a black hole's disk
+turning, clouds passing. The clip plays over the photo and under the cut-out and the clock, so the
+scenery in the cut-out stays in front of the digits while everything behind it moves. Only the
+scene on screen plays, and only while the home is showing; it stops the moment an app opens.
+
+1. Make the scene from the clip's first frame (steps 1 to 6), so the photo, the glass fill and the
+   cut-out match the clip.
+2. Make the clip from that same picture: any image-to-video model, a locked-off camera, and the
+   scenery in the cut-out told to stay completely still. Ask for clearly visible motion. Clips
+   made to start and end on the same frame often come out nearly frozen; make an ordinary clip
+   and blend its end into its start instead (below).
+3. Loop it and fit it for a TV: H.264, 1920x1080, no sound, a few MB at most.
+
+   ```sh
+   # the clip from 1.5 s on, its last 1.5 s faded into its first 1.5 s: it ends where it starts
+   D=$(ffprobe -v error -show_entries format=duration -of csv=p=0 clip.mp4)
+   ffmpeg -i clip.mp4 -filter_complex "[0:v]trim=start=1.5,setpts=PTS-STARTPTS[a];[0:v]trim=end=1.5,setpts=PTS-STARTPTS[b];[a][b]xfade=transition=fade:duration=1.5:offset=$(echo "$D - 3" | bc),format=yuv420p" \
+     -an -c:v libx264 -profile:v high -level 4.1 -crf 21 -r 24 -vf scale=1920:1080 -movflags +faststart \
+     tv-home/web/backgrounds/mine/scene-<id>.mp4
+   ```
+
+4. Add `"video": true` to the scene in `home.my_scenes`. Option A: build the app again and run
+   `apply.sh` (step 5), since the clip goes inside the app.
+
+The photo shows until the clip really plays, and stays if it cannot, so a clip the TV refuses
+does no harm. Lighter home and the whole-home video (`home.video_url`) leave scene clips off.
 
 ## Credits
 

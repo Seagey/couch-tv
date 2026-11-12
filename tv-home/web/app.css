@@ -285,6 +285,11 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .scene.ready { display: block; will-change: opacity; }   /* painted while it waits at opacity 0, not on the first frame of the fade */
 .scene.on { opacity: 1; }
 .scene .sbg, .scene .fg { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+/* a scene's own clip (home.my_scenes[].video): over the photo, under the cut-out and the clock */
+.scene .svid { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 600ms ease-in-out; }
+.scene .svid.playing { opacity: 1; }
+.night .scene .svid { filter: brightness(0.72); }
+.has-video .scene .svid { display: none; }
 .scene .shade { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
 .gclock {
   position: absolute; left: 0; right: 0; top: 9.375rem; text-align: center; white-space: nowrap;

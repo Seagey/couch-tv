@@ -686,7 +686,10 @@
         name: typeof m.name === "string" ? m.name.slice(0, 40) : "",
         x: ["left", "right"].indexOf(c.x) >= 0 ? c.x : "centre", y: y, size: size,
         inter: inter, weight: Math.round(share(c.weight, 100, 900, 600) / 100) * 100,
-        below: below, dark: m.text === "dark" });
+        below: below, dark: m.text === "dark",
+        // video: true plays backgrounds/mine/scene-<id>.mp4 (muted, looping) over the photo, under
+        // the cut-out and the clock, while this scene is the one on screen
+        video: m.video === true });
     });
     return out;
   }
@@ -708,6 +711,10 @@
     var order, off;
     if (Array.isArray(ST.scene_order)) {
       order = ST.scene_order.filter(uniq);
+      // a scene added since the order was saved: one named in home.scenes leads, in that order
+      // (a newly made scene is the one you want to see); anything else goes at the end
+      var fresh = (HOME.scenes || []).filter(function (id) { return ids.indexOf(id) >= 0 && order.indexOf(id) < 0; }).filter(uniq);
+      order = fresh.concat(order);
       order = order.concat(ids.filter(function (id) { return order.indexOf(id) < 0; }));
       off = (Array.isArray(ST.scenes_off) ? ST.scenes_off : []).filter(function (id) { return ids.indexOf(id) >= 0; });
     } else {
@@ -728,7 +735,8 @@
     sceneEls = SCENES.map(function (s) {
       var el = document.createElement("div");
       el.className = "scene s-" + sceneClass(s);
-      el.innerHTML = '<img class="sbg" alt=""><div class="shade"></div><div class="gclock"></div>' +
+      el.innerHTML = '<img class="sbg" alt="">' + (s.video ? '<video class="svid" muted loop playsinline preload="none"></video>' : "") +
+        '<div class="shade"></div><div class="gclock"></div>' +
         (s.water ? '<div class="gclock under"></div>' : "") + (s.fg ? '<img class="fg" alt="">' : "");
       if (s.mine) {   // your own scene: its clock from config.json (app.css, "your own scenes")
         el.className += " x-" + s.x + (s.inter ? " f-inter" : "") + (s.dark ? " t-dark" : "");
@@ -838,11 +846,38 @@
     v.removeAttribute("src");
     try { v.load(); } catch (e) {}
   }
-  function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); }
+  function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); sceneVideos(false); }
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) pauseVideo();
-    else { setIdleAmbient(false); resetSmartIdle(); startVideo(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); }
+    else { setIdleAmbient(false); resetSmartIdle(); startVideo(); sceneVideos(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); }
   });
+
+  // A scene's own clip (home.my_scenes[].video): only the scene on screen plays, and only while the
+  // home is showing. The photo under it stays until the clip really plays; a clip that fails just
+  // leaves the photo. Lighter home and the whole-home video (home.video_url) leave clips off.
+  function sceneVideos(on) {
+    sceneEls.forEach(function (el, k) {
+      var v = el.querySelector(".svid");
+      if (!v) return;
+      var s = SCENES[k];
+      if (on && k === scene && !LIGHTER && !VIDEO_ON && !document.hidden) {
+        if (!v.getAttribute("src")) {
+          v.onplaying = function () { v.classList.add("playing"); };
+          v.onerror = function () { v.classList.remove("playing"); };
+          v.src = "backgrounds/" + s.photo + ".mp4";
+        }
+        var p = v.play();
+        if (p && p.catch) p.catch(function () {});
+      } else if (v.getAttribute("src")) {
+        v.pause();
+        if (k !== scene) {   // off screen: let go of the decoder and the memory
+          v.classList.remove("playing");
+          v.removeAttribute("src");
+          try { v.load(); } catch (e) {}
+        }
+      }
+    });
+  }
 
   function showScene(i) {
     var prev = scene;
@@ -868,6 +903,7 @@
       var next = nextFrom(scene);
       sceneEls.forEach(function (el, k) { if (k !== scene && k !== next) el.classList.remove("ready"); });
       readyScene(next);
+      sceneVideos(true);   // the old scene's clip stops now it has faded out; this one's starts
     }, 2000);
   }
 
@@ -4518,7 +4554,7 @@
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
+    resume: function () { toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
     pause: pauseVideo,
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
