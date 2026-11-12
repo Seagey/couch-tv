@@ -78,6 +78,15 @@
     <div class="msg" id="kids-msg" role="status"></div>
   </section>
 
+  <section class="card" id="xiaomi" style="display:none">
+    <h2>Xiaomi: Couch TV in PatchWall's place (optional, off by default)</h2>
+    <p>The remote's PatchWall button opens Couch TV, PatchWall opens Couch TV instead, and Couch TV opens when the TV is switched on, unless the TV is going back to an HDMI input. The Home button is not changed. It needs the Home button watch switched on in Settings, Accessibility (Couch TV home watch); with this on, that watch also checks each remote key for the PatchWall button and passes every other key on.</p>
+    <label class="check"><input type="checkbox" id="pw-on"> Couch TV in PatchWall's place</label>
+    <p id="pw-state"></p>
+    <div class="row"><button class="go" id="pw-save">Save</button></div>
+    <div class="msg" id="pw-msg" role="status"></div>
+  </section>
+
   <section class="card">
     <h2>Ask (optional, off by default)</h2>
     <p>On-TV mode has no Claude unless you add your own Anthropic API key. Each ask uses Claude Haiku 5.5 and costs about a fifth of a US cent. Use a key made only for this TV, with a monthly spend limit set in the Anthropic Console: the key is stored on the TV, and anyone with ADB access to the TV could read it.</p>
@@ -116,6 +125,11 @@
       $('place').value = j.weather.place || ''; $('lat').value = j.weather.lat; $('lon').value = j.weather.lon;
       $('tz').value = j.weather.timezone || ''; $('country').value = j.country || '';
       $('ask-on').checked = !!j.ask.enabled;
+      if (j.xiaomi) {
+        $('xiaomi').style.display = '';
+        $('pw-on').checked = !!j.patchwall_replace;
+        $('pw-state').textContent = j.watch ? '' : 'The Home button watch is off: switch on Couch TV home watch in the TV\'s Settings, Accessibility.';
+      }
       $('ask-state').textContent = j.ask.has_key ? 'A key is saved. Model: ' + j.ask.model + '.' : 'No key saved.';
       $('phones').textContent = j.phones + (j.phones === 1 ? ' phone is' : ' phones are') + ' paired with this TV.';
       showAdb(j.adb);
@@ -163,6 +177,9 @@
     var body = { ask_enabled: $('ask-on').checked };
     if ($('ask-key').value.trim()) body.ask_key = $('ask-key').value.trim();
     api('POST', '/api/settings', body).then(function () { $('ask-key').value = ''; $('ask-msg').textContent = 'Saved.'; load(); }).catch(function (e) { $('ask-msg').textContent = e.message; });
+  };
+  $('pw-save').onclick = function () {
+    api('POST', '/api/settings', { patchwall_replace: $('pw-on').checked }).then(function () { $('pw-msg').textContent = 'Saved.'; load(); }).catch(function (e) { $('pw-msg').textContent = e.message; });
   };
   $('ask-clear').onclick = function () {
     api('POST', '/api/settings', { ask_key: '', ask_enabled: false }).then(function () { $('ask-msg').textContent = 'Key removed.'; load(); });

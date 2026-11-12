@@ -21,6 +21,12 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: Xiaomi TVs, Couch TV in PatchWall's place, and a lighter home page on 1 GB TVs (on main, in the next release).**
+In the on-TV app on a Xiaomi or Redmi TV, a setup page switch (off by default, Xiaomi only) makes the remote's PatchWall
+button, PatchWall's tile and power on open Couch TV, but never over an HDMI or TV input wake. The Home button is not
+changed. On low memory TVs the home page is now released only when Android says memory is critical, and comes back when
+the app does. See [on-tv/README.md](on-tv/README.md). Thanks gauharjk (#151).
+
 **13 November 2026: VIDAA fixes from a Hisense 43A6N (on main).** A VIDAA trace now hides the refresh
 token as well as the access token. With `keep_home` on, the phone remote's Input key no longer has
 couch-tv jump back over VIDAA's source picker. Pairing now keeps the token a TV sends on its

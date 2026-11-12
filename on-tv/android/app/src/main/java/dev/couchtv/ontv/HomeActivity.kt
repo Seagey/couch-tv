@@ -48,7 +48,52 @@ class HomeActivity : Activity() {
         App.startService(this)
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
         CookieManager.getInstance().setCookie(base, "couchtv_token=${Auth.internalToken}; path=/")
-        val w = WebView(this).apply {
+        val w = makeWeb()
+        web = w
+        shown = java.lang.ref.WeakReference(this)
+        setContentView(w)
+        hideBars()
+        load()
+    }
+
+    /**
+     * Low-memory TVs (1 GB): BridgeService keeps this process important, so Android never reclaims
+     * the home page while another app is in front. Only when Android says memory is critical, and
+     * the page is out of sight, drop the WebView; onStart builds it again. No timer, so normal use
+     * never pays for a rebuild. The activity stays, so Back still lands here.
+     */
+    private fun release() {
+        val w = web ?: return
+        if (front || isFinishing || isDestroyed) return
+        web = null; ready = false
+        banners.clear(); icons.clear()
+        setContentView(View(this).apply { setBackgroundColor(GROUND) })
+        w.stopLoading(); w.removeAllViews(); w.destroy()
+        android.util.Log.i("couchtv.home", "home page released (memory critical)")
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        // Only the most severe states: RUNNING_CRITICAL (this process runs a service) or COMPLETE (cached).
+        // On a 1 GB TV, RUNNING_LOW arrives every time YouTube or Netflix starts; releasing then made every
+        // return take 3 to 7 seconds, so it is left alone, as are UI_HIDDEN and RUNNING_MODERATE.
+        if (level == TRIM_MEMORY_RUNNING_CRITICAL || level >= TRIM_MEMORY_COMPLETE) release()
+    }
+
+    override fun onStart() { super.onStart(); rebuildIfReleased() }
+
+    /** Also called from onResume: the page can be released while this activity is paused but not stopped
+     *  (partly covered), and then onStart never runs again, so it would stay blank. */
+    private fun rebuildIfReleased() {
+        if (web != null || isFinishing || isDestroyed) return
+        val w = makeWeb()
+        web = w
+        setContentView(w)
+        hideBars()
+        load()
+    }
+
+    private fun makeWeb(): WebView = WebView(this).apply {
             setBackgroundColor(GROUND)
             isFocusable = true; isFocusableInTouchMode = true
             overScrollMode = View.OVER_SCROLL_NEVER
@@ -81,16 +126,10 @@ class HomeActivity : Activity() {
                 }
             }
         }
-        web = w
-        shown = java.lang.ref.WeakReference(this)
-        setContentView(w)
-        hideBars()
-        load()
-    }
 
     private fun load() { web?.loadUrl("$base/tv/") }
 
-    override fun onResume() { super.onResume(); front = true; hideBars(); if (ready) js("window.tv && tv.resume()") }
+    override fun onResume() { super.onResume(); front = true; rebuildIfReleased(); hideBars(); if (ready) js("window.tv && tv.resume()") }
     // the video background stops while an app is in front
     override fun onPause() { super.onPause(); front = false; js("window.tv && tv.pause && tv.pause()") }
     @Volatile private var front = false
@@ -238,6 +277,7 @@ class HomeActivity : Activity() {
 
     override fun onDestroy() {
         if (shown?.get() === this) shown = null
+        web?.let { web = null; it.stopLoading(); it.destroy() }
         super.onDestroy()
     }
 

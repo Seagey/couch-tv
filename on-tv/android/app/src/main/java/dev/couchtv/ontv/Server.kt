@@ -364,6 +364,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         .put("phones", Auth.phoneCount()).put("port", Store.port).put("adb", JSONObject(Adb.status()))
         .put("skip_watch_next", JSONArray(Store.skipWatchNext().sorted())).put("watch_next_per_app", Store.watchNextPerApp())
         .put("watch_next", JSONObject().put("granted", WatchNext.granted()).put("listed", WatchNext.listed()))
+        // Xiaomi only: Couch TV in PatchWall's place (FireHome); the setup page shows the switch when xiaomi is true
+        .put("xiaomi", FireHome.isXiaomi).put("patchwall_replace", Store.bool("patchwall_replace")).put("watch", WatchService.connected)
 
     /** {"people": [...]} replaces the list; {"order": [ids]} only reorders it. */
     private fun savePeople(b: JSONObject) {
@@ -410,6 +412,10 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         b.optString("tv_name").trim().takeIf { it.isNotEmpty() }?.let { Store.putStr("tv_name", it.take(30)) }
         if (b.has("ask_key")) Store.putStr("ask_key", b.optString("ask_key").trim().ifEmpty { null })
         if (b.has("ask_enabled")) Store.putBool("ask_enabled", b.optBoolean("ask_enabled"))
+        if (b.has("patchwall_replace") && FireHome.isXiaomi) {
+            Store.putBool("patchwall_replace", b.optBoolean("patchwall_replace"))
+            WatchService.keyFilterChanged()
+        }
         // Watch Next in Keep watching (#122): the TV home app's two settings, same names and limits
         b.optJSONArray("skip_watch_next")?.let { arr ->
             val clean = JSONArray()
