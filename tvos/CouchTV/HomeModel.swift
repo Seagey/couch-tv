@@ -32,6 +32,11 @@ final class HomeModel: ObservableObject {
     @Published var showSettings = false
     @Published var showMore = false
     @Published var posters: [String: PlatformImage] = [:]     // Keep watching pictures, by card id
+    @Published var kids: KidsShelf?                           // the person watching is a kids profile
+    @Published var kidsUnlockedFor: String?                   // a kids profile a grown up unlocked, with nobody to move to
+    @Published var pin: PinPad?                               // the parent PIN pad, while it is open
+    @Published var kidPosters: [String: PlatformImage] = [:]  // shelf pictures, by show id
+    private var wrongs: [Date] = []
 
     let bridge: BridgeClient
     private let finder = BridgeFinder()
@@ -64,6 +69,9 @@ final class HomeModel: ObservableObject {
     var dockApps: [DockApp] { Array(apps.prefix(min(dockLine, prefs.dockMax))) }
 
     var connected: Bool { state == .connected }
+
+    /// Kids mode is showing: the person watching is a kids profile, and no grown up has unlocked it.
+    var kidsOn: Bool { kids.map { $0.who == who && kidsUnlockedFor != who } ?? false }
 
     func timeText(_ d: Date) -> String {
         let c = Calendar.current.dateComponents([.hour, .minute], from: d)
@@ -165,10 +173,13 @@ final class HomeModel: ObservableObject {
             }
             state = .connected
             if let w = try? await bridge.get("/api/who"), let id = JSON.string(w["who"]) { who = id }
+            await refreshKids()
             if ticks == 1 || ticks % 20 == 0 || weather == nil, let w = try? await bridge.get("/api/weather") {
                 weather = JSON.weather(w)
             }
-            if prefs.keepWatching {
+            if kidsOn {
+                items = []          // no Keep watching in kids mode, theirs or anyone's
+            } else if prefs.keepWatching {
                 items = JSON.items((try? await bridge.get("/api/continue", who.isEmpty ? [:] : ["who": who]))?["items"])
                 await loadPosters()
             } else {
@@ -211,6 +222,10 @@ final class HomeModel: ObservableObject {
     // MARK: actions
 
     func open(_ app: DockApp) {
+        if kidsOn, !(kids?.apps.contains { $0.id == app.id } ?? false) {
+            say("Ask a grown up for that one.")
+            return
+        }
         #if canImport(UIKit)
         if let u = URLSchemes.url(for: app.id), UIApplication.shared.canOpenURL(u) {
             UIApplication.shared.open(u)
@@ -246,11 +261,136 @@ final class HomeModel: ObservableObject {
     }
 
     func choose(_ person: Person) {
+        if kidsOn { openPin(); return }      // leaving a kids profile: the parent PIN first
         who = person.id
         Task {
             _ = try? await bridge.post("/api/who", ["who": person.id])
-            items = JSON.items((try? await bridge.get("/api/continue", ["who": person.id]))?["items"])
+            await refreshKids()
+            items = kidsOn ? [] : JSON.items((try? await bridge.get("/api/continue", ["who": person.id]))?["items"])
             await loadPosters()
+        }
+    }
+
+    func openSettings() {
+        if kidsOn { openPin() } else { showSettings = true }
+    }
+
+    func openMore() {
+        if kidsOn { openPin() } else { showMore = true }
+    }
+
+    // MARK: kids mode (docs/APPLE-TV.md, "Kids mode")
+
+    /// Is the person watching a kids profile: their shelf, their apps and the PIN's hash, from the bridge. With the
+    /// bridge away it stays as it was (kept with the cache too), so a restart without the bridge stays locked.
+    func refreshKids() async {
+        if !who.isEmpty {
+            do {
+                kids = JSON.kids(try await bridge.get("/api/appletv/kids", ["who": who]))
+            } catch let e as BridgeError where e.status == 404 || e.status == 400 {
+                kids = nil          // a bridge from before kids mode on the Apple TV
+            } catch {}
+        }
+        if let u = kidsUnlockedFor, u != who { kidsUnlockedFor = nil }
+        if kidsOn {
+            showSettings = false
+            showMore = false
+            await loadKidPosters()
+        } else {
+            pin = nil
+        }
+    }
+
+    func loadKidPosters() async {
+        for s in kids?.shows ?? [] where kidPosters[s.id] == nil {
+            guard let u = bridge.picture(s.poster), let d = try? await bridge.data(u), let img = PlatformImage(data: d) else { continue }
+            kidPosters[s.id] = img
+        }
+    }
+
+    /// A show from the shelf: the bridge opens it (into the show where the app takes a link, else its app).
+    func openShow(_ s: KidsShow) {
+        say("Opening \(s.title)…", for: 3)
+        Task {
+            do {
+                let r = try await bridge.post("/api/appletv/kids/open", ["who": who, "id": s.id])
+                say(JSON.string(r["note"]) ?? "", for: 6)
+            } catch {
+                #if canImport(UIKit)
+                // the bridge away: at least the show's app, where it has a public address
+                if let b = s.appBundle, let u = URLSchemes.url(for: b), UIApplication.shared.canOpenURL(u) {
+                    _ = await UIApplication.shared.open(u)
+                    say("\(s.appName ?? "The app") is open. Pick \(s.title) there.", for: 6)
+                    return
+                }
+                #endif
+                say("\(s.title) did not open. Ask a grown up.")
+            }
+        }
+    }
+
+    /// Seconds left before the pad takes another try (five wrong PINs in a minute), else 0.
+    var pinWait: Int {
+        let now = Date()
+        let recent = wrongs.filter { now.timeIntervalSince($0) < KidsPIN.wait }
+        guard recent.count >= KidsPIN.tries, let first = recent.first else { return 0 }
+        return max(1, Int((KidsPIN.wait - now.timeIntervalSince(first)).rounded(.up)))
+    }
+
+    func openPin() {
+        guard kidsOn else { return }
+        pin = PinPad()
+    }
+
+    func closePin() { pin = nil }
+
+    /// A key on the pad: a digit, "del" or "ok". The right PIN unlocks as soon as it is typed.
+    func pinKey(_ k: String) {
+        guard var p = pin, let shelf = kids else { return }
+        wrongs = wrongs.filter { Date().timeIntervalSince($0) < KidsPIN.wait }
+        if pinWait > 0 { p.message = ""; pin = p; return }
+        switch k {
+        case "del":
+            if !p.digits.isEmpty { p.digits.removeLast() }
+            p.message = ""
+        case "ok":
+            if KidsPIN.matches(p.digits, shelf) { unlock(p.digits); return }
+            guard !p.digits.isEmpty else { return }
+            wrongs.append(Date())
+            p.digits = ""
+            p.message = "That PIN is not right."
+            p.wrong += 1
+        default:
+            guard k.count == 1, k.allSatisfy(\.isNumber), p.digits.count < KidsPIN.longest else { return }
+            p.digits += k
+            p.message = ""
+            if KidsPIN.matches(p.digits, shelf) { unlock(p.digits); return }
+        }
+        pin = p
+    }
+
+    /// The right PIN: the Apple TV moves to the first grown up, and the bridge checks the PIN again. With nobody
+    /// to move to, or the bridge away, kids mode stays off on this profile until someone else is picked.
+    private func unlock(_ code: String) {
+        guard let shelf = kids else { return }
+        pin = nil
+        wrongs = []
+        let grown = people.first { shelf.grownUps.contains($0.id) }?.id ?? shelf.grownUps.first
+        guard let g = grown else { kidsUnlockedFor = shelf.who; return }
+        Task {
+            do {
+                _ = try await bridge.post("/api/who", ["who": g, "pin": code])
+                who = g
+                kids = nil
+                items = prefs.keepWatching ? JSON.items((try? await bridge.get("/api/continue", ["who": g]))?["items"]) : []
+                await loadPosters()
+            } catch let e as BridgeError where e.status == 403 || e.status == 429 {
+                say(e.message)
+                await refreshKids()         // the PIN was changed on the phone: the new hash
+            } catch {
+                kidsUnlockedFor = shelf.who
+                say("Kids mode is off until someone else is picked. The bridge is not answering.", for: 8)
+            }
         }
     }
 
@@ -333,10 +473,11 @@ final class HomeModel: ObservableObject {
         var who: String
         var prefs: HomePrefs
         var dockLine: Int
+        var kids: KidsShelf?
     }
 
     private func saveCache() {
-        let c = Cache(apps: apps, people: people, who: who, prefs: prefs, dockLine: dockLine)
+        let c = Cache(apps: apps, people: people, who: who, prefs: prefs, dockLine: dockLine, kids: kids)
         if let d = try? JSONEncoder().encode(c) { UserDefaults.standard.set(d, forKey: "home-cache") }
     }
 
@@ -347,6 +488,7 @@ final class HomeModel: ObservableObject {
         who = c.who
         prefs = c.prefs
         dockLine = c.dockLine
+        kids = c.kids
     }
 }
 

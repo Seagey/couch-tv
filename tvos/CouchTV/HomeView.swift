@@ -164,9 +164,9 @@ struct HomeView: View {
                     .buttonStyle(BareButton())
                     .focused($focus, equals: .app(app.id))
                 }
-                toolTile("gearshape", tag: "settings", name: "Settings", focusAs: .settings) { model.showSettings = true }
+                toolTile("gearshape", tag: "settings", name: "Settings", focusAs: .settings) { model.openSettings() }
                 if !model.apps.isEmpty {
-                    toolTile("ellipsis", tag: "more", name: "More apps", focusAs: .more) { model.showMore = true }
+                    toolTile("ellipsis", tag: "more", name: "More apps", focusAs: .more) { model.openMore() }
                 }
                 if model.apps.isEmpty {
                     Text(model.bridge.link == nil ? "Set up the couch-tv bridge in Settings to see your apps here."

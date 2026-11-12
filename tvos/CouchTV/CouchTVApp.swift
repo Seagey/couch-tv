@@ -14,11 +14,18 @@ struct CouchTVApp: App {
 
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            Group {
+                if model.kidsOn { KidsView() } else { HomeView() }      // kids mode: only the shelf (KidsView.swift)
+            }
                 .environmentObject(model)
                 .onAppear { model.start() }
-                .fullScreenCover(isPresented: $model.showSettings) { SettingsView().environmentObject(model) }
-                .fullScreenCover(isPresented: $model.showMore) { MoreAppsView().environmentObject(model) }
+                // settings and every app never open over kids mode, whatever asks for them
+                .fullScreenCover(isPresented: Binding(get: { model.showSettings && !model.kidsOn }, set: { model.showSettings = $0 })) {
+                    SettingsView().environmentObject(model)
+                }
+                .fullScreenCover(isPresented: Binding(get: { model.showMore && !model.kidsOn }, set: { model.showMore = $0 })) {
+                    MoreAppsView().environmentObject(model)
+                }
                 .preferredColorScheme(.dark)
                 .onChange(of: phase) { _, now in
                     if now == .active { Task { await model.refresh() } }     // back from another app: fresh cards

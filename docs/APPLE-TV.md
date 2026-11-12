@@ -18,6 +18,7 @@ and say how it went (the Apple TV model, tvOS version, what worked and what did 
 | Replacing or coming before Apple's own home screen | **No, and it cannot be done.** tvOS lets no app replace the home, and couch-tv never jailbreaks anything. Apple's Home button still opens Apple's home |
 | Typing from the phone, screenshots, what is playing, a volume level | No (see "Limits") |
 | More than one TV on one phone remote | Yes, like the Roku and the LG: one bridge, several entries in `config.json` |
+| Kids mode (only a shelf of shows you picked, behind a parent PIN) | **New, Beta:** in Couch TV, with the bridge. Netflix, Disney+, Apple TV and YouTube posters open the show, other apps open on their home. Pair it with Apple's Restrictions ([Kids mode](#kids-mode)) |
 
 The phone remote costs nothing and needs no Apple account. Couch TV is free with your own Apple ID, but Apple makes a
 free signature run out after 7 days, so a Mac at home signs it again twice a week (a script does it).
@@ -59,7 +60,7 @@ same home again as a native SwiftUI app for tvOS 17 and newer:
   glass clock: the frosted photo seen through the digits, the scenery cut out in front of them, and the reflection
   on the water scene.
 - The date and the weather, the people switch, the sleep timer, Keep watching, and the dock with your apps, then
-  Settings and More apps. The Siri remote moves between them with tvOS's own focus, like any Apple TV app.
+  Settings and More apps. A kids profile sees only their shelf and allowed apps ([Kids mode](#kids-mode)). The Siri remote moves between them with tvOS's own focus, like any Apple TV app.
 - Picking an app asks the bridge to open it, because a tvOS app cannot open another app by its id. YouTube, Netflix
   and Spotify also open straight from Couch TV with their public addresses, even with the bridge away.
 - Picking a Keep watching card asks the bridge to open the show's app (on its own page, as with the phone remote).
@@ -159,6 +160,117 @@ anything else in couch-tv.
 - `tvos/make-project.py` writes the Xcode project and `tvos/make-assets.py` the fonts and icons. Run them after adding
   a Swift file or changing the look.
 
+## Kids mode
+
+**New, Beta, on main.** Kids mode ([CONFIG.md](CONFIG.md#kids-mode)) works in Couch TV too. Idea from Natalie Bruss
+(@nataliebruss on Instagram). It is off unless you set it up: nothing changes for a household with no kids profile.
+
+When the person watching is a kids profile, Couch TV shows only their shelf: big posters of the shows you picked, and
+under them the few apps you allow (up to six). Nothing else: no dock, no More apps, no Settings, no people switch, no
+Keep watching. Clicking a poster opens that show. **Grown ups** at the top right opens the parent PIN, which you type
+on a number pad with the Siri remote (up, down, left, right, then click); each digit shows as a dot. The right PIN
+moves the Apple TV to the first grown up's profile. Five wrong PINs in a minute and the pad waits a minute. Back
+(Menu) closes the pad, and on the shelf it goes nowhere, so it never reaches Couch TV's settings: the gear and
+More apps are not there, and if anything asks for them the PIN comes up instead.
+
+![Kids mode in Couch TV on an Apple TV](screens/appletv-kids-home.jpg)
+
+![The parent PIN on an Apple TV](screens/appletv-kids-pin.jpg)
+
+(Drawn on a Mac from Couch TV's own SwiftUI code against the stand-in bridge, like the pictures above.)
+
+**The PIN.** Couch TV is never given the PIN. The bridge sends it a salted hash of the PIN, the same one the TV home
+uses, and Couch TV checks what you type against that. The bridge checks the PIN again before it lets the Apple TV
+move away from the kids profile, and while a kids profile is watching it opens only the apps on that child's list.
+A PIN changed on the phone reaches the Apple TV within half a minute. If the computer is off, Couch TV stays in kids
+mode with the shelf it saw last.
+
+**What a poster opens, honestly.** A tvOS app cannot open another app by itself, so the bridge asks the Apple TV, over
+the same connection the phone remote uses. When the show's app is reported to take a link to a show on tvOS, the bridge
+hands the Apple TV that link; otherwise it opens the show's app on its own home page and says "pick Bluey there":
+
+| App | What a poster does |
+|---|---|
+| Netflix | Opens the show's page (`https://www.netflix.com/title/<id>`). Not a named episode: that link is for the show, so it says which season and episode to pick |
+| Disney+, Apple TV app | Opens the show's page, or the episode when JustWatch has an episode link |
+| YouTube | Opens the video (JustWatch rarely lists YouTube) |
+| ABC iview, SBS On Demand, 9Now, 10play, Stan, Binge, Prime Video and the rest | Opens the app on its own home page. Nothing public says their Apple TV apps take a show link, so couch-tv does not guess |
+| A show with its own `link` in `config.json` (not an Android `intent://` one) | That link first, for example one from the app's Share button on an iPhone. If the Apple TV refuses it, the app opens |
+
+Those links come from public notes (pyatv and Home Assistant, sources below) and have **not been tried on a real
+Apple TV here yet**. If the Apple TV refuses a link, the app opens instead, so the worst case is the app's home page.
+Each app must already be signed in on the Apple TV, and a "Who's watching?" screen may still come first.
+
+### Set it up on an Apple TV, start to finish
+
+You need the Apple TV, **a computer at home that stays on** running the bridge (README, option B: a Mac, a Linux
+box or a Raspberry Pi), and **a Mac with Xcode** (free from the App Store) to put Couch TV on the Apple TV. One Mac
+can do both, and that is the easiest way, because with a free Apple ID Couch TV has to be signed again every week and
+that Mac does it for you. Without a Mac there is no Couch TV, so no kids mode on the Apple TV (the phone remote still
+works).
+
+1. **Set up the phone remote** ([Set it up](#set-it-up) above) and **install Couch TV**
+   ([Install it free](#install-it-free-with-your-own-apple-id-the-main-way)), including the twice weekly signing job.
+2. **Make the kids profile**, either way:
+   - On the phone remote: TV, **Kids mode**, pick the child (add them under People first if they are not there), make
+     a PIN of 4 to 8 digits, then search for each show and tap the app it should open in, and pick the allowed apps.
+   - Or in `config.json`, on that person, then restart the bridge:
+     ```json
+     { "id": "ruby", "name": "Ruby", "kid": true,
+       "kids_mode": { "pin": "2580", "shows": ["Bluey", { "title": "Puffin Rock", "service": "netflix" }], "apps": ["abc-iview"] } }
+     ```
+   Where a show is on more than one app, pick the one the table above opens straight into the show.
+3. **Choose the child** in Couch TV (the names at the top left) or from the phone. Couch TV turns into their shelf.
+   Click a poster to check it opens, then try Grown ups and your PIN.
+4. **Lock the Apple TV itself** with Apple's Restrictions (next section). Couch TV cannot stop the Apple TV's own buttons.
+5. **Set up each streaming app's own kids profile** (below), because once a show is open your child is inside that app.
+
+### Lock the Apple TV itself: Apple's Restrictions
+
+Couch TV is an app, and Apple lets no app replace its home screen. **The TV button on the Siri remote still opens
+Apple's home**, where a child can open any app, the App Store or Settings, and holding it opens Control Centre. Couch TV
+cannot stop that. Apple's Restrictions, behind a passcode of your own, limit what a child can do from there:
+
+1. On the Apple TV open **Settings, General, Restrictions** (or hold the TV button and pick **Restrictions** in Control
+   Centre). Turn Restrictions on and make a four digit passcode your child does not know.
+2. Restrict **buying and renting** films, TV shows and apps, and **in-app purchases**.
+3. Set **apps, TV shows and films** to your child's age rating (and music and podcasts to clean, if you like). Apps
+   above the rating disappear from Apple's home.
+4. Restrict **changing AirPlay settings** if you like. Do not change **Settings, AirPlay and HomeKit, Allow Access**:
+   the bridge needs "Anyone on the Same Network" to reach the Apple TV.
+5. Check Couch TV still shows on Apple's home after you set an app rating. It is your own build with no App Store
+   rating, and how tvOS treats that has not been tried yet. If it disappears, set apps back to allow all.
+
+Apple says its Restrictions may not cover apps from the App Store, which is why each app's own kids profile matters
+too. The exact labels change a little between tvOS versions: Apple's guide is
+[Restrict access to content on Apple TV](https://support.apple.com/guide/tv/atvbbaf126df/tvos).
+
+### Each streaming app's own kids profile
+
+Kids mode decides which shows are on the shelf. It cannot see or limit what happens inside Netflix, iview or Disney+
+once a show is open. In each app the child uses:
+
+- **Netflix:** make a Kids profile, and on the Netflix website (Profile and Parental Controls) set its maturity
+  rating and put a profile lock on the grown ups' profiles. With the bridge, put the Kids profile's name in that
+  person's `app_profiles` ([CONFIG.md](CONFIG.md), People) so it is picked on "Who's watching?".
+- **Disney+:** a profile with **Junior mode** on, and a profile PIN on the grown ups' profiles.
+- **Prime Video:** a kids profile, and a Prime Video PIN for purchases and higher ratings.
+- **YouTube:** allow **YouTube Kids** instead of YouTube.
+- **ABC iview:** pick the kids profile when it asks who is watching.
+
+### What kids mode on an Apple TV cannot do
+
+- **Apple's TV button still opens Apple's home**, and holding it opens Control Centre. Restrictions (above) is the
+  answer to that, not couch-tv.
+- **Inside an app the child can browse anything that app offers.** The app's own kids profile is the answer to that.
+- **Most apps open on their own home page**, not on the show (the table above), and the show links expected to work
+  have not been tried on a real Apple TV.
+- **The phone remote is a grown up's tool.** It can still open any app. Keep it, and the pairing key, away from the kids.
+- **The PIN keeps a child with a remote out.** It is not a password against someone with a computer on your Wi-Fi.
+- **The computer has to stay on** for posters, opening shows and apps, and PIN changes. With it off, Couch TV stays in
+  kids mode on the last shelf, and a poster opens only Netflix or YouTube, the two apps Couch TV can open by itself.
+- **Not yet run on a real Apple TV** ([APPLE-TV-TESTING.md](APPLE-TV-TESTING.md)).
+
 ## Limits, plainly
 
 - **No home screen replacement.** Apple's home stays first. Couch TV opens when the Apple TV wakes (with the bridge
@@ -167,7 +279,8 @@ anything else in couch-tv.
 - **No "what is playing", no volume level, no screenshots.** The Companion link does not give them. (Apple's other
   protocols do carry now playing and volume. That is not built here.) The volume keys send the remote's
   volume buttons, which only change the TV's volume when the Apple TV is set up to control it (HDMI-CEC or learned IR).
-- **No deep links** into a show. The app opens on its home.
+- **No deep links** into a show from the phone remote's "put on": the app opens on its home. Kids mode's posters
+  hand Netflix, Disney+, Apple TV and YouTube a link to the show (not yet tried on a real Apple TV).
 - **Sleep and wake:** an Apple TV in sleep keeps listening, so wake works. If one has been fully unplugged,
   there is no way to wake it from the network.
 - **Parental and HomeKit settings** can limit which devices may control the Apple TV (Settings, AirPlay and
@@ -183,5 +296,9 @@ See [APPLE-TV-TESTING.md](APPLE-TV-TESTING.md) for what was checked and the step
 
 - Apple TV protocol notes (Companion Link, pairing, keys, power, app launch): <https://pyatv.dev/documentation/protocols/>, supported features: <https://pyatv.dev/documentation/supported_features/>
 - tvOS has no web view: <https://medium.com/bpxl-craft/apple-tv-a-world-without-webkit-5c428a64a6dd>. TVML deprecated in tvOS 18: <https://developer.apple.com/documentation/tvml.md>
+- Opening a link on tvOS over the Companion link (the form pyatv's `launch_app` sends with a link) and the link forms
+  for Netflix, Disney+, Apple TV and YouTube: <https://pyatv.dev/development/apps/> and
+  <https://www.home-assistant.io/integrations/apple_tv/>. Neither says which other tvOS apps take links.
+- Apple's Restrictions on Apple TV: <https://support.apple.com/guide/tv/atvbbaf126df/tvos>
 - Free Apple ID signing lasts 7 days, paid account 12 months: <https://9to5mac.com/2016/03/27/how-to-create-free-apple-developer-account-sideload-apps/> and the tutorials around it. The limits on a free ID (bundle ids a week, apps at once) are from third party reports and not confirmed by Apple.
 - Installing from the command line: `xcrun devicectl device install app` (Xcode 15 and newer, `xcrun devicectl help`).

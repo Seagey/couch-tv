@@ -327,7 +327,23 @@ For couch-tv's tvOS app (`tvos/`, [docs/APPLE-TV.md](../docs/APPLE-TV.md)). Appl
   ```
 - `POST /api/appletv/open` `{"bundle": "com.netflix.Netflix"}`: open an app by its bundle id (a tvOS app cannot open
   another app by its id itself). `400` for something that is not a bundle id, `503` when the Apple TV does not list
-  it, `502` when the Apple TV refuses.
+  it, `502` when the Apple TV refuses. While the person watching that Apple TV is a kids profile, only that child's
+  allowed apps open (`403` for any other).
+- `GET /api/appletv/kids` (`?who=`, else the person watching that Apple TV): kids mode for the app. For a kids profile,
+  its shelf (each show's app with its `bundle` on this Apple TV when it has it), the allowed apps as Apple TV apps
+  (never Settings, the App Store or couch-tv) and the parent PIN's salted hash, which the app checks a typed PIN
+  against (SHA-256, `pin_rounds` times, of `"<salt>:<pin>"`, as `/api/kids`). Never the PIN. `grown_ups` are the people
+  the right PIN moves the Apple TV to (the first one). For anyone else `{"ok": true, "kids": false, "who": "mum"}`.
+  ```json
+  {"ok": true, "kids": true, "who": "ruby", "name": "Ruby",
+   "shows": [{"id": "bluey-abc-iview", "title": "Bluey", "poster": "https://...", "app": {"id": "abc-iview", "name": "ABC iview", "package": "au.net.abc.iview", "bundle": "au.net.abc.iview"}}],
+   "apps": [{"id": "au.net.abc.iview", "title": "ABC iview", "package": "au.net.abc.iview"}],
+   "pin_hash": "<64 hex>", "pin_salt": "<hex>", "pin_rounds": 4000, "grown_ups": ["mum"]}
+  ```
+- `POST /api/appletv/kids/open` `{"who": "ruby", "id": "bluey-abc-iview"}`: open a show from that kids profile's shelf
+  (only a show on it, `404` otherwise). Straight into the show where the app is reported to take a link on tvOS
+  (Netflix, Disney+, Apple TV and YouTube, from JustWatch's links, or the show's own `link` in `config.json` when it is
+  not an Android `intent://`), else the show's app on its own page. `{"ok": true, "opened": "show" or "app", "note": "..."}`.
 - `POST /api/appletv/code` (needs the key): a six digit code for the app, good once for ten minutes.
   `{"ok": true, "code": "481516", "expires_in": 600, "tv": "lounge-appletv"}`. `scripts/appletv-home-code.py` asks for one.
 - `POST /api/appletv/claim` `{"code": "481516"}` (open, no key): swaps the code for the pairing key, once.

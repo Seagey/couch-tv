@@ -121,3 +121,54 @@ enum JSON {
         }
     }
 }
+
+// MARK: - kids mode (docs/APPLE-TV.md, "Kids mode")
+
+/// One show on a kids profile's shelf. The app never holds a link: the bridge opens the show by its id.
+struct KidsShow: Codable, Identifiable, Equatable {
+    let id: String
+    let title: String
+    var season: Int?
+    var episode: Int?
+    var poster: String?
+    var appName: String?
+    var appPackage: String?      // names couch-tv's bundled logo
+    var appBundle: String?       // the show's app on this Apple TV, when it has it
+
+    var subtitle: String {
+        if let s = season, let e = episode { return "Season \(s), episode \(e)" }
+        if let s = season { return "Season \(s)" }
+        return appName ?? ""
+    }
+}
+
+/// A kids profile's home, as /api/appletv/kids sends it: the shelf, the apps they may open, and the parent
+/// PIN's salted hash (never the PIN). Kept with the cache, so kids mode stays on with the bridge away.
+struct KidsShelf: Codable, Equatable {
+    let who: String
+    var name: String
+    var shows: [KidsShow]
+    var apps: [DockApp]
+    var pinHash: String
+    var pinSalt: String
+    var pinRounds: Int
+    var grownUps: [String]
+}
+
+extension JSON {
+    /// nil for anyone who is not a kids profile, or an answer without a PIN hash.
+    static func kids(_ j: [String: Any]) -> KidsShelf? {
+        guard (j["kids"] as? Bool) == true, let who = string(j["who"]),
+              let hash = string(j["pin_hash"]), hash.count == 64, let salt = string(j["pin_salt"]), !salt.isEmpty else { return nil }
+        let shows: [KidsShow] = (j["shows"] as? [[String: Any]] ?? []).compactMap { s in
+            guard let id = string(s["id"]), let title = string(s["title"]) else { return nil }
+            let app = s["app"] as? [String: Any]
+            return KidsShow(id: id, title: title, season: int(s["season"]), episode: int(s["episode"]),
+                            poster: string(s["poster"]) ?? string(s["backdrop"]), appName: string(app?["name"]),
+                            appPackage: string(app?["package"]), appBundle: string(app?["bundle"]))
+        }
+        return KidsShelf(who: who, name: string(j["name"]) ?? who, shows: shows, apps: apps(j["apps"]),
+                         pinHash: hash.lowercased(), pinSalt: salt, pinRounds: max(1, int(j["pin_rounds"]) ?? 4000),
+                         grownUps: (j["grown_ups"] as? [Any] ?? []).compactMap(string))
+    }
+}

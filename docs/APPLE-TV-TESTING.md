@@ -42,6 +42,28 @@ not with a real Apple TV. **The most likely places for a surprise on a real one:
   the blur behind the glass panels, Bonjour discovery and the keychain have not been seen working. Those are the
   first things to check.
 
+## Kids mode in Couch TV (November 2026)
+
+- `tests/test_appletv_kids.py` covers the bridge side behind the real middleware with a pairing key, against the
+  stand-in Apple TV: `/api/appletv/kids` gives only the child's shelf, their apps as Apple TV apps (never Settings,
+  the App Store or Couch TV, never an app the Apple TV does not have) and the PIN's salted hash, which it checks
+  against the PIN, and never the PIN; a grown up gets nothing; a PIN changed from the phone reaches it.
+  `/api/appletv/kids/open` opens only a show on that shelf: Netflix by its show link (never a rental elsewhere), a
+  parent's own link first, an app with no show link (iview) on its home, a refused link falling back to the app.
+  While a kids profile watches, `/api/appletv/open` opens only their apps, and `/api/who` needs the PIN to leave.
+- The app builds with Xcode for a real Apple TV (generic tvOS, unsigned). The tvOS Simulator could not be used on the
+  build Mac this time (its simulator service is older than Xcode), so nothing ran in a simulator.
+- `tvos/preview/render.sh` against `tests/appletv_home_standin.py --kids` drew the shelf (real JustWatch posters), the
+  Grown ups button and the PIN pad, typed a wrong PIN (refused, the dots cleared) and then the right one (the app's
+  own hash check matched the bridge's, and the bridge moved the Apple TV to a grown up), checked that Settings and
+  the gear never open over kids mode, opened a shelf show through the bridge and was refused an app not on the list.
+- **Not yet seen:** the Siri remote moving round the pad, Menu staying on the shelf, and whether Netflix, Disney+,
+  Apple TV and YouTube on a real Apple TV take the show links.
+
+First real test of kids mode: make a kids profile, choose it, check every poster (say which opened the show and which
+only the app), the allowed apps, Menu on the shelf and on the pad, Grown ups with a wrong PIN and the right one, and
+that the phone's PIN change reaches the Apple TV.
+
 First real test of Couch TV: follow "Install it free with your own Apple ID" in [APPLE-TV.md](APPLE-TV.md), then
 check that the home shows and the clock is right, the remote moves between the people, the cards and the dock, an
 app opens from the dock, a Keep watching card opens its app, Settings connects with a code, and that the Apple TV

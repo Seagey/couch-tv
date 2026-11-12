@@ -30,9 +30,10 @@ class StandIn:
     def __init__(self):
         self.pin = "1234"
         self.attention = A.AWAKE
-        self.log = []               # ("hid", code, down/up), ("launch", bundle), ("ask", name)
+        self.log = []               # ("hid", code, down/up), ("launch", bundle), ("url", link), ("ask", name)
         self.paired = {}            # client id -> public key (bytes)
         self.fail_launch = set()
+        self.fail_url = set()       # links containing any of these are refused
         self.drop_next = False      # close the next connection after pair verify
         self.ltsk = Ed25519PrivateKey.generate()
         self.atv_id = b"standin-apple-tv"
@@ -181,6 +182,12 @@ class StandIn:
             if c["_hBtS"] == 2 and c["_hidC"] == A.HID["wake"]:
                 self.attention = A.AWAKE
             return []                       # button events get no reply
+        if name == "_launchApp" and "_urlS" in c:     # a link (a show's page): refused when no app takes it
+            u = c["_urlS"]
+            self.log.append(("url", u))
+            if any(f in u for f in self.fail_url):
+                return [{"_t": 4, "_x": xid, "_em": "no app for that link"}]
+            return [{"_t": 3, "_x": xid, "_c": {}}]
         if name == "_launchApp":
             b = c.get("_bundleID")
             self.log.append(("launch", b))
