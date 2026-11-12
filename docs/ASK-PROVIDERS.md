@@ -35,8 +35,10 @@ Prices differ: set a monthly spend limit with the service.
 4. **Save ask.** The page says whether it is ready.
 
 Use a key made only for this TV. It is stored on the TV in the app's private storage, and anyone with
-ADB access to the TV can read it. **A key is only ever sent to the service it was saved for**: when you
-change the service or its host and do not type a new key, the saved key is removed.
+ADB access to the TV can read it. **A key is only ever sent to the exact address it was saved for**: it is
+stored together with its service, scheme, host and port, and the app uses it only while that is still the
+address in use. If you change any of those and do not type a new key, the old key is deleted, and it could
+not be used anyway.
 
 ## What a model has to support
 
@@ -52,6 +54,10 @@ rounds.
   (`localhost`, `10.x`, `192.168.x`, `172.16` to `172.31`, `169.254.x`, `*.local`, `*.lan`), so a key
   never crosses the internet unencrypted.
 - No name or password inside the address.
+- The address cannot be the TV itself (`localhost`, `127.x`, `::1`, `0.0.0.0`): its own services are not an
+  AI service. A computer on your network is fine.
+- When a service refuses a request, only its own JSON error message is shown (cut to 200 characters),
+  never anything else it sent back.
 - Claude always needs a key. An OpenAI compatible address on your own network may have none.
 - Ask is off for a kids profile, as before.
 

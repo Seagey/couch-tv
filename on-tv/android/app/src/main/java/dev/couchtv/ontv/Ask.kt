@@ -24,7 +24,12 @@ import java.net.URL
  */
 object Ask {
     /** The service chosen on the setup page, with the defaults filled in. */
-    fun config(): AskConfig = AskConfig.of(Store.str("ask_provider"), Store.str("ask_base"), Store.str("ask_model"), Store.str("ask_key"))
+    fun config(): AskConfig {
+        val c = AskConfig.of(Store.str("ask_provider"), Store.str("ask_base"), Store.str("ask_model"), null)
+        // The key is tied to the exact origin it was saved for (service, scheme, host, port) and is only handed out
+        // while that is still the address in use. A key saved before this existed was a Claude key.
+        return AskConfig(c.provider, c.base, c.model, AskWire.usableKey(Store.str("ask_key"), Store.str("ask_key_origin"), c.provider, c.base))
+    }
 
     val enabled get() = Store.bool("ask_enabled") && config().ready
 
@@ -37,8 +42,9 @@ object Ask {
 
     /**
      * The setup page's Ask settings. Throws an ApiError(400) with a sentence for the person if a value is
-     * wrong, and saves nothing then. A key belongs to one service: when the service or its host changes
-     * and no new key comes with it, the saved key is removed, so it can never be sent somewhere new.
+     * wrong, and saves nothing then. A key is saved together with the origin it belongs to (see [config]),
+     * so it is only ever used with that origin. When the origin changes and no new key comes with it, the
+     * old key is also deleted; that is only tidiness, since it could no longer be used anyway.
      */
     fun save(b: JSONObject) {
         if (b.has("ask_provider") || b.has("ask_base") || b.has("ask_model")) {
@@ -51,10 +57,16 @@ object Ask {
             Store.putStr("ask_provider", p.takeIf { it != AskWire.ANTHROPIC })
             Store.putStr("ask_base", base.trimEnd('/').ifEmpty { null })
             Store.putStr("ask_model", model.ifEmpty { null })
-            val now = config()
-            if (!b.has("ask_key") && (now.provider != old.provider || AskWire.host(now.base) != AskWire.host(old.base))) Store.putStr("ask_key", null)
+            if (!b.has("ask_key") && AskWire.origin(p, base.ifEmpty { if (p == AskWire.OPENAI) AskWire.OPENAI_BASE else AskWire.ANTHROPIC_BASE }) != AskWire.origin(old.provider, old.base)) {
+                Store.putStr("ask_key", null); Store.putStr("ask_key_origin", null)
+            }
         }
-        if (b.has("ask_key")) Store.putStr("ask_key", b.optString("ask_key").trim().ifEmpty { null })
+        if (b.has("ask_key")) {
+            val typed = b.optString("ask_key").trim().ifEmpty { null }
+            // the key goes in tied to the address that is saved right now, which is the new one if it came in the same request
+            Store.putStr("ask_key_origin", typed?.let { config().let { c -> AskWire.origin(c.provider, c.base) } })
+            Store.putStr("ask_key", typed)
+        }
         if (b.has("ask_enabled")) Store.putBool("ask_enabled", b.optBoolean("ask_enabled"))
     }
 
@@ -103,7 +115,7 @@ object Ask {
             throw ApiError(502, "Could not reach ${AskWire.host(cfg.base) ?: "the AI service"}: ${e.message ?: e.javaClass.simpleName}")
         } finally { c.disconnect() }
         if (code !in 200..299) throw ApiError(502, AskWire.errorMessage(cfg, code, text))
-        return try { JSONObject(text) } catch (e: Exception) { throw ApiError(502, "The AI service sent something that is not JSON: ${text.take(80)}") }
+        return try { JSONObject(text) } catch (e: Exception) { throw ApiError(502, "The AI service at ${AskWire.host(cfg.base) ?: "that address"} did not answer in the format expected (not JSON, ${text.length} bytes).") }
     }
 
     private fun str(d: String) = JSONObject().put("type", "string").put("description", d)

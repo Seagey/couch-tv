@@ -66,6 +66,31 @@ object AskWire {
 
     fun isLocalUrl(url: String) = isLocalHost(host(url))
 
+    /** The TV itself. Its own services are not an AI service, so an address that points there is refused. */
+    fun isThisDevice(host: String?): Boolean {
+        val h = host?.lowercase()?.trim('[', ']') ?: return false
+        return h == "localhost" || h == "::1" || h == "0.0.0.0" || h == "::" || h.startsWith("127.")
+    }
+
+    /**
+     * The saved key, if it may be used with the address now in use. A key saved before origins were
+     * recorded ([keyOrigin] is null) was a Claude key, so it only works for Claude's own address.
+     */
+    fun usableKey(key: String?, keyOrigin: String?, provider: String, base: String): String? =
+        key?.trim()?.ifEmpty { null }?.takeIf { (keyOrigin ?: origin(ANTHROPIC, ANTHROPIC_BASE)) == origin(provider, base) }
+
+    /**
+     * What a key is tied to: the service, the scheme, the host and the port, exactly. A key is handed out
+     * only while the address in use has this same origin, so it can never go anywhere else, even for a
+     * moment while settings are being changed.
+     */
+    fun origin(provider: String, base: String): String {
+        val u = try { URI(base.trim()) } catch (e: Exception) { return "$provider|?" }
+        val scheme = u.scheme?.lowercase() ?: "?"
+        val port = if (u.port != -1) u.port else if (scheme == "https") 443 else 80
+        return "$provider|$scheme://${u.host?.lowercase() ?: "?"}:$port"
+    }
+
     /** The settings are saved only if this says null. Otherwise it is the sentence to show the person. */
     fun check(provider: String, base: String, model: String): String? {
         if (provider != ANTHROPIC && provider != OPENAI) return "Unknown AI service \"$provider\". Use anthropic or openai."
@@ -76,6 +101,7 @@ object AskWire {
             if (u.scheme != "https" && u.scheme != "http") return "The web address must start with https:// (or http:// for a server at home)."
             if (u.host.isNullOrEmpty()) return "That web address has no host name."
             if (u.userInfo != null) return "Leave a name and password out of the web address. The key goes in its own box."
+            if (isThisDevice(u.host)) return "That address is the TV itself. Use the address of your computer or of the AI service."
             if (u.scheme == "http" && !isLocalHost(u.host)) return "A key must not travel over plain http. Use https://, or a server on your own network."
         }
         val m = model.trim()
@@ -90,12 +116,16 @@ object AskWire {
     fun chat(cfg: AskConfig, system: String, tools: List<AskTool>): AskChat =
         if (cfg.isAnthropic) AnthropicChat(cfg, system, tools) else OpenAiChat(cfg, system, tools)
 
-    /** What came back when the service said no, as one short sentence. */
+    /**
+     * What came back when the service said no, as one short sentence. Only the service's own error message
+     * is shown, never the rest of what it sent: the address can be one the household typed, so an answer
+     * from some other kind of server must not be read back to whoever asked.
+     */
     fun errorMessage(cfg: AskConfig, code: Int, text: String): String {
         val detail = runCatching {
             val e = JSONObject(text).get("error")
-            if (e is JSONObject) e.getString("message") else e.toString()
-        }.getOrNull() ?: text.take(120)
+            (if (e is JSONObject) e.getString("message") else e.toString()).take(200)
+        }.getOrNull() ?: "no details"
         return (if (cfg.isAnthropic) "Claude API error $code: " else "AI service error $code (${host(cfg.base) ?: "?"}): ") + detail
     }
 

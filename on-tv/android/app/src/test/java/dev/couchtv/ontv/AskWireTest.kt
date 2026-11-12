@@ -45,7 +45,6 @@ class AskWireTest {
         assertFalse(openai(key = null).ready)
         assertFalse(openai("https://api.openai.com/v1", key = null).ready)
         assertTrue(openai("http://192.168.1.20:11434/v1", key = null).ready)
-        assertTrue(openai("http://localhost:1234/v1", key = null).ready)
         assertTrue(openai("http://mac-studio.local:8080/v1", key = null).ready)
         assertFalse("Claude always needs a key", AskConfig.of(null, "http://192.168.1.20", null, null).ready)
         assertTrue(claude().ready)
@@ -275,7 +274,63 @@ class AskWireTest {
         assertEquals("Claude API error 401: invalid x-api-key", AskWire.errorMessage(claude(), 401, """{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}"""))
         assertEquals("AI service error 429 (api.openai.com): Rate limit", AskWire.errorMessage(openai(), 429, """{"error":{"message":"Rate limit","type":"x"}}"""))
         assertEquals("AI service error 400 (openrouter.ai): bad model", AskWire.errorMessage(openai("https://openrouter.ai/api/v1"), 400, """{"error":"bad model"}"""))
-        assertTrue(AskWire.errorMessage(openai(), 502, "<html>Bad gateway</html>").endsWith("<html>Bad gateway</html>"))
-        assertEquals("120 at most", 120, AskWire.errorMessage(openai("https://api.openai.com/v1"), 500, "x".repeat(500)).substringAfter("): ").length)
+    }
+
+    @Test fun errorMessagesNeverReadBackWhateverElseAServerSent() {
+        // the address can be one the household typed: only a JSON error message is shown, not an arbitrary page or file
+        val page = AskWire.errorMessage(openai(), 502, "<html>secret internal page</html>")
+        assertEquals("AI service error 502 (api.openai.com): no details", page)
+        assertFalse(AskWire.errorMessage(openai(), 200, "root:x:0:0:root:/root:/bin/sh").contains("root:"))
+        assertFalse("JSON without an error is not echoed", AskWire.errorMessage(openai(), 404, """{"name":"internal","password":"hunter2"}""").contains("hunter2"))
+        assertEquals("a long message is cut", 200, AskWire.errorMessage(openai(), 500, """{"error":{"message":"${"x".repeat(500)}"}}""").substringAfter("): ").length)
+    }
+
+    // ---- where a key may go
+
+    @Test fun anOriginIsTheServiceSchemeHostAndPort() {
+        assertEquals("openai|https://api.openai.com:443", AskWire.origin("openai", "https://api.openai.com/v1"))
+        assertEquals("openai|https://api.openai.com:443", AskWire.origin("openai", "HTTPS://API.OPENAI.COM:443/other/path"))
+        assertEquals("anthropic|https://api.anthropic.com:443", AskWire.origin("anthropic", AskWire.ANTHROPIC_BASE))
+        assertEquals("openai|http://192.168.1.20:11434", AskWire.origin("openai", "http://192.168.1.20:11434/v1"))
+    }
+
+    @Test fun anyChangeOfServiceSchemeHostOrPortIsADifferentOrigin() {
+        val o = AskWire.origin("openai", "https://api.example.com/v1")
+        for (other in listOf(
+            AskWire.origin("anthropic", "https://api.example.com/v1"),
+            AskWire.origin("openai", "http://api.example.com/v1"),
+            AskWire.origin("openai", "https://api.example.org/v1"),
+            AskWire.origin("openai", "https://api.example.com:8443/v1"),
+            AskWire.origin("openai", "https://api.example.com.evil.test/v1"))) assertTrue(other, other != o)
+        assertEquals("a path change is the same origin", o, AskWire.origin("openai", "https://api.example.com/v2/other"))
+        assertEquals("the default port is the same origin", o, AskWire.origin("openai", "https://api.example.com:443/v1"))
+    }
+
+    @Test fun aClaudeKeySavedByAnOlderVersionKeepsWorkingForClaude() {
+        // older versions stored just the key, with no origin
+        assertEquals("sk-old", AskWire.usableKey("sk-old", null, "anthropic", AskWire.ANTHROPIC_BASE))
+        assertEquals("sk-old", AskWire.usableKey("  sk-old ", null, "anthropic", "https://api.anthropic.com/"))
+        // ...but never for anywhere else
+        assertNull(AskWire.usableKey("sk-old", null, "openai", "https://api.openai.com/v1"))
+        assertNull(AskWire.usableKey("sk-old", null, "anthropic", "https://proxy.example.com"))
+        assertNull(AskWire.usableKey("sk-old", null, "anthropic", "http://192.168.1.20:8080"))
+    }
+
+    @Test fun aKeyIsUsableOnlyWhileItsOriginIsTheOneInUse() {
+        val o = AskWire.origin("openai", "https://api.groq.com/openai/v1")
+        assertEquals("k", AskWire.usableKey("k", o, "openai", "https://api.groq.com/openai/v1"))
+        assertNull("another host", AskWire.usableKey("k", o, "openai", "https://api.openai.com/v1"))
+        assertNull("another port", AskWire.usableKey("k", o, "openai", "https://api.groq.com:8443/openai/v1"))
+        assertNull("another scheme", AskWire.usableKey("k", o, "openai", "http://api.groq.com/openai/v1"))
+        assertNull("another service", AskWire.usableKey("k", o, "anthropic", "https://api.groq.com/openai/v1"))
+        assertNull("no key", AskWire.usableKey(null, o, "openai", "https://api.groq.com/openai/v1"))
+        assertNull("blank key", AskWire.usableKey("  ", o, "openai", "https://api.groq.com/openai/v1"))
+    }
+
+    @Test fun theTvItselfIsRefusedAsAnAddress() {
+        for (u in listOf("http://localhost:5400/v1", "http://127.0.0.1:5400/v1", "http://127.1.2.3/v1", "http://[::1]:5400/v1", "http://0.0.0.0/v1", "https://localhost/v1"))
+            assertNotNull(u, AskWire.check("openai", u, "m"))
+        assertNull("a computer on the home network is fine", AskWire.check("openai", "http://192.168.1.20:11434/v1", "m"))
+        assertNull("so is the emulator's address for its computer", AskWire.check("openai", "http://10.0.2.2:11434/v1", "m"))
     }
 }
