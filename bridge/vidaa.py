@@ -160,6 +160,11 @@ class VidaaTV:
         self.leave_inputs = cfg.get("leave_inputs", False) is True
         self.browser = (cfg.get("browser") or "").strip() or None
         self.home_url_cfg = (cfg.get("home_url") or "").strip() or None
+        # The id couch-tv's tile is added under. VIDAA keeps the address a tile was first added with
+        # (installing again under the same id does not change it), so moving the home elsewhere, for
+        # example to a hosted standalone copy (docs/VIDAA.md), needs a new id here.
+        tid = str(cfg.get("tile_id") or "").strip()
+        self.tile_id = tid if SAFE_ID.match(tid) else TILE_ID
         self.mqtt_user = cfg.get("mqtt_user")
         self.mqtt_password = cfg.get("mqtt_password")
         folder = os.path.join(config.DATA, "vidaa")
@@ -528,7 +533,9 @@ class VidaaTV:
             aid, title = str(r.get("appId") or r.get("id") or ""), str(r.get("name") or "").strip()
             if not SAFE_ID.match(aid) or not title:
                 continue
-            pkg = HOME_PACKAGE if aid == TILE_ID else BY_NAME.get(_plain(title))
+            # a VIDAA TV may list "Spotify : Music & Podcasts": the whole name first, then its first word
+            pkg = (HOME_PACKAGE if aid == self.tile_id
+                   else BY_NAME.get(_plain(title)) or BY_NAME.get(_plain(title.split(" ")[0])))
             if pkg:
                 found[aid] = pkg
             listed.append({"appId": aid, "name": title, "url": str(r.get("url") or ""),
@@ -540,7 +547,7 @@ class VidaaTV:
 
     async def apps_on_tv(self):
         await self.refresh_installed()
-        return [a for a in self.applist if a["appId"] != TILE_ID]
+        return [a for a in self.applist if a["appId"] != self.tile_id]
 
     def _entry(self, package):
         """The TV's own app list entry for a package, "vidaa.<appId>", or a catalogue id. Only an entry
@@ -552,7 +559,7 @@ class VidaaTV:
         return next((a for a in self.applist if a["package"] == pkg), None)
 
     def _tile(self):
-        return next((a for a in self.applist if a["appId"] == TILE_ID), None)
+        return next((a for a in self.applist if a["appId"] == self.tile_id), None)
 
     def _browser(self):
         want = _plain(self.browser) if self.browser else None
@@ -619,8 +626,9 @@ class VidaaTV:
         stays the way in). True when the tile is in the app list afterwards."""
         self.require()
         base = self.home_url()
-        icon = base.split("/tv/")[0] + "/vidaa/icon.png" if "/tv/" in base else None
-        info = {"Title": TILE_TITLE, "Id": TILE_ID, "URL": base, "StoreType": 99}
+        # the bridge's own icon, or icon.png next to a home hosted elsewhere (scripts/build-standalone.sh puts one there)
+        icon = base.split("/tv/")[0] + "/vidaa/icon.png" if "/tv/" in base else base.split("?")[0].rstrip("/") + "/icon.png"
+        info = {"Title": TILE_TITLE, "Id": self.tile_id, "URL": base, "StoreType": 99}
         if icon:
             info["Image"] = icon
         await self._send("ui_service", "uievent", {"type": "app_install", "app_info": info})
