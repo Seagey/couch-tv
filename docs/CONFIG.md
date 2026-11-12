@@ -240,8 +240,10 @@ release opens the app rather than the show.
   the pairing key if you set one, away from the kids.
 - **The PIN is a lock for a child with a remote, not a password.** A four digit PIN behind a hash can
   be worked out by someone with a computer on your Wi-Fi in seconds. A longer PIN helps a little.
-- The Roku channel and the Apple TV app (Couch TV) draw their own home, and do not have kids mode yet.
-  The Samsung and LG apps, and the pages the Beta paths open, are the same home page and do.
+- The Roku channel draws its own home and does not have kids mode yet. The Apple TV app (Couch TV) has it,
+  with the bridge: see [APPLE-TV.md](APPLE-TV.md#kids-mode), which also covers Apple's Restrictions, because the
+  Apple TV's own TV button still opens Apple's home. The Samsung and LG apps, and the pages the Beta paths open,
+  are the same home page and have it too.
 
 ## The home's look (`home`)
 

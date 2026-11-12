@@ -1045,12 +1045,146 @@ async def h_appletv_open(request):
     if not isinstance(bundle, str) or not appletv.BUNDLE_RE.fullmatch(bundle):
         raise ApiError(400, "bundle is an app's bundle id, for example com.netflix.Netflix")
     tv.require()
+    kid = _kid_on_appletv(None)
+    if kid:
+        # kids mode: only the apps on that child's list, whatever the app on the Apple TV asks for
+        await tv.refresh_installed()
+        if bundle not in {a["id"] for a in appletv_kids_apps(kids.mode(kid))}:
+            raise ApiError(403, "Kids mode is on: that app is not on this child's list.")
     try:
         await tv.open_bundle(bundle)
     except appletv.AppleTVError as e:
         raise ApiError(502, f"the Apple TV would not open {bundle}: {e}")
     record_action(request, "launch", {"app": bundle}, True)
     return ok(opened=bundle)
+
+
+# ---------- kids mode in couch-tv's Apple TV app (bridge/kids.py, docs/APPLE-TV.md "Kids mode") ----------
+def _kid_on_appletv(named):
+    """The kids profile named (or, with none named, the person watching this Apple TV), or None."""
+    pid = store.norm_who(named) if named else cur_who()
+    return pid if pid and pid != "both" and kids.is_kid(pid) else None
+
+
+def appletv_kids_apps(m):
+    """A kids profile's allowed apps as apps on this Apple TV: [{id: bundle id, title, package}]. Apps the
+    Apple TV does not have are left out, and so are Settings, the App Store and couch-tv itself."""
+    names = {c["id"]: c["title"] for c in tv.channels}
+    mine = tv.home_bundle()
+    out = []
+    for pkg in (m or {}).get("apps") or []:
+        b = tv.bundle_for(pkg)
+        if not b or b in appletv.NOT_FOR_KIDS or b == mine or b.startswith(appletv.HOME_BUNDLE) \
+                or any(a["id"] == b for a in out):
+            continue
+        app = apps.BY_PACKAGE.get(pkg) or apps.BY_ID.get(pkg)
+        out.append({"id": b, "title": names.get(b) or (app["name"] if app else b),
+                    "package": tv.ids.get(b) or (app["package"] if app else f"appletv.{b}")})
+    return out[:kids.MAX_APPS]
+
+
+async def h_appletv_kids(request):
+    """Kids mode for couch-tv's Apple TV app. For the person watching this Apple TV (or ?who=): when they are a
+    kids profile, their shelf (with posters and each show's app on this Apple TV), the apps they may open and
+    the parent PIN's salted hash, which the app checks a typed PIN against. Never the PIN. Anyone else:
+    {"kids": false}."""
+    _need_appletv()
+    pid = _kid_on_appletv(request.query.get("who"))
+    if not pid:
+        return ok(kids=False, who=store.norm_who(request.query.get("who")) or cur_who())
+    m = kids.mode(pid)
+    await kids.enrich(m["shows"], finder.find)
+    pub = kids.public_mode(m)
+    await tv.refresh_installed()
+    shows = []
+    for s in pub["shows"]:
+        show = {k: s[k] for k in ("id", "title", "season", "episode", "poster", "backdrop") if k in s}
+        app = s.get("app")
+        if app:
+            show["app"] = {**app}
+            bundle = tv.bundle_for(app["package"])
+            if bundle:
+                show["app"]["bundle"] = bundle
+        shows.append(show)
+    name = next((p["name"] for p in config.PEOPLE if p["id"] == pid), pid)
+    return ok(kids=True, who=pid, name=name, shows=shows, apps=appletv_kids_apps(m),
+              pin_hash=pub["pin_hash"], pin_salt=pub["pin_salt"], pin_rounds=pub["pin_rounds"],
+              grown_ups=[p["id"] for p in config.PEOPLE if not kids.is_kid(p["id"])])
+
+
+async def _appletv_show_link(show):
+    """(app id, the link to hand the Apple TV or None, whether the link reaches the episode) for a shelf show. The show's own "link" from
+    config.json first, when it is not an Android intent; else JustWatch, the way the TV home's shelf
+    chooses: a free or subscription app the Apple TV has, never a rent or buy page."""
+    title = show["title"]
+    app_id = show.get("service") or (kids.art.get(title.lower()) or {}).get("service")
+    own = show.get("link")
+    if own and not own.startswith("intent://") and appletv.URL_RE.fullmatch(own):
+        return app_id, own, True
+    try:
+        best, _ = await finder.find(title)
+    except Exception as e:
+        log.warning("kids: could not look up %s: %s", title, e)
+        return app_id, None, False
+    norm = lambda t: re.sub(r"[^a-z0-9]+", " ", (t or "").lower()).strip()
+    if not best or norm(best.get("title")) != norm(title):
+        return app_id, None, False   # a near name is another show
+    for p in best.get("providers") or []:
+        app = apps.BY_ID.get(p.get("service"))
+        if not app or p.get("kind") in ("rent", "buy") or (app_id and p["service"] != app_id):
+            continue
+        if not tv.bundle_for(app["package"]):
+            continue
+        if show.get("season") and best.get("jw_id") and appletv.SHOW_LINKS.get(app["id"], (0, 0, False))[2]:
+            try:
+                ep = await finder.episode_providers(best["jw_id"], int(show["season"]), show.get("episode"))
+                eps = [x.get(k) for x in (ep or {}).get("providers") or [] if x.get("service") == app["id"]
+                       for k in ("web", "deeplink")]
+                link = appletv.show_link(app["id"], *eps, episode=True)
+                if link:
+                    return app["id"], link, True
+            except Exception as e:
+                log.warning("kids: episode lookup failed for %s: %s", title, e)
+        return app["id"], appletv.show_link(app["id"], p.get("web"), p.get("deeplink")), False
+    return app_id, None, False
+
+
+def _season_words(show):
+    return f"season {show['season']}" + (f" episode {show['episode']}" if show.get("episode") else "")
+
+
+async def h_appletv_kids_open(request):
+    """Open a show from a kids profile's shelf on this Apple TV: {who, id}. Only a show on that shelf. Straight
+    into the show where the app takes a link (appletv.SHOW_LINKS), else its app on its own page."""
+    _need_appletv()
+    data = await body(request)
+    pid = _kid_on_appletv(data.get("who"))
+    if not pid:
+        raise ApiError(404, "That is not a kids profile.")
+    show = next((s for s in kids.mode(pid)["shows"] if s["id"] == data.get("id")), None)
+    if not show:
+        raise ApiError(404, "That show is not on the shelf.")
+    tv.require()
+    await tv.refresh_installed()
+    app_id, link, to_episode = await _appletv_show_link(show)
+    if link:
+        try:
+            await tv.open_url(link)
+            record_action(request, "kids_open", {"title": show["title"], "how": "link"}, True)
+            pick = "" if to_episode or not show.get("season") else f" Pick {_season_words(show)} there."
+            return ok(opened="show", note=f"Opening {show['title']}.{pick}")
+        except (appletv.AppleTVError, ValueError) as e:
+            log.info("kids: the Apple TV would not open the link for %s: %s", show["title"], e)
+    app = apps.BY_ID.get(app_id or "")
+    if app:
+        try:
+            await tv.launch_package(app["package"])
+            record_action(request, "kids_open", {"title": show["title"], "how": "app"}, True)
+            what = show["title"] + (f", {_season_words(show)}" if show.get("season") else "")
+            return ok(opened="app", note=f"{app['name']} is open. Pick {what} there.")
+        except (TVUnavailable, ValueError) as e:
+            log.info("kids: could not open %s for %s: %s", app["id"], show["title"], e)
+    raise ApiError(404, f"{show['title']} is not on an app on this Apple TV.")
 
 
 def _lan_address():
@@ -3258,6 +3392,8 @@ def make_app():
     r.add_get("/api/appletv/hello", h_appletv_hello)
     r.add_get("/api/appletv/apps", h_appletv_apps)
     r.add_post("/api/appletv/open", h_appletv_open)
+    r.add_get("/api/appletv/kids", h_appletv_kids)
+    r.add_post("/api/appletv/kids/open", h_appletv_kids_open)
     r.add_post("/api/vidaa/pair", h_vidaa_pair)
     r.add_post("/api/vidaa/tile", h_vidaa_tile)
     r.add_post("/api/vidaa/claim", h_vidaa_claim)

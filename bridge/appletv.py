@@ -336,6 +336,38 @@ BUNDLE_IDS = {
 
 
 BUNDLE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9.\-_]{2,149}")
+URL_RE = re.compile(r"(?:https://|[a-z][a-z0-9+.-]{1,30}://)[^\s\"'<>]{1,1500}")
+
+# Kids mode (bridge/kids.py): apps a kids profile is never handed on an Apple TV, whatever the list says
+NOT_FOR_KIDS = {"com.apple.TVSettings", "com.apple.TVAppStore"}
+
+# Show links an Apple TV app is reported to open straight into a title, when the Apple TV is asked over the
+# Companion link (the "_urlS" form of _launchApp). From pyatv's and Home Assistant's public notes on deep
+# links, NOT yet tried on a real Apple TV here (docs/APPLE-TV.md, "Kids mode"). Each rule turns a JustWatch
+# link (web or Android) into the form those notes give; the last value says whether an episode's own link
+# is kept (a Netflix /title/ link takes a show's id, never an episode's). Any other app opens on its home.
+SHOW_LINKS = {
+    "netflix": (re.compile(r"netflix\.com/(?:[a-z]{2}(?:-[a-z]{2})?/)?(?:title|watch)/(\d{4,12})"),
+                "https://www.netflix.com/title/{}", False),
+    "disney-plus": (re.compile(r"disneyplus\.com/(?:[a-z]{2}-[a-z]{2}/)?((?:series|movies|video|play|browse)/[^\s?#\"'<>]{1,200})"),
+                    "https://www.disneyplus.com/{}", True),
+    "apple-tv": (re.compile(r"tv\.apple\.com/(?:[a-z]{2}/)?((?:show|movie|episode)/[^\s?#\"'<>]{1,200})"),
+                 "https://tv.apple.com/{}", True),
+    "youtube": (re.compile(r"youtube\.com/watch\?v=([\w-]{6,20})"), "youtube://watch/{}", False),
+}
+
+
+def show_link(app_id, *links, episode=False):
+    """The link to hand an Apple TV for a show in this app, from JustWatch's links, or None. With
+    episode=True the links are one episode's, and only apps whose links can name an episode use them."""
+    rule = SHOW_LINKS.get(app_id)
+    if not rule or (episode and not rule[2]):
+        return None
+    for link in links:
+        m = rule[0].search(link) if isinstance(link, str) else None
+        if m:
+            return rule[1].format(m.group(1))
+    return None
 
 
 def _plain(name):
@@ -734,6 +766,29 @@ class AppleTV:
         if self.channels and bundle not in {c["id"] for c in self.channels}:
             raise TVUnavailable(f"{bundle} is not installed on the Apple TV")
         await self._launch(bundle)
+
+    async def open_url(self, url):
+        """Ask the Apple TV to open a link (a show's page in its app), the way the iPhone's remote can.
+        Which app takes which link is the app's own business: an app that takes none is refused here."""
+        if not isinstance(url, str) or not URL_RE.fullmatch(url):
+            raise ValueError("not a link the Apple TV can open")
+        self.require()
+        self.quiet_until = time.monotonic() + 20
+        await self._ask("_launchApp", {"_urlS": url})
+
+    def bundle_for(self, package):
+        """The bundle id on this Apple TV for an app named in kids mode (an app id, an Android package name,
+        appletv.<bundle> from the phone's app list, or a bundle id). None when the Apple TV does not have it.
+        Before the app list is known, the well known bundle id. Call refresh_installed() first."""
+        if not isinstance(package, str) or not package:
+            return None
+        listed = {c["id"] for c in self.channels}
+        if package in listed:
+            return package
+        for b in self._candidates(package):
+            if b in listed or (not self.channels and BUNDLE_RE.fullmatch(b)):
+                return b
+        return None
 
     async def launch_package(self, package):
         self.require()

@@ -25,7 +25,8 @@ so `git pull` brings their changes.
 switch it on for someone. A kids profile's home shows only
 a shelf of shows a parent picked, as big posters that open straight into each show, plus the few apps
 you allow. No other apps, no settings, no grown ups' Keep watching. Leaving it needs the parent PIN,
-typed with the remote's arrows. See [Kids mode](#kids-mode). Idea from Natalie Bruss (@nataliebruss on Instagram).
+typed with the remote's arrows. Now in the Apple TV app (Couch TV) too. See [Kids mode](#kids-mode). Idea from
+Natalie Bruss (@nataliebruss on Instagram).
 
 **12 November 2026: Philips, Panasonic and Fire TV on Vega OS, Beta.** Four more paths, each with a
 computer at home that stays on, and on each the maker's own Home button still opens the maker's home:
@@ -240,7 +241,9 @@ Netflix's Kids profile with its maturity rating and title blocking (Profile and 
 the web), Disney+ Junior mode, Prime Video's kids profile, YouTube Kids. On some TVs the remote's Home
 button can still reach the TV's own home; the Home button watch brings couch-tv back on Android TV and
 Google TV. The PIN keeps a child at the TV out; it is not a password against someone with a computer
-on your Wi-Fi. Not on the Roku channel or the Apple TV app yet. Every setting and the full list of limits: [docs/CONFIG.md](docs/CONFIG.md#kids-mode).
+on your Wi-Fi. On an Apple TV it is in Couch TV, with the bridge, and Apple's own TV button still opens Apple's
+home, so pair it with Apple's Restrictions: [docs/APPLE-TV.md](docs/APPLE-TV.md#kids-mode) has the steps. Not on the
+Roku channel yet. Every setting and the full list of limits: [docs/CONFIG.md](docs/CONFIG.md#kids-mode).
 
 ## Settings on the TV
 
@@ -484,7 +487,7 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, from public sou
 - **Apple TV (Beta):** the phone remote works, with no app and no payment: the bridge pairs once with a PIN
   and then sends the remote keys, sleep and wake, and opens any app on the Apple TV by its bundle id. tvOS
   has no web view, so the home is drawn again as a native Apple TV app, **Couch TV** (`tvos/`): the scenes
-  with the glass clock, the date and weather, people, Keep watching and your apps, and the bridge opens it
+  with the glass clock, the date and weather, people, Keep watching, your apps and kids mode, and the bridge opens it
   every time the Apple TV wakes. Apple's own Home button still opens Apple's home. You put Couch TV on the
   Apple TV yourself, free, with Xcode on a Mac and your own Apple ID; Apple makes that run out after 7 days,
   so the computer at home reinstalls it each week with `scripts/appletv-resign.sh` (or once a year with

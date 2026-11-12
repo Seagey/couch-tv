@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0C35336213867EF6CC71CD4B = {
+			isa = PBXBuildFile;
+			fileRef = 61166329589783918F1F15B2;
+		};
 		2B42FD10A7A5E6E40E61D90C = {
 			isa = PBXBuildFile;
 			fileRef = A3CB2022DF88CD57B17A949E;
@@ -38,6 +42,10 @@
 		BC9CEE9D0653DC00D6EDB61B = {
 			isa = PBXBuildFile;
 			fileRef = 587C68391026097D874BE662;
+		};
+		BE4D3E8AAB0ED328DF21DC74 = {
+			isa = PBXBuildFile;
+			fileRef = 3CCF94A85117DDE76344C55D;
 		};
 		C7860487E49E95BBC5943648 = {
 			isa = PBXBuildFile;
@@ -80,10 +88,22 @@
 			path = Info.plist;
 			sourceTree = "<group>";
 		};
+		3CCF94A85117DDE76344C55D = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = KidsView.swift;
+			sourceTree = "<group>";
+		};
 		587C68391026097D874BE662 = {
 			isa = PBXFileReference;
 			lastKnownFileType = file;
 			path = "CouchInter-Regular.ttf";
+			sourceTree = "<group>";
+		};
+		61166329589783918F1F15B2 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = KidsPIN.swift;
 			sourceTree = "<group>";
 		};
 		81B537788A87C293D5E76E43 = {
@@ -213,6 +233,8 @@
 				D76F38428E4458A5BADC8840,
 				FD69F6CF63D9FD42F4B3BE1D,
 				10D819C9ED8F996417A65BA8,
+				61166329589783918F1F15B2,
+				3CCF94A85117DDE76344C55D,
 				A3CB2022DF88CD57B17A949E,
 				88061402747C56CD1815B3DE,
 				81B537788A87C293D5E76E43,
@@ -327,6 +349,8 @@
 				696F194566E05EC5941B9F1A,
 				4BC51BDBBA42A3D94CACBD99,
 				F0BE681D054846C6913F8FD2,
+				0C35336213867EF6CC71CD4B,
+				BE4D3E8AAB0ED328DF21DC74,
 				2B42FD10A7A5E6E40E61D90C,
 				48941E0A3017E09001C924D9,
 				C7D8F91960974694AB0DF15E,

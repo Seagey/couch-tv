@@ -1,12 +1,15 @@
 """A stand-in couch-tv bridge for the Apple TV app (tvos/), no Apple TV needed.
 
-    .venv/bin/python tests/appletv_home_standin.py [--port 5455] [--code-file <path>]
+    .venv/bin/python tests/appletv_home_standin.py [--port 5455] [--code-file <path>] [--kids]
 
 Runs the bridge's real server (bridge/server.py) on this computer, with a made up config.json in a temporary
 folder: one Apple TV (the stand-in from tests/appletv_standin.py, already paired), two people, a pairing key,
 two Keep watching cards and the weather (no internet needed). It prints a six digit code for Couch TV's
 Settings (and writes it to --code-file), then prints every app the bridge asks the Apple TV to open. Point
 the tvOS Simulator's Couch TV, or tvos/preview/render.sh, at 127.0.0.1:<port>. Ctrl-C stops it.
+
+--kids adds a third person, Ruby, a kids profile (kids mode, parent PIN 2580) and makes her the one watching,
+for Couch TV's kids mode. Her shows are looked up on JustWatch for their posters when there is internet.
 """
 import argparse
 import asyncio
@@ -24,12 +27,22 @@ KEY = "couchpass123"
 TV_ID = "lounge-appletv"
 
 
-def write_config(folder, atv_port, port):
+KIDS_PIN = "2580"
+KIDS = {"id": "ruby", "name": "Ruby", "kid": True, "kids_mode": {
+    "pin": KIDS_PIN,
+    "shows": [{"title": "Bluey", "service": "abc-iview"}, {"title": "Hey Duggee", "service": "abc-iview"},
+              {"title": "Peppa Pig", "service": "abc-iview", "season": 1, "episode": 3},
+              {"title": "Octonauts", "service": "abc-iview"}, {"title": "Puffin Rock", "service": "netflix"},
+              {"title": "Sarah & Duck", "service": "abc-iview"}],
+    "apps": ["abc-iview", "youtube"]}}
+
+
+def write_config(folder, atv_port, port, with_kids=False):
     cfg = {
         "bridge": {"host": "127.0.0.1", "port": port, "pairing_key": KEY},
         "default_tv": TV_ID,
         "tvs": [{"id": TV_ID, "name": "Lounge Apple TV", "kind": "appletv", "ip": "127.0.0.1", "port": atv_port}],
-        "people": [{"id": "person1", "name": "Person 1"}, {"id": "person2", "name": "Person 2"}],
+        "people": [{"id": "person1", "name": "Person 1"}, {"id": "person2", "name": "Person 2"}] + ([KIDS] if with_kids else []),
         "weather": {"lat": -33.8688, "lon": 151.2093, "place": "Sydney", "timezone": "Australia/Sydney"},
         "home": {"clock": "12h"},
         "country": "AU",
@@ -44,6 +57,7 @@ async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=5455)
     ap.add_argument("--code-file")
+    ap.add_argument("--kids", action="store_true", help="add a kids profile and make her the one watching")
     args = ap.parse_args()
 
     folder = tempfile.mkdtemp(prefix="couchtv-atv-")
@@ -55,7 +69,7 @@ async def main():
     # the config first (the bridge reads it on import), then the stand-in Apple TV, whose port is only
     # known once it listens
     os.environ["COUCH_DATA"] = data
-    os.environ["COUCH_CONFIG"] = write_config(folder, 49153, args.port)
+    os.environ["COUCH_CONFIG"] = write_config(folder, 49153, args.port, args.kids)
     os.environ["COUCHTV_NO_BONJOUR"] = "1"
     import config  # noqa: F401  (reads COUCH_CONFIG)
     import server
@@ -82,9 +96,18 @@ async def main():
         store.add_history({"title": title, "type": "show", "service": service, "season": s, "episode": e,
                            "poster": poster, "who": "person1", "tv": TV_ID,
                            "when": (now - timedelta(hours=i + 1)).isoformat()})
-    store.save_who("person1", TV_ID)
+    store.save_who("ruby" if args.kids else "person1", TV_ID)
+    real_find = server.finder.find
+    kid_titles = {s["title"].lower() for s in KIDS["kids_mode"]["shows"]} if args.kids else set()
 
     async def find(title, *a, **k):         # no internet: every show is found as itself, on the three apps
+        if title.lower() in kid_titles:     # the kids shelf's posters, from JustWatch when there is internet
+            try:
+                got = await real_find(title)
+                if got and got[0]:
+                    return got
+            except Exception:
+                pass
         return {"title": title, "poster": None, "backdrop": None, "year": 2024, "type": "show",
                 "providers": [{"service": s, "name": s, "playable": True, "kind": "flatrate", "web": None,
                                "deeplink": f"https://example.invalid/{s}"} for s in ("netflix", "disney-plus", "abc-iview")]}, []
@@ -102,7 +125,7 @@ async def main():
         nonlocal seen
         while True:
             for k, *r in standin.log[seen:]:
-                if k == "launch":
+                if k in ("launch", "url"):
                     print(f"apple tv: opened {r[0]}", flush=True)
             seen = len(standin.log)
             await asyncio.sleep(0.2)
@@ -117,7 +140,8 @@ async def main():
     server.appletv_codes[code] = (time.monotonic() + server.APPLETV_CODE_SECS, TV_ID)
     if args.code_file:
         Path(args.code_file).write_text(code)
-    print(f"stand-in bridge on http://127.0.0.1:{args.port}, code {code} (pairing key {KEY})", flush=True)
+    print(f"stand-in bridge on http://127.0.0.1:{args.port}, code {code} (pairing key {KEY})"
+          + (f", kids profile Ruby, parent PIN {KIDS_PIN}" if args.kids else ""), flush=True)
     try:
         await asyncio.Event().wait()
     finally:
