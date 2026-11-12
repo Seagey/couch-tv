@@ -68,6 +68,15 @@ object Store {
 
     fun tvName(): String = str("tv_name", "This TV") ?: "This TV"
 
+    /** Watch Next in Keep watching (#122), with the TV home app's names and limits (docs/CONFIG.md):
+     *  packages never listed, and at most this many cards from any one app (1 to 20, 5 if unset). */
+    fun skipWatchNext(): Set<String> = runCatching {
+        val a = JSONArray(str("skip_watch_next") ?: "[]")
+        (0 until a.length()).map { a.optString(it) }.filter { PACKAGE.matches(it) }.toSet()
+    }.getOrDefault(emptySet())
+    fun watchNextPerApp(): Int = (str("watch_next_per_app")?.toIntOrNull() ?: 5).coerceIn(1, 20)
+    val PACKAGE = Regex("[A-Za-z0-9_.]{1,200}")
+
     const val TV_ID = "this-tv"
 
     // ---------- watch history (plays started from the phone, and what apps report) ----------

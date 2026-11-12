@@ -241,30 +241,38 @@ object Now {
     const val KEEP_DAYS = 30
 
     /** Keep watching for one person at this TV: one card per show (the latest), newest first, up to
-     *  10, nothing older than 30 days. Only lines made since 0.9 (with an id, this TV and a person). */
+     *  10, nothing older than 30 days. Only lines made since 0.9 (with an id, this TV and a person).
+     *  Where the app's own ADB never connects (current Fire OS), Android's Watch Next rows join in
+     *  (WatchNext.cards, #122): the same for everyone at the TV, and the newer of the two wins for a
+     *  show both name (KeepMerge). */
     fun continueItems(whoFilter: String?): JSONArray {
-        val who = whoFilter?.takeIf { it.isNotEmpty() } ?: this.who ?: return JSONArray()
-        val h = Store.history()
-        val out = JSONArray()
-        val seen = HashSet<String>()
-        val nowMs = System.currentTimeMillis() + (Store.testProp("clock_offset_s") ?: 0L) * 1000
-        val cutoff = nowMs - KEEP_DAYS * 24 * 3600_000L
-        for (i in 0 until h.length()) {
-            val it = h.getJSONObject(i)
-            if (it.optString("id").isEmpty() || it.optString("tv") != Store.TV_ID || it.optString("who") != who) continue
-            val whenMs = parseIso(it.optString("when")) ?: continue
-            if (whenMs < cutoff) continue
-            val key = Finder.norm(it.optString("title"))
-            if (key.isEmpty() || !seen.add(key)) continue
-            val pkg = it.optString("package").ifEmpty { Apps.BY_ID[it.optString("service")]?.pkg ?: "" }
-            out.put(JSONObject().put("id", it.optString("id")).put("title", it.optString("title"))
-                .put("episode_title", it.opt("episode_title") ?: JSONObject.NULL).put("season", it.opt("season") ?: JSONObject.NULL)
-                .put("episode", it.opt("episode") ?: JSONObject.NULL).put("app", Apps.describe(pkg)?.let { d -> JSONObject(d) } ?: JSONObject.NULL)
-                .put("service", it.opt("service") ?: JSONObject.NULL).put("poster", it.opt("poster") ?: JSONObject.NULL)
-                .put("backdrop", it.opt("backdrop") ?: JSONObject.NULL).put("progress", JSONObject.NULL).put("kind", "continue")
-                .put("last_played", it.opt("when") ?: JSONObject.NULL).put("source", "bridge"))
-            if (out.length() >= KEEP_MAX) break
+        val who = whoFilter?.takeIf { it.isNotEmpty() } ?: this.who
+        val history = ArrayList<KeepMerge.Card<JSONObject>>()
+        if (who != null) {
+            val h = Store.history()
+            val seen = HashSet<String>()
+            val nowMs = System.currentTimeMillis() + (Store.testProp("clock_offset_s") ?: 0L) * 1000
+            val cutoff = nowMs - KEEP_DAYS * 24 * 3600_000L
+            for (i in 0 until h.length()) {
+                val it = h.getJSONObject(i)
+                if (it.optString("id").isEmpty() || it.optString("tv") != Store.TV_ID || it.optString("who") != who) continue
+                val whenMs = parseIso(it.optString("when")) ?: continue
+                if (whenMs < cutoff) continue
+                val key = Finder.norm(it.optString("title"))
+                if (key.isEmpty() || !seen.add(key)) continue
+                val pkg = it.optString("package").ifEmpty { Apps.BY_ID[it.optString("service")]?.pkg ?: "" }
+                history.add(KeepMerge.Card(key, pkg, whenMs, false, JSONObject().put("id", it.optString("id")).put("title", it.optString("title"))
+                    .put("episode_title", it.opt("episode_title") ?: JSONObject.NULL).put("season", it.opt("season") ?: JSONObject.NULL)
+                    .put("episode", it.opt("episode") ?: JSONObject.NULL).put("app", Apps.describe(pkg)?.let { d -> JSONObject(d) } ?: JSONObject.NULL)
+                    .put("service", it.opt("service") ?: JSONObject.NULL).put("poster", it.opt("poster") ?: JSONObject.NULL)
+                    .put("backdrop", it.opt("backdrop") ?: JSONObject.NULL).put("progress", JSONObject.NULL).put("kind", "continue")
+                    .put("last_played", it.opt("when") ?: JSONObject.NULL).put("source", "bridge")))
+            }
         }
+        // the rows are the whole TV's, so never on a kids profile (Kids mode)
+        val wn = if (who != null && Kids.isKid(who)) emptyList() else WatchNext.cards(Store.skipWatchNext(), Store.watchNextPerApp())
+        val out = JSONArray()
+        KeepMerge.merge(history, wn, KEEP_MAX).forEach { out.put(it.item) }
         return out
     }
 
