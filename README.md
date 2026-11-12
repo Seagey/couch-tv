@@ -27,6 +27,12 @@ button, PatchWall's tile and power on open Couch TV, but never over an HDMI or T
 changed. On low memory TVs the home page is now released only when Android says memory is critical, and comes back when
 the app does. See [on-tv/README.md](on-tv/README.md). Thanks gauharjk (#151).
 
+**13 November 2026: an Open the home button on the on-TV setup screen (on main, in the next release).** On Google TV the
+Couch TV tile opens setup and Google's home keeps the Home button, so option C had no way to see the couch-tv home. Setup
+now starts with **Open the home**, which opens it, and the note under Use as home screen says how Google TV behaves. The
+Couch TV home watch accessibility service is for Fire TV only and switches itself off on other TVs, which is expected. The
+button opens the home, which applies Kids mode itself.
+
 **13 November 2026: VIDAA fixes from a Hisense 43A6N (on main).** A VIDAA trace now hides the refresh
 token as well as the access token. With `keep_home` on, the phone remote's Input key no longer has
 couch-tv jump back over VIDAA's source picker. Pairing now keeps the token a TV sends on its

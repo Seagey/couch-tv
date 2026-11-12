@@ -55,6 +55,10 @@ class SetupActivity : Activity() {
             setOnClickListener { on() }
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { rightMargin = px(12) }
         }
+        // The Couch TV tile opens this screen, so this is the way to the home page on a TV (Google TV) where Google's home keeps the Home button.
+        // HomeActivity is in this app, and it applies Kids mode itself, so this is no route around it.
+        val openHome = button("Open the home") { startActivity(Intent(this, HomeActivity::class.java)) }
+        row.addView(openHome)
         val connect = button("Connect ADB") { adb.text = "Connecting. If the TV asks \"Allow debugging?\", tick Always allow and press OK."; Thread { Adb.ensure(interactive = true); main.post { refresh() } }.start() }
         row.addView(connect)
         row.addView(button("New phone code") { Auth.newPin(); refresh() })
@@ -78,7 +82,7 @@ class SetupActivity : Activity() {
             "Careful: Revoke USB debugging authorizations sits right next to Wireless debugging; never press OK on it.", 14f, CREAM_2).apply { setPadding(0, px(18), 0, 0) })
         col.addView(text("Turning the TV on is not possible from the TV itself: once it sleeps, this app sleeps too. Use the TV's own remote.", 14f, CREAM_2))
         setContentView(ScrollView(this).apply { setBackgroundColor(GROUND); addView(col) })
-        connect.requestFocus()
+        openHome.requestFocus()
         if (Auth.currentPin() == null) Auth.newPin()
     }
 
@@ -106,7 +110,7 @@ class SetupActivity : Activity() {
         homeNote.text = when {
             !App.homeEnabled(this) -> "Use as home screen asks Android to make Couch TV your home. No computer needed on a plain Android TV."
             HomeRole.held(this) -> "Couch TV is your home screen."
-            HomeRole.googleTv(this) -> "This is Google TV, which can keep its own home on the Home button. The Home button watch needs a computer once: see the README."
+            HomeRole.googleTv(this) -> "On Google TV, Google's home keeps the Home button. Open Couch TV from here with Open the home, or use the TV home install (apply.sh) for the Home button."
             else -> "If Android showed a list, choose Couch TV and press Always. If Home still opens the TV's own home, press Home button watch and switch on Couch TV home watch."
         }
     }
