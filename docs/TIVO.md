@@ -32,7 +32,7 @@ as on a [Panasonic Viera](PANASONIC.md):
 - **The hook** (`bridge/tivo.py`): the bridge (option B, a computer that stays on) watches the TV. Each time
   the TV is switched on it waits a few seconds, presses the key that opens the browser, waits for it, and
   presses four more keys that lead to the tile: yellow, right, OK, OK.
-- **The phone remote and the assistant** work against the TV through the same bridge.
+- **The phone remote and the Claude ask** work against the TV through the same bridge.
 
 It needs the computer that stays on. Without one there is nothing on the TV to open couch-tv.
 
@@ -41,14 +41,14 @@ It needs the computer that stays on. Without one there is nothing on the TV to o
 | | TiVo OS (Vestel) |
 |---|---|
 | couch-tv home in the TV's browser | Yes. With the browser's "Always show menu bar" off, the page fills the whole screen (1920x1080) |
-| Opens by itself when the TV is switched on | Built, with the bridge running. The keys ran on the real TV when sent by hand; the hook itself has not been watched on a real TV yet |
+| Opens by itself when the TV is switched on | Built, with the bridge running. Home on the phone remote opened couch-tv on the real TV; a real power on has not been watched yet |
 | TiVo's own Home button | **Still opens TiVo's home.** Press Home on the phone remote to get couch-tv back |
 | Phone remote: arrows, OK, Back, volume up and down, open the browser | Yes. Volume, right, OK, yellow and the browser key ran on the real TV, the others are from the public key lists |
 | Volume level | **No.** The TV gives no level to read, so the phone's slider says to use up and down |
-| Opening Netflix and Prime Video from the phone | Built: the TV said it knows both. Opening them has not been tried yet |
+| Opening Netflix and Prime Video from the phone | Yes, both opened on the real TV. Netflix takes a good while to load there |
 | Other apps (YouTube, Disney+ and the rest) | Only from couch-tv's page, if at all. The TV refused the question for YouTube and does not know the others by the usual names. `--ask` in the first test finds names, `dial_apps` adds them |
 | The remote's colour keys on couch-tv's page | **No.** They belong to the browser: yellow shows its bar, others change the zoom |
-| The remote's arrows, OK and number keys on couch-tv's page | The number keys arrive. The arrows and OK have not been watched on couch-tv's home yet (the browser also has a pointer) |
+| The TV's own remote on couch-tv's page | By pointing: the arrows move the browser's pointer, a tile under it takes the focus, and OK opens it. The home switches to this by itself on TiVo OS. The arrows never reach the page as keys |
 | "Put on Bluey" (find and play) | The app opens on its own page and the reply says to pick the show there. No deep link into a show is known on TiVo OS |
 | Turning the TV on from the phone | Not tried. The power key is built for a TV that still answers, Wake on LAN for one that does not |
 | Which app is in front, what is playing, screenshots | No. The TV does not tell the network any of it |
@@ -62,7 +62,7 @@ not. So the hook is blind, and keeps to two rules:
 
 - It opens couch-tv only when the TV has **just been switched on**, a few seconds after (`settle`, 8 s by
   default). It never takes over later.
-- Anything the phone remote or the assistant asked for wins: the hook stays quiet for 20 seconds after any
+- Anything the phone remote or Claude asked for wins: the hook stays quiet for 20 seconds after any
   command, except a power press from the phone, so turning the TV on from the phone also lands on couch-tv.
 
 Being blind has a price. The browser opens on its own first page (Google) and the four keys only fit once
@@ -179,15 +179,20 @@ All of it on the JVC LT-50VUQ3455 above, in November 2026:
   rest). The remote's number keys reach a page as key events.
 - `bridge/tivo.py` read that TV correctly: the model, the Smart Center state, and Netflix and Prime Video
   as the apps it knows.
+- The bridge's own Home opened couch-tv's real home there, full screen, through the `/titan/` page (no
+  pairing key was set).
+- Netflix and Prime Video opened over DIAL (`POST :56789/apps/Netflix` answers 201), from the bridge and
+  from a tile on couch-tv's home.
+- On the home, pointing at a tile with the TV's remote gives it the focus and OK opens it.
+- The TV stops answering for many seconds while it starts Netflix, and its web server takes one request
+  at a time. The driver first read that as "switched off and on again" and sent the hook into the middle
+  of Netflix. It now counts the TV as off only after 30 seconds without any answer.
 
 ## What is unconfirmed
 
-- **The hook on a real TV.** Whether port 56789 goes away when the TV is switched off (the hook needs
+- **The hook on a real power on.** Whether port 56789 goes away when the TV is switched off (the hook needs
   that to notice it coming on), and how long the TV needs after power on before it takes the browser key.
-- **couch-tv's own home in the browser.** The test page ran, the home itself has not been opened there yet,
-  nor the pairing key page. Whether the arrows and OK move the home's focus or only the browser's pointer
-  is open.
-- **Opening Netflix and Prime Video** over DIAL (`POST :56789/apps/Netflix`).
+- **The pairing key page** (`/titan/` with a key set): typing the key with the TV remote.
 - **Every key not listed above**: the arrows up, down and left, Back, mute, power, the media keys and the
   number keys as Smart Center codes. They are from the public lists for older Vestel sets.
 - **Letters typed from the phone.**

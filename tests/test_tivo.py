@@ -313,7 +313,7 @@ class Hook(Base):
 
     async def test_the_watcher_sees_the_tv_come_on(self):
         t = self.other(port=closed_port(), settle=0)
-        t.connected, t._checked = False, False
+        t.connected, t._checked, t._last_answer = False, False, 0.0
         changes = []
         t.on_change(lambda: changes.append(t.connected))
         with patch.object(tivo, "WATCH_EVERY", 0.05):
@@ -331,6 +331,40 @@ class Hook(Base):
         self.assertEqual(self.s.screen, "couch-tv")
         self.assertEqual(t.smart_center_state, "running")
         self.assertIn(True, changes)
+
+    async def test_a_tv_that_is_busy_for_a_moment_is_not_switched_off(self):
+        """The real TV stopped answering while Netflix started. Read as off and on again, that set the
+        hook off in the middle of Netflix."""
+        self.tv.port = closed_port()
+        await self.tv._read_power()
+        self.assertTrue(self.tv.connected)
+        with patch.object(tivo, "PROTOCOL", dict(FAST, off_after=0)):
+            await self.tv._read_power()
+        self.assertFalse(self.tv.connected)
+
+    async def test_any_answer_from_the_tv_counts_as_there(self):
+        self.tv._last_answer = 0.0
+        await self.tv.key("up")
+        self.assertGreater(self.tv._last_answer, 0.0)
+
+    async def test_a_tv_that_never_answered_is_off(self):
+        t = self.other(port=closed_port())
+        t._last_answer = 0.0
+        await t._read_power()
+        self.assertIs(t.is_on, False)
+
+    async def test_the_watcher_does_not_take_a_busy_tv_for_a_power_on(self):
+        t = self.other(settle=0)
+        with patch.object(tivo, "WATCH_EVERY", 0.05):
+            await t.start()
+            await asyncio.sleep(0.3)
+            real_port, t.port = t.port, closed_port()    # the TV goes silent, as it does starting Netflix
+            await asyncio.sleep(1.5)
+            self.assertTrue(t.connected)
+            t.port = real_port
+            await asyncio.sleep(0.5)
+        self.assertEqual(self.s.keys, [])
+        self.assertEqual(t.hook_log, [])
 
     async def test_reconnect_now_reads_the_tv_again(self):
         self.tv.connected = False

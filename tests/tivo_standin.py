@@ -18,6 +18,7 @@ with what it sends, not that a real TV answers the same way.
 """
 import re
 import sys
+import time
 from pathlib import Path
 
 from aiohttp import web
@@ -67,6 +68,7 @@ class StandIn:
         t.ip = "127.0.0.1"
         t.connected = True
         t._checked = True
+        t._last_answer = time.monotonic()
         return t
 
     # ---------- the web server ----------

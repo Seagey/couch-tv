@@ -31,7 +31,8 @@ TiVo's home.
 
 The hook: a watcher knocks on port 56789 every 2 seconds. When the TV comes on it waits a few seconds and
 opens couch-tv. TiVo OS does not say what is on screen, so the hook opens on power on only, and stays
-quiet for 20 seconds after anything the phone asked for.
+quiet for 20 seconds after anything the phone asked for. The TV counts as off only after 30 seconds
+without any answer: it goes silent for a while each time it starts an app.
 
 What it cannot do (docs/TIVO.md): read which app is in front or what is playing, a volume level, typing
 digits into the browser's address field, screenshots, deep links into a show, ADB tools. The colour keys
@@ -69,6 +70,7 @@ PROTOCOL = {
     "key_gap": 2.5,          # seconds between the keys of browser_path: Speed Dial needs time to draw
     "browser_path": ("yellow", "right", "ok", "ok"),
     "text_gap": 0.3,
+    "off_after": 30.0,       # seconds without any answer before the TV counts as switched off
 }
 
 # Friendly key name -> Smart Center code. The first group ran on the real TV. The rest is from the public
@@ -120,9 +122,10 @@ class Wire:
     """Plain HTTP to the TV. A new connection for every request: Vestel's web server stalls on a reused
     one, and refuses a knock right after it served a page on the same port."""
 
-    def __init__(self, log, trace=False):
+    def __init__(self, log, trace=False, on_answer=None):
         self.log = log
         self.trace = trace
+        self.on_answer = on_answer   # called for every answer, whatever it says: the TV is there
         self._session = None
 
     async def _http(self):
@@ -146,6 +149,8 @@ class Wire:
             async with session.request(method, url, data=body.encode("latin-1") if body is not None else None,
                                        headers=headers, allow_redirects=False) as reply:
                 text = await reply.text(errors="replace")
+                if self.on_answer:
+                    self.on_answer()
                 if self.trace:
                     self.log.info("trace in %s %s", reply.status, text[:400])
                 return reply.status, reply.headers, text
@@ -237,8 +242,9 @@ class TivoTV:
         self.state = {"playing": {"item": None}, "media_now": {}, "seen_playing": {},
                       "sleep": {"ends": None, "handle": None}, "waking": {"on": False},
                       "installed": {"packages": None, "checked": 0.0}, "picture": {}}
-        self.connected = False      # port 56789 answers
+        self.connected = False      # port 56789 answered in the last PROTOCOL["off_after"] seconds
         self._checked = False       # the watcher has knocked at least once
+        self._last_answer = 0.0     # when the TV last answered anything (monotonic), 0.0 for never
         self.visible = None         # never known on TiVo OS
         self.model = None
         self.smart_center_state = None
@@ -252,7 +258,7 @@ class TivoTV:
         self.quiet_until = 0.0
         self.home_on_wake_until = 0.0
         self.hook_log = []
-        self.wire = Wire(self.log, self.trace)
+        self.wire = Wire(self.log, self.trace, self._answered)
         self.smart_center = SmartCenter(self.wire, self._apps_base)
         self.dial = Dial(self.wire, self._apps_base)
 
@@ -273,6 +279,9 @@ class TivoTV:
 
     def _apps_base(self):
         return f"http://{self.ip or self.fallback_ip}:{self.port}/apps/"
+
+    def _answered(self):
+        self._last_answer = time.monotonic()
 
     # ---------- shape shared with tv.TV ----------
     @property
@@ -422,8 +431,7 @@ class TivoTV:
         while True:
             try:
                 before = self.connected
-                self.connected = await self.port_open()
-                self._checked = True
+                await self._read_power()
                 if not self.connected:
                     self._front = (None, 0.0)
                     if ticks % 30 == 0:
@@ -567,7 +575,13 @@ class TivoTV:
 
     # ---------- power ----------
     async def _read_power(self):
-        self.connected = await self.port_open()
+        """On or off. A missed knock is not "off": the real TV stops answering for many seconds while it
+        starts Netflix, and its web server takes one request at a time, so a key that hangs there makes the
+        next knock fail as well. Read as "off, then on", that sent the power on hook into the middle of
+        Netflix. Off is PROTOCOL["off_after"] seconds without any answer."""
+        if await self.port_open():
+            self._answered()
+        self.connected = bool(self._last_answer) and time.monotonic() - self._last_answer < PROTOCOL["off_after"]
         self._checked = True
 
     async def port_open(self, port=None, timeout=1.5):
