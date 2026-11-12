@@ -321,6 +321,7 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on nine real LGs so far ([how](docs/LG.md)) | No |
 | **Roku** (TV or box) | App only, a sideloaded channel opened from Roku's home row, while Developer Mode is on | With a computer at home: as a channel that opens itself, not a true home screen. Built from Roku's documentation, not yet tried on a real Roku ([how](docs/ROKU.md)) | No |
 | **Hisense with VIDAA** | App only: a tile on the app row where the firmware allows it, else the TV's browser | With a computer at home: as a page that opens itself, not a true home screen. Tested against a stand-in only, not yet tried on a real VIDAA TV ([how](docs/VIDAA.md)) | No |
+| **Panasonic Viera** (My Home Screen and older Vieras) | No | New: phone remote and a page that opens itself in the TV's browser, Beta ([how](docs/PANASONIC.md)) | No |
 | **Apple TV** | No | No | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
@@ -376,9 +377,17 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   own copy of Hisense's phone app (couch-tv does not include it). **It was tested against a pretend VIDAA TV
   on a computer, and it has not been run on a real one**, so expect to fix something. If you try it, please
   open an issue and say how it went. Setup and limits: [docs/VIDAA.md](docs/VIDAA.md).
+- **Panasonic Viera (My Home Screen, and older Vieras with network control):** new, Beta. Nothing to
+  install on the TV: the bridge talks to it the way Panasonic's own phone app does, and every time the TV is
+  switched on it opens couch-tv's home in the TV's web browser a few seconds later. The browser's own bar
+  stays visible and Panasonic's Home button still opens Panasonic's home. The phone remote works, with a
+  real volume level; apps open on their own page; no "what is playing" and no screenshots. 2018 and newer
+  sets pair once with a PIN on the TV. Panasonic's Google TV models are normal couch-tv TVs. Start with the
+  read only first test in [docs/PANASONIC.md](docs/PANASONIC.md), and please open an issue with what it
+  printed.
 - **Apple TV and Vega OS Fire TV:** closed. Nothing here works on them.
 
-**Want everything on a Samsung, LG, Roku, VIDAA or another TV?** The Samsung, LG, Roku and VIDAA paths cover the home and the
+**Want everything on a Samsung, LG, Roku, VIDAA, Panasonic or another TV?** The Samsung, LG, Roku, VIDAA and Panasonic paths cover the home and the
 phone remote, not everything. Plug in a Google TV box (for example the Google TV Streamer) and set
 couch-tv up on that, and you get everything, on any TV with an HDMI port.
 
