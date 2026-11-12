@@ -91,7 +91,7 @@ export const api = {
   apps: () => call('GET', '/api/apps'),
   recs: (who) => call('GET', `/api/recs?who=${encodeURIComponent(who)}`),
   continueList: (who) => call('GET', `/api/continue?who=${encodeURIComponent(who)}`),
-  setWho: (who) => call('POST', '/api/who', { who }),
+  setWho: (who, pin) => call('POST', '/api/who', pin ? { who, pin } : { who }),
   openContinue: (id, who) => call('POST', '/api/continue/open', { id, who }, 60000),
   config: () => call('GET', '/api/config'),
   screens: () => call('GET', '/api/screens'),
@@ -116,6 +116,10 @@ export const api = {
   settings: () => call('GET', '/api/settings'),   // the TV home's Home settings (its language)
   health: () => call('GET', '/api/health'),
   pair: (key) => call('POST', '/api/pair', { key }),
+  find: (title) => call('GET', `/api/find?title=${encodeURIComponent(title)}`, null, 20000),
+  // kids mode: the shelves, and changes to them with the parent PIN (bridge/API.md)
+  kids: () => call('GET', '/api/kids', null, 20000),
+  kidsChange: (body) => call('POST', '/api/kids', body, 20000),
 };
 
 // Live TV state: server-sent events, with a slow poll as the fallback when the stream drops.

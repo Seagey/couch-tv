@@ -26,6 +26,7 @@ import apps
 import config
 import finder
 import history_import
+import kids
 import store
 import taste
 from tv import TV, TVUnavailable, intent_to_link
@@ -1358,6 +1359,10 @@ async def h_who_set(request):
     who = store.norm_who(data.get("who"))
     if not who:
         raise ApiError(400, "who must be " + ", ".join(config.PEOPLE_IDS) + " or both")
+    # Kids mode: moving this TV away from a kids profile needs the parent PIN (docs/CONFIG.md)
+    was = cur_who()
+    if was != who and kids.is_kid(was):
+        check_kids_pin(request, was, data.get("pin"))
     store.save_who(who, _current.get())
     push_now()
     return ok(who=who)
@@ -1397,6 +1402,85 @@ async def h_people_set(request):
     for tv_id in TVS:
         with_tv(tv_id, push_now)
     return ok(people=config.PEOPLE)
+
+
+# ---------- kids mode: a shelf of chosen shows, behind a parent PIN (bridge/kids.py) ----------
+def check_kids_pin(request, pid, pin):
+    """Raise 403 unless pin is the parent PIN for this kids profile; 429 after too many wrong ones."""
+    addr = client_ip(request) or "local"
+    if kids.locked_out(addr):
+        raise ApiError(429, "Too many wrong PINs. Wait a few minutes and try again.")
+    if not kids.verify(pid, pin):
+        kids.wrong_pin(addr)
+        raise ApiError(403, "That PIN is not right." if pin else "The parent PIN is needed for that.")
+
+
+async def kids_list():
+    out = []
+    for p in config.PEOPLE:
+        m = kids.mode(p["id"])
+        if not m:
+            continue
+        await kids.enrich(m["shows"], finder.find)
+        pub = kids.public_mode(m)
+        names = {a["package"]: a["name"] for a in apps.APPS}
+        out.append({"id": p["id"], "name": p["name"], "shows": pub["shows"],
+                    "apps": [{"package": k, "name": names.get(k, k)} for k in pub["apps"]],
+                    # the same hash config.js carries, so a PIN changed on the phone reaches the TV
+                    # without a restart. Never the PIN itself.
+                    "pin_hash": pub["pin_hash"], "pin_salt": pub["pin_salt"], "pin_rounds": pub["pin_rounds"]})
+    return out
+
+
+async def h_kids_get(request):
+    """The kids profiles, their shelves (with posters) and apps, and each PIN's salted hash (never the PIN)."""
+    return ok(kids=await kids_list(),
+              people=[{"id": p["id"], "name": p["name"], "kids": kids.is_kid(p["id"])} for p in config.PEOPLE])
+
+
+async def h_kids_set(request):
+    """Change a kids profile, always with its PIN: {who, pin, action, ...}. action is one of
+    check, add (show: {title, service, season, episode, poster}), remove (id), apps (apps: [...]),
+    pin (new_pin), off, and on (new_pin, for someone who is not a kids profile yet)."""
+    data = await body(request)
+    pid = store.norm_who(data.get("who"))
+    if not pid or pid == "both":
+        raise ApiError(400, "who must be one person's id")
+    action = data.get("action")
+    m = kids.mode(pid)
+    if action == "on":
+        if m:
+            raise ApiError(409, "That is a kids profile already.")
+        if not kids.good_pin(data.get("new_pin")):
+            raise ApiError(400, "The PIN must be 4 to 8 digits.")
+        kids.turn_on(pid, str(data["new_pin"]))
+    else:
+        if not m:
+            raise ApiError(404, "That is not a kids profile.")
+        check_kids_pin(request, pid, data.get("pin"))
+        if action == "add":
+            show = kids.clean_show(data.get("show"))
+            if not show:
+                raise ApiError(400, "show needs a title")
+            if len(m["shows"]) >= kids.MAX_SHOWS:
+                raise ApiError(400, f"A shelf holds {kids.MAX_SHOWS} shows. Remove one first.")
+            kids.set_shows(pid, m["shows"] + [show])
+        elif action == "remove":
+            kids.set_shows(pid, [s for s in m["shows"] if s["id"] != data.get("id")])
+        elif action == "apps":
+            kids.set_apps(pid, data.get("apps"))
+        elif action == "pin":
+            if not kids.good_pin(data.get("new_pin")):
+                raise ApiError(400, "The PIN must be 4 to 8 digits.")
+            kids.set_pin(pid, str(data["new_pin"]))
+        elif action == "off":
+            kids.turn_off(pid)
+        elif action != "check":
+            raise ApiError(400, "action must be check, add, remove, apps, pin, on or off")
+    record_action(request, "kids", {"action": action}, True)
+    for tv_id in TVS:
+        with_tv(tv_id, push_now)
+    return ok(kids=await kids_list())
 
 
 async def h_history(request):
@@ -1613,6 +1697,8 @@ async def h_ask(request):
     text = (data.get("text") or "").strip()
     if not text:
         raise ApiError(400, "text is required")
+    if kids.is_kid(store.norm_who(data.get("who")) or cur_who()):
+        raise ApiError(403, "Ask is off for a kids profile.")
     result = await claude.ask(text, store.norm_who(data.get("who")) or cur_who(), asks,
                               _current.get())
     return ok(**result)
@@ -3193,6 +3279,8 @@ def make_app():
     r.add_get("/api/people", h_people_get)
     r.add_post("/api/people", h_people_set)
     r.add_get("/api/who", h_who_get)
+    r.add_get("/api/kids", h_kids_get)
+    r.add_post("/api/kids", h_kids_set)
     r.add_post("/api/who", h_who_set)
     r.add_get("/api/weather", h_weather)
     r.add_get("/api/config", h_config)

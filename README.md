@@ -21,6 +21,11 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**12 November 2026: Kids mode, New (on main, in the next release).** A kids profile's home shows only
+a shelf of shows a parent picked, as big posters that open straight into each show, plus the few apps
+you allow. No other apps, no settings, no grown ups' Keep watching. Leaving it needs the parent PIN,
+typed with the remote's arrows. See [Kids mode](#kids-mode). Idea from Natalie Bruss (@nataliebruss on Instagram).
+
 **12 November 2026: Philips, Panasonic and Fire TV on Vega OS, Beta.** Four more paths, each with a
 computer at home that stays on, and on each the maker's own Home button still opens the maker's home:
 - **Philips with Titan OS:** the phone remote (power, keys, volume, inputs, apps). couch-tv's home needs a
@@ -201,6 +206,38 @@ With option A it is Android's own Watch Next list, the same for everyone on that
 On main, in the next release. Only part of your apps fit in the dock on some TVs. Press **Down** on the dock's bottom row to open
 the full apps view (the same one **More apps** opens), with the outline on the app you were on.
 Back returns to the dock on that app.
+
+## Kids mode
+
+New, on main, in the next release. Make someone a kids profile and their home becomes one shelf of
+shows you chose, from any of the streaming apps, as big posters. OK on a poster opens that show in its
+app (on the episode, if you named one). Under the shelf sit only the apps you allow, if any. There is
+no More apps, no Settings tile, no app store, no other people's Keep watching, and the phone remote's
+Ask is off for that profile.
+
+![Kids mode on the TV](docs/screens/kids-home.jpg)
+
+**Grown ups** at the top right (or the remote's Settings button) asks for the parent PIN, on a number
+pad you work with the arrows and OK, or the number keys. Each digit shows as a dot. The right PIN
+moves the TV to the first grown up's profile; to go back, pick the child's name.
+
+![The parent PIN](docs/screens/kids-pin.jpg)
+
+Set it up in `config.json` (every option), or from the phone remote (options B and C): TV, **Kids
+mode**, then the PIN, then search for a show and tap the app to add it.
+
+```json
+{ "id": "ruby", "name": "Ruby", "kid": true,
+  "kids_mode": { "pin": "2580", "shows": ["Bluey", { "title": "Peppa Pig", "service": "abc-iview" }], "apps": ["abc-iview"] } }
+```
+
+What it cannot do, plainly: once a show is open, your child is inside Netflix (or iview, or Disney+)
+and can browse anything that app offers. Pair kids mode with the app's own kids profile and limits:
+Netflix's Kids profile with its maturity rating and title blocking (Profile and Parental Controls, on
+the web), Disney+ Junior mode, Prime Video's kids profile, YouTube Kids. On some TVs the remote's Home
+button can still reach the TV's own home; the Home button watch brings couch-tv back on Android TV and
+Google TV. The PIN keeps a child at the TV out; it is not a password against someone with a computer
+on your Wi-Fi. Not on the Roku channel or the Apple TV app yet. Every setting and the full list of limits: [docs/CONFIG.md](docs/CONFIG.md#kids-mode).
 
 ## Settings on the TV
 
@@ -995,6 +1032,7 @@ protocol and ADB.
   [roliusz fork](https://github.com/roliusz/couch-tv).
 - The no-computer install for option A came from
   [udhava2-stack](https://github.com/Seagey/couch-tv/pull/14).
+- Kids mode: idea from Natalie Bruss (@nataliebruss on Instagram).
 - The Bluetooth and Network buttons, Amazon YouTube support and the Fire TV Stick guide came from
   the [killy10o10 fork](https://github.com/killy10o10/couch-tv); the unpaired TV guard from the
   [Justin1491 fork](https://github.com/Justin1491/couch-tv).

@@ -55,7 +55,7 @@ object Store {
 
     /** The public config the TV home and the phone remote read (same shape as the computer bridge). */
     fun publicConfig(): JSONObject = JSONObject()
-        .put("people", people())
+        .put("people", Kids.attach(people()))   // a kids profile carries its shelf and its PIN's hash, never the PIN
         .put("weather", weather())
         .put("tvs", JSONArray().put(JSONObject().put("id", TV_ID).put("name", tvName()).also {
             // Only a Fire TV changes: its quick buttons gain Bluetooth and Network (its long-press

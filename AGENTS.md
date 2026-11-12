@@ -300,6 +300,12 @@ recommend C (A if they only want the home screen). Write the choice down; the re
   Option B: they are left out of the household's taste, so the shared picks are not full of
   cartoons or a visitor's shows. They still have their own row. Imported Netflix Kids profiles are
   left out the same way.
+- "Should any of them be a kids profile, whose home shows only shows you pick, behind a parent PIN?"
+  If yes: which shows (and on which app, if it matters), which apps beside them (up to six, or none),
+  and a PIN of 4 to 8 digits they choose. It goes in `kids_mode` ([docs/CONFIG.md](docs/CONFIG.md),
+  Kids mode). Say the limits plainly: inside Netflix or another app the child can browse that app, so
+  set up the app's own kids profile too; and the PIN keeps a child out, it is not a password.
+  Option A: `apply.sh` looks the shows up while it installs, so run it again after changing them.
 - Option B, optional: "Do you want to bring in your past Netflix or YouTube history so 'keep
   watching' and suggestions start smart?" If yes, walk them through
   [bridge/IMPORT.md](bridge/IMPORT.md) later. They download their own files. You never sign in to

@@ -30,6 +30,7 @@ home button unless you switch that on.
 | Picture mode, screens, Moonlight | yes | no | |
 | Home screen (TV home page) | yes | yes, optional | Same page, served from the app. Replacing Google's home needs one ADB command, see below. |
 | Live updates (`/api/events`) | yes | yes | Server-sent events, plus a WebSocket at `/api/ws`. |
+| Kids mode (New) | yes | yes | A kids profile's home is a shelf of chosen shows behind a parent PIN ([docs/CONFIG.md](../docs/CONFIG.md#kids-mode)). With no `config.json` here, set it up on the phone remote: TV, Kids mode. |
 
 ## Which TVs
 

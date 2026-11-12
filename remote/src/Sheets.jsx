@@ -383,7 +383,7 @@ export function PeopleSheet({ open, onClose, onSaved }) {
   );
 }
 
-export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnds, onSleep, onKey, onText, sleepError, tvs, tvId, onTv, picture, pictureInfo, onPicture, onArrange, onPeople }, ref) {
+export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnds, onSleep, onKey, onText, sleepError, tvs, tvId, onTv, picture, pictureInfo, onPicture, onArrange, onPeople, onKids }, ref) {
   const [typed, setTyped] = useState('');
   const sheetEl = useRef(null);
   const setRefs = (el) => { sheetEl.current = el; if (typeof ref === 'function') ref(el); else if (ref) ref.current = el; };
@@ -449,6 +449,7 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
         <button className="pill glass arrange-open" onClick={() => { tick(); onArrange(); }}><Ic.Grid size={18} /> {t('arrange_apps')}</button>
         <button className="pill glass arrange-open" onClick={() => { tick(); onPeople(); }}><Ic.People size={18} /> {t('people')}</button>
       </div>
+      <button className="pill glass arrange-open kids-open" onClick={() => { tick(); onKids(); }}><Ic.Lock size={18} /> {t('kids_mode')}</button>
 
       {/* this phone's language: "Same as the TV" follows the TV home's Home settings */}
       <section className="more-block">

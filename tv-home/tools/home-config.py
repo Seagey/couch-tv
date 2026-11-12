@@ -3,7 +3,9 @@ base64 encoded, for apply.sh to hand to the app on the TV. The app keeps them an
 copy of the home it carries inside it (option A, or when the computer is off).
 
 Usage: .venv/bin/python tv-home/tools/home-config.py [--json]     (COUCH_CONFIG picks another file)
-Never contains secrets: only people, weather, the home's look and each TV's quick buttons.
+Never contains secrets: only people, weather, the home's look and each TV's quick buttons. A kids
+profile's parent PIN goes as a salted hash only. Each kids shelf show is looked up on JustWatch here
+(the TV has no computer to ask later) for its poster and the link that opens it; --no-lookup skips that.
 
        .venv/bin/python tv-home/tools/home-config.py --ha [--check]
 The smart home section ("home_assistant" in config.json, docs/CONFIG.md), base64 encoded, for
@@ -92,7 +94,42 @@ if "--ha" in sys.argv:
         print(base64.b64encode(json.dumps(ha, separators=(",", ":")).encode()).decode() if ha else "none")
     sys.exit(0)
 
+async def bake_kids(people):
+    """Kids mode with no computer (option A): look each shelf show up now, on this computer, and
+    hand the TV the app and link that open it, and its poster. A show that is not found still goes
+    on the shelf; it opens its app (or says it cannot) instead of the show."""
+    import asyncio
+    import finder
+    import kids
+    for p in people:
+        for show in (p.get("kids_mode") or {}).get("shows") or []:
+            try:
+                best, _ = await asyncio.wait_for(finder.find(show["title"]), 20)
+                if not best or finder._norm(best["title"]) != finder._norm(show["title"]):
+                    print(f"home-config: kids shelf: {show['title']!r} not found, it will open its app only",
+                          file=sys.stderr)
+                    continue
+                show.setdefault("poster", best.get("poster"))
+                show.setdefault("backdrop", best.get("backdrop"))
+                ep = None
+                if show.get("season") and best.get("type") == "tv":
+                    ep = await finder.episode_providers(best["jw_id"], show["season"], show.get("episode"))
+                got = kids.link_for(best, show, ep)
+                if got and not show.get("link"):
+                    show.update({k: v for k, v in got.items() if v})
+                    app = kids.apps.BY_ID.get(got["service"])
+                    if app:
+                        show["app"] = {"id": app["id"], "name": app["name"], "package": app["package"]}
+            except Exception as e:
+                print(f"home-config: kids shelf: could not look up {show['title']!r} ({e})", file=sys.stderr)
+    if finder._session and not finder._session.closed:
+        await finder._session.close()
+
+
 pub = config.public()
 pub["ask"] = {"enabled": False}
+if "--no-lookup" not in sys.argv and any(p.get("kids_mode") for p in pub["people"]):
+    import asyncio
+    asyncio.run(bake_kids(pub["people"]))
 text = json.dumps(pub, separators=(",", ":"))
 print(text if "--json" in sys.argv else base64.b64encode(text.encode()).decode())

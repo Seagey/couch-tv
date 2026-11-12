@@ -32,6 +32,9 @@
 //   reset=1             forget everything this preview saved (orders, people, the look, Home settings)
 //   ha=1                smart home: a pretend Home Assistant with two rooms and three scenes
 //                       (ha=down: it is not answering; ha=scenes: scenes only, no rooms)
+//   kids=1              kids mode: Ruby, a kids profile on the couch, with a shelf of sample shows (all
+//                       animated, so no real faces) and two allowed apps. The parent PIN is 1234.
+//                       kids=empty: the same profile with nothing on the shelf yet
 //   update=1            Home settings, Updates, with a pretend 0.4 waiting (update=latest: none
 //                       newer; update=allow: the TV has not let Home install apps yet;
 //                       update=ask: nobody has answered "tell you about new versions?" yet)
@@ -88,6 +91,26 @@
   if (arg("sungrade")) cfg.home.ambient_sun_grade = arg("sungrade") !== "off";
   if (arg("unit")) cfg.home.wx_unit = arg("unit");   // home.wx_unit: c or f (#56)
   if (arg("video")) cfg.home.video_url = arg("video");
+  // ---------- kids mode, for ?kids= (bridge/kids.py makes the same shape; the PIN here is 1234) ----------
+  var KIDS = null;
+  if (arg("kids")) {
+    var jwp = function (path) { return "https://images.justwatch.com/poster/" + path; };
+    var iview = { id: "abc-iview", name: "ABC iview", package: "au.net.abc.iview" };
+    var shelf = arg("kids") === "empty" ? [] : [
+      { id: "bluey", title: "Bluey", service: "abc-iview", app: iview, poster: jwp("185497966/s592/bluey-2018.jpg") },
+      { id: "hey-duggee", title: "Hey Duggee", service: "abc-iview", app: iview, poster: jwp("346323994/s592/hey-duggee.jpg") },
+      { id: "peppa-pig-1-3", title: "Peppa Pig", service: "abc-iview", season: 1, episode: 3, app: iview, poster: jwp("207234640/s592/peppa-pig.jpg") },
+      { id: "octonauts", title: "Octonauts", service: "abc-iview", app: iview, poster: jwp("174932116/s592/the-octonauts.jpg") },
+      { id: "puffin-rock", title: "Puffin Rock", service: "netflix", app: { id: "netflix", name: "Netflix", package: "com.netflix.ninja" }, poster: jwp("177142154/s592/puffin-rock.jpg") },
+      { id: "sarah-duck", title: "Sarah & Duck", poster: jwp("116976329/s592/sarah-and-duck.jpg") }
+    ];
+    KIDS = { id: "ruby", name: "Ruby", colour: "#ff9f0a", shows: shelf, apps: ["au.net.abc.iview", "com.google.android.youtube.tv"],
+      pin_salt: "0a1b2c3d4e5f6a7b8c9d0e1f", pin_rounds: 4000,
+      pin_hash: "79a9e80ea8547f9bfa6fc47647eb62c9d5cd284c1454f717e5d0f4178ad75d72" };
+    cfg.people = (cfg.people || [{ id: "person1", name: "Person 1" }, { id: "person2", name: "Person 2" }]).concat([
+      { id: "ruby", name: "Ruby", colour: "#ff9f0a", kid: true, kids_mode: { shows: shelf, apps: KIDS.apps,
+        pin_hash: KIDS.pin_hash, pin_salt: KIDS.pin_salt, pin_rounds: KIDS.pin_rounds } }]);
+  }
   window.COUCH_CONFIG = cfg;
 
   // ---------- the launcher's updater (Updater.kt), for ?update= ----------
@@ -257,7 +280,17 @@
           return resolve({ ok: true, saved: true, line: o.line, dock_max: 10,
             apps: o.order.map(function (p) { return { package: p, name: p }; }) });
         }
-        if (path.indexOf("/api/who") === 0) return resolve({ ok: true, who: null });
+        if (path.indexOf("/api/who") === 0) {
+          if (method === "POST") store.set("api.who", body.who);
+          return resolve({ ok: true, who: store.get("api.who") || (KIDS ? "ruby" : null) });
+        }
+        if (path.indexOf("/api/kids") === 0) {
+          var named = { "au.net.abc.iview": "ABC iview", "com.google.android.youtube.tv": "YouTube" };
+          return resolve({ ok: true, kids: KIDS ? [{ id: KIDS.id, name: KIDS.name, shows: KIDS.shows, pin_hash: KIDS.pin_hash,
+            pin_salt: KIDS.pin_salt, pin_rounds: KIDS.pin_rounds,
+            apps: KIDS.apps.map(function (p) { return { package: p, name: named[p] }; }) }] : [] });
+        }
+        if (path.indexOf("/api/play") === 0) return resolve({ ok: true, note: body.title + " is playing." });
         if (path.indexOf("/api/settings") === 0) {
           if (method === "POST") store.set("api.settings", { settings: body.settings || {}, updated: new Date().toISOString() });
           var st = store.get("api.settings") || { settings: {}, updated: null };

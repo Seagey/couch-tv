@@ -149,6 +149,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                     b.optString("service").ifEmpty { null }, b.optString("who").ifEmpty { null })))
             }
             "POST /api/ask" -> {
+                if (Kids.isKid(body(s).optString("who").ifEmpty { Now.who })) throw ApiError(403, "Ask is off for a kids profile.")
                 if (!Ask.enabled) throw ApiError(501, "Ask is off in on-TV mode. To switch it on, add your own Anthropic API key on the setup page (it costs a fraction of a cent per ask).")
                 val b = body(s)
                 json(200, Ask.ask(b.optString("text").ifEmpty { throw ApiError(400, "text is required") }, b.optString("who").ifEmpty { Now.who }))
@@ -165,7 +166,29 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             }
             "GET /api/history" -> json(200, ok().put("items", Store.history()))
             "GET /api/who" -> json(200, ok().put("who", Now.who ?: JSONObject.NULL))
-            "POST /api/who" -> { Now.who = body(s).optString("who").ifEmpty { null }; Now.push(); json(200, ok().put("who", Now.who ?: JSONObject.NULL)) }
+            "POST /api/who" -> {
+                val b = body(s)
+                val next = b.optString("who").ifEmpty { null }
+                // Kids mode: moving this TV away from a kids profile needs the parent PIN (docs/CONFIG.md)
+                val was = Now.who
+                if (was != next && Kids.isKid(was)) {
+                    val addr = s.remoteIpAddress ?: ""
+                    if (Kids.lockedOut(addr)) throw ApiError(429, "Too many wrong PINs. Wait a few minutes and try again.")
+                    if (!Kids.verify(was, b.optString("pin"))) { Kids.wrongPin(addr); throw ApiError(403, "The parent PIN is needed for that.") }
+                }
+                Now.who = next; Now.push(); json(200, ok().put("who", Now.who ?: JSONObject.NULL))
+            }
+            // Kids mode: the shelves, and changes to them with the parent PIN (Kids.kt, bridge/API.md)
+            "GET /api/kids" -> {
+                val people = Store.people(); val list = JSONArray()
+                for (i in 0 until people.length()) people.optJSONObject(i)?.let { p ->
+                    list.put(JSONObject().put("id", p.optString("id")).put("name", p.optString("name")).put("kids", Kids.isKid(p.optString("id")))) }
+                json(200, ok().put("kids", Kids.list()).put("people", list))
+            }
+            "POST /api/kids" -> {
+                val r = Kids.change(body(s), s.remoteIpAddress ?: "")
+                if (r != null) json(r.first, err(r.second)) else { Now.push(); refreshHomeAfter(s); json(200, ok().put("kids", Kids.list())) }
+            }
             "GET /api/sleep" -> json(200, ok().put("ends", Now.sleepEnds?.let { Now.iso(it) } ?: JSONObject.NULL))
             "POST /api/sleep" -> {
                 val min = body(s).optDouble("minutes", Double.NaN)

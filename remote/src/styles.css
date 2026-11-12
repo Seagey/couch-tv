@@ -543,3 +543,15 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
   display: grid; place-items: center; color: var(--ink); opacity: 0.45; background: transparent; border: 0; z-index: 2; }
 .pad .pointer-toggle.on { opacity: 1; background: rgba(255,255,255,0.16); }
 .pad.pointer-mode { touch-action: none; }
+
+/* kids mode (Kids.jsx) */
+.kids-open { width: 100%; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.kids-sheet .more-block { margin-top: 18px; }
+.kids-sheet .chips-row .chip svg { vertical-align: -2px; }
+.kids-pin input:not(:placeholder-shown) { letter-spacing: 0.3em; }
+.kids-sub { display: block; font-weight: 400; font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; }
+.kids-sheet .arrange-row img { width: 34px; height: 50px; border-radius: 6px; }
+.kids-found { display: flex; gap: 12px; padding: 12px; border-radius: 16px; margin-top: 10px; }
+.kids-found img { width: 64px; height: 96px; border-radius: 8px; object-fit: cover; flex: none; }
+.kids-found b { font-size: 16px; }
+.kids-off { width: 100%; margin-top: 12px; color: var(--err); }

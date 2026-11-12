@@ -40,3 +40,4 @@ export const Send = (p) => <I d="M12 19V5M6 11l6-6 6 6" {...p} />;
 export const Wifi = (p) => <I {...p}><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12.2a10 10 0 0 1 13 0M9 15.8a5 5 0 0 1 6 0" /><circle cx="12" cy="19" r="1" fill="currentColor" /></I>;
 export const Sparkle = (p) => <I d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" {...p} />;
 export const People = (p) => <I {...p}><circle cx="9" cy="8" r="3.2" /><path d="M3 19.5a6 6 0 0 1 12 0" /><circle cx="17" cy="9" r="2.6" /><path d="M15.5 14.2a5 5 0 0 1 5.5 4.8" /></I>;
+export const Lock = (p) => <I {...p}><rect x="5" y="10.5" width="14" height="10" rx="2.5" /><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" /></I>;

@@ -145,6 +145,9 @@ Who is on the couch right now. The TV home and the phone send it when someone sw
   `/api/continue/open`, and shows started by hand on the TV (logged from the app's own
   "now playing"). So once a person is set, what they start on that TV lands in their keep watching.
 - `both` is the household with no people set up: its own row, like a person.
+- Kids mode: moving a TV away from a kids profile needs that profile's parent PIN, `{"who": "mum", "pin": "2580"}`.
+  Without it, or with a wrong one, `403`; five wrong PINs from one address in five minutes, `429`. Moving
+  into a kids profile needs nothing.
 
 ### `POST /api/watch-next`
 The TV home app's copy of Android's Watch Next rows ("Continue watching"), sent each time the home
@@ -185,6 +188,36 @@ anything is changed the list lives in `data/people.json` and wins from then on.
 `who` back to `null`. Their watch history stays. Every change is pushed on the events stream (`now`)
 so open front ends can re-read the list.
 
+### Kids mode: `GET /api/kids` and `POST /api/kids`
+The kids profiles (people with `kids_mode`, docs/CONFIG.md "Kids mode"), each with its shelf (posters
+filled from JustWatch), its allowed apps and its PIN's salted hash (`pin_hash`, `pin_salt`,
+`pin_rounds`: SHA-256 applied `pin_rounds` times to `"salt:pin"`), the same hash `/tv/config.js` carries
+so the TV home can check a typed PIN. Never the PIN itself. `people` lists everyone with `kids` true or
+false, for the phone's Kids mode sheet.
+```json
+{"ok": true,
+ "kids": [{"id": "ruby", "name": "Ruby",
+           "shows": [{"id": "bluey-abc-iview", "title": "Bluey", "service": "abc-iview", "package": "au.net.abc.iview",
+                      "poster": "https://images.justwatch.com/...", "app": {"id": "abc-iview", "name": "ABC iview", "package": "au.net.abc.iview"}}],
+           "apps": [{"package": "au.net.abc.iview", "name": "ABC iview"}],
+           "pin_hash": "…", "pin_salt": "…", "pin_rounds": 4000}],
+ "people": [{"id": "mum", "name": "Mum", "kids": false}, {"id": "ruby", "name": "Ruby", "kids": true}]}
+```
+`POST` changes one kids profile and answers with `kids` as above. Every action but `on` needs that
+profile's `pin`:
+- `{"who": "ruby", "pin": "2580", "action": "check"}`: is the PIN right.
+- `"action": "add", "show": {"title": "Hey Duggee", "service": "abc-iview", "season": 1, "episode": 2, "poster": "https://..."}` (only `title` is needed; up to 24 shows).
+- `"action": "remove", "id": "bluey-abc-iview"`.
+- `"action": "apps", "apps": ["au.net.abc.iview"]` (app ids or packages, up to six).
+- `"action": "pin", "new_pin": "135790"` (4 to 8 digits).
+- `"action": "off"`: kids mode off for that person.
+- `{"who": "mum", "action": "on", "new_pin": "2580"}`: make someone a kids profile (no PIN of theirs yet).
+
+`403` for a missing or wrong PIN, `429` after five wrong PINs from one address in five minutes, `404`
+when the person is not a kids profile, `409` for `on` when they already are. Changes are kept in
+`data/kids.json`, which wins over `config.json` for that person. The on-TV app (option C) answers the
+same, from its own storage.
+
 ### `GET /api/config` and `/tv/config.js`
 The settings the front ends are allowed to see (never addresses, keys or history). `/tv/config.js`
 is the same object as `window.COUCH_CONFIG = {...};`, loaded by the TV home and kept in its offline
@@ -200,7 +233,8 @@ copy. All keys are explained in `docs/CONFIG.md`.
 ```
 `tvs[].quick` is the quick buttons for that TV, in order: any of `sleep`, `picture`, `look`,
 `soundscape`, `input`. `picture_modes` is the two mode names for the picture button (empty without a `picture`
-entry). The home itself hides a button that cannot work at the moment.
+entry). The home itself hides a button that cannot work at the moment. A kids profile in `people` carries
+`kids_mode` (its shelf, apps and PIN hash, as `GET /api/kids`), never the PIN.
 
 ### `GET /api/events`
 Server-sent events (`text/event-stream`). Open it with `new EventSource('/api/events')`.
@@ -358,6 +392,7 @@ provider in this order: free apps, then subscriptions, then the rest.
 Free text to Claude (runs on the subscription, never the API). Takes about 5 to 20 seconds for
 simple asks; bigger jobs (installing an app) can run longer, so at 80 s it answers "Still working
 on it" and the job finishes in the background. Show a thinking state. Optional `who` (see "Who is watching").
+`403` when that person (or, with no `who`, the one on the couch) is a kids profile: no Ask for them.
 ```json
 {"text": "put on the latest Bluey", "who": "person1"}
 ```
@@ -775,6 +810,8 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- 2026-11-12: Kids mode (New): `GET|POST /api/kids`, `pin` on `POST /api/who` when leaving a kids
+  profile, `403` from `POST /api/ask` for a kids profile, and `kids_mode` on people in `/api/config` and `/tv/config.js`.
 - 2026-11-12: Couch TV for Apple TV (New, Beta): `GET /api/appletv/hello`, `GET /api/appletv/apps`,
   `POST /api/appletv/open`, `POST /api/appletv/code` and `POST /api/appletv/claim` (open), and the bridge's Bonjour
   record `_couchtv._tcp` when an Apple TV is configured. `app_id` on an Apple TV is now optional: an installed app
