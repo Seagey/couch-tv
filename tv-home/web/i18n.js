@@ -286,6 +286,7 @@
     ambient_music: "Ambient music screen",
     ambient_open_app: "Open app",
     np_expand: "Full screen",
+    np_play_here: "Play on TV",
     sound_head: "Sound",
     nav_sound: "Navigation sound",
     nav_sound_system: "The TV's own",

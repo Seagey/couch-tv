@@ -17,6 +17,10 @@
   // key: the page swaps it for the key once (bridge/vidaa.py, bridge/panasonic.py), then the code is
   // taken out of the address.
   var ONCE = (Q.match(/[?&](?:vidaa|once)=([A-Za-z0-9_-]{8,64})/) || [])[1];
+  // A standalone copy hosted on a website (scripts/build-standalone.sh writes window.COUCH_STANDALONE
+  // into its config.js): no bridge at all. It runs as the no-computer copy below; its Now playing
+  // card comes from the site's own Spotify functions (standalone/api, spotify-player.js).
+  var STANDALONE = !!window.COUCH_STANDALONE;
   if (ONCE && !KEY) {
     try {
       var cx = new XMLHttpRequest();
@@ -35,10 +39,10 @@
   // The launcher's saved copy of this page, opened when the computer is off (or when there is no
   // computer at all): scenes, clock, weather straight from Open-Meteo and the apps in the saved
   // order; nothing that needs the bridge.
-  var OFFLINE = /[?&]offline=1/.test(Q);
+  var OFFLINE = STANDALONE || /[?&]offline=1/.test(Q);
   // No computer at all (option A): the launcher's built-in copy is the home, so there is no
   // "computer is off" note to show.
-  var ALONE = OFFLINE && /[?&]alone=1/.test(Q);
+  var ALONE = STANDALONE || (OFFLINE && /[?&]alone=1/.test(Q));
   if (OFFLINE) document.documentElement.classList.add("offline");
   var CACHE_KEY = "tvhome.cache.v2";
   // Every word on screen comes from i18n.js, in the language picked in Home settings.
@@ -1040,13 +1044,27 @@
   // media sessions (/api/music) every 5 s while the home is on screen; the buttons are the remote's
   // media keys. A paused song stays for ten minutes so play can start it again. No computer and no
   // on-TV app (option A): Android lets no ordinary app read other apps' sessions, so no card.
-  var music = null, npI = 1;
+  var music = null, npI = 1, npSrc = "";   // npSrc: where the song comes from, to reset npI when it changes
   var AMBIENT_MUSIC = false, ambientOpen = false, ambientDismissed = false, ambI = 1;
   var lastTrackKey = "", paletteCache = {}, curProgress = 0, curDuration = 0;
 
-  function npVisible() { return NP_ON && !!music && !OFFLINE; }
+  function npVisible() { return NP_ON && !!music && (!OFFLINE || STANDALONE); }
   // reachable with the remote: in the Night look it steps aside with the cards while More apps is open
-  function npReach() { return npVisible() && !(NIGHT && expanded); }
+  function npReach() { return npVisible() && !(NIGHT && expanded) && npButtons().length > 0; }
+  // The card's buttons: the TV's media keys for a song the TV itself plays. A song from Spotify's Web
+  // API (bridge/spotify_now.py, standalone/api/now.js) may be playing on a phone, where the TV's keys
+  // do not reach: the standalone home offers "Play on TV" instead (spotify-player.js), the bridge none.
+  function npButtons() {
+    if (!music) return [];
+    var b;
+    if (music.source === "spotify") b = STANDALONE && window.CouchSpotify ? [["play", t("np_play_here"), "here"]] : [];
+    else {
+      var playing = music.state === "playing";
+      b = [["prev", t("np_prev")], [playing ? "pause" : "play", playing ? t("np_pause") : t("np_play")], ["next", t("np_next")]];
+    }
+    if (AMBIENT_MUSIC) b.push(["expand", t("np_expand")]);
+    return b;
+  }
 
   function formatTime(sec) {
     if (isNaN(sec) || sec == null || sec < 0) return "0:00";
@@ -1144,6 +1162,12 @@
       oBtn.innerHTML = ICONS.launch + '<span class="amb-open-txt">' + esc(appName || t("ambient_open_app")) + "</span>";
       oBtn.classList.toggle("focus", zone === "ambient" && ambI === 3);
     }
+    // a song from Spotify's Web API may be playing on a phone, where the TV's keys don't reach: only the
+    // middle button stays (Play on TV in the standalone home), and the open-app button goes on the bridge only
+    var sp = !!(music && music.source === "spotify");
+    pBtn.style.display = nBtn.style.display = sp ? "none" : "";
+    if (oBtn) oBtn.style.display = sp && STANDALONE ? "none" : "";
+    if (sp && ambI !== 1 && !(ambI === 3 && !STANDALONE)) ambI = 1;
     pBtn.classList.toggle("focus", zone === "ambient" && ambI === 0);
     plBtn.classList.toggle("focus", zone === "ambient" && ambI === 1);
     nBtn.classList.toggle("focus", zone === "ambient" && ambI === 2);
@@ -1195,6 +1219,14 @@
 
   function ambPress() {
     if (!music) return;
+    if (music.source === "spotify") {   // see renderAmbientControls: no TV keys for a Spotify song
+      if (ambI === 1 && STANDALONE && window.CouchSpotify) window.CouchSpotify.playHere(note);
+      else if (ambI === 3 && !STANDALONE) {
+        var spPkg = (music.app && (music.app.package || music.app.id)) || null;
+        if (spPkg) api("POST", "/api/launch", { app: spPkg }).catch(function (e) { note(e.message); });
+      }
+      return;
+    }
     if (ambI === 3) {
       var pkg = (music.app && (music.app.package || music.app.id)) || null;
       if (pkg) api("POST", "/api/launch", { app: pkg }).catch(function (e) { note(e.message); });
@@ -1224,8 +1256,8 @@
     // the cover from the bridge (Apple's music search); none yet, or none found: a music note
     var art = music.art ? '<img class="np-art" src="' + esc(music.art) + '" alt="" decoding="async" onerror="this.className=\'np-art gone\'">' :
       '<span class="np-art">' + ICONS.note + "</span>";
-    var btns = [["prev", t("np_prev")], [playing ? "pause" : "play", playing ? t("np_pause") : t("np_play")], ["next", t("np_next")]];
-    if (AMBIENT_MUSIC) btns.push(["expand", t("np_expand")]);
+    var btns = npButtons();
+    if (npI >= btns.length) npI = Math.max(0, btns.length - 1);   // a Spotify song may have one button
     el.innerHTML = art + '<div class="np-t"><span class="np-app">' + esc((music.app && music.app.name) || t("np_head")) + "</span>" +
       "<b>" + esc(music.title) + "</b><small>" + esc(music.artist || music.album || "") + "</small></div>" +
       '<div class="np-ctl">' + btns.map(function (b, i) {
@@ -1233,13 +1265,20 @@
       }).join("") + "</div>";
   }
   function refreshMusic() {
-    if (!NP_ON || OFFLINE || document.hidden) {
+    if (!NP_ON || (OFFLINE && !STANDALONE) || document.hidden) {
       if (music) { music = null; ambientOpen = false; renderNp(); renderAmbientMusic(); }
       return;
     }
-    api("GET", "/api/music", null, 5000).then(function (j) {
+    // standalone: the site's own function (standalone/api/now.js), same origin, no bridge
+    var ask = STANDALONE ? fetch(window.CouchSpotify ? window.CouchSpotify.url("api/now") : "api/now", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      : api("GET", "/api/music", null, 5000);
+    ask.then(function (j) {
+      if (STANDALONE && j && j.music && window.CouchSpotify) window.CouchSpotify.warm();
       var had = !!music;
       music = j.music || null;
+      var src = (music && music.source) || "";
+      if (src !== npSrc) { npSrc = src; npI = Math.min(1, Math.max(0, npButtons().length - 1)); }
       if (music && AMBIENT_MUSIC) {
         var trackKey = (music.title || "") + " - " + (music.artist || "");
         if (trackKey !== lastTrackKey) {
@@ -1273,7 +1312,10 @@
   }
   function npPress() {
     if (!music) return;
-    if (npI === 3 && AMBIENT_MUSIC) {
+    var btn = npButtons()[npI];
+    if (!btn) return;
+    if (btn[2] === "here") { window.CouchSpotify.playHere(note); return; }   // Play on TV (standalone)
+    if (btn[0] === "expand") {
       ambientOpen = true;
       ambientDismissed = false;
       zone = "ambient";
@@ -1282,7 +1324,7 @@
       renderAmbientMusic();
       return;
     }
-    var key = ["previous", "play_pause", "next"][npI];
+    var key = { prev: "previous", play: "play_pause", pause: "play_pause", next: "next" }[btn[0]];
     if (key === "play_pause") {
       music.state = music.state === "playing" ? "paused" : "playing";
       renderNp();
@@ -2014,7 +2056,7 @@
     var list = expanded ? arr.items.slice() : arr.items.slice(0, arr.line);
     if (expanded && store) list.unshift({ kind: "app", store: true, name: t("app_store"), package: STORE_PKG, id: store.id });
     list = list.concat(toolItems());
-    if (!expanded) list.push(moreItem());
+    if (!expanded && !(STANDALONE && !data.apps.length)) list.push(moreItem());   // standalone: no app list behind it
     return list;
   }
 
@@ -2528,7 +2570,7 @@
       return;
     }
     if (zone === "np") {
-      var maxNp = AMBIENT_MUSIC ? 3 : 2;
+      var maxNp = Math.max(0, npButtons().length - 1);
       if (NIGHT) {
         // the first card of the row: right past the last button goes on to the shows
         if (dx > 0 && npI === maxNp) { if (cards.length) { zone = "shelf"; s = 0; } }
@@ -2571,7 +2613,7 @@
         pi = Math.max(0, Math.min(PEOPLE.length - 1, pi + dx));
       } else if (dy > 0) zone = NIGHT && npReach() ? "np" : cards.length ? "shelf" : "grid";
     } else if (zone === "shelf") {
-      if (dx < 0 && s === 0 && NIGHT && npReach()) { zone = "np"; npI = 2; }
+      if (dx < 0 && s === 0 && NIGHT && npReach()) { zone = "np"; npI = Math.max(0, npButtons().length - 1); }
       else if (dx) s = Math.max(0, Math.min(shelfEls.length - 1, s + dx));
       else if (dy < 0) { if (peopleOn()) toPeople(); else if (!NIGHT && npReach()) zone = "np"; else if (hasQuick()) { zone = "quick"; qi = 0; } }
       else if (dy > 0 && gridEls.length) {
