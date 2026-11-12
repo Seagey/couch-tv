@@ -1371,7 +1371,12 @@ class MainActivity : Activity() {
 
     private fun start(i: Intent): Boolean = try {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        main.post { startActivity(i) }
+        main.post {
+            try {
+                startActivity(i)
+            } catch (_: Exception) {
+            }
+        }
         true
     } catch (e: Exception) {
         false
