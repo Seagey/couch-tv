@@ -600,7 +600,7 @@ class MainActivity : Activity() {
         fun getSleepRemainingMinutes(): Int = getNativeSleepMinutes()
 
         @JavascriptInterface
-        fun openSettings(): Boolean = start(tvSettingsIntent())
+        fun openSettings(): Boolean = startSettings(tvSettingsIntent())
 
         /** Holding OK on an app, "Uninstall": Android's own remove dialog. Never ourselves.
          *  On TVs with no remove dialog, falls back to the app's details screen (it has Uninstall).
@@ -751,7 +751,7 @@ class MainActivity : Activity() {
             // couch-tv back over (#75). With the watch on, open Fire OS's own Settings screen by name.
             val fire = if (FireWatch.connected) FireWatch.amazonSettings(packageManager) else null
             val i = fire ?: actions.asSequence().map { Intent(it) }.firstOrNull { packageManager.resolveActivity(it, 0) != null }
-            return i?.let { start(it) } ?: false
+            return i?.let { startSettings(it) } ?: false
         }
 
         // The saved copy has its own web storage, so the page keeps what it needs offline here.
@@ -1348,6 +1348,12 @@ class MainActivity : Activity() {
     }
 
     private fun launchPackage(pkg: String): Boolean {
+        // The Settings tile: on Fire OS the Settings app (com.amazon.tv.settings*) starts through
+        // Amazon's home, which the Home button watch puts couch-tv back over (#123). Open Fire OS's own
+        // Settings screen by name instead, and tell the watch it is us.
+        if (pkg == "com.android.tv.settings" || pkg.startsWith(FireWatch.AMAZON_SETTINGS_PKG)) {
+            FireWatch.amazonSettings(packageManager)?.let { return startSettings(it) }
+        }
         val i = packageManager.getLeanbackLaunchIntentForPackage(pkg)
             ?: packageManager.getLaunchIntentForPackage(pkg)
             ?: return false
@@ -1356,6 +1362,12 @@ class MainActivity : Activity() {
 
     /** The TV's Settings: Fire OS's own screen by name on a Fire TV (it stays open under the Home button watch, #75), else Android's Settings action. */
     private fun tvSettingsIntent(): Intent = FireWatch.amazonSettings(packageManager) ?: Intent(Settings.ACTION_SETTINGS)
+
+    /** Starts a Settings screen and lets the Home button watch know it was asked for (#123). */
+    private fun startSettings(i: Intent): Boolean {
+        FireWatch.allowSettingsNow()
+        return start(i)
+    }
 
     private fun start(i: Intent): Boolean = try {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1484,7 +1496,7 @@ class MainActivity : Activity() {
                     (v.foreground as GradientDrawable).setStroke(if (has) px(3) else 0, AMBER)
                     v.elevation = if (has) px(8).toFloat() else 0f
                 }
-                setOnClickListener { if (ri == null) start(tvSettingsIntent()) else launchPackage(pkg) }
+                setOnClickListener { if (ri == null) startSettings(tvSettingsIntent()) else launchPackage(pkg) }
             }
             if (ri != null) {
                 tile.addView(ImageView(this).apply {

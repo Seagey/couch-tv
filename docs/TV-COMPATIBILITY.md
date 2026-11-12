@@ -102,6 +102,9 @@ Not tested by the author. Each line is what someone said worked on their own dev
   option B can. Fire OS 6 never connects the accessibility watcher (it runs Amazon's own accessibility
   manager), so there the Home button watch goes by usage access, the third grant. Seen on an Insignia Fire TV
   Edition, Fire OS 6.7.1.1 ([issue #50](https://github.com/Seagey/couch-tv/issues/50)). The Android TV Remote protocol is not confirmed on Fire TV.
+  The gear tile's TV settings (and the Settings app tile) open Fire OS's own Settings screen by name and tell
+  the Home button watch for a few seconds that Amazon's home coming forward is Settings being drawn, so Settings
+  stays open ([issue #75](https://github.com/Seagey/couch-tv/issues/75), [#123](https://github.com/Seagey/couch-tv/issues/123)). Pressing the remote's Home button and then going to Amazon's Settings is still a Home press: couch-tv comes back.
 - **Vega OS** is Amazon's newer Linux system. It has no APKs and no ADB, but Amazon's own Developer Mode
   does allow installing your own app (free Amazon Developer account, Vega CLI on a Mac or Linux computer, a
   USB cable once). couch-tv goes on as a WebView app the bridge opens ([FIRE-VEGA.md](FIRE-VEGA.md)); Amazon's
