@@ -417,7 +417,7 @@ class CheckScript(Base):
         for want in ("JointSpace answers on /6/", "Power", "Inputs", "In front now", "Apps it lists: 5", "Netflix"):
             self.assertIn(want, out)
         self.assertEqual([(m, p) for m, p, _ in self.s.log if m != "GET"], [])
-        self.assertNotIn("key-test", out)
+        self.assertNotIn(getattr(self.s, "test_login", None) or "never-printed", out)
 
 
 class Signature(unittest.TestCase):

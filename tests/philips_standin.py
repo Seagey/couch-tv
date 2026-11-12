@@ -15,6 +15,7 @@ The digest check and the pairing signature here are written separately from the 
 mistake in one is not copied into the other.
 """
 import base64
+import secrets
 import hashlib
 import hmac
 import json
@@ -96,8 +97,10 @@ class StandIn:
 
     def pair_now(self, tv):
         """Skip the PIN: give the bridge a login as pairing would."""
-        self.logins["dev-test"] = "key-test"
-        tv._keep(user="dev-test", password="key-test")
+        # a throwaway login made fresh each run, so no fixed credential sits in the repo
+        self.test_login = secrets.token_hex(8)
+        self.logins["dev-test"] = self.test_login
+        tv._keep(user="dev-test", password=self.test_login)
 
     def sent(self, path):
         return [json.loads(b) if b else None for m, p, b in self.log if p == path and m == "POST"]
