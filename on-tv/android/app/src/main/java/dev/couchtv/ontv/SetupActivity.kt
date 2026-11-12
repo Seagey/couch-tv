@@ -28,6 +28,8 @@ class SetupActivity : Activity() {
     private lateinit var adb: TextView
     private lateinit var homeBtn: Button
     private lateinit var homeNote: TextView
+    private lateinit var openHome: Button
+    private lateinit var connect: Button
     private val tick = object : Runnable { override fun run() { refresh(); main.postDelayed(this, 1500) } }
     private val pinListener: (String?) -> Unit = { main.post { refresh() } }
 
@@ -56,10 +58,11 @@ class SetupActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { rightMargin = px(12) }
         }
         // The Couch TV tile opens this screen, so this is the way to the home page on a TV (Google TV) where Google's home keeps the Home button.
+        // It only shows when the Home button does not already open couch-tv (see homeOpensUs).
         // HomeActivity is in this app, and it applies Kids mode itself, so this is no route around it.
-        val openHome = button("Open the home") { startActivity(Intent(this, HomeActivity::class.java)) }
+        openHome = button("Open the home") { startActivity(Intent(this, HomeActivity::class.java)) }
         row.addView(openHome)
-        val connect = button("Connect ADB") { adb.text = "Connecting. If the TV asks \"Allow debugging?\", tick Always allow and press OK."; Thread { Adb.ensure(interactive = true); main.post { refresh() } }.start() }
+        connect = button("Connect ADB") { adb.text = "Connecting. If the TV asks \"Allow debugging?\", tick Always allow and press OK."; Thread { Adb.ensure(interactive = true); main.post { refresh() } }.start() }
         row.addView(connect)
         row.addView(button("New phone code") { Auth.newPin(); refresh() })
         row.addView(button("Developer options") { runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) } })
@@ -68,7 +71,7 @@ class SetupActivity : Activity() {
             App.setHomeEnabled(this, on); FireHome.poke()
             // No computer: Android's own "default home app" request (plain Android TV 10+), else its Home chooser
             if (on && !HomeRole.googleTv(this) && !HomeRole.held(this)) HomeRole.request(this)
-            refresh()
+            refresh(); updateOpenHome()
         }
         row.addView(homeBtn)
         // The Home key on some TVs opens the maker's own home and ignores the default home: this watch brings couch-tv back.
@@ -82,16 +85,32 @@ class SetupActivity : Activity() {
             "Careful: Revoke USB debugging authorizations sits right next to Wireless debugging; never press OK on it.", 14f, CREAM_2).apply { setPadding(0, px(18), 0, 0) })
         col.addView(text("Turning the TV on is not possible from the TV itself: once it sleeps, this app sleeps too. Use the TV's own remote.", 14f, CREAM_2))
         setContentView(ScrollView(this).apply { setBackgroundColor(GROUND); addView(col) })
-        openHome.requestFocus()
+        updateOpenHome()
         if (Auth.currentPin() == null) Auth.newPin()
     }
 
-    override fun onResume() { super.onResume(); Auth.onPin(pinListener); main.post(tick) }
+    override fun onResume() { super.onResume(); Auth.onPin(pinListener); main.post(tick); updateOpenHome() }
     override fun onPause() { super.onPause(); Auth.offPin(pinListener); main.removeCallbacks(tick) }
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data); refresh()
     }
     override fun onNewIntent(i: Intent) { super.onNewIntent(i); refresh() }
+
+    /** True when the TV's Home button already opens this app (the HomeAlias), so Open the home would be redundant. */
+    private fun homeOpensUs(): Boolean {
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val pkg = runCatching { packageManager.resolveActivity(home, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName }.getOrNull()
+        return pkg == packageName
+    }
+
+    /** Shows Open the home only when Home does not open couch-tv; GONE keeps the D pad order gap free. */
+    private fun updateOpenHome() {
+        val show = !homeOpensUs()
+        val hadFocus = openHome.hasFocus()
+        openHome.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) { if (currentFocus == null) openHome.requestFocus() }
+        else if (hadFocus || currentFocus == null) connect.requestFocus()
+    }
 
     private fun refresh() {
         val ip = App.lanAddress()
@@ -110,7 +129,7 @@ class SetupActivity : Activity() {
         homeNote.text = when {
             !App.homeEnabled(this) -> "Use as home screen asks Android to make Couch TV your home. No computer needed on a plain Android TV."
             HomeRole.held(this) -> "Couch TV is your home screen."
-            HomeRole.googleTv(this) -> "On Google TV, Google's home keeps the Home button. Open Couch TV from here with Open the home, or use the TV home install (apply.sh) for the Home button."
+            HomeRole.googleTv(this) -> "On Google TV, Google's home keeps the Home button. Open Couch TV from here with Open the home (it shows when Home does not open Couch TV), or use the TV home install (apply.sh) for the Home button."
             else -> "If Android showed a list, choose Couch TV and press Always. If Home still opens the TV's own home, press Home button watch and switch on Couch TV home watch."
         }
     }

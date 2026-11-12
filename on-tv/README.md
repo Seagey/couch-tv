@@ -111,7 +111,7 @@ Switch on **Use as home screen** in Couch TV. On a plain Android TV that is enou
 system launcher still wins the Home button, and **do not switch it off**: on some Google TVs (a
 Sony Bravia among them) the TV then loops at every restart
 ([README](../README.md#if-your-tv-loops-after-a-restart)). The Couch TV tile in the app row opens
-setup, so choose **Open the home** there to see the home, or use option A's `apply.sh`, which takes
+setup, so choose **Open the home** there to see the home (it appears when the Home button doesn't already open Couch TV), or use option A's `apply.sh`, which takes
 the Home button with a watch and leaves the Google home on.
 The **Couch TV home watch** accessibility service is for Fire TV only. On any other TV it switches
 itself off when you turn it on, and that is expected.
