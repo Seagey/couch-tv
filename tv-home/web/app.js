@@ -332,6 +332,7 @@
     HOME = CFG.home || {};
     ON_TV = CFG.mode === "on-tv";
     ST = loadSettings();
+    KEEP_PHOTO = typeof ST.keep_photo === "boolean" ? ST.keep_photo : HOME.keep_photo === true;
     var savedIdle = ST.idle_photo_seconds;
     var configuredIdle = HOME.idle_photo_seconds;
     IDLE_PHOTO_SECONDS = IDLE_PHOTO_STEPS.indexOf(savedIdle) >= 0 ? savedIdle :
@@ -514,6 +515,7 @@
   // home.hi_res false keeps the 1080 copies on a 4K screen whose chip struggles with 3840x2160 photos
   // (an LG 43SQ700S monitor): they are four times the pixels to decode and keep in memory.
   function bgPath(name, ext, builtIn) { return "backgrounds/" + name + (HI_RES && HOME.hi_res !== false && builtIn !== false ? "@2x" : "") + ext; }
+  var KEEP_PHOTO = false;   // Home settings, Look, Keep one photo (Classic): no rotation, same picture after a reload
   var photo = 0, photoTimer = null, bgShown = null, bgLayer = 0, bgTicket = 0;
 
   function photoForHour(h) {   // sunrise in the morning, green by day, sunsets in the evening
@@ -550,14 +552,24 @@
     return own.map(function (s) { return { src: s.src, place: t("scene_photo", { n: s.n }), by: "" }; });
   }
 
+  function photoKey(p) { return String(p.src || p.file || ""); }
+  function pickedPhoto() {   // the index of the photo kept, or -1 when it is gone (the household removed it)
+    var list = classicPhotos(), k = ST.keep_photo_pick;
+    if (!k) return -1;
+    for (var i = 0; i < list.length; i++) if (photoKey(list[i]) === k) return i;
+    return -1;
+  }
+
   function showPhoto() {
     if (NIGHT) { $("place").textContent = ""; return; }   // the scenes carry their own photos
+    if (KEEP_PHOTO) { var at = pickedPhoto(); if (at >= 0) photo = at; }
     var list = classicPhotos(), p = list[photo % list.length];
     setBg(p.src || bgPath(p.file, ".jpg"), false);
     $("place").textContent = (p.key ? t(p.key) : p.place) + (p.by ? "  ·  " + t("photo_by", { by: p.by }) : "");
   }
 
   function nextPhoto() {
+    if (KEEP_PHOTO) return;
     photo = (photo + 1) % classicPhotos().length;
     if (zone !== "shelf") showPhoto();
   }
@@ -2944,6 +2956,17 @@
       rows.push({ kind: "choice", key: "look:" + id, label: t("look_" + id), sub: t("look_" + id + "_sub"), checked: look === id,
         act: function () { ST.look = id; keep("tvhome.look", id); saveSettings(); } });
     });
+    if (look === "classic") {
+      rows.push({ kind: "toggle", key: "keep-photo", label: t("keep_photo"), sub: t("keep_photo_sub"), value: KEEP_PHOTO ? t("on") : t("off"), act: function () {
+        KEEP_PHOTO = !KEEP_PHOTO; ST.keep_photo = KEEP_PHOTO;
+        if (KEEP_PHOTO) { var cl = classicPhotos(); ST.keep_photo_pick = photoKey(cl[photo % cl.length]); }
+        saveSettings(); showPhoto();
+      } });
+      if (KEEP_PHOTO) rows.push({ kind: "cycle", key: "keep-photo-pick", label: t("keep_photo_pick"), value: t("photo_n_of", { n: (photo % classicPhotos().length) + 1, total: classicPhotos().length }), act: function () {
+        var cl = classicPhotos(); photo = (photo + 1) % cl.length;
+        ST.keep_photo_pick = photoKey(cl[photo]); saveSettings(); showPhoto();
+      } });
+    }
     rows.push(head(t("scenes_head")));
     rows.push(info("photos-count-look", photoCountText()));
     st.order.forEach(function (id) {

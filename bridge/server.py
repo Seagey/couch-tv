@@ -2141,6 +2141,10 @@ def clean_settings(s):
     idle_photo_seconds = s.get("idle_photo_seconds")
     if type(idle_photo_seconds) is int and idle_photo_seconds in (0, 5, 10, 15, 30, 60):
         out["idle_photo_seconds"] = idle_photo_seconds
+    if isinstance(s.get("keep_photo"), bool):   # Classic keeps one photo (#127)
+        out["keep_photo"] = s["keep_photo"]
+    if isinstance(s.get("keep_photo_pick"), str) and 0 < len(s["keep_photo_pick"]) <= 300:
+        out["keep_photo_pick"] = s["keep_photo_pick"]
     if s.get("glass") in ("off", "on", "lite"):
         out["glass"] = s["glass"]
     if isinstance(s.get("glass_icons"), bool):
