@@ -272,6 +272,8 @@ def _my_scenes(items):
                 clock[key] = v
         item = {"id": m["id"], "clock": clock, "date": "below" if m.get("date") == "below" else "above",
                 "text": "dark" if m.get("text") == "dark" else "light", "cutout": m.get("cutout") is True}
+        if m.get("video") is True:   # backgrounds/mine/scene-<id>.mp4 loops over the photo
+            item["video"] = True
         if isinstance(m.get("name"), str) and m["name"].strip():
             item["name"] = m["name"].strip()[:40]
         out.append(item)
