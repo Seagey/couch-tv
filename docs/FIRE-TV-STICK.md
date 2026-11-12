@@ -4,7 +4,7 @@ Written by [killy10o10](https://github.com/killy10o10/couch-tv), who runs couch-
 (`dev.couchtv.ontv`, option C) as the home screen of a
 **Fire TV Stick 4K (2nd gen, model AFTKM) on Fire OS 8.1.8.5 (Android 11)**. Everything below was
 done on that stick. Other Fire OS 7 and 8 sticks should behave the same; sticks on **Vega OS**
-cannot sideload apps at all.
+have no APKs or ADB: they use a different path ([FIRE-VEGA.md](FIRE-VEGA.md)).
 
 ![couch-tv on the Fire TV Stick](screens/firestick-home.jpg)
 

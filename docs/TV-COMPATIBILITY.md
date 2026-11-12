@@ -19,7 +19,7 @@ TVs, see their pages; Roku and Hisense VIDAA have not).
 | Nvidia Shield | Yes (not tested) | Yes | Yes (not tested) |
 | Onn (Google TV) | Yes | Yes | Partial |
 | Fire TV on Fire OS 6, 7 and 8 (Stick 4K 1st and 2nd gen, Stick 4K Max, Cube) | Partial | Partial | Partial (home screen confirmed on a Stick 4K 2nd gen by a user; phone remote keys blocked on current Fire OS) |
-| Fire TV on Vega OS (Stick 4K Select, Stick HD 2026, 4K gen 3) | No | No | No |
+| Fire TV on Vega OS (Stick 4K Select, Stick HD 2026, 4K gen 3) | App only: built with Amazon's free developer tools, **New** | As an app the bridge opens when the stick comes up, not a home screen. Phone remote arrows and OK while couch-tv is in front ([FIRE-VEGA.md](FIRE-VEGA.md)) | No |
 | Samsung (Tizen) | App only | As an app the bridge opens on power-on, not a home screen ([SAMSUNG.md](SAMSUNG.md)) | No |
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on nine real LGs so far ([LG.md](LG.md)) | No |
 | Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation, **not yet tried on a real Roku** ([ROKU.md](ROKU.md)) | No |
@@ -91,8 +91,10 @@ Not tested by the author. Each line is what someone said worked on their own dev
   option B can. Fire OS 6 never connects the accessibility watcher (it runs Amazon's own accessibility
   manager), so there the Home button watch goes by usage access, the third grant. Seen on an Insignia Fire TV
   Edition, Fire OS 6.7.1.1 ([issue #50](https://github.com/Seagey/couch-tv/issues/50)). The Android TV Remote protocol is not confirmed on Fire TV.
-- **Vega OS** is Amazon's newer Linux system. It has no sideloading. Amazon says future Fire TV
-  sticks will run it.
+- **Vega OS** is Amazon's newer Linux system. It has no APKs and no ADB, but Amazon's own Developer Mode
+  does allow installing your own app (free Amazon Developer account, Vega CLI on a Mac or Linux computer, a
+  USB cable once). couch-tv goes on as a WebView app the bridge opens ([FIRE-VEGA.md](FIRE-VEGA.md)); Amazon's
+  home cannot be replaced. Amazon says future Fire TV sticks will run it.
 - **Roku** channels are BrightScript and SceneGraph, not web pages, so the home is drawn again natively
   (`roku/`) and the bridge talks to the Roku over its External Control Protocol on port 8060
   (`bridge/roku.py`). Built from Roku's documentation, tested against a test Roku and a BrightScript

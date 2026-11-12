@@ -183,7 +183,13 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   first (it only reads, but it still waits for the yes in step 3), and never suggest or walk them
   through rooting the TV. Afterwards ask them to open an issue on GitHub with what `vidaa-check.py`
   printed, and write down for them what worked and what did not.
-- **Apple TV, Fire TV on Vega OS:** not supported. Say so kindly,
+- **Fire TV on Vega OS:** do not say no. Offer the path in [docs/FIRE-VEGA.md](docs/FIRE-VEGA.md), and say
+  plainly that it is New, that it needs a free Amazon Developer account, Amazon's Vega tools on a Mac or Linux
+  computer, a USB cable once and a computer at home that stays on, that Amazon's Home button still opens Amazon's
+  home, that the phone remote only works while couch-tv is in front (no volume, no power off), and that only
+  Netflix and YouTube open from the phone. Follow docs/FIRE-VEGA-TESTING.md, and run `scripts/check-vega.py`
+  (read only) first. Never root anything.
+- **Apple TV:** not supported. Say so kindly,
   explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
   round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets
   them everything. If they do not want a box, stop. Do not suggest rooting the TV.
