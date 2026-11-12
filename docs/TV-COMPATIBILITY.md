@@ -2,7 +2,7 @@
 
 Research from public sources (linked below). Only Google TV has been tested
 by the author. Everything else is what the sources say, not tested (Samsung and LG have since run on real
-TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a read only check on one real TV but is not paired; Roku has run as a channel on one real TV, with no bridge; Philips Saphi, VIZIO and Panasonic have not run on a real TV).
+TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a read only check on one real TV but is not paired; Roku has run as a channel on one real TV, with no bridge; Philips Saphi, VIZIO and Panasonic have not run on a real TV; on TiVo OS the keys and the way to couch-tv's page ran on one real JVC, sent by hand, see [TIVO.md](TIVO.md)).
 
 - **A. TV home only:** an app replaces the TV's home screen.
 - **B. Computer bridge:** a computer at home controls the TV with the Android TV Remote protocol
@@ -29,7 +29,7 @@ TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a 
 | VIZIO (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Beta, phone remote only**: power, volume, inputs and opening apps; couch-tv's home page cannot open on the TV. Tested against a stand in so far ([VIZIO.md](VIZIO.md)) | No |
 | Panasonic Viera (My Home Screen, older Vieras) | No | **Beta**: phone remote and a page that opens itself in the TV's browser (Panasonic's Home button still opens Panasonic's home) ([PANASONIC.md](PANASONIC.md)) | No |
 | Apple TV | No (Apple lets no app replace its home; tvOS has no web view) | **Beta**: phone remote and opening apps, and Couch TV, the home as an Apple TV app that opens itself, installed free from a Mac with your own Apple ID and reinstalled weekly by the computer at home (Apple's Home button still opens Apple's home) ([APPLE-TV.md](APPLE-TV.md)) | No |
-| TiVo OS | No known way yet | No known way yet | No |
+| TiVo OS (JVC, Telefunken and other Vestel built sets) | No (no outside apps, no app store) | **Beta**: phone remote and a page the bridge opens in the TV's browser, from a Speed Dial tile added once (TiVo's Home button still opens TiVo's home). Keys and the way to the page ran on one real JVC LT-50VUQ3455; the power on hook has not been watched on a real TV ([TIVO.md](TIVO.md)) | No |
 
 **VIZIO, what it cannot do.** couch-tv's home page does not open on a VIZIO by itself: VIZIO OS has no
 browser, no sideloading and a closed app programme, and its Chromecast built in only opens registered

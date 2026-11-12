@@ -2,7 +2,7 @@
 
 Your own home screen and phone remote for a Google TV, an Android TV or a Fire TV, with app
 versions for Samsung and LG (run on ten real LGs so far), a Roku version, and Beta versions for
-Hisense VIDAA, Philips, Panasonic, VIZIO, Fire TV on Vega OS and Apple TV
+Hisense VIDAA, Philips, Panasonic, VIZIO, TiVo OS, Fire TV on Vega OS and Apple TV
 ([Will it work on my TV?](#will-it-work-on-my-tv)). No ads on the home screen. Open source (MIT).
 
 **Set it up the easy way: [couchtv.sites.underseage.studio](https://couchtv.sites.underseage.studio)**, from your phone, with the free Setup app
@@ -493,7 +493,7 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **VIZIO** (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Beta, phone remote only**, with a computer at home that stays on: power, volume, inputs and opening apps ([how](docs/VIZIO.md)) | No |
 | **Panasonic Viera** (My Home Screen and older Vieras) | No | **Beta**, with a computer at home that stays on: phone remote, and a page that opens itself in the TV's browser. Panasonic's Home button still opens Panasonic's home ([how](docs/PANASONIC.md)) | No |
 | **Apple TV** | No: Apple lets no app replace its home | **Beta**, with a computer at home that stays on: phone remote (keys, sleep and wake, opening apps), and the couch-tv home as an Apple TV app, Couch TV (Beta, free with your own Apple ID and a Mac, reinstalled weekly by the computer at home). Apple's Home button still opens Apple's home ([how](docs/APPLE-TV.md)) | No |
-| **TiVo OS** | No known way yet | No known way yet | No |
+| **TiVo OS** (JVC, Telefunken and other Vestel built sets) | No | **Beta**, with a computer at home that stays on: phone remote, and a page that opens itself in the TV's browser from a Speed Dial tile you add once. TiVo's Home button still opens TiVo's home. Run on one real JVC so far ([how](docs/TIVO.md)) | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
 not the brand. Their Google TV and Android TV models should work. Their VIDAA models run
@@ -542,9 +542,9 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, from public sou
   build with `--apps-from` (docs/ROKU.md). Newer Roku OS also limits remote control
   until "Control by mobile apps" is switched to Permissive or Enabled. If you try it, please open an issue
   and say how it went. Setup and limits: [docs/ROKU.md](docs/ROKU.md).
-- **The Beta paths: Hisense VIDAA, Philips, Fire TV on Vega OS, VIZIO, Panasonic and Apple TV.** All of them need a
+- **The Beta paths: Hisense VIDAA, Philips, Fire TV on Vega OS, VIZIO, Panasonic, TiVo OS and Apple TV.** All of them need a
   **computer at home that stays on**, and on all of them **the maker's own Home button still opens the
-  maker's own home**: couch-tv opens itself on top, it does not replace that home. VIDAA now runs on a real Hisense (Beta, below). The
+  maker's own home**: couch-tv opens itself on top, it does not replace that home. VIDAA now runs on a real Hisense (Beta, below), and the TiVo OS path was worked out on a real JVC. The
   others have not run on a real TV yet, so if you try one, please open an issue and say how it went (each has
   a short read only first test).
 - **Hisense VIDAA (Beta):** no app to install: the bridge talks to the TV the way Hisense's own phone app
@@ -592,10 +592,15 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, from public sou
   Apple TV yourself, free, with Xcode on a Mac and your own Apple ID; Apple makes that run out after 7 days,
   so the computer at home reinstalls it each week with `scripts/appletv-resign.sh` (or once a year with
   Apple's paid developer programme). Limits and steps: [docs/APPLE-TV.md](docs/APPLE-TV.md).
-- **TiVo OS:** no known way yet.
+- **TiVo OS (Beta)** (JVC, Telefunken and other sets built by Vestel): nothing to install on the TV. The
+  bridge talks to it the way Vestel's own phone app does, and every time the TV is switched on it presses
+  the keys that open couch-tv in the TV's browser, from a Speed Dial tile you add once. With the browser's
+  bar switched off the page fills the screen. TiVo's Home button still opens TiVo's home, the TV gives no
+  volume level, and only Netflix and Prime Video open from the phone. Worked out on one real JVC; the
+  list of what ran there and what did not is in [docs/TIVO.md](docs/TIVO.md).
 
 **Want everything on a TV that is not Google TV or Android TV?** The Samsung, LG, Roku, VIDAA, Philips
-Saphi, Panasonic and Vega paths give you the home (opened on top of the maker's) and the phone remote, not
+Saphi, Panasonic, TiVo OS and Vega paths give you the home (opened on top of the maker's) and the phone remote, not
 everything, and Philips Titan OS and VIZIO are the phone remote for now. Plug in a Google TV box (for
 example the Google TV Streamer) and set couch-tv up on that, and you get everything, on any TV with an
 HDMI port.

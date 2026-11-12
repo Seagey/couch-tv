@@ -260,8 +260,18 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   TV went. Run `scripts/appletv-check.py` (read only) before the yes, pair only after it. Couch TV needs a
   Mac: without one, offer the remote only. Signing in to Xcode is theirs to do (never ask for the Apple ID
   password), and their team id goes only in `tvos/Config/Signing.mine.xcconfig`, which git ignores.
-- **TiVo OS:** no known way yet. Say so kindly and offer the Google TV box. If they do not want a box,
-  stop. Do not suggest rooting the TV.
+- **TiVo OS on a TV built by Vestel (JVC, Telefunken and others, Beta):** do not say no. Offer the path in
+  [docs/TIVO.md](docs/TIVO.md), and say first, plainly: "There is a TiVo OS version of couch-tv, in Beta,
+  worked out on one real JVC. There is nothing to install on the TV. With a computer at home that stays on,
+  the phone remote works, and couch-tv opens itself in the TV's own browser a little while after the TV is
+  switched on. You add couch-tv once as the first Speed Dial tile in that browser, typing its address with
+  the TV remote, which is slow. It is not a true home screen: TiVo's Home button still opens TiVo's home.
+  The TV gives no volume level, only Netflix and Prime Video open from the phone, and there is no 'what is
+  playing' and no screenshots." Run `scripts/tivo-check.py` first (it only reads, and finds the TV by
+  itself). `--key volume_up` presses one key and waits for the yes like everything else that changes the
+  TV. The computer needs a fixed address, because the tile holds it. Afterwards ask them to open an issue
+  with what the check printed and how it went. A TiVo OS TV that does not answer Smart Center: say so
+  kindly and offer the Google TV box. Do not suggest rooting the TV.
 
 ## 2. The questions
 
