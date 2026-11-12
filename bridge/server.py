@@ -759,6 +759,10 @@ async def search_in_app(app, title, best=None):
     """Open the app on the title's page or its search with the title typed in, or just the app."""
     from urllib.parse import quote
     link = title_link(app, best) if tv.kind == "android" else None
+    # Only over ADB, which pins the link to the app's own package (-p). The remote-link fallback
+    # in start_intent would hand a nuvio:// link to whichever app claims it.
+    if link and not await tv.adb_ready():
+        link = None
     if link:
         try:
             await tv.start_intent(link, app["package"])
@@ -2655,7 +2659,7 @@ import re as _re
 SXE = [_re.compile(r"\bS(?:eason)?\s*(\d{1,2})\s*[:,.\- ]?\s*E(?:p(?:isode)?)?\s*(\d{1,3})\b", _re.I),
        _re.compile(r"\bSeason\s+(\d{1,2}),?\s+Episode\s+(\d{1,3})\b", _re.I),
        _re.compile(r"\b(\d{1,2})x(\d{1,3})\b")]
-episode_cache = {}  # (title, subtitle) -> result dict
+episode_cache = {}  # (title, subtitle, year_subtitle) -> result dict
 
 
 def _sxe(*texts):
@@ -2682,18 +2686,23 @@ def _episode_fields(ep):
             "duration_source": "justwatch" if run else None}
 
 
-async def resolve_episode(title, subtitle):
+# Apps that put a film's release year in the subtitle. A bare number is a year only for these: in
+# others (Paramount+) it can be a show's name, "1923" or "1883".
+YEAR_SUBTITLE_APPS = {"nuvio"}
+
+
+async def resolve_episode(title, subtitle, year_subtitle=False):
     """Season, episode, episode title and length for what an app reports. Matches the show by
     exact title on JustWatch, then the episode by an SxE number or an exact episode title.
     Films: the film's runtime when the title matches exactly. {} when nothing matches."""
-    key = (title or "", subtitle or "")
+    key = (title or "", subtitle or "", bool(year_subtitle))
     if key in episode_cache:
         return episode_cache[key]
     result = {}
     try:
         for show, other in ((title, subtitle), (subtitle, title)):
-            # a bare number is no show name: Nuvio sends a film's year there ("2012" is a film)
-            if not show or (show is subtitle and generic_title(show)):
+            # Nuvio sends a film's year as the subtitle, and "2012" is a film: not a show name there
+            if not show or (year_subtitle and show is subtitle and str(show).strip().isdigit()):
                 continue
             best, _ = await finder.find(show)
             if not best or finder._norm(best["title"]) != finder._norm(show):
@@ -2897,7 +2906,7 @@ async def media_read(pkg, app):
     s["title"] = title
     ep = {}
     if title:
-        ep = await resolve_episode(title, episode_title)
+        ep = await resolve_episode(title, episode_title, (app or {}).get("id") in YEAR_SUBTITLE_APPS)
         # Some apps (Paramount+) send the episode name first and the show second: "A Different
         # Corner, Mobland". Use the field that matched the show, or the poster comes from the wrong one.
         if ep.get("show") and finder._norm(ep["show"]) != finder._norm(title):
@@ -3188,7 +3197,7 @@ async def log_seen(title, subtitle, app, now=None, who=None, method="seen", post
     try:
         names = [finder._norm(title)] + ([finder._norm(subtitle)] if subtitle else [])
         best, _ = await finder.find(title)
-        if subtitle and not generic_title(subtitle) and (not best or finder._norm(best["title"]) not in names):
+        if subtitle and not (app.get("id") in YEAR_SUBTITLE_APPS and str(subtitle).strip().isdigit()) and (not best or finder._norm(best["title"]) not in names):
             alt, _ = await finder.find(subtitle)
             if alt and finder._norm(alt["title"]) in names:
                 best = alt

@@ -146,8 +146,16 @@ class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
         server.episode_cache.clear()
         find = AsyncMock(side_effect=lambda q, *a: (film if q == "2012" else None, []))
         with patch.object(server.finder, "find", find):
-            self.assertEqual(await server.resolve_episode("Some Unlisted Film", "2012"), {})
+            self.assertEqual(await server.resolve_episode("Some Unlisted Film", "2012", True), {})
         self.assertNotIn("2012", [c.args[0] for c in find.call_args_list])
+        server.episode_cache.clear()
+        # other apps can send a show named with a number ("1923") as the subtitle: still tried
+        self.assertIn("nuvio", server.YEAR_SUBTITLE_APPS)
+        self.assertNotIn("paramountplus", server.YEAR_SUBTITLE_APPS)
+        find = AsyncMock(return_value=(None, []))
+        with patch.object(server.finder, "find", find):
+            await server.resolve_episode("Nature's Empty Throne", "1923")
+        self.assertIn("1923", [c.args[0] for c in find.call_args_list])
         server.episode_cache.clear()
 
     def test_nuvio_link_is_the_show_or_film_page_by_imdb_id(self):
@@ -162,7 +170,7 @@ class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_nuvio_card_opens_the_show_page(self):
         import apps
         nuvio = apps.BY_ID["nuvio"]
-        fake = MagicMock(kind="android", start_intent=AsyncMock(), wait_for_app=AsyncMock(return_value="com.nuvio.tv"))
+        fake = MagicMock(kind="android", adb_ready=AsyncMock(return_value=True), start_intent=AsyncMock(), wait_for_app=AsyncMock(return_value="com.nuvio.tv"))
         with patch.object(server, "tv", fake), patch.object(server, "launch_app", AsyncMock(return_value=("com.nuvio.tv", "adb"))) as launch:
             method, note = await server.search_in_app(nuvio, "Pluribus", {"type": "tv", "imdb": "tt22202452"})
             self.assertEqual(method, "deeplink")
@@ -174,6 +182,12 @@ class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(method, "app")
             fake.start_intent.assert_not_awaited()
             launch.assert_awaited_once()
+            # no ADB: the link is never handed to the remote, which would not pin it to Nuvio
+            fake.adb_ready = AsyncMock(return_value=False)
+            fake.start_intent.reset_mock()
+            launch.reset_mock()
+            await server.search_in_app(nuvio, "Pluribus", {"type": "tv", "imdb": "tt22202452"})
+            fake.start_intent.assert_not_awaited()
 
 if __name__ == "__main__":
     unittest.main()

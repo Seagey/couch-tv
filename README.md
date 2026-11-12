@@ -30,7 +30,7 @@ release year where other apps send the episode. With the bridge, a Nuvio card op
 Nuvio (by its IMDb id from JustWatch), where you pick the episode: Nuvio takes no episode links. In the
 on-TV app a Nuvio card opens Nuvio. With the bridge only Nuvio's GitHub build (`com.nuvio.tv`) is read,
 not the Play Store one (`com.nuvio.app`). Shows played in Nuvio can't reach Keep watching with option A,
-because Nuvio adds them to its own channel, not Android's Watch Next list. Thanks @NathanGlasby.
+because Nuvio adds them to its own channel, not Android's Watch Next list. Thanks NathanGlasby (#157).
 
 **13 November 2026: Hebrew and right to left layout on the TV home (on main, in the next release).** The home now speaks
 Hebrew (עברית), including the TV's own `he` or older `iw` language setting. The layout mirrors for right to left: the settings
