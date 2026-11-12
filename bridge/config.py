@@ -284,6 +284,8 @@ def _home(h):
     if isinstance(h.get("glass_icons"), bool):
         out["glass_icons"] = h["glass_icons"]
     # the focused tile's slow sway (#52): on, or off for a TV that flickers
+    if isinstance(h.get("keep_photo"), bool):
+        out["keep_photo"] = h["keep_photo"]
     if isinstance(h.get("moving_tiles"), bool):
         out["moving_tiles"] = h["moving_tiles"]
     # lighter home for a slow box (#58): no blur, no soft shadows, a still photo, smaller pictures
