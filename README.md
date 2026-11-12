@@ -28,6 +28,11 @@ couch-tv jump back over VIDAA's source picker. Pairing now keeps the token a TV 
 take clicks from the TV Browser's mouse cursor. Thanks Schielef (#145), whose 43A6N is now on the
 compatibility list.
 
+**13 November 2026: check-tv warns about Fire OS builds that block the TV's own ADB (on main, in the next release).**
+`scripts/check-tv.py <tv address> --adb` reads the Fire OS version and says whether this build blocks option C's phone
+remote from pressing keys and typing, may still allow it, or could not be read, and points to option B each time. Other
+Android TVs are unchanged. Not run on a real Fire TV yet. Thanks googlarz (#149).
+
 **13 November 2026: the Screensaver button on Philips and similar TVs (on main, in the next release).** On a Philips
 43PUS8546/12 the TV home came back to the front half a second after the button cut the screen timeout and put it
 straight back, so the TV never napped and the button said "The TV did not start the photos". A return that soon is now

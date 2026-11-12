@@ -24,7 +24,7 @@ have no APKs or ADB: they use a different path ([FIRE-VEGA.md](FIRE-VEGA.md)).
 | Survives a restart | Yes (the accessibility watcher stays on) |
 | Bluetooth button | Yes. If parental controls are on, Fire OS asks for the Prime Video PIN first |
 | Network button | Yes |
-| Phone remote | Opening apps works without ADB. Keys, typing and "what's playing" need the TV's own ADB (Connect ADB in the app) |
+| Phone remote | Opening apps works without ADB. Keys, typing and "what's playing" need the TV's own ADB (Connect ADB in the app), which current Fire OS blocks: `scripts/check-tv.py <tv address> --adb` says whether yours does, and points to option B (the computer bridge) for the full remote |
 | Keep watching | Only fills from shows started from the phone remote |
 | Amazon's YouTube app | Yes, shown and sorted as YouTube |
 

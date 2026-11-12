@@ -113,7 +113,7 @@ Not tested by the author. Each line is what someone said worked on their own dev
   release after 0.3, checked on an Android 7.1 emulator only. ADB from a computer works. Fire OS
   Current Fire OS (6.7.1.1, 7.6.6.9, 8.1.0.3 and newer) blocks an app on the TV from using the TV's own ADB, so on an up to
   date Fire TV option C's phone remote cannot press keys or type ([issue #12](https://github.com/Seagey/couch-tv/issues/12));
-  option B can. Fire OS 6 never connects the accessibility watcher (it runs Amazon's own accessibility
+  option B can. `scripts/check-tv.py <tv address> --adb` now reads the Fire OS version and says which case yours is (only the version is read, and it has not run on a real Fire TV yet). Fire OS 6 never connects the accessibility watcher (it runs Amazon's own accessibility
   manager), so there the Home button watch goes by usage access, the third grant. Seen on an Insignia Fire TV
   Edition, Fire OS 6.7.1.1 ([issue #50](https://github.com/Seagey/couch-tv/issues/50)). The Android TV Remote protocol is not confirmed on Fire TV.
   The gear tile's TV settings (and the Settings app tile) open Fire OS's own Settings screen by name and tell
