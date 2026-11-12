@@ -39,13 +39,14 @@ import philips
 import vega
 import vizio
 import panasonic
+import tivo
 import spotify_now
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 REMOTE_DIR = os.path.join(ROOT, "remote", "dist")
 LAUNCHER_DIR = os.path.join(ROOT, "tv-home", "web")
-TITAN_DIR = os.path.join(ROOT, "titan")   # the start page a Titan OS app opens (docs/PHILIPS-TITAN.md)
+TITAN_DIR = os.path.join(ROOT, "titan")   # the start page a Titan OS app opens (docs/PHILIPS-TITAN.md), and a TiVo OS tile
 SHIM_PATH = os.path.join(HERE, "web", "shim.js")
 PORT = int(os.environ.get("PORT") or config.BRIDGE["port"])
 HOME_TZ = ZoneInfo(config.TIMEZONE)   # the home's time zone (weather.timezone in config.json)
@@ -64,8 +65,8 @@ def make_tv(cfg):
     ("kind": "roku", bridge/roku.py), a Hisense VIDAA ("kind": "vidaa", bridge/vidaa.py), a Philips on
     Titan OS or Saphi ("kind": "philips", bridge/philips.py), an Amazon Fire TV on Vega OS ("kind": "vega",
     bridge/vega.py), a VIZIO ("kind": "vizio", bridge/vizio.py), a Panasonic Viera ("kind": "panasonic",
-    bridge/panasonic.py), an Apple TV ("kind": "appletv", bridge/appletv.py) or an Android or Google TV
-    (tv.py)."""
+    bridge/panasonic.py), a TiVo OS TV built by Vestel ("kind": "tivo", bridge/tivo.py), an Apple TV
+    ("kind": "appletv", bridge/appletv.py) or an Android or Google TV (tv.py)."""
     if cfg.get("kind") == "samsung":
         return samsung.SamsungTV(cfg)
     if cfg.get("kind") == "lg":
@@ -82,6 +83,8 @@ def make_tv(cfg):
         return vizio.VizioTV(cfg)
     if cfg.get("kind") == "panasonic":
         return panasonic.PanasonicTV(cfg)
+    if cfg.get("kind") == "tivo":
+        return tivo.TivoTV(cfg)
     if cfg.get("kind") == "appletv":
         return appletv.AppleTV(cfg)
     return TV(cfg)
@@ -3506,6 +3509,8 @@ async def h_tvs(request):
             row |= {"vizio": t.vizio_status()}
         elif t.kind == "panasonic":
             row |= {"panasonic": t.panasonic_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
+        elif t.kind == "tivo":
+            row |= {"tivo": t.tivo_status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         elif t.kind == "appletv":
             row |= {"appletv": t.status(), "hook": [f"{w} {what}" for w, what in t.hook_log]}
         out.append(row)

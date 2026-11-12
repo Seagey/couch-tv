@@ -6,7 +6,7 @@
                                                                # Developer options and debugging on)
 
 The quick look knocks on the ports each kind of TV answers on (Android TV remote, ADB, Samsung,
-LG, Roku, Hisense VIDAA, Philips JointSpace, VIZIO, Panasonic Viera, Apple, Google Cast). On an LG it also says hello to LG's network remote, which tells
+LG, Roku, Hisense VIDAA, Philips JointSpace, VIZIO, Panasonic Viera, Vestel Smart Center, Apple, Google Cast). On an LG it also says hello to LG's network remote, which tells
 the webOS version without any prompt on the TV (the prompt only comes when couch-tv's bridge asks
 to control it). On a Philips answering plain port 1925 it reads "system" (a read, no login, nothing on
 screen) for the API version and whether the TV lists a browser. On 7345 or 9000 it asks whether the answer is a VIZIO's SmartCast (one read, no
@@ -43,6 +43,7 @@ PORTS = {
     7345: "VIZIO SmartCast (firmware 4.0 and newer, VIZIO OS)",
     9000: "VIZIO SmartCast (older firmware), or something else",
     55000: "Panasonic Viera remote",
+    56789: "Vestel Smart Center (TiVo OS on JVC, Telefunken and others, and older Vestel built TVs)",
     7000: "AirPlay (Apple TV and some TVs)",
 }
 
@@ -328,6 +329,13 @@ def main():
                           "can open itself in the TV's browser each time the TV comes on, with a computer at home, and the "
                           "phone remote works (docs/PANASONIC.md, Beta: first run scripts/panasonic-check.py, it only reads). "
                           "Or plug in a Google TV box for everything."}
+    elif open_ports[56789] and not android:
+        verdict = {"A": "no", "B": "TiVo OS path (New, Beta): docs/TIVO.md", "C": "no",
+                   "why": "A TV built by Vestel that answers Smart Center: TiVo OS (JVC, Telefunken and others) or an older "
+                          "Vestel system. No Android apps and a locked home screen. With a computer at home the phone "
+                          "remote works, and couch-tv opens itself in the TV's browser each time the TV comes on, from a "
+                          "Speed Dial tile you add once (docs/TIVO.md, Beta, run on one real JVC so far: first run "
+                          "scripts/tivo-check.py, it only reads). Or plug in a Google TV box for everything."}
     elif not android:
         verdict = {"A": "no", "B": "no", "C": "no", "why": "Not an Android TV as far as the network shows (no Android TV remote, no ADB)."}
     else:
