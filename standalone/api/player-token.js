@@ -1,7 +1,7 @@
 // A short-lived (1 hour) Spotify access token for the TV page's own player (the Web Playback SDK
 // needs one in the browser to become the "Couch TV" speaker). Only for this site's own page, never
-// cached. The refresh token and client secret never leave the server. Set COUCH_SITE_KEY (see
-// _spotify.js): without it, anyone who learns the site's address could get one.
+// cached. The refresh token and client secret never leave the server. Needs COUCH_SITE_KEY (see
+// _spotify.js): without it nobody gets one.
 const { accessToken, configured, keyOk, sameSite, noIndex, json } = require("./_spotify");
 
 module.exports = async (req, res) => {

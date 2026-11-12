@@ -21,6 +21,16 @@ the next release" below is not in those apps yet: build them yourself ("Building
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
 
+**13 November 2026: a Hisense VIDAA home with no computer, and Spotify on the Now playing card (on
+main).** A VIDAA TV can now run couch-tv's home as a small website the Couch TV tile opens, so the
+clock, scenes or your photos, weather and Home settings keep working with the computer off
+(`scripts/build-standalone.sh`, [docs/VIDAA.md](docs/VIDAA.md), "No computer: a standalone home"). On
+Vercel it also shows what's playing on your Spotify account, with a Play on TV button that moves the
+music to the TV. With the bridge, a new optional Spotify login fills the Now playing card when the TV
+itself shows nothing (a VIDAA, LG, Samsung or Roku, or music on a phone). Both stay off until you set
+them up. VIDAA also gets a `tile_id` setting for moving the tile to a new address. Thanks
+Matthew-Klette (#141).
+
 **13 November 2026: smaller fixes (on main, in the next release).** The home's quick buttons for
 Bluetooth and Network now open the TV's settings straight from the launcher, and the sleep timer
 button no longer says it needs the computer when the launcher can do it itself. The doorbell card also

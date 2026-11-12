@@ -237,10 +237,13 @@ on its own, as a website the Couch TV tile opens. What you keep and what you los
 2. Put it on a host. Vercel's free plan runs the Spotify functions too:
    `cd build/standalone && npx vercel deploy --prod`. Any static host serves the page without them.
    The address is public to anyone who has it (search engines are told to skip it), and the site carries
-   your own photos from `backgrounds/mine` if you have any.
+   your own photos from `backgrounds/mine` if you have any, your people's names, and for a kids profile
+   the kids PIN's hash (the page checks the PIN itself), so use a kids PIN you use nowhere else. The
+   weather's place goes in rounded to about a kilometre. The script only builds into a new or empty
+   folder, or over an earlier build.
 3. Point the tile at it, once, from any computer with the bridge set up: set `home_url` to the site's
    address and a new `tile_id` (above), restart the bridge, `POST /api/vidaa/tile`. From then on the tile
-   opens the site and the computer can stay off. With a site key (Spotify, below), put it in the address:
+   opens the site and the computer can stay off. With Spotify (below), put the site key in the address:
    `https://<your site>/?sk=<the key>`.
 
 ### Spotify on the standalone home (optional)
@@ -250,10 +253,10 @@ A TV remote can't type a Spotify password, so the login lives on the site, not t
 1. developer.spotify.com, Dashboard, Create app (Web API), Redirect URI `https://<your site>/api/callback`.
    Spotify needs the app owner on Premium for apps in Development Mode, and Play on TV needs Premium.
 2. On the host, add the environment variables `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` and
-   `COUCH_SITE_KEY` (a long random string, for example from `openssl rand -hex 24`), and deploy. With the
-   site key set, what's playing, the player's token and moving playback only answer a page opened with
-   `?sk=<the key>`, which is the tile's address; without it they answer anyone who learns the site's
-   address.
+   `COUCH_SITE_KEY` (16 to 128 letters, digits, `-` or `_`, for example from `openssl rand -hex 24`), and
+   deploy. What's playing, the player's token and moving playback only answer a page opened with
+   `?sk=<the key>`, which is the tile's address. Without a site key they answer nobody, so the card stays
+   empty until it is set.
 3. On a phone or computer open `https://<your site>/api/login`, sign in, and copy the code it shows into a
    third variable, `SPOTIFY_REFRESH_TOKEN`. Deploy once more.
 

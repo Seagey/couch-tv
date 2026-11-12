@@ -14,11 +14,19 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${1:-$ROOT/build/standalone}"
 PY="$ROOT/.venv/bin/python"; [ -x "$PY" ] || PY=python3
 
+# rsync --delete empties the folder first: only ever into a new or empty folder, or an earlier build
+# (it carries the .couch-standalone marker), never a folder of other things given by mistake
+if [ -d "$OUT" ] && [ -n "$(ls -A "$OUT" 2>/dev/null)" ] && [ ! -f "$OUT/.couch-standalone" ]; then
+  echo "$OUT is not empty and is not an earlier standalone build: pick a new or empty folder" 1>&2
+  exit 1
+fi
 mkdir -p "$OUT"
-rsync -a --delete --exclude '.vercel/' --exclude 'config.js' --exclude '.DS_Store' "$ROOT/tv-home/web/" "$OUT/"
+rsync -a --delete --exclude '.couch-standalone' --exclude '.vercel/' --exclude 'config.js' --exclude '.DS_Store' "$ROOT/tv-home/web/" "$OUT/"
 
 # config.js: the settings the bridge would hand the page, less what only the bridge uses, plus the
-# standalone switch app.js reads. Nothing secret goes in (no keys, no addresses).
+# standalone switch app.js reads. No keys and no TV addresses go in, and the weather's place is rounded
+# to about a kilometre. It does carry the people's names and, for a kids profile, the kids PIN's hash
+# (the page checks the PIN itself), so a public site shows those to anyone with its address.
 (cd "$ROOT" && "$PY" - "$OUT/config.js" <<'EOF'
 import json, sys
 sys.path.insert(0, "bridge")
@@ -26,6 +34,11 @@ import config
 c = config.public()
 for k in ("tvs", "default_tv", "phone_remote", "ask"):
     c.pop(k, None)
+w = dict(c.get("weather") or {})
+for k in ("lat", "lon"):
+    if isinstance(w.get(k), (int, float)):
+        w[k] = round(w[k], 2)
+c["weather"] = w
 with open(sys.argv[1], "w") as f:
     f.write("window.COUCH_CONFIG = " + json.dumps(c) + ";\nwindow.COUCH_STANDALONE = true;\n")
 EOF
@@ -45,4 +58,6 @@ cat > "$OUT/vercel.json" <<'EOF'
   ]
 }
 EOF
+: > "$OUT/.couch-standalone"
 echo "built the standalone home in $OUT ($(du -sh "$OUT" | cut -f1))"
+echo "anyone with the site's address sees what is in it: your people's names, any kids PIN's hash (use a PIN you use nowhere else) and backgrounds/mine"

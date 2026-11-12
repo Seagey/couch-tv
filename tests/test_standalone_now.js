@@ -27,11 +27,26 @@ assert.strictEqual(now.card({ is_playing: false, item: { name: "x" } }), null);
 assert.strictEqual(now.card(null), null);
 
 (async () => {
-  // not set up: now says so (cached briefly), login explains what's missing, token refuses
+  // no site key on the host: every Spotify function refuses, even a same-site page (fail closed)
+  delete process.env.COUCH_SITE_KEY;
   let r = res();
   await now({ url: "/api/now", headers: {} }, r);
+  assert.strictEqual(r.statusCode, 403);
+  r = res();
+  await token({ url: "/api/player-token", headers: { "sec-fetch-site": "same-origin" } }, r);
+  assert.strictEqual(r.statusCode, 403);
+  process.env.COUCH_SITE_KEY = "short";   // too short to count as a key: still refused
+  r = res();
+  await now({ url: "/api/now?sk=short", headers: {} }, r);
+  assert.strictEqual(r.statusCode, 403);
+
+  // not set up: now says so (cached briefly), login explains what's missing, token refuses
+  process.env.COUCH_SITE_KEY = "k".repeat(24);
+  r = res();
+  await now({ url: "/api/now?sk=" + "k".repeat(24), headers: {} }, r);
   assert.deepStrictEqual(JSON.parse(r.body), { ok: true, configured: false, music: null });
   assert.strictEqual(r.headers["X-Robots-Tag"], "noindex, nofollow");
+  delete process.env.COUCH_SITE_KEY;
 
   r = res();
   login({ url: "/api/login", headers: { host: "home.example" } }, r);

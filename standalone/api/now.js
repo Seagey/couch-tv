@@ -20,7 +20,7 @@ function card(j) {
 
 module.exports = async (req, res) => {
   noIndex(res);
-  if (!keyOk(req)) return json(res, 403, { ok: false, error: "site key needed (?sk=)" });
+  if (!keyOk(req)) return json(res, 403, { ok: false, error: "site key needed (COUCH_SITE_KEY on the host, ?sk= in the address)" });
   if (!configured()) return json(res, 200, { ok: true, configured: false, music: null }, "public, s-maxage=30");
   try {
     const r = await spotify("/me/player?additional_types=track,episode");

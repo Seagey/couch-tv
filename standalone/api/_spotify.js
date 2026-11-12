@@ -5,10 +5,11 @@
 //   SPOTIFY_CLIENT_ID       the Spotify app's Client ID
 //   SPOTIFY_CLIENT_SECRET   its Client secret
 //   SPOTIFY_REFRESH_TOKEN   shown once by /api/callback after signing in
-//   COUCH_SITE_KEY          optional but recommended: a long random string. With it set, what's playing,
-//                           the player token and moving playback answer only a page opened with
-//                           ?sk=<the key> (the Couch TV tile's address carries it), not anyone who
-//                           learns the site's address.
+//   COUCH_SITE_KEY          required: a random string of 16 to 128 letters, digits, - or _ (for example
+//                           openssl rand -hex 24). What's playing, the player token and moving playback
+//                           answer only a page opened with ?sk=<the key> (the Couch TV tile's address
+//                           carries it), never anyone who learns the site's address. Without it they
+//                           answer nobody.
 // The Spotify app needs https://<this site>/api/callback as a Redirect URI.
 const API = "https://api.spotify.com/v1";
 // read what's playing, move playback, and let the TV page be a player (the Web Playback SDK needs
@@ -58,10 +59,17 @@ async function spotify(path, opts) {
   return r;
 }
 
-// COUCH_SITE_KEY, when set: the request must carry it as ?sk= (compared in constant time)
+// COUCH_SITE_KEY: the request must carry it as ?sk= (compared in constant time). Without a site key
+// (or with one the tile's address can't carry: 16 to 128 letters, digits, - or _) every Spotify call is
+// refused, so a site set up without one never hands a stranger a token or the account's song.
+function siteKey() {
+  const k = (process.env.COUCH_SITE_KEY || "").trim();
+  return /^[A-Za-z0-9_-]{16,128}$/.test(k) ? k : "";
+}
+
 function keyOk(req) {
-  const want = process.env.COUCH_SITE_KEY || "";
-  if (!want) return true;
+  const want = siteKey();
+  if (!want) return false;
   const got = new URL(req.url, "http://x").searchParams.get("sk") || "";
   const a = Buffer.from(got), b = Buffer.from(want);
   return a.length === b.length && require("crypto").timingSafeEqual(a, b);
