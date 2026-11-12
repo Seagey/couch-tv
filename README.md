@@ -306,8 +306,8 @@ Any remote works: up and down move, right or OK opens a section, OK changes a ro
 scene, an app, a person or a quick button picks it up so up and down move it, and Back steps back
 and then closes. What you change shows when the list closes.
 
-- **Language:** English, Español, Español (México), Italiano, Deutsch, Français, Türkçe and Srpski
-  (latinica, on main, in the next release). Until one is picked here (or in
+- **Language:** English, Español, Español (México), Italiano, Deutsch, Français, Türkçe, Srpski
+  (latinica) and Hebrew (עברית with full RTL layout, on main, in the next release). Until one is picked here (or in
   `config.json`), the home speaks the TV's own language if it is one of these, else English.
 - **Location:** type a town or city with the TV's on-screen keyboard (or the phone remote's Type),
   pick it from the places found. It sets the weather's place and time zone. The place search is
@@ -399,9 +399,9 @@ back to it. [docs/CONFIG.md](docs/CONFIG.md) has the details.
 
 **Languages.** The TV home and the phone remote both speak English, Spanish (`es`, for Spain and
 everyone else), Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest),
-Italian (`it`), German (`de`), Turkish (`tr`), Serbian Latin (`sr-Latn-RS`) and Dutch (`nl`, TV home only for now, on main, in the next
-release). Italian, German,
-Turkish, Serbian and Dutch use a 24 hour clock by default unless you pick 12 hour. The optional smart-home
+Italian (`it`), German (`de`), Turkish (`tr`), Serbian Latin (`sr-Latn-RS`), Dutch (`nl`, TV home only for now, on main, in the next
+release) and Hebrew (`he`, with full right-to-left layout and 24 hour clock, TV home only for now). Italian, German,
+Turkish, Serbian, Dutch and Hebrew use a 24 hour clock by default unless you pick 12 hour. The optional smart-home
 controls are translated too. The phone has its own choice (TV menu, Language), "Same as the TV" by
 default. Messages that come from the bridge itself
 (an error, a note about how a show opened) and some screen reader labels on the phone are still in
