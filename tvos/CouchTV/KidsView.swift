@@ -119,7 +119,7 @@ struct KidsView: View {
                 .focused($focus, equals: .show(s.id))
             }
         }
-        .padding(.vertical, 30)
+        .padding(.vertical, 50)       // room for the focused poster's ring and lift, which the scroll view would clip
         .padding(.horizontal, 80)
         return Group {
             if flat {
@@ -129,6 +129,7 @@ struct KidsView: View {
             }
         }
         .padding(.horizontal, -80)
+        .padding(.vertical, -20)
     }
 
     // MARK: the allowed apps
