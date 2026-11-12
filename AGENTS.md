@@ -175,87 +175,79 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   picture mode, apply.sh, ADB and the quick buttons). The ids and deep links in its table are unverified:
   if one does not open, find the Roku's real id with `query/apps` and say what you found. Afterwards ask
   them to open an issue on GitHub saying how it went, and write down for them what worked and what did not.
-- **Hisense VIDAA:** do not say no. Offer the VIDAA path in [docs/VIDAA.md](docs/VIDAA.md) the way you
-  offer the Roku one, and say first, and plainly, that it is untested: "There is a VIDAA version of
-  couch-tv. It was tested against a pretend VIDAA TV on a computer and has **not been run on a real VIDAA
-  TV yet**, and Hisense documents none of this, so parts of it are our best reading and something will
-  probably need fixing. There is nothing to install on the TV: a computer at home that stays on opens
+- **Beta paths: Hisense VIDAA, Philips (Titan OS and Saphi), Fire TV on Vega OS, VIZIO, Panasonic.** Each
+  is a supported path, marked Beta. Do not say no. What they share, and what you say plainly every time:
+  they need **a computer at home that stays on** (without one, nothing on these paths works), and **the
+  maker's own Home button still opens the maker's own home**; couch-tv opens itself on top, it does not
+  replace that home. None of them has run on a real TV yet, so ask them to open an issue on GitHub
+  afterwards with what the read only check printed, and write down for them what worked and what did not.
+  Also offer the Google TV box as the way to get everything. The checks below only read, but they still
+  wait for the yes in step 3, and anything that shows a PIN or opens a page on the TV waits for it too.
+- **Hisense VIDAA:** offer the VIDAA path in [docs/VIDAA.md](docs/VIDAA.md): "There is a VIDAA version of
+  couch-tv, in Beta. There is nothing to install on the TV: a computer at home that stays on opens
   couch-tv's home in the TV's own browser every time the TV is switched on (on older firmware it may also
   go on the app row as a tile). It is not a true home screen: the remote's Home button still opens VIDAA's
   home, and that cannot change without rooting the TV, which couch-tv never does. The phone remote works:
   keys, volume up and down, Home, opening apps. Apps open on their own page and you pick the show. There is
   no 'what is playing', no volume level, no typing from the phone and no screenshots. You type a PIN the TV
   shows once. Newer TVs (2024 on, most Australian Hisense TVs bought in 2025 or 2026) also need a
-  certificate you take from your own copy of Hisense's VIDAA phone app; couch-tv does not include it."
-  Without a computer that stays on, nothing is possible. Also offer the Google TV box as the way to get
-  everything. If they choose VIDAA, follow docs/VIDAA.md: run `scripts/vidaa-check.py <tv address>`
-  first (it only reads, but it still waits for the yes in step 3), and never suggest or walk them
-  through rooting the TV. Afterwards ask them to open an issue on GitHub with what `vidaa-check.py`
-  printed, and write down for them what worked and what did not.
-- **Philips on Titan OS** (no Google button, a home of "Lifestyle" rows; mostly Europe): do not say no,
-  and do not promise the home. Say first, and plainly: "There is a Philips Titan OS version of couch-tv, and
-  it is the **phone remote only**: power, keys, volume, inputs, opening the TV's apps, and the assistant on
-  Titan app, and that needs a Titan developer account or a store listing that does not exist yet. It was
-  tested against a pretend Philips on a computer and has **not been run on a real Titan OS TV**, so
-  something will probably need fixing. You type a PIN the TV shows once, and pairing needs a key from
-  Philips's own TV Remote app that you save on this computer yourself; couch-tv does not include it."
-  Without a computer that stays on, nothing is possible. Also offer the Google TV box as the way to get
-  everything, including the home. If they choose the remote, follow
-  [docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md): run `scripts/philips-check.py <tv address>` first (it only
-  reads; pairing with `--pair` shows a PIN on the TV, so it waits for the yes in step 3). Never fetch,
-  paste or suggest a source for Philips's pairing key: they save their own with `scripts/philips-secret.py`.
-  Never use the TV's developer debug port. Afterwards ask them to open an issue on GitHub with what
-  `philips-check.py` printed ([docs/PHILIPS-TITAN-TESTING.md](docs/PHILIPS-TITAN-TESTING.md)).
-- **Older Philips with Saphi** (not Android, not Titan OS; roughly 2015 to 2019): do not say no, and do not
-  promise a home screen. Say first, and plainly: "There is a Saphi version of couch-tv. It is new, in Beta:
-  built from public notes and a pretend Philips on a computer, so on your set something may need fixing.
-  With a computer at home that stays on, you get the phone remote, and if your TV offers a browser to its
-  network remote, couch-tv's page opens in that browser every time the TV is switched on. It is not a real
-  home screen: the browser's bar can show and the remote's Home button still opens Philips's menu. Many of
-  these TVs need no pairing; some want a PIN, and some have no network remote at all." Run
-  `scripts/check-tv.py <tv address>` and `scripts/philips-check.py <tv address>` first (both only read).
-  If it wants a login, pairing is the Titan OS path above and waits for the yes in step 3. Also offer the
-  Google TV box as the way to get everything. If they choose it, follow
-  [docs/PHILIPS-SAPHI.md](docs/PHILIPS-SAPHI.md). Never send `activities/browser` before the yes: it opens a
-  page on the TV. Afterwards ask them to open an issue on GitHub with what the checks printed
-  ([docs/PHILIPS-SAPHI-TESTING.md](docs/PHILIPS-SAPHI-TESTING.md)).
-- **Fire TV on Vega OS:** do not say no. Offer the path in [docs/FIRE-VEGA.md](docs/FIRE-VEGA.md), and say
-  plainly that it is New, that it needs a free Amazon Developer account, Amazon's Vega tools on a Mac or Linux
-  computer, a USB cable once and a computer at home that stays on, that Amazon's Home button still opens Amazon's
+  certificate you take from your own copy of Hisense's VIDAA phone app; couch-tv does not include it.
+  Hisense documents none of this, so on your TV something may need fixing." Run
+  `scripts/vidaa-check.py <tv address>` first, and never suggest or walk them through rooting the TV.
+- **Philips on Titan OS** (no Google button, a home of "Lifestyle" rows; mostly Europe): offer the remote now
+  and do not promise the home yet. "There is a Philips Titan OS version of couch-tv, in Beta. The **phone
+  remote works now**: power, keys, volume, inputs, opening the TV's apps, and the assistant on top of those.
+  couch-tv's own home **needs a Titan app** to open on the TV: a couch-tv app in Titan's store, or Titan's
+  DevView developer app with a developer account. Neither is there yet, so for now the home stays Philips's.
+  You type a PIN the TV shows once, and pairing needs a key from Philips's own TV Remote app that you save
+  on this computer yourself; couch-tv does not include it." Follow
+  [docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md): run `scripts/philips-check.py <tv address>` first
+  (pairing with `--pair` shows a PIN on the TV). Never fetch, paste or suggest a source for Philips's
+  pairing key: they save their own with `scripts/philips-secret.py`. Never use the TV's developer debug
+  port. Testing guide: [docs/PHILIPS-TITAN-TESTING.md](docs/PHILIPS-TITAN-TESTING.md).
+- **Older Philips with Saphi** (not Android, not Titan OS; roughly 2015 to 2019): offer the Saphi path and do
+  not promise a home screen. "There is a Saphi version of couch-tv, in Beta. With a computer at home that
+  stays on, you get the phone remote, and if your TV offers a browser to its network remote, couch-tv's
+  page opens in that browser every time the TV is switched on. It is not a real home screen: the browser's
+  bar can show and the remote's Home button still opens Philips's menu. Many of these TVs need no pairing;
+  some want a PIN, and some have no network remote at all, so it depends on the model." Run
+  `scripts/check-tv.py <tv address>` and `scripts/philips-check.py <tv address>` first. If it wants a
+  login, pairing is the Titan OS path above. If they choose it, follow
+  [docs/PHILIPS-SAPHI.md](docs/PHILIPS-SAPHI.md). Never send `activities/browser` before the yes: it opens
+  a page on the TV. Testing guide: [docs/PHILIPS-SAPHI-TESTING.md](docs/PHILIPS-SAPHI-TESTING.md).
+- **Fire TV on Vega OS:** offer the path in [docs/FIRE-VEGA.md](docs/FIRE-VEGA.md), and say plainly that it
+  is Beta, that it needs a free Amazon Developer account, Amazon's Vega tools on a Mac or Linux computer, a
+  USB cable once and a computer at home that stays on, that Amazon's Home button still opens Amazon's
   home, that the phone remote only works while couch-tv is in front (no volume, no power off), and that only
   Netflix and YouTube open from the phone. Follow docs/FIRE-VEGA-TESTING.md, and run `scripts/check-vega.py`
-  (read only) first. Never root anything.
-- **VIZIO (SmartCast or VIZIO OS):** do not say no, and do not promise the home. Say first, and plainly:
-  "There is a VIZIO version of couch-tv. It is new (Beta) and it is the **phone remote only**: power, keys,
-  volume, switching inputs, opening apps such as Netflix and YouTube, and the assistant on top of those.
-  couch-tv's own home page **does not open on a VIZIO by itself**: VIZIO OS has no browser, takes no
-  outside apps, and its app programme is closed. It has **not been on a real VIZIO yet**, so something may
-  need fixing. Apps open on their own page and you pick the show; there is no 'what is playing' title, no
-  typing from the phone and no screenshots. You type a PIN the TV shows once." Without a computer that
-  stays on, nothing is possible. Also offer the Google TV box as the way to get everything, including the
-  home. If they choose the remote, follow [docs/VIZIO.md](docs/VIZIO.md): run
-  `scripts/vizio-check.py <tv address>` first (it only reads; `--pair` shows a PIN on the TV, so it waits
-  for the yes in step 3). Do not set up the Cast experiment in VIZIO.md for them unless they ask and
-  already run the tools it needs, and never open a router port. Afterwards ask them to open an issue on
-  GitHub with what `vizio-check.py` printed ([docs/VIZIO-TESTING.md](docs/VIZIO-TESTING.md)).
-- **Panasonic Viera (My Home Screen, or older Vieras with network control):** do not say no. Offer the
-  Panasonic path in [docs/PANASONIC.md](docs/PANASONIC.md) and say plainly what it is: "There is a new
-  Panasonic version of couch-tv, in Beta. There is nothing to install on the TV: a computer at home that
-  stays on opens couch-tv's home in the TV's web browser a few seconds after the TV is switched on. It is
-  not a true home screen: the browser's own bar stays visible, and the remote's Home button still opens
-  Panasonic's home. The phone remote works: keys, the volume slider, Home, opening apps. Apps open on their
-  own page and you pick the show. There is no 'what is playing', no typing from the phone and no
-  screenshots. Newer sets (2018 on) show a PIN once to pair. Some parts can only be settled on a real TV,
-  so you may help us fix something." Without a computer that stays on, nothing is possible. Also offer the
-  Google TV box as the way to get everything. A Panasonic Google TV model is a normal couch-tv TV, not this
-  path. If they choose Panasonic, follow docs/PANASONIC.md: run `scripts/panasonic-check.py <tv address>`
-  first (it only reads and presses no key, but it still waits for the yes in step 3); pairing with
-  `--pair` makes the TV show a PIN, so that too waits for the yes. Afterwards ask them to open an issue on
-  GitHub with what `panasonic-check.py` printed, and write down for them what worked and what did not.
-- **Apple TV:** not supported. Say so kindly,
-  explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
-  round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets
-  them everything. If they do not want a box, stop. Do not suggest rooting the TV.
+  first. Never root anything.
+- **VIZIO (SmartCast or VIZIO OS):** offer the remote and do not promise the home. "There is a VIZIO version
+  of couch-tv, in Beta, and it is the **phone remote only**: power, keys, volume, switching inputs, opening
+  apps such as Netflix and YouTube, and the assistant on top of those, with a computer at home that stays
+  on. couch-tv's own home page **cannot open on a VIZIO**: VIZIO OS has no browser, takes no outside apps,
+  and its app programme is closed. The remote's Home button opens VIZIO's home. Apps open on their own page
+  and you pick the show; there is no 'what is playing' title, no typing from the phone and no screenshots.
+  You type a PIN the TV shows once." If they choose the remote, follow [docs/VIZIO.md](docs/VIZIO.md): run
+  `scripts/vizio-check.py <tv address>` first (`--pair` shows a PIN on the TV). Do not set up the Cast
+  experiment in VIZIO.md for them unless they ask and already run the tools it needs, and never open a
+  router port. Testing guide: [docs/VIZIO-TESTING.md](docs/VIZIO-TESTING.md).
+- **Panasonic Viera (My Home Screen, or older Vieras with network control):** offer the Panasonic path in
+  [docs/PANASONIC.md](docs/PANASONIC.md): "There is a Panasonic version of couch-tv, in Beta. There is
+  nothing to install on the TV: a computer at home that stays on opens couch-tv's home in the TV's web
+  browser a few seconds after the TV is switched on. It is not a true home screen: the browser's own bar
+  stays visible, and the remote's Home button still opens Panasonic's home. The phone remote works: keys,
+  the volume slider, Home, opening apps. Apps open on their own page and you pick the show. There is no
+  'what is playing', no typing from the phone and no screenshots. Newer sets (2018 on) show a PIN once to
+  pair." A Panasonic Google TV model is a normal couch-tv TV, not this path. Run
+  `scripts/panasonic-check.py <tv address>` first (it presses no key); pairing with `--pair` makes the TV
+  show a PIN.
+- **Apple TV:** the phone remote is in Beta and in review
+  ([PR #117](https://github.com/Seagey/couch-tv/pull/117)), not on main yet; a couch-tv home app for tvOS
+  is coming. Say so, and that Apple's home cannot be replaced (tvOS does not allow it). Until #117 is
+  merged, offer the way round it: a Google TV box (for example the Google TV Streamer) plugged into the
+  TV's HDMI gets them everything.
+- **TiVo OS:** no known way yet. Say so kindly and offer the Google TV box. If they do not want a box,
+  stop. Do not suggest rooting the TV.
 
 ## 2. The questions
 

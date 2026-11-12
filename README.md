@@ -1,8 +1,9 @@
 # couch-tv
 
 Your own home screen and phone remote for a Google TV, an Android TV or a Fire TV, with app
-versions for Samsung and LG (run on nine real LGs so far) and a Roku version not yet run on a real
-Roku. No ads on the home screen. Open source (MIT).
+versions for Samsung and LG (run on nine real LGs so far), a Roku version, and Beta versions for
+Hisense VIDAA, Philips, Panasonic, VIZIO and Fire TV on Vega OS
+([Will it work on my TV?](#will-it-work-on-my-tv)). No ads on the home screen. Open source (MIT).
 
 **Set it up the easy way: [couchtv.sites.underseage.studio](https://couchtv.sites.underseage.studio)**, from your phone, with the free Setup app
 on a Mac or Windows computer, or with your AI agent. It also checks whether your TV will work.
@@ -19,6 +20,21 @@ The newest release is **0.12** (9 November 2026). The TV apps come from
 the next release" below is not in those apps yet: build them yourself ("Building the app") if you
 want it now. The bridge, and with option B the home's own screen, run from your copy of this repo,
 so `git pull` brings their changes.
+
+**12 November 2026: Philips, Panasonic and Fire TV on Vega OS, Beta.** Four more paths, each with a
+computer at home that stays on, and on each the maker's own Home button still opens the maker's home:
+- **Philips with Titan OS:** the phone remote (power, keys, volume, inputs, apps). couch-tv's home needs a
+  Titan app, from Titan's store or its DevView developer app, which is not there yet
+  ([docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md)).
+- **Older Philips with Saphi:** the phone remote, and couch-tv's page in the TV's browser where the set
+  offers one ([docs/PHILIPS-SAPHI.md](docs/PHILIPS-SAPHI.md)).
+- **Panasonic Viera (My Home Screen):** the phone remote, and couch-tv's page opens itself in the TV's
+  browser ([docs/PANASONIC.md](docs/PANASONIC.md)).
+- **Fire TV on Vega OS:** an app you build once with Amazon's free tools, opened by the bridge
+  ([docs/FIRE-VEGA.md](docs/FIRE-VEGA.md)).
+
+If you have one of these TVs, each has a short read only first test, and an issue saying how it went
+helps everyone after you.
 
 **12 November 2026: VIZIO, New (Beta).** couch-tv can now drive a VIZIO on SmartCast or VIZIO OS from
 the phone remote: power, volume, inputs and opening apps, with a computer at home. couch-tv's own home page
@@ -326,22 +342,23 @@ English. The TV home also speaks French (`fr`, 24 hour clock); the phone remote 
 | **Android 6 TV** (Xiaomi Mi TV 4A, PatchWall) | Experimental: opens, layout may break on an old browser engine | Not tested | Experimental, set up from a computer (no Wi-Fi pairing) |
 | **Nvidia Shield** | Yes (not tested) | Yes | Yes (not tested) |
 | **Fire TV on Fire OS** (Fire OS 6, 7 and 8: Fire TV Stick 4K 1st gen and newer, Stick 4K Max, Cube) | Partial. Takes the Home key back, but Amazon's home flashes up first | Partial | Partial. It takes the Home key back, but on current Fire OS the phone remote cannot press keys or type ([why](on-tv/README.md#fire-tv-fire-os)) |
-| **Fire TV on Vega OS** (Stick 4K Select and newer) | App only, built with Amazon's free developer tools. **New** | With a computer at home: as an app that opens itself, not a true home screen. Netflix and YouTube open from the phone ([how](docs/FIRE-VEGA.md)) | No |
+| **Fire TV on Vega OS** (Stick 4K Select and newer) | App only, built once with Amazon's free developer tools | **Beta**, with a computer at home that stays on: an app that opens itself when the stick comes up. Amazon's Home button still opens Amazon's home; the phone remote works while couch-tv is in front, and Netflix and YouTube open from the phone ([how](docs/FIRE-VEGA.md)) | No |
 | **Samsung** (Tizen) | App only, opened from Samsung's app row (or reopened by its Autorun Last App) | With a computer at home: yes, as an app that opens itself, not a true home screen ([how](docs/SAMSUNG.md)) | No |
 | **LG** (webOS) | App only, opened from LG's app row, while Developer Mode lasts | With a computer at home: as an app that opens itself, like the Samsung. Built, and run on nine real LGs so far ([how](docs/LG.md)) | No |
-| **Roku** (TV or box) | App only, a sideloaded channel opened from Roku's home row, while Developer Mode is on | With a computer at home: as a channel that opens itself, not a true home screen. Built from Roku's documentation, not yet tried on a real Roku ([how](docs/ROKU.md)) | No |
-| **Hisense with VIDAA** | App only: a tile on the app row where the firmware allows it, else the TV's browser | With a computer at home: as a page that opens itself, not a true home screen. Tested against a stand-in only, not yet tried on a real VIDAA TV ([how](docs/VIDAA.md)) | No |
-| **Philips with Titan OS** (mostly Europe) | No | Phone remote only (no couch-tv home without a Titan app). Tested against a stand in only, not yet tried on a real Titan OS TV ([how](docs/PHILIPS-TITAN.md)) | No |
-| **Older Philips with Saphi** (about 2015 to 2019, not Android) | No | New (Beta), with a computer at home: phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen ([how](docs/PHILIPS-SAPHI.md)) | No |
-| **VIZIO** (SmartCast, VIZIO OS) | No | New (Beta): phone remote, power, volume, inputs and opening apps; couch-tv's home page does not open on the TV by itself ([how](docs/VIZIO.md)) | No |
-| **Panasonic Viera** (My Home Screen and older Vieras) | No | New: phone remote and a page that opens itself in the TV's browser, Beta ([how](docs/PANASONIC.md)) | No |
-| **Apple TV** | No | No | No |
+| **Roku** (TV or box) | App only, a sideloaded channel opened from Roku's home row, while Developer Mode is on | With a computer at home: as a channel that opens itself, not a true home screen. Built from Roku's documentation, first real Roku reports wanted ([how](docs/ROKU.md)) | No |
+| **Hisense with VIDAA** | App only: a tile on the app row where the firmware allows it, else the TV's browser | **Beta**, with a computer at home that stays on: a page that opens itself in the TV's browser. VIDAA's Home button still opens VIDAA's home ([how](docs/VIDAA.md)) | No |
+| **Philips with Titan OS** (mostly Europe) | Needs a Titan app: a Titan store app or Titan's DevView, not there yet | **Beta**, with a computer at home that stays on: the phone remote works now (power, keys, volume, inputs, apps). The home opens once there is a Titan app ([how](docs/PHILIPS-TITAN.md)) | No |
+| **Older Philips with Saphi** (about 2015 to 2019, not Android) | No | **Beta**, with a computer at home that stays on: phone remote, and couch-tv's page opens in the TV's browser if your set offers one. Philips's Home button still opens Philips's menu ([how](docs/PHILIPS-SAPHI.md)) | No |
+| **VIZIO** (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Beta, phone remote only**, with a computer at home that stays on: power, volume, inputs and opening apps ([how](docs/VIZIO.md)) | No |
+| **Panasonic Viera** (My Home Screen and older Vieras) | No | **Beta**, with a computer at home that stays on: phone remote, and a page that opens itself in the TV's browser. Panasonic's Home button still opens Panasonic's home ([how](docs/PANASONIC.md)) | No |
+| **Apple TV** | Home app coming | Phone remote: **Beta**, in review ([#117](https://github.com/Seagey/couch-tv/pull/117)) | No |
+| **TiVo OS** | No known way yet | No known way yet | No |
 
 **Hisense, Sharp and other brands that sell more than one kind of TV:** it depends on the model,
 not the brand. Their Google TV and Android TV models should work. Their VIDAA models run
 Hisense's own system and get the VIDAA path below, not the full couch-tv. Open **Settings, System, About** (or
 **Device Preferences, About**): "Android TV OS" means yes. Or run `scripts/check-tv.py`.
-Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
+Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, from public sources):
 [docs/TV-BRANDS.md](docs/TV-BRANDS.md).
 
 **What you can and cannot do on each:**
@@ -382,53 +399,58 @@ Brand by brand (TCL, Philips, Panasonic, Sharp, Xiaomi and more, untested):
   has not been run on a real Roku**, so expect to fix something. Newer Roku OS also limits remote control
   until "Control by mobile apps" is switched to Permissive or Enabled. If you try it, please open an issue
   and say how it went. Setup and limits: [docs/ROKU.md](docs/ROKU.md).
-- **Hisense VIDAA:** the same idea as the Samsung and the LG, with no app to install: the bridge talks to the
-  TV the way Hisense's own phone app does, and every time the TV is switched on it opens couch-tv's home in
-  the TV's browser (or as a tile on the app row, on older firmware that still accepts one). VIDAA's own Home
-  button still opens VIDAA's home, and couch-tv never roots a TV. The phone remote works; apps open on their
-  own page; no "what is playing" and no screenshots. Newer firmware needs a certificate you take from your
-  own copy of Hisense's phone app (couch-tv does not include it). **It was tested against a pretend VIDAA TV
-  on a computer, and it has not been run on a real one**, so expect to fix something. If you try it, please
-  open an issue and say how it went. Setup and limits: [docs/VIDAA.md](docs/VIDAA.md).
-- **Philips with Titan OS:** the phone remote only, with a computer at home: power, keys, volume, inputs,
-  opening the TV's apps and the assistant on top of those. **couch-tv's home does not open on it**: Titan OS
-  runs a web page only as a Titan app, which needs a Titan developer account or a store listing that does
-  not exist yet. Pairing needs a key from Philips's own phone app that you save yourself (couch-tv does not
-  include it). **Tested against a pretend TV on a computer, not yet on a real Titan OS TV.** Mostly Philips
-  TVs sold in Europe from 2023. Setup, limits and the home routes: [docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md).
-- **Older Philips with Saphi** (Philips's own Linux system, roughly 2015 to 2019): New (Beta). The phone remote,
-  with a computer at home, and couch-tv's page opens in the TV's own browser each time it is switched on, if
-  your set offers a browser to the network remote. No real home screen: the browser's bar can show and the
-  remote's Home button still opens Philips's menu. Many of these sets need no pairing; some want a PIN and
-  some have no network remote at all, so it depends on the model. A two minute test in a web browser tells
-  you which: [docs/PHILIPS-SAPHI-TESTING.md](docs/PHILIPS-SAPHI-TESTING.md). Setup and limits:
+- **The Beta paths: Hisense VIDAA, Philips, Fire TV on Vega OS, VIZIO and Panasonic.** All of them need a
+  **computer at home that stays on**, and on all of them **the maker's own Home button still opens the
+  maker's own home**: couch-tv opens itself on top, it does not replace that home. None of them has run on
+  a real TV yet, so if you try one, please open an issue and say how it went (each has a short read only
+  first test).
+- **Hisense VIDAA (Beta):** no app to install: the bridge talks to the TV the way Hisense's own phone app
+  does, and every time the TV is switched on it opens couch-tv's home in the TV's browser (or as a tile on
+  the app row, on older firmware that still accepts one). VIDAA's Home button still opens VIDAA's home, and
+  couch-tv never roots a TV. The phone remote works; apps open on their own page; no "what is playing" and
+  no screenshots. Newer firmware needs a certificate you take from your own copy of Hisense's phone app
+  (couch-tv does not include it). Setup and limits: [docs/VIDAA.md](docs/VIDAA.md).
+- **Philips with Titan OS (Beta):** the phone remote works now: power, keys, volume, inputs, opening the
+  TV's apps and the assistant on top of those. couch-tv's home needs a Titan app to open on the TV: a
+  couch-tv app in Titan's store, or Titan's DevView developer app. Neither is there yet, so for now the home
+  stays Philips's. Pairing needs a key from Philips's own phone app that you save yourself (couch-tv does
+  not include it). Mostly Philips TVs sold in Europe from 2023. Setup, limits and the home routes:
+  [docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md).
+- **Older Philips with Saphi (Beta)** (Philips's own Linux system, roughly 2015 to 2019): the phone remote,
+  and couch-tv's page opens in the TV's own browser each time it is switched on, if your set offers a
+  browser to the network remote. The browser's bar can show and the remote's Home button still opens
+  Philips's menu. Many of these sets need no pairing; some want a PIN and some have no network remote at
+  all, so it depends on the model. A two minute test in a web browser tells you which:
+  [docs/PHILIPS-SAPHI-TESTING.md](docs/PHILIPS-SAPHI-TESTING.md). Setup and limits:
   [docs/PHILIPS-SAPHI.md](docs/PHILIPS-SAPHI.md).
-- **Fire TV on Vega OS:** New. couch-tv goes on as an app you build once with Amazon's free developer tools
-  (a free Amazon Developer account, a Mac or Linux computer and a USB cable), and a computer at home opens it
-  when the stick comes up. Amazon's Home button still opens Amazon's home, the phone remote presses arrows and
-  OK while couch-tv is in front but not volume or power off, and only Netflix and YouTube open from the phone.
-  First reports from real sticks are wanted: [docs/FIRE-VEGA.md](docs/FIRE-VEGA.md).
-- **VIZIO (SmartCast and VIZIO OS):** New (Beta), and a phone remote only. With a computer at home the
-  bridge talks to the TV the way VIZIO's own phone app does: power, the remote's keys, volume, switching
-  inputs by name, and opening Netflix, YouTube, Prime Video, Disney+ and other apps on their own page.
-  couch-tv's home page does not open on the TV by itself: VIZIO OS has no browser, takes no sideloaded app,
-  and its app programme is a closed partner scheme. VIZIO's Home button opens VIZIO's home. No "what is
-  playing" title, no typing and no screenshots. You type a PIN the TV shows once. It has not been on a
-  real VIZIO yet, so if you try it, please open an issue and say how it went. Setup and limits:
-  [docs/VIZIO.md](docs/VIZIO.md).
-- **Panasonic Viera (My Home Screen, and older Vieras with network control):** new, Beta. Nothing to
-  install on the TV: the bridge talks to it the way Panasonic's own phone app does, and every time the TV is
-  switched on it opens couch-tv's home in the TV's web browser a few seconds later. The browser's own bar
-  stays visible and Panasonic's Home button still opens Panasonic's home. The phone remote works, with a
-  real volume level; apps open on their own page; no "what is playing" and no screenshots. 2018 and newer
-  sets pair once with a PIN on the TV. Panasonic's Google TV models are normal couch-tv TVs. Start with the
-  read only first test in [docs/PANASONIC.md](docs/PANASONIC.md), and please open an issue with what it
-  printed.
-- **Apple TV:** closed. Nothing here works on it.
+- **Fire TV on Vega OS (Beta):** couch-tv goes on as an app you build once with Amazon's free developer
+  tools (a free Amazon Developer account, a Mac or Linux computer and a USB cable), and the computer at home
+  opens it when the stick comes up. Amazon's Home button still opens Amazon's home, the phone remote presses
+  arrows and OK while couch-tv is in front but not volume or power off, and only Netflix and YouTube open
+  from the phone. Setup and limits: [docs/FIRE-VEGA.md](docs/FIRE-VEGA.md).
+- **VIZIO (Beta), phone remote only** (SmartCast and VIZIO OS): the bridge talks to the TV the way VIZIO's
+  own phone app does: power, the remote's keys, volume, switching inputs by name, and opening Netflix,
+  YouTube, Prime Video, Disney+ and other apps on their own page. couch-tv's home cannot open on a VIZIO:
+  VIZIO OS has no browser, takes no sideloaded app, and its app programme is a closed partner scheme.
+  VIZIO's Home button opens VIZIO's home. No "what is playing" title, no typing and no screenshots. You
+  type a PIN the TV shows once. Setup and limits: [docs/VIZIO.md](docs/VIZIO.md).
+- **Panasonic Viera (Beta)** (My Home Screen, and older Vieras with network control): nothing to install on
+  the TV: the bridge talks to it the way Panasonic's own phone app does, and every time the TV is switched
+  on it opens couch-tv's home in the TV's web browser a few seconds later. The browser's own bar stays
+  visible and Panasonic's Home button still opens Panasonic's home. The phone remote works, with a real
+  volume level; apps open on their own page; no "what is playing" and no screenshots. 2018 and newer sets
+  pair once with a PIN on the TV. Panasonic's Google TV models are normal couch-tv TVs. Setup, limits and
+  the read only first test: [docs/PANASONIC.md](docs/PANASONIC.md).
+- **Apple TV:** a phone remote is in Beta and in review
+  ([PR #117](https://github.com/Seagey/couch-tv/pull/117)), and a couch-tv home app for tvOS is coming.
+  Apple's own home cannot be replaced (tvOS does not allow it).
+- **TiVo OS:** no known way yet.
 
-**Want everything on a Samsung, LG, Roku, VIDAA, Philips, VIZIO or another TV?** The Samsung, LG, Roku and VIDAA paths cover the home and the
-phone remote, not everything, and the Philips Titan OS and VIZIO paths are the phone remote only. Plug in a Google TV box (for example the Google TV Streamer) and set
-couch-tv up on that, and you get everything, on any TV with an HDMI port.
+**Want everything on a TV that is not Google TV or Android TV?** The Samsung, LG, Roku, VIDAA, Philips
+Saphi, Panasonic and Vega paths give you the home (opened on top of the maker's) and the phone remote, not
+everything, and Philips Titan OS and VIZIO are the phone remote for now. Plug in a Google TV box (for
+example the Google TV Streamer) and set couch-tv up on that, and you get everything, on any TV with an
+HDMI port.
 
 **Test your own TV** (changes nothing on it, and installs nothing outside this folder):
 

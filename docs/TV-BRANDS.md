@@ -1,7 +1,8 @@
 # Brands that sell more than one kind of TV
 
-Many brands sell some TVs on Google TV or Android TV (these work) and others on a system that does
-not (Fire TV, Roku, VIDAA, Titan OS and more). **The brand does not tell you. The model does.**
+Many brands sell some TVs on Google TV or Android TV (these get everything) and others on their own
+system (Fire TV, Roku, VIDAA, Titan OS and more), which get their own couch-tv path or, for a few, no
+known way yet. **The brand does not tell you. The model does.**
 
 Research from public sources, October 2026. **None of these brands has been tested with couch-tv**
 unless it says so in [TV-COMPATIBILITY.md](TV-COMPATIBILITY.md). Some rows rest on thin or older
@@ -10,32 +11,33 @@ settings menu.
 
 **The quickest check:** on the TV open **Settings, System, About** (older TVs: **Settings, Device
 Preferences, About**). "Android TV OS" means it works. A Google Assistant button on the remote is a
-good sign. A Fire TV, Alexa-only or Roku button means it does not.
+good sign. A Fire TV, Alexa-only or Roku button means it is another system: look for its row in the README's
+"Will it work on my TV?" table.
 
-| Brand | Works (Google TV or Android TV models) | Does not work | How to tell |
+| Brand | Everything (Google TV or Android TV models) | Other systems (their own path, Beta, or no known way yet) | How to tell |
 |---|---|---|---|
 | Hisense | Some Google TV models (US "G" suffix, some 2026 ranges) | VIDAA (most ranges, including many in Australia; being renamed V Home OS), Fire TV (US "F" suffix) | The retailer's "operating system" line. Australian model codes give no hint |
 | Toshiba | Older Android TV models | Fire TV (US and Canada), VIDAA | "Fire TV" on the box or an Alexa remote means no |
 | Sharp | Some Google TV models (US) | Roku TV (US), Titan OS (Europe, from mid 2026) | Region and series. Australian range not confirmed |
 | TCL (and Ffalcon) | Google TV (most recent ranges), some Android TV | Roku TV (US), Fire TV (some models) | The listing's OS field, not the series name |
-| Philips | 2020 to 2025 Google TV and Android TV models | Titan OS (Europe): all 2026 models, and many 2023 to 2025 models below the flagships (from 2025, most of the 7000 series up); 2020 to 2022 Philips Linux TVs now run Titan's app layer too. Some budget models on Roku. Titan OS gets the phone remote only, untested ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)). About 2015 to 2019, non Android Philips smart TVs run Saphi: New (Beta), the phone remote and couch-tv's page in the TV's browser if the set offers it ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)) | A Google Assistant button and "Android TV OS" in About means Google TV. No Google button and a "Lifestyle" home means Titan OS |
-| Panasonic | Google TV (some European models) | Fire TV (some UK models), Roku and TiVo (US). My Home Screen (older): New, a phone remote and a page that opens itself in the TV's browser, Beta ([PANASONIC.md](PANASONIC.md)) | Model codes differ by region: check the OS field. `check-tv.py` recognises a My Home Screen Viera by port 55000 |
-| Sony | Google TV or Android TV on most Bravias since 2015 | Sony's own Linux system on some cheaper Full HD Bravias, for example the 2018 W66F series (KDL-43W660F, KLV-50W662F) | "Android TV" or "Google TV" on the box or in Settings, About. A Linux Bravia cannot run couch-tv: use a Google TV box on HDMI |
+| Philips | 2020 to 2025 Google TV and Android TV models | Titan OS (Europe): all 2026 models, and many 2023 to 2025 models below the flagships (from 2025, most of the 7000 series up); 2020 to 2022 Philips Linux TVs now run Titan's app layer too. Some budget models on Roku. Titan OS: Beta, the phone remote now, the home once there is a Titan app ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)). About 2015 to 2019, non Android Philips smart TVs run Saphi: Beta, the phone remote and couch-tv's page in the TV's browser if the set offers it ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)) | A Google Assistant button and "Android TV OS" in About means Google TV. No Google button and a "Lifestyle" home means Titan OS |
+| Panasonic | Google TV (some European models) | Fire TV (some UK models), Roku and TiVo OS (US; TiVo OS: no known way yet). My Home Screen (older): Beta, a phone remote and a page that opens itself in the TV's browser ([PANASONIC.md](PANASONIC.md)) | Model codes differ by region: check the OS field. `check-tv.py` recognises a My Home Screen Viera by port 55000 |
+| Sony | Google TV or Android TV on most Bravias since 2015 | Sony's own Linux system on some cheaper Full HD Bravias, for example the 2018 W66F series (KDL-43W660F, KLV-50W662F) | "Android TV" or "Google TV" on the box or in Settings, About. No known way yet on a Linux Bravia: use a Google TV box on HDMI |
 | Xiaomi | Google TV (most models) | Fire TV (some 2026 models in Europe, "FireTV" in the name) | "FireTV" in the name or a Fire TV button |
 | Kogan | Google TV (OLED and QLED ranges), older Android TV | Roku TV (some older models), basic "Smart TV" on cheaper models | The spec sheet. No webOS models found |
-| Onn | Google TV (newer models). VIZIO OS models (some 2025): New (Beta), the VIZIO phone remote ([VIZIO.md](VIZIO.md)) | Roku TV (older) | A Google button on the remote |
+| Onn | Google TV (newer models). VIZIO OS models (some 2025): Beta, the VIZIO phone remote ([VIZIO.md](VIZIO.md)) | Roku TV (older) | A Google button on the remote |
 | Element | Some Google TV models | Fire TV and Roku models | Retailer spec only |
 | Thomson | Google TV (recent models) | Older own "Smart TV" | Thomson Europe went bankrupt in 2026, so updates are uncertain |
 | Wansa | Google TV (for example WLE65NGT63, WLE75NGT63) and Android TV 11 (for example WUD58J0A63S) | Not confirmed: check older or cheaper models | Retailer listings only (Gulf retailers). "Android TV OS" in Settings, About means yes |
 | Hitachi, JVC, Insignia, Westinghouse, Haier | Not confirmed | Mostly Roku TV or Fire TV | Check the spec sheet |
 | Metz, Grundig | Some Android or Google TV (not confirmed) | Fire TV, VIDAA, Saphi and others | No brand-wide rule: check the model |
 | Nokia, Motorola (licensed brands) | Android TV in some countries | Not confirmed | Made by different companies in each country |
-| Vizio | New (Beta): phone remote, power, volume, inputs and opening apps; couch-tv's home page does not open on the TV by itself ([VIZIO.md](VIZIO.md)) | The full couch-tv (no browser, no sideloading, a closed app programme) | SmartCast or VIZIO OS, never Google TV. `check-tv.py` recognises it by its SmartCast answer on port 7345 or 9000 |
+| Vizio | No | SmartCast or VIZIO OS: Beta, phone remote only (power, volume, inputs and opening apps). couch-tv's home cannot open on it: no browser, no sideloading, a closed app programme ([VIZIO.md](VIZIO.md)) | SmartCast or VIZIO OS, never Google TV. `check-tv.py` recognises it by its SmartCast answer on port 7345 or 9000 |
 | Samsung | No | Tizen only | couch-tv as an app: [SAMSUNG.md](SAMSUNG.md) |
 | LG | No | webOS only | couch-tv as an app (built, run on nine real LGs so far): [LG.md](LG.md) |
-| Any brand's Roku TV (TCL, Hisense, Sharp, Onn, Philips and others that sell one) | No | Roku OS only | couch-tv as a channel (built, not yet run on a real Roku): [ROKU.md](ROKU.md) |
+| Any brand's Roku TV (TCL, Hisense, Sharp, Onn, Philips and others that sell one) | No | Roku OS only | couch-tv as a channel (built, first real Roku reports wanted): [ROKU.md](ROKU.md) |
 
-Have a TV that says no? A Google TV box (for example the Google TV Streamer) plugged into any HDMI
+Have a TV with no known way yet, or want everything? A Google TV box (for example the Google TV Streamer) plugged into any HDMI
 port gets you everything.
 
 ## Sources
