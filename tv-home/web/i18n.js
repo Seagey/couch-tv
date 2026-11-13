@@ -4120,6 +4120,7 @@
     ambient_settings_sub: "Które albumy są pokazywane, gdy telewizor jest bezczynny.",
     quick_bluetooth: "Urządzenia Bluetooth",
     quick_network: "Sieć",
+    quick_tvsettings: "Ustawienia telewizora",
     quick_needs_tv_app: "Wymaga aplikacji na telewizorze",
     quick_needs_bridge: "Wymaga komputera",
     quick_needs_picture: "Wymaga komputera i ustawienia obrazu",
