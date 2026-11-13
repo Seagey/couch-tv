@@ -425,7 +425,7 @@ is the safe way to use the phone remote away from home.
 | `bridge.host`, `bridge.port` [5400], `bridge.fallback_hosts` | Where the bridge runs. `fallback_hosts` lists other names the bridge may be opened by (see "Opening the bridge by another name" below). |
 | `bridge.pairing_key` [""] | Optional API pairing key. Empty/unset by default. When set, clients (phone remote and TV front-ends) must authenticate with this key. |
 | `weather` | `lat`, `lon`, `place`, `timezone`, for the weather on the home (Open-Meteo, no key). A suburb or city is enough; never a home address. `timezone` (for example `Europe/London`) is also the time zone the bridge writes times in. |
-| `country` [`IT` for Italian, `DE` for German, `BE` for Dutch, `RS` for Serbian, `IL` for Hebrew, else `AU`] | Two letter code, for where shows stream (JustWatch), the country in links to Apple TV and Prime Video, and the country Claude is told about. |
+| `country` [`IT` for Italian, `DE` for German, `BE` for Dutch, `RS` for Serbian, `IL` for Hebrew, `CZ` for Czech, else `AU`] | Two letter code, for where shows stream (JustWatch), the country in links to Apple TV and Prime Video, and the country Claude is told about. |
 | `country_name` | Optional: what to call the country in Claude's prompts, if the built-in list does not know your code. |
 | `client_name` ["Couch TV bridge"] | The name the TV shows for the bridge in its list of paired remotes. Set it before `pair_tv.py`; changing it later means pairing again. |
 | `screens` [] | Extra screens the TV can open, for example a computer through Moonlight. |

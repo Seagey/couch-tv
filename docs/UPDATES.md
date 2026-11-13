@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 13 November 2026: Czech on the TV home (on main, in the next release)
+
+The TV home now speaks Czech (Čeština), with a 24 hour clock and Czechia as the country for where shows stream. It is picked in Home settings, `home.language: "cs"`, or by itself on a TV set to Czech. 298 of the home's sentences are translated; the newest ones (such as Ambient and the LG Developer Mode lines) show in English for now. The phone remote is not in Czech yet. Thanks slezaCZ, who tested it on a Gogen Android TV 11 (#178).
+
 ### 13 November 2026: Chromecast with Google TV keeps couch-tv after two quick Home presses (on main, in the next release)
 
 On a Chromecast with Google TV (Android 14), pressing Home twice quickly from an app could leave the Google home in front for good. The app that was closing (Jellyfin here) sent its window event after the Google home's, so the Home button watch read that as the home having gone, and later Home presses sent no new event. The watch now keeps when the TV's own home last came forward and when couch-tv last did, and its one re-check brings couch-tv back when the home came last and the only events since were another app closing within about 2 seconds. An app you really opened from the home still keeps the screen. Fire TV, Bell Fibe, Xiaomi and the Android 9 path are unchanged. Reported with the logcat trace by goldimpala ([#175](https://github.com/Seagey/couch-tv/issues/175)). Untested on a real Chromecast so far.

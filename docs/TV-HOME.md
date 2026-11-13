@@ -325,6 +325,7 @@ They win over `config.json` on that TV; About, Reset home settings goes back to 
 | Dutch | `nl` | 24 hour | Yes, on main, in the next release | Not yet |
 | Hebrew, with full right-to-left layout | `he` | 24 hour | Yes | Not yet |
 | French | `fr` | 24 hour | Yes | Not yet |
+| Czech | `cs` | 24 hour | Yes, on main, in the next release (some newer screens still in English) | Not yet |
 
 The TV home and the phone remote both speak English, Spanish (`es`, for Spain and everyone else),
 Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest), Italian (`it`),
@@ -332,7 +333,8 @@ German (`de`), Turkish (`tr`), Serbian Latin (`sr-Latn-RS`), Dutch (`nl`, TV hom
 main, in the next release) and Hebrew (`he`, with full right-to-left layout and 24 hour clock, TV
 home only for now). Italian, German, Turkish, Serbian, Dutch and Hebrew use a 24 hour clock by
 default unless you pick 12 hour. The TV home also speaks French (`fr`, 24 hour clock); the phone
-remote has no French yet.
+remote has no French yet. Czech (`cs`, 24 hour clock, TV home only, on main, in the next release)
+covers most of the home; the newest screens still show in English until they are translated.
 
 The optional smart-home controls are translated too. The phone has its own choice (TV menu,
 Language), "Same as the TV" by default. Messages that come from the bridge itself (an error, a note
