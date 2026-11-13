@@ -504,7 +504,9 @@ the phone says so and you use the TV's remote.
 ## On a rooted LG
 
 This part is only for a TV that is already rooted and has the Homebrew Channel with root status
-"ok". Rooting is not covered here, and it is not recommended for couch-tv (see
+"ok". Rooting is the owner's own choice and risk. couch-tv never roots a TV or changes its firmware,
+and nothing here is a couch-tv setup step: couch-tv works without any of it. Rooting is not covered
+here, and it is not recommended for couch-tv (see
 [TV-COMPATIBILITY.md](TV-COMPATIBILITY.md)); see [webosbrew](https://www.webosbrew.org) if you want
 to know more. Tried on the eleventh LG above (OLED B5, 2025, webOS 10.3), with no bridge.
 
@@ -535,6 +537,9 @@ On this TV the icons in that list are file paths on the TV (`/usr/palm/...`), no
 
 Two ways. The first is clean but changes how the TV reads the remote. The second changes nothing on
 the TV, but LG's home shows for a moment.
+
+**Read the security warning under option 1 before you install LG Input Hook.** It opens a settings
+page that can read and write files on the TV as root, and by default the whole network can reach it.
 
 **1. LG Input Hook** (`org.webosbrew.inputhook`, in the Homebrew Channel). It hooks into the TV's
 remote handling (here `lginput2` and `micomservice`) and can run a command for a key. Open the app
