@@ -215,6 +215,11 @@ class HomeActivity : Activity() {
             Thread { runCatching { Tv.powerOff() } }.start()
             return true
         }
+
+        /** The TV's inputs and switching to one: the home's Input menu and pinned input tiles (Tv.inputs). */
+        @JavascriptInterface fun tvInputs(): String = Tv.inputs().toString()
+        @JavascriptInterface fun openInput(id: String): Boolean = Tv.openInput(id)
+        @JavascriptInterface fun openInputs(): Boolean = Tv.openInputs()
     }
 
     private fun tvApps(): List<ResolveInfo> = Tv.tvLaunchables().filter { it.activityInfo.packageName != packageName }

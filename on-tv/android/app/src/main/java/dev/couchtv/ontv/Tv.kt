@@ -3,11 +3,17 @@ package dev.couchtv.ontv
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
+import android.media.tv.TvContract
+import android.media.tv.TvInputInfo
+import android.media.tv.TvInputManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
 import android.content.pm.PackageManager
+import org.json.JSONArray
+import org.json.JSONObject
 
 class ApiError(val status: Int, message: String) : Exception(message)
 
@@ -126,6 +132,56 @@ object Tv {
      * way there, which the Fire TV Home watcher sends straight back, so its Settings screen is
      * opened by name.
      */
+    /**
+     * The TV's own inputs: the HDMI ports and the rest Android lists, minus any the TV's owner hid,
+     * with the devices HDMI-CEC found behind each. Same JSON as the TV home app's tvInputs:
+     * [{id, label, type, devices: [..]}]. The home's Input menu and its pinned input tiles use it.
+     */
+    fun inputs(): JSONArray {
+        val all = runCatching {
+            (ctx.getSystemService(Context.TV_INPUT_SERVICE) as? TvInputManager)?.tvInputList.orEmpty()
+                .filter { it.isPassthroughInput && (Build.VERSION.SDK_INT < 24 || !it.isHidden(ctx)) }
+        }.getOrDefault(emptyList())
+        val out = JSONArray()
+        for (p in all.filter { it.parentId == null }) {
+            val devices = JSONArray()
+            all.filter { it.parentId == p.id }.forEach { c -> inputLabel(c)?.let { devices.put(it) } }
+            out.put(JSONObject().put("id", p.id).put("label", inputLabel(p) ?: "")
+                .put("type", if (p.type == TvInputInfo.TYPE_HDMI) "hdmi" else "other").put("devices", devices))
+        }
+        return out
+    }
+
+    /** The name the TV gives an input: the one its owner set, else the TV's own. */
+    private fun inputLabel(i: TvInputInfo): String? = runCatching {
+        ((if (Build.VERSION.SDK_INT >= 24) i.loadCustomLabel(ctx) else null) ?: i.loadLabel(ctx))?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+    }.getOrNull()
+
+    /**
+     * Switch the TV to one input: Android's passthrough channel for it, which the TV's own input
+     * app plays (checked on a Xiaomi MiTV-MSSP3, MediaTek). If nothing takes that, the TV's input
+     * list screen instead. False: neither.
+     */
+    fun openInput(id: String): Boolean {
+        if (id.isBlank()) return false
+        val view = Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(id))
+        if (ctx.packageManager.resolveActivity(view, 0) != null) return runCatching { start(view) }.isSuccess
+        return openInputs()
+    }
+
+    /** The TV's own input list screen, where it has one. */
+    fun openInputs(): Boolean = INPUT_ACTIONS.asSequence().map { Intent(it) }
+        .firstOrNull { ctx.packageManager.resolveActivity(it, 0) != null }
+        ?.let { runCatching { start(it) }.isSuccess } ?: false
+
+    /** Where a TV keeps its input list screen (the same list as the TV home app's). */
+    private val INPUT_ACTIONS = listOf(
+        "android.settings.TV_INPUT_SETTINGS",           // some Android TV builds
+        "com.android.tv.action.VIEW_INPUTS",            // the Live Channels input picker
+        "com.google.android.tv.action.VIEW_INPUTS",
+        "android.media.tv.action.SETUP_INPUTS"          // the system list of TV inputs
+    )
+
     fun openSettings() {
         val fire = android.content.ComponentName("com.amazon.tv.launcher", "com.amazon.tv.launcher.ui.MainSettingsActivity")
         start(if (FireHome.isFireTv) Intent().setComponent(fire) else Intent(Settings.ACTION_SETTINGS))

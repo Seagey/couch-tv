@@ -65,6 +65,12 @@ object Store {
         }))
         .put("default_tv", TV_ID)
         .put("mode", "on-tv")
+        // HDMI ports pinned as dock tiles, in the TV home's home.inputs shape (docs/CONFIG.md).
+        // Left out when none are set, so the home is exactly as before.
+        .also { c -> inputs().takeIf { it.length() > 0 }?.let { c.put("home", JSONObject().put("inputs", it)) } }
+
+    /** Pinned inputs: [{port, label, icon, id?}], set from /api/settings "inputs". */
+    fun inputs(): JSONArray = str("inputs")?.let { runCatching { JSONArray(it) }.getOrNull() } ?: JSONArray()
 
     fun tvName(): String = str("tv_name", "This TV") ?: "This TV"
 

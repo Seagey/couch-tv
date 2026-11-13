@@ -211,6 +211,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "POST /api/picture" -> json(409, err("picture mode is not available in on-TV mode"))
             "GET /api/screens" -> json(200, ok().put("screens", JSONArray()))
             "POST /api/screens/open" -> json(404, err("no screens in on-TV mode"))
+            // the TV's inputs, for the setup page's input tiles (the home reads them through TVOS.tvInputs)
+            "GET /api/inputs" -> json(200, ok().put("inputs", Tv.inputs()).put("pinned", Store.inputs()))
             "POST /api/power" -> power(body(s).optString("state"))
             "POST /api/volume" -> volume(body(s))
             "GET /api/screenshot" -> newFixedLengthResponse(Response.Status.OK, "image/png", Tv.screenshot().inputStream(), -1).noStore()
@@ -366,6 +368,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         .put("watch_next", JSONObject().put("granted", WatchNext.granted()).put("listed", WatchNext.listed()))
         // Xiaomi only: Couch TV in PatchWall's place (FireHome); the setup page shows the switch when xiaomi is true
         .put("xiaomi", FireHome.isXiaomi).put("patchwall_replace", Store.bool("patchwall_replace")).put("watch", WatchService.connected)
+        .put("inputs", Store.inputs())
 
     /** {"people": [...]} replaces the list; {"order": [ids]} only reorders it. */
     private fun savePeople(b: JSONObject) {
@@ -388,6 +391,28 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         Now.push()
     }
 
+    /**
+     * A saved app order (Arrange apps) puts anything it does not list behind More apps, so a newly
+     * pinned input tile would not show. Pinned inputs go in just above the line (the home names them
+     * "input:<id>"), unpinned ones come out. Without a saved order the home already keeps them in the dock.
+     */
+    private fun pinInputsInOrder(inputs: JSONArray) {
+        val saved = Store.readJson("app-order.json") as? JSONObject ?: return
+        val old = saved.optJSONArray("order") ?: JSONArray()
+        val want = (0 until inputs.length()).mapNotNull { inputs.optJSONObject(it)?.optString("id")?.takeIf { s -> s.isNotEmpty() }?.let { s -> "input:$s" } }
+        var line = saved.optInt("line")
+        val order = ArrayList<String>()
+        for (i in 0 until old.length()) {
+            val p = old.optString(i)
+            if (p.startsWith("input:") && p !in want) { if (i < saved.optInt("line")) line--; continue }
+            order += p
+        }
+        // a full dock (10): the inputs take the last places, and the apps there move behind More apps
+        var at = minOf(line, 10 - want.size).coerceIn(0, order.size)
+        for (p in want) if (p !in order) { order.add(at++, p); line++ }
+        Store.writeJson("app-order.json", JSONObject().put("order", JSONArray(order)).put("line", line.coerceIn(0, 10)))
+    }
+
     private fun saveSettings(b: JSONObject) {
         Ask.save(b)   // first: a wrong Ask setting answers 400 before anything else in the request is saved
         b.optJSONObject("settings")?.let {
@@ -408,6 +433,24 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             if (w.has("lat") && w.has("lon")) Store.putStr("weather", JSONObject().put("lat", w.getDouble("lat")).put("lon", w.getDouble("lon"))
                 .put("place", w.optString("place").take(40)).put("timezone", w.optString("timezone", "UTC").take(40)).toString())
             Weather.clear()
+        }
+        // HDMI ports as dock tiles: [{"port": 1, "label": "Camera", "icon": "hdmi"}], up to 6.
+        // An empty list takes them all off. Same keys as home.inputs in docs/CONFIG.md.
+        b.optJSONArray("inputs")?.let { arr ->
+            val clean = JSONArray()
+            for (i in 0 until minOf(arr.length(), 6)) {
+                val p = arr.optJSONObject(i) ?: continue
+                val o = JSONObject()
+                p.optInt("port", 0).takeIf { it in 1..9 }?.let { o.put("port", it) }
+                p.optString("id").trim().takeIf { it.isNotEmpty() && it.length <= 200 }?.let { o.put("id", it) }
+                p.optString("match").trim().takeIf { it.isNotEmpty() }?.let { o.put("match", it.take(40)) }
+                if (!o.has("port") && !o.has("id") && !o.has("match")) continue
+                o.put("label", p.optString("label").trim().ifEmpty { o.optInt("port").takeIf { it > 0 }?.let { "HDMI $it" } ?: "HDMI" }.take(30))
+                o.put("icon", p.optString("icon").takeIf { it in INPUT_ICONS } ?: "hdmi")
+                clean.put(o)
+            }
+            Store.putStr("inputs", clean.toString())
+            pinInputsInOrder(clean)
         }
         b.optString("country").takeIf { Regex("[A-Z]{2}").matches(it) }?.let { Store.putStr("country", it) }
         b.optString("tv_name").trim().takeIf { it.isNotEmpty() }?.let { Store.putStr("tv_name", it.take(30)) }
@@ -546,5 +589,9 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             409 -> "Conflict"; 413 -> "Payload Too Large"; 415 -> "Unsupported Media Type"; 429 -> "Too Many Requests";501 -> "Not Implemented"; 502 -> "Bad Gateway"; 503 -> "Service Unavailable"; 504 -> "Gateway Timeout"; else -> "Status" }
     }
 
-    companion object { private const val TAG = "couchtv.server" }
+    companion object {
+        private const val TAG = "couchtv.server"
+        /** The dock tile pictures the home has for an input (docs/CONFIG.md, home.inputs). */
+        private val INPUT_ICONS = setOf("hdmi", "cable", "pc", "ps5", "xbox", "switch")
+    }
 }

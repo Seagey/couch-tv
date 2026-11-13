@@ -87,6 +87,14 @@
     <div class="msg" id="pw-msg" role="status"></div>
   </section>
 
+  <section class="card" id="inputs" style="display:none">
+    <h2>Input tiles (optional, off by default)</h2>
+    <p>A set-top box, a camera or a games console on an HDMI port can sit in the home's app row as its own tile, next to Settings. OK on the tile switches the TV straight to that port. Tick the ports you want and give each a name. Up to 6; they take dock places, so the last apps move behind More apps.</p>
+    <div id="in-list"></div>
+    <div class="row"><button class="go" id="in-save">Save</button></div>
+    <div class="msg" id="in-msg" role="status"></div>
+  </section>
+
   <section class="card">
     <h2>Ask (optional, off by default)</h2>
     <p>Ask lets you say "put on Bluey" and have an AI find it and press the buttons. On-TV mode has no AI until you pick a service and add your own key: Claude, OpenAI, Google Gemini, OpenRouter, Groq, Mistral, or a model running on a computer at home. Use a key made only for this TV, with a monthly spend limit set with the service: the key is stored on the TV, and anyone with ADB access to the TV could read it. Each ask is a few short model calls. On Claude Haiku 5.5 that costs about a fifth of a US cent; other services and models price differently.</p>
@@ -135,6 +143,7 @@
         $('pw-on').checked = !!j.patchwall_replace;
         $('pw-state').textContent = j.watch ? '' : 'The Home button watch is off: switch on Couch TV home watch in the TV\'s Settings, Accessibility.';
       }
+      loadInputs();
       showAsk(j.ask);
       $('phones').textContent = j.phones + (j.phones === 1 ? ' phone is' : ' phones are') + ' paired with this TV.';
       showAdb(j.adb);
@@ -218,6 +227,33 @@
   };
   $('pw-save').onclick = function () {
     api('POST', '/api/settings', { patchwall_replace: $('pw-on').checked }).then(function () { $('pw-msg').textContent = 'Saved.'; load(); }).catch(function (e) { $('pw-msg').textContent = e.message; });
+  };
+  // Input tiles: one row per input the TV lists (GET /api/inputs), ticked when pinned already.
+  // Saved by input id, the TV's own name for the port, so it opens that port and no other.
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, ''); };
+  function loadInputs() {
+    api('GET', '/api/inputs').then(function (j) {
+      if (!j.inputs.length) return;
+      var pinned = {};
+      j.pinned.forEach(function (p) { if (p.id) pinned[p.id] = p.label; });
+      $('in-list').innerHTML = j.inputs.map(function (x, i) {
+        var name = x.label || ('Input ' + (i + 1)), on = pinned[x.id] !== undefined;
+        return '<label class="check"><input type="checkbox" data-id="' + esc(x.id) + '"' + (on ? ' checked' : '') + '> ' + esc(name) +
+          (x.devices.length ? ' (' + esc(x.devices.join(', ')) + ')' : '') + '</label>' +
+          '<input maxlength="30" placeholder="Name on the tile, for example Set-top box" data-name="' + esc(x.id) + '" value="' + esc(on ? pinned[x.id] : '') + '">';
+      }).join('');
+      $('inputs').style.display = '';
+    }).catch(function () {});
+  }
+  $('in-save').onclick = function () {
+    var list = [];
+    Array.prototype.forEach.call(document.querySelectorAll('#in-list input[type=checkbox]'), function (c) {
+      if (!c.checked) return;
+      var n = document.querySelector('#in-list input[data-name="' + c.getAttribute('data-id') + '"]');
+      list.push({ id: c.getAttribute('data-id'), label: n.value.trim() || c.parentNode.textContent.trim() });
+    });
+    api('POST', '/api/settings', { inputs: list }).then(function () { $('in-msg').textContent = list.length ? 'Saved. The home shows them now.' : 'Saved. No input tiles.'; load(); })
+      .catch(function (e) { $('in-msg').textContent = e.message; });
   };
   $('ask-clear').onclick = function () {
     api('POST', '/api/settings', { ask_key: '', ask_enabled: false }).then(function () { $('ask-msg').textContent = 'Key removed.'; load(); });
