@@ -6,6 +6,14 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: sharper scenes on a 4K TV that draws its interface at 1080 (on main, in the next release)
+
+Some 4K TVs (a TCL Google TV) draw apps at 1080 and upscale them, so the home thought the screen was 1080 and loaded the softer 1080 scene pictures. `home.hi_res: "always"` in `config.json` now loads the 4K copies anyway. It is off by default and there is no Home settings switch yet (thanks Hiren-Patel1, [#191](https://github.com/Seagey/couch-tv/issues/191)).
+
+### 14 November 2026: an app banner that is not 16:9 is no longer squeezed (on main, in the next release)
+
+The app row draws each app's TV banner as a 16:9 tile. A banner of another shape was stretched to fit, which is how Prime Video looked squeezed on a Fire TV Stick (thanks niravsaxena30, [#181](https://github.com/Seagey/couch-tv/issues/181)). Such a banner now keeps its proportions, fitted inside the tile with its own edge colour filling the gap. Banners that are already 16:9 draw exactly as before. This is a likely cause rather than a confirmed one, so #181 stays open until it is checked on the stick.
+
 ### 14 November 2026: the bridge's web pages stay inside their own folder (on main, in the next release)
 
 The bridge serves the phone remote and the TV home from their folders. A folder next to one of them whose name started the same way (for example `dist_old` beside `dist`) could be read through it. Now only files inside the folder itself are served. Thanks ekagra-codes (#179).

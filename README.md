@@ -41,6 +41,8 @@
 
 The newest release is **0.12** (9 November 2026), on [the Releases page](https://github.com/Seagey/couch-tv/releases). These are on main, in the next release:
 
+- **14 November:** `home.hi_res: "always"` loads the sharper 4K scenes on a 4K TV that draws its interface at 1080, thanks Hiren-Patel1 ([#191](docs/UPDATES.md#14-november-2026-sharper-scenes-on-a-4k-tv-that-draws-its-interface-at-1080-on-main-in-the-next-release))
+- **14 November:** an app banner that is not 16:9 keeps its proportions instead of being squeezed, thanks niravsaxena30 ([#181](docs/UPDATES.md#14-november-2026-an-app-banner-that-is-not-169-is-no-longer-squeezed-on-main-in-the-next-release))
 - **13 November:** the TV home speaks Czech, thanks slezaCZ ([#178](docs/UPDATES.md#13-november-2026-czech-on-the-tv-home-on-main-in-the-next-release))
 - **13 November:** Bell Streamer's Fibe TV home is replaced by couch-tv (Beta, untested), thanks Sparkybabcia ([#168](docs/UPDATES.md#13-november-2026-bell-streamer-with-fibe-tv-as-its-home-beta-on-main-in-the-next-release))
 - **13 November:** Privacy clean (Beta): `PRIVACY=1` switches off known tracking, ad and ACR apps, reversibly ([docs/PRIVACY.md](docs/PRIVACY.md), [details](docs/UPDATES.md#13-november-2026-privacy-clean-beta-on-main))

@@ -1034,7 +1034,7 @@ class MainActivity : Activity() {
         banners[pkg]?.let { return it }
         val ri = tvApps().firstOrNull { it.activityInfo.packageName == pkg } ?: return null
         val version = try { packageManager.getPackageInfo(pkg, 0).lastUpdateTime } catch (e: Exception) { 0L }
-        val file = java.io.File(java.io.File(filesDir, "banners").apply { mkdirs() }, "$pkg-$version-v3.jpg")
+        val file = java.io.File(java.io.File(filesDir, "banners").apply { mkdirs() }, "$pkg-$version-v4.jpg")
         val bytes = if (file.exists()) file.readBytes() else bannerBytes(ri)?.also { file.writeBytes(it) }
         if (bytes != null) banners[pkg] = bytes
         return bytes
@@ -1418,12 +1418,35 @@ class MainActivity : Activity() {
         val c = Canvas(bmp)
         c.drawColor(FLAP)
         if (banner != null) {
-            banner.setBounds(0, 0, 640, 360)
-            banner.draw(c)
+            drawBanner(banner, c)
         } else {
             iconTile(sharp(ri.activityInfo.packageName, ri.activityInfo.iconResource) ?: ri.loadIcon(packageManager), c)
         }
         return ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it); bmp.recycle() }.toByteArray()
+    }
+
+    /**
+     * A TV banner is meant to be 16:9, and almost all are. One that is another shape (Prime Video on a
+     * Fire TV Stick looked squeezed, issue #181) keeps its proportions: it is fitted inside the tile
+     * and the gap is filled with its own edge colour, never stretched.
+     */
+    private fun drawBanner(banner: Drawable, c: Canvas) {
+        val w = banner.intrinsicWidth
+        val h = banner.intrinsicHeight
+        val ratio = if (w > 0 && h > 0) w.toFloat() / h else 16f / 9f
+        if (Math.abs(ratio - 16f / 9f) < 0.05f) {
+            banner.setBounds(0, 0, 640, 360)
+            banner.draw(c)
+            return
+        }
+        val tw = if (ratio >= 16f / 9f) 640 else (360 * ratio).toInt().coerceAtLeast(1)
+        val th = if (ratio >= 16f / 9f) (640 / ratio).toInt().coerceAtLeast(1) else 360
+        val src = Bitmap.createBitmap(tw, th, Bitmap.Config.ARGB_8888)
+        banner.setBounds(0, 0, tw, th)
+        banner.draw(Canvas(src))
+        c.drawColor(src.getPixel(1, th / 2))
+        c.drawBitmap(src, ((640 - tw) / 2).toFloat(), ((360 - th) / 2).toFloat(), android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+        src.recycle()
     }
 
     /**
