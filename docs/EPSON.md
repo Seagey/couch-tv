@@ -27,7 +27,7 @@ settings out of reports.
 ## Connect without switching to plaintext ADB
 
 `tv-home/tools/tvadb.py` can optionally use Google's platform-tools `adb` for an
-already paired Wireless debugging connection. Its default pure-Python transport is
+already paired Wireless debugging connection. Its default Python transport is
 unchanged. This adapter also works with other Android TVs that offer paired debugging.
 It does not add TLS support to the bridge, `check-tv.py` or the on-TV remote.
 
@@ -64,7 +64,7 @@ plaintext debugging, or disconnect other adb clients on exit. The port can chang
 when Wireless debugging or the projector restarts; reconnect and update `ADB_PORT`.
 On macOS, adb may need Local Network permission.
 
-## Home-screen-only trial
+## Trying option A (TV home only)
 
 Option A uses the bundled home and needs no running computer or phone remote service.
 For modest hardware, start with `home.lighter: true`, `home.moving_tiles: false`, and

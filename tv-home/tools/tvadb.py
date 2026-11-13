@@ -13,7 +13,7 @@ TVADB_TRIES (3) and TVADB_TIMEOUT (120 s, for `shell`) tune the retries.
 ADB_PORT is 5555 unless set: the fixed port of "Network debugging", of USB debugging on TVs that
 open it with USB debugging alone, or of `adb tcpip 5555`.
 For paired Wireless debugging, set TV_ADB_BINARY to Google's adb executable and ADB_PORT to
-the current connection port. Pair/connect with that executable first; this mode reuses its
+the current connection port. Pair and connect with that executable first; this mode reuses its
 transport without opening plaintext port 5555. See docs/EPSON.md. No adb-shell dependency
 is needed for this mode of tvadb.py (other tools may still require it).
 
@@ -61,11 +61,11 @@ def connect():
             if not 1 <= port <= 65535:
                 raise ValueError
         except ValueError:
-            fail("set ADB_PORT to the Wireless debugging connection port (1–65535), not the pairing port")
+            fail("set ADB_PORT to the Wireless debugging connection port (1 to 65535), not the pairing port")
         host = ip if ":" not in ip or ip.startswith("[") else f"[{ip}]"
         dev = NativeAdb(os.environ["TV_ADB_BINARY"], f"{host}:{port}")
         if dev.run(["get-state"]).strip() != "device":
-            raise ConnectionError("the selected TV is not connected; pair/connect it with adb first")
+            raise ConnectionError("the selected TV is not connected; pair and connect it with adb first")
         return dev
     try:
         from adb_shell.adb_device import AdbDeviceTcp

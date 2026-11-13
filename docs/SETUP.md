@@ -121,13 +121,13 @@ and press **Allow**. You never see it again.
 
 Newer Google TVs (Android 11 and up) may offer only **Wireless
 debugging**, which pairs with a code and uses a random port that changes after a restart.
-For a **home-screen-only trial**, `tv-home/tools/tvadb.py` can reuse Google's paired TLS
-connection: set `TV_ADB_BINARY` and the current `ADB_PORT` after pairing/connecting. See
+For **option A only**, `tv-home/tools/tvadb.py` can reuse Google's paired (encrypted)
+connection: pair and connect with Google's `adb`, then set `TV_ADB_BINARY` and the current `ADB_PORT`. See
 [the paired connection steps](EPSON.md#connect-without-switching-to-plaintext-adb), tested on
 an Epson LS300. This does not open port 5555 and needs no `adb-shell` Python package for
 `tvadb.py` itself. It does not change the bridge or other tools' transports.
 
-The default pure-Python tools and the bridge speak plain ADB. For those, turn the fixed port
+The default Python tools and the bridge speak plain ADB. For those, turn the fixed port
 on once with Google's own tools ([Android platform-tools](https://developer.android.com/tools/releases/platform-tools)):
 1. On the TV: Developer options, **Wireless debugging** on, then **Pair device with pairing
    code**. It shows a code and an address with a port, for example `<tv address>:37123`.
@@ -140,7 +140,7 @@ On some TVs port 5555 closes again after a restart. Then run steps 2 to 4 again 
 daily guard and the remote need it open). If your TV keeps a different fixed port open, set
 `"adb_port"` on that TV in `config.json` (or `ADB_PORT=<port>` for the scripts). The Wireless
 debugging port itself needs Google's `adb`; only `tvadb.py` with `TV_ADB_BINARY` set can
-reuse that connection. The bridge and other pure-Python tools cannot use it directly.
+reuse that connection. The bridge and the other Python tools cannot use it directly.
 
 </details>
 
