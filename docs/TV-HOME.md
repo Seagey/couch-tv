@@ -124,8 +124,8 @@ What you change shows when the list closes.
 
 ### Language
 
-English, Español, Español (México), Italiano, Deutsch, Français, Türkçe, Srpski (latinica), Polski and
-Hebrew (עברית with full RTL layout, on main, in the next release). Until one is picked here (or in
+English, Español, Español (México), Italiano, Deutsch, Français, Türkçe, Srpski (latinica), Polski (on main,
+in the next release) and Hebrew (עברית with full RTL layout, on main, in the next release). Until one is picked here (or in
 `config.json`), the home speaks the TV's own language if it is one of these, else English. More on
 each language: [Languages](#languages).
 
@@ -322,7 +322,7 @@ They win over `config.json` on that TV; About, Reset home settings goes back to 
 | German | `de` | 24 hour | Yes | Yes |
 | Turkish | `tr` | 24 hour | Yes | Yes |
 | Serbian Latin | `sr-Latn-RS` | 24 hour | Yes | Yes |
-| Polish | `pl` | 24 hour | Yes | Yes |
+| Polish | `pl` | 24 hour | Yes, on main, in the next release | Yes, on main, in the next release |
 | Dutch | `nl` | 24 hour | Yes, on main, in the next release | Not yet |
 | Hebrew, with full right-to-left layout | `he` | 24 hour | Yes | Not yet |
 | French | `fr` | 24 hour | Yes | Not yet |
@@ -330,7 +330,7 @@ They win over `config.json` on that TV; About, Reset home settings goes back to 
 
 The TV home and the phone remote both speak English, Spanish (`es`, for Spain and everyone else),
 Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest), Italian (`it`),
-German (`de`), Turkish (`tr`), Serbian Latin (`sr-Latn-RS`), Polish (`pl`), Dutch (`nl`, TV home only for now, on
+German (`de`), Turkish (`tr`), Serbian Latin (`sr-Latn-RS`), Polish (`pl`, on main, in the next release), Dutch (`nl`, TV home only for now, on
 main, in the next release) and Hebrew (`he`, with full right-to-left layout and 24 hour clock, TV
 home only for now). Italian, German, Turkish, Serbian, Polish, Dutch and Hebrew use a 24 hour clock by
 default unless you pick 12 hour. The TV home also speaks French (`fr`, 24 hour clock); the phone
