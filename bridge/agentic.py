@@ -347,12 +347,15 @@ async def h_uninstall(request):
         raise S.ApiError(403, f"{shown} came with the TV and cannot be removed",
                          key="err_app_preinstalled", vars={"name": shown})
     if pkg not in await _packages():
-        return S.ok(uninstalled=False, note=f"{shown} is not on the TV.")
+        return S.ok(uninstalled=False, note=f"{shown} is not on the TV.",
+                    **messages.note_fields("note_app_not_on_tv", {"name": shown}))
     out = await S.tv.adb("shell", f"pm uninstall {check_package(pkg)}", timeout=30)
     done = "Success" in out
     await S.installed_packages(max_age=0)
     S.record_action(request, "uninstall_app", {"name": shown}, done)
-    return S.ok(uninstalled=done, package=pkg, note=f"Removed {shown}." if done else out.strip()[:120])
+    return S.ok(uninstalled=done, package=pkg, note=f"Removed {shown}." if done else out.strip()[:120],
+                **messages.note_fields("note_app_removed" if done else "note_app_remove_failed",
+                                       {"name": shown} if done else {"detail": out.strip()[:120]}))
 
 
 # ---------- HDMI inputs ----------
@@ -478,7 +481,8 @@ async def h_input(request):
     if _norm(name) in ("home", "tv", "apps", "google tv", "android", "smart tv"):
         await S.tv.key("home")
         S.record_action(request, "input", {"name": "home"}, True)
-        return S.ok(input="home", note="Back to the home screen.")
+        return S.ok(input="home", note="Back to the home screen.",
+                    **messages.note_fields("note_input_home"))
     if S.tv.kind in ("philips", "vizio"):   # an input the TV listed, by its name or id (bridge/philips.py, bridge/vizio.py)
         try:
             src = await S.tv.switch_source(name)
@@ -490,7 +494,8 @@ async def h_input(request):
                 vars=getattr(e, "vars", None) or {"name": name},
             )
         S.record_action(request, "input", {"name": name, "input": src["name"]}, True)
-        return S.ok(input=src["name"], how="listed", switched=True, note=f"Switched to {src['name']}.")
+        return S.ok(input=src["name"], how="listed", switched=True, note=f"Switched to {src['name']}.",
+                    **messages.note_fields("note_input_switched", {"input": src["name"]}))
     inputs = await list_inputs()
     hit, how = pick_input(inputs, name)
     if not hit:
@@ -507,13 +512,29 @@ async def h_input(request):
         _save_name(name, hit["id"])
     dev = ", ".join(d["name"] for d in hit["devices"] if d["type"] != "audio")
     note = f"Switched to {hit['name']}" + (f" ({dev})" if dev else "") + "."
-    if how == "guess":
+    is_guess = how == "guess"
+    no_signal = hit["state"] != "connected" and not dev
+    if is_guess:
         note += (f" The TV could not tell me where the {name} is, so {hit['name']} is my best guess. "
                  "If it is wrong, say which HDMI it is on and I will remember.")
-    if hit["state"] != "connected" and not dev:
+    if no_signal:
         note += " If it says no signal, turn the device on with its own controller or remote."
+    if is_guess and no_signal:
+        note_key = "note_input_switched_guess_no_signal"
+    elif is_guess:
+        note_key = "note_input_switched_device_guess" if dev else "note_input_switched_guess"
+    elif no_signal:
+        note_key = "note_input_switched_no_signal"
+    else:
+        note_key = "note_input_switched_device" if dev else "note_input_switched"
+    note_vars = {"input": hit["name"]}
+    if dev:
+        note_vars["device"] = dev
+    if is_guess:
+        note_vars["name"] = name
     S.record_action(request, "input", {"name": name, "input": hit["name"]}, switched)
-    return S.ok(input=hit["name"], how=how, switched=switched, note=note)
+    return S.ok(input=hit["name"], how=how, switched=switched, note=note,
+                **messages.note_fields(note_key, note_vars))
 
 
 # ---------- off when this episode ends ----------
@@ -641,7 +662,8 @@ async def h_off_after(request):
     if data.get("cancel"):
         was = cancel(tv_id)
         S.record_action(request, "off_after_episode", {"cancel": True}, True)
-        return S.ok(cancelled=was, note="Cancelled, the TV will stay on." if was else "Nothing was set.")
+        return S.ok(cancelled=was, note="Cancelled, the TV will stay on." if was else "Nothing was set.",
+                    **messages.note_fields("note_off_after_cancelled" if was else "note_off_after_nothing_set"))
     front = await S.tv.front_package()
     app = S.apps.describe_package(front)
     if not app or app["id"] in S.NOT_VIEWING:
@@ -683,13 +705,15 @@ async def h_off_after(request):
     if set_timer:
         mins = max(1, round((dur - pos - threshold) / 60000))
         note = f"The TV goes off when {what} ends, in about {mins} min."
+        nk, nv = "note_off_after_armed_minutes", {"what": what, "minutes": mins}
     else:
         note = (f"The TV goes off when {what} ends. {app['name']} does not say how long it is, so I "
                 "will turn it off when it stops or the next one starts.")
+        nk, nv = "note_off_after_armed_watch", {"what": what, "app": app["name"]}
     S.record_action(request, "off_after_episode", {"title": base.get("title"), "dry_run": dry_run}, True)
     return S.ok(armed=True, title=base.get("title"), season=base.get("season"), episode=base.get("episode"),
                 minutes_left=round((dur - pos) / 60000, 1) if set_timer else None,
-                dry_run=dry_run, note=note)
+                dry_run=dry_run, note=note, **messages.note_fields(nk, nv))
 
 
 # ---------- restart an app that is playing up, then carry on ----------

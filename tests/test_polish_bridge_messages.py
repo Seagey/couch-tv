@@ -378,6 +378,42 @@ class CoreBridgeMessageContractTests(unittest.TestCase):
                     missing.append(f"{fname}:{node.lineno} dict with 'note' missing note_fields/note_key")
         self.assertEqual(missing, [])
 
+    def test_note_calls_include_note_fields(self):
+        missing = []
+        for fname in ("server.py", "agentic.py"):
+            path = os.path.join(BRIDGE_DIR, fname)
+            with open(path, encoding="utf-8") as f:
+                tree = ast.parse(f.read(), filename=fname)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                is_ok = isinstance(node.func, ast.Name) and node.func.id == "ok"
+                is_s_ok = (
+                    isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "S"
+                    and node.func.attr == "ok"
+                )
+                is_finish_play = isinstance(node.func, ast.Name) and node.func.id == "finish_play"
+                if not (is_ok or is_s_ok or is_finish_play):
+                    continue
+                note_kw = next((kw for kw in node.keywords if kw.arg == "note"), None)
+                note_pos = node.args[3] if is_finish_play and len(node.args) >= 4 else None
+                note_val = note_kw.value if note_kw is not None else note_pos
+                if note_val is None:
+                    continue
+                if isinstance(note_val, ast.Constant) and note_val.value is None:
+                    continue
+                has_note_key = any(kw.arg == "note_key" for kw in node.keywords)
+                has_unpack = any(
+                    kw.arg is None and _is_note_fields_call(kw.value)
+                    for kw in node.keywords
+                )
+                if not (has_note_key or has_unpack):
+                    call_label = "S.ok" if is_s_ok else node.func.id
+                    missing.append(f"{fname}:{node.lineno} {call_label}(..., note=...) missing note_fields/note_key")
+        self.assertEqual(missing, [])
+
 
 class ServerTVUnavailablePreservationTests(unittest.IsolatedAsyncioTestCase):
     async def test_h_launch_settings_preserves_tv_unavailable_key_and_vars(self):

@@ -575,7 +575,8 @@ async def h_pair(request):
     b = await body(request)
     given = str(b.get("key") or "").strip()
     if not config.PAIRING_KEY:
-        return ok(paired=True, note="no pairing key required")
+        return ok(paired=True, note="no pairing key required",
+                  **messages.note_fields("note_no_pairing_key_required"))
     # Checked after the body is read, with no await before the key is compared and the miss is
     # recorded: checked before it, parallel requests could all pass while their bodies arrive.
     ip = client_ip(request)
@@ -587,7 +588,8 @@ async def h_pair(request):
         record_failed_attempt(ip, given)
         await asyncio.sleep(0.3)
         raise ApiError(401, "That pairing key is not right. Check config.json.", key="err_pairing_key_wrong")
-    return ok(paired=True, token=config.PAIRING_KEY, note="paired")
+    return ok(paired=True, token=config.PAIRING_KEY, note="paired",
+              **messages.note_fields("note_paired"))
 
 
 async def h_bridge_shim(request):
@@ -810,6 +812,14 @@ async def search_in_app(app, title, best=None):
     return "app", f"Opened {app['name']}. Search for {title} on the TV."
 
 
+def _search_note_fields(method, app, title):
+    if method == "deeplink":
+        return "note_opened_title_page", {"title": title, "app": app["name"]}
+    if method == "search":
+        return "note_opened_app_search", {"app": app["name"], "title": title}
+    return "note_opened_app_manual_search", {"app": app["name"], "title": title}
+
+
 def resume_link(app_id, link, title):
     """The show's own page instead of an episode. JustWatch's show links for some apps point at
     season 1 episode 1 (Apple TV "failures-contagious", Paramount+ "stick-or-twist", Prime
@@ -861,7 +871,9 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
                 raise ApiError(400, f"unknown service: {service}", key="err_unknown_service", vars={"service": service})
             # Not listed by JustWatch on that service: open it and search.
             method, note = await search_in_app(app, best["title"], best)
-            return finish_play(best, app, method, note, season, episode, who, ep_info)
+            note_key, note_vars = _search_note_fields(method, app, best["title"])
+            return finish_play(best, app, method, note, season, episode, who, ep_info,
+                               note_key=note_key, note_vars=note_vars)
     if not candidates:
         where = ", ".join(p["name"] for p in providers) or f"nowhere in {config.COUNTRY_NAME} right now"
         raise ApiError(
@@ -882,15 +894,18 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
         m = re.match(app["use_web"], pick["web"])
         if m:
             link = m.group(1)
-    note = "Opened the show page."
+    note, note_key, note_vars = "Opened the show page.", "note_opened_show_page", None
     if ep_info:
         ep_link = next((p["deeplink"] for p in ep_info["providers"] if p["service"] == app["id"]), None)
         if ep_link:
             link, note = ep_link, f"Opened season {season} episode {ep_info['episode']}."
+            note_key, note_vars = "note_opened_episode", {"season": season, "episode": ep_info["episode"]}
         else:
             note = f"Opened the show page. Season {season} is picked on the TV."
+            note_key, note_vars = "note_opened_show_season_picked", {"season": season}
     elif season:
         note = f"Opened the show page. Season {season} is picked on the TV."
+        note_key, note_vars = "note_opened_show_season_picked", {"season": season}
     elif resume and best["type"] == "tv":
         link = resume_link(app["id"], link, best["title"])
 
@@ -912,11 +927,19 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
                      "playing" if started else "not playing yet", f" (profile {picked})" if picked else "")
             if started:
                 note = f"{best['title']} is playing in {app['name']}" + (f", on {picked}'s profile." if picked else ".")
+                if picked:
+                    note_key, note_vars = "note_playing_in_app_profile", {
+                        "title": best["title"], "app": app["name"], "profile": picked,
+                    }
+                else:
+                    note_key, note_vars = "note_playing_in_app", {"title": best["title"], "app": app["name"]}
             else:
                 note = (f"{app['name']} is open on {best['title']}, but it has not started playing. "
                         "Press OK on the remote to start it.")
+                note_key, note_vars = "note_open_not_playing", {"app": app["name"], "title": best["title"]}
     if method and tv.kind == "samsung" and app["id"] == "netflix":
         note = f"Opened {best['title']} in Netflix and pressed Play. If it is not playing, press OK on the remote."
+        note_key, note_vars = "note_opened_samsung_pressed_play", {"title": best["title"], "app": "Netflix"}
     if method is None and tv.kind == "samsung" and pick.get("tizen"):
         # Samsung's own title link, handed over by the couch-tv app on the TV (samsung.py open_title)
         try:
@@ -924,11 +947,14 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
                 method = "deeplink"
                 note = (f"Opened {best['title']} in {app['name']} and pressed Play. If it is not playing, "
                         "press OK on the remote.")
+                note_key, note_vars = "note_opened_samsung_pressed_play", {"title": best["title"], "app": app["name"]}
         except Exception as e:
             log.warning("samsung title link failed for %s: %s", app["id"], e)
     if method is None:
         method, note = await search_in_app(app, best["title"], best)
-    result = finish_play(best, app, method, note, season, episode, who)
+        note_key, note_vars = _search_note_fields(method, app, best["title"])
+    result = finish_play(best, app, method, note, season, episode, who,
+                         note_key=note_key, note_vars=note_vars)
     if started is not None:
         result["started"] = started
     return result
@@ -997,7 +1023,8 @@ async def h_vidaa_pair(request):
     pin = data.get("pin")
     if pin is None:
         await tv.pair_start()
-        return ok(step="pin", note="The TV should now show a 4 digit PIN. Send it as {\"pin\": \"1234\"}.")
+        return ok(step="pin", note="The TV should now show a 4 digit PIN. Send it as {\"pin\": \"1234\"}.",
+                  **messages.note_fields("note_pair_pin_4_digits"))
     if not isinstance(pin, (str, int)) or not vidaa.PIN.match(str(pin).strip()):
         raise ApiError(400, "pin is the 4 digits the TV shows", key="err_pin_4_digits")
     try:
@@ -1016,7 +1043,8 @@ async def h_appletv_pair(request):
     try:
         if pin is None:
             await tv.pair_start()
-            return ok(step="pin", note="The Apple TV should now show a 4 digit PIN. Send it as {\"pin\": \"1234\"}.")
+            return ok(step="pin", note="The Apple TV should now show a 4 digit PIN. Send it as {\"pin\": \"1234\"}.",
+                      **messages.note_fields("note_appletv_pair_pin_4_digits"))
         if not isinstance(pin, (str, int)) or not re.fullmatch(r"\d{4}", str(pin).strip()):
             raise ApiError(400, "pin is the 4 digits the Apple TV shows", key="err_pin_4_digits_appletv")
         await tv.pair_finish(str(pin).strip())
@@ -1254,7 +1282,14 @@ async def h_appletv_kids_open(request):
             await tv.open_url(link)
             record_action(request, "kids_open", {"title": show["title"], "how": "link"}, True)
             pick = "" if to_episode or not show.get("season") else f" Pick {_season_words(show)} there."
-            return ok(opened="show", note=f"Opening {show['title']}.{pick}")
+            if pick:
+                nk, nv = "note_appletv_kids_opening_show_season", {
+                    "title": show["title"], "season": _season_words(show),
+                }
+            else:
+                nk, nv = "note_appletv_kids_opening_show", {"title": show["title"]}
+            return ok(opened="show", note=f"Opening {show['title']}.{pick}",
+                      **messages.note_fields(nk, nv))
         except (appletv.AppleTVError, ValueError) as e:
             log.info("kids: the Apple TV would not open the link for %s: %s", show["title"], e)
     app = apps.BY_ID.get(app_id or "")
@@ -1263,7 +1298,8 @@ async def h_appletv_kids_open(request):
             await tv.launch_package(app["package"])
             record_action(request, "kids_open", {"title": show["title"], "how": "app"}, True)
             what = show["title"] + (f", {_season_words(show)}" if show.get("season") else "")
-            return ok(opened="app", note=f"{app['name']} is open. Pick {what} there.")
+            return ok(opened="app", note=f"{app['name']} is open. Pick {what} there.",
+                      **messages.note_fields("note_appletv_kids_app_open", {"app": app["name"], "what": what}))
         except (TVUnavailable, ValueError) as e:
             log.info("kids: could not open %s for %s: %s", app["id"], show["title"], e)
     raise ApiError(
@@ -1315,7 +1351,8 @@ async def h_vidaa_tile(request):
     if tv.kind != "vidaa":
         raise ApiError(400, "only for VIDAA TVs", key="err_only_vidaa")
     added = await tv.install_tile()
-    return ok(tile=added, note=None if added else "The TV did not add the tile. The browser stays the way couch-tv opens.")
+    return ok(tile=added, note=None if added else "The TV did not add the tile. The browser stays the way couch-tv opens.",
+              **messages.note_fields(None if added else "note_vidaa_tile_not_added"))
 
 
 async def h_vidaa_claim(request):
@@ -1344,7 +1381,8 @@ async def h_vizio_pair(request):
     try:
         if pin is None:
             await tv.pair_start()
-            return ok(step="pin", note="The TV should now show a 4 digit PIN. Send it as {\"pin\": \"1234\"}.")
+            return ok(step="pin", note="The TV should now show a 4 digit PIN. Send it as {\"pin\": \"1234\"}.",
+                      **messages.note_fields("note_pair_pin_4_digits"))
         if not isinstance(pin, (str, int)) or not vizio.PIN.match(str(pin).strip()):
             raise ApiError(400, "pin is the 4 digits the TV shows", key="err_pin_4_digits")
         await tv.pair_finish(str(pin).strip())
@@ -1370,8 +1408,10 @@ async def h_panasonic_pair(request):
     try:
         if pin is None:
             if not await tv.pair_start():
-                return ok(step="none", note="This TV takes commands without pairing.")
-            return ok(step="pin", note="The TV should now show a PIN. Send it as {\"pin\": \"1234\"}.")
+                return ok(step="none", note="This TV takes commands without pairing.",
+                          **messages.note_fields("note_no_pairing_needed"))
+            return ok(step="pin", note="The TV should now show a PIN. Send it as {\"pin\": \"1234\"}.",
+                      **messages.note_fields("note_pair_pin"))
         if not isinstance(pin, (str, int)) or not re.match(panasonic.PROTOCOL["pin"], str(pin).strip()):
             raise ApiError(400, "pin is the digits the TV shows", key="err_pin_digits")
         await tv.pair_finish(str(pin).strip())
@@ -1398,7 +1438,8 @@ async def h_philips_pair(request):
     try:
         if pin is None:
             await tv.pair_start()
-            return ok(step="pin", note="The TV should now show a PIN. Send it as {\"pin\": \"1234\"}.")
+            return ok(step="pin", note="The TV should now show a PIN. Send it as {\"pin\": \"1234\"}.",
+                      **messages.note_fields("note_pair_pin"))
         if not isinstance(pin, (str, int)) or not philips.PIN.match(str(pin).strip()):
             raise ApiError(400, "pin is the digits the TV shows", key="err_pin_digits")
         await tv.pair_finish(str(pin).strip())
@@ -1766,7 +1807,8 @@ async def h_screens_open(request):
         raise ApiError(409, listed["note"], key=listed.get("note_key"), vars=listed.get("note_vars"))
     got, _ = await launch_app(apps.BY_PACKAGE[screen["package"]])
     record_action(request, "screens_open", {"id": sid}, bool(got))
-    return ok(id=sid, note=f"Opened Moonlight. Pick the {screen['name']} on the TV.")
+    return ok(id=sid, note=f"Opened Moonlight. Pick the {screen['name']} on the TV.",
+              **messages.note_fields("note_screens_opened_moonlight", {"screen": screen["name"]}))
 
 
 # ---------- power and volume ----------
