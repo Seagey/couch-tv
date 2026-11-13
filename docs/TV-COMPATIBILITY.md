@@ -81,6 +81,10 @@ Not tested by the author. Each line is what someone said worked on their own dev
   `apply.sh` (option A), whose Home button watch works: a single Home press and a restart both come back to
   couch-tv. The projector has no Wireless debugging, only USB debugging, and that alone opens ADB on port
   5555, which `check-tv.py` reports (thanks nithinjak, [#159](https://github.com/Seagey/couch-tv/issues/159)).
+- **Hisense based VU TV FFM (Indian market, Android 11, MediaTek, Google TV home): works with option A**,
+  reported by Prabhakar92 on 0.12. The TV's own Google TV home shows for a few seconds at power on before
+  the Home button watch brings couch-tv forward, which is the documented behaviour
+  ([#187](https://github.com/Seagey/couch-tv/issues/187)).
 - **Hisense VIDAA, older firmware P0218: connects, pairs and opens couch-tv from a browser bookmark**, reported
   by trentosc. Navigation there is point and click, because the older TV Browser never passes the D pad to a
   page. Details: [VIDAA.md](VIDAA.md) (thanks trentosc, [#131](https://github.com/Seagey/couch-tv/issues/131)).

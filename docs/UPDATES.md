@@ -16,6 +16,13 @@ On the TV home app, pressing the Look quick button, or changing a look or other 
 ### 14 November 2026: Czech is complete, and the phone remote speaks Czech too (on main, in the next release)
 
 The Czech TV home now has every sentence translated, including Ambient, the quick buttons, Kids mode and the LG Developer Mode lines, so nothing shows in English any more. The phone remote now speaks Czech as well (Čeština, picked in the TV menu under Language, or by itself on a phone set to Czech). Thanks slezaCZ, who wrote both sets of translations (#180).
+### 14 November 2026: sharper scenes on a 4K TV that draws its interface at 1080 (on main, in the next release)
+
+Some 4K TVs (a TCL Google TV) draw apps at 1080 and upscale them, so the home thought the screen was 1080 and loaded the softer 1080 scene pictures. `home.hi_res: "always"` in `config.json` now loads the 4K copies anyway. It is off by default and there is no Home settings switch yet (thanks Hiren-Patel1, [#191](https://github.com/Seagey/couch-tv/issues/191)).
+
+### 14 November 2026: an app banner that is not 16:9 is no longer squeezed (on main, in the next release)
+
+The app row draws each app's TV banner as a 16:9 tile. A banner of another shape was stretched to fit, which is how Prime Video looked squeezed on a Fire TV Stick (thanks niravsaxena30, [#181](https://github.com/Seagey/couch-tv/issues/181)). Such a banner now keeps its proportions, fitted inside the tile with its own edge colour filling the gap. Banners that are already 16:9 draw exactly as before. This is a likely cause rather than a confirmed one, so #181 stays open until it is checked on the stick.
 
 ### 14 November 2026: the bridge's web pages stay inside their own folder (on main, in the next release)
 

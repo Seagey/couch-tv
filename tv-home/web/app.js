@@ -540,9 +540,10 @@
   // page is laid out at 1920x1080 but drawn at devicePixelRatio 2 there, so the 1080 files were
   // stretched and looked soft (couch-tv#8, a UHD LG). Your own scenes in mine/ have no 4K copy.
   var HI_RES = (window.devicePixelRatio || 1) * window.innerWidth >= 3000;
+  // home.hi_res "always" uses the 4K copies even when the page is drawn at 1080 (a 4K panel with a 1080 interface, #191)
   // home.hi_res false keeps the 1080 copies on a 4K screen whose chip struggles with 3840x2160 photos
   // (an LG 43SQ700S monitor): they are four times the pixels to decode and keep in memory.
-  function bgPath(name, ext, builtIn) { return "backgrounds/" + name + (HI_RES && HOME.hi_res !== false && builtIn !== false ? "@2x" : "") + ext; }
+  function bgPath(name, ext, builtIn) { return "backgrounds/" + name + ((HOME.hi_res === "always" || (HI_RES && HOME.hi_res !== false)) && builtIn !== false ? "@2x" : "") + ext; }
   var KEEP_PHOTO = false;   // Home settings, Look, Keep one photo (Classic): no rotation, same picture after a reload
   var photo = 0, photoTimer = null, bgShown = null, bgLayer = 0, bgTicket = 0;
 
