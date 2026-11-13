@@ -36,7 +36,9 @@ JAVA_MAGIC = (b"\xfe\xed\xfe\xed", b"\xce\xce\xce\xce")   # JKS and JCEKS
 SKIP_EXT = (".dex", ".so", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".xml", ".arsc", ".ttf", ".otf",
             ".mp3", ".mp4", ".ogg", ".wav", ".json", ".js", ".html", ".css", ".kotlin_module", ".version")
 LOCKED = ("The app keeps its certificate in a locked keystore ({names}) that this script can't open. "
-          "See docs/VIDAA.md.")
+          "Two things to try (docs/VIDAA.md, step 2): your TV's firmware may not need a certificate at all, "
+          "so run scripts/vidaa-check.py first; and if this .apk was not RemoteNOW (com.universal.remote.ms), "
+          "try RemoteNOW's .apk, whose keystore has opened before.")
 
 
 def looks_pkcs12(body):

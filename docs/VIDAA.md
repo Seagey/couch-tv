@@ -133,8 +133,11 @@ emulator on your computer. There is no iPhone only path yet (thanks trentosc, #1
      `client.key`), which git ignores.
    - A keystore that needs a password, or a Java one (BKS, JKS), is named, and the script says the
      certificate is in a locked keystore it can't open. It does not unlock anything, decompile or patch the
-     app, and it never prints key material. If you get that message, please say so in an issue with the
-     file name it printed: that is a gap, not something to work round.
+     app, and it never prints key material. If you get that message, first check whether your TV needs a
+     certificate at all (run the first test in step 4: older firmware may not), and whether the `.apk` was
+     RemoteNOW (`com.universal.remote.ms`): its `remoteclientmobile.p12` has opened, while another Hisense app
+     shipped a locked `client_mobile_android.p12` and `remoteca.bks` (#170). Still stuck: please say so in an
+     issue with the file name it printed. That is a gap, not something to work round.
 
 The keystore Hisense's app ships (`remoteclientmobile.p12`) can use legacy PKCS#12 encryption, which the
 `cryptography` library in this repo's `.venv` (version 50) refuses to read. If the script says it can't open
