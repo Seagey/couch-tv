@@ -1377,16 +1377,19 @@ class MainActivity : Activity() {
             ?: return false
         // Bell's Fibe app is the home on a Bell Streamer and also its live TV: opened on purpose, it stays (#168).
         if (pkg == FireWatch.BELL_FIBE_HOME) FireWatch.fibeOpenedNow()
+        if (pkg == "com.android.tv.settings") return startSettings(i)
         return start(i)
     }
 
     /** The TV's Settings: Fire OS's own screen by name on a Fire TV (it stays open under the Home button watch, #75), else Android's Settings action. */
     private fun tvSettingsIntent(): Intent = FireWatch.amazonSettings(packageManager) ?: Intent(Settings.ACTION_SETTINGS)
 
-    /** Starts a Settings screen and lets the Home button watch know it was asked for (#123). */
+    /** Starts a Settings screen and lets the Home button watch know it was asked for (#123). The
+     *  Settings app keeps one task, so it is cleared: TV settings opens on its main menu and Bluetooth
+     *  on Bluetooth, not on whichever settings page was left open last time (Network, say). */
     private fun startSettings(i: Intent): Boolean {
         FireWatch.allowSettingsNow()
-        return start(i)
+        return start(i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK))
     }
 
     private fun start(i: Intent): Boolean = try {
