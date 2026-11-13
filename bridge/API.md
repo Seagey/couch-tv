@@ -624,7 +624,7 @@ is optional:
 
 | Key | What it is |
 |---|---|
-| `lang` | `en`, `es`, `es-MX`, `it`, `de`, `tr`, `sr-Latn-RS` or `pl`. |
+| `lang` | `en`, `es`, `es-MX`, `it`, `de`, `tr`, `sr-Latn-RS`, `pl` or `pt`. |
 | `place` | The weather's place: `name`, `lat`, `lon` (rounded to two decimals, a town, never a house), `timezone`. |
 | `wx_show`, `wx_unit`, `wx_every` | Weather on or off, `c` or `f`, minutes between checks (15, 30 or 60). |
 | `look` | `night`, `oled` (the Classic grid on pure black) or `classic`. |
@@ -842,6 +842,8 @@ URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
   as the country when they are not set).
 - Polish: `lang` in `/api/settings` and `home.language` take `pl` (24 hour clock and `PL`
   as the country when they are not set).
+- Brazilian Portuguese: the same keys take `pt` (24 hour clock and `BR` as the country when they
+  are not set).
 - Italian: `lang` in `/api/settings` and `home.language` take `it`. `home.clock` and
   `home.language` in `/api/config` and `/tv/config.js` are now there only when `config.json` sets
   them; without them the TV home follows the TV's own language and that language's usual clock.

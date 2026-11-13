@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: Brazilian Portuguese on the TV home and the phone remote (on main, in the next release)
+
+The TV home and the phone remote now speak Brazilian Portuguese (Português (Brasil), `pt`). A TV or phone set to Portuguese picks it by itself, and Home settings can switch to it. The clock is 24 hour unless you pick 12 hour, and the country for where shows stream is `BR` when `config.json` does not set one. All 398 TV home sentences are translated; the phone remote has 139 of its 166 (the newest few show in English for now). Thanks scursel (#193).
+
 ### 14 November 2026: Polish on the TV home and the phone remote (on main, in the next release)
 
 The TV home and the phone remote now speak Polish (Polski). A TV or phone set to Polish picks it by itself, and Home settings can switch to it. The clock is 24 hour unless you pick 12 hour, and the country for where shows stream is `PL` when `config.json` does not set one. English and the other languages are unchanged. Thanks Azumi0 (#184), who wrote it and plans two follow ups: the bridge's own messages, and the on-TV app.

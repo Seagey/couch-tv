@@ -69,7 +69,7 @@ Object.keys(R.en).forEach(function (key) {
   assert.strictEqual(holes(R.pl[key]), holes(R.en[key]), `remote placeholders differ for ${key}: "${R.pl[key]}"`);
 });
 noPluralAfterNumber('the phone remote', R.pl);
-assert(rsrc.includes("{ id: 'pl', name: 'Polski', locale: 'pl-PL' },\n];"), 'the remote LANGS ends with Polski (pl-PL)');
+assert(rsrc.includes("{ id: 'pl', name: 'Polski', locale: 'pl-PL' },\n"), 'the remote LANGS has Polski (pl-PL)');
 // a phone set to Polish starts in Polish before it has heard the TV's language
 const guessFn = rsrc.match(/function guess\(\) \{[\s\S]*?\n\}/);
 assert(guessFn && /\/\^pl\/i\.test\(n\)\) return 'pl';/.test(guessFn[0]), 'guess() returns pl for a Polish phone');
