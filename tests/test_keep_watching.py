@@ -27,7 +27,7 @@ class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
         self._orig_people_ids = config.PEOPLE_IDS
         config.PEOPLE = [{"id": "person1", "name": "Person 1"}, {"id": "person2", "name": "Person 2"}]
         config.PEOPLE_IDS = ["person1", "person2"]
-        for f in (store.HISTORY, store.WHO_FILE):
+        for f in (store.HISTORY, store.WHO_FILE, store.HIDDEN):
             if os.path.exists(f):
                 os.remove(f)
         store._cache.clear()
@@ -88,6 +88,15 @@ class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
                 with patch.object(server, "body", new=AsyncMock(return_value={"id": c["id"], "who": "person1"})):
                     await server.h_continue_open(req)
                 self.assertEqual(play.await_args.args[0], c["title"])
+
+    async def test_a_removed_card_stays_gone_until_played_again(self):
+        self.add(line("Dark", self.tv, "person1", 3), line("Dark", self.tv, "person1", 2), line("Ozark", self.tv, "person1", 1))
+        dark = next(c for c in server.continue_items("person1") if c["title"] == "Dark")
+        with patch.object(server, "body", new=AsyncMock(return_value={"id": dark["id"]})):
+            await server.h_continue_hide(AsyncMock())
+        self.assertEqual(self.titles("person1"), ["Ozark"])   # the older Dark line does not come back
+        self.add(line("Dark", self.tv, "person1", -0.001))   # watched again
+        self.assertEqual(self.titles("person1"), ["Dark", "Ozark"])
 
     def test_who_is_kept_per_tv(self):
         store.save_who("person2", "living-room")

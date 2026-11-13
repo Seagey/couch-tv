@@ -21,6 +21,7 @@ HISTORY = os.path.join(DATA, "history.jsonl")
 IMPORTED = os.path.join(DATA, "imported.jsonl")
 RECS = os.path.join(DATA, "recs.json")
 SLEEP = os.path.join(DATA, "sleep.json")
+HIDDEN = os.path.join(DATA, "hidden.json")  # Keep watching cards removed by hand: "tv|who|title" -> when
 _lock = threading.Lock()
 _cache = {}  # path -> (mtime, size, items oldest first)
 
@@ -186,6 +187,7 @@ def keep_watching(tv_id, who, now=None, limit=KEEP_MAX, days=KEEP_DAYS):
     now = now or datetime.now(timezone.utc)
     cutoff = now - timedelta(days=days)
     seen, out = set(), []
+    hidden = _read(HIDDEN, {})
     for h in history():
         if not h.get("id") or h.get("tv") != tv_id or h.get("who") != who:
             continue
@@ -196,10 +198,22 @@ def keep_watching(tv_id, who, now=None, limit=KEEP_MAX, days=KEEP_DAYS):
         if not key or key in seen:
             continue
         seen.add(key)
+        hid = _when({"when": hidden.get(f"{tv_id}|{who}|{key}")})
+        if hid and when <= hid:
+            continue   # removed by hand; watching it again brings it back
         out.append(h)
         if len(out) >= limit:
             break
     return out
+
+
+def hide_keep_watching(h):
+    """Take a show off Keep watching (the TV and person of its history line) until it is played again."""
+    key = (h.get("title") or "").strip().lower()
+    with _lock:
+        data = _read(HIDDEN, {})
+        data[f"{h.get('tv')}|{h.get('who')}|{key}"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        _write(HIDDEN, data)
 
 
 WHO_FILE = os.path.join(DATA, "who.json")

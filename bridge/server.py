@@ -2804,6 +2804,17 @@ async def h_continue_open(request):
     return ok(**result)
 
 
+async def h_continue_hide(request):
+    """Remove a Keep watching card (by its id) until the show is played again."""
+    cid = (await body(request)).get("id")
+    h = store.history_item(cid) if cid else None
+    if not h:
+        raise ApiError(404, f"unknown continue item: {cid}")
+    store.hide_keep_watching(h)
+    record_action(request, "continue_hide", {"id": cid}, True)
+    return ok()
+
+
 # ---------- which episode, and how long (only when matched, never a guess) ----------
 import re as _re
 
@@ -3795,6 +3806,7 @@ def make_app():
     r.add_get("/api/spotify/callback", h_spotify_callback)
     r.add_get("/api/spotify/status", h_spotify_status)
     r.add_post("/api/continue/open", h_continue_open)
+    r.add_post("/api/continue/hide", h_continue_hide)
     r.add_post("/api/watch-next", h_watch_next)
     r.add_get("/api/watch-next", h_watch_next_get)
     r.add_get("/api/sleep", h_sleep_get)

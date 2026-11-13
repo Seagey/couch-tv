@@ -96,6 +96,8 @@ S.en = {
   sent_to_tv: 'Sent to the TV',
   // Watch
   keep_watching: 'Keep watching',
+  kw_remove: 'Remove {title} from Keep watching',
+  kw_removed: 'Removed {title} from Keep watching.',
   couldnt_load: 'Couldn’t load this just now.',
   shows_wait: 'Shows you watch on the TV will wait here.',
   loading: 'Loading…',
@@ -792,6 +794,8 @@ S['es-MX'] = {
 };
 
 S.it = {
+  kw_remove: 'Rimuovi {title} da Continua a guardare',
+  kw_removed: '{title} rimosso da Continua a guardare.',
   // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
   devmode_gone: 'couch-tv non è più installata sulla TV. Probabilmente la Developer Mode è scaduta. Riattiva la Developer Mode e chiedi a Claude di reinstallare couch-tv.',
   devmode_runs_out: 'La Developer Mode scade tra {days} giorni, e poi LG rimuove couch-tv. Accendi la TV per un minuto così si rinnova, oppure premi Extend nell’app Developer Mode sulla TV.',

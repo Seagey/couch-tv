@@ -277,6 +277,9 @@ export default function App() {
       : api.play({ title: show.title, season: show.season, episode: show.episode, service: show.service }, who));
     if (r) { say(r.method === 'deeplink' ? t('is_on', { title: r.title }) : tBridge(r.note_key, r.note_vars, r.note) || t('opened', { app: r.app?.name })); loadRecs(); if (!wide) goTo('remote'); }
   };
+  const onRemoveCont = (show) => api.hideContinue(show.id)
+    .then(() => { setCont((c) => (c || recs?.continue || []).filter((s) => s.id !== show.id)); say(t('kw_removed', { title: show.title })); })
+    .catch((e) => say(e.message, 'err'));
   const onLaunch = (a) => run(api.launch(a.id), t('opening', { app: a.name })).then((r) => { if (r && !wide) goTo('remote'); });
   const onScreen = (s) => (s.ready ? run(api.openScreen(s.id), (r) => tBridge(r.note_key, r.note_vars, r.note) || t('opening', { app: s.name })) : say(tBridge(s.note_key, s.note_vars, s.note) || t('not_set_up')));
   const onAsk = (text) => api.ask(text, who).then((r) => { loadRecs(); return r; });
@@ -370,7 +373,7 @@ export default function App() {
       {wide && askOn && !kidIds.includes(who) && <AskButton onAsk={openAsk} quiet={Boolean(offState)} />}
     </div>
   );
-  const watch = <Watch pull={pull} people={people} who={who || people[0]?.id || 'both'} recs={recs} cont={cont === undefined ? (recs === false ? false : recs?.continue) : cont} apps={apps} hidden={hidden} screens={screens} serviceName={serviceName} onPlay={onPlay} onLaunch={onLaunch} onScreen={onScreen} wide={wide} />;
+  const watch = <Watch pull={pull} people={people} who={who || people[0]?.id || 'both'} recs={recs} cont={cont === undefined ? (recs === false ? false : recs?.continue) : cont} apps={apps} hidden={hidden} screens={screens} serviceName={serviceName} onPlay={onPlay} onRemove={onRemoveCont} onLaunch={onLaunch} onScreen={onScreen} wide={wide} />;
 
   return (
     <div className={`app ${wide ? 'is-wide' : ''} ${offState ? 'is-off' : ''}`}>
