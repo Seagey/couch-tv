@@ -55,6 +55,30 @@ assert.strictEqual(I18N.country(), 'PL');
 assert.strictEqual(I18N.locale(), 'pl-PL');
 assert.strictEqual(I18N.t('n_min', { n: 5 }), '5 min');
 
+assert.strictEqual(typeof I18N.tBridge, 'function', 'tv-home/web/i18n.js exposes I18N.tBridge');
+assert.strictEqual(
+  I18N.tBridge('err_app_not_installed', { app: 'Netflix' }, 'Netflix is not installed on the TV'),
+  'Aplikacja Netflix nie jest zainstalowana na telewizorze',
+  'tv-home tBridge returns Polish translation when lang is pl'
+);
+assert.strictEqual(
+  I18N.tBridge(null, null, 'Fallback text'),
+  'Fallback text',
+  'tv-home tBridge returns fallback when key is null'
+);
+assert.strictEqual(
+  I18N.tBridge('err_unknown_nonexistent_key', null, 'Fallback text'),
+  'Fallback text',
+  'tv-home tBridge returns fallback when key is unknown'
+);
+const tvEs = loadTv('es-ES');
+tvEs.set('es');
+assert.strictEqual(
+  tvEs.tBridge('err_app_not_installed', { app: 'Netflix' }, 'Netflix is not installed on the TV'),
+  'Netflix is not installed on the TV',
+  'tv-home tBridge returns fallback (not S.en) when lang does not define key'
+);
+
 // The phone remote (remote/src/i18n.js) is an ES module that imports react, so cut the
 // S.en and S.pl object literals out of the text and evaluate just those.
 const rsrc = fs.readFileSync(path.join(__dirname, '../remote/src/i18n.js'), 'utf8');
@@ -143,6 +167,15 @@ for (const file of fs.readdirSync(bridgeDir)) {
 for (const key of Array.from(bridgeKeys).sort()) {
   assert(key in R.en, `remote S.en is missing bridge key ${key}`);
   assert(key in R.pl, `remote S.pl is missing bridge key ${key}`);
+  if (/^(err|note)_/.test(key) && ![
+    'err_bridge_timeout',
+    'err_bridge_unreachable',
+    'err_not_found',
+    'err_something_wrong',
+  ].includes(key)) {
+    assert(key in S.en, `tv-home S.en is missing bridge key ${key}`);
+    assert(key in S.pl, `tv-home S.pl is missing bridge key ${key}`);
+  }
 }
 
 console.log('Polish i18n tests passed.');
