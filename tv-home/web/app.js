@@ -844,7 +844,7 @@
   }
   function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); sceneVideos(false); }
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) pauseVideo();
+    if (document.hidden) { saveFocusNow(); pauseVideo(); }
     else { setIdleAmbient(false); resetSmartIdle(); startVideo(); sceneVideos(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); }
   });
 
@@ -2623,6 +2623,7 @@
   function toPeople() { zone = "people"; pi = whoIndex(); }
 
   function paintFocus() {
+    saveFocusSoon();
     if (zone === "settings") { renderSettings(); return; }
     if (zone === "smart") { window.smartHome.paint(); return; }
     if (zone === "ambient") { renderAmbientMusic(); return; }
@@ -2827,6 +2828,45 @@
     if (ambientOpen && AMBIENT_MUSIC && npVisible()) zone = "ambient";   // the music screen is up: the remote stays on it
     else if (peopleOn()) toPeople();
     else zone = shelfEls.length ? "shelf" : "grid";
+  }
+
+  // Remember the focused row and tile (#166, thanks IshMehta), so a home that Android dropped while
+  // TV Settings or an app was in front (low memory on a 1.8 GB TV) opens on the tile you left. The
+  // Home key still goes to the first tile: tv.home() forgets it.
+  var FOCUS_KEY = "tvhome.focus", FOCUS_MAX_AGE = 20 * 60 * 1000, focusSaveTimer = 0, focusRestored = false;
+  function pickFocus(saved, now, shelfCount, gridKeys) {
+    if (!saved || typeof saved !== "object") return null;
+    if (typeof saved.t !== "number" || now - saved.t < 0 || now - saved.t > FOCUS_MAX_AGE) return null;
+    if (saved.zone === "shelf") {
+      if (!(saved.s >= 0) || saved.s >= shelfCount) return null;
+      return { zone: "shelf", s: saved.s, g: 0 };
+    }
+    if (saved.zone === "grid") {
+      if (!gridKeys.length) return null;
+      var i = saved.key ? gridKeys.indexOf(saved.key) : -1;
+      if (i < 0) i = Math.max(0, Math.min(saved.g | 0, gridKeys.length - 1));
+      return { zone: "grid", s: 0, g: i };
+    }
+    return null;
+  }
+  function saveFocusNow() {
+    clearTimeout(focusSaveTimer); focusSaveTimer = 0;
+    if (!focusRestored && !touched) return;   // a page not drawn yet must not overwrite what it is about to restore
+    if (zone !== "shelf" && zone !== "grid") return;   // menus and settings are not worth coming back to
+    try { localStorage.setItem(FOCUS_KEY, JSON.stringify({ t: Date.now(), zone: zone, s: s, g: g, key: zone === "grid" ? gridKey(gridItems[g]) : "" })); } catch (e) {}
+  }
+  function saveFocusSoon() { if (!focusSaveTimer) focusSaveTimer = setTimeout(saveFocusNow, 500); }
+  function forgetFocus() { clearTimeout(focusSaveTimer); focusSaveTimer = 0; try { localStorage.removeItem(FOCUS_KEY); } catch (e) {} }
+  // First draw of a fresh page only: true when the last focus was put back.
+  function restoreFocus() {
+    if (focusRestored) return false;
+    focusRestored = true;
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(FOCUS_KEY) || "null"); } catch (e) {}
+    var f = pickFocus(saved, Date.now(), shelfEls.length, gridItems.map(gridKey));
+    if (!f) return false;
+    zone = f.zone; s = f.s; g = f.g;
+    return true;
   }
 
   function goHome() {
@@ -4431,7 +4471,7 @@
   function render() {
     renderShelf();
     renderGrid();
-    if (!touched && zone !== "updask") startFocus();
+    if (!touched && zone !== "updask" && !restoreFocus()) startFocus();
     paintFocus();
     kidSync();
     if (kidsOn()) window.KidsMode.rerender();
@@ -4567,7 +4607,7 @@
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
   window.tv = { back: function () { if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); resetSmartIdle(); },
-    home: function () { if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); resetSmartIdle(); },
+    home: function () { forgetFocus(); if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); resetSmartIdle(); },
     screenOff: function () { toggleScreenOff(true); },
     wakeScreen: function () { toggleScreenOff(false); },
     isScreenOff: function () { return screenOffActive; },
@@ -4576,7 +4616,7 @@
     settingsKey: function () { blip(0, 0); settingsKey(); },
     resume: function () { toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
-    pause: pauseVideo,
+    pause: function () { saveFocusNow(); pauseVideo(); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
     // the launcher's updater has news (Updater.kt)
