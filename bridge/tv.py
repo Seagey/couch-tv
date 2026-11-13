@@ -19,6 +19,7 @@ from androidtvremote2 import AndroidTVRemote, CannotConnect, ConnectionClosed, I
 
 import apps
 import config
+import messages
 
 log = logging.getLogger("tv")
 
@@ -36,10 +37,19 @@ PACKAGE_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+")
 class UnsafeInput(ValueError):
     """A value that must never reach the TV's shell."""
 
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars
+
 
 def check_package(package):
     if not isinstance(package, str) or len(package) > 200 or not PACKAGE_RE.fullmatch(package):
-        raise UnsafeInput(f"refused unsafe app name: {str(package)[:80]!r}")
+        raise UnsafeInput(
+            f"refused unsafe app name: {str(package)[:80]!r}",
+            key="err_unsafe_app_name",
+            vars={"package": str(package)[:80]},
+        )
     return package
 
 
@@ -278,16 +288,20 @@ class TV:
 
     def require(self):
         if not self.paired:
-            raise TVUnavailable(f"the {self.name.lower()} TV is not paired yet")
+            raise TVUnavailable(
+                f"the {self.name.lower()} TV is not paired yet",
+                key="err_tv_not_paired",
+                vars={"tv": self.name.lower()},
+            )
         if not (self.remote and self.connected):
-            raise TVUnavailable("TV not connected")
+            raise TVUnavailable("TV not connected", key="err_tv_not_connected")
 
     # ---------- remote protocol ----------
     async def key(self, name, hold=False):
         self.require()
         code = resolve_key(name)
         if not code:
-            raise ValueError(f"unknown key: {name}")
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
         if hold:
             self.remote.send_key_command(code, "START_LONG")
             await asyncio.sleep(0.8)
@@ -342,7 +356,7 @@ class TV:
         """Mirror of the adb CLI forms we use ("shell ...", "exec-out ...", "get-state"), sent
         over the bridge's own ADB connection."""
         if not self.paired:
-            raise TVUnavailable("TV is not paired yet")
+            raise TVUnavailable("TV is not paired yet", key="err_not_paired_yet")
         if args and args[0] == "get-state":
             return "device" if (self._dev and self._dev.available) else "offline"
         if not (self._dev and self._dev.available):
@@ -500,12 +514,15 @@ class TV:
 
     async def screenshot(self):
         if not await self.adb_ready():
-            raise TVUnavailable("ADB is not on")
+            raise TVUnavailable("ADB is not on", key="err_adb_not_on")
         raw = await self.adb("exec-out", "screencap", "-p", binary=True, timeout=20)
         # This TV's screencap prints a debug line ("Init wrapper sys mutex...") before the PNG.
         start = raw.find(b"\x89PNG")
         if start < 0:
-            raise TVUnavailable("no screenshot (some apps, like Netflix, block them)")
+            raise TVUnavailable(
+                "no screenshot (some apps, like Netflix, block them)",
+                key="err_no_screenshot",
+            )
         return raw[start:]
 
     async def installed_packages(self):
@@ -517,7 +534,7 @@ class TV:
     async def open_bluetooth_settings(self):
         """Open Android's own Bluetooth settings screen over ADB with a fixed command."""
         if not await self.adb_ready():
-            raise TVUnavailable("ADB is not on")
+            raise TVUnavailable("ADB is not on", key="err_adb_not_on")
         out = await self.adb("shell", "am", "start", "-a", "android.settings.BLUETOOTH_SETTINGS", timeout=5)
         if "Error" in out or "unable to resolve" in out.lower() or "not found" in out.lower():
             # Fallback for Fire OS or devices without standard Bluetooth settings action
@@ -531,11 +548,18 @@ class TV:
             await self.open_bluetooth_settings()
         elif which == "network":
             if not await self.adb_ready():
-                raise TVUnavailable("ADB is not on")
+                raise TVUnavailable("ADB is not on", key="err_adb_not_on")
             await self.adb("shell", "am", "start", "-a", "android.settings.WIFI_SETTINGS", timeout=5)
         else:
-            raise ValueError(f"unknown settings screen: {which}")
+            raise messages.with_key(
+                ValueError(f"unknown settings screen: {which}"),
+                "err_unknown_settings_screen",
+                screen=which,
+            )
 
 
 class TVUnavailable(Exception):
-    pass
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars

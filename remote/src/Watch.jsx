@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import * as Ic from './icons.jsx';
 import { tick } from './haptics.js';
 import { logoFor } from './appLogos.js';
-import { t } from './i18n.js';
+import { t, tBridge } from './i18n.js';
 
 // Names that fit under an icon, like the iPhone home screen.
 const SHORT = { 'sbs-on-demand': 'SBS', 'prime-video': 'Prime Video', 'disney-plus': 'Disney+', 'paramount-plus': 'Paramount+', 'foxtel-go': 'Foxtel', 'hbo-max': 'HBO Max' };
@@ -82,7 +82,7 @@ export function Watch({ pull, people, who, recs, cont: contIn, apps, hidden, scr
           </button>
         ) : picks.length ? (
           <div className="shelf">
-            {picks.map((s) => <Poster key={`${s.title}-p`} show={s} onPlay={onPlay} sub={s.reason} />)}
+            {picks.map((s) => <Poster key={`${s.title}-p`} show={s} onPlay={onPlay} sub={tBridge(s.reason_key, s.reason_vars, s.reason)} />)}
           </div>
         ) : <p className="empty">{recs === false ? t('couldnt_load_ideas') : recs ? t('no_ideas') : t('loading')}</p>}
       </section>
@@ -93,7 +93,7 @@ export function Watch({ pull, people, who, recs, cont: contIn, apps, hidden, scr
           {ready.map((s) => (
             <button key={s.id} className={`row-btn cell ${s.ready ? '' : 'not-ready'}`} onClick={() => { tick(); onScreen(s); }}>
               <span className="row-icon"><Ic.Screen /></span>
-              <span className="row-text"><b>{s.name}</b><small>{s.ready ? t('screen_sub') : s.note}</small></span>
+              <span className="row-text"><b>{s.name}</b><small>{s.ready ? t('screen_sub') : tBridge(s.note_key, s.note_vars, s.note)}</small></span>
               <Ic.Chevron className="row-chev" />
             </button>
           ))}

@@ -8,7 +8,7 @@ import { Watch } from './Watch.jsx';
 import { AskSheet, MoreSheet, ArrangeSheet, PeopleSheet, Onboarding } from './Sheets.jsx';
 import { KidsSheet, PinSheet } from './Kids.jsx';
 import { usePullDown, usePageDrag } from './gestures.js';
-import { t, useLang, setTvLang } from './i18n.js';
+import { t, tBridge, useLang, setTvLang } from './i18n.js';
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -224,10 +224,10 @@ export default function App() {
     api.setWho(v, pin).catch((e) => {
       if (couchRef.current) setWho(couchRef.current);
       if (e.status === 403 && kidIds.includes(couchRef.current)) {
-        setPinAsk({ msg: pin ? e.message : t('kids_leave_pin', { name: people.find((p) => p.id === couchRef.current)?.name || '' }), go: (code) => pickWho(v, code) });
+        setPinAsk({ msg: pin ? tBridge(e.key, e.vars, e.message) : t('kids_leave_pin', { name: people.find((p) => p.id === couchRef.current)?.name || '' }), go: (code) => pickWho(v, code) });
         return;
       }
-      say(e.status === 429 ? e.message : t('cant_tell_who'), 'err');
+      say(e.status === 429 ? tBridge(e.key, e.vars, e.message) : t('cant_tell_who'), 'err');
     });
   };
   const couch = tv?.who;
@@ -238,7 +238,7 @@ export default function App() {
   const run = useCallback(async (p, okText) => {
     try { const r = await p; if (okText) say(typeof okText === 'function' ? okText(r) : okText); return r; } catch (e) {
       if (e.status === 0) setReach(false);
-      say(e.message, 'err'); return null;
+      say(tBridge(e.key, e.vars, e.message), 'err'); return null;
     }
   }, [say]);
 
@@ -262,7 +262,7 @@ export default function App() {
     setWakeError(null);
     try { await api.power('on'); } catch (e) {
       if (e.status === 0) setReach(false);
-      setWakeError(e.status === 503 ? t('didnt_wake') : e.message);
+      setWakeError(e.status === 503 ? t('didnt_wake') : tBridge(e.key, e.vars, e.message));
     }
   };
   const onRetry = () => api.now()
@@ -275,14 +275,14 @@ export default function App() {
     const r = await run(show.id
       ? api.openContinue(show.id, who)
       : api.play({ title: show.title, season: show.season, episode: show.episode, service: show.service }, who));
-    if (r) { say(r.method === 'deeplink' ? t('is_on', { title: r.title }) : r.note || t('opened', { app: r.app?.name })); loadRecs(); if (!wide) goTo('remote'); }
+    if (r) { say(r.method === 'deeplink' ? t('is_on', { title: r.title }) : tBridge(r.note_key, r.note_vars, r.note) || t('opened', { app: r.app?.name })); loadRecs(); if (!wide) goTo('remote'); }
   };
   const onLaunch = (a) => run(api.launch(a.id), t('opening', { app: a.name })).then((r) => { if (r && !wide) goTo('remote'); });
-  const onScreen = (s) => (s.ready ? run(api.openScreen(s.id), (r) => r.note || `Opening ${s.name}`) : say(s.note || t('not_set_up')));
+  const onScreen = (s) => (s.ready ? run(api.openScreen(s.id), (r) => tBridge(r.note_key, r.note_vars, r.note) || t('opening', { app: s.name })) : say(tBridge(s.note_key, s.note_vars, s.note) || t('not_set_up')));
   const onAsk = (text) => api.ask(text, who).then((r) => { loadRecs(); return r; });
   const onSleep = async (m) => {
     try { await api.setSleep(m); setSleepError(null); setTv((t) => t && ({ ...t, sleep: { ends: m ? new Date(Date.now() + m * 60000).toISOString() : null } })); say(m ? t('sleep_set', { n: m }) : t('sleep_off')); } catch (e) {
-      setSleepError(e.status === 404 ? t('sleep_needs_update') : e.message);
+      setSleepError(e.status === 404 ? t('sleep_needs_update') : tBridge(e.key, e.vars, e.message));
     }
   };
   // Picture mode: only for TVs that have a "picture" entry in config.json.
@@ -292,7 +292,7 @@ export default function App() {
     if (sheet === 'more' && thisTv?.picture) api.getPicture().then(setPictureInfo).catch(() => {});
   }, [sheet, tvId]);
   const onPicture = async (mode) => {
-    try { const r = await api.picture(mode); setPictureInfo((i) => ({ ...(i || {}), ...r })); setTv((t) => t && { ...t, picture: r.mode }); say(t('picture_now', { mode: pictureInfo?.modes?.find((m) => m.id === r.mode)?.name || r.mode })); } catch (e) { say(e.message, 'err'); }
+    try { const r = await api.picture(mode); setPictureInfo((i) => ({ ...(i || {}), ...r })); setTv((t) => t && { ...t, picture: r.mode }); say(t('picture_now', { mode: pictureInfo?.modes?.find((m) => m.id === r.mode)?.name || r.mode })); } catch (e) { say(tBridge(e.key, e.vars, e.message), 'err'); }
   };
   // iOS only raises the keyboard if focus happens inside the tap itself, and a closed sheet is inert
   // (cannot take focus), so open it synchronously, then focus, all within the same tap.

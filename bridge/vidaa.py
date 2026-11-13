@@ -47,6 +47,7 @@ from urllib.parse import quote
 
 import apps
 import config
+import messages
 from tinymqtt import Client, MQTTError, Refused
 from tv import TVUnavailable
 import vidaa_auth
@@ -153,6 +154,11 @@ for _a in apps.APPS:
 
 class VidaaError(RuntimeError):
     """The TV did not do what was asked, or answered with something unusable."""
+
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars
 
 
 class VidaaTV:
@@ -291,7 +297,11 @@ class VidaaTV:
 
     def require(self):
         if not self.connected:
-            raise TVUnavailable(f"the {self.name.lower()} TV is not answering on the network")
+            raise TVUnavailable(
+                f"the {self.name.lower()} TV is not answering on the network",
+                key="err_driver_not_answering",
+                vars={"name": self.name.lower()},
+            )
 
     def can_deeplink(self, app):
         return False   # no deep link into a show is known on VIDAA: apps open on their own page
@@ -331,8 +341,12 @@ class VidaaTV:
             try:
                 ctx.load_cert_chain(self.cert, self.cert_key)
             except (ssl.SSLError, OSError) as e:
-                raise VidaaError(f"the client certificate in {os.path.dirname(self.cert)} could not be "
-                                 f"loaded ({type(e).__name__}): run scripts/vidaa-cert.py again") from None
+                raise VidaaError(
+                    f"the client certificate in {os.path.dirname(self.cert)} could not be "
+                    f"loaded ({type(e).__name__}): run scripts/vidaa-cert.py again",
+                    key="err_vidaa_cert_load_failed",
+                    vars={"dir": os.path.dirname(self.cert), "error": type(e).__name__},
+                ) from None
         return ctx
 
     def _topic(self, service, name):
@@ -357,7 +371,16 @@ class VidaaTV:
                 return self._mqtt
             self.require()
             if time.monotonic() < self._retry_at:
-                raise TVUnavailable(self.last_error or "the TV refused the connection a moment ago")
+                if self.last_error:
+                    raise TVUnavailable(
+                        self.last_error,
+                        key="err_vidaa_refused_detail",
+                        vars={"error": self.last_error},
+                    )
+                raise TVUnavailable(
+                    "the TV refused the connection a moment ago",
+                    key="err_vidaa_refused_recently",
+                )
             ctx = self._ssl()
             # The broker wants credentials worked out from the clock, a fresh pair every connect
             # (vidaa_auth). A tester who set mqtt_user/mqtt_password overrides that. The method is
@@ -403,7 +426,11 @@ class VidaaTV:
             last = "; ".join(f"port {p} ({m}): {msg}" for p, m, msg in errors)
             self.last_error = last
             self._retry_at = time.monotonic() + 30
-            raise TVUnavailable(f"could not talk to the TV: {last}")
+            raise TVUnavailable(
+                f"could not talk to the TV: {last}",
+                key="err_vidaa_talk_failed",
+                vars={"error": str(last)},
+            )
 
     async def _subscribe(self, c):
         """Subscribe to the data topics one at a time. The TV refuses a # wildcard and refuses the
@@ -484,7 +511,11 @@ class VidaaTV:
             await c.publish(topic, body)
         except MQTTError as e:
             await self._drop()
-            raise TVUnavailable(f"the TV closed the connection ({e})") from None
+            raise TVUnavailable(
+                f"the TV closed the connection ({e})",
+                key="err_tv_closed_connection",
+                vars={"error": str(e)},
+            ) from None
 
     async def _ask(self, service, name, payload=None, answer=None, timeout=5, topic=None):
         """Publish and wait for the answer whose topic ends in `answer` (default `name`)."""
@@ -494,7 +525,11 @@ class VidaaTV:
             await self._publish(topic or self._topic(service, name), payload if payload is not None else {})
             return await asyncio.wait_for(fut, timeout)
         except asyncio.TimeoutError:
-            raise TVUnavailable(f"the TV did not answer {name}") from None
+            raise TVUnavailable(
+                f"the TV did not answer {name}",
+                key="err_tv_no_answer_to",
+                vars={"name": name},
+            ) from None
         finally:
             lst = self._waiters.get(answer or name)
             if lst and fut in lst:
@@ -516,14 +551,17 @@ class VidaaTV:
         uuid; modern firmware issues no token, so a token is kept only when one is sent."""
         pin = str(pin or "").strip()
         if not PIN.match(pin):
-            raise ValueError("the PIN is the 4 digits the TV shows")
+            raise messages.with_key(ValueError("the PIN is the 4 digits the TV shows"), "err_pin_4_digits")
         self.require()
         asked = time.monotonic()
         ans = await self._ask("ui_service", "authenticationcode", {PROTOCOL["pin_field"]: int(pin)},
                               answer="authenticationcode")
         if not (isinstance(ans, dict) and ans.get("result") == 1):
             self.last_error = "the TV did not accept that PIN"
-            raise VidaaError("the TV did not accept that PIN (it shows a fresh one each time: try again)")
+            raise VidaaError(
+                "the TV did not accept that PIN (it shows a fresh one each time: try again)",
+                key="err_vidaa_pin_rejected",
+            )
 
         def issued():   # a token the TV pushed since the PIN went, on gettoken or tokenissuance
             tok, at = self._issued
@@ -659,8 +697,11 @@ class VidaaTV:
         await self.refresh_installed()
         entry = self._tile() or self._browser()
         if not entry:
-            raise TVUnavailable("the TV lists no couch-tv tile and no browser to open couch-tv in "
-                                "(set \"browser\" to the browser's name in config.json, docs/VIDAA.md)")
+            raise TVUnavailable(
+                "the TV lists no couch-tv tile and no browser to open couch-tv in "
+                "(set \"browser\" to the browser's name in config.json, docs/VIDAA.md)",
+                key="err_vidaa_no_tile_or_browser",
+            )
         await self._launch_entry(entry, url=self.home_url(self.new_code()))
         self._front = (HOME_PACKAGE, time.monotonic())
 
@@ -802,7 +843,7 @@ class VidaaTV:
             await self._launch(self.app_id)
             return "couch-tv"
         if not code:
-            raise ValueError(f"unknown key: {name}")
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
         self.require()
         if code == "KEY_HOME":
             self._phone_home_at = time.monotonic()   # keep_home must not bounce a home asked for on purpose
@@ -815,7 +856,10 @@ class VidaaTV:
         return code
 
     async def text(self, text):
-        raise TVUnavailable("typing into a VIDAA TV from the phone is not built yet: use the TV's own keyboard")
+        raise TVUnavailable(
+            "typing into a VIDAA TV from the phone is not built yet: use the TV's own keyboard",
+            key="err_vidaa_typing_unsupported",
+        )
 
     async def _launch(self, app_id, quiet=True):
         if quiet:
@@ -825,13 +869,17 @@ class VidaaTV:
             return
         entry = next((a for a in self.applist if a["appId"] == app_id), None)
         if not entry:
-            raise ValueError(f"not an app the TV listed: {app_id}")
+            raise messages.with_key(
+                ValueError(f"not an app the TV listed: {app_id}"),
+                "err_vidaa_app_not_listed",
+                app=app_id,
+            )
         await self._launch_entry(entry)
 
     async def _launch_entry(self, entry, url=None):
         """launchapp with the TV's own fields for the app (only ever an entry from its app list)."""
         if not SAFE_ID.match(entry.get("appId") or ""):
-            raise ValueError("not a VIDAA app id")
+            raise messages.with_key(ValueError("not a VIDAA app id"), "err_vidaa_bad_app_id")
         await self._send("ui_service", "launchapp", {
             "appId": entry["appId"], "name": entry["name"], "url": url if url is not None else entry.get("url") or "",
             "urlType": entry.get("urlType"), "storeType": entry.get("storeType")})
@@ -846,8 +894,12 @@ class VidaaTV:
         entry = self._entry(package)
         if not entry:
             if not self.applist:
-                raise TVUnavailable("the TV has not said which apps it has yet")
-            raise TVUnavailable(f"{package} is not installed on the TV")
+                raise TVUnavailable("the TV has not said which apps it has yet", key="err_tv_apps_not_listed_yet")
+            raise TVUnavailable(
+                f"{package} is not installed on the TV",
+                key="err_tv_app_not_installed",
+                vars={"app": package},
+            )
         self.quiet_until = time.monotonic() + 20
         await self._launch_entry(entry)
         self._front = (entry["package"], time.monotonic())
@@ -857,7 +909,10 @@ class VidaaTV:
         """No deep link into a show is known on VIDAA: the app opens on its own page."""
         self.require()
         if not package:
-            raise ValueError("VIDAA TVs only open apps, not links: name the app")
+            raise messages.with_key(
+                ValueError("VIDAA TVs only open apps, not links: name the app"),
+                "err_vidaa_apps_not_links",
+            )
         await self.launch_package(package)
         return "app"
 
@@ -892,10 +947,10 @@ class VidaaTV:
         return False
 
     async def adb(self, *args, **kw):
-        raise TVUnavailable("this is a VIDAA TV: ADB tools are Android only")
+        raise TVUnavailable("this is a VIDAA TV: ADB tools are Android only", key="err_vidaa_adb_android_only")
 
     async def screenshot(self):
-        raise TVUnavailable("VIDAA TVs do not give screenshots over the network")
+        raise TVUnavailable("VIDAA TVs do not give screenshots over the network", key="err_vidaa_no_screenshots")
 
     # ---------- power ----------
     async def _read_power(self):

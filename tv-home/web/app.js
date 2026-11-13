@@ -47,6 +47,10 @@
   var CACHE_KEY = "tvhome.cache.v2";
   // Every word on screen comes from i18n.js, in the language picked in Home settings.
   var t = window.I18N ? window.I18N.t : function (k) { return k; };
+  var tBridge = window.I18N && window.I18N.tBridge ? window.I18N.tBridge : function (key, vars, fallback) {
+    var said = key ? t(key, vars) : fallback;
+    return !key || said === key ? fallback : said;
+  };
 
   // Settings from the bridge's config.json (served as config.js, and saved with the offline copy),
   // read in readConfig() once the page starts (mock.js fills them in for previews). See docs/CONFIG.md.
@@ -494,10 +498,22 @@
         var j = null;
         try { j = JSON.parse(x.responseText); } catch (e) {}
         if (x.status >= 200 && x.status < 300 && j && j.ok !== false) resolve(j);
-        else reject(new Error((j && j.error) || t("bridge_no", { status: x.status })));
+        else {
+          var err = new Error((j && j.error) || t("bridge_no", { status: x.status }));
+          if (j && j.error_key) { err.key = j.error_key; err.vars = j.error_vars; }
+          reject(err);
+        }
       };
-      x.onerror = function () { reject(new Error(t("bridge_down"))); };
-      x.ontimeout = function () { reject(new Error(t("bridge_slow"))); };
+      x.onerror = function () {
+        var err = new Error(t("bridge_down"));
+        err.key = "bridge_down";
+        reject(err);
+      };
+      x.ontimeout = function () {
+        var err = new Error(t("bridge_slow"));
+        err.key = "bridge_slow";
+        reject(err);
+      };
       x.send(body ? JSON.stringify(body) : null);
     });
   }
@@ -1263,13 +1279,13 @@
       if (ambI === 1 && STANDALONE && window.CouchSpotify) window.CouchSpotify.playHere(note);
       else if (ambI === 3 && !STANDALONE) {
         var spPkg = (music.app && (music.app.package || music.app.id)) || null;
-        if (spPkg) api("POST", "/api/launch", { app: spPkg }).catch(function (e) { note(e.message); });
+        if (spPkg) api("POST", "/api/launch", { app: spPkg }).catch(function (e) { note(tBridge(e.key, e.vars, e.message)); });
       }
       return;
     }
     if (ambI === 3) {
       var pkg = (music.app && (music.app.package || music.app.id)) || null;
-      if (pkg) api("POST", "/api/launch", { app: pkg }).catch(function (e) { note(e.message); });
+      if (pkg) api("POST", "/api/launch", { app: pkg }).catch(function (e) { note(tBridge(e.key, e.vars, e.message)); });
       return;
     }
     var key = ["previous", "play_pause", "next"][ambI];
@@ -1278,7 +1294,7 @@
       renderAmbientMusic();
       renderNp();
     }
-    api("POST", "/api/key", { key: key }).catch(function (e) { note(e.message); });
+    api("POST", "/api/key", { key: key }).catch(function (e) { note(tBridge(e.key, e.vars, e.message)); });
     setTimeout(refreshMusic, key === "play_pause" ? 1500 : 900);
   }
 
@@ -1370,7 +1386,7 @@
       renderNp();
       renderAmbientMusic();
     }
-    api("POST", "/api/key", { key: key }).catch(function (e) { note(e.message); });
+    api("POST", "/api/key", { key: key }).catch(function (e) { note(tBridge(e.key, e.vars, e.message)); });
     setTimeout(refreshMusic, key === "play_pause" ? 1500 : 900);
   }
 
@@ -1639,7 +1655,7 @@
     if (!OFFLINE) {
       api("POST", "/api/sleep", { minutes: minutes })
         .then(function (j) { if (j.ends !== undefined) sleepEnds = j.ends ? Date.parse(j.ends) : null; renderQuick(); refreshBedtimeDim(); })
-        .catch(function (e) { note(e.message); refreshQuick(); });
+        .catch(function (e) { note(tBridge(e.key, e.vars, e.message)); refreshQuick(); });
     }
   }
   function togglePicture() {
@@ -1651,7 +1667,7 @@
     renderQuick();
     api("POST", "/api/picture", { mode: "toggle" }, 20000)
       .then(function (j) { if (j.mode) picMode = j.mode; })
-      .catch(function (e) { note(e.message); })
+      .catch(function (e) { note(tBridge(e.key, e.vars, e.message)); })
       .then(function () { picBusy = false; renderQuick(); });
   }
   // The look is kept on this TV; the page starts again in the other look.
@@ -1774,7 +1790,7 @@
     var native = function () { try { return !!(TV && TV.openInputs && TV.openInputs()); } catch (e) { return false; } };
     if (OFFLINE) { if (!native()) note(t("no_inputs")); return; }
     api("POST", "/api/key", { key: "input" })
-      .catch(function (e) { if (!native()) note(e.message); });
+      .catch(function (e) { if (!native()) note(tBridge(e.key, e.vars, e.message)); });
   }
   // ---------------- the Input menu (#30) ----------------
   // The TV's own inputs, read by the launcher from Android's TV input list (TVOS.tvInputs): each HDMI
@@ -1842,7 +1858,7 @@
       try { ok = !!TV.openSettingsScreen(which); } catch (e) {}
       if (ok) return;
     }
-    if (ON_TV && !OFFLINE) api("POST", "/api/launch", { app: which }).catch(function (e) { note(e.message); });
+    if (ON_TV && !OFFLINE) api("POST", "/api/launch", { app: which }).catch(function (e) { note(tBridge(e.key, e.vars, e.message)); });
   }
   // The TV's own screensaver (Google TV's Ambient mode: the Google Photos albums are chosen there).
   function startScreensaver() {
@@ -1879,7 +1895,7 @@
     if (OFFLINE) { note(t("quick_needs_bridge")); return; }
     if (ON_TV) { openSettingsScreen("bluetooth"); return; }
     api("POST", "/api/bluetooth-audio").catch(function (e) {
-      note(e.message || t("headphones_not_found"));
+      note(tBridge(e.key, e.vars, e.message) || t("headphones_not_found"));
     });
   }
   function refreshQuick() {
@@ -2045,7 +2061,7 @@
       launch: function (pkg) {
         opened(pkg);
         if (TV && TV.launch(pkg)) return;
-        api("POST", "/api/launch", { app: pkg }).catch(function (e) { status(e.message); });
+        api("POST", "/api/launch", { app: pkg }).catch(function (e) { status(tBridge(e.key, e.vars, e.message)); });
       },
       isOk: isOk, isBack: isBack, isMenu: isMenu, isSettings: isSettings, arrowOf: arrowOf,
       unlocked: kidsUnlocked
@@ -2178,7 +2194,7 @@
     var extra = apps.filter(tucked);
     var inputs = resolveInputs();
     list = list.concat(inputs);
-    data.screens.forEach(function (sc) { list.push({ kind: "screen", id: sc.id, name: sc.name, ready: sc.ready, note: sc.note }); });
+    data.screens.forEach(function (sc) { list.push({ kind: "screen", id: sc.id, name: sc.name, ready: sc.ready, note: sc.note, noteKey: sc.note_key, noteVars: sc.note_vars }); });
     var tools = toolItems();
     if (expanded) return list.concat(extra, tools);
     if (extra.length || list.length > GRID_MAX - tools.length) {
@@ -2193,7 +2209,7 @@
   function arrangeItems() {
     var rest = shownApps().filter(function (a) { return a.package !== SETTINGS_PKG; });
     var screens = data.screens.map(function (sc) {
-      return { kind: "screen", id: sc.id, name: sc.name, ready: sc.ready, note: sc.note, package: "screen:" + sc.id };
+      return { kind: "screen", id: sc.id, name: sc.name, ready: sc.ready, note: sc.note, noteKey: sc.note_key, noteVars: sc.note_vars, package: "screen:" + sc.id };
     });
     var inputs = resolveInputs();
     var shown = rest.filter(function (a) { return !tucked(a); });
@@ -2968,11 +2984,11 @@
         return;
       }
       api("POST", "/api/continue/open", { id: it.id, who: NOBODY ? "both" : who }, 60000)
-        .then(function (res) { status(res.note || ""); })
+        .then(function (res) { status(res.note ? tBridge(res.note_key, res.note_vars, res.note) : ""); })
         .catch(function (e) {
           // the bridge can't help: at least open the app it was in
           if (TV && it.app && TV.launch(it.app.package)) { status(""); return; }
-          status(e.message);
+          status(tBridge(e.key, e.vars, e.message));
         });
       return;
     }
@@ -2986,27 +3002,27 @@
       var done = false;
       if (TV && TV.openInput) { try { done = !!TV.openInput(a.id); } catch (e) {} }
       if (!done && !OFFLINE) {
-        api("POST", "/api/key", { key: "input" }).catch(function (e) { status(e.message); });
+        api("POST", "/api/key", { key: "input" }).catch(function (e) { status(tBridge(e.key, e.vars, e.message)); });
       } else if (!done) {
         note(t("no_inputs"));
       }
       return;
     }
     if (a.kind === "screen") {
-      if (!a.ready) { status(a.note || t("screen_not_set")); return; }
+      if (!a.ready) { status(tBridge(a.noteKey, a.noteVars, a.note || t("screen_not_set"))); return; }
       el.classList.add("busy");
       api("POST", "/api/screens/open", { id: a.id }, 10000)
-        .then(function (res) { status(res.note || ""); })
+        .then(function (res) { status(res.note ? tBridge(res.note_key, res.note_vars, res.note) : ""); })
         .catch(function (e) {
           if (TV && TV.launch("com.limelight")) { status(""); return; }
-          status(e.message);
+          status(tBridge(e.key, e.vars, e.message));
         })
         .then(function () { el.classList.remove("busy"); });
       return;
     }
     opened(a.package);
     if (TV && TV.launch(a.package)) return;
-    api("POST", "/api/launch", { app: a.id || a.package }).catch(function (e) { status(e.message); });
+    api("POST", "/api/launch", { app: a.id || a.package }).catch(function (e) { status(tBridge(e.key, e.vars, e.message)); });
   }
 
   // ---------------- Smart home: the rooms and scenes screen (smarthome.js) ----------------

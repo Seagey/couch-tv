@@ -40,6 +40,7 @@ from urllib.parse import quote
 import aiohttp
 
 import apps
+import messages
 from samsung import netflix_id, youtube_id
 from tv import TVUnavailable
 
@@ -111,6 +112,11 @@ class ECPLimited(TVUnavailable):
 class RokuError(RuntimeError):
     """The Roku answered a request with an error status."""
 
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars
+
 
 class RokuTV:
     kind = "roku"
@@ -181,7 +187,11 @@ class RokuTV:
 
     def require(self):
         if not self.connected:
-            raise TVUnavailable(f"the {self.name.lower()} TV is not answering on the network")
+            raise TVUnavailable(
+                f"the {self.name.lower()} TV is not answering on the network",
+                key="err_driver_not_answering",
+                vars={"name": self.name.lower()},
+            )
 
     def can_deeplink(self, app):
         return app.get("id") in ("netflix", "youtube")
@@ -239,19 +249,31 @@ class RokuTV:
             async with s.request(method, self._url(path), timeout=aiohttp.ClientTimeout(total=timeout)) as r:
                 if r.status == 403:
                     self.ecp_limited = True
-                    raise ECPLimited(LIMITED_HELP)
+                    raise ECPLimited(LIMITED_HELP, key="err_roku_ecp_limited")
                 if r.status >= 400:
-                    raise RokuError(f"the Roku answered {r.status} to {method} {path.split('?')[0]}")
+                    raise RokuError(
+                        f"the Roku answered {r.status} to {method} {path.split('?')[0]}",
+                        key="err_roku_http_status",
+                        vars={"status": r.status, "method": method, "path": path.split("?")[0]},
+                    )
                 self.ecp_limited = False
                 return await (r.read() if raw else r.text())
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
-            raise TVUnavailable(f"the Roku did not answer ({type(e).__name__})") from None
+            raise TVUnavailable(
+                f"the Roku did not answer ({type(e).__name__})",
+                key="err_roku_no_answer",
+                vars={"error": type(e).__name__},
+            ) from None
 
     async def _xml(self, path):
         try:
             return ET.fromstring(await self._ecp("GET", path))
         except ET.ParseError:
-            raise RokuError(f"the Roku sent something that is not XML for {path}") from None
+            raise RokuError(
+                f"the Roku sent something that is not XML for {path}",
+                key="err_roku_bad_xml",
+                vars={"path": path},
+            ) from None
 
     # ---------- reading the TV ----------
     async def _read_power(self):
@@ -313,11 +335,15 @@ class RokuTV:
         if rid in self._icons:
             return self._icons[rid]
         if not re.fullmatch(r"[A-Za-z0-9._-]{1,40}", rid or ""):
-            raise ValueError("not a channel id")
+            raise messages.with_key(ValueError("not a channel id"), "err_roku_bad_channel_id")
         s = await self._http()
         async with s.get(self._url(f"query/icon/{rid}")) as r:
             if r.status != 200:
-                raise RokuError(f"the Roku has no icon for {rid} ({r.status})")
+                raise RokuError(
+                    f"the Roku has no icon for {rid} ({r.status})",
+                    key="err_roku_no_icon",
+                    vars={"id": rid, "status": r.status},
+                )
             self._icons[rid] = (await r.read(), r.headers.get("Content-Type", "image/jpeg"))
         return self._icons[rid]
 
@@ -437,7 +463,7 @@ class RokuTV:
             await self._launch(self.app_id)
             return "couch-tv"
         if not code:
-            raise ValueError(f"unknown key: {name}")
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
         self.require()
         if power:
             if self.is_on:
@@ -470,7 +496,7 @@ class RokuTV:
         if quiet:
             self.quiet_until = time.monotonic() + 20
         if not re.fullmatch(r"[A-Za-z0-9._-]{1,40}", str(rid)):
-            raise ValueError(f"not a Roku channel id: {rid}")
+            raise messages.with_key(ValueError(f"not a Roku channel id: {rid}"), "err_roku_bad_channel_id_value", id=rid)
         q = ""
         if content_id:
             q = f"?contentId={quote(str(content_id), safe='')}" + (f"&mediaType={media_type}" if media_type else "")
@@ -482,7 +508,11 @@ class RokuTV:
         await self.refresh_installed()
         ids = self._candidates(package)
         if not ids:
-            raise ValueError(f"no Roku channel id known for {package}")
+            raise messages.with_key(
+                ValueError(f"no Roku channel id known for {package}"),
+                "err_roku_no_channel_id",
+                package=package,
+            )
         listed = {c["id"] for c in self.channels}
         installed = [i for i in ids if i in listed or i == self.app_id]
         last = None
@@ -493,8 +523,16 @@ class RokuTV:
             except RokuError as e:
                 last = e
         if self.channels and not installed:
-            raise TVUnavailable(f"{package} is not installed on the Roku")
-        raise TVUnavailable(f"the Roku would not open {package}: {last}")
+            raise TVUnavailable(
+                f"{package} is not installed on the Roku",
+                key="err_roku_not_installed",
+                vars={"app": package},
+            )
+        raise TVUnavailable(
+            f"the Roku would not open {package}: {last}",
+            key="err_roku_open_failed",
+            vars={"package": package, "error": str(last)},
+        )
 
     async def start_intent(self, uri, package=None, cold=False, media_type=None):
         """Open a show. Netflix and YouTube links open the title through ECP's deep link (contentId and
@@ -516,7 +554,10 @@ class RokuTV:
             await self._launch(rid, content_id=yid, media_type="live")
             return "remote"
         if not pkg:
-            raise ValueError("Roku only opens links for Netflix and YouTube")
+            raise messages.with_key(
+                ValueError("Roku only opens links for Netflix and YouTube"),
+                "err_roku_only_netflix_youtube",
+            )
         await self.launch_package(pkg)
         return "app"
 
@@ -550,10 +591,10 @@ class RokuTV:
         return False
 
     async def adb(self, *args, **kw):
-        raise TVUnavailable("this is a Roku: ADB tools are Android only")
+        raise TVUnavailable("this is a Roku: ADB tools are Android only", key="err_roku_adb_android_only")
 
     async def screenshot(self):
-        raise TVUnavailable("Roku does not give screenshots over the network")
+        raise TVUnavailable("Roku does not give screenshots over the network", key="err_roku_no_screenshots")
 
     # ---------- power ----------
     async def port_open(self, port=None, timeout=1.0):

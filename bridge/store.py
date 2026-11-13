@@ -13,6 +13,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import config
+import messages
 
 DATA = config.DATA
 HISTORY_OLD = os.path.join(DATA, "history.json")  # the older capped list, read once and moved over
@@ -135,7 +136,11 @@ def norm_who(value):
         return None
     who = who_map().get(str(value).strip().lower())
     if not who:
-        raise ValueError("who must be " + ", ".join(config.PEOPLE_IDS) + " or both")
+        raise messages.with_key(
+            ValueError("who must be " + ", ".join(config.PEOPLE_IDS) + " or both"),
+            "err_who_must_be",
+            choices=", ".join(config.PEOPLE_IDS),
+        )
     return who
 
 

@@ -57,6 +57,7 @@ import aiohttp
 
 import apps
 import config
+import messages
 from tv import TVUnavailable
 
 HOME_PACKAGE = "app.couchtv.launcher"
@@ -135,6 +136,11 @@ def sign(secret, timestamp, pin):
 
 class PhilipsError(RuntimeError):
     """The TV did not do what was asked, or answered with something unusable."""
+
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars
 
 
 class NeedsLogin(PhilipsError):
@@ -328,7 +334,11 @@ class PhilipsTV:
 
     def require(self):
         if not self.connected:
-            raise TVUnavailable(f"the {self.name.lower()} TV is not answering on the network")
+            raise TVUnavailable(
+                f"the {self.name.lower()} TV is not answering on the network",
+                key="err_driver_not_answering",
+                vars={"name": self.name.lower()},
+            )
 
     def can_deeplink(self, app):
         return False   # no deep link into a show is known on Titan OS: apps open on their own page
@@ -400,11 +410,22 @@ class PhilipsTV:
                         continue
                     self._show("in ", f"{r.status} {uri}", text)
                     if r.status == 401:
-                        raise NeedsLogin("the TV wants a login: pair first (docs/PHILIPS-TITAN.md, step 3)")
+                        raise NeedsLogin(
+                            "the TV wants a login: pair first (docs/PHILIPS-TITAN.md, step 3)",
+                            key="err_philips_needs_login",
+                        )
                     if r.status == 404:
-                        raise NotThere(f"the TV has no {path} (it answered 404)")
+                        raise NotThere(
+                            f"the TV has no {path} (it answered 404)",
+                            key="err_philips_not_there",
+                            vars={"path": path},
+                        )
                     if r.status >= 400:
-                        raise PhilipsError(f"the TV answered {r.status} to {method} {path}")
+                        raise PhilipsError(
+                            f"the TV answered {r.status} to {method} {path}",
+                            key="err_philips_http_status",
+                            vars={"status": r.status, "method": method, "path": path},
+                        )
                     if not text.strip():
                         return {}
                     try:
@@ -412,10 +433,18 @@ class PhilipsTV:
                     except ValueError:
                         if any_body:   # a 200 is the answer: the 43PUS8909/12 says "Ok" as a web page to activities/browser
                             return {}
-                        raise PhilipsError(f"the TV sent something that is not JSON for {path}") from None
+                        raise PhilipsError(
+                            f"the TV sent something that is not JSON for {path}",
+                            key="err_philips_bad_json",
+                            vars={"path": path},
+                        ) from None
             except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
-                raise TVUnavailable(f"the TV did not answer ({type(e).__name__})") from None
-        raise PhilipsError("the TV refused the login")
+                raise TVUnavailable(
+                    f"the TV did not answer ({type(e).__name__})",
+                    key="err_tv_did_not_answer_error",
+                    vars={"error": type(e).__name__},
+                ) from None
+        raise PhilipsError("the TV refused the login", key="err_philips_login_refused")
 
     async def find_version(self):
         """The API version prefix this TV answers on (/6/, /5/, /1/ or none), from "system". On the
@@ -428,7 +457,7 @@ class PhilipsTV:
             v = await self._find_here()
             if self.tls or await self._answers_without_login() or not self.may_switch:
                 return v
-            why = NeedsLogin("the TV wants a login on port 1925")
+            why = NeedsLogin("the TV wants a login on port 1925", key="err_philips_needs_login_1925")
         except (PhilipsError, TVUnavailable) as e:
             if not self.may_switch or self.tls:
                 raise
@@ -460,7 +489,10 @@ class PhilipsTV:
                 self.has_browser = lists_browser(self.system)
                 self.log.info("JointSpace answers on %s port %s /%s", "https" if self.tls else "http", self.port, v)
                 return v
-        raise PhilipsError("the TV did not answer \"system\" on any API version")
+        raise PhilipsError(
+            "the TV did not answer \"system\" on any API version",
+            key="err_philips_no_system_api",
+        )
 
     async def _answers_without_login(self):
         """Plain port only: one read that Android sets guard with the login (PROTOCOL["open_probe"]).
@@ -489,15 +521,26 @@ class PhilipsTV:
         """Ask the TV to show its PIN."""
         self.require()
         if not self._secret():
-            raise PhilipsError("no pairing key saved yet: run scripts/philips-secret.py first (docs/PHILIPS-TITAN.md)")
+            raise PhilipsError(
+                "no pairing key saved yet: run scripts/philips-secret.py first (docs/PHILIPS-TITAN.md)",
+                key="err_philips_no_secret_yet",
+            )
         await self.find_version()
         if self.open_api:
-            raise PhilipsError("this TV answers without pairing, so there is nothing to pair (docs/PHILIPS-SAPHI.md)")
+            raise PhilipsError(
+                "this TV answers without pairing, so there is nothing to pair (docs/PHILIPS-SAPHI.md)",
+                key="err_philips_no_pairing_needed",
+            )
         device_id = secrets.token_hex(8)
         got = await self._call("POST", "pair/request", {"scope": PROTOCOL["pair_scope"], "device": self._device(device_id)})
         if not isinstance(got, dict) or got.get("error_id") != PROTOCOL["pair_ok"] or not got.get("auth_key"):
             self.last_error = "the TV did not start pairing"
-            raise PhilipsError(f"the TV did not start pairing ({(got or {}).get('error_id') or 'no answer'})")
+            reason = (got or {}).get("error_id") or "no answer"
+            raise PhilipsError(
+                f"the TV did not start pairing ({reason})",
+                key="err_philips_pair_start_failed",
+                vars={"error": reason},
+            )
         self._pairing = (device_id, str(got["auth_key"]), got.get("timestamp"))
         self._keep(pending=list(self._pairing))   # so the PIN can be sent from another run (philips-check.py --pin)
         return True
@@ -506,22 +549,23 @@ class PhilipsTV:
         """Send the PIN back, signed, and keep the login the TV gave (bridge/data, never in git)."""
         pin = str(pin or "").strip()
         if not PIN.match(pin):
-            raise ValueError("the PIN is the 4 digits the TV shows")
+            raise messages.with_key(ValueError("the PIN is the 4 digits the TV shows"), "err_pin_4_digits")
         if not self._pairing and isinstance(self._stored().get("pending"), list) and len(self._stored()["pending"]) == 3:
             self._pairing = tuple(self._stored()["pending"])
         if not self._pairing:
-            raise PhilipsError("ask the TV for a PIN first")
+            raise PhilipsError("ask the TV for a PIN first", key="err_ask_pin_first")
         secret = self._secret()
         if not secret:
-            raise PhilipsError("no pairing key saved: run scripts/philips-secret.py first")
+            raise PhilipsError("no pairing key saved: run scripts/philips-secret.py first", key="err_philips_no_secret")
         device_id, auth_key, ts = self._pairing
         grant = {"auth": {"auth_AppId": PROTOCOL["app_id"], "pin": pin, "auth_timestamp": ts,
                           "auth_signature": sign(secret, ts, pin)},
                  "device": self._device(device_id)}
         got = await self._call("POST", "pair/grant", grant, auth=Digest(device_id, auth_key))
         if isinstance(got, dict) and got.get("error_id") not in (None, PROTOCOL["pair_ok"]):
-            self.last_error = f"the TV refused the PIN ({got.get('error_id')})"
-            raise PhilipsError(self.last_error)
+            err_id = got.get("error_id")
+            self.last_error = f"the TV refused the PIN ({err_id})"
+            raise PhilipsError(self.last_error, key="err_philips_pin_refused", vars={"error": err_id})
         self._keep(user=device_id, password=auth_key, pending=None)
         self._pairing, self._auth, self.last_error = None, None, None
         self._ids_checked = 0.0   # the app list can be read now
@@ -628,7 +672,7 @@ class PhilipsTV:
         if not hit and want.isdigit():
             hit = next((s for s in srcs if re.search(rf"\D{want}$", _plain(s["name"]))), None)
         if not hit:
-            raise ValueError(f"not an input the TV listed: {name}")
+            raise messages.with_key(ValueError(f"not an input the TV listed: {name}"), "err_tv_input_not_listed", name=name)
         self.quiet_until = time.monotonic() + 20
         await self._call("POST", "sources/current", {"id": hit["id"]})
         return hit
@@ -685,9 +729,9 @@ class PhilipsTV:
         """The TV's browser at one page: POST activities/browser {"url": ...}. Only when the TV listed a browser
         activity, and only a plain http(s) address. UNCONFIRMED on a real Saphi TV."""
         if not self.has_browser:
-            raise TVUnavailable("this TV reports no browser to open a page in")
+            raise TVUnavailable("this TV reports no browser to open a page in", key="err_philips_no_browser")
         if not isinstance(url, str) or not SAFE_URL.match(url):
-            raise ValueError("only a plain http:// or https:// address")
+            raise messages.with_key(ValueError("only a plain http:// or https:// address"), "err_plain_http_url_only")
         await self._call("POST", PROTOCOL["browser_open"], {"url": url}, timeout=8, any_body=True)
         self.visible = BROWSER_FRONT
 
@@ -700,8 +744,11 @@ class PhilipsTV:
             await self.open_page(self.home_url())
             return
         if not entry:
-            raise TVUnavailable("this TV lists no app that shows couch-tv and reports no browser, so couch-tv "
-                                "cannot open on it (docs/PHILIPS-TITAN.md, \"The home\"; docs/PHILIPS-SAPHI.md)")
+            raise TVUnavailable(
+                "this TV lists no app that shows couch-tv and reports no browser, so couch-tv "
+                "cannot open on it (docs/PHILIPS-TITAN.md, \"The home\"; docs/PHILIPS-SAPHI.md)",
+                key="err_philips_no_home_route",
+            )
         await self._launch_entry(entry)
         for k in self.home_keys:
             await asyncio.sleep(1.0)
@@ -820,7 +867,7 @@ class PhilipsTV:
                 return "couch-tv"
             code = "Home"
         if not code:
-            raise ValueError(f"unknown key: {name}")
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
         self.require()
         if power:
             if self.is_on:
@@ -852,7 +899,10 @@ class PhilipsTV:
         self.vol = v | {"muted": bool(muted)}
 
     async def text(self, text):
-        raise TVUnavailable("typing into a Philips Titan OS TV from the phone is not built: use the TV's own keyboard")
+        raise TVUnavailable(
+            "typing into a Philips Titan OS TV from the phone is not built: use the TV's own keyboard",
+            key="err_philips_typing_unsupported",
+        )
 
     async def _launch(self, app_id, quiet=True):
         if quiet:
@@ -862,13 +912,17 @@ class PhilipsTV:
             return
         entry = next((a for a in self.applist if a["id"] == app_id), None)
         if not entry:
-            raise ValueError(f"not an app the TV listed: {app_id}")
+            raise messages.with_key(
+                ValueError(f"not an app the TV listed: {app_id}"),
+                "err_philips_app_not_listed",
+                app=app_id,
+            )
         await self._launch_entry(entry)
 
     async def _launch_entry(self, entry):
         """activities/launch with the TV's own object for the app, exactly as it listed it."""
         if entry not in self.applist or not SAFE_ID.match(entry.get("id") or ""):
-            raise ValueError("not an app the TV listed")
+            raise messages.with_key(ValueError("not an app the TV listed"), "err_philips_not_listed_app")
         await self._call("POST", "activities/launch", entry["entry"], timeout=8)
 
     async def launch_package(self, package):
@@ -886,8 +940,12 @@ class PhilipsTV:
             entry = next((a for a in self.applist if a["package"] == pkg), None)
         if not entry:
             if not self.applist:
-                raise TVUnavailable("the TV has not said which apps it has yet")
-            raise TVUnavailable(f"{package} is not on the TV's app list")
+                raise TVUnavailable("the TV has not said which apps it has yet", key="err_tv_apps_not_listed_yet")
+            raise TVUnavailable(
+                f"{package} is not on the TV's app list",
+                key="err_philips_app_not_on_list",
+                vars={"app": package},
+            )
         self.quiet_until = time.monotonic() + 20
         await self._launch_entry(entry)
         self.visible = entry["id"]
@@ -897,7 +955,10 @@ class PhilipsTV:
         """No deep link into a show is known on Titan OS: the app opens on its own page."""
         self.require()
         if not package:
-            raise ValueError("Philips Titan OS TVs only open apps, not links: name the app")
+            raise messages.with_key(
+                ValueError("Philips Titan OS TVs only open apps, not links: name the app"),
+                "err_philips_apps_not_links",
+            )
         await self.launch_package(package)
         return "app"
 
@@ -933,10 +994,10 @@ class PhilipsTV:
         return False
 
     async def adb(self, *args, **kw):
-        raise TVUnavailable("this is a Philips Titan OS TV: ADB tools are Android only")
+        raise TVUnavailable("this is a Philips Titan OS TV: ADB tools are Android only", key="err_philips_adb_android_only")
 
     async def screenshot(self):
-        raise TVUnavailable("Philips Titan OS TVs do not give screenshots over the network")
+        raise TVUnavailable("Philips Titan OS TVs do not give screenshots over the network", key="err_philips_no_screenshots")
 
     # ---------- power ----------
     async def port_open(self, port=None, timeout=1.0):
