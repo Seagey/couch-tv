@@ -109,7 +109,8 @@ Not tested by the author. Each line is what someone said worked on their own dev
   script uses: with a Network debugging switch, or on some TVs (a TCL with Android TV 11) with USB
   debugging alone. Some Android 11 and newer Google TVs only offer Wireless
   debugging (pairing code, random port). For options A and B, open port 5555 once with Google's
-  platform-tools (`adb pair`, `adb connect`, `adb tcpip 5555`, README step 1); on some TVs it
+  platform-tools (`adb pair`, `adb connect`, `adb tcpip 5555`,
+  [SETUP.md step 1](SETUP.md#step-1-developer-mode-on-the-tv-every-option)); on some TVs it
   closes again after a restart. `scripts/check-tv.py` says which kind your TV has.
 - **Google TV, on the TV (C).** Many Android 11 and newer Google TVs (all the Android 13 and newer
   ones seen so far) use "Wireless debugging" with a pairing code and a random port, not the old

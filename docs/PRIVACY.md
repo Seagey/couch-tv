@@ -35,7 +35,7 @@ same undo list as ambient mode (`tv-home/tvs/<TV_NAME>.disabled`).
 **What it will never switch off**, even if the list named it (the same check `EXTRA_OFF` uses):
 
 - the TV's home screens and setup apps (switching those off made a Sony Bravia loop at every start,
-  see "If your TV loops after a restart" in the README)
+  see [If your TV loops after a restart](TROUBLESHOOTING.md#if-your-tv-loops-after-a-restart))
 - anything with a persistent process, and any core part of Android or Google Play Services
 - **the remote:** Bluetooth, remote pairing, voice and the Assistant, HDMI CEC, the keyboard
 - **Keep watching:** the TV provider that holds Android's Watch Next list (`com.android.providers.tv`),
@@ -49,7 +49,7 @@ switches them off again. With option A, run `apply.sh` with `PRIVACY=1` again.
 ## Undo
 
 `undo.sh` switches back on everything `apply.sh` switched off, privacy apps included, and puts the
-TV's own home back (README, "Undo: put the Google home screen back"):
+TV's own home back ([Undo: put the Google home screen back](SETUP.md#undo-put-the-google-home-screen-back)):
 
 ```sh
 TV_IP=<your tv address> sh tv-home/tools/undo.sh

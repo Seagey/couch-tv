@@ -3437,7 +3437,7 @@ async def h_taste(request):
 
 # Never switched off by the guard, even when an old keep-disabled file lists them: couch-tv 0.10 and
 # older wrote the TV's own homes and the setup wizard there, and with them off some Google TVs loop
-# at power on (README, "If your TV loops after a restart").
+# at power on (docs/TROUBLESHOOTING.md, "If your TV loops after a restart").
 NEVER_DISABLE = {"com.google.android.apps.tv.launcherx", "com.google.android.tvlauncher",
                  "com.google.android.tungsten.setupwraith"}
 

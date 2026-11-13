@@ -382,8 +382,8 @@ accepted.
 - On the phone remote: volume, Home (opens couch-tv), and "put on" a YouTube video or a Netflix
   show.
 - Open the phone remote at `http://<bridge>:5400`. If it says **Not built yet**, build it once: in
-  `remote/` run `npm ci && npm run build` (README, step 4). It is easy to miss when you follow this
-  page alone.
+  `remote/` run `npm ci && npm run build` ([SETUP.md step 4](SETUP.md#step-4-build-the-phone-remote-option-b)).
+  It is easy to miss when you follow this page alone.
 - `http://<bridge>:5400/api/tvs` shows the last few things the hook did and when Developer Mode
   was last extended (`devmode`).
 

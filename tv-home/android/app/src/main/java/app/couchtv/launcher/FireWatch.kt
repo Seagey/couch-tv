@@ -18,7 +18,8 @@ import android.view.accessibility.AccessibilityEvent
 
 /**
  * The Home button watch. The TV's own home stays installed and switched on (switching it off can
- * leave a Google TV in a boot loop, see README "If your TV loops after a restart"), so on many TVs
+ * leave a Google TV in a boot loop, see docs/TROUBLESHOOTING.md "If your TV loops after a
+ * restart"), so on many TVs
  * the Home key, and the TV at power on, still open that home. This watcher sees the TV's own home
  * come on screen and puts couch-tv back on top. On a Xiaomi TV it also catches the Home and Mi
  * keys as they are pressed; the window watch stays the fallback when the TV still starts its home.
