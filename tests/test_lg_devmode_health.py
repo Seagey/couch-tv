@@ -87,6 +87,7 @@ class Translatable(unittest.TestCase):
             src = (root / f).read_text()
             for key, english in lg.LGTV.DEVMODE_WARNINGS.items():
                 found = re.findall(r"\b%s: ['\"](.+?)['\"],\n" % key, src)
+                # Czech (cs, #178) has no LG dev mode lines yet and shows them in English
                 langs = 10 if f.startswith("tv-home") else 7
                 self.assertEqual(len(found), langs, (f, key))
                 self.assertEqual(found[0], english, (f, key))   # en comes first, same words as the bridge

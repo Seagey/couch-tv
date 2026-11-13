@@ -41,6 +41,7 @@
 
 The newest release is **0.12** (9 November 2026), on [the Releases page](https://github.com/Seagey/couch-tv/releases). These are on main, in the next release:
 
+- **13 November:** the TV home speaks Czech, thanks slezaCZ ([#178](docs/UPDATES.md#13-november-2026-czech-on-the-tv-home-on-main-in-the-next-release))
 - **13 November:** Bell Streamer's Fibe TV home is replaced by couch-tv (Beta, untested), thanks Sparkybabcia ([#168](docs/UPDATES.md#13-november-2026-bell-streamer-with-fibe-tv-as-its-home-beta-on-main-in-the-next-release))
 - **13 November:** Privacy clean (Beta): `PRIVACY=1` switches off known tracking, ad and ACR apps, reversibly ([docs/PRIVACY.md](docs/PRIVACY.md), [details](docs/UPDATES.md#13-november-2026-privacy-clean-beta-on-main))
 - **13 November:** the home comes back to the tile you left after Settings, thanks IshMehta ([#166](docs/UPDATES.md#13-november-2026-the-home-comes-back-to-the-tile-you-left-on-main-in-the-next-release))
@@ -162,7 +163,7 @@ look and scenes, your apps and their order, the people and the quick buttons, wi
 - **[Glass and video](docs/TV-HOME.md#glass-and-video)**: clear glass panels and icons, a liquid glass clock, or a looping video behind it all.
 - **[Quick buttons](docs/TV-HOME.md#quick-buttons)**: sleep timer, picture mode, inputs by name, screensaver and more, one press from the home.
 - **[Smart home](docs/TV-HOME.md#smart-home)**: air conditioning, scenes and a doorbell card from Home Assistant. Off unless you add it.
-- **[Ten languages](docs/TV-HOME.md#languages)**: English, Spanish, Mexican Spanish, Italian, German, French, Turkish, Serbian, Dutch and Hebrew.
+- **[Eleven languages](docs/TV-HOME.md#languages)**: English, Spanish, Mexican Spanish, Italian, German, French, Turkish, Serbian, Dutch, Hebrew and Czech.
 - **[Your own photos](docs/TV-HOME.md#your-own-photos)**: from a USB drive, the TV or the web, taking turns with the scenes.
 - **[Two TVs, one show](docs/SYNC.md)**: start the same show on two TVs at once, so two rooms do not echo. Experimental.
 - **[Updates on the TV](docs/TV-HOME.md#updates)**: off until you say yes. Then the TV tells you about a new version and hands it to Android to install.
