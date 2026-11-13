@@ -16,6 +16,8 @@ import asyncio
 import logging
 import struct
 
+import messages
+
 log = logging.getLogger("tinymqtt")
 
 # Packet types (MQTT 3.1.1, section 2.2.1), shifted into the top four bits of the first byte.
@@ -48,14 +50,14 @@ class Refused(MQTTError):
 def _text(s):
     b = s.encode("utf-8") if isinstance(s, str) else bytes(s)
     if len(b) > 0xFFFF:
-        raise ValueError("an MQTT string is at most 65535 bytes")
+        raise messages.with_key(ValueError("an MQTT string is at most 65535 bytes"), "err_mqtt_string_too_long")
     return struct.pack("!H", len(b)) + b
 
 
 def _length(n):
     """The remaining length, 7 bits per byte, the top bit saying another byte follows (2.2.3)."""
     if n < 0 or n > 268435455:
-        raise ValueError("packet too large for MQTT")
+        raise messages.with_key(ValueError("packet too large for MQTT"), "err_mqtt_packet_too_large")
     out = bytearray()
     while True:
         byte, n = n % 128, n // 128

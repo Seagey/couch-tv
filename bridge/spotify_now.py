@@ -26,6 +26,7 @@ import urllib.parse
 import aiohttp
 
 import config
+import messages
 
 log = logging.getLogger("spotify")
 
@@ -72,7 +73,7 @@ def status():
 def login_url(redirect_uri):
     """Spotify's login page, with a fresh PKCE verifier remembered for the callback."""
     if not client_id():
-        raise ValueError("SPOTIFY_CLIENT_ID is not set in .env")
+        raise messages.with_key(ValueError("SPOTIFY_CLIENT_ID is not set in .env"), "err_spotify_client_id_missing")
     now = time.time()
     for k in [k for k, v in _pending.items() if now - v[2] > 600]:
         _pending.pop(k, None)
@@ -98,7 +99,10 @@ async def finish_login(state, code):
     """The callback: swap the code for tokens and keep them."""
     entry = _pending.pop(state or "", None)
     if not entry or not code:
-        raise ValueError("That login link is stale or was not started here. Open /api/spotify/login again.")
+        raise messages.with_key(
+            ValueError("That login link is stale or was not started here. Open /api/spotify/login again."),
+            "err_spotify_login_link_stale",
+        )
     verifier, redirect_uri, _ = entry
     j = await _token_request({"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri,
                               "client_id": client_id(), "code_verifier": verifier})

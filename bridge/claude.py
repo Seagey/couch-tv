@@ -59,7 +59,7 @@ def resolve_lang(lang=None, tv_id=None):
         if isinstance(data, dict) and isinstance(data.get("settings"), dict):
             lang = data["settings"].get("lang")
     if not lang:
-        lang = config.CONFIG.get("home", {}).get("language")
+        lang = (config.CONFIG.get("home") or {}).get("language")
     return lang or "en"
 
 ASK_SYSTEM = """You run the living room TV in a home (a Google TV). You control it only with the tv tools. The people asking are on the couch

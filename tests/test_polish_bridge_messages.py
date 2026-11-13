@@ -1,3 +1,4 @@
+import ast
 import asyncio
 import os
 import sys
@@ -270,6 +271,124 @@ class ClaudeLanguageAndStatusTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(picks[0]["reason"], f"Popular in {config.COUNTRY_NAME} this week")
         self.assertEqual(picks[0]["reason_key"], "ask_popular_reason")
         self.assertEqual(picks[0]["reason_vars"], {"country": config.COUNTRY_NAME})
+
+
+BRIDGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bridge")
+CORE_BRIDGE_FILES = (
+    "server.py",
+    "agentic.py",
+    "tv.py",
+    "finder.py",
+    "store.py",
+    "spotify_now.py",
+    "history_import.py",
+    "tinymqtt.py",
+)
+VALUE_ERROR_FILES = (
+    "tv.py",
+    "server.py",
+    "store.py",
+    "finder.py",
+    "spotify_now.py",
+    "tinymqtt.py",
+)
+NOTE_DICT_FILES = (
+    "agentic.py",
+    "server.py",
+    "history_import.py",
+)
+
+
+def _call_name(node):
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _is_note_fields_call(node):
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "messages"
+        and node.func.attr == "note_fields"
+    )
+
+
+class CoreBridgeMessageContractTests(unittest.TestCase):
+    def test_raises_pass_message_key(self):
+        missing = []
+        for fname in CORE_BRIDGE_FILES:
+            path = os.path.join(BRIDGE_DIR, fname)
+            with open(path, encoding="utf-8") as f:
+                tree = ast.parse(f.read(), filename=fname)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Raise) or not isinstance(node.exc, ast.Call):
+                    continue
+                name = _call_name(node.exc.func)
+                if name in ("ApiError", "TVUnavailable", "UnsafeInput"):
+                    if not any(kw.arg == "key" for kw in node.exc.keywords):
+                        missing.append(f"{fname}:{node.lineno} raise {name}(...) missing key=")
+                elif fname in VALUE_ERROR_FILES and name == "ValueError":
+                    missing.append(f"{fname}:{node.lineno} raise ValueError(...) not wrapped in messages.with_key(...)")
+        self.assertEqual(missing, [])
+
+    def test_note_dicts_include_note_fields(self):
+        missing = []
+        for fname in NOTE_DICT_FILES:
+            path = os.path.join(BRIDGE_DIR, fname)
+            with open(path, encoding="utf-8") as f:
+                tree = ast.parse(f.read(), filename=fname)
+            ignored_dicts = set()
+            for node in ast.walk(tree):
+                if _is_note_fields_call(node):
+                    for arg in list(node.args) + [kw.value for kw in node.keywords]:
+                        if isinstance(arg, ast.Dict):
+                            ignored_dicts.add(id(arg))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Dict) or id(node) in ignored_dicts:
+                    continue
+                has_note = any(
+                    isinstance(k, ast.Constant) and k.value == "note"
+                    for k in node.keys
+                )
+                if not has_note:
+                    continue
+                has_note_key = any(
+                    isinstance(k, ast.Constant) and k.value == "note_key"
+                    for k in node.keys
+                )
+                has_unpack = any(
+                    k is None and _is_note_fields_call(v)
+                    for k, v in zip(node.keys, node.values)
+                )
+                if not (has_note_key or has_unpack):
+                    missing.append(f"{fname}:{node.lineno} dict with 'note' missing note_fields/note_key")
+        self.assertEqual(missing, [])
+
+
+class ServerTVUnavailablePreservationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_h_launch_settings_preserves_tv_unavailable_key_and_vars(self):
+        class FakeTV:
+            async def open_settings_screen(self, _target):
+                raise TVUnavailable("TV not connected", key="err_tv_not_connected", vars={"tv": "living"})
+
+        class FakeRequest(dict):
+            pass
+
+        req = FakeRequest()
+        with patch.object(server, "tv", FakeTV()), \
+             patch.object(server, "body", AsyncMock(return_value={"app": "network"})), \
+             patch.object(server, "record_action"):
+            with self.assertRaises(server.ApiError) as ctx:
+                await server.h_launch(req)
+
+        self.assertEqual(ctx.exception.status, 503)
+        self.assertEqual(ctx.exception.message, "TV not connected")
+        self.assertEqual(ctx.exception.key, "err_tv_not_connected")
+        self.assertEqual(ctx.exception.vars, {"tv": "living"})
 
 
 if __name__ == "__main__":

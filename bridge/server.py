@@ -379,9 +379,9 @@ async def body(request):
     try:
         data = await request.json()
     except Exception:
-        raise ApiError(400, "body must be JSON")
+        raise ApiError(400, "body must be JSON", key="err_body_must_be_json")
     if not isinstance(data, dict):
-        raise ApiError(400, "body must be a JSON object")
+        raise ApiError(400, "body must be a JSON object", key="err_body_must_be_json_object")
     return data
 
 
@@ -420,7 +420,7 @@ async def middleware(request, handler):
         try:
             # 3. Refuse POST without application/json (couch-tv#73)
             if request.method == "POST" and request.content_type != "application/json":
-                raise ApiError(415, "Content-Type must be application/json")
+                raise ApiError(415, "Content-Type must be application/json", key="err_content_type_json")
 
             # 4. Check pairing key authentication & rate limiting for protected API endpoints (couch-tv#73)
             path = request.path
@@ -428,15 +428,19 @@ async def middleware(request, handler):
             if is_api and path not in OPEN_PATHS and config.PAIRING_KEY:
                 ip = client_ip(request)
                 if is_rate_limited(ip):
-                    raise ApiError(429, "Too many wrong pairing keys. Please wait a minute.")
+                    raise ApiError(
+                        429,
+                        "Too many wrong pairing keys. Please wait a minute.",
+                        key="err_too_many_pairing_keys",
+                    )
                 key = extract_auth_key(request)
                 if key:
                     if not key_matches(key):
                         record_failed_attempt(ip, key)
                         await asyncio.sleep(0.3)
-                        raise ApiError(401, "invalid pairing key")
+                        raise ApiError(401, "invalid pairing key", key="err_invalid_pairing_key")
                 else:
-                    raise ApiError(401, "pairing key required")
+                    raise ApiError(401, "pairing key required", key="err_pairing_key_required")
 
             tv_id = request.query.get("tv")
             if not tv_id and request.method == "POST" and request.body_exists:
@@ -447,7 +451,12 @@ async def middleware(request, handler):
                     tv_id = None
             tv_id = tv_id or DEFAULT_TV
             if tv_id not in TVS:
-                raise ApiError(400, f"unknown tv: {tv_id} (try {', '.join(TVS)})")
+                raise ApiError(
+                    400,
+                    f"unknown tv: {tv_id} (try {', '.join(TVS)})",
+                    key="err_unknown_tv",
+                    vars={"tv": tv_id, "choices": ", ".join(TVS)},
+                )
             _current.set(tv_id)
             resp = await handler(request)
         except ApiError as e:
@@ -571,13 +580,13 @@ async def h_pair(request):
     # recorded: checked before it, parallel requests could all pass while their bodies arrive.
     ip = client_ip(request)
     if is_rate_limited(ip):
-        raise ApiError(429, "Too many wrong pairing keys. Please wait a minute.")
+        raise ApiError(429, "Too many wrong pairing keys. Please wait a minute.", key="err_too_many_pairing_keys")
     if not given:
-        raise ApiError(400, "pairing key is required")
+        raise ApiError(400, "pairing key is required", key="err_pairing_key_required")
     if not key_matches(given):
         record_failed_attempt(ip, given)
         await asyncio.sleep(0.3)
-        raise ApiError(401, "That pairing key is not right. Check config.json.")
+        raise ApiError(401, "That pairing key is not right. Check config.json.", key="err_pairing_key_wrong")
     return ok(paired=True, token=config.PAIRING_KEY, note="paired")
 
 
@@ -632,7 +641,7 @@ async def h_key(request):
     data = await body(request)
     key = data.get("key")
     if not key:
-        raise ApiError(400, "key is required")
+        raise ApiError(400, "key is required", key="err_key_required")
     _reset_paused_idle()
     await tv.key(str(key), hold=bool(data.get("hold")))
     record_action(request, "key", {"key": key}, True)
@@ -643,7 +652,7 @@ async def h_pointer(request):
     """LG only: move the TV's pointer ({"dx", "dy"}), click ({"click": true}) or scroll ({"scroll": dy})."""
     data = await body(request)
     if not hasattr(tv, "pointer"):
-        raise ApiError(400, "only an LG TV has a pointer")
+        raise ApiError(400, "only an LG TV has a pointer", key="err_lg_only_pointer")
     tv.require()
     clamp = lambda v: max(-400, min(400, int(v or 0)))
     await tv.pointer(clamp(data.get("dx")), clamp(data.get("dy")), bool(data.get("click")), clamp(data.get("scroll")))
@@ -654,7 +663,7 @@ async def h_text(request):
     data = await body(request)
     text = data.get("text")
     if not isinstance(text, str) or not text:
-        raise ApiError(400, "text is required")
+        raise ApiError(400, "text is required", key="err_text_required")
     await tv.text(text)
     record_action(request, "text", {"text": text}, True)
     return ok()
@@ -682,7 +691,7 @@ async def h_launch(request):
     data = await body(request)
     target = data.get("app")
     if not target or not isinstance(target, str):
-        raise ApiError(400, "app is required")
+        raise ApiError(400, "app is required", key="err_app_required")
     if "://" in target:
         await tv.start_intent(target)
         await asyncio.sleep(2)
@@ -694,13 +703,18 @@ async def h_launch(request):
             record_action(request, "launch", {"app": target}, True)
             return ok(app=target)
         except TVUnavailable as e:
-            raise ApiError(503, str(e))
+            raise ApiError(503, str(e), key=getattr(e, "key", None), vars=getattr(e, "vars", None))
         except Exception as e:
-            raise ApiError(500, f"could not open {target} settings: {e}")
+            raise ApiError(
+                500,
+                f"could not open {target} settings: {e}",
+                key="err_settings_open_failed",
+                vars={"target": target, "error": str(e)},
+            )
     app = apps.BY_ID.get(target) or apps.BY_PACKAGE.get(target)
     if app is None:
         if "." not in target:
-            raise ApiError(400, f"unknown app: {target}")
+            raise ApiError(400, f"unknown app: {target}", key="err_unknown_app", vars={"app": target})
         app = {"id": None, "name": target, "package": target}
     if app.get("id") == "home":
         await tv.key("home")
@@ -711,19 +725,29 @@ async def h_launch(request):
     if not got:
         await installed_packages(max_age=0)
         if installed["packages"] is not None and app["package"] not in installed["packages"]:
-            raise ApiError(404, f"{app['name']} is not installed on the TV")
-        raise ApiError(504, f"asked the TV to open {app['name']} but it did not come up")
+            raise ApiError(
+                404,
+                f"{app['name']} is not installed on the TV",
+                key="err_app_not_installed",
+                vars={"app": app["name"]},
+            )
+        raise ApiError(
+            504,
+            f"asked the TV to open {app['name']} but it did not come up",
+            key="err_app_did_not_come_up",
+            vars={"app": app["name"]},
+        )
     return ok(app=apps.describe_package(got))
 
 
 async def h_find(request):
     title = request.query.get("title", "").strip()
     if not title:
-        raise ApiError(400, "title is required")
+        raise ApiError(400, "title is required", key="err_title_required")
     await installed_packages()
     best, others = await finder.find(title, request.query.get("type"))
     if not best:
-        raise ApiError(404, f"could not find {title}")
+        raise ApiError(404, f"could not find {title}", key="err_title_not_found", vars={"title": title})
     return ok(result=public_result(best), others=others)
 
 
@@ -814,7 +838,7 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
     await installed_packages()
     best, _ = await finder.find(title)
     if not best:
-        raise ApiError(404, f"could not find {title}")
+        raise ApiError(404, f"could not find {title}", key="err_title_not_found", vars={"title": title})
     providers = best["providers"]
     ep_info = None
     if season and best["type"] == "tv":
@@ -834,13 +858,18 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
         if not candidates:
             app = apps.BY_ID.get(service)
             if not app:
-                raise ApiError(400, f"unknown service: {service}")
+                raise ApiError(400, f"unknown service: {service}", key="err_unknown_service", vars={"service": service})
             # Not listed by JustWatch on that service: open it and search.
             method, note = await search_in_app(app, best["title"], best)
             return finish_play(best, app, method, note, season, episode, who, ep_info)
     if not candidates:
         where = ", ".join(p["name"] for p in providers) or f"nowhere in {config.COUNTRY_NAME} right now"
-        raise ApiError(404, f"{best['title']} is not on any app on this TV (streams on: {where})")
+        raise ApiError(
+            404,
+            f"{best['title']} is not on any app on this TV (streams on: {where})",
+            key="err_not_on_any_app",
+            vars={"title": best["title"], "where": where},
+        )
 
     pick = candidates[0]
     app = apps.BY_ID[pick["service"]]
@@ -908,14 +937,14 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
 async def h_tizen_next(request):
     """The couch-tv app on a Samsung TV asks here (long poll) for jobs only it can do."""
     if tv.kind != "samsung":
-        raise ApiError(400, "only for Samsung TVs")
+        raise ApiError(400, "only for Samsung TVs", key="err_only_samsung")
     return ok(job=await tv.tizen_next())
 
 
 async def h_webos_apps(request):
     """The couch-tv app on an LG TV asks here for the TV's apps (webOS may not tell the app)."""
     if tv.kind != "lg":
-        raise ApiError(400, "only for LG TVs")
+        raise ApiError(400, "only for LG TVs", key="err_only_lg")
     return ok(apps=await tv.apps_on_tv())
 
 
@@ -924,7 +953,7 @@ async def h_roku_apps(request):
     phone (the Roku has no app list a channel may read). Each has "icon", the bridge's copy of the Roku's
     own icon, and "logo", true when the channel has a bundled one named after "package"."""
     if tv.kind != "roku":
-        raise ApiError(400, "only for Roku TVs")
+        raise ApiError(400, "only for Roku TVs", key="err_only_roku")
     tv.require()
     listed = await tv.apps_on_tv()
     saved, _, was_saved = effective_order()
@@ -938,11 +967,11 @@ async def h_roku_apps(request):
 
 async def h_roku_icon(request):
     if tv.kind != "roku":
-        raise ApiError(400, "only for Roku TVs")
+        raise ApiError(400, "only for Roku TVs", key="err_only_roku")
     try:
         data, kind = await tv.icon(request.match_info["id"])
     except (roku.RokuError, ValueError, TVUnavailable) as e:
-        raise ApiError(404, str(e))
+        raise ApiError(404, str(e), key=getattr(e, "key", None), vars=getattr(e, "vars", None))
     return web.Response(body=data, content_type=kind.split(";")[0], headers={"Cache-Control": "max-age=86400"})
 
 
@@ -951,11 +980,11 @@ async def h_vega_keys(request):
     20 seconds for a key, and the asking is how the bridge knows the page is in front). Vega has no way
     for the network to press a key, so the page presses them on itself (tv-home/web/vega.js)."""
     if tv.kind != "vega":
-        raise ApiError(400, "only for Fire TV on Vega OS")
+        raise ApiError(400, "only for Fire TV on Vega OS", key="err_only_vega")
     try:
         after = int(request.query.get("after") or 0)
     except ValueError:
-        raise ApiError(400, "after must be a number")
+        raise ApiError(400, "after must be a number", key="err_after_must_be_number")
     keys, last = await tv.next_keys(after, timeout=20.0)
     return ok(keys=keys, last=last)
 
@@ -963,25 +992,25 @@ async def h_vega_keys(request):
 async def h_vidaa_pair(request):
     """VIDAA pairing: {} asks the TV to show its PIN, {"pin": "1234"} sends it back (docs/VIDAA.md)."""
     if tv.kind != "vidaa":
-        raise ApiError(400, "only for VIDAA TVs")
+        raise ApiError(400, "only for VIDAA TVs", key="err_only_vidaa")
     data = await body(request)
     pin = data.get("pin")
     if pin is None:
         await tv.pair_start()
         return ok(step="pin", note="The TV should now show a 4 digit PIN. Send it as {\"pin\": \"1234\"}.")
     if not isinstance(pin, (str, int)) or not vidaa.PIN.match(str(pin).strip()):
-        raise ApiError(400, "pin is the 4 digits the TV shows")
+        raise ApiError(400, "pin is the 4 digits the TV shows", key="err_pin_4_digits")
     try:
         await tv.pair_finish(str(pin).strip())
     except vidaa.VidaaError as e:
-        raise ApiError(409, str(e))
+        raise ApiError(409, str(e), key=getattr(e, "key", None), vars=getattr(e, "vars", None))
     return ok(paired=True)
 
 
 async def h_appletv_pair(request):
     """Apple TV pairing: {} asks the Apple TV to show its PIN, {"pin": "1234"} sends it back (docs/APPLE-TV.md)."""
     if tv.kind != "appletv":
-        raise ApiError(400, "only for Apple TVs")
+        raise ApiError(400, "only for Apple TVs", key="err_only_appletv")
     data = await body(request)
     pin = data.get("pin")
     try:
@@ -989,10 +1018,10 @@ async def h_appletv_pair(request):
             await tv.pair_start()
             return ok(step="pin", note="The Apple TV should now show a 4 digit PIN. Send it as {\"pin\": \"1234\"}.")
         if not isinstance(pin, (str, int)) or not re.fullmatch(r"\d{4}", str(pin).strip()):
-            raise ApiError(400, "pin is the 4 digits the Apple TV shows")
+            raise ApiError(400, "pin is the 4 digits the Apple TV shows", key="err_pin_4_digits_appletv")
         await tv.pair_finish(str(pin).strip())
     except appletv.AppleTVError as e:
-        raise ApiError(409, str(e))
+        raise ApiError(409, str(e), key=getattr(e, "key", None), vars=getattr(e, "vars", None))
     return ok(paired=True)
 
 
@@ -1006,7 +1035,7 @@ appletv_codes = {}          # code -> (runs out at, monotonic; tv id)
 
 def _need_appletv():
     if tv.kind != "appletv":
-        raise ApiError(400, "only for Apple TVs (add ?tv=<the Apple TV's id>)")
+        raise ApiError(400, "only for Apple TVs (add ?tv=<the Apple TV's id>)", key="err_only_appletv_with_hint")
 
 
 async def h_appletv_code(request):
@@ -1031,12 +1060,12 @@ async def h_appletv_claim(request):
     code = str(data.get("code") or "").strip()
     ip = client_ip(request)
     if is_rate_limited(ip):
-        raise ApiError(429, "Too many wrong codes. Please wait a minute.")
+        raise ApiError(429, "Too many wrong codes. Please wait a minute.", key="err_too_many_codes")
     found = appletv_codes.pop(code, None) if re.fullmatch(r"\d{6}", code) else None
     if not found or found[0] <= time.monotonic() or found[1] not in TVS:
         record_failed_attempt(ip, code)
         await asyncio.sleep(0.3)
-        raise ApiError(401, "that code is not valid (a code works once, for ten minutes)")
+        raise ApiError(401, "that code is not valid (a code works once, for ten minutes)", key="err_invalid_code_10m")
     t = TVS[found[1]]
     return ok(key=config.PAIRING_KEY, tv=found[1], name=t.name)
 
@@ -1057,7 +1086,7 @@ async def h_appletv_hello(request):
     """The Apple TV app's first question: which TV am I. It needs the key, so it also checks the key."""
     tv_id = appletv_for(request.query.get("tv"), (getattr(request, "remote", None) or "").removeprefix("::ffff:"))
     if not tv_id:
-        raise ApiError(404, "no Apple TV in config.json (docs/APPLE-TV.md)")
+        raise ApiError(404, "no Apple TV in config.json (docs/APPLE-TV.md)", key="err_no_appletv_in_config")
     t = TVS[tv_id]
     return ok(tv=tv_id, name=t.name, home_bundle=t.home_bundle(), dock_max=DOCK_MAX)
 
@@ -1083,18 +1112,31 @@ async def h_appletv_open(request):
     data = await body(request)
     bundle = data.get("bundle")
     if not isinstance(bundle, str) or not appletv.BUNDLE_RE.fullmatch(bundle):
-        raise ApiError(400, "bundle is an app's bundle id, for example com.netflix.Netflix")
+        raise ApiError(
+            400,
+            "bundle is an app's bundle id, for example com.netflix.Netflix",
+            key="err_invalid_bundle_id",
+        )
     tv.require()
     kid = _kid_on_appletv(None)
     if kid:
         # kids mode: only the apps on that child's list, whatever the app on the Apple TV asks for
         await tv.refresh_installed()
         if bundle not in {a["id"] for a in appletv_kids_apps(kids.mode(kid))}:
-            raise ApiError(403, "Kids mode is on: that app is not on this child's list.")
+            raise ApiError(
+                403,
+                "Kids mode is on: that app is not on this child's list.",
+                key="err_kids_app_not_allowed",
+            )
     try:
         await tv.open_bundle(bundle)
     except appletv.AppleTVError as e:
-        raise ApiError(502, f"the Apple TV would not open {bundle}: {e}")
+        raise ApiError(
+            502,
+            f"the Apple TV would not open {bundle}: {e}",
+            key="err_appletv_open_bundle_failed",
+            vars={"bundle": bundle, "error": str(e)},
+        )
     record_action(request, "launch", {"app": bundle}, True)
     return ok(opened=bundle)
 
@@ -1200,10 +1242,10 @@ async def h_appletv_kids_open(request):
     data = await body(request)
     pid = _kid_on_appletv(data.get("who"))
     if not pid:
-        raise ApiError(404, "That is not a kids profile.")
+        raise ApiError(404, "That is not a kids profile.", key="err_not_kids_profile")
     show = next((s for s in kids.mode(pid)["shows"] if s["id"] == data.get("id")), None)
     if not show:
-        raise ApiError(404, "That show is not on the shelf.")
+        raise ApiError(404, "That show is not on the shelf.", key="err_show_not_on_shelf")
     tv.require()
     await tv.refresh_installed()
     app_id, link, to_episode = await _appletv_show_link(show)
@@ -1224,7 +1266,12 @@ async def h_appletv_kids_open(request):
             return ok(opened="app", note=f"{app['name']} is open. Pick {what} there.")
         except (TVUnavailable, ValueError) as e:
             log.info("kids: could not open %s for %s: %s", app["id"], show["title"], e)
-    raise ApiError(404, f"{show['title']} is not on an app on this Apple TV.")
+    raise ApiError(
+        404,
+        f"{show['title']} is not on an app on this Apple TV.",
+        key="err_show_not_on_appletv",
+        vars={"title": show["title"]},
+    )
 
 
 def _lan_address():
@@ -1266,7 +1313,7 @@ async def advertise_for_appletv():
 async def h_vidaa_tile(request):
     """VIDAA: ask the TV to add couch-tv to its app row. Newer firmware may refuse (docs/VIDAA.md)."""
     if tv.kind != "vidaa":
-        raise ApiError(400, "only for VIDAA TVs")
+        raise ApiError(400, "only for VIDAA TVs", key="err_only_vidaa")
     added = await tv.install_tile()
     return ok(tile=added, note=None if added else "The TV did not add the tile. The browser stays the way couch-tv opens.")
 
@@ -1279,19 +1326,19 @@ async def h_vidaa_claim(request):
     code = data.get("code")
     ip = client_ip(request)
     if is_rate_limited(ip):
-        raise ApiError(429, "Too many wrong codes. Please wait a minute.")
+        raise ApiError(429, "Too many wrong codes. Please wait a minute.", key="err_too_many_codes")
     for tv_id, t in TVS.items():
         if t.kind in ("vidaa", "panasonic") and t.claim(code):
             return ok(key=config.PAIRING_KEY, tv=tv_id)
     record_failed_attempt(ip, str(code))
     await asyncio.sleep(0.3)
-    raise ApiError(401, "that code is not valid (codes work once, for two minutes)")
+    raise ApiError(401, "that code is not valid (codes work once, for two minutes)", key="err_invalid_code_2m")
 
 
 async def h_vizio_pair(request):
     """VIZIO pairing: {} asks the TV to show its PIN, {"pin": "1234"} sends it back (docs/VIZIO.md)."""
     if tv.kind != "vizio":
-        raise ApiError(400, "only for VIZIO TVs")
+        raise ApiError(400, "only for VIZIO TVs", key="err_only_vizio")
     data = await body(request)
     pin = data.get("pin")
     try:
@@ -1299,17 +1346,17 @@ async def h_vizio_pair(request):
             await tv.pair_start()
             return ok(step="pin", note="The TV should now show a 4 digit PIN. Send it as {\"pin\": \"1234\"}.")
         if not isinstance(pin, (str, int)) or not vizio.PIN.match(str(pin).strip()):
-            raise ApiError(400, "pin is the 4 digits the TV shows")
+            raise ApiError(400, "pin is the 4 digits the TV shows", key="err_pin_4_digits")
         await tv.pair_finish(str(pin).strip())
     except vizio.VizioError as e:
-        raise ApiError(409, str(e))
+        raise ApiError(409, str(e), key=getattr(e, "key", None), vars=getattr(e, "vars", None))
     return ok(paired=True)
 
 
 async def h_vizio_apps(request):
     """The apps couch-tv knows how to open on a VIZIO (the TV itself does not list them)."""
     if tv.kind != "vizio":
-        raise ApiError(400, "only for VIZIO TVs")
+        raise ApiError(400, "only for VIZIO TVs", key="err_only_vizio")
     return ok(apps=await tv.apps_on_tv())
 
 
@@ -1317,7 +1364,7 @@ async def h_panasonic_pair(request):
     """Panasonic pairing, encrypted sets only: {} asks the TV to show its PIN, {"pin": "1234"} sends it
     back (docs/PANASONIC.md). A set that needs no pairing answers step "none"."""
     if tv.kind != "panasonic":
-        raise ApiError(400, "only for Panasonic TVs")
+        raise ApiError(400, "only for Panasonic TVs", key="err_only_panasonic")
     data = await body(request)
     pin = data.get("pin")
     try:
@@ -1326,10 +1373,10 @@ async def h_panasonic_pair(request):
                 return ok(step="none", note="This TV takes commands without pairing.")
             return ok(step="pin", note="The TV should now show a PIN. Send it as {\"pin\": \"1234\"}.")
         if not isinstance(pin, (str, int)) or not re.match(panasonic.PROTOCOL["pin"], str(pin).strip()):
-            raise ApiError(400, "pin is the digits the TV shows")
+            raise ApiError(400, "pin is the digits the TV shows", key="err_pin_digits")
         await tv.pair_finish(str(pin).strip())
     except panasonic.PanasonicError as e:
-        raise ApiError(409, str(e))
+        raise ApiError(409, str(e), key=getattr(e, "key", None), vars=getattr(e, "vars", None))
     return ok(paired=True)
 
 
@@ -1345,7 +1392,7 @@ async def h_philips_pair(request):
     """Philips pairing: {} asks the TV to show its PIN, {"pin": "1234"} sends it back
     (docs/PHILIPS-TITAN.md). Needs the pairing key saved first (scripts/philips-secret.py)."""
     if tv.kind != "philips":
-        raise ApiError(400, "only for Philips TVs")
+        raise ApiError(400, "only for Philips TVs", key="err_only_philips")
     data = await body(request)
     pin = data.get("pin")
     try:
@@ -1353,17 +1400,17 @@ async def h_philips_pair(request):
             await tv.pair_start()
             return ok(step="pin", note="The TV should now show a PIN. Send it as {\"pin\": \"1234\"}.")
         if not isinstance(pin, (str, int)) or not philips.PIN.match(str(pin).strip()):
-            raise ApiError(400, "pin is the digits the TV shows")
+            raise ApiError(400, "pin is the digits the TV shows", key="err_pin_digits")
         await tv.pair_finish(str(pin).strip())
     except philips.PhilipsError as e:
-        raise ApiError(409, str(e))
+        raise ApiError(409, str(e), key=getattr(e, "key", None), vars=getattr(e, "vars", None))
     return ok(paired=True)
 
 
 async def h_philips_apps(request):
     """The apps a Philips TV lists, with the one couch-tv opens at power on (if any)."""
     if tv.kind != "philips":
-        raise ApiError(400, "only for Philips TVs")
+        raise ApiError(400, "only for Philips TVs", key="err_only_philips")
     tv.require()
     listed = await tv.apps_on_tv()
     home = tv._home_entry()
@@ -1373,28 +1420,28 @@ async def h_philips_apps(request):
 async def h_philips_sources(request):
     """A Philips TV's inputs, as the TV lists them."""
     if tv.kind != "philips":
-        raise ApiError(400, "only for Philips TVs")
+        raise ApiError(400, "only for Philips TVs", key="err_only_philips")
     tv.require()
     try:
         return ok(sources=await tv.read_sources())
     except philips.PhilipsError as e:
-        raise ApiError(409, str(e))
+        raise ApiError(409, str(e), key=getattr(e, "key", None), vars=getattr(e, "vars", None))
 
 
 async def h_philips_source(request):
     """Switch a Philips TV to one of the inputs it listed: {"name": "HDMI 2"} (or its id)."""
     if tv.kind != "philips":
-        raise ApiError(400, "only for Philips TVs")
+        raise ApiError(400, "only for Philips TVs", key="err_only_philips")
     data = await body(request)
     name = data.get("name")
     if not isinstance(name, str) or not name.strip():
-        raise ApiError(400, "name is required (an input the TV lists)")
+        raise ApiError(400, "name is required (an input the TV lists)", key="err_philips_input_name_required")
     try:
         hit = await tv.switch_source(name)
     except ValueError as e:
-        raise ApiError(404, str(e))
+        raise ApiError(404, str(e), key=getattr(e, "key", None), vars=getattr(e, "vars", None))
     except philips.PhilipsError as e:
-        raise ApiError(409, str(e))
+        raise ApiError(409, str(e), key=getattr(e, "key", None), vars=getattr(e, "vars", None))
     record_action(request, "input", {"name": name, "input": hit["name"]}, True)
     return ok(input=hit["name"])
 
@@ -1484,7 +1531,7 @@ async def wait_until_playing(pkg, timeout=30):
     return False
 
 
-def finish_play(best, app, method, note, season, episode, who, ep_info=None):
+def finish_play(best, app, method, note, season, episode, who, ep_info=None, note_key=None, note_vars=None):
     extra = {}
     if ep_info and ep_info.get("episode"):
         extra = _episode_fields(ep_info)
@@ -1507,14 +1554,15 @@ def finish_play(best, app, method, note, season, episode, who, ep_info=None):
     asyncio.get_running_loop().call_later(5, lambda: asyncio.ensure_future(recs_refresh_soon()))
     return {"title": best["title"], "year": best["year"], "type": best["type"],
             "poster": best["poster"], "backdrop": best["backdrop"], "service": app["id"],
-            "app": apps.describe_package(app["package"]), "method": method, "note": note}
+            "app": apps.describe_package(app["package"]), "method": method, "note": note,
+            **messages.note_fields(note_key, note_vars)}
 
 
 async def h_play(request):
     data = await body(request)
     title = (data.get("title") or "").strip()
     if not title:
-        raise ApiError(400, "title is required")
+        raise ApiError(400, "title is required", key="err_title_required")
     _reset_paused_idle()
     # No season asked for: open the show where they are up to, never episode 1.
     result = await play(title, data.get("season"), data.get("episode"), data.get("service"),
@@ -1533,7 +1581,12 @@ async def h_who_set(request):
     data = await body(request)
     who = store.norm_who(data.get("who"))
     if not who:
-        raise ApiError(400, "who must be " + ", ".join(config.PEOPLE_IDS) + " or both")
+        raise ApiError(
+            400,
+            "who must be " + ", ".join(config.PEOPLE_IDS) + " or both",
+            key="err_who_must_be",
+            vars={"choices": ", ".join(config.PEOPLE_IDS)},
+        )
     # Kids mode: moving this TV away from a kids profile needs the parent PIN (docs/CONFIG.md)
     was = cur_who()
     if was != who and kids.is_kid(was):
@@ -1554,17 +1607,26 @@ async def h_people_set(request):
     data = await body(request)
     if isinstance(data.get("people"), list):
         if len(data["people"]) > config.MAX_PEOPLE:
-            raise ApiError(400, f"at most {config.MAX_PEOPLE} people")
+            raise ApiError(
+                400,
+                f"at most {config.MAX_PEOPLE} people",
+                key="err_too_many_people",
+                vars={"max": config.MAX_PEOPLE},
+            )
         people = data["people"]
     elif isinstance(data.get("order"), list):
         by = {p["id"]: p for p in config.PEOPLE}
         order = [i for i in dict.fromkeys(data["order"]) if isinstance(i, str) and i in by]
         people = [by[i] for i in order] + [p for p in config.PEOPLE if p["id"] not in order]
     else:
-        raise ApiError(400, "people (a list) or order (a list of ids) is required")
+        raise ApiError(
+            400,
+            "people (a list) or order (a list of ids) is required",
+            key="err_people_or_order_required",
+        )
     for item in people:
         if isinstance(item, dict) and not " ".join(str(item.get("name") or "").split()):
-            raise ApiError(400, "every person needs a name")
+            raise ApiError(400, "every person needs a name", key="err_person_needs_name")
     # The phone only edits names and order: keep each person's kid and guest marks from config.
     old = {p["id"]: p for p in config.PEOPLE}
     people = [{**{k: old[i["id"]][k] for k in ("kid", "guest") if k in old.get(i.get("id"), {})}, **i}
@@ -1584,10 +1646,14 @@ def check_kids_pin(request, pid, pin):
     """Raise 403 unless pin is the parent PIN for this kids profile; 429 after too many wrong ones."""
     addr = client_ip(request) or "local"
     if kids.locked_out(addr):
-        raise ApiError(429, "Too many wrong PINs. Wait a few minutes and try again.")
+        raise ApiError(429, "Too many wrong PINs. Wait a few minutes and try again.", key="err_too_many_pins")
     if not kids.verify(pid, pin):
         kids.wrong_pin(addr)
-        raise ApiError(403, "That PIN is not right." if pin else "The parent PIN is needed for that.")
+        raise ApiError(
+            403,
+            "That PIN is not right." if pin else "The parent PIN is needed for that.",
+            key="err_pin_wrong" if pin else "err_parent_pin_needed",
+        )
 
 
 async def kids_list():
@@ -1620,25 +1686,30 @@ async def h_kids_set(request):
     data = await body(request)
     pid = store.norm_who(data.get("who"))
     if not pid or pid == "both":
-        raise ApiError(400, "who must be one person's id")
+        raise ApiError(400, "who must be one person's id", key="err_who_must_be_one_person")
     action = data.get("action")
     m = kids.mode(pid)
     if action == "on":
         if m:
-            raise ApiError(409, "That is a kids profile already.")
+            raise ApiError(409, "That is a kids profile already.", key="err_already_kids_profile")
         if not kids.good_pin(data.get("new_pin")):
-            raise ApiError(400, "The PIN must be 4 to 8 digits.")
+            raise ApiError(400, "The PIN must be 4 to 8 digits.", key="err_pin_4_to_8_digits")
         kids.turn_on(pid, str(data["new_pin"]))
     else:
         if not m:
-            raise ApiError(404, "That is not a kids profile.")
+            raise ApiError(404, "That is not a kids profile.", key="err_not_kids_profile")
         check_kids_pin(request, pid, data.get("pin"))
         if action == "add":
             show = kids.clean_show(data.get("show"))
             if not show:
-                raise ApiError(400, "show needs a title")
+                raise ApiError(400, "show needs a title", key="err_show_needs_title")
             if len(m["shows"]) >= kids.MAX_SHOWS:
-                raise ApiError(400, f"A shelf holds {kids.MAX_SHOWS} shows. Remove one first.")
+                raise ApiError(
+                    400,
+                    f"A shelf holds {kids.MAX_SHOWS} shows. Remove one first.",
+                    key="err_shelf_full",
+                    vars={"max": kids.MAX_SHOWS},
+                )
             kids.set_shows(pid, m["shows"] + [show])
         elif action == "remove":
             kids.set_shows(pid, [s for s in m["shows"] if s["id"] != data.get("id")])
@@ -1646,12 +1717,16 @@ async def h_kids_set(request):
             kids.set_apps(pid, data.get("apps"))
         elif action == "pin":
             if not kids.good_pin(data.get("new_pin")):
-                raise ApiError(400, "The PIN must be 4 to 8 digits.")
+                raise ApiError(400, "The PIN must be 4 to 8 digits.", key="err_pin_4_to_8_digits")
             kids.set_pin(pid, str(data["new_pin"]))
         elif action == "off":
             kids.turn_off(pid)
         elif action != "check":
-            raise ApiError(400, "action must be check, add, remove, apps, pin, on or off")
+            raise ApiError(
+                400,
+                "action must be check, add, remove, apps, pin, on or off",
+                key="err_invalid_kids_action",
+            )
     record_action(request, "kids", {"action": action}, True)
     for tv_id in TVS:
         with_tv(tv_id, push_now)
@@ -1671,7 +1746,8 @@ async def screens_list():
         inst = is_installed(app) if app else None
         ready = inst is True
         out.append({"id": s["id"], "name": s["name"], "kind": s["kind"], "ready": ready,
-                    "note": None if ready else "Needs Sunshine on the computer and Moonlight on the TV."})
+                    "note": None if ready else "Needs Sunshine on the computer and Moonlight on the TV.",
+                    **messages.note_fields(None if ready else "note_screens_need_sunshine")})
     return out
 
 
@@ -1684,10 +1760,10 @@ async def h_screens_open(request):
     sid = data.get("id")
     screen = next((s for s in SCREENS if s["id"] == sid), None)
     if not screen:
-        raise ApiError(404, f"unknown screen: {sid}")
+        raise ApiError(404, f"unknown screen: {sid}", key="err_unknown_screen", vars={"id": sid})
     listed = next(s for s in await screens_list() if s["id"] == sid)
     if not listed["ready"]:
-        raise ApiError(409, listed["note"])
+        raise ApiError(409, listed["note"], key=listed.get("note_key"), vars=listed.get("note_vars"))
     got, _ = await launch_app(apps.BY_PACKAGE[screen["package"]])
     record_action(request, "screens_open", {"id": sid}, bool(got))
     return ok(id=sid, note=f"Opened Moonlight. Pick the {screen['name']} on the TV.")
@@ -1718,7 +1794,7 @@ async def h_power(request):
     data = await body(request)
     state = data.get("state")
     if state not in ("on", "off", "toggle"):
-        raise ApiError(400, "state must be on, off or toggle")
+        raise ApiError(400, "state must be on, off or toggle", key="err_power_state_invalid")
     started = time.monotonic()
     if hasattr(tv, "home_on_wake_until") and tv.connected:
         # LG: the phone's idea of on or off can be seconds behind (Quick Start+ standby still
@@ -1789,7 +1865,10 @@ async def power_on():
             else:
                 await asyncio.sleep(1)
         if not tv.connected:
-            raise TVUnavailable("the TV did not wake over the network (turn it on with its remote)")
+            raise TVUnavailable(
+                "the TV did not wake over the network (turn it on with its remote)",
+                key="err_tv_did_not_wake",
+            )
         await asyncio.sleep(1)  # let the TV report its power state
     # Still in standby but on the network ("light" standby, the first minute or so after off):
     # POWER switches it on in under a second. WAKEUP did nothing. A wake packet
@@ -1812,7 +1891,10 @@ async def power_on():
             if tv.is_on:
                 break
     if not tv.is_on:
-        raise TVUnavailable("the TV is on the network but did not switch on; try again")
+        raise TVUnavailable(
+            "the TV is on the network but did not switch on; try again",
+            key="err_tv_did_not_switch_on",
+        )
 
 
 async def h_volume(request):
@@ -1824,7 +1906,11 @@ async def h_volume(request):
     if "level" in data:
         vol = tv.volume
         if not vol["known"]:
-            raise ApiError(409, "this TV does not report a volume level, use up and down")
+            raise ApiError(
+                409,
+                "this TV does not report a volume level, use up and down",
+                key="err_volume_level_not_reported",
+            )
         target = max(0, min(100, int(data["level"])))
         want = round(target * vol["max"] / 100)
         diff = want - (vol["level"] or 0)
@@ -1835,7 +1921,11 @@ async def h_volume(request):
         action = data.get("action")
         keys = {"up": "volume_up", "down": "volume_down", "mute": "mute"}
         if action not in keys:
-            raise ApiError(400, "action must be up, down or mute, or send level")
+            raise ApiError(
+                400,
+                "action must be up, down or mute, or send level",
+                key="err_volume_action_invalid",
+            )
         steps = 1 if action == "mute" else max(1, min(int(data.get("steps", 1)), 20))
         if action == "mute" and hasattr(tv, "set_mute") and tv.volume["known"]:
             await tv.set_mute(not tv.volume["muted"])   # Samsung: set over UPnP, its mute key is ignored. LG: over SSAP
@@ -1867,13 +1957,17 @@ async def recs_refresh_soon():
 
 async def h_ask(request):
     if not config.ASK_ENABLED:
-        raise ApiError(409, "The Claude ask is switched off (ask.enabled in config.json).")
+        raise ApiError(
+            409,
+            "The Claude ask is switched off (ask.enabled in config.json).",
+            key="err_ask_disabled",
+        )
     data = await body(request)
     text = (data.get("text") or "").strip()
     if not text:
-        raise ApiError(400, "text is required")
+        raise ApiError(400, "text is required", key="err_text_required")
     if kids.is_kid(store.norm_who(data.get("who")) or cur_who()):
-        raise ApiError(403, "Ask is off for a kids profile.")
+        raise ApiError(403, "Ask is off for a kids profile.", key="err_ask_off_for_kids")
     result = await claude.ask(text, store.norm_who(data.get("who")) or cur_who(), asks,
                               _current.get(), lang=home_settings().get("settings", {}).get("lang"))
     return ok(**result)
@@ -1887,7 +1981,7 @@ async def h_recs(request):
 
 
 async def h_api_missing(request):
-    raise ApiError(404, "no such endpoint")
+    raise ApiError(404, "no such endpoint", key="err_no_such_endpoint")
 
 
 async def h_options(request):
@@ -2143,7 +2237,7 @@ async def get_weather():
 async def h_weather(request):
     w = await get_weather()
     if not w:
-        raise ApiError(503, "No weather right now.")
+        raise ApiError(503, "No weather right now.", key="err_no_weather")
     return ok(**w)
 
 
@@ -2187,7 +2281,7 @@ async def h_home_apps(request):
     data = await body(request)
     apps = _clean_apps(data.get("apps"))
     if not apps:
-        raise ApiError(400, "apps is required")
+        raise ApiError(400, "apps is required", key="err_apps_required")
     line = data.get("line")
     store._write(_order_paths()[0], {"apps": apps, "line": int(line) if isinstance(line, int) else DOCK_MAX,
                                      "at": datetime.now(HOME_TZ).isoformat(timespec="seconds")})
@@ -2203,11 +2297,11 @@ async def h_app_order_set(request):
     data = await body(request)
     order = data.get("order")
     if not isinstance(order, list) or not all(isinstance(p, str) for p in order):
-        raise ApiError(400, "order must be a list of app packages")
+        raise ApiError(400, "order must be a list of app packages", key="err_order_must_be_packages")
     try:
         line = int(data.get("line"))
     except (TypeError, ValueError):
-        raise ApiError(400, "line is required")
+        raise ApiError(400, "line is required", key="err_line_required")
     line = max(0, min(line, DOCK_MAX, len(order)))
     store._write(_order_paths()[1], {"order": order, "line": line,
                                      "at": datetime.now(HOME_TZ).isoformat(timespec="seconds")})
@@ -2350,9 +2444,9 @@ async def h_settings_set(request):
     data = await body(request)
     s = data.get("settings")
     if not isinstance(s, dict):
-        raise ApiError(400, "settings (an object) is required")
+        raise ApiError(400, "settings (an object) is required", key="err_settings_object_required")
     if len(json.dumps(s)) > SETTINGS_MAX:
-        raise ApiError(413, "settings are too big")
+        raise ApiError(413, "settings are too big", key="err_settings_too_big")
     cleaned = clean_settings(s)
     updated = now_iso()
     store._write(_settings_path(), {"settings": cleaned, "updated": updated})
@@ -2369,9 +2463,9 @@ async def h_sleep_set(request):
     try:
         minutes = float(data.get("minutes"))
     except (TypeError, ValueError):
-        raise ApiError(400, "minutes is required (0 cancels)")
+        raise ApiError(400, "minutes is required (0 cancels)", key="err_minutes_required")
     if minutes < 0 or minutes > 600:
-        raise ApiError(400, "minutes must be 0 to 600")
+        raise ApiError(400, "minutes must be 0 to 600", key="err_minutes_range")
     agentic.cancel(clear_timer=False)  # a timer set by hand replaces "off when this episode ends"
     ends = None
     if minutes > 0:
@@ -2651,7 +2745,7 @@ async def h_continue_open(request):
     cid = data.get("id")
     h = store.history_item(cid) if cid else None
     if not h:
-        raise ApiError(404, f"unknown continue item: {cid}")
+        raise ApiError(404, f"unknown continue item: {cid}", key="err_unknown_continue_item", vars={"id": cid})
     # the episode the card shows: the app's own Watch Next row when it is newer than the line, so
     # the play opens (and history records) where the show is really up to, not the stale episode
     h = wn_fresher(h, _wn_rows())
@@ -3231,7 +3325,7 @@ def _picture_ids():
 def _other_mode(cur):
     ids = _picture_ids()
     if len(ids) < 2:
-        raise ApiError(409, "picture.modes needs two mode names in config.json")
+        raise ApiError(409, "picture.modes needs two mode names in config.json", key="err_picture_modes_config")
     return ids[1] if cur == ids[0] else ids[0]
 
 async def read_picture():
@@ -3264,11 +3358,21 @@ async def h_picture_set(request):
     data = await body(request)
     want = data.get("mode")
     if not tv.picture_cfg:
-        raise ApiError(409, f"picture mode is not supported on the {tv.name.lower()} TV")
+        raise ApiError(
+            409,
+            f"picture mode is not supported on the {tv.name.lower()} TV",
+            key="err_picture_mode_unsupported",
+            vars={"tv": tv.name.lower()},
+        )
     if want not in (*_picture_ids(), "toggle"):
-        raise ApiError(400, "mode must be " + ", ".join(_picture_ids()) + " or toggle")
+        raise ApiError(
+            400,
+            "mode must be " + ", ".join(_picture_ids()) + " or toggle",
+            key="err_picture_mode_invalid",
+            vars={"choices": ", ".join(_picture_ids())},
+        )
     if not tv.picture_cfg.get("can_set"):
-        raise ApiError(409, "picture mode switching is not set up on this TV yet")
+        raise ApiError(409, "picture mode switching is not set up on this TV yet", key="err_picture_mode_not_setup")
     tv.require()
     if tv.picture_cfg.get("method") == "panel":
         mode = await set_picture_panel(want)
@@ -3295,20 +3399,30 @@ async def h_bluetooth_audio_get(request):
 async def h_bluetooth_audio_set(request):
     tv.require()
     if not hasattr(tv, "open_bluetooth_settings"):
-        raise ApiError(409, f"Bluetooth screen is not supported on this {tv.name} TV")
+        raise ApiError(
+            409,
+            f"Bluetooth screen is not supported on this {tv.name} TV",
+            key="err_bluetooth_unsupported",
+            vars={"tv": tv.name},
+        )
     try:
         await tv.open_bluetooth_settings()
         record_action(request, "bluetooth_audio", {"action": "open_settings"}, True)
         return ok()
     except TVUnavailable as e:
-        raise ApiError(503, str(e))
+        raise ApiError(503, str(e), key=getattr(e, "key", None), vars=getattr(e, "vars", None))
     except Exception as e:
-        raise ApiError(500, f"could not open Bluetooth settings: {e}")
+        raise ApiError(
+            500,
+            f"could not open Bluetooth settings: {e}",
+            key="err_bluetooth_open_failed",
+            vars={"error": str(e)},
+        )
 
 
 async def set_picture(mode):
     """Filled in once the switch method is tested on the TV (see API.md, picture mode)."""
-    raise ApiError(409, "picture mode switching is not set up on this TV yet")
+    raise ApiError(409, "picture mode switching is not set up on this TV yet", key="err_picture_mode_not_setup")
 
 
 # Some TVs only change picture mode inside its own settings app, so we open its
@@ -3341,7 +3455,7 @@ async def set_picture_panel(want):
     # One switch at a time: two presses driving the same panel mix up the cursor moves, and a
     # queued second press would only switch it back. So a press during a switch is turned away.
     if picture_panel_lock.locked():
-        raise ApiError(409, "Still switching the picture, one moment.")
+        raise ApiError(409, "Still switching the picture, one moment.", key="err_picture_still_switching")
     async with picture_panel_lock:
         return await _set_picture_panel(want)
 
@@ -3367,7 +3481,12 @@ async def _set_picture_panel(want):
     to = next((i for i, r in enumerate(usable) if r["title"].lower() == titles[want].lower()), None)
     if at is None or to is None:
         await tv.adb("shell", "input keyevent KEYCODE_BACK", timeout=5)
-        raise ApiError(502, f"could not find {titles[want]} in the TV's Picture Mode panel")
+        raise ApiError(
+            502,
+            f"could not find {titles[want]} in the TV's Picture Mode panel",
+            key="err_picture_panel_item_not_found",
+            vars={"title": titles[want]},
+        )
     log.info("picture panel: ticked %s, want %s, cursor row %s -> %s, rows %s", ticked, want, at, to,
              [r["title"] for r in usable])
     key = "KEYCODE_DPAD_DOWN" if to > at else "KEYCODE_DPAD_UP"
