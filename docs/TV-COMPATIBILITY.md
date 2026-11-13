@@ -53,6 +53,16 @@ Not tested by the author. Each line is what someone said worked on their own dev
   App brought it back after the monitor was switched off and on. The install stopped printing at
   65% but the app was there. If the install service is unreachable after Developer Mode, unplug
   the monitor for a minute ([issue #93](https://github.com/Seagey/couch-tv/issues/93)).
+- **Samsung UE49NU8005 (NU8000, 2018, Tizen 4.0): works as an app the bridge opens**, reported by
+  cvrpierre with the bridge on Ubuntu (Python 3.14). The oldest Samsung so far. Its One Remote has
+  no number keys, and 1 2 3 4 5 on its on-screen 123 pad did not open the Developer Mode box here;
+  the same digits sent through the bridge (`POST /api/key`, `1` to `5`, with the Apps screen open)
+  did, once the TV had allowed the remote. Apps2Samsung's install stopped printing at 21 to 23% both
+  times, but the app was there (`GET http://<tv>:8001/api/v2/applications/CouchTVApp.Home`). This
+  set sends no `PowerState` and leaves the Wi-Fi in standby, so the hook opens couch-tv only after
+  the TV has been off for more than two minutes (`GONE_MEANS_OFF`): a quick off and on looks like a
+  dropout. Its older browser showed the tiles' corners square for about a second while a tile
+  scaled; `samsung/app/tizen.css` now rounds the picture itself.
 - **LG OLED65C56LA (OLED C5, 2025, webOS 11.2, firmware 43.21.96): works**, reported by BlueSpark911 with
   the bridge on Windows 10. The first LG on webOS 11.2. The snags were Windows ones and are in
   [LG.md](LG.md) ([issue #136](https://github.com/Seagey/couch-tv/issues/136)).
