@@ -45,9 +45,13 @@ class FireWatch : AccessibilityService() {
     /** That home is Amazon's: see [moveToFront]. */
     private var amazonInFront = false
     private var recheckPending = false
+    /** When (elapsedRealtime) the TV's own home last came forward, couch-tv's own window last did, and any other app's last did. 0 = never. */
+    private var stockAt = 0L
+    private var ownAt = 0L
+    private var otherAt = 0L
     private val recheck = Runnable {
         recheckPending = false
-        if (stockInFront && !CrashGuard.standingAside(this)) bringBack()
+        if (shouldRecheckBringBack(stockInFront, stockAt, ownAt, otherAt) && !CrashGuard.standingAside(this)) bringBack()
     }
 
     override fun onInterrupt() {}
@@ -102,6 +106,12 @@ class FireWatch : AccessibilityService() {
         stockInFront = isStockHome(pkg, e.className?.toString()) &&
             !(pkg == AMAZON_HOME && settingsAllowed()) &&
             !(pkg == BELL_FIBE_HOME && fibeOpenedOnPurpose)
+        // Kept for the re-check (#175): a window event from an app that is closing arrives after the
+        // TV's home has come forward, and must not hide that the home is what is in front.
+        val now = SystemClock.elapsedRealtime()
+        if (stockInFront) stockAt = now
+        else if (pkg == packageName) ownAt = now
+        else if (pkg != null) otherAt = now
         amazonInFront = stockInFront && e.packageName?.toString() == AMAZON_HOME
         if (!stockInFront) return
         if (CrashGuard.standingAside(this)) return
@@ -184,6 +194,25 @@ class FireWatch : AccessibilityService() {
                 }
             }.start()
         }
+
+        /**
+         * The one re-check after a quick second Home press (#175). Normally the latest window event
+         * decides: [stockInFront]. On a Chromecast with Google TV (Android 14) the app that is closing
+         * (Jellyfin) sends its window event after the Google home's, so the latest event is no longer the
+         * home although the home is what is in front, and later Home presses send no new event at all.
+         * So the re-check also brings couch-tv back when the TV's own home came after couch-tv's last
+         * window, and the only events since were another app's within [CLOSING_SETTLE_MS] of the home's:
+         * that is the app closing. An app the user really opened takes longer than that, and keeps the
+         * screen. Times are elapsedRealtime; 0 means never.
+         */
+        fun shouldRecheckBringBack(stockInFront: Boolean, stockAt: Long, ownAt: Long, otherAt: Long): Boolean {
+            if (stockInFront) return true
+            if (stockAt == 0L || stockAt <= ownAt) return false
+            return otherAt <= stockAt || otherAt - stockAt <= CLOSING_SETTLE_MS
+        }
+
+        /** How soon after the TV's home an event from another app still counts as that app closing (#175 logged about 1.2 s). */
+        private const val CLOSING_SETTLE_MS = 2_000L
 
         const val AMAZON_HOME = "com.amazon.tv.launcher"
         // MiTV-MOOQ1's Mi-logo key reports BUTTON_5 with this scan code, not KEYCODE_HOME.

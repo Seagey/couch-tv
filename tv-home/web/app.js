@@ -4375,7 +4375,7 @@
       var p = pointAt(e.target);
       if (!p) {
         // a click beside an open menu closes it, as Back does
-        if (["menu", "gear", "appmenu", "inputs", "pmenu"].indexOf(zone) >= 0) {
+        if (["menu", "gear", "appmenu", "shelfmenu", "inputs", "pmenu"].indexOf(zone) >= 0) {
           e.preventDefault();
           document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
         }
