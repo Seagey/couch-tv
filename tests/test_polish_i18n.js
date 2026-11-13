@@ -31,7 +31,7 @@ Object.keys(S.pl).forEach(function (key) {
 // Polish plurals change with the number (1 minuta, 2 minuty, 5 minut), and there is no plural
 // mechanism, so never put a word right after a number. Only the unit "min", the unit "s" and
 // "z" ("{n} z {max}") may follow one; anything else is a noun that would need a plural form.
-const NUMBER_THEN_WORD = /\{(n|m|s|e|t|p|days|left|max|total)\} (?!(?:min|s|z)(?![\p{L}]))\p{Ll}/u;
+const NUMBER_THEN_WORD = /\{(n|m|s|e|t|p|days|left|max|total|minutes|seconds)\} (?!(?:min|s|z)(?![\p{L}]))\p{Ll}/u;
 function noPluralAfterNumber(where, table) {
   Object.keys(table).forEach(function (key) {
     assert(!NUMBER_THEN_WORD.test(table[key]), `${where} has a word after a number in ${key}: "${table[key]}"`);
@@ -73,5 +73,76 @@ assert(rsrc.includes("{ id: 'pl', name: 'Polski', locale: 'pl-PL' },\n"), 'the r
 // a phone set to Polish starts in Polish before it has heard the TV's language
 const guessFn = rsrc.match(/function guess\(\) \{[\s\S]*?\n\}/);
 assert(guessFn && /\/\^pl\/i\.test\(n\)\) return 'pl';/.test(guessFn[0]), 'guess() returns pl for a Polish phone');
+
+// tBridge(key, vars, fallback) in remote/src/i18n.js
+function loadRemote(language) {
+  const cleaned = rsrc
+    .replace(/^import .*?;\n/m, 'const useEffect = () => {}, useState = (v) => [v, () => {}];\n')
+    .replace(/^export /gm, '');
+  const sandbox = {
+    navigator: { language },
+    document: { documentElement: {} },
+    localStorage: { getItem: () => null, setItem: () => {} },
+    Set,
+  };
+  vm.runInNewContext(cleaned + '\nthis.__exports = { tBridge, setChoice };', sandbox);
+  return sandbox.__exports;
+}
+
+const remotePl = loadRemote('pl-PL');
+assert.strictEqual(typeof remotePl.tBridge, 'function', 'remote/src/i18n.js exports tBridge');
+assert.strictEqual(
+  remotePl.tBridge('err_app_not_installed', { app: 'Netflix' }, 'Netflix is not installed on the TV'),
+  'Aplikacja Netflix nie jest zainstalowana na telewizorze',
+  'tBridge returns Polish translation when lang is pl'
+);
+assert.strictEqual(
+  remotePl.tBridge(null, null, 'Fallback text'),
+  'Fallback text',
+  'tBridge returns fallback when key is null'
+);
+assert.strictEqual(
+  remotePl.tBridge(undefined, null, 'Fallback text'),
+  'Fallback text',
+  'tBridge returns fallback when key is undefined'
+);
+assert.strictEqual(
+  remotePl.tBridge('err_unknown_nonexistent_key', null, 'Fallback text'),
+  'Fallback text',
+  'tBridge returns fallback when key is unknown'
+);
+
+const remoteEs = loadRemote('es-ES');
+assert.strictEqual(
+  remoteEs.tBridge('err_app_not_installed', { app: 'Netflix' }, 'Netflix is not installed on the TV'),
+  'Netflix is not installed on the TV',
+  'tBridge returns fallback (not S.en) when lang does not define key'
+);
+
+// Cross-repo parity: every err_*, note_*, ask_* key emitted by bridge/*.py (plus client-side
+// error keys from remote/src/api.js) must exist in both S.en and S.pl.
+const bridgeDir = path.join(__dirname, '../bridge');
+const bridgeKeys = new Set([
+  'err_bridge_timeout',
+  'err_bridge_unreachable',
+  'err_tv_not_connected',
+  'err_not_found',
+  'err_something_wrong',
+]);
+for (const file of fs.readdirSync(bridgeDir)) {
+  if (!file.endsWith('.py') || file.startsWith('test_')) continue;
+  const py = fs.readFileSync(path.join(bridgeDir, file), 'utf8');
+  const re = /['"]((?:err|note|ask)_[a-z0-9_]+)['"]/g;
+  let m;
+  while ((m = re.exec(py)) !== null) {
+    const k = m[1];
+    if (k === 'note_key' || k === 'note_vars' || k === 'error_key' || k === 'error_vars') continue;
+    bridgeKeys.add(k);
+  }
+}
+for (const key of Array.from(bridgeKeys).sort()) {
+  assert(key in R.en, `remote S.en is missing bridge key ${key}`);
+  assert(key in R.pl, `remote S.pl is missing bridge key ${key}`);
+}
 
 console.log('Polish i18n tests passed.');
