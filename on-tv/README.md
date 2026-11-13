@@ -29,6 +29,7 @@ home button unless you switch that on.
 | Ask (AI assistant) | yes (computer's Claude Code) | **off by default** | Optional: your own API key on the setup page, for Claude, OpenAI, Gemini and others, or a model at home. See below. |
 | Picture mode, screens, Moonlight | yes | no | |
 | Home screen (TV home page) | yes | yes, optional | Same page, served from the app. Replacing Google's home needs one ADB command, see below. |
+| Input tiles (HDMI ports in the dock) | yes (`home.inputs`) | yes | Set on the setup page, Input tiles. OK switches the TV straight to that port. |
 | Live updates (`/api/events`) | yes | yes | Server-sent events, plus a WebSocket at `/api/ws`. |
 | Kids mode (New) | yes | yes | A kids profile's home is a shelf of chosen shows behind a parent PIN ([docs/CONFIG.md](../docs/CONFIG.md#kids-mode)). With no `config.json` here, set it up on the phone remote: TV, Kids mode. |
 
@@ -202,6 +203,20 @@ scenes, glass panels, a video background, apps, people, quick buttons; README, "
 (`/api/settings`, next to the setup page's own settings), and the people list is the same one the
 setup page edits. One difference: this app has no file picker, so your own photos come from a web
 address.
+
+### Input tiles: HDMI ports in the app row
+
+A set-top box, a camera or a console on an HDMI port can sit in the home's app row as its own tile,
+next to Settings, the way `home.inputs` does for the computer-bridge home ([docs/CONFIG.md](../docs/CONFIG.md)).
+On the setup page (`http://<tv-ip>:5400/setup`), **Input tiles** lists the inputs the TV reports
+(Android's TV input list, with the TV's own names, for example "HDMI 1" and "HDMI 2(ARC)"): tick the
+ones you want and give each a name. Up to 6. If an app order was saved (Arrange apps), the new tiles
+go in just above the More apps line, so they show at once.
+
+OK on a tile opens Android's passthrough channel for that port, which the TV's own input app plays,
+so the TV switches straight to it; a TV that does not take that opens its input list instead. The
+home's Input quick button now lists the same inputs. Checked on a Xiaomi MiTV-MSSP3 (Android 9,
+MediaTek): HDMI 1 and HDMI 3 tiles both switched straight to their port.
 
 ### Xiaomi and Redmi (PatchWall)
 
