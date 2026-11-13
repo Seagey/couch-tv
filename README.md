@@ -41,11 +41,8 @@
 
 The newest release is **0.12** (9 November 2026), on [the Releases page](https://github.com/Seagey/couch-tv/releases). These are on main, in the next release:
 
-<<<<<<< HEAD
 - **14 November:** a TV settings quick button, and Settings opens on its own screen, thanks syedhabibtirmizi ([#190](docs/UPDATES.md#14-november-2026-a-tv-settings-quick-button-and-settings-opens-on-its-own-screen-on-main-in-the-next-release))
-=======
 - **14 November:** the TV home installs over paired Wireless debugging, tested on an Epson LS300, thanks mazzanfar ([#194](docs/UPDATES.md#14-november-2026-tv-home-over-paired-wireless-debugging-tested-on-an-epson-ls300-on-main-in-the-next-release))
->>>>>>> 0d5a101 (UPDATES and README: paired Wireless debugging for the TV home (#194))
 - **14 November:** the Look button and Home settings changes show at once on the TV home, thanks clembgrn and syedhabibtirmizi ([#185](docs/UPDATES.md#14-november-2026-the-look-button-and-home-settings-changes-show-at-once-on-the-tv-home-on-main-in-the-next-release))
 - **14 November:** the phone remote is complete in Brazilian Portuguese, thanks scursel ([#195](docs/UPDATES.md#14-november-2026-the-phone-remote-is-complete-in-brazilian-portuguese-on-main-in-the-next-release))
 - **14 November:** Czech is complete on the TV home and the phone remote speaks Czech, thanks slezaCZ ([#180](docs/UPDATES.md#14-november-2026-czech-is-complete-and-the-phone-remote-speaks-czech-on-main-in-the-next-release))
