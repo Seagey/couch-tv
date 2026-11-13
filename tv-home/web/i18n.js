@@ -3704,8 +3704,8 @@
   // "{n} s", "{n} min", "Zdjęcia: {n}".
   S.pl = {
     // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
-    devmode_gone: "couch-tv nie jest już zainstalowany na telewizorze. Prawdopodobnie wygasł Developer Mode. Włącz ponownie Developer Mode i poproś Claude o ponowną instalację couch-tv.",
-    devmode_runs_out: "Developer Mode wkrótce wygaśnie (pozostało dni: {days}), a wtedy LG usunie couch-tv. Włącz telewizor na minutę, żeby mógł się odnowić, albo naciśnij Extend w aplikacji Developer Mode na telewizorze.",
+    devmode_gone: "couch-tv nie jest już zainstalowany na telewizorze. Prawdopodobnie wygasł Developer Mode. Włącz ponownie Developer Mode i poproś Claude’a o ponowną instalację couch-tv.",
+    devmode_runs_out: "Developer Mode wkrótce wygaśnie (pozostało dni: {days}), a wtedy LG usunie couch-tv. Włącz telewizor na minutę, żeby Developer Mode mógł się odnowić, albo naciśnij Extend w aplikacji Developer Mode na telewizorze.",
     devmode_not_renewed_left: "Developer Mode nie został odnowiony (dni bez odnowienia: {days}, pozostało dni: {left}). Odnowi się przy następnym włączeniu telewizora.",
     devmode_not_renewed: "Developer Mode nie został odnowiony (dni bez odnowienia: {days}). Odnowi się przy następnym włączeniu telewizora.",
 
@@ -3753,7 +3753,7 @@
     smart_idle_head: "Inteligentne wygaszanie i ochrona OLED",
     smart_idle_on: "Inteligentne wygaszanie",
     smart_idle_on_sub: "Chroni ekran i samo wyłącza bezczynne lub wstrzymane odtwarzanie",
-    smart_idle_home: "Bezczynny ekran główny po",
+    smart_idle_home: "Ekran główny bezczynny po",
     smart_idle_action: "Gdy ekran główny jest bezczynny",
     smart_idle_act_ambient_clock: "Przyciemniony zegar OLED",
     smart_idle_act_screen_off: "Wyłącz ekran",
@@ -3856,7 +3856,7 @@
     loc_searching: "Szukanie…",
     loc_none: "Nic nie znaleziono dla „{q}”.",
     loc_error: "Brak połączenia z wyszukiwarką miejsc. Sprawdź Wi-Fi.",
-    loc_set: "Pogoda jest teraz dla: {place}.",
+    loc_set: "Pogoda dla: {place}.",
     loc_reset: "Wróć do miejsca z config.json",
     loc_results: "Znalezione miejsca",
     loc_note: "Ustawia miejsce i strefę czasową pogody. Wystarczy miasto lub dzielnica, nigdy adres domowy. Wyszukiwanie miejsc: Open-Meteo.",
@@ -3921,7 +3921,7 @@
     glass_head: "Szkło",
     glass: "Szklane panele",
     glass_lite: "Włączone, bez rozmycia",
-    glass_note: "Matowe szkło za zegarem, rzędem „{keep}” i aplikacjami, przez które prześwituje tło. Na starszym lub wolniejszym telewizorze wybierz „Włączone, bez rozmycia”.",
+    glass_note: "Matowe szkło, przez które prześwituje tło, za zegarem, rzędem „{keep}” i aplikacjami. Na starszym lub wolniejszym telewizorze wybierz „Włączone, bez rozmycia”.",
     moving_tiles: "Ruchome kafelki",
     moving_tiles_note: "Zaznaczony kafelek powoli się kołysze. Jeśli na starszym lub wolniejszym telewizorze migocze, wyłącz to.",
     keep_show: "Pokazuj „Kontynuuj oglądanie”",
@@ -4005,7 +4005,7 @@
     quick_screensaver: "Wygaszacz ekranu",
     quick_screensaver_sub: "Od razu włącza wygaszacz ze zdjęciami. To nie jest przełącznik dnia i nocy.",
     no_screensaver: "Ten telewizor nie ma wygaszacza do otwarcia.",
-    no_dream: "Telewizor nie włączył zdjęć. Spróbuj ponownie, a jeśli to się powtarza, uruchom telewizor ponownie.",
+    no_dream: "Telewizor nie włączył wygaszacza ze zdjęciami. Spróbuj ponownie, a jeśli to się powtarza, uruchom telewizor ponownie.",
     ambient_head: "Wygaszacz ekranu",
     ambient_settings: "Albumy Zdjęć Google",
     ambient_settings_sub: "Które albumy są pokazywane, gdy telewizor jest bezczynny.",
@@ -4119,7 +4119,7 @@
     sh_started: "{name}: gotowe.",
     sh_failed: "Nie udało się. Home Assistant może być zajęty, spróbuj ponownie.",
     sh_refused: "Tego ten telewizor nie może zmieniać.",
-    sh_hint: "Lewo i prawo – przesuń, góra i dół – zmiana rzędu. OK – naciśnij. Wstecz – zamknij."
+    sh_hint: "Lewo i prawo – przesuń, góra i dół – zmień rząd, OK – wybierz, Wstecz – zamknij."
   };
 
   for (var fk in S.en) if (!(fk in S.fr)) S.fr[fk] = S.en[fk];
