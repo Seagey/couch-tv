@@ -11,7 +11,7 @@
 //   look=oled           home.look (night, oled, classic)       clock=24h   home.clock     dock=6   home.dock_size
 //   scenes=fog,dawn     home.scenes     secs=8      home.scene_seconds     sunsync=1   home.sun_sync
 //   myscenes=[...]      home.my_scenes, as JSON (docs/MAKE-A-SCENE.md), for your own scenes
-//   lang=it             home.language (en, es, es-MX, it, de, tr, sr-Latn-RS); without it, the browser's own language
+//   lang=it             home.language (en, es, es-MX, it, de, tr, sr-Latn-RS, pl); without it, the browser's own language
 //   glass=on            home.glass (on, lite: no blur)      video=<link>   home.video_url, an MP4 or MOV
 //   moving=off          home.moving_tiles: the focused tile's slow sway (off, or on)
 //   ambient=1           home.ambient_music: the full screen music view (needs music=1; ambient=off: off)
