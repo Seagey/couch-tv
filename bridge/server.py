@@ -221,15 +221,39 @@ def allowed_hosts():
         if h:
             hosts.add(h)
             hosts.add(h if h.endswith(".local") else f"{h}.local")
+        for info in socket.getaddrinfo(socket.gethostname(), None):
+            addr = host_name(info[4][0])
+            if addr:
+                hosts.add(addr)
     except OSError:
         pass
     return hosts
 
 
+def is_bridge_ip(name, request=None):
+    """Check if the given IP address belongs to one of this computer's interfaces."""
+    try:
+        ip = ipaddress.ip_address(name)
+    except ValueError:
+        return False
+    if ip.is_loopback:
+        return True
+    clean_name = str(ip.ipv4_mapped) if getattr(ip, "ipv4_mapped", None) else name
+    if clean_name in allowed_hosts():
+        return True
+    if request and getattr(request, "transport", None):
+        sock = request.transport.get_extra_info("sockname")
+        if sock and sock[0]:
+            sock_ip = host_name(sock[0])
+            if sock_ip and (sock_ip == name or sock_ip == clean_name):
+                return True
+    return False
+
+
 def is_allowed_host(request):
     """DNS rebinding guard (couch-tv#73). A rebinding page reaches the bridge under the attacker's own
-    name, so a Host the bridge does not know is refused. Any IP address passes (rebinding needs a
-    name; this also covers a computer with two network connections, and Docker), and so does any
+    name, so a Host the bridge does not know is refused. Any local interface IP address passes
+    (loopback, LAN IP, socket destination, or configured bridge host/fallback_hosts), and so does any
     .local name (only the home network answers for those). No Host header at all is a script, not a
     browser, so it passes too."""
     raw = request.headers.get("Host")
@@ -238,7 +262,39 @@ def is_allowed_host(request):
     name = host_name(raw)
     if not name:
         return False
-    return is_ip(name) or name.endswith(".local") or name in allowed_hosts()
+    if is_ip(name):
+        return is_bridge_ip(name, request)
+    return name.endswith(".local") or name in allowed_hosts()
+
+
+def extract_auth_key(request):
+    """Extract pairing/API key from Authorization header, X-API-Key, or ?key= / ?token=."""
+    auth = request.headers.get("Authorization") or ""
+    if auth.startswith("Bearer "):
+        token = auth[7:].strip()
+        if token:
+            return token
+    api_key = (request.headers.get("X-API-Key") or "").strip()
+    if api_key:
+        return api_key
+    q_key = (request.query.get("key") or request.query.get("token") or "").strip()
+    if q_key:
+        return q_key
+    return None
+
+
+def key_matches(given):
+    # bytes, so a key with non-ASCII characters is simply wrong instead of a 500
+    return hmac.compare_digest(str(given).encode(), config.PAIRING_KEY.encode())
+
+
+def is_authed(request):
+    if not config.PAIRING_KEY:
+        return True
+    key = extract_auth_key(request)
+    if not key:
+        return False
+    return key_matches(key)
 
 
 def is_allowed_origin(request, origin):
@@ -247,13 +303,17 @@ def is_allowed_origin(request, origin):
         return False
     clean = origin.rstrip("/").lower()
     # 1. Front-end origins used by the TV apps:
-    # "null" is sent by browsers for local file:// WebViews (Android WebView, webOS, Tizen).
-    # NOTE: Because any website can emit Origin: null (e.g. from a sandboxed iframe),
-    # Origin: null is allowed for the TV apps, but only the pairing key (config.PAIRING_KEY)
-    # protects against malicious websites sending Origin: null.
-    # "file://" is sent literally by some embedded Chromium / WebViews.
-    # "http(s)://home.tvos.invalid" is used by couch-tv's Android TV offline launcher.
-    if clean == "null" or clean.startswith("file:") or clean in ("http://home.tvos.invalid", "https://home.tvos.invalid"):
+    # "null" is sent by browsers for local file:// WebViews or sandboxed iframes.
+    # Disallow unauthenticated Origin: null to prevent cross-origin access from untrusted pages.
+    if clean == "null":
+        if not config.PAIRING_KEY:
+            return False
+        if request is not None:
+            if request.method == "OPTIONS":
+                return True
+            return is_authed(request)
+        return False
+    if clean.startswith("file:") or clean in ("http://home.tvos.invalid", "https://home.tvos.invalid"):
         return True
     if clean.startswith(("widget:", "wgt:", "tizen:")):
         return True
@@ -278,36 +338,6 @@ def is_allowed_origin(request, origin):
         pass
 
     return False
-
-
-def extract_auth_key(request):
-    """Extract pairing/API key from Authorization header, X-API-Key, or ?key= / ?token=."""
-    auth = request.headers.get("Authorization") or ""
-    if auth.startswith("Bearer "):
-        token = auth[7:].strip()
-        if token:
-            return token
-    api_key = (request.headers.get("X-API-Key") or "").strip()
-    if api_key:
-        return api_key
-    q_key = (request.query.get("key") or request.query.get("token") or "").strip()
-    if q_key:
-        return q_key
-    return None
-
-
-def is_authed(request):
-    if not config.PAIRING_KEY:
-        return True
-    key = extract_auth_key(request)
-    if not key:
-        return False
-    return key_matches(key)
-
-
-def key_matches(given):
-    # bytes, so a key with non-ASCII characters is simply wrong instead of a 500
-    return hmac.compare_digest(str(given).encode(), config.PAIRING_KEY.encode())
 
 
 # Wrong pairing keys, per client address: {ip: [(time, fingerprint of the wrong key), ...]}.
@@ -1899,16 +1929,22 @@ PLACEHOLDER = """<!doctype html><meta charset=utf-8><meta name=viewport content=
 
 
 def static_handler(folder, name):
+    norm_folder = os.path.abspath(folder)
+
     async def handler(request):
         rel = request.match_info.get("path", "")
-        target = os.path.normpath(os.path.join(folder, rel))
-        if not target.startswith(os.path.normpath(folder)):
+        rel_clean = rel.lstrip("/\\")
+        target = os.path.abspath(os.path.join(norm_folder, rel_clean))
+        try:
+            if os.path.commonpath([target, norm_folder]) != norm_folder:
+                raise web.HTTPForbidden()
+        except (ValueError, Exception):
             raise web.HTTPForbidden()
         if os.path.isdir(target):
             target = os.path.join(target, "index.html")
         if not os.path.isfile(target):
             # Single page app: unknown paths without a file extension get index.html.
-            index = os.path.join(folder, "index.html")
+            index = os.path.join(norm_folder, "index.html")
             if "." in os.path.basename(rel) or not os.path.isfile(index):
                 if not os.path.isfile(index):
                     return web.Response(text=PLACEHOLDER.format(name=name), content_type="text/html")
@@ -1926,7 +1962,7 @@ def static_handler(folder, name):
             tags = []
             if ip.count(".") == 3 and not ip.startswith("127."):
                 tags.append('<meta name="lan-ip" content="%s">' % ip)
-            if folder == REMOTE_DIR:
+            if folder == REMOTE_DIR or norm_folder == os.path.abspath(REMOTE_DIR):
                 tags.append('<script src="/bridge/shim.js"></script>')
             if tags and "<head>" in html:
                 html = html.replace("<head>", "<head>\n  " + "\n  ".join(tags), 1)

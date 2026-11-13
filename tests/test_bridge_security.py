@@ -1,11 +1,28 @@
 """couch-tv#73: Bridge pairing key, origin filtering, and POST body Content-Type enforcement."""
 import json
 import os
+import socket
 import sys
+import time
 import unittest
 from unittest.mock import patch, AsyncMock
 from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop, make_mocked_request
+
+# On Windows with Python 3.14, rapid socketpair creation in test suites can hit WinError 10013.
+if hasattr(socket, "_fallback_socketpair"):
+    _orig_fallback = socket._fallback_socketpair
+
+    def _retry_fallback(*args, **kwargs):
+        for _ in range(10):
+            try:
+                return _orig_fallback(*args, **kwargs)
+            except OSError:
+                time.sleep(0.05)
+        return _orig_fallback(*args, **kwargs)
+
+    socket._fallback_socketpair = _retry_fallback
+    socket.socketpair = _retry_fallback
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bridge"))
 import config  # noqa: E402
@@ -27,8 +44,13 @@ class TestOriginAndAuthHelpers(unittest.TestCase):
         req_spoofed = make_mocked_request("GET", "/api/now", headers={"Host": "evil.com:5400"})
         self.assertFalse(server.is_allowed_origin(req_spoofed, "http://evil.com:5400"))
 
-        # TV home origins
-        self.assertTrue(server.is_allowed_origin(req, "null"))  # file:// WebView in browser standard
+        # TV home origins: "null" is refused unless authenticated with pairing key
+        self.assertFalse(server.is_allowed_origin(req, "null"))  # unauthenticated null origin refused
+        with patch.object(config, "PAIRING_KEY", "testpass"):
+            req_authed = make_mocked_request("GET", "/api/now", headers={"Host": "192.0.2.10:5400", "Authorization": "Bearer testpass"})
+            self.assertTrue(server.is_allowed_origin(req_authed, "null"))
+            req_opt = make_mocked_request("OPTIONS", "/api/now", headers={"Host": "192.0.2.10:5400"})
+            self.assertTrue(server.is_allowed_origin(req_opt, "null"))
         self.assertTrue(server.is_allowed_origin(req, "file://"))
         self.assertTrue(server.is_allowed_origin(req, "http://home.tvos.invalid"))
         self.assertTrue(server.is_allowed_origin(req, "widget://CouchTVApp.Home"))
@@ -125,10 +147,10 @@ class TestBridgeSecurityApp(AioHTTPTestCase):
         self.assertEqual(resp.headers.get("Vary"), "Origin")
         self.assertIn("Authorization", resp.headers.get("Access-Control-Allow-Headers", ""))
 
-        # 2. TV origin "null" is allowed
+        # 2. TV origin "null" without authentication is rejected with 403 Forbidden
         resp_null = await self.client.get("/api/health", headers={"Origin": "null"})
-        self.assertEqual(resp_null.status, 200)
-        self.assertEqual(resp_null.headers.get("Access-Control-Allow-Origin"), "null")
+        self.assertEqual(resp_null.status, 403)
+        self.assertIsNone(resp_null.headers.get("Access-Control-Allow-Origin"))
 
         # 3. Disallowed origin (e.g. evil.com) is rejected with 403 Forbidden (couch-tv#73)
         resp_evil = await self.client.get("/api/health", headers={"Origin": "http://evil.com"})
@@ -242,6 +264,23 @@ class TestBridgeSecurityApp(AioHTTPTestCase):
             resp_shim = await self.client.get("/bridge/shim.js")
             self.assertEqual(resp_shim.status, 200)
             self.assertIn("application/javascript", resp_shim.headers.get("Content-Type", ""))
+
+            # 11. Origin: null with valid auth succeeds and gets CORS headers
+            resp_null_good = await self.client.get("/api/now", headers={
+                "Origin": "null",
+                "Authorization": "Bearer couchpass123",
+            })
+            self.assertEqual(resp_null_good.status, 200)
+            self.assertEqual(resp_null_good.headers.get("Access-Control-Allow-Origin"), "null")
+
+            # 12. Origin: null preflight OPTIONS succeeds when pairing key is configured
+            resp_null_opt = await self.client.options("/api/now", headers={"Origin": "null"})
+            self.assertEqual(resp_null_opt.status, 204)
+            self.assertEqual(resp_null_opt.headers.get("Access-Control-Allow-Origin"), "null")
+
+            # 13. Origin: null without auth is refused
+            resp_null_bad = await self.client.get("/api/now", headers={"Origin": "null"})
+            self.assertEqual(resp_null_bad.status, 403)
 
     @unittest_run_loop
     async def test_pairing_key_flow_when_disabled(self):
@@ -480,11 +519,16 @@ class TestReviewFixes(unittest.TestCase):
         self.assertTrue(server.is_allowed_host(DummyRequest(host="")))
 
         with patch.object(server, "lan_ipv4", return_value="192.0.2.50"):
-            # Any address passes: a second network connection, Docker, a phone opened by number
-            for h in ("192.0.2.51:5400", "198.51.100.7", "[fe80::1]:5400", "localhost.:5400"):
+            # Local loopback, LAN IP, and .local names pass
+            for h in ("127.0.0.1:5400", "192.0.2.50:5400", "localhost.:5400", "[::1]:5400", "my-computer.local:5400"):
                 self.assertTrue(server.is_allowed_host(make_mocked_request("GET", "/", headers={"Host": h})), h)
-            # Any .local name passes (only the home network answers for those)
-            self.assertTrue(server.is_allowed_host(make_mocked_request("GET", "/", headers={"Host": "my-computer.local:5400"})))
+            # Arbitrary foreign IPs fail check
+            for h in ("8.8.8.8:5400", "198.51.100.7:5400", "192.0.2.51:5400"):
+                self.assertFalse(server.is_allowed_host(make_mocked_request("GET", "/", headers={"Host": h})), h)
+            # A socket that arrived on an interface IP passes via sockname
+            req_sock = make_mocked_request("GET", "/", headers={"Host": "192.0.2.51:5400"})
+            req_sock.transport.get_extra_info.side_effect = lambda k: ("192.0.2.51", 5400) if k == "sockname" else None
+            self.assertTrue(server.is_allowed_host(req_sock))
             # A name nobody configured does not, until it is added to fallback_hosts
             req_lan = make_mocked_request("GET", "/", headers={"Host": "box.home:5400"})
             self.assertFalse(server.is_allowed_host(req_lan))
@@ -494,11 +538,43 @@ class TestReviewFixes(unittest.TestCase):
     def test_same_origin_is_allowed_by_any_address(self):
         # The phone remote opened by the computer's second address posts with that origin
         req = make_mocked_request("POST", "/api/key", headers={"Host": "192.0.2.99:5400"})
+        req.transport.get_extra_info.side_effect = lambda k: ("192.0.2.99", 5400) if k == "sockname" else None
         with patch.object(server, "lan_ipv4", return_value="192.0.2.50"):
             self.assertTrue(server.is_allowed_origin(req, "http://192.0.2.99:5400"))
             self.assertFalse(server.is_allowed_origin(req, "http://evil.example"))
             evil = make_mocked_request("POST", "/api/key", headers={"Host": "evil.example:5400"})
             self.assertFalse(server.is_allowed_origin(evil, "http://evil.example:5400"))
+
+
+class TestStaticHandlerSecurity(unittest.IsolatedAsyncioTestCase):
+    async def test_prefix_traversal_refused(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            base_dir = os.path.join(td, "dist")
+            sibling_dir = os.path.join(td, "dist_sibling")
+            os.makedirs(base_dir, exist_ok=True)
+            os.makedirs(sibling_dir, exist_ok=True)
+            with open(os.path.join(base_dir, "app.js"), "w") as f:
+                f.write("console.log('hello');")
+            with open(os.path.join(sibling_dir, "secret.txt"), "w") as f:
+                f.write("secret data")
+
+            handler = server.static_handler(base_dir, "test")
+
+            # 1. Normal file inside folder returns 200 FileResponse
+            req_good = make_mocked_request("GET", "/dist/app.js", match_info={"path": "app.js"})
+            resp_good = await handler(req_good)
+            self.assertEqual(resp_good.status, 200)
+
+            # 2. Sibling directory matching prefix raises HTTPForbidden
+            req_sibling = make_mocked_request("GET", "/dist/secret", match_info={"path": "../dist_sibling/secret.txt"})
+            with self.assertRaises(web.HTTPForbidden):
+                await handler(req_sibling)
+
+            # 3. Path traversal outside folder raises HTTPForbidden
+            req_parent = make_mocked_request("GET", "/dist/secret", match_info={"path": "../../secret.txt"})
+            with self.assertRaises(web.HTTPForbidden):
+                await handler(req_parent)
 
 
 if __name__ == "__main__":
