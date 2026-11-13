@@ -52,6 +52,7 @@ import aiohttp
 
 import apps
 import config
+import messages
 from tv import TVUnavailable
 
 HOME_PACKAGE = "app.couchtv.launcher"
@@ -170,15 +171,18 @@ def _aes(key, iv):
     try:
         from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     except ImportError:
-        raise PanasonicError("this TV wants encryption, which needs the cryptography package: "
-                             ".venv/bin/pip install -r bridge/requirements.txt") from None
+        raise PanasonicError(
+            "this TV wants encryption, which needs the cryptography package: "
+            ".venv/bin/pip install -r bridge/requirements.txt",
+            key="err_panasonic_needs_cryptography",
+        ) from None
     return Cipher(algorithms.AES(bytes(key)), modes.CBC(bytes(iv)))
 
 
 def pairing_keys(challenge):
     """(AES key, HMAC key) for the PIN step, from the TV's 16 byte challenge."""
     if len(challenge) != 16:
-        raise PanasonicError("the TV's challenge is not 16 bytes")
+        raise PanasonicError("the TV's challenge is not 16 bytes", key="err_panasonic_bad_challenge")
     aes_key = bytearray()
     for g in range(0, 16, 4):
         aes_key += bytes(~b & 0xFF for b in reversed(challenge[g:g + 4]))
@@ -192,7 +196,7 @@ def session_keys(keyword):
     """(IV, AES key, HMAC key) for commands, from the key word the TV gave when it was paired."""
     iv = base64.b64decode(keyword)
     if len(iv) != 16:
-        raise PanasonicError("the stored key word is not 16 bytes: pair again")
+        raise PanasonicError("the stored key word is not 16 bytes: pair again", key="err_panasonic_bad_keyword")
     key = bytes(iv[g + o] for g in range(0, 16, 4) for o in (2, 3, 0, 1))
     return iv, key, iv + iv
 
@@ -212,11 +216,11 @@ def unseal(b64, key, hmac_key, iv):
     try:
         data = base64.b64decode(b64 or "", validate=True)
     except ValueError:
-        raise PanasonicError("the TV's encrypted answer is not base64") from None
+        raise PanasonicError("the TV's encrypted answer is not base64", key="err_panasonic_answer_not_base64") from None
     if len(data) >= 48 and hmac.compare_digest(hmac.new(hmac_key, data[:-32], hashlib.sha256).digest(), data[-32:]):
         data = data[:-32]
     if not data or len(data) % 16:
-        raise PanasonicError("the TV's encrypted answer has the wrong length")
+        raise PanasonicError("the TV's encrypted answer has the wrong length", key="err_panasonic_answer_bad_length")
     dec = _aes(key, iv).decryptor()
     plain = dec.update(data) + dec.finalize()
     return plain[16:].split(b"\0", 1)[0].decode("utf-8", "replace")
@@ -225,9 +229,11 @@ def unseal(b64, key, hmac_key, iv):
 class PanasonicError(RuntimeError):
     """The TV did not do what was asked, or answered with something unusable."""
 
-    def __init__(self, message, code=None):
+    def __init__(self, message, code=None, key=None, vars=None):
         super().__init__(message)
         self.code = code
+        self.key = key
+        self.vars = vars
 
 
 class PanasonicTV:
@@ -339,7 +345,11 @@ class PanasonicTV:
 
     def require(self):
         if not self.connected:
-            raise TVUnavailable(f"the {self.name.lower()} TV is not answering on the network")
+            raise TVUnavailable(
+                f"the {self.name.lower()} TV is not answering on the network",
+                key="err_driver_not_answering",
+                vars={"name": self.name.lower()},
+            )
 
     def can_deeplink(self, app):
         return False   # no deep link into a show is known on Panasonic: apps open on their own page
@@ -375,16 +385,29 @@ class PanasonicTV:
                 text = await r.text()
                 self._trace("in ", path, f"{r.status} {text}")
                 if r.status != 200:
-                    raise PanasonicError(f"the TV answered {r.status} for {path}", r.status)
+                    raise PanasonicError(
+                        f"the TV answered {r.status} for {path}",
+                        r.status,
+                        key="err_panasonic_http_status",
+                        vars={"status": r.status, "path": path},
+                    )
                 return text
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
-            raise TVUnavailable(f"the TV did not answer ({type(e).__name__})") from None
+            raise TVUnavailable(
+                f"the TV did not answer ({type(e).__name__})",
+                key="err_tv_did_not_answer_error",
+                vars={"error": type(e).__name__},
+            ) from None
 
     async def _post(self, service, action, args, urn=None):
         path, default_urn = PROTOCOL[service]
         urn = urn or default_urn or self.services.get(path)
         if not urn:
-            raise PanasonicError(f"the TV does not list a service at {path}")
+            raise PanasonicError(
+                f"the TV does not list a service at {path}",
+                key="err_panasonic_no_service",
+                vars={"path": path},
+            )
         body = envelope(action, urn, args)
         self._trace("out", action, body)
         s = await self._http()
@@ -393,13 +416,22 @@ class PanasonicTV:
                     "Content-Type": 'text/xml; charset="utf-8"', "SOAPAction": f'"{urn}#{action}"'}) as r:
                 text = await r.text()
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
-            raise TVUnavailable(f"the TV did not answer {action} ({type(e).__name__})") from None
+            raise TVUnavailable(
+                f"the TV did not answer {action} ({type(e).__name__})",
+                key="err_panasonic_action_no_answer",
+                vars={"action": action, "error": type(e).__name__},
+            ) from None
         self._trace("in ", action, f"{r.status} {text}")
         if r.status != 200:
             code = field(text, "errorCode")
             desc = field(text, "errorDescription") or ""
-            raise PanasonicError(f"the TV refused {action} ({code or r.status}{', ' + desc if desc else ''})",
-                                 int(code) if code and code.isdigit() else r.status)
+            detail = f"{code or r.status}{', ' + desc if desc else ''}"
+            raise PanasonicError(
+                f"the TV refused {action} ({detail})",
+                int(code) if code and code.isdigit() else r.status,
+                key="err_panasonic_refused_detail",
+                vars={"action": action, "detail": detail},
+            )
         return text
 
     async def _soap(self, service, action, args=""):
@@ -420,7 +452,7 @@ class PanasonicTV:
                     raise
                 self.log.info("encrypted %s refused (%s): asking for a new session", action, e.code)
                 self._enc = None   # the session may have run out: one new one, then give up
-        raise PanasonicError(f"the TV refused {action}")
+        raise PanasonicError(f"the TV refused {action}", key="err_panasonic_refused", vars={"action": action})
 
     async def _encrypted(self, action, args):
         app_id, keyword = self._need_credentials()
@@ -446,7 +478,7 @@ class PanasonicTV:
         creds = self.credentials
         if not creds:
             self.last_error = "this TV wants pairing first (a PIN on the TV, docs/PANASONIC.md)"
-            raise PanasonicError(self.last_error)
+            raise PanasonicError(self.last_error, key="err_panasonic_needs_pairing")
         return creds
 
     async def _new_session(self):
@@ -458,7 +490,10 @@ class PanasonicTV:
                                 + "</X_EncInfo>")
         sid = field(unseal(field(text, "X_EncResult") or "", key, hk, iv), "X_SessionId")
         if not sid:
-            raise PanasonicError("the TV gave no session (pair again if this keeps happening)")
+            raise PanasonicError(
+                "the TV gave no session (pair again if this keeps happening)",
+                key="err_panasonic_no_session",
+            )
         self._enc = (sid, 0)
 
     # ---------- reading the TV ----------
@@ -589,10 +624,14 @@ class PanasonicTV:
     async def open_url(self, url):
         """Open a web address in the TV's browser (PROTOCOL: browser_keyword, then X_ConnectApp)."""
         if not isinstance(url, str) or not re.match(r"^https?://[\x21-\x7e]+$", url):
-            raise ValueError("only a plain http or https address can be opened")
+            raise messages.with_key(ValueError("only a plain http or https address can be opened"), "err_panasonic_plain_http_only")
         data = url.encode("ascii")
         if len(data) > PROTOCOL["url_max"]:
-            raise ValueError(f"the address is longer than {PROTOCOL['url_max']} characters")
+            raise messages.with_key(
+                ValueError(f"the address is longer than {PROTOCOL['url_max']} characters"),
+                "err_panasonic_url_too_long",
+                max=PROTOCOL["url_max"],
+            )
         self.require()
         got = asyncio.get_running_loop().create_future()
 
@@ -619,8 +658,11 @@ class PanasonicTV:
             try:
                 await asyncio.wait_for(got, PROTOCOL["connect_timeout"])
             except asyncio.TimeoutError:
-                raise PanasonicError("the browser opened but the TV never came for the address "
-                                     "(turn on trace and send the log, docs/PANASONIC.md)") from None
+                raise PanasonicError(
+                    "the browser opened but the TV never came for the address "
+                    "(turn on trace and send the log, docs/PANASONIC.md)",
+                    key="err_panasonic_browser_timeout",
+                ) from None
         finally:
             server.close()
             await server.wait_closed()
@@ -644,7 +686,10 @@ class PanasonicTV:
             self._challenge = None
         if not self._challenge or len(self._challenge) != 16:
             self._challenge = None
-            raise PanasonicError("the TV showed no PIN challenge (turn on trace and send the log)")
+            raise PanasonicError(
+                "the TV showed no PIN challenge (turn on trace and send the log)",
+                key="err_panasonic_no_pin_challenge",
+            )
         self.pin_shown_at = time.monotonic()
         return True
 
@@ -652,10 +697,10 @@ class PanasonicTV:
         """Send the PIN sealed with the challenge; keep the application id and key word (0600, never in git)."""
         pin = str(pin or "").strip()
         if not re.match(PROTOCOL["pin"], pin):
-            raise ValueError("the PIN is the digits the TV shows")
+            raise messages.with_key(ValueError("the PIN is the digits the TV shows"), "err_panasonic_pin_digits")
         self.require()
         if not self._challenge:
-            raise PanasonicError("ask the TV for a PIN first")
+            raise PanasonicError("ask the TV for a PIN first", key="err_ask_pin_first")
         key, hk = pairing_keys(self._challenge)
         iv = self._challenge
         try:
@@ -664,13 +709,20 @@ class PanasonicTV:
         except PanasonicError as e:
             if e.code == PROTOCOL["wrong_pin"]:
                 self.last_error = "the TV said the PIN was wrong"
-                raise PanasonicError("the PIN was wrong: ask for a new one and try again", e.code) from None
+                raise PanasonicError(
+                    "the PIN was wrong: ask for a new one and try again",
+                    e.code,
+                    key="err_panasonic_pin_wrong",
+                ) from None
             raise
         out = unseal(field(text, "X_AuthResult") or "", key, hk, iv)
         app_id, keyword = field(out, "X_ApplicationId"), field(out, "X_Keyword")
         if not app_id or not keyword:
             self.last_error = "the TV accepted the PIN but sent no keys"
-            raise PanasonicError("the TV accepted the PIN but sent no keys (turn on trace and send the log)")
+            raise PanasonicError(
+                "the TV accepted the PIN but sent no keys (turn on trace and send the log)",
+                key="err_panasonic_no_keys",
+            )
         session_keys(keyword)   # refuses a key word that is not 16 bytes before it is kept
         self._keep(app_id=app_id, keyword=keyword)
         self._challenge, self._enc, self.last_error = None, None, None
@@ -768,7 +820,7 @@ class PanasonicTV:
             await self.select_input(m.group(1))
             return f"hdmi{m.group(1)}"
         if not code:
-            raise ValueError(f"unknown key: {name}")
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
         if power and not self.connected:
             await self.wake()   # fully off, or deep standby: the port is gone with it
             return code
@@ -791,14 +843,17 @@ class PanasonicTV:
         """An input by its id (PROTOCOL input_*, UNCONFIRMED). HDMI 1 to 4 are "1" to "4" as far as known."""
         input_id = str(input_id)
         if not INPUT_ID.match(input_id):
-            raise ValueError("not an input id")
+            raise messages.with_key(ValueError("not an input id"), "err_panasonic_bad_input_id")
         self.require()
         self.quiet_until = time.monotonic() + 20
         value = escape(PROTOCOL["input_value"].format(id=input_id))
         await self._soap("pac", PROTOCOL["input_action"], f"<{PROTOCOL['input_arg']}>{value}</{PROTOCOL['input_arg']}>")
 
     async def text(self, text):
-        raise TVUnavailable("typing into a Panasonic TV from the phone is not built: use the TV's own keyboard")
+        raise TVUnavailable(
+            "typing into a Panasonic TV from the phone is not built: use the TV's own keyboard",
+            key="err_panasonic_typing_unsupported",
+        )
 
     async def _launch(self, app_id, quiet=True):
         if quiet:
@@ -808,12 +863,16 @@ class PanasonicTV:
             return
         entry = next((a for a in self.applist if a["launch"] == app_id), None)
         if not entry:
-            raise ValueError(f"not an app the TV listed: {app_id}")
+            raise messages.with_key(
+                ValueError(f"not an app the TV listed: {app_id}"),
+                "err_panasonic_app_not_listed",
+                app=app_id,
+            )
         await self._launch_entry(entry)
 
     async def _launch_entry(self, entry):
         if not LAUNCH.match(entry.get("launch") or ""):
-            raise ValueError("not a Panasonic app keyword")
+            raise messages.with_key(ValueError("not a Panasonic app keyword"), "err_panasonic_bad_app_keyword")
         await self._soap("nrc", "X_LaunchApp", f"<X_AppType>{PROTOCOL['app_type']}</X_AppType>"
                                                f"<X_LaunchKeyword>{entry['launch']}</X_LaunchKeyword>")
 
@@ -827,8 +886,12 @@ class PanasonicTV:
         entry = self._entry(package)
         if not entry:
             if not self.applist:
-                raise TVUnavailable("the TV has not said which apps it has yet")
-            raise TVUnavailable(f"{package} is not installed on the TV")
+                raise TVUnavailable("the TV has not said which apps it has yet", key="err_tv_apps_not_listed_yet")
+            raise TVUnavailable(
+                f"{package} is not installed on the TV",
+                key="err_tv_app_not_installed",
+                vars={"app": package},
+            )
         self.quiet_until = time.monotonic() + 20
         await self._launch_entry(entry)
         self._front = (entry["package"], time.monotonic())
@@ -838,7 +901,10 @@ class PanasonicTV:
         """No deep link into a show is known on Panasonic: the app opens on its own page."""
         self.require()
         if not package:
-            raise ValueError("Panasonic TVs only open apps, not links: name the app")
+            raise messages.with_key(
+                ValueError("Panasonic TVs only open apps, not links: name the app"),
+                "err_panasonic_apps_not_links",
+            )
         await self.launch_package(package)
         return "app"
 
@@ -864,10 +930,10 @@ class PanasonicTV:
         return False
 
     async def adb(self, *args, **kw):
-        raise TVUnavailable("this is a Panasonic TV: ADB tools are Android only")
+        raise TVUnavailable("this is a Panasonic TV: ADB tools are Android only", key="err_panasonic_adb_android_only")
 
     async def screenshot(self):
-        raise TVUnavailable("Panasonic TVs do not give screenshots over the network")
+        raise TVUnavailable("Panasonic TVs do not give screenshots over the network", key="err_panasonic_no_screenshots")
 
     # ---------- power ----------
     async def _read_power(self):

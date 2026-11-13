@@ -30,6 +30,7 @@ from urllib.parse import quote, urlparse
 import aiohttp
 
 import apps
+import messages
 from samsung import netflix_id, youtube_id
 from tv import TVUnavailable
 
@@ -67,6 +68,11 @@ def resolve_key(name):
 
 class VegaError(RuntimeError):
     """Amazon's tools or the stick answered with an error."""
+
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars
 
 
 class VegaTV:
@@ -136,7 +142,11 @@ class VegaTV:
 
     def require(self):
         if not self.connected:
-            raise TVUnavailable(f"the {self.name.lower()} TV is not answering on the network")
+            raise TVUnavailable(
+                f"the {self.name.lower()} TV is not answering on the network",
+                key="err_driver_not_answering",
+                vars={"name": self.name.lower()},
+            )
 
     def can_deeplink(self, app):
         return app.get("id") in DIAL_APPS
@@ -157,20 +167,32 @@ class VegaTV:
         """Run one `vega ...` command. Arguments are passed as a list, never through a shell."""
         exe = shutil.which(self.cli)
         if not exe:
-            raise TVUnavailable("Amazon's Vega CLI is not installed on this computer (docs/FIRE-VEGA.md)")
+            raise TVUnavailable(
+                "Amazon's Vega CLI is not installed on this computer (docs/FIRE-VEGA.md)",
+                key="err_vega_cli_not_installed",
+            )
         try:
             p = await asyncio.create_subprocess_exec(exe, *args, stdout=asyncio.subprocess.PIPE,
                                                      stderr=asyncio.subprocess.STDOUT)
             out, _ = await asyncio.wait_for(p.communicate(), timeout)
         except asyncio.TimeoutError:
             p.kill()
-            raise TVUnavailable("Amazon's Vega CLI did not answer in time") from None
+            raise TVUnavailable("Amazon's Vega CLI did not answer in time", key="err_vega_cli_timeout") from None
         except OSError as e:
-            raise TVUnavailable(f"could not run the Vega CLI ({type(e).__name__})") from None
+            raise TVUnavailable(
+                f"could not run the Vega CLI ({type(e).__name__})",
+                key="err_vega_cli_run_failed",
+                vars={"error": type(e).__name__},
+            ) from None
         text = out.decode("utf-8", "replace").strip()
         self.last_cli = f"{' '.join(args[:3])}: {'ok' if p.returncode == 0 else 'failed'}"
         if p.returncode != 0:
-            raise VegaError(f"vega {' '.join(args[:2])} failed: {text[-200:]}")
+            cmd = " ".join(args[:2])
+            raise VegaError(
+                f"vega {cmd} failed: {text[-200:]}",
+                key="err_vega_cli_failed",
+                vars={"cmd": cmd, "error": text[-200:]},
+            )
         return text
 
     async def _connect(self):
@@ -180,7 +202,7 @@ class VegaTV:
 
     async def _cli_launch(self, app_id):
         if not ID_RE.fullmatch(str(app_id)):
-            raise ValueError(f"not a Vega app id: {app_id}")
+            raise messages.with_key(ValueError(f"not a Vega app id: {app_id}"), "err_vega_bad_app_id", app=app_id)
         await self._connect()
         await self._cli("device", "launch-app", "--appName", str(app_id), "-d", self._target(), timeout=30)
 
@@ -215,41 +237,57 @@ class VegaTV:
             sock.sendto(msg, (ip, self.dial_port))
             data = await asyncio.wait_for(loop.sock_recv(sock, 4096), 3)
         except (asyncio.TimeoutError, OSError):
-            raise TVUnavailable("the stick did not answer DIAL discovery") from None
+            raise TVUnavailable("the stick did not answer DIAL discovery", key="err_vega_dial_discovery_failed") from None
         finally:
             sock.close()
         loc = re.search(rb"(?im)^location:\s*(\S+)", data)
         if not loc:
-            raise TVUnavailable("the stick's DIAL answer had no LOCATION")
+            raise TVUnavailable("the stick's DIAL answer had no LOCATION", key="err_vega_dial_no_location")
         s = await self._http()
         try:
             async with s.get(loc.group(1).decode()) as r:
                 base = r.headers.get("Application-URL")
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
-            raise TVUnavailable(f"could not read the stick's DIAL description ({type(e).__name__})") from None
+            raise TVUnavailable(
+                f"could not read the stick's DIAL description ({type(e).__name__})",
+                key="err_vega_dial_desc_failed",
+                vars={"error": type(e).__name__},
+            ) from None
         if not base:
-            raise TVUnavailable("the stick's DIAL description had no Application-URL")
+            raise TVUnavailable("the stick's DIAL description had no Application-URL", key="err_vega_dial_no_app_url")
         u = urlparse(base)
         # only ever talk to the stick itself
         if u.hostname != ip:
-            raise TVUnavailable("the DIAL address did not match the stick, left alone")
+            raise TVUnavailable("the DIAL address did not match the stick, left alone", key="err_vega_dial_host_mismatch")
         self.dial_url = base.rstrip("/")
         return self.dial_url
 
     async def _dial_launch(self, name, payload=""):
         if not re.fullmatch(r"[A-Za-z0-9_.-]{1,40}", name):
-            raise ValueError(f"not a DIAL app name: {name}")
+            raise messages.with_key(ValueError(f"not a DIAL app name: {name}"), "err_vega_bad_dial_app", app=name)
         base = await self._discover()
         s = await self._http()
         try:
             async with s.post(f"{base}/{name}", data=payload.encode(),
                               headers={"Content-Type": "text/plain; charset=utf-8"}) as r:
                 if r.status == 404:
-                    raise TVUnavailable(f"the stick does not know {name} over DIAL")
+                    raise TVUnavailable(
+                        f"the stick does not know {name} over DIAL",
+                        key="err_vega_dial_unknown_app",
+                        vars={"app": name},
+                    )
                 if r.status >= 400:
-                    raise VegaError(f"DIAL answered {r.status} for {name}")
+                    raise VegaError(
+                        f"DIAL answered {r.status} for {name}",
+                        key="err_vega_dial_http_status",
+                        vars={"status": r.status, "app": name},
+                    )
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
-            raise TVUnavailable(f"DIAL did not answer ({type(e).__name__})") from None
+            raise TVUnavailable(
+                f"DIAL did not answer ({type(e).__name__})",
+                key="err_vega_dial_no_answer",
+                vars={"error": type(e).__name__},
+            ) from None
 
     # ---------- keys, through the page ----------
     def push_key(self, key):
@@ -280,24 +318,34 @@ class VegaTV:
             return "couch-tv"
         if n == "power":
             if self.is_on:
-                raise TVUnavailable("a Vega stick cannot be switched off from the network: press the power key on its remote")
+                raise TVUnavailable(
+                    "a Vega stick cannot be switched off from the network: press the power key on its remote",
+                    key="err_vega_power_off_unsupported",
+                )
             self.home_on_wake_until = time.monotonic() + 90
             await self.wake()
             return "power"
         code = resolve_key(name)
         if not code:
             if n in NOT_POSSIBLE:
-                raise TVUnavailable(f"{n} is the stick's own: nothing on a Vega stick lets the network press it")
-            raise ValueError(f"unknown key: {name}")
+                raise TVUnavailable(
+                    f"{n} is the stick's own: nothing on a Vega stick lets the network press it",
+                    key="err_vega_key_not_possible",
+                    vars={"key": n},
+                )
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
         self.require()
         if not self.page_in_front():
-            raise TVUnavailable("couch-tv is not in front on the stick, so there is nothing to press the key on: "
-                                "open it first (Home on the phone remote)")
+            raise TVUnavailable(
+                "couch-tv is not in front on the stick, so there is nothing to press the key on: "
+                "open it first (Home on the phone remote)",
+                key="err_vega_not_in_front",
+            )
         self.push_key(code)
         return code
 
     async def text(self, text):
-        raise TVUnavailable("typing from the phone is not built for Vega yet")
+        raise TVUnavailable("typing from the phone is not built for Vega yet", key="err_vega_typing_unsupported")
 
     # ---------- opening things ----------
     async def _launch_home(self):
@@ -314,7 +362,12 @@ class VegaTV:
             return
         except (VegaError, TVUnavailable) as e:
             errs.append(str(e))
-        raise TVUnavailable("could not open couch-tv on the stick: " + "; ".join(errs))
+        joined = "; ".join(errs)
+        raise TVUnavailable(
+            "could not open couch-tv on the stick: " + joined,
+            key="err_vega_open_home_failed",
+            vars={"error": joined},
+        )
 
     async def launch_package(self, package):
         self.require()
@@ -325,8 +378,11 @@ class VegaTV:
         app = apps.BY_PACKAGE.get(package) or apps.BY_ID.get(package)
         name = DIAL_APPS.get(app["id"]) if app else None
         if not name:
-            raise TVUnavailable("on a Vega stick only couch-tv, Netflix and YouTube can be opened from the "
-                                "computer: pick the other apps with the stick's own remote")
+            raise TVUnavailable(
+                "on a Vega stick only couch-tv, Netflix and YouTube can be opened from the "
+                "computer: pick the other apps with the stick's own remote",
+                key="err_vega_only_couch_netflix_youtube",
+            )
         await self._dial_launch(name)
         return "remote"
 
@@ -342,7 +398,10 @@ class VegaTV:
             return "remote"
         if package:
             return await self.launch_package(package)
-        raise ValueError("a Vega stick only opens Netflix and YouTube links")
+        raise messages.with_key(
+            ValueError("a Vega stick only opens Netflix and YouTube links"),
+            "err_vega_only_netflix_youtube_links",
+        )
 
     async def front_package(self):
         return self.current_package
@@ -420,10 +479,10 @@ class VegaTV:
         return False
 
     async def adb(self, *args, **kw):
-        raise TVUnavailable("this is a Vega stick: ADB does not exist on Vega OS")
+        raise TVUnavailable("this is a Vega stick: ADB does not exist on Vega OS", key="err_vega_adb_unsupported")
 
     async def screenshot(self):
-        raise TVUnavailable("screenshots are not built for Vega")
+        raise TVUnavailable("screenshots are not built for Vega", key="err_vega_no_screenshots")
 
     async def reconnect_now(self):
         self.connected = self.power = await self.port_open()

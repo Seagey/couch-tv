@@ -48,6 +48,7 @@ import aiohttp
 
 import apps
 import config
+import messages
 from tv import TVUnavailable
 
 HOME_PACKAGE = "app.couchtv.launcher"
@@ -164,6 +165,11 @@ def _first_item(data):
 class VizioError(RuntimeError):
     """The TV did not do what was asked, or answered with something unusable."""
 
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars
+
 
 class NeedsPairing(VizioError):
     """The TV is there, but wants the token pairing gives (or the one kept is no longer good)."""
@@ -272,7 +278,11 @@ class VizioTV:
 
     def require(self):
         if not self.connected:
-            raise TVUnavailable(f"the {self.name.lower()} TV is not answering on the network")
+            raise TVUnavailable(
+                f"the {self.name.lower()} TV is not answering on the network",
+                key="err_driver_not_answering",
+                vars={"name": self.name.lower()},
+            )
 
     def can_deeplink(self, app):
         return False   # no deep link into a show is known on VIZIO: apps open on their own page
@@ -332,7 +342,11 @@ class VizioTV:
                 text = await r.text()
                 status = r.status
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError, ssl.SSLError) as e:
-            raise TVUnavailable(f"the TV did not answer ({type(e).__name__})") from None
+            raise TVUnavailable(
+                f"the TV did not answer ({type(e).__name__})",
+                key="err_tv_did_not_answer_error",
+                vars={"error": type(e).__name__},
+            ) from None
         self._show("in ", f"{status} {path}", text)
         try:
             data = json.loads(text) if text.strip() else {}
@@ -340,14 +354,33 @@ class VizioTV:
             data = None
         result = _result(data)
         if result in PROTOCOL["needs_pairing"] or (status in (401, 403) and data is not None and result not in PROTOCOL["ok"]):
-            raise NeedsPairing("the TV wants pairing first (docs/VIZIO.md, step 3)" if not self.token
-                               else "the TV no longer accepts the kept token: pair again (docs/VIZIO.md, step 3)")
+            if not self.token:
+                raise NeedsPairing(
+                    "the TV wants pairing first (docs/VIZIO.md, step 3)",
+                    key="err_vizio_needs_pairing",
+                )
+            raise NeedsPairing(
+                "the TV no longer accepts the kept token: pair again (docs/VIZIO.md, step 3)",
+                key="err_vizio_token_rejected",
+            )
         if data is None:
-            raise VizioError(f"the TV sent something that is not JSON for {path} (HTTP {status})")
+            raise VizioError(
+                f"the TV sent something that is not JSON for {path} (HTTP {status})",
+                key="err_vizio_bad_json",
+                vars={"path": path, "status": status},
+            )
         if result and result not in PROTOCOL["ok"]:
-            raise VizioError(f"the TV answered {result.lower()} to {method} {path}")
+            raise VizioError(
+                f"the TV answered {result.lower()} to {method} {path}",
+                key="err_vizio_result_error",
+                vars={"result": result.lower(), "method": method, "path": path},
+            )
         if status >= 400 and not result:
-            raise VizioError(f"the TV answered HTTP {status} to {method} {path}")
+            raise VizioError(
+                f"the TV answered HTTP {status} to {method} {path}",
+                key="err_vizio_http_status",
+                vars={"status": status, "method": method, "path": path},
+            )
         return data
 
     async def find_port(self):
@@ -370,7 +403,12 @@ class VizioTV:
             self.port = p
             self.log.info("SmartCast answers on port %s", p)
             return p
-        raise TVUnavailable(f"no SmartCast answer on port {' or '.join(map(str, self.ports))} ({last})")
+        ports = " or ".join(map(str, self.ports))
+        raise TVUnavailable(
+            f"no SmartCast answer on port {ports} ({last})",
+            key="err_vizio_no_smartcast",
+            vars={"ports": ports, "error": str(last)},
+        )
 
     # ---------- pairing (the PIN on the TV) ----------
     async def pair_start(self):
@@ -383,14 +421,20 @@ class VizioTV:
         except VizioError as e:
             if any(b.lower() in str(e) for b in PROTOCOL["busy"]):
                 self.last_error = "the TV is already pairing with something"
-                raise VizioError("the TV is already showing a PIN for something else: press Back on the TV, "
-                                 "wait a minute and try again") from None
+                raise VizioError(
+                    "the TV is already showing a PIN for something else: press Back on the TV, "
+                    "wait a minute and try again",
+                    key="err_vizio_pairing_busy",
+                ) from None
             self.last_error = str(e)
             raise
         item = got.get("ITEM") if isinstance(got, dict) else None
         if not isinstance(item, dict) or item.get("PAIRING_REQ_TOKEN") is None:
             self.last_error = "the TV did not start pairing"
-            raise VizioError("the TV did not start pairing (no PAIRING_REQ_TOKEN): turn on trace and send the log")
+            raise VizioError(
+                "the TV did not start pairing (no PAIRING_REQ_TOKEN): turn on trace and send the log",
+                key="err_vizio_pair_start_failed",
+            )
         self._keep(pending={"req": item.get("PAIRING_REQ_TOKEN"), "challenge": item.get("CHALLENGE_TYPE", 1)})
         return True
 
@@ -398,10 +442,10 @@ class VizioTV:
         """Send the PIN, keep the token the TV gives back (bridge/data, 0600, never logged)."""
         pin = str(pin or "").strip()
         if not PIN.match(pin):
-            raise ValueError("the PIN is the 4 digits the TV shows")
+            raise messages.with_key(ValueError("the PIN is the 4 digits the TV shows"), "err_pin_4_digits")
         pending = self._stored().get("pending")
         if not isinstance(pending, dict) or pending.get("req") is None:
-            raise VizioError("ask the TV for a PIN first")
+            raise VizioError("ask the TV for a PIN first", key="err_ask_pin_first")
         self.require()
         body = {"DEVICE_ID": self.device_id, "CHALLENGE_TYPE": pending.get("challenge", 1),
                 "RESPONSE_VALUE": pin, "PAIRING_REQ_TOKEN": pending["req"]}
@@ -412,18 +456,27 @@ class VizioTV:
             if any(w.lower() in text for w in PROTOCOL["pin_wrong"]):
                 self._keep(pending=None)
                 self.last_error = "the TV refused the PIN"
-                raise VizioError("the TV refused the PIN: ask for a new one and try again") from None
+                raise VizioError(
+                    "the TV refused the PIN: ask for a new one and try again",
+                    key="err_vizio_pin_refused",
+                ) from None
             if any(w.lower() in text for w in PROTOCOL["pin_locked"]):
                 self._keep(pending=None)
                 self.last_error = "too many wrong PINs"
-                raise VizioError("too many wrong PINs: wait a few minutes before asking for a new one") from None
+                raise VizioError(
+                    "too many wrong PINs: wait a few minutes before asking for a new one",
+                    key="err_vizio_pin_locked",
+                ) from None
             self.last_error = text
             raise
         item = got.get("ITEM") if isinstance(got, dict) else None
         token = item.get("AUTH_TOKEN") if isinstance(item, dict) else None
         if not isinstance(token, str) or not token:
             self.last_error = "the TV accepted the PIN but sent no token"
-            raise VizioError("the TV accepted the PIN but sent no token (turn on trace and send the log)")
+            raise VizioError(
+                "the TV accepted the PIN but sent no token (turn on trace and send the log)",
+                key="err_vizio_no_token",
+            )
         self._keep(token=token, pending=None)
         self.last_error = None
         self.log.info("paired (token kept in %s)", os.path.basename(self.store_file))
@@ -525,17 +578,23 @@ class VizioTV:
         if not hit and want.startswith("hdmi") and want[4:].isdigit():
             hit = next((s for s in srcs if _plain(s["id"]) == want), None)
         if not hit:
-            raise ValueError(f"not an input the TV listed: {name}")
+            raise messages.with_key(ValueError(f"not an input the TV listed: {name}"), "err_tv_input_not_listed", name=name)
         _now, hashval = await self.current_input()
         if hashval is None:
-            raise VizioError("the TV did not give the HASHVAL needed to switch inputs (turn on trace and send the log)")
+            raise VizioError(
+                "the TV did not give the HASHVAL needed to switch inputs (turn on trace and send the log)",
+                key="err_vizio_no_hashval",
+            )
         await self._call("PUT", PROTOCOL["current_input"], {"REQUEST": "MODIFY", "VALUE": hit["id"], "HASHVAL": hashval})
         return hit
 
     # ---------- the home (not possible on a VIZIO) ----------
     async def open_home(self):
-        raise TVUnavailable("couch-tv's home cannot open on a VIZIO TV: VIZIO OS has no browser and takes no "
-                            "outside apps. couch-tv is the phone remote here (docs/VIZIO.md, \"The home\")")
+        raise TVUnavailable(
+            "couch-tv's home cannot open on a VIZIO TV: VIZIO OS has no browser and takes no "
+            "outside apps. couch-tv is the phone remote here (docs/VIZIO.md, \"The home\")",
+            key="err_vizio_no_home",
+        )
 
     # ---------- the watcher ----------
     async def start(self):
@@ -612,7 +671,7 @@ class VizioTV:
         else:
             code = resolve_key(name)
         if not code:
-            raise ValueError(f"unknown key: {name}")
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
         self.require()
         if k in ("play", "pause"):
             self._played = k == "play"
@@ -629,7 +688,10 @@ class VizioTV:
         return f"{code[0]}:{code[1]}"
 
     async def text(self, text):
-        raise TVUnavailable("typing into a VIZIO TV from the phone is not built: use the TV's own keyboard")
+        raise TVUnavailable(
+            "typing into a VIZIO TV from the phone is not built: use the TV's own keyboard",
+            key="err_vizio_typing_unsupported",
+        )
 
     def _app_entry(self, package):
         """(name space, app id, message) for a catalogue package or id, or "vizio.<ns>.<id>"."""
@@ -649,7 +711,11 @@ class VizioTV:
             return "remote"
         entry = self._app_entry(package)
         if not entry:
-            raise TVUnavailable(f"couch-tv does not know {package}'s id on a VIZIO (docs/VIZIO.md, \"Apps\")")
+            raise TVUnavailable(
+                f"couch-tv does not know {package}'s id on a VIZIO (docs/VIZIO.md, \"Apps\")",
+                key="err_vizio_unknown_app",
+                vars={"app": package},
+            )
         ns, aid, msg = entry
         await self._call("PUT", PROTOCOL["launch"], {"VALUE": {"NAME_SPACE": ns, "APP_ID": aid, "MESSAGE": msg}}, timeout=8)
         self.visible = (ns, aid)
@@ -659,7 +725,10 @@ class VizioTV:
         """No deep link into a show is known on VIZIO: the app opens on its own page."""
         self.require()
         if not package:
-            raise ValueError("VIZIO TVs only open apps, not links: name the app")
+            raise messages.with_key(
+                ValueError("VIZIO TVs only open apps, not links: name the app"),
+                "err_vizio_apps_not_links",
+            )
         await self.launch_package(package)
         return "app"
 
@@ -691,10 +760,10 @@ class VizioTV:
         return False
 
     async def adb(self, *args, **kw):
-        raise TVUnavailable("this is a VIZIO TV: ADB tools are Android only")
+        raise TVUnavailable("this is a VIZIO TV: ADB tools are Android only", key="err_vizio_adb_android_only")
 
     async def screenshot(self):
-        raise TVUnavailable("VIZIO TVs do not give screenshots over the network")
+        raise TVUnavailable("VIZIO TVs do not give screenshots over the network", key="err_vizio_no_screenshots")
 
     # ---------- power ----------
     async def port_open(self, port=None, timeout=1.0):

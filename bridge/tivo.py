@@ -49,6 +49,7 @@ import aiohttp
 
 import apps
 import config
+import messages
 from tv import TVUnavailable
 
 HOME_PACKAGE = "app.couchtv.launcher"
@@ -117,6 +118,11 @@ def field(xml, tag):
 class TivoError(RuntimeError):
     """The TV did not do what was asked, or answered with something unusable."""
 
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars
+
 
 class Wire:
     """Plain HTTP to the TV. A new connection for every request: Vestel's web server stalls on a reused
@@ -155,7 +161,11 @@ class Wire:
                     self.log.info("trace in %s %s", reply.status, text[:400])
                 return reply.status, reply.headers, text
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
-            raise TVUnavailable(f"the TV did not answer ({type(e).__name__})") from None
+            raise TVUnavailable(
+                f"the TV did not answer ({type(e).__name__})",
+                key="err_tv_did_not_answer_error",
+                vars={"error": type(e).__name__},
+            ) from None
 
 
 class SmartCenter:
@@ -180,9 +190,16 @@ class SmartCenter:
     async def _send(self, body, shown=None):
         status, _, _ = await self.wire.request("POST", self.base_of() + PROTOCOL["smart_center"], body, shown)
         if status == 403:
-            raise TivoError("the TV refused the key: switch on Devices, Virtual Remote in the TV's settings")
+            raise TivoError(
+                "the TV refused the key: switch on Devices, Virtual Remote in the TV's settings",
+                key="err_tivo_key_refused",
+            )
         if status not in (200, 201):
-            raise TivoError(f"the TV answered {status} to a key")
+            raise TivoError(
+                f"the TV answered {status} to a key",
+                key="err_tivo_key_status",
+                vars={"status": status},
+            )
 
 
 class Dial:
@@ -201,9 +218,13 @@ class Dial:
     async def launch(self, name):
         status, _, _ = await self.wire.request("POST", self.base_of() + name, "")
         if status == 404:
-            raise TivoError(f"the TV does not know {name}")
+            raise TivoError(f"the TV does not know {name}", key="err_tivo_unknown_app", vars={"app": name})
         if status not in (200, 201):
-            raise TivoError(f"the TV answered {status} when asked to open {name}")
+            raise TivoError(
+                f"the TV answered {status} when asked to open {name}",
+                key="err_tivo_launch_status",
+                vars={"status": status, "app": name},
+            )
 
 
 class TivoTV:
@@ -314,7 +335,11 @@ class TivoTV:
 
     def require(self):
         if not self.connected:
-            raise TVUnavailable(f"the {self.name.lower()} TV is not answering on the network")
+            raise TVUnavailable(
+                f"the {self.name.lower()} TV is not answering on the network",
+                key="err_driver_not_answering",
+                vars={"name": self.name.lower()},
+            )
 
     def can_deeplink(self, app):
         return False   # no deep link into a show is known on TiVo OS: apps open on their own page
@@ -494,7 +519,7 @@ class TivoTV:
             await self.open_home()
             return "couch-tv"
         if code is None:
-            raise ValueError(f"unknown key: {name}")
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
         if power and not self.connected:
             await self.wake()   # fully off, or deep standby: the port is gone with it
             return str(code)
@@ -510,9 +535,13 @@ class TivoTV:
         field takes neither kind of digit, a field on a web page takes the number keys. Letters are
         UNCONFIRMED on TiVo OS, signs ran on the real TV."""
         if not isinstance(text, str) or not text or len(text) > TEXT_MAX:
-            raise ValueError(f"text is 1 to {TEXT_MAX} characters")
+            raise messages.with_key(
+                ValueError(f"text is 1 to {TEXT_MAX} characters"),
+                "err_tivo_text_length",
+                max=TEXT_MAX,
+            )
         if any(ord(c) < 32 or ord(c) > 0xFFFF for c in text):
-            raise ValueError("only printable characters can be typed")
+            raise messages.with_key(ValueError("only printable characters can be typed"), "err_tivo_printable_only")
         self.require()
         self.quiet_until = time.monotonic() + 20
         for c in text:
@@ -532,7 +561,11 @@ class TivoTV:
         await self.refresh_installed()
         entry = self._entry(package)
         if not entry:
-            raise TVUnavailable(f"{package} is not an app this TV opens when asked")
+            raise TVUnavailable(
+                f"{package} is not an app this TV opens when asked",
+                key="err_tivo_app_not_supported",
+                vars={"app": package},
+            )
         self.quiet_until = time.monotonic() + 20
         await self.dial.launch(entry["dial"])
         self._front = (entry["package"], time.monotonic())
@@ -542,7 +575,10 @@ class TivoTV:
         """No deep link into a show is known on TiVo OS: the app opens on its own page."""
         self.require()
         if not package:
-            raise ValueError("TiVo OS TVs only open apps, not links: name the app")
+            raise messages.with_key(
+                ValueError("TiVo OS TVs only open apps, not links: name the app"),
+                "err_tivo_apps_not_links",
+            )
         await self.launch_package(package)
         return "app"
 
@@ -568,10 +604,10 @@ class TivoTV:
         return False
 
     async def adb(self, *args, **kw):
-        raise TVUnavailable("this is a TiVo OS TV: ADB tools are Android only")
+        raise TVUnavailable("this is a TiVo OS TV: ADB tools are Android only", key="err_tivo_adb_android_only")
 
     async def screenshot(self):
-        raise TVUnavailable("TiVo OS TVs do not give screenshots over the network")
+        raise TVUnavailable("TiVo OS TVs do not give screenshots over the network", key="err_tivo_no_screenshots")
 
     # ---------- power ----------
     async def _read_power(self):

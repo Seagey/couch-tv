@@ -20,7 +20,12 @@ def note_fields(key, vars=None):
     return _fields("note", key, vars)
 
 
-def with_key(exc, key, **vars):
+def error_fields(key, vars=None):
+    """Return error_key / error_vars fields for a localized error."""
+    return _fields("error", key, vars)
+
+
+def with_key(exc, key, /, **vars):
     """Attach .key and .vars to an exception and return it."""
     exc.key = key
     exc.vars = vars or None

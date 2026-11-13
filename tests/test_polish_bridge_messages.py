@@ -12,8 +12,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import claude  # noqa: E402
 import config  # noqa: E402
 import messages  # noqa: E402
+import roku  # noqa: E402
 import server  # noqa: E402
 import store  # noqa: E402
+import vidaa  # noqa: E402
 from tv import TVUnavailable  # noqa: E402
 
 
@@ -307,14 +309,22 @@ def _call_name(node):
     return None
 
 
-def _is_note_fields_call(node):
+def _is_messages_call(node, attr):
     return (
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Attribute)
         and isinstance(node.func.value, ast.Name)
         and node.func.value.id == "messages"
-        and node.func.attr == "note_fields"
+        and node.func.attr == attr
     )
+
+
+def _is_note_fields_call(node):
+    return _is_messages_call(node, "note_fields")
+
+
+def _is_error_fields_call(node):
+    return _is_messages_call(node, "error_fields")
 
 
 class CoreBridgeMessageContractTests(unittest.TestCase):
@@ -389,6 +399,138 @@ class ServerTVUnavailablePreservationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.message, "TV not connected")
         self.assertEqual(ctx.exception.key, "err_tv_not_connected")
         self.assertEqual(ctx.exception.vars, {"tv": "living"})
+
+
+DRIVER_BRIDGE_FILES = (
+    "lg.py",
+    "samsung.py",
+    "appletv.py",
+    "vidaa.py",
+    "philips.py",
+    "vizio.py",
+    "panasonic.py",
+    "tivo.py",
+    "vega.py",
+    "roku.py",
+)
+DRIVER_ERROR_CLASSES = (
+    "TVUnavailable",
+    "LGError",
+    "SamsungError",
+    "AppleTVError",
+    "PairingError",
+    "VidaaError",
+    "PhilipsError",
+    "NeedsLogin",
+    "NotThere",
+    "VizioError",
+    "NeedsPairing",
+    "PanasonicError",
+    "TivoError",
+    "VegaError",
+    "RokuError",
+    "ECPLimited",
+)
+
+
+def _has_string_literal(node):
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return True
+    if isinstance(node, ast.JoinedStr):
+        return True
+    if isinstance(node, ast.IfExp):
+        return _has_string_literal(node.body) or _has_string_literal(node.orelse)
+    return False
+
+
+class DriverBridgeMessageContractTests(unittest.TestCase):
+    def test_driver_raises_pass_message_key(self):
+        missing = []
+        for fname in DRIVER_BRIDGE_FILES:
+            path = os.path.join(BRIDGE_DIR, fname)
+            with open(path, encoding="utf-8") as f:
+                tree = ast.parse(f.read(), filename=fname)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Raise) or not isinstance(node.exc, ast.Call):
+                    continue
+                name = _call_name(node.exc.func)
+                if name in DRIVER_ERROR_CLASSES:
+                    if not any(kw.arg == "key" for kw in node.exc.keywords):
+                        missing.append(f"{fname}:{node.lineno} raise {name}(...) missing key=")
+                elif name == "ValueError":
+                    missing.append(f"{fname}:{node.lineno} raise ValueError(...) not wrapped in messages.with_key(...)")
+        self.assertEqual(missing, [])
+
+    def test_driver_note_and_error_string_dicts_include_keys(self):
+        missing = []
+        for fname in DRIVER_BRIDGE_FILES:
+            path = os.path.join(BRIDGE_DIR, fname)
+            with open(path, encoding="utf-8") as f:
+                tree = ast.parse(f.read(), filename=fname)
+            ignored_dicts = set()
+            for node in ast.walk(tree):
+                if _is_note_fields_call(node):
+                    for arg in list(node.args) + [kw.value for kw in node.keywords]:
+                        if isinstance(arg, ast.Dict):
+                            ignored_dicts.add(id(arg))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Dict) or id(node) in ignored_dicts:
+                    continue
+                for k, v in zip(node.keys, node.values):
+                    if not isinstance(k, ast.Constant):
+                        continue
+                    if k.value == "note" and _has_string_literal(v):
+                        has_note_key = any(isinstance(dk, ast.Constant) and dk.value == "note_key" for dk in node.keys)
+                        has_unpack = any(dk is None and _is_note_fields_call(dv) for dk, dv in zip(node.keys, node.values))
+                        if not (has_note_key or has_unpack):
+                            missing.append(f"{fname}:{node.lineno} dict with 'note' missing note_fields/note_key")
+                    elif k.value == "error" and _has_string_literal(v):
+                        has_error_key = any(isinstance(dk, ast.Constant) and dk.value == "error_key" for dk in node.keys)
+                        has_unpack = any(dk is None and _is_error_fields_call(dv) for dk, dv in zip(node.keys, node.values))
+                        if not (has_error_key or has_unpack):
+                            missing.append(f"{fname}:{node.lineno} dict with 'error' missing error_fields/error_key")
+        self.assertEqual(missing, [])
+
+
+class ServerDriverErrorPreservationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_h_roku_icon_forwards_roku_error_key_and_vars(self):
+        class FakeRokuTV:
+            kind = "roku"
+
+            async def icon(self, _rid):
+                raise roku.RokuError(
+                    "the Roku has no icon for 12 (404)",
+                    key="err_roku_no_icon",
+                    vars={"id": "12", "status": 404},
+                )
+
+        req = type("FakeRequest", (), {"match_info": {"id": "12"}})()
+        with patch.object(server, "tv", FakeRokuTV()):
+            with self.assertRaises(server.ApiError) as ctx:
+                await server.h_roku_icon(req)
+
+        self.assertEqual(ctx.exception.status, 404)
+        self.assertEqual(ctx.exception.message, "the Roku has no icon for 12 (404)")
+        self.assertEqual(ctx.exception.key, "err_roku_no_icon")
+        self.assertEqual(ctx.exception.vars, {"id": "12", "status": 404})
+
+    async def test_h_vidaa_pair_forwards_vidaa_error_key_and_vars(self):
+        class FakeVidaaTV:
+            kind = "vidaa"
+
+            async def pair_finish(self, _pin):
+                raise vidaa.VidaaError("wrong PIN", key="err_vidaa_wrong_pin")
+
+        req = {}
+        with patch.object(server, "tv", FakeVidaaTV()), \
+             patch.object(server, "body", AsyncMock(return_value={"pin": "1234"})):
+            with self.assertRaises(server.ApiError) as ctx:
+                await server.h_vidaa_pair(req)
+
+        self.assertEqual(ctx.exception.status, 409)
+        self.assertEqual(ctx.exception.message, "wrong PIN")
+        self.assertEqual(ctx.exception.key, "err_vidaa_wrong_pin")
+        self.assertIsNone(ctx.exception.vars)
 
 
 if __name__ == "__main__":

@@ -35,6 +35,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 import apps
 import config
+import messages
 from tv import TVUnavailable
 
 HOME_PACKAGE = "app.couchtv.launcher"
@@ -52,6 +53,11 @@ MAX_FRAME = 1 << 20
 class AppleTVError(RuntimeError):
     """The Apple TV refused or answered something unexpected."""
 
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars
+
 
 class PairingError(AppleTVError):
     """Pairing failed: usually a wrong PIN."""
@@ -68,13 +74,13 @@ def opack_encode(v):
         return b"\x02"
     if isinstance(v, int):
         if v < 0:
-            raise ValueError("OPACK here has no negative integers")
+            raise messages.with_key(ValueError("OPACK here has no negative integers"), "err_appletv_opack_negative")
         if v < 40:
             return bytes([0x08 + v])
         for tag, size in ((0x30, 1), (0x31, 2), (0x32, 4), (0x33, 8)):
             if v < 1 << (8 * size):
                 return bytes([tag]) + v.to_bytes(size, "little")
-        raise ValueError("integer too large")
+        raise messages.with_key(ValueError("integer too large"), "err_appletv_opack_int_too_large")
     if isinstance(v, float):
         return b"\x36" + struct.pack("<d", v)
     if isinstance(v, str):
@@ -99,7 +105,7 @@ def _sized(raw, short_base, long_base, short_max):
     for i, size in enumerate((1, 2, 3, 4)):
         if n < 1 << (8 * size):
             return bytes([long_base + i]) + n.to_bytes(size, "little")
-    raise ValueError("too long")
+    raise messages.with_key(ValueError("too long"), "err_appletv_opack_too_long")
 
 
 def opack_decode(data):
@@ -173,12 +179,19 @@ def opack_decode(data):
                 val, pos = take(pos)
                 out[k if isinstance(k, (str, int, bytes)) else str(k)] = val
             return out, pos + (1 if count == 15 else 0)
-        raise AppleTVError(f"OPACK tag 0x{tag:02x} not understood")
+        raise AppleTVError(
+            f"OPACK tag 0x{tag:02x} not understood",
+            key="err_appletv_opack_tag",
+            vars={"tag": f"0x{tag:02x}"},
+        )
 
     try:
         val, end = take(0)
     except (IndexError, struct.error, UnicodeDecodeError):
-        raise AppleTVError("the Apple TV sent a message that could not be read") from None
+        raise AppleTVError(
+            "the Apple TV sent a message that could not be read",
+            key="err_appletv_unreadable_message",
+        ) from None
     return val
 
 
@@ -269,7 +282,7 @@ class SRPClient:
     def process(self, salt, b_pub_bytes):
         b_pub = _b2i(b_pub_bytes)
         if b_pub % SRP_N == 0:
-            raise PairingError("the Apple TV sent an invalid key")
+            raise PairingError("the Apple TV sent an invalid key", key="err_appletv_invalid_key")
         x = srp_x(salt, self.user, self.password)
         u = srp_u(self.a_pub, b_pub)
         s = pow((b_pub - srp_k() * pow(SRP_G, x, SRP_N)) % SRP_N, self.a + u * x, SRP_N)
@@ -298,7 +311,7 @@ def unseal(key, label, data):
     try:
         return ChaCha20Poly1305(key).decrypt(_nonce(label), data, b"")
     except Exception:
-        raise AppleTVError("the Apple TV's reply did not check out") from None
+        raise AppleTVError("the Apple TV's reply did not check out", key="err_appletv_reply_invalid") from None
 
 
 def raw_public(key):
@@ -388,7 +401,11 @@ class Link:
         try:
             self.r, self.w = await asyncio.wait_for(asyncio.open_connection(self.host, self.port), self.timeout)
         except (OSError, asyncio.TimeoutError) as e:
-            raise TVUnavailable(f"the Apple TV did not answer ({type(e).__name__})") from None
+            raise TVUnavailable(
+                f"the Apple TV did not answer ({type(e).__name__})",
+                key="err_appletv_no_answer",
+                vars={"error": type(e).__name__},
+            ) from None
 
     async def close(self):
         if self.w:
@@ -414,17 +431,24 @@ class Link:
             header = await asyncio.wait_for(self.r.readexactly(4), self.timeout)
             n = int.from_bytes(header[1:], "big")
             if n > MAX_FRAME:
-                raise AppleTVError("a frame that is too big")
+                raise AppleTVError("a frame that is too big", key="err_appletv_frame_too_big")
             payload = await asyncio.wait_for(self.r.readexactly(n), self.timeout)
         except (asyncio.IncompleteReadError, OSError, asyncio.TimeoutError) as e:
-            raise TVUnavailable(f"the Apple TV stopped answering ({type(e).__name__})") from None
+            raise TVUnavailable(
+                f"the Apple TV stopped answering ({type(e).__name__})",
+                key="err_appletv_stopped_answering",
+                vars={"error": type(e).__name__},
+            ) from None
         if self.in_key:
             nonce = self.in_n.to_bytes(12, "little")
             self.in_n += 1
             try:
                 payload = ChaCha20Poly1305(self.in_key).decrypt(nonce, payload, header)
             except Exception:
-                raise AppleTVError("a sealed message from the Apple TV did not check out") from None
+                raise AppleTVError(
+                    "a sealed message from the Apple TV did not check out",
+                    key="err_appletv_sealed_invalid",
+                ) from None
         return header[0], payload
 
     async def step(self, ftype, fields):
@@ -441,9 +465,13 @@ class Link:
     def _tlv(self, msg, seq):
         t = tlv_decode(msg.get("_pd", b"")) if isinstance(msg, dict) else {}
         if T_ERROR in t:
-            raise PairingError(f"the Apple TV refused (error {t[T_ERROR][0]}). Start again and use the PIN it shows now.")
+            raise PairingError(
+                f"the Apple TV refused (error {t[T_ERROR][0]}). Start again and use the PIN it shows now.",
+                key="err_appletv_pairing_refused",
+                vars={"code": t[T_ERROR][0]},
+            )
         if t.get(T_SEQ) != bytes([seq]):
-            raise AppleTVError("the Apple TV answered the wrong pairing step")
+            raise AppleTVError("the Apple TV answered the wrong pairing step", key="err_appletv_wrong_pairing_step")
         return t
 
     async def pair_setup_finish(self, t2, pin):
@@ -454,9 +482,9 @@ class Link:
         try:
             t4 = self._tlv(m4, 4)
         except PairingError:
-            raise PairingError("the PIN was not accepted") from None
+            raise PairingError("the PIN was not accepted", key="err_appletv_pin_rejected") from None
         if not srp.verify_server(t4[T_PROOF]):
-            raise PairingError("the Apple TV's proof did not match")
+            raise PairingError("the Apple TV's proof did not match", key="err_appletv_proof_mismatch")
         ltsk = Ed25519PrivateKey.generate()
         ltpk = raw_public(ltsk)
         client_id = secrets.token_hex(8).upper().encode()
@@ -472,7 +500,7 @@ class Link:
         try:
             Ed25519PublicKey.from_public_bytes(acc[T_PUBLIC_KEY]).verify(acc[T_SIGNATURE], ax + acc[T_IDENTIFIER] + acc[T_PUBLIC_KEY])
         except (InvalidSignature, KeyError):
-            raise PairingError("the Apple TV's signature did not check out") from None
+            raise PairingError("the Apple TV's signature did not check out", key="err_appletv_signature_invalid") from None
         return {"client_id": client_id.decode(), "ltsk": raw_private(ltsk).hex(),
                 "atv_id": acc[T_IDENTIFIER].decode(errors="replace"), "atv_ltpk": acc[T_PUBLIC_KEY].hex()}
 
@@ -490,7 +518,10 @@ class Link:
             Ed25519PublicKey.from_public_bytes(bytes.fromhex(cred["atv_ltpk"])).verify(
                 inner[T_SIGNATURE], server_pub + inner[T_IDENTIFIER] + pub)
         except (InvalidSignature, KeyError):
-            raise PairingError("this is not the Apple TV that was paired (or it was reset): pair again") from None
+            raise PairingError(
+                "this is not the Apple TV that was paired (or it was reset): pair again",
+                key="err_appletv_wrong_device_pair_again",
+            ) from None
         client_id = cred["client_id"].encode()
         ltsk = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(cred["ltsk"]))
         sub = tlv_encode([(T_IDENTIFIER, client_id), (T_SIGNATURE, ltsk.sign(pub + client_id + server_pub))])
@@ -498,7 +529,10 @@ class Link:
         try:
             self._tlv(m4, 4)
         except PairingError:
-            raise PairingError("the Apple TV does not know this pairing any more: pair again") from None
+            raise PairingError(
+                "the Apple TV does not know this pairing any more: pair again",
+                key="err_appletv_pairing_forgotten",
+            ) from None
         self.out_key = hkdf(shared, b"", b"ClientEncrypt-main")
         self.in_key = hkdf(shared, b"", b"ServerEncrypt-main")
         self.out_n = self.in_n = 0
@@ -514,9 +548,10 @@ class Link:
             msg = opack_decode(payload)
             if isinstance(msg, dict) and msg.get("_x") == self.xid and msg.get("_t") in (3, 4):
                 if msg.get("_t") == 4 or "_em" in msg:
-                    raise AppleTVError(str(msg.get("_em") or "the Apple TV refused"))
+                    err = str(msg.get("_em") or "the Apple TV refused")
+                    raise AppleTVError(err, key="err_appletv_refused", vars={"error": err})
                 return msg.get("_c") or {}
-        raise AppleTVError("no answer to " + name)
+        raise AppleTVError("no answer to " + name, key="err_appletv_no_answer_to", vars={"name": name})
 
     async def start_session(self):
         await self.ask("_systemInfo", {"_bf": 0, "_cf": 512, "_clFl": 128, "_i": "couch-tv", "_idsID": secrets.token_hex(8),
@@ -603,15 +638,24 @@ class AppleTV:
 
     def require(self):
         if not self.connected:
-            raise TVUnavailable(f"the {self.name.lower()} Apple TV is not answering on the network")
+            raise TVUnavailable(
+                f"the {self.name.lower()} Apple TV is not answering on the network",
+                key="err_appletv_not_answering",
+                vars={"name": self.name.lower()},
+            )
 
     def can_deeplink(self, app):
         return False
 
     def status(self):
         """For /api/tvs, in plain words."""
-        return {"paired": self.paired, "port": self.port, "app_id": self.home_bundle(),
-                "note": None if self.paired else "Not paired yet: POST /api/appletv/pair, or run scripts/appletv-check.py --pair"}
+        return {
+            "paired": self.paired,
+            "port": self.port,
+            "app_id": self.home_bundle(),
+            "note": None if self.paired else "Not paired yet: POST /api/appletv/pair, or run scripts/appletv-check.py --pair",
+            **messages.note_fields(None if self.paired else "note_appletv_not_paired"),
+        }
 
     # ---------- the pairing, kept in bridge/data (git ignores it), never printed or logged ----------
     def _cred(self):
@@ -644,7 +688,7 @@ class AppleTV:
 
     async def pair_finish(self, pin):
         if not self._pairing:
-            raise PairingError("ask for the PIN first")
+            raise PairingError("ask for the PIN first", key="err_ask_pin_first")
         link, t2 = self._pairing
         self._pairing = None
         try:
@@ -661,7 +705,7 @@ class AppleTV:
             return self._link
         cred = self._cred()
         if not cred:
-            raise TVUnavailable("this Apple TV is not paired with couch-tv yet (docs/APPLE-TV.md)")
+            raise TVUnavailable("this Apple TV is not paired with couch-tv yet (docs/APPLE-TV.md)", key="err_appletv_not_paired")
         link = Link(self.ip, self.port)
         await link.open()
         try:
@@ -687,7 +731,11 @@ class AppleTV:
                 raise
             except OSError as e:
                 await self._drop()
-                raise TVUnavailable(f"the Apple TV did not answer ({type(e).__name__})") from None
+                raise TVUnavailable(
+                    f"the Apple TV did not answer ({type(e).__name__})",
+                    key="err_appletv_no_answer",
+                    vars={"error": type(e).__name__},
+                ) from None
 
     async def _read_attention(self):
         c = await self._ask("FetchAttentionState")
@@ -753,25 +801,29 @@ class AppleTV:
         if quiet:
             self.quiet_until = time.monotonic() + 20
         if not isinstance(bundle, str) or not BUNDLE_RE.fullmatch(bundle):
-            raise ValueError(f"not a bundle id: {bundle}")
+            raise messages.with_key(ValueError(f"not a bundle id: {bundle}"), "err_appletv_not_bundle_id", bundle=bundle)
         await self._ask("_launchApp", {"_bundleID": bundle})
 
     async def open_bundle(self, bundle):
         """Open an app by its bundle id, for couch-tv's own Apple TV app (it cannot open other apps itself).
         When the Apple TV's app list is known, only an app on it."""
         if not isinstance(bundle, str) or not BUNDLE_RE.fullmatch(bundle):
-            raise ValueError(f"not a bundle id: {bundle}")
+            raise messages.with_key(ValueError(f"not a bundle id: {bundle}"), "err_appletv_not_bundle_id", bundle=bundle)
         self.require()
         await self.refresh_installed()
         if self.channels and bundle not in {c["id"] for c in self.channels}:
-            raise TVUnavailable(f"{bundle} is not installed on the Apple TV")
+            raise TVUnavailable(
+                f"{bundle} is not installed on the Apple TV",
+                key="err_appletv_not_installed",
+                vars={"app": bundle},
+            )
         await self._launch(bundle)
 
     async def open_url(self, url):
         """Ask the Apple TV to open a link (a show's page in its app), the way the iPhone's remote can.
         Which app takes which link is the app's own business: an app that takes none is refused here."""
         if not isinstance(url, str) or not URL_RE.fullmatch(url):
-            raise ValueError("not a link the Apple TV can open")
+            raise messages.with_key(ValueError("not a link the Apple TV can open"), "err_appletv_bad_url")
         self.require()
         self.quiet_until = time.monotonic() + 20
         await self._ask("_launchApp", {"_urlS": url})
@@ -795,11 +847,19 @@ class AppleTV:
         await self.refresh_installed()
         ids = self._candidates(package)
         if not ids:
-            raise ValueError(f"no Apple TV bundle id known for {package}")
+            raise messages.with_key(
+                ValueError(f"no Apple TV bundle id known for {package}"),
+                "err_appletv_no_bundle_id",
+                package=package,
+            )
         listed = {c["id"] for c in self.channels}
         usable = [i for i in ids if i in listed or i == self.home_bundle()] if self.channels else ids
         if not usable:
-            raise TVUnavailable(f"{package} is not installed on the Apple TV")
+            raise TVUnavailable(
+                f"{package} is not installed on the Apple TV",
+                key="err_appletv_not_installed",
+                vars={"app": package},
+            )
         last = None
         for b in usable:
             try:
@@ -807,14 +867,21 @@ class AppleTV:
                 return "remote"
             except AppleTVError as e:
                 last = e
-        raise TVUnavailable(f"the Apple TV would not open {package}: {last}")
+        raise TVUnavailable(
+            f"the Apple TV would not open {package}: {last}",
+            key="err_appletv_open_failed",
+            vars={"package": package, "error": str(last)},
+        )
 
     async def start_intent(self, uri, package=None, cold=False, media_type=None):
         """Open the app a show is in. No deep link: it opens on its own home and the reply says to pick
         the show there (docs/APPLE-TV.md)."""
         self.require()
         if not package:
-            raise ValueError("the Apple TV opens the app, not the show: name an app")
+            raise messages.with_key(
+                ValueError("the Apple TV opens the app, not the show: name an app"),
+                "err_appletv_name_app",
+            )
         await self.launch_package(package)
         return "app"
 
@@ -838,7 +905,10 @@ class AppleTV:
             await self.refresh_installed()
             mine = self.home_bundle()
             if not mine:
-                raise ValueError("couch-tv's app is not on this Apple TV (tvos/, docs/APPLE-TV.md): use apple_home for Apple's own home")
+                raise messages.with_key(
+                    ValueError("couch-tv's app is not on this Apple TV (tvos/, docs/APPLE-TV.md): use apple_home for Apple's own home"),
+                    "err_appletv_no_home_app",
+                )
             await self._launch(mine)
             return "couch-tv"
         if raw == "power":
@@ -851,7 +921,7 @@ class AppleTV:
             return "power"
         code = KEYS.get(raw) or (raw if raw in HID else None)
         if not code:
-            raise ValueError(f"unknown key: {name}")
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
         self.require()
         if code == "wake":
             self.home_on_wake_until = time.monotonic() + 90
@@ -865,7 +935,10 @@ class AppleTV:
         await self._ask("_hidC", {"_hBtS": 2, "_hidC": c}, wait=False)
 
     async def text(self, text):
-        raise TVUnavailable("typing into an Apple TV is not supported yet: use the on screen keyboard with the arrows")
+        raise TVUnavailable(
+            "typing into an Apple TV is not supported yet: use the on screen keyboard with the arrows",
+            key="err_appletv_typing_unsupported",
+        )
 
     # ---------- the watcher and the hook ----------
     async def start(self):
@@ -940,10 +1013,10 @@ class AppleTV:
         return False
 
     async def adb(self, *args, **kw):
-        raise TVUnavailable("this is an Apple TV: ADB tools are Android only")
+        raise TVUnavailable("this is an Apple TV: ADB tools are Android only", key="err_appletv_adb_android_only")
 
     async def screenshot(self):
-        raise TVUnavailable("an Apple TV does not give screenshots over the network")
+        raise TVUnavailable("an Apple TV does not give screenshots over the network", key="err_appletv_no_screenshots")
 
     async def port_open(self, port=None, timeout=1.0):
         try:
