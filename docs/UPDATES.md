@@ -6,6 +6,14 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 13 November 2026: Chromecast with Google TV keeps couch-tv after two quick Home presses (on main, in the next release)
+
+On a Chromecast with Google TV (Android 14), pressing Home twice quickly from an app could leave the Google home in front for good. The app that was closing (Jellyfin here) sent its window event after the Google home's, so the Home button watch read that as the home having gone, and later Home presses sent no new event. The watch now keeps when the TV's own home last came forward and when couch-tv last did, and its one re-check brings couch-tv back when the home came last and the only events since were another app closing within about 2 seconds. An app you really opened from the home still keeps the screen. Fire TV, Bell Fibe, Xiaomi and the Android 9 path are unchanged. Reported with the logcat trace by goldimpala ([#175](https://github.com/Seagey/couch-tv/issues/175)). Untested on a real Chromecast so far.
+
+### 13 November 2026: Hold OK on a Keep watching card (on main, in the next release)
+
+Holding OK on a card in Keep watching opens a small menu with **Remove from Keep watching**, the same way holding OK on a dock app opens its menu. It is on main and not in 0.12, so a TV running the 0.12 release app does nothing on that hold (a Chromecast and an NVIDIA Shield both showed this, [#175](https://github.com/Seagey/couch-tv/issues/175), thanks goldimpala). Build the app from main ([Building the app](SETUP.md#building-the-app-instead-of-downloading-it)) to have it now. A click beside the open menu now closes it, as it does for the dock menu.
+
 ### 13 November 2026: Android TV 9 brings couch-tv back without the 5 second wait (on main, in the next release)
 
 On a Xiaomi MiTV-AXSO2 (Android TV 9, Google's older Android TV home), a Home press left the Google home up for 5 seconds, and a second press in that time kept it there. It is the same Android 9 hold as on Fire OS 7 (#162), so the Home button watch now moves couch-tv's own task to the front on every TV with Android 9 or older, not only on Fire TV. Android 10 and newer are unchanged.
