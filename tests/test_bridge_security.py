@@ -501,5 +501,28 @@ class TestReviewFixes(unittest.TestCase):
             self.assertFalse(server.is_allowed_origin(evil, "http://evil.example:5400"))
 
 
+class TestStaticHandlerSecurity(unittest.IsolatedAsyncioTestCase):
+    """A sibling folder whose name starts like the served one is not inside it (#179, ekagra-codes)."""
+
+    async def test_prefix_traversal_refused(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            base_dir = os.path.join(td, "dist")
+            sibling_dir = os.path.join(td, "dist_sibling")
+            os.makedirs(base_dir)
+            os.makedirs(sibling_dir)
+            with open(os.path.join(base_dir, "app.js"), "w") as f:
+                f.write("console.log('hello');")
+            with open(os.path.join(sibling_dir, "secret.txt"), "w") as f:
+                f.write("secret data")
+            handler = server.static_handler(base_dir, "test")
+
+            resp = await handler(make_mocked_request("GET", "/dist/app.js", match_info={"path": "app.js"}))
+            self.assertEqual(resp.status, 200)
+            for bad in ("../dist_sibling/secret.txt", "../../secret.txt", "/etc/hosts"):
+                with self.assertRaises(web.HTTPForbidden, msg=bad):
+                    await handler(make_mocked_request("GET", "/dist/x", match_info={"path": bad}))
+
+
 if __name__ == "__main__":
     unittest.main()
