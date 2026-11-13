@@ -87,7 +87,7 @@ class Translatable(unittest.TestCase):
             src = (root / f).read_text()
             for key, english in lg.LGTV.DEVMODE_WARNINGS.items():
                 found = re.findall(r"\b%s: ['\"](.+?)['\"],\n" % key, src)
-                langs = 11 if f.startswith("tv-home") else 8
+                langs = 12 if f.startswith("tv-home") else 9
                 self.assertEqual(len(found), langs, (f, key))
                 self.assertEqual(found[0], english, (f, key))   # en comes first, same words as the bridge
                 for said in found:

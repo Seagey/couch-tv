@@ -10,12 +10,18 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 TV settings, Bluetooth and Network now open on the screen you asked for. Android's Settings app keeps a single task, so opening TV settings after visiting Network used to bring back the Network page. The launcher now clears that task first. There is also a new **tvsettings** quick button for people who reach the TV's Settings often: add it in Home settings (or `home.quick`), it is off unless you add it. It uses the same route as Home settings, TV settings, so it works on the TV home launcher (option A) and with the bridge. Thanks syedhabibtirmizi ([#190](https://github.com/Seagey/couch-tv/pull/190)).
 
+### 14 November 2026: Polish on the TV home and the phone remote (on main, in the next release)
+
+The TV home and the phone remote now speak Polish (Polski). A TV or phone set to Polish picks it by itself, and Home settings can switch to it. The clock is 24 hour unless you pick 12 hour, and the country for where shows stream is `PL` when `config.json` does not set one. English and the other languages are unchanged. Thanks Azumi0 (#184), who wrote it and plans two follow ups: the bridge's own messages, and the on-TV app.
+
 ### 14 November 2026: the Look button and Home settings changes show at once on the TV home (on main, in the next release)
 
 On the TV home app, pressing the Look quick button, or changing a look or other setting in Home settings, saved the choice but the screen did not change until the app next restarted. The page restarts itself after those changes, and the app's WebView was refusing that reload along with every other navigation. It now lets the home page reload itself (same address, under `/tv/`, for both the bridge home and the saved offline copy) and still refuses every other address. The reload also uses `location.reload()` when the address would not change. Thanks clembgrn for the diagnosis ([#185](https://github.com/Seagey/couch-tv/issues/185)) and syedhabibtirmizi for the fix ([#189](https://github.com/Seagey/couch-tv/pull/189)). It may also be the cause of [#186](https://github.com/Seagey/couch-tv/issues/186).
+
 ### 14 November 2026: Czech is complete, and the phone remote speaks Czech too (on main, in the next release)
 
 The Czech TV home now has every sentence translated, including Ambient, the quick buttons, Kids mode and the LG Developer Mode lines, so nothing shows in English any more. The phone remote now speaks Czech as well (Čeština, picked in the TV menu under Language, or by itself on a phone set to Czech). Thanks slezaCZ, who wrote both sets of translations (#180).
+
 ### 14 November 2026: sharper scenes on a 4K TV that draws its interface at 1080 (on main, in the next release)
 
 Some 4K TVs (a TCL Google TV) draw apps at 1080 and upscale them, so the home thought the screen was 1080 and loaded the softer 1080 scene pictures. `home.hi_res: "always"` in `config.json` now loads the 4K copies anyway. It is off by default and there is no Home settings switch yet (thanks Hiren-Patel1, [#191](https://github.com/Seagey/couch-tv/issues/191)).
