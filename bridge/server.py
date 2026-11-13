@@ -1901,8 +1901,11 @@ PLACEHOLDER = """<!doctype html><meta charset=utf-8><meta name=viewport content=
 def static_handler(folder, name):
     async def handler(request):
         rel = request.match_info.get("path", "")
+        base = os.path.normpath(folder)
         target = os.path.normpath(os.path.join(folder, rel))
-        if not target.startswith(os.path.normpath(folder)):
+        # base + os.sep, so a sibling folder whose name starts the same (dist_old next to dist) is
+        # outside too (#179)
+        if target != base and not target.startswith(base + os.sep):
             raise web.HTTPForbidden()
         if os.path.isdir(target):
             target = os.path.join(target, "index.html")
