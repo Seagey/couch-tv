@@ -191,7 +191,7 @@ class HomeActivity : Activity() {
             return out.toString()
         }
         @JavascriptInterface fun launch(pkg: String): Boolean {
-            val i = packageManager.getLeanbackLaunchIntentForPackage(pkg) ?: packageManager.getLaunchIntentForPackage(pkg) ?: return false
+            val i = Tv.launchIntent(pkg) ?: return false
             main.post { runCatching { startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
             return true
         }

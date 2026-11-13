@@ -1013,7 +1013,8 @@ class MainActivity : Activity() {
     private fun appList(): List<Pair<ResolveInfo, String>> = appCache ?: synchronized(this) {
         appCache ?: run {
             val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-            packageManager.queryIntentActivities(q, 0)
+            val store = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage("com.amazon.venezia")
+            (packageManager.queryIntentActivities(q, 0) + packageManager.queryIntentActivities(store, 0))
                 .filter { it.activityInfo.packageName != packageName }
                 .distinctBy { it.activityInfo.packageName }
                 .map { it to it.loadLabel(packageManager).toString() }
@@ -1369,7 +1370,9 @@ class MainActivity : Activity() {
         if (pkg == "com.android.tv.settings" || pkg.startsWith(FireWatch.AMAZON_SETTINGS_PKG)) {
             FireWatch.amazonSettings(packageManager)?.let { return startSettings(it) }
         }
-        val i = packageManager.getLeanbackLaunchIntentForPackage(pkg)
+        val store = Intent("com.amazon.venezia.ade.FEATURED_LAUNCH").setPackage(pkg)
+            .takeIf { pkg == "com.amazon.venezia" && packageManager.resolveActivity(it, 0) != null }
+        val i = store ?: packageManager.getLeanbackLaunchIntentForPackage(pkg)
             ?: packageManager.getLaunchIntentForPackage(pkg)
             ?: return false
         return start(i)

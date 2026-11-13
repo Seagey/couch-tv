@@ -207,14 +207,14 @@
     "com.spotify.tv.android", "com.google.android.youtube.tvmusic"
   ];
   // The TV's own tools go last, in this order, just before the screens.
-  var APP_LAST = ["com.mediatek.wwtv.tvcenter", "com.android.vending", "com.android.tv.settings"];
+  var APP_LAST = ["com.mediatek.wwtv.tvcenter", "com.android.vending", "com.amazon.venezia", "com.android.tv.settings"];
   // Kept behind the "More apps" tile on every TV (apps most people rarely open).
-  var TUCKED = ["com.mediatek.wwtv.tvcenter", "com.google.android.youtube.tvmusic", "com.spotify.tv.android"];
+  var TUCKED = ["com.mediatek.wwtv.tvcenter", "com.google.android.youtube.tvmusic", "com.spotify.tv.android", "com.android.vending", "com.amazon.venezia"];
   // The same tools on other makers' TVs, by name.
   var TUCKED_NAMES = /^(screen ?shar|live ?tv|usb|media ?cent|browser|device assistant)/i;
-  // The Play Store, under the name most people know it by (in the chosen language).
-  var RENAME = { "com.android.vending": "app_store" };
-  // Never shown: home screens, store and system clutter, and Moonlight (a screen tile opens it).
+  // Both Android stores, under the same translated name.
+  var RENAME = { "com.android.vending": "app_store", "com.amazon.venezia": "app_store" };
+  // Never shown: home screens and system clutter, and Moonlight (a screen tile opens it).
   // A maker's own clutter (help apps, file browsers) is listed per house in config.json,
   // home.hide_packages, and added to this list in readConfig().
   var HIDDEN = [
@@ -224,8 +224,6 @@
   var GRID_COLS = 12, GRID_MAX = 24;
   var DOCK_APPS = 10;   // Night: apps in the dock before Settings and More apps (home.dock_size)
   var SETTINGS_PKG = "com.android.tv.settings";
-  // The Play Store: always the first tile of More apps, never in the dock's order.
-  var STORE_PKG = "com.android.vending";
   var HOLD_MS = 600;    // how long OK is held to pick something up
 
   var ICONS = {
@@ -2181,10 +2179,10 @@
   }
 
   // Night: a dock of the first ten apps (home.dock_size), then Settings, then More apps (which shows
-  // everything, the App Store first). The order and the More apps line come from Arrange apps on the
+  // everything). The order and the More apps line come from Arrange apps on the
   // phone, or from moving apps with the TV remote (hold OK), once one is saved.
   function arrangeItems() {
-    var rest = shownApps().filter(function (a) { return a.package !== SETTINGS_PKG && a.package !== STORE_PKG; });
+    var rest = shownApps().filter(function (a) { return a.package !== SETTINGS_PKG; });
     var screens = data.screens.map(function (sc) {
       return { kind: "screen", id: sc.id, name: sc.name, ready: sc.ready, note: sc.note, package: "screen:" + sc.id };
     });
@@ -2209,10 +2207,8 @@
   }
 
   function dockList() {
-    var store = data.apps.filter(function (a) { return a.package === STORE_PKG; })[0];
     var arr = arrangeItems();
     var list = expanded ? arr.items.slice() : arr.items.slice(0, arr.line);
-    if (expanded && store) list.unshift({ kind: "app", store: true, name: t("app_store"), package: STORE_PKG, id: store.id });
     list = list.concat(toolItems());
     if (!expanded && !(STANDALONE && !data.apps.length)) list.push(moreItem());   // standalone: no app list behind it
     return list;
@@ -2269,11 +2265,11 @@
     hintTimer = setTimeout(function () { hintFlash = ""; renderHint(); }, 4000);
   }
   // Holding OK on a dock app opens a small menu (Move, Hide, Uninstall, App info). "Move" is the
-  // old pick-up-to-reorder behaviour, now in startMove(). Store/gear/smart/screen tiles stay put.
+  // old pick-up-to-reorder behaviour, now in startMove(). Gear/smart/screen tiles stay put.
   function holdApp() {
     var a = gridItems[g];
     if (!a || a.kind === "more") return false;
-    if (a.store || a.kind === "gear" || a.kind === "smart" || a.kind === "devmode" || a.kind === "screen") { flash(t("stays_put", { name: a.name })); return true; }
+    if (a.kind === "gear" || a.kind === "smart" || a.kind === "devmode" || a.kind === "screen") { flash(t("stays_put", { name: a.name })); return true; }
     if (a.kind !== "app") return startMove();
     openAppMenu(a);
     return true;
@@ -2484,7 +2480,7 @@
   // otherwise first behind More apps, with a New dot until opened once.
   function detectNew() {
     if (!data.apps.length) return;
-    var pk = data.apps.filter(function (a) { return a.package !== SETTINGS_PKG && a.package !== STORE_PKG; })
+    var pk = data.apps.filter(function (a) { return a.package !== SETTINGS_PKG; })
       .map(function (a) { return a.package; });
     var seen = kept("tvhome.apps.seen");
     if (!seen) { keep("tvhome.apps.seen", pk); return; }
@@ -2522,7 +2518,6 @@
     else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
     else if (it.kind === "smart") face = '<div class="face tool">' + window.smartHome.icon + "</div>";
     else if (iconUrl(it.package)) face = '<div class="face"><img src="' + esc(iconUrl(it.package)) + '" alt="" decoding="async" onerror="this.parentNode.className=\'face word\';this.parentNode.textContent=this.getAttribute(\'data-name\')" data-name="' + esc(it.name) + '"></div>';
-    else if (it.store) face = '<div class="face tool">' + ICONS.store + "</div>";
     else face = '<div class="face word">' + esc(it.name) + "</div>";
     var cls = "tile app dock-ic" + (it.kind === "input" ? " input-ic ic-" + esc(it.icon || "hdmi") : "") + (lift && it.package === lift.pkg ? " lifted" : "");
     return '<div class="' + cls + '">' + face + dotHTML(it) + '<div class="label">' + esc(it.name) + "</div></div>";

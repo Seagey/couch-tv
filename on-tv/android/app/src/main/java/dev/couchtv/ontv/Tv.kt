@@ -60,14 +60,24 @@ object Tv {
 
     fun tvLaunchables(): List<android.content.pm.ResolveInfo> {
         val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-        return ctx.packageManager.queryIntentActivities(q, 0).distinctBy { it.activityInfo.packageName }
+        // Fire TV's Appstore declares LAUNCHER, but no LEANBACK_LAUNCHER.
+        val store = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage("com.amazon.venezia")
+        return (ctx.packageManager.queryIntentActivities(q, 0) + ctx.packageManager.queryIntentActivities(store, 0))
+            .distinctBy { it.activityInfo.packageName }
+    }
+
+    /** The same launch target for the TV tile and the phone remote. */
+    fun launchIntent(pkg: String): Intent? {
+        val pm = ctx.packageManager
+        // The store's ordinary LAUNCHER activity opens "Your Apps & Games", not the storefront.
+        val store = Intent("com.amazon.venezia.ade.FEATURED_LAUNCH").setPackage(pkg)
+            .takeIf { pkg == "com.amazon.venezia" && pm.resolveActivity(it, 0) != null }
+        return store ?: pm.getLeanbackLaunchIntentForPackage(pkg) ?: pm.getLaunchIntentForPackage(pkg)
     }
 
     /** Opens an app. ADB when connected (works from the background on every TV), else an intent. */
     fun launchPackage(pkg: String): String {
-        val pm = ctx.packageManager
-        val i = pm.getLeanbackLaunchIntentForPackage(pkg) ?: pm.getLaunchIntentForPackage(pkg)
-            ?: throw ApiError(404, "$pkg is not installed on the TV")
+        val i = launchIntent(pkg) ?: throw ApiError(404, "$pkg is not installed on the TV")
         val comp = i.component
         if (Adb.connected && comp != null) {
             val out = Adb.shell("am start -n ${comp.packageName}/${comp.className} -a android.intent.action.MAIN -f 0x10200000", 12_000)

@@ -311,7 +311,8 @@ remote:
 - **Home settings, Apps** (gear tile) lists every app: OK moves one between home, More apps and
   hidden (hidden apps are not shown anywhere on that TV until you bring them back there), holding
   OK picks it up to change the order with up and down.
-- **New apps:** the Play Store is the **App Store** tile, first in More apps. An app installed later
+- **New apps:** the Play Store or Amazon Appstore is the **App Store** tile, near the end of More apps
+  by default. Move it onto the home or rearrange it like any other app. An app installed later
   goes to the end of the dock if there is room, otherwise first in More apps, with a small blue dot
   until it is opened once.
 
