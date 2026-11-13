@@ -327,7 +327,7 @@ They win over `config.json` on that TV; About, Reset home settings goes back to 
 | Hebrew, with full right-to-left layout | `he` | 24 hour | Yes | Not yet |
 | French | `fr` | 24 hour | Yes | Not yet |
 | Czech | `cs` | 24 hour | Yes, on main, in the next release | Yes, on main, in the next release |
-| Brazilian Portuguese | `pt` | 24 hour | Yes, on main, in the next release | Yes, on main, in the next release (a few newer phone screens still in English) |
+| Brazilian Portuguese | `pt` | 24 hour | Yes, on main, in the next release | Yes, on main, in the next release |
 
 The TV home and the phone remote both speak English, Spanish (`es`, for Spain and everyone else),
 Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest), Italian (`it`),
