@@ -121,12 +121,14 @@ class FireWatch : AccessibilityService() {
 
     private fun bringBack() {
         last = System.currentTimeMillis()
-        if (amazonInFront && moveToFront()) return
+        // Android 9 and older hold activity starts for 5 s after a Home press on every TV, not only
+        // Fire TV (seen on a Xiaomi MiTV-AXSO2: a second press in that time left the Google home up).
+        if ((amazonInFront || Build.VERSION.SDK_INT < 29) && moveToFront()) return
         runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
     /**
-     * Fire TV on Android 9 and older: Android holds an app's activity starts for 5 s after a Home press
+     * Any TV on Android 9 and older: Android holds an app's activity starts for 5 s after a Home press
      * (the app-switch delay). Seen with the on-TV app on a Fire TV Cube (3rd gen, Fire OS 7.7.1.7):
      * Amazon's home stayed up for 5 s, and another press in that time buried the held start under
      * Amazon's home for good. Moving couch-tv's own task to the front is not an activity start and was
@@ -141,7 +143,7 @@ class FireWatch : AccessibilityService() {
             }
         }.getOrNull() ?: return false
         if (runCatching { task.moveToFront() }.isFailure) return false
-        Log.i("couchtv.firewatch", "Amazon's home came forward: moved couch-tv's task to the front")
+        Log.i("couchtv.firewatch", "the TV's own home came forward: moved couch-tv's task to the front")
         MainActivity.backToFirstTile()
         return true
     }
