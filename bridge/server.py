@@ -1862,7 +1862,7 @@ agentic.S = _sys.modules[__name__]
 
 
 async def recs_refresh_soon():
-    await claude.refresh_recs(force=True)
+    await claude.refresh_recs(force=True, lang=home_settings().get("settings", {}).get("lang"))
 
 
 async def h_ask(request):
@@ -1875,13 +1875,13 @@ async def h_ask(request):
     if kids.is_kid(store.norm_who(data.get("who")) or cur_who()):
         raise ApiError(403, "Ask is off for a kids profile.")
     result = await claude.ask(text, store.norm_who(data.get("who")) or cur_who(), asks,
-                              _current.get())
+                              _current.get(), lang=home_settings().get("settings", {}).get("lang"))
     return ok(**result)
 
 
 async def h_recs(request):
     who = store.norm_who(request.query.get("who"))
-    picks, updated = await claude.cached_recs(who)
+    picks, updated = await claude.cached_recs(who, lang=home_settings().get("settings", {}).get("lang"))
     return web.json_response({"ok": True, "updated": updated,
                               "continue": continue_items(who), "picks": picks})
 
@@ -3397,8 +3397,9 @@ async def run_import():
             log.info("imported %s new history items", new)
         if new or not os.path.exists(taste.TASTE):
             await taste.build()
+            lang = home_settings().get("settings", {}).get("lang")
             for who in (None, *config.PEOPLE_IDS):
-                asyncio.ensure_future(claude.refresh_recs(who, force=True))
+                asyncio.ensure_future(claude.refresh_recs(who, force=True, lang=lang))
         return report
 
 

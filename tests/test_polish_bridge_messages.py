@@ -1,12 +1,18 @@
+import asyncio
 import os
 import sys
+import tempfile
 import unittest
+from unittest.mock import AsyncMock, patch
 from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bridge"))
+import claude  # noqa: E402
+import config  # noqa: E402
 import messages  # noqa: E402
 import server  # noqa: E402
+import store  # noqa: E402
 from tv import TVUnavailable  # noqa: E402
 
 
@@ -151,6 +157,119 @@ class MiddlewareMessageFieldsTests(AioHTTPTestCase):
         self.assertEqual(resp.status, 400)
         data = await resp.json()
         self.assertEqual(data, {"ok": False, "error": "plain value error"})
+
+
+class ClaudeLanguageAndStatusTests(unittest.IsolatedAsyncioTestCase):
+    def test_resolve_lang_explicit_and_fallbacks(self):
+        self.assertEqual(claude.resolve_lang("pl"), "pl")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(store, "DATA", tmp), \
+                 patch.object(store, "_read", return_value={"settings": {"lang": "pl"}}) as mock_read:
+                self.assertEqual(claude.resolve_lang(None, tv_id="living"), "pl")
+                mock_read.assert_called_once_with(os.path.join(tmp, "settings.living.json"), {})
+
+            with patch.object(store, "DATA", tmp), \
+                 patch.object(store, "_read", return_value={}), \
+                 patch.dict(config.CONFIG, {"home": {"language": "de"}}, clear=False):
+                self.assertEqual(claude.resolve_lang(None, tv_id="living"), "de")
+
+            with patch.object(store, "DATA", tmp), \
+                 patch.object(store, "_read", return_value={}), \
+                 patch.dict(config.CONFIG, {"home": {}}, clear=False):
+                self.assertEqual(claude.resolve_lang(None, tv_id="living"), "en")
+
+    async def test_ask_prompt_uses_target_language_when_not_english(self):
+        captured = {}
+
+        async def fake_run_claude(prompt, system=None, mcp_config=None, timeout=claude.ASK_TIMEOUT):
+            captured["system"] = system
+            return "Polecam Severance."
+
+        with patch.object(claude, "run_claude", side_effect=fake_run_claude), \
+             patch.object(claude, "_mcp_config", return_value="/tmp/nonexistent-mcp.json"), \
+             patch.object(claude.taste, "summary", return_value=""):
+            res = await claude.ask("polec cos", None, {}, lang="pl")
+
+        self.assertEqual(res["reply"], "Polecam Severance.")
+        self.assertIn("Polish", captured["system"])
+        self.assertIn("OPTIONS:", captured["system"])
+        self.assertNotIn("the English spelling used in", captured["system"])
+
+        with patch.object(claude, "run_claude", side_effect=fake_run_claude), \
+             patch.object(claude, "_mcp_config", return_value="/tmp/nonexistent-mcp.json"), \
+             patch.object(claude.taste, "summary", return_value=""):
+            await claude.ask("recommend something", None, {}, lang="en")
+
+        self.assertIn("the English spelling used in", captured["system"])
+
+    async def test_ask_soft_timeout_returns_still_working_keys(self):
+        async def slow_run_claude(*_args, **_kwargs):
+            await asyncio.sleep(5)
+            return "done"
+
+        with patch.object(claude, "run_claude", side_effect=slow_run_claude), \
+             patch.object(claude, "_mcp_config", return_value="/tmp/nonexistent-mcp.json"), \
+             patch.object(claude.taste, "summary", return_value=""), \
+             patch.object(claude, "ASK_SOFT", 0.01):
+            res_idle = await claude.ask("play something", None, {}, tv_id="t1", lang="en")
+
+        self.assertTrue(res_idle["still"])
+        self.assertEqual(res_idle["reply_key"], "ask_still_working")
+        self.assertNotIn("reply_vars", res_idle)
+        self.assertIn("Still working on it", res_idle["reply"])
+
+        asks = {}
+
+        async def slow_with_action(*_args, **_kwargs):
+            for ask_id in list(asks):
+                asks[ask_id].append({"tool": "play", "args": {"title": "Severance"}})
+            await asyncio.sleep(5)
+            return "done"
+
+        with patch.object(claude, "run_claude", side_effect=slow_with_action), \
+             patch.object(claude, "_mcp_config", return_value="/tmp/nonexistent-mcp.json"), \
+             patch.object(claude.taste, "summary", return_value=""), \
+             patch.object(claude, "ASK_SOFT", 0.05):
+            res_doing = await claude.ask("play Severance", None, asks, tv_id="t2", lang="en")
+
+        self.assertTrue(res_doing["still"])
+        self.assertEqual(res_doing["reply_key"], "ask_still_working_doing")
+        self.assertEqual(res_doing["reply_vars"], {"doing": "putting on Severance"})
+        self.assertIn("putting on Severance", res_doing["reply"])
+
+        # Cancel background tasks from the soft timeout so event loop exits cleanly
+        for task in list(claude._background):
+            task.cancel()
+        if claude._background:
+            await asyncio.gather(*claude._background, return_exceptions=True)
+
+    async def test_ask_runtime_error_includes_reply_key_and_vars(self):
+        with patch.object(claude, "run_claude", side_effect=RuntimeError("Claude took too long")), \
+             patch.object(claude, "_mcp_config", return_value="/tmp/nonexistent-mcp.json"), \
+             patch.object(claude.taste, "summary", return_value=""):
+            res = await claude.ask("play something", None, {}, tv_id="t3", lang="en")
+
+        self.assertEqual(res["reply"], "Sorry, that did not work: Claude took too long")
+        self.assertEqual(res["reply_key"], "ask_did_not_work")
+        self.assertEqual(res["reply_vars"], {"error": "Claude took too long"})
+
+    async def test_popular_picks_includes_reason_key_and_vars(self):
+        fake_items = [{
+            "title": "Severance",
+            "year": 2022,
+            "type": "tv",
+            "poster": "p.jpg",
+            "backdrop": "b.jpg",
+            "providers": [{"service": "appletv", "playable": True}],
+        }]
+        with patch.object(claude.finder, "popular", AsyncMock(return_value=fake_items)):
+            picks = await claude._popular_picks()
+
+        self.assertEqual(len(picks), 1)
+        self.assertEqual(picks[0]["reason"], f"Popular in {config.COUNTRY_NAME} this week")
+        self.assertEqual(picks[0]["reason_key"], "ask_popular_reason")
+        self.assertEqual(picks[0]["reason_vars"], {"country": config.COUNTRY_NAME})
 
 
 if __name__ == "__main__":
