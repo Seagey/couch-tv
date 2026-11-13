@@ -2059,6 +2059,7 @@
     try {
       if (TV && TV.dismissWatchNext) TV.dismissWatchNext(id, pkg, title);
     } catch (e) {}
+    if (!OFFLINE && data.bridge !== false && it.source === "bridge") api("POST", "/api/continue/hide", { id: id }).catch(function () {});   // the phone's list too
 
     var dismissed = kept("tvhome.dismissed_shows") || [];
     var sig = pkg + "|" + title;

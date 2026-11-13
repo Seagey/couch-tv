@@ -93,6 +93,7 @@ export const api = {
   continueList: (who) => call('GET', `/api/continue?who=${encodeURIComponent(who)}`),
   setWho: (who, pin) => call('POST', '/api/who', pin ? { who, pin } : { who }),
   openContinue: (id, who) => call('POST', '/api/continue/open', { id, who }, 60000),
+  hideContinue: (id) => call('POST', '/api/continue/hide', { id }),
   config: () => call('GET', '/api/config'),
   screens: () => call('GET', '/api/screens'),
   sleep: () => call('GET', '/api/sleep'),

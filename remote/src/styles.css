@@ -194,6 +194,9 @@ main { position: relative; z-index: 1; height: 100%; }
 .poster-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .poster-art span { padding: 10px; font-weight: 700; text-align: center; }
 .poster:active .poster-art { transform: scale(0.96); transition: none; }
+.poster-wrap { position: relative; flex: none; scroll-snap-align: start; }
+.poster-remove { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.55); color: #fff; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.poster-remove:active { background: rgba(0, 0, 0, 0.8); }
 .poster b { display: block; font-size: 15px; font-weight: 600; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .poster small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; color: var(--ink-2); margin-top: 2px; line-height: 1.25; }
 .poster.dim .poster-art { opacity: 0.55; }
