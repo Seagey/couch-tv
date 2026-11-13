@@ -28,6 +28,13 @@ have no APKs or ADB: they use a different path ([FIRE-VEGA.md](FIRE-VEGA.md)).
 | Keep watching | Only fills from shows started from the phone remote |
 | Amazon's YouTube app | Yes, shown and sorted as YouTube |
 
+**Keep watching with no computer (option A)** is Android's own Watch Next list, which couch-tv reads
+and nothing else. It shows only what the apps themselves put there. On Fire OS that has been seen
+to be Hotstar and not Netflix or Prime Video ([#183](https://github.com/Seagey/couch-tv/issues/183)):
+those apps may keep their "continue watching" for Amazon's home instead. That is not confirmed, and
+couch-tv has no other source for them without the bridge. With the bridge (option B), shows you
+start through couch-tv are remembered by the bridge itself.
+
 ## Install
 
 You need a computer with `adb` (macOS: `brew install --cask android-platform-tools`) on the same
