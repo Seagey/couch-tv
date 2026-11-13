@@ -28,10 +28,21 @@ Object.keys(S.pl).forEach(function (key) {
   assert(key in S.en, `S.pl has ${key}, which English does not`);
 });
 
-// Polish plurals change with the number: never put a counted noun right after it
-Object.keys(S.pl).forEach(function (key) {
-  assert(!/\{\w+\} (sekund|minut|zdjęć|dni|godzin|cyfr|osób)/.test(S.pl[key]), `plural after a number in ${key}: "${S.pl[key]}"`);
-});
+// Polish plurals change with the number (1 minuta, 2 minuty, 5 minut), and there is no plural
+// mechanism, so never put a word right after a number. Only the unit "min", the unit "s" and
+// "z" ("{n} z {max}") may follow one; anything else is a noun that would need a plural form.
+const NUMBER_THEN_WORD = /\{(n|m|s|e|t|p|days|left|max|total)\} (?!(?:min|s|z)(?![\p{L}]))\p{Ll}/u;
+function noPluralAfterNumber(where, table) {
+  Object.keys(table).forEach(function (key) {
+    assert(!NUMBER_THEN_WORD.test(table[key]), `${where} has a word after a number in ${key}: "${table[key]}"`);
+  });
+}
+// the guard itself: these must be caught, and the safe forms must pass
+['{n} aplikacji', '{n} programów', '{days} dni', '{n} odcinki', '{max} zdjęć', '{n} sekund', '{n} minut']
+  .forEach(function (bad) { assert(NUMBER_THEN_WORD.test(bad), `the plural guard misses "${bad}"`); });
+['{n} min', '{n} s', '{n} z {max}', 'Zdjęcia: {n}', '{name} jest', '{n} min.', '{n} s,']
+  .forEach(function (ok) { assert(!NUMBER_THEN_WORD.test(ok), `the plural guard wrongly flags "${ok}"`); });
+noPluralAfterNumber('the TV home', S.pl);
 
 // a TV set to Polish speaks Polish without Home settings
 assert.strictEqual(I18N.device(), 'pl', 'pl-PL picks pl');
@@ -56,8 +67,8 @@ const R = { en: literal('.en'), pl: literal('.pl') };
 assert.deepStrictEqual(Object.keys(R.pl), Object.keys(R.en), 'the remote S.pl has the same keys as S.en, in the same order');
 Object.keys(R.en).forEach(function (key) {
   assert.strictEqual(holes(R.pl[key]), holes(R.en[key]), `remote placeholders differ for ${key}: "${R.pl[key]}"`);
-  assert(!/\{\w+\} (sekund|minut|zdjęć|dni|godzin|cyfr|osób)/.test(R.pl[key]), `remote plural after a number in ${key}: "${R.pl[key]}"`);
 });
+noPluralAfterNumber('the phone remote', R.pl);
 assert(rsrc.includes("{ id: 'pl', name: 'Polski', locale: 'pl-PL' },\n];"), 'the remote LANGS ends with Polski (pl-PL)');
 // a phone set to Polish starts in Polish before it has heard the TV's language
 const guessFn = rsrc.match(/function guess\(\) \{[\s\S]*?\n\}/);
