@@ -1660,8 +1660,12 @@
     restart();
   }
   // Start the page again, so a new look or new settings take effect everywhere at once.
+  // A location.replace to the very same address can be dropped by the launcher's WebView, so
+  // reload when nothing in the address changes.
   function restart() {
-    location.replace(location.href.replace(/([?&])theme=[a-z]+&?/, "$1").replace(/[?&]$/, ""));
+    var to = location.href.replace(/([?&])theme=[a-z]+&?/, "$1").replace(/[?&]$/, "");
+    if (to === location.href) location.reload();
+    else location.replace(to);
   }
   // Screen off / Audio-only mode: turns off the display (pitch black canvas for OLEDs and hardware backlight floor)
   // while sleep soundscapes, Spotify, and sleep timers continue playing in the dark.
