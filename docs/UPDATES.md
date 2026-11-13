@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: the Look button and Home settings changes show at once on the TV home (on main, in the next release)
+
+On the TV home app, pressing the Look quick button, or changing a look or other setting in Home settings, saved the choice but the screen did not change until the app next restarted. The page restarts itself after those changes, and the app's WebView was refusing that reload along with every other navigation. It now lets the home page reload itself (same address, under `/tv/`, for both the bridge home and the saved offline copy) and still refuses every other address. The reload also uses `location.reload()` when the address would not change. Thanks clembgrn for the diagnosis ([#185](https://github.com/Seagey/couch-tv/issues/185)) and syedhabibtirmizi for the fix ([#189](https://github.com/Seagey/couch-tv/pull/189)). It may also be the cause of [#186](https://github.com/Seagey/couch-tv/issues/186).
+
 ### 14 November 2026: the bridge's web pages stay inside their own folder (on main, in the next release)
 
 The bridge serves the phone remote and the TV home from their folders. A folder next to one of them whose name started the same way (for example `dist_old` beside `dist`) could be read through it. Now only files inside the folder itself are served. Thanks ekagra-codes (#179).
