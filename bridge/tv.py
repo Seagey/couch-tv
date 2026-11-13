@@ -538,4 +538,7 @@ class TV:
 
 
 class TVUnavailable(Exception):
-    pass
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars

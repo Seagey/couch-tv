@@ -27,6 +27,7 @@ import config
 import finder
 import history_import
 import kids
+import messages
 import store
 import taste
 from tv import TV, TVUnavailable, intent_to_link
@@ -164,9 +165,10 @@ def cur_who():
 
 
 class ApiError(Exception):
-    def __init__(self, status, message):
+    def __init__(self, status, message, key=None, vars=None):
         super().__init__(message)
         self.status, self.message = status, message
+        self.key, self.vars = key, vars
 
 
 def ok(**fields):
@@ -449,11 +451,11 @@ async def middleware(request, handler):
             _current.set(tv_id)
             resp = await handler(request)
         except ApiError as e:
-            resp = web.json_response({"ok": False, "error": e.message}, status=e.status)
+            resp = web.json_response({"ok": False, "error": e.message, **messages.err_fields(e)}, status=e.status)
         except TVUnavailable as e:
-            resp = web.json_response({"ok": False, "error": str(e)}, status=503)
+            resp = web.json_response({"ok": False, "error": str(e), **messages.err_fields(e)}, status=503)
         except ValueError as e:
-            resp = web.json_response({"ok": False, "error": str(e)}, status=400)
+            resp = web.json_response({"ok": False, "error": str(e), **messages.err_fields(e)}, status=400)
         except web.HTTPException:
             raise
         except Exception as e:
