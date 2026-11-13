@@ -59,5 +59,8 @@ Object.keys(R.en).forEach(function (key) {
   assert(!/\{\w+\} (sekund|minut|zdjęć|dni|godzin|cyfr|osób)/.test(R.pl[key]), `remote plural after a number in ${key}: "${R.pl[key]}"`);
 });
 assert(rsrc.includes("{ id: 'pl', name: 'Polski', locale: 'pl-PL' },\n];"), 'the remote LANGS ends with Polski (pl-PL)');
+// a phone set to Polish starts in Polish before it has heard the TV's language
+const guessFn = rsrc.match(/function guess\(\) \{[\s\S]*?\n\}/);
+assert(guessFn && /\/\^pl\/i\.test\(n\)\) return 'pl';/.test(guessFn[0]), 'guess() returns pl for a Polish phone');
 
 console.log('Polish i18n tests passed.');

@@ -1284,7 +1284,7 @@ S.pl = {
   kids_shelf_empty: 'Półka jest jeszcze pusta. Wyszukaj program, aby go dodać.',
   kids_remove: 'Usuń: {title}',
   kids_search: 'Wyszukaj program',
-  kids_add_on: 'Dodaj, otwierane w:',
+  kids_add_on: 'Dodaj, aby otwierać w:',
   kids_not_here: 'Tego programu nie ma teraz w żadnej aplikacji na tym telewizorze. Nadal możesz go dodać.',
   kids_add_anyway: 'Dodaj mimo to',
   kids_added: 'Dodano: {title}. Pojawi się na telewizorze po następnym naciśnięciu Home.',
@@ -1322,6 +1322,7 @@ function guess() {
   if (/^it/i.test(n)) return 'it';
   if (/^de/i.test(n)) return 'de';
   if (/^tr/i.test(n)) return 'tr';
+  if (/^pl/i.test(n)) return 'pl';
   return /^es/i.test(n) ? 'es' : 'en';
 }
 function resolve() {
