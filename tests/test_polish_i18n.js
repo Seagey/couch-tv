@@ -44,4 +44,20 @@ assert.strictEqual(I18N.country(), 'PL');
 assert.strictEqual(I18N.locale(), 'pl-PL');
 assert.strictEqual(I18N.t('n_min', { n: 5 }), '5 min');
 
+// The phone remote (remote/src/i18n.js) is an ES module that imports react, so cut the
+// S.en and S.pl object literals out of the text and evaluate just those.
+const rsrc = fs.readFileSync(path.join(__dirname, '../remote/src/i18n.js'), 'utf8');
+function literal(name) {
+  const m = rsrc.match(new RegExp('^S' + name.replace('.', '\\.') + ' = (\\{[\\s\\S]*?\\n\\});', 'm'));
+  assert(m, `the phone remote has an S${name} block`);
+  return new Function('return ' + m[1])();
+}
+const R = { en: literal('.en'), pl: literal('.pl') };
+assert.deepStrictEqual(Object.keys(R.pl), Object.keys(R.en), 'the remote S.pl has the same keys as S.en, in the same order');
+Object.keys(R.en).forEach(function (key) {
+  assert.strictEqual(holes(R.pl[key]), holes(R.en[key]), `remote placeholders differ for ${key}: "${R.pl[key]}"`);
+  assert(!/\{\w+\} (sekund|minut|zdjęć|dni|godzin|cyfr|osób)/.test(R.pl[key]), `remote plural after a number in ${key}: "${R.pl[key]}"`);
+});
+assert(rsrc.includes("{ id: 'pl', name: 'Polski', locale: 'pl-PL' },\n];"), 'the remote LANGS ends with Polski (pl-PL)');
+
 console.log('Polish i18n tests passed.');
