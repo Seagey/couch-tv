@@ -12,6 +12,10 @@ Usage (TV_IP=<tv address> [ADB_PORT=5555] .venv/bin/python tv-home/tools/tvadb.p
 TVADB_TRIES (3) and TVADB_TIMEOUT (120 s, for `shell`) tune the retries.
 ADB_PORT is 5555 unless set: the fixed port of "Network debugging", of USB debugging on TVs that
 open it with USB debugging alone, or of `adb tcpip 5555`.
+For paired Wireless debugging, set TV_ADB_BINARY to Google's adb executable and ADB_PORT to
+the current connection port. Pair and connect with that executable first; this mode reuses its
+transport without opening plaintext port 5555. See docs/EPSON.md. No adb-shell dependency
+is needed for this mode of tvadb.py (other tools may still require it).
 
 Every ADB call reconnects and tries again (3 tries) when the TV stops answering, which some TVs do
 for a few seconds at a time. `install` first copies the app in 64 KB parts with adb push. Some TVs
@@ -25,7 +29,9 @@ import base64
 import hashlib
 import io
 import os
+import subprocess
 import sys
+import tempfile
 import time
 
 TMP = "/data/local/tmp/tvhome"
@@ -46,6 +52,21 @@ def say(msg):
 
 
 def connect():
+    # Google's client supports paired Wireless debugging (TLS); adb_shell does not.
+    # Opt in explicitly so existing installations keep their permission/key behaviour.
+    if os.environ.get("TV_ADB_BINARY"):
+        ip = os.environ.get("TV_IP") or fail("set TV_IP to the address of the TV")
+        try:
+            port = int(os.environ.get("ADB_PORT") or "")
+            if not 1 <= port <= 65535:
+                raise ValueError
+        except ValueError:
+            fail("set ADB_PORT to the Wireless debugging connection port (1 to 65535), not the pairing port")
+        host = ip if ":" not in ip or ip.startswith("[") else f"[{ip}]"
+        dev = NativeAdb(os.environ["TV_ADB_BINARY"], f"{host}:{port}")
+        if dev.run(["get-state"]).strip() != "device":
+            raise ConnectionError("the selected TV is not connected; pair and connect it with adb first")
+        return dev
     try:
         from adb_shell.adb_device import AdbDeviceTcp
         from adb_shell.auth.sign_pythonrsa import PythonRSASigner
@@ -72,6 +93,48 @@ def connect():
             "computer allowed? Check with: .venv/bin/python scripts/check-tv.py <tv address>. "
             "See docs/UNINSTALL.md for the TV-remote-only way.") from e
     return dev
+
+
+class NativeAdb:
+    """Adapter for an already paired/connected Google adb transport.
+
+    Never changes the TV's debugging mode or disconnects other adb users.
+    TV_ADB_BINARY is an executable path, not a shell command.
+    """
+
+    def __init__(self, binary, serial):
+        self.binary, self.serial = binary, serial
+
+    def run(self, args, timeout_s=60):
+        try:
+            result = subprocess.run(
+                [self.binary, "-s", self.serial, *args],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                timeout=timeout_s, check=True,
+            )
+            return result.stdout
+        except (OSError, subprocess.SubprocessError) as e:
+            raise ConnectionError(
+                f"Google adb failed ({type(e).__name__}); check TV_ADB_BINARY and the paired "
+                "connection with adb devices. Wireless debugging ports can change after restart."
+            ) from e
+
+    def shell(self, cmd, timeout_s=60, read_timeout_s=None):
+        # -T: no terminal; -x: preserve adb_shell's combined output/exit behaviour.
+        return self.run(["shell", "-T", "-x", cmd], timeout_s)
+
+    def push(self, source, dest, transport_timeout_s=20, read_timeout_s=20):
+        # adb_shell accepts a byte stream; Google's client needs a local file.
+        with tempfile.NamedTemporaryFile(prefix="tvadb-") as part:
+            part.write(source.read())
+            part.flush()
+            return self.run(["push", part.name, dest], max(transport_timeout_s, read_timeout_s))
+
+    def pull(self, source, dest):
+        return self.run(["pull", source, os.fspath(dest)], SHELL_TIMEOUT)
+
+    def close(self):
+        pass  # the shared adb server and its paired transports belong to the caller
 
 
 class Tv:

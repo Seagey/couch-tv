@@ -28,7 +28,7 @@ settings), and what is chosen there wins on that TV. See
 | `ip` (needed) | The TV's address on your Wi-Fi, four numbers with dots. |
 | `host` | Optional: a name for the TV on your network (one ending in `.local`, if your TV has one), tried before `ip`. Leave it out (an empty `""` counts as left out). |
 | `label` | Optional: a longer name for your own notes. Nothing reads it yet. |
-| `adb_port` [5555] | The TV's ADB port. 5555 is what Network debugging and `adb tcpip 5555` use; change it only if your TV keeps a different fixed port open. The scripts in `tv-home/tools/` and `scripts/` read `ADB_PORT` instead. The random Wireless debugging port does not work here: see [SETUP.md step 1](SETUP.md#step-1-developer-mode-on-the-tv-every-option). |
+| `adb_port` [5555] | The TV's ADB port. 5555 is what Network debugging and `adb tcpip 5555` use; change it only if your TV keeps a different fixed port open. The scripts in `tv-home/tools/` and `scripts/` read `ADB_PORT` instead. The random Wireless debugging port does not work here (only `tvadb.py` can use it, with `TV_ADB_BINARY`): see [SETUP.md step 1](SETUP.md#step-1-developer-mode-on-the-tv-every-option). |
 | `mac` | The TV's network (MAC) address, for turning it on from the phone. |
 | `wake_on_lan` [true] | `false` stops the bridge sending Wake-on-LAN packets to this TV, even with a `mac`. |
 | `paired` | Set by `bridge/pair_tv.py`. Leave it alone. |
