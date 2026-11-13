@@ -17,6 +17,7 @@ On the TV home app, pressing the Look quick button, or changing a look or other 
 ### 14 November 2026: Czech is complete, and the phone remote speaks Czech too (on main, in the next release)
 
 The Czech TV home now has every sentence translated, including Ambient, the quick buttons, Kids mode and the LG Developer Mode lines, so nothing shows in English any more. The phone remote now speaks Czech as well (Čeština, picked in the TV menu under Language, or by itself on a phone set to Czech). Thanks slezaCZ, who wrote both sets of translations (#180).
+
 ### 14 November 2026: sharper scenes on a 4K TV that draws its interface at 1080 (on main, in the next release)
 
 Some 4K TVs (a TCL Google TV) draw apps at 1080 and upscale them, so the home thought the screen was 1080 and loaded the softer 1080 scene pictures. `home.hi_res: "always"` in `config.json` now loads the 4K copies anyway. It is off by default and there is no Home settings switch yet (thanks Hiren-Patel1, [#191](https://github.com/Seagey/couch-tv/issues/191)).
