@@ -55,10 +55,10 @@ object FireHome {
         get() = isFireTv && App.homeEnabled(App.instance)
 
     /**
-     * Amazon's launcher package also holds Fire OS's Settings screens (`.ui.MainSettingsActivity`
-     * and others), so only its other screens count as Amazon's home.
+     * Amazon's launcher package also holds Fire OS's Settings screens (`.ui.MainSettingsActivity`)
+     * and search screens. Only an actual HOME activity counts, never the whole package.
      */
-    fun isAmazonHome(pkg: String?, cls: String?) = pkg == AMAZON_HOME && cls?.contains("Settings") != true
+    fun isAmazonHome(pkg: String?, cls: String?) = FireHomeWindow.isHome(pkg, cls, homeClasses)
 
     /** The WatchService saw Amazon's home come on screen. */
     fun onAmazonHome() {

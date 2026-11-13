@@ -13,7 +13,9 @@ MAIN = (SRC / "MainActivity.kt").read_text()
 
 class FireSettingsWatch(unittest.TestCase):
     def test_amazon_settings_screens_are_not_home(self):
-        self.assertRegex(WATCH, r'AMAZON_HOME -> cls\?\.contains\("Settings"\) != true')
+        rule = WATCH.split('AMAZON_HOME ->', 1)[1].split('\n', 1)[0]
+        self.assertIn('HomeActivity_vNext', rule)
+        self.assertNotIn('contains("Settings")', rule)
 
     def test_settings_opened_by_name(self):
         self.assertIn('AMAZON_HOME.ui.MainSettingsActivity', WATCH)
