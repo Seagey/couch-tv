@@ -52,7 +52,7 @@
   // read in readConfig() once the page starts (mock.js fills them in for previews). See docs/CONFIG.md.
   var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [];
   var WXCFG = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
-  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "screensaver", "extend"];
+  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "tvsettings", "screensaver", "extend"];
   // The most personal photos this TV keeps (also MAX_PHOTOS in bridge/server.py and MainActivity.kt).
   var MAX_PHOTOS = 50;
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
@@ -1532,6 +1532,7 @@
       if (q === "input") return !OFFLINE || nativeInputs();
       if (q === "screensaver") return nativeScreensaver();
       if (q === "bluetooth" || q === "network") return nativeSettingsScreen() || (ON_TV && !OFFLINE);
+      if (q === "tvsettings") return !!(TV && (TV.launch || TV.openSettings)) || !OFFLINE;
       if (q === "extend") return devOn();
       return false;
     });
@@ -1585,6 +1586,8 @@
         el.classList.toggle("set", devBusy);
       } else if (q === "bluetooth" || q === "network") {
         el.innerHTML = ICONS[q] + "<span>" + esc(t(q)) + "</span>";
+      } else if (q === "tvsettings") {
+        el.innerHTML = ICONS.gear + "<span>" + esc(t("gear_tv")) + "</span>";
       }
     });
     var sv = $("q-screensaver");   // an icon only look (Night) still says what it is, to the eye and to a screen reader
@@ -1864,6 +1867,7 @@
     else if (q === "screensaver") startScreensaver();
     else if (q === "extend") devExtend();
     else if (q === "bluetooth" || q === "network") openSettingsScreen(q);
+    else if (q === "tvsettings") openTvSettings();
   }
   // Headphones: the TV's own Bluetooth screen. The launcher opens it itself, the on-TV app through
   // its /api/launch, and the bridge with a fixed ADB command (POST /api/bluetooth-audio, no body).
@@ -3772,6 +3776,7 @@
     if (q === "input" && OFFLINE && !nativeInputs()) return t("quick_needs_inputs");
     if (q === "screensaver") return nativeScreensaver() ? t("quick_screensaver_sub") : t("quick_needs_tv_app");
     if ((q === "bluetooth" || q === "network") && !nativeSettingsScreen() && (!ON_TV || OFFLINE)) return t("quick_needs_tv_app");
+    if (q === "tvsettings" && OFFLINE && !(TV && (TV.launch || TV.openSettings))) return t("quick_needs_bridge");
     if (q === "extend" && !devCan()) return t("quick_needs_devmode");
     return "";
   }
