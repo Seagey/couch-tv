@@ -374,7 +374,13 @@ class MainActivity : Activity() {
                 if (req.isForMainFrame && res.statusCode >= 500) pageFailed()
             }
 
-            override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest) = true
+            // Only the home page itself may navigate (its restart() after a look or Home settings
+            // change, #185); anything on another host or path is refused.
+            override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
+                val here = view.url?.let { Uri.parse(it) } ?: return true
+                return !(req.isForMainFrame && req.url.host == here.host && req.url.port == here.port &&
+                    req.url.path?.startsWith("/tv/") == true)
+            }
 
             override fun shouldInterceptRequest(view: WebView, req: WebResourceRequest): WebResourceResponse? {
                 val u = req.url
