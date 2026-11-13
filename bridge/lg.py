@@ -43,6 +43,7 @@ import aiohttp
 
 import apps
 import config
+import messages
 from samsung import netflix_id, youtube_id
 from tv import TVUnavailable
 
@@ -125,6 +126,11 @@ for _a in apps.APPS:
 
 class LGError(RuntimeError):
     """The TV answered a request with an error."""
+
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars
 
 
 class LGTV:
@@ -233,7 +239,11 @@ class LGTV:
 
     def require(self):
         if not self.connected:
-            raise TVUnavailable(f"the {self.name.lower()} TV is not answering on the network")
+            raise TVUnavailable(
+                f"the {self.name.lower()} TV is not answering on the network",
+                key="err_driver_not_answering",
+                vars={"name": self.name.lower()},
+            )
 
     def can_deeplink(self, app):
         return app.get("id") in ("netflix", "youtube")
@@ -339,7 +349,11 @@ class LGTV:
                 except Exception as e:
                     last = e
             if ws is None:
-                raise TVUnavailable(f"the TV's remote port did not open ({type(last).__name__})")
+                raise TVUnavailable(
+                    f"the TV's remote port did not open ({type(last).__name__})",
+                    key="err_lg_remote_port_failed",
+                    vars={"error": type(last).__name__},
+                )
             try:
                 await self._handshake(ws, pairing_wait)
             except Exception:
@@ -353,7 +367,7 @@ class LGTV:
         async def next_msg(wait):
             msg = await asyncio.wait_for(ws.receive(), wait)
             if msg.type != aiohttp.WSMsgType.TEXT:
-                raise TVUnavailable("the TV closed the remote connection")
+                raise TVUnavailable("the TV closed the remote connection", key="err_tv_closed_remote")
             return json.loads(msg.data)
 
         # hello, and the system info newer webOS wants before the register (as aiowebostv does)
@@ -389,11 +403,22 @@ class LGTV:
                         self.log.info("the TV accepted the remote (client key kept)")
                     return
                 elif j.get("type") == "error":
-                    raise TVUnavailable(f"the TV said no to the remote ({j.get('error')}): accept it on the TV "
-                                        "when it asks, and check LG Connect Apps is on in its network settings")
+                    raise TVUnavailable(
+                        f"the TV said no to the remote ({j.get('error')}): accept it on the TV "
+                        "when it asks, and check LG Connect Apps is on in its network settings",
+                        key="err_lg_remote_refused",
+                        vars={"error": j.get("error")},
+                    )
         except asyncio.TimeoutError:
-            raise TVUnavailable("the TV is waiting for someone to accept the remote on its screen" if prompting
-                                else "the TV did not answer the remote's hello") from None
+            if prompting:
+                raise TVUnavailable(
+                    "the TV is waiting for someone to accept the remote on its screen",
+                    key="err_lg_remote_waiting_accept",
+                ) from None
+            raise TVUnavailable(
+                "the TV did not answer the remote's hello",
+                key="err_lg_remote_hello_timeout",
+            ) from None
 
     async def _read(self, ws):
         try:
@@ -413,7 +438,7 @@ class LGTV:
             self._ws = None
         for fut in list(self._pending.values()):
             if not fut.done():
-                fut.set_exception(TVUnavailable("the TV closed the remote connection"))
+                fut.set_exception(TVUnavailable("the TV closed the remote connection", key="err_tv_closed_remote"))
 
     async def _close(self):
         for ws in (self._ws, self._pointer_ws):
@@ -434,14 +459,20 @@ class LGTV:
             await ws.send_json({"id": rid, "type": "request", "uri": f"ssap://{uri}", "payload": payload or {}})
             j = await asyncio.wait_for(fut, timeout)
         except asyncio.TimeoutError:
-            raise TVUnavailable(f"the TV did not answer {uri}") from None
+            raise TVUnavailable(
+                f"the TV did not answer {uri}",
+                key="err_lg_request_timeout",
+                vars={"uri": uri},
+            ) from None
         finally:
             self._pending.pop(rid, None)
         if j.get("type") == "error":
-            raise LGError(j.get("error") or "error")
+            msg = j.get("error") or "error"
+            raise LGError(msg, key="err_lg_error", vars={"error": msg})
         p = j.get("payload") or {}
         if p.get("returnValue") is False:
-            raise LGError(p.get("errorText") or p.get("errorCode") or "returnValue false")
+            msg = p.get("errorText") or p.get("errorCode") or "returnValue false"
+            raise LGError(msg, key="err_lg_error", vars={"error": msg})
         return p
 
     async def _command(self, uri, payload=None):
@@ -852,7 +883,7 @@ class LGTV:
             return self._pointer_ws
         path = (await self._request("com.webos.service.networkinput/getPointerInputSocket")).get("socketPath")
         if not path:
-            raise TVUnavailable("the TV did not give a pointer socket")
+            raise TVUnavailable("the TV did not give a pointer socket", key="err_lg_no_pointer_socket")
         tries = [path]
         if path.startswith("ws://") and (self._url or "").startswith("wss://"):
             tries.append("wss://" + path[5:].replace(":3000/", ":3001/", 1))
@@ -865,7 +896,11 @@ class LGTV:
                 return self._pointer_ws
             except Exception as e:
                 last = e
-        raise TVUnavailable(f"the TV's pointer socket did not open ({type(last).__name__})")
+        raise TVUnavailable(
+            f"the TV's pointer socket did not open ({type(last).__name__})",
+            key="err_lg_pointer_socket_failed",
+            vars={"error": type(last).__name__},
+        )
 
     async def _drain(self, ws):
         try:
@@ -924,7 +959,7 @@ class LGTV:
             return "couch-tv"
         code = resolve_key(name)
         if not code:
-            raise ValueError(f"unknown key: {name}")
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
         # The pointer socket has no press and release, so a hold is a press.
         if code == "POWER":
             if self.is_on:
@@ -978,7 +1013,11 @@ class LGTV:
         self.require()
         ids = self._candidates(package)
         if not ids:
-            raise ValueError(f"no LG app id known for {package}")
+            raise messages.with_key(
+                ValueError(f"no LG app id known for {package}"),
+                "err_lg_no_app_id",
+                package=package,
+            )
         await self.refresh_installed()
         installed = [i for i in ids if i in self.ids or i == self.app_id]
         last = None
@@ -988,7 +1027,11 @@ class LGTV:
                 return "remote"
             except LGError as e:
                 last = e
-        raise TVUnavailable(f"the TV would not open {package}: {last}")
+        raise TVUnavailable(
+            f"the TV would not open {package}: {last}",
+            key="err_driver_open_failed",
+            vars={"package": package, "error": str(last)},
+        )
 
     async def start_intent(self, uri, package=None, cold=False):
         """Open a show. Netflix and YouTube links open the title (as LG's own integrations do it);
@@ -1006,7 +1049,10 @@ class LGTV:
             await self._launch(lid, params={"contentTarget": f"https://www.youtube.com/tv?v={youtube_id(uri)}"})
             return "remote"
         if not pkg:
-            raise ValueError("LG TVs only open links for Netflix and YouTube")
+            raise messages.with_key(
+                ValueError("LG TVs only open links for Netflix and YouTube"),
+                "err_lg_only_netflix_youtube",
+            )
         await self.launch_package(pkg)
         return "app"
 
@@ -1040,10 +1086,10 @@ class LGTV:
         return False
 
     async def adb(self, *args, **kw):
-        raise TVUnavailable("this is an LG TV: ADB tools are Android only")
+        raise TVUnavailable("this is an LG TV: ADB tools are Android only", key="err_lg_adb_android_only")
 
     async def screenshot(self):
-        raise TVUnavailable("LG TVs do not give screenshots over the network")
+        raise TVUnavailable("LG TVs do not give screenshots over the network", key="err_lg_no_screenshots")
 
     # ---------- power ----------
     async def port_open(self, port=None, timeout=1.0):

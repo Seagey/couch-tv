@@ -4,7 +4,7 @@ import { usePushUp } from './gestures.js';
 import { tick } from './haptics.js';
 import { api } from './api.js';
 import { logoFor } from './appLogos.js';
-import { t, LANGS, choice, setChoice, locale } from './i18n.js';
+import { t, tBridge, LANGS, choice, setChoice, locale } from './i18n.js';
 
 export const Sheet = forwardRef(function Sheet({ open, onClose, title, children, className = '', fromTop = false, closeDrag, extra = null }, ref) {
   return (
@@ -43,7 +43,7 @@ const loadThread = () => {
   } catch { return []; }
 };
 const saveThread = (items) => { try { sessionStorage.setItem(THREAD_KEY, JSON.stringify({ at: Date.now(), items })); } catch { /* private mode */ } };
-const friendly = (msg) => (msg === 'Can’t reach the bridge' ? t('cant_reach_wifi') : msg);
+const friendly = (e) => (e?.key === 'err_bridge_unreachable' || e?.message === 'Can’t reach the bridge' ? t('cant_reach_wifi') : tBridge(e?.key, e?.vars, e?.message));
 
 export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAsk, onDone }, inputRef) {
   const [text, setText] = useState('');
@@ -107,12 +107,14 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
     let reply;
     try {
       const r = await onAsk(ask);
-      reply = { text: r.say || r.reply || 'Done.', options: (Array.isArray(r.options) ? r.options : []).filter((o) => o && o.text).slice(0, 3), still: /^Still working on it/.test(r.reply || '') };
+      // A keyed reply (still working, did not work) is the bridge's own sentence, so translate it;
+      // anything else is Claude's answer, already in the home's language.
+      reply = { text: (r.reply_key ? tBridge(r.reply_key, r.reply_vars, r.say || r.reply) : r.say || r.reply) || 'Done.', options: (Array.isArray(r.options) ? r.options : []).filter((o) => o && o.text).slice(0, 3), still: Boolean(r.still) || /^Still working on it/.test(r.reply || '') };
       // The chat never closes by itself (it used to close after a plain "done it" answer). It closes
       // only on the X, the scrim, Escape or Back; the answer stays in the thread.
       if (c === chat.current) tick();
     } catch (e) {
-      reply = { text: friendly(e.message), err: true, options: [{ label: t('try_again'), text: ask }] };
+      reply = { text: friendly(e), err: true, options: [{ label: t('try_again'), text: ask }] };
     }
     if (c !== chat.current) return;
     lastAt.current = Date.now();
@@ -237,7 +239,7 @@ export function ArrangeSheet({ open, onClose, tvName, hidden }) {
       setNames(Object.fromEntries((d.apps || []).map((a) => [a.package, a.name])));
       setMax(d.dock_max || 10);
       setRows(pk.length ? [...pk.slice(0, d.line), LINE, ...pk.slice(d.line)] : []);
-    }).catch((e) => { setRows([]); setMsg(e.message); });
+    }).catch((e) => { setRows([]); setMsg(tBridge(e.key, e.vars, e.message)); });
   }, [open]);
 
   const save = (next) => {
@@ -248,7 +250,7 @@ export function ArrangeSheet({ open, onClose, tvName, hidden }) {
       setRows(r);
       setMsg(t('dock_full', { max }));
     } else setMsg(t('saved_home'));
-    api.saveAppOrder(r.filter((p) => p !== LINE), at).catch((e) => setMsg(e.message));
+    api.saveAppOrder(r.filter((p) => p !== LINE), at).catch((e) => setMsg(tBridge(e.key, e.vars, e.message)));
   };
 
   const start = (e, p) => {
@@ -319,14 +321,14 @@ export function PeopleSheet({ open, onClose, onSaved }) {
   useEffect(() => {
     if (!open) return;
     setRows(null); setMsg(''); setAdding('');
-    api.people().then((d) => setRows(d.people || [])).catch((e) => { setRows([]); setMsg(e.message); });
+    api.people().then((d) => setRows(d.people || [])).catch((e) => { setRows([]); setMsg(tBridge(e.key, e.vars, e.message)); });
   }, [open]);
 
   const save = (next, done) => {
     // someone new has no id until the bridge gives one, so they show once it answers
     if (next.every((p) => p.id)) setRows(next);
     api.savePeople(next).then((d) => { setRows(d.people); onSaved?.(d.people); setMsg(done || t('saved_home')); })
-      .catch((e) => setMsg(e.message));
+      .catch((e) => setMsg(tBridge(e.key, e.vars, e.message)));
   };
   const rename = (id, name) => {
     const clean = name.replace(/\s+/g, ' ').trim();

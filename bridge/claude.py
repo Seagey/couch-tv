@@ -35,6 +35,41 @@ RECS_MIN_GAP = 15 * 60  # after a play, refresh picks at most this often
 
 _recs_lock = asyncio.Lock()
 
+LANG_NAMES = {
+    "en": "English",
+    "es": "Spanish",
+    "es-MX": "Mexican Spanish",
+    "it": "Italian",
+    "de": "German",
+    "tr": "Turkish",
+    "fr": "French",
+    "sr-Latn-RS": "Serbian",
+    "nl": "Dutch",
+    "he": "Hebrew",
+    "cs": "Czech",
+    "pl": "Polish",
+    "pt": "Brazilian Portuguese",
+}
+
+
+def _known_lang(lang):
+    # Only a code from config.LANGUAGES with a fixed name above ever reaches a prompt, so a
+    # hand edited settings file or config.json cannot put its own words into the system prompt.
+    return lang if isinstance(lang, str) and lang in config.LANGUAGES and lang in LANG_NAMES else None
+
+
+def resolve_lang(lang=None, tv_id=None):
+    """Return the active language code: explicit arg, TV settings, home config, or 'en'."""
+    lang = _known_lang(lang)
+    if not lang:
+        tv = tv_id or config.DEFAULT_TV
+        data = store._read(os.path.join(store.DATA, f"settings.{tv}.json"), {})
+        if isinstance(data, dict) and isinstance(data.get("settings"), dict):
+            lang = _known_lang(data["settings"].get("lang"))
+    if not lang:
+        lang = _known_lang((config.CONFIG.get("home") or {}).get("language"))
+    return lang or "en"
+
 ASK_SYSTEM = """You run the living room TV in a home (a Google TV). You control it only with the tv tools. The people asking are on the couch
 with a phone remote. You act on your own: never ask them to clarify, make the best guess, do the
 whole job, then say what you did. The one thing you may ask is whether they want the next step
@@ -79,7 +114,7 @@ after episode job counts as asking). Netflix and other apps black out screenshot
 and ui there.
 
 Your final answer is shown on a phone. One to three short sentences (four at most when you
-give several titles), plain words, the English spelling used in {country}, no dashes used as punctuation, no
+give several titles), plain words, {language_rule}, no dashes used as punctuation, no
 markdown. Never use bullet points, numbered lists or line breaks: put several titles in one
 sentence. Say what you did, and plainly what you could not do and why.
 
@@ -88,7 +123,7 @@ exactly OPTIONS: followed by a JSON list of one to three quick replies, each {{"
 "text": "..."}}. label is one to three words for a button; text is the full reply the person would
 send, naming the title so it makes sense on its own, for example
 OPTIONS: [{{"label": "Play it", "text": "Yes, play Twilight"}}, {{"label": "Not now", "text": "No thanks"}}]
-Leave the OPTIONS line out when nothing is offered. Never mention the options in the sentences."""
+Leave the OPTIONS line out when nothing is offered. Never mention the options in the sentences.{language_extra}"""
 
 MAX_TURNS = 25        # the step cap for one ask
 ASK_SOFT = 80         # the phone waits 90 s; answer by then and let the job finish in the background
@@ -108,7 +143,23 @@ things like what they dropped early, and use their YouTube channels as a hint to
 Prefer things on the apps listed. Mix in a couple of recent releases.
 Answer with ONLY a JSON array, no prose, each item:
 {{"title": "...", "year": 2024, "type": "tv" or "movie", "reason": "Because you watched X"}}
-The reason is at most eight words."""
+The reason is at most eight words.{reason_lang}"""
+
+
+def _ask_system(lang):
+    if lang == "en":
+        return ASK_SYSTEM.format(
+            language_rule=f"the English spelling used in {config.COUNTRY_NAME}",
+            language_extra="",
+        )
+    lang_name = LANG_NAMES.get(lang, "English")
+    return ASK_SYSTEM.format(
+        language_rule=f"written in {lang_name}",
+        language_extra=(
+            f"\n\nReply in {lang_name} (including OPTIONS labels and texts, "
+            "keeping the literal 'OPTIONS:' prefix)."
+        ),
+    )
 
 
 def _env(extra=None):
@@ -145,8 +196,6 @@ async def run_claude(prompt, system=None, mcp_config=None, timeout=ASK_TIMEOUT):
         data = json.loads(text)
     except json.JSONDecodeError:
         raise RuntimeError((err.decode(errors="replace").strip() or text)[:200] or "Claude failed")
-    if data.get("subtype") == "error_max_turns":
-        raise RuntimeError("I ran out of steps before finishing")
     if data.get("subtype") == "error_max_turns":
         raise RuntimeError("I ran out of steps before finishing")
     if data.get("is_error"):
@@ -214,35 +263,16 @@ def _ago(seconds):
     return "just now" if mins < 1 else f"{mins} min ago"
 
 
-DOING = {"install_app": "installing {name}", "play": "putting on {title}",
-         "restart_app": "restarting the app", "input": "switching input", "tap": "pressing {label}",
-         "launch": "opening {app}", "off_after_episode": "setting the TV to go off"}
-
-
-def _doing(actions):
-    for a in reversed(actions):
-        words = DOING.get(a.get("tool"))
-        if words:
-            try:
-                return words.format(**{k: v for k, v in (a.get("args") or {}).items()})
-            except (KeyError, IndexError):
-                return words.split(" {")[0]
-    return None
-
-
 def _memory(reply):
     say, opts = split_options(reply)
     return say + (" (offered: " + "; ".join(o["text"] for o in opts) + ")" if opts else "")
 
 
-def _ago(seconds):
-    mins = int(seconds // 60)
-    return "just now" if mins < 1 else f"{mins} min ago"
-
-
-async def ask(text, who, asks, tv_id=None):
+async def ask(text, who, asks, tv_id=None, lang=None):
     from datetime import datetime
     from zoneinfo import ZoneInfo
+    lang = resolve_lang(lang, tv_id)
+    system = _ask_system(lang)
     ask_id = uuid.uuid4().hex[:12]
     asks[ask_id] = []
     cfg = _mcp_config(ask_id, tv_id)
@@ -267,11 +297,18 @@ async def ask(text, who, asks, tv_id=None):
         # So "recommend something" and "put on something good" use the real taste.
         prompt = f"{prompt}\n\n[Background, use only if relevant]\n{likes}"
 
+    reply_key = None
+    reply_vars = None
+    still = False
+
     async def job():
+        nonlocal reply_key, reply_vars
         try:
-            return (await run_claude(prompt, ASK_SYSTEM.format(country=config.COUNTRY_NAME), cfg)).strip()
+            return (await run_claude(prompt, system, cfg)).strip()
         except RuntimeError as e:
             log.warning("ask failed: %s", e)
+            reply_key = "ask_did_not_work"
+            reply_vars = {"error": str(e)}
             return f"Sorry, that did not work: {e}"
         finally:
             try:
@@ -288,8 +325,15 @@ async def ask(text, who, asks, tv_id=None):
         # The phone gives up at 90 s. Answer now and let the job finish on its own.
         actions = list(asks.get(ask_id, []))
         doing = _doing(actions)
-        reply = ("Still working on it" + (f", {doing}" if doing else "")
-                 + ". Give it a minute and watch the TV.")
+        still = True
+        if doing:
+            reply_key = "ask_still_working_doing"
+            reply_vars = {"doing": doing}
+            reply = f"Still working on it, {doing}. Give it a minute and watch the TV."
+        else:
+            reply_key = "ask_still_working"
+            reply_vars = None
+            reply = "Still working on it. Give it a minute and watch the TV."
         _last[key] = {"text": text, "reply": reply, "ts": time.time(), "pending": True}
 
         def finished(t):
@@ -301,8 +345,15 @@ async def ask(text, who, asks, tv_id=None):
         _background.add(task)
         task.add_done_callback(finished)
     say, options = split_options(reply)
-    return {"reply": say, "say": say, "options": options, "actions": actions,
-            "seconds": round(time.monotonic() - start, 1)}
+    out = {"reply": say, "say": say, "options": options, "actions": actions,
+           "seconds": round(time.monotonic() - start, 1)}
+    if still:
+        out["still"] = True
+    if reply_key:
+        out["reply_key"] = reply_key
+    if reply_vars:
+        out["reply_vars"] = reply_vars
+    return out
 
 
 _background = set()
@@ -344,6 +395,8 @@ async def _popular_picks():
         picks.append({"title": b["title"], "year": b["year"], "type": b["type"],
                       "poster": b["poster"], "backdrop": b["backdrop"],
                       "reason": f"Popular in {config.COUNTRY_NAME} this week",
+                      "reason_key": "ask_popular_reason",
+                      "reason_vars": {"country": config.COUNTRY_NAME},
                       "service": usable[0]["service"], "playable": True})
         if len(picks) >= 12:
             break
@@ -356,7 +409,9 @@ def _parse_list(text):
     return json.loads(m.group(0) if m else text)
 
 
-async def refresh_recs(who=None, force=False):
+async def refresh_recs(who=None, force=False, lang=None):
+    lang = resolve_lang(lang)
+    reason_lang = "" if lang == "en" else f" Write the reason in {LANG_NAMES.get(lang, 'English')}."
     async with _recs_lock:
         cache = store.recs()
         entry = cache.get(_key(who))
@@ -371,7 +426,8 @@ async def refresh_recs(who=None, force=False):
                               for h in hist) or "(nothing yet)"
             try:
                 raw = await run_claude(RECS_PROMPT.format(taste=likes or "(no taste profile yet)", country=config.COUNTRY_NAME,
-                                                          history=lines, apps=_installed_app_names()),
+                                                          history=lines, apps=_installed_app_names(),
+                                                          reason_lang=reason_lang),
                                        timeout=RECS_TIMEOUT)
                 wanted = _parse_list(raw)[:14]
                 watched = {h["title"].lower() for h in store.history()} | {
@@ -397,11 +453,11 @@ async def refresh_recs(who=None, force=False):
         return entry
 
 
-async def cached_recs(who=None):
+async def cached_recs(who=None, lang=None):
     entry = store.recs().get(_key(who))
     stale = not entry or time.time() - entry.get("ts", 0) > RECS_MAX_AGE
     if stale and not _recs_lock.locked():
-        asyncio.create_task(refresh_recs(who))
+        asyncio.create_task(refresh_recs(who, lang=lang))
     if not entry:
         entry = store.recs().get("all")  # nothing for this person yet: show the shared picks
     if not entry:

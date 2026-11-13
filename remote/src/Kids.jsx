@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as Ic from './icons.jsx';
 import { tick } from './haptics.js';
 import { api } from './api.js';
-import { t } from './i18n.js';
+import { t, tBridge } from './i18n.js';
 import { Sheet } from './Sheets.jsx';
 
 const digits = (v) => v.replace(/\D/g, '').slice(0, 8);
@@ -54,7 +54,7 @@ export function KidsSheet({ open, onClose, onChanged }) {
       const first = (d.kids || [])[0]?.id || (d.people || [])[0]?.id || null;
       setWho(first);
     }
-  }).catch((e) => { setData({ kids: [], people: [] }); setMsg(e.status === 404 ? t('kids_needs_update') : e.message); });
+  }).catch((e) => { setData({ kids: [], people: [] }); setMsg(e.status === 404 ? t('kids_needs_update') : tBridge(e.key, e.vars, e.message)); });
 
   useEffect(() => {
     if (!open) return;
@@ -71,21 +71,21 @@ export function KidsSheet({ open, onClose, onChanged }) {
     setBusy(true); setMsg('');
     return api.kidsChange({ who, pin: unlocked?.pin || pin, ...body })
       .then((d) => { setData((x) => ({ ...(x || {}), kids: d.kids })); if (done) setMsg(done); onChanged?.(); return d; })
-      .catch((e) => { setMsg(e.message); throw e; })
+      .catch((e) => { setMsg(tBridge(e.key, e.vars, e.message)); throw e; })
       .finally(() => setBusy(false));
   };
   const unlock = () => change({ action: 'check' }).then(() => { tick(); setUnlocked({ who, pin }); setPin(''); }).catch(() => setPin(''));
   const turnOn = () => api.kidsChange({ who, action: 'on', new_pin: newPin })
     .then((d) => { tick(); setData((x) => ({ ...(x || {}), kids: d.kids, people: (x?.people || []).map((p) => (p.id === who ? { ...p, kids: true } : p)) }));
       setUnlocked({ who, pin: newPin }); setNewPin(''); setMsg(t('kids_on_done', { name: person?.name || '' })); onChanged?.(); })
-    .catch((e) => setMsg(e.message));
+    .catch((e) => setMsg(tBridge(e.key, e.vars, e.message)));
 
   const find = (e) => {
     e.preventDefault();
     const q = query.trim();
     if (!q) return;
     setFound('…'); setMsg('');
-    api.find(q).then((d) => setFound(d.result)).catch((er) => { setFound(null); setMsg(er.message); });
+    api.find(q).then((d) => setFound(d.result)).catch((er) => { setFound(null); setMsg(tBridge(er.key, er.vars, er.message)); });
   };
   const add = (service) => {
     const r = found;

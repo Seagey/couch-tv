@@ -35,6 +35,7 @@ import aiohttp
 
 import apps
 import config
+import messages
 from tv import TVUnavailable
 
 # The couch-tv app's id on the TV (samsung/app/config.xml). "app_id" on the TV in config.json wins.
@@ -176,7 +177,11 @@ class SamsungTV:
 
     def require(self):
         if not self.connected:
-            raise TVUnavailable(f"the {self.name.lower()} TV is not answering on the network")
+            raise TVUnavailable(
+                f"the {self.name.lower()} TV is not answering on the network",
+                key="err_driver_not_answering",
+                vars={"name": self.name.lower()},
+            )
 
     def can_deeplink(self, app):
         return app.get("id") in ("netflix", "youtube")
@@ -481,7 +486,7 @@ class SamsungTV:
             while True:
                 msg = await asyncio.wait_for(ws.receive(), pairing_wait)
                 if msg.type != aiohttp.WSMsgType.TEXT:
-                    raise TVUnavailable("the TV closed the remote connection")
+                    raise TVUnavailable("the TV closed the remote connection", key="err_tv_closed_remote")
                 j = json.loads(msg.data)
                 if j.get("event") == "ms.channel.connect":
                     new = (j.get("data") or {}).get("token")
@@ -493,11 +498,17 @@ class SamsungTV:
                         self.log.info("the TV allowed the remote (token kept)")
                     break
                 if j.get("event") == "ms.channel.unauthorized":
-                    raise TVUnavailable("the TV said no to the remote: press Allow on the TV when it asks "
-                                        "(Settings, General, External Device Manager, Device Connection Manager)")
+                    raise TVUnavailable(
+                        "the TV said no to the remote: press Allow on the TV when it asks "
+                        "(Settings, General, External Device Manager, Device Connection Manager)",
+                        key="err_samsung_remote_refused",
+                    )
         except asyncio.TimeoutError:
             await ws.close()
-            raise TVUnavailable("the TV is waiting for someone to press Allow on its screen")
+            raise TVUnavailable(
+                "the TV is waiting for someone to press Allow on its screen",
+                key="err_samsung_remote_waiting_allow",
+            )
         except Exception:
             await ws.close()
             raise
@@ -541,7 +552,7 @@ class SamsungTV:
             return "couch-tv"
         code = resolve_key(name)
         if not code:
-            raise ValueError(f"unknown key: {name}")
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
         if hold:
             # A Frame: holding power switches it fully off (a press only goes to Art Mode).
             await self._key(code, "Press")
@@ -597,7 +608,11 @@ class SamsungTV:
         self.require()
         ids = self._candidates(package)
         if not ids:
-            raise ValueError(f"no Samsung app id known for {package}")
+            raise messages.with_key(
+                ValueError(f"no Samsung app id known for {package}"),
+                "err_samsung_no_app_id",
+                package=package,
+            )
         await self.refresh_installed()
         installed = [i for i in ids if i in self.ids or i == self.app_id]
         await self._launch_tizen((installed or ids)[0])
@@ -620,7 +635,10 @@ class SamsungTV:
             await self._dial("YouTube", f"v={youtube_id(uri)}")
             return "dial"
         if not pkg:
-            raise ValueError("Samsung TVs only open links for Netflix and YouTube")
+            raise messages.with_key(
+                ValueError("Samsung TVs only open links for Netflix and YouTube"),
+                "err_samsung_only_netflix_youtube",
+            )
         await self.launch_package(pkg)
         return "app"
 
@@ -661,7 +679,11 @@ class SamsungTV:
             return await asyncio.wait_for(fut, timeout)
         except asyncio.TimeoutError:
             self._tv_answers.pop(job["id"], None)
-            return {"ok": False, "error": "the couch-tv app on the TV did not answer"}
+            return {
+                "ok": False,
+                "error": "the couch-tv app on the TV did not answer",
+                **messages.error_fields("err_samsung_tv_app_timeout"),
+            }
 
     async def _installed_id(self, app, given):
         await self.refresh_installed()
@@ -755,10 +777,10 @@ class SamsungTV:
         return False
 
     async def adb(self, *args, **kw):
-        raise TVUnavailable("this is a Samsung TV: ADB tools are Android only")
+        raise TVUnavailable("this is a Samsung TV: ADB tools are Android only", key="err_samsung_adb_android_only")
 
     async def screenshot(self):
-        raise TVUnavailable("Samsung TVs do not give screenshots over the network")
+        raise TVUnavailable("Samsung TVs do not give screenshots over the network", key="err_samsung_no_screenshots")
 
     # ---------- power ----------
     async def port_open(self, port=8001, timeout=1.0):

@@ -33,6 +33,11 @@ Every response is JSON.
   - `404` not found (no show by that name, unknown screen id).
   - `503` the TV is not reachable right now (off at the wall, Wi-Fi). Show a gentle "TV not
     connected" state, the bridge keeps retrying on its own.
+- For translation, many answers also carry a message key beside the English text: `error_key` and
+  `error_vars` next to `error`, `note_key` and `note_vars` next to `note`, `reply_key` and
+  `reply_vars` next to an Ask `reply`, `reason_key` and `reason_vars` on a popular pick. The keys
+  are in `remote/src/i18n.js` and `tv-home/web/i18n.js`; a front end that has no translation for a
+  key shows the English text, which is always there and unchanged.
 
 ## Which TV (more than one TV)
 The bridge can run more than one TV. Every endpoint takes an optional TV id:
@@ -447,8 +452,13 @@ Also in every answer (since 27 Oct 2026, for a chat box):
   knowledge plus `find` (which of the home's apps it streams on), without touching the TV until
   the person says yes.
 - `tv` in the body (or `?tv=`) picks the TV, as everywhere else.
-- After 80 s the answer is "Still working on it, ..." with no options, and the job finishes in
-  the background; the next ask is told how it ended.
+- After 80 s the answer is "Still working on it, ..." with no options, `"still": true` and
+  `reply_key` `ask_still_working` (or `ask_still_working_doing`, with `reply_vars.doing`), and the
+  job finishes in the background; the next ask is told how it ended.
+- Claude answers in the TV home's language: `lang` in that TV's Home settings, else
+  `home.language` in `config.json`, else English. Only a code from the bridge's language list is
+  used, mapped to a fixed language name; anything else counts as English. Claude's picks write
+  their `reason` in the same language.
 
 ### `GET /api/recs`
 Claude's picks plus continue watching. Optional `?who=person1`. Fast: it returns the cached picks
@@ -826,6 +836,9 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- 2026-11-14: Message keys (`error_key`, `note_key`, `reply_key`, `reason_key` and their `_vars`) beside the
+  unchanged English text; `still: true` on a soft timeout of `POST /api/ask`; Ask and Claude's picks answer in the
+  home's language (#196).
 - 2026-11-12: Kids mode (New): `GET|POST /api/kids`, `pin` on `POST /api/who` when leaving a kids
   profile, `403` from `POST /api/ask` for a kids profile, and `kids_mode` on people in `/api/config` and `/tv/config.js`.
 - 2026-11-12: Couch TV for Apple TV (New, Beta): `GET /api/appletv/hello`, `GET /api/appletv/apps`,

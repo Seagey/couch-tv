@@ -1,7 +1,12 @@
 // Thin client for the bridge (../../bridge/API.md). Relative URLs, so it works from any phone at home.
 
 export class ApiError extends Error {
-  constructor(message, status) { super(message); this.status = status; }
+  constructor(message, status, key = null, vars = null) {
+    super(message);
+    this.status = status;
+    this.key = key;
+    this.vars = vars;
+  }
 }
 
 // Which TV this phone is driving. null means the bridge's default (the default TV), and then
@@ -70,7 +75,9 @@ async function call(method, path, body, ms = 12000) {
       signal: ctl.signal,
     });
   } catch (e) {
-    throw e.name === 'AbortError' ? new ApiError('The bridge is taking too long. Try again.', 408) : new ApiError('Can’t reach the bridge', 0);
+    throw e.name === 'AbortError'
+      ? new ApiError('The bridge is taking too long. Try again.', 408, 'err_bridge_timeout')
+      : new ApiError('Can’t reach the bridge', 0, 'err_bridge_unreachable');
   } finally {
     clearTimeout(t);
   }
@@ -80,8 +87,9 @@ async function call(method, path, body, ms = 12000) {
     if (res.status === 401 && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('couchtv:unauthorized'));
     }
+    const fallbackKey = res.status === 503 ? 'err_tv_not_connected' : res.status === 404 ? 'err_not_found' : 'err_something_wrong';
     const msg = data?.error || (res.status === 503 ? 'TV not connected' : res.status === 404 ? 'Not found' : 'Something went wrong');
-    throw new ApiError(msg, res.status);
+    throw new ApiError(msg, res.status, data?.error_key || (data?.error ? null : fallbackKey), data?.error_vars || null);
   }
   return data;
 }
