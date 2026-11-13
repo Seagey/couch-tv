@@ -64,11 +64,11 @@ if PAIRING_KEY and not re.fullmatch(r"[A-Za-z0-9_-]{12,128}", PAIRING_KEY):
 CLIENT_NAME = CONFIG.get("client_name", "Couch TV bridge")
 
 # The languages the TV home and the phone remote speak (tv-home/web/i18n.js, remote/src/i18n.js).
-LANGUAGES = ("en", "es", "es-MX", "it", "de", "tr", "fr", "sr-Latn-RS", "nl", "he", "cs")
+LANGUAGES = ("en", "es", "es-MX", "it", "de", "tr", "fr", "sr-Latn-RS", "nl", "he", "cs", "pl")
 # Where shows stream (JustWatch) and what the prompts call the country: "country" in config.json.
 # Without it: the country of the home's language, where it has one of its own (Italian: IT,
-# German: DE, Turkish: TR, Serbian: RS, Dutch: BE), else AU.
-_LANGUAGE_COUNTRY = {"it": "IT", "de": "DE", "tr": "TR", "sr-Latn-RS": "RS", "nl": "BE", "he": "IL", "cs": "CZ"}
+# German: DE, Turkish: TR, Serbian: RS, Dutch: BE, Hebrew: IL, Czech: CZ, Polish: PL), else AU.
+_LANGUAGE_COUNTRY = {"it": "IT", "de": "DE", "tr": "TR", "sr-Latn-RS": "RS", "nl": "BE", "he": "IL", "cs": "CZ", "pl": "PL"}
 _language = CONFIG["home"].get("language") if isinstance(CONFIG.get("home"), dict) else None
 COUNTRY = str(CONFIG.get("country") or _LANGUAGE_COUNTRY.get(str(_language)) or "AU").upper()
 _COUNTRY_NAMES = {
@@ -77,7 +77,7 @@ _COUNTRY_NAMES = {
     "SG": "Singapore", "DE": "Germany", "FR": "France", "ES": "Spain", "IT": "Italy",
     "NL": "the Netherlands", "SE": "Sweden", "NO": "Norway", "DK": "Denmark", "FI": "Finland",
     "BR": "Brazil", "MX": "Mexico", "JP": "Japan", "KR": "South Korea", "PH": "the Philippines",
-    "RS": "Serbia", "IL": "Israel", "CZ": "Czechia",
+    "RS": "Serbia", "IL": "Israel", "CZ": "Czechia", "PL": "Poland",
 }
 COUNTRY_NAME = CONFIG.get("country_name") or _COUNTRY_NAMES.get(COUNTRY, COUNTRY)
 # The home's time zone, for times the bridge writes down: "timezone" under "weather".
@@ -303,7 +303,7 @@ def _home(h):
         out["idle_photo_seconds"] = idle_photo_seconds
     # Only when config.json gives them. Without "language" the TV home speaks the TV's own language
     # (English if it is not one of LANGUAGES), and without "clock" it uses that language's usual
-    # clock (24 hour in Italian, German, Turkish, French and Serbian, else 12 hour). Home settings on the TV win over both.
+    # clock (24 hour in Italian, German, Turkish, French, Serbian and Polish, else 12 hour). Home settings on the TV win over both.
     clock = str(h.get("clock") or "").lower()
     if clock in ("12h", "24h"):
         out["clock"] = clock
