@@ -98,17 +98,6 @@ class TestBridgeSecurityApp(AioHTTPTestCase):
         return app
 
     async def get_server(self, app):
-        from aiohttp.test_utils import TestServer
-        import socket
-        for _ in range(5):
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            try:
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                sock.bind(("127.0.0.1", 0))
-                return TestServer(app, sock=sock)
-            except OSError:
-                sock.close()
-                await asyncio.sleep(0.05)
         return await super().get_server(app)
 
     async def tearDownAsync(self):
