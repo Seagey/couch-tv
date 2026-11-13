@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: TV home over paired Wireless debugging, tested on an Epson LS300 (on main, in the next release)
+
+`tv-home/tools/tvadb.py` can now install and test the TV home over a Wireless debugging connection you have already paired with Google's `adb`, without opening port 5555. `apply.sh` goes through `tvadb.py` too, but has not been tried this way yet. It is opt in: set `TV_ADB_BINARY` to that `adb` and `ADB_PORT` to the current connection port. Without `TV_ADB_BINARY` nothing changes, and the bridge, the phone remote and the other tools still use plain ADB on the fixed port. Tested on one Epson LS300 projector (Android TV 14): install, apps, the projector remote's buttons and a restart worked. The Home button on stock LS300 firmware, and the LS650, LS800 and LS500, are untested ([EPSON.md](EPSON.md)). Thanks mazzanfar (#194).
+
 ### 14 November 2026: Brazilian Portuguese on the TV home and the phone remote (on main, in the next release)
 
 The TV home and the phone remote now speak Brazilian Portuguese (Português (Brasil), `pt`). A TV or phone set to Portuguese picks it by itself, and Home settings can switch to it. The clock is 24 hour unless you pick 12 hour, and the country for where shows stream is `BR` when `config.json` does not set one. All 398 TV home sentences are translated; the phone remote has 139 of its 166 (the newest few show in English for now). Thanks scursel (#193).
