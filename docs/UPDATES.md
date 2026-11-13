@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: the bridge's web pages stay inside their own folder (on main, in the next release)
+
+The bridge serves the phone remote and the TV home from their folders. A folder next to one of them whose name started the same way (for example `dist_old` beside `dist`) could be read through it. Now only files inside the folder itself are served. Thanks ekagra-codes (#179).
+
 ### 13 November 2026: Czech on the TV home (on main, in the next release)
 
 The TV home now speaks Czech (Čeština), with a 24 hour clock and Czechia as the country for where shows stream. It is picked in Home settings, `home.language: "cs"`, or by itself on a TV set to Czech. 298 of the home's sentences are translated; the newest ones (such as Ambient and the LG Developer Mode lines) show in English for now. The phone remote is not in Czech yet. Thanks slezaCZ, who tested it on a Gogen Android TV 11 (#178).
