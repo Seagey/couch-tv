@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: Polish bridge messages, and the assistant answers in Polish (on main, in the next release)
+
+With the home set to Polish, the bridge's own messages (an app that will not open, a TV that is not answering, what an input switch did) now show in Polish on the phone remote and the TV home, and the Claude assistant answers in Polish, quick reply buttons and the reasons on its picks included. The assistant follows the TV home's language in every language: Home settings on that TV first, then `home.language` in `config.json`, then English. The bridge still sends every message in English exactly as before, with a key beside it, so the other languages show the English text until someone translates the new keys. Thanks Azumi0 (#196). The on-TV app follows in part 3.
+
 ### 14 November 2026: the phone remote is complete in Brazilian Portuguese (on main, in the next release)
 
 The phone remote now has every sentence in Brazilian Portuguese: the 27 Kids mode lines that showed in English after #193 are translated, so the remote has all 166. The TV home was already complete and is unchanged. Thanks scursel (#195).

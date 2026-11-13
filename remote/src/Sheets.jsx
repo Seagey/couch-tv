@@ -107,7 +107,9 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
     let reply;
     try {
       const r = await onAsk(ask);
-      reply = { text: r.say || tBridge(r.reply_key, r.reply_vars, r.reply) || 'Done.', options: (Array.isArray(r.options) ? r.options : []).filter((o) => o && o.text).slice(0, 3), still: Boolean(r.still) || /^Still working on it/.test(r.reply || '') };
+      // A keyed reply (still working, did not work) is the bridge's own sentence, so translate it;
+      // anything else is Claude's answer, already in the home's language.
+      reply = { text: (r.reply_key ? tBridge(r.reply_key, r.reply_vars, r.say || r.reply) : r.say || r.reply) || 'Done.', options: (Array.isArray(r.options) ? r.options : []).filter((o) => o && o.text).slice(0, 3), still: Boolean(r.still) || /^Still working on it/.test(r.reply || '') };
       // The chat never closes by itself (it used to close after a plain "done it" answer). It closes
       // only on the X, the scrim, Escape or Back; the answer stays in the thread.
       if (c === chat.current) tick();

@@ -48,18 +48,26 @@ LANG_NAMES = {
     "he": "Hebrew",
     "cs": "Czech",
     "pl": "Polish",
+    "pt": "Brazilian Portuguese",
 }
+
+
+def _known_lang(lang):
+    # Only a code from config.LANGUAGES with a fixed name above ever reaches a prompt, so a
+    # hand edited settings file or config.json cannot put its own words into the system prompt.
+    return lang if isinstance(lang, str) and lang in config.LANGUAGES and lang in LANG_NAMES else None
 
 
 def resolve_lang(lang=None, tv_id=None):
     """Return the active language code: explicit arg, TV settings, home config, or 'en'."""
+    lang = _known_lang(lang)
     if not lang:
         tv = tv_id or config.DEFAULT_TV
         data = store._read(os.path.join(store.DATA, f"settings.{tv}.json"), {})
         if isinstance(data, dict) and isinstance(data.get("settings"), dict):
-            lang = data["settings"].get("lang")
+            lang = _known_lang(data["settings"].get("lang"))
     if not lang:
-        lang = (config.CONFIG.get("home") or {}).get("language")
+        lang = _known_lang((config.CONFIG.get("home") or {}).get("language"))
     return lang or "en"
 
 ASK_SYSTEM = """You run the living room TV in a home (a Google TV). You control it only with the tv tools. The people asking are on the couch
@@ -144,7 +152,7 @@ def _ask_system(lang):
             language_rule=f"the English spelling used in {config.COUNTRY_NAME}",
             language_extra="",
         )
-    lang_name = LANG_NAMES.get(lang, lang)
+    lang_name = LANG_NAMES.get(lang, "English")
     return ASK_SYSTEM.format(
         language_rule=f"written in {lang_name}",
         language_extra=(
@@ -403,7 +411,7 @@ def _parse_list(text):
 
 async def refresh_recs(who=None, force=False, lang=None):
     lang = resolve_lang(lang)
-    reason_lang = "" if lang == "en" else f" Write the reason in {LANG_NAMES.get(lang, lang)}."
+    reason_lang = "" if lang == "en" else f" Write the reason in {LANG_NAMES.get(lang, 'English')}."
     async with _recs_lock:
         cache = store.recs()
         entry = cache.get(_key(who))
