@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: a TV settings quick button, and Settings opens on its own screen (on main, in the next release)
+
+TV settings, Bluetooth and Network now open on the screen you asked for. Android's Settings app keeps a single task, so opening TV settings after visiting Network used to bring back the Network page. The launcher now clears that task first. There is also a new **tvsettings** quick button for people who reach the TV's Settings often: add it in Home settings (or `home.quick`), it is off unless you add it. It uses the same route as Home settings, TV settings, so it works on the TV home launcher (option A) and with the bridge. Thanks syedhabibtirmizi ([#190](https://github.com/Seagey/couch-tv/pull/190)).
+
 ### 14 November 2026: the Look button and Home settings changes show at once on the TV home (on main, in the next release)
 
 On the TV home app, pressing the Look quick button, or changing a look or other setting in Home settings, saved the choice but the screen did not change until the app next restarted. The page restarts itself after those changes, and the app's WebView was refusing that reload along with every other navigation. It now lets the home page reload itself (same address, under `/tv/`, for both the bridge home and the saved offline copy) and still refuses every other address. The reload also uses `location.reload()` when the address would not change. Thanks clembgrn for the diagnosis ([#185](https://github.com/Seagey/couch-tv/issues/185)) and syedhabibtirmizi for the fix ([#189](https://github.com/Seagey/couch-tv/pull/189)). It may also be the cause of [#186](https://github.com/Seagey/couch-tv/issues/186).
