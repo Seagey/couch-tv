@@ -26,6 +26,7 @@ import android.view.accessibility.AccessibilityEvent
  *
  * - Fire TV: Amazon's TVs start Amazon's launcher from the Home key by name.
  * - Google TV and Android TV: the Google home outranks the default-home setting.
+ * - Bell's Streamer (Android TV 12): Bell's Fibe TV app is the box's only real home (issue #168).
  *
  * Off until a computer switches it on over ADB (tv-home/tools/apply.sh, or guest-tv's
  * `tools/tv_app.py home`). They also grant WRITE_SECURE_SETTINGS, because Android drops the
@@ -94,8 +95,13 @@ class FireWatch : AccessibilityService() {
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        stockInFront = isStockHome(e.packageName?.toString(), e.className?.toString()) &&
-            !(e.packageName?.toString() == AMAZON_HOME && settingsAllowed())
+        val pkg = e.packageName?.toString()
+        // Fibe opened from couch-tv's own tile stays open (see [fibeOpenedNow]). Once any other window
+        // comes forward, after the launch has settled, Fibe is only ever replaced again by a new open.
+        if (pkg != BELL_FIBE_HOME && pkg != null && fibeOpenedOnPurpose && !fibeInGrace()) fibeOpenedOnPurpose = false
+        stockInFront = isStockHome(pkg, e.className?.toString()) &&
+            !(pkg == AMAZON_HOME && settingsAllowed()) &&
+            !(pkg == BELL_FIBE_HOME && fibeOpenedOnPurpose)
         amazonInFront = stockInFront && e.packageName?.toString() == AMAZON_HOME
         if (!stockInFront) return
         if (CrashGuard.standingAside(this)) return
@@ -183,6 +189,9 @@ class FireWatch : AccessibilityService() {
         private fun isXiaomi() = Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)
         const val GOOGLE_TV_HOME = "com.google.android.apps.tv.launcherx"
         const val ANDROID_TV_HOME = "com.google.android.tvlauncher"
+        /** Bell's Fibe TV app (Bell Streamer, Canada): its MainTvActivity is the box's HOME, and also its live TV. */
+        const val BELL_FIBE_HOME = "com.quickplay.android.bellmediaplayer"
+        private const val BELL_FIBE_ACTIVITY = "ca.bell.fiberemote.tv.MainTvActivity"
         /** Fire OS's own Settings screen, opened by name (see [amazonSettings]). */
         const val AMAZON_SETTINGS = "$AMAZON_HOME.ui.MainSettingsActivity"
         /** Fire OS's Settings app package (the plain Settings action goes through it too). */
@@ -197,7 +206,20 @@ class FireWatch : AccessibilityService() {
          */
         fun allowSettingsNow() { settingsUntil = SystemClock.elapsedRealtime() + SETTINGS_GRACE_MS }
         fun settingsAllowed(): Boolean = SystemClock.elapsedRealtime() < settingsUntil
-        private val STOCK_HOMES = listOf(AMAZON_HOME, GOOGLE_TV_HOME, ANDROID_TV_HOME)
+
+        private const val FIBE_GRACE_MS = 5_000L
+        @Volatile private var fibeOpenedOnPurpose = false
+        @Volatile private var fibeSince = 0L
+
+        /**
+         * couch-tv just opened Fibe itself (issue #168): Fibe's home screen is also its live TV, so
+         * while it stays in front the watch leaves it alone. It ends when another window comes forward.
+         * The limit: Fibe opened from anywhere else (a Fibe button on the remote, say) looks the same as
+         * a Home press and is replaced by couch-tv. That is the trade off, and it is documented.
+         */
+        fun fibeOpenedNow() { fibeSince = SystemClock.elapsedRealtime(); fibeOpenedOnPurpose = true }
+        private fun fibeInGrace(): Boolean = SystemClock.elapsedRealtime() - fibeSince < FIBE_GRACE_MS
+        private val STOCK_HOMES = listOf(AMAZON_HOME, GOOGLE_TV_HOME, ANDROID_TV_HOME, BELL_FIBE_HOME)
 
         /** Stock activities that the TV itself lists as a HOME screen (read when the service binds). */
         @Volatile var homeClasses: Set<String> = emptySet()
@@ -223,6 +245,8 @@ class FireWatch : AccessibilityService() {
             AMAZON_HOME -> cls == "$AMAZON_HOME.ui.HomeActivity_vNext" || cls == "$AMAZON_HOME.ui.HomeActivity" || (cls != null && cls in homes)
             GOOGLE_TV_HOME -> cls == "$GOOGLE_TV_HOME.home.HomeActivity" || cls == "$GOOGLE_TV_HOME.home.VanillaModeHomeActivity" || (cls != null && cls in homes)
             ANDROID_TV_HOME -> cls == "$ANDROID_TV_HOME.MainActivity" || (cls != null && cls in homes)
+            // Fibe's other screens (players, settings) are not its home: only the HOME activity is replaced.
+            BELL_FIBE_HOME -> cls == BELL_FIBE_ACTIVITY || (cls != null && cls in homes)
             else -> false
         }
 

@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 13 November 2026: Bell Streamer with Fibe TV as its home (Beta, on main, in the next release)
+
+On a Bell Streamer (Bell Canada's Android TV 12 box) the home is Bell's Fibe TV app, so the Home key opened Fibe and never reached couch-tv. The Home button watch now knows Fibe's home screen and puts couch-tv back on top, and `apply.sh` switches the watch on when Fibe is installed. Fibe is never switched off. Opening Fibe from couch-tv's own tile works and is left alone while it stays in front. Untested on a real box so far (thanks Sparkybabcia, [#168](https://github.com/Seagey/couch-tv/issues/168)). What to expect: Fibe may flash up for a moment before couch-tv comes back, and a Fibe button on the remote will bring couch-tv back instead of Fibe, because the watch cannot tell it from a Home press.
+
 ### 13 November 2026: The home comes back to the tile you left (on main, in the next release)
 
 After opening TV Settings or an app's settings, a TV that was short of memory could drop the home page and start it again at the first tile, because the page did not remember where you were. The home now saves the row and tile you were on when it goes into the background (and a moment after each move), and puts you back there for the next 20 minutes. Pressing Home still goes to the first tile. Reported on a Hisense Google TV with 1.8 GB of RAM (thanks IshMehta, [#166](https://github.com/Seagey/couch-tv/issues/166)).

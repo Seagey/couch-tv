@@ -76,7 +76,7 @@ LIST="$HERE/../tvs/$TV_NAME.disabled"
 WIZARD=com.google.android.tungsten.setupwraith
 # Never switched off, and switched back on if an older couch-tv (0.10 and before) switched them off:
 # the TV's own home screens and the setup wizard. Without them some Google TVs crash at every start.
-NEVER_OFF="com.google.android.apps.tv.launcherx com.google.android.tvlauncher $WIZARD"
+NEVER_OFF="com.google.android.apps.tv.launcherx com.google.android.tvlauncher com.quickplay.android.bellmediaplayer $WIZARD"
 WANT=""
 # KEEP_AMBIENT=1 keeps Google TV's ambient mode (the screensaver, and the Google Photos albums
 # that come with it) switched on: it is the TV's own, and the screensaver quick button opens it.
@@ -256,7 +256,7 @@ fi
 # force-stop above, because Android drops a stopped app's watcher; the secure-settings grant lets
 # the app put it back itself after updates and reboots. undo.sh takes both away. If couch-tv itself
 # keeps crashing, the watch stands aside and the TV's own home stays (CrashGuard.kt).
-if echo "$present" | grep -qx -E "com.google.android.apps.tv.launcherx|com.google.android.tvlauncher|com.amazon.tv.launcher"; then
+if echo "$present" | grep -qx -E "com.google.android.apps.tv.launcherx|com.google.android.tvlauncher|com.amazon.tv.launcher|com.quickplay.android.bellmediaplayer"; then
   "$PY" "$T" shell "pm grant app.couchtv.launcher android.permission.WRITE_SECURE_SETTINGS" > /dev/null 2>&1 || true
   CUR=$("$PY" "$T" shell "settings get secure enabled_accessibility_services" | tr -d '\r')
   case ":$CUR:" in

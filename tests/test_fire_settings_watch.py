@@ -32,7 +32,7 @@ class FireSettingsWatch(unittest.TestCase):
         self.assertIn("FireWatch.allowSettingsNow()", MAIN)
 
     def test_grace_only_spares_amazon_windows(self):
-        self.assertRegex(WATCH, r"packageName\?\.toString\(\) == AMAZON_HOME && settingsAllowed\(\)")
+        self.assertRegex(WATCH, r"pkg == AMAZON_HOME && settingsAllowed\(\)")
 
 
 if __name__ == "__main__":

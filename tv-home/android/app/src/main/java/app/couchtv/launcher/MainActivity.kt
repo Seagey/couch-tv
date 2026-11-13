@@ -1375,6 +1375,8 @@ class MainActivity : Activity() {
         val i = store ?: packageManager.getLeanbackLaunchIntentForPackage(pkg)
             ?: packageManager.getLaunchIntentForPackage(pkg)
             ?: return false
+        // Bell's Fibe app is the home on a Bell Streamer and also its live TV: opened on purpose, it stays (#168).
+        if (pkg == FireWatch.BELL_FIBE_HOME) FireWatch.fibeOpenedNow()
         return start(i)
     }
 

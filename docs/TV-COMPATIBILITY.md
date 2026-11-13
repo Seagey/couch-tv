@@ -17,6 +17,7 @@ TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a 
 | Android 6 TV (Xiaomi Mi TV 4A, PatchWall) | Installs and opens, layout may break (experimental) | Not tested | Installs and opens, set up from a computer (experimental) |
 | Xiaomi TV Stick 4K (Android TV 11) | Yes (reported by a user, not tested by us) | Not reported | Not reported |
 | XGIMI projector (Android TV 11, XK03H) | Yes, through `apply.sh` (reported by a user, not tested by us) | Not reported | Yes (reported by a user: phone remote, keys, typing and apps; use `apply.sh` for the Home button) |
+| Bell Streamer (Bell Canada, Android TV 12) | **Beta**, untested (reported by Sparkybabcia, [#168](https://github.com/Seagey/couch-tv/issues/168)): Bell's Fibe TV app is the box's home, so `apply.sh` switches the Home button watch on. Fibe may flash up before couch-tv comes back. Opening Fibe from the couch-tv tile works; a Fibe button on the remote brings couch-tv back instead | Not reported | Not reported |
 | Nvidia Shield | Yes (not tested) | Yes | Yes (not tested) |
 | Onn (Google TV) | Yes | Yes | Partial |
 | Fire TV on Fire OS 6, 7 and 8 (Stick 4K 1st and 2nd gen, Stick 4K Max, Cube) | Partial | Partial | Partial (home screen confirmed on a Stick 4K 2nd gen by a user; phone remote keys blocked on current Fire OS) |
