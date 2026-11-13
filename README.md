@@ -47,6 +47,7 @@ The newest release is **0.12** (9 November 2026), on [the Releases page](https:/
 - **13 November:** the home comes back to the tile you left after Settings, thanks IshMehta ([#166](docs/UPDATES.md#13-november-2026-the-home-comes-back-to-the-tile-you-left-on-main-in-the-next-release))
 - **13 November:** on Fire OS 7 Couch TV comes back without the 5 second wait, thanks atul016 ([#162](docs/UPDATES.md#13-november-2026-fire-os-7-brings-couch-tv-back-without-the-5-second-wait-on-main-in-the-next-release))
 - **13 November:** the Next song button skips the track again on a Mi Box, thanks NathanGlasby ([#158](docs/UPDATES.md#13-november-2026-the-next-song-button-skips-the-track-again-on-main-in-the-next-release))
+- **13 November:** Polish on the TV home and the phone remote ([details](docs/UPDATES.md#13-november-2026-polish-on-the-tv-home-and-the-phone-remote-on-main-in-the-next-release))
 - **13 November:** the TV home speaks Hebrew, right to left, thanks YuvalHir ([#153](docs/UPDATES.md#13-november-2026-hebrew-and-right-to-left-layout-on-the-tv-home-on-main-in-the-next-release))
 
 Every change, with credits: [docs/UPDATES.md](docs/UPDATES.md).
@@ -163,7 +164,7 @@ look and scenes, your apps and their order, the people and the quick buttons, wi
 - **[Glass and video](docs/TV-HOME.md#glass-and-video)**: clear glass panels and icons, a liquid glass clock, or a looping video behind it all.
 - **[Quick buttons](docs/TV-HOME.md#quick-buttons)**: sleep timer, picture mode, inputs by name, screensaver and more, one press from the home.
 - **[Smart home](docs/TV-HOME.md#smart-home)**: air conditioning, scenes and a doorbell card from Home Assistant. Off unless you add it.
-- **[Eleven languages](docs/TV-HOME.md#languages)**: English, Spanish, Mexican Spanish, Italian, German, French, Turkish, Serbian, Dutch, Hebrew and Czech.
+- **[Twelve languages](docs/TV-HOME.md#languages)**: English, Spanish, Mexican Spanish, Italian, German, French, Turkish, Serbian, Polish, Dutch, Hebrew and Czech.
 - **[Your own photos](docs/TV-HOME.md#your-own-photos)**: from a USB drive, the TV or the web, taking turns with the scenes.
 - **[Two TVs, one show](docs/SYNC.md)**: start the same show on two TVs at once, so two rooms do not echo. Experimental.
 - **[Updates on the TV](docs/TV-HOME.md#updates)**: off until you say yes. Then the TV tells you about a new version and hands it to Android to install.

@@ -54,6 +54,10 @@ On a 2020 Samsung (Tizen 5.5), moving down a long Home settings list such as App
 
 Shows played in Nuvio, the Stremio-style player, now show as playing and count for Keep watching, with the bridge and in the on-TV app. A film played in Nuvio is no longer logged as the film "2012" or "1917": Nuvio sends the release year where other apps send the episode. With the bridge, a Nuvio card opens the show's page in Nuvio (by its IMDb id from JustWatch), where you pick the episode: Nuvio takes no episode links. In the on-TV app a Nuvio card opens Nuvio. With the bridge only Nuvio's GitHub build (`com.nuvio.tv`) is read, not the Play Store one (`com.nuvio.app`). Shows played in Nuvio can't reach Keep watching with option A, because Nuvio adds them to its own channel, not Android's Watch Next list. Thanks NathanGlasby (#157).
 
+### 13 November 2026: Polish on the TV home and the phone remote (on main, in the next release)
+
+The TV home and the phone remote now speak Polish (Polski). A TV or phone set to Polish picks it by itself, and Home settings can switch to it. The clock is 24 hour unless you pick 12 hour, and the country for where shows stream is `PL` when `config.json` does not set one. English and the other languages are unchanged.
+
 ### 13 November 2026: Hebrew and right to left layout on the TV home (on main, in the next release)
 
 The home now speaks Hebrew (עברית), including the TV's own `he` or older `iw` language setting. The layout mirrors for right to left: the settings list moves to the right, chevrons flip, popups open on the correct side, and the remote's left and right buttons move the way the screen reads. English and the other languages are unchanged. Thanks YuvalHir (#153).
