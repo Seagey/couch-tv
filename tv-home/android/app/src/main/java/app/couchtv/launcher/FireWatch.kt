@@ -199,7 +199,7 @@ class FireWatch : AccessibilityService() {
         fun settingsAllowed(): Boolean = SystemClock.elapsedRealtime() < settingsUntil
         private val STOCK_HOMES = listOf(AMAZON_HOME, GOOGLE_TV_HOME, ANDROID_TV_HOME)
 
-        /** The activities of the Google homes that the TV itself lists as a HOME screen (read when the service binds). */
+        /** Stock activities that the TV itself lists as a HOME screen (read when the service binds). */
         @Volatile var homeClasses: Set<String> = emptySet()
 
         /**
@@ -210,7 +210,7 @@ class FireWatch : AccessibilityService() {
         fun homeActivitiesOf(c: Context): Set<String> = runCatching {
             val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
             c.packageManager.queryIntentActivities(q, 0)
-                .filter { it.activityInfo.packageName == GOOGLE_TV_HOME || it.activityInfo.packageName == ANDROID_TV_HOME }
+                .filter { it.activityInfo.packageName in STOCK_HOMES }
                 .map { it.activityInfo.name }.toSet()
         }.getOrDefault(emptySet())
 
@@ -220,7 +220,7 @@ class FireWatch : AccessibilityService() {
          * setup screens: only the home itself is replaced.
          */
         fun isStockHome(pkg: String?, cls: String?, homes: Set<String> = homeClasses): Boolean = when (pkg) {
-            AMAZON_HOME -> cls?.contains("Settings") != true
+            AMAZON_HOME -> cls == "$AMAZON_HOME.ui.HomeActivity_vNext" || cls == "$AMAZON_HOME.ui.HomeActivity" || (cls != null && cls in homes)
             GOOGLE_TV_HOME -> cls == "$GOOGLE_TV_HOME.home.HomeActivity" || cls == "$GOOGLE_TV_HOME.home.VanillaModeHomeActivity" || (cls != null && cls in homes)
             ANDROID_TV_HOME -> cls == "$ANDROID_TV_HOME.MainActivity" || (cls != null && cls in homes)
             else -> false

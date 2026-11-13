@@ -366,7 +366,7 @@ recommend C (A if they only want the home screen). Write the choice down; the re
   Settings and More apps. Everything else sits behind More apps.
 - "Any apps you never use that I should tuck away behind More apps?" A maker's own clutter (help
   apps, file browsers) can be hidden completely with `home.hide_packages`.
-- Tell them: new apps come from the **App Store** tile (top of More apps) and turn up on the home by
+- Tell them: new apps come from the **App Store** tile (in More apps, and it can be moved onto the home) and turn up on the home by
   themselves. They can rearrange later from the phone, or with the TV remote (hold OK on an app).
 
 ### 2.5 Quick settings
