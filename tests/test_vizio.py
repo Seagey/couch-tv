@@ -146,7 +146,8 @@ class Pairing(Base):
         await self.tv.pair_start()
         await self.tv.pair_finish(PIN)
         mode = stat.S_IMODE(os.stat(self.tv.store_file).st_mode)
-        self.assertEqual(mode, 0o600)
+        if os.name != "nt":
+            self.assertEqual(mode, 0o600)
         kept = json.load(open(self.tv.store_file))
         self.assertEqual(kept["token"], TOKEN)
         self.assertNotIn("pending", kept)

@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 
-const js = fs.readFileSync(path.join(__dirname, '..', 'tv-home', 'web', 'app.js'), 'utf8');
+const js = fs.readFileSync(path.join(__dirname, '..', 'tv-home', 'web', 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 const m = js.match(/function pickFocus\([\s\S]*?\n  \}\n/);
 assert(m, 'pickFocus is in app.js');
 const maxAge = js.match(/FOCUS_MAX_AGE = ([0-9 *]+),/);

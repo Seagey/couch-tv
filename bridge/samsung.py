@@ -634,6 +634,9 @@ class SamsungTV:
         if app and app["id"] == "youtube" and youtube_id(uri):
             await self._dial("YouTube", f"v={youtube_id(uri)}")
             return "dial"
+        if uri.startswith("http://") or uri.startswith("https://"):
+            await self._launch_tizen("org.tizen.browser", meta=uri)
+            return "browser"
         if not pkg:
             raise messages.with_key(
                 ValueError("Samsung TVs only open links for Netflix and YouTube"),

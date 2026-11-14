@@ -18,6 +18,7 @@ a title. The TV home asks the bridge (GET /api/custom-cards) every 10 minutes.
 """
 import json
 import os
+import pathlib
 import re
 import time
 
@@ -91,7 +92,7 @@ def source(value, config_dir):
     path = os.path.expanduser(value)
     if not os.path.isabs(path):
         path = os.path.join(config_dir, path)
-    return ("file", os.path.normpath(path))
+    return ("file", pathlib.Path(os.path.normpath(path)).as_posix())
 
 
 _cache = {"at": 0.0, "cards": []}
@@ -114,13 +115,13 @@ async def _read(src):
     return json.loads(raw.decode("utf-8"))
 
 
-async def get(src, log=None, now=None):
+async def get(src, log=None, now=None, force=False):
     """The cards to show. A file or link that cannot be read, or is not JSON, keeps the last good
     cards (none if there never were any), so a hiccup never empties the row or slows the home."""
     if not src:
         return []
     now = time.time() if now is None else now
-    if _cache["at"] and now - _cache["at"] < FETCH_EVERY:
+    if not force and _cache["at"] and now - _cache["at"] < FETCH_EVERY:
         return _cache["cards"]
     _cache["at"] = now
     try:

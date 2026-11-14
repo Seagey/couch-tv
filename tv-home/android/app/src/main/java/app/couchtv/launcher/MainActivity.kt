@@ -568,6 +568,20 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun launch(pkg: String): Boolean = launchPackage(pkg)
 
+        /** Opens an http(s) web link in the TV's browser (used by custom cards with a url). */
+        @JavascriptInterface
+        fun openUrl(url: String): Boolean {
+            if (!url.startsWith("http://") && !url.startsWith("https://")) return false
+            return try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                if (intent.resolveActivity(packageManager) == null) false else start(intent)
+            } catch (e: Exception) {
+                false
+            }
+        }
+
         /** Is couch-tv the home? "held", "google_tv" (explain the Home button watch) or "ask" (HomeRole.kt, #98). */
         @JavascriptInterface
         fun homeState(): String = HomeRole.state(this@MainActivity)

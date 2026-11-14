@@ -8,6 +8,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -193,6 +194,13 @@ class HomeActivity : Activity() {
         @JavascriptInterface fun launch(pkg: String): Boolean {
             val i = Tv.launchIntent(pkg) ?: return false
             main.post { runCatching { startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+            return true
+        }
+        @JavascriptInterface fun openUrl(url: String): Boolean {
+            if (!url.startsWith("http://") && !url.startsWith("https://")) return false
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (packageManager.resolveActivity(intent, 0) == null) return false
+            main.post { runCatching { startActivity(intent) } }
             return true
         }
         @JavascriptInterface fun openSettings(): Boolean = runCatching { Tv.openSettings() }.isSuccess

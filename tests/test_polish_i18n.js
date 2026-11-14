@@ -6,7 +6,7 @@ const assert = require('assert');
 console.log('Running Polish i18n tests...');
 
 // The TV home (tv-home/web/i18n.js): load it the way the TV does, with a Polish TV language.
-const src = fs.readFileSync(path.join(__dirname, '../tv-home/web/i18n.js'), 'utf8');
+const src = fs.readFileSync(path.join(__dirname, '../tv-home/web/i18n.js'), 'utf8').replace(/\r\n/g, '\n');
 function loadTv(language) {
   const sandbox = { window: {}, navigator: { language: language }, document: { documentElement: {} } };
   vm.runInNewContext(src, sandbox);
@@ -81,7 +81,7 @@ assert.strictEqual(
 
 // The phone remote (remote/src/i18n.js) is an ES module that imports react, so cut the
 // S.en and S.pl object literals out of the text and evaluate just those.
-const rsrc = fs.readFileSync(path.join(__dirname, '../remote/src/i18n.js'), 'utf8');
+const rsrc = fs.readFileSync(path.join(__dirname, '../remote/src/i18n.js'), 'utf8').replace(/\r\n/g, '\n');
 function literal(name) {
   const m = rsrc.match(new RegExp('^S' + name.replace('.', '\\.') + ' = (\\{[\\s\\S]*?\\n\\});', 'm'));
   assert(m, `the phone remote has an S${name} block`);
