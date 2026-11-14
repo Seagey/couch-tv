@@ -558,5 +558,16 @@ class Endpoints(Base):
             vizio.VizioTV({"id": "x", "name": "X", "ip": "192.0.2.9", "device_id": "me/../x"})
 
 
+class NoAppIdOneByName(unittest.TestCase):
+    """"vizio.<ns>.<id>" app names can never reach APP_ID 1, the main UI (PR #206 safety note)."""
+
+    def test_app_id_one_is_refused_in_any_spelling(self):
+        for name in ("vizio.4.1", "vizio.4.01", "vizio.4.001", "vizio.3.1"):
+            self.assertIsNone(vizio.VizioTV._app_entry(None, name), name)
+
+    def test_other_ids_still_open(self):
+        self.assertEqual(vizio.VizioTV._app_entry(None, "vizio.3.12")[:2], (3, "12"))
+
+
 if __name__ == "__main__":
     unittest.main()

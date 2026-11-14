@@ -770,6 +770,9 @@ class VizioTV:
             return None
         m = SAFE_APP.match(package)
         if m:
+            # Never APP_ID 1 (the main UI), in any spelling ("01" too), even with no URL: see WEB_APP_IDS.
+            if m.group(2).lstrip("0") == "1":
+                return None
             return int(m.group(1)), m.group(2), PROTOCOL["launch_message"]
         app = apps.BY_PACKAGE.get(package) or apps.BY_ID.get(package)
         return APPS.get(app["id"]) if app else None
