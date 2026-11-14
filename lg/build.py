@@ -128,6 +128,25 @@ def read_apps(path, tv_id):
     return out
 
 
+def css_var_fallbacks(css):
+    """webOS 3.x (Chrome 38) has no CSS variables, so every `var(--safe-x)` drops and the layout loses
+    its margins. Put the plain value just before each declaration that uses only the constants set once
+    in :root: newer engines still read the var() line after it, Chrome 38 keeps the plain one."""
+    root = re.search(r":root\s*\{([^}]*)\}", css)
+    consts = dict(re.findall(r"--([\w-]+)\s*:\s*([^;]+);", root.group(1))) if root else {}
+    consts = {k: v.strip() for k, v in consts.items()
+              if len(re.findall(r"--" + re.escape(k) + r"\s*:", css)) == 1}   # set only in :root
+
+    def sub(m):
+        prop, value = m.group(1), m.group(2)
+        names = re.findall(r"var\(--([\w-]+)", value)
+        if not names or any(n not in consts for n in names):
+            return m.group(0)
+        plain = re.sub(r"var\(--([\w-]+)(?:\s*,[^()]*)?\)", lambda v: consts[v.group(1)], value)
+        return f"{prop}: {plain}; {m.group(0)}"
+    return re.sub(r"(?<![\w-])([a-z-]+)\s*:\s*([^;{}]*var\(--[^;{}]*)", sub, css)
+
+
 def _plain(name):
     """The app's name the way lg/app/webos.js compares them: lower case, letters and digits only."""
     return re.sub(r"[^a-z0-9]", "", str(name or "").lower())
@@ -262,6 +281,12 @@ def main():
             logos.add(name[:-4])
     if baked:
         fetch_tv_icons(baked, os.path.join(stage, "logos"), logos)
+
+    css_path = os.path.join(stage, "app.css")
+    with open(css_path) as f:
+        css = f.read()
+    with open(css_path, "w") as f:
+        f.write(css_var_fallbacks(css))
 
     # index.html: the LG side loads before the bridge settings and app.js
     index = os.path.join(stage, "index.html")

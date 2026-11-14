@@ -181,8 +181,9 @@
       activeNodes.push(src, fireLp, fireBedGain);
       src.start();
 
-      // Periodic random crackle bursts
-      function scheduleCrackle() {
+      // Periodic random crackle bursts. A function expression, not a declaration: Chrome 38 (webOS 3.x)
+      // rejects a function declared inside a block in strict mode, and the whole file fails to load.
+      var scheduleCrackle = function () {
         if (!ac || currentType !== "fire") return;
         var nextDelay = 120 + Math.random() * 380;
         crackleTimer = setTimeout(function () {
@@ -210,7 +211,7 @@
           } catch (e) {}
           scheduleCrackle();
         }, nextDelay);
-      }
+      };
       scheduleCrackle();
     }
   }
