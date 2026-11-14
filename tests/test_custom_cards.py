@@ -138,6 +138,22 @@ class GetTests(unittest.TestCase):
         self.assertEqual(forced, [{"title": "Updated"}])
 
 
+    def test_force_keeps_a_short_gap(self):
+        self.write(json.dumps({"cards": [{"title": "Initial"}]}))
+        self.assertEqual(self.get(1000), [{"title": "Initial"}])
+        self.write(json.dumps({"cards": [{"title": "Updated"}]}))
+        self.assertEqual(self.get(1002, force=True), [{"title": "Initial"}])
+        self.assertEqual(self.get(1006, force=True), [{"title": "Updated"}])
+
+
+class WebUrlTests(unittest.TestCase):
+    def test_only_http_with_a_host(self):
+        self.assertEqual(custom_cards.web_url("https://example.com/bins"), "https://example.com/bins")
+        for bad in ("intent://x#Intent;end", "file:///etc/passwd", "javascript:alert(1)", "https://", "http:///x",
+                    "https://exa mple.com", "ftp://example.com", "", None):
+            self.assertEqual(custom_cards.web_url(bad), "", bad)
+
+
 class WebLinksOnSmartTvs(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

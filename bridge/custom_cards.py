@@ -41,6 +41,18 @@ def _text(v, most):
     return s[:most].rstrip()
 
 
+FORCE_GAP = 5                # seconds a forced refresh (?force=1) still waits since the last read
+
+
+def web_url(v):
+    """The link if it is a plain http(s) link with a host, else "" (for the LG and Samsung browsers)."""
+    u = _url(v)
+    if not u:
+        return ""
+    host = u.split("://", 1)[1].split("/", 1)[0].split("?", 1)[0].split("#", 1)[0].rsplit("@", 1)[-1]
+    return u if host.strip(":") else ""
+
+
 def _url(v):
     if isinstance(v, str) and len(v) <= URL_MAX and URL_RE.fullmatch(v.strip()):
         return v.strip()
@@ -121,7 +133,9 @@ async def get(src, log=None, now=None, force=False):
     if not src:
         return []
     now = time.time() if now is None else now
-    if not force and _cache["at"] and now - _cache["at"] < FETCH_EVERY:
+    # force (a page asking for a fresh read) still keeps a short gap, so a client cannot hammer the source
+    gap = FORCE_GAP if force else FETCH_EVERY
+    if _cache["at"] and now - _cache["at"] < gap:
         return _cache["cards"]
     _cache["at"] = now
     try:

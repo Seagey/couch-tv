@@ -198,7 +198,9 @@ class HomeActivity : Activity() {
         }
         @JavascriptInterface fun openUrl(url: String): Boolean {
             if (!url.startsWith("http://") && !url.startsWith("https://")) return false
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val uri = Uri.parse(url)
+            if (uri.host.isNullOrEmpty()) return false
+            val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             if (packageManager.resolveActivity(intent, 0) == null) return false
             main.post { runCatching { startActivity(intent) } }
             return true

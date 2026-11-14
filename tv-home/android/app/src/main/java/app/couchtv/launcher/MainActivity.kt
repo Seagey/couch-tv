@@ -573,7 +573,9 @@ class MainActivity : Activity() {
         fun openUrl(url: String): Boolean {
             if (!url.startsWith("http://") && !url.startsWith("https://")) return false
             return try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                val uri = Uri.parse(url)
+                if (uri.host.isNullOrEmpty()) return false
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 if (intent.resolveActivity(packageManager) == null) false else start(intent)

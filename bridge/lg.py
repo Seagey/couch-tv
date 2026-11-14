@@ -1088,9 +1088,12 @@ class LGTV:
             lid = (self._candidates(app["package"]) or ["youtube.leanback.v4"])[0]
             await self._launch(lid, params={"contentTarget": f"https://www.youtube.com/tv?v={youtube_id(uri)}"})
             return "remote"
-        if uri.startswith("http://") or uri.startswith("https://"):
-            await self._launch("com.webos.app.browser", params={"target": uri})
-            return "browser"
+        if "://" in uri and not pkg:
+            import custom_cards
+            link = custom_cards.web_url(uri)
+            if link:
+                await self._launch("com.webos.app.browser", params={"target": link})
+                return "browser"
         if not pkg:
             raise messages.with_key(
                 ValueError("LG TVs only open links for Netflix and YouTube"),
