@@ -2448,6 +2448,8 @@ def clean_settings(s):
         out["ambient_sun_grade"] = s["ambient_sun_grade"]
     if s.get("nav_sound") in ("system", "soft", "off"):
         out["nav_sound"] = s["nav_sound"]
+    if s.get("start_focus") in ("people", "apps", "keep_watching"):
+        out["start_focus"] = s["start_focus"]
     if s.get("glass_focus") in ("colour", "glass"):   # glass app icons: the focused app (#32)
         out["glass_focus"] = s["glass_focus"]
     if isinstance(s.get("video"), bool):
