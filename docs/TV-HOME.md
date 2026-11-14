@@ -224,8 +224,14 @@ not do this yet.
 
 ### About
 
-The version, the GitHub address (github.com/Seagey/couch-tv), where the settings are kept, and
-Reset.
+The version, the GitHub address (github.com/Seagey/couch-tv), where the settings are kept, Restart
+home and Reset.
+
+**Restart home** starts the home again from scratch, the way a force-stop in the TV's Settings, Apps
+and then Home would: a new WebView, the bridge looked for again, nothing taken from the old page's
+cache. It keeps every setting. A change to `config.json` still needs the bridge restarted first
+(option B) or `apply.sh` again (option A). With an app from before this row, or outside the TV home
+app, it reloads the page.
 
 ## Glass and video
 
