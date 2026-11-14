@@ -97,8 +97,10 @@ def read_apps(path, tv_id):
             raise SystemExit("--apps tv: no LG TV (\"kind\": \"lg\") in config.json" + (f" with id {tv_id}" if tv_id else ""))
         tv = lg.LGTV(cfg)
         if not os.path.exists(tv.key_file):
-            raise SystemExit(f"--apps tv: this TV has not accepted the remote yet ({os.path.relpath(tv.key_file, ROOT)} "
-                             "is missing). Start the bridge with this TV and press Accept on the TV, or use --apps <file>.")
+            # No bridge needed (#219): the connection below pairs by itself and keeps the key.
+            print(f"--apps tv: this TV has not accepted the remote yet ({os.path.relpath(tv.key_file, ROOT)} is missing). "
+                  "Watch the TV: when the prompt appears, move the highlight to Accept, then press OK "
+                  "(this waits 90 seconds).", file=sys.stderr)
 
         async def run():
             await tv._resolve()

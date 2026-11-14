@@ -151,7 +151,7 @@ effects** (light rain, snow and fog over the scenes), off to start.
 
 - Night scenes or Classic.
 - Which scenes take turns, in what order, how many seconds each.
-- A 12 or 24 hour clock.
+- A 12 or 24 hour clock. Until you pick one, an Android TV home follows the TV's own setting (System, Date and time), then the language.
 - Glass panels and a video background: see [Glass and video](#glass-and-video).
 - Your own photos: see [Your own photos](#your-own-photos).
 
@@ -224,8 +224,14 @@ not do this yet.
 
 ### About
 
-The version, the GitHub address (github.com/Seagey/couch-tv), where the settings are kept, and
-Reset.
+The version, the GitHub address (github.com/Seagey/couch-tv), where the settings are kept, Restart
+home and Reset.
+
+**Restart home** starts the home again from scratch, the way a force-stop in the TV's Settings, Apps
+and then Home would: a new WebView, the bridge looked for again, nothing taken from the old page's
+cache. It keeps every setting. A change to `config.json` still needs the bridge restarted first
+(option B) or `apply.sh` again (option A). With an app from before this row, or outside the TV home
+app, it reloads the page.
 
 ## Glass and video
 

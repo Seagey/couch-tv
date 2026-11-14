@@ -84,7 +84,7 @@ cannot do it. Read [docs/SYNC.md](SYNC.md) first.
 
 - Google TV and Android TV run everything. Fire TV (Fire OS) runs all three options, with Amazon's
   home flashing up first. Samsung runs it as an app, with a computer that stays on, and LG the
-  same way (run on eleven real LGs so far). Roku is built the same way and has run as a channel on one real Roku TV, but not yet with the bridge.
+  same way (run on thirteen real LGs so far). Roku is built the same way and has run as a channel on one real Roku TV, but not yet with the bridge.
   Developer mode has to be on.
 - A Google TV update can switch ambient mode back on. Option B's bridge checks once a day and
   switches it off again; with option A, run `apply.sh` again. couch-tv never switches the Google

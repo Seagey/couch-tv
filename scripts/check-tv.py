@@ -286,10 +286,10 @@ def main():
                    "why": "Samsung Tizen: no Android apps and a locked home screen. couch-tv goes on as a Samsung app that a "
                           "computer at home opens each time the TV comes on (docs/SAMSUNG.md), or plug in a Google TV box for everything."}
     elif lg and not android:
-        verdict = {"A": "no", "B": "LG path (untested on a real LG): docs/LG.md", "C": "no",
+        verdict = {"A": "no", "B": "LG path (works on real LGs): docs/LG.md", "C": "no",
                    "why": "LG webOS: no Android apps and a locked home screen. couch-tv can go on as an LG app that a computer "
-                          "at home opens each time the TV comes on (docs/LG.md, built and tested against a stand-in, "
-                          "not yet on a real LG), or plug in a Google TV box for everything."}
+                          "at home opens each time the TV comes on (docs/LG.md, run on many real LGs), or as an app on its own "
+                          "with no computer left on (docs/LG.md, the app only path), or plug in a Google TV box for everything."}
     elif open_ports[8060] and not android:
         verdict = {"A": "no", "B": "Roku path (built, not yet tried on a real Roku): docs/ROKU.md", "C": "no",
                    "why": "Roku: no Android apps and a locked home screen. couch-tv can go on as a Roku channel that a computer "

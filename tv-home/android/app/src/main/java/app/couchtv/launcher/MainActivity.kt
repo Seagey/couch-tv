@@ -431,6 +431,20 @@ class MainActivity : Activity() {
         later(3000)
     }
 
+    /**
+     * A new WebView, the bridge looked for again and the page loaded from scratch, with nothing kept
+     * from the old one (its cache included), so changes on the computer show without a force-stop.
+     */
+    private fun restartPage() {
+        main.removeCallbacks(retry)
+        web?.let { root.removeView(it); it.clearCache(true); it.destroy() }
+        web = null
+        pageReady = false
+        loadFailed = false
+        offline = false
+        connect()
+    }
+
     // ---------------------------------------------------------------- the saved copy 
 
     private val offlineDir get() = java.io.File(filesDir, "offline/web")
@@ -584,6 +598,10 @@ class MainActivity : Activity() {
             }
         }
 
+        /** The TV's own 12 or 24 hour setting (System, Date and time), so the clock follows it until Home settings picks one (#221). */
+        @JavascriptInterface
+        fun is24Hour(): Boolean = android.text.format.DateFormat.is24HourFormat(this@MainActivity)
+
         /** Is couch-tv the home? "held", "google_tv" (explain the Home button watch) or "ask" (HomeRole.kt, #98). */
         @JavascriptInterface
         fun homeState(): String = HomeRole.state(this@MainActivity)
@@ -674,6 +692,12 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun version(): String = BuildConfig.VERSION_NAME
+
+        /** Home settings, About, Restart home: what a force-stop and Home would do, from the remote. */
+        @JavascriptInterface
+        fun restartHome() {
+            main.post { restartPage() }
+        }
 
         // The TV's own input list (HDMI and the rest), for the Input quick button when there is no
         // bridge to press the TV_INPUT key. Only where the TV has a screen for it.

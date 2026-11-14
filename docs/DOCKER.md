@@ -52,5 +52,16 @@ some Synologys `scp` fails with "Connection closed". Copying the repo with `tar`
 tar -cf - . | ssh nas 'cd /volume1/docker/couch-tv && tar -xf -'
 ```
 
+From **Windows**, OpenSSH's `scp` fails against DSM with "subsystem request failed on channel 0"
+unless you add `-O` (the older copy protocol). The `tar` over `ssh` copy also works, but in
+PowerShell wrap it in `cmd /c`, because PowerShell's pipeline corrupts the binary stream:
+
+```sh
+cmd /c "tar -cf - . | ssh nas ""cd /volume1/docker/couch-tv && tar -xf -"""
+```
+
+A bridge for an LG in Docker on a Synology (host network) was run end to end, including the power on
+hook and the daily Developer Mode Extend, on an LG 28TQ515S ([LG.md](LG.md), #220, thanks adri07).
+
 The Developer Mode passphrase sits in `examples/docker/.env`, which git ignores. Keep that file
 private.

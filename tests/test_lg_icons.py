@@ -104,5 +104,43 @@ class LargeIconFirst(unittest.TestCase):
         self.assertEqual(apps["only-small"]["icon"], "https://tv/s_80.png")
 
 
+class AppsTvPairsByItself(unittest.TestCase):
+    """--apps tv with no saved key no longer stops: it pairs on the spot, no bridge needed (#219)."""
+
+    def test_no_key_still_reads_the_list(self):
+        import contextlib
+        import io
+        import lg
+        from unittest import mock
+
+        class FakeTV:
+            def __init__(self, cfg):
+                self.key_file = os.path.join(tempfile.mkdtemp(), "lg-x-key.txt")   # not there
+                self.pairing_wait = None
+
+            async def _resolve(self):
+                pass
+
+            async def port_open(self):
+                return True
+
+            async def _remote(self, pairing_wait=30):
+                self.pairing_wait = pairing_wait
+
+            async def apps_on_tv(self):
+                return [{"id": "plex", "title": "Plex", "icon": ""}]
+
+            async def _close(self):
+                pass
+
+        err = io.StringIO()
+        with mock.patch.object(lg, "LGTV", FakeTV), \
+                mock.patch.object(build.config, "TVS", [{"id": "x", "kind": "lg"}]), \
+                contextlib.redirect_stderr(err):
+            apps = build.read_apps("tv", "")
+        self.assertEqual([a["id"] for a in apps], ["plex"])
+        self.assertIn("move the highlight to Accept", err.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()
