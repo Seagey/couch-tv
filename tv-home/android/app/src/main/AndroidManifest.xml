@@ -55,6 +55,15 @@
         <intent><action android:name="com.android.tv.action.VIEW_INPUTS" /></intent>
         <intent><action android:name="com.google.android.tv.action.VIEW_INPUTS" /></intent>
         <intent><action android:name="android.media.tv.action.SETUP_INPUTS" /></intent>
+        <!-- Web links (custom cards with a url): Android 11+ hides browser packages otherwise. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
         <!-- The Input menu (#30): the TV's own app that plays an input when asked to view its
              passthrough channel (content://android.media.tv/passthrough/<input>). -->
         <intent>

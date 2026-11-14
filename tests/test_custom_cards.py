@@ -148,7 +148,10 @@ class WebLinksOnSmartTvs(unittest.TestCase):
         cls.loop.close()
 
     def test_lg_browser_launch(self):
-        import lg
+        try:
+            import lg
+        except ImportError:
+            raise unittest.SkipTest("aiohttp not installed")
         t = lg.LGTV({"id": "test", "name": "Test", "kind": "lg", "ip": "192.0.2.1"})
         t.require = lambda: None
         launched = []
@@ -160,7 +163,10 @@ class WebLinksOnSmartTvs(unittest.TestCase):
         self.assertEqual(launched, [("com.webos.app.browser", {"target": "https://example.com/bins"})])
 
     def test_samsung_browser_launch(self):
-        import samsung
+        try:
+            import samsung
+        except ImportError:
+            raise unittest.SkipTest("aiohttp not installed")
         t = samsung.SamsungTV({"id": "test", "name": "Test", "kind": "samsung", "ip": "192.0.2.1"})
         t.require = lambda: None
         launched = []
