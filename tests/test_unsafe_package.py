@@ -6,6 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "bridge"))
 import tv  # noqa: E402
+import server  # noqa: E402
 
 BAD = ["a.b;touch /sdcard/proof", "a.b && reboot", "a.b'", "a.b$(id)", "a.b`id`", "a.b|sh",
        "a.b\nid", "nodots", ".a.b", "a..b", "", None, 5, "a." * 150 + "b"]
@@ -51,6 +52,57 @@ class CheckPackage(unittest.TestCase):
         t.adb, t.adb_ready = adb, ready
         with self.assertRaises(tv.UnsafeInput):
             asyncio.run(t.start_intent("https://example.com", package="a.b'; reboot"))
+
+    def test_force_stop_skips_bad_packages(self):
+        t = tv.TV.__new__(tv.TV)
+        t.id = "test_tv"
+        t.paired = True
+        calls = []
+
+        async def ready():
+            return True
+
+        async def adb(*a, **k):
+            calls.append(a)
+            return ""
+
+        t.adb, t.adb_ready = adb, ready
+        asyncio.run(server._force_stop(t, [
+            "com.netflix.ninja",
+            "a.b;touch /sdcard/proof",
+            "com.disney.disneyplus",
+            None,
+            "bad'name",
+        ]))
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0], ("shell", "am", "force-stop", "com.netflix.ninja"))
+        self.assertEqual(calls[1], ("shell", "am", "force-stop", "com.disney.disneyplus"))
+
+    def test_keep_disabled_sanitization(self):
+        raw_list = [
+            "com.google.android.apps.tv.launcherx",
+            "com.google.android.tvlauncher",
+            "com.example.adtracker",
+            "a.b;touch /sdcard/proof",
+            None,
+            123,
+            "invalid..pkg",
+        ]
+        packages, to_enable = [], []
+        for p in raw_list:
+            try:
+                safe_p = tv.check_package(p)
+            except (tv.UnsafeInput, TypeError, ValueError):
+                continue
+            if safe_p in server.NEVER_DISABLE:
+                to_enable.append(safe_p)
+            else:
+                packages.append(safe_p)
+        self.assertEqual(to_enable, [
+            "com.google.android.apps.tv.launcherx",
+            "com.google.android.tvlauncher",
+        ])
+        self.assertEqual(packages, ["com.example.adtracker"])
 
 
 if __name__ == "__main__":
