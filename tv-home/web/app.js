@@ -110,7 +110,7 @@
   var IDLE_PHOTO_SECONDS = 0, idlePhotoTimer = null, idlePhotoActive = false;
   var WX_AMBIENT = true, WX_SUN_GRADE = true;
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
-  var NP_ON = true, KW_ON = true, SOUND_STYLE = "system", START_FOCUS = "keep_watching";
+  var NP_ON = true, KW_ON = true, SOUND_STYLE = "system", START_FOCUS = "people";
   // Ambient sleep soundscapes (rain, fire, waves, brown noise)
   var SOUND_TYPE = "off", SOUND_VOL = 0.5, SOUND_FADE_SLEEP = true;
   function initSoundscape() {
@@ -413,7 +413,7 @@
     document.documentElement.classList.toggle("glass-icons", GLASS_ICONS);
     GLASS_AMT = glassAmount();
     CLOCK_LIQUID = (ST.clock_style || HOME.clock_style) === "liquid";
-    START_FOCUS = ["people", "apps", "keep_watching"].indexOf(ST.start_focus || HOME.start_focus) >= 0 ? (ST.start_focus || HOME.start_focus) : "keep_watching";
+    START_FOCUS = ["people", "apps", "keep_watching"].indexOf(ST.start_focus || HOME.start_focus) >= 0 ? (ST.start_focus || HOME.start_focus) : "people";
     glassClasses();
     // a link set in Home settings wins over home.video_url; one from config.json alone means on
     VIDEO_URL = typeof ST.video_url === "string" ? ST.video_url : typeof HOME.video_url === "string" ? HOME.video_url : "";
@@ -2953,7 +2953,7 @@
     paintFocus();
   }
 
-  // Start on the chosen place (home.start_focus): keep_watching (default), apps or people (#211).
+  // Start on the chosen place (home.start_focus): people (default, as before), keep_watching or apps (#211).
   function startFocus() {
     s = 0; g = 0;
     if (ambientOpen && AMBIENT_MUSIC && npVisible()) {
@@ -3578,7 +3578,7 @@
     } });
     rows.push({ kind: "cycle", key: "start-focus", label: t("start_focus"), sub: t("start_focus_sub"),
       value: t("start_focus_" + START_FOCUS), act: function () {
-        var steps = ["keep_watching", "apps", "people"];
+        var steps = ["people", "keep_watching", "apps"];
         var i = steps.indexOf(START_FOCUS);
         START_FOCUS = steps[(i + 1) % steps.length];
         ST.start_focus = START_FOCUS;

@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: choose where the home starts, profiles, Keep watching or apps (on main, in the next release)
+
+Thanks nidhalmouldi (#211) for the request and ekagra-codes (#212) for the code. With two or more people set up, every Home press landed on the profile switcher, so a home that rarely changes profile needed two presses Down to reach the apps. Home settings, Look, has a new Start on row (or set `home.start_focus` in `config.json`): Profiles (the default, exactly as before), Keep watching, or Apps. An unknown value is ignored. See [TV-HOME.md](TV-HOME.md) and [CONFIG.md](CONFIG.md).
+
 ### 14 November 2026: VIZIO, couch-tv's home in the TV's own webview, Beta (on main, in the next release)
 
 Thanks lukionsp (#206). On a VIZIO, `scripts/vizio-web.py` can now load couch-tv's home (the bridge's `/tv/`) in the TV's own webview, through VIZIO OS's web app launcher. `--probe` finds which launcher id your set accepts with a test page that reports back, and `--url` puts the home up. It is Beta and has been tried on one set, a V4K65X-0810 on VIZIO OS 86.920.9.3; the webview is slow, so a single scene works best. It is off unless you run it: the bridge never opens it by itself, and a new install behaves exactly as before. For safety, couch-tv only sends a page with name space 4 and an allow listed launcher id (3001 or 17), checked in the one function that builds the request, and only a plain `http://` or `https://` address. It refuses `APP_ID` 1, the TV's main menu, where a saved address can leave the menus dead until a factory reset. Steps and the safety note: [VIZIO.md](VIZIO.md#the-home).

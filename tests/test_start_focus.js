@@ -8,16 +8,16 @@ const appJs = fs.readFileSync(path.join(web, 'app.js'), 'utf8');
 const i18n = fs.readFileSync(path.join(web, 'i18n.js'), 'utf8');
 
 // 1. Setting declaration and config reading
-assert(/START_FOCUS = "keep_watching"/.test(appJs), 'default START_FOCUS is keep_watching');
+assert(/START_FOCUS = "people"/.test(appJs), 'default START_FOCUS is people, as before the setting existed');
 assert(
-  /START_FOCUS = \["people", "apps", "keep_watching"\]\.indexOf\(ST\.start_focus \|\| HOME\.start_focus\) >= 0 \? \(ST\.start_focus \|\| HOME\.start_focus\) : "keep_watching"/.test(appJs),
-  'readConfig respects ST.start_focus, HOME.start_focus, or defaults to keep_watching'
+  /START_FOCUS = \["people", "apps", "keep_watching"\]\.indexOf\(ST\.start_focus \|\| HOME\.start_focus\) >= 0 \? \(ST\.start_focus \|\| HOME\.start_focus\) : "people"/.test(appJs),
+  'readConfig respects ST.start_focus, HOME.start_focus, or defaults to people'
 );
 
 // 2. Home settings cycle row
 assert(appJs.includes('key: "start-focus"'), 'Home settings has start-focus row');
 assert(appJs.includes('value: t("start_focus_" + START_FOCUS)'), 'start-focus displays localized current value');
-assert(appJs.includes('var steps = ["keep_watching", "apps", "people"]'), 'cycles through keep_watching, apps, people');
+assert(appJs.includes('var steps = ["people", "keep_watching", "apps"]'), 'cycles through people, keep_watching, apps');
 
 // 3. startFocus function logic
 const fnMatch = appJs.match(/function startFocus\(\) \{[\s\S]*?\n  \}/);
@@ -53,12 +53,18 @@ function simulateStartFocus(startFocusSetting, peopleCount, shelfCardsCount, amb
   return { zone, s, g, pi };
 }
 
-// Case A: Default (keep_watching) with 2+ people and keep watching cards -> starts on Keep watching (shelf)
-let res = simulateStartFocus('keep_watching', 2, 3);
-assert.strictEqual(res.zone, 'shelf', 'default with 2+ people and cards starts on shelf');
+// Case 0: Default (people) is exactly the old behaviour
+let res = simulateStartFocus('people', 2, 3);
+assert.strictEqual(res.zone, 'people', 'default with 2+ people starts on people');
+res = simulateStartFocus('people', 1, 0);
+assert.strictEqual(res.zone, 'grid', 'default with one person and no cards starts on the grid');
+
+// Case A: keep_watching with 2+ people and cards -> starts on Keep watching (shelf)
+res = simulateStartFocus('keep_watching', 2, 3);
+assert.strictEqual(res.zone, 'shelf', 'keep_watching with 2+ people and cards starts on shelf');
 assert.strictEqual(res.s, 0);
 
-// Case B: Default (keep_watching) with 2+ people but NO cards -> falls back to apps (grid)
+// Case B: keep_watching with 2+ people but NO cards -> falls back to apps (grid)
 res = simulateStartFocus('keep_watching', 2, 0);
 assert.strictEqual(res.zone, 'grid', 'default with no cards falls back to grid');
 assert.strictEqual(res.g, 0);

@@ -292,6 +292,10 @@ On main, in the next release: a full screen Now playing view with the album art,
 **Show Keep watching** (Home settings, Look, or `home.keep_watching`, on main, in the next release):
 switch it off to hide the whole row and stop fetching it.
 
+**Start on** (Home settings, Look, or `home.start_focus`, on main, in the next release): where the
+remote starts when you press Home. Profiles is as before, Keep watching starts on the first show
+card, and Apps starts on the first app (thanks nidhalmouldi, #211, and ekagra-codes, #212).
+
 **Navigation sound** (Home settings, Look, Sound): the TV's own click, a soft tap, or none (#32).
 
 ## Custom cards

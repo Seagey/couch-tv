@@ -356,7 +356,7 @@ def _home(h):
         out["ambient_sun_grade"] = h["ambient_sun_grade"]
     if h.get("nav_sound") in ("system", "soft", "off"):
         out["nav_sound"] = h["nav_sound"]
-    # where the remote starts on Home: keep_watching (default), apps or people (#211)
+    # where the remote starts on Home: people (default, as before), keep_watching or apps (#211)
     if h.get("start_focus") in ("people", "apps", "keep_watching"):
         out["start_focus"] = h["start_focus"]
     if h.get("glass_focus") in ("colour", "glass"):   # glass app icons: the focused app (#32)
