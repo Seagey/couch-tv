@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: LG goes back to couch-tv in about half a second, and input tiles switch straight to HDMI (on main, in the next release)
+
+On an LG, backing out of an app took 3 to 4.5 seconds to land on couch-tv. The bridge now subscribes to the TV's foreground app, so it hears the moment the app in front changes, and while another app is in front it also looks every quarter of a second as a fallback for a firmware that sends no message (it does not look that often at any other time). The waits after an app closes and after the TV comes on are shorter too. The false "couch-tv is no longer installed" warning no longer shows while couch-tv is on screen. A pinned input tile on an LG (`home.inputs`, a `port` of 1 to 9 or an id like `HDMI_1`) opens `com.webos.app.hdmi<N>` directly instead of LG's input list. Eight more LG app names were added to `bridge/apps.py`. Thanks BireshwarChakravarty (#204, from #89), measured on an LG QNED88T6A and an LG NANO83A6A.
+
 ### 14 November 2026: Home button on Android 10 TVs comes back faster (on main, in the next release)
 
 On a Hisense Android TV 10, the TV's own home stayed up for about 5 seconds after a Home press before couch-tv came back (option A), and the on-TV app did not come back at all. Android 10 still holds new app starts for that long after Home. Both apps now try moving couch-tv's task to the front first on Android 10 (the way they already did on Android 9), check under a second later that couch-tv really is in front, and fall back to the normal start if Android refused the move. Android 11 and newer behave exactly as before. Thanks vladyslav-makar (#202) for the very detailed report.
