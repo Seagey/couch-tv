@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: app names checked before closing or switching off apps (on main, in the next release)
+
+The bridge now checks every app name before it closes apps when a TV turns off (`close_on_off` in `config.json`) and before its daily keep-disabled check switches apps off or back on. A name that is not a plain Android package name is skipped with a line in the log, and the rest still run, so a mistyped or tampered file can never send anything else to the TV. Nothing changes for a normal setup. Thanks ekagra-codes (#177).
+
 ### 14 November 2026: your own cards on the home, without changing couch-tv (on main, in the next release)
 
 The home can now show your own cards at the end of the Keep watching row: the solar output today, bin night, a message for the family. Point `home.custom_cards` in `config.json` at a small JSON file, either a file on the bridge computer or an `http` or `https` link (a raw GitHub file, a Raspberry Pi on your Wi-Fi), and whatever you like writes that file. couch-tv only shows the cards: a title, a value, a subtitle and a picture, and OK opens an installed app or a link. Nothing in the file is ever run, at most 8 cards show, and a bad file keeps the last good cards. It is read every 10 minutes and is off unless you set it ([TV-HOME.md](TV-HOME.md#custom-cards)). Thanks geissmannz on Instagram for the idea.

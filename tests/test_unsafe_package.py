@@ -88,21 +88,15 @@ class CheckPackage(unittest.TestCase):
             123,
             "invalid..pkg",
         ]
-        packages, to_enable = [], []
-        for p in raw_list:
-            try:
-                safe_p = tv.check_package(p)
-            except (tv.UnsafeInput, TypeError, ValueError):
-                continue
-            if safe_p in server.NEVER_DISABLE:
-                to_enable.append(safe_p)
-            else:
-                packages.append(safe_p)
+        packages, to_enable = server._keep_disabled_lists(raw_list, "test_tv")
         self.assertEqual(to_enable, [
             "com.google.android.apps.tv.launcherx",
             "com.google.android.tvlauncher",
         ])
         self.assertEqual(packages, ["com.example.adtracker"])
+        # Not a list (a hand edited file): nothing to do, no crash
+        self.assertEqual(server._keep_disabled_lists({"a.b": 1}), ([], []))
+        self.assertEqual(server._keep_disabled_lists("com.example.app"), ([], []))
 
 
 if __name__ == "__main__":

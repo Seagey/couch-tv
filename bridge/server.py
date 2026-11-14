@@ -3619,6 +3619,21 @@ NEVER_DISABLE = {"com.google.android.apps.tv.launcherx", "com.google.android.tvl
 stock_home_done = set()
 
 
+def _keep_disabled_lists(listed, tv_id=""):
+    """Split a keep-disabled file into (to switch off, to switch back on). Every name goes to the
+    TV's shell, so anything check_package refuses is logged and skipped (#177)."""
+    packages, to_enable = [], []
+    for p in listed if isinstance(listed, list) else []:
+        try:
+            p = check_package(p)
+        except UnsafeInput as e:
+            log.warning("%s: ignoring unsafe package in keep-disabled: %s", tv_id, e)
+            continue
+        # NEVER_DISABLE ones are only switched back on, and only when couch-tv's own file lists them
+        (to_enable if p in NEVER_DISABLE else packages).append(p)
+    return packages, to_enable
+
+
 async def keep_disabled_loop():
     """Daily, per TV: re-disable packages listed in that TV's keep-disabled file (the living
     room's is data/keep-disabled.json, written by apply.sh: ambient mode and any ad tracker). A
@@ -3631,18 +3646,7 @@ async def keep_disabled_loop():
         try:
             with open(path) as f:
                 listed = json.load(f)
-            packages, to_enable = [], []
-            if isinstance(listed, list):
-                for p in listed:
-                    try:
-                        safe_p = check_package(p)
-                    except (UnsafeInput, TypeError, ValueError) as e:
-                        log.warning("%s: ignoring unsafe package in keep-disabled: %s", tv.id, e)
-                        continue
-                    if safe_p in NEVER_DISABLE:
-                        to_enable.append(safe_p)
-                    else:
-                        packages.append(safe_p)
+            packages, to_enable = _keep_disabled_lists(listed, tv.id)
         except (FileNotFoundError, IsADirectoryError, json.JSONDecodeError, TypeError):
             packages, to_enable = [], []
         if not packages and not to_enable:
@@ -3702,7 +3706,7 @@ async def _force_stop(t, packages):
         for pkg in packages:
             try:
                 safe_pkg = check_package(pkg)
-            except (UnsafeInput, TypeError, ValueError) as e:
+            except UnsafeInput as e:
                 log.warning("%s: skipping unsafe package in close_on_off: %s", t.id, e)
                 continue
             await t.adb("shell", "am", "force-stop", safe_pkg)
