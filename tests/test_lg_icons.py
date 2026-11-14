@@ -87,5 +87,22 @@ class FetchTvIcons(unittest.TestCase):
         self.assertEqual(logos, set())
 
 
+class LargeIconFirst(unittest.TestCase):
+    """An app with no bundled logo gets the TV's 130x130 largeIcon, not its 80x80 icon (#89):
+    stretched onto a 112 px tile at devicePixelRatio 1 (webOS 26), the small one looks soft."""
+
+    def test_baked_list_prefers_large_icon(self):
+        import json
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, "apps.json")
+        with open(path, "w") as f:
+            json.dump([{"id": "plex", "title": "Plex", "icon": "https://tv/Plex_80x80.png",
+                        "largeIcon": "https://tv/Plex_130x130.png"},
+                       {"id": "only-small", "title": "Small", "icon": "https://tv/s_80.png"}], f)
+        apps = {a["id"]: a for a in build.read_apps(path, "")}
+        self.assertEqual(apps["plex"]["icon"], "https://tv/Plex_130x130.png")
+        self.assertEqual(apps["only-small"]["icon"], "https://tv/s_80.png")
+
+
 if __name__ == "__main__":
     unittest.main()
