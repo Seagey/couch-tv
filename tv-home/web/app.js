@@ -4333,6 +4333,13 @@
       o.start(now); o.stop(now + 0.1);
     } catch (e) {}
   }
+  function warmSound() {
+    if (!SOUND || SOUND_STYLE !== "soft" || AC) return;
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) AC = new Ctx();   // may start suspended until a key is pressed; softTick resumes it
+    } catch (e) {}
+  }
   function blip(dx, dy) {
     if (!SOUND || SOUND_STYLE === "off") return;
     if (SOUND_STYLE === "soft") { softTick(); return; }
@@ -4800,6 +4807,10 @@
       if (!first && SUN_SYNC) first = sunTargetScene();
       showScene(Math.max(0, SCENES.map(function (s) { return s.own ? "own" : s.id; }).indexOf(first)));
       if (SCENES.length > 1) setInterval(nextScene, SCENE_MS);
+      // the soft tap's audio context, made while the home is idle: made on the first key press it
+      // cost that press 112 ms on an LG NANO83 (webOS 26), so the first press after every return
+      // from an app lagged
+      setTimeout(warmSound, 2000);
       // the clock font must be in before the glass is measured
       if (document.fonts) document.fonts.load("300 10px Antonio").then(function () { glassShown = ""; clock(); });
       refreshWeather();
