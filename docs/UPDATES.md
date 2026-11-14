@@ -13,6 +13,9 @@ Thanks ekagra-codes ([#207](https://github.com/Seagey/couch-tv/pull/207)). A cus
 ### 15 November 2026: the clock follows the TV's 12 or 24 hour setting, and Keep watching stays in view while you remove a show (on main, in the next release)
 
 Thanks devmaliakbar (#221) and Hiren-Patel1 (#218). On an Android TV the home's clock now follows the TV's own setting (System, Date and time, Use 24-hour format) until you pick 12 or 24 hour in Home settings, Look, or set `clock` in `config.json`. Before, it only went by the language, so a 24 hour TV in English showed 12 hour. In the Night look, the Keep watching row no longer vanishes while the hold OK menu is open: the row stays on screen with the other cards dimmed, and "Removed" now shows in the status line instead of hiding the row for 4 seconds. The clock needs the updated app on the TV (the next release); the row fix is in the home page.
+### 14 November 2026: Restart home in Home settings, About (on main, in the next release)
+
+Home settings, About now has a **Restart home** row. It starts the home again from scratch, the way a force-stop in the TV's Settings, Apps and then Home would: a new WebView, the bridge looked for again, nothing kept from the old page's cache. Every setting stays. It is for seeing a change made on the computer without walking to the TV settings. With an app from before this row, or outside the TV home app, it reloads the page instead. Thanks janooh37-hue (#217).
 
 ### 14 November 2026: VIZIO, couch-tv's home in the TV's own webview, Beta (on main, in the next release)
 
