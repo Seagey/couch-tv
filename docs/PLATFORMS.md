@@ -46,7 +46,7 @@ A, B and C are the [three ways to run it](../README.md#three-ways-to-run-it).
 | **Hisense with VIDAA** | App only: a tile on the app row where the firmware allows it, else the TV's browser | **Beta**, with a computer at home that stays on: a page that opens itself in the TV's browser. VIDAA's Home button still opens VIDAA's home unless you opt in with `keep_home` ([how](VIDAA.md)). On older firmware the TV Browser gives the page a mouse cursor only, so you point and click ([what to expect](VIDAA.md#what-to-expect-on-older-vidaa-firmware-field-report-firmware-p0218)) | No |
 | **Philips with Titan OS** (mostly Europe) | Needs a Titan app: a Titan store app or Titan's DevView, not there yet | **Beta**, with a computer at home that stays on: the phone remote works now (power, keys, volume, inputs, apps). The home opens once there is a Titan app ([how](PHILIPS-TITAN.md)) | No |
 | **Older Philips with Saphi** (about 2015 to 2019, not Android) | No | **Beta**, with a computer at home that stays on: phone remote, and couch-tv's page opens in the TV's browser if your set offers one. Philips's Home button still opens Philips's menu ([how](PHILIPS-SAPHI.md)) | No |
-| **VIZIO** (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Beta, phone remote only**, with a computer at home that stays on: power, volume, inputs and opening apps ([how](VIZIO.md)) | No |
+| **VIZIO** (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Beta, phone remote**, with a computer at home that stays on: power, volume, inputs and opening apps. Also a Beta that loads the home in the TV's webview when you run a script, tried on one set ([how](VIZIO.md#the-home)) | No |
 | **Panasonic Viera** (My Home Screen and older Vieras) | No | **Beta**, with a computer at home that stays on: phone remote, and a page that opens itself in the TV's browser. Panasonic's Home button still opens Panasonic's home ([how](PANASONIC.md)) | No |
 | **Apple TV** | No: Apple lets no app replace its home | **Beta**, with a computer at home that stays on: phone remote (keys, sleep and wake, opening apps), and the couch-tv home as an Apple TV app, Couch TV (Beta, free with your own Apple ID and a Mac, reinstalled weekly by the computer at home). Apple's Home button still opens Apple's home ([how](APPLE-TV.md)) | No |
 | **TiVo OS** (JVC, Telefunken and other Vestel built sets) | No | **Beta**, with a computer at home that stays on: phone remote, and a page that opens itself in the TV's browser from a Speed Dial tile you add once. TiVo's Home button still opens TiVo's home. Run on one real JVC so far ([how](TIVO.md)) | No |
@@ -185,13 +185,13 @@ from the phone. Setup and limits: [FIRE-VEGA.md](FIRE-VEGA.md).
 
 ### VIZIO
 
-**At a glance.** Works as: the phone remote only; couch-tv's home cannot open on a VIZIO. Needs: a computer at home that stays on, and a PIN the TV shows once. Home button: opens VIZIO's home.
+**At a glance.** Works as: the phone remote; couch-tv's home does not open on a VIZIO by itself (a Beta loads it in the TV's webview by hand, tried on one set). Needs: a computer at home that stays on, and a PIN the TV shows once. Home button: opens VIZIO's home.
 
 **VIZIO (Beta), phone remote only** (SmartCast and VIZIO OS): the bridge talks to the TV the way VIZIO's
 own phone app does: power, the remote's keys, volume, switching inputs by name, and opening Netflix,
-YouTube, Prime Video, Disney+ and other apps on their own page. couch-tv's home cannot open on a VIZIO:
+YouTube, Prime Video, Disney+ and other apps on their own page. couch-tv's home does not open on a VIZIO by itself:
 VIZIO OS has no browser, takes no sideloaded app, and its app programme is a closed partner scheme.
-VIZIO's Home button opens VIZIO's home. No "what is playing" title, no typing and no screenshots. You
+A Beta loads it in the TV's own webview when you run a script, tried on one set ([VIZIO.md](VIZIO.md), "The home"). VIZIO's Home button opens VIZIO's home. No "what is playing" title, no typing and no screenshots. You
 type a PIN the TV shows once. Setup and limits: [VIZIO.md](VIZIO.md).
 
 ### Panasonic Viera

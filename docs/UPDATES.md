@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: VIZIO, couch-tv's home in the TV's own webview, Beta (on main, in the next release)
+
+Thanks lukionsp (#206). On a VIZIO, `scripts/vizio-web.py` can now load couch-tv's home (the bridge's `/tv/`) in the TV's own webview, through VIZIO OS's web app launcher. `--probe` finds which launcher id your set accepts with a test page that reports back, and `--url` puts the home up. It is Beta and has been tried on one set, a V4K65X-0810 on VIZIO OS 86.920.9.3; the webview is slow, so a single scene works best. It is off unless you run it: the bridge never opens it by itself, and a new install behaves exactly as before. For safety, couch-tv only sends a page with name space 4 and an allow listed launcher id (3001 or 17), checked in the one function that builds the request, and only a plain `http://` or `https://` address. It refuses `APP_ID` 1, the TV's main menu, where a saved address can leave the menus dead until a factory reset. Steps and the safety note: [VIZIO.md](VIZIO.md#the-home).
+
 ### 14 November 2026: input tiles for each TV, and a picture on an input tile (on main, in the next release)
 
 A TV can now have its own input tiles, `tvs[].inputs` in `config.json`, with the same items as `home.inputs`. That suits two TVs with different consoles; `[]` gives one TV no input tiles. An input tile can also have an `image`: a picture file inside the app (SVG, PNG, JPEG or WebP, such as `backgrounds/mine/console.svg`) shown in place of the drawn icon, which comes back if the picture does not load. Web addresses, absolute paths and `..` are refused. Both are off unless configured, so a `config.json` without them behaves exactly as before. Thanks BireshwarChakravarty (#205, from #89).

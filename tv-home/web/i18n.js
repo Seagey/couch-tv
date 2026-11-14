@@ -734,7 +734,7 @@
     err_vizio_http_status: "the TV answered HTTP {status} to {method} {path}",
     err_vizio_needs_pairing: "the TV wants pairing first (docs/VIZIO.md, step 3)",
     err_vizio_no_hashval: "the TV did not give the HASHVAL needed to switch inputs (turn on trace and send the log)",
-    err_vizio_no_home: "couch-tv's home cannot open on a VIZIO TV: VIZIO OS has no browser and takes no outside apps. couch-tv is the phone remote here (docs/VIZIO.md, \"The home\")",
+    err_vizio_no_home: "couch-tv's home cannot open on a VIZIO TV by itself: VIZIO OS has no browser and takes no outside apps. couch-tv is the phone remote here. A Beta loads it in the TV's own webview with scripts/vizio-web.py (docs/VIZIO.md, \"The home\")",
     err_vizio_no_screenshots: "VIZIO TVs do not give screenshots over the network",
     err_vizio_no_smartcast: "no SmartCast answer on port {ports} ({error})",
     err_vizio_no_token: "the TV accepted the PIN but sent no token (turn on trace and send the log)",

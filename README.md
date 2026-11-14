@@ -52,6 +52,7 @@ Other TVs: [Will it work on my TV?](#will-it-work-on-my-tv)
 
 The newest release is **0.12** (9 November 2026), on [the Releases page](https://github.com/Seagey/couch-tv/releases). These are on main, in the next release:
 
+- **14 November:** on a VIZIO, couch-tv's home in the TV's own webview, Beta, tried on one set, thanks lukionsp ([#206](docs/UPDATES.md#14-november-2026-vizio-couch-tvs-home-in-the-tvs-own-webview-beta-on-main-in-the-next-release))
 - **14 November:** input tiles for each TV, and a picture on an input tile, thanks BireshwarChakravarty ([#205](docs/UPDATES.md#14-november-2026-input-tiles-for-each-tv-and-a-picture-on-an-input-tile-on-main-in-the-next-release))
 - **14 November:** an LG goes back to couch-tv in about half a second, and input tiles switch straight to HDMI, thanks BireshwarChakravarty ([#204](docs/UPDATES.md#14-november-2026-lg-goes-back-to-couch-tv-in-about-half-a-second-and-input-tiles-switch-straight-to-hdmi-on-main-in-the-next-release))
 - **14 November:** remove a card from Keep watching on the phone remote, and it returns when you play the show again, thanks poinch ([#176](docs/UPDATES.md#14-november-2026-remove-a-card-from-keep-watching-on-the-phone-remote-on-main-in-the-next-release))
@@ -106,7 +107,7 @@ A is the TV home only, B adds the computer bridge, C lives on the TV ([the three
 | [Hisense VIDAA](docs/PLATFORMS.md#hisense-vidaa) | App only | Beta | No |
 | [Philips with Titan OS](docs/PLATFORMS.md#philips-with-titan-os) | Not yet | Remote only, Beta | No |
 | [Older Philips with Saphi](docs/PLATFORMS.md#older-philips-with-saphi) | No | Beta | No |
-| [VIZIO](docs/PLATFORMS.md#vizio) | No | Remote only, Beta | No |
+| [VIZIO](docs/PLATFORMS.md#vizio) | No | Remote, Beta (home in the TV's webview by hand, Beta, one set) | No |
 | [Panasonic Viera](docs/PLATFORMS.md#panasonic-viera) | No | Beta | No |
 | [Apple TV](docs/PLATFORMS.md#apple-tv) | No | Beta | No |
 | [TiVo OS](docs/PLATFORMS.md#tivo-os) | No | Beta | No |

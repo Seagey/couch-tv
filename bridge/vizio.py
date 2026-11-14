@@ -25,13 +25,14 @@ Every path, field and code is in PROTOCOL, KEYS and APPS below, each marked with
 community Vizio_SmartCast_API notes). "VIZIO list" means VIZIO's own public app list. UNCONFIRMED
 means one source or our own reading. None of it is seen on a real set yet.
 
-THE HOME: couch-tv's page cannot be opened on a VIZIO by the bridge. VIZIO OS has no browser, takes no
-sideloaded app, and its developer programme is a closed partner scheme. Its built in Chromecast only
-opens registered receivers, and nobody has shown a VIZIO opening a page that is not Google's. So this
-is a phone remote: power, keys, volume, inputs and opening apps. open_home() says so plainly. The
-remote's Home (and the phone's Home) press VIZIO's own Home.
+THE HOME: the bridge does not open couch-tv's page on a VIZIO by itself. VIZIO OS has no browser, takes
+no sideloaded app, and its developer programme is a closed partner scheme. So this is a phone remote:
+power, keys, volume, inputs and opening apps, and open_home() says so plainly. The remote's Home (and
+the phone's Home) press VIZIO's own Home. BETA (#206, tried on one set, a V4K65X-0810): the owner can
+load the page in the TV's own webview with scripts/vizio-web.py, through launch_web() and the allow
+list in web_launch_body() (name space 4, WEB_APP_IDS only, never APP_ID 1).
 
-What it cannot do (docs/VIZIO.md): couch-tv's home on the TV, what is playing (only which app), typing,
+What it cannot do (docs/VIZIO.md): couch-tv's home on the TV by itself, what is playing (only which app), typing,
 screenshots, deep links into a show, ADB tools.
 """
 import asyncio
@@ -43,6 +44,7 @@ import secrets
 import socket
 import ssl
 import time
+from urllib.parse import urlsplit
 
 import aiohttp
 
@@ -132,6 +134,45 @@ APPS = {
 }
 EQUIVALENT = {2: 4, 4: 2}   # name spaces 2 and 4 name the same apps (pyvizio, UNCONFIRMED)
 
+# Experiment: VIZIO OS has a system "web-app launcher" namespace. PUT /app/launch with
+# NAME_SPACE 4 and one of these APP_IDs passes MESSAGE through as a URL the TV's own
+# webview loads, over plain http on the LAN (docs/VIZIO.md, "The home"). Which id works
+# is chipset-specific, so the bridge only tries it when config.json gives "web_app". Find
+# the id with scripts/vizio-web.py --probe. APP_ID 1 is the main UI: a URL written there
+# persists to NVRAM and can brick the UI. So this is an ALLOW LIST, enforced in web_launch_body(),
+# the only place a web launch is built: name space 4 only, and only these ids. A tester who finds
+# another id adds it here in a pull request; it is never taken from config or the command line alone.
+WEB_NS = 4
+WEB_APP_IDS = ("3001", "17")   # VIZIO OS modal, then older web-app launcher. Never "1".
+assert "1" not in WEB_APP_IDS
+WEB_URL_MAX = 2048
+
+
+def web_launch_body(app_id, url):
+    """The PUT /app/launch body for a web page, or TVUnavailable. Refuses any APP_ID outside
+    WEB_APP_IDS (so never 1, the main UI) and any URL that is not plain http(s) with a host."""
+    aid = app_id if isinstance(app_id, str) else ""     # exact match only, no trimming or numbers
+    if aid not in WEB_APP_IDS:
+        raise TVUnavailable(
+            f"VIZIO web launcher id {aid or '(none)'} is refused: only {', '.join(WEB_APP_IDS)} are allowed "
+            "(APP_ID 1 is the main UI and a URL written there can brick it until a factory reset)",
+            key="err_vizio_web_app_refused",
+            vars={"id": aid or "(none)"},
+        )
+    u = url if isinstance(url, str) else ""
+    try:
+        parts = urlsplit(u)
+    except ValueError:
+        parts = None
+    if (not parts or parts.scheme not in ("http", "https") or not parts.hostname
+            or len(u) > WEB_URL_MAX or any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in u)):
+        raise TVUnavailable(
+            "a VIZIO web page must be a plain http:// or https:// address with a host, such as the "
+            "bridge's own /tv/",
+            key="err_vizio_web_url_refused",
+        )
+    return {"VALUE": {"NAME_SPACE": WEB_NS, "APP_ID": aid, "MESSAGE": u}}
+
 
 def resolve_key(name):
     """Friendly name, or "codeset:code" -> (codeset, code). Power and home are handled before this."""
@@ -200,6 +241,12 @@ class VizioTV:
             raise SystemExit(f"tvs[{self.id}].device_id: 4 to 64 letters, digits and . _ - only")
         self.device_id = did or "couchtv-" + secrets.token_hex(6)
         self.app_id = None          # there is no couch-tv app on a VIZIO
+        wa = cfg.get("web_app")
+        self.web_app_id = str(wa).strip() if wa not in (None, "", False) else None
+        if self.web_app_id is not None and self.web_app_id not in WEB_APP_IDS:
+            raise SystemExit(f"tvs[{self.id}].web_app: only {', '.join(WEB_APP_IDS)} are allowed "
+                             "(APP_ID 1 is refused: it can brick the TV's UI). "
+                             "Use the id scripts/vizio-web.py --probe reports.")
         self.picture_cfg = {}
         self.keep_disabled_file = None
         self.adb_ok = False
@@ -588,11 +635,35 @@ class VizioTV:
         await self._call("PUT", PROTOCOL["current_input"], {"REQUEST": "MODIFY", "VALUE": hit["id"], "HASHVAL": hashval})
         return hit
 
-    # ---------- the home (not possible on a VIZIO) ----------
+    # ---------- the home (the bridge does not open it; a Beta webview path, run by the owner) ----------
+    async def launch_web(self, url, app_id=None):
+        """Experiment: load a web page in the TV's system webview (docs/VIZIO.md, "The home").
+
+        app_id is the web-app launcher id for this chipset (scripts/vizio-web.py --probe).
+        Only name space 4 and the ids in WEB_APP_IDS, checked in web_launch_body(), so APP_ID 1
+        (the main UI, where a URL persists to NVRAM and can brick it) can never be sent from here.
+        Nothing calls this by itself: only scripts/vizio-web.py, when the owner runs it.
+        """
+        self.require()
+        aid = app_id if app_id is not None else self.web_app_id
+        if aid is None:
+            raise TVUnavailable(
+                "no VIZIO web launcher id set: run scripts/vizio-web.py --probe, then add "
+                '"web_app": "<id>" to this TV in config.json',
+                key="err_vizio_no_web_app",
+            )
+        body = web_launch_body(aid, url)
+        await self._call("PUT", PROTOCOL["launch"], body, timeout=8)
+        self.visible = (WEB_NS, body["VALUE"]["APP_ID"])
+        return "web"
+
     async def open_home(self):
+        # The bridge never opens the home on a VIZIO by itself, with or without "web_app": the Beta
+        # webview path is run by the owner with scripts/vizio-web.py (docs/VIZIO.md, "The home").
         raise TVUnavailable(
-            "couch-tv's home cannot open on a VIZIO TV: VIZIO OS has no browser and takes no "
-            "outside apps. couch-tv is the phone remote here (docs/VIZIO.md, \"The home\")",
+            "couch-tv's home cannot open on a VIZIO TV by itself: VIZIO OS has no browser and takes no "
+            "outside apps. couch-tv is the phone remote here. A Beta loads it in the TV's own webview "
+            "with scripts/vizio-web.py (docs/VIZIO.md, \"The home\")",
             key="err_vizio_no_home",
         )
 

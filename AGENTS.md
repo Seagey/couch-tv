@@ -230,13 +230,17 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
 - **VIZIO (SmartCast or VIZIO OS):** offer the remote and do not promise the home. "There is a VIZIO version
   of couch-tv, in Beta, and it is the **phone remote only**: power, keys, volume, switching inputs, opening
   apps such as Netflix and YouTube, and the assistant on top of those, with a computer at home that stays
-  on. couch-tv's own home page **cannot open on a VIZIO**: VIZIO OS has no browser, takes no outside apps,
-  and its app programme is closed. The remote's Home button opens VIZIO's home. Apps open on their own page
+  on. couch-tv's own home page **does not open on a VIZIO by itself**: VIZIO OS has no browser, takes no
+  outside apps, and its app programme is closed. The remote's Home button opens VIZIO's home. Apps open on their own page
   and you pick the show; there is no 'what is playing' title, no typing from the phone and no screenshots.
   You type a PIN the TV shows once." If they choose the remote, follow [docs/VIZIO.md](docs/VIZIO.md): run
-  `scripts/vizio-check.py <tv address>` first (`--pair` shows a PIN on the TV). Do not set up the Cast
-  experiment in VIZIO.md for them unless they ask and already run the tools it needs, and never open a
-  router port. Testing guide: [docs/VIZIO-TESTING.md](docs/VIZIO-TESTING.md).
+  `scripts/vizio-check.py <tv address>` first (`--pair` shows a PIN on the TV). **Beta, only if they ask
+  for the home:** `scripts/vizio-web.py` loads couch-tv's home in the TV's own webview (docs/VIZIO.md, "The
+  home"). It has been tried on one set (a V4K65X-0810), it waits for the yes in step 3 like everything that
+  changes the TV, and it is run by hand: the bridge never opens it by itself. Use only the script, which
+  sends name space 4 with an allow listed id (3001 or 17). Never send a URL to `APP_ID` 1 by any route: it
+  persists to the TV's NVRAM and can leave the TV's menus dead until a factory reset. Never open a router
+  port. Testing guide: [docs/VIZIO-TESTING.md](docs/VIZIO-TESTING.md).
 - **Panasonic Viera (My Home Screen, or older Vieras with network control):** offer the Panasonic path in
   [docs/PANASONIC.md](docs/PANASONIC.md): "There is a Panasonic version of couch-tv, in Beta. There is
   nothing to install on the TV: a computer at home that stays on opens couch-tv's home in the TV's web

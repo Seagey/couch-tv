@@ -9,6 +9,10 @@ community Vizio_SmartCast_API notes), and tested against a pretend VIZIO on a co
 If you have a VIZIO, you would be the first: please run the first test below and
 [open an issue](https://github.com/Seagey/couch-tv/issues) with what it printed.
 
+**Update (14 Nov 2026):** a tester (lukionsp, #206) paired a real set, a V4K65X-0810 on VIZIO OS
+86.920.9.3, and loaded couch-tv's home in its webview with the Beta below. That is one set: other models and
+firmwares still want testing.
+
 Not technical? [VIZIO-TESTING.md](VIZIO-TESTING.md) is a step by step guide to the first test.
 
 ## What it is
@@ -27,7 +31,7 @@ the TV by itself (below, "The home"). With the bridge running on a computer that
 
 | | VIZIO |
 |---|---|
-| couch-tv's home on the TV | **No.** See "The home" |
+| couch-tv's home on the TV | **Beta, tried on one set (V4K65X-0810).** You load it in the TV's own webview with a script. See "The home" |
 | Phone remote: arrows, OK, Back, Menu, Home | Built (Home opens VIZIO's own home). The key codes come from one public source |
 | Power off, and on from standby | Built |
 | Power on from fully off | Only with Wake on LAN, and not in Eco mode |
@@ -43,34 +47,57 @@ the TV by itself (below, "The home"). With the bridge running on a computer that
 
 ## The home
 
-couch-tv's page cannot be opened on a VIZIO by the bridge, for free, today:
+**Beta: couch-tv's home can open on a VIZIO, in the TV's own webview.** This is new, tried on one set only
+(a V4K65X-0810 on VIZIO OS 86.920.9.3, thanks lukionsp, #206), and unofficial. It uses an undocumented part
+of the SmartCast API, so a firmware update could break it. It is off unless you run it: the bridge never
+opens the webview by itself, at start, at power on or from the phone. You run `scripts/vizio-web.py` when
+you want the home up.
 
-- **No browser.** VIZIO OS has no web browser to open the page in.
-- **No sideloading.** There is no developer mode that installs an outside app.
-- **VIZIO's app programme is a closed partner scheme.** An app on the TV's row means a business deal with
-  VIZIO, not a download.
-- **Chromecast built in only opens registered receivers.** A Cast receiver is a web page Google has
-  registered. Nobody has shown a VIZIO opening a receiver that is not a known one.
+How it works: VIZIO OS has a system "web-app launcher" name space. `PUT /app/launch` with `NAME_SPACE` 4
+and the right web-launcher `APP_ID` passes the `MESSAGE` field through as a URL that the TV's own webview
+loads, over plain `http` on your network. No browser install, no sideload, no HTTPS and no Cast receiver.
+The bridge already serves the home at `http://<bridge>:5400/tv/`, so the launcher just points the TV at it.
 
-So the bridge does not claim a home on a VIZIO. Asking it to open couch-tv's home gives a plain error
-that says so, and Home on the phone remote opens VIZIO's own home.
+Which `APP_ID`: this is chipset-specific. `3001` is the system modal webview on VIZIO OS (firmware 86 and
+similar). `17` is the web-app launcher on some older SmartCast sets. `scripts/vizio-web.py --probe` finds
+which one your set accepts, using a throwaway local page that reports back when the TV loads it.
 
-### One open experiment, for testers only
+Set it up:
 
-VIZIO SmartCast TVs have Chromecast built in. Two public Cast receivers can show a web page: Home
-Assistant's (`cast.show_lovelace_view`, which shows a Home Assistant dashboard, and a dashboard can hold a
-web page card) and the DashCast style receivers (which load any address). If you already run Home
-Assistant or a Cast tool, you could try showing couch-tv's home page (`/tv/` on the bridge) on the VIZIO
-that way and tell us what happened.
+1. Pair the TV first (below, "Set it up").
+2. Find your launcher id, with the TV on:
 
-- The page has to be reachable at an `https://` address. Cast receivers run over HTTPS, and a plain
-  `http://` page inside one is blocked. That means your own reverse proxy with a certificate. Never open
-  a router port for it.
-- couch-tv does not do this for you, and the bridge has no code for it. It is an experiment, not a
-  feature, and it may not work at all.
-- If it works, the phone remote still drives the TV through the bridge, not through the page.
+   ```sh
+   .venv/bin/python scripts/vizio-web.py <tv address> --probe
+   ```
 
-Please open an issue either way. A clear "it does not work" is a useful result.
+   Windows: `.venv\Scripts\python scripts\vizio-web.py <tv address> --probe`. Allow Python through the
+   firewall on private networks. A test page flashes on the TV and the script prints the id.
+3. Put the home up, with the bridge running:
+
+   ```sh
+   .venv/bin/python scripts/vizio-web.py <tv address> --app-id 3001 --url http://<bridge-ip>:5400/tv/
+   ```
+4. Optional: `"web_app": "3001"` on the TV in `config.json` records the id. The bridge checks it against
+   the same allow list at start (and refuses to start on any other value), and it still does not open the
+   home by itself.
+
+Press Home or Input on the VIZIO remote to leave the home. It stays up only while the bridge is running.
+
+**Safety.** Writing a URL into `APP_ID` 1 (the main system UI) saves to the TV's NVRAM and survives a
+reboot, which can leave the UI dead until a factory reset. So couch-tv only ever sends a web page with
+name space 4 and an id from a short allow list, `3001` or `17` (`WEB_APP_IDS` in `bridge/vizio.py`). The
+check sits inside the one function that builds the request, so the probe, `--url` and `web_app` all go
+through it, and anything else (`1`, `01`, a number, any other id) is refused before the TV is touched. The
+page must be a plain `http://` or `https://` address. The web-launcher name space loads fresh each time and
+does not persist. Never send a URL to `APP_ID` 1 with any other tool. If a tester finds another launcher id,
+it is added to the allow list in a pull request, never typed in on the command line.
+
+The probe's test page runs on this computer's own network address (port 8765, `--port-serve` changes it),
+answers only its two test addresses, and closes when the probe ends (two minutes at most).
+
+What is rough: the TV's webview is an old, slow browser engine, so the home lags, more so with moving
+backgrounds. Setting `home.scenes` in `config.json` to a single scene (one scene stays put) calms it down.
 
 ## Which VIZIO TVs
 
@@ -186,7 +213,8 @@ launch and inputs. These rest on one source or our own reading:
 
 ## Limits to know
 
-- couch-tv's home does not open on the TV. This is a phone remote.
+- couch-tv's home opens only in the TV's webview, through the Beta above, when you run the script, and
+  only while the bridge runs. The Home button on the VIZIO remote still goes to VIZIO's own home.
 - VIZIO's Home button and home row are VIZIO's.
 - Pairing needs the PIN on the TV once. If the TV is reset, or forgets the bridge, pair again.
 - Everything here rests on public notes about the SmartCast API, not on anything VIZIO publishes for

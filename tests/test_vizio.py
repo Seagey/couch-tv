@@ -397,6 +397,64 @@ class Apps(Base):
         self.assertIsNone(await self.tv.installed_packages())
 
 
+class WebHome(Base):
+    """The Beta webview path (#206): name space 4 and the allow listed ids only, never APP_ID 1."""
+    URL = "http://127.0.0.1:5400/tv/"
+
+    async def test_allowed_ids_send_name_space_4_and_the_url(self):
+        for aid in vizio.WEB_APP_IDS:
+            self.assertEqual(await self.tv.launch_web(self.URL, aid), "web")
+        sent = [b["VALUE"] for b in self.s.sent("/app/launch")]
+        self.assertEqual(sent, [{"NAME_SPACE": 4, "APP_ID": a, "MESSAGE": self.URL} for a in vizio.WEB_APP_IDS])
+
+    async def test_app_id_1_and_unknown_ids_send_nothing(self):
+        self.assertNotIn("1", vizio.WEB_APP_IDS)
+        for bad in ("1", 1, " 1 ", "01", "1.0", "0", "2", "3002", "", "17 ", "abc", None):
+            with self.assertRaises(TVUnavailable, msg=repr(bad)):
+                await self.tv.launch_web(self.URL, bad if bad is not None else "")
+        self.assertEqual(self.s.sent("/app/launch"), [])
+
+    async def test_only_name_space_4(self):
+        for aid in vizio.WEB_APP_IDS:
+            self.assertEqual(vizio.web_launch_body(aid, self.URL)["VALUE"]["NAME_SPACE"], 4)
+        self.assertEqual(vizio.WEB_NS, 4)
+
+    async def test_bad_urls_send_nothing(self):
+        for bad in ("javascript:alert(1)", "file:///etc/passwd", "data:text/html,x", "ftp://x/",
+                    "http://", "//host/tv/", "http://a b/", "http://x/\n", None, 5, "http://x/" + "a" * 3000):
+            with self.assertRaises(TVUnavailable, msg=repr(bad)):
+                await self.tv.launch_web(bad, "3001")
+        self.assertEqual(self.s.sent("/app/launch"), [])
+
+    async def test_no_id_set_sends_nothing(self):
+        with self.assertRaises(TVUnavailable):
+            await self.tv.launch_web(self.URL)
+        self.assertEqual(self.s.sent("/app/launch"), [])
+
+    async def test_config_web_app(self):
+        t = self.s.tv(web_app="3001")
+        t._keep(token=TOKEN)
+        try:
+            await t.launch_web(self.URL)
+            self.assertEqual(self.s.sent("/app/launch")[-1]["VALUE"]["APP_ID"], "3001")
+        finally:
+            await t.close()
+        for bad in ("1", 1, "01", "999"):
+            with self.assertRaises(SystemExit, msg=repr(bad)):
+                self.s.tv(web_app=bad)
+
+    async def test_off_by_default_and_never_automatic(self):
+        self.assertIsNone(self.tv.web_app_id)
+        t = self.s.tv(web_app="3001")
+        try:
+            with self.assertRaises(TVUnavailable):
+                await t.open_home()        # the bridge never opens the webview by itself
+            await t.poll()
+        finally:
+            await t.close()
+        self.assertEqual(self.s.sent("/app/launch"), [])
+
+
 class Inputs(Base):
     async def test_inputs_listed_with_the_owners_labels(self):
         got = await self.tv.read_sources()
