@@ -3946,9 +3946,16 @@
       info("code", t("about_code"), REPO_URL),
       info("run", t("about_running"), t(run)),
       info("kept", t("about_kept"), t(OFFLINE || data.bridge === false ? "kept_tv" : "kept_both")),
+      { kind: "action", key: "restart", label: t("about_restart"), sub: t("about_restart_sub"), act: restartHome },
       { kind: "action", key: "reset", label: t("about_reset"), sub: t("about_reset_sub"), danger: true, confirmText: t("confirm_reset"),
         act: resetSettings }
     ]);
+  }
+  // About, Restart home: the launcher starts a new page and looks for the bridge again, as a
+  // force-stop would. Anywhere else (a browser, the on-TV app, an older launcher) the page reloads.
+  function restartHome() {
+    try { if (TV && TV.restartHome) { TV.restartHome(); return; } } catch (e) {}
+    restart();
   }
   // ---- updates: couch-tv's own GitHub releases (the launcher's Updater.kt) ----
   // The launcher looks once a day while the home is on screen (switch below); "Check now" looks
