@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: app names checked before closing or switching off apps (on main, in the next release)
+
+The bridge now checks every app name before it closes apps when a TV turns off (`close_on_off` in `config.json`) and before its daily keep-disabled check switches apps off or back on. A name that is not a plain Android package name is skipped with a line in the log, and the rest still run, so a mistyped or tampered file can never send anything else to the TV. Nothing changes for a normal setup. Thanks ekagra-codes (#177).
+
 ### 14 November 2026: remove a card from Keep watching on the phone remote (on main, in the next release)
 
 Thanks poinch (#176). Each poster in Keep watching on the phone remote now has a small X. Tap it and that show leaves the row for that TV and that person, and a line says it was removed. It stays gone, including after the bridge restarts, until the show is played again, and then it comes back. Removing a card on the TV home does the same on the phone. The bridge keeps the list in `bridge/data/hidden.json` and the phone uses a new `POST /api/continue/hide`, which needs the pairing key like the other `/api` routes. The phone strings are in English, Italian and Polish.

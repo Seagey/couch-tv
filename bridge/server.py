@@ -31,7 +31,7 @@ import kids
 import messages
 import store
 import taste
-from tv import TV, TVUnavailable, intent_to_link
+from tv import TV, TVUnavailable, intent_to_link, check_package, UnsafeInput
 import samsung
 import lg
 import roku
@@ -3630,6 +3630,21 @@ NEVER_DISABLE = {"com.google.android.apps.tv.launcherx", "com.google.android.tvl
 stock_home_done = set()
 
 
+def _keep_disabled_lists(listed, tv_id=""):
+    """Split a keep-disabled file into (to switch off, to switch back on). Every name goes to the
+    TV's shell, so anything check_package refuses is logged and skipped (#177)."""
+    packages, to_enable = [], []
+    for p in listed if isinstance(listed, list) else []:
+        try:
+            p = check_package(p)
+        except UnsafeInput as e:
+            log.warning("%s: ignoring unsafe package in keep-disabled: %s", tv_id, e)
+            continue
+        # NEVER_DISABLE ones are only switched back on, and only when couch-tv's own file lists them
+        (to_enable if p in NEVER_DISABLE else packages).append(p)
+    return packages, to_enable
+
+
 async def keep_disabled_loop():
     """Daily, per TV: re-disable packages listed in that TV's keep-disabled file (the living
     room's is data/keep-disabled.json, written by apply.sh: ambient mode and any ad tracker). A
@@ -3642,8 +3657,7 @@ async def keep_disabled_loop():
         try:
             with open(path) as f:
                 listed = json.load(f)
-            packages = [p for p in listed if p not in NEVER_DISABLE]
-            to_enable = [p for p in listed if p in NEVER_DISABLE]   # only what couch-tv's own file says it switched off
+            packages, to_enable = _keep_disabled_lists(listed, tv.id)
         except (FileNotFoundError, IsADirectoryError, json.JSONDecodeError, TypeError):
             packages, to_enable = [], []
         if not packages and not to_enable:
@@ -3697,11 +3711,19 @@ def _close_on_off():
 async def _force_stop(t, packages):
     try:
         if not (t.paired and await t.adb_ready()):
-            log.info("%s: turned off, could not reach ADB to close %s", t.id, ", ".join(packages))
+            log.info("%s: turned off, could not reach ADB to close %s", t.id, ", ".join(str(p) for p in packages))
             return
+        closed = []
         for pkg in packages:
-            await t.adb("shell", "am", "force-stop", pkg)
-        log.info("%s: turned off, closed %s", t.id, ", ".join(packages))
+            try:
+                safe_pkg = check_package(pkg)
+            except UnsafeInput as e:
+                log.warning("%s: skipping unsafe package in close_on_off: %s", t.id, e)
+                continue
+            await t.adb("shell", "am", "force-stop", safe_pkg)
+            closed.append(safe_pkg)
+        if closed:
+            log.info("%s: turned off, closed %s", t.id, ", ".join(closed))
     except Exception as e:
         log.warning("%s: closing apps on turn off failed: %s", t.id, e)
 
