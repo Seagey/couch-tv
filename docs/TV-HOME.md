@@ -151,7 +151,7 @@ effects** (light rain, snow and fog over the scenes), off to start.
 
 - Night scenes or Classic.
 - Which scenes take turns, in what order, how many seconds each.
-- A 12 or 24 hour clock.
+- A 12 or 24 hour clock. Until you pick one, an Android TV home follows the TV's own setting (System, Date and time), then the language.
 - Glass panels and a video background: see [Glass and video](#glass-and-video).
 - Your own photos: see [Your own photos](#your-own-photos).
 

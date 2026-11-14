@@ -584,6 +584,10 @@ class MainActivity : Activity() {
             }
         }
 
+        /** The TV's own 12 or 24 hour setting (System, Date and time), so the clock follows it until Home settings picks one (#221). */
+        @JavascriptInterface
+        fun is24Hour(): Boolean = android.text.format.DateFormat.is24HourFormat(this@MainActivity)
+
         /** Is couch-tv the home? "held", "google_tv" (explain the Home button watch) or "ask" (HomeRole.kt, #98). */
         @JavascriptInterface
         fun homeState(): String = HomeRole.state(this@MainActivity)

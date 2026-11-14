@@ -459,8 +459,10 @@
   // Lighter home: ask for the 640 px size of a Keep watching picture, not the 1440 px one (a card is about 500 px wide)
   function slim(u) { return LIGHTER && typeof u === "string" ? u.replace("/s1440/", "/s640/") : u; }
   function glassSetting() { var g = ST.glass || HOME.glass; return g === "on" || g === "lite" ? g : "off"; }
-  // no clock in Home settings or config.json: the one usual for the language (24 hour in Italian, German, Turkish, French, Serbian, Polish and Brazilian Portuguese)
-  function clock24() { return (ST.clock || HOME.clock || (window.I18N ? window.I18N.clock() : "12h")) === "24h"; }
+  // no clock in Home settings or config.json: the TV's own setting, else the one usual for the language (24 hour in Italian, German, Turkish, French, Serbian, Polish and Brazilian Portuguese)
+  // On the Android home the TV's own 12 or 24 hour setting (System, Date and time) comes before the language's usual clock (#221)
+  function systemClock() { try { if (TV && typeof TV.is24Hour === "function") return TV.is24Hour() ? "24h" : "12h"; } catch (e) {} return ""; }
+  function clock24() { return (ST.clock || HOME.clock || systemClock() || (window.I18N ? window.I18N.clock() : "12h")) === "24h"; }
 
   // ---------------- helpers ----------------
   function esc(v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
@@ -2474,8 +2476,7 @@
       return '<div class="grow' + (i === smI ? " focus" : "") + '" role="menuitem"><span><b>' + esc(it.label) + "</b></span></div>";
     }).join("");
     pop.classList.add("on");
-    document.documentElement.classList.add("apping");
-    hintFlash = t("ctx_hint"); renderHint();
+    document.documentElement.classList.add("shelfmenu");
     var el = shelfEls[s], rem = innerWidth / 120;
     if (el) {
       var b = el.getBoundingClientRect(), w = pop.offsetWidth;
@@ -2485,8 +2486,7 @@
   }
   function closeShelfMenu() {
     $("app-pop").classList.remove("on");
-    document.documentElement.classList.remove("apping");
-    hintFlash = "";
+    document.documentElement.classList.remove("shelfmenu");
     if (zone === "shelfmenu") zone = "shelf";
   }
   function doShelfMenu() {
@@ -2534,7 +2534,7 @@
         zone = "shelf";
       }
       paintFocus();
-      flash(t("removed") || "Removed");
+      status(t("removed") || "Removed");
     };
 
     if (card) {
