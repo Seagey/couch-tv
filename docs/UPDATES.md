@@ -16,6 +16,9 @@ Thanks devmaliakbar (#221) and Hiren-Patel1 (#218). On an Android TV the home's 
 ### 14 November 2026: Restart home in Home settings, About (on main, in the next release)
 
 Home settings, About now has a **Restart home** row. It starts the home again from scratch, the way a force-stop in the TV's Settings, Apps and then Home would: a new WebView, the bridge looked for again, nothing kept from the old page's cache. Every setting stays. It is for seeing a change made on the computer without walking to the TV settings. With an app from before this row, or outside the TV home app, it reloads the page instead. Thanks janooh37-hue (#217).
+### 14 November 2026: two more real LGs, and `--apps tv` pairs by itself (on main, in the next release)
+
+Thanks Anshul7171 (#219) and adri07 (#220). An LG NANO80TNA (webOS 5.6.2) ran app only with no bridge, and an LG 28TQ515S smart monitor (webOS 7.6.0) ran the bridge in Docker on a Synology; both work, so LG is now at thirteen real TVs. `lg/build.py --apps tv` no longer stops when the TV has not accepted the remote: it asks for it itself, with no bridge, and says to move the highlight to Accept before pressing OK. `check-tv.py` no longer calls the LG path untested. [LG.md](LG.md) now says to keep the Developer Mode app open while `--getkey` runs, to prefer `--apps tv` over a saved list (the icon addresses go stale), that the dock follows couch-tv's own order, and that `prisoner` cannot read `/usr/palm/applications`. [DOCKER.md](DOCKER.md) has the Windows `scp -O` and `cmd /c` notes for a Synology.
 
 ### 14 November 2026: VIZIO, couch-tv's home in the TV's own webview, Beta (on main, in the next release)
 

@@ -21,7 +21,7 @@ It needs a computer at home that stays on (option B). Without one you can still 
 and open it from LG's app row, and the app asks once a week whether to extend Developer Mode, but
 nothing opens couch-tv for you when the TV comes on.
 
-## Test status: eleven real LGs so far
+## Test status: thirteen real LGs so far
 
 **First real LG, 2 November 2026** ([issue #8](https://github.com/Seagey/couch-tv/issues/8)): an
 LG UHD TV on webOS 5.6.2 (2020/2021 firmware), Developer Mode with the Homebrew Channel, the bridge
@@ -184,6 +184,24 @@ home drew in full, and app tiles opened from the TV remote. `check-tv.py` saw it
 5.6.2 and 6.5.3, `listLaunchPoints` from inside the app returned nothing, so build with `--apps`. The
 bridge has not been tried on webOS TV Lite yet.
 
+**Twelfth real LG, 14 November 2026** ([issue #219](https://github.com/Seagey/couch-tv/issues/219),
+reported by Anshul7171): an LG NANO80TNA on webOS 5.6.2, Developer Mode (not rooted), **app only, no
+bridge**, built on Windows 11 with `--apps` and the default Python packer. The `.ipk` built and
+installed first time; the Night look's scenes, clock and weather, opening apps from the dock, the Look
+and Extend quick buttons, a number key pinned to couch-tv with LG's Quick Access, and an input tile
+(`home.inputs` with `"port": 3` and an `image`) switching straight to HDMI 3 all worked. `--apps tv`
+read the app list from the TV. It found six things; the ones that were wrong are fixed or written up
+in steps 2, 3 and 6 below.
+
+**Thirteenth real LG, 14 November 2026** ([issue #220](https://github.com/Seagey/couch-tv/issues/220),
+reported by adri07): an LG 28TQ515S-PZ (2022 MyView smart monitor, 28", HD panel) on webOS 7.6.0
+(firmware 04.60.92), wired Ethernet, with the **bridge in Docker on a Synology NAS** through Container
+Manager (`examples/docker/compose.yaml`, `network_mode: host`) and `home.hi_res: false`,
+`home.lighter: true`. Everything worked, including the power on hook and the daily Developer Mode Extend
+from inside the container. Not checked yet on it: the phone remote driven by hand, turning it on from
+the phone (Wake-on-LAN) and Quick Access as a way back from live TV. Notes for Windows and Synology
+are in [DOCKER.md](DOCKER.md#synology-note).
+
 Everything else was built from LG's documentation and the open source libraries that talk to LG
 TVs, and tested against a stand-in TV on a computer. If you run it on another LG, thank you: please
 [open an issue](https://github.com/Seagey/couch-tv/issues) and say how it went (TV model and year,
@@ -261,6 +279,9 @@ ares-setup-device -a lounge -i "username=prisoner" -i "host=<tv address>" -i "po
 ares-novacom --device lounge --getkey        # asks for the passphrase from step 1
 ```
 
+Keep the **Developer Mode app open on the TV** with Key Server on while `--getkey` runs: leaving
+the app closes port 9991 and `--getkey` fails ([#219](https://github.com/Seagey/couch-tv/issues/219)).
+
 Use the same name as the TV's `id` in `config.json` (here `lounge`), or set `ares_device` there.
 Check it with `ares-launch --device lounge com.palmdts.devmode`: the Developer Mode app opens on
 the TV.
@@ -318,11 +339,17 @@ dock would be empty. Build with the list baked in instead
 ```
 
 `my-tv-apps.json` is a list of `{"id": "netflix", "title": "Netflix", "icon": ""}`: the apps on your
-TV (`ares-install --device lounge --list` gives the ids). If the TV has accepted the remote before
-(the bridge was run once with this TV and you pressed Accept), `--apps tv` reads the list from the TV
-itself over LG's network remote instead. The app seeds its dock from the list once per build, so a
-later reorder on the TV is kept, and the list goes stale when you install or remove an app: build
-again. The package also carries the app logos from `remote/src/app-logos`, because the icon
+TV (`ares-install --device lounge --list` gives the ids). `--apps tv` reads the list from the TV
+itself over LG's network remote instead, and it is the better choice: it lists the apps and fetches
+their icons in one run. On a TV that has not accepted the remote yet it asks for it itself (no bridge
+needed): see step 6. A list saved earlier goes stale, because the `<hash>` in the icon addresses the TV
+gives changes with every listing and the old addresses become a 404 soon after
+([#219](https://github.com/Seagey/couch-tv/issues/219)), so an app with no bundled logo shows a letter.
+The app seeds its dock from the list once per build, but the dock is **not in the file's order**: the
+app sorts it by its own order (YouTube, Netflix, Prime Video and the other well known apps first, then
+A to Z), and the rest sit under More apps. Hold OK on an app and choose Move to put it where you want;
+that is kept after a later reorder on the TV. The list goes stale when you install or remove an app:
+build again. The package also carries the app logos from `remote/src/app-logos`, because the icon
 addresses the TV gives are a 404 on several TVs; an app with no logo there shows its first letter.
 The app-only build also sets `handlesRelaunch` so reopening it does not flash black.
 
@@ -339,7 +366,10 @@ over `listLaunchPoints`, fetch each one's `largeIcon`, and save it as
 `remote/src/app-logos/<package>.png` before running `lg/build.py`. `lg/build.py --apps` now does
 this by itself: for each app in the list with no bundled logo, it downloads the icon address the TV
 gave, with certificate checks off, into the package (not into `remote/src/app-logos`). An icon it
-cannot fetch is listed when the build ends, and that tile shows its letter as before.
+cannot fetch is listed when the build ends, and that tile shows its letter as before. On a TV that is
+not rooted, Developer Mode's ssh user (`prisoner`) cannot read `/usr/palm/applications`, so an icon for
+an app that is not a launch point cannot be copied off the TV that way
+([#220](https://github.com/Seagey/couch-tv/issues/220)).
 
 ### 4. Install it
 
@@ -364,7 +394,9 @@ bridge.
 ### 6. Accept the remote (someone at the TV, once)
 
 When the bridge starts, the TV shows a prompt asking to accept a remote control connection. Press
-**Accept** (or Yes) within two minutes: the bridge waits that long, and if the press comes later no key is
+**Accept** (or Yes): **move the highlight to Accept first, then press OK**, because pressing OK the
+moment the prompt appears has given `403 User rejected pairing` on a real TV
+([#219](https://github.com/Seagey/couch-tv/issues/219)). Do it within two minutes: the bridge waits that long, and if the press comes later no key is
 saved even though the prompt is still on the TV. Restart the bridge and the TV shows a fresh prompt
 ([#136](https://github.com/Seagey/couch-tv/issues/136)). The TV gives the bridge a client key, kept in
 `bridge/data/lg-<id>-key.txt`, and never asks again. If nobody presses it, the bridge asks again at
