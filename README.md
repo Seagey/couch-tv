@@ -239,4 +239,8 @@ Everything else: [docs/](docs/README.md).
   the [killy10o10 fork](https://github.com/killy10o10/couch-tv); the unpaired TV guard from the
   [Justin1491 fork](https://github.com/Justin1491/couch-tv).
 
+## Shout me a coffee
+
+couch-tv is free. If it made your day a bit easier and you'd like to say thanks, you can [shout me a coffee](https://buy.stripe.com/3cIdR8deM30bexRaYl6Vq0s), any amount you like.
+
 <p align="center"><sub>MIT licence, see <a href="LICENSE">LICENSE</a>. Your settings, secrets and watch history stay on your own computer and TV: <a href="docs/HOW-IT-WORKS.md#privacy-and-safety">privacy and safety</a>.</sub></p>
