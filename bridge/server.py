@@ -2287,7 +2287,8 @@ async def h_weather(request):
 # ---------- custom cards (home.custom_cards, bridge/custom_cards.py) ----------
 async def h_custom_cards(request):
     """The household's own cards for the TV home: display only, cleaned and capped. Empty when off."""
-    return ok(cards=await custom_cards.get(config.CUSTOM_CARDS, log))
+    force = request.query.get("force") in ("1", "true")
+    return ok(cards=await custom_cards.get(config.CUSTOM_CARDS, log, force=force))
 
 
 # ---------- app order, arranged from the phone ----------

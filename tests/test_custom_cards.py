@@ -87,6 +87,14 @@ class SourceAndConfigTests(unittest.TestCase):
 
 
 class GetTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.loop = asyncio.new_event_loop()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.loop.close()
+
     def setUp(self):
         custom_cards._cache.update(at=0.0, cards=[])
         self.dir = tempfile.TemporaryDirectory()
@@ -100,11 +108,11 @@ class GetTests(unittest.TestCase):
         with open(self.path, "w") as f:
             f.write(text)
 
-    def get(self, now):
-        return asyncio.run(custom_cards.get(("file", self.path), now=now))
+    def get(self, now, force=False):
+        return self.loop.run_until_complete(custom_cards.get(("file", self.path), now=now, force=force))
 
     def test_reads_caches_and_keeps_last_good(self):
-        self.assertEqual(asyncio.run(custom_cards.get(None)), [])
+        self.assertEqual(self.loop.run_until_complete(custom_cards.get(None)), [])
         self.write(json.dumps({"cards": [{"title": "A"}]}))
         self.assertEqual(self.get(1000), [{"title": "A"}])
         self.write(json.dumps({"cards": [{"title": "B"}]}))
@@ -120,6 +128,49 @@ class GetTests(unittest.TestCase):
     def test_a_bad_file_from_the_start_shows_nothing(self):
         self.write("<html>oops</html>")
         self.assertEqual(self.get(1000), [])
+
+    def test_force_bypasses_cache(self):
+        self.write(json.dumps({"cards": [{"title": "Initial"}]}))
+        self.assertEqual(self.get(1000), [{"title": "Initial"}])
+        self.write(json.dumps({"cards": [{"title": "Updated"}]}))
+        self.assertEqual(self.get(1010), [{"title": "Initial"}])
+        forced = self.get(1010, force=True)
+        self.assertEqual(forced, [{"title": "Updated"}])
+
+
+class WebLinksOnSmartTvs(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.loop = asyncio.new_event_loop()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.loop.close()
+
+    def test_lg_browser_launch(self):
+        import lg
+        t = lg.LGTV({"id": "test", "name": "Test", "kind": "lg", "ip": "192.0.2.1"})
+        t.require = lambda: None
+        launched = []
+        async def fake_launch(lid, content_id=None, params=None, quiet=True):
+            launched.append((lid, params))
+        t._launch = fake_launch
+        res = self.loop.run_until_complete(t.start_intent("https://example.com/bins"))
+        self.assertEqual(res, "browser")
+        self.assertEqual(launched, [("com.webos.app.browser", {"target": "https://example.com/bins"})])
+
+    def test_samsung_browser_launch(self):
+        import samsung
+        t = samsung.SamsungTV({"id": "test", "name": "Test", "kind": "samsung", "ip": "192.0.2.1"})
+        t.require = lambda: None
+        launched = []
+        async def fake_launch(tid, meta=""):
+            launched.append((tid, meta))
+            return "rest"
+        t._launch_tizen = fake_launch
+        res = self.loop.run_until_complete(t.start_intent("https://example.com/bins"))
+        self.assertEqual(res, "browser")
+        self.assertEqual(launched, [("org.tizen.browser", "https://example.com/bins")])
 
 
 if __name__ == "__main__":

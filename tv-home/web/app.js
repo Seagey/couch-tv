@@ -2182,8 +2182,19 @@
   }
   function openCard(c) {
     if (!c || (!c.app && !c.url)) return;
-    if (c.app && TV && TV.launch(c.app)) return;
-    if (OFFLINE) { status(t("computer_off")); return; }
+    if (c.app && TV && TV.launch && TV.launch(c.app)) return;
+    if (c.url && TV && TV.openUrl) {
+      if (TV.openUrl(c.url)) return;
+      status(t("err_philips_no_browser") || "No browser installed");
+      return;
+    }
+    if (OFFLINE) {
+      if (c.url && window.open) {
+        try { window.open(c.url, "_blank"); return; } catch (_) {}
+      }
+      status(t("computer_off"));
+      return;
+    }
     api("POST", "/api/launch", { app: c.app || c.url }).catch(function (e) { status(tBridge(e.key, e.vars, e.message)); });
   }
   function setCards(list) {
@@ -2198,7 +2209,7 @@
       paintFocus();
     }
   }
-  function refreshCards() {
+  function refreshCards(force) {
     var src = HOME.custom_cards, CC = window.CustomCards;
     if (!src || !CC) return;
     // a link: the on-TV app (or a home with no computer) reads it itself, so it needs CORS
@@ -2209,7 +2220,8 @@
         .then(function (s) { setCards(s == null ? null : CC.parse(s)); }, function () {});
     };
     if (OFFLINE) { direct(); return; }
-    api("GET", "/api/custom-cards", null, 9000).then(function (j) { setCards(CC.clean(j.cards || [])); }, direct);
+    var q = force ? "?force=1" : "";
+    api("GET", "/api/custom-cards" + q, null, 9000).then(function (j) { setCards(CC.clean(j.cards || [])); }, direct);
   }
 
   // ---------------- apps ----------------
@@ -3274,6 +3286,7 @@
     if (SET.dirty) { SET.dirty = false; restart(); return; }
     paintFocus();
     resetIdlePhoto();
+    refreshCards(true);
   }
 
   // ---- rows ----
@@ -4746,7 +4759,7 @@
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
+    resume: function () { toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
     pause: function () { saveFocusNow(); pauseVideo(); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)

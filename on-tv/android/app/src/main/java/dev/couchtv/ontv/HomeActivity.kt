@@ -195,6 +195,13 @@ class HomeActivity : Activity() {
             main.post { runCatching { startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
             return true
         }
+        @JavascriptInterface fun openUrl(url: String): Boolean {
+            if (!url.startsWith("http://") && !url.startsWith("https://")) return false
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (packageManager.resolveActivity(intent, 0) == null) return false
+            main.post { runCatching { startActivity(intent) } }
+            return true
+        }
         @JavascriptInterface fun openSettings(): Boolean = runCatching { Tv.openSettings() }.isSuccess
         /** A Keep watching card from Android's Watch Next rows (#122): the page opens it here, as the TV home app does. */
         @JavascriptInterface fun openWatchNext(id: String): Boolean = runCatching { WatchNext.open(id) }.getOrDefault(false)

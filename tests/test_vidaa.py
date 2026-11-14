@@ -294,7 +294,8 @@ class Pairing(Base):
         self.assertTrue(self.tv.paired)
         self.assertEqual(self.tv.token, TOKEN)            # older firmware sends one: it is kept
         path = os.path.join(self.data, "vidaa-lounge.json")
-        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+        if os.name != "nt":
+            self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
         self.assertTrue(self.tv.vidaa_status()["token"])
         t = self.s.tv()                                   # the next start: same uuid, still paired
         self.assertTrue(t.paired)

@@ -89,7 +89,8 @@ class Pairing(Base):
     async def test_pairing_with_the_right_pin_keeps_a_private_file(self):
         await self.pair()
         self.assertTrue(self.tv.paired)
-        self.assertEqual(oct(os.stat(self.tv.store_file).st_mode & 0o777), "0o600")
+        if os.name != "nt":
+            self.assertEqual(oct(os.stat(self.tv.store_file).st_mode & 0o777), "0o600")
         self.assertEqual(len(self.s.paired), 1)
         self.assertEqual(await self.tv._read_attention(), A.AWAKE)
 
