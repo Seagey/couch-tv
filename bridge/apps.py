@@ -147,6 +147,15 @@ WEBOS_ONLY = {
     "io.strem.tv": "Stremio",
     "amazon.alexa.view": "Amazon Alexa",
     "com.cobalt.youtube.adfree": "YouTube Cobalt AdFree",
+    # Seen on an LG QNED88T6A and an LG NANO83A6A in India, webOS 10.3 and webOS 26 (#89).
+    "com.hoichoi.tv": "Hoichoi",
+    "com.mxplayer.lg": "MX Player TV",
+    "com.wavesott.app": "Waves OTT",
+    "com.geforcenow.play": "GeForce NOW",
+    "com.microsoft.xbox": "Xbox",
+    "com.dailymotion.dailymotion": "Dailymotion",
+    "com.apple.applemusic": "Apple Music",
+    "epoxyaisports": "LG Sports Playbook",
 }
 
 # Roku channel ids, for a TV with "kind": "roku" (bridge/roku.py, docs/ROKU.md). Built from Roku's

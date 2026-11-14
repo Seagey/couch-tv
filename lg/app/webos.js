@@ -162,7 +162,20 @@
     keep: function (k, v) { try { localStorage.setItem("tvos." + k, v); } catch (e) {} },
     // the input button goes through the bridge; a web app cannot open LG's input list
     canOpenInputs: function () { return false; },
-    openInputs: function () { return false; }
+    openInputs: function () { return false; },
+    // a pinned input tile (home.inputs): switch straight to it. LG opens each input as an app,
+    // com.webos.app.hdmi<N>; "HDMI_<N>" (a tile with only a port) maps to the same.
+    openInput: function (id) {
+      var m = /^HDMI_(\d+)$/i.exec(id || "");
+      var lg = m ? "com.webos.app.hdmi" + m[1] : /^com\.webos\.app\.(hdmi\d+|externalinput\..+)$/.test(id || "") ? id : null;
+      if (!lg) return false;
+      luna("luna://com.webos.applicationManager/launch", { id: lg }, function (r) {
+        if (r && r.returnValue) { send("log", "input " + lg); return; }
+        send("log", "input " + lg + ": " + (r ? r.errorText || r.errorCode : "no answer") + ", asking the bridge");
+        bridgeLaunch(lg);
+      });
+      return true;
+    }
   };
 
   // ---------- the remote ----------

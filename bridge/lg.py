@@ -51,6 +51,7 @@ from tv import TVUnavailable
 COUCH_APP = "app.couchtv.home"
 HOME_PACKAGE = "app.couchtv.launcher"
 DEVMODE_APP = "com.palmdts.devmode"
+FG_SUB = "fg-sub"   # the id of the subscription to the app in front
 # How often the Developer Mode countdown is read from LG (it needs the TV on).
 LEFT_EVERY_HOURS = 6
 
@@ -189,6 +190,7 @@ class LGTV:
         self._ws = None             # the SSAP websocket, once the TV has accepted the remote
         self._url = None
         self._pending = {}
+        self._fg_changed = asyncio.Event()   # set by the TV's message when the app in front changes
         self._n = 0
         self._connect_lock = asyncio.Lock()
         self._pointer_ws = None
@@ -361,6 +363,13 @@ class LGTV:
                 raise
             self._ws = ws
             asyncio.create_task(self._read(ws))
+            try:
+                # the TV then says straight away when the app in front changes (Back out of an
+                # app, the TV coming on), instead of the watcher finding out on its next look
+                await ws.send_json({"id": FG_SUB, "type": "subscribe",
+                                    "uri": "ssap://com.webos.applicationManager/getForegroundAppInfo"})
+            except Exception:
+                pass
             return ws
 
     async def _handshake(self, ws, pairing_wait):
@@ -428,6 +437,9 @@ class LGTV:
                 try:
                     j = json.loads(msg.data)
                 except ValueError:
+                    continue
+                if j.get("id") == FG_SUB:
+                    self._fg_changed.set()
                     continue
                 fut = self._pending.get(j.get("id"))
                 if fut and not fut.done():
@@ -567,6 +579,7 @@ class LGTV:
                 if self.connected and self.registered:
                     await self._read_power()
                     prev = self.visible
+                    self._fg_changed.clear()   # what this read sees needs no second look
                     self.visible = await self._read_visible()
                     if self.visible != prev and prev is not None and self.visible is not None:
                         self.log.info("screen: %s -> %s", prev or "nothing", self.visible or "nothing")
@@ -609,11 +622,36 @@ class LGTV:
             except Exception as e:
                 self.log.warning("watch: %s %s", type(e).__name__, e)
             ticks += 1
-            await asyncio.sleep(2)
+            if (self.back_to_couch and self.registered and self.visible
+                    and self.visible not in (self.app_id, DEVMODE_APP) and not NOTHING.match(self.visible)):
+                await self._wait_app_change(2.0, look_every=0.25)
+            elif self.registered:
+                await self._wait_app_change(2.0 if self.is_on else 1.0)
+            else:
+                await asyncio.sleep(2)
+
+    async def _wait_app_change(self, total, look_every=None):
+        """Wait up to `total` seconds, returning as soon as the TV says the app in front changed
+        (its subscription message), so the main loop handles it at once. look_every: also ask the
+        TV that often, in case a firmware does not send the message."""
+        end = time.monotonic() + total
+        while True:
+            left = end - time.monotonic()
+            if left <= 0:
+                return
+            try:
+                await asyncio.wait_for(self._fg_changed.wait(), min(left, look_every or left))
+                return
+            except asyncio.TimeoutError:
+                pass
+            if look_every:
+                now = await self._read_visible()
+                if now is not None and now != self.visible:
+                    return
 
     async def _back_to_couch(self, came_from):
         """An app closed to LG's home: put couch-tv back, unless something else came up."""
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.15)
         if not LG_HOME.match(await self._read_visible() or ""):
             return
         try:
@@ -639,7 +677,7 @@ class LGTV:
         elif time.monotonic() < self.quiet_until:
             self._note("TV came on, left alone (a command is running)")
             return
-        await asyncio.sleep(1.5)   # let the TV settle on whatever it opens by itself
+        await asyncio.sleep(0.8)   # let the TV settle on whatever it opens by itself
         front = await self._read_visible()
         if front and front == self.app_id:
             self._note("TV came on, couch-tv already open")
@@ -842,7 +880,9 @@ class LGTV:
     def devmode_warning_parts(self):
         """(level, key, vars) when couch-tv is at risk, else None. level is "alert" or "warn"."""
         ids = {p.get("id") for p in self.launch_points}
-        if self.launch_points and self.app_id not in ids:
+        # couch-tv on screen is installed, whatever an app list read before it went on says
+        # (the list is read every 30 minutes, so a fresh install would otherwise warn until then)
+        if self.launch_points and self.app_id not in ids and self.visible != self.app_id:
             return ("alert", "devmode_gone", {})
         if not self.extend_devmode:
             return None
