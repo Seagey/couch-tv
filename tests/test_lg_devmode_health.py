@@ -39,6 +39,12 @@ class Warning(unittest.TestCase):
         t = make_tv(installed=False)
         self.assertEqual(t.devmode_warning()[0], "alert")
 
+    def test_couch_tv_on_screen_is_installed(self):
+        # an app list read before couch-tv went on must not say it is gone while it is on screen
+        t = make_tv(installed=False)
+        t.visible = t.app_id
+        self.assertIsNone(t.devmode_warning())
+
     def test_under_a_week_is_an_alert(self):
         t = make_tv(left={"hours": 100.0, "hours_at": iso(0), "at": iso(0)})
         level, text = t.devmode_warning()
