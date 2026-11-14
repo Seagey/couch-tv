@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: remove a card from Keep watching on the phone remote (on main, in the next release)
+
+Thanks poinch (#176). Each poster in Keep watching on the phone remote now has a small X. Tap it and that show leaves the row for that TV and that person, and a line says it was removed. It stays gone, including after the bridge restarts, until the show is played again, and then it comes back. Removing a card on the TV home does the same on the phone. The bridge keeps the list in `bridge/data/hidden.json` and the phone uses a new `POST /api/continue/hide`, which needs the pairing key like the other `/api` routes. The phone strings are in English, Italian and Polish.
+
 ### 14 November 2026: your own cards on the home, without changing couch-tv (on main, in the next release)
 
 The home can now show your own cards at the end of the Keep watching row: the solar output today, bin night, a message for the family. Point `home.custom_cards` in `config.json` at a small JSON file, either a file on the bridge computer or an `http` or `https` link (a raw GitHub file, a Raspberry Pi on your Wi-Fi), and whatever you like writes that file. couch-tv only shows the cards: a title, a value, a subtitle and a picture, and OK opens an installed app or a link. Nothing in the file is ever run, at most 8 cards show, and a bad file keeps the last good cards. It is read every 10 minutes and is off unless you set it ([TV-HOME.md](TV-HOME.md#custom-cards)). Thanks geissmannz on Instagram for the idea.

@@ -28,17 +28,24 @@ function episode(s) {
   return [s.season && `S${s.season}`, s.episode && `E${s.episode}`].filter(Boolean).join(' · ');
 }
 
-function Poster({ show, sub, onPlay, dim }) {
-  return (
+function Poster({ show, sub, onPlay, onRemove, dim }) {
+  const poster = (
     <button className={`poster ${dim ? 'dim' : ''}`} onClick={() => { tick(); onPlay(show); }}>
       <div className="poster-art">{show.poster ? <img src={show.poster} alt="" loading="lazy" /> : <span>{show.title}</span>}</div>
       <b>{show.title}</b>
       <small>{sub}</small>
     </button>
   );
+  if (!onRemove) return poster;
+  return (
+    <div className="poster-wrap">
+      {poster}
+      <button className="poster-remove" aria-label={t('kw_remove', { title: show.title })} onClick={() => { tick(); onRemove(show); }}><Ic.Close size={14} /></button>
+    </div>
+  );
 }
 
-export function Watch({ pull, people, who, recs, cont: contIn, apps, hidden, screens, serviceName, onPlay, onLaunch, onScreen, wide }) {
+export function Watch({ pull, people, who, recs, cont: contIn, apps, hidden, screens, serviceName, onPlay, onRemove, onLaunch, onScreen, wide }) {
   const cont = contIn || [];
   const picks = (recs?.picks || []).filter((s) => s.playable !== false);
   const ready = (screens || []).filter((s) => s.ready);
@@ -52,7 +59,7 @@ export function Watch({ pull, people, who, recs, cont: contIn, apps, hidden, scr
         <h3>{t('keep_watching')}{who !== 'both' ? <span className="h3-who"> · {(people || []).find((p) => p.id === who)?.name || ''}</span> : null}</h3>
         {cont.length ? (
           <div className="shelf">
-            {cont.map((s) => <Poster key={s.id || `${s.title}-${s.service}`} show={s} onPlay={onPlay}
+            {cont.map((s) => <Poster key={s.id || `${s.title}-${s.service}`} show={s} onPlay={onPlay} onRemove={s.id ? onRemove : null}
               sub={[episode(s) || s.episode_title, s.app?.name || serviceName(s.service)].filter(Boolean).join(' · ')} />)}
           </div>
         ) : <p className="empty">{contIn === false ? t('couldnt_load') : contIn ? t('shows_wait') : t('loading')}</p>}
