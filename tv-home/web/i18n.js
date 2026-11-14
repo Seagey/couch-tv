@@ -38,6 +38,7 @@
 
     // ---- the home ----
     keep_watching: "Keep watching",
+    custom_cards: "Your cards",   // the row heading when it holds only the household's own cards (home.custom_cards)
     who_watching: "Who is watching",
     apps: "Apps",
     more_apps: "More apps",
@@ -4168,6 +4169,7 @@
 
     // ---- the home ----
     keep_watching: "Kontynuuj oglądanie",
+    custom_cards: "Twoje karty",
     who_watching: "Kto ogląda",
     apps: "Aplikacje",
     more_apps: "Więcej aplikacji",

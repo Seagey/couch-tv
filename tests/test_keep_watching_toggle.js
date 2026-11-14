@@ -17,7 +17,7 @@ assert(/if \(!KW_ON\) return null;[^\n]*\n\s*return Promise\.all\(PEOPLE\.map/.t
 assert(appJs.includes('KW_ON ? sendWatchNext() : Promise.resolve()'), 'Watch Next report is skipped when off');
 // off hides the section and leaves no shelf cards to focus
 assert(/data\.shows = KW_ON \?/.test(appJs), 'no shows when off');
-assert(/if \(!KW_ON\) \{ track\.innerHTML = ""; shelfEls = \[\]; return; \}/.test(appJs), 'no focusable cards when off');
+assert(/if \(!KW_ON\) \{ track\.innerHTML = ""; shelfEls = \[\]; addCards\(track\); return; \}/.test(appJs), 'no show cards when off (only custom cards, if set)');
 assert(css.includes('html.kw-off #shelf-title'), 'css hides the heading when off');
 
 // all 13 languages have the string

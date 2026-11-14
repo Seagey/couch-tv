@@ -52,6 +52,7 @@ Other TVs: [Will it work on my TV?](#will-it-work-on-my-tv)
 
 The newest release is **0.12** (9 November 2026), on [the Releases page](https://github.com/Seagey/couch-tv/releases). These are on main, in the next release:
 
+- **14 November:** your own cards on the home from a small JSON file, display only, thanks geissmannz on Instagram for the idea ([custom cards](docs/UPDATES.md#14-november-2026-your-own-cards-on-the-home-without-changing-couch-tv-on-main-in-the-next-release))
 - **14 November:** the bridge's messages in Polish, and the assistant answers in the home's language, thanks Azumi0 ([#196](docs/UPDATES.md#14-november-2026-polish-bridge-messages-and-the-assistant-answers-in-polish-on-main-in-the-next-release))
 - **14 November:** a TV settings quick button, and Settings opens on its own screen, thanks syedhabibtirmizi ([#190](docs/UPDATES.md#14-november-2026-a-tv-settings-quick-button-and-settings-opens-on-its-own-screen-on-main-in-the-next-release))
 - **14 November:** the TV home installs over paired Wireless debugging, tested on an Epson LS300, thanks mazzanfar ([#194](docs/UPDATES.md#14-november-2026-tv-home-over-paired-wireless-debugging-tested-on-an-epson-ls300-on-main-in-the-next-release))

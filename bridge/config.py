@@ -12,6 +12,8 @@ import re
 import shutil
 import tempfile
 
+import custom_cards
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
@@ -377,6 +379,12 @@ def _home(h):
             "volume": 0.5,
             "fade_with_sleep": True,
         }
+    # custom cards (geissmannz on Instagram): a JSON file on this computer or an http(s) link. The TV
+    # sees the link (so the on-TV app, with no bridge, can read it too) or just true for a file,
+    # never the file's path. Off unless set.
+    src = custom_cards.source(h.get("custom_cards"), os.path.dirname(os.path.abspath(CONFIG_FILE)))
+    if src:
+        out["custom_cards"] = src[1] if src[0] == "url" else True
     out["watch_next_per_app"] = _int(h.get("watch_next_per_app"), 5, 1, 20)
     out["smart_idle"] = _smart_idle(h.get("smart_idle"))
     if "inputs" in h:
@@ -415,6 +423,10 @@ def _inputs(raw_list):
 
 
 HOME = _home(CONFIG.get("home"))
+
+# the source of the custom cards (home.custom_cards), kept here: the TV only sees HOME["custom_cards"]
+CUSTOM_CARDS = custom_cards.source((CONFIG.get("home") or {}).get("custom_cards") if isinstance(CONFIG.get("home"), dict) else None,
+                                   os.path.dirname(os.path.abspath(CONFIG_FILE)))
 
 # ---------- quick settings (per TV) and picture modes ----------
 QUICK_IDS = ["sleep", "picture", "look", "soundscape", "screen_off", "input", "screensaver", "headphones", "tvsettings", "extend"]

@@ -491,6 +491,16 @@ are `POST /api/key` with `previous`, `play_pause` and `next`.
  "art": "https://is1-ssl.mzstatic.com/.../600x600bb.jpg", "position": 42.5, "duration": 215.0}}
 ```
 
+### `GET /api/custom-cards`
+The household's own cards (`home.custom_cards`, docs/TV-HOME.md "Custom cards"), read from the file
+or link, cleaned and capped: at most 8, `title` (40 characters), optional `subtitle` (60), `value`
+(24), `image` (http or https) and either `app` (a package name) or `url` (http or https). The bridge
+reads the source at most once a minute and keeps the last good cards when it cannot. `[]` when the
+key is not set.
+```json
+{"ok": true, "cards": [{"title": "Solar today", "value": "18.4 kWh", "app": "com.example.solar"}]}
+```
+
 ### `GET /api/continue`
 "Keep watching" for one TV (`?tv=`) and one person (`?who=`, else the person on that TV's couch):
 one card per show (its latest episode), newest first, at most 10, nothing older than 30 days.
@@ -836,6 +846,8 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- 2026-11-14: Custom cards (New): `GET /api/custom-cards`, and `home.custom_cards` in `/api/config` and
+  `/tv/config.js` (the link, or `true` for a file on the bridge computer).
 - 2026-11-14: Message keys (`error_key`, `note_key`, `reply_key`, `reason_key` and their `_vars`) beside the
   unchanged English text; `still: true` on a soft timeout of `POST /api/ask`; Ask and Claude's picks answer in the
   home's language (#196).

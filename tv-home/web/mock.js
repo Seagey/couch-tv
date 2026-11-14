@@ -36,6 +36,7 @@
 //   kids=1              kids mode: Ruby, a kids profile on the couch, with a shelf of sample shows (all
 //                       animated, so no real faces) and two allowed apps. The parent PIN is 1234.
 //                       kids=empty: the same profile with nothing on the shelf yet
+//   cards=1             custom cards (home.custom_cards): three sample cards at the end of the row
 //   update=1            Home settings, Updates, with a pretend 0.4 waiting (update=latest: none
 //                       newer; update=allow: the TV has not let Home install apps yet;
 //                       update=ask: nobody has answered "tell you about new versions?" yet)
@@ -116,6 +117,9 @@
       { id: "ruby", name: "Ruby", colour: "#ff9f0a", kid: true, kids_mode: { shows: shelf, apps: KIDS.apps,
         pin_hash: KIDS.pin_hash, pin_salt: KIDS.pin_salt, pin_rounds: KIDS.pin_rounds } }]);
   }
+  // ?cards=1: home.custom_cards with three sample cards (docs/TV-HOME.md, Custom cards); the third has a
+  // javascript: link and a script in its title, which must show as plain text and open nothing
+  if (arg("cards")) cfg.home.custom_cards = true;
   window.COUCH_CONFIG = cfg;
 
   // ---------- the launcher's updater (Updater.kt), for ?update= ----------
@@ -246,6 +250,10 @@
         if (down) return reject(new Error("The computer isn't answering."));
         // Now playing (#31): ?music=1, a song that previous and next step through, play and pause toggle
         if (path.indexOf("/api/music") === 0) return resolve({ ok: true, music: arg("music") ? mockSong() : null });
+        if (path.indexOf("/api/custom-cards") === 0) return resolve({ ok: true, cards: arg("cards") ? [
+          { title: "Solar today", subtitle: "Roof panels", value: "18.4 kWh", app: "com.google.android.youtube.tv" },
+          { title: "Bin night", subtitle: "Put out by 7 pm", value: "Recycling", url: "https://example.com/bins" },
+          { title: "<b>not bold</b><script>alert(1)</script>", value: "Plain text", url: "javascript:alert(1)" }] : [] });
         if (path.indexOf("/api/key") === 0) {
           var k = body && body.key;
           if (k === "play_pause") songPlaying = !songPlaying;

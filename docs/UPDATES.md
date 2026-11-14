@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: your own cards on the home, without changing couch-tv (on main, in the next release)
+
+The home can now show your own cards at the end of the Keep watching row: the solar output today, bin night, a message for the family. Point `home.custom_cards` in `config.json` at a small JSON file, either a file on the bridge computer or an `http` or `https` link (a raw GitHub file, a Raspberry Pi on your Wi-Fi), and whatever you like writes that file. couch-tv only shows the cards: a title, a value, a subtitle and a picture, and OK opens an installed app or a link. Nothing in the file is ever run, at most 8 cards show, and a bad file keeps the last good cards. It is read every 10 minutes and is off unless you set it ([TV-HOME.md](TV-HOME.md#custom-cards)). Thanks geissmannz on Instagram for the idea.
+
 ### 14 November 2026: Polish bridge messages, and the assistant answers in Polish (on main, in the next release)
 
 With the home set to Polish, the bridge's own messages (an app that will not open, a TV that is not answering, what an input switch did) now show in Polish on the phone remote and the TV home, and the Claude assistant answers in Polish, quick reply buttons and the reasons on its picks included. The assistant follows the TV home's language in every language: Home settings on that TV first, then `home.language` in `config.json`, then English. The bridge still sends every message in English exactly as before, with a key beside it, so the other languages show the English text until someone translates the new keys. Thanks Azumi0 (#196). The on-TV app follows in part 3.

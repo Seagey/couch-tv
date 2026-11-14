@@ -24,6 +24,7 @@ from aiohttp import web
 
 import apps
 import config
+import custom_cards
 import finder
 import history_import
 import kids
@@ -2283,6 +2284,12 @@ async def h_weather(request):
     return ok(**w)
 
 
+# ---------- custom cards (home.custom_cards, bridge/custom_cards.py) ----------
+async def h_custom_cards(request):
+    """The household's own cards for the TV home: display only, cleaned and capped. Empty when off."""
+    return ok(cards=await custom_cards.get(config.CUSTOM_CARDS, log))
+
+
 # ---------- app order, arranged from the phone ----------
 # The TV home reports the apps it has (home-apps.<tv>.json, in its default order); the phone saves
 # the order and where the "More apps" line sits (app-order.<tv>.json). Apps above the line show in
@@ -3775,6 +3782,7 @@ def make_app():
     r.add_post("/api/kids", h_kids_set)
     r.add_post("/api/who", h_who_set)
     r.add_get("/api/weather", h_weather)
+    r.add_get("/api/custom-cards", h_custom_cards)
     r.add_get("/api/config", h_config)
     r.add_post("/api/home-apps", h_home_apps)
     r.add_get("/api/app-order", h_app_order_get)
