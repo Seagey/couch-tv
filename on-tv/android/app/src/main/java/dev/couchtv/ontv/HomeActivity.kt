@@ -289,6 +289,9 @@ class HomeActivity : Activity() {
     companion object {
         @Volatile private var shown: java.lang.ref.WeakReference<HomeActivity>? = null
 
+        /** True while the home is resumed (in front). FireHome checks this after a move to front on Android 10 (issue #202). */
+        fun isInFront(): Boolean = shown?.get()?.front == true
+
         /**
          * Shows settings saved by a phone or a setup tool straight away (#96). The home page reads
          * them again only in tv.resume(), when it comes back on screen, so after a save from

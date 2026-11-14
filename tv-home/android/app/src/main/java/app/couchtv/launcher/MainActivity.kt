@@ -1620,6 +1620,9 @@ class MainActivity : Activity() {
     companion object {
         @Volatile private var shown: java.lang.ref.WeakReference<MainActivity>? = null
 
+        /** True while the home is resumed (in front). FireWatch checks this after a move to front on Android 10 (issue #202). */
+        fun isInFront(): Boolean = shown?.get()?.resumed == true
+
         /** What onNewIntent does for a Home press, for when FireWatch brought the home back without a new intent. */
         fun backToFirstTile() {
             val a = shown?.get() ?: return

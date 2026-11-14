@@ -133,7 +133,21 @@ class FireWatch : AccessibilityService() {
         last = System.currentTimeMillis()
         // Android 9 and older hold activity starts for 5 s after a Home press on every TV, not only
         // Fire TV (seen on a Xiaomi MiTV-AXSO2: a second press in that time left the Google home up).
-        if ((amazonInFront || Build.VERSION.SDK_INT < 29) && moveToFront()) return
+        if ((amazonInFront || Build.VERSION.SDK_INT <= 29) && moveToFront()) {
+            // Android 10 only (issue #202): the move can be refused quietly by background start limits,
+            // so look again shortly and fall back to the normal start if the home is still not in front.
+            if (Build.VERSION.SDK_INT == 29) handler.postDelayed({
+                if (!MainActivity.isInFront()) {
+                    Log.i("couchtv.firewatch", "the move to front did not show the home: starting it")
+                    startHome()
+                }
+            }, FRONT_CHECK_MS)
+            return
+        }
+        startHome()
+    }
+
+    private fun startHome() {
         runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
@@ -143,10 +157,15 @@ class FireWatch : AccessibilityService() {
      * Amazon's home stayed up for 5 s, and another press in that time buried the held start under
      * Amazon's home for good. Moving couch-tv's own task to the front is not an activity start and was
      * not held there. False (a normal start, as before) before the home has ever opened and on
-     * Android 10 and newer (background start limits).
+     * Android 11 and newer (background start limits).
+     *
+     * Android 10 (SDK 29) is included since issue #202: a Hisense Android TV 10 still held the start
+     * for about 5 s after a Home press (option A) and the on-TV app never came back. There Android may
+     * quietly refuse the move, so [bringBack] checks [FRONT_CHECK_MS] later that the home is in front
+     * and starts it normally if not. Android 11 and newer are unchanged.
      */
     private fun moveToFront(): Boolean {
-        if (Build.VERSION.SDK_INT >= 29) return false
+        if (Build.VERSION.SDK_INT >= 30) return false
         val task = runCatching {
             getSystemService(android.app.ActivityManager::class.java).appTasks.firstOrNull {
                 it.taskInfo.topActivity?.className == MainActivity::class.java.name
@@ -169,6 +188,7 @@ class FireWatch : AccessibilityService() {
     companion object {
         /** Set while Android has this service bound. */
         @Volatile var connected = false
+        private const val FRONT_CHECK_MS = 800L   // Android 10: how long to wait before checking the move worked
         private const val DEBOUNCE_MS = 1200L   // one jump per press, not one per event
         private const val BOOT_WINDOW_MS = 2 * 60_000L
 

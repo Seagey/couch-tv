@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: Home button on Android 10 TVs comes back faster (on main, in the next release)
+
+On a Hisense Android TV 10, the TV's own home stayed up for about 5 seconds after a Home press before couch-tv came back (option A), and the on-TV app did not come back at all. Android 10 still holds new app starts for that long after Home. Both apps now try moving couch-tv's task to the front first on Android 10 (the way they already did on Android 9), check under a second later that couch-tv really is in front, and fall back to the normal start if Android refused the move. Android 11 and newer behave exactly as before. Thanks vladyslav-makar (#202) for the very detailed report.
+
 ### 14 November 2026: app names checked before closing or switching off apps (on main, in the next release)
 
 The bridge now checks every app name before it closes apps when a TV turns off (`close_on_off` in `config.json`) and before its daily keep-disabled check switches apps off or back on. A name that is not a plain Android package name is skipped with a line in the log, and the rest still run, so a mistyped or tampered file can never send anything else to the TV. Nothing changes for a normal setup. Thanks ekagra-codes (#177).

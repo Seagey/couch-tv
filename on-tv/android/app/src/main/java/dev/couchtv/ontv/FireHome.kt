@@ -254,6 +254,7 @@ object FireHome {
         bringForward()
     }
     private const val JUMP_GAP_MS = 1200L
+    private const val FRONT_CHECK_MS = 800L   // Android 10: how long to wait before checking the move worked
     private val recheck = android.os.Handler(android.os.Looper.getMainLooper())
     private val again = Runnable { if (amazonHomeInFront) { Log.i(TAG, "Amazon's home still in front after the gap"); jump() } }
 
@@ -263,10 +264,15 @@ object FireHome {
      * for 5 s, and another press in that time buried the held start under Amazon's home for good.
      * Moving this app's own task to the front is not an activity start and was not held there. Only
      * when the home is the top of that task (setup shares it). Before the home has ever opened, on
-     * Android 10 and newer (background start limits) and on other TVs: a normal start, as before.
+     * Android 11 and newer (background start limits) and on other TVs below Android 10: a normal start, as before.
+     *
+     * Android 10 (SDK 29), any TV, since issue #202: a Hisense Android TV 10 held the start for about 5 s
+     * after a Home press and the home never came back. Android may quietly refuse the move there, so
+     * [FRONT_CHECK_MS] later we check the home is in front and start it normally if not.
      */
     private fun bringForward() {
-        if (android.os.Build.VERSION.SDK_INT >= 29 || !isFireTv) { App.openHome(); return }
+        val sdk = android.os.Build.VERSION.SDK_INT
+        if (sdk >= 30 || (sdk < 29 && !isFireTv)) { App.openHome(); return }
         val task = runCatching {
             App.instance.getSystemService(android.app.ActivityManager::class.java).appTasks.firstOrNull {
                 it.taskInfo.topActivity?.className == HomeActivity::class.java.name
@@ -275,6 +281,12 @@ object FireHome {
         if (task != null && runCatching { task.moveToFront() }.isSuccess) {
             Log.i(TAG, "Amazon's home came forward: moved the home's task to the front")
             HomeActivity.home()
+            if (sdk == 29) recheck.postDelayed({
+                if (!HomeActivity.isInFront()) {
+                    Log.i(TAG, "the move to front did not show the home: starting it")
+                    App.openHome()
+                }
+            }, FRONT_CHECK_MS)
         } else {
             Log.i(TAG, "Amazon's home came forward: starting the home")
             App.openHome()
