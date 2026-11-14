@@ -4,6 +4,9 @@
 #   loginctl enable-linger $USER      # so it keeps running when you are logged out
 # systemd starts programs with a bare PATH, so the Claude ask (optional) needs CLAUDE_BIN: set it to
 # what `command -v claude` prints. Never add ANTHROPIC_API_KEY: the ask runs on your Claude plan.
+# Running it as a system service instead (/etc/systemd/system, with User=)? Also set
+# Environment=HOME=/home/<you>, or LG's ares-launch crashes and the daily Developer Mode Extend
+# fails with only "Node.js v20.x" as the error (seen on a Debian 13 container, PR #201).
 [Unit]
 Description=Couch TV bridge
 After=network-online.target
