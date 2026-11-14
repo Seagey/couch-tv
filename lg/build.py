@@ -122,7 +122,7 @@ def read_apps(path, tv_id):
     for a in data:
         if isinstance(a, dict) and a.get("id"):
             out.append({"id": str(a["id"]), "title": str(a.get("title") or a["id"]),
-                        "icon": a.get("icon") or a.get("largeIcon") or None})
+                        "icon": a.get("largeIcon") or a.get("icon") or None})   # the 130x130 one first
     if not out:
         raise SystemExit("--apps: the list has no apps")
     return out
