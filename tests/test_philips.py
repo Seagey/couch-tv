@@ -139,7 +139,8 @@ class NotPaired(Base):
         await self.tv.pair_finish(PIN)
         self.assertTrue(self.tv.paired)
         path = os.path.join(self.data, "philips-lounge.json")
-        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+        if os.name != "nt":
+            self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
         t = self.another()
         self.assertEqual(await t._read_power(), "On")
 

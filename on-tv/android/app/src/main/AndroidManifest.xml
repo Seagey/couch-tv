@@ -39,6 +39,15 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />
         </intent>
+        <!-- Web links (custom cards with a url): Android 11+ hides browser packages otherwise. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
         <package android:name="com.amazon.tv.launcher" />
         <package android:name="com.google.android.apps.tv.launcherx" />
         <package android:name="com.google.android.tvlauncher" />

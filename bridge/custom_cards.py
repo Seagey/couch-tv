@@ -18,6 +18,7 @@ a title. The TV home asks the bridge (GET /api/custom-cards) every 10 minutes.
 """
 import json
 import os
+import pathlib
 import re
 import time
 
@@ -38,6 +39,18 @@ def _text(v, most):
         return ""
     s = _CONTROL.sub(" ", str(v)).strip()
     return s[:most].rstrip()
+
+
+FORCE_GAP = 5                # seconds a forced refresh (?force=1) still waits since the last read
+
+
+def web_url(v):
+    """The link if it is a plain http(s) link with a host, else "" (for the LG and Samsung browsers)."""
+    u = _url(v)
+    if not u:
+        return ""
+    host = u.split("://", 1)[1].split("/", 1)[0].split("?", 1)[0].split("#", 1)[0].rsplit("@", 1)[-1]
+    return u if host.strip(":") else ""
 
 
 def _url(v):
@@ -91,7 +104,7 @@ def source(value, config_dir):
     path = os.path.expanduser(value)
     if not os.path.isabs(path):
         path = os.path.join(config_dir, path)
-    return ("file", os.path.normpath(path))
+    return ("file", pathlib.Path(os.path.normpath(path)).as_posix())
 
 
 _cache = {"at": 0.0, "cards": []}
@@ -114,13 +127,15 @@ async def _read(src):
     return json.loads(raw.decode("utf-8"))
 
 
-async def get(src, log=None, now=None):
+async def get(src, log=None, now=None, force=False):
     """The cards to show. A file or link that cannot be read, or is not JSON, keeps the last good
     cards (none if there never were any), so a hiccup never empties the row or slows the home."""
     if not src:
         return []
     now = time.time() if now is None else now
-    if _cache["at"] and now - _cache["at"] < FETCH_EVERY:
+    # force (a page asking for a fresh read) still keeps a short gap, so a client cannot hammer the source
+    gap = FORCE_GAP if force else FETCH_EVERY
+    if _cache["at"] and now - _cache["at"] < gap:
         return _cache["cards"]
     _cache["at"] = now
     try:

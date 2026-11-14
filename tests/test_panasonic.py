@@ -385,7 +385,8 @@ class Encrypted(Base):
         self.assertTrue(self.s.pin_shown)
         await self.tv.pair_finish(PIN)
         path = os.path.join(self.data, "panasonic-lounge.json")
-        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+        if os.name != "nt":
+            self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
         self.assertEqual(self.tv.credentials, (APP_ID, KEYWORD))
         self.assertTrue(self.tv.panasonic_status()["paired"])
         await self.tv.key("up")

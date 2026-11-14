@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 14 November 2026: custom cards with a web link open on Android TV, LG and Samsung (on main, in the next release)
+
+Thanks ekagra-codes ([#207](https://github.com/Seagey/couch-tv/pull/207)). A custom card with a `url` now opens in the TV's browser: on a standalone Android TV through the home app or the on-TV app, on an LG through its browser app and on a Samsung through its browser app (the Samsung one opens the browser, but the TV's own launch call may not pass the address on, so it is untried). Only plain http and https links with a host are opened. The home also reads the card file again when you come back to it (`/api/custom-cards?force=1`, kept at least 5 seconds apart), and some tests now run on Windows too.
+
 ### 14 November 2026: VIZIO, couch-tv's home in the TV's own webview, Beta (on main, in the next release)
 
 Thanks lukionsp (#206). On a VIZIO, `scripts/vizio-web.py` can now load couch-tv's home (the bridge's `/tv/`) in the TV's own webview, through VIZIO OS's web app launcher. `--probe` finds which launcher id your set accepts with a test page that reports back, and `--url` puts the home up. It is Beta and has been tried on one set, a V4K65X-0810 on VIZIO OS 86.920.9.3; the webview is slow, so a single scene works best. It is off unless you run it: the bridge never opens it by itself, and a new install behaves exactly as before. For safety, couch-tv only sends a page with name space 4 and an allow listed launcher id (3001 or 17), checked in the one function that builds the request, and only a plain `http://` or `https://` address. It refuses `APP_ID` 1, the TV's main menu, where a saved address can leave the menus dead until a factory reset. Steps and the safety note: [VIZIO.md](VIZIO.md#the-home).

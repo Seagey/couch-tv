@@ -78,8 +78,9 @@ class VidaaCert(unittest.TestCase):
             self.assertIn(b"BEGIN CERTIFICATE", f.read())
         with open(self.out_path("client.key"), "rb") as f:
             self.assertIn(b"PRIVATE KEY", f.read())
-        for name in ("client.pem", "client.key"):
-            self.assertEqual(stat.S_IMODE(os.stat(self.out_path(name)).st_mode), 0o600)
+        if os.name != "nt":
+            for name in ("client.pem", "client.key"):
+                self.assertEqual(stat.S_IMODE(os.stat(self.out_path(name)).st_mode), 0o600)
         with open(self.out_path("client.pem"), "rb") as pem, open(self.out_path("client.key"), "rb") as key:
             self.assertTrue(self.mod.matches(pem.read().strip(), key.read().strip()))
         self.assertNotIn("PRIVATE KEY", text)
