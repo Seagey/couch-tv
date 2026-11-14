@@ -2240,7 +2240,9 @@
   }
 
   function resolveInputs() {
-    var raw = HOME.inputs || (window.COUCH_CONFIG && window.COUCH_CONFIG.home && window.COUCH_CONFIG.home.inputs);
+    // this TV's own input tiles (tvs[].inputs in config.json) win over the shared home.inputs
+    var raw = Array.isArray(TVCFG.inputs) ? TVCFG.inputs
+      : HOME.inputs || (window.COUCH_CONFIG && window.COUCH_CONFIG.home && window.COUCH_CONFIG.home.inputs);
     if (!Array.isArray(raw) || !raw.length) return [];
     var detected = inputList();
     var list = [];
@@ -2267,6 +2269,7 @@
         id: matchId,
         name: label,
         icon: icon,
+        image: typeof cfg.image === "string" && /^[\w./-]+\.(svg|png|jpe?g|webp)$/i.test(cfg.image) ? cfg.image : null,
         package: "input:" + matchId
       });
     });
@@ -2622,10 +2625,21 @@
     renderGrid();
   }
 
+  // An input tile: its own picture (home.inputs[].image, a file in the app such as
+  // backgrounds/mine/console.svg), else the drawn icon for its kind. A picture that fails falls
+  // back to the drawn icon.
+  function inputFace(it) {
+    var drawn = ICONS[it.icon] || ICONS.hdmi || ICONS.input;
+    if (it.image) {
+      return '<div class="face input-img"><img src="' + esc(it.image) + '" alt="" decoding="async" onerror="this.parentNode.className=\'face tool input-ic\';this.parentNode.innerHTML=this.getAttribute(\'data-svg\')" data-svg="' + esc(drawn) + '"></div>';
+    }
+    return '<div class="face tool input-ic ic-' + esc(it.icon || "hdmi") + '">' + drawn + "</div>";
+  }
+
   function dockHTML(it) {
     var face;
     if (it.kind === "screen") face = '<div class="face tool">' + ICONS.screen + "</div>";
-    else if (it.kind === "input") face = '<div class="face tool input-ic ic-' + esc(it.icon || "hdmi") + '">' + (ICONS[it.icon] || ICONS.hdmi || ICONS.input) + "</div>";
+    else if (it.kind === "input") face = inputFace(it);
     else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
     else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
     else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
@@ -2640,7 +2654,7 @@
     if (NIGHT) return dockHTML(it);
     var face;
     if (it.kind === "screen") face = '<div class="face tool">' + ICONS.screen + "</div>";
-    else if (it.kind === "input") face = '<div class="face tool input-ic ic-' + esc(it.icon || "hdmi") + '">' + (ICONS[it.icon] || ICONS.hdmi || ICONS.input) + "</div>";
+    else if (it.kind === "input") face = inputFace(it);
     else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
     else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
     else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";

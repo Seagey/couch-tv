@@ -43,6 +43,28 @@ class TestProductionFeatures(unittest.TestCase):
         self.assertEqual(len(res["inputs"]), 1)
         self.assertEqual(res["inputs"][0]["label"], "PlayStation 5")
 
+    def test_input_picture_is_off_unless_asked_for(self):
+        """An input tile has no picture unless one is given, and only a file inside the app counts."""
+        self.assertNotIn("image", config._inputs([{"port": 1, "label": "PS5", "icon": "ps5"}])[0])
+        ok = config._inputs([{"port": 1, "label": "PS5", "image": "backgrounds/mine/console.svg"}])[0]
+        self.assertEqual(ok["image"], "backgrounds/mine/console.svg")
+        for bad in ("https://example.org/a.png", "../../etc/a.png", "backgrounds/mine/a.gif", "a b.png", 5):
+            self.assertNotIn("image", config._inputs([{"port": 1, "label": "X", "image": bad}])[0], bad)
+
+    def test_inputs_per_tv_are_off_unless_asked_for(self):
+        """A TV with no inputs list of its own gets no "inputs" key, so home.inputs applies as before."""
+        saved = config.TVS
+        try:
+            config.TVS = [{"id": "a", "name": "A"},
+                          {"id": "b", "name": "B", "inputs": [{"port": 2, "label": "Console", "icon": "xbox"}]},
+                          {"id": "c", "name": "C", "inputs": []}]
+            tvs = {t["id"]: t for t in config.public()["tvs"]}
+            self.assertNotIn("inputs", tvs["a"])
+            self.assertEqual(tvs["b"]["inputs"], [{"port": 2, "label": "Console", "icon": "xbox"}])
+            self.assertEqual(tvs["c"]["inputs"], [])   # an empty list: no input tiles on that TV
+        finally:
+            config.TVS = saved
+
     def test_bedtime_dim_is_off_unless_asked_for(self):
         self.assertIs(config._home({})["bedtime_dim"], False)
         self.assertIs(config._home({"bedtime_dim": "yes"})["bedtime_dim"], False)
