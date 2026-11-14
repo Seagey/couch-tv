@@ -404,7 +404,7 @@
     NP_ON = typeof ST.now_playing === "boolean" ? ST.now_playing : HOME.now_playing !== false;
     // the Keep watching row: Home settings win over home.keep_watching; off hides it and stops fetching it
     KW_ON = typeof ST.keep_watching === "boolean" ? ST.keep_watching : HOME.keep_watching !== false;
-    document.documentElement.classList.toggle("kw-off", !KW_ON);
+    document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
     // the full screen music view is off until it is switched on in Home settings or home.ambient_music
     AMBIENT_MUSIC = typeof ST.ambient_music === "boolean" ? ST.ambient_music : HOME.ambient_music === true;
     GLASS_FOCUS = (ST.glass_focus || HOME.glass_focus) === "glass" ? "glass" : "colour";
@@ -2091,13 +2091,17 @@
     // nobody has anything on the go: no empty box, the photo has the space (unless Now playing
     // is up at night). The people switcher stays: with nothing yet (Netflix tells Android nothing on
     // some TVs, issue #23) it is the only way to say who is watching before anything is played.
-    $("shelf-section").classList.toggle("empty", !anyone && !(NIGHT && npVisible()));
+    $("shelf-section").classList.toggle("empty", !anyone && !(NIGHT && npVisible()) && !CARDS.length);
+    // custom cards keep the row (and its heading) even with Keep watching switched off
+    document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
+    $("shelf-title").textContent = t(data.shows.length || !CARDS.length ? "keep_watching" : "custom_cards");
     renderPeople();
-    if (!KW_ON) { track.innerHTML = ""; shelfEls = []; return; }   // row switched off: nothing to draw, the section is closed up
+    if (!KW_ON) { track.innerHTML = ""; shelfEls = []; addCards(track); return; }   // row switched off: only the custom cards, if any
     if (!data.shows.length) {
       var name = PEOPLE[whoIndex()].name;
-      track.innerHTML = '<p class="shelf-none">' + esc(peopleCount() < 2 ? t("nothing_yet") : t("nothing_for", { name: name })) + "</p>";
+      track.innerHTML = CARDS.length ? "" : '<p class="shelf-none">' + esc(peopleCount() < 2 ? t("nothing_yet") : t("nothing_for", { name: name })) + "</p>";
       shelfEls = [];
+      addCards(track);
       return;
     }
     if (NIGHT) {
@@ -2112,6 +2116,7 @@
           (it.progress ? '<span class="nbar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "") + "</div></div>";
       }).join("");
       shelfEls = Array.prototype.slice.call(track.children);
+      addCards(track);
       return;
     }
     track.innerHTML = data.shows.map(function (it) {
@@ -2124,6 +2129,87 @@
         badge + bar + '</div><div class="caption"><b>' + esc(it.title) + "</b><span>" + esc(subtitle(it)) + "</span></div></div>";
     }).join("");
     shelfEls = Array.prototype.slice.call(track.children);
+    addCards(track);
+  }
+
+  // ---------------- custom cards (home.custom_cards, cards.js; idea from geissmannz on Instagram) ----------------
+  // The household's own cards, at the end of the Keep watching row. Display only: every string goes in
+  // with textContent, an image only from an http(s) link, and OK opens an installed app or an http(s)
+  // link through the same /api/launch the app tiles use. Off (no cards, no fetching) unless set.
+  var CARDS = [];
+  function cardAt(i) { return i >= data.shows.length ? CARDS[i - data.shows.length] || null : null; }
+  function addCards(track) {
+    CARDS.forEach(function (c) {
+      var el = document.createElement("div");
+      var img = null;
+      if (c.image) {
+        img = document.createElement("img");
+        img.alt = ""; img.decoding = "async";
+        img.onerror = function () { if (img.parentNode) img.parentNode.removeChild(img); };
+        img.src = c.image;
+      }
+      var add = function (parent, tag, cls, text) {
+        var n = document.createElement(tag);
+        if (cls) n.className = cls;
+        n.textContent = text;
+        parent.appendChild(n);
+        return n;
+      };
+      if (NIGHT) {
+        el.className = "tile ncard ccard";
+        if (img) { img.className = "thumb"; el.appendChild(img); }
+        var tx = document.createElement("div");
+        tx.className = "t";
+        if (c.subtitle) add(tx, "div", "nap", c.subtitle);
+        add(tx, "b", "", c.title);
+        if (c.value) add(tx, "i", "", c.value);
+        el.appendChild(tx);
+      } else {
+        el.className = "tile show ccard" + (img ? " has-img" : "");
+        var face = document.createElement("div");
+        face.className = "face";
+        if (img) face.appendChild(img);
+        var words = document.createElement("div");
+        words.className = "cwords";
+        if (c.value) add(words, "span", "cvalue", c.value);
+        add(words, "b", "", c.title);
+        face.appendChild(words);
+        el.appendChild(face);
+      }
+      track.appendChild(el);
+      shelfEls.push(el);
+    });
+  }
+  function openCard(c) {
+    if (!c || (!c.app && !c.url)) return;
+    if (c.app && TV && TV.launch(c.app)) return;
+    if (OFFLINE) { status(t("computer_off")); return; }
+    api("POST", "/api/launch", { app: c.app || c.url }).catch(function (e) { status(tBridge(e.key, e.vars, e.message)); });
+  }
+  function setCards(list) {
+    if (!list) return;   // not JSON, or nothing came back: keep the last good cards
+    var before = JSON.stringify(CARDS);
+    CARDS = list;
+    if (JSON.stringify(list) === before) return;
+    // redraw now only where it cannot pull anything from under the remote; otherwise the next refresh does
+    if (zone === "shelf" || zone === "grid" || zone === "people" || zone === "quick" || zone === "np") {
+      renderShelf();
+      s = Math.max(0, Math.min(s, shelfEls.length - 1));
+      paintFocus();
+    }
+  }
+  function refreshCards() {
+    var src = HOME.custom_cards, CC = window.CustomCards;
+    if (!src || !CC) return;
+    // a link: the on-TV app (or a home with no computer) reads it itself, so it needs CORS
+    var direct = function () {
+      if (typeof src !== "string" || !window.fetch) return;
+      fetch(src, { credentials: "omit", cache: "no-store" })
+        .then(function (r) { return r.ok ? r.text() : null; })
+        .then(function (s) { setCards(s == null ? null : CC.parse(s)); }, function () {});
+    };
+    if (OFFLINE) { direct(); return; }
+    api("GET", "/api/custom-cards", null, 9000).then(function (j) { setCards(CC.clean(j.cards || [])); }, direct);
   }
 
   // ---------------- apps ----------------
@@ -2423,12 +2509,12 @@
       });
       data.shows = (data.showsBy[who] || []).slice(0, KEEP_MAX);
       renderShelf();
-      if (!data.shows.length) {
+      if (!shelfEls.length) {
         $("shelf-section").classList.add("empty");
         zone = "grid";
         g = 0;
       } else {
-        s = Math.max(0, Math.min(s, data.shows.length - 1));
+        s = Math.max(0, Math.min(s, shelfEls.length - 1));
         zone = "shelf";
       }
       paintFocus();
@@ -2685,6 +2771,14 @@
       shelfEls[s].classList.add("focus");
       scrollShelf();
       if (NIGHT) return;   // the cards carry the titles; the photo stays put under the clock
+      var cc = cardAt(s);
+      if (cc) {   // a custom card: its title and line at the top, the photo stays (its picture may be small)
+        hero({ title: cc.title, app: cc.subtitle ? { name: cc.subtitle } : null });
+        $("place").style.visibility = "hidden";
+        showPhoto();
+        renderHint();
+        return;
+      }
       setBg(data.shows[s].backdrop || data.shows[s].poster, true);
       hero(data.shows[s]);
       $("place").style.visibility = "hidden";
@@ -2975,6 +3069,7 @@
       return;
     }
     if (zone === "shelf") {
+      if (cardAt(s)) { openCard(cardAt(s)); return; }
       var it = data.shows[s];
       if (!it) return;
       status(it.app ? t("opening_in", { title: it.title, app: it.app.name }) : t("opening", { title: it.title }), true);
@@ -3454,7 +3549,7 @@
     // the whole Keep watching row, heading and all (home.keep_watching): off closes the gap and stops fetching it
     rows.push({ kind: "toggle", key: "keep-watching", label: t("keep_show"), value: KW_ON ? t("on") : t("off"), act: function () {
       KW_ON = !KW_ON; ST.keep_watching = KW_ON; saveSettings();
-      document.documentElement.classList.toggle("kw-off", !KW_ON);
+      document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
       if (!KW_ON) { data.shows = []; shelfEls = []; s = 0; }
       renderShelf(); renderNp();
     } });
@@ -4636,7 +4731,7 @@
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
+    resume: function () { toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
     pause: function () { saveFocusNow(); pauseVideo(); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
@@ -4699,6 +4794,11 @@
     showPhoto();
     startVideo();
     photoTimer = setInterval(nextPhoto, PHOTO_MS);
+    // custom cards (home.custom_cards): every 10 minutes, and never before the home is drawn
+    if (HOME.custom_cards && window.CustomCards) {
+      setTimeout(refreshCards, 1500);
+      setInterval(refreshCards, window.CustomCards.EVERY_MIN * 60000);
+    }
     var cached = load();
     if (cached) { data.showsBy = cached.showsBy || data.showsBy; data.screens = cached.screens || []; data.order = cached.order || null; }
     setPeople(PEOPLE);   // the cache may predate someone new

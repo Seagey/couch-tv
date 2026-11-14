@@ -294,6 +294,66 @@ switch it off to hide the whole row and stop fetching it.
 
 **Navigation sound** (Home settings, Look, Sound): the TV's own click, a soft tap, or none (#32).
 
+## Custom cards
+
+On main, in the next release. Your own cards on the home, without changing couch-tv: the solar
+panels' output today, bin night, the surf, a family message. couch-tv reads a small JSON file and
+shows what is in it at the end of the Keep watching row. It only shows them: it never runs anything
+from the file, so whatever writes the file is up to you (a script on a Raspberry Pi, a GitHub
+Action, a file you edit by hand). The idea came from geissmannz on Instagram.
+
+It is off unless `home.custom_cards` in `config.json` names the file. That can be either:
+
+- **A file on the bridge computer** (option B), for example `"custom_cards": "cards.json"`. A path
+  that is not absolute is read from the folder `config.json` is in. The TV never sees the path.
+- **An http or https link**, for example a raw GitHub file or a Raspberry Pi on your Wi-Fi
+  (`"custom_cards": "http://raspberrypi:8080/cards.json"`). With a bridge, the bridge reads it, so the
+  server needs nothing special. The on-TV app (option C) has no bridge, so the TV reads the link
+  itself, and then the server has to allow it (send `Access-Control-Allow-Origin: *`; GitHub's raw
+  files already do).
+
+Why the bridge reads it: one place cleans the file (`bridge/custom_cards.py`), a Raspberry Pi on
+the network needs no web settings, and a bad file never slows the home. The TV home cleans it again
+(`tv-home/web/cards.js`), because on the on-TV app it reads the link itself.
+
+The file (a bare list of cards works too):
+
+```json
+{
+  "cards": [
+    {"title": "Solar today", "value": "18.4 kWh", "subtitle": "Roof panels",
+     "image": "https://example.com/sun.png", "app": "com.example.solar"},
+    {"title": "Bin night", "value": "Recycling", "subtitle": "Put out by 7 pm",
+     "url": "https://example.com/bins"}
+  ]
+}
+```
+
+| Field | What it is |
+|---|---|
+| `title` | Needed. Up to 40 characters. A card without one is left out. |
+| `value` | Optional, the big line: a number, a word. Up to 24 characters. |
+| `subtitle` | Optional, the small line. Up to 60 characters. |
+| `image` | Optional. An `http` or `https` link to a picture. Anything else is ignored. |
+| `app` | Optional. What OK opens: an installed app, by its Android package name (for example `com.netflix.ninja`). It goes through the same check and launch as the app tiles. |
+| `url` | Optional, used only when there is no `app`. An `http` or `https` link that OK opens on the TV. |
+
+The limits are hard: at most 8 cards (the rest are left out), each piece of text cut to its length,
+and a file over 64 KB is refused. Every piece of text shows exactly as written: `<b>` stays `<b>`,
+nothing is read as HTML or code. `javascript:` and every other kind of link is refused, and so is a
+link with spaces, quotes, `$` or a backtick in it. A card with no `app` or `url` simply does nothing
+on OK.
+
+The home asks for the cards when it opens and every 10 minutes after that, and the bridge reads the
+file at most once a minute. If the file is missing, is not JSON, or the link does not answer, the home
+keeps the last good cards (none, if it never had any) and carries on.
+
+They look like the shows: glass cards on the Night look, tiles on Classic, and the remote moves to them
+like any other card in the row. With Keep watching switched off, or with nothing to keep watching, the
+row stays for your cards and its heading says "Your cards". There is no switch in Home settings: take
+`home.custom_cards` out of `config.json` to hide them. It works wherever the home is this web page
+(Android and Google TV, LG, Samsung, the on-TV app); the Roku and Apple TV homes do not show them yet.
+
 ## Smart home
 
 Optional. If you already run Home Assistant, the home can show:
