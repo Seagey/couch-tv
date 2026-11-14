@@ -1195,6 +1195,11 @@ html.has-pointer.glass .ssec:hover {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.tile.input-ic .face.input-img {   /* an input with its own picture (home.inputs[].image) */
+  background: #0a1a3f;
+  box-shadow: none;
+  overflow: hidden;
+}
 .tile.input-ic.ic-ps5.focus .face {
   box-shadow: 0 0 0 0.1875rem #0070d1, 0 1.5rem 3rem rgba(0, 112, 209, 0.4);
 }

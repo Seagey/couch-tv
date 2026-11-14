@@ -415,6 +415,10 @@ def _inputs(raw_list):
             entry["id"] = item["id"].strip()[:200]
         if "device" in item and isinstance(item["device"], str) and item["device"].strip():
             entry["device"] = item["device"].strip()[:50]
+        # a picture for the tile, a file inside the TV app (backgrounds/mine/...): no addresses
+        if isinstance(item.get("image"), str) and re.fullmatch(r"[\w./-]+\.(svg|png|jpe?g|webp)", item["image"].strip(), re.I) \
+                and ".." not in item["image"]:
+            entry["image"] = item["image"].strip()
         if "port" in entry or "match" in entry or "id" in entry or "device" in entry:
             out.append(entry)
         if len(out) >= 8:
@@ -489,7 +493,10 @@ def public():
     """The parts the TV home and the phone remote are allowed to see."""
     import kids   # kids mode: the shelf and the PIN's hash (never the PIN) on each kids profile
     return {"people": kids.attach(PEOPLE), "weather": WEATHER, "home": HOME,
-            "tvs": [{"id": t["id"], "name": t["name"], "quick": quick_for(t),
-                     "extend_devmode": t.get("extend_devmode", True) is not False,
-                     "picture_modes": [m["name"] for m in picture_modes(t.get("picture"))]} for t in TVS],
+            "tvs": [dict({"id": t["id"], "name": t["name"], "quick": quick_for(t),
+                          "extend_devmode": t.get("extend_devmode", True) is not False,
+                          "picture_modes": [m["name"] for m in picture_modes(t.get("picture"))]},
+                         # input tiles for this TV only (its own HDMI devices); else home.inputs
+                         **({"inputs": _inputs(t["inputs"])} if isinstance(t.get("inputs"), list) else {}))
+                     for t in TVS],
             "default_tv": DEFAULT_TV, "ask": {"enabled": ASK_ENABLED}, "phone_remote": PHONE_REMOTE}
