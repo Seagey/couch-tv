@@ -39,7 +39,7 @@
   function store(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
   function keepApps(list) {
     store("couch.webos.apps", JSON.stringify(list.map(function (a) {
-      return { id: a.id, title: a.title, icon: a.icon || a.largeIcon || null };
+      return { id: a.id, title: a.title, icon: a.largeIcon || a.icon || null };   // the 130x130 one first: a tile is 112 px
     })));
   }
 

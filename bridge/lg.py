@@ -541,7 +541,7 @@ class LGTV:
             lid = lp.get("id")
             if not lid:
                 continue
-            points.append({"id": lid, "title": lp.get("title") or lid, "icon": lp.get("icon") or lp.get("largeIcon")})
+            points.append({"id": lid, "title": lp.get("title") or lid, "icon": lp.get("largeIcon") or lp.get("icon")})   # largeIcon is 130x130, icon 80x80: a tile is 112 px
             pkg = HOME_PACKAGE if lid == self.app_id else apps.WEBOS_TO_PACKAGE.get(lid) or BY_NAME.get(_plain(lp.get("title")))
             if pkg:
                 found[lid] = pkg
