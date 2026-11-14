@@ -416,8 +416,8 @@ def _inputs(raw_list):
         if "device" in item and isinstance(item["device"], str) and item["device"].strip():
             entry["device"] = item["device"].strip()[:50]
         # a picture for the tile, a file inside the TV app (backgrounds/mine/...): no addresses
-        if isinstance(item.get("image"), str) and re.fullmatch(r"[\w./-]+\.(svg|png|jpe?g|webp)", item["image"].strip(), re.I) \
-                and ".." not in item["image"]:
+        if isinstance(item.get("image"), str) and re.fullmatch(r"\w[\w./-]*\.(svg|png|jpe?g|webp)", item["image"].strip(), re.I) \
+                and ".." not in item["image"] and "//" not in item["image"]:
             entry["image"] = item["image"].strip()
         if "port" in entry or "match" in entry or "id" in entry or "device" in entry:
             out.append(entry)

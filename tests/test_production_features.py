@@ -48,7 +48,9 @@ class TestProductionFeatures(unittest.TestCase):
         self.assertNotIn("image", config._inputs([{"port": 1, "label": "PS5", "icon": "ps5"}])[0])
         ok = config._inputs([{"port": 1, "label": "PS5", "image": "backgrounds/mine/console.svg"}])[0]
         self.assertEqual(ok["image"], "backgrounds/mine/console.svg")
-        for bad in ("https://example.org/a.png", "../../etc/a.png", "backgrounds/mine/a.gif", "a b.png", 5):
+        for bad in ("https://example.org/a.png", "../../etc/a.png", "backgrounds/mine/a.gif", "a b.png", 5,
+                    "//example.org/a.png", "/etc/a.png", "a\\b.png", "javascript:a.png", "data:image/png;base64,a.png",
+                    "backgrounds/%2e%2e/a.png", "backgrounds/a..png"):
             self.assertNotIn("image", config._inputs([{"port": 1, "label": "X", "image": bad}])[0], bad)
 
     def test_inputs_per_tv_are_off_unless_asked_for(self):

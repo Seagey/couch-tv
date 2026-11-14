@@ -2269,7 +2269,7 @@
         id: matchId,
         name: label,
         icon: icon,
-        image: typeof cfg.image === "string" && /^[\w./-]+\.(svg|png|jpe?g|webp)$/i.test(cfg.image) ? cfg.image : null,
+        image: typeof cfg.image === "string" && /^\w[\w./-]*\.(svg|png|jpe?g|webp)$/i.test(cfg.image) && cfg.image.indexOf("..") < 0 && cfg.image.indexOf("//") < 0 ? cfg.image : null,
         package: "input:" + matchId
       });
     });
