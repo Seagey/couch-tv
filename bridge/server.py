@@ -2809,7 +2809,7 @@ async def h_continue_hide(request):
     cid = (await body(request)).get("id")
     h = store.history_item(cid) if cid else None
     if not h:
-        raise ApiError(404, f"unknown continue item: {cid}")
+        raise ApiError(404, f"unknown continue item: {cid}", key="err_unknown_continue_item", vars={"id": cid})
     store.hide_keep_watching(h)
     record_action(request, "continue_hide", {"id": cid}, True)
     return ok()

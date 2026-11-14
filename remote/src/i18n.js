@@ -1745,6 +1745,8 @@ S.pl = {
   sent_to_tv: 'Wysłano do telewizora',
   // Watch
   keep_watching: 'Kontynuuj oglądanie',
+  kw_remove: 'Usuń {title} z sekcji Kontynuuj oglądanie',
+  kw_removed: 'Usunięto {title} z sekcji Kontynuuj oglądanie.',
   couldnt_load: 'Nie udało się teraz tego wczytać.',
   shows_wait: 'Tu będą czekać programy oglądane na telewizorze.',
   loading: 'Wczytywanie…',
