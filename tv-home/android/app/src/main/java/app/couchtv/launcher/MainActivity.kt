@@ -149,6 +149,12 @@ class MainActivity : Activity() {
             connect()
             return
         }
+        // tv-home/tools/app-icons.sh after it copies your own app icons: the page afresh, so they
+        // show (the same as Home settings, About, Restart home, and no force-stop for the Home watch)
+        if (intent.getBooleanExtra("restart", false)) {
+            restartPage()
+            return
+        }
         // The remote's gear button, caught by KeyWatch: open the gear menu (a moment's wait in case
         // we were just brought forward from another app and the page is still settling).
         if (intent.getBooleanExtra("gear", false)) {
@@ -401,6 +407,13 @@ class MainActivity : Activity() {
                 }
                 val pkg = u.lastPathSegment ?: return null
                 val isIcon = u.pathSegments.firstOrNull() == "icon"
+                // your own picture for this app, when app-icons.sh put one there (CustomArt.kt); no-cache,
+                // so a new picture shows the next time the page loads
+                CustomArt.find(getExternalFilesDir("custom"), if (isIcon) "icons" else "banners", pkg)?.let { f ->
+                    return WebResourceResponse(CustomArt.mime(f), null, f.inputStream()).apply {
+                        responseHeaders = mapOf("Cache-Control" to "no-cache", "Access-Control-Allow-Origin" to "*")
+                    }
+                }
                 val img = (if (isIcon) iconImage(pkg) else bannerImage(pkg)) ?: return null
                 return WebResourceResponse(if (isIcon) "image/png" else "image/jpeg", null, ByteArrayInputStream(img)).apply {
                     // CORS: the page cuts each icon's glyph out on a canvas for Glass app icons
