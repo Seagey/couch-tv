@@ -95,6 +95,7 @@ class TheList(unittest.TestCase):
         self.assertNotIn("com.android.providers.tv", packages())
 
 
+@unittest.skipUnless(shutil.which("sh") and sys.platform != "win32", "POSIX sh environment required")
 class Run(unittest.TestCase):
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp())

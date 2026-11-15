@@ -46,9 +46,15 @@ class _Ssdp(asyncio.DatagramProtocol):
 class StandIn:
     def __init__(self, tmp):
         self.tmp = Path(tmp)
-        self.cli = self.tmp / "vega"
-        self.cli.write_text(FAKE_CLI)
-        self.cli.chmod(0o755)
+        if sys.platform == "win32":
+            py_cli = self.tmp / "fake_vega.py"
+            py_cli.write_text(FAKE_CLI)
+            self.cli = self.tmp / "vega.cmd"
+            self.cli.write_text(f'@"{sys.executable}" "{py_cli}" %*\n')
+        else:
+            self.cli = self.tmp / "vega"
+            self.cli.write_text(FAKE_CLI)
+            self.cli.chmod(0o755)
         self.cli_log = self.tmp / "cli.log"
         self.cli_log.write_text("")
         self.dial_on = True

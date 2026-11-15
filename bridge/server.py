@@ -387,9 +387,11 @@ async def body(request):
 
 
 def record_action(request, tool, args, success):
-    ask_id = request.headers.get("X-Ask-Id")
-    if ask_id and ask_id in asks:
-        asks[ask_id].append({"tool": tool, "args": args, "ok": success})
+    headers = getattr(request, "headers", None)
+    if headers and hasattr(headers, "get"):
+        ask_id = headers.get("X-Ask-Id")
+        if isinstance(ask_id, str) and ask_id in asks:
+            asks[ask_id].append({"tool": tool, "args": args, "ok": success})
 
 
 # ---------- middleware: CORS + errors ----------
@@ -610,9 +612,19 @@ def push_now():
     """Send /api/now to everyone watching the current TV's events."""
     tv_id = _current.get()
     payload = "event: now\ndata: " + json.dumps({"ok": True, **now_payload()}) + "\n\n"
-    for q, qtv in list(events_clients):
-        if qtv == tv_id and q.qsize() < 20:
-            q.put_nowait(payload)
+    for entry in list(events_clients):
+        q, qtv = entry
+        req = getattr(q, "_request", None)
+        if req is not None:
+            transport = getattr(req, "transport", None)
+            if transport is not None and hasattr(transport, "is_closing") and transport.is_closing():
+                events_clients.discard(entry)
+                continue
+        if qtv == tv_id:
+            if q.qsize() < 20:
+                q.put_nowait(payload)
+            else:
+                events_clients.discard(entry)
 
 
 async def h_events(request):
@@ -623,6 +635,7 @@ async def h_events(request):
     resp = web.StreamResponse(headers=headers)
     await resp.prepare(request)
     q = asyncio.Queue()
+    q._request = request
     entry = (q, _current.get())
     events_clients.add(entry)
     try:
@@ -632,8 +645,13 @@ async def h_events(request):
                 msg = await asyncio.wait_for(q.get(), timeout=20)
             except asyncio.TimeoutError:
                 msg = ": keepalive\n\n"
+            transport = getattr(request, "transport", None)
+            if transport is not None and hasattr(transport, "is_closing") and transport.is_closing():
+                break
             await resp.write(msg.encode())
-    except (ConnectionResetError, asyncio.CancelledError):
+    except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, asyncio.CancelledError):
+        pass
+    except Exception:
         pass
     finally:
         events_clients.discard(entry)
