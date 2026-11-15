@@ -6481,6 +6481,7 @@
     glass_lite: "Activat, fără estompare",
     glass_note: "Sticlă mată în spatele ceasului, al rândului {keep} și al aplicațiilor, prin care se vede fundalul. Pe un televizor mai vechi sau mai lent, alege Activat, fără estompare.",
     moving_tiles: "Dale animate",
+    dock_mac: "Dock în stil Mac",
     moving_tiles_note: "Dala selectată se mișcă ușor. Dacă pâlpâie pe un televizor mai vechi sau mai lent, dezactivează opțiunea.",
     keep_show: "Afișează Continuă vizionarea",
     start_focus: "Pornește pe",
