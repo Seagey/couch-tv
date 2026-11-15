@@ -75,7 +75,7 @@
   // no made up town. The weather tiles ask for a town instead (widgets.js noWx), never a sample place.
   var WX_NONE = { lat: null, lon: null, place: "", timezone: "auto" };
   var WXCFG = WX_NONE;
-  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "tvsettings", "screensaver", "extend"];
+  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "tvsettings", "screensaver", "extend", "reminder"];
   // The most personal photos this TV keeps (also MAX_PHOTOS in bridge/server.py and MainActivity.kt).
   var MAX_PHOTOS = 50;
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
@@ -351,6 +351,7 @@
     switch: '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="6" height="16" rx="3"/><rect x="13" y="4" width="6" height="16" rx="3"/><circle cx="8" cy="8" r="1" class="fill"/><circle cx="16" cy="14" r="1" class="fill"/></svg>',
     hdmi: '<svg viewBox="0 0 24 24"><path d="M4 8h16v5l-3 4H7l-3-4z"/><path d="M8 8v3M11 8v3M13 8v3M16 8v3"/></svg>',
     screensaver: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="14" rx="2.5"/><path d="M15.2 7.3a3.4 3.4 0 1 0 2.1 5 3.9 3.9 0 0 1-2.1-5z"/></svg>',
+    reminder: '<svg viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>',
     headphones: '<svg viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>',
     bluetooth: '<svg viewBox="0 0 24 24"><path d="M6.5 7.5l11 9-5.5 4.5v-18l5.5 4.5-11 9"/></svg>',
     network: '<svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.7 12.5a9.5 9.5 0 0 1 12.6 0M8.9 16a4.8 4.8 0 0 1 6.2 0"/><circle cx="12" cy="19.3" r="1"/></svg>',
@@ -912,6 +913,7 @@
     var iov = $("idle-ambient-overlay");
     if (iov) iov.classList.toggle("quiet-hours", isQuietHours(SMART_IDLE.quiet_hours));
     fitDate();
+    if (window.Reminders) window.Reminders.tick();
     document.body.classList.toggle("night", h >= 21 || h < 6);
     if (NIGHT) { glassClock(hm); if (SUN_SYNC) applySunSync(); updateAmbientWeather(); }
     if (quickReady) renderQuick();
@@ -2548,6 +2550,7 @@
       if (q === "bluetooth" || q === "network") return nativeSettingsScreen() || (ON_TV && !OFFLINE);
       if (q === "tvsettings") return !!(TV && (TV.launch || TV.openSettings)) || !OFFLINE;
       if (q === "extend") return devOn();
+      if (q === "reminder") return !!window.Reminders;
       return false;
     });
   }
@@ -2606,6 +2609,9 @@
         el.innerHTML = ICONS[q] + "<span>" + esc(t(q)) + "</span>";
       } else if (q === "tvsettings") {
         el.innerHTML = ICONS.gear + "<span>" + esc(t("gear_tv")) + "</span>";
+      } else if (q === "reminder") {
+        el.innerHTML = ICONS.reminder + "<span>" + esc(t("quick_reminder")) + "</span>";
+        el.setAttribute("aria-label", t("quick_reminder"));
       }
     });
     var sv = $("q-screensaver");   // an icon only look (Night) still says what it is, to the eye and to a screen reader
@@ -2911,6 +2917,32 @@
     else if (q === "extend") devExtend();
     else if (q === "bluetooth" || q === "network") openSettingsScreen(q);
     else if (q === "tvsettings") openTvSettings();
+    else if (q === "reminder") openReminders();
+  }
+
+  // ---------------- reminders (reminders.js): said into the remote's mic, kept on this TV ----------------
+  var remPrev = "quick";
+  function openReminders() {
+    if (!window.Reminders) return;
+    remPrev = zone; zone = "remind"; clearFocus();
+    window.Reminders.open();
+  }
+  function remindersInit() {
+    if (!window.Reminders) return;
+    window.Reminders.init({
+      keep: keep, kept: kept, toast: toast,
+      who: function () { var p = personById(who); return p ? p.name : ""; },
+      clock24: function () { return CLOCK24; },
+      canListen: function () { try { return !!(TV && TV.canListen && TV.canListen()); } catch (e) { return false; } },
+      listen: function (prompt) { try { return !!(TV && TV.listen && TV.listen(prompt)); } catch (e) { return false; } },
+      // a due reminder pops up only over the plain home, never over Settings, a menu or kids mode
+      canAlert: function () {
+        return NIGHT && !document.hidden && !lift && !expanded && !kidsOn() && !idleAmbientActive && !screenOffActive &&
+          ["grid", "shelf", "quick", "people"].indexOf(zone) >= 0;
+      },
+      takeKeys: function () { remPrev = zone; zone = "remind"; clearFocus(); },
+      done: function () { zone = ["grid", "shelf", "quick", "people"].indexOf(remPrev) >= 0 ? remPrev : "grid"; paintFocus(); }
+    });
   }
   // Headphones: the TV's own Bluetooth screen. The launcher opens it itself, the on-TV app through
   // its /api/launch, and the bridge with a fixed ADB command (POST /api/bluetooth-audio, no body).
@@ -3063,6 +3095,7 @@
     else if (zone === "menu") closeMenu();
     else if (zone === "inputs") closeInputMenu();
     else if (zone === "smart") closeSmart();
+    else if (zone === "remind") { remPrev = "grid"; window.Reminders.close(); }
     else if (zone === "updask") { $("gear-pop").classList.remove("on", "ask"); document.documentElement.classList.remove("gearing"); }
     else if (zone === "ambient") { ambientOpen = false; ambientDismissed = true; renderAmbientMusic(); }
     if (lift) dropLift();
@@ -4099,6 +4132,7 @@
     followSync();   // the row follows the app tile the remote is on (home.shelf_follows_app)
     if (zone === "settings") { renderSettings(); return; }
     if (zone === "smart") { window.smartHome.paint(); return; }
+    if (zone === "remind") { window.Reminders.paint(); return; }
     if (zone === "ambient") { renderAmbientMusic(); return; }
     clearFocus();
     renderHint();
@@ -4183,6 +4217,7 @@
     if (document.documentElement.dir === "rtl") dx = -dx;
     if (zone === "settings") { setMove(dx, dy); return; }
     if (zone === "smart") { window.smartHome.move(dx, dy); return; }
+    if (zone === "remind") { window.Reminders.move(dx, dy); return; }
     if (zone === "gear") { if (dy) { gi = Math.max(0, Math.min(gearItems().length - 1, gi + dy)); renderGear(); } return; }
     if (zone === "appmenu") { if (dy) { amI = Math.max(0, Math.min(amItems.length - 1, amI + dy)); renderAppMenu(); } return; }
     if (zone === "shelfmenu") { if (dy) { smI = Math.max(0, Math.min(smItems.length - 1, smI + dy)); renderShelfMenu(); } return; }
@@ -4506,6 +4541,7 @@
     }
     if (zone === "settings") { setBack(); return; }
     if (zone === "smart") { closeSmart(); paintFocus(); return; }
+    if (zone === "remind") { window.Reminders.back(); return; }
     if (zone === "gear") { closeGear(); paintFocus(); return; }
     if (zone === "appmenu") { closeAppMenu(); paintFocus(); return; }
     if (zone === "shelfmenu") { closeShelfMenu(); paintFocus(); return; }
@@ -4534,7 +4570,7 @@
   function hold() {
     touched = true;
     if (zone === "settings") return setHold();
-    if (zone === "gear" || zone === "smart" || zone === "updask" || zone === "inputs" || zone === "shelfmenu") return false;
+    if (zone === "gear" || zone === "smart" || zone === "remind" || zone === "updask" || zone === "inputs" || zone === "shelfmenu") return false;
     if (lift) { dropLift(); return true; }
     if (zone === "pmenu") {
       if (plift) dropPeople();
@@ -4550,6 +4586,7 @@
     touched = true;
     if (zone === "settings") { setActivate(); return; }
     if (zone === "smart") { window.smartHome.ok(); return; }
+    if (zone === "remind") { window.Reminders.ok(); return; }
     if (zone === "gear") { var gIt = gearItems()[gi]; if (gIt) gIt.act(); return; }
     if (zone === "appmenu") { doAppMenu(); return; }
     if (zone === "shelfmenu") { doShelfMenu(); return; }
@@ -6197,7 +6234,7 @@
   function settingsKey() {
     if (kidsOn()) { window.KidsMode.askPin(); return; }
     if (idlePhotoInput(null)) return;
-    if (zone === "gear" || zone === "settings" || zone === "smart" || zone === "appmenu" || zone === "shelfmenu" || zone === "updask" || zone === "inputs") { goHome(); return; }
+    if (zone === "gear" || zone === "settings" || zone === "smart" || zone === "remind" || zone === "appmenu" || zone === "shelfmenu" || zone === "updask" || zone === "inputs") { goHome(); return; }
     openGear();
   }
 
@@ -6503,7 +6540,7 @@
   var refreshAt = 0, refreshing = null;
   function refresh() {
     // never reshuffle under something being moved, or under the settings screen
-    if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart" || zone === "updask") return Promise.resolve();
+    if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart" || zone === "remind" || zone === "updask") return Promise.resolve();
     if (refreshing && Date.now() - refreshAt < 1500) return refreshing;
     refreshAt = Date.now();
     return refreshing = refreshNow();
@@ -6580,7 +6617,7 @@
     ];
     return Promise.all(jobs.map(function (p) { return p.then(function () { return true; }, function () { return false; }); }))
       .then(function (ok) {
-        if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart" || zone === "updask") return;
+        if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart" || zone === "remind" || zone === "updask") return;
         data.bridge = ok[0] || ok[2];
         var apps = TV ? nativeApps() : (window.MOCK_APPS ? window.MOCK_APPS.slice() : null);
         if (!apps) apps = (data.bridgeApps || []).filter(function (a) { return a.installed !== false && a.id !== "home"; })
@@ -7225,6 +7262,8 @@
     pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); designVideo("away", true); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
+    // Android's speech screen closed (MainActivity.listen): what was said, or null
+    heard: function (text) { if (window.Reminders) window.Reminders.heard(text); },
     // the launcher's updater has news (Updater.kt)
     update: function (state) { updChanged(state); },
     // Android's "default home app" chooser closed (HomeRole.kt, #98)
@@ -7508,6 +7547,7 @@
     document.addEventListener(PTR + "down", resetSmartIdle, { passive: true });
     document.addEventListener("wheel", resetSmartIdle, { passive: true });
     initSettings();
+    remindersInit();
     // Home settings gets an Updates section, before About, where the launcher can update itself
     if (updRead() && UPD.supported) SECS.splice(SECS.length - 1, 0, ["updates", "download"]);
     mark("app-start");

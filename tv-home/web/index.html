@@ -53,6 +53,11 @@
   </div>
 </header>
 
+<!-- Reminders (reminders.js): the next few at the top right, and the panel the Reminder quick button
+     opens (new by voice, the calendar card, done and delete), also the pop-up for a due one -->
+<div class="rem-chips" id="rem-chips" aria-live="polite"></div>
+<div class="rem-panel" id="rem-panel" role="dialog" aria-modal="true" aria-label="Reminders"></div>
+
 <!-- Ambient Music Art Screen: large album cover, dynamic ambient backlight, and remote media controls -->
 <div class="ambient-music" id="ambient-music" aria-live="polite">
   <div class="ambient-glow" id="ambient-glow"></div>
@@ -189,6 +194,7 @@
 <script src="share-home.js"></script>
 <!-- Home settings, couch-tv Studio, At home: the note, lists, Wi-Fi, guide, calendar and screen time (kept on this TV) -->
 <script src="athome.js"></script>
+<script src="reminders.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -1006,7 +1006,33 @@ class MainActivity : Activity() {
         fun removePhoto(name: String) {
             photoFile(name)?.delete()
         }
+
+        // Reminders (reminders.js): Android's own speech screen (Google's "Speak now" on Google TV),
+        // which listens through the remote's mic and hands back what was said as text. The words go
+        // to the TV's voice service only; the page gets them through tv.heard().
+        @JavascriptInterface
+        fun canListen(): Boolean = packageManager.resolveActivity(speechIntent(""), 0) != null
+
+        @JavascriptInterface
+        fun listen(prompt: String): Boolean {
+            val i = speechIntent(prompt)
+            if (packageManager.resolveActivity(i, 0) == null) return false
+            main.post {
+                try {
+                    startActivityForResult(i, LISTEN)
+                } catch (e: Exception) {
+                    js("window.tv && tv.heard && tv.heard(null)")
+                }
+            }
+            return true
+        }
     }
+
+    private fun speechIntent(prompt: String): Intent =
+        Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            .apply { if (prompt.isNotBlank()) putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, prompt.take(80)) }
 
     // ---------------------------------------------------------------- the household's own photos
 
@@ -1033,6 +1059,11 @@ class MainActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == HomeRole.REQUEST) { js("window.tv && tv.homeAnswered && tv.homeAnswered(" + HomeRole.held(this) + ")"); return }
+        if (requestCode == LISTEN) {
+            val said = if (resultCode == RESULT_OK) data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() else null
+            js("window.tv && tv.heard && tv.heard(" + (said?.let { JSONObject.quote(it.take(300)) } ?: "null") + ")")
+            return
+        }
         if (requestCode != PICK_PHOTOS) return
         val uris = mutableListOf<android.net.Uri>()
         if (resultCode == RESULT_OK && data != null) {
@@ -1893,6 +1924,7 @@ class MainActivity : Activity() {
         private const val SLOW_MS = 2_500L
         private const val NET_WAIT_MS = 15_000L   // at power-on, how long the first load waits for Wi-Fi
         private const val PICK_PHOTOS = 41
+        private const val LISTEN = 43   // reminders: Android's speech screen
         // The screensaver: Google TV's Ambient mode settings (source and the Google Photos albums),
         // the short screen timeout the home sets for a moment, and what to put back afterwards.
         private const val AMBIENT_SETTINGS = "dreamx.two.panel.SETTINGS"
