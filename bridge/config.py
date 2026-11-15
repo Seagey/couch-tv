@@ -326,6 +326,9 @@ def _home(h):
         out["keep_photo"] = h["keep_photo"]
     if isinstance(h.get("moving_tiles"), bool):
         out["moving_tiles"] = h["moving_tiles"]
+    # the Mac-style dock: the focused app and its neighbours grow in a wave, its name in a bubble
+    if h.get("dock") in ("mac", "classic"):
+        out["dock"] = h["dock"]
     # lighter home for a slow box (#58): no blur, no soft shadows, a still photo, smaller pictures
     if isinstance(h.get("lighter"), bool):
         out["lighter"] = h["lighter"]
