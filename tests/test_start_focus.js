@@ -86,7 +86,7 @@ assert.strictEqual(res.zone, 'shelf', 'people setting with 1 person falls back t
 res = simulateStartFocus('keep_watching', 2, 3, { open: true, enabled: true, npVisible: true });
 assert.strictEqual(res.zone, 'ambient', 'ambient music open takes priority');
 
-// 4. All 13 languages in i18n.js have the keys
+// 4. All 14 languages in i18n.js have the keys
 const keys = [
   'start_focus',
   'start_focus_sub',
@@ -97,7 +97,7 @@ const keys = [
 
 keys.forEach(k => {
   const count = (i18n.match(new RegExp('\\b' + k + ':', 'g')) || []).length;
-  assert.strictEqual(count, 13, `${k} must exist in all 13 languages (found ${count})`);
+  assert.strictEqual(count, 14, `${k} must exist in all 14 languages (found ${count})`);
 });
 
 console.log('All start_focus tests passed successfully.');
