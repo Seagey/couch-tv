@@ -651,6 +651,7 @@ is optional:
 | `glass` | Glass panels: `off`, `on` or `lite` (no blur). |
 | `glass_icons` | Glass app icons: `true` or `false`. |
 | `moving_tiles` | The focused tile's slow sway: `true` or `false`. |
+| `dock` | The dock: `mac` (the focused app and its neighbours grow in a wave, the name in a bubble above it) or `classic`. |
 | `lighter` | Lighter home for a slow box (no blur, no soft shadows, a still photo, smaller pictures): `true` or `false`. |
 | `glass_amount` | How clear the glass is: `1` (frosted) to `5` (very clear). |
 | `clock_style` | The Night clock: `frosted` or `liquid`. |

@@ -14,6 +14,7 @@
 //   lang=it             home.language (en, es, es-MX, it, de, tr, sr-Latn-RS, pl, pt); without it, the browser's own language
 //   glass=on            home.glass (on, lite: no blur)      video=<link>   home.video_url, an MP4 or MOV
 //   moving=off          home.moving_tiles: the focused tile's slow sway (off, or on)
+//   dock=mac            home.dock: the Mac-style dock (mac, or classic)
 //   ambient=1           home.ambient_music: the full screen music view (needs music=1; ambient=off: off)
 //   lighter=1           home.lighter: Lighter home for a slow box (no blur, no soft shadows, a still photo)
 //   icons=glass         home.glass_icons: Apple style clear app icons on glass
@@ -87,6 +88,7 @@
   if (arg("myscenes")) try { cfg.home.my_scenes = JSON.parse(arg("myscenes")); } catch (e) {}
   if (arg("glass")) cfg.home.glass = arg("glass");
   if (arg("moving")) cfg.home.moving_tiles = arg("moving") !== "off";
+  if (arg("dock")) cfg.home.dock = arg("dock");
   if (arg("lighter")) cfg.home.lighter = arg("lighter") !== "off";
   if (arg("ambient")) cfg.home.ambient_music = arg("ambient") !== "off";   // the full screen music view (off unless set)
   if (arg("icons") === "glass") cfg.home.glass_icons = true;

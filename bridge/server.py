@@ -2445,6 +2445,8 @@ def clean_settings(s):
         out["glass_icons"] = s["glass_icons"]
     if isinstance(s.get("moving_tiles"), bool):   # the focused tile's slow sway (#52)
         out["moving_tiles"] = s["moving_tiles"]
+    if s.get("dock") in ("mac", "classic"):   # the Mac-style dock
+        out["dock"] = s["dock"]
     if isinstance(s.get("lighter"), bool):   # lighter home for a slow box (#58)
         out["lighter"] = s["lighter"]
     if isinstance(s.get("glass_amount"), int) and not isinstance(s.get("glass_amount"), bool) and 1 <= s["glass_amount"] <= 5:
