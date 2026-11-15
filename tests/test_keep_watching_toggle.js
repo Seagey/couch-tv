@@ -20,7 +20,7 @@ assert(/data\.shows = KW_ON \?/.test(appJs), 'no shows when off');
 assert(/if \(!KW_ON\) \{ track\.innerHTML = ""; shelfEls = \[\]; addCards\(track\); return; \}/.test(appJs), 'no show cards when off (only custom cards, if set)');
 assert(css.includes('html.kw-off #shelf-title'), 'css hides the heading when off');
 
-// all 13 languages have the string
+// all 14 languages have the string
 const count = (i18n.match(/\bkeep_show:/g) || []).length;
-assert.strictEqual(count, 13, `keep_show must exist in all 13 languages (found ${count})`);
+assert.strictEqual(count, 14, `keep_show must exist in all 14 languages (found ${count})`);
 console.log('Keep watching toggle tests passed.');

@@ -49,6 +49,7 @@ LANG_NAMES = {
     "cs": "Czech",
     "pl": "Polish",
     "pt": "Brazilian Portuguese",
+    "ar": "Arabic",
 }
 
 

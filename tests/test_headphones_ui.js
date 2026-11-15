@@ -19,9 +19,9 @@ assert(!/api\("POST", "\/api\/bluetooth-audio", \{/.test(appJs), 'the POST carri
 const def = appJs.match(/TVCFG\.quick \|\| (\[[^\]]*\])/);
 assert(def && !def[1].includes('headphones'), 'headphones is not in the default quick buttons');
 
-// 2. i18n.js: all 13 languages (English, Spanish, Mexican Spanish, Italian, German, Turkish, French, Serbian Latin, Dutch, Hebrew, Czech, Polish, Brazilian Portuguese)
+// 2. i18n.js: all 14 languages (English, Spanish, Mexican Spanish, Italian, German, Turkish, French, Serbian Latin, Dutch, Hebrew, Czech, Polish, Brazilian Portuguese, Arabic)
 // have the strings the button uses. Mexican Spanish is an overlay on Spanish, so it is counted by hand.
-const langs = 13;
+const langs = 14;
 ['quick_headphones', 'headphones', 'headphones_not_found'].forEach(function (key) {
   const count = (i18n.match(new RegExp('\\b' + key + ':', 'g')) || []).length;
   assert.strictEqual(count, langs, `${key} must exist in all ${langs} languages (found ${count})`);
