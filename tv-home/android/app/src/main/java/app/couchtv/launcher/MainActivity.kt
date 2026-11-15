@@ -803,6 +803,16 @@ class MainActivity : Activity() {
         /** The TV's Bluetooth or network settings, for the Input menu (falls back to all Settings). */
         @JavascriptInterface
         fun openSettingsScreen(which: String): Boolean {
+            // Google TV has no Bluetooth settings action: open its Remotes and accessories screen instead,
+            // which only opens for an app with the secure settings grant apply.sh gives.
+            if (which == "bluetooth" && !FireWatch.connected &&
+                packageManager.resolveActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS), 0) == null &&
+                checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == PackageManager.PERMISSION_GRANTED) {
+                val acc = Intent("android.settings.SLICE_SETTINGS")
+                    .putExtra("slice_uri", "content://com.android.tv.settings.accessories.sliceprovider/general")
+                    .putExtra("slice_title", "Remotes and accessories")
+                if (packageManager.resolveActivity(acc, 0) != null && startSettings(acc)) return true
+            }
             val actions = when (which) {
                 "bluetooth" -> listOf(Settings.ACTION_BLUETOOTH_SETTINGS)
                 "network" -> listOf(Settings.ACTION_WIFI_SETTINGS, Settings.ACTION_WIRELESS_SETTINGS)
