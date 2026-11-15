@@ -129,5 +129,141 @@ class SecondOff(unittest.TestCase):
         self.assertEqual(asked, ["on"])
 
 
+class StandbyPowerOn(unittest.IsolatedAsyncioTestCase):
+    async def test_webos26_standby_connection_drop_then_register_triggers_hook(self):
+        t = make_tv()
+        t.key_file = str(Path(tempfile.mkdtemp()) / "key.txt")
+        Path(t.key_file).write_text("client-key-123")
+
+        hook_called = []
+
+        async def fake_hook():
+            hook_called.append(True)
+
+        async def fake_port_open():
+            return True   # TV stays on network in standby
+
+        t._hook = fake_hook
+        t.port_open = fake_port_open
+
+        # Phase 1: in standby, SSAP drops / connection closes immediately
+        state = {"on": False}
+
+        async def fake_remote(pairing_wait=120):
+            if not state["on"]:
+                t._ws = None
+                raise lg.TVUnavailable("connection refused in standby")
+            t._ws = type("FakeWS", (), {"closed": False})()
+
+        async def fake_read_power():
+            t.power = "Active"
+
+        async def fake_read_visible():
+            return "com.webos.app.home"
+
+        async def fake_refresh_installed():
+            pass
+
+        async def fake_read_volume():
+            pass
+
+        t._remote = fake_remote
+        t._read_power = fake_read_power
+        t._read_visible = fake_read_visible
+        t.refresh_installed = fake_refresh_installed
+        t._read_volume = fake_read_volume
+
+        real_sleep = asyncio.sleep
+        with patch("asyncio.sleep", new=lambda *_: real_sleep(0.01)), \
+                patch.object(t, "_wait_app_change", new=lambda *a, **kw: real_sleep(0.01)), \
+                patch.object(t, "_resolve", new=lambda: real_sleep(0)):
+            watch_task = asyncio.create_task(t._watch())
+            await real_sleep(0.05)
+            self.assertEqual(hook_called, [])
+            self.assertFalse(t.registered)
+
+            # Phase 2: TV wakes up and accepts registration
+            state["on"] = True
+            await real_sleep(0.05)
+
+            watch_task.cancel()
+            try:
+                await watch_task
+            except asyncio.CancelledError:
+                pass
+
+        self.assertEqual(hook_called, [True])
+
+    async def test_webos26_on_then_standby_then_on_triggers_hook(self):
+        t = make_tv()
+        t.key_file = str(Path(tempfile.mkdtemp()) / "key.txt")
+        Path(t.key_file).write_text("client-key-123")
+
+        hook_called = []
+
+        async def fake_hook():
+            hook_called.append(True)
+
+        async def fake_port_open():
+            return True
+
+        t._hook = fake_hook
+        t.port_open = fake_port_open
+
+        state = {"on": True}
+
+        async def fake_remote(pairing_wait=120):
+            if not state["on"]:
+                t._ws = None
+                raise lg.TVUnavailable("connection refused in standby")
+            t._ws = type("FakeWS", (), {"closed": False})()
+
+        async def fake_read_power():
+            t.power = "Active" if state["on"] else None
+
+        async def fake_read_visible():
+            return "com.webos.app.home"
+
+        async def fake_refresh_installed():
+            pass
+
+        async def fake_read_volume():
+            pass
+
+        t._remote = fake_remote
+        t._read_power = fake_read_power
+        t._read_visible = fake_read_visible
+        t.refresh_installed = fake_refresh_installed
+        t._read_volume = fake_read_volume
+
+        real_sleep = asyncio.sleep
+        with patch("asyncio.sleep", new=lambda *_: real_sleep(0.01)), \
+                patch.object(t, "_wait_app_change", new=lambda *a, **kw: real_sleep(0.01)), \
+                patch.object(t, "_resolve", new=lambda: real_sleep(0)):
+            watch_task = asyncio.create_task(t._watch())
+            # Start on: hook does not run initially because was_on is not False yet
+            await real_sleep(0.05)
+            self.assertTrue(t.registered)
+            self.assertEqual(hook_called, [])
+
+            # TV enters standby: SSAP drops
+            state["on"] = False
+            t._ws = None
+            await real_sleep(0.05)
+            self.assertEqual(hook_called, [])
+
+            # TV turns back on: SSAP reconnects, hook must fire!
+            state["on"] = True
+            await real_sleep(0.05)
+
+            watch_task.cancel()
+            try:
+                await watch_task
+            except asyncio.CancelledError:
+                pass
+
+        self.assertEqual(hook_called, [True])
+
+
 if __name__ == "__main__":
     unittest.main()

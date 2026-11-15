@@ -614,6 +614,8 @@ class LGTV:
                     was_on = on
                 elif not self.connected:
                     was_on = False   # gone from the network counts as off
+                elif not self.registered and self._key():
+                    was_on = False   # webOS 26 standby: on the network but drops SSAP until switched on
                 after = (self.connected, self.power, self.visible, self._vol.get("level"), self._vol.get("muted"))
                 if after != before:
                     self._changed()
