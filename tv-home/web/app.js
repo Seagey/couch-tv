@@ -2681,7 +2681,7 @@
   // The small blue dot: an app not opened yet, or (on the gear tile) a new couch-tv release.
   function dotHTML(it) {
     if (isNew(it.package)) return '<i class="dot" aria-label="' + esc(t("new_app")) + '"></i>';
-    if (it.kind === "gear" && updReady()) return '<i class="dot" aria-label="' + esc(t("upd_gear", { v: UPD.latest })) + '"></i>';
+    if (it.kind === "gear" && updReady()) return '<i class="dot" aria-label="' + esc(t("upd_gear", { v: UPD.latest, c: UPD.current || "" })) + '"></i>';
     return "";
   }
 
@@ -3174,7 +3174,7 @@
   }
   function renderGear() {
     var pop = $("gear-pop");
-    var items = [[ICONS.sliders, t("gear_home"), updReady() ? t("upd_gear", { v: UPD.latest }) : t("gear_home_sub")],
+    var items = [[ICONS.sliders, t("gear_home"), updReady() ? t("upd_gear", { v: UPD.latest, c: UPD.current || "" }) : t("gear_home_sub")],
       [ICONS.gear, t("gear_tv"), t("gear_tv_sub")]];
     pop.innerHTML = items.map(function (it, i) {
       return '<div class="grow' + (i === gi ? " focus" : "") + '" role="menuitem"><i>' + it[0] + "</i><span><b>" + esc(it[1]) +
@@ -3987,7 +3987,9 @@
     try { if (u) UPD = JSON.parse(u.state()); } catch (e) {}
     return UPD;
   }
-  function updReady() { return !!(UPD && UPD.available); }
+  // A newer release is out: one this TV can install, or one a copy built on another computer can't
+  // take (refused), which still gets the dot and the line so the household hears about it.
+  function updReady() { return !!(UPD && (UPD.available || UPD.refused)); }
   // the launcher's news: a check finished, a download moved on, the installer answered
   function updChanged(s) {
     var was = updReady();
@@ -4000,7 +4002,7 @@
   function updTell() {
     if (!updReady() || kept("tvhome.update.told") === UPD.latest) return;
     keep("tvhome.update.told", UPD.latest);
-    status(t("upd_told", { v: UPD.latest }));
+    status(t("upd_told", { v: UPD.latest, c: UPD.current || "" }));
   }
   // Asked once: tell the household about new versions, or leave it to "Check for updates now"? Until
   // they answer nothing is checked by itself, so frequent releases never nag anyone who did not ask.
@@ -4102,6 +4104,7 @@
   function updateRows() {
     var u = updRead() || {}, busy = u.busy || "";
     var rows = [info("upd-ver", t("about_version"), u.current || "")];
+    if (u.latest) rows.push(info("upd-newest", t("upd_newest"), u.latest));   // both numbers side by side
     if (u.available) {
       rows.push({ kind: "action", key: "upd-install", label: t("upd_install", { v: u.latest }),
         sub: busy === "downloading" ? t("upd_downloading", { p: u.progress || 0 }) : busy === "installing" ? t("upd_confirm") : u.title || "",

@@ -211,7 +211,9 @@ version is out?" (setup can answer it for you, `home.updates`).
 - **Tell me about new versions:** with it on, the TV looks on GitHub once a week, so frequent
   releases never nag; with it off nothing is checked by itself.
 - **Check for updates now** looks straight away either way.
-- A new release puts a small dot on the gear tile and a line on the home.
+- A new release puts a small dot on the gear tile and a line on the home, naming the new version
+  and the one this TV has ("couch-tv 0.13 is out (this TV has 0.12)"). Updates shows both too:
+  **Version** and **Latest release**.
 - **Update to ...** downloads it, checks it, and hands it to Android, which asks "Do you want to
   update this app?" first. Your settings, people, photos and apps stay.
 
@@ -219,7 +221,8 @@ The first time, Android asks you to let Home install apps (Settings, Security an
 Unknown sources).
 
 Only the app from the Releases page updates this way. A copy built on your own computer, for example
-with your own scenes, says so and is updated the way you installed it. The on-TV app (option C) does
+with your own scenes, says so and is updated the way you installed it. It still looks for new
+releases and keeps the dot and the line, so you hear when one is out. The on-TV app (option C) does
 not do this yet.
 
 ### About
