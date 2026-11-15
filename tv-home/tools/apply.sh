@@ -192,8 +192,14 @@ echo "1/4  Installing the app"
 # Make couch-tv the chosen home and check the TV took it. On Google TV the Home key itself still
 # opens Google's home (it outranks the chosen one), and resolve-activity keeps naming Google's, so
 # the check asks for the chosen launcher instead; the Home button watch (step 3) does the rest.
-"$PY" "$T" shell "cmd package set-home-activity $HOME_ACT" > /dev/null
-NOW=$("$PY" "$T" shell "cmd shortcut get-default-launcher" | grep -m1 Launcher || true)
+# A TCL (Android 14) drops the chosen home for a moment after any install, so the first set right
+# after the install does not stick: set it again a few times before giving up.
+for try in 1 2 3 4 5; do
+  "$PY" "$T" shell "cmd package set-home-activity $HOME_ACT" > /dev/null
+  NOW=$("$PY" "$T" shell "cmd shortcut get-default-launcher" | grep -m1 Launcher || true)
+  case "$NOW" in *app.couchtv.launcher/*) break ;; esac
+  sleep 2
+done
 case "$NOW" in
   *app.couchtv.launcher/*) ;;
   *) echo "The TV did not take couch-tv as its home (it says: $NOW). Nothing was switched off."; exit 1 ;;
