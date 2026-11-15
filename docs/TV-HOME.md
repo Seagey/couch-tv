@@ -282,6 +282,34 @@ app (option C) only takes web addresses.
 Your photos take turns with the scenes and replace the Classic look's own. The home keeps up to 20
 photos (50 on main, in the next release).
 
+## Your own app icons
+
+On main, in the next release. Google TV and Android TV (options A and B). A picture you make for an
+app shows in place of the app's own icon on the dock and on its Keep watching badge, and in place of
+its banner in the Classic grid and More apps: one style for every app, a logo the app ships too
+small or soft, or a different look for an app that has none. Apps with no picture of yours keep
+their own, and nothing changes until you add one.
+
+Make a folder with an `icons` folder (square, about 512 x 512) and a `banners` folder (16:9, about
+640 x 360) in it, and name each picture after the app's package: `icons/com.netflix.ninja.png`,
+`banners/com.netflix.ninja.png`. PNG, JPEG (`.jpg`) or WebP. `survey-tv.py` lists every app's
+package name. Then, from the repo root:
+
+```sh
+TV_IP=<your tv address> sh tv-home/tools/app-icons.sh my-icons        # copy them, adds or replaces
+TV_IP=<your tv address> sh tv-home/tools/app-icons.sh --list          # what is on the TV now
+TV_IP=<your tv address> sh tv-home/tools/app-icons.sh --remove        # every app's own pictures again
+```
+
+They go in the home's own folder on the TV (`Android/data/app.couchtv.launcher/files/custom`), and
+the home loads them straight away (the same as Home settings, About, Restart home). Taking the home
+off the TV takes them with it.
+
+- **Glass app icons** draws your picture in glass like the rest. Switch it off (Look) to see your
+  pictures as they are.
+- The phone remote's app grid keeps the apps' own icons.
+- The on-TV app (option C), LG, Samsung, Roku and the rest keep the apps' own icons.
+
 ## Now playing
 
 When Spotify or any other music app is playing behind the home, a card shows the song, the artist

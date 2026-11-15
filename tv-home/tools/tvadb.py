@@ -6,6 +6,7 @@ Usage (TV_IP=<tv address> [ADB_PORT=5555] .venv/bin/python tv-home/tools/tvadb.p
   tvadb.py ping                     connect and say so (exit 1 if the TV cannot be reached)
   tvadb.py shell "<command>"        run a shell command, print the output
   tvadb.py install <file.apk>       install or update an app
+  tvadb.py put <file> <dest>        copy a file onto the TV (its folder made first), md5 checked
   tvadb.py shot <out.png>           screenshot of the TV
   tvadb.py keys KEY [KEY ...]       press remote keys (e.g. DPAD_DOWN ENTER HOME), 0.4 s apart
 
@@ -220,10 +221,10 @@ def copy_by_base64(tv, data, dest):
     tv.shell(f"rm -rf {TMP}.b64")
 
 
-def install(tv, path):
-    data = open(path, "rb").read()
+def copy_checked(tv, data, dest, what, then):
+    """Copies data to dest on the TV with adb push, or the base64 way when push stalls, and checks
+    the copy with md5. A damaged copy is removed and stops the tool with one plain line."""
     want = hashlib.md5(data).hexdigest()
-    dest = TMP + ".apk"
     ok = False
     if os.environ.get("FORCE_B64") != "1":
         try:
@@ -239,7 +240,20 @@ def install(tv, path):
         got = md5_on_tv(tv, dest)
         if got != want:
             tv.shell(f"rm -f {dest}")
-            fail(f"the app reached the TV damaged (md5 {got or 'unknown'}, wanted {want}), not installing")
+            fail(f"{what} reached the TV damaged (md5 {got or 'unknown'}, wanted {want}), {then}")
+
+
+def put(tv, path, dest):
+    """A file onto the TV at dest (its folder made first), checked like an app: your own app icons."""
+    folder = dest.rsplit("/", 1)[0]
+    tv.shell(f"mkdir -p {folder}")
+    copy_checked(tv, open(path, "rb").read(), dest, os.path.basename(path), "not copied")
+    print(dest)
+
+
+def install(tv, path):
+    dest = TMP + ".apk"
+    copy_checked(tv, open(path, "rb").read(), dest, "the app", "not installing")
     out = tv.shell(f"pm install -r {dest}; rm -f {dest}", 180)
     print(out, end="")
     if "Success" not in out:
@@ -248,7 +262,7 @@ def install(tv, path):
 
 def main():
     if len(sys.argv) < 2:
-        fail("usage: tvadb.py ping | shell CMD | install APK | shot OUT.png | keys KEY ...")
+        fail("usage: tvadb.py ping | shell CMD | install APK | put FILE DEST | shot OUT.png | keys KEY ...")
     cmd, args = sys.argv[1], sys.argv[2:]
     try:
         tv = Tv(connect)
@@ -261,6 +275,8 @@ def main():
             print(tv.shell(args[0], SHELL_TIMEOUT), end="")
         elif cmd == "install":
             install(tv, args[0])
+        elif cmd == "put":
+            put(tv, args[0], args[1])
         elif cmd == "shot":
             tv.shell("screencap -p /sdcard/tv-shot.png")
             tv._retry("pull", lambda: tv.dev.pull("/sdcard/tv-shot.png", args[0]))
