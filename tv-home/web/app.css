@@ -1024,6 +1024,8 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .theme-night .shelf-row { display: flex; align-items: stretch; gap: 1.375rem; }
 .theme-night .np-slot.on { display: flex; flex: none; }
 .theme-night .shelf-clip { flex: 1; min-width: 0; overflow: hidden; padding: 1.5rem; margin: -1.5rem; }
+/* Beside Now playing the clip's left edge stays inside the gap, so scrolled cards stop short of the card */
+.theme-night:not(.no-flex-gap) .np-slot.on + .shelf-clip { padding-left: 1.25rem; margin-left: -1.25rem; }
 .theme-night .np { width: 34rem; margin: 0; padding: 1rem; border-radius: 1.875rem; }
 .theme-night .np-art { width: 5.9375rem; height: 5.9375rem; border-radius: 1rem; }
 .theme-night .np-app { font-size: 1.1875rem; line-height: 1.5rem; }
