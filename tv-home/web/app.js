@@ -2968,9 +2968,13 @@
   // ---------------- going round at the ends ----------------
   // A single press of an arrow at the end of a row or a list goes round to the other end: left on the
   // first app lands on More apps, down on the last row of a Home settings list lands on its first row.
-  // It happens when the key is let go, and only if the key did not repeat, so holding an arrow still
-  // runs to the end and stops there, even when it starts at the end.
-  var wrapPending = null;
+  // It happens when the key is let go, and only for a press that did one thing: holding an arrow still
+  // runs to the end and stops there, even when it starts at the end. Some remotes send a held arrow
+  // as more key downs that are not marked as repeats, so every key down of the same arrow before it
+  // is let go counts as the same press (arrowPress), and a press longer than HOLD_MS never goes round.
+  var wrapPending = null, arrowPress = null;
+  // is this key down the arrow of the press still going (held), rather than a new press?
+  function arrowAgain(p, dir, now, repeat) { return !!(repeat || (p && p.dir === dir && now - p.last < 1000)); }
   function navState() {
     return [zone, g, s, pi, qi, npI, menuI, pmi, gi, amI, smI, ai, inI, ambI, expanded, !!lift, plift,
       SET.col, SET.sec, SET.ri, !!SET.lift, !!SET.sub].join("|");
@@ -4653,8 +4657,13 @@
     var arrow = arrowOf(e);
     if (arrow) {
       blip(arrow[0], arrow[1]);
-      // a single press that moved nothing is at an end: it goes round when the key is let go
-      var before = e.repeat ? null : navState();
+      // the same arrow again before it was let go is the key being held, marked as a repeat or not
+      var dir = arrow[0] + "," + arrow[1], now = Date.now();
+      var again = arrowAgain(arrowPress, dir, now, e.repeat);
+      if (again && arrowPress) arrowPress.last = now;
+      else arrowPress = { dir: dir, at: now, last: now };
+      // the first key down of a press that moved nothing is at an end: it goes round when let go
+      var before = again ? null : navState();
       move(arrow[0], arrow[1]);
       wrapPending = before !== null && navState() === before ? { dx: arrow[0], dy: arrow[1] } : null;
     }
@@ -4674,10 +4683,11 @@
     }
     if (kidsOn()) { if (isOk(e)) e.preventDefault(); okReset(); return; }
     var arrow = arrowOf(e);
-    if (arrow) {   // the end of a single press at an end: go round (a repeat cleared wrapPending)
-      var w = wrapPending;
-      wrapPending = null;
-      if (w && w.dx === arrow[0] && w.dy === arrow[1] && !isTyping()) {
+    if (arrow) {   // the end of a single press at an end: go round (a held key cleared wrapPending)
+      var w = wrapPending, p = arrowPress;
+      wrapPending = null; arrowPress = null;
+      var quick = p && Date.now() - p.at <= HOLD_MS;
+      if (w && quick && w.dx === arrow[0] && w.dy === arrow[1] && !isTyping()) {
         e.preventDefault();
         wrapRound(w.dx, w.dy);
         ensureFocus();
@@ -4695,6 +4705,7 @@
     resetIdlePhoto();
   });
   window.addEventListener("blur", okReset);
+  window.addEventListener("blur", function () { wrapPending = null; arrowPress = null; });   // a key let go elsewhere
 
   // ---------------- data ----------------
   function nativeApps() {
