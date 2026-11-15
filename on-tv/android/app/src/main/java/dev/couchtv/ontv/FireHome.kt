@@ -62,8 +62,16 @@ object FireHome {
 
     /** The WatchService saw Amazon's home come on screen. */
     fun onAmazonHome() {
+        // Recents is its own Amazon activity (issue #223). The Home screen under it reports itself
+        // for a moment as it opens, which is not a Home press, so a window just after Recents is left alone.
+        if (android.os.SystemClock.elapsedRealtime() - recentsAt < RECENTS_QUIET_MS) {
+            Log.i(TAG, "Amazon home right after Recents: left alone")
+            return
+        }
         if (wanted) jump()
     }
+    @Volatile private var recentsAt = -RECENTS_QUIET_MS
+    private const val RECENTS_QUIET_MS = 2_500L
 
     /**
      * Any other TV (a Haier, a TCL, Google TV, issue #98): the Home key can open the maker's own
@@ -121,6 +129,9 @@ object FireHome {
     private val later = android.os.Handler(android.os.Looper.getMainLooper())
     fun seen(pkg: String?, cls: String?) {
         if (pkg == null || pkg in notScreens) return
+        if (pkg == AMAZON_HOME && cls != null && cls.contains("RecentDeepLinkActivity")) {
+            recentsAt = android.os.SystemClock.elapsedRealtime()
+        }
         lastPkg = pkg
         amazonHomeInFront = isAmazonHome(pkg, cls)
     }
