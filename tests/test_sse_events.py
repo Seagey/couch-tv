@@ -69,7 +69,7 @@ class TestSSEEvents(unittest.IsolatedAsyncioTestCase):
         req.transport.is_closing.return_value = False
 
         with patch.object(server, "now_payload", return_value={"title": "Now Playing"}), \
-             patch("bridge.server.web.StreamResponse") as mock_stream_cls:
+             patch.object(server.web, "StreamResponse") as mock_stream_cls:
             mock_stream = MagicMock()
             mock_stream.prepare = AsyncMock()
             mock_stream.write = AsyncMock()
