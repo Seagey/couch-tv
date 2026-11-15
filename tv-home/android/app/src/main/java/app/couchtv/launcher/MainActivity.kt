@@ -1082,8 +1082,11 @@ class MainActivity : Activity() {
     private fun appList(): List<Pair<ResolveInfo, String>> = appCache ?: synchronized(this) {
         appCache ?: run {
             val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-            val store = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage("com.amazon.venezia")
-            (packageManager.queryIntentActivities(q, 0) + packageManager.queryIntentActivities(store, 0))
+            // Fire TV apps that declare only LAUNCHER: the Appstore and Audible (#238).
+            val extra = listOf("com.amazon.venezia", "com.audible.application.firetv").flatMap {
+                packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(it), 0)
+            }
+            (packageManager.queryIntentActivities(q, 0) + extra)
                 .filter { it.activityInfo.packageName != packageName }
                 .distinctBy { it.activityInfo.packageName }
                 .map { it to it.loadLabel(packageManager).toString() }

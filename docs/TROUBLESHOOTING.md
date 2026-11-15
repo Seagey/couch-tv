@@ -57,7 +57,7 @@ installing so it is switched on. Other TVs are unchanged and show no new input. 
 until it is tested on a real TCL.
 
 **A fix confirmed on a real TCL (0.12, without the TV input):** from a computer, once, run
-`adb shell appops set app.couchtv.launcher AUTO_START allow`, then on the TV itself open Settings,
+`adb shell appops set app.couchtv.launcher AUTO_START allow` (on some TCL builds the op is named `APP_AUTO_START` instead, and `AUTO_START` answers "Unknown operation string"; run `adb shell appops get app.couchtv.launcher` to see which name your TV lists), then on the TV itself open Settings,
 Accessibility and switch on **Home button watch** and **Home gear button** with the remote (not over
 ADB). After a real power cut at the wall the TV went straight to couch-tv with no flash of Google
 TV, and TCL kept AUTO_START allowed. It is not yet known which of the two steps does it, so do both. If the two services are not in the Accessibility menu yet, open couch-tv once, then set AUTO_START and write `enabled_accessibility_services` and `accessibility_enabled 1` over ADB: on that TCL the services only appeared in the menu once they were actually running.
