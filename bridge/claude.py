@@ -50,6 +50,7 @@ LANG_NAMES = {
     "pl": "Polish",
     "pt": "Brazilian Portuguese",
     "ar": "Arabic",
+    "ro": "Romanian",
 }
 
 

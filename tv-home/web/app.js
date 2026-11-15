@@ -373,7 +373,7 @@
     if (window.I18N) window.I18N.set(ST.lang || HOME.language || window.I18N.device());
     if (CFG.weather) WXCFG = CFG.weather;
     var pl = ST.place;
-    if (pl && isFinite(pl.lat) && isFinite(pl.lon)) WXCFG = { lat: pl.lat, lon: pl.lon, place: pl.name || "", timezone: pl.timezone || "auto" };
+    if (pl && isFinite(pl.lat) && isFinite(pl.lon)) WXCFG = { lat: pl.lat, lon: pl.lon, place: [pl.name, pl.area].filter(Boolean).join(", "), timezone: pl.timezone || "auto" };
     WX_SHOW = ST.wx_show !== false;
     WX_F = (ST.wx_unit || HOME.wx_unit) === "f";   // Home settings, else home.wx_unit in config.json
     WX_EVERY = [15, 30, 60].indexOf(ST.wx_every) >= 0 ? ST.wx_every : 30;
@@ -626,23 +626,52 @@
   function tempText(c) { return WX_F ? Math.round(c * 9 / 5 + 32) + "°F" : c + "°"; }
   function wxText(w) { var k = WMO_KEY[w.code]; return k ? t(k) : (w.text || ""); }
 
+  function weatherPlace() {
+    var place = String((WXCFG && WXCFG.place) || "").trim();
+    var L = window.I18N, country = L && L.country ? L.country() : "";
+    var parts = place.split(/\s*,\s*/);
+    if (country && parts.length > 1 && typeof Intl !== "undefined" && Intl.DisplayNames) {
+      var names = [
+        new Intl.DisplayNames(["en"], { type: "region" }).of(country),
+        new Intl.DisplayNames([L.locale()], { type: "region" }).of(country)
+      ];
+      var last = parts[parts.length - 1].toLowerCase();
+      if (names.some(function (name) { return name && name.toLowerCase() === last; })) parts.pop();
+    }
+    return parts.join(", ");
+  }
+
   function clock() {
     var d = new Date(), h = d.getHours(), m = d.getMinutes();
     var mm = (m < 10 ? "0" : "") + m;
     var hm = CLOCK24 ? (h < 10 ? "0" : "") + h + ":" + mm : (h % 12 || 12) + ":" + mm;
     $("time").innerHTML = hm + (CLOCK24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
     var loc = window.I18N ? window.I18N.locale() : "en-AU";
-    var day = d.toLocaleDateString(loc, { weekday: "long", day: "numeric", month: "long" }).replace(",", "");
+    var lang = window.I18N ? window.I18N.lang() : "en";
+    var day = d.toLocaleDateString(loc, { weekday: "long", day: "numeric", month: "long" });
+    if (lang !== "ro") day = day.replace(",", "");
     day = day.charAt(0).toUpperCase() + day.slice(1);   // "lunes 27 de octubre" starts a line on screen
     var w = NIGHT && WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
-    $("date").innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' + wxIcon(w) + esc(tempText(w.temp)) +
-      '<span class="ww"> ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
+    var place = w ? weatherPlace() : "";
+    var date = $("date");
+    if (lang === "ro" && (place || w)) {
+      var weatherParts = [place, w && tempText(w.temp), w && wxText(w)].filter(Boolean);
+      date.classList.add("weather-lines");
+      date.innerHTML = '<span class="dline"><span class="date-label">' + esc(day) +
+        '</span><span class="wx">' + weatherParts.map(esc).join(" · ") + "</span></span>";
+    } else {
+      date.classList.remove("weather-lines");
+      date.innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' +
+        (place ? '<span class="wx-place">' + esc(place) + " · </span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
+        '<span class="ww"> · ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
+    }
     var ic = $("idle-clock"), idate = $("idle-date"), iwx = $("idle-wx");
     if (ic) ic.innerHTML = hm + (CLOCK24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
     if (idate) idate.textContent = day;
     if (iwx) {
       var wIdle = WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
-      iwx.textContent = wIdle ? (tempText(wIdle.temp) + " · " + wxText(wIdle)) : "";
+      var placeIdle = wIdle ? weatherPlace() : "";
+      iwx.textContent = wIdle ? ([placeIdle, tempText(wIdle.temp), wxText(wIdle)].filter(Boolean).join(" · ")) : "";
     }
     var iov = $("idle-ambient-overlay");
     if (iov) iov.classList.toggle("quiet-hours", isQuietHours(SMART_IDLE.quiet_hours));
@@ -3486,8 +3515,8 @@
     if (go) run(); else geoTimer = setTimeout(run, 500);
   }
   function choosePlace(p) {
-    ST.place = { name: p.name, lat: p.lat, lon: p.lon, timezone: p.timezone };
-    WXCFG = { lat: p.lat, lon: p.lon, place: p.name, timezone: p.timezone };
+    ST.place = { name: p.name, area: p.area || "", lat: p.lat, lon: p.lon, timezone: p.timezone };
+    WXCFG = { lat: p.lat, lon: p.lon, place: [p.name, p.area].filter(Boolean).join(", "), timezone: p.timezone };
     saveSettings();
     SET.msg = t("loc_set", { place: p.name });
     data.weather = null;
