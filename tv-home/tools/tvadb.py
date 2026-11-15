@@ -126,10 +126,14 @@ class NativeAdb:
 
     def push(self, source, dest, transport_timeout_s=20, read_timeout_s=20):
         # adb_shell accepts a byte stream; Google's client needs a local file.
-        with tempfile.NamedTemporaryFile(prefix="tvadb-") as part:
-            part.write(source.read())
-            part.flush()
+        # Closed before adb reads it: on Windows an open NamedTemporaryFile is locked to other programs.
+        part = tempfile.NamedTemporaryFile(prefix="tvadb-", delete=False)
+        try:
+            with part:
+                part.write(source.read())
             return self.run(["push", part.name, dest], max(transport_timeout_s, read_timeout_s))
+        finally:
+            os.unlink(part.name)
 
     def pull(self, source, dest):
         return self.run(["pull", source, os.fspath(dest)], SHELL_TIMEOUT)
