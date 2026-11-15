@@ -1,6 +1,7 @@
 package dev.couchtv.ontv
 
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.NanoWSD
@@ -339,8 +340,21 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         val apps = known.optJSONArray("apps") ?: JSONArray()
         val saved = Store.readJson("app-order.json") as? JSONObject
         if (saved == null) return ok().put("apps", apps).put("line", minOf(known.optInt("line", 10), 10, apps.length())).put("saved", false).put("dock_max", 10)
-        val by = (0 until apps.length()).associate { apps.getJSONObject(it).optString("package") to apps.getJSONObject(it) }
+        val by = (0 until apps.length()).associate { apps.getJSONObject(it).optString("package") to apps.getJSONObject(it) }.toMutableMap()
         val order = saved.optJSONArray("order") ?: JSONArray()
+        val pm = ctx.packageManager
+        for (i in 0 until order.length()) {
+            val p = order.optString(i)
+            if (p.isNotEmpty() && !by.containsKey(p)) {
+                val ri = pm.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER).setPackage(p), 0)
+                    ?: pm.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(p), 0)
+                if (ri != null) {
+                    val ai = ri.activityInfo
+                    by[p] = JSONObject().put("package", p).put("label", ri.loadLabel(pm).toString())
+                        .put("hasBanner", ai.banner != 0 || ai.applicationInfo.banner != 0)
+                }
+            }
+        }
         val listed = JSONArray(); val inOrder = HashSet<String>()
         for (i in 0 until order.length()) { val p = order.optString(i); inOrder += p; by[p]?.let { listed.put(it) } }
         val line = (0 until minOf(saved.optInt("line"), order.length())).count { by.containsKey(order.optString(it)) }

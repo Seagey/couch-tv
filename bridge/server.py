@@ -2339,6 +2339,12 @@ def effective_order():
     if not saved:
         return apps, min(int(known.get("line", DOCK_MAX)), DOCK_MAX, len(apps)), False
     by = {a["package"]: a for a in apps}
+    import apps as _apps_mod
+    for p in saved.get("order", []):
+        if p and p not in by:
+            known_app = _apps_mod.BY_PACKAGE.get(p)
+            if known_app:
+                by[p] = {"package": p, "name": known_app.get("name", p)}
     listed = [by[p] for p in saved.get("order", []) if p in by]
     above = sum(1 for p in saved.get("order", [])[:saved.get("line", 0)] if p in by)
     listed += [a for a in apps if a["package"] not in set(saved.get("order", []))]

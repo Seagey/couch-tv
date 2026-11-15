@@ -43,6 +43,7 @@ object Apps {
         TvApp("google-tv", "Google TV", "com.google.android.videos", "#4285F4", listOf("play", "googleplaymovies")),
         TvApp("twitch", "Twitch", "tv.twitch.android.app", "#9146FF"),
         TvApp("spotify", "Spotify", "com.spotify.tv.android", "#1DB954"),
+        TvApp("audible", "Audible", "com.audible.application.firetv", "#F8991D"),
         TvApp("plex", "Plex", "com.plexapp.android", "#E5A00D"),
         // Nuvio, a Stremio-style player. com.nuvio.app is its Play Store build.
         TvApp("nuvio", "Nuvio", "com.nuvio.tv", "#111111", alt = listOf("com.nuvio.app")),

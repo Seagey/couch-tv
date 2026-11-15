@@ -49,6 +49,8 @@
             <data android:scheme="https" />
         </intent>
         <package android:name="com.amazon.tv.launcher" />
+        <package android:name="com.amazon.venezia" />
+        <package android:name="com.audible.application.firetv" />
         <package android:name="com.google.android.apps.tv.launcherx" />
         <package android:name="com.google.android.tvlauncher" />
     </queries>
