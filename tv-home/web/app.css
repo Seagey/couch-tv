@@ -352,8 +352,16 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 }
 .theme-night .date .wx { color: rgba(255, 255, 255, 0.78); font-weight: 400; }
 .theme-night .date { white-space: nowrap; }
+.theme-night .date.weather-lines { white-space: normal; }
+.theme-night .date.weather-lines .dline {
+  display: inline-flex; flex-direction: column; align-items: center; white-space: normal;
+}
+.theme-night .date.weather-lines .date-label,
+.theme-night .date.weather-lines .wx { display: block; }
+.theme-night .date.weather-lines .wx { font-size: 0.72em; line-height: 1.4; }
 /* fitDate() in app.js: not enough room between the people switch and the quick buttons */
-.theme-night .date.tight .ww, .theme-night .date.tighter .wx { display: none; }
+.theme-night .date.tight .ww, .theme-night .date.tight .wx-place,
+.theme-night .date.tighter .wx { display: none; }
 /* the date sits just above each scene's clock; it fades out while the scenes swap */
 .theme-night .date.swap { opacity: 0; }
 .scene-night .date { color: rgba(255, 232, 238, 0.92); }

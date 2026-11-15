@@ -125,7 +125,7 @@ What you change shows when the list closes.
 ### Language
 
 English, Español, Español (México), Italiano, Deutsch, Français, Türkçe, Srpski (latinica), Polski (on main,
-in the next release), Português (Brasil) (on main, in the next release), Čeština (on main, in the next release) Hebrew (עברית with full RTL layout, on main, in the next release) and Arabic (العربية with full RTL layout, on main, in the next release). Until one is picked here (or in
+in the next release), Português (Brasil) (on main, in the next release), Čeština (on main, in the next release), Hebrew (עברית with full RTL layout, on main, in the next release), Arabic (العربية with full RTL layout, on main, in the next release) and Romanian (Română, 24-hour clock). Until one is picked here (or in
 `config.json`), the home speaks the TV's own language if it is one of these, else English. More on
 each language: [Languages](#languages).
 
@@ -430,14 +430,15 @@ They win over `config.json` on that TV; About, Reset home settings goes back to 
 | Czech | `cs` | 24 hour | Yes, on main, in the next release | Yes, on main, in the next release |
 | Brazilian Portuguese | `pt` | 24 hour | Yes, on main, in the next release | Yes, on main, in the next release |
 | Arabic, with full right-to-left layout | `ar` | 12 hour | Yes, on main, in the next release | Not yet |
+| Romanian | `ro` | 24 hour | Yes | Not yet |
 
 The TV home and the phone remote both speak English, Spanish (`es`, for Spain and everyone else),
 Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest), Italian (`it`),
 German (`de`), Turkish (`tr`), Serbian Latin (`sr-Latn-RS`), Czech (`cs`, 24 hour clock, on main, in the next release), Polish (`pl`, on main, in the next release), Brazilian Portuguese (`pt`, on main, in the next release), Dutch (`nl`, TV home only for now, on
 main, in the next release) and Hebrew (`he`, with full right-to-left layout and 24 hour clock, TV
-home only for now) and Arabic (`ar`, with full right-to-left layout, TV home only for now, on main, in the next release). Italian, German, Turkish, Serbian, Czech, Polish, Brazilian Portuguese, Dutch and Hebrew use a 24 hour clock by
-default unless you pick 12 hour. The TV home also speaks French (`fr`, 24 hour clock); the phone
-remote has no French yet.
+home only for now), Arabic (`ar`, with full right-to-left layout, TV home only for now, on main, in the next release) and Romanian (`ro`, TV home only for now). The TV home also speaks French (`fr`, 24 hour clock); the phone
+remote has no French yet. Italian, German, Turkish, Serbian, Czech, Polish, Brazilian Portuguese, Dutch, Hebrew and Romanian use a 24 hour clock by
+default unless you pick 12 hour.
 
 The optional smart-home controls are translated too. The phone has its own choice (TV menu,
 Language), "Same as the TV" by default. Messages that come from the bridge itself (an error, a note
