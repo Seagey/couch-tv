@@ -85,6 +85,7 @@ class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(server, "play", new=AsyncMock(return_value={"title": "x"})) as play:
             for c in cards:
                 req = AsyncMock()
+                req.headers = {}
                 with patch.object(server, "body", new=AsyncMock(return_value={"id": c["id"], "who": "person1"})):
                     await server.h_continue_open(req)
                 self.assertEqual(play.await_args.args[0], c["title"])
@@ -92,8 +93,10 @@ class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_removed_card_stays_gone_until_played_again(self):
         self.add(line("Dark", self.tv, "person1", 3), line("Dark", self.tv, "person1", 2), line("Ozark", self.tv, "person1", 1))
         dark = next(c for c in server.continue_items("person1") if c["title"] == "Dark")
+        hide_req = AsyncMock()
+        hide_req.headers = {}
         with patch.object(server, "body", new=AsyncMock(return_value={"id": dark["id"]})):
-            await server.h_continue_hide(AsyncMock())
+            await server.h_continue_hide(hide_req)
         self.assertEqual(self.titles("person1"), ["Ozark"])   # the older Dark line does not come back
         self.add(line("Dark", self.tv, "person1", -0.001))   # watched again
         self.assertEqual(self.titles("person1"), ["Dark", "Ozark"])

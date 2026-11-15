@@ -481,10 +481,16 @@ class Hook(Base):
         t._hook = hook
         with patch.object(vidaa, "WATCH_EVERY", 0.02):
             task = asyncio.create_task(t._watch())
-            await asyncio.sleep(0.3)
+            for _ in range(100):
+                if t.is_on is not None:
+                    break
+                await asyncio.sleep(0.02)
             self.assertEqual((fired, t.is_on), ([], False))
             self.s.statetype = "remote_launcher"
-            await asyncio.sleep(0.4)
+            for _ in range(100):
+                if fired and t.is_on:
+                    break
+                await asyncio.sleep(0.02)
             task.cancel()
         self.assertTrue(fired)        # the state answer and the watcher may both call it: _hook keeps it to one
         self.assertTrue(t.is_on)
