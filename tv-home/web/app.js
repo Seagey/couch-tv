@@ -2965,6 +2965,65 @@
     paintFocus();
   }
 
+  // ---------------- going round at the ends ----------------
+  // A single press of an arrow at the end of a row or a list goes round to the other end: left on the
+  // first app lands on More apps, down on the last row of a Home settings list lands on its first row.
+  // It happens when the key is let go, and only for a press that did one thing: holding an arrow still
+  // runs to the end and stops there, even when it starts at the end. Some remotes send a held arrow
+  // as more key downs that are not marked as repeats, so every key down of the same arrow before it
+  // is let go counts as the same press (arrowPress), and a press longer than HOLD_MS never goes round.
+  var wrapPending = null, arrowPress = null;
+  // is this key down the arrow of the press still going (held), rather than a new press?
+  function arrowAgain(p, dir, now, repeat) { return !!(repeat || (p && p.dir === dir && now - p.last < 1000)); }
+  function navState() {
+    return [zone, g, s, pi, qi, npI, menuI, pmi, gi, amI, smI, ai, inI, ambI, expanded, !!lift, plift,
+      SET.col, SET.sec, SET.ri, !!SET.lift, !!SET.sub].join("|");
+  }
+  // where a list of n entries goes round to: forwards to the first, backwards to the last
+  function wrapIndex(n, d) { return d > 0 ? 0 : Math.max(0, n - 1); }
+  function wrapRound(dx, dy) {
+    if (document.documentElement.dir === "rtl") dx = -dx;
+    if (lift || plift || SET.lift) return;   // carrying something: the ends stay the ends
+    if (zone === "smart" || zone === "ambient") return;   // they keep their own focus
+    var d = dy || dx;
+    if (zone === "settings") {
+      if (!dy) return;   // left and right change a value or the column
+      if (SET.col === "secs") {
+        var n = wrapIndex(SECS.length, dy);
+        if (n !== SET.sec) { SET.sec = n; SET.sub = null; SET.msg = ""; SET.keyFocus = null; SET.ri = 0; }
+      } else {
+        var rows = rowsNow(), r = stepRow(rows, dy > 0 ? -1 : rows.length, dy);
+        if (r >= 0 && r < rows.length) { SET.ri = r; SET.keyFocus = rows[r].key; }
+      }
+      renderSettings();
+      return;
+    }
+    if (zone === "gear") { if (dy) { gi = wrapIndex(2, dy); renderGear(); } return; }
+    if (zone === "appmenu") { if (dy) { amI = wrapIndex(amItems.length, dy); renderAppMenu(); } return; }
+    if (zone === "shelfmenu") { if (dy) { smI = wrapIndex(smItems.length, dy); renderShelfMenu(); } return; }
+    if (zone === "updask") { if (dy) { ai = wrapIndex(2, dy); renderAsk(); } return; }
+    if (zone === "inputs") { if (dy) { inI = wrapIndex(inItems.length, dy); renderInputMenu(); } return; }
+    if (zone === "pmenu") { if (dy) { pmi = wrapIndex(PEOPLE.length, dy); renderPop(); } return; }
+    if (zone === "menu") { menuI = wrapIndex(SLEEP_CHOICES.length, d); paintFocus(); return; }
+    if (zone === "grid") {
+      if (dx) {   // along the row: the first app and the last tile (More apps) meet
+        var first = Math.floor(g / GRID_COLS) * GRID_COLS;
+        g = dx > 0 ? first : Math.min(first + GRID_COLS, gridEls.length) - 1;
+      } else if (dy > 0) {   // down from the very bottom: back to the top of the home
+        if (peopleOn()) toPeople();
+        else if (hasQuick()) { zone = "quick"; qi = 0; }
+        else if (shelfEls.length && !(NIGHT && expanded)) { zone = "shelf"; s = 0; }
+        else g = g % GRID_COLS;
+      }
+    } else if (zone === "shelf") {
+      if (dx) s = wrapIndex(shelfEls.length, dx);
+      else if (dy < 0 && gridEls.length) { zone = "grid"; g = 0; }   // nothing above the cards: round to the apps
+    } else if (zone === "people" || zone === "quick" || zone === "np") {
+      if (dy < 0 && gridEls.length) { zone = "grid"; g = 0; }      // up from the very top: round to the apps
+    }
+    paintFocus();
+  }
+
   // Start on the chosen place (home.start_focus): people (default, as before), keep_watching or apps (#211).
   function startFocus() {
     s = 0; g = 0;
@@ -4599,7 +4658,18 @@
       return;
     }
     var arrow = arrowOf(e);
-    if (arrow) { blip(arrow[0], arrow[1]); move(arrow[0], arrow[1]); }
+    if (arrow) {
+      blip(arrow[0], arrow[1]);
+      // the same arrow again before it was let go is the key being held, marked as a repeat or not
+      var dir = arrow[0] + "," + arrow[1], now = Date.now();
+      var again = arrowAgain(arrowPress, dir, now, e.repeat);
+      if (again && arrowPress) arrowPress.last = now;
+      else arrowPress = { dir: dir, at: now, last: now };
+      // the first key down of a press that moved nothing is at an end: it goes round when let go
+      var before = again ? null : navState();
+      move(arrow[0], arrow[1]);
+      wrapPending = before !== null && navState() === before ? { dx: arrow[0], dy: arrow[1] } : null;
+    }
     else if (isBack(e)) goHome();
     else if (isSettings(e)) { if (!e.repeat) settingsKey(); }   // the remote's own Settings/gear key
     else if (isMenu(e)) { if (!e.repeat) hold(); }   // optional: many remotes have no Menu key
@@ -4615,6 +4685,19 @@
       return;
     }
     if (kidsOn()) { if (isOk(e)) e.preventDefault(); okReset(); return; }
+    var arrow = arrowOf(e);
+    if (arrow) {   // the end of a single press at an end: go round (a held key cleared wrapPending)
+      var w = wrapPending, p = arrowPress;
+      wrapPending = null; arrowPress = null;
+      var quick = p && Date.now() - p.at <= HOLD_MS;
+      if (w && quick && w.dx === arrow[0] && w.dy === arrow[1] && !isTyping()) {
+        e.preventDefault();
+        wrapRound(w.dx, w.dy);
+        ensureFocus();
+        resetIdlePhoto();
+      }
+      return;
+    }
     if (!isOk(e) || isTyping()) return;
     e.preventDefault();
     if (!okDown) return;
@@ -4625,6 +4708,7 @@
     resetIdlePhoto();
   });
   window.addEventListener("blur", okReset);
+  window.addEventListener("blur", function () { wrapPending = null; arrowPress = null; });   // a key let go elsewhere
 
   // ---------------- data ----------------
   function nativeApps() {
