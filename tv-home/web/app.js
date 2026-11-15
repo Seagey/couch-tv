@@ -2242,14 +2242,14 @@
   // config.json has a home_assistant section with rooms or scenes. Otherwise nothing changes.
   function smartOn() { return !!(window.smartHome && window.smartHome.available()); }
   function smartItem() { return { kind: "smart", name: t("smart_home"), package: "smart:home" }; }
-  // LG's own Developer Mode app, as a dock tile: it opens the app itself, so the Extend button and
+  // LG's own Developer Mode app, in More apps: it opens the app itself, so the Extend button and
   // the remaining days are there to use by hand (the quick button does the Extend for you).
   function devOn() { return devCan() && TVCFG.extend_devmode !== false; }
   function devItem() { return { kind: "devmode", name: t("dev_app"), package: "com.palmdts.devmode" }; }
   function toolItems() {
     var list = [];
     if (smartOn()) list.push(smartItem());
-    if (devOn()) list.push(devItem());
+    if (devOn() && expanded) list.push(devItem());
     list.push(gearItem());
     return list;
   }
