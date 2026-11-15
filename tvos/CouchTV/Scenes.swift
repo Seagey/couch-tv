@@ -242,7 +242,6 @@ struct SceneBackdrop: View {
                     GlassClock(look: look, time: time, glass: glass, under: true)
                         .blur(radius: 2.2)
                         .opacity(0.78)
-                        .offset(x: 5)
                         .mask(Rectangle().frame(width: 1920, height: 1080 * (1 - line)).frame(width: 1920, height: 1080, alignment: .bottom))
                 } else {
                     GlassClock(look: look, time: time, glass: glass)

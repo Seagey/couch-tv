@@ -324,10 +324,10 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 /* 1 Golden hour: a little smaller, low enough for the volcano's tip to rise into the digits */
 .s-golden .gclock { top: 9.5rem; font-size: 24.375rem; }
 /* 2 Waterline: the clock sits on the water (app.js water: the underside of the surface); the part
-   under it is blurred like a reflection */
+   under it is blurred like a reflection, lined up with the sharp part above (no sideways shift) */
 .s-water .shade { background: linear-gradient(180deg, rgba(0, 12, 24, 0.42) 0%, rgba(0, 12, 24, 0.12) 40%, rgba(0, 0, 0, 0) 52%, rgba(0, 20, 40, 0.5) 100%); }
 .s-water .gclock { top: 16.75rem; font-size: 26.25rem; filter: drop-shadow(0 0.5rem 1.875rem rgba(0, 20, 40, 0.35)); }
-.s-water .gclock.under { filter: blur(0.1375rem); opacity: 0.78; transform: translateX(0.3125rem); }
+.s-water .gclock.under { filter: blur(0.1375rem); opacity: 0.78; }
 .s-water .gclock.under .fill { filter: hue-rotate(-8deg) saturate(1.4); }
 .s-water .gclock.under .rim { -webkit-text-stroke-color: rgba(170, 240, 255, 0.5); }
 /* 3 Fog: a big dark clock on the left, sinking into the misty hills */
