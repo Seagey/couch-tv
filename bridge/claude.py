@@ -51,6 +51,7 @@ LANG_NAMES = {
     "pt": "Brazilian Portuguese",
     "ar": "Arabic",
     "ro": "Romanian",
+    "zh-CN": "Simplified Chinese",
 }
 
 
