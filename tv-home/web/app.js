@@ -3025,9 +3025,16 @@
       }
     } else {
       var row = Math.floor(g / GRID_COLS), lastRow = Math.floor((gridEls.length - 1) / GRID_COLS);
-      if (dx) {
-        var nx = g + dx;
-        if (nx >= 0 && nx < gridEls.length && Math.floor(nx / GRID_COLS) === row) g = nx;
+      if (dx && gridEls.length) {
+        // More apps: left/right run through every app line by line and wrap from the last to
+        // the first; the dock (one row): they wrap within the row (#167).
+        var n = gridEls.length;
+        if (expanded) g = (g + dx + n) % n;
+        else {
+          var first = row * GRID_COLS, last = Math.min(n, first + GRID_COLS) - 1;
+          var nx = g + dx;
+          g = nx > last ? first : nx < first ? last : nx;
+        }
       } else if (dy < 0 && row === 0) {
         if (cards.length) zone = "shelf";
         else if (npReach()) {

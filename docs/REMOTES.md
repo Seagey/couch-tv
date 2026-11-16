@@ -30,7 +30,9 @@ still get them, and they never move the focus.
 ## Going round at the ends
 
 One press of an arrow at the end of a row or a list goes round to the other end: left on the first
-app lands on More apps and right on More apps lands on the first app; the same along Keep watching;
+app lands on More apps and right on More apps lands on the first app; in More apps, left and right
+run continuously line by line through every app and wrap between the first and last (#167); the
+same along Keep watching;
 up from the very top lands on the apps, and down from the very bottom goes back to the top. In
 Home settings, up and down go round the sections and each section's rows, and the small menus (the
 gear menu, an app's menu, the people list) go round too. Left and right in Home settings keep their
