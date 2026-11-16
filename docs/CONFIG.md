@@ -10,8 +10,8 @@ change people, weather, the look or the quick buttons.
 Every key below is optional unless it says otherwise. Leave a key out and you get the default in
 brackets, which is how couch-tv behaved before the key existed. So an older `config.json` with no
 `home` or `quick` keys looks and works exactly as it did, except one thing: with no
-`home.language`, a TV set to Spanish, Italian, German, French, Serbian, Polish, Czech, Brazilian Portuguese, Hebrew, Arabic or Romanian now shows the home in that language
-(and an Italian, German, Turkish, French, Serbian, Polish, Czech, Brazilian Portuguese, Hebrew or Romanian one with a 24 hour clock), where it used to be English.
+`home.language`, a TV set to Spanish, Italian, German, French, Serbian, Polish, Czech, Brazilian Portuguese, Hebrew, Arabic, Romanian or Simplified Chinese now shows the home in that language
+(and an Italian, German, Turkish, French, Serbian, Polish, Czech, Brazilian Portuguese, Hebrew, Romanian or Simplified Chinese one with a 24 hour clock), where it used to be English.
 
 Most of what the home shows can also be changed on the TV itself, with the gear tile (Home
 settings), and what is chosen there wins on that TV. See
@@ -269,7 +269,7 @@ release opens the app rather than the show.
 | `scenes` [all five] | Which Night scenes take turns, and in what order. Any of `night`, `golden`, `water`, `fog`, `dawn`, and the ids of your own scenes. One scene stays put. |
 | `my_scenes` [none] | Your own scenes from any photo, each with its clock designed: where it sits, its size and font, the date above or below it, light or dark text, `cutout` for the skyline in front of the clock, and `video` for a looping clip behind it. Made with `tv-home/tools/make-scene.py`; [MAKE-A-SCENE.md](MAKE-A-SCENE.md) has every key. They take turns after the scenes in `scenes` unless they are listed there. Option A needs the app rebuilt with the scene's pictures inside (that guide says how). |
 | `scene_seconds` [20] | How long each scene shows. 5 or more. |
-| `clock` [the language's usual clock: `24h` in Italian, German, Turkish, French, Serbian, Polish, Czech, Brazilian Portuguese, Dutch and Romanian, `12h` in the others] | `12h` (5:30 pm) or `24h` (17:30). |
+| `clock` [the language's usual clock: `24h` in Italian, German, Turkish, French, Serbian, Polish, Czech, Brazilian Portuguese, Dutch, Romanian and Simplified Chinese, `12h` in the others] | `12h` (5:30 pm) or `24h` (17:30). |
 | `idle_photo_seconds` [`0`] | `0` leaves rows on. `5`, `10`, `15`, `30` or `60` fades out the app dock, Keep watching and profile controls after that many seconds without input. The clock, weather and background scenes stay visible. Any remote button wakes the rows without opening the focused app. Home settings, Look, Hide rows when idle wins over it. |
 | `keep_photo` [`false`] | Classic look only. `true` stops the background changing and holds one photo, the one showing when it was switched on. In Home settings, Look, Keep one photo you can then pick which photo it holds, and the TV remembers it after a restart (if that photo is later removed it goes back to the usual photo for the time of day). Night and OLED are unaffected. Home settings wins over it. |
 | `hide_packages` [none] | Android package names never shown on the home or in More apps, for a maker's own clutter (help apps, file browsers, screen sharing tools). `survey-tv.py` lists every TV app with its package name. For example `["com.example.tvhelp"]`. |
@@ -301,7 +301,7 @@ release opens the app rather than the show.
 | `custom_cards` [none: off] | Your own cards at the end of the Keep watching row, from a small JSON file: a file on the bridge computer (`"cards.json"`, read from the folder `config.json` is in, or an absolute path) or an `http` or `https` link (`"https://raw.githubusercontent.com/you/repo/main/cards.json"`, or a Raspberry Pi on your Wi-Fi). Display only: a title, a value, a subtitle, a picture, and an installed app or an `http(s)` link for OK; at most 8 cards, nothing in the file is ever run. Read every 10 minutes; a bad file keeps the last good cards. Example: `{"cards": [{"title": "Solar today", "value": "18.4 kWh", "app": "com.example.solar"}, {"title": "Bin night", "value": "Recycling", "url": "https://example.com/bins"}]}`. The schema and limits: [TV-HOME.md](TV-HOME.md#custom-cards). |
 | `skip_watch_next` [none] | Package names never shown in the Keep watching row (e.g. `["com.google.android.youtube.tv"]`). |
 | `watch_next_per_app` [5] | The maximum number of Keep watching cards to show from any single app (1 to 20). |
-| `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish), `it` (Italian), `de` (German), `tr` (Turkish), `fr` (French), `sr-Latn-RS` (Serbian Latin), `pl` (Polish), `cs` (Czech), `pt` (Brazilian Portuguese), `nl` (Dutch) or `ro` (Romanian). The phone remote has its own choice, "Same as the TV" by default; Romanian is not available as a separate phone language yet. |
+| `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish), `it` (Italian), `de` (German), `tr` (Turkish), `fr` (French), `sr-Latn-RS` (Serbian Latin), `pl` (Polish), `cs` (Czech), `pt` (Brazilian Portuguese), `nl` (Dutch), `ro` (Romanian) or `zh-CN` (Simplified Chinese). The phone remote has its own choice, "Same as the TV" by default; Romanian is not available as a separate phone language yet. |
 
 ## Apps on the home
 
@@ -430,7 +430,7 @@ is the safe way to use the phone remote away from home.
 | `bridge.host`, `bridge.port` [5400], `bridge.fallback_hosts` | Where the bridge runs. `fallback_hosts` lists other names the bridge may be opened by (see "Opening the bridge by another name" below). |
 | `bridge.pairing_key` [""] | Optional API pairing key. Empty/unset by default. When set, clients (phone remote and TV front-ends) must authenticate with this key. |
 | `weather` | `lat`, `lon`, `place`, `timezone`, for the weather on the home (Open-Meteo, no key). A suburb or city is enough; never a home address. `timezone` (for example `Europe/London`) is also the time zone the bridge writes times in. |
-| `country` [`IT` for Italian, `DE` for German, `BE` for Dutch, `RS` for Serbian, `IL` for Hebrew, `CZ` for Czech, `PL` for Polish, `BR` for Brazilian Portuguese, `SA` for Arabic, `RO` for Romanian, else `AU`] | Two letter code, for where shows stream (JustWatch), the country in links to Apple TV and Prime Video, and the country Claude is told about. |
+| `country` [`IT` for Italian, `DE` for German, `BE` for Dutch, `RS` for Serbian, `IL` for Hebrew, `CZ` for Czech, `PL` for Polish, `BR` for Brazilian Portuguese, `SA` for Arabic, `RO` for Romanian, `CN` for Simplified Chinese, else `AU`] | Two letter code, for where shows stream (JustWatch), the country in links to Apple TV and Prime Video, and the country Claude is told about. |
 | `country_name` | Optional: what to call the country in Claude's prompts, if the built-in list does not know your code. |
 | `client_name` ["Couch TV bridge"] | The name the TV shows for the bridge in its list of paired remotes. Set it before `pair_tv.py`; changing it later means pairing again. |
 | `screens` [] | Extra screens the TV can open, for example a computer through Moonlight. |

@@ -97,7 +97,7 @@ const keys = [
 
 keys.forEach(k => {
   const count = (i18n.match(new RegExp('\\b' + k + ':', 'g')) || []).length;
-  assert.strictEqual(count, 15, `${k} must exist in all 15 languages (found ${count})`);
+  assert.strictEqual(count, 16, `${k} must exist in all 16 languages (found ${count})`);
 });
 
 console.log('All start_focus tests passed successfully.');
