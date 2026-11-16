@@ -64,16 +64,25 @@ object Tv {
         ctx.packageManager.getInstalledApplications(0).map { it.packageName }.toSet()
     } catch (e: Exception) { emptySet() }
 
-    private val LAUNCHER_ONLY = listOf("com.amazon.venezia", "com.audible.application.firetv")
+    val LAUNCHER_ONLY = listOf("com.amazon.venezia", "com.audible.application.firetv")
 
     fun tvLaunchables(): List<android.content.pm.ResolveInfo> {
+        val pm = ctx.packageManager
         val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
         // Fire TV's Appstore declares LAUNCHER, but no LEANBACK_LAUNCHER.
-        // Also Fire TV apps that declare only LAUNCHER (Audible, #238).
-        val extra = LAUNCHER_ONLY.flatMap {
-            ctx.packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(it), 0)
+        // Also Fire TV apps that declare only LAUNCHER (Audible, #238) and packages in app order.
+        val launcherPkgs = LAUNCHER_ONLY.toMutableSet()
+        val saved = runCatching { Store.readJson("app-order.json") as? JSONObject }.getOrNull()
+        saved?.optJSONArray("order")?.let { order ->
+            for (i in 0 until order.length()) {
+                val pkg = order.optString(i)
+                if (pkg.isNotEmpty()) launcherPkgs.add(pkg)
+            }
         }
-        return (ctx.packageManager.queryIntentActivities(q, 0) + extra)
+        val extra = launcherPkgs.flatMap {
+            pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(it), 0)
+        }
+        return (pm.queryIntentActivities(q, 0) + extra)
             .distinctBy { it.activityInfo.packageName }
     }
 

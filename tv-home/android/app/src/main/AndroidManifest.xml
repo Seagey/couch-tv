@@ -36,8 +36,9 @@
         <!-- The TV's own homes: the Home button watch looks for them (FireWatch.kt), and the crash
              guard hands the screen to one if couch-tv keeps crashing (CrashGuard.kt). -->
         <package android:name="com.amazon.tv.launcher" />
-        <!-- Fire TV's Appstore: it has no Leanback tile, so the app list asks for it by name (#169). -->
+        <!-- Fire TV apps with no Leanback tile (like Appstore and Audible, #169, #238) -->
         <package android:name="com.amazon.venezia" />
+        <package android:name="com.audible.application.firetv" />
         <package android:name="com.google.android.apps.tv.launcherx" />
         <package android:name="com.google.android.tvlauncher" />
         <intent>

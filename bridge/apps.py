@@ -69,6 +69,8 @@ APPS = [
      "jw": [], "deeplink": "app"},
     {"id": "spotify", "name": "Spotify", "package": "com.spotify.tv.android", "colour": "#1DB954",
      "jw": [], "deeplink": "app"},
+    {"id": "audible", "name": "Audible", "package": "com.audible.application.firetv", "colour": "#F8991D",
+     "jw": [], "deeplink": "app"},
     {"id": "moonlight", "name": "Moonlight", "package": "com.limelight", "colour": "#2A2A2A",
      "jw": [], "deeplink": "app"},
     {"id": "settings", "name": "Settings", "package": "com.android.tv.settings", "colour": "#5F6368",
