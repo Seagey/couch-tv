@@ -56,9 +56,9 @@ class FireWatch : AccessibilityService() {
 
     override fun onInterrupt() {}
 
-    /** Xiaomi TVs only (issue #54): every other TV's Home key is left exactly as before. */
+    /** Xiaomi TVs (issue #54) and KTC/JVC TVs (a double press of Home left the Google home up): every other TV's Home key is left exactly as before. */
     override fun onKeyEvent(event: KeyEvent): Boolean {
-        if (!isXiaomi()) return false
+        if (!catchesHomeKey()) return false
         val homeKey = event.keyCode == KeyEvent.KEYCODE_HOME ||
             (event.keyCode == KeyEvent.KEYCODE_BUTTON_5 && event.scanCode == XIAOMI_MI_SCAN)
         if (!homeKey || CrashGuard.standingAside(this)) return false
@@ -68,8 +68,8 @@ class FireWatch : AccessibilityService() {
 
     override fun onServiceConnected() {
         connected = true
-        // Key filtering is switched on at run time and only on Xiaomi, so no other TV sees key presses here.
-        if (isXiaomi()) runCatching {
+        // Key filtering is switched on at run time and only on Xiaomi and KTC/JVC, so no other TV sees key presses here.
+        if (catchesHomeKey()) runCatching {
             serviceInfo = serviceInfo.also { it.flags = it.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS }
         }
         homeClasses = homeActivitiesOf(this)
@@ -238,6 +238,9 @@ class FireWatch : AccessibilityService() {
         // MiTV-MOOQ1's Mi-logo key reports BUTTON_5 with this scan code, not KEYCODE_HOME.
         private const val XIAOMI_MI_SCAN = 580
         private fun isXiaomi() = Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)
+        /** KTC builds the JVC 4K ISDB TV (Android 11): on it a double Home press opens the Google home and no window event follows. */
+        private fun isKtc() = Build.MANUFACTURER.equals("KTC", ignoreCase = true)
+        private fun catchesHomeKey() = isXiaomi() || isKtc()
         const val GOOGLE_TV_HOME = "com.google.android.apps.tv.launcherx"
         const val ANDROID_TV_HOME = "com.google.android.tvlauncher"
         /** Bell's Fibe TV app (Bell Streamer, Canada): its MainTvActivity is the box's HOME, and also its live TV. */
