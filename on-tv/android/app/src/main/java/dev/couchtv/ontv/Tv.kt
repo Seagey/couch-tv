@@ -85,8 +85,6 @@ object Tv {
         return (pm.queryIntentActivities(q, 0) + extra)
             .distinctBy { it.activityInfo.packageName }
     }
-            .distinctBy { it.activityInfo.packageName }
-    }
 
     /** The same launch target for the TV tile and the phone remote. */
     fun launchIntent(pkg: String): Intent? {
