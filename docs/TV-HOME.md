@@ -160,7 +160,8 @@ On main, in the next release:
 - An **OLED Cinema** look (the Classic grid on pure black).
 - **Follow the sun** (the scene follows dawn, day, sunset and night where you are).
 - **Lighter home** for a slow box that stutters.
-- **Moving tiles** (switch it off if the slowly swaying focused tile flickers on an older TV).
+- **Moving tiles** (switch it off if the slowly swaying focused tile flickers on an older TV). The sway and the light that slides across the focused tile now hold still 6 s after the focus last moves, and start again with the next press.
+- **Lighter home turns itself on on a low end TV** (it measures itself once a week) unless you have chosen in Home settings or with `home.lighter` ([CONFIG.md](CONFIG.md)).
 
 Look also holds **Now playing**, **Show Keep watching** and **Sound**: see [Now playing](#now-playing).
 
