@@ -133,6 +133,10 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   no Android TV Remote protocol, so `pair_tv.py`'s code pairing cannot work there; with the flag the
   bridge drives the TV over ADB alone and `pair_tv.py <tv id>` only does the ADB check (the TV's "Allow
   USB debugging?" is the pairing). Skip docs/SETUP.md step 3's code pairing for such a TV.
+  After `apply.sh` on a Fire TV, check `settings get secure enabled_accessibility_services` still lists
+  `app.couchtv.launcher/.FireWatch` and `accessibility_enabled` is 1: on a Cube (Fire OS 7.7) both were
+  cleared a few seconds after the run, twice; `apply.sh` now re-checks, and writing them again holds
+  (docs/TROUBLESHOOTING.md, "Fire TV: Home still opens Amazon's home right after apply.sh").
 - **Samsung (Tizen):** do not say no. Offer the Samsung path in
   [docs/SAMSUNG.md](docs/SAMSUNG.md), with its honest limits, in plain words: "couch-tv goes on
   your Samsung as an app, and a computer at home that stays on opens it every time the TV is

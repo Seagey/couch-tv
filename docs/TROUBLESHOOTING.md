@@ -72,6 +72,21 @@ app.couchtv.launcher/.MainActivity`, start the app, `appops set app.couchtv.laun
 allow`, then write `enabled_accessibility_services` and `accessibility_enabled 1` again. On that TCL
 a real double press of Home also stays on Google TV; Back twice escapes.
 
+## Fire TV: Home still opens Amazon's home right after apply.sh
+
+Seen twice on a Fire TV Cube (3rd gen, Fire OS 7.7.1.7): `apply.sh` finished with "home screen now:
+couch-tv", but a few seconds later `enabled_accessibility_services` was empty and
+`accessibility_enabled` was 0 again, so the Home button watch was off and the Home key stayed on
+Amazon's home. Writing the two settings once more held, through force-stops and Home presses. The
+app's own rebind (it takes the watch out of the list and puts it back, ten seconds after it starts)
+was tried on its own over ADB and leaves both settings intact, so it is not the cause; what clears
+them is not pinned down. `apply.sh` now looks again after pressing Home and puts them back. If a
+Fire TV is still on Amazon's home after `apply.sh`, run from the repo root:
+
+```sh
+TV_IP=<tv address> .venv/bin/python tv-home/tools/tvadb.py shell "settings put secure enabled_accessibility_services app.couchtv.launcher/.FireWatch; settings put secure accessibility_enabled 1"
+```
+
 ## If Disney+ (or another app) signs you out after the TV turns off
 
 This is not couch-tv, and changing your password does not fix it. Seen on an Android TV with Disney+
