@@ -44,7 +44,8 @@ class FireLauncherAppsTests(unittest.TestCase):
     def test_tv_home_queries_known_and_ordered_launcher_apps(self):
         """tv-home appList() queries LEANBACK_LAUNCHER, known Fire apps, and saved order packages."""
         main_kt = (TV_HOME_SRC / "java/app/couchtv/launcher/MainActivity.kt").read_text(encoding="utf-8")
-        app_list = main_kt.split("private fun appList()", 1)[1].split("private fun", 1)[0]
+        # appList() hands out the cached list; buildAppList(), right after it, does the reading
+        app_list = main_kt.split("private fun appList()", 1)[1].split("private fun warmApps()", 1)[0]
         self.assertIn("CATEGORY_LEANBACK_LAUNCHER", app_list)
         self.assertIn("com.amazon.venezia", app_list)
         self.assertIn("com.audible.application.firetv", app_list)
