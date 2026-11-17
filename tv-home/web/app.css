@@ -371,6 +371,9 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .scene-dawn .date { top: 11rem; }
 .scene-fog .date { left: 6.5rem; right: auto; top: 7.25rem; text-align: left; color: #16201d; text-shadow: none; }
 .scene-fog .date .wx { color: rgba(22, 32, 29, 0.72); }
+/* the place opens the weather when it shows: the same gap from the date as the weather icon has */
+.theme-night .date .wx-place { margin-left: 1rem; }
+.theme-night .date .wx-place + svg { margin-left: 0.4rem; }
 .theme-night .date svg { width: 1.875rem; height: 1.875rem; vertical-align: -0.3rem; margin: 0 0.4rem 0 1rem;
   fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .theme-night .quick { margin-top: 0; }
@@ -1933,6 +1936,8 @@ html:not(.kids-on) .kids { display: none; }
   right: 0;
   text-align: center !important;
 }
+
+[dir="rtl"] .theme-night .date .wx-place { margin-left: 0; margin-right: 1rem; }
 
 [dir="rtl"] .scene-fog .date {
   right: 6.5rem;

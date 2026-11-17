@@ -289,6 +289,9 @@
 
   window.smartHome = {
     available: available, open: open, close: close, move: move, ok: ok, paint: paint, reply: reply,
-    isOpen: function () { return S.open; }, icon: ICONS.home
+    isOpen: function () { return S.open; }, icon: ICONS.home,
+    // the rooms as they are now, for a design's aircon card (design.js): the same question the
+    // screen asks, only the climate entities named in config.json
+    climate: function () { return available() ? ask("climate") : Promise.resolve({ ok: false }); }
   };
 })();

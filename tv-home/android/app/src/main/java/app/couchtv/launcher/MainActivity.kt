@@ -232,6 +232,8 @@ class MainActivity : Activity() {
         // The home screen never exits on BACK; the page decides what BACK means.
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (event.action == KeyEvent.ACTION_UP && pageReady) js("window.tv && tv.back()")
+            // held: a design's way out (Back held about 5 s switches it off), so the page hears the repeats
+            else if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount > 0 && pageReady) js("window.CouchDesign && CouchDesign.backHeld && CouchDesign.backHeld()")
             return true
         }
         return super.dispatchKeyEvent(event)

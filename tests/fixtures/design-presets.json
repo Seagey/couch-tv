@@ -1,0 +1,3378 @@
+[
+ {
+  "id": "couch-night",
+  "title": "Couch Night",
+  "design": {
+   "v": 1,
+   "background": {
+    "image": "backgrounds/scene-night.jpg",
+    "darken": 0.28,
+    "scrim": "even"
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "date",
+     "type": "widget",
+     "kind": "date",
+     "size": "wline",
+     "x": 580,
+     "y": 60,
+     "w": 760,
+     "h": 60,
+     "opts": {
+      "align": "center"
+     }
+    },
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "tallclock",
+     "size": "12x5",
+     "x": 380,
+     "y": 160,
+     "w": 1160,
+     "h": 460
+    },
+    {
+     "id": "people",
+     "type": "widget",
+     "kind": "people",
+     "size": "line",
+     "x": 80,
+     "y": 60,
+     "w": 360,
+     "h": 60
+    },
+    {
+     "id": "quick",
+     "type": "widget",
+     "kind": "quick",
+     "size": "line",
+     "x": 1480,
+     "y": 60,
+     "w": 360,
+     "h": 60,
+     "opts": {
+      "quick": [
+       "sleep",
+       "picture",
+       "input"
+      ]
+     }
+    },
+    {
+     "id": "keep",
+     "type": "widget",
+     "kind": "keep",
+     "size": "5x4",
+     "x": 80,
+     "y": 660,
+     "w": 460,
+     "h": 360,
+     "start": true
+    },
+    {
+     "id": "music",
+     "type": "widget",
+     "kind": "nowplaying",
+     "size": "7x4",
+     "x": 580,
+     "y": 660,
+     "w": 660,
+     "h": 360
+    },
+    {
+     "id": "apps",
+     "type": "widget",
+     "kind": "folder",
+     "size": "6x4",
+     "x": 1280,
+     "y": 660,
+     "w": 560,
+     "h": 360,
+     "opts": {
+      "apps": [
+       "com.google.android.youtube.tv",
+       "com.netflix.ninja",
+       "au.net.abc.iview",
+       "com.disney.disneyplus",
+       "au.com.stan.and",
+       "com.amazon.amazonvideo.livingroom"
+      ],
+      "cols": 3
+     }
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:date": {
+      "c": 5,
+      "r": 0,
+      "size": "wline"
+     },
+     "obj:clock": {
+      "c": 3,
+      "r": 1,
+      "size": "12x5"
+     },
+     "obj:people": {
+      "c": 0,
+      "r": 0,
+      "size": "line"
+     },
+     "obj:quick": {
+      "c": 14,
+      "r": 0,
+      "size": "line"
+     },
+     "obj:keep": {
+      "c": 0,
+      "r": 6,
+      "size": "5x4"
+     },
+     "obj:music": {
+      "c": 5,
+      "r": 6,
+      "size": "7x4"
+     },
+     "obj:apps": {
+      "c": 12,
+      "r": 6,
+      "size": "6x4"
+     }
+    },
+    "order": [
+     "obj:date",
+     "obj:clock",
+     "obj:people",
+     "obj:quick",
+     "obj:keep",
+     "obj:music",
+     "obj:apps"
+    ],
+    "placed": {
+     "obj:date": {
+      "c": 5,
+      "r": 0,
+      "w": 8,
+      "h": 1,
+      "size": "wline"
+     },
+     "obj:clock": {
+      "c": 3,
+      "r": 1,
+      "w": 12,
+      "h": 5,
+      "size": "12x5"
+     },
+     "obj:people": {
+      "c": 0,
+      "r": 0,
+      "w": 4,
+      "h": 1,
+      "size": "line"
+     },
+     "obj:quick": {
+      "c": 14,
+      "r": 0,
+      "w": 4,
+      "h": 1,
+      "size": "line"
+     },
+     "obj:keep": {
+      "c": 0,
+      "r": 6,
+      "w": 5,
+      "h": 4,
+      "size": "5x4"
+     },
+     "obj:music": {
+      "c": 5,
+      "r": 6,
+      "w": 7,
+      "h": 4,
+      "size": "7x4"
+     },
+     "obj:apps": {
+      "c": 12,
+      "r": 6,
+      "w": 6,
+      "h": 4,
+      "size": "6x4"
+     }
+    }
+   }
+  }
+ },
+ {
+  "id": "cinema",
+  "title": "Cinema",
+  "design": {
+   "v": 1,
+   "background": {
+    "colour": "#050505"
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "upnext",
+     "type": "widget",
+     "kind": "upnext",
+     "size": "hero",
+     "x": 80,
+     "y": 60,
+     "w": 1760,
+     "h": 660,
+     "start": true
+    },
+    {
+     "id": "picks",
+     "type": "widget",
+     "kind": "picks",
+     "size": "14x3",
+     "x": 80,
+     "y": 760,
+     "w": 1360,
+     "h": 260
+    },
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "clock",
+     "size": "4x3",
+     "x": 1480,
+     "y": 760,
+     "w": 360,
+     "h": 260,
+     "opts": {
+      "align": "right",
+      "date": true
+     }
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:upnext": {
+      "c": 0,
+      "r": 0,
+      "size": "hero"
+     },
+     "obj:picks": {
+      "c": 0,
+      "r": 7,
+      "size": "14x3"
+     },
+     "obj:clock": {
+      "c": 14,
+      "r": 7,
+      "size": "4x3"
+     }
+    },
+    "order": [
+     "obj:upnext",
+     "obj:picks",
+     "obj:clock"
+    ],
+    "placed": {
+     "obj:upnext": {
+      "c": 0,
+      "r": 0,
+      "w": 18,
+      "h": 7,
+      "size": "hero"
+     },
+     "obj:picks": {
+      "c": 0,
+      "r": 7,
+      "w": 14,
+      "h": 3,
+      "size": "14x3"
+     },
+     "obj:clock": {
+      "c": 14,
+      "r": 7,
+      "w": 4,
+      "h": 3,
+      "size": "4x3"
+     }
+    }
+   }
+  }
+ },
+ {
+  "id": "folders",
+  "title": "App Folders",
+  "design": {
+   "v": 1,
+   "background": {
+    "image": "backgrounds/scene-water.jpg",
+    "darken": 0.5,
+    "scrim": "left"
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "stream",
+     "type": "widget",
+     "kind": "folder",
+     "size": "7x8",
+     "x": 80,
+     "y": 60,
+     "w": 660,
+     "h": 760,
+     "opts": {
+      "label": "Streaming",
+      "apps": [
+       "com.netflix.ninja",
+       "com.disney.disneyplus",
+       "au.com.stan.and",
+       "com.amazon.amazonvideo.livingroom",
+       "au.com.streamotion.ares.tv",
+       "com.apple.atve.androidtv.appletv",
+       "com.wbd.stream",
+       "com.cbs.ca",
+       "com.google.android.youtube.tv"
+      ],
+      "cols": 3
+     },
+     "start": true
+    },
+    {
+     "id": "people",
+     "type": "widget",
+     "kind": "people",
+     "size": "7x2",
+     "x": 80,
+     "y": 860,
+     "w": 660,
+     "h": 160
+    },
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "clock",
+     "size": "10x5",
+     "x": 880,
+     "y": 60,
+     "w": 960,
+     "h": 460,
+     "opts": {
+      "align": "right",
+      "date": true
+     }
+    },
+    {
+     "id": "fta",
+     "type": "widget",
+     "kind": "folder",
+     "size": "5x4",
+     "x": 880,
+     "y": 660,
+     "w": 460,
+     "h": 360,
+     "opts": {
+      "label": "Free to air",
+      "apps": [
+       "au.net.abc.iview",
+       "com.sbs.ondemand.tv",
+       "au.com.ninenow.ctv",
+       "com.swm.live",
+       "au.com.tenplay",
+       "au.com.foxtel.atv"
+      ],
+      "cols": 3
+     }
+    },
+    {
+     "id": "more",
+     "type": "widget",
+     "kind": "folder",
+     "size": "5x4",
+     "x": 1380,
+     "y": 660,
+     "w": 460,
+     "h": 360,
+     "opts": {
+      "label": "Music and more",
+      "apps": [
+       "com.spotify.tv.android",
+       "com.google.android.youtube.tv",
+       "tv.twitch.android.app",
+       "com.crunchyroll.webapp",
+       "au.com.kayosports.tv",
+       "dazn"
+      ],
+      "cols": 3
+     }
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:stream": {
+      "c": 0,
+      "r": 0,
+      "size": "7x8"
+     },
+     "obj:people": {
+      "c": 0,
+      "r": 8,
+      "size": "7x2"
+     },
+     "obj:clock": {
+      "c": 8,
+      "r": 0,
+      "size": "10x5"
+     },
+     "obj:fta": {
+      "c": 8,
+      "r": 6,
+      "size": "5x4"
+     },
+     "obj:more": {
+      "c": 13,
+      "r": 6,
+      "size": "5x4"
+     }
+    },
+    "order": [
+     "obj:stream",
+     "obj:people",
+     "obj:clock",
+     "obj:fta",
+     "obj:more"
+    ],
+    "placed": {
+     "obj:stream": {
+      "c": 0,
+      "r": 0,
+      "w": 7,
+      "h": 8,
+      "size": "7x8"
+     },
+     "obj:people": {
+      "c": 0,
+      "r": 8,
+      "w": 7,
+      "h": 2,
+      "size": "7x2"
+     },
+     "obj:clock": {
+      "c": 8,
+      "r": 0,
+      "w": 10,
+      "h": 5,
+      "size": "10x5"
+     },
+     "obj:fta": {
+      "c": 8,
+      "r": 6,
+      "w": 5,
+      "h": 4,
+      "size": "5x4"
+     },
+     "obj:more": {
+      "c": 13,
+      "r": 6,
+      "w": 5,
+      "h": 4,
+      "size": "5x4"
+     }
+    }
+   },
+   "look": {
+    "panel": "rgba(10, 30, 50, 0.36)"
+   }
+  }
+ },
+ {
+  "id": "sports",
+  "title": "Game Day",
+  "design": {
+   "v": 1,
+   "background": {
+    "image": "backgrounds/albury-storm.jpg",
+    "darken": 0.55,
+    "scrim": "left"
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "scores",
+     "type": "widget",
+     "kind": "sports",
+     "size": "6x10",
+     "x": 80,
+     "y": 60,
+     "w": 560,
+     "h": 960,
+     "opts": {
+      "label": "NRL"
+     },
+     "style": {
+      "show": "live"
+     }
+    },
+    {
+     "id": "upnext",
+     "type": "widget",
+     "kind": "upnext",
+     "size": "xl",
+     "x": 680,
+     "y": 60,
+     "w": 1160,
+     "h": 560,
+     "start": true
+    },
+    {
+     "id": "sport",
+     "type": "widget",
+     "kind": "folder",
+     "size": "6x4",
+     "x": 680,
+     "y": 660,
+     "w": 560,
+     "h": 360,
+     "opts": {
+      "label": "Sport",
+      "apps": [
+       "au.com.kayosports.tv",
+       "au.com.foxtel.atv",
+       "au.com.ninenow.ctv",
+       "com.swm.live",
+       "au.com.tenplay",
+       "dazn"
+      ],
+      "cols": 3
+     }
+    },
+    {
+     "id": "test",
+     "type": "widget",
+     "kind": "countdown",
+     "size": "3x4",
+     "x": 1280,
+     "y": 660,
+     "w": 260,
+     "h": 360,
+     "opts": {
+      "label": "Boxing Day Test",
+      "month": 12,
+      "day": 26,
+      "unit": "days",
+      "icon": "games"
+     },
+     "style": {
+      "colour": "#0a84ff",
+      "gradient": "soft"
+     }
+    },
+    {
+     "id": "rain",
+     "type": "widget",
+     "kind": "rain",
+     "size": "3x4",
+     "x": 1580,
+     "y": 660,
+     "w": 260,
+     "h": 360
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:scores": {
+      "c": 0,
+      "r": 0,
+      "size": "6x10"
+     },
+     "obj:upnext": {
+      "c": 6,
+      "r": 0,
+      "size": "xl"
+     },
+     "obj:sport": {
+      "c": 6,
+      "r": 6,
+      "size": "6x4"
+     },
+     "obj:test": {
+      "c": 12,
+      "r": 6,
+      "size": "3x4"
+     },
+     "obj:rain": {
+      "c": 15,
+      "r": 6,
+      "size": "3x4"
+     }
+    },
+    "order": [
+     "obj:scores",
+     "obj:upnext",
+     "obj:sport",
+     "obj:test",
+     "obj:rain"
+    ],
+    "placed": {
+     "obj:scores": {
+      "c": 0,
+      "r": 0,
+      "w": 6,
+      "h": 10,
+      "size": "6x10"
+     },
+     "obj:upnext": {
+      "c": 6,
+      "r": 0,
+      "w": 12,
+      "h": 6,
+      "size": "xl"
+     },
+     "obj:sport": {
+      "c": 6,
+      "r": 6,
+      "w": 6,
+      "h": 4,
+      "size": "6x4"
+     },
+     "obj:test": {
+      "c": 12,
+      "r": 6,
+      "w": 3,
+      "h": 4,
+      "size": "3x4"
+     },
+     "obj:rain": {
+      "c": 15,
+      "r": 6,
+      "w": 3,
+      "h": 4,
+      "size": "3x4"
+     }
+    }
+   },
+   "look": {
+    "panel": "rgba(10, 14, 22, 0.5)"
+   }
+  }
+ },
+ {
+  "id": "music",
+  "title": "Music Room",
+  "design": {
+   "v": 1,
+   "background": {
+    "colour": "#7a3d1c",
+    "colour2": "#120a14",
+    "radial": true
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "music",
+     "type": "widget",
+     "kind": "nowplaying",
+     "size": "xl",
+     "x": 80,
+     "y": 60,
+     "w": 1160,
+     "h": 560,
+     "start": true
+    },
+    {
+     "id": "queue",
+     "type": "widget",
+     "kind": "queue",
+     "size": "6x10",
+     "x": 1280,
+     "y": 60,
+     "w": 560,
+     "h": 960,
+     "style": {
+      "show": "live"
+     }
+    },
+    {
+     "id": "speakers",
+     "type": "widget",
+     "kind": "speakers",
+     "size": "6x4",
+     "x": 80,
+     "y": 660,
+     "w": 560,
+     "h": 360,
+     "style": {
+      "show": "live"
+     }
+    },
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "clock",
+     "size": "6x2",
+     "x": 680,
+     "y": 660,
+     "w": 560,
+     "h": 160,
+     "opts": {
+      "date": false
+     }
+    },
+    {
+     "id": "apps",
+     "type": "widget",
+     "kind": "folder",
+     "size": "6x2",
+     "x": 680,
+     "y": 860,
+     "w": 560,
+     "h": 160,
+     "opts": {
+      "apps": [
+       "com.spotify.tv.android",
+       "com.google.android.youtube.tv",
+       "com.apple.atve.androidtv.appletv",
+       "tv.twitch.android.app"
+      ],
+      "cols": 4
+     }
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:music": {
+      "c": 0,
+      "r": 0,
+      "size": "xl"
+     },
+     "obj:queue": {
+      "c": 12,
+      "r": 0,
+      "size": "6x10"
+     },
+     "obj:speakers": {
+      "c": 0,
+      "r": 6,
+      "size": "6x4"
+     },
+     "obj:clock": {
+      "c": 6,
+      "r": 6,
+      "size": "6x2"
+     },
+     "obj:apps": {
+      "c": 6,
+      "r": 8,
+      "size": "6x2"
+     }
+    },
+    "order": [
+     "obj:music",
+     "obj:queue",
+     "obj:speakers",
+     "obj:clock",
+     "obj:apps"
+    ],
+    "placed": {
+     "obj:music": {
+      "c": 0,
+      "r": 0,
+      "w": 12,
+      "h": 6,
+      "size": "xl"
+     },
+     "obj:queue": {
+      "c": 12,
+      "r": 0,
+      "w": 6,
+      "h": 10,
+      "size": "6x10"
+     },
+     "obj:speakers": {
+      "c": 0,
+      "r": 6,
+      "w": 6,
+      "h": 4,
+      "size": "6x4"
+     },
+     "obj:clock": {
+      "c": 6,
+      "r": 6,
+      "w": 6,
+      "h": 2,
+      "size": "6x2"
+     },
+     "obj:apps": {
+      "c": 6,
+      "r": 8,
+      "w": 6,
+      "h": 2,
+      "size": "6x2"
+     }
+    }
+   },
+   "look": {
+    "panel": "rgba(255, 255, 255, 0.08)"
+   }
+  }
+ },
+ {
+  "id": "standby",
+  "title": "Bedside StandBy",
+  "design": {
+   "v": 1,
+   "background": {
+    "colour": "#000000"
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "tallclock",
+     "size": "11x10",
+     "x": 80,
+     "y": 60,
+     "w": 1060,
+     "h": 960
+    },
+    {
+     "id": "agenda",
+     "type": "widget",
+     "kind": "agenda",
+     "size": "7x5",
+     "x": 1180,
+     "y": 60,
+     "w": 660,
+     "h": 460,
+     "opts": {
+      "label": "Tomorrow"
+     },
+     "style": {
+      "panel": "solid"
+     }
+    },
+    {
+     "id": "temp",
+     "type": "widget",
+     "kind": "bigtemp",
+     "size": "4x5",
+     "x": 1180,
+     "y": 560,
+     "w": 360,
+     "h": 460,
+     "style": {
+      "colour": "#1a0404",
+      "ink": "accent",
+      "accent": "#ff453a",
+      "gradient": "off"
+     }
+    },
+    {
+     "id": "timer",
+     "type": "widget",
+     "kind": "timer",
+     "size": "3x5",
+     "x": 1580,
+     "y": 560,
+     "w": 260,
+     "h": 460,
+     "opts": {
+      "label": "Sleep"
+     },
+     "style": {
+      "panel": "solid"
+     },
+     "start": true
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:clock": {
+      "c": 0,
+      "r": 0,
+      "size": "11x10"
+     },
+     "obj:agenda": {
+      "c": 11,
+      "r": 0,
+      "size": "7x5"
+     },
+     "obj:temp": {
+      "c": 11,
+      "r": 5,
+      "size": "4x5"
+     },
+     "obj:timer": {
+      "c": 15,
+      "r": 5,
+      "size": "3x5"
+     }
+    },
+    "order": [
+     "obj:clock",
+     "obj:agenda",
+     "obj:temp",
+     "obj:timer"
+    ],
+    "placed": {
+     "obj:clock": {
+      "c": 0,
+      "r": 0,
+      "w": 11,
+      "h": 10,
+      "size": "11x10"
+     },
+     "obj:agenda": {
+      "c": 11,
+      "r": 0,
+      "w": 7,
+      "h": 5,
+      "size": "7x5"
+     },
+     "obj:temp": {
+      "c": 11,
+      "r": 5,
+      "w": 4,
+      "h": 5,
+      "size": "4x5"
+     },
+     "obj:timer": {
+      "c": 15,
+      "r": 5,
+      "w": 3,
+      "h": 5,
+      "size": "3x5"
+     }
+    }
+   },
+   "look": {
+    "ink": "#ff3b30",
+    "sub": "rgba(255, 69, 58, 0.86)",
+    "solid": "#140303",
+    "focus": "#ff453a"
+   }
+  }
+ },
+ {
+  "id": "calm",
+  "title": "Slow Morning",
+  "design": {
+   "v": 1,
+   "background": {
+    "image": "backgrounds/scene-fog.jpg",
+    "darken": 0
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "clock",
+     "size": "8x3",
+     "x": 80,
+     "y": 60,
+     "w": 760,
+     "h": 260,
+     "opts": {
+      "date": false,
+      "ampm": false
+     },
+     "style": {
+      "ink": "ink"
+     }
+    },
+    {
+     "id": "date",
+     "type": "widget",
+     "kind": "date",
+     "size": "wline",
+     "x": 80,
+     "y": 360,
+     "w": 760,
+     "h": 60,
+     "style": {
+      "ink": "ink"
+     }
+    },
+    {
+     "id": "breathe",
+     "type": "widget",
+     "kind": "quote",
+     "size": "medium",
+     "x": 80,
+     "y": 660,
+     "w": 760,
+     "h": 360,
+     "opts": {
+      "text": "Breathe in for four. Hold for four. Out for six.",
+      "sub": "Today's practice, five minutes"
+     },
+     "style": {
+      "panel": "paper"
+     }
+    },
+    {
+     "id": "word",
+     "type": "widget",
+     "kind": "word",
+     "size": "5x5",
+     "x": 880,
+     "y": 60,
+     "w": 460,
+     "h": 460
+    },
+    {
+     "id": "moon",
+     "type": "widget",
+     "kind": "moon",
+     "size": "5x5",
+     "x": 880,
+     "y": 560,
+     "w": 460,
+     "h": 460,
+     "style": {
+      "panel": "paper"
+     }
+    },
+    {
+     "id": "week",
+     "type": "widget",
+     "kind": "week",
+     "size": "5x10",
+     "x": 1380,
+     "y": 60,
+     "w": 460,
+     "h": 960,
+     "start": true
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:clock": {
+      "c": 0,
+      "r": 0,
+      "size": "8x3"
+     },
+     "obj:date": {
+      "c": 0,
+      "r": 3,
+      "size": "wline"
+     },
+     "obj:breathe": {
+      "c": 0,
+      "r": 6,
+      "size": "medium"
+     },
+     "obj:word": {
+      "c": 8,
+      "r": 0,
+      "size": "5x5"
+     },
+     "obj:moon": {
+      "c": 8,
+      "r": 5,
+      "size": "5x5"
+     },
+     "obj:week": {
+      "c": 13,
+      "r": 0,
+      "size": "5x10"
+     }
+    },
+    "order": [
+     "obj:clock",
+     "obj:date",
+     "obj:breathe",
+     "obj:word",
+     "obj:moon",
+     "obj:week"
+    ],
+    "placed": {
+     "obj:clock": {
+      "c": 0,
+      "r": 0,
+      "w": 8,
+      "h": 3,
+      "size": "8x3"
+     },
+     "obj:date": {
+      "c": 0,
+      "r": 3,
+      "w": 8,
+      "h": 1,
+      "size": "wline"
+     },
+     "obj:breathe": {
+      "c": 0,
+      "r": 6,
+      "w": 8,
+      "h": 4,
+      "size": "medium"
+     },
+     "obj:word": {
+      "c": 8,
+      "r": 0,
+      "w": 5,
+      "h": 5,
+      "size": "5x5"
+     },
+     "obj:moon": {
+      "c": 8,
+      "r": 5,
+      "w": 5,
+      "h": 5,
+      "size": "5x5"
+     },
+     "obj:week": {
+      "c": 13,
+      "r": 0,
+      "w": 5,
+      "h": 10,
+      "size": "5x10"
+     }
+    }
+   },
+   "look": {
+    "ink": "#16201d",
+    "sub": "rgba(22, 32, 29, 0.7)",
+    "panel": "rgba(255, 255, 255, 0.45)",
+    "rim": "rgba(255, 255, 255, 0.6)",
+    "paper": "rgba(250, 248, 242, 0.88)",
+    "focus": "#16201d"
+   }
+  }
+ },
+ {
+  "id": "kids",
+  "title": "Kids Room",
+  "design": {
+   "v": 1,
+   "background": {
+    "colour": "#ff7a59",
+    "colour2": "#7b5cff",
+    "angle": 150
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "hi",
+     "type": "widget",
+     "kind": "welcome",
+     "size": "10x2",
+     "x": 80,
+     "y": 60,
+     "w": 960,
+     "h": 160,
+     "opts": {
+      "text": "Hi Ruby!",
+      "sub": "Three sleeps till the beach"
+     },
+     "style": {
+      "accent": "#c2185b"
+     }
+    },
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "analog",
+     "size": "small",
+     "x": 80,
+     "y": 260,
+     "w": 360,
+     "h": 360,
+     "style": {
+      "colour": "#ffd60a"
+     }
+    },
+    {
+     "id": "keep",
+     "type": "widget",
+     "kind": "keep",
+     "size": "6x4",
+     "x": 480,
+     "y": 260,
+     "w": 560,
+     "h": 360,
+     "start": true
+    },
+    {
+     "id": "screen",
+     "type": "widget",
+     "kind": "screentime",
+     "size": "6x4",
+     "x": 80,
+     "y": 660,
+     "w": 560,
+     "h": 360
+    },
+    {
+     "id": "xmas",
+     "type": "widget",
+     "kind": "countdown",
+     "size": "small",
+     "x": 680,
+     "y": 660,
+     "w": 360,
+     "h": 360,
+     "opts": {
+      "label": "Christmas",
+      "month": 12,
+      "day": 25,
+      "unit": "sleeps"
+     },
+     "style": {
+      "colour": "#30d158",
+      "gradient": "soft"
+     }
+    },
+    {
+     "id": "apps",
+     "type": "widget",
+     "kind": "folder",
+     "size": "8x10",
+     "x": 1080,
+     "y": 60,
+     "w": 760,
+     "h": 960,
+     "opts": {
+      "apps": [
+       "au.net.abc.iview",
+       "com.disney.disneyplus",
+       "com.google.android.youtube.tv",
+       "com.netflix.ninja",
+       "com.sbs.ondemand.tv",
+       "au.com.stan.and"
+      ],
+      "cols": 2
+     }
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:hi": {
+      "c": 0,
+      "r": 0,
+      "size": "10x2"
+     },
+     "obj:clock": {
+      "c": 0,
+      "r": 2,
+      "size": "small"
+     },
+     "obj:keep": {
+      "c": 4,
+      "r": 2,
+      "size": "6x4"
+     },
+     "obj:screen": {
+      "c": 0,
+      "r": 6,
+      "size": "6x4"
+     },
+     "obj:xmas": {
+      "c": 6,
+      "r": 6,
+      "size": "small"
+     },
+     "obj:apps": {
+      "c": 10,
+      "r": 0,
+      "size": "8x10"
+     }
+    },
+    "order": [
+     "obj:hi",
+     "obj:clock",
+     "obj:keep",
+     "obj:screen",
+     "obj:xmas",
+     "obj:apps"
+    ],
+    "placed": {
+     "obj:hi": {
+      "c": 0,
+      "r": 0,
+      "w": 10,
+      "h": 2,
+      "size": "10x2"
+     },
+     "obj:clock": {
+      "c": 0,
+      "r": 2,
+      "w": 4,
+      "h": 4,
+      "size": "small"
+     },
+     "obj:keep": {
+      "c": 4,
+      "r": 2,
+      "w": 6,
+      "h": 4,
+      "size": "6x4"
+     },
+     "obj:screen": {
+      "c": 0,
+      "r": 6,
+      "w": 6,
+      "h": 4,
+      "size": "6x4"
+     },
+     "obj:xmas": {
+      "c": 6,
+      "r": 6,
+      "w": 4,
+      "h": 4,
+      "size": "small"
+     },
+     "obj:apps": {
+      "c": 10,
+      "r": 0,
+      "w": 8,
+      "h": 10,
+      "size": "8x10"
+     }
+    }
+   },
+   "look": {
+    "panel": "rgba(255, 255, 255, 0.18)",
+    "rim": "rgba(255, 255, 255, 0.3)",
+    "icons": "playful"
+   }
+  }
+ },
+ {
+  "id": "welcome",
+  "title": "Guest Welcome",
+  "design": {
+   "v": 1,
+   "background": {
+    "image": "backgrounds/aresquiers-beach.jpg",
+    "darken": 0.6,
+    "scrim": "top"
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "hello",
+     "type": "widget",
+     "kind": "welcome",
+     "size": "12x3",
+     "x": 80,
+     "y": 60,
+     "w": 1160,
+     "h": 260,
+     "opts": {
+      "kicker": "Headland House, North Point",
+      "text": "Welcome, Ella and friends",
+      "sub": "Tuesday to Sunday. Night two of five"
+     }
+    },
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "clock",
+     "size": "5x2",
+     "x": 1380,
+     "y": 60,
+     "w": 460,
+     "h": 160,
+     "opts": {
+      "align": "right",
+      "date": false
+     }
+    },
+    {
+     "id": "surf",
+     "type": "widget",
+     "kind": "surf",
+     "size": "5x4",
+     "x": 1380,
+     "y": 260,
+     "w": 460,
+     "h": 360,
+     "opts": {
+      "label": "North Point"
+     }
+    },
+    {
+     "id": "wifi",
+     "type": "widget",
+     "kind": "wifi",
+     "size": "9x5",
+     "x": 80,
+     "y": 560,
+     "w": 860,
+     "h": 460
+    },
+    {
+     "id": "guide",
+     "type": "widget",
+     "kind": "guide",
+     "size": "4x5",
+     "x": 980,
+     "y": 560,
+     "w": 360,
+     "h": 460
+    },
+    {
+     "id": "apps",
+     "type": "widget",
+     "kind": "folder",
+     "size": "5x4",
+     "x": 1380,
+     "y": 660,
+     "w": 460,
+     "h": 360,
+     "opts": {
+      "apps": [
+       "com.netflix.ninja",
+       "com.google.android.youtube.tv",
+       "au.net.abc.iview",
+       "com.spotify.tv.android",
+       "au.com.stan.and",
+       "com.disney.disneyplus"
+      ],
+      "cols": 3
+     },
+     "start": true
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:hello": {
+      "c": 0,
+      "r": 0,
+      "size": "12x3"
+     },
+     "obj:clock": {
+      "c": 13,
+      "r": 0,
+      "size": "5x2"
+     },
+     "obj:surf": {
+      "c": 13,
+      "r": 2,
+      "size": "5x4"
+     },
+     "obj:wifi": {
+      "c": 0,
+      "r": 5,
+      "size": "9x5"
+     },
+     "obj:guide": {
+      "c": 9,
+      "r": 5,
+      "size": "4x5"
+     },
+     "obj:apps": {
+      "c": 13,
+      "r": 6,
+      "size": "5x4"
+     }
+    },
+    "order": [
+     "obj:hello",
+     "obj:clock",
+     "obj:surf",
+     "obj:wifi",
+     "obj:guide",
+     "obj:apps"
+    ],
+    "placed": {
+     "obj:hello": {
+      "c": 0,
+      "r": 0,
+      "w": 12,
+      "h": 3,
+      "size": "12x3"
+     },
+     "obj:clock": {
+      "c": 13,
+      "r": 0,
+      "w": 5,
+      "h": 2,
+      "size": "5x2"
+     },
+     "obj:surf": {
+      "c": 13,
+      "r": 2,
+      "w": 5,
+      "h": 4,
+      "size": "5x4"
+     },
+     "obj:wifi": {
+      "c": 0,
+      "r": 5,
+      "w": 9,
+      "h": 5,
+      "size": "9x5"
+     },
+     "obj:guide": {
+      "c": 9,
+      "r": 5,
+      "w": 4,
+      "h": 5,
+      "size": "4x5"
+     },
+     "obj:apps": {
+      "c": 13,
+      "r": 6,
+      "w": 5,
+      "h": 4,
+      "size": "5x4"
+     }
+    }
+   }
+  }
+ },
+ {
+  "id": "art-frame",
+  "title": "Art Frame",
+  "design": {
+   "v": 1,
+   "background": {
+    "colour": "#efe9de",
+    "colour2": "#e4ddcf",
+    "angle": 170
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "art",
+     "type": "widget",
+     "kind": "artframe",
+     "size": "16x8",
+     "x": 180,
+     "y": 60,
+     "w": 1560,
+     "h": 760
+    },
+    {
+     "id": "date",
+     "type": "widget",
+     "kind": "date",
+     "size": "7x2",
+     "x": 180,
+     "y": 860,
+     "w": 660,
+     "h": 160,
+     "opts": {
+      "show": "both"
+     }
+    },
+    {
+     "id": "line",
+     "type": "widget",
+     "kind": "quote",
+     "size": "8x2",
+     "x": 980,
+     "y": 860,
+     "w": 760,
+     "h": 160,
+     "opts": {
+      "text": "Slow mornings are the good ones."
+     },
+     "style": {
+      "font": "cormorant"
+     }
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:art": {
+      "c": 1,
+      "r": 0,
+      "size": "16x8"
+     },
+     "obj:date": {
+      "c": 1,
+      "r": 8,
+      "size": "7x2"
+     },
+     "obj:line": {
+      "c": 9,
+      "r": 8,
+      "size": "8x2"
+     }
+    },
+    "order": [
+     "obj:art",
+     "obj:date",
+     "obj:line"
+    ],
+    "placed": {
+     "obj:art": {
+      "c": 1,
+      "r": 0,
+      "w": 16,
+      "h": 8,
+      "size": "16x8"
+     },
+     "obj:date": {
+      "c": 1,
+      "r": 8,
+      "w": 7,
+      "h": 2,
+      "size": "7x2"
+     },
+     "obj:line": {
+      "c": 9,
+      "r": 8,
+      "w": 8,
+      "h": 2,
+      "size": "8x2"
+     }
+    }
+   },
+   "look": {
+    "ink": "#2c2a27",
+    "sub": "#6f6962",
+    "focus": "#2c2a27"
+   }
+  }
+ },
+ {
+  "id": "photo-wall",
+  "title": "Family Photo Wall",
+  "design": {
+   "v": 1,
+   "background": {
+    "colour": "#2a211a",
+    "colour2": "#120f0c",
+    "radial": true
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "photos",
+     "type": "widget",
+     "kind": "slideshow",
+     "size": "11x10",
+     "x": 80,
+     "y": 60,
+     "w": 1060,
+     "h": 960,
+     "opts": {
+      "caption": "The beach, last summer",
+      "sub": "From the family album"
+     }
+    },
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "clock",
+     "size": "7x3",
+     "x": 1180,
+     "y": 60,
+     "w": 660,
+     "h": 260,
+     "opts": {
+      "date": true
+     }
+    },
+    {
+     "id": "temp",
+     "type": "widget",
+     "kind": "bigtemp",
+     "size": "small",
+     "x": 1180,
+     "y": 360,
+     "w": 360,
+     "h": 360,
+     "style": {
+      "colour": "#ffb340",
+      "gradient": "soft",
+      "ink": "ink"
+     }
+    },
+    {
+     "id": "next",
+     "type": "widget",
+     "kind": "agenda",
+     "size": "3x4",
+     "x": 1580,
+     "y": 360,
+     "w": 260,
+     "h": 360,
+     "style": {
+      "panel": "colour",
+      "colour": "#ff453a"
+     }
+    },
+    {
+     "id": "memory",
+     "type": "widget",
+     "kind": "memory",
+     "size": "4x3",
+     "x": 1180,
+     "y": 760,
+     "w": 360,
+     "h": 260
+    },
+    {
+     "id": "apps",
+     "type": "widget",
+     "kind": "folder",
+     "size": "3x3",
+     "x": 1580,
+     "y": 760,
+     "w": 260,
+     "h": 260,
+     "opts": {
+      "apps": [
+       "com.netflix.ninja",
+       "au.net.abc.iview",
+       "com.google.android.youtube.tv",
+       "com.spotify.tv.android"
+      ]
+     },
+     "start": true
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:photos": {
+      "c": 0,
+      "r": 0,
+      "size": "11x10"
+     },
+     "obj:clock": {
+      "c": 11,
+      "r": 0,
+      "size": "7x3"
+     },
+     "obj:temp": {
+      "c": 11,
+      "r": 3,
+      "size": "small"
+     },
+     "obj:next": {
+      "c": 15,
+      "r": 3,
+      "size": "3x4"
+     },
+     "obj:memory": {
+      "c": 11,
+      "r": 7,
+      "size": "4x3"
+     },
+     "obj:apps": {
+      "c": 15,
+      "r": 7,
+      "size": "3x3"
+     }
+    },
+    "order": [
+     "obj:photos",
+     "obj:clock",
+     "obj:temp",
+     "obj:next",
+     "obj:memory",
+     "obj:apps"
+    ],
+    "placed": {
+     "obj:photos": {
+      "c": 0,
+      "r": 0,
+      "w": 11,
+      "h": 10,
+      "size": "11x10"
+     },
+     "obj:clock": {
+      "c": 11,
+      "r": 0,
+      "w": 7,
+      "h": 3,
+      "size": "7x3"
+     },
+     "obj:temp": {
+      "c": 11,
+      "r": 3,
+      "w": 4,
+      "h": 4,
+      "size": "small"
+     },
+     "obj:next": {
+      "c": 15,
+      "r": 3,
+      "w": 3,
+      "h": 4,
+      "size": "3x4"
+     },
+     "obj:memory": {
+      "c": 11,
+      "r": 7,
+      "w": 4,
+      "h": 3,
+      "size": "4x3"
+     },
+     "obj:apps": {
+      "c": 15,
+      "r": 7,
+      "w": 3,
+      "h": 3,
+      "size": "3x3"
+     }
+    }
+   },
+   "look": {
+    "panel": "rgba(255, 240, 225, 0.08)"
+   }
+  }
+ },
+ {
+  "id": "bento",
+  "title": "Packed Bento",
+  "design": {
+   "v": 1,
+   "background": {
+    "colour": "#efe9df"
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "analog",
+     "size": "small",
+     "x": 80,
+     "y": 60,
+     "w": 360,
+     "h": 360
+    },
+    {
+     "id": "weather",
+     "type": "widget",
+     "kind": "weather",
+     "size": "small",
+     "x": 480,
+     "y": 60,
+     "w": 360,
+     "h": 360
+    },
+    {
+     "id": "today",
+     "type": "widget",
+     "kind": "agenda",
+     "size": "6x4",
+     "x": 880,
+     "y": 60,
+     "w": 560,
+     "h": 360,
+     "style": {
+      "panel": "colour",
+      "colour": "#5e5ce6"
+     }
+    },
+    {
+     "id": "hols",
+     "type": "widget",
+     "kind": "countdown",
+     "size": "small",
+     "x": 1480,
+     "y": 60,
+     "w": 360,
+     "h": 360,
+     "opts": {
+      "label": "Holidays",
+      "month": 12,
+      "day": 19,
+      "unit": "days"
+     },
+     "style": {
+      "colour": "#ff7a2f",
+      "gradient": "soft"
+     }
+    },
+    {
+     "id": "photos",
+     "type": "widget",
+     "kind": "slideshow",
+     "size": "6x6",
+     "x": 80,
+     "y": 460,
+     "w": 560,
+     "h": 560
+    },
+    {
+     "id": "note",
+     "type": "widget",
+     "kind": "note",
+     "size": "4x3",
+     "x": 680,
+     "y": 460,
+     "w": 360,
+     "h": 260
+    },
+    {
+     "id": "timer",
+     "type": "widget",
+     "kind": "timer",
+     "size": "4x3",
+     "x": 680,
+     "y": 760,
+     "w": 360,
+     "h": 260,
+     "opts": {
+      "label": "Pizza"
+     },
+     "style": {
+      "panel": "colour",
+      "colour": "#1d1b18"
+     }
+    },
+    {
+     "id": "list",
+     "type": "widget",
+     "kind": "list",
+     "size": "tall",
+     "x": 1080,
+     "y": 460,
+     "w": 360,
+     "h": 560,
+     "opts": {
+      "label": "Shopping"
+     },
+     "style": {
+      "panel": "paper"
+     }
+    },
+    {
+     "id": "apps",
+     "type": "widget",
+     "kind": "folder",
+     "size": "tall",
+     "x": 1480,
+     "y": 460,
+     "w": 360,
+     "h": 560,
+     "opts": {
+      "apps": [
+       "au.com.streamotion.ares.tv",
+       "com.sbs.ondemand.tv",
+       "com.google.android.youtube.tv",
+       "com.amazon.amazonvideo.livingroom",
+       "au.com.kayosports.tv",
+       "com.spotify.tv.android"
+      ],
+      "cols": 2
+     },
+     "style": {
+      "panel": "colour",
+      "colour": "#30d158"
+     },
+     "start": true
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:clock": {
+      "c": 0,
+      "r": 0,
+      "size": "small"
+     },
+     "obj:weather": {
+      "c": 4,
+      "r": 0,
+      "size": "small"
+     },
+     "obj:today": {
+      "c": 8,
+      "r": 0,
+      "size": "6x4"
+     },
+     "obj:hols": {
+      "c": 14,
+      "r": 0,
+      "size": "small"
+     },
+     "obj:photos": {
+      "c": 0,
+      "r": 4,
+      "size": "6x6"
+     },
+     "obj:note": {
+      "c": 6,
+      "r": 4,
+      "size": "4x3"
+     },
+     "obj:timer": {
+      "c": 6,
+      "r": 7,
+      "size": "4x3"
+     },
+     "obj:list": {
+      "c": 10,
+      "r": 4,
+      "size": "tall"
+     },
+     "obj:apps": {
+      "c": 14,
+      "r": 4,
+      "size": "tall"
+     }
+    },
+    "order": [
+     "obj:clock",
+     "obj:weather",
+     "obj:today",
+     "obj:hols",
+     "obj:photos",
+     "obj:note",
+     "obj:timer",
+     "obj:list",
+     "obj:apps"
+    ],
+    "placed": {
+     "obj:clock": {
+      "c": 0,
+      "r": 0,
+      "w": 4,
+      "h": 4,
+      "size": "small"
+     },
+     "obj:weather": {
+      "c": 4,
+      "r": 0,
+      "w": 4,
+      "h": 4,
+      "size": "small"
+     },
+     "obj:today": {
+      "c": 8,
+      "r": 0,
+      "w": 6,
+      "h": 4,
+      "size": "6x4"
+     },
+     "obj:hols": {
+      "c": 14,
+      "r": 0,
+      "w": 4,
+      "h": 4,
+      "size": "small"
+     },
+     "obj:photos": {
+      "c": 0,
+      "r": 4,
+      "w": 6,
+      "h": 6,
+      "size": "6x6"
+     },
+     "obj:note": {
+      "c": 6,
+      "r": 4,
+      "w": 4,
+      "h": 3,
+      "size": "4x3"
+     },
+     "obj:timer": {
+      "c": 6,
+      "r": 7,
+      "w": 4,
+      "h": 3,
+      "size": "4x3"
+     },
+     "obj:list": {
+      "c": 10,
+      "r": 4,
+      "w": 4,
+      "h": 6,
+      "size": "tall"
+     },
+     "obj:apps": {
+      "c": 14,
+      "r": 4,
+      "w": 4,
+      "h": 6,
+      "size": "tall"
+     }
+    }
+   },
+   "look": {
+    "focus": "#1d1b18",
+    "paper": "#ffffff"
+   }
+  }
+ },
+ {
+  "id": "morning",
+  "title": "Morning Brief",
+  "design": {
+   "v": 1,
+   "background": {
+    "image": "backgrounds/scene-dawn.jpg",
+    "darken": 0.4,
+    "scrim": "top"
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "clock",
+     "size": "8x3",
+     "x": 80,
+     "y": 60,
+     "w": 760,
+     "h": 260,
+     "opts": {
+      "date": false,
+      "ampm": false
+     }
+    },
+    {
+     "id": "date",
+     "type": "widget",
+     "kind": "date",
+     "size": "wline",
+     "x": 80,
+     "y": 360,
+     "w": 760,
+     "h": 60
+    },
+    {
+     "id": "hourly",
+     "type": "widget",
+     "kind": "hourly",
+     "size": "10x4",
+     "x": 880,
+     "y": 60,
+     "w": 960,
+     "h": 360,
+     "start": true
+    },
+    {
+     "id": "news",
+     "type": "widget",
+     "kind": "news",
+     "size": "8x5",
+     "x": 80,
+     "y": 560,
+     "w": 760,
+     "h": 460
+    },
+    {
+     "id": "drive",
+     "type": "widget",
+     "kind": "commute",
+     "size": "5x5",
+     "x": 880,
+     "y": 560,
+     "w": 460,
+     "h": 460,
+     "style": {
+      "show": "live"
+     }
+    },
+    {
+     "id": "agenda",
+     "type": "widget",
+     "kind": "agenda",
+     "size": "5x5",
+     "x": 1380,
+     "y": 560,
+     "w": 460,
+     "h": 460
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:clock": {
+      "c": 0,
+      "r": 0,
+      "size": "8x3"
+     },
+     "obj:date": {
+      "c": 0,
+      "r": 3,
+      "size": "wline"
+     },
+     "obj:hourly": {
+      "c": 8,
+      "r": 0,
+      "size": "10x4"
+     },
+     "obj:news": {
+      "c": 0,
+      "r": 5,
+      "size": "8x5"
+     },
+     "obj:drive": {
+      "c": 8,
+      "r": 5,
+      "size": "5x5"
+     },
+     "obj:agenda": {
+      "c": 13,
+      "r": 5,
+      "size": "5x5"
+     }
+    },
+    "order": [
+     "obj:clock",
+     "obj:date",
+     "obj:hourly",
+     "obj:news",
+     "obj:drive",
+     "obj:agenda"
+    ],
+    "placed": {
+     "obj:clock": {
+      "c": 0,
+      "r": 0,
+      "w": 8,
+      "h": 3,
+      "size": "8x3"
+     },
+     "obj:date": {
+      "c": 0,
+      "r": 3,
+      "w": 8,
+      "h": 1,
+      "size": "wline"
+     },
+     "obj:hourly": {
+      "c": 8,
+      "r": 0,
+      "w": 10,
+      "h": 4,
+      "size": "10x4"
+     },
+     "obj:news": {
+      "c": 0,
+      "r": 5,
+      "w": 8,
+      "h": 5,
+      "size": "8x5"
+     },
+     "obj:drive": {
+      "c": 8,
+      "r": 5,
+      "w": 5,
+      "h": 5,
+      "size": "5x5"
+     },
+     "obj:agenda": {
+      "c": 13,
+      "r": 5,
+      "w": 5,
+      "h": 5,
+      "size": "5x5"
+     }
+    }
+   }
+  }
+ },
+ {
+  "id": "big-simple",
+  "title": "Big and Simple",
+  "design": {
+   "v": 1,
+   "background": {
+    "colour": "#f3efe7"
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "words",
+     "type": "widget",
+     "kind": "wordclock",
+     "size": "9x5",
+     "x": 80,
+     "y": 60,
+     "w": 860,
+     "h": 460,
+     "style": {
+      "colour": "#0a84ff"
+     }
+    },
+    {
+     "id": "photos",
+     "type": "widget",
+     "kind": "slideshow",
+     "size": "9x5",
+     "x": 980,
+     "y": 60,
+     "w": 860,
+     "h": 460,
+     "opts": {
+      "caption": "Ruby turned five",
+      "sub": "Sent by Sam"
+     }
+    },
+    {
+     "id": "apps",
+     "type": "widget",
+     "kind": "appgrid",
+     "size": "12x5",
+     "x": 80,
+     "y": 560,
+     "w": 1160,
+     "h": 460,
+     "opts": {
+      "apps": [
+       "au.net.abc.iview",
+       "com.sbs.ondemand.tv",
+       "com.swm.live",
+       "au.com.ninenow.ctv"
+      ],
+      "cols": 4,
+      "names": true
+     },
+     "start": true
+    },
+    {
+     "id": "temp",
+     "type": "widget",
+     "kind": "bigtemp",
+     "size": "6x5",
+     "x": 1280,
+     "y": 560,
+     "w": 560,
+     "h": 460
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:words": {
+      "c": 0,
+      "r": 0,
+      "size": "9x5"
+     },
+     "obj:photos": {
+      "c": 9,
+      "r": 0,
+      "size": "9x5"
+     },
+     "obj:apps": {
+      "c": 0,
+      "r": 5,
+      "size": "12x5"
+     },
+     "obj:temp": {
+      "c": 12,
+      "r": 5,
+      "size": "6x5"
+     }
+    },
+    "order": [
+     "obj:words",
+     "obj:photos",
+     "obj:apps",
+     "obj:temp"
+    ],
+    "placed": {
+     "obj:words": {
+      "c": 0,
+      "r": 0,
+      "w": 9,
+      "h": 5,
+      "size": "9x5"
+     },
+     "obj:photos": {
+      "c": 9,
+      "r": 0,
+      "w": 9,
+      "h": 5,
+      "size": "9x5"
+     },
+     "obj:apps": {
+      "c": 0,
+      "r": 5,
+      "w": 12,
+      "h": 5,
+      "size": "12x5"
+     },
+     "obj:temp": {
+      "c": 12,
+      "r": 5,
+      "w": 6,
+      "h": 5,
+      "size": "6x5"
+     }
+    }
+   },
+   "look": {
+    "ink": "#1d1b18",
+    "sub": "rgba(29, 27, 24, 0.7)",
+    "focus": "#1d1b18"
+   }
+  }
+ },
+ {
+  "id": "smart-home",
+  "title": "Smart Home",
+  "design": {
+   "v": 1,
+   "background": {
+    "image": "backgrounds/scene-night.jpg",
+    "darken": 0.45,
+    "scrim": "even"
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "clock",
+     "size": "6x2",
+     "x": 80,
+     "y": 60,
+     "w": 560,
+     "h": 160,
+     "opts": {
+      "date": false
+     }
+    },
+    {
+     "id": "date",
+     "type": "widget",
+     "kind": "date",
+     "size": "6x1",
+     "x": 80,
+     "y": 260,
+     "w": 560,
+     "h": 60
+    },
+    {
+     "id": "air",
+     "type": "widget",
+     "kind": "aircon",
+     "size": "6x7",
+     "x": 80,
+     "y": 360,
+     "w": 560,
+     "h": 660
+    },
+    {
+     "id": "controls",
+     "type": "widget",
+     "kind": "controls",
+     "size": "8x6",
+     "x": 680,
+     "y": 60,
+     "w": 760,
+     "h": 560,
+     "opts": {
+      "cols": 4
+     },
+     "start": true
+    },
+    {
+     "id": "cam",
+     "type": "widget",
+     "kind": "camera",
+     "size": "small",
+     "x": 1480,
+     "y": 60,
+     "w": 360,
+     "h": 360,
+     "opts": {
+      "label": "Backyard"
+     }
+    },
+    {
+     "id": "scenes",
+     "type": "widget",
+     "kind": "scenes",
+     "size": "tall",
+     "x": 1480,
+     "y": 460,
+     "w": 360,
+     "h": 560
+    },
+    {
+     "id": "solar",
+     "type": "widget",
+     "kind": "energy",
+     "size": "medium",
+     "x": 680,
+     "y": 660,
+     "w": 760,
+     "h": 360
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:clock": {
+      "c": 0,
+      "r": 0,
+      "size": "6x2"
+     },
+     "obj:date": {
+      "c": 0,
+      "r": 2,
+      "size": "6x1"
+     },
+     "obj:air": {
+      "c": 0,
+      "r": 3,
+      "size": "6x7"
+     },
+     "obj:controls": {
+      "c": 6,
+      "r": 0,
+      "size": "8x6"
+     },
+     "obj:cam": {
+      "c": 14,
+      "r": 0,
+      "size": "small"
+     },
+     "obj:scenes": {
+      "c": 14,
+      "r": 4,
+      "size": "tall"
+     },
+     "obj:solar": {
+      "c": 6,
+      "r": 6,
+      "size": "medium"
+     }
+    },
+    "order": [
+     "obj:clock",
+     "obj:date",
+     "obj:air",
+     "obj:controls",
+     "obj:cam",
+     "obj:scenes",
+     "obj:solar"
+    ],
+    "placed": {
+     "obj:clock": {
+      "c": 0,
+      "r": 0,
+      "w": 6,
+      "h": 2,
+      "size": "6x2"
+     },
+     "obj:date": {
+      "c": 0,
+      "r": 2,
+      "w": 6,
+      "h": 1,
+      "size": "6x1"
+     },
+     "obj:air": {
+      "c": 0,
+      "r": 3,
+      "w": 6,
+      "h": 7,
+      "size": "6x7"
+     },
+     "obj:controls": {
+      "c": 6,
+      "r": 0,
+      "w": 8,
+      "h": 6,
+      "size": "8x6"
+     },
+     "obj:cam": {
+      "c": 14,
+      "r": 0,
+      "w": 4,
+      "h": 4,
+      "size": "small"
+     },
+     "obj:scenes": {
+      "c": 14,
+      "r": 4,
+      "w": 4,
+      "h": 6,
+      "size": "tall"
+     },
+     "obj:solar": {
+      "c": 6,
+      "r": 6,
+      "w": 8,
+      "h": 4,
+      "size": "medium"
+     }
+    }
+   }
+  }
+ },
+ {
+  "id": "gamer",
+  "title": "Game Room",
+  "design": {
+   "v": 1,
+   "background": {
+    "colour": "#1f3d1a",
+    "colour2": "#0b0d10",
+    "radial": true
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "games",
+     "type": "widget",
+     "kind": "games",
+     "size": "xl",
+     "x": 80,
+     "y": 60,
+     "w": 1160,
+     "h": 560,
+     "start": true
+    },
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "clock",
+     "size": "6x2",
+     "x": 1280,
+     "y": 60,
+     "w": 560,
+     "h": 160,
+     "opts": {
+      "align": "right",
+      "date": false
+     },
+     "style": {
+      "ink": "accent",
+      "accent": "#9cff8f"
+     }
+    },
+    {
+     "id": "pads",
+     "type": "widget",
+     "kind": "battery",
+     "size": "6x4",
+     "x": 1280,
+     "y": 260,
+     "w": 560,
+     "h": 360,
+     "style": {
+      "show": "live"
+     }
+    },
+    {
+     "id": "keep",
+     "type": "widget",
+     "kind": "keeprow",
+     "size": "wide",
+     "x": 80,
+     "y": 660,
+     "w": 1160,
+     "h": 360,
+     "opts": {
+      "label": ""
+     }
+    },
+    {
+     "id": "apps",
+     "type": "widget",
+     "kind": "folder",
+     "size": "6x4",
+     "x": 1280,
+     "y": 660,
+     "w": 560,
+     "h": 360,
+     "opts": {
+      "apps": [
+       "tv.twitch.android.app",
+       "com.google.android.youtube.tv",
+       "com.crunchyroll.webapp",
+       "com.netflix.ninja",
+       "com.spotify.tv.android",
+       "io.strem.tv"
+      ],
+      "cols": 3
+     }
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:games": {
+      "c": 0,
+      "r": 0,
+      "size": "xl"
+     },
+     "obj:clock": {
+      "c": 12,
+      "r": 0,
+      "size": "6x2"
+     },
+     "obj:pads": {
+      "c": 12,
+      "r": 2,
+      "size": "6x4"
+     },
+     "obj:keep": {
+      "c": 0,
+      "r": 6,
+      "size": "wide"
+     },
+     "obj:apps": {
+      "c": 12,
+      "r": 6,
+      "size": "6x4"
+     }
+    },
+    "order": [
+     "obj:games",
+     "obj:clock",
+     "obj:pads",
+     "obj:keep",
+     "obj:apps"
+    ],
+    "placed": {
+     "obj:games": {
+      "c": 0,
+      "r": 0,
+      "w": 12,
+      "h": 6,
+      "size": "xl"
+     },
+     "obj:clock": {
+      "c": 12,
+      "r": 0,
+      "w": 6,
+      "h": 2,
+      "size": "6x2"
+     },
+     "obj:pads": {
+      "c": 12,
+      "r": 2,
+      "w": 6,
+      "h": 4,
+      "size": "6x4"
+     },
+     "obj:keep": {
+      "c": 0,
+      "r": 6,
+      "w": 12,
+      "h": 4,
+      "size": "wide"
+     },
+     "obj:apps": {
+      "c": 12,
+      "r": 6,
+      "w": 6,
+      "h": 4,
+      "size": "6x4"
+     }
+    }
+   },
+   "look": {
+    "panel": "rgba(255, 255, 255, 0.07)",
+    "rim": "rgba(120, 255, 140, 0.18)",
+    "icons": "solid"
+   }
+  }
+ },
+ {
+  "id": "office",
+  "title": "Work From Home",
+  "design": {
+   "v": 1,
+   "background": {
+    "colour": "#e7e3da",
+    "colour2": "#dcd6ca",
+    "angle": 180
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "world",
+     "type": "widget",
+     "kind": "worldclock",
+     "size": "12x3",
+     "x": 80,
+     "y": 60,
+     "w": 1160,
+     "h": 260,
+     "opts": {
+      "cities": [
+       "Australia/Sydney",
+       "Europe/London",
+       "America/New_York",
+       "Asia/Tokyo"
+      ]
+     },
+     "style": {
+      "panel": "colour",
+      "colour": "#0a84ff"
+     }
+    },
+    {
+     "id": "month",
+     "type": "widget",
+     "kind": "month",
+     "size": "6x6",
+     "x": 1280,
+     "y": 60,
+     "w": 560,
+     "h": 560,
+     "style": {
+      "panel": "paper"
+     }
+    },
+    {
+     "id": "markets",
+     "type": "widget",
+     "kind": "stocks",
+     "size": "6x4",
+     "x": 80,
+     "y": 360,
+     "w": 560,
+     "h": 360,
+     "style": {
+      "panel": "paper",
+      "show": "live"
+     }
+    },
+    {
+     "id": "news",
+     "type": "widget",
+     "kind": "news",
+     "size": "6x3",
+     "x": 80,
+     "y": 760,
+     "w": 560,
+     "h": 260,
+     "style": {
+      "panel": "paper"
+     }
+    },
+    {
+     "id": "todo",
+     "type": "widget",
+     "kind": "list",
+     "size": "6x7",
+     "x": 680,
+     "y": 360,
+     "w": 560,
+     "h": 660,
+     "opts": {
+      "label": "To do",
+      "icon": "check"
+     },
+     "style": {
+      "panel": "paper"
+     }
+    },
+    {
+     "id": "focus",
+     "type": "widget",
+     "kind": "timer",
+     "size": "6x4",
+     "x": 1280,
+     "y": 660,
+     "w": 560,
+     "h": 360,
+     "opts": {
+      "label": "Focus"
+     },
+     "style": {
+      "panel": "paper"
+     },
+     "start": true
+    }
+   ],
+   "grid": {
+    "on": true,
+    "v": 2,
+    "items": {
+     "obj:world": {
+      "c": 0,
+      "r": 0,
+      "size": "12x3"
+     },
+     "obj:month": {
+      "c": 12,
+      "r": 0,
+      "size": "6x6"
+     },
+     "obj:markets": {
+      "c": 0,
+      "r": 3,
+      "size": "6x4"
+     },
+     "obj:news": {
+      "c": 0,
+      "r": 7,
+      "size": "6x3"
+     },
+     "obj:todo": {
+      "c": 6,
+      "r": 3,
+      "size": "6x7"
+     },
+     "obj:focus": {
+      "c": 12,
+      "r": 6,
+      "size": "6x4"
+     }
+    },
+    "order": [
+     "obj:world",
+     "obj:month",
+     "obj:markets",
+     "obj:news",
+     "obj:todo",
+     "obj:focus"
+    ],
+    "placed": {
+     "obj:world": {
+      "c": 0,
+      "r": 0,
+      "w": 12,
+      "h": 3,
+      "size": "12x3"
+     },
+     "obj:month": {
+      "c": 12,
+      "r": 0,
+      "w": 6,
+      "h": 6,
+      "size": "6x6"
+     },
+     "obj:markets": {
+      "c": 0,
+      "r": 3,
+      "w": 6,
+      "h": 4,
+      "size": "6x4"
+     },
+     "obj:news": {
+      "c": 0,
+      "r": 7,
+      "w": 6,
+      "h": 3,
+      "size": "6x3"
+     },
+     "obj:todo": {
+      "c": 6,
+      "r": 3,
+      "w": 6,
+      "h": 7,
+      "size": "6x7"
+     },
+     "obj:focus": {
+      "c": 12,
+      "r": 6,
+      "w": 6,
+      "h": 4,
+      "size": "6x4"
+     }
+    }
+   },
+   "look": {
+    "ink": "#1d1b18",
+    "sub": "rgba(29, 27, 24, 0.68)",
+    "focus": "#0a84ff",
+    "paper": "#fbf9f5"
+   }
+  }
+ }
+]

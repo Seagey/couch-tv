@@ -54,7 +54,20 @@
 
   // Settings from the bridge's config.json (served as config.js, and saved with the offline copy),
   // read in readConfig() once the page starts (mock.js fills them in for previews). See docs/CONFIG.md.
-  var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [];
+  var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [], DESIGN_FROM_CODE = false;
+  // A picture that fails to load falls back to what its data-err names (kids.js uses it too). One
+  // listener instead of inline onerror handlers, so the page runs under a strict Content Security
+  // Policy (index.html) that allows no inline script at all.
+  document.addEventListener("error", function (e) {
+    var n = e.target, k = n && n.getAttribute && n.getAttribute("data-err"), p = n && n.parentNode;
+    if (!k) return;
+    if (k === "remove") { if (p) p.removeChild(n); }
+    else if (k === "parent") { if (p && p.parentNode) p.parentNode.removeChild(p); }
+    else if (k === "np") n.className = "np-art gone";
+    else if (k === "svg" && p) { p.className = "face tool input-ic"; p.innerHTML = n.getAttribute("data-svg"); }
+    else if (k === "word" && p) { p.className = "face word"; p.textContent = n.getAttribute("data-name"); }
+    else if (k === "name" && p) p.textContent = n.getAttribute("data-n");
+  }, true);
   var WXCFG = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
   var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "tvsettings", "screensaver", "extend"];
   // The most personal photos this TV keeps (also MAX_PHOTOS in bridge/server.py and MainActivity.kt).
@@ -360,7 +373,15 @@
   // this TV (kept by the bridge too when there is one), then ?theme= for a preview. docs/CONFIG.md.
   function readConfig() {
     CFG = window.COUCH_CONFIG || {};
+    // a design got by code at this TV (design-code.js, Home settings, Look, Get a design) wins over one
+    // in config.json; it is always asked about first (CouchDesign.start with fromCode)
+    var GOT = typeof CouchDesignCode !== "undefined" ? CouchDesignCode.kept() : null;
+    DESIGN_FROM_CODE = !!GOT;
+    if (GOT) CFG = Object.assign({}, CFG, { design: GOT });
     HOME = CFG.home || {};
+    // a design from the TV Designer (design.js, docs/CONFIG.md "Design") may carry look settings of
+    // its own (design.home): they win over home in config.json, Home settings still win over both
+    if (typeof CouchDesign !== "undefined") HOME = CouchDesign.home(HOME, CFG.design, { fromCode: DESIGN_FROM_CODE });
     ON_TV = CFG.mode === "on-tv";
     ST = loadSettings();
     KEEP_PHOTO = typeof ST.keep_photo === "boolean" ? ST.keep_photo : HOME.keep_photo === true;
@@ -649,13 +670,16 @@
   function clock() {
     var d = new Date(), h = d.getHours(), m = d.getMinutes();
     var mm = (m < 10 ? "0" : "") + m;
-    var hm = CLOCK24 ? (h < 10 ? "0" : "") + h + ":" + mm : (h % 12 || 12) + ":" + mm;
-    $("time").innerHTML = hm + (CLOCK24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
+    var CD = typeof CouchDesign !== "undefined" && CouchDesign.on() ? CouchDesign : null;
+    var c24 = CD ? CD.clock24(CLOCK24) : CLOCK24;   // a design's clock format wins (design.js)
+    var hm = c24 ? (h < 10 ? "0" : "") + h + ":" + mm : (h % 12 || 12) + ":" + mm;
+    $("time").innerHTML = hm + (c24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
     var loc = window.I18N ? window.I18N.locale() : "en-AU";
     var lang = window.I18N ? window.I18N.lang() : "en";
     var day = d.toLocaleDateString(loc, { weekday: "long", day: "numeric", month: "long" });
     if (lang !== "ro") day = day.replace(",", "");
     day = day.charAt(0).toUpperCase() + day.slice(1);   // "lunes 27 de octubre" starts a line on screen
+    if (CD) day = CD.day(d, day, loc);   // a design's date format (design.js)
     var w = NIGHT && WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
     var place = w ? weatherPlace() : "";
     var date = $("date");
@@ -671,7 +695,7 @@
         '<span class="ww"> · ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
     }
     var ic = $("idle-clock"), idate = $("idle-date"), iwx = $("idle-wx");
-    if (ic) ic.innerHTML = hm + (CLOCK24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
+    if (ic) ic.innerHTML = hm + (c24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
     if (idate) idate.textContent = day;
     if (iwx) {
       var wIdle = WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
@@ -850,6 +874,9 @@
         f.style.backgroundImage = s.src ? cssUrl(s.src) : "url(backgrounds/" + s.photo + (s.glass ? "-glass" : "") + ".jpg)";
         f.style.backgroundPosition = -ex + "px " + -ey + "px";
       }
+      // a design moves and sizes the clock and may set its own background: design.js lines the
+      // glass up again from where the digits really are
+      if (typeof CouchDesign !== "undefined" && CouchDesign.on()) CouchDesign.fill(c, f, s, CLOCK_LIQUID);
     }
     if (s.water) {   // above the waterline sharp, below it the blurred reflection
       // The digits hang below the clock's box (its line height is tight), so the clips reach past
@@ -1096,14 +1123,18 @@
 
   // The bridge's reading for the place in config.json, or straight from Open-Meteo with no bridge
   // or when Home settings chose another place. Hidden when Home settings switched the weather off.
+  function wantsForecast() { return typeof CouchDesign !== "undefined" && CouchDesign.wantsForecast && CouchDesign.wantsForecast(); }
   function refreshWeather() {
-    if (!NIGHT || !WX_SHOW) {
+    var fc = wantsForecast();
+    if ((!NIGHT && !fc) || !WX_SHOW) {
       updateAmbientWeather();
       return Promise.resolve();
     }
-    var direct = OFFLINE || !!(ST.place && isFinite(ST.place.lat));
-    return (direct ? weatherDirect() : api("GET", "/api/weather")).then(function (j) {
+    // a preview (?mock=1) never asks Open-Meteo itself: the designer talks to nobody else (wxlive=1: a test that does)
+    var direct = (!MOCK || /[?&]wxlive=1/.test(Q)) && (OFFLINE || fc || !!(ST.place && isFinite(ST.place.lat)));
+    return (direct ? weatherDirect(fc) : api("GET", "/api/weather")).then(function (j) {
       data.weather = j;
+      if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("weather", [j && j.temp, j && j.code, j && j.daily && j.daily.length]);
       clock();
       updateAmbientWeather();
     }, function () {});
@@ -1114,12 +1145,23 @@
     51: "wx_drizzle", 53: "wx_drizzle", 55: "wx_drizzle", 56: "wx_drizzle", 57: "wx_drizzle", 61: "wx_light_rain",
     63: "wx_rain", 65: "wx_heavy_rain", 66: "wx_rain", 67: "wx_rain", 80: "wx_showers", 81: "wx_showers",
     82: "wx_heavy_showers", 95: "wx_storms", 96: "wx_storms", 99: "wx_storms" };
-  function weatherDirect() {
+  // With a forecast widget on a design, the same one call grows (widgets/CATALOGUE.md "Data plumbing" 1):
+  // hourly, daily and the next hours of rain, still free, keyless and one request per refresh.
+  function weatherDirect(forecast) {
     var url = "https://api.open-meteo.com/v1/forecast?latitude=" + WXCFG.lat + "&longitude=" + WXCFG.lon +
-      "&current=temperature_2m,weather_code,is_day&timezone=" + encodeURIComponent(WXCFG.timezone || "auto") + "&forecast_days=1";
+      "&current=temperature_2m,weather_code,is_day&timezone=" + encodeURIComponent(WXCFG.timezone || "auto") +
+      (forecast ? "&hourly=temperature_2m,weather_code,uv_index,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&minutely_15=precipitation&forecast_days=7&forecast_minutely_15=12" : "&forecast_days=1");
     return fetch(url).then(function (r) { return r.json(); }).then(function (j) {
       var c = j.current, code = Math.round(c.weather_code);
-      return { temp: Math.round(c.temperature_2m), code: code, text: "", is_day: !!c.is_day };
+      var out = { temp: Math.round(c.temperature_2m), code: code, text: "", is_day: !!c.is_day };
+      if (forecast) {
+        var H = j.hourly || {}, Dd = j.daily || {}, M = j.minutely_15 || {}, nowIso = (c.time || "").slice(0, 13), at = Math.max(0, (H.time || []).indexOf(nowIso + ":00"));
+        out.hourly = (H.time || []).slice(at, at + 8).map(function (t, i) { return { time: t, temp: H.temperature_2m[at + i], code: H.weather_code[at + i], uv: H.uv_index && H.uv_index[at + i], pop: H.precipitation_probability && H.precipitation_probability[at + i] }; });
+        out.daily = (Dd.time || []).map(function (t, i) { return { date: t, code: Dd.weather_code[i], hi: Dd.temperature_2m_max[i], lo: Dd.temperature_2m_min[i], sunrise: Dd.sunrise[i], sunset: Dd.sunset[i], uv: Dd.uv_index_max && Dd.uv_index_max[i] }; });
+        out.rain15 = (M.precipitation || []).slice(0, 12);
+        if (out.daily.length) { out.hi = Math.round(out.daily[0].hi); out.lo = Math.round(out.daily[0].lo); out.uv = Math.round(out.daily[0].uv || 0); }
+      }
+      return out;
     });
   }
 
@@ -1347,7 +1389,7 @@
     if (!on) { el.innerHTML = ""; return; }
     var playing = music.state === "playing";
     // the cover from the bridge (Apple's music search); none yet, or none found: a music note
-    var art = music.art ? '<img class="np-art" src="' + esc(music.art) + '" alt="" decoding="async" onerror="this.className=\'np-art gone\'">' :
+    var art = music.art ? '<img class="np-art" src="' + esc(music.art) + '" alt="" decoding="async" data-err="np">' :
       '<span class="np-art">' + ICONS.note + "</span>";
     var btns = npButtons();
     if (npI >= btns.length) npI = Math.max(0, btns.length - 1);   // a Spotify song may have one button
@@ -1391,6 +1433,7 @@
       }
       renderNp();
       renderAmbientMusic();
+      if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("music", music ? [music.title, music.artist, music.state] : null);
       if (had !== !!music && (zone === "np" || zone === "ambient") && !music) paintFocus();
     }, function () {
       if (music) {
@@ -1591,7 +1634,10 @@
       return false;
     });
   }
-  function hasQuick() { return quickVisible().length > 0; }
+  function hasQuick() { return quickVisible().length > 0 && !designHides("quick"); }
+  // a part a design hides is out of the remote's way too: focus never lands on something you cannot see
+  function designHides(part) { return typeof CouchDesign !== "undefined" && CouchDesign.on() && CouchDesign.hides(part); }
+  function shelfReach() { return shelfEls.length > 0 && !designHides("keep_watching"); }
   function picLabel() {
     if (picBusy) return t("switching");
     var names = picModes || (TVCFG.picture_modes || []).map(function (n) { return { id: null, name: n }; });
@@ -2124,6 +2170,7 @@
   function renderShelf() {
     var track = $("shelf");
     data.shows = KW_ON ? (data.showsBy[who] || []).slice(0, KEEP_MAX) : [];
+    if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("shows", [who, data.shows.map(function (x) { return x.title + (x.progress || ""); })]);
     var anyone = KW_ON && PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
     // nobody has anything on the go: no empty box, the photo has the space (unless Now playing
     // is up at night). The people switcher stays: with nothing yet (Netflix tells Android nothing on
@@ -2148,7 +2195,7 @@
         var ep = it.season && it.episode ? "S" + it.season + " E" + it.episode : (it.episode_title || "");
         return '<div class="tile ncard">' +
           (art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async">' : '<span class="thumb none"></span>') +
-          '<div class="t"><div class="nap">' + (pkg && iconUrl(pkg) ? '<img src="' + esc(iconUrl(pkg)) + '" alt="" onerror="this.remove()">' : "") +
+          '<div class="t"><div class="nap">' + (pkg && iconUrl(pkg) ? '<img src="' + esc(iconUrl(pkg)) + '" alt="" data-err="remove">' : "") +
           esc(it.app ? it.app.name : "") + "</div><b>" + esc(it.title) + "</b>" + (ep ? "<i>" + esc(ep) + "</i>" : "") +
           (it.progress ? '<span class="nbar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "") + "</div></div>";
       }).join("");
@@ -2159,7 +2206,7 @@
     track.innerHTML = data.shows.map(function (it) {
       var art = slim(it.backdrop || it.poster);
       var pkg = it.app && it.app.package;
-      var badge = pkg && iconUrl(pkg) ? '<span class="badge"><img src="' + esc(iconUrl(pkg)) + '" alt="" onerror="this.parentNode.remove()"></span>' : "";
+      var badge = pkg && iconUrl(pkg) ? '<span class="badge"><img src="' + esc(iconUrl(pkg)) + '" alt="" data-err="parent"></span>' : "";
       var bar = it.progress ? '<span class="bar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "";
       return '<div class="tile show"><div class="face">' +
         (art ? '<img src="' + esc(art) + '" alt="" decoding="async">' : '<span class="no-art">' + esc(it.title) + "</span>") +
@@ -2372,8 +2419,13 @@
   function dockList() {
     var arr = arrangeItems();
     var list = expanded ? arr.items.slice() : arr.items.slice(0, arr.line);
+    // a design's own dock: its apps in its order, without the ones it hides (design.js)
+    if (!expanded && typeof CouchDesign !== "undefined" && CouchDesign.on()) list = CouchDesign.dock(arr.items, list, DOCK_APPS);
     list = list.concat(toolItems());
     if (!expanded && !(STANDALONE && !data.apps.length)) list.push(moreItem());   // standalone: no app list behind it
+    // apps a design put out on the screen come after Settings and More apps, so Right along the dock
+    // reaches those two before it leaves the dock (design.js)
+    if (!expanded && typeof CouchDesign !== "undefined" && CouchDesign.on() && CouchDesign.order) list = CouchDesign.order(list);
     return list;
   }
 
@@ -2678,7 +2730,7 @@
   function inputFace(it) {
     var drawn = ICONS[it.icon] || ICONS.hdmi || ICONS.input;
     if (it.image) {
-      return '<div class="face input-img"><img src="' + esc(it.image) + '" alt="" decoding="async" onerror="this.parentNode.className=\'face tool input-ic\';this.parentNode.innerHTML=this.getAttribute(\'data-svg\')" data-svg="' + esc(drawn) + '"></div>';
+      return '<div class="face input-img"><img src="' + esc(it.image) + '" alt="" decoding="async" data-err="svg" data-svg="' + esc(drawn) + '"></div>';
     }
     return '<div class="face tool input-ic ic-' + esc(it.icon || "hdmi") + '">' + drawn + "</div>";
   }
@@ -2691,11 +2743,11 @@
     else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
     else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
     else if (it.kind === "smart") face = '<div class="face tool">' + window.smartHome.icon + "</div>";
-    else if (iconUrl(it.package)) face = '<div class="face"><img src="' + esc(iconUrl(it.package)) + '" alt="" decoding="async" onerror="this.parentNode.className=\'face word\';this.parentNode.textContent=this.getAttribute(\'data-name\')" data-name="' + esc(it.name) + '"></div>';
+    else if (iconUrl(it.package)) face = '<div class="face"><img src="' + esc(iconUrl(it.package)) + '" alt="" decoding="async" data-err="word" data-name="' + esc(it.name) + '"></div>';
     else face = '<div class="face word">' + esc(it.name) + "</div>";
     var cls = "tile app dock-ic" + (it.kind === "input" ? " input-ic ic-" + esc(it.icon || "hdmi") : "") + (lift && it.package === lift.pkg ? " lifted" : "");
     // the name sits in a span: with the Mac-style dock it is a small bubble above the icon (app.css)
-    return '<div class="' + cls + '">' + face + dotHTML(it) + '<div class="label"><span>' + esc(it.name) + "</span></div></div>";
+    return '<div class="' + cls + '" data-pkg="' + esc(it.package || it.kind || "") + '">' + face + dotHTML(it) + '<div class="label"><span>' + esc(it.name) + "</span></div></div>";
   }
 
   function appHTML(it) {
@@ -2724,9 +2776,13 @@
     document.documentElement.classList.toggle("expanded", expanded);
     document.documentElement.classList.toggle("lifting", !!lift);
     gridItems = gridList();
+    // before anyone has pressed a key, a design's dock starts on its first app (or More apps), not Settings
+    if (!touched && !expanded && zone === "grid" && g === 0 && typeof CouchDesign !== "undefined" && CouchDesign.on() && CouchDesign.startIndex) g = CouchDesign.startIndex(gridItems);
     if (NIGHT) {
       // the dock is as wide as what is in it; More apps uses all twelve columns
       GRID_COLS = expanded ? 12 : Math.max(1, Math.min(12, gridItems.length));
+      // a design's dock can be a column, a grid or a wrapped row: the remote follows its shape (design.js)
+      if (!expanded && typeof CouchDesign !== "undefined" && CouchDesign.on()) GRID_COLS = CouchDesign.cols(GRID_COLS, gridItems.length);
       $("grid").style.gridTemplateColumns = "repeat(" + GRID_COLS + ", 7rem)";
     }
     $("grid").innerHTML = gridItems.map(appHTML).join("");
@@ -2789,7 +2845,7 @@
 
   function shelfOn() { return !$("shelf-section").classList.contains("empty"); }
   // the switcher shows for two or more people, also while nobody has anything yet (issue #23)
-  function peopleOn() { return peopleCount() >= 2; }
+  function peopleOn() { return peopleCount() >= 2 && !designHides("people"); }
   function toPeople() { zone = "people"; pi = whoIndex(); }
 
   // ---------------- the Mac-style dock ----------------
@@ -2868,7 +2924,7 @@
     if (zone === "inputs") { if (quickEls[qi]) quickEls[qi].classList.add("focus"); renderInputMenu(); return; }
     if (zone === "pmenu") { renderPop(); $("people").classList.add("focus"); return; }
     if (zone === "np") {
-      if (!npReach()) { zone = shelfEls.length ? "shelf" : "grid"; paintFocus(); return; }
+      if (!npReach()) { zone = shelfReach() ? "shelf" : "grid"; paintFocus(); return; }
       renderNp();
       hero(null);
       $("place").style.visibility = "";
@@ -2955,7 +3011,7 @@
       return;
     }
     // Night with More apps open: the cards step aside, so up and down skip them
-    var cards = NIGHT && expanded ? [] : shelfEls;
+    var cards = (NIGHT && expanded) || designHides("keep_watching") ? [] : shelfEls;
     if (zone === "menu") {
       if (dx || dy) menuI = Math.max(0, Math.min(SLEEP_CHOICES.length - 1, menuI + (dy || dx)));
       paintFocus();
@@ -3015,6 +3071,7 @@
       } else if (dy > 0) zone = NIGHT && npReach() ? "np" : cards.length ? "shelf" : "grid";
     } else if (zone === "shelf") {
       if (dx < 0 && s === 0 && NIGHT && npReach()) { zone = "np"; npI = Math.max(0, npButtons().length - 1); }
+      else if (dx < 0 && s === 0 && !expanded && GRID_COLS === 1 && gridEls.length > 1) { zone = "grid"; g = 0; }   // back onto a side rail
       else if (dx) s = Math.max(0, Math.min(shelfEls.length - 1, s + dx));
       else if (dy < 0) { if (peopleOn()) toPeople(); else if (!NIGHT && npReach()) zone = "np"; else if (hasQuick()) { zone = "quick"; qi = 0; } }
       else if (dy > 0 && gridEls.length) {
@@ -3025,7 +3082,13 @@
       }
     } else {
       var row = Math.floor(g / GRID_COLS), lastRow = Math.floor((gridEls.length - 1) / GRID_COLS);
-      if (dx && gridEls.length) {
+      if (dx && !expanded && GRID_COLS === 1 && gridEls.length > 1) {
+        // a dock that is one column (a design's side rail): left and right step off it, to the
+        // shows or the people, the way up and down step off a row
+        if (cards.length) zone = "shelf";
+        else if (peopleOn()) toPeople();
+        else if (hasQuick()) { zone = "quick"; qi = 0; }
+      } else if (dx && gridEls.length) {
         // More apps: left/right run through every app line by line and wrap from the last to
         // the first; the dock (one row): they wrap within the row (#167).
         var n = gridEls.length;
@@ -3114,7 +3177,7 @@
       } else if (dy > 0) {   // down from the very bottom: back to the top of the home
         if (peopleOn()) toPeople();
         else if (hasQuick()) { zone = "quick"; qi = 0; }
-        else if (shelfEls.length && !(NIGHT && expanded)) { zone = "shelf"; s = 0; }
+        else if (shelfReach() && !(NIGHT && expanded)) { zone = "shelf"; s = 0; }
         else g = g % GRID_COLS;
       }
     } else if (zone === "shelf") {
@@ -3135,10 +3198,14 @@
       zone = "grid";
     } else if (START_FOCUS === "people") {
       if (peopleOn()) toPeople();
-      else zone = shelfEls.length ? "shelf" : "grid";
+      else zone = shelfReach() ? "shelf" : "grid";
     } else {
-      zone = shelfEls.length ? "shelf" : "grid";
+      zone = shelfReach() ? "shelf" : "grid";
     }
+    // a design whose dock starts with Settings (it hides the dock, say): start on the first app, or
+    // More apps, never Settings (design.js)
+    // a design always starts on its first app (or More apps), on every load: not People, not Settings
+    if (zone !== "ambient" && typeof CouchDesign !== "undefined" && CouchDesign.on() && CouchDesign.startIndex && gridItems) { zone = "grid"; g = CouchDesign.startIndex(gridItems); }
   }
 
   // Remember the focused row and tile (#166, thanks IshMehta), so a home that Android dropped while
@@ -3172,9 +3239,11 @@
   function restoreFocus() {
     if (focusRestored) return false;
     focusRestored = true;
+    // a design starts on its first app every time, it does not resume the last tile (Settings included)
+    if (typeof CouchDesign !== "undefined" && CouchDesign.on()) return false;
     var saved = null;
     try { saved = JSON.parse(localStorage.getItem(FOCUS_KEY) || "null"); } catch (e) {}
-    var f = pickFocus(saved, Date.now(), shelfEls.length, gridItems.map(gridKey));
+    var f = pickFocus(saved, Date.now(), shelfReach() ? shelfEls.length : 0, gridItems.map(gridKey));
     if (!f) return false;
     zone = f.zone; s = f.s; g = f.g;
     return true;
@@ -3625,6 +3694,29 @@
   }
 
   // ---- look, scenes and the household's own photos ----
+  // Get a design (design-code.js): only when config.json names a design store. The TV asks that one
+  // server for the code typed here; nothing connects to the TV. English only for now (needs i18n).
+  function designCodeRows(rows) {
+    if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.base()) return;
+    rows.push({ kind: "input", key: "design-get", label: "Get a design", sub: "Type the code the TV Designer shows you", act: function () {
+      startTyping({ label: "Type the code from the TV Designer (like ABCDE-FGHJK)", value: "", code: true, submit: getDesignByCode });
+    } });
+    if (DESIGN_FROM_CODE) rows.push({ kind: "action", key: "design-forget", label: "Remove the design I got", sub: "Back to the home as it was", act: function () {
+      CouchDesignCode.forget(); SET.dirty = true; SET.msg = "Removed. The home goes back to how it was when you close Home settings.";
+    } });
+  }
+  function getDesignByCode(typed) {
+    SET.msg = "Getting the design...";
+    renderSettings();
+    CouchDesignCode.get(typed).then(function () {
+      SET.msg = "Got it. Your TV asks you about it now.";
+      renderSettings();
+      setTimeout(restart, 600);   // it starts again and shows "Use this design?" first
+    }, function (e) {
+      SET.msg = (e && e.message) || "That design could not be used.";
+      if (zone === "settings") renderSettings();
+    });
+  }
   var SECS_STEPS = [10, 15, 20, 30, 45, 60, 120];
   function lookRows() {
     var look = lookSetting(), st = sceneState(), rows = [head(t("look_head"))];
@@ -3632,6 +3724,9 @@
       rows.push({ kind: "choice", key: "look:" + id, label: t("look_" + id), sub: t("look_" + id + "_sub"), checked: look === id,
         act: function () { ST.look = id; keep("tvhome.look", id); saveSettings(); } });
     });
+    // a TV Designer design (config.json "design"): switched off with Back held, it comes back here
+    if (CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.settingsRow) rows.push(CouchDesign.settingsRow(restart));
+    designCodeRows(rows);
     if (look === "classic") {
       rows.push({ kind: "toggle", key: "keep-photo", label: t("keep_photo"), sub: t("keep_photo_sub"), value: KEEP_PHOTO ? t("on") : t("off"), act: function () {
         KEEP_PHOTO = !KEEP_PHOTO; ST.keep_photo = KEEP_PHOTO;
@@ -4311,7 +4406,9 @@
     inp.value = spec.value || "";
     inp.type = spec.url ? "url" : "text";
     inp.setAttribute("enterkeyhint", spec.search ? "search" : "done");
-    inp.setAttribute("autocapitalize", spec.url ? "off" : "words");
+    inp.setAttribute("autocapitalize", spec.url ? "off" : spec.code ? "characters" : "words");
+    if (spec.code) { inp.setAttribute("autocorrect", "off"); inp.setAttribute("spellcheck", "false"); }
+    else { inp.removeAttribute("autocorrect"); inp.removeAttribute("spellcheck"); }
     $("set-type").classList.add("on");
     renderSettings();
     try { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) {}
@@ -4423,9 +4520,9 @@
     var cls = "srow k-" + r.kind + (f ? " focus" : "") + (lifted ? " lifted" : "") + (r.danger ? " danger" : "");
     var lead = "";
     if (r.avatar) lead = avatarHTML(r.avatar);
-    else if (r.icon && iconUrl(r.icon)) lead = '<img class="sicon" src="' + esc(iconUrl(r.icon)) + '" alt="" onerror="this.remove()">';
+    else if (r.icon && iconUrl(r.icon)) lead = '<img class="sicon" src="' + esc(iconUrl(r.icon)) + '" alt="" data-err="remove">';
     else if (r.kind === "item") lead = '<span class="sicon none">' + (r.icon.indexOf("screen:") === 0 ? ICONS.screen : esc((r.label || "?").charAt(0).toUpperCase())) + "</span>";
-    else if (r.thumb) lead = '<img class="sthumb" src="' + esc(r.thumb) + '" alt="" decoding="async" onerror="this.remove()">';
+    else if (r.thumb) lead = '<img class="sthumb" src="' + esc(r.thumb) + '" alt="" decoding="async" data-err="remove">';
     var label = SET.confirm === r.key ? r.confirmText || t("confirm_remove") : r.label;
     var tail = "";
     if (lifted) tail = '<i class="smark">' + ICONS.updown + "</i>";
@@ -4976,7 +5073,7 @@
 
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
-  window.tv = { back: function () { if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); resetSmartIdle(); },
+  window.tv = { back: function () { if (typeof CouchDesign !== "undefined" && CouchDesign.back && CouchDesign.back()) return; if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); resetSmartIdle(); },
     home: function () { forgetFocus(); if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); resetSmartIdle(); },
     screenOff: function () { toggleScreenOff(true); },
     wakeScreen: function () { toggleScreenOff(false); },
@@ -4996,6 +5093,47 @@
 
   function start() {
     readConfig();
+    // a design got by code: pictures only from here, the store and the hosts this TV already uses
+    if (DESIGN_FROM_CODE && CouchDesignCode.lockImages) CouchDesignCode.lockImages((ST.photos || []).map(function (p) { return p && p.url; }));
+    // the TV Designer's design block (design.js): nothing happens without one, unless the page is
+    // the designer's own preview (?designer=1), which sends designs in as they are made
+    if (typeof CouchDesign !== "undefined") CouchDesign.start(CFG.design, {
+      clock: function () { glassShown = ""; clock(); },
+      apps: function () { renderGrid(); },
+      clock24: function () { return CLOCK24; },
+      night: NIGHT,
+      // widget mode: whether the home itself has the remote (no menu, settings or pop up open)
+      free: function () { return !screenOffActive && !idleAmbientActive && !kidsOn() && !expanded && !lift && ["grid", "shelf", "np", "people", "quick"].indexOf(zone) >= 0; },
+      // what the widgets show: only what this TV already has
+      data: function () {
+        return { weather: WX_SHOW ? data.weather : null, wxOff: !WX_SHOW, place: { name: String((WXCFG && WXCFG.place) || "").split(",")[0], lat: WXCFG && WXCFG.lat, lon: WXCFG && WXCFG.lon },
+          shows: data.shows || [], music: music, apps: (function () { try { return arrangeItems().items.map(function (it) { return { package: it.package, name: it.name }; }); } catch (e) { return []; } })(),
+          photos: (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && (p.file || p.url); }).map(photoSrc),
+          people: NOBODY ? [] : PEOPLE.map(function (p) { return { id: p.id, name: p.name }; }), who: who, quick: quickVisible(), cards: CARDS.slice(0, 8), iconUrl: iconUrl,
+          scenes: (CFG.home_assistant && CFG.home_assistant.scenes) || [] };
+      },
+      // OK on a widget: open the app, the show, the smart home, a quick button
+      act: function (what, arg) {
+        touched = true;
+        if (what === "app") {
+          var it = arrangeItems().items.filter(function (x) { return x.package === arg; })[0];
+          if (it && it.kind && it.kind !== "app") { var i = gridItems.indexOf(it); if (i >= 0) { zone = "grid"; g = i; activate(); } return; }
+          opened(arg);
+          if (TV && TV.launch(arg)) return;
+          api("POST", "/api/launch", { app: (it && it.id) || arg }).catch(function (e) { status(tBridge(e.key, e.vars, e.message)); });
+        } else if (what === "show") { zone = "shelf"; s = Math.max(0, parseInt(arg, 10) || 0); activate(); zone = "grid"; }
+        else if (what === "more") { dockBack = null; expanded = true; zone = "grid"; g = 0; renderGrid(); paintFocus(); }
+        else if (what === "gear") openGear();
+        else if (what === "smart") openSmart();
+        else if (what === "quick") { var qv = quickVisible(), qn = qv.indexOf(arg); if (qn >= 0) { qi = qn; quickAction(); } else if (arg === "soundscape") cycleSoundscape(); }
+        else if (what === "person") { pickWho(arg); renderPeople(); }
+        else if (what === "media") {
+          var key = { prev: "previous", play: "play_pause", next: "next" }[arg];
+          if (key) { api("POST", "/api/key", { key: key }).catch(function (e) { note(tBridge(e.key, e.vars, e.message)); }); setTimeout(refreshMusic, 1200); }
+        }
+      },
+      fromCode: DESIGN_FROM_CODE
+    });
     kidsInit();
     kidSync();   // a kids profile on the couch: its shelf before anything else shows
     staticText();

@@ -435,6 +435,77 @@ def _inputs(raw_list):
 
 HOME = _home(CONFIG.get("home"))
 
+
+# A design is untrusted input that runs on a TV. tv-home/web/design.js is the real gate (it rebuilds
+# the design from an allowed list); this is a second one, so nothing that looks like a link or markup
+# is even handed to the home: such a value is dropped, with a note.
+_DESIGN_PICTURE = re.compile(r"^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$")
+_DESIGN_BAD = re.compile(r"(?i)(\b(javascript|vbscript|https?|ftp|file|blob)\s*:|^\s*//|<\s*/?\s*(script|iframe|object|embed|svg|img|style|link)\b|\bon\w+\s*=|url\s*\(|@import|expression\s*\()")
+
+
+def _design_clean(v, depth=0, dropped=None):
+    if depth > 8:
+        return None
+    if isinstance(v, dict):
+        out = {}
+        for k, x in list(v.items())[:200]:
+            if not isinstance(k, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,200}", k):
+                dropped.append(str(k)[:40])
+                continue
+            c = _design_clean(x, depth + 1, dropped)
+            if c is not None:
+                out[k] = c
+        return out
+    if isinstance(v, list):
+        return [c for c in (_design_clean(x, depth + 1, dropped) for x in v[:200]) if c is not None]
+    if isinstance(v, str):
+        if _DESIGN_PICTURE.match(v):
+            return v
+        if len(v) > 2000 or _DESIGN_BAD.search(v):
+            dropped.append(v[:40])
+            return None
+        return v
+    if isinstance(v, bool) or v is None:
+        return v
+    if isinstance(v, (int, float)):
+        return v if abs(v) < 1e9 else None
+    return None
+
+
+def _design(d):
+    """The TV Designer's design block (docs/CONFIG.md, "Design"), cleaned of anything that looks like
+    a link or markup, then handed to the TV home, whose design.js checks every value again. Only an
+    object, and not too big for the TV to keep (an uploaded background travels inside it)."""
+    if not isinstance(d, dict) or not d:
+        return None
+    if len(json.dumps(d)) > 4_000_000:
+        print("config: design is over 4 MB (a smaller background picture fixes it), the home stays as it is")
+        return None
+    dropped = []
+    clean = _design_clean(d, 0, dropped)
+    if dropped:
+        print("config: design: left out %d value(s) that looked like a link or markup" % len(dropped))
+    return clean or None
+
+
+DESIGN = _design(CONFIG.get("design"))
+
+
+def _design_store(u):
+    """The TV Designer's design store (docs/CONFIG.md, "Design"): the one server the TV may ask for a
+    design by code. https only (plain http only to this computer, for development); no path."""
+    if not isinstance(u, str):
+        return None
+    m = re.fullmatch(r"(?i)(https://[a-z0-9.-]+(:\d{1,5})?|http://(127\.0\.0\.1|localhost)(:\d{1,5})?)/?", u.strip())
+    if not m:
+        if u:
+            print("config: design_store must be an https address with no path, it was left out")
+        return None
+    return m.group(1).lower()
+
+
+DESIGN_STORE = _design_store(CONFIG.get("design_store"))
+
 # the source of the custom cards (home.custom_cards), kept here: the TV only sees HOME["custom_cards"]
 CUSTOM_CARDS = custom_cards.source((CONFIG.get("home") or {}).get("custom_cards") if isinstance(CONFIG.get("home"), dict) else None,
                                    os.path.dirname(os.path.abspath(CONFIG_FILE)))
@@ -506,4 +577,7 @@ def public():
                          # input tiles for this TV only (its own HDMI devices); else home.inputs
                          **({"inputs": _inputs(t["inputs"])} if isinstance(t.get("inputs"), list) else {}))
                      for t in TVS],
-            "default_tv": DEFAULT_TV, "ask": {"enabled": ASK_ENABLED}, "phone_remote": PHONE_REMOTE}
+            "default_tv": DEFAULT_TV, "ask": {"enabled": ASK_ENABLED}, "phone_remote": PHONE_REMOTE,
+            # only when config.json has one: without it the home is exactly as before
+            **({"design": DESIGN} if DESIGN else {}),
+            **({"design_store": DESIGN_STORE} if DESIGN_STORE else {})}

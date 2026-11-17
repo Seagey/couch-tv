@@ -1,0 +1,137 @@
+/* Widgets for a design (widgets.js draws them, design.js places them). A widget is one box on the
+   designer's grid (9 x 5 square tiles of 160 px, 40 px gutters, inside the tvOS safe area), drawn in
+   1920 x 1080 pixels and scaled with the design layer. Type never under 23 px.
+   The look of every widget comes from a few variables, set per design (design.look) and per widget
+   (its style): --ink, --sub, --faint, --panel, --rim, --r, --pad, --on, --tile. */
+.cd-layer { --ink: #fff; --sub: rgba(255, 255, 255, 0.74); --faint: rgba(255, 255, 255, 0.5); --panel: rgba(22, 18, 26, 0.38);
+  --rim: rgba(255, 255, 255, 0.14); --solid: #16161b; --paperbg: #f6f2ea; --on: #ffd60a; --focus: #fff; }
+.cw { position: relative; z-index: 0; box-sizing: border-box; border-radius: var(--r, 36px); padding: var(--pad, 24px); display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-flex-direction: column; flex-direction: column; color: var(--ink); font-family: "Inter", sans-serif; -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1; overflow: hidden; text-align: left; line-height: 1.2;
+  -webkit-transition: -webkit-transform 0.16s ease-out, box-shadow 0.16s ease-out; transition: transform 0.16s ease-out, box-shadow 0.16s ease-out; }
+.cw * { box-sizing: border-box; }
+.cw { white-space: normal; }
+/* the panel is its own layer under the content, so its opacity never fades the words */
+.cw > .cw-bg { position: absolute; left: 0; top: 0; right: 0; bottom: 0; border-radius: inherit; z-index: -1; pointer-events: none; }
+.cw-glass > .cw-bg { background: var(--panel); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%);
+  box-shadow: inset 0 0 0 1.5px var(--rim), inset 0 1.5px 0 rgba(255, 255, 255, 0.16); }
+.cw-solid > .cw-bg { background: var(--solid); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.06); }
+.cw-paper { color: #1d1b18; --ink: #1d1b18; --sub: rgba(29, 27, 24, 0.74); --faint: rgba(29, 27, 24, 0.45); }
+.cw-paper > .cw-bg { background: var(--paperbg); }
+.cw-tint > .cw-bg { background: var(--tile, #0a84ff); }
+.cw-bare { padding: 0; border-radius: 0; overflow: visible; }
+.cw-photo { padding: 0; }
+.cw-sh-soft { box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22); }
+.cw-sh-lifted { box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42); }
+.cw-glass.cw-sh-none, .cw-solid.cw-sh-none { box-shadow: none; }
+.cw-glass:not(.cw-sh-none):not(.cw-sh-lifted) { box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22); }
+
+/* type, tvOS sizes */
+.cw-lab { font-size: 25px; font-weight: 650; letter-spacing: 0.01em; color: var(--sub); display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; white-space: nowrap; overflow: hidden; }
+.cw-lab > * { margin-right: 10px; -webkit-flex: none; flex: none; }
+.cw-t29 { font-size: 29px; font-weight: 560; line-height: 1.22; }
+.cw-t25 { font-size: 25px; font-weight: 560; line-height: 1.25; color: var(--sub); }
+.cw-t23 { font-size: 24px; font-weight: 560; line-height: 1.25; color: var(--sub); }
+.cw-t38 { font-size: 38px; font-weight: 680; line-height: 1.12; letter-spacing: -0.01em; }
+.cw-t48 { font-size: 48px; font-weight: 700; line-height: 1.05; letter-spacing: -0.015em; }
+.cw-big { font-weight: 640; letter-spacing: -0.035em; line-height: 0.92; }
+.cw-grow { -webkit-flex: 1; flex: 1; min-height: 0; }
+.cw-row { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+.cw-col { display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; }
+.cw-sp { -webkit-justify-content: space-between; justify-content: space-between; }
+.cw-center { -webkit-justify-content: center; justify-content: center; -webkit-align-items: center; align-items: center; }
+.cw-dim { color: var(--sub); }
+.cw-ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cw-fill { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-size: cover; background-position: center; }
+.cw-svg { display: block; overflow: visible; }
+
+/* dots: a stack (down the right) and a slideshow (along the bottom) */
+.cw-dots { position: absolute; right: 18px; top: 50%; -webkit-transform: translateY(-50%); transform: translateY(-50%); display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; z-index: 3; }
+.cw-dots i { display: block; width: 12px; height: 12px; border-radius: 6px; background: currentColor; opacity: 0.45; margin: 5px 0; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); -webkit-transition: height 0.2s; transition: height 0.2s; }
+.cw-dots i.on { height: 30px; opacity: 1; }
+.cw-hdots { display: -webkit-flex; display: flex; -webkit-justify-content: center; justify-content: center; position: absolute; left: 0; right: 0; z-index: 3; }
+.cw-hdots i { display: block; width: 10px; height: 10px; border-radius: 5px; background: #fff; opacity: 0.5; margin: 0 4px; -webkit-transition: width 0.3s; transition: width 0.3s; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }
+.cw-hdots i.on { width: 28px; opacity: 1; }
+
+/* progress */
+.cw-bar { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.22); overflow: hidden; position: relative; -webkit-flex: none; flex: none; }
+.cw-paper .cw-bar { background: rgba(0, 0, 0, 0.1); }
+.cw-bar b { display: block; height: 100%; border-radius: 4px; background: var(--ink); }
+
+/* app icons: the TV's own icon, or the app's name on a tile when there is no icon */
+.cw-app { position: relative; -webkit-flex: none; flex: none; background: #2a2a30 center / cover no-repeat; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25); overflow: hidden;
+  display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center;
+  color: #fff; font-weight: 700; text-align: center; line-height: 1.05; padding: 0; word-break: break-word; }
+.cw-app.cw-has-icon { color: transparent; }
+.cw-more { background: rgba(255, 255, 255, 0.16); box-shadow: none; }
+
+.cw-chip { display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; height: 54px; padding: 0 22px; border-radius: 27px;
+  font-size: 25px; font-weight: 600; background: rgba(255, 255, 255, 0.14); white-space: nowrap; -webkit-flex: none; flex: none; }
+.cw-chip > svg { margin-right: 10px; }
+.cw-chip.on { background: var(--on); color: #1a1406; }
+.cw-paper .cw-chip { background: rgba(0, 0, 0, 0.06); }
+
+/* Control Centre modules and scene buttons */
+.cw-mods { display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; -webkit-flex: 1; flex: 1; min-height: 0; margin: -10px; -webkit-align-content: stretch; align-content: stretch; }
+.cw-mod { margin: 10px; border-radius: 30px; background: rgba(255, 255, 255, 0.12); padding: 20px; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-justify-content: space-between; justify-content: space-between; min-height: 0; overflow: hidden; color: var(--ink); }
+.cw-mod.on { background: #fff; color: #18171c; --sub: rgba(24, 23, 28, 0.62); }
+.cw-mod .cw-ic { width: 58px; height: 58px; border-radius: 29px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; background: rgba(255, 255, 255, 0.16); -webkit-flex: none; flex: none; }
+.cw-mod.on .cw-ic { background: var(--on); }
+.cw-paper .cw-mod { background: rgba(0, 0, 0, 0.06); }
+
+/* lists */
+.cw-ev { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+.cw-ev > i { display: block; width: 8px; -webkit-align-self: stretch; align-self: stretch; min-height: 50px; border-radius: 4px; margin-right: 16px; -webkit-flex: none; flex: none; }
+.cw-ev > .cw-t29 { -webkit-flex: 1; flex: 1; min-width: 0; }
+.cw-ev > .cw-t25 { margin-left: 12px; }
+.cw-month { display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; text-align: center; font-size: 24px; font-weight: 600; -webkit-align-content: space-around; align-content: space-around; }
+.cw-month span { width: 14.2857%; height: 40px; line-height: 40px; }
+.cw-month .h { color: var(--faint); font-size: 23px; }
+.cw-month .today b { display: inline-block; min-width: 40px; height: 40px; background: #ff453a; color: #fff; border-radius: 20px; font-weight: 700; }
+.cw-li { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; font-size: 27px; font-weight: 560; min-width: 0; }
+.cw-li .bx { width: 32px; height: 32px; border-radius: 16px; border: 3px solid var(--faint); -webkit-flex: none; flex: none; margin-right: 16px; }
+.cw-li.done { color: var(--faint); text-decoration: line-through; }
+.cw-li.done .bx { background: var(--faint); border-color: transparent; }
+
+/* posters */
+.cw-poster { border-radius: 26px; background: #333 center / cover; position: relative; overflow: hidden; }
+.cw-poster:after { content: ""; position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: linear-gradient(180deg, transparent 45%, rgba(0, 0, 0, 0.72)); }
+.cw-poster .cap { position: absolute; left: 22px; right: 22px; bottom: 20px; z-index: 1; color: #fff; }
+
+/* the empty state: what this widget needs on this TV, said plainly in its own box */
+.cw-empty { -webkit-justify-content: center; justify-content: center; }
+.cw-empty .cw-e1 { font-size: 29px; font-weight: 680; line-height: 1.2; margin-top: 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cw-empty .cw-e2 { font-size: 24px; font-weight: 560; color: var(--sub); margin-top: 6px; line-height: 1.25; }
+.cw-empty.cw-tiny .cw-e1 { font-size: 24px; margin-top: 8px; }
+
+/* slideshow and stacks cross fade */
+.cw-layer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; -webkit-transition: opacity 0.9s ease; transition: opacity 0.9s ease; }
+.cw-stack > .cw-slot { position: absolute; left: 0; top: 0; right: 0; bottom: 0; -webkit-transition: opacity 0.6s ease; transition: opacity 0.6s ease; }
+
+/* focus from the remote: the widget lifts, a white ring 6 px out, a deeper shadow */
+.cd-o.cw-o { z-index: 1; }
+.cd-o.cw-o.cw-hasfocus { z-index: 5; }
+.cw.cw-focus { outline: 6px solid var(--focus); outline-offset: 6px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); }
+.cw-bare.cw-focus { outline-offset: 10px; border-radius: 28px; }
+.cw-ifocus { outline: 5px solid var(--focus); outline-offset: 5px; }
+.cw .cw-app.cw-ifocus { -webkit-transform: scale(1.06); transform: scale(1.06); }
+
+/* widget mode: the design's widgets are the home, the home's own parts step aside (design.js) */
+html.cd-wmode header.top, html.cd-wmode .scrim, html.cd-wmode #shelf-section, html.cd-wmode #scenes .gclock, html.cd-wmode #scenes .fg { visibility: hidden !important; }
+html.cd-wmode:not(.expanded) #apps-section { visibility: hidden !important; }
+html.cd-wmode.expanded #cd-front, html.cd-wmode.expanded #cd-back { visibility: hidden; }
+html.cd-wmode #grid .app.focus { outline: none; }
+
+/* the folder opened full screen, and the hold OK menu */
+.cw-sheet { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; -webkit-transform-origin: 0 0; transform-origin: 0 0; z-index: 60;
+  background: rgba(6, 7, 10, 0.72); -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px); color: #fff; font-family: "Inter", sans-serif;
+  display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; }
+.cw-sheet h2 { font-size: 52px; font-weight: 720; letter-spacing: -0.02em; margin: 0 0 48px; }
+.cw-sheet .cw-sheet-apps { display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; -webkit-justify-content: center; justify-content: center; max-width: 1200px; }
+.cw-sheet .cw-sheet-apps .cw-app { margin: 22px; }
+.cw-sheet .cw-hint { margin-top: 40px; font-size: 25px; color: rgba(255, 255, 255, 0.72); }
+.cw-menu .cw-mi { width: 640px; padding: 26px 34px; margin: 10px 0; border-radius: 28px; font-size: 34px; font-weight: 650; background: rgba(255, 255, 255, 0.1); }
+.cw-menu .cw-mi.cw-ifocus { background: #fff; color: #111; outline: none; }
+.cw-tip { position: fixed; left: 50%; bottom: 40px; -webkit-transform: translateX(-50%); transform: translateX(-50%); z-index: 59; padding: 16px 30px; border-radius: 40px;
+  background: rgba(10, 10, 14, 0.82); color: #fff; font: 600 25px "Inter", sans-serif; white-space: nowrap; -webkit-transition: opacity 0.6s; transition: opacity 0.6s; }

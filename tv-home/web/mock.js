@@ -41,8 +41,30 @@
 //   update=1            Home settings, Updates, with a pretend 0.4 waiting (update=latest: none
 //                       newer; update=allow: the TV has not let Home install apps yet;
 //                       update=ask: nobody has answered "tell you about new versions?" yet)
+//   remoteart=1         the real show posters from JustWatch (otherwise every picture is from this server)
+//   wx=24,2             pretend weather: 24 degrees, Open-Meteo code 2 (partly cloudy)
+//   place=Riverside    weather.place, the name shown beside the weather
+//   design=local        design: the TV Designer's current design (tools/tv-designer), read from
+//                       this browser's localStorage ("tvdesigner.design"); designer=1 takes live edits
 (function () {
   var q = location.search;
+  // Every picture is made right here: a preview never asks another site for anything, so nobody's
+  // address goes to an image host, and no show's real poster is copied. Each show gets a plain
+  // placeholder (two colours and soft shapes, picked from its name), wide for a backdrop, tall for
+  // a poster. ?remoteart=1 shows the real posters from JustWatch, for development only.
+  var PALETTE = [["#2b3a55", "#c9746b"], ["#1f3d3a", "#d9b26f"], ["#3a2b4f", "#7fa7c9"], ["#4a3426", "#e0a96d"],
+    ["#203040", "#9cc5a1"], ["#3d2233", "#f0b6a0"], ["#26323a", "#b9a7e0"], ["#33402a", "#e6cf8b"]];
+  var localArt = function (p, tall) {
+    if (/[?&]remoteart=1\b/.test(q)) return "";
+    var h = 0; for (var i = 0; i < p.length; i++) h = (h * 31 + p.charCodeAt(i)) >>> 0;
+    var c = PALETTE[h % PALETTE.length], w = tall ? 400 : 640, ht = tall ? 600 : 360, r = (h >>> 8) % 40;
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + " " + ht + '" preserveAspectRatio="xMidYMid slice">' +
+      '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c[0] + '"/><stop offset="1" stop-color="' + c[1] + '"/></linearGradient></defs>' +
+      '<rect width="' + w + '" height="' + ht + '" fill="url(#g)"/>' +
+      '<circle cx="' + Math.round(w * (0.62 + r / 200)) + '" cy="' + Math.round(ht * 0.38) + '" r="' + Math.round(ht * 0.3) + '" fill="#fff" opacity=".14"/>' +
+      '<circle cx="' + Math.round(w * 0.22) + '" cy="' + Math.round(ht * 0.86) + '" r="' + Math.round(ht * 0.42) + '" fill="#000" opacity=".16"/></svg>';
+    return "data:image/svg+xml," + encodeURIComponent(svg);
+  };
   var arg = function (name) { var m = q.match(new RegExp("[?&]" + name + "=([^&]*)")); return m ? decodeURIComponent(m[1]) : null; };
   if (arg("reset")) {
     try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf("mock:") === 0) localStorage.removeItem(k); }); } catch (e) {}
@@ -102,7 +124,7 @@
   // ---------- kids mode, for ?kids= (bridge/kids.py makes the same shape; the PIN here is 1234) ----------
   var KIDS = null;
   if (arg("kids")) {
-    var jwp = function (path) { return "https://images.justwatch.com/poster/" + path; };
+    var jwp = function (path) { return localArt(path, true) || "https://images.justwatch.com/poster/" + path; };
     var iview = { id: "abc-iview", name: "ABC iview", package: "au.net.abc.iview" };
     var shelf = arg("kids") === "empty" ? [] : [
       { id: "bluey", title: "Bluey", service: "abc-iview", app: iview, poster: jwp("185497966/s592/bluey-2018.jpg") },
@@ -122,6 +144,10 @@
   // ?cards=1: home.custom_cards with three sample cards (docs/TV-HOME.md, Custom cards); the third has a
   // javascript: link and a script in its title, which must show as plain text and open nothing
   if (arg("cards")) cfg.home.custom_cards = true;
+  if (arg("place")) cfg.weather.place = arg("place");
+  if (arg("design") === "local") {
+    try { var dz = JSON.parse(localStorage.getItem("tvdesigner.design") || "null"); if (dz && typeof dz === "object") cfg.design = dz; } catch (e) {}
+  }
   window.COUCH_CONFIG = cfg;
 
   // ---------- the launcher's updater (Updater.kt), for ?update= ----------
@@ -219,7 +245,7 @@
   }
 
   // ---------- a pretend bridge ----------
-  var jw = function (p) { return "https://images.justwatch.com/" + p + ".webp"; };
+  var jw = function (p) { return localArt(p) || "https://images.justwatch.com/" + p + ".webp"; };
   var app = function (id, name, pkg) { return { id: id, name: name, package: pkg }; };
   var shows = [
     { id: "m2", title: "The Bear", season: 3, episode: 2, app: app("disney-plus", "Disney+", "com.disney.disneyplus"), backdrop: jw("backdrop/346664278/s1440/the-bear-2022"), progress: 0.7 },
@@ -251,6 +277,14 @@
       setTimeout(function () {
         if (down) return reject(new Error("The computer isn't answering."));
         // Now playing (#31): ?music=1, a song that previous and next step through, play and pause toggle
+        if (path.indexOf("/api/weather") === 0 && arg("wx")) {
+          var wp = arg("wx").split(",");
+          // with a pretend forecast too, for the widgets (hourly, the week, rain soon, UV)
+          var t0 = parseInt(wp[0], 10) || 22, c0 = parseInt(wp[1], 10) || 0, nw = new Date(), iso = function (d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); };
+          var hourly = [0, 1, 2, 3, 4, 5, 6, 7].map(function (i) { var d = new Date(nw.getTime() + i * 3600000); return { time: iso(d) + "T" + ("0" + d.getHours()).slice(-2) + ":00", temp: t0 + [0, 1, 2, 3, 3, 1, -1, -2][i], code: [c0, 0, 0, 2, 3, 61, 95, 80][i], uv: 6, pop: [0, 0, 5, 10, 20, 60, 80, 70][i] }; });
+          var daily = [0, 1, 2, 3, 4, 5, 6].map(function (i) { var d = new Date(nw.getTime() + i * 86400000); return { date: iso(d), code: [c0, 95, 61, 2, 0, 0, 3][i], hi: t0 + [3, 1, -2, 0, 2, 4, 2][i], lo: t0 - [7, 6, 7, 8, 9, 7, 6][i], sunrise: iso(d) + "T04:41", sunset: iso(d) + "T18:22", uv: 11 }; });
+          return resolve({ ok: true, temp: t0, code: c0, text: "", is_day: true, hourly: hourly, daily: daily, hi: daily[0].hi, lo: daily[0].lo, uv: 11, rain15: [0, 0, 0.1, 0.4, 1.2, 2.8, 3, 1, 0.4, 0, 0, 0] });
+        }
         if (path.indexOf("/api/music") === 0) return resolve({ ok: true, music: arg("music") ? mockSong() : null });
         if (path.indexOf("/api/custom-cards") === 0) return resolve({ ok: true, cards: arg("cards") ? [
           { title: "Solar today", subtitle: "Roof panels", value: "18.4 kWh", app: "com.google.android.youtube.tv" },
