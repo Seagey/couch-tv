@@ -187,7 +187,7 @@ def keep_watching(tv_id, who, now=None, limit=KEEP_MAX, days=KEEP_DAYS):
     now = now or datetime.now(timezone.utc)
     cutoff = now - timedelta(days=days)
     seen, out = set(), []
-    hidden = _read(HIDDEN, {})
+    hidden = hidden_times(tv_id, who)
     for h in history():
         if not h.get("id") or h.get("tv") != tv_id or h.get("who") != who:
             continue
@@ -198,12 +198,25 @@ def keep_watching(tv_id, who, now=None, limit=KEEP_MAX, days=KEEP_DAYS):
         if not key or key in seen:
             continue
         seen.add(key)
-        hid = _when({"when": hidden.get(f"{tv_id}|{who}|{key}")})
+        hid = hidden.get(key)
         if hid and when <= hid:
             continue   # removed by hand; watching it again brings it back
         out.append(h)
         if len(out) >= limit:
             break
+    return out
+
+
+def hidden_times(tv_id, who):
+    """The shows removed by hand from this person's Keep watching on this TV: lower case title ->
+    when it was removed. A card is hidden while its own time is not after that."""
+    out = {}
+    for key, when in _read(HIDDEN, {}).items():
+        tv, _, rest = key.partition("|")
+        person, _, title = rest.partition("|")
+        t = _when({"when": when})
+        if tv == tv_id and person == str(who) and title and t:
+            out[title] = t
     return out
 
 

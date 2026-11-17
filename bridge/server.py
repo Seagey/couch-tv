@@ -43,6 +43,7 @@ import vizio
 import panasonic
 import tivo
 import spotify_now
+import plex
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -2038,7 +2039,7 @@ async def h_recs(request):
     who = store.norm_who(request.query.get("who"))
     picks, updated = await claude.cached_recs(who, lang=home_settings().get("settings", {}).get("lang"))
     return web.json_response({"ok": True, "updated": updated,
-                              "continue": continue_items(who), "picks": picks})
+                              "continue": continue_items(who, request_base(request)), "picks": picks})
 
 
 async def h_api_missing(request):
@@ -2677,13 +2678,16 @@ async def watch_next():
     return items
 
 
-def continue_items(who=None):
+def continue_items(who=None, base=""):
     """Keep watching for the person on the couch (or `who`) at this TV: one card per show, newest
-    first, up to 10, nothing older than 30 days. A card's id is its history line's own id."""
+    first, up to 10, nothing older than 30 days. A card's id is its history line's own id, or
+    "plex-<ratingKey>" for a card from the Plex server's own Continue Watching (bridge/plex.py),
+    whose pictures the bridge serves from `base` (the bridge as the page reached it)."""
     who = who or cur_who()
     out = []
     rows = _wn_rows()
-    for h in store.keep_watching(_current.get(), who):
+    tv_id = _current.get()
+    for h in store.keep_watching(tv_id, who):
         if h.get("service") in CONTINUE_SKIP:
             continue
         h = wn_fresher(h, rows)   # the app's own row, when it was watched after our line
@@ -2694,7 +2698,41 @@ def continue_items(who=None):
                     "service": h.get("service"), "poster": h.get("poster"),
                     "backdrop": h.get("backdrop"), "progress": None, "kind": "continue",
                     "last_played": h.get("when"), "source": "bridge"})
-    return out
+    plex_cards = plex.cards(who, days=store.KEEP_DAYS)
+    if not plex_cards:
+        return out
+    plex_app = apps.describe_package(apps.BY_ID["plex"]["package"])
+    for p in plex_cards:
+        out.append({"id": p["id"], "title": p["title"], "episode_title": p.get("episode_title"),
+                    "season": p.get("season"), "episode": p.get("episode"), "app": plex_app,
+                    "service": "plex",
+                    "poster": plex.picture_url(base, p["id"], "poster") if "poster" in p["pictures"] else None,
+                    "backdrop": plex.picture_url(base, p["id"], "backdrop") if "backdrop" in p["pictures"] else None,
+                    "progress": p.get("progress"), "kind": "continue", "last_played": p["when"],
+                    "source": "plex"})
+    # One card per show across both lists, the newest: the bridge logs a Plex play as JustWatch
+    # names the show ("The Office") and the server as its own ("The Office (US)"), the same title
+    # but for the bracket. A show removed by hand under either name stays off until watched again.
+    hidden = store.hidden_times(tv_id, who)
+    out.sort(key=lambda c: c["last_played"] or "", reverse=True)
+    merged = []
+    for c in out:
+        if any(finder.same_title(c["title"], m["title"]) for m in merged):
+            continue
+        when = store._when({"when": c["last_played"]})
+        if any(finder.same_title(c["title"], t) and when and when <= hid for t, hid in hidden.items()):
+            continue
+        merged.append(c)
+        if len(merged) >= store.KEEP_MAX:
+            break
+    return merged
+
+
+def request_base(request):
+    """The bridge's address as this page reached it ("http://your-computer.local:5400"), for links in the
+    answer that an <img> fetches: the saved copy of the home runs from the TV's own storage, so a
+    bare "/api/..." would not find the bridge."""
+    return f"{request.scheme}://{request.host}"
 
 
 def _wn_num(v):
@@ -2867,12 +2905,37 @@ async def h_spotify_status(request):
 
 async def h_continue(request):
     who = store.norm_who(request.query.get("who"))
-    return ok(items=continue_items(who))
+    return ok(items=continue_items(who, request_base(request)))
+
+
+async def open_plex_card(p, who):
+    """A Plex card opens the way a Plex history line does: `play` with the service pinned to Plex,
+    which opens the show's page when JustWatch knows it and the Plex app otherwise. A title JustWatch
+    has never heard of (a home video, a local recording) opens the Plex app the same way instead
+    of failing."""
+    try:
+        return await play(p["title"], p.get("season"), p.get("episode"), "plex", who, resume=True)
+    except ApiError as e:
+        if e.status != 404:
+            raise
+    app = apps.BY_ID["plex"]
+    method, note = await search_in_app(app, p["title"])
+    note_key, note_vars = _search_note_fields(method, app, p["title"])
+    return {"title": p["title"], "year": p.get("year"), "type": p.get("type"), "poster": None,
+            "backdrop": None, "service": "plex", "app": apps.describe_package(app["package"]),
+            "method": method, "note": note, **messages.note_fields(note_key, note_vars)}
 
 
 async def h_continue_open(request):
     data = await body(request)
     cid = data.get("id")
+    if isinstance(cid, str) and cid.startswith("plex-"):
+        p = plex.item(cid)
+        if not p:
+            raise ApiError(404, f"unknown continue item: {cid}", key="err_unknown_continue_item", vars={"id": cid})
+        result = await open_plex_card(p, store.norm_who(data.get("who")) or cur_who())
+        record_action(request, "continue", {"id": cid}, True)
+        return ok(**result)
     h = store.history_item(cid) if cid else None
     if not h:
         raise ApiError(404, f"unknown continue item: {cid}", key="err_unknown_continue_item", vars={"id": cid})
@@ -2887,13 +2950,44 @@ async def h_continue_open(request):
 
 async def h_continue_hide(request):
     """Remove a Keep watching card (by its id) until the show is played again."""
-    cid = (await body(request)).get("id")
+    data = await body(request)
+    cid = data.get("id")
+    if isinstance(cid, str) and cid.startswith("plex-"):
+        p = plex.item(cid)
+        if not p:
+            raise ApiError(404, f"unknown continue item: {cid}", key="err_unknown_continue_item", vars={"id": cid})
+        # The Plex list is one per account, so the card is removed for the person it was shown to:
+        # the one asked for, else the person on this couch, else (nobody picked) everyone.
+        who = store.norm_who(data.get("who")) or cur_who()
+        for w in ([who] if who and who != "both" else config.PEOPLE_IDS):
+            store.hide_keep_watching({"tv": _current.get(), "who": w, "title": p["title"]})
+        record_action(request, "continue_hide", {"id": cid}, True)
+        return ok()
     h = store.history_item(cid) if cid else None
     if not h:
         raise ApiError(404, f"unknown continue item: {cid}", key="err_unknown_continue_item", vars={"id": cid})
     store.hide_keep_watching(h)
     record_action(request, "continue_hide", {"id": cid}, True)
     return ok()
+
+
+async def h_plex_art(request):
+    """A Plex card's poster or backdrop, fetched from the server by the bridge with its token, so
+    the TV and the phone never hold the token or the server's address."""
+    cid, kind = request.query.get("id") or "", request.query.get("kind") or "poster"
+    try:
+        got = await plex.picture(cid, kind)
+    except Exception as e:
+        raise ApiError(502, f"Plex did not give the picture: {e}", key="err_plex_picture")
+    if not got:
+        raise ApiError(404, "no such picture", key="err_no_such_picture")
+    data, ctype = got
+    return web.Response(body=data, content_type=ctype, headers={"Cache-Control": "public, max-age=%d" % MEDIA_MAX_AGE})
+
+
+async def h_plex_status(request):
+    """What the Plex link is set up as and how the last read went (never the token)."""
+    return ok(plex=plex.status())
 
 
 # ---------- which episode, and how long (only when matched, never a guess) ----------
@@ -3919,6 +4013,8 @@ def make_app():
     r.add_get("/api/spotify/status", h_spotify_status)
     r.add_post("/api/continue/open", h_continue_open)
     r.add_post("/api/continue/hide", h_continue_hide)
+    r.add_get("/api/plex/art", h_plex_art)
+    r.add_get("/api/plex/status", h_plex_status)
     r.add_post("/api/watch-next", h_watch_next)
     r.add_get("/api/watch-next", h_watch_next_get)
     r.add_get("/api/sleep", h_sleep_get)
@@ -3944,6 +4040,11 @@ def make_app():
         # Keep references so the loops are never garbage collected.
         app["loops"] = [asyncio.create_task(claude.background_loop()),
                         asyncio.create_task(history_loop())]
+        if plex.enabled():
+            app["loops"].append(asyncio.create_task(plex.loop()))
+        elif plex.settings():
+            log.warning("plex: config.json has a plex section but PLEX_TOKEN is not set in .env; "
+                        "Keep watching from Plex is off")
         for tv_id, t in TVS.items():
             t.on_change(lambda tv_id=tv_id: with_tv(tv_id, push_now))
             t.on_change(lambda tv_id=tv_id: with_tv(tv_id, _maybe_refresh_installed))

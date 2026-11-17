@@ -535,6 +535,14 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
   own, so it always opens that card's show (and season and episode). It reopens the show in its app; the app
   itself picks up where you left off (Netflix, Stan, iview and the rest remember the position).
   Response is the same as `POST /api/play`.
+- With a `plex` section in `config.json` and `PLEX_TOKEN` in `.env` (docs/CONFIG.md, Plex), the Plex
+  Media Server's own Continue Watching list is read every five minutes and its shows and films join
+  the row with `"source": "plex"`, an id of `plex-<ratingKey>`, a real `progress` (0 to 1) and
+  pictures served by the bridge (`GET /api/plex/art?id=plex-<ratingKey>&kind=poster|backdrop`, the
+  pairing key as `?key=` when one is set). One card per show across both lists, the newer wins.
+  `/api/continue/open` and `/api/continue/hide` take those ids too; hide takes an optional `who`
+  (else the person on the couch; nobody picked means everyone). `GET /api/plex/status` says what is
+  set up and how the last read went, never the token.
 
 ### `POST /api/sleep` and `GET /api/sleep`
 Sleep timer, kept on the bridge so it still fires when the phone locks.
