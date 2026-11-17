@@ -240,7 +240,9 @@ class FireWatch : AccessibilityService() {
         private fun isXiaomi() = Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)
         /** KTC builds the JVC 4K ISDB TV (Android 11): on it a double Home press opens the Google home and no window event follows. */
         private fun isKtc() = Build.MANUFACTURER.equals("KTC", ignoreCase = true)
-        private fun catchesHomeKey() = isXiaomi() || isKtc()
+        /** Sony BRAVIA (CT1, Google TV, Android 14): a double Home press left the Google home up, the same as KTC (#258). */
+        private fun isSony() = Build.MANUFACTURER.equals("Sony", ignoreCase = true)
+        private fun catchesHomeKey() = isXiaomi() || isKtc() || isSony()
         const val GOOGLE_TV_HOME = "com.google.android.apps.tv.launcherx"
         const val ANDROID_TV_HOME = "com.google.android.tvlauncher"
         /** Bell's Fibe TV app (Bell Streamer, Canada): its MainTvActivity is the box's HOME, and also its live TV. */

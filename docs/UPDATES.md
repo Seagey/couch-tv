@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 17 November 2026: Sony Bravia, a double Home press stays on the home (option A and B, in the next release)
+
+On a Sony Bravia (Google TV, Android 14) two quick presses of Home left the Google home in front. The Home button watch now catches the Home key on Sony, the same as it already does on Xiaomi and KTC, so every press goes straight to couch-tv. Tested on the real remote by the person who reported it (#258). The Kotlin part needs a build.
+
 ### 17 November 2026: the focused tile holds still after a few seconds, and a low end TV turns on Lighter home by itself (option B, from your copy of the repo)
 
 Measured on a 2 GB Android TV (Android 11, four Cortex A55 cores, 1.8 GB, WebView 157) with the home's own frame clock: at rest the home drew 52 frames a second, but with a dock tile focused only 22, and moving along the dock 21. Anything that moves makes the TV draw every frosted panel again each frame, and the focused tile's slow sway and glint never stop moving. Switching parts off one by one on that TV: the glint alone 24, the sway alone 18, every blur off 47, the sway and glint still 60; the shadows, the photo, its filters, the clock's filters and the rain and snow canvas made no difference. Now the sway and glint play for 6 s after the focus moves, then hold still where they are until the next press, so a home left alone draws nothing. And when nobody has chosen Lighter home (Home settings, Look, or `home.lighter`), the TV checks itself: 1 GB of memory or less turns Lighter home on, 4 GB or more leaves it off, and otherwise (that TV's WebView does not say) the home measures its frame time for 1.5 s with something moving, a few seconds after it opens, and keeps the answer for a week. On that TV it measured 33 ms. With the hold and the blur off (a first version of this change, before it used the rest of Lighter home too): at rest 56, a dock tile focused 56 to 59, moving along the dock 42 to 44. A TV that measures smooth looks exactly as before. docs/CONFIG.md, `lighter`; `tests/test_low_end.js`.
