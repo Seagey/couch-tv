@@ -477,6 +477,32 @@ def picture_modes(pic):
     return [{"id": k, "name": str(v) if panel else k.replace("-", " ").title()} for k, v in list(values.items())[:2]]
 
 
+# ---------- Plex (optional, option B): Keep watching from the server's own Continue Watching ----------
+# The server's address as the bridge reaches it, and (optional) whose cards they are. The token is
+# PLEX_TOKEN in .env, never here (bridge/plex.py). None: no section, "enabled": false, or no address.
+PLEX_ERROR = None   # why a plex section that is there was refused (the bridge's log and /api/plex/status say)
+
+
+def _plex(raw):
+    global PLEX_ERROR
+    PLEX_ERROR = None
+    p = raw if isinstance(raw, dict) else {}
+    url = str(p.get("url") or "").strip().rstrip("/")
+    if p.get("enabled") is False:
+        return None
+    if not re.fullmatch(r"https?://[^/\s?#]+", url):
+        if url:
+            PLEX_ERROR = f"plex.url must be http(s)://<name or address>[:port] with no path, not {url!r}"
+        elif raw:
+            PLEX_ERROR = "the plex section has no url"
+        return None
+    who = str(p.get("who") or "").strip()
+    return {"url": url, "who": who or None}
+
+
+PLEX = _plex(CONFIG.get("plex"))
+
+
 # ---------- the phone remote and the Claude ask ----------
 PHONE_REMOTE = CONFIG.get("phone_remote", True) is not False
 

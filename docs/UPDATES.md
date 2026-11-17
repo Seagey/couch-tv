@@ -6,6 +6,14 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 17 November 2026: Keep watching from the Plex server's own Continue Watching (option B, from your copy of the repo)
+
+The bridge only learned of a Plex play it saw on the TV, a minute into playback, so a show left half way on a phone, on another TV or before couch-tv existed never got a card. With a `plex` section in `config.json` (the server's address, and optionally whose cards they are) and `PLEX_TOKEN` in `.env`, the bridge now reads the Plex Media Server's own Continue Watching list every five minutes and gives each show and film a Keep watching card next to the plays it logs itself: the show with its season, episode and a progress bar, or the film, newest first, one card per show across both lists. The card opens the show in Plex the way a Plex card already did, and removing it keeps it off until it is watched again. The token stays on the bridge: the TV and the phone get the posters through the bridge, never the token or the server's address. Off unless configured; one Plex account per bridge. docs/CONFIG.md, Plex; `tests/test_plex_keep_watching.py`.
+
+### 17 November 2026: Keep watching, one card per show when the app names the episode first (option B, from your copy of the repo)
+
+Plex (and some others) report what plays as the episode first and the show second, and name the show with its country, "The Office (US)". The bridge took the episode's name for the show, so every episode became its own Keep watching card, and the picture came from whatever JustWatch has under that episode's name: an Office episode called "The Sting" got the 1973 film's poster, most got none. The bridge now treats a title the same but for a trailing bracket as the same title, and when one of the two names is a show that has the other as one of its episodes, that show wins, even when the episode's name is also a film's. One card per show again, with the show's own picture and the latest episode on it. Cards from plays logged before this still carry the episode's name: hold OK on one and choose Remove from Keep watching, and the next play of that show makes a proper card.
+
 ### 17 November 2026: Sony Bravia, a double Home press stays on the home (option A and B, in the next release)
 
 On a Sony Bravia (Google TV, Android 14) two quick presses of Home left the Google home in front. The Home button watch now catches the Home key on Sony, the same as it already does on Xiaomi and KTC, so every press goes straight to couch-tv. Tested on the real remote by the person who reported it (#258). The Kotlin part needs a build.

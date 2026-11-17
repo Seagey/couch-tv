@@ -423,6 +423,62 @@ anything outside Home Assistant.
 Preview with no TV and no Home Assistant: `?mock=1&ha=1` (see the end of this page). The doorbell
 card is drawn by the app itself, so it cannot be previewed in a browser.
 
+## Plex (optional, option B)
+
+Off unless you add it. With no `plex` section (or `"enabled": false`) nothing changes: no calls to
+anything, Keep watching as before.
+
+The bridge only learns of a Plex play it sees on the TV, a minute into playback. The Plex Media
+Server itself keeps a **Continue Watching** list for the account: shows and films left half way on a
+phone, on another TV, or before couch-tv existed. With this section the bridge reads that list every
+five minutes and gives each item a Keep watching card next to the plays it logs itself, with the
+show's season, episode and how far in it is (the progress bar), and the server's own poster.
+
+```json
+"plex": {
+  "url": "http://plex.local:32400",
+  "who": "person1"
+}
+```
+
+And the token in `.env` (never in `config.json`):
+
+```sh
+PLEX_TOKEN=<your X-Plex-Token>
+```
+
+| Key | What it does |
+|---|---|
+| `url` (needed) | The server's address as the bridge computer reaches it, `http://` or `https://` with the port (32400 unless you changed it): the name or the number address of the computer Plex runs on, on the home network. |
+| token (needed) | `PLEX_TOKEN` in `.env`. The token of the Plex account whose list this is. Finding it: [Plex's own article](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/) (in Plex Web, any item's **Get Info**, **View XML**: the address ends in `X-Plex-Token=...`). The bridge keeps it to itself: it goes to the server in a header, is never written to a log, and the TV and the phone get the pictures through the bridge (`/api/plex/art`), never the token or the server's address. |
+| `who` | Whose cards they are: a person's `id` or `name` from `people`. Left out, everyone sees the same cards. A name that is not a person shows them to nobody, and the bridge's log says so. |
+| `enabled` [true] | `false` switches it off and keeps the rest of the section for later. |
+
+**One account.** A Plex server keeps one Continue Watching list per Plex account, and a token belongs to
+one account, so the bridge reads one list. With Plex Home (several users on one server) the token
+decides whose list it is; a second user's list would need that user's token, which the bridge does not
+do yet. `who` is how you say which person on the couch it belongs to.
+
+**On the TV and the phone.** A Plex card looks like any other: the show and its episode, or the film,
+newest first, one card per show, nothing older than 30 days, up to 10 with the bridge's own. When
+both the bridge and Plex know a show, the newer of the two is the card (Plex names a show with its
+country, "The Office (US)", and the bridge as JustWatch does, "The Office": they count as one; two
+different brackets, "The Office (UK)" and "The Office (US)", are two shows). The card opens the show
+in Plex the way a Plex card already did: the show's page when JustWatch knows the title by that
+name, or the Plex app for you to pick it (a home video, say; the search's nearest guess at a name
+it does not know is never played in its place). Removing a card (hold OK on the TV, the cross on
+the phone) keeps it off until it is watched again, for the person it was shown to, or for everyone
+when nobody was picked. Plays the bridge sees on the TV are still logged as before.
+
+**Checking it.** `GET /api/plex/status` on the bridge says whether the section and the token are
+there, the server's name, how many items the last read gave and any error (never the token). The
+bridge's log has one line at the first read, `plex: Continue Watching from <server name>`, one
+warning when the server stops answering and one line when it answers again; the last good list is
+kept in between. The error in the status is a plain reason ("the server is not reachable"), never
+the server's address. A `url` the bridge cannot use (no `http://`, a path on the end) switches the
+section off and says so, at start and in the status. A server that is off or away never holds the
+home up: the hub is read in the background, and a read gives up after 10 seconds.
+
 ## Everything else
 
 **Never forward a port to the bridge.** The bridge is built for your home network only. Never expose it
