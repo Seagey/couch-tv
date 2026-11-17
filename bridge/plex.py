@@ -129,8 +129,21 @@ def items_from(hub_json):
     return out
 
 
+def _summary(e):
+    """What went wrong, for the TV and the phone: never the server's address (aiohttp puts it in
+    its connection errors) and never the token. The log gets the exception itself."""
+    if isinstance(e, RuntimeError):            # _get_json's own "HTTP 401 from /hubs/..."
+        return str(e)[:120]
+    if isinstance(e, asyncio.TimeoutError):
+        return "the server did not answer in time"
+    if isinstance(e, aiohttp.ClientConnectionError):
+        return "the server is not reachable"
+    return "the server's answer could not be read"
+
+
 async def refresh():
-    """Ask the server once. Keeps the last good list on a failure and says why in the log."""
+    """Ask the server once. Keeps the last good list on a failure and says why in the log, once
+    per outage (the next line is when the server answers again)."""
     _state["at"] = time.time()
     try:
         if _state["server"] is None:
@@ -139,10 +152,14 @@ async def refresh():
             log.info("plex: Continue Watching from %s (%s)", _state["server"]["name"] or settings()["url"],
                      _state["server"]["version"])
         items = items_from(await _get_json(HUB, {"count": str(COUNT)}))
+        if _state["error"]:
+            log.info("plex: Continue Watching read again (%d items)", len(items))
         _state.update(items=items, by_id={it["id"]: it for it in items}, ok_at=time.time(), error=None)
     except Exception as e:   # the address, the token or the server: the log says which, never the token
-        _state["error"] = f"{type(e).__name__}: {e}"[:200]
-        log.warning("plex: Continue Watching not read (%s); keeping the last list", _state["error"])
+        first = _state["error"] is None
+        _state["error"] = _summary(e)
+        (log.warning if first else log.debug)("plex: Continue Watching not read (%s: %s); keeping the last list",
+                                              type(e).__name__, str(e)[:200])
     return _state["items"]
 
 
@@ -216,7 +233,7 @@ async def picture(card_id, kind):
 def status():
     """For GET /api/plex/status: what is set up and how the last read went. Never the token."""
     if not settings():
-        return {"configured": False}
+        return {"configured": False, "error": config.PLEX_ERROR} if config.PLEX_ERROR else {"configured": False}
     out = {"configured": True, "enabled": enabled(), "who": settings().get("who"),
            "items": len(_state["items"]), "server": _state["server"],
            "read_s_ago": round(time.time() - _state["at"]) if _state["at"] else None,

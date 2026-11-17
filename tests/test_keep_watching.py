@@ -174,7 +174,12 @@ class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
         # Plex: description=Andy's Play, The Office (US), ...; JustWatch calls the show "The Office"
         import finder
         self.assertTrue(finder.same_title("The Office", "The Office (US)"))
+        self.assertTrue(finder.same_title("Shameless (US)", "Shameless"))
         self.assertFalse(finder.same_title("The Office", "The Office Party"))
+        # two different brackets are two shows, not one with a country
+        self.assertFalse(finder.same_title("The Office (UK)", "The Office (US)"))
+        self.assertFalse(finder.same_title("Dune (1984)", "Dune (2021)"))
+        self.assertFalse(finder.same_title("", ""))
         office = {"title": "The Office", "type": "tv", "jw_id": "ts-office"}
         find = AsyncMock(side_effect=lambda q, *a: (office if q == "The Office (US)" else None, []))
         ep = {"season": 7, "episode": 3, "name": "Andy's Play", "runtime_min": 22}

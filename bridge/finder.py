@@ -83,9 +83,22 @@ def _loose(s):
     return _norm(re.sub(r"\s*\([^)]*\)\s*$", "", s or ""))
 
 
+def _bracket(s):
+    """The trailing bracket's text, normalised ("us" for "The Office (US)"), or "" when there is none."""
+    m = re.search(r"\(([^)]*)\)\s*$", s or "")
+    return _norm(m.group(1)) if m else ""
+
+
 def same_title(a, b):
-    """The two names are the same title, exactly or but for a trailing bracket."""
-    return bool(_norm(a)) and (_norm(a) == _norm(b) or _loose(a) == _loose(b))
+    """The two names are the same title: exactly, or one is the other with a trailing bracket
+    ("The Office (US)" and "The Office"). Two different brackets are two shows ("The Office (UK)"
+    and "The Office (US)", "Dune (1984)" and "Dune (2021)")."""
+    na, nb = _norm(a), _norm(b)
+    if not na:
+        return False
+    if na == nb:
+        return True
+    return _loose(a) == _loose(b) and not (_bracket(a) and _bracket(b))
 
 
 def _tizen_links(offers):

@@ -462,18 +462,22 @@ do yet. `who` is how you say which person on the couch it belongs to.
 **On the TV and the phone.** A Plex card looks like any other: the show and its episode, or the film,
 newest first, one card per show, nothing older than 30 days, up to 10 with the bridge's own. When
 both the bridge and Plex know a show, the newer of the two is the card (Plex names a show with its
-country, "The Office (US)", and the bridge as JustWatch does, "The Office": they count as one). The
-card opens the show in Plex the way a Plex card already did: the show's page when JustWatch knows
-the title, or the Plex app for you to pick it (a home video, say). Removing a card (hold OK on the
-TV, the cross on the phone) keeps it off until it is watched again, for the person it was shown to,
-or for everyone when nobody was picked. Plays the bridge sees on the TV are still logged as before.
+country, "The Office (US)", and the bridge as JustWatch does, "The Office": they count as one; two
+different brackets, "The Office (UK)" and "The Office (US)", are two shows). The card opens the show
+in Plex the way a Plex card already did: the show's page when JustWatch knows the title by that
+name, or the Plex app for you to pick it (a home video, say; the search's nearest guess at a name
+it does not know is never played in its place). Removing a card (hold OK on the TV, the cross on
+the phone) keeps it off until it is watched again, for the person it was shown to, or for everyone
+when nobody was picked. Plays the bridge sees on the TV are still logged as before.
 
 **Checking it.** `GET /api/plex/status` on the bridge says whether the section and the token are
 there, the server's name, how many items the last read gave and any error (never the token). The
-bridge's log has one line at the first read, `plex: Continue Watching from <server name>`, and a
-warning when a read fails; the last good list is kept until the server answers again. A server that
-is off or away never holds the home up: the hub is read in the background, and a read gives up after
-10 seconds.
+bridge's log has one line at the first read, `plex: Continue Watching from <server name>`, one
+warning when the server stops answering and one line when it answers again; the last good list is
+kept in between. The error in the status is a plain reason ("the server is not reachable"), never
+the server's address. A `url` the bridge cannot use (no `http://`, a path on the end) switches the
+section off and says so, at start and in the status. A server that is off or away never holds the
+home up: the hub is read in the background, and a read gives up after 10 seconds.
 
 ## Everything else
 

@@ -1,17 +1,26 @@
 """Keep watching from a Plex Media Server's Continue Watching hub (bridge/plex.py): the cards it
 makes from the hub's JSON, how they merge with the bridge's own history, whose they are, that a
 removed card stays off, how one opens, and that nothing happens until it is set up."""
+import asyncio
 import os
 import sys
 import tempfile
 import time
 import unittest
+
+import aiohttp
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from unittest.mock import AsyncMock, MagicMock, patch
 
+ROOT = Path(__file__).parents[1]
+# The repo's example settings, not the owner's config.json: its pairing key, people and time zone
+# would change the answers below. This only takes when this module is the first to import config
+# (another test module may have loaded it already), so setUp patches what the tests read as well.
+os.environ["COUCH_CONFIG"] = str(ROOT / "config.example.json")
 os.environ["COUCH_DATA"] = tempfile.mkdtemp(prefix="couchtv-plex-")
-sys.path.insert(0, str(Path(__file__).parents[1] / "bridge"))
+sys.path.insert(0, str(ROOT / "bridge"))
 import config  # noqa: E402
 import plex  # noqa: E402
 import store  # noqa: E402
@@ -98,7 +107,8 @@ class KeepWatchingWithPlex(unittest.IsolatedAsyncioTestCase):
         plex._state.pop("who_warned", None)
         self.tv = next(iter(server.TVS))
         server._current.set(self.tv)
-        self._patches = [patch.object(config, "PLEX", dict(SETTINGS)), patch.dict(os.environ, {"PLEX_TOKEN": "secret-token"})]
+        self._patches = [patch.object(config, "PLEX", dict(SETTINGS)), patch.object(config, "PAIRING_KEY", ""),
+                         patch.dict(os.environ, {"PLEX_TOKEN": "secret-token"})]
         for p in self._patches:
             p.start()
 
@@ -147,8 +157,20 @@ class KeepWatchingWithPlex(unittest.IsolatedAsyncioTestCase):
         got = self.cards("person1")
         self.assertEqual(len(got), 10)
         self.assertNotIn("Old film", [c["title"] for c in got])
-        self.assertEqual([c["title"] for c in got][:3], ["Film 0", "Film 1", "Film 2"])
-        self.assertIn("Show 0", [c["title"] for c in got])      # 2.4 hours old: between Film 2 and Film 3
+        # newest first across both lists: Show 0 (2.4 hours old) sits between Film 2 and Film 3
+        self.assertEqual([c["title"] for c in got][:5], ["Film 0", "Film 1", "Film 2", "Show 0", "Film 3"])
+
+    def test_the_order_is_by_the_instant_whatever_the_home_time_zone(self):
+        # A history line is written in UTC and a Plex card in the home's time zone. Behind UTC
+        # (Los Angeles, -08:00) the Plex text reads earlier than a UTC text of the same hour, and
+        # ahead of it (Sydney, +11:00) later: the order must follow the instant, not the text.
+        for zone in ("America/Los_Angeles", "Australia/Sydney", "UTC"):
+            with patch.object(plex, "_HOME_TZ", ZoneInfo(zone)):
+                load(dict(FILM, ratingKey="21", title="Film an hour ago", lastViewedAt=ago(hours=1)),
+                     dict(FILM, ratingKey="22", title="Film four hours ago", lastViewedAt=ago(hours=4)))
+                store.add_history(line("Show two hours ago", self.tv, "person1", days_ago=2 / 24))
+                got = [c["title"] for c in self.cards("person1")]
+                self.assertEqual(got[:3], ["Film an hour ago", "Show two hours ago", "Film four hours ago"], zone)
 
     def test_whose_cards(self):
         load(EPISODE)
@@ -171,19 +193,39 @@ class KeepWatchingWithPlex(unittest.IsolatedAsyncioTestCase):
         # watched again on Plex: back
         load(dict(EPISODE, lastViewedAt=int(time.time()) + 60), FILM)
         self.assertEqual([c["title"] for c in self.cards("person1")], ["The Office (US)", "Heat"])
-        # removed with nobody picked: off for everyone
+        # removed with nobody picked: off for everyone, and off the list with nobody picked too
+        self.assertEqual([c["title"] for c in self.cards(None)], ["The Office (US)", "Heat"])
         req, body = request({"id": "plex-9001"})
         with body, patch.object(server, "cur_who", return_value=None):
             await server.h_continue_hide(req)
         self.assertEqual([c["title"] for c in self.cards("person1")], ["The Office (US)"])
         self.assertEqual([c["title"] for c in self.cards("person2")], ["The Office (US)"])
+        self.assertEqual([c["title"] for c in self.cards(None)], ["The Office (US)"])
+        self.assertEqual([c["title"] for c in self.cards("both")], ["The Office (US)"])
+        # a household with nobody in people: the list is "both", and a hide still holds
+        load(EPISODE, FILM)                       # The Office as last read, not the play 60 s ahead
+        with patch.object(config, "PEOPLE_IDS", []):
+            req, body = request({"id": "plex-4411", "who": "both"})
+            with body:
+                await server.h_continue_hide(req)
+            self.assertEqual(self.cards("both"), [])
+
+    def test_two_countries_are_two_shows(self):
+        uk = dict(EPISODE, ratingKey="4500", grandparentTitle="The Office (UK)", parentIndex=1, index=2,
+                  lastViewedAt=ago(days=1))
+        load(EPISODE, uk)
+        self.assertEqual([c["title"] for c in self.cards("person1")], ["The Office (US)", "The Office (UK)"])
+        req, body = request({"id": "plex-4411", "who": "person1"})
+        with body:
+            asyncio.run(server.h_continue_hide(req))
+        self.assertEqual([c["title"] for c in self.cards("person1")], ["The Office (UK)"])
 
     async def test_a_plex_card_opens_in_plex(self):
         load(EPISODE, FILM)
         req, body = request({"id": "plex-4411", "who": "person1"})
         with body, patch.object(server, "play", new=AsyncMock(return_value={"title": "The Office"})) as play:
             await server.h_continue_open(req)
-        play.assert_awaited_once_with("The Office (US)", 7, 3, "plex", "person1", resume=True)
+        play.assert_awaited_once_with("The Office (US)", 7, 3, "plex", "person1", resume=True, exact=True)
         # a title JustWatch does not know: the Plex app opens instead of an error
         unknown = server.ApiError(404, "could not find Heat", key="err_title_not_found")
         req, body = request({"id": "plex-9001", "who": "person1"})
@@ -197,6 +239,20 @@ class KeepWatchingWithPlex(unittest.IsolatedAsyncioTestCase):
         with body, self.assertRaises(server.ApiError) as e:
             await server.h_continue_open(req)
         self.assertEqual(e.exception.status, 404)
+
+    async def test_a_title_the_search_guesses_at_opens_the_plex_app_not_the_guess(self):
+        # JustWatch's search has a best guess for any text; for a home video that guess is another
+        # film, and play() with exact=True refuses it, so the Plex app is searched for the card's title
+        load(dict(FILM, ratingKey="123", title="Family Holiday 2019"))
+        guess = {"title": "Holiday", "type": "movie", "jw_id": "tm-holiday", "providers": [], "year": 2006}
+        req, body = request({"id": "plex-123", "who": "person1"})
+        with body, patch.object(server, "installed_packages", new=AsyncMock()), \
+                patch.object(server.finder, "find", new=AsyncMock(return_value=(guess, []))), \
+                patch.object(server, "search_in_app", new=AsyncMock(return_value=("app", "Opened Plex."))) as search:
+            resp = await server.h_continue_open(req)
+        search.assert_awaited_once_with(server.apps.BY_ID["plex"], "Family Holiday 2019")
+        self.assertNotIn(b'"Holiday"', resp.body)
+        self.assertIn(b'"Family Holiday 2019"', resp.body)
 
     async def test_the_hub_is_read_and_a_failure_keeps_the_last_list(self):
         answers = {"/": {"MediaContainer": {"friendlyName": "Lounge", "version": "1.41.0"}}, plex.HUB: hub(EPISODE)}
@@ -215,6 +271,32 @@ class KeepWatchingWithPlex(unittest.IsolatedAsyncioTestCase):
         self.assertIn("HTTP 401", st["error"])
         self.assertNotIn("secret-token", str(st))
 
+    async def test_an_outage_is_one_warning_and_never_the_address(self):
+        load(EPISODE)
+        plex._state["server"] = {"name": "Lounge", "version": "1"}
+        down = aiohttp.ClientConnectionError("Cannot connect to host plex.test:32400 ssl:default [Connection refused]")
+        with patch.object(plex, "_get_json", AsyncMock(side_effect=down)), self.assertLogs("plex", "DEBUG") as logs:
+            await plex.refresh()
+            await plex.refresh()
+            await plex.refresh()
+        self.assertEqual([r.levelname for r in logs.records], ["WARNING", "DEBUG", "DEBUG"])   # once per outage
+        st = plex.status()
+        self.assertEqual(st["error"], "the server is not reachable")
+        self.assertNotIn("plex.test", str(st))
+        self.assertNotIn("32400", str(st))
+        self.assertEqual(st["items"], 1)                                                 # the last list kept
+        with patch.object(plex, "_get_json", AsyncMock(side_effect=asyncio.TimeoutError())):
+            await plex.refresh()
+        self.assertEqual(plex.status()["error"], "the server did not answer in time")
+        with patch.object(plex, "_get_json", AsyncMock(side_effect=ValueError("bad json"))):
+            await plex.refresh()
+        self.assertEqual(plex.status()["error"], "the server's answer could not be read")
+        # back: one line says so, and the error is gone
+        with patch.object(plex, "_get_json", AsyncMock(return_value=hub(EPISODE))), self.assertLogs("plex", "INFO") as logs:
+            await plex.refresh()
+        self.assertEqual([r.levelname for r in logs.records], ["INFO"])
+        self.assertIsNone(plex.status()["error"])
+
     async def test_pictures_come_through_the_bridge(self):
         load(EPISODE)
         req = MagicMock()
@@ -227,6 +309,14 @@ class KeepWatchingWithPlex(unittest.IsolatedAsyncioTestCase):
         with patch.object(plex, "picture", new=AsyncMock(return_value=None)), self.assertRaises(server.ApiError) as e:
             await server.h_plex_art(req)
         self.assertEqual(e.exception.status, 404)
+        # the server not answering: the client gets a plain 502, the log the reason
+        down = aiohttp.ClientConnectionError("Cannot connect to host plex.test:32400")
+        with patch.object(plex, "picture", new=AsyncMock(side_effect=down)), self.assertRaises(server.ApiError) as e, \
+                self.assertLogs("bridge", "WARNING"):
+            await server.h_plex_art(req)
+        self.assertEqual(e.exception.status, 502)
+        self.assertNotIn("plex.test", str(e.exception))
+        self.assertNotIn("32400", str(e.exception))
 
     def test_the_token_goes_in_a_header(self):
         h = plex._headers()
@@ -255,9 +345,20 @@ class NotSetUp(unittest.TestCase):
         self.assertEqual(config._plex({"url": "http://plex.local:32400/", "who": " person1 "}), {"url": "http://plex.local:32400", "who": "person1"})
         self.assertIsNone(config._plex({"url": "http://plex.local:32400", "enabled": False}))
         self.assertIsNone(config._plex({"url": "plex.local:32400"}))
+        self.assertIn("plex.local:32400", config.PLEX_ERROR)                  # a refused address says why
         self.assertIsNone(config._plex({"url": "http://plex.local:32400/web?x=1"}))
+        self.assertIn("no path", config.PLEX_ERROR)
+        self.assertIsNone(config._plex({"who": "person1"}))
+        self.assertEqual(config.PLEX_ERROR, "the plex section has no url")
         self.assertIsNone(config._plex(None))
+        self.assertIsNone(config.PLEX_ERROR)                                   # no section: nothing to say
         self.assertIsNone(config._plex("http://plex.local:32400"))
+        self.assertIsNone(config._plex({"url": "http://plex.local:32400", "enabled": False}))
+        self.assertIsNone(config.PLEX_ERROR)
+        with patch.object(config, "PLEX", None), patch.object(config, "PLEX_ERROR", "the plex section has no url"):
+            self.assertEqual(plex.status(), {"configured": False, "error": "the plex section has no url"})
+        with patch.object(config, "PLEX", None), patch.object(config, "PLEX_ERROR", None):
+            self.assertEqual(plex.status(), {"configured": False})
 
 
 if __name__ == "__main__":

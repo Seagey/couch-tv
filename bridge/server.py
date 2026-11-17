@@ -864,10 +864,12 @@ def resume_link(app_id, link, title):
     return link
 
 
-async def play(title, season=None, episode=None, service=None, who=None, resume=False):
+async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False):
+    """`exact`: only a result with this title will do (finder.same_title); the search's best guess
+    for a name it does not know is a 404 instead of another show."""
     await installed_packages()
     best, _ = await finder.find(title)
-    if not best:
+    if not best or (exact and not finder.same_title(best["title"], title)):
         raise ApiError(404, f"could not find {title}", key="err_title_not_found", vars={"title": title})
     providers = best["providers"]
     ep_info = None
@@ -2678,6 +2680,12 @@ async def watch_next():
     return items
 
 
+def _played_at(card):
+    """When a Keep watching card was last played, as a timestamp (the oldest when it has none)."""
+    t = store._when({"when": card.get("last_played")})
+    return t.timestamp() if t else float("-inf")
+
+
 def continue_items(who=None, base=""):
     """Keep watching for the person on the couch (or `who`) at this TV: one card per show, newest
     first, up to 10, nothing older than 30 days. A card's id is its history line's own id, or
@@ -2714,7 +2722,9 @@ def continue_items(who=None, base=""):
     # names the show ("The Office") and the server as its own ("The Office (US)"), the same title
     # but for the bracket. A show removed by hand under either name stays off until watched again.
     hidden = store.hidden_times(tv_id, who)
-    out.sort(key=lambda c: c["last_played"] or "", reverse=True)
+    # Sort by the instant, not the text: a history line is written in UTC and a Plex card in the
+    # home's time zone, and as strings those sort by the offset, not by when it was watched.
+    out.sort(key=_played_at, reverse=True)
     merged = []
     for c in out:
         if any(finder.same_title(c["title"], m["title"]) for m in merged):
@@ -2912,9 +2922,9 @@ async def open_plex_card(p, who):
     """A Plex card opens the way a Plex history line does: `play` with the service pinned to Plex,
     which opens the show's page when JustWatch knows it and the Plex app otherwise. A title JustWatch
     has never heard of (a home video, a local recording) opens the Plex app the same way instead
-    of failing."""
+    of failing, or of playing the search's best guess at it: the title has to match."""
     try:
-        return await play(p["title"], p.get("season"), p.get("episode"), "plex", who, resume=True)
+        return await play(p["title"], p.get("season"), p.get("episode"), "plex", who, resume=True, exact=True)
     except ApiError as e:
         if e.status != 404:
             raise
@@ -2957,9 +2967,10 @@ async def h_continue_hide(request):
         if not p:
             raise ApiError(404, f"unknown continue item: {cid}", key="err_unknown_continue_item", vars={"id": cid})
         # The Plex list is one per account, so the card is removed for the person it was shown to:
-        # the one asked for, else the person on this couch, else (nobody picked) everyone.
+        # the one asked for, else the person on this couch, else (nobody picked) everyone, which
+        # is each person and the list with nobody picked (hidden_times reads one key per view).
         who = store.norm_who(data.get("who")) or cur_who()
-        for w in ([who] if who and who != "both" else config.PEOPLE_IDS):
+        for w in ([who] if who and who != "both" else [None, "both", *config.PEOPLE_IDS]):
             store.hide_keep_watching({"tv": _current.get(), "who": w, "title": p["title"]})
         record_action(request, "continue_hide", {"id": cid}, True)
         return ok()
@@ -2977,8 +2988,9 @@ async def h_plex_art(request):
     cid, kind = request.query.get("id") or "", request.query.get("kind") or "poster"
     try:
         got = await plex.picture(cid, kind)
-    except Exception as e:
-        raise ApiError(502, f"Plex did not give the picture: {e}", key="err_plex_picture")
+    except Exception as e:   # the log gets the reason; the client never the server's address
+        log.warning("plex: picture %s %s not given (%s: %s)", cid, kind, type(e).__name__, str(e)[:200])
+        raise ApiError(502, "Plex did not give the picture", key="err_plex_picture")
     if not got:
         raise ApiError(404, "no such picture", key="err_no_such_picture")
     data, ctype = got
@@ -4045,6 +4057,8 @@ def make_app():
         elif plex.settings():
             log.warning("plex: config.json has a plex section but PLEX_TOKEN is not set in .env; "
                         "Keep watching from Plex is off")
+        elif config.PLEX_ERROR:
+            log.warning("plex: %s; Keep watching from Plex is off", config.PLEX_ERROR)
         for tv_id, t in TVS.items():
             t.on_change(lambda tv_id=tv_id: with_tv(tv_id, push_now))
             t.on_change(lambda tv_id=tv_id: with_tv(tv_id, _maybe_refresh_installed))
