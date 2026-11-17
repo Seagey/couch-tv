@@ -227,6 +227,9 @@
   ];
   var GRID_COLS = 12, GRID_MAX = 24;
   var DOCK_APPS = 10;   // Night: apps in the dock before Settings and More apps (home.dock_size)
+  var DOCK_BANNERS = false;   // Night: the dock shows each app's wide TV banner instead of its square icon (home.dock_banners)
+  var BANNER_COLS = 6;        // wide tiles: six to a row; the rows below show one at a time, moving down
+  var BANNER_ROW_REM = 10;    // one row of banners and the gap under it (7rem tile + 3rem), for the slide
   var SETTINGS_PKG = "com.android.tv.settings";
   var HOLD_MS = 600;    // how long OK is held to pick something up
 
@@ -419,6 +422,8 @@
     VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true);
     GRID_COLS = NIGHT ? 12 : 8;
     DOCK_APPS = Math.max(1, Math.min(10, parseInt(HOME.dock_size, 10) || 10));
+    DOCK_BANNERS = NIGHT && (typeof ST.dock_banners === "boolean" ? ST.dock_banners : HOME.dock_banners === true);
+    document.documentElement.classList.toggle("dock-banners", DOCK_BANNERS);
     initSoundscape();
     if (smartOn()) DOCK_APPS = Math.min(DOCK_APPS, 9);   // the Smart home tile takes one place in the dock
     CLOCK24 = clock24();
@@ -2644,11 +2649,27 @@
     else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
     else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
     else if (it.kind === "smart") face = '<div class="face tool">' + window.smartHome.icon + "</div>";
+    else if (DOCK_BANNERS && it.banner) face = '<div class="face banner"><img src="' + esc(it.banner) + '" alt="" decoding="async" onerror="this.parentNode.className=\'face word\';this.parentNode.textContent=this.getAttribute(\'data-name\')" data-name="' + esc(it.name) + '"></div>';
     else if (iconUrl(it.package)) face = '<div class="face"><img src="' + esc(iconUrl(it.package)) + '" alt="" decoding="async" onerror="this.parentNode.className=\'face word\';this.parentNode.textContent=this.getAttribute(\'data-name\')" data-name="' + esc(it.name) + '"></div>';
     else face = '<div class="face word">' + esc(it.name) + "</div>";
     var cls = "tile app dock-ic" + (it.kind === "input" ? " input-ic ic-" + esc(it.icon || "hdmi") : "") + (lift && it.package === lift.pkg ? " lifted" : "");
     return '<div class="' + cls + '">' + face + dotHTML(it) + '<div class="label">' + esc(it.name) + "</div></div>";
   }
+
+  // home.dock_banners: the dock shows one row of six; the rows under it sit below the screen and slide
+  // up a row at a time as the focus moves down into them (Keep watching fades out meanwhile).
+  function slideDock() {
+    var apps = $("apps-section") || $("grid").parentNode, el = document.documentElement;
+    var rows = DOCK_BANNERS && !expanded ? Math.ceil(gridEls.length / GRID_COLS) : 1;
+    var row = rows > 1 && (zone === "grid" || zone === "gear" || zone === "appmenu") ? Math.floor(g / GRID_COLS) : 0;
+    el.classList.toggle("dock-down", row > 0);
+    if (rows <= 1) { apps.style.bottom = ""; apps.style.transform = ""; return; }
+    apps.style.bottom = (2.875 - (rows - 1) * BANNER_ROW_REM) + "rem";
+    apps.style.transform = "translateX(-50%) translateY(" + (-row * BANNER_ROW_REM) + "rem)";
+  }
+
+  // The Night dock tile's width in rem: a square icon, or a 16:9 TV banner as tall as the icon.
+  function dockTileRem() { return DOCK_BANNERS ? 12.5 : 7; }
 
   function appHTML(it) {
     if (NIGHT) return dockHTML(it);
@@ -2678,8 +2699,10 @@
     gridItems = gridList();
     if (NIGHT) {
       // the dock is as wide as what is in it; More apps uses all twelve columns
-      GRID_COLS = expanded ? 12 : Math.max(1, Math.min(12, gridItems.length));
-      $("grid").style.gridTemplateColumns = "repeat(" + GRID_COLS + ", 7rem)";
+      // wide banner tiles: six to a row; the dock shows its first row and the rest wait below the screen
+      GRID_COLS = DOCK_BANNERS ? Math.max(1, Math.min(BANNER_COLS, gridItems.length))
+        : expanded ? 12 : Math.max(1, Math.min(12, gridItems.length));
+      $("grid").style.gridTemplateColumns = "repeat(" + GRID_COLS + ", " + dockTileRem() + "rem)";
     }
     $("grid").innerHTML = gridItems.map(appHTML).join("");
     gridEls = Array.prototype.slice.call($("grid").children);
@@ -2689,7 +2712,7 @@
       // row of eight fits it. app.css needs to know which tiles end a row and which sit in the last
       // one, to leave the gap off there. Plain rem here, not a custom property:
       // WebViews this old may not have those either.
-      if (NIGHT) $("grid").style.width = (GRID_COLS * 7 + (GRID_COLS - 1) * 1.625 + 3.5) + "rem";
+      if (NIGHT) $("grid").style.width = (GRID_COLS * dockTileRem() + (GRID_COLS - 1) * 1.625 + 3.5) + "rem";
       var lastRow = Math.floor((gridEls.length - 1) / GRID_COLS) * GRID_COLS;
       gridEls.forEach(function (el, i) {
         if (i % GRID_COLS === GRID_COLS - 1) el.classList.add("end-col");
@@ -2751,6 +2774,7 @@
     if (zone === "ambient") { renderAmbientMusic(); return; }
     clearFocus();
     renderHint();
+    slideDock();
     if (npVisible()) renderNp();   // its buttons carry the focus only while zone is "np"
     if (zone === "gear") { if (gridEls[g]) gridEls[g].classList.add("focus"); renderGear(); return; }
     if (zone === "appmenu") { if (gridEls[g]) gridEls[g].classList.add("focus"); renderAppMenu(); return; }

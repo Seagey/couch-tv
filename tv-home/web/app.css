@@ -413,6 +413,13 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .theme-night .app .face.tool { background: rgba(255, 255, 255, 0.14); }
 .theme-night .app .face.word { font-size: 1.125rem; padding: 0 0.5rem; background: #2a2a30; }
 .theme-night .app .label { top: calc(100% + 0.75rem); }
+/* home.dock_banners: each app's wide TV banner (16:9) instead of its square icon, as tall as the icon */
+.dock-banners.theme-night .app { width: 12.5rem; height: 7rem; }
+.dock-banners.theme-night .app .face { border-radius: 1rem; corner-shape: round; }
+.dock-banners.theme-night .app .face.banner img { width: 100%; height: 100%; object-fit: cover; }
+/* rows of banners below the first: they slide up into view as the focus moves down */
+.dock-banners.theme-night .apps { transition: transform 240ms var(--ease); }
+.dock-down.theme-night .shelf { opacity: 0; }
 /* More apps: the dock grows into a full list and the cards step aside */
 .theme-night.expanded .shelf { display: none; }
 
