@@ -5101,9 +5101,17 @@
     return api("POST", "/api/watch-next", { rows: rows });
   }
 
+  // On Fire OS a return to the home asks for this twice within a moment (the Home button watch's
+  // tv.home, then the launcher's tv.resume); the second ask gets the first's result.
+  var refreshAt = 0, refreshing = null;
   function refresh() {
     // never reshuffle under something being moved, or under the settings screen
     if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart" || zone === "updask") return Promise.resolve();
+    if (refreshing && Date.now() - refreshAt < 1500) return refreshing;
+    refreshAt = Date.now();
+    return refreshing = refreshNow();
+  }
+  function refreshNow() {
     if (OFFLINE) {
       // only the TV's own apps, in the order last saved; no shows, no Screens
       if (TV) data.apps = sortApps(nativeApps() || []);

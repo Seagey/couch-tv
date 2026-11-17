@@ -100,6 +100,15 @@ class MainActivity : Activity() {
         hideSystemBars()
         intent?.let { readExtras(it) }
         io.execute { warmApps() }
+        // An app installed, removed or renamed (or the TV's language changed): the list is read again,
+        // in the background, instead of on every return to the home.
+        listenForChanges(android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED); addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addDataScheme("package")
+        })
+        listenForChanges(android.content.IntentFilter(Intent.ACTION_LOCALE_CHANGED))
+        runCatching { contentResolver.registerContentObserver(WATCH_NEXT, true, watchNextChanged) }
         askWatchNextPermission()
         Doorbell.start(this)   // smart home (optional): nothing happens unless a doorbell is set up
         FireWatch.ensure(this)   // Fire TV only, and only once a computer has switched it on
@@ -191,8 +200,15 @@ class MainActivity : Activity() {
                 if (!reachable(base)) main.post { if (resumed && !offline) { showOffline(); later(OFFLINE_RETRY_MS) } }
             }
         } else if (offline || fallback != null) connect()
-        io.execute { warmApps() }
+        if (appCache == null) io.execute { warmApps() }   // otherwise the package receiver below keeps the list fresh
+        io.execute { watchNextCache = readWatchNext().toString() }   // off the page's thread: TV.watchNext() answers from here
         Updater.resumed(this)   // the daily look for a new release (Home settings, Updates)
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(packageChanged) }
+        runCatching { contentResolver.unregisterContentObserver(watchNextChanged) }
+        super.onDestroy()
     }
 
     override fun onPause() {
@@ -641,7 +657,7 @@ class MainActivity : Activity() {
 
         /** Android's Watch Next list (what each app says you are in the middle of), as JSON. */
         @JavascriptInterface
-        fun watchNext(): String = readWatchNext().toString()
+        fun watchNext(): String = watchNextCache ?: readWatchNext().toString().also { watchNextCache = it }   // the first ask reads; later ones answer at once
 
         /** Opens one Watch Next item (its row id) in the app that owns it. */
         @JavascriptInterface
@@ -1088,12 +1104,27 @@ class MainActivity : Activity() {
     }
 
     @Volatile private var appCache: List<Pair<ResolveInfo, String>>? = null
+    /** System broadcasts only; Android 13 and newer insist on saying whether other apps may send them (they may not). */
+    private fun listenForChanges(filter: android.content.IntentFilter) {
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(packageChanged, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+        else registerReceiver(packageChanged, filter)
+    }
+    private val packageChanged = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: android.content.Context, i: Intent) { io.execute { warmApps() } }
+    }
+    /** Android's Watch Next rows as the page last asked for them (JSON), kept up to date off the page's thread. */
+    @Volatile private var watchNextCache: String? = null
+    private val watchNextChanged = object : android.database.ContentObserver(main) {
+        override fun onChange(selfChange: Boolean) { io.execute { watchNextCache = readWatchNext().toString() } }
+    }
 
     /** The TV's apps with their labels. Cached: reading labels for 30 apps is slow on this TV. */
     private fun tvApps(): List<ResolveInfo> = appList().map { it.first }
 
-    private fun appList(): List<Pair<ResolveInfo, String>> = appCache ?: synchronized(this) {
-        appCache ?: run {
+    private fun appList(): List<Pair<ResolveInfo, String>> = appCache ?: synchronized(this) { appCache ?: buildAppList().also { appCache = it } }
+
+    /** Reads the installed apps and their labels: slow (30 apps on a Fire TV take a while), so never on the page's thread while a copy exists. */
+    private fun buildAppList(): List<Pair<ResolveInfo, String>> = run {
             val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
             // Fire TV apps that declare only LAUNCHER: the Appstore and Audible (#238), plus saved order packages.
             val launcherPkgs = mutableSetOf("com.amazon.venezia", "com.audible.application.firetv")
@@ -1115,14 +1146,16 @@ class MainActivity : Activity() {
                 .distinctBy { it.activityInfo.packageName }
                 .map { it to it.loadLabel(packageManager).toString() }
                 .sortedBy { it.second.lowercase() }
-                .also { appCache = it }
-        }
     }
 
     /** Builds the app list and every banner ahead of time, so the page never waits for them. */
     private fun warmApps() {
-        appCache = null
-        appList().forEach { bannerImage(it.first.activityInfo.packageName) }
+        // The fresh list replaces the old one in a single step: emptying the cache first made the page's
+        // synchronous TV.apps() wait for the whole rescan, and on a Fire TV Cube that held the page for
+        // seconds right after every return to the home (a Chromium trace showed 6 s key latency).
+        val fresh = buildAppList()
+        appCache = fresh
+        fresh.forEach { bannerImage(it.first.activityInfo.packageName) }
     }
 
     /** The app's TV banner as a JPEG: memory, then disk, then drawn fresh. */
