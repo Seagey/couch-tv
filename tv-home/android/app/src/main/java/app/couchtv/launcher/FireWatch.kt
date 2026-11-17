@@ -242,7 +242,9 @@ class FireWatch : AccessibilityService() {
         private fun isKtc() = Build.MANUFACTURER.equals("KTC", ignoreCase = true)
         /** Sony BRAVIA (CT1, Google TV, Android 14): a double Home press left the Google home up, the same as KTC (#258). */
         private fun isSony() = Build.MANUFACTURER.equals("Sony", ignoreCase = true)
-        private fun catchesHomeKey() = isXiaomi() || isKtc() || isSony()
+        /** Nokia Android TV 11 reports its manufacturer as "My": the same double Home race left tvlauncher up (#256). */
+        private fun isNokiaMy() = Build.MANUFACTURER.equals("My", ignoreCase = true)
+        private fun catchesHomeKey() = isXiaomi() || isKtc() || isSony() || isNokiaMy()
         const val GOOGLE_TV_HOME = "com.google.android.apps.tv.launcherx"
         const val ANDROID_TV_HOME = "com.google.android.tvlauncher"
         /** Bell's Fibe TV app (Bell Streamer, Canada): its MainTvActivity is the box's HOME, and also its live TV. */
