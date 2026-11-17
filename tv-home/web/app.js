@@ -463,10 +463,12 @@
     document.documentElement.classList.toggle("still", !MOVING);
     // Mac-style dock (Home settings, Look; home.dock "mac"): off unless chosen, held off by Lighter home
     DOCK_MAC = !LIGHTER && (ST.dock || HOME.dock) === "mac";
+    DATE_BARS = HOME.date_bars === true;
     document.documentElement.classList.toggle("dock-mac", DOCK_MAC);
     if (typeof magnify === "function") magnify();
   }
   var DOCK_MAC = false;
+  var DATE_BARS = false;   // home.date_bars: thin vertical bars between the day, the place and the weather
   // Lighter home: ask for the 640 px size of a Keep watching picture, not the 1440 px one (a card is about 500 px wide)
   function slim(u) { return LIGHTER && typeof u === "string" ? u.replace("/s1440/", "/s640/") : u; }
   function glassSetting() { var g = ST.glass || HOME.glass; return g === "on" || g === "lite" ? g : "off"; }
@@ -682,9 +684,10 @@
         '</span><span class="wx">' + weatherParts.map(esc).join(" · ") + "</span></span>";
     } else {
       date.classList.remove("weather-lines");
-      date.innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' +
-        (place ? '<span class="wx-place"> · ' + esc(place) + " · </span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
-        '<span class="ww"> · ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
+      var bar = DATE_BARS ? '<i class="vbar"></i>' : "";
+      date.innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' + bar +
+        (place ? '<span class="wx-place">' + (DATE_BARS ? esc(place) + bar : " · " + esc(place) + " · ") + "</span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
+        '<span class="ww">' + (DATE_BARS ? " " : " · ") + esc(wxText(w)) + "</span></span>" : "") + "</span>";
     }
     var ic = $("idle-clock"), idate = $("idle-date"), iwx = $("idle-wx");
     if (ic) ic.innerHTML = hm + (CLOCK24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");

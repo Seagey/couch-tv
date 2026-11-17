@@ -51,6 +51,7 @@ function render(language) {
     WX_SHOW: true,
     WX_F: false,
     CLOCK24: true,
+    DATE_BARS: false,
     NIGHT: true,
     SUN_SYNC: false,
     SMART_IDLE: { quiet_hours: {} },
