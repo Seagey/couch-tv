@@ -8,7 +8,7 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ### 17 November 2026: the scenes wait while something covers the home (option B, from your copy of the repo)
 
-The Night look's scenes went on taking turns while an app or the TV's screensaver was in front. Each change decodes and uploads a fresh set of 1080p layers, and on a Fire TV Cube (2 GB of memory) the home's GPU memory was seen swinging between about 115 MB and 260 MB with every change while the screensaver covered it, which is what pushes a small box into swapping and makes the first presses after Home slow. The page now holds the scene while the launcher has told it to pause (an app in front, the screensaver) and while it is hidden, and carries on when the home is back. The date line of the Night look also gets a bullet between the day and the weather place.
+The Night look's scenes went on taking turns while an app or the TV's screensaver was in front. Each change decodes and uploads a fresh set of 1080p layers, and on a Fire TV Cube (2 GB of memory) the home's GPU memory was seen swinging between about 115 MB and 260 MB with every change while the screensaver covered it, which is what pushes a small box into swapping and makes the first presses after Home slow. The page now holds the scene while the launcher has told it to pause (an app in front, the screensaver) and while it is hidden, and carries on when the home is back. The date line of the Night look also gets a middle dot between the day and the weather place, the same as between the other parts.
 
 ### 17 November 2026: option B on a Fire TV, over ADB alone (on main, in the next release)
 

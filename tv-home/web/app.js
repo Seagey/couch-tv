@@ -672,7 +672,7 @@
     } else {
       date.classList.remove("weather-lines");
       date.innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' +
-        (place ? '<span class="wx-place"> • ' + esc(place) + " · </span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
+        (place ? '<span class="wx-place"> · ' + esc(place) + " · </span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
         '<span class="ww"> · ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
     }
     var ic = $("idle-clock"), idate = $("idle-date"), iwx = $("idle-wx");
