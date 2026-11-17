@@ -651,8 +651,19 @@
     return parts.join(", ");
   }
 
+  // Every 15 s: redraw only on a new minute, and only while the home can be seen. The redraw sets
+  // two innerHTMLs and forces a few layouts (fitDate, the glass clock), which a 2 GB box felt four
+  // times a minute for a display that changes once. tv.resume() redraws straight away.
+  var clockMinute = "";
+  function clockTick() {
+    if (!active()) return;
+    var d = new Date(), minute = d.getHours() + ":" + d.getMinutes();
+    if (minute === clockMinute && !(NIGHT && !glassShown)) return;   // glassShown blank: a glass setting changed
+    clock();
+  }
   function clock() {
     var d = new Date(), h = d.getHours(), m = d.getMinutes();
+    clockMinute = h + ":" + m;
     var mm = (m < 10 ? "0" : "") + m;
     var hm = CLOCK24 ? (h < 10 ? "0" : "") + h + ":" + mm : (h % 12 || 12) + ":" + mm;
     $("time").innerHTML = hm + (CLOCK24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
@@ -796,13 +807,68 @@
         el.style.setProperty("--my-top", s.y * 100 + "vh");
         el.style.setProperty("--my-size", s.size * 100 + "vh");
         el.style.setProperty("--my-weight", s.weight);
-        el.querySelector(".sbg").onerror = function () { lostScene(s); };
-        var fg = el.querySelector(".fg");
-        if (fg) fg.onerror = function () { fg.style.display = "none"; };   // "cutout": true but no file: the clock stays in front
       }
+      watchImage(el.querySelector(".sbg"), s, true);
+      var fg = el.querySelector(".fg");
+      if (fg) watchImage(fg, s, false);
       box.appendChild(el);
       return el;
     });
+  }
+
+  // A scene picture that did not arrive. Your own scene: the file is not on this TV, so the scene
+  // leaves the turns (lostScene) or the clock stays in front without its cut-out. A built-in one
+  // was lost on the way (seen on a Fire TV Cube over weak Wi-Fi, where it left a black scene for
+  // the whole turn): ask again after 2, 6 and 15 s, and if the scene on screen still has no photo,
+  // move on to the next one. A picture whose src was taken away (unreadyScene) is not an error.
+  var RETRY_MS = [2000, 6000, 15000];
+  function watchImage(img, s, isPhoto) {
+    img.onerror = function () {
+      var src = img.getAttribute("src");
+      if (!src) return;
+      if (s.mine) { if (isPhoto) lostScene(s); else img.style.display = "none"; return; }
+      var tries = parseInt(img.dataset.tries || "0", 10);
+      if (tries < RETRY_MS.length) {
+        setTimeout(function () {
+          if (!img.getAttribute("src")) return;   // released meanwhile: nothing to retry
+          var base = src.replace(/([?&])retry=\d+$/, "$1").replace(/[?&]$/, "");
+          img.dataset.tries = tries + 1;
+          img.src = base + (base.indexOf("?") < 0 ? "?" : "&") + "retry=" + (tries + 1);
+        }, RETRY_MS[tries]);
+      } else if (isPhoto && SCENES[scene] === s && SCENES.length > 1) showScene(nextFrom(scene));
+    };
+    img.onload = function () { delete img.dataset.tries; };
+  }
+
+  /** The scene's photo is in and drawable. */
+  function photoIn(el) {
+    var img = el.querySelector(".sbg");
+    return !!img && img.complete && img.naturalWidth > 0;
+  }
+
+  // Resolves once the scene's photo is in (or failed, or 8 s passed): a fade only starts when there
+  // is something to fade to, instead of a black scene while the photo is still on its way.
+  function sceneLoaded(el, ms) {
+    var img = el.querySelector(".sbg");
+    if (!img || (img.complete && img.naturalWidth > 0)) return Promise.resolve();
+    return new Promise(function (done) {
+      var t = setTimeout(done, ms);
+      var fin = function () { clearTimeout(t); img.removeEventListener("load", fin); img.removeEventListener("error", fin); done(); };
+      img.addEventListener("load", fin); img.addEventListener("error", fin);
+    });
+  }
+
+  // A scene that has faded out gives its pictures back: the decoded 1920x1080 photo, the cut-out
+  // with its alpha and the clock's frosted fill are what a scene costs in GPU memory, and a scene
+  // keeping them while it waits is why a 2 GB Fire TV Cube swung 115 to 260 MB at every change.
+  // readyScene puts them back (from the browser's cache) when its turn comes near.
+  function unreadyScene(k) {
+    var el = sceneEls[k];
+    if (!el || !el.classList.contains("ready")) return;
+    el.classList.remove("ready");
+    Array.prototype.forEach.call(el.querySelectorAll("img"), function (img) { img.removeAttribute("src"); delete img.dataset.tries; });
+    Array.prototype.forEach.call(el.querySelectorAll(".gclock .fill"), function (f) { f.style.backgroundImage = ""; });
+    delete el.dataset.hm;
   }
 
   // An own scene whose photo is not on this TV (option A with an app built before the scene was
@@ -814,8 +880,10 @@
       $("scenes").innerHTML = "";
       buildScenes();
       scene = 0;
+      switching = false; pendingScene = -1;   // a fade still waiting for a lost photo is over (its scene element is gone)
       showScene(0);
-    } else if (SCENES[scene] === s) showScene(nextFrom(scene));
+    } else if (SCENES[scene] === s && pendingScene < 0) showScene(nextFrom(scene));
+    // a lost scene a fade is waiting for: that fade moves on by itself (showScene)
   }
   function nextFrom(i) {
     for (var k = 1; k <= SCENES.length; k++) if (!SCENES[(i + k) % SCENES.length].lost) return (i + k) % SCENES.length;
@@ -831,12 +899,13 @@
       el.classList.add("ready");
       // decoded now, while the scene waits at opacity 0, rather than when its fade starts
       Array.prototype.forEach.call(el.querySelectorAll("img"), function (img) { if (img.decode && img.src) img.decode().catch(function () {}); });
-    }
-    drawClocks(el, s, glassShown);
+      drawClocks(el, s, glassShown);
+    } else if (el.dataset.hm !== glassShown) drawClocks(el, s, glassShown);   // already drawn with this time: nothing to do
   }
 
   function drawClocks(el, s, hm) {
     if (!hm) return;
+    el.dataset.hm = hm;
     var cs = el.querySelectorAll(".gclock");
     for (var k = 0; k < cs.length; k++) {
       var c = cs[k];
@@ -936,10 +1005,30 @@
     });
   }
 
-  function showScene(i) {
-    var prev = scene;
-    scene = i;
+  // The next scene is readied this long before its turn (today's 2 s after the fade kept two full
+  // scenes decoded for the whole turn); short turns keep the old timing.
+  var PRE_READY_MS = 3000, preReadyTimer = null, switching = false, pendingScene = -1;
+  function showScene(i, hops) {
+    if (switching) return;   // a fade is waiting for its photo: the next tick comes round
+    var prev = scene, s = SCENES[i], el = sceneEls[i];
     readyScene(i);
+    if (prev === i) { swapScene(i, prev); return; }
+    switching = true; pendingScene = i;
+    sceneLoaded(el, 8000).then(function () {
+      switching = false; pendingScene = -1;
+      if (sceneEls[i] !== el) return;   // the scenes were rebuilt meanwhile (lostScene): that showed what is left
+      if (s.lost || !photoIn(el)) {
+        // nothing to fade to: keep what is on screen and try the scene after this one (bounded, so a
+        // TV with no network does not go round and round); the retries and the next turn try again
+        hops = (hops || 0) + 1;
+        if (hops < SCENES.length) showScene(nextFrom(i), hops);
+        return;
+      }
+      swapScene(i, prev);
+    });
+  }
+  function swapScene(i, prev) {
+    scene = i;
     var date = $("date");
     date.classList.add("swap");
     setTimeout(function () {
@@ -955,13 +1044,18 @@
     }, 600);
     sceneEls[i].classList.add("on");
     if (prev !== i) sceneEls[prev].classList.remove("on");
-    // after the fade, stop drawing the old one and get the next one ready
+    // after the fade, give the other scenes' pictures back; the next one is readied just before its turn
+    var lead = SCENE_MS > 10000 ? SCENE_MS - PRE_READY_MS : 2000;
     setTimeout(function () {
-      var next = nextFrom(scene);
-      sceneEls.forEach(function (el, k) { if (k !== scene && k !== next) el.classList.remove("ready"); });
-      readyScene(next);
+      sceneEls.forEach(function (el, k) { if (k !== scene && k !== pendingScene && (lead > 2000 || k !== nextFrom(scene))) unreadyScene(k); });
       sceneVideos(true);   // the old scene's clip stops now it has faded out; this one's starts
     }, 2000);
+    clearTimeout(preReadyTimer);
+    preReadyTimer = setTimeout(function () {
+      var next = nextFrom(scene);
+      if (SUN_SYNC) { var idx = SCENES.map(function (x) { return x.id; }).indexOf(sunTargetScene()); if (idx >= 0) next = idx; }
+      if (next !== scene) readyScene(next);
+    }, lead);
   }
 
   // Night: the date line sits centred above the clock, between the people switch and the quick
@@ -1070,8 +1164,13 @@
   // (2 GB) the page's GPU memory was seen swinging between 115 MB and 260 MB with every change while
   // the screensaver covered it, which is what pushes a small box into swapping.
   var PAGE_PAUSED = false;
+  // An app or the TV's screensaver is in front: nothing on the home can be seen, so its clock,
+  // its polls and its scene changes wait (the launcher also pauses the WebView's timers, so these
+  // guards matter on TVs that do not, and for the screen-off mode, which has no pause).
+  function covered() { return PAGE_PAUSED || document.hidden; }
+  function active() { return !covered() && !screenOffActive; }
   function nextScene() {
-    if (zone !== "settings" && !PAGE_PAUSED && !document.hidden && sceneMayChange()) {
+    if (zone !== "settings" && active() && sceneMayChange()) {
       if (SUN_SYNC) applySunSync();
       else showScene(nextFrom(scene));
     }
@@ -1368,7 +1467,7 @@
       }).join("") + "</div>";
   }
   function refreshMusic() {
-    if (!NP_ON || (OFFLINE && !STANDALONE) || document.hidden) {
+    if (!NP_ON || (OFFLINE && !STANDALONE) || covered()) {
       if (music) { music = null; ambientOpen = false; renderNp(); renderAmbientMusic(); }
       return;
     }
@@ -1756,6 +1855,7 @@
       if (overlay) overlay.classList.remove("active");
       try { if (TV && TV.setScreenOff) TV.setScreenOff(false); } catch (e) {}
       paintFocus();
+      clock();   // the clock rested in the dark
     }
     sceneVideos(!screenOffActive);
     resetIdlePhoto();
@@ -1810,7 +1910,7 @@
     sceneVideos(!idleAmbientActive);   // no clip decoding behind the ambient clock
   }
   function checkSmartIdle() {
-    if (!SMART_IDLE.enabled || document.hidden || screenOffActive || idleAmbientActive) return;
+    if (!SMART_IDLE.enabled || covered() || screenOffActive || idleAmbientActive) return;
     var mins = isQuietHours(SMART_IDLE.quiet_hours) ? SMART_IDLE.quiet_hours.idle_minutes : SMART_IDLE.home_idle_minutes;
     if (!mins && !window.MOCK_SMART_IDLE_MS) return;
     var thresh = window.MOCK_SMART_IDLE_MS || (mins * 60000);
@@ -2034,20 +2134,30 @@
   // A person switch made elsewhere (the phone, another TV): when the bridge's "who" changes, show
   // that person here too.
   var bridgeWho = null;
+  // Every 3 s while the home can be seen (a phone that switched the person shows here within a
+  // moment); while the bridge does not answer the wait doubles up to 30 s. Returns the request.
+  var whoEvery = 3000;
+  function followWhoTick() {
+    if (!active()) { setTimeout(followWhoTick, 3000); return; }
+    followWho().then(function () { whoEvery = 3000; }, function () { whoEvery = Math.min(30000, whoEvery * 2); })
+      .then(function () { setTimeout(followWhoTick, whoEvery); });
+  }
   function followWho() {
-    if (NOBODY) return;
-    api("GET", "/api/who").then(function (j) {
-      var w = j && j.who;
-      if (!w || w === bridgeWho) return;
-      var first = bridgeWho === null;
-      bridgeWho = w;
-      if (first || w === who) return;   // the first answer only sets the baseline
-      if (!PEOPLE.some(function (p) { return p.id === w; })) return;
-      who = w; s = 0;
-      try { localStorage.setItem("tvhome.who", who); } catch (e) {}
-      renderShelf();
-      kidSync();
-    }, function () {});
+    if (NOBODY) return Promise.resolve();
+    return api("GET", "/api/who").then(function (j) {
+      try {
+        var w = j && j.who;
+        if (!w || w === bridgeWho) return;
+        var first = bridgeWho === null;
+        bridgeWho = w;
+        if (first || w === who) return;   // the first answer only sets the baseline
+        if (!PEOPLE.some(function (p) { return p.id === w; })) return;
+        who = w; s = 0;
+        try { localStorage.setItem("tvhome.who", who); } catch (e) {}
+        renderShelf();
+        kidSync();
+      } catch (e) { console.error(e); }   // a drawing error is not a bridge failure: no backoff
+    });
   }
 
   // ---------------- kids mode (kids.js, docs/CONFIG.md "Kids mode") ----------------
@@ -5013,7 +5123,7 @@
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { PAGE_PAUSED = false; toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
+    resume: function () { PAGE_PAUSED = false; clock(); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
     pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
@@ -5054,7 +5164,7 @@
     if (updRead() && UPD.supported) SECS.splice(SECS.length - 1, 0, ["updates", "download"]);
     mark("app-start");
     clock();
-    setInterval(clock, 15000);
+    setInterval(clockTick, 15000);
     if (NIGHT) {
       if (window.AmbientWeather) {
         window.AmbientWeather.init($("weather-canvas"), $("ambient-lighting"));
@@ -5098,18 +5208,18 @@
     renderQuick();
     if (!OFFLINE) refreshQuick();
     refreshMusic();
-    setInterval(refreshMusic, 5000);
+    setInterval(function () { if (!covered()) refreshMusic(); }, 5000);
     updateOledShift();
     setInterval(updateOledShift, 60000);
     setInterval(checkSmartIdle, 10000);
-    setInterval(function () { renderQuick(); refreshBedtimeDim(); }, 30000);
+    setInterval(function () { if (!covered()) { if (!screenOffActive) renderQuick(); refreshBedtimeDim(); } }, 30000);
     // LG: the weekly Developer Mode extend. It asks on screen and stays until answered (this TV's
     // clock screensaver would hide anything that timed out). devResume() records an extend that just
     // happened, so the question is never asked twice.
     setTimeout(devResume, 1500);
     // This TV says who is on its couch first, so what plays here is logged for them (each TV
     // keeps its own); then the lists. Once the home is up: the one-time "tell you about new versions?" question.
-    if (!OFFLINE) setInterval(followWho, 3000);
+    if (!OFFLINE) setTimeout(followWhoTick, 3000);
     // The bridge's choice wins (a phone that just turned the TV on set it); this TV's own memory is
     // only handed over when the bridge has nobody yet.
     var hello = OFFLINE ? Promise.resolve() : api("GET", "/api/who").then(function (j) {

@@ -168,6 +168,8 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         resumed = true
+        // the page's timers and script were paused while another app or the screensaver was in front
+        web?.resumeTimers(); web?.onResume()
         restoreTimeout(resume = true)   // back in front: the normal screen timeout goes back (not for the first moments of a press, see ambientAt)
         hideSystemBars()
         // Back within a moment of opening a channel card: the app crashed on the way in (see
@@ -176,10 +178,13 @@ class MainActivity : Activity() {
             channelOpened = null
             if (android.os.SystemClock.elapsedRealtime() - at < CHANNEL_RETRY_MS) start(i)
         }
+        // Whatever copy is showing was told to pause (onPause): tell it the home is back. Option B's
+        // saved copy (offline, the computer away) took the connect() branch below without a resume,
+        // which left the page's own pause flag set and its clock stopped for good.
+        if (pageReady) js("window.tv && tv.resume()")
         if (pageReady && offline && alone()) {
-            js("window.tv && tv.resume()")   // option A: the built-in copy is the home, keep it fresh
+            // option A: the built-in copy is the home, nothing to look for
         } else if (pageReady && !offline) {
-            js("window.tv && tv.resume()")
             // the computer may have gone off while the page was open: then the saved copy takes over
             val base = prefs.getString("bridge", null)
             if (base != null && hasOffline()) io.execute {
@@ -202,6 +207,13 @@ class MainActivity : Activity() {
         } catch (_: Exception) {}
         restoreTimeout(dream = true)   // the screensaver covered the home: timeout goes back
         js("window.tv && tv.pause && tv.pause()")   // the video background stops while an app is in front
+        // Nothing of the home can be seen now: stop the page's timers (its clock, its polls of the
+        // bridge, scene changes) and its script until onResume. On a Fire TV Cube (2 GB) the page
+        // kept polling the bridge every 3 and 5 s behind Netflix and under the screensaver, each
+        // music poll costing the TV a dumpsys. evaluateJavascript (tv.home, tv.pause) still runs.
+        // Not while the page is still loading (the TV's own home flashes up at boot): a paused load
+        // would only show the app grid.
+        if (pageReady) { web?.onPause(); web?.pauseTimers() }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -347,6 +359,7 @@ class MainActivity : Activity() {
 
     private fun makeWebView(): WebView = WebView(this).apply {
         setBackgroundColor(GROUND)
+        if (resumed) resumeTimers()   // a WebView made while the last one's pause is still in force (a renderer crash while covered)
         isFocusable = true
         isFocusableInTouchMode = true
         overScrollMode = View.OVER_SCROLL_NEVER
