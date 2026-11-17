@@ -28,6 +28,7 @@
 //   smartidle=1          home.smart_idle.enabled: enable Smart Idle (smartidle_sec=5 sets test timeout in seconds)
 //   inputs=4            the Input button lists four HDMI ports (one eARC), as the launcher reads them
 //   gfocus=glass        home.glass_focus: with glass app icons, the focused app stays glass
+//   banners=1           home.dock_banners: the Night dock shows each app's wide TV banner
 //   music=1             Now playing: a pretend song in Spotify (music=paused: paused; music=noart: no cover)
 //   newapp=1            an app turns up that this TV has not seen before (the New dot)
 //   down                the bridge is not answering      offline=1   the saved copy, no bridge at all
@@ -63,6 +64,7 @@
     });
   }
   if (arg("quick") !== null) cfg.tvs[0].quick = arg("quick").split(",").filter(Boolean);
+  if (arg("banners")) cfg.home.dock_banners = true;
   if (arg("inputs")) {
     window.MOCK_INPUTS = [
       { id: "mock/hdmi1", label: "HDMI 1", type: "hdmi", devices: ["PlayStation 5"] },

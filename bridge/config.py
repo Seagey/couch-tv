@@ -322,6 +322,9 @@ def _home(h):
         out["glass"] = h["glass"]
     if isinstance(h.get("glass_icons"), bool):
         out["glass_icons"] = h["glass_icons"]
+    # the Night dock shows each app's wide TV banner instead of its square icon (six apps fit)
+    if isinstance(h.get("dock_banners"), bool):
+        out["dock_banners"] = h["dock_banners"]
     # the focused tile's slow sway (#52): on, or off for a TV that flickers
     if isinstance(h.get("keep_photo"), bool):
         out["keep_photo"] = h["keep_photo"]
