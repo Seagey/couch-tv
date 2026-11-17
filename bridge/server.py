@@ -2943,19 +2943,21 @@ async def resolve_episode(title, subtitle, year_subtitle=False):
         return episode_cache[key]
     result = {}
     try:
+        # Either field may be the show. A show that has the other field as one of its episodes
+        # settles it, whichever came first: Plex sends the episode first and the show second, and
+        # an episode called "The Sting" or "Sex Ed" is also the exact name of a film, which used
+        # to win and put the film's poster on The Office.
+        films = []
         for show, other in ((title, subtitle), (subtitle, title)):
             # Nuvio sends a film's year as the subtitle, and "2012" is a film: not a show name there
             if not show or (year_subtitle and show is subtitle and str(show).strip().isdigit()):
                 continue
             best, _ = await finder.find(show)
-            if not best or finder._norm(best["title"]) != finder._norm(show):
+            if not best or not finder.same_title(best["title"], show):
                 continue
             if best["type"] == "movie":
-                if not other and best.get("runtime_min"):
-                    result = {"duration_ms": best["runtime_min"] * 60000,
-                              "duration_source": "justwatch"}
-                result["show"] = best["title"]
-                break
+                films.append((best, other))
+                continue
             num = _sxe(other, show)
             ep = None
             if num:
@@ -2966,6 +2968,12 @@ async def resolve_episode(title, subtitle, year_subtitle=False):
                 result = _episode_fields(ep)
                 result["show"] = best["title"]   # which of the two fields was the show
                 break
+        if not result and films:
+            best, other = films[0]
+            if not other and best.get("runtime_min"):
+                result = {"duration_ms": best["runtime_min"] * 60000,
+                          "duration_source": "justwatch"}
+            result["show"] = best["title"]
     except Exception as e:
         log.info("episode lookup failed: %s", e)
         return {}  # not cached, try again next read
@@ -3115,7 +3123,7 @@ async def artwork(title):
             try:
                 best, _ = await finder.find(title)
                 # a near name is another show: no picture beats the wrong one
-                if best and finder._norm(best["title"]) == finder._norm(title):
+                if best and finder.same_title(best["title"], title):
                     art_cache[key] = {"poster": best["poster"], "backdrop": best["backdrop"]}
             except Exception:
                 pass
@@ -3152,7 +3160,7 @@ async def media_read(pkg, app):
         ep = await resolve_episode(title, episode_title, (app or {}).get("id") in YEAR_SUBTITLE_APPS)
         # Some apps (Paramount+) send the episode name first and the show second: "A Different
         # Corner, Mobland". Use the field that matched the show, or the poster comes from the wrong one.
-        if ep.get("show") and finder._norm(ep["show"]) != finder._norm(title):
+        if ep.get("show") and not finder.same_title(ep["show"], title):
             title, episode_title = ep["show"], title
         s["title"], s["subtitle"] = title, episode_title
     else:
@@ -3438,13 +3446,14 @@ async def log_seen(title, subtitle, app, now=None, who=None, method="seen", post
     poster = backdrop = year = kind = None
     show = title
     try:
-        names = [finder._norm(title)] + ([finder._norm(subtitle)] if subtitle else [])
+        names = [title] + ([subtitle] if subtitle else [])
+        named = lambda b: b and any(finder.same_title(b["title"], n) for n in names)
         best, _ = await finder.find(title)
-        if subtitle and not (app.get("id") in YEAR_SUBTITLE_APPS and str(subtitle).strip().isdigit()) and (not best or finder._norm(best["title"]) not in names):
+        if subtitle and not (app.get("id") in YEAR_SUBTITLE_APPS and str(subtitle).strip().isdigit()) and not named(best):
             alt, _ = await finder.find(subtitle)
-            if alt and finder._norm(alt["title"]) in names:
+            if named(alt):
                 best = alt
-        if best and finder._norm(best["title"]) in names:
+        if named(best):
             show, poster, backdrop, year, kind = (best["title"], best["poster"], best["backdrop"],
                                                   best["year"], best["type"])
     except Exception:

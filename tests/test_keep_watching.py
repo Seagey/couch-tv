@@ -170,6 +170,49 @@ class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("1923", [c.args[0] for c in find.call_args_list])
         server.episode_cache.clear()
 
+    async def test_plex_sends_the_episode_first_and_the_show_with_a_country_second(self):
+        # Plex: description=Andy's Play, The Office (US), ...; JustWatch calls the show "The Office"
+        import finder
+        self.assertTrue(finder.same_title("The Office", "The Office (US)"))
+        self.assertFalse(finder.same_title("The Office", "The Office Party"))
+        office = {"title": "The Office", "type": "tv", "jw_id": "ts-office"}
+        find = AsyncMock(side_effect=lambda q, *a: (office if q == "The Office (US)" else None, []))
+        ep = {"season": 7, "episode": 3, "name": "Andy's Play", "runtime_min": 22}
+        server.episode_cache.clear()
+        with patch.object(server.finder, "find", find), \
+             patch.object(server.finder, "episode_by_name", new=AsyncMock(return_value=ep)):
+            r = await server.resolve_episode("Andy's Play", "The Office (US)")
+        self.assertEqual((r["show"], r["season"], r["episode"], r["episode_title"]), ("The Office", 7, 3, "Andy's Play"))
+        server.episode_cache.clear()
+
+    async def test_an_episode_named_like_a_film_stays_an_episode_of_the_show(self):
+        # "The Sting" is an Office episode and a 1973 film: the show that has it as an episode wins
+        office = {"title": "The Office", "type": "tv", "jw_id": "ts-office"}
+        film = {"title": "The Sting", "type": "movie", "jw_id": "tm-sting", "runtime_min": 129, "poster": "film.jpg"}
+        find = AsyncMock(side_effect=lambda q, *a: ({"The Sting": film, "The Office (US)": office}.get(q), []))
+        ep = {"season": 7, "episode": 5, "name": "The Sting", "runtime_min": 22}
+        server.episode_cache.clear()
+        with patch.object(server.finder, "find", find), \
+             patch.object(server.finder, "episode_by_name", new=AsyncMock(return_value=ep)):
+            r = await server.resolve_episode("The Sting", "The Office (US)")
+        self.assertEqual((r["show"], r["season"], r["episode"]), ("The Office", 7, 5))
+        server.episode_cache.clear()
+        # a film on its own is still a film
+        with patch.object(server.finder, "find", find):
+            r = await server.resolve_episode("The Sting", None)
+        self.assertEqual((r["show"], r["duration_ms"]), ("The Sting", 129 * 60000))
+        server.episode_cache.clear()
+
+    async def test_a_logged_play_takes_the_shows_picture_under_its_country_name(self):
+        store.save_who("person1", self.tv)
+        office = {"title": "The Office", "poster": "office.jpg", "backdrop": "b", "year": 2005, "type": "tv"}
+        find = AsyncMock(side_effect=lambda q, *a: (office if q == "The Office (US)" else None, []))
+        with patch.object(server.finder, "find", find):
+            await server.log_seen("The Office (US)", "Andy's Play", {"id": "plex", "package": "com.plexapp.android", "name": "Plex"},
+                                  {"season": 7, "episode": 3, "episode_title": "Andy's Play"})
+        h = store.history()[0]
+        self.assertEqual((h["title"], h["poster"], h["season"], h["episode"]), ("The Office", "office.jpg", 7, 3))
+
     def test_nuvio_link_is_the_show_or_film_page_by_imdb_id(self):
         import apps
         nuvio = apps.BY_ID["nuvio"]

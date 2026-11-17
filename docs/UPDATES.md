@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 17 November 2026: Keep watching, one card per show when the app names the episode first (option B, from your copy of the repo)
+
+Plex (and some others) report what plays as the episode first and the show second, and name the show with its country, "The Office (US)". The bridge took the episode's name for the show, so every episode became its own Keep watching card, and the picture came from whatever JustWatch has under that episode's name: an Office episode called "The Sting" got the 1973 film's poster, most got none. The bridge now treats a title the same but for a trailing bracket as the same title, and when one of the two names is a show that has the other as one of its episodes, that show wins, even when the episode's name is also a film's. One card per show again, with the show's own picture and the latest episode on it. Cards from plays logged before this still carry the episode's name: hold OK on one and choose Remove from Keep watching, and the next play of that show makes a proper card.
+
 ### 17 November 2026: Sony Bravia, a double Home press stays on the home (option A and B, in the next release)
 
 On a Sony Bravia (Google TV, Android 14) two quick presses of Home left the Google home in front. The Home button watch now catches the Home key on Sony, the same as it already does on Xiaomi and KTC, so every press goes straight to couch-tv. Tested on the real remote by the person who reported it (#258). The Kotlin part needs a build.

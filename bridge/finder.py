@@ -77,6 +77,17 @@ def _norm(s):
     return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
 
 
+def _loose(s):
+    """The title without a trailing bracket: Plex and others name a show "The Office (US)", JustWatch
+    "The Office", and a year in brackets is the same film."""
+    return _norm(re.sub(r"\s*\([^)]*\)\s*$", "", s or ""))
+
+
+def same_title(a, b):
+    """The two names are the same title, exactly or but for a trailing bracket."""
+    return bool(_norm(a)) and (_norm(a) == _norm(b) or _loose(a) == _loose(b))
+
+
 def _tizen_links(offers):
     out = {}
     for o in offers or []:
@@ -142,10 +153,12 @@ async def find(title, type_=None):
     results = await search(title, type_)
     if not results:
         return None, []
-    want = _norm(title)
-    # Exact title with somewhere to watch it, then exact title, then the most popular result.
+    want, want_loose = _norm(title), _loose(title)
+    # Exact title with somewhere to watch it, then exact title, then the same title but for a
+    # trailing bracket ("The Office (US)"), then the most popular result.
     ranked = sorted(range(len(results)), key=lambda i: (
         _norm(results[i]["title"]) != want,
+        _loose(results[i]["title"]) != want_loose,
         not results[i]["providers"],
         i,
     ))
