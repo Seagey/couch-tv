@@ -250,6 +250,6 @@ Everything else: [docs/](docs/README.md).
 
 ## Shout me a coffee
 
-couch-tv is free. If it made your day a bit easier and you'd like to say thanks, you can [shout me a coffee](https://buy.stripe.com/3cIdR8deM30bexRaYl6Vq0s), any amount you like.
+couch-tv is free. If it made your day a bit easier and you'd like to say thanks, you can [shout me a coffee](https://buy.stripe.com/14A14m5Mk6cndtNeax6Vq0t), any amount you like.
 
 <p align="center"><sub>MIT licence, see <a href="LICENSE">LICENSE</a>. Your settings, secrets and watch history stay on your own computer and TV: <a href="docs/HOW-IT-WORKS.md#privacy-and-safety">privacy and safety</a>.</sub></p>
