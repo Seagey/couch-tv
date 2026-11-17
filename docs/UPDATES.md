@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 17 November 2026: option B on a Fire TV, over ADB alone (on main, in the next release)
+
+Fire OS ships no Android TV Remote protocol (ports 6466 and 6467 are closed on a Fire TV Cube 3rd gen), so the bridge could never pair with a Fire TV and option B's phone remote failed with "not paired". A TV with `"adb_only": true` in `config.json` now runs on ADB alone: keys, typing, links, power and the app in front all go over the bridge computer's ADB connection, which current Fire OS does not block (it only blocks apps on the TV). `bridge/pair_tv.py <tv id>` skips the code pairing for such a TV and only checks ADB, and `scripts/check-tv.py --adb` says when to set the flag. Tested end to end on a Fire TV Cube (3rd gen, Fire OS 7, Android 9) with the bridge in a Debian container. Typing is limited to letters, digits and plain punctuation, and there is no volume level. docs/CONFIG.md, The TVs.
+
 ### 14 November 2026: custom cards with a web link open on Android TV, LG and Samsung (on main, in the next release)
 
 Thanks ekagra-codes ([#207](https://github.com/Seagey/couch-tv/pull/207)). A custom card with a `url` now opens in the TV's browser: on a standalone Android TV through the home app or the on-TV app, on an LG through its browser app and on a Samsung through its browser app (the Samsung one opens the browser, but the TV's own launch call may not pass the address on, so it is untried). Only plain http and https links with a host are opened. The home also reads the card file again when you come back to it (`/api/custom-cards?force=1`, kept at least 5 seconds apart), and some tests now run on Windows too.

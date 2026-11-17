@@ -271,6 +271,10 @@ def main():
         else:
             homes = ", ".join(HOMES[h] for h in facts["homes"]) or "unknown"
             print(f"  {facts['maker']} {facts['model']}, Android {facts['android']} (API {facts['sdk']}), TV: {facts['tv']}, home apps: {homes}")
+            if facts.get("fire_os") and not (open_ports[6466] or open_ports[6467]):
+                print(f"  Fire OS {facts['fire_os']}: no Android TV Remote protocol on this TV (ports 6466 and 6467 are closed),")
+                print("  so option B's bridge drives it over ADB instead. Put \"adb_only\": true on this TV in config.json")
+                print("  (docs/CONFIG.md, The TVs); bridge/pair_tv.py then skips the code pairing and only checks ADB.")
             rs = facts.get("remote_service") or ""
             if rs:
                 print(f"  Android TV Remote Service: {rs}")

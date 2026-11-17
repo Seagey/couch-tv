@@ -142,7 +142,7 @@ Not tested by the author. Each line is what someone said worked on their own dev
   date Fire TV option C's phone remote cannot press keys or type ([issue #12](https://github.com/Seagey/couch-tv/issues/12));
   option B can. `scripts/check-tv.py <tv address> --adb` now reads the Fire OS version and says which case yours is (only the version is read, and it has not run on a real Fire TV yet). Fire OS 6 never connects the accessibility watcher (it runs Amazon's own accessibility
   manager), so there the Home button watch goes by usage access, the third grant. Seen on an Insignia Fire TV
-  Edition, Fire OS 6.7.1.1 ([issue #50](https://github.com/Seagey/couch-tv/issues/50)). The Android TV Remote protocol is not confirmed on Fire TV.
+  Edition, Fire OS 6.7.1.1 ([issue #50](https://github.com/Seagey/couch-tv/issues/50)). Fire OS has no Android TV Remote protocol (a Fire TV Cube 3rd gen refuses ports 6466 and 6467), so option B's bridge needs `"adb_only": true` on that TV ([CONFIG.md](CONFIG.md), The TVs) and drives it over ADB alone.
   The gear tile's TV settings (and the Settings app tile) open Fire OS's own Settings screen by name and tell
   the Home button watch for a few seconds that Amazon's home coming forward is Settings being drawn, so Settings
   stays open ([issue #75](https://github.com/Seagey/couch-tv/issues/75), [#123](https://github.com/Seagey/couch-tv/issues/123)). Pressing the remote's Home button and then going to Amazon's Settings is still a Home press: couch-tv comes back.
