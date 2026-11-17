@@ -207,6 +207,10 @@ body {
   to { transform: perspective(60rem) rotateX(-1.2deg) rotateY(1.8deg); }
 }
 @keyframes glint { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+/* a few seconds after the focus last moved (app.js, unsettle), the sway and glint hold still where they
+   are: while anything moves the TV draws the whole screen every frame, and on a 2 GB TV with frosted
+   panels that is 22 frames a second instead of 60. Any key or pointer move starts them again. */
+html.settled .tile.focus .face, html.settled .tile.focus .face::after { animation-play-state: paused; }
 
 /* Keep watching tile */
 .show { width: var(--shelf-w); height: var(--shelf-h); }
