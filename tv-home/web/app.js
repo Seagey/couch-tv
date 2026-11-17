@@ -1730,10 +1730,22 @@
   // A location.replace to the very same address can be dropped by the launcher's WebView, so
   // reload when nothing in the address changes.
   function restart() {
+    flushSettings();
+    // the page starting again asks the bridge who is watching and what plays within seconds of
+    // the last time: it skips those first asks when it starts within 10 s of this
+    try { sessionStorage.setItem("tvhome.restarted", String(Date.now())); } catch (e) {}
     var to = location.href.replace(/([?&])theme=[a-z]+&?/, "$1").replace(/[?&]$/, "");
     if (to === location.href) location.reload();
     else location.replace(to);
   }
+  // True once, on a page that restart() started within the last 10 s.
+  var JUST_RESTARTED = (function () {
+    try {
+      var at = parseInt(sessionStorage.getItem("tvhome.restarted") || "0", 10);
+      sessionStorage.removeItem("tvhome.restarted");
+      return at > 0 && Date.now() - at < 10000;
+    } catch (e) { return false; }
+  })();
   // Screen off / Audio-only mode: turns off the display (pitch black canvas for OLEDs and hardware backlight floor)
   // while sleep soundscapes, Spotify, and sleep timers continue playing in the dark.
   var screenOffActive = false;
@@ -3424,13 +3436,31 @@
     return api("POST", "/api/settings", { settings: rec.s })
       .then(function () { rec.pending = false; keep(ST_KEY, rec); }, function () {});
   }
+  // The push that is still waiting its 400 ms, sent now for a page about to start again (restart):
+  // a reload drops the timer, and the settings then went over on the next load, inside its first
+  // refresh. A keepalive request outlives the reload and never holds the page (a blocking request
+  // has no time limit and would freeze the home while the computer is away); the record stays
+  // pending, and the next page clears it without a second push when the bridge already has it
+  // (syncSettings). Not sendBeacon: the bridge wants the pairing key in a header.
+  function flushSettings() {
+    clearTimeout(pushTimer); pushTimer = null;
+    var rec = kept(ST_KEY);
+    if (!rec || !rec.pending || OFFLINE || data.bridge === false || MOCK || PREVIEW || typeof fetch !== "function") return;
+    try {
+      var headers = { "Content-Type": "application/json" };
+      if (KEY) headers.Authorization = "Bearer " + KEY;
+      rec.flushed = Date.now(); keep(ST_KEY, rec);
+      fetch(API + "/api/settings", { method: "POST", keepalive: true, headers: headers,
+        body: JSON.stringify(TV_ID ? { tv: TV_ID, settings: rec.s } : { settings: rec.s }) }).catch(function () {});
+    } catch (e) {}
+  }
   // Kept on this TV straight away; handed to the bridge a moment later (pending until it has it).
   function saveSettings() {
     var rec = keepSettings(true);
     SET.dirty = true;
     if (OFFLINE || data.bridge === false) return;
     clearTimeout(pushTimer);
-    pushTimer = setTimeout(function () { pushSettings(rec); }, 400);
+    pushTimer = setTimeout(function () { pushTimer = null; pushSettings(rec); }, 400);
   }
   // Same content, whatever order the keys came back in.
   function canon(v) {
@@ -3443,6 +3473,10 @@
   function syncSettings() {
     return api("GET", "/api/settings").then(function (j) {
       var rec = kept(ST_KEY), remote = j.settings && typeof j.settings === "object" && !Array.isArray(j.settings) ? j.settings : null;
+      if (rec && rec.pending && rec.flushed && Date.now() - rec.flushed < 10000 && remote && canon(remote) === canon(ST)) {
+        rec.pending = false; keep(ST_KEY, rec);   // the push sent just before the restart landed
+        return null;
+      }
       if (rec && rec.pending) return pushSettings(rec);
       if (!remote || (!j.updated && !Object.keys(remote).length)) {   // the bridge has none yet: it gets ours
         if (Object.keys(ST).length) return pushSettings(keepSettings(true));
@@ -4165,6 +4199,7 @@
   // About, Restart home: the launcher starts a new page and looks for the bridge again, as a
   // force-stop would. Anywhere else (a browser, the on-TV app, an older launcher) the page reloads.
   function restartHome() {
+    flushSettings();
     try { if (TV && TV.restartHome) { TV.restartHome(); return; } } catch (e) {}
     restart();
   }
@@ -5096,8 +5131,9 @@
     if (cached || TV) { render(); mark("home-painted-from-cache"); }
     if (NIGHT) $("np-slot").appendChild($("np"));   // Now playing: the first card of the row
     renderQuick();
-    if (!OFFLINE) refreshQuick();
-    refreshMusic();
+    // a page that restart() started asked these seconds ago: ask again a moment later, off the way to the first picture
+    if (!OFFLINE) { if (JUST_RESTARTED) setTimeout(refreshQuick, 3000); else refreshQuick(); }
+    if (JUST_RESTARTED && !STANDALONE) setTimeout(refreshMusic, 1500); else refreshMusic();
     setInterval(refreshMusic, 5000);
     updateOledShift();
     setInterval(updateOledShift, 60000);
@@ -5112,7 +5148,7 @@
     if (!OFFLINE) setInterval(followWho, 3000);
     // The bridge's choice wins (a phone that just turned the TV on set it); this TV's own memory is
     // only handed over when the bridge has nobody yet.
-    var hello = OFFLINE ? Promise.resolve() : api("GET", "/api/who").then(function (j) {
+    var hello = OFFLINE || JUST_RESTARTED ? Promise.resolve() : api("GET", "/api/who").then(function (j) {
       var w = j && j.who;
       if (w && PEOPLE.some(function (p) { return p.id === w; })) {
         bridgeWho = w;

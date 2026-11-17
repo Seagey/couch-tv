@@ -71,6 +71,8 @@ class MainActivity : Activity() {
     private var probing = false
     private var offline = false   // showing the saved copy because the computer is off
     private var resumed = false
+    private var pageFinishedAt = 0L   // when the live page last finished loading (elapsedRealtime)
+    private var pageGen = 0           // counts page loads: a bridge probe started for an older one is dropped
     private var waitingForNet = false   // just switched on, no Wi-Fi yet: the first load waits for it
     private val retry = Runnable { if (!pageReady || offline) connect() }
 
@@ -180,11 +182,12 @@ class MainActivity : Activity() {
             js("window.tv && tv.resume()")   // option A: the built-in copy is the home, keep it fresh
         } else if (pageReady && !offline) {
             js("window.tv && tv.resume()")
-            // the computer may have gone off while the page was open: then the saved copy takes over
+            // the computer may have gone off while the page was open: then the saved copy takes over.
+            // Not within moments of the page loading from it, and only after two misses 2 s apart:
+            // one slow answer over a weak Wi-Fi link swapped the live page for a full load of the
+            // saved copy (and another full load when the computer answered again a minute later).
             val base = prefs.getString("bridge", null)
-            if (base != null && hasOffline()) io.execute {
-                if (!reachable(base)) main.post { if (resumed && !offline) { showOffline(); later(OFFLINE_RETRY_MS) } }
-            }
+            if (base != null && hasOffline() && android.os.SystemClock.elapsedRealtime() - pageFinishedAt > PROBE_GRACE_MS) probeBridge(base, 2)
         } else if (offline || fallback != null) connect()
         io.execute { warmApps() }
         Updater.resumed(this)   // the daily look for a new release (Home settings, Updates)
@@ -306,6 +309,16 @@ class MainActivity : Activity() {
         main.postDelayed(retry, ms)
     }
 
+    /** Looks for the bridge [strikes] times, [PROBE_AGAIN_MS] apart; only when every look fails does the saved copy take over. */
+    private fun probeBridge(base: String, strikes: Int, gen: Int = pageGen) {
+        io.execute {
+            if (reachable(base)) return@execute
+            val still = { resumed && !offline && pageReady && gen == pageGen }   // the page it was started for is still the one showing
+            if (strikes > 1) main.postDelayed({ if (still()) probeBridge(base, strikes - 1, gen) }, PROBE_AGAIN_MS)
+            else main.post { if (still()) { showOffline(); later(OFFLINE_RETRY_MS) } }
+        }
+    }
+
     private fun reachable(base: String): Boolean = try {
         val c = URL("$base/api/health").openConnection() as HttpURLConnection
         c.connectTimeout = 1200
@@ -334,6 +347,7 @@ class MainActivity : Activity() {
         loadFailed = false
         offline = false
         pageReady = false
+        pageGen++
         val tv = prefs.getString("tv", null)
         val key = prefs.getString("pairing_key", null)
         val q = mutableListOf<String>()
@@ -364,6 +378,7 @@ class MainActivity : Activity() {
             override fun onPageFinished(view: WebView, url: String) {
                 if (!loadFailed && url.startsWith("http")) {
                     pageReady = true
+                    if (!offline && !url.startsWith("http://$OFFLINE_HOST/")) pageFinishedAt = android.os.SystemClock.elapsedRealtime()
                     removeFallback()
                     view.visibility = View.VISIBLE
                     view.requestFocus()
@@ -455,6 +470,7 @@ class MainActivity : Activity() {
         pageReady = false
         loadFailed = false
         offline = false
+        pageGen++
         connect()
     }
 
@@ -483,6 +499,7 @@ class MainActivity : Activity() {
         val w = webView() ?: return
         loadFailed = false
         offline = true
+        pageGen++
         val tv = prefs.getString("tv", null)
         w.loadUrl("http://$OFFLINE_HOST/tv/index.html?offline=1" + (if (alone()) "&alone=1" else "") +
             if (tv.isNullOrEmpty()) "" else "&tv=$tv")
@@ -1718,6 +1735,8 @@ class MainActivity : Activity() {
         private const val MAX_PHOTOS = 50   // same as MAX_PHOTOS in tv-home/web/app.js and bridge/server.py
         private const val RETRY_MS = 15_000L
         private const val OFFLINE_RETRY_MS = 60_000L   // looking for the bridge while the saved copy shows
+        private const val PROBE_GRACE_MS = 20_000L     // no reachability probe this soon after the live page loaded
+        private const val PROBE_AGAIN_MS = 2_000L      // the second look for the bridge after a miss
         private const val OFFLINE_HOST = "home.tvos.invalid"
         private const val BUNDLED = "www/tv"   // the built-in copy, in the app's assets
         private const val SLOW_MS = 2_500L

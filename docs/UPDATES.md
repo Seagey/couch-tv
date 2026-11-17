@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 17 November 2026: a cheaper Look switch, and a steadier hand on the saved copy (option B; the launcher part needs a build)
+
+The Look quick button (and closing Home settings after a change) starts the page again. The settings it had just saved used to go to the bridge on the next load, inside the first refresh, one more round trip before the first picture: they now go in one go before the reload. The page that comes back skips the asks the old one made seconds earlier (who is watching, the quick buttons, what is playing); the regular polls carry on. In the launcher, the look for the bridge on every return to the home, which swapped the live page for a full load of the saved copy on one slow answer (and another full load when the computer answered again a minute later), now waits 20 s after a page load and needs two misses 2 s apart. Seen on a Fire TV Cube over weak Wi-Fi. `tests/test_look_restart.js`.
+
 ### 17 November 2026: the scenes wait while something covers the home (option B, from your copy of the repo)
 
 The Night look's scenes went on taking turns while an app or the TV's screensaver was in front. Each change decodes and uploads a fresh set of 1080p layers, and on a Fire TV Cube (2 GB of memory) the home's GPU memory was seen swinging between about 115 MB and 260 MB with every change while the screensaver covered it, which is what pushes a small box into swapping and makes the first presses after Home slow. The page now holds the scene while the launcher has told it to pause (an app in front, the screensaver) and while it is hidden, and carries on when the home is back. The date line of the Night look also gets a middle dot between the day and the weather place, the same as between the other parts.
