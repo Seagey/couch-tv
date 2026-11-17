@@ -351,6 +351,10 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
   text-shadow: 0 0.125rem 1.125rem rgba(0, 0, 0, 0.25); transition: opacity 600ms ease-in-out;
 }
 .theme-night .date .wx { color: rgba(255, 255, 255, 0.78); font-weight: 400; }
+/* the weather place follows the date on the same line (#weather header): give it the same gap
+   the icon has when there is no place, and the icon a small one after the place */
+.theme-night .date .wx-place { margin-inline-start: 1rem; }
+.theme-night .date .wx-place + svg { margin-inline-start: 0.4rem; }
 .theme-night .date { white-space: nowrap; }
 .theme-night .date.weather-lines { white-space: normal; }
 .theme-night .date.weather-lines .dline {

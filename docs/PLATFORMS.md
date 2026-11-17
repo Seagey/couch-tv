@@ -76,7 +76,10 @@ YouTube button). It stays on, and a Home button watch (an accessibility service,
 
 **Fire TV (Fire OS):** the phone remote and app launching work (with option C on current Fire OS,
 the phone remote's keys and typing do not: Amazon blocks an app from using the TV's own ADB, so
-use option B for the full remote). Amazon does not let another home
+use option B for the full remote). Fire OS has no Android TV Remote protocol (ports 6466 and 6467
+are closed, so `pair_tv.py` cannot pair), so for option B put `"adb_only": true` on the TV in
+`config.json` ([CONFIG.md](CONFIG.md), The TVs): the bridge then sends keys, typing and links over
+ADB from the computer instead (seen working on a Fire TV Cube 3rd gen, Fire OS 7). Amazon does not let another home
 screen replace its own, so couch-tv watches for Amazon's home and puts its own home back on top;
 Amazon's home still flashes up for a moment first. Options A and B: `apply.sh` switches the watch
 on by itself. Option C needs three one-off ADB grants: [on-tv/README.md](../on-tv/README.md#fire-tv-fire-os).

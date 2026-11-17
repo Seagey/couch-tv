@@ -204,7 +204,12 @@ def main():
     cfg = next((t for t in load()["tvs"] if t["id"] == tv_id), None)
     if not cfg:
         sys.exit(f"unknown tv {tv_id}; see config.json")
-    if "--adb" in sys.argv:
+    if cfg.get("adb_only") and not arg("--code"):
+        # A Fire TV on Fire OS has no Android TV Remote protocol to pair with: the TV's
+        # "Allow USB debugging?" is the only pairing, so only the ADB check applies.
+        print(f"{tv_id} is \"adb_only\": no remote pairing to do, checking ADB instead.")
+        ok = asyncio.run(adb_check(cfg))
+    elif "--adb" in sys.argv:
         ok = asyncio.run(adb_check(cfg))
     elif arg("--code"):
         ok = give_code(cfg, arg("--code"))

@@ -72,6 +72,10 @@ function render(language) {
   return { date, time, idleWx, classes };
 }
 
+const css = fs.readFileSync(path.join(web, 'app.css'), 'utf8');
+assert(/\.theme-night \.date \.wx-place \{[^}]*margin-inline-start: 1rem/.test(css),
+  'the place is set apart from the date on the one-line header (it follows the date with no space in the markup)');
+
 const romanian = render('ro');
 assert(romanian.date.innerHTML.includes('Duminică, 15 noiembrie'), 'Romanian date keeps its localized comma');
 assert(
