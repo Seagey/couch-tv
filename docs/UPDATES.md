@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 17 November 2026: the bridge compresses the home and the remote, and lets the TV cache pictures (option B, from your copy of the repo)
+
+The bridge sent every file of the TV home and the phone remote uncompressed and marked `no-cache`: a reload of the home (the Look button is one) fetched 920 KB of script and style and revalidated each background one by one, which on a Fire TV Cube over weak Wi-Fi showed as seconds of lag and a late photo. Script, style, HTML and JSON are now gzipped on the fly (about a quarter of the size) and still revalidated on every load, so an edit lands at once; pictures, fonts and video are cached for an hour (a replaced picture under the same name shows within the hour); the phone remote's built files, whose names carry a content hash, are cached for a year. An unchanged file answers 304 with no body, worked around a quirk of this aiohttp with compression on.
+
 ### 17 November 2026: option B on a Fire TV, over ADB alone (on main, in the next release)
 
 Fire OS ships no Android TV Remote protocol (ports 6466 and 6467 are closed on a Fire TV Cube 3rd gen), so the bridge could never pair with a Fire TV and option B's phone remote failed with "not paired". A TV with `"adb_only": true` in `config.json` now runs on ADB alone: keys, typing, links, power and the app in front all go over the bridge computer's ADB connection, which current Fire OS does not block (it only blocks apps on the TV). `bridge/pair_tv.py <tv id>` skips the code pairing for such a TV and only checks ADB, and `scripts/check-tv.py --adb` says when to set the flag. Tested end to end on a Fire TV Cube (3rd gen, Fire OS 7, Android 9) with the bridge in a Debian container. Typing is limited to letters, digits and plain punctuation, and there is no volume level. docs/CONFIG.md, The TVs.
