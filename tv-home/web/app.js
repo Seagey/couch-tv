@@ -672,7 +672,7 @@
     } else {
       date.classList.remove("weather-lines");
       date.innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' +
-        (place ? '<span class="wx-place">' + esc(place) + " · </span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
+        (place ? '<span class="wx-place"> · ' + esc(place) + " · </span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
         '<span class="ww"> · ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
     }
     var ic = $("idle-clock"), idate = $("idle-date"), iwx = $("idle-wx");
@@ -1064,9 +1064,14 @@
     }
   }
 
-  // the settings screen covers the scenes, so they wait (one less thing for a small TV stick to draw)
+  // the settings screen covers the scenes, so they wait (one less thing for a small TV stick to draw).
+  // So do an app or the TV's screensaver in front (the launcher calls tv.pause, and the page's own
+  // visibility): a crossfade decodes and uploads a fresh set of 1080p layers, and on a Fire TV Cube
+  // (2 GB) the page's GPU memory was seen swinging between 115 MB and 260 MB with every change while
+  // the screensaver covered it, which is what pushes a small box into swapping.
+  var PAGE_PAUSED = false;
   function nextScene() {
-    if (zone !== "settings" && sceneMayChange()) {
+    if (zone !== "settings" && !PAGE_PAUSED && !document.hidden && sceneMayChange()) {
       if (SUN_SYNC) applySunSync();
       else showScene(nextFrom(scene));
     }
@@ -5008,9 +5013,9 @@
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
+    resume: function () { PAGE_PAUSED = false; toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
-    pause: function () { saveFocusNow(); pauseVideo(); },
+    pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
     // the launcher's updater has news (Updater.kt)

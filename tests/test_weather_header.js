@@ -72,10 +72,6 @@ function render(language) {
   return { date, time, idleWx, classes };
 }
 
-const css = fs.readFileSync(path.join(web, 'app.css'), 'utf8');
-assert(/\.theme-night \.date \.wx-place \{[^}]*margin-inline-start: 1rem/.test(css),
-  'the place is set apart from the date on the one-line header (it follows the date with no space in the markup)');
-
 const romanian = render('ro');
 assert(romanian.date.innerHTML.includes('Duminică, 15 noiembrie'), 'Romanian date keeps its localized comma');
 assert(
@@ -89,6 +85,8 @@ assert(/^\d{2}:\d{2}$/.test(romanian.time.innerHTML), 'the time remains a separa
 const english = render('en');
 assert(english.date.innerHTML.includes('Sunday 15 November'), 'other locales keep their existing date punctuation');
 assert(english.date.innerHTML.includes('Sâmburești, Olt, Romania'), 'other locales keep the full configured place');
+assert(english.date.innerHTML.includes('Sunday 15 November<span class="wx"><span class="wx-place"> · Sâmburești, Olt, Romania · </span>'),
+  'the one-line header puts the same middle dot between the date and the place as between the other parts');
 assert(english.date.innerHTML.includes('<svg class="icon"></svg>'), 'other locales retain the existing weather icon');
 assert(!english.classes.has('weather-lines'), 'the Romanian stacked layout is not applied to other locales');
 
