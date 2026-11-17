@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parents[1] / "bridge"))
 import tv  # noqa: E402
 
-CFG = {"id": "cube", "name": "Cube", "ip": "192.168.1.187", "adb_only": True}
+CFG = {"id": "cube", "name": "Cube", "ip": "192.0.2.10", "adb_only": True}
 
 
 class FakeAdb(tv.TV):
