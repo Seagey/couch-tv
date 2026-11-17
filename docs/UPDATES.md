@@ -6,6 +6,10 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 17 November 2026: Lighter home turns off the filters it had left on (option B, from your copy of the repo)
+
+On a Fire TV Cube (2 GB) the home drew at a 15-21 ms frame whenever it animated, over the 16.7 ms of a 60 Hz frame, with Lighter home on: the night dim after 9 pm was a brightness filter on three full-screen layers, the glass clock kept its drop-shadow and saturation filters, and every dock icon that is not focused had a brightness filter of its own. Under Lighter none of those run now: the night dim is one dark sheet over the scene, the fog clock's dark fill is a dark colour, and an icon that is not focused is a little see-through instead. Measured on that Cube with the same run of presses: the Keep watching row went from a 15 ms frame with a third of them late to 8 ms with none. The full look is unchanged.
+
 ### 17 November 2026: the scenes wait while something covers the home (option B, from your copy of the repo)
 
 The Night look's scenes went on taking turns while an app or the TV's screensaver was in front. Each change decodes and uploads a fresh set of 1080p layers, and on a Fire TV Cube (2 GB of memory) the home's GPU memory was seen swinging between about 115 MB and 260 MB with every change while the screensaver covered it, which is what pushes a small box into swapping and makes the first presses after Home slow. The page now holds the scene while the launcher has told it to pause (an app in front, the screensaver) and while it is hidden, and carries on when the home is back. The date line of the Night look also gets a middle dot between the day and the weather place, the same as between the other parts.

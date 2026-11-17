@@ -1074,6 +1074,21 @@ html.lighter.theme-night .people, html.lighter.theme-night .qbtn:not(.focus), ht
 html.lighter.theme-night .hint.on { background: rgba(30, 20, 28, 0.62); box-shadow: inset 0 0 0 0.0625rem rgba(255, 210, 220, 0.16); }
 html.lighter.glass { --glass-edge: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.26); }
 
+/* Lighter home, the filters it still left on: a Fire TV Cube (2 GB) drew the home at a 17-21 ms frame
+   whenever it animated, over the 16.7 ms budget, with the night dim's brightness filter on three
+   full-screen layers, drop-shadows and saturation on the glass clock, and a brightness filter on
+   every dock icon that is not focused. Under Lighter none of those run: the night dim is one dark
+   sheet over the scene, the fog clock's dark fill is a dark colour, and a dock icon that is not
+   focused is a little see-through instead. */
+html.lighter .night .scene .sbg, html.lighter .night .scene .fg, html.lighter .night .scene .gclock, html.lighter .night .scene .svid,
+html.lighter .s-night .sbg, html.lighter .s-night .fg, html.lighter .gclock, html.lighter .s-water .gclock, html.lighter .s-dawn .gclock,
+html.lighter .s-night .gclock .fill, html.lighter .s-water .gclock.under .fill, html.lighter .clock-liquid.night .scene .gclock { filter: none; }
+html.lighter .night .scene.ready::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0, 0, 0, 0.28); pointer-events: none; }
+html.lighter .s-water .gclock.under { filter: none; opacity: 0.6; }
+html.lighter .s-fog .gclock .fill { filter: none; background-image: none !important; color: rgba(22, 32, 29, 0.78); -webkit-text-fill-color: rgba(22, 32, 29, 0.78); }
+html.lighter .gclock .sheen { display: none; }
+html.lighter.theme-night .app:not(.focus) .face img { filter: none; opacity: 0.85; }
+
 /* webOS: LG's pointer is shown over the home (elsewhere the home is arrows only) */
 html.has-pointer body { cursor: default; }
 html.has-pointer .grid > *, html.has-pointer .quick > *, html.has-pointer .people > *, html.has-pointer .app-pop > *, html.has-pointer #sleep-menu > *, html.has-pointer #set-secs > *, html.has-pointer #set-rows > .srow { cursor: pointer; }
