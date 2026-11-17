@@ -540,10 +540,12 @@
     document.documentElement.classList.toggle("still", !MOVING);
     // Mac-style dock (Home settings, Look; home.dock "mac"): off unless chosen, held off by Lighter home
     DOCK_MAC = !LIGHTER && (ST.dock || HOME.dock) === "mac";
+    DATE_BARS = HOME.date_bars === true;
     document.documentElement.classList.toggle("dock-mac", DOCK_MAC);
     if (typeof magnify === "function") magnify();
   }
   var DOCK_MAC = false;
+  var DATE_BARS = false;   // home.date_bars: thin vertical bars between the day, the place and the weather
   // Lighter home: ask for the 640 px size of a Keep watching picture, not the 1440 px one (a card is about 500 px wide)
   function slim(u) { return LIGHTER && typeof u === "string" ? u.replace("/s1440/", "/s640/") : u; }
   function glassSetting() { var g = ST.glass || HOME.glass; return g === "on" || g === "lite" ? g : "off"; }
@@ -759,9 +761,10 @@
         '</span><span class="wx">' + weatherParts.map(esc).join(" · ") + "</span></span>";
     } else {
       date.classList.remove("weather-lines");
-      date.innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' +
-        (place ? '<span class="wx-place"> · ' + esc(place) + " · </span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
-        '<span class="ww"> · ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
+      var bar = DATE_BARS ? '<i class="vbar"></i>' : "";
+      date.innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' + bar +
+        (place ? '<span class="wx-place">' + (DATE_BARS ? esc(place) + bar : " · " + esc(place) + " · ") + "</span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
+        '<span class="ww">' + (DATE_BARS ? " " : " · ") + esc(wxText(w)) + "</span></span>" : "") + "</span>";
     }
     var ic = $("idle-clock"), idate = $("idle-date"), iwx = $("idle-wx");
     if (ic) ic.innerHTML = hm + (CLOCK24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
@@ -834,7 +837,10 @@
         below: below, dark: m.text === "dark",
         // video: true plays backgrounds/mine/scene-<id>.mp4 (muted, looping) over the photo, under
         // the cut-out and the clock, while this scene is the one on screen
-        video: m.video === true });
+        video: m.video === true,
+        // when: dawn, day, dusk or night. With Follow the sun, an own scene tagged like this joins the built-in
+        // scene for that time of day, and the home steps through the group (home.sun_rotate_minutes)
+        when: ["dawn", "day", "dusk", "night"].indexOf(m.when) >= 0 ? m.when : "" });
     });
     return out;
   }
@@ -971,7 +977,15 @@
   function readyScene(i) {
     var s = SCENES[i], el = sceneEls[i];
     if (!el.classList.contains("ready")) {
-      el.querySelector(".sbg").src = s.src || bgPath(s.photo, ".jpg", !s.mine);
+      var sbg = el.querySelector(".sbg");
+      if (s.src) sbg.src = s.src;
+      else if (s.mine) {
+        // an own scene may carry a 4K copy, scene-<id>@2x.jpg (make-scene.py --4k). On a 4K screen it is
+        // tried first, and the 1080 file is used if it is not there, so scenes made before this keep working.
+        var lo = bgPath(s.photo, ".jpg", false), hi = bgPath(s.photo, ".jpg", true);
+        if (hi !== lo) sbg.onerror = function () { sbg.onerror = null; sbg.src = lo; };
+        sbg.src = hi;
+      } else sbg.src = bgPath(s.photo, ".jpg", true);
       if (s.fg) el.querySelector(".fg").src = bgPath(s.photo + "-fg", ".webp", !s.mine);
       el.classList.add("ready");
       // decoded now, while the scene waits at opacity 0, rather than when its fade starts
@@ -1176,7 +1190,30 @@
     return { alt: alt, hourAngle: hourAngle * (180 / Math.PI) };
   }
 
+  // The time of day where the TV is, from the sun's height, as the built-in picks below do: night under
+  // -6 degrees, dawn or dusk under 10 degrees (the hour angle says which), day above.
+  function sunPhase() {
+    if (!WXCFG || WXCFG.lat == null || WXCFG.lon == null || !isFinite(WXCFG.lat) || !isFinite(WXCFG.lon)) {
+      var h = new Date().getHours();
+      return h >= 5 && h < 8 ? "dawn" : h >= 8 && h < 16 ? "day" : h >= 16 && h < 19 ? "dusk" : "night";
+    }
+    var pos = solarAltitude(Number(WXCFG.lat), Number(WXCFG.lon), new Date());
+    if (pos.alt < -6) return "night";
+    if (pos.alt < 10) return pos.hourAngle < 0 ? "dawn" : "dusk";
+    return "day";
+  }
+  // Follow the sun with own scenes: the built-in scene for this time of day plus every own scene tagged
+  // with it (and not switched off) take turns, one every home.sun_rotate_minutes (25 by default). With no
+  // tagged scene this is the built-in pick alone, as it always was.
   function sunTargetScene() {
+    var base = sunTargetBuiltIn();
+    var ph = sunPhase();
+    var pool = [base].concat(SCENES.filter(function (sc) { return sc.mine && sc.when === ph; }).map(function (sc) { return sc.id; }));
+    if (pool.length < 2) return base;
+    var mins = Math.max(5, Math.min(240, parseInt(HOME.sun_rotate_minutes, 10) || 25));
+    return pool[Math.floor(Date.now() / (mins * 60000)) % pool.length];
+  }
+  function sunTargetBuiltIn() {
     var st = sceneState();
     var available = st.order.filter(function (id) { return st.off.indexOf(id) < 0; });
     var pick = function (preferred, fallback) {

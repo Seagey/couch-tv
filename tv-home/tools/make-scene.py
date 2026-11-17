@@ -56,8 +56,8 @@ OUT = os.path.join(ROOT, "tv-home", "web", "backgrounds", "mine")
 BUILT_IN = {"night", "golden", "water", "fog", "dawn", "own", "mine"}
 
 
-def band(img, top):
-    """A 16:9 band of the photo, the right way up, 1920x1080."""
+def band(img, top, size=None):
+    """A 16:9 band of the photo, the right way up, 1920x1080 (or size)."""
     img = ImageOps.exif_transpose(img).convert("RGB")
     w, h = img.size
     bh = round(w * 9 / 16)
@@ -68,7 +68,7 @@ def band(img, top):
         bw = round(h * 16 / 9)
         x = (w - bw) // 2
         img = img.crop((x, 0, x + bw, h))
-    return img.resize((W, H), Image.LANCZOS)
+    return img.resize(size or (W, H), Image.LANCZOS)
 
 
 def clean(img):
@@ -263,6 +263,7 @@ def main():
     ap.add_argument("--top", type=float, default=0.1, help="where the 16:9 band starts in a taller photo, as a share of its height (0 = the top)")
     ap.add_argument("--out", default=OUT, help="where the files go (default tv-home/web/backgrounds/mine)")
     ap.add_argument("--preview", nargs="?", const=os.path.join(ROOT, "build", "scenes"), help="also write DIR/ID-check.jpg, the cut-out over magenta (default build/scenes)")
+    ap.add_argument("--4k", dest="k4", action="store_true", help="also write scene-<id>@2x.jpg, a 3840x2160 copy that a 4K screen uses (the 1080 file stays for the rest)")
     ap.add_argument("--bright", type=float, default=1.3, help="how much brighter the clock's frosted fill is than the photo")
     g = ap.add_argument_group("extra depth, with an image model's magenta-sky edit")
     g.add_argument("--sky-edit", help="the same photo with its sky painted flat magenta (#FF00FF): makes the cut-out")
@@ -295,6 +296,9 @@ def main():
     name = os.path.join(o.out, "scene-" + o.id)
 
     img.save(name + ".jpg", quality=86, optimize=True, progressive=True)
+    if o.k4:
+        big = band(src, o.top, (2 * W, 2 * H))
+        big.save(name + "@2x.jpg", quality=87, optimize=True, progressive=True)
     # the clock's frosted fill: blurred, a little brighter and richer
     glass = img.filter(ImageFilter.GaussianBlur(16))
     glass = ImageEnhance.Color(ImageEnhance.Brightness(glass).enhance(o.bright)).enhance(1.25)

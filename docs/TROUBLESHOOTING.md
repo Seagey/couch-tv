@@ -48,6 +48,22 @@ later, so a broken couch-tv cannot hold the TV in a loop either. Only ambient mo
 adverts) and any ad tracker you name are switched off, and `apply.sh` refuses to switch off anything
 the TV may need to start: a home screen, a setup app, a persistent system app or part of Android.
 
+## Sony Bravia: the TV turns very slow after switching off "unused" Sony apps
+
+Seen on a Sony Bravia XBR-65X850G (Android TV 10, 2.3 GB of memory). Switching off Sony's browser engine, `com.vewd.core.service`, and its three `com.sony.dtv.browser.*` packages looks safe: they belong to Sony's web browser and web apps, which most people never open. But Sony's AirPlay app, `com.sony.dtv.airplayapp`, binds to `com.vewd.core.service` when it starts, so with the engine off AirPlay crashes and Android restarts it several times a second. The log shows `Unable to bind to com.vewd.core.service/.BrowserServiceImpl`, the CPU load climbs past 30, and poster pictures stop loading on the home.
+
+The fix is to switch them back on, then restart the home:
+
+```sh
+for p in com.vewd.core.service com.sony.dtv.browser.webappruntime com.sony.dtv.browser.webappruntimeextension com.sony.dtv.browser.webappservice; do
+  TV_IP=<your tv address> .venv/bin/python tv-home/tools/tvadb.py shell "pm enable --user 0 $p"
+done
+```
+
+couch-tv itself never switches these off (`apply.sh` and the privacy list leave them alone). If you switch off Sony apps by hand, do it one at a time, check `logcat -d -b crash` after each, and keep a list so that you can switch each one back on with `pm enable --user 0 <package>`.
+
+On the same TV these were switched off with no ill effect over an evening of use, about five hours (all with `pm disable-user --user 0`, never uninstalled, so no sign-in was lost): `tv.samba.ssm` (Samba TV), `com.sony.dtv.promos`, `com.sony.dtv.sonyselect`, `com.sony.dtv.notificationcenter`, the Sony analytics apps `com.qterics.da.product`, `com.sony.dtv.da.service` and `com.sonyericsson.idd.agent`, the shop demo and hotel mode apps (`com.sony.dtv.demosupport`, `com.sony.dtv.demosystemsupport`, `com.sony.dtv.multiscreendemo`, `com.sony.dtv.b2b.hotelmode`, `rs232csupport`, `prosettings`, `adminpassword`, `deviceadminsettings`, `importexport`), `com.google.android.feedback`, the Google bug report sender, Play Games, Play Movies and YouTube Music. This is one TV, so treat it as a report, not a rule.
+
 ## TCL: Home goes back to Google TV after every restart
 
 On a TCL Google TV (reported on a TCL Smart TV Pro, Android 14) the TV's own boot manager can stop

@@ -29,6 +29,16 @@ The Night look's scenes went on taking turns while an app or the TV's screensave
 
 The bridge sent every file of the TV home and the phone remote uncompressed and marked `no-cache`: a reload of the home (the Look button is one) fetched 920 KB of script and style and revalidated each background one by one, which on a Fire TV Cube over weak Wi-Fi showed as seconds of lag and a late photo. Script, style, HTML and JSON are now gzipped on the fly (about a quarter of the size) and still revalidated on every load, so an edit lands at once; pictures, fonts and video are cached for an hour (a replaced picture under the same name shows within the hour); the phone remote's built files, whose names carry a content hash, are cached for a year. An unchanged file answers 304 with no body, worked around a quirk of this aiohttp with compression on.
 
+### 16 November 2026: own scenes follow the sun, a 4K copy for own scenes, and a date line with bars (on main, in the next release)
+
+Three small, opt-in additions, found while putting couch-tv on a Sony Bravia XBR-65X850G (Android TV 10, option A with the on-TV app). None changes anything unless you set it.
+
+- **Own scenes follow the sun.** A scene in `home.my_scenes` can say `"when": "dawn"`, `"day"`, `"dusk"` or `"night"`. With `home.sun_sync` on, the home shows the built-in scene for the time of day, and the scenes tagged with that time take turns with it, one every `home.sun_rotate_minutes` (25 by default). That lets a long list of your own photos follow the sun without a clock of their own. With no `when` anywhere, Follow the sun is exactly as it was. ([MAKE-A-SCENE.md](MAKE-A-SCENE.md), [CONFIG.md](CONFIG.md))
+- **A 4K copy for own scenes.** `make-scene.py --4k` also writes `scene-<id>@2x.jpg`. On a 4K screen the home tries it first and falls back to the 1080 file if it is missing, so scenes made before this still show. Built-in scenes already had 4K copies; own scenes had none.
+- **A date line with bars.** `home.date_bars: true` puts a thin vertical bar between the day, the place and the weather instead of the dots. Off by default.
+
+Also written down: `smart_idle.home_idle_minutes` only takes 5, 10, 15, 30 or 60, and any other number is read as 15 without a warning ([CONFIG.md](CONFIG.md)).
+
 ### 17 November 2026: option B on a Fire TV, over ADB alone (on main, in the next release)
 
 Fire OS ships no Android TV Remote protocol (ports 6466 and 6467 are closed on a Fire TV Cube 3rd gen), so the bridge could never pair with a Fire TV and option B's phone remote failed with "not paired". A TV with `"adb_only": true` in `config.json` now runs on ADB alone: keys, typing, links, power and the app in front all go over the bridge computer's ADB connection, which current Fire OS does not block (it only blocks apps on the TV). `bridge/pair_tv.py <tv id>` skips the code pairing for such a TV and only checks ADB, and `scripts/check-tv.py --adb` says when to set the flag. Tested end to end on a Fire TV Cube (3rd gen, Fire OS 7, Android 9) with the bridge in a Debian container. Typing is limited to letters, digits and plain punctuation, and there is no volume level. docs/CONFIG.md, The TVs.

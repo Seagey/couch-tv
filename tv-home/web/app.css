@@ -355,6 +355,9 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
   text-shadow: 0 0.125rem 1.125rem rgba(0, 0, 0, 0.25); transition: opacity 600ms ease-in-out;
 }
 .theme-night .date .wx { color: rgba(255, 255, 255, 0.78); font-weight: 400; }
+/* home.date_bars: a thin vertical bar between the day, the place and the weather, in place of the dots */
+.theme-night .date .vbar { display: inline-block; width: 0.125rem; height: 1.3em; margin: 0 0.95em; vertical-align: -0.28em; border-radius: 0.0625rem;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), currentColor 25%, currentColor 75%, rgba(255, 255, 255, 0)); opacity: 0.55; }
 /* the weather place follows the date on the same line, after a middle dot (app.js clock()); the
    icon then needs only a small gap after the place */
 .theme-night .date .wx-place + svg { margin-inline-start: 0.4rem; }

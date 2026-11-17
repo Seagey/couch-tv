@@ -68,6 +68,8 @@ Ask for 16:9 at about 2K. Look at the result before going on, and make it again 
 .venv/bin/python tv-home/tools/make-scene.py photo.jpg beach
 ```
 
+Add `--4k` to also write `scene-<id>@2x.jpg`, a 3840x2160 copy. A 4K screen (or `home.hi_res` set to `always`) uses it, and every other screen keeps the 1080 file. A scene made without `--4k` works exactly as before: the home tries the 4K file first and falls back to the 1080 one when there is none. (A 4K copy is about 2 to 4 MB, so on a TV with little memory keep the number of 4K scenes modest.)
+
 `beach` is the scene's id: lowercase letters and digits, up to 24, not a built-in scene's name. It
 writes `scene-beach.jpg` and `scene-beach-glass.jpg`, and prints an entry to paste into
 `config.json`.
@@ -103,6 +105,7 @@ Add the scene to `home.my_scenes` in `config.json`:
 | `text` ["light"] | `light`: white date, bright glass. `dark`: dark date and a smoky glass, for a pale picture. |
 | `cutout` [false] | `true` only when step 6 made `scene-<id>-fg.webp`. The tool prints it when it did. |
 | `video` [false] | `true` plays `scene-<id>.mp4`, a looping silent clip, over the photo ([step 7](#7-optional-a-moving-scene)). |
+| `when` [none] | `dawn`, `day`, `dusk` or `night`. With `home.sun_sync` on, the scene joins the built-in scene for that time of day, and the home steps through that group slowly (`home.sun_rotate_minutes`, 25 by default), so many scenes can follow the sun. Without `when` the scene takes its turn in the ordinary rotation, as before. The time of day comes from the sun's height at `weather.lat` and `weather.lon`: night below -6 degrees, dawn or dusk below 10, day above. |
 
 The page keeps the clock above Keep watching and the dock whatever the numbers say, and the date
 moves aside if it would run into the people switch or the quick buttons.
