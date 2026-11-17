@@ -254,7 +254,7 @@ def serial(tv):
 def _local():
     p = paths.data() / "changed.json"
     try:
-        return json.loads(p.read_text())
+        return json.loads(p.read_text(encoding="utf-8"))
     except Exception:
         return {}
 
@@ -265,7 +265,7 @@ def _save_local(key, rec):
         all_[key] = rec
     else:
         all_.pop(key, None)
-    (paths.data() / "changed.json").write_text(json.dumps(all_, indent=1))
+    (paths.data() / "changed.json").write_text(json.dumps(all_, indent=1), encoding="utf-8")
 
 
 def _read_tv_record(tv):

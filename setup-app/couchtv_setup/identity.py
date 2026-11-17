@@ -33,14 +33,16 @@ class Identity:
                 pass
             # The name the TV lists under Paired devices (and asks "Allow?" about): say what it is, so
             # a person can find it and choose Forget. adb-shell would write "user@host" (often root@...).
-            with open(self.key_path + ".pub") as f:
-                key_b64 = f.read().split()[0]
-            with open(self.key_path + ".pub", "w") as f:
+            # Read as bytes: adb-shell writes "user@host" in UTF-8, and on Windows the default text
+            # encoding is not UTF-8, so a plain text read dies (UnicodeDecodeError) on a name with accents.
+            with open(self.key_path + ".pub", "rb") as f:
+                key_b64 = f.read().decode("utf-8", "replace").split()[0]
+            with open(self.key_path + ".pub", "w", encoding="utf-8") as f:
                 f.write(key_b64 + " " + NAME)
         with open(self.key_path, "rb") as f:
             self.key_pem = f.read()
-        with open(self.key_path + ".pub") as f:
-            self.public_text = f.read().strip()
+        with open(self.key_path + ".pub", "rb") as f:
+            self.public_text = f.read().decode("utf-8", "replace").strip()
         self.key = serialization.load_pem_private_key(self.key_pem, password=None)
         if os.path.exists(self.cert_path):
             with open(self.cert_path, "rb") as f:

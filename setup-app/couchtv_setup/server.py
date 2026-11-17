@@ -117,7 +117,7 @@ def _attach(tv, ip, route):
 
 def _known():
     try:
-        return json.loads((paths.data() / "known-tvs.json").read_text())
+        return json.loads((paths.data() / "known-tvs.json").read_text(encoding="utf-8"))
     except Exception:
         return {}
 
@@ -127,7 +127,7 @@ def _remember(ip, f):
     k = _known()
     k[ip] = {"name": f.get("name"), "kind": f.get("kind")}
     try:
-        (paths.data() / "known-tvs.json").write_text(json.dumps(k))
+        (paths.data() / "known-tvs.json").write_text(json.dumps(k), encoding="utf-8")
     except OSError:
         pass
 
