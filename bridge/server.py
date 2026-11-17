@@ -2055,6 +2055,29 @@ PLACEHOLDER = """<!doctype html><meta charset=utf-8><meta name=viewport content=
 <h1>{name}</h1><p>Not built yet. The bridge API is live at <a style="color:#8cf" href="/api/now">/api/now</a>.</p>"""
 
 
+# What the static front ends send back with each file. Code and text are compressed on the fly
+# (gzip or deflate, whichever the page accepts) and stay "no-cache": the page revalidates them on
+# every load and gets a 304 from the ETag unless the file changed, so an edit still lands at once.
+# Pictures, fonts and video are cached for an hour (a replaced picture under the same name shows
+# within the hour, or after a restart of the home that clears the cache). The phone remote's built
+# files carry a content hash in their names, so those are cached for a year. Measured on a Fire TV
+# Cube on a weak Wi-Fi link: a reload of the home fetched 920 KB of uncompressed script and style
+# and revalidated 21 MB of backgrounds one by one before this.
+COMPRESSIBLE_TYPES = {"text/html", "text/css", "text/plain", "application/javascript", "text/javascript",
+                      "application/json", "application/manifest+json", "image/svg+xml", "application/xml"}
+MEDIA_MAX_AGE = 3600
+HASHED_NAME = re.compile(r"-[A-Za-z0-9_-]{8}\.[A-Za-z0-9]+$")
+
+
+def static_cache_control(folder, rel, ctype):
+    """The Cache-Control for one served file (see the note above)."""
+    if ctype in COMPRESSIBLE_TYPES:
+        return "no-cache"
+    if folder == REMOTE_DIR and HASHED_NAME.search(os.path.basename(rel)):
+        return "public, max-age=31536000, immutable"
+    return "public, max-age=%d" % MEDIA_MAX_AGE
+
+
 def static_handler(folder, name):
     async def handler(request):
         rel = request.match_info.get("path", "")
@@ -2090,12 +2113,39 @@ def static_handler(folder, name):
                 tags.append('<script src="/bridge/shim.js"></script>')
             if tags and "<head>" in html:
                 html = html.replace("<head>", "<head>\n  " + "\n  ".join(tags), 1)
-            return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
+            resp = web.Response(text=html, content_type="text/html",
+                                headers={"Cache-Control": "no-cache", "Vary": "Accept-Encoding"})
+            resp.enable_compression()
+            return resp
         ctype = mimetypes.guess_type(target)[0] or "application/octet-stream"
         if target.endswith(".webmanifest"):
             ctype = "application/manifest+json"
-        return web.FileResponse(target, headers={"Cache-Control": "no-cache", "Content-Type": ctype})
+        headers = {"Cache-Control": static_cache_control(folder, rel, ctype), "Content-Type": ctype}
+        if ctype in COMPRESSIBLE_TYPES:
+            headers["Vary"] = "Accept-Encoding"
+            # Answer "has it changed?" here, before compression is in play: aiohttp 3.14 writes the
+            # compressor's trailer after a 304 when compression is on, which breaks the next answer
+            # on the same connection (seen in tests/test_static_handler.py). Same ETag as aiohttp's.
+            st = os.stat(target)
+            etag = f"{st.st_mtime_ns:x}-{st.st_size:x}"
+            if static_not_modified(request, etag, st.st_mtime):
+                return web.Response(status=304, headers={**headers, "ETag": '"%s"' % etag})
+        resp = web.FileResponse(target, headers=headers)
+        if ctype in COMPRESSIBLE_TYPES:
+            resp.enable_compression()   # only when the page says it accepts it
+        return resp
     return handler
+
+
+def static_not_modified(request, etag, mtime):
+    """True when the request's If-None-Match (or, without one, If-Modified-Since) says the copy the
+    page holds is this file: the weak marker and the quotes are stripped, as aiohttp does."""
+    inm = request.headers.get("If-None-Match")
+    if inm:
+        tags = [t.strip() for t in inm.split(",")]
+        return "*" in tags or any(t.removeprefix("W/").strip('"') == etag for t in tags)
+    ims = request.if_modified_since
+    return bool(ims) and int(mtime) <= int(ims.timestamp())
 
 
 
@@ -2127,8 +2177,10 @@ def _config_js():
 
 async def h_tv_config_js(request):
     """The home page reads its people and weather place from here (and saves a copy offline)."""
-    return web.Response(text=_config_js(), content_type="application/javascript",
-                        headers={"Cache-Control": "no-cache"})
+    resp = web.Response(text=_config_js(), content_type="application/javascript",
+                        headers={"Cache-Control": "no-cache", "Vary": "Accept-Encoding"})
+    resp.enable_compression()
+    return resp
 
 
 async def h_config(request):
