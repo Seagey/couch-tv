@@ -460,7 +460,7 @@
   }
   R.solar = function (root, o, b, env) {
     var s = sunToday(env);
-    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Home settings, Weather place");
+    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Home settings, Location");
     var at = arc(s.frac);
     add(root, [lab("sun", "Sun"),
       svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.28)", "stroke-width": 3, "stroke-dasharray": "2 9", "stroke-linecap": "round" }),
@@ -588,7 +588,7 @@
   };
 
   // weather
-  function noWx(root, b, env) { return empty(root, b, "partly-cloudy", dataOf(env).wxOff ? "Weather is off on this TV" : "Waiting for the weather", dataOf(env).wxOff ? "Turn it on in Home settings" : "Set your town in Home settings"); }
+  function noWx(root, b, env) { return empty(root, b, "partly-cloudy", dataOf(env).wxOff ? "Weather is off on this TV" : "Set your town for the weather", dataOf(env).wxOff ? "Turn it on in Home settings, Weather" : "Home settings, Location"); }
   R.weather = function (root, o, b, env, sh) {
     var w = weather(env);
     if (!w) return noWx(root, b, env);
@@ -678,7 +678,7 @@
   };
   R.sun = function (root, o, b, env) {
     var s = sunToday(env);
-    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Home settings, Weather place");
+    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Home settings, Location");
     var at = arc(s.frac);
     add(root, [lab("sun", "Sun"), svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.3)", "stroke-width": 4, "stroke-dasharray": "2 10", "stroke-linecap": "round" }),
       s.frac > 0 && s.frac < 1 ? S("circle", { cx: at.x, cy: at.y, r: 14, fill: "#ffd60a" }) : null], "flex:1;min-height:0;margin:6px 0"),

@@ -70,25 +70,31 @@
   var B = {};
 
   // the setup record (widget-caps.js), for a widget with nothing real to show yet
-  var WHERE = { tv: "On this TV", phone: "From the phone remote", computer: "On the computer at home", designer: "In couch-tv Studio", nothing: "Nothing to set up" };
-  var STATUS = { works: ["Works on this TV", "#30d158"], setup: ["Needs setting up", "#ffd60a"], "not-built": ["Not on couch-tv yet", "#ff9f0a"] };
+  var STATUS = { works: ["Works on this TV", "#30d158"], setup: ["Set it up first", "#ffd60a"], computer: ["Needs a home computer", "#ff9f0a"], no: ["Not possible on this TV", "#8e8e93"], "not-built": ["Not on couch-tv yet", "#ff9f0a"] };
   B.setup = function (o) {
     var kind = (S.from && S.from.getAttribute("data-setup")) || o.kind, C = window.CouchWidgetCaps, c = C && C.get(kind);
     S.panel.classList.add("cwd-setup");
     if (!c) { S.body.appendChild(head("info", "This widget", "It needs a newer couch-tv")); return; }
-    var st = STATUS[c.status] || STATUS.setup;
-    S.body.appendChild(head("info", c.name, "", st[1]));
-    S.subEl.appendChild(E("span", "cwd-pill", "background:" + st[1], [st[0]]));
-    var group = function (keys) { var ons = keys.map(function (k) { return c.platforms[k] ? c.platforms[k].on : "no"; }); return ons.indexOf("yes") >= 0 ? "yes" : ons.indexOf("setup") >= 0 ? "setup" : ons.indexOf("partial") >= 0 ? "partial" : "no"; };
-    var WORD = { yes: "Works", setup: "Once set up", partial: "Partly", no: "No" };
-    var tvs = [["Google TV, Android TV, Fire TV", ["Google TV", "Android TV", "Fire OS"]], ["Samsung, LG, Hisense and the browser TVs", ["Tizen", "webOS", "VIDAA", "Saphi", "TiVo OS", "My Home Screen"]],
-      ["Roku, Apple TV, Vega and others", ["Roku OS", "tvOS", "Vega OS", "Titan OS", "SmartCast", "Other"]]];
+    // what each kind of TV needs for it (widget-caps.js platforms[p].need), the best of its group
+    var RANK = ["works", "setup", "computer", "no"];
+    var group = function (keys) { var best = 3; keys.forEach(function (k) { var p = c.platforms[k], i = RANK.indexOf(p ? p.need || (p.on === "yes" ? "works" : p.on === "no" ? "no" : "setup") : "no"); if (i >= 0 && i < best) best = i; }); return RANK[best]; };
+    var WORD = { works: ["Works", "yes"], setup: ["Set up first", "setup"], computer: ["Needs a home computer", "partial"], no: ["Not possible", "no"] };
+    var tvs = [["Google TV, Android TV, Fire TV", ["Google TV", "Android TV", "Fire OS"]], ["Samsung, LG, Philips, Panasonic", ["Tizen", "webOS", "Saphi", "TiVo OS", "My Home Screen"]],
+      ["Hisense", ["VIDAA"]], ["Roku, Apple TV and others", ["Roku OS", "tvOS", "Vega OS", "Titan OS", "SmartCast", "Other"]]];
     var left = E("div", "cwd-col", "width:820px", [label("What it shows"), E("div", "cwd-text", "", [c.what]), label("What it needs"),
       E("div", "cwd-list", "", c.needs.map(function (n) { return E("div", "cwd-li", "", [E("i", "cwd-bullet"), E("span", "", "", [n])]); })),
-      label("Which TVs"), E("div", "cwd-col", "", tvs.map(function (g) { var v = group(g[1]); return E("div", "cwd-tvrow", "", [E("span", "", "", [g[0]]), E("b", "cwd-tv-" + v, "", [WORD[v]])]); }))]);
-    var right = E("div", "cwd-col", "flex:1;margin-left:64px;min-width:0", [label(c.status === "not-built" ? "What has to be built first" : "Where to set it up"),
-      c.status === "not-built" ? E("div", "cwd-text", "", [c.build]) : E("div", "cwd-text", "", [E("b", "", "", [WHERE[c.setup.where] || ""]), ". " + c.setup.how]),
-      c.status === "not-built" ? label("Until then") : label("Until it is set up"), E("div", "cwd-text", "", [c.until]),
+      label("Which TVs"), E("div", "cwd-col", "", tvs.map(function (g) { var v = c.status === "not-built" ? ["Not yet", "no"] : WORD[group(g[1])]; return E("div", "cwd-tvrow", "", [E("span", "", "", [g[0]]), E("b", "cwd-tv-" + v[1], "", [v[0]])]); }))]);
+    // the steps for this TV: the Android home has window.TVOS; a Hisense says so in its browser's name
+    // (the designer and a browser preview, ?mock, stand in for the Android home)
+    var sys = window.TVOS || S.api.designer || /[?&]mock\b/.test(location.search) ? "android" : /VIDAA|Hisense/i.test(navigator.userAgent || "") ? "vidaa" : "web";
+    var steps = C.steps ? C.steps(kind, sys) : [c.setup.how], none = steps.length === 1 && /^Nothing to set up\.$/.test(steps[0]);
+    // the pill says what this TV needs for it (works, set up first, a home computer, not possible)
+    var mine = c.status === "not-built" ? "not-built" : group(C.groups && C.groups[sys] ? C.groups[sys] : ["Google TV"]), st = STATUS[mine] || STATUS.setup;
+    S.body.appendChild(head("info", c.name, "", st[1]));
+    S.subEl.appendChild(E("span", "cwd-pill", "background:" + st[1], [st[0]]));
+    var right = E("div", "cwd-col", "flex:1;margin-left:64px;min-width:0", [label(c.status === "not-built" ? "What you can do" : none ? "Nothing to set up" : "How to set it up on this TV"),
+      E("div", "cwd-list", "", steps.map(function (s, i) { return E("div", "cwd-li", "", [E("b", "", "flex:none;width:44px", [String(i + 1) + "."]), E("span", "", "", [s])]); })),
+      none ? null : label("Until then"), none ? null : E("div", "cwd-text", "", [c.until]),
       label("OK on the widget"), E("div", "cwd-text", "", [c.ok])]);
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:flex-start;margin-top:30px", [left, right]));
   };
