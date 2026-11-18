@@ -42,5 +42,6 @@ assert(!/frost-lite|low_end/.test(js) && !/frost-lite/.test(css), 'no separate l
 assert(/html\.settled \.tile\.focus \.face, html\.settled \.tile\.focus \.face::after \{ animation-play-state: paused; \}/.test(css), 'settled pauses the sway and the glint');
 // the page settles after the focus last moved, and any key or pointer move starts it again
 assert(/var SETTLE_MS = 6000/.test(js), 'it settles after 6 s');
-assert(/\["keydown", "pointermove", "pointerdown", "wheel"\]\.forEach\(function \(ev\) \{ window\.addEventListener\(ev, unsettle, true\); \}\)/.test(js), 'keys and the pointer unsettle it');
+assert(/var PTR = window\.PointerEvent \? "pointer" : "mouse";/.test(js), 'mouse events where there are no pointer events (Chrome 53, webOS 4)');
+assert(/\["keydown", PTR \+ "move", PTR \+ "down", "wheel"\]\.forEach\(function \(ev\) \{ window\.addEventListener\(ev, unsettle, true\); \}\)/.test(js), 'keys and the pointer unsettle it');
 console.log('Low end tests passed.');

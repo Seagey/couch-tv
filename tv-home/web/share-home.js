@@ -141,7 +141,7 @@
     box = document.createElement("div");
     box.className = "share-home";
     box.setAttribute("role", "dialog");
-    box.setAttribute("style", "position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;gap:5rem;padding:5rem;background:#08090c;color:#fff;font-family:Inter, sans-serif");
+    box.setAttribute("style", "position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;display:flex;align-items:center;justify-content:center;gap:5rem;padding:5rem;background:#08090c;color:#fff;font-family:Inter, sans-serif");
     var qr = document.createElement("div");
     qr.setAttribute("style", "flex:none;padding:1.25rem;border-radius:1.5rem;background:#fff");
     try { qr.appendChild(window.TVQR.svg(res.link, 420)); } catch (e) { qr.style.display = "none"; }

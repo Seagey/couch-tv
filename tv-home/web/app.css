@@ -196,6 +196,9 @@ body {
   background-size: 250% 100%; background-position: 100% 0;
   transition: opacity 240ms var(--ease);
 }
+/* Chrome before 57 (webOS 4) drops a rounded overflow clip while the tile animates, so the picture
+   showed square corners as the focus moved: round the picture and the glint themselves */
+.old-engine .face img, .old-engine .face::after { border-radius: inherit; }
 .tile.focus { z-index: 2; }
 .tile.focus .face {
   box-shadow: 0 1.75rem 3rem rgba(0, 0, 0, 0.6), 0 0 0 0.0625rem rgba(255, 255, 255, 0.12);
@@ -918,12 +921,15 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
    html.no-flex-gap there, and these margins stand in for the gaps people can see. */
 .no-flex-gap .quick > * + *, .no-flex-gap .qbtns > * + * { margin-left: 0.75rem; }
 .no-flex-gap .qbtn > * + * { margin-left: 0.625rem; }
+.no-flex-gap .toast > * + * { margin-left: 0.75rem; }
+.no-flex-gap .shelf-head h2 { margin-right: 1.5rem; }   /* not on .status: its margin-left: auto keeps it right */
+.no-flex-gap .share-home > * + * { margin-left: 5rem; }
 .no-flex-gap .top-left > * + * { margin-top: 1.5rem; }
 .no-flex-gap .people > * + * { margin-left: 0.5rem; }
 .no-flex-gap .shelf-track > * + * { margin-left: var(--gap); }
 .no-flex-gap.theme-night .shelf-track > * + * { margin-left: 1.375rem; }
 .no-flex-gap .ncard > * + * { margin-left: 1.25rem; }
-.no-flex-gap .ncard .nap > * + * { margin-left: 0.625rem; }
+.no-flex-gap .ncard .nap > img { margin-right: 0.625rem; }   /* the app's name after it is text, not an element */
 .no-flex-gap .plist > * + * { margin-top: 0.25rem; }
 .no-flex-gap .prow > * + * { margin-left: 1rem; }
 .no-flex-gap .grow > * + * { margin-left: 1.25rem; }
@@ -955,6 +961,7 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .old-engine .app.end-row, .old-engine.theme-night .app.end-row { margin-bottom: 0; }
 .old-engine .settings.on { display: flex; column-gap: 0; }
 .old-engine .set-side { flex: none; width: 36rem; margin-right: 4rem; }
+.old-engine[dir="rtl"] .set-side { margin-left: 4rem; }   /* right to left the list sits on the right */
 .old-engine .set-main { flex: 1; }
 /* Home settings and Smart home sit over the home. With no blur (Chrome before 76) a see-through panel shows
    the clock, the dock and the Keep watching cards ghosting behind its words, which read as a broken layout
@@ -1057,7 +1064,9 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .theme-night .np-t b { margin-top: 0.375rem; font-size: 1.5625rem; line-height: 2rem; }
 .theme-night .np-t small { font-size: 1.25rem; line-height: 1.625rem; }
 .theme-night.gearing .np-slot, .theme-night.apping .np-slot, .theme-night.shelfmenu .np-slot { opacity: 0; }
-.no-flex-gap.theme-night .shelf-row > * + * { margin-left: 1.375rem; }
+/* no flex gap: the clip itself steps 1.375rem clear of Now playing (with the same 1.25rem inside the gap
+   as above), and keeps its -1.5rem when Now playing is hidden, as a gap after a hidden card is no gap */
+.no-flex-gap.theme-night .np-slot.on + .shelf-clip { padding-left: 1.25rem; margin-left: 0.125rem; }
 
 /* ================= Lighter home (Home settings, Look, Lighter home; home.lighter) =================
    #58: for a slow box (a Xiaomi Mi Box, a Fire stick). Nothing is blurred, no tile casts a soft
@@ -1705,6 +1714,8 @@ html.ambient-playing .ambient-wave span {
 .no-flex-gap .ambient-stage > * + * { margin-left: 5rem; }
 .no-flex-gap .ambient-progress > * + * { margin-left: 1.25rem; }
 .no-flex-gap .ambient-controls > * + * { margin-left: 1.5rem; }
+.no-flex-gap .ambient-wave > * + * { margin-left: 0.375rem; }
+.no-flex-gap .amb-btn-open > * + * { margin-left: 0.625rem; }
 
 /* Lighter home and old WebViews: a plain colour wash, no 100px blur, no blend mode, no breathing,
    no backdrop blur, no transitions. The big blur on a full screen layer is what a low end box cannot draw. */

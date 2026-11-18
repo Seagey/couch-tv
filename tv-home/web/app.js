@@ -255,7 +255,9 @@
     clearTimeout(settleTimer);
     settleTimer = setTimeout(function () { document.documentElement.classList.add("settled"); }, SETTLE_MS);
   }
-  ["keydown", "pointermove", "pointerdown", "wheel"].forEach(function (ev) { window.addEventListener(ev, unsettle, true); });
+  // pointer events came in Chrome 55: webOS 4 (Chrome 53) reports the Magic Remote as a mouse only
+  var PTR = window.PointerEvent ? "pointer" : "mouse";
+  ["keydown", PTR + "move", PTR + "down", "wheel"].forEach(function (ev) { window.addEventListener(ev, unsettle, true); });
   unsettle();
   // WebViews before Chrome 84 (still on many Android 9 TVs) skip gap in a flex box, so icons touch
   // their words and rows touch each other. html.no-flex-gap lets app.css put margins in instead (#26).
@@ -431,8 +433,8 @@
     }
     return wakeOnly;
   }
-  document.addEventListener("pointerdown", function (e) { idlePhotoInput(e); }, true);
-  document.addEventListener("pointermove", function (e) {
+  document.addEventListener(PTR + "down", function (e) { idlePhotoInput(e); }, true);
+  document.addEventListener(PTR + "move", function (e) {
     if (e.movementX || e.movementY) idlePhotoInput(e);
   }, true);
   document.addEventListener("touchstart", function (e) { idlePhotoInput(e); }, { capture: true, passive: false });
@@ -599,7 +601,8 @@
     img.setAttribute("data-src", src);
     img.setAttribute("data-retry", String(n + 1));
     setTimeout(function () {
-      if (!img.isConnected) return;   // the row was drawn again meanwhile, with a new picture
+      // the row was drawn again meanwhile, with a new picture (not isConnected: Chrome 53, webOS 4, lacks it)
+      if (!document.documentElement.contains(img)) return;
       if (src.indexOf("//tvos.invalid/art/") >= 0) img.src = src + "?r=" + (n + 1);
       else { img.removeAttribute("src"); img.src = src; }
     }, ART_RETRY_MS[n]);
@@ -6135,7 +6138,7 @@
         resetSmartIdle();
       });
     }
-    document.addEventListener("pointerdown", resetSmartIdle, { passive: true });
+    document.addEventListener(PTR + "down", resetSmartIdle, { passive: true });
     document.addEventListener("wheel", resetSmartIdle, { passive: true });
     initSettings();
     // Home settings gets an Updates section, before About, where the launcher can update itself
