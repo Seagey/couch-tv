@@ -1268,11 +1268,40 @@
     stop(root, "detail", "camera", name);
   };
 
+  // Doorbell: when it last rang, with the door camera's picture
+  function ringWords(at) {
+    var d = new Date(at), t = now(), day0 = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime(), dd = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    var days = Math.round((day0 - dd) / 86400000);
+    var day = days <= 0 ? "today" : days === 1 ? "yesterday" : days < 7 ? DAYS[d.getDay()] : d.getDate() + " " + MONTHS[d.getMonth()].slice(0, 3);
+    return [fmt12(d), "Last ring " + day, day.charAt(0).toUpperCase() + day.slice(1)];
+  }
   R.doorbell = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "doorbell", "doorbell");
-    add(root, E("div", "cw-row", "height:100%;align-items:stretch", [E("div", "", "width:44%;border-radius:22px;background:#2b3035 center/cover;flex:none;background-image:" + cssImg(bgImg("grose-valley"))),
-      E("div", "cw-col", "flex:1;margin-left:20px", [lab("doorbell", "Front door"), E("div", "cw-t38", "margin-top:10px", ["Parcel left"]), E("div", "cw-t25", "", ["2:14pm"])])]));
+    var ha = haOf(env), info = ha.info || {}, al = alignOf(o), W = b.w - 48, H = b.h - 48;
+    if (!env.demo && !info.doorbell) return soonFit(root, b, "doorbell", "doorbell");
+    var bell = ha.bell, name = op(o).label || (bell && bell.name) || "Front door";
+    var words = !bell ? ["Checking", "Home Assistant", "Checking"] : !bell.ok ? ["Not answering", "Home Assistant", "Home Assistant"] : bell.ringing ? ["Ringing now", name, "At the door"] : bell.at ? ringWords(bell.at) : ["No ring", "Not this week", "This week"];
+    var ring = !env.demo && ha.ring && bell && bell.kept && ha.ring.at ? ha.ring : null;
+    var src = env.demo ? bgImg("grose-valley") : ring ? ring.src : (ha.stills || {}).doorbell, cam = env.demo || info.doorbell_camera;
+    var hot = bell && bell.ringing ? "color:#ff453a;" : "";
+    alignRoot(root, al);
+    if (b.w < 300 && b.h < 300) {
+      add(root, [ic("doorbell", 32, "currentColor"), E("div", "cw-grow"), fitNum(root, words[0], W, 48, hot), fitWords(root, words[2], W, 24, 1, 560, "margin-top:6px;color:var(--sub)")]);
+    } else {
+      var strip = b.h < 200, side = strip || b.w > b.h * 1.4, picW = side ? (strip ? H * 1.3 : W * 0.46) : W, colW = side && cam ? W - picW - 20 : W;
+      var picH = side ? H : Math.min(H * 0.5, W * 0.5625), colH = side || !cam ? H : H - picH - 16;
+      var pic = cam ? E("div", "", "position:relative;flex:none;border-radius:22px;overflow:hidden;background:#2b3035 center/cover;" + (src ? "background-image:" + cssImg(src) + ";" : "") +
+        "width:" + px(picW) + ";height:" + px(picH), [!strip ? E("div", "cw-t23", "position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.7)", [env.demo || ring ? "At the ring" : "Door now"]) : null]) : null;
+      var big = strip ? 40 : b.w >= 700 ? 72 : 52;
+      var timeEl = fitNum(root, words[0], colW, big, hot + "font-weight:700"), lineEl = fitWords(root, strip ? words[2] : words[1], colW, 25, 1, 560, "margin-top:6px;color:var(--sub)");
+      var labEl = colH >= (strip ? 96 : 150) ? fitLab(root, "doorbell", name, colW) : null;
+      var text = E("div", "cw-col", "flex:1;min-width:0;justify-content:center;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center") + ";" + (side && cam ? "margin-left:20px" : cam ? "margin-top:16px" : ""), [labEl, labEl ? E("div", "", "height:8px;flex:none") : null, timeEl, lineEl]);
+      add(root, E("div", side ? "cw-row" : "cw-col", "width:100%;height:100%;align-items:" + (side ? "stretch" : "center") + ";min-height:0", [pic, text]));
+      // no picture kept from the ring: the door camera now, a new still every two seconds
+      if (pic && !ring) liveStill(root, pic, "doorbell", b, env);
+    }
+    stop(root, "detail", "camera", name);
   };
+
   R.energy = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "bolt", "energy");
     var bars = [0, 0, 5, 18, 40, 66, 82, 90, 84, 70, 44, 20, 4, 0];
@@ -1579,7 +1608,6 @@
       E("div", "cw-t23", "position:absolute;left:18px;top:14px;right:18px;color:#fff;font-weight:700;z-index:2", ["On this day"])]);
   });
   CR.speakers = sample("speakers", "speakers", function (root, o, b) { mini(root, b, "speakers", "2", "Speakers", "Living and Kitchen playing"); });
-  CR.doorbell = sample("doorbell", "doorbell", function (root, o, b) { mini(root, b, "doorbell", "2:14", "Front door", "Last ring, parcel left"); });
   CR.energy = sample("energy", "bolt", function (root, o, b) { mini(root, b, "bolt", "18.4", "kWh today", "Solar, battery 86%"); });
   CR.sensor = sample("sensor", "temperature", function (root, o, b) { mini(root, b, "temperature", "26°", op(o).label || "Pool", "Pool water"); });
   CR.battery = sample("battery", "bolt", function (root, o, b) { mini(root, b, "games", "12%", "Pad 2", "Charge it soon", "#ff453a"); });
@@ -1695,5 +1723,5 @@
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12 }
   };
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
-  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, stillWidth: stillWidth };
+  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, ringWords: ringWords, stillWidth: stillWidth };
 })();
