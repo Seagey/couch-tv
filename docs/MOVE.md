@@ -59,8 +59,8 @@ the rest from the bridge's API or the remote page in a browser.
 
 | App | Runs | Played | Seconds | Spot | What it needed, or why not |
 |---|---|---|---|---|---|
-| Netflix | 9 | 8 | 15 to 36 | Same spot, by itself or through the sync helper | OK pressed on the Streamer's profile screen (not readable). The one miss: a link opened straight after the wake was covered by the home screen; the 4 second wait fixed it |
-| YouTube | 5 | 5 | 15 to 24 | Same spot, by the link with the time (once 10 s behind, before the 5 second rule) | Nothing |
+| Netflix | 12 | 11 | 15 to 37 | Same spot, by itself or through the sync helper | OK pressed on the Streamer's profile screen (not readable). The one miss: a link opened straight after the wake was covered by the home screen; the 4 second wait fixed it |
+| YouTube | 6 | 6 | 15 to 24 | Same spot, by the link with the time (once 10 s behind, before the 5 second rule) | Nothing |
 | Prime Video | 3 | 3 | 46 to 48 | Same spot in 2 runs (sync helper), from the start in 1 | Blind OK switched on for it: two presses (profile, then Play) |
 | Disney+ | 7 | 4 | 42 to 48 | Same spot, through the sync helper | The profile is picked by name. The 3 misses came first and were fixed: the show and episode in one title, "Access Sam's profile" as the profile's label, and a profile screen that came up late |
 | Plex | 1 | 0 | - | - | On the Sony the bridge saw nothing playing in Plex. And it has no link that opens a Plex title on the other TV |
@@ -84,7 +84,11 @@ the rest from the bridge's API or the remote page in a browser.
   asleep, woken, Netflix started fresh, paused two seconds after it began). The same key worked a
   minute later. The move tries the key twice and then asks the sync helper to pause the app itself;
   on the Streamer that took when the key had not. Without the sync helper on the first TV the move can
-  only say that it would not pause. Not yet seen fixed on the Sony.
+  only say that it would not pause. On the Sony, two moves made right after a fresh Netflix start
+  then ended with the first TV paused. Also seen there: one pause key five seconds after the start did
+  nothing at all, a key nineteen seconds after the start paused it, and a show paused in its first
+  seconds took up again by itself three seconds later. So the move looks at the first TV again when
+  the other TV has opened the show, and once more when it plays, and pauses it again if need be.
 - **YouTube needs the same account, with watch history on, on both TVs.** That is how YouTube knows
   where you were. When it starts somewhere else anyway (seen: from the beginning, on a move right after
   the pause), the bridge opens the video again at the first TV's spot. The bridge finds the video by its

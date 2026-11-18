@@ -4221,6 +4221,14 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
         app = apps.describe_package(pkg)
         session = await media_read(pkg, app) if app and app["id"] not in NOT_VIEWING else None
         now = dict(media_now) if session else {}
+        for _ in range(2):
+            # YouTube plays for some seconds before it says what the video is (seen on a Sony Google
+            # TV: no title yet about ten seconds in). Look again before saying it gives none.
+            if not session or now.get("title") or now.get("state") not in ("playing", "buffering"):
+                break
+            await asyncio.sleep(2)
+            session = await media_read(pkg, app)
+            now = dict(media_now) if session else {}
         if now.get("title_from") == "bridge":
             # The app gave no title (Netflix on some TVs) and media_read filled one in. Only what the
             # bridge itself opened in this app in the last three hours, with the app in front ever
@@ -4309,6 +4317,12 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
                     # picked this time, and the link is opened again behind it.
                     opened = await move_open(app, now, session, who, again=True)
                     started = bool(opened.get("started")) or await move_wait_playing(pkg, timeout=8)
+            if paused_here:
+                # Netflix can take up again by itself after a pause in its first seconds (seen on a
+                # Sony Google TV: paused, and playing again three seconds later). Look once more now,
+                # and again at the end, so the two TVs do not play on side by side.
+                with on_tv(src):
+                    source_paused = await _move_state(pkg) != "PLAYING" or await move_pause(pkg)
             # 7. the backup: only when B is playing and is not near A's spot
             if started:
                 await media_read(pkg, app)

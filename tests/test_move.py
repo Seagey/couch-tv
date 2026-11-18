@@ -350,8 +350,9 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
     async def test_a_pause_that_did_not_take_is_sent_again(self):
         self.a.adb_out = f"package={self.a.front}\nactive=true\nstate=PlaybackState {{state=PLAYING(3), position=5}}"
         r = await server.move_playing(A, B)
-        # three key presses at the start and three more once the other TV plays; no helper on this TV
-        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause"] * 6)
+        # three key presses at the start, three when the other TV has opened the show, and three
+        # more once it plays; no helper on this TV
+        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause"] * 9)
         self.assertEqual([e for e in self.did(A, "adb") if "op pause" in e[2]], [])
         self.assertTrue(r["started"])
         self.assertFalse(r["source_paused"])                    # and it says so
@@ -448,6 +449,24 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((ctx.exception.status, ctx.exception.key), (409, "err_move_app_not_known"))
         self.assertEqual(self.did(A, "key"), [])
         self.assertEqual(self.did(B, "adb"), [])
+
+    async def test_a_title_that_comes_a_moment_late_is_waited_for(self):
+        late = playing("Some Show", 600_000)
+        self.media[A] = playing(None, 600_000)
+        reads = []
+        real = server.media_read
+
+        async def media_read(pkg, app):
+            if server._current.get() == A:
+                reads.append(1)
+                if len(reads) == 2:
+                    self.media[A] = late     # the second look has the title
+            return await real(pkg, app)
+        with patch.object(server, "media_read", media_read):
+            r = await server.move_playing(A, B)
+        self.assertEqual(len(reads), 2)
+        self.assertEqual(r["title"], "Some Show")
+        self.assertTrue(r["started"])
 
     async def test_a_title_the_bridge_only_guessed_is_not_moved(self):
         # the app gave no title; media_read took one from the watch history (title_from "bridge")
