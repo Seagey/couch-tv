@@ -4246,7 +4246,8 @@ async def move_open(app, now, session, who, again=False, asked=None):
             try:
                 # the episode TV A is on now (it may have played on past the one the bridge opened)
                 return await play(asked, now.get("season"), now.get("episode"), app["id"], who,
-                                  resume=not now.get("season"), exact=True) | {"asked": asked}
+                                  resume=not now.get("season"), exact=True,
+                                  same=None if finder._norm(asked) else move.same_name) | {"asked": asked}
             except ApiError as e:
                 if e.status != 404:
                     raise
