@@ -1339,9 +1339,59 @@
     stop(root, "detail", "energy", name);
   };
 
+  // Sensor: one reading, with its last 24 hours
+  var SENSOR_ICON = { temperature: "temperature", humidity: "humidity", precipitation: "rain", precipitation_intensity: "rain", wind_speed: "wind", power: "bolt", energy: "bolt", battery: "bolt", illuminance: "sun" };
+  function sensorText(s) {
+    if (!s || s.ok === false) return ["--", ""];
+    var v = s.num != null && isFinite(s.num) ? String(Math.round(s.num * 10) / 10) : String(s.value || "--").slice(0, 12), u = String(s.unit || "");
+    return u === "°C" || u === "°F" ? [v + "°", ""] : [v, u];
+  }
+  function spark(points, w, h, colour) {
+    var vals = (points || []).map(function (v) { return v == null || !isFinite(v) ? null : +v; }), got = vals.filter(function (v) { return v != null; });
+    if (got.length < 2) return E("div", "cw-t23", "flex:none;height:" + px(Math.min(h, 30)), ["No readings yet"]);
+    var lo = Math.min.apply(null, got), hi = Math.max.apply(null, got), span = hi - lo || 1, d = "";
+    vals.forEach(function (v, i) { if (v == null) return; var x = i / (vals.length - 1) * 236 + 2, y = 96 - (v - lo) / span * 92; d += (d ? "L" : "M") + Math.round(x * 10) / 10 + " " + Math.round(y * 10) / 10; });
+    var g = svg("0 0 240 100", w, h, [S("path", { d: d, fill: "none", stroke: colour || "currentColor", "stroke-width": 4, "stroke-linecap": "round", "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" })], "flex:none;display:block");
+    g.setAttribute("preserveAspectRatio", "none");   // the day fills the width it is given
+    return g;
+  }
+  function sensorPick(env, o) {
+    var ha = haOf(env), names = (ha.info && ha.info.sensors) || [], want = op(o).reading;
+    var n = names.filter(function (s) { return s.entity === want; })[0] || names[0];
+    if (!n) return null;
+    var s = (ha.sensors || []).filter(function (x) { return x.entity === n.entity; })[0];
+    return { entity: n.entity, name: op(o).label || (s && s.name) || n.name || "Sensor", s: s, read: !!ha.sensors, hist: (ha.hist || {})[n.entity] };
+  }
+  // the reading and its unit on one line, as big as fits
+  function sensorValue(root, t, width, max) {
+    var unitW = t[1] ? (fitPxText(t[1], width * 0.4, 25, 1, 560, famOf(root)) ? t[1].length * 15 + 12 : -1) : 0;
+    if (unitW < 0) unitW = 0, t = [t[0], ""];
+    return E("div", "cw-row", "flex:none;align-items:baseline;max-width:100%", [fitNum(root, t[0], width - unitW, max), t[1] ? E("span", "cw-t25", "margin-left:8px;white-space:nowrap;flex:none", [t[1]]) : null]);
+  }
   R.sensor = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "temperature", "sensor");
-    add(root, [lab("temperature", op(o).label || "Pool"), E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(b.h < 300 ? 64 : 96), ["26°"])]);
+    var p = sensorPick(env, o), al = alignOf(o), W = b.w - 48, H = b.h - 48;
+    if (!p) return soonFit(root, b, "temperature", "sensor");
+    var iconName = SENSOR_ICON[p.s && p.s.cls] || "temperature";
+    if (!p.read) return haWait(root, b, o, iconName, p.name, "Checking Home Assistant");
+    if (!p.s || p.s.ok === false) return haWait(root, b, o, iconName, p.name, NOT_ANSWERING);
+    alignRoot(root, al);
+    var t = sensorText(p.s), pts = p.hist && p.hist.points, got = (pts || []).filter(function (v) { return v != null; });
+    if (b.w < 300 && b.h < 300) {
+      add(root, [fitLab(root, iconName, p.name, W), E("div", "cw-grow"), sensorValue(root, t, W, 64)]);
+    } else {
+      root.setAttribute("data-ha-hist", p.entity);   // smarthome.js reads its last 24 hours
+      if (b.h < 200) {
+        var leftW = W * 0.5;
+        add(root, E("div", "cw-row", "width:100%;height:100%;align-items:center;" + justify(al), [E("div", "cw-col", "flex:none;max-width:" + px(leftW) + ";justify-content:center;align-items:" + (al === "right" ? "flex-end" : al === "left" ? "flex-start" : "center"), [fitLab(root, iconName, p.name, leftW), sensorValue(root, t, leftW, 64)]),
+          E("div", "", "flex:none;margin-left:16px", [spark(pts, W - leftW - 16, H - 20)])]));
+      } else {
+        var foot = got.length >= 2 ? "Low " + Math.round(Math.min.apply(null, got) * 10) / 10 + ", high " + Math.round(Math.max.apply(null, got) * 10) / 10 : "";
+        var footEl = foot ? fitWords(root, foot, W, 24, 1, 560, "color:var(--sub)") : null, value = sensorValue(root, t, W, b.h < 300 ? 64 : 96);
+        add(root, [fitLab(root, iconName, p.name, W), E("div", "", "height:10px;flex:none"), value, E("div", "cw-grow cw-col", "width:100%;justify-content:center;min-height:0", [spark(pts, W, Math.max(40, H - 46 - (b.h < 300 ? 70 : 100) - (footEl ? 34 : 0) - 24))]),
+          footEl, fitWords(root, "Last 24 hours", W, 24, 1, 560, "color:var(--sub)")]);
+      }
+    }
+    stop(root, "detail", "sensor", p.name);
   };
   R.battery = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "bolt", "battery");
@@ -1638,7 +1688,6 @@
       E("div", "cw-t23", "position:absolute;left:18px;top:14px;right:18px;color:#fff;font-weight:700;z-index:2", ["On this day"])]);
   });
   CR.speakers = sample("speakers", "speakers", function (root, o, b) { mini(root, b, "speakers", "2", "Speakers", "Living and Kitchen playing"); });
-  CR.sensor = sample("sensor", "temperature", function (root, o, b) { mini(root, b, "temperature", "26°", op(o).label || "Pool", "Pool water"); });
   CR.battery = sample("battery", "bolt", function (root, o, b) { mini(root, b, "games", "12%", "Pad 2", "Charge it soon", "#ff453a"); });
   CR.agenda = sample("agenda", "calendar", function (root, o, b) {
     var d = now();
@@ -1752,5 +1801,5 @@
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12 }
   };
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
-  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, hourBars: hourBars, kwh: kwh, ringWords: ringWords, stillWidth: stillWidth };
+  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
 })();

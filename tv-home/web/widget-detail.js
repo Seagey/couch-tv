@@ -31,8 +31,8 @@
     photos: "Photos", keep: "Keep watching", folder: "Apps", player: "Now playing", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre",
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up" };
   // the smart home and music widgets' own layers (group C): set here, beside the table above
-  LAYER.energy = "energy";
-  TITLE.energy = "Energy";
+  LAYER.energy = "energy"; LAYER.sensor = "sensor";
+  TITLE.energy = "Energy"; TITLE.sensor = "Sensor";
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -589,6 +589,52 @@
     S.every = 5000;
     S.tick = function () { if (Date.now() - (S.readAt || 0) > 300000) reread(); };
     if (!demo && !e) reread();
+  };
+
+  // Sensor: the reading big, with its last 24 hours; Left and Right reach the other sensors
+  B.sensor = function (o, env) {
+    var H = kit().ha, ha = H.haOf(env), demo = !!env.demo, names = (ha.info || {}).sensors || [];
+    var first = H.sensorPick(env, o);
+    if (!first) return B.setup(o, env);
+    var sel = first.entity, hist = {}, sensors = ha.sensors;
+    if (first.hist) hist[sel] = first.hist;
+    S.body.appendChild(head(H.SENSOR_ICON[first.s && first.s.cls] || "temperature", first.name, "", "#5e5ce6"));
+    var body = E("div", "cwd-col cwd-grow", "margin-top:30px"), row = E("div", "cwd-row", "margin-top:24px");
+    S.body.appendChild(body);
+    S.body.appendChild(row);
+    var draw = function () {
+      while (body.firstChild) body.removeChild(body.firstChild);
+      var s = (sensors || []).filter(function (x) { return x.entity === sel; })[0], n = names.filter(function (x) { return x.entity === sel; })[0] || {};
+      var label = (sel === first.entity && op(o).label) || (s && s.name) || n.name || "Sensor";
+      S.panel.querySelector(".cwd-title").textContent = label;
+      if (!sensors) { S.subEl.textContent = "Checking Home Assistant"; return; }
+      if (!s || s.ok === false) { S.subEl.textContent = "Home Assistant is not answering"; return; }
+      var t = H.sensorText(s), h = hist[sel], pts = h && h.points, got = (pts || []).filter(function (v) { return v != null; });
+      S.subEl.textContent = got.length >= 2 ? "Last 24 hours: low " + Math.round(Math.min.apply(null, got) * 10) / 10 + ", high " + Math.round(Math.max.apply(null, got) * 10) / 10 : "Last 24 hours";
+      body.appendChild(E("div", "cwd-row", "align-items:baseline", [E("div", "cwd-huge", "", [t[0]]), t[1] ? E("div", "cwd-big", "margin-left:16px;opacity:.75", [t[1]]) : null]));
+      body.appendChild(E("div", "cwd-grow", "margin-top:24px;display:flex;align-items:flex-end", [h ? H.spark(pts, 1630, 300, "#64d2ff") : E("div", "cwd-mid", "opacity:.7", ["Reading the last 24 hours"])]));
+    };
+    var chips = function () {
+      while (row.firstChild) row.removeChild(row.firstChild);
+      S.stops = [];
+      if (names.length > 1) names.forEach(function (n, i) { var c = F(chip(n.name || n.entity, n.entity === sel), function () { sel = n.entity; chips(); draw(); history(); }, n.name); if (i) c.style.marginLeft = "16px"; row.appendChild(c); });
+      S.cur = Math.max(0, names.map(function (n) { return n.entity; }).indexOf(sel));
+      paint();
+    };
+    var history = function () {
+      if (!S || demo || !S.api.ha || hist[sel]) return;
+      var want = sel;
+      S.api.ha("history", want).then(function (r) { if (S && r && r.ok) { hist[want] = { points: r.points || [] }; if (sel === want) draw(); } });
+    };
+    var reread = function () {
+      if (!S || demo || !S.api.ha) return;
+      S.readAt = Date.now();
+      S.api.ha("sensors").then(function (r) { if (S && r && r.ok) { sensors = r.sensors || []; draw(); } else if (S && !sensors) { sensors = []; draw(); } });
+    };
+    chips(); draw();
+    S.every = 5000;
+    S.tick = function () { if (Date.now() - (S.readAt || 0) > 60000) reread(); };
+    if (!demo) { if (!sensors) reread(); history(); }
   };
 
   B.cards = function (o, env) {
