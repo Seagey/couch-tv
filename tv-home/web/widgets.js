@@ -1122,9 +1122,11 @@
     // a card written in TV Designer: a title, a line of words and an icon (words only, like every design)
     var q = op(o);
     if (q.label || q.text) {
-      var small = b.h < 200;
-      add(root, [lab(q.icon || "info", q.label || ""), E("div", "cw-grow"),
-        q.text ? E("div", "cw-big", "font-size:" + px(clamp(Math.min(b.h / (small ? 4.2 : 3.4), (b.w - 48) / Math.max(4, q.text.length) * 1.9), 26, 84)) + ";line-height:1.08;white-space:pre-line", [q.text]) : null]);
+      // the words fill what is left under the title, wrapping, as big as they fit (the quote's rule)
+      var room = Math.max(40, b.h - 48 - (q.label ? 52 : 0)), len = Math.max(6, (q.text || "").length);
+      var fs = clamp(Math.min(Math.sqrt((b.w - 48) * room / len / 1.7), room / 1.15), 23, 84);
+      add(root, [q.label ? lab(q.icon || "info", q.label) : null, E("div", "cw-grow"),
+        q.text ? E("div", "cw-big", "font-size:" + px(fs) + ";line-height:1.1;letter-spacing:-.01em;white-space:pre-line;overflow-wrap:break-word;min-width:0;max-height:" + px(room) + ";overflow:hidden", [q.text]) : null]);
       return;
     }
     var cards = env.demo ? [{ title: "Solar today", value: "18.4 kWh" }] : (dataOf(env).cards || []);
