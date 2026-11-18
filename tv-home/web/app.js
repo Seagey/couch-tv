@@ -555,6 +555,25 @@
   var DATE_BARS = false;   // home.date_bars: thin vertical bars between the day, the place and the weather
   // Lighter home: ask for the 640 px size of a Keep watching picture, not the 1440 px one (a card is about 500 px wide)
   function slim(u) { return LIGHTER && typeof u === "string" ? u.replace("/s1440/", "/s640/") : u; }
+  // A Keep watching picture that does not load is asked for again a little later, up to six times
+  // (about a minute and a quarter), instead of staying broken until the row is drawn again (#274):
+  // just after a TV restart the home is up before the Wi-Fi and the apps' picture providers are.
+  // Nothing waits meanwhile. The app's art route (tvos.invalid/art/<token>) reads only the last
+  // path segment, so a query makes it a fresh request; any other address is set again as it was.
+  var ART_RETRY_MS = [1500, 3000, 6000, 12000, 20000, 30000];
+  window.kwArtRetry = function (img) {
+    var n = +(img.getAttribute("data-retry") || 0);
+    if (n >= ART_RETRY_MS.length) { img.onerror = null; return; }
+    var src = img.getAttribute("data-src") || img.getAttribute("src") || "";
+    if (!src) return;
+    img.setAttribute("data-src", src);
+    img.setAttribute("data-retry", String(n + 1));
+    setTimeout(function () {
+      if (!img.isConnected) return;   // the row was drawn again meanwhile, with a new picture
+      if (src.indexOf("//tvos.invalid/art/") >= 0) img.src = src + "?r=" + (n + 1);
+      else { img.removeAttribute("src"); img.src = src; }
+    }, ART_RETRY_MS[n]);
+  };
   function glassSetting() { var g = ST.glass || HOME.glass; return g === "on" || g === "lite" ? g : "off"; }
   // no clock in Home settings or config.json: the TV's own setting, else the one usual for the language (24 hour in Italian, German, Turkish, French, Serbian, Polish and Brazilian Portuguese)
   // On the Android home the TV's own 12 or 24 hour setting (System, Date and time) comes before the language's usual clock (#221)
@@ -2448,7 +2467,7 @@
         var art = slim(it.backdrop || it.poster), pkg = it.app && it.app.package;
         var ep = it.kind === "video" ? t("video_card") : it.season && it.episode ? "S" + it.season + " E" + it.episode : (it.episode_title || "");
         return '<div class="tile ncard">' +
-          (art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async">' : '<span class="thumb none"></span>') +
+          (art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async" onerror="kwArtRetry(this)">' : '<span class="thumb none"></span>') +
           '<div class="t"><div class="nap">' + (pkg && iconUrl(pkg) ? '<img src="' + esc(iconUrl(pkg)) + '" alt="" onerror="this.remove()">' : "") +
           esc(it.app ? it.app.name : "") + "</div><b>" + esc(it.title) + "</b>" + (ep ? "<i>" + esc(ep) + "</i>" : "") +
           (it.progress ? '<span class="nbar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "") + "</div></div>";
@@ -2463,7 +2482,7 @@
       var badge = pkg && iconUrl(pkg) ? '<span class="badge"><img src="' + esc(iconUrl(pkg)) + '" alt="" onerror="this.parentNode.remove()"></span>' : "";
       var bar = it.progress ? '<span class="bar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "";
       return '<div class="tile show"><div class="face">' +
-        (art ? '<img src="' + esc(art) + '" alt="" decoding="async">' : '<span class="no-art">' + esc(it.title) + "</span>") +
+        (art ? '<img src="' + esc(art) + '" alt="" decoding="async" onerror="kwArtRetry(this)">' : '<span class="no-art">' + esc(it.title) + "</span>") +
         badge + bar + '</div><div class="caption"><b>' + esc(it.title) + "</b><span>" + esc(subtitle(it)) + "</span></div></div>";
     }).join("");
     shelfEls = Array.prototype.slice.call(track.children);
