@@ -1205,13 +1205,43 @@
     add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-lab", "", ["Word of the day"]), E("div", "cw-t48", "margin-top:10px;font-size:" + px(clamp(b.w / 7, 40, 64)), [w[0]]),
       E("div", "cw-t25", "font-style:italic;margin-top:4px", [w[1]]), b.h >= 300 ? E("div", "cw-t25", "color:var(--ink);margin-top:14px", [w[2]]) : null]));
   };
+  // ---------------- the web widgets: news, scores, markets, the commute (widget-web.js) ----------------
+  // app.js hands in what widget-web.js got (data.web[source][id]); before that, or when it failed, the
+  // widget says so in its own box. In TV Designer, demo data. Never a made up reading on a TV.
+  function webOf(env, src, id) { var w = dataOf(env).web; return w && w[src] && Object.prototype.hasOwnProperty.call(w[src], id) ? w[src][id] : null; }
+  // the plain words for each web widget: [still asking, could not read it, nothing there, no relay on this TV]
+  var WEB_WORDS = {
+    news: ["Getting the headlines", "The headlines could not be read just now", "No headlines in this feed right now", "Headlines need a home computer or a newer couch-tv"]
+  };
+  // true when rec has something to draw; otherwise draws the honest state and says false
+  function webReady(root, b, iconName, kind, rec) {
+    var w = WEB_WORDS[kind];
+    if (rec && rec.ok) return true;
+    if (!rec) empty(root, b, iconName, w[0], "It shows here in a moment");
+    else if (rec.err === "relay") { empty(root, b, iconName, w[3], "OK here shows how"); root.setAttribute("data-setup", kind); }
+    else if (rec.err === "empty") empty(root, b, iconName, w[2], "couch-tv looks again soon");
+    else empty(root, b, iconName, w[1], "couch-tv tries again in a few minutes");
+    return false;
+  }
+  var DEMO_NEWS = [["Coastal highway upgrade finishes a month early", 1], ["Storm season outlook: a wetter summer than usual", 2], ["Matildas name squad for December friendlies", 3], ["Petrol prices ease ahead of the holidays", 4],
+    ["Library extends weekend hours over summer", 5], ["New ferry timetable starts on Monday", 6]];
+  function newsOf(root, o, b, env) {
+    var WW = window.CouchWidgetWeb, q = op(o), feed = WW ? WW.feedOf(q.feed) : "abc", name = q.label || (WW ? WW.FEEDS[feed].name : "Headlines");
+    if (env.demo) return { name: name, items: DEMO_NEWS.map(function (x) { return { title: x[0], at: Date.now() - x[1] * 3600000 }; }) };
+    var rec = webOf(env, "news", feed);
+    return webReady(root, b, "info", "news", rec) ? { name: name, items: rec.v || [], stale: !!rec.stale, at: rec.at } : null;
+  }
+  function agoOf(at) { var WW = window.CouchWidgetWeb; return WW && at ? WW.ago(at, now().getTime()) : ""; }
   R.news = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "info", "news");
-    var h = [["Northern Rivers", "Bruxner Highway roadworks finish a month early", "1h"], ["Weather", "Storm season outlook: a wetter summer than usual for NSW", "2h"], ["Sport", "Matildas name squad for December friendlies", "3h"], ["Business", "Petrol prices ease ahead of the holidays", "4h"]];
+    var N = newsOf(root, o, b, env);
+    if (!N) return;
+    if (!N.items.length) return empty(root, b, "info", WEB_WORDS.news[2], "");
     var n = clamp(Math.floor((b.h - 90) / 128), 1, 4);
-    add(root, [lab("info", "Headlines"), E("div", "cw-col cw-grow", "margin-top:18px;justify-content:space-around", h.slice(0, n).map(function (x) {
-      return E("div", "", "", [E("div", "cw-t23", "color:#ff453a;font-weight:700", [x[0] + " · " + x[2]]), E("div", "cw-t29", "font-weight:640;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden", [x[1]])]);
-    }))]);
+    add(root, [E("div", "cw-row cw-sp", "", [lab("info", N.name), N.stale ? E("div", "cw-t23", "", ["Not updated lately"]) : null]),
+      E("div", "cw-col cw-grow", "margin-top:18px;justify-content:space-around;min-height:0", N.items.slice(0, n).map(function (x) {
+        return E("div", "", "min-width:0", [x.at ? E("div", "cw-t23", "color:#ff453a;font-weight:700", [agoOf(x.at)]) : null,
+          E("div", "cw-t29", "font-weight:640;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden", [x.title])]);
+      }))]);
   };
   R.sports = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "tv", "sports");
@@ -1426,9 +1456,14 @@
     add(root, E("div", "", "font-size:" + px(b.w < 300 ? 26 : 34) + ";font-weight:680;line-height:1.15;display:-webkit-box;-webkit-line-clamp:" + (b.w < 300 ? 3 : 2) + ";-webkit-box-orient:vertical;overflow:hidden", ["Dinner at 6. Feed Max!"]));
   });
   CR.list = sample("list", "check", function (root, o, b) { mini(root, b, op(o).icon || "check", "6", op(o).label || "Shopping", "Milk, avocados, sunscreen"); });
-  CR.news = sample("news", "info", function (root, o, b) {
-    add(root, [E("div", "cw-t23", "color:#ff453a;font-weight:700", ["Local · 1h"]), E("div", "cw-t29", "font-weight:640;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden", ["Highway roadworks finish a month early"])]);
-  });
+  // a wide tile: the outlet and how long ago, then the newest headline on two lines
+  CR.news = function (root, o, b, env) {
+    var N = newsOf(root, o, b, env);
+    if (!N) return;
+    if (!N.items.length) return empty(root, b, "info", WEB_WORDS.news[2], "");
+    var x = N.items[0], meta = [N.name, agoOf(x.at)].filter(Boolean).join(" · ");
+    add(root, [E("div", "cw-t23 cw-ell", "color:#ff453a;font-weight:700", [meta]), E("div", "cw-t29", "font-weight:640;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden", [x.title])]);
+  };
   CR.sports = sample("sports", "tv", function (root, o, b) {
     var team = function (nm, col, sc, win) { return E("div", "cw-row cw-sp", "", [E("div", "cw-row", "min-width:0", [E("i", "", "display:block;width:22px;height:22px;border-radius:11px;flex:none;margin-right:12px;background:" + col), E("span", "cw-t25 cw-ell", "font-weight:" + (win ? 720 : 520), [nm])]), E("span", "cw-t29", "font-weight:700;opacity:" + (win ? 1 : 0.6), [String(sc)])]); };
     add(root, E("div", "cw-col", "height:100%;justify-content:space-around", [team("Titans", "#00a6e2", 24, 1), team("Broncos", "#7c1d3f", 18, 0)]));
@@ -1527,4 +1562,6 @@
       roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12 }
   };
+  // what the web widgets' detail layers share with them (widget-detail.js)
+  window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS };
 })();

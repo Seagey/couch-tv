@@ -5186,6 +5186,42 @@
     // Android's "default home app" chooser closed (HomeRole.kt, #98)
     homeAnswered: function (held) { homeAnswered(held); } };
 
+  // ---------------- the web widgets (widget-web.js): headlines, scores, markets, the commute ----------------
+  // Asked only while such a widget is on the home, each source at most once per refresh, the last
+  // answers kept on this TV. A news feed or a share price sends no CORS header, so the TV asks through a
+  // relay that is part of couch-tv at home: the bridge or the on-TV app (/api/webdata), or with neither,
+  // this TV's own launcher (tvos.invalid/webdata). Scores and the drive come straight from their free
+  // services. A preview (?mock=1) asks nobody (weblive=1: a test that does).
+  var WEB = null, webTimer = 0;
+  function webRelayOk() { return !OFFLINE || !!(TV && TV.webData && TV.webData()); }
+  function webRelay(src, id) {
+    var q = "src=" + encodeURIComponent(src) + "&id=" + encodeURIComponent(id);
+    var get = function (url, auth) {
+      return new Promise(function (resolve, reject) {
+        var x = new XMLHttpRequest();
+        x.open("GET", url); x.timeout = 15000;
+        if (auth && KEY) x.setRequestHeader("Authorization", "Bearer " + KEY);
+        x.onload = function () { var j = null; try { j = JSON.parse(x.responseText); } catch (e) {} if (x.status === 200 && j && j.ok && typeof j.text === "string") resolve(j.text); else reject(new Error((j && j.error) || "relay " + x.status)); };
+        x.onerror = x.ontimeout = function () { reject(new Error("relay")); };
+        x.send();
+      });
+    };
+    return !OFFLINE ? get(API + "/api/webdata?" + q + (TV_ID ? "&tv=" + TV_ID : ""), true) : get("http://tvos.invalid/webdata?" + q, false);
+  }
+  function webStart() {
+    if (WEB || typeof CouchWidgetWeb === "undefined" || !CouchDesign.widgetsOf || (MOCK && !/[?&]weblive=1/.test(Q))) return;
+    WEB = CouchWidgetWeb.loader({
+      widgets: function () { return CouchDesign.widgetsOf(Object.keys(CouchWidgetWeb.SOURCES)); },
+      canRelay: webRelayOk, relay: webRelay,
+      json: function (url) { return fetch(url).then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); }); },
+      // the last answers, on this TV only (headlines and prices, never anything about the household)
+      load: function () { try { return JSON.parse(localStorage.getItem(PFX + "tvhome.webdata") || "null"); } catch (e) { return null; } },
+      save: function (o) { try { localStorage.setItem(PFX + "tvhome.webdata", JSON.stringify(o)); } catch (e) {} },
+      changed: function () { clearTimeout(webTimer); webTimer = setTimeout(function () { if (CouchDesign.dataChanged) CouchDesign.dataChanged("web"); }, 150); },
+      hidden: function () { return !!document.hidden; }
+    }).start();
+  }
+
   function start() {
     readConfig();
     // a design got by code: pictures only from here, the store and the hosts this TV already uses
@@ -5212,7 +5248,9 @@
           // no bridge at all (option A, or the standalone home): widgets that need one say so
           bridge: !OFFLINE,
           // the scenes the launcher's Home Assistant allows (names and entities only, never its address)
-          scenes: window.smartHome && window.smartHome.scenes ? window.smartHome.scenes() : [] };
+          scenes: window.smartHome && window.smartHome.scenes ? window.smartHome.scenes() : [],
+          // the web widgets' answers (widget-web.js): headlines, scores, prices, the drive
+          web: WEB ? WEB.data() : null };
       },
       // the detail layers (widget-detail.js) ask Home Assistant through smarthome.js, never directly
       ha: function (action, entity, value) {
@@ -5242,6 +5280,7 @@
       },
       fromCode: DESIGN_FROM_CODE
     });
+    if (designOn) webStart();
     kidsInit();
     kidSync();   // a kids profile on the couch: its shelf before anything else shows
     staticText();

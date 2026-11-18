@@ -312,10 +312,16 @@
     word: { name: "Word of the day", status: "works", what: "A word and what it means", needs: ["Nothing: the words come with couch-tv"],
       setup: setup("nothing", NOTHING), until: "Always shows a word", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["wtile", "small", "medium"], [4, 2]) },
-    news: { name: "Headlines", status: "not-built", what: "One to four news headlines", needs: ["Needs couch-tv to read a news feed for the TV"],
-      setup: setup("nothing", NOT_YET), until: "\"Headlines: not on couch-tv yet\", and what it needs",
-      build: "The bridge has to read a chosen RSS feed (ABC News and most Australian outlets publish one) and hand the titles to the home; a TV page cannot read most feeds itself (browsers block it).",
-      ok: "Opens the headlines in full (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
+    // the feed is read through couch-tv itself (the launcher, the on-TV app or the home computer's
+    // bridge: widget-web.js, /api/webdata), never a server of ours; ABC News unless the design picks another
+    news: { name: "Headlines", status: "works", what: "One to four of the latest headlines from a news feed you pick (ABC News unless you choose another)",
+      needs: ["Nothing on a Google TV, Android TV or Fire TV: couch-tv reads the feed itself", "On other TVs, the home computer, which reads the feed for the TV"],
+      setup: setup("designer", {
+        android: ["Nothing to set up: the headlines come from ABC News.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source: ABC News, SBS, The Guardian, BBC or RNZ.", SEND],
+        web: ["Keep the home computer on: it reads the news feed for this TV.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source: ABC News, SBS, The Guardian, BBC or RNZ.", SEND],
+        vidaa: ["Needs a computer at home that stays on, running couch-tv (setup option B). The website home cannot read news feeds.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source.", SEND] }),
+      until: "\"Getting the headlines\" for a moment. If the feed cannot be read, it says so and tries again in a few minutes", build: "",
+      ok: "Opens the headlines: the latest six, with how long ago each came out", platforms: plat("works", "computer", "computer", { android: "couch-tv on the TV reads the feed: no computer needed.", vidaa: "Needs a computer at home: the website home cannot read news feeds." }), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
     sports: { name: "Scores", status: "not-built", what: "Scores for your teams", needs: ["Needs a free, reliable score feed for the NRL, AFL and A-League (none exists today)"],
       setup: setup("nothing", NOT_YET), until: "\"Scores: not on couch-tv yet\", and why",
       build: "A score source the TV may use: official feeds are paid, TheSportsDB's free tier is patchy for the NRL and AFL, and ESPN's are unofficial. Once one is picked, the bridge reads it for the chosen teams.",

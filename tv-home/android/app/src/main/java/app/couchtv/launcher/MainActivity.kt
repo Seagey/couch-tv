@@ -394,6 +394,12 @@ class MainActivity : Activity() {
                 val u = req.url
                 if (u.host == OFFLINE_HOST) return offlineFile(u.path ?: "")
                 if (u.host != "tvos.invalid") return null
+                if (u.pathSegments.firstOrNull() == "webdata") {
+                    // the web widgets' relay (WebData.kt): news feeds and share prices, by id only
+                    val (code, body) = WebData.answer(u)
+                    return WebResourceResponse("application/json", "utf-8", code, if (code == 200) "OK" else "Error",
+                        mapOf("Cache-Control" to "no-store", "Access-Control-Allow-Origin" to "*"), ByteArrayInputStream(body.toByteArray(Charsets.UTF_8)))
+                }
                 if (u.pathSegments.firstOrNull() == "photo") {
                     // the household's own photos (Home settings), copied in by the file picker
                     val f = photoFile(u.lastPathSegment ?: "") ?: return null
@@ -596,6 +602,10 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun launch(pkg: String): Boolean = launchPackage(pkg)
+
+        /** This launcher relays the web widgets' sources (WebData.kt, http://tvos.invalid/webdata). */
+        @JavascriptInterface
+        fun webData(): Boolean = true
 
         /** Opens an http(s) web link in the TV's browser (used by custom cards with a url). */
         @JavascriptInterface

@@ -488,11 +488,19 @@
       return E("div", "cwd-card", "", [E("div", "cwd-mid cwd-ell", "opacity:.8", [String(c.title || "")]), E("div", "cwd-big cwd-ell", "font-size:72px;margin-top:20px", [String(c.value || "")])]);
     })));
   };
+  // the web widgets (widget-web.js): what the widget has, bigger; reading only, nothing opens a link
+  function wk() { return (window.CouchWidgets && window.CouchWidgets.webKit) || {}; }
+  function webRec(env, src, id) { var f = wk().webOf; return f ? f(env, src, id) : null; }
+  function updated(rec) { if (!rec || !rec.at) return ""; var d = new Date(rec.at), h = d.getHours(), m = d.getMinutes(); return "Updated " + ((h % 12) || 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? "am" : "pm") + (rec.stale ? ", not lately" : ""); }
   B.news = function (o, env) {
-    if (!env.demo) return B.setup(o, env);
-    S.body.appendChild(head("info", "Headlines", "Top stories", "#ff453a"));
-    S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:30px", [["Local", "Highway roadworks finish a month early", "1h"], ["Weather", "Storm season outlook: a wetter summer than usual", "2h"], ["Sport", "Matildas name squad for December friendlies", "3h"], ["Business", "Petrol prices ease ahead of the holidays", "4h"]].map(function (x) {
-      return F(E("div", "cwd-news", "", [E("div", "cwd-small", "color:#ff453a;font-weight:700", [x[0] + " · " + x[2]]), E("div", "cwd-big", "font-size:44px;margin-top:6px", [x[1]])]), null, x[1]);
+    var WW = window.CouchWidgetWeb, q = op(o), feed = WW ? WW.feedOf(q.feed) : "abc", name = q.label || (WW ? WW.FEEDS[feed].name : "Headlines"), rec = null, items;
+    if (env.demo) items = (wk().DEMO_NEWS || []).map(function (x) { return { title: x[0], at: Date.now() - x[1] * 3600000 }; });
+    else { rec = webRec(env, "news", feed); if (!rec || !rec.ok || !rec.v || !rec.v.length) return B.setup(o, env); items = rec.v; }
+    S.body.appendChild(head("info", name, rec ? updated(rec) : "The latest headlines", "#ff453a"));
+    // two columns of three: six headlines, each on three lines at most
+    S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:30px", items.slice(0, 6).map(function (x) {
+      return F(E("div", "cwd-news", "width:780px", [x.at ? E("div", "cwd-small", "color:#ff453a;font-weight:700", [wk().agoOf ? wk().agoOf(x.at) : ""]) : null,
+        E("div", "cwd-big", "font-size:40px;margin-top:6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden", [x.title])]), null, x.title);
     })));
   };
   B.sports = function (o, env) {

@@ -314,8 +314,11 @@
     night: SAN.b, place: SAN.b, hilo: SAN.b, sport: SAN.b,
     entity: function (v) { return typeof v === "string" && /^climate\.[a-z0-9_]{1,64}$/.test(v) ? v : undefined; },
     controls: function (v) { return SAN.list(v, 8, function (c) { c = obj(c); var o = {}; put(o, "icon", SAN.pick(c.icon, CTL_ICONS)); put(o, "name", SAN.w(c.name, 24)); return o.icon ? o : undefined; }); },
-    shows: function (v) { return SAN.n(v, 1, 5, true); }
+    shows: function (v) { return SAN.n(v, 1, 5, true); },
+    // the web widgets (widget-web.js): a source picked from a fixed list, never a link
+    feed: function (v) { return SAN.pick(v, WEB_FEEDS); }
   };
+  var WEB_FEEDS = ["abc", "abc-justin", "abc-sport", "abc-business", "sbs", "guardian", "bbc", "rnz"];
   var WOPT = {
     clock: "format ampm seconds date align", tallclock: "format align", glassclock: "format scene", analog: "seconds", flipclock: "format",
     wordclock: "", solar: "", worldclock: "cities", countdown: "label month day unit icon", date: "show dfmt align place", month: "", timer: "label",
@@ -326,7 +329,7 @@
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "",
     bins: "weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label", note: "", list: "label icon",
-    card: "label text icon", quote: "text sub", word: "", news: "", sports: "label", stocks: "", commute: "",
+    card: "label text icon", quote: "text sub", word: "", news: "feed label", sports: "label", stocks: "", commute: "",
     welcome: "kicker text sub align", quick: "quick align", wifi: "", guide: "", screentime: "", stack: ""
   };
   function sanWStyle(src) {
@@ -2245,6 +2248,8 @@
     // a weather widget that needs the forecast is on the home: the TV asks Open-Meteo for it
     // which of these widget kinds are on the home (air and surf ask their own free services only then)
     wantsKinds: function (kinds) { var on = {}; if (D && ON) list(D.objects).forEach(function (o) { o = obj(o); if (o.type === "widget") [o].concat(list(o.items)).forEach(function (it) { if (kinds.indexOf(obj(it).kind) >= 0) on[obj(it).kind] = 1; }); }); return Object.keys(on); },
+    // the web widgets on the home, each with its options (widget-web.js asks only for these)
+    widgetsOf: function (kinds) { var out = []; if (D && ON) list(D.objects).forEach(function (o) { o = obj(o); if (o.type === "widget") [o].concat(list(o.items)).forEach(function (it) { it = obj(it); if (kinds.indexOf(it.kind) >= 0) out.push({ kind: it.kind, opts: obj(it.opts) }); }); }); return out; },
     wantsForecast: function () { return !!(D && ON && list(D.objects).some(function (o) { o = obj(o); return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return ["weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "air", "surf", "date"].indexOf(it.kind) >= 0; }); })); },
     nogo: function (part) { var pb = PART_BOX.filter(function (x) { return x[0] === part; })[0], n = pb && document.querySelector(pb[1]); return !!(n && n.getAttribute("data-nogo")); },
     // where the remote starts on the dock: the first app, as couch-tv does; with no app showing (a
