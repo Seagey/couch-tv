@@ -247,6 +247,20 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r["target_position_ms"], 600_500)
         self.assertEqual(r["note_key"], "note_moved")
 
+    async def test_not_playing_after_the_seek_is_not_a_move(self):
+        self.installed.add(move.SYNC_HELPER)
+        self.media["after_play"] = playing("Some Show", 10_000)
+        self.after_seek = playing("Some Show", 600_500, state="paused")
+        self.plays_after_presses = 99        # and it does not start again
+        self.b.adb_out = (f"package={self.a.front}\nactive=true\nstate=PlaybackState {{state=PAUSED(2), position=5}}\n"
+                          'Broadcast completed: result=0, data="{"id":1,"result":"ok","can_seek":true}"')
+        r = await server.move_playing(A, B, power_off=True, force=True)
+        self.assertEqual(r["seek"], "helper")
+        self.assertFalse(r["started"])
+        self.assertFalse(r["powered_off"])                         # TV A stays on
+        self.assertNotIn("power", [e[2] for e in self.did(A, "key")])
+        self.assertEqual(r["note_key"], "note_move_not_playing")
+
     async def test_an_app_that_takes_no_seek_is_not_sent_one(self):
         self.installed.add(move.SYNC_HELPER)
         self.media["after_play"] = playing("Some Show", 10_000)
@@ -400,6 +414,34 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(r["source_paused"])
         self.assertEqual(r["note_key"], "note_moved")
 
+    async def test_a_tv_that_does_not_answer_is_not_counted_as_paused(self):
+        async def dead(*args, **kw):
+            self.log.append((A, "adb", " ".join(args)))
+            raise RuntimeError("adb: connection lost")
+        self.a.adb = dead
+        r = await server.move_playing(A, B)
+        self.assertTrue(r["started"])
+        self.assertFalse(r["source_paused"])                      # not "paused" on no answer
+        self.assertEqual(r["note_key"], "note_move_still_playing")
+        self.assertGreaterEqual(len([e for e in self.did(A, "key") if e[2] == "pause"]), 3)   # it kept trying
+
+    async def test_no_blind_ok_when_the_tv_does_not_answer(self):
+        self.started, self.screen, self.plays_after_presses = False, [], 99
+
+        async def dead(*args, **kw):
+            raise RuntimeError("adb: connection lost")
+        real_play = server.play
+
+        async def play_then_b_goes_quiet(*a, **k):
+            r = await real_play(*a, **k)
+            self.b.adb = dead
+            return r
+        with patch.object(server, "play", play_then_b_goes_quiet), \
+             patch.object(server, "get_it_playing", lambda *a, **k: play_then_b_goes_quiet()):
+            r = await server.move_playing(A, B)
+        self.assertEqual(self.did(B, "key"), [])
+        self.assertFalse(r["started"])
+
     async def test_a_pause_that_takes_is_sent_once(self):
         r = await server.move_playing(A, B)
         self.assertEqual([e[2] for e in self.did(A, "key")], ["pause"])
@@ -425,6 +467,20 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.did(A, "key"), [])          # A was not paused
         self.assertEqual(self.did(B, "play"), [])
         self.assertEqual(store.current_who(B), "person2")  # and B keeps its person
+
+    async def test_a_tv_that_is_buffering_or_winding_is_being_watched_too(self):
+        self.b.front = YOUTUBE
+        for state in ("BUFFERING(6)", "CONNECTING(8)", "FAST_FORWARDING(4)", "REWINDING(5)"):
+            self.b.adb_out = f"package={YOUTUBE}\nactive=true\nstate=PlaybackState {{state={state}, position=5}}"
+            with self.assertRaises(server.ApiError, msg=state) as ctx:
+                await server.move_playing(A, B)
+            self.assertEqual(ctx.exception.key, "err_move_tv_in_use", state)
+        for state in ("PAUSED(2)", "STOPPED(1)", "NONE(0)"):
+            self.log.clear()
+            self.b.adb_out = f"package={YOUTUBE}\nactive=true\nstate=PlaybackState {{state={state}, position=5}}"
+            r = await server.move_playing(A, B)       # free: nobody is watching a paused TV
+            self.assertIn("to", r)
+        self.assertEqual(self.did(A, "key")[0][2], "pause")
 
     async def test_force_takes_the_tv_over(self):
         self.b.front = YOUTUBE
@@ -564,6 +620,42 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(r["wrong_title"])
         self.assertTrue(r["started"])
 
+    async def test_a_title_in_another_script_is_opened_when_the_finder_has_that_very_title(self):
+        name = "\u5343\u3068\u5343\u5c0b\u306e\u795e\u96a0\u3057"
+        self.media[A] = playing(name, 600_000, title_from="app")
+        self.media["after_play"] = playing(name, 598_000, title_from="app")
+        asked = []
+
+        async def find(title, type_=None):
+            return {"title": name}, []
+
+        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False):
+            asked.append((title, exact))
+            self.b.front = server.apps.BY_ID[service]["package"]
+            self.media[B] = self.media["after_play"]
+            return {"method": "deeplink", "started": True}
+        with patch.object(server.finder, "find", find), patch.object(server, "play", play):
+            r = await server.move_playing(A, B)
+        self.assertEqual(asked, [(name, False)])      # compared in the move, so play is not asked to
+        self.assertTrue(r["started"])
+        self.assertIsNone(r["wrong_title"])           # and the same name on TV B is the same title
+
+    async def test_a_title_in_another_script_the_finder_has_another_name_for_is_not_opened(self):
+        name = "\u5343\u3068\u5343\u5c0b\u306e\u795e\u96a0\u3057"
+        self.media[A] = playing(name, 600_000)
+        asked = []
+
+        async def find(title, type_=None):
+            return {"title": "\u3082\u306e\u306e\u3051\u59eb"}, []
+
+        async def play(*a, **k):
+            asked.append(a)
+            return {"method": "deeplink", "started": True}
+        with patch.object(server.finder, "find", find), patch.object(server, "play", play):
+            r = await server.move_playing(A, B)
+        self.assertEqual(asked, [])
+        self.assertEqual((r["started"], r["note_key"]), (False, "note_move_app_only"))
+
     async def test_a_near_name_is_never_opened_in_its_place(self):
         # "Some Show Fancy Dinner" is a series of its own; the finder only knows "Some Show", which
         # even has an episode called "Fancy Dinner". The move must not open that.
@@ -649,6 +741,10 @@ class MoveYouTube(MoveSteps):
     test_off_the_spot_without_the_helper_says_so = None
     test_a_failure_after_the_pause_puts_things_back = None
     test_a_near_name_is_never_opened_in_its_place = None
+    test_a_title_in_another_script_is_opened_when_the_finder_has_that_very_title = None
+    test_a_title_in_another_script_the_finder_has_another_name_for_is_not_opened = None
+    test_not_playing_after_the_seek_is_not_a_move = None
+    test_no_blind_ok_when_the_tv_does_not_answer = None
     test_a_profile_screen_that_came_up_late_gets_a_second_go = None
     test_no_second_go_without_a_profile_screen = None
     test_ok_is_not_pressed_when_another_app_has_come_to_the_front = None
@@ -857,6 +953,33 @@ class MoveHelpers(unittest.TestCase):
             self.assertIsNone(asyncio.run(move.youtube_video_id("Another Video", "A Channel")))
             self.assertEqual(len(asked), 6)
             self.assertNotIn((move._norm("Another Video"), move._norm("A Channel")), move._found)
+        move._found.clear()
+
+    def test_same_name_in_any_script(self):
+        a = "\u5343\u3068\u5343\u5c0b\u306e\u795e\u96a0\u3057"
+        self.assertTrue(move.same_name(a, a))
+        self.assertTrue(move.same_name("Caf\u00e9 Society", "caf\u00e9  society!"))
+        self.assertFalse(move.same_name(a, "\u3082\u306e\u306e\u3051\u59eb"))
+        self.assertFalse(move.same_name("", ""))
+        self.assertFalse(move.same_name("!!!", "???"))
+
+    def test_a_remembered_video_is_for_that_length_only(self):
+        five = ('<script>var ytInitialData = {"c": [{"videoRenderer": {"videoId": "aaaaaaaaaaa", "title": '
+                '{"simpleText": "A Video"}, "ownerText": {"simpleText": "A Channel"}, "lengthText": {"simpleText": "5:00"}}}, '
+                '{"videoRenderer": {"videoId": "bbbbbbbbbbb", "title": {"simpleText": "A Video"}, "ownerText": '
+                '{"simpleText": "A Channel"}, "lengthText": {"simpleText": "10:00"}}}]};</script>')
+        asked = []
+
+        async def page(query):
+            asked.append(query)
+            return five
+        move._found.clear()
+        with patch.object(move, "_results_page", page):
+            self.assertEqual(asyncio.run(move.youtube_video_id("A Video", "A Channel", 300_000)), "aaaaaaaaaaa")
+            self.assertEqual(asyncio.run(move.youtube_video_id("A Video", "A Channel", 600_000)), "bbbbbbbbbbb")
+            self.assertEqual(len(asked), 2)
+            self.assertEqual(asyncio.run(move.youtube_video_id("A Video", "A Channel", 600_400)), "bbbbbbbbbbb")
+            self.assertEqual(len(asked), 2)      # the same length again: remembered
         move._found.clear()
 
     def test_clock(self):

@@ -4028,7 +4028,8 @@ def move_target(src, wanted=None):
 
 
 async def _tv_in_use():
-    """Is someone watching this TV: it is on, and the app in front says it is playing."""
+    """Is someone watching this TV: it is on, and the app in front says it is playing (or
+    buffering, or winding: a moment of BUFFERING in the same app is still someone watching)."""
     if not (tv.connected and tv.is_on and await tv.adb_ready()):
         return False
     try:
@@ -4036,7 +4037,8 @@ async def _tv_in_use():
         front = await tv.front_package()
     except Exception:
         return False   # it could not say: treat it as free
-    return any(s.get("package") == front and s.get("state") == "PLAYING" for s in _sessions(out))
+    return any(s.get("package") == front and STATES.get(s.get("state")) in ("playing", "buffering")
+               for s in _sessions(out))
 
 
 async def move_open(app, now, session, who, again=False):
@@ -4055,11 +4057,22 @@ async def move_open(app, now, session, who, again=False):
             started, _ = await get_it_playing(app, link, who or cur_who())
             return {"method": "deeplink", "started": started, "video": video}
     else:
+        # exact: only a show of exactly this name. A near name is another show ("Bluey Fancy
+        # Restaurant" is a series of its own, not the "Fancy Restaurant" episode of "Bluey").
+        exact, known = True, True
+        if not finder._norm(title):
+            # A name with no Latin letter or digit: play's exact check (finder.same_title) reads it
+            # as empty and turns it down even when the finder has that very title. Compare here.
+            try:
+                best, _ = await finder.find(title)
+            except Exception:
+                best = None
+            known = bool(best and move.same_name(best["title"], title))
+            exact = False
         try:
-            # exact: only a show of exactly this name. A near name is another show ("Bluey Fancy
-            # Restaurant" is a series of its own, not the "Fancy Restaurant" episode of "Bluey").
-            return await play(title, now.get("season"), now.get("episode"), app["id"], who,
-                              resume=not now.get("season"), exact=True)
+            if known:
+                return await play(title, now.get("season"), now.get("episode"), app["id"], who,
+                                  resume=not now.get("season"), exact=exact)
         except ApiError as e:
             if e.status != 404:
                 raise
@@ -4070,11 +4083,12 @@ async def move_open(app, now, session, who, again=False):
 
 async def _move_state(pkg):
     """The app's playback state on this TV ("PLAYING", "PAUSED", ...), its active session first. None
-    when it has no session or the TV did not answer."""
+    when it has no session. "UNKNOWN" when the TV did not answer: that is not a pause, and not a
+    screen to press OK on."""
     try:
         out = await tv.adb("shell", "dumpsys media_session", timeout=8)
     except Exception:
-        return None
+        return "UNKNOWN"
     mine = [s for s in _sessions(out) if s.get("package") == pkg and s.get("state")]
     mine.sort(key=lambda s: not s.get("active"))
     return mine[0]["state"] if mine else None
@@ -4098,7 +4112,7 @@ async def move_pause(pkg):
         else:
             continue
         await asyncio.sleep(1)
-        if await _move_state(pkg) != "PLAYING":
+        if await _move_state(pkg) not in ("PLAYING", "UNKNOWN"):
             return True
     log.warning("move: %s would not pause on %s", pkg, tv.name)
     return False
@@ -4148,7 +4162,7 @@ async def move_nudge(app, tries=3):
         state = await _move_state(pkg)
         if state == "PAUSED":
             await tv.key("play")
-        elif state not in ("PLAYING", "BUFFERING"):
+        elif state not in ("PLAYING", "BUFFERING", "UNKNOWN"):
             await tv.key("ok")
             log.info("move: pressed OK on a screen that cannot be read")
         if await move_wait_playing(pkg, timeout=12):
@@ -4303,7 +4317,10 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
                 # Sony Google TV), so a pause before that comes undone. Look once more now, and again
                 # at the end, so the two TVs do not play on side by side.
                 with on_tv(src):
-                    source_paused = await _move_state(pkg) != "PLAYING" or await move_pause(pkg)
+                    if await _move_state(pkg) in ("PLAYING", "UNKNOWN"):
+                        source_paused = await move_pause(pkg)
+                    else:
+                        source_paused = True
             # Is it the same title? Only the two TVs' own words count here, not what the bridge
             # asked for: Disney+, asked for the show "Bluey", played the series "Bluey Fancy
             # Restaurant" (seen on a Sony Google TV and a Google TV Streamer). When both apps name
@@ -4311,7 +4328,8 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
             if started:
                 await media_read(pkg, app)
                 there = media_now.get("title") if media_now.get("title_from") == "app" else None
-                if now.get("title_from") == "app" and there and not finder.same_title(there, title):
+                same = finder.same_title(there, title) or move.same_name(there, title)
+                if now.get("title_from") == "app" and there and not same:
                     wrong_title = there
                     started = False
                     await tv.key("pause")
@@ -4328,6 +4346,10 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
                         at = media_now.get("position_ms")
                         if move.near(spot, at):
                             break
+                    if seek and media_now.get("state") != "playing":
+                        # the seek, or the link opened again, may leave it paused or stopped: only
+                        # a TV that plays counts as moved (and lets TV A be turned off)
+                        started = await move_wait_playing(pkg, timeout=12)
             # B may be ahead of A's spot by as long as it has had to play since the link was opened
             played_ms = int((time.monotonic() - opened_at) * 1000)
             off_spot = (started and spot is not None and at is not None
@@ -4352,8 +4374,12 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
     powered_off = False
     if started:
         with on_tv(src):
-            # never leave both TVs playing without saying so; a pause that landed late counts
-            source_paused = await _move_state(pkg) != "PLAYING" or await move_pause(pkg)
+            # never leave both TVs playing without saying so; a pause that landed late counts, a TV
+            # that does not answer does not
+            if await _move_state(pkg) in ("PLAYING", "UNKNOWN"):
+                source_paused = await move_pause(pkg)
+            else:
+                source_paused = True
     if power_off and started:
         with on_tv(src):
             if tv.is_on:
