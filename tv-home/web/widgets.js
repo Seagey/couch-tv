@@ -148,7 +148,8 @@
   function wxIcon(code, day) {
     code = +code;
     if (code <= 1) return day === false ? "clear-night" : "sun";
-    if (code === 2) return "partly-cloudy";
+    // partly cloudy at night: a cloud, never the sun (the icon sets have no moon behind a cloud yet)
+    if (code === 2) return day === false ? "cloud" : "partly-cloudy";
     if (code === 3) return "cloud";
     if (code === 45 || code === 48) return "fog";
     if (code >= 71 && code <= 77 || code === 85 || code === 86) return "snow";
@@ -166,21 +167,61 @@
     DEMO_WX.hours = codes.map(function (c, i) { var d = new Date(t.getTime() + i * 3600000); return { t: hourLabel(d, i), code: c, temp: temps[i], pop: c >= 61 ? 60 + (i % 3) * 10 : c === 3 ? 20 : 5, uv: d.getHours() > 6 && d.getHours() < 18 ? Math.max(0, Math.round(11 - Math.abs(12.5 - d.getHours()) * 1.8)) : 0, night: d.getHours() < 6 || d.getHours() >= 19 }; });
     DEMO_WX.days = DEMO_WX.daily.map(function (x, i) { return { d: i === 0 ? "Today" : x[0], code: x[1], lo: x[2], hi: x[3], rise: "5:4" + (1 - Math.min(1, i)) + "am", set: "7:2" + Math.min(9, 2 + i) + "pm", uv: [11, 9, 6, 11, 12, 12, 10][i], pop: [40, 80, 70, 10, 5, 5, 20][i] }; });
   }
+  // the date as the forecast writes it (Open-Meteo's daily "time": 2026-11-18), in the TV's own time
+  function ymd(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  // is it day now? Worked out at the moment the widget is drawn, not when the weather was fetched (a
+  // reading from 5:50pm still said day at 9pm): the town's own sunrise and sunset, else the forecast's
+  // for today, else the reading's own is_day, else 6am to 7pm
+  function dayNow(w, d) {
+    var t = now(), p = d.place, s = p && isFinite(p.lat) && isFinite(p.lon) ? sunTimes(t, +p.lat, +p.lon) : null;
+    if (!s && w.daily) {
+      var today = ymd(t);
+      for (var i = 0; i < w.daily.length; i++) if (w.daily[i] && w.daily[i].date === today) {
+        var r = new Date(w.daily[i].sunrise), z = new Date(w.daily[i].sunset);
+        if (!isNaN(r.getTime()) && !isNaN(z.getTime())) s = { rise: r, set: z };
+        break;
+      }
+    }
+    if (s) return t >= s.rise && t < s.set;
+    if (typeof w.is_day === "boolean") return w.is_day;
+    var h = t.getHours(); return h >= 6 && h < 19;
+  }
+  // the day a bedside or evening screen should talk about: from 6pm, tomorrow; otherwise today (after
+  // midnight, today is the day ahead). Found by its date, so a forecast fetched yesterday still picks
+  // the right one; null when the forecast does not reach it.
+  function dayAhead(w, days) {
+    var t = now(), tomorrow = t.getHours() >= 18;
+    if (!tomorrow) return null;
+    var want = ymd(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1));
+    for (var i = 0; i < days.length; i++) if (days[i].date ? days[i].date === want : i === 1) return { label: "Tomorrow", code: days[i].code, hi: days[i].hi, lo: days[i].lo };
+    return null;
+  }
   function weather(env) {
-    if (env.demo) { var hr = now().getHours(); DEMO_WX.is_day = hr >= 6 && hr < 19; demoFull(); return DEMO_WX; }
+    if (env.demo) {
+      var hr = now().getHours(); DEMO_WX.is_day = hr >= 6 && hr < 19; demoFull();
+      DEMO_WX.ahead = dayAhead(DEMO_WX, DEMO_WX.days);
+      return DEMO_WX;
+    }
     var d = dataOf(env), w = d.weather;
     if (!w || w.temp === undefined || w.temp === null) return null;
-    var out = { place: (d.place && d.place.name) || "", temp: Math.round(w.temp), code: w.code, is_day: w.is_day !== false, hi: w.hi, lo: w.lo, uv: w.uv, aqi: w.aqi };
+    var out = { place: (d.place && d.place.name) || "", temp: Math.round(w.temp), code: w.code, is_day: dayNow(w, d), hi: w.hi, lo: w.lo, uv: w.uv, aqi: w.aqi };
+    // each hour is night or day by that day's own sunrise and sunset when the forecast has them
+    var sunOf = {};
+    (w.daily || []).forEach(function (x) { if (x && x.date) sunOf[x.date] = [new Date(x.sunrise), new Date(x.sunset)]; });
+    var nightAt = function (hd) { var s = sunOf[ymd(hd)]; return s && !isNaN(s[0].getTime()) && !isNaN(s[1].getTime()) ? hd < s[0] || hd >= s[1] : hd.getHours() < 6 || hd.getHours() >= 19; };
     if (w.hourly && w.hourly.length) {
-      out.hourly = w.hourly.slice(0, 8).map(function (x, i) { return [hourLabel(new Date(x.time), i), x.code, Math.round(x.temp)]; });
-      out.hours = w.hourly.slice(0, 24).map(function (x, i) { var hd = new Date(x.time); return { t: hourLabel(hd, i), code: x.code, temp: Math.round(x.temp), pop: x.pop, uv: x.uv, night: hd.getHours() < 6 || hd.getHours() >= 19 }; });
+      out.hourly = w.hourly.slice(0, 8).map(function (x, i) { var hd = new Date(x.time); return [hourLabel(hd, i), x.code, Math.round(x.temp), i === 0 ? !out.is_day : nightAt(hd)]; });
+      out.hours = w.hourly.slice(0, 24).map(function (x, i) { var hd = new Date(x.time); return { t: hourLabel(hd, i), code: x.code, temp: Math.round(x.temp), pop: x.pop, uv: x.uv, night: i === 0 ? !out.is_day : nightAt(hd) }; });
     }
     if (w.daily && w.daily.length) {
-      out.days = w.daily.slice(0, 7).map(function (x, i) { var dd = new Date(x.date + "T12:00:00"); return { d: i === 0 ? "Today" : DAYS[dd.getDay()].slice(0, 3), code: x.code, lo: Math.round(x.lo), hi: Math.round(x.hi), rise: hm(x.sunrise), set: hm(x.sunset), uv: x.uv, pop: x.pop }; });
-      out.daily = w.daily.slice(0, 7).map(function (x, i) { var dd = new Date(x.date + "T12:00:00"); return [i === 0 ? "Today" : DAYS[dd.getDay()].slice(0, 3), x.code, Math.round(x.lo), Math.round(x.hi)]; });
+      // "Today" is today's date, not simply the first day the forecast holds
+      var today = ymd(now()), dname = function (x, i) { return x.date === today || (!x.date && i === 0) ? "Today" : DAYS[new Date(x.date + "T12:00:00").getDay()].slice(0, 3); };
+      out.days = w.daily.slice(0, 7).map(function (x, i) { return { d: dname(x, i), date: x.date, code: x.code, lo: Math.round(x.lo), hi: Math.round(x.hi), rise: hm(x.sunrise), set: hm(x.sunset), uv: x.uv, pop: x.pop }; });
+      out.daily = w.daily.slice(0, 7).map(function (x, i) { return [dname(x, i), x.code, Math.round(x.lo), Math.round(x.hi)]; });
       out.sunrise = hm(w.daily[0].sunrise); out.sunset = hm(w.daily[0].sunset);
       if (out.hi === undefined) { out.hi = Math.round(w.daily[0].hi); out.lo = Math.round(w.daily[0].lo); }
       if (out.uv === undefined && w.daily[0].uv !== undefined) out.uv = Math.round(w.daily[0].uv);
+      out.ahead = dayAhead(out, out.days);
     }
     if (w.rain15 && w.rain15.length) {
       var mx = Math.max.apply(null, w.rain15.concat([0.5]));
@@ -561,7 +602,7 @@
       E("div", "cw-big", "font-size:" + px(tiny ? 72 : large ? Math.min(124, b.h * 0.3) : 92) + ";margin-top:6px", [w.temp + "°"]), E("div", "cw-grow"),
       tiny ? null : ic(wxIcon(w.code, w.is_day), 40, rgba(sh.ink, 1), "solid"),
       E("div", "cw-t25 cw-ell", "color:var(--ink);font-weight:600;margin-top:6px", [wxWords(w.code)]),
-      q.hilo === false || w.hi === undefined ? null : E("div", "cw-t23", "", ["H:" + w.hi + "° L:" + w.lo + "°"])]);
+      q.hilo === false || w.hi === undefined ? null : E("div", "cw-t23", "", [w.ahead ? w.ahead.label + " H:" + w.ahead.hi + "° L:" + w.ahead.lo + "°" : "H:" + w.hi + "° L:" + w.lo + "°"])]);
   };
   R.bigtemp = function (root, o, b, env, sh) {
     var w = weather(env);
@@ -580,10 +621,14 @@
       add(root, [ic(wxIcon(w.code, w.is_day), 40, rgba(sh.ink, 1), "solid"), E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(clamp(b.w * 0.4, 56, 80)) + ";letter-spacing:-.05em", [w.temp + "°"])]);
       return;
     }
-    var fs = Math.min(b.h * 0.52, b.w * 0.44);
+    var fs = Math.min(b.h * 0.52, b.w * 0.44), ah = w.ahead;
+    // in the evening the line under the number looks ahead: tomorrow's sky and top, not today's past one
+    var words = ah ? E("div", "cw-col", "margin-top:6px", [E("div", "cw-t29 cw-ell", "font-weight:680", [ah.label + (ah.hi !== undefined ? ", top of " + ah.hi + "°" : "")]),
+      b.h >= 300 ? E("div", "cw-t23 cw-ell cw-ahead", "", [wxWords(ah.code)]) : null])
+      : E("div", "cw-t29 cw-ell", "font-weight:680;margin-top:6px", [wxWords(w.code) + (w.hi !== undefined && b.w >= 400 ? ", top of " + w.hi + "°" : "")]);
+    if (ah) fs = Math.min(fs, b.h * 0.42);
     add(root, [E("div", "cw-row cw-sp", "", [o.opts && o.opts.place === false ? E("span") : E("div", "cw-t29 cw-ell", "font-weight:700", [w.place || "Here"]), ic(wxIcon(w.code, w.is_day), clamp(b.w / 6, 44, 80), rgba(sh.ink, 1), "solid")]),
-      E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(fs) + ";letter-spacing:-.06em", [w.temp + "°"]),
-      E("div", "cw-t29 cw-ell", "font-weight:680;margin-top:6px", [wxWords(w.code) + (w.hi !== undefined && b.w >= 400 ? ", top of " + w.hi + "°" : "")])]);
+      E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(fs) + ";letter-spacing:-.06em", [w.temp + "°"]), words]);
   };
   R.hourly = function (root, o, b, env, sh) {
     var w = weather(env);
@@ -595,7 +640,7 @@
       E("div", "", "text-align:right", [ic(wxIcon(w.code, w.is_day), 44, ink, "solid"), E("div", "cw-t25", "color:var(--ink);font-weight:600", [next ? wxWords(next[1]) + " from " + next[0] : wxWords(w.code)]), w.hi !== undefined ? E("div", "cw-t23", "", ["H:" + w.hi + "° L:" + w.lo + "°"]) : null])]),
       E("div", "cw-grow"),
       E("div", "cw-row cw-sp", "border-top:1.5px solid rgba(255,255,255,.25);padding-top:16px", w.hourly.slice(0, n).map(function (h) {
-        return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink)", [h[0]]), E("div", "", "margin:8px 0", [ic(wxIcon(h[1], true), 36, ink, "solid")]), E("div", "", "font-size:27px;font-weight:650", [h[2] + "°"])]);
+        return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink)", [h[0]]), E("div", "", "margin:8px 0", [ic(wxIcon(h[1], !h[3]), 36, ink, "solid")]), E("div", "", "font-size:27px;font-weight:650", [h[2] + "°"])]);
       }))]);
   };
   R.week = function (root, o, b, env, sh) {
@@ -1292,7 +1337,7 @@
     var w = weather(env);
     if (!w) return noWx(root, b, env);
     add(root, E("div", "cw-row", "height:100%", [ic(wxIcon(w.code, w.is_day), 48, rgba(sh.ink, 1), "solid"), E("div", "cw-col", "flex:1;min-width:0;margin-left:14px", [E("div", "cw-t29 cw-ell", "font-weight:680", [w.place || "Here"]),
-      E("div", "cw-t23 cw-ell", "color:var(--ink)", [wxWords(w.code) + (w.hi !== undefined ? ", " + w.hi + "°" : "")])]), E("div", "cw-big", "font-size:72px;margin-left:10px", [w.temp + "°"])]));
+      E("div", "cw-t23 cw-ell", "color:var(--ink)", [w.ahead ? w.ahead.label + ", " + w.ahead.hi + "°" : wxWords(w.code) + (w.hi !== undefined ? ", " + w.hi + "°" : "")])]), E("div", "cw-big", "font-size:72px;margin-left:10px", [w.temp + "°"])]));
   };
   CR.hourly = function (root, o, b, env, sh) {
     var w = weather(env);
@@ -1300,7 +1345,7 @@
     if (!w.hourly) return empty(root, b, "clock", "The hourly forecast is on its way", "");
     var n = clamp(Math.floor((b.w - 48) / 76), 2, 5), ink = rgba(sh.ink, 1);
     add(root, E("div", "cw-row cw-sp", "height:100%", w.hourly.slice(0, n).map(function (h) {
-      return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink)", [h[0]]), E("div", "", "margin:4px 0", [ic(wxIcon(h[1], true), 34, ink, "solid")]), E("div", "", "font-size:27px;font-weight:650", [h[2] + "°"])]);
+      return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink)", [h[0]]), E("div", "", "margin:4px 0", [ic(wxIcon(h[1], !h[3]), 34, ink, "solid")]), E("div", "", "font-size:27px;font-weight:650", [h[2] + "°"])]);
     })));
   };
   CR.week = function (root, o, b, env, sh) {
