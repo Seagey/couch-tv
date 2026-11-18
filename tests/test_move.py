@@ -537,6 +537,33 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r["note_key"], "note_move_app_only")
         self.assertEqual(r["note_vars"], {"title": "Some Show", "tv": "Den", "app": "Netflix"})
 
+    async def test_another_title_playing_on_b_is_paused_and_said(self):
+        # both apps name what they play; B came up on something else (Disney+ did this for "Bluey")
+        self.installed.add(move.SYNC_HELPER)
+        self.media[A] = playing("Some Show", 600_000, title_from="app")
+        self.media["after_play"] = playing("Some Show Specials", 5_000, title_from="app")
+        r = await server.move_playing(A, B, power_off=True)
+        self.assertEqual(r["wrong_title"], "Some Show Specials")
+        self.assertFalse(r["started"])
+        self.assertFalse(r["powered_off"])
+        self.assertIsNone(r["seek"])                                   # no seek inside the wrong title
+        self.assertEqual([e[2] for e in self.did(B, "key")], ["pause"])
+        self.assertEqual(r["note_key"], "note_move_wrong_title")
+        self.assertEqual(r["note_vars"], {"app": server.apps.describe_package(self.a.front)["name"],
+                                          "other": "Some Show Specials", "tv": "Den", "title": "Some Show"})
+
+    async def test_the_same_title_on_b_is_fine_and_a_title_b_does_not_give_is_not_judged(self):
+        self.media[A] = playing("Some Show", 600_000, title_from="app")
+        self.media["after_play"] = playing("some show", 598_000, title_from="app")
+        r = await server.move_playing(A, B)
+        self.assertIsNone(r["wrong_title"])
+        self.assertTrue(r["started"])
+        self.log.clear()
+        self.media["after_play"] = playing("Whatever The Bridge Guessed", 598_000, title_from="bridge")
+        r = await server.move_playing(A, B, force=True)
+        self.assertIsNone(r["wrong_title"])
+        self.assertTrue(r["started"])
+
     async def test_a_near_name_is_never_opened_in_its_place(self):
         # "Some Show Fancy Dinner" is a series of its own; the finder only knows "Some Show", which
         # even has an episode called "Fancy Dinner". The move must not open that.

@@ -4257,7 +4257,7 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
         with on_tv(src):
             source_paused = await move_pause(pkg)
 
-    opened, started, at, seek = {}, False, None, None
+    opened, started, at, seek, wrong_title = {}, False, None, None, None
     who_set = False
     try:
         with on_tv(dst):
@@ -4304,9 +4304,20 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
                 # at the end, so the two TVs do not play on side by side.
                 with on_tv(src):
                     source_paused = await _move_state(pkg) != "PLAYING" or await move_pause(pkg)
-            # 7. the backup: only when B is playing and is not near A's spot
+            # Is it the same title? Only the two TVs' own words count here, not what the bridge
+            # asked for: Disney+, asked for the show "Bluey", played the series "Bluey Fancy
+            # Restaurant" (seen on a Sony Google TV and a Google TV Streamer). When both apps name
+            # what they play and the names differ, stop it there and say so.
             if started:
                 await media_read(pkg, app)
+                there = media_now.get("title") if media_now.get("title_from") == "app" else None
+                if now.get("title_from") == "app" and there and not finder.same_title(there, title):
+                    wrong_title = there
+                    started = False
+                    await tv.key("pause")
+                    log.info("move: %s played %s on %s, not %s: paused it", app["name"], there, dst, title)
+            # 7. the backup: only when B is playing and is not near A's spot
+            if started:
                 at = media_now.get("position_ms")
                 if spot is not None and at is not None and not move.near(spot, at):
                     seek = await move_seek(pkg, spot, opened.get("video"))
@@ -4350,7 +4361,12 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
                 power_off_at[src] = time.monotonic()
                 powered_off = True
 
-    if not started and opened.get("method") != "deeplink":
+    if wrong_title:
+        note = (f"{app['name']} opened {wrong_title} on {to_name}, not {title}. It is paused there: "
+                f"find {title} with the TV remote.")
+        note_key, note_vars = "note_move_wrong_title", {"app": app["name"], "other": wrong_title, "tv": to_name,
+                                                        "title": title}
+    elif not started and opened.get("method") != "deeplink":
         note = f"Could not open {title} by itself on {to_name}. {app['name']} is open there: find it with the TV remote."
         note_key, note_vars = "note_move_app_only", {"title": title, "tv": to_name, "app": app["name"]}
     elif not started:
@@ -4368,8 +4384,8 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
         note = f"{title} is playing on {to_name}, but {from_name} would not pause. Pause it with its remote."
         note_key, note_vars = "note_move_still_playing", {"title": title, "tv": to_name, "from": from_name}
     return {"title": title, "from": src, "to": dst, "who": who, "app": apps.describe_package(pkg),
-            "method": opened.get("method"), "started": started, "source_paused": source_paused,
-            "position_ms": spot,
+            "method": opened.get("method"), "started": started, "wrong_title": wrong_title,
+            "source_paused": source_paused, "position_ms": spot,
             "target_position_ms": at, "seek": seek, "powered_off": powered_off,
             "note": note, **messages.note_fields(note_key, note_vars)}
 

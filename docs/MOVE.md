@@ -43,9 +43,11 @@ In this order (`POST /api/move`, [bridge/API.md](../bridge/API.md)):
    but not playing, it waits a little longer, and opens it once more if a profile screen has come up
    in the meantime. In Netflix only, if the screen cannot be read, it then
    presses OK and watches, up to three times.
-7. Reads where the other TV started. **Apps mostly resume by themselves.** Only when it is more than 5
+7. Checks the other TV plays the same title, when both apps say what they play. If it is another one, it is
+   paused there and the phone says so.
+8. Reads where the other TV started. **Apps mostly resume by themselves.** Only when it is more than 5
    seconds from the first TV's spot is that spot used, as a backup (see below).
-8. Leaves the first TV on and paused. It is only turned off when asked (`"power_off": true`), and only
+9. Leaves the first TV on and paused. It is only turned off when asked (`"power_off": true`), and only
    once the other TV is playing.
 
 If anything fails before the show is open on the other TV (it will not wake, its ADB drops), the first
@@ -62,7 +64,7 @@ the rest from the bridge's API or the remote page in a browser.
 | Netflix | 13 | 12 | 15 to 37 | Same spot, by itself or through the sync helper | OK pressed on the Streamer's profile screen (not readable). The one miss: a link opened straight after the wake was covered by the home screen; the 4 second wait fixed it |
 | YouTube | 12 | 10 | 15 to 27 | Same spot, by the link with the time (once 10 s behind, before the 5 second rule) | Nothing. The 2 misses: YouTube sent its results page in another layout and the video was not found, so only YouTube's search opened; the lookup now asks again and remembers a video it found |
 | Prime Video | 3 | 3 | 46 to 48 | Same spot in 2 runs (sync helper), from the start in 1 | Blind OK switched on for it: two presses (profile, then Play) |
-| Disney+ | 9 | 2 right show, 3 wrong show | 42 to 48 | Same spot, through the sync helper | The profile is picked by name. Right show: "Bluey", 2 of 2 once the profile fixes were in. Wrong show: the series "Bluey Fancy Restaurant" moved as "Bluey" (3 runs), because of title guessing that is now removed; that series is not in the show finder, so it now opens the app's search instead |
+| Disney+ | 14 | 2 confirmed right (a film, both ways) | 40 to 45 | Near the same spot (it resumed by itself) | The profile is picked by name. Only the two runs of a film had their title read back from the other TV and confirmed. Of the runs with the series "Bluey", the other TV was found on the series "Bluey Fancy Restaurant" whenever it was checked (4 runs; 2 more were not checked): Disney+ opens that one when asked for the show without an episode. The move now compares the two TVs' titles, pauses the other TV and says so. A move from "Bluey Fancy Restaurant" itself, which the show finder does not know, opens the app's search and says so |
 | Plex | 1 | 0 | - | - | On the Sony the bridge saw nothing playing in Plex. And it has no link that opens a Plex title on the other TV |
 | An app not in `bridge/apps.py` | 1 | 0 | - | - | Refused: the bridge has no way to open a title in it |
 
@@ -135,7 +137,7 @@ the rest from the bridge's API or the remote page in a browser.
   [SYNC.md](SYNC.md) (`dev.couchtv.sync`), if you have installed it on the other TV, and only if the
   app takes a seek from outside (the helper says). Without it the phone says the show started at
   another spot and where the first TV was, and you wind on by hand.
-- **The bridge does not check which title ended up playing** on the other TV, only that the app plays.
+- **The other TV may come up on another title.** The bridge opens the title by the show finder's link, and the app decides what that plays: Disney+, asked for the show "Bluey", played the series "Bluey Fancy Restaurant". So when both apps say what they play (YouTube and Disney+ do), the move compares the two titles; if they differ it pauses the other TV and the phone says which title came up. Netflix and Prime Video do not say what they play, so there the bridge cannot check.
 - **Kids mode:** a TV that is on a kids profile is not moved to another person without the parent PIN.
   The phone remote does not ask for the PIN yet: change the person on that TV first.
 - **Samsung, LG, Roku, VIDAA, Philips, VIZIO, Panasonic, TiVo and Apple TV** cannot be either end: they
