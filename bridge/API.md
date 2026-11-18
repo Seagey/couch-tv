@@ -557,11 +557,27 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
   `GET /api/history`. One card per title (the newest), newest first, at most 10, within 30 days,
   minus the ones removed with `/api/continue/hide`, in the shape of an item with `"kind": "video"`,
   `episode_title`, `season`, `episode`, `poster`, `backdrop` and `progress` all `null`, and `app`
-  YouTube's installed build. `/api/continue/open` with a video's id opens that build on YouTube's
-  search for the title (`"method": "search"`; Amazon's YouTube on a Fire TV shows its home for the web
-  search link, so there the bridge sends the `youtube://search?query=` link Alexa's voice search uses,
-  which opens its results page, tested on a Fire TV Cube), or the app alone where the link does not take
-  (`"method": "app"`), never through the show finder. Its answer is `{"title", "service": "youtube", "app", "method", "note"}`.
+  YouTube's installed build. The line also keeps the channel and the length the app's media session
+  gave (`channel`, `duration_ms`; a live stream has no length), neither on the card.
+  `/api/continue/open` with a video's id opens the exact video when it can: the id comes from
+  YouTube's public results page (the same lookup the move feature uses, no key and no sign in,
+  remembered six hours, and warmed when the line is written), and only when the title matches and
+  the channel or the length agrees; a title many channels reuse is told apart by those, and a wrong
+  video is worse than none, so otherwise the lookup says unsure. An unsure answer is remembered ten
+  minutes, so the next press on that card goes straight to the search instead of paying the lookup
+  again, and a press that comes while the warm up is still running waits on it (15 s at most) rather
+  than starting a second one. A line with neither channel nor length (written by an older bridge, or
+  from a session that gave neither) is never looked up: a title alone cannot be sure of the video, so
+  that card searches. A sure id goes to the build as its
+  watch link with no time in it, and YouTube resumes it from the account's own history
+  (`"method": "deeplink"`, `"video_id"` the id; tested on a Fire TV Cube with Amazon's YouTube, which
+  played that very video from where it was left). Unsure, a lookup that fails or takes longer than
+  15 s, or a link that does not take: the build opens on YouTube's search for the title
+  (`"method": "search"`; Amazon's YouTube on a Fire TV shows its home for the web search link, so there
+  the bridge sends the `youtube://search?query=` link Alexa's voice search uses, which opens its results
+  page, tested on that Cube), or the app alone where that does not take either (`"method": "app"`),
+  never through the show finder. Its answer is `{"title", "service": "youtube", "app", "method",
+  "video_id", "note"}`, `video_id` null unless the method is `deeplink`.
   ```json
   {"ok": true, "items": [], "videos": [
     {"id": "9c1e0b7d4a553f2a", "title": "How Trains Work", "episode_title": null, "season": null, "episode": null,

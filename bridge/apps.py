@@ -19,8 +19,10 @@ APPS = [
      "jw": ["netflix", "netflixbasicwithads", "netflixkids"], "deeplink": "jw",
      "cold": "background", "verify": True},
     # com.amazon.firetv.youtube: Amazon's YouTube, seen on a Fire TV Cube (Fire OS 7.7). It takes
-    # https://www.youtube.com links but shows its home for the web search link; its search opens from
-    # youtube://search?query= (server.SEARCH_LINKS_BY_PACKAGE, tested on that Cube).
+    # https://www.youtube.com links (a watch link played the exact video, resumed from the account's
+    # own history, which is how a video card opens when server.open_video finds the id) but shows its
+    # home for the web search link; its search opens from youtube://search?query=
+    # (server.SEARCH_LINKS_BY_PACKAGE, tested on that Cube).
     {"id": "youtube", "name": "YouTube", "package": "com.google.android.youtube.tv", "colour": "#FF0000",
      "packages": ["com.amazon.firetv.youtube"], "jw": ["youtubered", "youtube"], "deeplink": "jw"},
     {"id": "stan", "name": "Stan", "package": "au.com.stan.and", "colour": "#0072F5",
