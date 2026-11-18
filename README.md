@@ -213,7 +213,10 @@ short code. It also has a gallery of designs other people made.
   at the TV turns it on (Home settings, couch-tv Studio) or types a code there, the TV asks Studio
   for nothing. **Back to my classic home** switches it off again in one step.
 - **What the TV sends to Studio:** the code you typed, with no cookies and no referrer. While a
-  design is on, the TV also fetches the fonts the design names from Studio, and while a news,
+  design is on, the TV also fetches the fonts the design names from Studio, and the design's
+  background video, if it has one, by the video's id and a size (720p or 1080p, short clip or long
+  loop), with no cookies and no referrer; once it has played, the TV keeps its own copy and does
+  not ask again. While a news,
   scores, markets or commute widget is on, it asks Studio once a day whether that source is paused.
   **Share this home** sends the layout of the home you have now, without names, photos or places.
 - **What never leaves the TV:** your watch history, your people, things typed at home (the note,

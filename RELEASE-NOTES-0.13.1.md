@@ -14,9 +14,17 @@ A small release on top of 0.13. If you have not turned on couch-tv Studio, your 
 - If the long loop does not arrive within 3 minutes, the TV takes the 15 second copy instead.
 - Once a video has played, the TV keeps it (one video, the current design's), so the next start plays straight away without downloading it again.
 
+### Also new since 0.13, thanks Gil124
+
+- **Restart app and Quit app** in the hold OK menu on an app (option B, with the bridge connected) ([#280](https://github.com/Seagey/couch-tv/pull/280), closes #214). Their words are in Arabic, Polish, Romanian and Simplified Chinese too, not only English.
+- **`home.app_keys`:** a remote button the TV hands to no app (seen on an XGIMI projector) can open an app you choose ([#279](https://github.com/Seagey/couch-tv/pull/279)). `apply.sh` also starts the Home button watch again after it stops the app.
+- **`home.render_height`:** draws the home at a lower resolution (for example 720) for a slow TV, and the TV scales it up ([#278](https://github.com/Seagey/couch-tv/pull/278)).
+- **XGIMI Elfin Flip Plus** notes in the docs ([#281](https://github.com/Seagey/couch-tv/pull/281)).
+
 ### Fixed
 
 - **The Guest Wi-Fi join code was blank.** In a design, a style meant for the small line icons drew a white outline round every square of the QR code, so the widget showed a white square no phone could read. It draws properly again, and a test now photographs the code as the TV shows it and reads it back.
+- **The phone remote says "Closed {name}"** in its own words after Quit app, in English, Polish and Simplified Chinese, like its other app messages.
 
 ### Docs
 
