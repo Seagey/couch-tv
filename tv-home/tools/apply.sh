@@ -36,6 +36,8 @@
 # as EXTRA_OFF. Without PRIVACY=1 nothing about it changes.
 # Dry run: DRY_RUN=1 only lists what would be switched off and left on, and why. It installs
 # nothing, switches nothing off and writes no files. Without TV_IP it prints the privacy list.
+# Screen time (opt in): SCREEN_TIME=1 lets the home read Android's usage numbers for couch-tv Studio's
+# Screen time widget (usage access). They stay on the TV. undo.sh takes it back.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
@@ -209,6 +211,11 @@ esac
 # The screensaver quick button cuts the screen timeout for a moment (its own screensaver refuses
 # apps), which needs "modify system settings".
 "$PY" "$T" shell "appops set app.couchtv.launcher WRITE_SETTINGS allow" > /dev/null 2>&1 || true
+# couch-tv Studio's Screen time widget reads Android's usage numbers: only with SCREEN_TIME=1.
+# Without it nothing changes (a switch made in the TV's own Usage access screen stays as it is).
+if [ "${SCREEN_TIME:-}" = 1 ]; then
+  "$PY" "$T" shell "appops set app.couchtv.launcher GET_USAGE_STATS allow" > /dev/null 2>&1 || true
+fi
 
 echo "2/4  Keeping the TV's own home and setup on"
 present=$("$PY" "$T" shell "pm list packages" | sed 's/package://')

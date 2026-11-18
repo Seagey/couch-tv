@@ -25,12 +25,12 @@
     aircon: "aircon", scenes: "scenes", controls: "controls", camera: "camera", doorbell: "camera",
     card: "cards", news: "news", sports: "sports",
     picks: "setup", queue: "setup", speakers: "setup", energy: "setup", sensor: "setup", battery: "setup",
-    note: "note", list: "list", stocks: "setup", commute: "setup", wifi: "wifi", guide: "guide", screentime: "setup"
+    note: "note", list: "list", stocks: "setup", commute: "setup", wifi: "wifi", guide: "guide", screentime: "screentime"
   };
   var TITLE = { timers: "Timers", forecast: "Forecast", world: "World clocks", calendar: "Calendar", moon: "Moon", air: "Air quality", surf: "Surf",
     photos: "Photos", keep: "Keep watching", folder: "Apps", player: "Now playing", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre",
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up",
-    note: "Family note", list: "List", wifi: "Guest Wi-Fi", guide: "House guide" };
+    note: "Family note", list: "List", wifi: "Guest Wi-Fi", guide: "House guide", screentime: "Screen time" };
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -298,6 +298,19 @@
     S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:30px;overflow:hidden", g.map(function (x) {
       return F(E("div", "cwd-card cwd-gcard", "width:" + px(w), [E("div", "cwd-row", "", [ic(kit().guideIcon(x.title), 40), E("div", "cwd-mid cwd-ell", "margin-left:16px", [x.title])]), x.text ? E("div", "cwd-text", "margin-top:14px;white-space:pre-line", [x.text]) : null]), null, x.title);
     })));
+  };
+  B.screentime = function (o, env) {
+    var h = kit().athome(env), s = env.demo ? { ok: true, minutes: 95, apps: [{ name: "YouTube", minutes: 52 }, { name: "ABC iview", minutes: 31 }, { name: "Netflix", minutes: 12 }] } : h && h.screen, goal = env.demo ? 120 : (h && h.goal) || 0;
+    if (!s || !s.ok) return B.setup(o, env);
+    var CA = window.CouchAtHome, hm = CA ? CA.hm : function (m) { return m + "m"; };
+    S.body.appendChild(head("timer", "Screen time today", goal && CA ? CA.goalLine(s.minutes, goal) : "Time in apps on this TV today", "#5e5ce6"));
+    var max = Math.max(1, (s.apps[0] || {}).minutes || 1);
+    var left = E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "font-size:180px", [hm(s.minutes)]), goal ? E("div", "cwd-bar", "margin-top:30px", [E("b", "", "width:" + Math.round(clamp(s.minutes / goal, 0, 1) * 100) + "%;background:" + (s.minutes > goal ? "#ffd60a" : "#fff"))]) : null,
+      E("div", "cwd-small", "margin-top:20px", [goal ? "Daily goal " + hm(goal) + ", set in Home settings" : "Set a daily goal in Home settings, couch-tv Studio, At home"])]);
+    var right = E("div", "cwd-col", "margin-left:80px;flex:1;min-width:0", [label("By app")].concat(s.apps.length ? s.apps.slice(0, 7).map(function (a) {
+      return F(E("div", "cwd-app-time", "", [E("span", "cwd-ell", "", [a.name || a.package || ""]), E("div", "cwd-bar", "", [E("b", "", "width:" + Math.round(a.minutes / max * 100) + "%")]), E("b", "", "", [hm(a.minutes)])]), null, a.name || a.package);
+    }) : [E("div", "cwd-text", "", ["No apps yet today."])]));
+    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:flex-start;margin-top:40px", [left, right]));
   };
 
   // moon: tonight and the next four weeks

@@ -368,9 +368,14 @@
     guide: { name: "House guide", status: "setup", what: "Check out, the bins, around here: what guests need to know", needs: [GUIDE_NEED],
       setup: setup("tv", typed(["Pick Add to the guide, type a heading like Check out, then its words. Up to 8."])), until: "\"Write your house guide\", and where", build: "",
       ok: "Opens the whole guide", platforms: plat("setup", "computer", "setup", KEPT), sizes: sz(["wtile", "small", "tall"], [4, 2]) },
-    screentime: { name: "Screen time", status: "not-built", what: "Minutes left today and bedtime", needs: ["Needs daily time limits in Kids mode (it has a PIN today, not a limit)"],
-      setup: setup("nothing", NOT_YET), until: "\"Screen time: not on couch-tv yet\", and what it needs", build: "Kids mode has to keep a daily limit and a bedtime on the TV and count what the kids profile watches.",
-      ok: "Opens today's screen time (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
+    screentime: { name: "Screen time", status: "setup", what: "Time in apps on this TV today, against a daily goal", needs: [SCREEN_NEED],
+      setup: setup("tv", {
+        android: ["Ask whoever set up couch-tv to switch on screen time from their computer (it allows one Android permission).", OPEN, "Or go down to couch-tv Studio, pick At home, then Allow screen time, and switch on Home.", "Pick Daily goal for the time left each day."],
+        web: ["Not possible on this TV: only Google TV, Android TV and Fire TV share screen time."],
+        vidaa: ["Not possible on this TV: only Google TV, Android TV and Fire TV share screen time."] }),
+      until: "\"Allow screen time on this TV\", and where", build: "",
+      ok: "Opens today's screen time, app by app", platforms: plat("setup", "no", "no", { android: "Counts every app on this TV, not one person.", web: "This TV does not share screen time.", vidaa: "This TV does not share screen time." }),
+      sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- a smart stack (not a widget of its own: up to 10 widgets taking turns) ----------
     stack: { name: "Smart stack", status: "works", what: "Up to 10 widgets of one size taking turns in one place", needs: ["Whatever the widgets in it need"],

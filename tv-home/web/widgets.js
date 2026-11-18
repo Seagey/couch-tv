@@ -1228,11 +1228,6 @@
       return stop(bt, "quick", id, nm[1]);
     })));
   };
-  R.screentime = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "timer", "screentime");
-    add(root, [lab("timer", "Screen time", "rgba(255,255,255,.88)"), E("div", "cw-big", "font-size:" + px(clamp(b.h / 2.6, 80, 150)) + ";margin-top:14px", ["25", E("span", "", "font-size:.38em", [" min"])]), E("div", "cw-t29", "font-weight:650", ["left today"]), E("div", "cw-grow"),
-      E("div", "cw-bar", "height:14px;border-radius:7px;background:rgba(255,255,255,.25)", [E("b", "", "width:58%;background:#fff")]), E("div", "cw-t23", "color:#fff;margin-top:10px", ["Bedtime 7:30pm, the TV goes quiet"])]);
-  };
 
   // ---------------- the small sizes (widget-caps.js sizes): a tile 2 x 2 and a wide tile 4 x 2 ----------------
   // CR[kind] draws a box under 200 px tall; kinds without one draw their own small layout in R.
@@ -1372,7 +1367,6 @@
   });
   CR.stocks = sample("stocks", "info", function (root, o, b) { mini(root, b, "info", "+0.6%", "ASX 200", "8,412 at the close", "#30d158"); });
   CR.commute = sample("commute", "location", function (root, o, b) { mini(root, b, "location", "16 min", "To work", "Light traffic, leave by 8:10"); });
-  CR.screentime = sample("screentime", "timer", function (root, o, b) { mini(root, b, "timer", "25m", "Screen time", "Left today, bedtime 7:30pm"); });
   CR.queue = sample("queue", "music", function (root, o, b) { mini(root, b, "music", "8", "Up next", "Sunday Best, Surfaces"); });
 
   // ---------------- things typed at home (athome.js, through app.js): kept on this TV only ----------------
@@ -1547,6 +1541,33 @@
     if (list.length > 1) live(root, 20000, function () { var q = list[dayIndex(list.length, 20)]; img.style.backgroundImage = cssImg(q.src); big.textContent = tiny ? String(now().getFullYear() - q.years) : yearsAgo(q.years); });
   };
   CR.memory = R.memory;
+
+  // ---- Screen time today: the launcher's own count of time in apps, and the goal set on the TV ----
+  function screenOf(root, b, env) {
+    if (env.demo) return { ok: true, minutes: 95, goal: 120, apps: [{ name: "YouTube", minutes: 52 }, { name: "ABC iview", minutes: 31 }, { name: "Netflix", minutes: 12 }] };
+    var h = athome(env), s = h && h.screen;
+    if (!s || s.why === "off") { soon(root, b, "timer", "screentime"); return null; }
+    if (s.why === "tv") { empty(root, b, "timer", b.w < 300 ? "Not on this TV" : "Screen time is not on this TV", "It needs a Google TV, Android TV or Fire TV"); return null; }
+    if (!s.ok) { empty(root, b, "timer", s.why === "access" ? (b.w < 300 ? "Allow it first" : "Allow screen time on this TV") : (b.w < 300 ? "Needs an update" : "Needs a newer couch-tv TV home"), s.why === "access" ? "Home settings, couch-tv Studio, At home" : ""); return null; }
+    return { ok: true, minutes: s.minutes || 0, goal: h.goal || 0, apps: s.apps || [] };
+  }
+  R.screentime = function (root, o, b, env) {
+    var a = ahAlign(root, o), s = screenOf(root, b, env);
+    if (!s) return;
+    var CA = window.CouchAtHome, hm = CA ? CA.hm : function (m) { return m + "m"; }, gl = CA && s.goal ? CA.goalLine(s.minutes, s.goal) : "", total = hm(s.minutes);
+    var apps = b.w >= 700 && b.h >= 200 ? s.apps.slice(0, Math.max(0, Math.floor((b.h - 48) / 52))) : [];
+    // the total as big as fits the room it has (beside the apps, half the box)
+    var appsW = Math.min(340, (b.w - 48) * 0.45), room = apps.length ? b.w - 48 - appsW - 40 : b.w - 48, fs = clamp(Math.min((b.h - 48 - (b.h < 200 ? 64 : 110)) / 0.92, room / (total.length * 0.6)), 24, 140);
+    var main = ahCol(apps.length ? "center" : a, [b.h >= 200 || b.w >= 300 ? ahLab("timer", "Screen time") : ic("timer", 30, "currentColor"), E("div", "cw-big", "flex:none;max-width:100%;white-space:nowrap;font-size:" + px(fs) + ";margin-top:" + (b.h < 200 ? 2 : 12) + "px", [total]),
+      one1(gl ? "cw-t25" : "cw-t23", "color:var(--ink);font-weight:650;margin-top:" + (b.h < 200 ? 0 : 8) + "px", gl || "In apps today"),
+      s.goal && b.h >= 200 ? E("div", "cw-bar", "flex:none;width:100%;max-width:320px;margin-top:16px;height:14px;border-radius:7px;background:rgba(255,255,255,.25)", [E("b", "", "width:" + Math.round(clamp(s.minutes / s.goal, 0, 1) * 100) + "%;background:" + (s.minutes > s.goal ? "#ffd60a" : "#fff"))]) : null], apps.length ? "width:auto;max-width:" + px(room) + ";flex:0 1 auto" : "");
+    if (!apps.length) { add(root, main); return; }
+    // beside the apps: the two side by side, as one group in the middle (or to the side picked)
+    add(root, E("div", "cw-row", "width:100%;height:100%;align-items:center;justify-content:" + FLEX[a], [main, E("div", "cw-col", "width:" + px(appsW) + ";flex:none;margin-left:40px;justify-content:center;min-width:0", apps.map(function (x, i) {
+      return E("div", "cw-row cw-sp", i ? "margin-top:16px" : "", [E("span", "cw-t25 cw-ell", "color:var(--ink);font-weight:620;min-width:0", [x.name || x.package || ""]), E("span", "cw-t25", "flex:none;margin-left:14px;color:var(--ink)", [hm(x.minutes)])]);
+    }))]));
+  };
+  CR.screentime = R.screentime;
 
   // ---------------- one widget, a stack, the API ----------------
   function one(o, b, env) {
