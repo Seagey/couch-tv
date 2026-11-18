@@ -78,6 +78,10 @@
     if (/(https?|ftp|file|javascript|data):|\/\//i.test(text)) hits.push("link");
     if (/[^\s"@]+@[^\s"@]+\.[a-z]{2,}/i.test(text)) hits.push("email");
     if (/\b([0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b/i.test(text)) hits.push("hardware address");
+    // a key or a token (a Home Assistant long-lived token is a JWT, eyJ...; a bearer header; a long run
+    // of letters and digits): never shared, even if the TV's own gate were not there
+    if (/eyJ[A-Za-z0-9_-]{10,}|\bbearer\s|home.?assistant.?token|long.?lived/i.test(text) ||
+      (text.match(/[A-Za-z0-9_-]{40,}/g) || []).some(function (r) { return /\d/.test(r) && /[a-z]/i.test(r); })) hits.push("key");
     return hits.filter(function (h, i, a) { return a.indexOf(h) === i; });
   }
 

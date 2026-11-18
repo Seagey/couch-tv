@@ -194,8 +194,14 @@
   var KEEP = ["gear", "more", "smart", "com.android.tv.settings"];
   // a package name is used as an object key (apps.tiles): never one that reaches an object's prototype
   var POISON = ["__proto__", "constructor", "prototype"];
-  function pkgOk(p) { return typeof p === "string" && /^[A-Za-z0-9_.:-]{1,200}$/.test(p) && POISON.indexOf(p) < 0; }
-  function idOk(p) { return typeof p === "string" && /^[A-Za-z0-9_-]{1,60}$/.test(p) && POISON.indexOf(p) < 0; }
+  // a key or a token (a Home Assistant long-lived token is a JWT, eyJ...): never kept as an app or an
+  // id, so a design cannot carry one off the TV. A part between dots that is very long, or long with
+  // capitals, small letters and digits mixed, is not a package name or a catalogue id
+  function secretish(p) {
+    return String(p).split(/[.:]/).some(function (s) { return s.length >= 32 || (s.length >= 16 && /[a-z]/.test(s) && /[A-Z]/.test(s) && /[0-9]/.test(s)) || (/^eyJ/.test(s) && s.length >= 12); });
+  }
+  function pkgOk(p) { return typeof p === "string" && /^[A-Za-z0-9_.:-]{1,200}$/.test(p) && POISON.indexOf(p) < 0 && !secretish(p); }
+  function idOk(p) { return typeof p === "string" && /^[A-Za-z0-9_-]{1,60}$/.test(p) && POISON.indexOf(p) < 0 && !secretish(p); }
   function imgOk(u) {
     u = typeof u === "string" ? u : "";
     if (u.length > 4000000) return "";
@@ -406,7 +412,7 @@
     quick: function (v) { return SAN.list(v, 6, function (q) { return SAN.pick(q, QUICK_IDS); }); },
     scene: function (v) { return SAN.pick(v, SCENE_IDS); }, sound: function (v) { return SAN.pick(v, ["rain", "fire", "waves", "brown"]); },
     night: SAN.b, place: SAN.b, hilo: SAN.b, sport: SAN.b,
-    entity: function (v) { return typeof v === "string" && /^climate\.[a-z0-9_]{1,64}$/.test(v) ? v : undefined; },
+    entity: function (v) { return typeof v === "string" && /^climate\.[a-z0-9_]{1,64}$/.test(v) && !secretish(v) ? v : undefined; },
     controls: function (v) { return SAN.list(v, 8, function (c) { c = obj(c); var o = {}; put(o, "icon", SAN.pick(c.icon, CTL_ICONS)); put(o, "name", SAN.w(c.name, 24)); return o.icon ? o : undefined; }); },
     shows: function (v) { return SAN.n(v, 1, 5, true); },
     // the web widgets (widget-web.js): a source picked from a fixed list, never a link
@@ -436,7 +442,7 @@
   // The smart home and music widgets: which of the TV's own Home Assistant things a widget shows,
   // named by entity id only (never a reading, a state or an address). A TV shows one only when it is
   // also named in that TV's config.json; anything else in a design is dropped here.
-  function haId(re) { return function (v) { return typeof v === "string" && v.length <= 80 && re.test(v) ? v : undefined; }; }
+  function haId(re) { return function (v) { return typeof v === "string" && v.length <= 80 && re.test(v) && !secretish(v) ? v : undefined; }; }
   OPT.switches = function (v) { return SAN.list(v, 16, haId(/^(light|switch|fan|cover)\.[a-z0-9_]{1,64}$/)); };
   OPT.cam = haId(/^camera\.[a-z0-9_]{1,64}$/);
   OPT.reading = haId(/^sensor\.[a-z0-9_]{1,64}$/);
@@ -502,7 +508,7 @@
       // no status or reading from a design: a TV shows its own (Home Assistant) or Not connected
       put(out, "on", SAN.b(src.on)); put(out, "only_live", SAN.b(src.only_live)); put(out, "instead", SAN.pick(src.instead, ["bigtemp"]));
       put(out, "label", SAN.b(src.label)); put(out, "panel", SAN.pick(src.panel, PANELS));
-      put(out, "entity", typeof src.entity === "string" && /^climate\.[a-z0-9_]{1,64}$/.test(src.entity) ? src.entity : undefined);
+      put(out, "entity", typeof src.entity === "string" && /^climate\.[a-z0-9_]{1,64}$/.test(src.entity) && !secretish(src.entity) ? src.entity : undefined);
       put(out, "zones", SAN.list(src.zones, 8, function (z) { return SAN.w(z, 24); }));
       put(out, "items", SAN.list(src.items, 8, function (z) { return SAN.w(z, 24); }));
       put(out, "icon_style", iconSetOk(src.icon_style));
