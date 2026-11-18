@@ -97,7 +97,8 @@ What is on the TV right now.
 - `power`: `"on"`, `"off"` or `"unknown"`.
 - `app`: `null` when not known. `id` is `null` for an app the bridge has no name for (the raw
   `package` is still given). `id` `"home"` means a home screen (ours, `app.couchtv.launcher`, or
-  Google's).
+  Google's). `package` is the package in front on this TV: on a Fire TV, Amazon's build of the app
+  (`com.amazon.firetv.youtube`), with the same `id` as the Google TV one.
 - `volume.known` is `false` when the TV does not report a level (this TV reports `max: 0` while
   sound goes out to an external speaker). Then hide the slider, keep the up and down buttons.
 - `playing`: what is on, `null` when nothing is known. Needs ADB. Fields:
@@ -303,7 +304,12 @@ the known set.
 ```
 Known ids: `netflix` `youtube` `stan` `binge` `abc-iview` `sbs-on-demand` `disney-plus`
 `prime-video` `kayo` `foxtel-go` `9now` `7plus` `10play` `spotify` `plex` `moonlight`
-`settings` `home`. `installed` is `null` when the bridge cannot tell yet.
+`settings` `home`. `installed` is `null` when the bridge cannot tell yet. An app that has another
+build under another package name also lists `packages`, the Google TV one first
+(`"packages": ["com.google.android.youtube.tv", "com.amazon.firetv.youtube"]`): on a Fire TV the
+bridge opens and watches whichever build the TV has, and `installed` is true when any of them is
+there. YouTube, Prime Video and HBO Max have Amazon's builds (seen on a Fire TV Cube); every other
+app has one package.
 
 ### `GET /api/roku/apps` and `GET /api/roku/icon/<id>`
 Roku only (`400` for any other TV, `503` while the Roku is not answering). The couch-tv channel on the Roku

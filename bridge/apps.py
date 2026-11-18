@@ -6,7 +6,9 @@ knows which app opens which offer. `deeplink` says how a show opens in it, as te
 and search, "app" means only the app opens. `use_web` (a regex) opens the JustWatch web link cut
 down to the show page instead of the intent; `cold` restarts the app first so it takes the link
 ("background" restarts it only when it is not on screen). `verify` waits until the app says it is
-really playing before the bridge says so.
+really playing before the bridge says so. `packages` lists the same app's other builds: a Fire TV
+has Amazon's own build of YouTube, Prime Video and HBO Max under another package name, and the
+bridge opens and watches whichever one the TV has (`package` stays the Google TV one).
 """
 
 APPS = [
@@ -16,8 +18,10 @@ APPS = [
     {"id": "netflix", "name": "Netflix", "package": "com.netflix.ninja", "colour": "#E50914",
      "jw": ["netflix", "netflixbasicwithads", "netflixkids"], "deeplink": "jw",
      "cold": "background", "verify": True},
+    # com.amazon.firetv.youtube: Amazon's YouTube, seen on a Fire TV Cube (Fire OS 7.7). It takes
+    # https://www.youtube.com links (VIEW, BROWSABLE) like the Google TV one.
     {"id": "youtube", "name": "YouTube", "package": "com.google.android.youtube.tv", "colour": "#FF0000",
-     "jw": ["youtubered", "youtube"], "deeplink": "jw"},
+     "packages": ["com.amazon.firetv.youtube"], "jw": ["youtubered", "youtube"], "deeplink": "jw"},
     {"id": "stan", "name": "Stan", "package": "au.com.stan.and", "colour": "#0072F5",
      "jw": ["stan"], "deeplink": "jw"},
     {"id": "binge", "name": "Binge", "package": "au.com.streamotion.ares.tv", "colour": "#1E1EFF",
@@ -29,8 +33,9 @@ APPS = [
      "cold": True},
     {"id": "disney-plus", "name": "Disney+", "package": "com.disney.disneyplus", "colour": "#113CCF",
      "jw": ["disneyplus"], "deeplink": "jw"},
+    # com.amazon.firebat: Prime Video as a Fire TV ships it, seen on a Fire TV Cube (Fire OS 7.7).
     {"id": "prime-video", "name": "Prime Video", "package": "com.amazon.amazonvideo.livingroom",
-     "colour": "#00A8E1", "jw": ["amazonprimevideo", "amazonprime", "amazonprimevideowithads", "amazon"], "deeplink": "jw"},
+     "packages": ["com.amazon.firebat"], "colour": "#00A8E1", "jw": ["amazonprimevideo", "amazonprime", "amazonprimevideowithads", "amazon"], "deeplink": "jw"},
     {"id": "apple-tv", "name": "Apple TV", "package": "com.apple.atve.androidtv.appletv", "colour": "#111111",
      "jw": ["appletvplus", "itunes"], "deeplink": "jw"},
     {"id": "paramount-plus", "name": "Paramount+", "package": "com.cbs.ca", "colour": "#0064FF",
@@ -61,8 +66,9 @@ APPS = [
      "jw": ["sevenplus"], "deeplink": "jw"},
     {"id": "10play", "name": "10play", "package": "au.com.tenplay", "colour": "#0B0B0B",
      "jw": ["tenplay"], "deeplink": "jw"},
+    # com.hbo.hbonow: HBO Max's Fire TV build, seen on a Fire TV Cube (Fire OS 7.7).
     {"id": "hbo-max", "name": "HBO Max", "package": "com.wbd.stream", "colour": "#002BE7",
-     "jw": ["max", "hbomax"], "deeplink": "search"},
+     "packages": ["com.hbo.hbonow"], "jw": ["max", "hbomax"], "deeplink": "search"},
     {"id": "google-tv", "name": "Google TV", "package": "com.google.android.videos", "colour": "#4285F4",
      "jw": ["play", "googleplaymovies"], "deeplink": "app"},
     {"id": "twitch", "name": "Twitch", "package": "tv.twitch.android.app", "colour": "#9146FF",
@@ -73,8 +79,10 @@ APPS = [
      "jw": [], "deeplink": "app"},
     {"id": "moonlight", "name": "Moonlight", "package": "com.limelight", "colour": "#2A2A2A",
      "jw": [], "deeplink": "app"},
+    # com.amazon.tv.settings.v2: Fire OS's own Settings, seen on a Fire TV Cube (Fire OS 7.7), so
+    # Settings in front there counts as Settings and not as an app someone is watching.
     {"id": "settings", "name": "Settings", "package": "com.android.tv.settings", "colour": "#5F6368",
-     "jw": [], "deeplink": "app"},
+     "packages": ["com.amazon.tv.settings.v2"], "jw": [], "deeplink": "app"},
     {"id": "home", "name": "Home", "package": "app.couchtv.launcher", "colour": "#000000",
      "jw": [], "deeplink": "app"},
 ]
@@ -200,6 +208,10 @@ TIZEN_TO_PACKAGE = {tid: BY_ID[aid]["package"] for aid, t in TIZEN.items()
 WEBOS_TO_PACKAGE = {lid: BY_ID[aid]["package"] for aid, w in WEBOS.items() for lid in w["ids"]}
 ROKU_TO_PACKAGE = {rid: BY_ID[aid]["package"] for aid, r in ROKU.items() for rid in r["ids"]}
 BY_PACKAGE = {a["package"]: a for a in APPS}
+# The other builds too (Amazon's on a Fire TV), so what the TV says is in front is a known app.
+for _a in APPS:
+    for _p in _a.get("packages") or []:
+        BY_PACKAGE.setdefault(_p, _a)
 BY_JW = {jw: a for a in APPS for jw in a["jw"]}
 
 # Other packages that mean "the home screen" (our own launcher registers here).
@@ -212,13 +224,16 @@ def public(app, installed=None):
     if app is None:
         return None
     out = {"id": app["id"], "name": app["name"], "package": app["package"], "colour": app["colour"]}
+    if app.get("packages"):
+        out["packages"] = [app["package"], *app["packages"]]   # the Google TV one first
     if installed is not None or "installed" in app:
         out["installed"] = installed
     return out
 
 
 def describe_package(package):
-    """{id, name, package} for whatever package is in front on the TV."""
+    """{id, name, package} for whatever package is in front on the TV. `package` is the one asked
+    about, so on a Fire TV it is Amazon's build, the one the TV home's tile has."""
     if not package:
         return None
     if package in HOME_PACKAGES:

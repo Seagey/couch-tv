@@ -6,6 +6,11 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 18 November 2026: Fire TV app packages (option B, on main, in the next release)
+
+Worked out on a Fire TV Cube (Fire OS 7.7, Android 9).
+
+- **Amazon's builds of YouTube, Prime Video and HBO Max.** A Fire TV ships these as Amazon's own builds, under other package names than the Google TV ones the bridge knew (`com.amazon.firetv.youtube`, `com.amazon.firebat`, `com.hbo.hbonow`; Fire OS's own Settings is `com.amazon.tv.settings.v2`). The bridge took them for apps it had no name for: it never watched what played in them, so their shows never reached Keep watching, it said they were not installed, and every launch and link went to a package the TV did not have. Each app in `bridge/apps.py` can now list its other builds (`packages`), and the bridge opens, links, watches and cards whichever build this TV has, so a Keep watching card's app is the package the TV home's tile has and the two match. `GET /api/apps` lists the packages where there are several. A Google TV with the usual packages behaves exactly as before. bridge/API.md; `tests/test_fire_os_packages.py`.
 ### 17 November 2026: Keep watching from the Plex server's own Continue Watching (option B, from your copy of the repo)
 
 The bridge only learned of a Plex play it saw on the TV, a minute into playback, so a show left half way on a phone, on another TV or before couch-tv existed never got a card. With a `plex` section in `config.json` (the server's address, and optionally whose cards they are) and `PLEX_TOKEN` in `.env`, the bridge now reads the Plex Media Server's own Continue Watching list every five minutes and gives each show and film a Keep watching card next to the plays it logs itself: the show with its season, episode and a progress bar, or the film, newest first, one card per show across both lists. The card opens the show in Plex the way a Plex card already did, and removing it keeps it off until it is watched again. The token stays on the bridge: the TV and the phone get the posters through the bridge, never the token or the server's address. Off unless configured; one Plex account per bridge. docs/CONFIG.md, Plex; `tests/test_plex_keep_watching.py`.

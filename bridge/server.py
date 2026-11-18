@@ -512,11 +512,27 @@ async def installed_packages(max_age=1800, wait=True):
     return installed["packages"]
 
 
+def pkg_of(app):
+    """The package that opens this app on this TV: the one apps.py names or, when the TV has not got
+    that one but has another build of the app ("packages": Amazon's YouTube, Prime Video and HBO Max
+    on a Fire TV), that build. Before the installed list is read, the one apps.py names. Every launch,
+    link and Keep watching card goes through here, so on a Fire TV a card's app.package is the
+    package the TV home's tile has."""
+    canonical = app["package"]
+    try:
+        pk = installed["packages"]
+    except KeyError:   # a TV the bridge keeps no state for (a card read for an unknown TV id)
+        pk = None
+    if pk is None or canonical in pk:
+        return canonical
+    return next((p for p in app.get("packages") or () if p in pk), canonical)
+
+
 def is_installed(app):
     pk = installed["packages"]
     if app["id"] in ("home", "settings"):
         return True
-    return None if pk is None else app["package"] in pk
+    return None if pk is None else pkg_of(app) in pk
 
 
 def now_payload():
@@ -703,11 +719,12 @@ async def h_apps(request):
 
 
 async def launch_app(app):
-    method = await tv.launch_package(app["package"])
-    got = await tv.wait_for_app({app["package"]}, timeout=8)
+    pkg = pkg_of(app)
+    method = await tv.launch_package(pkg)
+    got = await tv.wait_for_app({pkg}, timeout=8)
     if not got and app["id"] == "home":
         await tv.key("home")
-        got = app["package"]
+        got = pkg
     return got, method
 
 
@@ -743,12 +760,12 @@ async def h_launch(request):
     if app.get("id") == "home":
         await tv.key("home")
         record_action(request, "launch", {"app": "home"}, True)
-        return ok(app=apps.describe_package(app["package"]))
+        return ok(app=apps.describe_package(pkg_of(app)))
     got, _ = await launch_app(app)
     record_action(request, "launch", {"app": target}, bool(got))
     if not got:
         await installed_packages(max_age=0)
-        if installed["packages"] is not None and app["package"] not in installed["packages"]:
+        if installed["packages"] is not None and pkg_of(app) not in installed["packages"]:
             raise ApiError(
                 404,
                 f"{app['name']} is not installed on the TV",
@@ -811,6 +828,7 @@ def title_link(app, best):
 async def search_in_app(app, title, best=None):
     """Open the app on the title's page or its search with the title typed in, or just the app."""
     from urllib.parse import quote
+    pkg = pkg_of(app)
     link = title_link(app, best) if tv.kind == "android" else None
     # Only over ADB, which pins the link to the app's own package (-p). The remote-link fallback
     # in start_intent would hand a nuvio:// link to whichever app claims it.
@@ -818,15 +836,15 @@ async def search_in_app(app, title, best=None):
         link = None
     if link:
         try:
-            await tv.start_intent(link, app["package"])
-            if await tv.wait_for_app({app["package"]}, timeout=8):
+            await tv.start_intent(link, pkg)
+            if await tv.wait_for_app({pkg}, timeout=8):
                 return "deeplink", f"Opened the {title} page in {app['name']}."
         except Exception as e:
             log.warning("title link failed for %s: %s", app["id"], e)
     link = SEARCH_LINKS.get(app["id"]) if tv.kind == "android" else None
     if link:
-        await tv.start_intent(link.format(q=quote(title)), app["package"])
-        if await tv.wait_for_app({app["package"]}, timeout=8):
+        await tv.start_intent(link.format(q=quote(title)), pkg)
+        if await tv.wait_for_app({pkg}, timeout=8):
             return "search", f"Opened {app['name']} search for {title}."
     # Google TV's own search (GLOBAL_SEARCH) only shows a stuck search bar on this TV, so the
     # fallback is the app itself (DEEPLINKS.md).
@@ -934,14 +952,15 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
         link = resume_link(app["id"], link, best["title"])
 
     method, started = None, None
+    pkg = pkg_of(app)
     if app["deeplink"] == "jw" and link and tv.can_deeplink(app):
         cold = app.get("cold")
         if cold == "background":
-            cold = await tv.front_package() != app["package"]
+            cold = await tv.front_package() != pkg
         try:
             extra = {"media_type": "series" if best["type"] == "tv" else "movie"} if tv.kind == "roku" else {}
-            await tv.start_intent(link, app["package"], cold=bool(cold), **extra)
-            if await tv.wait_for_app({app["package"]}, timeout=10):
+            await tv.start_intent(link, pkg, cold=bool(cold), **extra)
+            if await tv.wait_for_app({pkg}, timeout=10):
                 method = "deeplink"
         except Exception as e:
             log.warning("deep link failed for %s: %s", app["id"], e)
@@ -1574,7 +1593,7 @@ def profile_item(items, order, own=()):
 async def get_it_playing(app, link, who):
     """After a deep link: pass a "Who's watching?" screen with the right profile, open the link
     again, and press Play if the app stops on the title page. Returns (started, profile)."""
-    pkg = app["package"]
+    pkg = pkg_of(app)
     # Short waits: a profile screen or a title page never plays by itself, and each screen read
     # costs 3 to 4 s already (first real run, Stan, 29 Oct: 36 s from ask to playing).
     if await wait_until_playing(pkg, timeout=1.5):
@@ -1641,7 +1660,7 @@ def finish_play(best, app, method, note, season, episode, who, ep_info=None, not
     item = {"title": best["title"], "year": best["year"], "type": best["type"],
             "poster": best["poster"], "backdrop": best["backdrop"], "service": app["id"],
             "season": season, "episode": episode, "started": now_iso(),
-            "package": app["package"], "who": who, "ts": time.time()} | extra
+            "package": pkg_of(app), "who": who, "ts": time.time()} | extra
     playing["item"] = item
     store.add_history({"title": best["title"], "year": best["year"], "type": best["type"],
                        "poster": best["poster"], "backdrop": best["backdrop"],
@@ -1654,7 +1673,7 @@ def finish_play(best, app, method, note, season, episode, who, ep_info=None, not
     asyncio.get_running_loop().call_later(5, lambda: asyncio.ensure_future(recs_refresh_soon()))
     return {"title": best["title"], "year": best["year"], "type": best["type"],
             "poster": best["poster"], "backdrop": best["backdrop"], "service": app["id"],
-            "app": apps.describe_package(app["package"]), "method": method, "note": note,
+            "app": apps.describe_package(pkg_of(app)), "method": method, "note": note,
             **messages.note_fields(note_key, note_vars)}
 
 
@@ -1764,7 +1783,7 @@ async def kids_list():
             continue
         await kids.enrich(m["shows"], finder.find)
         pub = kids.public_mode(m)
-        names = {a["package"]: a["name"] for a in apps.APPS}
+        names = {p: a["name"] for p, a in apps.BY_PACKAGE.items()}   # the other builds too
         out.append({"id": p["id"], "name": p["name"], "shows": pub["shows"],
                     "apps": [{"package": k, "name": names.get(k, k)} for k in pub["apps"]],
                     # the same hash config.js carries, so a PIN changed on the phone reaches the TV
@@ -2739,14 +2758,14 @@ def continue_items(who=None, base=""):
         app = apps.BY_ID.get(h.get("service"))
         out.append({"id": h["id"], "title": h["title"], "episode_title": h.get("episode_title"),
                     "season": h.get("season"), "episode": h.get("episode"),
-                    "app": apps.describe_package(app["package"]) if app else None,
+                    "app": apps.describe_package(pkg_of(app)) if app else None,
                     "service": h.get("service"), "poster": h.get("poster"),
                     "backdrop": h.get("backdrop"), "progress": None, "kind": "continue",
                     "last_played": h.get("when"), "source": "bridge"})
     plex_cards = plex.cards(who, days=store.KEEP_DAYS)
     if not plex_cards:
         return out
-    plex_app = apps.describe_package(apps.BY_ID["plex"]["package"])
+    plex_app = apps.describe_package(pkg_of(apps.BY_ID["plex"]))
     for p in plex_cards:
         out.append({"id": p["id"], "title": p["title"], "episode_title": p.get("episode_title"),
                     "season": p.get("season"), "episode": p.get("episode"), "app": plex_app,
@@ -2808,13 +2827,14 @@ def wn_fresher(h, rows):
     title = finder._norm(h.get("title") or "")
     service = h.get("service")
     app = apps.BY_ID.get(service)
-    pkg = app["package"] if app else service
+    # the row names the build this TV has (Amazon's on a Fire TV), so any of the app's packages counts
+    pkgs = {app["package"], *(app.get("packages") or ())} if app else {service}
     best = None
     for r in rows:
         eng = r.get("engaged")
         if not isinstance(eng, (int, float)) or eng <= line_ts:
             continue
-        if not title or r.get("package") != pkg or finder._norm(r.get("title") or "") != title:
+        if not title or r.get("package") not in pkgs or finder._norm(r.get("title") or "") != title:
             continue
         season, episode = _wn_num(r.get("season")), _wn_num(r.get("episode"))
         if not (season and episode):
@@ -2969,7 +2989,7 @@ async def open_plex_card(p, who):
     method, note = await search_in_app(app, p["title"])
     note_key, note_vars = _search_note_fields(method, app, p["title"])
     return {"title": p["title"], "year": p.get("year"), "type": p.get("type"), "poster": None,
-            "backdrop": None, "service": "plex", "app": apps.describe_package(app["package"]),
+            "backdrop": None, "service": "plex", "app": apps.describe_package(pkg_of(app)),
             "method": method, "note": note, **messages.note_fields(note_key, note_vars)}
 
 
@@ -4050,8 +4070,9 @@ async def move_open(app, now, session, who, again=False):
         video = await move.youtube_video_id(title, (session or {}).get("subtitle"), (session or {}).get("duration"))
         if video:
             link = move.youtube_link(video)   # no time in the link: YouTube resumes from its own history
-            await tv.start_intent(link, app["package"], cold=not again)
-            await tv.wait_for_app({app["package"]}, timeout=10)
+            pkg = pkg_of(app)
+            await tv.start_intent(link, pkg, cold=not again)
+            await tv.wait_for_app({pkg}, timeout=10)
             started, _ = await get_it_playing(app, link, who or cur_who())
             return {"method": "deeplink", "started": started, "video": video}
     else:
@@ -4126,7 +4147,7 @@ async def move_nudge(app, tries=3):
     is lost. Never OK while the app says it is playing (OK would pause it); a show a press paused
     gets Play instead. A screen that can be read is left alone: get_it_playing has already decided.
     Only in apps where a blind OK cannot buy anything (move.BLIND_OK_APPS)."""
-    pkg = app["package"]
+    pkg = pkg_of(app)
     if app["id"] not in move.BLIND_OK_APPS:
         return False
     try:
@@ -4232,7 +4253,8 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
     if not now.get("title"):
         raise ApiError(409, f"{app['name']} does not say what is playing, so it cannot be moved",
                        key="err_move_no_title", vars={"app": app["name"]})
-    pkg = check_package(pkg)   # it goes to TV B's shell below
+    pkg = check_package(pkg)
+    known = apps.BY_ID[app["id"]]   # the app as apps.py knows it: TV B may have another build of it
     title, spot = now["title"], now.get("position_ms")
 
     # 2. TV B: never take a TV from someone who is watching it, or out of kids mode without the PIN
@@ -4246,7 +4268,8 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
         if not force and await _tv_in_use():
             raise ApiError(409, f"{to_name} is playing something", key="err_move_tv_in_use", vars={"tv": to_name})
         on_b = await installed_packages()
-        if on_b is not None and pkg not in on_b:
+        pkg_b = check_package(pkg_of(known))   # it goes to TV B's shell below
+        if on_b is not None and pkg_b not in on_b:
             raise ApiError(409, f"{app['name']} is not installed on {to_name}", key="err_move_not_installed",
                            vars={"app": app["name"], "tv": to_name})
 
@@ -4284,20 +4307,20 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
             _reset_paused_idle()
             # 6. the same title from a fresh start (an app left running may ignore the link, or ask
             # "Who's watching?" and then drop the show), the person's profile, and play
-            await tv.adb("shell", "am", "force-stop", pkg)
+            await tv.adb("shell", "am", "force-stop", pkg_b)
             opened_at = time.monotonic()
-            opened = await move_open(app, now, session, who)
+            opened = await move_open(known, now, session, who)
             started = bool(opened.get("started"))
             if not started and opened.get("method") == "deeplink":
                 # A fresh start is slow (YouTube began a few seconds after `play` stopped waiting, on
                 # a real TV): give it a little longer before deciding the screen needs a press.
-                started = await move_wait_playing(pkg, timeout=8) or await move_nudge(app)
+                started = await move_wait_playing(pkg_b, timeout=8) or await move_nudge(known)
                 if not started and await _who_screen_up():
                     # The profile screen came up after `play` had looked and given up (Disney+ from
                     # a fresh start on a Google TV Streamer). Open it once more: the profile is
                     # picked this time, and the link is opened again behind it.
-                    opened = await move_open(app, now, session, who, again=True)
-                    started = bool(opened.get("started")) or await move_wait_playing(pkg, timeout=8)
+                    opened = await move_open(known, now, session, who, again=True)
+                    started = bool(opened.get("started")) or await move_wait_playing(pkg_b, timeout=8)
             if paused_here:
                 # Netflix starts playback over about ten seconds after it first plays (measured on a
                 # Sony Google TV), so a pause before that comes undone. Look once more now, and again
@@ -4309,7 +4332,7 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
             # Restaurant" (seen on a Sony Google TV and a Google TV Streamer). When both apps name
             # what they play and the names differ, stop it there and say so.
             if started:
-                await media_read(pkg, app)
+                await media_read(pkg_b, app)
                 there = media_now.get("title") if media_now.get("title_from") == "app" else None
                 if now.get("title_from") == "app" and there and not finder.same_title(there, title):
                     wrong_title = there
@@ -4320,11 +4343,11 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
             if started:
                 at = media_now.get("position_ms")
                 if spot is not None and at is not None and not move.near(spot, at):
-                    seek = await move_seek(pkg, spot, opened.get("video"))
+                    seek = await move_seek(pkg_b, spot, opened.get("video"))
                     for _ in range(4 if seek else 0):
                         # the app takes a moment to report the new spot (seen: 2 s was too soon on Netflix)
                         await asyncio.sleep(1.5)
-                        await media_read(pkg, app)
+                        await media_read(pkg_b, app)
                         at = media_now.get("position_ms")
                         if move.near(spot, at):
                             break
