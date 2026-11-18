@@ -85,7 +85,7 @@ Not tested by the author. Each line is what someone said worked on their own dev
   couch-tv. The projector has no Wireless debugging, only USB debugging, and that alone opens ADB on port
   5555, which `check-tv.py` reports (thanks nithinjak, [#159](https://github.com/Seagey/couch-tv/issues/159)).
 - **XGIMI Elfin Flip Plus projector (WK03C, Android TV 11, MediaTek, Mali-G52, 1.7 GB): works with option A,
-  with three things to know**, reported by Gil124 on 0.12 and main.
+  with four things to know**, reported by Gil124 on 0.12 and main.
   - *Smoothness.* Moving along the rows reached the screen every 33.3 ms (30 fps) in the Night look and in
     the OLED look, with Lighter home on or off, while a frame timer inside the page ran at a steady 16.7 ms.
     The GPU could not composite a 1080p WebView at 60 fps: with the display set to 1280x720 it showed 16.7 ms.
@@ -95,6 +95,10 @@ Not tested by the author. Each line is what someone said worked on their own dev
     service (`com.xgimi.xrmservice`, a `GLOBAL_BUTTON` broadcast) before any app sees them, and open Google's
     YouTube. They are scancodes 398 (`KEY_RED`, Android keycode 134) and 399 (`KEY_GREEN`, keycode 139).
     `getevent -lt` shows them.
+  - *Inputs.* The Input quick button (`"quick": ["input"]`) lists HDMI 1, Bluetooth and Network, and OK on
+    HDMI 1 switches to the HDMI input: the passthrough link opens MediaTek's own HDMI view
+    (`com.mediatek.wwtv.tvcenter`) and Home comes back to couch-tv. This firmware has no
+    `com.xgimi.action.hdmiPlayer` (the Horizon S Pro needs it), so nothing extra was needed.
   - *Home.* This unit has no Google launcher installed: the only app that offers a Home screen apart from
     couch-tv is the setup wizard's `RecoveryActivity` (`com.google.android.tungsten.setupwraith`, priority 1,
     ahead of couch-tv's 0). `apply.sh` switched the wizard back on ("an older couch-tv had switched it off")
