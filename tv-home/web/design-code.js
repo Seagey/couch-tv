@@ -77,6 +77,11 @@
       if (img !== undefined && !(typeof img === "string" && (jpegOk(img) || /^backgrounds\/[A-Za-z0-9_-]+\.(jpe?g|png|webp)$/.test(img)))) delete d.background.image;
       var cut = d.background.depth_image;
       if (cut !== undefined && (!d.background.image || !(typeof cut === "string" && (cutoutOk(cut) || /^backgrounds\/[A-Za-z0-9_-]+\.(png|webp)$/.test(cut))))) delete d.background.depth_image;
+      // a video background: never inside the answer and never a link. Only a video this same store
+      // keeps (store:<id>, fetched and checked by its bytes later, bg-video.js) or a built in loop,
+      // and only with its still picture
+      var vid = d.background.video;
+      if (vid !== undefined && (!d.background.image || !(typeof vid === "string" && (/^store:[A-Za-z0-9_-]{16,64}$/.test(vid) || /^backgrounds\/[A-Za-z0-9_-]+\.(mp4|webm)$/.test(vid))))) delete d.background.video;
     }
     return d;
   }
@@ -141,20 +146,27 @@
   // person added by link). A second Content Security Policy narrows the page's own (index.html); two
   // policies both apply, so this can only take away. Photos added by link while it is on load after the
   // next restart, which Home settings does anyway.
-  function lockImages(ownLinks) {
+  // Videos the same way: this page, blob: (a design's video is played from memory once checked) and
+  // the design store; plus the host of the video link this TV's own Home settings use, if any.
+  function hostOf(u) { var m = /^(https:\/\/[a-z0-9.-]+(:\d{1,5})?)\//i.exec(String(u || "")); return m ? m[1].toLowerCase() : ""; }
+  function lockImages(ownLinks, ownVideo) {
     if (!kept() || !document.head) return false;
     var src = ["'self'", "data:", "blob:", "http://tvos.invalid", "https://images.justwatch.com", "https://i.scdn.co"];
     var b = base(); if (b) src.push(b);
-    (ownLinks || []).forEach(function (u) {
-      var m = /^(https:\/\/[a-z0-9.-]+(:\d{1,5})?)\//i.exec(String(u || ""));
-      if (m && src.indexOf(m[1].toLowerCase()) < 0) src.push(m[1].toLowerCase());
-    });
+    (ownLinks || []).forEach(function (u) { var h = hostOf(u); if (h && src.indexOf(h) < 0) src.push(h); });
+    var media = mediaSources(ownVideo);
     var meta = document.createElement("meta");
     meta.setAttribute("http-equiv", "Content-Security-Policy");
-    meta.setAttribute("content", "img-src " + src.join(" "));
+    meta.setAttribute("content", "img-src " + src.join(" ") + "; media-src " + media.join(" "));
     document.head.appendChild(meta);
     return true;
   }
+  function mediaSources(ownVideo) {
+    var media = ["'self'", "blob:"], b = base(), h = hostOf(ownVideo);
+    if (b) media.push(b);
+    if (h && media.indexOf(h) < 0) media.push(h);
+    return media;
+  }
 
-  window.CouchDesignCode = { base: base, readCode: readCode, get: get, kept: kept, forget: forget, accept: accept, lockImages: lockImages };
+  window.CouchDesignCode = { base: base, readCode: readCode, get: get, kept: kept, forget: forget, accept: accept, lockImages: lockImages, mediaSources: mediaSources };
 })();

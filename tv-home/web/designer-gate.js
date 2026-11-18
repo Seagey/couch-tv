@@ -53,24 +53,33 @@
     "img-src 'self' data: blob: https: http://tvos.invalid; media-src 'self' blob: https:; " +
     "connect-src 'self' https: http://127.0.0.1:* http://localhost:*; frame-src https://sdk.scdn.co; font-src 'self' data:; " +
     "object-src 'none'; base-uri 'none'; form-action 'none'";
+  // The policy a design runs under, from this page's rules plus two lists:
   // fonts named by a design (design.js) come only from the design store: font-src names that one
-  // origin and nothing else (never Google), on top of this page and data:
-  function policy(store) {
+  // origin and nothing else (never Google), on top of this page and data:.
+  // opts.media: where videos may come from while a design is on (design-code.js mediaSources: this
+  // page, blob:, the design store and the host of this TV's own Home settings video link). Without
+  // it media-src stays as above.
+  // policy("<store>") names the store for fonts; policy({ media: [...], store: "<store>" }) does both;
+  // with no store given it is the one design-code.js uses.
+  function policy(arg) {
+    var opts = arg && typeof arg === "object" ? arg : null, store = typeof arg === "string" ? arg : opts && typeof opts.store === "string" ? opts.store : undefined;
     var C = typeof window !== "undefined" && window.CouchDesignCode, b = store !== undefined ? store : C && C.base ? C.base() : "";
     b = /^https?:\/\/[a-z0-9.-]+(:\d{1,5})?$/i.test(b || "") ? b : "";
-    return POLICY.replace("font-src 'self' data:", "font-src 'self' data:" + (b ? " " + b : ""));
+    var out = POLICY.replace("font-src 'self' data:", "font-src 'self' data:" + (b ? " " + b : ""));
+    var media = opts && Array.isArray(opts.media) ? opts.media.filter(function (s) { return /^('self'|blob:|https:\/\/[a-z0-9.-]+(:\d{1,5})?|http:\/\/(127\.0\.0\.1|localhost)(:\d{1,5})?)$/i.test(String(s)); }) : null;
+    return media && media.length ? out.replace(/media-src [^;]*;/, "media-src " + media.join(" ") + ";") : out;
   }
-  function lockPage(doc) {
+  function lockPage(doc, opts) {
     doc = doc || (typeof document !== "undefined" ? document : null);
     if (!doc || !doc.head || doc.querySelector && doc.querySelector('meta[data-tvdesigner="policy"]')) return false;
     var m = doc.createElement("meta");
     m.setAttribute("http-equiv", "Content-Security-Policy");
-    m.setAttribute("content", policy());
+    m.setAttribute("content", policy(opts));
     m.setAttribute("data-tvdesigner", "policy");
     doc.head.appendChild(m);
     return true;
   }
 
-  window.CouchDesigner = { KEY: KEY, DEFAULT_STORE: DEFAULT_STORE, DESIGNER_PAGE: DESIGNER_PAGE, POLICY: POLICY, policy: policy,
-    decide: decide, readChoice: readChoice, lockPage: lockPage };
+  window.CouchDesigner = { KEY: KEY, DEFAULT_STORE: DEFAULT_STORE, DESIGNER_PAGE: DESIGNER_PAGE, POLICY: POLICY,
+    decide: decide, readChoice: readChoice, lockPage: lockPage, policy: policy };
 })();

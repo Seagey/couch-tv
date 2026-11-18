@@ -1845,6 +1845,7 @@
       paintFocus();
     }
     sceneVideos(!screenOffActive);
+    designVideo("off", screenOffActive);
     resetIdlePhoto();
   }
   // Smart Idle & OLED-safe Ambient Clock
@@ -1895,7 +1896,10 @@
       ov.classList.remove("active");
     }
     sceneVideos(!idleAmbientActive);   // no clip decoding behind the ambient clock
+    designVideo("idle", idleAmbientActive);
   }
+  // a design's video background (design.js, bg-video.js) stops while the home is not on screen
+  function designVideo(why, held) { if (typeof CouchDesign !== "undefined" && CouchDesign.hold) CouchDesign.hold(why, held); }
   function checkSmartIdle() {
     if (!SMART_IDLE.enabled || document.hidden || screenOffActive || idleAmbientActive) return;
     var mins = isQuietHours(SMART_IDLE.quiet_hours) ? SMART_IDLE.quiet_hours.idle_minutes : SMART_IDLE.home_idle_minutes;
@@ -5492,9 +5496,10 @@
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
+    resume: function () { designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
-    pause: function () { saveFocusNow(); pauseVideo(); },
+    // (and a design's video background lets go of the TV's decoder, which the app may need)
+    pause: function () { saveFocusNow(); pauseVideo(); designVideo("away", true); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
     // the launcher's updater has news (Updater.kt)
@@ -5507,14 +5512,17 @@
   function start() {
     readConfig();
     // a design got by code: pictures only from here, the store and the hosts this TV already uses
-    if (DESIGN_FROM_CODE && CouchDesignCode.lockImages) CouchDesignCode.lockImages((ST.photos || []).map(function (p) { return p && p.url; }));
+    if (DESIGN_FROM_CODE && CouchDesignCode.lockImages) CouchDesignCode.lockImages((ST.photos || []).map(function (p) { return p && p.url; }), VIDEO_URL);
     // the TV Designer's design block (design.js): nothing happens without one, unless the page is
     // the designer's own preview (?designer=1), which sends designs in as they are made
     // With TV Designer off (designer-gate.js) design.js is never started: no keys of its own, no
     // question, no page policy. On, the page policy a design runs under goes in first.
     var designOn = typeof CouchDesign !== "undefined" && !!(GATE.design || GATE.preview);
-    if (designOn && typeof CouchDesigner !== "undefined") CouchDesigner.lockPage();
+    // (videos only from this page, memory, the design store and this TV's own video link)
+    if (designOn && typeof CouchDesigner !== "undefined") CouchDesigner.lockPage(document, typeof CouchDesignCode !== "undefined" && CouchDesignCode.mediaSources ? { media: CouchDesignCode.mediaSources(VIDEO_URL) } : null);
     if (designOn) CouchDesign.start(CFG.design, {
+      // a design's video background keeps its still picture with Lighter home or in power save
+      videoEnv: function () { var ps = false; try { ps = !!(TV && TV.powerSave && TV.powerSave()); } catch (e) {} return { lighter: LIGHTER, powerSave: ps }; },
       clock: function () { glassShown = ""; clock(); },
       apps: function () { renderGrid(); },
       clock24: function () { return CLOCK24; },
