@@ -34,6 +34,10 @@
   // the smart home and music widgets' own layers (group C): set here, beside the table above
   LAYER.energy = "energy"; LAYER.sensor = "sensor"; LAYER.speakers = "speakers"; LAYER.queue = "queue";
   TITLE.energy = "Energy"; TITLE.sensor = "Sensor"; TITLE.speakers = "Speakers"; TITLE.queue = "Up next";
+  // the web widgets' own layers (widget-web.js)
+  LAYER.stocks = "stocks"; TITLE.stocks = "Markets";
+  LAYER.commute = "commute"; TITLE.commute = "Commute";
+  LAYER.picks = "picks"; TITLE.picks = "Picks for you";
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -835,20 +839,88 @@
       return E("div", "cwd-card", "", [E("div", "cwd-mid cwd-ell", "opacity:.8", [String(c.title || "")]), E("div", "cwd-big cwd-ell", "font-size:72px;margin-top:20px", [String(c.value || "")])]);
     })));
   };
+  // the web widgets (widget-web.js): what the widget has, bigger; reading only, nothing opens a link
+  function wk() { return (window.CouchWidgets && window.CouchWidgets.webKit) || {}; }
+  function webRec(env, src, id) { var f = wk().webOf; return f ? f(env, src, id) : null; }
+  function updated(rec) { if (!rec || !rec.at) return ""; var d = new Date(rec.at), h = d.getHours(), m = d.getMinutes(); return "Updated " + ((h % 12) || 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? "am" : "pm") + (rec.stale ? ", not lately" : ""); }
   B.news = function (o, env) {
-    if (!env.demo) return B.setup(o, env);
-    S.body.appendChild(head("info", "Headlines", "Top stories", "#ff453a"));
-    S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:30px", [["Local", "Highway roadworks finish a month early", "1h"], ["Weather", "Storm season outlook: a wetter summer than usual", "2h"], ["Sport", "Matildas name squad for December friendlies", "3h"], ["Business", "Petrol prices ease ahead of the holidays", "4h"]].map(function (x) {
-      return F(E("div", "cwd-news", "", [E("div", "cwd-small", "color:#ff453a;font-weight:700", [x[0] + " · " + x[2]]), E("div", "cwd-big", "font-size:44px;margin-top:6px", [x[1]])]), null, x[1]);
+    var WW = window.CouchWidgetWeb, q = op(o), feed = WW ? WW.feedOf(q.feed) : "abc", name = q.label || (WW ? WW.FEEDS[feed].name : "Headlines"), rec = null, items;
+    if (env.demo) items = (wk().DEMO_NEWS || []).map(function (x) { return { title: x[0], at: Date.now() - x[1] * 3600000 }; });
+    else { rec = webRec(env, "news", feed); if (!rec || !rec.ok || !rec.v || !rec.v.length) return B.setup(o, env); items = rec.v; }
+    S.body.appendChild(head("info", name, rec ? updated(rec) : "The latest headlines", "#ff453a"));
+    // two columns of three: six headlines, each on three lines at most
+    S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:30px", items.slice(0, 6).map(function (x) {
+      return F(E("div", "cwd-news", "width:780px", [x.at ? E("div", "cwd-small", "color:#ff453a;font-weight:700", [wk().agoOf ? wk().agoOf(x.at) : ""]) : null,
+        E("div", "cwd-big", "font-size:40px;margin-top:6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden", [x.title])]), null, x.title);
     })));
   };
+  // the round: every game with its score, in the order it is played (up to 12; a line says how many more)
   B.sports = function (o, env) {
-    if (!env.demo) return B.setup(o, env);
-    S.body.appendChild(head("tv", op(o).label || "NRL", "This round", "#0a6e8a"));
-    var games = [["Titans", "#00a6e2", 24, "Broncos", "#7c1d3f", 18, "Full time"], ["Rabbitohs", "#00843d", 12, "Roosters", "#002b5c", 12, "Live, 62 min"], ["Storm", "#592c82", 6, "Raiders", "#6bbe45", 0, "Live, 21 min"], ["Sharks", "#00a9d8", 0, "Eels", "#ffcc00", 0, "7:50pm"]];
-    var team = function (n, c, s, win) { return E("div", "cwd-row", "justify-content:space-between", [E("div", "cwd-row", "", [E("i", "cwd-dot", "background:" + c), E("span", "cwd-mid", "font-weight:" + (win ? 760 : 520), [n])]), E("span", "cwd-big", "font-size:56px;opacity:" + (win ? 1 : 0.6), [String(s)])]); };
-    S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:30px", games.map(function (g) {
-      return F(E("div", "cwd-game", "", [team(g[0], g[1], g[2], g[2] >= g[5]), team(g[3], g[4], g[5], g[5] >= g[2]), E("div", "cwd-small", "margin-top:10px;color:" + (/Live/.test(g[6]) ? "#ff453a" : "rgba(255,255,255,.7)"), [g[6]])]), null, g[0] + " v " + g[3]);
+    var WW = window.CouchWidgetWeb, q = op(o), id = WW ? WW.leagueOf(q.league) : "nrl", rec = null, v;
+    if (env.demo) v = wk().demoScores ? wk().demoScores() : { games: [] };
+    else { rec = webRec(env, "sports", id); if (!rec || !rec.ok || !rec.v || !rec.v.games || !rec.v.games.length) return B.setup(o, env); v = rec.v; }
+    var games = v.games.slice().sort(function (a, b) { return a.at - b.at; }), shown = games.slice(0, 12), n = shown.length;
+    var cols = n <= 6 ? 2 : n <= 9 ? 3 : 4, w = Math.floor((1600 - (cols - 1) * 24) / cols), big = cols <= 2 ? 56 : cols === 3 ? 48 : 40, mid = cols <= 3 ? 34 : 29;
+    S.body.appendChild(head("tv", q.label || v.league || "Scores", [v.round, rec ? updated(rec) : ""].filter(Boolean).join(". ") || "This round", "#0a6e8a"));
+    var team = function (t, g) {
+      var dim = g.state === "post" && !t.win;
+      return E("div", "cwd-row", "justify-content:space-between;min-width:0", [E("div", "cwd-row", "min-width:0", [E("i", "cwd-dot", "flex:none;background:" + (t.colour || "rgba(255,255,255,.35)")), E("span", "cwd-mid cwd-ell", "font-size:" + mid + "px;font-weight:" + (g.state === "post" && t.win ? 760 : 560) + ";opacity:" + (dim ? 0.7 : 1), [t.name || t.abbr])]),
+        E("span", "cwd-big", "font-size:" + (String(t.score).length > 5 ? Math.round(big * 0.6) : big) + "px;white-space:nowrap;margin-left:14px;opacity:" + (dim ? 0.7 : 1), [String(t.score || "")])]);
+    };
+    S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:26px", shown.map(function (g) {
+      var st = wk().gameStatus ? wk().gameStatus(g, env) : { text: "" };
+      return F(E("div", "cwd-game", "width:" + w + "px;padding:" + (cols <= 2 ? "24px 32px" : "18px 24px"), [team(g.teams[0], g), team(g.teams[1], g), E("div", "cwd-small cwd-ell", "margin-top:8px;color:" + (st.live ? "#ff453a" : "rgba(255,255,255,.7)"), [[g.title, st.text].filter(Boolean).join(". ")])]),
+        null, (g.teams[0].name || "") + " v " + (g.teams[1].name || ""));
+    })));
+    if (games.length > n) S.body.appendChild(E("div", "cwd-small", "margin-top:14px", ["And " + (games.length - n) + " more games"]));
+  };
+  // every pick, from what everyone at home has on the go on this TV; Resume plays it
+  B.picks = function (o, env) {
+    var list = wk().picksOf ? wk().picksOf(env) : [];
+    if (!list.length) return B.setup(o, env);
+    S.body.appendChild(head("favourite", op(o).label || "Picks for you", "From what everyone at home is watching on this TV", "#bf5af2"));
+    var track = E("div", "cwd-track");
+    list.forEach(function (s, i) {
+      track.appendChild(F(E("div", "cwd-show", "", [E("div", "cwd-art", s.art ? "background-image:" + kit().cssImg(s.art) : "", [s.progress ? E("div", "cwd-prog", "", [E("b", "", "width:" + Math.round(s.progress * 100) + "%")]) : null,
+        E("div", "cwd-resume", "", [ic("play", 30, "#111", "solid"), "Play"])]),
+        E("div", "cwd-row", "margin-top:18px", [s.app ? kit().appIcon(s.app, 44, env) : null, E("div", "cwd-col", "margin-left:14px;min-width:0", [E("div", "cwd-mid", "overflow-wrap:anywhere", [s.title]), E("div", "cwd-small", "", [s.why || ""])])])]),
+        function () { if (designerSays()) return; S.api.act("pick", String(i)); close(true); }, s.title));
+    });
+    S.body.appendChild(E("div", "cwd-scroll cwd-grow", "margin-top:40px", [track]));
+  };
+  // the drive: how long, how far, when to leave, and where the route comes from (OpenStreetMap's credit)
+  B.commute = function (o, env) {
+    var host = document.createElement("div"), V = wk().commuteOf ? wk().commuteOf(host, o, { w: 1760, h: 960 }, env) : null;
+    if (!V) return B.setup(o, env);
+    var c = kit().dataOf(env).commute || {}, from = env.demo ? "Home" : (c.from && c.from.name) || "", to = env.demo ? "Work" : (c.to && c.to.name) || "";
+    S.body.appendChild(head("location", V.label, (from && to ? "From " + from + " to " + to + ". " : "") + "The usual drive by road, no live traffic", "#0a84ff"));
+    var tile = function (name, big, sub) { return F(E("div", "cwd-game", "width:520px", [E("div", "cwd-small", "", [name]), E("div", "cwd-big", "font-size:72px;margin-top:8px", [big]), sub ? E("div", "cwd-small", "margin-top:6px", [sub]) : null]), null, name); };
+    var lb = V.leave ? V.leave.replace(/^(.*?)(leave by|Leave by) /, "") : "";
+    S.body.appendChild(E("div", "cwd-grid", "align-content:flex-start;margin-top:30px", [tile("Drive", V.minutes + " min", "Without traffic"), tile("Distance", V.km + " km", "By road"),
+      tile(V.leave ? (/^Leave/.test(V.leave) ? "Leave by" : V.leave.replace(/, leave by .*/, "") + ", leave by") : "Leave by", lb || "Not set", V.leave ? (V.arrive ? "To arrive by " + V.arrive : "") : "Set an arrive by time in couch-tv Studio")]));
+    S.body.appendChild(E("div", "cwd-grow"));
+    S.body.appendChild(E("div", "cwd-small", "", ["Route by OSRM from OpenStreetMap. Map data © OpenStreetMap contributors."]));
+  };
+  // the watchlist with today's line for each (the day's prices, from the first trade to now)
+  B.stocks = function (o, env) {
+    var WW = window.CouchWidgetWeb, q = op(o), list = WW ? WW.tickersOf(q.tickers) : [], rec = null, quotes;
+    if (env.demo) quotes = list.map(function (s, i) { return wk().demoQuote(s, i); });
+    else {
+      rec = webRec(env, "stocks", list.join(","));
+      if (!rec || !rec.ok || !rec.v) return B.setup(o, env);
+      quotes = list.map(function (s) { return (rec.v.quotes || {})[s]; }).filter(Boolean);
+      if (!quotes.length) return B.setup(o, env);
+    }
+    S.body.appendChild(head("info", q.label || "Markets", ["From Yahoo Finance, about 20 minutes late", rec ? updated(rec) : ""].filter(Boolean).join(". "), "#30a46c"));
+    var w = quotes.length <= 4 ? 790 : 520;
+    S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:26px", quotes.map(function (x) {
+      var pts = x.points || [], lo = Math.min.apply(null, pts.concat([x.prev || x.price])), hi = Math.max.apply(null, pts.concat([x.prev || x.price])), span = hi - lo || 1, cw = w - 64, ch = 90;
+      var path = pts.map(function (v, i) { return (i ? "L" : "M") + Math.round(i / Math.max(1, pts.length - 1) * cw) + " " + Math.round(ch - (v - lo) / span * ch); }).join(" ");
+      var base = x.prev ? Math.round(ch - (x.prev - lo) / span * ch) : null, col = wk().upDown ? wk().upDown(x.change) : "#fff";
+      var line = pts.length > 1 ? kit().svg("0 0 " + cw + " " + ch, cw, ch, [base !== null ? kit().S("line", { x1: 0, y1: base, x2: cw, y2: base, stroke: "rgba(255,255,255,.3)", "stroke-width": 2, "stroke-dasharray": "4 8" }) : null,
+        kit().S("path", { d: path, fill: "none", stroke: col, "stroke-width": 4, "stroke-linejoin": "round", "stroke-linecap": "round" })], "margin-top:14px;display:block") : null;
+      return F(E("div", "cwd-game", "width:" + w + "px", [E("div", "cwd-row", "justify-content:space-between", [E("span", "cwd-mid cwd-ell", "min-width:0", [x.name]), E("span", "cwd-chip on", "flex:none;margin-left:14px;background:" + col + ";color:#fff", [WW ? WW.change(x) || "0%" : ""])]),
+        E("div", "cwd-big", "font-size:52px;margin-top:8px", [WW ? WW.price(x) : String(x.price)]), line]), null, x.name);
     })));
   };
 

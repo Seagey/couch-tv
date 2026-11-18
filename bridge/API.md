@@ -510,6 +510,18 @@ key is not set.
 {"ok": true, "cards": [{"title": "Solar today", "value": "18.4 kWh", "app": "com.example.solar"}]}
 ```
 
+### `GET /api/webdata?src=news&id=abc`
+The relay for the TV home's web widgets (`tv-home/web/widget-web.js`, `bridge/webdata.py`): a news feed
+or a share price sends no CORS header, so the home asks here. `src` is `news` (`id` one of `abc`,
+`abc-justin`, `abc-sport`, `abc-business`, `sbs`, `guardian`, `bbc`, `rnz`) or `stocks` (`id` up to 8
+Yahoo symbols joined by commas, like `^AXJO,BHP.AX,AUDUSD=X`). Anything else is 400: it never takes a
+link. The answer is the source's own text (the home reads it); kept 10 minutes for news, 2 for prices;
+502 when the source cannot be read. The launcher (`http://tvos.invalid/webdata`) and the on-TV app
+answer the same way.
+```json
+{"ok": true, "src": "news", "id": "abc", "text": "<?xml version=\"1.0\"?><rss>..."}
+```
+
 ### `GET /api/continue`
 "Keep watching" for one TV (`?tv=`) and one person (`?who=`, else the person on that TV's couch):
 one card per show (its latest episode), newest first, at most 10, nothing older than 30 days.

@@ -3798,6 +3798,7 @@
       } });
       // a design switched off with Back held, or not chosen yet: it comes back here
       if (CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.settingsRow) rows.push(CouchDesign.settingsRow(restart));
+      commuteRows(rows);
     }
     if (on && AH) rows.push({ kind: "nav", key: "dz-athome", label: "At home", sub: "A note, lists, guest Wi-Fi, a house guide, your calendar and screen time, for your widgets", act: openAtHome });
     designCodeRows(rows);
@@ -3821,6 +3822,8 @@
     var w = PEOPLE.map(function (p) { return p.name; }).concat((CFG.people || []).map(function (p) { return p && (p.name || p); }));
     var pl = ST.place || {};
     w.push(WXCFG && WXCFG.place, pl.name, pl.area, CFG.weather && CFG.weather.place);
+    // where the household drives to (the Commute widget's place, kept on this TV)
+    var cm = kept("tvhome.commute"); if (cm && cm.name) w.push(String(cm.name));
     try { w.push(location.hostname); } catch (e) {}
     w = w.concat(ahPrivateWords());
     return w.filter(function (x) { return typeof x === "string" && x.length >= 3 && !/^(home\.tvos\.invalid|localhost|127\.0\.0\.1)$/.test(x); });
@@ -5509,6 +5512,168 @@
     // a calendar the launcher read for the Agenda widget (MainActivity.calendar)
     calendarText: function (id, ok, text) { calendarText(id, ok, text); } };
 
+  // ---------------- the web widgets (widget-web.js): headlines, scores, markets, the commute ----------------
+  // Asked only while such a widget is on the home, each source at most once per refresh, the last
+  // answers kept on this TV. A news feed or a share price sends no CORS header, so the TV asks through a
+  // relay that is part of couch-tv at home: the bridge or the on-TV app (/api/webdata), or with neither,
+  // this TV's own launcher (tvos.invalid/webdata). Scores and the drive come straight from their free
+  // services. A preview (?mock=1) asks nobody (weblive=1: a test that does).
+  var WEB = null, webTimer = 0;
+  function webRelayOk() { return !OFFLINE || !!(TV && TV.webData && TV.webData()); }
+  function webRelay(src, id) {
+    var q = "src=" + encodeURIComponent(src) + "&id=" + encodeURIComponent(id);
+    var get = function (url, auth) {
+      return new Promise(function (resolve, reject) {
+        var x = new XMLHttpRequest();
+        x.open("GET", url); x.timeout = 15000;
+        if (auth && KEY) x.setRequestHeader("Authorization", "Bearer " + KEY);
+        x.onload = function () { var j = null; try { j = JSON.parse(x.responseText); } catch (e) {} if (x.status === 200 && j && j.ok && typeof j.text === "string") resolve(j.text); else reject(new Error((j && j.error) || "relay " + x.status)); };
+        x.onerror = x.ontimeout = function () { reject(new Error("relay")); };
+        x.send();
+      });
+    };
+    return !OFFLINE ? get(API + "/api/webdata?" + q + (TV_ID ? "&tv=" + TV_ID : ""), true) : get("http://tvos.invalid/webdata?" + q, false);
+  }
+  function webStart() {
+    if (WEB || typeof CouchWidgetWeb === "undefined" || !CouchDesign.widgetsOf || (MOCK && !/[?&]weblive=1/.test(Q))) return;
+    WEB = CouchWidgetWeb.loader({
+      widgets: function () { return CouchDesign.widgetsOf(Object.keys(CouchWidgetWeb.SOURCES)); },
+      canRelay: webRelayOk, relay: webRelay,
+      json: function (url) { return fetch(url).then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); }); },
+      // the last answers, on this TV only (headlines and prices, never anything about the household)
+      load: function () { try { return JSON.parse(localStorage.getItem(PFX + "tvhome.webdata") || "null"); } catch (e) { return null; } },
+      save: function (o) { try { localStorage.setItem(PFX + "tvhome.webdata", JSON.stringify(o)); } catch (e) {} },
+      changed: webChanged,
+      paused: webPaused,
+      places: commutePlaces,
+      hidden: function () { return !!document.hidden; }
+    });
+    // the first look waits for the store's off switch (or 6 seconds), so a paused source is never asked
+    var go = function () { if (WEB && !WEB.started) { WEB.started = true; WEB.start(); } };
+    if (CouchDesign.widgetsOf(Object.keys(CouchWidgetWeb.SOURCES)).length) webPaused(); else WEB_PAUSE = WEB_PAUSE || { at: 0, paused: [] };
+    if (WEB_PAUSE.wait) { WEB_PAUSE.wait.then(go, go); setTimeout(go, 6000); } else go();
+  }
+  // The design store's off switch for the web widgets' sources (widget-web.js pausedOf): GET
+  // <store>/v1/config/sources, asked at most once a day and only while a web widget is on the home,
+  // with no cookies and no referrer. No store, no answer or a bad one: everything on.
+  var WEB_PAUSE = null;
+  function webPaused() {
+    var t = Date.now();
+    if (!WEB_PAUSE) {
+      var c = null;
+      try { c = JSON.parse(localStorage.getItem(PFX + "tvhome.webpause") || "null"); } catch (e) {}
+      WEB_PAUSE = c && isFinite(c.at) && t - c.at < 86400000 && t >= c.at ? { at: c.at, paused: CouchWidgetWeb.pausedOf(c) } : { at: 0, paused: [] };
+    }
+    if (t - WEB_PAUSE.at >= 86400000) webPauseAsk();
+    return WEB_PAUSE.paused;
+  }
+  function webPauseAsk() {
+    var base = typeof CouchDesignCode !== "undefined" && CouchDesignCode.base ? CouchDesignCode.base() : "", t = Date.now();
+    WEB_PAUSE.at = t;   // one ask a day, whatever the answer
+    var done = function (paused) {
+      var was = WEB_PAUSE.paused.join();
+      WEB_PAUSE = { at: t, paused: paused };
+      try { localStorage.setItem(PFX + "tvhome.webpause", JSON.stringify({ at: t, paused: paused })); } catch (e) {}
+      if (was !== paused.join()) { if (WEB) WEB.tick(); webChanged(); }
+    };
+    if (!base || !window.fetch) return done([]);
+    WEB_PAUSE.wait = fetch(base + "/v1/config/sources", { credentials: "omit", referrerPolicy: "no-referrer", cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { done(CouchWidgetWeb.pausedOf(j)); }, function () { done([]); });
+    return WEB_PAUSE.wait;
+  }
+  function webChanged() { clearTimeout(webTimer); webTimer = setTimeout(function () { if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("web"); }, 150); }
+  // The commute's two places, kept on this TV only (never in a design, never sent to the bridge): from
+  // the town set in Location (or config.json's weather place), to the place picked in Home settings,
+  // couch-tv Studio, Commute. Both are towns or suburbs from the place search, about a kilometre wide.
+  function commutePlaces() {
+    var pl = ST.place && isFinite(ST.place.lat) && isFinite(ST.place.lon) ? { name: ST.place.name, lat: ST.place.lat, lon: ST.place.lon }
+      : CFG.weather && isFinite(CFG.weather.lat) && isFinite(CFG.weather.lon) ? { name: String(CFG.weather.place || "").split(",")[0], lat: CFG.weather.lat, lon: CFG.weather.lon } : null;
+    var to = kept("tvhome.commute");
+    return { from: pl, to: to && isFinite(to.lat) && isFinite(to.lon) ? { name: String(to.name || ""), lat: +to.lat, lon: +to.lon } : null };
+  }
+  // Picks for you: each person's Keep watching (no kids or guest profiles' shows are picked for others)
+  function householdData() {
+    if (NOBODY || !KW_ON) return [];
+    return PEOPLE.map(function (p) {
+      var kid = !!(window.KidsMode && window.KidsMode.isKid && window.KidsMode.isKid(p)) || !!p.kid;
+      return { id: p.id, name: p.name, kid: kid, guest: !!p.guest, shows: (data.showsBy[p.id] || []).slice(0, KEEP_MAX) };
+    });
+  }
+  // OK on a pick: the show, in its own app, the way Keep watching opens it (as its owner's)
+  function playPick(i) {
+    var d = typeof CouchWidgetWeb !== "undefined" ? CouchWidgetWeb.picks(householdData(), who, arrangeItems().items.map(function (it) { return it.package; }), 8) : [], p = d[i];
+    var it = p && (data.showsBy[p.owner] || [])[p.i];
+    if (!it) return;
+    status(it.app ? t("opening_in", { title: it.title, app: it.app.name }) : t("opening", { title: it.title }), true);
+    if (it.wn && TV && TV.openWatchNext) {
+      if (!TV.openWatchNext(String(it.id)) && it.app) TV.launch(it.app.package);
+      status("");
+      return;
+    }
+    api("POST", "/api/continue/open", { id: it.id, who: p.owner }, 60000)
+      .then(function (res) { status(res.note ? tBridge(res.note_key, res.note_vars, res.note) : ""); })
+      .catch(function (e) { if (TV && it.app && TV.launch(it.app.package)) { status(""); return; } status(tBridge(e.key, e.vars, e.message)); });
+  }
+  function commuteData() {
+    var p = commutePlaces();
+    return { from: p.from ? { name: p.from.name } : null, to: p.to ? { name: p.to.name } : null,
+      key: typeof CouchWidgetWeb !== "undefined" ? CouchWidgetWeb.routeKey(p.from, p.to) : null };
+  }
+  // Home settings, couch-tv Studio, Commute: shown while a design has a Commute widget (English only,
+  // like the rest of this section)
+  var cgeoTimer = null, cgeoTicket = 0;
+  function commuteRows(rows) {
+    if (typeof CouchDesign === "undefined" || !CouchDesign.widgetsOf || !CouchDesign.widgetsOf(["commute"]).length) return;
+    var p = commutePlaces(), g = SET.cgeo || (SET.cgeo = { q: "", list: null, busy: false, err: false });
+    rows.push(head("Commute"));
+    rows.push(info("cm-from", "From", p.from ? p.from.name : "Not set", p.from ? "Your town in Location" : "Set your town in Location first"));
+    rows.push({ kind: "input", key: "cm-search", label: "Where to", sub: p.to ? p.to.name : "Type the town or suburb you drive to", value: g.q, act: function () {
+      startTyping({ label: "Type the town or suburb you drive to", value: g.q, search: true,
+        live: function (q) { findCommute(q, false); }, submit: function (q) { findCommute(q, true); } });
+    } });
+    if (g.busy) rows.push(info("cm-busy", t("loc_searching")));
+    else if (g.err) rows.push(info("cm-err", t("loc_error")));
+    else if (g.list && !g.list.length) rows.push(info("cm-none", t("loc_none", { q: g.q })));
+    (g.list || []).forEach(function (pl, i) {
+      rows.push({ kind: "choice", key: "cplace:" + i, label: pl.name, sub: pl.area, checked: !!(p.to && p.to.lat === pl.lat && p.to.lon === pl.lon), act: function () { chooseCommute(pl); } });
+    });
+    if (p.to) rows.push({ kind: "action", key: "cm-forget", label: "Forget where you drive to", sub: "Removes it from this TV", act: function () {
+      keep("tvhome.commute", null); SET.msg = "Forgotten. The Commute widget asks for a place again."; webChanged();
+    } });
+    rows.push(info("cm-note", "Kept on this TV only, never in a design. The route uses the suburb, never your address."));
+  }
+  function findCommute(q, go) {
+    clearTimeout(cgeoTimer);
+    q = (q || "").trim();
+    SET.cgeo = SET.cgeo || {};
+    SET.cgeo.q = q;
+    if (q.length < 2) { SET.cgeo = { q: q, list: null, busy: false, err: false }; if (zone === "settings") renderSettings(); return; }
+    var run = function () {
+      var ticket = ++cgeoTicket;
+      SET.cgeo.busy = true; SET.cgeo.err = false;
+      if (zone === "settings") renderSettings();
+      geocode(q).then(function (list) {
+        if (ticket !== cgeoTicket) return;
+        SET.cgeo = { q: q, list: list, busy: false, err: false };
+        if (go && list.length && !SET.typing) { SET.col = "rows"; SET.keyFocus = "cplace:0"; }
+        if (zone === "settings") renderSettings();
+      }, function () {
+        if (ticket !== cgeoTicket) return;
+        SET.cgeo = { q: q, list: null, busy: false, err: true };
+        if (zone === "settings") renderSettings();
+      });
+    };
+    if (go) run(); else cgeoTimer = setTimeout(run, 500);
+  }
+  function chooseCommute(pl) {
+    // the town or suburb from the place search (two decimals: about a kilometre), never an address
+    keep("tvhome.commute", { name: pl.name, lat: pl.lat, lon: pl.lon });
+    SET.msg = "Commute set: to " + pl.name + ".";
+    if (WEB) WEB.tick();
+    webChanged();
+  }
+
   function start() {
     readConfig();
     // a design got by code: pictures only from here, the store and the hosts this TV already uses
@@ -5540,7 +5705,13 @@
           // the scenes the launcher's Home Assistant allows (names and entities only, never its address)
           scenes: window.smartHome && window.smartHome.scenes ? window.smartHome.scenes() : [],
           // things typed at home (Home settings, couch-tv Studio, At home): kept on this TV only
-          home: homeView() };
+          home: homeView(),
+          // the web widgets' answers (widget-web.js): headlines, scores, prices, the drive
+          web: WEB ? WEB.data() : null,
+          // the commute's two places by name only, and the drive's id (Home settings; never in a design)
+          commute: commuteData(),
+          // everyone's Keep watching on this TV, for Picks for you (widget-web.js picks; stays on the TV)
+          household: householdData() };
       },
       // the detail layers (widget-detail.js) ask Home Assistant through smarthome.js, never directly
       ha: function (action, entity, value) {
@@ -5558,6 +5729,7 @@
           if (TV && TV.launch(arg)) return;
           api("POST", "/api/launch", { app: (it && it.id) || arg }).catch(function (e) { status(tBridge(e.key, e.vars, e.message)); });
         } else if (what === "show") { zone = "shelf"; s = Math.max(0, parseInt(arg, 10) || 0); activate(); zone = "grid"; }
+        else if (what === "pick") playPick(parseInt(arg, 10) || 0);
         else if (what === "more") { dockBack = null; expanded = true; zone = "grid"; g = 0; renderGrid(); paintFocus(); }
         else if (what === "gear") openGear();
         else if (what === "smart") openSmart();
@@ -5571,6 +5743,7 @@
       },
       fromCode: DESIGN_FROM_CODE
     });
+    if (designOn) webStart();
     kidsInit();
     kidSync();   // a kids profile on the couch: its shelf before anything else shows
     staticText();

@@ -44,6 +44,7 @@ import vizio
 import panasonic
 import tivo
 import spotify_now
+import webdata
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -2303,6 +2304,21 @@ async def h_weather(request):
     return ok(**w)
 
 
+# ---------- the web widgets' relay (bridge/webdata.py): news feeds and share prices, by id only ----------
+async def h_webdata(request):
+    src, ident = request.query.get("src", ""), request.query.get("id", "")
+    # only the TV home asks this, and it shows its own words for a failure (widgets.js), so the answer
+    # carries no message key for the phone remote
+    try:
+        text = await webdata.get(src, ident)
+    except webdata.BadSource as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+    except Exception as e:  # the source is down or slow: the home keeps its last answer and asks again
+        log.warning("webdata %s: %s", src, e)
+        return web.json_response({"ok": False, "error": "The source could not be read just now."}, status=502)
+    return ok(src=src, id=ident, text=text)
+
+
 # ---------- custom cards (home.custom_cards, bridge/custom_cards.py) ----------
 async def h_custom_cards(request):
     """The household's own cards for the TV home: display only, cleaned and capped. Empty when off."""
@@ -3863,6 +3879,7 @@ def make_app():
     r.add_post("/api/kids", h_kids_set)
     r.add_post("/api/who", h_who_set)
     r.add_get("/api/weather", h_weather)
+    r.add_get("/api/webdata", h_webdata)
     r.add_get("/api/custom-cards", h_custom_cards)
     r.add_get("/api/config", h_config)
     r.add_post("/api/home-apps", h_home_apps)

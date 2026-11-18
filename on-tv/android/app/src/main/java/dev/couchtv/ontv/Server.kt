@@ -218,6 +218,13 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "POST /api/volume" -> volume(body(s))
             "GET /api/screenshot" -> newFixedLengthResponse(Response.Status.OK, "image/png", Tv.screenshot().inputStream(), -1).noStore()
             "GET /api/weather" -> json(200, ok(Weather.get() ?: throw ApiError(503, "No weather right now.")))
+            // the web widgets' relay (WebData.kt): news feeds and share prices, by id only
+            "GET /api/webdata" -> {
+                val src = q("src") ?: ""; val id = q("id") ?: ""
+                val url = WebData.urlFor(src, id) ?: throw ApiError(400, "unknown source")
+                val text = try { WebData.get(src, id, url) } catch (e: Exception) { throw ApiError(502, "The source could not be read just now.") }
+                json(200, ok().put("src", src).put("id", id).put("text", text))
+            }
             "POST /api/home-apps" -> {
                 val b = body(s)
                 Store.writeJson("home-apps.json", JSONObject().put("apps", b.optJSONArray("apps") ?: JSONArray()).put("line", b.optInt("line", 10)))

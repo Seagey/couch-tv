@@ -408,19 +408,29 @@
     night: SAN.b, place: SAN.b, hilo: SAN.b, sport: SAN.b,
     entity: function (v) { return typeof v === "string" && /^climate\.[a-z0-9_]{1,64}$/.test(v) ? v : undefined; },
     controls: function (v) { return SAN.list(v, 8, function (c) { c = obj(c); var o = {}; put(o, "icon", SAN.pick(c.icon, CTL_ICONS)); put(o, "name", SAN.w(c.name, 24)); return o.icon ? o : undefined; }); },
-    shows: function (v) { return SAN.n(v, 1, 5, true); }
+    shows: function (v) { return SAN.n(v, 1, 5, true); },
+    // the web widgets (widget-web.js): a source picked from a fixed list, never a link
+    feed: function (v) { return SAN.pick(v, WEB_FEEDS); },
+    league: function (v) { return SAN.pick(v, WEB_LEAGUES); }, team: function (v) { return SAN.w(v, 24); },
+    // share symbols as Yahoo writes them (BHP.AX, ^AXJO, AUDUSD=X, BTC-AUD): never a link or a word
+    tickers: function (v) { return SAN.list(v, 6, function (s) { s = typeof s === "string" ? s.trim().toUpperCase() : ""; return /^\^?[A-Z0-9]{1,8}([.=-][A-Z0-9]{1,4})?$/.test(s) ? s : undefined; }); },
+    // the commute: when to arrive and the minutes to spare; the places stay on the TV, never here
+    arrive_h: function (v) { return SAN.n(v, 0, 23, true); }, arrive_m: function (v) { return SAN.n(v, 0, 59, true); },
+    buffer: function (v) { return SAN.n(v, 0, 60, true); }, weekdays: SAN.b
   };
+  var WEB_LEAGUES = ["afl", "nrl", "aleague", "epl", "nba", "bbl", "cricket"];
+  var WEB_FEEDS = ["abc", "abc-justin", "abc-sport", "abc-business", "sbs", "guardian", "bbc", "rnz"];
   var WOPT = {
     clock: "format ampm seconds date align", tallclock: "format align", glassclock: "format scene", analog: "seconds", flipclock: "format",
     wordclock: "", solar: "", worldclock: "cities", countdown: "label month day unit icon", date: "show dfmt align place", month: "", timer: "label",
     weather: "place hilo night", bigtemp: "place", hourly: "place", week: "place", rain: "", uv: "", sun: "", moon: "", air: "", surf: "label",
     photo: "image fit caption sub", slideshow: "seconds_each caption sub", mosaic: "count", artframe: "image mat caption sub", memory: "align",
-    keep: "", keeprow: "label shows", upnext: "apps sport", picks: "",
+    keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",
     app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "apps",
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "",
     bins: "weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label align", note: "align", list: "label icon align",
-    card: "label text icon", quote: "text sub", word: "", news: "", sports: "label", stocks: "", commute: "",
+    card: "label text icon", quote: "text sub", word: "", news: "feed label align", sports: "label league team align", stocks: "label tickers align", commute: "label arrive_h arrive_m buffer weekdays align",
     welcome: "kicker text sub align", quick: "quick align", wifi: "align", guide: "align", screentime: "align", stack: ""
   };
   // The smart home and music widgets: which of the TV's own Home Assistant things a widget shows,
@@ -2531,6 +2541,8 @@
     // a weather widget that needs the forecast is on the home: the TV asks Open-Meteo for it
     // which of these widget kinds are on the home (air and surf ask their own free services only then)
     wantsKinds: function (kinds) { var on = {}; if (D && ON) list(D.objects).forEach(function (o) { o = obj(o); if (o.type === "widget") [o].concat(list(o.items)).forEach(function (it) { if (kinds.indexOf(obj(it).kind) >= 0) on[obj(it).kind] = 1; }); }); return Object.keys(on); },
+    // the web widgets on the home, each with its options (widget-web.js asks only for these)
+    widgetsOf: function (kinds) { var out = []; if (D && ON) list(D.objects).forEach(function (o) { o = obj(o); if (o.type === "widget") [o].concat(list(o.items)).forEach(function (it) { it = obj(it); if (kinds.indexOf(it.kind) >= 0) out.push({ kind: it.kind, opts: obj(it.opts) }); }); }); return out; },
     wantsForecast: function () { return !!(D && ON && list(D.objects).some(function (o) { o = obj(o); return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return ["weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "air", "surf", "date"].indexOf(it.kind) >= 0; }); })); },
     nogo: function (part) { var pb = PART_BOX.filter(function (x) { return x[0] === part; })[0], n = pb && document.querySelector(pb[1]); return !!(n && n.getAttribute("data-nogo")); },
     // where the remote starts on the dock: the first app, as couch-tv does; with no app showing (a

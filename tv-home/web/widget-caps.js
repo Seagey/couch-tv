@@ -23,6 +23,7 @@
 //                        picks the right list.
 //   until       what the person sees on the TV until it is set up: a setup card, never pretend data
 //   build       for "not-built": what has to be built; otherwise ""
+//   beta        (only some) the Beta label: why this widget is marked Beta, in one plain line
 //   ok          what OK on the remote opens (the detail layer, widget-detail.js), or what it does
 //   platforms   { <tvs/platform-setup.js key>: { on, need, note } }
 //                 on    "yes" | "setup" | "partial" | "no" (the older field the designer reads)
@@ -236,10 +237,14 @@
     upnext: { name: "Up next", status: "setup", what: "One show filling the space, with Resume and Start over. Beside Scores it shows your last game", needs: [WATCH_NEED],
       setup: setup("computer", WATCH), until: "\"Nothing to keep watching yet\", or \"No game to pick up\"", build: "",
       ok: "Resume plays it. Hold OK, then Open, for the whole list", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from couch-tv's home.", vidaa: "Only with a computer at home: the website home cannot." }), sizes: sz(["medium", "wide", "xl", "hero", "full"], [8, 4]) },
-    picks: { name: "Picks for you", status: "not-built", what: "\"Because you watched\" posters", needs: ["Needs couch-tv's picks brought to the home (they are on the home computer only)"],
-      setup: setup("nothing", NOT_YET), until: "\"Picks for you: not on couch-tv yet\", and what it needs",
-      build: "The home has to ask the bridge's /api/recs for the person watching and hand the answer to this widget, as it does for Keep watching.",
-      ok: "Opens the picks, each one playable (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["small", "medium", "wide"], [4, 3]) },
+    // made on the TV from its own Keep watching (widget-web.js picks): no outside service, nothing leaves
+    picks: { name: "Picks for you", status: "setup", what: "Shows the others at home are watching, and your own shows left part way, each ready to play",
+      needs: [WATCH_NEED],
+      setup: setup("computer", { android: WATCH.android.concat(["Picks come from what everyone at home has on the go: add people in Home settings, People."]),
+        web: WATCH.web.concat(["Picks come from what everyone at home has on the go: add people in Home settings, People."]),
+        vidaa: WATCH.vidaa.concat(["Picks come from what everyone at home has on the go: add people in Home settings, People."]) }),
+      until: "\"No picks yet\" until shows are on the go on this TV", build: "",
+      ok: "Opens every pick with Play. OK on a poster plays it", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from couch-tv's home.", vidaa: "Only with a computer at home: the website home cannot." }), sizes: sz(["small", "medium", "wide"], [4, 3]) },
 
     // ---------- apps ----------
     app: { name: "One app", status: "works", what: "One app as a big icon", needs: ["The app installed on this TV"],
@@ -347,22 +352,43 @@
     word: { name: "Word of the day", status: "works", what: "A word and what it means", needs: ["Nothing: the words come with couch-tv"],
       setup: setup("nothing", NOTHING), until: "Always shows a word", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["wtile", "small", "medium"], [4, 2]) },
-    news: { name: "Headlines", status: "not-built", what: "One to four news headlines", needs: ["Needs couch-tv to read a news feed for the TV"],
-      setup: setup("nothing", NOT_YET), until: "\"Headlines: not on couch-tv yet\", and what it needs",
-      build: "The bridge has to read a chosen RSS feed (ABC News and most Australian outlets publish one) and hand the titles to the home; a TV page cannot read most feeds itself (browsers block it).",
-      ok: "Opens the headlines in full (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
-    sports: { name: "Scores", status: "not-built", what: "Scores for your teams", needs: ["Needs a free, reliable score feed for the NRL, AFL and A-League (none exists today)"],
-      setup: setup("nothing", NOT_YET), until: "\"Scores: not on couch-tv yet\", and why",
-      build: "A score source the TV may use: official feeds are paid, TheSportsDB's free tier is patchy for the NRL and AFL, and ESPN's are unofficial. Once one is picked, the bridge reads it for the chosen teams.",
-      ok: "Opens the round: every game with its score (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
-    stocks: { name: "Markets", status: "not-built", what: "The ASX, a few shares and the dollar", needs: ["Needs a free share price feed the TV may use"],
-      setup: setup("nothing", NOT_YET), until: "\"Markets: not on couch-tv yet\", and why",
-      build: "A market source: free share prices are unofficial or delayed; CoinGecko is free for crypto. The bridge would read it for the watchlist kept on the TV.",
-      ok: "Opens the watchlist with today's charts (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "tall"], [2, 2]) },
-    commute: { name: "Commute", status: "not-built", what: "Drive time and when to leave", needs: ["Needs live traffic, which only paid map services give"],
-      setup: setup("nothing", NOT_YET), until: "\"Commute: not on couch-tv yet\", and why",
-      build: "A traffic source (paid) or OSRM's free drive time without traffic, with the home and work places kept on the TV only.",
-      ok: "Opens the drive with when to leave (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
+    // the feed is read through couch-tv itself (the launcher, the on-TV app or the home computer's
+    // bridge: widget-web.js, /api/webdata), never a server of ours; ABC News unless the design picks another
+    news: { name: "Headlines", status: "works", what: "One to four of the latest headlines from a news feed you pick (ABC News unless you choose another)",
+      needs: ["Nothing on a Google TV, Android TV or Fire TV: couch-tv reads the feed itself", "On other TVs, the home computer, which reads the feed for the TV"],
+      setup: setup("designer", {
+        android: ["Nothing to set up: the headlines come from ABC News.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source: ABC News, SBS, The Guardian, BBC or RNZ.", SEND],
+        web: ["Keep the home computer on: it reads the news feed for this TV.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source: ABC News, SBS, The Guardian, BBC or RNZ.", SEND],
+        vidaa: ["Needs a computer at home that stays on, running couch-tv (setup option B). The website home cannot read news feeds.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source.", SEND] }),
+      until: "\"Getting the headlines\" for a moment. If the feed cannot be read, it says so and tries again in a few minutes", build: "",
+      ok: "Opens the headlines: the latest six, with how long ago each came out", platforms: plat("works", "computer", "computer", { android: "couch-tv on the TV reads the feed: no computer needed.", vidaa: "Needs a computer at home: the website home cannot read news feeds." }), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
+    // ESPN's public scoreboards, asked by the TV itself (free, no key; unofficial, so they may change)
+    sports: { name: "Scores", status: "works", beta: "Beta: it reads an unofficial free source, which may change. couch-tv can pause it for every TV, and then the widget says the feed is paused.", what: "This round's games with their scores, live ones first: AFL, NRL, A-League, Premier League, NBA, Big Bash or cricket",
+      needs: ["Nothing: the TV reads the scores itself (the NRL unless you pick another)"],
+      setup: setup("designer", {
+        android: ["Nothing to set up: the widget shows the NRL.", "To pick another competition or your team, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket, and type your team if you like.", SEND],
+        web: ["Keep the home computer on: it runs couch-tv for this TV.", "To pick another competition or your team, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket, and type your team if you like.", SEND],
+        vidaa: ["Nothing to set up: the widget shows the NRL.", "To pick another competition or your team, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket, and type your team if you like.", SEND] }),
+      until: "\"Getting the scores\" for a moment; \"No NRL games this week\" between seasons", build: "",
+      ok: "Opens the round: every game with its score, live ones marked, and when the rest start", platforms: plat("works", "computer", "works", { web: "Works while the home computer is on (it runs couch-tv for this TV)." }), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
+    // Yahoo Finance's chart data (free, no key, unofficial), read through couch-tv itself (the launcher,
+    // the on-TV app or the home computer's bridge: widget-web.js, /api/webdata), never a server of ours
+    stocks: { name: "Markets", status: "works", beta: "Beta: it reads an unofficial free source, which may change. couch-tv can pause it for every TV, and then the widget says the feed is paused.", what: "Your watchlist: the ASX 200, the dollar and Bitcoin unless you pick others, each with today's move. ASX prices are about 20 minutes late",
+      needs: ["Nothing on a Google TV, Android TV or Fire TV: couch-tv reads the prices itself", "On other TVs, the home computer, which reads the prices for the TV"],
+      setup: setup("designer", {
+        android: ["Nothing to set up: it shows the ASX 200, the Australian dollar and Bitcoin.", "To pick your own, open your design in couch-tv Studio on your phone.", "Tap the widget, then type up to six share codes, like BHP.AX or CBA.AX for ASX shares.", SEND],
+        web: ["Keep the home computer on: it reads the prices for this TV.", "To pick your own, open your design in couch-tv Studio on your phone.", "Tap the widget, then type up to six share codes, like BHP.AX or CBA.AX for ASX shares.", SEND],
+        vidaa: ["Needs a computer at home that stays on, running couch-tv (setup option B). The website home cannot read share prices.", "To pick your own, open your design in couch-tv Studio on your phone.", "Tap the widget, then type up to six share codes, like BHP.AX.", SEND] }),
+      until: "\"Getting the prices\" for a moment. If they cannot be read, it says so and tries again in a few minutes", build: "",
+      ok: "Opens the watchlist: each price, today's move and today's line", platforms: plat("works", "computer", "computer", { android: "couch-tv on the TV reads the prices: no computer needed.", vidaa: "Needs a computer at home: the website home cannot read share prices." }), sizes: sz(["tile", "wtile", "small", "tall"], [2, 2]) },
+    // OSRM's free route server with OpenStreetMap roads, asked by the TV itself: the usual drive, no live
+    // traffic (that needs a paid map service). Both places stay on the TV (Location, and Commute in
+    // couch-tv Studio's section of Home settings), never in a design
+    commute: { name: "Commute", status: "setup", what: "The usual drive to work or school by road, and when to leave to arrive on time. No live traffic",
+      needs: ["Your town, and where you drive to, set on the TV (never in the design)"],
+      setup: setup("tv", [OPEN, "Go down to Location and set your town, if it is not set yet.", "Go down to couch-tv Studio, then Commute, Where to. Type the town or suburb you drive to and pick it.", "For when to leave: in couch-tv Studio on your phone, tap the widget and set the arrive by time, then send it again."]),
+      until: "\"Set where you drive to\", and where", build: "",
+      ok: "Opens the drive: how long, how far, and when to leave", platforms: plat("setup", "computer", "setup", { android: "The places are kept on the TV. Drive time without traffic.", web: "Works while the home computer is on. The places are kept on the TV." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- guests and the room ----------
     welcome: { name: "Welcome words", status: "works", what: "A greeting in your own words", needs: ["The words, typed in couch-tv Studio"],
@@ -453,6 +479,8 @@
     on: function (kind, platform) { var c = C[kind]; return c && c.platforms[platform] ? c.platforms[platform].on : "no"; },
     need: function (kind, platform) { var c = C[kind]; return c && c.platforms[platform] ? c.platforms[platform].need : "no"; },
     steps: steps,
+    // "" or the line saying why a widget is marked Beta (its source is unofficial)
+    beta: function (kind) { var c = C[kind]; return (c && c.beta) || ""; },
     card: card
   };
   root.CouchWidgetCaps = API;
