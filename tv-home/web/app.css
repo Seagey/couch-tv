@@ -207,6 +207,10 @@ body {
   to { transform: perspective(60rem) rotateX(-1.2deg) rotateY(1.8deg); }
 }
 @keyframes glint { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+/* a few seconds after the focus last moved (app.js, unsettle), the sway and glint hold still where they
+   are: while anything moves the TV draws the whole screen every frame, and on a 2 GB TV with frosted
+   panels that is 22 frames a second instead of 60. Any key or pointer move starts them again. */
+html.settled .tile.focus .face, html.settled .tile.focus .face::after { animation-play-state: paused; }
 
 /* Keep watching tile */
 .show { width: var(--shelf-w); height: var(--shelf-h); }
@@ -351,6 +355,12 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
   text-shadow: 0 0.125rem 1.125rem rgba(0, 0, 0, 0.25); transition: opacity 600ms ease-in-out;
 }
 .theme-night .date .wx { color: rgba(255, 255, 255, 0.78); font-weight: 400; }
+/* home.date_bars: a thin vertical bar between the day, the place and the weather, in place of the dots */
+.theme-night .date .vbar { display: inline-block; width: 0.125rem; height: 1.3em; margin: 0 0.95em; vertical-align: -0.28em; border-radius: 0.0625rem;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), currentColor 25%, currentColor 75%, rgba(255, 255, 255, 0)); opacity: 0.55; }
+/* the weather place follows the date on the same line, after a middle dot (app.js clock()); the
+   icon then needs only a small gap after the place */
+.theme-night .date .wx-place + svg { margin-inline-start: 0.4rem; }
 .theme-night .date { white-space: nowrap; }
 .theme-night .date.weather-lines { white-space: normal; }
 .theme-night .date.weather-lines .dline {
@@ -424,6 +434,13 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .theme-night .app .face.tool { background: rgba(255, 255, 255, 0.14); }
 .theme-night .app .face.word { font-size: 1.125rem; padding: 0 0.5rem; background: #2a2a30; }
 .theme-night .app .label { top: calc(100% + 0.75rem); }
+/* home.dock_banners: each app's wide TV banner (16:9) instead of its square icon, as tall as the icon */
+.dock-banners.theme-night .app { width: 12.5rem; height: 7rem; }
+.dock-banners.theme-night .app .face { border-radius: 1rem; corner-shape: round; }
+.dock-banners.theme-night .app .face.banner img { width: 100%; height: 100%; object-fit: cover; }
+/* rows of banners below the first: they slide up into view as the focus moves down */
+.dock-banners.theme-night .apps { transition: transform 240ms var(--ease); }
+.dock-down.theme-night .shelf { opacity: 0; }
 /* More apps: the dock grows into a full list and the cards step aside */
 .theme-night.expanded .shelf { display: none; }
 
@@ -1066,6 +1083,21 @@ html.lighter .gear-pop, html.lighter .app-pop, html.lighter .people-pop, html.li
 html.lighter.theme-night .people, html.lighter.theme-night .qbtn:not(.focus), html.lighter.theme-night .grid, html.lighter.theme-night .ncard:not(.focus),
 html.lighter.theme-night .hint.on { background: rgba(30, 20, 28, 0.62); box-shadow: inset 0 0 0 0.0625rem rgba(255, 210, 220, 0.16); }
 html.lighter.glass { --glass-edge: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.26); }
+
+/* Lighter home, the filters it still left on: a Fire TV Cube (2 GB) drew the home at a 17-21 ms frame
+   whenever it animated, over the 16.7 ms budget, with the night dim's brightness filter on three
+   full-screen layers, drop-shadows and saturation on the glass clock, and a brightness filter on
+   every dock icon that is not focused. Under Lighter none of those run: the night dim is one dark
+   sheet over the scene, the fog clock's dark fill is a dark colour, and a dock icon that is not
+   focused is a little see-through instead. */
+html.lighter .night .scene .sbg, html.lighter .night .scene .fg, html.lighter .night .scene .gclock, html.lighter .night .scene .svid,
+html.lighter .s-night .sbg, html.lighter .s-night .fg, html.lighter .gclock, html.lighter .s-water .gclock, html.lighter .s-dawn .gclock,
+html.lighter .s-night .gclock .fill, html.lighter .s-water .gclock.under .fill, html.lighter .clock-liquid.night .scene .gclock { filter: none; }
+html.lighter .night .scene.ready::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0, 0, 0, 0.28); pointer-events: none; }
+html.lighter .s-water .gclock.under { filter: none; opacity: 0.6; }
+html.lighter .s-fog .gclock .fill { filter: none; background-image: none !important; color: rgba(22, 32, 29, 0.78); -webkit-text-fill-color: rgba(22, 32, 29, 0.78); }
+html.lighter .gclock .sheen { display: none; }
+html.lighter.theme-night .app:not(.focus) .face img { filter: none; opacity: 0.85; }
 
 /* webOS: LG's pointer is shown over the home (elsewhere the home is arrows only) */
 html.has-pointer body { cursor: default; }

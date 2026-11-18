@@ -276,7 +276,14 @@ class HomeActivity : Activity() {
             ?: try { sharp(pkg, packageManager.getApplicationInfo(pkg, 0).icon) ?: packageManager.getApplicationIcon(pkg) } catch (e: Exception) { return null }
         val n = 256
         val bmp = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888)
-        d.setBounds(0, 0, n, n); d.draw(Canvas(bmp))
+        // A non-square icon (a wide wordmark) keeps its shape: fit it inside the square, centred (#181).
+        val iw = d.intrinsicWidth; val ih = d.intrinsicHeight
+        if (d !is android.graphics.drawable.AdaptiveIconDrawable && iw > 0 && ih > 0 && iw != ih) {
+            val w = if (iw > ih) n else (n * iw / ih).coerceAtLeast(1)
+            val h = if (ih > iw) n else (n * ih / iw).coerceAtLeast(1)
+            d.setBounds((n - w) / 2, (n - h) / 2, (n + w) / 2, (n + h) / 2)
+        } else d.setBounds(0, 0, n, n)
+        d.draw(Canvas(bmp))
         val bytes = ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.PNG, 100, it); bmp.recycle() }.toByteArray()
         icons[pkg] = bytes
         return bytes

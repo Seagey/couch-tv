@@ -5,7 +5,7 @@ import { tick } from './haptics.js';
 import * as Ic from './icons.jsx';
 import { TopBar, NowPlaying, Pad, Controls, AskButton } from './Remote.jsx';
 import { Watch } from './Watch.jsx';
-import { AskSheet, MoreSheet, ArrangeSheet, PeopleSheet, Onboarding } from './Sheets.jsx';
+import { AskSheet, MoreSheet, TypeSheet, ArrangeSheet, PeopleSheet, Onboarding } from './Sheets.jsx';
 import { KidsSheet, PinSheet } from './Kids.jsx';
 import { usePullDown, usePageDrag } from './gestures.js';
 import { t, tBridge, useLang, setTvLang } from './i18n.js';
@@ -166,6 +166,7 @@ export default function App() {
   const [sleepError, setSleepError] = useState(null);
   const [, setNowTick] = useState(0);
   const askInput = useRef(null);
+  const typeInput = useRef(null);
   const { w, h } = useSize();
   const wide = w >= 760 && h >= 480;
   const standalone = typeof navigator !== 'undefined' && (navigator.standalone || window.matchMedia('(display-mode: standalone)').matches);
@@ -269,6 +270,16 @@ export default function App() {
     .then((d) => { setTv(d); setReach(true); loadRecs(); api.apps().then((a) => setApps(a.apps)).catch(() => {}); })
     .catch(() => say(t('still_cant_reach'), 'err'));
   const onPower = () => (tv?.power === 'on' ? run(api.power('off')) : onWake());
+  // Move what is playing on this TV to another one. A TV that is playing something itself is only
+  // taken over after a yes.
+  const onMove = async (to, force = false) => {
+    setSheet(null); say(t('moving_to', { tv: to.name }));
+    try { const r = await api.move(to.id, force); say(tBridge(r.note_key, r.note_vars, r.note)); } catch (e) {
+      if (e.key === 'err_move_tv_in_use' && !force && window.confirm(t('move_take_over', { tv: to.name }))) { onMove(to, true); return; }
+      if (e.status === 0) setReach(false);
+      say(tBridge(e.key, e.vars, e.message), 'err');
+    }
+  };
   const onPlay = async (show) => {
     if (show.playable === false) { say(t('not_on_tv', { title: show.title, service: serviceName(show.service) })); return; }
     say(t('starting', { title: show.title }));
@@ -300,6 +311,8 @@ export default function App() {
   // iOS only raises the keyboard if focus happens inside the tap itself, and a closed sheet is inert
   // (cannot take focus), so open it synchronously, then focus, all within the same tap.
   const openAsk = () => { tick(); flushSync(() => setSheet('ask')); askInput.current?.focus({ preventScroll: true }); };
+  const openType = () => { tick(); flushSync(() => setSheet('type')); typeInput.current?.focus({ preventScroll: true }); };
+  const sendText = (text) => run(api.text(text), t('sent_to_tv'));
 
   const sleepEnds = tv?.sleep?.ends;
   const sleepLeft = sleepEnds ? `${Math.max(0, Math.round((new Date(sleepEnds) - Date.now()) / 60000))}m` : null;
@@ -369,7 +382,7 @@ export default function App() {
       </div>
       <Pad onPointer={(thisTv || (tvs.length === 1 ? tvs[0] : null))?.kind === 'lg' ? (d) => api.pointer(d) : null} onKey={onKey} offState={offState} wakeError={wakeError} onWake={onWake} onRetry={onRetry}
         tvName={thisTv?.name} onLivingRoom={() => { tick(); chooseTv(null); }} />
-      <Controls tv={tv} onKey={onKey} onVolume={onVolume} />
+      <Controls tv={tv} onKey={onKey} onVolume={onVolume} onType={openType} />
       {wide && askOn && !kidIds.includes(who) && <AskButton onAsk={openAsk} quiet={Boolean(offState)} />}
     </div>
   );
@@ -398,9 +411,11 @@ export default function App() {
       )}
       {toast && <div key={toast.id} className={`toast glass ${toast.kind}`} role="status">{toast.text}</div>}
       <AskSheet ref={askInput} open={sheet === 'ask'} onClose={() => setSheet(null)} who={who} recs={recs} onAsk={onAsk} onDone={(reply) => say(reply)} />
+      <TypeSheet ref={typeInput} open={sheet === 'type'} onClose={() => setSheet(null)} onText={sendText} />
       <MoreSheet ref={moreSheet} open={sheet === 'more'} tvs={tvs} tvId={tvId || 'living-room'} onTv={(id) => { tick(); chooseTv(id); }}
+        canMove={!offState && ['playing', 'paused', 'buffering'].includes(tv?.playing?.state) && Boolean(tv?.playing?.title)} onMove={onMove}
         picture={tv?.picture} pictureInfo={pictureInfo} onPicture={onPicture} onClose={() => setSheet(null)} sleepEnds={sleepEnds} sleepError={sleepError} onSleep={onSleep}
-        onKey={onKey} onText={(text) => run(api.text(text), t('sent_to_tv'))} onArrange={() => setSheet('arrange')} onPeople={() => setSheet('people')} onKids={() => setSheet('kids')} />
+        onKey={onKey} onText={sendText} onArrange={() => setSheet('arrange')} onPeople={() => setSheet('people')} onKids={() => setSheet('kids')} />
       <ArrangeSheet open={sheet === 'arrange'} onClose={() => setSheet(null)} tvName={thisTv?.name} hidden={hidden} />
       <KidsSheet open={sheet === 'kids'} onClose={() => setSheet(null)} onChanged={loadConfig} />
       <PinSheet ask={pinAsk} onClose={() => setPinAsk(null)} />

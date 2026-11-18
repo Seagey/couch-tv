@@ -97,7 +97,8 @@ What is on the TV right now.
 - `power`: `"on"`, `"off"` or `"unknown"`.
 - `app`: `null` when not known. `id` is `null` for an app the bridge has no name for (the raw
   `package` is still given). `id` `"home"` means a home screen (ours, `app.couchtv.launcher`, or
-  Google's).
+  Google's). `package` is the package in front on this TV: on a Fire TV, Amazon's build of the app
+  (`com.amazon.firetv.youtube`), with the same `id` as the Google TV one.
 - `volume.known` is `false` when the TV does not report a level (this TV reports `max: 0` while
   sound goes out to an external speaker). Then hide the slider, keep the up and down buttons.
 - `playing`: what is on, `null` when nothing is known. Needs ADB. Fields:
@@ -281,7 +282,10 @@ inputs (HDMI and the rest) on TVs that have one.
 ```
 
 ### `POST /api/text`
-Types text into whatever text box is open on the TV (a search box).
+Types text into whatever text box is open on the TV (a search box). On Android this is `input text`,
+so only ASCII letters, digits and plain punctuation are safe. Thai, Chinese, Korean and other
+non-Latin text must be typed with the TV's own on-screen keyboard; non-Latin text comes back as
+`BufferOverflowException`.
 ```json
 {"text": "bluey"}
 ```
@@ -303,7 +307,12 @@ the known set.
 ```
 Known ids: `netflix` `youtube` `stan` `binge` `abc-iview` `sbs-on-demand` `disney-plus`
 `prime-video` `kayo` `foxtel-go` `9now` `7plus` `10play` `spotify` `plex` `moonlight`
-`settings` `home`. `installed` is `null` when the bridge cannot tell yet.
+`settings` `home`. `installed` is `null` when the bridge cannot tell yet. An app that has another
+build under another package name also lists `packages`, the Google TV one first
+(`"packages": ["com.google.android.youtube.tv", "com.amazon.firetv.youtube"]`): on a Fire TV the
+bridge opens and watches whichever build the TV has, and `installed` is true when any of them is
+there. YouTube, Prime Video and HBO Max have Amazon's builds (seen on a Fire TV Cube); every other
+app has one package.
 
 ### `GET /api/roku/apps` and `GET /api/roku/icon/<id>`
 Roku only (`400` for any other TV, `503` while the Roku is not answering). The couch-tv channel on the Roku
@@ -556,6 +565,34 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
   own, so it always opens that card's show (and season and episode). It reopens the show in its app; the app
   itself picks up where you left off (Netflix, Stan, iview and the rest remember the position).
   Response is the same as `POST /api/play`.
+- With a `plex` section in `config.json` and `PLEX_TOKEN` in `.env` (docs/CONFIG.md, Plex), the Plex
+  Media Server's own Continue Watching list is read every five minutes and its shows and films join
+  the row with `"source": "plex"`, an id of `plex-<ratingKey>`, a real `progress` (0 to 1) and
+  pictures served by the bridge (`GET /api/plex/art?id=plex-<ratingKey>&kind=poster|backdrop`, the
+  pairing key as `?key=` when one is set). One card per show across both lists, the newer wins.
+  `/api/continue/open` and `/api/continue/hide` take those ids too; hide takes an optional `who`
+  (else the person on the couch; nobody picked means everyone). `GET /api/plex/status` says what is
+  set up and how the last read went, never the token.
+- `videos`, next to `items`: the YouTube videos this person watched on this TV, a list of their own.
+  YouTube stays out of `items` (it would bury everything else), and a video's name is never looked
+  up (matched to a film, it would put that film in the household's taste, issue #23): a video that
+  played the minute is written by the name YouTube gave it, with no picture, and shows only here, for
+  the home to put under the YouTube tile and nowhere else. Never in the picks, the taste or
+  `GET /api/history`. One card per title (the newest), newest first, at most 10, within 30 days,
+  minus the ones removed with `/api/continue/hide`, in the shape of an item with `"kind": "video"`,
+  `episode_title`, `season`, `episode`, `poster`, `backdrop` and `progress` all `null`, and `app`
+  YouTube's installed build. `/api/continue/open` with a video's id opens that build on YouTube's
+  search for the title (`"method": "search"`; Amazon's YouTube lists `https://www.youtube.com` links in
+  its intent filter, read with `dumpsys package` on a Fire TV Cube, but opening the search link there
+  has not been tried yet), or the app alone where the link does not take (`"method": "app"`), never
+  through the show finder. Its answer is `{"title", "service": "youtube", "app", "method", "note"}`.
+  ```json
+  {"ok": true, "items": [], "videos": [
+    {"id": "9c1e0b7d4a553f2a", "title": "How Trains Work", "episode_title": null, "season": null, "episode": null,
+     "app": {"id": "youtube", "name": "YouTube", "package": "com.amazon.firetv.youtube"},
+     "service": "youtube", "poster": null, "backdrop": null, "progress": null, "kind": "video",
+     "last_played": "2030-01-01T19:31:00Z", "source": "bridge"}]}
+  ```
 
 ### `POST /api/sleep` and `GET /api/sleep`
 Sleep timer, kept on the bridge so it still fires when the phone locks.
@@ -790,6 +827,46 @@ lag behind Quick Start+ standby, so a second press means "wake it"). A script or
 While an `on` is in progress, `/api/now` and the events stream carry `"waking": true`. Show
 "Waking the TV" until `waking` is `false` and `power` is `"on"`.
 
+### `POST /api/move`
+Moves what is playing on this TV (`tv`, as for every endpoint) to another TV. Android and Google TV at
+both ends. What it does, step by step, and its limits: [docs/MOVE.md](../docs/MOVE.md).
+```json
+{"tv": "living-room", "to": "bedroom-tv", "power_off": false, "force": false}
+```
+- `to`: the TV to move to. Leave it out when there is only one other Android or Google TV.
+- `power_off`: `true` turns this TV off once the other one is playing. Off unless it is exactly `true`.
+- `force`: `true` goes ahead when the other TV is playing something itself. Without it that is a `409`
+  (`error_key` `err_move_tv_in_use`): ask the person, then send it again with `force`.
+- `pin`: the parent PIN, only needed when the other TV is on a kids profile (`403` without it).
+
+It answers once the other TV is playing, or has stopped short of it. Allow up to three minutes: a wake,
+a fresh app start and a profile screen add up.
+```json
+{
+  "ok": true, "title": "Bluey", "from": "living-room", "to": "bedroom-tv", "who": "person1",
+  "app": {"id": "netflix", "name": "Netflix", "package": "com.netflix.ninja"},
+  "method": "deeplink", "started": true, "wrong_title": null, "source_paused": true,
+  "position_ms": 612000, "target_position_ms": 611400, "seek": null, "powered_off": false,
+  "note": "Bluey is playing on Bedroom.", "note_key": "note_moved",
+  "note_vars": {"title": "Bluey", "tv": "Bedroom"}
+}
+```
+`wrong_title` is the title the other TV came up on when it is not this TV's (both apps have to say what they
+play); it is paused there and `started` is `false`. `source_paused: false` means this TV would not pause and is still on (`note` then says to pause it by
+hand).
+`position_ms` is where this TV was; `target_position_ms` is where the other TV is playing (`null` when
+it does not say). `seek` says whether this TV's spot had to be used as the backup: `null` (the app
+resumed near it by itself, or there was no way to jump), `"link"` (YouTube, opened again with the time)
+or `"helper"` (the sync helper app of docs/SYNC.md). `started: false` means the other TV has the title
+open but not playing (`method` `deeplink`), or only the app or its search (`method` `search` or `app`);
+this TV is then left on and paused, and `note` says which.
+
+Errors: `400` no other TV to move to, the same or an unknown TV, or one end is not an Android or Google
+TV; `403` the other TV is on a kids profile and the PIN is missing or wrong; `409` nothing is playing
+here, the app gives no title, the bridge does not know the app, the other TV does not have the app, the
+other TV is in use, or another move is running; `503` the other TV did not wake. When a move fails
+before the title is open on the other TV, this TV plays on.
+
 ### `POST /api/volume`
 ```json
 {"action": "up"}
@@ -885,6 +962,7 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- 2026-11-17: Move what is playing to another TV (New): `POST /api/move` (docs/MOVE.md, #268).
 - 2026-11-14: Custom cards (New): `GET /api/custom-cards`, and `home.custom_cards` in `/api/config` and
   `/tv/config.js` (the link, or `true` for a file on the bridge computer).
 - 2026-11-14: Message keys (`error_key`, `note_key`, `reply_key`, `reason_key` and their `_vars`) beside the

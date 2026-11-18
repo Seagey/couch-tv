@@ -1,7 +1,10 @@
 """Watch history, imported history and cached picks, kept as files in bridge/data/.
 
 History is kept forever. Two append-only JSON-lines files, oldest first:
-- history.jsonl: what was played on our TVs (through the bridge, or seen playing in an app).
+- history.jsonl: what was played on our TVs (through the bridge, or seen playing in an app). A line
+  with "type": "video" is a YouTube video seen playing: history() leaves those out, so nothing that
+  reads the history (Keep watching, the picks, the taste, the Ask context) ever sees one, and only
+  videos() lists them.
 - imported.jsonl: what came from the owner's own downloads (Netflix viewing activity, YouTube
   watch history), see history_import.py. Each line has a "key" so re-importing a file adds nothing twice.
 """
@@ -84,10 +87,22 @@ def _append(path, items):
         os.fsync(f.fileno())
 
 
-def history():
-    """Plays on our TVs, newest first. Kept forever."""
+def _all_history():
+    """Every line, shows and videos, newest first."""
     _migrate()
     return list(reversed(_lines(HISTORY)))
+
+
+def history():
+    """Shows and films played on our TVs, newest first. Kept forever. Never a YouTube video line
+    (videos()): a video's name matched to a film would put that film in the household's taste
+    (issue #23), and YouTube would bury everything else in Keep watching."""
+    return [h for h in _all_history() if h.get("type") != "video"]
+
+
+def videos():
+    """YouTube videos seen playing on our TVs, newest first: the lines history() leaves out."""
+    return [h for h in _all_history() if h.get("type") == "video"]
 
 
 def add_history(item):
@@ -97,8 +112,8 @@ def add_history(item):
 
 
 def history_item(item_id):
-    """One history line by its id, or None."""
-    for h in history():
+    """One history line by its id (a show or a video), or None."""
+    for h in _all_history():
         if h.get("id") == item_id:
             return h
     return None
@@ -184,11 +199,31 @@ def _when(h):
 def keep_watching(tv_id, who, now=None, limit=KEEP_MAX, days=KEEP_DAYS):
     """What this person watched on this TV, one line per show (the latest), newest first, at most
     `limit`, nothing older than `days` days."""
+    return _keep(history(), tv_id, who, now, limit, days)
+
+
+def keep_videos(tv_id, who, now=None, limit=KEEP_MAX, days=KEEP_DAYS):
+    """The YouTube videos this person watched on this TV, the same way: one line per title (the
+    latest), newest first, at most `limit`, within `days` days, minus the ones removed by hand."""
+    return _keep(videos(), tv_id, who, now, limit, days, VIDEO_KEY)
+
+
+# A video is hidden under its own key, "video:<title>", so taking a video off the YouTube row never
+# takes a show of the same name off Keep watching ("Bluey" the show and a Bluey video), or the other way.
+VIDEO_KEY = "video:"
+
+
+def _hidden_key(h):
+    """The lower case title a history line is hidden under, with the video mark on a video line."""
+    return (VIDEO_KEY if h.get("type") == "video" else "") + (h.get("title") or "").strip().lower()
+
+
+def _keep(lines, tv_id, who, now, limit, days, kind=""):
     now = now or datetime.now(timezone.utc)
     cutoff = now - timedelta(days=days)
     seen, out = set(), []
-    hidden = _read(HIDDEN, {})
-    for h in history():
+    hidden = hidden_times(tv_id, who)
+    for h in lines:
         if not h.get("id") or h.get("tv") != tv_id or h.get("who") != who:
             continue
         when = _when(h)
@@ -198,7 +233,7 @@ def keep_watching(tv_id, who, now=None, limit=KEEP_MAX, days=KEEP_DAYS):
         if not key or key in seen:
             continue
         seen.add(key)
-        hid = _when({"when": hidden.get(f"{tv_id}|{who}|{key}")})
+        hid = hidden.get(kind + key)
         if hid and when <= hid:
             continue   # removed by hand; watching it again brings it back
         out.append(h)
@@ -207,9 +242,24 @@ def keep_watching(tv_id, who, now=None, limit=KEEP_MAX, days=KEEP_DAYS):
     return out
 
 
+def hidden_times(tv_id, who):
+    """The shows removed by hand from this person's Keep watching on this TV: lower case title ->
+    when it was removed (a video under "video:<title>"). A card is hidden while its own time is not
+    after that."""
+    out = {}
+    for key, when in _read(HIDDEN, {}).items():
+        tv, _, rest = key.partition("|")
+        person, _, title = rest.partition("|")
+        t = _when({"when": when})
+        if tv == tv_id and person == str(who) and title and t:
+            out[title] = t
+    return out
+
+
 def hide_keep_watching(h):
-    """Take a show off Keep watching (the TV and person of its history line) until it is played again."""
-    key = (h.get("title") or "").strip().lower()
+    """Take a show (or a video, under its own key) off Keep watching, for the TV and person of its
+    history line, until it is played again."""
+    key = _hidden_key(h)
     with _lock:
         data = _read(HIDDEN, {})
         data[f"{h.get('tv')}|{h.get('who')}|{key}"] = datetime.now(timezone.utc).isoformat(timespec="seconds")

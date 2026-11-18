@@ -24,6 +24,9 @@ com.google.android.adservices.api | Google TV | Privacy Sandbox ad services (ad 
 # ACR made by Alphonso, shipped on some budget Android TVs
 tv.alphonso.alphonso_eula | Android TV (some brands) | Alphonso ACR: recognises what is on screen for ad targeting | Alphonso "recommendations" stop | UAD-ng list (removal: Recommended)
 
+# TCL Google TV
+tv.samba.ssm.ui | TCL | Samba TV ACR: recognises what is on screen (system app SambaTv.apk, seen on a TCL P69K, Android 12) | Samba Interactive TV stops; the TV restarted normally after it was switched off | Reported on GitHub issue 276 with the survey-tv.py listing
+
 # Sony Bravia
 tv.samba.ssm | Sony Bravia | Samba TV ACR: recognises what is on screen, including HDMI inputs | Samba Interactive TV stops (also switch it off in the TV menu, docs/PRIVACY.md) | community.sony.es/t5/android-tv/disabling-system-apps-via-adb/td-p/2403349; Sony support article 00182856 (Samba Interactive TV)
 com.sony.dtv.promos | Sony Bravia | Sony promotions and offers | The Sony offers app goes | UAD-ng list (removal: Recommended)

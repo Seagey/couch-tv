@@ -70,13 +70,16 @@ The full list, with what each app does, what changes when it is off and where it
 | Google TV and Android TV (any brand, including Chromecast with Google TV and onn) | `com.google.android.feedback`, `com.google.android.adservices.api` | Feedback and crash reports; Privacy Sandbox ad services |
 | Some budget Android TVs | `tv.alphonso.alphonso_eula` | Alphonso ACR |
 | Sony Bravia | `tv.samba.ssm`, `com.sony.dtv.promos`, `com.sony.dtv.sonyselect`, `com.sony.dtv.notificationcenter` | Samba TV ACR; Sony promotions, promoted apps and promo notifications |
+| TCL Google TV | `tv.samba.ssm.ui` | Samba TV ACR (seen on a TCL P69K) |
 | Xiaomi Mi TV and Mi Box | `com.miui.tv.analytics`, `com.miui.analytics`, `com.miui.msa.global` | Xiaomi analytics; MSA, Xiaomi's ad service |
 | Amazon Fire TV (Fire OS 6 and 7) | `com.amazon.tv.acr`, `com.amazon.hybridadidservice`, `com.amazon.privacypassservice`, `com.amazon.hedwig`, `com.amazon.sneakpeek`, `com.amazon.kso.blackbird`, and eight metrics, analytics and log uploaders | ACR; advertising ID and ad tokens; watch time tracking; autoplaying promos and banner ad sync; telemetry |
 
 Google TV's ambient mode (`dreamx`, the idle adverts) is already switched off by every `apply.sh`
 run unless you set `KEEP_AMBIENT=1`, so it is not on this list.
 
-**TCL, Hisense (Google TV), Philips and onn:** no ACR or ad app made by these brands was found in a
+**TCL Google TV:** a TCL P69K (Android 12) ships Samba TV as `tv.samba.ssm.ui`, and it is on the list above. Other TCL models may differ.
+
+**Hisense (Google TV), Philips and onn:** no ACR or ad app made by these brands was found in a
 source we could check, so nothing brand specific is switched off on them yet. The Google apps above
 still are. Their tracking is switched off in the TV's menu (below). If you find one, open an issue
 with the package name and a source.

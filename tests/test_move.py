@@ -1,0 +1,1074 @@
+"""Move what is playing to another TV (POST /api/move, #268): the steps, in order, on two pretend TVs."""
+import asyncio
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+os.environ["COUCH_DATA"] = tempfile.mkdtemp(prefix="couchtv-move-")
+sys.path.insert(0, str(Path(__file__).parents[1] / "bridge"))
+import move  # noqa: E402
+import server  # noqa: E402
+import store  # noqa: E402
+import tv as tvmod  # noqa: E402
+
+NETFLIX, YOUTUBE = "com.netflix.ninja", "com.google.android.youtube.tv"
+A, B = "tv-a", "tv-b"
+
+
+REAL_PLAY = server.play     # the tests below put a pretend one in its place
+
+
+class FakeTV:
+    """A pretend Android TV: remembers every key, ADB line and link it was sent."""
+    kind = "android"
+    paired = True
+    connected = True
+
+    def __init__(self, tv_id, name, log, front=None, on=True):
+        self.id, self.name, self.log = tv_id, name, log
+        self.front, self.is_on = front, on
+        self.adb_out = ""          # what `dumpsys media_session` and the sync helper answer
+        self.state = {"playing": {"item": None}, "media_now": {}, "seen_playing": {},
+                      "sleep": {"ends": None, "handle": None}, "waking": {"on": False},
+                      "installed": {"packages": None, "checked": 0.0}, "picture": {}}
+
+    def require(self):
+        pass
+
+    async def adb_ready(self):
+        return True
+
+    async def front_package(self):
+        return self.front
+
+    async def key(self, name, hold=False):
+        self.log.append((self.id, "key", name))
+
+    async def adb(self, *args, **kw):
+        self.log.append((self.id, "adb", " ".join(args)))
+        return self.adb_out
+
+    async def start_intent(self, uri, package=None, cold=False):
+        self.log.append((self.id, "link", uri, package, cold))
+        self.front = package
+        return "adb"
+
+    async def wait_for_app(self, packages, timeout=8.0):
+        return self.front
+
+
+def playing(title, pos, state="playing", **extra):
+    return {"title": title, "state": state, "position_ms": pos, "season": None, "episode": None} | extra
+
+
+class MoveSteps(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.log = []
+        self.a = FakeTV(A, "Lounge", self.log, front=NETFLIX)
+        self.b = FakeTV(B, "Den", self.log)
+        self.media = {A: playing("Some Show", 600_000, season=2, episode=3), B: None}
+        self.after_seek = None       # what TV B reports once a seek or a timed link has gone out
+        self.started = True          # does the show start playing on TV B
+        self.installed = {NETFLIX, YOUTUBE}
+        self.video = "abcdefghijk"
+        for f in (store.WHO_FILE,):
+            if os.path.exists(f):
+                os.remove(f)
+        store._cache.clear()
+        store.save_who("person1", A)
+        store.save_who("person2", B)
+
+        async def media_read(pkg, app):
+            tv_id = server._current.get()
+            if tv_id == B and self.after_seek is not None and any(
+                    e[0] == B and ("op seek" in str(e[2:]) or "&t=" in str(e[2:])) for e in self.log):
+                self.media[B] = self.after_seek
+            got = self.media[tv_id]
+            self.log.append((tv_id, "read"))
+            server.media_now.clear()
+            if got is None:
+                return None
+            server.media_now.update(got, package=pkg)
+            return {"title": got["title"], "subtitle": got.get("channel"), "duration": got.get("duration"),
+                    "state": got["state"].upper()}
+
+        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False,
+                       same=None):
+            tv_id = server._current.get()
+            self.log.append((tv_id, "play", title, season, episode, service, who, resume, exact,
+                             store.current_who(tv_id)))
+            self.media[tv_id] = self.media.get("after_play")
+            server.TVS[tv_id].front = server.apps.BY_ID[service]["package"]   # the app came to the front
+            return {"title": title, "method": "deeplink", "started": self.started}
+
+        async def get_it_playing(app, link, who):
+            self.log.append((server._current.get(), "profile", who))
+            self.media[server._current.get()] = self.media.get("after_play")
+            return self.started, None
+
+        async def power_on():
+            self.log.append((server._current.get(), "power_on"))
+            server.TVS[server._current.get()].is_on = True
+
+        async def installed_packages(max_age=1800, wait=True):
+            return self.installed
+
+        async def youtube_video_id(title, channel=None, duration_ms=None):
+            return self.video
+
+        async def search_in_app(app, title, best=None):
+            self.log.append((server._current.get(), "search", app["id"], title))
+            return "search", "note"
+
+        async def no_sleep(_):
+            return None
+
+        async def find(title, type_=None):   # the show finder is never asked for real in these tests
+            return None, []
+
+        async def ui_items():
+            self.log.append((server._current.get(), "screen"))
+            if self.screen is None:
+                raise RuntimeError("could not read the screen")
+            return self.screen
+
+        async def wait_until_playing(pkg, timeout=30):
+            self.log.append((server._current.get(), "wait"))
+            keys = [e[2] for e in self.did(server._current.get(), "key")]
+            return self.slow_start or len(keys) >= self.plays_after_presses
+        self.slow_start = False   # the show starts by itself, a little late
+        self.screen = [{"label": "Play", "x": 1, "y": 1}]   # what the screen reader sees on TV B
+        blind = patch.object(move, "BLIND_OK_APPS", {"netflix", "youtube"})
+        blind.start()
+        self.addCleanup(blind.stop)
+        self.plays_after_presses = 2
+
+        self.media["after_play"] = playing("Some Show", 598_000)
+        for p in (patch.dict(server.TVS, {A: self.a, B: self.b}, clear=True),
+                  patch.object(server, "media_read", media_read),
+                  patch.object(server, "play", play),
+                  patch.object(server, "get_it_playing", get_it_playing),
+                  patch.object(server, "power_on", power_on),
+                  patch.object(server, "installed_packages", installed_packages),
+                  patch.object(server, "search_in_app", search_in_app),
+                  patch.object(server, "push_now", lambda: None),
+                  patch.object(server.asyncio, "sleep", no_sleep),
+                  patch.object(server.agentic, "ui_items", ui_items),
+                  patch.object(server.finder, "find", find),
+                  patch.object(server, "move_wait_playing", wait_until_playing),
+                  patch.object(move, "youtube_video_id", youtube_video_id)):
+            p.start()
+            self.addCleanup(p.stop)
+        token = server._current.set(A)
+        self.addCleanup(server._current.reset, token)
+
+    def did(self, tv_id, what):
+        return [e for e in self.log if e[0] == tv_id and e[1] == what]
+
+    def index(self, tv_id, what, has=None):
+        return next(i for i, e in enumerate(self.log)
+                    if e[0] == tv_id and e[1] == what and (has is None or has in str(e[2])))
+
+    async def test_the_steps_run_in_order(self):
+        r = await server.move_playing(A, B)
+        read_a = self.index(A, "read")
+        pause_a = self.index(A, "key", "pause")
+        stop_b = self.index(B, "adb", "force-stop")
+        play_b = self.index(B, "play")
+        self.assertLess(read_a, pause_a)
+        self.assertLess(pause_a, stop_b)
+        self.assertLess(stop_b, play_b)
+        self.assertEqual(self.log[stop_b][2], f"shell am force-stop {NETFLIX}")
+        # the same title, season and episode, pinned to the same app, and only that exact title
+        self.assertEqual(self.log[play_b][2:9], ("Some Show", 2, 3, "netflix", "person1", False, True))
+        self.assertEqual((r["from"], r["to"], r["title"], r["who"]), (A, B, "Some Show", "person1"))
+        self.assertTrue(r["started"])
+        self.assertEqual(r["note_key"], "note_moved")
+        self.assertEqual(r["position_ms"], 600_000)
+        self.assertEqual(r["target_position_ms"], 598_000)
+
+    async def test_who_is_read_on_a_and_set_on_b_before_the_show_opens(self):
+        await server.move_playing(A, B)
+        self.assertEqual(store.current_who(B), "person1")
+        self.assertEqual(self.did(B, "play")[0][9], "person1")   # already set when play ran
+        self.assertEqual(store.current_who(A), "person1")
+
+    async def test_nobody_set_on_a_leaves_b_alone(self):
+        os.remove(store.WHO_FILE)
+        store._cache.clear()
+        store.save_who("person2", B)
+        r = await server.move_playing(A, B)
+        self.assertIsNone(r["who"])
+        self.assertEqual(store.current_who(B), "person2")
+
+    async def test_a_paused_show_is_not_paused_again(self):
+        self.media[A] = playing("Some Show", 600_000, state="paused")
+        await server.move_playing(A, B)
+        self.assertEqual(self.did(A, "key"), [])
+
+    async def test_b_is_woken_before_the_show_opens(self):
+        self.b.is_on = False
+        await server.move_playing(A, B)
+        self.assertLess(self.index(B, "power_on"), self.index(B, "play"))
+        self.assertFalse(self.b.state["waking"]["on"])
+
+    async def test_b_awake_is_not_woken(self):
+        await server.move_playing(A, B)
+        self.assertEqual(self.did(B, "power_on"), [])
+
+    async def test_b_will_not_wake_so_a_plays_on(self):
+        self.b.is_on = False
+
+        async def power_on():
+            raise server.TVUnavailable("did not wake", key="err_tv_did_not_wake")
+        with patch.object(server, "power_on", power_on):
+            with self.assertRaises(server.TVUnavailable):
+                await server.move_playing(A, B, power_off=True)
+        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause", "play"])
+        self.assertEqual(self.did(B, "play"), [])
+        self.assertEqual(self.did(B, "adb"), [])
+
+    async def test_near_the_spot_means_no_seek(self):
+        self.installed.add(move.SYNC_HELPER)
+        r = await server.move_playing(A, B)
+        self.assertIsNone(r["seek"])
+        self.assertEqual([e for e in self.did(B, "adb") if "broadcast" in e[2]], [])
+
+    async def test_off_the_spot_seeks_through_the_sync_helper(self):
+        self.installed.add(move.SYNC_HELPER)
+        self.media["after_play"] = playing("Some Show", 10_000)
+        self.after_seek = playing("Some Show", 600_500)
+        self.b.adb_out = 'Broadcast completed: result=0, data="{"id":1,"result":"ok","can_seek":true}"'
+        r = await server.move_playing(A, B)
+        seeks = [e[2] for e in self.did(B, "adb") if "broadcast" in e[2]]
+        helper = "shell am broadcast -a dev.couchtv.sync.CMD -n dev.couchtv.sync/.CmdReceiver --es op"
+        self.assertEqual(seeks, [f"{helper} state --es pkg {NETFLIX}",       # asked first: does it take a seek
+                                 f"{helper} seek --es pkg {NETFLIX} --es pos_ms 600000"])
+        self.assertEqual(r["seek"], "helper")
+        self.assertEqual(r["target_position_ms"], 600_500)
+        self.assertEqual(r["note_key"], "note_moved")
+
+    async def test_not_playing_after_the_seek_is_not_a_move(self):
+        self.installed.add(move.SYNC_HELPER)
+        self.media["after_play"] = playing("Some Show", 10_000)
+        self.after_seek = playing("Some Show", 600_500, state="paused")
+        self.plays_after_presses = 99        # and it does not start again
+        self.b.adb_out = (f"package={self.a.front}\nactive=true\nstate=PlaybackState {{state=PAUSED(2), position=5}}\n"
+                          'Broadcast completed: result=0, data="{"id":1,"result":"ok","can_seek":true}"')
+        r = await server.move_playing(A, B, power_off=True, force=True)
+        self.assertEqual(r["seek"], "helper")
+        self.assertFalse(r["started"])
+        self.assertFalse(r["powered_off"])                         # TV A stays on
+        self.assertNotIn("power", [e[2] for e in self.did(A, "key")])
+        self.assertEqual(r["note_key"], "note_move_not_playing")
+
+    async def test_an_app_that_takes_no_seek_is_not_sent_one(self):
+        self.installed.add(move.SYNC_HELPER)
+        self.media["after_play"] = playing("Some Show", 10_000)
+        self.b.adb_out = 'Broadcast completed: result=0, data="{"state":3,"can_seek":false}"'
+        r = await server.move_playing(A, B)
+        self.assertEqual(len([e for e in self.did(B, "adb") if "op seek" in e[2]]), 0)
+        self.assertIsNone(r["seek"])
+        self.assertEqual(r["note_key"], "note_move_other_spot")
+
+    async def test_off_the_spot_without_the_helper_says_so(self):
+        self.media["after_play"] = playing("Some Show", 10_000)
+        r = await server.move_playing(A, B)
+        self.assertIsNone(r["seek"])
+        self.assertEqual([e for e in self.did(B, "adb") if "broadcast" in e[2]], [])
+        self.assertEqual(r["note_key"], "note_move_other_spot")
+        self.assertEqual(r["note_vars"], {"title": "Some Show", "tv": "Den", "from": "Lounge", "time": "10:00"})
+
+    async def test_live_tv_has_no_spot_and_no_seek(self):
+        self.installed.add(move.SYNC_HELPER)
+        self.media[A] = playing("Channel One", None)
+        self.media["after_play"] = playing("Channel One", None)
+        r = await server.move_playing(A, B)
+        self.assertIsNone(r["seek"])
+        self.assertEqual(r["note_key"], "note_moved")
+
+    async def test_not_playing_on_b_is_said_and_a_stays_on(self):
+        self.started = False
+        r = await server.move_playing(A, B, power_off=True)
+        self.assertFalse(r["started"])
+        self.assertFalse(r["powered_off"])
+        self.assertEqual(r["note_key"], "note_move_not_playing")
+        self.assertNotIn("power", [e[2] for e in self.did(A, "key")])
+
+    async def test_a_screen_that_cannot_be_read_gets_ok_until_it_plays(self):
+        self.started = False
+        for screen in ([], None, [{"label": "", "x": 960, "y": 540}]):
+            self.log.clear()
+            self.screen = screen
+            r = await server.move_playing(A, B)
+            self.assertEqual([e[2] for e in self.did(B, "key")], ["ok", "ok"])   # the first press was lost
+            self.assertTrue(r["started"])
+            self.assertEqual(r["note_key"], "note_moved")
+
+    async def test_ok_is_never_pressed_on_a_show_that_plays_and_a_paused_one_gets_play(self):
+        self.started, self.screen, self.plays_after_presses = False, [], 1
+        for state, keys in (("PLAYING(3)", []), ("BUFFERING(6)", []), ("PAUSED(2)", ["play"])):
+            self.log.clear()
+            self.b.adb_out = f"package={self.a.front}\nactive=true\nstate=PlaybackState {{state={state}, position=5}}"
+            await server.move_playing(A, B, force=True)
+            self.assertEqual([e[2] for e in self.did(B, "key")], keys, state)
+
+    async def test_ok_is_only_pressed_blind_in_apps_that_sell_nothing(self):
+        self.started, self.screen = False, []
+        with patch.object(move, "BLIND_OK_APPS", {"some-other-app"}):
+            r = await server.move_playing(A, B)
+        self.assertEqual(self.did(B, "key"), [])
+        self.assertFalse(r["started"])
+
+    async def test_a_profile_screen_that_came_up_late_gets_a_second_go(self):
+        self.started = False
+        self.screen = [{"label": "Who's watching?"}, {"label": "Access Sam's profile"}]
+        self.plays_after_presses = 99
+        calls = []
+
+        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False, same=None):
+            calls.append(title)
+            self.b.front = server.apps.BY_ID[service]["package"]
+            return {"method": "deeplink", "started": len(calls) > 1}   # the second go picks the profile and plays
+        with patch.object(server, "play", play):
+            r = await server.move_playing(A, B)
+        self.assertEqual(calls, ["Some Show", "Some Show"])
+        self.assertEqual(len([e for e in self.did(B, "adb") if "force-stop" in e[2]]), 1)   # not started afresh again
+        self.assertEqual(self.did(B, "key"), [])
+        self.assertTrue(r["started"])
+
+    async def test_no_second_go_without_a_profile_screen(self):
+        self.started, self.plays_after_presses = False, 99
+        r = await server.move_playing(A, B)
+        self.assertEqual(len(self.did(B, "play")), 1)
+        self.assertFalse(r["started"])
+
+    async def test_a_slow_start_is_waited_for_and_nothing_is_pressed(self):
+        self.started, self.screen, self.slow_start = False, [], True
+        r = await server.move_playing(A, B)
+        self.assertEqual(self.did(B, "key"), [])
+        self.assertTrue(r["started"])
+
+    async def test_a_screen_that_can_be_read_is_not_pressed_blind(self):
+        self.started = False   # for example a profile screen without this person's name on it
+        r = await server.move_playing(A, B)
+        self.assertEqual(self.did(B, "key"), [])
+        self.assertFalse(r["started"])
+
+    async def test_ok_gives_up_after_three_presses(self):
+        self.started, self.screen, self.plays_after_presses = False, [], 99
+        r = await server.move_playing(A, B)
+        self.assertEqual([e[2] for e in self.did(B, "key")], ["ok"] * 3)
+        self.assertFalse(r["started"])
+        self.assertEqual(r["note_key"], "note_move_not_playing")
+
+    async def test_a_pause_that_did_not_take_is_sent_again(self):
+        self.a.adb_out = f"package={self.a.front}\nactive=true\nstate=PlaybackState {{state=PLAYING(3), position=5}}"
+        r = await server.move_playing(A, B)
+        # three key presses at the start, three when the other TV has opened the show, and three
+        # more once it plays; no helper on this TV
+        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause"] * 9)
+        self.assertEqual([e for e in self.did(A, "adb") if "op pause" in e[2]], [])
+        self.assertTrue(r["started"])
+        self.assertFalse(r["source_paused"])                    # and it says so
+        self.assertEqual(r["note_key"], "note_move_still_playing")
+        self.assertEqual(r["note_vars"]["from"], "Lounge")
+
+    async def test_the_sync_helper_is_asked_to_pause_when_the_key_does_not_take(self):
+        self.installed.add(move.SYNC_HELPER)
+        self.a.adb_out = f"package={self.a.front}\nactive=true\nstate=PlaybackState {{state=PLAYING(3), position=5}}"
+        real_adb = self.a.adb
+
+        async def adb(*args, **kw):
+            out = await real_adb(*args, **kw)
+            if "op pause" in " ".join(args):     # the helper's pause is the one that takes
+                self.a.adb_out = self.a.adb_out.replace("PLAYING(3)", "PAUSED(2)")
+            return out
+        self.a.adb = adb
+        r = await server.move_playing(A, B)
+        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause", "pause"])
+        self.assertEqual([e[2] for e in self.did(A, "adb") if "op pause" in e[2]],
+                         [f"shell am broadcast -a dev.couchtv.sync.CMD -n dev.couchtv.sync/.CmdReceiver "
+                          f"--es op pause --es pkg {self.a.front}"])
+        self.assertTrue(r["source_paused"])
+        self.assertEqual(r["note_key"], "note_moved")
+
+    async def test_a_pause_that_landed_late_counts_as_paused(self):
+        playing_out = f"package={self.a.front}\nactive=true\nstate=PlaybackState {{state=PLAYING(3), position=5}}"
+        self.a.adb_out = playing_out
+        real_power_on, self.b.is_on = None, True
+
+        async def play_then_a_is_paused(*a, **k):
+            self.a.adb_out = playing_out.replace("PLAYING(3)", "PAUSED(2)")   # it took while B was starting
+            self.b.front = self.a.front
+            return {"method": "deeplink", "started": True}
+        with patch.object(server, "play", play_then_a_is_paused), \
+             patch.object(server, "get_it_playing", lambda *a, **k: play_then_a_is_paused()):
+            r = await server.move_playing(A, B)
+        self.assertTrue(r["source_paused"])
+        self.assertEqual(r["note_key"], "note_moved")
+
+    async def test_a_tv_that_was_turned_off_is_not_reported_as_still_playing(self):
+        self.a.adb_out = f"package={self.a.front}\nactive=true\nstate=PlaybackState {{state=PLAYING(3), position=5}}"
+        r = await server.move_playing(A, B, power_off=True)
+        self.assertTrue(r["powered_off"])
+        self.assertTrue(r["source_paused"])
+        self.assertEqual(r["note_key"], "note_moved")
+
+    async def test_a_tv_that_does_not_answer_is_not_counted_as_paused(self):
+        async def dead(*args, **kw):
+            self.log.append((A, "adb", " ".join(args)))
+            raise RuntimeError("adb: connection lost")
+        self.a.adb = dead
+        r = await server.move_playing(A, B)
+        self.assertTrue(r["started"])
+        self.assertFalse(r["source_paused"])                      # not "paused" on no answer
+        self.assertEqual(r["note_key"], "note_move_still_playing")
+        self.assertGreaterEqual(len([e for e in self.did(A, "key") if e[2] == "pause"]), 3)   # it kept trying
+
+    async def test_no_blind_ok_when_the_tv_does_not_answer(self):
+        self.started, self.screen, self.plays_after_presses = False, [], 99
+
+        async def dead(*args, **kw):
+            raise RuntimeError("adb: connection lost")
+        real_play = server.play
+
+        async def play_then_b_goes_quiet(*a, **k):
+            r = await real_play(*a, **k)
+            self.b.adb = dead
+            return r
+        with patch.object(server, "play", play_then_b_goes_quiet), \
+             patch.object(server, "get_it_playing", lambda *a, **k: play_then_b_goes_quiet()):
+            r = await server.move_playing(A, B)
+        self.assertEqual(self.did(B, "key"), [])
+        self.assertFalse(r["started"])
+
+    async def test_a_pause_that_takes_is_sent_once(self):
+        r = await server.move_playing(A, B)
+        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause"])
+        self.assertTrue(r["source_paused"])
+
+    async def test_a_stays_on_unless_asked(self):
+        r = await server.move_playing(A, B)
+        self.assertFalse(r["powered_off"])
+        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause"])
+
+    async def test_a_turns_off_when_asked_once_b_plays(self):
+        r = await server.move_playing(A, B, power_off=True)
+        self.assertTrue(r["powered_off"])
+        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause", "power"])
+        self.assertGreater(self.index(A, "key", "power"), self.index(B, "play"))
+
+    async def test_a_tv_someone_is_watching_is_left_alone(self):
+        self.b.front = YOUTUBE
+        self.b.adb_out = f"package={YOUTUBE}\nactive=true\nstate=PlaybackState {{state=PLAYING(3), position=5}}"
+        with self.assertRaises(server.ApiError) as ctx:
+            await server.move_playing(A, B)
+        self.assertEqual((ctx.exception.status, ctx.exception.key), (409, "err_move_tv_in_use"))
+        self.assertEqual(self.did(A, "key"), [])          # A was not paused
+        self.assertEqual(self.did(B, "play"), [])
+        self.assertEqual(store.current_who(B), "person2")  # and B keeps its person
+
+    async def test_a_tv_that_is_buffering_or_winding_is_being_watched_too(self):
+        self.b.front = YOUTUBE
+        for state in ("BUFFERING(6)", "CONNECTING(8)", "FAST_FORWARDING(4)", "REWINDING(5)"):
+            self.b.adb_out = f"package={YOUTUBE}\nactive=true\nstate=PlaybackState {{state={state}, position=5}}"
+            with self.assertRaises(server.ApiError, msg=state) as ctx:
+                await server.move_playing(A, B)
+            self.assertEqual(ctx.exception.key, "err_move_tv_in_use", state)
+        for state in ("PAUSED(2)", "STOPPED(1)", "NONE(0)"):
+            self.log.clear()
+            self.b.adb_out = f"package={YOUTUBE}\nactive=true\nstate=PlaybackState {{state={state}, position=5}}"
+            r = await server.move_playing(A, B)       # free: nobody is watching a paused TV
+            self.assertIn("to", r)
+        self.assertEqual(self.did(A, "key")[0][2], "pause")
+
+    async def test_force_takes_the_tv_over(self):
+        self.b.front = YOUTUBE
+        self.b.adb_out = f"package={YOUTUBE}\nactive=true\nstate=PlaybackState {{state=PLAYING(3), position=5}}"
+        r = await server.move_playing(A, B, force=True)
+        self.assertTrue(r["started"])
+
+    async def test_nothing_playing(self):
+        for media, front in ((None, NETFLIX), (playing("Some Show", 5, state="stopped"), NETFLIX),
+                             (playing("Some Show", 5), "com.google.android.tvlauncher")):
+            self.media[A], self.a.front = media, front
+            with self.assertRaises(server.ApiError) as ctx:
+                await server.move_playing(A, B)
+            self.assertEqual((ctx.exception.status, ctx.exception.key), (409, "err_move_nothing_playing"))
+        self.assertEqual(self.did(A, "key"), [])
+        self.assertEqual(self.did(B, "adb"), [])
+
+    async def test_an_app_the_bridge_does_not_know(self):
+        self.a.front = "tv.example.someapp"
+        with self.assertRaises(server.ApiError) as ctx:
+            await server.move_playing(A, B)
+        self.assertEqual((ctx.exception.status, ctx.exception.key), (409, "err_move_app_not_known"))
+        self.assertEqual(self.did(A, "key"), [])
+        self.assertEqual(self.did(B, "adb"), [])
+
+    async def test_a_title_that_comes_a_moment_late_is_waited_for(self):
+        late = playing("Some Show", 600_000)
+        self.media[A] = playing(None, 600_000)
+        reads = []
+        real = server.media_read
+
+        async def media_read(pkg, app):
+            if server._current.get() == A:
+                reads.append(1)
+                if len(reads) == 2:
+                    self.media[A] = late     # the second look has the title
+            return await real(pkg, app)
+        with patch.object(server, "media_read", media_read):
+            r = await server.move_playing(A, B)
+        self.assertEqual(len(reads), 2)
+        self.assertEqual(r["title"], "Some Show")
+        self.assertTrue(r["started"])
+
+    async def test_a_title_the_bridge_only_guessed_is_not_moved(self):
+        # the app gave no title; media_read took one from the watch history (title_from "bridge")
+        self.media[A] = playing("Some Show", 600_000, title_from="bridge")
+        with self.assertRaises(server.ApiError) as ctx:
+            await server.move_playing(A, B)
+        self.assertEqual((ctx.exception.status, ctx.exception.key), (409, "err_move_no_title"))
+        self.assertEqual(self.did(A, "key"), [])
+        self.assertEqual(self.did(B, "adb"), [])
+
+    async def test_a_title_the_bridge_opened_itself_is_moved_and_the_app_picks_the_episode(self):
+        import time
+        self.media[A] = playing("Some Show", 600_000, title_from="bridge")
+        self.a.state["playing"]["item"] = {"title": "Some Show", "package": self.a.front, "season": 2, "episode": 5,
+                                           "ts": time.time() - 600}
+        r = await server.move_playing(A, B)
+        self.assertTrue(r["started"])
+        if self.a.front == NETFLIX:
+            # not the episode the bridge opened back then: autoplay may have moved on, the app knows
+            self.assertEqual(self.did(B, "play")[0][2:5], ("Some Show", None, None))
+
+    async def test_what_the_bridge_opened_hours_ago_does_not_count(self):
+        import time
+        self.media[A] = playing("Some Show", 600_000, title_from="bridge")
+        self.a.state["playing"]["item"] = {"title": "Some Show", "package": self.a.front,
+                                           "ts": time.time() - server.MOVE_OPENED_S - 60}
+        with self.assertRaises(server.ApiError) as ctx:
+            await server.move_playing(A, B)
+        self.assertEqual(ctx.exception.key, "err_move_no_title")
+
+    async def test_what_the_bridge_opened_in_another_app_does_not_count(self):
+        self.media[A] = playing("Some Show", 600_000, title_from="bridge")
+        import time
+        self.a.state["playing"]["item"] = {"title": "Some Show", "package": "com.example.other", "ts": time.time()}
+        with self.assertRaises(server.ApiError) as ctx:
+            await server.move_playing(A, B)
+        self.assertEqual(ctx.exception.key, "err_move_no_title")
+
+    async def test_an_app_that_gives_no_title(self):
+        self.media[A] = playing(None, 5)
+        with self.assertRaises(server.ApiError) as ctx:
+            await server.move_playing(A, B)
+        self.assertEqual((ctx.exception.status, ctx.exception.key), (409, "err_move_no_title"))
+        self.assertEqual(self.did(A, "key"), [])
+
+    async def test_a_tv_in_kids_mode_needs_the_parent_pin(self):
+        store.save_who("kid1", B)
+        with patch.object(server.kids, "is_kid", lambda pid: pid == "kid1"), \
+             patch.object(server.kids, "verify", lambda pid, pin: pin == "2468"), \
+             patch.object(server.kids, "locked_out", lambda addr: False), \
+             patch.object(server.kids, "wrong_pin", lambda addr: None):
+            with self.assertRaises(server.ApiError) as ctx:
+                await server.move_playing(A, B)
+            self.assertEqual(ctx.exception.status, 403)
+            self.assertEqual(self.did(A, "key"), [])
+            self.assertEqual(store.current_who(B), "kid1")
+            r = await server.move_playing(A, B, pin="2468")
+        self.assertTrue(r["started"])
+        self.assertEqual(store.current_who(B), "person1")
+
+    async def test_a_title_the_finder_does_not_know_opens_the_app_search(self):
+        async def play(*a, **k):
+            raise server.ApiError(404, "could not find it", key="err_title_not_found")
+        with patch.object(server, "play", play):
+            r = await server.move_playing(A, B)
+        self.assertEqual(self.did(B, "search"), [(B, "search", "netflix", "Some Show")])
+        self.assertEqual((r["method"], r["started"]), ("search", False))
+        self.assertEqual(r["note_key"], "note_move_app_only")
+        self.assertEqual(r["note_vars"], {"title": "Some Show", "tv": "Den", "app": "Netflix"})
+
+    async def test_another_title_playing_on_b_is_paused_and_said(self):
+        # both apps name what they play; B came up on something else (Disney+ did this for "Bluey")
+        self.installed.add(move.SYNC_HELPER)
+        self.media[A] = playing("Some Show", 600_000, title_from="app")
+        self.media["after_play"] = playing("Some Show Specials", 5_000, title_from="app")
+        r = await server.move_playing(A, B, power_off=True)
+        self.assertEqual(r["wrong_title"], "Some Show Specials")
+        self.assertFalse(r["started"])
+        self.assertFalse(r["powered_off"])
+        self.assertIsNone(r["seek"])                                   # no seek inside the wrong title
+        self.assertEqual([e[2] for e in self.did(B, "key")], ["pause"])
+        self.assertEqual(r["note_key"], "note_move_wrong_title")
+        self.assertEqual(r["note_vars"], {"app": server.apps.describe_package(self.a.front)["name"],
+                                          "other": "Some Show Specials", "tv": "Den", "title": "Some Show"})
+
+    async def test_the_same_title_on_b_is_fine_and_a_title_b_does_not_give_is_not_judged(self):
+        self.media[A] = playing("Some Show", 600_000, title_from="app")
+        self.media["after_play"] = playing("some show", 598_000, title_from="app")
+        r = await server.move_playing(A, B)
+        self.assertIsNone(r["wrong_title"])
+        self.assertTrue(r["started"])
+        self.log.clear()
+        self.media["after_play"] = playing("Whatever The Bridge Guessed", 598_000, title_from="bridge")
+        r = await server.move_playing(A, B, force=True)
+        self.assertIsNone(r["wrong_title"])
+        self.assertTrue(r["started"])
+
+    async def test_a_title_in_another_script_is_opened_when_the_finder_has_that_very_title(self):
+        name = "\u5343\u3068\u5343\u5c0b\u306e\u795e\u96a0\u3057"
+        self.media[A] = playing(name, 600_000, title_from="app")
+        self.media["after_play"] = playing(name, 598_000, title_from="app")
+        opened = await self.move_with_lookups([name])
+        self.assertEqual(opened, [name])
+        self.assertTrue(self.result["started"])
+        self.assertIsNone(self.result["wrong_title"])  # and the same name on TV B is the same title
+
+    async def move_with_lookups(self, answers):
+        """Run a move where the show finder gives these titles, one per lookup (the last one again
+        after that), and play works the way the real one does: one lookup, checked, then opened."""
+        opened, left = [], list(answers)
+
+        async def find(title, type_=None):
+            return {"title": left.pop(0) if len(left) > 1 else left[0]}, []
+
+        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False,
+                       same=None):
+            best, _ = await server.finder.find(title)
+            if exact and not (same or server.finder.same_title)(best["title"], title):
+                raise server.ApiError(404, "could not find it", key="err_title_not_found", vars={"title": title})
+            opened.append(best["title"])
+            self.b.front = server.apps.BY_ID[service]["package"]
+            self.media[B] = self.media["after_play"]
+            return {"method": "deeplink", "started": True}
+        with patch.object(server.finder, "find", find), patch.object(server, "play", play):
+            self.result = await server.move_playing(A, B)
+        return opened
+
+    async def test_the_title_that_was_checked_is_the_one_that_is_opened(self):
+        # the finder's answer can change between two lookups; whichever one play gets is the one checked
+        name, other = "\u5343\u3068\u5343\u5c0b\u306e\u795e\u96a0\u3057", "\u3082\u306e\u306e\u3051\u59eb"
+        import time
+        for answers in ([name, other], [other, name]):
+            self.log.clear()
+            self.b.front = None
+            self.media[B] = None
+            # a title the bridge opened itself: the later "same title on TV B" check does not run
+            self.media[A] = playing(name, 600_000, title_from="bridge")
+            self.a.state["playing"]["item"] = {"title": name, "package": self.a.front, "ts": time.time() - 60}
+            opened = await self.move_with_lookups(answers)
+            self.assertNotIn(other, opened, answers)
+            if not opened:
+                self.assertEqual((self.result["started"], self.result["note_key"]),
+                                 (False, "note_move_app_only"), answers)
+
+    async def test_a_title_in_another_script_the_finder_has_another_name_for_is_not_opened(self):
+        name = "\u5343\u3068\u5343\u5c0b\u306e\u795e\u96a0\u3057"
+        self.media[A] = playing(name, 600_000)
+        opened = await self.move_with_lookups(["\u3082\u306e\u306e\u3051\u59eb"])
+        self.assertEqual(opened, [])
+        self.assertEqual((self.result["started"], self.result["note_key"]), (False, "note_move_app_only"))
+
+    async def test_the_real_play_checks_the_result_it_uses(self):
+        name = "\u5343\u3068\u5343\u5c0b\u306e\u795e\u96a0\u3057"
+
+        async def find(title, type_=None):
+            return {"title": "\u3082\u306e\u306e\u3051\u59eb"}, []
+        with patch.object(server.finder, "find", find):
+            for same in (move.same_name, None):
+                with self.assertRaises(server.ApiError) as ctx:
+                    await REAL_PLAY(name, service="netflix", exact=True, same=same)
+                self.assertEqual(ctx.exception.key, "err_title_not_found")
+
+    async def test_a_near_name_is_never_opened_in_its_place(self):
+        # "Some Show Fancy Dinner" is a series of its own; the finder only knows "Some Show", which
+        # even has an episode called "Fancy Dinner". The move must not open that.
+        self.media[A] = playing("Some Show Fancy Dinner", 600_000)
+        asked = []
+
+        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False, same=None):
+            asked.append((title, exact))
+            raise server.ApiError(404, "could not find it", key="err_title_not_found")
+        with patch.object(server, "play", play):
+            r = await server.move_playing(A, B)
+        self.assertEqual(asked, [("Some Show Fancy Dinner", True)])      # asked once, exactly, and nothing else
+        self.assertEqual(self.did(B, "search"), [(B, "search", "netflix", "Some Show Fancy Dinner")])
+        self.assertEqual((r["started"], r["note_key"]), (False, "note_move_app_only"))
+
+    async def test_a_failure_after_the_pause_puts_things_back(self):
+        async def play(*a, **k):
+            raise RuntimeError("adb: connection lost")
+        with patch.object(server, "play", play):
+            with self.assertRaises(RuntimeError):
+                await server.move_playing(A, B)
+        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause", "play"])
+        self.assertEqual(store.current_who(B), "person2")   # B has its own person back
+
+    async def test_nobody_set_on_a_never_takes_b_out_of_kids_mode(self):
+        os.remove(store.WHO_FILE)
+        store._cache.clear()
+        store.save_who("kid1", B)
+        with patch.object(server.kids, "is_kid", lambda pid: pid == "kid1"):
+            await server.move_playing(A, B)
+        self.assertEqual(store.current_who(B), "kid1")
+
+    async def test_the_app_has_to_be_on_the_other_tv(self):
+        self.installed.discard(self.a.front)
+        with self.assertRaises(server.ApiError) as ctx:
+            await server.move_playing(A, B)
+        self.assertEqual((ctx.exception.status, ctx.exception.key), (409, "err_move_not_installed"))
+        self.assertEqual(self.did(A, "key"), [])
+
+    async def test_ok_is_not_pressed_when_another_app_has_come_to_the_front(self):
+        self.started, self.screen = False, []
+
+        async def play(*a, **k):
+            self.b.front = "com.example.somethingelse"
+            return {"method": "deeplink", "started": False}
+        with patch.object(server, "play", play):
+            r = await server.move_playing(A, B)
+        self.assertEqual(self.did(B, "key"), [])
+        self.assertFalse(r["started"])
+
+    async def test_only_android_tvs(self):
+        self.b.kind = "roku"
+        with self.assertRaises(server.ApiError) as ctx:
+            await server.move_playing(A, B)
+        self.assertEqual((ctx.exception.status, ctx.exception.key), (400, "err_move_not_supported"))
+        self.assertEqual(self.log, [])
+
+    async def test_a_package_that_is_not_one_never_reaches_b(self):
+        bad = "a.b;touch /sdcard/proof"
+        self.a.front = bad
+        with patch.object(server.apps, "describe_package",
+                          lambda p: {"id": "netflix", "name": "Netflix", "package": p}):
+            with self.assertRaises(tvmod.UnsafeInput):
+                await server.move_playing(A, B)
+        self.assertEqual(self.did(B, "adb"), [])
+        self.assertEqual(self.did(A, "key"), [])
+
+
+class MoveYouTube(MoveSteps):
+    """YouTube: a video link, not the show finder. The time goes in the link only as the backup."""
+
+    def setUp(self):
+        super().setUp()
+        self.a.front = YOUTUBE
+        self.media[A] = playing("A Video", 300_000, channel="A Channel", duration=900_000)
+        self.media["after_play"] = playing("A Video", 299_000)
+
+    # the show-finder tests of the parent class do not apply to the YouTube path
+    test_the_steps_run_in_order = None
+    test_who_is_read_on_a_and_set_on_b_before_the_show_opens = None
+    test_a_title_the_finder_does_not_know_opens_the_app_search = None
+    test_off_the_spot_seeks_through_the_sync_helper = None
+    test_off_the_spot_without_the_helper_says_so = None
+    test_a_failure_after_the_pause_puts_things_back = None
+    test_a_near_name_is_never_opened_in_its_place = None
+    test_a_title_in_another_script_is_opened_when_the_finder_has_that_very_title = None
+    test_a_title_in_another_script_the_finder_has_another_name_for_is_not_opened = None
+    test_the_title_that_was_checked_is_the_one_that_is_opened = None
+    test_the_real_play_checks_the_result_it_uses = None
+    test_not_playing_after_the_seek_is_not_a_move = None
+    test_no_blind_ok_when_the_tv_does_not_answer = None
+    test_a_profile_screen_that_came_up_late_gets_a_second_go = None
+    test_no_second_go_without_a_profile_screen = None
+    test_ok_is_not_pressed_when_another_app_has_come_to_the_front = None
+    test_an_app_that_takes_no_seek_is_not_sent_one = None
+    test_a_package_that_is_not_one_never_reaches_b = None
+    test_a_turns_off_when_asked_once_b_plays = None
+    test_b_is_woken_before_the_show_opens = None
+    test_b_will_not_wake_so_a_plays_on = None
+
+    async def test_the_video_opens_fresh_with_no_time_and_the_profile_is_the_watcher(self):
+        r = await server.move_playing(A, B)
+        links = self.did(B, "link")
+        self.assertEqual(links, [(B, "link", "https://www.youtube.com/watch?v=abcdefghijk", YOUTUBE, True)])
+        self.assertEqual(self.did(B, "profile"), [(B, "profile", "person1")])
+        self.assertEqual(self.did(B, "play"), [])
+        self.assertIsNone(r["seek"])
+        self.assertEqual(r["note_key"], "note_moved")
+
+    async def test_off_the_spot_opens_the_link_again_with_the_time(self):
+        self.media["after_play"] = playing("A Video", 0)
+        self.after_seek = playing("A Video", 300_400)
+        r = await server.move_playing(A, B)
+        self.assertEqual([e[2:] for e in self.did(B, "link")],
+                         [("https://www.youtube.com/watch?v=abcdefghijk", YOUTUBE, True),
+                          ("https://www.youtube.com/watch?v=abcdefghijk&t=300", YOUTUBE, False)])
+        self.assertEqual(r["seek"], "link")
+        self.assertEqual(r["target_position_ms"], 300_400)
+
+    async def test_a_video_that_cannot_be_found_opens_the_search(self):
+        self.video = None
+        r = await server.move_playing(A, B)
+        self.assertEqual(self.did(B, "link"), [])
+        self.assertEqual(self.did(B, "search"), [(B, "search", "youtube", "A Video")])
+        self.assertFalse(r["started"])
+        self.assertEqual(r["note_key"], "note_move_app_only")
+
+
+class MoveWaitPlaying(unittest.IsolatedAsyncioTestCase):
+    """What a real Google TV Streamer printed for YouTube: the position is reported once and stays."""
+    PLAYING = (f"package={YOUTUBE}\nactive=false\nstate=PlaybackState {{state=STOPPED(1), position=0}}\n"
+               f"package={YOUTUBE}\nactive=true\nstate=PlaybackState {{state=PLAYING(3), position=356, speed=1.0}}")
+
+    async def wait(self, out):
+        t = FakeTV(B, "Den", [])
+        t.adb_out = out
+
+        async def no_sleep(_):
+            return None
+        token = server._current.set(B)
+        self.addCleanup(server._current.reset, token)
+        with patch.dict(server.TVS, {B: t}, clear=True), patch.object(server.asyncio, "sleep", no_sleep):
+            return await server.move_wait_playing(YOUTUBE, timeout=0.2)
+
+    async def test_playing_with_a_position_that_never_moves_counts(self):
+        self.assertTrue(await self.wait(self.PLAYING))
+
+    async def test_paused_stopped_or_another_app_does_not(self):
+        self.assertFalse(await self.wait(self.PLAYING.replace("PLAYING(3)", "PAUSED(2)")))
+        self.assertFalse(await self.wait(self.PLAYING.replace(YOUTUBE, NETFLIX)))
+        self.assertFalse(await self.wait(""))
+
+
+class ProfileItem(unittest.TestCase):
+    """Picking a profile on a "Who's watching?" screen (get_it_playing), which the move leans on."""
+    SCREEN = [{"label": "Access Sam's profile"}, {"label": "Access Samantha's profile"},
+              {"label": "Access Kids's profile"}, {"label": "Add Profile"}, {"label": "EDIT PROFILES"}]
+
+    def pick(self, order, items=None, own=None):
+        hit = server.profile_item(self.SCREEN if items is None else items, order, own=order if own is None else own)
+        return hit and hit["label"]
+
+    def test_a_name_with_the_apps_words_around_it_is_found(self):
+        self.assertEqual(self.pick(["Sam"]), "Access Sam's profile")
+        self.assertEqual(self.pick(["Samantha"]), "Access Samantha's profile")
+        self.assertEqual(self.pick(["samantha", "Sam"]), "Access Samantha's profile")   # the order decides
+        self.assertEqual(self.pick(["Kids"]), "Access Kids's profile")
+        self.assertEqual(self.pick(["Mary Ann"], [{"label": "Access Mary Ann's profile"}]), "Access Mary Ann's profile")
+        self.assertEqual(self.pick(["New House"], [{"label": "Access New House's profile"}]), "Access New House's profile")
+        for name in ("Saman", "Jo", "", "S", "Profile", "Add", "Edit", "Access"):
+            self.assertIsNone(self.pick([name]), name)
+        self.assertIsNone(self.pick([]))
+
+    def test_a_wrapped_profile_is_called_by_the_name(self):
+        hit = server.profile_item(self.SCREEN + [{"label": "Jo"}], ["Sam", "Jo"], own=["Sam"])
+        self.assertEqual((hit["label"], hit["profile"]), ("Access Sam's profile", "Sam"))
+        self.assertNotIn("profile", server.profile_item([{"label": "Jo"}], ["Jo"], own=["Jo"]))
+
+    def test_buttons_that_only_mention_the_name_are_never_picked(self):
+        items = [{"label": "Sign out Sam"}, {"label": "Edit Sam"}, {"label": "Welcome back, Sam"},
+                 {"label": "Sam and Jo"}, {"label": "Create Kids Profile"}, {"label": "Add Profile"}]
+        for name in ("Sam", "Jo", "Kids", "Add"):
+            self.assertIsNone(self.pick([name], items), name)
+        self.assertEqual(self.pick(["Sam"], items + self.SCREEN), "Access Sam's profile")
+
+    def test_an_exact_label_is_enough_and_comes_first_for_each_name(self):
+        items = [{"label": "Access Sam's profile"}, {"label": "Sam"}, {"label": "Jo"}]
+        self.assertEqual(self.pick(["Sam"], items), "Sam")
+        self.assertEqual(self.pick(["Sam", "Jo"], items[:1] + items[2:]), "Access Sam's profile")   # own, wrapped, before Jo
+
+    def test_another_persons_name_has_to_match_exactly(self):
+        # Sam is watching and has no profile here: Jo's wrapped label is not taken for Sam
+        items = [{"label": "Access Jo's profile"}]
+        self.assertIsNone(self.pick(["Sam", "Jo"], items, own=["Sam"]))
+        self.assertEqual(self.pick(["Sam", "Jo"], [{"label": "Jo"}], own=["Sam"]), "Jo")   # as before this change
+
+    def test_own_names_come_from_the_person_and_the_fallback(self):
+        import config
+        people = [{"id": "p1", "name": "Sam", "app_profiles": ["Sam", "Sammy"]}, {"id": "p2", "name": "Jo"}]
+        with patch.object(config, "PEOPLE", people), patch.object(config, "APP_PROFILE_FALLBACK", ["Guest"]):
+            self.assertEqual(server.profile_order("p1"), ["Sam", "Sammy", "Guest", "Jo"])
+            self.assertEqual(server.profile_order("p1", own_only=True), ["Sam", "Sammy", "Guest"])
+            self.assertEqual(server.profile_order(None, own_only=True), ["Guest"])
+
+
+class MoveTarget(unittest.TestCase):
+    def tvs(self, **kinds):
+        out = {}
+        for tv_id, kind in kinds.items():
+            t = FakeTV(tv_id, tv_id, [])
+            t.kind = kind
+            out[tv_id] = t
+        return patch.dict(server.TVS, out, clear=True)
+
+    def test_the_only_other_android_tv_is_picked(self):
+        with self.tvs(a="android", b="android", c="roku"):
+            self.assertEqual(server.move_target("a"), "b")
+            self.assertEqual(server.move_target("a", "b"), "b")
+
+    def test_more_than_one_choice_has_to_be_named(self):
+        with self.tvs(a="android", b="android", c="android"):
+            with self.assertRaises(server.ApiError) as ctx:
+                server.move_target("a")
+            self.assertEqual(ctx.exception.key, "err_move_which_tv")
+            self.assertEqual(server.move_target("a", "c"), "c")
+
+    def test_no_other_tv_the_same_tv_and_an_unknown_tv(self):
+        with self.tvs(a="android", c="roku"):
+            for wanted, key in ((None, "err_move_which_tv"), ("a", "err_move_same_tv"), ("zz", "err_unknown_tv"),
+                                ("a.b;reboot", "err_unknown_tv"), (["a"], "err_unknown_tv"), ({}, "err_unknown_tv"),
+                                (5, "err_unknown_tv")):
+                with self.assertRaises(server.ApiError) as ctx:
+                    server.move_target("a", wanted)
+                self.assertEqual((ctx.exception.status, ctx.exception.key), (400, key))
+
+
+class MoveHandler(unittest.IsolatedAsyncioTestCase):
+    async def test_one_move_at_a_time_and_off_stays_off_by_default(self):
+        seen = []
+
+        async def body(_request):
+            return {"to": "b", "power_off": "yes"}   # only a real true turns TV A off
+
+        async def move_playing(src, dst, **kw):
+            seen.append((src, dst, kw["power_off"], kw["force"]))
+            return {"started": True, "title": "Some Show"}
+        token = server._current.set("a")
+        self.addCleanup(server._current.reset, token)
+        with patch.dict(server.TVS, {"a": FakeTV("a", "a", []), "b": FakeTV("b", "b", [])}, clear=True), \
+             patch.object(server, "body", body), patch.object(server, "move_playing", move_playing):
+            resp = await server.h_move(object())
+            self.assertEqual(resp.status, 200)
+            self.assertEqual(seen, [("a", "b", False, False)])
+            async with server._move_lock:
+                with self.assertRaises(server.ApiError) as ctx:
+                    await server.h_move(object())
+            self.assertEqual((ctx.exception.status, ctx.exception.key), (409, "err_move_busy"))
+
+    def test_the_route_is_there(self):
+        routes = {(r.method, r.resource.canonical) for r in server.make_app().router.routes()}
+        self.assertIn(("POST", "/api/move"), routes)
+
+
+class MoveHelpers(unittest.TestCase):
+    def test_blind_ok_is_netflix_and_nothing_else_unless_asked(self):
+        if not os.environ.get("COUCHTV_MOVE_BLIND_OK"):
+            self.assertEqual(move.BLIND_OK_APPS, {"netflix"})
+
+    def test_near(self):
+        self.assertTrue(move.near(600_000, 600_000 + move.NEAR_MS))
+        self.assertFalse(move.near(600_000, 600_001 + move.NEAR_MS))
+        self.assertFalse(move.near(None, 5))
+        self.assertFalse(move.near(5, None))
+
+    def test_youtube_lookup_asks_again_when_the_page_gives_no_sure_answer(self):
+        good = ('<script>var ytInitialData = {"c": [{"videoRenderer": {"videoId": "bbbbbbbbbbb", '
+                '"title": {"simpleText": "A Video"}, "ownerText": {"simpleText": "A Channel"}}}]};</script>')
+        other = ('<script>var ytInitialData = {"c": [{"videoRenderer": {"videoId": "ccccccccccc", '
+                 '"title": {"simpleText": "A Video (reupload)"}, "ownerText": {"simpleText": "Someone"}}}]};</script>')
+        pages = [other, "", good]     # another layout with one wrong video, a failed fetch, then the usual page
+        asked = []
+
+        async def page(query):
+            asked.append(query)
+            return pages[len(asked) - 1] if len(asked) <= len(pages) else ""
+
+        async def no_sleep(_):
+            return None
+        move._found.clear()
+        with patch.object(move, "_results_page", page), patch.object(move.asyncio, "sleep", no_sleep):
+            self.assertEqual(asyncio.run(move.youtube_video_id("A Video", "A Channel")), "bbbbbbbbbbb")
+            self.assertEqual(len(asked), 3)
+            # found once, remembered: no new request
+            self.assertEqual(asyncio.run(move.youtube_video_id("a video", "A CHANNEL")), "bbbbbbbbbbb")
+            self.assertEqual(len(asked), 3)
+            # never sure: three tries, then None, and nothing is remembered
+            self.assertIsNone(asyncio.run(move.youtube_video_id("Another Video", "A Channel")))
+            self.assertEqual(len(asked), 6)
+            self.assertNotIn((move._norm("Another Video"), move._norm("A Channel")), move._found)
+        move._found.clear()
+
+    def test_same_name_in_any_script(self):
+        a = "\u5343\u3068\u5343\u5c0b\u306e\u795e\u96a0\u3057"
+        self.assertTrue(move.same_name(a, a))
+        self.assertTrue(move.same_name("Caf\u00e9 Society", "caf\u00e9  society!"))
+        self.assertFalse(move.same_name(a, "\u3082\u306e\u306e\u3051\u59eb"))
+        self.assertFalse(move.same_name("", ""))
+        self.assertFalse(move.same_name("!!!", "???"))
+
+    def test_a_remembered_video_is_for_that_length_only(self):
+        five = ('<script>var ytInitialData = {"c": [{"videoRenderer": {"videoId": "aaaaaaaaaaa", "title": '
+                '{"simpleText": "A Video"}, "ownerText": {"simpleText": "A Channel"}, "lengthText": {"simpleText": "5:00"}}}, '
+                '{"videoRenderer": {"videoId": "bbbbbbbbbbb", "title": {"simpleText": "A Video"}, "ownerText": '
+                '{"simpleText": "A Channel"}, "lengthText": {"simpleText": "10:00"}}}]};</script>')
+        asked = []
+
+        async def page(query):
+            asked.append(query)
+            return five
+        move._found.clear()
+        with patch.object(move, "_results_page", page):
+            self.assertEqual(asyncio.run(move.youtube_video_id("A Video", "A Channel", 300_000)), "aaaaaaaaaaa")
+            self.assertEqual(asyncio.run(move.youtube_video_id("A Video", "A Channel", 600_000)), "bbbbbbbbbbb")
+            self.assertEqual(len(asked), 2)
+            self.assertEqual(asyncio.run(move.youtube_video_id("A Video", "A Channel", 600_400)), "bbbbbbbbbbb")
+            self.assertEqual(len(asked), 2)      # the same length again: remembered
+        move._found.clear()
+
+    def test_clock(self):
+        self.assertEqual([move.clock(x) for x in (0, 83_000, 3_723_000, None)], ["0:00", "1:23", "1:02:03", "0:00"])
+
+    def test_seek_command_checks_the_package(self):
+        self.assertTrue(move.seek_command(NETFLIX, 1234.9).endswith(f"--es pkg {NETFLIX} --es pos_ms 1234"))
+        self.assertTrue(move.seek_command(NETFLIX, -5).endswith("--es pos_ms 0"))
+        for bad in ("a.b;reboot", "a.b && id", "nodots", None):
+            with self.assertRaises(tvmod.UnsafeInput):
+                move.seek_command(bad, 1000)
+        with self.assertRaises(ValueError):
+            move.seek_command(NETFLIX, "1; reboot")
+
+    def test_seek_ok(self):
+        self.assertTrue(move.seek_ok('Broadcast completed: result=0, data="{"id":2,"result":"ok"}"\n'))
+        self.assertFalse(move.seek_ok('Broadcast completed: result=0, data="{"error":"no media session"}"'))
+        self.assertFalse(move.seek_ok("Broadcast completed: result=0"))
+        self.assertFalse(move.seek_ok(""))
+        self.assertFalse(move.seek_ok('Broadcast completed: result=0, data="[1]"'))
+
+    def test_can_seek(self):
+        self.assertTrue(move.can_seek('Broadcast completed: result=0, data="{"state":3,"can_seek":true}"'))
+        self.assertFalse(move.can_seek('Broadcast completed: result=0, data="{"state":3,"can_seek":false}"'))
+        self.assertFalse(move.can_seek('Broadcast completed: result=0, data="{"error":"no media session"}"'))
+        self.assertFalse(move.can_seek(""))
+        self.assertTrue(move.can_seek_command(NETFLIX).endswith(f"--es op state --es pkg {NETFLIX}"))
+        with self.assertRaises(tvmod.UnsafeInput):
+            move.can_seek_command("a.b;reboot")
+
+    def test_youtube_link(self):
+        self.assertEqual(move.youtube_link("abcdefghijk"), "https://www.youtube.com/watch?v=abcdefghijk")
+        self.assertEqual(move.youtube_link("abcdefghijk", 61.9), "https://www.youtube.com/watch?v=abcdefghijk&t=61")
+        for bad in ("short", "abcdefghijk&x=1", "abcdefghij'", None):
+            with self.assertRaises(ValueError):
+                move.youtube_link(bad)
+
+    def test_youtube_results_and_pick(self):
+        page = ('<script>var ytInitialData = {"contents": [{"videoRenderer": {"videoId": "aaaaaaaaaaa", '
+                '"title": {"runs": [{"text": "A Video"}]}, "ownerText": {"runs": [{"text": "Other Channel"}]}, '
+                '"lengthText": {"simpleText": "15:00"}}}, {"videoRenderer": {"videoId": "bbbbbbbbbbb", '
+                '"title": {"simpleText": "A Video"}, "ownerText": {"runs": [{"text": "A Channel"}]}, '
+                '"lengthText": {"simpleText": "15:01"}}}]};</script>')
+        found = move.youtube_results(page)
+        self.assertEqual([r["id"] for r in found], ["aaaaaaaaaaa", "bbbbbbbbbbb"])
+        self.assertEqual(found[1], {"id": "bbbbbbbbbbb", "title": "A Video", "channel": "A Channel", "length_s": 901})
+        self.assertEqual(move.youtube_pick(found, "a video!", "A Channel", 900_000), "bbbbbbbbbbb")
+        self.assertEqual(move.youtube_pick(found, "A Video", "A Channel"), "bbbbbbbbbbb")
+        self.assertIsNone(move.youtube_pick(found, "A Video", "A Channel", 300_000))   # the length disagrees
+        self.assertIsNone(move.youtube_pick(found, "Another Video", "A Channel", 900_000))
+        self.assertIsNone(move.youtube_pick(found, "A Video", "Nobody"))
+        self.assertEqual(move.youtube_results("<html>consent</html>"), [])
+        self.assertEqual(move.youtube_results("<script>var ytInitialData = {broken;</script>"), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

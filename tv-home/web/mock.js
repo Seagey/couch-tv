@@ -10,6 +10,7 @@
 //   picture=1           this TV has a picture mode switch (Calibrated and Dynamic)
 //   look=oled           home.look (night, oled, classic)       clock=24h   home.clock     dock=6   home.dock_size
 //   scenes=fog,dawn     home.scenes     secs=8      home.scene_seconds     sunsync=1   home.sun_sync
+//   sunrotate=25        home.sun_rotate_minutes (own scenes tagged "when")     datebars=1   home.date_bars
 //   myscenes=[...]      home.my_scenes, as JSON (docs/MAKE-A-SCENE.md), for your own scenes
 //   lang=it             home.language (en, es, es-MX, it, de, tr, sr-Latn-RS, pl, pt); without it, the browser's own language
 //   glass=on            home.glass (on, lite: no blur)      video=<link>   home.video_url, an MP4 or MOV
@@ -28,6 +29,7 @@
 //   smartidle=1          home.smart_idle.enabled: enable Smart Idle (smartidle_sec=5 sets test timeout in seconds)
 //   inputs=4            the Input button lists four HDMI ports (one eARC), as the launcher reads them
 //   gfocus=glass        home.glass_focus: with glass app icons, the focused app stays glass
+//   banners=1           home.dock_banners: the Night dock shows each app's wide TV banner
 //   music=1             Now playing: a pretend song in Spotify (music=paused: paused; music=noart: no cover)
 //   newapp=1            an app turns up that this TV has not seen before (the New dot)
 //   down                the bridge is not answering      offline=1   the saved copy, no bridge at all
@@ -38,6 +40,8 @@
 //                       animated, so no real faces) and two allowed apps. The parent PIN is 1234.
 //                       kids=empty: the same profile with nothing on the shelf yet
 //   cards=1             custom cards (home.custom_cards): three sample cards at the end of the row
+//   follow=1            home.shelf_follows_app: on an app tile the row shows only that app's cards, as
+//                       "Recently on <app>" (YouTube: two pretend videos, the way the bridge sends them)
 //   update=1            Home settings, Updates, with a pretend 0.4 waiting (update=latest: none
 //                       newer; update=allow: the TV has not let Home install apps yet;
 //                       update=ask: nobody has answered "tell you about new versions?" yet)
@@ -85,6 +89,7 @@
     });
   }
   if (arg("quick") !== null) cfg.tvs[0].quick = arg("quick").split(",").filter(Boolean);
+  if (arg("banners")) cfg.home.dock_banners = true;
   if (arg("inputs")) {
     window.MOCK_INPUTS = [
       { id: "mock/hdmi1", label: "HDMI 1", type: "hdmi", devices: ["PlayStation 5"] },
@@ -107,6 +112,8 @@
   if (arg("scenes")) cfg.home.scenes = arg("scenes").split(",");
   if (arg("secs")) cfg.home.scene_seconds = parseInt(arg("secs"), 10);
   if (arg("sunsync")) cfg.home.sun_sync = arg("sunsync") === "1" || arg("sunsync") === "true";
+  if (arg("sunrotate")) cfg.home.sun_rotate_minutes = parseInt(arg("sunrotate"), 10);   // home.sun_rotate_minutes
+  if (arg("datebars")) cfg.home.date_bars = arg("datebars") !== "off";   // home.date_bars
   if (arg("myscenes")) try { cfg.home.my_scenes = JSON.parse(arg("myscenes")); } catch (e) {}
   if (arg("glass")) cfg.home.glass = arg("glass");
   if (arg("moving")) cfg.home.moving_tiles = arg("moving") !== "off";
@@ -148,6 +155,7 @@
   if (arg("design") === "local") {
     try { var dz = JSON.parse(localStorage.getItem("tvdesigner.design") || "null"); if (dz && typeof dz === "object") cfg.design = dz; } catch (e) {}
   }
+  if (arg("follow")) cfg.home.shelf_follows_app = arg("follow") !== "off";   // home.shelf_follows_app
   window.COUCH_CONFIG = cfg;
 
   // ---------- the launcher's updater (Updater.kt), for ?update= ----------
@@ -361,7 +369,12 @@
             var b = shows[i % shows.length];
             return { id: "k" + i, title: "Show " + (i + 1), season: 1, episode: i + 1, app: b.app, backdrop: b.backdrop };
           });
-          return resolve({ ok: true, items: mine });
+          // the videos next to the items, as GET /api/continue sends them (bridge/API.md): made-up titles, no picture
+          var videos = empty ? [] : [
+            { id: "v1", title: "How a Sydney ferry is built", kind: "video", app: app("youtube", "YouTube", "com.google.android.youtube.tv"), poster: null, backdrop: null, progress: null },
+            { id: "v2", title: "Sourdough for beginners", kind: "video", app: app("youtube", "YouTube", "com.google.android.youtube.tv"), poster: null, backdrop: null, progress: null }
+          ];
+          return resolve({ ok: true, items: mine, videos: videos });
         }
         if (path.indexOf("/api/people") === 0) {
           if (method === "POST") {

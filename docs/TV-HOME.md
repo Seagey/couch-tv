@@ -38,6 +38,13 @@ Shown with sample shows and sample people. On your TV, "keep watching" fills fro
 actually watch: per TV and per person (with options B and C), up to 10 shows, newest first.
 With option A it is Android's own Watch Next list, the same for everyone on that TV.
 
+Switched on in Home settings, Look (Keep watching follows the app) or with `home.shelf_follows_app`
+(off unless you ask), the row follows the remote: on an app tile it shows only what you watched in
+that app, as "Recently on Netflix", and under the YouTube tile the videos you watched there (with the
+bridge, option B), which the row never shows otherwise. It stays that way while you go up from the tile
+into the row, and the whole row comes back on any other tile, or anywhere else on the home. An app with
+nothing on the go leaves the whole row where it is.
+
 ## Finding every app
 
 On main, in the next release. Only part of your apps fit in the dock on some TVs. Press **Down** on
@@ -160,7 +167,8 @@ On main, in the next release:
 - An **OLED Cinema** look (the Classic grid on pure black).
 - **Follow the sun** (the scene follows dawn, day, sunset and night where you are).
 - **Lighter home** for a slow box that stutters.
-- **Moving tiles** (switch it off if the slowly swaying focused tile flickers on an older TV).
+- **Moving tiles** (switch it off if the slowly swaying focused tile flickers on an older TV). The sway and the light that slides across the focused tile now hold still 6 s after the focus last moves, and start again with the next press.
+- **Lighter home turns itself on on a low end TV** (it measures itself once a week) unless you have chosen in Home settings or with `home.lighter` ([CONFIG.md](CONFIG.md)).
 
 Look also holds **Now playing**, **Show Keep watching** and **Sound**: see [Now playing](#now-playing).
 

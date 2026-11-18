@@ -112,6 +112,8 @@ export const api = {
   play: (show, who) => call('POST', '/api/play', { ...show, who }, 60000),
   ask: (text, who) => call('POST', '/api/ask', { text, who }, 90000),
   power: (state) => call('POST', '/api/power', { state }, 40000),
+  // move what is playing on this TV to another one: a wake, a fresh app start and a profile screen can add up
+  move: (to, force = false) => call('POST', '/api/move', force ? { to, force: true } : { to }, 180000),
   volume: (action, steps) => call('POST', '/api/volume', steps ? { action, steps } : { action }),
   setSleep: (minutes) => call('POST', '/api/sleep', { minutes }),
   cancelIdle: () => call('POST', '/api/idle/cancel', {}),

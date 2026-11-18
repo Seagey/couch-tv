@@ -67,6 +67,7 @@
     else if (k === "svg" && p) { p.className = "face tool input-ic"; p.innerHTML = n.getAttribute("data-svg"); }
     else if (k === "word" && p) { p.className = "face word"; p.textContent = n.getAttribute("data-name"); }
     else if (k === "name" && p) p.textContent = n.getAttribute("data-n");
+    else if (k === "kwretry" && window.kwArtRetry) window.kwArtRetry(n);   // a Keep watching picture is asked for again (#274)
   }, true);
   var WXCFG = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
   var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "tvsettings", "screensaver", "extend"];
@@ -124,6 +125,8 @@
   var WX_AMBIENT = true, WX_SUN_GRADE = true;
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
   var NP_ON = true, KW_ON = true, SOUND_STYLE = "system", START_FOCUS = "people";
+  // Keep watching follows the app the remote is on (home.shelf_follows_app), off unless switched on
+  var SHELF_FOLLOW = false;
   // Ambient sleep soundscapes (rain, fire, waves, brown noise)
   var SOUND_TYPE = "off", SOUND_VOL = 0.5, SOUND_FADE_SLEEP = true;
   function initSoundscape() {
@@ -178,6 +181,81 @@
   var MOVING = true;
   // Lighter home (#58): no blur, no soft shadows, a photo that holds still, smaller pictures. For a slow box.
   var LIGHTER = false;
+  // Lighter home by itself on a low end TV. On a 2 GB TV (Android 11, four A55 cores) anything
+  // that moves makes every frosted panel be drawn again each frame: 60 frames a second at rest, 22 with a
+  // focused tile's sway, 47 with the blur off. When nobody has chosen (Home settings, Look, Lighter home,
+  // or home.lighter), the TV decides: navigator.deviceMemory where it is clear (1 GB or less: low end, 4 or
+  // more: not), otherwise a 1.5 s measurement of frame times with something moving, kept for a week.
+  var LOW_END = false, LOW_END_WHY = "", LOW_END_KEY = "tvhome.lowend", LOW_END_DAYS = 7;
+  function lowEndDecision(o) {
+    if (o.setting === true || o.setting === false) return { low: o.setting, why: "setting" };
+    if (typeof o.memory === "number" && o.memory > 0 && o.memory <= 1) return { low: true, why: "memory" };
+    if (typeof o.memory === "number" && o.memory >= 4) return { low: false, why: "memory" };
+    if (o.cached && typeof o.cached.low === "boolean" && o.now - o.cached.t < o.days * 86400000) return { low: o.cached.low, why: "measured" };
+    if (typeof o.medianMs === "number") return { low: o.medianMs > 22, why: "measured" };
+    return null;   // measure first
+  }
+  // frame times for 1.5 s while a screen sized, nearly clear layer fades a little (it makes every frosted
+  // panel be drawn again each frame, as a focused tile's sway does); the median frame, in ms
+  function measureFrames(done) {
+    var veil = document.createElement("div"), d = [], last = 0, end = 0;
+    veil.setAttribute("aria-hidden", "true");
+    veil.style.cssText = "position:fixed;top:0;right:0;bottom:0;left:0;z-index:1;pointer-events:none;background:rgba(0,0,0,0.01);will-change:opacity";
+    document.body.appendChild(veil);
+    var a = veil.animate ? veil.animate([{ opacity: 1 }, { opacity: 0.5 }], { duration: 1500, iterations: 1 }) : null;
+    var step = function (t) {
+      if (!end) end = t + 1500;
+      if (last) d.push(t - last);
+      last = t;
+      if (t < end) { requestAnimationFrame(step); return; }
+      if (a) a.cancel();
+      veil.remove();
+      d.sort(function (x, y) { return x - y; });
+      done(d.length ? d[d.length >> 1] : 16.7);
+    };
+    requestAnimationFrame(step);
+  }
+  // decides once nobody has chosen Lighter home; turns it on, as the Home settings row does, if low end
+  function lowEnd() {
+    var chosen = typeof ST.lighter === "boolean" || typeof HOME.lighter === "boolean";
+    if (chosen || OLD_ENGINE) return;   // a choice, or an old WebView that is already Lighter
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem(LOW_END_KEY) || "null"); } catch (e) {}
+    var o = { setting: "auto", memory: navigator.deviceMemory, cached: cached, now: Date.now(), days: LOW_END_DAYS };
+    // late: after a measurement, when the home is already drawn (redraw it as the settings row does)
+    var apply = function (r, late) {
+      LOW_END = r.low; LOW_END_WHY = r.why;
+      if (LIGHTER === LOW_END || typeof ST.lighter === "boolean") return;   // already so, or chosen meanwhile
+      LIGHTER = LOW_END;
+      document.documentElement.classList.toggle("lighter", LIGHTER);
+      if (late) { ambientSync(); movingTiles(); renderShelf(); paintFocus(); }   // else the settings code goes on to do these
+    };
+    var r = lowEndDecision(o);
+    if (r) { apply(r); return; }
+    // measure once the home has drawn, when nothing else is starting up (once, however often settings apply)
+    if (lowEnd.pending) return;
+    lowEnd.pending = true;
+    setTimeout(function () {
+      measureFrames(function (ms) {
+        o.medianMs = ms; lowEnd.pending = false;
+        var m = lowEndDecision(o);
+        try { localStorage.setItem(LOW_END_KEY, JSON.stringify({ low: m.low, t: Date.now(), ms: Math.round(ms * 10) / 10 })); } catch (e) {}
+        apply(m, true);
+      });
+    }, 4000);
+  }
+
+  // The focused tile's sway and glint play for a few seconds after the focus moves, then hold still: a
+  // running animation makes the TV draw the whole screen every frame (60 to 22 frames a second on a 2 GB
+  // TV with frosted panels), and a still home costs nothing. Any key or pointer move starts them again.
+  var SETTLE_MS = 6000, settleTimer = 0;
+  function unsettle() {
+    document.documentElement.classList.remove("settled");
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(function () { document.documentElement.classList.add("settled"); }, SETTLE_MS);
+  }
+  ["keydown", "pointermove", "pointerdown", "wheel"].forEach(function (ev) { window.addEventListener(ev, unsettle, true); });
+  unsettle();
   // WebViews before Chrome 84 (still on many Android 9 TVs) skip gap in a flex box, so icons touch
   // their words and rows touch each other. html.no-flex-gap lets app.css put margins in instead (#26).
   (function () {
@@ -240,6 +318,9 @@
   ];
   var GRID_COLS = 12, GRID_MAX = 24;
   var DOCK_APPS = 10;   // Night: apps in the dock before Settings and More apps (home.dock_size)
+  var DOCK_BANNERS = false;   // Night: the dock shows each app's wide TV banner instead of its square icon (home.dock_banners)
+  var BANNER_COLS = 6;        // wide tiles: six to a row; the rows below show one at a time, moving down
+  var BANNER_ROW_REM = 10;    // one row of banners and the gap under it (7rem tile + 3rem), for the slide
   var SETTINGS_PKG = "com.android.tv.settings";
   var HOLD_MS = 600;    // how long OK is held to pick something up
 
@@ -303,7 +384,9 @@
   }
 
   var $ = function (id) { return document.getElementById(id); };
-  var data = { shows: [], showsBy: {}, apps: [], screens: [], bridge: null };
+  // shows is the row on screen (the whole row, or one app's cards while the remote follows an app);
+  // showsBy and videosBy are the full lists per person, as the bridge (or Android's Watch Next) gave them
+  var data = { shows: [], showsBy: {}, videosBy: {}, apps: [], screens: [], bridge: null };
   // Whose Keep watching is showing. Remembered on this TV. Any number of people: none or one shows
   // no switcher, two the pill switch, three or more a round head icon that opens a list.
   // With nobody set up, everything is shown ("both" to the bridge).
@@ -357,7 +440,7 @@
     PEOPLE = (list || []).filter(function (p) { return p && p.id && p.name; });
     NOBODY = !PEOPLE.length;
     if (NOBODY) PEOPLE = [{ id: "both", name: t("everyone") }];
-    PEOPLE.forEach(function (p) { if (!data.showsBy[p.id]) data.showsBy[p.id] = []; });
+    PEOPLE.forEach(function (p) { if (!data.showsBy[p.id]) data.showsBy[p.id] = []; if (!data.videosBy[p.id]) data.videosBy[p.id] = []; });
     if (!PEOPLE.some(function (p) { return p.id === who; })) who = PEOPLE[0].id;
   }
   // An order made on this TV with no bridge to keep it (or before the bridge heard about it).
@@ -422,9 +505,11 @@
     document.documentElement.classList.toggle("glass", GLASS !== "off");
     document.documentElement.classList.toggle("glass-lite", GLASS === "lite");
     // Lighter home: what was chosen in Home settings, else home.lighter, else on for a WebView with no
-    // CSS grid (Android 6 and older, a 1 GB box), where blur, soft shadows and drift make it crawl (#59).
+    // CSS grid (Android 6 and older, a 1 GB box), where blur, soft shadows and drift make it crawl (#59);
+    // with none of those, lowEnd() turns it on by itself on a TV it finds low end.
     LIGHTER = typeof ST.lighter === "boolean" ? ST.lighter : typeof HOME.lighter === "boolean" ? HOME.lighter : OLD_ENGINE;
     document.documentElement.classList.toggle("lighter", LIGHTER);
+    lowEnd();
     ambientSync();
     movingTiles();
     // glass app icons (#25): set in Home settings, else home.glass_icons; off unless switched on
@@ -433,6 +518,9 @@
     // the Keep watching row: Home settings win over home.keep_watching; off hides it and stops fetching it
     KW_ON = typeof ST.keep_watching === "boolean" ? ST.keep_watching : HOME.keep_watching !== false;
     document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
+    // the row follows the app the remote is on: Home settings win over home.shelf_follows_app; off unless switched on
+    SHELF_FOLLOW = typeof ST.shelf_follows_app === "boolean" ? ST.shelf_follows_app : HOME.shelf_follows_app === true;
+    if (!SHELF_FOLLOW) followPkg = null;
     // the full screen music view is off until it is switched on in Home settings or home.ambient_music
     AMBIENT_MUSIC = typeof ST.ambient_music === "boolean" ? ST.ambient_music : HOME.ambient_music === true;
     GLASS_FOCUS = (ST.glass_focus || HOME.glass_focus) === "glass" ? "glass" : "colour";
@@ -448,6 +536,8 @@
     VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true);
     GRID_COLS = NIGHT ? 12 : 8;
     DOCK_APPS = Math.max(1, Math.min(10, parseInt(HOME.dock_size, 10) || 10));
+    DOCK_BANNERS = NIGHT && (typeof ST.dock_banners === "boolean" ? ST.dock_banners : HOME.dock_banners === true);
+    document.documentElement.classList.toggle("dock-banners", DOCK_BANNERS);
     initSoundscape();
     if (smartOn()) DOCK_APPS = Math.min(DOCK_APPS, 9);   // the Smart home tile takes one place in the dock
     CLOCK24 = clock24();
@@ -486,12 +576,33 @@
     document.documentElement.classList.toggle("still", !MOVING);
     // Mac-style dock (Home settings, Look; home.dock "mac"): off unless chosen, held off by Lighter home
     DOCK_MAC = !LIGHTER && (ST.dock || HOME.dock) === "mac";
+    DATE_BARS = HOME.date_bars === true;
     document.documentElement.classList.toggle("dock-mac", DOCK_MAC);
     if (typeof magnify === "function") magnify();
   }
   var DOCK_MAC = false;
+  var DATE_BARS = false;   // home.date_bars: thin vertical bars between the day, the place and the weather
   // Lighter home: ask for the 640 px size of a Keep watching picture, not the 1440 px one (a card is about 500 px wide)
   function slim(u) { return LIGHTER && typeof u === "string" ? u.replace("/s1440/", "/s640/") : u; }
+  // A Keep watching picture that does not load is asked for again a little later, up to six times
+  // (about a minute and a quarter), instead of staying broken until the row is drawn again (#274):
+  // just after a TV restart the home is up before the Wi-Fi and the apps' picture providers are.
+  // Nothing waits meanwhile. The app's art route (tvos.invalid/art/<token>) reads only the last
+  // path segment, so a query makes it a fresh request; any other address is set again as it was.
+  var ART_RETRY_MS = [1500, 3000, 6000, 12000, 20000, 30000];
+  window.kwArtRetry = function (img) {
+    var n = +(img.getAttribute("data-retry") || 0);
+    if (n >= ART_RETRY_MS.length) { img.onerror = null; return; }
+    var src = img.getAttribute("data-src") || img.getAttribute("src") || "";
+    if (!src) return;
+    img.setAttribute("data-src", src);
+    img.setAttribute("data-retry", String(n + 1));
+    setTimeout(function () {
+      if (!img.isConnected) return;   // the row was drawn again meanwhile, with a new picture
+      if (src.indexOf("//tvos.invalid/art/") >= 0) img.src = src + "?r=" + (n + 1);
+      else { img.removeAttribute("src"); img.src = src; }
+    }, ART_RETRY_MS[n]);
+  };
   function glassSetting() { var g = ST.glass || HOME.glass; return g === "on" || g === "lite" ? g : "off"; }
   // no clock in Home settings or config.json: the TV's own setting, else the one usual for the language (24 hour in Italian, German, Turkish, French, Serbian, Polish and Brazilian Portuguese)
   // On the Android home the TV's own 12 or 24 hour setting (System, Date and time) comes before the language's usual clock (#221)
@@ -510,7 +621,7 @@
   }
   function save() {
     if (MOCK || PREVIEW || OFFLINE) return;
-    var j = JSON.stringify({ showsBy: data.showsBy, screens: data.screens, order: data.order });
+    var j = JSON.stringify({ showsBy: data.showsBy, videosBy: data.videosBy, screens: data.screens, order: data.order });
     try { localStorage.setItem(CACHE_KEY, j); } catch (e) {}
     try { if (TV && TV.keep) TV.keep(CACHE_KEY, j); } catch (e) {}
   }
@@ -674,8 +785,19 @@
     return parts.join(", ");
   }
 
+  // Every 15 s: redraw only on a new minute, and only while the home can be seen. The redraw sets
+  // two innerHTMLs and forces a few layouts (fitDate, the glass clock), which a 2 GB box felt four
+  // times a minute for a display that changes once. tv.resume() redraws straight away.
+  var clockMinute = "";
+  function clockTick() {
+    if (!active()) return;
+    var d = new Date(), minute = d.getHours() + ":" + d.getMinutes();
+    if (minute === clockMinute && !(NIGHT && !glassShown)) return;   // glassShown blank: a glass setting changed
+    clock();
+  }
   function clock() {
     var d = new Date(), h = d.getHours(), m = d.getMinutes();
+    clockMinute = h + ":" + m;
     var mm = (m < 10 ? "0" : "") + m;
     var CD = typeof CouchDesign !== "undefined" && CouchDesign.on() ? CouchDesign : null;
     var c24 = CD ? CD.clock24(CLOCK24) : CLOCK24;   // a design's clock format wins (design.js)
@@ -697,9 +819,10 @@
         '</span><span class="wx">' + weatherParts.map(esc).join(" · ") + "</span></span>";
     } else {
       date.classList.remove("weather-lines");
-      date.innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' +
-        (place ? '<span class="wx-place">' + esc(place) + " · </span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
-        '<span class="ww"> · ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
+      var bar = DATE_BARS ? '<i class="vbar"></i>' : "";
+      date.innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' + bar +
+        (place ? '<span class="wx-place">' + (DATE_BARS ? esc(place) + bar : " · " + esc(place) + " · ") + "</span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
+        '<span class="ww">' + (DATE_BARS ? " " : " · ") + esc(wxText(w)) + "</span></span>" : "") + "</span>";
     }
     var ic = $("idle-clock"), idate = $("idle-date"), iwx = $("idle-wx");
     if (ic) ic.innerHTML = hm + (c24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
@@ -772,7 +895,10 @@
         below: below, dark: m.text === "dark",
         // video: true plays backgrounds/mine/scene-<id>.mp4 (muted, looping) over the photo, under
         // the cut-out and the clock, while this scene is the one on screen
-        video: m.video === true });
+        video: m.video === true,
+        // when: dawn, day, dusk or night. With Follow the sun, an own scene tagged like this joins the built-in
+        // scene for that time of day, and the home steps through the group (home.sun_rotate_minutes)
+        when: ["dawn", "day", "dusk", "night"].indexOf(m.when) >= 0 ? m.when : "" });
     });
     return out;
   }
@@ -822,13 +948,68 @@
         el.style.setProperty("--my-top", s.y * 100 + "vh");
         el.style.setProperty("--my-size", s.size * 100 + "vh");
         el.style.setProperty("--my-weight", s.weight);
-        el.querySelector(".sbg").onerror = function () { lostScene(s); };
-        var fg = el.querySelector(".fg");
-        if (fg) fg.onerror = function () { fg.style.display = "none"; };   // "cutout": true but no file: the clock stays in front
       }
+      watchImage(el.querySelector(".sbg"), s, true);
+      var fg = el.querySelector(".fg");
+      if (fg) watchImage(fg, s, false);
       box.appendChild(el);
       return el;
     });
+  }
+
+  // A scene picture that did not arrive. Your own scene: the file is not on this TV, so the scene
+  // leaves the turns (lostScene) or the clock stays in front without its cut-out. A built-in one
+  // was lost on the way (seen on a Fire TV Cube over weak Wi-Fi, where it left a black scene for
+  // the whole turn): ask again after 2, 6 and 15 s, and if the scene on screen still has no photo,
+  // move on to the next one. A picture whose src was taken away (unreadyScene) is not an error.
+  var RETRY_MS = [2000, 6000, 15000];
+  function watchImage(img, s, isPhoto) {
+    img.onerror = function () {
+      var src = img.getAttribute("src");
+      if (!src) return;
+      if (s.mine) { if (isPhoto) lostScene(s); else img.style.display = "none"; return; }
+      var tries = parseInt(img.dataset.tries || "0", 10);
+      if (tries < RETRY_MS.length) {
+        setTimeout(function () {
+          if (!img.getAttribute("src")) return;   // released meanwhile: nothing to retry
+          var base = src.replace(/([?&])retry=\d+$/, "$1").replace(/[?&]$/, "");
+          img.dataset.tries = tries + 1;
+          img.src = base + (base.indexOf("?") < 0 ? "?" : "&") + "retry=" + (tries + 1);
+        }, RETRY_MS[tries]);
+      } else if (isPhoto && SCENES[scene] === s && SCENES.length > 1) showScene(nextFrom(scene));
+    };
+    img.onload = function () { delete img.dataset.tries; };
+  }
+
+  /** The scene's photo is in and drawable. */
+  function photoIn(el) {
+    var img = el.querySelector(".sbg");
+    return !!img && img.complete && img.naturalWidth > 0;
+  }
+
+  // Resolves once the scene's photo is in (or failed, or 8 s passed): a fade only starts when there
+  // is something to fade to, instead of a black scene while the photo is still on its way.
+  function sceneLoaded(el, ms) {
+    var img = el.querySelector(".sbg");
+    if (!img || (img.complete && img.naturalWidth > 0)) return Promise.resolve();
+    return new Promise(function (done) {
+      var t = setTimeout(done, ms);
+      var fin = function () { clearTimeout(t); img.removeEventListener("load", fin); img.removeEventListener("error", fin); done(); };
+      img.addEventListener("load", fin); img.addEventListener("error", fin);
+    });
+  }
+
+  // A scene that has faded out gives its pictures back: the decoded 1920x1080 photo, the cut-out
+  // with its alpha and the clock's frosted fill are what a scene costs in GPU memory, and a scene
+  // keeping them while it waits is why a 2 GB Fire TV Cube swung 115 to 260 MB at every change.
+  // readyScene puts them back (from the browser's cache) when its turn comes near.
+  function unreadyScene(k) {
+    var el = sceneEls[k];
+    if (!el || !el.classList.contains("ready")) return;
+    el.classList.remove("ready");
+    Array.prototype.forEach.call(el.querySelectorAll("img"), function (img) { img.removeAttribute("src"); delete img.dataset.tries; });
+    Array.prototype.forEach.call(el.querySelectorAll(".gclock .fill"), function (f) { f.style.backgroundImage = ""; });
+    delete el.dataset.hm;
   }
 
   // An own scene whose photo is not on this TV (option A with an app built before the scene was
@@ -840,8 +1021,10 @@
       $("scenes").innerHTML = "";
       buildScenes();
       scene = 0;
+      switching = false; pendingScene = -1;   // a fade still waiting for a lost photo is over (its scene element is gone)
       showScene(0);
-    } else if (SCENES[scene] === s) showScene(nextFrom(scene));
+    } else if (SCENES[scene] === s && pendingScene < 0) showScene(nextFrom(scene));
+    // a lost scene a fade is waiting for: that fade moves on by itself (showScene)
   }
   function nextFrom(i) {
     for (var k = 1; k <= SCENES.length; k++) if (!SCENES[(i + k) % SCENES.length].lost) return (i + k) % SCENES.length;
@@ -852,17 +1035,26 @@
   function readyScene(i) {
     var s = SCENES[i], el = sceneEls[i];
     if (!el.classList.contains("ready")) {
-      el.querySelector(".sbg").src = s.src || bgPath(s.photo, ".jpg", !s.mine);
+      var sbg = el.querySelector(".sbg");
+      if (s.src) sbg.src = s.src;
+      else if (s.mine) {
+        // an own scene may carry a 4K copy, scene-<id>@2x.jpg (make-scene.py --4k). On a 4K screen it is
+        // tried first, and the 1080 file is used if it is not there, so scenes made before this keep working.
+        var lo = bgPath(s.photo, ".jpg", false), hi = bgPath(s.photo, ".jpg", true);
+        if (hi !== lo) sbg.onerror = function () { sbg.onerror = null; sbg.src = lo; };
+        sbg.src = hi;
+      } else sbg.src = bgPath(s.photo, ".jpg", true);
       if (s.fg) el.querySelector(".fg").src = bgPath(s.photo + "-fg", ".webp", !s.mine);
       el.classList.add("ready");
       // decoded now, while the scene waits at opacity 0, rather than when its fade starts
       Array.prototype.forEach.call(el.querySelectorAll("img"), function (img) { if (img.decode && img.src) img.decode().catch(function () {}); });
-    }
-    drawClocks(el, s, glassShown);
+      drawClocks(el, s, glassShown);
+    } else if (el.dataset.hm !== glassShown) drawClocks(el, s, glassShown);   // already drawn with this time: nothing to do
   }
 
   function drawClocks(el, s, hm) {
     if (!hm) return;
+    el.dataset.hm = hm;
     var cs = el.querySelectorAll(".gclock");
     for (var k = 0; k < cs.length; k++) {
       var c = cs[k];
@@ -965,10 +1157,30 @@
     });
   }
 
-  function showScene(i) {
-    var prev = scene;
-    scene = i;
+  // The next scene is readied this long before its turn (today's 2 s after the fade kept two full
+  // scenes decoded for the whole turn); short turns keep the old timing.
+  var PRE_READY_MS = 3000, preReadyTimer = null, switching = false, pendingScene = -1;
+  function showScene(i, hops) {
+    if (switching) return;   // a fade is waiting for its photo: the next tick comes round
+    var prev = scene, s = SCENES[i], el = sceneEls[i];
     readyScene(i);
+    if (prev === i) { swapScene(i, prev); return; }
+    switching = true; pendingScene = i;
+    sceneLoaded(el, 8000).then(function () {
+      switching = false; pendingScene = -1;
+      if (sceneEls[i] !== el) return;   // the scenes were rebuilt meanwhile (lostScene): that showed what is left
+      if (s.lost || !photoIn(el)) {
+        // nothing to fade to: keep what is on screen and try the scene after this one (bounded, so a
+        // TV with no network does not go round and round); the retries and the next turn try again
+        hops = (hops || 0) + 1;
+        if (hops < SCENES.length) showScene(nextFrom(i), hops);
+        return;
+      }
+      swapScene(i, prev);
+    });
+  }
+  function swapScene(i, prev) {
+    scene = i;
     var date = $("date");
     date.classList.add("swap");
     setTimeout(function () {
@@ -984,13 +1196,18 @@
     }, 600);
     sceneEls[i].classList.add("on");
     if (prev !== i) sceneEls[prev].classList.remove("on");
-    // after the fade, stop drawing the old one and get the next one ready
+    // after the fade, give the other scenes' pictures back; the next one is readied just before its turn
+    var lead = SCENE_MS > 10000 ? SCENE_MS - PRE_READY_MS : 2000;
     setTimeout(function () {
-      var next = nextFrom(scene);
-      sceneEls.forEach(function (el, k) { if (k !== scene && k !== next) el.classList.remove("ready"); });
-      readyScene(next);
+      sceneEls.forEach(function (el, k) { if (k !== scene && k !== pendingScene && (lead > 2000 || k !== nextFrom(scene))) unreadyScene(k); });
       sceneVideos(true);   // the old scene's clip stops now it has faded out; this one's starts
     }, 2000);
+    clearTimeout(preReadyTimer);
+    preReadyTimer = setTimeout(function () {
+      var next = nextFrom(scene);
+      if (SUN_SYNC) { var idx = SCENES.map(function (x) { return x.id; }).indexOf(sunTargetScene()); if (idx >= 0) next = idx; }
+      if (next !== scene) readyScene(next);
+    }, lead);
   }
 
   // Night: the date line sits centred above the clock, between the people switch and the quick
@@ -1034,7 +1251,30 @@
     return { alt: alt, hourAngle: hourAngle * (180 / Math.PI) };
   }
 
+  // The time of day where the TV is, from the sun's height, as the built-in picks below do: night under
+  // -6 degrees, dawn or dusk under 10 degrees (the hour angle says which), day above.
+  function sunPhase() {
+    if (!WXCFG || WXCFG.lat == null || WXCFG.lon == null || !isFinite(WXCFG.lat) || !isFinite(WXCFG.lon)) {
+      var h = new Date().getHours();
+      return h >= 5 && h < 8 ? "dawn" : h >= 8 && h < 16 ? "day" : h >= 16 && h < 19 ? "dusk" : "night";
+    }
+    var pos = solarAltitude(Number(WXCFG.lat), Number(WXCFG.lon), new Date());
+    if (pos.alt < -6) return "night";
+    if (pos.alt < 10) return pos.hourAngle < 0 ? "dawn" : "dusk";
+    return "day";
+  }
+  // Follow the sun with own scenes: the built-in scene for this time of day plus every own scene tagged
+  // with it (and not switched off) take turns, one every home.sun_rotate_minutes (25 by default). With no
+  // tagged scene this is the built-in pick alone, as it always was.
   function sunTargetScene() {
+    var base = sunTargetBuiltIn();
+    var ph = sunPhase();
+    var pool = [base].concat(SCENES.filter(function (sc) { return sc.mine && sc.when === ph; }).map(function (sc) { return sc.id; }));
+    if (pool.length < 2) return base;
+    var mins = Math.max(5, Math.min(240, parseInt(HOME.sun_rotate_minutes, 10) || 25));
+    return pool[Math.floor(Date.now() / (mins * 60000)) % pool.length];
+  }
+  function sunTargetBuiltIn() {
     var st = sceneState();
     var available = st.order.filter(function (id) { return st.off.indexOf(id) < 0; });
     var pick = function (preferred, fallback) {
@@ -1093,9 +1333,19 @@
     }
   }
 
-  // the settings screen covers the scenes, so they wait (one less thing for a small TV stick to draw)
+  // the settings screen covers the scenes, so they wait (one less thing for a small TV stick to draw).
+  // So do an app or the TV's screensaver in front (the launcher calls tv.pause, and the page's own
+  // visibility): a crossfade decodes and uploads a fresh set of 1080p layers, and on a Fire TV Cube
+  // (2 GB) the page's GPU memory was seen swinging between 115 MB and 260 MB with every change while
+  // the screensaver covered it, which is what pushes a small box into swapping.
+  var PAGE_PAUSED = false;
+  // An app or the TV's screensaver is in front: nothing on the home can be seen, so its clock,
+  // its polls and its scene changes wait (the launcher also pauses the WebView's timers, so these
+  // guards matter on TVs that do not, and for the screen-off mode, which has no pause).
+  function covered() { return PAGE_PAUSED || document.hidden; }
+  function active() { return !covered() && !screenOffActive; }
   function nextScene() {
-    if (zone !== "settings" && sceneMayChange()) {
+    if (zone !== "settings" && active() && sceneMayChange()) {
       if (SUN_SYNC) applySunSync();
       else showScene(nextFrom(scene));
     }
@@ -1412,8 +1662,8 @@
     var el = $("np"), on = npVisible();
     el.classList.toggle("on", on);
     if (NIGHT) {
-      // the row shows while someone has a show on the go, or while a song plays
-      var anyone = KW_ON && PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
+      // the row shows while someone has a show on the go (or videos under the YouTube tile), or while a song plays
+      var anyone = rowHasCards();
       $("shelf-section").classList.toggle("empty", !anyone && !on);
       $("np-slot").classList.toggle("on", on);
     }
@@ -1451,7 +1701,7 @@
   setInterval(function () { var age = Date.now() - queueAt; if ((QUEUE === undefined && age > 6000) || age > 20000) refreshQueue(); }, 2000);
 
   function refreshMusic() {
-    if (!NP_ON || (OFFLINE && !STANDALONE) || document.hidden) {
+    if (!NP_ON || (OFFLINE && !STANDALONE) || covered()) {
       if (music) { music = null; ambientOpen = false; renderNp(); renderAmbientMusic(); }
       return;
     }
@@ -1843,6 +2093,7 @@
       if (overlay) overlay.classList.remove("active");
       try { if (TV && TV.setScreenOff) TV.setScreenOff(false); } catch (e) {}
       paintFocus();
+      clock();   // the clock rested in the dark
     }
     sceneVideos(!screenOffActive);
     designVideo("off", screenOffActive);
@@ -1901,7 +2152,7 @@
   // a design's video background (design.js, bg-video.js) stops while the home is not on screen
   function designVideo(why, held) { if (typeof CouchDesign !== "undefined" && CouchDesign.hold) CouchDesign.hold(why, held); }
   function checkSmartIdle() {
-    if (!SMART_IDLE.enabled || document.hidden || screenOffActive || idleAmbientActive) return;
+    if (!SMART_IDLE.enabled || covered() || screenOffActive || idleAmbientActive) return;
     var mins = isQuietHours(SMART_IDLE.quiet_hours) ? SMART_IDLE.quiet_hours.idle_minutes : SMART_IDLE.home_idle_minutes;
     if (!mins && !window.MOCK_SMART_IDLE_MS) return;
     var thresh = window.MOCK_SMART_IDLE_MS || (mins * 60000);
@@ -2060,6 +2311,7 @@
   function subtitle(it) {
     var parts = [];
     if (it.app && it.app.name) parts.push(it.app.name);
+    if (it.kind === "video") parts.push(t("video_card"));   // a YouTube video: no season, episode or picture
     if (it.season && it.episode) parts.push("S" + it.season + ", E" + it.episode);
     if (it.episode_title) parts.push(it.episode_title);
     return parts.join("  ·  ");
@@ -2125,20 +2377,30 @@
   // A person switch made elsewhere (the phone, another TV): when the bridge's "who" changes, show
   // that person here too.
   var bridgeWho = null;
+  // Every 3 s while the home can be seen (a phone that switched the person shows here within a
+  // moment); while the bridge does not answer the wait doubles up to 30 s. Returns the request.
+  var whoEvery = 3000;
+  function followWhoTick() {
+    if (!active()) { setTimeout(followWhoTick, 3000); return; }
+    followWho().then(function () { whoEvery = 3000; }, function () { whoEvery = Math.min(30000, whoEvery * 2); })
+      .then(function () { setTimeout(followWhoTick, whoEvery); });
+  }
   function followWho() {
-    if (NOBODY) return;
-    api("GET", "/api/who").then(function (j) {
-      var w = j && j.who;
-      if (!w || w === bridgeWho) return;
-      var first = bridgeWho === null;
-      bridgeWho = w;
-      if (first || w === who) return;   // the first answer only sets the baseline
-      if (!PEOPLE.some(function (p) { return p.id === w; })) return;
-      who = w; s = 0;
-      try { localStorage.setItem("tvhome.who", who); } catch (e) {}
-      renderShelf();
-      kidSync();
-    }, function () {});
+    if (NOBODY) return Promise.resolve();
+    return api("GET", "/api/who").then(function (j) {
+      try {
+        var w = j && j.who;
+        if (!w || w === bridgeWho) return;
+        var first = bridgeWho === null;
+        bridgeWho = w;
+        if (first || w === who) return;   // the first answer only sets the baseline
+        if (!PEOPLE.some(function (p) { return p.id === w; })) return;
+        who = w; s = 0;
+        try { localStorage.setItem("tvhome.who", who); } catch (e) {}
+        renderShelf();
+        kidSync();
+      } catch (e) { console.error(e); }   // a drawing error is not a bridge failure: no backoff
+    });
   }
 
   // ---------------- kids mode (kids.js, docs/CONFIG.md "Kids mode") ----------------
@@ -2222,18 +2484,77 @@
 
   // Keep watching shows up to ten per person; the row slides along under the remote.
   var KEEP_MAX = 10;
+
+  // ---------------- the row follows the app the remote is on (home.shelf_follows_app) ----------------
+  // followPkg is the package of the app tile the remote is on, or null for the whole row. While it is
+  // set, the row shows only that app's cards (under the YouTube tile, also that person's videos from the
+  // bridge) under a "Recently on <app>" heading. An app with nothing on the go changes nothing: the
+  // whole row stays, so the row never empties or flickers as the remote runs along the dock.
+  var followPkg = null, shelfShown = "";
+  function pkgOf(it) { return (it.app && it.app.package) || it.package || ""; }
+  function fullShows() { return KW_ON ? (data.showsBy[who] || []).slice(0, KEEP_MAX) : []; }
+  // one app's cards: its shows from the row, then its videos (only YouTube has any), each newest first
+  function showsFor(pkg) {
+    return fullShows().filter(function (it) { return pkgOf(it) === pkg; })
+      .concat((data.videosBy[who] || []).filter(function (it) { return pkgOf(it) === pkg; })).slice(0, KEEP_MAX);
+  }
+  // the list on screen: the followed app's cards when it has some, else the whole row
+  function visibleShows() {
+    if (!followPkg) return fullShows();
+    var mine = showsFor(followPkg);
+    return mine.length ? mine : fullShows();
+  }
+  // the app the heading names, or null while the whole row shows
+  function followName() {
+    if (!followPkg) return null;
+    var mine = showsFor(followPkg);
+    if (!mine.length) return null;
+    var a = (data.apps || []).filter(function (x) { return x.package === followPkg; })[0];
+    return a ? a.name : (mine[0].app && mine[0].app.name) || followPkg;
+  }
+  // what the row would show now, as one string: the heading and the ids of the cards
+  function shelfKey() { return (followName() || "") + "\n" + visibleShows().map(function (it) { return it.id; }).join("\n"); }
+  // Which app the row follows right now: the app tile the remote is on (not More apps, Settings, an input, a
+  // Screen or a tool), kept while the remote has gone up from it into the row or holds OK on a card there;
+  // anywhere else (another tile, the people, the quick buttons, Now playing, a menu) the whole row comes
+  // back. Called from paintFocus on every press, so the row is drawn again only when its cards would change.
+  function followSync() {
+    var want = null;
+    if (SHELF_FOLLOW && KW_ON && !kidsOn() && !lift) {
+      if (zone === "grid") { var a = gridItems[g]; want = a && (a.kind === "app" || !a.kind) && a.package ? a.package : null; }
+      else if (zone === "shelf" || zone === "shelfmenu") want = followPkg;
+    }
+    if (want === followPkg) return false;
+    followPkg = want;
+    if (shelfKey() === shelfShown) return false;   // the same cards under the same heading: nothing to redraw
+    renderShelf();
+    s = Math.max(0, Math.min(s, shelfEls.length - 1));   // the row may have fewer cards now
+    // the track still sits where the longer row was scrolled to, and only a press in the row moves it:
+    // a shorter row drawn under it would start off screen, under the heading, until the remote came back up
+    scrollShelf();
+    return true;
+  }
+  // The row has something to show: the cards on screen now (one app's, or someone's videos under the
+  // YouTube tile, which showsBy never holds) or someone's shows. renderShelf and renderNp hide the row on
+  // this, so a person whose only history is YouTube videos still sees their "Recently on YouTube".
+  function rowHasCards() {
+    return KW_ON && (data.shows.length > 0 || PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length > 0; }));
+  }
+
   function renderShelf() {
     var track = $("shelf");
-    data.shows = KW_ON ? (data.showsBy[who] || []).slice(0, KEEP_MAX) : [];
+    data.shows = KW_ON ? visibleShows() : [];   // the whole row, or one app's cards while the remote follows it
     if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("shows", [who, data.shows.map(function (x) { return x.title + (x.progress || ""); })]);
-    var anyone = KW_ON && PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
+    var anyone = rowHasCards();
     // nobody has anything on the go: no empty box, the photo has the space (unless Now playing
     // is up at night). The people switcher stays: with nothing yet (Netflix tells Android nothing on
     // some TVs, issue #23) it is the only way to say who is watching before anything is played.
     $("shelf-section").classList.toggle("empty", !anyone && !(NIGHT && npVisible()) && !CARDS.length);
     // custom cards keep the row (and its heading) even with Keep watching switched off
     document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
-    $("shelf-title").textContent = t(data.shows.length || !CARDS.length ? "keep_watching" : "custom_cards");
+    var following = followName();
+    $("shelf-title").textContent = following ? t("recently_on", { app: following }) : t(data.shows.length || !CARDS.length ? "keep_watching" : "custom_cards");
+    shelfShown = shelfKey();
     renderPeople();
     if (!KW_ON) { track.innerHTML = ""; shelfEls = []; addCards(track); return; }   // row switched off: only the custom cards, if any
     if (!data.shows.length) {
@@ -2247,9 +2568,9 @@
       // lock screen notifications: glass cards, three in view, the row slides past the third
       track.innerHTML = data.shows.map(function (it) {
         var art = slim(it.backdrop || it.poster), pkg = it.app && it.app.package;
-        var ep = it.season && it.episode ? "S" + it.season + " E" + it.episode : (it.episode_title || "");
+        var ep = it.kind === "video" ? t("video_card") : it.season && it.episode ? "S" + it.season + " E" + it.episode : (it.episode_title || "");
         return '<div class="tile ncard">' +
-          (art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async">' : '<span class="thumb none"></span>') +
+          (art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async" data-err="kwretry">' : '<span class="thumb none"></span>') +
           '<div class="t"><div class="nap">' + (pkg && iconUrl(pkg) ? '<img src="' + esc(iconUrl(pkg)) + '" alt="" data-err="remove">' : "") +
           esc(it.app ? it.app.name : "") + "</div><b>" + esc(it.title) + "</b>" + (ep ? "<i>" + esc(ep) + "</i>" : "") +
           (it.progress ? '<span class="nbar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "") + "</div></div>";
@@ -2264,7 +2585,7 @@
       var badge = pkg && iconUrl(pkg) ? '<span class="badge"><img src="' + esc(iconUrl(pkg)) + '" alt="" data-err="parent"></span>' : "";
       var bar = it.progress ? '<span class="bar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "";
       return '<div class="tile show"><div class="face">' +
-        (art ? '<img src="' + esc(art) + '" alt="" decoding="async">' : '<span class="no-art">' + esc(it.title) + "</span>") +
+        (art ? '<img src="' + esc(art) + '" alt="" decoding="async" data-err="kwretry">' : '<span class="no-art">' + esc(it.title) + "</span>") +
         badge + bar + '</div><div class="caption"><b>' + esc(it.title) + "</b><span>" + esc(subtitle(it)) + "</span></div></div>";
     }).join("");
     shelfEls = Array.prototype.slice.call(track.children);
@@ -2646,7 +2967,7 @@
     try {
       if (TV && TV.dismissWatchNext) TV.dismissWatchNext(id, pkg, title);
     } catch (e) {}
-    if (!OFFLINE && data.bridge !== false && it.source === "bridge") api("POST", "/api/continue/hide", { id: id }).catch(function () {});   // the phone's list too
+    if (!OFFLINE && data.bridge !== false && (it.source === "bridge" || it.source === "plex")) api("POST", "/api/continue/hide", { id: id, who: NOBODY ? "both" : who }).catch(function () {});   // the phone's list too
 
     var dismissed = kept("tvhome.dismissed_shows") || [];
     var sig = pkg + "|" + title;
@@ -2656,16 +2977,15 @@
 
     var card = shelfEls[s];
     var finishRemoval = function () {
+      var keepIt = function (showItem) {
+        var sId = String(showItem.id || "");
+        var sSig = pkgOf(showItem) + "|" + (showItem.title || "");
+        return sId !== id && sSig !== sig;
+      };
       PEOPLE.forEach(function (p) {
-        if (data.showsBy[p.id]) {
-          data.showsBy[p.id] = data.showsBy[p.id].filter(function (showItem) {
-            var sId = String(showItem.id || "");
-            var sSig = ((showItem.app && showItem.app.package) || showItem.package || "") + "|" + (showItem.title || "");
-            return sId !== id && sSig !== sig;
-          });
-        }
+        if (data.showsBy[p.id]) data.showsBy[p.id] = data.showsBy[p.id].filter(keepIt);
+        if (data.videosBy[p.id]) data.videosBy[p.id] = data.videosBy[p.id].filter(keepIt);
       });
-      data.shows = (data.showsBy[who] || []).slice(0, KEEP_MAX);
       renderShelf();
       if (!shelfEls.length) {
         $("shelf-section").classList.add("empty");
@@ -2798,12 +3118,28 @@
     else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
     else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
     else if (it.kind === "smart") face = '<div class="face tool">' + window.smartHome.icon + "</div>";
+    else if (DOCK_BANNERS && it.banner) face = '<div class="face banner"><img src="' + esc(it.banner) + '" alt="" decoding="async" data-err="word" data-name="' + esc(it.name) + '"></div>';
     else if (iconUrl(it.package)) face = '<div class="face"><img src="' + esc(iconUrl(it.package)) + '" alt="" decoding="async" data-err="word" data-name="' + esc(it.name) + '"></div>';
     else face = '<div class="face word">' + esc(it.name) + "</div>";
     var cls = "tile app dock-ic" + (it.kind === "input" ? " input-ic ic-" + esc(it.icon || "hdmi") : "") + (lift && it.package === lift.pkg ? " lifted" : "");
     // the name sits in a span: with the Mac-style dock it is a small bubble above the icon (app.css)
     return '<div class="' + cls + '" data-pkg="' + esc(it.package || it.kind || "") + '">' + face + dotHTML(it) + '<div class="label"><span>' + esc(it.name) + "</span></div></div>";
   }
+
+  // home.dock_banners: the dock shows one row of six; the rows under it sit below the screen and slide
+  // up a row at a time as the focus moves down into them (Keep watching fades out meanwhile).
+  function slideDock() {
+    var apps = $("apps-section") || $("grid").parentNode, el = document.documentElement;
+    var rows = DOCK_BANNERS && !expanded ? Math.ceil(gridEls.length / GRID_COLS) : 1;
+    var row = rows > 1 && (zone === "grid" || zone === "gear" || zone === "appmenu") ? Math.floor(g / GRID_COLS) : 0;
+    el.classList.toggle("dock-down", row > 0);
+    if (rows <= 1) { apps.style.bottom = ""; apps.style.transform = ""; return; }
+    apps.style.bottom = (2.875 - (rows - 1) * BANNER_ROW_REM) + "rem";
+    apps.style.transform = "translateX(-50%) translateY(" + (-row * BANNER_ROW_REM) + "rem)";
+  }
+
+  // The Night dock tile's width in rem: a square icon, or a 16:9 TV banner as tall as the icon.
+  function dockTileRem() { return DOCK_BANNERS ? 12.5 : 7; }
 
   function appHTML(it) {
     if (NIGHT) return dockHTML(it);
@@ -2835,10 +3171,12 @@
     if (!touched && !expanded && zone === "grid" && g === 0 && typeof CouchDesign !== "undefined" && CouchDesign.on() && CouchDesign.startIndex) g = CouchDesign.startIndex(gridItems);
     if (NIGHT) {
       // the dock is as wide as what is in it; More apps uses all twelve columns
-      GRID_COLS = expanded ? 12 : Math.max(1, Math.min(12, gridItems.length));
+      // wide banner tiles: six to a row; the dock shows its first row and the rest wait below the screen
+      GRID_COLS = DOCK_BANNERS ? Math.max(1, Math.min(BANNER_COLS, gridItems.length))
+        : expanded ? 12 : Math.max(1, Math.min(12, gridItems.length));
       // a design's dock can be a column, a grid or a wrapped row: the remote follows its shape (design.js)
       if (!expanded && typeof CouchDesign !== "undefined" && CouchDesign.on()) GRID_COLS = CouchDesign.cols(GRID_COLS, gridItems.length);
-      $("grid").style.gridTemplateColumns = "repeat(" + GRID_COLS + ", 7rem)";
+      $("grid").style.gridTemplateColumns = "repeat(" + GRID_COLS + ", " + dockTileRem() + "rem)";
     }
     $("grid").innerHTML = gridItems.map(appHTML).join("");
     gridEls = Array.prototype.slice.call($("grid").children);
@@ -2848,7 +3186,7 @@
       // row of eight fits it. app.css needs to know which tiles end a row and which sit in the last
       // one, to leave the gap off there. Plain rem here, not a custom property:
       // WebViews this old may not have those either.
-      if (NIGHT) $("grid").style.width = (GRID_COLS * 7 + (GRID_COLS - 1) * 1.625 + 3.5) + "rem";
+      if (NIGHT) $("grid").style.width = (GRID_COLS * dockTileRem() + (GRID_COLS - 1) * 1.625 + 3.5) + "rem";
       var lastRow = Math.floor((gridEls.length - 1) / GRID_COLS) * GRID_COLS;
       gridEls.forEach(function (el, i) {
         if (i % GRID_COLS === GRID_COLS - 1) el.classList.add("end-col");
@@ -2965,11 +3303,13 @@
   function paintFocus() {
     if (DOCK_MAC) setTimeout(magnify, 0);   // after this paint has put the focus class where it belongs
     saveFocusSoon();
+    followSync();   // the row follows the app tile the remote is on (home.shelf_follows_app)
     if (zone === "settings") { renderSettings(); return; }
     if (zone === "smart") { window.smartHome.paint(); return; }
     if (zone === "ambient") { renderAmbientMusic(); return; }
     clearFocus();
     renderHint();
+    slideDock();
     if (npVisible()) renderNp();   // its buttons carry the focus only while zone is "np"
     if (zone === "gear") { if (gridEls[g]) gridEls[g].classList.add("focus"); renderGear(); return; }
     if (zone === "appmenu") { if (gridEls[g]) gridEls[g].classList.add("focus"); renderAppMenu(); return; }
@@ -3286,7 +3626,9 @@
     clearTimeout(focusSaveTimer); focusSaveTimer = 0;
     if (!focusRestored && !touched) return;   // a page not drawn yet must not overwrite what it is about to restore
     if (zone !== "shelf" && zone !== "grid") return;   // menus and settings are not worth coming back to
-    try { localStorage.setItem(FOCUS_KEY, JSON.stringify({ t: Date.now(), zone: zone, s: s, g: g, key: zone === "grid" ? gridKey(gridItems[g]) : "" })); } catch (e) {}
+    // a card's place in the row only means something with the same row: "pkg" is the app the row was
+    // following (home.shelf_follows_app), "" for the whole row
+    try { localStorage.setItem(FOCUS_KEY, JSON.stringify({ t: Date.now(), zone: zone, s: s, g: g, key: zone === "grid" ? gridKey(gridItems[g]) : "", pkg: zone === "shelf" && followPkg ? followPkg : "" })); } catch (e) {}
   }
   function saveFocusSoon() { if (!focusSaveTimer) focusSaveTimer = setTimeout(saveFocusNow, 500); }
   function forgetFocus() { clearTimeout(focusSaveTimer); focusSaveTimer = 0; try { localStorage.removeItem(FOCUS_KEY); } catch (e) {} }
@@ -3298,8 +3640,17 @@
     if (typeof CouchDesign !== "undefined" && CouchDesign.on()) return false;
     var saved = null;
     try { saved = JSON.parse(localStorage.getItem(FOCUS_KEY) || "null"); } catch (e) {}
+    // the remote was left in a "Recently on <app>" row: draw that row again before the card is looked up,
+    // so the outline lands on the card it left and not on the same place in the whole row
+    var pkg = saved && typeof saved === "object" && saved.zone === "shelf" && typeof saved.pkg === "string" ? saved.pkg : "";
+    if (pkg && !SHELF_FOLLOW) return false;   // the setting went off since: that place means nothing now
+    var wholeRow = function () { followPkg = null; renderShelf(); return false; };   // as a fresh start has it
+    if (pkg) {
+      followPkg = pkg; renderShelf();
+      if (!followName()) return wholeRow();   // that app has nothing on the go any more
+    }
     var f = pickFocus(saved, Date.now(), shelfReach() ? shelfEls.length : 0, gridItems.map(gridKey));
-    if (!f) return false;
+    if (!f) return pkg ? wholeRow() : false;
     zone = f.zone; s = f.s; g = f.g;
     return true;
   }
@@ -3973,6 +4324,11 @@
       document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
       if (!KW_ON) { data.shows = []; shelfEls = []; s = 0; }
       renderShelf(); renderNp();
+    } });
+    // the row follows the app the remote is on (home.shelf_follows_app): only that app's cards, as "Recently on <app>"
+    rows.push({ kind: "toggle", key: "shelf-follows-app", label: t("shelf_follow"), sub: t("shelf_follow_sub"), value: SHELF_FOLLOW ? t("on") : t("off"), act: function () {
+      SHELF_FOLLOW = !SHELF_FOLLOW; ST.shelf_follows_app = SHELF_FOLLOW; saveSettings();
+      if (!SHELF_FOLLOW && followPkg) { followPkg = null; renderShelf(); }   // the whole row again, straight away
     } });
     rows.push({ kind: "cycle", key: "start-focus", label: t("start_focus"), sub: t("start_focus_sub"),
       value: t("start_focus_" + START_FOCUS), act: function () {
@@ -5106,9 +5462,17 @@
     return api("POST", "/api/watch-next", { rows: rows });
   }
 
+  // On Fire OS a return to the home asks for this twice within a moment (the Home button watch's
+  // tv.home, then the launcher's tv.resume); the second ask gets the first's result.
+  var refreshAt = 0, refreshing = null;
   function refresh() {
     // never reshuffle under something being moved, or under the settings screen
     if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart" || zone === "updask") return Promise.resolve();
+    if (refreshing && Date.now() - refreshAt < 1500) return refreshing;
+    refreshAt = Date.now();
+    return refreshing = refreshNow();
+  }
+  function refreshNow() {
     if (OFFLINE) {
       // only the TV's own apps, in the order last saved; no shows, no Screens
       if (TV) data.apps = sortApps(nativeApps() || []);
@@ -5153,6 +5517,10 @@
               return dismissed.indexOf(id) === -1 && dismissed.indexOf(sig) === -1;
             });
             data.showsBy[p.id] = items.slice(0, KEEP_MAX);
+            // that person's YouTube videos, shown under the YouTube tile alone (home.shelf_follows_app)
+            data.videosBy[p.id] = (j.videos || []).filter(function (it) {
+              return dismissed.indexOf(String(it.id || "")) === -1 && dismissed.indexOf(pkgOf(it) + "|" + (it.title || "")) === -1;
+            }).slice(0, KEEP_MAX);
           });
         }));
       }),
@@ -5499,10 +5867,10 @@
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
+    resume: function () { PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
     // (and a design's video background lets go of the TV's decoder, which the app may need)
-    pause: function () { saveFocusNow(); pauseVideo(); designVideo("away", true); },
+    pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); designVideo("away", true); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
     // the launcher's updater has news (Updater.kt)
@@ -5773,7 +6141,7 @@
     if (updRead() && UPD.supported) SECS.splice(SECS.length - 1, 0, ["updates", "download"]);
     mark("app-start");
     clock();
-    setInterval(clock, 15000);
+    setInterval(clockTick, 15000);
     if (NIGHT) {
       if (window.AmbientWeather) {
         window.AmbientWeather.init($("weather-canvas"), $("ambient-lighting"));
@@ -5805,7 +6173,7 @@
       setInterval(refreshCards, window.CustomCards.EVERY_MIN * 60000);
     }
     var cached = load();
-    if (cached) { data.showsBy = cached.showsBy || data.showsBy; data.screens = cached.screens || []; data.order = cached.order || null; }
+    if (cached) { data.showsBy = cached.showsBy || data.showsBy; data.videosBy = cached.videosBy || data.videosBy; data.screens = cached.screens || []; data.order = cached.order || null; }
     setPeople(PEOPLE);   // the cache may predate someone new
     if (OFFLINE) {   // no bridge: an order made with this TV's remote wins
       var lo = kept("tvhome.order.tv");
@@ -5817,20 +6185,20 @@
     renderQuick();
     if (!OFFLINE) refreshQuick();
     refreshMusic();
-    setInterval(refreshMusic, 5000);
+    setInterval(function () { if (!covered()) refreshMusic(); }, 5000);
     updateOledShift();
     setInterval(updateOledShift, 60000);
     setInterval(checkSmartIdle, 10000);
     // couch-tv Studio's home widgets: the calendar, photo dates, screen time and a new day
     if (AH) { setTimeout(ahTick, 2500); setInterval(ahTick, 60000); }
-    setInterval(function () { renderQuick(); refreshBedtimeDim(); }, 30000);
+    setInterval(function () { if (!covered()) { if (!screenOffActive) renderQuick(); refreshBedtimeDim(); } }, 30000);
     // LG: the weekly Developer Mode extend. It asks on screen and stays until answered (this TV's
     // clock screensaver would hide anything that timed out). devResume() records an extend that just
     // happened, so the question is never asked twice.
     setTimeout(devResume, 1500);
     // This TV says who is on its couch first, so what plays here is logged for them (each TV
     // keeps its own); then the lists. Once the home is up: the one-time "tell you about new versions?" question.
-    if (!OFFLINE) setInterval(followWho, 3000);
+    if (!OFFLINE) setTimeout(followWhoTick, 3000);
     // The bridge's choice wins (a phone that just turned the TV on set it); this TV's own memory is
     // only handed over when the bridge has nobody yet.
     var hello = OFFLINE ? Promise.resolve() : api("GET", "/api/who").then(function (j) {

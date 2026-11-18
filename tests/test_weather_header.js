@@ -51,6 +51,7 @@ function render(language) {
     WX_SHOW: true,
     WX_F: false,
     CLOCK24: true,
+    DATE_BARS: false,
     NIGHT: true,
     SUN_SYNC: false,
     SMART_IDLE: { quiet_hours: {} },
@@ -85,6 +86,8 @@ assert(/^\d{2}:\d{2}$/.test(romanian.time.innerHTML), 'the time remains a separa
 const english = render('en');
 assert(english.date.innerHTML.includes('Sunday 15 November'), 'other locales keep their existing date punctuation');
 assert(english.date.innerHTML.includes('Sâmburești, Olt, Romania'), 'other locales keep the full configured place');
+assert(english.date.innerHTML.includes('Sunday 15 November<span class="wx"><span class="wx-place"> · Sâmburești, Olt, Romania · </span>'),
+  'the one-line header puts the same middle dot between the date and the place as between the other parts');
 assert(english.date.innerHTML.includes('<svg class="icon"></svg>'), 'other locales retain the existing weather icon');
 assert(!english.classes.has('weather-lines'), 'the Romanian stacked layout is not applied to other locales');
 

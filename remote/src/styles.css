@@ -162,9 +162,21 @@ main { position: relative; z-index: 1; height: 100%; }
 
 /* Bottom controls */
 .controls { display: flex; gap: 10px; align-items: center; }
-.volume { flex: 1; height: var(--ctl); border-radius: calc(var(--ctl) / 2); display: flex; align-items: stretch; overflow: hidden; }
+/* Amber fill so Type on the TV stands out from Back / Home / Play (#216).
+   Slightly under --ctl so the four round buttons leave room for volume on a phone. */
+.controls .type-key {
+  width: 48px; height: 48px;
+  background: rgba(255, 159, 10, 0.92);
+  color: #1a1200;
+  border-color: rgba(255, 210, 120, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 6px 20px rgba(0, 0, 0, 0.22);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+button.type-key:active { background: rgba(255, 179, 64, 0.98); }
+.volume { flex: 1; min-width: 0; height: var(--ctl); border-radius: calc(var(--ctl) / 2); display: flex; align-items: stretch; overflow: hidden; }
 .volume button { width: 48px; display: grid; place-items: center; flex: none; touch-action: pan-x; }
-.volume .vol-mid { flex: 1; width: auto; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; font-size: 16px; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.volume .vol-mid { flex: 1; min-width: 0; width: auto; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; font-size: 16px; font-variant-numeric: tabular-nums; color: var(--ink-2); overflow: hidden; }
 .ask {
   height: var(--ask-h); border-radius: calc(var(--ask-h) / 2); background: #e4e4e8; color: var(--on-solid);
   display: flex; align-items: center; justify-content: center; gap: 10px; font: 600 17px/1 var(--font); flex: none;
@@ -296,6 +308,7 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
 .grabber-zone { padding: 12px 0 8px; touch-action: none; cursor: grab; }
 .more-sheet { min-height: 64%; display: flex; flex-direction: column; }
 .more-sheet .more-block.first { margin-top: auto; }
+.type-sheet .note { margin-top: 12px; }
 .grabber-zone .grabber { margin: 0 auto; }
 .grabber { width: 40px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.28); margin: 0 auto 10px; }
 .sheet-head { display: flex; align-items: center; margin-bottom: 14px; }
@@ -333,6 +346,8 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
 .chips-row.chips-wrap { flex-wrap: wrap; }
 .chips-row.chips-wrap .chip { flex: 1 1 auto; padding: 0 14px; white-space: nowrap; }
 .note { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+.move-row { margin-top: 8px; }
+.move-row .chip svg { vertical-align: -2px; margin-inline-end: 4px; }
 .more-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 6px; }
 .tile { height: 76px; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-weight: 600; font-size: 14px; }
 
@@ -361,11 +376,19 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
   .pad { min-height: 150px; border-radius: 28px; }
   .pad .hint { display: none; }
 }
+@media (max-width: 430px) {
+  /* Four round buttons plus volume: shrink a little so mute stays usable on narrow phones. */
+  :root { --ctl: 48px; }
+  .controls { gap: 6px; }
+  .controls .type-key { width: 44px; height: 44px; }
+  .volume button { width: 36px; }
+}
 @media (max-width: 360px) {
-  :root { --side: 14px; --ctl: 52px; }
+  :root { --side: 14px; --ctl: 46px; }
   .seg button { padding: 0 9px; font-size: 14px; }
-  .volume button { width: 44px; }
-  .controls { gap: 8px; }
+  .volume button { width: 34px; }
+  .controls { gap: 5px; }
+  .controls .type-key { width: 40px; height: 40px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

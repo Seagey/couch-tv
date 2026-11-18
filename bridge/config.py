@@ -322,6 +322,9 @@ def _home(h):
         out["glass"] = h["glass"]
     if isinstance(h.get("glass_icons"), bool):
         out["glass_icons"] = h["glass_icons"]
+    # the Night dock shows each app's wide TV banner instead of its square icon (six apps fit)
+    if isinstance(h.get("dock_banners"), bool):
+        out["dock_banners"] = h["dock_banners"]
     # the focused tile's slow sway (#52): on, or off for a TV that flickers
     if isinstance(h.get("keep_photo"), bool):
         out["keep_photo"] = h["keep_photo"]
@@ -543,6 +546,32 @@ def picture_modes(pic):
     values = pic.get("values") or {}
     panel = pic.get("method") == "panel"
     return [{"id": k, "name": str(v) if panel else k.replace("-", " ").title()} for k, v in list(values.items())[:2]]
+
+
+# ---------- Plex (optional, option B): Keep watching from the server's own Continue Watching ----------
+# The server's address as the bridge reaches it, and (optional) whose cards they are. The token is
+# PLEX_TOKEN in .env, never here (bridge/plex.py). None: no section, "enabled": false, or no address.
+PLEX_ERROR = None   # why a plex section that is there was refused (the bridge's log and /api/plex/status say)
+
+
+def _plex(raw):
+    global PLEX_ERROR
+    PLEX_ERROR = None
+    p = raw if isinstance(raw, dict) else {}
+    url = str(p.get("url") or "").strip().rstrip("/")
+    if p.get("enabled") is False:
+        return None
+    if not re.fullmatch(r"https?://[^/\s?#]+", url):
+        if url:
+            PLEX_ERROR = f"plex.url must be http(s)://<name or address>[:port] with no path, not {url!r}"
+        elif raw:
+            PLEX_ERROR = "the plex section has no url"
+        return None
+    who = str(p.get("who") or "").strip()
+    return {"url": url, "who": who or None}
+
+
+PLEX = _plex(CONFIG.get("plex"))
 
 
 # ---------- the phone remote and the Claude ask ----------

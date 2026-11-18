@@ -306,6 +306,25 @@ echo "4/4  Pressing Home"
 "$PY" "$T" keys HOME || true
 sleep 3
 
+# Seen twice on a Fire TV Cube (3rd gen, Fire OS 7.7): a few seconds after the force-stop and the
+# write above, enabled_accessibility_services was empty again and accessibility_enabled 0, so the
+# Home key stayed on Amazon's home until the two settings were written once more (the app's own
+# rebind, FireWatch.rebindIfUnbound, was ruled out: its write pattern alone leaves them intact).
+# Whatever clears them, a second write a little later holds, so look again and put them back.
+if [ -n "${WATCH:-}" ] && echo "$present" | grep -qx -E "com.google.android.apps.tv.launcherx|com.google.android.tvlauncher|com.amazon.tv.launcher|com.quickplay.android.bellmediaplayer"; then
+  for try in 1 2 3; do
+    sleep 5
+    CUR=$("$PY" "$T" shell "settings get secure enabled_accessibility_services" | tr -d '\r')
+    ON=$("$PY" "$T" shell "settings get secure accessibility_enabled" | tr -d '\r')
+    case ":$CUR:" in
+      *":$WATCH:"*|*":app.couchtv.launcher/app.couchtv.launcher.FireWatch:"*) [ "$ON" = 1 ] && break ;;
+    esac
+    echo "     the Home button watch had dropped off again (try $try): switching it back on"
+    REST=$(echo "$CUR" | tr ':' '\n' | grep -v -e FireWatch -e '^null$' -e '^$' | paste -sd: - || true)
+    "$PY" "$T" shell "settings put secure enabled_accessibility_services ${REST:+$REST:}$WATCH; settings put secure accessibility_enabled 1"
+  done
+fi
+
 echo "switched off (undo list): $LIST"
 cat "$LIST"
 if "$PY" "$T" ping > /dev/null 2>&1; then

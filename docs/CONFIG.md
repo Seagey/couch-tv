@@ -29,6 +29,7 @@ settings), and what is chosen there wins on that TV. See
 | `host` | Optional: a name for the TV on your network (one ending in `.local`, if your TV has one), tried before `ip`. Leave it out (an empty `""` counts as left out). |
 | `label` | Optional: a longer name for your own notes. Nothing reads it yet. |
 | `adb_port` [5555] | The TV's ADB port. 5555 is what Network debugging and `adb tcpip 5555` use; change it only if your TV keeps a different fixed port open. The scripts in `tv-home/tools/` and `scripts/` read `ADB_PORT` instead. The random Wireless debugging port does not work here (only `tvadb.py` can use it, with `TV_ADB_BINARY`): see [SETUP.md step 1](SETUP.md#step-1-developer-mode-on-the-tv-every-option). |
+| `adb_only` [false] | Fire TV on Fire OS only (a Cube or a stick): `true` when the TV has no Android TV Remote protocol (`scripts/check-tv.py <tv address> --adb` says so: ports 6466 and 6467 closed, Fire OS read). The bridge then drives the TV over ADB alone: keys (`input keyevent`), typing (`input text`, letters, digits and plain punctuation only), links (`am start`), power and the app in front (read every few seconds). There is no code pairing: the TV's "Allow USB debugging?" for the bridge computer is the pairing, `paired` is implied, and `bridge/pair_tv.py <tv id>` only checks ADB. No volume level (the volume keys still work). Current Fire OS blocks apps on the TV from using the TV's own ADB, but not a computer, so this is the way to the full phone remote on a Fire TV. Seen working on a Fire TV Cube (3rd gen, Fire OS 7, Android 9). |
 | `mac` | The TV's network (MAC) address, for turning it on from the phone. |
 | `wake_on_lan` [true] | `false` stops the bridge sending Wake-on-LAN packets to this TV, even with a `mac`. |
 | `paired` | Set by `bridge/pair_tv.py`. Leave it alone. |
@@ -134,7 +135,12 @@ out the same way. The phone's People sheet keeps these marks when it renames or 
   after 30 days with no watching. A show counts after a minute of the same title playing. An app
   that gives Android no title (Netflix on some TVs) or only its own name (Prime on a Sony) is named
   from its row in Android's "Continue watching" (Watch Next) instead: the TV home app reads those
-  rows and hands them to the bridge, because ADB cannot read them. Videos and music are never kept.
+  rows and hands them to the bridge, because ADB cannot read them. Music and streams are never kept.
+  On a Fire TV the bridge knows Amazon's builds of YouTube, Prime Video and HBO Max (other package
+  names than the Google TV ones), so it opens the one the TV has and their shows reach Keep watching.
+  YouTube videos are kept as a list of their own that the home shows only for the YouTube tile, never
+  in the shared row or the household's taste: a video is written by the name YouTube gave it, with no
+  picture, and opening it searches YouTube for that name.
 - **With no computer (option A),** Keep watching is Android's own Watch Next list, plus the
   Continue Watching channel of apps that put nothing in Watch Next but keep a home screen row of
   their own instead: so far Stremio. Both are read the same read only way, with no account and no
@@ -193,7 +199,7 @@ screen, no update questions. The phone remote's Ask is off while that profile is
 |---|---|
 | `pin` (needed) | The parent PIN, 4 to 8 digits. Without a good one kids mode stays off for that person (the bridge says so once in its log). |
 | `shows` [none] | Up to 24. A plain title, or `title` with any of `service` (the app it opens in: an id from `bridge/apps.py`, such as `netflix`, `abc-iview`, `disney-plus`, `stan`, `prime-video`), `season` and `episode`. Without `service` the first free or subscription app it streams on is used, never a rent or buy page. Without `season` it opens the show's own page in the app; with one, that episode (or the season's first). |
-| `apps` [none] | Up to six apps shown under the shelf: app ids from `bridge/apps.py` or Android package names. Only apps installed on that TV show. Android's Settings is never allowed. |
+| `apps` [none] | Up to six apps shown under the shelf: app ids from `bridge/apps.py` or Android package names. Only apps installed on that TV show. Android's Settings is never allowed. On a Fire TV with the bridge (option B), `youtube`, `prime-video` and `hbo-max` are Amazon's own builds, and the bridge hands the TV the package it has; without a bridge (option A) the kids home only knows the Google TV package, so those three do not show on a Fire TV. |
 
 The poster on each tile comes from JustWatch, the same place Keep watching gets its pictures. `kid`
 is separate and optional: it keeps someone out of the household's taste, as before.
@@ -278,7 +284,7 @@ release opens the app rather than the show.
 | `glass_icons` [`false`] | `true`: Apple style clear app icons. Each app's symbol is cut from its own background and drawn in light glass on a glass tile, and the app you are on shows its own colours. An icon that will not cut cleanly (a photo) is shown grey and half see-through instead. Works with `glass` on or off, and the phone remote's app grid follows it. Home settings, Look, Glass app icons wins over it. |
 | `moving_tiles` [`true`, or `false` when `glass` is `lite`] | The focused tile's slow sway and the light that slides across it. `false` holds it still, which stops the black box that flickers around the focused tile on some slow TVs (a TCL with a weak GPU). Home settings, Look, Moving tiles wins over it, and a TV set to reduce motion (Developer options, Animator duration scale) already holds it still. |
 | `dock` [`classic`] | The Night look's dock. `mac` makes it a Mac-style dock: the focused app and its neighbours grow in a wave (the focused one 1.55 times, then 1.45, 1.25 and 1.05), all standing on one line, the dock stays centred and its tray grows with them, and the app's name shows in a small bubble above it instead of a white ring. OK presses the icon in and it hops as the app opens. A dock too wide for the screen shrinks as a whole. Home settings, Look, Mac-style dock wins over it; Lighter home holds it off. |
-| `lighter` [`false`; `true` on an old TV] | For a slow box (a Xiaomi Mi Box, a Fire stick) where moving along the rows stutters. `true` turns off every blur, the soft shadows under tiles and panels, the slow drift of the photo and the focused tile's sway, and asks for smaller Keep watching pictures. The layout and colours stay. Home settings, Look, Lighter home wins over it. On a TV whose WebView is too old for CSS grid (Android 6 and older, for example a Mi TV 4A with 1 GB of memory) it starts **on** until someone chooses otherwise, in Home settings or by writing `"lighter": false` here. Other TVs start with it off. |
+| `lighter` [`false`; `true` on an old or low end TV] | For a slow box (a Xiaomi Mi Box, a Fire stick) where moving along the rows stutters. `true` turns off every blur, the soft shadows under tiles and panels, the slow drift of the photo and the focused tile's sway, and asks for smaller Keep watching pictures. The layout and colours stay. Home settings, Look, Lighter home wins over it. On a TV whose WebView is too old for CSS grid (Android 6 and older, for example a Mi TV 4A with 1 GB of memory) it starts **on** until someone chooses otherwise, in Home settings or by writing `"lighter": false` here. When it is not set (here or in Home settings), the TV also checks itself: 1 GB of memory or less (`navigator.deviceMemory`) turns it on, 4 GB or more leaves it off, and in between (or when the WebView does not say) it measures its frame time for 1.5 s with something moving, a few seconds after the home opens, and keeps the answer for a week. On a 2 GB Android 11 TV the blur held the home to 22 frames a second whenever a tile was focused. Other TVs start with it off. On every TV the focused tile's sway and glint hold still 6 s after the focus last moved, so a home left alone draws nothing. |
 | `hi_res` [`true`] | `"always"` uses the 3840x2160 copies even when the TV draws its interface at 1080 (a 4K panel set to a 1080 interface, where the scenes looked soft). On a TCL 75C6K with 2.4 GB that cost about 65 MB more for the home's WebView (145 MB to 209 MB), with no stutter (#191). `false` keeps the 1080 copies of the built-in pictures on a 4K screen. A 4K TV normally gets the 3840x2160 copies, which a weak chip can struggle to decode and keep in memory (an LG 43SQ700S monitor). On an LG, `lg/build.py` then leaves the 4K copies out of the app too (22 MB down to under 6 MB). |
 | `glass_amount` [`3`] | How clear the glass is, `1` (frosted) to `5` (very clear): the glass panels, the glass app icons and both clocks (the frosted clock only gets more see-through at `4` and `5`). Home settings, Look, How clear wins over it, and the phone remote follows it. |
 | `glass_focus` [`colour`] | With glass app icons: the focused app shows its own colours (`colour`) or stays glass like the rest (`glass`), shown by its lift, a brighter rim and a deeper shadow. Home settings, Look, Focused app wins over it, and the phone remote follows it. |
@@ -289,14 +295,18 @@ release opens the app rather than the show.
 | `wx_unit` [`c`] | The weather's temperature unit: `c` (Celsius) or `f` (Fahrenheit). Home settings, Weather, Units wins over it. |
 | `video_url` [none] | A looping, muted video background in place of the photo, in both looks: the address of an MP4 or MOV (`https://...`, or `http://` for a computer at home). Given here it is on; Home settings, Look switches it off or changes the link. The photo stays if the clip does not play. |
 | `sun_sync` [`false`] | Follow the sun. `true` picks the Night look's scene from the sun's height at `weather.lat` and `weather.lon`: Dawn in the morning twilight, Waterline in the day (Fog when the weather is overcast or rainy), Golden hour in the evening and Night after dark, instead of rotating every `scene_seconds`. A scene you switched off is skipped. With no place set it goes by the clock. Home settings, Look, Scenes, Follow the sun wins over it (ekagra-codes, #57). |
+| `sun_rotate_minutes` [`25`] | With `sun_sync` on and own scenes tagged with `when` (see [MAKE-A-SCENE.md](MAKE-A-SCENE.md)), how long each scene of the current time of day stays before the next one in that group takes its turn, 5 to 240. Without any tagged scene nothing changes. |
+| `date_bars` [`false`] | `true` puts a thin vertical bar between the day, the place and the weather on the Night look's date line, in place of the dots (`Monday 16 November │ Sydney │ 17° Cloudy`). Off, the line is exactly as before. |
 | `ambient_weather` [`false`] | Soft rain, snow, fog and thunderstorm effects drawn over the Night look's scenes when Open-Meteo reports that weather for your place. Off unless you switch it on. It also needs Weather on, stops while an app or Settings is open, and never runs under Lighter home or on an old WebView. Home settings, Weather, Ambient weather effects wins over it (ekagra-codes, #88). |
 | `ambient_sun_grade` [`false`] | A gentle tint over the Night look's scenes that follows the sun's height at `weather.lat` and `weather.lon` (cool at night, rose at sunrise and sunset, amber in the golden hour). Off unless you switch it on, and never under Lighter home or on an old WebView. Home settings, Weather, Sunlight colour grading wins over it. |
 | `dock_size` [10] | How many apps sit in the Night dock before Settings and More apps. 1 to 10. Everything else is behind More apps. The phone's Arrange apps keeps to the same number. |
+| `dock_banners` [`false`] | `true`: the Night dock shows each app's wide TV banner (16:9, as tall as the icon) instead of its square icon, like a streaming box's home. The dock shows one row of six; the apps after them, then Settings and More apps, wait in rows below the screen and slide up one row at a time as you press down (Keep watching fades out meanwhile, and comes back on the way up). More apps lists six to a row. Nothing else changes: the scenes, clock and Keep watching stay as they are. An app with no banner of its own gets the one the launcher draws. |
 | `inputs` [none] | Pinned external inputs/consoles displayed as dock and grid tiles. They take dock places, so the last apps move behind More apps. Each item can specify `port` (e.g. `1` for HDMI 1), `label` or `name` (e.g. `"PS5"`), `icon` (`"ps5"`, `"xbox"`, `"switch"`, `"hdmi"`, `"cable"`, or `"pc"`), `match` (substring matched against TV input labels or IDs), or `id`. Optional `image`: a picture for the tile, a file inside the app such as `"backgrounds/mine/console.svg"` (SVG, PNG, JPEG or WebP; no web addresses), shown in place of the drawn icon, which comes back if the picture does not load. On an LG the tile switches straight to that HDMI input (`com.webos.app.hdmi<N>`). For example: `[{"port": 1, "label": "PlayStation 5", "icon": "ps5"}]`. A TV can have its own list instead, `tvs[].inputs` (below). |
 | `soundscape` [none] | The sound the Soundscape button starts with: `"rain"`, `"fire"`, `"waves"`, `"brown"`, or `"off"`, or an object `{"type": "rain", "volume": 0.5, "fade_with_sleep": true}` (`volume` 0 to 1). It never starts by itself: only a press on the button, or the row in Home settings, plays it. With `fade_with_sleep` it gets quieter over the last 15 minutes of a sleep timer and stops when it ends. |
 | `bedtime_dim` [`false`] | `true` dims the couch-tv home into a warm amber for the last 15 minutes of a sleep timer. It only darkens the couch-tv page, not an app that is playing, and not the TV's brightness or picture settings. |
-| `smart_idle` [off] | Automatic OLED protection and idle power-off: `{"enabled": false, "home_idle_minutes": 15, "home_action": "ambient_clock", "paused_idle_minutes": 30, "quiet_hours": {"enabled": false, "start": "23:00", "end": "06:00", "idle_minutes": 15}}`. `home_action` is `"ambient_clock"`, `"screen_off"`, or `"tv_off"`. Setting either minute value to `0` turns that trigger off. Paused-media auto-off works on Android TV (Option B and Option C) and Roku; it never turns off HDMI inputs or games with no media session, and is not available on Samsung or LG. Home settings, Smart Idle (under Look) wins over it. Off unless `enabled` is `true`. It sits beside, not over, `idle_photo_seconds` (above): that only fades the rows out, the ambient clock covers the whole screen in black after a longer wait, and the OLED look's burn in nudge is unchanged. Quiet hours are checked in the `weather.timezone` zone, else the TV's own. Option C reads only the settings made on the TV, not this file. |
+| `smart_idle` [off] | Automatic OLED protection and idle power-off: `{"enabled": false, "home_idle_minutes": 15, "home_action": "ambient_clock", "paused_idle_minutes": 30, "quiet_hours": {"enabled": false, "start": "23:00", "end": "06:00", "idle_minutes": 15}}`. `home_action` is `"ambient_clock"`, `"screen_off"`, or `"tv_off"`. Setting either minute value to `0` turns that trigger off. `home_idle_minutes` is one of `5`, `10`, `15`, `30` or `60` (the same steps as Home settings), and `paused_idle_minutes` one of `10`, `15`, `20`, `30`, `45` or `60`: any other number is not an error, it is quietly read as the default (15 and 30), so `"home_idle_minutes": 2` behaves as 15. Paused-media auto-off works on Android TV (Option B and Option C) and Roku; it never turns off HDMI inputs or games with no media session, and is not available on Samsung or LG. Home settings, Smart Idle (under Look) wins over it. Off unless `enabled` is `true`. It sits beside, not over, `idle_photo_seconds` (above): that only fades the rows out, the ambient clock covers the whole screen in black after a longer wait, and the OLED look's burn in nudge is unchanged. Quiet hours are checked in the `weather.timezone` zone, else the TV's own. Option C reads only the settings made on the TV, not this file. |
 | `keep_watching` [`true`] | `false` hides the whole Keep watching row, heading and all: the layout closes the gap, the remote skips it and the home stops asking the bridge for it. A song still shows its Now playing card in the Night look. Home settings, Look, Show Keep watching wins over it. Works on the Android, LG, Samsung and Roku homes. |
+| `shelf_follows_app` [`false`] | `true` makes the Keep watching row follow the app the remote is on: while the outline is on an app tile in the dock or the grid (not More apps, Settings, an input, a Screen or a tool), the row shows only that app's cards under the heading "Recently on <app>", and under the YouTube tile that person's YouTube videos, which the bridge sends next to the row (`videos` in `GET /api/continue`, option B) and the row never shows otherwise. The filter stays while the remote goes up from that tile into the row, and the whole row comes back on any other tile or anywhere else on the home. An app with nothing on the go changes nothing: the whole row stays. Works with Android's Watch Next list too (option A, no videos there). Home settings, Look, Keep watching follows the app wins over it. |
 | `start_focus` [`"people"`] | Where focus starts when the Home button is pressed or when couch-tv opens: `"people"` (as before: the profile switcher at the top left when two or more people are set up, else Keep watching if cards exist, else apps), `"keep_watching"` (the first show card in Keep watching, falling back to apps if empty), or `"apps"` (the first app in the dock or grid). Any other value is ignored and the home starts as it always has. Home settings, Look, Start on wins over it (#211). |
 | `custom_cards` [none: off] | Your own cards at the end of the Keep watching row, from a small JSON file: a file on the bridge computer (`"cards.json"`, read from the folder `config.json` is in, or an absolute path) or an `http` or `https` link (`"https://raw.githubusercontent.com/you/repo/main/cards.json"`, or a Raspberry Pi on your Wi-Fi). Display only: a title, a value, a subtitle, a picture, and an installed app or an `http(s)` link for OK; at most 8 cards, nothing in the file is ever run. Read every 10 minutes; a bad file keeps the last good cards. Example: `{"cards": [{"title": "Solar today", "value": "18.4 kWh", "app": "com.example.solar"}, {"title": "Bin night", "value": "Recycling", "url": "https://example.com/bins"}]}`. The schema and limits: [TV-HOME.md](TV-HOME.md#custom-cards). |
 | `skip_watch_next` [none] | Package names never shown in the Keep watching row (e.g. `["com.google.android.youtube.tv"]`). |
@@ -615,6 +625,62 @@ TV.
 
 Preview with no TV and no Home Assistant: `?mock=1&ha=1` (see the end of this page). The doorbell
 card is drawn by the app itself, so it cannot be previewed in a browser.
+
+## Plex (optional, option B)
+
+Off unless you add it. With no `plex` section (or `"enabled": false`) nothing changes: no calls to
+anything, Keep watching as before.
+
+The bridge only learns of a Plex play it sees on the TV, a minute into playback. The Plex Media
+Server itself keeps a **Continue Watching** list for the account: shows and films left half way on a
+phone, on another TV, or before couch-tv existed. With this section the bridge reads that list every
+five minutes and gives each item a Keep watching card next to the plays it logs itself, with the
+show's season, episode and how far in it is (the progress bar), and the server's own poster.
+
+```json
+"plex": {
+  "url": "http://your-computer.local:32400",
+  "who": "person1"
+}
+```
+
+And the token in `.env` (never in `config.json`):
+
+```sh
+PLEX_TOKEN=<your X-Plex-Token>
+```
+
+| Key | What it does |
+|---|---|
+| `url` (needed) | The server's address as the bridge computer reaches it, `http://` or `https://` with the port (32400 unless you changed it): the name or the number address of the computer Plex runs on, on the home network. |
+| token (needed) | `PLEX_TOKEN` in `.env`. The token of the Plex account whose list this is. Finding it: [Plex's own article](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/) (in Plex Web, any item's **Get Info**, **View XML**: the address ends in `X-Plex-Token=...`). The bridge keeps it to itself: it goes to the server in a header, is never written to a log, and the TV and the phone get the pictures through the bridge (`/api/plex/art`), never the token or the server's address. |
+| `who` | Whose cards they are: a person's `id` or `name` from `people`. Left out, everyone sees the same cards. A name that is not a person shows them to nobody, and the bridge's log says so. |
+| `enabled` [true] | `false` switches it off and keeps the rest of the section for later. |
+
+**One account.** A Plex server keeps one Continue Watching list per Plex account, and a token belongs to
+one account, so the bridge reads one list. With Plex Home (several users on one server) the token
+decides whose list it is; a second user's list would need that user's token, which the bridge does not
+do yet. `who` is how you say which person on the couch it belongs to.
+
+**On the TV and the phone.** A Plex card looks like any other: the show and its episode, or the film,
+newest first, one card per show, nothing older than 30 days, up to 10 with the bridge's own. When
+both the bridge and Plex know a show, the newer of the two is the card (Plex names a show with its
+country, "The Office (US)", and the bridge as JustWatch does, "The Office": they count as one; two
+different brackets, "The Office (UK)" and "The Office (US)", are two shows). The card opens the show
+in Plex the way a Plex card already did: the show's page when JustWatch knows the title by that
+name, or the Plex app for you to pick it (a home video, say; the search's nearest guess at a name
+it does not know is never played in its place). Removing a card (hold OK on the TV, the cross on
+the phone) keeps it off until it is watched again, for the person it was shown to, or for everyone
+when nobody was picked. Plays the bridge sees on the TV are still logged as before.
+
+**Checking it.** `GET /api/plex/status` on the bridge says whether the section and the token are
+there, the server's name, how many items the last read gave and any error (never the token). The
+bridge's log has one line at the first read, `plex: Continue Watching from <server name>`, one
+warning when the server stops answering and one line when it answers again; the last good list is
+kept in between. The error in the status is a plain reason ("the server is not reachable"), never
+the server's address. A `url` the bridge cannot use (no `http://`, a path on the end) switches the
+section off and says so, at start and in the status. A server that is off or away never holds the
+home up: the hub is read in the background, and a read gives up after 10 seconds.
 
 ## Everything else
 
