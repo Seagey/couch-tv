@@ -136,5 +136,8 @@ the rest from the bridge's API or the remote page in a browser.
   The phone remote does not ask for the PIN yet: change the person on that TV first.
 - **Samsung, LG, Roku, VIDAA, Philips, VIZIO, Panasonic, TiVo and Apple TV** cannot be either end: they
   do not let the bridge read what is playing.
+- **Tested on two TVs only.** It is built for any number: the phone shows one Move button for each
+  other Android or Google TV, and the bridge asks which TV when there are more than two and none is
+  named. With three or more TVs that is covered by the unit tests only, not by real TVs.
 - One move at a time. One trigger for now: the phone remote. A button on the TV home and a remote key
   may come later.
