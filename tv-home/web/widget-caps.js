@@ -207,10 +207,14 @@
     upnext: { name: "Up next", status: "setup", what: "One show filling the space, with Resume and Start over. Beside Scores it shows your last game", needs: [WATCH_NEED],
       setup: setup("computer", WATCH), until: "\"Nothing to keep watching yet\", or \"No game to pick up\"", build: "",
       ok: "Resume plays it. Hold OK, then Open, for the whole list", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from couch-tv's home.", vidaa: "Only with a computer at home: the website home cannot." }), sizes: sz(["medium", "wide", "xl", "hero", "full"], [8, 4]) },
-    picks: { name: "Picks for you", status: "not-built", what: "\"Because you watched\" posters", needs: ["Needs couch-tv's picks brought to the home (they are on the home computer only)"],
-      setup: setup("nothing", NOT_YET), until: "\"Picks for you: not on couch-tv yet\", and what it needs",
-      build: "The home has to ask the bridge's /api/recs for the person watching and hand the answer to this widget, as it does for Keep watching.",
-      ok: "Opens the picks, each one playable (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["small", "medium", "wide"], [4, 3]) },
+    // made on the TV from its own Keep watching (widget-web.js picks): no outside service, nothing leaves
+    picks: { name: "Picks for you", status: "setup", what: "Shows the others at home are watching, and your own shows left part way, each ready to play",
+      needs: [WATCH_NEED],
+      setup: setup("computer", { android: WATCH.android.concat(["Picks come from what everyone at home has on the go: add people in Home settings, People."]),
+        web: WATCH.web.concat(["Picks come from what everyone at home has on the go: add people in Home settings, People."]),
+        vidaa: WATCH.vidaa.concat(["Picks come from what everyone at home has on the go: add people in Home settings, People."]) }),
+      until: "\"No picks yet\" until shows are on the go on this TV", build: "",
+      ok: "Opens every pick with Play. OK on a poster plays it", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from couch-tv's home.", vidaa: "Only with a computer at home: the website home cannot." }), sizes: sz(["small", "medium", "wide"], [4, 3]) },
 
     // ---------- apps ----------
     app: { name: "One app", status: "works", what: "One app as a big icon", needs: ["The app installed on this TV"],

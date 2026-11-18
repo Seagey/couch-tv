@@ -5235,6 +5235,29 @@
     var to = kept("tvhome.commute");
     return { from: pl, to: to && isFinite(to.lat) && isFinite(to.lon) ? { name: String(to.name || ""), lat: +to.lat, lon: +to.lon } : null };
   }
+  // Picks for you: each person's Keep watching (no kids or guest profiles' shows are picked for others)
+  function householdData() {
+    if (NOBODY || !KW_ON) return [];
+    return PEOPLE.map(function (p) {
+      var kid = !!(window.KidsMode && window.KidsMode.isKid && window.KidsMode.isKid(p)) || !!p.kid;
+      return { id: p.id, name: p.name, kid: kid, guest: !!p.guest, shows: (data.showsBy[p.id] || []).slice(0, KEEP_MAX) };
+    });
+  }
+  // OK on a pick: the show, in its own app, the way Keep watching opens it (as its owner's)
+  function playPick(i) {
+    var d = typeof CouchWidgetWeb !== "undefined" ? CouchWidgetWeb.picks(householdData(), who, arrangeItems().items.map(function (it) { return it.package; }), 8) : [], p = d[i];
+    var it = p && (data.showsBy[p.owner] || [])[p.i];
+    if (!it) return;
+    status(it.app ? t("opening_in", { title: it.title, app: it.app.name }) : t("opening", { title: it.title }), true);
+    if (it.wn && TV && TV.openWatchNext) {
+      if (!TV.openWatchNext(String(it.id)) && it.app) TV.launch(it.app.package);
+      status("");
+      return;
+    }
+    api("POST", "/api/continue/open", { id: it.id, who: p.owner }, 60000)
+      .then(function (res) { status(res.note ? tBridge(res.note_key, res.note_vars, res.note) : ""); })
+      .catch(function (e) { if (TV && it.app && TV.launch(it.app.package)) { status(""); return; } status(tBridge(e.key, e.vars, e.message)); });
+  }
   function commuteData() {
     var p = commutePlaces();
     return { from: p.from ? { name: p.from.name } : null, to: p.to ? { name: p.to.name } : null,
@@ -5324,7 +5347,9 @@
           // the web widgets' answers (widget-web.js): headlines, scores, prices, the drive
           web: WEB ? WEB.data() : null,
           // the commute's two places by name only, and the drive's id (Home settings; never in a design)
-          commute: commuteData() };
+          commute: commuteData(),
+          // everyone's Keep watching on this TV, for Picks for you (widget-web.js picks; stays on the TV)
+          household: householdData() };
       },
       // the detail layers (widget-detail.js) ask Home Assistant through smarthome.js, never directly
       ha: function (action, entity, value) {
@@ -5341,6 +5366,7 @@
           if (TV && TV.launch(arg)) return;
           api("POST", "/api/launch", { app: (it && it.id) || arg }).catch(function (e) { status(tBridge(e.key, e.vars, e.message)); });
         } else if (what === "show") { zone = "shelf"; s = Math.max(0, parseInt(arg, 10) || 0); activate(); zone = "grid"; }
+        else if (what === "pick") playPick(parseInt(arg, 10) || 0);
         else if (what === "more") { dockBack = null; expanded = true; zone = "grid"; g = 0; renderGrid(); paintFocus(); }
         else if (what === "gear") openGear();
         else if (what === "smart") openSmart();

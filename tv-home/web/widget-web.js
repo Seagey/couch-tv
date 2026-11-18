@@ -258,6 +258,33 @@
     return null;
   }
 
+  // ---------------- picks: from this TV's own Keep watching, no outside service ----------------
+  // household: [{ id, name, kid, shows: [Keep watching items, newest first] }], who: the person watching,
+  // apps: the packages this TV has (empty when not known). Picks, in order: what other grown ups at home
+  // are watching that this person is not (never a kids profile's shows), then this person's own shows
+  // left part way further back than Keep watching's first three; each only once, and only from apps
+  // this TV still has. Every pick keeps who it came from and its place in their list, to play it.
+  function picks(household, who, apps, max) {
+    var out = [], seen = {}, have = (apps || []).filter(Boolean), me = null;
+    (household || []).forEach(function (p) { if (p && p.id === who) me = p; });
+    var mine = {};
+    ((me && me.shows) || []).forEach(function (s) { if (s && s.title) mine[String(s.title).toLowerCase()] = 1; });
+    var push = function (s, owner, i, why) {
+      if (!s || !s.title) return;
+      var key = String(s.title).toLowerCase(), pkg = s.app && s.app.package || s.package || "";
+      if (seen[key] || (have.length && pkg && have.indexOf(pkg) < 0)) return;
+      seen[key] = 1;
+      out.push({ title: cut(s.title, 60), sub: s.season && s.episode ? "S" + s.season + " E" + s.episode : "", app: pkg, art: s.backdrop || s.poster || "",
+        progress: +s.progress || 0, why: why, owner: owner, i: i });
+    };
+    (household || []).forEach(function (p) {
+      if (!p || p.id === who || p.kid || p.guest) return;
+      (p.shows || []).forEach(function (s, i) { if (s && s.title && !mine[String(s.title).toLowerCase()]) push(s, p.id, i, cut(p.name, 20) + " is watching"); });
+    });
+    ((me && me.shows) || []).forEach(function (s, i) { if (i >= 3 && (+s.progress || 0) < 0.95) push(s, me.id, i, "Pick up again"); });
+    return out.slice(0, max || 8);
+  }
+
   // ---------------- the sources the loader knows ----------------
   // key(w): which answer a widget on the home needs (widgets with the same key share one request);
   // every: how long an answer is good for; get(h, id): one request, through the relay or straight
@@ -379,7 +406,7 @@
     feedOf: feedOf, plain: plain, parseRss: parseRss, ago: ago,
     LEAGUES: LEAGUES, LEAGUE_DEFAULT: LEAGUE_DEFAULT, leagueOf: leagueOf, parseScores: parseScores, scoreOrder: scoreOrder, kickoff: kickoff,
     SYMBOL: SYMBOL, TICKERS_DEFAULT: TICKERS_DEFAULT, TICKER_NAMES: TICKER_NAMES, tickersOf: tickersOf, parseSpark: parseSpark, price: price, change: change,
-    routeKey: routeKey, routeUrl: routeUrl, parseRoute: parseRoute, leaveBy: leaveBy,
+    routeKey: routeKey, routeUrl: routeUrl, parseRoute: parseRoute, leaveBy: leaveBy, picks: picks,
     loader: function (h) { return Loader(h); }
   };
   root.CouchWidgetWeb = API;

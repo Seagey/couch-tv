@@ -385,6 +385,36 @@ each widget needs, where that is set up, which TVs can run it and the sizes it c
 OK on the card opens the whole record. It never shows pretend data. The air quality and surf widgets
 ask Open-Meteo's free air quality and marine services, only while one is on the home.
 
+**Web widgets: where their data comes from, and what stays on the TV.** Headlines, Scores, Markets
+and Commute read free sources with no key and no account, and no couch-tv server is in the way
+(`tv-home/web/widget-web.js`). Each source is asked only while its widget is on the home, at most
+once per refresh, and the last answer is kept in the TV's own storage (`tvhome.webdata`) so a
+reload asks nothing.
+
+| Widget | Source | How often | What it sends |
+|---|---|---|---|
+| Headlines | A public RSS feed picked in the design (`opts.feed`: `abc` (default), `abc-justin`, `abc-sport`, `abc-business`, `sbs`, `guardian`, `bbc`, `rnz`), for personal, non commercial reading | 15 minutes | Nothing: the feed is fetched by its id |
+| Scores | ESPN's public scoreboards (`opts.league`: `afl`, `nrl` (default), `aleague`, `epl`, `nba`, `bbl`, `cricket`; `opts.team` puts a team first). Unofficial and undocumented, so they may change | 2 minutes while a game is on, else 15 | Nothing |
+| Markets | Yahoo Finance's public chart data (`opts.tickers`, up to six symbols such as `BHP.AX`, `^AXJO`, `AUDUSD=X`, `BTC-AUD`; the ASX 200, the dollar and Bitcoin by default). Unofficial, for personal use, ASX prices about 20 minutes late | 10 minutes | The symbols |
+| Commute | OSRM's route server with OpenStreetMap roads; the usual drive, no live traffic | When the places change, then 6 hours | The two places, rounded to about a kilometre |
+| Picks for you | This TV's own Keep watching (everyone's, but never a kids or guest profile's shows) | Never asks anyone | Nothing |
+
+A news feed and a share price send no CORS header, so the TV asks through a relay that is part of
+couch-tv at home: the bridge or the on-TV app (`GET /api/webdata`, bridge/API.md), or with neither,
+the launcher itself (`http://tvos.invalid/webdata`). The relay knows only the ids above, never a
+link. The website home on a Hisense (no computer) has no relay, so Headlines and Markets say they
+need a home computer there; Scores and Commute ask their services straight from the TV.
+
+The commute's places are never in a design: from the town in Home settings, Location, to the town or
+suburb picked in Home settings, couch-tv Studio, Commute (shown while a design has the widget). The
+second is kept on the TV only (`tvhome.commute`), not in the settings the bridge keeps, and Share
+this home stops if it would send it. A design's Commute widget carries only its label, the arrive by
+time (`arrive_h`, `arrive_m`), the minutes to spare (`buffer`, 10 unless set) and `weekdays`.
+
+Every web widget is centred unless the design sets `opts.align` (`left` or `right`), and fits its
+box at every size: words wrap and shrink (never under 23 px) and whole items are left out before
+anything is cut off.
+
 The whole block must stay under 4 MB (a photo inside it is the big part). The bridge passes it to
 the home as it is, in `/tv/config.js` (option B), and the standalone build carries it. `apply.sh`
 (option A) hands the settings to the app inside an Android intent, which is far too small for a

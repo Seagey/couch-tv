@@ -52,7 +52,9 @@ const CASES = [
   { kind: "stocks", opts: { tickers: ["BHP.AX", "^AXJO"] }, box: [0, 0, 4, 6], says: () => "$54.34", layer: "stocks" },
   // the commute's places are the TV's own (Home settings), never the design's
   { kind: "commute", opts: { arrive_h: 8, arrive_m: 30 }, box: [0, 0, 8, 4], routes: [["https://router.project-osrm.org/**", "osrm-route.json"]], says: () => "27", layer: "commute",
-    kept: { "mock:tvhome.commute": { name: "Parramatta", lat: -33.82, lon: 151.0 }, "mock:tvhome.settings": { s: { place: { name: "Riverside", area: "", lat: -33.87, lon: 151.21, timezone: "Australia/Sydney" } }, updated: Date.now(), pending: false } } }
+    kept: { "mock:tvhome.commute": { name: "Parramatta", lat: -33.82, lon: 151.0 }, "mock:tvhome.settings": { s: { place: { name: "Riverside", area: "", lat: -33.87, lon: 151.21, timezone: "Australia/Sydney" } }, updated: Date.now(), pending: false } } },
+  // picks come from the preview's own Keep watching (two people, each with their own shows): nothing is asked
+  { kind: "picks", box: [0, 0, 12, 4], says: () => "Person 2 is watching", layer: "picks", noAsk: true }
 ];
 const KINDS = CASES.map((c) => c.kind);
 const WW = createRequire(import.meta.url)("../tv-home/web/widget-web.js");
@@ -87,12 +89,14 @@ for (const c of CASES) {
   const page = await home(c), want = c.says();
   const got = await page.waitForFunction((w) => ((document.querySelector('.cw-o[data-obj="w0"] .cw') || {}).textContent || "").indexOf(w) >= 0, want, { timeout: 8000 }).then(() => true, () => false);
   ok(got, c.kind + ": the widget shows the real answer (" + want + "); asked " + page.asked.join(", ") + "; it says " + (await widgetText(page)).slice(0, 120));
-  ok(page.asked.length >= 1 && page.asked.length <= (c.maxAsks || 1), c.kind + ": one request for the widget (" + page.asked.length + ")");
+  ok(c.noAsk ? page.asked.length === 0 : page.asked.length >= 1 && page.asked.length <= (c.maxAsks || 1), c.kind + ": " + (c.noAsk ? "no request at all" : "one request for the widget") + " (" + page.asked.length + ")");
   await page.screenshot({ path: path.join(SHOTS, c.kind + "-home.png") });
+  // the home settles first (Keep watching and the widgets drawn again with what came back)
+  await page.waitForTimeout(1200);
   await page.evaluate(() => window.CouchDesign.nav.move(-1, 0));
   ok((await page.evaluate(() => window.CouchDesign.nav.current().id)) === "w0", c.kind + ": the remote reaches the widget");
   await press(page, "Enter", 800);
-  const cur = await page.evaluate(() => window.CouchDetail.current());
+  const cur =await page.evaluate(() => window.CouchDetail.current());
   ok(cur && cur.name === c.layer, c.kind + ": OK opens " + c.layer + " (got " + (cur && cur.name) + ")");
   const layerText = await page.evaluate(() => (document.querySelector(".cwd-panel") || {}).textContent || "");
   ok(layerText.indexOf(want) >= 0, c.kind + ": the layer shows the real answer too");
@@ -100,6 +104,14 @@ for (const c of CASES) {
   await page.screenshot({ path: path.join(SHOTS, c.kind + "-layer.png") });
   await press(page, "Escape", 600);
   ok(!(await page.evaluate(() => window.CouchDetail.isOpen())), c.kind + ": Back closes the layer");
+  if (c.kind === "picks") {
+    // Play on a pick opens that show the way Keep watching does, as its owner's (Person 2)
+    await page.evaluate(() => { window.__calls = []; const f = window.MOCK_API; window.MOCK_API = (m, p, b) => { window.__calls.push(m + " " + p + " " + JSON.stringify(b || {})); return f(m, p, b); }; });
+    await press(page, "Enter", 800);
+    await press(page, "Enter", 800);
+    const calls = await page.evaluate(() => window.__calls.join("\n"));
+    ok(/POST \/api\/continue\/open .*"who":"person2"/.test(calls), "picks: Play opens the show as Person 2's (" + calls.replace(/\n/g, "; ").slice(0, 200) + ")");
+  }
   if (c.kind === "commute") {
     // Home settings, couch-tv Studio: the Commute rows, with the TV's own places, said to stay on the TV
     await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300);
@@ -167,7 +179,10 @@ for (const c of CASES) {
         if (align && st !== "real" && st !== "hard") continue;
         while (host.firstChild) host.removeChild(host.firstChild);
         const opts = Object.assign({}, OPTS[kind], align ? { align } : {});
-        const el = W.render({ id: "t", kind, w: w * 100 - 40, h: h * 100 - 40, opts }, STATES[st]());
+        const env = STATES[st]();
+        // Picks read this TV's own Keep watching: everyone's shows, long titles and Hindi in the hard case
+        if (env.data) { env.data.who = "a"; env.data.household = [{ id: "a", name: "Alex", shows: [] }, { id: "b", name: st === "hard" ? "मुंबई की प्रिया" : "Sam", shows: (st === "hard" ? [HINDI, LONG, "Wolverhampton Wanderers v Brighton and Hove Albion, the full match replay"] : ["Mystery Road", "Utopia", "The Newsreader", "Total Control"]).map((t, i) => ({ id: "s" + i, title: t, progress: 0.3 })) }]; }
+        const el = W.render({ id: "t", kind, w: w * 100 - 40, h: h * 100 - 40, opts }, env);
         el.style.position = "absolute"; el.style.left = "80px"; el.style.top = "60px";
         host.appendChild(el); count++;
         for (let k = 0; k < 40 && el.getAttribute("data-fits") && !el.getAttribute("data-fitted"); k++) await frame();

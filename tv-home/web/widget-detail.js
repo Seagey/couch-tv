@@ -33,6 +33,7 @@
   // the web widgets' own layers (widget-web.js)
   LAYER.stocks = "stocks"; TITLE.stocks = "Markets";
   LAYER.commute = "commute"; TITLE.commute = "Commute";
+  LAYER.picks = "picks"; TITLE.picks = "Picks for you";
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -525,6 +526,20 @@
         null, (g.teams[0].name || "") + " v " + (g.teams[1].name || ""));
     })));
     if (games.length > n) S.body.appendChild(E("div", "cwd-small", "margin-top:14px", ["And " + (games.length - n) + " more games"]));
+  };
+  // every pick, from what everyone at home has on the go on this TV; Resume plays it
+  B.picks = function (o, env) {
+    var list = wk().picksOf ? wk().picksOf(env) : [];
+    if (!list.length) return B.setup(o, env);
+    S.body.appendChild(head("favourite", op(o).label || "Picks for you", "From what everyone at home is watching on this TV", "#bf5af2"));
+    var track = E("div", "cwd-track");
+    list.forEach(function (s, i) {
+      track.appendChild(F(E("div", "cwd-show", "", [E("div", "cwd-art", s.art ? "background-image:" + kit().cssImg(s.art) : "", [s.progress ? E("div", "cwd-prog", "", [E("b", "", "width:" + Math.round(s.progress * 100) + "%")]) : null,
+        E("div", "cwd-resume", "", [ic("play", 30, "#111", "solid"), "Play"])]),
+        E("div", "cwd-row", "margin-top:18px", [s.app ? kit().appIcon(s.app, 44, env) : null, E("div", "cwd-col", "margin-left:14px;min-width:0", [E("div", "cwd-mid", "overflow-wrap:anywhere", [s.title]), E("div", "cwd-small", "", [s.why || ""])])])]),
+        function () { if (designerSays()) return; S.api.act("pick", String(i)); close(true); }, s.title));
+    });
+    S.body.appendChild(E("div", "cwd-scroll cwd-grow", "margin-top:40px", [track]));
   };
   // the drive: how long, how far, when to leave, and where the route comes from (OpenStreetMap's credit)
   B.commute = function (o, env) {

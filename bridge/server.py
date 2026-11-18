@@ -2306,13 +2306,15 @@ async def h_weather(request):
 # ---------- the web widgets' relay (bridge/webdata.py): news feeds and share prices, by id only ----------
 async def h_webdata(request):
     src, ident = request.query.get("src", ""), request.query.get("id", "")
+    # only the TV home asks this, and it shows its own words for a failure (widgets.js), so the answer
+    # carries no message key for the phone remote
     try:
         text = await webdata.get(src, ident)
     except webdata.BadSource as e:
-        raise ApiError(400, str(e))
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
     except Exception as e:  # the source is down or slow: the home keeps its last answer and asks again
         log.warning("webdata %s: %s", src, e)
-        raise ApiError(502, "The source could not be read just now.")
+        return web.json_response({"ok": False, "error": "The source could not be read just now."}, status=502)
     return ok(src=src, id=ident, text=text)
 
 

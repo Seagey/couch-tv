@@ -884,13 +884,31 @@
         b.h >= 420 ? E("div", "cw-row", "margin-top:26px", [resume, stop(E("div", "cw-chip", "height:64px;font-size:27px;padding:0 30px;margin-left:16px;background:rgba(255,255,255,.2)", ["Start over"]), "show", s.i, s.title)]) : null])]);
     if (b.h < 420) stop(root, "show", s.i, s.title);
   };
+  // Picks for you: from this TV's own Keep watching, no outside service (widget-web.js picks): what the
+  // other grown ups at home are watching, then your own shows left part way further back. OK plays it.
+  var DEMO_PICKS = [["Mystery Road", "scene-dawn", "Sam is watching"], ["Utopia", "aresquiers-beach", "Sam is watching"], ["The Newsreader", "scene-fog", "Pick up again"], ["Total Control", "scene-water", "Ruby is watching"],
+    ["Colin from Accounts", "vang-vieng-sunset", "Pick up again"], ["Rake", "albury-storm", "Pick up again"], ["Wakefield", "scene-golden", "Sam is watching"]];
+  function picksOf(env) {
+    if (env.demo) return DEMO_PICKS.map(function (x, i) { return { title: x[0], art: bgImg(x[1]), why: x[2], i: i }; });
+    var d = dataOf(env), WW = window.CouchWidgetWeb;
+    return WW ? WW.picks(d.household || [], d.who, (d.apps || []).map(function (a) { return a && a.package; }), 8) : [];
+  }
   R.picks = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "favourite", "picks");
-    var arts = ["scene-dawn", "aresquiers-beach", "scene-fog", "scene-water", "vang-vieng-sunset", "albury-storm", "scene-golden"], names = ["Mystery Road", "Utopia", "The Newsreader", "Total Control", "Colin from Accounts", "Rake", "Wakefield"];
-    var n = Math.max(1, Math.floor((b.w + 24) / 230));
-    add(root, [E("div", "cw-lab", "color:var(--ink);margin-bottom:16px", ["Because you watched Fisk"]), E("div", "cw-row", "flex:1;align-items:stretch;min-height:0", arts.slice(0, n).map(function (a, i) {
-      return E("div", "cw-poster", "flex:1;" + (i ? "margin-left:24px;" : "") + "background-image:" + cssImg(bgImg(a)), [E("div", "cap", "", [E("div", "cw-t25", "color:#fff;font-weight:700", [names[i]])])]);
+    var a = alignOf(o), list = picksOf(env);
+    if (!list.length) {
+      // no Keep watching at all (no bridge, no on-TV app): its setup steps; otherwise nothing yet
+      if (!env.demo && dataOf(env).bridge === false && !(dataOf(env).household || []).some(function (p) { return p.shows && p.shows.length; })) { soon(root, b, "favourite", "picks"); return; }
+      return webEmpty(root, b, "favourite", "No picks yet", "Shows anyone at home starts on this TV make picks here", "No picks yet");
+    }
+    var gap = 20, n = clamp(Math.floor((b.w - 48 + gap) / 220), 1, list.length), pw = Math.floor((b.w - 48 - (n - 1) * gap) / n);
+    webBody(root, a, [webHead("favourite", op(o).label || "Picks for you", a), E("div", "cw-row", "flex:1;min-height:0;margin-top:14px;align-items:stretch;justify-content:" + jc(a), list.slice(0, n).map(function (p, i) {
+      var cap = E("div", "", "position:absolute;left:0;right:0;bottom:0;padding:14px 16px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.82));text-align:" + a, [
+        fitT(E("div", "", WRAP + "font-size:25px;line-height:1.2;color:#fff;font-weight:700", [p.title])), dropT(fitT(E("div", "", WRAP + "font-size:23px;line-height:1.2;color:rgba(255,255,255,.86);margin-top:2px", [p.why])), 3)]);
+      var card = E("div", "", "position:relative;overflow:hidden;flex:none;border-radius:24px;background:#2a2a30 center/cover;width:" + px(pw) + ";" + (i ? "margin-left:" + gap + "px;" : "") + (p.art ? "background-image:" + cssImg(p.art) : ""), [cap]);
+      return stop(dropT(card, i ? 2 : 1), "pick", i, p.title);
     }))]);
+    // OK on the widget as a whole (the remote arrived before the posters were there) opens every pick
+    stop(root, "detail", "picks", "Picks for you");
   };
 
   // apps
@@ -1774,5 +1792,5 @@
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12 }
   };
   // what the web widgets' detail layers share with them (widget-detail.js)
-  window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS, demoScores: demoScores, gameStatus: gameStatus, shortScore: shortScore, demoQuote: demoQuote, upDown: upDown, commuteOf: commuteOf };
+  window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS, demoScores: demoScores, gameStatus: gameStatus, shortScore: shortScore, demoQuote: demoQuote, upDown: upDown, commuteOf: commuteOf, picksOf: picksOf };
 })();

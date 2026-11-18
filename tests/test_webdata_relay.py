@@ -86,6 +86,43 @@ class SameListsTests(unittest.TestCase):
         self.assertEqual(sorted(re.findall(r'"([a-z-]+)"', m.group(1))), sorted(webdata.FEEDS))
 
 
+class HandlerTests(unittest.IsolatedAsyncioTestCase):
+    """GET /api/webdata through the bridge's own handler, with the source faked."""
+
+    async def asyncSetUp(self):
+        import server
+        from aiohttp import web
+        from aiohttp.test_utils import TestClient, TestServer
+        webdata._cache.clear()
+        self.real = webdata._fetch
+        self.asked = []
+
+        async def fake(url):
+            self.asked.append(url)
+            if "bbc" in url:
+                raise OSError("down")
+            return "<rss><item><title>One</title></item></rss>"
+        webdata._fetch = fake
+        app = web.Application()
+        app.router.add_get("/api/webdata", server.h_webdata)
+        self.client = TestClient(TestServer(app))
+        await self.client.start_server()
+
+    async def asyncTearDown(self):
+        webdata._fetch = self.real
+        await self.client.close()
+
+    async def test_answers(self):
+        r = await self.client.get("/api/webdata?src=news&id=abc")
+        j = await r.json()
+        self.assertEqual((r.status, j["ok"], j["text"]), (200, True, "<rss><item><title>One</title></item></rss>"))
+        r = await self.client.get("/api/webdata?src=news&id=https://evil.example/rss")
+        self.assertEqual((r.status, (await r.json())["ok"]), (400, False))
+        r = await self.client.get("/api/webdata?src=news&id=bbc")
+        self.assertEqual((r.status, (await r.json())["ok"]), (502, False))
+        self.assertEqual(len(self.asked), 2)   # the refused link was never asked for
+
+
 class RouteTests(unittest.TestCase):
     def test_the_bridge_serves_it(self):
         src = self.read_server()

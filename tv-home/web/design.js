@@ -331,7 +331,7 @@
     wordclock: "", solar: "", worldclock: "cities", countdown: "label month day unit icon", date: "show dfmt align place", month: "", timer: "label",
     weather: "place hilo night", bigtemp: "place", hourly: "place", week: "place", rain: "", uv: "", sun: "", moon: "", air: "", surf: "label",
     photo: "image fit caption sub", slideshow: "seconds_each caption sub", mosaic: "count", artframe: "image mat caption sub", memory: "",
-    keep: "", keeprow: "label shows", upnext: "apps sport", picks: "",
+    keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",
     app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "apps",
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "",
