@@ -308,10 +308,13 @@
     if (!apps.length) return B.setup(o, env);
     S.body.appendChild(head("apps", op(o).label || "Apps", apps.length + (apps.length === 1 ? " app" : " apps"), "#0a84ff"));
     var grid = E("div", "cwd-grid cwd-grow", "justify-content:center;align-content:center;margin-top:20px");
-    apps.forEach(function (p) {
+    apps.forEach(function (p, i) {
       var n = kit().appNode(p, 200, env);
       n.removeAttribute("data-act");
       grid.appendChild(F(E("div", "cwd-app", "", [n, E("div", "cwd-small cwd-ell", "", [kit().appName(String(p).replace(/^missing:/, ""), env)])]), function () { if (designerSays()) return; if (String(p).indexOf("missing:") === 0) { msg("Not on this TV. Install it from the App Store in More apps, or hold OK on it in the folder to change it."); return; } S.api.act("app", p); close(true); }, kit().appName(String(p).replace(/^missing:/, ""), env)));
+      // Hold OK on an app: the folder closes and its Hold OK menu opens for that app (design.js)
+      var api = S.api;
+      if (!api.designer && api.hold) S.stops[S.stops.length - 1].hold = function () { close(true); api.hold(i); };
     });
     S.body.appendChild(grid);
   };
@@ -630,12 +633,21 @@
       moveFocus(a[0], a[1]);
       return true;
     }
-    if (isOk(e)) { if (!e.repeat) S.okDown = true; return true; }
+    if (isOk(e)) {
+      if (!e.repeat) {
+        S.okDown = true; S.held = false; clearTimeout(S.holdT);
+        // Hold OK on a stop that has more to offer (an app in a folder: change, move, remove)
+        var hs = S.stops[S.cur];
+        if (hs && hs.hold) S.holdT = setTimeout(function () { if (S && S.okDown) { S.held = true; S.okDown = false; hs.hold(); } }, 650);
+      }
+      return true;
+    }
     return true;   // every other key stays in the layer while it is open
   }
   function keyup(e) {
     if (!S) return false;
     if (isOk(e)) {
+      clearTimeout(S.holdT);
       if (!S.okDown) return true;
       S.okDown = false;
       if (S.key && S.key(null, true)) return true;

@@ -396,6 +396,7 @@
     }
     if (st.accent) root.style.setProperty("--on", st.accent);
     if (FONT[st.font]) root.style.fontFamily = FONT[st.font];
+    else if (st.font && window.CouchFonts && window.CouchFonts.css(st.font)) root.style.fontFamily = window.CouchFonts.css(st.font);   // a Google Fonts family (design.js loads it from the store)
     var rr = CORNER[st.corners] !== undefined ? CORNER[st.corners] : 36;
     if (rr === 999) rr = Math.min(b.w, b.h) / 2;
     root.style.setProperty("--r", px(rr));

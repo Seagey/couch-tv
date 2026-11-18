@@ -39,6 +39,87 @@
     mono: '"Roboto Mono", "Droid Sans Mono", Menlo, monospace',
     condensed: '"Roboto Condensed", "Arial Narrow", sans-serif'
   };
+  // Any Google Fonts family by its name (google-fonts.js, a list made from Google Fonts' public
+  // metadata): a design may name up to three. The TV never asks Google: each font's file comes from the
+  // design store, /v1/fonts/<family>/<weight>.woff2, shown with font-display swap (the home's own font
+  // until it arrives, and for good if it takes too long). A name not on the list is dropped.
+  var FONT_CAP = 3, FONT_WAIT = 6000;
+  var OWN_FONTS = ["inter", "antonio", "serif", "mono", "condensed", "rounded", "cormorant", "jost"];
+  function gfont(v) { var F = typeof window !== "undefined" && window.CouchFonts, f = F && OWN_FONTS.indexOf(v) < 0 ? F.find(v) : null; return f ? f.family : undefined; }
+  function customFont(v) { return typeof v === "string" && OWN_FONTS.indexOf(v) < 0 && !!gfont(v); }
+  // the font-family for a font a design names: the home's own, or a Google Fonts family
+  function fontOf(name) { if (FONTS[name]) return FONTS[name]; var F = window.CouchFonts; return customFont(name) ? F.css(name) : ""; }
+  // at most three Google Fonts families in a design: the first three named keep theirs, the rest
+  // fall back to the home's own font (their font is dropped)
+  function capFonts(out) {
+    var seen = [];
+    (function walk(x) {
+      if (!x || typeof x !== "object") return;
+      if (Array.isArray(x)) { x.forEach(walk); return; }
+      Object.keys(x).forEach(function (k) {
+        if (k === "font" && customFont(x[k])) {
+          if (seen.indexOf(x[k]) < 0 && seen.length < FONT_CAP) seen.push(x[k]);
+          if (seen.indexOf(x[k]) < 0) { delete x[k]; note("Only three fonts of your own fit in a design: the rest use the home's font."); }
+        } else walk(x[k]);
+      });
+    })(out);
+    return seen;
+  }
+  // the families a design uses and the weights it asks for each (400 and 700 always, for widgets)
+  function fontsOf(d) {
+    var want = {};
+    (function walk(x) {
+      if (!x || typeof x !== "object") return;
+      if (Array.isArray(x)) { x.forEach(walk); return; }
+      if (customFont(x.font)) { var w = want[x.font] = want[x.font] || [400, 700]; if (x.weight && w.indexOf(+x.weight) < 0) w.push(+x.weight); }
+      Object.keys(x).forEach(function (k) { if (k !== "font") walk(x[k]); });
+    })(d);
+    return want;
+  }
+  // load them from the store (never from Google), each with a time limit; a font that fails or is late
+  // is simply not used, and the home's own font stays
+  var FONT_DONE = {}, FONT_LATER = false;
+  // the characters in each subset the store serves (Google Fonts' own ranges)
+  var FONT_RANGE = {
+    latin: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    "latin-ext": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
+    devanagari: "U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B09"
+  };
+  function loadFonts(d) {
+    var C = window.CouchDesignCode, base = C && C.base ? C.base() : "", F = window.CouchFonts, want = fontsOf(d);
+    if (!base || !F) return 0;
+    var n = 0;
+    Object.keys(want).slice(0, FONT_CAP).forEach(function (name) {
+      var fam = F.find(name);
+      if (!fam) return;
+      want[name].map(function (w) { return F.weight(fam.family, w); }).filter(function (w, i, a) { return a.indexOf(w) === i; }).forEach(function (w) {
+        // one file per subset the family has (the store's names): latin, latin-ext, devanagari; each
+        // with its characters, so the TV fetches a subset only when the words on screen need it
+        fam.subsets.forEach(function (sub) {
+          if (!FONT_RANGE[sub]) return;
+          var url = base + "/v1/fonts/" + fam.name + "/" + w + (sub === "latin" ? "" : "." + sub) + ".woff2", key = url;
+          if (FONT_DONE[key]) return;
+          FONT_DONE[key] = 1; n++;
+          if (typeof FontFace === "function" && document.fonts && document.fonts.add) {
+            try {
+              var face = new FontFace(fam.family, 'url("' + url.replace(/["\\\n]/g, encodeURIComponent) + '") format("woff2")', { weight: String(w), display: "swap", unicodeRange: FONT_RANGE[sub] });
+              var late = false, timer = setTimeout(function () { late = true; }, FONT_WAIT);
+              // only a latin file is fetched straight away (the others when their characters show)
+              if (sub !== "latin") { document.fonts.add(face); return; }
+              face.load().then(function () { clearTimeout(timer); if (!late) document.fonts.add(face); }, function () { clearTimeout(timer); });
+            } catch (e) { /* no font: the home's own stays */ }
+          } else if (document.head) {
+            // an older WebView with no FontFace: the same file by a rule, swapped in when it arrives
+            var st = document.createElement("style");
+            st.setAttribute("data-cd-font", fam.family);
+            st.textContent = '@font-face{font-family:"' + fam.family + '";src:url("' + url.replace(/["\\\n]/g, encodeURIComponent) + '") format("woff2");font-weight:' + w + ";font-display:swap;unicode-range:" + FONT_RANGE[sub] + "}";
+            document.head.appendChild(st);
+          }
+        });
+      });
+    });
+    return n;
+  }
   var TEXT_SHADOW = {
     none: "none",
     soft: "0 0.125rem 1.25rem rgba(0, 0, 0, 0.38)",
@@ -209,7 +290,7 @@
     put(out, "locked", SAN.b(src.locked)); put(out, "name", SAN.w(src.name, 40));
   }
   function sanType(src, out) {
-    put(out, "font", SAN.pick(src.font, Object.keys(FONTS))); put(out, "weight", SAN.n(src.weight, 100, 900, true));
+    put(out, "font", SAN.pick(src.font, Object.keys(FONTS)) || gfont(src.font)); put(out, "weight", SAN.n(src.weight, 100, 900, true));
     put(out, "colour", SAN.c(src.colour)); put(out, "shadow", SAN.pick(src.shadow, ["none", "soft", "strong"]));
     put(out, "shade", SAN.pick(src.shade, ["glow", "panel"])); put(out, "case", SAN.pick(src.case, ["upper"]));
     put(out, "align", SAN.pick(src.align, ["left", "center", "right"]));
@@ -343,6 +424,7 @@
     src = obj(src);
     var out = {};
     Object.keys(WSTYLE).forEach(function (k) { put(out, k, SAN.pick(src[k], WSTYLE[k])); });
+    if (out.font === undefined) put(out, "font", gfont(src.font));   // or any Google Fonts family by name
     put(out, "colour", SAN.c(src.colour)); put(out, "accent", SAN.c(src.accent)); put(out, "opacity", SAN.n(src.opacity, 0.2, 1));
     return Object.keys(out).length ? out : undefined;
   }
@@ -494,6 +576,7 @@
     });
     scam(out);
     budget(out);
+    capFonts(out);
     return out;
   }
 
@@ -785,7 +868,7 @@
   // ---------------- the stylesheet ----------------
   function textRules(sel, e, opts) {
     var r = [];
-    var f = FONTS[e.font];
+    var f = fontOf(e.font);
     if (f) r.push("font-family:" + f + (opts && opts.important ? " !important" : ""));
     var w = parseInt(e.weight, 10);
     if (w >= 100 && w <= 900) r.push("font-weight:" + w);
@@ -832,7 +915,7 @@
     var cr = [];
     if (cm.x || cm.y) cr.push("transform:translate(" + vw(cm.x) + "," + vh(cm.y) + ")");
     if (cm.s !== 1) cr.push("font-size:" + +(25 * cm.s).toFixed(3) + "rem");
-    if (FONTS[ce.font]) cr.push("font-family:" + FONTS[ce.font] + (ce.font === "antonio" ? "" : ";letter-spacing:-0.045em;line-height:0.86"));
+    if (fontOf(ce.font)) cr.push("font-family:" + fontOf(ce.font) + (ce.font === "antonio" ? "" : ";letter-spacing:-0.045em;line-height:0.86"));
     var cw = parseInt(ce.weight, 10);
     if (cw >= 100 && cw <= 900) cr.push("font-weight:" + cw);
     if (ce.shade === "glow") cr.push("filter:drop-shadow(0 0 1.25rem rgba(0, 0, 0, 0.55)) drop-shadow(0 0.25rem 0.5rem rgba(0, 0, 0, 0.45))");
@@ -866,7 +949,7 @@
     if (obj(E.weather).place === false) out.push(H + " #cd-weather .wx-place{display:none}");
     if (obj(E.weather).words === false) out.push(H + " #cd-weather .ww{display:none}");
     out.push(textRules(H + " #shelf-section .shelf-head h2", obj(E.keep_watching)));
-    if (FONTS[obj(E.keep_watching).font]) out.push(H + " #shelf-section .ncard{font-family:" + FONTS[obj(E.keep_watching).font] + "}");
+    if (fontOf(obj(E.keep_watching).font)) out.push(H + " #shelf-section .ncard{font-family:" + fontOf(obj(E.keep_watching).font) + "}");
     out.push(shelfCompact(obj(E.keep_watching).compact));
     out.push(panel(H + " #people", obj(E.people).panel));
     out.push(panel(H + " .qbtn:not(.focus)", obj(E.quick).panel));
@@ -1189,7 +1272,7 @@
   function icFull(set) { return set && ICON_SETS[set] && ICON_FULL[set] ? " cd-ic-full" : ""; }
   function textStyle(o, base) {
     var st = {};
-    if (FONTS[o.font]) st["font-family"] = FONTS[o.font];
+    if (fontOf(o.font)) st["font-family"] = fontOf(o.font);
     var w = parseInt(o.weight, 10);
     if (w >= 100 && w <= 900) st["font-weight"] = w;
     if (colour(o.colour)) st.color = colour(o.colour);
@@ -1772,6 +1855,8 @@
     }
     copyWeather();
     background(D);
+    // fonts only once the page has loaded: a slow store never holds up the home (or the TV app's "page finished")
+    if (document.readyState === "complete") loadFonts(D); else if (!FONT_LATER) { FONT_LATER = true; window.addEventListener("load", function () { if (D && ON) loadFonts(D); }); }
     texts(D);
     objects(D);
     // the glass clock is lined up from where its digits are, so it is drawn again when it moves
@@ -2128,7 +2213,9 @@
     function detailApi() {
       return { designer: DESIGNER,
         act: function (what, arg) { if (DESIGNER) { try { window.parent.postMessage({ type: "couchtv:open", name: String(arg || what) }, location.origin); } catch (x) {} return; } if (hooks.act) hooks.act(what, arg); },
-        ha: hooks.ha && !DESIGNER ? function (a, e, v) { return hooks.ha(a, e, v); } : null };
+        ha: hooks.ha && !DESIGNER ? function (a, e, v) { return hooks.ha(a, e, v); } : null,
+        // Hold OK on an app inside a folder's full screen layer: the same menu as on the widget, for that app
+        hold: DESIGNER ? null : function (slot) { FORCE_SLOT = slot; holdMenu(); FORCE_SLOT = null; } };
     }
     function openDetail(el) {
       var root = el;
@@ -2172,7 +2259,7 @@
       openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes }, "Back to close");
     }
     // ---- changing a container's apps with the remote ----
-    var EDIT = null, MOVING = null;
+    var EDIT = null, MOVING = null, FORCE_SLOT = null;
     function appCtx() {
       var W = window.CouchWidgets, t = target();
       if (!t || DESIGNER || !W || !W.appKinds) return null;
@@ -2183,7 +2270,8 @@
       while (wrap && !(wrap.getAttribute && wrap.getAttribute("data-obj"))) wrap = wrap.parentNode;
       var id = wrap && wrap.getAttribute("data-obj"), o = list(D && D.objects).filter(function (x) { return obj(x).id === id; })[0];
       if (!o || o.type !== "widget" || W.appKinds().indexOf(o.kind) < 0) return null;
-      var s = t.getAttribute("data-slot");
+      var s = FORCE_SLOT !== null ? String(FORCE_SLOT) : t.getAttribute("data-slot");
+      FORCE_SLOT = null;
       return { o: o, id: id, kind: o.kind, slot: s === null ? null : s === "add" ? "add" : +s, keys: W.appKeys(o, wenv()), max: W.appMax(o.kind), name: t.getAttribute("data-name") || "" };
     }
     function saveKeys(ctx, keys) {
@@ -2354,6 +2442,8 @@
     nav: NAV,
     widgetMode: function () { return ROOT.classList.contains("cd-wmode"); },
     wkinds: function () { return WKINDS.slice(); },
+    // fonts: the CSS a design font name draws with, and which store files a design would load
+    fontOf: function (name) { return fontOf(name); }, fontsOf: function (d) { return fontsOf(sanitize(d)); },
     // the apps changed on this TV with the remote (Hold OK), by "<object id>|<kind>"
     appEdits: function () { return JSON.parse(JSON.stringify(EDITS)); },
     wact: function () { return WACT.slice(); },
@@ -2522,7 +2612,9 @@
       if (order.length) {
         var by = {};
         items.forEach(function (it) { if (it.package) by[it.package] = it; });
-        out = order.map(function (p) { return by[p]; }).filter(Boolean);
+        // an order may name catalogue ids (a shared home, app-catalogue.js): each becomes the app this TV has
+        var AC = window.CouchApps;
+        out = order.map(function (p) { if (by[p]) return by[p]; var r = AC && AC.get(p) ? AC.resolve(p, items) : null; return r && by[r.package] ? by[r.package] : null; }).filter(function (it, i, a) { return it && a.indexOf(it) === i; });
       }
       // the dock's own places are counted without the apps pulled out onto the screen: a Smart home
       // tile (or anything else app.js adds) may shorten the dock, but never drops a pulled out app

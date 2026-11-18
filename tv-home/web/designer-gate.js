@@ -53,17 +53,24 @@
     "img-src 'self' data: blob: https: http://tvos.invalid; media-src 'self' blob: https:; " +
     "connect-src 'self' https: http://127.0.0.1:* http://localhost:*; frame-src https://sdk.scdn.co; font-src 'self' data:; " +
     "object-src 'none'; base-uri 'none'; form-action 'none'";
+  // fonts named by a design (design.js) come only from the design store: font-src names that one
+  // origin and nothing else (never Google), on top of this page and data:
+  function policy(store) {
+    var C = typeof window !== "undefined" && window.CouchDesignCode, b = store !== undefined ? store : C && C.base ? C.base() : "";
+    b = /^https?:\/\/[a-z0-9.-]+(:\d{1,5})?$/i.test(b || "") ? b : "";
+    return POLICY.replace("font-src 'self' data:", "font-src 'self' data:" + (b ? " " + b : ""));
+  }
   function lockPage(doc) {
     doc = doc || (typeof document !== "undefined" ? document : null);
     if (!doc || !doc.head || doc.querySelector && doc.querySelector('meta[data-tvdesigner="policy"]')) return false;
     var m = doc.createElement("meta");
     m.setAttribute("http-equiv", "Content-Security-Policy");
-    m.setAttribute("content", POLICY);
+    m.setAttribute("content", policy());
     m.setAttribute("data-tvdesigner", "policy");
     doc.head.appendChild(m);
     return true;
   }
 
-  window.CouchDesigner = { KEY: KEY, DEFAULT_STORE: DEFAULT_STORE, DESIGNER_PAGE: DESIGNER_PAGE, POLICY: POLICY,
+  window.CouchDesigner = { KEY: KEY, DEFAULT_STORE: DEFAULT_STORE, DESIGNER_PAGE: DESIGNER_PAGE, POLICY: POLICY, policy: policy,
     decide: decide, readChoice: readChoice, lockPage: lockPage };
 })();
