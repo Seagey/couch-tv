@@ -31,6 +31,7 @@
     photos: "Photos", keep: "Keep watching", folder: "Apps", player: "Now playing", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre",
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up" };
 
+
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
   function kit() { return K || (K = window.CouchWidgets && window.CouchWidgets.kit); }
@@ -453,25 +454,60 @@
 
   // Control Centre, camera, headlines and scores: TV Designer shows what they will look like; a TV
   // shows their setup record (widgets.js draws them empty there, which opens B.setup)
+  // Control Centre: every switch big. OK switches one through the launcher (HomeAssistant.kt "set"),
+  // which only switches what config.json names and never opens a garage door, gate or door.
   B.controls = function (o, env) {
-    if (!env.demo) return B.setup(o, env);
-    var items = op(o).controls && op(o).controls.length ? op(o).controls : [{ icon: "light", name: "Lounge" }, { icon: "lamp", name: "Lamp" }, { icon: "pendant", name: "Kitchen" }, { icon: "blinds", name: "Blinds" }, { icon: "fan", name: "Ceiling fan" }, { icon: "outlet", name: "Heater" }, { icon: "speaker", name: "Speakers" }, { icon: "light-off", name: "Porch" }];
-    var on = items.map(function (x, i) { return i % 2 === 0; });
-    S.body.appendChild(head("home", op(o).label || "Control Centre", "", "#30d158"));
+    var H = kit().ha, demo = !!env.demo, info = H.haOf(env).info || {};
+    if (!demo && !(info.controls && info.controls.length)) return B.setup(o, env);
+    var copy = function (l) { return l ? l.map(function (c) { var x = {}; for (var k in c) x[k] = c[k]; return x; }) : null; };
+    var items = copy(H.controlsOf(env, o)), title = op(o).label || "Control Centre";
+    S.body.appendChild(head("home", title, "", "#30d158"));
     var grid = E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:36px");
+    S.body.appendChild(grid);
+    var reread = function () {
+      if (!S || demo || !S.api.ha) return;
+      S.readAt = Date.now();
+      S.api.ha("controls").then(function (r) {
+        if (!S || !r || !r.ok) { if (S && !items) { items = []; draw(); msg("Home Assistant is not answering"); } return; }
+        var want = op(o).switches, l = r.controls || [];
+        if (want && want.length) l = want.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
+        items = l; draw();
+      });
+    };
     var draw = function () {
+      var keep = S.stops[S.cur] && S.stops[S.cur].el.getAttribute("data-name");
       while (grid.firstChild) grid.removeChild(grid.firstChild);
       S.stops = [];
-      items.forEach(function (x, i) {
-        grid.appendChild(F(E("div", "cwd-toggle" + (on[i] ? " on" : ""), "", [E("div", "cwd-sic", "", [ic(x.icon, 44, on[i] ? "#1a1406" : "#fff", "solid")]), E("div", "cwd-mid cwd-ell", "", [x.name]), E("div", "cwd-small", "", [on[i] ? "On" : "Off"])]),
-          function () { on[i] = !on[i]; designerSays(); draw(); }, x.name));
+      if (!items) { S.subEl.textContent = "Checking Home Assistant"; return; }
+      (items || []).slice(0, 16).forEach(function (c) {
+        var on = c.ok !== false && c.on;
+        grid.appendChild(F(E("div", "cwd-toggle" + (on ? " on" : ""), c.ok === false ? "opacity:.6" : "", [E("div", "cwd-sic", "", [ic(c.icon || H.ctlIcon(c), 44, on ? "#1a1406" : "#fff", "solid")]),
+          E("div", "cwd-mid cwd-ell", "", [c.name || ""]), E("div", "cwd-small", "", [c.blocked ? H.ctlWord(c) + ", not from the TV" : H.ctlWord(c)])]), function () {
+          if (demo || S.api.designer) { c.on = !c.on; designerSays(); draw(); return; }
+          if (c.ok === false) return msg(c.name + " is not answering");
+          if (c.blocked) return msg("Garage doors, gates and doors are never opened from the TV");
+          if (!S.api.ha) return msg("Home Assistant is not set up on this TV");
+          var want = c.kind === "cover" ? (c.on ? "close" : "open") : (c.on ? "off" : "on");
+          c.on = !c.on; draw();
+          msg(c.name + (c.kind === "cover" ? (c.on ? " opening" : " closing") : c.on ? " on" : " off"));
+          S.api.ha("set", c.entity, want).then(function (r) {
+            if (!S) return;
+            if (!r || !r.ok) { c.on = !c.on; draw(); msg(r && r.error === "refused" ? "Home Assistant would not switch " + c.name : "Home Assistant did not answer. Try again."); }
+            setTimeout(reread, 1500);
+          });
+        }, c.name));
       });
-      S.subEl.textContent = on.filter(Boolean).length + " of " + items.length + " on";
+      S.subEl.textContent = !items.length ? "None of these switches is set up on this TV" : items.filter(function (c) { return c.ok !== false && c.on; }).length + " of " + items.length + " on";
+      var again = keep ? S.stops.map(function (s) { return s.el.getAttribute("data-name"); }).indexOf(keep) : -1;
+      S.cur = again >= 0 ? again : Math.min(S.cur || 0, Math.max(0, S.stops.length - 1));
       paint();
     };
-    S.body.appendChild(grid);
     draw();
+    S.redraw = draw;
+    S.tick = function () { if (Date.now() - (S.readAt || 0) > 10000) reread(); };
+    if (!demo) reread();
   };
+
   B.camera = function (o, env) {
     if (!env.demo) return B.setup(o, env);
     S.full = true;

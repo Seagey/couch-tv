@@ -105,6 +105,13 @@
   var PHOTOS_NEED = "Your photos on the TV, or one photo put in the widget";
   var WATCH_NEED = "The couch-tv TV app or a computer at home that stays on";
   var HA_NEED = "Home Assistant (a smart home app) running at home";
+  // the smart home widgets (group C): every one is set up once on a computer, then needs no computer
+  function haSteps(what) {
+    var after = [].slice.call(arguments, 1);
+    return { android: ["Needs Home Assistant, the smart home app, running at home.", "Whoever set up couch-tv adds your " + what + " once on a computer (setup guide, Smart home), then puts couch-tv on the TV again."].concat(after),
+      web: SMART_HOME.web.slice(), vidaa: SMART_HOME.vidaa.slice() };
+  }
+  var HA_PLAT = function () { return plat("setup", "no", "no", { android: "Set up once from a computer; after that no computer is needed.", web: "Smart home needs a Google TV, Android TV or Fire TV.", vidaa: "Smart home needs a Google TV, Android TV or Fire TV." }); };
 
   var C = {
     // ---------- time ----------
@@ -255,10 +262,10 @@
     scenes: { name: "Scenes", status: "setup", what: "Your Home Assistant scenes as big buttons (Movie night, Goodnight)", needs: [HA_NEED, "Your scenes added once on a computer"],
       setup: setup("computer", SMART_HOME), until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "OK on a button runs it. On a tile, OK opens every button", platforms: plat("setup", "no", "no", { android: "Set up once from a computer; after that no computer is needed.", web: "Smart home needs a Google TV, Android TV or Fire TV.", vidaa: "Smart home needs a Google TV, Android TV or Fire TV." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
-    controls: { name: "Control Centre", status: "not-built", what: "Lights, lamps and blinds as switches", needs: ["Needs couch-tv to switch lights and blinds (today it does aircon and scenes)"],
-      setup: setup("nothing", ["Nothing to set up yet.", "Until then: put your lights in a Home Assistant scene and use the Scenes widget."]), until: "\"Control Centre: not on couch-tv yet\", and what it needs",
-      build: "HomeAssistant.kt has to allow light, switch, cover and fan entities named in config.json (turn on, off, open, close), with the page asking for them as it asks for climate. Locks stay out on purpose: nothing that opens the house from a TV remote.",
-      ok: "Opens Control Centre: every switch big (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "medium", "wide", "large"], [2, 2]) },
+    controls: { name: "Control Centre", status: "setup", what: "Lights, switches, fans and blinds as big switches", needs: [HA_NEED, "Your lights and switches added once on a computer"],
+      setup: setup("computer", haSteps("lights, switches, fans and blinds (up to 16)", "Press Home: your switches show here. OK opens them big, and OK on one switches it.", "Locks, alarms, garage doors and gates never show: nothing that opens the house from a TV remote.")),
+      until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      ok: "Opens Control Centre: every switch big, OK on one switches it", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "medium", "wide", "large"], [2, 2]) },
     camera: { name: "Camera", status: "not-built", what: "A picture from a camera, new every few seconds", needs: ["Needs couch-tv to bring camera pictures into the home"],
       setup: setup("nothing", ["Nothing to set up yet.", "The doorbell pop up already works: it shows the door camera over everything when someone rings (set up once on a computer)."]),
       until: "\"Camera: not on couch-tv yet\", and what it needs",

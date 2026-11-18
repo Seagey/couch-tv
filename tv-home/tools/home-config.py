@@ -30,7 +30,16 @@ ENTITY = {
     "scenes": re.compile(r"^(scene|script)\.[a-z0-9_]{1,64}$"),
     "doorbell": re.compile(r"^(binary_sensor|input_boolean|event)\.[a-z0-9_]{1,64}$"),
     "camera": re.compile(r"^camera\.[a-z0-9_]{1,64}$"),
+    # the smart home widgets (Control Centre, camera, sensor, energy, speakers). Never lock.*,
+    # alarm_control_panel.* or anything else that opens the house: those are refused here and on the TV
+    "controls": re.compile(r"^(light|switch|fan|cover)\.[a-z0-9_]{1,64}$"),
+    "cameras": re.compile(r"^camera\.[a-z0-9_]{1,64}$"),
+    "sensors": re.compile(r"^sensor\.[a-z0-9_]{1,64}$"),
+    "speakers": re.compile(r"^media_player\.[a-z0-9_]{1,64}$"),
 }
+# a garage door, gate or front door as a switch or blind: refused by its name too (the TV also refuses
+# a blind Home Assistant calls a garage door, gate or door, whatever its name)
+OPENS_THE_HOUSE = re.compile(r"^(cover|switch)\.(.*_)?(garage|gate|door|doors|lock|alarm)(_.*)?$")
 
 
 def smart_home():
@@ -58,6 +67,9 @@ def smart_home():
             if not ENTITY[key].match(ent):
                 print(f"home-config: skipping {key} entry {ent or '(empty)'!r}: not a {key} entity id", file=sys.stderr)
                 continue
+            if key == "controls" and OPENS_THE_HOUSE.search(ent):
+                print(f"home-config: skipping {ent!r}: nothing that opens the house goes on the TV", file=sys.stderr)
+                continue
             out.append({"entity": ent, "name": str(x.get("name") or "").strip()[:40]})
         return out[:most]
 
@@ -70,9 +82,35 @@ def smart_home():
                   "camera must be camera.", file=sys.stderr)
         else:
             out["doorbell"] = {"entity": ent, "camera": cam, "name": str(bell.get("name") or "").strip()[:40]}
-    if not out["climate"] and not out["scenes"] and "doorbell" not in out:
+    for key, most in (("controls", 16), ("cameras", 4), ("sensors", 8), ("speakers", 6)):
+        found = named(key, most)
+        if found:
+            out[key] = found
+    energy = ha.get("energy")
+    if isinstance(energy, dict) and energy.get("entity"):
+        ent, bat = str(energy.get("entity")).strip(), str(energy.get("battery") or "").strip()
+        if not ENTITY["sensors"].match(ent) or (bat and not ENTITY["sensors"].match(bat)):
+            print("home-config: skipping energy: entity and battery must be sensor.", file=sys.stderr)
+        else:
+            out["energy"] = {"entity": ent, "name": str(energy.get("name") or "").strip()[:40]}
+            if bat:
+                out["energy"]["battery"] = bat
+    if not out["climate"] and not out["scenes"] and not any(k in out for k in ("doorbell", "controls", "cameras", "sensors", "speakers", "energy")):
         return None
     return out
+
+
+def summary(ha):
+    """The one line apply.sh prints: what is set up, never the address or the token."""
+    parts = [f"{len(ha['climate'])} climate", f"{len(ha['scenes'])} scenes"]
+    for key, word in (("controls", "controls"), ("cameras", "cameras"), ("sensors", "sensors"), ("speakers", "speakers")):
+        if ha.get(key):
+            parts.append(f"{len(ha[key])} {word}")
+    if "energy" in ha:
+        parts.append("energy")
+    if "doorbell" in ha:
+        parts.append("doorbell")
+    return "smart home: " + ", ".join(parts)
 
 
 if "--key" in sys.argv:
@@ -84,8 +122,7 @@ if "--ha" in sys.argv:
     ha = smart_home()
     if "--check" in sys.argv:
         if ha:
-            print(f"smart home: {len(ha['climate'])} climate, {len(ha['scenes'])} scenes"
-                  + (", doorbell" if "doorbell" in ha else ""))
+            print(summary(ha))
             if "doorbell" in ha:
                 print("doorbell")
         else:

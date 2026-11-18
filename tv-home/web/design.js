@@ -329,6 +329,17 @@
     card: "label text icon", quote: "text sub", word: "", news: "", sports: "label", stocks: "", commute: "",
     welcome: "kicker text sub align", quick: "quick align", wifi: "", guide: "", screentime: "", stack: ""
   };
+  // The smart home and music widgets: which of the TV's own Home Assistant things a widget shows,
+  // named by entity id only (never a reading, a state or an address). A TV shows one only when it is
+  // also named in that TV's config.json; anything else in a design is dropped here.
+  function haId(re) { return function (v) { return typeof v === "string" && v.length <= 80 && re.test(v) ? v : undefined; }; }
+  OPT.switches = function (v) { return SAN.list(v, 16, haId(/^(light|switch|fan|cover)\.[a-z0-9_]{1,64}$/)); };
+  OPT.cam = haId(/^camera\.[a-z0-9_]{1,64}$/);
+  OPT.reading = haId(/^sensor\.[a-z0-9_]{1,64}$/);
+  OPT.players = function (v) { return SAN.list(v, 6, haId(/^media_player\.[a-z0-9_]{1,64}$/)); };
+  // align: centred unless the design says left or right (seagey, 18 Nov 2026)
+  WOPT.controls = "label controls cols switches align"; WOPT.camera = "label cam align"; WOPT.doorbell = "label align"; WOPT.energy = "label align";
+  WOPT.sensor = "label reading align"; WOPT.speakers = "label players align"; WOPT.queue = "label align";
   function sanWStyle(src) {
     src = obj(src);
     var out = {};

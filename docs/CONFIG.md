@@ -474,6 +474,22 @@ HOME_ASSISTANT_TOKEN=<the long-lived token>
 | `climate` | Up to 8 air conditioners or heaters (`climate.*` entities), in the order shown. `name` is optional (else Home Assistant's own name). |
 | `scenes` | Up to 10 scenes or scripts (`scene.*`, `script.*`), shown as tiles that run on OK. This is also the way to put lights, blinds or anything else on the TV: make a scene or script for it in Home Assistant. |
 | `doorbell` | `entity`: what rings, one of `event.*` (most doorbells, a new event per press), `binary_sensor.*` or `input_boolean.*` (on while ringing). `camera` (optional): a `camera.*` for the still picture. `name` (optional): the card's title. |
+| `controls` | Up to 16 lights, switches, fans and blinds (`light.*`, `switch.*`, `fan.*`, `cover.*`) for a design's **Control Centre** widget. Never a lock, an alarm, a garage door or a gate: `lock.*` and `alarm_control_panel.*` are refused, so is a `cover.*` or `switch.*` whose id says garage, gate, door or lock, and on the TV a blind Home Assistant calls a garage door, gate or door is shown but never switched. |
+| `cameras` | Up to 4 cameras (`camera.*`) for the **Camera** widget: a still picture, new every 2 seconds, never video. |
+| `sensors` | Up to 8 sensors (`sensor.*`, the pool, a rain gauge, humidity) for the **Sensor** widget: the reading and its last 24 hours. |
+| `energy` | One sensor for the **Solar and energy** widget: `entity`, either today's energy total (kWh or Wh, the kind that counts up through the day) or power (W or kW); `name` (optional); `battery` (optional): a home battery's charge in %. |
+| `speakers` | Up to 6 speakers (`media_player.*`, anything Home Assistant plays on: Sonos, Google, others) for the **Speakers** widget: what each plays, its volume, louder, quieter, play and pause. |
+
+Each takes `{ "entity": "...", "name": "..." }` (the name is optional, else Home Assistant's own), the
+same as `climate`. For example:
+
+```json
+"controls": [{ "entity": "light.lounge", "name": "Lounge" }, { "entity": "cover.blinds", "name": "Blinds" }],
+"cameras": [{ "entity": "camera.backyard", "name": "Backyard" }],
+"sensors": [{ "entity": "sensor.pool_temperature", "name": "Pool" }],
+"energy": { "entity": "sensor.solar_energy_today", "name": "Solar", "battery": "sensor.home_battery" },
+"speakers": [{ "entity": "media_player.kitchen", "name": "Kitchen" }]
+```
 
 **Make a separate Home Assistant user for the TV**, and make the token as that user: in Home
 Assistant, Settings, People, add a user (not an administrator), log in as it once, then its
@@ -490,6 +506,10 @@ app, and the app only allows these, for the entities named here and nothing else
   mode (only modes it lists), or switch it on or off
 - run a listed scene or script
 - for the doorbell: read the doorbell entity, and the named camera's still picture
+- for a design's widgets: read and switch a listed control (on, off, open, close; never a garage
+  door, gate or door), read a listed sensor and its last 24 hours, read the energy sensor's history
+  for today, read a listed speaker and set its volume or play and pause it, get a still from a listed
+  camera, and read when the doorbell last rang
 
 Every call goes to `url` only, never follows a redirect, and gives up after a few seconds, so a
 Home Assistant that is off never holds the TV up. Change `config.json` and run `apply.sh` again to
@@ -512,9 +532,22 @@ and takes it back if you remove the doorbell later. `undo.sh` takes it back too.
 video, only stills, and no sound. The card only shows while the couch-tv app is running, which is
 normally all the time because it is the home screen.
 
-**Not supported yet:** live camera video, locks and alarms (on purpose: nothing that opens the house
-from a TV remote), single lights or switches as their own buttons (use a scene or a script), and
-anything outside Home Assistant.
+**The smart home widgets** (couch-tv Studio designs: Control Centre, Camera, Doorbell, Solar and
+energy, Sensor, Speakers). Each shows only what this section lists; a design can only pick among
+them by entity id, and a TV without them shows the widget's set up card instead. They are asked only
+while a widget for them is on the home and the home is in front, never while an app plays: switches
+and speakers every 10 seconds, the doorbell every 8, sensors every minute and their last 24 hours
+every 15 minutes, energy every 5 minutes, and a camera's still every 2 seconds (stills only, kept in
+memory, never saved or sent anywhere). The Doorbell widget shows when it last rang (Home Assistant's
+own record, or the ring this TV saw), with the still the TV kept from that ring while the card was up
+(in memory only, gone when the app restarts), else the door camera now. Energy and sensor history
+come from Home Assistant's history, so a sensor Home Assistant does not record shows no curve, and
+one that writes many times a second may be too much to draw (it then says so).
+
+**Not supported:** live camera video, locks, alarms, garage doors and gates (on purpose: nothing that
+opens the house from a TV remote), and anything outside Home Assistant. On Samsung, LG, Hisense
+VIDAA and the other web TVs there is no smart home at all: it needs a Google TV, Android TV or Fire
+TV.
 
 Preview with no TV and no Home Assistant: `?mock=1&ha=1` (see the end of this page). The doorbell
 card is drawn by the app itself, so it cannot be previewed in a browser.

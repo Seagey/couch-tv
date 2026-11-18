@@ -26,7 +26,12 @@ import java.util.concurrent.Executors
  * and only these are allowed, each for the entities named in config.json and nothing else:
  *   read the state of a named climate entity, change its temperature or mode, switch it on or
  *   off, and run a named scene or script. The doorbell (Doorbell.kt) also reads the named
- *   doorbell entity and the named camera's still picture. Every call goes to the configured
+ *   doorbell entity and the named camera's still picture. The smart home widgets (widgets.js,
+ *   through smarthome.js) may also: read and switch a named light, switch, fan or blind (on, off,
+ *   open, close; a garage door, gate or door blind is read but never switched), read a named
+ *   sensor and its last 24 hours by the hour, read today's energy by the hour, read a named
+ *   speaker and set its volume or play and pause it, get a still from a named camera (never
+ *   video), and read when the doorbell last rang. Every call goes to the configured
  *   address only, never follows a redirect, and gives up after a few seconds, so a Home Assistant
  *   that is off never holds anything up. The token is never logged.
  */
@@ -37,12 +42,21 @@ object HomeAssistant {
 
     class Named(val entity: String, val name: String)
     class Bell(val entity: String, val camera: String?, val name: String)
-    class Settings(val base: String, val token: String, val climate: List<Named>, val scenes: List<Named>, val doorbell: Bell?)
+    // the energy widget: one energy total (kWh) or power (W) sensor, and a home battery's charge if there is one
+    class Energy(val entity: String, val name: String, val battery: String?)
+    class Settings(val base: String, val token: String, val climate: List<Named>, val scenes: List<Named>, val doorbell: Bell?,
+                   val controls: List<Named> = emptyList(), val cameras: List<Named> = emptyList(), val sensors: List<Named> = emptyList(),
+                   val energy: Energy? = null, val speakers: List<Named> = emptyList())
 
     private val CLIMATE = Regex("climate\\.[a-z0-9_]{1,64}")
     private val SCENE = Regex("(scene|script)\\.[a-z0-9_]{1,64}")
     private val BELL = Regex("(binary_sensor|input_boolean|event)\\.[a-z0-9_]{1,64}")
     private val CAMERA = Regex("camera\\.[a-z0-9_]{1,64}")
+    // Control Centre: lights, switches, fans and blinds. Never lock.*, alarm_control_panel.* or anything
+    // else that opens the house; a cover that is a garage door, gate or door reads but is never switched.
+    private val CONTROL = Regex("(light|switch|fan|cover)\\.[a-z0-9_]{1,64}")
+    private val SENSOR = Regex("sensor\\.[a-z0-9_]{1,64}")
+    private val SPEAKER = Regex("media_player\\.[a-z0-9_]{1,64}")
     private val TOKEN = Regex("[A-Za-z0-9._-]{20,1024}")
     private val MODES = listOf("off", "heat", "cool", "heat_cool", "auto", "dry", "fan_only")
 
@@ -99,8 +113,18 @@ object HomeAssistant {
             if (!BELL.matches(ent) || (cam != null && !CAMERA.matches(cam))) null
             else Bell(ent, cam, b.optString("name").trim().take(40))
         }
-        return Settings(base, token, list("climate", CLIMATE, 8), list("scenes", SCENE, 10), bell)
+        val energy = o.optJSONObject("energy")?.let { e ->
+            val ent = e.optString("entity").trim()
+            val bat = e.optString("battery").trim().takeIf { it.isNotEmpty() }
+            if (!SENSOR.matches(ent) || (bat != null && !SENSOR.matches(bat))) null
+            else Energy(ent, e.optString("name").trim().take(40), bat)
+        }
+        return Settings(base, token, list("climate", CLIMATE, 8), list("scenes", SCENE, 10), bell,
+            list("controls", CONTROL, 16), list("cameras", CAMERA, 4), list("sensors", SENSOR, 8), energy, list("speakers", SPEAKER, 6))
     }
+
+    /** Parsed for tests (HomeAssistantTest): the same checks readExtras makes. */
+    internal fun parseForTest(o: JSONObject): Settings? = parse(o)
 
     /** http(s)://host[:port][/path], nothing else: no user name, no query, no fragment. */
     private fun cleanBase(u: String): String? = try {
@@ -115,8 +139,12 @@ object HomeAssistant {
 
     // ---------------------------------------------------------------- talking to Home Assistant
 
+    /** Tests put a pretend Home Assistant here (HomeAssistantTest); the app never sets it. */
+    @Volatile internal var fake: ((method: String, path: String, body: JSONObject?) -> Pair<Int, ByteArray?>)? = null
+
     /** One call. Returns the status code and the body (at most [limit] bytes), or -1 when it failed. */
     private fun call(s: Settings, method: String, path: String, body: JSONObject?, limit: Int): Pair<Int, ByteArray?> {
+        fake?.let { f -> return f(method, path, body).let { (code, b) -> if (b != null && b.size > limit) -1 to null else code to b } }
         var c: HttpURLConnection? = null
         return try {
             c = URL(s.base + path).openConnection() as HttpURLConnection
@@ -160,6 +188,12 @@ object HomeAssistant {
     /** The doorbell camera's still picture, shrunk to about [width] pixels wide. */
     fun snapshot(s: Settings, width: Int): Bitmap? {
         val cam = s.doorbell?.camera ?: return null
+        return snapshot(s, cam, width)
+    }
+
+    /** A named camera's still picture (only a camera in config.json), shrunk to about [width] pixels wide. */
+    fun snapshot(s: Settings, cam: String, width: Int): Bitmap? {
+        if (s.cameras.none { it.entity == cam } && s.doorbell?.camera != cam) return null
         val (code, bytes) = call(s, "GET", "/api/camera_proxy/$cam", null, 6 * 1024 * 1024)
         if (code != 200 || bytes == null) return null
         return try {
@@ -243,9 +277,129 @@ object HomeAssistant {
                 val sc = s.scenes.firstOrNull { it.entity == entity } ?: return refused
                 done(service(s, sc.entity.substringBefore('.'), "turn_on", id))
             }
-            else -> refused
+            else -> widgets(s, action, entity, value) ?: refused
         }
     }
+
+    // ---------------------------------------------------------------- the smart home widgets
+
+    // What was last read for each control (is it a garage door?) and speaker (can its volume be
+    // set?), to check a switch or a volume against: nothing is switched that was not read first.
+    private val readControls = ConcurrentHashMap<String, Boolean>()
+    private val readSpeakers = ConcurrentHashMap<String, JSONObject>()
+    internal var clock: () -> Long = { System.currentTimeMillis() }
+    private const val HOUR = 3_600_000L
+
+    private fun hx(l: List<Named>) = l.map { HaReadings.Named(it.entity, it.name) }
+
+    /** One entity's history between two times, as (time, state), or null when Home Assistant did not answer. */
+    private fun history(s: Settings, entity: String, from: Long, to: Long, limit: Int): List<Pair<Long, String>>? {
+        val path = "/api/history/period/" + HaReadings.isoUtc(from) + "?filter_entity_id=" + entity +
+            "&end_time=" + HaReadings.isoUtc(to) + "&minimal_response&no_attributes"
+        val (code, bytes) = call(s, "GET", path, null, limit)
+        if (code != 200 || bytes == null) return null
+        return try { HaReadings.points(JSONArray(String(bytes, Charsets.UTF_8))) } catch (e: Exception) { null }
+    }
+
+    private fun widgets(s: Settings, action: String, entity: String, value: String): JSONObject? {
+        val failed = JSONObject().put("ok", false).put("error", "failed")
+        val refused = JSONObject().put("ok", false).put("error", "refused")
+        val done = { ok: Boolean -> if (ok) JSONObject().put("ok", true) else failed }
+        val id = JSONObject().put("entity_id", entity)
+        return when (action) {
+            "controls" -> JSONObject().put("ok", true).put("controls", JSONArray(hx(s.controls).map { n ->
+                HaReadings.control(n, state(s, n.entity)).also { r -> if (r.optBoolean("ok")) readControls[n.entity] = r.optBoolean("blocked") }
+            }))
+            "set" -> {
+                if (s.controls.none { it.entity == entity }) return refused
+                val blocked = readControls[entity] ?: return refused   // read it first
+                val (domain, svc) = HaReadings.service(entity, value, blocked) ?: return refused
+                done(service(s, domain, svc, id))
+            }
+            "sensors" -> JSONObject().put("ok", true).put("sensors", JSONArray(hx(s.sensors).map { HaReadings.sensor(it, state(s, it.entity)) }))
+            "history" -> {
+                if (s.sensors.none { it.entity == entity }) return refused
+                val now = clock()
+                val start = now / HOUR * HOUR - 23 * HOUR   // 24 hours, the last one is this hour
+                val p = history(s, entity, start, now, 6 * 1024 * 1024) ?: return failed
+                JSONObject().put("ok", true).put("start", start).put("points", HaReadings.series(HaReadings.hourlyMeans(p, start, 24)))
+            }
+            "energy" -> {
+                val e = s.energy ?: return refused
+                val st = state(s, e.entity) ?: return failed
+                val unit = st.optJSONObject("attributes")?.optString("unit_of_measurement").orEmpty()
+                val now = clock()
+                val start = HaReadings.midnight(now)
+                val p = history(s, e.entity, start, now, 6 * 1024 * 1024) ?: return failed
+                val hours = HaReadings.energyHours(p, start, now, unit) ?: return JSONObject().put("ok", false).put("error", "unit")
+                val o = JSONObject().put("ok", true).put("name", e.name.ifEmpty { st.optJSONObject("attributes")?.optString("friendly_name").orEmpty().take(40) })
+                    .put("start", start).put("hours", HaReadings.series(hours)).put("total", Math.round(hours.sumOf { it ?: 0.0 } * 100) / 100.0)
+                if (unit.trim() in listOf("W", "kW", "MW")) st.optString("state").toDoubleOrNull()?.takeIf { it.isFinite() }?.let { o.put("power", it).put("power_unit", unit.trim()) }
+                e.battery?.let { b -> state(s, b)?.optString("state")?.toDoubleOrNull()?.takeIf { it.isFinite() }?.let { o.put("battery", Math.round(it).toInt().coerceIn(0, 100)) } }
+                o
+            }
+            "speakers" -> JSONObject().put("ok", true).put("speakers", JSONArray(hx(s.speakers).map { n ->
+                HaReadings.speaker(n, state(s, n.entity)).also { r -> if (r.optBoolean("ok")) readSpeakers[n.entity] = r }
+            }))
+            "volume" -> {
+                if (s.speakers.none { it.entity == entity }) return refused
+                val r = readSpeakers[entity] ?: return refused   // read it first
+                if (!r.optBoolean("can_volume")) return refused
+                val v = value.toIntOrNull()?.coerceIn(0, 100) ?: return refused
+                done(service(s, "media_player", "volume_set", id.put("volume_level", v / 100.0)))
+            }
+            "playpause" -> {
+                if (s.speakers.none { it.entity == entity }) return refused
+                val r = readSpeakers[entity] ?: return refused
+                if (!r.optBoolean("can_pause")) return refused
+                done(service(s, "media_player", "media_play_pause", id))
+            }
+            "bell" -> {
+                val bell = s.doorbell ?: return refused
+                val st = state(s, bell.entity) ?: return failed
+                val state = st.optString("state")
+                val now = clock()
+                var ringing = false
+                val fromHa = when {
+                    bell.entity.startsWith("event.") -> HaReadings.parseTime(state)
+                    state == "on" -> { ringing = true; HaReadings.parseTime(st.optString("last_changed")) }
+                    // off now: when it last turned on, from the last week of its history (a small answer)
+                    else -> history(s, bell.entity, now - 7 * 24 * HOUR, now, 512 * 1024)?.let { HaReadings.lastOn(it) }
+                }
+                val seen = DoorbellKept.at.takeIf { it > 0 }
+                val at = listOfNotNull(fromHa, seen).maxOrNull()
+                val friendly = st.optJSONObject("attributes")?.optString("friendly_name").orEmpty()
+                JSONObject().put("ok", true).put("name", bell.name.ifEmpty { friendly.take(40) }).put("ringing", ringing)
+                    .put("camera", bell.camera != null).put("kept", DoorbellKept.still != null).apply { if (at != null) put("at", at) }
+            }
+            "still" -> {
+                // "doorbell": the doorbell's own camera (the page knows only that there is one)
+                val cam = if (entity == "doorbell") s.doorbell?.camera ?: return refused else entity
+                if (s.cameras.none { it.entity == cam } && s.doorbell?.camera != cam) return refused
+                val w = value.toIntOrNull()?.coerceIn(160, 1280) ?: 640
+                val bmp = snapshot(s, cam, w) ?: return failed
+                JSONObject().put("ok", true).put("src", jpeg(bmp, w))
+            }
+            "ringstill" -> {
+                if (s.doorbell == null) return refused
+                val b = DoorbellKept.still ?: return JSONObject().put("ok", false).put("error", "none")
+                JSONObject().put("ok", true).put("src", "data:image/jpeg;base64," + android.util.Base64.encodeToString(b, android.util.Base64.NO_WRAP))
+                    .put("at", DoorbellKept.stillAt)
+            }
+            else -> null
+        }
+    }
+
+    /** A still as a picture the page can draw, kept in memory only: never written anywhere. */
+    private fun jpeg(bmp: Bitmap, width: Int): String {
+        val b = if (bmp.width > width) Bitmap.createScaledBitmap(bmp, width, Math.max(1, bmp.height * width / bmp.width), true) else bmp
+        val out = ByteArrayOutputStream()
+        b.compress(Bitmap.CompressFormat.JPEG, 72, out)
+        return "data:image/jpeg;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+    }
+
+    /** The page's question, answered as the launcher would (tests: HomeAssistantTest). */
+    internal fun answerForTest(s: Settings?, action: String, entity: String, value: String): JSONObject = answer(s, action, entity, value)
 
     /**
      * window.TVHA on the page. info() says what is set up (names only, no address, no token);
@@ -264,7 +418,11 @@ object HomeAssistant {
             val s = settings(app) ?: return "{}"
             fun names(l: List<Named>) = JSONArray(l.map { JSONObject().put("entity", it.entity).put("name", it.name.ifEmpty { pretty(it.entity) }) })
             return JSONObject().put("climate", names(s.climate)).put("scenes", names(s.scenes))
-                .put("doorbell", s.doorbell != null).toString()
+                .put("doorbell", s.doorbell != null)
+                // the smart home widgets: names only, the same as above
+                .put("controls", names(s.controls)).put("cameras", names(s.cameras)).put("sensors", names(s.sensors))
+                .put("speakers", names(s.speakers)).put("energy", s.energy != null)
+                .put("doorbell_camera", s.doorbell?.camera != null).toString()
         }
 
         @JavascriptInterface

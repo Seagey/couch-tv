@@ -5216,7 +5216,7 @@
       },
       // the detail layers (widget-detail.js) ask Home Assistant through smarthome.js, never directly
       ha: function (action, entity, value) {
-        if (!window.smartHome || !window.smartHome.request || !window.smartHome.available()) return Promise.resolve({ ok: false, error: "off" });
+        if (!window.smartHome || !window.smartHome.request || !(window.smartHome.enabled || window.smartHome.available)()) return Promise.resolve({ ok: false, error: "off" });
         return window.smartHome.request(action, entity, value);
       },
       // OK on a widget: open the app, the show, the smart home, a quick button
