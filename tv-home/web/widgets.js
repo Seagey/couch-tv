@@ -1211,7 +1211,8 @@
   function webOf(env, src, id) { var w = dataOf(env).web; return w && w[src] && Object.prototype.hasOwnProperty.call(w[src], id) ? w[src][id] : null; }
   // the plain words for each web widget: [still asking, could not read it, nothing there, no relay on this TV]
   var WEB_WORDS = {
-    news: ["Getting the headlines", "The headlines could not be read just now", "No headlines in this feed right now", "Headlines need a home computer or a newer couch-tv"]
+    news: ["Getting the headlines", "The headlines could not be read just now", "No headlines in this feed right now", "Headlines need a home computer or a newer couch-tv"],
+    sports: ["Getting the scores", "The scores could not be read just now", "No games right now", "Scores need a newer couch-tv"]
   };
   // true when rec has something to draw; otherwise draws the honest state and says false
   function webReady(root, b, iconName, kind, rec) {
@@ -1243,15 +1244,61 @@
           E("div", "cw-t29", "font-weight:640;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden", [x.title])]);
       }))]);
   };
+  // Scores: one league's round from ESPN's public scoreboard (widget-web.js), live games first, then
+  // the household's team (opts.team), then results, then what is next
+  var DEMO_GAMES = [["Titans", "GLD", "#00a6e2", "24", "Broncos", "BRI", "#7c1d3f", "18", "post", "Full time"], ["Rabbitohs", "SOU", "#00843d", "12", "Roosters", "SYD", "#002b5c", "12", "in", "62 min"],
+    ["Storm", "MEL", "#592c82", "6", "Raiders", "CAN", "#6bbe45", "0", "in", "21 min"], ["Sharks", "CRO", "#00a9d8", "", "Eels", "PAR", "#ffcc00", "", "pre", ""], ["Dolphins", "DOL", "#e0262c", "", "Cowboys", "NQL", "#002b5c", "", "pre", ""]];
+  function demoScores() {
+    var t = now().getTime();
+    return { league: "NRL", round: "Round 3", games: DEMO_GAMES.map(function (x, i) {
+      return { id: "d" + i, at: t + (i - 2) * 3600000, state: x[8], detail: x[9], teams: [{ name: x[0], abbr: x[1], colour: x[2], score: x[3], win: x[8] === "post" && +x[3] > +x[7], home: true }, { name: x[4], abbr: x[5], colour: x[6], score: x[7], win: x[8] === "post" && +x[7] > +x[3] }] };
+    }) };
+  }
+  function scoresOf(root, o, b, env) {
+    var WW = window.CouchWidgetWeb, q = op(o), id = WW ? WW.leagueOf(q.league) : "nrl", v;
+    if (env.demo) v = demoScores();
+    else { var rec = webOf(env, "sports", id); if (!webReady(root, b, "tv", "sports", rec)) return null; v = rec.v || { games: [] }; v.stale = !!rec.stale; }
+    var name = q.label || v.league || "Scores";
+    if (!v.games || !v.games.length) { empty(root, b, "tv", "No " + (v.league || "") + " games this week", "Scores show here when the next round starts"); return null; }
+    return { name: name, round: v.round || "", stale: v.stale, games: WW ? WW.scoreOrder(v.games, q.team, now().getTime()) : v.games };
+  }
+  // a result in plain words: "Full time", "Full time, extra time", "Full time, penalties"
+  var FULL = { ot: "extra time", aet: "extra time", pens: "penalties", so: "a shoot out" };
+  function resultWords(d) {
+    var m = /^(final|ft|full time)(\/(\w+))?$/i.exec(String(d || "").trim());
+    if (!d || m && !m[3]) return "Full time";
+    if (m) return "Full time, " + (FULL[m[3].toLowerCase()] || (/^\d+ot$/i.test(m[3]) ? "extra time" : m[3]));
+    return d;
+  }
+  // what a game's status line says: live and how far in, the result, or when it starts (the TV's time)
+  function gameStatus(g, env) {
+    if (g.state === "in") return { text: g.detail && !/^(in progress|live)$/i.test(g.detail) ? "Live, " + g.detail : "Live", live: true };
+    if (g.state === "post") return { text: resultWords(g.detail) };
+    var WW = window.CouchWidgetWeb;
+    return { text: WW ? WW.kickoff(g.at, now().getTime(), env && env.clock24) : "" };
+  }
+  // a cricket score keeps its runs and wickets on a widget ("460/7"); the overs are in the layer
+  function shortScore(s) { s = String(s || ""); var i = s.indexOf(" ("); return i > 0 ? s.slice(0, i) : s; }
+  function teamRow(t, g, big) {
+    var dim = g.state === "post" && !t.win, fw = g.state === "post" && t.win ? 740 : 560;
+    return E("div", "cw-row cw-sp", "min-width:0", [E("div", "cw-row", "min-width:0;flex:1", [E("i", "", "display:block;flex:none;width:22px;height:22px;border-radius:11px;margin-right:12px;box-shadow:0 0 0 3px rgba(255,255,255,.18);background:" + (t.colour || "rgba(255,255,255,.35)")),
+      E("span", (big ? "cw-t29" : "cw-t25") + " cw-ell", "font-weight:" + fw + ";opacity:" + (dim ? 0.7 : 1), [t.name || t.abbr])]),
+      E("span", big ? "cw-t29" : "cw-t25", "margin-left:12px;font-weight:720;white-space:nowrap;opacity:" + (dim ? 0.7 : 1), [shortScore(t.score)])]);
+  }
+  function gameBlock(g, env) {
+    var st = gameStatus(g, env);
+    return E("div", "cw-col", "padding:12px 18px;border-radius:22px;min-width:0;background:rgba(255,255,255," + (g.mine ? ".16" : ".08") + ")", [teamRow(g.teams[0], g, true), E("div", "", "height:6px"), teamRow(g.teams[1], g, true),
+      E("div", "cw-t23 cw-ell", "margin-top:6px;font-weight:700;color:" + (st.live ? "#ff453a" : "var(--sub)"), [st.text])]);
+  }
   R.sports = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "tv", "sports");
-    var m = [["Titans", "GLD", "#00a6e2", 24, "Broncos", "BRI", "#7c1d3f", 18, "FT"], ["Rabbitohs", "SOU", "#00843d", 12, "Roosters", "SYD", "#002b5c", 12, "62'"], ["Storm", "MEL", "#592c82", 6, "Raiders", "CAN", "#6bbe45", 0, "21'"], ["Sharks", "CRO", "#00a9d8", 0, "Eels", "PAR", "#ffcc00", 0, "7:50"]];
-    var n = Math.max(1, Math.floor((b.h - 60) / 200));
-    var team = function (nm, c, col, s, win) { void c; return E("div", "cw-row cw-sp", "", [E("div", "cw-row", "", [E("i", "", "display:block;width:28px;height:28px;border-radius:14px;background:" + col + ";margin-right:14px;box-shadow:0 0 0 3px rgba(255,255,255,.18)"), E("span", "cw-t29", "font-weight:" + (win ? 720 : 520), [nm])]), E("span", "cw-t38", "opacity:" + (win ? 1 : 0.6), [String(s)])]); };
-    add(root, [E("div", "cw-row cw-sp", "", [lab("tv", op(o).label || "NRL"), E("div", "cw-t23", "", ["Today"])]), E("div", "cw-col cw-grow", "margin-top:16px;justify-content:space-between", m.slice(0, n).map(function (x) {
-      return E("div", "cw-col", "padding:16px 20px;border-radius:24px;background:rgba(255,255,255,.08)", [team(x[0], x[1], x[2], x[3], x[3] >= x[7]), E("div", "", "height:10px"), team(x[4], x[5], x[6], x[7], x[7] >= x[3]),
-        E("div", "cw-t23", "margin-top:10px;font-weight:700;color:" + (x[8] === "FT" ? "var(--sub)" : "#ff453a"), [x[8] === "FT" ? "Full time" : "Live " + x[8]])]);
-    }))]);
+    var V = scoresOf(root, o, b, env);
+    if (!V) return;
+    var cols = b.w >= 700 ? 2 : 1, rows = clamp(Math.floor((b.h - 56) / 150), 1, 6), n = Math.min(V.games.length, cols * rows), cw = (b.w - 48 - (cols - 1) * 16) / cols;
+    var live = V.games.some(function (g) { return g.state === "in"; });
+    add(root, [E("div", "cw-row cw-sp", "", [lab("tv", V.name), E("div", "cw-t23", "font-weight:700;white-space:nowrap;margin-left:12px;" + (live ? "color:#ff453a" : ""), [V.stale ? "Not updated lately" : live ? "Live now" : V.round])]),
+      E("div", "cw-row", "flex:1;min-height:0;margin-top:14px;flex-wrap:wrap;align-content:flex-start;justify-content:space-between", V.games.slice(0, n).map(function (g, i) {
+        var el = gameBlock(g, env); el.style.width = px(cw); if (i >= cols) el.style.marginTop = "12px"; return el;
+      }))]);
   };
   R.stocks = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "info", "stocks");
@@ -1464,10 +1511,14 @@
     var x = N.items[0], meta = [N.name, agoOf(x.at)].filter(Boolean).join(" · ");
     add(root, [E("div", "cw-t23 cw-ell", "color:#ff453a;font-weight:700", [meta]), E("div", "cw-t29", "font-weight:640;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden", [x.title])]);
   };
-  CR.sports = sample("sports", "tv", function (root, o, b) {
-    var team = function (nm, col, sc, win) { return E("div", "cw-row cw-sp", "", [E("div", "cw-row", "min-width:0", [E("i", "", "display:block;width:22px;height:22px;border-radius:11px;flex:none;margin-right:12px;background:" + col), E("span", "cw-t25 cw-ell", "font-weight:" + (win ? 720 : 520), [nm])]), E("span", "cw-t29", "font-weight:700;opacity:" + (win ? 1 : 0.6), [String(sc)])]); };
-    add(root, E("div", "cw-col", "height:100%;justify-content:space-around", [team("Titans", "#00a6e2", 24, 1), team("Broncos", "#7c1d3f", 18, 0)]));
-  });
+  // a wide tile: the one game that matters most (live, the household's team, the latest result)
+  CR.sports = function (root, o, b, env) {
+    var V = scoresOf(root, o, b, env);
+    if (!V) return;
+    var g = V.games[0], st = gameStatus(g, env);
+    add(root, E("div", "cw-col", "height:100%;justify-content:space-between", [teamRow(g.teams[0], g, false), teamRow(g.teams[1], g, false),
+      E("div", "cw-t23 cw-ell", "font-weight:700;color:" + (st.live ? "#ff453a" : "var(--sub)"), [st.text])]));
+  };
   CR.stocks = sample("stocks", "info", function (root, o, b) { mini(root, b, "info", "+0.6%", "ASX 200", "8,412 at the close", "#30d158"); });
   CR.commute = sample("commute", "location", function (root, o, b) { mini(root, b, "location", "16 min", "To work", "Light traffic, leave by 8:10"); });
   CR.guide = sample("guide", "info", function (root, o, b) { mini(root, b, "info", "Sun", "Check out", "House guide, around here"); });
@@ -1563,5 +1614,5 @@
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12 }
   };
   // what the web widgets' detail layers share with them (widget-detail.js)
-  window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS };
+  window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS, demoScores: demoScores, gameStatus: gameStatus, shortScore: shortScore };
 })();

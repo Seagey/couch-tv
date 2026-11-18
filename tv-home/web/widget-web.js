@@ -82,6 +82,91 @@
     return h < 48 ? "Yesterday" : Math.round(h / 24) + " days ago";
   }
 
+  // ---------------- scores: ESPN's public scoreboards (free, no key, open to web pages) ----------------
+  // Unofficial and undocumented: ESPN publishes no terms for them and may change them. Each TV asks for
+  // its own household's viewing, one league per request, and shows only teams and scores.
+  var ESPN = "https://site.api.espn.com/apis/site/v2/sports/";
+  var LEAGUES = {
+    afl: { name: "AFL", url: ESPN + "australian-football/afl/scoreboard" },
+    nrl: { name: "NRL", url: ESPN + "rugby-league/3/scoreboard" },
+    aleague: { name: "A-League", url: ESPN + "soccer/aus.1/scoreboard" },
+    epl: { name: "Premier League", url: ESPN + "soccer/eng.1/scoreboard" },
+    nba: { name: "NBA", url: ESPN + "basketball/nba/scoreboard" },
+    bbl: { name: "Big Bash", url: ESPN + "cricket/8044/scoreboard" },
+    cricket: { name: "Cricket", url: "https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=cricket&lang=en&region=au", header: true }
+  };
+  var LEAGUE_DEFAULT = "nrl";
+  function leagueOf(id) { return LEAGUES[id] ? id : LEAGUE_DEFAULT; }
+  function hex(c) { return /^#?[0-9a-f]{6}$/i.test(String(c || "")) ? "#" + String(c).replace("#", "").toLowerCase() : ""; }
+  function cut(s, n) { s = plain(s); return s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, "") : s; }
+  function stateOf(s) { return s === "in" || s === "post" ? s : "pre"; }
+  function side(name, abbr, colour, score, win, home) {
+    return { name: cut(name, 22), abbr: cut(abbr, 5).toUpperCase(), colour: hex(colour), score: plain(score === undefined || score === null ? "" : String(score)).slice(0, 40), win: win === true, home: !!home };
+  }
+  // one league's games: { league, round, games: [{ id, at, state, detail, teams: [home, away] }] }
+  // detail: ESPN's own short line ("Final", "Q3 4:12", "62'", "Australia need 224 runs")
+  function parseScores(j, id) {
+    id = leagueOf(id);
+    j = j && typeof j === "object" ? j : {};
+    var L = LEAGUES[id], games = [];
+    if (L.header) {
+      // cricket: the matches on now or lately that an Australian household follows: Australia's first,
+      // then other internationals, then the Australian competitions (Big Bash, Sheffield Shield, the
+      // one day cup); other countries' domestic matches are left out
+      (((j.sports || [])[0] || {}).leagues || []).forEach(function (lg) {
+        var local = /big bash|bbl|sheffield|marsh|wbbl|australia/i.test(String(lg.name || "") + " " + String(lg.shortName || ""));
+        (lg.events || []).forEach(function (e) {
+          var fs = e.fullStatus || {}, ty = fs.type || {}, cs = e.competitors || [];
+          if (cs.length < 2) return;
+          var teams = cs.slice(0, 2).map(function (c) { return side(c.displayName, c.abbreviation, c.color, c.score, c.winner, c.homeAway === "home"); });
+          var intl = e["class"] && e["class"].internationalClassId && e["class"].internationalClassId !== "0";
+          var aus = teams.some(function (t) { return /^australia/i.test(t.name); });
+          if (!intl && !local) return;
+          games.push({ id: String(e.id || ""), at: Date.parse(e.date) || 0, state: stateOf(ty.state || e.status), detail: cut(fs.summary || e.summary || ty.shortDetail || "", 60),
+            title: cut(e.title || "", 30), teams: teams, rank: aus ? 0 : intl ? 1 : 2 });
+        });
+      });
+      games.sort(function (a, b) { return a.rank - b.rank || b.at - a.at; });
+    } else {
+      (j.events || []).forEach(function (e) {
+        var c = (e.competitions || [])[0] || {}, cs = c.competitors || [], st = (e.status || {}).type || {};
+        if (cs.length < 2) return;
+        // home first, the way Australian codes say a game ("Roosters v Knights")
+        cs = cs.slice(0, 2).sort(function (a, b) { return (a.homeAway === "home" ? 0 : 1) - (b.homeAway === "home" ? 0 : 1); });
+        games.push({ id: String(e.id || ""), at: Date.parse(e.date) || 0, state: stateOf(st.state), detail: cut(st.shortDetail || st.detail || "", 40),
+          teams: cs.map(function (x) { var t = x.team || {}; return side(t.shortDisplayName || t.displayName, t.abbreviation, t.color, x.score, x.winner, x.homeAway === "home"); }) });
+      });
+      games.sort(function (a, b) { return a.at - b.at; });
+    }
+    games.forEach(function (g) { delete g.rank; if (g.state === "pre") g.teams.forEach(function (t) { t.score = ""; }); });
+    var wk = j.week && isFinite(j.week.number) ? +j.week.number : 0;
+    return { league: L.name, round: wk && (id === "afl" || id === "nrl") ? "Round " + wk : "", games: games.slice(0, 16) };
+  }
+  // the games in the order a widget shows them: live first, then the household's team, then the
+  // latest results, then what is next
+  function scoreOrder(games, team, now) {
+    team = String(team || "").toLowerCase();
+    var mine = function (g) { return !!team && g.teams.some(function (t) { return t.name.toLowerCase().indexOf(team) >= 0 || t.abbr.toLowerCase() === team; }); };
+    var rank = function (g) { return g.state === "in" ? 0 : mine(g) ? 1 : g.state === "post" ? 2 : 3; };
+    return games.slice().sort(function (a, b) {
+      var d = rank(a) - rank(b);
+      if (d) return d;
+      return a.state === "post" ? b.at - a.at : a.at - b.at;
+    }).map(function (g) { g = JSON.parse(JSON.stringify(g)); g.mine = mine(g); return g; });
+  }
+  var WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  // when a game starts, in the TV's own time: "7:40pm", "Tomorrow 7:40pm", "Sat 7:40pm", "17 Mar"
+  function kickoff(at, now, h24) {
+    if (!at) return "";
+    var d = new Date(at), n = new Date(now || Date.now());
+    var hm = h24 ? d.getHours() + ":" + ("0" + d.getMinutes()).slice(-2) : ((d.getHours() % 12) || 12) + ":" + ("0" + d.getMinutes()).slice(-2) + (d.getHours() < 12 ? "am" : "pm");
+    var day = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(n.getFullYear(), n.getMonth(), n.getDate())) / 86400000);
+    if (day === 0) return hm;
+    if (day === 1) return "Tomorrow " + hm;
+    if (day > 1 && day < 7) return WEEKDAY[d.getDay()] + " " + hm;
+    return d.getDate() + " " + ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getMonth()];
+  }
+
   // ---------------- the sources the loader knows ----------------
   // key(w): which answer a widget on the home needs (widgets with the same key share one request);
   // every: how long an answer is good for; get(h, id): one request, through the relay or straight
@@ -98,6 +183,15 @@
           return items;
         });
       }
+    },
+    sports: {
+      key: function (w) { return leagueOf((w.opts || {}).league); },
+      // every 2 minutes while a game is on or about to start, else every 15
+      every: function (v, t) {
+        var soon = (v && v.games || []).some(function (g) { return g.state === "in" || (g.state === "pre" && g.at - t < 20 * MIN && g.at - t > -3 * 60 * MIN); });
+        return (soon ? 2 : 15) * MIN;
+      },
+      get: function (h, id) { return h.json(LEAGUES[id].url).then(function (j) { return parseScores(j, id); }); }
     }
   };
 
@@ -169,6 +263,7 @@
   var API = {
     FEEDS: FEEDS, FEED_DEFAULT: FEED_DEFAULT, SOURCES: SOURCES,
     feedOf: feedOf, plain: plain, parseRss: parseRss, ago: ago,
+    LEAGUES: LEAGUES, LEAGUE_DEFAULT: LEAGUE_DEFAULT, leagueOf: leagueOf, parseScores: parseScores, scoreOrder: scoreOrder, kickoff: kickoff,
     loader: function (h) { return Loader(h); }
   };
   root.CouchWidgetWeb = API;

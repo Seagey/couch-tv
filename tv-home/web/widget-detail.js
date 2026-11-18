@@ -503,14 +503,25 @@
         E("div", "cwd-big", "font-size:40px;margin-top:6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden", [x.title])]), null, x.title);
     })));
   };
+  // the round: every game with its score, in the order it is played (up to 12; a line says how many more)
   B.sports = function (o, env) {
-    if (!env.demo) return B.setup(o, env);
-    S.body.appendChild(head("tv", op(o).label || "NRL", "This round", "#0a6e8a"));
-    var games = [["Titans", "#00a6e2", 24, "Broncos", "#7c1d3f", 18, "Full time"], ["Rabbitohs", "#00843d", 12, "Roosters", "#002b5c", 12, "Live, 62 min"], ["Storm", "#592c82", 6, "Raiders", "#6bbe45", 0, "Live, 21 min"], ["Sharks", "#00a9d8", 0, "Eels", "#ffcc00", 0, "7:50pm"]];
-    var team = function (n, c, s, win) { return E("div", "cwd-row", "justify-content:space-between", [E("div", "cwd-row", "", [E("i", "cwd-dot", "background:" + c), E("span", "cwd-mid", "font-weight:" + (win ? 760 : 520), [n])]), E("span", "cwd-big", "font-size:56px;opacity:" + (win ? 1 : 0.6), [String(s)])]); };
-    S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:30px", games.map(function (g) {
-      return F(E("div", "cwd-game", "", [team(g[0], g[1], g[2], g[2] >= g[5]), team(g[3], g[4], g[5], g[5] >= g[2]), E("div", "cwd-small", "margin-top:10px;color:" + (/Live/.test(g[6]) ? "#ff453a" : "rgba(255,255,255,.7)"), [g[6]])]), null, g[0] + " v " + g[3]);
+    var WW = window.CouchWidgetWeb, q = op(o), id = WW ? WW.leagueOf(q.league) : "nrl", rec = null, v;
+    if (env.demo) v = wk().demoScores ? wk().demoScores() : { games: [] };
+    else { rec = webRec(env, "sports", id); if (!rec || !rec.ok || !rec.v || !rec.v.games || !rec.v.games.length) return B.setup(o, env); v = rec.v; }
+    var games = v.games.slice().sort(function (a, b) { return a.at - b.at; }), shown = games.slice(0, 12), n = shown.length;
+    var cols = n <= 6 ? 2 : n <= 9 ? 3 : 4, w = Math.floor((1600 - (cols - 1) * 24) / cols), big = cols <= 2 ? 56 : cols === 3 ? 48 : 40, mid = cols <= 3 ? 34 : 29;
+    S.body.appendChild(head("tv", q.label || v.league || "Scores", [v.round, rec ? updated(rec) : ""].filter(Boolean).join(". ") || "This round", "#0a6e8a"));
+    var team = function (t, g) {
+      var dim = g.state === "post" && !t.win;
+      return E("div", "cwd-row", "justify-content:space-between;min-width:0", [E("div", "cwd-row", "min-width:0", [E("i", "cwd-dot", "flex:none;background:" + (t.colour || "rgba(255,255,255,.35)")), E("span", "cwd-mid cwd-ell", "font-size:" + mid + "px;font-weight:" + (g.state === "post" && t.win ? 760 : 560) + ";opacity:" + (dim ? 0.7 : 1), [t.name || t.abbr])]),
+        E("span", "cwd-big", "font-size:" + (String(t.score).length > 5 ? Math.round(big * 0.6) : big) + "px;white-space:nowrap;margin-left:14px;opacity:" + (dim ? 0.7 : 1), [String(t.score || "")])]);
+    };
+    S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:26px", shown.map(function (g) {
+      var st = wk().gameStatus ? wk().gameStatus(g, env) : { text: "" };
+      return F(E("div", "cwd-game", "width:" + w + "px;padding:" + (cols <= 2 ? "24px 32px" : "18px 24px"), [team(g.teams[0], g), team(g.teams[1], g), E("div", "cwd-small cwd-ell", "margin-top:8px;color:" + (st.live ? "#ff453a" : "rgba(255,255,255,.7)"), [[g.title, st.text].filter(Boolean).join(". ")])]),
+        null, (g.teams[0].name || "") + " v " + (g.teams[1].name || ""));
     })));
+    if (games.length > n) S.body.appendChild(E("div", "cwd-small", "margin-top:14px", ["And " + (games.length - n) + " more games"]));
   };
 
   // ---------------- focus inside a layer: the same geometry as the home (design.js NAV) ----------------

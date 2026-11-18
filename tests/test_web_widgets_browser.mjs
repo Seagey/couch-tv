@@ -47,8 +47,10 @@ const ANSWERS = {
 };
 // per widget: the design's widget, what proves the real answer is drawn, its layer
 const CASES = [
-  { kind: "news", opts: { feed: "bbc" }, box: [0, 0, 8, 4], says: () => WW.parseRss(fix("rss-bbc.xml"), 12)[0].title, layer: "news" }
+  { kind: "news", opts: { feed: "bbc" }, box: [0, 0, 8, 4], says: () => WW.parseRss(fix("rss-bbc.xml"), 12)[0].title, layer: "news" },
+  { kind: "sports", opts: { league: "nba", team: "Knicks" }, box: [0, 0, 8, 4], routes: [["https://site.api.espn.com/**", "espn-nba.json"]], says: () => "Knicks", layer: "sports" }
 ];
+const KINDS = CASES.map((c) => c.kind);
 const WW = createRequire(import.meta.url)("../tv-home/web/widget-web.js");
 
 const browser = await chromium.launch();
@@ -102,10 +104,10 @@ for (const c of CASES) {
 {
   const page = await home({ kind: "clock", box: [0, 0, 4, 2] });
   const fixtures = {}; ["rss-abc-top.xml", "rss-bbc.xml", "yahoo-spark.json", "espn-nrl.json", "espn-afl.json", "espn-nba.json", "espn-cricket.json", "osrm-route.json"].forEach((f) => { fixtures[f] = fix(f); });
-  const bad = await page.evaluate((F) => {
+  const bad = await page.evaluate(([F, KINDS]) => {
     const NAMED = { line: [4, 1], wline: [8, 1], tile: [2, 2], wtile: [4, 2], small: [4, 4], tall: [4, 6], medium: [8, 4], wide: [12, 4], large: [8, 8], xl: [12, 6], hero: [18, 7], full: [18, 10] };
     const C = window.CouchWidgetCaps, W = window.CouchWidgets, WW = window.CouchWidgetWeb, at = Date.now();
-    const good = { news: { abc: { ok: true, at, v: WW.parseRss(F["rss-abc-top.xml"], 12) } } };
+    const good = { news: { abc: { ok: true, at, v: WW.parseRss(F["rss-abc-top.xml"], 12) } }, sports: { nrl: { ok: true, at, v: WW.parseScores(JSON.parse(F["espn-nba.json"]), "nba") } } };
     // the states a web widget can be in on a TV, by the data it is handed
     const states = { real: good, asking: {}, failed: null, relay: null, stale: null };
     const failWith = (err) => { const o = {}; Object.keys(good).forEach((s) => { o[s] = {}; Object.keys(good[s]).forEach((id) => { o[s][id] = { ok: false, at, err }; }); }); return o; };
@@ -115,7 +117,7 @@ for (const c of CASES) {
     host.className = "cd-layer"; host.style.cssText = "position:fixed;left:0;top:0;width:1920px;height:1080px;z-index:99";
     document.body.appendChild(host);
     const out = []; let count = 0;
-    ["news"].forEach((kind) => {
+    KINDS.forEach((kind) => {
       const s = C.get(kind).sizes, list = s.s.map((id) => [id, NAMED[id][0], NAMED[id][1]]).concat([["min", s.min[0], s.min[1]]]);
       list.forEach(([id, w, h]) => ["designer"].concat(Object.keys(states)).forEach((st) => {
         while (host.firstChild) host.removeChild(host.firstChild);
@@ -140,27 +142,30 @@ for (const c of CASES) {
     });
     host.remove();
     return { out, count };
-  }, fixtures);
+  }, [fixtures, KINDS]);
   ok(bad.count >= 25, "drew " + bad.count + " web widget boxes");
   ok(bad.out.length === 0, "every size and state reads and fits:\n  " + bad.out.slice(0, 30).join("\n  "));
-  // a sheet of every size with real data, for a person to look at
-  await page.evaluate((F) => {
+  // a sheet of every size with real data, one per widget, for a person to look at
+  for (const one of KINDS) {
+  await page.evaluate(([F, KINDS]) => {
+    document.querySelectorAll(".sheet-host").forEach((e) => e.remove());
     const NAMED = { tile: [2, 2], wtile: [4, 2], small: [4, 4], tall: [4, 6], medium: [8, 4], wide: [12, 4] };
     const C = window.CouchWidgetCaps, W = window.CouchWidgets, WW = window.CouchWidgetWeb, at = Date.now();
-    const web = { news: { abc: { ok: true, at, v: WW.parseRss(F["rss-abc-top.xml"], 12) } } };
+    const web = { news: { abc: { ok: true, at, v: WW.parseRss(F["rss-abc-top.xml"], 12) } }, sports: { nrl: { ok: true, at, v: WW.parseScores(JSON.parse(F["espn-nba.json"]), "nba") } } };
     const host = document.createElement("div");
-    host.style.cssText = "position:fixed;left:0;top:0;width:1920px;height:1080px;z-index:99;background:#26303f";
+    host.className = "sheet-host"; host.style.cssText = "position:fixed;left:0;top:0;width:1920px;height:1080px;z-index:99;background:#26303f";
     document.body.appendChild(host);
     let x = 40, y = 40, rowH = 0;
-    ["news"].forEach((kind) => C.get(kind).sizes.s.forEach((id) => {
+    KINDS.forEach((kind) => C.get(kind).sizes.s.forEach((id) => {
       const w = NAMED[id][0] * 100 - 40, h = NAMED[id][1] * 100 - 40;
       if (x + w > 1880) { x = 40; y += rowH + 30; rowH = 0; }
       const el = W.render({ id: "t", kind, w, h }, { data: { bridge: true, web } });
       el.style.position = "absolute"; el.style.left = x + "px"; el.style.top = y + "px";
       host.appendChild(el); x += w + 30; rowH = Math.max(rowH, h);
     }));
-  }, fixtures);
-  await page.screenshot({ path: path.join(SHOTS, "sizes.png") });
+  }, [fixtures, [one]]);
+  await page.screenshot({ path: path.join(SHOTS, "sizes-" + one + ".png") });
+  }
   await page.close();
 }
 

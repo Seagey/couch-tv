@@ -1,0 +1,391 @@
+{
+ "leagues": [
+  {
+   "name": "AFL",
+   "abbreviation": "AFL"
+  }
+ ],
+ "week": {
+  "number": 1
+ },
+ "events": [
+  {
+   "id": "1133712",
+   "date": "2027-03-17T08:30Z",
+   "name": "Geelong Cats at Sydney Swans",
+   "shortName": "GEEL @ SYD",
+   "status": {
+    "type": {
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "3/17 - 1:30 AM EDT",
+     "detail": "Wed, March 16th at 1:30 AM EDT"
+    },
+    "displayClock": "0:00",
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "displayName": "Sydney Swans",
+        "shortDisplayName": "Sydney Swans",
+        "abbreviation": "SYD",
+        "color": "b61300"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "displayName": "Geelong Cats",
+        "shortDisplayName": "Geelong Cats",
+        "abbreviation": "GEEL",
+        "color": "173246"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1133713",
+   "date": "2027-03-18T09:10Z",
+   "name": "Western Bulldogs at Fremantle",
+   "shortName": "WB @ FRE",
+   "status": {
+    "type": {
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "3/18 - 2:10 AM EDT",
+     "detail": "Thu, March 17th at 2:10 AM EDT"
+    },
+    "displayClock": "0:00",
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "displayName": "Fremantle",
+        "shortDisplayName": "Fremantle",
+        "abbreviation": "FRE",
+        "color": "5d368f"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "displayName": "Western Bulldogs",
+        "shortDisplayName": "Western Bulldogs",
+        "abbreviation": "WB",
+        "color": "25269f"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1133714",
+   "date": "2027-03-19T08:50Z",
+   "name": "Brisbane Lions at Hawthorn",
+   "shortName": "BL @ HAW",
+   "status": {
+    "type": {
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "3/19 - 1:50 AM EDT",
+     "detail": "Fri, March 18th at 1:50 AM EDT"
+    },
+    "displayClock": "0:00",
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "displayName": "Hawthorn",
+        "shortDisplayName": "Hawthorn",
+        "abbreviation": "HAW",
+        "color": "462d22"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "displayName": "Brisbane Lions",
+        "shortDisplayName": "Brisbane Lions",
+        "abbreviation": "BL",
+        "color": "6d144a"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1133715",
+   "date": "2027-03-20T01:35Z",
+   "name": "Carlton at Richmond",
+   "shortName": "CARL @ RICH",
+   "status": {
+    "type": {
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "3/19 - 6:35 PM EDT",
+     "detail": "Fri, March 19th at 6:35 PM EDT"
+    },
+    "displayClock": "0:00",
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "displayName": "Richmond",
+        "shortDisplayName": "Richmond",
+        "abbreviation": "RICH",
+        "color": "e6b843"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "displayName": "Carlton",
+        "shortDisplayName": "Carlton",
+        "abbreviation": "CARL",
+        "color": "0d0e5f"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1133716",
+   "date": "2027-03-20T05:15Z",
+   "name": "GWS GIANTS at Adelaide Crows",
+   "shortName": "GWS @ ADEL",
+   "status": {
+    "type": {
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "3/19 - 10:15 PM EDT",
+     "detail": "Fri, March 19th at 10:15 PM EDT"
+    },
+    "displayClock": "0:00",
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "displayName": "Adelaide Crows",
+        "shortDisplayName": "Adelaide Crows",
+        "abbreviation": "ADEL",
+        "color": "002a6f"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "displayName": "GWS GIANTS",
+        "shortDisplayName": "GWS GIANTS",
+        "abbreviation": "GWS",
+        "color": "F07947"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1133717",
+   "date": "2027-03-20T08:40Z",
+   "name": "Collingwood at St Kilda",
+   "shortName": "COLL @ STK",
+   "status": {
+    "type": {
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "3/20 - 1:40 AM EDT",
+     "detail": "Sat, March 19th at 1:40 AM EDT"
+    },
+    "displayClock": "0:00",
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "displayName": "St Kilda",
+        "shortDisplayName": "St Kilda",
+        "abbreviation": "STK",
+        "color": "b12526"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "displayName": "Collingwood",
+        "shortDisplayName": "Collingwood",
+        "abbreviation": "COLL",
+        "color": "222222"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1133718",
+   "date": "2027-03-21T02:10Z",
+   "name": "Port Adelaide at North Melbourne",
+   "shortName": "PORT @ NMFC",
+   "status": {
+    "type": {
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "3/20 - 7:10 PM EDT",
+     "detail": "Sat, March 20th at 7:10 PM EDT"
+    },
+    "displayClock": "0:00",
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "displayName": "North Melbourne",
+        "shortDisplayName": "North Melbourne",
+        "abbreviation": "NMFC",
+        "color": "124cb1"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "displayName": "Port Adelaide",
+        "shortDisplayName": "Port Adelaide",
+        "abbreviation": "PORT",
+        "color": "2498a5"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1133719",
+   "date": "2027-03-21T04:15Z",
+   "name": "Essendon at Melbourne",
+   "shortName": "ESS @ MELB",
+   "status": {
+    "type": {
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "3/20 - 9:15 PM EDT",
+     "detail": "Sat, March 20th at 9:15 PM EDT"
+    },
+    "displayClock": "0:00",
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "displayName": "Melbourne",
+        "shortDisplayName": "Melbourne",
+        "abbreviation": "MELB",
+        "color": "00274d"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "displayName": "Essendon",
+        "shortDisplayName": "Essendon",
+        "abbreviation": "ESS",
+        "color": "b93535"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1133720",
+   "date": "2027-03-21T07:10Z",
+   "name": "Gold Coast SUNS at West Coast Eagles",
+   "shortName": "SUNS @ WCE",
+   "status": {
+    "type": {
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "3/21 - 12:10 AM EDT",
+     "detail": "Sun, March 20th at 12:10 AM EDT"
+    },
+    "displayClock": "0:00",
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "displayName": "West Coast Eagles",
+        "shortDisplayName": "West Coast Eagles",
+        "abbreviation": "WCE",
+        "color": "24275a"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "displayName": "Gold Coast SUNS",
+        "shortDisplayName": "Gold Coast SUNS",
+        "abbreviation": "SUNS",
+        "color": "b1212b"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

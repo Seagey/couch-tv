@@ -316,8 +316,10 @@
     controls: function (v) { return SAN.list(v, 8, function (c) { c = obj(c); var o = {}; put(o, "icon", SAN.pick(c.icon, CTL_ICONS)); put(o, "name", SAN.w(c.name, 24)); return o.icon ? o : undefined; }); },
     shows: function (v) { return SAN.n(v, 1, 5, true); },
     // the web widgets (widget-web.js): a source picked from a fixed list, never a link
-    feed: function (v) { return SAN.pick(v, WEB_FEEDS); }
+    feed: function (v) { return SAN.pick(v, WEB_FEEDS); },
+    league: function (v) { return SAN.pick(v, WEB_LEAGUES); }, team: function (v) { return SAN.w(v, 24); }
   };
+  var WEB_LEAGUES = ["afl", "nrl", "aleague", "epl", "nba", "bbl", "cricket"];
   var WEB_FEEDS = ["abc", "abc-justin", "abc-sport", "abc-business", "sbs", "guardian", "bbc", "rnz"];
   var WOPT = {
     clock: "format ampm seconds date align", tallclock: "format align", glassclock: "format scene", analog: "seconds", flipclock: "format",
@@ -329,7 +331,7 @@
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "",
     bins: "weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label", note: "", list: "label icon",
-    card: "label text icon", quote: "text sub", word: "", news: "feed label", sports: "label", stocks: "", commute: "",
+    card: "label text icon", quote: "text sub", word: "", news: "feed label", sports: "label league team", stocks: "", commute: "",
     welcome: "kicker text sub align", quick: "quick align", wifi: "", guide: "", screentime: "", stack: ""
   };
   function sanWStyle(src) {
