@@ -293,6 +293,29 @@ if echo "$present" | grep -qx -E "com.google.android.apps.tv.launcherx|com.googl
   echo "     the Home button watch is on (the TV's own home may flash up, then couch-tv comes back)"
 fi
 
+# Remote buttons that open an app (home.app_keys in config.json, KeyWatch.kt): the TV hands such a
+# button to no app, so the accessibility service that sees keys first is switched on, only when the
+# list is not empty. Any other accessibility service already on is kept.
+if [ "$DRY" != 1 ] && "$PY" -c "import sys; sys.path.insert(0, '$ROOT/bridge'); import config; sys.exit(0 if config._home(config.CONFIG.get('home') or {}).get('app_keys') else 1)" 2>/dev/null; then
+  KEYWATCH=app.couchtv.launcher/.KeyWatch
+  "$PY" "$T" shell "pm grant app.couchtv.launcher android.permission.WRITE_SECURE_SETTINGS" > /dev/null 2>&1 || true
+  CUR=$("$PY" "$T" shell "settings get secure enabled_accessibility_services" | tr -d '\r')
+  # The force-stop above leaves a listed service showing as crashed and never rebound (issue #37, as for
+  # the Home watch): take it out of the list and put it back so Android binds it again.
+  REST=$(echo "$CUR" | tr ':' '\n' | grep -v -e KeyWatch -e '^null$' -e '^$' | paste -sd: - || true)
+  if [ -z "$REST" ]; then
+    "$PY" "$T" shell "settings delete secure enabled_accessibility_services" > /dev/null
+    NEW=$KEYWATCH
+  else
+    "$PY" "$T" shell "settings put secure enabled_accessibility_services $REST" > /dev/null
+    NEW="$REST:$KEYWATCH"
+  fi
+  sleep 2
+  "$PY" "$T" shell "settings put secure enabled_accessibility_services $NEW"
+  "$PY" "$T" shell "settings put secure accessibility_enabled 1"
+  echo "     the remote's app buttons are on (home.app_keys)"
+fi
+
 # Tell the bridge's daily guard what to keep switched off (a Google TV update can switch ambient
 # mode back on). Option A has no bridge, so no guard: run this script again after an update.
 KEEP="$ROOT/bridge/data/keep-disabled.json"
