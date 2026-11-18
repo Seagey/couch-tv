@@ -177,7 +177,9 @@ object HomeAssistant {
     // ---------------------------------------------------------------- what the page may ask
 
     // What was last read for each climate entity, to check a new temperature or mode against.
-    private class Limits(val min: Double, val max: Double, val step: Double, val modes: List<String>)
+    private class Limits(val min: Double, val max: Double, val step: Double, val modes: List<String>, val fans: List<String> = emptyList())
+    // a fan speed is a short word Home Assistant's climate entity lists itself (low, medium, high, auto, ...)
+    private val FAN = Regex("[A-Za-z0-9 _-]{1,24}")
     private val limits = ConcurrentHashMap<String, Limits>()
 
     private fun room(n: Named, st: JSONObject?): JSONObject {
@@ -191,7 +193,11 @@ object HomeAssistant {
         val min = a.optDouble("min_temp", 7.0)
         val modes = mutableListOf<String>()
         a.optJSONArray("hvac_modes")?.let { m -> for (k in 0 until m.length()) m.optString(k).takeIf { it in MODES }?.let { modes.add(it) } }
-        limits[n.entity] = Limits(min, max, step, modes)
+        val fans = mutableListOf<String>()
+        a.optJSONArray("fan_modes")?.let { m -> for (k in 0 until minOf(m.length(), 8)) m.optString(k).takeIf { FAN.matches(it) }?.let { fans.add(it) } }
+        limits[n.entity] = Limits(min, max, step, modes, fans)
+        if (fans.isNotEmpty()) o.put("fan_modes", JSONArray(fans))
+        a.optString("fan_mode").takeIf { it in fans }?.let { o.put("fan", it) }
         o.put("ok", true).put("state", state).put("min", min).put("max", max).put("step", step)
             .put("modes", JSONArray(modes)).put("action", a.optString("hvac_action"))
         if (a.has("current_temperature") && !a.isNull("current_temperature")) o.put("current", a.optDouble("current_temperature"))
@@ -222,6 +228,12 @@ object HomeAssistant {
                 val known = limits[entity]?.modes ?: return refused
                 if (value !in MODES || value !in known) return refused
                 done(service(s, "climate", "set_hvac_mode", id.put("hvac_mode", value)))
+            }
+            "fan" -> {
+                climate ?: return refused
+                val known = limits[entity]?.fans ?: return refused   // read the room first
+                if (value !in known) return refused
+                done(service(s, "climate", "set_fan_mode", id.put("fan_mode", value)))
             }
             "on", "off" -> {
                 climate ?: return refused

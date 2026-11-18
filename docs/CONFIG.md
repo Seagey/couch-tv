@@ -373,6 +373,18 @@ colour, `#000000` for a black screen) can stand in for `background.image`; a wid
 | `objects` | Up to 80 things of the design's own, each with an `id` (letters, digits, `-`, `_`), `type`, `x`, `y`, `scale`, `rotate`, `opacity`, `hidden`, and `layer` `front` (over the home, the default) or `back` (behind the clock, the dock and the rest). Later in the list is drawn on top. `text`: `text`, `size`, `align` and the text styles. `shape`: `variant` `glass`, `solid`, `outline` or `line`, `w`, `h`, `radius`, `colour`. `clock`: `size`, `format`, `date: true` and `date_format`, text styles. `weather`: `style` `line`, `card` or `big`, `place: false`. `smart`: `kind` (`aircon`, `light`, `speaker`, `camera`, `doorbell`, `network`, `devices`, `vacuum`, `appliance`, `scene`), `style` `tile`, `pill`, `icon` or `card`, `name`, `status`, `value`, `on: false`, `zones` (aircon) or `items` (scene buttons), `panel` `glass`, `solid` or `none`. On the TV a smart home object never shows a reading it does not have: an `aircon` widget reads its room (`entity`, else the first) and lists the other rooms as zones, and a `scene` widget lists the scenes, both from the Home Assistant section of this file through couch-tv's smart home; every other kind, and these two without Home Assistant, shows its name and "Not connected". The demo readings saved in the design show only in the designer, marked Demo. Objects do not take the remote's focus. |
 | `home` | Look settings carried with the design: `scenes`, `scene_seconds`, `glass`, `glass_icons`, `glass_amount`, `clock_style`, `ambient_weather`, `ambient_sun_grade`, `dock`, `moving_tiles`, `lighter`, `keep_watching`, `now_playing`, `dock_size`, `clock` (never `video_url`: a design carries no links). They win over the same keys in `home`; Home settings on the TV still win over both. |
 
+**Widgets: OK, sizes and what each needs.** In a widget design, OK on a widget opens its detail
+layer (`tv-home/web/widget-detail.js`): the widget grows into a sheet over the home, Back shrinks it
+back. A clock opens Timers (kept on the TV), the weather the 24 hour and 7 day forecast, a photo the
+full screen slideshow, Now playing the player (previous, play or pause, next, volume), Aircon every
+room (warmer, cooler, on and off, mode and, when Home Assistant lists them, fan speeds), Scenes every
+scene, Keep watching every show with Resume, an app folder every app. A widget whose own buttons do
+things (a row of scenes, a poster row) keeps them, and its layer is the first item of Hold OK. What
+each widget needs, where that is set up, which TVs can run it and the sizes it comes in are in
+`tv-home/web/widget-caps.js`; a TV with nothing real for a widget shows that record's setup card, and
+OK on the card opens the whole record. It never shows pretend data. The air quality and surf widgets
+ask Open-Meteo's free air quality and marine services, only while one is on the home.
+
 The whole block must stay under 4 MB (a photo inside it is the big part). The bridge passes it to
 the home as it is, in `/tv/config.js` (option B), and the standalone build carries it. `apply.sh`
 (option A) hands the settings to the app inside an Android intent, which is far too small for a

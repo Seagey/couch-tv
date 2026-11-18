@@ -292,6 +292,14 @@
     isOpen: function () { return S.open; }, icon: ICONS.home,
     // the rooms as they are now, for a design's aircon card (design.js): the same question the
     // screen asks, only the climate entities named in config.json
-    climate: function () { return available() ? ask("climate") : Promise.resolve({ ok: false }); }
+    climate: function () { return available() ? ask("climate") : Promise.resolve({ ok: false }); },
+    // the detail layers (widget-detail.js through design.js): the same allowed asks as this screen
+    // (climate, temp, mode, fan, on, off, scene), each answered by the launcher, only for the entities
+    // named in config.json
+    request: function (action, entity, value) {
+      if (!available() || ["climate", "temp", "mode", "fan", "on", "off", "scene"].indexOf(action) < 0) return Promise.resolve({ ok: false, error: "refused" });
+      return ask(action, entity, value);
+    },
+    scenes: function () { return available() ? info().scenes.map(function (s) { return { entity: s.entity, name: s.name }; }) : []; }
   };
 })();

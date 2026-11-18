@@ -269,7 +269,13 @@
     bigtemp: "colour", hourly: "colour", week: "colour", uv: "colour", surf: "colour", screentime: "colour", note: "colour", word: "paper",
     worldclock: "solid", moon: "solid", timer: "solid", stocks: "solid", battery: "solid" };
   // the kinds the remote stops on (they do something with OK); the rest are to look at (GRID.md Focus 6)
-  var WACT = ["keep", "keeprow", "upnext", "picks", "app", "folder", "dock", "appgrid", "games", "nowplaying", "soundscape", "aircon", "scenes", "controls", "people", "quick", "stack"];
+  // (and, from 18 Nov 2026, every kind whose OK opens its detail layer, widget-detail.js: a clock opens
+  // Timers, the weather the forecast, a photo the slideshow; a widget with nothing real to show opens
+  // its setup record, so it is a stop too, decided when it is drawn)
+  var WACT = ["keep", "keeprow", "upnext", "picks", "app", "folder", "dock", "appgrid", "games", "nowplaying", "soundscape", "aircon", "scenes", "controls", "people", "quick", "stack",
+    "clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "timer", "solar", "worldclock", "date", "month", "agenda",
+    "weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "moon", "air", "surf", "photo", "slideshow", "mosaic", "artframe",
+    "camera", "doorbell", "card", "news", "sports", "memory", "queue", "speakers", "energy", "sensor", "battery", "note", "list", "stocks", "commute", "wifi", "guide", "screentime"];
   var WSIZES = ["line", "wline", "tile", "wtile", "small", "tall", "medium", "wide", "large", "xl", "hero", "full", "row8", "row12", "row18"];
   var WSTYLE = { panel: ["glass", "solid", "colour", "paper", "none"], gradient: ["off", "soft"], ink: ["auto", "white", "ink", "accent"],
     font: ["inter", "antonio", "rounded", "cormorant", "jost"], icons: ["line", "solid", "duotone", "tile", "glass", "playful", "classic"],
@@ -1325,7 +1331,8 @@
     return { off: true, name: o.name, status: "Not connected", value: o.kind === "aircon" || o.kind === "devices" ? "--" : "", on: false, zones: o.zones, items: o.items };
   }
   function pollRooms(objs) {
-    var want = objs.some(function (o) { o = obj(o); return (o.type === "smart" && o.kind === "aircon") || (o.type === "group" && list(o.controls).some(function (c) { return obj(c).kind === "aircon"; })); });
+    var want = objs.some(function (o) { o = obj(o); return (o.type === "smart" && o.kind === "aircon") || (o.type === "group" && list(o.controls).some(function (c) { return obj(c).kind === "aircon"; })) ||
+      (o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return obj(it).kind === "aircon"; })); });
     if (!want || !window.smartHome || !window.smartHome.climate || !window.smartHome.available()) return;
     if (Date.now() - LIVE.asked < 60000) return;
     LIVE.asked = Date.now();
@@ -2056,10 +2063,24 @@
         return;
       }
       el.classList.remove("cd-flash"); void el.offsetWidth; el.classList.add("cd-flash");
-      if (what === "folder") { openFolder(el); return; }
+      if (what === "detail" || what === "folder") { openDetail(el); return; }
       if (what === "menu") { holdMenu(); return; }
       if (DESIGNER) { try { window.parent.postMessage({ type: "couchtv:open", name: el.getAttribute("data-name") || "" }, location.origin); } catch (x) {} return; }
       if (hooks.act) hooks.act(what, arg);
+    }
+    // the detail layer (widget-detail.js): the widget grows into a sheet; the remote stays in it until Back.
+    // What it does goes through the same hooks as the widgets' own buttons; in TV Designer nothing is switched.
+    function detailApi() {
+      return { designer: DESIGNER,
+        act: function (what, arg) { if (DESIGNER) { try { window.parent.postMessage({ type: "couchtv:open", name: String(arg || what) }, location.origin); } catch (x) {} return; } if (hooks.act) hooks.act(what, arg); },
+        ha: hooks.ha && !DESIGNER ? function (a, e, v) { return hooks.ha(a, e, v); } : null };
+    }
+    function openDetail(el) {
+      var root = el;
+      while (root && !(root.classList && root.classList.contains("cw"))) root = root.parentNode;
+      if (!root || !window.CouchDetail) return;
+      paint();
+      window.CouchDetail.open(root, wenv(), detailApi());
     }
     // a sheet over the home: a folder opened full screen, or the hold OK menu. The remote stays in it.
     function openSheet(title, items, hint) {
@@ -2074,17 +2095,14 @@
     }
     function paintSheet() { if (sheet) sheet.nodes.forEach(function (n, k) { n.classList.toggle("cw-ifocus", k === sheet.i); }); }
     function closeSheet() { if (sheet && sheet.el.parentNode) sheet.el.parentNode.removeChild(sheet.el); sheet = null; paint(); }
-    function openFolder(el) {
-      var w = el;
-      while (w && !(w.classList && w.classList.contains("cw-o"))) w = w.parentNode;
-      var o = w && list(D && D.objects).filter(function (x) { return x.id === w.getAttribute("data-obj"); })[0];
-      if (!o || !window.CouchWidgets) return;
-      var apps = window.CouchWidgets.folderApps(o, wenv());
-      openSheet(String(obj(o.opts).label || "Apps"), { nodes: apps.map(function (a) { return window.CouchWidgets.appNode(a, 200, wenv(), true); }) }, "Back closes the folder");
-    }
     function holdMenu() {
       var mk = function (label, what) { var n = h("div", "cw-mi", null, [label]); n.setAttribute("data-act", what); n.setAttribute("data-name", label); return n; };
-      openSheet("Home", { menu: true, nodes: [mk("All apps", "more"), mk("Settings", "gear"), mk("Smart home", "smart")] }, "Back to close");
+      var t = target(), w = t;
+      while (w && !(w.classList && w.classList.contains("cw"))) w = w.parentNode;
+      var nodes = [mk("All apps", "more"), mk("Settings", "gear"), mk("Smart home", "smart")];
+      var layer = w && w.getAttribute("data-detail");
+      if (layer && window.CouchDetail) { var op = mk("Open " + (window.CouchDetail.title(layer) || "this widget"), "detail"); op.__root = w; nodes.unshift(op); }
+      openSheet("Home", { menu: true, nodes: nodes }, "Back to close");
     }
     function sheetKey(e, a) {
       if (a) {
@@ -2096,6 +2114,7 @@
       }
       var el = sheet.nodes[sheet.i];
       closeSheet();
+      if (el.__root) { openDetail(el.__root); return; }
       act(el);
     }
     function tip() {
@@ -2113,6 +2132,7 @@
     function backKey(e) { return ["Escape", "Esc", "Backspace", "GoBack", "BrowserBack"].indexOf(e.key) >= 0 || e.keyCode === 27 || e.keyCode === 8 || e.keyCode === 10009 || e.keyCode === 461; }
     function ours() { return shown() && !ASK && (DESIGNER || !hooks.free || hooks.free()); }
     function keydown(e) {
+      if (window.CouchDetail && window.CouchDetail.isOpen()) { e.preventDefault(); e.stopPropagation(); window.CouchDetail.keydown(e); return; }
       // trying it in the designer: Back with nothing open goes back to editing
       if (!sheet && DESIGNER && backKey(e) && shown()) { e.preventDefault(); e.stopPropagation(); try { window.parent.postMessage({ type: "couchtv:exit-remote" }, location.origin); } catch (x) {} return; }
       if (sheet) {
@@ -2134,6 +2154,7 @@
       }
     }
     function keyup(e) {
+      if (window.CouchDetail && window.CouchDetail.isOpen() && !okDown) { e.preventDefault(); e.stopPropagation(); window.CouchDetail.keyup(e); return; }
       if (!okDown || !okKey(e)) return;
       e.preventDefault(); e.stopPropagation();
       clearTimeout(okT); okDown = false;
@@ -2144,13 +2165,15 @@
     return {
       bind: function () { if (bound) return; bound = true; document.addEventListener("keydown", keydown, true); document.addEventListener("keyup", keyup, true); },
       refresh: function () {
-        if (!shown()) { if (sheet) closeSheet(); paint(); return; }
+        if (!shown()) { if (sheet) closeSheet(); if (window.CouchDetail && window.CouchDetail.isOpen()) window.CouchDetail.close(true); paint(); return; }
         if (!cur) { var S = stops(); cur = startStop(S); }
         paint();
       },
-      reset: function () { cur = null; last = null; closeSheet(); },
+      reset: function () { cur = null; last = null; closeSheet(); if (window.CouchDetail && window.CouchDetail.isOpen()) window.CouchDetail.close(true); },
       move: move, activate: function () { act(target()); }, current: function () { return cur ? { id: cur.id, i: cur.i } : null },
-      sheetOpen: function () { return !!sheet; }, back: function () { if (sheet) { closeSheet(); return true; } return false; },
+      sheetOpen: function () { return !!sheet; },
+      back: function () { if (window.CouchDetail && window.CouchDetail.isOpen()) { window.CouchDetail.close(); return true; } if (sheet) { closeSheet(); return true; } return false; },
+      detail: function () { var t = target(); if (t) openDetail(t); },
       // the designer's Remote path: from every stop, where each press goes
       paths: function () {
         var S = stops(), out = [], keep = cur, keepLast = last;
@@ -2198,6 +2221,8 @@
     imgOk: function (u) { return imgOk(u); },
     dataChanged: function (what, key) { key = JSON.stringify(key === undefined ? DATA_V + 1 : key); if (DATA_KEYS[what] === key) return; DATA_KEYS[what] = key; DATA_V++; if (D && ON) objects(D); },
     // a weather widget that needs the forecast is on the home: the TV asks Open-Meteo for it
+    // which of these widget kinds are on the home (air and surf ask their own free services only then)
+    wantsKinds: function (kinds) { var on = {}; if (D && ON) list(D.objects).forEach(function (o) { o = obj(o); if (o.type === "widget") [o].concat(list(o.items)).forEach(function (it) { if (kinds.indexOf(obj(it).kind) >= 0) on[obj(it).kind] = 1; }); }); return Object.keys(on); },
     wantsForecast: function () { return !!(D && ON && list(D.objects).some(function (o) { o = obj(o); return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return ["weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "air", "surf", "date"].indexOf(it.kind) >= 0; }); })); },
     nogo: function (part) { var pb = PART_BOX.filter(function (x) { return x[0] === part; })[0], n = pb && document.querySelector(pb[1]); return !!(n && n.getAttribute("data-nogo")); },
     // where the remote starts on the dock: the first app, as couch-tv does; with no app showing (a
