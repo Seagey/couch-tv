@@ -122,6 +122,14 @@ r = V.sniff(big);
 ok(!r.ok && /too big/.test(r.why), "over 8 MB: refused (" + r.why + ")");
 const mid = new Uint8Array(5 * 1024 * 1024); mid.set(mp4());
 ok(V.sniff(mid).ok && !V.sniff(mid, { h: 720 }).ok, "5 MB: fine for the 1080p copy, too big for the 720p copy");
+// an official design's long loop from the store (opts.long): up to 4 minutes, 24 MB (16 MB at 720p)
+ok(V.sniff(mp4({ seconds: 196 }), { long: true }).ok && !V.sniff(mp4({ seconds: 196 })).ok, "a 3:16 loop: passes from the store, refused as a 15 s copy");
+r = V.sniff(mp4({ seconds: 241 }), { long: true });
+ok(!r.ok && /at most 240 s/.test(r.why), "over 4 minutes: refused even from the store (" + r.why + ")");
+const lbig = new Uint8Array(20 * 1024 * 1024); lbig.set(mp4({ seconds: 196, w: 1920, h: 1080 }));
+ok(V.sniff(lbig, { long: true }).ok && !V.sniff(lbig, { long: true, h: 720 }).ok && !V.sniff(lbig).ok, "20 MB: fine for the long 1080p loop, too big at 720p (16 MB) or as a 15 s copy");
+ok(!V.sniff(mp4({ seconds: 60, w: 3840, h: 2160 }), { long: true }).ok, "a long loop is still at most 1920x1080");
+ok(V.LIMIT.long.memory === 2 && V.LIMIT.long.fetchMs >= 120000, "the long loop: only on 2 GB TVs or more, with minutes to arrive");
 
 // WebM, built element by element
 const vintSize = (n) => { const b = Buffer.alloc(8); b[0] = 0x01; b.writeUIntBE(n, 2, 6); return b; };

@@ -7,6 +7,8 @@
 //     stop it and let go of the decoder; the home coming back starts it again;
 //  4. from the store: played from memory once its bytes pass; bytes that are not a video, or a video
 //     the TV cannot play, leave the still picture and say why; Lighter home keeps the still picture;
+//     an official design's long loop (over 15 s) is asked for, played, and kept on the TV, so a
+//     restart plays it without asking the store again;
 //  5. the cost: frames a second and main thread time at 4x slower CPU, with the still picture, the
 //     video, and the video under frosted panels.
 // Shots go to $SHOTS (default: the system temp folder, couchtv-video-bg).
@@ -19,6 +21,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import assert from "node:assert";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -39,16 +42,26 @@ const STORE = {
   // a whole index, but the pictures cut off after a few bytes: passes the byte check, cannot play
   BrokenPicturesMp4x01: { type: "video/mp4", body: RAIN.subarray(0, mdatAt + 2000) }
 };
+// an official design's long loop: the rain loop four times over (a stream copy, no encode), about 40 s
+let LONG = null;
+try {
+  const out = path.join(SHOTS, "long-loop.mp4");
+  execFileSync("ffmpeg", ["-nostdin", "-v", "error", "-y", "-stream_loop", "3", "-i", path.join(WEB, "backgrounds/loop-rain.mp4"), "-c", "copy", "-an", "-movflags", "+faststart", out]);
+  LONG = fs.readFileSync(out);
+} catch (e) { console.log("  (no ffmpeg: the long loop checks are left out)"); }
+if (LONG) STORE.LongLoopOfficial01 = { type: "video/mp4", body: RAIN, long: LONG };
 const asked = [];
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".ttf": "font/ttf", ".mp4": "video/mp4" };
 const server = http.createServer((req, res) => {
-  const m = /^\/v1\/assets\/video\/([A-Za-z0-9_-]+)\?h=(720|1080)$/.exec(req.url);
+  const m = /^\/v1\/assets\/video\/([A-Za-z0-9_-]+)\?h=(l?(?:720|1080))$/.exec(req.url);
   if (m) {
     asked.push({ id: m[1], h: m[2], cookie: req.headers.cookie || "", referer: req.headers.referer || "" });
     const v = STORE[m[1]];
     if (!v) { res.writeHead(404); res.end(); return; }
-    res.writeHead(200, { "content-type": v.type, "content-length": v.body.length, "access-control-allow-origin": "*" });
-    res.end(v.body);
+    // as the store: the long loop when asked and there is one, else the 15 s copy
+    const body = m[2][0] === "l" && v.long ? v.long : v.body;
+    res.writeHead(200, { "content-type": v.type, "content-length": body.length, "access-control-allow-origin": "*" });
+    res.end(body);
     return;
   }
   const p = path.normalize(decodeURIComponent(req.url.split("?")[0])).replace(/^(\.\.[/\\])+/, "");
@@ -186,7 +199,7 @@ console.log("Running video background browser tests...");
   const s = await vstate(page);
   ok(/^blob:/.test(s.src) && s.shown, "a store video plays from memory (" + s.src.slice(0, 40) + "...)");
   const a = asked.filter((x) => x.id === "GoodVideoFromStore01");
-  ok(a.length === 1 && !a[0].cookie && !a[0].referer && (a[0].h === "720" || a[0].h === "1080"), "asked the store once, no cookie, no referrer, for the " + (a[0] && a[0].h) + "p copy");
+  ok(a.length === 1 && !a[0].cookie && !a[0].referer && /^l(720|1080)$/.test(a[0].h), "asked the store once, no cookie, no referrer, for the long loop if there is one (" + (a[0] && a[0].h) + "; this one has none, so its 15 s copy came)");
   const pol = await page.evaluate(() => (document.querySelector('meta[data-tvdesigner="policy"]') || {}).content || "");
   ok(/media-src 'self' blob: http:\/\/127\.0\.0\.1:\d+;/.test(pol), "the page policy lets videos come only from here, memory and the store (" + (pol.match(/media-src [^;]*/) || [""])[0] + ")");
   await page.screenshot({ path: path.join(SHOTS, "rain-from-store.png") });
@@ -202,6 +215,27 @@ for (const [id, want, label] of [["NotAVideoAtAllJpeg01", /not a video/, "bytes 
   ok(/still picture shows/.test(row), "Home settings says so too: " + row);
   ok(!page.errors.length, "no page errors " + page.errors.join(" | "));
   if (id === "BrokenPicturesMp4x01") await page.screenshot({ path: path.join(SHOTS, "broken-fallback.png") });
+  await page.close();
+}
+if (LONG) { // 4c. an official design's long loop: played whole, looping; kept, so a restart asks nothing
+  const page = await home({ v: 1, background: { image: "backgrounds/loop-rain.jpg", video: "store:LongLoopOfficial01", darken: 0 } });
+  await until(page, "playing", 20000);
+  const s = await vstate(page);
+  const d = await page.evaluate(() => document.querySelector("#cd-bg video").duration);
+  const a = asked.filter((x) => x.id === "LongLoopOfficial01");
+  ok(d > 30 && s.loop && /^blob:/.test(s.src), "the long loop plays from memory, " + d.toFixed(1) + " s, looping");
+  ok(a.length === 1 && /^l(720|1080)$/.test(a[0].h), "asked once, for the long loop (" + a.map((x) => x.h).join(", ") + ")");
+  // the TV restarts: the home loads again in the same browser
+  await page.waitForTimeout(500);
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.classList.contains("cd"));
+  await until(page, "playing", 20000);
+  const d2 = await page.evaluate(() => document.querySelector("#cd-bg video").duration);
+  ok(asked.filter((x) => x.id === "LongLoopOfficial01").length === 1 && d2 > 30, "after a restart it plays from the TV's own copy: the store was not asked again (" + d2.toFixed(1) + " s)");
+  // only the current design's video is kept
+  const kept = await page.evaluate(() => new Promise((r) => { const q = indexedDB.open("couchtv-video"); q.onsuccess = () => { const t = q.result.transaction("v").objectStore("v").getAllKeys(); t.onsuccess = () => r(t.result); }; }));
+  ok(kept.length === 1 && /^LongLoopOfficial01:(720|1080):l$/.test(kept[0]), "one video kept on the TV: " + JSON.stringify(kept));
+  ok(!page.errors.length, "no page errors " + page.errors.join(" | "));
   await page.close();
 }
 { // 4b. Lighter home: the still picture only, and the store is not asked at all

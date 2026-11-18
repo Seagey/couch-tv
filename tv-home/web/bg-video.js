@@ -16,6 +16,13 @@
 // checked again once it loads (its length and size), and watched for a few seconds: a TV that drops
 // a quarter of its frames goes back to the still picture and remembers that for a week.
 //
+// An official gallery design's video may also have a long seamless loop (up to 4 minutes, 16 MB at
+// 720p and 24 MB at 1080p; the store keeps those for official listings only). A TV with 2 GB of
+// memory or more asks for it (?h=l720 or ?h=l1080); a store without one answers the 15 s copy, and if
+// the long one cannot be fetched in time the TV asks for the 15 s copy instead. Once a store video
+// has played, the TV keeps it on its own storage (IndexedDB, one video only, the design's current
+// one), so the next start, and every one after, plays it without asking the store again.
+//
 // While an app is in front, the screen saver or the ambient clock is up, or the screen is off, the
 // video stops and lets go of the TV's decoder (the app in front may need it); it starts again from
 // memory when the home comes back.
@@ -23,7 +30,9 @@
   "use strict";
 
   var LIMIT = { seconds: 15, slack: 0.5, bytes: 8 * 1024 * 1024, w: 1920, h: 1080,
-    bytes720: 4 * 1024 * 1024, w720: 1280, h720: 720, startMs: 12000, fetchMs: 20000, dropAt: 0.25, slowDays: 7 };
+    bytes720: 4 * 1024 * 1024, w720: 1280, h720: 720, startMs: 12000, fetchMs: 20000, dropAt: 0.25, slowDays: 7,
+    // an official design's long loop from the store: longer, bigger, more time to fetch (once)
+    long: { seconds: 240, bytes: 24 * 1024 * 1024, bytes720: 16 * 1024 * 1024, fetchMs: 180000, memory: 2 } };
   // the built in loops: drawn from code for couch-tv (tv-home/tools/loops), 1280x720, 10 s, H.264
   var LOOPS = [
     { id: "rain", name: "Rain on glass", video: "backgrounds/loop-rain.mp4", image: "backgrounds/loop-rain.jpg" },
@@ -136,17 +145,19 @@
     r.codec = r.codec === "V_VP8" ? "vp8" : "vp9";
     return r;
   }
-  // bytes: a Uint8Array of the whole file. opts.h: 720 for the smaller copy's limits.
+  // bytes: a Uint8Array of the whole file. opts.h: 720 for the smaller copy's limits. opts.long: a
+  // video from the store, which may be an official design's long loop (LIMIT.long).
   // Answers { ok, type, codec, seconds, w, h } or { ok: false, why }.
   function sniff(bytes, opts) {
     opts = opts || {};
     var b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || 0);
-    var small = opts.h === 720, max = small ? LIMIT.bytes720 : LIMIT.bytes;
+    var L = opts.long ? LIMIT.long : LIMIT, secs = opts.long ? LIMIT.long.seconds : LIMIT.seconds;
+    var small = opts.h === 720, max = small ? L.bytes720 : L.bytes;
     if (b.length < 32) return { ok: false, why: "not a video" };
     if (b.length > max) return { ok: false, why: "too big (" + (b.length / 1048576).toFixed(1) + " MB, at most " + max / 1048576 + " MB)" };
     var r = fourcc(b, 4) === "ftyp" ? mp4(b) : webm(b);
     if (r.why) return { ok: false, why: r.why };
-    if (r.seconds > LIMIT.seconds + LIMIT.slack) return { ok: false, why: "too long (" + r.seconds.toFixed(1) + " s, at most " + LIMIT.seconds + " s)" };
+    if (r.seconds > secs + LIMIT.slack) return { ok: false, why: "too long (" + r.seconds.toFixed(1) + " s, at most " + secs + " s)" };
     if (r.w > (small ? LIMIT.w720 : LIMIT.w) || r.h > (small ? LIMIT.h720 : LIMIT.h)) return { ok: false, why: "too big a picture (" + r.w + "x" + r.h + ")" };
     r.ok = true;
     return r;
@@ -179,7 +190,7 @@
   // "paused" (the home is not on screen), "failed" (could not play: the picture stays).
   function player(host, o) {
     o = o || {};
-    var v = null, ref = "", url = "", owned = "", state = "off", why = "", want = false, timer = null, watch = null, stuck = null, fetching = null, gen = 0;
+    var v = null, ref = "", url = "", owned = "", state = "off", why = "", want = false, timer = null, watch = null, stuck = null, fetching = null, gen = 0, keep = null, hit = false;
     function set(s, w) { if (s === state && (w || "") === why) return; state = s; why = w || ""; if (o.onState) o.onState(state, why); }
     function el() {
       if (v) return v;
@@ -196,8 +207,9 @@
       if (v && v.getAttribute("src")) { v.pause(); v.removeAttribute("src"); try { v.load(); } catch (e) {} }
       if (v) v.classList.remove("on");
     }
-    function forget() { release(); if (owned) { try { URL.revokeObjectURL(owned); } catch (e) {} } owned = ""; url = ""; }
-    function fail(w) { release(); set("failed", w); }
+    function forget() { release(); if (owned) { try { URL.revokeObjectURL(owned); } catch (e) {} } owned = ""; url = ""; keep = null; hit = false; }
+    // a kept video that no longer plays is let go, so the next start asks the store again
+    function fail(w) { if (hit) cache.drop(); hit = false; keep = null; release(); set("failed", w); }
     function load(r) {
       if (r !== ref) { gen++; forget(); fetching = null; ref = r || ""; if (state === "failed") { state = "off"; why = ""; } }
       update();
@@ -215,16 +227,27 @@
       if (fetching) return;
       var base = o.base ? o.base() : "";
       if (!base || typeof fetch !== "function") { fail("no design store to ask"); return; }
-      var g = gen, h = t.tier === "1080" ? 1080 : 720;
+      var g = gen, h = t.tier === "1080" ? 1080 : 720, env = o.env ? o.env() : {};
+      // the long loop only where it fits: 2 GB of memory or more (a TV that does not say asks for the 15 s copy)
+      var long = !env.designer && env.memory >= LIMIT.long.memory, key = id + ":" + h + (long ? ":l" : "");
       set("loading");
-      fetching = getStore(base, id, h).then(function (buf) {
+      var got = function (blob) { if (g !== gen) return; fetching = null; owned = url = URL.createObjectURL(blob); update(); };
+      var fresh = function () {
+        var ask = function (l) {
+          return getStore(base, id, h, l).then(function (buf) {
+            var s = sniff(new Uint8Array(buf), { h: h, long: true });
+            if (!s.ok) throw new Error(s.why);
+            return new Blob([buf], { type: s.type });
+          });
+        };
+        // the long loop first; if it cannot come (too slow, too big, refused), the 15 s copy
+        return long ? ask(true).then(null, function (e) { if (g !== gen) throw e; return ask(false); }) : ask(false);
+      };
+      fetching = cache.get(key).then(function (blob) {
         if (g !== gen) return;
-        fetching = null;
-        var s = sniff(new Uint8Array(buf), { h: h });
-        if (!s.ok) { fail(s.why); return; }
-        owned = url = URL.createObjectURL(new Blob([buf], { type: s.type }));
-        update();
-      }, function (e) { if (g === gen) { fetching = null; fail(e && e.message || "could not fetch it"); } });
+        if (blob) { hit = true; got(blob); return; }
+        return fresh().then(function (blob) { keep = { key: key, blob: blob }; got(blob); });
+      }).then(null, function (e) { if (g === gen) { fetching = null; fail(e && e.message || "could not fetch it"); } });
     }
     function start() {
       var e = el(), g = gen;
@@ -232,7 +255,8 @@
         set("loading");
         e.onloadedmetadata = function () {
           if (g !== gen) return;
-          if (e.duration > LIMIT.seconds + LIMIT.slack && isFinite(e.duration)) fail("too long (" + e.duration.toFixed(1) + " s)");
+          var most = storeId(ref) ? LIMIT.long.seconds : LIMIT.seconds;   // the store may send an official long loop
+          if (e.duration > most + LIMIT.slack && isFinite(e.duration)) fail("too long (" + e.duration.toFixed(1) + " s)");
           else if (e.videoWidth > LIMIT.w || e.videoHeight > LIMIT.h) fail("too big a picture (" + e.videoWidth + "x" + e.videoHeight + ")");
         };
         // it counts as playing once its clock really moves (a TV may say "playing" with no picture to
@@ -242,6 +266,8 @@
           clearTimeout(timer); timer = null;
           e.classList.add("on");
           set("playing");
+          // it plays: keep it on this TV, so the next start does not ask the store again
+          if (keep) { cache.put(keep.key, keep.blob); keep = null; }
           clearTimeout(watch);
           watch = setTimeout(checkFrames, 8000);
           stuckWatch(g, e.currentTime, 0);
@@ -279,18 +305,58 @@
       destroy: function () { gen++; forget(); ref = ""; if (v && v.parentNode) v.parentNode.removeChild(v); v = null; set("off"); }
     };
   }
-  function getStore(base, id, h) {
+  // long: ask for an official design's long loop (?h=l720|l1080); the store answers the 15 s copy
+  // when the video has none, and an older store reads it as its 720p copy
+  function getStore(base, id, h, long) {
     var ctl = typeof AbortController === "function" ? new AbortController() : null;
-    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, LIMIT.fetchMs);
-    return fetch(base + "/v1/assets/video/" + encodeURIComponent(id) + "?h=" + h, {
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, long ? LIMIT.long.fetchMs : LIMIT.fetchMs);
+    return fetch(base + "/v1/assets/video/" + encodeURIComponent(id) + "?h=" + (long ? "l" : "") + h, {
       method: "GET", mode: "cors", credentials: "omit", referrerPolicy: "no-referrer", redirect: "error", signal: ctl ? ctl.signal : undefined
     }).then(function (r) {
       if (!r.ok) throw new Error(r.status === 404 ? "the store no longer has it" : "the store said no (" + r.status + ")");
-      var max = h === 720 ? LIMIT.bytes720 : LIMIT.bytes, len = Number(r.headers.get("content-length"));
+      var L = long ? LIMIT.long : LIMIT, max = h === 720 ? L.bytes720 : L.bytes, len = Number(r.headers.get("content-length"));
       if (len > max) throw new Error("too big (" + (len / 1048576).toFixed(1) + " MB)");
       return r.arrayBuffer();
     }).then(function (buf) { clearTimeout(timer); return buf; }, function (e) { clearTimeout(timer); throw e && e.name === "AbortError" ? new Error("the store was too slow") : e; });
   }
+
+  // ---------------------------------------------------------------- the one video kept on this TV
+  // IndexedDB (it works on the plain http pages the TV home runs on, where the Cache API does not),
+  // one entry: the design's current store video as a Blob, which the browser keeps on disk, not in
+  // memory. Any trouble (no IndexedDB, private mode, full, slow) just means asking the store again.
+  var cache = (function () {
+    var DB = "couchtv-video", ST = "v", MS = 3000;
+    function open() {
+      return new Promise(function (ok) {
+        var done = false, t = setTimeout(function () { done = true; ok(null); }, MS);
+        try {
+          if (!window.indexedDB) { clearTimeout(t); ok(null); return; }
+          var rq = window.indexedDB.open(DB, 1);
+          rq.onupgradeneeded = function () { try { rq.result.createObjectStore(ST); } catch (e) {} };
+          rq.onsuccess = function () { clearTimeout(t); if (done) { try { rq.result.close(); } catch (e) {} return; } done = true; ok(rq.result); };
+          rq.onerror = rq.onblocked = function () { clearTimeout(t); if (!done) { done = true; ok(null); } };
+        } catch (e) { clearTimeout(t); ok(null); }
+      });
+    }
+    function tx(mode, fn) {
+      return open().then(function (db) {
+        if (!db) return null;
+        return new Promise(function (ok) {
+          try {
+            var x = db.transaction(ST, mode), out = fn(x.objectStore(ST));
+            x.oncomplete = function () { db.close(); ok(out && "result" in out ? out.result : null); };
+            x.onerror = x.onabort = function () { db.close(); ok(null); };
+          } catch (e) { try { db.close(); } catch (e2) {} ok(null); }
+        });
+      });
+    }
+    return {
+      get: function (key) { return tx("readonly", function (st) { return st.get(key); }).then(function (b) { return typeof Blob !== "undefined" && b instanceof Blob && b.size > 0 ? b : null; }, function () { return null; }); },
+      // one video only: whatever was kept before goes
+      put: function (key, blob) { return tx("readwrite", function (st) { st.clear(); st.put(blob, key); }).then(null, function () {}); },
+      drop: function () { return tx("readwrite", function (st) { st.clear(); }).then(null, function () {}); }
+    };
+  })();
 
   window.CouchVideo = { LIMIT: LIMIT, LOOPS: LOOPS, SLOW_KEY: SLOW_KEY, refOk: refOk, storeId: storeId, localOk: localOk,
     sniff: sniff, tier: function (env) { return tierOf(env).tier; }, tierWhy: tierOf, slowMarked: slowMarked, player: player };
