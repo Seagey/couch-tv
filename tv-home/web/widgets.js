@@ -1147,20 +1147,6 @@
       return stop(p, "person", x[3], x[1]);
     })));
   };
-  R.agenda = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "calendar", "agenda");
-    var ev = [["#ff9f0a", "School drop off", "8:30"], ["#30d158", "Swimming lessons, Ruby", "4:00"], ["#64d2ff", "Bins out, recycling", "7:00pm"], ["#bf5af2", "Movie night", "7:30pm"]];
-    if (b.w < 360) {
-      // narrow: the next event on a calendar page (the day, the date, what is next)
-      var d = now();
-      add(root, [E("div", "cw-t23", "font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub)", [DAYS[d.getDay()]]), E("div", "cw-big", "font-size:" + px(clamp(b.w / 2.6, 64, 110)), [String(d.getDate())]),
-        E("div", "cw-grow"), E("div", "cw-t29 cw-ell", "font-weight:680", ["Swimming"]), E("div", "cw-t23", "", ["4:00pm"])]);
-      return;
-    }
-    var n = clamp(Math.floor((b.h - 100) / 90), 1, ev.length);
-    add(root, [E("div", "cw-row cw-sp", "", [lab("calendar", op(o).label || "Today"), E("div", "cw-t23", "", [ev.length + " events"])]),
-      E("div", "cw-col cw-grow", "margin-top:20px;justify-content:space-around", ev.slice(0, n).map(function (e) { return E("div", "cw-ev", "", [E("i", "", "background:" + e[0]), E("div", "cw-t29 cw-ell", "", [e[1]]), E("div", "cw-t25", "", [e[2]])]); }))]);
-  };
 
   // info
   R.card = function (root, o, b, env) {
@@ -1386,12 +1372,6 @@
   CR.energy = sample("energy", "bolt", function (root, o, b) { mini(root, b, "bolt", "18.4", "kWh today", "Solar, battery 86%"); });
   CR.sensor = sample("sensor", "temperature", function (root, o, b) { mini(root, b, "temperature", "26°", op(o).label || "Pool", "Pool water"); });
   CR.battery = sample("battery", "bolt", function (root, o, b) { mini(root, b, "games", "12%", "Pad 2", "Charge it soon", "#ff453a"); });
-  CR.agenda = sample("agenda", "calendar", function (root, o, b) {
-    var d = now();
-    if (b.w < 300) return CR.month(root, o, b);
-    add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "align-items:center;flex:none;width:92px", [E("div", "cw-t23", "font-weight:750;color:#ff453a", [DAYS[d.getDay()].slice(0, 3).toUpperCase()]), E("div", "cw-big", "font-size:62px", [String(d.getDate())])]),
-      E("div", "cw-ev", "flex:1;min-width:0;margin-left:16px", [E("i", "", "background:#30d158"), E("div", "cw-col", "min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:680", ["Swimming"]), E("div", "cw-t23", "", ["4:00pm"])])])]));
-  });
   CR.news = sample("news", "info", function (root, o, b) {
     add(root, [E("div", "cw-t23", "color:#ff453a;font-weight:700", ["Local · 1h"]), E("div", "cw-t29", "font-weight:640;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden", ["Highway roadworks finish a month early"])]);
   });
@@ -1421,6 +1401,52 @@
   function ahLab(iconName, text, colour) {
     return E("div", "cw-lab", "max-width:100%;flex:none;" + (colour ? "color:" + colour : ""), [iconName ? ic(iconName, 30, colour || "currentColor") : null, E("span", "cw-ell", "flex:0 1 auto;min-width:0;margin-right:0", [text])]);
   }
+  // ---- Agenda: today's events from the calendar link kept on the TV ----
+  var EV_COL = ["#ff9f0a", "#30d158", "#64d2ff", "#bf5af2", "#ff453a", "#ffd60a"];
+  function hhmm(ms, env) { var p = clockParts(new Date(ms), {}, env); return p.t + p.ap; }
+  function dayStart(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
+  // the calendar's events for a day (0 today, 1 tomorrow), still to come when it is today
+  function evDay(evs, k, env) {
+    var t = now(), s = dayStart(t) + k * 86400000, e = s + 86400000;
+    return (evs || []).filter(function (x) { return x.start < e && x.end > s && (k || x.allDay || x.end > t.getTime()); })
+      .map(function (x, i) { return { title: x.title, when: x.allDay ? "All day" : hhmm(x.start, env), col: EV_COL[i % EV_COL.length], start: x.start, end: x.end, allDay: x.allDay }; });
+  }
+  function demoEvents() {
+    var s = dayStart(now()), h = 3600000;
+    return [["School drop off", 8.5, 9], ["Swimming lessons, Ruby", 16, 17], ["Bins out, recycling", 19, 19.25], ["Movie night", 19.5, 22]].map(function (x) { return { title: x[0], start: s + x[1] * h, end: s + x[2] * h, allDay: false }; });
+  }
+  function agendaOf(root, b, env) {
+    if (env.demo) { var de = demoEvents(); return { today: de.map(function (x, i) { return { title: x.title, when: hhmm(x.start, env), col: EV_COL[i], start: x.start, end: x.end }; }), tomorrow: [] }; }
+    var c = (athome(env) || {}).cal;
+    if (!c || !c.set) { soon(root, b, "calendar", "agenda"); return null; }
+    if (!c.events) { empty(root, b, "calendar", c.err ? (b.w < 300 ? "Calendar not read" : c.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), c.err ? "Home settings, couch-tv Studio, At home" : ""); return null; }
+    return { today: evDay(c.events, 0, env), tomorrow: evDay(c.events, 1, env) };
+  }
+  R.agenda = function (root, o, b, env) {
+    var a = ahAlign(root, o), ag = agendaOf(root, b, env);
+    if (!ag) return;
+    var d = now(), list = ag.today.length ? ag.today : ag.tomorrow, nx = list[0], heading = ag.today.length ? op(o).label || "Today" : "Tomorrow", day = DAYS[d.getDay()].slice(0, 3).toUpperCase() + " " + d.getDate();
+    if (b.h < 200) {
+      // a tile or a wide tile: the day, what is next and when
+      add(root, ahCol(a, [one1("cw-t23", "font-weight:750;color:#ff453a", b.w < 300 ? (ag.today.length || !nx ? day : "TOMORROW") : day + (ag.today.length || !nx ? "" : ", tomorrow")),
+        one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", nx ? nx.title : "Nothing on"), one1("cw-t23", "", nx ? nx.when : "today or tomorrow")]));
+      return;
+    }
+    if (b.w < 600 && b.h < 500) {
+      // a square: the day and the date, then what is next
+      add(root, ahCol(a, [one1("cw-t23", "font-weight:700;text-transform:uppercase;letter-spacing:.06em", DAYS[d.getDay()]), E("div", "cw-big", "flex:none;font-size:" + px(clamp(b.w / 3.4, 64, 110)), [String(d.getDate())]),
+        one1("cw-t29", "font-weight:680;margin-top:16px", nx ? nx.title : "Nothing on"),
+        one1("cw-t23", "", nx ? (ag.today.length ? "" : "Tomorrow, ") + nx.when + (ag.today.length > 1 ? ", then " + (ag.today.length - 1) + " more" : "") : "today or tomorrow")]));
+      return;
+    }
+    var n = clamp(Math.floor((b.h - 48 - 50) / 72), 1, 8), more = list.length > n ? list.length - (n - 1) : 0, shown = more ? list.slice(0, n - 1) : list;
+    add(root, ahCol(a, [ahLab("calendar", heading + (list.length ? " · " + list.length + (list.length === 1 ? " event" : " events") : "")),
+      list.length ? E("div", "cw-col", "max-width:100%;margin-top:14px;flex:none;align-items:" + (a === "right" ? "flex-end" : "flex-start"), shown.map(function (e) {
+        return E("div", "cw-ev", "max-width:100%;margin-top:14px", [E("i", "", "background:" + e.col), E("div", "cw-t29 cw-ell", "flex:0 1 auto;min-width:0", [e.title]), E("div", "cw-t25", "flex:none;margin-left:16px", [e.when])]);
+      }).concat(more ? [one1("cw-t23", "margin-top:14px", "and " + more + " more")] : [])) : one1("cw-t29", "font-weight:680;margin-top:16px", "Nothing on today or tomorrow")]));
+  };
+  CR.agenda = R.agenda;
+
   // ---- Family note ----
   function noteOf(env) { var n = env.demo ? { text: "Dinner at 6. Feed Max!", from: "Mum" } : (athome(env) || {}).note; return n && n.text ? n : null; }
   R.note = function (root, o, b, env) {
@@ -1594,6 +1620,6 @@
       roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
       // things typed at home (athome.js through app.js)
-      athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guideIcon: guideIcon, qrNode: qrNode }
+      athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL }
   };
 })();

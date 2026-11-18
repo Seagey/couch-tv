@@ -204,14 +204,52 @@
     S.body.appendChild(head("calendar", "Calendar", kit().longDate(d), "#ff453a"));
     var todayCol = E("div", "cwd-col", "width:430px", [E("div", "cwd-label", "color:#ff453a", [kit().DAYS[d.getDay()]]), E("div", "cwd-huge", "font-size:220px;line-height:.9", [String(d.getDate())]),
       E("div", "cwd-mid", "", [kit().MONTHS[m] + " " + y]), E("div", "cwd-small", "margin-top:10px", ["Day " + doy + " of the year, week " + week])]);
-    if (o.kind === "agenda" && env.demo) {
-      todayCol.appendChild(label("Today"));
-      [["#ff9f0a", "School drop off", "8:30am"], ["#30d158", "Swimming lessons", "4:00pm"], ["#64d2ff", "Bins out", "7:00pm"], ["#bf5af2", "Movie night", "7:30pm"]].forEach(function (e) {
-        todayCol.appendChild(E("div", "cwd-ev", "", [E("i", "", "background:" + e[0]), E("span", "", "", [e[1]]), E("b", "", "", [e[2]])]));
-      });
-    }
+    var evs = o.kind === "agenda" ? (env.demo ? kit().demoEvents() : ((kit().athome(env) || {}).cal || {}).events) : null;
+    if (o.kind === "agenda" && !evs) return B.setup(o, env);
+    if (evs) return agendaDay(evs, env, todayCol);
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:flex-start;margin-top:36px", [todayCol, E("div", "cwd-row", "margin-left:60px;align-items:flex-start", [monthGrid(y, m, d.getDate()), E("div", "", "width:56px"), monthGrid(m === 11 ? y + 1 : y, (m + 1) % 12, -1)])]));
   };
+
+  // the Agenda: today's events on a timeline (6am to midnight, overlapping ones side by side), then
+  // the rest of the week. Titles and times only, from the calendar link kept on this TV.
+  function agendaDay(evs, env, todayCol) {
+    var K = kit(), d = K.now(), s0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    var all = evs.filter(function (x) { return x.start < s0 + 86400000 && x.end > s0; });
+    todayCol.appendChild(label("Today"));
+    var allDay = all.filter(function (x) { return x.allDay; }), timed = all.filter(function (x) { return !x.allDay; });
+    if (!all.length) todayCol.appendChild(E("div", "cwd-text", "", ["Nothing on today."]));
+    all.slice(0, 7).forEach(function (e, i) { todayCol.appendChild(F(E("div", "cwd-ev", "", [E("i", "", "background:" + K.EV_COL[i % K.EV_COL.length]), E("span", "cwd-ell", "", [e.title]), E("b", "", "flex:none;margin-left:14px", [e.allDay ? "All day" : K.hhmm(e.start, env)])]), null, e.title)); });
+    // the timeline: hours across, each event a block in its lane
+    // the hours that matter today: from just before the first event to just after the last, at least 8
+    var hrs = timed.map(function (e) { return [(e.start - s0) / 3600000, (e.end - s0) / 3600000]; });
+    var H0 = hrs.length ? clamp(Math.floor(Math.min.apply(null, hrs.map(function (x) { return x[0]; }))) - 1, 0, 16) : 6;
+    var H1 = hrs.length ? clamp(Math.ceil(Math.max.apply(null, hrs.map(function (x) { return x[1]; }))) + 1, H0 + 8, 24) : 24;
+    H0 = Math.min(H0, H1 - 8);
+    var W = 1180, HW = W / (H1 - H0), lanes = [], blocks = [];
+    timed.forEach(function (e, i) {
+      var a = Math.max(H0, (e.start - s0) / 3600000), z = Math.min(H1, Math.max(a + 0.5, (e.end - s0) / 3600000));
+      if (z <= H0 || a >= H1) return;
+      var lane = 0; while (lanes[lane] !== undefined && lanes[lane] > a) lane++;
+      if (lane > 3) return;
+      lanes[lane] = z;
+      blocks.push(E("div", "cwd-tblock", "left:" + px((a - H0) * HW) + ";top:" + px(56 + lane * 96) + ";width:" + px(Math.max(60, (z - a) * HW - 6)) + ";background:" + K.EV_COL[all.indexOf(e) % K.EV_COL.length], [E("span", "cwd-ell", "", [e.title])]));
+    });
+    var hours = [];
+    for (var h = H0; h <= H1; h += H1 - H0 > 12 ? 3 : 2) hours.push(E("div", "cwd-thour", "left:" + px((h - H0) * HW), [h === 24 ? "" : K.fmt12(new Date(2000, 0, 1, h, 0)).replace(":00", "")]));
+    var nowAt = (d.getTime() - s0) / 3600000, nowLine = nowAt > H0 && nowAt < H1 ? E("div", "cwd-tnow", "left:" + px((nowAt - H0) * HW)) : null;
+    var line = E("div", "cwd-timeline", "width:" + px(W) + ";height:" + px(56 + Math.max(1, lanes.length) * 96), hours.concat(blocks, nowLine ? [nowLine] : []));
+    // the next six days
+    var week = E("div", "cwd-col", "", []);
+    for (var k = 1; k <= 6; k++) {
+      var ds = s0 + k * 86400000, de = ds + 86400000, these = evs.filter(function (x) { return x.start < de && x.end > ds; });
+      if (!these.length) continue;
+      var dd = new Date(ds);
+      week.appendChild(F(E("div", "cwd-wkrow", "", [E("b", "", "", [K.DAYS[dd.getDay()].slice(0, 3) + " " + dd.getDate()]), E("span", "cwd-ell", "", [these.slice(0, 4).map(function (x) { return x.title + (x.allDay ? "" : " " + K.hhmm(x.start, env)); }).join(", ") + (these.length > 4 ? " and " + (these.length - 4) + " more" : "")])]), null, "day " + k));
+    }
+    if (!week.childNodes.length) week.appendChild(E("div", "cwd-text", "", ["Nothing else this week."]));
+    var right = E("div", "cwd-col", "margin-left:60px;min-width:0;flex:1", [label(allDay.length && !timed.length ? "Today, all day" : "Today, hour by hour"), line, label("This week"), week]);
+    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:flex-start;margin-top:36px", [todayCol, right]));
+  }
 
   // things typed at home (Home settings, couch-tv Studio, At home), kept on this TV
   B.note = function (o, env) {

@@ -672,6 +672,23 @@ Unknown keys and wrong shapes are dropped. Larger than 32 KB answers `413`. With
 A) the TV keeps them alone. The on-TV app (option C) keeps them in its own `/api/settings` under
 the same `settings` key, next to its setup settings.
 
+### Calendar: `POST /api/calendar`
+For couch-tv Studio's Agenda widget on a TV whose home this computer runs (a Samsung, LG, Philips,
+TiVo OS or Panasonic TV, or a Hisense with a computer): a web page cannot read a Google, Apple or
+Outlook calendar itself. The TV sends the calendar's private address it keeps (Home settings, couch-tv
+Studio, At home) and gets the calendar's words back:
+
+```json
+{"url": "https://calendar.example.com/private-abc/basic.ics"}
+{"ok": true, "text": "BEGIN:VCALENDAR\r\n..."}
+```
+A calendar app's own link (the same address with a scheme ending in `cal`) is read as `https://`. Only https, no name or password in the address, no address on the
+home network or this computer (every redirect is checked the same way, at most 3), 4 MB at most, and
+only an answer that is a calendar: anything else is `400` with a short reason (`not a calendar link`,
+`that address is not on the internet`, `http 404`, `not a calendar`, `too big`, `unreachable`), never
+the address. The bridge keeps nothing: the address is not stored, logged or put in the action history
+(`bridge/agenda.py`).
+
 ### `GET /api/history`
 ```json
 {"ok": true, "items": [{"title": "Bluey", "service": "abc-iview", "who": "person1",
