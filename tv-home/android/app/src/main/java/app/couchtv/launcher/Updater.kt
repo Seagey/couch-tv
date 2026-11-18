@@ -15,6 +15,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -44,7 +45,9 @@ import java.util.concurrent.Executors
  * the smart home section) stays.
  *
  * Which releases: BuildConfig.UPDATE_REPO (-PupdateRepo=owner/name at build time, Seagey/couch-tv
- * by default). An empty value switches updates off for that build.
+ * by default). An empty value switches updates off for that build. Which of them: the channel,
+ * BuildConfig.UPDATE_CHANNEL (ReleaseChannel.kt). Every build people download is "stable", which never
+ * takes a pre-release or a beta tag; only a test build made with -PupdateChannel=beta looks at betas.
  */
 object Updater {
     private const val STORE = "update"
@@ -74,20 +77,9 @@ object Updater {
     private fun repo(): String? = BuildConfig.UPDATE_REPO.takeIf { REPO.matches(it) }
     private fun current(): String = BuildConfig.VERSION_NAME
 
-    /** True when version a is newer than b ("v0.4" > "0.3", "0.10" > "0.9"). */
-    fun newer(a: String, b: String): Boolean {
-        val x = parts(a)
-        val y = parts(b)
-        for (i in 0 until maxOf(x.size, y.size)) {
-            val p = x.getOrElse(i) { 0 }
-            val q = y.getOrElse(i) { 0 }
-            if (p != q) return p > q
-        }
-        return false
-    }
-
-    private fun parts(v: String) = v.trim().removePrefix("v").split('.', '-', '+')
-        .map { s -> s.takeWhile { it.isDigit() }.toIntOrNull() ?: 0 }
+    /** True when version a is newer than b ("v0.4" > "0.3", "0.10" > "0.9", "0.13" > "0.13-beta.1"). */
+    fun newer(a: String, b: String): Boolean = ReleaseChannel.newer(a, b)
+    private fun beta(): Boolean = BuildConfig.UPDATE_CHANNEL == "beta"
 
     /** Everything the page shows in Home settings, Updates. */
     fun state(ctx: Context): String {
@@ -100,6 +92,7 @@ object Updater {
         return JSONObject()
             .put("supported", repo() != null)
             .put("current", current())
+            .put("channel", if (beta()) "beta" else "stable")
             .put("latest", latest)
             .put("title", s.getString("title", "") ?: "")
             .put("available", offered)
@@ -158,7 +151,15 @@ object Updater {
             val s = store(app)
             s.edit().putLong("tried", System.currentTimeMillis()).apply()
             try {
-                val j = JSONObject(open("https://api.github.com/repos/$repo/releases/latest", json = true).use { it.readText() })
+                val j = release(repo)
+                if (j == null) {
+                    // nothing this channel may take (on stable: the newest release is marked as a test)
+                    s.edit().putLong("checked", System.currentTimeMillis()).apply()
+                    error = ""
+                    busy = ""
+                    changed(app)
+                    return@execute
+                }
                 val tag = j.getString("tag_name").trim()
                 var url = ""
                 var digest = ""
@@ -189,6 +190,27 @@ object Updater {
             // an update installed earlier leaves its copy behind: tidy it away
             if (!newer(s.getString("latest", "") ?: "", current())) File(app.cacheDir, "update").deleteRecursively()
         }
+    }
+
+    /**
+     * The release this TV may go to. Stable: GitHub's latest (never a draft or a pre-release), and
+     * only if its tag is not a test one either. Beta: the newest of the recent releases, betas included.
+     */
+    private fun release(repo: String): JSONObject? {
+        fun asset(j: JSONObject): Boolean {
+            val a = j.optJSONArray("assets") ?: return false
+            for (i in 0 until a.length()) if (a.getJSONObject(i).optString("name") == ASSET) return true
+            return false
+        }
+        fun info(j: JSONObject) = ReleaseChannel.Release(j.optString("tag_name").trim(), j.optBoolean("prerelease"), j.optBoolean("draft"), asset(j))
+        if (!beta()) {
+            val j = JSONObject(open("https://api.github.com/repos/$repo/releases/latest", json = true).use { it.readText() })
+            return j.takeIf { ReleaseChannel.stableOk(info(it)) }
+        }
+        val arr = JSONArray(open("https://api.github.com/repos/$repo/releases?per_page=15", json = true).use { it.readText() })
+        val all = (0 until arr.length()).map { arr.getJSONObject(it) }
+        val pick = ReleaseChannel.pickBeta(all.map { info(it) }) ?: return null
+        return all.firstOrNull { it.optString("tag_name").trim() == pick.tag }
     }
 
     /** "Update to ...": download, check, then Android's installer asks the person at the TV. */

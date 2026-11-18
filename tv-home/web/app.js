@@ -54,7 +54,7 @@
 
   // Settings from the bridge's config.json (served as config.js, and saved with the offline copy),
   // read in readConfig() once the page starts (mock.js fills them in for previews). See docs/CONFIG.md.
-  var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [], DESIGN_FROM_CODE = false;
+  var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [], DESIGN_FROM_CODE = false, GATE = { on: false, design: null };
   // A picture that fails to load falls back to what its data-err names (kids.js uses it too). One
   // listener instead of inline onerror handlers, so the page runs under a strict Content Security
   // Policy (index.html) that allows no inline script at all.
@@ -249,6 +249,7 @@
     picture: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" class="fill"/></svg>',
     more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>',
     gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+    designer: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="13" rx="2.5"/><path d="M8 21h8M12 17.5V21M9 13l5.5-5.5 2 2L11 15H9z"/></svg>',
     look: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="3"/><path d="M2.5 16l5.5-5.5 4.5 4.5 3-3 6 6"/><circle cx="16.5" cy="8.8" r="1.6"/></svg>',
     soundscape: '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
     screen_off: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4M3 3l18 18"/></svg>',
@@ -373,15 +374,21 @@
   // this TV (kept by the bridge too when there is one), then ?theme= for a preview. docs/CONFIG.md.
   function readConfig() {
     CFG = window.COUCH_CONFIG || {};
-    // a design got by code at this TV (design-code.js, Home settings, Look, Get a design) wins over one
-    // in config.json; it is always asked about first (CouchDesign.start with fromCode)
+    // TV Designer is opt in (designer-gate.js): until the person at this TV turns it on, no design
+    // reaches design.js at all and the home is exactly as it was. A design got by code at this TV
+    // (design-code.js, Home settings, TV Designer, Get a design) wins over one in config.json; it is
+    // always asked about first (CouchDesign.start with fromCode).
     var GOT = typeof CouchDesignCode !== "undefined" ? CouchDesignCode.kept() : null;
-    DESIGN_FROM_CODE = !!GOT;
-    if (GOT) CFG = Object.assign({}, CFG, { design: GOT });
+    GATE = typeof CouchDesigner !== "undefined" ? CouchDesigner.decide({ choice: CouchDesigner.readChoice(kept(CouchDesigner.KEY)),
+      cfgDesign: CFG.design, got: GOT, preview: /[?&]designer=1\b/.test(Q) || (MOCK && /[?&]design=local\b/.test(Q)) }) :
+      { on: false, design: null, fromCode: false };
+    DESIGN_FROM_CODE = !!GATE.fromCode;
+    CFG = Object.assign({}, CFG, { design: GATE.design || undefined });
+    if (!GATE.design) delete CFG.design;
     HOME = CFG.home || {};
     // a design from the TV Designer (design.js, docs/CONFIG.md "Design") may carry look settings of
     // its own (design.home): they win over home in config.json, Home settings still win over both
-    if (typeof CouchDesign !== "undefined") HOME = CouchDesign.home(HOME, CFG.design, { fromCode: DESIGN_FROM_CODE });
+    if (typeof CouchDesign !== "undefined" && CFG.design) HOME = CouchDesign.home(HOME, CFG.design, { fromCode: DESIGN_FROM_CODE });
     ON_TV = CFG.mode === "on-tv";
     ST = loadSettings();
     KEEP_PHOTO = typeof ST.keep_photo === "boolean" ? ST.keep_photo : HOME.keep_photo === true;
@@ -3444,7 +3451,7 @@
   // also on the computer (/api/settings), so the phone and the TV agree.
   var ST_KEY = "tvhome.settings";
   var SECS = [["language", "globe"], ["location", "pin"], ["weather", "cloud"], ["look", "look"],
-    ["apps", "apps"], ["people", "person"], ["quick", "bolt"], ["about", "info"]];
+    ["apps", "apps"], ["people", "person"], ["quick", "bolt"], ["designer", "designer"], ["about", "info"]];
   var SET = { col: "secs", sec: 0, ri: 0, keyFocus: null, sub: null, lift: null, confirm: null, dirty: false, typing: null,
     msg: "", geo: { q: "", list: null, busy: false, err: false } };
   var REPO_URL = "github.com/Seagey/couch-tv";
@@ -3528,6 +3535,8 @@
   }
 
   // ---- rows ----
+  // TV Designer is a name, the same in every language
+  function secName(id) { return id === "designer" ? "TV Designer" : t("sec_" + id); }
   function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(SECS[SET.sec][0]); }
   function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info"; }
   function firstRow(rows) { for (var i = 0; i < rows.length; i++) if (focusable(rows[i])) return i; return -1; }
@@ -3542,6 +3551,7 @@
     if (id === "location") return locationRows();
     if (id === "weather") return weatherRows();
     if (id === "look") return lookRows();
+    if (id === "designer") return designerRows();
     if (id === "apps") return appsRows();
     if (id === "people") return peopleRows();
     if (id === "quick") return quickRows();
@@ -3694,8 +3704,8 @@
   }
 
   // ---- look, scenes and the household's own photos ----
-  // Get a design (design-code.js): only when config.json names a design store. The TV asks that one
-  // server for the code typed here; nothing connects to the TV. English only for now (needs i18n).
+  // Get a design (design-code.js): from config.json's design store, else TV Designer's own. The TV asks
+  // that one server for the code typed here; nothing connects to the TV. English only for now (needs i18n).
   function designCodeRows(rows) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.base()) return;
     rows.push({ kind: "input", key: "design-get", label: "Get a design", sub: "Type the code the TV Designer shows you", act: function () {
@@ -3709,11 +3719,75 @@
     SET.msg = "Getting the design...";
     renderSettings();
     CouchDesignCode.get(typed).then(function () {
+      setDesigner(true);   // typing a code is asking for TV Designer: it is on from now
       SET.msg = "Got it. Your TV asks you about it now.";
       renderSettings();
       setTimeout(restart, 600);   // it starts again and shows "Use this design?" first
     }, function (e) {
       SET.msg = (e && e.message) || "That design could not be used.";
+      if (zone === "settings") renderSettings();
+    });
+  }
+  // ---- TV Designer (designer-gate.js): opt in, and one step back to the classic home ----
+  // English only for now, like the rows above (needs i18n). The section's name is the product's.
+  function setDesigner(on) {
+    keep(CouchDesigner.KEY, on ? "on" : "off");
+    // on again: designs switched off with Back held (design.js) come back too
+    if (on) try { localStorage.removeItem("couchtv.design.off"); } catch (e) {}
+    SET.dirty = true;
+  }
+  function designerRows() {
+    var rows = [], on = GATE.on || (typeof CouchDesign !== "undefined" && CouchDesign.on());
+    if (typeof CouchDesigner === "undefined") return [info("dz-none", "TV Designer", "", "Not in this version of the home.")];
+    if (!on) {
+      rows.push(info("dz-off", "TV Designer", "Off", "Design your home on your phone, then send it to this TV. While it is off, your home stays exactly as it is."));
+      rows.push({ kind: "action", key: "dz-turn-on", label: "Turn on TV Designer", sub: "Nothing changes until you choose a design", act: function () {
+        setDesigner(true); SET.msg = "TV Designer is on. Get a design below, or close Home settings.";
+      } });
+    } else {
+      rows.push({ kind: "action", key: "dz-classic", label: "Back to my classic home", sub: "Turns TV Designer off in one step. Your design is kept for later.", act: function () {
+        setDesigner(false); SET.msg = "TV Designer is off. Your classic home comes back when you close Home settings.";
+      } });
+      // a design switched off with Back held, or not chosen yet: it comes back here
+      if (CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.settingsRow) rows.push(CouchDesign.settingsRow(restart));
+    }
+    designCodeRows(rows);
+    rows.push({ kind: "action", key: "dz-share", label: "Share this home", sub: "Open it in TV Designer on your phone. No names, photos or places are sent.", act: shareHome });
+    return rows;
+  }
+  // The home as it is now, for Share this home (share-home.js keeps only what a design is made of)
+  function homeSnapshot() {
+    var arr = arrangeItems();
+    return {
+      scenes: SCENES.map(function (x) { return x.id; }), builtIn: BUILT_IN.map(function (x) { return x.id; }),
+      scene_seconds: SCENE_MS / 1000, clock24: CLOCK24, clock_style: CLOCK_LIQUID ? "liquid" : undefined,
+      glass: GLASS, glass_icons: GLASS_ICONS, glass_amount: GLASS_AMT, ambient_weather: WX_AMBIENT, ambient_sun_grade: WX_SUN_GRADE,
+      lighter: LIGHTER, keep_watching: KW_ON, now_playing: NP_ON, dock_size: DOCK_APPS,
+      dock: arr.items.slice(0, arr.line).filter(function (it) { return !it.kind || it.kind === "app"; }).map(function (it) { return it.package; }),
+      design: CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.on() ? CFG.design : null
+    };
+  }
+  // everything private this TV knows, so a share holding any of it is stopped
+  function privateWords() {
+    var w = PEOPLE.map(function (p) { return p.name; }).concat((CFG.people || []).map(function (p) { return p && (p.name || p); }));
+    var pl = ST.place || {};
+    w.push(WXCFG && WXCFG.place, pl.name, pl.area, CFG.weather && CFG.weather.place);
+    try { w.push(location.hostname); } catch (e) {}
+    return w.filter(function (x) { return typeof x === "string" && x.length >= 3 && !/^(home\.tvos\.invalid|localhost|127\.0\.0\.1)$/.test(x); });
+  }
+  function shareHome() {
+    if (typeof CouchShare === "undefined") return;
+    var r = CouchShare.prepare(homeSnapshot(), privateWords(), typeof CouchDesign !== "undefined" ? CouchDesign : null);
+    if (r.error) { SET.msg = r.error; renderSettings(); return; }
+    var base = typeof CouchDesignCode !== "undefined" ? CouchDesignCode.base() : "";
+    SET.msg = "Sharing this home...";
+    renderSettings();
+    CouchShare.send(base, r.design).then(function (res) {
+      SET.msg = "";
+      if (zone === "settings") renderSettings();
+      CouchShare.show(res);
+    }, function (e) {
+      SET.msg = (e && e.message) || "That did not work. Try again.";
       if (zone === "settings") renderSettings();
     });
   }
@@ -3724,9 +3798,6 @@
       rows.push({ kind: "choice", key: "look:" + id, label: t("look_" + id), sub: t("look_" + id + "_sub"), checked: look === id,
         act: function () { ST.look = id; keep("tvhome.look", id); saveSettings(); } });
     });
-    // a TV Designer design (config.json "design"): switched off with Back held, it comes back here
-    if (CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.settingsRow) rows.push(CouchDesign.settingsRow(restart));
-    designCodeRows(rows);
     if (look === "classic") {
       rows.push({ kind: "toggle", key: "keep-photo", label: t("keep_photo"), sub: t("keep_photo_sub"), value: KEEP_PHOTO ? t("on") : t("off"), act: function () {
         KEEP_PHOTO = !KEEP_PHOTO; ST.keep_photo = KEEP_PHOTO;
@@ -4554,10 +4625,10 @@
     $("set-title").textContent = t("set_title");
     $("set-secs").innerHTML = SECS.map(function (sc, i) {
       var cls = "ssec" + (i === SET.sec ? (SET.col === "secs" ? " focus" : " on") : "");
-      return '<div class="' + cls + '"><i>' + ICONS[sc[1]] + "</i><span>" + esc(t("sec_" + sc[0])) + "</span></div>";
+      return '<div class="' + cls + '"><i>' + ICONS[sc[1]] + "</i><span>" + esc(secName(sc[0])) + "</span></div>";
     }).join("");
     $("set-crumb").textContent = SET.sub ? SET.sub.crumb : "";
-    $("set-head").textContent = SET.sub ? SET.sub.title() : t("sec_" + SECS[SET.sec][0]);
+    $("set-head").textContent = SET.sub ? SET.sub.title() : secName(SECS[SET.sec][0]);
     var box = $("set-rows");
     // Rebuilding the rows drops the list back to the top on some TV engines (a 2020 Samsung,
     // Tizen 5.5), and the smooth scroll below then ran from the top down to the row: every move
@@ -5073,7 +5144,7 @@
 
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
-  window.tv = { back: function () { if (typeof CouchDesign !== "undefined" && CouchDesign.back && CouchDesign.back()) return; if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); resetSmartIdle(); },
+  window.tv = { back: function () { if (typeof CouchShare !== "undefined" && CouchShare.close()) return; if (typeof CouchDesign !== "undefined" && CouchDesign.back && CouchDesign.back()) return; if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); resetSmartIdle(); },
     home: function () { forgetFocus(); if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); resetSmartIdle(); },
     screenOff: function () { toggleScreenOff(true); },
     wakeScreen: function () { toggleScreenOff(false); },
@@ -5097,7 +5168,11 @@
     if (DESIGN_FROM_CODE && CouchDesignCode.lockImages) CouchDesignCode.lockImages((ST.photos || []).map(function (p) { return p && p.url; }));
     // the TV Designer's design block (design.js): nothing happens without one, unless the page is
     // the designer's own preview (?designer=1), which sends designs in as they are made
-    if (typeof CouchDesign !== "undefined") CouchDesign.start(CFG.design, {
+    // With TV Designer off (designer-gate.js) design.js is never started: no keys of its own, no
+    // question, no page policy. On, the page policy a design runs under goes in first.
+    var designOn = typeof CouchDesign !== "undefined" && !!(GATE.design || GATE.preview);
+    if (designOn && typeof CouchDesigner !== "undefined") CouchDesigner.lockPage();
+    if (designOn) CouchDesign.start(CFG.design, {
       clock: function () { glassShown = ""; clock(); },
       apps: function () { renderGrid(); },
       clock24: function () { return CLOCK24; },

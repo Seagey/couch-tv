@@ -25,6 +25,17 @@ android {
         // with releases of its own, -PupdateRepo= (empty) for none. Updater.kt checks the format.
         val updateRepo = (project.findProperty("updateRepo") as String? ?: "Seagey/couch-tv").trim()
         buildConfigField("String", "UPDATE_REPO", "\"" + updateRepo.filter { it.isLetterOrDigit() || it in "/._-" } + "\"")
+        // Which releases it takes (ReleaseChannel.kt): "stable" for every build people download (never
+        // a pre-release), "beta" only for a test build installed by hand: -PupdateChannel=beta.
+        val channel = if ((project.findProperty("updateChannel") as String? ?: "").trim() == "beta") "beta" else "stable"
+        buildConfigField("String", "UPDATE_CHANNEL", "\"" + channel + "\"")
+        // A beta build names its own version (-PbetaVersionCode=15 -PbetaVersionName=0.13-beta.1). Its
+        // versionCode sits between this release and the next one, so the next stable release must use
+        // a higher versionCode than any beta handed out (Android never steps a version down).
+        if (channel == "beta") {
+            (project.findProperty("betaVersionCode") as String?)?.toIntOrNull()?.let { versionCode = it }
+            (project.findProperty("betaVersionName") as String?)?.trim()?.takeIf { Regex("[0-9][0-9.]*-beta\\.[0-9]+").matches(it) }?.let { versionName = it }
+        }
     }
     buildFeatures { buildConfig = true }
     // Test builds: when COUCHTV_KEYSTORE names a keystore (a debug-style key, alias androiddebugkey,
