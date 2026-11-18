@@ -190,8 +190,8 @@ class Videos(unittest.IsolatedAsyncioTestCase):
                 patch.object(t, "wait_for_app", new=AsyncMock(return_value=FIRE_YOUTUBE)), \
                 patch.object(t, "launch_package", new=AsyncMock()) as launch:
             resp = await server.h_continue_open(req)
-        start.assert_awaited_once_with("https://www.youtube.com/results?search_query=How%20Trains%20Work%20%26%20More",
-                                       FIRE_YOUTUBE)
+        # Amazon's build shows its home for the web results link: it gets the link Alexa's voice search sends
+        start.assert_awaited_once_with("youtube://search?query=How%20Trains%20Work%20%26%20More", FIRE_YOUTUBE)
         launch.assert_not_awaited()
         self.assertIn(b'"method": "search"', resp.body)
         self.assertIn(b'"service": "youtube"', resp.body)
@@ -223,6 +223,8 @@ class Videos(unittest.IsolatedAsyncioTestCase):
                 patch.object(t, "wait_for_app", new=AsyncMock(return_value=GOOGLE_YOUTUBE)):
             await server.h_continue_open(req)
         self.assertEqual(start.await_args.args[1], GOOGLE_YOUTUBE)
+        # Google's build keeps the web results link, which opens its results there
+        self.assertEqual(start.await_args.args[0], "https://www.youtube.com/results?search_query=How%20Trains%20Work")
 
 
 if __name__ == "__main__":

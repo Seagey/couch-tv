@@ -825,6 +825,20 @@ SEARCH_LINKS = {
     "youtube": "https://www.youtube.com/results?search_query={q}",
 }
 
+# The same, for a build of the app that wants another link: Amazon's YouTube on a Fire TV takes the
+# web results link but shows its home, and opens its results page for the link Alexa's own voice
+# search sends it (youtube://search?query=..., with or without &isVoice=true, with or without the
+# BROWSABLE category; its results page takes about ten seconds to draw). Tested on a Fire TV Cube,
+# Fire OS 7.7, YouTube 24.40, cold and already open.
+SEARCH_LINKS_BY_PACKAGE = {
+    "com.amazon.firetv.youtube": "youtube://search?query={q}",
+}
+
+
+def search_link(app, pkg):
+    """The search link for this app as this TV has it: the build's own if it needs one, else the app's."""
+    return SEARCH_LINKS_BY_PACKAGE.get(pkg) or SEARCH_LINKS.get(app["id"])
+
 
 # Apps not on JustWatch that open a title's page by its IMDb id, tested on this TV (DEEPLINKS.md).
 # Nuvio takes only the show or film: "nuvio://series/tt22202452:1:8" is read as one id and fails.
@@ -859,7 +873,7 @@ async def search_in_app(app, title, best=None):
                 return "deeplink", f"Opened the {title} page in {app['name']}."
         except Exception as e:
             log.warning("title link failed for %s: %s", app["id"], e)
-    link = SEARCH_LINKS.get(app["id"]) if tv.kind == "android" else None
+    link = search_link(app, pkg) if tv.kind == "android" else None
     if link:
         await tv.start_intent(link.format(q=quote(title)), pkg)
         if await tv.wait_for_app({pkg}, timeout=8):
@@ -3024,10 +3038,9 @@ async def h_continue(request):
 async def open_video(h):
     """A video card opens YouTube's installed build on a search for the video's name: never through
     play() and the show finder (a video's name matched to a film would open the film, issue #23), and
-    with no stored link (the media session gives the title, not the video's id). Amazon's YouTube on
-    a Fire TV Cube lists https://www.youtube.com links in its intent filter (read with dumpsys package:
-    VIEW, BROWSABLE, www.youtube.com); opening the search link there has not been tried on a real Fire
-    TV yet. Where the link does not take, the app itself opens."""
+    with no stored link (the media session gives the title, not the video's id). The link is the one
+    this build takes (search_link: Amazon's YouTube on a Fire TV wants youtube://search?query=, the
+    web results link only opens its home). Where the link does not take, the app itself opens."""
     from urllib.parse import quote
     app = apps.BY_ID["youtube"]
     pkg = pkg_of(app)
@@ -3035,7 +3048,7 @@ async def open_video(h):
     method = None
     if tv.kind == "android":
         try:
-            await tv.start_intent(SEARCH_LINKS["youtube"].format(q=quote(title)), pkg)
+            await tv.start_intent(search_link(app, pkg).format(q=quote(title)), pkg)
             if await tv.wait_for_app({pkg}, timeout=8):
                 method = "search"
         except Exception as e:
