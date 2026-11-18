@@ -159,13 +159,24 @@
   function hourLabel(d, i) { if (i === 0) return "Now"; var h = d.getHours(); return (h % 12 || 12) + (h < 12 ? "am" : "pm"); }
   function hm(s) { var d = new Date(s); if (isNaN(d.getTime())) return ""; var h = d.getHours(), m = d.getMinutes(); return (h % 12 || 12) + ":" + (m < 10 ? "0" : "") + m; }
   // the weather this TV has, in one shape (app.js weatherDirect: current, hourly, daily, minutely_15)
+  // the demo's next 24 hours and 7 days in full (the forecast layer): made from the demo's own numbers
+  function demoFull() {
+    if (DEMO_WX.hours) return;
+    var t = now(), codes = [2, 0, 0, 2, 3, 61, 95, 80, 61, 3, 2, 2, 1, 0, 0, 0, 0, 1, 2, 2, 3, 2, 1, 0], temps = [24, 25, 26, 27, 27, 25, 23, 22, 22, 21, 21, 20, 19, 18, 18, 17, 17, 18, 19, 21, 22, 23, 24, 25];
+    DEMO_WX.hours = codes.map(function (c, i) { var d = new Date(t.getTime() + i * 3600000); return { t: hourLabel(d, i), code: c, temp: temps[i], pop: c >= 61 ? 60 + (i % 3) * 10 : c === 3 ? 20 : 5, uv: d.getHours() > 6 && d.getHours() < 18 ? Math.max(0, Math.round(11 - Math.abs(12.5 - d.getHours()) * 1.8)) : 0, night: d.getHours() < 6 || d.getHours() >= 19 }; });
+    DEMO_WX.days = DEMO_WX.daily.map(function (x, i) { return { d: i === 0 ? "Today" : x[0], code: x[1], lo: x[2], hi: x[3], rise: "5:4" + (1 - Math.min(1, i)) + "am", set: "7:2" + Math.min(9, 2 + i) + "pm", uv: [11, 9, 6, 11, 12, 12, 10][i], pop: [40, 80, 70, 10, 5, 5, 20][i] }; });
+  }
   function weather(env) {
-    if (env.demo) { var hr = now().getHours(); DEMO_WX.is_day = hr >= 6 && hr < 19; return DEMO_WX; }
+    if (env.demo) { var hr = now().getHours(); DEMO_WX.is_day = hr >= 6 && hr < 19; demoFull(); return DEMO_WX; }
     var d = dataOf(env), w = d.weather;
     if (!w || w.temp === undefined || w.temp === null) return null;
     var out = { place: (d.place && d.place.name) || "", temp: Math.round(w.temp), code: w.code, is_day: w.is_day !== false, hi: w.hi, lo: w.lo, uv: w.uv, aqi: w.aqi };
-    if (w.hourly && w.hourly.length) out.hourly = w.hourly.slice(0, 8).map(function (x, i) { return [hourLabel(new Date(x.time), i), x.code, Math.round(x.temp)]; });
+    if (w.hourly && w.hourly.length) {
+      out.hourly = w.hourly.slice(0, 8).map(function (x, i) { return [hourLabel(new Date(x.time), i), x.code, Math.round(x.temp)]; });
+      out.hours = w.hourly.slice(0, 24).map(function (x, i) { var hd = new Date(x.time); return { t: hourLabel(hd, i), code: x.code, temp: Math.round(x.temp), pop: x.pop, uv: x.uv, night: hd.getHours() < 6 || hd.getHours() >= 19 }; });
+    }
     if (w.daily && w.daily.length) {
+      out.days = w.daily.slice(0, 7).map(function (x, i) { var dd = new Date(x.date + "T12:00:00"); return { d: i === 0 ? "Today" : DAYS[dd.getDay()].slice(0, 3), code: x.code, lo: Math.round(x.lo), hi: Math.round(x.hi), rise: hm(x.sunrise), set: hm(x.sunset), uv: x.uv, pop: x.pop }; });
       out.daily = w.daily.slice(0, 7).map(function (x, i) { var dd = new Date(x.date + "T12:00:00"); return [i === 0 ? "Today" : DAYS[dd.getDay()].slice(0, 3), x.code, Math.round(x.lo), Math.round(x.hi)]; });
       out.sunrise = hm(w.daily[0].sunrise); out.sunset = hm(w.daily[0].sunset);
       if (out.hi === undefined) { out.hi = Math.round(w.daily[0].hi); out.lo = Math.round(w.daily[0].lo); }
@@ -313,13 +324,25 @@
   function empty(root, b, iconName, line, sub) {
     while (root.childNodes.length > (root.firstChild && root.firstChild.className === "cw-bg" ? 1 : 0)) root.removeChild(root.lastChild);
     if (root.classList.contains("cw-bare")) { root.classList.remove("cw-bare"); root.classList.add("cw-glass"); root.insertBefore(E("div", "cw-bg"), root.firstChild); }
-    var tiny = b.h < 220 || b.w < 300;
+    var tiny = b.h < 220 || b.w < 300, strip = b.h < 200 && b.w >= 300;
     root.classList.add("cw-empty"); if (tiny) root.classList.add("cw-tiny");
     root.setAttribute("data-empty", "1");
+    if (strip) {
+      // a wide tile: the icon beside the words, so two lines fit
+      root.classList.add("cw-strip");
+      add(root, E("div", "cw-row", "height:100%", [ic(iconName || "info", 40, "currentColor"), E("div", "cw-col", "margin-left:18px;min-width:0", [E("div", "cw-e1", "margin-top:0", [line])])]));
+      return root;
+    }
     add(root, [ic(iconName || "info", tiny ? 34 : 46, "currentColor"), E("div", "cw-e1", "", [line]), sub && b.h >= 200 ? E("div", "cw-e2", "", [sub]) : null]);
     return root;
   }
-  function soon(root, b, iconName, line) { return empty(root, b, iconName, line, "Coming to couch-tv's Home settings"); }
+  // the setup card: what this widget needs and where that is set up, from widget-caps.js (never from a
+  // design). OK on it opens the same record in full (widget-detail.js, the setup layer).
+  function soon(root, b, iconName, kind) {
+    var C = window.CouchWidgetCaps, c = C ? C.card(kind, b.w < 300 && b.h < 300) : { line: "Not on couch-tv yet", sub: "" };
+    root.setAttribute("data-setup", kind);
+    return empty(root, b, iconName, c.line, c.sub);
+  }
   function live(root, every, fn) { REG.push({ el: root, every: every, at: 0, fn: fn }); startTick(); }
   function startTick() {
     if (TICK) return;
@@ -460,7 +483,7 @@
     else {
       if (show !== "weather") lines.push(dText);
       if (show !== "date" && w) lines.push(wText);
-      if (show === "weather" && !w) lines.push("Weather coming");
+      if (show === "weather" && !w) lines.push("Set your town for the weather");
     }
     var bare = root.classList.contains("cw-bare");
     add(root, E("div", "cw-col", "height:100%;justify-content:center;text-align:" + align + (bare ? ";text-shadow:0 2px 18px rgba(0,0,0,.35)" : ""), lines.map(function (l, i) {
@@ -477,12 +500,50 @@
     add(root, [E("div", "cw-row cw-sp", "", [E("div", "cw-t29", "font-weight:700;color:#ff453a;letter-spacing:.04em", [MONTHS[m].toUpperCase()]), E("div", "cw-t23", "", [String(y)])]),
       E("div", "cw-month cw-grow", "margin-top:14px", cells)]);
   };
+  // Timers are kept on this TV (localStorage), started from the remote in the Timers layer
+  // (widget-detail.js): one at a time, a label from a fixed list, nothing from a design.
+  var TIMER_KEY = "couchtv.timer", TIMER_FNS = [];
+  var Timer = {
+    get: function () { try { var t = JSON.parse(localStorage.getItem(TIMER_KEY) || "null"); return t && isFinite(t.end) && isFinite(t.total) ? t : null; } catch (e) { return null; } },
+    put: function (t) { try { if (t) localStorage.setItem(TIMER_KEY, JSON.stringify(t)); else localStorage.removeItem(TIMER_KEY); } catch (e) {} TIMER_FNS.forEach(function (f) { try { f(t); } catch (x) {} }); },
+    start: function (min, label) { var ms = clamp(+min || 1, 1, 180) * 60000; Timer.put({ end: Date.now() + ms, total: ms, label: String(label || "Timer").slice(0, 24) }); },
+    add: function (min) { var t = Timer.get(); if (!t) return Timer.start(min); var left = Math.max(0, t.end - Date.now()); t.end = Date.now() + left + min * 60000; t.total = Math.max(t.total, left + min * 60000); delete t.seen; Timer.put(t); },
+    cancel: function () { Timer.put(null); },
+    left: function (t) { t = t || Timer.get(); return t ? Math.max(0, t.end - Date.now()) : 0; },
+    // a timer that finished more than ten minutes ago is forgotten
+    live: function () { var t = Timer.get(); if (t && Date.now() - t.end > 600000) { Timer.put(null); return null; } return t; },
+    on: function (fn) { TIMER_FNS.push(fn); }
+  };
+  function mmss(ms) { var s = Math.ceil(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60; return (h ? h + ":" + (m < 10 ? "0" : "") : "") + m + ":" + (x < 10 ? "0" : "") + x; }
+  function ring(s, frac, colour, done) {
+    return svg("0 0 100 100", s, s, [S("circle", { cx: 50, cy: 50, r: 44, fill: "none", stroke: done ? "rgba(255,69,58,.3)" : "rgba(255,159,10,.22)", "stroke-width": 7 }),
+      frac > 0.004 ? S("circle", { cx: 50, cy: 50, r: 44, fill: "none", stroke: done ? "#ff453a" : colour || "#ff9f0a", "stroke-width": 7, "stroke-linecap": "round", "stroke-dasharray": 276, "stroke-dashoffset": 276 * (1 - clamp(frac, 0, 1)), transform: "rotate(-90 50 50)" }) : null]);
+  }
   R.timer = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "timer", "Start a timer from the phone remote");
-    var s = Math.min(b.w, b.h) - 48;
-    add(root, E("div", "cw-grow cw-row cw-center", "position:relative", [svg("0 0 100 100", s, s, [S("circle", { cx: 50, cy: 50, r: 44, fill: "none", stroke: "rgba(255,159,10,.22)", "stroke-width": 7 }),
-      S("circle", { cx: 50, cy: 50, r: 44, fill: "none", stroke: "#ff9f0a", "stroke-width": 7, "stroke-linecap": "round", "stroke-dasharray": 276, "stroke-dashoffset": 276 * 0.38, transform: "rotate(-90 50 50)" })]),
-      E("div", "", "position:absolute;text-align:center", [E("div", "", "font-size:" + px(clamp(s * 0.2, 30, 110)) + ";font-weight:650;letter-spacing:-.02em", ["11:08"]), E("div", "cw-t23", "", [op(o).label || "Pizza"])])]));
+    var draw = function () {
+      while (root.lastChild && root.lastChild.className !== "cw-bg") root.removeChild(root.lastChild);
+      var t = Timer.live();
+      if (!t && env.demo) t = { end: Date.now() + 668000, total: 1080000, label: op(o).label || "Pizza", demo: 1 };
+      var wide = b.w > b.h * 1.6, s = Math.min(wide ? b.h : b.w, b.h) - 48;
+      if (!t) {
+        add(root, wide ? E("div", "cw-row", "height:100%", [ic("timer", 56, "currentColor"), E("div", "cw-col", "margin-left:20px;min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:700", ["No timer"]), E("div", "cw-t23 cw-ell", "", ["OK to start one"])])])
+          : [ic("timer", b.h < 200 ? 44 : 64, "currentColor"), E("div", "cw-grow"), E("div", b.w < 300 ? "cw-t25" : "cw-t29", "font-weight:700;color:var(--ink)", ["No timer"]), E("div", "cw-t23 cw-ell", "", ["OK to start one"])]);
+        return;
+      }
+      var left = t.demo ? t.end - Date.now() : Timer.left(t), done = !t.demo && left <= 0, frac = done ? 1 : left / t.total;
+      var words = done ? "Time's up" : mmss(left);
+      var fs = clamp(s * (words.length > 5 ? 0.17 : 0.21), 26, 110);
+      var label = E("div", "cw-t23 cw-ell", "max-width:" + px(s * 0.78) + (done ? ";color:#ff453a;font-weight:700" : ""), [t.label]);
+      if (wide) {
+        add(root, E("div", "cw-row", "height:100%", [ring(s, frac, null, done), E("div", "cw-col", "margin-left:24px;min-width:0", [E("div", "cw-big", "font-size:" + px(clamp(b.h * 0.42, 40, 96)), [words]), label])]));
+      } else {
+        add(root, E("div", "cw-grow cw-row cw-center", "position:relative", [ring(s, frac, null, done),
+          E("div", "", "position:absolute;text-align:center", [E("div", "", "font-size:" + px(fs) + ";font-weight:650;letter-spacing:-.02em" + (done ? ";color:#ff453a" : ""), [words]), s >= 140 ? label : null])]));
+      }
+      root.classList.toggle("cw-done", done);
+    };
+    draw();
+    live(root, 1000, draw);
   };
 
   // weather
@@ -513,6 +574,11 @@
       root.style.setProperty("--tile", c);
       var ink = !w.is_day ? WHITE : cold ? WHITE : [42, 20, 5];
       root.style.setProperty("--ink", rgba(ink, 1)); root.style.setProperty("--sub", rgba(ink, 0.78)); root.style.color = rgba(ink, 1); sh.ink = ink;
+    }
+    if (b.h < 200) {
+      // a tile: the sky and the number
+      add(root, [ic(wxIcon(w.code, w.is_day), 40, rgba(sh.ink, 1), "solid"), E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(clamp(b.w * 0.4, 56, 80)) + ";letter-spacing:-.05em", [w.temp + "°"])]);
+      return;
     }
     var fs = Math.min(b.h * 0.52, b.w * 0.44);
     add(root, [E("div", "cw-row cw-sp", "", [o.opts && o.opts.place === false ? E("span") : E("div", "cw-t29 cw-ell", "font-weight:700", [w.place || "Here"]), ic(wxIcon(w.code, w.is_day), clamp(b.w / 6, 44, 80), rgba(sh.ink, 1), "solid")]),
@@ -581,18 +647,54 @@
     add(root, [E("div", "cw-lab", "", ["Moon"]), E("div", "cw-grow cw-row cw-center", "", [svg("0 0 100 100", s, s, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit])]),
       E("div", "cw-t29", "", [m.name]), b.h >= 280 ? E("div", "cw-t23", "", [m.full]) : null]);
   };
+  // air quality: the European AQI from Open-Meteo's free air quality service (app.js asks for it only
+  // while an air widget is on the home); its bands are the EEA's
+  function aqiBand(v) { return v < 20 ? ["Good", "#30d158"] : v < 40 ? ["Fair", "#a4e05a"] : v < 60 ? ["Moderate", "#ffd60a"] : v < 80 ? ["Poor", "#ff9f0a"] : v < 100 ? ["Very poor", "#ff453a"] : ["Extremely poor", "#bf5af2"]; }
+  function airOf(env) {
+    if (env.demo) return { aqi: 18, hourly: [18, 17, 16, 18, 21, 24, 26, 25, 22, 20, 19, 18] };
+    var w = dataOf(env).weather;
+    return w && w.air && isFinite(w.air.aqi) ? w.air : null;
+  }
   R.air = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "wind", "Air quality is coming");
-    add(root, [lab("wind", "Air quality"), E("div", "cw-big", "font-size:96px;margin-top:8px;color:#30d158", ["18"]), E("div", "cw-t29", "", ["Good"]), E("div", "cw-grow")]);
+    var a = airOf(env);
+    if (!a) return weather(env) ? empty(root, b, "wind", "Waiting for the air quality", "From Open-Meteo, every refresh") : noWx(root, b, env);
+    var v = Math.round(a.aqi), band = aqiBand(v);
+    if (b.h < 200) {
+      add(root, b.w < 300 ? [lab("wind", "Air"), E("div", "cw-grow"), E("div", "cw-big", "font-size:56px;color:" + band[1], [String(v)]), E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--ink)", [band[0]])]
+        : E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("wind", "Air quality"), E("div", "cw-t29 cw-ell", "font-weight:700;margin-top:8px", [band[0]])]), E("div", "cw-big", "font-size:84px;color:" + band[1], [String(v)])]));
+      return;
+    }
+    add(root, [lab("wind", "Air quality"), E("div", "cw-big", "font-size:96px;margin-top:8px;color:" + band[1], [String(v)]), E("div", "cw-t29", "font-weight:680", [band[0]]), E("div", "cw-grow"),
+      E("div", "cw-bar", "background:linear-gradient(90deg,#30d158,#a4e05a,#ffd60a,#ff9f0a,#ff453a,#bf5af2);overflow:visible", [E("i", "", "position:absolute;left:" + clamp(v, 2, 96) + "%;top:-6px;width:20px;height:20px;border-radius:10px;background:#fff;border:3px solid #111;display:block")])]);
   };
+  // surf: swell from Open-Meteo's free marine service for the sea nearest the town, and the wind from
+  // the forecast (app.js asks only while a surf widget is on the home)
+  var COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  function compass(deg) { return isFinite(deg) ? COMPASS[Math.round(((+deg % 360) + 360) % 360 / 45) % 8] : ""; }
+  function surfOf(env) {
+    if (env.demo) return { wave: 1.4, period: 11, dir: 135, wind: 9, windDir: 250, hourly: [1.2, 1.3, 1.4, 1.4, 1.5, 1.5, 1.4, 1.3, 1.3, 1.2, 1.2, 1.1] };
+    var w = dataOf(env).weather;
+    return w && w.marine ? w.marine : null;
+  }
   R.surf = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "wind", "Surf is coming to couch-tv");
-    add(root, [E("div", "cw-row cw-sp", "", [lab("wind", op(o).label || "North Point", "rgba(255,255,255,.88)"), E("div", "cw-t23", "color:#fff", ["Wed 6am"])]),
-      E("div", "cw-row", "margin-top:10px;align-items:flex-end", [E("div", "", "margin-right:28px", [E("div", "cw-big", "font-size:92px", ["1.4", E("span", "", "font-size:.4em", ["m"])]), E("div", "cw-t25", "color:#fff", ["SE swell, 11s"])]),
-        b.w >= 460 ? E("div", "", "", [E("div", "cw-t38", "", ["Offshore"]), E("div", "cw-t25", "color:#fff", ["WSW 9 km/h"])]) : null]),
-      E("div", "cw-grow"), svg("0 0 400 70", "100%", 70, [S("path", { d: "M0 50 C40 50 50 20 100 20 S160 55 200 55 S260 15 300 15 S360 45 400 45 V70 H0Z", fill: "rgba(255,255,255,.16)" }),
-        S("path", { d: "M0 50 C40 50 50 20 100 20 S160 55 200 55 S260 15 300 15 S360 45 400 45", fill: "none", stroke: "#fff", "stroke-width": 4, opacity: 0.9 })], "flex:none"),
-      E("div", "cw-row cw-sp cw-t23", "color:#fff", [E("span", "", "", ["High 9:12am"]), E("span", "", "", ["Low 3:31pm"])])]);
+    var m = surfOf(env);
+    if (!m) return weather(env) ? empty(root, b, "wind", "Waiting for the swell", "From Open-Meteo's marine service") : noWx(root, b, env);
+    if (!isFinite(m.wave)) return empty(root, b, "wind", "No surf reading here", "The sea is too far from your town");
+    var place = op(o).label || (env.demo ? "The point" : (dataOf(env).place || {}).name || "Surf");
+    var swell = compass(m.dir) + " swell" + (isFinite(m.period) ? ", " + Math.round(m.period) + "s" : "");
+    var wind = isFinite(m.wind) ? compass(m.windDir) + " " + Math.round(m.wind) + " km/h" : "";
+    var big = E("div", "cw-big", "font-size:" + px(b.h < 200 ? 64 : 92), [String(Math.round(m.wave * 10) / 10), E("span", "", "font-size:.4em", ["m"])]);
+    if (b.h < 200) {
+      add(root, E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("wind", place, "rgba(255,255,255,.88)"), E("div", "cw-t25 cw-ell", "color:#fff;margin-top:6px", [swell])]), big]));
+      return;
+    }
+    var hs = (m.hourly || []).slice(0, 12), top = Math.max.apply(null, hs.concat([0.5]));
+    add(root, [lab("wind", place, "rgba(255,255,255,.88)"),
+      E("div", "cw-row", "margin-top:10px;align-items:flex-end", [E("div", "", "margin-right:28px", [big, E("div", "cw-t25", "color:#fff", [swell])]),
+        b.w >= 460 && wind ? E("div", "", "", [E("div", "cw-t38", "", ["Wind"]), E("div", "cw-t25", "color:#fff", [wind])]) : null]),
+      E("div", "cw-grow"),
+      hs.length ? E("div", "cw-row", "align-items:flex-end;height:70px;flex:none", hs.map(function (v) { return E("i", "", "display:block;flex:1;margin:0 3px;border-radius:5px;background:rgba(255,255,255,.7);height:" + Math.round(clamp(v / top, 0.08, 1) * 100) + "%"); })) : null,
+      hs.length ? E("div", "cw-row cw-sp cw-t23", "color:#fff;margin-top:6px", [E("span", "", "", ["Now"]), E("span", "", "", ["+12h"])]) : null]);
   };
 
   // photos
@@ -652,13 +754,13 @@
       q.caption ? E("div", "", "position:absolute;left:0;right:0;bottom:0;height:" + px(lh - 16) + ";display:flex;flex-direction:column;justify-content:center", [E("div", "cw-t29", "font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:600", [q.caption]), q.sub ? E("div", "cw-t23", "", [q.sub]) : null]) : null]);
   };
   R.memory = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "picture", "On this day is coming");
+    if (!env.demo) return soon(root, b, "picture", "memory");
     add(root, [photoLayer(demoImg("camp")), E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.72),rgba(0,0,0,.2) 55%,transparent 75%)"),
       E("div", "", "position:absolute;left:30px;top:26px;color:#fff;z-index:2", [E("div", "cw-t23", "color:rgba(255,255,255,.88);text-transform:uppercase;letter-spacing:.08em;font-weight:700", ["On this day"]), E("div", "cw-t48", "margin-top:4px;font-size:" + px(b.h < 300 ? 36 : 48), ["Two years ago"])])]);
   };
 
   // watching
-  function noShows(root, b) { return empty(root, b, "tv", "Nothing to keep watching yet", "Shows you start on this TV show up here"); }
+  function noShows(root, b, env) { return env && dataOf(env).bridge === false ? soon(root, b, "tv", "keep") : empty(root, b, "tv", "Nothing to keep watching yet", "Shows you start on this TV show up here"); }
   function showCard(s, b, env, i, n) {
     var logoA = clamp(b.h / 9, 34, 48);
     var card = E("div", "cw-layer", "", [E("div", "cw-fill", "background:#2a2a30 center/cover;" + (s.art ? "background-image:" + cssImg(s.art) : "")),
@@ -677,7 +779,7 @@
   }
   R.keep = function (root, o, b, env) {
     var list = shows(env);
-    if (!list.length) return noShows(root, b);
+    if (!list.length) return noShows(root, b, env);
     list = list.slice(0, 5);
     root.classList.add("cw-photo");
     var at = dayIndex(list.length, 8), cards = list.map(function (s, i) { var c = showCard(s, b, env, i, list.length); c.removeAttribute("data-act"); c.style.opacity = i === at ? "1" : "0"; return c; });
@@ -685,8 +787,8 @@
     var dots = E("div", "cw-hdots", "top:22px;left:auto;right:22px", []);
     list.forEach(function (s, i) { dots.appendChild(E("i", i === at ? "on" : "")); });
     if (list.length > 1) root.appendChild(dots);
-    // the remote reaches every show: OK opens the one showing (the widget's own stop)
-    stop(root, "show", at, list[at].title);
+    // OK opens Keep watching (widget-detail.js) on the show that is showing
+    stop(root, "detail", "keep", list[at].title); root.setAttribute("data-at", String(at));
     root.setAttribute("data-turns", "1");
     live(root, 1000, function () {
       if (root.classList.contains("cw-focus")) return;   // stops turning while focused
@@ -694,12 +796,12 @@
       if (j === at) return;
       at = j; cards.forEach(function (c, i) { c.style.opacity = i === at ? "1" : "0"; });
       for (var d = 0; d < dots.children.length; d++) dots.children[d].className = d === at ? "on" : "";
-      stop(root, "show", at, list[at].title);
+      root.setAttribute("data-at", String(at));
     });
   };
   R.keeprow = function (root, o, b, env) {
     var list = shows(env);
-    if (!list.length) return noShows(root, b);
+    if (!list.length) return noShows(root, b, env);
     var q = op(o), labelH = q.label === "" || b.h < 220 ? 0 : 50, gap = 28, n = clamp(q.shows || Math.floor((b.w + gap) / 380), 1, Math.min(5, list.length)), cw = (b.w - (n - 1) * gap) / n;
     add(root, [labelH ? E("div", "cw-lab", "color:var(--ink);margin-bottom:16px;text-shadow:0 2px 12px rgba(0,0,0,.3)", [q.label || "Keep watching"]) : null,
       E("div", "cw-row", "flex:1;align-items:stretch;min-height:0", list.slice(0, n).map(function (s, i) {
@@ -711,7 +813,7 @@
   };
   R.upnext = function (root, o, b, env) {
     var list = shows(env);
-    if (!list.length) return noShows(root, b);
+    if (!list.length) return noShows(root, b, env);
     var s = env.demo ? { title: "Bay of Fires", sub: "Season 1, episode 4. 52 min left", app: "au.com.stan.and", art: bgImg("vang-vieng-sunset") } : list[0];
     var fs = clamp(Math.min(b.h / 6.5, b.w / 12), 48, 110);
     var resume = stop(E("div", "cw-chip", "background:#fff;color:#111;height:64px;font-size:27px;padding:0 30px", [ic("play", 30, "#111", "solid"), "Resume"]), "show", 0, s.title);
@@ -725,7 +827,7 @@
     if (b.h < 420) stop(root, "show", 0, s.title);
   };
   R.picks = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "favourite", "Picks for you are coming");
+    if (!env.demo) return soon(root, b, "favourite", "picks");
     var arts = ["scene-dawn", "aresquiers-beach", "scene-fog", "scene-water", "vang-vieng-sunset", "albury-storm", "scene-golden"], names = ["Mystery Road", "Utopia", "The Newsreader", "Total Control", "Colin from Accounts", "Rake", "Wakefield"];
     var n = Math.max(1, Math.floor((b.w + 24) / 230));
     add(root, [E("div", "cw-lab", "color:var(--ink);margin-bottom:16px", ["Because you watched Fisk"]), E("div", "cw-row", "flex:1;align-items:stretch;min-height:0", arts.slice(0, n).map(function (a, i) {
@@ -758,11 +860,12 @@
       // a Tile: four tiny icons, OK opens the folder full screen (like iOS)
       var mini = list.slice(0, 4), s = Math.floor((Math.min(b.w, b.h) - 48 - 12) / 2);
       add(root, E("div", "cw-grow", "display:flex;flex-wrap:wrap;align-content:center;justify-content:center", mini.map(function (p) { var n = appNode(p, s, env); n.removeAttribute("data-act"); n.style.margin = "3px"; n.style.fontSize = "0"; return n; })));
-      stop(root, "folder", "", q.label || "Apps");
+      stop(root, "detail", "folder", q.label || "Apps");
       return;
     }
     var cols = q.cols || clamp(Math.round(Math.sqrt(list.length * b.w / b.h)), 1, 6);
     add(root, [label, appGrid(list, b.w > 0 ? { w: b.w - 48, h: b.h - 48 } : b, cols, env, label ? 50 : 0)]);
+    root.setAttribute("data-detail", "folder");
   };
   R.dock = function (root, o, b, env) {
     var q = op(o), list = appsFor(o, env, 12);
@@ -775,9 +878,10 @@
     add(root, row);
   };
   R.appgrid = function (root, o, b, env) {
-    var q = op(o), list = appsFor(o, env, 16);
+    // a small grid holds four apps without names (Hold OK, then All apps, has the rest)
+    var small = b.w < 500 && b.h < 500, q = op(o), list = appsFor(o, env, small ? 4 : 16);
     if (!list.length) return noApps(root, b, (q.apps || []).length);
-    var cols = q.cols || clamp(Math.round(Math.sqrt(list.length * b.w / b.h)), 1, 8), rows = Math.ceil(list.length / cols), names = q.names !== false;
+    var cols = small ? 2 : q.cols || clamp(Math.round(Math.sqrt(list.length * b.w / b.h)), 1, 8), rows = Math.ceil(list.length / cols), names = !small && q.names !== false;
     var gx = 40, gy = 40, nameH = names ? 52 : 0, a = Math.floor(Math.min((b.w - cols * gx) / cols, (b.h - rows * gy - rows * nameH) / rows));
     add(root, E("div", "", "display:flex;flex-wrap:wrap;justify-content:center;align-content:center;height:100%", list.map(function (p, i) {
       var n = appNode(p, a, env);
@@ -801,10 +905,18 @@
   // music
   R.nowplaying = function (root, o, b, env) {
     var m = music(env);
-    if (!m) return empty(root, b, "music", "Nothing playing", "Songs playing on this TV show up here");
+    if (!m) return dataOf(env).bridge === false ? soon(root, b, "music", "nowplaying") : empty(root, b, "music", "Nothing playing", "Songs playing on this TV show up here");
+    if (b.w < 300 && b.h < 300) {
+      // a tile: the cover, with play or pause on it; OK opens the player
+      root.classList.add("cw-photo");
+      add(root, [E("div", "cw-fill", "background:#333 center/cover;" + (m.art ? "background-image:" + cssImg(m.art) : "")), E("div", "cw-fill", "background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.7))"),
+        E("div", "cw-row", "position:absolute;left:16px;right:16px;bottom:14px;color:#fff", [ic(m.state === "playing" ? "pause" : "play", 30, "#fff", "solid"), E("span", "cw-t23 cw-ell", "color:#fff;font-weight:700;margin-left:8px", [m.title])])]);
+      stop(root, "detail", "player", m.title);
+      return;
+    }
     var wide = b.w > b.h * 1.4, s = wide ? b.h - 48 : Math.min(b.w - 48, b.h * 0.55), big = b.w > 900;
     var art = E("div", "", "width:" + px(s) + ";height:" + px(s) + ";border-radius:24px;background:#333 center/cover;flex:none;box-shadow:0 14px 40px rgba(0,0,0,.35);" + (m.art ? "background-image:" + cssImg(m.art) : ""));
-    var btn = function (name, sz, key) { return stop(E("div", "", "padding:10px;border-radius:50%;display:flex", [ic(name, sz, "currentColor", "solid")]), "media", key, name); };
+    var btn = function (name, sz) { return E("div", "", "padding:10px;border-radius:50%;display:flex", [ic(name, sz, "currentColor", "solid")]); };
     var pct = m.dur ? clamp(m.pos / m.dur, 0, 1) : 0.38;
     var info = E("div", "cw-col", "min-width:0;flex:1;" + (wide ? "margin-left:30px" : ""), [
       E("div", "cw-lab", "", [m.app ? appIcon(m.app, 34, env) : ic("music", 30), m.source || "Now playing"]),
@@ -816,7 +928,8 @@
       b.h >= 300 ? E("div", "cw-row", "justify-content:center;margin-top:10px", [btn("previous", 40, "prev"), E("div", "", "width:40px"), btn(m.state === "playing" ? "pause" : "play", 52, "play"), E("div", "", "width:40px"), btn("next", 40, "next")]) : null]);
     if (wide) add(root, E("div", "cw-row", "height:100%;align-items:stretch", [art, info]));
     else add(root, [art, E("div", "cw-t29 cw-ell", "margin-top:16px;font-weight:680", [m.title]), E("div", "cw-t25 cw-ell", "", [m.artist]), E("div", "cw-grow"), E("div", "cw-bar", "", [E("b", "", "width:" + Math.round(pct * 100) + "%")])]);
-    if (b.h < 300) stop(root, "media", "play", m.title);
+    // OK opens the player (widget-detail.js), which has every control
+    stop(root, "detail", "player", m.title);
   };
   R.soundscape = function (root, o, b) {
     var snd = op(o).sound || "rain", names = { rain: "Rain", fire: "Fire", waves: "Waves", brown: "Brown noise" }, icons = { rain: "rain", fire: "bolt", waves: "wind", brown: "speaker" };
@@ -824,7 +937,7 @@
     stop(root, "quick", "soundscape", "Soundscape");
   };
   R.queue = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "music", "The song queue is coming");
+    if (!env.demo) return soon(root, b, "music", "queue");
     var q = [["Sunday Best", "Surfaces"], ["Riptide", "Vance Joy"], ["Electric Feel", "MGMT"], ["Dreams", "Fleetwood Mac"], ["Bloom", "The Paper Kites"], ["Holocene", "Bon Iver"], ["Sunsets", "Thelma Plum"], ["Old Pine", "Ben Howard"]];
     var covers = ["surf", "hike", "camp", "beach", "dog", "nan", "art", "birthday"];
     add(root, [lab("music", "Up next"), E("div", "cw-col cw-grow", "margin-top:18px;justify-content:space-between", q.slice(0, Math.min(8, Math.floor((b.h - 90) / 104))).map(function (s, i) {
@@ -832,14 +945,14 @@
     }))]);
   };
   R.speakers = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "speakers", "Speakers are coming");
+    if (!env.demo) return soon(root, b, "speakers", "speakers");
     add(root, [lab("speakers", "Speakers"), E("div", "cw-col cw-grow", "justify-content:space-around;margin-top:12px", [["Living", 42], ["Kitchen", 30], ["Deck", 0]].map(function (s) {
       return E("div", "", "", [E("div", "cw-row cw-sp", "", [E("span", "cw-t29", "", [s[0]]), E("span", "cw-t23", "", [s[1] ? s[1] + "%" : "Off"])]), E("div", "cw-bar", "margin-top:10px;height:12px;border-radius:6px", [E("b", "", "width:" + s[1] + "%")])]);
     }))]);
   };
 
   // smart home
-  function noHa(root, b, iconName) { return empty(root, b, iconName || "home", "Connect Home Assistant on the TV", "couch-tv setup, Smart home"); }
+  function noHa(root, b, iconName, kind) { return soon(root, b, iconName || "home", kind || "aircon"); }
   function dial(s, set, cur) {
     var frac = clamp((set - 16) / 14, 0, 1);
     return E("div", "", "position:relative;width:" + px(s) + ";height:" + px(s) + ";flex:none", [svg("0 0 100 100", s, s, [
@@ -847,63 +960,99 @@
       S("circle", { cx: 50, cy: 50, r: 42, fill: "none", stroke: "#64d2ff", "stroke-width": 8, "stroke-dasharray": Math.round(198 * frac) + " 300", "stroke-linecap": "round", transform: "rotate(135 50 50)" })]),
       E("div", "", "position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;text-align:center", [E("div", "", "", [E("div", "cw-big", "font-size:" + px(s * 0.3), [Math.round(set) + "°"]), cur !== null && cur !== undefined ? E("div", "cw-t23", "", ["Now " + cur + "°"]) : null])])]);
   }
+  // the rooms in Home Assistant's shape (HomeAssistant.kt room()): the demo uses the same shape
+  var DEMO_ROOMS = [
+    { entity: "climate.living", name: "Living", ok: true, state: "cool", action: "cooling", target: 22, current: 24.5, min: 16, max: 30, step: 0.5, modes: ["off", "cool", "heat", "dry", "fan_only", "auto"], fan_modes: ["low", "medium", "high", "auto"], fan: "auto" },
+    { entity: "climate.media", name: "Media", ok: true, state: "cool", action: "idle", target: 23, current: 23.5, min: 16, max: 30, step: 0.5, modes: ["off", "cool", "heat", "dry", "fan_only", "auto"], fan_modes: ["low", "medium", "high", "auto"], fan: "low" },
+    { entity: "climate.main_bed", name: "Main bed", ok: true, state: "cool", action: "cooling", target: 21, current: 22, min: 16, max: 30, step: 0.5, modes: ["off", "cool", "heat", "dry", "fan_only", "auto"], fan_modes: ["low", "medium", "high", "auto"], fan: "medium" },
+    { entity: "climate.bed_2", name: "Bed 2", ok: true, state: "off", action: "off", target: 22, current: 25, min: 16, max: 30, step: 0.5, modes: ["off", "cool", "heat", "dry", "fan_only", "auto"], fan_modes: ["low", "medium", "high", "auto"], fan: "auto" }];
+  var MODE_WORD = { off: "Off", heat: "Heat", cool: "Cool", heat_cool: "Heat and cool", auto: "Auto", dry: "Dry", fan_only: "Fan" };
+  var MODE_COL = { heat: "#ff9f0a", cool: "#64d2ff", heat_cool: "#bf5af2", auto: "#30d158", dry: "#ffd60a", fan_only: "#e5e5ea" };
+  function roomsOf(env) { return env.demo ? DEMO_ROOMS : (env.rooms || []); }
+  function roomOn(r) { return r.ok !== false && r.state !== "off"; }
+  function roomMode(r) { return r.ok === false ? "Not answering" : MODE_WORD[r.state] || (r.state ? String(r.state) : "On"); }
+  function tdeg(v) { return v == null || !isFinite(v) ? "--" : (Math.round(v * 10) / 10) + "°"; }
   R.aircon = function (root, o, b, env) {
-    var rooms = env.demo ? [{ name: "Living", target: 22, current: 24.5, mode: "Cool", on: true }, { name: "Media", target: 23, on: true }, { name: "Master", target: 21, on: true }, { name: "Bed 2", on: false }] : (env.rooms || []);
-    if (!rooms.length) return noHa(root, b, "aircon");
+    var rooms = roomsOf(env);
+    if (!rooms.length) return noHa(root, b, "aircon", "aircon");
     var ent = op(o).entity, r = rooms.filter(function (x) { return ent && x.entity === ent; })[0] || rooms[0];
-    var wideA = b.w > b.h * 1.3, s = Math.min(b.h - 130, wideA ? b.w * 0.5 : b.w - 48), others = rooms.filter(function (x) { return x !== r; }).slice(0, 4);
-    var mode = r.mode || (r.on === false ? "Off" : "On");
-    add(root, [E("div", "cw-row cw-sp", "", [lab("aircon", r.name || "Aircon"), E("div", "cw-chip on", "height:44px;font-size:23px;background:#64d2ff", [String(mode)])]),
-      E("div", "cw-grow cw-row cw-center", "", [dial(s, r.target || r.setpoint || 22, r.current), wideA && b.w >= 700 ? E("div", "cw-col", "margin-left:30px", others.map(function (z) {
-        return E("div", "cw-chip" + (z.on !== false ? " on" : ""), "margin:7px 0;" + (z.on !== false ? "background:#64d2ff" : ""), [z.name + (z.on === false ? " off" : z.target ? " " + z.target + "°" : "")]);
-      })) : null])]);
-    stop(root, "smart", "", r.name || "Aircon");
+    var on = roomOn(r), col = on ? MODE_COL[r.state] || "#64d2ff" : "rgba(255,255,255,.35)";
+    var dot = E("i", "", "display:block;width:18px;height:18px;border-radius:9px;flex:none;background:" + col + ";box-shadow:0 0 0 4px rgba(255,255,255,.12)");
+    if (b.w < 300 && b.h < 300) {
+      // a tile: the room, its temperature now, and whether it is on
+      add(root, [E("div", "cw-row cw-sp", "", [E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--ink);min-width:0", [r.name || "Aircon"]), dot]), E("div", "cw-grow"),
+        E("div", "cw-big", "font-size:" + px(clamp(b.w * 0.36, 44, 64)), [r.current != null ? Math.round(r.current) + "°" : tdeg(r.target)]), E("div", "cw-t23 cw-ell", "", [on ? roomMode(r) + " " + tdeg(r.target) : "Off"])]);
+    } else if (b.h < 200) {
+      // a wide tile: the room and its mode beside the set temperature
+      add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:1;min-width:0", [lab("aircon", r.name || "Aircon"), E("div", "cw-row", "margin-top:8px", [dot, E("span", "cw-t25 cw-ell", "margin-left:12px;color:var(--ink);font-weight:650", [on ? roomMode(r) : "Off"])]),
+        E("div", "cw-t23 cw-ell", "margin-top:2px", ["Now " + tdeg(r.current)])]),
+        E("div", "cw-big", "font-size:84px;margin-left:16px;opacity:" + (on ? 1 : 0.55), [tdeg(r.target)])]));
+    } else {
+      var wideA = b.w > b.h * 1.3, s = Math.min(b.h - 130, wideA ? b.w * 0.5 : b.w - 48), others = rooms.filter(function (x) { return x !== r; }).slice(0, 4);
+      add(root, [E("div", "cw-row cw-sp", "", [lab("aircon", r.name || "Aircon"), E("div", "cw-chip on", "height:44px;font-size:23px;background:" + col + ";color:#1a1406", [on ? roomMode(r) : "Off"])]),
+        E("div", "cw-grow cw-row cw-center", "", [dial(s, r.target != null ? r.target : 22, r.current != null ? Math.round(r.current * 10) / 10 : null), wideA && b.w >= 700 ? E("div", "cw-col", "margin-left:30px", others.map(function (z) {
+          var zo = roomOn(z);
+          return E("div", "cw-chip" + (zo ? " on" : ""), "margin:7px 0;" + (zo ? "background:" + (MODE_COL[z.state] || "#64d2ff") : ""), [z.name + (zo ? " " + tdeg(z.target) : " off")]);
+        })) : null])]);
+    }
+    stop(root, "detail", "aircon", r.name || "Aircon");
   };
-  var SCENE_DEMO = [["movie", "Movie"], ["bedtime", "Goodnight"], ["morning", "Morning"], ["away", "Away"], ["party", "Party"], ["dinner", "Dinner"]];
+  var SCENE_DEMO = [["movie", "Movie night", "scene.movie_night"], ["bedtime", "Goodnight", "scene.goodnight"], ["morning", "Morning", "script.morning"], ["away", "Away", "scene.away"], ["party", "Party", "scene.party"], ["dinner", "Dinner", "scene.dinner"]];
+  function scenesOf(env) {
+    if (env.demo) return SCENE_DEMO;
+    return (dataOf(env).scenes || []).map(function (s) { return [/^script\./.test(s.entity || "") ? "play" : "favourite", String(s.name || s.entity || ""), String(s.entity || "")]; }).filter(function (s) { return s[2]; });
+  }
   R.scenes = function (root, o, b, env) {
-    var list = env.demo ? SCENE_DEMO : (dataOf(env).scenes || []).map(function (s) { return ["favourite", String(s.name || s)]; });
-    if (!list.length) return noHa(root, b, "favourite");
-    var cols = b.w > 500 ? 3 : 2, rows = Math.max(1, Math.floor((b.h - 70) / 150)), n = Math.min(list.length, cols * rows);
-    var mw = (b.w - 48 - 20 * (cols - 1)) / cols, mh = (b.h - 48 - 60 - 20 * (rows - 1)) / rows;
-    add(root, [lab("favourite", op(o).label || "Scenes"), E("div", "cw-mods", "margin-top:8px", list.slice(0, n).map(function (x, i) {
-      var m = E("div", "cw-mod" + (env.demo && i === 0 ? " on" : ""), "width:" + px(mw) + ";height:" + px(mh) + ";padding:16px 20px", [E("div", "cw-ic", "", [ic(x[0], 32, env.demo && i === 0 ? "#1a1406" : "#fff", "solid")]), E("div", "cw-t25 cw-ell", "font-weight:700;color:inherit", [x[1]])]);
-      return stop(m, "smart", "", x[1]);
+    var list = scenesOf(env);
+    if (!list.length) return noHa(root, b, "favourite", "scenes");
+    if (b.w < 300 && b.h < 300) {
+      // a tile: OK opens every scene
+      add(root, [ic("favourite", 44, "currentColor", "solid"), E("div", "cw-grow"), E("div", "cw-t25", "font-weight:700;color:var(--ink)", [op(o).label || "Scenes"]), E("div", "cw-t23", "", [list.length + (list.length === 1 ? " scene" : " scenes")])]);
+      stop(root, "detail", "scenes", op(o).label || "Scenes");
+      return;
+    }
+    var strip = b.h < 200, cols = strip ? Math.max(1, Math.min(list.length, Math.floor((b.w - 28) / 160))) : b.w > 500 ? 3 : 2, rows = strip ? 1 : Math.max(1, Math.floor((b.h - 70) / 150)), n = Math.min(list.length, cols * rows);
+    var mw = (b.w - 48 - 20 * (cols - 1)) / cols, mh = strip ? b.h - 48 : (b.h - 48 - 60 - 20 * (rows - 1)) / rows;
+    add(root, [strip ? null : lab("favourite", op(o).label || "Scenes"), E("div", "cw-mods", strip ? "" : "margin-top:8px", list.slice(0, n).map(function (x) {
+      var m = E("div", "cw-mod", "width:" + px(mw) + ";height:" + px(mh) + ";padding:" + (strip ? "12px 16px" : "16px 20px"), [E("div", "cw-ic", strip ? "width:46px;height:46px" : "", [ic(x[0], strip ? 26 : 32, "#fff", "solid")]), E("div", "cw-t25 cw-ell", "font-weight:700;color:inherit", [x[1]])]);
+      return stop(m, "scene", x[2], x[1]);
     }))]);
+    root.setAttribute("data-detail", "scenes");
   };
   R.controls = function (root, o, b, env) {
     var q = op(o), items = (q.controls && q.controls.length ? q.controls : [{ icon: "light", name: "Lounge" }, { icon: "lamp", name: "Lamp" }, { icon: "pendant", name: "Kitchen" }, { icon: "blinds", name: "Blinds" }, { icon: "lock", name: "Front door" }, { icon: "outlet", name: "Heater" }, { icon: "speaker", name: "Speakers" }, { icon: "shield", name: "Alarm" }]);
-    if (!env.demo) return env.ha ? soon(root, b, "light", "Lights and switches are coming") : noHa(root, b, "light");
+    if (!env.demo) return soon(root, b, "light", "controls");
     var states = ["80%", "Off", "On", "Closed", "Locked", "Off", "Playing", "Off"], on = [1, 0, 1, 0, 1, 0, 1, 0];
     var cols = q.cols || clamp(Math.round(b.w / 200), 1, 6), rows = Math.ceil(items.length / cols);
     var mw = (b.w - 48 - 20 * (cols - 1)) / cols, mh = (b.h - 48 - (q.label ? 50 : 0) - 20 * (rows - 1)) / rows;
     add(root, [q.label ? lab("home", q.label) : null, E("div", "cw-mods", q.label ? "margin-top:6px" : "", items.map(function (x, i) {
       var m = E("div", "cw-mod" + (on[i % 8] ? " on" : ""), "width:" + px(mw) + ";height:" + px(mh), [E("div", "cw-ic", "", [ic(x.icon, 32, on[i % 8] ? "#1a1406" : "#fff", "solid")]), E("div", "", "min-width:0", [E("div", "cw-t25", "font-weight:680;color:inherit", [x.name || ""]), E("div", "cw-t23", "", [states[i % 8]])])]);
-      return stop(m, "smart", "", x.name);
+      return m;
     }))]);
   };
   R.camera = function (root, o, b, env) {
-    if (!env.demo) return env.ha ? soon(root, b, "camera", "Camera pictures are coming") : noHa(root, b, "camera");
+    if (!env.demo) return soon(root, b, "camera", "camera");
     add(root, [E("div", "cw-fill", "background:#333 center/cover;filter:saturate(.7) contrast(1.05);background-image:" + cssImg(demoImg("dog"))), E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.45),transparent 35%)"),
       E("div", "cw-row", "position:absolute;left:24px;top:20px;color:#fff", [E("i", "", "display:block;width:14px;height:14px;border-radius:7px;background:#ff453a;margin-right:12px"), E("span", "cw-t25", "color:#fff;font-weight:680;margin-right:10px", [op(o).label || "Backyard"]), E("span", "cw-t23", "color:rgba(255,255,255,.82)", ["Live"])])]);
   };
   R.doorbell = function (root, o, b, env) {
-    if (!env.demo) return env.ha ? soon(root, b, "doorbell", "The doorbell card is coming") : noHa(root, b, "doorbell");
+    if (!env.demo) return soon(root, b, "doorbell", "doorbell");
     add(root, E("div", "cw-row", "height:100%;align-items:stretch", [E("div", "", "width:44%;border-radius:22px;background:#2b3035 center/cover;flex:none;background-image:" + cssImg(bgImg("grose-valley"))),
       E("div", "cw-col", "flex:1;margin-left:20px", [lab("doorbell", "Front door"), E("div", "cw-t38", "margin-top:10px", ["Parcel left"]), E("div", "cw-t25", "", ["2:14pm"])])]));
   };
   R.energy = function (root, o, b, env) {
-    if (!env.demo) return env.ha ? soon(root, b, "bolt", "Solar readings are coming") : noHa(root, b, "bolt");
+    if (!env.demo) return soon(root, b, "bolt", "energy");
     var bars = [0, 0, 5, 18, 40, 66, 82, 90, 84, 70, 44, 20, 4, 0];
     add(root, [E("div", "cw-row cw-sp", "", [lab("bolt", "Solar today"), E("div", "cw-t23", "", ["Battery 86%"])]),
       E("div", "cw-row", "margin-top:10px", [E("div", "", "margin-right:36px", [E("div", "cw-big", "font-size:76px", ["18.4"]), E("div", "cw-t25", "", ["kWh made"])]), b.w >= 560 ? E("div", "", "", [E("div", "cw-big", "font-size:76px;color:#30d158", ["-$6.20"]), E("div", "cw-t25", "", ["paid to grid"])]) : null]),
       E("div", "cw-grow cw-row", "align-items:flex-end;margin-top:16px", bars.map(function (v, i) { return E("i", "", "display:block;flex:1;margin:0 3px;height:" + Math.max(3, v) + "%;border-radius:5px;background:" + (i === 9 ? "#ffd60a" : "rgba(255,214,10,.72)")); }))]);
   };
   R.sensor = function (root, o, b, env) {
-    if (!env.demo) return env.ha ? soon(root, b, "temperature", "Sensors are coming") : noHa(root, b, "temperature");
+    if (!env.demo) return soon(root, b, "temperature", "sensor");
     add(root, [lab("temperature", op(o).label || "Pool"), E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(b.h < 300 ? 64 : 96), ["26°"])]);
   };
   R.battery = function (root, o, b, env) {
-    if (!env.demo) return empty(root, b, "bolt", "Batteries are not available on a TV yet", "Android TV does not share them");
+    if (!env.demo) return soon(root, b, "bolt", "battery");
     var d = [["games", "Pad 1", 72], ["games", "Pad 2", 12], ["headphones", "Headset", 55]], R2 = Math.max(96, Math.min((b.w - 48) / d.length - 40, b.h - 190));
     add(root, [lab("bolt", "Batteries"), E("div", "cw-row cw-grow", "justify-content:space-around", d.map(function (x) {
       var c = x[2] < 20 ? "#ff453a" : "#30d158";
@@ -941,7 +1090,7 @@
     })));
   };
   R.agenda = function (root, o, b, env) {
-    if (!env.demo) return empty(root, b, "calendar", "Connect your calendar on the TV", "Coming to couch-tv's Home settings");
+    if (!env.demo) return soon(root, b, "calendar", "agenda");
     var ev = [["#ff9f0a", "School drop off", "8:30"], ["#30d158", "Swimming lessons, Ruby", "4:00"], ["#64d2ff", "Bins out, recycling", "7:00pm"], ["#bf5af2", "Movie night", "7:30pm"]];
     if (b.w < 360) {
       // narrow: the next event on a calendar page (the day, the date, what is next)
@@ -955,11 +1104,11 @@
       E("div", "cw-col cw-grow", "margin-top:20px;justify-content:space-around", ev.slice(0, n).map(function (e) { return E("div", "cw-ev", "", [E("i", "", "background:" + e[0]), E("div", "cw-t29 cw-ell", "", [e[1]]), E("div", "cw-t25", "", [e[2]])]); }))]);
   };
   R.note = function (root, o, b, env) {
-    if (!env.demo) return empty(root, b, "edit", "Write a note from the phone remote", "Coming to couch-tv");
+    if (!env.demo) return soon(root, b, "edit", "note");
     add(root, [E("div", "cw-t23", "font-weight:700;color:var(--sub)", ["From Mum"]), E("div", "", "font-size:" + px(clamp(b.w / 9, 30, 44)) + ";font-weight:680;line-height:1.18;margin-top:10px;letter-spacing:-.01em", ["Dinner at 6. Feed Max!"])]);
   };
   R.list = function (root, o, b, env) {
-    if (!env.demo) return empty(root, b, "check", "Tick lists from the phone remote", "Coming to couch-tv");
+    if (!env.demo) return soon(root, b, "check", "list");
     var todo = /to ?do|task|work/i.test(op(o).label || "");
     var items = todo ? [["Send the quote", 0], ["Call the plumber", 1], ["Book flights", 0], ["Renew the rego", 0], ["Back up the laptop", 0], ["Order printer ink", 1], ["Reply to Sam", 0], ["Pay the power bill", 0]]
       : [["Milk", 0], ["Bread", 1], ["Avocados", 0], ["Sunscreen", 0], ["Dog food", 0], ["Lemons", 1], ["Coffee", 0], ["Bin bags", 0]];
@@ -971,7 +1120,7 @@
   // info
   R.card = function (root, o, b, env) {
     var cards = env.demo ? [{ title: "Solar today", value: "18.4 kWh" }] : (dataOf(env).cards || []);
-    if (!cards.length) return empty(root, b, "info", "Add custom cards on the bridge", "couch-tv bridge, custom cards");
+    if (!cards.length) return soon(root, b, "info", "card");
     var c = cards[dayIndex(cards.length, 20)];
     add(root, [E("div", "cw-lab", "", [String(c.title || "")]), E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(clamp(b.h / 3.2, 44, 96)), [String(c.value || "")])]);
   };
@@ -989,7 +1138,7 @@
       E("div", "cw-t25", "font-style:italic;margin-top:4px", [w[1]]), b.h >= 300 ? E("div", "cw-t25", "color:var(--ink);margin-top:14px", [w[2]]) : null]));
   };
   R.news = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "info", "Headlines are coming");
+    if (!env.demo) return soon(root, b, "info", "news");
     var h = [["Northern Rivers", "Bruxner Highway roadworks finish a month early", "1h"], ["Weather", "Storm season outlook: a wetter summer than usual for NSW", "2h"], ["Sport", "Matildas name squad for December friendlies", "3h"], ["Business", "Petrol prices ease ahead of the holidays", "4h"]];
     var n = clamp(Math.floor((b.h - 90) / 128), 1, 4);
     add(root, [lab("info", "Headlines"), E("div", "cw-col cw-grow", "margin-top:18px;justify-content:space-around", h.slice(0, n).map(function (x) {
@@ -997,17 +1146,17 @@
     }))]);
   };
   R.sports = function (root, o, b, env) {
-    if (!env.demo) return empty(root, b, "tv", "Scores are not on couch-tv yet", "No free score feed covers the NRL and AFL");
+    if (!env.demo) return soon(root, b, "tv", "sports");
     var m = [["Titans", "GLD", "#00a6e2", 24, "Broncos", "BRI", "#7c1d3f", 18, "FT"], ["Rabbitohs", "SOU", "#00843d", 12, "Roosters", "SYD", "#002b5c", 12, "62'"], ["Storm", "MEL", "#592c82", 6, "Raiders", "CAN", "#6bbe45", 0, "21'"], ["Sharks", "CRO", "#00a9d8", 0, "Eels", "PAR", "#ffcc00", 0, "7:50"]];
     var n = Math.max(1, Math.floor((b.h - 60) / 200));
     var team = function (nm, c, col, s, win) { void c; return E("div", "cw-row cw-sp", "", [E("div", "cw-row", "", [E("i", "", "display:block;width:28px;height:28px;border-radius:14px;background:" + col + ";margin-right:14px;box-shadow:0 0 0 3px rgba(255,255,255,.18)"), E("span", "cw-t29", "font-weight:" + (win ? 720 : 520), [nm])]), E("span", "cw-t38", "opacity:" + (win ? 1 : 0.6), [String(s)])]); };
-    add(root, [E("div", "cw-row cw-sp", "", [lab("tv", op(o).label || "NRL"), E("div", "cw-t23", "", ["Demo"])]), E("div", "cw-col cw-grow", "margin-top:16px;justify-content:space-between", m.slice(0, n).map(function (x) {
+    add(root, [E("div", "cw-row cw-sp", "", [lab("tv", op(o).label || "NRL"), E("div", "cw-t23", "", ["Today"])]), E("div", "cw-col cw-grow", "margin-top:16px;justify-content:space-between", m.slice(0, n).map(function (x) {
       return E("div", "cw-col", "padding:16px 20px;border-radius:24px;background:rgba(255,255,255,.08)", [team(x[0], x[1], x[2], x[3], x[3] >= x[7]), E("div", "", "height:10px"), team(x[4], x[5], x[6], x[7], x[7] >= x[3]),
         E("div", "cw-t23", "margin-top:10px;font-weight:700;color:" + (x[8] === "FT" ? "var(--sub)" : "#ff453a"), [x[8] === "FT" ? "Full time" : "Live " + x[8]])]);
     }))]);
   };
   R.stocks = function (root, o, b, env) {
-    if (!env.demo) return empty(root, b, "info", "Markets are not on couch-tv yet", "");
+    if (!env.demo) return soon(root, b, "info", "stocks");
     var s = [["ASX 200", "8,412", "+0.6%", 1], ["BTC", "$142,310", "-1.2%", 0], ["AUD/USD", "0.672", "+0.1%", 1]];
     add(root, [E("div", "cw-lab", "", ["Markets"]), E("div", "cw-col cw-grow", "justify-content:space-around;margin-top:12px", s.map(function (x) {
       return E("div", "cw-row cw-sp", "", [E("div", "", "", [E("div", "cw-t29", "", [x[0]]), E("div", "cw-t23", "", [x[1]])]), b.w >= 460 ? svg("0 0 110 40", 110, 40, [S("path", { d: x[3] ? "M0 34 L20 30 L38 32 L56 20 L74 24 L92 10 L110 6" : "M0 8 L20 12 L38 9 L56 22 L74 18 L92 30 L110 33", fill: "none", stroke: x[3] ? "#30d158" : "#ff453a", "stroke-width": 3.4, "stroke-linejoin": "round" })]) : null,
@@ -1015,7 +1164,7 @@
     }))]);
   };
   R.commute = function (root, o, b, env) {
-    if (!env.demo) return empty(root, b, "location", "Drive times are not on couch-tv yet", "");
+    if (!env.demo) return soon(root, b, "location", "commute");
     add(root, [lab("location", "To work"), E("div", "cw-row", "margin-top:10px;align-items:baseline", [E("span", "cw-big", "font-size:88px;margin-right:16px", ["16"]), E("span", "cw-t29", "", ["min"])]),
       E("div", "cw-t25", "color:#30d158;font-weight:650", ["Light traffic"]), svg("0 0 300 90", "100%", "100%", [S("path", { d: "M14 70 C70 70 80 24 140 30 S220 70 286 22", fill: "none", stroke: "rgba(255,255,255,.25)", "stroke-width": 12, "stroke-linecap": "round" }),
         S("path", { d: "M14 70 C70 70 80 24 140 30 S220 70 286 22", fill: "none", stroke: "#30d158", "stroke-width": 7, "stroke-linecap": "round" }), S("circle", { cx: 14, cy: 70, r: 9, fill: "#fff" }), S("circle", { cx: 286, cy: 22, r: 9, fill: "#fff", stroke: "#30d158", "stroke-width": 5 })], "flex:1;min-height:0;margin:12px 0"),
@@ -1025,7 +1174,7 @@
   // guests and the room
   R.welcome = function (root, o, b) {
     var q = op(o), align = q.align || "left", text = q.text || "Welcome";
-    var lines = text.split("\n").length, fs = clamp(Math.min((b.h - (q.kicker ? 50 : 0) - (q.sub ? 50 : 0)) / (1.08 * lines), b.w / (Math.max(8, text.length / lines) * 0.52)), 30, 120);
+    var lines = text.split("\n").length, fs = clamp(Math.min((b.h - (q.kicker ? 50 : 0) - (q.sub ? 50 : 0)) / (1.08 * lines), b.w / (Math.max(8, Math.max.apply(null, text.split("\n").map(function (l) { return l.length; }))) * 0.6)), 30, 120);
     var bare = root.classList.contains("cw-bare"), sh = bare ? ";text-shadow:0 3px 24px rgba(0,0,0,.28)" : "";
     add(root, E("div", "cw-col", "height:100%;justify-content:center;text-align:" + align + ";align-items:" + (align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start"), [
       q.kicker ? E("div", "", "font-size:23px;font-weight:720;letter-spacing:.14em;text-transform:uppercase;opacity:.86;margin-bottom:12px" + sh, [q.kicker]) : null,
@@ -1044,7 +1193,7 @@
     })));
   };
   R.wifi = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "wifi", "Guest Wi-Fi details are kept on the TV");
+    if (!env.demo) return soon(root, b, "wifi", "wifi");
     var qs = Math.min(b.h - 48, b.w * 0.42), cells = [], seed = 7;
     for (var i = 0; i < 21 * 21; i++) {
       seed = (seed * 9301 + 49297) % 233280;
@@ -1056,22 +1205,193 @@
       E("div", "cw-col", "margin-left:30px;min-width:0", [lab("wifi", "Guest Wi-Fi"), E("div", "cw-t48 cw-ell", "margin-top:10px", ["salt-and-sun"]), E("div", "cw-t29 cw-dim", "margin-top:6px", ["Password"]), E("div", "cw-t38 cw-ell", "", ["summer-swell"]), E("div", "cw-t23", "margin-top:10px", ["Point your phone camera here"])])]));
   };
   R.guide = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "info", "The house guide is coming");
+    if (!env.demo) return soon(root, b, "info", "guide");
     var it = [["info", "House guide"], ["clock", "Check out Sun 10am"], ["location", "Around here"]];
     add(root, E("div", "cw-col cw-grow", "", it.map(function (x, i) { return E("div", "cw-row", "flex:1;padding:14px 20px;border-radius:24px;background:rgba(255,255,255,.12);" + (i ? "margin-top:16px" : ""), [ic(x[0], 34), E("span", "cw-t29", "margin-left:16px", [x[1]])]); })));
   };
   R.screentime = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "timer", "Screen time is coming with Kids mode");
+    if (!env.demo) return soon(root, b, "timer", "screentime");
     add(root, [lab("timer", "Screen time", "rgba(255,255,255,.88)"), E("div", "cw-big", "font-size:" + px(clamp(b.h / 2.6, 80, 150)) + ";margin-top:14px", ["25", E("span", "", "font-size:.38em", [" min"])]), E("div", "cw-t29", "font-weight:650", ["left today"]), E("div", "cw-grow"),
       E("div", "cw-bar", "height:14px;border-radius:7px;background:rgba(255,255,255,.25)", [E("b", "", "width:58%;background:#fff")]), E("div", "cw-t23", "color:#fff;margin-top:10px", ["Bedtime 7:30pm, the TV goes quiet"])]);
   };
+
+  // ---------------- the small sizes (widget-caps.js sizes): a tile 2 x 2 and a wide tile 4 x 2 ----------------
+  // CR[kind] draws a box under 200 px tall; kinds without one draw their own small layout in R.
+  // `mini` is the shared shape: on a tile an icon over one big value and its name; on a wide tile
+  // the name and a line beside the value. Never under 23 px words.
+  var CR = {};
+  function fitPx(text, w, max) { return clamp(Math.min(max, w / (Math.max(2, String(text).length) * 0.6)), 30, max); }
+  function mini(root, b, iconName, value, label, sub, vcol) {
+    if (b.w < 300) {
+      root.style.padding = "18px";
+      add(root, [iconName ? ic(iconName, 32, "currentColor") : null, E("div", "cw-grow"),
+        E("div", "cw-big", "white-space:nowrap;font-size:" + px(fitPx(value, b.w - 36, 54)) + (vcol ? ";color:" + vcol : ""), [value]),
+        label ? E("div", "cw-t23 cw-ell", "font-weight:650;color:var(--ink);margin-top:2px", [label]) : null]);
+      return;
+    }
+    add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:1;min-width:0", [label ? lab(iconName, label) : null, sub ? E("div", "cw-t25 cw-ell", "color:var(--ink);font-weight:620;margin-top:8px", [sub]) : null]),
+      E("div", "cw-big", "white-space:nowrap;margin-left:16px;font-size:" + px(fitPx(value, (b.w - 48) * 0.4, 72)) + (vcol ? ";color:" + vcol : ""), [value])]));
+  }
+  // a kind couch-tv cannot fill yet: the setup card on a TV, the sample in TV Designer
+  function sample(kind, iconName, fn) { return function (root, o, b, env, sh) { if (!env.demo) return soon(root, b, iconName, kind); return fn(root, o, b, env, sh); }; }
+  CR.wordclock = function (root, o, b) {
+    var tl = timeWords(now()).split("\n"), longest = Math.max.apply(null, tl.map(function (l) { return l.length; }));
+    var fs = clamp(Math.min((b.w - 48) / (longest * 0.56), (b.h - 48) / (tl.length * 1.08)), 26, 70);
+    var w = E("div", "", "font-size:" + px(fs) + ";font-weight:780;line-height:1.04;letter-spacing:-.02em;white-space:pre-line", [timeWords(now())]);
+    add(root, E("div", "cw-col", "height:100%;justify-content:center", [w]));
+    live(root, 15000, function () { w.textContent = timeWords(now()); });
+  };
+  CR.solar = CR.sun = function (root, o, b, env) {
+    var s = sunToday(env);
+    if (!s) return empty(root, b, "sun", "Set your town for the sun", "");
+    if (b.w < 300) return mini(root, b, "sun", (s.frac > 0.5 ? s.set : s.rise).replace(/[ap]m$/, ""), s.frac > 0.5 ? "Sunset" : "Sunrise");
+    var col = function (word, t) { return E("div", "cw-col", "", [E("div", "cw-t23", "", [word]), E("div", "cw-t29", "font-weight:700", [t])]); };
+    add(root, E("div", "cw-row", "height:100%;justify-content:space-around", [ic("sun", 48, "#ffd60a", "solid"), col("Sunrise", s.rise), col("Sunset", s.set)]));
+  };
+  CR.worldclock = function (root, o, b, env) {
+    var cities = (op(o).cities && op(o).cities.length ? op(o).cities : ["Europe/London", "America/New_York"]);
+    var name = function (tz) { return CITY[tz] || tz.split("/").pop().replace(/_/g, " "); };
+    if (b.w < 300) { var t = tzTime(cities[0]); return mini(root, b, null, t ? t.t.replace(/[ap]m$/, "") : "", name(cities[0])); }
+    add(root, E("div", "cw-col", "height:100%;justify-content:space-around", cities.slice(0, 2).map(function (tz) {
+      var t = tzTime(tz);
+      return E("div", "cw-row cw-sp", "", [E("div", "cw-t29 cw-ell", "font-weight:650;min-width:0", [name(tz)]), E("div", "cw-t38", "margin-left:12px", [t ? t.t : ""])]);
+    })));
+    void env;
+  };
+  CR.month = function (root, o, b) {
+    var d = now();
+    root.style.padding = "18px";
+    add(root, E("div", "cw-col cw-center", "height:100%", [E("div", "cw-t23", "font-weight:750;color:#ff453a;text-transform:uppercase;letter-spacing:.06em", [DAYS[d.getDay()].slice(0, 3)]),
+      E("div", "cw-big", "font-size:" + px(b.w < 300 ? 76 : 96), [String(d.getDate())])]));
+  };
+  CR.weather = function (root, o, b, env, sh) {
+    if (b.w < 300) return R.weather(root, o, b, env, sh);
+    var w = weather(env);
+    if (!w) return noWx(root, b, env);
+    add(root, E("div", "cw-row", "height:100%", [ic(wxIcon(w.code, w.is_day), 48, rgba(sh.ink, 1), "solid"), E("div", "cw-col", "flex:1;min-width:0;margin-left:14px", [E("div", "cw-t29 cw-ell", "font-weight:680", [w.place || "Here"]),
+      E("div", "cw-t23 cw-ell", "color:var(--ink)", [wxWords(w.code) + (w.hi !== undefined ? ", " + w.hi + "°" : "")])]), E("div", "cw-big", "font-size:72px;margin-left:10px", [w.temp + "°"])]));
+  };
+  CR.hourly = function (root, o, b, env, sh) {
+    var w = weather(env);
+    if (!w) return noWx(root, b, env);
+    if (!w.hourly) return empty(root, b, "clock", "The hourly forecast is on its way", "");
+    var n = clamp(Math.floor((b.w - 48) / 76), 2, 5), ink = rgba(sh.ink, 1);
+    add(root, E("div", "cw-row cw-sp", "height:100%", w.hourly.slice(0, n).map(function (h) {
+      return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink)", [h[0]]), E("div", "", "margin:4px 0", [ic(wxIcon(h[1], true), 34, ink, "solid")]), E("div", "", "font-size:27px;font-weight:650", [h[2] + "°"])]);
+    })));
+  };
+  CR.week = function (root, o, b, env, sh) {
+    var w = weather(env);
+    if (!w) return noWx(root, b, env);
+    if (!w.daily) return empty(root, b, "calendar", "The week's forecast is on its way", "");
+    var n = clamp(Math.floor((b.w - 48) / 96), 2, 4), ink = rgba(sh.ink, 1);
+    add(root, E("div", "cw-row cw-sp", "height:100%", w.daily.slice(0, n).map(function (d) {
+      return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink);font-weight:650", [d[0]]), E("div", "", "margin:4px 0", [ic(wxIcon(d[1], true), 32, ink, "solid")]), E("div", "", "font-size:25px;font-weight:650", [d[3] + "°", E("span", "", "opacity:.6", [" " + d[2] + "°"])])]);
+    })));
+  };
+  CR.rain = function (root, o, b, env) {
+    var w = weather(env);
+    if (!w) return noWx(root, b, env);
+    if (!w.rain) return empty(root, b, "rain", "Rain soon is on its way", "");
+    var heavy = (w.rainMax || 3) >= 2.5;
+    add(root, [E("div", "cw-t29 cw-ell", "font-weight:700", [w.rainFrom ? (heavy ? "Heavy rain from " : "Rain from ") + w.rainFrom : "No rain coming"]),
+      E("div", "cw-grow cw-row", "align-items:flex-end;margin-top:10px", w.rain.map(function (v) { return E("i", "", "display:block;flex:1;margin:0 3px;height:" + v + "%;border-radius:5px;background:#64d2ff"); }))]);
+  };
+  CR.uv = function (root, o, b, env) {
+    var w = weather(env);
+    if (!w || w.uv === undefined) return w ? empty(root, b, "sun", "UV is on its way", "") : noWx(root, b, env);
+    var band = w.uv < 3 ? "Low" : w.uv < 6 ? "Moderate" : w.uv < 8 ? "High" : w.uv < 11 ? "Very high" : "Extreme";
+    if (b.w < 300) return mini(root, b, "sun", String(w.uv), band);
+    mini(root, b, "sun", String(w.uv), "UV index", band + (w.uvFrom ? ", " + w.uvFrom + " to " + w.uvTo : ""));
+  };
+  CR.moon = function (root, o, b) {
+    var m = moon(now()), r = 44, f = m.f, waxing = f < 0.5, k = Math.cos(f * 2 * Math.PI), ex = Math.abs(k) * r;
+    var lit = S("path", { d: "M50 6 A44 44 0 0 " + (waxing ? 1 : 0) + " 50 94 A" + ex + " 44 0 0 " + ((waxing ? k > 0 : k < 0) ? 0 : 1) + " 50 6Z", fill: "#f2efe6" });
+    if (b.w < 300) {
+      // a tile: the moon, and its name under it
+      root.style.padding = "16px";
+      add(root, E("div", "cw-col", "height:100%;align-items:center;justify-content:space-between", [svg("0 0 100 100", 78, 78, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit]),
+        E("div", "cw-t23 cw-ell", "font-weight:680;color:var(--ink);max-width:100%", [m.name.replace(/^Waxing |^Waning /, "")])]));
+      return;
+    }
+    add(root, E("div", "cw-row", "height:100%", [svg("0 0 100 100", b.h - 48, b.h - 48, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit]),
+      E("div", "cw-col", "margin-left:20px;min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:680", [m.name]), E("div", "cw-t23 cw-ell", "", [m.full])])]));
+  };
+  CR.bins = function (root, o, b, env) {
+    var q = op(o), d = now(), wd = q.weekday === undefined ? 3 : q.weekday, ahead = (wd - d.getDay() + 7) % 7;
+    if (!env.demo && q.weekday === undefined) return empty(root, b, "calendar", "Set your bin night in TV Designer", "");
+    var when = ahead === 0 ? "Tonight" : ahead === 1 ? "Tomorrow" : DAYS[wd].slice(0, 3) + " night";
+    var night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + ahead), week = Math.floor((night.getTime() / 86400000 - (q.anchor || 0)) / 7);
+    var A = q.lid_a || "#ffd60a", B = q.lid_b || "#30d158", lids = q.alt ? ["#ff453a", week % 2 === 0 ? A : B] : [A, B];
+    var bin = function (c) { return svg("0 0 62 72", 40, 46, [S("rect", { x: 6, y: 14, width: 50, height: 56, rx: 8, fill: "#3a3a40" }), S("rect", { x: 2, y: 6, width: 58, height: 12, rx: 5, fill: c })], "margin-left:8px"); };
+    if (b.w < 300) { root.style.padding = "18px"; add(root, [E("div", "cw-t23", "font-weight:700;color:var(--sub)", ["Bins"]), E("div", "cw-grow"), E("div", "cw-row", "margin-left:-8px", lids.map(bin)), E("div", "cw-t25 cw-ell", "font-weight:720;color:var(--ink);margin-top:6px", [when])]); return; }
+    add(root, E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("calendar", "Bin night"), E("div", "cw-t29", "font-weight:720;margin-top:6px", [when])]), E("div", "cw-row", "", lids.map(bin))]));
+  };
+  CR.word = function (root, o, b) {
+    var words = (window.CouchWords || {}).words || [["Petrichor", "noun", "The smell of rain on dry ground."]], w = words[dayOfYear() % words.length];
+    add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-t48 cw-ell", "font-size:" + px(clamp((b.w - 48) / (w[0].length * 0.6), 30, 56)), [w[0]]), E("div", "cw-t25 cw-ell", "font-style:italic;margin-top:4px", [w[1] + (b.w >= 600 ? ". " + w[2] : "")])]));
+  };
+  CR.memory = sample("memory", "picture", function (root, o, b) {
+    add(root, [photoLayer(demoImg("camp")), E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.7),transparent 70%)"),
+      E("div", "cw-t23", "position:absolute;left:18px;top:14px;right:18px;color:#fff;font-weight:700;z-index:2", ["On this day"])]);
+  });
+  CR.speakers = sample("speakers", "speakers", function (root, o, b) { mini(root, b, "speakers", "2", "Speakers", "Living and Kitchen playing"); });
+  CR.controls = sample("controls", "light", function (root, o, b) {
+    var items = (op(o).controls && op(o).controls.length ? op(o).controls : [{ icon: "light", name: "Lounge" }, { icon: "lamp", name: "Lamp" }]).slice(0, b.w < 300 ? 1 : 2);
+    var mw = (b.w - 48 - 20 * (items.length - 1)) / items.length;
+    add(root, E("div", "cw-mods", "", items.map(function (x, i) {
+      return E("div", "cw-mod" + (i === 0 ? " on" : ""), "width:" + px(mw) + ";height:" + px(b.h - 48) + ";padding:14px 16px", [E("div", "cw-ic", "width:44px;height:44px", [ic(x.icon, 26, i === 0 ? "#1a1406" : "#fff", "solid")]), E("div", "cw-t23 cw-ell", "font-weight:700;color:inherit", [x.name || ""])]);
+    })));
+  });
+  CR.camera = sample("camera", "camera", function (root, o, b, env) { R.camera(root, o, b, env); });
+  CR.doorbell = sample("doorbell", "doorbell", function (root, o, b) { mini(root, b, "doorbell", "2:14", "Front door", "Last ring, parcel left"); });
+  CR.energy = sample("energy", "bolt", function (root, o, b) { mini(root, b, "bolt", "18.4", "kWh today", "Solar, battery 86%"); });
+  CR.sensor = sample("sensor", "temperature", function (root, o, b) { mini(root, b, "temperature", "26°", op(o).label || "Pool", "Pool water"); });
+  CR.battery = sample("battery", "bolt", function (root, o, b) { mini(root, b, "games", "12%", "Pad 2", "Charge it soon", "#ff453a"); });
+  CR.agenda = sample("agenda", "calendar", function (root, o, b) {
+    var d = now();
+    if (b.w < 300) return CR.month(root, o, b);
+    add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "align-items:center;flex:none;width:92px", [E("div", "cw-t23", "font-weight:750;color:#ff453a", [DAYS[d.getDay()].slice(0, 3).toUpperCase()]), E("div", "cw-big", "font-size:62px", [String(d.getDate())])]),
+      E("div", "cw-ev", "flex:1;min-width:0;margin-left:16px", [E("i", "", "background:#30d158"), E("div", "cw-col", "min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:680", ["Swimming"]), E("div", "cw-t23", "", ["4:00pm"])])])]));
+  });
+  CR.note = sample("note", "edit", function (root, o, b) {
+    add(root, E("div", "", "font-size:" + px(b.w < 300 ? 26 : 34) + ";font-weight:680;line-height:1.15;display:-webkit-box;-webkit-line-clamp:" + (b.w < 300 ? 3 : 2) + ";-webkit-box-orient:vertical;overflow:hidden", ["Dinner at 6. Feed Max!"]));
+  });
+  CR.list = sample("list", "check", function (root, o, b) { mini(root, b, op(o).icon || "check", "6", op(o).label || "Shopping", "Milk, avocados, sunscreen"); });
+  CR.news = sample("news", "info", function (root, o, b) {
+    add(root, [E("div", "cw-t23", "color:#ff453a;font-weight:700", ["Local · 1h"]), E("div", "cw-t29", "font-weight:640;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden", ["Highway roadworks finish a month early"])]);
+  });
+  CR.sports = sample("sports", "tv", function (root, o, b) {
+    var team = function (nm, col, sc, win) { return E("div", "cw-row cw-sp", "", [E("div", "cw-row", "min-width:0", [E("i", "", "display:block;width:22px;height:22px;border-radius:11px;flex:none;margin-right:12px;background:" + col), E("span", "cw-t25 cw-ell", "font-weight:" + (win ? 720 : 520), [nm])]), E("span", "cw-t29", "font-weight:700;opacity:" + (win ? 1 : 0.6), [String(sc)])]); };
+    add(root, E("div", "cw-col", "height:100%;justify-content:space-around", [team("Titans", "#00a6e2", 24, 1), team("Broncos", "#7c1d3f", 18, 0)]));
+  });
+  CR.stocks = sample("stocks", "info", function (root, o, b) { mini(root, b, "info", "+0.6%", "ASX 200", "8,412 at the close", "#30d158"); });
+  CR.commute = sample("commute", "location", function (root, o, b) { mini(root, b, "location", "16 min", "To work", "Light traffic, leave by 8:10"); });
+  CR.guide = sample("guide", "info", function (root, o, b) { mini(root, b, "info", "Sun", "Check out", "House guide, around here"); });
+  CR.screentime = sample("screentime", "timer", function (root, o, b) { mini(root, b, "timer", "25m", "Screen time", "Left today, bedtime 7:30pm"); });
+  CR.queue = sample("queue", "music", function (root, o, b) { mini(root, b, "music", "8", "Up next", "Sunday Best, Surfaces"); });
+  CR.wifi = sample("wifi", "wifi", function (root, o, b) { mini(root, b, "wifi", "Join", "Guest Wi-Fi", "Point your phone camera here"); });
 
   // ---------------- one widget, a stack, the API ----------------
   function one(o, b, env) {
     var sh = shell(o, b, env), root = sh.root, st = o.style || {};
     CTX = { icons: st.icons || (env.look && env.look.icons) || "line" };
-    try { (R[o.kind] || function (r) { empty(r, b, "info", "This widget needs a newer couch-tv", ""); })(root, o, b, env, sh); }
+    var draw = (b.h < 200 && CR[o.kind]) || R[o.kind];
+    try { (draw || function (r) { empty(r, b, "info", "This widget needs a newer couch-tv", ""); })(root, o, b, env, sh); }
     catch (e) { empty(root, b, "info", "This widget could not be drawn", ""); }
+    root.__o = o;
+    // OK on a widget (widget-detail.js): a widget with nothing real to show opens its setup record;
+    // one with a detail layer opens that; one whose own buttons do things keeps them, and its
+    // layer is in the Hold OK menu (data-detail)
+    var D = window.CouchDetail, layer = D ? D.layerOf(o.kind) : null;
+    if (root.getAttribute("data-empty")) {
+      if (!root.getAttribute("data-setup")) root.setAttribute("data-setup", o.kind);
+      [].forEach.call(root.querySelectorAll("[data-act]"), function (n) { n.removeAttribute("data-act"); });
+      stop(root, "detail", "setup", (window.CouchWidgetCaps && window.CouchWidgetCaps.get(o.kind) || {}).name || o.kind);
+    } else if (layer) {
+      if (!root.getAttribute("data-detail")) root.setAttribute("data-detail", layer);
+      if (!root.hasAttribute("data-act") && !root.querySelector("[data-act]")) stop(root, "detail", layer, (window.CouchWidgetCaps && window.CouchWidgetCaps.get(o.kind) || {}).name || o.kind);
+    }
     // show when (EDITING.md 8): at night, in the day, only when there is something to show
     var hide = (st.show === "night" && !nightNow()) || (st.show === "day" && nightNow()) || (st.show === "live" && root.getAttribute("data-empty"));
     if (hide) { if (env.designer || env.preview) root.style.opacity = "0.35"; else root.style.visibility = "hidden"; root.setAttribute("data-hidden", "1"); }
@@ -1129,6 +1449,14 @@
     autoInk: function (hex) { var c = autoInk(rgbOf(hex)); return c === WHITE ? "#ffffff" : "#1d1b18"; },
     contrast: function (a, b) { return contrast(rgbOf(a) || WHITE, rgbOf(b) || WHITE); },
     tileColour: function (kind) { return TILE[kind] || null; },
-    timeWords: timeWords, moon: moon, sunTimes: sunTimes, daysTo: daysTo
+    timeWords: timeWords, moon: moon, sunTimes: sunTimes, daysTo: daysTo,
+    timer: Timer,
+    // the building blocks and data readers the detail layers share (widget-detail.js)
+    kit: { E: E, S: S, svg: svg, ic: ic, add: add, px: px, clamp: clamp, rgba: rgba, avatar: avatar, cssImg: cssImg, now: now, dataOf: dataOf,
+      weather: weather, wxIcon: wxIcon, wxWords: wxWords, shows: shows, music: music, photos: photos, people: people,
+      appNode: appNode, appsFor: appsFor, appName: appName, appIcon: appIcon, demoImg: demoImg, bgImg: bgImg,
+      sunToday: sunToday, sunTimes: sunTimes, moon: moon, tzTime: tzTime, CITY: CITY, DAYS: DAYS, MONTHS: MONTHS, longDate: longDate, clockParts: clockParts,
+      roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
+      airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12 }
   };
 })();

@@ -1150,19 +1150,43 @@
   function weatherDirect(forecast) {
     var url = "https://api.open-meteo.com/v1/forecast?latitude=" + WXCFG.lat + "&longitude=" + WXCFG.lon +
       "&current=temperature_2m,weather_code,is_day&timezone=" + encodeURIComponent(WXCFG.timezone || "auto") +
-      (forecast ? "&hourly=temperature_2m,weather_code,uv_index,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&minutely_15=precipitation&forecast_days=7&forecast_minutely_15=12" : "&forecast_days=1");
+      (forecast ? "&hourly=temperature_2m,weather_code,uv_index,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max&minutely_15=precipitation&forecast_days=7&forecast_minutely_15=12" : "&forecast_days=1");
     return fetch(url).then(function (r) { return r.json(); }).then(function (j) {
       var c = j.current, code = Math.round(c.weather_code);
       var out = { temp: Math.round(c.temperature_2m), code: code, text: "", is_day: !!c.is_day };
       if (forecast) {
         var H = j.hourly || {}, Dd = j.daily || {}, M = j.minutely_15 || {}, nowIso = (c.time || "").slice(0, 13), at = Math.max(0, (H.time || []).indexOf(nowIso + ":00"));
-        out.hourly = (H.time || []).slice(at, at + 8).map(function (t, i) { return { time: t, temp: H.temperature_2m[at + i], code: H.weather_code[at + i], uv: H.uv_index && H.uv_index[at + i], pop: H.precipitation_probability && H.precipitation_probability[at + i] }; });
+        out.hourly = (H.time || []).slice(at, at + 24).map(function (t, i) { return { time: t, temp: H.temperature_2m[at + i], code: H.weather_code[at + i], uv: H.uv_index && H.uv_index[at + i], pop: H.precipitation_probability && H.precipitation_probability[at + i] }; });
         out.daily = (Dd.time || []).map(function (t, i) { return { date: t, code: Dd.weather_code[i], hi: Dd.temperature_2m_max[i], lo: Dd.temperature_2m_min[i], sunrise: Dd.sunrise[i], sunset: Dd.sunset[i], uv: Dd.uv_index_max && Dd.uv_index_max[i] }; });
         out.rain15 = (M.precipitation || []).slice(0, 12);
         if (out.daily.length) { out.hi = Math.round(out.daily[0].hi); out.lo = Math.round(out.daily[0].lo); out.uv = Math.round(out.daily[0].uv || 0); }
+        if (Dd.precipitation_probability_max) out.daily.forEach(function (d, i) { d.pop = Dd.precipitation_probability_max[i]; });
       }
-      return out;
+      return airAndSurf(out);
     });
+  }
+  // Only while an air or surf widget is on the home: Open-Meteo's free air quality and marine
+  // services for the same rounded place (widget-caps.js "air", "surf"). A failure leaves the rest.
+  function airAndSurf(out) {
+    var want = typeof CouchDesign !== "undefined" && CouchDesign.wantsKinds ? CouchDesign.wantsKinds(["air", "surf"]) : [];
+    if (!want.length) return out;
+    var at = "latitude=" + WXCFG.lat + "&longitude=" + WXCFG.lon + "&timezone=" + encodeURIComponent(WXCFG.timezone || "auto");
+    var nowAt = function (times) { var h = new Date(), iso = h.getFullYear() + "-" + ("0" + (h.getMonth() + 1)).slice(-2) + "-" + ("0" + h.getDate()).slice(-2) + "T" + ("0" + h.getHours()).slice(-2) + ":00"; return Math.max(0, (times || []).indexOf(iso)); };
+    var jobs = [];
+    if (want.indexOf("air") >= 0) jobs.push(fetch("https://air-quality-api.open-meteo.com/v1/air-quality?" + at + "&current=european_aqi&hourly=european_aqi&forecast_days=2")
+      .then(function (r) { return r.json(); }).then(function (j) {
+        var H = j.hourly || {}, i = nowAt(H.time);
+        if (j.current && isFinite(j.current.european_aqi)) out.air = { aqi: j.current.european_aqi, hourly: (H.european_aqi || []).slice(i, i + 12).filter(function (v) { return v != null; }) };
+      }, function () {}));
+    if (want.indexOf("surf") >= 0) jobs.push(Promise.all([
+      fetch("https://marine-api.open-meteo.com/v1/marine?" + at + "&current=wave_height,wave_period,wave_direction&hourly=wave_height&forecast_days=2").then(function (r) { return r.json(); }),
+      fetch("https://api.open-meteo.com/v1/forecast?" + at + "&current=wind_speed_10m,wind_direction_10m&forecast_days=1").then(function (r) { return r.json(); })
+    ]).then(function (j) {
+      var c = j[0].current || {}, H = j[0].hourly || {}, i = nowAt(H.time), wc = j[1].current || {};
+      out.marine = { wave: c.wave_height == null ? NaN : c.wave_height, period: c.wave_period, dir: c.wave_direction, wind: wc.wind_speed_10m, windDir: wc.wind_direction_10m,
+        hourly: (H.wave_height || []).slice(i, i + 12).filter(function (v) { return v != null; }) };
+    }, function () {}));
+    return Promise.all(jobs).then(function () { return out; });
   }
 
   function hero(it) {
@@ -5110,7 +5134,15 @@
           shows: data.shows || [], music: music, apps: (function () { try { return arrangeItems().items.map(function (it) { return { package: it.package, name: it.name }; }); } catch (e) { return []; } })(),
           photos: (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && (p.file || p.url); }).map(photoSrc),
           people: NOBODY ? [] : PEOPLE.map(function (p) { return { id: p.id, name: p.name }; }), who: who, quick: quickVisible(), cards: CARDS.slice(0, 8), iconUrl: iconUrl,
-          scenes: (CFG.home_assistant && CFG.home_assistant.scenes) || [] };
+          // no bridge at all (option A, or the standalone home): widgets that need one say so
+          bridge: !OFFLINE,
+          // the scenes the launcher's Home Assistant allows (names and entities only, never its address)
+          scenes: window.smartHome && window.smartHome.scenes ? window.smartHome.scenes() : [] };
+      },
+      // the detail layers (widget-detail.js) ask Home Assistant through smarthome.js, never directly
+      ha: function (action, entity, value) {
+        if (!window.smartHome || !window.smartHome.request || !window.smartHome.available()) return Promise.resolve({ ok: false, error: "off" });
+        return window.smartHome.request(action, entity, value);
       },
       // OK on a widget: open the app, the show, the smart home, a quick button
       act: function (what, arg) {
@@ -5127,8 +5159,9 @@
         else if (what === "smart") openSmart();
         else if (what === "quick") { var qv = quickVisible(), qn = qv.indexOf(arg); if (qn >= 0) { qi = qn; quickAction(); } else if (arg === "soundscape") cycleSoundscape(); }
         else if (what === "person") { pickWho(arg); renderPeople(); }
+        else if (what === "scene") { if (window.smartHome && window.smartHome.request && window.smartHome.available()) { var scn = (window.smartHome.scenes() || []).filter(function (x) { return x.entity === arg; })[0], snm = scn ? scn.name : arg; window.smartHome.request("scene", arg).then(function (r) { note(r && r.ok ? t("sh_started", { name: snm }) : t("sh_failed")); }); } }
         else if (what === "media") {
-          var key = { prev: "previous", play: "play_pause", next: "next" }[arg];
+          var key = { prev: "previous", play: "play_pause", next: "next", vol_up: "volume_up", vol_down: "volume_down", mute: "mute" }[arg];
           if (key) { api("POST", "/api/key", { key: key }).catch(function (e) { note(tBridge(e.key, e.vars, e.message)); }); setTimeout(refreshMusic, 1200); }
         }
       },
