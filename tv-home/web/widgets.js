@@ -1327,6 +1327,8 @@
     var w = WEB_WORDS[kind], s = WEB_SHORT[kind];
     if (rec && rec.ok) return true;
     if (!rec) webEmpty(root, b, iconName, w[0], "It shows here in a moment", s[0]);
+    // switched off for every TV by the design store (an unofficial source that changed): calm, no steps
+    else if (rec.err === "paused") webEmpty(root, b, iconName, "This feed is paused", "It comes back on its own", "Paused");
     else if (rec.err === "relay") { webEmpty(root, b, iconName, w[3], "OK here shows how", s[3]); root.setAttribute("data-setup", kind); }
     else if (rec.err === "empty") webEmpty(root, b, iconName, w[2], "couch-tv looks again soon", s[2]);
     else webEmpty(root, b, iconName, w[1], "couch-tv tries again in a few minutes", s[1]);

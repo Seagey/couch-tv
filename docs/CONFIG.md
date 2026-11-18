@@ -411,6 +411,13 @@ second is kept on the TV only (`tvhome.commute`), not in the settings the bridge
 this home stops if it would send it. A design's Commute widget carries only its label, the arrive by
 time (`arrive_h`, `arrive_m`), the minutes to spare (`buffer`, 10 unless set) and `weekdays`.
 
+Scores and Markets are marked Beta (their sources are unofficial). The design store can pause any of
+these sources for every TV without an update: the TV asks `<design_store>/v1/config/sources` at most
+once a day, only while a web widget is on the home, with no cookies and no referrer, and keeps the
+answer for the day. `{"v": 1, "paused": ["sports"]}` pauses Scores; a paused source is never asked and
+its widget says "This feed is paused". No store (`"design_store": ""`), no answer or a bad one means
+everything on.
+
 Every web widget is centred unless the design sets `opts.align` (`left` or `right`), and fits its
 box at every size: words wrap and shrink (never under 23 px) and whole items are left out before
 anything is cut off.

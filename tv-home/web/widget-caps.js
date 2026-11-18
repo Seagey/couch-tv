@@ -23,6 +23,7 @@
 //                        picks the right list.
 //   until       what the person sees on the TV until it is set up: a setup card, never pretend data
 //   build       for "not-built": what has to be built; otherwise ""
+//   beta        (only some) the Beta label: why this widget is marked Beta, in one plain line
 //   ok          what OK on the remote opens (the detail layer, widget-detail.js), or what it does
 //   platforms   { <tvs/platform-setup.js key>: { on, need, note } }
 //                 on    "yes" | "setup" | "partial" | "no" (the older field the designer reads)
@@ -327,7 +328,7 @@
       until: "\"Getting the headlines\" for a moment. If the feed cannot be read, it says so and tries again in a few minutes", build: "",
       ok: "Opens the headlines: the latest six, with how long ago each came out", platforms: plat("works", "computer", "computer", { android: "couch-tv on the TV reads the feed: no computer needed.", vidaa: "Needs a computer at home: the website home cannot read news feeds." }), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
     // ESPN's public scoreboards, asked by the TV itself (free, no key; unofficial, so they may change)
-    sports: { name: "Scores", status: "works", what: "This round's games with their scores, live ones first: AFL, NRL, A-League, Premier League, NBA, Big Bash or cricket",
+    sports: { name: "Scores", status: "works", beta: "Beta: it reads an unofficial free source, which may change. couch-tv can pause it for every TV, and then the widget says the feed is paused.", what: "This round's games with their scores, live ones first: AFL, NRL, A-League, Premier League, NBA, Big Bash or cricket",
       needs: ["Nothing: the TV reads the scores itself (the NRL unless you pick another)"],
       setup: setup("designer", {
         android: ["Nothing to set up: the widget shows the NRL.", "To pick another competition or your team, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket, and type your team if you like.", SEND],
@@ -337,7 +338,7 @@
       ok: "Opens the round: every game with its score, live ones marked, and when the rest start", platforms: plat("works", "computer", "works", { web: "Works while the home computer is on (it runs couch-tv for this TV)." }), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
     // Yahoo Finance's chart data (free, no key, unofficial), read through couch-tv itself (the launcher,
     // the on-TV app or the home computer's bridge: widget-web.js, /api/webdata), never a server of ours
-    stocks: { name: "Markets", status: "works", what: "Your watchlist: the ASX 200, the dollar and Bitcoin unless you pick others, each with today's move. ASX prices are about 20 minutes late",
+    stocks: { name: "Markets", status: "works", beta: "Beta: it reads an unofficial free source, which may change. couch-tv can pause it for every TV, and then the widget says the feed is paused.", what: "Your watchlist: the ASX 200, the dollar and Bitcoin unless you pick others, each with today's move. ASX prices are about 20 minutes late",
       needs: ["Nothing on a Google TV, Android TV or Fire TV: couch-tv reads the prices itself", "On other TVs, the home computer, which reads the prices for the TV"],
       setup: setup("designer", {
         android: ["Nothing to set up: it shows the ASX 200, the Australian dollar and Bitcoin.", "To pick your own, open your design in couch-tv Studio on your phone.", "Tap the widget, then type up to six share codes, like BHP.AX or CBA.AX for ASX shares.", SEND],
@@ -429,6 +430,8 @@
     on: function (kind, platform) { var c = C[kind]; return c && c.platforms[platform] ? c.platforms[platform].on : "no"; },
     need: function (kind, platform) { var c = C[kind]; return c && c.platforms[platform] ? c.platforms[platform].need : "no"; },
     steps: steps,
+    // "" or the line saying why a widget is marked Beta (its source is unofficial)
+    beta: function (kind) { var c = C[kind]; return (c && c.beta) || ""; },
     card: card
   };
   root.CouchWidgetCaps = API;

@@ -10,7 +10,7 @@
 //
 // What a widget gets (env.data.web, read by widgets.js and widget-detail.js), per source and id:
 //   { ok: true, at: <ms>, v: <what the reader made>, stale: true when the last ask failed }
-//   { ok: false, at: <ms>, err: "relay" | "failed" | "empty" }      nothing to show, and why
+//   { ok: false, at: <ms>, err: "relay" | "failed" | "empty" | "paused" }   nothing to show, and why
 //   nothing at all                                                    still being asked
 //
 // ES5 on purpose: old Android TV WebViews. Also a CommonJS module for tests.
@@ -285,6 +285,19 @@
     return out.slice(0, max || 8);
   }
 
+  // ---------------- the remote off switch ----------------
+  // Scores and Markets read unofficial sources, so the design store can pause any source for every
+  // TV without an update: GET <store>/v1/config/sources answers { "v": 1, "paused": ["sports"] }. The
+  // TV asks at most once a day (app.js) and treats no answer as everything on. A paused source is
+  // never asked; its widget says calmly that the feed is paused.
+  var PAUSABLE = ["news", "sports", "stocks", "commute"];
+  function pausedOf(j) {
+    if (typeof j === "string") { try { j = JSON.parse(j); } catch (e) { j = null; } }
+    var p = j && typeof j === "object" ? j.paused : null, out = [];
+    if (Object.prototype.toString.call(p) === "[object Array]") p.forEach(function (x) { if (PAUSABLE.indexOf(x) >= 0 && out.indexOf(x) < 0) out.push(x); });
+    return out;
+  }
+
   // ---------------- the sources the loader knows ----------------
   // key(w): which answer a widget on the home needs (widgets with the same key share one request);
   // every: how long an answer is good for; get(h, id): one request, through the relay or straight
@@ -337,7 +350,8 @@
   };
 
   // ---------------- the loader ----------------
-  // h: { widgets(): [{kind, opts}] on the home now, canRelay(): whether this TV has a relay,
+  // h: { widgets(): [{kind, opts}] on the home now, paused(): the sources switched off by the store,
+  //      canRelay(): whether this TV has a relay,
   //      relay(src, id): a Promise of the source's text through it, json(url): a Promise of JSON from a
   //      source that allows pages,
   //      load(): the last answers kept on this TV, save(o), changed(): the widgets draw again,
@@ -366,6 +380,7 @@
     function ask(src, id) {
       var S = SOURCES[src], k = src + "\n" + id;
       if (busy[k]) return busy[k];
+      if (isPaused(src)) { put(src, id, { ok: false, at: now(), err: "paused" }); return null; }
       if (S.relay && !(h.canRelay && h.canRelay())) { put(src, id, { ok: false, at: now(), err: "relay" }); return null; }
       busy[k] = S.get(h, id).then(function (v) {
         delete busy[k];
@@ -379,9 +394,12 @@
       });
       return busy[k];
     }
+    function isPaused(src) { try { return !!h.paused && (h.paused() || []).indexOf(src) >= 0; } catch (e) { return false; } }
     function due(src, id) {
       var rec = web[src] && web[src][id], t = now();
       if (!rec) return true;
+      // paused: asked again only once it is switched back on (then straight away)
+      if (rec.err === "paused" || isPaused(src)) return isPaused(src) ? rec.err !== "paused" : true;
       if (!rec.ok || rec.stale) return t - (rec.retry || rec.at) >= 3 * MIN;
       return t - rec.at >= SOURCES[src].every(rec.v, t);
     }
@@ -406,7 +424,7 @@
     feedOf: feedOf, plain: plain, parseRss: parseRss, ago: ago,
     LEAGUES: LEAGUES, LEAGUE_DEFAULT: LEAGUE_DEFAULT, leagueOf: leagueOf, parseScores: parseScores, scoreOrder: scoreOrder, kickoff: kickoff,
     SYMBOL: SYMBOL, TICKERS_DEFAULT: TICKERS_DEFAULT, TICKER_NAMES: TICKER_NAMES, tickersOf: tickersOf, parseSpark: parseSpark, price: price, change: change,
-    routeKey: routeKey, routeUrl: routeUrl, parseRoute: parseRoute, leaveBy: leaveBy, picks: picks,
+    routeKey: routeKey, routeUrl: routeUrl, parseRoute: parseRoute, leaveBy: leaveBy, picks: picks, PAUSABLE: PAUSABLE, pausedOf: pausedOf,
     loader: function (h) { return Loader(h); }
   };
   root.CouchWidgetWeb = API;

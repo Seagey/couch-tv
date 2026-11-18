@@ -5221,9 +5221,43 @@
       load: function () { try { return JSON.parse(localStorage.getItem(PFX + "tvhome.webdata") || "null"); } catch (e) { return null; } },
       save: function (o) { try { localStorage.setItem(PFX + "tvhome.webdata", JSON.stringify(o)); } catch (e) {} },
       changed: webChanged,
+      paused: webPaused,
       places: commutePlaces,
       hidden: function () { return !!document.hidden; }
-    }).start();
+    });
+    // the first look waits for the store's off switch (or 6 seconds), so a paused source is never asked
+    var go = function () { if (WEB && !WEB.started) { WEB.started = true; WEB.start(); } };
+    if (CouchDesign.widgetsOf(Object.keys(CouchWidgetWeb.SOURCES)).length) webPaused(); else WEB_PAUSE = WEB_PAUSE || { at: 0, paused: [] };
+    if (WEB_PAUSE.wait) { WEB_PAUSE.wait.then(go, go); setTimeout(go, 6000); } else go();
+  }
+  // The design store's off switch for the web widgets' sources (widget-web.js pausedOf): GET
+  // <store>/v1/config/sources, asked at most once a day and only while a web widget is on the home,
+  // with no cookies and no referrer. No store, no answer or a bad one: everything on.
+  var WEB_PAUSE = null;
+  function webPaused() {
+    var t = Date.now();
+    if (!WEB_PAUSE) {
+      var c = null;
+      try { c = JSON.parse(localStorage.getItem(PFX + "tvhome.webpause") || "null"); } catch (e) {}
+      WEB_PAUSE = c && isFinite(c.at) && t - c.at < 86400000 && t >= c.at ? { at: c.at, paused: CouchWidgetWeb.pausedOf(c) } : { at: 0, paused: [] };
+    }
+    if (t - WEB_PAUSE.at >= 86400000) webPauseAsk();
+    return WEB_PAUSE.paused;
+  }
+  function webPauseAsk() {
+    var base = typeof CouchDesignCode !== "undefined" && CouchDesignCode.base ? CouchDesignCode.base() : "", t = Date.now();
+    WEB_PAUSE.at = t;   // one ask a day, whatever the answer
+    var done = function (paused) {
+      var was = WEB_PAUSE.paused.join();
+      WEB_PAUSE = { at: t, paused: paused };
+      try { localStorage.setItem(PFX + "tvhome.webpause", JSON.stringify({ at: t, paused: paused })); } catch (e) {}
+      if (was !== paused.join()) { if (WEB) WEB.tick(); webChanged(); }
+    };
+    if (!base || !window.fetch) return done([]);
+    WEB_PAUSE.wait = fetch(base + "/v1/config/sources", { credentials: "omit", referrerPolicy: "no-referrer", cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { done(CouchWidgetWeb.pausedOf(j)); }, function () { done([]); });
+    return WEB_PAUSE.wait;
   }
   function webChanged() { clearTimeout(webTimer); webTimer = setTimeout(function () { if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("web"); }, 150); }
   // The commute's two places, kept on this TV only (never in a design, never sent to the bridge): from

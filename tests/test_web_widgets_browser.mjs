@@ -127,6 +127,27 @@ for (const c of CASES) {
   await page.close();
 }
 
+// 1b. the store's off switch: with Scores paused in <store>/v1/config/sources, the TV asks the store
+// once, never asks ESPN, and the widget says the feed is paused; the answer is kept for the day
+{
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const asked = [];
+  await page.route("**/v1/config/sources", (r) => { asked.push("store"); r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ v: 1, paused: ["sports"] }) }); });
+  await page.route("https://site.api.espn.com/**", (r) => { asked.push("espn"); r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: fix("espn-nba.json") }); });
+  const R = rect(0, 0, 8, 4), design = { v: 1, background: { colour: "#26303f" }, objects: [{ id: "w0", type: "widget", kind: "sports", x: R.x, y: R.y, w: R.w, h: R.h, opts: { league: "nba" } }] };
+  await page.goto(BASE + "?mock=1&reset=1");
+  await page.evaluate((d) => { localStorage.clear(); localStorage.setItem("tvdesigner.design", JSON.stringify(d)); }, design);
+  const url = BASE + "?mock=1&design=local&weblive=1&designstore=" + encodeURIComponent("http://127.0.0.1:" + server.address().port);
+  await page.goto(url);
+  const said = await page.waitForFunction(() => /This feed is paused/.test((document.querySelector('.cw-o[data-obj="w0"] .cw') || {}).textContent || ""), null, { timeout: 8000 }).then(() => true, () => false);
+  await page.waitForTimeout(800);
+  ok(said && asked.join() === "store", "paused: the widget says so, the store was asked once and ESPN never (" + asked.join() + ")");
+  await page.goto(url); await page.waitForTimeout(2500);
+  ok(asked.join() === "store", "a reload the same day asks the store nothing more (" + asked.join() + ")");
+  await page.screenshot({ path: path.join(SHOTS, "sports-paused.png") });
+  await page.close();
+}
+
 // 2. every size, every state, centred: the owner's rule ("each widget fits in each container, things
 // are not cut off, icons and the rest centred unless changed in the designer"). For each kind, each
 // size widget-caps.js allows, and each state (the designer's demo, real data, hard data with long
@@ -165,7 +186,8 @@ for (const c of CASES) {
       relay: () => ({ data: { bridge: true, web: failWith("relay"), commute } }),
       empty: () => ({ data: { bridge: true, web: failWith("empty"), commute } }),
       stale: () => ({ data: { bridge: true, web: stale, commute } }),
-      noplace: () => ({ data: { bridge: true, web: real, commute: { from: commute.from, to: null, key: null } } })
+      noplace: () => ({ data: { bridge: true, web: real, commute: { from: commute.from, to: null, key: null } } }),
+      paused: () => ({ data: { bridge: true, web: failWith("paused"), commute } })
     };
     const OPTS = { commute: { arrive_h: 8, arrive_m: 30, label: "To the school on the other side of town" }, news: { label: "Headlines from the national broadcaster" }, sports: { team: "Knicks" }, stocks: {} };
     const host = document.createElement("div");
