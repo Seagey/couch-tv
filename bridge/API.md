@@ -778,12 +778,14 @@ a fresh app start and a profile screen add up.
 {
   "ok": true, "title": "Bluey", "from": "living-room", "to": "bedroom-tv", "who": "person1",
   "app": {"id": "netflix", "name": "Netflix", "package": "com.netflix.ninja"},
-  "method": "deeplink", "started": true,
+  "method": "deeplink", "started": true, "source_paused": true,
   "position_ms": 612000, "target_position_ms": 611400, "seek": null, "powered_off": false,
   "note": "Bluey is playing on Bedroom.", "note_key": "note_moved",
   "note_vars": {"title": "Bluey", "tv": "Bedroom"}
 }
 ```
+`source_paused: false` means this TV would not pause and is still on (`note` then says to pause it by
+hand).
 `position_ms` is where this TV was; `target_position_ms` is where the other TV is playing (`null` when
 it does not say). `seek` says whether this TV's spot had to be used as the backup: `null` (the app
 resumed near it by itself, or there was no way to jump), `"link"` (YouTube, opened again with the time)

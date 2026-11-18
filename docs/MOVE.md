@@ -33,8 +33,9 @@ In this order (`POST /api/move`, [bridge/API.md](../bridge/API.md)):
 
 1. Reads what is playing on the first TV, where it is up to, and who is watching there.
 2. Checks the other TV: it is free, it has the app, and it is not on a kids profile.
-3. Pauses the first TV, and checks that it took (Netflix on a Sony ignored a pause sent in a show's
-   first seconds; the bridge sends it again).
+3. Pauses the first TV, and checks that it took. If the pause key does not take, it is sent again,
+   and then the sync helper (when that TV has it) is asked to pause the app itself. If the first TV
+   still plays, the answer says so (`source_paused: false`) and the phone tells you to pause it.
 4. Wakes the other TV, and waits 4 seconds for its home screen to settle.
 5. Sets the same person on the other TV, before the show opens.
 6. Closes the app on the other TV and opens the same title in it, picks that person's profile on a
@@ -62,7 +63,7 @@ the rest from the bridge's API or the remote page in a browser.
 | YouTube | 5 | 5 | 15 to 24 | Same spot, by the link with the time (once 10 s behind, before the 5 second rule) | Nothing |
 | Prime Video | 3 | 3 | 46 to 48 | Same spot in 2 runs (sync helper), from the start in 1 | Blind OK switched on for it: two presses (profile, then Play) |
 | Disney+ | 7 | 4 | 42 to 48 | Same spot, through the sync helper | The profile is picked by name. The 3 misses came first and were fixed: the show and episode in one title, "Access Sam's profile" as the profile's label, and a profile screen that came up late |
-| Plex | 1 | 0 | - | - | Plex gives the TV no media session: the bridge sees nothing playing |
+| Plex | 1 | 0 | - | - | On the Sony the bridge saw nothing playing in Plex. And it has no link that opens a Plex title on the other TV |
 | An app not in `bridge/apps.py` | 1 | 0 | - | - | Refused: the bridge has no way to open a title in it |
 
 ## The limits
@@ -71,9 +72,17 @@ the rest from the bridge's API or the remote page in a browser.
   skip. Netflix resumes from the spot its own servers last saved, and that save lags behind (seen: a
   show moved one second after the pause started from the beginning). The backup fixes it only with the
   sync helper installed (below).
-- **Netflix does not say what is playing on some TVs** (no title in its media session). The move then
-  only works for a show the bridge knows it is: one couch-tv opened, or one it logged in that app in
-  the last six hours. Otherwise the phone says the app does not say what is playing.
+- **A show started with the TV's own remote can only be moved when the app says what it is.** YouTube
+  and Disney+ do. Netflix and Prime Video do not (seen on both TVs: no title, or just "PrimeVideo"), so
+  for them the move only works for a show couch-tv opened itself (the phone remote, Keep watching, a
+  move) in the last three hours, with the app in front ever since. Otherwise the phone says the app does
+  not say what is playing. The bridge never guesses the title from the watch history: that could move
+  another show. One case it cannot see: you pick another show inside the app with the TV's remote after
+  couch-tv opened one. The first show is the one that moves.
+- **The first TV may not pause** (not proven fixed). Twice, Netflix on the Sony played on through the
+  pause key right after it had been started, while the other TV started too. The same key worked a
+  minute later, and all three pause paths work on the Streamer. The move now tries the key twice, then
+  the sync helper, and says so when the first TV still plays.
 - **YouTube needs the same account, with watch history on, on both TVs.** That is how YouTube knows
   where you were. When it starts somewhere else anyway (seen: from the beginning, on a move right after
   the pause), the bridge opens the video again at the first TV's spot. The bridge finds the video by its
@@ -98,8 +107,9 @@ the rest from the bridge's API or the remote page in a browser.
   title that is a show's name followed by an episode's name (Disney+: "Bluey Fancy Restaurant") is
   matched when that episode is found. For anything else the app opens on its search, with the title
   typed in where the app allows it, and the phone says so.
-- **An app that does not say what is playing** cannot be moved: no title in its media session, or no
-  media session at all (Plex on a Sony Google TV).
+- **Plex cannot be moved.** On the Streamer Plex does say what is playing, but the bridge has no link
+  that opens a Plex title on the other TV (`bridge/apps.py` has Plex as "app only"), so only the app
+  would open. On the Sony the bridge saw nothing playing in Plex at all.
 - **An app the bridge does not know** (not in `bridge/apps.py`) cannot be moved.
 - **The first TV's saved spot is a backup only.** YouTube: the video is opened again with the time in
   the link. Any other app: the bridge can only jump inside it through the sync helper app of

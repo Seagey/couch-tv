@@ -350,9 +350,59 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
     async def test_a_pause_that_did_not_take_is_sent_again(self):
         self.a.adb_out = f"package={self.a.front}\nactive=true\nstate=PlaybackState {{state=PLAYING(3), position=5}}"
         r = await server.move_playing(A, B)
-        # three tries at the start, and one more once the other TV plays: both never play on
-        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause"] * 4)
+        # three key presses at the start and three more once the other TV plays; no helper on this TV
+        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause"] * 6)
+        self.assertEqual([e for e in self.did(A, "adb") if "op pause" in e[2]], [])
         self.assertTrue(r["started"])
+        self.assertFalse(r["source_paused"])                    # and it says so
+        self.assertEqual(r["note_key"], "note_move_still_playing")
+        self.assertEqual(r["note_vars"]["from"], "Lounge")
+
+    async def test_the_sync_helper_is_asked_to_pause_when_the_key_does_not_take(self):
+        self.installed.add(move.SYNC_HELPER)
+        self.a.adb_out = f"package={self.a.front}\nactive=true\nstate=PlaybackState {{state=PLAYING(3), position=5}}"
+        real_adb = self.a.adb
+
+        async def adb(*args, **kw):
+            out = await real_adb(*args, **kw)
+            if "op pause" in " ".join(args):     # the helper's pause is the one that takes
+                self.a.adb_out = self.a.adb_out.replace("PLAYING(3)", "PAUSED(2)")
+            return out
+        self.a.adb = adb
+        r = await server.move_playing(A, B)
+        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause", "pause"])
+        self.assertEqual([e[2] for e in self.did(A, "adb") if "op pause" in e[2]],
+                         [f"shell am broadcast -a dev.couchtv.sync.CMD -n dev.couchtv.sync/.CmdReceiver "
+                          f"--es op pause --es pkg {self.a.front}"])
+        self.assertTrue(r["source_paused"])
+        self.assertEqual(r["note_key"], "note_moved")
+
+    async def test_a_pause_that_landed_late_counts_as_paused(self):
+        playing_out = f"package={self.a.front}\nactive=true\nstate=PlaybackState {{state=PLAYING(3), position=5}}"
+        self.a.adb_out = playing_out
+        real_power_on, self.b.is_on = None, True
+
+        async def play_then_a_is_paused(*a, **k):
+            self.a.adb_out = playing_out.replace("PLAYING(3)", "PAUSED(2)")   # it took while B was starting
+            self.b.front = self.a.front
+            return {"method": "deeplink", "started": True}
+        with patch.object(server, "play", play_then_a_is_paused), \
+             patch.object(server, "get_it_playing", lambda *a, **k: play_then_a_is_paused()):
+            r = await server.move_playing(A, B)
+        self.assertTrue(r["source_paused"])
+        self.assertEqual(r["note_key"], "note_moved")
+
+    async def test_a_tv_that_was_turned_off_is_not_reported_as_still_playing(self):
+        self.a.adb_out = f"package={self.a.front}\nactive=true\nstate=PlaybackState {{state=PLAYING(3), position=5}}"
+        r = await server.move_playing(A, B, power_off=True)
+        self.assertTrue(r["powered_off"])
+        self.assertTrue(r["source_paused"])
+        self.assertEqual(r["note_key"], "note_moved")
+
+    async def test_a_pause_that_takes_is_sent_once(self):
+        r = await server.move_playing(A, B)
+        self.assertEqual([e[2] for e in self.did(A, "key")], ["pause"])
+        self.assertTrue(r["source_paused"])
 
     async def test_a_stays_on_unless_asked(self):
         r = await server.move_playing(A, B)
@@ -398,6 +448,43 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((ctx.exception.status, ctx.exception.key), (409, "err_move_app_not_known"))
         self.assertEqual(self.did(A, "key"), [])
         self.assertEqual(self.did(B, "adb"), [])
+
+    async def test_a_title_the_bridge_only_guessed_is_not_moved(self):
+        # the app gave no title; media_read took one from the watch history (title_from "bridge")
+        self.media[A] = playing("Some Show", 600_000, title_from="bridge")
+        with self.assertRaises(server.ApiError) as ctx:
+            await server.move_playing(A, B)
+        self.assertEqual((ctx.exception.status, ctx.exception.key), (409, "err_move_no_title"))
+        self.assertEqual(self.did(A, "key"), [])
+        self.assertEqual(self.did(B, "adb"), [])
+
+    async def test_a_title_the_bridge_opened_itself_is_moved_and_the_app_picks_the_episode(self):
+        import time
+        self.media[A] = playing("Some Show", 600_000, title_from="bridge")
+        self.a.state["playing"]["item"] = {"title": "Some Show", "package": self.a.front, "season": 2, "episode": 5,
+                                           "ts": time.time() - 600}
+        r = await server.move_playing(A, B)
+        self.assertTrue(r["started"])
+        if self.a.front == NETFLIX:
+            # not the episode the bridge opened back then: autoplay may have moved on, the app knows
+            self.assertEqual(self.did(B, "play")[0][2:5], ("Some Show", None, None))
+
+    async def test_what_the_bridge_opened_hours_ago_does_not_count(self):
+        import time
+        self.media[A] = playing("Some Show", 600_000, title_from="bridge")
+        self.a.state["playing"]["item"] = {"title": "Some Show", "package": self.a.front,
+                                           "ts": time.time() - server.MOVE_OPENED_S - 60}
+        with self.assertRaises(server.ApiError) as ctx:
+            await server.move_playing(A, B)
+        self.assertEqual(ctx.exception.key, "err_move_no_title")
+
+    async def test_what_the_bridge_opened_in_another_app_does_not_count(self):
+        self.media[A] = playing("Some Show", 600_000, title_from="bridge")
+        import time
+        self.a.state["playing"]["item"] = {"title": "Some Show", "package": "com.example.other", "ts": time.time()}
+        with self.assertRaises(server.ApiError) as ctx:
+            await server.move_playing(A, B)
+        self.assertEqual(ctx.exception.key, "err_move_no_title")
 
     async def test_an_app_that_gives_no_title(self):
         self.media[A] = playing(None, 5)

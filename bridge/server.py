@@ -3998,6 +3998,7 @@ async def h_tvs(request):
 # backup. Android and Google TV only (docs/MOVE.md lists the limits).
 _move_lock = asyncio.Lock()
 MOVE_SETTLE_S = 4   # after waking TV B, before a link is opened on it
+MOVE_OPENED_S = 3 * 3600   # how long a show the bridge opened itself stands in for a title the app does not give
 
 
 @contextlib.contextmanager
@@ -4058,7 +4059,8 @@ async def move_open(app, now, session, who, again=False):
     """On TV B: open what `now` says was playing on TV A, in the same app. Uses `play` (the show
     finder, the app's own link, the profile screen and the Play button) for every app it knows, and
     a video link for YouTube. Returns `play`'s answer; "video" is the YouTube id when one was found.
-    `again`: a second go at an app that is already open (it is not started afresh)."""
+    `again`: a second go at an app that is already open (YouTube is not started afresh then; the
+    others follow their own "cold" rule in apps.py, as any `play` does)."""
     title = now["title"]
     if app["id"] == "youtube":
         video = await move.youtube_video_id(title, (session or {}).get("subtitle"), (session or {}).get("duration"))
@@ -4098,14 +4100,27 @@ async def _move_state(pkg):
 
 
 async def move_pause(pkg):
-    """Pause the app on this TV and see that it took: Netflix on a Sony Google TV ignored a pause
-    sent in the first seconds of a show and played on while the other TV started. Pause is not a
-    toggle, so sending it again is safe."""
-    for _ in range(3):
-        await tv.key("pause")
+    """Pause the app on this TV and see that it took. True when it no longer says it is playing.
+    Seen on a Sony Google TV: Netflix, started a moment before, played on through the pause key,
+    twice, while the other TV started. A media key goes to whichever app Android thinks owns the
+    media keys, so the key is tried twice (pause is not a toggle, so that is safe) and then the sync
+    helper, when this TV has it, is asked to pause this app itself. False means it is still playing:
+    the caller says so instead of pretending."""
+    for way in ("key", "key", "helper", "key"):
+        if way == "key":
+            await tv.key("pause")
+        elif move.SYNC_HELPER in (await installed_packages(wait=False) or ()):
+            try:
+                await tv.adb("shell", move.pause_command(pkg), timeout=8)
+            except Exception as e:
+                log.info("move: pause through the sync helper failed: %s", e)
+        else:
+            continue
         await asyncio.sleep(1)
         if await _move_state(pkg) != "PLAYING":
-            return
+            return True
+    log.warning("move: %s would not pause on %s", pkg, tv.name)
+    return False
 
 
 async def move_wait_playing(pkg, timeout=8):
@@ -4206,6 +4221,16 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
         app = apps.describe_package(pkg)
         session = await media_read(pkg, app) if app and app["id"] not in NOT_VIEWING else None
         now = dict(media_now) if session else {}
+        if now.get("title_from") == "bridge":
+            # The app gave no title (Netflix on some TVs) and media_read filled one in. Only what the
+            # bridge itself opened in this app in the last three hours, with the app in front ever
+            # since, is taken to be it. Its other source, the last thing watched in the app in the past
+            # six hours, is a guess: a show started with the TV's own remote would be moved as some
+            # other show. (Someone who picks another show inside the app with the TV's remote after
+            # the bridge opened one still gets the first one moved: the bridge cannot see that.)
+            item = playing["item"]
+            if not (item and item.get("package") == pkg and item.get("ts", 0) > time.time() - MOVE_OPENED_S):
+                now["title"] = None
         who = cur_who()
         from_name = tv.name
     if app and app["id"] is None:
@@ -4238,9 +4263,10 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
 
     # 3. pause A
     paused_here = now["state"] != "paused"
+    source_paused = True
     if paused_here:
         with on_tv(src):
-            await move_pause(pkg)
+            source_paused = await move_pause(pkg)
 
     opened, started, at, seek = {}, False, None, None
     who_set = False
@@ -4320,8 +4346,8 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
     powered_off = False
     if started:
         with on_tv(src):
-            if await _move_state(pkg) == "PLAYING":   # never leave both TVs playing
-                await tv.key("pause")
+            # never leave both TVs playing without saying so; a pause that landed late counts
+            source_paused = await _move_state(pkg) != "PLAYING" or await move_pause(pkg)
     if power_off and started:
         with on_tv(src):
             if tv.is_on:
@@ -4342,8 +4368,13 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
     else:
         note = f"{title} is playing on {to_name}."
         note_key, note_vars = "note_moved", {"title": title, "tv": to_name}
+    source_paused = source_paused or powered_off
+    if started and not source_paused:
+        note = f"{title} is playing on {to_name}, but {from_name} would not pause. Pause it with its remote."
+        note_key, note_vars = "note_move_still_playing", {"title": title, "tv": to_name, "from": from_name}
     return {"title": title, "from": src, "to": dst, "who": who, "app": apps.describe_package(pkg),
-            "method": opened.get("method"), "started": started, "position_ms": spot,
+            "method": opened.get("method"), "started": started, "source_paused": source_paused,
+            "position_ms": spot,
             "target_position_ms": at, "seek": seek, "powered_off": powered_off,
             "note": note, **messages.note_fields(note_key, note_vars)}
 

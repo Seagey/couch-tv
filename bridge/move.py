@@ -175,6 +175,12 @@ def can_seek_command(package):
     return _helper("state", package)
 
 
+def pause_command(package):
+    """The `adb shell` line that asks the sync helper to pause `package` itself. A pause key goes to
+    whichever app Android thinks owns the media keys, which is not always the one on screen."""
+    return _helper("pause", package)
+
+
 def seek_command(package, position_ms):
     """The `adb shell` line that asks the sync helper to move `package` to `position_ms`. The package
     goes through check_package and the spot is a whole number, so nothing else can reach the shell."""
