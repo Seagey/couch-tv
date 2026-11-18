@@ -62,7 +62,7 @@
     if (t && !keep) S.msgT = setTimeout(function () { if (S && S.msgEl) S.msgEl.classList.remove("on"); }, 3600);
   }
   // In TV Designer nothing in the house is switched, and the layer says so (once)
-  function designerSays() { if (S.api.designer && !S.said) { S.said = true; msg("In TV Designer this only shows what OK does. Nothing is switched."); return true; } return S.api.designer; }
+  function designerSays() { if (S.api.designer && !S.said) { S.said = true; msg("In couch-tv Studio this only shows what OK does. Nothing is switched."); return true; } return S.api.designer; }
   function btn(iconName, text, cls) { return E("div", "cwd-btn" + (cls ? " " + cls : ""), "", [iconName ? ic(iconName, 34, "currentColor", "solid") : null, text ? E("span", "", "", [text]) : null]); }
   function chip(text, on) { return E("div", "cwd-chip" + (on ? " on" : ""), "", [text]); }
 
@@ -70,7 +70,7 @@
   var B = {};
 
   // the setup record (widget-caps.js), for a widget with nothing real to show yet
-  var WHERE = { tv: "On this TV", phone: "From the phone remote", computer: "On the computer at home", designer: "In TV Designer", nothing: "Nothing to set up" };
+  var WHERE = { tv: "On this TV", phone: "From the phone remote", computer: "On the computer at home", designer: "In couch-tv Studio", nothing: "Nothing to set up" };
   var STATUS = { works: ["Works on this TV", "#30d158"], setup: ["Needs setting up", "#ffd60a"], "not-built": ["Not on couch-tv yet", "#ff9f0a"] };
   B.setup = function (o) {
     var kind = (S.from && S.from.getAttribute("data-setup")) || o.kind, C = window.CouchWidgetCaps, c = C && C.get(kind);

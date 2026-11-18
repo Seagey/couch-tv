@@ -3560,7 +3560,7 @@
 
   // ---- rows ----
   // TV Designer is a name, the same in every language
-  function secName(id) { return id === "designer" ? "TV Designer" : t("sec_" + id); }
+  function secName(id) { return id === "designer" ? "couch-tv Studio" : t("sec_" + id); }
   function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(SECS[SET.sec][0]); }
   function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info"; }
   function firstRow(rows) { for (var i = 0; i < rows.length; i++) if (focusable(rows[i])) return i; return -1; }
@@ -3732,8 +3732,8 @@
   // that one server for the code typed here; nothing connects to the TV. English only for now (needs i18n).
   function designCodeRows(rows) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.base()) return;
-    rows.push({ kind: "input", key: "design-get", label: "Get a design", sub: "Type the code the TV Designer shows you", act: function () {
-      startTyping({ label: "Type the code from the TV Designer (like ABCDE-FGHJK)", value: "", code: true, submit: getDesignByCode });
+    rows.push({ kind: "input", key: "design-get", label: "Get a design", sub: "Type the code couch-tv Studio shows you", act: function () {
+      startTyping({ label: "Type the code from couch-tv Studio (like ABCDE-FGHJK)", value: "", code: true, submit: getDesignByCode });
     } });
     if (DESIGN_FROM_CODE) rows.push({ kind: "action", key: "design-forget", label: "Remove the design I got", sub: "Back to the home as it was", act: function () {
       CouchDesignCode.forget(); SET.dirty = true; SET.msg = "Removed. The home goes back to how it was when you close Home settings.";
@@ -3762,21 +3762,21 @@
   }
   function designerRows() {
     var rows = [], on = GATE.on || (typeof CouchDesign !== "undefined" && CouchDesign.on());
-    if (typeof CouchDesigner === "undefined") return [info("dz-none", "TV Designer", "", "Not in this version of the home.")];
+    if (typeof CouchDesigner === "undefined") return [info("dz-none", "couch-tv Studio", "", "Not in this version of the home.")];
     if (!on) {
-      rows.push(info("dz-off", "TV Designer", "Off", "Design your home on your phone, then send it to this TV. While it is off, your home stays exactly as it is."));
-      rows.push({ kind: "action", key: "dz-turn-on", label: "Turn on TV Designer", sub: "Nothing changes until you choose a design", act: function () {
-        setDesigner(true); SET.msg = "TV Designer is on. Get a design below, or close Home settings.";
+      rows.push(info("dz-off", "couch-tv Studio", "Off", "Design your home on your phone, then send it to this TV. While it is off, your home stays exactly as it is."));
+      rows.push({ kind: "action", key: "dz-turn-on", label: "Turn on couch-tv Studio", sub: "Nothing changes until you choose a design", act: function () {
+        setDesigner(true); SET.msg = "couch-tv Studio is on. Get a design below, or close Home settings.";
       } });
     } else {
-      rows.push({ kind: "action", key: "dz-classic", label: "Back to my classic home", sub: "Turns TV Designer off in one step. Your design is kept for later.", act: function () {
-        setDesigner(false); SET.msg = "TV Designer is off. Your classic home comes back when you close Home settings.";
+      rows.push({ kind: "action", key: "dz-classic", label: "Back to my classic home", sub: "Turns couch-tv Studio off in one step. Your design is kept for later.", act: function () {
+        setDesigner(false); SET.msg = "couch-tv Studio is off. Your classic home comes back when you close Home settings.";
       } });
       // a design switched off with Back held, or not chosen yet: it comes back here
       if (CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.settingsRow) rows.push(CouchDesign.settingsRow(restart));
     }
     designCodeRows(rows);
-    rows.push({ kind: "action", key: "dz-share", label: "Share this home", sub: "Open it in TV Designer on your phone. No names, photos or places are sent.", act: shareHome });
+    rows.push({ kind: "action", key: "dz-share", label: "Share this home", sub: "Open it in couch-tv Studio on your phone. No names, photos or places are sent.", act: shareHome });
     return rows;
   }
   // The home as it is now, for Share this home (share-home.js keeps only what a design is made of)

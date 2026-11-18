@@ -82,7 +82,7 @@
   }
   var MSG = {
     nocode: "That is not a design code. It looks like ABCDE-FGHJK.",
-    notfound: "That code did not work. A code works once, for 30 minutes. Make a new one in the TV Designer.",
+    notfound: "That code did not work. A code works once, for 30 minutes. Make a new one in couch-tv Studio.",
     slow: "Too many tries. Wait a few minutes, then try again.",
     paused: "Short codes are paused for a few minutes. Try again soon.",
     offline: "Could not reach the design server. Check the TV is online.",

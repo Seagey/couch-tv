@@ -894,7 +894,7 @@
   };
 
   // apps
-  function noApps(root, b, named) { return empty(root, b, "apps", named ? "These apps are not on this TV" : "No apps yet", named ? "Install them, or pick others in TV Designer" : ""); }
+  function noApps(root, b, named) { return empty(root, b, "apps", named ? "These apps are not on this TV" : "No apps yet", named ? "Install them, or pick others in couch-tv Studio" : ""); }
   function appGrid(list, b, cols, env, top) {
     var rows = Math.ceil(list.length / cols), gap = clamp(Math.min(b.w, b.h) / 18, 14, 28);
     var a = Math.floor(Math.min((b.w - (cols - 1) * gap) / cols, (b.h - top - (rows - 1) * gap) / rows));
@@ -1129,7 +1129,7 @@
     var night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + ahead), week = Math.floor((night.getTime() / 86400000 - (q.anchor || 0)) / 7);
     var a = [q.lid_a || "#ffd60a", q.bin_a || "Recycling"], c = [q.lid_b || "#30d158", q.bin_b || "Garden"];
     var bins = q.alt ? [["#ff453a", "Rubbish"], week % 2 === 0 ? a : c] : [a, c];
-    if (!env.demo && q.weekday === undefined) return empty(root, b, "calendar", "Set your bin night in TV Designer", "Pick the night and the bins");
+    if (!env.demo && q.weekday === undefined) return empty(root, b, "calendar", "Set your bin night in couch-tv Studio", "Pick the night and the bins");
     var bs = b.h < 300 ? 48 : 62;
     add(root, [lab("calendar", "Bin night"), E("div", b.h < 300 ? "cw-t29" : "cw-t38", "margin-top:12px;font-weight:700", [when]), E("div", "cw-grow"),
       E("div", "cw-row", "", bins.map(function (x, i) {
@@ -1387,7 +1387,7 @@
   };
   CR.bins = function (root, o, b, env) {
     var q = op(o), d = now(), wd = q.weekday === undefined ? 3 : q.weekday, ahead = (wd - d.getDay() + 7) % 7;
-    if (!env.demo && q.weekday === undefined) return empty(root, b, "calendar", "Set your bin night in TV Designer", "");
+    if (!env.demo && q.weekday === undefined) return empty(root, b, "calendar", "Set your bin night in couch-tv Studio", "");
     var when = ahead === 0 ? "Tonight" : ahead === 1 ? "Tomorrow" : DAYS[wd].slice(0, 3) + " night";
     var night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + ahead), week = Math.floor((night.getTime() / 86400000 - (q.anchor || 0)) / 7);
     var A = q.lid_a || "#ffd60a", B = q.lid_b || "#30d158", lids = q.alt ? ["#ff453a", week % 2 === 0 ? A : B] : [A, B];

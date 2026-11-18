@@ -35,7 +35,7 @@
   var WEB = ["Tizen", "webOS", "VIDAA", "Saphi", "TiVo OS", "My Home Screen"];
   // The rest have no couch-tv home that draws designs (Roku's is a channel, Apple TV's a native app,
   // Vega's its own app; Titan OS, SmartCast and unknown TVs have no home yet).
-  var NO_HOME = "This TV's couch-tv home does not draw TV Designer designs.";
+  var NO_HOME = "This TV's couch-tv home does not draw couch-tv Studio designs.";
 
   function row(on, note) { return { on: on, note: note || "" }; }
   // the platform table from what the Android home and the web home can do with this widget
@@ -61,7 +61,7 @@
   var TOWN_NEED = "Needs your town (set when couch-tv was set up)";
   var TOWN_HOW = "On the TV: Home settings, Weather, Place. The weather comes free from Open-Meteo, no account.";
   var PHOTOS_NEED = "Needs photos on the TV, or a photo put in the design";
-  var PHOTOS_HOW = "On the TV: Home settings, Your photos (up to 50, kept on the TV). Or drop a photo into the widget in TV Designer.";
+  var PHOTOS_HOW = "On the TV: Home settings, Your photos (up to 50, kept on the TV). Or drop a photo into the widget in couch-tv Studio.";
 
   var C = {
     // ---------- time ----------
@@ -86,11 +86,11 @@
     solar: { name: "Sun clock", status: "works", what: "The sun's arc today with sunrise and sunset, worked out on the TV", needs: [TOWN_NEED],
       setup: setup("tv", TOWN_HOW), until: "\"Set your town for the sun\", with where to do it", build: "",
       ok: "Opens the forecast: sunrise and sunset for the week", platforms: EVERY("Works with no computer."), sizes: sz(["wtile", "small", "medium"], [4, 2]) },
-    worldclock: { name: "World clocks", status: "works", what: "Two to four cities, worked out on the TV", needs: ["Nothing: the cities are picked in TV Designer"],
-      setup: setup("designer", "Pick the cities in TV Designer."), until: "Always shows the times", build: "",
+    worldclock: { name: "World clocks", status: "works", what: "Two to four cities, worked out on the TV", needs: ["Nothing: the cities are picked in couch-tv Studio"],
+      setup: setup("designer", "Pick the cities in couch-tv Studio."), until: "Always shows the times", build: "",
       ok: "Opens World clocks: every city big, with day and night", platforms: EVERY("Works with no computer."), sizes: sz(["tile", "wtile", "small", "medium", "wide"], [2, 2]) },
-    countdown: { name: "Countdown", status: "works", what: "Sleeps, days or weeks to a date", needs: ["Nothing: the date and words are picked in TV Designer"],
-      setup: setup("designer", "Pick the date and the words in TV Designer."), until: "Always shows the count", build: "",
+    countdown: { name: "Countdown", status: "works", what: "Sleeps, days or weeks to a date", needs: ["Nothing: the date and words are picked in couch-tv Studio"],
+      setup: setup("designer", "Pick the date and the words in couch-tv Studio."), until: "Always shows the count", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY("Works with no computer."), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     date: { name: "Date", status: "works", what: "Today's date, with the weather if you like", needs: ["Nothing for the date. The weather line needs your town"],
       setup: setup("nothing", "Nothing for the date. For the weather line: " + TOWN_HOW), until: "Always shows the date", build: "",
@@ -171,7 +171,7 @@
       setup: setup("tv", "Install the app on the TV. A design names it, the TV opens it."), until: "\"This app is not on this TV\"", build: "",
       ok: "Opens the app", platforms: plat("yes", "yes", "", "Opened through the computer bridge. VIDAA's standalone home cannot open apps."), sizes: sz(["tile", "small"], [2, 2]) },
     folder: { name: "App folder", status: "works", what: "A box of apps with a name", needs: ["The apps installed on this TV"],
-      setup: setup("designer", "Pick the apps in TV Designer. Apps this TV does not have are left out."), until: "\"These apps are not on this TV\"", build: "",
+      setup: setup("designer", "Pick the apps in couch-tv Studio. Apps this TV does not have are left out."), until: "\"These apps are not on this TV\"", build: "",
       ok: "Opens the folder full screen, every app in a grid", platforms: plat("yes", "yes", "", "Opened through the computer bridge."), sizes: sz(["tile", "small", "tall", "medium", "large"], [2, 2]) },
     dock: { name: "Dock", status: "works", what: "A row of your apps in a bar", needs: ["The apps installed on this TV"],
       setup: setup("nothing", "Nothing: it shows this TV's apps in your order."), until: "Always shows the TV's apps", build: "",
@@ -180,7 +180,7 @@
       setup: setup("nothing", "Nothing: it shows this TV's apps in your order."), until: "Always shows the TV's apps", build: "",
       ok: "OK on an app opens it", platforms: plat("yes", "yes", "", "Opened through the computer bridge."), sizes: sz(["small", "medium", "large", "xl"], [4, 4]) },
     games: { name: "Games", status: "works", what: "Game apps as tall tiles", needs: ["Game apps installed on this TV"],
-      setup: setup("designer", "Pick the game apps in TV Designer."), until: "\"These apps are not on this TV\"", build: "",
+      setup: setup("designer", "Pick the game apps in couch-tv Studio."), until: "\"These apps are not on this TV\"", build: "",
       ok: "OK on a game opens it", platforms: plat("yes", "yes", "", "Opened through the computer bridge."), sizes: sz(["small", "medium", "wide"], [4, 3]) },
 
     // ---------- music ----------
@@ -230,8 +230,8 @@
       ok: "Nothing", platforms: NOWHERE("The TV does not share battery levels."), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- lists and the family ----------
-    bins: { name: "Bin night", status: "setup", what: "Tonight's bins with their lid colours", needs: ["Your bin night and bins, picked in TV Designer"],
-      setup: setup("designer", "Pick the night, the bins and whether they take turns in TV Designer. Nothing personal goes in the design."), until: "\"Set your bin night in TV Designer\"", build: "",
+    bins: { name: "Bin night", status: "setup", what: "Tonight's bins with their lid colours", needs: ["Your bin night and bins, picked in couch-tv Studio"],
+      setup: setup("designer", "Pick the night, the bins and whether they take turns in couch-tv Studio. Nothing personal goes in the design."), until: "\"Set your bin night in couch-tv Studio\"", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY("Works with no computer."), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     people: { name: "People", status: "works", what: "Who is watching; OK switches", needs: ["People added when couch-tv was set up"],
       setup: setup("phone", "From the phone remote's People sheet, or config.json people. Switching here changes whose Keep watching shows, inside couch-tv only: it does not sign anyone in or out of Netflix or Google."),
@@ -256,7 +256,7 @@
       until: "A card on the widget: what it needs, and that it is set up on the computer at home", build: "",
       ok: "Opens every custom card big", platforms: plat("setup", "setup", "", "With the computer bridge running at home."), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     quote: { name: "Quote", status: "works", what: "A short line for the day, from a list on the TV, or your own words", needs: ["Nothing: the lines ship with couch-tv"],
-      setup: setup("nothing", "Nothing to set up. Type your own line in TV Designer if you like."), until: "Always shows a line", build: "",
+      setup: setup("nothing", "Nothing to set up. Type your own line in couch-tv Studio if you like."), until: "Always shows a line", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY("Works with no computer."), sizes: sz(["wtile", "small", "medium", "wide"], [4, 2]) },
     word: { name: "Word of the day", status: "works", what: "A word and what it means, from a list on the TV", needs: ["Nothing: the words ship with couch-tv"],
       setup: setup("nothing", "Nothing to set up."), until: "Always shows a word", build: "",
@@ -279,11 +279,11 @@
       ok: "Opens the drive with when to leave (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- guests and the room ----------
-    welcome: { name: "Welcome words", status: "works", what: "A greeting in your own words", needs: ["Nothing: the words are typed in TV Designer"],
-      setup: setup("designer", "Type the words in TV Designer. No digits or web addresses: a design never carries those."), until: "Always shows the words", build: "",
+    welcome: { name: "Welcome words", status: "works", what: "A greeting in your own words", needs: ["Nothing: the words are typed in couch-tv Studio"],
+      setup: setup("designer", "Type the words in couch-tv Studio. No digits or web addresses: a design never carries those."), until: "Always shows the words", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY("Works with no computer."), sizes: sz(["wline", "wtile", "medium", "wide"], [4, 1]) },
     quick: { name: "Quick buttons", status: "works", what: "Sleep timer, picture mode, look, input and more", needs: ["Some buttons need the computer bridge or an Android TV (picture mode, input)"],
-      setup: setup("designer", "Pick the buttons in TV Designer. Picture mode needs the computer bridge; the home leaves out any button this TV cannot do."),
+      setup: setup("designer", "Pick the buttons in couch-tv Studio. Picture mode needs the computer bridge; the home leaves out any button this TV cannot do."),
       until: "Buttons this TV cannot do are left out", build: "",
       ok: "OK on a button does it: the sleep timer, the next picture mode, the next look, the input list", platforms: plat("yes", "partial", "", "Picture mode is Android only (docs/SAMSUNG.md). The home leaves out any button this TV cannot do."), sizes: sz(["line", "wline", "tile", "wtile"], [2, 1]) },
     wifi: { name: "Guest Wi-Fi", status: "not-built", what: "The network and a code to join", needs: ["Needs the Wi-Fi name and password kept on the TV (never in a design)"],
@@ -299,7 +299,7 @@
 
     // ---------- a smart stack (not a widget of its own: up to 10 widgets taking turns) ----------
     stack: { name: "Smart stack", status: "works", what: "Up to 10 widgets of one size taking turns in one place", needs: ["Whatever the widgets in it need"],
-      setup: setup("designer", "Make it in TV Designer: drop widgets of one size on each other."), until: "Each widget in it says what it needs", build: "",
+      setup: setup("designer", "Make it in couch-tv Studio: drop widgets of one size on each other."), until: "Each widget in it says what it needs", build: "",
       ok: "OK opens what the widget showing opens. Left and Right flick through it", platforms: EVERY("As its widgets."), sizes: sz([], [2, 2]) }
   };
 
@@ -311,7 +311,7 @@
 
   // the setup card a TV shows for a widget that has nothing real to show yet: the first line says what
   // is missing, the second where it is set up. Built only from this file, never from a design.
-  var WHERE = { tv: "Set up on this TV", phone: "Set up from the phone remote", computer: "Set up on the computer at home", designer: "Set up in TV Designer", nothing: "" };
+  var WHERE = { tv: "Set up on this TV", phone: "Set up from the phone remote", computer: "Set up on the computer at home", designer: "Set up in couch-tv Studio", nothing: "" };
   var SHORT = {};
   // [the line, where it is set up, the line for a tile (two short lines at most)]
   SHORT[HA_NEED] = ["Needs Home Assistant", "Set up on the computer at home: config.json, Smart home", "Needs Home Assistant"];
