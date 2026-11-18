@@ -390,7 +390,7 @@
     TICK = setInterval(function () {
       var t = Date.now();
       REG = REG.filter(function (r) { return r.el && r.el.parentNode && document.documentElement.contains(r.el); });
-      REG.forEach(function (r) { if (t - r.at >= r.every) { r.at = t; try { r.fn(t); } catch (e) {} } });
+      REG.forEach(function (r) { if (t - r.at >= r.every - 120) { r.at = t; try { r.fn(t); } catch (e) {} } });
       if (!REG.length) { clearInterval(TICK); TICK = null; }
     }, 1000);
   }

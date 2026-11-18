@@ -125,8 +125,14 @@ for (const [layer, w, q] of CASES) {
   await press(page, "Enter", 600);   // 5 minutes
   const tm = await page.evaluate(() => JSON.parse(localStorage.getItem("couchtv.timer")));
   ok(tm && Math.abs(tm.total - 300000) < 1000, "timer: 5 minutes started, kept on the TV");
-  await press(page, "Escape", 1600);
-  ok(/4:5\d/.test(await page.evaluate(() => document.querySelector('.cw-o[data-obj="w0"] .cw').textContent)), "timer: the widget counts it down");
+  await press(page, "Escape", 400);
+  // the widget ticks every second: wait for it to leave 5:00 (up to 4 s) instead of guessing when
+  const counted = await page.waitForFunction(() => /4:5\d/.test((document.querySelector('.cw-o[data-obj="w0"] .cw') || {}).textContent || ""), null, { timeout: 4000 }).then(() => true, () => false);
+  ok(counted, "timer: the widget counts it down");
+  // and every second, not every other one: three readings a second apart are three different times
+  const reads = [];
+  for (let i = 0; i < 3; i++) { reads.push(await page.evaluate(() => (/\d+:\d\d/.exec(document.querySelector('.cw-o[data-obj="w0"] .cw').textContent) || [""])[0])); await page.waitForTimeout(1300); }
+  ok(new Set(reads).size === 3, "timer: it changes each second (" + reads.join(", ") + ")");
   await page.close();
 }
 { // Hold OK on a widget whose own buttons do things: Open is the first item
