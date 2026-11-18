@@ -25,12 +25,12 @@
     aircon: "aircon", scenes: "scenes", controls: "controls", camera: "camera", doorbell: "camera",
     card: "cards", news: "news", sports: "sports",
     memory: "setup", picks: "setup", queue: "setup", speakers: "setup", energy: "setup", sensor: "setup", battery: "setup",
-    note: "note", list: "list", stocks: "setup", commute: "setup", wifi: "wifi", guide: "setup", screentime: "setup"
+    note: "note", list: "list", stocks: "setup", commute: "setup", wifi: "wifi", guide: "guide", screentime: "setup"
   };
   var TITLE = { timers: "Timers", forecast: "Forecast", world: "World clocks", calendar: "Calendar", moon: "Moon", air: "Air quality", surf: "Surf",
     photos: "Photos", keep: "Keep watching", folder: "Apps", player: "Now playing", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre",
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up",
-    note: "Family note", list: "List", wifi: "Guest Wi-Fi" };
+    note: "Family note", list: "List", wifi: "Guest Wi-Fi", guide: "House guide" };
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -251,6 +251,15 @@
       E("div", "cwd-qr", "", [code || E("div", "cwd-text", "color:#111", ["The name and password are too long for a code. Type them in instead."])]),
       E("div", "cwd-col", "margin-left:80px;min-width:0;flex:1", [label("Network"), E("div", "cwd-big cwd-ell", "", [w.ssid]), label(nopass ? "No password" : "Password"), nopass ? null : E("div", "cwd-big cwd-ell", "", [w.pass]),
         label("How to join"), E("div", "cwd-list", "", ["Open the camera on your phone.", "Point it at the code.", "Tap the Wi-Fi note that comes up, then Join."].map(function (t, i) { return E("div", "cwd-li", "", [E("b", "", "flex:none;width:44px", [String(i + 1) + "."]), E("span", "", "", [t])]); }))])]));
+  };
+  B.guide = function (o, env) {
+    var g = kit().guideOf(env);
+    if (!g.length) return B.setup(o, env);
+    S.body.appendChild(head("info", "House guide", g.length === 1 ? "One thing to know" : g.length + " things to know", "#5e5ce6"));
+    var w = g.length > 4 ? 520 : 800;
+    S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:30px;overflow:hidden", g.map(function (x) {
+      return F(E("div", "cwd-card cwd-gcard", "width:" + px(w), [E("div", "cwd-row", "", [ic(kit().guideIcon(x.title), 40), E("div", "cwd-mid cwd-ell", "margin-left:16px", [x.title])]), x.text ? E("div", "cwd-text", "margin-top:14px;white-space:pre-line", [x.text]) : null]), null, x.title);
+    })));
   };
 
   // moon: tonight and the next four weeks

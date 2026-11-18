@@ -1247,11 +1247,6 @@
       return stop(bt, "quick", id, nm[1]);
     })));
   };
-  R.guide = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "info", "guide");
-    var it = [["info", "House guide"], ["clock", "Check out Sun 10am"], ["location", "Around here"]];
-    add(root, E("div", "cw-col cw-grow", "", it.map(function (x, i) { return E("div", "cw-row", "flex:1;padding:14px 20px;border-radius:24px;background:rgba(255,255,255,.12);" + (i ? "margin-top:16px" : ""), [ic(x[0], 34), E("span", "cw-t29", "margin-left:16px", [x[1]])]); })));
-  };
   R.screentime = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "timer", "screentime");
     add(root, [lab("timer", "Screen time", "rgba(255,255,255,.88)"), E("div", "cw-big", "font-size:" + px(clamp(b.h / 2.6, 80, 150)) + ";margin-top:14px", ["25", E("span", "", "font-size:.38em", [" min"])]), E("div", "cw-t29", "font-weight:650", ["left today"]), E("div", "cw-grow"),
@@ -1406,7 +1401,6 @@
   });
   CR.stocks = sample("stocks", "info", function (root, o, b) { mini(root, b, "info", "+0.6%", "ASX 200", "8,412 at the close", "#30d158"); });
   CR.commute = sample("commute", "location", function (root, o, b) { mini(root, b, "location", "16 min", "To work", "Light traffic, leave by 8:10"); });
-  CR.guide = sample("guide", "info", function (root, o, b) { mini(root, b, "info", "Sun", "Check out", "House guide, around here"); });
   CR.screentime = sample("screentime", "timer", function (root, o, b) { mini(root, b, "timer", "25m", "Screen time", "Left today, bedtime 7:30pm"); });
   CR.queue = sample("queue", "music", function (root, o, b) { mini(root, b, "music", "8", "Up next", "Sunday Best, Surfaces"); });
 
@@ -1496,6 +1490,23 @@
   };
   CR.wifi = R.wifi;
 
+  // ---- House guide: headings and their words, typed in Home settings ----
+  var GUIDE_IC = [[/check ?out|leav/i, "clock"], [/wi-?fi|internet/i, "wifi"], [/around|near|beach|shop|cafe|eat|walk/i, "location"], [/bin|rubbish|recycl/i, "calendar"], [/tv|remote|netflix/i, "tv"]];
+  function guideIcon(t) { for (var i = 0; i < GUIDE_IC.length; i++) if (GUIDE_IC[i][0].test(t)) return GUIDE_IC[i][1]; return "info"; }
+  function guideOf(env) { return env.demo ? [{ title: "Check out", text: "Sunday by 10am. Leave the keys on the bench." }, { title: "Bins", text: "Red Tuesday night, yellow every second week." }, { title: "Around here", text: "The beach is a 5 minute walk down the lane." }] : (athome(env) || {}).guide || []; }
+  R.guide = function (root, o, b, env) {
+    var a = ahAlign(root, o), g = guideOf(env);
+    if (!g.length) return soon(root, b, "info", "guide");
+    if (b.h < 200) { add(root, ahCol(a, [ahLab("info", "House guide"), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", g[0].title), g.length > 1 ? one1("cw-t23", "", g.slice(1).map(function (x) { return x.title; }).join(", ")) : null])); return; }
+    var withText = b.h >= 500, rowH = withText ? 128 : 74, n = clamp(Math.floor((b.h - 48 + 16) / (rowH + 16)), 1, g.length);
+    if (g.length > n && n * (rowH + 16) + 34 > b.h - 48 + 16) n = Math.max(1, n - 1);
+    add(root, ahCol(a, g.slice(0, n).map(function (x, i) {
+      return E("div", "cw-col", "width:100%;flex:none;padding:14px 20px;border-radius:24px;background:rgba(255,255,255,.12);overflow:hidden;align-items:" + FLEX[a] + ";" + (i ? "margin-top:16px" : ""), [
+        ahLab(guideIcon(x.title), x.title), withText && x.text ? E("div", "cw-t23", "flex:none;max-width:100%;margin-top:4px;" + lines(2), [x.text]) : null]);
+    }).concat(g.length > n ? [one1("cw-t23", "margin-top:12px", "and " + (g.length - n) + " more. OK opens the guide")] : [])));
+  };
+  CR.guide = R.guide;
+
   // ---------------- one widget, a stack, the API ----------------
   function one(o, b, env) {
     var sh = shell(o, b, env), root = sh.root, st = o.style || {};
@@ -1583,6 +1594,6 @@
       roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
       // things typed at home (athome.js through app.js)
-      athome: athome, listOf: listOf, wifiOf: wifiOf, qrNode: qrNode }
+      athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guideIcon: guideIcon, qrNode: qrNode }
   };
 })();
