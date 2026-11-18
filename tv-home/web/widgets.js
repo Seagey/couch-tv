@@ -1212,7 +1212,8 @@
   // the plain words for each web widget: [still asking, could not read it, nothing there, no relay on this TV]
   var WEB_WORDS = {
     news: ["Getting the headlines", "The headlines could not be read just now", "No headlines in this feed right now", "Headlines need a home computer or a newer couch-tv"],
-    sports: ["Getting the scores", "The scores could not be read just now", "No games right now", "Scores need a newer couch-tv"]
+    sports: ["Getting the scores", "The scores could not be read just now", "No games right now", "Scores need a newer couch-tv"],
+    stocks: ["Getting the prices", "The prices could not be read just now", "No prices for these right now", "Prices need a home computer or a newer couch-tv"]
   };
   // true when rec has something to draw; otherwise draws the honest state and says false
   function webReady(root, b, iconName, kind, rec) {
@@ -1300,13 +1301,37 @@
         var el = gameBlock(g, env); el.style.width = px(cw); if (i >= cols) el.style.marginTop = "12px"; return el;
       }))]);
   };
+  // Markets: the design's watchlist (opts.tickers) from Yahoo Finance's chart data, through couch-tv's
+  // relay (widget-web.js); prices about 20 minutes late on the ASX
+  var DEMO_QUOTES = { "^AXJO": ["ASX 200", "index", "AUD", 8412, 8362], "AUDUSD=X": ["AUD/USD", "fx", "USD", 0.672, 0.6713], "BTC-AUD": ["Bitcoin", "crypto", "AUD", 142310, 144038], "BHP.AX": ["BHP", "share", "AUD", 54.34, 53.9] };
+  function demoQuote(sym, i) {
+    var d = DEMO_QUOTES[sym] || [sym.replace(/\.AX$/, ""), "share", "AUD", 12.5 + i * 7.25, 12.5 + i * 7.25 + (i % 2 ? 0.3 : -0.2)];
+    var pts = []; for (var k = 0; k < 24; k++) pts.push(d[4] + (d[3] - d[4]) * (k / 23) + Math.sin(k * 1.3 + i) * Math.abs(d[3] - d[4]) * 0.4);
+    return { symbol: sym, name: d[0], kind: d[1], currency: d[2], price: d[3], prev: d[4], change: Math.round((d[3] - d[4]) / d[4] * 10000) / 100, points: pts };
+  }
+  function stocksOf(root, o, b, env) {
+    var WW = window.CouchWidgetWeb, q = op(o), list = WW ? WW.tickersOf(q.tickers) : ["^AXJO"], quotes, stale = false;
+    if (env.demo) quotes = list.map(demoQuote);
+    else {
+      var rec = webOf(env, "stocks", list.join(","));
+      if (!webReady(root, b, "info", "stocks", rec)) return null;
+      quotes = list.map(function (s) { return ((rec.v || {}).quotes || {})[s]; }).filter(Boolean); stale = !!rec.stale;
+    }
+    if (!quotes.length) { empty(root, b, "info", "None of these has a price right now", "Check the symbols in couch-tv Studio"); return null; }
+    return { name: q.label || "Markets", quotes: quotes, stale: stale };
+  }
+  function upDown(c) { return c > 0 ? "#30d158" : c < 0 ? "#ff453a" : "rgba(255,255,255,.3)"; }
+  function quoteRow(x, b, big) {
+    var WW = window.CouchWidgetWeb;
+    return E("div", "cw-row cw-sp", "min-width:0", [E("div", "cw-col", "min-width:0;flex:1", [E("div", (big ? "cw-t29" : "cw-t25") + " cw-ell", "font-weight:680", [x.name]), big ? E("div", "cw-t23 cw-ell", "", [WW ? WW.price(x) : String(x.price)]) : null]),
+      E("div", "cw-chip", "height:44px;font-size:23px;margin-left:12px;color:#fff;flex:none;background:" + upDown(x.change), [WW ? WW.change(x) || "0%" : ""])]);
+  }
   R.stocks = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "info", "stocks");
-    var s = [["ASX 200", "8,412", "+0.6%", 1], ["BTC", "$142,310", "-1.2%", 0], ["AUD/USD", "0.672", "+0.1%", 1]];
-    add(root, [E("div", "cw-lab", "", ["Markets"]), E("div", "cw-col cw-grow", "justify-content:space-around;margin-top:12px", s.map(function (x) {
-      return E("div", "cw-row cw-sp", "", [E("div", "", "", [E("div", "cw-t29", "", [x[0]]), E("div", "cw-t23", "", [x[1]])]), b.w >= 460 ? svg("0 0 110 40", 110, 40, [S("path", { d: x[3] ? "M0 34 L20 30 L38 32 L56 20 L74 24 L92 10 L110 6" : "M0 8 L20 12 L38 9 L56 22 L74 18 L92 30 L110 33", fill: "none", stroke: x[3] ? "#30d158" : "#ff453a", "stroke-width": 3.4, "stroke-linejoin": "round" })]) : null,
-        E("div", "cw-chip", "height:44px;font-size:23px;color:#fff;background:" + (x[3] ? "#30d158" : "#ff453a"), [x[2]])]);
-    }))]);
+    var V = stocksOf(root, o, b, env);
+    if (!V) return;
+    var n = clamp(Math.floor((b.h - 70) / 92), 1, 6);
+    add(root, [E("div", "cw-row cw-sp", "", [E("div", "cw-lab", "", [V.name]), V.stale ? E("div", "cw-t23", "", ["Not updated lately"]) : null]),
+      E("div", "cw-col cw-grow", "justify-content:space-around;margin-top:12px;min-height:0", V.quotes.slice(0, n).map(function (x) { return quoteRow(x, b, true); }))]);
   };
   R.commute = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "location", "commute");
@@ -1519,7 +1544,14 @@
     add(root, E("div", "cw-col", "height:100%;justify-content:space-between", [teamRow(g.teams[0], g, false), teamRow(g.teams[1], g, false),
       E("div", "cw-t23 cw-ell", "font-weight:700;color:" + (st.live ? "#ff453a" : "var(--sub)"), [st.text])]));
   };
-  CR.stocks = sample("stocks", "info", function (root, o, b) { mini(root, b, "info", "+0.6%", "ASX 200", "8,412 at the close", "#30d158"); });
+  // a tile: the first on the watchlist, its move today big; a wide tile: the first two, a line each
+  CR.stocks = function (root, o, b, env) {
+    var V = stocksOf(root, o, b, env), WW = window.CouchWidgetWeb;
+    if (!V) return;
+    var x = V.quotes[0];
+    if (b.w < 300) return mini(root, b, null, WW ? WW.change(x) || "0%" : "", x.name, "", upDown(x.change));
+    add(root, E("div", "cw-col", "height:100%;justify-content:space-around", V.quotes.slice(0, 2).map(function (q) { return quoteRow(q, b, false); })));
+  };
   CR.commute = sample("commute", "location", function (root, o, b) { mini(root, b, "location", "16 min", "To work", "Light traffic, leave by 8:10"); });
   CR.guide = sample("guide", "info", function (root, o, b) { mini(root, b, "info", "Sun", "Check out", "House guide, around here"); });
   CR.screentime = sample("screentime", "timer", function (root, o, b) { mini(root, b, "timer", "25m", "Screen time", "Left today, bedtime 7:30pm"); });
@@ -1614,5 +1646,5 @@
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12 }
   };
   // what the web widgets' detail layers share with them (widget-detail.js)
-  window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS, demoScores: demoScores, gameStatus: gameStatus, shortScore: shortScore };
+  window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS, demoScores: demoScores, gameStatus: gameStatus, shortScore: shortScore, demoQuote: demoQuote, upDown: upDown };
 })();

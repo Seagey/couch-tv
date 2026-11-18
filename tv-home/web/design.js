@@ -317,7 +317,9 @@
     shows: function (v) { return SAN.n(v, 1, 5, true); },
     // the web widgets (widget-web.js): a source picked from a fixed list, never a link
     feed: function (v) { return SAN.pick(v, WEB_FEEDS); },
-    league: function (v) { return SAN.pick(v, WEB_LEAGUES); }, team: function (v) { return SAN.w(v, 24); }
+    league: function (v) { return SAN.pick(v, WEB_LEAGUES); }, team: function (v) { return SAN.w(v, 24); },
+    // share symbols as Yahoo writes them (BHP.AX, ^AXJO, AUDUSD=X, BTC-AUD): never a link or a word
+    tickers: function (v) { return SAN.list(v, 6, function (s) { s = typeof s === "string" ? s.trim().toUpperCase() : ""; return /^\^?[A-Z0-9]{1,8}([.=-][A-Z0-9]{1,4})?$/.test(s) ? s : undefined; }); }
   };
   var WEB_LEAGUES = ["afl", "nrl", "aleague", "epl", "nba", "bbl", "cricket"];
   var WEB_FEEDS = ["abc", "abc-justin", "abc-sport", "abc-business", "sbs", "guardian", "bbc", "rnz"];
@@ -331,7 +333,7 @@
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "",
     bins: "weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label", note: "", list: "label icon",
-    card: "label text icon", quote: "text sub", word: "", news: "feed label", sports: "label league team", stocks: "", commute: "",
+    card: "label text icon", quote: "text sub", word: "", news: "feed label", sports: "label league team", stocks: "label tickers", commute: "",
     welcome: "kicker text sub align", quick: "quick align", wifi: "", guide: "", screentime: "", stack: ""
   };
   function sanWStyle(src) {

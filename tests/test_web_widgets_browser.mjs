@@ -48,7 +48,8 @@ const ANSWERS = {
 // per widget: the design's widget, what proves the real answer is drawn, its layer
 const CASES = [
   { kind: "news", opts: { feed: "bbc" }, box: [0, 0, 8, 4], says: () => WW.parseRss(fix("rss-bbc.xml"), 12)[0].title, layer: "news" },
-  { kind: "sports", opts: { league: "nba", team: "Knicks" }, box: [0, 0, 8, 4], routes: [["https://site.api.espn.com/**", "espn-nba.json"]], says: () => "Knicks", layer: "sports" }
+  { kind: "sports", opts: { league: "nba", team: "Knicks" }, box: [0, 0, 8, 4], routes: [["https://site.api.espn.com/**", "espn-nba.json"]], says: () => "Knicks", layer: "sports" },
+  { kind: "stocks", opts: { tickers: ["BHP.AX", "^AXJO"] }, box: [0, 0, 4, 6], says: () => "$54.34", layer: "stocks" }
 ];
 const KINDS = CASES.map((c) => c.kind);
 const WW = createRequire(import.meta.url)("../tv-home/web/widget-web.js");
@@ -107,7 +108,8 @@ for (const c of CASES) {
   const bad = await page.evaluate(([F, KINDS]) => {
     const NAMED = { line: [4, 1], wline: [8, 1], tile: [2, 2], wtile: [4, 2], small: [4, 4], tall: [4, 6], medium: [8, 4], wide: [12, 4], large: [8, 8], xl: [12, 6], hero: [18, 7], full: [18, 10] };
     const C = window.CouchWidgetCaps, W = window.CouchWidgets, WW = window.CouchWidgetWeb, at = Date.now();
-    const good = { news: { abc: { ok: true, at, v: WW.parseRss(F["rss-abc-top.xml"], 12) } }, sports: { nrl: { ok: true, at, v: WW.parseScores(JSON.parse(F["espn-nba.json"]), "nba") } } };
+    const good = { news: { abc: { ok: true, at, v: WW.parseRss(F["rss-abc-top.xml"], 12) } }, sports: { nrl: { ok: true, at, v: WW.parseScores(JSON.parse(F["espn-nba.json"]), "nba") } },
+      stocks: { "^AXJO,AUDUSD=X,BTC-AUD": { ok: true, at, v: WW.parseSpark(F["yahoo-spark.json"]) } } };
     // the states a web widget can be in on a TV, by the data it is handed
     const states = { real: good, asking: {}, failed: null, relay: null, stale: null };
     const failWith = (err) => { const o = {}; Object.keys(good).forEach((s) => { o[s] = {}; Object.keys(good[s]).forEach((id) => { o[s][id] = { ok: false, at, err }; }); }); return o; };
@@ -151,7 +153,8 @@ for (const c of CASES) {
     document.querySelectorAll(".sheet-host").forEach((e) => e.remove());
     const NAMED = { tile: [2, 2], wtile: [4, 2], small: [4, 4], tall: [4, 6], medium: [8, 4], wide: [12, 4] };
     const C = window.CouchWidgetCaps, W = window.CouchWidgets, WW = window.CouchWidgetWeb, at = Date.now();
-    const web = { news: { abc: { ok: true, at, v: WW.parseRss(F["rss-abc-top.xml"], 12) } }, sports: { nrl: { ok: true, at, v: WW.parseScores(JSON.parse(F["espn-nba.json"]), "nba") } } };
+    const web = { news: { abc: { ok: true, at, v: WW.parseRss(F["rss-abc-top.xml"], 12) } }, sports: { nrl: { ok: true, at, v: WW.parseScores(JSON.parse(F["espn-nba.json"]), "nba") } },
+      stocks: { "^AXJO,AUDUSD=X,BTC-AUD": { ok: true, at, v: WW.parseSpark(F["yahoo-spark.json"]) } } };
     const host = document.createElement("div");
     host.className = "sheet-host"; host.style.cssText = "position:fixed;left:0;top:0;width:1920px;height:1080px;z-index:99;background:#26303f";
     document.body.appendChild(host);

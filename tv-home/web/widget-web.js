@@ -167,6 +167,60 @@
     return d.getDate() + " " + ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getMonth()];
   }
 
+  // ---------------- markets: Yahoo Finance's public chart data, through the relay ----------------
+  // Free, no key, but unofficial (Yahoo publishes no terms for it, and asks for personal use): the
+  // TV or the household's own computer asks for its own watchlist, one request for every symbol on
+  // a widget, prices about 20 minutes late on the ASX. Symbols as Yahoo writes them: BHP.AX, ^AXJO,
+  // AUDUSD=X, BTC-AUD.
+  var SYMBOL = /^\^?[A-Z0-9]{1,8}([.=-][A-Z0-9]{1,4})?$/;
+  var TICKERS_DEFAULT = ["^AXJO", "AUDUSD=X", "BTC-AUD"];
+  var TICKER_NAMES = { "^AXJO": "ASX 200", "^AORD": "All Ords", "AUDUSD=X": "AUD/USD", "AUDNZD=X": "AUD/NZD", "AUDEUR=X": "AUD/EUR", "AUDGBP=X": "AUD/GBP", "AUDJPY=X": "AUD/JPY",
+    "BTC-AUD": "Bitcoin", "ETH-AUD": "Ether", "^GSPC": "S&P 500", "^IXIC": "Nasdaq", "^DJI": "Dow Jones", "^FTSE": "FTSE 100", "^NZ50": "NZX 50", "^N225": "Nikkei", "GC=F": "Gold", "CL=F": "Oil" };
+  function tickersOf(list) {
+    var out = [];
+    (Object.prototype.toString.call(list) === "[object Array]" ? list : []).forEach(function (s) {
+      s = String(s || "").trim().toUpperCase();
+      if (SYMBOL.test(s) && out.indexOf(s) < 0 && out.length < 6) out.push(s);
+    });
+    return out.length ? out : TICKERS_DEFAULT.slice();
+  }
+  function num(v) { return typeof v === "number" && isFinite(v) ? v : null; }
+  // "BHP GROUP FPO" reads as "BHP": the company, without the share class and Limited
+  function company(s) {
+    s = plain(s).replace(/\s*\[[^\]]*\]/g, "").replace(/\b(FPO|LIMITED|LTD|GROUP|HOLDINGS|INC|CORP|CORPORATION|PLC|ORD|NPV)\b\.?/gi, "").replace(/\s+/g, " ").trim();
+    if (s && s === s.toUpperCase()) s = s.split(" ").map(function (w) { return w.length > 3 ? w.charAt(0) + w.slice(1).toLowerCase() : w; }).join(" ");
+    return cut(s, 18);
+  }
+  // { quotes: { SYMBOL: { symbol, name, kind, currency, price, prev, change (per cent), points, at } } }
+  function parseSpark(j) {
+    if (typeof j === "string") { try { j = JSON.parse(j); } catch (e) { j = null; } }
+    var out = {};
+    (((j && j.spark) || {}).result || []).forEach(function (r) {
+      var x = (r && r.response || [])[0] || {}, m = x.meta || {}, sym = String(r.symbol || m.symbol || "").toUpperCase();
+      if (!SYMBOL.test(sym)) return;
+      var price = num(m.regularMarketPrice), prev = num(m.chartPreviousClose) !== null ? num(m.chartPreviousClose) : num(m.previousClose);
+      if (price === null) return;
+      var closes = ((((x.indicators || {}).quote || [])[0] || {}).close || []).filter(function (v) { return num(v) !== null; }).slice(-96);
+      var type = String(m.instrumentType || "").toUpperCase();
+      out[sym] = { symbol: sym, name: TICKER_NAMES[sym] || company(m.shortName || m.longName || "") || sym.replace(/\.AX$/, ""),
+        kind: type === "CURRENCY" ? "fx" : type === "INDEX" ? "index" : type === "CRYPTOCURRENCY" ? "crypto" : "share",
+        currency: /^[A-Z]{3}$/.test(m.currency || "") ? m.currency : "", price: price, prev: prev,
+        change: prev ? Math.round((price - prev) / prev * 10000) / 100 : null, points: closes, at: num(m.regularMarketTime) ? m.regularMarketTime * 1000 : 0 };
+    });
+    return { quotes: out };
+  }
+  function thousands(n, dp) { var s = n.toFixed(dp), p = s.split("."); p[0] = p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ","); return p.join("."); }
+  // a price the way people say it: 8,412 for an index, 0.6726 for a currency, $54.34 for a share
+  function price(q) {
+    if (!q || q.price === null || q.price === undefined) return "";
+    var p = q.price;
+    if (q.kind === "fx") return p.toFixed(4);
+    if (q.kind === "index") return thousands(p, p >= 1000 ? 0 : 2);
+    var sign = q.currency === "AUD" || !q.currency ? "$" : q.currency === "USD" ? "US$" : q.currency + " ";
+    return sign + thousands(p, p >= 1000 ? 0 : 2);
+  }
+  function change(q) { return q && q.change !== null && q.change !== undefined ? (q.change > 0 ? "+" : q.change < 0 ? "-" : "") + Math.abs(q.change).toFixed(Math.abs(q.change) < 10 ? 2 : 1) + "%" : ""; }
+
   // ---------------- the sources the loader knows ----------------
   // key(w): which answer a widget on the home needs (widgets with the same key share one request);
   // every: how long an answer is good for; get(h, id): one request, through the relay or straight
@@ -192,6 +246,19 @@
         return (soon ? 2 : 15) * MIN;
       },
       get: function (h, id) { return h.json(LEAGUES[id].url).then(function (j) { return parseScores(j, id); }); }
+    },
+    stocks: {
+      // one request for every symbol on the widget (the id is the symbols, in the widget's order)
+      key: function (w) { return tickersOf((w.opts || {}).tickers).join(","); },
+      every: function () { return 10 * MIN; },
+      relay: true,
+      get: function (h, id) {
+        return h.relay("stocks", id).then(function (text) {
+          var v = parseSpark(text);
+          if (!Object.keys(v.quotes).length) throw new Error("empty");
+          return v;
+        });
+      }
     }
   };
 
@@ -264,6 +331,7 @@
     FEEDS: FEEDS, FEED_DEFAULT: FEED_DEFAULT, SOURCES: SOURCES,
     feedOf: feedOf, plain: plain, parseRss: parseRss, ago: ago,
     LEAGUES: LEAGUES, LEAGUE_DEFAULT: LEAGUE_DEFAULT, leagueOf: leagueOf, parseScores: parseScores, scoreOrder: scoreOrder, kickoff: kickoff,
+    SYMBOL: SYMBOL, TICKERS_DEFAULT: TICKERS_DEFAULT, TICKER_NAMES: TICKER_NAMES, tickersOf: tickersOf, parseSpark: parseSpark, price: price, change: change,
     loader: function (h) { return Loader(h); }
   };
   root.CouchWidgetWeb = API;

@@ -30,6 +30,8 @@
   var TITLE = { timers: "Timers", forecast: "Forecast", world: "World clocks", calendar: "Calendar", moon: "Moon", air: "Air quality", surf: "Surf",
     photos: "Photos", keep: "Keep watching", folder: "Apps", player: "Now playing", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre",
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up" };
+  // the web widgets' own layers (widget-web.js)
+  LAYER.stocks = "stocks"; TITLE.stocks = "Markets";
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -522,6 +524,28 @@
         null, (g.teams[0].name || "") + " v " + (g.teams[1].name || ""));
     })));
     if (games.length > n) S.body.appendChild(E("div", "cwd-small", "margin-top:14px", ["And " + (games.length - n) + " more games"]));
+  };
+  // the watchlist with today's line for each (the day's prices, from the first trade to now)
+  B.stocks = function (o, env) {
+    var WW = window.CouchWidgetWeb, q = op(o), list = WW ? WW.tickersOf(q.tickers) : [], rec = null, quotes;
+    if (env.demo) quotes = list.map(function (s, i) { return wk().demoQuote(s, i); });
+    else {
+      rec = webRec(env, "stocks", list.join(","));
+      if (!rec || !rec.ok || !rec.v) return B.setup(o, env);
+      quotes = list.map(function (s) { return (rec.v.quotes || {})[s]; }).filter(Boolean);
+      if (!quotes.length) return B.setup(o, env);
+    }
+    S.body.appendChild(head("info", q.label || "Markets", ["From Yahoo Finance, about 20 minutes late", rec ? updated(rec) : ""].filter(Boolean).join(". "), "#30a46c"));
+    var w = quotes.length <= 4 ? 790 : 520;
+    S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:26px", quotes.map(function (x) {
+      var pts = x.points || [], lo = Math.min.apply(null, pts.concat([x.prev || x.price])), hi = Math.max.apply(null, pts.concat([x.prev || x.price])), span = hi - lo || 1, cw = w - 64, ch = 90;
+      var path = pts.map(function (v, i) { return (i ? "L" : "M") + Math.round(i / Math.max(1, pts.length - 1) * cw) + " " + Math.round(ch - (v - lo) / span * ch); }).join(" ");
+      var base = x.prev ? Math.round(ch - (x.prev - lo) / span * ch) : null, col = wk().upDown ? wk().upDown(x.change) : "#fff";
+      var line = pts.length > 1 ? kit().svg("0 0 " + cw + " " + ch, cw, ch, [base !== null ? kit().S("line", { x1: 0, y1: base, x2: cw, y2: base, stroke: "rgba(255,255,255,.3)", "stroke-width": 2, "stroke-dasharray": "4 8" }) : null,
+        kit().S("path", { d: path, fill: "none", stroke: col, "stroke-width": 4, "stroke-linejoin": "round", "stroke-linecap": "round" })], "margin-top:14px;display:block") : null;
+      return F(E("div", "cwd-game", "width:" + w + "px", [E("div", "cwd-row", "justify-content:space-between", [E("span", "cwd-mid cwd-ell", "min-width:0", [x.name]), E("span", "cwd-chip on", "flex:none;margin-left:14px;background:" + col + ";color:#fff", [WW ? WW.change(x) || "0%" : ""])]),
+        E("div", "cwd-big", "font-size:52px;margin-top:8px", [WW ? WW.price(x) : String(x.price)]), line]), null, x.name);
+    })));
   };
 
   // ---------------- focus inside a layer: the same geometry as the home (design.js NAV) ----------------
