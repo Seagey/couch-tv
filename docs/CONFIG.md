@@ -139,8 +139,10 @@ out the same way. The phone's People sheet keeps these marks when it renames or 
   On a Fire TV the bridge knows Amazon's builds of YouTube, Prime Video and HBO Max (other package
   names than the Google TV ones), so it opens the one the TV has and their shows reach Keep watching.
   YouTube videos are kept as a list of their own that the home shows only for the YouTube tile, never
-  in the shared row or the household's taste: a video is written by the name YouTube gave it, with no
-  picture, and opening it searches YouTube for that name.
+  in the shared row or the household's taste: a video is written by the name YouTube gave it (and the
+  channel and length the app reported), with no picture. Opening it plays the exact video when
+  YouTube's public results page is sure of it from the title and the channel or the length, resumed
+  from the account's own history; otherwise it searches YouTube for the name.
 - **With no computer (option A),** Keep watching is Android's own Watch Next list, plus the
   Continue Watching channel of apps that put nothing in Watch Next but keep a home screen row of
   their own instead: so far Stremio. Both are read the same read only way, with no account and no

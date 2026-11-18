@@ -1,10 +1,14 @@
 """YouTube videos as a list of their own (store.videos, /api/continue "videos"): a video that played
 the minute is a history line with "type": "video", written by its own name with no show finder, that
 the shared Keep watching row, the picks, the taste and every other reader of the history never see.
-A video card hides by its id like any card, and opens YouTube's installed build on a search."""
+A video card hides by its id like any card, and opens the exact video when move.youtube_video_id is
+sure of it (the line keeps the channel and the length the session gave), else YouTube's installed
+build on a search, else the app."""
+import asyncio
 import os
 import sys
 import tempfile
+import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -19,11 +23,23 @@ import apps  # noqa: E402
 import config  # noqa: E402
 import store  # noqa: E402
 import taste  # noqa: E402
+import move  # noqa: E402
 import server  # noqa: E402
 
 FIRE_YOUTUBE = "com.amazon.firetv.youtube"
 GOOGLE_YOUTUBE = "com.google.android.youtube.tv"
 NOW = datetime.now(timezone.utc)
+VIDEO_ID = "dQw4w9WgXcQ"
+WATCH_LINK = "https://www.youtube.com/watch?v=" + VIDEO_ID
+# dumpsys media_session as Amazon's YouTube printed it on a Fire TV Cube: the channel is the
+# description's second field and the length is the metadata's duration
+DUMPSYS = """1234.56 2.00
+  package=com.amazon.firetv.youtube
+    active=true
+    state=PlaybackState {state=PLAYING(3), position=120000, buffered position=0, speed=1.0, updated=1230000, actions=0, custom actions=[], active item id=-1, error=null}
+    metadata:size=5, description=How Trains Work, Some Channel, null
+    metadata: android.media.metadata.DURATION=600000
+"""
 
 
 def request(data):
@@ -51,11 +67,41 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         self._installed = dict(server.installed)
         server.installed["packages"], server.installed["checked"] = {FIRE_YOUTUBE, "com.netflix.ninja"}, 1e12
         store.save_who("person1", self.tv)
+        # the id lookup never goes to YouTube from a test: unsure unless a test says otherwise
+        self._lookup = patch.object(move, "youtube_video_id", new=AsyncMock(return_value=None))
+        self.lookup = self._lookup.start()
+        move._found.clear()
 
     def tearDown(self):
+        self._lookup.stop()
         server.installed.clear()
         server.installed.update(self._installed)
         config.PEOPLE, config.PEOPLE_IDS = self._people
+
+    def video_line(self, title="How Trains Work", **extra):
+        """A video line as an older bridge wrote it (no channel, no duration_ms) unless `extra` says."""
+        line = {"id": "line-" + title.lower().replace(" ", "-"), "title": title, "type": "video", "service": "youtube",
+                "tv": self.tv, "who": "person1", "when": NOW.isoformat(timespec="seconds"), **extra}
+        store._append(store.HISTORY, [line])
+        return line["id"]
+
+    def opening(self, start=None, wait=None, launch=None):
+        """The TV mocked for an open: start_intent, wait_for_app and launch_package, plus play() and
+        the finder, which a video must never reach."""
+        t = server.TVS[self.tv]
+        self._mocks = (patch.object(t, "start_intent", new=start or AsyncMock(return_value="adb")),
+                       patch.object(t, "wait_for_app", new=wait or AsyncMock(return_value=FIRE_YOUTUBE)),
+                       patch.object(t, "launch_package", new=launch or AsyncMock(return_value="adb")),
+                       patch.object(server, "play", new=AsyncMock(side_effect=AssertionError("play() was called"))),
+                       no_finder())
+        return self._mocks
+
+    async def open(self, vid, **mocks):
+        req, body = request({"id": vid})
+        start, wait, launch, play_, finder_ = self.opening(**mocks)
+        with body, start as s, wait, launch as l, play_, finder_:
+            resp = await server.h_continue_open(req)
+        return resp.body.decode(), s, l
 
     def youtube(self, package=FIRE_YOUTUBE):
         return apps.describe_package(package)
@@ -76,6 +122,85 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((v["tv"], v["who"]), (self.tv, "person1"))
         self.assertTrue(v["id"])
         self.assertEqual(store.history(), [])                    # not a show
+        self.assertEqual((v["channel"], v["duration_ms"]), (None, None))   # the session gave neither
+
+    async def test_the_line_keeps_the_channel_and_the_length_the_session_gave(self):
+        with no_finder():
+            await server.log_seen("How Trains Work", "Some Channel", self.youtube(), {"duration_ms": None},
+                                  who="person1", channel="Some Channel", duration_ms=600000)
+            await server.log_seen("A live stream", "Some Channel", self.youtube(), {}, who="person1",
+                                  channel="Some Channel", duration_ms=None)
+        by_title = {v["title"]: v for v in store.videos()}
+        self.assertEqual((by_title["How Trains Work"]["channel"], by_title["How Trains Work"]["duration_ms"]),
+                         ("Some Channel", 600000))
+        self.assertEqual((by_title["A live stream"]["channel"], by_title["A live stream"]["duration_ms"]),
+                         ("Some Channel", None))
+        # the warm up got the same three
+        await asyncio.sleep(0)
+        self.assertEqual([c.args for c in self.lookup.await_args_list],
+                         [("How Trains Work", "Some Channel", 600000), ("A live stream", "Some Channel", None)])
+
+    async def test_media_read_keeps_the_channel_and_the_length_from_the_session(self):
+        t = server.TVS[self.tv]
+        with patch.object(t, "adb", new=AsyncMock(return_value=DUMPSYS)), \
+                patch.object(server, "resolve_episode", new=AsyncMock(return_value={})), \
+                patch.object(server, "artwork_soon", return_value={}):
+            s = await server.media_read(FIRE_YOUTUBE, self.youtube())
+        self.assertEqual((s["title"], s["app_subtitle"], s["duration"]), ("How Trains Work", "Some Channel", 600000))
+        self.assertIsNone(server.media_now["duration_ms"])   # JustWatch's, not the session's: None for a video
+
+    async def test_the_watch_loop_hands_the_channel_and_the_length_to_log_seen(self):
+        s = {"package": FIRE_YOUTUBE, "state": "PLAYING", "title": "How Trains Work", "subtitle": "Some Channel",
+             "app_subtitle": "Some Channel", "duration": 600000}
+        key = (FIRE_YOUTUBE, "how trains work")
+        server.seen_playing.clear()
+        server.seen_playing["_playing"] = (key, time.time() - server.SEEN_AFTER_S - 5)
+        server.seen_playing["_playing_last"] = time.time()
+        server.playing["item"] = None
+        server.media_now.clear()
+        server.media_now.update({"title": "How Trains Work", "state": "playing", "position_ms": None, "duration_ms": None})
+
+        class Stop(Exception):
+            pass
+        fake_tv = MagicMock(picture_cfg=None, connected=True, is_on=True, current_package=FIRE_YOUTUBE,
+                            adb_ready=AsyncMock(return_value=True), native_media=False)
+        with patch.object(server, "tv", fake_tv), patch.object(server, "media_read", new=AsyncMock(return_value=s)), \
+                patch.object(server, "log_seen", new=AsyncMock()) as seen, \
+                patch.object(server, "untitled_step"), patch.object(server, "_paused_idle_step", new=AsyncMock()), \
+                patch.object(server, "untitled_resolve", new=AsyncMock()), \
+                patch.object(server.asyncio, "sleep", new=AsyncMock(side_effect=Stop())):
+            with self.assertRaises(Stop):
+                await server.media_watch_loop()
+        seen.assert_awaited_once()
+        self.assertEqual(seen.await_args.args[:3], ("How Trains Work", "Some Channel", self.youtube()))
+        self.assertEqual(seen.await_args.kwargs, {"channel": "Some Channel", "duration_ms": 600000})
+
+    async def test_the_warm_up_is_scheduled_and_never_awaited_inline(self):
+        never = asyncio.Event()   # a lookup that never answers
+        calls = []
+
+        async def stuck(title, channel=None, duration_ms=None):
+            calls.append((title, channel, duration_ms))
+            await never.wait()
+        self.lookup.side_effect = stuck
+        with no_finder():
+            await asyncio.wait_for(server.log_seen("How Trains Work", "Some Channel", self.youtube(), who="person1",
+                                                   channel="Some Channel", duration_ms=600000), timeout=2)
+        self.assertEqual(len(store.videos()), 1, "the line is written before the lookup answers")
+        await asyncio.sleep(0)   # lets the scheduled task start
+        self.assertEqual(calls, [("How Trains Work", "Some Channel", 600000)])
+        pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()]
+        self.assertEqual(len(pending), 1, "the warm up runs in a task of its own")
+        pending[0].cancel()
+
+    async def test_a_failing_warm_up_is_swallowed(self):
+        self.lookup.side_effect = RuntimeError("no network")
+        with no_finder():
+            await server.log_seen("How Trains Work", None, self.youtube(), who="person1")
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        self.assertEqual(len(store.videos()), 1)
+        self.assertFalse([t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()])
 
     async def test_music_and_streams_are_still_never_logged(self):
         with no_finder():
@@ -179,24 +304,78 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         # the hidden file keeps the two apart
         self.assertEqual(set(store.hidden_times(self.tv, "person1")), {"bluey", "video:bluey"})
 
-    async def test_open_searches_the_installed_youtube_and_never_asks_the_finder(self):
+    async def test_open_with_a_sure_id_sends_the_watch_link_to_the_installed_build(self):
+        vid = self.video_line(channel="Some Channel", duration_ms=600000)
+        self.lookup.return_value = VIDEO_ID
+        body, start, launch = await self.open(vid)
+        # the line's channel and length tell the lookup which "How Trains Work" it is
+        self.lookup.assert_awaited_once_with("How Trains Work", "Some Channel", 600000)
+        # the watch link, no time in it: YouTube resumes from the account's own history (seen on a Cube)
+        start.assert_awaited_once_with(WATCH_LINK, FIRE_YOUTUBE)
+        launch.assert_not_awaited()
+        self.assertIn('"method": "deeplink"', body)
+        self.assertIn(f'"video_id": "{VIDEO_ID}"', body)
+        self.assertIn('"service": "youtube"', body)
+        self.assertIn(FIRE_YOUTUBE, body)
+        self.assertIn('"note_opened_title_page"', body)
+        self.assertIn("Opened How Trains Work in YouTube.", body)
+
+    async def test_open_with_an_unsure_lookup_searches_the_installed_youtube_and_never_asks_the_finder(self):
         with no_finder():
             await server.log_seen("How Trains Work & More", None, self.youtube(), who="person1")
         vid = store.videos()[0]["id"]
-        t = server.TVS[self.tv]
-        req, body = request({"id": vid})
-        with body, no_finder(), patch.object(server, "play", new=AsyncMock(side_effect=AssertionError("play() was called"))), \
-                patch.object(t, "start_intent", new=AsyncMock(return_value="adb")) as start, \
-                patch.object(t, "wait_for_app", new=AsyncMock(return_value=FIRE_YOUTUBE)), \
-                patch.object(t, "launch_package", new=AsyncMock()) as launch:
-            resp = await server.h_continue_open(req)
+        self.lookup.reset_mock()   # the warm up's call
+        body, start, launch = await self.open(vid)
+        self.lookup.assert_awaited_once_with("How Trains Work & More", None, None)
         # Amazon's build shows its home for the web results link: it gets the link Alexa's voice search sends
         start.assert_awaited_once_with("youtube://search?query=How%20Trains%20Work%20%26%20More", FIRE_YOUTUBE)
         launch.assert_not_awaited()
-        self.assertIn(b'"method": "search"', resp.body)
-        self.assertIn(b'"service": "youtube"', resp.body)
-        self.assertIn(FIRE_YOUTUBE.encode(), resp.body)
-        self.assertIn(b'"note_opened_app_search"', resp.body)
+        self.assertIn('"method": "search"', body)
+        self.assertIn('"video_id": null', body)
+        self.assertIn('"service": "youtube"', body)
+        self.assertIn(FIRE_YOUTUBE, body)
+        self.assertIn('"note_opened_app_search"', body)
+
+    async def test_open_with_a_lookup_that_raises_still_searches(self):
+        vid = self.video_line(channel="Some Channel", duration_ms=600000)
+        self.lookup.side_effect = RuntimeError("YouTube gave a consent page")
+        body, start, launch = await self.open(vid)
+        start.assert_awaited_once_with("youtube://search?query=How%20Trains%20Work", FIRE_YOUTUBE)
+        launch.assert_not_awaited()
+        self.assertIn('"method": "search"', body)
+
+    async def test_open_with_a_lookup_that_hangs_still_searches(self):
+        vid = self.video_line(channel="Some Channel", duration_ms=600000)
+        async def hang(*a):
+            await asyncio.Event().wait()
+        self.lookup.side_effect = hang
+        with patch.object(server, "OPEN_VIDEO_LOOKUP_S", 0.05):
+            body, start, launch = await self.open(vid)
+        start.assert_awaited_once_with("youtube://search?query=How%20Trains%20Work", FIRE_YOUTUBE)
+        self.assertIn('"method": "search"', body)
+
+    async def test_open_falls_back_to_the_search_when_the_watch_link_does_not_take(self):
+        vid = self.video_line(channel="Some Channel", duration_ms=600000)
+        self.lookup.return_value = VIDEO_ID
+        start = AsyncMock(side_effect=[RuntimeError("Error: no activity"), "adb"])
+        body, start, launch = await self.open(vid, start=start)
+        self.assertEqual([c.args for c in start.await_args_list],
+                         [(WATCH_LINK, FIRE_YOUTUBE), ("youtube://search?query=How%20Trains%20Work", FIRE_YOUTUBE)])
+        launch.assert_not_awaited()
+        self.assertIn('"method": "search"', body)
+        self.assertIn('"video_id": null', body)
+
+    async def test_an_old_line_without_channel_or_length_opens_the_same_way(self):
+        vid = self.video_line()   # written before the bridge kept them
+        self.lookup.return_value = VIDEO_ID
+        body, start, launch = await self.open(vid)
+        self.lookup.assert_awaited_once_with("How Trains Work", None, None)
+        start.assert_awaited_once_with(WATCH_LINK, FIRE_YOUTUBE)
+        self.assertIn('"method": "deeplink"', body)
+        self.lookup.return_value = None
+        body, start, launch = await self.open(vid)
+        start.assert_awaited_once_with("youtube://search?query=How%20Trains%20Work", FIRE_YOUTUBE)
+        self.assertIn('"method": "search"', body)
 
     async def test_open_falls_back_to_the_app_when_the_link_does_not_take(self):
         with no_finder():
