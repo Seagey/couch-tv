@@ -970,6 +970,14 @@
 
   // info
   R.card = function (root, o, b, env) {
+    // a card written in TV Designer: a title, a line of words and an icon (words only, like every design)
+    var q = op(o);
+    if (q.label || q.text) {
+      var small = b.h < 200;
+      add(root, [lab(q.icon || "info", q.label || ""), E("div", "cw-grow"),
+        q.text ? E("div", "cw-big", "font-size:" + px(clamp(Math.min(b.h / (small ? 4.2 : 3.4), (b.w - 48) / Math.max(4, q.text.length) * 1.9), 26, 84)) + ";line-height:1.08;white-space:pre-line", [q.text]) : null]);
+      return;
+    }
     var cards = env.demo ? [{ title: "Solar today", value: "18.4 kWh" }] : (dataOf(env).cards || []);
     if (!cards.length) return empty(root, b, "info", "Add custom cards on the bridge", "couch-tv bridge, custom cards");
     var c = cards[dayIndex(cards.length, 20)];

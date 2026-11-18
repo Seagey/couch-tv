@@ -24,7 +24,9 @@
   var DEMO_PREVIEW = /[?&]mock\b/.test(Q) && /[?&]demo=1\b/.test(Q);
   var ROOT = document.documentElement;
   var SEQ = 0, D = null, ON = false, hooks = {}, styleEl = null, dockStyle = null, wxEl = null, bgEl = null, textBox = null;
-  var layers = { back: null, front: null }, clockTimer = null;
+  var layers = { back: null, front: null }, clockTimer = null, depthEl = null;
+  // the built in scenes with a cut out of their hills (backgrounds/scene-<name>-fg.webp); water has none
+  var DEPTH_SCENE = /^backgrounds\/scene-(night|golden|fog|dawn)\.jpg$/;
   var appsKey = "", clockKey = "", observer = null, gridObserver = null;
 
   // the look settings a design may carry (design.home); Home settings on the TV still win
@@ -310,7 +312,7 @@
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "",
     bins: "weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label", note: "", list: "label icon",
-    card: "", quote: "text sub", word: "", news: "", sports: "label", stocks: "", commute: "",
+    card: "label text icon", quote: "text sub", word: "", news: "", sports: "label", stocks: "", commute: "",
     welcome: "kicker text sub align", quick: "quick align", wifi: "", guide: "", screentime: "", stack: ""
   };
   function sanWStyle(src) {
@@ -415,6 +417,9 @@
       put(out.background, "darken", SAN.n(bg.darken, 0, 0.9)); put(out.background, "zoom", SAN.n(bg.zoom, 1, 4));
       put(out.background, "x", SAN.n(bg.x, 0, 100)); put(out.background, "y", SAN.n(bg.y, 0, 100)); put(out.background, "blur", SAN.n(bg.blur, 0, 16));
       put(out.background, "scrim", SAN.pick(bg.scrim, ["top", "bottom", "left", "right", "even"]));
+      // depth: a built in scene photo has a cut out of its hills (scene-<name>-fg.webp); drawn between
+      // the widgets behind (layer "back") and the ones in front, so a clock can stand behind the hills
+      if (DEPTH_SCENE.test(image)) put(out.background, "depth", SAN.b(bg.depth));
     } else if (SAN.c(bg.colour)) {
       out.background = { colour: SAN.c(bg.colour) };   // one plain colour, in a plain colour format
       // or two, as a gradient (the widget presets): two colours and an angle, nothing else
@@ -916,6 +921,14 @@
       }
       var SCRIM = { top: "linear-gradient(180deg,#000,rgba(0,0,0,.25) 45%,rgba(0,0,0,.5))", bottom: "linear-gradient(0deg,#000,rgba(0,0,0,.2) 50%,rgba(0,0,0,.35))", left: "linear-gradient(90deg,#000,rgba(0,0,0,.3) 60%)", right: "linear-gradient(270deg,#000,rgba(0,0,0,.3) 60%)" };
       if (!col) out.push(H + " #cd-bg b{position:absolute;top:0;left:0;right:0;bottom:0;background:" + (SCRIM[bg.scrim] || "#000") + ";opacity:" + num(bg.darken, 0.15, 0, 0.9) + "}");
+      // the hills of a built in scene, in front of the widgets behind: placed and darkened like the photo
+      if (bg.depth === true && DEPTH_SCENE.test(src)) {
+        var fgSrc = src.replace(/\.jpg$/, "-fg.webp"), dk = num(bg.darken, 0.15, 0, 0.9);
+        out.push(H + " #cd-depth{position:fixed;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background-image:" + cssUrl(fgSrc) +
+          ";background-repeat:no-repeat;background-size:" + (z * 100) + "vw " + (z * 100) + "vh;background-position:" + num(bg.x, 50, 0, 100) + "% " + num(bg.y, 50, 0, 100) + "%" +
+          ";filter:brightness(" + +(1 - dk * 0.85).toFixed(3) + ")" + (num(bg.blur, 0, 0, 40) ? " blur(" + num(bg.blur, 0, 0, 40) / 16 + "rem);transform:scale(1.06)" : "") + "}");
+        out.push(H + ":not(.theme-night) #cd-depth, " + H + ".expanded #cd-depth{display:none}");
+      }
       out.push(H + ".cd-bg .scene .sbg, " + H + ".cd-bg .scene .fg, " + H + ".cd-bg .scene .svid, " + H + ".cd-bg .bg, " + H + ".cd-bg #bgvid{visibility:hidden !important}");
       if (ce.shade !== "panel") out.push(H + ".cd-bg .scene .shade{visibility:hidden !important}");
       out.push(H + ".cd-bg #scenes .gclock.under{display:none}");
@@ -1661,6 +1674,16 @@
       bgEl.appendChild(document.createElement("b"));
       document.body.insertBefore(bgEl, document.body.firstChild);
     }
+    // the hills in front: one picture between the widgets behind (z 0) and in front (z 3)
+    var depth = !!(src && BG.ok && obj(d.background).depth === true && DEPTH_SCENE.test(src));
+    if (depth && !depthEl) {
+      depthEl = document.createElement("div");
+      depthEl.id = "cd-depth";
+      depthEl.className = "cd-depth";
+      depthEl.setAttribute("aria-hidden", "true");
+      document.body.appendChild(depthEl);
+    }
+    if (depthEl) depthEl.hidden = !depth;
   }
 
   // ---------------- apply, and take back off ----------------
@@ -1712,6 +1735,7 @@
     NAV.reset(); ROOT.classList.remove("cd-wmode");
     shelfTurns();
     ROOT.classList.remove("cd", "cd-bg");
+    if (depthEl) depthEl.hidden = true;
     if (styleEl) styleEl.textContent = "";
     if (dockStyle) dockStyle.textContent = "";
     if (wxEl) wxEl.textContent = "";
