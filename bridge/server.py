@@ -2676,6 +2676,9 @@ CONTINUE_SKIP = {"youtube"}
 # Never logged as watched at all: videos, music and streams are not shows to keep watching, and a
 # video title matched to a film would put that film in the household's taste (issue #23: a
 # Veritasium video logged as "Fear of Rain"). The on-TV app has the same list (Now.NOT_KEPT).
+# YouTube alone gets a list of its own: a video that played the minute is written as a history
+# line with "type": "video" (the session's title, no finder, no picture), which store.history()
+# leaves out, so it reaches nothing but /api/continue "videos" (continue_videos).
 NOT_KEPT = {"youtube", "spotify", "twitch", "moonlight"}
 
 
@@ -2792,6 +2795,19 @@ def continue_items(who=None, base=""):
         if len(merged) >= store.KEEP_MAX:
             break
     return merged
+
+
+def continue_videos(who=None):
+    """The YouTube videos this person watched on this TV (store.keep_videos): one card per title, newest
+    first, up to 10, within 30 days, minus the ones removed by hand. A list of its own, next to Keep
+    watching's "items", so the home can show it for the YouTube tile alone and never in the shared row.
+    The card's app is YouTube's installed build (Amazon's on a Fire TV), like any item's."""
+    who = who or cur_who()
+    app = apps.describe_package(pkg_of(apps.BY_ID["youtube"]))
+    return [{"id": h["id"], "title": h["title"], "episode_title": None, "season": None, "episode": None,
+             "app": app, "service": "youtube", "poster": None, "backdrop": None, "progress": None,
+             "kind": "video", "last_played": h.get("when"), "source": "bridge"}
+            for h in store.keep_videos(_current.get(), who)]
 
 
 def request_base(request):
@@ -2972,7 +2988,35 @@ async def h_spotify_status(request):
 
 async def h_continue(request):
     who = store.norm_who(request.query.get("who"))
-    return ok(items=continue_items(who, request_base(request)))
+    return ok(items=continue_items(who, request_base(request)), videos=continue_videos(who))
+
+
+async def open_video(h):
+    """A video card opens YouTube's installed build on a search for the video's name: never through
+    play() and the show finder (a video's name matched to a film would open the film, issue #23), and
+    with no stored link (the media session gives the title, not the video's id). Amazon's YouTube on
+    a Fire TV Cube takes https://www.youtube.com links like the Google TV one (checked with dumpsys
+    package: VIEW, BROWSABLE, www.youtube.com). Where the link does not take, the app itself opens."""
+    from urllib.parse import quote
+    app = apps.BY_ID["youtube"]
+    pkg = pkg_of(app)
+    title = h["title"]
+    method = None
+    if tv.kind == "android":
+        try:
+            await tv.start_intent(SEARCH_LINKS["youtube"].format(q=quote(title)), pkg)
+            if await tv.wait_for_app({pkg}, timeout=8):
+                method = "search"
+        except Exception as e:
+            log.warning("YouTube search link failed: %s", e)
+    if method == "search":
+        note = f"Opened {app['name']} search for {title}."
+    else:
+        await launch_app(app)
+        method, note = "app", f"Opened {app['name']}. Search for {title} on the TV."
+    note_key, note_vars = _search_note_fields(method, app, title)
+    return {"title": title, "service": "youtube", "app": apps.describe_package(pkg), "method": method,
+            "note": note, **messages.note_fields(note_key, note_vars)}
 
 
 async def open_plex_card(p, who):
@@ -3006,6 +3050,10 @@ async def h_continue_open(request):
     h = store.history_item(cid) if cid else None
     if not h:
         raise ApiError(404, f"unknown continue item: {cid}", key="err_unknown_continue_item", vars={"id": cid})
+    if h.get("type") == "video":
+        result = await open_video(h)
+        record_action(request, "continue", {"id": cid}, True)
+        return ok(**result)
     # the episode the card shows: the app's own Watch Next row when it is newer than the line, so
     # the play opens (and history records) where the show is really up to, not the stale episode
     h = wn_fresher(h, _wn_rows())
@@ -3601,7 +3649,17 @@ async def log_seen(title, subtitle, app, now=None, who=None, method="seen", post
     """Log a show seen playing, with the season and episode media_read worked out (`now`, a copy of
     media_now), on this TV for the person on the couch here (or `who`, the person picked when it
     played). Only a show of the same name gets the finder's title and picture; a near miss keeps the
-    app's own title and no picture. Videos and music are never logged (NOT_KEPT)."""
+    app's own title and no picture. Music and streams are never logged (NOT_KEPT); a YouTube video
+    is written as a video line, by its own name and with no lookup (see NOT_KEPT)."""
+    if app.get("id") == "youtube":
+        if method != "seen":
+            return
+        store.add_history({"title": title, "year": None, "type": "video", "poster": None, "backdrop": None,
+                           "service": "youtube", "who": who if who is not None else cur_who(),
+                           "tv": _current.get(), "season": None, "episode": None, "episode_title": None,
+                           "when": now_iso(), "method": method})
+        log.info("logged video %s on %s (%s)", title, app["name"], method)
+        return
     if app.get("id") in NOT_KEPT:
         return
     now = now or {}

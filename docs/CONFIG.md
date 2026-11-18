@@ -135,9 +135,12 @@ out the same way. The phone's People sheet keeps these marks when it renames or 
   after 30 days with no watching. A show counts after a minute of the same title playing. An app
   that gives Android no title (Netflix on some TVs) or only its own name (Prime on a Sony) is named
   from its row in Android's "Continue watching" (Watch Next) instead: the TV home app reads those
-  rows and hands them to the bridge, because ADB cannot read them. Videos and music are never kept.
+  rows and hands them to the bridge, because ADB cannot read them. Music and streams are never kept.
   On a Fire TV the bridge knows Amazon's builds of YouTube, Prime Video and HBO Max (other package
   names than the Google TV ones), so it opens the one the TV has and their shows reach Keep watching.
+  YouTube videos are kept as a list of their own that the home shows only for the YouTube tile, never
+  in the shared row or the household's taste: a video is written by the name YouTube gave it, with no
+  picture, and opening it searches YouTube for that name.
 - **With no computer (option A),** Keep watching is Android's own Watch Next list, plus the
   Continue Watching channel of apps that put nothing in Watch Next but keep a home screen row of
   their own instead: so far Stremio. Both are read the same read only way, with no account and no

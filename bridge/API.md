@@ -549,6 +549,25 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
   `/api/continue/open` and `/api/continue/hide` take those ids too; hide takes an optional `who`
   (else the person on the couch; nobody picked means everyone). `GET /api/plex/status` says what is
   set up and how the last read went, never the token.
+- `videos`, next to `items`: the YouTube videos this person watched on this TV, a list of their own.
+  YouTube stays out of `items` (it would bury everything else), and a video's name is never looked
+  up (matched to a film, it would put that film in the household's taste, issue #23): a video that
+  played the minute is written by the name YouTube gave it, with no picture, and shows only here, for
+  the home to put under the YouTube tile and nowhere else. Never in the picks, the taste or
+  `GET /api/history`. One card per title (the newest), newest first, at most 10, within 30 days,
+  minus the ones removed with `/api/continue/hide`, in the shape of an item with `"kind": "video"`,
+  `episode_title`, `season`, `episode`, `poster`, `backdrop` and `progress` all `null`, and `app`
+  YouTube's installed build. `/api/continue/open` with a video's id opens that build on YouTube's
+  search for the title (`"method": "search"`; Amazon's YouTube takes the `https://www.youtube.com`
+  link too), or the app alone where the link does not take (`"method": "app"`), never through the
+  show finder. Its answer is `{"title", "service": "youtube", "app", "method", "note"}`.
+  ```json
+  {"ok": true, "items": [], "videos": [
+    {"id": "9c1e0b7d4a553f2a", "title": "How Trains Work", "episode_title": null, "season": null, "episode": null,
+     "app": {"id": "youtube", "name": "YouTube", "package": "com.amazon.firetv.youtube"},
+     "service": "youtube", "poster": null, "backdrop": null, "progress": null, "kind": "video",
+     "last_played": "2030-01-01T19:31:00Z", "source": "bridge"}]}
+  ```
 
 ### `POST /api/sleep` and `GET /api/sleep`
 Sleep timer, kept on the bridge so it still fires when the phone locks.
