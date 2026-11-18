@@ -535,6 +535,22 @@ def is_installed(app):
     return None if pk is None else pkg_of(app) in pk
 
 
+async def settle_builds():
+    """Read the installed list (the cached read play() does) before pkg_of picks a build: until the
+    first read it can only name the package apps.py names, so the first launch, link or card after the
+    bridge starts (or the TV reconnects) would go to Google's YouTube on a Fire TV that has Amazon's.
+    Only a TV with ADB has a list to read; the others are left alone."""
+    if tv.adb_ok:
+        await installed_packages()
+
+
+def tv_build(pkg):
+    """A package as this TV has it: an app the bridge knows goes through pkg_of (Amazon's build on a
+    Fire TV), any other package is itself."""
+    app = apps.BY_PACKAGE.get(pkg)
+    return pkg_of(app) if app else pkg
+
+
 def now_payload():
     pkg = tv.current_package
     item = playing["item"]
@@ -719,6 +735,7 @@ async def h_apps(request):
 
 
 async def launch_app(app):
+    await settle_builds()   # the build this TV has, not the one apps.py names, from the first launch on
     pkg = pkg_of(app)
     method = await tv.launch_package(pkg)
     got = await tv.wait_for_app({pkg}, timeout=8)
@@ -828,6 +845,7 @@ def title_link(app, best):
 async def search_in_app(app, title, best=None):
     """Open the app on the title's page or its search with the title typed in, or just the app."""
     from urllib.parse import quote
+    await settle_builds()
     pkg = pkg_of(app)
     link = title_link(app, best) if tv.kind == "android" else None
     # Only over ADB, which pins the link to the app's own package (-p). The remote-link fallback
@@ -1784,8 +1802,19 @@ async def kids_list():
         await kids.enrich(m["shows"], finder.find)
         pub = kids.public_mode(m)
         names = {p: a["name"] for p, a in apps.BY_PACKAGE.items()}   # the other builds too
-        out.append({"id": p["id"], "name": p["name"], "shows": pub["shows"],
-                    "apps": [{"package": k, "name": names.get(k, k)} for k in pub["apps"]],
+        # kids.py knows no TV, so its packages are the ones apps.py names: here they become the builds
+        # this TV has (Amazon's YouTube on a Fire TV), the packages the kids home's tiles and launches use
+        await settle_builds()
+        shows = []
+        for s in pub["shows"]:
+            s = dict(s)
+            if s.get("package"):
+                s["package"] = tv_build(s["package"])
+            if isinstance(s.get("app"), dict) and s["app"].get("package"):
+                s["app"] = dict(s["app"], package=tv_build(s["app"]["package"]))
+            shows.append(s)
+        out.append({"id": p["id"], "name": p["name"], "shows": shows,
+                    "apps": [{"package": tv_build(k), "name": names.get(k, k)} for k in pub["apps"]],
                     # the same hash config.js carries, so a PIN changed on the phone reaches the TV
                     # without a restart. Never the PIN itself.
                     "pin_hash": pub["pin_hash"], "pin_salt": pub["pin_salt"], "pin_rounds": pub["pin_rounds"]})
@@ -2988,6 +3017,7 @@ async def h_spotify_status(request):
 
 async def h_continue(request):
     who = store.norm_who(request.query.get("who"))
+    await settle_builds()   # so a card's app.package is the build this TV has from the first answer on
     return ok(items=continue_items(who, request_base(request)), videos=continue_videos(who))
 
 
@@ -2995,8 +3025,9 @@ async def open_video(h):
     """A video card opens YouTube's installed build on a search for the video's name: never through
     play() and the show finder (a video's name matched to a film would open the film, issue #23), and
     with no stored link (the media session gives the title, not the video's id). Amazon's YouTube on
-    a Fire TV Cube takes https://www.youtube.com links like the Google TV one (checked with dumpsys
-    package: VIEW, BROWSABLE, www.youtube.com). Where the link does not take, the app itself opens."""
+    a Fire TV Cube lists https://www.youtube.com links in its intent filter (read with dumpsys package:
+    VIEW, BROWSABLE, www.youtube.com); opening the search link there has not been tried on a real Fire
+    TV yet. Where the link does not take, the app itself opens."""
     from urllib.parse import quote
     app = apps.BY_ID["youtube"]
     pkg = pkg_of(app)

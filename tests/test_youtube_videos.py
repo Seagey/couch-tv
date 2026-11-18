@@ -154,6 +154,31 @@ class Videos(unittest.IsolatedAsyncioTestCase):
                                        "when": (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat(timespec="seconds")}])
         self.assertEqual([v["title"] for v in server.continue_videos("person1")], ["How Trains Work"])
 
+    async def test_hiding_a_video_leaves_a_show_of_the_same_name_and_the_other_way_round(self):
+        # "Bluey" the Netflix show and a Bluey video on YouTube: two cards, hidden one at a time
+        self.show("Bluey", days_ago=0.01)
+        with no_finder():
+            await server.log_seen("Bluey", None, self.youtube(), who="person1")
+        self.assertEqual([c["title"] for c in server.continue_items("person1")], ["Bluey"])
+        self.assertEqual([v["title"] for v in server.continue_videos("person1")], ["Bluey"])
+        req, body = request({"id": store.videos()[0]["id"]})
+        with body:
+            await server.h_continue_hide(req)
+        self.assertEqual(server.continue_videos("person1"), [])
+        self.assertEqual([c["title"] for c in server.continue_items("person1")], ["Bluey"], "the show stays")
+        # now the show: the video comes back when it is watched again, and the show stays hidden
+        req, body = request({"id": store.history()[0]["id"]})
+        with body:
+            await server.h_continue_hide(req)
+        self.assertEqual(server.continue_items("person1"), [])
+        store._append(store.HISTORY, [{"id": "later", "title": "Bluey", "type": "video", "service": "youtube",
+                                       "tv": self.tv, "who": "person1",
+                                       "when": (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat(timespec="seconds")}])
+        self.assertEqual([v["title"] for v in server.continue_videos("person1")], ["Bluey"])
+        self.assertEqual(server.continue_items("person1"), [], "hiding the show never hid the video, nor the other way")
+        # the hidden file keeps the two apart
+        self.assertEqual(set(store.hidden_times(self.tv, "person1")), {"bluey", "video:bluey"})
+
     async def test_open_searches_the_installed_youtube_and_never_asks_the_finder(self):
         with no_finder():
             await server.log_seen("How Trains Work & More", None, self.youtube(), who="person1")

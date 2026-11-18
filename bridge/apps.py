@@ -18,8 +18,9 @@ APPS = [
     {"id": "netflix", "name": "Netflix", "package": "com.netflix.ninja", "colour": "#E50914",
      "jw": ["netflix", "netflixbasicwithads", "netflixkids"], "deeplink": "jw",
      "cold": "background", "verify": True},
-    # com.amazon.firetv.youtube: Amazon's YouTube, seen on a Fire TV Cube (Fire OS 7.7). It takes
-    # https://www.youtube.com links (VIEW, BROWSABLE) like the Google TV one.
+    # com.amazon.firetv.youtube: Amazon's YouTube, seen on a Fire TV Cube (Fire OS 7.7). It lists
+    # https://www.youtube.com links in its intent filter (VIEW, BROWSABLE, read with dumpsys package);
+    # opening a search link there has not been tried on a real Fire TV yet.
     {"id": "youtube", "name": "YouTube", "package": "com.google.android.youtube.tv", "colour": "#FF0000",
      "packages": ["com.amazon.firetv.youtube"], "jw": ["youtubered", "youtube"], "deeplink": "jw"},
     {"id": "stan", "name": "Stan", "package": "au.com.stan.and", "colour": "#0072F5",

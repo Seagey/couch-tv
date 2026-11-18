@@ -558,9 +558,10 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
   minus the ones removed with `/api/continue/hide`, in the shape of an item with `"kind": "video"`,
   `episode_title`, `season`, `episode`, `poster`, `backdrop` and `progress` all `null`, and `app`
   YouTube's installed build. `/api/continue/open` with a video's id opens that build on YouTube's
-  search for the title (`"method": "search"`; Amazon's YouTube takes the `https://www.youtube.com`
-  link too), or the app alone where the link does not take (`"method": "app"`), never through the
-  show finder. Its answer is `{"title", "service": "youtube", "app", "method", "note"}`.
+  search for the title (`"method": "search"`; Amazon's YouTube lists `https://www.youtube.com` links in
+  its intent filter, read with `dumpsys package` on a Fire TV Cube, but opening the search link there
+  has not been tried yet), or the app alone where the link does not take (`"method": "app"`), never
+  through the show finder. Its answer is `{"title", "service": "youtube", "app", "method", "note"}`.
   ```json
   {"ok": true, "items": [], "videos": [
     {"id": "9c1e0b7d4a553f2a", "title": "How Trains Work", "episode_title": null, "season": null, "episode": null,

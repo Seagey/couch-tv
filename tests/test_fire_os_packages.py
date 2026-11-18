@@ -1,13 +1,14 @@
 """Fire OS package names (bridge/apps.py "packages", server.pkg_of): on a Fire TV the same apps are
 Amazon's builds under other package names (seen on a Fire TV Cube, Fire OS 7.7), and the bridge has to
 open, watch and card the build the TV has. A Google TV with the usual packages behaves as before."""
+import json
 import os
 import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = Path(__file__).parents[1]
 # The repo's example settings, not the owner's config.json (see tests/test_plex_keep_watching.py).
@@ -16,6 +17,7 @@ os.environ["COUCH_DATA"] = tempfile.mkdtemp(prefix="couchtv-fireos-")
 sys.path.insert(0, str(ROOT / "bridge"))
 import apps  # noqa: E402
 import config  # noqa: E402
+import kids  # noqa: E402
 import store  # noqa: E402
 import server  # noqa: E402
 
@@ -113,6 +115,65 @@ class OnATV(unittest.IsolatedAsyncioTestCase):
         launch.assert_awaited_once_with(FIRE_YOUTUBE)
         wait.assert_awaited_once_with({FIRE_YOUTUBE}, timeout=8)
         self.assertEqual(got, FIRE_YOUTUBE)
+
+    async def test_the_first_launch_after_a_start_reads_the_installed_list_first(self):
+        # the bridge has just started (or the TV just reconnected): no list yet, ADB up. The launch must not
+        # go to Google's YouTube, which the Cube has not got, and fail although YouTube is installed.
+        self.assertIsNone(server.installed["packages"])
+        t = server.TVS[self.tv]
+        with patch.object(t, "adb_ok", True), \
+                patch.object(t, "installed_packages", new=AsyncMock(return_value=set(ON_THE_CUBE))) as read, \
+                patch.object(t, "launch_package", new=AsyncMock(return_value="adb")) as launch, \
+                patch.object(t, "wait_for_app", new=AsyncMock(return_value=FIRE_YOUTUBE)):
+            got, _ = await server.launch_app(apps.BY_ID["youtube"])
+        read.assert_awaited_once()
+        launch.assert_awaited_once_with(FIRE_YOUTUBE)
+        self.assertEqual(got, FIRE_YOUTUBE)
+        # the same read serves the cards: a card built straight after a start names the Cube's build
+        server.installed["packages"] = None
+        store.add_history({"title": "How Trains Work", "tv": self.tv, "who": "person1", "service": "youtube",
+                           "type": "video", "when": NOW.isoformat(timespec="seconds")})
+        req = MagicMock(query={"who": "person1"}, scheme="http", host="bridge:5400")
+        with patch.object(t, "adb_ok", True), \
+                patch.object(t, "installed_packages", new=AsyncMock(return_value=set(ON_THE_CUBE))):
+            resp = await server.h_continue(req)
+        self.assertEqual(json.loads(resp.body)["videos"][0]["app"]["package"], FIRE_YOUTUBE)
+
+    async def test_a_tv_without_adb_is_not_asked_for_its_list(self):
+        t = server.TVS[self.tv]
+        with patch.object(t, "adb_ok", False), \
+                patch.object(t, "installed_packages", new=AsyncMock(side_effect=AssertionError("asked"))), \
+                patch.object(t, "launch_package", new=AsyncMock(return_value="remote")), \
+                patch.object(t, "wait_for_app", new=AsyncMock(return_value=GOOGLE_YOUTUBE)):
+            got, _ = await server.launch_app(apps.BY_ID["youtube"])
+        self.assertEqual(got, GOOGLE_YOUTUBE)   # no list: the package apps.py names, as before
+
+    async def test_kids_mode_on_the_cube_lists_amazons_builds(self):
+        # kids.py knows no TV and names the Google TV packages; the TV's kids home keeps only the allowed
+        # apps it has installed, so on the Cube it must be given Amazon's builds, for the apps and the shows
+        people = [{"id": "person1", "name": "Person 1"},
+                  {"id": "person2", "name": "Person 2", "kid": True, "kids_mode": {
+                      "pin": "2580", "shows": [{"title": "Bluey", "service": "youtube"}, {"title": "Hey Duggee", "service": "netflix"}],
+                      "apps": ["youtube", "prime-video", "hbo-max", "netflix", "com.example.other"]}}]
+        with patch.object(kids, "KIDS_FILE", os.path.join(tempfile.mkdtemp(prefix="couchtv-kids-"), "kids.json")), \
+                patch.dict(config.CONFIG, {"people": people}), \
+                patch.object(server.finder, "find", new=AsyncMock(return_value=(None, None))):
+            kids.art.clear()
+            self.on_tv(ON_THE_CUBE)
+            kid = (await server.kids_list())[0]
+            self.assertEqual(kid["id"], "person2")
+            self.assertEqual([a["package"] for a in kid["apps"]],
+                             [FIRE_YOUTUBE, FIRE_PRIME, FIRE_HBO, "com.netflix.ninja", "com.example.other"])
+            self.assertEqual([a["name"] for a in kid["apps"]][:3], ["YouTube", "Prime Video", "HBO Max"])
+            bluey, duggee = kid["shows"]
+            self.assertEqual((bluey["package"], bluey["app"]["package"]), (FIRE_YOUTUBE, FIRE_YOUTUBE))
+            self.assertEqual((duggee["package"], duggee["app"]["package"]), ("com.netflix.ninja", "com.netflix.ninja"))
+            # a Google TV gets the packages apps.py names, as before
+            self.on_tv(ON_A_GOOGLE_TV)
+            kid = (await server.kids_list())[0]
+            self.assertEqual([a["package"] for a in kid["apps"]][:2], [GOOGLE_YOUTUBE, "com.amazon.amazonvideo.livingroom"])
+            self.assertEqual(kid["shows"][0]["app"]["package"], GOOGLE_YOUTUBE)
+            self.assertNotIn("pin", kid)
 
     def test_a_watch_next_row_from_the_fire_build_brings_the_card_up_to_date(self):
         self.on_tv(ON_THE_CUBE)

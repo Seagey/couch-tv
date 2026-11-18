@@ -205,10 +205,20 @@ def keep_watching(tv_id, who, now=None, limit=KEEP_MAX, days=KEEP_DAYS):
 def keep_videos(tv_id, who, now=None, limit=KEEP_MAX, days=KEEP_DAYS):
     """The YouTube videos this person watched on this TV, the same way: one line per title (the
     latest), newest first, at most `limit`, within `days` days, minus the ones removed by hand."""
-    return _keep(videos(), tv_id, who, now, limit, days)
+    return _keep(videos(), tv_id, who, now, limit, days, VIDEO_KEY)
 
 
-def _keep(lines, tv_id, who, now, limit, days):
+# A video is hidden under its own key, "video:<title>", so taking a video off the YouTube row never
+# takes a show of the same name off Keep watching ("Bluey" the show and a Bluey video), or the other way.
+VIDEO_KEY = "video:"
+
+
+def _hidden_key(h):
+    """The lower case title a history line is hidden under, with the video mark on a video line."""
+    return (VIDEO_KEY if h.get("type") == "video" else "") + (h.get("title") or "").strip().lower()
+
+
+def _keep(lines, tv_id, who, now, limit, days, kind=""):
     now = now or datetime.now(timezone.utc)
     cutoff = now - timedelta(days=days)
     seen, out = set(), []
@@ -223,7 +233,7 @@ def _keep(lines, tv_id, who, now, limit, days):
         if not key or key in seen:
             continue
         seen.add(key)
-        hid = hidden.get(key)
+        hid = hidden.get(kind + key)
         if hid and when <= hid:
             continue   # removed by hand; watching it again brings it back
         out.append(h)
@@ -234,7 +244,8 @@ def _keep(lines, tv_id, who, now, limit, days):
 
 def hidden_times(tv_id, who):
     """The shows removed by hand from this person's Keep watching on this TV: lower case title ->
-    when it was removed. A card is hidden while its own time is not after that."""
+    when it was removed (a video under "video:<title>"). A card is hidden while its own time is not
+    after that."""
     out = {}
     for key, when in _read(HIDDEN, {}).items():
         tv, _, rest = key.partition("|")
@@ -246,8 +257,9 @@ def hidden_times(tv_id, who):
 
 
 def hide_keep_watching(h):
-    """Take a show off Keep watching (the TV and person of its history line) until it is played again."""
-    key = (h.get("title") or "").strip().lower()
+    """Take a show (or a video, under its own key) off Keep watching, for the TV and person of its
+    history line, until it is played again."""
+    key = _hidden_key(h)
     with _lock:
         data = _read(HIDDEN, {})
         data[f"{h.get('tv')}|{h.get('who')}|{key}"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
