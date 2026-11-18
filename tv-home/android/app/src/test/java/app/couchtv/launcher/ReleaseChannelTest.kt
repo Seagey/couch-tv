@@ -34,6 +34,11 @@ class ReleaseChannelTest {
         assertTrue(ReleaseChannel.newer("v0.13.0", "0.13-beta.1"))
         assertFalse(ReleaseChannel.newer("v0.13.0", "0.13.0"))
         assertFalse(ReleaseChannel.newer("v0.13.0", "0.13"))
+        // 0.13.1 (tag v0.13.1) reaches 0.13.0, 0.13 and 0.12 TVs, and is not newer than itself
+        assertTrue(ReleaseChannel.newer("v0.13.1", "0.13.0"))
+        assertTrue(ReleaseChannel.newer("v0.13.1", "0.13"))
+        assertTrue(ReleaseChannel.newer("v0.13.1", "0.12"))
+        assertFalse(ReleaseChannel.newer("v0.13.1", "0.13.1"))
     }
 
     @Test fun theOldRulesStillHoldForEveryReleaseSoFar() {

@@ -2,8 +2,9 @@
 // browser to be drawn). Byte mode, error correction level M, versions 1 to 10 (up to 213 bytes, far
 // more than a design code needs). Follows ISO/IEC 18004 the way Project Nayuki's reference does.
 // TVQR.matrix(text) gives rows of true (dark) and false; TVQR.svg(text, px) gives an <svg> element.
-// Checked by decoding with jsQR: tools/tv-designer/server/tests/qr.test.mjs. The same file as the TV
-// Designer's app/qr.js; here it draws the QR of Home settings, TV Designer, Share this home.
+// Checked by decoding with jsQR: tools/tv-designer/server/tests/qr.test.mjs. Made from couch-tv
+// Studio's app/qr.js (this copy also sets stroke="none"); here it draws the QR of
+// Home settings, couch-tv Studio, Share this home, and of the Guest Wi-Fi widget.
 (function (root) {
   "use strict";
   var ECC_PER_BLOCK = [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26];
@@ -160,8 +161,10 @@
     s.setAttribute("width", px); s.setAttribute("height", px);
     s.setAttribute("shape-rendering", "crispEdges");
     s.setAttribute("role", "img");
-    var bg = document.createElementNS(NS, "rect"); bg.setAttribute("width", all); bg.setAttribute("height", all); bg.setAttribute("fill", "#fff");
-    var p = document.createElementNS(NS, "path"); p.setAttribute("d", d); p.setAttribute("fill", "#000");
+    // stroke="none" on both: a page's own svg styles (a design's icon rule strokes every svg in
+    // currentColor) must never draw over the squares, or the code reads blank
+    var bg = document.createElementNS(NS, "rect"); bg.setAttribute("width", all); bg.setAttribute("height", all); bg.setAttribute("fill", "#fff"); bg.setAttribute("stroke", "none");
+    var p = document.createElementNS(NS, "path"); p.setAttribute("d", d); p.setAttribute("fill", "#000"); p.setAttribute("stroke", "none");
     s.appendChild(bg); s.appendChild(p);
     return s;
   }

@@ -2,9 +2,17 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.1**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 19 November 2026: release 0.13.1, long video loops for official designs, and the Wi-Fi join code draws again
+
+0.13.1 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Both TV apps are 0.13.1 and install over 0.13. A classic home, with couch-tv Studio off, looks exactly as it did.
+
+- **Long video loops for official designs.** An official couch-tv Studio gallery design can now bring a long, seamless looping video (up to 4 minutes, the slow aquarium kind) instead of the 15 second clip. Only a TV with 2 GB of memory or more asks for it; a 1 GB TV, Lighter home, power save, data saver and less motion keep the still picture, as before. If the long loop does not arrive within 3 minutes, the TV takes the 15 second copy. Once a video has played, the TV keeps it (one video, the current design's), so the next start plays it without downloading it again. `tests/test_design_video.js`, `tests/test_design_video_browser.mjs`.
+- **The Guest Wi-Fi join code draws again.** In a design, a style meant for the small line icons also drew a white outline round every square of the QR code, so the Guest Wi-Fi widget showed a blank white square that no phone could read. The code now draws its squares with no outline. `tests/test_athome_browser.mjs` now photographs the code as the TV draws it and reads it back.
+- **Docs:** a couch-tv Studio section in the README, a table of the Android permissions each app asks for, and couch-tv Studio's old name replaced in the code's comments too.
 
 ### 19 November 2026: release 0.13, and TV home designs from couch-tv Studio (opt in)
 

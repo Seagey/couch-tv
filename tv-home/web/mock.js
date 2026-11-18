@@ -48,7 +48,7 @@
 //   remoteart=1         the real show posters from JustWatch (otherwise every picture is from this server)
 //   wx=24,2             pretend weather: 24 degrees, Open-Meteo code 2 (partly cloudy)
 //   place=Riverside    weather.place, the name shown beside the weather
-//   design=local        design: the TV Designer's current design (tools/tv-designer), read from
+//   design=local        design: couch-tv Studio's current design (tools/tv-designer), read from
 //                       this browser's localStorage ("tvdesigner.design"); designer=1 takes live edits
 (function () {
   var q = location.search;

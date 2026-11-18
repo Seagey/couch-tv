@@ -142,6 +142,19 @@ console.log("Running at home browser tests...");
     });
     const jsQR = createRequire(import.meta.url)(jsqrPath), got = (jsQR(new Uint8ClampedArray(px), 600, 600) || {}).data;
     ok(got === 'WIFI:T:WPA;S:Salt\\;and \\"Sun\\";P:summer-swell 42;;',"the code on the widget reads back as the join words (" + got + ")");
+    // and as the TV draws it, with the design's own styles on it: a screenshot of the code on screen.
+    // A design rule once gave every square of it a white stroke, so the code drew blank while the
+    // copy above still read back.
+    const shot = await page.locator('.cw-o[data-obj="w2"] svg[role="img"]').screenshot({ animations: "disabled" });
+    const drawn = await page.evaluate(async (b64) => {
+      const img = new Image(); img.src = "data:image/png;base64," + b64; await img.decode();
+      const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+      return { w: img.width, h: img.height, px: Array.from(g.getImageData(0, 0, img.width, img.height).data) };
+    }, shot.toString("base64"));
+    const dark = drawn.px.filter((v, i) => i % 4 === 0 && v < 80).length / (drawn.w * drawn.h);
+    const read = (jsQR(new Uint8ClampedArray(drawn.px), drawn.w, drawn.h) || {}).data;
+    ok(dark > 0.2 && dark < 0.8, "the code on screen has dark squares (" + Math.round(dark * 100) + "% dark)");
+    ok(read === 'WIFI:T:WPA;S:Salt\\;and \\"Sun\\";P:summer-swell 42;;', "the code on screen reads back as the join words (" + read + ")");
   } else console.log("  (jsQR not found: the code is not read back; set COUCHTV_JSQR)");
   ok(/Check out/.test(await text(page, "w3")), "the guide: its headings on a square");
   await page.waitForFunction(() => /Late swim|Bins out|Nothing on/.test((document.querySelector('.cw-o[data-obj="w4"] .cw') || {}).textContent || ""), null, { timeout: 5000 }).catch(() => {});

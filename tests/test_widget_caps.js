@@ -1,5 +1,5 @@
 // The widget capability records (tv-home/web/widget-caps.js): every widget kind the TV accepts has
-// one, every field is filled, the platform table names every kind of TV TV Designer knows, the sizes
+// one, every field is filled, the platform table names every kind of TV couch-tv Studio knows, the sizes
 // are real named sizes with the smallest that reads first, and every kind whose OK opens a detail
 // layer (widget-detail.js) is a remote stop (design.js WACT).
 // Run: node tests/test_widget_caps.js

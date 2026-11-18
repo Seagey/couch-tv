@@ -2,7 +2,7 @@
 //  1. OK on each widget opens its layer; the remote moves inside it (Right then Left comes back);
 //     Back closes it, the widget shows again and the home keeps its focus.
 //  2. What the layers do reaches the TV: aircon warmer and fan, a scene, a timer, Hold OK's Open.
-//  3. Every widget kind at every size in widget-caps.js, as TV Designer draws it, as a TV with its
+//  3. Every widget kind at every size in widget-caps.js, as couch-tv Studio draws it, as a TV with its
 //     data draws it, and as a TV with nothing set up draws it: nothing past its box, no words under 23 px.
 // Needs Playwright (Chromium). Without it the test says so and passes:
 //   COUCHTV_PLAYWRIGHT=<a folder whose node_modules has playwright> node tests/test_widget_detail_browser.mjs

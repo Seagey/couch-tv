@@ -1,5 +1,5 @@
-// The TV Designer's design block: config.json "design" (docs/CONFIG.md, "Design"), made in the
-// TV Designer (a poster style editor for this home). It is laid over the normal Night home:
+// couch-tv Studio's design block: config.json "design" (docs/CONFIG.md, "Design"), made in
+// couch-tv Studio (a poster style editor for this home). It is laid over the normal Night home:
 //  - the home's own parts (clock, date, weather, people, quick buttons, Keep watching, the dock):
 //    where each sits, its size and turn, font, colour, weight, shadow, a shade behind it to read it
 //    on a busy photo, the panel behind it, and for the dock its shape (row, column, grid), icon
@@ -345,7 +345,7 @@
     if (!app) { put(out, "name", SAN.w(src.name, 24)); put(out, "on", SAN.b(src.on)); }
     return out;
   }
-  // ---------------- widgets (TV Designer v10, widgets/CATALOGUE.md) ----------------
+  // ---------------- widgets (couch-tv Studio v10, widgets/CATALOGUE.md) ----------------
   // A widget is one box on the designer's grid: a kind (one renderer each, widgets.js), a set size,
   // a style from fixed lists and plain colours, and a few options per kind, each on an allow list.
   // A design never carries a widget's data: the TV reads its own (the clock, its weather, its photos,
@@ -556,7 +556,7 @@
       // depth: a built in scene photo has a cut out of its hills (scene-<name>-fg.webp); drawn between
       // the widgets behind (layer "back") and the ones in front, so a clock can stand behind the hills
       // depth_image: the design's own cut out of its photo (a PNG or WebP with see through sky, made in
-      // TV Designer), drawn in the same place over the clock; checked like the photo itself (only from
+      // couch-tv Studio), drawn in the same place over the clock; checked like the photo itself (only from
       // this TV or inside the design, never a link; the same size limit). With one, depth is on unless
       // the design says false. A design without it is drawn exactly as before.
       var cut = depthImgOk(bg.depth_image);
@@ -2299,7 +2299,7 @@
       if (hooks.act) hooks.act(what, arg);
     }
     // the detail layer (widget-detail.js): the widget grows into a sheet; the remote stays in it until Back.
-    // What it does goes through the same hooks as the widgets' own buttons; in TV Designer nothing is switched.
+    // What it does goes through the same hooks as the widgets' own buttons; in couch-tv Studio nothing is switched.
     function detailApi() {
       return { designer: DESIGNER,
         act: function (what, arg) { if (DESIGNER) { try { window.parent.postMessage({ type: "couchtv:open", name: String(arg || what) }, location.origin); } catch (x) {} return; } if (hooks.act) hooks.act(what, arg); },

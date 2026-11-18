@@ -1,4 +1,4 @@
-/* TV Designer icon sets.
+/* couch-tv Studio icon sets.
  *
  * One drawing per concept on a 24 unit grid, rendered in six styles. Everything
  * here is plain data plus string building: no fetch, no DOM, no eval, no event

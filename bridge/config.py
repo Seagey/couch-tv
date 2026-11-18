@@ -486,7 +486,7 @@ def _design_clean(v, depth=0, dropped=None):
 
 
 def _design(d):
-    """The TV Designer's design block (docs/CONFIG.md, "Design"), cleaned of anything that looks like
+    """couch-tv Studio's design block (docs/CONFIG.md, "Design"), cleaned of anything that looks like
     a link or markup, then handed to the TV home, whose design.js checks every value again. Only an
     object, and not too big for the TV to keep (an uploaded background travels inside it)."""
     if not isinstance(d, dict) or not d:
@@ -505,7 +505,7 @@ DESIGN = _design(CONFIG.get("design"))
 
 
 def _design_store(u):
-    """The TV Designer's design store (docs/CONFIG.md, "Design"): the one server the TV may ask for a
+    """couch-tv Studio's design store (docs/CONFIG.md, "Design"): the one server the TV may ask for a
     design by code. https only (plain http only to this computer, for development); no path."""
     if not isinstance(u, str):
         return None

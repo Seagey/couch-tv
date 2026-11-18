@@ -1,4 +1,4 @@
-// Share this home (tv-home/web/share-home.js): the home on the TV becomes a TV Designer design that
+// Share this home (tv-home/web/share-home.js): the home on the TV becomes a couch-tv Studio design that
 // carries the look and the dock's apps and nothing private, it passes design.js's own gate, anything
 // private stops it before it is sent, and only {design} goes to the store.
 // Run: node tests/test_share_home.js

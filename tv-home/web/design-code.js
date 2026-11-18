@@ -1,5 +1,5 @@
-// Getting a design by code (Home settings, Look, Get a design). The TV PULLS a design from the TV
-// Designer's store: it asks one server, the one in config.json "design_store", and nothing ever
+// Getting a design by code (Home settings, Look, Get a design). The TV PULLS a design from couch-tv
+// Studio's store: it asks one server, the one in config.json "design_store", and nothing ever
 // connects to the TV. The store never learns anything about this home (no address it keeps, no
 // Wi-Fi, no devices, no names): the request carries the code and nothing else (no cookies, no
 // referrer).
@@ -27,7 +27,7 @@
     var b = cleanBase(cfg.design_store);
     // a browser preview (mock.js) may point at a local store: ?designstore=http://127.0.0.1:5490
     if (!b && /[?&]mock\b/.test(Q)) { var m = /[?&]designstore=([^&]*)/.exec(Q); if (m) b = cleanBase(decodeURIComponent(m[1])); }
-    // no design_store in config.json at all: TV Designer's own store (designer-gate.js). It is asked
+    // no design_store in config.json at all: couch-tv Studio's own store (designer-gate.js). It is asked
     // only when the person at the TV types a code or shares the home. "design_store": "" turns both
     // off; a browser preview (?mock) never reaches it.
     else if (!b && !/[?&]mock\b/.test(Q) && !Object.prototype.hasOwnProperty.call(cfg, "design_store") && window.CouchDesigner) b = window.CouchDesigner.DEFAULT_STORE;

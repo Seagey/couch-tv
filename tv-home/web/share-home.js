@@ -1,7 +1,7 @@
-// Share this home (Home settings, TV Designer). Turns the home this TV shows now (made on the TV,
-// from the phone, the scenes or config.json, or a TV Designer design) into a TV Designer design,
+// Share this home (Home settings, couch-tv Studio). Turns the home this TV shows now (made on the TV,
+// from the phone, the scenes or config.json, or a couch-tv Studio design) into a couch-tv Studio design,
 // hands it to the design store, and shows a QR code and a short code. On a phone,
-// <store>/design/?from=<code> opens it in TV Designer, to change it and share or sell it.
+// <store>/design/?from=<code> opens it in couch-tv Studio, to change it and share or sell it.
 //
 // What leaves the TV is only what a design is made of: the look settings (scenes from the app's own
 // set, clock, glass, Keep watching and Now playing on or off), the dock's apps by their Android

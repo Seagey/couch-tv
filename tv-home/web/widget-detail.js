@@ -1,14 +1,14 @@
-// The detail layer: what opens when OK is pressed on a widget (TV Designer v10). The widget grows
+// The detail layer: what opens when OK is pressed on a widget (couch-tv Studio v10). The widget grows
 // into a sheet over the home, the way the wall tablet's cards do (home-hub wall/app.js openSheet:
 // the card's own box grows to the sheet with one transform, the words fade in after it, Back shrinks
 // it back into the card). On a TV it is drawn for 3 m away: words 25 px and up, one focus ring, the
 // remote moves by geometry the way the home does (GRID.md, Focus), and Back always closes it.
 //
-// What a layer shows comes from the same places the widget does (widgets.js kit): demo data in TV
-// Designer, the TV's own data on a TV, or the widget's setup record (widget-caps.js) when the TV has
+// What a layer shows comes from the same places the widget does (widgets.js kit): demo data in couch-tv
+// Studio, the TV's own data on a TV, or the widget's setup record (widget-caps.js) when the TV has
 // nothing real yet. Never pretend data on a TV. What a layer does goes through design.js (api.act:
 // the app.js hooks, the same ones a widget's own buttons use) or Home Assistant through the
-// launcher (api.ha). In TV Designer nothing is switched: the layer says so.
+// launcher (api.ha). In couch-tv Studio nothing is switched: the layer says so.
 //
 // Built element by element, never from markup. ES5 on purpose: old Android TV WebViews.
 (function () {
@@ -69,7 +69,7 @@
     clearTimeout(S.msgT);
     if (t && !keep) S.msgT = setTimeout(function () { if (S && S.msgEl) S.msgEl.classList.remove("on"); }, 3600);
   }
-  // In TV Designer nothing in the house is switched, and the layer says so (once)
+  // In couch-tv Studio nothing in the house is switched, and the layer says so (once)
   function designerSays() { if (S.api.designer && !S.said) { S.said = true; msg("In couch-tv Studio this only shows what OK does. Nothing is switched."); return true; } return S.api.designer; }
   function btn(iconName, text, cls) { return E("div", "cwd-btn" + (cls ? " " + cls : ""), "", [iconName ? ic(iconName, 34, "currentColor", "solid") : null, text ? E("span", "", "", [text]) : null]); }
   function chip(text, on) { return E("div", "cwd-chip" + (on ? " on" : ""), "", [text]); }
@@ -563,7 +563,7 @@
     })));
   };
 
-  // Control Centre, camera, headlines and scores: TV Designer shows what they will look like; a TV
+  // Control Centre, camera, headlines and scores: couch-tv Studio shows what they will look like; a TV
   // shows their setup record (widgets.js draws them empty there, which opens B.setup)
   // Control Centre: every switch big. OK switches one through the launcher (HomeAssistant.kt "set"),
   // which only switches what config.json names and never opens a garage door, gate or door.

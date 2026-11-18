@@ -1,4 +1,4 @@
-// Widgets for a design (TV Designer v10, tools/tv-designer/widgets/CATALOGUE.md). design.js checks a
+// Widgets for a design (couch-tv Studio v10, tools/tv-designer/widgets/CATALOGUE.md). design.js checks a
 // widget (sanitize) and places it; this file draws its inside: one renderer per kind, built element by
 // element (text is always a text node, never markup from a design). Icons come from icon-sets.js
 // (code that ships with the home), parsed with DOMParser.
@@ -64,7 +64,7 @@
   // the text colour for a tile: white or dark ink, whichever reads better (at least 4.5 : 1 where it can)
   function autoInk(tile) { return !tile ? WHITE : contrast(tile, WHITE) >= 4.5 || contrast(tile, WHITE) >= contrast(tile, INK_DARK) ? WHITE : INK_DARK; }
 
-  // icons: the TV Designer's icon sets, drawn by icon-sets.js
+  // icons: couch-tv Studio's icon sets, drawn by icon-sets.js
   var ICACHE = {};
   function ic(name, size, colour, style) {
     var T = window.TVIcons;
@@ -1588,7 +1588,7 @@
 
   // info
   R.card = function (root, o, b, env) {
-    // a card written in TV Designer: a title, a line of words and an icon (words only, like every design)
+    // a card written in couch-tv Studio: a title, a line of words and an icon (words only, like every design)
     var q = op(o);
     if (q.label || q.text) {
       // the words fill what is left under the title, wrapping, as big as they fit (the quote's rule)
@@ -1618,7 +1618,7 @@
   };
   // ---------------- the web widgets: news, scores, markets, the commute (widget-web.js) ----------------
   // app.js hands in what widget-web.js got (data.web[source][id]); before that, or when it failed, the
-  // widget says so in its own box. In TV Designer, demo data. Never a made up reading on a TV.
+  // widget says so in its own box. In couch-tv Studio, demo data. Never a made up reading on a TV.
   //
   // The owner's rule for every one of them: nothing is ever cut off, and everything is centred unless
   // the design sets opts.align. Words wrap (a long word breaks rather than spills), never end in "...";
@@ -1932,7 +1932,7 @@
     add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:0 1 auto;min-width:0", [label ? lab(iconName, label) : null, sub ? E("div", "cw-t25 cw-ell", "color:var(--ink);font-weight:620;margin-top:8px", [sub]) : null]),
       E("div", "cw-big", "white-space:nowrap;margin-left:16px;font-size:" + px(fitPx(value, (b.w - 48) * 0.4, 72)) + (vcol ? ";color:" + vcol : ""), [value])]));
   }
-  // a kind couch-tv cannot fill yet: the setup card on a TV, the sample in TV Designer
+  // a kind couch-tv cannot fill yet: the setup card on a TV, the sample in couch-tv Studio
   function sample(kind, iconName, fn) { return function (root, o, b, env, sh) { if (!env.demo) return soon(root, b, iconName, kind); return fn(root, o, b, env, sh); }; }
   CR.wordclock = function (root, o, b) {
     var tl = timeWords(now()).split("\n"), longest = Math.max.apply(null, tl.map(function (l) { return l.length; }));

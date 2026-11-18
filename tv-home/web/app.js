@@ -458,9 +458,9 @@
   // this TV (kept by the bridge too when there is one), then ?theme= for a preview. docs/CONFIG.md.
   function readConfig() {
     CFG = window.COUCH_CONFIG || {};
-    // TV Designer is opt in (designer-gate.js): until the person at this TV turns it on, no design
+    // couch-tv Studio is opt in (designer-gate.js): until the person at this TV turns it on, no design
     // reaches design.js at all and the home is exactly as it was. A design got by code at this TV
-    // (design-code.js, Home settings, TV Designer, Get a design) wins over one in config.json; it is
+    // (design-code.js, Home settings, couch-tv Studio, Get a design) wins over one in config.json; it is
     // always asked about first (CouchDesign.start with fromCode).
     var GOT = typeof CouchDesignCode !== "undefined" ? CouchDesignCode.kept() : null;
     GATE = typeof CouchDesigner !== "undefined" ? CouchDesigner.decide({ choice: CouchDesigner.readChoice(kept(CouchDesigner.KEY)),
@@ -470,7 +470,7 @@
     CFG = Object.assign({}, CFG, { design: GATE.design || undefined });
     if (!GATE.design) delete CFG.design;
     HOME = CFG.home || {};
-    // a design from the TV Designer (design.js, docs/CONFIG.md "Design") may carry look settings of
+    // a design from couch-tv Studio (design.js, docs/CONFIG.md "Design") may carry look settings of
     // its own (design.home): they win over home in config.json, Home settings still win over both
     if (typeof CouchDesign !== "undefined" && CFG.design) HOME = CouchDesign.home(HOME, CFG.design, { fromCode: DESIGN_FROM_CODE });
     ON_TV = CFG.mode === "on-tv";
@@ -3961,7 +3961,7 @@
   }
 
   // ---- rows ----
-  // TV Designer is a name, the same in every language
+  // couch-tv Studio is a name, the same in every language
   function secName(id) { return id === "designer" ? "couch-tv Studio" : t("sec_" + id); }
   function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(SECS[SET.sec][0]); }
   function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info"; }
@@ -4130,7 +4130,7 @@
   }
 
   // ---- look, scenes and the household's own photos ----
-  // Get a design (design-code.js): from config.json's design store, else TV Designer's own. The TV asks
+  // Get a design (design-code.js): from config.json's design store, else couch-tv Studio's own. The TV asks
   // that one server for the code typed here; nothing connects to the TV. English only for now (needs i18n).
   function designCodeRows(rows) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.base()) return;
@@ -4145,7 +4145,7 @@
     SET.msg = "Getting the design...";
     renderSettings();
     CouchDesignCode.get(typed).then(function () {
-      setDesigner(true);   // typing a code is asking for TV Designer: it is on from now
+      setDesigner(true);   // typing a code is asking for couch-tv Studio: it is on from now
       SET.msg = "Got it. Your TV asks you about it now.";
       renderSettings();
       setTimeout(restart, 600);   // it starts again and shows "Use this design?" first
@@ -4154,7 +4154,7 @@
       if (zone === "settings") renderSettings();
     });
   }
-  // ---- TV Designer (designer-gate.js): opt in, and one step back to the classic home ----
+  // ---- couch-tv Studio (designer-gate.js): opt in, and one step back to the classic home ----
   // English only for now, like the rows above (needs i18n). The section's name is the product's.
   function setDesigner(on) {
     keep(CouchDesigner.KEY, on ? "on" : "off");
@@ -6073,9 +6073,9 @@
     readConfig();
     // a design got by code: pictures only from here, the store and the hosts this TV already uses
     if (DESIGN_FROM_CODE && CouchDesignCode.lockImages) CouchDesignCode.lockImages((ST.photos || []).map(function (p) { return p && p.url; }), VIDEO_URL);
-    // the TV Designer's design block (design.js): nothing happens without one, unless the page is
+    // couch-tv Studio's design block (design.js): nothing happens without one, unless the page is
     // the designer's own preview (?designer=1), which sends designs in as they are made
-    // With TV Designer off (designer-gate.js) design.js is never started: no keys of its own, no
+    // With couch-tv Studio off (designer-gate.js) design.js is never started: no keys of its own, no
     // question, no page policy. On, the page policy a design runs under goes in first.
     var designOn = typeof CouchDesign !== "undefined" && !!(GATE.design || GATE.preview);
     // (videos only from this page, memory, the design store and this TV's own video link)

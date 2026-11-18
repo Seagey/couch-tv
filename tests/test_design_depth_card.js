@@ -1,7 +1,7 @@
 // Two small design additions (tv-home/web/design.js and widgets.js, 18 Nov 2026):
 // background.depth draws a built in scene's hills (scene-<name>-fg.webp) between the widgets behind and
 // the widgets in front, so a clock can stand behind the mountains; and a custom card can carry a title,
-// a line of words and an icon typed in TV Designer (words only, like every word in a design).
+// a line of words and an icon typed in couch-tv Studio (words only, like every word in a design).
 // Run: node tests/test_design_depth_card.js
 const assert = require("assert");
 const fs = require("fs");
