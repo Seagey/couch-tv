@@ -27,7 +27,7 @@
 .cw-glass:not(.cw-sh-none):not(.cw-sh-lifted) { box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22); }
 
 /* type, tvOS sizes */
-.cw-lab { font-size: 25px; font-weight: 650; letter-spacing: 0.01em; color: var(--sub); display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cw-lab { font-size: 25px; font-weight: 650; letter-spacing: 0.01em; color: var(--sub); display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; white-space: nowrap; overflow: hidden; overflow-x: clip; overflow-y: visible; text-overflow: ellipsis; min-width: 0; }
 .cw-lab > * { margin-right: 10px; -webkit-flex: none; flex: none; }
 .cw-t29 { font-size: 29px; font-weight: 560; line-height: 1.22; }
 .cw-t25 { font-size: 25px; font-weight: 560; line-height: 1.25; color: var(--sub); }
@@ -41,7 +41,17 @@
 .cw-sp { -webkit-justify-content: space-between; justify-content: space-between; }
 .cw-center { -webkit-justify-content: center; justify-content: center; -webkit-align-items: center; align-items: center; }
 .cw-dim { color: var(--sub); }
-.cw-ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* centred unless the design says left or right (widgets.js adds .cw-mid when opts.align is not set):
+   lines of words in the middle, rows of things packed in the middle, an icon on its own in the middle.
+   A renderer that sets its own alignment inline keeps it. */
+.cw-mid { text-align: center; }
+.cw-mid .cw-row:not(.cw-sp), .cw-mid .cw-lab { -webkit-justify-content: center; justify-content: center; }
+.cw-mid > svg, .cw-mid .cw-col > svg { -webkit-align-self: center; align-self: center; }
+.cw-mid .cw-mods { -webkit-justify-content: center; justify-content: center; -webkit-align-content: center; align-content: center; }
+/* one line that ends in "..." when it is too long: never wider than the box it is in (so the "..." shows
+   instead of the words running out of the widget), and cut only at the side, never through the tops of
+   letters or the tails of g, y and Hindi's marks below the line (where overflow-x: clip is known) */
+.cw-ell { white-space: nowrap; overflow: hidden; overflow-x: clip; overflow-y: visible; text-overflow: ellipsis; max-width: 100%; min-width: 0; }
 .cw-fill { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-size: cover; background-position: center; }
 .cw-svg { display: block; overflow: visible; }
 

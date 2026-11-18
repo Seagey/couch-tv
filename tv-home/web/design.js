@@ -1406,8 +1406,12 @@
     if (t === "clock") {
       var size = num(o.size, 120, 16, 600);
       return h("div", "cd-clockw" + (o.shade === "panel" ? " cd-shade-panel" : ""), textStyle(o, true), [
-        h("div", "", { "font-size": size + "px", "line-height": "1", "letter-spacing": "-0.03em", "font-weight": parseInt(o.weight, 10) || 300 }, [timeText(o)]),
-        o.date ? h("div", "", { "font-size": Math.round(size * 0.24) + "px", "margin-top": "8px", "font-weight": "500" }, [dateText(o)]) : null
+        // the digits at the size set, or smaller when "22:02" would be wider than the clock's box
+        h("div", "", { "font-size": Math.max(1, Math.round(Math.min(size, ((o.w || size * 2.4) - 8) / (timeText(o).length * ((parseInt(o.weight, 10) || 300) >= 600 ? 0.62 : 0.56))))) + "px", "line-height": "1", "letter-spacing": "-0.03em", "font-weight": parseInt(o.weight, 10) || 300, "white-space": "nowrap" }, [timeText(o)]),
+        // the date as wide as the clock's box allows ("Wednesday 18 November" is wider than the digits),
+        // never cut at the sides; and its gap grows with the clock, so a small one fits its box too
+        o.date ? h("div", "", { "font-size": Math.max(1, Math.round(Math.min(size * 0.24, ((o.w || size * 2.4) - 8) / (dateText(o).length * 0.56)))) + "px",
+          "margin-top": Math.round(Math.min(8, size * 0.05)) + "px", "font-weight": "500", "white-space": "nowrap", "max-width": "100%", overflow: "hidden", "text-overflow": "ellipsis" }, [dateText(o)]) : null
       ]);
     }
     if (t === "weather") {

@@ -413,7 +413,12 @@
     if (strip) {
       // a wide tile: the icon beside the words, so two lines fit
       root.classList.add("cw-strip");
-      add(root, E("div", "cw-row", "height:100%", [ic(iconName || "info", 40, "currentColor"), E("div", "cw-col", "margin-left:18px;min-width:0", [E("div", "cw-e1", "margin-top:0", [line])])]));
+      // the icon and the words as one group in the middle: once on screen the words' box narrows to its
+      // longest line (data-hug, fitNow), so the two lines do not leave a gap on one side
+      var hug = E("div", "cw-col", "margin-left:18px;min-width:0;flex:0 1 auto", [E("div", "cw-e1", "margin-top:0", [line])]);
+      hug.setAttribute("data-hug", "1");
+      add(root, E("div", "cw-row", "height:100%;justify-content:center", [ic(iconName || "info", 40, "currentColor"), hug]));
+      fitLater(root);
       return root;
     }
     add(root, [ic(iconName || "info", tiny ? 34 : 46, "currentColor"), E("div", "cw-e1", "", [line]), sub && b.h >= 200 ? E("div", "cw-e2", "", [sub]) : null]);
@@ -445,7 +450,7 @@
   // clocks
   R.clock = function (root, o, b, env) {
     var p = clockParts(now(), o, env), sub = op(o).date !== false && b.h >= 200, shortD = b.w < 420;
-    var align = op(o).align || "left", showAp = op(o).ampm !== false && p.ap && b.w >= 300;
+    var align = op(o).align || "center", showAp = op(o).ampm !== false && p.ap && b.w >= 300;
     var fs = Math.min((b.h - (sub ? 60 : 0)) * 0.75, b.w / (p.t.length * 0.62 + (showAp ? 0.6 : 0)), 240);
     var tEl = E("span", "", "", [p.t]), aEl = showAp ? E("span", "", "font-size:" + px(Math.max(24, fs * 0.3)) + ";letter-spacing:0;margin-left:.12em;font-weight:600;opacity:.8", [p.ap]) : null;
     var big = E("div", "cw-big", "font-size:" + px(fs) + ";font-weight:640;text-align:" + align + (root.classList.contains("cw-bare") ? ";text-shadow:0 4px 30px rgba(0,0,0,.25)" : ""), [tEl, aEl]);
@@ -453,15 +458,23 @@
     add(root, E("div", "cw-col cw-center", "height:100%;align-items:" + (align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center"), [big, dEl]));
     live(root, 1000, function () { var q = clockParts(now(), o, env); tEl.textContent = q.t; if (aEl) aEl.textContent = q.ap; if (dEl) dEl.textContent = shortD ? shortDate(now()) : longDate(now()); });
   };
+  // the tall digits (Antonio, line height .82): their ink runs from .05em to .93em of the line, so the
+  // box grows .12em at the bottom (and a little at the top) to hold them whole, and the size comes from
+  // the room inside the widget's own padding (seagey, 18 Nov 2026: the bottom of the digits was cut off)
+  function tallFs(root, b, len) {
+    var ins = root.classList.contains("cw-bare") || root.classList.contains("cw-photo") ? 0 : 48;
+    return Math.max(24, Math.min((b.h - ins) / 0.98, (b.w - ins) / (len * 0.42)));
+  }
+  var TALL = "font-family:Antonio,'Arial Narrow',sans-serif;font-weight:300;line-height:.82;padding:.03em 0 .13em;letter-spacing:-.02em;white-space:nowrap;flex:none;";
   R.tallclock = function (root, o, b, env) {
-    var p = clockParts(now(), o, env), fs = Math.min(b.h * 1.12, b.w / (p.t.length * 0.42));
-    var tEl = E("div", "", "font-family:Antonio,'Arial Narrow',sans-serif;font-weight:300;font-size:" + px(fs) + ";line-height:.82;letter-spacing:-.02em;text-align:" + (op(o).align || "center") + ";text-shadow:0 6px 40px rgba(0,0,0,.25);white-space:nowrap", [p.t]);
-    add(root, E("div", "cw-col", "height:100%;justify-content:center", [tEl]));
+    var p = clockParts(now(), o, env), fs = tallFs(root, b, p.t.length), al = op(o).align || "center";
+    var tEl = E("div", "", TALL + "font-size:" + px(fs) + ";text-align:" + al + ";text-shadow:0 6px 40px rgba(0,0,0,.25)", [p.t]);
+    add(root, E("div", "cw-col", "height:100%;justify-content:center;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center"), [tEl]));
     live(root, 1000, function () { tEl.textContent = clockParts(now(), o, env).t; });
   };
   R.glassclock = function (root, o, b, env) {
-    var p = clockParts(now(), o, env), fs = Math.min(b.h * 1.12, b.w / (p.t.length * 0.42)), sc = op(o).scene || (dataOf(env).scene) || "night";
-    var tEl = E("div", "", "font-family:Antonio,'Arial Narrow',sans-serif;font-weight:300;font-size:" + px(fs) + ";line-height:.82;letter-spacing:-.02em;text-align:center;white-space:nowrap;" +
+    var p = clockParts(now(), o, env), fs = tallFs(root, b, p.t.length), sc = op(o).scene || (dataOf(env).scene) || "night";
+    var tEl = E("div", "", TALL + "font-size:" + px(fs) + ";text-align:center;" +
       "color:rgba(255,255,255,.88);background-image:url(" + CW.base + "backgrounds/scene-" + sc + "-glass.jpg);background-size:1920px 1080px;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;" +
       "filter:drop-shadow(0 8px 30px rgba(0,0,0,.25))", [p.t]);
     add(root, E("div", "cw-col", "height:100%;justify-content:center", [tEl]));
@@ -537,9 +550,10 @@
       live(root, 30000, function () { while (root.lastChild && root.lastChild.className !== "cw-bg") root.removeChild(root.lastChild); R.worldclock(root, o, b); });
       return;
     }
-    add(root, [lab("clock", "World clock"), E("div", "cw-col cw-grow", "justify-content:space-around;margin-top:10px", cities.map(function (tz) {
+    // the cities spread from under the label to the bottom, so the whole sits in the middle
+    add(root, [lab("clock", "World clock"), E("div", "cw-col cw-grow", "justify-content:space-between;margin-top:18px", cities.map(function (tz) {
       var t = tzTime(tz);
-      return E("div", "cw-row cw-sp", "", [E("div", "cw-t29", "", [name(tz)]), E("div", "cw-t38", "", [t ? t.t : ""])]);
+      return E("div", "cw-row cw-sp", "", [E("div", "cw-t29 cw-ell", "min-width:0", [name(tz)]), E("div", "cw-t38", "flex:none;margin-left:12px", [t ? t.t : ""])]);
     }))]);
   };
   function daysTo(month, day) {
@@ -560,7 +574,7 @@
     var q = op(o), show = q.show || "date", d = now(), w = weather(env), short = b.w < 560 || q.dfmt === "short";
     var dText = short ? shortDate(d) : longDate(d);
     var wText = w ? w.temp + "°" + (show === "both" && b.h >= 120 ? (w.code !== undefined ? " and " + wxWords(w.code).toLowerCase() : "") : (b.w >= 600 && q.place !== false && w.place ? " " + w.place : "") + (b.w >= 760 && w.code !== undefined ? ", " + wxWords(w.code).toLowerCase() : "")) : "";
-    var big = b.h >= 160, fs = big ? clamp(b.h / 3.4, 34, 72) : clamp(b.h * 0.6, 26, 40), align = q.align || "left";
+    var big = b.h >= 160, fs = big ? clamp(b.h / 3.4, 34, 72) : clamp(b.h * 0.6, 26, 40), align = q.align || "center";
     var lines = [];
     if (show === "both" && w && b.h < 120) lines.push(dText + ". " + wText);
     else {
@@ -570,7 +584,9 @@
     }
     var bare = root.classList.contains("cw-bare");
     add(root, E("div", "cw-col", "height:100%;justify-content:center;text-align:" + align + (bare ? ";text-shadow:0 2px 18px rgba(0,0,0,.35)" : ""), lines.map(function (l, i) {
-      return E("div", i ? "cw-dim" : "", "font-size:" + px(i ? Math.max(24, fs * 0.66) : fs) + ";font-weight:" + (i ? 560 : 620) + ";letter-spacing:-.01em;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" + (i ? ";margin-top:6px" : ""), [l]);
+      // as big as the line fits across (Inter is about .56em a letter), else on two lines at 24 px
+      var want = i ? Math.max(24, fs * 0.66) : fs, fit = (b.w - 48) / (l.length * 0.56), f = Math.max(24, Math.min(want, fit)), wrap = fit < 24 && b.h >= 120;
+      return E("div", i ? "cw-dim" : "", "font-size:" + px(f) + ";font-weight:" + (i ? 560 : 620) + ";letter-spacing:-.01em;line-height:1.15;" + (wrap ? "display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" : "white-space:nowrap;overflow:hidden;text-overflow:ellipsis") + (i ? ";margin-top:6px" : ""), [l]);
     })));
   };
   R.month = function (root, o, b) {
@@ -637,7 +653,7 @@
     var q = op(o), large = b.w > 300, tiny = b.h < 300;
     if (b.h < 200) {
       // a Tile: the temperature and the sky, nothing else
-      add(root, [ic(wxIcon(w.code, w.is_day), 44, rgba(sh.ink, 1), "solid"), E("div", "cw-grow"), E("div", "cw-big", "font-size:64px", [w.temp + "°"])]);
+      add(root, [ic(wxIcon(w.code, w.is_day), 44, rgba(sh.ink, 1), "solid"), E("div", "cw-grow"), E("div", "cw-big", "white-space:nowrap;font-size:" + px(fitPx(w.temp + "°", b.w - 48, 64)), [w.temp + "°"])]);
       return;
     }
     add(root, [q.place === false ? null : E("div", "cw-t29 cw-ell", "font-weight:640", [w.place || "Here"]),
@@ -660,7 +676,7 @@
     }
     if (b.h < 200) {
       // a tile: the sky and the number
-      add(root, [ic(wxIcon(w.code, w.is_day), 40, rgba(sh.ink, 1), "solid"), E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(clamp(b.w * 0.4, 56, 80)) + ";letter-spacing:-.05em", [w.temp + "°"])]);
+      add(root, [ic(wxIcon(w.code, w.is_day), 40, rgba(sh.ink, 1), "solid"), E("div", "cw-grow"), E("div", "cw-big", "white-space:nowrap;font-size:" + px(Math.min(clamp(b.w * 0.4, 56, 80), fitPx(w.temp + "°", b.w - 48, 80))) + ";letter-spacing:-.05em", [w.temp + "°"])]);
       return;
     }
     var fs = Math.min(b.h * 0.52, b.w * 0.44), ah = w.ahead;
@@ -678,8 +694,8 @@
     if (!w.hourly) return empty(root, b, "clock", "The hourly forecast is on its way", "");
     var n = clamp(Math.floor((b.w - 48) / 110), 3, w.hourly.length), ink = rgba(sh.ink, 1);
     var next = w.hourly.slice(1).filter(function (h) { return h[1] >= 51; })[0];
-    add(root, [E("div", "cw-row cw-sp", "", [E("div", "", "", [E("div", "cw-t29", "font-weight:640", [w.place || "Here"]), E("div", "cw-big", "font-size:72px;margin-top:4px", [w.temp + "°"])]),
-      E("div", "", "text-align:right", [ic(wxIcon(w.code, w.is_day), 44, ink, "solid"), E("div", "cw-t25", "color:var(--ink);font-weight:600", [next ? wxWords(next[1]) + " from " + next[0] : wxWords(w.code)]), w.hi !== undefined ? E("div", "cw-t23", "", ["H:" + w.hi + "° L:" + w.lo + "°"]) : null])]),
+    add(root, [E("div", "cw-row cw-sp", "", [E("div", "", "min-width:0;flex:0 1 auto", [E("div", "cw-t29 cw-ell", "font-weight:640", [w.place || "Here"]), E("div", "cw-big", "font-size:72px;margin-top:4px", [w.temp + "°"])]),
+      E("div", "cw-col", "text-align:right;align-items:flex-end;min-width:0;max-width:55%;margin-left:16px;flex:0 1 auto", [ic(wxIcon(w.code, w.is_day), 44, ink, "solid"), E("div", "cw-t25 cw-ell", "color:var(--ink);font-weight:600", [next ? wxWords(next[1]) + " from " + next[0] : wxWords(w.code)]), w.hi !== undefined ? E("div", "cw-t23 cw-ell", "", ["H:" + w.hi + "° L:" + w.lo + "°"]) : null])]),
       E("div", "cw-grow"),
       E("div", "cw-row cw-sp", "border-top:1.5px solid rgba(255,255,255,.25);padding-top:16px", w.hourly.slice(0, n).map(function (h) {
         return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink)", [h[0]]), E("div", "", "margin:8px 0", [ic(wxIcon(h[1], !h[3]), 36, ink, "solid")]), E("div", "", "font-size:27px;font-weight:650", [h[2] + "°"])]);
@@ -692,7 +708,7 @@
     var rows = clamp(Math.floor((b.h - 170) / 62), 3, w.daily.length), ink = rgba(sh.ink, 1), lo = 99, hi = -99;
     w.daily.forEach(function (d) { lo = Math.min(lo, d[2]); hi = Math.max(hi, d[3]); });
     var span = Math.max(6, hi - lo);
-    add(root, [E("div", "cw-row cw-sp", "", [E("div", "", "", [E("div", "cw-t29", "font-weight:640", [w.place || "Here"]), E("div", "cw-big", "font-size:76px;margin-top:4px", [w.temp + "°"])]), ic(wxIcon(w.code, w.is_day), 56, ink, "solid")]),
+    add(root, [E("div", "cw-row cw-sp", "", [E("div", "", "min-width:0;flex:0 1 auto", [E("div", "cw-t29 cw-ell", "font-weight:640", [w.place || "Here"]), E("div", "cw-big", "font-size:76px;margin-top:4px", [w.temp + "°"])]), ic(wxIcon(w.code, w.is_day), 56, ink, "solid")]),
       E("div", "cw-col cw-grow", "margin-top:18px;justify-content:space-around", w.daily.slice(0, rows).map(function (d) {
         var a = (d[2] - lo) / span * 100, z = (d[3] - lo) / span * 100;
         return E("div", "cw-row", "font-size:27px;font-weight:620", [E("span", "", "width:96px;flex:none", [d[0]]), E("span", "", "margin:0 14px;flex:none;display:flex", [ic(wxIcon(d[1], true), 34, ink, "solid")]),
@@ -916,8 +932,9 @@
       E("div", "cw-fill", "background:linear-gradient(90deg,rgba(0,0,0,.85),rgba(0,0,0,.35) 55%,transparent 80%),linear-gradient(0deg,rgba(0,0,0,.6),transparent 50%)"),
       E("div", "", "position:absolute;left:44px;bottom:40px;max-width:60%;color:#fff", [
         E("div", "cw-row", "", [s.app ? appIcon(s.app, 44, env) : null, E("span", "cw-t25", "color:rgba(255,255,255,.88);font-weight:650;margin-left:12px", ["Up next"])]),
-        E("div", "", "font-size:" + px(fs) + ";font-weight:780;letter-spacing:-.03em;line-height:.98;margin-top:16px", [s.title]),
-        s.sub ? E("div", "cw-t29", "color:rgba(255,255,255,.86);margin-top:14px", [s.sub]) : null,
+        // a long title takes two lines at most and ends in "...", so it never climbs out of the box
+        E("div", "", "font-size:" + px(fs) + ";font-weight:780;letter-spacing:-.03em;line-height:1.08;margin-top:16px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere", [s.title]),
+        s.sub ? E("div", "cw-t29 cw-ell", "color:rgba(255,255,255,.86);margin-top:14px", [s.sub]) : null,
         b.h >= 420 ? E("div", "cw-row", "margin-top:26px", [resume, stop(E("div", "cw-chip", "height:64px;font-size:27px;padding:0 30px;margin-left:16px;background:rgba(255,255,255,.2)", ["Start over"]), "show", s.i, s.title)]) : null])]);
     if (b.h < 420) stop(root, "show", s.i, s.title);
   };
@@ -1036,7 +1053,7 @@
     var art = E("div", "", "width:" + px(s) + ";height:" + px(s) + ";border-radius:24px;background:#333 center/cover;flex:none;box-shadow:0 14px 40px rgba(0,0,0,.35);" + (m.art ? "background-image:" + cssImg(m.art) : ""));
     var btn = function (name, sz) { return E("div", "", "padding:10px;border-radius:50%;display:flex", [ic(name, sz, "currentColor", "solid")]); };
     var pct = m.dur ? clamp(m.pos / m.dur, 0, 1) : 0.38;
-    var info = E("div", "cw-col", "min-width:0;flex:1;" + (wide ? "margin-left:30px" : ""), [
+    var info = E("div", "cw-col", "min-width:0;" + (wide ? "flex:0 1 auto;margin-left:30px;width:" + px(Math.min(b.w - 48 - s - 30, Math.max(260, (b.w - 48 - s - 30) * 0.6))) : "flex:1"), [
       E("div", "cw-lab", "", [m.app ? appIcon(m.app, 34, env) : ic("music", 30), m.source || "Now playing"]),
       E("div", "cw-ell", "margin-top:10px;font-size:" + px(big ? 64 : 38) + ";font-weight:760;letter-spacing:-.02em;line-height:1.1", [m.title]),
       E("div", "cw-ell cw-dim", "font-size:" + px(big ? 38 : 29) + ";font-weight:560", [m.artist]), E("div", "cw-grow"),
@@ -1044,8 +1061,9 @@
       b.h >= 240 ? E("div", "cw-bar", "margin-top:14px", [E("b", "", "width:" + Math.round(pct * 100) + "%")]) : null,
       b.h >= 300 && m.dur ? E("div", "cw-row cw-sp cw-t23", "margin-top:8px", [E("span", "", "", [Math.floor(m.pos / 60) + ":" + ("0" + Math.floor(m.pos % 60)).slice(-2)]), E("span", "", "", ["-" + Math.floor((m.dur - m.pos) / 60) + ":" + ("0" + Math.floor((m.dur - m.pos) % 60)).slice(-2)])]) : null,
       b.h >= 300 ? E("div", "cw-row", "justify-content:center;margin-top:10px", [btn("previous", 40, "prev"), E("div", "", "width:40px"), btn(m.state === "playing" ? "pause" : "play", 52, "play"), E("div", "", "width:40px"), btn("next", 40, "next")]) : null]);
-    if (wide) add(root, E("div", "cw-row", "height:100%;align-items:stretch", [art, info]));
-    else add(root, [art, E("div", "cw-t29 cw-ell", "margin-top:16px;font-weight:680", [m.title]), E("div", "cw-t25 cw-ell", "", [m.artist]), E("div", "cw-grow"), E("div", "cw-bar", "", [E("b", "", "width:" + Math.round(pct * 100) + "%")])]);
+    // the cover and its words as one group in the middle (the design's align does not apply here)
+    if (wide) add(root, E("div", "cw-row", "height:100%;align-items:stretch;justify-content:center", [art, info]));
+    else { art.style.alignSelf = "center"; add(root, [art, E("div", "cw-t29 cw-ell", "margin-top:16px;font-weight:680", [m.title]), E("div", "cw-t25 cw-ell", "", [m.artist]), E("div", "cw-grow"), E("div", "cw-bar", "", [E("b", "", "width:" + Math.round(pct * 100) + "%")])]); }
     // OK opens the player (widget-detail.js), which has every control
     stop(root, "detail", "player", m.title);
   };
@@ -1160,7 +1178,9 @@
       var ok = coverOk(s.art, env), cover = E("div", "", "width:" + px(cs) + ";height:" + px(cs) + ";border-radius:14px;flex:none;margin-right:20px;display:flex;align-items:center;justify-content:center;background:#333 center/cover;" + (ok ? "background-image:" + cssImg(s.art) : ""), ok ? null : [ic("music", cs * 0.42, "rgba(255,255,255,.6)")]);
       rows.push(E("div", "cw-row", "flex:none;max-width:100%;text-align:left;" + (rows.length ? "margin-top:" + gap + "px" : ""), [cover, E("div", "", "min-width:0", [t, a])]));
     }
-    add(root, [fitLab(root, "music", title, W), E("div", "cw-col cw-grow", "width:100%;margin-top:16px;justify-content:center;min-height:0;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center"),
+    // the label and the songs as one group in the middle of the box
+    root.style.justifyContent = "center";
+    add(root, [fitLab(root, "music", title, W), E("div", "cw-col", "flex:0 1 auto;width:100%;margin-top:16px;justify-content:center;min-height:0;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center"),
       // the songs as one block, each row from its left edge, the block centred (or where the design says)
       [E("div", "cw-col", "flex:none;max-width:100%;align-items:flex-start", rows)])]);
     stop(root, "detail", "queue", title);
@@ -1198,7 +1218,7 @@
       add(root, [head(p, false), E("div", "cw-grow"), song ? fitWords(root, song, W, 24, 1, 560, "color:var(--sub)") : null, bar(p)]);
     } else {
       var rowH = b.h >= 520 ? 120 : 100, n = Math.max(1, Math.min(list.length, Math.floor((b.h - 90) / rowH)));
-      add(root, [fitLab(root, "speakers", title, W), E("div", "cw-col cw-grow", "width:100%;justify-content:space-around;margin-top:10px;min-height:0", list.slice(0, n).map(function (s) {
+      add(root, [fitLab(root, "speakers", title, W), E("div", "cw-col cw-grow", "width:100%;justify-content:space-between;margin-top:18px;min-height:0", list.slice(0, n).map(function (s) {
         var song = rowH >= 120 ? spkSong(s) : "";
         return E("div", "", "flex:none;width:100%", [head(s, true), song ? fitWords(root, song, W, 24, 1, 560, "color:var(--sub)") : null, bar(s)]);
       }))]);
@@ -1243,9 +1263,11 @@
         E("div", "cw-t23 cw-ell", "margin-top:2px", ["Now " + tdeg(r.current)])]),
         E("div", "cw-big", "font-size:84px;margin-left:16px;opacity:" + (on ? 1 : 0.55), [tdeg(r.target)])]));
     } else {
+      // the room, its mode and the dial as one group in the middle (a tall box: not the dial alone)
       var wideA = b.w > b.h * 1.3, s = Math.min(b.h - 130, wideA ? b.w * 0.5 : b.w - 48), others = rooms.filter(function (x) { return x !== r; }).slice(0, 4);
+      if (!wideA) root.style.justifyContent = "center";
       add(root, [E("div", "cw-row cw-sp", "", [lab("aircon", r.name || "Aircon"), E("div", "cw-chip on", "height:44px;font-size:23px;background:" + col + ";color:#1a1406", [on ? roomMode(r) : "Off"])]),
-        E("div", "cw-grow cw-row cw-center", "", [dial(s, r.target != null ? r.target : 22, r.current != null ? Math.round(r.current * 10) / 10 : null), wideA && b.w >= 700 ? E("div", "cw-col", "margin-left:30px", others.map(function (z) {
+        E("div", (wideA ? "cw-grow " : "") + "cw-row cw-center", wideA ? "" : "margin-top:20px", [dial(s, r.target != null ? r.target : 22, r.current != null ? Math.round(r.current * 10) / 10 : null), wideA && b.w >= 700 ? E("div", "cw-col", "margin-left:30px", others.map(function (z) {
           var zo = roomOn(z);
           return E("div", "cw-chip" + (zo ? " on" : ""), "margin:7px 0;" + (zo ? "background:" + (MODE_COL[z.state] || "#64d2ff") : ""), [z.name + (zo ? " " + tdeg(z.target) : " off")]);
         })) : null])]);
@@ -1359,7 +1381,9 @@
         var named = mods.every(function (m, i) { return !items[i].name || m.textContent.indexOf(items[i].name) >= 0; });
         if (named || cols === 1) best = { mods: mods, n: n };
       }
-      add(root, [head ? fitLab(root, "home", title, W) : null, E("div", "cw-mods", "align-self:stretch;align-content:center;" + justify(al) + (head ? ";margin-top:-4px" : ""), best.mods)]);
+      // the label and the switches as one group in the middle of the box
+      root.style.justifyContent = "center";
+      add(root, [head ? fitLab(root, "home", title, W) : null, E("div", "cw-mods", "flex:0 1 auto;align-self:stretch;align-content:center;" + justify(al) + (head ? ";margin-top:-4px" : ""), best.mods)]);
     }
     stop(root, "detail", "controls", title);
   };
@@ -1421,7 +1445,8 @@
       var timeEl = fitNum(root, words[0], colW, big, hot + "font-weight:700"), lineEl = fitWords(root, strip ? words[2] : words[1], colW, 25, 1, 560, "margin-top:6px;color:var(--sub)");
       var labEl = colH >= (strip ? 96 : 150) ? fitLab(root, "doorbell", name, colW) : null;
       var text = E("div", "cw-col", "flex:1;min-width:0;justify-content:center;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center") + ";" + (side && cam ? "margin-left:20px" : cam ? "margin-top:16px" : ""), [labEl, labEl ? E("div", "", "height:8px;flex:none") : null, timeEl, lineEl]);
-      add(root, E("div", side ? "cw-row" : "cw-col", "width:100%;height:100%;align-items:" + (side ? "stretch" : "center") + ";min-height:0", [pic, text]));
+      if (side && cam) { text.style.flex = "0 1 auto"; text.style.maxWidth = px(W - picW - 20); }
+      add(root, E("div", side ? "cw-row" : "cw-col", "width:100%;height:100%;align-items:" + (side ? "stretch" : "center") + ";min-height:0" + (side ? ";" + justify(al) : ""), [pic, text]));
       // no picture kept from the ring: the door camera now, a new still every two seconds
       if (pic && !ring) liveStill(root, pic, "doorbell", b, env);
     }
@@ -1522,7 +1547,9 @@
   R.battery = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "bolt", "battery");
     var d = [["games", "Pad 1", 72], ["games", "Pad 2", 12], ["headphones", "Headset", 55]], R2 = Math.max(96, Math.min((b.w - 48) / d.length - 40, b.h - 190));
-    add(root, [lab("bolt", "Batteries"), E("div", "cw-row cw-grow", "justify-content:space-around", d.map(function (x) {
+    // the label and the rings as one group in the middle of the box
+    root.style.justifyContent = "center";
+    add(root, [lab("bolt", "Batteries"), E("div", "cw-row", "justify-content:space-around;margin-top:16px", d.map(function (x) {
       var c = x[2] < 20 ? "#ff453a" : "#30d158";
       return E("div", "cw-col", "align-items:center", [E("div", "", "position:relative;width:" + px(R2) + ";height:" + px(R2), [svg("0 0 100 100", R2, R2, [S("circle", { cx: 50, cy: 50, r: 42, fill: "none", stroke: "rgba(255,255,255,.14)", "stroke-width": 9 }),
         S("circle", { cx: 50, cy: 50, r: 42, fill: "none", stroke: c, "stroke-width": 9, "stroke-linecap": "round", "stroke-dasharray": 264, "stroke-dashoffset": 264 * (1 - x[2] / 100), transform: "rotate(-90 50 50)" })]),
@@ -1551,9 +1578,9 @@
     if (!ps.length) return empty(root, b, "people", "Add people in Home settings", "");
     var av = clamp(b.h - 20, 40, 62);
     root.style.padding = b.h < 100 ? "0 20px" : "14px 20px";
-    add(root, E("div", "cw-row", "height:100%", ps.slice(0, Math.max(1, Math.floor(b.w / 150))).map(function (x, i) {
-      var p = E("div", "cw-row", "opacity:" + (x[2] ? 1 : 0.68) + ";" + (i ? "margin-left:20px" : "") + ";border-radius:40px;padding:4px", [E("div", "", "width:" + px(av) + ";height:" + px(av) + ";border-radius:50%;overflow:hidden;flex:none;" + (x[2] ? "box-shadow:0 0 0 4px #fff" : ""), [avatar(x[0], av)]),
-        E("span", "cw-t25", "color:var(--ink);margin-left:12px;font-weight:" + (x[2] ? 700 : 560), [x[1]])]);
+    add(root, E("div", "cw-row", "height:100%;max-width:100%", ps.slice(0, Math.max(1, Math.floor(b.w / 150))).map(function (x, i) {
+      var p = E("div", "cw-row", "min-width:0;flex:0 1 auto;opacity:" + (x[2] ? 1 : 0.68) + ";" + (i ? "margin-left:20px" : "") + ";border-radius:40px;padding:4px", [E("div", "", "width:" + px(av) + ";height:" + px(av) + ";border-radius:50%;overflow:hidden;flex:none;" + (x[2] ? "box-shadow:0 0 0 4px #fff" : ""), [avatar(x[0], av)]),
+        E("span", "cw-t25 cw-ell", "color:var(--ink);margin-left:12px;font-weight:" + (x[2] ? 700 : 560), [x[1]])]);
       return stop(p, "person", x[3], x[1]);
     })));
   };
@@ -1573,7 +1600,7 @@
     var cards = env.demo ? [{ title: "Solar today", value: "18.4 kWh" }] : (dataOf(env).cards || []);
     if (!cards.length) return soon(root, b, "info", "card");
     var c = cards[dayIndex(cards.length, 20)];
-    add(root, [E("div", "cw-lab", "", [String(c.title || "")]), E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(clamp(b.h / 3.2, 44, 96)), [String(c.value || "")])]);
+    add(root, [E("div", "cw-lab", "", [String(c.title || "")]), E("div", "cw-grow"), E("div", "cw-big", "overflow-wrap:anywhere;font-size:" + px(Math.min(clamp(b.h / 3.2, 44, 96), fitPx(String(c.value || "").split(/\s+/).sort(function (x, y) { return y.length - x.length; })[0], b.w - 48, 96))), [String(c.value || "")])]);
   };
   R.quote = function (root, o, b) {
     var q = op(o), words = window.CouchWords || { quotes: ["Slow mornings are the good ones."] };
@@ -1613,8 +1640,10 @@
   // inside the box's own padding, so words never crowd its edge
   // tall: only whether it runs out of room up and down (too many items, not too wide a word)
   function spills(root, tall) {
-    var bb = root.getBoundingClientRect(), cs = window.getComputedStyle(root), all = root.querySelectorAll("*"), p = function (k) { return Math.max(0, (parseFloat(cs[k]) || 0) - 6); };
-    var b = { left: bb.left + p("paddingLeft"), right: bb.right - p("paddingRight"), top: bb.top + p("paddingTop"), bottom: bb.bottom - p("paddingBottom") };
+    // on screen the design layer may be scaled (couch-tv Studio's preview, a smaller TV): every length
+    // here is in the widget's own pixels times that scale, so a design fits the same at any size
+    var bb = root.getBoundingClientRect(), sc = root.offsetWidth ? bb.width / root.offsetWidth : 1, cs = window.getComputedStyle(root), all = root.querySelectorAll("*"), p = function (k) { return Math.max(0, (parseFloat(cs[k]) || 0) - 6) * sc; };
+    var b = { left: bb.left + p("paddingLeft") - sc + 1, right: bb.right - p("paddingRight") + sc - 1, top: bb.top + p("paddingTop") - sc + 1, bottom: bb.bottom - p("paddingBottom") + sc - 1 };
     if (root.scrollHeight > root.clientHeight + 1 || (!tall && root.scrollWidth > root.clientWidth + 1)) return true;
     for (var i = 0; i < all.length; i++) {
       var n = all[i];
@@ -1647,6 +1676,20 @@
     var drop = [].slice.call(root.querySelectorAll("[data-drop]")).map(function (e, i) { return { e: e, n: +e.getAttribute("data-drop") || 1, i: i }; });
     drop.sort(function (a, c) { return a.n - c.n || a.i - c.i; });
     while (drop.length > 1 && spills(root)) { var d = drop.pop().e; if (d.parentNode) d.parentNode.removeChild(d); }
+    // and last: a block of words still too tall ends in "..." on the last line that fits (3, 2, then 1)
+    for (var L = 3; L >= 1 && spills(root); L--) fit.forEach(function (e) {
+      if (!e.parentNode) return;
+      var cs = window.getComputedStyle(e), lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
+      if (e.offsetHeight > lh * L + 1) { e.style.display = "-webkit-box"; e.style.webkitLineClamp = String(L); e.style.webkitBoxOrient = "vertical"; e.style.overflow = "hidden"; }
+    });
+    // a box of words as wide as its longest line (so a group with an icon sits in the middle)
+    [].forEach.call(root.querySelectorAll("[data-hug]"), function (e) {
+      var w = 0, walk = document.createTreeWalker(e, 4);
+      for (var t = walk.nextNode(); t; t = walk.nextNode()) { var rg = document.createRange(); rg.selectNodeContents(t); [].forEach.call(rg.getClientRects(), function (q) { w = Math.max(w, q.width); }); }
+      // (the design layer is scaled to the screen: a line's width on screen over the scale)
+      var sc = root.offsetWidth ? root.getBoundingClientRect().width / root.offsetWidth : 1;
+      if (w && sc > 0) { e.style.flex = "none"; e.style.width = Math.ceil(w / sc + 2) + "px"; }
+    });
     root.setAttribute("data-fitted", "1");
     return true;
   }
@@ -1757,7 +1800,7 @@
   function shortScore(s) { s = String(s || ""); var i = s.indexOf(" ("); return i > 0 ? s.slice(0, i) : s; }
   function teamRow(t, g, size) {
     var dim = g.state === "post" && !t.win, fw = g.state === "post" && t.win ? 740 : 560;
-    return E("div", "cw-row", "justify-content:space-between;align-items:center;min-width:0", [E("div", "cw-row", "min-width:0;flex:1;align-items:center", [E("i", "", "display:block;flex:none;width:22px;height:22px;border-radius:11px;margin-right:12px;box-shadow:0 0 0 3px rgba(255,255,255,.18);background:" + (t.colour || "rgba(255,255,255,.35)")),
+    return E("div", "cw-row", "justify-content:space-between;align-items:center;min-width:0", [E("div", "cw-row", "min-width:0;flex:1;align-items:center;justify-content:flex-start", [E("i", "", "display:block;flex:none;width:22px;height:22px;border-radius:11px;margin-right:12px;box-shadow:0 0 0 3px rgba(255,255,255,.18);background:" + (t.colour || "rgba(255,255,255,.35)")),
       fitT(E("span", "", WRAP + "font-size:" + size + "px;line-height:1.2;text-align:left;font-weight:" + fw + ";opacity:" + (dim ? 0.7 : 1), [t.name || t.abbr]))]),
       fitT(E("span", "", "font-size:" + size + "px;line-height:1.2;margin-left:12px;font-weight:720;flex:none;text-align:right;max-width:45%;" + WRAP + "opacity:" + (dim ? 0.7 : 1), [shortScore(t.score)]))]);
   }
@@ -1850,7 +1893,7 @@
 
   // guests and the room
   R.welcome = function (root, o, b) {
-    var q = op(o), align = q.align || "left", text = q.text || "Welcome";
+    var q = op(o), align = q.align || "center", text = q.text || "Welcome";
     var lines = text.split("\n").length, fs = clamp(Math.min((b.h - (q.kicker ? 50 : 0) - (q.sub ? 50 : 0)) / (1.08 * lines), b.w / (Math.max(8, Math.max.apply(null, text.split("\n").map(function (l) { return l.length; }))) * 0.6)), 30, 120);
     var bare = root.classList.contains("cw-bare"), sh = bare ? ";text-shadow:0 3px 24px rgba(0,0,0,.28)" : "";
     add(root, E("div", "cw-col", "height:100%;justify-content:center;text-align:" + align + ";align-items:" + (align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start"), [
@@ -1863,7 +1906,7 @@
   R.quick = function (root, o, b, env) {
     var q = op(o), ids = q.quick && q.quick.length ? q.quick : (!env.demo && dataOf(env).quick && dataOf(env).quick.length ? dataOf(env).quick : ["sleep", "picture", "input"]);
     var s = clamp(b.h, 60, 96), gap = 24, n = Math.max(1, Math.min(ids.length, Math.floor((b.w + gap) / (s + gap))));
-    add(root, E("div", "cw-row", "height:100%;justify-content:" + (q.align === "left" ? "flex-start" : q.align === "center" ? "center" : "flex-end"), ids.slice(0, n).map(function (id, i) {
+    add(root, E("div", "cw-row", "height:100%;justify-content:" + (q.align === "left" ? "flex-start" : q.align === "right" ? "flex-end" : "center"), ids.slice(0, n).map(function (id, i) {
       var nm = QNAMES[id] || ["settings", id];
       var bt = E("div", "", "width:" + px(s) + ";height:" + px(s) + ";border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;background:var(--panel);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);box-shadow:inset 0 0 0 1.5px var(--rim);" + (i ? "margin-left:" + gap + "px" : ""), [ic(nm[0], s * 0.44, "#fff")]);
       return stop(bt, "quick", id, nm[1]);
@@ -1878,13 +1921,14 @@
   function fitPx(text, w, max) { return clamp(Math.min(max, w / (Math.max(2, String(text).length) * 0.6)), 30, max); }
   function mini(root, b, iconName, value, label, sub, vcol) {
     if (b.w < 300) {
-      root.style.padding = "18px";
-      add(root, [iconName ? ic(iconName, 32, "currentColor") : null, E("div", "cw-grow"),
-        E("div", "cw-big", "white-space:nowrap;font-size:" + px(fitPx(value, b.w - 36, 54)) + (vcol ? ";color:" + vcol : ""), [value]),
+      // a tile: the icon, the value and its label as one group in the middle (never pushed to the bottom)
+      root.style.padding = "18px"; root.style.justifyContent = "center";
+      add(root, [iconName ? ic(iconName, 32, "currentColor") : null,
+        E("div", "cw-big", "margin-top:" + (iconName ? 6 : 0) + "px;white-space:nowrap;font-size:" + px(fitPx(value, b.w - 36, 54)) + (vcol ? ";color:" + vcol : ""), [value]),
         label ? E("div", "cw-t23 cw-ell", "font-weight:650;color:var(--ink);margin-top:2px", [label]) : null]);
       return;
     }
-    add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:1;min-width:0", [label ? lab(iconName, label) : null, sub ? E("div", "cw-t25 cw-ell", "color:var(--ink);font-weight:620;margin-top:8px", [sub]) : null]),
+    add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:0 1 auto;min-width:0", [label ? lab(iconName, label) : null, sub ? E("div", "cw-t25 cw-ell", "color:var(--ink);font-weight:620;margin-top:8px", [sub]) : null]),
       E("div", "cw-big", "white-space:nowrap;margin-left:16px;font-size:" + px(fitPx(value, (b.w - 48) * 0.4, 72)) + (vcol ? ";color:" + vcol : ""), [value])]));
   }
   // a kind couch-tv cannot fill yet: the setup card on a TV, the sample in TV Designer
@@ -2224,8 +2268,16 @@
     var sh = shell(o, b, env), root = sh.root, st = o.style || {};
     CTX = { icons: st.icons || (env.look && env.look.icons) || "line" };
     var draw = (b.h < 200 && CR[o.kind]) || R[o.kind];
+    // seagey, 18 Nov 2026: "all icons etc are default centre align unless it's changed in the designer".
+    // Words and icons sit in the middle unless the design sets opts.align (widgets.css .cw-mid); a
+    // renderer that places something itself still does
+    if (!op(o).align) root.classList.add("cw-mid");
     try { (draw || function (r) { empty(r, b, "info", "This widget needs a newer couch-tv", ""); })(root, o, b, env, sh); }
     catch (e) { empty(root, b, "info", "This widget could not be drawn", ""); }
+    // a label's words in their own box, so a long one ends in "..." (centred or not) instead of being cut
+    [].forEach.call(root.querySelectorAll ? root.querySelectorAll(".cw-lab") : [], function (l) {
+      [].slice.call(l.childNodes).forEach(function (t) { if (t.nodeType === 3 && t.textContent.trim()) { l.insertBefore(E("span", "cw-ell", "flex:0 1 auto;min-width:0;margin-right:0", [t.textContent]), t); l.removeChild(t); } });
+    });
     root.__o = o;
     // a dock, row, folder or app tile: each app is numbered by its place, so Hold OK can change, move
     // or remove it (design.js); the Add app place is "add"
