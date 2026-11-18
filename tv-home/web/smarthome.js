@@ -39,7 +39,17 @@
     try { INFO = JSON.parse(native().info() || "{}") || {}; } catch (e) { INFO = {}; }
     INFO.climate = Array.isArray(INFO.climate) ? INFO.climate : [];
     INFO.scenes = Array.isArray(INFO.scenes) ? INFO.scenes : [];
+    // the smart home widgets (HomeAssistant.kt info()): names and entities only
+    ["controls", "cameras", "sensors", "speakers"].forEach(function (k) { INFO[k] = Array.isArray(INFO[k]) ? INFO[k] : []; });
+    INFO.energy = INFO.energy === true; INFO.doorbell = INFO.doorbell === true; INFO.doorbell_camera = INFO.doorbell_camera === true;
     return INFO;
+  }
+  // anything at all set up for this TV (the widgets need no climate or scenes)
+  function enabled() {
+    if (!native()) return false;
+    var i = info();
+    return i.climate.length > 0 || i.scenes.length > 0 || i.controls.length > 0 || i.cameras.length > 0 || i.sensors.length > 0 ||
+      i.speakers.length > 0 || i.energy || i.doorbell;
   }
   // The tile shows only when there is something for this screen (a doorbell alone has no screen).
   function available() {
@@ -287,7 +297,86 @@
     render();
   }
 
+  // ---------------- the smart home widgets (widgets.js, widget-detail.js) ----------------
+  // What a design's Control Centre, camera, doorbell, energy, sensor and speakers widgets show on a
+  // TV, read through the launcher like everything above. Asked only while such a widget is on the
+  // home and the home is in front: nothing at all while an app plays or with no widget for it. Each
+  // answer that changes something draws the design again (CouchDesign.dataChanged). Pictures are
+  // kept here in memory only; nothing read here is ever sent anywhere.
+  var WIDGET_ACTIONS = ["controls", "set", "sensors", "history", "energy", "speakers", "volume", "playpause", "bell", "still", "ringstill"];
+  var LIVE = { controls: null, sensors: null, hist: {}, energy: null, speakers: null, bell: null, ring: null, stills: {}, at: {}, busy: {} };
+  var EVERY = { controls: 10000, sensors: 60000, hist: 900000, energy: 300000, speakers: 10000, bell: 8000 };
+  var liveTimer = null;
+  function shown(kind) { return !!document.querySelector(".cd-layer .cw-k-" + kind); }
+  function changed(key, value) {
+    if (window.CouchDesign && window.CouchDesign.dataChanged) window.CouchDesign.dataChanged("ha_" + key, value);
+  }
+  function due(key, every) { return !LIVE.busy[key] && Date.now() - (LIVE.at[key] || 0) >= every; }
+  function read(key, action, entity, put) {
+    LIVE.busy[key] = true;
+    return ask(action, entity).then(function (r) {
+      LIVE.busy[key] = false; LIVE.at[key] = Date.now();
+      put(r || { ok: false });
+    });
+  }
+  function poll() {
+    if (!enabled() || document.hidden) return;
+    var i = info();
+    if (i.controls.length && shown("controls") && due("controls", EVERY.controls))
+      read("controls", "controls", "", function (r) { LIVE.controls = r.ok ? r.controls || [] : (LIVE.controls || []).map(function (c) { return { entity: c.entity, name: c.name, ok: false }; }); changed("controls", LIVE.controls); });
+    if (i.sensors.length && shown("sensor") && due("sensors", EVERY.sensors))
+      read("sensors", "sensors", "", function (r) { if (r.ok) { LIVE.sensors = r.sensors || []; changed("sensors", LIVE.sensors); } else if (!LIVE.sensors) { LIVE.sensors = []; LIVE.down = true; changed("sensors", "down"); } });
+    // each sensor a widget shows (data-ha-hist, set by widgets.js): its last 24 hours
+    var want = {};
+    [].forEach.call(document.querySelectorAll(".cd-layer [data-ha-hist]"), function (el) { want[el.getAttribute("data-ha-hist")] = true; });
+    Object.keys(want).forEach(function (e) {
+      if (!i.sensors.some(function (s) { return s.entity === e; }) || !due("hist:" + e, EVERY.hist)) return;
+      read("hist:" + e, "history", e, function (r) { if (r.ok) { LIVE.hist[e] = { start: r.start, points: r.points || [] }; changed("hist_" + e, r.points); } });
+    });
+    if (i.energy && shown("energy") && due("energy", EVERY.energy))
+      read("energy", "energy", "", function (r) { LIVE.energy = r; changed("energy", [r.ok, r.total, r.error, r.hours && r.hours.join(",")]); });
+    if (i.speakers.length && shown("speakers") && due("speakers", EVERY.speakers))
+      read("speakers", "speakers", "", function (r) { LIVE.speakers = r.ok ? r.speakers || [] : (LIVE.speakers || []).map(function (c) { return { entity: c.entity, name: c.name, ok: false }; }); changed("speakers", LIVE.speakers); });
+    if (i.doorbell && shown("doorbell") && due("bell", EVERY.bell))
+      read("bell", "bell", "", function (r) {
+        var before = LIVE.bell;
+        LIVE.bell = r;
+        // the picture this TV kept from the ring, once per ring
+        if (r.ok && r.kept && (!LIVE.ring || !before || before.at !== r.at)) ask("ringstill").then(function (p) { LIVE.ring = p && p.ok && stillOk(p.src) ? p : null; changed("ring", LIVE.ring && LIVE.ring.at); });
+        changed("bell", [r.ok, r.at, r.ringing]);
+      });
+  }
+  function startLive() {
+    if (liveTimer || !enabled()) return;
+    liveTimer = setInterval(poll, 2500);
+    setTimeout(poll, 300);
+  }
+  // only a JPEG, PNG or WebP picture made by the launcher itself, never an address
+  function stillOk(src) { return typeof src === "string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(src) && src.length < 4000000; }
+  // a camera's still (a camera.* named in config.json, or "doorbell" for the door camera), at most
+  // one question at a time per camera; the last picture stays in memory for the next drawing
+  function still(entity, width) {
+    if (!enabled()) return Promise.resolve({ ok: false, error: "off" });
+    var key = "still:" + entity;
+    if (LIVE.busy[key]) return Promise.resolve({ ok: false, error: "busy" });
+    LIVE.busy[key] = true;
+    return ask("still", entity, width || 640).then(function (r) {
+      LIVE.busy[key] = false;
+      if (r && r.ok && stillOk(r.src)) { LIVE.stills[entity] = r.src; return { ok: true, src: r.src }; }
+      return { ok: false, error: (r && r.error) || "failed" };
+    });
+  }
+  // what the widgets draw from: the names set up, and the last readings (null: not read yet)
+  function live() {
+    if (!enabled()) return null;
+    startLive();
+    var i = info();
+    return { info: { controls: i.controls, cameras: i.cameras, sensors: i.sensors, speakers: i.speakers, energy: i.energy, doorbell: i.doorbell, doorbell_camera: i.doorbell_camera },
+      controls: LIVE.controls, sensors: LIVE.sensors, hist: LIVE.hist, energy: LIVE.energy, speakers: LIVE.speakers, bell: LIVE.bell, ring: LIVE.ring, stills: LIVE.stills };
+  }
+
   window.smartHome = {
+    enabled: enabled, live: live, still: still, stillOk: stillOk,
     available: available, open: open, close: close, move: move, ok: ok, paint: paint, reply: reply,
     isOpen: function () { return S.open; }, icon: ICONS.home,
     // the rooms as they are now, for a design's aircon card (design.js): the same question the
@@ -297,8 +386,18 @@
     // (climate, temp, mode, fan, on, off, scene), each answered by the launcher, only for the entities
     // named in config.json
     request: function (action, entity, value) {
-      if (!available() || ["climate", "temp", "mode", "fan", "on", "off", "scene"].indexOf(action) < 0) return Promise.resolve({ ok: false, error: "refused" });
-      return ask(action, entity, value);
+      if (available() && ["climate", "temp", "mode", "fan", "on", "off", "scene"].indexOf(action) >= 0) return ask(action, entity, value);
+      // the smart home widgets' asks (the launcher checks each against config.json again)
+      if (enabled() && WIDGET_ACTIONS.indexOf(action) >= 0) {
+        if (action === "still") return still(entity, value);
+        return ask(action, entity, value).then(function (r) {
+          // a fresh reading from a detail layer is the widget's too
+          if (r && r.ok && action === "controls") { LIVE.controls = r.controls || []; LIVE.at.controls = Date.now(); changed("controls", LIVE.controls); }
+          if (r && r.ok && action === "speakers") { LIVE.speakers = r.speakers || []; LIVE.at.speakers = Date.now(); changed("speakers", LIVE.speakers); }
+          return r;
+        });
+      }
+      return Promise.resolve({ ok: false, error: "refused" });
     },
     scenes: function () { return available() ? info().scenes.map(function (s) { return { entity: s.entity, name: s.name }; }) : []; }
   };

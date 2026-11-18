@@ -1430,6 +1430,26 @@
         return '<span class="nb' + (zone === "np" && i === npI ? " focus" : "") + '" role="button" aria-label="' + esc(b[1]) + '">' + ICONS[b[0]] + "</span>";
       }).join("") + "</div>";
   }
+  // ---------- Up next queue (a design's queue widget, widgets.js R.queue) ----------
+  // The next songs on the Spotify account, from the person's own Spotify sign in: the bridge's
+  // /api/music/queue (bridge/spotify_now.py), or the standalone site's own api/now?queue=1. Asked
+  // only while a queue widget is on the home and the home is in front, at most every 20 seconds.
+  // undefined: not asked yet; { ok: false }: Spotify is not connected; { ok: true, items }.
+  var QUEUE, queueAt = 0;
+  function refreshQueue() {
+    if (document.hidden || (OFFLINE && !STANDALONE) || !document.querySelector(".cd-layer .cw-k-queue")) return;
+    queueAt = Date.now();
+    var ask = STANDALONE ? fetch(window.CouchSpotify ? window.CouchSpotify.url("api/now?queue=1") : "api/now?queue=1", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      : api("GET", "/api/music/queue", null, 8000);
+    ask.then(function (j) {
+      QUEUE = j && Array.isArray(j.queue) ? { ok: true, items: j.queue.slice(0, 10) } : { ok: false };
+      if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("queue", QUEUE.ok ? QUEUE.items.map(function (s) { return s && s.title; }) : "off");
+    }, function () {});
+  }
+  window.CouchQueueNow = function () { return QUEUE; };
+  setInterval(function () { var age = Date.now() - queueAt; if ((QUEUE === undefined && age > 6000) || age > 20000) refreshQueue(); }, 2000);
+
   function refreshMusic() {
     if (!NP_ON || (OFFLINE && !STANDALONE) || document.hidden) {
       if (music) { music = null; ambientOpen = false; renderNp(); renderAmbientMusic(); }
@@ -5516,7 +5536,7 @@
       },
       // the detail layers (widget-detail.js) ask Home Assistant through smarthome.js, never directly
       ha: function (action, entity, value) {
-        if (!window.smartHome || !window.smartHome.request || !window.smartHome.available()) return Promise.resolve({ ok: false, error: "off" });
+        if (!window.smartHome || !window.smartHome.request || !(window.smartHome.enabled || window.smartHome.available)()) return Promise.resolve({ ok: false, error: "off" });
         return window.smartHome.request(action, entity, value);
       },
       // OK on a widget: open the app, the show, the smart home, a quick button

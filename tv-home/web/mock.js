@@ -225,14 +225,64 @@
       { entity: "script.good_morning", name: "Good morning" }];
     var reply = function (id, r) { setTimeout(function () { if (window.smartHome) window.smartHome.reply(id, r); }, 150); };
     var room = function (e) { return rooms.filter(function (r) { return r.entity === e; })[0]; };
+    // the smart home widgets (HomeAssistant.kt widgets()): the same answers, made up. ?ha=1 has them all;
+    // ?ha=scenes has none of them
+    var W = ha === "scenes" ? null : {
+      controls: [
+        { entity: "light.lounge", name: "Lounge", ok: true, kind: "light", state: "on", on: true, level: 80 },
+        { entity: "light.lamp", name: "Lamp", ok: true, kind: "light", state: "off", on: false },
+        { entity: "fan.bedroom", name: "Ceiling fan", ok: true, kind: "fan", state: "on", on: true, level: 33 },
+        { entity: "cover.blinds", name: "Blinds", ok: true, kind: "cover", state: "closed", on: false, level: 0 },
+        { entity: "switch.heater", name: "Heater", ok: false, kind: "switch" },
+        { entity: "cover.garage", name: "Garage", ok: true, kind: "cover", state: "closed", on: false, blocked: true }],
+      cameras: [{ entity: "camera.backyard", name: "Backyard" }, { entity: "camera.driveway", name: "Driveway" }],
+      sensors: [{ entity: "sensor.pool", name: "Pool", ok: true, value: "26.4", num: 26.4, unit: "°C", cls: "temperature" },
+        { entity: "sensor.rain_today", name: "Rain gauge", ok: true, value: "12", num: 12, unit: "mm" }],
+      speakers: [{ entity: "media_player.kitchen", name: "Kitchen", ok: true, state: "playing", volume: 35, can_volume: true, can_pause: true, title: "Low Tide", artist: "Saltwater Radio" },
+        { entity: "media_player.deck", name: "Deck", ok: true, state: "idle", volume: 20, can_volume: true, can_pause: true }],
+      bellAt: Date.now() - 2 * 3600000
+    };
+    var names = function (l) { return l.map(function (x) { return { entity: x.entity, name: x.name }; }); };
+    function mockStill(entity) {
+      // a made up picture drawn here (never a real camera): sky and a moving bar, so a new still shows
+      var c = document.createElement("canvas"); c.width = 320; c.height = 180;
+      var g = c.getContext && c.getContext("2d");
+      if (!g) return null;
+      g.fillStyle = entity === "doorbell" ? "#4b5563" : "#2f5d50"; g.fillRect(0, 0, 320, 180);
+      g.fillStyle = "#cfe3ff"; g.fillRect(0, 0, 320, 70);
+      g.fillStyle = "#f2c14e"; g.fillRect((Date.now() / 40) % 320, 110, 40, 40);
+      return c.toDataURL("image/jpeg", 0.7);
+    }
     window.TVHA = {
       info: function () {
-        return JSON.stringify({ climate: rooms.map(function (r) { return { entity: r.entity, name: r.name }; }), scenes: scenes, doorbell: true });
+        var o = { climate: rooms.map(function (r) { return { entity: r.entity, name: r.name }; }), scenes: scenes, doorbell: true };
+        if (W) { o.controls = names(W.controls); o.cameras = W.cameras; o.sensors = names(W.sensors); o.speakers = names(W.speakers); o.energy = true; o.doorbell_camera = true; }
+        return JSON.stringify(o);
       },
       request: function (id, action, entity, value) {
         if (ha === "down") return reply(id, action === "climate"
           ? { ok: true, rooms: rooms.map(function (r) { return { entity: r.entity, name: r.name, ok: false }; }) }
           : { ok: false, error: "failed" });
+        if (W) {
+          var ctl = W.controls.filter(function (c) { return c.entity === entity; })[0], sp = W.speakers.filter(function (c) { return c.entity === entity; })[0];
+          if (action === "controls") return reply(id, { ok: true, controls: JSON.parse(JSON.stringify(W.controls)) });
+          if (action === "set") {
+            if (!ctl || !ctl.ok || ctl.blocked) return reply(id, { ok: false, error: "refused" });
+            ctl.on = value === "on" || value === "open"; ctl.state = ctl.kind === "cover" ? (ctl.on ? "open" : "closed") : ctl.on ? "on" : "off";
+            window.MOCK_HA_LAST = action + " " + entity + " " + value;
+            return reply(id, { ok: true });
+          }
+          if (action === "sensors") return reply(id, { ok: true, sensors: W.sensors });
+          if (action === "history") return reply(id, { ok: true, start: Date.now() - 23 * 3600000, points: Array.apply(null, Array(24)).map(function (x, i) { return i < 3 ? null : Math.round((24 + 3 * Math.sin(i / 3.5)) * 10) / 10; }) });
+          if (action === "energy") return reply(id, { ok: true, name: "Solar", start: Date.now() - 14 * 3600000, total: 18.4, battery: 86, power: 2.4, power_unit: "kW",
+            hours: [0, 0, 0, 0, 0, 0, 0.2, 0.9, 1.8, 2.6, 3.1, 3.2, 2.9, 2.2, 1.5].concat([null, null, null, null, null, null, null, null, null]) });
+          if (action === "speakers") return reply(id, { ok: true, speakers: JSON.parse(JSON.stringify(W.speakers)) });
+          if (action === "volume" && sp) { sp.volume = Math.max(0, Math.min(100, parseInt(value, 10) || 0)); window.MOCK_HA_LAST = "volume " + entity + " " + sp.volume; return reply(id, { ok: true }); }
+          if (action === "playpause" && sp) { sp.state = sp.state === "playing" ? "paused" : "playing"; window.MOCK_HA_LAST = "playpause " + entity; return reply(id, { ok: true }); }
+          if (action === "bell") return reply(id, { ok: true, name: "Front door", at: W.bellAt, ringing: false, camera: true, kept: false });
+          if (action === "ringstill") return reply(id, { ok: false, error: "none" });
+          if (action === "still" && (entity === "doorbell" || W.cameras.some(function (c) { return c.entity === entity; }))) { var src = mockStill(entity); return reply(id, src ? { ok: true, src: src } : { ok: false, error: "failed" }); }
+        }
         var r = room(entity);
         if (action === "climate") return reply(id, { ok: true, rooms: rooms.map(function (x) { return Object.assign({ ok: true }, x); }) });
         if (action === "temp" && r) { r.target = Math.max(r.min, Math.min(r.max, parseFloat(value))); return reply(id, { ok: true }); }
@@ -286,6 +336,8 @@
           var daily = [0, 1, 2, 3, 4, 5, 6].map(function (i) { var d = new Date(nw.getTime() + i * 86400000); return { date: iso(d), code: [c0, 95, 61, 2, 0, 0, 3][i], hi: t0 + [3, 1, -2, 0, 2, 4, 2][i], lo: t0 - [7, 6, 7, 8, 9, 7, 6][i], sunrise: iso(d) + "T04:41", sunset: iso(d) + "T18:22", uv: 11 }; });
           return resolve({ ok: true, temp: t0, code: c0, text: "", is_day: true, hourly: hourly, daily: daily, hi: daily[0].hi, lo: daily[0].lo, uv: 11, rain15: [0, 0, 0.1, 0.4, 1.2, 2.8, 3, 1, 0.4, 0, 0, 0] });
         }
+        // Up next (?queue=1: three made up songs; ?queue=empty: connected, nothing queued; none: Spotify not connected)
+        if (path.indexOf("/api/music/queue") === 0) return resolve({ ok: true, configured: !!arg("queue"), queue: arg("queue") === "empty" ? [] : arg("queue") ? SONGS.map(function (x) { return { title: x[0], artist: x[1], art: null }; }) : null });
         if (path.indexOf("/api/music") === 0) return resolve({ ok: true, music: arg("music") ? mockSong() : null });
         if (path.indexOf("/api/custom-cards") === 0) return resolve({ ok: true, cards: arg("cards") ? [
           { title: "Solar today", subtitle: "Roof panels", value: "18.4 kWh", app: "com.google.android.youtube.tv" },

@@ -137,6 +137,9 @@ abstract class BundleTvWeb : DefaultTask() {
 dependencies {
     // Unit tests for the plain Kotlin rules (FireWatchTest), run with testDebugUnitTest (EPL 1.0).
     testImplementation("junit:junit:4.13.2")
+    // The real org.json for the smart home tests (HaReadingsTest, HomeAssistantTest): android.jar only
+    // has empty stand ins for it off a TV (public domain licence, test only, not in the app)
+    testImplementation("org.json:json:20240303")
 }
 
 val repoRoot = rootProject.projectDir.resolve("../..")

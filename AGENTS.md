@@ -443,11 +443,17 @@ If they say yes to the air conditioning or the doorbell card:
    sound.
 4. **Then always ask: "Are there any other smart home devices you want on the TV?"** Map what they
    say to what couch-tv can do, and say plainly what it cannot:
-   - Lights, blinds, fans, a "movie night" mood, a "good night" routine: a **scene or script
-     tile**. If they have no scene for it yet, they make one in Home Assistant (Settings,
-     Automations and scenes) and give you its `scene.*` or `script.*` name. Up to 10 tiles.
+   - A "movie night" mood, a "good night" routine: a **scene or script tile**. If they have no
+     scene for it yet, they make one in Home Assistant (Settings, Automations and scenes) and give
+     you its `scene.*` or `script.*` name. Up to 10 tiles.
+   - Single lights, switches, fans and blinds: `controls` (up to 16 `light.*`, `switch.*`, `fan.*`,
+     `cover.*`), for a couch-tv Studio design's Control Centre widget. Never a garage door or gate.
    - More air conditioners or heaters: more `climate` rooms.
-   - Other cameras: only the doorbell's camera, and only as stills. Say so.
+   - Other cameras: `cameras` (up to 4 `camera.*`), for a design's Camera widget, stills only (a new
+     one every 2 seconds, never video). Say so.
+   - The pool, a rain gauge, humidity: `sensors` (up to 8 `sensor.*`). Solar or the power meter:
+     `energy` (one `sensor.*` for today's kWh or the power in W, and a battery if they have one).
+     Speakers: `speakers` (up to 6 `media_player.*`). Each is for a design's widget of that name.
    - Locks, alarms, garage doors: **not supported, on purpose** (nothing that opens the house from
      a TV remote). Say so.
    - Anything that is not in Home Assistant (a separate app, a hub Home Assistant does not know):

@@ -119,6 +119,16 @@
   var PHOTOS_NEED = "Your photos on the TV, or one photo put in the widget";
   var WATCH_NEED = "The couch-tv TV app or a computer at home that stays on";
   var HA_NEED = "Home Assistant (a smart home app) running at home";
+  // the smart home widgets (group C): every one is set up once on a computer, then needs no computer
+  function haSteps(what) {
+    var after = [].slice.call(arguments, 1);
+    return { android: ["Needs Home Assistant, the smart home app, running at home.", "Whoever set up couch-tv adds your " + what + " once on a computer (setup guide, Smart home), then puts couch-tv on the TV again."].concat(after),
+      web: SMART_HOME.web.slice(), vidaa: SMART_HOME.vidaa.slice() };
+  }
+  var HA_PLAT = function () { return plat("setup", "no", "no", { android: "Set up once from a computer; after that no computer is needed.", web: "Smart home needs a Google TV, Android TV or Fire TV.", vidaa: "Smart home needs a Google TV, Android TV or Fire TV." }); };
+  // the Up next queue: Spotify's queue, read with the person's own Spotify sign in
+  var QUEUE_NEED = "Spotify connected on the home computer, or on the website home on a Hisense";
+  var SPOTIFY_ON = "On that computer, connect Spotify once: open the couch-tv Spotify page on it and sign in (setup guide, Spotify Now playing).";
 
   var C = {
     // ---------- time ----------
@@ -260,12 +270,16 @@
     soundscape: { name: "Soundscape", status: "works", what: "Rain, fire, waves or soft noise, played by the home", needs: ["Nothing: the sounds come with couch-tv"],
       setup: setup("nothing", ["Nothing to set up.", "Move to the widget and press OK to start or stop the sound."]), until: "Always ready", build: "",
       ok: "Starts or stops the sound", platforms: EVERY(), sizes: sz(["tile", "wtile"], [2, 2]) },
-    queue: { name: "Up next queue", status: "not-built", what: "The next songs", needs: ["Needs couch-tv to read your Spotify queue (TVs do not share it)"],
-      setup: setup("nothing", NOT_YET), until: "\"Up next queue: not on couch-tv yet\", and what it needs", build: "The bridge has to read the queue from the Spotify Web API (the person signs in to Spotify once on the computer) and hand it to the home.",
-      ok: "Opens the queue (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["small", "tall", "large"], [4, 4]) },
-    speakers: { name: "Speakers", status: "not-built", what: "Each room's speaker and its volume", needs: ["Needs couch-tv to control Home Assistant speakers"],
-      setup: setup("nothing", NOT_YET), until: "\"Speakers: not on couch-tv yet\", and what it needs", build: "HomeAssistant.kt has to allow media_player entities named in config.json (volume and play or pause), as it does for climate today.",
-      ok: "Opens the speakers with a volume for each (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["wtile", "small", "tall"], [4, 2]) },
+    queue: { name: "Up next queue", status: "setup", what: "The next songs in your Spotify queue", needs: [QUEUE_NEED, "Only Spotify: TVs and other music apps do not share their queue"],
+      setup: setup("computer", { android: ["Needs a computer at home that stays on, running couch-tv (setup option B).", SPOTIFY_ON, "Play music in Spotify on any phone, computer or speaker: the next songs in your queue show here."],
+        web: ["Keep the home computer on: it runs couch-tv for this TV.", SPOTIFY_ON, "Play music in Spotify on any phone, computer or speaker: the next songs in your queue show here."],
+        vidaa: ["With a home computer that stays on: connect Spotify once on it (open the couch-tv Spotify page on it and sign in).", "With the website home and no computer: sign in to Spotify once on your own couch-tv site (setup guide, Hisense VIDAA, Spotify).", "Play music in Spotify: the next songs in your queue show here."] }),
+      until: "\"Needs Spotify connected\", and where it is set up", build: "",
+      ok: "Opens the next ten songs, big", platforms: plat("computer", "computer", "setup", { android: "Needs a home computer with Spotify connected (setup option B). Only Spotify shares its queue.", web: "Works while the home computer is on, with Spotify connected on it.", vidaa: "Works with the home computer, or the website home with Spotify signed in." }), sizes: sz(["small", "tall", "large"], [4, 4]) },
+    speakers: { name: "Speakers", status: "setup", what: "Each speaker, what it plays and its volume", needs: [HA_NEED, "Your speakers added once on a computer"],
+      setup: setup("computer", haSteps("speakers (up to 6, any Home Assistant knows)", "Press Home: each speaker and its volume show here. OK opens them: louder, quieter, play and pause.")),
+      until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      ok: "Opens the speakers: louder, quieter, play and pause for each", platforms: HA_PLAT(), sizes: sz(["wtile", "small", "tall"], [4, 2]) },
 
     // ---------- smart home (Home Assistant, through the Android home) ----------
     aircon: { name: "Aircon", status: "setup", what: "A room's set temperature, what it is now, and the other rooms", needs: [HA_NEED, "Your aircon rooms added once on a computer"],
@@ -274,27 +288,26 @@
     scenes: { name: "Scenes", status: "setup", what: "Your Home Assistant scenes as big buttons (Movie night, Goodnight)", needs: [HA_NEED, "Your scenes added once on a computer"],
       setup: setup("computer", SMART_HOME), until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "OK on a button runs it. On a tile, OK opens every button", platforms: plat("setup", "no", "no", { android: "Set up once from a computer; after that no computer is needed.", web: "Smart home needs a Google TV, Android TV or Fire TV.", vidaa: "Smart home needs a Google TV, Android TV or Fire TV." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
-    controls: { name: "Control Centre", status: "not-built", what: "Lights, lamps and blinds as switches", needs: ["Needs couch-tv to switch lights and blinds (today it does aircon and scenes)"],
-      setup: setup("nothing", ["Nothing to set up yet.", "Until then: put your lights in a Home Assistant scene and use the Scenes widget."]), until: "\"Control Centre: not on couch-tv yet\", and what it needs",
-      build: "HomeAssistant.kt has to allow light, switch, cover and fan entities named in config.json (turn on, off, open, close), with the page asking for them as it asks for climate. Locks stay out on purpose: nothing that opens the house from a TV remote.",
-      ok: "Opens Control Centre: every switch big (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "medium", "wide", "large"], [2, 2]) },
-    camera: { name: "Camera", status: "not-built", what: "A picture from a camera, new every few seconds", needs: ["Needs couch-tv to bring camera pictures into the home"],
-      setup: setup("nothing", ["Nothing to set up yet.", "The doorbell pop up already works: it shows the door camera over everything when someone rings (set up once on a computer)."]),
-      until: "\"Camera: not on couch-tv yet\", and what it needs",
-      build: "HomeAssistant.kt has to fetch camera_proxy stills for camera entities named in config.json and hand them to the page as pictures that never leave the house.",
-      ok: "Opens the camera full screen, a new picture every two seconds (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["wtile", "small", "medium", "large"], [4, 2]) },
-    doorbell: { name: "Doorbell", status: "not-built", what: "The last ring, with a picture", needs: ["Needs the doorbell's last ring kept for the home"],
-      setup: setup("nothing", ["Nothing to set up for this widget yet.", "The doorbell pop up already works (set up once on a computer)."]),
-      until: "\"Doorbell: not on couch-tv yet\", and that the pop up works", build: "The launcher already hears the doorbell (DoorbellWatch); it has to keep the last ring's time and still for the page.",
-      ok: "Opens the last ring full screen (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
-    energy: { name: "Solar and energy", status: "not-built", what: "Power made today, and the day's curve", needs: ["Needs couch-tv to read Home Assistant sensors"],
-      setup: setup("nothing", ["Nothing to set up yet.", "Until then: a Custom card can show today's solar number (needs a home computer)."]), until: "\"Solar and energy: not on couch-tv yet\", and the Custom card way round",
-      build: "HomeAssistant.kt has to allow sensor entities named in config.json and return their readings; the widget then draws today's curve from Home Assistant's history.",
-      ok: "Opens Energy: today by the hour (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "medium", "wide"], [2, 2]) },
-    sensor: { name: "Sensor", status: "not-built", what: "One reading: the pool, the rain gauge, the humidity", needs: ["Needs couch-tv to read Home Assistant sensors"],
-      setup: setup("nothing", ["Nothing to set up yet.", "Until then: a Custom card can show any number (needs a home computer)."]), until: "\"Sensor: not on couch-tv yet\", and the Custom card way round",
-      build: "HomeAssistant.kt has to allow sensor entities named in config.json and return their state and unit.",
-      ok: "Opens the reading with its last 24 hours (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
+    controls: { name: "Control Centre", status: "setup", what: "Lights, switches, fans and blinds as big switches", needs: [HA_NEED, "Your lights and switches added once on a computer"],
+      setup: setup("computer", haSteps("lights, switches, fans and blinds (up to 16)", "Press Home: your switches show here. OK opens them big, and OK on one switches it.", "Locks, alarms, garage doors and gates never show: nothing that opens the house from a TV remote.")),
+      until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      ok: "Opens Control Centre: every switch big, OK on one switches it", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "medium", "wide", "large"], [2, 2]) },
+    camera: { name: "Camera", status: "setup", what: "A still picture from a camera, new every 2 seconds (no video)", needs: [HA_NEED, "Your cameras added once on a computer"],
+      setup: setup("computer", haSteps("cameras (up to 4)", "Press Home: a still from the camera shows here, new every 2 seconds while the home is on screen. There is no live video and no sound.")),
+      until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      ok: "Opens the camera full screen, a new still every 2 seconds; Left and Right reach your other cameras", platforms: HA_PLAT(), sizes: sz(["wtile", "small", "medium", "large"], [4, 2]) },
+    doorbell: { name: "Doorbell", status: "setup", what: "When the doorbell last rang, with a picture", needs: [HA_NEED, "Your doorbell added once on a computer"],
+      setup: setup("computer", haSteps("doorbell and its camera", "Press Home: when it last rang shows here, with the picture the TV kept from that ring, or the door now.")),
+      until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      ok: "Opens the last ring full screen: the picture from the ring, then the door now", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
+    energy: { name: "Solar and energy", status: "setup", what: "Power made or used today, by the hour", needs: [HA_NEED, "Your solar or energy sensor added once on a computer"],
+      setup: setup("computer", haSteps("solar or power meter (kWh today, or watts)", "Press Home: today by the hour shows here, with power now and the battery if there is one.")),
+      until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      ok: "Opens Energy: today by the hour, power now and the battery", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "medium", "wide"], [2, 2]) },
+    sensor: { name: "Sensor", status: "setup", what: "One reading (the pool, the rain gauge, humidity) and its last 24 hours", needs: [HA_NEED, "Your sensors added once on a computer"],
+      setup: setup("computer", haSteps("sensors (up to 8: the pool, a rain gauge, humidity)", "Press Home: the reading shows here, with its last 24 hours.")),
+      until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      ok: "Opens the reading big with its last 24 hours; Left and Right reach your other sensors", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     battery: { name: "Batteries", status: "not-built", what: "Remotes and controllers as rings", needs: ["Needs the TV to share battery levels (TVs do not)"],
       setup: setup("nothing", ["Nothing can be set up: TVs do not share battery levels."]), until: "\"Batteries: not on couch-tv yet\", and why", build: "Not possible on the TV itself. Home Assistant's phone app could report phone batteries, through sensor support (see Sensor).",
       ok: "Nothing", platforms: NOWHERE("TVs do not share battery levels."), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
@@ -400,6 +413,7 @@
   SHORT[PHOTOS_NEED] = ["Add your photos", "Home settings, Look and scenes, Your photos", "Add photos"];
   SHORT[WATCH_NEED] = ["Needs the couch-tv TV app or a home computer", "OK here shows how", "Needs setting up"];
   SHORT[HA_NEED] = ["Needs Home Assistant", "Set up once on a computer. OK here shows how", "Needs Home Assistant"];
+  SHORT[QUEUE_NEED] = ["Needs Spotify connected", "On the home computer. OK here shows how", "Needs Spotify"];
   SHORT[C.card.needs[0]] = ["Needs a home computer", "OK here shows how to set it up", "Needs a computer"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];
   var AT = "Home settings, couch-tv Studio, At home";

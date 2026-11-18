@@ -31,6 +31,9 @@
     photos: "Photos", keep: "Keep watching", folder: "Apps", player: "Now playing", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre",
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up",
     note: "Family note", list: "List", wifi: "Guest Wi-Fi", guide: "House guide", screentime: "Screen time" };
+  // the smart home and music widgets' own layers (group C): set here, beside the table above
+  LAYER.energy = "energy"; LAYER.sensor = "sensor"; LAYER.speakers = "speakers"; LAYER.queue = "queue";
+  TITLE.energy = "Energy"; TITLE.sensor = "Sensor"; TITLE.speakers = "Speakers"; TITLE.queue = "Up next";
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -558,32 +561,271 @@
 
   // Control Centre, camera, headlines and scores: TV Designer shows what they will look like; a TV
   // shows their setup record (widgets.js draws them empty there, which opens B.setup)
+  // Control Centre: every switch big. OK switches one through the launcher (HomeAssistant.kt "set"),
+  // which only switches what config.json names and never opens a garage door, gate or door.
   B.controls = function (o, env) {
-    if (!env.demo) return B.setup(o, env);
-    var items = op(o).controls && op(o).controls.length ? op(o).controls : [{ icon: "light", name: "Lounge" }, { icon: "lamp", name: "Lamp" }, { icon: "pendant", name: "Kitchen" }, { icon: "blinds", name: "Blinds" }, { icon: "fan", name: "Ceiling fan" }, { icon: "outlet", name: "Heater" }, { icon: "speaker", name: "Speakers" }, { icon: "light-off", name: "Porch" }];
-    var on = items.map(function (x, i) { return i % 2 === 0; });
-    S.body.appendChild(head("home", op(o).label || "Control Centre", "", "#30d158"));
+    var H = kit().ha, demo = !!env.demo, info = H.haOf(env).info || {};
+    if (!demo && !(info.controls && info.controls.length)) return B.setup(o, env);
+    var copy = function (l) { return l ? l.map(function (c) { var x = {}; for (var k in c) x[k] = c[k]; return x; }) : null; };
+    var items = copy(H.controlsOf(env, o)), title = op(o).label || "Control Centre";
+    S.body.appendChild(head("home", title, "", "#30d158"));
     var grid = E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:36px");
+    S.body.appendChild(grid);
+    var reread = function () {
+      if (!S || demo || !S.api.ha) return;
+      S.readAt = Date.now();
+      S.api.ha("controls").then(function (r) {
+        if (!S || !r || !r.ok) { if (S && !items) { items = []; draw(); msg("Home Assistant is not answering"); } return; }
+        var want = op(o).switches, l = r.controls || [];
+        if (want && want.length) l = want.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
+        items = l; draw();
+      });
+    };
     var draw = function () {
+      var keep = S.stops[S.cur] && S.stops[S.cur].el.getAttribute("data-name");
       while (grid.firstChild) grid.removeChild(grid.firstChild);
       S.stops = [];
-      items.forEach(function (x, i) {
-        grid.appendChild(F(E("div", "cwd-toggle" + (on[i] ? " on" : ""), "", [E("div", "cwd-sic", "", [ic(x.icon, 44, on[i] ? "#1a1406" : "#fff", "solid")]), E("div", "cwd-mid cwd-ell", "", [x.name]), E("div", "cwd-small", "", [on[i] ? "On" : "Off"])]),
-          function () { on[i] = !on[i]; designerSays(); draw(); }, x.name));
+      if (!items) { S.subEl.textContent = "Checking Home Assistant"; return; }
+      (items || []).slice(0, 16).forEach(function (c) {
+        var on = c.ok !== false && c.on;
+        grid.appendChild(F(E("div", "cwd-toggle" + (on ? " on" : ""), c.ok === false ? "opacity:.6" : "", [E("div", "cwd-sic", "", [ic(c.icon || H.ctlIcon(c), 44, on ? "#1a1406" : "#fff", "solid")]),
+          E("div", "cwd-mid cwd-ell", "", [c.name || ""]), E("div", "cwd-small", "", [c.blocked ? H.ctlWord(c) + ", not from the TV" : H.ctlWord(c)])]), function () {
+          if (demo || S.api.designer) { c.on = !c.on; designerSays(); draw(); return; }
+          if (c.ok === false) return msg(c.name + " is not answering");
+          if (c.blocked) return msg("Garage doors, gates and doors are never opened from the TV");
+          if (!S.api.ha) return msg("Home Assistant is not set up on this TV");
+          var want = c.kind === "cover" ? (c.on ? "close" : "open") : (c.on ? "off" : "on");
+          c.on = !c.on; draw();
+          msg(c.name + (c.kind === "cover" ? (c.on ? " opening" : " closing") : c.on ? " on" : " off"));
+          S.api.ha("set", c.entity, want).then(function (r) {
+            if (!S) return;
+            if (!r || !r.ok) { c.on = !c.on; draw(); msg(r && r.error === "refused" ? "Home Assistant would not switch " + c.name : "Home Assistant did not answer. Try again."); }
+            setTimeout(reread, 1500);
+          });
+        }, c.name));
       });
-      S.subEl.textContent = on.filter(Boolean).length + " of " + items.length + " on";
+      S.subEl.textContent = !items.length ? "None of these switches is set up on this TV" : items.filter(function (c) { return c.ok !== false && c.on; }).length + " of " + items.length + " on";
+      var again = keep ? S.stops.map(function (s) { return s.el.getAttribute("data-name"); }).indexOf(keep) : -1;
+      S.cur = again >= 0 ? again : Math.min(S.cur || 0, Math.max(0, S.stops.length - 1));
       paint();
     };
-    S.body.appendChild(grid);
     draw();
+    S.redraw = draw;
+    S.tick = function () { if (Date.now() - (S.readAt || 0) > 10000) reread(); };
+    if (!demo) reread();
   };
+
+  // Camera and doorbell: a still, a new one every two seconds while this is open (never video).
+  // The doorbell shows the picture this TV kept from the last ring first, then the door now.
   B.camera = function (o, env) {
-    if (!env.demo) return B.setup(o, env);
+    var H = kit().ha, ha = H.haOf(env), info = ha.info || {}, demo = !!env.demo, door = o.kind === "doorbell";
+    if (!demo && (door ? !info.doorbell : !(info.cameras && info.cameras.length))) return B.setup(o, env);
     S.full = true;
     S.panel.classList.add("cwd-photos");
-    S.body.appendChild(E("div", "cwd-pstage", "", [E("div", "cwd-photo", "", [E("div", "cwd-pimg", "background-size:cover;filter:saturate(.75) contrast(1.05);background-image:" + kit().cssImg(o.kind === "doorbell" ? kit().bgImg("grose-valley") : kit().demoImg("dog")))]),
-      E("div", "cwd-live", "", [E("i"), op(o).label || (o.kind === "doorbell" ? "Front door" : "Backyard"), E("span", "", "", [o.kind === "doorbell" ? "Last ring 2:14pm" : "Live, a new picture every 2 seconds"])]),
-      E("div", "cwd-phint", "", ["Back closes."])]));
+    var bell = ha.bell, ring = !demo && door && ha.ring && bell && bell.kept ? ha.ring : null;
+    var cams = door ? [{ entity: "doorbell", name: op(o).label || (bell && bell.name) || "Front door" }] : (demo ? [{ entity: "camera.backyard", name: op(o).label || "Backyard" }, { entity: "camera.driveway", name: "Driveway" }] : info.cameras);
+    var sel = Math.max(0, cams.map(function (c) { return c.entity; }).indexOf(op(o).cam)), showRing = !!(ring || (demo && door));
+    var img = E("div", "cwd-pimg", "background-size:contain;background-color:#000"), nameEl = E("b", "", "font-weight:680"), subEl = E("span");
+    var stage = E("div", "cwd-pstage", "", [E("div", "cwd-photo", "", [img]), E("div", "cwd-live", "", [E("i"), nameEl, subEl])]);
+    S.body.appendChild(stage);
+    var row = E("div", "cwd-row", "position:absolute;left:80px;bottom:56px");
+    stage.appendChild(row);
+    var bellWords = function () { var r = bell && bell.at ? H.ringWords(bell.at) : null; return !bell ? "" : bell.ringing ? "Ringing now" : r ? r[1] + ", " + r[0] : "No ring this week"; };
+    var picture = function () {
+      var c = cams[sel];
+      nameEl.textContent = c.name || "Camera";
+      if (demo) { img.style.backgroundImage = kit().cssImg(door ? kit().bgImg("grose-valley") : kit().demoImg(sel ? "camp" : "dog")); subEl.textContent = door ? "Last ring today, 2:14pm. The picture from the ring" : "A new still every 2 seconds"; return; }
+      if (showRing && ring) { img.style.backgroundImage = kit().cssImg(ring.src); subEl.textContent = bellWords() + ". The picture from the ring"; return; }
+      var last = (ha.stills || {})[c.entity];
+      if (last) img.style.backgroundImage = kit().cssImg(last);
+      subEl.textContent = (door ? bellWords() + ". " : "") + (last ? "A new still every 2 seconds" : "Getting a picture");
+    };
+    var chips = function () {
+      while (row.firstChild) row.removeChild(row.firstChild);
+      S.stops = [];
+      if (door && (ring || demo)) [["At the ring", true], ["Door now", false]].forEach(function (x) { row.appendChild(F(chip(x[0], showRing === x[1]), function () { showRing = x[1]; chips(); picture(); }, x[0])); });
+      if (!door && cams.length > 1) cams.forEach(function (c, i) { row.appendChild(F(chip(c.name || c.entity, i === sel), function () { sel = i; chips(); picture(); S.tickAt = 0; }, c.name)); });
+      [].forEach.call(row.childNodes, function (n, i) { if (i) n.style.marginLeft = "16px"; });
+      paint();
+    };
+    chips(); picture();
+    S.start = Math.max(0, sel);
+    var fails = 0;
+    S.every = 2000;
+    S.tick = function () {
+      if (demo || showRing || S.api.designer || !S.api.ha) return;
+      var c = cams[sel];
+      S.api.ha("still", c.entity, 1280).then(function (r) {
+        if (!S || cams[sel] !== c || showRing) return;
+        if (r && r.ok && r.src) { fails = 0; img.style.backgroundImage = kit().cssImg(r.src); subEl.textContent = (door ? bellWords() + ". " : "") + "A new still every 2 seconds"; }
+        else if (r && r.error !== "busy" && ++fails >= 3) subEl.textContent = "The camera is not answering";
+      });
+    };
+  };
+
+  // Solar and energy: today by the hour
+  B.energy = function (o, env) {
+    var H = kit().ha, ha = H.haOf(env), demo = !!env.demo, e = ha.energy;
+    if (!demo && !(ha.info || {}).energy) return B.setup(o, env);
+    var name = op(o).label || (e && e.name) || "Energy";
+    S.body.appendChild(head("bolt", name + " today", "", "#ff9f0a"));
+    var body = E("div", "cwd-col cwd-grow", "margin-top:30px");
+    S.body.appendChild(body);
+    var draw = function () {
+      while (body.firstChild) body.removeChild(body.firstChild);
+      if (!e) { S.subEl.textContent = "Checking Home Assistant"; return; }
+      if (!e.ok) { S.subEl.textContent = e.error === "unit" ? "This sensor is not energy or power" : "Home Assistant is not answering"; return; }
+      var hours = (e.hours || []).slice(0, 24), max = Math.max.apply(null, hours.map(function (v) { return v || 0; }).concat([0.1])), last = -1, best = -1;
+      hours.forEach(function (v, i) { if (v != null) last = i; if (v != null && (best < 0 || v > hours[best])) best = i; });
+      S.subEl.textContent = best >= 0 && hours[best] > 0 ? "Most in the hour from " + kit().fmt12(new Date(2000, 0, 1, best)) : "Nothing yet today";
+      var stat = function (big, small, col) { return E("div", "", "margin-right:80px", [E("div", "cwd-huge", "font-size:150px;" + (col ? "color:" + col : ""), [big]), E("div", "cwd-mid", "opacity:.75", [small])]); };
+      body.appendChild(E("div", "cwd-row", "align-items:flex-end", [stat(H.kwh(e.total), "kWh today"), e.power != null ? stat(H.kwh(e.power), String(e.power_unit || "kW") + " now", "#30d158") : null, e.battery != null ? stat(e.battery + "%", "Battery") : null]));
+      body.appendChild(E("div", "cwd-bars", "margin-top:40px;height:300px", hours.map(function (v, i) {
+        return E("i", "", v == null ? "height:4px;background:rgba(255,255,255,.18)" : "height:" + Math.max(4, Math.round(v / max * 300)) + "px;background:" + (i === last ? "#ffd60a" : "rgba(255,214,10,.6)"));
+      })));
+      body.appendChild(E("div", "cwd-row", "justify-content:space-between;margin-top:12px", ["12am", "3am", "6am", "9am", "12pm", "3pm", "6pm", "9pm", "12am"].map(function (x) { return E("span", "cwd-small", "", [x]); })));
+    };
+    var reread = function () {
+      if (!S || demo || !S.api.ha) return;
+      S.readAt = Date.now();
+      S.api.ha("energy").then(function (r) { if (S && r) { e = r; draw(); } });
+    };
+    draw();
+    S.every = 5000;
+    S.tick = function () { if (Date.now() - (S.readAt || 0) > 300000) reread(); };
+    if (!demo && !e) reread();
+  };
+
+  // Sensor: the reading big, with its last 24 hours; Left and Right reach the other sensors
+  B.sensor = function (o, env) {
+    var H = kit().ha, ha = H.haOf(env), demo = !!env.demo, names = (ha.info || {}).sensors || [];
+    var first = H.sensorPick(env, o);
+    if (!first) return B.setup(o, env);
+    var sel = first.entity, hist = {}, sensors = ha.sensors;
+    if (first.hist) hist[sel] = first.hist;
+    S.body.appendChild(head(H.SENSOR_ICON[first.s && first.s.cls] || "temperature", first.name, "", "#5e5ce6"));
+    var body = E("div", "cwd-col cwd-grow", "margin-top:30px"), row = E("div", "cwd-row", "margin-top:24px");
+    S.body.appendChild(body);
+    S.body.appendChild(row);
+    var draw = function () {
+      while (body.firstChild) body.removeChild(body.firstChild);
+      var s = (sensors || []).filter(function (x) { return x.entity === sel; })[0], n = names.filter(function (x) { return x.entity === sel; })[0] || {};
+      var label = (sel === first.entity && op(o).label) || (s && s.name) || n.name || "Sensor";
+      S.panel.querySelector(".cwd-title").textContent = label;
+      if (!sensors) { S.subEl.textContent = "Checking Home Assistant"; return; }
+      if (!s || s.ok === false) { S.subEl.textContent = "Home Assistant is not answering"; return; }
+      var t = H.sensorText(s), h = hist[sel], pts = h && h.points, got = (pts || []).filter(function (v) { return v != null; });
+      S.subEl.textContent = got.length >= 2 ? "Last 24 hours: low " + Math.round(Math.min.apply(null, got) * 10) / 10 + ", high " + Math.round(Math.max.apply(null, got) * 10) / 10 : "Last 24 hours";
+      body.appendChild(E("div", "cwd-row", "align-items:baseline", [E("div", "cwd-huge", "", [t[0]]), t[1] ? E("div", "cwd-big", "margin-left:16px;opacity:.75", [t[1]]) : null]));
+      body.appendChild(E("div", "cwd-grow", "margin-top:24px;display:flex;align-items:flex-end", [h ? H.spark(pts, 1630, 300, "#64d2ff") : E("div", "cwd-mid", "opacity:.7", ["Reading the last 24 hours"])]));
+    };
+    var chips = function () {
+      while (row.firstChild) row.removeChild(row.firstChild);
+      S.stops = [];
+      if (names.length > 1) names.forEach(function (n, i) { var c = F(chip(n.name || n.entity, n.entity === sel), function () { sel = n.entity; chips(); draw(); history(); }, n.name); if (i) c.style.marginLeft = "16px"; row.appendChild(c); });
+      S.cur = Math.max(0, names.map(function (n) { return n.entity; }).indexOf(sel));
+      paint();
+    };
+    var history = function () {
+      if (!S || demo || !S.api.ha || hist[sel]) return;
+      var want = sel;
+      S.api.ha("history", want).then(function (r) { if (S && r && r.ok) { hist[want] = { points: r.points || [] }; if (sel === want) draw(); } });
+    };
+    var reread = function () {
+      if (!S || demo || !S.api.ha) return;
+      S.readAt = Date.now();
+      S.api.ha("sensors").then(function (r) { if (S && r && r.ok) { sensors = r.sensors || []; draw(); } else if (S && !sensors) { sensors = []; draw(); } });
+    };
+    chips(); draw();
+    S.every = 5000;
+    S.tick = function () { if (Date.now() - (S.readAt || 0) > 60000) reread(); };
+    if (!demo) { if (!sensors) reread(); history(); }
+  };
+
+  // Speakers: each with its volume. Quieter and louder move it 5 at a time (presses are joined),
+  // play or pause where the speaker can
+  B.speakers = function (o, env) {
+    var H = kit().ha, demo = !!env.demo, info = H.haOf(env).info || {};
+    if (!demo && !(info.speakers && info.speakers.length)) return B.setup(o, env);
+    var copy = function (l) { return l ? l.map(function (c) { var x = {}; for (var k in c) x[k] = c[k]; return x; }) : null; };
+    var list = copy(H.speakersOf(env, o)), joinT = null;
+    S.body.appendChild(head("speakers", op(o).label || "Speakers", "", "#ff375f"));
+    var body = E("div", "cwd-col cwd-grow", "margin-top:30px");
+    S.body.appendChild(body);
+    var send = function (action, s, value, say) {
+      if (demo || S.api.designer) { designerSays(); return; }
+      if (!S.api.ha) return msg("Home Assistant is not set up on this TV");
+      if (say) msg(say);
+      S.api.ha(action, s.entity, value).then(function (r) {
+        if (!S) return;
+        if (!r || !r.ok) msg(r && r.error === "refused" ? s.name + " cannot do that from the TV" : "Home Assistant did not answer. Try again.");
+        setTimeout(reread, 1500);
+      });
+    };
+    var reread = function () {
+      if (!S || demo || !S.api.ha || joinT) return;
+      S.readAt = Date.now();
+      S.api.ha("speakers").then(function (r) {
+        if (!S || joinT) return;
+        if (!r || !r.ok) { if (!list) { list = []; draw(); msg("Home Assistant is not answering"); } return; }
+        var want = op(o).players, l = r.speakers || [];
+        if (want && want.length) l = want.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
+        list = l; draw();
+      });
+    };
+    var draw = function () {
+      var keep = S.stops[S.cur] && S.stops[S.cur].el.getAttribute("data-name");
+      while (body.firstChild) body.removeChild(body.firstChild);
+      S.stops = [];
+      if (!list) { S.subEl.textContent = "Checking Home Assistant"; return; }
+      S.subEl.textContent = list.filter(function (s) { return s.state === "playing"; }).length + " of " + list.length + " playing";
+      list.slice(0, 6).forEach(function (s) {
+        var ok = s.ok !== false, vol = ok && s.state !== "off" ? kit().clamp(s.volume || 0, 0, 100) : 0;
+        var nudge = function (d) {
+          return function () {
+            if (!ok) return msg(s.name + " is not answering");
+            if (s.can_volume === false) return msg(s.name + " has no volume Home Assistant can set");
+            s.volume = kit().clamp((s.volume || 0) + d, 0, 100); draw();
+            clearTimeout(joinT);
+            joinT = setTimeout(function () { joinT = null; send("volume", s, s.volume, s.name + " to " + s.volume + "%"); }, 700);
+          };
+        };
+        body.appendChild(E("div", "cwd-row", "margin-bottom:22px;padding:18px 26px;border-radius:30px;background:rgba(255,255,255,.08)" + (ok ? "" : ";opacity:.6"), [
+          E("div", "cwd-col", "width:560px;flex:none;min-width:0", [E("div", "cwd-mid cwd-ell", "", [s.name || ""]), E("div", "cwd-small cwd-ell", "", [H.spkSong(s) || H.spkWord(s)])]),
+          E("div", "cwd-col cwd-grow", "margin:0 30px;min-width:0", [E("div", "cwd-row", "justify-content:space-between", [E("span", "cwd-small", "", ["Volume"]), E("span", "cwd-mid", "", [H.spkWord(s)])]),
+            E("div", "", "height:16px;border-radius:8px;background:rgba(255,255,255,.18);margin-top:10px;overflow:hidden", [E("div", "", "height:100%;border-radius:8px;background:#fff;width:" + vol + "%")])]),
+          F(btn("minus", "", "cwd-round cwd-sm"), nudge(-5), s.name + " quieter"),
+          E("div", "", "width:16px;flex:none"), F(btn("plus", "", "cwd-round cwd-sm"), nudge(5), s.name + " louder"),
+          E("div", "", "width:16px;flex:none"), F(btn(s.state === "playing" ? "pause" : "play", "", "cwd-round cwd-sm"), function () {
+            if (!ok) return msg(s.name + " is not answering");
+            if (s.can_pause === false) return msg(s.name + " cannot play or pause from the TV");
+            s.state = s.state === "playing" ? "paused" : "playing"; draw();
+            send("playpause", s, "", s.name + (s.state === "playing" ? " playing" : " paused"));
+          }, s.name + " play or pause")]));
+      });
+      var again = keep ? S.stops.map(function (x) { return x.el.getAttribute("data-name"); }).indexOf(keep) : -1;
+      S.cur = again >= 0 ? again : Math.min(S.cur || 0, Math.max(0, S.stops.length - 1));
+      paint();
+    };
+    draw();
+    S.start = 1;   // the first speaker's louder
+    S.redraw = draw;
+    S.every = 2000;
+    S.tick = function () { if (Date.now() - (S.readAt || 0) > 10000) reread(); };
+    if (!demo) reread();
+  };
+
+  // Up next: the next songs on the Spotify account (to look at: Spotify itself changes the queue)
+  B.queue = function (o, env) {
+    var H = kit().ha, q = H.queueOf(env), items = q && q.ok ? (q.items || []).filter(function (s) { return s && s.title; }) : [];
+    if (q && !q.ok) return B.setup(o, env);
+    if (!q) { S.body.appendChild(head("music", op(o).label || "Up next", "Checking Spotify", "#1db954")); return; }
+    S.body.appendChild(head("music", op(o).label || "Up next", items.length ? items.length + (items.length === 1 ? " song" : " songs") + " in the Spotify queue" : "Nothing up next in Spotify", "#1db954"));
+    S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:36px", items.slice(0, 10).map(function (s, i) {
+      var art = H.coverOk(s.art, env);
+      return E("div", "cwd-row", "width:820px;height:120px", [E("div", "", "width:120px;height:120px;border-radius:18px;flex:none;background:#333 center/cover;" + (art ? "background-image:" + kit().cssImg(s.art) : "")),
+        E("div", "cwd-col", "margin-left:26px;min-width:0;flex:1", [E("div", "cwd-mid cwd-ell", "", [(i + 1) + ". " + String(s.title).slice(0, 80)]), E("div", "cwd-small cwd-ell", "", [String(s.artist || "").slice(0, 80)])])]);
+    })));
   };
   B.cards = function (o, env) {
     var cards = env.demo ? [{ title: "Solar today", value: "18.4 kWh" }, { title: "Pool", value: "26°" }, { title: "Rain gauge", value: "12 mm" }] : (kit().dataOf(env).cards || []);

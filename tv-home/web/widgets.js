@@ -1036,19 +1036,156 @@
     add(root, [ic(icons[snd], b.h < 200 ? 44 : 56, "currentColor"), E("div", "cw-grow"), E("div", b.w < 300 ? "cw-t25" : "cw-t29", "font-weight:680;color:var(--ink)", [names[snd]]), b.w >= 300 ? E("div", "cw-t23", "", ["Soundscape"]) : null]);
     stop(root, "quick", "soundscape", "Soundscape");
   };
+  // ---------------- fitting words (group C widgets) ----------------
+  // seagey, 18 Nov 2026: "Make sure each widget fits in each container correctly things aren't cut off
+  // and all icons etc are default centre align unless it's changed in the designer." So these widgets
+  // never cut words with an ellipsis: each line is measured and drawn at the largest size from its own
+  // size down to 23 px that fits on the lines it has; what still cannot fit is left out whole. Content
+  // is centred unless the design sets opts.align (left or right).
+  var MEASURE = null, MCACHE = {}, MCOUNT = 0;
+  function measureBox() {
+    if (!MEASURE) {
+      MEASURE = document.createElement("div");
+      MEASURE.setAttribute("aria-hidden", "true");
+      MEASURE.style.cssText = "position:absolute;left:-10000px;top:0;visibility:hidden;white-space:normal;overflow-wrap:normal;word-break:normal;padding:0;margin:0;border:0;font-feature-settings:'tnum' 1";
+    }
+    if (!MEASURE.parentNode && document.body) document.body.appendChild(MEASURE);
+    return MEASURE;
+  }
+  // the largest size, max down to 23 px, at which `text` fits `width` on at most `lines` lines; 0 if none
+  function fitPxText(text, width, max, lines, weight, family, spacing) {
+    text = String(text == null ? "" : text);
+    if (!text) return max;
+    var key = [text, Math.floor(width), max, lines, weight, family, spacing].join("|");
+    if (MCACHE[key] !== undefined) return MCACHE[key];
+    if (++MCOUNT > 3000) { MCACHE = {}; MCOUNT = 0; }
+    var m = measureBox(), got = 0, lh = 1.2;
+    m.style.width = Math.max(1, Math.floor(width)) + "px"; m.style.fontWeight = weight || 600; m.style.fontFamily = family || '"Inter", sans-serif';
+    m.style.letterSpacing = spacing || "normal"; m.style.lineHeight = String(lh); m.textContent = text;
+    for (var px = Math.round(max); px >= 23; px -= px > 40 ? 3 : 1) {
+      m.style.fontSize = px + "px";
+      if (m.scrollWidth <= Math.floor(width) && m.scrollHeight <= Math.ceil(px * lh * lines) + 1) { got = px; break; }
+    }
+    MCACHE[key] = got;
+    return got;
+  }
+  function famOf(root) { return root.style.fontFamily || '"Inter", sans-serif'; }
+  function alignOf(o) { var a = op(o).align; return a === "left" || a === "right" ? a : "center"; }
+  function alignRoot(root, al) { root.style.alignItems = al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center"; root.style.textAlign = al; }
+  function justify(al) { return "justify-content:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center"); }
+  // words that fit, whole, or null (the caller leaves them out)
+  function fitWords(root, text, width, max, lines, weight, css) {
+    if (text == null || text === "") return null;
+    var px = fitPxText(text, width, max, lines || 1, weight || 600, famOf(root));
+    if (!px) return null;
+    return E("div", "cw-fit", "font-size:" + px + "px;font-weight:" + (weight || 600) + ";line-height:1.2;max-width:" + Math.floor(width) + "px;overflow-wrap:normal;flex:none;" + (css || ""), [String(text)]);
+  }
+  // a big number on one line, as big as fits
+  function fitNum(root, text, width, max, css) {
+    var px = fitPxText(text, width, max, 1, 640, famOf(root), "-0.035em") || 23;
+    return E("div", "cw-big", "white-space:nowrap;flex:none;font-size:" + px + "px;" + (css || ""), [String(text)]);
+  }
+  // a label: icon and name; the name on one line, else two, else the icon alone
+  function fitLab(root, iconName, text, width, max) {
+    var t = fitWords(root, text, width - 40, max || 25, 1, 650, "color:var(--sub)") || fitWords(root, text, width - 40, 24, 2, 650, "color:var(--sub)");
+    return E("div", "cw-row", "flex:none;max-width:100%;color:var(--sub)", [iconName ? ic(iconName, 30, "currentColor") : null, t ? E("div", "", "margin-left:10px;min-width:0", [t]) : null]);
+  }
+  // the setup card from widget-caps.js; in a box too small for its line, the short "Set up first" (OK opens all of it)
+  function soonFit(root, b, iconName, kind) {
+    // a picture widget (camera) with no picture: the card gets the glass box, so it never floats
+    if (root.classList.contains("cw-photo")) { root.classList.remove("cw-photo"); root.classList.add("cw-glass"); if (!(root.firstChild && root.firstChild.className === "cw-bg")) root.insertBefore(E("div", "cw-bg"), root.firstChild); }
+    soon(root, b, iconName, kind);
+    var e1 = root.querySelector(".cw-e1"), tiny = b.w < 300 && b.h < 300, strip = b.h < 200 && b.w >= 300;
+    var room = strip ? b.w - 48 - 58 : b.w - 48, lines = strip ? 2 : tiny ? 2 : 3;
+    if (e1 && !fitPxText(e1.textContent, room, tiny ? 24 : 29, lines, 680, famOf(root))) e1.textContent = "Set up first";
+    var e2 = root.querySelector(".cw-e2");
+    if (e2 && !fitPxText(e2.textContent, room, 24, 3, 560, famOf(root))) e2.parentNode.removeChild(e2);
+    return root;
+  }
+  function haWait(root, b, o, iconName, title, line) {
+    alignRoot(root, alignOf(o));
+    add(root, [fitLab(root, iconName, title, b.w - 48), E("div", "cw-grow"), fitWords(root, line, b.w - 48, 25, 3, 560, "color:var(--sub)") || fitWords(root, "Checking", b.w - 48, 25, 1, 560)]);
+  }
+
+  // Up next queue: the next songs on the Spotify account, read by the home computer (the bridge's
+  // /api/music/queue) or the standalone home's own site (api/now?queue=1), from the person's own
+  // Spotify sign in. Other music apps do not share their queue with anything, so it is Spotify only.
+  //   queue undefined: not asked yet; { ok: false }: Spotify is not connected; { ok: true, items }
+  var DEMO_QUEUE = [["Sunday Best", "Surfaces", "surf"], ["Riptide", "Vance Joy", "hike"], ["Electric Feel", "MGMT", "camp"], ["Dreams", "Fleetwood Mac", "beach"],
+    ["Bloom", "The Paper Kites", "dog"], ["Holocene", "Bon Iver", "nan"], ["Sunsets", "Thelma Plum", "art"], ["Old Pine", "Ben Howard", "birthday"]];
+  function queueOf(env) {
+    if (env.demo) return { ok: true, items: DEMO_QUEUE.map(function (s) { return { title: s[0], artist: s[1], art: demoImg(s[2]) }; }) };
+    var q = dataOf(env).queue;
+    if (q === undefined && window.CouchQueueNow) q = window.CouchQueueNow();
+    return q && typeof q === "object" ? q : undefined;
+  }
+  // a cover: only a picture from Spotify's own picture host (or the designer's demo pictures)
+  function coverOk(u, env) { return typeof u === "string" && (/^https:\/\/i\.scdn\.co\/image\/[A-Za-z0-9]+$/.test(u) || (env.demo && /^[a-z0-9\/._-]+\.jpg$/.test(u))); }
   R.queue = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "music", "queue");
-    var q = [["Sunday Best", "Surfaces"], ["Riptide", "Vance Joy"], ["Electric Feel", "MGMT"], ["Dreams", "Fleetwood Mac"], ["Bloom", "The Paper Kites"], ["Holocene", "Bon Iver"], ["Sunsets", "Thelma Plum"], ["Old Pine", "Ben Howard"]];
-    var covers = ["surf", "hike", "camp", "beach", "dog", "nan", "art", "birthday"];
-    add(root, [lab("music", "Up next"), E("div", "cw-col cw-grow", "margin-top:18px;justify-content:space-between", q.slice(0, Math.min(8, Math.floor((b.h - 90) / 104))).map(function (s, i) {
-      return E("div", "cw-row", "", [E("div", "", "width:76px;height:76px;border-radius:14px;flex:none;margin-right:20px;background:#333 center/cover;background-image:" + cssImg(demoImg(covers[i]))), E("div", "", "min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:650", [s[0]]), E("div", "cw-t25 cw-ell", "", [s[1]])])]);
-    }))]);
+    var q = queueOf(env), d = dataOf(env), al = alignOf(o), W = b.w - 48;
+    if (!env.demo && ((d.bridge === false && !window.COUCH_STANDALONE) || (q && q.ok === false))) return soonFit(root, b, "music", "queue");
+    var title = op(o).label || "Up next";
+    if (!q) return haWait(root, b, o, "music", title, "Checking Spotify");
+    var items = (q.items || []).filter(function (s) { return s && s.title; });
+    if (!items.length) return haWait(root, b, o, "music", title, "Nothing up next in Spotify");
+    alignRoot(root, al);
+    var big = b.w >= 700, cs = big ? 96 : 76, gap = big ? 24 : 18, textW = W - cs - 20, left = b.h - 48 - 46, rows = [];
+    for (var i = 0; i < Math.min(10, items.length); i++) {
+      var s = items[i], name = String(s.title).slice(0, 120), tl = 1, tpx = fitPxText(name, textW, big ? 38 : 29, 1, 650, famOf(root));
+      if (!tpx) { tl = 2; tpx = fitPxText(name, textW, 25, 2, 650, famOf(root)); }
+      if (!tpx) continue;   // a title too long for this box is left out, never cut
+      var t = E("div", "cw-fit", "font-size:" + tpx + "px;font-weight:650;line-height:1.2;overflow-wrap:normal;max-width:" + Math.floor(textW) + "px", [name]);
+      var a = s.artist ? fitWords(root, String(s.artist).slice(0, 120), textW, 25, 1, 560, "color:var(--sub)") : null;
+      var h = Math.max(cs, Math.ceil(tpx * 1.2 * tl) + (a ? Math.ceil(parseFloat(a.style.fontSize) * 1.2) : 0));
+      if (h + (rows.length ? gap : 0) > left) break;
+      left -= h + (rows.length ? gap : 0);
+      var ok = coverOk(s.art, env), cover = E("div", "", "width:" + px(cs) + ";height:" + px(cs) + ";border-radius:14px;flex:none;margin-right:20px;display:flex;align-items:center;justify-content:center;background:#333 center/cover;" + (ok ? "background-image:" + cssImg(s.art) : ""), ok ? null : [ic("music", cs * 0.42, "rgba(255,255,255,.6)")]);
+      rows.push(E("div", "cw-row", "flex:none;max-width:100%;text-align:left;" + (rows.length ? "margin-top:" + gap + "px" : ""), [cover, E("div", "", "min-width:0", [t, a])]));
+    }
+    add(root, [fitLab(root, "music", title, W), E("div", "cw-col cw-grow", "width:100%;margin-top:16px;justify-content:center;min-height:0;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center"),
+      // the songs as one block, each row from its left edge, the block centred (or where the design says)
+      [E("div", "cw-col", "flex:none;max-width:100%;align-items:flex-start", rows)])]);
+    stop(root, "detail", "queue", title);
   };
+
+  // Speakers: each Home Assistant speaker (media_player.* named in config.json) and its volume
+  function speakersOf(env, o) {
+    var ha = haOf(env), want = op(o).players;
+    if (!ha.speakers) return ha.speakers;
+    var l = ha.speakers.filter(function (s) { return s && s.entity; });
+    if (want && want.length) l = want.map(function (e) { return l.filter(function (s) { return s.entity === e; })[0]; }).filter(Boolean);
+    return l;
+  }
+  function spkWord(s) { return s.ok === false ? "Not answering" : s.state === "off" || s.state === "standby" ? "Off" : s.muted ? "Muted" : s.volume != null ? s.volume + "%" : s.state === "playing" ? "Playing" : "On"; }
+  function spkSong(s) { return s.ok === false ? "" : s.title ? s.title + (s.artist ? ", " + s.artist : "") : s.state === "playing" ? "Playing" : s.state === "paused" ? "Paused" : s.state === "off" ? "" : "Not playing"; }
   R.speakers = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "speakers", "speakers");
-    add(root, [lab("speakers", "Speakers"), E("div", "cw-col cw-grow", "justify-content:space-around;margin-top:12px", [["Living", 42], ["Kitchen", 30], ["Deck", 0]].map(function (s) {
-      return E("div", "", "", [E("div", "cw-row cw-sp", "", [E("span", "cw-t29", "", [s[0]]), E("span", "cw-t23", "", [s[1] ? s[1] + "%" : "Off"])]), E("div", "cw-bar", "margin-top:10px;height:12px;border-radius:6px", [E("b", "", "width:" + s[1] + "%")])]);
-    }))]);
+    var ha = haOf(env), info = ha.info || {}, al = alignOf(o), W = b.w - 48;
+    if (!env.demo && !(info.speakers && info.speakers.length)) return soonFit(root, b, "speakers", "speakers");
+    var list = speakersOf(env, o), title = op(o).label || "Speakers";
+    if (!list) return haWait(root, b, o, "speakers", title, "Checking Home Assistant");
+    if (!list.length) return haWait(root, b, o, "speakers", title, "No speaker is answering");
+    alignRoot(root, al);
+    var bar = function (s) { return E("div", "cw-bar", "width:100%;margin-top:10px;height:12px;border-radius:6px", [E("b", "", "width:" + (s.ok === false || s.state === "off" ? 0 : clamp(s.volume || 0, 0, 100)) + "%")]); };
+    var head = function (s, big) {
+      var word = spkWord(s), wpx = fitPxText(word, W, big ? 29 : 25, 1, 650, famOf(root)) || 23, ww = word.length * wpx * 0.62 + 12;
+      var name = fitWords(root, s.name || "", W - ww, big ? 29 : 25, 1, 650) || fitWords(root, s.name || "", W - ww, 23, 2, 650);
+      var pct = fitWords(root, word, ww, wpx, 1, 650, "margin-left:10px");
+      if (name || !s.name) return E("div", "cw-row", "flex:none;width:100%;justify-content:space-between;align-items:flex-start", [name || E("div"), pct]);
+      // a long name: on its own lines above, the volume under it
+      return E("div", "cw-col", "flex:none;width:100%;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center"), [fitWords(root, s.name, W, 25, 2, 650), pct]);
+    };
+    if (b.h < 200) {
+      // a wide tile: the one playing (else the first), its volume and what it plays
+      var p = list.filter(function (s) { return s.state === "playing"; })[0] || list[0], song = spkSong(p);
+      add(root, [head(p, false), E("div", "cw-grow"), song ? fitWords(root, song, W, 24, 1, 560, "color:var(--sub)") : null, bar(p)]);
+    } else {
+      var rowH = b.h >= 520 ? 120 : 100, n = Math.max(1, Math.min(list.length, Math.floor((b.h - 90) / rowH)));
+      add(root, [fitLab(root, "speakers", title, W), E("div", "cw-col cw-grow", "width:100%;justify-content:space-around;margin-top:10px;min-height:0", list.slice(0, n).map(function (s) {
+        var song = rowH >= 120 ? spkSong(s) : "";
+        return E("div", "", "flex:none;width:100%", [head(s, true), song ? fitWords(root, song, W, 24, 1, 560, "color:var(--sub)") : null, bar(s)]);
+      }))]);
+    }
+    stop(root, "detail", "speakers", title);
   };
 
   // smart home
@@ -1119,37 +1256,250 @@
     }))]);
     root.setAttribute("data-detail", "scenes");
   };
+  // ---------------- Control Centre, camera, doorbell, energy, sensor (and Speakers above) ----------------
+  // What Home Assistant said, through the launcher (smarthome.js live(), HomeAssistant.kt): only the
+  // entities named in config.json. In the designer, the demo below in the same shape. On a TV with none
+  // of it set up, the widget's setup card; set up but not read yet, or not answering, it says so in its
+  // own box. A design only ever names entities (opts.switches, cam, reading, players), never a reading.
+  var TODAY = new Date();
+  var DEMO_HA = {
+    info: { controls: [1], cameras: [{ entity: "camera.backyard", name: "Backyard" }], sensors: [{ entity: "sensor.pool", name: "Pool" }], speakers: [1], energy: true, doorbell: true, doorbell_camera: true },
+    controls: [{ entity: "light.lounge", name: "Lounge", ok: true, kind: "light", on: true, level: 80 }, { entity: "light.lamp", name: "Lamp", ok: true, kind: "light", on: false },
+      { entity: "light.kitchen", name: "Kitchen", ok: true, kind: "light", on: true }, { entity: "cover.blinds", name: "Blinds", ok: true, kind: "cover", on: false, state: "closed" },
+      { entity: "fan.ceiling", name: "Ceiling fan", ok: true, kind: "fan", on: true, level: 33 }, { entity: "switch.heater", name: "Heater", ok: true, kind: "switch", on: false },
+      { entity: "switch.fairy_lights", name: "Fairy lights", ok: true, kind: "switch", on: true }, { entity: "light.porch", name: "Porch", ok: true, kind: "light", on: false }],
+    sensors: [{ entity: "sensor.pool", name: "Pool", ok: true, value: "26.4", num: 26.4, unit: "°C", cls: "temperature" }],
+    hist: { "sensor.pool": { points: [24.1, 24, 23.9, 23.8, 23.7, 23.6, 23.6, 23.7, 24, 24.4, 24.9, 25.4, 25.9, 26.3, 26.6, 26.8, 26.8, 26.7, 26.6, 26.5, 26.5, 26.4, 26.4, 26.4] } },
+    energy: { ok: true, name: "Solar", total: 18.4, battery: 86, power: 2.4, power_unit: "kW", hours: [0, 0, 0, 0, 0, 0, 0.2, 0.7, 1.4, 2.1, 2.6, 2.9, 3, 2.6, 1.9, 0.8, 0.2, null, null, null, null, null, null, null] },
+    speakers: [{ entity: "media_player.living", name: "Living", ok: true, state: "playing", volume: 42, title: "Low Tide", artist: "Saltwater Radio", can_volume: true, can_pause: true },
+      { entity: "media_player.kitchen", name: "Kitchen", ok: true, state: "idle", volume: 30, can_volume: true, can_pause: true }, { entity: "media_player.deck", name: "Deck", ok: true, state: "off" }],
+    bell: { ok: true, name: "Front door", at: new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), 14, 14).getTime(), ringing: false, camera: true, kept: true },
+    stills: {}
+  };
+  function haOf(env) {
+    if (env.demo) return DEMO_HA;
+    var d = dataOf(env).ha;
+    if (d && typeof d === "object") return d;
+    var sh = window.smartHome;
+    return (sh && sh.live && sh.live()) || {};
+  }
+  var NOT_ANSWERING = "Home Assistant is not answering";
+
+  // Control Centre: lights, switches, fans and blinds
+  function ctlIcon(c) { return c.kind === "cover" ? (c.blocked ? "garage" : "blinds") : c.kind === "fan" ? "fan" : c.kind === "switch" ? "outlet" : c.on ? "light" : "light-off"; }
+  function ctlWord(c) {
+    if (c.ok === false) return "Not answering";
+    if (c.kind === "cover") return c.on ? "Open" + (c.level != null && c.level < 100 ? " " + c.level + "%" : "") : "Closed";
+    return c.on ? "On" + (c.level != null && c.level < 100 ? " " + c.level + "%" : "") : "Off";
+  }
+  function controlsOf(env, o) {
+    var ha = haOf(env), q = op(o);
+    if (env.demo && q.controls && q.controls.length) {
+      // the designer: the design's own icons and names over the demo readings
+      return q.controls.map(function (c, i) { var d = DEMO_HA.controls[i % DEMO_HA.controls.length]; return { entity: "demo." + i, name: c.name || d.name, ok: true, kind: d.kind, on: i % 2 === 0, icon: c.icon }; });
+    }
+    if (!ha.controls) return ha.controls;
+    var l = ha.controls.filter(function (c) { return c && c.entity; });
+    if (q.switches && q.switches.length) l = q.switches.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
+    return l;
+  }
+  // one switch in its own box: icon over name over state in a tall box, icon beside them in a short one;
+  // each line fitted, the name left out whole (never cut) if it cannot fit
+  function ctlMod(root, c, mw, mh, al) {
+    var on = c.ok !== false && c.on, tall = mh >= 170, pad = tall ? 18 : 14, iconS = tall ? 58 : 46, inner = tall ? mw - 2 * pad : mw - 2 * pad - iconS - 14;
+    var room = tall ? mh - 2 * pad - iconS - 8 : mh - 2 * pad;
+    var st = fitWords(root, ctlWord(c), inner, 24, 1, 560, "color:var(--sub)");
+    if (st && room - 30 >= 29) room -= 30; else st = null;
+    var name = room >= 29 ? fitWords(root, c.name || "", inner, tall ? 27 : 25, Math.max(1, Math.min(2, Math.floor(room / 30))), 680, "color:inherit") : null;
+    if (!name && st && !tall) { st = null; name = fitWords(root, c.name || "", inner, 25, Math.min(2, Math.floor((mh - 2 * pad) / 30)), 680, "color:inherit"); if (!name) st = fitWords(root, ctlWord(c), inner, 24, 1, 560, "color:var(--sub)"); }
+    var icon = E("div", "cw-ic", "flex:none;width:" + iconS + "px;height:" + iconS + "px;" + (tall ? "margin-bottom:8px" : "margin-right:14px"), [ic(c.icon || ctlIcon(c), tall ? 32 : 26, on ? "#1a1406" : "#fff", "solid")]);
+    var items = al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center";
+    return E("div", "cw-mod" + (on ? " on" : ""), "flex:none;margin:10px;width:" + px(mw) + ";height:" + px(mh) + ";padding:" + pad + "px;" +
+      (tall ? "flex-direction:column;justify-content:center;align-items:" + items : "flex-direction:row;align-items:center;justify-content:" + items) + ";text-align:" + al,
+      tall ? [icon, name, st] : [icon, E("div", "cw-col", "min-width:0;align-items:" + (al === "right" ? "flex-end" : "flex-start") + ";text-align:" + (al === "right" ? "right" : "left"), [name, st])]);
+  }
   R.controls = function (root, o, b, env) {
-    var q = op(o), items = (q.controls && q.controls.length ? q.controls : [{ icon: "light", name: "Lounge" }, { icon: "lamp", name: "Lamp" }, { icon: "pendant", name: "Kitchen" }, { icon: "blinds", name: "Blinds" }, { icon: "lock", name: "Front door" }, { icon: "outlet", name: "Heater" }, { icon: "speaker", name: "Speakers" }, { icon: "shield", name: "Alarm" }]);
-    if (!env.demo) return soon(root, b, "light", "controls");
-    var states = ["80%", "Off", "On", "Closed", "Locked", "Off", "Playing", "Off"], on = [1, 0, 1, 0, 1, 0, 1, 0];
-    var cols = q.cols || clamp(Math.round(b.w / 200), 1, 6), rows = Math.ceil(items.length / cols);
-    var mw = (b.w - 48 - 20 * (cols - 1)) / cols, mh = (b.h - 48 - (q.label ? 50 : 0) - 20 * (rows - 1)) / rows;
-    add(root, [q.label ? lab("home", q.label) : null, E("div", "cw-mods", q.label ? "margin-top:6px" : "", items.map(function (x, i) {
-      var m = E("div", "cw-mod" + (on[i % 8] ? " on" : ""), "width:" + px(mw) + ";height:" + px(mh), [E("div", "cw-ic", "", [ic(x.icon, 32, on[i % 8] ? "#1a1406" : "#fff", "solid")]), E("div", "", "min-width:0", [E("div", "cw-t25", "font-weight:680;color:inherit", [x.name || ""]), E("div", "cw-t23", "", [states[i % 8]])])]);
-      return m;
-    }))]);
+    var ha = haOf(env), info = ha.info || {}, q = op(o), title = q.label || "Control Centre", al = alignOf(o), W = b.w - 48, H = b.h - 48;
+    if (!env.demo && !(info.controls && info.controls.length)) return soonFit(root, b, "light", "controls");
+    var items = controlsOf(env, o);
+    if (!items) return haWait(root, b, o, "home", title, "Checking Home Assistant");
+    if (!items.length) return haWait(root, b, o, "home", title, "None of these switches is set up on this TV");
+    alignRoot(root, al);
+    var nOn = items.filter(function (c) { return c.ok !== false && c.on; }).length, allDown = !items.some(function (c) { return c.ok !== false; });
+    if (b.w < 300 && b.h < 300) {
+      // a tile: how many are on; OK opens every switch big
+      add(root, [ic("home", 40, "currentColor", "solid"), E("div", "cw-grow"), fitWords(root, allDown ? "Not answering" : nOn ? nOn + " on" : "All off", W, 34, 1, 700, "color:var(--ink)"),
+        fitWords(root, q.label || "Switches", W, 25, 1, 600, "color:var(--sub)")]);
+    } else {
+      // as many switches as fit with their names whole: fewer, wider boxes when names are long
+      var head = q.label || b.h >= 560 ? 46 : 0, small = b.h < 200, best = null;
+      for (var cols = small ? Math.max(1, Math.min(items.length, Math.floor((W + 20) / 150))) : (q.cols || clamp(Math.round(b.w / 230), 1, 6)); cols >= 1 && !best; cols--) {
+        var rows = small ? 1 : Math.max(1, Math.floor((H - head + 20) / 150)), n = Math.min(items.length, cols * rows), c2 = Math.min(cols, n);
+        rows = Math.ceil(n / c2);
+        var mw = (W - 20 * (c2 - 1)) / c2, mh = small ? H : Math.min(220, (H - head - 20 * (rows - 1)) / rows);
+        var mods = items.slice(0, n).map(function (c) { return ctlMod(root, c, mw, mh, al); });
+        var named = mods.every(function (m, i) { return !items[i].name || m.textContent.indexOf(items[i].name) >= 0; });
+        if (named || cols === 1) best = { mods: mods, n: n };
+      }
+      add(root, [head ? fitLab(root, "home", title, W) : null, E("div", "cw-mods", "align-self:stretch;align-content:center;" + justify(al) + (head ? ";margin-top:-4px" : ""), best.mods)]);
+    }
+    stop(root, "detail", "controls", title);
   };
+
+  // Camera: a still picture, a new one every two seconds while the home is in front (never video)
+  function stillWidth(b) { return b.w > 900 ? 1280 : b.w > 500 ? 960 : 640; }
+  function liveStill(root, pic, entity, b, env, onFail) {
+    if (env.demo || env.designer || !window.smartHome || !window.smartHome.still) return;
+    var fails = 0;
+    live(root, 2000, function () {
+      if (document.hidden) return;
+      window.smartHome.still(entity, stillWidth(b)).then(function (r) {
+        if (r && r.ok && window.smartHome.stillOk(r.src)) { fails = 0; pic.style.backgroundImage = cssImg(r.src); if (onFail) onFail(false); }
+        else if (r && r.error !== "busy" && ++fails >= 3 && onFail) onFail(true);
+      });
+    });
+  }
   R.camera = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "camera", "camera");
-    add(root, [E("div", "cw-fill", "background:#333 center/cover;filter:saturate(.7) contrast(1.05);background-image:" + cssImg(demoImg("dog"))), E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.45),transparent 35%)"),
-      E("div", "cw-row", "position:absolute;left:24px;top:20px;color:#fff", [E("i", "", "display:block;width:14px;height:14px;border-radius:7px;background:#ff453a;margin-right:12px"), E("span", "cw-t25", "color:#fff;font-weight:680;margin-right:10px", [op(o).label || "Backyard"]), E("span", "cw-t23", "color:rgba(255,255,255,.82)", ["Live"])])]);
+    var ha = haOf(env), info = ha.info || {}, q = op(o), cams = info.cameras || [], al = alignOf(o), W = b.w - 48;
+    if (!env.demo && !cams.length) return soonFit(root, b, "camera", "camera");
+    var cam = cams.filter(function (c) { return c.entity === q.cam; })[0] || cams[0], name = q.label || cam.name || "Camera";
+    var src = env.demo ? demoImg("dog") : (ha.stills || {})[cam.entity];
+    var pic = E("div", "cw-fill", "background:#1c1f24 center/cover;" + (src ? "background-image:" + cssImg(src) : ""));
+    var EVERY2 = "A still every 2 seconds", say = function (t) { return fitWords(root, t, W, 24, 1, 560, "color:rgba(255,255,255,.86)"); };
+    var note = E("div", "", "flex:none", [say(src ? (b.h >= 300 ? EVERY2 : "") : "Getting a picture")]);
+    var nm = fitWords(root, name, W - 40, 25, 1, 680, "color:#fff") || fitWords(root, name, W - 40, 23, 2, 680, "color:#fff");
+    add(root, [pic, E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.55),transparent 45%)"),
+      E("div", "cw-col", "position:absolute;left:24px;right:24px;top:18px;color:#fff;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center") + ";text-align:" + al, [E("div", "cw-row", "max-width:100%", [ic("camera", 28, "#fff"), nm ? E("div", "", "margin-left:10px;min-width:0", [nm]) : null]), note])]);
+    root.setAttribute("data-ha-cam", cam.entity);
+    var setNote = function (t) { while (note.firstChild) note.removeChild(note.firstChild); var n = t ? say(t) : null; if (n) note.appendChild(n); };
+    liveStill(root, pic, cam.entity, b, env, function (bad) { setNote(bad ? "Camera not answering" : b.h >= 300 ? EVERY2 : ""); });
+    stop(root, "detail", "camera", name);
   };
+
+  // Doorbell: when it last rang, with the door camera's picture
+  function ringWords(at) {
+    var d = new Date(at), t = now(), day0 = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime(), dd = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    var days = Math.round((day0 - dd) / 86400000);
+    var day = days <= 0 ? "today" : days === 1 ? "yesterday" : days < 7 ? DAYS[d.getDay()] : d.getDate() + " " + MONTHS[d.getMonth()].slice(0, 3);
+    return [fmt12(d), "Last ring " + day, day.charAt(0).toUpperCase() + day.slice(1)];
+  }
   R.doorbell = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "doorbell", "doorbell");
-    add(root, E("div", "cw-row", "height:100%;align-items:stretch", [E("div", "", "width:44%;border-radius:22px;background:#2b3035 center/cover;flex:none;background-image:" + cssImg(bgImg("grose-valley"))),
-      E("div", "cw-col", "flex:1;margin-left:20px", [lab("doorbell", "Front door"), E("div", "cw-t38", "margin-top:10px", ["Parcel left"]), E("div", "cw-t25", "", ["2:14pm"])])]));
+    var ha = haOf(env), info = ha.info || {}, al = alignOf(o), W = b.w - 48, H = b.h - 48;
+    if (!env.demo && !info.doorbell) return soonFit(root, b, "doorbell", "doorbell");
+    var bell = ha.bell, name = op(o).label || (bell && bell.name) || "Front door";
+    var words = !bell ? ["Checking", "Home Assistant", "Checking"] : !bell.ok ? ["Not answering", "Home Assistant", "Home Assistant"] : bell.ringing ? ["Ringing now", name, "At the door"] : bell.at ? ringWords(bell.at) : ["No ring", "Not this week", "This week"];
+    var ring = !env.demo && ha.ring && bell && bell.kept && ha.ring.at ? ha.ring : null;
+    var src = env.demo ? bgImg("grose-valley") : ring ? ring.src : (ha.stills || {}).doorbell, cam = env.demo || info.doorbell_camera;
+    var hot = bell && bell.ringing ? "color:#ff453a;" : "";
+    alignRoot(root, al);
+    if (b.w < 300 && b.h < 300) {
+      add(root, [ic("doorbell", 32, "currentColor"), E("div", "cw-grow"), fitNum(root, words[0], W, 48, hot), fitWords(root, words[2], W, 24, 1, 560, "margin-top:6px;color:var(--sub)")]);
+    } else {
+      var strip = b.h < 200, side = strip || b.w > b.h * 1.4, picW = side ? (strip ? H * 1.3 : W * 0.46) : W, colW = side && cam ? W - picW - 20 : W;
+      var picH = side ? H : Math.min(H * 0.5, W * 0.5625), colH = side || !cam ? H : H - picH - 16;
+      var pic = cam ? E("div", "", "position:relative;flex:none;border-radius:22px;overflow:hidden;background:#2b3035 center/cover;" + (src ? "background-image:" + cssImg(src) + ";" : "") +
+        "width:" + px(picW) + ";height:" + px(picH), [!strip ? E("div", "cw-t23", "position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.7)", [env.demo || ring ? "At the ring" : "Door now"]) : null]) : null;
+      var big = strip ? 40 : b.w >= 700 ? 72 : 52;
+      var timeEl = fitNum(root, words[0], colW, big, hot + "font-weight:700"), lineEl = fitWords(root, strip ? words[2] : words[1], colW, 25, 1, 560, "margin-top:6px;color:var(--sub)");
+      var labEl = colH >= (strip ? 96 : 150) ? fitLab(root, "doorbell", name, colW) : null;
+      var text = E("div", "cw-col", "flex:1;min-width:0;justify-content:center;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center") + ";" + (side && cam ? "margin-left:20px" : cam ? "margin-top:16px" : ""), [labEl, labEl ? E("div", "", "height:8px;flex:none") : null, timeEl, lineEl]);
+      add(root, E("div", side ? "cw-row" : "cw-col", "width:100%;height:100%;align-items:" + (side ? "stretch" : "center") + ";min-height:0", [pic, text]));
+      // no picture kept from the ring: the door camera now, a new still every two seconds
+      if (pic && !ring) liveStill(root, pic, "doorbell", b, env);
+    }
+    stop(root, "detail", "camera", name);
   };
+
+  // Solar and energy: today by the hour, in kWh
+  function kwh(v) { return v == null || !isFinite(v) ? "--" : v >= 100 ? String(Math.round(v)) : String(Math.round(v * 10) / 10); }
+  function hourBars(hours, h, gap) {
+    var max = Math.max.apply(null, hours.map(function (v) { return v || 0; }).concat([0.1])), last = -1;
+    hours.forEach(function (v, i) { if (v != null) last = i; });
+    return E("div", "cw-row", "width:100%;align-items:flex-end;height:" + px(h) + ";flex:none", hours.map(function (v, i) {
+      return E("i", "", "display:block;flex:1;margin:0 " + gap + "px;border-radius:5px;height:" + (v == null ? "3px;opacity:.25;background:currentColor" : Math.max(3, Math.round(v / max * 100)) + "%;background:" + (i === last ? "#ffd60a" : "rgba(255,214,10,.62)")));
+    }));
+  }
   R.energy = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "bolt", "energy");
-    var bars = [0, 0, 5, 18, 40, 66, 82, 90, 84, 70, 44, 20, 4, 0];
-    add(root, [E("div", "cw-row cw-sp", "", [lab("bolt", "Solar today"), E("div", "cw-t23", "", ["Battery 86%"])]),
-      E("div", "cw-row", "margin-top:10px", [E("div", "", "margin-right:36px", [E("div", "cw-big", "font-size:76px", ["18.4"]), E("div", "cw-t25", "", ["kWh made"])]), b.w >= 560 ? E("div", "", "", [E("div", "cw-big", "font-size:76px;color:#30d158", ["-$6.20"]), E("div", "cw-t25", "", ["paid to grid"])]) : null]),
-      E("div", "cw-grow cw-row", "align-items:flex-end;margin-top:16px", bars.map(function (v, i) { return E("i", "", "display:block;flex:1;margin:0 3px;height:" + Math.max(3, v) + "%;border-radius:5px;background:" + (i === 9 ? "#ffd60a" : "rgba(255,214,10,.72)")); }))]);
+    var ha = haOf(env), info = ha.info || {}, e = ha.energy, al = alignOf(o), W = b.w - 48, H = b.h - 48;
+    if (!env.demo && !info.energy) return soonFit(root, b, "bolt", "energy");
+    var name = op(o).label || (e && e.name) || "Energy";
+    if (!e) return haWait(root, b, o, "bolt", name, "Checking Home Assistant");
+    if (!e.ok) return haWait(root, b, o, "bolt", name, e.error === "unit" ? "This sensor is not energy or power" : NOT_ANSWERING);
+    alignRoot(root, al);
+    var hours = Array.isArray(e.hours) ? e.hours.slice(0, 24) : [];
+    if (b.w < 300 && b.h < 300) {
+      add(root, [ic("bolt", 32, "currentColor"), E("div", "cw-grow"), fitNum(root, kwh(e.total), W, 60), fitWords(root, "kWh today", W, 25, 1, 560, "color:var(--sub)") || fitWords(root, "kWh", W, 25, 1, 560, "color:var(--sub)")]);
+    } else if (b.h < 200) {
+      var leftW = Math.min(W * 0.5, 200);
+      add(root, E("div", "cw-row", "width:100%;height:100%;align-items:stretch", [E("div", "cw-col", "flex:none;width:" + px(leftW) + ";justify-content:center;align-items:" + (al === "right" ? "flex-end" : al === "left" ? "flex-start" : "center"), [fitLab(root, "bolt", name, leftW),
+        fitNum(root, kwh(e.total), leftW, 60, "margin-top:6px"), fitWords(root, "kWh today", leftW, 24, 1, 560, "color:var(--sub)")]),
+        E("div", "cw-col", "flex:1;min-width:0;margin-left:16px;justify-content:center", [hourBars(hours, H - 20, 1)])]));
+    } else {
+      var wide = b.w >= 560, axis = b.h >= 300 && wide, half = wide && e.power != null ? (W - 36) / 2 : W;
+      var stat = function (v, unit, col) { return E("div", "cw-col", "flex:none;align-items:center", [fitNum(root, v, Math.min(half, 360), 84, col ? "color:" + col : ""), fitWords(root, unit, Math.min(half, 360), 25, 1, 560, "color:var(--sub)")]); };
+      var bat = e.battery != null && wide ? fitWords(root, "Battery " + e.battery + "%", W * 0.4, 25, 1, 560, "color:var(--sub)") : null;
+      add(root, [E("div", "cw-row", "width:100%;flex:none;" + (bat ? "justify-content:space-between" : justify(al)), [fitLab(root, "bolt", name + " today", bat ? W * 0.58 : W), bat]),
+        E("div", "cw-row", "width:100%;flex:none;margin-top:10px;align-items:flex-end;" + justify(al), [stat(kwh(e.total), "kWh today"), wide && e.power != null ? E("div", "", "width:36px;flex:none") : null,
+          wide && e.power != null ? stat(kwh(e.power), String(e.power_unit || "kW") + " now", "#30d158") : null]),
+        E("div", "cw-col cw-grow", "width:100%;justify-content:flex-end;margin-top:14px;min-height:0", [hourBars(hours, Math.max(40, b.h - (axis ? 260 : 220)), wide ? 3 : 1),
+          axis ? E("div", "cw-row cw-sp cw-t23", "width:100%;margin-top:6px", ["12am", "6am", "12pm", "6pm", "12am"].map(function (x) { return E("span", "", "", [x]); })) : null])]);
+    }
+    stop(root, "detail", "energy", name);
   };
+
+  // Sensor: one reading, with its last 24 hours
+  var SENSOR_ICON = { temperature: "temperature", humidity: "humidity", precipitation: "rain", precipitation_intensity: "rain", wind_speed: "wind", power: "bolt", energy: "bolt", battery: "bolt", illuminance: "sun" };
+  function sensorText(s) {
+    if (!s || s.ok === false) return ["--", ""];
+    var v = s.num != null && isFinite(s.num) ? String(Math.round(s.num * 10) / 10) : String(s.value || "--").slice(0, 12), u = String(s.unit || "");
+    return u === "°C" || u === "°F" ? [v + "°", ""] : [v, u];
+  }
+  function spark(points, w, h, colour) {
+    var vals = (points || []).map(function (v) { return v == null || !isFinite(v) ? null : +v; }), got = vals.filter(function (v) { return v != null; });
+    if (got.length < 2) return E("div", "cw-t23", "flex:none;height:" + px(Math.min(h, 30)), ["No readings yet"]);
+    var lo = Math.min.apply(null, got), hi = Math.max.apply(null, got), span = hi - lo || 1, d = "";
+    vals.forEach(function (v, i) { if (v == null) return; var x = i / (vals.length - 1) * 236 + 2, y = 96 - (v - lo) / span * 92; d += (d ? "L" : "M") + Math.round(x * 10) / 10 + " " + Math.round(y * 10) / 10; });
+    var g = svg("0 0 240 100", w, h, [S("path", { d: d, fill: "none", stroke: colour || "currentColor", "stroke-width": 4, "stroke-linecap": "round", "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" })], "flex:none;display:block");
+    g.setAttribute("preserveAspectRatio", "none");   // the day fills the width it is given
+    return g;
+  }
+  function sensorPick(env, o) {
+    var ha = haOf(env), names = (ha.info && ha.info.sensors) || [], want = op(o).reading;
+    var n = names.filter(function (s) { return s.entity === want; })[0] || names[0];
+    if (!n) return null;
+    var s = (ha.sensors || []).filter(function (x) { return x.entity === n.entity; })[0];
+    return { entity: n.entity, name: op(o).label || (s && s.name) || n.name || "Sensor", s: s, read: !!ha.sensors, hist: (ha.hist || {})[n.entity] };
+  }
+  // the reading and its unit on one line, as big as fits
+  function sensorValue(root, t, width, max) {
+    var unitW = t[1] ? (fitPxText(t[1], width * 0.4, 25, 1, 560, famOf(root)) ? t[1].length * 15 + 12 : -1) : 0;
+    if (unitW < 0) unitW = 0, t = [t[0], ""];
+    return E("div", "cw-row", "flex:none;align-items:baseline;max-width:100%", [fitNum(root, t[0], width - unitW, max), t[1] ? E("span", "cw-t25", "margin-left:8px;white-space:nowrap;flex:none", [t[1]]) : null]);
+  }
   R.sensor = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "temperature", "sensor");
-    add(root, [lab("temperature", op(o).label || "Pool"), E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(b.h < 300 ? 64 : 96), ["26°"])]);
+    var p = sensorPick(env, o), al = alignOf(o), W = b.w - 48, H = b.h - 48;
+    if (!p) return soonFit(root, b, "temperature", "sensor");
+    var iconName = SENSOR_ICON[p.s && p.s.cls] || "temperature";
+    if (!p.read) return haWait(root, b, o, iconName, p.name, "Checking Home Assistant");
+    if (!p.s || p.s.ok === false) return haWait(root, b, o, iconName, p.name, NOT_ANSWERING);
+    alignRoot(root, al);
+    var t = sensorText(p.s), pts = p.hist && p.hist.points, got = (pts || []).filter(function (v) { return v != null; });
+    if (b.w < 300 && b.h < 300) {
+      add(root, [fitLab(root, iconName, p.name, W), E("div", "cw-grow"), sensorValue(root, t, W, 64)]);
+    } else {
+      root.setAttribute("data-ha-hist", p.entity);   // smarthome.js reads its last 24 hours
+      if (b.h < 200) {
+        var leftW = W * 0.5;
+        add(root, E("div", "cw-row", "width:100%;height:100%;align-items:center;" + justify(al), [E("div", "cw-col", "flex:none;max-width:" + px(leftW) + ";justify-content:center;align-items:" + (al === "right" ? "flex-end" : al === "left" ? "flex-start" : "center"), [fitLab(root, iconName, p.name, leftW), sensorValue(root, t, leftW, 64)]),
+          E("div", "", "flex:none;margin-left:16px", [spark(pts, W - leftW - 16, H - 20)])]));
+      } else {
+        var foot = got.length >= 2 ? "Low " + Math.round(Math.min.apply(null, got) * 10) / 10 + ", high " + Math.round(Math.max.apply(null, got) * 10) / 10 : "";
+        var footEl = foot ? fitWords(root, foot, W, 24, 1, 560, "color:var(--sub)") : null, value = sensorValue(root, t, W, b.h < 300 ? 64 : 96);
+        add(root, [fitLab(root, iconName, p.name, W), E("div", "", "height:10px;flex:none"), value, E("div", "cw-grow cw-col", "width:100%;justify-content:center;min-height:0", [spark(pts, W, Math.max(40, H - 46 - (b.h < 300 ? 70 : 100) - (footEl ? 34 : 0) - 24))]),
+          footEl, fitWords(root, "Last 24 hours", W, 24, 1, 560, "color:var(--sub)")]);
+      }
+    }
+    stop(root, "detail", "sensor", p.name);
   };
   R.battery = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "bolt", "battery");
@@ -1392,18 +1742,6 @@
     var words = (window.CouchWords || {}).words || [["Petrichor", "noun", "The smell of rain on dry ground."]], w = words[dayOfYear() % words.length];
     add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-t48 cw-ell", "font-size:" + px(clamp((b.w - 48) / (w[0].length * 0.6), 30, 56)), [w[0]]), E("div", "cw-t25 cw-ell", "font-style:italic;margin-top:4px", [w[1] + (b.w >= 600 ? ". " + w[2] : "")])]));
   };
-  CR.speakers = sample("speakers", "speakers", function (root, o, b) { mini(root, b, "speakers", "2", "Speakers", "Living and Kitchen playing"); });
-  CR.controls = sample("controls", "light", function (root, o, b) {
-    var items = (op(o).controls && op(o).controls.length ? op(o).controls : [{ icon: "light", name: "Lounge" }, { icon: "lamp", name: "Lamp" }]).slice(0, b.w < 300 ? 1 : 2);
-    var mw = (b.w - 48 - 20 * (items.length - 1)) / items.length;
-    add(root, E("div", "cw-mods", "", items.map(function (x, i) {
-      return E("div", "cw-mod" + (i === 0 ? " on" : ""), "width:" + px(mw) + ";height:" + px(b.h - 48) + ";padding:14px 16px", [E("div", "cw-ic", "width:44px;height:44px", [ic(x.icon, 26, i === 0 ? "#1a1406" : "#fff", "solid")]), E("div", "cw-t23 cw-ell", "font-weight:700;color:inherit", [x.name || ""])]);
-    })));
-  });
-  CR.camera = sample("camera", "camera", function (root, o, b, env) { R.camera(root, o, b, env); });
-  CR.doorbell = sample("doorbell", "doorbell", function (root, o, b) { mini(root, b, "doorbell", "2:14", "Front door", "Last ring, parcel left"); });
-  CR.energy = sample("energy", "bolt", function (root, o, b) { mini(root, b, "bolt", "18.4", "kWh today", "Solar, battery 86%"); });
-  CR.sensor = sample("sensor", "temperature", function (root, o, b) { mini(root, b, "temperature", "26°", op(o).label || "Pool", "Pool water"); });
   CR.battery = sample("battery", "bolt", function (root, o, b) { mini(root, b, "games", "12%", "Pad 2", "Charge it soon", "#ff453a"); });
   CR.news = sample("news", "info", function (root, o, b) {
     add(root, [E("div", "cw-t23", "color:#ff453a;font-weight:700", ["Local · 1h"]), E("div", "cw-t29", "font-weight:640;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden", ["Highway roadworks finish a month early"])]);
@@ -1414,8 +1752,6 @@
   });
   CR.stocks = sample("stocks", "info", function (root, o, b) { mini(root, b, "info", "+0.6%", "ASX 200", "8,412 at the close", "#30d158"); });
   CR.commute = sample("commute", "location", function (root, o, b) { mini(root, b, "location", "16 min", "To work", "Light traffic, leave by 8:10"); });
-  CR.queue = sample("queue", "music", function (root, o, b) { mini(root, b, "music", "8", "Up next", "Sunday Best, Surfaces"); });
-
   // ---------------- things typed at home (athome.js, through app.js): kept on this TV only ----------------
   // Note, List, Guest Wi-Fi, House guide, Agenda, On this day and Screen time. seagey, 18 Nov 2026:
   // each fits its box at every size (nothing cut off: long words wrap, a line that cannot fit ends in
@@ -1722,4 +2058,6 @@
       // things typed at home (athome.js through app.js)
       athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
   };
+  // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
+  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, queueOf: queueOf, coverOk: coverOk, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
 })();

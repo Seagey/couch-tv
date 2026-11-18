@@ -18,10 +18,36 @@ function card(j) {
   return item;
 }
 
+// The Up next widget (?queue=1): the next songs, title, artist and a cover from Spotify's own picture host
+function queueItems(j, most) {
+  const out = [];
+  for (const it of (j && j.queue) || []) {
+    if (!it || !it.name) continue;
+    const ep = it.type === "episode";
+    const artist = ep ? ((it.show || {}).name || "") : (it.artists || []).map((a) => a.name).filter(Boolean).join(", ");
+    const images = ep ? (it.images || (it.show || {}).images || []) : ((it.album || {}).images || []);
+    const pick = images.length ? images.reduce((a, b) => (Math.abs((b.width || 300) - 300) < Math.abs((a.width || 300) - 300) ? b : a)).url : null;
+    out.push({ title: String(it.name).slice(0, 120), artist: artist.slice(0, 120), art: pick && pick.indexOf("https://i.scdn.co/image/") === 0 ? pick : null });
+    if (out.length >= (most || 10)) break;
+  }
+  return out;
+}
+
 module.exports = async (req, res) => {
   noIndex(res);
   if (!keyOk(req)) return json(res, 403, { ok: false, error: "site key needed (COUCH_SITE_KEY on the host, ?sk= in the address)" });
-  if (!configured()) return json(res, 200, { ok: true, configured: false, music: null }, "public, s-maxage=30");
+  const wantsQueue = /[?&]queue=1\b/.test(req.url || "");
+  if (!configured()) return json(res, 200, wantsQueue ? { ok: true, configured: false, queue: null } : { ok: true, configured: false, music: null }, "public, s-maxage=30");
+  if (wantsQueue) {
+    try {
+      const q = await spotify("/me/player/queue");
+      if (q.status === 204) return json(res, 200, { ok: true, configured: true, queue: [] }, "public, s-maxage=10");
+      if (!q.ok) return json(res, 200, { ok: false, configured: true, queue: [], error: "Spotify said HTTP " + q.status }, "public, s-maxage=15");
+      return json(res, 200, { ok: true, configured: true, queue: queueItems(await q.json(), 10) }, "public, s-maxage=10");
+    } catch (e) {
+      return json(res, 200, { ok: false, configured: true, queue: [], error: String(e.message || e) }, "public, s-maxage=15");
+    }
+  }
   try {
     const r = await spotify("/me/player?additional_types=track,episode");
     if (r.status === 204) return json(res, 200, { ok: true, configured: true, music: null }, "public, s-maxage=2");
@@ -33,3 +59,4 @@ module.exports = async (req, res) => {
   }
 };
 module.exports.card = card;
+module.exports.queueItems = queueItems;

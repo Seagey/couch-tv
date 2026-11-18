@@ -2784,6 +2784,12 @@ async def h_music(request):
     return ok(music=await music_now())
 
 
+async def h_music_queue(request):
+    """The Up next widget: the next songs on the Spotify account (bridge/spotify_now.py), or queue None
+    when Spotify is not connected here. TVs do not share any app's queue, so Spotify is the only source."""
+    return ok(configured=spotify_now.status()["connected"], queue=await spotify_now.queue())
+
+
 # ---------- Spotify's now playing for the whole account (bridge/spotify_now.py, optional) ----------
 def _bridge_port(request):
     return request.url.port or int(os.environ.get("PORT") or config.BRIDGE.get("port") or 5400)
@@ -3867,6 +3873,7 @@ def make_app():
     r.add_post("/api/settings", h_settings_set)
     r.add_get("/api/continue", h_continue)
     r.add_get("/api/music", h_music)
+    r.add_get("/api/music/queue", h_music_queue)
     r.add_get("/api/spotify/login", h_spotify_login)
     r.add_get("/api/spotify/callback", h_spotify_callback)
     r.add_get("/api/spotify/status", h_spotify_status)

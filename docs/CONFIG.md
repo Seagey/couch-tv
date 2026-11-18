@@ -282,7 +282,7 @@ release opens the app rather than the show.
 | `hi_res` [`true`] | `"always"` uses the 3840x2160 copies even when the TV draws its interface at 1080 (a 4K panel set to a 1080 interface, where the scenes looked soft). On a TCL 75C6K with 2.4 GB that cost about 65 MB more for the home's WebView (145 MB to 209 MB), with no stutter (#191). `false` keeps the 1080 copies of the built-in pictures on a 4K screen. A 4K TV normally gets the 3840x2160 copies, which a weak chip can struggle to decode and keep in memory (an LG 43SQ700S monitor). On an LG, `lg/build.py` then leaves the 4K copies out of the app too (22 MB down to under 6 MB). |
 | `glass_amount` [`3`] | How clear the glass is, `1` (frosted) to `5` (very clear): the glass panels, the glass app icons and both clocks (the frosted clock only gets more see-through at `4` and `5`). Home settings, Look, How clear wins over it, and the phone remote follows it. |
 | `glass_focus` [`colour`] | With glass app icons: the focused app shows its own colours (`colour`) or stays glass like the rest (`glass`), shown by its lift, a brighter rim and a deeper shadow. Home settings, Look, Focused app wins over it, and the phone remote follows it. |
-| `now_playing` [`true`] | Now playing: a card with the song any music app is playing, and previous, play or pause and next. `false` hides it. Needs option B or C. Home settings, Look, Now playing wins over it. Optional: with `SPOTIFY_CLIENT_ID` in `.env` and one login at `http://127.0.0.1:5400/api/spotify/login`, a song playing on the Spotify account anywhere (a phone, or a TV with no ADB) fills the card when the TV shows none, without the media buttons ([VIDAA.md](VIDAA.md), "Spotify"). The standalone home gets it from its own site, with a Play on TV button. |
+| `now_playing` [`true`] | Now playing: a card with the song any music app is playing, and previous, play or pause and next. `false` hides it. Needs option B or C. Home settings, Look, Now playing wins over it. Optional: with `SPOTIFY_CLIENT_ID` in `.env` and one login at `http://127.0.0.1:5400/api/spotify/login`, a song playing on the Spotify account anywhere (a phone, or a TV with no ADB) fills the card when the TV shows none, without the media buttons ([VIDAA.md](VIDAA.md), "Spotify"). The same login also fills a design's Up next widget with the next songs in the Spotify queue (the bridge's `/api/music/queue`, the standalone site's `api/now?queue=1`); no other music app shares its queue. The standalone home gets it from its own site, with a Play on TV button. |
 | `ambient_music` [`false`] | Music screen: a full screen album cover with a colour glow, a progress bar and previous, play or pause and next, which opens when a new song starts while you are on the home. Down or Back goes back to the apps. Off by default. Needs Now playing (option B or C). On the Lighter home setting (or an old WebView) the glow is a plain colour wash with no blur or animation. Home settings, Look, Ambient music screen wins over it. |
 | `nav_sound` [`system`] | The sound on every arrow and OK: `system` (the TV's own, which follows its system sounds switch), `soft` (a short, quiet tap) or `off`. Home settings, Look, Sound wins over it. |
 | `clock_style` [`frosted`] | The Night look's clock: `frosted` (the photo's frosted copy, as before) or `liquid` (clear glass digits that bend the photo behind them a little, with a bright rim and a soft edge). Home settings, Look, Clock style wins over it. |
@@ -501,6 +501,22 @@ HOME_ASSISTANT_TOKEN=<the long-lived token>
 | `climate` | Up to 8 air conditioners or heaters (`climate.*` entities), in the order shown. `name` is optional (else Home Assistant's own name). |
 | `scenes` | Up to 10 scenes or scripts (`scene.*`, `script.*`), shown as tiles that run on OK. This is also the way to put lights, blinds or anything else on the TV: make a scene or script for it in Home Assistant. |
 | `doorbell` | `entity`: what rings, one of `event.*` (most doorbells, a new event per press), `binary_sensor.*` or `input_boolean.*` (on while ringing). `camera` (optional): a `camera.*` for the still picture. `name` (optional): the card's title. |
+| `controls` | Up to 16 lights, switches, fans and blinds (`light.*`, `switch.*`, `fan.*`, `cover.*`) for a design's **Control Centre** widget. Never a lock, an alarm, a garage door or a gate: `lock.*` and `alarm_control_panel.*` are refused, so is a `cover.*` or `switch.*` whose id says garage, gate, door or lock, and on the TV a blind Home Assistant calls a garage door, gate or door is shown but never switched. |
+| `cameras` | Up to 4 cameras (`camera.*`) for the **Camera** widget: a still picture, new every 2 seconds, never video. |
+| `sensors` | Up to 8 sensors (`sensor.*`, the pool, a rain gauge, humidity) for the **Sensor** widget: the reading and its last 24 hours. |
+| `energy` | One sensor for the **Solar and energy** widget: `entity`, either today's energy total (kWh or Wh, the kind that counts up through the day) or power (W or kW); `name` (optional); `battery` (optional): a home battery's charge in %. |
+| `speakers` | Up to 6 speakers (`media_player.*`, anything Home Assistant plays on: Sonos, Google, others) for the **Speakers** widget: what each plays, its volume, louder, quieter, play and pause. |
+
+Each takes `{ "entity": "...", "name": "..." }` (the name is optional, else Home Assistant's own), the
+same as `climate`. For example:
+
+```json
+"controls": [{ "entity": "light.lounge", "name": "Lounge" }, { "entity": "cover.blinds", "name": "Blinds" }],
+"cameras": [{ "entity": "camera.backyard", "name": "Backyard" }],
+"sensors": [{ "entity": "sensor.pool_temperature", "name": "Pool" }],
+"energy": { "entity": "sensor.solar_energy_today", "name": "Solar", "battery": "sensor.home_battery" },
+"speakers": [{ "entity": "media_player.kitchen", "name": "Kitchen" }]
+```
 
 **Make a separate Home Assistant user for the TV**, and make the token as that user: in Home
 Assistant, Settings, People, add a user (not an administrator), log in as it once, then its
@@ -517,6 +533,10 @@ app, and the app only allows these, for the entities named here and nothing else
   mode (only modes it lists), or switch it on or off
 - run a listed scene or script
 - for the doorbell: read the doorbell entity, and the named camera's still picture
+- for a design's widgets: read and switch a listed control (on, off, open, close; never a garage
+  door, gate or door), read a listed sensor and its last 24 hours, read the energy sensor's history
+  for today, read a listed speaker and set its volume or play and pause it, get a still from a listed
+  camera, and read when the doorbell last rang
 
 Every call goes to `url` only, never follows a redirect, and gives up after a few seconds, so a
 Home Assistant that is off never holds the TV up. Change `config.json` and run `apply.sh` again to
@@ -539,9 +559,22 @@ and takes it back if you remove the doorbell later. `undo.sh` takes it back too.
 video, only stills, and no sound. The card only shows while the couch-tv app is running, which is
 normally all the time because it is the home screen.
 
-**Not supported yet:** live camera video, locks and alarms (on purpose: nothing that opens the house
-from a TV remote), single lights or switches as their own buttons (use a scene or a script), and
-anything outside Home Assistant.
+**The smart home widgets** (couch-tv Studio designs: Control Centre, Camera, Doorbell, Solar and
+energy, Sensor, Speakers). Each shows only what this section lists; a design can only pick among
+them by entity id, and a TV without them shows the widget's set up card instead. They are asked only
+while a widget for them is on the home and the home is in front, never while an app plays: switches
+and speakers every 10 seconds, the doorbell every 8, sensors every minute and their last 24 hours
+every 15 minutes, energy every 5 minutes, and a camera's still every 2 seconds (stills only, kept in
+memory, never saved or sent anywhere). The Doorbell widget shows when it last rang (Home Assistant's
+own record, or the ring this TV saw), with the still the TV kept from that ring while the card was up
+(in memory only, gone when the app restarts), else the door camera now. Energy and sensor history
+come from Home Assistant's history, so a sensor Home Assistant does not record shows no curve, and
+one that writes many times a second may be too much to draw (it then says so).
+
+**Not supported:** live camera video, locks, alarms, garage doors and gates (on purpose: nothing that
+opens the house from a TV remote), and anything outside Home Assistant. On Samsung, LG, Hisense
+VIDAA and the other web TVs there is no smart home at all: it needs a Google TV, Android TV or Fire
+TV.
 
 Preview with no TV and no Home Assistant: `?mock=1&ha=1` (see the end of this page). The doorbell
 card is drawn by the app itself, so it cannot be previewed in a browser.
