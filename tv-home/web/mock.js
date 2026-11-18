@@ -40,6 +40,8 @@
 //                       animated, so no real faces) and two allowed apps. The parent PIN is 1234.
 //                       kids=empty: the same profile with nothing on the shelf yet
 //   cards=1             custom cards (home.custom_cards): three sample cards at the end of the row
+//   follow=1            home.shelf_follows_app: on an app tile the row shows only that app's cards, as
+//                       "Recently on <app>" (YouTube: two pretend videos, the way the bridge sends them)
 //   update=1            Home settings, Updates, with a pretend 0.4 waiting (update=latest: none
 //                       newer; update=allow: the TV has not let Home install apps yet;
 //                       update=ask: nobody has answered "tell you about new versions?" yet)
@@ -127,6 +129,7 @@
   // ?cards=1: home.custom_cards with three sample cards (docs/TV-HOME.md, Custom cards); the third has a
   // javascript: link and a script in its title, which must show as plain text and open nothing
   if (arg("cards")) cfg.home.custom_cards = true;
+  if (arg("follow")) cfg.home.shelf_follows_app = arg("follow") !== "off";   // home.shelf_follows_app
   window.COUCH_CONFIG = cfg;
 
   // ---------- the launcher's updater (Updater.kt), for ?update= ----------
@@ -279,7 +282,12 @@
             var b = shows[i % shows.length];
             return { id: "k" + i, title: "Show " + (i + 1), season: 1, episode: i + 1, app: b.app, backdrop: b.backdrop };
           });
-          return resolve({ ok: true, items: mine });
+          // the videos next to the items, as GET /api/continue sends them (bridge/API.md): made-up titles, no picture
+          var videos = empty ? [] : [
+            { id: "v1", title: "How a Sydney ferry is built", kind: "video", app: app("youtube", "YouTube", "com.google.android.youtube.tv"), poster: null, backdrop: null, progress: null },
+            { id: "v2", title: "Sourdough for beginners", kind: "video", app: app("youtube", "YouTube", "com.google.android.youtube.tv"), poster: null, backdrop: null, progress: null }
+          ];
+          return resolve({ ok: true, items: mine, videos: videos });
         }
         if (path.indexOf("/api/people") === 0) {
           if (method === "POST") {
