@@ -1569,8 +1569,8 @@
     var el = $("np"), on = npVisible();
     el.classList.toggle("on", on);
     if (NIGHT) {
-      // the row shows while someone has a show on the go, or while a song plays
-      var anyone = KW_ON && PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
+      // the row shows while someone has a show on the go (or videos under the YouTube tile), or while a song plays
+      var anyone = rowHasCards();
       $("shelf-section").classList.toggle("empty", !anyone && !on);
       $("np-slot").classList.toggle("on", on);
     }
@@ -2408,13 +2408,22 @@
     if (shelfKey() === shelfShown) return false;   // the same cards under the same heading: nothing to redraw
     renderShelf();
     s = Math.max(0, Math.min(s, shelfEls.length - 1));   // the row may have fewer cards now
+    // the track still sits where the longer row was scrolled to, and only a press in the row moves it:
+    // a shorter row drawn under it would start off screen, under the heading, until the remote came back up
+    scrollShelf();
     return true;
+  }
+  // The row has something to show: the cards on screen now (one app's, or someone's videos under the
+  // YouTube tile, which showsBy never holds) or someone's shows. renderShelf and renderNp hide the row on
+  // this, so a person whose only history is YouTube videos still sees their "Recently on YouTube".
+  function rowHasCards() {
+    return KW_ON && (data.shows.length > 0 || PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length > 0; }));
   }
 
   function renderShelf() {
     var track = $("shelf");
     data.shows = KW_ON ? visibleShows() : [];   // the whole row, or one app's cards while the remote follows it
-    var anyone = KW_ON && PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
+    var anyone = rowHasCards();
     // nobody has anything on the go: no empty box, the photo has the space (unless Now playing
     // is up at night). The people switcher stays: with nothing yet (Netflix tells Android nothing on
     // some TVs, issue #23) it is the only way to say who is watching before anything is played.
@@ -3475,7 +3484,9 @@
     clearTimeout(focusSaveTimer); focusSaveTimer = 0;
     if (!focusRestored && !touched) return;   // a page not drawn yet must not overwrite what it is about to restore
     if (zone !== "shelf" && zone !== "grid") return;   // menus and settings are not worth coming back to
-    try { localStorage.setItem(FOCUS_KEY, JSON.stringify({ t: Date.now(), zone: zone, s: s, g: g, key: zone === "grid" ? gridKey(gridItems[g]) : "" })); } catch (e) {}
+    // a card's place in the row only means something with the same row: "pkg" is the app the row was
+    // following (home.shelf_follows_app), "" for the whole row
+    try { localStorage.setItem(FOCUS_KEY, JSON.stringify({ t: Date.now(), zone: zone, s: s, g: g, key: zone === "grid" ? gridKey(gridItems[g]) : "", pkg: zone === "shelf" && followPkg ? followPkg : "" })); } catch (e) {}
   }
   function saveFocusSoon() { if (!focusSaveTimer) focusSaveTimer = setTimeout(saveFocusNow, 500); }
   function forgetFocus() { clearTimeout(focusSaveTimer); focusSaveTimer = 0; try { localStorage.removeItem(FOCUS_KEY); } catch (e) {} }
@@ -3485,8 +3496,17 @@
     focusRestored = true;
     var saved = null;
     try { saved = JSON.parse(localStorage.getItem(FOCUS_KEY) || "null"); } catch (e) {}
+    // the remote was left in a "Recently on <app>" row: draw that row again before the card is looked up,
+    // so the outline lands on the card it left and not on the same place in the whole row
+    var pkg = saved && typeof saved === "object" && saved.zone === "shelf" && typeof saved.pkg === "string" ? saved.pkg : "";
+    if (pkg && !SHELF_FOLLOW) return false;   // the setting went off since: that place means nothing now
+    var wholeRow = function () { followPkg = null; renderShelf(); return false; };   // as a fresh start has it
+    if (pkg) {
+      followPkg = pkg; renderShelf();
+      if (!followName()) return wholeRow();   // that app has nothing on the go any more
+    }
     var f = pickFocus(saved, Date.now(), shelfEls.length, gridItems.map(gridKey));
-    if (!f) return false;
+    if (!f) return pkg ? wholeRow() : false;
     zone = f.zone; s = f.s; g = f.g;
     return true;
   }
