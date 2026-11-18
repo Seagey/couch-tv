@@ -777,6 +777,7 @@
     err_vizio_unknown_app: "couch-tv does not know {app}'s id on a VIZIO (docs/VIZIO.md, \"Apps\")",
     note_app_already_on_tv: "{name} is already on the TV.",
     note_app_installed: "Installed {name}.",
+    note_app_quit: "Closed {name}.",
     note_app_not_on_tv: "{name} is not on the TV.",
     note_app_paid_on_play_store: "{name} costs {price} on the Play Store. I never buy apps, so it is left on screen for you to decide.",
     note_app_remove_failed: "{detail}",
