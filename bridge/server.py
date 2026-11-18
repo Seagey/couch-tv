@@ -866,12 +866,13 @@ def resume_link(app_id, link, title):
     return link
 
 
-async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False):
-    """`exact`: only a result with this title will do (finder.same_title); the search's best guess
-    for a name it does not know is a 404 instead of another show."""
+async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False,
+               same=None):
+    """`exact`: only a result with this title will do (finder.same_title, or `same` when given); the
+    search's best guess for a name it does not know is a 404 instead of another show."""
     await installed_packages()
     best, _ = await finder.find(title)
-    if not best or (exact and not finder.same_title(best["title"], title)):
+    if not best or (exact and not (same or finder.same_title)(best["title"], title)):
         raise ApiError(404, f"could not find {title}", key="err_title_not_found", vars={"title": title})
     providers = best["providers"]
     ep_info = None
@@ -4059,20 +4060,14 @@ async def move_open(app, now, session, who, again=False):
     else:
         # exact: only a show of exactly this name. A near name is another show ("Bluey Fancy
         # Restaurant" is a series of its own, not the "Fancy Restaurant" episode of "Bluey").
-        exact, known = True, True
-        if not finder._norm(title):
-            # A name with no Latin letter or digit: play's exact check (finder.same_title) reads it
-            # as empty and turns it down even when the finder has that very title. Compare here.
-            try:
-                best, _ = await finder.find(title)
-            except Exception:
-                best = None
-            known = bool(best and move.same_name(best["title"], title))
-            exact = False
+        # A name with no Latin letter or digit: finder.same_title reads it as empty and turns it
+        # down even when the finder has that very title, so play compares those with the move's
+        # own check. The check runs inside play, on the very result it opens: a lookup made here
+        # first could differ from the one play makes.
+        same = None if finder._norm(title) else move.same_name
         try:
-            if known:
-                return await play(title, now.get("season"), now.get("episode"), app["id"], who,
-                                  resume=not now.get("season"), exact=exact)
+            return await play(title, now.get("season"), now.get("episode"), app["id"], who,
+                              resume=not now.get("season"), exact=True, same=same)
         except ApiError as e:
             if e.status != 404:
                 raise

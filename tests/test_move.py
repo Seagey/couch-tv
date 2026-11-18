@@ -18,6 +18,9 @@ NETFLIX, YOUTUBE = "com.netflix.ninja", "com.google.android.youtube.tv"
 A, B = "tv-a", "tv-b"
 
 
+REAL_PLAY = server.play     # the tests below put a pretend one in its place
+
+
 class FakeTV:
     """A pretend Android TV: remembers every key, ADB line and link it was sent."""
     kind = "android"
@@ -92,7 +95,8 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
             return {"title": got["title"], "subtitle": got.get("channel"), "duration": got.get("duration"),
                     "state": got["state"].upper()}
 
-        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False):
+        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False,
+                       same=None):
             tv_id = server._current.get()
             self.log.append((tv_id, "play", title, season, episode, service, who, resume, exact,
                              store.current_who(tv_id)))
@@ -325,7 +329,7 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
         self.plays_after_presses = 99
         calls = []
 
-        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False):
+        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False, same=None):
             calls.append(title)
             self.b.front = server.apps.BY_ID[service]["package"]
             return {"method": "deeplink", "started": len(calls) > 1}   # the second go picks the profile and plays
@@ -624,37 +628,66 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
         name = "\u5343\u3068\u5343\u5c0b\u306e\u795e\u96a0\u3057"
         self.media[A] = playing(name, 600_000, title_from="app")
         self.media["after_play"] = playing(name, 598_000, title_from="app")
-        asked = []
+        opened = await self.move_with_lookups([name])
+        self.assertEqual(opened, [name])
+        self.assertTrue(self.result["started"])
+        self.assertIsNone(self.result["wrong_title"])  # and the same name on TV B is the same title
+
+    async def move_with_lookups(self, answers):
+        """Run a move where the show finder gives these titles, one per lookup (the last one again
+        after that), and play works the way the real one does: one lookup, checked, then opened."""
+        opened, left = [], list(answers)
 
         async def find(title, type_=None):
-            return {"title": name}, []
+            return {"title": left.pop(0) if len(left) > 1 else left[0]}, []
 
-        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False):
-            asked.append((title, exact))
+        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False,
+                       same=None):
+            best, _ = await server.finder.find(title)
+            if exact and not (same or server.finder.same_title)(best["title"], title):
+                raise server.ApiError(404, "could not find it", key="err_title_not_found", vars={"title": title})
+            opened.append(best["title"])
             self.b.front = server.apps.BY_ID[service]["package"]
             self.media[B] = self.media["after_play"]
             return {"method": "deeplink", "started": True}
         with patch.object(server.finder, "find", find), patch.object(server, "play", play):
-            r = await server.move_playing(A, B)
-        self.assertEqual(asked, [(name, False)])      # compared in the move, so play is not asked to
-        self.assertTrue(r["started"])
-        self.assertIsNone(r["wrong_title"])           # and the same name on TV B is the same title
+            self.result = await server.move_playing(A, B)
+        return opened
+
+    async def test_the_title_that_was_checked_is_the_one_that_is_opened(self):
+        # the finder's answer can change between two lookups; whichever one play gets is the one checked
+        name, other = "\u5343\u3068\u5343\u5c0b\u306e\u795e\u96a0\u3057", "\u3082\u306e\u306e\u3051\u59eb"
+        import time
+        for answers in ([name, other], [other, name]):
+            self.log.clear()
+            self.b.front = None
+            self.media[B] = None
+            # a title the bridge opened itself: the later "same title on TV B" check does not run
+            self.media[A] = playing(name, 600_000, title_from="bridge")
+            self.a.state["playing"]["item"] = {"title": name, "package": self.a.front, "ts": time.time() - 60}
+            opened = await self.move_with_lookups(answers)
+            self.assertNotIn(other, opened, answers)
+            if not opened:
+                self.assertEqual((self.result["started"], self.result["note_key"]),
+                                 (False, "note_move_app_only"), answers)
 
     async def test_a_title_in_another_script_the_finder_has_another_name_for_is_not_opened(self):
         name = "\u5343\u3068\u5343\u5c0b\u306e\u795e\u96a0\u3057"
         self.media[A] = playing(name, 600_000)
-        asked = []
+        opened = await self.move_with_lookups(["\u3082\u306e\u306e\u3051\u59eb"])
+        self.assertEqual(opened, [])
+        self.assertEqual((self.result["started"], self.result["note_key"]), (False, "note_move_app_only"))
+
+    async def test_the_real_play_checks_the_result_it_uses(self):
+        name = "\u5343\u3068\u5343\u5c0b\u306e\u795e\u96a0\u3057"
 
         async def find(title, type_=None):
             return {"title": "\u3082\u306e\u306e\u3051\u59eb"}, []
-
-        async def play(*a, **k):
-            asked.append(a)
-            return {"method": "deeplink", "started": True}
-        with patch.object(server.finder, "find", find), patch.object(server, "play", play):
-            r = await server.move_playing(A, B)
-        self.assertEqual(asked, [])
-        self.assertEqual((r["started"], r["note_key"]), (False, "note_move_app_only"))
+        with patch.object(server.finder, "find", find):
+            for same in (move.same_name, None):
+                with self.assertRaises(server.ApiError) as ctx:
+                    await REAL_PLAY(name, service="netflix", exact=True, same=same)
+                self.assertEqual(ctx.exception.key, "err_title_not_found")
 
     async def test_a_near_name_is_never_opened_in_its_place(self):
         # "Some Show Fancy Dinner" is a series of its own; the finder only knows "Some Show", which
@@ -662,7 +695,7 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
         self.media[A] = playing("Some Show Fancy Dinner", 600_000)
         asked = []
 
-        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False):
+        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False, same=None):
             asked.append((title, exact))
             raise server.ApiError(404, "could not find it", key="err_title_not_found")
         with patch.object(server, "play", play):
@@ -743,6 +776,8 @@ class MoveYouTube(MoveSteps):
     test_a_near_name_is_never_opened_in_its_place = None
     test_a_title_in_another_script_is_opened_when_the_finder_has_that_very_title = None
     test_a_title_in_another_script_the_finder_has_another_name_for_is_not_opened = None
+    test_the_title_that_was_checked_is_the_one_that_is_opened = None
+    test_the_real_play_checks_the_result_it_uses = None
     test_not_playing_after_the_seek_is_not_a_move = None
     test_no_blind_ok_when_the_tv_does_not_answer = None
     test_a_profile_screen_that_came_up_late_gets_a_second_go = None
