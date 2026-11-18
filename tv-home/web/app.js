@@ -56,8 +56,9 @@
   // read in readConfig() once the page starts (mock.js fills them in for previews). See docs/CONFIG.md.
   var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [], DESIGN_FROM_CODE = false, GATE = { on: false, design: null };
   // A picture that fails to load falls back to what its data-err names (kids.js uses it too). One
-  // listener instead of inline onerror handlers, so the page runs under a strict Content Security
-  // Policy (index.html) that allows no inline script at all.
+  // listener instead of inline onerror handlers, so the page still works under the strict Content
+  // Security Policy a couch-tv Studio design adds (designer-gate.js lockPage), which allows no inline
+  // script at all. Keep watching pictures use "kwretry" (kwArtRetry, below).
   document.addEventListener("error", function (e) {
     var n = e.target, k = n && n.getAttribute && n.getAttribute("data-err"), p = n && n.parentNode;
     if (!k) return;

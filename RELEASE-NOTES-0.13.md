@@ -16,13 +16,14 @@ If you already use couch-tv, updating leaves your home exactly as it was. Every 
 ### New: TV home designs from couch-tv Studio (opt in)
 
 - **couch-tv Studio** is a design tool for your TV home. Make a home there, get a short code, and type it on the TV in Home settings, couch-tv Studio, Get a design. Nothing about it is on until someone at the TV turns it on, and **Back to my classic home** puts the old home back in one step (your design is kept for later).
-- **66 widgets** on a 9 by 5 grid, each with sizes that fit: clocks (flip, analog, word, world, countdown), weather, rain, UV, air quality and surf, photos and On this day, Keep watching, Picks for you, Now playing and the Spotify Up next queue, Agenda from your own calendar, Family note, List, Guest Wi-Fi with a join code, House guide, Screen time, Headlines, Commute, and Scores and Markets (Beta).
-- **Smart home widgets** for Home Assistant: Control Centre (lights, switches, fans, blinds), **Camera** (a still picture every two seconds, never video), Doorbell, Solar and energy, Sensor and Speakers. Locks, alarms and garage doors are left out on purpose.
+- **66 widgets** on a 9 by 5 grid, each with sizes that fit: clocks (flip, analogue, word, world, countdown), weather, rain, UV, air quality and surf, photos and On this day, Keep watching, Picks for you, Now playing and the Spotify Up next queue, Agenda from your own calendar, Family note, List, Guest Wi-Fi with a join code, House guide, Screen time, Headlines, Commute, and Scores and Markets (Beta).
+- **Smart home widgets** for Home Assistant: Control Centre (lights, switches, fans, blinds), **Camera** (a still picture every two seconds, never video), Doorbell, Solar and energy, Sensor and Speakers. Locks and alarms are left out on purpose, and a garage door, gate or door Home Assistant lists as a blind is shown but never opened or closed from the TV.
 - **A short looping video** as a design's background, which stops while an app is open and falls back to its still picture on a slow TV.
 - **Google Fonts by name** in a design, apps picked by catalogue id, and your own cut out photo drawn over the clock.
 - **Share this home:** open the home you have now in couch-tv Studio on your phone, to change it or keep it. No names, photos or places are sent.
 - **Things typed at home** (the note, lists, Wi-Fi password, house guide, calendar address) stay on that TV. They are never put in a design, a share or `config.json`.
 - **Home Assistant token privacy:** a design or a share refuses anything that looks like a token or a private key, so your Home Assistant token can never leave the TV that way.
+- **A new optional Android permission, usage access** (`PACKAGE_USAGE_STATS`), in the TV home app. It is only for the Screen time widget, which shows today's time in each app. It is not granted when you install or update: it stays off until you switch Home on in the TV's own Usage access screen (Home settings, At home, Allow screen time), or run `apply.sh` with `SCREEN_TIME=1`. `undo.sh` takes it back.
 - **Fit fixes:** every widget fits its box and is centred unless the design says otherwise, and the flip clock fits at every size, with or without a panel.
 
 ### New on every TV
