@@ -42,6 +42,14 @@ def near(a_ms, b_ms, within_ms=NEAR_MS):
     return abs(int(a_ms) - int(b_ms)) <= within_ms
 
 
+def same_name(a, b):
+    """The same title, in any script: compared after Unicode folding, letters and digits only.
+    finder.same_title keeps Latin letters and digits only, so two identical Japanese or Arabic
+    titles are both empty to it and never match."""
+    a, b = _norm(a), _norm(b)
+    return bool(a) and a == b
+
+
 def clock(ms):
     """83000 -> "1:23", 3723000 -> "1:02:03"."""
     s = max(0, int(ms or 0) // 1000)
@@ -161,7 +169,8 @@ async def youtube_video_id(title, channel=None, duration_ms=None):
     video that was found is remembered for six hours."""
     if not (title or "").strip():
         return None
-    key = (_norm(title), _norm(channel))
+    # the length is part of what was found: a channel can have two videos of one title
+    key = (_norm(title), _norm(channel), round(duration_ms / 1000) if duration_ms else None)
     hit = _found.get(key)
     if hit and time.time() - hit[1] < FOUND_KEEP_S:
         return hit[0]
