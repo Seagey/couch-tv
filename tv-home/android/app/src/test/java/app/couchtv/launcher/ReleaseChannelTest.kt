@@ -1,0 +1,54 @@
+package app.couchtv.launcher
+
+import app.couchtv.launcher.ReleaseChannel.Release
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** Which release a TV may update to: a beta never reaches a stable TV, and beta TVs move on. */
+class ReleaseChannelTest {
+    private fun rel(tag: String, pre: Boolean = false, draft: Boolean = false, asset: Boolean = true) = Release(tag, pre, draft, asset)
+
+    @Test fun versionsCompareAsPeopleReadThem() {
+        assertTrue(ReleaseChannel.newer("v0.4", "0.3"))
+        assertTrue(ReleaseChannel.newer("0.10", "0.9"))
+        assertFalse(ReleaseChannel.newer("0.12", "0.12"))
+        assertFalse(ReleaseChannel.newer("0.12", "0.13"))
+    }
+
+    @Test fun aBetaComesBeforeItsOwnRelease() {
+        assertTrue(ReleaseChannel.newer("0.13", "0.13-beta.1"))
+        assertFalse(ReleaseChannel.newer("0.13-beta.1", "0.13"))
+        assertTrue(ReleaseChannel.newer("0.13-beta.1", "0.12"))
+        assertTrue(ReleaseChannel.newer("0.13-beta.2", "0.13-beta.1"))
+        assertTrue(ReleaseChannel.newer("0.13-beta.10", "0.13-beta.9"))
+        assertTrue(ReleaseChannel.newer("0.13-rc.1", "0.13-beta.3"))
+        assertTrue(ReleaseChannel.newer("0.14", "0.13-beta.1"))
+    }
+
+    @Test fun theOldRulesStillHoldForEveryReleaseSoFar() {
+        val tags = listOf("0.3", "0.4", "0.5", "0.8", "0.9", "0.10", "0.11", "0.12")
+        for (i in 1 until tags.size) assertTrue(tags[i], ReleaseChannel.newer(tags[i], tags[i - 1]))
+    }
+
+    @Test fun aStableTvNeverTakesABeta() {
+        assertTrue(ReleaseChannel.stableOk(rel("v0.13")))
+        assertFalse(ReleaseChannel.stableOk(rel("v0.13-beta.1", pre = true)))
+        assertFalse("published without the pre-release tick", ReleaseChannel.stableOk(rel("v0.13-beta.1")))
+        assertFalse(ReleaseChannel.stableOk(rel("v0.13", pre = true)))
+        assertFalse(ReleaseChannel.stableOk(rel("v0.13", draft = true)))
+        assertFalse(ReleaseChannel.stableOk(rel("v0.13-rc1")))
+        assertTrue("build metadata is not a pre-release", ReleaseChannel.stableOk(rel("v0.13+tv")))
+    }
+
+    @Test fun aBetaTvTakesTheNewestOfEither() {
+        val list = listOf(rel("v0.12"), rel("v0.13-beta.1", pre = true), rel("v0.13-beta.2", pre = true, draft = true), rel("v0.11"))
+        assertEquals("v0.13-beta.1", ReleaseChannel.pickBeta(list)!!.tag)
+        val later = list + rel("v0.13")
+        assertEquals("the real release wins over its beta", "v0.13", ReleaseChannel.pickBeta(later)!!.tag)
+        assertEquals("a release without the app is skipped", "v0.12", ReleaseChannel.pickBeta(listOf(rel("v0.12"), rel("v0.14", asset = false)))!!.tag)
+        assertNull(ReleaseChannel.pickBeta(emptyList()))
+    }
+}

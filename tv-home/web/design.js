@@ -1796,7 +1796,7 @@
     clear();
     var t = document.createElement("div");
     t.className = "cd-escaped";
-    t.textContent = "Design switched off. This is the normal home. Turn it back on in Home settings, Look.";
+    t.textContent = "Design switched off. This is the normal home. Turn it back on in Home settings, TV Designer.";
     t.setAttribute("style", "position:fixed;left:50%;top:2rem;transform:translateX(-50%);z-index:60;padding:0.875rem 1.5rem;border-radius:2rem;background:rgba(16,16,20,0.9);color:#fff;font-size:1.4375rem;font-weight:600");
     document.body.appendChild(t);
     setTimeout(function () { t.remove(); }, 6000);

@@ -27,6 +27,10 @@
     var b = cleanBase(cfg.design_store);
     // a browser preview (mock.js) may point at a local store: ?designstore=http://127.0.0.1:5490
     if (!b && /[?&]mock\b/.test(Q)) { var m = /[?&]designstore=([^&]*)/.exec(Q); if (m) b = cleanBase(decodeURIComponent(m[1])); }
+    // no design_store in config.json at all: TV Designer's own store (designer-gate.js). It is asked
+    // only when the person at the TV types a code or shares the home. "design_store": "" turns both
+    // off; a browser preview (?mock) never reaches it.
+    else if (!b && !/[?&]mock\b/.test(Q) && !Object.prototype.hasOwnProperty.call(cfg, "design_store") && window.CouchDesigner) b = window.CouchDesigner.DEFAULT_STORE;
     return b;
   }
   // a code as typed with the remote: a short one (ABCDE-FGHJK, any case, spaces and dashes ignored) or

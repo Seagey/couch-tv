@@ -3,10 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
-<!-- No inline script, no eval, no plugins, no outside scripts but Spotify's player. Pictures and
-     videos may come from https (posters, photos and video links set in Home settings; a design
-     carries none: design.js refuses outside links) and from the launcher's own tvos.invalid host. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://sdk.scdn.co; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http://tvos.invalid; media-src 'self' blob: https:; connect-src 'self' https: http://127.0.0.1:* http://localhost:*; frame-src https://sdk.scdn.co; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<!-- The page policy a TV Designer design runs under is added by designer-gate.js, only once TV
+     Designer is on: with it off this page has the same rules it always had. -->
 <title>Home</title>
 <link rel="preload" href="fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="app.css">
@@ -165,7 +163,8 @@
 <script src="kids.js"></script>
 <script src="spotify-player.js"></script>
 <script src="cards.js"></script>
-<!-- the TV Designer's design block (config.json "design"): does nothing without one -->
+<!-- TV Designer is opt in: designer-gate.js decides, and with it off design.js is never started -->
+<script src="designer-gate.js"></script>
 <script src="design.js"></script>
 <script src="icon-sets.js"></script>
 <script src="design-icons.js"></script>
@@ -173,8 +172,10 @@
 <script src="widgets.js"></script>
 <script src="widget-caps.js"></script>
 <script src="widget-detail.js"></script>
-<!-- Get a design by code (Home settings, Look): only with config.json "design_store" -->
+<!-- Home settings, TV Designer: Get a design by code, and Share this home (with its QR code) -->
 <script src="design-code.js"></script>
+<script src="qr.js"></script>
+<script src="share-home.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
