@@ -97,7 +97,8 @@ What is on the TV right now.
 - `power`: `"on"`, `"off"` or `"unknown"`.
 - `app`: `null` when not known. `id` is `null` for an app the bridge has no name for (the raw
   `package` is still given). `id` `"home"` means a home screen (ours, `app.couchtv.launcher`, or
-  Google's).
+  Google's). `package` is the package in front on this TV: on a Fire TV, Amazon's build of the app
+  (`com.amazon.firetv.youtube`), with the same `id` as the Google TV one.
 - `volume.known` is `false` when the TV does not report a level (this TV reports `max: 0` while
   sound goes out to an external speaker). Then hide the slider, keep the up and down buttons.
 - `playing`: what is on, `null` when nothing is known. Needs ADB. Fields:
@@ -303,7 +304,12 @@ the known set.
 ```
 Known ids: `netflix` `youtube` `stan` `binge` `abc-iview` `sbs-on-demand` `disney-plus`
 `prime-video` `kayo` `foxtel-go` `9now` `7plus` `10play` `spotify` `plex` `moonlight`
-`settings` `home`. `installed` is `null` when the bridge cannot tell yet.
+`settings` `home`. `installed` is `null` when the bridge cannot tell yet. An app that has another
+build under another package name also lists `packages`, the Google TV one first
+(`"packages": ["com.google.android.youtube.tv", "com.amazon.firetv.youtube"]`): on a Fire TV the
+bridge opens and watches whichever build the TV has, and `installed` is true when any of them is
+there. YouTube, Prime Video and HBO Max have Amazon's builds (seen on a Fire TV Cube); every other
+app has one package.
 
 ### `GET /api/roku/apps` and `GET /api/roku/icon/<id>`
 Roku only (`400` for any other TV, `503` while the Roku is not answering). The couch-tv channel on the Roku
@@ -543,6 +549,26 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
   `/api/continue/open` and `/api/continue/hide` take those ids too; hide takes an optional `who`
   (else the person on the couch; nobody picked means everyone). `GET /api/plex/status` says what is
   set up and how the last read went, never the token.
+- `videos`, next to `items`: the YouTube videos this person watched on this TV, a list of their own.
+  YouTube stays out of `items` (it would bury everything else), and a video's name is never looked
+  up (matched to a film, it would put that film in the household's taste, issue #23): a video that
+  played the minute is written by the name YouTube gave it, with no picture, and shows only here, for
+  the home to put under the YouTube tile and nowhere else. Never in the picks, the taste or
+  `GET /api/history`. One card per title (the newest), newest first, at most 10, within 30 days,
+  minus the ones removed with `/api/continue/hide`, in the shape of an item with `"kind": "video"`,
+  `episode_title`, `season`, `episode`, `poster`, `backdrop` and `progress` all `null`, and `app`
+  YouTube's installed build. `/api/continue/open` with a video's id opens that build on YouTube's
+  search for the title (`"method": "search"`; Amazon's YouTube lists `https://www.youtube.com` links in
+  its intent filter, read with `dumpsys package` on a Fire TV Cube, but opening the search link there
+  has not been tried yet), or the app alone where the link does not take (`"method": "app"`), never
+  through the show finder. Its answer is `{"title", "service": "youtube", "app", "method", "note"}`.
+  ```json
+  {"ok": true, "items": [], "videos": [
+    {"id": "9c1e0b7d4a553f2a", "title": "How Trains Work", "episode_title": null, "season": null, "episode": null,
+     "app": {"id": "youtube", "name": "YouTube", "package": "com.amazon.firetv.youtube"},
+     "service": "youtube", "poster": null, "backdrop": null, "progress": null, "kind": "video",
+     "last_played": "2030-01-01T19:31:00Z", "source": "bridge"}]}
+  ```
 
 ### `POST /api/sleep` and `GET /api/sleep`
 Sleep timer, kept on the bridge so it still fires when the phone locks.

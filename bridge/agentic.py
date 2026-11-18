@@ -729,7 +729,7 @@ async def h_restart_app(request):
         app = S.apps.BY_PACKAGE.get(front)
         if not app or app["id"] in ("home", "settings"):
             raise S.ApiError(409, "no app is open to restart", key="err_no_app_to_restart")
-    pkg = app["package"]
+    pkg = S.pkg_of(app)   # the build this TV has (Amazon's on a Fire TV)
     title = season = episode = None
     m = S.media_now
     if m and m.get("package") == pkg and m.get("title"):

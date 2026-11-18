@@ -135,7 +135,12 @@ out the same way. The phone's People sheet keeps these marks when it renames or 
   after 30 days with no watching. A show counts after a minute of the same title playing. An app
   that gives Android no title (Netflix on some TVs) or only its own name (Prime on a Sony) is named
   from its row in Android's "Continue watching" (Watch Next) instead: the TV home app reads those
-  rows and hands them to the bridge, because ADB cannot read them. Videos and music are never kept.
+  rows and hands them to the bridge, because ADB cannot read them. Music and streams are never kept.
+  On a Fire TV the bridge knows Amazon's builds of YouTube, Prime Video and HBO Max (other package
+  names than the Google TV ones), so it opens the one the TV has and their shows reach Keep watching.
+  YouTube videos are kept as a list of their own that the home shows only for the YouTube tile, never
+  in the shared row or the household's taste: a video is written by the name YouTube gave it, with no
+  picture, and opening it searches YouTube for that name.
 - **With no computer (option A),** Keep watching is Android's own Watch Next list, plus the
   Continue Watching channel of apps that put nothing in Watch Next but keep a home screen row of
   their own instead: so far Stremio. Both are read the same read only way, with no account and no
@@ -194,7 +199,7 @@ screen, no update questions. The phone remote's Ask is off while that profile is
 |---|---|
 | `pin` (needed) | The parent PIN, 4 to 8 digits. Without a good one kids mode stays off for that person (the bridge says so once in its log). |
 | `shows` [none] | Up to 24. A plain title, or `title` with any of `service` (the app it opens in: an id from `bridge/apps.py`, such as `netflix`, `abc-iview`, `disney-plus`, `stan`, `prime-video`), `season` and `episode`. Without `service` the first free or subscription app it streams on is used, never a rent or buy page. Without `season` it opens the show's own page in the app; with one, that episode (or the season's first). |
-| `apps` [none] | Up to six apps shown under the shelf: app ids from `bridge/apps.py` or Android package names. Only apps installed on that TV show. Android's Settings is never allowed. |
+| `apps` [none] | Up to six apps shown under the shelf: app ids from `bridge/apps.py` or Android package names. Only apps installed on that TV show. Android's Settings is never allowed. On a Fire TV with the bridge (option B), `youtube`, `prime-video` and `hbo-max` are Amazon's own builds, and the bridge hands the TV the package it has; without a bridge (option A) the kids home only knows the Google TV package, so those three do not show on a Fire TV. |
 
 The poster on each tile comes from JustWatch, the same place Keep watching gets its pictures. `kid`
 is separate and optional: it keeps someone out of the household's taste, as before.
