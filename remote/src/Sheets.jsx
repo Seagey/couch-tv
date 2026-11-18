@@ -385,7 +385,7 @@ export function PeopleSheet({ open, onClose, onSaved }) {
   );
 }
 
-export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnds, onSleep, onKey, onText, sleepError, tvs, tvId, onTv, picture, pictureInfo, onPicture, onArrange, onPeople, onKids }, ref) {
+export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnds, onSleep, onKey, onText, sleepError, tvs, tvId, onTv, canMove, onMove, picture, pictureInfo, onPicture, onArrange, onPeople, onKids }, ref) {
   const [typed, setTyped] = useState('');
   const sheetEl = useRef(null);
   const setRefs = (el) => { sheetEl.current = el; if (typeof ref === 'function') ref(el); else if (ref) ref.current = el; };
@@ -404,6 +404,16 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
               </button>
             ))}
           </div>
+          {/* Move what is playing here to another TV (Android and Google TV only, docs/MOVE.md) */}
+          {canMove && tvs.find((tv) => tv.id === tvId)?.kind === 'android' && (
+            <div className="chips-row chips-wrap move-row">
+              {tvs.filter((tv) => tv.id !== tvId && tv.kind === 'android' && tv.paired !== false).map((tv) => (
+                <button key={tv.id} className="chip glass" onClick={() => { tick(); onMove(tv); }}>
+                  <Ic.Send size={15} /> {t('move_to', { tv: tv.name })}
+                </button>
+              ))}
+            </div>
+          )}
         </section>
       )}
 

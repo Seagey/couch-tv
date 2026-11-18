@@ -812,7 +812,21 @@
     note_restarted_youtube_searched: "Restarted YouTube and searched for {title}.",
     note_screens_need_sunshine: "Needs Sunshine on the computer and Moonlight on the TV.",
     note_screens_opened_moonlight: "Opened Moonlight. Pick the {screen} on the TV.",
-    note_vidaa_tile_not_added: "The TV did not add the tile. The browser stays the way couch-tv opens."
+    note_vidaa_tile_not_added: "The TV did not add the tile. The browser stays the way couch-tv opens.",
+    // Move what is playing to another TV (POST /api/move)
+    note_moved: "{title} is playing on {tv}.",
+    note_move_other_spot: "{title} is playing on {tv}, at another spot. {from} was at {time}.",
+    note_move_not_playing: "Opened {title} on {tv}, but it has not started playing. Press OK on its remote.",
+    note_move_app_only: "Could not open {title} by itself on {tv}. {app} is open there: find it with the TV remote.",
+    err_move_same_tv: "pick another TV to move to",
+    err_move_which_tv: "say which TV to move to",
+    err_move_not_supported: "moving a show needs an Android or Google TV at both ends ({tv} is not)",
+    err_move_nothing_playing: "nothing is playing on {tv}",
+    err_move_no_title: "{app} does not say what is playing, so it cannot be moved",
+    err_move_app_not_known: "couch-tv does not know the app {app}, so it cannot move it",
+    err_move_not_installed: "{app} is not installed on {tv}",
+    err_move_tv_in_use: "{tv} is playing something",
+    err_move_busy: "a move is already running, wait for it to finish"
   };
 
   S["zh-CN"] = {
@@ -1593,7 +1607,21 @@
     note_restarted_youtube_searched: "已重启 YouTube 并搜索 {title}。",
     note_screens_need_sunshine: "需要电脑上装 Sunshine、电视上装 Moonlight。",
     note_screens_opened_moonlight: "已打开 Moonlight。请在电视上选择 {screen}。",
-    note_vidaa_tile_not_added: "电视没有添加磁贴。仍按 couch-tv 的方式用浏览器打开。"
+    note_vidaa_tile_not_added: "电视没有添加磁贴。仍按 couch-tv 的方式用浏览器打开。",
+    // Move what is playing to another TV (POST /api/move)
+    note_moved: "{title} 正在{tv}上播放。",
+    note_move_other_spot: "{title} 正在{tv}上播放，但位置不同。{from}当时播到 {time}。",
+    note_move_not_playing: "已在{tv}上打开 {title}，但还没有开始播放。请按它遥控器上的 OK。",
+    note_move_app_only: "无法在{tv}上直接打开 {title}。{app} 已在那里打开：请用电视遥控器找到它。",
+    err_move_same_tv: "请选择另一台电视",
+    err_move_which_tv: "请说明要移到哪台电视",
+    err_move_not_supported: "两端都必须是 Android TV 或 Google TV 才能移动节目（{tv}不是）",
+    err_move_nothing_playing: "{tv}上没有在播放内容",
+    err_move_no_title: "{app} 没有说明正在播放什么，所以无法移动",
+    err_move_app_not_known: "couch-tv 不认识应用 {app}，所以无法移动",
+    err_move_not_installed: "{tv}上没有安装 {app}",
+    err_move_tv_in_use: "{tv}正在播放内容",
+    err_move_busy: "已有一次移动正在进行，请等它完成"
   };
 
   S.cs = {
@@ -5816,7 +5844,21 @@
     note_restarted_youtube_searched: "Uruchomiono ponownie YouTube i wyszukano „{title}”.",
     note_screens_need_sunshine: "Wymaga programu Sunshine na komputerze i Moonlight na telewizorze.",
     note_screens_opened_moonlight: "Otwarto Moonlight. Wybierz „{screen}” na telewizorze.",
-    note_vidaa_tile_not_added: "Telewizor nie dodał kafelka. couch-tv nadal będzie otwierać się w przeglądarce."
+    note_vidaa_tile_not_added: "Telewizor nie dodał kafelka. couch-tv nadal będzie otwierać się w przeglądarce.",
+    // Move what is playing to another TV (POST /api/move)
+    note_moved: "„{title}” jest odtwarzane na telewizorze {tv}.",
+    note_move_other_spot: "„{title}” jest odtwarzane na telewizorze {tv}, ale w innym miejscu. {from}: {time}.",
+    note_move_not_playing: "Otwarto „{title}” na telewizorze {tv}, ale odtwarzanie się nie zaczęło. Naciśnij OK na jego pilocie.",
+    note_move_app_only: "Nie udało się otworzyć „{title}” na telewizorze {tv}. Aplikacja {app} jest tam otwarta: znajdź tytuł pilotem.",
+    err_move_same_tv: "wybierz inny telewizor",
+    err_move_which_tv: "podaj, na który telewizor przenieść",
+    err_move_not_supported: "przenoszenie wymaga Android TV lub Google TV po obu stronach ({tv} nim nie jest)",
+    err_move_nothing_playing: "na telewizorze {tv} nic nie jest odtwarzane",
+    err_move_no_title: "{app} nie podaje, co jest odtwarzane, więc nie można tego przenieść",
+    err_move_app_not_known: "couch-tv nie zna aplikacji {app}, więc nie może jej przenieść",
+    err_move_not_installed: "Aplikacja {app} nie jest zainstalowana na telewizorze {tv}",
+    err_move_tv_in_use: "na telewizorze {tv} coś jest odtwarzane",
+    err_move_busy: "przenoszenie już trwa, poczekaj na jego koniec"
   };
 
   for (var fk in S.en) if (!(fk in S.fr)) S.fr[fk] = S.en[fk];

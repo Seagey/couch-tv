@@ -1,0 +1,115 @@
+# Move what is playing to another TV
+
+You are watching in one room and want to carry on in another. One tap on the phone remote pauses the
+show on the first TV and starts it on the other one, as the same person, near the same spot.
+
+**New.** It has run in one house, between a Sony Google TV and a Google TV Streamer, both ways. What
+each app did there is in the table below. If it works (or does not) on yours, please open an issue and
+say which TVs and which app.
+
+## What you need
+
+- Option B: the bridge, with **two or more TVs** in `config.json` ([CONFIG.md](CONFIG.md), The TVs).
+- **Android TV or Google TV at both ends** (a Fire TV on Fire OS with `"adb_only": true` counts), with ADB
+  allowed on both ([SETUP.md](SETUP.md), step 1). The bridge reads what is playing, and passes the
+  "Who's watching?" screen, over ADB.
+- The same app on both TVs, signed in to the same account. It has to be an app in the bridge's own
+  list (`bridge/apps.py`).
+- Optional, for landing on the same spot: the sync helper app of [SYNC.md](SYNC.md) on the TV you move to.
+
+## How to use it
+
+1. On the phone remote, pick the TV that is playing (pull down the **TV** menu, **Which TV**).
+2. While something is playing or paused, a button **Move to <the other TV>** shows under the TV names.
+   Tap it.
+3. The first TV pauses. The other TV wakes, opens the app from a fresh start, picks your profile and
+   plays. Allow 15 to 50 seconds, depending on the app.
+
+If the other TV is playing something itself, nothing happens there and the phone asks first.
+
+## What the bridge does
+
+In this order (`POST /api/move`, [bridge/API.md](../bridge/API.md)):
+
+1. Reads what is playing on the first TV, where it is up to, and who is watching there.
+2. Checks the other TV: it is free, it has the app, and it is not on a kids profile.
+3. Pauses the first TV, and checks that it took (Netflix on a Sony ignored a pause sent in a show's
+   first seconds; the bridge sends it again).
+4. Wakes the other TV, and waits 4 seconds for its home screen to settle.
+5. Sets the same person on the other TV, before the show opens.
+6. Closes the app on the other TV and opens the same title in it, picks that person's profile on a
+   "Who's watching?" screen, and presses Play if the app stops on the title's page. If the show is open
+   but not playing, it waits a little longer, and opens it once more if a profile screen has come up
+   in the meantime. In Netflix only, if the screen cannot be read, it then
+   presses OK and watches, up to three times.
+7. Reads where the other TV started. **Apps mostly resume by themselves.** Only when it is more than 5
+   seconds from the first TV's spot is that spot used, as a backup (see below).
+8. Leaves the first TV on and paused. It is only turned off when asked (`"power_off": true`), and only
+   once the other TV is playing.
+
+If anything fails before the show is open on the other TV (it will not wake, its ADB drops), the first
+TV plays on and the other TV keeps the person it had.
+
+## What each app did (one house, November 2026)
+
+A Sony Google TV and a Google TV Streamer, the sync helper on both. "Blind OK" is the
+`COUCHTV_MOVE_BLIND_OK` switch described under the limits. Two of the Netflix runs were started from a real phone;
+the rest from the bridge's API or the remote page in a browser.
+
+| App | Runs | Played | Seconds | Spot | What it needed, or why not |
+|---|---|---|---|---|---|
+| Netflix | 9 | 8 | 15 to 36 | Same spot, by itself or through the sync helper | OK pressed on the Streamer's profile screen (not readable). The one miss: a link opened straight after the wake was covered by the home screen; the 4 second wait fixed it |
+| YouTube | 5 | 5 | 15 to 24 | Same spot, by the link with the time (once 10 s behind, before the 5 second rule) | Nothing |
+| Prime Video | 3 | 3 | 46 to 48 | Same spot in 2 runs (sync helper), from the start in 1 | Blind OK switched on for it: two presses (profile, then Play) |
+| Disney+ | 7 | 4 | 42 to 48 | Same spot, through the sync helper | The profile is picked by name. The 3 misses came first and were fixed: the show and episode in one title, "Access Sam's profile" as the profile's label, and a profile screen that came up late |
+| Plex | 1 | 0 | - | - | Plex gives the TV no media session: the bridge sees nothing playing |
+| An app not in `bridge/apps.py` | 1 | 0 | - | - | Refused: the bridge has no way to open a title in it |
+
+## The limits
+
+- **Netflix can start at the wrong spot** when you move seconds after pausing or seconds after a long
+  skip. Netflix resumes from the spot its own servers last saved, and that save lags behind (seen: a
+  show moved one second after the pause started from the beginning). The backup fixes it only with the
+  sync helper installed (below).
+- **Netflix does not say what is playing on some TVs** (no title in its media session). The move then
+  only works for a show the bridge knows it is: one couch-tv opened, or one it logged in that app in
+  the last six hours. Otherwise the phone says the app does not say what is playing.
+- **YouTube needs the same account, with watch history on, on both TVs.** That is how YouTube knows
+  where you were. When it starts somewhere else anyway (seen: from the beginning, on a move right after
+  the pause), the bridge opens the video again at the first TV's spot. The bridge finds the video by its
+  title and channel on YouTube's public search page. If it is not sure which video it is, it opens
+  YouTube's search for the title and you pick it.
+- **Live TV has no spot.** The channel or app opens; you may land on its home page.
+- **Profile names must match.** The bridge looks for the person's name on the "Who's watching?" screen
+  (`app_profiles` in [CONFIG.md](CONFIG.md), People). The label has to be the name, or the name with only
+  the app's own words around it (Disney+ reads "Access Sam's profile"). A profile it cannot find is
+  left for you to pick with the TV remote; it never takes another person's profile on a loose match.
+- **A profile screen the bridge cannot read is passed with OK, in Netflix only.** Netflix draws its own
+  "Who's watching?" on some TVs (seen on a Google TV Streamer), and nothing on it can be read. The bridge
+  then presses OK, which takes the profile Netflix has in focus: the one last used on that TV, not the
+  person by name. It only presses while Netflix is the app in front.
+- **Other apps with a screen that cannot be read stop there** (seen: Prime Video's profile screen, then
+  its title page with Play in focus). The show is open on the other TV and you press OK on its remote.
+  The bridge does not press OK blind in an app that sells rentals or channels, because it cannot see
+  whether Play or Rent has the focus. A household that accepts that can name more apps in the
+  `COUCHTV_MOVE_BLIND_OK` environment variable of the bridge (app ids, comma separated, for example
+  `prime-video`).
+- **The show has to be one the show finder knows** (it is how the bridge opens a title in an app). A
+  title that is a show's name followed by an episode's name (Disney+: "Bluey Fancy Restaurant") is
+  matched when that episode is found. For anything else the app opens on its search, with the title
+  typed in where the app allows it, and the phone says so.
+- **An app that does not say what is playing** cannot be moved: no title in its media session, or no
+  media session at all (Plex on a Sony Google TV).
+- **An app the bridge does not know** (not in `bridge/apps.py`) cannot be moved.
+- **The first TV's saved spot is a backup only.** YouTube: the video is opened again with the time in
+  the link. Any other app: the bridge can only jump inside it through the sync helper app of
+  [SYNC.md](SYNC.md) (`dev.couchtv.sync`), if you have installed it on the other TV, and only if the
+  app takes a seek from outside (the helper says). Without it the phone says the show started at
+  another spot and where the first TV was, and you wind on by hand.
+- **The bridge does not check which title ended up playing** on the other TV, only that the app plays.
+- **Kids mode:** a TV that is on a kids profile is not moved to another person without the parent PIN.
+  The phone remote does not ask for the PIN yet: change the person on that TV first.
+- **Samsung, LG, Roku, VIDAA, Philips, VIZIO, Panasonic, TiVo and Apple TV** cannot be either end: they
+  do not let the bridge read what is playing.
+- One move at a time. One trigger for now: the phone remote. A button on the TV home and a remote key
+  may come later.

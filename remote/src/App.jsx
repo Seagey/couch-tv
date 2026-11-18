@@ -269,6 +269,16 @@ export default function App() {
     .then((d) => { setTv(d); setReach(true); loadRecs(); api.apps().then((a) => setApps(a.apps)).catch(() => {}); })
     .catch(() => say(t('still_cant_reach'), 'err'));
   const onPower = () => (tv?.power === 'on' ? run(api.power('off')) : onWake());
+  // Move what is playing on this TV to another one. A TV that is playing something itself is only
+  // taken over after a yes.
+  const onMove = async (to, force = false) => {
+    setSheet(null); say(t('moving_to', { tv: to.name }));
+    try { const r = await api.move(to.id, force); say(tBridge(r.note_key, r.note_vars, r.note)); } catch (e) {
+      if (e.key === 'err_move_tv_in_use' && !force && window.confirm(t('move_take_over', { tv: to.name }))) { onMove(to, true); return; }
+      if (e.status === 0) setReach(false);
+      say(tBridge(e.key, e.vars, e.message), 'err');
+    }
+  };
   const onPlay = async (show) => {
     if (show.playable === false) { say(t('not_on_tv', { title: show.title, service: serviceName(show.service) })); return; }
     say(t('starting', { title: show.title }));
@@ -399,6 +409,7 @@ export default function App() {
       {toast && <div key={toast.id} className={`toast glass ${toast.kind}`} role="status">{toast.text}</div>}
       <AskSheet ref={askInput} open={sheet === 'ask'} onClose={() => setSheet(null)} who={who} recs={recs} onAsk={onAsk} onDone={(reply) => say(reply)} />
       <MoreSheet ref={moreSheet} open={sheet === 'more'} tvs={tvs} tvId={tvId || 'living-room'} onTv={(id) => { tick(); chooseTv(id); }}
+        canMove={!offState && ['playing', 'paused', 'buffering'].includes(tv?.playing?.state) && Boolean(tv?.playing?.title)} onMove={onMove}
         picture={tv?.picture} pictureInfo={pictureInfo} onPicture={onPicture} onClose={() => setSheet(null)} sleepEnds={sleepEnds} sleepError={sleepError} onSleep={onSleep}
         onKey={onKey} onText={(text) => run(api.text(text), t('sent_to_tv'))} onArrange={() => setSheet('arrange')} onPeople={() => setSheet('people')} onKids={() => setSheet('kids')} />
       <ArrangeSheet open={sheet === 'arrange'} onClose={() => setSheet(null)} tvName={thisTv?.name} hidden={hidden} />
