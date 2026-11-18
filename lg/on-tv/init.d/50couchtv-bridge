@@ -1,0 +1,3 @@
+#!/bin/sh
+# Started by the Homebrew Channel at boot.
+pgrep -f bridge-loop.sh >/dev/null || nohup /home/root/couchtv/bridge-loop.sh >/dev/null 2>&1 &

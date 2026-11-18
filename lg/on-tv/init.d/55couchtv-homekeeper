@@ -1,0 +1,2 @@
+#!/bin/sh
+pgrep -f home-keeper.sh >/dev/null || nohup /home/root/couchtv/home-keeper.sh >/dev/null 2>&1 </dev/null &

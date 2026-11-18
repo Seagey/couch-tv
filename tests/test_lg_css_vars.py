@@ -32,5 +32,18 @@ class CssVarFallbacks(unittest.TestCase):
         self.assertIn("top: 3.75rem; top: var(--safe-y);", out)
 
 
+class FontWeightFallbacks(unittest.TestCase):
+    """webOS 3.x and 4.x (Chrome 38, 53) only know font-weight in hundreds."""
+    def test_in_between_weights_get_the_nearest_hundred_first(self):
+        out = build.font_weight_fallbacks(".a { font-weight: 620; } .b{font-weight:650} .c { font-weight: 250 !important; }")
+        self.assertIn("font-weight: 600; font-weight: 620;", out)
+        self.assertIn("font-weight: 600; font-weight:650}", out)
+        self.assertIn("font-weight: 200 !important; font-weight: 250 !important;", out)
+
+    def test_hundreds_and_the_font_face_range_are_left_alone(self):
+        css = '@font-face { font-family: "Inter"; font-weight: 100 900; }\n.a { font-weight: 600; }'
+        self.assertEqual(build.font_weight_fallbacks(css), css)
+
+
 if __name__ == "__main__":
     unittest.main()
