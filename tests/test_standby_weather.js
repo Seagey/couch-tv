@@ -47,7 +47,13 @@ D.set(nine);
 let wx = kit.weather({ demo: false, data: { weather: forecast(nine, true) } });
 ok(wx.is_day === false, "9pm: night, though the reading fetched at 5:50pm said day");
 ok(kit.wxIcon(wx.code, wx.is_day) === "clear-night", "9pm, clear: the night icon, not the sun");
-ok(kit.wxIcon(2, false) === "cloud" && kit.wxIcon(2, true) === "partly-cloudy", "partly cloudy at night: a cloud, never the sun");
+ok(kit.wxIcon(2, false) === "partly-cloudy-night" && kit.wxIcon(2, true) === "partly-cloudy", "partly cloudy at night: the moon behind the cloud, never the sun");
+// the night icon ships with the home (icon-sets.js, a copy of tools/tv-designer/icons/icon-sets.js) in every style
+const TVIcons = require(path.join(web, "icon-sets.js"));
+["line", "solid", "duotone", "tile", "glass", "playful"].forEach((s) => {
+  const night = TVIcons.svg(s, "partly-cloudy-night", 40, "#fff"), day = TVIcons.svg(s, "partly-cloudy", 40, "#fff");
+  ok(/^<svg/.test(night) && night !== day, "partly cloudy night draws in the " + s + " style, unlike the day one");
+});
 ok(wx.ahead && wx.ahead.label === "Tomorrow" && wx.ahead.code === 95 && wx.ahead.hi === 25, "9pm: the day ahead is tomorrow (storms, top of 25)");
 ok(wx.hourly.every((h) => h[3] === true), "9pm to midnight: every hour is a night hour");
 el = draw(bigtemp, { demo: false, data: { weather: forecast(nine, true) } });

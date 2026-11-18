@@ -281,6 +281,10 @@
     ["partly-cloudy", "Partly cloudy", "weather", "blue", [
       C("b", 9, 9, 3.6, BACK), P("s", rays(9, 9, 6, 7.9, 8, 0), BACK),
       P("b", cloud(6.25, 20.5, 15.5)), P("x", cloud(6.25, 20.5, 15.5))], { k: .9, dx: -.5 }],
+    // partly cloudy at night: the clear night moon (cut the same way) where the sun was, behind the same cloud
+    ["partly-cloudy-night", "Partly cloudy night", "weather", "indigo", [
+      P("b", crescent(9, 9.25, 5.6, 3.4, -3.4, 4.9), BACK), P("f", "M18.25 2.25l0.50 1.15 1.15 0.50-1.15 0.50-0.50 1.15-0.50-1.15-1.15-0.50 1.15-0.50z", BACK),
+      P("b", cloud(6.25, 20.5, 15.5)), P("x", cloud(6.25, 20.5, 15.5))], { k: .9, dx: -.5 }],
     ["cloud", "Cloudy", "weather", "cyan", [P("b", CLOUD_MID)], { k: 1.08, dy: -1 }],
     ["rain", "Rain", "weather", "blue", [P("b", CLOUD_HIGH), P("s", "M8.5 18.25l-1 2.5M12.5 18.25l-1 2.5M16.5 18.25l-1 2.5")]],
     ["storm", "Storm", "weather", "purple", [P("b", CLOUD_HIGH), P("s", "M12.75 15.75 10.5 19.25h3.25l-2 3")]],

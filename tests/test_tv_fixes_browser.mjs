@@ -88,6 +88,19 @@ console.log("Running TV fixes browser tests...");
   ok(!page.errors.length, "StandBy: no page errors " + page.errors.join(" | "));
   await page.close();
 }
+{ // 2b. StandBy at 9pm, partly cloudy (code 2): the moon behind the cloud, not the sun behind it
+  const page = await home(preset("standby"), "&wx=19,2", new Date(2026, 10, 18, 21, 0));
+  const same = await page.evaluate(() => {
+    const el = document.querySelector('.cw-o[data-obj="temp"] .cw svg');
+    const ds = (svg) => [...svg.querySelectorAll("path,circle")].map((p) => p.getAttribute("d") || p.getAttribute("r")).join("|");
+    const want = (name) => ds(new DOMParser().parseFromString(window.TVIcons.svg("solid", name, 40, "#fff"), "image/svg+xml").documentElement);
+    return { night: ds(el) === want("partly-cloudy-night"), day: ds(el) === want("partly-cloudy") };
+  });
+  ok(same.night && !same.day, "StandBy at 9pm, partly cloudy: the moon behind the cloud");
+  await page.screenshot({ path: path.join(SHOTS, "standby-9pm-partly.png") });
+  ok(!page.errors.length, "StandBy partly cloudy: no page errors " + page.errors.join(" | "));
+  await page.close();
+}
 { // 3. depth_image: your own photo (a grey JPEG) and your own cut out (solid green below y 540, see through above)
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   page.errors = [];

@@ -148,8 +148,8 @@
   function wxIcon(code, day) {
     code = +code;
     if (code <= 1) return day === false ? "clear-night" : "sun";
-    // partly cloudy at night: a cloud, never the sun (the icon sets have no moon behind a cloud yet)
-    if (code === 2) return day === false ? "cloud" : "partly-cloudy";
+    // partly cloudy at night: the moon behind the cloud, never the sun
+    if (code === 2) return day === false ? "partly-cloudy-night" : "partly-cloudy";
     if (code === 3) return "cloud";
     if (code === 45 || code === 48) return "fog";
     if (code >= 71 && code <= 77 || code === 85 || code === 86) return "snow";
