@@ -1161,15 +1161,6 @@
     add(root, [E("div", "cw-row cw-sp", "", [lab("calendar", op(o).label || "Today"), E("div", "cw-t23", "", [ev.length + " events"])]),
       E("div", "cw-col cw-grow", "margin-top:20px;justify-content:space-around", ev.slice(0, n).map(function (e) { return E("div", "cw-ev", "", [E("i", "", "background:" + e[0]), E("div", "cw-t29 cw-ell", "", [e[1]]), E("div", "cw-t25", "", [e[2]])]); }))]);
   };
-  R.list = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "check", "list");
-    var todo = /to ?do|task|work/i.test(op(o).label || "");
-    var items = todo ? [["Send the quote", 0], ["Call the plumber", 1], ["Book flights", 0], ["Renew the rego", 0], ["Back up the laptop", 0], ["Order printer ink", 1], ["Reply to Sam", 0], ["Pay the power bill", 0]]
-      : [["Milk", 0], ["Bread", 1], ["Avocados", 0], ["Sunscreen", 0], ["Dog food", 0], ["Lemons", 1], ["Coffee", 0], ["Bin bags", 0]];
-    var n = clamp(Math.floor((b.h - 100) / 72), 2, items.length), lc = todo ? "#0a84ff" : root.classList.contains("cw-paper") ? "#1f9d55" : "#30d158";
-    add(root, [E("div", "cw-row cw-sp", "", [lab(op(o).icon || "check", op(o).label || "Shopping", lc), E("div", "cw-t23", "", [String(items.filter(function (x) { return !x[1]; }).length)])]),
-      E("div", "cw-col cw-grow", "margin-top:16px;justify-content:space-around", items.slice(0, n).map(function (x) { return E("div", "cw-li" + (x[1] ? " done" : ""), "", [E("span", "bx"), E("span", "cw-ell", "", [x[0]])]); }))]);
-  };
 
   // info
   R.card = function (root, o, b, env) {
@@ -1418,7 +1409,6 @@
     add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "align-items:center;flex:none;width:92px", [E("div", "cw-t23", "font-weight:750;color:#ff453a", [DAYS[d.getDay()].slice(0, 3).toUpperCase()]), E("div", "cw-big", "font-size:62px", [String(d.getDate())])]),
       E("div", "cw-ev", "flex:1;min-width:0;margin-left:16px", [E("i", "", "background:#30d158"), E("div", "cw-col", "min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:680", ["Swimming"]), E("div", "cw-t23", "", ["4:00pm"])])])]));
   });
-  CR.list = sample("list", "check", function (root, o, b) { mini(root, b, op(o).icon || "check", "6", op(o).label || "Shopping", "Milk, avocados, sunscreen"); });
   CR.news = sample("news", "info", function (root, o, b) {
     add(root, [E("div", "cw-t23", "color:#ff453a;font-weight:700", ["Local · 1h"]), E("div", "cw-t29", "font-weight:640;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden", ["Highway roadworks finish a month early"])]);
   });
@@ -1462,6 +1452,40 @@
       E("div", "", "flex:none;max-width:100%;font-size:" + px(fs) + ";font-weight:680;line-height:1.18;margin-top:" + (fromH ? 8 : 0) + "px;letter-spacing:-.01em;white-space:pre-line;" + lines(max), [n.text])]));
   };
   CR.note = R.note;
+
+  // ---- List: the one whose name its label gives, else the first ----
+  function listOf(o, env) {
+    if (env.demo) {
+      var todo = /to ?do|task|work/i.test(op(o).label || "");
+      var items = todo ? [["Send the quote", 0], ["Call the plumber", 1], ["Book flights", 0], ["Renew the rego", 0], ["Back up the laptop", 0], ["Order printer ink", 1], ["Reply to Sam", 0], ["Pay the power bill", 0]]
+        : [["Milk", 0], ["Bread", 1], ["Avocados", 0], ["Sunscreen", 0], ["Dog food", 0], ["Lemons", 1], ["Coffee", 0], ["Bin bags", 0]];
+      return { at: 0, name: op(o).label || "Shopping", todo: todo, items: items.map(function (x) { return { t: x[0], done: !!x[1] }; }) };
+    }
+    var ls = (athome(env) || {}).lists || [], want = String(op(o).label || "").toLowerCase(), at = 0;
+    if (!ls.length) return null;
+    for (var i = 0; i < ls.length; i++) if (want && ls[i].name.toLowerCase() === want) { at = i; break; }
+    return { at: at, name: ls[at].name, todo: /to ?do|task|work/i.test(ls[at].name), items: ls[at].items };
+  }
+  R.list = function (root, o, b, env) {
+    var a = ahAlign(root, o), l = listOf(o, env);
+    if (!l) return soon(root, b, "check", "list");
+    // what is still to do first, then what is ticked
+    var items = l.items.filter(function (x) { return !x.done; }).concat(l.items.filter(function (x) { return x.done; }));
+    var left = items.filter(function (x) { return !x.done; }), lc = l.todo ? "#0a84ff" : root.classList.contains("cw-paper") ? "#1f9d55" : "#30d158", icon = op(o).icon || "check";
+    var count = left.length ? left.length + (l.todo ? " to do" : " left") : l.items.length ? "All done" : "Nothing on it yet";
+    if (b.h < 200) {
+      add(root, ahCol(a, [ahLab(icon, l.name, lc), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", count),
+        left.length ? one1("cw-t23", "", left.slice(0, 4).map(function (x) { return x.t; }).join(", ")) : null]));
+      return;
+    }
+    var n = clamp(Math.floor((b.h - 48 - 40) / 50), 1, 40), more = items.length > n ? items.length - (n - 1) : 0, shown = more ? items.slice(0, n - 1) : items;
+    add(root, ahCol(a, [ahLab(icon, l.name + (items.length ? " · " + count : ""), lc),
+      items.length ? E("div", "cw-col", "max-width:100%;flex:none;align-items:" + (a === "right" ? "flex-end" : "flex-start"), shown.map(function (x) {
+        return E("div", "cw-li" + (x.done ? " done" : ""), "max-width:100%;margin-top:14px", [E("span", "bx"), E("span", "cw-ell", "flex:0 1 auto;min-width:0", [x.t])]);
+      }).concat(more ? [one1("cw-t23", "margin-top:14px", "and " + more + " more")] : []))
+        : E("div", "cw-col", "flex:none;max-width:100%;margin-top:14px;align-items:" + FLEX[a], [one1("cw-t29", "font-weight:680", "Nothing on this list"), one1("cw-t23", "margin-top:4px", "Add to it in Home settings")])]));
+  };
+  CR.list = R.list;
 
   // ---------------- one widget, a stack, the API ----------------
   function one(o, b, env) {
@@ -1550,6 +1574,6 @@
       roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
       // things typed at home (athome.js through app.js)
-      athome: athome }
+      athome: athome, listOf: listOf }
   };
 })();

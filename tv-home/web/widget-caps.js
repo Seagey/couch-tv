@@ -309,10 +309,10 @@
     note: { name: "Family note", status: "setup", what: "A sticky note typed at home, with who it is from", needs: [NOTE_NEED],
       setup: setup("tv", typed(["Pick Write a note, type it, then press OK. Pick From to say who it is from."])), until: "\"Write a note\", and where", build: "",
       ok: "Opens the note big", platforms: plat("setup", "computer", "setup", KEPT), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
-    list: { name: "List", status: "not-built", what: "Reminders or shopping, ticked from the phone", needs: ["Needs a list kept at home that the phone can tick"],
-      setup: setup("nothing", NOT_YET), until: "\"List: not on couch-tv yet\", and what it needs",
-      build: "HomeAssistant.kt has to allow todo entities named in config.json (read and tick), or the bridge has to keep a list the phone remote edits.",
-      ok: "Opens the whole list, tick with OK (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["wtile", "small", "tall", "large"], [4, 2]) },
+    list: { name: "List", status: "setup", what: "Shopping or to do, ticked with OK on the remote", needs: [LIST_NEED],
+      setup: setup("tv", typed(["Pick Add a list and name it (up to 3), then Add an item for each thing.", "On the home, OK on the widget opens the list: OK ticks an item."])),
+      until: "\"Add a list\", and where", build: "",
+      ok: "Opens the whole list: OK ticks an item", platforms: plat("setup", "computer", "setup", KEPT), sizes: sz(["wtile", "small", "tall", "large"], [4, 2]) },
 
     // ---------- info ----------
     card: { name: "Custom card", status: "setup", what: "A number from your home: solar today, the pool", needs: ["A computer at home that stays on, running couch-tv"],

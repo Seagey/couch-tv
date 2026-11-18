@@ -25,12 +25,12 @@
     aircon: "aircon", scenes: "scenes", controls: "controls", camera: "camera", doorbell: "camera",
     card: "cards", news: "news", sports: "sports",
     memory: "setup", picks: "setup", queue: "setup", speakers: "setup", energy: "setup", sensor: "setup", battery: "setup",
-    note: "note", list: "setup", stocks: "setup", commute: "setup", wifi: "setup", guide: "setup", screentime: "setup"
+    note: "note", list: "list", stocks: "setup", commute: "setup", wifi: "setup", guide: "setup", screentime: "setup"
   };
   var TITLE = { timers: "Timers", forecast: "Forecast", world: "World clocks", calendar: "Calendar", moon: "Moon", air: "Air quality", surf: "Surf",
     photos: "Photos", keep: "Keep watching", folder: "Apps", player: "Now playing", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre",
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up",
-    note: "Family note" };
+    note: "Family note", list: "List" };
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -220,6 +220,27 @@
     S.body.appendChild(head("edit", "Family note", n.from ? "From " + n.from : "Change it in Home settings, couch-tv Studio, At home", "#c79a00"));
     var fs = clamp(Math.sqrt(1500 * 640 / Math.max(10, n.text.length) / 1.6), 44, 120);
     S.body.appendChild(E("div", "cwd-col cwd-grow cwd-center", "", [E("div", "cwd-note", "font-size:" + px(fs), [n.text])]));
+  };
+  B.list = function (o, env) {
+    var l = kit().listOf(o, env);
+    if (!l) return B.setup(o, env);
+    var left = function () { return l.items.filter(function (x) { return !x.done; }).length; };
+    S.body.appendChild(head("check", l.name, "", l.todo ? "#0a84ff" : "#30d158"));
+    var sub = function () { S.subEl.textContent = (left() ? left() + " to do" : l.items.length ? "All done" : "Nothing on it yet") + (l.items.length ? ". OK ticks an item." : ""); };
+    sub();
+    if (!l.items.length) { S.body.appendChild(E("div", "cwd-text", "margin-top:40px", ["Add to this list in Home settings, couch-tv Studio, At home, or with Type on the TV in the phone remote."])); return; }
+    var grid = E("div", "cwd-grid", "align-content:flex-start;margin-top:30px");
+    l.items.forEach(function (it, i) {
+      var row = E("div", "cwd-item" + (it.done ? " done" : ""), "", [E("i", "cwd-box"), E("span", "cwd-ell", "", [it.t])]);
+      grid.appendChild(F(row, function () {
+        if (designerSays()) return;
+        it.done = !it.done;
+        row.classList.toggle("done", it.done);
+        S.api.act("tick", l.at + ":" + i);
+        sub();
+      }, it.t));
+    });
+    S.body.appendChild(E("div", "cwd-grow", "overflow:hidden", [grid]));
   };
 
   // moon: tonight and the next four weeks
