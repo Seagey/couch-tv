@@ -85,10 +85,15 @@ the rest from the bridge's API or the remote page in a browser.
   minute later. The move tries the key twice and then asks the sync helper to pause the app itself;
   on the Streamer that took when the key had not. Without the sync helper on the first TV the move can
   only say that it would not pause. On the Sony, two moves made right after a fresh Netflix start
-  then ended with the first TV paused. Also seen there: one pause key five seconds after the start did
-  nothing at all, a key nineteen seconds after the start paused it, and a show paused in its first
-  seconds took up again by itself three seconds later. So the move looks at the first TV again when
-  the other TV has opened the show, and once more when it plays, and pauses it again if need be.
+  then ended with the first TV paused. Measured there, without a move: in the first twenty seconds or
+  so after Netflix starts, the pause key took once in four tries; the sync helper's pause took every
+  time, but a pause in the first six seconds came undone (Netflix starts playback over about ten
+  seconds in), and one after sixteen seconds held. So the move looks at the first TV again when the
+  other TV has opened the show, and once more when it plays, and pauses it again if need be.
+- **If the other TV cannot be reached** (off at the wall, off the network), the move gives up after
+  about 45 seconds with "the TV did not wake", and the first TV, paused meanwhile, plays on.
+- **YouTube says what the video is five or six seconds after it starts** (measured on the Sony). A move
+  pressed before that waits up to six seconds for the title.
 - **YouTube needs the same account, with watch history on, on both TVs.** That is how YouTube knows
   where you were. When it starts somewhere else anyway (seen: from the beginning, on a move right after
   the pause), the bridge opens the video again at the first TV's spot. The bridge finds the video by its
