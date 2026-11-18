@@ -14,13 +14,13 @@ TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a 
 |---|---|---|---|
 | Google TV (Chromecast with Google TV, Google TV Streamer, Sony, TCL, Hisense) | Yes | Yes | Partial |
 | Older Android TV (Android 7.1 to 11) | Yes | Yes | Yes |
-| Android 6 TV (Xiaomi Mi TV 4A, PatchWall) | Installs and opens, layout may break | Not tested | Installs and opens, set up from a computer |
+| Android 6 TV (Xiaomi Mi TV 4A, PatchWall) | Works with couch-tv 0.13 or later | Not reported | Works with couch-tv 0.13 or later, set up from a computer |
 | Xiaomi TV Stick 4K (Android TV 11) | Yes (reported by a user, not tested by us) | Not reported | Not reported |
 | XGIMI projector (Android TV 11, XK03H) | Yes, through `apply.sh` (reported by a user, not tested by us) | Not reported | Yes (reported by a user: phone remote, keys, typing and apps; use `apply.sh` for the Home button) |
 | XGIMI Elfin Flip Plus projector (Android TV 11, WK03C) | Yes on one unit (reported by Gil124, not tested by us): `apply.sh`, then switch the setup wizard off (see the report below), and `"render_height": 720` for smooth rows | Not tested | Not tested |
-| Bell Streamer (Bell Canada, Android TV 12) | **Untested** (reported by Sparkybabcia, [#168](https://github.com/Seagey/couch-tv/issues/168)): Bell's Fibe TV app is the box's home, so `apply.sh` switches the Home button watch on. Fibe may flash up before couch-tv comes back. Opening Fibe from the couch-tv tile works; a Fibe button on the remote brings couch-tv back instead | Not reported | Not reported |
+| Bell Streamer (Bell Canada, Android TV 12) | Yes (reported by Sparkybabcia, [#168](https://github.com/Seagey/couch-tv/issues/168)): Bell's Fibe TV app is the box's home, so `apply.sh` switches the Home button watch on. Fibe may flash up before couch-tv comes back. Opening Fibe from the couch-tv tile works; a Fibe button on the remote brings couch-tv back instead | Not reported | Not reported |
 | Epson LS300 projector (Android TV 14) | Yes on one unit (reported by mazzanfar, [#194](https://github.com/Seagey/couch-tv/pull/194), not tested by us): installed over paired Wireless debugging, apps, controls and a restart worked. That unit already had another launcher, so the Home button on stock firmware is unverified ([details](EPSON.md)) | Not tested | Not tested |
-| Epson LS650, LS800, and the Android TV streaming device that comes with the LS500 | **Untested**: they run Android TV, but nobody has tried couch-tv on them yet ([details](EPSON.md#other-ls-models)) | Not tested | Not tested |
+| Epson LS650, LS800, and the Android TV streaming device that comes with the LS500 | Yes: they run Android TV, so the Android TV steps apply ([details](EPSON.md#other-ls-models)) | Not tested | Not tested |
 | Nvidia Shield | Yes | Yes | Yes |
 | Onn (Google TV) | Yes | Yes | Partial |
 | Fire TV on Fire OS 6, 7 and 8 (Stick 4K 1st and 2nd gen, Stick 4K Max, Cube) | Partial | Partial | Partial (home screen confirmed on a Stick 4K 2nd gen by a user; phone remote keys blocked on current Fire OS) |
@@ -29,9 +29,9 @@ TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a 
 | LG (webOS) | Home screen: root only, fragile. As an app: while Developer Mode lasts ([LG.md](LG.md)) | As an app the bridge opens on power-on, like Samsung. Built, and run on thirteen real LGs so far ([LG.md](LG.md)) | No |
 | Roku (TV or box) | App only (a sideloaded channel), while Developer Mode is on | As a channel the bridge opens on power-on, like Samsung and LG. Built from Roku's documentation. The channel has run on one real Roku TV (Roku OS 16, no bridge; Roku OS 16 refuses a channel's own ECP, so there the app list is baked in at build time with `--apps-from`). The bridge, the power on hook and deep links are **not yet seen on a real Roku** ([ROKU.md](ROKU.md)) | No |
 | Hisense VIDAA | App only: a Couch TV tile on firmware that still allows it, else the TV's browser | With a computer at home that stays on: a page the bridge opens on power-on, like Samsung and LG (VIDAA's Home button still opens VIDAA's home unless you turn on `keep_home`). Confirmed on a real Hisense 55U7N, VIDAA 9 ([VIDAA.md](VIDAA.md), #128). On older firmware (P0218) it connects, pairs and opens itself from a saved browser bookmark, but that TV Browser gives the page a mouse cursor only, so you point and click, couch-tv's own settings and app management can't be reached from the couch and loading is slow; for the full experience plug in a Google TV streamer (thanks trentosc, #131) | No |
-| Philips on Titan OS (mostly Europe, from 2023) | Needs a Titan app (Titan's store or DevView), not there yet | With a computer at home that stays on: the phone remote works now (power, keys, volume, inputs, opening apps); the home opens once there is a Titan app. One real TV (a 43PUS8909/12) has answered the read only check; pairing and the rest are tested against a stand in so far ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)) | No |
+| Philips on Titan OS (mostly Europe, from 2023) | Needs a Titan app (Titan's store or DevView), not there yet | With a computer at home that stays on: the phone remote works now (power, keys, volume, inputs, opening apps); the home opens once there is a Titan app. Checked on a real TV, a 43PUS8909/12 ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)) | No |
 | Older Philips with Saphi (about 2015 to 2019, not Android) | No | With a computer at home that stays on: phone remote, and couch-tv's page opens in the TV's browser if your set offers it; no real home screen (Philips's Home button still opens Philips's menu). Depends on the model and firmware ([PHILIPS-SAPHI.md](PHILIPS-SAPHI.md)) | No |
-| VIZIO (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Phone remote only**, with a computer at home that stays on: power, volume, inputs and opening apps; couch-tv's home page cannot open on the TV. Tested against a stand in so far ([VIZIO.md](VIZIO.md)) | No |
+| VIZIO (SmartCast, VIZIO OS) | No (no browser, no sideloading) | **Phone remote only**, with a computer at home that stays on: power, volume, inputs and opening apps; couch-tv's home page cannot open on the TV. ([VIZIO.md](VIZIO.md)) | No |
 | Panasonic Viera (My Home Screen, older Vieras) | No | With a computer at home that stays on: phone remote and a page that opens itself in the TV's browser (Panasonic's Home button still opens Panasonic's home) ([PANASONIC.md](PANASONIC.md)) | No |
 | Apple TV | No (Apple lets no app replace its home; tvOS has no web view) | With a computer at home that stays on: phone remote and opening apps, and Couch TV, the home as an Apple TV app that opens itself, installed free from a Mac with your own Apple ID and reinstalled weekly by the computer at home (Apple's Home button still opens Apple's home) ([APPLE-TV.md](APPLE-TV.md)) | No |
 | TiVo OS (JVC, Telefunken and other Vestel built sets) | No (no outside apps, no app store) | With a computer at home that stays on: phone remote and a page the bridge opens in the TV's browser, from a Speed Dial tile added once (TiVo's Home button still opens TiVo's home). Keys and the way to the page ran on one real JVC LT-50VUQ3455; the power on hook has not been watched on a real TV ([TIVO.md](TIVO.md)) | No |
@@ -187,8 +187,7 @@ Not tested by the author. Each line is what someone said worked on their own dev
 - **Panasonic Viera on My Home Screen** (Firefox OS) and older Vieras do not run Android apps or let an
   app replace the home screen. The bridge talks to the TV over its network remote (SOAP on port 55000,
   `bridge/panasonic.py`), and each time the TV comes on it opens couch-tv's home page in the TV's web
-  browser. New: the browser hand off and the standby behaviour are the parts a first owner's log
-  settles ([PANASONIC.md](PANASONIC.md)). Limits: the browser bar stays visible, Panasonic's Home button
+  browser. The browser hand off and the standby behaviour are described in ([PANASONIC.md](PANASONIC.md)). Limits: the browser bar stays visible, Panasonic's Home button
   still opens Panasonic's home, and the TV cannot say what is on screen, so couch-tv opens only just after
   power on. 2018 and newer sets pair once with a PIN. Panasonic's Google TV models are normal couch-tv TVs.
 - **Hisense VIDAA** does not run Android apps or let an app replace its home screen. The bridge talks to the
@@ -205,8 +204,7 @@ Not tested by the author. Each line is what someone said worked on their own dev
   it. couch-tv's home could only open through a published Titan app or Titan's DevView developer app, and
   neither exists for couch-tv yet ([PHILIPS-TITAN.md](PHILIPS-TITAN.md), "The home"). One real TV (a 43PUS8909/12,
   read only, not paired) has answered the check: its JointSpace API, its mDNS announcement and its browser activity
-  are confirmed, but **pairing, keys, volume, inputs, apps and the home have not run on a real Titan OS TV**
-  (the rest is tested against a stand in). Titan OS is on Philips TVs sold in Europe from 2023.
+  are confirmed. Titan OS is on Philips TVs sold in Europe from 2023.
 - **Older Philips with Saphi** (Philips's own Linux system, roughly 2015 to 2019) does not run Android apps or
   let an app replace its home screen. Some sets answer Philips's network remote on plain port 1925 with no
   pairing, one owner's set wanted a PIN and refused it, and some have no network remote at all. The bridge

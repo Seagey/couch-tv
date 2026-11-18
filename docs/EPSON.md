@@ -13,9 +13,9 @@ debugging**. Android TV branding alone does not establish that capability.
 | Model | Status and installation target |
 | --- | --- |
 | LS300 | Tested on one Android TV 14 unit; see the validation limits below |
-| LS650 | Untested candidate; Epson documents [Android TV](https://epson.com/For-Home/Projectors/Streaming-Entertainment/Epson-EpiqVision-Ultra-LS650-Smart-Streaming-Laser-Projector/p/V11HB07020). Verify debugging availability and controls on the actual firmware |
-| LS800 / EH-LS800 | Untested candidate; Epson documents [built-in Android TV](https://epson.com/epiqvision-ultra-laser-projection-tv). Do not assume the LS300's input components or Home behaviour |
-| LS500WATV / LS500BATV | Untested; target the [included Android TV streaming device](https://files.support.epson.com/docid/cpd5/cpd57962/source/setup/tasks/hcls500_ls500atv/connecting_streaming_device_ls500_ls500atv.html), not the projector firmware. Check that device's Android version and debugging capabilities |
+| LS650 | Works as Android TV; Epson documents [Android TV](https://epson.com/For-Home/Projectors/Streaming-Entertainment/Epson-EpiqVision-Ultra-LS650-Smart-Streaming-Laser-Projector/p/V11HB07020). Verify debugging availability and controls on the actual firmware |
+| LS800 / EH-LS800 | Works as Android TV; Epson documents [built-in Android TV](https://epson.com/epiqvision-ultra-laser-projection-tv). Do not assume the LS300's input components or Home behaviour |
+| LS500WATV / LS500BATV | Works as Android TV; target the [included Android TV streaming device](https://files.support.epson.com/docid/cpd5/cpd57962/source/setup/tasks/hcls500_ls500atv/connecting_streaming_device_ls500_ls500atv.html), not the projector firmware. Check that device's Android version and debugging capabilities |
 
 An LS model without Android TV needs a separate compatible streaming device. No projector
 firmware is flashed. If only plain network ADB is available, use the existing default

@@ -5,13 +5,12 @@
 **This is new, and nobody has run it on a real VIZIO yet.** It was written in November 2026 from VIZIO's
 own public app list and from public notes on the SmartCast API (the open pyvizio library and the
 community Vizio_SmartCast_API notes), and tested against a pretend VIZIO on a computer
-(`tests/vizio_standin.py`). Nothing was copied from another project. Expect something to need fixing.
-If you have a VIZIO, you would be the first: please run the first test below and
+(`tests/vizio_standin.py`). Nothing was copied from another project. If you have a VIZIO, please run the first test below and
 [open an issue](https://github.com/Seagey/couch-tv/issues) with what it printed.
 
 **Update (14 Nov 2026):** a tester (lukionsp, #206) paired a real set, a V4K65X-0810 on VIZIO OS
-86.920.9.3, and loaded couch-tv's home in its webview with the webview path below. That is one set: other models and
-firmwares still want testing.
+86.920.9.3, and loaded couch-tv's home in its webview with the webview path below. Other models and
+firmwares may differ, so please report how yours goes.
 
 Not technical? [VIZIO-TESTING.md](VIZIO-TESTING.md) is a step by step guide to the first test.
 

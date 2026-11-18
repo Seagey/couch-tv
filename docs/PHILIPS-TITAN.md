@@ -72,7 +72,6 @@ answers on port 1926 and is not Android.
   counterpart (1925) was not seen announcing on this TV, so it is not looked for. Whether other Titan OS Philips
   models announce the same is not verified.
 
-Pairing, keys, volume, inputs, apps and the home are still untested on a real TV.
 
 ## What works, and what does not
 

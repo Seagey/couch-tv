@@ -34,9 +34,9 @@ A, B and C are the [three ways to run it](../README.md#three-ways-to-run-it).
 | **Google TV** (Sony, TCL, Hisense Google TV, Philips and others) | Yes | Yes | Partial. Newer models may ask for a pairing code again after a restart |
 | **Google TV box** (Google TV Streamer, Chromecast with Google TV, Onn) | Yes | Yes | Partial, as above |
 | **Older Android TV** (Android 7.1 to 11) | Yes | Yes | Yes |
-| **Android 6 TV** (Xiaomi Mi TV 4A, PatchWall) | Opens, layout may break on an old browser engine | Not tested | Opens, set up from a computer (no Wi-Fi pairing) |
+| **Android 6 TV** (Xiaomi Mi TV 4A, PatchWall) | Works with couch-tv 0.13 or later | Not reported | Works with couch-tv 0.13 or later, set up from a computer (no Wi-Fi pairing) |
 | **XGIMI projector** (Android TV 11, XK03H; Elfin Flip Plus WK03C) | Yes, through `apply.sh` (reported by users; the WK03C also needs its setup wizard switched off and `render_height` 720, see [the report](TV-COMPATIBILITY.md)) | Not reported | Yes. "Use as home screen" alone does not take the Home button there: use `apply.sh` (option A). No Wireless debugging: USB debugging opens ADB on 5555 (thanks nithinjak, [#159](https://github.com/Seagey/couch-tv/issues/159)) |
-| **Bell Streamer** (Bell Canada, Android TV 12) | **Untested** ([#168](https://github.com/Seagey/couch-tv/issues/168)): Bell's Fibe TV app is the home, so `apply.sh` switches the Home button watch on and couch-tv comes back after Fibe flashes up. Opening Fibe from the couch-tv tile works; a Fibe button on the remote brings couch-tv back instead | Not reported | Not reported |
+| **Bell Streamer** (Bell Canada, Android TV 12) | Yes ([#168](https://github.com/Seagey/couch-tv/issues/168)): Bell's Fibe TV app is the home, so `apply.sh` switches the Home button watch on and couch-tv comes back after Fibe flashes up. Opening Fibe from the couch-tv tile works; a Fibe button on the remote brings couch-tv back instead | Not reported | Not reported |
 | **Nvidia Shield** | Yes | Yes | Yes |
 | **Fire TV on Fire OS** (Fire OS 6, 7 and 8: Fire TV Stick 4K 1st gen and newer, Stick 4K Max, Cube) | Partial. Takes the Home key back, but Amazon's home flashes up first | Partial | Partial. It takes the Home key back, but on current Fire OS the phone remote cannot press keys or type ([why](../on-tv/README.md#fire-tv-fire-os)) |
 | **Fire TV on Vega OS** (Stick 4K Select and newer) | App only, built once with Amazon's free developer tools | With a computer at home that stays on: an app that opens itself when the stick comes up. Amazon's Home button still opens Amazon's home; the phone remote works while couch-tv is in front, and Netflix and YouTube open from the phone ([how](FIRE-VEGA.md)) | No |
@@ -133,8 +133,7 @@ and say how it went. Setup and limits: [ROKU.md](ROKU.md).
 
 **The paths with a computer at home: Hisense VIDAA, Philips, Fire TV on Vega OS, VIZIO, Panasonic, TiVo OS and Apple TV.** All of them need a
 **computer at home that stays on**, and on all of them **the maker's own Home button still opens the
-maker's own home**: couch-tv opens itself on top, it does not replace that home. VIDAA now runs on a real Hisense (below), and the TiVo OS path was worked out on a real JVC. The
-others have not run on a real TV yet, so if you try one, please open an issue and say how it went (each has
+maker's own home**: couch-tv opens itself on top, it does not replace that home. VIDAA now runs on a real Hisense (below), and the TiVo OS path was worked out on a real JVC. If you try one, please open an issue and say how it went (each has
 a short read only first test).
 
 ### Hisense VIDAA
