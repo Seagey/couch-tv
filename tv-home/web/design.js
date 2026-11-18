@@ -303,7 +303,17 @@
     cities: function (v) { return SAN.list(v, 4, tzOk); },
     month: function (v) { return SAN.n(v, 1, 12, true); }, day: function (v) { return SAN.n(v, 1, 31, true); },
     unit: function (v) { return SAN.pick(v, ["sleeps", "days", "weeks"]); }, icon: iconName,
-    apps: function (v) { return SAN.list(v, 16, function (p) { return pkgOk(p) && KEEP.indexOf(p) < 0 ? p : undefined; }); },
+    // apps in a dock, row, folder or app tile: catalogue ids (app-catalogue.js). An old design's package
+    // name becomes its id when the catalogue knows it; anything else is dropped. A page without the
+    // catalogue (an older copy of this file's helpers) keeps package names as it always did.
+    apps: function (v) {
+      var A = typeof window !== "undefined" && window.CouchApps;
+      return SAN.list(v, 16, function (p) {
+        if (!A) return pkgOk(p) && KEEP.indexOf(p) < 0 ? p : undefined;
+        if (A.get(p)) return p;
+        return pkgOk(p) && KEEP.indexOf(p) < 0 ? A.idOf(p) || undefined : undefined;
+      });
+    },
     cols: function (v) { return SAN.n(v, 1, 6, true); }, names: SAN.b, more: SAN.b,
     image: function (v) { return imgOk(v) || undefined; }, fit: function (v) { return SAN.pick(v, ["cover", "contain"]); },
     seconds_each: function (v) { return SAN.n(v, 5, 600, true); }, count: function (v) { return SAN.n(v, 1, 8, true); },
@@ -1294,6 +1304,22 @@
     }
     return h("div");
   }
+  // The apps a person changed with the remote (Hold OK: Change app, Move, Remove, Add app), kept on this
+  // TV only: { "<object id>|<kind>": [catalogue ids or package names] }. They win over the design's own
+  // apps for that container, survive a restart, and stay when a new design arrives unless the person
+  // picks "Use its own apps" (askFirst). Never in a design: they name this TV's own apps.
+  var EDITS_KEY = "couchtv.design.appedits", EDITS = readEdits();
+  function readEdits() {
+    var out = {}, raw = null;
+    try { raw = JSON.parse(localStorage.getItem(EDITS_KEY) || "null"); } catch (e) { raw = null; }
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) Object.keys(raw).slice(0, 60).forEach(function (k) {
+      if (!/^[A-Za-z0-9_-]{1,60}\|[a-z]{1,20}$/.test(k) || !Array.isArray(raw[k])) return;
+      out[k] = raw[k].filter(function (p) { return pkgOk(p) && KEEP.indexOf(p) < 0; }).slice(0, 16);
+    });
+    return out;
+  }
+  function saveEdits() { try { if (Object.keys(EDITS).length) localStorage.setItem(EDITS_KEY, JSON.stringify(EDITS)); else localStorage.removeItem(EDITS_KEY); } catch (e) {} }
+  function editsOf(id, kind) { var e = EDITS[id + "|" + kind]; return Array.isArray(e) ? e.slice() : null; }
   // what a widget may know: demo data in the designer, else what this TV really has (app.js hooks)
   var DATA_V = 0, DATA_KEYS = {};
   function wenv() {
@@ -1302,6 +1328,7 @@
     // sport: the design has a Scores widget (the Game Day preset), so its Up next is the game hero
     var sport = !!(D && list(D.objects).some(function (o) { o = obj(o); return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return obj(it).kind === "sports"; }); }));
     return { demo: !!(FORCE_DEMO || DEMO_ON), preview: PREVIEW, designer: DESIGNER, data: data, look: obj(D && D.look), sport: sport,
+      edits: DESIGNER || PREVIEW ? null : editsOf,
       clock24: hooks.clock24 ? hooks.clock24() : false, ha: !!(window.smartHome && window.smartHome.enabled && window.smartHome.enabled()), rooms: LIVE.rooms,
       icon: function (name, size, set) { return icon(name, size, set); }, colour: colour, imgOk: imgOk };
   }
@@ -1455,7 +1482,7 @@
       layers[side].style.transform = "scale(" + innerWidth / 1920 + ")";
       var mine = objs.filter(function (o) { return (o.layer === "back" ? "back" : "front") === side && idOk(o.id); });
       // drawn again only when something it shows has changed (the clock's minute, the weather, live rooms)
-      var sig = JSON.stringify([mine, DEMO_ON, LIVE.rooms, weatherKey(), timeText({}), DATA_V, D && D.look]);
+      var sig = JSON.stringify([mine, DEMO_ON, LIVE.rooms, weatherKey(), timeText({}), DATA_V, D && D.look, EDITS]);
       if (layers[side].getAttribute("data-sig") === sig) return;
       layers[side].setAttribute("data-sig", sig);
       // the design's look for its widgets: plain colours as variables on the layer
@@ -1923,8 +1950,11 @@
     p.setAttribute("style", "margin-top:1.25rem;font-size:1.75rem;line-height:2.375rem;color:rgba(255,255,255,0.82);max-width:44rem");
     var row = document.createElement("div"); row.setAttribute("style", "margin-top:2.5rem;display:flex;flex-direction:column;align-items:flex-start;gap:1.25rem");
     var mk = function (label, big) { var b = document.createElement("div"); b.textContent = label; b.setAttribute("style", "padding:" + (big ? "1.375rem 3rem" : "1rem 2.25rem") + ";border-radius:3rem;font-size:" + (big ? "2rem" : "1.625rem") + ";font-weight:700;background:rgba(255,255,255,0.12)"); row.appendChild(b); return b; };
-    var keepB = mk("Keep my home", true), useB = mk("Use this design", false);
-    var paint = function () { [keepB, useB].forEach(function (b, i) { b.style.background = i === pick ? "#fff" : "rgba(255,255,255,0.12)"; b.style.color = i === pick ? "#111" : "rgba(255,255,255,0.85)"; b.style.boxShadow = i === pick ? "0 0 0 4px rgba(255,255,255,0.35)" : "none"; }); };
+    // apps changed on this TV (Hold OK): keep them with the new design, or take the design's own
+    var hasEdits = Object.keys(EDITS).length > 0;
+    var keepB = mk("Keep my home", true), useB = mk(hasEdits ? "Use this design, keep my app changes" : "Use this design", false), ownB = hasEdits ? mk("Use this design with its own apps", false) : null;
+    var btns = [keepB, useB].concat(ownB ? [ownB] : []);
+    var paint = function () { btns.forEach(function (b, i) { b.style.background = i === pick ? "#fff" : "rgba(255,255,255,0.12)"; b.style.color = i === pick ? "#111" : "rgba(255,255,255,0.85)"; b.style.boxShadow = i === pick ? "0 0 0 4px rgba(255,255,255,0.35)" : "none"; }); };
     var hint = document.createElement("div"); hint.textContent = "Back keeps your home too.";
     hint.setAttribute("style", "margin-top:1.5rem;font-size:1.4375rem;color:rgba(255,255,255,0.6)");
     col.appendChild(h1); col.appendChild(p); col.appendChild(row); col.appendChild(hint);
@@ -1944,9 +1974,9 @@
     var onKey = function (e) {
       var key = e.key;
       e.preventDefault(); e.stopImmediatePropagation();
-      if (key === "ArrowUp" || key === "ArrowLeft") { pick = 0; paint(); }
-      else if (key === "ArrowDown" || key === "ArrowRight") { pick = 1; paint(); }
-      else if (key === "Enter" || key === " " || e.keyCode === 23) done(pick === 1);
+      if (key === "ArrowUp" || key === "ArrowLeft") { pick = Math.max(0, pick - 1); paint(); }
+      else if (key === "ArrowDown" || key === "ArrowRight") { pick = Math.min(btns.length - 1, pick + 1); paint(); }
+      else if (key === "Enter" || key === " " || e.keyCode === 23) { if (pick === 2) { EDITS = {}; saveEdits(); } done(pick >= 1); }
       else if (key === "Escape" || key === "Backspace" || key === "GoBack" || key === "BrowserBack" || e.keyCode === 27 || e.keyCode === 8 || e.keyCode === 10009 || e.keyCode === 461) done(false);
     };
     window.addEventListener("keydown", onKey, true);
@@ -2087,6 +2117,9 @@
       el.classList.remove("cd-flash"); void el.offsetWidth; el.classList.add("cd-flash");
       if (what === "detail" || what === "folder") { openDetail(el); return; }
       if (what === "menu") { holdMenu(); return; }
+      if (what === "edit" || what === "pick") { edit(what === "pick" ? "pick" : arg, arg); return; }
+      if (what === "addapp" && !DESIGNER) { EDIT = appCtx(); if (EDIT) picker("add"); return; }
+      if (what === "missing" && !DESIGNER) { say("Not on this TV. Install it from the App Store in More apps, or hold OK to change it."); return; }
       if (DESIGNER) { try { window.parent.postMessage({ type: "couchtv:open", name: el.getAttribute("data-name") || "" }, location.origin); } catch (x) {} return; }
       if (hooks.act) hooks.act(what, arg);
     }
@@ -2118,13 +2151,88 @@
     function paintSheet() { if (sheet) sheet.nodes.forEach(function (n, k) { n.classList.toggle("cw-ifocus", k === sheet.i); }); }
     function closeSheet() { if (sheet && sheet.el.parentNode) sheet.el.parentNode.removeChild(sheet.el); sheet = null; paint(); }
     function holdMenu() {
-      var mk = function (label, what) { var n = h("div", "cw-mi", null, [label]); n.setAttribute("data-act", what); n.setAttribute("data-name", label); return n; };
+      var mk = function (label, what, arg) { var n = h("div", "cw-mi", null, [label]); n.setAttribute("data-act", what); n.setAttribute("data-name", label); if (arg) n.setAttribute("data-arg", arg); return n; };
       var t = target(), w = t;
       while (w && !(w.classList && w.classList.contains("cw"))) w = w.parentNode;
       var nodes = [mk("All apps", "more"), mk("Settings", "gear"), mk("Smart home", "smart")];
       var layer = w && w.getAttribute("data-detail");
       if (layer && window.CouchDetail) { var op = mk("Open " + (window.CouchDetail.title(layer) || "this widget"), "detail"); op.__root = w; nodes.unshift(op); }
-      openSheet("Home", { menu: true, nodes: nodes }, "Back to close");
+      // an app in a dock, row, folder or app tile: change, move or remove it, or add one (kept on this TV)
+      var ctx = EDIT = appCtx();
+      if (ctx) {
+        var folder = ctx.kind === "folder", room = ctx.keys.length < ctx.max, eds = [];
+        if (typeof ctx.slot === "number") {
+          eds.push(mk("Change app", "edit", "change"));
+          if (ctx.max > 1 && ctx.keys.length > 1) eds.push(mk("Move", "edit", "move"));
+          eds.push(mk(folder ? "Remove from folder" : "Remove", "edit", "remove"));
+        }
+        if (room && (ctx.slot !== 0 || ctx.max > 1)) eds.push(mk(folder ? "Add app to folder" : "Add app", "edit", "add"));
+        nodes = eds.concat(nodes);
+      }
+      openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes }, "Back to close");
+    }
+    // ---- changing a container's apps with the remote ----
+    var EDIT = null, MOVING = null;
+    function appCtx() {
+      var W = window.CouchWidgets, t = target();
+      if (!t || DESIGNER || !W || !W.appKinds) return null;
+      var w = t;
+      while (w && !(w.classList && w.classList.contains("cw"))) w = w.parentNode;
+      if (!w || !w.getAttribute("data-apps")) return null;
+      var wrap = w;
+      while (wrap && !(wrap.getAttribute && wrap.getAttribute("data-obj"))) wrap = wrap.parentNode;
+      var id = wrap && wrap.getAttribute("data-obj"), o = list(D && D.objects).filter(function (x) { return obj(x).id === id; })[0];
+      if (!o || o.type !== "widget" || W.appKinds().indexOf(o.kind) < 0) return null;
+      var s = t.getAttribute("data-slot");
+      return { o: o, id: id, kind: o.kind, slot: s === null ? null : s === "add" ? "add" : +s, keys: W.appKeys(o, wenv()), max: W.appMax(o.kind), name: t.getAttribute("data-name") || "" };
+    }
+    function saveKeys(ctx, keys) {
+      EDITS[ctx.id + "|" + ctx.kind] = keys.slice(0, ctx.max);
+      saveEdits();
+      objects(D);
+    }
+    function say(text) {
+      var old = document.querySelector(".cw-tip.cw-say"); if (old && old.parentNode) old.parentNode.removeChild(old);
+      var t = h("div", "cw-tip cw-say", null, [text]);
+      document.body.appendChild(t);
+      setTimeout(function () { t.style.opacity = "0"; setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 700); }, 4000);
+    }
+    // the TV's own apps, to pick one for a place (Change app, Add app)
+    function picker(op) {
+      var W = window.CouchWidgets, env = wenv(), have = W.installedApps(env);
+      if (!EDIT || !have.length) { say("No apps found on this TV yet."); return; }
+      EDIT.op = op;
+      var nodes = have.slice(0, 120).map(function (a) {
+        var n = W.appNode(a.package, 180, env); n.setAttribute("data-act", "pick"); n.setAttribute("data-arg", a.package); n.style.margin = "16px";
+        return n;
+      });
+      openSheet(op === "add" ? (EDIT.kind === "folder" ? "Add app to folder" : "Add app") : "Change app", { nodes: nodes }, "Pick an app. Back to close");
+    }
+    function edit(op, arg) {
+      var c = EDIT;
+      if (!c) return;
+      var keys = c.keys.slice(), A = window.CouchApps;
+      if (op === "change" || op === "add") { picker(op); return; }
+      if (op === "remove" && typeof c.slot === "number") { keys.splice(c.slot, 1); saveKeys(c, keys); cur = { id: c.id, i: Math.max(0, Math.min(c.slot, keys.length - 1)) }; paint(); say(c.kind === "folder" ? "Removed from the folder." : "Removed. Hold OK, Add app, to put one back."); return; }
+      if (op === "move" && typeof c.slot === "number") { MOVING = c; say("Left and Right move it. OK when it is in place."); return; }
+      if (op === "pick" && arg) {
+        var key = (A && A.idOf(arg)) || arg;
+        if (keys.indexOf(key) >= 0 && !(c.op === "change" && keys[c.slot] === key)) { say("That app is already here."); return; }
+        if (c.op === "change" && typeof c.slot === "number") keys[c.slot] = key;
+        else if (keys.length < c.max) keys.push(key);
+        saveKeys(c, keys);
+        cur = { id: c.id, i: c.op === "change" && typeof c.slot === "number" ? c.slot : keys.length - 1 };
+        paint();
+      }
+    }
+    // moving an app along its container: each press swaps it with its neighbour
+    function moveKey(dx) {
+      var c = MOVING, keys = c.keys, to = c.slot + dx;
+      if (to < 0 || to >= keys.length) return;
+      var k = keys[c.slot]; keys[c.slot] = keys[to]; keys[to] = k; c.slot = to;
+      saveKeys(c, keys);
+      cur = { id: c.id, i: to }; last = null;
+      paint();
     }
     function sheetKey(e, a) {
       if (a) {
@@ -2165,6 +2273,14 @@
         return;
       }
       if (!ours()) return;
+      if (MOVING) {
+        // moving an app: Left and Right (Up and Down too) carry it along; OK or Back puts it down
+        e.preventDefault(); e.stopPropagation();
+        var mv = arrowOf(e);
+        if (mv) moveKey(mv[0] || mv[1]);
+        else if ((okKey(e) || backKey(e)) && !e.repeat) { MOVING = null; say("Moved."); }
+        return;
+      }
       var ar = arrowOf(e);
       if (ar) { e.preventDefault(); e.stopPropagation(); if (document.documentElement.dir === "rtl") ar = [-ar[0], ar[1]]; move(ar[0], ar[1]); tip(); return; }
       if (okKey(e)) {
@@ -2193,6 +2309,9 @@
       },
       reset: function () { cur = null; last = null; closeSheet(); if (window.CouchDetail && window.CouchDetail.isOpen()) window.CouchDetail.close(true); },
       move: move, activate: function () { act(target()); }, current: function () { return cur ? { id: cur.id, i: cur.i } : null },
+      // put the focus on a widget (and an item in it): the designer and the tests
+      focus: function (id, i) { cur = { id: String(id), i: typeof i === "number" ? i : -1 }; last = null; paint(); },
+      moving: function () { return !!MOVING; },
       sheetOpen: function () { return !!sheet; },
       back: function () { if (window.CouchDetail && window.CouchDetail.isOpen()) { window.CouchDetail.close(); return true; } if (sheet) { closeSheet(); return true; } return false; },
       detail: function () { var t = target(); if (t) openDetail(t); },
@@ -2235,6 +2354,8 @@
     nav: NAV,
     widgetMode: function () { return ROOT.classList.contains("cd-wmode"); },
     wkinds: function () { return WKINDS.slice(); },
+    // the apps changed on this TV with the remote (Hold OK), by "<object id>|<kind>"
+    appEdits: function () { return JSON.parse(JSON.stringify(EDITS)); },
     wact: function () { return WACT.slice(); },
     wopts: function () { return JSON.parse(JSON.stringify(WOPT)); },
     wstyle: function () { return JSON.parse(JSON.stringify(WSTYLE)); },

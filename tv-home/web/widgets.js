@@ -101,33 +101,74 @@
   };
   var DEMO_APPS = ["com.google.android.youtube.tv", "com.netflix.ninja", "au.net.abc.iview", "com.disney.disneyplus", "au.com.stan.and", "com.amazon.amazonvideo.livingroom", "com.sbs.ondemand.tv", "au.com.streamotion.ares.tv", "com.apple.atve.androidtv.appletv", "com.spotify.tv.android"];
   var GAME_APPS = ["com.microsoft.xcloud", "com.nvidia.geforcenow", "com.valvesoftware.steamlink", "com.retroarch"];
+  // the containers of apps a person can change on the TV (Hold OK): their most apps
+  var APP_KINDS = ["app", "folder", "dock", "appgrid", "games"], APP_MAX = { app: 1, folder: 12, dock: 12, appgrid: 16, games: 4 };
   function dataOf(env) { return (env && env.data) || {}; }
   function demoImg(k) { return CW.base + "demo/" + k + ".jpg"; }
   function bgImg(k) { return CW.base + "backgrounds/" + k + ".jpg"; }
+  // the app catalogue (app-catalogue.js): a design names apps by catalogue id ("netflix")
+  function cat() { return window.CouchApps || null; }
+  function catApp(k) { var A = cat(); return A ? A.get(k) : null; }
   function iconUrl(pkg, env) {
-    var d = dataOf(env);
+    var d = dataOf(env), c = catApp(pkg);
+    if (c) return c.icon ? CW.base + c.icon : null;   // a catalogue id: its own picture (the designer, a missing app)
     if (!env.demo && d.iconUrl) { try { return d.iconUrl(pkg); } catch (e) { return null; } }
     if (d.iconUrl) { try { var u = d.iconUrl(pkg); if (u) return u; } catch (e2) {} }
     return APPS[pkg] ? CW.logoBase + pkg + ".png" : null;
   }
   function appName(pkg, env) {
+    var c = catApp(pkg);
+    if (c) return c.name;
     var list = dataOf(env).apps || [];
     for (var i = 0; i < list.length; i++) if (list[i] && list[i].package === pkg) return String(list[i].name || pkg);
     return APPS[pkg] || String(pkg).split(".").pop();
   }
-  // the apps a widget shows: the ones it names that this TV has (in the designer, the ones it names)
-  function appsFor(o, env, max) {
-    var want = ((o.opts || {}).apps || []).slice(), d = dataOf(env), have = (d.apps || []).map(function (a) { return a.package; });
-    var out;
-    if (env.demo || env.designer) out = want.length ? want : (o.kind === "games" ? GAME_APPS : DEMO_APPS).slice();
-    else if (want.length) out = want.filter(function (p) { return have.indexOf(p) >= 0; });
-    else out = have.filter(function (p) { return p && p !== "gear" && p !== "more" && p !== "smart" && !/^(screen|input):/.test(p); });
-    return out.slice(0, max || 16);
+  // the apps on this TV a person can put in a design's dock, row or folder (no Settings or More tiles)
+  function installed(env) { return (dataOf(env).apps || []).filter(function (a) { return a && a.package && a.package !== "gear" && a.package !== "more" && a.package !== "smart" && a.package !== "com.android.tv.settings" && !/^(screen|input):/.test(a.package); }); }
+  // what a container holds: the person's own changes on this TV (env.edits, design.js), else the design's
+  // apps (catalogue ids, or an old design's package names)
+  function wantOf(o, env) {
+    var e = !env.designer && !env.demo && env.edits ? env.edits(o.id, o.kind) : null, w = (e || (o.opts || {}).apps || []).slice();
+    w.edited = !!e;   // emptied on this TV: it stays empty (an Add app place), not every app
+    return w;
   }
+  // the apps a widget shows, as keys: on a TV each catalogue id becomes the package this TV has, or
+  // "missing:<id>" when it is not installed (drawn dimmed, "Not on this TV"); with nothing named, every
+  // app the TV has. In the designer, the ids themselves. out.keys holds what each one was in the design.
+  function appsFor(o, env, max) {
+    var want = wantOf(o, env), have = installed(env), out = [], keys = [];
+    if (env.demo || env.designer) { out = want.length ? want : (o.kind === "games" ? GAME_APPS : DEMO_APPS).slice(); keys = out.slice(); }
+    else if (want.length || want.edited) {
+      want.forEach(function (k) {
+        var A = cat(), hit = null, i;
+        if (A && A.get(k)) { hit = A.resolve(k, have); out.push(hit ? hit.package : "missing:" + k); keys.push(k); return; }
+        for (i = 0; i < have.length; i++) if (have[i].package === k) hit = have[i];
+        if (hit) { out.push(k); keys.push(k); }   // an app picked on this TV, or an old design's package name
+      });
+    }
+    else { out = have.map(function (a) { return a.package; }); keys = out.slice(); }
+    out = out.slice(0, max || 16); out.keys = keys.slice(0, max || 16);
+    return out;
+  }
+  // a dock, row or folder on a TV may take one more app: an "Add app" place at its end
+  function canAdd(env) { return !env.demo && !env.designer && !env.preview && !!env.edits; }
   function appNode(pkg, a, env, big) {
-    var name = appName(pkg, env), url = iconUrl(pkg, env);
-    var n = E("div", "cw-app", "width:" + px(a) + ";height:" + px(a) + ";padding:" + px(a * 0.08) + ";border-radius:" + px(a * 0.24) + ";font-size:" + px(clamp(a * 0.17, 23, 40)), [name]);
-    if (url && (env.imgOk ? (env.imgOk(url) || /^(https?:|\.\.\/|\/|demo\/|backgrounds\/)/.test(url)) : true)) {
+    pkg = String(pkg);
+    if (pkg === "add:") {
+      var plus = E("div", "cw-app cw-add", "width:" + px(a) + ";height:" + px(a) + ";border-radius:" + px(a * 0.24) + ";font-size:" + px(clamp(a * 0.15, 23, 34)) + ";border:3px dashed rgba(255,255,255,.45);background:rgba(255,255,255,.06);display:flex;flex-direction:column;align-items:center;justify-content:center", [ic("plus", a * 0.32, "#fff"), a >= 140 ? E("span", "", "margin-top:6px", ["Add app"]) : null]);
+      if (big) plus.style.margin = "22px";
+      return stop(plus, "addapp", "", "Add app");
+    }
+    var missing = pkg.indexOf("missing:") === 0, key = missing ? pkg.slice(8) : pkg;
+    if (missing) {
+      var m = appNode(key, a, env, big);
+      m.style.opacity = "0.42"; m.classList.add("cw-missing");
+      m.appendChild(E("div", "", "position:absolute;left:0;right:0;bottom:0;padding:4px;background:rgba(0,0,0,.72);color:#fff;font-size:" + px(clamp(a * 0.11, 23, 28)) + ";text-align:center;line-height:1.15", ["Not on this TV"]));
+      return stop(m, "missing", key, appName(key, env));
+    }
+    var name = appName(pkg, env), url = iconUrl(pkg, env), c = catApp(pkg);
+    var n = E("div", "cw-app", "width:" + px(a) + ";height:" + px(a) + ";padding:" + px(a * 0.08) + ";border-radius:" + px(a * 0.24) + ";font-size:" + px(clamp(a * 0.17, 23, 40)) + (c && !c.icon && /^#[0-9a-f]{6}$/i.test(c.colour) ? ";background:" + c.colour : ""), [name]);
+    if (url && (env.imgOk ? (env.imgOk(url) || /^(https?:|\.\.\/|\/|demo\/|backgrounds\/|app-icons\/)/.test(url)) : true)) {
       var img = document.createElement("img");
       img.alt = ""; img.src = url; img.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover";
       img.onerror = function () { if (img.parentNode) img.parentNode.removeChild(img); n.classList.remove("cw-has-icon"); };
@@ -903,15 +944,18 @@
   }
   R.app = function (root, o, b, env) {
     var list = appsFor(o, env, 1);
+    if (!list.length && canAdd(env)) list = ["add:"];
     if (!list.length) return noApps(root, b, (op(o).apps || []).length);
-    var n = appNode(list[0], Math.min(b.w, b.h), env);
+    var n = appNode(list[0], Math.min(b.w, b.h), env), act = n.getAttribute("data-act"), arg = n.getAttribute("data-arg");
     n.style.borderRadius = px(Math.min(b.w, b.h) * 0.22);
     n.removeAttribute("data-act");
     add(root, n);
-    stop(root, "app", list[0], appName(list[0], env));
+    stop(root, act, arg === null ? undefined : arg, n.getAttribute("data-name"));
+    root.setAttribute("data-slot", "0");
   };
   R.folder = function (root, o, b, env) {
     var q = op(o), list = appsFor(o, env, 12);
+    if (canAdd(env) && list.length < 12 && !(b.w < 300 && b.h < 300)) list.push("add:");
     if (!list.length) return noApps(root, b, (q.apps || []).length);
     var label = q.label ? E("div", "cw-lab", "margin-bottom:12px", [q.label]) : null;
     if (b.w < 300 && b.h < 300) {
@@ -927,9 +971,10 @@
   };
   R.dock = function (root, o, b, env) {
     var q = op(o), list = appsFor(o, env, 12);
-    if (!list.length) return noApps(root, b, (q.apps || []).length);
+    if (!list.length && !canAdd(env)) return noApps(root, b, (q.apps || []).length);
     var a = Math.min(112, b.h - 40), gap = 30, cap = Math.max(1, Math.floor((b.w - 40 + gap) / (a + gap))), more = q.more !== false;
     var shown = list.slice(0, Math.max(1, cap - (more ? 1 : 0)));
+    if (canAdd(env) && list.length < 12 && shown.length < cap - (more ? 1 : 0)) shown.push("add:");
     root.style.padding = "20px";
     var row = E("div", "cw-row cw-center", "height:100%", shown.map(function (p, i) { var n = appNode(p, a, env); if (i) n.style.marginLeft = px(gap); return n; }));
     if (more) row.appendChild(stop(E("div", "cw-app cw-more", "width:" + px(a) + ";height:" + px(a) + ";border-radius:" + px(a * 0.24) + ";margin-left:" + px(gap), [ic("more", a * 0.4, "#fff")]), "more", "", "All apps"));
@@ -938,12 +983,13 @@
   R.appgrid = function (root, o, b, env) {
     // a small grid holds four apps without names (Hold OK, then All apps, has the rest)
     var small = b.w < 500 && b.h < 500, q = op(o), list = appsFor(o, env, small ? 4 : 16);
+    if (canAdd(env) && list.length < (small ? 4 : 16)) list.push("add:");
     if (!list.length) return noApps(root, b, (q.apps || []).length);
     var cols = small ? 2 : q.cols || clamp(Math.round(Math.sqrt(list.length * b.w / b.h)), 1, 8), rows = Math.ceil(list.length / cols), names = !small && q.names !== false;
     var gx = 40, gy = 40, nameH = names ? 52 : 0, a = Math.floor(Math.min((b.w - cols * gx) / cols, (b.h - rows * gy - rows * nameH) / rows));
     add(root, E("div", "", "display:flex;flex-wrap:wrap;justify-content:center;align-content:center;height:100%", list.map(function (p, i) {
       var n = appNode(p, a, env);
-      return E("div", "cw-col", "align-items:center;width:" + px(a) + ";margin:" + px(gy / 2) + " " + px(gx / 2), [n, names ? E("span", "cw-t25 cw-ell", "color:var(--ink);margin-top:12px;max-width:" + px(a + 30) + ";text-align:center;font-weight:650" + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 10px rgba(0,0,0,.3)" : ""), [appName(p, env)]) : null]);
+      return E("div", "cw-col", "align-items:center;width:" + px(a) + ";margin:" + px(gy / 2) + " " + px(gx / 2), [n, names ? E("span", "cw-t25 cw-ell", "color:var(--ink);margin-top:12px;max-width:" + px(a + 30) + ";text-align:center;font-weight:650" + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 10px rgba(0,0,0,.3)" : ""), [p === "add:" ? "Add app" : appName(String(p).replace(/^missing:/, ""), env)]) : null]);
     })));
   };
   var GAMES = { "com.microsoft.xcloud": ["#107c10", "#0b4f0b", "Xbox Cloud", "cloud", "Last played: Forza"], "com.nvidia.geforcenow": ["#76b900", "#3f6400", "GeForce NOW", "bolt", "Fortnite, 2h ago"],
@@ -953,10 +999,10 @@
     if (!list.length) return noApps(root, b, (op(o).apps || []).length);
     var n = clamp(Math.floor(b.w / 240), 2, list.length);
     add(root, [lab("games", "Play"), E("div", "cw-row cw-grow", "margin-top:16px;align-items:stretch", list.slice(0, n).map(function (p, i) {
-      var g = GAMES[p] || ["#3a3a46", "#1d1d24", appName(p, env), "games"];
+      var miss = String(p).indexOf("missing:") === 0, key = miss ? p.slice(8) : p, gp = GAMES[key] || (cat() && cat().get(key) ? GAMES[cat().get(key).packages.android[0]] : null), g = gp || ["#3a3a46", "#1d1d24", appName(key, env), "games"];
       var t = E("div", "cw-col", "flex:1;position:relative;overflow:hidden;border-radius:28px;background:linear-gradient(165deg," + g[0] + "," + g[1] + ");padding:24px;justify-content:space-between;" + (i ? "margin-left:20px" : ""), [
         ic(g[3], clamp(b.h / 5, 56, 96), "#fff", "solid"), E("div", "", "min-width:0", [E("div", "cw-t29 cw-ell", "color:#fff;font-weight:740", [g[2]]), env.demo && g[4] && b.h >= 400 ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.86)", [g[4]]) : null])]);
-      return stop(t, "app", p, g[2]);
+      if (miss) { t.style.opacity = "0.42"; t.appendChild(E("div", "cw-t23", "color:#fff", ["Not on this TV"])); } return stop(t, miss ? "missing" : "app", key, g[2]);
     }))]);
   };
 
@@ -1448,6 +1494,13 @@
     try { (draw || function (r) { empty(r, b, "info", "This widget needs a newer couch-tv", ""); })(root, o, b, env, sh); }
     catch (e) { empty(root, b, "info", "This widget could not be drawn", ""); }
     root.__o = o;
+    // a dock, row, folder or app tile: each app is numbered by its place, so Hold OK can change, move
+    // or remove it (design.js); the Add app place is "add"
+    if (APP_KINDS.indexOf(o.kind) >= 0) {
+      root.setAttribute("data-apps", o.kind);
+      var sl = 0;
+      [].forEach.call(root.querySelectorAll("[data-act]"), function (n) { if (["app", "missing", "addapp"].indexOf(n.getAttribute("data-act")) >= 0) n.setAttribute("data-slot", n.getAttribute("data-act") === "addapp" ? "add" : String(sl++)); });
+    }
     // OK on a widget (widget-detail.js): a widget with nothing real to show opens its setup record;
     // one with a detail layer opens that; one whose own buttons do things keeps them, and its
     // layer is in the Hold OK menu (data-detail)
@@ -1513,6 +1566,16 @@
     // the designer: show stack item i on the canvas
     showStackItem: function (el, i) { if (el && el.__show) el.__show(i); },
     folderApps: function (o, env) { return appsFor(o, env, 12); },
+    // editing apps on the TV (design.js, Hold OK): what a container holds now, as design keys (catalogue
+    // ids, or packages of apps that are not in the catalogue), how many it takes, and what the TV has
+    appKinds: function () { return APP_KINDS.slice(); },
+    appMax: function (kind) { return APP_MAX[kind] || 0; },
+    appKeys: function (o, env) {
+      env = env || {};
+      var A = cat(), l = appsFor(o, env, APP_MAX[o.kind] || 16);
+      return l.keys.map(function (k) { return A && !A.get(k) ? A.idOf(k) || k : k; });
+    },
+    installedApps: function (env) { return installed(env || {}); },
     appNode: function (pkg, a, env, big) { return appNode(pkg, a, env || {}, big); },
     autoInk: function (hex) { var c = autoInk(rgbOf(hex)); return c === WHITE ? "#ffffff" : "#1d1b18"; },
     contrast: function (a, b) { return contrast(rgbOf(a) || WHITE, rgbOf(b) || WHITE); },

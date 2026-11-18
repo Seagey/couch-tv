@@ -311,7 +311,7 @@
     apps.forEach(function (p) {
       var n = kit().appNode(p, 200, env);
       n.removeAttribute("data-act");
-      grid.appendChild(F(E("div", "cwd-app", "", [n, E("div", "cwd-small cwd-ell", "", [kit().appName(p, env)])]), function () { if (designerSays()) return; S.api.act("app", p); close(true); }, kit().appName(p, env)));
+      grid.appendChild(F(E("div", "cwd-app", "", [n, E("div", "cwd-small cwd-ell", "", [kit().appName(String(p).replace(/^missing:/, ""), env)])]), function () { if (designerSays()) return; if (String(p).indexOf("missing:") === 0) { msg("Not on this TV. Install it from the App Store in More apps, or hold OK on it in the folder to change it."); return; } S.api.act("app", p); close(true); }, kit().appName(String(p).replace(/^missing:/, ""), env)));
     });
     S.body.appendChild(grid);
   };
