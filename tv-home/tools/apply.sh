@@ -300,12 +300,19 @@ if [ "$DRY" != 1 ] && "$PY" -c "import sys; sys.path.insert(0, '$ROOT/bridge'); 
   KEYWATCH=app.couchtv.launcher/.KeyWatch
   "$PY" "$T" shell "pm grant app.couchtv.launcher android.permission.WRITE_SECURE_SETTINGS" > /dev/null 2>&1 || true
   CUR=$("$PY" "$T" shell "settings get secure enabled_accessibility_services" | tr -d '\r')
-  case ":$CUR:" in
-    *":$KEYWATCH:"*|*":app.couchtv.launcher/app.couchtv.launcher.KeyWatch:"*) ;;
-    *) if [ -z "$CUR" ] || [ "$CUR" = null ]; then NEW=$KEYWATCH; else NEW="$CUR:$KEYWATCH"; fi
-       "$PY" "$T" shell "settings put secure enabled_accessibility_services $NEW"
-       "$PY" "$T" shell "settings put secure accessibility_enabled 1" ;;
-  esac
+  # The force-stop above leaves a listed service showing as crashed and never rebound (issue #37, as for
+  # the Home watch): take it out of the list and put it back so Android binds it again.
+  REST=$(echo "$CUR" | tr ':' '\n' | grep -v -e KeyWatch -e '^null$' -e '^$' | paste -sd: - || true)
+  if [ -z "$REST" ]; then
+    "$PY" "$T" shell "settings delete secure enabled_accessibility_services" > /dev/null
+    NEW=$KEYWATCH
+  else
+    "$PY" "$T" shell "settings put secure enabled_accessibility_services $REST" > /dev/null
+    NEW="$REST:$KEYWATCH"
+  fi
+  sleep 2
+  "$PY" "$T" shell "settings put secure enabled_accessibility_services $NEW"
+  "$PY" "$T" shell "settings put secure accessibility_enabled 1"
   echo "     the remote's app buttons are on (home.app_keys)"
 fi
 
