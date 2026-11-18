@@ -25,12 +25,12 @@
     aircon: "aircon", scenes: "scenes", controls: "controls", camera: "camera", doorbell: "camera",
     card: "cards", news: "news", sports: "sports",
     memory: "setup", picks: "setup", queue: "setup", speakers: "setup", energy: "setup", sensor: "setup", battery: "setup",
-    note: "note", list: "list", stocks: "setup", commute: "setup", wifi: "setup", guide: "setup", screentime: "setup"
+    note: "note", list: "list", stocks: "setup", commute: "setup", wifi: "wifi", guide: "setup", screentime: "setup"
   };
   var TITLE = { timers: "Timers", forecast: "Forecast", world: "World clocks", calendar: "Calendar", moon: "Moon", air: "Air quality", surf: "Surf",
     photos: "Photos", keep: "Keep watching", folder: "Apps", player: "Now playing", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre",
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up",
-    note: "Family note", list: "List" };
+    note: "Family note", list: "List", wifi: "Guest Wi-Fi" };
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -241,6 +241,16 @@
       }, it.t));
     });
     S.body.appendChild(E("div", "cwd-grow", "overflow:hidden", [grid]));
+  };
+  B.wifi = function (o, env) {
+    var w = kit().wifiOf(env);
+    if (!w || !w.ssid) return B.setup(o, env);
+    S.body.appendChild(head("wifi", "Guest Wi-Fi", "Join from a phone", "#0a84ff"));
+    var code = kit().qrNode(w.qr, 600), nopass = w.sec === "nopass" || !w.pass;
+    S.body.appendChild(E("div", "cwd-row cwd-grow", "margin-top:30px", [
+      E("div", "cwd-qr", "", [code || E("div", "cwd-text", "color:#111", ["The name and password are too long for a code. Type them in instead."])]),
+      E("div", "cwd-col", "margin-left:80px;min-width:0;flex:1", [label("Network"), E("div", "cwd-big cwd-ell", "", [w.ssid]), label(nopass ? "No password" : "Password"), nopass ? null : E("div", "cwd-big cwd-ell", "", [w.pass]),
+        label("How to join"), E("div", "cwd-list", "", ["Open the camera on your phone.", "Point it at the code.", "Tap the Wi-Fi note that comes up, then Join."].map(function (t, i) { return E("div", "cwd-li", "", [E("b", "", "flex:none;width:44px", [String(i + 1) + "."]), E("span", "", "", [t])]); }))])]));
   };
 
   // moon: tonight and the next four weeks

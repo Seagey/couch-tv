@@ -1247,18 +1247,6 @@
       return stop(bt, "quick", id, nm[1]);
     })));
   };
-  R.wifi = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "wifi", "wifi");
-    var qs = Math.min(b.h - 48, b.w * 0.42), cells = [], seed = 7;
-    for (var i = 0; i < 21 * 21; i++) {
-      seed = (seed * 9301 + 49297) % 233280;
-      var x = i % 21, y = Math.floor(i / 21), fin = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
-      var on = fin ? ((x % 7 === 0 || x % 7 === 6 || y % 7 === 0 || y % 7 === 6) || (x % 7 > 1 && x % 7 < 5 && y % 7 > 1 && y % 7 < 5)) : seed / 233280 > 0.52;
-      if (on) cells.push(S("rect", { x: x, y: y, width: 1, height: 1 }));
-    }
-    add(root, E("div", "cw-row", "height:100%", [E("div", "", "width:" + px(qs) + ";height:" + px(qs) + ";border-radius:22px;background:#fff;padding:16px;flex:none", [svg("0 0 21 21", "100%", "100%", cells, "fill:#111")]),
-      E("div", "cw-col", "margin-left:30px;min-width:0", [lab("wifi", "Guest Wi-Fi"), E("div", "cw-t48 cw-ell", "margin-top:10px", ["salt-and-sun"]), E("div", "cw-t29 cw-dim", "margin-top:6px", ["Password"]), E("div", "cw-t38 cw-ell", "", ["summer-swell"]), E("div", "cw-t23", "margin-top:10px", ["Point your phone camera here"])])]));
-  };
   R.guide = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "info", "guide");
     var it = [["info", "House guide"], ["clock", "Check out Sun 10am"], ["location", "Around here"]];
@@ -1421,7 +1409,6 @@
   CR.guide = sample("guide", "info", function (root, o, b) { mini(root, b, "info", "Sun", "Check out", "House guide, around here"); });
   CR.screentime = sample("screentime", "timer", function (root, o, b) { mini(root, b, "timer", "25m", "Screen time", "Left today, bedtime 7:30pm"); });
   CR.queue = sample("queue", "music", function (root, o, b) { mini(root, b, "music", "8", "Up next", "Sunday Best, Surfaces"); });
-  CR.wifi = sample("wifi", "wifi", function (root, o, b) { mini(root, b, "wifi", "Join", "Guest Wi-Fi", "Point your phone camera here"); });
 
   // ---------------- things typed at home (athome.js, through app.js): kept on this TV only ----------------
   // Note, List, Guest Wi-Fi, House guide, Agenda, On this day and Screen time. seagey, 18 Nov 2026:
@@ -1486,6 +1473,28 @@
         : E("div", "cw-col", "flex:none;max-width:100%;margin-top:14px;align-items:" + FLEX[a], [one1("cw-t29", "font-weight:680", "Nothing on this list"), one1("cw-t23", "margin-top:4px", "Add to it in Home settings")])]));
   };
   CR.list = R.list;
+
+  // ---- Guest Wi-Fi: a real join code (qr.js, drawn here, the words never leave the TV), and the
+  // name and password in words for anyone without a camera ----
+  function wifiOf(env) { return env.demo ? { ssid: "salt-and-sun", pass: "summer-swell", sec: "WPA", qr: "WIFI:T:WPA;S:salt-and-sun;P:summer-swell;;" } : (athome(env) || {}).wifi; }
+  function qrNode(text, size) {
+    if (!text || !window.TVQR) return null;
+    try { var s = window.TVQR.svg(text, size); s.style.cssText = "display:block;width:" + px(size) + ";height:" + px(size); return s; } catch (e) { return null; }
+  }
+  R.wifi = function (root, o, b, env) {
+    var a = ahAlign(root, o), w = wifiOf(env);
+    if (!w || !w.ssid) return soon(root, b, "wifi", "wifi");
+    if (b.h < 200 || b.w < 200) { add(root, ahCol(a, [ahLab("wifi", "Guest Wi-Fi"), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", w.ssid), one1("cw-t23", "", "OK shows the code")])); return; }
+    var narrow = b.w < 600, qs = Math.max(80, narrow ? Math.min(b.h - 48 - 46, b.w - 48) : b.h - 48), code = qrNode(w.qr, qs - 24);
+    var box = E("div", "", "width:" + px(qs) + ";height:" + px(qs) + ";border-radius:22px;background:#fff;padding:12px;flex:none;overflow:hidden", [code || E("div", "cw-t23", "color:#1d1b18;padding:8px;" + lines(4), ["The name and password are too long for a code"])]);
+    if (narrow) { add(root, ahCol(a, [box, one1("cw-t25", "margin-top:10px;font-weight:650;color:var(--ink)", w.ssid)])); return; }
+    var nopass = w.sec === "nopass" || !w.pass;
+    add(root, E("div", "cw-row", "width:100%;height:100%;justify-content:" + FLEX[a], [box,
+      E("div", "cw-col", "margin-left:30px;min-width:0;flex:0 1 auto;max-width:" + px(b.w - 48 - qs - 30), [ahLab("wifi", "Guest Wi-Fi"), one1("cw-t48", "margin-top:10px", w.ssid),
+        one1("cw-t29 cw-dim", "margin-top:6px", nopass ? "No password" : "Password"), nopass ? null : one1("cw-t38", "", w.pass),
+        one1("cw-t23", "margin-top:10px", "Point your phone camera at the code")])]));
+  };
+  CR.wifi = R.wifi;
 
   // ---------------- one widget, a stack, the API ----------------
   function one(o, b, env) {
@@ -1574,6 +1583,6 @@
       roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
       // things typed at home (athome.js through app.js)
-      athome: athome, listOf: listOf }
+      athome: athome, listOf: listOf, wifiOf: wifiOf, qrNode: qrNode }
   };
 })();
