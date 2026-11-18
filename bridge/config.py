@@ -340,6 +340,12 @@ def _home(h):
     # the app reads it from the saved settings, so it only needs to get through here
     if isinstance(h.get("render_height"), int) and not isinstance(h.get("render_height"), bool) and 360 <= h["render_height"] <= 2160:
         out["render_height"] = h["render_height"]
+    # remote buttons that open an app (KeyWatch.kt): "KEYCODE_BUTTON_3:org.smarttube.stable", "190:pkg" or "scan384:pkg"
+    if isinstance(h.get("app_keys"), list):
+        keys = [k for k in h["app_keys"] if isinstance(k, str) and re.fullmatch(
+            r"(KEYCODE_[A-Z0-9_]{1,40}|\d{1,4}|scan\d{1,4}):[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+", k)]
+        if keys:
+            out["app_keys"] = keys[:30]
     # "always": the 4K copies on a 4K panel whose interface is drawn at 1080 (#191). false: a 4K screen with a weak chip keeps the 1080 backgrounds (lg/build.py then leaves the 4K copies out)
     if isinstance(h.get("hi_res"), bool) or h.get("hi_res") == "always":
         out["hi_res"] = h["hi_res"]
