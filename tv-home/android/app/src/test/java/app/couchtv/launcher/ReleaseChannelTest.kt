@@ -28,6 +28,14 @@ class ReleaseChannelTest {
         assertTrue(ReleaseChannel.newer("0.14", "0.13-beta.1"))
     }
 
+    @Test fun threePartVersionsMeetTwoPartOnes() {
+        // the 0.13.0 release (tag v0.13.0) reaches 0.12 TVs and the 0.13-beta.1 TVs, and is not newer than itself
+        assertTrue(ReleaseChannel.newer("v0.13.0", "0.12"))
+        assertTrue(ReleaseChannel.newer("v0.13.0", "0.13-beta.1"))
+        assertFalse(ReleaseChannel.newer("v0.13.0", "0.13.0"))
+        assertFalse(ReleaseChannel.newer("v0.13.0", "0.13"))
+    }
+
     @Test fun theOldRulesStillHoldForEveryReleaseSoFar() {
         val tags = listOf("0.3", "0.4", "0.5", "0.8", "0.9", "0.10", "0.11", "0.12")
         for (i in 1 until tags.size) assertTrue(tags[i], ReleaseChannel.newer(tags[i], tags[i - 1]))

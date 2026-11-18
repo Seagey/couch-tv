@@ -166,7 +166,7 @@ Home settings saves to the same `bridge/data/people.json` the phone uses.
 
 ## Kids mode
 
-New, on main, in the next release. Idea from Natalie Bruss (@nataliebruss on Instagram).
+New, since 0.13. Idea from Natalie Bruss (@nataliebruss on Instagram).
 
 Optional, and off unless you set it up: a person with no `kids_mode` key is not a kids profile, and a
 `config.json` with no `kids_mode` anywhere works exactly as before. Nothing makes a kids profile or a

@@ -67,8 +67,7 @@ On the same TV these were switched off with no ill effect over an evening of use
 ## TCL: Home goes back to Google TV after every restart
 
 On a TCL Google TV (reported on a TCL Smart TV Pro, Android 14) the TV's own boot manager can stop
-the Home button watch from starting, so Home falls back to Google TV after each restart. On main, in
-the next release, couch-tv adds an empty TV input on TCL TVs only, which TCL lets start at boot. Open the app once after
+the Home button watch from starting, so Home falls back to Google TV after each restart. Since 0.13, couch-tv adds an empty TV input on TCL TVs only, which TCL lets start at boot. Open the app once after
 installing so it is switched on. Other TVs are unchanged and show no new input. This is unconfirmed
 until it is tested on a real TCL.
 

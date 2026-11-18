@@ -257,8 +257,8 @@ a show. Put visitors on a guest Wi-Fi network (most routers have one) so they ca
 
 To require a password on your home network, set `"pairing_key"` under `"bridge"` in `config.json`. The
 phone remote pairs once by typing it (or opening `http://your-computer.local:5400/?pair=<key>`), and the
-TV homes carry their key. On a Google TV, Android TV or Fire TV that needs a TV home app newer than
-0.12 (on main, in the next release: build it until then), and the Samsung, LG and Roku apps are built
+TV homes carry their key. On a Google TV, Android TV or Fire TV that needs a TV home app of
+0.13 or newer, and the Samsung, LG and Roku apps are built
 again with the key. See [Switching the pairing key on](CONFIG.md#switching-the-pairing-key-on)
 for how to switch it on and update your TVs.
 
@@ -323,7 +323,7 @@ do the install instead of `apply.sh`:
    It connects to the TV over Wi-Fi with ADB, so the TV asks you to allow it. Open **Setup
    Launcher**, pick couch-tv, then restart the TV.
 
-**Option A with no computer at all, making it the home** (issue #98, on main, in the next release). If couch-tv installed and
+**Option A with no computer at all, making it the home** (issue #98, since 0.13). If couch-tv installed and
 shows up as an app but the Home button still opens the TV's own home, there is no computer step
 left. On a plain Android TV 10 or newer, couch-tv asks Android to make it the home:
 
