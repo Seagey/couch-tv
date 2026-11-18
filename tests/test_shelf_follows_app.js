@@ -56,6 +56,8 @@ function part(from, to) {
 vm.runInContext(part('  var followPkg = null', '  // ---------------- custom cards'), context);
 vm.runInContext(part('  function subtitle(it) {', '  function peopleCount()'), context);
 vm.runInContext(part('  var FOCUS_KEY = ', '  function goHome()'), context);
+// shelfReach (restoreFocus asks it), with designHides: no couch-tv Studio design here, so nothing is hidden
+vm.runInContext(part('  function designHides(part)', '  function picLabel()'), context);
 
 const FIRE_YOUTUBE = 'com.amazon.firetv.youtube', NETFLIX = 'com.netflix.ninja', DISNEY = 'com.disney.disneyplus';
 const app = (pkg, name) => ({ kind: 'app', package: pkg, name });

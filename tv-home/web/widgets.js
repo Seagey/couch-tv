@@ -680,6 +680,7 @@
       return;
     }
     var fs = Math.min(b.h * 0.52, b.w * 0.44), ah = w.ahead;
+    fs = Math.min(fs, fitPx(w.temp + "°", b.w - 48, fs));   // a minus sign (-23°) still fits across the box
     // in the evening the line under the number looks ahead: tomorrow's sky and top, not today's past one
     var words = ah ? E("div", "cw-col", "margin-top:6px", [E("div", "cw-t29 cw-ell", "font-weight:680", [ah.label + (ah.hi !== undefined ? ", top of " + ah.hi + "°" : "")]),
       b.h >= 300 ? E("div", "cw-t23 cw-ell cw-ahead", "", [wxWords(ah.code)]) : null])
