@@ -251,9 +251,10 @@
     queue: { name: "Up next queue", status: "not-built", what: "The next songs", needs: ["Needs couch-tv to read your Spotify queue (TVs do not share it)"],
       setup: setup("nothing", NOT_YET), until: "\"Up next queue: not on couch-tv yet\", and what it needs", build: "The bridge has to read the queue from the Spotify Web API (the person signs in to Spotify once on the computer) and hand it to the home.",
       ok: "Opens the queue (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["small", "tall", "large"], [4, 4]) },
-    speakers: { name: "Speakers", status: "not-built", what: "Each room's speaker and its volume", needs: ["Needs couch-tv to control Home Assistant speakers"],
-      setup: setup("nothing", NOT_YET), until: "\"Speakers: not on couch-tv yet\", and what it needs", build: "HomeAssistant.kt has to allow media_player entities named in config.json (volume and play or pause), as it does for climate today.",
-      ok: "Opens the speakers with a volume for each (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["wtile", "small", "tall"], [4, 2]) },
+    speakers: { name: "Speakers", status: "setup", what: "Each speaker, what it plays and its volume", needs: [HA_NEED, "Your speakers added once on a computer"],
+      setup: setup("computer", haSteps("speakers (up to 6, any Home Assistant knows)", "Press Home: each speaker and its volume show here. OK opens them: louder, quieter, play and pause.")),
+      until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      ok: "Opens the speakers: louder, quieter, play and pause for each", platforms: HA_PLAT(), sizes: sz(["wtile", "small", "tall"], [4, 2]) },
 
     // ---------- smart home (Home Assistant, through the Android home) ----------
     aircon: { name: "Aircon", status: "setup", what: "A room's set temperature, what it is now, and the other rooms", needs: [HA_NEED, "Your aircon rooms added once on a computer"],

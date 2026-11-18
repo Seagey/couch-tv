@@ -31,8 +31,8 @@
     photos: "Photos", keep: "Keep watching", folder: "Apps", player: "Now playing", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre",
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up" };
   // the smart home and music widgets' own layers (group C): set here, beside the table above
-  LAYER.energy = "energy"; LAYER.sensor = "sensor";
-  TITLE.energy = "Energy"; TITLE.sensor = "Sensor";
+  LAYER.energy = "energy"; LAYER.sensor = "sensor"; LAYER.speakers = "speakers";
+  TITLE.energy = "Energy"; TITLE.sensor = "Sensor"; TITLE.speakers = "Speakers";
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -635,6 +635,79 @@
     S.every = 5000;
     S.tick = function () { if (Date.now() - (S.readAt || 0) > 60000) reread(); };
     if (!demo) { if (!sensors) reread(); history(); }
+  };
+
+  // Speakers: each with its volume. Quieter and louder move it 5 at a time (presses are joined),
+  // play or pause where the speaker can
+  B.speakers = function (o, env) {
+    var H = kit().ha, demo = !!env.demo, info = H.haOf(env).info || {};
+    if (!demo && !(info.speakers && info.speakers.length)) return B.setup(o, env);
+    var copy = function (l) { return l ? l.map(function (c) { var x = {}; for (var k in c) x[k] = c[k]; return x; }) : null; };
+    var list = copy(H.speakersOf(env, o)), joinT = null;
+    S.body.appendChild(head("speakers", op(o).label || "Speakers", "", "#ff375f"));
+    var body = E("div", "cwd-col cwd-grow", "margin-top:30px");
+    S.body.appendChild(body);
+    var send = function (action, s, value, say) {
+      if (demo || S.api.designer) { designerSays(); return; }
+      if (!S.api.ha) return msg("Home Assistant is not set up on this TV");
+      if (say) msg(say);
+      S.api.ha(action, s.entity, value).then(function (r) {
+        if (!S) return;
+        if (!r || !r.ok) msg(r && r.error === "refused" ? s.name + " cannot do that from the TV" : "Home Assistant did not answer. Try again.");
+        setTimeout(reread, 1500);
+      });
+    };
+    var reread = function () {
+      if (!S || demo || !S.api.ha || joinT) return;
+      S.readAt = Date.now();
+      S.api.ha("speakers").then(function (r) {
+        if (!S || joinT) return;
+        if (!r || !r.ok) { if (!list) { list = []; draw(); msg("Home Assistant is not answering"); } return; }
+        var want = op(o).players, l = r.speakers || [];
+        if (want && want.length) l = want.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
+        list = l; draw();
+      });
+    };
+    var draw = function () {
+      var keep = S.stops[S.cur] && S.stops[S.cur].el.getAttribute("data-name");
+      while (body.firstChild) body.removeChild(body.firstChild);
+      S.stops = [];
+      if (!list) { S.subEl.textContent = "Checking Home Assistant"; return; }
+      S.subEl.textContent = list.filter(function (s) { return s.state === "playing"; }).length + " of " + list.length + " playing";
+      list.slice(0, 6).forEach(function (s) {
+        var ok = s.ok !== false, vol = ok && s.state !== "off" ? kit().clamp(s.volume || 0, 0, 100) : 0;
+        var nudge = function (d) {
+          return function () {
+            if (!ok) return msg(s.name + " is not answering");
+            if (s.can_volume === false) return msg(s.name + " has no volume Home Assistant can set");
+            s.volume = kit().clamp((s.volume || 0) + d, 0, 100); draw();
+            clearTimeout(joinT);
+            joinT = setTimeout(function () { joinT = null; send("volume", s, s.volume, s.name + " to " + s.volume + "%"); }, 700);
+          };
+        };
+        body.appendChild(E("div", "cwd-row", "margin-bottom:22px;padding:18px 26px;border-radius:30px;background:rgba(255,255,255,.08)" + (ok ? "" : ";opacity:.6"), [
+          E("div", "cwd-col", "width:560px;flex:none;min-width:0", [E("div", "cwd-mid cwd-ell", "", [s.name || ""]), E("div", "cwd-small cwd-ell", "", [H.spkSong(s) || H.spkWord(s)])]),
+          E("div", "cwd-col cwd-grow", "margin:0 30px;min-width:0", [E("div", "cwd-row", "justify-content:space-between", [E("span", "cwd-small", "", ["Volume"]), E("span", "cwd-mid", "", [H.spkWord(s)])]),
+            E("div", "", "height:16px;border-radius:8px;background:rgba(255,255,255,.18);margin-top:10px;overflow:hidden", [E("div", "", "height:100%;border-radius:8px;background:#fff;width:" + vol + "%")])]),
+          F(btn("minus", "", "cwd-round cwd-sm"), nudge(-5), s.name + " quieter"),
+          E("div", "", "width:16px;flex:none"), F(btn("plus", "", "cwd-round cwd-sm"), nudge(5), s.name + " louder"),
+          E("div", "", "width:16px;flex:none"), F(btn(s.state === "playing" ? "pause" : "play", "", "cwd-round cwd-sm"), function () {
+            if (!ok) return msg(s.name + " is not answering");
+            if (s.can_pause === false) return msg(s.name + " cannot play or pause from the TV");
+            s.state = s.state === "playing" ? "paused" : "playing"; draw();
+            send("playpause", s, "", s.name + (s.state === "playing" ? " playing" : " paused"));
+          }, s.name + " play or pause")]));
+      });
+      var again = keep ? S.stops.map(function (x) { return x.el.getAttribute("data-name"); }).indexOf(keep) : -1;
+      S.cur = again >= 0 ? again : Math.min(S.cur || 0, Math.max(0, S.stops.length - 1));
+      paint();
+    };
+    draw();
+    S.start = 1;   // the first speaker's louder
+    S.redraw = draw;
+    S.every = 2000;
+    S.tick = function () { if (Date.now() - (S.readAt || 0) > 10000) reread(); };
+    if (!demo) reread();
   };
 
   B.cards = function (o, env) {

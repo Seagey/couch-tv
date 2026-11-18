@@ -1073,11 +1073,44 @@
       return E("div", "cw-row", "", [E("div", "", "width:76px;height:76px;border-radius:14px;flex:none;margin-right:20px;background:#333 center/cover;background-image:" + cssImg(demoImg(covers[i]))), E("div", "", "min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:650", [s[0]]), E("div", "cw-t25 cw-ell", "", [s[1]])])]);
     }))]);
   };
+  // Speakers: each Home Assistant speaker (media_player.* named in config.json) and its volume
+  function speakersOf(env, o) {
+    var ha = haOf(env), want = op(o).players;
+    if (!ha.speakers) return ha.speakers;
+    var l = ha.speakers.filter(function (s) { return s && s.entity; });
+    if (want && want.length) l = want.map(function (e) { return l.filter(function (s) { return s.entity === e; })[0]; }).filter(Boolean);
+    return l;
+  }
+  function spkWord(s) { return s.ok === false ? "Not answering" : s.state === "off" || s.state === "standby" ? "Off" : s.muted ? "Muted" : s.volume != null ? s.volume + "%" : s.state === "playing" ? "Playing" : "On"; }
+  function spkSong(s) { return s.ok === false ? "" : s.title ? s.title + (s.artist ? ", " + s.artist : "") : s.state === "playing" ? "Playing" : s.state === "paused" ? "Paused" : s.state === "off" ? "" : "Not playing"; }
   R.speakers = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "speakers", "speakers");
-    add(root, [lab("speakers", "Speakers"), E("div", "cw-col cw-grow", "justify-content:space-around;margin-top:12px", [["Living", 42], ["Kitchen", 30], ["Deck", 0]].map(function (s) {
-      return E("div", "", "", [E("div", "cw-row cw-sp", "", [E("span", "cw-t29", "", [s[0]]), E("span", "cw-t23", "", [s[1] ? s[1] + "%" : "Off"])]), E("div", "cw-bar", "margin-top:10px;height:12px;border-radius:6px", [E("b", "", "width:" + s[1] + "%")])]);
-    }))]);
+    var ha = haOf(env), info = ha.info || {}, al = alignOf(o), W = b.w - 48;
+    if (!env.demo && !(info.speakers && info.speakers.length)) return soonFit(root, b, "speakers", "speakers");
+    var list = speakersOf(env, o), title = op(o).label || "Speakers";
+    if (!list) return haWait(root, b, o, "speakers", title, "Checking Home Assistant");
+    if (!list.length) return haWait(root, b, o, "speakers", title, "No speaker is answering");
+    alignRoot(root, al);
+    var bar = function (s) { return E("div", "cw-bar", "width:100%;margin-top:10px;height:12px;border-radius:6px", [E("b", "", "width:" + (s.ok === false || s.state === "off" ? 0 : clamp(s.volume || 0, 0, 100)) + "%")]); };
+    var head = function (s, big) {
+      var word = spkWord(s), wpx = fitPxText(word, W, big ? 29 : 25, 1, 650, famOf(root)) || 23, ww = word.length * wpx * 0.62 + 12;
+      var name = fitWords(root, s.name || "", W - ww, big ? 29 : 25, 1, 650) || fitWords(root, s.name || "", W - ww, 23, 2, 650);
+      var pct = fitWords(root, word, ww, wpx, 1, 650, "margin-left:10px");
+      if (name || !s.name) return E("div", "cw-row", "flex:none;width:100%;justify-content:space-between;align-items:flex-start", [name || E("div"), pct]);
+      // a long name: on its own lines above, the volume under it
+      return E("div", "cw-col", "flex:none;width:100%;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center"), [fitWords(root, s.name, W, 25, 2, 650), pct]);
+    };
+    if (b.h < 200) {
+      // a wide tile: the one playing (else the first), its volume and what it plays
+      var p = list.filter(function (s) { return s.state === "playing"; })[0] || list[0], song = spkSong(p);
+      add(root, [head(p, false), E("div", "cw-grow"), song ? fitWords(root, song, W, 24, 1, 560, "color:var(--sub)") : null, bar(p)]);
+    } else {
+      var rowH = b.h >= 520 ? 120 : 100, n = Math.max(1, Math.min(list.length, Math.floor((b.h - 90) / rowH)));
+      add(root, [fitLab(root, "speakers", title, W), E("div", "cw-col cw-grow", "width:100%;justify-content:space-around;margin-top:10px;min-height:0", list.slice(0, n).map(function (s) {
+        var song = rowH >= 120 ? spkSong(s) : "";
+        return E("div", "", "flex:none;width:100%", [head(s, true), song ? fitWords(root, song, W, 24, 1, 560, "color:var(--sub)") : null, bar(s)]);
+      }))]);
+    }
+    stop(root, "detail", "speakers", title);
   };
 
   // smart home
@@ -1687,7 +1720,6 @@
     add(root, [photoLayer(demoImg("camp")), E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.7),transparent 70%)"),
       E("div", "cw-t23", "position:absolute;left:18px;top:14px;right:18px;color:#fff;font-weight:700;z-index:2", ["On this day"])]);
   });
-  CR.speakers = sample("speakers", "speakers", function (root, o, b) { mini(root, b, "speakers", "2", "Speakers", "Living and Kitchen playing"); });
   CR.battery = sample("battery", "bolt", function (root, o, b) { mini(root, b, "games", "12%", "Pad 2", "Charge it soon", "#ff453a"); });
   CR.agenda = sample("agenda", "calendar", function (root, o, b) {
     var d = now();
@@ -1801,5 +1833,5 @@
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12 }
   };
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
-  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
+  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
 })();
