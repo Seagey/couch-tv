@@ -221,6 +221,43 @@
   }
   function change(q) { return q && q.change !== null && q.change !== undefined ? (q.change > 0 ? "+" : q.change < 0 ? "-" : "") + Math.abs(q.change).toFixed(Math.abs(q.change) < 10 ? 2 : 1) + "%" : ""; }
 
+  // ---------------- the commute: OSRM's public route server (free, no key, open to web pages) ----------------
+  // The usual drive by road, from OpenStreetMap: no live traffic (traffic needs a paid map service).
+  // The two places are kept on the TV only (Home settings: the town in Location, and Commute, where to),
+  // never in a design; both are sent rounded to about a kilometre, the suburb, never the house. The
+  // demo server asks for light use and credit to OpenStreetMap: one request when the places change,
+  // then every 6 hours.
+  var OSRM = "https://router.project-osrm.org/route/v1/driving/";
+  function r2(v) { return Math.round(+v * 100) / 100; }
+  function placeOk(p) { return !!p && isFinite(+p.lat) && isFinite(+p.lon) && Math.abs(+p.lat) <= 90 && Math.abs(+p.lon) <= 180; }
+  // the id of a drive: both places, rounded ("-28.85,153.56;-28.81,153.28"), or null without both
+  function routeKey(from, to) { return placeOk(from) && placeOk(to) ? r2(from.lat) + "," + r2(from.lon) + ";" + r2(to.lat) + "," + r2(to.lon) : null; }
+  function routeUrl(key) {
+    var p = String(key || "").split(";").map(function (x) { return x.split(","); });
+    if (p.length !== 2 || p[0].length !== 2 || p[1].length !== 2) return null;
+    // OSRM takes longitude first
+    return OSRM + r2(p[0][1]) + "," + r2(p[0][0]) + ";" + r2(p[1][1]) + "," + r2(p[1][0]) + "?overview=false&alternatives=false&steps=false";
+  }
+  // { minutes, km } for the drive, or null when there is no road route
+  function parseRoute(j) {
+    var r = j && j.code === "Ok" && j.routes && j.routes[0];
+    if (!r || !isFinite(r.duration) || !isFinite(r.distance)) return null;
+    return { minutes: Math.max(1, Math.round(r.duration / 60)), km: Math.round(r.distance / 100) / 10 };
+  }
+  // when to leave to arrive by hh:mm with a few minutes to spare, on the next day it is needed (the
+  // next weekday unless weekends count): { at: Date, day: "" | "Tomorrow" | "Monday" }
+  function leaveBy(minutes, hh, mm, spare, now, weekdays) {
+    if (!isFinite(hh) || !isFinite(mm) || !isFinite(minutes)) return null;
+    var n = new Date(now || Date.now()), names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    for (var add = 0; add < 8; add++) {
+      var d = new Date(n.getFullYear(), n.getMonth(), n.getDate() + add, hh, mm, 0, 0), leave = new Date(d.getTime() - (minutes + (spare || 0)) * MIN);
+      if (weekdays !== false && (d.getDay() === 0 || d.getDay() === 6)) continue;
+      if (leave.getTime() < n.getTime()) continue;
+      return { at: leave, day: add === 0 ? "" : add === 1 ? "Tomorrow" : names[d.getDay()] };
+    }
+    return null;
+  }
+
   // ---------------- the sources the loader knows ----------------
   // key(w): which answer a widget on the home needs (widgets with the same key share one request);
   // every: how long an answer is good for; get(h, id): one request, through the relay or straight
@@ -258,6 +295,16 @@
           if (!Object.keys(v.quotes).length) throw new Error("empty");
           return v;
         });
+      }
+    },
+    commute: {
+      // the places come from the TV (h.places), never from the widget's options
+      key: function (w, h) { var p = h.places ? h.places() : null; return p ? routeKey(p.from, p.to) : null; },
+      every: function () { return 6 * 60 * MIN; },
+      get: function (h, id) {
+        var url = routeUrl(id);
+        if (!url) return Promise.reject(new Error("empty"));
+        return h.json(url).then(function (j) { var v = parseRoute(j); if (!v) throw new Error("empty"); return v; });
       }
     }
   };
@@ -332,6 +379,7 @@
     feedOf: feedOf, plain: plain, parseRss: parseRss, ago: ago,
     LEAGUES: LEAGUES, LEAGUE_DEFAULT: LEAGUE_DEFAULT, leagueOf: leagueOf, parseScores: parseScores, scoreOrder: scoreOrder, kickoff: kickoff,
     SYMBOL: SYMBOL, TICKERS_DEFAULT: TICKERS_DEFAULT, TICKER_NAMES: TICKER_NAMES, tickersOf: tickersOf, parseSpark: parseSpark, price: price, change: change,
+    routeKey: routeKey, routeUrl: routeUrl, parseRoute: parseRoute, leaveBy: leaveBy,
     loader: function (h) { return Loader(h); }
   };
   root.CouchWidgetWeb = API;

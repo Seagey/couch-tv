@@ -341,10 +341,14 @@
         vidaa: ["Needs a computer at home that stays on, running couch-tv (setup option B). The website home cannot read share prices.", "To pick your own, open your design in couch-tv Studio on your phone.", "Tap the widget, then type up to six share codes, like BHP.AX.", SEND] }),
       until: "\"Getting the prices\" for a moment. If they cannot be read, it says so and tries again in a few minutes", build: "",
       ok: "Opens the watchlist: each price, today's move and today's line", platforms: plat("works", "computer", "computer", { android: "couch-tv on the TV reads the prices: no computer needed.", vidaa: "Needs a computer at home: the website home cannot read share prices." }), sizes: sz(["tile", "wtile", "small", "tall"], [2, 2]) },
-    commute: { name: "Commute", status: "not-built", what: "Drive time and when to leave", needs: ["Needs live traffic, which only paid map services give"],
-      setup: setup("nothing", NOT_YET), until: "\"Commute: not on couch-tv yet\", and why",
-      build: "A traffic source (paid) or OSRM's free drive time without traffic, with the home and work places kept on the TV only.",
-      ok: "Opens the drive with when to leave (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
+    // OSRM's free route server with OpenStreetMap roads, asked by the TV itself: the usual drive, no live
+    // traffic (that needs a paid map service). Both places stay on the TV (Location, and Commute in
+    // couch-tv Studio's section of Home settings), never in a design
+    commute: { name: "Commute", status: "setup", what: "The usual drive to work or school by road, and when to leave to arrive on time. No live traffic",
+      needs: ["Your town, and where you drive to, set on the TV (never in the design)"],
+      setup: setup("tv", [OPEN, "Go down to Location and set your town, if it is not set yet.", "Go down to couch-tv Studio, then Commute, Where to. Type the town or suburb you drive to and pick it.", "For when to leave: in couch-tv Studio on your phone, tap the widget and set the arrive by time, then send it again."]),
+      until: "\"Set where you drive to\", and where", build: "",
+      ok: "Opens the drive: how long, how far, and when to leave", platforms: plat("setup", "computer", "setup", { android: "The places are kept on the TV. Drive time without traffic.", web: "Works while the home computer is on. The places are kept on the TV." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- guests and the room ----------
     welcome: { name: "Welcome words", status: "works", what: "A greeting in your own words", needs: ["The words, typed in couch-tv Studio"],

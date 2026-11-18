@@ -58,9 +58,10 @@ ok(WW.tickersOf(undefined).join() === "^AXJO,AUDUSD=X,BTC-AUD" && WW.tickersOf([
   ok(/My shares/.test(mine.textContent) && mine.textContent.indexOf("BHP") < mine.textContent.indexOf("ASX 200"), "the design's own watchlist, in its order, and its label");
   const gone = T.W.render({ kind: "stocks", w: 360, h: 360, opts: { tickers: ["ZZZ.AX"] } }, { data: { web: { stocks: { "ZZZ.AX": good } } } });
   ok(gone.getAttribute("data-empty") === "1" && /None of these has a price/.test(gone.textContent), "symbols with no price: says so");
-  [[undefined, "Getting the prices"], [{ ok: false, err: "failed", at: 1 }, "could not be read"], [{ ok: false, err: "relay", at: 1 }, "need a home computer"]].forEach(([r, says]) => K.sizes(T.C, "stocks").forEach(([id, w, h]) => {
-    const el = T.W.render({ kind: "stocks", w, h }, env(r));
-    ok(el.getAttribute("data-empty") === "1" && el.textContent.indexOf(says) >= 0, "stocks " + id + ": " + says);
+  // a tile has room for two or three words only: its own short line
+  [[undefined, "Getting the prices", "Getting prices"], [{ ok: false, err: "failed", at: 1 }, "could not be read", "Prices failed"], [{ ok: false, err: "relay", at: 1 }, "need a home computer", "Needs set up"]].forEach(([r, says, short]) => K.sizes(T.C, "stocks").forEach(([id, w, h]) => {
+    const el = T.W.render({ kind: "stocks", w, h }, env(r)), want = w < 300 || h < 200 ? short : says;
+    ok(el.getAttribute("data-empty") === "1" && el.textContent.indexOf(want) >= 0, "stocks " + id + ": " + want);
   }));
 
   // ---------------- 4. the design and the setup record ----------------

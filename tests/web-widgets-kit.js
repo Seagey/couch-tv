@@ -42,14 +42,14 @@ function sizes(C, kind) {
 // a loader with a fake TV: what it asked for, and answers it is told to give
 function fakeTv(WW, opts) {
   opts = opts || {};
-  const t = { now: opts.now || Date.UTC(2026, 10, 18, 9, 0), asked: [], fail: false, store: opts.store || null, changed: 0, widgets: opts.widgets || [], relayOk: opts.relay !== false };
+  const t = { now: opts.now || Date.UTC(2026, 10, 18, 9, 0), asked: [], fail: false, store: opts.store || null, changed: 0, widgets: opts.widgets || [], relayOk: opts.relay !== false, places: opts.places || null };
   t.h = {
     widgets: () => t.widgets, canRelay: () => t.relayOk,
     relay: (src, id) => { t.asked.push(src + ":" + id); return t.fail ? Promise.reject(new Error("down")) : Promise.resolve(opts.answer(src, id)); },
     json: (url) => { t.asked.push(url); return t.fail ? Promise.reject(new Error("down")) : Promise.resolve(opts.answer("json", url)); },
     load: () => t.store, save: (o) => { t.store = JSON.parse(JSON.stringify(o)); }, changed: () => { t.changed++; },
     now: () => t.now, hidden: () => false,
-    place: opts.place ? () => opts.place : undefined, work: opts.work ? () => opts.work : undefined
+    places: () => t.places || null
   };
   t.L = WW.loader(t.h);
   return t;

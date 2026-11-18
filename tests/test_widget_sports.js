@@ -86,8 +86,8 @@ ok(WW.kickoff(Date.UTC(2026, 10, 18, 9, 40), NOW, false).length > 0 && /^Tomorro
   ok(!/AM EDT/.test(T.W.render({ kind: "sports", w: 360, h: 360, opts: { league: "afl" } }, { data: { web: { sports: { afl: pre } } } }).textContent), "a game not started says when in the TV's own time, not ESPN's");
   const none = T.W.render({ kind: "sports", w: 360, h: 360, opts: { league: "nba" } }, env({ ok: true, at: NOW, v: { league: "NBA", round: "", games: [] } }));
   ok(none.getAttribute("data-empty") === "1" && /No NBA games this week/.test(none.textContent), "between seasons: says there are no games");
-  [[undefined, "Getting the scores"], [{ ok: false, err: "failed", at: 1 }, "could not be read"]].forEach(([r, says]) => K.sizes(T.C, "sports").forEach(([id, w, h]) => {
-    const el = T.W.render({ kind: "sports", w, h }, env(r));
+  [[undefined, "Getting the scores", "Getting scores"], [{ ok: false, err: "failed", at: 1 }, "could not be read", "Scores failed"]].forEach(([r, long, short]) => K.sizes(T.C, "sports").forEach(([id, w, h]) => {
+    const el = T.W.render({ kind: "sports", w, h }, env(r)), says = w < 300 || h < 200 ? short : long;
     ok(el.getAttribute("data-empty") === "1" && el.textContent.indexOf(says) >= 0, "sports " + id + ": " + says);
   }));
 

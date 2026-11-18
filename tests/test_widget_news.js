@@ -77,7 +77,7 @@ ok(Object.keys(WW.FEEDS).every((k) => /^https:\/\/[a-z0-9.-]+\//.test(WW.FEEDS[k
   const good = { ok: true, at: T.D.now(), v: items };
   K.sizes(T.C, "news").forEach(([id, w, h]) => {
     const el = T.W.render({ kind: "news", w, h }, env(good));
-    ok(!el.getAttribute("data-empty") && el.textContent.indexOf(items[0].title) >= 0, "news " + id + ": shows the newest real headline");
+    ok(!el.getAttribute("data-empty") && (h < 200 ? items.slice(0, 5).some((x) => el.textContent.indexOf(x.title) >= 0) : el.textContent.indexOf(items[0].title) >= 0), "news " + id + ": shows the newest real headline (a wide tile: the newest of five that fits whole)");
     ok(/ABC News/.test(el.textContent), "news " + id + ": names the outlet");
     const d = T.W.render({ kind: "news", w, h }, { demo: true, designer: true });
     ok(/Coastal highway/.test(d.textContent), "news " + id + ": the designer shows demo headlines");
@@ -87,9 +87,10 @@ ok(Object.keys(WW.FEEDS).every((k) => /^https:\/\/[a-z0-9.-]+\//.test(WW.FEEDS[k
   ok(count(tall) > count(small) && count(small) >= 2, "a tall box shows more headlines than a small one (" + count(tall) + " and " + count(small) + ")");
   const named = T.W.render({ kind: "news", w: 760, h: 360, opts: { feed: "bbc", label: "World" } }, { data: { web: { news: { bbc: good } } } });
   ok(/World/.test(named.textContent) && !/ABC/.test(named.textContent), "the design's own label names it");
-  const states = [[undefined, "Getting the headlines"], [{ ok: false, err: "failed", at: 1 }, "could not be read"], [{ ok: false, err: "empty", at: 1 }, "No headlines"], [{ ok: false, err: "relay", at: 1 }, "need a home computer"]];
-  states.forEach(([rec, says]) => K.sizes(T.C, "news").forEach(([id, w, h]) => {
-    const el = T.W.render({ kind: "news", w, h }, env(rec));
+  // a wide tile has room for two or three words only: its own short line
+  const states = [[undefined, "Getting the headlines", "Getting news"], [{ ok: false, err: "failed", at: 1 }, "could not be read", "News failed"], [{ ok: false, err: "empty", at: 1 }, "No headlines", "No news"], [{ ok: false, err: "relay", at: 1 }, "need a home computer", "Needs set up"]];
+  states.forEach(([rec, long, short]) => K.sizes(T.C, "news").forEach(([id, w, h]) => {
+    const el = T.W.render({ kind: "news", w, h }, env(rec)), says = w < 300 || h < 200 ? short : long;
     ok(el.getAttribute("data-empty") === "1" && el.textContent.indexOf(says) >= 0 && el.textContent.indexOf(items[0].title) < 0, "news " + id + ": " + says + ", in its own box, nothing made up");
   }));
   ok(T.W.render({ kind: "news", w: 360, h: 360 }, env({ ok: false, err: "relay", at: 1 })).getAttribute("data-setup") === "news", "no relay: OK opens the setup steps");

@@ -32,6 +32,7 @@
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up" };
   // the web widgets' own layers (widget-web.js)
   LAYER.stocks = "stocks"; TITLE.stocks = "Markets";
+  LAYER.commute = "commute"; TITLE.commute = "Commute";
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -524,6 +525,19 @@
         null, (g.teams[0].name || "") + " v " + (g.teams[1].name || ""));
     })));
     if (games.length > n) S.body.appendChild(E("div", "cwd-small", "margin-top:14px", ["And " + (games.length - n) + " more games"]));
+  };
+  // the drive: how long, how far, when to leave, and where the route comes from (OpenStreetMap's credit)
+  B.commute = function (o, env) {
+    var host = document.createElement("div"), V = wk().commuteOf ? wk().commuteOf(host, o, { w: 1760, h: 960 }, env) : null;
+    if (!V) return B.setup(o, env);
+    var c = kit().dataOf(env).commute || {}, from = env.demo ? "Home" : (c.from && c.from.name) || "", to = env.demo ? "Work" : (c.to && c.to.name) || "";
+    S.body.appendChild(head("location", V.label, (from && to ? "From " + from + " to " + to + ". " : "") + "The usual drive by road, no live traffic", "#0a84ff"));
+    var tile = function (name, big, sub) { return F(E("div", "cwd-game", "width:520px", [E("div", "cwd-small", "", [name]), E("div", "cwd-big", "font-size:72px;margin-top:8px", [big]), sub ? E("div", "cwd-small", "margin-top:6px", [sub]) : null]), null, name); };
+    var lb = V.leave ? V.leave.replace(/^(.*?)(leave by|Leave by) /, "") : "";
+    S.body.appendChild(E("div", "cwd-grid", "align-content:flex-start;margin-top:30px", [tile("Drive", V.minutes + " min", "Without traffic"), tile("Distance", V.km + " km", "By road"),
+      tile(V.leave ? (/^Leave/.test(V.leave) ? "Leave by" : V.leave.replace(/, leave by .*/, "") + ", leave by") : "Leave by", lb || "Not set", V.leave ? (V.arrive ? "To arrive by " + V.arrive : "") : "Set an arrive by time in couch-tv Studio")]));
+    S.body.appendChild(E("div", "cwd-grow"));
+    S.body.appendChild(E("div", "cwd-small", "", ["Route by OSRM from OpenStreetMap. Map data © OpenStreetMap contributors."]));
   };
   // the watchlist with today's line for each (the day's prices, from the first trade to now)
   B.stocks = function (o, env) {
