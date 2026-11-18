@@ -81,6 +81,8 @@ source we could check, so nothing brand specific is switched off on them yet. Th
 still are. Their tracking is switched off in the TV's menu (below). If you find one, open an issue
 with the package name and a source.
 
+**TCL (Google TV)**: `tv.samba.ssm.ui` is a Samba TV ACR app on TCL Google TVs (found by survey-tv.py). It is now included in the privacy list above.
+
 ## What it cannot do
 
 - **Samsung (Tizen), LG (webOS), Hisense VIDAA, Roku, Vizio and Panasonic** are not Android: there are

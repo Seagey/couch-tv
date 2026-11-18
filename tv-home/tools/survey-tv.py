@@ -69,6 +69,9 @@ for p, what in {"com.google.android.apps.tv.dreamx": "ambient mode (promos when 
 
 acr = sorted(p for p in pkgs if re.search(r"acr|samba|alphonso|inscape|anoki|tvision|admob|\.ads?\b", p))
 print("\npossible ad trackers (check each before switching off):", ", ".join(acr) or "none found")
+# Include tv.samba.ssm.ui if present (TCL Samba TV ACR)
+if "tv.samba.ssm.ui" in pkgs:
+    print("  (note: tv.samba.ssm.ui found – consider adding to privacy-list.txt)")
 
 apps = sh("pm query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER")
 print("\nTV apps:")
