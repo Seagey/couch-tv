@@ -1,10 +1,10 @@
-# Two TVs, one show (experimental)
+# Two TVs, one show
 
 Put the same show on two TVs and have them play within a few hundredths of a second of each other.
 Useful when two rooms are watching the same match, or when you walk from one room to the other and
 do not want to hear an echo.
 
-**This is experimental.** It has run on two TVs in one house, with YouTube and Netflix. Everything
+It has run on two TVs in one house, with YouTube and Netflix. Everything
 below says what was measured and what was not. If it works (or does not) on yours, please open an
 issue and say which TV, which Android version and which app.
 

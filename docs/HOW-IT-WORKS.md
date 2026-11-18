@@ -6,7 +6,7 @@ On this page:
 
 - [How it fits together](#how-it-fits-together)
 - [The parts](#the-parts)
-- [Two TVs, one show (experimental)](#two-tvs-one-show-experimental)
+- [Two TVs, one show](#two-tvs-one-show)
 - [Privacy and safety](#privacy-and-safety)
 - [Limits](#limits)
 
@@ -45,7 +45,7 @@ protocol and ADB.
 
 Each TV has its own guide in [the docs index](README.md).
 
-## Two TVs, one show (experimental)
+## Two TVs, one show
 
 Two Android TVs or Google TVs can be started on the same show within a few hundredths of a second of
 each other, so two rooms do not echo. It needs a small helper app on each TV and a computer to run
@@ -54,7 +54,7 @@ cannot do it. Read [docs/SYNC.md](SYNC.md) first.
 
 ## Privacy and safety
 
-- **Privacy clean (Beta, opt in).** couch-tv replaces the ad filled home, and with `PRIVACY=1`
+- **Privacy clean (opt in).** couch-tv replaces the ad filled home, and with `PRIVACY=1`
   `apply.sh` also switches off known tracking, ad and ACR apps it can find on your TV, reversibly
   (`pm disable-user`; `undo.sh` switches them back on). It never touches the TV's home, setup, the
   remote or Keep watching. It does not remove all tracking: see [PRIVACY.md](PRIVACY.md)

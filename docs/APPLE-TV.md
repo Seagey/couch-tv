@@ -1,6 +1,6 @@
-# couch-tv on an Apple TV (Beta)
+# couch-tv on an Apple TV
 
-**New, Beta.** Two parts: the phone remote (the bridge talks to the Apple TV) and **Couch TV**, couch-tv's home as an
+**New.** Two parts: the phone remote (the bridge talks to the Apple TV) and **Couch TV**, couch-tv's home as an
 Apple TV app. Both were built and checked against a stand-in Apple TV and a stand-in bridge on a computer, and Couch TV also runs in
 the tvOS Simulator. No real Apple TV has run them yet, so expect something to need fixing. Please [open an issue](https://github.com/Seagey/couch-tv/issues)
 and say how it went (the Apple TV model, tvOS version, what worked and what did not), even if all of it worked.
@@ -13,12 +13,12 @@ and say how it went (the Apple TV model, tvOS version, what worked and what did 
 | Sleep and wake from the phone | Yes |
 | Opening an app from the phone (Netflix, YouTube, Disney+, Prime Video, Apple TV and the rest the Apple TV lists) | Yes. The app opens on its own home page: pick the show there, nothing presses Play for you |
 | "Put on Bluey" (find and play) | Finds where it streams, opens that app. No deep link into the show |
-| couch-tv's home screen on the TV | **New, Beta:** Couch TV, an app with the same scenes, glass clock, date and weather, people switch, Keep watching and dock as the other TVs. You put it on the Apple TV yourself with Xcode on a Mac ([below](#the-home-app-couch-tv)) |
+| couch-tv's home screen on the TV | **New:** Couch TV, an app with the same scenes, glass clock, date and weather, people switch, Keep watching and dock as the other TVs. You put it on the Apple TV yourself with Xcode on a Mac ([below](#the-home-app-couch-tv)) |
 | Opening couch-tv by itself when the Apple TV wakes | Yes, once Couch TV is installed and the bridge is running, like the Samsung and LG paths |
 | Replacing or coming before Apple's own home screen | **No, and it cannot be done.** tvOS lets no app replace the home, and couch-tv never jailbreaks anything. Apple's Home button still opens Apple's home |
 | Typing from the phone, screenshots, what is playing, a volume level | No (see "Limits") |
 | More than one TV on one phone remote | Yes, like the Roku and the LG: one bridge, several entries in `config.json` |
-| Kids mode (only a shelf of shows you picked, behind a parent PIN) | **New, Beta:** in Couch TV, with the bridge. Netflix, Disney+, Apple TV and YouTube posters open the show, other apps open on their home. Pair it with Apple's Restrictions ([Kids mode](#kids-mode)) |
+| Kids mode (only a shelf of shows you picked, behind a parent PIN) | **New:** in Couch TV, with the bridge. Netflix, Disney+, Apple TV and YouTube posters open the show, other apps open on their home. Pair it with Apple's Restrictions ([Kids mode](#kids-mode)) |
 
 The phone remote costs nothing and needs no Apple account. Couch TV is free with your own Apple ID, but Apple makes a
 free signature run out after 7 days, so a Mac at home signs it again twice a week (a script does it).
@@ -169,7 +169,7 @@ anything else in couch-tv.
 
 ## Kids mode
 
-**New, Beta, on main.** Kids mode ([CONFIG.md](CONFIG.md#kids-mode)) works in Couch TV too. Idea from Natalie Bruss
+**New, on main.** Kids mode ([CONFIG.md](CONFIG.md#kids-mode)) works in Couch TV too. Idea from Natalie Bruss
 (@nataliebruss on Instagram). It is off unless you set it up: nothing changes for a household with no kids profile.
 
 When the person watching is a kids profile, Couch TV shows only their shelf: big posters of the shows you picked, and

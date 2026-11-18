@@ -1,6 +1,6 @@
 # couch-tv on a Panasonic Viera TV
 
-## Status: New, Beta
+## Status: New
 
 The Panasonic path is new. It was written in November 2026 from the public description of the network
 remote that Panasonic's own phone app uses, and checked against a stand-in TV on a computer

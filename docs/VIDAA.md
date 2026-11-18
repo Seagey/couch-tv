@@ -36,7 +36,7 @@ It needs the computer that stays on. Without one there is nothing on the TV to o
 |---|---|
 | couch-tv home, apps in your order, the remote's arrows and OK | In the TV's browser or a tile. Confirmed on a Hisense 55U7N |
 | Opens by itself when the TV is switched on | Yes, with the bridge running |
-| VIDAA's own Home button | **Still opens VIDAA's home** unless `keep_home: true` is set (opt in, Beta). Without it that cannot change without rooting the TV, and couch-tv never roots a TV. Press Home on the phone remote to get couch-tv back |
+| VIDAA's own Home button | **Still opens VIDAA's home** unless `keep_home: true` is set (opt in). Without it that cannot change without rooting the TV, and couch-tv never roots a TV. Press Home on the phone remote to get couch-tv back |
 | A Couch TV tile on the app row | Only on firmware that still accepts it (below). Asked for once, from the phone, never by itself |
 | Phone remote: keys, volume up and down, mute, open an app | Works |
 | More than one TV on one phone remote | Yes: one bridge runs Google TVs, Samsungs, LGs, Rokus and VIDAA TVs together |
@@ -169,7 +169,7 @@ In `config.json`, add the TV with `"kind": "vidaa"`:
   was **first** added with: adding it again under the same id answers `"tile": true` but the tile still opens
   the old address. To point the tile somewhere new (the standalone home below, or a new bridge address), set a
   new id here (for example `app.couchtv.tv`), add the tile again, and remove the old one from the app row.
-- `keep_home` (false): opt in (Beta). When the TV falls back to VIDAA's own home, couch-tv opens again on top. A
+- `keep_home` (false): opt in. When the TV falls back to VIDAA's own home, couch-tv opens again on top. A
   Home press from the phone remote is never bounced, and after the phone remote's Input key it waits up to
   30 seconds, or until a source is picked, so the source picker stays usable. The Input key on the TV's own
   remote is not seen by the bridge: press Home twice to keep VIDAA's home up for a while instead.

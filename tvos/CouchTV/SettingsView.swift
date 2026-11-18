@@ -65,7 +65,7 @@ struct SettingsView: View {
                     note("Apple's Home button still opens Apple's home: tvOS lets no app replace it. With the bridge running, Couch TV opens by itself when the Apple TV wakes.")
                     note("Apps open through the bridge, because a tvOS app cannot open another app by itself. A few (YouTube, Netflix, Spotify) also open without it.")
                     note("Without the bridge the clock, the date and the scenes still work, and the apps you saw last stay in the dock.")
-                    note(["Couch TV", Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String, "(Beta)"]
+                    note(["Couch TV", Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String]
                         .compactMap { $0 }.joined(separator: " "))
                 }
                 .frame(width: 760, alignment: .leading)

@@ -72,8 +72,8 @@ The newest release is **0.13.1**, on [the Releases page](https://github.com/Seag
 - **14 November:** `home.hi_res: "always"` loads the sharper 4K scenes on a 4K TV that draws its interface at 1080, thanks Hiren-Patel1 ([#191](docs/UPDATES.md#14-november-2026-sharper-scenes-on-a-4k-tv-that-draws-its-interface-at-1080-since-013))
 - **14 November:** an app banner that is not 16:9 keeps its proportions instead of being squeezed, thanks niravsaxena30 ([#181](docs/UPDATES.md#14-november-2026-an-app-banner-that-is-not-169-is-no-longer-squeezed-since-013))
 - **13 November:** the TV home speaks Czech, thanks slezaCZ ([#178](docs/UPDATES.md#13-november-2026-czech-on-the-tv-home-since-013))
-- **13 November:** Bell Streamer's Fibe TV home is replaced by couch-tv (Beta, untested), thanks Sparkybabcia ([#168](docs/UPDATES.md#13-november-2026-bell-streamer-with-fibe-tv-as-its-home-beta-since-013))
-- **13 November:** Privacy clean (Beta): `PRIVACY=1` switches off known tracking, ad and ACR apps, reversibly ([docs/PRIVACY.md](docs/PRIVACY.md), [details](docs/UPDATES.md#13-november-2026-privacy-clean-beta-on-main))
+- **13 November:** Bell Streamer's Fibe TV home is replaced by couch-tv (untested), thanks Sparkybabcia ([#168](docs/UPDATES.md#13-november-2026-bell-streamer-with-fibe-tv-as-its-home-beta-since-013))
+- **13 November:** Privacy clean: `PRIVACY=1` switches off known tracking, ad and ACR apps, reversibly ([docs/PRIVACY.md](docs/PRIVACY.md), [details](docs/UPDATES.md#13-november-2026-privacy-clean-beta-on-main))
 - **13 November:** the home comes back to the tile you left after Settings, thanks IshMehta ([#166](docs/UPDATES.md#13-november-2026-the-home-comes-back-to-the-tile-you-left-since-013))
 - **13 November:** on Fire OS 7 Couch TV comes back without the 5 second wait, thanks atul016 ([#162](docs/UPDATES.md#13-november-2026-fire-os-7-brings-couch-tv-back-without-the-5-second-wait-since-013))
 - **13 November:** the Next song button skips the track again on a Mi Box, thanks NathanGlasby ([#158](docs/UPDATES.md#13-november-2026-the-next-song-button-skips-the-track-again-since-013))
@@ -102,23 +102,23 @@ A is the TV home only, B adds the computer bridge, C lives on the TV ([the three
 | [Google TV](docs/PLATFORMS.md#google-tv-and-android-tv) | Yes | Yes | Partial |
 | [Google TV box](docs/PLATFORMS.md#google-tv-and-android-tv) | Yes | Yes | Partial |
 | [Older Android TV](docs/PLATFORMS.md#google-tv-and-android-tv) | Yes | Yes | Yes |
-| [Android 6 TV](docs/PLATFORMS.md#all-tvs-in-one-table) | Experimental | Not tested | Experimental |
+| [Android 6 TV](docs/PLATFORMS.md#all-tvs-in-one-table) | Installs and opens | Not tested | Installs and opens |
 | [XGIMI projector](docs/PLATFORMS.md#all-tvs-in-one-table) | Yes | Not reported | Yes |
-| [Nvidia Shield](docs/PLATFORMS.md#google-tv-and-android-tv) | Yes, untested | Yes | Yes, untested |
+| [Nvidia Shield](docs/PLATFORMS.md#google-tv-and-android-tv) | Yes | Yes | Yes |
 | [Fire TV on Fire OS](docs/PLATFORMS.md#fire-tv-on-fire-os) | Partial | Partial | Partial |
-| [Fire TV on Vega OS](docs/PLATFORMS.md#fire-tv-on-vega-os) | App only | Beta | No |
+| [Fire TV on Vega OS](docs/PLATFORMS.md#fire-tv-on-vega-os) | App only | With a computer at home | No |
 | [Samsung](docs/PLATFORMS.md#samsung) | App only | As an app | No |
 | [LG](docs/PLATFORMS.md#lg) | App only | As an app | No |
 | [Roku](docs/PLATFORMS.md#roku) | App only | As a channel | No |
-| [Hisense VIDAA](docs/PLATFORMS.md#hisense-vidaa) | App only | Beta | No |
-| [Philips with Titan OS](docs/PLATFORMS.md#philips-with-titan-os) | Not yet | Remote only, Beta | No |
-| [Older Philips with Saphi](docs/PLATFORMS.md#older-philips-with-saphi) | No | Beta | No |
-| [VIZIO](docs/PLATFORMS.md#vizio) | No | Remote, Beta (home in the TV's webview by hand, Beta, one set) | No |
-| [Panasonic Viera](docs/PLATFORMS.md#panasonic-viera) | No | Beta | No |
-| [Apple TV](docs/PLATFORMS.md#apple-tv) | No | Beta | No |
-| [TiVo OS](docs/PLATFORMS.md#tivo-os) | No | Beta | No |
+| [Hisense VIDAA](docs/PLATFORMS.md#hisense-vidaa) | App only | With a computer at home | No |
+| [Philips with Titan OS](docs/PLATFORMS.md#philips-with-titan-os) | Not yet | Remote only, with a computer at home | No |
+| [Older Philips with Saphi](docs/PLATFORMS.md#older-philips-with-saphi) | No | With a computer at home | No |
+| [VIZIO](docs/PLATFORMS.md#vizio) | No | Remote, with a computer at home (home in the TV's webview by hand, one set) | No |
+| [Panasonic Viera](docs/PLATFORMS.md#panasonic-viera) | No | With a computer at home | No |
+| [Apple TV](docs/PLATFORMS.md#apple-tv) | No | With a computer at home | No |
+| [TiVo OS](docs/PLATFORMS.md#tivo-os) | No | With a computer at home | No |
 
-**Beta** means a computer at home that stays on, and the maker's own Home button still opens the maker's own home.
+**With a computer at home** means a computer at home that stays on, and the maker's own Home button still opens the maker's own home.
 
 **It depends on the model, not the brand.** Open **Settings, System, About** (or **Device Preferences, About**) on the TV: "Android TV OS" means yes ([brand by brand](docs/TV-BRANDS.md)).
 
@@ -197,7 +197,7 @@ look and scenes, your apps and their order, the people and the quick buttons, wi
 - **[Smart home](docs/TV-HOME.md#smart-home)**: air conditioning, scenes and a doorbell card from Home Assistant. Off unless you add it.
 - **[Sixteen languages](docs/TV-HOME.md#languages)**: English, Spanish, Mexican Spanish, Italian, German, French, Turkish, Serbian, Polish, Dutch, Hebrew, Czech, Brazilian Portuguese, Arabic, Romanian and Simplified Chinese.
 - **[Your own photos](docs/TV-HOME.md#your-own-photos)**: from a USB drive, the TV or the web, taking turns with the scenes.
-- **[Two TVs, one show](docs/SYNC.md)**: start the same show on two TVs at once, so two rooms do not echo. Experimental.
+- **[Two TVs, one show](docs/SYNC.md)**: start the same show on two TVs at once, so two rooms do not echo.
 - **[Move to another TV](docs/MOVE.md)**: carry on in another room. One tap on the phone pauses the show here and starts it there, as the same person. New, Android and Google TV with the bridge.
 - **[Updates on the TV](docs/TV-HOME.md#updates)**: off until you say yes. Then the TV tells you about a new version and hands it to Android to install.
 
@@ -230,7 +230,7 @@ short code. It also has a gallery of designs other people made.
 ## One home, many TVs
 
 The same home on Google TV and Android TV, an app on Apple TV, a channel on Roku, and Fire TV,
-Samsung and LG versions, with Beta paths for more.
+Samsung and LG versions, with more paths for other TVs.
 
 <p align="center">
   <img src="docs/screens/appletv-home.jpg" alt="Couch TV on Apple TV" width="32%">
@@ -238,7 +238,7 @@ Samsung and LG versions, with Beta paths for more.
   <img src="docs/screens/firestick-home.jpg" alt="couch-tv on a Fire TV Stick" width="32%">
 </p>
 
-<p align="center"><sub>Apple TV (Beta), Roku and a Fire TV Stick.</sub></p>
+<p align="center"><sub>Apple TV, Roku and a Fire TV Stick.</sub></p>
 
 ## Android permissions, and why
 
@@ -279,7 +279,7 @@ gains a permission these tables do not explain.
 | `READ_TV_LISTINGS`, `READ_EPG_DATA` | The same way | Keep watching: reads Android's Watch Next rows to name what is playing when an app does not say. Read only |
 | `PACKAGE_USAGE_STATS` | The same way, or from a computer where Fire OS blocks the TV's own ADB | Fire TV only in use: lets the home watch see Amazon's home come forward on Fire OS builds where the accessibility watch never connects |
 
-**The sync helper** (`sync/`, only for [Two TVs, one show](docs/SYNC.md), experimental):
+**The sync helper** (`sync/`, only for [Two TVs, one show](docs/SYNC.md)):
 
 | Permission | Granted | Why |
 |---|---|---|

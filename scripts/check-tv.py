@@ -306,7 +306,7 @@ def main():
                           "stand-in only, not yet on a real VIDAA TV), or plug in a Google TV box for everything."}
     elif open_ports[1925] and not open_ports[1926] and not android:
         page = (saphi or {}).get("browser")
-        verdict = {"A": "no", "B": "Philips Saphi path, New (Beta): phone remote" + (
+        verdict = {"A": "no", "B": "Philips Saphi path, New: phone remote" + (
                        ", and couch-tv's page opens in the TV's browser" if page else " only (no browser listed)")
                    + ": docs/PHILIPS-SAPHI.md", "C": "no",
                    "why": "An older Philips Linux TV (Saphi): no Android apps and a locked home screen. With a computer at "
@@ -322,23 +322,23 @@ def main():
                           "against a stand in only). couch-tv's home cannot open on it without a Titan app, so plug in a "
                           "Google TV box for everything."}
     elif vizio:
-        verdict = {"A": "no", "B": "VIZIO path, New (Beta): phone remote, power, volume, inputs and opening apps: "
+        verdict = {"A": "no", "B": "VIZIO path, New: phone remote, power, volume, inputs and opening apps: "
                               "docs/VIZIO.md", "C": "no",
                    "why": "VIZIO SmartCast or VIZIO OS: no Android apps, no browser and a locked home screen. With a computer "
                           "at home the phone remote and the assistant can drive it (docs/VIZIO.md, tested against a stand in "
                           "so far). couch-tv's own home cannot open on a VIZIO, so plug in a Google TV box for everything."}
     elif open_ports[55000] and not android:
-        verdict = {"A": "no", "B": "Panasonic path (New, Beta): docs/PANASONIC.md", "C": "no",
+        verdict = {"A": "no", "B": "Panasonic path (New): docs/PANASONIC.md", "C": "no",
                    "why": "Panasonic Viera (My Home Screen or older): no Android apps and a locked home screen. couch-tv "
                           "can open itself in the TV's browser each time the TV comes on, with a computer at home, and the "
-                          "phone remote works (docs/PANASONIC.md, Beta: first run scripts/panasonic-check.py, it only reads). "
+                          "phone remote works (docs/PANASONIC.md: first run scripts/panasonic-check.py, it only reads). "
                           "Or plug in a Google TV box for everything."}
     elif open_ports[56789] and not android:
-        verdict = {"A": "no", "B": "TiVo OS path (New, Beta): docs/TIVO.md", "C": "no",
+        verdict = {"A": "no", "B": "TiVo OS path (New): docs/TIVO.md", "C": "no",
                    "why": "A TV built by Vestel that answers Smart Center: TiVo OS (JVC, Telefunken and others) or an older "
                           "Vestel system. No Android apps and a locked home screen. With a computer at home the phone "
                           "remote works, and couch-tv opens itself in the TV's browser each time the TV comes on, from a "
-                          "Speed Dial tile you add once (docs/TIVO.md, Beta, run on one real JVC so far: first run "
+                          "Speed Dial tile you add once (docs/TIVO.md, run on one real JVC so far: first run "
                           "scripts/tivo-check.py, it only reads). Or plug in a Google TV box for everything."}
     elif not android:
         verdict = {"A": "no", "B": "no", "C": "no", "why": "Not an Android TV as far as the network shows (no Android TV remote, no ADB)."}

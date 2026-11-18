@@ -29,7 +29,7 @@ The hook: a watcher checks the TV every second (a power on is also pushed at onc
 ("statetype" remote_launcher) or live TV, the bridge opens couch-tv: its tile, if one was added
 (POST /api/vidaa/tile), else the TV's browser at the bridge's home page. It is a page that opens
 itself, not a true home screen: the remote's Home button still opens VIDAA's home unless "keep_home": true
-is set (opt in, Beta). No root, ever.
+is set (opt in). No root, ever.
 
 What it cannot do (docs/VIDAA.md): read which app is in front, a volume level, typing, screenshots,
 deep links into a show, ADB tools.

@@ -1,6 +1,6 @@
 # couch-tv on an older Philips TV (Saphi)
 
-**New (Beta).** Read this first.
+**New.** Read this first.
 
 - **What you get:** the phone remote (power, keys, volume, inputs, the Claude ask on top of those), and, if
   your set offers it, couch-tv's page opening in the TV's own browser each time the TV is switched on.
@@ -8,7 +8,7 @@
   can show, the remote's Home button still opens Philips's menu, and a page that opens itself is the most
   couch-tv can do on these sets. No "what is playing", no screenshots, no typing from the phone, and apps open
   on their own page, not inside a show.
-- **Beta:** it was built from public notes on Philips's network remote and checked against a pretend Philips
+- **Tested so far:** it was built from public notes on Philips's network remote and checked against a pretend Philips
   on a computer (`tests/philips_standin.py`, Saphi mode). The first real set will probably show something to
   fix. The quickest test takes two minutes and needs nothing installed:
   [PHILIPS-SAPHI-TESTING.md](PHILIPS-SAPHI-TESTING.md).

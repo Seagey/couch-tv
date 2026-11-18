@@ -1,7 +1,7 @@
 // The design store's off switch for the web widgets' sources (widget-web.js pausedOf, the loader,
 // widgets.js, app.js): GET <store>/v1/config/sources answers { "v": 1, "paused": ["sports"] }; a paused
 // source is never asked and its widget says calmly that the feed is paused; switched back on, it is
-// asked straight away; no answer means everything on. Scores and Markets are marked Beta. No live calls.
+// asked straight away; no answer means everything on. Scores and Markets are marked unofficial. No live calls.
 // Run: node tests/test_widget_pause.js
 const fs = require("fs");
 const path = require("path");
@@ -52,12 +52,12 @@ ok(WW.PAUSABLE.join() === "news,sports,stocks,commute", "every web source can be
     ok(el.getAttribute("data-empty") === "1" && el.textContent.indexOf(says) >= 0 && !/failed|could not|need/i.test(el.textContent), kind + " " + id + ": " + says + ", calmly");
   }));
 
-  // ---------------- 4. the TV asks the store once a day, and Beta ----------------
+  // ---------------- 4. the TV asks the store once a day, and the unofficial label ----------------
   const app = fs.readFileSync(path.join(__dirname, "../tv-home/web/app.js"), "utf8");
   ok(/fetch\(base \+ "\/v1\/config\/sources", \{ credentials: "omit", referrerPolicy: "no-referrer", cache: "no-store" \}\)/.test(app), "app.js asks <store>/v1/config/sources with no cookies and no referrer");
   ok(/t - WEB_PAUSE\.at >= 86400000/.test(app) && /WEB_PAUSE\.at = t;   \/\/ one ask a day, whatever the answer/.test(app), "at most once a day, whatever the answer");
   ok(/if \(!base \|\| !window\.fetch\) return done\(\[\]\);/.test(app) && /function \(\) \{ done\(\[\]\); \}/.test(app), "no store or no answer: everything on");
   ok(/WEB_PAUSE\.wait\.then\(go, go\); setTimeout\(go, 6000\)/.test(app), "the first look waits for the answer (6 seconds at most)");
-  ok(/^Beta: /.test(T.C.beta("sports")) && /^Beta: /.test(T.C.beta("stocks")) && T.C.beta("news") === "" && T.C.beta("commute") === "", "widget-caps: Scores and Markets are marked Beta");
+  ok(/^Unofficial source: /.test(T.C.beta("sports")) && /^Unofficial source: /.test(T.C.beta("stocks")) && T.C.beta("news") === "" && T.C.beta("commute") === "", "widget-caps: Scores and Markets are marked unofficial");
   done();
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -399,7 +399,7 @@ class Apps(Base):
 
 
 class WebHome(Base):
-    """The Beta webview path (#206): name space 4 and the allow listed ids only, never APP_ID 1."""
+    """The webview path (#206): name space 4 and the allow listed ids only, never APP_ID 1."""
     URL = "http://127.0.0.1:5400/tv/"
 
     async def test_allowed_ids_send_name_space_4_and_the_url(self):

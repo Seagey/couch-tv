@@ -31,7 +31,7 @@
 # APK defaults to the one scripts/build-apk.sh builds. KEEP_SETUP is no longer needed: the setup
 # wizard always stays on.
 #
-# Privacy clean (Beta, opt in, docs/PRIVACY.md): PRIVACY=1 also switches off the known tracking, ad
+# Privacy clean (opt in, docs/PRIVACY.md): PRIVACY=1 also switches off the known tracking, ad
 # and ACR apps from privacy-list.txt that this TV has, through the same safety check and undo list
 # as EXTRA_OFF. Without PRIVACY=1 nothing about it changes.
 # Dry run: DRY_RUN=1 only lists what would be switched off and left on, and why. It installs

@@ -1,4 +1,4 @@
-# Privacy clean list (Beta). Read by apply.sh when PRIVACY=1. See docs/PRIVACY.md.
+# Privacy clean list. Read by apply.sh when PRIVACY=1. See docs/PRIVACY.md.
 #
 # Known tracking, telemetry, advertising and ACR (automatic content recognition) apps on Google TV,
 # Android TV and Fire TV. apply.sh switches off only the ones a TV actually has, with

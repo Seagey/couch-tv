@@ -1,4 +1,4 @@
-# Privacy clean (Beta)
+# Privacy clean
 
 couch-tv replaces the TV's ad filled home screen. On its own it does not switch off the TV's
 tracking, ad and automatic content recognition (ACR) apps: the ones that report what you watch,

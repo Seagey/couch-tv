@@ -74,6 +74,8 @@
     if (guide.length) out.guide = guide;
     var url = calUrl(obj(r.cal).url);
     if (url) out.cal = { url: url };
+    var st = cleanStay(r.stay);
+    if (st) out.stay = st;
     var goal = +obj(r.screen).goal;
     if (GOALS.indexOf(goal) > 0) out.screen = { goal: goal };
     return out;

@@ -243,7 +243,7 @@ release opens the app rather than the show.
   person's `app_profiles` and the bridge picks it on the "Who's watching?" screen (People, above).
 - **The TV's own buttons.** On some TVs the remote's Home button, or a long press of it, can reach the
   TV's own home or quick settings. On Android TV and Google TV the Home button watch (set up by
-  `apply.sh`) brings couch-tv back, and with it kids mode. Samsung, LG, Roku and the Beta paths keep
+  `apply.sh`) brings couch-tv back, and with it kids mode. Samsung, LG, Roku and the paths that need a computer at home keep
   their maker's own Home button, so there a child can leave couch-tv that way.
 - **The phone remote is a grown up's tool.** It can still open any app or play any show. Keep it, and
   the pairing key if you set one, away from the kids.
@@ -251,7 +251,7 @@ release opens the app rather than the show.
   be worked out by someone with a computer on your Wi-Fi in seconds. A longer PIN helps a little.
 - The Roku channel draws its own home and does not have kids mode yet. The Apple TV app (Couch TV) has it,
   with the bridge: see [APPLE-TV.md](APPLE-TV.md#kids-mode), which also covers Apple's Restrictions, because the
-  Apple TV's own TV button still opens Apple's home. The Samsung and LG apps, and the pages the Beta paths open,
+  Apple TV's own TV button still opens Apple's home. The Samsung and LG apps, and the pages the paths that need a computer at home open,
   are the same home page and have it too.
 
 ## The home's look (`home`)
@@ -450,7 +450,7 @@ second is kept on the TV only (`tvhome.commute`), not in the settings the bridge
 this home stops if it would send it. A design's Commute widget carries only its label, the arrive by
 time (`arrive_h`, `arrive_m`), the minutes to spare (`buffer`, 10 unless set) and `weekdays`.
 
-Scores and Markets are marked Beta (their sources are unofficial). The design store can pause any of
+Scores and Markets are marked as unofficial (their sources are unofficial). The design store can pause any of
 these sources for every TV without an update: the TV asks `<design_store>/v1/config/sources` at most
 once a day, only while a web widget is on the home, with no cookies and no referrer, and keeps the
 answer for the day. `{"v": 1, "paused": ["sports"]}` pauses Scores; a paused source is never asked and

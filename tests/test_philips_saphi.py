@@ -411,7 +411,7 @@ class CheckTv(Base):
                 patch.object(sys, "argv", ["check-tv.py", "192.0.2.9"]), contextlib.redirect_stdout(out):
             mod.main()
         text = out.getvalue()
-        self.assertIn("Philips Saphi path, New (Beta)", text)
+        self.assertIn("Philips Saphi path, New", text)
         self.assertIn("opens in the TV's browser", text)
         self.assertIn("browser listed: yes", text)
         self.assertNotIn("untested", text)

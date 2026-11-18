@@ -1,4 +1,4 @@
-// Couch TV for Apple TV (Beta): the couch-tv home as a native tvOS app. tvOS has no web view, so this
+// Couch TV for Apple TV: the couch-tv home as a native tvOS app. tvOS has no web view, so this
 // draws the TV home's Night look again in SwiftUI and talks to the same bridge (docs/APPLE-TV.md).
 import SwiftUI
 
