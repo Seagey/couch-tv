@@ -1,7 +1,9 @@
 package app.couchtv.launcher
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
@@ -76,6 +78,28 @@ class MainActivity : Activity() {
 
     private val prefs by lazy { getSharedPreferences("home", MODE_PRIVATE) }
 
+    /**
+     * `home.render_height` (config.json): draw the home this many pixels high in its own hardware layer and
+     * scale that layer up to the screen. A weak GPU (a MediaTek projector's Mali-G52) cannot composite a
+     * 1080p WebView at 60 fps but does at 720p. (FLAG_SCALED does nothing useful on Android 11: it only makes
+     * a smaller window.) The density is lowered by the same factor, so the page still lays out on the same
+     * dp canvas and only the pixels behind it are fewer. 0 or missing: the screen's own size.
+     */
+    private fun renderHeight(base: Context): Int = runCatching {
+        val cfg = base.getSharedPreferences("home", MODE_PRIVATE).getString("config", null) ?: return 0
+        JSONObject(cfg).optJSONObject("home")?.optInt("render_height", 0) ?: 0
+    }.getOrDefault(0)
+
+    override fun attachBaseContext(base: Context) {
+        val h = renderHeight(base)
+        val screen = base.resources.displayMetrics.heightPixels
+        if (h in 360 until screen) {
+            val c = Configuration(base.resources.configuration)
+            c.densityDpi = Math.round(c.densityDpi * h.toFloat() / screen)
+            super.attachBaseContext(base.createConfigurationContext(c))
+        } else super.attachBaseContext(base)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         shown = java.lang.ref.WeakReference(this)
@@ -96,7 +120,16 @@ class MainActivity : Activity() {
         runCatching { WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG) }
         CrashGuard.install(this)   // the WebView puts its own crash handler in front: ours goes first again
         root = FrameLayout(this).apply { setBackgroundColor(GROUND) }
-        setContentView(root)
+        val screenSize = android.graphics.Point().also { runCatching { @Suppress("DEPRECATION") windowManager.defaultDisplay.getRealSize(it) } }
+        val renderH = renderHeight(this)
+        if (renderH in 360 until screenSize.y) {
+            // The whole home is laid out and drawn at renderH pixels high in its own hardware layer, and that
+            // layer is scaled up to the screen: the page rasterises at the lower size, the GPU only blits it.
+            val k = screenSize.y.toFloat() / renderH
+            setContentView(root, android.view.ViewGroup.LayoutParams(Math.round(screenSize.x / k), renderH))
+            root.pivotX = 0f; root.pivotY = 0f; root.scaleX = k; root.scaleY = k
+            root.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        } else setContentView(root)
         hideSystemBars()
         intent?.let { readExtras(it) }
         io.execute { warmApps() }
