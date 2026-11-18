@@ -353,6 +353,9 @@ def _home(h):
     # false hides the whole Keep watching row and stops the home asking for it. Home settings win over it.
     if isinstance(h.get("keep_watching"), bool):
         out["keep_watching"] = h["keep_watching"]
+    # true makes the row follow the app the remote is on ("Recently on <app>"). Home settings win over it.
+    if isinstance(h.get("shelf_follows_app"), bool):
+        out["shelf_follows_app"] = h["shelf_follows_app"]
     if isinstance(h.get("ambient_music"), bool):
         out["ambient_music"] = h["ambient_music"]
     if isinstance(h.get("sun_sync"), bool):

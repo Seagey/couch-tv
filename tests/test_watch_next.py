@@ -47,6 +47,16 @@ class TestWatchNextLogic(unittest.TestCase):
         self.assertNotIn("keep_watching", config._home({"keep_watching": "no"}))
         self.assertNotIn("keep_watching", config._home({"keep_watching": 0}))
 
+    def test_shelf_follows_app_reaches_the_tv(self):
+        """home.shelf_follows_app goes to the TV through config.js (and option A's home-config.py), as a
+        real boolean only: the page reads it from window.COUCH_CONFIG.home, so a key left out here would
+        make the setting in config.json do nothing (seen on a Fire TV Cube: the row never followed)."""
+        self.assertNotIn("shelf_follows_app", config._home({}))
+        self.assertIs(config._home({"shelf_follows_app": True})["shelf_follows_app"], True)
+        self.assertIs(config._home({"shelf_follows_app": False})["shelf_follows_app"], False)
+        self.assertNotIn("shelf_follows_app", config._home({"shelf_follows_app": "yes"}))
+        self.assertNotIn("shelf_follows_app", config._home({"shelf_follows_app": 1}))
+
     def test_watch_next_per_app_default_and_bounds(self):
         """Verify watch_next_per_app defaults to 5 and is clamped between 1 and 20."""
         self.assertEqual(config._home({})["watch_next_per_app"], 5)
