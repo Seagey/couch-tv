@@ -1,6 +1,7 @@
 """Move what is playing to another TV (POST /api/move, #268): the steps, in order, on two pretend TVs."""
 import asyncio
 import os
+import time
 import sys
 import tempfile
 import unittest
@@ -755,6 +756,86 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
                 await server.move_playing(A, B)
         self.assertEqual(self.did(B, "adb"), [])
         self.assertEqual(self.did(A, "key"), [])
+
+
+class MoveAskedTitle(unittest.IsolatedAsyncioTestCase):
+    """The app names another title than the one the bridge opened: Disney+, asked for "Bluey", plays
+    the series "Bluey Fancy Restaurant", which the show finder does not know."""
+    did = MoveSteps.did
+
+    def setUp(self):
+        MoveSteps.setUp(self)   # the same two pretend TVs, without running MoveSteps' own tests again
+        self.media[A] = playing("Show Extra", 60_000, title_from="app")
+        self.media["after_play"] = playing("Show Extra", 58_000, title_from="app")
+        self.a.state["playing"]["item"] = {"title": "Show", "season": None, "episode": None,
+                                           "package": NETFLIX, "ts": time.time() - 60}
+        outer = self
+
+        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False,
+                       same=None):
+            tv_id = server._current.get()
+            outer.log.append((tv_id, "play", title, season, episode, service, who, resume, exact))
+            if title != "Show":      # the show finder only knows the name the bridge asked for
+                raise server.ApiError(404, "could not find it", key="err_title_not_found")
+            outer.media[tv_id] = outer.media.get("after_play")
+            return {"title": title, "method": "deeplink", "started": outer.started}
+        p = patch.object(server, "play", play)
+        p.start()
+        self.addCleanup(p.stop)
+
+    async def test_the_title_the_bridge_opened_is_used_and_the_tvs_agree(self):
+        r = await server.move_playing(A, B, power_off=True)
+        self.assertEqual([e[2] for e in self.did(B, "play")], ["Show Extra", "Show"])
+        self.assertEqual(self.did(B, "play")[1][8], True)              # still only that exact title
+        self.assertEqual(self.did(B, "search"), [])
+        self.assertTrue(r["started"])
+        self.assertIsNone(r["wrong_title"])
+        self.assertEqual(r["title"], "Show Extra")                     # the name the TVs give
+        self.assertEqual(r["note_key"], "note_moved")
+        self.assertTrue(r["powered_off"])
+
+    async def test_another_title_on_b_is_paused_and_said(self):
+        self.media["after_play"] = playing("Show", 0, title_from="app")
+        r = await server.move_playing(A, B, power_off=True)
+        self.assertEqual(r["wrong_title"], "Show")
+        self.assertFalse(r["started"])
+        self.assertFalse(r["powered_off"])
+        self.assertEqual([e[2] for e in self.did(B, "key")], ["pause"])
+        self.assertEqual(r["note_key"], "note_move_wrong_title")
+
+    async def test_a_tv_b_that_names_nothing_has_not_confirmed_it(self):
+        # opened by the asked-for name, and TV B's app gives no title: nothing says it is the same show
+        self.media["after_play"] = playing(None, 58_000, title_from=None)
+        r = await server.move_playing(A, B, power_off=True)
+        self.assertEqual(r["wrong_title"], "Show")
+        self.assertFalse(r["started"])
+        self.assertFalse(r["powered_off"])
+        self.assertEqual([e[2] for e in self.did(B, "key")], ["pause"])
+        self.assertGreaterEqual(len(self.did(B, "read")), 4)           # it looked again first
+
+    async def test_without_a_fresh_bridge_play_in_this_app_the_search_opens_as_before(self):
+        for item in (None,
+                     {"title": "Show", "package": NETFLIX, "ts": time.time() - server.MOVE_OPENED_S - 5},
+                     {"title": "Show", "package": YOUTUBE, "ts": time.time() - 60}):
+            with self.subTest(item=item):
+                self.log.clear()
+                self.a.state["playing"]["item"] = item
+                self.b.state["playing"]["item"] = None
+                self.media[B] = None
+                r = await server.move_playing(A, B)
+                self.assertEqual([e[2] for e in self.did(B, "play")], ["Show Extra"])
+                self.assertEqual(self.did(B, "search"), [(B, "search", "netflix", "Show Extra")])
+                self.assertEqual((r["method"], r["started"]), ("search", False))
+
+    def test_move_asked_is_none_when_the_names_agree_or_the_app_gives_none(self):
+        with server.on_tv(A):
+            now = {"title": "Show Extra", "title_from": "app"}
+            self.assertEqual(server.move_asked(now, NETFLIX),
+                             {"title": "Show", "season": None, "episode": None})
+            self.assertIsNone(server.move_asked({"title": "Show", "title_from": "app"}, NETFLIX))
+            self.assertIsNone(server.move_asked({"title": "SHOW!", "title_from": "app"}, NETFLIX))
+            self.assertIsNone(server.move_asked({"title": "Show", "title_from": "bridge"}, NETFLIX))
+            self.assertIsNone(server.move_asked({"title": None, "title_from": None}, NETFLIX))
 
 
 class MoveYouTube(MoveSteps):
