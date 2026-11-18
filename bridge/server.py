@@ -24,6 +24,7 @@ from aiohttp import web
 
 import apps
 import config
+import agenda
 import custom_cards
 import finder
 import history_import
@@ -2532,6 +2533,18 @@ async def h_settings_set(request):
     return ok(settings=cleaned, updated=updated)
 
 
+async def h_calendar(request):
+    """The Agenda widget's calendar for a TV whose home this computer runs (bridge/agenda.py). The
+    address is the person's own private link: it is never kept, logged or put in the action history."""
+    data = await body(request)
+    try:
+        text = await agenda.fetch(data.get("url"))
+    except agenda.CalendarError as e:
+        # the TV words this itself (app.js calRefresh): no phone message key, just the short reason
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+    return ok(text=text)
+
+
 async def h_sleep_get(request):
     return ok(ends=sleep["ends"])
 
@@ -3849,6 +3862,7 @@ def make_app():
     r.add_post("/api/home-apps", h_home_apps)
     r.add_get("/api/app-order", h_app_order_get)
     r.add_post("/api/app-order", h_app_order_set)
+    r.add_post("/api/calendar", h_calendar)
     r.add_get("/api/settings", h_settings_get)
     r.add_post("/api/settings", h_settings_set)
     r.add_get("/api/continue", h_continue)

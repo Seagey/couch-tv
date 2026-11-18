@@ -60,7 +60,9 @@ CAPS.kinds().forEach((k) => {
 // menu a step names is a real one on the TV (i18n.js and app.js)
 const i18n = fs.readFileSync(path.join(web, "i18n.js"), "utf8"), appSrc = fs.readFileSync(path.join(web, "app.js"), "utf8");
 const MENUS = ["Home settings", "Location", "Search for a town or city", "Look and scenes", "Your photos", "Add photos from a USB drive or this TV",
-  "Add a photo from a web address", "People", "Add a person", "Apps", "Quick buttons", "Now playing card", "Clock", "More apps", "App Store", "Get a design"];
+  "Add a photo from a web address", "People", "Add a person", "Apps", "Quick buttons", "Now playing card", "Clock", "More apps", "App Store", "Get a design",
+  // couch-tv Studio, At home (things typed at home)
+  "At home", "Write a note", "From", "Add a list", "Add an item", "Network name", "Password", "Add to the guide", "Add a calendar link", "Allow screen time", "Daily goal"];
 MENUS.forEach((m) => ok(i18n.indexOf('"' + m + '"') >= 0 || appSrc.indexOf('"' + m + '"') >= 0, "the TV has a menu called " + m));
 const SECTIONS = ["Language", "Location", "Weather", "Look and scenes", "Apps", "People", "Quick buttons", "couch-tv Studio", "About"];
 const JARGON = /Open-Meteo|bridge|endpoint|config\.json|apply\.sh|entit(y|ies)|EXIF|RSS|iCal|\.kt\b|\bAPI\b|WebView|launcher/;

@@ -333,3 +333,45 @@ html.lighter .cwd-artbg { -webkit-filter: none; filter: none; opacity: 0.18; }
 }
 .cwd-dial .cw-t23 { font-size: 29px; color: rgba(255, 255, 255, 0.75); margin-top: 4px; }
 .cwd-room { -webkit-flex: none; flex: none; }
+
+/* things typed at home (athome.js): the note, a list to tick, the Wi-Fi code, the guide, screen time, the agenda's day */
+.cwd-note { max-width: 1500px; font-weight: 700; line-height: 1.16; letter-spacing: -0.015em; white-space: pre-line; overflow-wrap: break-word; text-align: center; max-height: 700px; overflow: hidden; }
+.cwd-item { width: 516px; height: 96px; border-radius: 30px; background: rgba(255, 255, 255, 0.1); display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+  padding: 0 28px; font-size: 32px; font-weight: 620; min-width: 0; }
+.cwd-item .cwd-box { display: block; width: 40px; height: 40px; border-radius: 20px; border: 4px solid rgba(255, 255, 255, 0.6); margin-right: 22px; -webkit-flex: none; flex: none; }
+.cwd-item.done { color: rgba(255, 255, 255, 0.5); text-decoration: line-through; }
+.cwd-item.done .cwd-box { background: #30d158; border-color: #30d158; }
+.cwd-item.cwd-f { background: #fff; color: #111; }
+.cwd-item.cwd-f.done { color: rgba(0, 0, 0, 0.45); }
+.cwd-item.cwd-f .cwd-box { border-color: rgba(0, 0, 0, 0.5); }
+.cwd-qr { width: 640px; height: 640px; border-radius: 40px; background: #fff; padding: 20px; -webkit-flex: none; flex: none; }
+.cwd-gcard { height: auto; min-height: 160px; max-height: 330px; overflow: hidden; }
+.cwd-gcard.cwd-f { background: #fff; color: #111; }
+.cwd-gcard.cwd-f .cwd-text { color: rgba(0, 0, 0, 0.8); }
+.cwd-bar { height: 16px; border-radius: 8px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
+.cwd-bar b { display: block; height: 100%; border-radius: 8px; background: #fff; }
+.cwd-app-time { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; font-size: 30px; font-weight: 620; padding: 14px 20px; border-radius: 24px; margin-bottom: 8px; }
+.cwd-app-time > span { width: 300px; -webkit-flex: none; flex: none; }
+.cwd-app-time .cwd-bar { -webkit-flex: 1; flex: 1; margin: 0 24px; }
+.cwd-app-time > b { width: 130px; text-align: right; -webkit-flex: none; flex: none; }
+.cwd-app-time.cwd-f { background: #fff; color: #111; }
+.cwd-timeline { position: relative; border-radius: 28px; background: rgba(255, 255, 255, 0.06); -webkit-flex: none; flex: none; }
+.cwd-thour { position: absolute; top: 10px; font-size: 25px; font-weight: 600; color: rgba(255, 255, 255, 0.6); padding-left: 8px; border-left: 2px solid rgba(255, 255, 255, 0.16); height: calc(100% - 20px); }
+.cwd-tblock { position: absolute; height: 84px; border-radius: 20px; padding: 0 18px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+  font-size: 26px; font-weight: 700; color: #111; min-width: 0; overflow: hidden; }
+.cwd-tnow { position: absolute; top: 0; bottom: 0; width: 4px; margin-left: -2px; background: #ff453a; border-radius: 2px; }
+.cwd-wkrow { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; font-size: 29px; font-weight: 560; padding: 12px 18px; border-radius: 22px; min-width: 0; }
+.cwd-wkrow b { width: 150px; -webkit-flex: none; flex: none; font-weight: 720; color: #ff9f0a; }
+.cwd-wkrow.cwd-f { background: #fff; color: #111; }
+.cwd-ev.cwd-f { background: #fff; color: #111; border-radius: 18px; padding-right: 14px; }
+.cwd-ev.cwd-f b, .cwd-ev.cwd-f span { color: #111; }
+/* the at home widgets (note, list, Wi-Fi, guide, agenda, on this day, screen time): centred unless the
+   design picks a side, including what they say before they are set up */
+.cw-ah.cw-empty { -webkit-align-items: center; align-items: center; text-align: center; }
+.cw-ah.cw-empty .cw-e1, .cw-ah.cw-empty .cw-e2 { max-width: 100%; }
+/* a wide tile: the icon over the words, both in the middle (beside each other, two wrapped lines leave
+   the words off centre) */
+.cw-ah.cw-strip > .cw-row { -webkit-flex-direction: column; flex-direction: column; -webkit-justify-content: center; justify-content: center; }
+.cw-ah.cw-strip > .cw-row > svg { width: 34px !important; height: 34px !important; }
+.cw-ah.cw-strip > .cw-row > .cw-col { margin-left: 0 !important; margin-top: 6px; -webkit-align-items: center; align-items: center; max-width: 100%; }
+.cw-ah.cw-strip .cw-e1 { text-align: center; font-size: 24px; line-height: 1.2; }

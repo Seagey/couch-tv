@@ -101,6 +101,20 @@
   };
   var APPS_ORDER = [OPEN, "Go down to Apps and press OK.", "OK moves an app between the home, More apps and hidden. Hold OK on an app to move it along."];
 
+  // things typed at home: Home settings, couch-tv Studio, At home (athome.js), kept on the TV only
+  var AT_HOME = "Go down to couch-tv Studio, then pick At home.";
+  var TYPE_PHONE = "Typing is quicker with the phone remote: Type on the TV puts the words in the box.";
+  var TYPE_TV = "Type with the TV remote's keyboard, then press OK.";
+  function typed(first) { return { android: [OPEN, AT_HOME].concat(first, [TYPE_PHONE]).slice(0, 5), web: [OPEN, AT_HOME].concat(first, [TYPE_TV]).slice(0, 5), vidaa: [OPEN, AT_HOME].concat(first, [TYPE_TV]).slice(0, 5) }; }
+  var KEPT = { android: "Kept on this TV only, never in a design.", web: "Kept on this TV only, never in a design. The home computer has to be on.", vidaa: "Kept in this TV's browser only, never in a design." };
+  var NOTE_NEED = "A note typed on the TV";
+  var LIST_NEED = "A list typed on the TV";
+  var WIFI_NEED = "The guest Wi-Fi's name and password, typed on the TV";
+  var GUIDE_NEED = "The guide, typed on the TV";
+  var CAL_NEED = "Your calendar's private address, typed on the TV";
+  var DATED_NEED = "Your photos on the TV, with the day each was taken";
+  var SCREEN_NEED = "A Google TV, Android TV or Fire TV that allows screen time";
+
   var TOWN_NEED = "Your town, set on the TV";
   var PHOTOS_NEED = "Your photos on the TV, or one photo put in the widget";
   var WATCH_NEED = "The couch-tv TV app or a computer at home that stays on";
@@ -193,9 +207,14 @@
     artframe: { name: "Art frame", status: "setup", what: "One photo in a frame with a label", needs: [PHOTOS_NEED],
       setup: setup("tv", { android: PHOTOS_ANDROID, web: PHOTOS_LINK, vidaa: PHOTOS_LINK }), until: "\"Add your photos\"", build: "",
       ok: "Opens the picture full screen, without the frame", platforms: plat("setup", "computer:partial", "setup:partial", { web: "Photos are added by web address on this TV (no USB).", vidaa: "Photos are added by web address on this TV (no USB)." }), sizes: sz(["small", "tall", "large", "xl", "hero", "full"], [4, 4]) },
-    memory: { name: "On this day", status: "not-built", what: "A photo from this date in past years", needs: ["Needs couch-tv to know the date each photo was taken"],
-      setup: setup("nothing", NOT_YET), until: "\"On this day: not on couch-tv yet\", and what it needs", build: "The launcher has to read each photo's taken date (EXIF) when it is added in Home settings, Your photos, and keep it on the TV.",
-      ok: "Opens the photos from this day full screen (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
+    memory: { name: "On this day", status: "setup", what: "Your photos taken on this date in other years, with how long ago", needs: [DATED_NEED, "Photos taken on this day in another year"],
+      setup: setup("tv", {
+        android: [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add photos from a USB drive or this TV, and choose your photos. couch-tv notes the day each was taken.", "Photos added before this version have no day: add them again.", "On the day, the widget shows the photos from that date in other years."],
+        web: [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add a photo from a web address, type the photo's address, then press OK.", "The day comes from the photo itself, when its address lets the TV read it, or from a date in its name (like IMG_20231118)."],
+        vidaa: [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add a photo from a web address, type the photo's address, then press OK.", "The day comes from the photo itself, when its address lets the TV read it, or from a date in its name (like IMG_20231118)."] }),
+      until: "\"Add your photos\"; then \"No photos from this day\" on days with none, never another day's photo", build: "",
+      ok: "Opens this day's photos full screen", platforms: plat("setup", "computer:partial", "setup:partial", { android: "Photos added from a USB drive or this TV keep the day they were taken.", web: "Only photos whose address lets the TV read them, or with a date in their name.", vidaa: "Only photos whose address lets the TV read them, or with a date in their name." }),
+      sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- watching ----------
     keep: { name: "Keep watching", status: "setup", what: "The show you were watching, ready to carry on", needs: [WATCH_NEED],
@@ -288,18 +307,21 @@
       setup: setup("tv", [OPEN, "Go down to People and press OK.", "Pick Add a person, type a name, then press OK. Do it for everyone who watches.", "OK on a name in the widget switches whose shows you see. It does not sign anyone in or out of Netflix."]),
       until: "\"Add people in Home settings\"", build: "",
       ok: "OK on a name makes them the one watching", platforms: plat("setup", "computer", "setup"), sizes: sz(["line", "wline", "wtile"], [4, 1]) },
-    agenda: { name: "Agenda", status: "not-built", what: "Today's events with times and colours", needs: ["Needs your calendar on the TV, kept private"],
-      setup: setup("nothing", NOT_YET), until: "\"Agenda: not on couch-tv yet\", and what it needs",
-      build: "Home settings has to keep a private iCal link (Google, Apple or Outlook) on the TV, never in a design, and the bridge or the TV has to read today's events from it.",
-      ok: "Opens the day: every event on a timeline (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "tall", "medium", "large"], [2, 2]) },
-    note: { name: "Family note", status: "not-built", what: "A sticky note typed at home", needs: ["Needs a note typed from the phone and kept on the TV"],
-      setup: setup("nothing", NOT_YET), until: "\"Family note: not on couch-tv yet\", and what it needs",
-      build: "The phone remote needs a Note sheet that saves the words on the TV (not in the design, which refuses digits and links).",
-      ok: "Opens the note big (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
-    list: { name: "List", status: "not-built", what: "Reminders or shopping, ticked from the phone", needs: ["Needs a list kept at home that the phone can tick"],
-      setup: setup("nothing", NOT_YET), until: "\"List: not on couch-tv yet\", and what it needs",
-      build: "HomeAssistant.kt has to allow todo entities named in config.json (read and tick), or the bridge has to keep a list the phone remote edits.",
-      ok: "Opens the whole list, tick with OK (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["wtile", "small", "tall", "large"], [4, 2]) },
+    agenda: { name: "Agenda", status: "setup", what: "Today's events with times and colours, from your own calendar", needs: [CAL_NEED, "Something to read the calendar: the couch-tv TV home, or a computer at home"],
+      setup: setup("tv", {
+        android: ["Find your calendar's private address on a phone or computer. Google Calendar: the calendar's Settings, Secret address.", OPEN, "Go down to couch-tv Studio, pick At home, then Add a calendar link.", "Type the address, or paste it with Type on the TV in the phone remote. Today's events show within a minute."],
+        web: ["Find your calendar's private address on a phone or computer. Google Calendar: the calendar's Settings, Secret address.", OPEN, "Go down to couch-tv Studio, pick At home, then Add a calendar link.", "Type the address with the TV remote's keyboard. The home computer reads the calendar for this TV, so keep it on."],
+        vidaa: ["Needs a computer at home that stays on, running couch-tv (setup option B). The website home cannot read a calendar.", "Find your calendar's private address. Google Calendar: the calendar's Settings, Secret address.", OPEN, "Go down to couch-tv Studio, pick At home, then Add a calendar link, and type the address."] }),
+      until: "\"Add your calendar\"; then \"Nothing on today or tomorrow\" when the calendar is clear", build: "",
+      ok: "Opens the day: every event on a timeline, then the rest of the week", platforms: plat("setup", "computer", "computer", { android: "The TV reads the calendar itself. The address stays on this TV, never in a design.", web: "The home computer reads the calendar for this TV.", vidaa: "Needs a computer at home: the website home cannot read a calendar." }),
+      sizes: sz(["tile", "wtile", "small", "tall", "medium", "large"], [2, 2]) },
+    note: { name: "Family note", status: "setup", what: "A sticky note typed at home, with who it is from", needs: [NOTE_NEED],
+      setup: setup("tv", typed(["Pick Write a note, type it, then press OK. Pick From to say who it is from."])), until: "\"Write a note\", and where", build: "",
+      ok: "Opens the note big", platforms: plat("setup", "computer", "setup", KEPT), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
+    list: { name: "List", status: "setup", what: "Shopping or to do, ticked with OK on the remote", needs: [LIST_NEED],
+      setup: setup("tv", typed(["Pick Add a list and name it (up to 3), then Add an item for each thing.", "On the home, OK on the widget opens the list: OK ticks an item."])),
+      until: "\"Add a list\", and where", build: "",
+      ok: "Opens the whole list: OK ticks an item", platforms: plat("setup", "computer", "setup", KEPT), sizes: sz(["wtile", "small", "tall", "large"], [4, 2]) },
 
     // ---------- info ----------
     card: { name: "Custom card", status: "setup", what: "A number from your home: solar today, the pool", needs: ["A computer at home that stays on, running couch-tv"],
@@ -339,16 +361,21 @@
         vidaa: [OPEN, "Go down to Quick buttons and press OK.", "OK shows or hides a button. Picture mode and input need a Google TV, Android TV or Fire TV."] }),
       until: "Buttons this TV cannot do are left out", build: "",
       ok: "OK on a button does it: the sleep timer, the next picture mode, the next look, the input list", platforms: plat("works", "computer:partial", "works:partial", { web: "Some buttons (picture mode, input) need a Google TV, Android TV or Fire TV.", vidaa: "Some buttons (picture mode, input) need a Google TV, Android TV or Fire TV." }), sizes: sz(["line", "wline", "tile", "wtile"], [2, 1]) },
-    wifi: { name: "Guest Wi-Fi", status: "not-built", what: "Your guest network and a code to join it", needs: ["Needs the Wi-Fi name and password kept on the TV (never in a design)"],
-      setup: setup("nothing", NOT_YET), until: "\"Guest Wi-Fi: not on couch-tv yet\", and what it needs",
-      build: "Home settings has to keep the guest network's name and password on the TV, and the home has to draw the join code there. A password has digits, so it can never travel in a design.",
-      ok: "Opens the join code big, for a phone camera (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["small", "medium", "wide"], [4, 4]) },
-    guide: { name: "House guide", status: "not-built", what: "The house guide, check out and around here", needs: ["Needs the guest-tv house guide opened from couch-tv"],
-      setup: setup("nothing", NOT_YET), until: "\"House guide: not on couch-tv yet\", and what it needs", build: "couch-tv has to open guest-tv's guide screens, with the guide written on the TV.",
-      ok: "Opens the house guide (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["wtile", "small", "tall"], [4, 2]) },
-    screentime: { name: "Screen time", status: "not-built", what: "Minutes left today and bedtime", needs: ["Needs daily time limits in Kids mode (it has a PIN today, not a limit)"],
-      setup: setup("nothing", NOT_YET), until: "\"Screen time: not on couch-tv yet\", and what it needs", build: "Kids mode has to keep a daily limit and a bedtime on the TV and count what the kids profile watches.",
-      ok: "Opens today's screen time (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
+    wifi: { name: "Guest Wi-Fi", status: "setup", what: "Your guest network, its password and a code a phone camera joins with", needs: [WIFI_NEED],
+      setup: setup("tv", typed(["Pick Network name and type the guest network's name, then Password.", "Guests point their phone camera at the code on the widget."])),
+      until: "\"Add your guest Wi-Fi\", and where", build: "",
+      ok: "Opens the join code big, for a phone camera", platforms: plat("setup", "computer", "setup", KEPT), sizes: sz(["small", "medium", "wide"], [4, 4]) },
+    guide: { name: "House guide", status: "setup", what: "Check out, the bins, around here: what guests need to know", needs: [GUIDE_NEED],
+      setup: setup("tv", typed(["Pick Add to the guide, type a heading like Check out, then its words. Up to 8."])), until: "\"Write your house guide\", and where", build: "",
+      ok: "Opens the whole guide", platforms: plat("setup", "computer", "setup", KEPT), sizes: sz(["wtile", "small", "tall"], [4, 2]) },
+    screentime: { name: "Screen time", status: "setup", what: "Time in apps on this TV today, against a daily goal", needs: [SCREEN_NEED],
+      setup: setup("tv", {
+        android: ["Ask whoever set up couch-tv to switch on screen time from their computer (it allows one Android permission).", OPEN, "Or go down to couch-tv Studio, pick At home, then Allow screen time, and switch on Home.", "Pick Daily goal for the time left each day."],
+        web: ["Not possible on this TV: only Google TV, Android TV and Fire TV share screen time."],
+        vidaa: ["Not possible on this TV: only Google TV, Android TV and Fire TV share screen time."] }),
+      until: "\"Allow screen time on this TV\", and where", build: "",
+      ok: "Opens today's screen time, app by app", platforms: plat("setup", "no", "no", { android: "Counts every app on this TV, not one person.", web: "This TV does not share screen time.", vidaa: "This TV does not share screen time." }),
+      sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- a smart stack (not a widget of its own: up to 10 widgets taking turns) ----------
     stack: { name: "Smart stack", status: "works", what: "Up to 10 widgets of one size taking turns in one place", needs: ["Whatever the widgets in it need"],
@@ -375,6 +402,14 @@
   SHORT[HA_NEED] = ["Needs Home Assistant", "Set up once on a computer. OK here shows how", "Needs Home Assistant"];
   SHORT[C.card.needs[0]] = ["Needs a home computer", "OK here shows how to set it up", "Needs a computer"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];
+  var AT = "Home settings, couch-tv Studio, At home";
+  SHORT[NOTE_NEED] = ["Write a note", AT, "Write a note"];
+  SHORT[LIST_NEED] = ["Add a list", AT, "Add a list"];
+  SHORT[WIFI_NEED] = ["Add your guest Wi-Fi", AT, "Add Wi-Fi"];
+  SHORT[GUIDE_NEED] = ["Write your house guide", AT, "Write a guide"];
+  SHORT[CAL_NEED] = ["Add your calendar", AT, "Add a calendar"];
+  SHORT[DATED_NEED] = ["Add your photos", "Home settings, Look and scenes, Your photos", "Add photos"];
+  SHORT[SCREEN_NEED] = ["Allow screen time", AT, "Allow it first"];
   // tiny: the box is a tile, so the line has to fit two short lines (OK opens the whole record)
   function card(kind, tiny) {
     var c = C[kind];

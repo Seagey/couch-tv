@@ -411,14 +411,14 @@
     clock: "format ampm seconds date align", tallclock: "format align", glassclock: "format scene", analog: "seconds", flipclock: "format",
     wordclock: "", solar: "", worldclock: "cities", countdown: "label month day unit icon", date: "show dfmt align place", month: "", timer: "label",
     weather: "place hilo night", bigtemp: "place", hourly: "place", week: "place", rain: "", uv: "", sun: "", moon: "", air: "", surf: "label",
-    photo: "image fit caption sub", slideshow: "seconds_each caption sub", mosaic: "count", artframe: "image mat caption sub", memory: "",
+    photo: "image fit caption sub", slideshow: "seconds_each caption sub", mosaic: "count", artframe: "image mat caption sub", memory: "align",
     keep: "", keeprow: "label shows", upnext: "apps sport", picks: "",
     app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "apps",
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "",
-    bins: "weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label", note: "", list: "label icon",
+    bins: "weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label align", note: "align", list: "label icon align",
     card: "label text icon", quote: "text sub", word: "", news: "", sports: "label", stocks: "", commute: "",
-    welcome: "kicker text sub align", quick: "quick align", wifi: "", guide: "", screentime: "", stack: ""
+    welcome: "kicker text sub align", quick: "quick align", wifi: "align", guide: "align", screentime: "align", stack: ""
   };
   function sanWStyle(src) {
     src = obj(src);

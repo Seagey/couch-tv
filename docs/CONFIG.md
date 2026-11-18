@@ -385,6 +385,33 @@ each widget needs, where that is set up, which TVs can run it and the sizes it c
 OK on the card opens the whole record. It never shows pretend data. The air quality and surf widgets
 ask Open-Meteo's free air quality and marine services, only while one is on the home.
 
+**Things typed at home (Home settings, couch-tv Studio, At home).** The Family note, List, Guest
+Wi-Fi, House guide, Agenda and Screen time widgets show what is typed on the TV itself, with the remote
+or the phone remote's Type on the TV: a note and who it is from, up to 3 lists of 40 items (OK on the
+List widget opens it, OK ticks an item), the guest network's name, password and security, up to 8 guide
+entries, a calendar's private address, and a daily screen time goal. Privacy:
+
+- It is kept on that TV only (`tv-home/web/athome.js`). On the Android home it goes in the app's own
+  `athome` store, which Android's backups and device transfers leave out (like the Home Assistant token);
+  on a TV that runs the home as a web page, in that page's storage. It is not in `config.json`, not in
+  Home settings' copy the bridge keeps (`/api/settings`), never in a design (design.js drops every option
+  these widgets could carry), never in Share this home (which also refuses to share if any of it turns
+  up), and never sent to couch-tv Studio or any server of couch-tv's.
+- The calendar address is a password: Home settings shows only its host. The Android home reads it
+  itself (https only, no cookies, at most 3 https redirects, 4 MB, and only an answer that is a
+  calendar). A TV whose home a computer runs asks the bridge (`POST /api/calendar`), which reads it the
+  same way, refuses any address on the home network, and keeps and logs nothing. The home as a website
+  (VIDAA with no computer) can only read a calendar that lets web pages read it, which Google, Apple and
+  Outlook do not. Today and the next 7 days are kept on the TV (titles and times only).
+- On this day reads the day each photo was taken: the Android home notes it in the photo's file name
+  when Home settings copies it in (from the photo's EXIF block; photos added before this have no day);
+  a photo by web address gives its day from its own bytes, when its host lets the TV read them, or from
+  a date in its name.
+- Screen time reads Android's own usage numbers (time in each app today, this home not counted), only
+  once usage access is allowed: `apply.sh` with `SCREEN_TIME=1`, or the TV's own Usage access screen
+  (Home settings, At home, Allow screen time). `undo.sh` takes it back. Not possible on Samsung, LG,
+  Hisense or the other web TVs.
+
 The whole block must stay under 4 MB (a photo inside it is the big part). The bridge passes it to
 the home as it is, in `/tv/config.js` (option B), and the standalone build carries it. `apply.sh`
 (option A) hands the settings to the app inside an Android intent, which is far too small for a

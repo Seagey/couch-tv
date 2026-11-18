@@ -3775,6 +3775,7 @@
       // a design switched off with Back held, or not chosen yet: it comes back here
       if (CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.settingsRow) rows.push(CouchDesign.settingsRow(restart));
     }
+    if (on && AH) rows.push({ kind: "nav", key: "dz-athome", label: "At home", sub: "A note, lists, guest Wi-Fi, a house guide, your calendar and screen time, for your widgets", act: openAtHome });
     designCodeRows(rows);
     rows.push({ kind: "action", key: "dz-share", label: "Share this home", sub: "Open it in couch-tv Studio on your phone. No names, photos or places are sent.", act: shareHome });
     return rows;
@@ -3797,6 +3798,7 @@
     var pl = ST.place || {};
     w.push(WXCFG && WXCFG.place, pl.name, pl.area, CFG.weather && CFG.weather.place);
     try { w.push(location.hostname); } catch (e) {}
+    w = w.concat(ahPrivateWords());
     return w.filter(function (x) { return typeof x === "string" && x.length >= 3 && !/^(home\.tvos\.invalid|localhost|127\.0\.0\.1)$/.test(x); });
   }
   function shareHome() {
@@ -4542,7 +4544,7 @@
     SET.col = "rows"; SET.ri = i; SET.keyFocus = rows[i].key;
   }
   function leaveRows() {
-    if (SET.sub) { SET.keyFocus = SET.sub.back; SET.sub = null; return; }
+    if (SET.sub) { SET.keyFocus = SET.sub.back; SET.sub = SET.sub.up || null; return; }
     SET.col = "secs"; SET.keyFocus = null;
   }
   function setMove(dx, dy) {
@@ -5166,6 +5168,300 @@
       });
   }
 
+  // ---------------- at home: what couch-tv Studio's home widgets show (athome.js) ----------------
+  // The family note, lists, guest Wi-Fi, house guide, calendar link and screen time goal, typed in Home
+  // settings, couch-tv Studio, At home. Kept on this TV only: the launcher's private store on the
+  // Android home (TVOS.keepPrivate: left out of Android's backups), else this page's own storage. Never
+  // in ST (the copy of Home settings the bridge keeps), never in a design or Share this home.
+  var AH = (function () {
+    if (typeof CouchAtHome === "undefined") return null;
+    var io = TV && TV.keepPrivate && TV.keptPrivate
+      ? { get: function (k) { return TV.keptPrivate(PFX + k); }, set: function (k, v) { TV.keepPrivate(PFX + k, v); } }
+      : { get: function (k) { try { return localStorage.getItem(PFX + k); } catch (e) { return null; } }, set: function (k, v) { try { localStorage.setItem(PFX + k, v); } catch (e) {} } };
+    return { io: io, store: CouchAtHome.store(io) };
+  })();
+  var AH_KINDS = ["note", "list", "wifi", "guide", "agenda", "memory", "screentime"];
+  function ahWants(kind) { return typeof CouchDesign !== "undefined" && CouchDesign.wantsKinds && CouchDesign.wantsKinds([kind]).length > 0; }
+  function ahChanged() { if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("athome", Date.now()); }
+  function ahRead(key) { try { var v = AH.io.get(key); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  function ahWrite(key, v) { try { AH.io.set(key, JSON.stringify(v)); } catch (e) {} }
+
+  // the calendar: read every 15 minutes while an Agenda is on the home. The launcher reads it (no
+  // computer); a TV whose home a computer runs asks that computer (POST /api/calendar on the bridge);
+  // the home as a website can only read a calendar that lets web pages read it. Today and the next
+  // seven days are kept (titles and times only), so the widget has them after a restart.
+  var CAL = { at: 0, events: null, err: "", busy: false, url: "" }, CAL_WAIT = {}, CAL_MS = 15 * 60000;
+  function calCan() { return TV && TV.calendar ? "tv" : !OFFLINE && !STANDALONE ? "bridge" : "web"; }
+  function calFetch(url) {
+    return new Promise(function (resolve, reject) {
+      if (MOCK && window.MOCK_ICS != null) { setTimeout(function () { resolve(String(window.MOCK_ICS)); }, 50); return; }
+      if (TV && TV.calendar) {
+        var id = "c" + Date.now().toString(36) + Math.floor(Math.random() * 1000);
+        CAL_WAIT[id] = { resolve: resolve, reject: reject };
+        setTimeout(function () { if (CAL_WAIT[id]) { delete CAL_WAIT[id]; reject(new Error("timeout")); } }, 40000);
+        try { TV.calendar(url, id); } catch (e) { delete CAL_WAIT[id]; reject(e); }
+        return;
+      }
+      if (!OFFLINE && !MOCK) { api("POST", "/api/calendar", { url: url }, 40000).then(function (j) { if (j && typeof j.text === "string") resolve(j.text); else reject(new Error((j && j.error) || "no calendar")); }, reject); return; }
+      var x = new XMLHttpRequest();
+      x.open("GET", url);
+      x.timeout = 30000;
+      x.onload = function () { if (x.status >= 200 && x.status < 300) resolve(x.responseText || ""); else reject(new Error("http " + x.status)); };
+      x.onerror = x.ontimeout = function () { reject(new Error("blocked")); };
+      x.send();
+    });
+  }
+  // the launcher's answer (MainActivity.calendar): ok, and the calendar's words or why not
+  function calendarText(id, ok, text) {
+    var w = CAL_WAIT[id];
+    if (!w) return;
+    delete CAL_WAIT[id];
+    if (ok) w.resolve(String(text || "")); else w.reject(new Error(String(text || "failed")));
+  }
+  function calWindow() { var d = new Date(); var from = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); return { from: from, to: from + 8 * 86400000 }; }
+  function calRefresh(force) {
+    if (!AH) return;
+    var url = (AH.store.get().cal || {}).url || "";
+    if (!url) { CAL = { at: 0, events: null, err: "", busy: false, url: "" }; ahWrite("tvhome.athome.cal", null); return; }
+    if (CAL.url !== url) { CAL.url = url; CAL.events = null; CAL.at = 0; CAL.err = ""; var kept0 = ahRead("tvhome.athome.cal"); if (kept0 && kept0.host === CouchAtHome.calHost(url) && Array.isArray(kept0.events)) { CAL.events = kept0.events; CAL.at = kept0.at || 0; } }
+    if (CAL.busy || (!force && Date.now() - CAL.at < CAL_MS && CAL.events)) return;
+    CAL.busy = true;
+    calFetch(url).then(function (text) {
+      CAL.busy = false;
+      if (!CouchAtHome.isIcs(text)) { CAL.err = "That link is not a calendar. Check it is the private address (iCal format) of the calendar."; ahChanged(); return; }
+      var win = calWindow();
+      CAL.events = CouchAtHome.parseIcs(text, win.from, win.to, 60);
+      CAL.at = Date.now(); CAL.err = "";
+      ahWrite("tvhome.athome.cal", { host: CouchAtHome.calHost(url), at: CAL.at, events: CAL.events });
+      ahChanged();
+      if (zone === "settings") renderSettings();
+    }, function (e) {
+      CAL.busy = false;
+      var why = String((e && e.message) || "");
+      CAL.err = /blocked/.test(why) ? "This TV cannot read that calendar by itself. It needs the couch-tv TV home or a computer at home." : /http 40[134]/.test(why) ? "The calendar said no. Check the link is the private address and still works." : "The calendar did not answer. couch-tv tries again soon.";
+      CAL.at = Date.now() - CAL_MS + 2 * 60000;   // try again in two minutes
+      ahChanged();
+      if (zone === "settings") renderSettings();
+    });
+  }
+
+  // when each photo was taken: the launcher notes it in the file name when a photo is added ("-t" and
+  // the date, from the photo's own EXIF block); a photo by web address has its date read from its own
+  // bytes once (if its host lets the TV read them) or from a date in its name. Kept on this TV.
+  var DATES = null, DATES_BUSY = false;
+  function photoDates() {
+    if (!DATES) DATES = ahRead("tvhome.athome.dates") || {};
+    return (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && (p.file || p.url); }).map(function (p) {
+      var src = photoSrc(p), d = CouchAtHome.nameDate(p.file || p.url), k = DATES[src];
+      if (!d && k) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(k); if (m) d = { y: +m[1], m: +m[2], d: +m[3] }; }
+      return { src: src, date: d, url: !p.file && !d && k === undefined ? p.url : "" };
+    });
+  }
+  function photoDatesRead() {
+    if (DATES_BUSY || !AH) return;
+    var todo = photoDates().filter(function (p) { return p.url && /^https?:\/\//i.test(p.url); });
+    if (!todo.length) return;
+    DATES_BUSY = true;
+    var next = function (i) {
+      if (i >= todo.length || i >= 50) { DATES_BUSY = false; ahWrite("tvhome.athome.dates", DATES); ahChanged(); return; }
+      var x = new XMLHttpRequest(), done = function (d) { DATES[todo[i].src] = d ? d.y + "-" + ("0" + d.m).slice(-2) + "-" + ("0" + d.d).slice(-2) : ""; next(i + 1); };
+      try {
+        x.open("GET", todo[i].url); x.responseType = "arraybuffer"; x.timeout = 20000;
+        x.onload = function () { var d = null; try { d = x.status === 200 ? CouchAtHome.exifDate(new Uint8Array(x.response)) : null; } catch (e) {} done(d); };
+        x.onerror = x.ontimeout = function () { done(null); };
+        x.send();
+      } catch (e) { done(null); }
+    };
+    next(0);
+  }
+
+  // screen time today: the launcher reads Android's own usage numbers, once one permission is allowed
+  var SCR = { at: 0, v: null };
+  function screenNow() {
+    if (!TV) return { ok: false, why: "tv" };
+    if (!TV.screenTime) return { ok: false, why: "update" };
+    if (!SCR.v || Date.now() - SCR.at > 60000) { SCR.at = Date.now(); try { SCR.v = JSON.parse(TV.screenTime()); } catch (e) { SCR.v = { ok: false, why: "error" }; } }
+    return SCR.v || { ok: false, why: "error" };
+  }
+
+  // what the widgets get (design.js hooks.data): only what is set, never a pretend value
+  function homeView() {
+    if (!AH) return null;
+    var r = AH.store.get(), out = { note: r.note || null, lists: r.lists || [], wifi: null, guide: r.guide || [], goal: (r.screen || {}).goal || 0 };
+    if (r.wifi) out.wifi = { ssid: r.wifi.ssid, pass: r.wifi.pass, sec: r.wifi.sec, hidden: r.wifi.hidden, qr: CouchAtHome.wifiQr(r.wifi) };
+    // a calendar link with nothing read yet: read it now, not at the next minute
+    if (r.cal && !CAL.events && !CAL.busy && !CAL.err && ahWants("agenda")) setTimeout(function () { calRefresh(false); }, 0);
+    out.cal = { set: !!r.cal, events: CAL.events, err: CAL.err, at: CAL.at, can: calCan() };
+    var ps = photoDates();
+    out.memory = { photos: ps.length, dated: ps.filter(function (p) { return p.date; }).length, today: CouchAtHome.onThisDay(ps, new Date()) };
+    out.screen = ahWants("screentime") ? screenNow() : { ok: false, why: "off" };
+    return out;
+  }
+  // every minute: a new day, a new calendar read, today's screen time
+  function ahTick() {
+    if (!AH || typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on()) return;
+    if (ahWants("agenda")) calRefresh(false);
+    if (ahWants("memory")) photoDatesRead();
+    if (ahWants("screentime")) { var s = screenNow(); CouchDesign.dataChanged("screentime", [s.ok, s.minutes]); }
+    // a new day: today's events, On this day's photos (the page drew the first day when it started)
+    var day = new Date().toDateString();
+    if (day !== AH_DAY) { AH_DAY = day; CouchDesign.dataChanged("athome-day", day); }
+  }
+  var AH_DAY = new Date().toDateString();
+  // OK on a list item (widget-detail.js, the List layer): tick it
+  function ahAct(what, arg) {
+    if (!AH || what !== "tick") return false;
+    var m = /^(\d+):(\d+)$/.exec(String(arg || ""));
+    if (m && AH.store.tick(+m[1], +m[2])) ahChanged();
+    return true;
+  }
+  // anything private typed here stops a Share this home that somehow holds it
+  function ahPrivateWords() {
+    if (!AH) return [];
+    var r = AH.store.get(), w = [];
+    if (r.wifi) w.push(r.wifi.ssid, r.wifi.pass);
+    if (r.note) w.push(r.note.text);
+    if (r.cal) w.push(r.cal.url);
+    (r.guide || []).forEach(function (g) { w.push(g.text); });
+    return w;
+  }
+
+  // Home settings, couch-tv Studio, At home: one page with the note, lists, Wi-Fi, guide, calendar and
+  // screen time; a list and a guide entry each open their own page. English only for now, like the
+  // rest of the couch-tv Studio section (needs i18n).
+  var AH_INTRO = "Words for your couch-tv Studio widgets. They stay on this TV: never in a design, Share this home or couch-tv Studio. Typing is quicker with Type on the TV in the phone remote.";
+  function ahEdit(fn, msg) { AH.store.edit(fn); ahChanged(); if (msg) SET.msg = msg; }
+  function ahType(label, value, submit, url) { startTyping({ label: label, value: value || "", url: !!url, submit: submit }); }
+  function openAtHome() {
+    SET.sub = { back: "dz-athome", crumb: "couch-tv Studio", title: function () { return "At home"; }, rows: atHomeRows };
+    SET.keyFocus = null; SET.ri = 0;
+  }
+  function atHomeRows() {
+    if (!AH) return [info("ah-none", "At home", "", "Not in this version of the home.")];
+    var r = AH.store.get(), rows = [info("ah-intro", "", "", AH_INTRO)], L = CouchAtHome.LIM;
+    // the family note
+    rows.push(head("Family note"));
+    rows.push({ kind: "input", key: "ah-note", label: r.note ? "Change the note" : "Write a note", sub: r.note ? r.note.text : "Shows on the Family note widget", act: function () {
+      ahType("Type the note", r.note && r.note.text, function (v) { ahEdit(function (x) { x.note = { text: v, from: x.note ? x.note.from : "", at: Date.now() }; }, String(v || "").trim() ? "The note is on the home." : ""); });
+    } });
+    if (r.note) {
+      rows.push({ kind: "input", key: "ah-note-from", label: "From", value: r.note.from || "No name", act: function () {
+        ahType("Who is it from? (a name, or leave it empty)", r.note.from, function (v) { ahEdit(function (x) { if (x.note) x.note.from = v; }); });
+      } });
+      rows.push({ kind: "action", key: "ah-note-clear", label: "Clear the note", danger: true, act: function () { ahEdit(function (x) { delete x.note; }, "The note is cleared."); } });
+    }
+    // lists
+    rows.push(head("Lists"));
+    (r.lists || []).forEach(function (l, li) {
+      var left = l.items.filter(function (it) { return !it.done; }).length;
+      rows.push({ kind: "nav", key: "ah-list:" + li, label: l.name, value: left ? left + " to do" : l.items.length ? "All done" : "Empty", act: function () { openList(li); } });
+    });
+    if ((r.lists || []).length < L.lists) rows.push({ kind: "input", key: "ah-list-add", label: "Add a list", sub: "Like Shopping or To do. Up to " + L.lists + " lists.", act: function () {
+      ahType("Name the list", "", function (v) {
+        var before = (AH.store.get().lists || []).length;
+        ahEdit(function (x) { x.lists = (x.lists || []).concat([{ name: v, items: [] }]); });
+        if ((AH.store.get().lists || []).length > before) openList(before);
+      });
+    } });
+    // guest Wi-Fi
+    rows.push(head("Guest Wi-Fi"));
+    var w = r.wifi;
+    rows.push({ kind: "input", key: "ah-wifi-name", label: "Network name", value: w ? w.ssid : "Not set", act: function () {
+      ahType("Type the guest network's name, exactly as it shows on a phone", w && w.ssid, function (v) { ahEdit(function (x) { if (!String(v || "").trim()) { delete x.wifi; return; } x.wifi = x.wifi || { sec: "WPA", pass: "" }; x.wifi.ssid = v; }); });
+    } });
+    if (w) {
+      if (w.sec !== "nopass") rows.push({ kind: "input", key: "ah-wifi-pass", label: "Password", value: w.pass ? w.pass : "Not set", act: function () {
+        ahType("Type the guest network's password", w.pass, function (v) { ahEdit(function (x) { if (x.wifi) x.wifi.pass = v; }); });
+      } });
+      var SECW = { WPA: "WPA, WPA2 or WPA3 (most)", WEP: "WEP (old)", nopass: "No password" };
+      rows.push({ kind: "cycle", key: "ah-wifi-sec", label: "Security", value: SECW[w.sec], act: function () {
+        ahEdit(function (x) { var s = CouchAtHome.SEC; if (x.wifi) x.wifi.sec = s[(s.indexOf(x.wifi.sec) + 1) % s.length]; });
+      } });
+      rows.push({ kind: "toggle", key: "ah-wifi-hidden", label: "Hidden network", value: w.hidden ? t("on") : t("off"), act: function () { ahEdit(function (x) { if (x.wifi) x.wifi.hidden = !x.wifi.hidden; }); } });
+      rows.push({ kind: "action", key: "ah-wifi-clear", label: "Remove the Wi-Fi details", danger: true, act: function () { ahEdit(function (x) { delete x.wifi; }, "The Wi-Fi details are removed."); } });
+    }
+    // the house guide
+    rows.push(head("House guide"));
+    (r.guide || []).forEach(function (g, gi) { rows.push({ kind: "nav", key: "ah-guide:" + gi, label: g.title, sub: g.text, act: function () { openGuide(gi); },
+      move: function (d) { ahEdit(function (x) { var a = x.guide || [], j = gi + d; if (j < 0 || j >= a.length) return; var tmp = a[gi]; a[gi] = a[j]; a[j] = tmp; }); SET.lift = "ah-guide:" + (gi + d); } }); });
+    if ((r.guide || []).length < L.guide) rows.push({ kind: "input", key: "ah-guide-add", label: "Add to the guide", sub: "A heading, like Check out, Bins or Around here, then its words", act: function () {
+      ahType("Type the heading", "", function (v) {
+        var before = (AH.store.get().guide || []).length;
+        ahEdit(function (x) { x.guide = (x.guide || []).concat([{ title: v, text: "" }]); });
+        if ((AH.store.get().guide || []).length > before) { openGuide(before); typeGuideWords(before); }
+      });
+    } });
+    // the calendar
+    rows.push(head("Calendar"));
+    var host = r.cal ? CouchAtHome.calHost(r.cal.url) : "";
+    rows.push({ kind: "input", key: "ah-cal", label: r.cal ? "Change the calendar link" : "Add a calendar link", value: host || "",
+      sub: r.cal ? (CAL.err || (CAL.events ? CAL.events.length + " events this week, read at " + timeStr(new Date(CAL.at)) : CAL.busy ? "Reading it..." : "Read when an Agenda widget is on the home")) : "The private address of a Google, Apple or Outlook calendar. Keep it private: it opens your calendar.",
+      act: function () {
+        ahType("Paste or type the calendar's private address (it starts with https)", "", function (v) {
+          var u = CouchAtHome.calUrl(v);
+          if (!u) { SET.msg = "That is not a calendar link. It starts with https://, or is a calendar app's own link."; return; }
+          ahEdit(function (x) { x.cal = { url: u }; }, "Got it. The Agenda reads it now.");
+          calRefresh(true);
+        }, true);
+      } });
+    if (r.cal) {
+      rows.push({ kind: "action", key: "ah-cal-now", label: "Read the calendar now", act: function () { calRefresh(true); SET.msg = "Reading the calendar..."; } });
+      rows.push({ kind: "action", key: "ah-cal-clear", label: "Remove the calendar link", danger: true, act: function () { ahEdit(function (x) { delete x.cal; }, "The calendar link is removed from this TV."); calRefresh(true); } });
+    }
+    // screen time
+    rows.push(head("Screen time"));
+    var s = screenNow(), goal = (r.screen || {}).goal || 0;
+    rows.push(info("ah-screen", "Today", s.ok ? CouchAtHome.hm(s.minutes) : "", s.ok ? "Time in apps on this TV today." : s.why === "access" ? "This TV has not allowed couch-tv to read screen time yet." : s.why === "tv" ? "This TV does not share screen time: it needs a Google TV, Android TV or Fire TV." : "Needs a newer couch-tv TV home."));
+    rows.push({ kind: "cycle", key: "ah-goal", label: "Daily goal", value: goal ? CouchAtHome.hm(goal) : t("off"), act: function () {
+      ahEdit(function (x) { var g = CouchAtHome.GOALS, i = g.indexOf((x.screen || {}).goal || 0); x.screen = { goal: g[(i + 1) % g.length] }; });
+    } });
+    if (s.why === "access" && TV && TV.openUsageAccess) rows.push({ kind: "action", key: "ah-screen-allow", label: "Allow screen time", sub: "Opens the TV's Usage access list: switch on Home", act: function () { if (!TV.openUsageAccess()) SET.msg = "This TV has no such screen. Ask whoever set up couch-tv to switch on screen time from their computer."; SCR.at = 0; } });
+    return rows;
+  }
+  function timeStr(d) { var h = d.getHours(), m = d.getMinutes(); return CLOCK24 ? h + ":" + (m < 10 ? "0" : "") + m : (h % 12 || 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? "am" : "pm"); }
+  function openList(li) {
+    var up = SET.sub;
+    SET.sub = { up: up, back: "ah-list:" + li, crumb: "At home", title: function () { var l = (AH.store.get().lists || [])[li]; return l ? l.name : ""; }, rows: function () {
+      var l = (AH.store.get().lists || [])[li];
+      if (!l) return [];
+      var rows = l.items.map(function (it, ii) {
+        return { kind: "check", key: "ah-item:" + ii, label: it.t, checked: it.done, act: function () { AH.store.tick(li, ii); ahChanged(); },
+          move: function (d) { ahEdit(function (x) { var a = x.lists[li].items, j = ii + d; if (j < 0 || j >= a.length) return; var tmp = a[ii]; a[ii] = a[j]; a[j] = tmp; }); SET.lift = "ah-item:" + (ii + d); } };
+      });
+      if (!rows.length) rows.push(info("ah-items-none", "", "", "Nothing on this list yet."));
+      var addOne = function () {
+        ahType("Add to " + l.name + " (Back when you are done)", "", function (v) {
+          if (!String(v || "").trim()) return;
+          ahEdit(function (x) { var it = x.lists[li].items; if (it.length < CouchAtHome.LIM.items) it.push({ t: v, done: false }); });
+          setTimeout(function () { if (zone === "settings" && SET.sub && SET.sub.back === "ah-list:" + li) addOne(); }, 60);
+        });
+      };
+      if (l.items.length < CouchAtHome.LIM.items) rows.push({ kind: "input", key: "ah-item-add", label: "Add an item", act: addOne });
+      if (l.items.some(function (it) { return it.done; })) rows.push({ kind: "action", key: "ah-item-clear", label: "Clear ticked items", act: function () { ahEdit(function (x) { x.lists[li].items = x.lists[li].items.filter(function (it) { return !it.done; }); }); } });
+      rows.push({ kind: "input", key: "ah-list-name", label: "Rename the list", value: l.name, act: function () { ahType("Name the list", l.name, function (v) { ahEdit(function (x) { if (String(v || "").trim()) x.lists[li].name = v; }); }); } });
+      rows.push({ kind: "action", key: "ah-list-remove", label: "Remove this list", danger: true, act: function () { ahEdit(function (x) { x.lists.splice(li, 1); }, "The list is removed."); SET.sub = up; SET.keyFocus = "ah-list-add"; } });
+      return rows;
+    } };
+    SET.keyFocus = null; SET.ri = 0;
+  }
+  function typeGuideWords(gi) {
+    var g = (AH.store.get().guide || [])[gi];
+    if (g) ahType("Type the words for " + g.title, g.text, function (v) { ahEdit(function (x) { if (x.guide && x.guide[gi]) x.guide[gi].text = v; }); });
+  }
+  function openGuide(gi) {
+    var up = SET.sub;
+    SET.sub = { up: up, back: "ah-guide:" + gi, crumb: "At home", title: function () { var g = (AH.store.get().guide || [])[gi]; return g ? g.title : ""; }, rows: function () {
+      var g = (AH.store.get().guide || [])[gi];
+      if (!g) return [];
+      return [
+        { kind: "input", key: "ah-g-title", label: "Heading", value: g.title, act: function () { ahType("Type the heading", g.title, function (v) { ahEdit(function (x) { if (String(v || "").trim()) x.guide[gi].title = v; }); }); } },
+        { kind: "input", key: "ah-g-text", label: "Words", sub: g.text || "None yet", act: function () { typeGuideWords(gi); } },
+        { kind: "action", key: "ah-g-remove", label: "Remove from the guide", danger: true, act: function () { ahEdit(function (x) { x.guide.splice(gi, 1); }); SET.sub = up; SET.keyFocus = "ah-guide-add"; } }
+      ];
+    } };
+    SET.keyFocus = null; SET.ri = 0;
+  }
+
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
   window.tv = { back: function () { if (typeof CouchShare !== "undefined" && CouchShare.close()) return; if (typeof CouchDesign !== "undefined" && CouchDesign.back && CouchDesign.back()) return; if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); resetSmartIdle(); },
@@ -5184,7 +5480,9 @@
     // the launcher's updater has news (Updater.kt)
     update: function (state) { updChanged(state); },
     // Android's "default home app" chooser closed (HomeRole.kt, #98)
-    homeAnswered: function (held) { homeAnswered(held); } };
+    homeAnswered: function (held) { homeAnswered(held); },
+    // a calendar the launcher read for the Agenda widget (MainActivity.calendar)
+    calendarText: function (id, ok, text) { calendarText(id, ok, text); } };
 
   function start() {
     readConfig();
@@ -5212,7 +5510,9 @@
           // no bridge at all (option A, or the standalone home): widgets that need one say so
           bridge: !OFFLINE,
           // the scenes the launcher's Home Assistant allows (names and entities only, never its address)
-          scenes: window.smartHome && window.smartHome.scenes ? window.smartHome.scenes() : [] };
+          scenes: window.smartHome && window.smartHome.scenes ? window.smartHome.scenes() : [],
+          // things typed at home (Home settings, couch-tv Studio, At home): kept on this TV only
+          home: homeView() };
       },
       // the detail layers (widget-detail.js) ask Home Assistant through smarthome.js, never directly
       ha: function (action, entity, value) {
@@ -5222,6 +5522,7 @@
       // OK on a widget: open the app, the show, the smart home, a quick button
       act: function (what, arg) {
         touched = true;
+        if (ahAct(what, arg)) return;
         if (what === "app") {
           var it = arrangeItems().items.filter(function (x) { return x.package === arg; })[0];
           if (it && it.kind && it.kind !== "app") { var i = gridItems.indexOf(it); if (i >= 0) { zone = "grid"; g = i; activate(); } return; }
@@ -5319,6 +5620,8 @@
     updateOledShift();
     setInterval(updateOledShift, 60000);
     setInterval(checkSmartIdle, 10000);
+    // couch-tv Studio's home widgets: the calendar, photo dates, screen time and a new day
+    if (AH) { setTimeout(ahTick, 2500); setInterval(ahTick, 60000); }
     setInterval(function () { renderQuick(); refreshBedtimeDim(); }, 30000);
     // LG: the weekly Developer Mode extend. It asks on screen and stays until answered (this TV's
     // clock screensaver would hide anything that timed out). devResume() records an extend that just

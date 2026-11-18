@@ -840,11 +840,6 @@
       E("div", "", "width:100%;height:100%;background:#222 center/cover;background-image:" + cssImg(ps[dayIndex(ps.length, 3600)]) + ";box-shadow:inset 0 2px 8px rgba(0,0,0,.25)")]),
       q.caption ? E("div", "", "position:absolute;left:0;right:0;bottom:0;height:" + px(lh - 16) + ";display:flex;flex-direction:column;justify-content:center", [E("div", "cw-t29", "font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:600", [q.caption]), q.sub ? E("div", "cw-t23", "", [q.sub]) : null]) : null]);
   };
-  R.memory = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "picture", "memory");
-    add(root, [photoLayer(demoImg("camp")), E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.72),rgba(0,0,0,.2) 55%,transparent 75%)"),
-      E("div", "", "position:absolute;left:30px;top:26px;color:#fff;z-index:2", [E("div", "cw-t23", "color:rgba(255,255,255,.88);text-transform:uppercase;letter-spacing:.08em;font-weight:700", ["On this day"]), E("div", "cw-t48", "margin-top:4px;font-size:" + px(b.h < 300 ? 36 : 48), ["Two years ago"])])]);
-  };
 
   // watching
   function noShows(root, b, env) { return env && dataOf(env).bridge === false ? soon(root, b, "tv", "keep") : empty(root, b, "tv", "Nothing to keep watching yet", "Shows you start on this TV show up here"); }
@@ -1194,33 +1189,6 @@
       return stop(p, "person", x[3], x[1]);
     })));
   };
-  R.agenda = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "calendar", "agenda");
-    var ev = [["#ff9f0a", "School drop off", "8:30"], ["#30d158", "Swimming lessons, Ruby", "4:00"], ["#64d2ff", "Bins out, recycling", "7:00pm"], ["#bf5af2", "Movie night", "7:30pm"]];
-    if (b.w < 360) {
-      // narrow: the next event on a calendar page (the day, the date, what is next)
-      var d = now();
-      add(root, [E("div", "cw-t23", "font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub)", [DAYS[d.getDay()]]), E("div", "cw-big", "font-size:" + px(clamp(b.w / 2.6, 64, 110)), [String(d.getDate())]),
-        E("div", "cw-grow"), E("div", "cw-t29 cw-ell", "font-weight:680", ["Swimming"]), E("div", "cw-t23", "", ["4:00pm"])]);
-      return;
-    }
-    var n = clamp(Math.floor((b.h - 100) / 90), 1, ev.length);
-    add(root, [E("div", "cw-row cw-sp", "", [lab("calendar", op(o).label || "Today"), E("div", "cw-t23", "", [ev.length + " events"])]),
-      E("div", "cw-col cw-grow", "margin-top:20px;justify-content:space-around", ev.slice(0, n).map(function (e) { return E("div", "cw-ev", "", [E("i", "", "background:" + e[0]), E("div", "cw-t29 cw-ell", "", [e[1]]), E("div", "cw-t25", "", [e[2]])]); }))]);
-  };
-  R.note = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "edit", "note");
-    add(root, [E("div", "cw-t23", "font-weight:700;color:var(--sub)", ["From Mum"]), E("div", "", "font-size:" + px(clamp(b.w / 9, 30, 44)) + ";font-weight:680;line-height:1.18;margin-top:10px;letter-spacing:-.01em", ["Dinner at 6. Feed Max!"])]);
-  };
-  R.list = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "check", "list");
-    var todo = /to ?do|task|work/i.test(op(o).label || "");
-    var items = todo ? [["Send the quote", 0], ["Call the plumber", 1], ["Book flights", 0], ["Renew the rego", 0], ["Back up the laptop", 0], ["Order printer ink", 1], ["Reply to Sam", 0], ["Pay the power bill", 0]]
-      : [["Milk", 0], ["Bread", 1], ["Avocados", 0], ["Sunscreen", 0], ["Dog food", 0], ["Lemons", 1], ["Coffee", 0], ["Bin bags", 0]];
-    var n = clamp(Math.floor((b.h - 100) / 72), 2, items.length), lc = todo ? "#0a84ff" : root.classList.contains("cw-paper") ? "#1f9d55" : "#30d158";
-    add(root, [E("div", "cw-row cw-sp", "", [lab(op(o).icon || "check", op(o).label || "Shopping", lc), E("div", "cw-t23", "", [String(items.filter(function (x) { return !x[1]; }).length)])]),
-      E("div", "cw-col cw-grow", "margin-top:16px;justify-content:space-around", items.slice(0, n).map(function (x) { return E("div", "cw-li" + (x[1] ? " done" : ""), "", [E("span", "bx"), E("span", "cw-ell", "", [x[0]])]); }))]);
-  };
 
   // info
   R.card = function (root, o, b, env) {
@@ -1306,28 +1274,6 @@
       var bt = E("div", "", "width:" + px(s) + ";height:" + px(s) + ";border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;background:var(--panel);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);box-shadow:inset 0 0 0 1.5px var(--rim);" + (i ? "margin-left:" + gap + "px" : ""), [ic(nm[0], s * 0.44, "#fff")]);
       return stop(bt, "quick", id, nm[1]);
     })));
-  };
-  R.wifi = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "wifi", "wifi");
-    var qs = Math.min(b.h - 48, b.w * 0.42), cells = [], seed = 7;
-    for (var i = 0; i < 21 * 21; i++) {
-      seed = (seed * 9301 + 49297) % 233280;
-      var x = i % 21, y = Math.floor(i / 21), fin = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
-      var on = fin ? ((x % 7 === 0 || x % 7 === 6 || y % 7 === 0 || y % 7 === 6) || (x % 7 > 1 && x % 7 < 5 && y % 7 > 1 && y % 7 < 5)) : seed / 233280 > 0.52;
-      if (on) cells.push(S("rect", { x: x, y: y, width: 1, height: 1 }));
-    }
-    add(root, E("div", "cw-row", "height:100%", [E("div", "", "width:" + px(qs) + ";height:" + px(qs) + ";border-radius:22px;background:#fff;padding:16px;flex:none", [svg("0 0 21 21", "100%", "100%", cells, "fill:#111")]),
-      E("div", "cw-col", "margin-left:30px;min-width:0", [lab("wifi", "Guest Wi-Fi"), E("div", "cw-t48 cw-ell", "margin-top:10px", ["salt-and-sun"]), E("div", "cw-t29 cw-dim", "margin-top:6px", ["Password"]), E("div", "cw-t38 cw-ell", "", ["summer-swell"]), E("div", "cw-t23", "margin-top:10px", ["Point your phone camera here"])])]));
-  };
-  R.guide = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "info", "guide");
-    var it = [["info", "House guide"], ["clock", "Check out Sun 10am"], ["location", "Around here"]];
-    add(root, E("div", "cw-col cw-grow", "", it.map(function (x, i) { return E("div", "cw-row", "flex:1;padding:14px 20px;border-radius:24px;background:rgba(255,255,255,.12);" + (i ? "margin-top:16px" : ""), [ic(x[0], 34), E("span", "cw-t29", "margin-left:16px", [x[1]])]); })));
-  };
-  R.screentime = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "timer", "screentime");
-    add(root, [lab("timer", "Screen time", "rgba(255,255,255,.88)"), E("div", "cw-big", "font-size:" + px(clamp(b.h / 2.6, 80, 150)) + ";margin-top:14px", ["25", E("span", "", "font-size:.38em", [" min"])]), E("div", "cw-t29", "font-weight:650", ["left today"]), E("div", "cw-grow"),
-      E("div", "cw-bar", "height:14px;border-radius:7px;background:rgba(255,255,255,.25)", [E("b", "", "width:58%;background:#fff")]), E("div", "cw-t23", "color:#fff;margin-top:10px", ["Bedtime 7:30pm, the TV goes quiet"])]);
   };
 
   // ---------------- the small sizes (widget-caps.js sizes): a tile 2 x 2 and a wide tile 4 x 2 ----------------
@@ -1446,10 +1392,6 @@
     var words = (window.CouchWords || {}).words || [["Petrichor", "noun", "The smell of rain on dry ground."]], w = words[dayOfYear() % words.length];
     add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-t48 cw-ell", "font-size:" + px(clamp((b.w - 48) / (w[0].length * 0.6), 30, 56)), [w[0]]), E("div", "cw-t25 cw-ell", "font-style:italic;margin-top:4px", [w[1] + (b.w >= 600 ? ". " + w[2] : "")])]));
   };
-  CR.memory = sample("memory", "picture", function (root, o, b) {
-    add(root, [photoLayer(demoImg("camp")), E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.7),transparent 70%)"),
-      E("div", "cw-t23", "position:absolute;left:18px;top:14px;right:18px;color:#fff;font-weight:700;z-index:2", ["On this day"])]);
-  });
   CR.speakers = sample("speakers", "speakers", function (root, o, b) { mini(root, b, "speakers", "2", "Speakers", "Living and Kitchen playing"); });
   CR.controls = sample("controls", "light", function (root, o, b) {
     var items = (op(o).controls && op(o).controls.length ? op(o).controls : [{ icon: "light", name: "Lounge" }, { icon: "lamp", name: "Lamp" }]).slice(0, b.w < 300 ? 1 : 2);
@@ -1463,16 +1405,6 @@
   CR.energy = sample("energy", "bolt", function (root, o, b) { mini(root, b, "bolt", "18.4", "kWh today", "Solar, battery 86%"); });
   CR.sensor = sample("sensor", "temperature", function (root, o, b) { mini(root, b, "temperature", "26°", op(o).label || "Pool", "Pool water"); });
   CR.battery = sample("battery", "bolt", function (root, o, b) { mini(root, b, "games", "12%", "Pad 2", "Charge it soon", "#ff453a"); });
-  CR.agenda = sample("agenda", "calendar", function (root, o, b) {
-    var d = now();
-    if (b.w < 300) return CR.month(root, o, b);
-    add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "align-items:center;flex:none;width:92px", [E("div", "cw-t23", "font-weight:750;color:#ff453a", [DAYS[d.getDay()].slice(0, 3).toUpperCase()]), E("div", "cw-big", "font-size:62px", [String(d.getDate())])]),
-      E("div", "cw-ev", "flex:1;min-width:0;margin-left:16px", [E("i", "", "background:#30d158"), E("div", "cw-col", "min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:680", ["Swimming"]), E("div", "cw-t23", "", ["4:00pm"])])])]));
-  });
-  CR.note = sample("note", "edit", function (root, o, b) {
-    add(root, E("div", "", "font-size:" + px(b.w < 300 ? 26 : 34) + ";font-weight:680;line-height:1.15;display:-webkit-box;-webkit-line-clamp:" + (b.w < 300 ? 3 : 2) + ";-webkit-box-orient:vertical;overflow:hidden", ["Dinner at 6. Feed Max!"]));
-  });
-  CR.list = sample("list", "check", function (root, o, b) { mini(root, b, op(o).icon || "check", "6", op(o).label || "Shopping", "Milk, avocados, sunscreen"); });
   CR.news = sample("news", "info", function (root, o, b) {
     add(root, [E("div", "cw-t23", "color:#ff453a;font-weight:700", ["Local · 1h"]), E("div", "cw-t29", "font-weight:640;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden", ["Highway roadworks finish a month early"])]);
   });
@@ -1482,10 +1414,207 @@
   });
   CR.stocks = sample("stocks", "info", function (root, o, b) { mini(root, b, "info", "+0.6%", "ASX 200", "8,412 at the close", "#30d158"); });
   CR.commute = sample("commute", "location", function (root, o, b) { mini(root, b, "location", "16 min", "To work", "Light traffic, leave by 8:10"); });
-  CR.guide = sample("guide", "info", function (root, o, b) { mini(root, b, "info", "Sun", "Check out", "House guide, around here"); });
-  CR.screentime = sample("screentime", "timer", function (root, o, b) { mini(root, b, "timer", "25m", "Screen time", "Left today, bedtime 7:30pm"); });
   CR.queue = sample("queue", "music", function (root, o, b) { mini(root, b, "music", "8", "Up next", "Sunday Best, Surfaces"); });
-  CR.wifi = sample("wifi", "wifi", function (root, o, b) { mini(root, b, "wifi", "Join", "Guest Wi-Fi", "Point your phone camera here"); });
+
+  // ---------------- things typed at home (athome.js, through app.js): kept on this TV only ----------------
+  // Note, List, Guest Wi-Fi, House guide, Agenda, On this day and Screen time. seagey, 18 Nov 2026:
+  // each fits its box at every size (nothing cut off: long words wrap, a line that cannot fit ends in
+  // "...", a block too tall ends in "..." on its last line) and its content is centred unless the design
+  // picks left or right (opts.align).
+  var FLEX = { left: "flex-start", center: "center", right: "flex-end" };
+  function athome(env) { return dataOf(env).home || null; }
+  function ahAlign(root, o) { var a = op(o).align === "left" || op(o).align === "right" ? op(o).align : "center"; root.classList.add("cw-ah"); root.setAttribute("data-align", a); return a; }
+  // the content as one group, in the middle of the box (or to the side the design picks)
+  function ahCol(a, kids, css) { return E("div", "cw-col cw-ahcol", "width:100%;height:100%;min-height:0;justify-content:center;align-items:" + FLEX[a] + ";text-align:" + a + ";" + (css || ""), kids); }
+  function lines(n) { return "display:-webkit-box;-webkit-line-clamp:" + n + ";-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;"; }
+  // one line of words that ends in "..." when it is too long, never cut
+  function one1(cls, css, text) { return E("div", cls + " cw-ell", "max-width:100%;flex:none;" + (css || ""), [text]); }
+  // the label: an icon and its words, as wide as they are (so it can sit in the middle)
+  function ahLab(iconName, text, colour) {
+    return E("div", "cw-lab", "max-width:100%;flex:none;" + (colour ? "color:" + colour : ""), [iconName ? ic(iconName, 30, colour || "currentColor") : null, E("span", "cw-ell", "flex:0 1 auto;min-width:0;margin-right:0", [text])]);
+  }
+  // ---- Agenda: today's events from the calendar link kept on the TV ----
+  var EV_COL = ["#ff9f0a", "#30d158", "#64d2ff", "#bf5af2", "#ff453a", "#ffd60a"];
+  function hhmm(ms, env) { var p = clockParts(new Date(ms), {}, env); return p.t + p.ap; }
+  function dayStart(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
+  // the calendar's events for a day (0 today, 1 tomorrow), still to come when it is today
+  function evDay(evs, k, env) {
+    var t = now(), s = dayStart(t) + k * 86400000, e = s + 86400000;
+    return (evs || []).filter(function (x) { return x.start < e && x.end > s && (k || x.allDay || x.end > t.getTime()); })
+      .map(function (x, i) { return { title: x.title, when: x.allDay ? "All day" : hhmm(x.start, env), col: EV_COL[i % EV_COL.length], start: x.start, end: x.end, allDay: x.allDay }; });
+  }
+  function demoEvents() {
+    var s = dayStart(now()), h = 3600000;
+    return [["School drop off", 8.5, 9], ["Swimming lessons, Ruby", 16, 17], ["Bins out, recycling", 19, 19.25], ["Movie night", 19.5, 22]].map(function (x) { return { title: x[0], start: s + x[1] * h, end: s + x[2] * h, allDay: false }; });
+  }
+  function agendaOf(root, b, env) {
+    if (env.demo) { var de = demoEvents(); return { today: de.map(function (x, i) { return { title: x.title, when: hhmm(x.start, env), col: EV_COL[i], start: x.start, end: x.end }; }), tomorrow: [] }; }
+    var c = (athome(env) || {}).cal;
+    if (!c || !c.set) { soon(root, b, "calendar", "agenda"); return null; }
+    if (!c.events) { empty(root, b, "calendar", c.err ? (b.w < 300 ? "Calendar not read" : c.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), c.err ? "Home settings, couch-tv Studio, At home" : ""); return null; }
+    return { today: evDay(c.events, 0, env), tomorrow: evDay(c.events, 1, env) };
+  }
+  R.agenda = function (root, o, b, env) {
+    var a = ahAlign(root, o), ag = agendaOf(root, b, env);
+    if (!ag) return;
+    var d = now(), list = ag.today.length ? ag.today : ag.tomorrow, nx = list[0], heading = ag.today.length ? op(o).label || "Today" : "Tomorrow", day = DAYS[d.getDay()].slice(0, 3).toUpperCase() + " " + d.getDate();
+    if (b.h < 200) {
+      // a tile or a wide tile: the day, what is next and when
+      add(root, ahCol(a, [one1("cw-t23", "font-weight:750;color:#ff453a", b.w < 300 ? (ag.today.length || !nx ? day : "TOMORROW") : day + (ag.today.length || !nx ? "" : ", tomorrow")),
+        one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", nx ? nx.title : "Nothing on"), one1("cw-t23", "", nx ? nx.when : "today or tomorrow")]));
+      return;
+    }
+    if (b.w < 600 && b.h < 500) {
+      // a square: the day and the date, then what is next
+      add(root, ahCol(a, [one1("cw-t23", "font-weight:700;text-transform:uppercase;letter-spacing:.06em", DAYS[d.getDay()]), E("div", "cw-big", "flex:none;font-size:" + px(clamp(b.w / 3.4, 64, 110)), [String(d.getDate())]),
+        one1("cw-t29", "font-weight:680;margin-top:16px", nx ? nx.title : "Nothing on"),
+        one1("cw-t23", "", nx ? (ag.today.length ? "" : "Tomorrow, ") + nx.when + (ag.today.length > 1 ? ", then " + (ag.today.length - 1) + " more" : "") : "today or tomorrow")]));
+      return;
+    }
+    var n = clamp(Math.floor((b.h - 48 - 50) / 72), 1, 8), more = list.length > n ? list.length - (n - 1) : 0, shown = more ? list.slice(0, n - 1) : list;
+    add(root, ahCol(a, [ahLab("calendar", heading + (list.length ? " · " + list.length + (list.length === 1 ? " event" : " events") : "")),
+      list.length ? E("div", "cw-col", "max-width:100%;margin-top:14px;flex:none;align-items:" + (a === "right" ? "flex-end" : "flex-start"), shown.map(function (e) {
+        return E("div", "cw-ev", "max-width:100%;margin-top:14px", [E("i", "", "background:" + e.col), E("div", "cw-t29 cw-ell", "flex:0 1 auto;min-width:0", [e.title]), E("div", "cw-t25", "flex:none;margin-left:16px", [e.when])]);
+      }).concat(more ? [one1("cw-t23", "margin-top:14px", "and " + more + " more")] : [])) : one1("cw-t29", "font-weight:680;margin-top:16px", "Nothing on today or tomorrow")]));
+  };
+  CR.agenda = R.agenda;
+
+  // ---- Family note ----
+  function noteOf(env) { var n = env.demo ? { text: "Dinner at 6. Feed Max!", from: "Mum" } : (athome(env) || {}).note; return n && n.text ? n : null; }
+  R.note = function (root, o, b, env) {
+    var a = ahAlign(root, o), n = noteOf(env);
+    if (!n) return soon(root, b, "edit", "note");
+    // the words as big as they fit (the quote's rule), wrapping, and "..." on the last line that fits
+    var fromH = n.from && b.h >= 200 ? 40 : 0, room = Math.max(30, b.h - 48 - fromH), len = Math.max(8, n.text.length);
+    var fs = clamp(Math.min(Math.sqrt((b.w - 48) * room / len / 1.7), room / 1.2, 64), 25, 64), max = Math.max(1, Math.floor(room / (fs * 1.18)));
+    add(root, ahCol(a, [fromH ? one1("cw-t23", "font-weight:700;color:var(--sub)", "From " + n.from) : null,
+      E("div", "", "flex:none;max-width:100%;font-size:" + px(fs) + ";font-weight:680;line-height:1.18;margin-top:" + (fromH ? 8 : 0) + "px;letter-spacing:-.01em;white-space:pre-line;" + lines(max), [n.text])]));
+  };
+  CR.note = R.note;
+
+  // ---- List: the one whose name its label gives, else the first ----
+  function listOf(o, env) {
+    if (env.demo) {
+      var todo = /to ?do|task|work/i.test(op(o).label || "");
+      var items = todo ? [["Send the quote", 0], ["Call the plumber", 1], ["Book flights", 0], ["Renew the rego", 0], ["Back up the laptop", 0], ["Order printer ink", 1], ["Reply to Sam", 0], ["Pay the power bill", 0]]
+        : [["Milk", 0], ["Bread", 1], ["Avocados", 0], ["Sunscreen", 0], ["Dog food", 0], ["Lemons", 1], ["Coffee", 0], ["Bin bags", 0]];
+      return { at: 0, name: op(o).label || "Shopping", todo: todo, items: items.map(function (x) { return { t: x[0], done: !!x[1] }; }) };
+    }
+    var ls = (athome(env) || {}).lists || [], want = String(op(o).label || "").toLowerCase(), at = 0;
+    if (!ls.length) return null;
+    for (var i = 0; i < ls.length; i++) if (want && ls[i].name.toLowerCase() === want) { at = i; break; }
+    return { at: at, name: ls[at].name, todo: /to ?do|task|work/i.test(ls[at].name), items: ls[at].items };
+  }
+  R.list = function (root, o, b, env) {
+    var a = ahAlign(root, o), l = listOf(o, env);
+    if (!l) return soon(root, b, "check", "list");
+    // what is still to do first, then what is ticked
+    var items = l.items.filter(function (x) { return !x.done; }).concat(l.items.filter(function (x) { return x.done; }));
+    var left = items.filter(function (x) { return !x.done; }), lc = l.todo ? "#0a84ff" : root.classList.contains("cw-paper") ? "#1f9d55" : "#30d158", icon = op(o).icon || "check";
+    var count = left.length ? left.length + (l.todo ? " to do" : " left") : l.items.length ? "All done" : "Nothing on it yet";
+    if (b.h < 200) {
+      add(root, ahCol(a, [ahLab(icon, l.name, lc), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", count),
+        left.length ? one1("cw-t23", "", left.slice(0, 4).map(function (x) { return x.t; }).join(", ")) : null]));
+      return;
+    }
+    var n = clamp(Math.floor((b.h - 48 - 40) / 50), 1, 40), more = items.length > n ? items.length - (n - 1) : 0, shown = more ? items.slice(0, n - 1) : items;
+    add(root, ahCol(a, [ahLab(icon, l.name + (items.length ? " · " + count : ""), lc),
+      items.length ? E("div", "cw-col", "max-width:100%;flex:none;align-items:" + (a === "right" ? "flex-end" : "flex-start"), shown.map(function (x) {
+        return E("div", "cw-li" + (x.done ? " done" : ""), "max-width:100%;margin-top:14px", [E("span", "bx"), E("span", "cw-ell", "flex:0 1 auto;min-width:0", [x.t])]);
+      }).concat(more ? [one1("cw-t23", "margin-top:14px", "and " + more + " more")] : []))
+        : E("div", "cw-col", "flex:none;max-width:100%;margin-top:14px;align-items:" + FLEX[a], [one1("cw-t29", "font-weight:680", "Nothing on this list"), one1("cw-t23", "margin-top:4px", "Add to it in Home settings")])]));
+  };
+  CR.list = R.list;
+
+  // ---- Guest Wi-Fi: a real join code (qr.js, drawn here, the words never leave the TV), and the
+  // name and password in words for anyone without a camera ----
+  function wifiOf(env) { return env.demo ? { ssid: "salt-and-sun", pass: "summer-swell", sec: "WPA", qr: "WIFI:T:WPA;S:salt-and-sun;P:summer-swell;;" } : (athome(env) || {}).wifi; }
+  function qrNode(text, size) {
+    if (!text || !window.TVQR) return null;
+    try { var s = window.TVQR.svg(text, size); s.style.cssText = "display:block;width:" + px(size) + ";height:" + px(size); return s; } catch (e) { return null; }
+  }
+  R.wifi = function (root, o, b, env) {
+    var a = ahAlign(root, o), w = wifiOf(env);
+    if (!w || !w.ssid) return soon(root, b, "wifi", "wifi");
+    if (b.h < 200 || b.w < 200) { add(root, ahCol(a, [ahLab("wifi", "Guest Wi-Fi"), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", w.ssid), one1("cw-t23", "", "OK shows the code")])); return; }
+    var narrow = b.w < 600, qs = Math.max(80, narrow ? Math.min(b.h - 48 - 46, b.w - 48) : b.h - 48), code = qrNode(w.qr, qs - 24);
+    var box = E("div", "", "width:" + px(qs) + ";height:" + px(qs) + ";border-radius:22px;background:#fff;padding:12px;flex:none;overflow:hidden", [code || E("div", "cw-t23", "color:#1d1b18;padding:8px;" + lines(4), ["The name and password are too long for a code"])]);
+    if (narrow) { add(root, ahCol(a, [box, one1("cw-t25", "margin-top:10px;font-weight:650;color:var(--ink)", w.ssid)])); return; }
+    var nopass = w.sec === "nopass" || !w.pass;
+    add(root, E("div", "cw-row", "width:100%;height:100%;justify-content:" + FLEX[a], [box,
+      E("div", "cw-col", "margin-left:30px;min-width:0;flex:0 1 auto;max-width:" + px(b.w - 48 - qs - 30), [ahLab("wifi", "Guest Wi-Fi"), one1("cw-t48", "margin-top:10px", w.ssid),
+        one1("cw-t29 cw-dim", "margin-top:6px", nopass ? "No password" : "Password"), nopass ? null : one1("cw-t38", "", w.pass),
+        one1("cw-t23", "margin-top:10px", "Point your phone camera at the code")])]));
+  };
+  CR.wifi = R.wifi;
+
+  // ---- House guide: headings and their words, typed in Home settings ----
+  var GUIDE_IC = [[/check ?out|leav/i, "clock"], [/wi-?fi|internet/i, "wifi"], [/around|near|beach|shop|cafe|eat|walk/i, "location"], [/bin|rubbish|recycl/i, "calendar"], [/tv|remote|netflix/i, "tv"]];
+  function guideIcon(t) { for (var i = 0; i < GUIDE_IC.length; i++) if (GUIDE_IC[i][0].test(t)) return GUIDE_IC[i][1]; return "info"; }
+  function guideOf(env) { return env.demo ? [{ title: "Check out", text: "Sunday by 10am. Leave the keys on the bench." }, { title: "Bins", text: "Red Tuesday night, yellow every second week." }, { title: "Around here", text: "The beach is a 5 minute walk down the lane." }] : (athome(env) || {}).guide || []; }
+  R.guide = function (root, o, b, env) {
+    var a = ahAlign(root, o), g = guideOf(env);
+    if (!g.length) return soon(root, b, "info", "guide");
+    if (b.h < 200) { add(root, ahCol(a, [ahLab("info", "House guide"), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", g[0].title), g.length > 1 ? one1("cw-t23", "", g.slice(1).map(function (x) { return x.title; }).join(", ")) : null])); return; }
+    var withText = b.h >= 500, rowH = withText ? 128 : 74, n = clamp(Math.floor((b.h - 48 + 16) / (rowH + 16)), 1, g.length);
+    if (g.length > n && n * (rowH + 16) + 34 > b.h - 48 + 16) n = Math.max(1, n - 1);
+    add(root, ahCol(a, g.slice(0, n).map(function (x, i) {
+      return E("div", "cw-col", "width:100%;flex:none;padding:14px 20px;border-radius:24px;background:rgba(255,255,255,.12);overflow:hidden;align-items:" + FLEX[a] + ";" + (i ? "margin-top:16px" : ""), [
+        ahLab(guideIcon(x.title), x.title), withText && x.text ? E("div", "cw-t23", "flex:none;max-width:100%;margin-top:4px;" + lines(2), [x.text]) : null]);
+    }).concat(g.length > n ? [one1("cw-t23", "margin-top:12px", "and " + (g.length - n) + " more. OK opens the guide")] : [])));
+  };
+  CR.guide = R.guide;
+
+  // ---- On this day: the household's own photos taken on this date in other years (athome.js reads
+  // each photo's date). Nothing from today: it says so, never another day's photo ----
+  function yearsAgo(n) { return n === 1 ? "A year ago" : n + " years ago"; }
+  function memoryOf(root, b, env) {
+    if (env.demo) return [{ src: demoImg("camp"), years: 2 }];
+    var m = (athome(env) || {}).memory;
+    // no photo to show: the words get the glass panel a picture would have covered
+    if ((!m || !m.today || !m.today.length) && root.classList.contains("cw-photo")) { root.classList.remove("cw-photo"); root.classList.add("cw-glass"); if (!root.querySelector(".cw-bg")) root.insertBefore(E("div", "cw-bg"), root.firstChild); }
+    if (!m || !m.photos) { soon(root, b, "picture", "memory"); return null; }
+    if (!m.dated) { empty(root, b, "picture", b.w < 300 ? "No dates yet" : "Your photos have no dates yet", "Add them again in Home settings, Your photos"); return null; }
+    if (!m.today || !m.today.length) { empty(root, b, "picture", b.w < 300 ? "None today" : "No photos from this day", m.dated === 1 ? "One of your photos has a date" : m.dated + " of your photos have dates"); return null; }
+    return m.today;
+  }
+  R.memory = function (root, o, b, env) {
+    var a = ahAlign(root, o), list = memoryOf(root, b, env);
+    if (!list) return;
+    var p = list[dayIndex(list.length, 20)], tiny = b.w < 300 || b.h < 200, img = photoLayer(p.src);
+    var big = one1("cw-t48", "color:#fff;font-size:" + px(tiny ? 34 : b.h < 300 ? 38 : 48) + ";text-shadow:0 2px 18px rgba(0,0,0,.5)", tiny ? String(now().getFullYear() - p.years) : yearsAgo(p.years));
+    add(root, [img, E("div", "cw-fill", "background:radial-gradient(ellipse at center,rgba(0,0,0,.5),rgba(0,0,0,.18) 70%)"),
+      E("div", "cw-fill", "z-index:2;padding:18px;display:flex", [ahCol(a, [b.h >= 200 && b.w >= 300 ? one1("cw-t23", "color:rgba(255,255,255,.92);text-transform:uppercase;letter-spacing:.08em;font-weight:700;text-shadow:0 2px 12px rgba(0,0,0,.5)", "On this day") : null, big])])]);
+    if (list.length > 1) live(root, 20000, function () { var q = list[dayIndex(list.length, 20)]; img.style.backgroundImage = cssImg(q.src); big.textContent = tiny ? String(now().getFullYear() - q.years) : yearsAgo(q.years); });
+  };
+  CR.memory = R.memory;
+
+  // ---- Screen time today: the launcher's own count of time in apps, and the goal set on the TV ----
+  function screenOf(root, b, env) {
+    if (env.demo) return { ok: true, minutes: 95, goal: 120, apps: [{ name: "YouTube", minutes: 52 }, { name: "ABC iview", minutes: 31 }, { name: "Netflix", minutes: 12 }] };
+    var h = athome(env), s = h && h.screen;
+    if (!s || s.why === "off") { soon(root, b, "timer", "screentime"); return null; }
+    if (s.why === "tv") { empty(root, b, "timer", b.w < 300 ? "Not on this TV" : "Screen time is not on this TV", "It needs a Google TV, Android TV or Fire TV"); return null; }
+    if (!s.ok) { empty(root, b, "timer", s.why === "access" ? (b.w < 300 ? "Allow it first" : "Allow screen time on this TV") : (b.w < 300 ? "Needs an update" : "Needs a newer couch-tv TV home"), s.why === "access" ? "Home settings, couch-tv Studio, At home" : ""); return null; }
+    return { ok: true, minutes: s.minutes || 0, goal: h.goal || 0, apps: s.apps || [] };
+  }
+  R.screentime = function (root, o, b, env) {
+    var a = ahAlign(root, o), s = screenOf(root, b, env);
+    if (!s) return;
+    var CA = window.CouchAtHome, hm = CA ? CA.hm : function (m) { return m + "m"; }, gl = CA && s.goal ? CA.goalLine(s.minutes, s.goal) : "", total = hm(s.minutes);
+    var apps = b.w >= 700 && b.h >= 200 ? s.apps.slice(0, Math.max(0, Math.floor((b.h - 48) / 52))) : [];
+    // the total as big as fits the room it has (beside the apps, half the box)
+    var appsW = Math.min(340, (b.w - 48) * 0.45), room = apps.length ? b.w - 48 - appsW - 40 : b.w - 48, fs = clamp(Math.min((b.h - 48 - (b.h < 200 ? 64 : 110)) / 0.92, room / (total.length * 0.6)), 24, 140);
+    var main = ahCol(apps.length ? "center" : a, [b.h >= 200 || b.w >= 300 ? ahLab("timer", "Screen time") : ic("timer", 30, "currentColor"), E("div", "cw-big", "flex:none;max-width:100%;white-space:nowrap;font-size:" + px(fs) + ";margin-top:" + (b.h < 200 ? 2 : 12) + "px", [total]),
+      one1(gl ? "cw-t25" : "cw-t23", "color:var(--ink);font-weight:650;margin-top:" + (b.h < 200 ? 0 : 8) + "px", gl || "In apps today"),
+      s.goal && b.h >= 200 ? E("div", "cw-bar", "flex:none;width:100%;max-width:320px;margin-top:16px;height:14px;border-radius:7px;background:rgba(255,255,255,.25)", [E("b", "", "width:" + Math.round(clamp(s.minutes / s.goal, 0, 1) * 100) + "%;background:" + (s.minutes > s.goal ? "#ffd60a" : "#fff"))]) : null], apps.length ? "width:auto;max-width:" + px(room) + ";flex:0 1 auto" : "");
+    if (!apps.length) { add(root, main); return; }
+    // beside the apps: the two side by side, as one group in the middle (or to the side picked)
+    add(root, E("div", "cw-row", "width:100%;height:100%;align-items:center;justify-content:" + FLEX[a], [main, E("div", "cw-col", "width:" + px(appsW) + ";flex:none;margin-left:40px;justify-content:center;min-width:0", apps.map(function (x, i) {
+      return E("div", "cw-row cw-sp", i ? "margin-top:16px" : "", [E("span", "cw-t25 cw-ell", "color:var(--ink);font-weight:620;min-width:0", [x.name || x.package || ""]), E("span", "cw-t25", "flex:none;margin-left:14px;color:var(--ink)", [hm(x.minutes)])]);
+    }))]));
+  };
+  CR.screentime = R.screentime;
 
   // ---------------- one widget, a stack, the API ----------------
   function one(o, b, env) {
@@ -1589,6 +1718,8 @@
       appNode: appNode, appsFor: appsFor, appName: appName, appIcon: appIcon, demoImg: demoImg, bgImg: bgImg,
       sunToday: sunToday, sunTimes: sunTimes, moon: moon, tzTime: tzTime, CITY: CITY, DAYS: DAYS, MONTHS: MONTHS, longDate: longDate, clockParts: clockParts,
       roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
-      airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12 }
+      airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
+      // things typed at home (athome.js through app.js)
+      athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
   };
 })();
