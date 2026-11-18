@@ -65,6 +65,7 @@ class MainActivity : Activity() {
 
     private lateinit var root: FrameLayout
     private var web: WebView? = null
+    private var sharp: SharpScreen? = null
     private var fallback: View? = null
     private var pageReady = false
     private var loadFailed = false
@@ -97,6 +98,7 @@ class MainActivity : Activity() {
         CrashGuard.install(this)   // the WebView puts its own crash handler in front: ours goes first again
         root = FrameLayout(this).apply { setBackgroundColor(GROUND) }
         setContentView(root)
+        sharp = SharpScreen.open(this, root, GROUND)
         hideSystemBars()
         intent?.let { readExtras(it) }
         io.execute { warmApps() }
@@ -206,6 +208,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        sharp?.close()
         runCatching { unregisterReceiver(packageChanged) }
         runCatching { contentResolver.unregisterContentObserver(watchNextChanged) }
         super.onDestroy()
@@ -262,6 +265,8 @@ class MainActivity : Activity() {
             if (event.action == KeyEvent.ACTION_UP && pageReady) js("window.tv && tv.back()")
             return true
         }
+        val page = web
+        if (sharp != null && page != null && sharp?.typingTakes(event) != true) return page.dispatchKeyEvent(event)
         return super.dispatchKeyEvent(event)
     }
 
@@ -349,13 +354,15 @@ class MainActivity : Activity() {
 
     /** The page's WebView, or null while the TV's WebView cannot start (then the app grid shows). */
     private fun webView(): WebView? = web ?: try {
-        makeWebView().also { web = it; root.addView(it, 0, MATCH); CrashGuard.install(this) }
+        makeWebView().also { web = it; pageParent().addView(it, 0, MATCH); sharp?.use(it); CrashGuard.install(this) }
     } catch (e: Throwable) {
         android.util.Log.w("couchtv", "WebView not ready, showing the app grid: ${e.message}")
         showFallback()
         later(RETRY_MS)
         null
     }
+
+    private fun pageParent(): FrameLayout = sharp?.pageHost ?: root
 
     private fun showWeb(base: String) {
         val w = webView() ?: return
@@ -373,7 +380,7 @@ class MainActivity : Activity() {
         main.postDelayed({ if (!pageReady) showFallback() }, SLOW_MS)
     }
 
-    private fun makeWebView(): WebView = WebView(this).apply {
+    private fun makeWebView(): WebView = WebView(sharp?.pageContext ?: this).apply {
         setBackgroundColor(GROUND)
         if (resumed) resumeTimers()   // a WebView made while the last one's pause is still in force (a renderer crash while covered)
         isFocusable = true
@@ -389,6 +396,7 @@ class MainActivity : Activity() {
         addJavascriptInterface(Native(), "TVOS")
         addJavascriptInterface(HomeAssistant.Page(this@MainActivity, this), "TVHA")   // smart home, see HomeAssistant.kt
         addJavascriptInterface(Updater.Page(this@MainActivity, this), "TVUP")   // updates from GitHub releases, see Updater.kt
+        sharp?.let { addJavascriptInterface(it.keyboardBridge, SharpScreen.KEYBOARD_NAME) }
         webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {
                 if (!loadFailed && url.startsWith("http")) {
@@ -396,6 +404,7 @@ class MainActivity : Activity() {
                     removeFallback()
                     view.visibility = View.VISIBLE
                     view.requestFocus()
+                    sharp?.hookKeyboard(view)
                     // the live page is up: bring the saved copy up to date if the page changed
                     if (!offline) prefs.getString("bridge", null)?.let { b -> io.execute { syncOffline(b) } }
                 }
@@ -453,7 +462,7 @@ class MainActivity : Activity() {
 
             override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
                 // The page crashed or was killed for memory. Drop it and start again.
-                root.removeView(view)
+                pageParent().removeView(view)
                 view.destroy()
                 web = null
                 pageReady = false
@@ -479,7 +488,7 @@ class MainActivity : Activity() {
      */
     private fun restartPage() {
         main.removeCallbacks(retry)
-        web?.let { root.removeView(it); it.clearCache(true); it.destroy() }
+        web?.let { pageParent().removeView(it); it.clearCache(true); it.destroy() }
         web = null
         pageReady = false
         loadFailed = false
