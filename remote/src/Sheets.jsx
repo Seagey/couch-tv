@@ -385,6 +385,24 @@ export function PeopleSheet({ open, onClose, onSaved }) {
   );
 }
 
+// Same Type on the TV form as More, focused from the main controls so iOS can raise the keyboard
+// inside the tap (#216). Always mounted; App opens the sheet then focuses the input synchronously.
+export const TypeSheet = forwardRef(function TypeSheet({ open, onClose, onText }, inputRef) {
+  const [typed, setTyped] = useState('');
+  useEffect(() => { if (open) setTyped(''); }, [open]);
+  return (
+    <Sheet open={open} onClose={onClose} title={t('type_on_tv')} className="type-sheet">
+      <form className="ask-field glass" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { tick(); onText(typed.trim()); setTyped(''); } }}>
+        <input ref={inputRef} value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={t('type_placeholder')}
+          enterKeyHint="send" aria-label="Text to type on the TV" autoComplete="off" autoCorrect="on" />
+        <button type="submit" className="round solid small" aria-label={t('send_to_tv')} disabled={!typed.trim()}
+          onPointerDown={(e) => e.preventDefault()}><Ic.Send size={18} /></button>
+      </form>
+      <p className="note">{t('type_note')}</p>
+    </Sheet>
+  );
+});
+
 export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnds, onSleep, onKey, onText, sleepError, tvs, tvId, onTv, canMove, onMove, picture, pictureInfo, onPicture, onArrange, onPeople, onKids }, ref) {
   const [typed, setTyped] = useState('');
   const sheetEl = useRef(null);

@@ -282,7 +282,10 @@ inputs (HDMI and the rest) on TVs that have one.
 ```
 
 ### `POST /api/text`
-Types text into whatever text box is open on the TV (a search box).
+Types text into whatever text box is open on the TV (a search box). On Android this is `input text`,
+so only ASCII letters, digits and plain punctuation are safe. Thai, Chinese, Korean and other
+non-Latin text must be typed with the TV's own on-screen keyboard; non-Latin text comes back as
+`BufferOverflowException`.
 ```json
 {"text": "bluey"}
 ```
