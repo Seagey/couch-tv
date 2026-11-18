@@ -929,6 +929,13 @@ would do (for testing). `GET` says whether it is armed and why it last stopped.
 on with what was playing (the show page, which resumes where the profile was up to; YouTube
 reopens its search for the video).
 
+### `POST /api/quit-app`
+`{"package": "com.netflix.ninja"}` (an app name works too): force stops the app over ADB and does
+nothing else, so it is not opened again (`/api/restart-app` does that). The home screen, couch-tv and
+the apps that are part of how the TV works are refused with 403. The TV home's hold OK menu on an
+app tile (Restart app, Quit app) uses this and `/api/restart-app`, and only offers them when the
+bridge is connected.
+
 ### `GET /api/latest?title=...`
 The newest episode available (season, episode, name, date, apps), announced upcoming releases,
 and the last episode of it played on our TVs, with `newer_than_last_watched`.

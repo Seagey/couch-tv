@@ -2872,6 +2872,10 @@
   function openAppMenu(a) {
     amApp = a; amI = 0;
     amItems = [{ act: "move", label: t("ctx_move") }, { act: "hide", label: t("ctx_hide") }];
+    // Restart and Quit sit above Uninstall. They need the computer's bridge: it force stops the app over ADB.
+    // The TV's own call for it only asks Android, which ignores it for most apps (tried on an Android 11
+    // projector), so with no bridge the items are left out rather than offered and doing nothing.
+    if (bridgeCanStop(a)) amItems.push({ act: "restart", label: t("ctx_restart") }, { act: "quit", label: t("ctx_quit") });
     if (TV && TV.uninstall) amItems.push({ act: "uninstall", label: t("ctx_uninstall") });
     if (TV && TV.appInfo) amItems.push({ act: "info", label: t("ctx_info") });
     zone = "appmenu";
@@ -2898,6 +2902,26 @@
     hintFlash = "";
     if (zone === "appmenu") zone = "grid";
   }
+  // Quit app / Restart app: the bridge force stops the app (restart also opens it again on what was playing).
+  // Restart says what it is doing at once, since it takes a few seconds; Quit says so when it is done.
+  function bridgeCanStop(a) {
+    return !OFFLINE && !PREVIEW && a.package && a.package !== "app.couchtv.launcher" && data.bridge !== false;
+  }
+  function stopApp(a, path, body, doneKey, failKey, early) {
+    if (early) flash(t(doneKey, { name: a.name }));
+    api("POST", path, body, 30000).then(function () {
+      if (!early) flash(t(doneKey, { name: a.name }));
+    }).catch(function (e) {
+      // /api/restart-app only knows the apps the bridge lists: quit any other one and open it again here
+      if (early && e && e.key === "err_unknown_app" && TV && TV.launch) {
+        api("POST", "/api/quit-app", { package: a.package }, 30000).then(function () {
+          setTimeout(function () { try { TV.launch(a.package); } catch (x) {} }, 600);
+        }).catch(function (e2) { flash(t(failKey, { name: a.name }) + (e2 && e2.message ? ": " + e2.message : "")); });
+        return;
+      }
+      flash(t(failKey, { name: a.name }) + (e && e.message ? ": " + e.message : ""));
+    });
+  }
   function doAppMenu() {
     var it = amItems[amI], a = amApp;
     closeAppMenu();
@@ -2915,6 +2939,8 @@
       flash(t("ctx_hidden"));
       return;
     }
+    if (it.act === "quit") { stopApp(a, "/api/quit-app", { package: a.package }, "ctx_quit_done", "ctx_quit_failed"); paintFocus(); return; }
+    if (it.act === "restart") { stopApp(a, "/api/restart-app", { app: a.package }, "ctx_restarting", "ctx_restart_failed", true); paintFocus(); return; }
     if (it.act === "uninstall") { try { TV.uninstall(a.package); } catch (e) {} paintFocus(); return; }
     if (it.act === "info") { try { TV.appInfo(a.package); } catch (e) {} paintFocus(); return; }
     paintFocus();
