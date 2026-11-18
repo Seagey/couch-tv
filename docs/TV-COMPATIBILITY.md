@@ -17,6 +17,7 @@ TVs, see their pages, and so has Hisense VIDAA; Philips Titan OS has answered a 
 | Android 6 TV (Xiaomi Mi TV 4A, PatchWall) | Installs and opens, layout may break (experimental) | Not tested | Installs and opens, set up from a computer (experimental) |
 | Xiaomi TV Stick 4K (Android TV 11) | Yes (reported by a user, not tested by us) | Not reported | Not reported |
 | XGIMI projector (Android TV 11, XK03H) | Yes, through `apply.sh` (reported by a user, not tested by us) | Not reported | Yes (reported by a user: phone remote, keys, typing and apps; use `apply.sh` for the Home button) |
+| XGIMI Elfin Flip Plus projector (Android TV 11, WK03C) | Yes on one unit (reported by Gil124, not tested by us): `apply.sh`, then switch the setup wizard off (see the report below), and `"render_height": 720` for smooth rows | Not tested | Not tested |
 | Bell Streamer (Bell Canada, Android TV 12) | **Beta**, untested (reported by Sparkybabcia, [#168](https://github.com/Seagey/couch-tv/issues/168)): Bell's Fibe TV app is the box's home, so `apply.sh` switches the Home button watch on. Fibe may flash up before couch-tv comes back. Opening Fibe from the couch-tv tile works; a Fibe button on the remote brings couch-tv back instead | Not reported | Not reported |
 | Epson LS300 projector (Android TV 14) | Yes on one unit (reported by mazzanfar, [#194](https://github.com/Seagey/couch-tv/pull/194), not tested by us): installed over paired Wireless debugging, apps, controls and a restart worked. That unit already had another launcher, so the Home button on stock firmware is unverified ([details](EPSON.md)) | Not tested | Not tested |
 | Epson LS650, LS800, and the Android TV streaming device that comes with the LS500 | **Beta**, untested: they run Android TV, but nobody has tried couch-tv on them yet ([details](EPSON.md#other-ls-models)) | Not tested | Not tested |
@@ -83,6 +84,29 @@ Not tested by the author. Each line is what someone said worked on their own dev
   `apply.sh` (option A), whose Home button watch works: a single Home press and a restart both come back to
   couch-tv. The projector has no Wireless debugging, only USB debugging, and that alone opens ADB on port
   5555, which `check-tv.py` reports (thanks nithinjak, [#159](https://github.com/Seagey/couch-tv/issues/159)).
+- **XGIMI Elfin Flip Plus projector (WK03C, Android TV 11, MediaTek, Mali-G52, 1.7 GB): works with option A,
+  with four things to know**, reported by Gil124 on 0.12 and main.
+  - *Smoothness.* Moving along the rows reached the screen every 33.3 ms (30 fps) in the Night look and in
+    the OLED look, with Lighter home on or off, while a frame timer inside the page ran at a steady 16.7 ms.
+    The GPU could not composite a 1080p WebView at 60 fps: with the display set to 1280x720 it showed 16.7 ms.
+    `"render_height": 720` under `home` (#278) gave 17 ms, and the home's memory went from about 250 MB to 136 MB
+    ([#197](https://github.com/Seagey/couch-tv/issues/197)).
+  - *The remote's colour buttons.* This remote's YouTube and Netflix buttons are handled by XGIMI's own
+    service (`com.xgimi.xrmservice`, a `GLOBAL_BUTTON` broadcast) before any app sees them, and open Google's
+    YouTube. They are scancodes 398 (`KEY_RED`, Android keycode 134) and 399 (`KEY_GREEN`, keycode 139).
+    `getevent -lt` shows them.
+  - *Inputs.* The Input quick button (`"quick": ["input"]`) lists HDMI 1, Bluetooth and Network, and OK on
+    HDMI 1 switches to the HDMI input: the passthrough link opens MediaTek's own HDMI view
+    (`com.mediatek.wwtv.tvcenter`) and Home comes back to couch-tv. This firmware has no
+    `com.xgimi.action.hdmiPlayer` (the Horizon S Pro needs it), so nothing extra was needed.
+    Keystone and focus stay reachable: the Settings tile, TV settings, has a Projector section.
+  - *Home.* This unit has no Google launcher installed: the only app that offers a Home screen apart from
+    couch-tv is the setup wizard's `RecoveryActivity` (`com.google.android.tungsten.setupwraith`, priority 1,
+    ahead of couch-tv's 0). `apply.sh` switched the wizard back on ("an older couch-tv had switched it off")
+    and, finding no Google launcher, did not switch the Home button watch on. After
+    `pm disable-user --user 0 com.google.android.tungsten.setupwraith` the Home key, a restart and the remote's
+    Home button all came back to couch-tv (undo with `pm enable`). Not tried: whether `apply.sh` alone is enough
+    with the wizard left on.
 - **Hisense based VU TV FFM (Indian market, Android 11, MediaTek, Google TV home): works with option A**,
   reported by Prabhakar92 on 0.12. The TV's own Google TV home shows for a few seconds at power on before
   the Home button watch brings couch-tv forward, which is the documented behaviour
