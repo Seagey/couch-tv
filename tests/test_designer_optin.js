@@ -95,5 +95,13 @@ ok(code("", { design_store: "https://designs.example" }, true).base() === "https
 ok(code("?mock=1", {}, true).base() === "", "a browser preview never reaches the real store");
 ok(code("", {}, false).base() === "", "without the gate loaded, nothing changes");
 ok(/^https:\/\/[a-z0-9.-]+$/.test(G.DEFAULT_STORE), "the default store is https with no path");
+// option C (the on-TV app, no computer, no config.json): its config.js (Store.publicConfig) names no
+// store, so Get a design and Share this home use couch-tv Studio's own; Home settings, couch-tv Studio,
+// Back to my classic home is the off switch there
+const onTv = { people: [], weather: { place: "Town" }, tvs: [{ id: "this-tv", name: "This TV" }], default_tv: "this-tv", mode: "on-tv" };
+ok(code("", onTv, true).base() === G.DEFAULT_STORE, "option C: the on-TV app's config gets couch-tv Studio's own store");
+const ontvStore = fs.readFileSync(path.join(__dirname, "../on-tv/android/app/src/main/java/dev/couchtv/ontv/Store.kt"), "utf8");
+ok(/fun publicConfig\(\)/.test(ontvStore) && !/design_store/.test(ontvStore), "option C: the on-TV app never sets design_store, so the default applies");
+ok(/from\(tvHomeWeb\) \{ into\("tv"\); exclude\("mock\.js"\) \}/.test(fs.readFileSync(path.join(__dirname, "../on-tv/android/app/build.gradle.kts"), "utf8")), "option C: the on-TV app carries this branch's whole TV home (design.js, the catalogue, the gate)");
 
 console.log(`${n} TV Designer opt in tests passed.`);
