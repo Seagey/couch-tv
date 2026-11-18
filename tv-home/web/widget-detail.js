@@ -38,6 +38,9 @@
   LAYER.stocks = "stocks"; TITLE.stocks = "Markets";
   LAYER.commute = "commute"; TITLE.commute = "Commute";
   LAYER.picks = "picks"; TITLE.picks = "Picks for you";
+  // Ask AI and From your AI (ask.js): Ask AI has its own layer; From your AI shows how to connect an agent
+  LAYER.battery = "batteries"; TITLE.batteries = "Batteries";
+  LAYER.ask = "ask"; TITLE.ask = "Ask AI"; LAYER.agent = "agent"; TITLE.agent = "From your AI";
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -79,7 +82,9 @@
 
   // the setup record (widget-caps.js), for a widget with nothing real to show yet
   var STATUS = { works: ["Works on this TV", "#30d158"], setup: ["Set it up first", "#ffd60a"], computer: ["Needs a home computer", "#ff9f0a"], no: ["Not possible on this TV", "#8e8e93"], "not-built": ["Not on couch-tv yet", "#ff9f0a"] };
-  B.setup = function (o) {
+  B.setup = function (o, env) {
+    // Ask AI and From your AI with nothing to show yet open their own layer, which sets them up
+    if ((o.kind === "ask" || o.kind === "agent") && B[o.kind]) return B[o.kind](o, env || {});
     var kind = (S.from && S.from.getAttribute("data-setup")) || o.kind, C = window.CouchWidgetCaps, c = C && C.get(kind);
     S.panel.classList.add("cwd-setup");
     if (!c) { S.body.appendChild(head("info", "This widget", "It needs a newer couch-tv")); return; }
@@ -91,7 +96,7 @@
       ["Hisense", ["VIDAA"]], ["Roku, Apple TV and others", ["Roku OS", "tvOS", "Vega OS", "Titan OS", "SmartCast", "Other"]]];
     var left = E("div", "cwd-col", "width:820px", [label("What it shows"), E("div", "cwd-text", "", [c.what]), label("What it needs"),
       E("div", "cwd-list", "", c.needs.map(function (n) { return E("div", "cwd-li", "", [E("i", "cwd-bullet"), E("span", "", "", [n])]); })),
-      label("Which TVs"), E("div", "cwd-col", "", tvs.map(function (g) { var v = c.status === "not-built" ? ["Not yet", "no"] : WORD[group(g[1])]; return E("div", "cwd-tvrow", "", [E("span", "", "", [g[0]]), E("b", "cwd-tv-" + v[1], "", [v[0]])]); }))]);
+      label("Which TVs"), E("div", "cwd-col", "", tvs.map(function (g) { var v = c.status === "not-built" ? ["Not possible", "no"] : WORD[group(g[1])]; return E("div", "cwd-tvrow", "", [E("span", "", "", [g[0]]), E("b", "cwd-tv-" + v[1], "", [v[0]])]); }))]);
     // the steps for this TV: the Android home has window.TVOS; a Hisense says so in its browser's name
     // (the designer and a browser preview, ?mock, stand in for the Android home)
     var sys = window.TVOS || S.api.designer || /[?&]mock\b/.test(location.search) ? "android" : /VIDAA|Hisense/i.test(navigator.userAgent || "") ? "vidaa" : "web";
@@ -108,9 +113,12 @@
   };
 
   // timers: one at a time, kept on the TV (widgets.js Timer)
-  var LABELS = ["Timer", "Oven", "Pizza", "Bath", "Homework", "Bedtime", "Tea"];
-  B.timers = function () {
+  var LABELS_ALL = ["Timer", "Oven", "Pizza", "Bath", "Homework", "Bedtime", "Tea"];
+  B.timers = function (o) {
     var T = kit().Timer, now = kit().now();
+    // a Timer widget with a name in its design (opts.label): a timer started from it has that name
+    var own = o && o.kind === "timer" && op(o).label ? String(op(o).label).slice(0, 24) : "";
+    var LABELS = own ? [own].concat(LABELS_ALL.filter(function (x) { return x !== own; })) : LABELS_ALL;
     S.body.appendChild(head("timer", "Timers", "It's " + kit().fmt12(now), "#ff9f0a"));
     var ringBox = E("div", "cwd-ringbox"), nameAt = 0;
     var drawRing = function () {
@@ -259,6 +267,45 @@
   }
 
   // things typed at home (Home settings, couch-tv Studio, At home), kept on this TV
+  // Batteries (Batteries.kt through TVOS.batteries): every paired device that reports its charge, and on
+  // Android 12 and newer the one question Android asks first ("Nearby devices")
+  B.batteries = function (o, env) {
+    var T = window.TVOS, bt = null;
+    if (env.demo) bt = { need: "", devices: [{ kind: "controller", name: "Pad 1", level: 72 }, { kind: "controller", name: "Pad 2", level: 12 }, { kind: "headphones", name: "Headset", level: 55 }] };
+    else if (T && typeof T.batteries === "function") { try { bt = JSON.parse(T.batteries()); } catch (e) { bt = null; } }
+    if (!bt) return B.setup(o, env);
+    S.body.appendChild(head("bolt", "Batteries", bt.need === "permission" ? "Android asks first" : "Paired with this TV by Bluetooth", "#30d158"));
+    if (bt.need === "permission") {
+      S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:30px", [E("div", "cwd-text", "", ["To read the charge of your remotes and controllers, Android asks once to let couch-tv see nearby devices. OK below shows Android's question: pick Allow."]),
+        E("div", "cwd-row", "margin-top:30px", [F(btn("check", "Ask Android now"), function () { if (designerSays()) return; var ok = false; try { ok = T.askBatteries(); } catch (e) {} msg(ok ? "Already allowed. Close and open the widget again." : "Pick Allow on Android's question, then press Back."); }, "Allow")])]));
+      return;
+    }
+    var icon = { remote: "remote", controller: "games", headphones: "headphones", keyboard: "edit", other: "bluetooth" };
+    S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:30px", (bt.devices || []).length ? bt.devices.map(function (x) {
+      return E("div", "cwd-tvrow", "", [E("span", "", "display:flex;align-items:center;gap:18px", [ic(icon[x.kind] || "bluetooth", 40), x.name]), E("b", x.level < 20 ? "cwd-tv-no" : "cwd-tv-yes", "", [x.level + "%"])]);
+    }) : [E("div", "cwd-text", "", ["No paired device reports its charge right now. Remotes and controllers that do show here by themselves."])]));
+  };
+  // Ask AI (ask.js): the last question and answer in full, then Ask and Set up, which open the Ask sheet
+  B.ask = function (o, env) {
+    var A = window.CouchAsk, st = A ? A.status() : { ready: false, by: "" };
+    var v = env.demo ? { q: "How far away is the moon?", a: "About 384,000 kilometres. Light from it takes just over a second to reach us." } : A && A.last();
+    S.body.appendChild(head("mic", "Ask AI", env.demo ? "Answered by your own AI" : st.ready ? "Answered by " + st.by : "Pick who answers first: OK on Set up", "#5e5ce6"));
+    var go = function (view) { return function () { if (designerSays()) return; close(true); if (A) A.open(view); }; };
+    var row = E("div", "cwd-row", "margin-top:30px", [F(btn("mic", st.ready || env.demo ? "Ask a question" : "Set it up now"), go(st.ready ? "ask" : "setup"), "Ask"), F(btn("settings", "Set up"), go("setup"), "Set up")]);
+    var words = v && v.q ? [label("You asked"), E("div", "cwd-text", "", [v.q]), label(v.pending ? "Thinking" : "The answer"), E("div", "cwd-note", "font-size:" + px(clamp(Math.sqrt(1500 * 420 / Math.max(10, String(v.err || v.a || "").length) / 1.6), 36, 84)), [v.pending ? "..." : v.err || v.a])]
+      : [E("div", "cwd-text", "margin-top:30px", [st.ready ? "Ask anything. Type it, or press OK on the box and then the microphone on the TV's keyboard. Ask on the phone remote shows its answer here too."
+        : "Ask AI answers with the AI you pick: your own Claude, OpenAI, Gemini or another service with your own key kept on this TV, a model on a computer at home, or couch-tv at home. couch-tv never pays for it and never sees your key."])];
+    S.body.appendChild(E("div", "cwd-col cwd-grow", "", words.concat([row])));
+  };
+  // From your AI (ask.js): the last message in full, and how to connect an agent (docs/AI-AGENT.md)
+  B.agent = function (o, env) {
+    var A = window.CouchAsk, m = env.demo ? { from: "Claude", text: "Your new autumn design is on its way. Press OK on the TV when it asks." } : A && A.message();
+    S.body.appendChild(head("phone", "From your AI", m ? "From " + m.from : "Your own AI agent can write to this TV", "#5e5ce6"));
+    if (m) S.body.appendChild(E("div", "cwd-note", "margin-top:24px;font-size:" + px(clamp(Math.sqrt(1500 * 300 / Math.max(10, m.text.length) / 1.6), 36, 84)), [m.text]));
+    var C = window.CouchWidgetCaps, steps = C ? C.steps("agent", "android") : [];
+    S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:24px", [label("Connect your AI agent"),
+      E("div", "cwd-list", "", steps.map(function (t, i) { return E("div", "cwd-li", "", [E("b", "", "flex:none;width:44px", [String(i + 1) + "."]), E("span", "", "", [t])]); }))]));
+  };
   B.note = function (o, env) {
     var n = env.demo ? { text: "Dinner at 6. Feed Max!", from: "Mum" } : (kit().athome(env) || {}).note;
     if (!n || !n.text) return B.setup(o, env);

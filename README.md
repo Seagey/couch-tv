@@ -256,6 +256,8 @@ gains a permission these tables do not explain.
 | `READ_TV_LISTINGS` | By `apply.sh` | Keep watching: reads Android's Watch Next list (what each app says you are part way through). Read only |
 | `PACKAGE_USAGE_STATS` | Only with `SCREEN_TIME=1`, or when you switch Home on in the TV's Usage access screen | The Screen time widget: today's time in each app. Off unless you ask for it |
 | `SYSTEM_ALERT_WINDOW` | By `apply.sh`, only when `config.json` has a doorbell | The doorbell card over whatever is playing. A later `apply.sh` run without a doorbell takes it back |
+| `BLUETOOTH_CONNECT` | Android 12 and newer: only when you press OK on a Batteries widget and pick Allow on Android's question | The Batteries widget: the charge left in remotes and controllers paired with the TV. Only their names and levels, kept on the TV |
+| `BLUETOOTH` | On install, Android 11 and older only | The same Batteries widget, on older Android: lists the paired remotes and controllers |
 | `REQUEST_INSTALL_PACKAGES` | Android asks you once | Updates: hands a new release to Android's installer, which always asks the person at the TV first |
 | `REQUEST_DELETE_PACKAGES` | On install | Hold OK on an app, Uninstall: opens Android's own remove dialog, which always asks first |
 | `WRITE_SECURE_SETTINGS` | By `apply.sh`, on a Fire TV only | Keeps the Home button watch switched on after updates and restarts |

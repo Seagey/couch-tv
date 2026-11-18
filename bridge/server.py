@@ -48,6 +48,7 @@ import tivo
 import spotify_now
 import webdata
 import plex
+import say
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -2123,6 +2124,22 @@ async def h_ask(request):
     result = await claude.ask(text, store.norm_who(data.get("who")) or cur_who(), asks,
                               _current.get(), lang=home_settings().get("settings", {}).get("lang"))
     return ok(**result)
+
+
+# ---------- Ask AI on the TV, and messages and designs from the person's own AI agent (say.py) ----------
+async def h_say(request):
+    return ok(**say.snapshot(_current.get(), claude._last.get(_current.get() or "default")))
+
+
+async def h_say_message(request):
+    data = await body(request)
+    return ok(message=say.message(_current.get(), data.get("text"), data.get("from"), data.get("seconds")))
+
+
+async def h_say_design(request):
+    data = await body(request)
+    # the TV fetches it and always asks "Use this design?" first: someone at the TV says yes
+    return ok(design=say.design(_current.get(), data.get("code")), asks_first=True)
 
 
 async def h_recs(request):
@@ -4590,6 +4607,9 @@ def make_app():
     r.add_get("/api/find", h_find)
     r.add_post("/api/play", h_play)
     r.add_post("/api/ask", h_ask)
+    r.add_get("/api/say", h_say)
+    r.add_post("/api/say/message", h_say_message)
+    r.add_post("/api/say/design", h_say_design)
     r.add_get("/api/tizen/next", h_tizen_next)
     r.add_post("/api/tizen/answer", h_tizen_answer)
     r.add_get("/api/webos/apps", h_webos_apps)

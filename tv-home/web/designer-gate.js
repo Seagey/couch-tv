@@ -66,6 +66,9 @@
     var C = typeof window !== "undefined" && window.CouchDesignCode, b = store !== undefined ? store : C && C.base ? C.base() : "";
     b = /^https?:\/\/[a-z0-9.-]+(:\d{1,5})?$/i.test(b || "") ? b : "";
     var out = POLICY.replace("font-src 'self' data:", "font-src 'self' data:" + (b ? " " + b : ""));
+    // Ask AI with a model on a computer at home (ask.js): that one home network address, plain http, may be asked
+    var A = typeof window !== "undefined" && window.CouchAsk, ao = A && A.connectOrigin ? A.connectOrigin() : "";
+    if (/^http:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|[a-z0-9-]{1,63}\.(local|lan))(:\d{1,5})?$/i.test(ao)) out = out.replace("connect-src 'self' https:", "connect-src 'self' https: " + ao.toLowerCase());
     var media = opts && Array.isArray(opts.media) ? opts.media.filter(function (s) { return /^('self'|blob:|https:\/\/[a-z0-9.-]+(:\d{1,5})?|http:\/\/(127\.0\.0\.1|localhost)(:\d{1,5})?)$/i.test(String(s)); }) : null;
     return media && media.length ? out.replace(/media-src [^;]*;/, "media-src " + media.join(" ") + ";") : out;
   }

@@ -155,7 +155,21 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 if (Kids.isKid(body(s).optString("who").ifEmpty { Now.who })) throw ApiError(403, "Ask is off for a kids profile.")
                 if (!Ask.enabled) throw ApiError(501, "Ask is off in on-TV mode. To switch it on, add your own API key (Claude, OpenAI and others) or the address of a model at home on the setup page.")
                 val b = body(s)
-                json(200, Ask.ask(b.optString("text").ifEmpty { throw ApiError(400, "text is required") }, b.optString("who").ifEmpty { Now.who }))
+                val text = b.optString("text").ifEmpty { throw ApiError(400, "text is required") }
+                val r = Ask.ask(text, b.optString("who").ifEmpty { Now.who })
+                Say.asked(text, r.optString("reply"), "Your AI service, from the couch-tv TV app")   // shows on the TV home too
+                json(200, r)
+            }
+            // Ask AI on the TV home, and messages and designs from the person's own AI agent (Say.kt, docs/AI-AGENT.md)
+            "GET /api/say" -> json(200, ok(Say.snapshot()))
+            "POST /api/say/message" -> {
+                val b = body(s)
+                val m = try { Say.message(b.optString("text"), b.optString("from"), if (b.has("seconds")) b.optInt("seconds", 30) else null) } catch (e: IllegalArgumentException) { throw ApiError(400, e.message ?: "bad message") }
+                json(200, ok().put("message", m))
+            }
+            "POST /api/say/design" -> {
+                val d = try { Say.design(body(s).optString("code")) } catch (e: IllegalArgumentException) { throw ApiError(400, e.message ?: "bad code") }
+                json(200, ok().put("design", d).put("asks_first", true))   // the TV always asks "Use this design?" first
             }
             "GET /api/recs" -> json(200, ok().put("updated", Now.iso()).put("continue", Now.continueItems(q("who"))).put("picks", JSONArray()))
             "GET /api/continue" -> json(200, ok().put("items", Now.continueItems(q("who"))))

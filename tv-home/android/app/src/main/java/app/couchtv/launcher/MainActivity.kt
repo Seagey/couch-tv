@@ -917,6 +917,18 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun kept(key: String): String? = getSharedPreferences("page", MODE_PRIVATE).getString(key, null)
 
+        // couch-tv Studio's Batteries widget (Batteries.kt): the paired remotes and controllers and their charge
+        @JavascriptInterface
+        fun batteries(): String = Batteries.read(this@MainActivity)
+
+        // Android 12 and newer: Android's own "Nearby devices" question, once, from the widget's OK
+        @JavascriptInterface
+        fun askBatteries(): Boolean {
+            if (Batteries.allowed(this@MainActivity)) return true
+            runOnUiThread { try { requestPermissions(arrayOf(android.Manifest.permission.BLUETOOTH_CONNECT), 78) } catch (e: Exception) {} }
+            return false
+        }
+
         // couch-tv Studio's home widgets (AtHome.kt): the things typed at home go in their own store,
         // left out of Android's backups, never in the page's storage
         @JavascriptInterface

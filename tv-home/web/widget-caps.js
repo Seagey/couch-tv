@@ -115,6 +115,10 @@
   var CAL_NEED = "Your calendar's private address, typed on the TV";
   var DATED_NEED = "Your photos on the TV, with the day each was taken";
   var SCREEN_NEED = "A Google TV, Android TV or Fire TV that allows screen time";
+  // Ask AI and From your AI (ask.js)
+  var ASK_NEED = "The AI you choose: Claude, OpenAI, Google Gemini or another service, a model at home, or couch-tv at home";
+  var AGENT_NEED = "The couch-tv TV app or a computer at home running couch-tv, for your agent to reach the TV";
+  var OPEN_ASK = "Move to the Ask AI widget and press OK, then pick Set up.";
 
   var TOWN_NEED = "Your town, set on the TV";
   var PHOTOS_NEED = "Your photos on the TV, or one photo put in the widget";
@@ -313,9 +317,17 @@
       setup: setup("computer", haSteps("sensors (up to 8: the pool, a rain gauge, humidity)", "Press Home: the reading shows here, with its last 24 hours.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens the reading big with its last 24 hours; Left and Right reach your other sensors", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
-    battery: { name: "Batteries", status: "not-built", what: "Remotes and controllers as rings", needs: ["Needs the TV to share battery levels (TVs do not)"],
-      setup: setup("nothing", ["Nothing can be set up: TVs do not share battery levels."]), until: "\"Batteries: not on couch-tv yet\", and why", build: "Not possible on the TV itself. Home Assistant's phone app could report phone batteries, through sensor support (see Sensor).",
-      ok: "Nothing", platforms: NOWHERE("TVs do not share battery levels."), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
+    // the launcher reads Android's own Bluetooth battery levels (tv-home/android Batteries.kt)
+    battery: { name: "Batteries", status: "setup", what: "The remotes, game controllers and headphones paired with this TV, and the charge left in each, as rings",
+      needs: ["A Google TV, Android TV or Fire TV, with Bluetooth remotes or controllers that report their charge"],
+      setup: setup("tv", {
+        android: ["Pair the remote or controller with the TV as usual (Settings, Remotes and accessories).", "Move to the Batteries widget and press OK.", "On Android 12 and newer, pick Ask Android now, then Allow on Android's question. Older TVs ask nothing.", "The rings show the charge, lowest first. They update every few minutes."],
+        web: ["Not possible on this TV: only Android shares the charge of paired remotes. A Google TV box or Fire TV stick plugged in shows it."],
+        vidaa: ["Not possible on this TV: only Android shares the charge of paired remotes. A Google TV box or Fire TV stick plugged in shows it."] }),
+      until: "\"Allow nearby devices\" on Android 12 and newer, or \"No charge to show\" when nothing paired reports one", build: "",
+      ok: "Opens every paired device and its charge, and asks Android once on Android 12 and newer",
+      platforms: plat("setup", "no", "no", { android: "Remotes, controllers and headphones paired by Bluetooth that report their charge.", web: "Only Android shares the charge of paired remotes.", vidaa: "Only Android shares the charge of paired remotes." }),
+      sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- lists and the family ----------
     bins: { name: "Bin night", status: "setup", what: "Tonight's bins with their lid colours", needs: ["Your bin night and bins, picked in couch-tv Studio"],
@@ -342,10 +354,13 @@
       ok: "Opens the whole list: OK ticks an item", platforms: plat("setup", "computer", "setup", KEPT), sizes: sz(["wtile", "small", "tall", "large"], [4, 2]) },
 
     // ---------- info ----------
-    card: { name: "Custom card", status: "setup", what: "A number from your home: solar today, the pool", needs: ["A computer at home that stays on, running couch-tv"],
-      setup: setup("computer", ["Needs a computer at home that stays on, running couch-tv (setup option B).", "On that computer, add each card to couch-tv's settings file under Custom cards: a title and where to read the number.", "Press Home: the cards show here."]),
-      until: "\"Needs a home computer\", and where it is set up", build: "",
-      ok: "Opens every custom card big", platforms: plat("computer", "computer", "computer", { vidaa: "Needs a computer at home: the website home cannot." }), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
+    // a typed card (a title and words from the design) shows on every TV; a live number from home is the
+    // extra that needs the computer at home (bridge/custom_cards.py)
+    card: { name: "Custom card", status: "works", what: "Your own title and words, or a live number from your home: solar today, the pool",
+      needs: ["Your title and words, typed in couch-tv Studio", "For a live number: a computer at home that stays on, running couch-tv"],
+      setup: setup("designer", inStudio("type a title and its words").concat(["For a live number: on the home computer, add it to couch-tv's settings under Custom cards, with no words in the widget."])),
+      until: "Always shows your words. A card for a live number with no computer: \"Needs a home computer\", and where", build: "",
+      ok: "Opens every custom card big", platforms: EVERY(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     quote: { name: "Quote", status: "works", what: "A short line for the day, or your own words", needs: ["Nothing: the lines come with couch-tv"],
       setup: setup("nothing", ["Nothing to set up.", "For your own words: open your design in couch-tv Studio, tap the widget and type them.", SEND]), until: "Always shows a line", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["wtile", "small", "medium", "wide"], [4, 2]) },
@@ -416,6 +431,32 @@
       ok: "Opens today's screen time, app by app", platforms: plat("setup", "no", "no", { android: "Counts every app on this TV, not one person.", web: "This TV does not share screen time.", vidaa: "This TV does not share screen time." }),
       sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
+    // ---------- your own AI (ask.js, docs/ASK-AI.md and docs/AI-AGENT.md) ----------
+    ask: { name: "Ask AI", status: "setup", what: "Ask anything by voice or typing, answered on the TV by the AI you pick",
+      needs: [ASK_NEED, "Your own key for that service, kept on this TV (a model on a computer at home needs none)"],
+      setup: setup("tv", {
+        android: [OPEN_ASK, "Pick who answers: Claude, OpenAI, Google Gemini, OpenRouter, Groq, Mistral, a model at home (Ollama, LM Studio), another service, or couch-tv at home.",
+          "Type the model name if it asks, then the key. With the phone remote, Type on the TV pastes it. The key stays on this TV.", "Pick Use it and try it: an answer shows on the TV.",
+          "To ask: OK on the widget, then type, or press the microphone on the TV's keyboard and say it. Ask on the phone remote shows its answer here too."],
+        web: [OPEN_ASK, "Pick who answers. couch-tv at home uses Claude on the home computer with your own Claude plan; or pick a service and type your own key.", "Pick Use it and try it: an answer shows on the TV.", "To ask: OK on the widget and type, or use Ask on the phone remote (its microphone too)."],
+        vidaa: [OPEN_ASK, "Pick who answers: a service with your own key, or a model at home.", "Type the model name and the key with the TV remote, then pick Use it and try it.", "To ask: OK on the widget and type."] }),
+      until: "\"Ask AI: pick who answers\", and OK sets it up step by step", build: "",
+      ok: "Opens Ask AI: the answer in full, Ask a question and Set up",
+      platforms: plat("setup", "setup", "setup", { android: "Your own key on this TV, a model at home, or couch-tv at home. Speak with the TV keyboard's microphone or the phone remote.",
+        web: "Your own key on this TV, or the home computer's Claude on your own plan. Speak with the phone remote's microphone.", vidaa: "Your own key or a model at home, typed with the TV remote." }),
+      sizes: sz(["wtile", "small", "medium", "wide", "large"], [4, 2]) },
+    agent: { name: "From your AI", status: "setup", what: "Messages your own AI agent sends to the TV. The agent can also put a couch-tv Studio design on the TV (you press OK first)",
+      needs: [AGENT_NEED, "An AI app that can use tools (MCP), such as Claude Desktop, Claude Code or Cursor, or any program on your network"],
+      setup: setup("computer", [
+        "Needs the couch-tv TV app (setup option C) or a computer at home running couch-tv (option B): they hold the TV's own address for your agent.",
+        "In your AI app, add couch-tv's TV tools with the TV app's or home computer's address and pairing key. The guide Connect your own AI agent has the lines to copy.",
+        "Ask your AI: \"Show 'Dinner is ready' on the TV\". It shows over the home and in this widget.",
+        "To change the home: ask it to design one with couch-tv Studio's tools and send it. The TV asks \"Use this design?\" first: press OK."]),
+      until: "\"Connect your AI agent\", and OK shows how", build: "",
+      ok: "Opens the last message in full, and how to connect your agent",
+      platforms: plat("computer", "computer", "computer", { android: "Through the couch-tv TV app (no computer at home needed) or a computer at home.", web: "Works while the home computer is on.", vidaa: "Needs a computer at home running couch-tv: the website home has nothing an agent can reach." }),
+      sizes: sz(["wtile", "small", "medium", "wide"], [4, 2]) },
+
     // ---------- a smart stack (not a widget of its own: up to 10 widgets taking turns) ----------
     stack: { name: "Smart stack", status: "works", what: "Up to 10 widgets of one size taking turns in one place", needs: ["Whatever the widgets in it need"],
       setup: setup("designer", inStudio("drop widgets of the same size on top of each other")), until: "Each widget in it says what it needs", build: "",
@@ -425,7 +466,7 @@
   // A widget couch-tv cannot fill yet always shows the same card on a TV (widgets.js soon()), so its
   // `until` says exactly that, rather than each record wording it its own way
   Object.keys(C).forEach(function (k) {
-    if (C[k].status === "not-built") C[k].until = "A card on the widget: \"" + C[k].name + ": not on couch-tv yet\" and what it needs. OK on it shows this.";
+    if (C[k].status === "not-built") C[k].until = "A card on the widget: \"" + C[k].name + ": not on this TV\" and what it needs. OK on it shows this.";
     // a TV whose couch-tv does not draw designs gets the same one step everywhere
     C[k].setup.steps.none = NOT_HERE.slice();
   });
@@ -440,7 +481,7 @@
   SHORT[WATCH_NEED] = ["Needs the couch-tv TV app or a home computer", "OK here shows how", "Needs setting up"];
   SHORT[HA_NEED] = ["Needs Home Assistant", "Set up once on a computer. OK here shows how", "Needs Home Assistant"];
   SHORT[QUEUE_NEED] = ["Needs Spotify connected", "On the home computer. OK here shows how", "Needs Spotify"];
-  SHORT[C.card.needs[0]] = ["Needs a home computer", "OK here shows how to set it up", "Needs a computer"];
+  SHORT[C.card.needs[0]] = ["Type your words in couch-tv Studio", "Or a live number from the home computer. OK here shows how", "Type your words"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];
   var AT = "Home settings, couch-tv Studio, At home";
   SHORT[NOTE_NEED] = ["Write a note", AT, "Write a note"];
@@ -450,11 +491,14 @@
   SHORT[CAL_NEED] = ["Add your calendar", AT, "Add a calendar"];
   SHORT[DATED_NEED] = ["Add your photos", "Home settings, Look and scenes, Your photos", "Add photos"];
   SHORT[SCREEN_NEED] = ["Allow screen time", AT, "Allow it first"];
+  SHORT[ASK_NEED] = ["Ask AI: pick who answers", "OK here sets it up, step by step", "Set up Ask AI"];
+  SHORT[AGENT_NEED] = ["Connect your AI agent", "OK here shows how", "Connect your AI"];
+  SHORT[C.battery.needs[0]] = ["Allow nearby devices", "OK here asks Android", "Allow it first"];
   // tiny: the box is a tile, so the line has to fit two short lines (OK opens the whole record)
   function card(kind, tiny) {
     var c = C[kind];
     if (!c) return { line: tiny ? "Needs an update" : "This widget needs a newer couch-tv", sub: "" };
-    if (c.status === "not-built") return { line: tiny ? "Not built yet" : c.name + ": not on couch-tv yet", sub: c.needs[0].replace(/^Needs /, "It needs ") };
+    if (c.status === "not-built") return { line: tiny ? "Not on this TV" : c.name + ": not on this TV", sub: c.needs[0].replace(/^Needs /, "It needs ") };
     var s = SHORT[c.needs[0]];
     if (s) return { line: tiny ? s[2] : s[0], sub: s[1] };
     return { line: tiny ? "Set up needed" : c.needs[0], sub: WHERE[c.setup.where] || "" };

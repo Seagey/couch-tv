@@ -517,7 +517,7 @@
     var s = sunToday(env);
     if (!s) return empty(root, b, "sun", "Set your town for the sun", "Home settings, Location");
     var at = arc(s.frac);
-    add(root, [lab("sun", "Sun"),
+    add(root, [lab("sun", op(o).label || "Sun"),
       svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.28)", "stroke-width": 3, "stroke-dasharray": "2 9", "stroke-linecap": "round" }),
         S("line", { x1: 0, y1: 110, x2: 300, y2: 110, stroke: "rgba(255,255,255,.3)", "stroke-width": 2 }),
         s.frac > 0 && s.frac < 1 ? S("circle", { cx: at.x, cy: at.y, r: 13, fill: "#ffd60a" }) : null], "flex:1;min-height:0;margin-top:6px"),
@@ -551,7 +551,7 @@
       return;
     }
     // the cities spread from under the label to the bottom, so the whole sits in the middle
-    add(root, [lab("clock", "World clock"), E("div", "cw-col cw-grow", "justify-content:space-between;margin-top:18px", cities.map(function (tz) {
+    add(root, [lab("clock", op(o).label || "World clock"), E("div", "cw-col cw-grow", "justify-content:space-between;margin-top:18px", cities.map(function (tz) {
       var t = tzTime(tz);
       return E("div", "cw-row cw-sp", "", [E("div", "cw-t29 cw-ell", "min-width:0", [name(tz)]), E("div", "cw-t38", "flex:none;margin-left:12px", [t ? t.t : ""])]);
     }))]);
@@ -723,7 +723,7 @@
     if (!w) return noWx(root, b, env);
     if (!w.rain) return empty(root, b, "rain", "Rain soon is on its way", "");
     var heavy = (w.rainMax || 3) >= 2.5;
-    add(root, [lab("rain", "Rain soon"), E("div", "cw-t38", "margin-top:10px", [w.rainFrom ? (heavy ? "Heavy rain from " : "Rain from ") + w.rainFrom : "No rain coming"]),
+    add(root, [lab("rain", op(o).label || "Rain soon"), E("div", "cw-t38", "margin-top:10px", [w.rainFrom ? (heavy ? "Heavy rain from " : "Rain from ") + w.rainFrom : "No rain coming"]),
       E("div", "cw-grow cw-row", "align-items:flex-end;margin-top:14px", w.rain.map(function (v) { return E("i", "", "display:block;flex:1;margin:0 4px;height:" + v + "%;border-radius:6px;background:#64d2ff"); })),
       E("div", "cw-row cw-sp cw-t23", "margin-top:8px", [E("span", "", "", ["Now"]), E("span", "", "", ["+1h"]), E("span", "", "", ["+2h"]), E("span", "", "", ["+3h"])])]);
   };
@@ -731,7 +731,7 @@
     var w = weather(env);
     if (!w || w.uv === undefined) return w ? empty(root, b, "sun", "UV is on its way", "") : noWx(root, b, env);
     var band = w.uv < 3 ? "Low" : w.uv < 6 ? "Moderate" : w.uv < 8 ? "High" : w.uv < 11 ? "Very high" : "Extreme";
-    add(root, [lab("sun", "UV index"), E("div", "cw-big", "font-size:" + px(b.h < 300 ? 64 : 96) + ";margin-top:8px", [String(w.uv)]), E("div", "cw-t29", "font-weight:680", [band]), E("div", "cw-grow"),
+    add(root, [lab("sun", op(o).label || "UV index"), E("div", "cw-big", "font-size:" + px(b.h < 300 ? 64 : 96) + ";margin-top:8px", [String(w.uv)]), E("div", "cw-t29", "font-weight:680", [band]), E("div", "cw-grow"),
       E("div", "cw-bar", "background:linear-gradient(90deg,#34c759,#ffd60a,#ff9f0a,#ff3b30,#af52de);overflow:visible", [E("i", "", "position:absolute;left:" + clamp(w.uv / 12 * 100, 2, 96) + "%;top:-6px;width:20px;height:20px;border-radius:10px;background:#fff;border:3px solid #ff6a3d;display:block")]),
       b.h >= 300 && w.uvFrom ? E("div", "cw-t23", "color:var(--ink);margin-top:12px", ["Sun protection " + w.uvFrom + " to " + w.uvTo]) : null]);
   };
@@ -739,7 +739,7 @@
     var s = sunToday(env);
     if (!s) return empty(root, b, "sun", "Set your town for the sun", "Home settings, Location");
     var at = arc(s.frac);
-    add(root, [lab("sun", "Sun"), svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.3)", "stroke-width": 4, "stroke-dasharray": "2 10", "stroke-linecap": "round" }),
+    add(root, [lab("sun", op(o).label || "Sun"), svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.3)", "stroke-width": 4, "stroke-dasharray": "2 10", "stroke-linecap": "round" }),
       s.frac > 0 && s.frac < 1 ? S("circle", { cx: at.x, cy: at.y, r: 14, fill: "#ffd60a" }) : null], "flex:1;min-height:0;margin:6px 0"),
       E("div", "cw-row cw-sp", "", [E("div", "cw-t29", "", ["↑ " + s.rise]), b.w >= 300 ? E("div", "cw-t29", "", ["↓ " + s.set]) : null])]);
   };
@@ -764,11 +764,11 @@
     if (!a) return weather(env) ? empty(root, b, "wind", "Waiting for the air quality", "From Open-Meteo, every refresh") : noWx(root, b, env);
     var v = Math.round(a.aqi), band = aqiBand(v);
     if (b.h < 200) {
-      add(root, b.w < 300 ? [lab("wind", "Air"), E("div", "cw-grow"), E("div", "cw-big", "font-size:56px;color:" + band[1], [String(v)]), E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--ink)", [band[0]])]
-        : E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("wind", "Air quality"), E("div", "cw-t29 cw-ell", "font-weight:700;margin-top:8px", [band[0]])]), E("div", "cw-big", "font-size:84px;color:" + band[1], [String(v)])]));
+      add(root, b.w < 300 ? [lab("wind", op(o).label || "Air"), E("div", "cw-grow"), E("div", "cw-big", "font-size:56px;color:" + band[1], [String(v)]), E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--ink)", [band[0]])]
+        : E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("wind", op(o).label || "Air quality"), E("div", "cw-t29 cw-ell", "font-weight:700;margin-top:8px", [band[0]])]), E("div", "cw-big", "font-size:84px;color:" + band[1], [String(v)])]));
       return;
     }
-    add(root, [lab("wind", "Air quality"), E("div", "cw-big", "font-size:96px;margin-top:8px;color:" + band[1], [String(v)]), E("div", "cw-t29", "font-weight:680", [band[0]]), E("div", "cw-grow"),
+    add(root, [lab("wind", op(o).label || "Air quality"), E("div", "cw-big", "font-size:96px;margin-top:8px;color:" + band[1], [String(v)]), E("div", "cw-t29", "font-weight:680", [band[0]]), E("div", "cw-grow"),
       E("div", "cw-bar", "background:linear-gradient(90deg,#30d158,#a4e05a,#ffd60a,#ff9f0a,#ff453a,#bf5af2);overflow:visible", [E("i", "", "position:absolute;left:" + clamp(v, 2, 96) + "%;top:-6px;width:20px;height:20px;border-radius:10px;background:#fff;border:3px solid #111;display:block")])]);
   };
   // surf: swell from Open-Meteo's free marine service for the sea nearest the town, and the wind from
@@ -1030,7 +1030,7 @@
     var list = appsFor(o, env, 4);
     if (!list.length) return noApps(root, b, (op(o).apps || []).length);
     var n = clamp(Math.floor(b.w / 240), 2, list.length);
-    add(root, [lab("games", "Play"), E("div", "cw-row cw-grow", "margin-top:16px;align-items:stretch", list.slice(0, n).map(function (p, i) {
+    add(root, [lab("games", op(o).label || "Play"), E("div", "cw-row cw-grow", "margin-top:16px;align-items:stretch", list.slice(0, n).map(function (p, i) {
       var miss = String(p).indexOf("missing:") === 0, key = miss ? p.slice(8) : p, gp = GAMES[key] || (cat() && cat().get(key) ? GAMES[cat().get(key).packages.android[0]] : null), g = gp || ["#3a3a46", "#1d1d24", appName(key, env), "games"];
       var t = E("div", "cw-col", "flex:1;position:relative;overflow:hidden;border-radius:28px;background:linear-gradient(165deg," + g[0] + "," + g[1] + ");padding:24px;justify-content:space-between;" + (i ? "margin-left:20px" : ""), [
         ic(g[3], clamp(b.h / 5, 56, 96), "#fff", "solid"), E("div", "", "min-width:0", [E("div", "cw-t29 cw-ell", "color:#fff;font-weight:740", [g[2]]), env.demo && g[4] && b.h >= 400 ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.86)", [g[4]]) : null])]);
@@ -1545,17 +1545,31 @@
     }
     stop(root, "detail", "sensor", p.name);
   };
+  // the remotes, controllers and headphones paired with this TV by Bluetooth, and their charge: read from
+  // Android by the launcher (Batteries.kt, TVOS.batteries), at most every 5 minutes. Only the device's
+  // name and level; none of it leaves the TV.
+  var BAT_ICON = { remote: "remote", controller: "games", headphones: "headphones", keyboard: "edit", other: "bluetooth" }, BAT = { at: 0, v: null };
+  function batteriesOf(env) {
+    if (env.demo) return { need: "", devices: [{ kind: "controller", name: "Pad 1", level: 72 }, { kind: "controller", name: "Pad 2", level: 12 }, { kind: "headphones", name: "Headset", level: 55 }] };
+    var T = window.TVOS;
+    if (!T || typeof T.batteries !== "function") return null;
+    if (!BAT.v || Date.now() - BAT.at > 300000) { try { BAT.v = JSON.parse(T.batteries()); } catch (e) { BAT.v = { need: "bluetooth", devices: [] }; } BAT.at = Date.now(); }
+    return BAT.v;
+  }
   R.battery = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "bolt", "battery");
-    var d = [["games", "Pad 1", 72], ["games", "Pad 2", 12], ["headphones", "Headset", 55]], R2 = Math.max(96, Math.min((b.w - 48) / d.length - 40, b.h - 190));
+    var bt = batteriesOf(env);
+    if (!bt) return empty(root, b, "bolt", "Batteries show on a Google TV, Android TV or Fire TV", "Only Android shares the charge of paired remotes");
+    if (bt.need === "permission") return soon(root, b, "bolt", "battery");
+    if (!bt.devices || !bt.devices.length) return empty(root, b, "bolt", "No charge to show", "Paired remotes and controllers that report their charge show here");
+    var d = bt.devices.slice(0, b.w < 700 ? 3 : 4).map(function (x) { return [BAT_ICON[x.kind] || "bluetooth", x.name, x.level]; }), R2 = Math.max(96, Math.min((b.w - 48) / d.length - 40, b.h - 190));
     // the label and the rings as one group in the middle of the box
     root.style.justifyContent = "center";
-    add(root, [lab("bolt", "Batteries"), E("div", "cw-row", "justify-content:space-around;margin-top:16px", d.map(function (x) {
+    add(root, [lab("bolt", op(o).label || "Batteries"), E("div", "cw-row", "justify-content:space-around;margin-top:16px", d.map(function (x) {
       var c = x[2] < 20 ? "#ff453a" : "#30d158";
       return E("div", "cw-col", "align-items:center", [E("div", "", "position:relative;width:" + px(R2) + ";height:" + px(R2), [svg("0 0 100 100", R2, R2, [S("circle", { cx: 50, cy: 50, r: 42, fill: "none", stroke: "rgba(255,255,255,.14)", "stroke-width": 9 }),
         S("circle", { cx: 50, cy: 50, r: 42, fill: "none", stroke: c, "stroke-width": 9, "stroke-linecap": "round", "stroke-dasharray": 264, "stroke-dashoffset": 264 * (1 - x[2] / 100), transform: "rotate(-90 50 50)" })]),
         E("div", "", "position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center", [ic(x[0], R2 * 0.36, "#fff")])]),
-        E("div", "cw-t29", "color:var(--ink);font-weight:680;margin-top:12px", [x[2] + "%"]), E("div", "cw-t23", "", [x[1]])]);
+        E("div", "cw-t29", "color:var(--ink);font-weight:680;margin-top:12px", [x[2] + "%"]), E("div", "cw-t23 cw-ell", "max-width:" + px(R2 + 40), [x[1]])]);
     }))]);
   };
 
@@ -1569,7 +1583,7 @@
     var bins = q.alt ? [["#ff453a", "Rubbish"], week % 2 === 0 ? a : c] : [a, c];
     if (!env.demo && q.weekday === undefined) return empty(root, b, "calendar", "Set your bin night in couch-tv Studio", "Pick the night and the bins");
     var bs = b.h < 300 ? 48 : 62;
-    add(root, [lab("calendar", "Bin night"), E("div", b.h < 300 ? "cw-t29" : "cw-t38", "margin-top:12px;font-weight:700", [when]), E("div", "cw-grow"),
+    add(root, [lab("calendar", op(o).label || "Bin night"), E("div", b.h < 300 ? "cw-t29" : "cw-t38", "margin-top:12px;font-weight:700", [when]), E("div", "cw-grow"),
       E("div", "cw-row", "", bins.map(function (x, i) {
         return E("div", "cw-col", "align-items:center;" + (i ? "margin-left:16px" : ""), [svg("0 0 62 72", bs, bs * 72 / 62, [S("rect", { x: 6, y: 14, width: 50, height: 56, rx: 8, fill: "#3a3a40" }), S("rect", { x: 2, y: 6, width: 58, height: 12, rx: 5, fill: x[0] })]), b.w >= 300 ? E("span", "cw-t23", "margin-top:8px", [x[1]]) : null]);
       }))]);
@@ -2024,14 +2038,20 @@
     var night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + ahead), week = Math.floor((night.getTime() / 86400000 - (q.anchor || 0)) / 7);
     var A = q.lid_a || "#ffd60a", B = q.lid_b || "#30d158", lids = q.alt ? ["#ff453a", week % 2 === 0 ? A : B] : [A, B];
     var bin = function (c) { return svg("0 0 62 72", 40, 46, [S("rect", { x: 6, y: 14, width: 50, height: 56, rx: 8, fill: "#3a3a40" }), S("rect", { x: 2, y: 6, width: 58, height: 12, rx: 5, fill: c })], "margin-left:8px"); };
-    if (b.w < 300) { root.style.padding = "18px"; add(root, [E("div", "cw-t23", "font-weight:700;color:var(--sub)", ["Bins"]), E("div", "cw-grow"), E("div", "cw-row", "margin-left:-8px", lids.map(bin)), E("div", "cw-t25 cw-ell", "font-weight:720;color:var(--ink);margin-top:6px", [when])]); return; }
-    add(root, E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("calendar", "Bin night"), E("div", "cw-t29", "font-weight:720;margin-top:6px", [when])]), E("div", "cw-row", "", lids.map(bin))]));
+    if (b.w < 300) { root.style.padding = "18px"; add(root, [E("div", "cw-t23", "font-weight:700;color:var(--sub)", [op(o).label || "Bins"]), E("div", "cw-grow"), E("div", "cw-row", "margin-left:-8px", lids.map(bin)), E("div", "cw-t25 cw-ell", "font-weight:720;color:var(--ink);margin-top:6px", [when])]); return; }
+    add(root, E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("calendar", op(o).label || "Bin night"), E("div", "cw-t29", "font-weight:720;margin-top:6px", [when])]), E("div", "cw-row", "", lids.map(bin))]));
   };
   CR.word = function (root, o, b) {
     var words = (window.CouchWords || {}).words || [["Petrichor", "noun", "The smell of rain on dry ground."]], w = words[dayOfYear() % words.length];
     add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-t48 cw-ell", "font-size:" + px(clamp((b.w - 48) / (w[0].length * 0.6), 30, 56)), [w[0]]), E("div", "cw-t25 cw-ell", "font-style:italic;margin-top:4px", [w[1] + (b.w >= 600 ? ". " + w[2] : "")])]));
   };
-  CR.battery = sample("battery", "bolt", function (root, o, b) { mini(root, b, "games", "12%", "Pad 2", "Charge it soon", "#ff453a"); });
+  CR.battery = function (root, o, b, env) {
+    var bt = batteriesOf(env), x = bt && bt.devices && bt.devices[0];
+    if (!bt) return empty(root, b, "bolt", "Needs an Android TV", "");
+    if (bt.need === "permission") return soon(root, b, "bolt", "battery");
+    if (!x) return empty(root, b, "bolt", "No charge to show", "");
+    mini(root, b, BAT_ICON[x.kind] || "bluetooth", x.level + "%", x.name, x.level < 20 ? "Charge it soon" : "Lowest charge", x.level < 20 ? "#ff453a" : "#30d158");
+  };
   // the web widgets at a tile and a wide tile: centred unless the design says, nothing cut off
   // (a headline that would not fit whole gives way to a shorter one of the newest three)
   CR.news = function (root, o, b, env) {
@@ -2342,6 +2362,9 @@
   window.CouchWidgets = {
     config: CW,
     kinds: function () { return Object.keys(R); },
+    // a widget drawn by its own file (ask.js: Ask AI and From your AI): draw(root, o, b, env), and
+    // optionally its own drawing for a box under 200 px tall
+    define: function (kind, draw, small) { if (typeof draw === "function" && /^[a-z]{2,16}$/.test(kind)) { R[kind] = draw; if (typeof small === "function") CR[kind] = small; } },
     render: function (o, env) {
       env = env || {};
       var b = { w: Math.max(40, +o.w || 360), h: Math.max(40, +o.h || 360) };
@@ -2369,7 +2392,7 @@
     timeWords: timeWords, moon: moon, sunTimes: sunTimes, daysTo: daysTo,
     timer: Timer,
     // the building blocks and data readers the detail layers share (widget-detail.js)
-    kit: { E: E, S: S, svg: svg, ic: ic, add: add, px: px, clamp: clamp, rgba: rgba, avatar: avatar, cssImg: cssImg, now: now, dataOf: dataOf,
+    kit: { E: E, S: S, svg: svg, ic: ic, add: add, empty: empty, px: px, clamp: clamp, rgba: rgba, avatar: avatar, cssImg: cssImg, now: now, dataOf: dataOf,
       weather: weather, wxIcon: wxIcon, wxWords: wxWords, shows: shows, music: music, photos: photos, people: people,
       appNode: appNode, appsFor: appsFor, appName: appName, appIcon: appIcon, demoImg: demoImg, bgImg: bgImg,
       sunToday: sunToday, sunTimes: sunTimes, moon: moon, tzTime: tzTime, CITY: CITY, DAYS: DAYS, MONTHS: MONTHS, longDate: longDate, clockParts: clockParts,

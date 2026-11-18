@@ -112,7 +112,9 @@ const wsrc = fs.readFileSync(path.join(web, "widgets.js"), "utf8");
 ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function/.test(wsrc), "widgets.js never parses markup or code");
 ok(/parseFromString\(src, "image\/svg\+xml"\)/.test(wsrc) && /T\.svg\(style, name/.test(wsrc), "icons are parsed from icon-sets.js only (code that ships with the home)");
 const kinds = CD.wkinds().filter((k) => k !== "stack");
-kinds.forEach((k) => ok(new RegExp("\\bR\\." + k + " = function").test(wsrc), "a renderer for " + k));
+// Ask AI and From your AI are drawn by ask.js, which hands widgets.js its renderers (CouchWidgets.define)
+const asrc = fs.readFileSync(path.join(web, "ask.js"), "utf8");
+kinds.forEach((k) => ok(new RegExp("\\bR\\." + k + " = function").test(wsrc) || new RegExp("CW\\.define\\(\"" + k + "\", ").test(asrc), "a renderer for " + k));
 ok(/getAttribute\("data-empty"\)/.test(wsrc) && /function empty\(/.test(wsrc), "widgets with nothing to show say so in their own box");
 
 console.log("OK: " + n + " checks");

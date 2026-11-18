@@ -359,13 +359,13 @@
     "aircon", "scenes", "controls", "camera", "doorbell", "energy", "sensor", "battery",
     "bins", "people", "agenda", "note", "list",
     "card", "quote", "word", "news", "sports", "stocks", "commute",
-    "welcome", "quick", "wifi", "guide", "screentime", "stack"];
+    "welcome", "quick", "wifi", "guide", "screentime", "ask", "agent", "stack"];
   // which panel each kind has when its style does not say (glass, solid, colour, paper, none)
   var WPANEL = { clock: "none", tallclock: "none", glassclock: "none", flipclock: "none", date: "none", welcome: "none", quote: "none", quick: "none",
     photo: "none", slideshow: "none", mosaic: "none", artframe: "none", memory: "none", keep: "none", keeprow: "none", upnext: "none", picks: "none",
     app: "none", appgrid: "none", camera: "none", stack: "none", analog: "colour", wordclock: "colour", countdown: "colour", weather: "colour",
     bigtemp: "colour", hourly: "colour", week: "colour", uv: "colour", surf: "colour", screentime: "colour", note: "colour", word: "paper",
-    worldclock: "solid", moon: "solid", timer: "solid", stocks: "solid", battery: "solid" };
+    worldclock: "solid", moon: "solid", timer: "solid", stocks: "solid", battery: "solid", ask: "glass", agent: "glass" };
   // the kinds the remote stops on (they do something with OK); the rest are to look at (GRID.md Focus 6)
   // (and, from 18 Nov 2026, every kind whose OK opens its detail layer, widget-detail.js: a clock opens
   // Timers, the weather the forecast, a photo the slideshow; a widget with nothing real to show opens
@@ -373,7 +373,7 @@
   var WACT = ["keep", "keeprow", "upnext", "picks", "app", "folder", "dock", "appgrid", "games", "nowplaying", "soundscape", "aircon", "scenes", "controls", "people", "quick", "stack",
     "clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "timer", "solar", "worldclock", "date", "month", "agenda",
     "weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "moon", "air", "surf", "photo", "slideshow", "mosaic", "artframe",
-    "camera", "doorbell", "card", "news", "sports", "memory", "queue", "speakers", "energy", "sensor", "battery", "note", "list", "stocks", "commute", "wifi", "guide", "screentime"];
+    "camera", "doorbell", "card", "news", "sports", "memory", "queue", "speakers", "energy", "sensor", "battery", "note", "list", "stocks", "commute", "wifi", "guide", "screentime", "ask", "agent"];
   var WSIZES = ["line", "wline", "tile", "wtile", "small", "tall", "medium", "wide", "large", "xl", "hero", "full", "row8", "row12", "row18"];
   var WSTYLE = { panel: ["glass", "solid", "colour", "paper", "none"], gradient: ["off", "soft"], ink: ["auto", "white", "ink", "accent"],
     font: ["inter", "antonio", "rounded", "cormorant", "jost"], icons: ["line", "solid", "duotone", "tile", "glass", "playful", "classic"],
@@ -428,16 +428,16 @@
   var WEB_FEEDS = ["abc", "abc-justin", "abc-sport", "abc-business", "sbs", "guardian", "bbc", "rnz"];
   var WOPT = {
     clock: "format ampm seconds date align", tallclock: "format align", glassclock: "format scene", analog: "seconds", flipclock: "format",
-    wordclock: "", solar: "", worldclock: "cities", countdown: "label month day unit icon", date: "show dfmt align place", month: "", timer: "label",
-    weather: "place hilo night", bigtemp: "place", hourly: "place", week: "place", rain: "", uv: "", sun: "", moon: "", air: "", surf: "label",
+    wordclock: "", solar: "", worldclock: "label cities", countdown: "label month day unit icon", date: "show dfmt align place", month: "", timer: "label",
+    weather: "place hilo night", bigtemp: "place", hourly: "place", week: "place", rain: "label", uv: "label", sun: "label", moon: "", air: "label", surf: "label",
     photo: "image fit caption sub", slideshow: "seconds_each caption sub", mosaic: "count", artframe: "image mat caption sub", memory: "align",
     keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",
-    app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "apps",
+    app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "label apps",
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "",
-    bins: "weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label align", note: "align", list: "label icon align",
+    bins: "label weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label align", note: "align", list: "label icon align",
     card: "label text icon", quote: "text sub", word: "", news: "feed label align", sports: "label league team align", stocks: "label tickers align", commute: "label arrive_h arrive_m buffer weekdays align",
-    welcome: "kicker text sub align", quick: "quick align", wifi: "align", guide: "align", screentime: "align", stack: ""
+    welcome: "kicker text sub align", quick: "quick align", wifi: "align", guide: "align", screentime: "align", ask: "label align", agent: "label align", stack: ""
   };
   // The smart home and music widgets: which of the TV's own Home Assistant things a widget shows,
   // named by entity id only (never a reading, a state or an address). A TV shows one only when it is
