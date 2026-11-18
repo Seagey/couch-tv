@@ -207,9 +207,14 @@
     artframe: { name: "Art frame", status: "setup", what: "One photo in a frame with a label", needs: [PHOTOS_NEED],
       setup: setup("tv", { android: PHOTOS_ANDROID, web: PHOTOS_LINK, vidaa: PHOTOS_LINK }), until: "\"Add your photos\"", build: "",
       ok: "Opens the picture full screen, without the frame", platforms: plat("setup", "computer:partial", "setup:partial", { web: "Photos are added by web address on this TV (no USB).", vidaa: "Photos are added by web address on this TV (no USB)." }), sizes: sz(["small", "tall", "large", "xl", "hero", "full"], [4, 4]) },
-    memory: { name: "On this day", status: "not-built", what: "A photo from this date in past years", needs: ["Needs couch-tv to know the date each photo was taken"],
-      setup: setup("nothing", NOT_YET), until: "\"On this day: not on couch-tv yet\", and what it needs", build: "The launcher has to read each photo's taken date (EXIF) when it is added in Home settings, Your photos, and keep it on the TV.",
-      ok: "Opens the photos from this day full screen (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
+    memory: { name: "On this day", status: "setup", what: "Your photos taken on this date in other years, with how long ago", needs: [DATED_NEED, "Photos taken on this day in another year"],
+      setup: setup("tv", {
+        android: [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add photos from a USB drive or this TV, and choose your photos. couch-tv notes the day each was taken.", "Photos added before this version have no day: add them again.", "On the day, the widget shows the photos from that date in other years."],
+        web: [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add a photo from a web address, type the photo's address, then press OK.", "The day comes from the photo itself, when its address lets the TV read it, or from a date in its name (like IMG_20231118)."],
+        vidaa: [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add a photo from a web address, type the photo's address, then press OK.", "The day comes from the photo itself, when its address lets the TV read it, or from a date in its name (like IMG_20231118)."] }),
+      until: "\"Add your photos\"; then \"No photos from this day\" on days with none, never another day's photo", build: "",
+      ok: "Opens this day's photos full screen", platforms: plat("setup", "computer:partial", "setup:partial", { android: "Photos added from a USB drive or this TV keep the day they were taken.", web: "Only photos whose address lets the TV read them, or with a date in their name.", vidaa: "Only photos whose address lets the TV read them, or with a date in their name." }),
+      sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- watching ----------
     keep: { name: "Keep watching", status: "setup", what: "The show you were watching, ready to carry on", needs: [WATCH_NEED],

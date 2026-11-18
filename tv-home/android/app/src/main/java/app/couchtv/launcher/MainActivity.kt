@@ -940,6 +940,7 @@ class MainActivity : Activity() {
             while (bounds.outWidth / (sample * 2) >= 1920 && bounds.outHeight / (sample * 2) >= 1080) sample *= 2
             val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
             val raw = contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, opts) } ?: return null
+            var taken = ""
             val turn = try {
                 contentResolver.openInputStream(uri)?.use {
                     val exif = if (Build.VERSION.SDK_INT >= 24) android.media.ExifInterface(it) else {
@@ -947,6 +948,8 @@ class MainActivity : Activity() {
                         val tmp = java.io.File.createTempFile("exif", ".jpg", cacheDir)
                         try { tmp.outputStream().use { o -> it.copyTo(o) }; android.media.ExifInterface(tmp.path) } finally { tmp.delete() }
                     }
+                    // the day it was taken goes in its name, for On this day (athome.js nameDate)
+                    taken = AtHome.takenNote(exif.getAttribute(android.media.ExifInterface.TAG_DATETIME_ORIGINAL) ?: exif.getAttribute(android.media.ExifInterface.TAG_DATETIME))
                     when (exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) {
                         6 -> 90f; 3 -> 180f; 8 -> 270f; else -> 0f
                     }
@@ -957,7 +960,7 @@ class MainActivity : Activity() {
             val scale = minOf(1f, maxOf(1920f / w, 1080f / h))
             val m = android.graphics.Matrix().apply { postRotate(turn); postScale(scale, scale) }
             val bmp = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, m, true)
-            val name = "p" + System.currentTimeMillis().toString(36) + "-" + (1000 + (Math.random() * 9000).toInt()) + ".jpg"
+            val name = "p" + System.currentTimeMillis().toString(36) + "-" + (1000 + (Math.random() * 9000).toInt()) + taken + ".jpg"
             java.io.File(photoDir, name).outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 88, it) }
             if (bmp !== raw) bmp.recycle()
             raw.recycle()

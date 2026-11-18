@@ -20,11 +20,11 @@
     solar: "forecast", worldclock: "world", date: "calendar", month: "calendar", agenda: "calendar",
     weather: "forecast", bigtemp: "forecast", hourly: "forecast", week: "forecast", rain: "forecast", uv: "forecast", sun: "forecast",
     moon: "moon", air: "air", surf: "surf",
-    photo: "photos", slideshow: "photos", mosaic: "photos", artframe: "photos",
+    photo: "photos", slideshow: "photos", mosaic: "photos", artframe: "photos", memory: "photos",
     keep: "keep", keeprow: "keep", upnext: "keep", folder: "folder", nowplaying: "player",
     aircon: "aircon", scenes: "scenes", controls: "controls", camera: "camera", doorbell: "camera",
     card: "cards", news: "news", sports: "sports",
-    memory: "setup", picks: "setup", queue: "setup", speakers: "setup", energy: "setup", sensor: "setup", battery: "setup",
+    picks: "setup", queue: "setup", speakers: "setup", energy: "setup", sensor: "setup", battery: "setup",
     note: "note", list: "list", stocks: "setup", commute: "setup", wifi: "wifi", guide: "guide", screentime: "setup"
   };
   var TITLE = { timers: "Timers", forecast: "Forecast", world: "World clocks", calendar: "Calendar", moon: "Moon", air: "Air quality", surf: "Surf",
@@ -342,7 +342,8 @@
 
   // photos: full screen, Left and Right flick, OK pauses
   B.photos = function (o, env) {
-    var q = op(o), list = q.image ? [q.image] : (o.kind === "artframe" && env.demo ? [kit().demoImg("art")] : kit().photos(env, o));
+    var q = op(o), mem = o.kind === "memory" ? (env.demo ? [{ src: kit().demoImg("camp"), years: 2 }] : (((kit().athome(env) || {}).memory || {}).today || [])) : null;
+    var list = mem ? mem.map(function (m) { return m.src; }) : q.image ? [q.image] : (o.kind === "artframe" && env.demo ? [kit().demoImg("art")] : kit().photos(env, o));
     if (!list.length) return B.setup(o, env);
     S.full = true;
     S.panel.classList.add("cwd-photos");
@@ -353,7 +354,7 @@
     set(a, list[at]); b.style.opacity = "0";
     var dots = E("div", "cwd-pdots"), count = E("div", "cwd-pcount"), pause = E("div", "cwd-pchip", "", [ic("pause", 30, "#fff", "solid"), "Paused"]);
     var paint = function () {
-      count.textContent = (at + 1) + " of " + list.length;
+      count.textContent = (mem ? "On this day, " + kit().yearsAgo(mem[at].years).toLowerCase() + (list.length > 1 ? ". " : "") : "") + (list.length > 1 || !mem ? (at + 1) + " of " + list.length : "");
       while (dots.firstChild) dots.removeChild(dots.firstChild);
       for (var i = 0; i < Math.min(list.length, 12); i++) dots.appendChild(E("i", i === at % 12 ? "on" : ""));
       pause.style.opacity = paused ? "1" : "0";

@@ -798,11 +798,6 @@
       E("div", "", "width:100%;height:100%;background:#222 center/cover;background-image:" + cssImg(ps[dayIndex(ps.length, 3600)]) + ";box-shadow:inset 0 2px 8px rgba(0,0,0,.25)")]),
       q.caption ? E("div", "", "position:absolute;left:0;right:0;bottom:0;height:" + px(lh - 16) + ";display:flex;flex-direction:column;justify-content:center", [E("div", "cw-t29", "font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:600", [q.caption]), q.sub ? E("div", "cw-t23", "", [q.sub]) : null]) : null]);
   };
-  R.memory = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "picture", "memory");
-    add(root, [photoLayer(demoImg("camp")), E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.72),rgba(0,0,0,.2) 55%,transparent 75%)"),
-      E("div", "", "position:absolute;left:30px;top:26px;color:#fff;z-index:2", [E("div", "cw-t23", "color:rgba(255,255,255,.88);text-transform:uppercase;letter-spacing:.08em;font-weight:700", ["On this day"]), E("div", "cw-t48", "margin-top:4px;font-size:" + px(b.h < 300 ? 36 : 48), ["Two years ago"])])]);
-  };
 
   // watching
   function noShows(root, b, env) { return env && dataOf(env).bridge === false ? soon(root, b, "tv", "keep") : empty(root, b, "tv", "Nothing to keep watching yet", "Shows you start on this TV show up here"); }
@@ -1355,10 +1350,6 @@
     var words = (window.CouchWords || {}).words || [["Petrichor", "noun", "The smell of rain on dry ground."]], w = words[dayOfYear() % words.length];
     add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-t48 cw-ell", "font-size:" + px(clamp((b.w - 48) / (w[0].length * 0.6), 30, 56)), [w[0]]), E("div", "cw-t25 cw-ell", "font-style:italic;margin-top:4px", [w[1] + (b.w >= 600 ? ". " + w[2] : "")])]));
   };
-  CR.memory = sample("memory", "picture", function (root, o, b) {
-    add(root, [photoLayer(demoImg("camp")), E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.7),transparent 70%)"),
-      E("div", "cw-t23", "position:absolute;left:18px;top:14px;right:18px;color:#fff;font-weight:700;z-index:2", ["On this day"])]);
-  });
   CR.speakers = sample("speakers", "speakers", function (root, o, b) { mini(root, b, "speakers", "2", "Speakers", "Living and Kitchen playing"); });
   CR.controls = sample("controls", "light", function (root, o, b) {
     var items = (op(o).controls && op(o).controls.length ? op(o).controls : [{ icon: "light", name: "Lounge" }, { icon: "lamp", name: "Lamp" }]).slice(0, b.w < 300 ? 1 : 2);
@@ -1533,6 +1524,30 @@
   };
   CR.guide = R.guide;
 
+  // ---- On this day: the household's own photos taken on this date in other years (athome.js reads
+  // each photo's date). Nothing from today: it says so, never another day's photo ----
+  function yearsAgo(n) { return n === 1 ? "A year ago" : n + " years ago"; }
+  function memoryOf(root, b, env) {
+    if (env.demo) return [{ src: demoImg("camp"), years: 2 }];
+    var m = (athome(env) || {}).memory;
+    // no photo to show: the words get the glass panel a picture would have covered
+    if ((!m || !m.today || !m.today.length) && root.classList.contains("cw-photo")) { root.classList.remove("cw-photo"); root.classList.add("cw-glass"); if (!root.querySelector(".cw-bg")) root.insertBefore(E("div", "cw-bg"), root.firstChild); }
+    if (!m || !m.photos) { soon(root, b, "picture", "memory"); return null; }
+    if (!m.dated) { empty(root, b, "picture", b.w < 300 ? "No dates yet" : "Your photos have no dates yet", "Add them again in Home settings, Your photos"); return null; }
+    if (!m.today || !m.today.length) { empty(root, b, "picture", b.w < 300 ? "None today" : "No photos from this day", m.dated === 1 ? "One of your photos has a date" : m.dated + " of your photos have dates"); return null; }
+    return m.today;
+  }
+  R.memory = function (root, o, b, env) {
+    var a = ahAlign(root, o), list = memoryOf(root, b, env);
+    if (!list) return;
+    var p = list[dayIndex(list.length, 20)], tiny = b.w < 300 || b.h < 200, img = photoLayer(p.src);
+    var big = one1("cw-t48", "color:#fff;font-size:" + px(tiny ? 34 : b.h < 300 ? 38 : 48) + ";text-shadow:0 2px 18px rgba(0,0,0,.5)", tiny ? String(now().getFullYear() - p.years) : yearsAgo(p.years));
+    add(root, [img, E("div", "cw-fill", "background:radial-gradient(ellipse at center,rgba(0,0,0,.5),rgba(0,0,0,.18) 70%)"),
+      E("div", "cw-fill", "z-index:2;padding:18px;display:flex", [ahCol(a, [b.h >= 200 && b.w >= 300 ? one1("cw-t23", "color:rgba(255,255,255,.92);text-transform:uppercase;letter-spacing:.08em;font-weight:700;text-shadow:0 2px 12px rgba(0,0,0,.5)", "On this day") : null, big])])]);
+    if (list.length > 1) live(root, 20000, function () { var q = list[dayIndex(list.length, 20)]; img.style.backgroundImage = cssImg(q.src); big.textContent = tiny ? String(now().getFullYear() - q.years) : yearsAgo(q.years); });
+  };
+  CR.memory = R.memory;
+
   // ---------------- one widget, a stack, the API ----------------
   function one(o, b, env) {
     var sh = shell(o, b, env), root = sh.root, st = o.style || {};
@@ -1620,6 +1635,6 @@
       roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
       // things typed at home (athome.js through app.js)
-      athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL }
+      athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
   };
 })();
