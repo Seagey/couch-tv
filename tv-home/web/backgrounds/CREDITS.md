@@ -34,6 +34,25 @@ The files that go with them are made from those same generated scenes, so the sa
   the cut-out's transparency was scaled up from the 1080 cut-out so the two line up exactly. The
   glass copy is a blur, so it has no 4K copy.
 
+## Ambient loops (video backgrounds for designs)
+
+`loop-rain.mp4`, `loop-fire.mp4`, `loop-ocean.mp4` and `loop-clouds.mp4`, their still pictures
+`loop-<name>.jpg` (each loop's first frame) and `loop-clouds-fg.png` (the clouds loop's hills with the
+sky see through, for the clock behind the hills) were drawn from code for couch-tv by
+`tv-home/tools/loops/make-loops.mjs` and `loop-scenes.mjs`: noise, waves and drops worked out pixel by
+pixel. No footage, no stock clips, no photos and no AI model went into them. They are couch-tv's own,
+under the same licence as the rest of couch-tv (LICENSE), so use them however that allows.
+
+Each is 10 s, 1280x720, 24 frames a second, H.264 Main, no sound, and loops with no seam. Run the
+script again to change them (it is a heavy job: see the comment at its top).
+
+| File | What it shows | Size |
+|---|---|---|
+| loop-rain.mp4 | Rain on a window at night, city lights out of focus behind it | about 0.6 MB |
+| loop-fire.mp4 | A low fire on two logs in a brick hearth | about 0.9 MB |
+| loop-ocean.mp4 | A calm sea at dusk with the sun's path on the water | about 2.8 MB |
+| loop-clouds.mp4 | Clouds drifting over two ridges of hills, late afternoon | about 0.5 MB |
+
 ## Your own photo with the clock behind it
 
 The easy way: `tv-home/tools/make-scene.py` makes the photo and glass copy (and, if you want it,
