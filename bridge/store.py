@@ -7,6 +7,11 @@ History is kept forever. Two append-only JSON-lines files, oldest first:
   videos() lists them.
 - imported.jsonl: what came from the owner's own downloads (Netflix viewing activity, YouTube
   watch history), see history_import.py. Each line has a "key" so re-importing a file adds nothing twice.
+
+Small keyed files next to them, read and written whole under one lock: hidden.json (Keep watching
+cards removed by hand), who.json (who is on the couch), sleep.json, recs.json, and video-ids.json
+(the YouTube video id found for a video line's title and channel, so a bridge restart does not lose
+it; at most VIDEO_IDS_MAX entries, the oldest dropped first).
 """
 import json
 import os
@@ -17,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 
 import config
 import messages
+import move   # the video id pattern and the title key, so there is one copy of each
 
 DATA = config.DATA
 HISTORY_OLD = os.path.join(DATA, "history.json")  # the older capped list, read once and moved over
@@ -25,6 +31,8 @@ IMPORTED = os.path.join(DATA, "imported.jsonl")
 RECS = os.path.join(DATA, "recs.json")
 SLEEP = os.path.join(DATA, "sleep.json")
 HIDDEN = os.path.join(DATA, "hidden.json")  # Keep watching cards removed by hand: "tv|who|title" -> when
+VIDEO_IDS = os.path.join(DATA, "video-ids.json")  # "title|channel" (move._norm) -> {"id", "when"}
+VIDEO_IDS_MAX = 500
 _lock = threading.Lock()
 _cache = {}  # path -> (mtime, size, items oldest first)
 
@@ -264,6 +272,44 @@ def hide_keep_watching(h):
         data = _read(HIDDEN, {})
         data[f"{h.get('tv')}|{h.get('who')}|{key}"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         _write(HIDDEN, data)
+
+
+def _video_ids_key(title, channel):
+    """The key a video's id is kept under: the title and the channel the way move's lookup tells
+    them apart (move._norm), so a title many channels reuse keeps one id per channel."""
+    return move._norm(title) + "|" + move._norm(channel)
+
+
+def video_id(title, channel):
+    """The YouTube video id found for this title and channel on an earlier lookup, or None. Only an
+    id shaped like one (move.YOUTUBE_ID) is ever given back, whatever is in the file."""
+    entry = _read(VIDEO_IDS, {}).get(_video_ids_key(title, channel))
+    vid = entry.get("id") if isinstance(entry, dict) else None
+    return vid if isinstance(vid, str) and move.YOUTUBE_ID.fullmatch(vid) else None
+
+
+def remember_video_id(title, channel, vid):
+    """Keep a found video id on disk for this title and channel, so a bridge restart and the six
+    hours move's own memory lasts do not lose it and an OK press never waits on the network for a
+    video already found. True when written. An id not shaped like one is refused, False and
+    nothing written (this is called with the lookup's own answer in a background task, never with
+    a person's input, so it is not a keyed ValueError like norm_who's). The file holds
+    VIDEO_IDS_MAX entries at most: past that the oldest written are dropped."""
+    if not (isinstance(vid, str) and move.YOUTUBE_ID.fullmatch(vid)):
+        return False
+    key = _video_ids_key(title, channel)
+    with _lock:
+        data = _read(VIDEO_IDS, {})
+        if not isinstance(data, dict):
+            data = {}
+        data.pop(key, None)   # written again: it goes to the end, the newest
+        data[key] = {"id": vid, "when": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        if len(data) > VIDEO_IDS_MAX:
+            def when(kv):
+                return (kv[1].get("when") or "") if isinstance(kv[1], dict) else ""
+            data = dict(sorted(data.items(), key=when)[-VIDEO_IDS_MAX:])   # stable: equal times keep their order
+        _write(VIDEO_IDS, data)
+    return True
 
 
 WHO_FILE = os.path.join(DATA, "who.json")

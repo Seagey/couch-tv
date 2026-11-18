@@ -2844,13 +2844,29 @@ def continue_videos(who=None):
     """The YouTube videos this person watched on this TV (store.keep_videos): one card per title, newest
     first, up to 10, within 30 days, minus the ones removed by hand. A list of its own, next to Keep
     watching's "items", so the home can show it for the YouTube tile alone and never in the shared row.
-    The card's app is YouTube's installed build (Amazon's on a Fire TV), like any item's."""
+    The card's app is YouTube's installed build (Amazon's on a Fire TV), like any item's.
+
+    A video whose id is known (store.video_id, found by the lookup and kept on disk) carries it as
+    "video_id" and YouTube's own thumbnail for it as "backdrop" (video_thumbnail; the page draws the
+    backdrop first, and the TV fetches it straight from YouTube's image host, as it does JustWatch's
+    posters). Without one, and with the channel or the length to be sure by, the lookup is started
+    in the background (_video_lookup, never awaited here: this is a plain function called from the
+    handler) unless it said unsure lately or is already running, so the next fetch of the row has the
+    picture. A line with neither channel nor length keeps no picture and starts no lookup."""
     who = who or cur_who()
     app = apps.describe_package(pkg_of(apps.BY_ID["youtube"]))
-    return [{"id": h["id"], "title": h["title"], "episode_title": None, "season": None, "episode": None,
-             "app": app, "service": "youtube", "poster": None, "backdrop": None, "progress": None,
-             "kind": "video", "last_played": h.get("when"), "source": "bridge"}
-            for h in store.keep_videos(_current.get(), who)]
+    cards = []
+    for h in store.keep_videos(_current.get(), who):
+        video_id = None
+        if h.get("channel") or h.get("duration_ms"):
+            video_id = store.video_id(h["title"], h.get("channel"))
+            if not video_id and not _video_unsure_lately(h["title"], h.get("channel")):
+                _video_lookup(h["title"], h.get("channel"), h.get("duration_ms"))
+        cards.append({"id": h["id"], "title": h["title"], "episode_title": None, "season": None, "episode": None,
+                      "app": app, "service": "youtube", "poster": None,
+                      "backdrop": video_thumbnail(video_id) if video_id else None, "progress": None,
+                      "kind": "video", "last_played": h.get("when"), "source": "bridge", "video_id": video_id})
+    return cards
 
 
 def request_base(request):
@@ -3043,6 +3059,10 @@ OPEN_VIDEO_LOOKUP_S = 15
 # costs three fetches and 2 s at least (15 s when YouTube is slow), which an OK press must not pay
 # again and again for a video the results page does not list the same way.
 VIDEO_UNSURE_KEEP_S = 10 * 60
+# YouTube's own thumbnail for a video, public, 320x180 and 16:9 with no black bars (hqdefault.jpg
+# is 4:3 with bars, and maxresdefault.jpg is not there for every video). The TV fetches it straight
+# from YouTube's image host, as it already fetches JustWatch's posters from theirs.
+VIDEO_THUMBNAIL = "https://i.ytimg.com/vi/{id}/mqdefault.jpg"
 _video_tasks = {}    # (title, channel) -> the lookup task while it runs
 _video_unsure = {}   # (title, channel) -> when the lookup last said unsure
 
@@ -3051,17 +3071,38 @@ def _video_key(title, channel):
     return (move._norm(title), move._norm(channel))
 
 
+def video_thumbnail(video_id):
+    """The picture a video card shows, YouTube's own thumbnail for the id (VIDEO_THUMBNAIL), or None
+    for anything not shaped like an id, so nothing else ever reaches the link."""
+    if not move.YOUTUBE_ID.fullmatch(str(video_id or "")):
+        return None
+    return VIDEO_THUMBNAIL.format(id=video_id)
+
+
+def _video_unsure_lately(title, channel):
+    """True while the lookup's last unsure answer for this video is younger than VIDEO_UNSURE_KEEP_S."""
+    when = _video_unsure.get(_video_key(title, channel))
+    return bool(when and time.time() - when < VIDEO_UNSURE_KEEP_S)
+
+
 def _video_lookup(title, channel, duration_ms):
     """The task that finds the video's id (move.youtube_video_id), one per title and channel at a
-    time: log_seen starts it as soon as the line is written, and an OK press that comes while it
-    runs waits on the same task instead of starting a second lookup. The loop keeps only weak
-    references to tasks, so _video_tasks holds it until it is done. The task gives the id, or None
-    when the lookup was unsure or failed (no network, a consent page: logged at debug level only),
-    and an unsure answer is remembered VIDEO_UNSURE_KEEP_S in _video_unsure."""
+    time: log_seen starts it as soon as the line is written, continue_videos starts it for a card
+    without a picture, and an OK press that comes while it runs waits on the same task instead of
+    starting a second lookup. The loop keeps only weak references to tasks, so _video_tasks holds
+    it until it is done. The task gives the id, or None when the lookup was unsure or failed (no
+    network, a consent page: logged at debug level only), and an unsure answer is remembered
+    VIDEO_UNSURE_KEEP_S in _video_unsure. A found id is kept on disk (store.remember_video_id), and
+    an id already there is given back at once as a done future: no task, no network."""
     key = _video_key(title, channel)
     task = _video_tasks.get(key)
     if task is not None and not task.done():
         return task
+    known = store.video_id(title, channel)
+    if known:
+        done = asyncio.get_running_loop().create_future()
+        done.set_result(known)
+        return done
 
     async def look():
         try:
@@ -3071,6 +3112,10 @@ def _video_lookup(title, channel, duration_ms):
             video = None
         if video:
             _video_unsure.pop(key, None)
+            try:
+                store.remember_video_id(title, channel, video)
+            except Exception as e:
+                log.warning("could not keep the video id for %s: %s", title, e)
         else:
             _video_unsure[key] = time.time()
         log.debug("video lookup for %s: %s", title, video or "unsure")
@@ -3087,11 +3132,14 @@ def _video_lookup(title, channel, duration_ms):
 
 
 async def _find_video(title, channel, duration_ms, timeout):
-    """The video's id for an OK press, or None: at once when the lookup said unsure in the last
-    VIDEO_UNSURE_KEEP_S, else from the lookup (the warm up still running, or a fresh one) within
-    `timeout`. Past that the lookup runs on by itself, for the next press, and this one goes without."""
-    when = _video_unsure.get(_video_key(title, channel))
-    if when and time.time() - when < VIDEO_UNSURE_KEEP_S:
+    """The video's id for an OK press, or None: at once from disk when an earlier lookup found it
+    (store.video_id), at once None when the lookup said unsure in the last VIDEO_UNSURE_KEEP_S, else
+    from the lookup (the warm up still running, or a fresh one) within `timeout`. Past that the
+    lookup runs on by itself, for the next press, and this one goes without."""
+    known = store.video_id(title, channel)
+    if known:
+        return known
+    if _video_unsure_lately(title, channel):
         return None
     try:
         return await asyncio.wait_for(asyncio.shield(_video_lookup(title, channel, duration_ms)), timeout=timeout)

@@ -140,10 +140,14 @@ out the same way. The phone's People sheet keeps these marks when it renames or 
   names than the Google TV ones), so it opens the one the TV has and their shows reach Keep watching.
   YouTube videos are kept as a list of their own that the home shows only for the YouTube tile, never
   in the shared row or the household's taste: a video is written by the name YouTube gave it (and the
-  channel and length the app reported), with no picture. Opening it plays the exact video when
-  YouTube's public results page is sure of it from the title and the channel or the length, resumed
-  from the account's own history; otherwise (unsure, or a line with neither channel nor length) it
-  searches YouTube for the name.
+  channel and length the app reported). Opening it plays the exact video when YouTube's public
+  results page is sure of it from the title and the channel or the length, resumed from the
+  account's own history; otherwise (unsure, or a line with neither channel nor length) it searches
+  YouTube for the name. Once the video is found the card shows YouTube's own thumbnail for it, which
+  the TV fetches straight from YouTube's image host, the way it already fetches JustWatch posters;
+  the found id is kept in `bridge/data/video-ids.json`, so a bridge restart does not lose it. The
+  thumbnail on a real TV's screen is not yet tested; the lookup and the watch link are (a Fire TV
+  Cube).
 - **With no computer (option A),** Keep watching is Android's own Watch Next list, plus the
   Continue Watching channel of apps that put nothing in Watch Next but keep a home screen row of
   their own instead: so far Stremio. Both are read the same read only way, with no account and no

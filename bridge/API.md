@@ -556,19 +556,29 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
   the home to put under the YouTube tile and nowhere else. Never in the picks, the taste or
   `GET /api/history`. One card per title (the newest), newest first, at most 10, within 30 days,
   minus the ones removed with `/api/continue/hide`, in the shape of an item with `"kind": "video"`,
-  `episode_title`, `season`, `episode`, `poster`, `backdrop` and `progress` all `null`, and `app`
-  YouTube's installed build. The line also keeps the channel and the length the app's media session
-  gave (`channel`, `duration_ms`; a live stream has no length), neither on the card.
+  `episode_title`, `season`, `episode`, `poster` and `progress` all `null`, and `app` YouTube's
+  installed build. The line also keeps the channel and the length the app's media session gave
+  (`channel`, `duration_ms`; a live stream has no length), neither on the card. Once the video's id
+  is known (below) the card carries it as `video_id` and YouTube's own thumbnail for it as
+  `backdrop`, `https://i.ytimg.com/vi/<id>/mqdefault.jpg` (320x180, 16:9, no black bars; the TV
+  fetches it straight from YouTube's image host, the way it already fetches JustWatch's posters from
+  theirs); until then both are `null`, and the page shows the title alone. The thumbnail on the
+  TV's screen is not yet tested on a real TV; the lookup and the watch link are (a Fire TV Cube).
   `/api/continue/open` with a video's id opens the exact video when it can: the id comes from
-  YouTube's public results page (the same lookup the move feature uses, no key and no sign in,
-  remembered six hours, and warmed when the line is written), and only when the title matches and
-  the channel or the length agrees; a title many channels reuse is told apart by those, and a wrong
-  video is worse than none, so otherwise the lookup says unsure. An unsure answer is remembered ten
-  minutes, so the next press on that card goes straight to the search instead of paying the lookup
-  again, and a press that comes while the warm up is still running waits on it (15 s at most) rather
-  than starting a second one. A line with neither channel nor length (written by an older bridge, or
-  from a session that gave neither) is never looked up: a title alone cannot be sure of the video, so
-  that card searches. A sure id goes to the build as its
+  YouTube's public results page (the same lookup the move feature uses, no key and no sign in, and
+  warmed when the line is written), and only when the title matches and the channel or the length
+  agrees; a title many channels reuse is told apart by those, and a wrong video is worse than none,
+  so otherwise the lookup says unsure. A found id is kept on disk, in `bridge/data/video-ids.json`
+  (the normalised title and channel, the id and when it was found; the newest 500), so a bridge
+  restart does not lose it and a press on a card already found never waits on the network. An unsure
+  answer is remembered ten minutes, in memory only, so the next press on that card goes straight to
+  the search instead of paying the lookup again, and a press that comes while the warm up is still
+  running waits on it (15 s at most) rather than starting a second one. `GET /api/continue` itself
+  may start that lookup in the background, for a card whose id is not yet known and not lately
+  unsure, and answers at once without it, so the next fetch of the row has the picture. A line with
+  neither channel nor length (written by an older bridge, or from a session that gave neither) is
+  never looked up: a title alone cannot be sure of the video, so that card has no picture and
+  searches. A sure id goes to the build as its
   watch link with no time in it, and YouTube resumes it from the account's own history
   (`"method": "deeplink"`, `"video_id"` the id; tested on a Fire TV Cube with Amazon's YouTube, which
   played that very video from where it was left). Unsure, a lookup that fails or takes longer than
@@ -582,8 +592,9 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
   {"ok": true, "items": [], "videos": [
     {"id": "9c1e0b7d4a553f2a", "title": "How Trains Work", "episode_title": null, "season": null, "episode": null,
      "app": {"id": "youtube", "name": "YouTube", "package": "com.amazon.firetv.youtube"},
-     "service": "youtube", "poster": null, "backdrop": null, "progress": null, "kind": "video",
-     "last_played": "2030-01-01T19:31:00Z", "source": "bridge"}]}
+     "service": "youtube", "poster": null, "backdrop": "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
+     "progress": null, "kind": "video", "last_played": "2030-01-01T19:31:00Z", "source": "bridge",
+     "video_id": "dQw4w9WgXcQ"}]}
   ```
 
 ### `POST /api/sleep` and `GET /api/sleep`
