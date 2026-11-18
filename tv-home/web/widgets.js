@@ -1302,13 +1302,43 @@
     stop(root, "detail", "camera", name);
   };
 
+  // Solar and energy: today by the hour, in kWh
+  function kwh(v) { return v == null || !isFinite(v) ? "--" : v >= 100 ? String(Math.round(v)) : String(Math.round(v * 10) / 10); }
+  function hourBars(hours, h, gap) {
+    var max = Math.max.apply(null, hours.map(function (v) { return v || 0; }).concat([0.1])), last = -1;
+    hours.forEach(function (v, i) { if (v != null) last = i; });
+    return E("div", "cw-row", "width:100%;align-items:flex-end;height:" + px(h) + ";flex:none", hours.map(function (v, i) {
+      return E("i", "", "display:block;flex:1;margin:0 " + gap + "px;border-radius:5px;height:" + (v == null ? "3px;opacity:.25;background:currentColor" : Math.max(3, Math.round(v / max * 100)) + "%;background:" + (i === last ? "#ffd60a" : "rgba(255,214,10,.62)")));
+    }));
+  }
   R.energy = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "bolt", "energy");
-    var bars = [0, 0, 5, 18, 40, 66, 82, 90, 84, 70, 44, 20, 4, 0];
-    add(root, [E("div", "cw-row cw-sp", "", [lab("bolt", "Solar today"), E("div", "cw-t23", "", ["Battery 86%"])]),
-      E("div", "cw-row", "margin-top:10px", [E("div", "", "margin-right:36px", [E("div", "cw-big", "font-size:76px", ["18.4"]), E("div", "cw-t25", "", ["kWh made"])]), b.w >= 560 ? E("div", "", "", [E("div", "cw-big", "font-size:76px;color:#30d158", ["-$6.20"]), E("div", "cw-t25", "", ["paid to grid"])]) : null]),
-      E("div", "cw-grow cw-row", "align-items:flex-end;margin-top:16px", bars.map(function (v, i) { return E("i", "", "display:block;flex:1;margin:0 3px;height:" + Math.max(3, v) + "%;border-radius:5px;background:" + (i === 9 ? "#ffd60a" : "rgba(255,214,10,.72)")); }))]);
+    var ha = haOf(env), info = ha.info || {}, e = ha.energy, al = alignOf(o), W = b.w - 48, H = b.h - 48;
+    if (!env.demo && !info.energy) return soonFit(root, b, "bolt", "energy");
+    var name = op(o).label || (e && e.name) || "Energy";
+    if (!e) return haWait(root, b, o, "bolt", name, "Checking Home Assistant");
+    if (!e.ok) return haWait(root, b, o, "bolt", name, e.error === "unit" ? "This sensor is not energy or power" : NOT_ANSWERING);
+    alignRoot(root, al);
+    var hours = Array.isArray(e.hours) ? e.hours.slice(0, 24) : [];
+    if (b.w < 300 && b.h < 300) {
+      add(root, [ic("bolt", 32, "currentColor"), E("div", "cw-grow"), fitNum(root, kwh(e.total), W, 60), fitWords(root, "kWh today", W, 25, 1, 560, "color:var(--sub)") || fitWords(root, "kWh", W, 25, 1, 560, "color:var(--sub)")]);
+    } else if (b.h < 200) {
+      var leftW = Math.min(W * 0.5, 200);
+      add(root, E("div", "cw-row", "width:100%;height:100%;align-items:stretch", [E("div", "cw-col", "flex:none;width:" + px(leftW) + ";justify-content:center;align-items:" + (al === "right" ? "flex-end" : al === "left" ? "flex-start" : "center"), [fitLab(root, "bolt", name, leftW),
+        fitNum(root, kwh(e.total), leftW, 60, "margin-top:6px"), fitWords(root, "kWh today", leftW, 24, 1, 560, "color:var(--sub)")]),
+        E("div", "cw-col", "flex:1;min-width:0;margin-left:16px;justify-content:center", [hourBars(hours, H - 20, 1)])]));
+    } else {
+      var wide = b.w >= 560, axis = b.h >= 300 && wide, half = wide && e.power != null ? (W - 36) / 2 : W;
+      var stat = function (v, unit, col) { return E("div", "cw-col", "flex:none;align-items:center", [fitNum(root, v, Math.min(half, 360), 84, col ? "color:" + col : ""), fitWords(root, unit, Math.min(half, 360), 25, 1, 560, "color:var(--sub)")]); };
+      var bat = e.battery != null && wide ? fitWords(root, "Battery " + e.battery + "%", W * 0.4, 25, 1, 560, "color:var(--sub)") : null;
+      add(root, [E("div", "cw-row", "width:100%;flex:none;" + (bat ? "justify-content:space-between" : justify(al)), [fitLab(root, "bolt", name + " today", bat ? W * 0.58 : W), bat]),
+        E("div", "cw-row", "width:100%;flex:none;margin-top:10px;align-items:flex-end;" + justify(al), [stat(kwh(e.total), "kWh today"), wide && e.power != null ? E("div", "", "width:36px;flex:none") : null,
+          wide && e.power != null ? stat(kwh(e.power), String(e.power_unit || "kW") + " now", "#30d158") : null]),
+        E("div", "cw-col cw-grow", "width:100%;justify-content:flex-end;margin-top:14px;min-height:0", [hourBars(hours, Math.max(40, b.h - (axis ? 260 : 220)), wide ? 3 : 1),
+          axis ? E("div", "cw-row cw-sp cw-t23", "width:100%;margin-top:6px", ["12am", "6am", "12pm", "6pm", "12am"].map(function (x) { return E("span", "", "", [x]); })) : null])]);
+    }
+    stop(root, "detail", "energy", name);
   };
+
   R.sensor = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "temperature", "sensor");
     add(root, [lab("temperature", op(o).label || "Pool"), E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(b.h < 300 ? 64 : 96), ["26°"])]);
@@ -1608,7 +1638,6 @@
       E("div", "cw-t23", "position:absolute;left:18px;top:14px;right:18px;color:#fff;font-weight:700;z-index:2", ["On this day"])]);
   });
   CR.speakers = sample("speakers", "speakers", function (root, o, b) { mini(root, b, "speakers", "2", "Speakers", "Living and Kitchen playing"); });
-  CR.energy = sample("energy", "bolt", function (root, o, b) { mini(root, b, "bolt", "18.4", "kWh today", "Solar, battery 86%"); });
   CR.sensor = sample("sensor", "temperature", function (root, o, b) { mini(root, b, "temperature", "26°", op(o).label || "Pool", "Pool water"); });
   CR.battery = sample("battery", "bolt", function (root, o, b) { mini(root, b, "games", "12%", "Pad 2", "Charge it soon", "#ff453a"); });
   CR.agenda = sample("agenda", "calendar", function (root, o, b) {
@@ -1723,5 +1752,5 @@
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12 }
   };
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
-  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, ringWords: ringWords, stillWidth: stillWidth };
+  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, hourBars: hourBars, kwh: kwh, ringWords: ringWords, stillWidth: stillWidth };
 })();

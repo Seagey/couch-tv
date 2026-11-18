@@ -30,7 +30,9 @@
   var TITLE = { timers: "Timers", forecast: "Forecast", world: "World clocks", calendar: "Calendar", moon: "Moon", air: "Air quality", surf: "Surf",
     photos: "Photos", keep: "Keep watching", folder: "Apps", player: "Now playing", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre",
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up" };
-
+  // the smart home and music widgets' own layers (group C): set here, beside the table above
+  LAYER.energy = "energy";
+  TITLE.energy = "Energy";
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -554,6 +556,39 @@
         else if (r && r.error !== "busy" && ++fails >= 3) subEl.textContent = "The camera is not answering";
       });
     };
+  };
+
+  // Solar and energy: today by the hour
+  B.energy = function (o, env) {
+    var H = kit().ha, ha = H.haOf(env), demo = !!env.demo, e = ha.energy;
+    if (!demo && !(ha.info || {}).energy) return B.setup(o, env);
+    var name = op(o).label || (e && e.name) || "Energy";
+    S.body.appendChild(head("bolt", name + " today", "", "#ff9f0a"));
+    var body = E("div", "cwd-col cwd-grow", "margin-top:30px");
+    S.body.appendChild(body);
+    var draw = function () {
+      while (body.firstChild) body.removeChild(body.firstChild);
+      if (!e) { S.subEl.textContent = "Checking Home Assistant"; return; }
+      if (!e.ok) { S.subEl.textContent = e.error === "unit" ? "This sensor is not energy or power" : "Home Assistant is not answering"; return; }
+      var hours = (e.hours || []).slice(0, 24), max = Math.max.apply(null, hours.map(function (v) { return v || 0; }).concat([0.1])), last = -1, best = -1;
+      hours.forEach(function (v, i) { if (v != null) last = i; if (v != null && (best < 0 || v > hours[best])) best = i; });
+      S.subEl.textContent = best >= 0 && hours[best] > 0 ? "Most in the hour from " + kit().fmt12(new Date(2000, 0, 1, best)) : "Nothing yet today";
+      var stat = function (big, small, col) { return E("div", "", "margin-right:80px", [E("div", "cwd-huge", "font-size:150px;" + (col ? "color:" + col : ""), [big]), E("div", "cwd-mid", "opacity:.75", [small])]); };
+      body.appendChild(E("div", "cwd-row", "align-items:flex-end", [stat(H.kwh(e.total), "kWh today"), e.power != null ? stat(H.kwh(e.power), String(e.power_unit || "kW") + " now", "#30d158") : null, e.battery != null ? stat(e.battery + "%", "Battery") : null]));
+      body.appendChild(E("div", "cwd-bars", "margin-top:40px;height:300px", hours.map(function (v, i) {
+        return E("i", "", v == null ? "height:4px;background:rgba(255,255,255,.18)" : "height:" + Math.max(4, Math.round(v / max * 300)) + "px;background:" + (i === last ? "#ffd60a" : "rgba(255,214,10,.6)"));
+      })));
+      body.appendChild(E("div", "cwd-row", "justify-content:space-between;margin-top:12px", ["12am", "3am", "6am", "9am", "12pm", "3pm", "6pm", "9pm", "12am"].map(function (x) { return E("span", "cwd-small", "", [x]); })));
+    };
+    var reread = function () {
+      if (!S || demo || !S.api.ha) return;
+      S.readAt = Date.now();
+      S.api.ha("energy").then(function (r) { if (S && r) { e = r; draw(); } });
+    };
+    draw();
+    S.every = 5000;
+    S.tick = function () { if (Date.now() - (S.readAt || 0) > 300000) reread(); };
+    if (!demo && !e) reread();
   };
 
   B.cards = function (o, env) {
