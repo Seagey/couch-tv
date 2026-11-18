@@ -794,6 +794,16 @@ class MoveAskedTitle(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r["note_key"], "note_moved")
         self.assertTrue(r["powered_off"])
 
+    async def test_the_episode_is_the_one_tv_a_is_on_now_not_the_one_the_bridge_opened(self):
+        self.a.state["playing"]["item"] |= {"season": 2, "episode": 5}
+        self.media[A] = playing("Show Extra", 60_000, title_from="app") | {"season": 2, "episode": 6}
+        await server.move_playing(A, B)
+        self.assertEqual(self.did(B, "play")[1][2:5], ("Show", 2, 6))
+
+    async def test_a_title_that_matches_is_not_read_again(self):
+        await server.move_playing(A, B)
+        self.assertLessEqual(len(self.did(B, "read")), 3)   # no waiting once TV B has named it
+
     async def test_another_title_on_b_is_paused_and_said(self):
         self.media["after_play"] = playing("Show", 0, title_from="app")
         r = await server.move_playing(A, B, power_off=True)
@@ -830,8 +840,7 @@ class MoveAskedTitle(unittest.IsolatedAsyncioTestCase):
     def test_move_asked_is_none_when_the_names_agree_or_the_app_gives_none(self):
         with server.on_tv(A):
             now = {"title": "Show Extra", "title_from": "app"}
-            self.assertEqual(server.move_asked(now, NETFLIX),
-                             {"title": "Show", "season": None, "episode": None})
+            self.assertEqual(server.move_asked(now, NETFLIX), "Show")
             self.assertIsNone(server.move_asked({"title": "Show", "title_from": "app"}, NETFLIX))
             self.assertIsNone(server.move_asked({"title": "SHOW!", "title_from": "app"}, NETFLIX))
             self.assertIsNone(server.move_asked({"title": "Show", "title_from": "bridge"}, NETFLIX))

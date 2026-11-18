@@ -4201,7 +4201,7 @@ def move_asked(now, pkg):
         return None
     if finder.same_title(item["title"], now["title"]) or move.same_name(item["title"], now["title"]):
         return None
-    return {"title": item["title"], "season": item.get("season"), "episode": item.get("episode")}
+    return item["title"]
 
 
 async def move_open(app, now, session, who, again=False, asked=None):
@@ -4242,10 +4242,11 @@ async def move_open(app, now, session, who, again=False, asked=None):
             # bridge opened on TV A got it there, so the same link is the way to it on TV B. The
             # caller still compares what the two TVs say they play, and pauses TV B if they differ.
             log.info("move: the show finder does not know %s; opening %s, which got it playing on the first TV",
-                     title, asked["title"])
+                     title, asked)
             try:
-                return await play(asked["title"], asked.get("season"), asked.get("episode"), app["id"], who,
-                                  resume=not asked.get("season"), exact=True) | {"asked": asked["title"]}
+                # the episode TV A is on now (it may have played on past the one the bridge opened)
+                return await play(asked, now.get("season"), now.get("episode"), app["id"], who,
+                                  resume=not now.get("season"), exact=True) | {"asked": asked}
             except ApiError as e:
                 if e.status != 404:
                     raise
@@ -4508,7 +4509,9 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
                 # if TV B says so itself. An app names its show a few seconds after it starts, so
                 # look again before giving up; a TV B that names nothing has not confirmed it.
                 unconfirmed = opened.get("asked")
-                for _ in range(3 if unconfirmed and not there else 0):
+                for _ in range(3 if unconfirmed else 0):
+                    if there:
+                        break
                     await asyncio.sleep(2)
                     await media_read(pkg_b, app)
                     there = media_now.get("title") if media_now.get("title_from") == "app" else None
