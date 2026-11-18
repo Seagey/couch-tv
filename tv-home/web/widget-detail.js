@@ -508,14 +508,54 @@
     if (!demo) reread();
   };
 
+  // Camera and doorbell: a still, a new one every two seconds while this is open (never video).
+  // The doorbell shows the picture this TV kept from the last ring first, then the door now.
   B.camera = function (o, env) {
-    if (!env.demo) return B.setup(o, env);
+    var H = kit().ha, ha = H.haOf(env), info = ha.info || {}, demo = !!env.demo, door = o.kind === "doorbell";
+    if (!demo && (door ? !info.doorbell : !(info.cameras && info.cameras.length))) return B.setup(o, env);
     S.full = true;
     S.panel.classList.add("cwd-photos");
-    S.body.appendChild(E("div", "cwd-pstage", "", [E("div", "cwd-photo", "", [E("div", "cwd-pimg", "background-size:cover;filter:saturate(.75) contrast(1.05);background-image:" + kit().cssImg(o.kind === "doorbell" ? kit().bgImg("grose-valley") : kit().demoImg("dog")))]),
-      E("div", "cwd-live", "", [E("i"), op(o).label || (o.kind === "doorbell" ? "Front door" : "Backyard"), E("span", "", "", [o.kind === "doorbell" ? "Last ring 2:14pm" : "Live, a new picture every 2 seconds"])]),
-      E("div", "cwd-phint", "", ["Back closes."])]));
+    var bell = ha.bell, ring = !demo && door && ha.ring && bell && bell.kept ? ha.ring : null;
+    var cams = door ? [{ entity: "doorbell", name: op(o).label || (bell && bell.name) || "Front door" }] : (demo ? [{ entity: "camera.backyard", name: op(o).label || "Backyard" }, { entity: "camera.driveway", name: "Driveway" }] : info.cameras);
+    var sel = Math.max(0, cams.map(function (c) { return c.entity; }).indexOf(op(o).cam)), showRing = !!(ring || (demo && door));
+    var img = E("div", "cwd-pimg", "background-size:contain;background-color:#000"), nameEl = E("b", "", "font-weight:680"), subEl = E("span");
+    var stage = E("div", "cwd-pstage", "", [E("div", "cwd-photo", "", [img]), E("div", "cwd-live", "", [E("i"), nameEl, subEl])]);
+    S.body.appendChild(stage);
+    var row = E("div", "cwd-row", "position:absolute;left:80px;bottom:56px");
+    stage.appendChild(row);
+    var bellWords = function () { var r = bell && bell.at ? H.ringWords(bell.at) : null; return !bell ? "" : bell.ringing ? "Ringing now" : r ? r[1] + ", " + r[0] : "No ring this week"; };
+    var picture = function () {
+      var c = cams[sel];
+      nameEl.textContent = c.name || "Camera";
+      if (demo) { img.style.backgroundImage = kit().cssImg(door ? kit().bgImg("grose-valley") : kit().demoImg(sel ? "camp" : "dog")); subEl.textContent = door ? "Last ring today, 2:14pm. The picture from the ring" : "A new still every 2 seconds"; return; }
+      if (showRing && ring) { img.style.backgroundImage = kit().cssImg(ring.src); subEl.textContent = bellWords() + ". The picture from the ring"; return; }
+      var last = (ha.stills || {})[c.entity];
+      if (last) img.style.backgroundImage = kit().cssImg(last);
+      subEl.textContent = (door ? bellWords() + ". " : "") + (last ? "A new still every 2 seconds" : "Getting a picture");
+    };
+    var chips = function () {
+      while (row.firstChild) row.removeChild(row.firstChild);
+      S.stops = [];
+      if (door && (ring || demo)) [["At the ring", true], ["Door now", false]].forEach(function (x) { row.appendChild(F(chip(x[0], showRing === x[1]), function () { showRing = x[1]; chips(); picture(); }, x[0])); });
+      if (!door && cams.length > 1) cams.forEach(function (c, i) { row.appendChild(F(chip(c.name || c.entity, i === sel), function () { sel = i; chips(); picture(); S.tickAt = 0; }, c.name)); });
+      [].forEach.call(row.childNodes, function (n, i) { if (i) n.style.marginLeft = "16px"; });
+      paint();
+    };
+    chips(); picture();
+    S.start = Math.max(0, sel);
+    var fails = 0;
+    S.every = 2000;
+    S.tick = function () {
+      if (demo || showRing || S.api.designer || !S.api.ha) return;
+      var c = cams[sel];
+      S.api.ha("still", c.entity, 1280).then(function (r) {
+        if (!S || cams[sel] !== c || showRing) return;
+        if (r && r.ok && r.src) { fails = 0; img.style.backgroundImage = kit().cssImg(r.src); subEl.textContent = (door ? bellWords() + ". " : "") + "A new still every 2 seconds"; }
+        else if (r && r.error !== "busy" && ++fails >= 3) subEl.textContent = "The camera is not answering";
+      });
+    };
   };
+
   B.cards = function (o, env) {
     var cards = env.demo ? [{ title: "Solar today", value: "18.4 kWh" }, { title: "Pool", value: "26°" }, { title: "Rain gauge", value: "12 mm" }] : (kit().dataOf(env).cards || []);
     if (!cards.length) return B.setup(o, env);

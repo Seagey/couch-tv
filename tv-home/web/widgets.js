@@ -1238,11 +1238,36 @@
     stop(root, "detail", "controls", title);
   };
 
+  // Camera: a still picture, a new one every two seconds while the home is in front (never video)
+  function stillWidth(b) { return b.w > 900 ? 1280 : b.w > 500 ? 960 : 640; }
+  function liveStill(root, pic, entity, b, env, onFail) {
+    if (env.demo || env.designer || !window.smartHome || !window.smartHome.still) return;
+    var fails = 0;
+    live(root, 2000, function () {
+      if (document.hidden) return;
+      window.smartHome.still(entity, stillWidth(b)).then(function (r) {
+        if (r && r.ok && window.smartHome.stillOk(r.src)) { fails = 0; pic.style.backgroundImage = cssImg(r.src); if (onFail) onFail(false); }
+        else if (r && r.error !== "busy" && ++fails >= 3 && onFail) onFail(true);
+      });
+    });
+  }
   R.camera = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "camera", "camera");
-    add(root, [E("div", "cw-fill", "background:#333 center/cover;filter:saturate(.7) contrast(1.05);background-image:" + cssImg(demoImg("dog"))), E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.45),transparent 35%)"),
-      E("div", "cw-row", "position:absolute;left:24px;top:20px;color:#fff", [E("i", "", "display:block;width:14px;height:14px;border-radius:7px;background:#ff453a;margin-right:12px"), E("span", "cw-t25", "color:#fff;font-weight:680;margin-right:10px", [op(o).label || "Backyard"]), E("span", "cw-t23", "color:rgba(255,255,255,.82)", ["Live"])])]);
+    var ha = haOf(env), info = ha.info || {}, q = op(o), cams = info.cameras || [], al = alignOf(o), W = b.w - 48;
+    if (!env.demo && !cams.length) return soonFit(root, b, "camera", "camera");
+    var cam = cams.filter(function (c) { return c.entity === q.cam; })[0] || cams[0], name = q.label || cam.name || "Camera";
+    var src = env.demo ? demoImg("dog") : (ha.stills || {})[cam.entity];
+    var pic = E("div", "cw-fill", "background:#1c1f24 center/cover;" + (src ? "background-image:" + cssImg(src) : ""));
+    var EVERY2 = "A still every 2 seconds", say = function (t) { return fitWords(root, t, W, 24, 1, 560, "color:rgba(255,255,255,.86)"); };
+    var note = E("div", "", "flex:none", [say(src ? (b.h >= 300 ? EVERY2 : "") : "Getting a picture")]);
+    var nm = fitWords(root, name, W - 40, 25, 1, 680, "color:#fff") || fitWords(root, name, W - 40, 23, 2, 680, "color:#fff");
+    add(root, [pic, E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.55),transparent 45%)"),
+      E("div", "cw-col", "position:absolute;left:24px;right:24px;top:18px;color:#fff;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center") + ";text-align:" + al, [E("div", "cw-row", "max-width:100%", [ic("camera", 28, "#fff"), nm ? E("div", "", "margin-left:10px;min-width:0", [nm]) : null]), note])]);
+    root.setAttribute("data-ha-cam", cam.entity);
+    var setNote = function (t) { while (note.firstChild) note.removeChild(note.firstChild); var n = t ? say(t) : null; if (n) note.appendChild(n); };
+    liveStill(root, pic, cam.entity, b, env, function (bad) { setNote(bad ? "Camera not answering" : b.h >= 300 ? EVERY2 : ""); });
+    stop(root, "detail", "camera", name);
   };
+
   R.doorbell = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "doorbell", "doorbell");
     add(root, E("div", "cw-row", "height:100%;align-items:stretch", [E("div", "", "width:44%;border-radius:22px;background:#2b3035 center/cover;flex:none;background-image:" + cssImg(bgImg("grose-valley"))),
@@ -1554,7 +1579,6 @@
       E("div", "cw-t23", "position:absolute;left:18px;top:14px;right:18px;color:#fff;font-weight:700;z-index:2", ["On this day"])]);
   });
   CR.speakers = sample("speakers", "speakers", function (root, o, b) { mini(root, b, "speakers", "2", "Speakers", "Living and Kitchen playing"); });
-  CR.camera = sample("camera", "camera", function (root, o, b, env) { R.camera(root, o, b, env); });
   CR.doorbell = sample("doorbell", "doorbell", function (root, o, b) { mini(root, b, "doorbell", "2:14", "Front door", "Last ring, parcel left"); });
   CR.energy = sample("energy", "bolt", function (root, o, b) { mini(root, b, "bolt", "18.4", "kWh today", "Solar, battery 86%"); });
   CR.sensor = sample("sensor", "temperature", function (root, o, b) { mini(root, b, "temperature", "26°", op(o).label || "Pool", "Pool water"); });
@@ -1671,5 +1695,5 @@
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12 }
   };
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
-  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord };
+  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, stillWidth: stillWidth };
 })();
