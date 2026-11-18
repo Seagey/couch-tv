@@ -518,6 +518,34 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(store.video_id("How Trains Work", "Some Channel"))
         self.assertIsNone(store.video_id("Other", "Some Channel"))
 
+    async def test_store_reads_a_file_that_is_not_an_object_as_empty(self):
+        # a hand edited file: the reader and the writer treat it the same, and the row still answers
+        self.video_line(channel="Some Channel", duration_ms=600000)
+        for text in ("[]", "null", '"x"', "1"):
+            with open(store.VIDEO_IDS, "w") as f:
+                f.write(text)
+            self.assertIsNone(store.video_id("How Trains Work", "Some Channel"), text)
+            card, = server.continue_videos("person1")
+            self.assertEqual((card["backdrop"], card["video_id"]), (None, None), text)
+            self.assertTrue(store.remember_video_id("How Trains Work", "Some Channel", VIDEO_ID), text)
+            self.assertEqual(store.video_id("How Trains Work", "Some Channel"), VIDEO_ID, text)
+        for task in server._video_tasks.values():
+            task.cancel()
+
+    def test_store_caps_the_file_whatever_a_hand_edited_when_holds(self):
+        with open(store.VIDEO_IDS, "w") as f:
+            json.dump({"a|": {"id": "aaaaaaaaaaa", "when": 5},
+                       "b|": {"id": "bbbbbbbbbbb", "when": "2026-01-01T00:00:00+00:00"},
+                       "c|": "not a dict"}, f)
+        with patch.object(store, "VIDEO_IDS_MAX", 2):
+            self.assertTrue(store.remember_video_id("d", None, "ddddddddddd"))
+        self.assertEqual(store.video_id("d", None), "ddddddddddd")
+        with open(store.VIDEO_IDS) as f:
+            data = json.load(f)
+        self.assertEqual(len(data), 2)
+        self.assertIn("d|", data)
+        self.assertIn("b|", data, "the one with a real time outlives the ones without")
+
     def test_store_keeps_at_most_the_newest_five_hundred(self):
         with patch.object(store, "VIDEO_IDS_MAX", 5):
             for i in range(7):

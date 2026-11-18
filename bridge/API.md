@@ -552,8 +552,8 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
 - `videos`, next to `items`: the YouTube videos this person watched on this TV, a list of their own.
   YouTube stays out of `items` (it would bury everything else), and a video's name is never looked
   up (matched to a film, it would put that film in the household's taste, issue #23): a video that
-  played the minute is written by the name YouTube gave it, with no picture, and shows only here, for
-  the home to put under the YouTube tile and nowhere else. Never in the picks, the taste or
+  played the minute is written by the name YouTube gave it (with no picture until the video is found,
+  below), and shows only here, for the home to put under the YouTube tile and nowhere else. Never in the picks, the taste or
   `GET /api/history`. One card per title (the newest), newest first, at most 10, within 30 days,
   minus the ones removed with `/api/continue/hide`, in the shape of an item with `"kind": "video"`,
   `episode_title`, `season`, `episode`, `poster` and `progress` all `null`, and `app` YouTube's

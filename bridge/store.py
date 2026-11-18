@@ -282,8 +282,10 @@ def _video_ids_key(title, channel):
 
 def video_id(title, channel):
     """The YouTube video id found for this title and channel on an earlier lookup, or None. Only an
-    id shaped like one (move.YOUTUBE_ID) is ever given back, whatever is in the file."""
-    entry = _read(VIDEO_IDS, {}).get(_video_ids_key(title, channel))
+    id shaped like one (move.YOUTUBE_ID) is ever given back, whatever is in the file, and a file
+    that is not an object (hand edited) reads as empty, the way remember_video_id treats it."""
+    data = _read(VIDEO_IDS, {})
+    entry = data.get(_video_ids_key(title, channel)) if isinstance(data, dict) else None
     vid = entry.get("id") if isinstance(entry, dict) else None
     return vid if isinstance(vid, str) and move.YOUTUBE_ID.fullmatch(vid) else None
 
@@ -306,7 +308,9 @@ def remember_video_id(title, channel, vid):
         data[key] = {"id": vid, "when": datetime.now(timezone.utc).isoformat(timespec="seconds")}
         if len(data) > VIDEO_IDS_MAX:
             def when(kv):
-                return (kv[1].get("when") or "") if isinstance(kv[1], dict) else ""
+                # always a string, so a hand edited "when" of another type cannot break the sort
+                w = kv[1].get("when") if isinstance(kv[1], dict) else None
+                return w if isinstance(w, str) else ""
             data = dict(sorted(data.items(), key=when)[-VIDEO_IDS_MAX:])   # stable: equal times keep their order
         _write(VIDEO_IDS, data)
     return True
