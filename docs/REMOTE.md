@@ -47,6 +47,12 @@ You can still open the `.local` name in the browser: the remote moves itself to 
 straight away, so the icon you add from there gets the address. An icon added before that change
 keeps the `.local` name. If it ever opens a blank page, remove it and add it again from the browser.
 
+## More than one TV
+
+With two or more TVs the **TV** menu (pull down from the top) has **Which TV**. While something is playing
+on the TV you picked, **Move to <the other TV>** sits under the names: it pauses the show here and starts
+it there, as the same person. Android and Google TV only; the limits are in [MOVE.md](MOVE.md).
+
 ## iPhone (Safari)
 
 1. On the phone, open Safari and go to `http://<computer address>:5400`.

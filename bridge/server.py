@@ -3,6 +3,7 @@
 Run: .venv/bin/python bridge/server.py   (settings come from config.json, see config.example.json)
 """
 import asyncio
+import contextlib
 import contextvars
 import hashlib
 import hmac
@@ -29,6 +30,7 @@ import finder
 import history_import
 import kids
 import messages
+import move
 import store
 import taste
 from tv import TV, TVUnavailable, intent_to_link, check_package, UnsafeInput
@@ -1522,15 +1524,51 @@ PLAY_BUTTONS = ("play", "watch", "watch now", "resume", "continue watching", "st
                 "watch movie", "play episode", "start")
 
 
-def profile_order(who):
+def profile_order(who, own_only=False):
     """Profile names to look for, best first: the watcher's own (people[].app_profiles, else their
-    name), then app_profile_fallback, then everyone else's."""
+    name), then app_profile_fallback, then everyone else's (left out with own_only)."""
     def names(p):
         return p.get("app_profiles") or [p["name"]]
     me = next((p for p in config.PEOPLE if p["id"] == who), None)
     order = (names(me) if me else []) + config.APP_PROFILE_FALLBACK
-    order += [n for p in config.PEOPLE if p is not me for n in names(p)]
+    if not own_only:
+        order += [n for p in config.PEOPLE if p is not me for n in names(p)]
     return list(dict.fromkeys(order))
+
+
+# Words an app may put around a profile's name on its "Who's watching?" screen. Disney+ labels its
+# profiles "Access Sam's profile" (seen on a Sony Google TV and a Google TV Streamer).
+PROFILE_WRAP = {"access", "profile", "s", "open", "select", "choose", "watch", "as", "the", "user"}
+PROFILE_BUTTONS = {"add", "edit", "manage", "create", "new", "delete", "switch"}   # never a name by themselves
+
+
+def _wrapped_name(label, name):
+    """Is this label the name with only such words around it? "Access Sam's profile" is, for Sam.
+    "Sign out Sam", "Sam and Jo" and "Access Samantha's profile" are not. A name of one letter, or
+    one that is itself such a word or a button's ("Add"), never matches this way."""
+    words, want = agentic._norm(label).split(), agentic._norm(name).split()
+    if len("".join(want)) < 2 or set(want) <= PROFILE_WRAP | PROFILE_BUTTONS:
+        return False
+    for at in range(len(words) - len(want) + 1):
+        if words[at:at + len(want)] == want:
+            rest = words[:at] + words[at + len(want):]
+            return bool(rest) and set(rest) <= PROFILE_WRAP
+    return False
+
+
+def profile_item(items, order, own=()):
+    """The item on a "Who's watching?" screen for the first name in `order` that is on it. A label has
+    to be exactly the name. For the names in `own` (the watcher's own and the fallback) a label that
+    wraps the name also counts; another person's name is never matched that loosely, so nobody lands
+    on someone else's profile because of it."""
+    for n in order:
+        hit = next((i for i in items if agentic._norm(i["label"]) == agentic._norm(n)), None)
+        if not hit and n in own:
+            hit = next((i for i in items if _wrapped_name(i["label"], n)), None)
+            hit = hit and dict(hit, profile=n)   # what to call it: "Sam", not "Access Sam's profile"
+        if hit:
+            return hit
+    return None
 
 
 async def get_it_playing(app, link, who):
@@ -1549,13 +1587,12 @@ async def get_it_playing(app, link, who):
             break
         if any(WHO_SCREEN.search(i["label"]) for i in items):
             names = [i for i in items if i["label"] and not WHO_SCREEN.search(i["label"])]
-            hit = next((i for n in profile_order(who) for i in names
-                        if agentic._norm(i["label"]) == agentic._norm(n)), None)
+            hit = profile_item(names, profile_order(who), own=profile_order(who, own_only=True))
             if not hit:
                 log.info("profile screen in %s, none of %s on it", app["name"], profile_order(who))
                 return False, None
             await tv.adb("shell", f"input tap {hit['x']} {hit['y']}", timeout=8)
-            picked = hit["label"]
+            picked = hit.get("profile") or hit["label"]
             log.info("profile screen in %s: picked %s", app["name"], picked)
             await asyncio.sleep(1.2)
             await tv.start_intent(link, pkg, cold=False)
@@ -3954,6 +3991,419 @@ async def h_tvs(request):
     return ok(default=DEFAULT_TV, tvs=out)
 
 
+# ---------- move what is playing to another TV (#268) ----------
+# One action: read what plays and who is watching on TV A, pause A, set the same person on TV B,
+# wake B, open the same title there from a fresh start, pass "Who's watching?" as that person and
+# play. Apps mostly resume by themselves; only when B is not near A's spot is A's spot used, as a
+# backup. Android and Google TV only (docs/MOVE.md lists the limits).
+_move_lock = asyncio.Lock()
+MOVE_SETTLE_S = 4   # after waking TV B, before a link is opened on it
+MOVE_OPENED_S = 3 * 3600   # how long a show the bridge opened itself stands in for a title the app does not give
+
+
+@contextlib.contextmanager
+def on_tv(tv_id):
+    """Inside the block, `tv`, `media_now`, `cur_who()` and the rest mean this TV."""
+    token = _current.set(tv_id)
+    try:
+        yield
+    finally:
+        _current.reset(token)
+
+
+def move_target(src, wanted=None):
+    """The TV to move to: the one asked for, or the only other Android or Google TV."""
+    if wanted is not None:
+        if not isinstance(wanted, str) or wanted not in TVS:
+            said = str(wanted)[:80]
+            raise ApiError(400, f"unknown tv: {said} (try {', '.join(TVS)})", key="err_unknown_tv",
+                           vars={"tv": said, "choices": ", ".join(TVS)})
+        if wanted == src:
+            raise ApiError(400, "pick another TV to move to", key="err_move_same_tv")
+        return wanted
+    others = [i for i, t in TVS.items() if i != src and t.kind == "android" and t.paired]
+    if len(others) != 1:
+        raise ApiError(400, 'say which TV to move to ("to")', key="err_move_which_tv")
+    return others[0]
+
+
+async def _tv_in_use():
+    """Is someone watching this TV: it is on, and the app in front says it is playing."""
+    if not (tv.connected and tv.is_on and await tv.adb_ready()):
+        return False
+    try:
+        out = await tv.adb("shell", "dumpsys media_session", timeout=8)
+        front = await tv.front_package()
+    except Exception:
+        return False   # it could not say: treat it as free
+    return any(s.get("package") == front and s.get("state") == "PLAYING" for s in _sessions(out))
+
+
+async def move_open(app, now, session, who, again=False):
+    """On TV B: open what `now` says was playing on TV A, in the same app. Uses `play` (the show
+    finder, the app's own link, the profile screen and the Play button) for every app it knows, and
+    a video link for YouTube. Returns `play`'s answer; "video" is the YouTube id when one was found.
+    `again`: a second go at an app that is already open (YouTube is not started afresh then; the
+    others follow their own "cold" rule in apps.py, as any `play` does)."""
+    title = now["title"]
+    if app["id"] == "youtube":
+        video = await move.youtube_video_id(title, (session or {}).get("subtitle"), (session or {}).get("duration"))
+        if video:
+            link = move.youtube_link(video)   # no time in the link: YouTube resumes from its own history
+            await tv.start_intent(link, app["package"], cold=not again)
+            await tv.wait_for_app({app["package"]}, timeout=10)
+            started, _ = await get_it_playing(app, link, who or cur_who())
+            return {"method": "deeplink", "started": started, "video": video}
+    else:
+        try:
+            # exact: only a show of exactly this name. A near name is another show ("Bluey Fancy
+            # Restaurant" is a series of its own, not the "Fancy Restaurant" episode of "Bluey").
+            return await play(title, now.get("season"), now.get("episode"), app["id"], who,
+                              resume=not now.get("season"), exact=True)
+        except ApiError as e:
+            if e.status != 404:
+                raise
+    # The show finder (or YouTube's search) does not know this title: open the app on its search.
+    method, _ = await search_in_app(apps.BY_ID[app["id"]], now["title"])
+    return {"method": method, "started": False}
+
+
+async def _move_state(pkg):
+    """The app's playback state on this TV ("PLAYING", "PAUSED", ...), its active session first. None
+    when it has no session or the TV did not answer."""
+    try:
+        out = await tv.adb("shell", "dumpsys media_session", timeout=8)
+    except Exception:
+        return None
+    mine = [s for s in _sessions(out) if s.get("package") == pkg and s.get("state")]
+    mine.sort(key=lambda s: not s.get("active"))
+    return mine[0]["state"] if mine else None
+
+
+async def move_pause(pkg):
+    """Pause the app on this TV and see that it took. True when it no longer says it is playing.
+    Seen on a Sony Google TV: Netflix, started a moment before, played on through the pause key,
+    twice, while the other TV started. A media key goes to whichever app Android thinks owns the
+    media keys, so the key is tried twice (pause is not a toggle, so that is safe) and then the sync
+    helper, when this TV has it, is asked to pause this app itself. False means it is still playing:
+    the caller says so instead of pretending."""
+    for way in ("key", "key", "helper", "key"):
+        if way == "key":
+            await tv.key("pause")
+        elif move.SYNC_HELPER in (await installed_packages(wait=False) or ()):
+            try:
+                await tv.adb("shell", move.pause_command(pkg), timeout=8)
+            except Exception as e:
+                log.info("move: pause through the sync helper failed: %s", e)
+        else:
+            continue
+        await asyncio.sleep(1)
+        if await _move_state(pkg) != "PLAYING":
+            return True
+    log.warning("move: %s would not pause on %s", pkg, tv.name)
+    return False
+
+
+async def move_wait_playing(pkg, timeout=8):
+    """True once the app says PLAYING on two readings in a row. wait_until_playing wants the reported
+    position to move, and YouTube reports it once and leaves it (seen on a Google TV Streamer:
+    position=356 for as long as the video played), so a playing YouTube never passed."""
+    end = time.monotonic() + timeout
+    seen = 0
+    while time.monotonic() < end:
+        await asyncio.sleep(1.5)
+        seen = seen + 1 if await _move_state(pkg) == "PLAYING" else 0
+        if seen >= 2:
+            return True
+    return False
+
+
+async def move_nudge(app, tries=3):
+    """On TV B, when the show is open but not playing and the screen cannot be read. Netflix draws
+    its own "Who's watching?" on some TVs (seen on a Google TV Streamer): the screen reader gets
+    nothing back, so no profile can be picked by name. Press OK, which takes the profile the app has
+    in focus (the one last used on that TV), watch, and press again: a press before the screen is up
+    is lost. Never OK while the app says it is playing (OK would pause it); a show a press paused
+    gets Play instead. A screen that can be read is left alone: get_it_playing has already decided.
+    Only in apps where a blind OK cannot buy anything (move.BLIND_OK_APPS)."""
+    pkg = app["package"]
+    if app["id"] not in move.BLIND_OK_APPS:
+        return False
+    try:
+        # Prime Video's profile screen comes back as one item with no words on it: not readable either
+        if any((i.get("label") or "").strip() for i in await agentic.ui_items()):
+            return False
+    except Exception:
+        pass   # could not read it at all: the same case
+    for _ in range(tries):
+        # Only ever press into the app that is being moved: if the home screen or another app has
+        # come to the front, or the TV does not answer, stop.
+        try:
+            front = await tv.front_package()
+        except Exception:
+            front = None
+        if front != pkg:
+            log.info("move: %s is not in front, no blind OK", app["name"])
+            return False
+        state = await _move_state(pkg)
+        if state == "PAUSED":
+            await tv.key("play")
+        elif state not in ("PLAYING", "BUFFERING"):
+            await tv.key("ok")
+            log.info("move: pressed OK on a screen that cannot be read")
+        if await move_wait_playing(pkg, timeout=12):
+            return True
+    return False
+
+
+async def _who_screen_up():
+    """Is a "Who's watching?" screen the bridge can read on this TV now?"""
+    try:
+        return any(WHO_SCREEN.search(i["label"]) for i in await agentic.ui_items())
+    except Exception:
+        return False
+
+
+async def move_seek(pkg, position_ms, video=None):
+    """The backup, on TV B: put playback at TV A's spot. YouTube: the same link with a time. Any other
+    app: the sync helper (docs/SYNC.md), when it is installed on this TV. Returns "link", "helper" or
+    None when there is no way to seek here."""
+    if video:
+        await tv.start_intent(move.youtube_link(video, position_ms // 1000), pkg, cold=False)
+        return "link"
+    if move.SYNC_HELPER in (await installed_packages() or ()):
+        try:
+            if not move.can_seek(await tv.adb("shell", move.can_seek_command(pkg), timeout=8)):
+                log.info("move: %s does not take a seek from outside", pkg)
+                return None
+            out = await tv.adb("shell", move.seek_command(pkg, position_ms), timeout=8)
+        except Exception as e:
+            log.info("move: seek through the sync helper failed: %s", e)
+            return None
+        if move.seek_ok(out):
+            return "helper"
+    return None
+
+
+async def move_playing(src, dst, power_off=False, force=False, request=None, pin=None):
+    """Move what is playing on TV `src` to TV `dst`. `power_off` turns `src` off once `dst` plays
+    (off unless asked). `force` goes ahead when `dst` is playing something itself."""
+    for i in (src, dst):
+        if TVS[i].kind != "android":
+            raise ApiError(400, f"moving a show needs an Android or Google TV at both ends ({TVS[i].name} is not)",
+                           key="err_move_not_supported", vars={"tv": TVS[i].name})
+
+    # 1. TV A: what is playing, where it is up to, and who is watching
+    with on_tv(src):
+        tv.require()
+        if not await tv.adb_ready():
+            raise TVUnavailable("ADB is not on", key="err_adb_not_on")
+        pkg = await tv.front_package()
+        app = apps.describe_package(pkg)
+        session = await media_read(pkg, app) if app and app["id"] not in NOT_VIEWING else None
+        now = dict(media_now) if session else {}
+        for _ in range(3):
+            # YouTube plays for some seconds before it says what the video is (measured on a Sony
+            # Google TV: 5 to 6 s after it reports PLAYING). Look again before saying it gives none.
+            if not session or now.get("title") or now.get("state") not in ("playing", "buffering"):
+                break
+            await asyncio.sleep(2)
+            session = await media_read(pkg, app)
+            now = dict(media_now) if session else {}
+        if now.get("title_from") == "bridge":
+            # The app gave no title (Netflix on some TVs) and media_read filled one in. Only what the
+            # bridge itself opened in this app in the last three hours, with the app in front ever
+            # since, is taken to be it. Its other source, the last thing watched in the app in the past
+            # six hours, is a guess: a show started with the TV's own remote would be moved as some
+            # other show. (Someone who picks another show inside the app with the TV's remote after
+            # the bridge opened one still gets the first one moved: the bridge cannot see that.)
+            item = playing["item"]
+            if not (item and item.get("package") == pkg and item.get("ts", 0) > time.time() - MOVE_OPENED_S):
+                now["title"] = None
+        who = cur_who()
+        from_name = tv.name
+    if app and app["id"] is None:
+        # Not in the bridge's app list (apps.py): it has no way to open a title in it on the other TV.
+        raise ApiError(409, f"couch-tv does not know the app {app['name']}, so it cannot move it",
+                       key="err_move_app_not_known", vars={"app": app["name"]})
+    if now.get("state") not in ("playing", "paused", "buffering"):
+        raise ApiError(409, f"nothing is playing on {from_name}", key="err_move_nothing_playing",
+                       vars={"tv": from_name})
+    if not now.get("title"):
+        raise ApiError(409, f"{app['name']} does not say what is playing, so it cannot be moved",
+                       key="err_move_no_title", vars={"app": app["name"]})
+    pkg = check_package(pkg)   # it goes to TV B's shell below
+    title, spot = now["title"], now.get("position_ms")
+
+    # 2. TV B: never take a TV from someone who is watching it, or out of kids mode without the PIN
+    with on_tv(dst):
+        to_name = tv.name
+        if not tv.paired:
+            tv.require()
+        was = cur_who()
+        if who and was != who and kids.is_kid(was):
+            check_kids_pin(request, was, pin)
+        if not force and await _tv_in_use():
+            raise ApiError(409, f"{to_name} is playing something", key="err_move_tv_in_use", vars={"tv": to_name})
+        on_b = await installed_packages()
+        if on_b is not None and pkg not in on_b:
+            raise ApiError(409, f"{app['name']} is not installed on {to_name}", key="err_move_not_installed",
+                           vars={"app": app["name"], "tv": to_name})
+
+    # 3. pause A
+    paused_here = now["state"] != "paused"
+    source_paused = True
+    if paused_here:
+        with on_tv(src):
+            source_paused = await move_pause(pkg)
+
+    opened, started, at, seek, wrong_title = {}, False, None, None, None
+    who_set = False
+    try:
+        with on_tv(dst):
+            # 4. wake B
+            if not (tv.connected and tv.is_on):
+                waking["on"] = True
+                push_now()
+                try:
+                    await power_on()
+                finally:
+                    waking["on"] = False
+                    push_now()
+                # A TV that has just woken brings its home screen to the front a moment later, on
+                # top of a link opened straight away (seen on a Google TV Streamer: the app opened
+                # behind the home, and the show never came up). Let the home settle first.
+                await asyncio.sleep(MOVE_SETTLE_S)
+            if not await tv.adb_ready():
+                raise TVUnavailable("ADB is not on", key="err_adb_not_on")
+            # 5. the same person on B, before the show is opened: the profile screen is passed as them
+            if who and who != was:
+                store.save_who(who, dst)
+                who_set = True
+                push_now()
+            _reset_paused_idle()
+            # 6. the same title from a fresh start (an app left running may ignore the link, or ask
+            # "Who's watching?" and then drop the show), the person's profile, and play
+            await tv.adb("shell", "am", "force-stop", pkg)
+            opened_at = time.monotonic()
+            opened = await move_open(app, now, session, who)
+            started = bool(opened.get("started"))
+            if not started and opened.get("method") == "deeplink":
+                # A fresh start is slow (YouTube began a few seconds after `play` stopped waiting, on
+                # a real TV): give it a little longer before deciding the screen needs a press.
+                started = await move_wait_playing(pkg, timeout=8) or await move_nudge(app)
+                if not started and await _who_screen_up():
+                    # The profile screen came up after `play` had looked and given up (Disney+ from
+                    # a fresh start on a Google TV Streamer). Open it once more: the profile is
+                    # picked this time, and the link is opened again behind it.
+                    opened = await move_open(app, now, session, who, again=True)
+                    started = bool(opened.get("started")) or await move_wait_playing(pkg, timeout=8)
+            if paused_here:
+                # Netflix starts playback over about ten seconds after it first plays (measured on a
+                # Sony Google TV), so a pause before that comes undone. Look once more now, and again
+                # at the end, so the two TVs do not play on side by side.
+                with on_tv(src):
+                    source_paused = await _move_state(pkg) != "PLAYING" or await move_pause(pkg)
+            # Is it the same title? Only the two TVs' own words count here, not what the bridge
+            # asked for: Disney+, asked for the show "Bluey", played the series "Bluey Fancy
+            # Restaurant" (seen on a Sony Google TV and a Google TV Streamer). When both apps name
+            # what they play and the names differ, stop it there and say so.
+            if started:
+                await media_read(pkg, app)
+                there = media_now.get("title") if media_now.get("title_from") == "app" else None
+                if now.get("title_from") == "app" and there and not finder.same_title(there, title):
+                    wrong_title = there
+                    started = False
+                    await tv.key("pause")
+                    log.info("move: %s played %s on %s, not %s: paused it", app["name"], there, dst, title)
+            # 7. the backup: only when B is playing and is not near A's spot
+            if started:
+                at = media_now.get("position_ms")
+                if spot is not None and at is not None and not move.near(spot, at):
+                    seek = await move_seek(pkg, spot, opened.get("video"))
+                    for _ in range(4 if seek else 0):
+                        # the app takes a moment to report the new spot (seen: 2 s was too soon on Netflix)
+                        await asyncio.sleep(1.5)
+                        await media_read(pkg, app)
+                        at = media_now.get("position_ms")
+                        if move.near(spot, at):
+                            break
+            # B may be ahead of A's spot by as long as it has had to play since the link was opened
+            played_ms = int((time.monotonic() - opened_at) * 1000)
+            off_spot = (started and spot is not None and at is not None
+                        and not (-move.NEAR_MS <= at - spot <= move.NEAR_MS + played_ms))
+            log.info("move %s from %s to %s: %s (spot %s, now at %s, seek %s)", title, src, dst,
+                     "playing" if started else "open, not playing", spot, at, seek)
+    except Exception:
+        # Whatever went wrong (B would not wake, its ADB dropped, the app would not open): unless the
+        # show is already open on B, put things back. A plays on, and B keeps the person it had.
+        if not opened:
+            if who_set:
+                store.save_who(was, dst)
+            if paused_here:
+                try:
+                    with on_tv(src):
+                        await tv.key("play")
+                except Exception as e:
+                    log.warning("move: could not start %s playing again: %s", from_name, e)
+        raise
+
+    # 8. turn A off, only when asked and only once B is playing
+    powered_off = False
+    if started:
+        with on_tv(src):
+            # never leave both TVs playing without saying so; a pause that landed late counts
+            source_paused = await _move_state(pkg) != "PLAYING" or await move_pause(pkg)
+    if power_off and started:
+        with on_tv(src):
+            if tv.is_on:
+                await tv.key("power")
+                power_off_at[src] = time.monotonic()
+                powered_off = True
+
+    if wrong_title:
+        note = (f"{app['name']} opened {wrong_title} on {to_name}, not {title}. It is paused there: "
+                f"find {title} with the TV remote.")
+        note_key, note_vars = "note_move_wrong_title", {"app": app["name"], "other": wrong_title, "tv": to_name,
+                                                        "title": title}
+    elif not started and opened.get("method") != "deeplink":
+        note = f"Could not open {title} by itself on {to_name}. {app['name']} is open there: find it with the TV remote."
+        note_key, note_vars = "note_move_app_only", {"title": title, "tv": to_name, "app": app["name"]}
+    elif not started:
+        note = f"Opened {title} on {to_name}, but it has not started playing. Press OK on its remote."
+        note_key, note_vars = "note_move_not_playing", {"title": title, "tv": to_name}
+    elif off_spot:
+        note = f"{title} is playing on {to_name}, at another spot. {from_name} was at {move.clock(spot)}."
+        note_key, note_vars = "note_move_other_spot", {"title": title, "tv": to_name, "from": from_name,
+                                                       "time": move.clock(spot)}
+    else:
+        note = f"{title} is playing on {to_name}."
+        note_key, note_vars = "note_moved", {"title": title, "tv": to_name}
+    source_paused = source_paused or powered_off
+    if started and not source_paused:
+        note = f"{title} is playing on {to_name}, but {from_name} would not pause. Pause it with its remote."
+        note_key, note_vars = "note_move_still_playing", {"title": title, "tv": to_name, "from": from_name}
+    return {"title": title, "from": src, "to": dst, "who": who, "app": apps.describe_package(pkg),
+            "method": opened.get("method"), "started": started, "wrong_title": wrong_title,
+            "source_paused": source_paused, "position_ms": spot,
+            "target_position_ms": at, "seek": seek, "powered_off": powered_off,
+            "note": note, **messages.note_fields(note_key, note_vars)}
+
+
+async def h_move(request):
+    """POST /api/move: move what is playing on this TV ("tv") to another TV ("to")."""
+    data = await body(request)
+    src = _current.get()
+    dst = move_target(src, data.get("to"))
+    if _move_lock.locked():
+        raise ApiError(409, "a move is already running, wait for it to finish", key="err_move_busy")
+    async with _move_lock:
+        result = await move_playing(src, dst, power_off=data.get("power_off") is True,
+                                    force=data.get("force") is True, request=request, pin=data.get("pin"))
+    record_action(request, "move", {"to": dst}, result["started"])
+    return ok(**result)
+
+
 # ---------- app ----------
 def make_app():
     app = web.Application(middlewares=[middleware])
@@ -4035,6 +4485,7 @@ def make_app():
     r.add_get("/api/screens", h_screens)
     r.add_post("/api/screens/open", h_screens_open)
     r.add_post("/api/power", h_power)
+    r.add_post("/api/move", h_move)
     r.add_post("/api/volume", h_volume)
     r.add_get("/api/screenshot", h_screenshot)
     agentic.routes(r)

@@ -760,6 +760,46 @@ lag behind Quick Start+ standby, so a second press means "wake it"). A script or
 While an `on` is in progress, `/api/now` and the events stream carry `"waking": true`. Show
 "Waking the TV" until `waking` is `false` and `power` is `"on"`.
 
+### `POST /api/move`
+Moves what is playing on this TV (`tv`, as for every endpoint) to another TV. Android and Google TV at
+both ends. What it does, step by step, and its limits: [docs/MOVE.md](../docs/MOVE.md).
+```json
+{"tv": "living-room", "to": "bedroom-tv", "power_off": false, "force": false}
+```
+- `to`: the TV to move to. Leave it out when there is only one other Android or Google TV.
+- `power_off`: `true` turns this TV off once the other one is playing. Off unless it is exactly `true`.
+- `force`: `true` goes ahead when the other TV is playing something itself. Without it that is a `409`
+  (`error_key` `err_move_tv_in_use`): ask the person, then send it again with `force`.
+- `pin`: the parent PIN, only needed when the other TV is on a kids profile (`403` without it).
+
+It answers once the other TV is playing, or has stopped short of it. Allow up to three minutes: a wake,
+a fresh app start and a profile screen add up.
+```json
+{
+  "ok": true, "title": "Bluey", "from": "living-room", "to": "bedroom-tv", "who": "person1",
+  "app": {"id": "netflix", "name": "Netflix", "package": "com.netflix.ninja"},
+  "method": "deeplink", "started": true, "wrong_title": null, "source_paused": true,
+  "position_ms": 612000, "target_position_ms": 611400, "seek": null, "powered_off": false,
+  "note": "Bluey is playing on Bedroom.", "note_key": "note_moved",
+  "note_vars": {"title": "Bluey", "tv": "Bedroom"}
+}
+```
+`wrong_title` is the title the other TV came up on when it is not this TV's (both apps have to say what they
+play); it is paused there and `started` is `false`. `source_paused: false` means this TV would not pause and is still on (`note` then says to pause it by
+hand).
+`position_ms` is where this TV was; `target_position_ms` is where the other TV is playing (`null` when
+it does not say). `seek` says whether this TV's spot had to be used as the backup: `null` (the app
+resumed near it by itself, or there was no way to jump), `"link"` (YouTube, opened again with the time)
+or `"helper"` (the sync helper app of docs/SYNC.md). `started: false` means the other TV has the title
+open but not playing (`method` `deeplink`), or only the app or its search (`method` `search` or `app`);
+this TV is then left on and paused, and `note` says which.
+
+Errors: `400` no other TV to move to, the same or an unknown TV, or one end is not an Android or Google
+TV; `403` the other TV is on a kids profile and the PIN is missing or wrong; `409` nothing is playing
+here, the app gives no title, the bridge does not know the app, the other TV does not have the app, the
+other TV is in use, or another move is running; `503` the other TV did not wake. When a move fails
+before the title is open on the other TV, this TV plays on.
+
 ### `POST /api/volume`
 ```json
 {"action": "up"}
@@ -855,6 +895,7 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- 2026-11-17: Move what is playing to another TV (New): `POST /api/move` (docs/MOVE.md, #268).
 - 2026-11-14: Custom cards (New): `GET /api/custom-cards`, and `home.custom_cards` in `/api/config` and
   `/tv/config.js` (the link, or `true` for a file on the bridge computer).
 - 2026-11-14: Message keys (`error_key`, `note_key`, `reply_key`, `reason_key` and their `_vars`) beside the

@@ -333,6 +333,8 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
 .chips-row.chips-wrap { flex-wrap: wrap; }
 .chips-row.chips-wrap .chip { flex: 1 1 auto; padding: 0 14px; white-space: nowrap; }
 .note { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+.move-row { margin-top: 8px; }
+.move-row .chip svg { vertical-align: -2px; margin-inline-end: 4px; }
 .more-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 6px; }
 .tile { height: 76px; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-weight: 600; font-size: 14px; }
 
