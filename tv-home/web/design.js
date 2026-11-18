@@ -303,7 +303,7 @@
     lid_a: SAN.c, lid_b: SAN.c, bin_a: function (v) { return SAN.w(v, 20); }, bin_b: function (v) { return SAN.w(v, 20); },
     quick: function (v) { return SAN.list(v, 6, function (q) { return SAN.pick(q, QUICK_IDS); }); },
     scene: function (v) { return SAN.pick(v, SCENE_IDS); }, sound: function (v) { return SAN.pick(v, ["rain", "fire", "waves", "brown"]); },
-    night: SAN.b, place: SAN.b, hilo: SAN.b,
+    night: SAN.b, place: SAN.b, hilo: SAN.b, sport: SAN.b,
     entity: function (v) { return typeof v === "string" && /^climate\.[a-z0-9_]{1,64}$/.test(v) ? v : undefined; },
     controls: function (v) { return SAN.list(v, 8, function (c) { c = obj(c); var o = {}; put(o, "icon", SAN.pick(c.icon, CTL_ICONS)); put(o, "name", SAN.w(c.name, 24)); return o.icon ? o : undefined; }); },
     shows: function (v) { return SAN.n(v, 1, 5, true); }
@@ -313,7 +313,7 @@
     wordclock: "", solar: "", worldclock: "cities", countdown: "label month day unit icon", date: "show dfmt align place", month: "", timer: "label",
     weather: "place hilo night", bigtemp: "place", hourly: "place", week: "place", rain: "", uv: "", sun: "", moon: "", air: "", surf: "label",
     photo: "image fit caption sub", slideshow: "seconds_each caption sub", mosaic: "count", artframe: "image mat caption sub", memory: "",
-    keep: "", keeprow: "label shows", upnext: "", picks: "",
+    keep: "", keeprow: "label shows", upnext: "apps sport", picks: "",
     app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "apps",
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "",
@@ -1283,7 +1283,9 @@
   function wenv() {
     var data = null;
     try { data = hooks.data ? hooks.data() : null; } catch (e) { data = null; }
-    return { demo: !!(FORCE_DEMO || DEMO_ON), preview: PREVIEW, designer: DESIGNER, data: data, look: obj(D && D.look),
+    // sport: the design has a Scores widget (the Game Day preset), so its Up next is the game hero
+    var sport = !!(D && list(D.objects).some(function (o) { o = obj(o); return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return obj(it).kind === "sports"; }); }));
+    return { demo: !!(FORCE_DEMO || DEMO_ON), preview: PREVIEW, designer: DESIGNER, data: data, look: obj(D && D.look), sport: sport,
       clock24: hooks.clock24 ? hooks.clock24() : false, ha: !!(window.smartHome && window.smartHome.enabled && window.smartHome.enabled()), rooms: LIVE.rooms,
       icon: function (name, size, set) { return icon(name, size, set); }, colour: colour, imgOk: imgOk };
   }

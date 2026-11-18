@@ -811,20 +811,33 @@
         return stop(p, "show", i, s.title);
       }))]);
   };
+  // the sport apps a game comes from (the Game Day hero): Kayo, Foxtel, 9Now, 7plus, 10, DAZN
+  var SPORT_APPS = ["au.com.kayosports.tv", "au.com.foxtel.atv", "au.com.ninenow.ctv", "com.swm.live", "au.com.tenplay", "dazn"];
+  // an Up next is a game hero when it says so (opts.sport), or, when it does not say, when the design
+  // also has a Scores widget (the Game Day preset); opts.apps narrows it to those apps
+  function upnextSport(o, env) { var q = op(o); return q.sport === true || (q.sport !== false && !!env.sport); }
   R.upnext = function (root, o, b, env) {
-    var list = shows(env);
-    if (!list.length) return noShows(root, b, env);
-    var s = env.demo ? { title: "Bay of Fires", sub: "Season 1, episode 4. 52 min left", app: "au.com.stan.and", art: bgImg("vang-vieng-sunset") } : list[0];
+    var q = op(o), sport = upnextSport(o, env), want = q.apps && q.apps.length ? q.apps : sport ? SPORT_APPS : null;
+    // each show keeps its place in Keep watching: Resume opens that one (app.js "show" is its index)
+    var list = shows(env).map(function (x, i) { x.i = i; return x; });
+    if (want && !env.demo) list = list.filter(function (x) { return want.indexOf(x.app) >= 0; });
+    if (!list.length) {
+      // on a TV, never a demo and never an unrelated show: say plainly there is no game to pick up
+      if (sport && !(env && dataOf(env).bridge === false)) return empty(root, b, "tv", "No game to pick up", "Start a game in Kayo, Foxtel or 9Now and it shows here");
+      return noShows(root, b, env);
+    }
+    var s = env.demo ? (sport ? { title: "Titans v Broncos", sub: "NRL, round 3. Kick off 7:50pm", app: "au.com.kayosports.tv", art: bgImg("scene-golden"), i: 0 }
+      : { title: "Bay of Fires", sub: "Season 1, episode 4. 52 min left", app: "au.com.stan.and", art: bgImg("vang-vieng-sunset"), i: 0 }) : list[0];
     var fs = clamp(Math.min(b.h / 6.5, b.w / 12), 48, 110);
-    var resume = stop(E("div", "cw-chip", "background:#fff;color:#111;height:64px;font-size:27px;padding:0 30px", [ic("play", 30, "#111", "solid"), "Resume"]), "show", 0, s.title);
+    var resume = stop(E("div", "cw-chip", "background:#fff;color:#111;height:64px;font-size:27px;padding:0 30px", [ic("play", 30, "#111", "solid"), "Resume"]), "show", s.i, s.title);
     add(root, [E("div", "cw-fill", "background:#111 center/cover;" + (s.art ? "background-image:" + cssImg(s.art) : "")),
       E("div", "cw-fill", "background:linear-gradient(90deg,rgba(0,0,0,.85),rgba(0,0,0,.35) 55%,transparent 80%),linear-gradient(0deg,rgba(0,0,0,.6),transparent 50%)"),
       E("div", "", "position:absolute;left:44px;bottom:40px;max-width:60%;color:#fff", [
         E("div", "cw-row", "", [s.app ? appIcon(s.app, 44, env) : null, E("span", "cw-t25", "color:rgba(255,255,255,.88);font-weight:650;margin-left:12px", ["Up next"])]),
         E("div", "", "font-size:" + px(fs) + ";font-weight:780;letter-spacing:-.03em;line-height:.98;margin-top:16px", [s.title]),
         s.sub ? E("div", "cw-t29", "color:rgba(255,255,255,.86);margin-top:14px", [s.sub]) : null,
-        b.h >= 420 ? E("div", "cw-row", "margin-top:26px", [resume, stop(E("div", "cw-chip", "height:64px;font-size:27px;padding:0 30px;margin-left:16px;background:rgba(255,255,255,.2)", ["Start over"]), "show", 0, s.title)]) : null])]);
-    if (b.h < 420) stop(root, "show", 0, s.title);
+        b.h >= 420 ? E("div", "cw-row", "margin-top:26px", [resume, stop(E("div", "cw-chip", "height:64px;font-size:27px;padding:0 30px;margin-left:16px;background:rgba(255,255,255,.2)", ["Start over"]), "show", s.i, s.title)]) : null])]);
+    if (b.h < 420) stop(root, "show", s.i, s.title);
   };
   R.picks = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "favourite", "picks");
