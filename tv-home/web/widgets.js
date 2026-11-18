@@ -1103,7 +1103,7 @@
     show(at);
     stop(root, "stack", "", "Stack");
     root.__flick = function (dx) { var ni = at + dx; if (ni < 0 || ni >= items.length) return false; manual = Date.now(); show(ni); return true; };
-    root.__show = show; root.__at = function () { return at; };
+    root.__show = function (i) { if (env.designer) manual = 1e15; show(i); }; root.__at = function () { return at; };
     live(root, 1000, function () {
       if (root.classList.contains("cw-focus") || Date.now() - manual < 60000) return;
       var j = stackIndex(o, items.length);
