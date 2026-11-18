@@ -112,6 +112,9 @@
       web: SMART_HOME.web.slice(), vidaa: SMART_HOME.vidaa.slice() };
   }
   var HA_PLAT = function () { return plat("setup", "no", "no", { android: "Set up once from a computer; after that no computer is needed.", web: "Smart home needs a Google TV, Android TV or Fire TV.", vidaa: "Smart home needs a Google TV, Android TV or Fire TV." }); };
+  // the Up next queue: Spotify's queue, read with the person's own Spotify sign in
+  var QUEUE_NEED = "Spotify connected on the home computer, or on the website home on a Hisense";
+  var SPOTIFY_ON = "On that computer, connect Spotify once: open the couch-tv Spotify page on it and sign in (setup guide, Spotify Now playing).";
 
   var C = {
     // ---------- time ----------
@@ -248,9 +251,12 @@
     soundscape: { name: "Soundscape", status: "works", what: "Rain, fire, waves or soft noise, played by the home", needs: ["Nothing: the sounds come with couch-tv"],
       setup: setup("nothing", ["Nothing to set up.", "Move to the widget and press OK to start or stop the sound."]), until: "Always ready", build: "",
       ok: "Starts or stops the sound", platforms: EVERY(), sizes: sz(["tile", "wtile"], [2, 2]) },
-    queue: { name: "Up next queue", status: "not-built", what: "The next songs", needs: ["Needs couch-tv to read your Spotify queue (TVs do not share it)"],
-      setup: setup("nothing", NOT_YET), until: "\"Up next queue: not on couch-tv yet\", and what it needs", build: "The bridge has to read the queue from the Spotify Web API (the person signs in to Spotify once on the computer) and hand it to the home.",
-      ok: "Opens the queue (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["small", "tall", "large"], [4, 4]) },
+    queue: { name: "Up next queue", status: "setup", what: "The next songs in your Spotify queue", needs: [QUEUE_NEED, "Only Spotify: TVs and other music apps do not share their queue"],
+      setup: setup("computer", { android: ["Needs a computer at home that stays on, running couch-tv (setup option B).", SPOTIFY_ON, "Play music in Spotify on any phone, computer or speaker: the next songs in your queue show here."],
+        web: ["Keep the home computer on: it runs couch-tv for this TV.", SPOTIFY_ON, "Play music in Spotify on any phone, computer or speaker: the next songs in your queue show here."],
+        vidaa: ["With a home computer that stays on: connect Spotify once on it (open the couch-tv Spotify page on it and sign in).", "With the website home and no computer: sign in to Spotify once on your own couch-tv site (setup guide, Hisense VIDAA, Spotify).", "Play music in Spotify: the next songs in your queue show here."] }),
+      until: "\"Needs Spotify connected\", and where it is set up", build: "",
+      ok: "Opens the next ten songs, big", platforms: plat("computer", "computer", "setup", { android: "Needs a home computer with Spotify connected (setup option B). Only Spotify shares its queue.", web: "Works while the home computer is on, with Spotify connected on it.", vidaa: "Works with the home computer, or the website home with Spotify signed in." }), sizes: sz(["small", "tall", "large"], [4, 4]) },
     speakers: { name: "Speakers", status: "setup", what: "Each speaker, what it plays and its volume", needs: [HA_NEED, "Your speakers added once on a computer"],
       setup: setup("computer", haSteps("speakers (up to 6, any Home Assistant knows)", "Press Home: each speaker and its volume show here. OK opens them: louder, quieter, play and pause.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
@@ -380,6 +386,7 @@
   SHORT[PHOTOS_NEED] = ["Add your photos", "Home settings, Look and scenes, Your photos", "Add photos"];
   SHORT[WATCH_NEED] = ["Needs the couch-tv TV app or a home computer", "OK here shows how", "Needs setting up"];
   SHORT[HA_NEED] = ["Needs Home Assistant", "Set up once on a computer. OK here shows how", "Needs Home Assistant"];
+  SHORT[QUEUE_NEED] = ["Needs Spotify connected", "On the home computer. OK here shows how", "Needs Spotify"];
   SHORT[C.card.needs[0]] = ["Needs a home computer", "OK here shows how to set it up", "Needs a computer"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];
   // tiny: the box is a tile, so the line has to fit two short lines (OK opens the whole record)

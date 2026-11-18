@@ -31,8 +31,8 @@
     photos: "Photos", keep: "Keep watching", folder: "Apps", player: "Now playing", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre",
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up" };
   // the smart home and music widgets' own layers (group C): set here, beside the table above
-  LAYER.energy = "energy"; LAYER.sensor = "sensor"; LAYER.speakers = "speakers";
-  TITLE.energy = "Energy"; TITLE.sensor = "Sensor"; TITLE.speakers = "Speakers";
+  LAYER.energy = "energy"; LAYER.sensor = "sensor"; LAYER.speakers = "speakers"; LAYER.queue = "queue";
+  TITLE.energy = "Energy"; TITLE.sensor = "Sensor"; TITLE.speakers = "Speakers"; TITLE.queue = "Up next";
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -710,6 +710,18 @@
     if (!demo) reread();
   };
 
+  // Up next: the next songs on the Spotify account (to look at: Spotify itself changes the queue)
+  B.queue = function (o, env) {
+    var H = kit().ha, q = H.queueOf(env), items = q && q.ok ? (q.items || []).filter(function (s) { return s && s.title; }) : [];
+    if (q && !q.ok) return B.setup(o, env);
+    if (!q) { S.body.appendChild(head("music", op(o).label || "Up next", "Checking Spotify", "#1db954")); return; }
+    S.body.appendChild(head("music", op(o).label || "Up next", items.length ? items.length + (items.length === 1 ? " song" : " songs") + " in the Spotify queue" : "Nothing up next in Spotify", "#1db954"));
+    S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:36px", items.slice(0, 10).map(function (s, i) {
+      var art = H.coverOk(s.art, env);
+      return E("div", "cwd-row", "width:820px;height:120px", [E("div", "", "width:120px;height:120px;border-radius:18px;flex:none;background:#333 center/cover;" + (art ? "background-image:" + kit().cssImg(s.art) : "")),
+        E("div", "cwd-col", "margin-left:26px;min-width:0;flex:1", [E("div", "cwd-mid cwd-ell", "", [(i + 1) + ". " + String(s.title).slice(0, 80)]), E("div", "cwd-small cwd-ell", "", [String(s.artist || "").slice(0, 80)])])]);
+    })));
+  };
   B.cards = function (o, env) {
     var cards = env.demo ? [{ title: "Solar today", value: "18.4 kWh" }, { title: "Pool", value: "26°" }, { title: "Rain gauge", value: "12 mm" }] : (kit().dataOf(env).cards || []);
     if (!cards.length) return B.setup(o, env);
