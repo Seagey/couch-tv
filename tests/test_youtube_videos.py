@@ -71,6 +71,8 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         self._lookup = patch.object(move, "youtube_video_id", new=AsyncMock(return_value=None))
         self.lookup = self._lookup.start()
         move._found.clear()
+        server._video_tasks.clear()
+        server._video_unsure.clear()
 
     def tearDown(self):
         self._lookup.stop()
@@ -123,6 +125,9 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(v["id"])
         self.assertEqual(store.history(), [])                    # not a show
         self.assertEqual((v["channel"], v["duration_ms"]), (None, None))   # the session gave neither
+        await asyncio.sleep(0)
+        self.lookup.assert_not_awaited()   # nothing to be sure by: no warm up, the card will search
+        self.assertEqual(server._video_tasks, {})
 
     async def test_the_line_keeps_the_channel_and_the_length_the_session_gave(self):
         with no_finder():
@@ -148,6 +153,19 @@ class Videos(unittest.IsolatedAsyncioTestCase):
             s = await server.media_read(FIRE_YOUTUBE, self.youtube())
         self.assertEqual((s["title"], s["app_subtitle"], s["duration"]), ("How Trains Work", "Some Channel", 600000))
         self.assertIsNone(server.media_now["duration_ms"])   # JustWatch's, not the session's: None for a video
+
+    async def test_media_read_never_sends_a_video_to_the_show_finder(self):
+        # resolve_episode unpatched: a channel named like a show and a video named like one of its
+        # episodes used to come back as that episode, with the show's name swapped into the title
+        t = server.TVS[self.tv]
+        dumpsys = DUMPSYS.replace("How Trains Work, Some Channel", "Keepy Uppy, Bluey")
+        server.episode_cache.clear()
+        with patch.object(t, "adb", new=AsyncMock(return_value=dumpsys)), no_finder(), \
+                patch.object(server, "artwork_soon", return_value={}):
+            s = await server.media_read(FIRE_YOUTUBE, self.youtube())
+        self.assertEqual((s["title"], s["subtitle"], s["app_subtitle"]), ("Keepy Uppy", "Bluey", "Bluey"))
+        self.assertEqual((server.media_now["title"], server.media_now["episode_title"], server.media_now["season"]),
+                         ("Keepy Uppy", "Bluey", None))
 
     async def test_the_watch_loop_hands_the_channel_and_the_length_to_log_seen(self):
         s = {"package": FIRE_YOUTUBE, "state": "PLAYING", "title": "How Trains Work", "subtitle": "Some Channel",
@@ -191,16 +209,22 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, [("How Trains Work", "Some Channel", 600000)])
         pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()]
         self.assertEqual(len(pending), 1, "the warm up runs in a task of its own")
+        # the bridge holds the task (the loop keeps only weak references, so it could be dropped mid flight)
+        self.assertEqual(list(server._video_tasks.values()), pending)
         pending[0].cancel()
 
     async def test_a_failing_warm_up_is_swallowed(self):
         self.lookup.side_effect = RuntimeError("no network")
         with no_finder():
-            await server.log_seen("How Trains Work", None, self.youtube(), who="person1")
+            await server.log_seen("How Trains Work", None, self.youtube(), who="person1", channel="Some Channel")
+        self.assertEqual(len(server._video_tasks), 1)
         await asyncio.sleep(0)
         await asyncio.sleep(0)
+        self.lookup.assert_awaited_once_with("How Trains Work", "Some Channel", None)
         self.assertEqual(len(store.videos()), 1)
         self.assertFalse([t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()])
+        self.assertEqual(server._video_tasks, {})   # let go once done
+        self.assertIn(server._video_key("How Trains Work", "Some Channel"), server._video_unsure)
 
     async def test_music_and_streams_are_still_never_logged(self):
         with no_finder():
@@ -321,12 +345,9 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Opened How Trains Work in YouTube.", body)
 
     async def test_open_with_an_unsure_lookup_searches_the_installed_youtube_and_never_asks_the_finder(self):
-        with no_finder():
-            await server.log_seen("How Trains Work & More", None, self.youtube(), who="person1")
-        vid = store.videos()[0]["id"]
-        self.lookup.reset_mock()   # the warm up's call
+        vid = self.video_line("How Trains Work & More", channel="Some Channel", duration_ms=600000)
         body, start, launch = await self.open(vid)
-        self.lookup.assert_awaited_once_with("How Trains Work & More", None, None)
+        self.lookup.assert_awaited_once_with("How Trains Work & More", "Some Channel", 600000)
         # Amazon's build shows its home for the web results link: it gets the link Alexa's voice search sends
         start.assert_awaited_once_with("youtube://search?query=How%20Trains%20Work%20%26%20More", FIRE_YOUTUBE)
         launch.assert_not_awaited()
@@ -335,6 +356,46 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         self.assertIn('"service": "youtube"', body)
         self.assertIn(FIRE_YOUTUBE, body)
         self.assertIn('"note_opened_app_search"', body)
+
+    async def test_an_unsure_warm_up_is_remembered_so_the_open_goes_straight_to_the_search(self):
+        with no_finder():
+            await server.log_seen("How Trains Work", "Some Channel", self.youtube(), who="person1",
+                                  channel="Some Channel", duration_ms=600000)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        self.lookup.assert_awaited_once_with("How Trains Work", "Some Channel", 600000)   # the warm up: unsure
+        vid = store.videos()[0]["id"]
+        body, start, launch = await self.open(vid)
+        self.lookup.assert_awaited_once()   # not again: the press does not pay the lookup a second time
+        start.assert_awaited_once_with("youtube://search?query=How%20Trains%20Work", FIRE_YOUTUBE)
+        self.assertIn('"method": "search"', body)
+        # until the memory runs out: then the lookup is tried once more
+        key = server._video_key("How Trains Work", "Some Channel")
+        server._video_unsure[key] = time.time() - server.VIDEO_UNSURE_KEEP_S - 1
+        self.lookup.return_value = VIDEO_ID
+        body, start, launch = await self.open(vid)
+        self.assertEqual(self.lookup.await_count, 2)
+        start.assert_awaited_once_with(WATCH_LINK, FIRE_YOUTUBE)
+        self.assertIn('"method": "deeplink"', body)
+        self.assertNotIn(key, server._video_unsure)   # found: forgotten as unsure
+
+    async def test_an_open_while_the_warm_up_runs_waits_on_it_instead_of_a_second_lookup(self):
+        answer = asyncio.Event()
+
+        async def slow(title, channel=None, duration_ms=None):
+            await answer.wait()
+            return VIDEO_ID
+        self.lookup.side_effect = slow
+        with no_finder():
+            await server.log_seen("How Trains Work", "Some Channel", self.youtube(), who="person1",
+                                  channel="Some Channel", duration_ms=600000)
+        vid = store.videos()[0]["id"]
+        asyncio.get_running_loop().call_later(0.05, answer.set)
+        body, start, launch = await self.open(vid)
+        self.assertEqual(self.lookup.await_count, 1)
+        start.assert_awaited_once_with(WATCH_LINK, FIRE_YOUTUBE)
+        self.assertIn('"method": "deeplink"', body)
+        self.assertIn(f'"video_id": "{VIDEO_ID}"', body)
 
     async def test_open_with_a_lookup_that_raises_still_searches(self):
         vid = self.video_line(channel="Some Channel", duration_ms=600000)
@@ -353,6 +414,10 @@ class Videos(unittest.IsolatedAsyncioTestCase):
             body, start, launch = await self.open(vid)
         start.assert_awaited_once_with("youtube://search?query=How%20Trains%20Work", FIRE_YOUTUBE)
         self.assertIn('"method": "search"', body)
+        # the lookup runs on for the next press; the press that ran out is what was let go
+        task, = server._video_tasks.values()
+        self.assertFalse(task.done())
+        task.cancel()
 
     async def test_open_falls_back_to_the_search_when_the_watch_link_does_not_take(self):
         vid = self.video_line(channel="Some Channel", duration_ms=600000)
@@ -365,17 +430,22 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         self.assertIn('"method": "search"', body)
         self.assertIn('"video_id": null', body)
 
-    async def test_an_old_line_without_channel_or_length_opens_the_same_way(self):
-        vid = self.video_line()   # written before the bridge kept them
+    async def test_an_old_line_without_channel_or_length_goes_straight_to_the_search(self):
+        # written before the bridge kept them: a title alone cannot be sure of the video (the lookup
+        # would take the first result of that name, from any channel), so there is no lookup at all
+        vid = self.video_line()
         self.lookup.return_value = VIDEO_ID
         body, start, launch = await self.open(vid)
-        self.lookup.assert_awaited_once_with("How Trains Work", None, None)
-        start.assert_awaited_once_with(WATCH_LINK, FIRE_YOUTUBE)
-        self.assertIn('"method": "deeplink"', body)
-        self.lookup.return_value = None
-        body, start, launch = await self.open(vid)
+        self.lookup.assert_not_awaited()
         start.assert_awaited_once_with("youtube://search?query=How%20Trains%20Work", FIRE_YOUTUBE)
+        launch.assert_not_awaited()
         self.assertIn('"method": "search"', body)
+        self.assertIn('"video_id": null', body)
+        # a live stream has no length: the channel alone is enough to ask
+        vid = self.video_line("A live stream", channel="Some Channel", duration_ms=None)
+        body, start, launch = await self.open(vid)
+        self.lookup.assert_awaited_once_with("A live stream", "Some Channel", None)
+        self.assertIn('"method": "deeplink"', body)
 
     async def test_open_falls_back_to_the_app_when_the_link_does_not_take(self):
         with no_finder():

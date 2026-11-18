@@ -142,7 +142,8 @@ out the same way. The phone's People sheet keeps these marks when it renames or 
   in the shared row or the household's taste: a video is written by the name YouTube gave it (and the
   channel and length the app reported), with no picture. Opening it plays the exact video when
   YouTube's public results page is sure of it from the title and the channel or the length, resumed
-  from the account's own history; otherwise it searches YouTube for the name.
+  from the account's own history; otherwise (unsure, or a line with neither channel nor length) it
+  searches YouTube for the name.
 - **With no computer (option A),** Keep watching is Android's own Watch Next list, plus the
   Continue Watching channel of apps that put nothing in Watch Next but keep a home screen row of
   their own instead: so far Stremio. Both are read the same read only way, with no account and no

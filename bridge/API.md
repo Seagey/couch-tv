@@ -563,7 +563,12 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
   YouTube's public results page (the same lookup the move feature uses, no key and no sign in,
   remembered six hours, and warmed when the line is written), and only when the title matches and
   the channel or the length agrees; a title many channels reuse is told apart by those, and a wrong
-  video is worse than none, so otherwise the lookup says unsure. A sure id goes to the build as its
+  video is worse than none, so otherwise the lookup says unsure. An unsure answer is remembered ten
+  minutes, so the next press on that card goes straight to the search instead of paying the lookup
+  again, and a press that comes while the warm up is still running waits on it (15 s at most) rather
+  than starting a second one. A line with neither channel nor length (written by an older bridge, or
+  from a session that gave neither) is never looked up: a title alone cannot be sure of the video, so
+  that card searches. A sure id goes to the build as its
   watch link with no time in it, and YouTube resumes it from the account's own history
   (`"method": "deeplink"`, `"video_id"` the id; tested on a Fire TV Cube with Amazon's YouTube, which
   played that very video from where it was left). Unsure, a lookup that fails or takes longer than
