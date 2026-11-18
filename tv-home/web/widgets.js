@@ -1161,10 +1161,6 @@
     add(root, [E("div", "cw-row cw-sp", "", [lab("calendar", op(o).label || "Today"), E("div", "cw-t23", "", [ev.length + " events"])]),
       E("div", "cw-col cw-grow", "margin-top:20px;justify-content:space-around", ev.slice(0, n).map(function (e) { return E("div", "cw-ev", "", [E("i", "", "background:" + e[0]), E("div", "cw-t29 cw-ell", "", [e[1]]), E("div", "cw-t25", "", [e[2]])]); }))]);
   };
-  R.note = function (root, o, b, env) {
-    if (!env.demo) return soon(root, b, "edit", "note");
-    add(root, [E("div", "cw-t23", "font-weight:700;color:var(--sub)", ["From Mum"]), E("div", "", "font-size:" + px(clamp(b.w / 9, 30, 44)) + ";font-weight:680;line-height:1.18;margin-top:10px;letter-spacing:-.01em", ["Dinner at 6. Feed Max!"])]);
-  };
   R.list = function (root, o, b, env) {
     if (!env.demo) return soon(root, b, "check", "list");
     var todo = /to ?do|task|work/i.test(op(o).label || "");
@@ -1422,9 +1418,6 @@
     add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "align-items:center;flex:none;width:92px", [E("div", "cw-t23", "font-weight:750;color:#ff453a", [DAYS[d.getDay()].slice(0, 3).toUpperCase()]), E("div", "cw-big", "font-size:62px", [String(d.getDate())])]),
       E("div", "cw-ev", "flex:1;min-width:0;margin-left:16px", [E("i", "", "background:#30d158"), E("div", "cw-col", "min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:680", ["Swimming"]), E("div", "cw-t23", "", ["4:00pm"])])])]));
   });
-  CR.note = sample("note", "edit", function (root, o, b) {
-    add(root, E("div", "", "font-size:" + px(b.w < 300 ? 26 : 34) + ";font-weight:680;line-height:1.15;display:-webkit-box;-webkit-line-clamp:" + (b.w < 300 ? 3 : 2) + ";-webkit-box-orient:vertical;overflow:hidden", ["Dinner at 6. Feed Max!"]));
-  });
   CR.list = sample("list", "check", function (root, o, b) { mini(root, b, op(o).icon || "check", "6", op(o).label || "Shopping", "Milk, avocados, sunscreen"); });
   CR.news = sample("news", "info", function (root, o, b) {
     add(root, [E("div", "cw-t23", "color:#ff453a;font-weight:700", ["Local · 1h"]), E("div", "cw-t29", "font-weight:640;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden", ["Highway roadworks finish a month early"])]);
@@ -1439,6 +1432,36 @@
   CR.screentime = sample("screentime", "timer", function (root, o, b) { mini(root, b, "timer", "25m", "Screen time", "Left today, bedtime 7:30pm"); });
   CR.queue = sample("queue", "music", function (root, o, b) { mini(root, b, "music", "8", "Up next", "Sunday Best, Surfaces"); });
   CR.wifi = sample("wifi", "wifi", function (root, o, b) { mini(root, b, "wifi", "Join", "Guest Wi-Fi", "Point your phone camera here"); });
+
+  // ---------------- things typed at home (athome.js, through app.js): kept on this TV only ----------------
+  // Note, List, Guest Wi-Fi, House guide, Agenda, On this day and Screen time. seagey, 18 Nov 2026:
+  // each fits its box at every size (nothing cut off: long words wrap, a line that cannot fit ends in
+  // "...", a block too tall ends in "..." on its last line) and its content is centred unless the design
+  // picks left or right (opts.align).
+  var FLEX = { left: "flex-start", center: "center", right: "flex-end" };
+  function athome(env) { return dataOf(env).home || null; }
+  function ahAlign(root, o) { var a = op(o).align === "left" || op(o).align === "right" ? op(o).align : "center"; root.classList.add("cw-ah"); root.setAttribute("data-align", a); return a; }
+  // the content as one group, in the middle of the box (or to the side the design picks)
+  function ahCol(a, kids, css) { return E("div", "cw-col cw-ahcol", "width:100%;height:100%;min-height:0;justify-content:center;align-items:" + FLEX[a] + ";text-align:" + a + ";" + (css || ""), kids); }
+  function lines(n) { return "display:-webkit-box;-webkit-line-clamp:" + n + ";-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;"; }
+  // one line of words that ends in "..." when it is too long, never cut
+  function one1(cls, css, text) { return E("div", cls + " cw-ell", "max-width:100%;flex:none;" + (css || ""), [text]); }
+  // the label: an icon and its words, as wide as they are (so it can sit in the middle)
+  function ahLab(iconName, text, colour) {
+    return E("div", "cw-lab", "max-width:100%;flex:none;" + (colour ? "color:" + colour : ""), [iconName ? ic(iconName, 30, colour || "currentColor") : null, E("span", "cw-ell", "flex:0 1 auto;min-width:0;margin-right:0", [text])]);
+  }
+  // ---- Family note ----
+  function noteOf(env) { var n = env.demo ? { text: "Dinner at 6. Feed Max!", from: "Mum" } : (athome(env) || {}).note; return n && n.text ? n : null; }
+  R.note = function (root, o, b, env) {
+    var a = ahAlign(root, o), n = noteOf(env);
+    if (!n) return soon(root, b, "edit", "note");
+    // the words as big as they fit (the quote's rule), wrapping, and "..." on the last line that fits
+    var fromH = n.from && b.h >= 200 ? 40 : 0, room = Math.max(30, b.h - 48 - fromH), len = Math.max(8, n.text.length);
+    var fs = clamp(Math.min(Math.sqrt((b.w - 48) * room / len / 1.7), room / 1.2, 64), 25, 64), max = Math.max(1, Math.floor(room / (fs * 1.18)));
+    add(root, ahCol(a, [fromH ? one1("cw-t23", "font-weight:700;color:var(--sub)", "From " + n.from) : null,
+      E("div", "", "flex:none;max-width:100%;font-size:" + px(fs) + ";font-weight:680;line-height:1.18;margin-top:" + (fromH ? 8 : 0) + "px;letter-spacing:-.01em;white-space:pre-line;" + lines(max), [n.text])]));
+  };
+  CR.note = R.note;
 
   // ---------------- one widget, a stack, the API ----------------
   function one(o, b, env) {
@@ -1525,6 +1548,8 @@
       appNode: appNode, appsFor: appsFor, appName: appName, appIcon: appIcon, demoImg: demoImg, bgImg: bgImg,
       sunToday: sunToday, sunTimes: sunTimes, moon: moon, tzTime: tzTime, CITY: CITY, DAYS: DAYS, MONTHS: MONTHS, longDate: longDate, clockParts: clockParts,
       roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
-      airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12 }
+      airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
+      // things typed at home (athome.js through app.js)
+      athome: athome }
   };
 })();

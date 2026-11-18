@@ -25,11 +25,12 @@
     aircon: "aircon", scenes: "scenes", controls: "controls", camera: "camera", doorbell: "camera",
     card: "cards", news: "news", sports: "sports",
     memory: "setup", picks: "setup", queue: "setup", speakers: "setup", energy: "setup", sensor: "setup", battery: "setup",
-    note: "setup", list: "setup", stocks: "setup", commute: "setup", wifi: "setup", guide: "setup", screentime: "setup"
+    note: "note", list: "setup", stocks: "setup", commute: "setup", wifi: "setup", guide: "setup", screentime: "setup"
   };
   var TITLE = { timers: "Timers", forecast: "Forecast", world: "World clocks", calendar: "Calendar", moon: "Moon", air: "Air quality", surf: "Surf",
     photos: "Photos", keep: "Keep watching", folder: "Apps", player: "Now playing", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre",
-    camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up" };
+    camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up",
+    note: "Family note" };
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -210,6 +211,15 @@
       });
     }
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:flex-start;margin-top:36px", [todayCol, E("div", "cwd-row", "margin-left:60px;align-items:flex-start", [monthGrid(y, m, d.getDate()), E("div", "", "width:56px"), monthGrid(m === 11 ? y + 1 : y, (m + 1) % 12, -1)])]));
+  };
+
+  // things typed at home (Home settings, couch-tv Studio, At home), kept on this TV
+  B.note = function (o, env) {
+    var n = env.demo ? { text: "Dinner at 6. Feed Max!", from: "Mum" } : (kit().athome(env) || {}).note;
+    if (!n || !n.text) return B.setup(o, env);
+    S.body.appendChild(head("edit", "Family note", n.from ? "From " + n.from : "Change it in Home settings, couch-tv Studio, At home", "#c79a00"));
+    var fs = clamp(Math.sqrt(1500 * 640 / Math.max(10, n.text.length) / 1.6), 44, 120);
+    S.body.appendChild(E("div", "cwd-col cwd-grow cwd-center", "", [E("div", "cwd-note", "font-size:" + px(fs), [n.text])]));
   };
 
   // moon: tonight and the next four weeks

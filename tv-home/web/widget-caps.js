@@ -101,6 +101,20 @@
   };
   var APPS_ORDER = [OPEN, "Go down to Apps and press OK.", "OK moves an app between the home, More apps and hidden. Hold OK on an app to move it along."];
 
+  // things typed at home: Home settings, couch-tv Studio, At home (athome.js), kept on the TV only
+  var AT_HOME = "Go down to couch-tv Studio, then pick At home.";
+  var TYPE_PHONE = "Typing is quicker with the phone remote: Type on the TV puts the words in the box.";
+  var TYPE_TV = "Type with the TV remote's keyboard, then press OK.";
+  function typed(first) { return { android: [OPEN, AT_HOME].concat(first, [TYPE_PHONE]).slice(0, 5), web: [OPEN, AT_HOME].concat(first, [TYPE_TV]).slice(0, 5), vidaa: [OPEN, AT_HOME].concat(first, [TYPE_TV]).slice(0, 5) }; }
+  var KEPT = { android: "Kept on this TV only, never in a design.", web: "Kept on this TV only, never in a design. The home computer has to be on.", vidaa: "Kept in this TV's browser only, never in a design." };
+  var NOTE_NEED = "A note typed on the TV";
+  var LIST_NEED = "A list typed on the TV";
+  var WIFI_NEED = "The guest Wi-Fi's name and password, typed on the TV";
+  var GUIDE_NEED = "The guide, typed on the TV";
+  var CAL_NEED = "Your calendar's private address, typed on the TV";
+  var DATED_NEED = "Your photos on the TV, with the day each was taken";
+  var SCREEN_NEED = "A Google TV, Android TV or Fire TV that allows screen time";
+
   var TOWN_NEED = "Your town, set on the TV";
   var PHOTOS_NEED = "Your photos on the TV, or one photo put in the widget";
   var WATCH_NEED = "The couch-tv TV app or a computer at home that stays on";
@@ -292,10 +306,9 @@
       setup: setup("nothing", NOT_YET), until: "\"Agenda: not on couch-tv yet\", and what it needs",
       build: "Home settings has to keep a private iCal link (Google, Apple or Outlook) on the TV, never in a design, and the bridge or the TV has to read today's events from it.",
       ok: "Opens the day: every event on a timeline (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small", "tall", "medium", "large"], [2, 2]) },
-    note: { name: "Family note", status: "not-built", what: "A sticky note typed at home", needs: ["Needs a note typed from the phone and kept on the TV"],
-      setup: setup("nothing", NOT_YET), until: "\"Family note: not on couch-tv yet\", and what it needs",
-      build: "The phone remote needs a Note sheet that saves the words on the TV (not in the design, which refuses digits and links).",
-      ok: "Opens the note big (once built)", platforms: NOWHERE("Not built yet."), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
+    note: { name: "Family note", status: "setup", what: "A sticky note typed at home, with who it is from", needs: [NOTE_NEED],
+      setup: setup("tv", typed(["Pick Write a note, type it, then press OK. Pick From to say who it is from."])), until: "\"Write a note\", and where", build: "",
+      ok: "Opens the note big", platforms: plat("setup", "computer", "setup", KEPT), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     list: { name: "List", status: "not-built", what: "Reminders or shopping, ticked from the phone", needs: ["Needs a list kept at home that the phone can tick"],
       setup: setup("nothing", NOT_YET), until: "\"List: not on couch-tv yet\", and what it needs",
       build: "HomeAssistant.kt has to allow todo entities named in config.json (read and tick), or the bridge has to keep a list the phone remote edits.",
@@ -375,6 +388,14 @@
   SHORT[HA_NEED] = ["Needs Home Assistant", "Set up once on a computer. OK here shows how", "Needs Home Assistant"];
   SHORT[C.card.needs[0]] = ["Needs a home computer", "OK here shows how to set it up", "Needs a computer"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];
+  var AT = "Home settings, couch-tv Studio, At home";
+  SHORT[NOTE_NEED] = ["Write a note", AT, "Write a note"];
+  SHORT[LIST_NEED] = ["Add a list", AT, "Add a list"];
+  SHORT[WIFI_NEED] = ["Add your guest Wi-Fi", AT, "Add Wi-Fi"];
+  SHORT[GUIDE_NEED] = ["Write your house guide", AT, "Write a guide"];
+  SHORT[CAL_NEED] = ["Add your calendar", AT, "Add a calendar"];
+  SHORT[DATED_NEED] = ["Add your photos", "Home settings, Look and scenes, Your photos", "Add photos"];
+  SHORT[SCREEN_NEED] = ["Allow screen time", AT, "Allow it first"];
   // tiny: the box is a tile, so the line has to fit two short lines (OK opens the whole record)
   function card(kind, tiny) {
     var c = C[kind];
