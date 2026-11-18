@@ -111,6 +111,8 @@
   var WX_AMBIENT = true, WX_SUN_GRADE = true;
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
   var NP_ON = true, KW_ON = true, SOUND_STYLE = "system", START_FOCUS = "people";
+  // Keep watching follows the app the remote is on (home.shelf_follows_app), off unless switched on
+  var SHELF_FOLLOW = false;
   // Ambient sleep soundscapes (rain, fire, waves, brown noise)
   var SOUND_TYPE = "off", SOUND_VOL = 0.5, SOUND_FADE_SLEEP = true;
   function initSoundscape() {
@@ -367,7 +369,9 @@
   }
 
   var $ = function (id) { return document.getElementById(id); };
-  var data = { shows: [], showsBy: {}, apps: [], screens: [], bridge: null };
+  // shows is the row on screen (the whole row, or one app's cards while the remote follows an app);
+  // showsBy and videosBy are the full lists per person, as the bridge (or Android's Watch Next) gave them
+  var data = { shows: [], showsBy: {}, videosBy: {}, apps: [], screens: [], bridge: null };
   // Whose Keep watching is showing. Remembered on this TV. Any number of people: none or one shows
   // no switcher, two the pill switch, three or more a round head icon that opens a list.
   // With nobody set up, everything is shown ("both" to the bridge).
@@ -421,7 +425,7 @@
     PEOPLE = (list || []).filter(function (p) { return p && p.id && p.name; });
     NOBODY = !PEOPLE.length;
     if (NOBODY) PEOPLE = [{ id: "both", name: t("everyone") }];
-    PEOPLE.forEach(function (p) { if (!data.showsBy[p.id]) data.showsBy[p.id] = []; });
+    PEOPLE.forEach(function (p) { if (!data.showsBy[p.id]) data.showsBy[p.id] = []; if (!data.videosBy[p.id]) data.videosBy[p.id] = []; });
     if (!PEOPLE.some(function (p) { return p.id === who; })) who = PEOPLE[0].id;
   }
   // An order made on this TV with no bridge to keep it (or before the bridge heard about it).
@@ -485,6 +489,9 @@
     // the Keep watching row: Home settings win over home.keep_watching; off hides it and stops fetching it
     KW_ON = typeof ST.keep_watching === "boolean" ? ST.keep_watching : HOME.keep_watching !== false;
     document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
+    // the row follows the app the remote is on: Home settings win over home.shelf_follows_app; off unless switched on
+    SHELF_FOLLOW = typeof ST.shelf_follows_app === "boolean" ? ST.shelf_follows_app : HOME.shelf_follows_app === true;
+    if (!SHELF_FOLLOW) followPkg = null;
     // the full screen music view is off until it is switched on in Home settings or home.ambient_music
     AMBIENT_MUSIC = typeof ST.ambient_music === "boolean" ? ST.ambient_music : HOME.ambient_music === true;
     GLASS_FOCUS = (ST.glass_focus || HOME.glass_focus) === "glass" ? "glass" : "colour";
@@ -566,7 +573,7 @@
   }
   function save() {
     if (MOCK || PREVIEW || OFFLINE) return;
-    var j = JSON.stringify({ showsBy: data.showsBy, screens: data.screens, order: data.order });
+    var j = JSON.stringify({ showsBy: data.showsBy, videosBy: data.videosBy, screens: data.screens, order: data.order });
     try { localStorage.setItem(CACHE_KEY, j); } catch (e) {}
     try { if (TV && TV.keep) TV.keep(CACHE_KEY, j); } catch (e) {}
   }
@@ -1562,8 +1569,8 @@
     var el = $("np"), on = npVisible();
     el.classList.toggle("on", on);
     if (NIGHT) {
-      // the row shows while someone has a show on the go, or while a song plays
-      var anyone = KW_ON && PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
+      // the row shows while someone has a show on the go (or videos under the YouTube tile), or while a song plays
+      var anyone = rowHasCards();
       $("shelf-section").classList.toggle("empty", !anyone && !on);
       $("np-slot").classList.toggle("on", on);
     }
@@ -2183,6 +2190,7 @@
   function subtitle(it) {
     var parts = [];
     if (it.app && it.app.name) parts.push(it.app.name);
+    if (it.kind === "video") parts.push(t("video_card"));   // a YouTube video: no season, episode or picture
     if (it.season && it.episode) parts.push("S" + it.season + ", E" + it.episode);
     if (it.episode_title) parts.push(it.episode_title);
     return parts.join("  ·  ");
@@ -2355,17 +2363,76 @@
 
   // Keep watching shows up to ten per person; the row slides along under the remote.
   var KEEP_MAX = 10;
+
+  // ---------------- the row follows the app the remote is on (home.shelf_follows_app) ----------------
+  // followPkg is the package of the app tile the remote is on, or null for the whole row. While it is
+  // set, the row shows only that app's cards (under the YouTube tile, also that person's videos from the
+  // bridge) under a "Recently on <app>" heading. An app with nothing on the go changes nothing: the
+  // whole row stays, so the row never empties or flickers as the remote runs along the dock.
+  var followPkg = null, shelfShown = "";
+  function pkgOf(it) { return (it.app && it.app.package) || it.package || ""; }
+  function fullShows() { return KW_ON ? (data.showsBy[who] || []).slice(0, KEEP_MAX) : []; }
+  // one app's cards: its shows from the row, then its videos (only YouTube has any), each newest first
+  function showsFor(pkg) {
+    return fullShows().filter(function (it) { return pkgOf(it) === pkg; })
+      .concat((data.videosBy[who] || []).filter(function (it) { return pkgOf(it) === pkg; })).slice(0, KEEP_MAX);
+  }
+  // the list on screen: the followed app's cards when it has some, else the whole row
+  function visibleShows() {
+    if (!followPkg) return fullShows();
+    var mine = showsFor(followPkg);
+    return mine.length ? mine : fullShows();
+  }
+  // the app the heading names, or null while the whole row shows
+  function followName() {
+    if (!followPkg) return null;
+    var mine = showsFor(followPkg);
+    if (!mine.length) return null;
+    var a = (data.apps || []).filter(function (x) { return x.package === followPkg; })[0];
+    return a ? a.name : (mine[0].app && mine[0].app.name) || followPkg;
+  }
+  // what the row would show now, as one string: the heading and the ids of the cards
+  function shelfKey() { return (followName() || "") + "\n" + visibleShows().map(function (it) { return it.id; }).join("\n"); }
+  // Which app the row follows right now: the app tile the remote is on (not More apps, Settings, an input, a
+  // Screen or a tool), kept while the remote has gone up from it into the row or holds OK on a card there;
+  // anywhere else (another tile, the people, the quick buttons, Now playing, a menu) the whole row comes
+  // back. Called from paintFocus on every press, so the row is drawn again only when its cards would change.
+  function followSync() {
+    var want = null;
+    if (SHELF_FOLLOW && KW_ON && !kidsOn() && !lift) {
+      if (zone === "grid") { var a = gridItems[g]; want = a && (a.kind === "app" || !a.kind) && a.package ? a.package : null; }
+      else if (zone === "shelf" || zone === "shelfmenu") want = followPkg;
+    }
+    if (want === followPkg) return false;
+    followPkg = want;
+    if (shelfKey() === shelfShown) return false;   // the same cards under the same heading: nothing to redraw
+    renderShelf();
+    s = Math.max(0, Math.min(s, shelfEls.length - 1));   // the row may have fewer cards now
+    // the track still sits where the longer row was scrolled to, and only a press in the row moves it:
+    // a shorter row drawn under it would start off screen, under the heading, until the remote came back up
+    scrollShelf();
+    return true;
+  }
+  // The row has something to show: the cards on screen now (one app's, or someone's videos under the
+  // YouTube tile, which showsBy never holds) or someone's shows. renderShelf and renderNp hide the row on
+  // this, so a person whose only history is YouTube videos still sees their "Recently on YouTube".
+  function rowHasCards() {
+    return KW_ON && (data.shows.length > 0 || PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length > 0; }));
+  }
+
   function renderShelf() {
     var track = $("shelf");
-    data.shows = KW_ON ? (data.showsBy[who] || []).slice(0, KEEP_MAX) : [];
-    var anyone = KW_ON && PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
+    data.shows = KW_ON ? visibleShows() : [];   // the whole row, or one app's cards while the remote follows it
+    var anyone = rowHasCards();
     // nobody has anything on the go: no empty box, the photo has the space (unless Now playing
     // is up at night). The people switcher stays: with nothing yet (Netflix tells Android nothing on
     // some TVs, issue #23) it is the only way to say who is watching before anything is played.
     $("shelf-section").classList.toggle("empty", !anyone && !(NIGHT && npVisible()) && !CARDS.length);
     // custom cards keep the row (and its heading) even with Keep watching switched off
     document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
-    $("shelf-title").textContent = t(data.shows.length || !CARDS.length ? "keep_watching" : "custom_cards");
+    var following = followName();
+    $("shelf-title").textContent = following ? t("recently_on", { app: following }) : t(data.shows.length || !CARDS.length ? "keep_watching" : "custom_cards");
+    shelfShown = shelfKey();
     renderPeople();
     if (!KW_ON) { track.innerHTML = ""; shelfEls = []; addCards(track); return; }   // row switched off: only the custom cards, if any
     if (!data.shows.length) {
@@ -2379,7 +2446,7 @@
       // lock screen notifications: glass cards, three in view, the row slides past the third
       track.innerHTML = data.shows.map(function (it) {
         var art = slim(it.backdrop || it.poster), pkg = it.app && it.app.package;
-        var ep = it.season && it.episode ? "S" + it.season + " E" + it.episode : (it.episode_title || "");
+        var ep = it.kind === "video" ? t("video_card") : it.season && it.episode ? "S" + it.season + " E" + it.episode : (it.episode_title || "");
         return '<div class="tile ncard">' +
           (art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async">' : '<span class="thumb none"></span>') +
           '<div class="t"><div class="nap">' + (pkg && iconUrl(pkg) ? '<img src="' + esc(iconUrl(pkg)) + '" alt="" onerror="this.remove()">' : "") +
@@ -2783,16 +2850,15 @@
 
     var card = shelfEls[s];
     var finishRemoval = function () {
+      var keepIt = function (showItem) {
+        var sId = String(showItem.id || "");
+        var sSig = pkgOf(showItem) + "|" + (showItem.title || "");
+        return sId !== id && sSig !== sig;
+      };
       PEOPLE.forEach(function (p) {
-        if (data.showsBy[p.id]) {
-          data.showsBy[p.id] = data.showsBy[p.id].filter(function (showItem) {
-            var sId = String(showItem.id || "");
-            var sSig = ((showItem.app && showItem.app.package) || showItem.package || "") + "|" + (showItem.title || "");
-            return sId !== id && sSig !== sig;
-          });
-        }
+        if (data.showsBy[p.id]) data.showsBy[p.id] = data.showsBy[p.id].filter(keepIt);
+        if (data.videosBy[p.id]) data.videosBy[p.id] = data.videosBy[p.id].filter(keepIt);
       });
-      data.shows = (data.showsBy[who] || []).slice(0, KEEP_MAX);
       renderShelf();
       if (!shelfEls.length) {
         $("shelf-section").classList.add("empty");
@@ -3106,6 +3172,7 @@
   function paintFocus() {
     if (DOCK_MAC) setTimeout(magnify, 0);   // after this paint has put the focus class where it belongs
     saveFocusSoon();
+    followSync();   // the row follows the app tile the remote is on (home.shelf_follows_app)
     if (zone === "settings") { renderSettings(); return; }
     if (zone === "smart") { window.smartHome.paint(); return; }
     if (zone === "ambient") { renderAmbientMusic(); return; }
@@ -3417,7 +3484,9 @@
     clearTimeout(focusSaveTimer); focusSaveTimer = 0;
     if (!focusRestored && !touched) return;   // a page not drawn yet must not overwrite what it is about to restore
     if (zone !== "shelf" && zone !== "grid") return;   // menus and settings are not worth coming back to
-    try { localStorage.setItem(FOCUS_KEY, JSON.stringify({ t: Date.now(), zone: zone, s: s, g: g, key: zone === "grid" ? gridKey(gridItems[g]) : "" })); } catch (e) {}
+    // a card's place in the row only means something with the same row: "pkg" is the app the row was
+    // following (home.shelf_follows_app), "" for the whole row
+    try { localStorage.setItem(FOCUS_KEY, JSON.stringify({ t: Date.now(), zone: zone, s: s, g: g, key: zone === "grid" ? gridKey(gridItems[g]) : "", pkg: zone === "shelf" && followPkg ? followPkg : "" })); } catch (e) {}
   }
   function saveFocusSoon() { if (!focusSaveTimer) focusSaveTimer = setTimeout(saveFocusNow, 500); }
   function forgetFocus() { clearTimeout(focusSaveTimer); focusSaveTimer = 0; try { localStorage.removeItem(FOCUS_KEY); } catch (e) {} }
@@ -3427,8 +3496,17 @@
     focusRestored = true;
     var saved = null;
     try { saved = JSON.parse(localStorage.getItem(FOCUS_KEY) || "null"); } catch (e) {}
+    // the remote was left in a "Recently on <app>" row: draw that row again before the card is looked up,
+    // so the outline lands on the card it left and not on the same place in the whole row
+    var pkg = saved && typeof saved === "object" && saved.zone === "shelf" && typeof saved.pkg === "string" ? saved.pkg : "";
+    if (pkg && !SHELF_FOLLOW) return false;   // the setting went off since: that place means nothing now
+    var wholeRow = function () { followPkg = null; renderShelf(); return false; };   // as a fresh start has it
+    if (pkg) {
+      followPkg = pkg; renderShelf();
+      if (!followName()) return wholeRow();   // that app has nothing on the go any more
+    }
     var f = pickFocus(saved, Date.now(), shelfEls.length, gridItems.map(gridKey));
-    if (!f) return false;
+    if (!f) return pkg ? wholeRow() : false;
     zone = f.zone; s = f.s; g = f.g;
     return true;
   }
@@ -4007,6 +4085,11 @@
       document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
       if (!KW_ON) { data.shows = []; shelfEls = []; s = 0; }
       renderShelf(); renderNp();
+    } });
+    // the row follows the app the remote is on (home.shelf_follows_app): only that app's cards, as "Recently on <app>"
+    rows.push({ kind: "toggle", key: "shelf-follows-app", label: t("shelf_follow"), sub: t("shelf_follow_sub"), value: SHELF_FOLLOW ? t("on") : t("off"), act: function () {
+      SHELF_FOLLOW = !SHELF_FOLLOW; ST.shelf_follows_app = SHELF_FOLLOW; saveSettings();
+      if (!SHELF_FOLLOW && followPkg) { followPkg = null; renderShelf(); }   // the whole row again, straight away
     } });
     rows.push({ kind: "cycle", key: "start-focus", label: t("start_focus"), sub: t("start_focus_sub"),
       value: t("start_focus_" + START_FOCUS), act: function () {
@@ -5193,6 +5276,10 @@
               return dismissed.indexOf(id) === -1 && dismissed.indexOf(sig) === -1;
             });
             data.showsBy[p.id] = items.slice(0, KEEP_MAX);
+            // that person's YouTube videos, shown under the YouTube tile alone (home.shelf_follows_app)
+            data.videosBy[p.id] = (j.videos || []).filter(function (it) {
+              return dismissed.indexOf(String(it.id || "")) === -1 && dismissed.indexOf(pkgOf(it) + "|" + (it.title || "")) === -1;
+            }).slice(0, KEEP_MAX);
           });
         }));
       }),
@@ -5318,7 +5405,7 @@
       setInterval(refreshCards, window.CustomCards.EVERY_MIN * 60000);
     }
     var cached = load();
-    if (cached) { data.showsBy = cached.showsBy || data.showsBy; data.screens = cached.screens || []; data.order = cached.order || null; }
+    if (cached) { data.showsBy = cached.showsBy || data.showsBy; data.videosBy = cached.videosBy || data.videosBy; data.screens = cached.screens || []; data.order = cached.order || null; }
     setPeople(PEOPLE);   // the cache may predate someone new
     if (OFFLINE) {   // no bridge: an order made with this TV's remote wins
       var lo = kept("tvhome.order.tv");
