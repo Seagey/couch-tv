@@ -24,7 +24,8 @@ SYNC_HELPER = "dev.couchtv.sync"   # the helper app of docs/SYNC.md; the only wa
 # Apps where the move may press OK on a screen it cannot read (server.move_nudge). A blind OK is only
 # safe where it cannot buy anything: Netflix sells nothing inside its TV app. An app with rentals or
 # add-on channels (Prime Video) could have Rent or Subscribe in focus instead of Play, so it is not
-# here. COUCHTV_MOVE_BLIND_OK adds app ids (comma separated) for a household that accepts that.
+# here. COUCHTV_MOVE_BLIND_OK adds app ids (comma separated) for a household that accepts that: it
+# can cost money (docs/MOVE.md says so).
 BLIND_OK_APPS = {"netflix"} | {a.strip() for a in os.environ.get("COUCHTV_MOVE_BLIND_OK", "").split(",") if a.strip()}
 
 YOUTUBE_ID = re.compile(r"[A-Za-z0-9_-]{11}")

@@ -114,6 +114,10 @@ the rest from the bridge's API or the remote page in a browser.
   whether Play or Rent has the focus. A household that accepts that can name more apps in the
   `COUCHTV_MOVE_BLIND_OK` environment variable of the bridge (app ids, comma separated, for example
   `prime-video`).
+  **This setting can cost money.** With it, the bridge presses OK on a title page it cannot read. If
+  that page has Rent or Buy in focus instead of Play (a title that is not in your plan on the other
+  TV's account, or a different account there), that OK can rent or buy it. Leave it unset unless you
+  accept that, and keep a purchase PIN on the app.
 - **The show has to be one the show finder knows** (it is how the bridge opens a title in an app). A
   title that is a show's name followed by an episode's name (Disney+: "Bluey Fancy Restaurant") is
   matched when that episode is found. For anything else the app opens on its search, with the title
