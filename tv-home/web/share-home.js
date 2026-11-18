@@ -14,6 +14,7 @@
   "use strict";
   var PKG = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/i;
   var BUILT_IN_BG = /^backgrounds\/[A-Za-z0-9_][A-Za-z0-9_-]{0,80}\.(jpe?g|png|webp)$/;
+  var BUILT_IN_VID = /^backgrounds\/[A-Za-z0-9_][A-Za-z0-9_-]{0,80}\.(mp4|webm)$/;
   var TIMEOUT = 15000;
 
   function obj(v) { return v && typeof v === "object" && !Array.isArray(v) ? v : {}; }
@@ -34,6 +35,9 @@
       if (bg.image !== undefined && !(typeof bg.image === "string" && BUILT_IN_BG.test(bg.image))) delete bg.image;
       // its cut out (depth_image) is a picture of that photo too: it goes with it
       if (bg.depth_image !== undefined && !(bg.image && typeof bg.depth_image === "string" && BUILT_IN_BG.test(bg.depth_image))) delete bg.depth_image;
+      // a video background goes only when it is a built in loop with its still picture: the
+      // household's own clip, or one from the store, stays where it is
+      if (bg.video !== undefined && !(bg.image && typeof bg.video === "string" && BUILT_IN_VID.test(bg.video))) delete bg.video;
       if (d.background && !Object.keys(bg).length) delete d.background;
       // smart home controls name this house's own devices
       (Array.isArray(d.objects) ? d.objects : []).forEach(function (o) { if (o && typeof o === "object") { delete o.entity; delete o.entities; } });
@@ -83,6 +87,7 @@
     var bg = obj(d.background);
     if (bg.image !== undefined && !(typeof bg.image === "string" && BUILT_IN_BG.test(bg.image))) delete bg.image;
     if (bg.depth_image !== undefined && !(bg.image && typeof bg.depth_image === "string" && BUILT_IN_BG.test(bg.depth_image))) delete bg.depth_image;
+    if (bg.video !== undefined && !(bg.image && typeof bg.video === "string" && BUILT_IN_VID.test(bg.video))) delete bg.video;
     if (d.background && !Object.keys(bg).length) delete d.background;
     var keys = Object.keys(d).filter(function (k) { return k !== "v"; });
     if (!keys.length) return { error: "There is nothing on this home to share yet." };

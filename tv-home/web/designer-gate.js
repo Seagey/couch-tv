@@ -53,17 +53,24 @@
     "img-src 'self' data: blob: https: http://tvos.invalid; media-src 'self' blob: https:; " +
     "connect-src 'self' https: http://127.0.0.1:* http://localhost:*; frame-src https://sdk.scdn.co; font-src 'self' data:; " +
     "object-src 'none'; base-uri 'none'; form-action 'none'";
-  function lockPage(doc) {
+  // opts.media: where videos may come from while a design is on (design-code.js mediaSources: this
+  // page, blob:, the design store and the host of this TV's own Home settings video link). Without
+  // it the policy above is used as it is.
+  function policy(opts) {
+    var media = opts && Array.isArray(opts.media) ? opts.media.filter(function (s) { return /^('self'|blob:|https:\/\/[a-z0-9.-]+(:\d{1,5})?|http:\/\/(127\.0\.0\.1|localhost)(:\d{1,5})?)$/i.test(String(s)); }) : null;
+    return media && media.length ? POLICY.replace(/media-src [^;]*;/, "media-src " + media.join(" ") + ";") : POLICY;
+  }
+  function lockPage(doc, opts) {
     doc = doc || (typeof document !== "undefined" ? document : null);
     if (!doc || !doc.head || doc.querySelector && doc.querySelector('meta[data-tvdesigner="policy"]')) return false;
     var m = doc.createElement("meta");
     m.setAttribute("http-equiv", "Content-Security-Policy");
-    m.setAttribute("content", POLICY);
+    m.setAttribute("content", policy(opts));
     m.setAttribute("data-tvdesigner", "policy");
     doc.head.appendChild(m);
     return true;
   }
 
   window.CouchDesigner = { KEY: KEY, DEFAULT_STORE: DEFAULT_STORE, DESIGNER_PAGE: DESIGNER_PAGE, POLICY: POLICY,
-    decide: decide, readChoice: readChoice, lockPage: lockPage };
+    decide: decide, readChoice: readChoice, lockPage: lockPage, policy: policy };
 })();

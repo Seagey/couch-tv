@@ -565,7 +565,8 @@ class MainActivity : Activity() {
             "jpg", "jpeg" -> "image/jpeg"
             "png" -> "image/png"
             "webp" -> "image/webp"
-            "mp4" -> "video/mp4"   // a scene's own clip (home.my_scenes[].video)
+            "mp4" -> "video/mp4"   // a scene's own clip (home.my_scenes[].video), a design's loop (background.video)
+            "webm" -> "video/webm"
             "svg" -> "image/svg+xml"
             "woff2" -> "font/woff2"
             else -> "application/octet-stream"
@@ -616,6 +617,14 @@ class MainActivity : Activity() {
         /** The TV's own 12 or 24 hour setting (System, Date and time), so the clock follows it until Home settings picks one (#221). */
         @JavascriptInterface
         fun is24Hour(): Boolean = android.text.format.DateFormat.is24HourFormat(this@MainActivity)
+
+        /** Is the TV saving power (Android's power save mode)? A design's video background then keeps its still picture (bg-video.js). */
+        @JavascriptInterface
+        fun powerSave(): Boolean = try {
+            getSystemService(android.os.PowerManager::class.java)?.isPowerSaveMode ?: false
+        } catch (e: Exception) {
+            false
+        }
 
         /** Is couch-tv the home? "held", "google_tv" (explain the Home button watch) or "ask" (HomeRole.kt, #98). */
         @JavascriptInterface

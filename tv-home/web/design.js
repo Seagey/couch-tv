@@ -25,8 +25,9 @@
   var ROOT = document.documentElement;
   var SEQ = 0, D = null, ON = false, hooks = {}, styleEl = null, dockStyle = null, wxEl = null, bgEl = null, textBox = null;
   var layers = { back: null, front: null }, clockTimer = null, depthEl = null;
-  // the built in scenes with a cut out of their hills (backgrounds/scene-<name>-fg.webp); water has none
-  var DEPTH_SCENE = /^backgrounds\/scene-(night|golden|fog|dawn)\.jpg$/;
+  // the built in scenes with a cut out of their hills (backgrounds/scene-<name>-fg.webp); water has none.
+  // The clouds loop's still picture has one too (backgrounds/loop-clouds-fg.png, bg-video.js).
+  var DEPTH_SCENE = /^backgrounds\/(scene-(night|golden|fog|dawn)|loop-clouds)\.jpg$/;
   var appsKey = "", clockKey = "", observer = null, gridObserver = null;
 
   // the look settings a design may carry (design.home); Home settings on the TV still win
@@ -127,8 +128,10 @@
   function depthSrc(bg, src) {
     if (!src || bg.depth !== true) return "";
     var own = depthImgOk(bg.depth_image);
-    return own || (DEPTH_SCENE.test(src) ? src.replace(/\.jpg$/, "-fg.webp") : "");
+    return own || (DEPTH_SCENE.test(src) ? (/^backgrounds\/loop-/.test(src) ? src.replace(/\.jpg$/, "-fg.png") : src.replace(/\.jpg$/, "-fg.webp")) : "");
   }
+  // a looping video behind the home (background.video, bg-video.js): only with its still picture
+  function vidOk(u) { return window.CouchVideo ? window.CouchVideo.refOk(u, { designer: DESIGNER, origin: location.origin }) : ""; }
   function cssUrl(u) { return 'url("' + String(u).replace(/["\\\n]/g, encodeURIComponent) + '")'; }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 
@@ -450,7 +453,16 @@
       var cut = depthImgOk(bg.depth_image);
       if (cut) { out.background.depth_image = cut; put(out.background, "depth", bg.depth === false ? false : true); }
       else if (DEPTH_SCENE.test(image)) put(out.background, "depth", SAN.b(bg.depth));
-    } else if (SAN.c(bg.colour)) {
+      // video: a short loop played over the photo, which is its still picture (bg-video.js says what
+      // may be named: a file on this TV, or a video the design store keeps; never a link). A blur
+      // is drawn on the still only: blurring every frame of a video is too slow for a TV.
+      var vid = vidOk(bg.video);
+      if (vid) { out.background.video = vid; if (out.background.blur) { delete out.background.blur; note("A video background is not blurred, so the blur was taken off."); } }
+      else if (bg.video !== undefined) note("That video background is not allowed: only a built in loop or a video from couch-tv Studio's store.");
+    } else if (bg.video !== undefined) {
+      note("A video background needs its still picture, so it was left out.");
+    }
+    if (!out.background && SAN.c(bg.colour)) {
       out.background = { colour: SAN.c(bg.colour) };   // one plain colour, in a plain colour format
       // or two, as a gradient (the widget presets): two colours and an angle, nothing else
       if (SAN.c(bg.colour2)) { out.background.colour2 = SAN.c(bg.colour2); put(out.background, "angle", SAN.n(bg.angle, 0, 360, true)); put(out.background, "radial", SAN.b(bg.radial)); }
@@ -649,6 +661,9 @@
     out.push(["The home itself", 10, "home"]);
     if (bg.image) out.push(["Your photo", 3, "photo"]);
     else if (bg.colour) out.push(["Plain colour", 1, "colour"]);
+    // a looping video: decoded by the TV's video chip, but every frame makes the TV draw again what
+    // sits over it (frosted panels most of all). A slow TV keeps the still picture (bg-video.js).
+    if (bg.image && bg.video) out.push(["Video background", 24, "bgvideo"]);
     else if (home.scenes && home.scenes.length === 1) out.push(["One scene", 2, "scene"]);
     else out.push(["Scenes taking turns", 6, "scenes"]);
     if (bg.blur) out.push(["Blurred background", bg.blur > 8 ? 14 : 8, "blur"]);
@@ -748,6 +763,7 @@
     var h = d.home || {};
     var steps = [
       [function () { return h.ambient_weather; }, function () { delete h.ambient_weather; }, "Rain and snow effects were switched off: too slow with everything else."],
+      [function () { return d.background && d.background.video; }, function () { delete d.background.video; }, "The video background was switched off: too slow with everything else. Its still picture stays."],
       [function () { return h.clock_style === "liquid"; }, function () { delete h.clock_style; }, "The liquid clock went back to frosted glass: too slow with everything else."],
       [function () { return (h.glass_amount || 0) > 2; }, function () { h.glass_amount = 2; }, "The glass level was brought down to 2."],
       [function () { return d.background && d.background.blur > 8; }, function () { d.background.blur = 8; }, "The background blur was made lighter."],
@@ -948,6 +964,15 @@
         out.push(H + " #cd-bg i{position:absolute;top:0;left:0;right:0;bottom:0;background-image:" + cssUrl(src) + ";background-repeat:no-repeat;background-size:" +
           (z * 100) + "vw " + (z * 100) + "vh;background-position:" + num(bg.x, 50, 0, 100) + "% " + num(bg.y, 50, 0, 100) + "%" +
           (num(bg.blur, 0, 0, 40) ? ";filter:blur(" + num(bg.blur, 0, 0, 40) / 16 + "rem);transform:scale(1.06)" : "") + "}");
+      }
+      // the video (bg-video.js puts it between the photo and the shade): placed like the photo,
+      // hidden until it really plays, so the still picture shows first and stays if it cannot
+      if (src && bg.video) {
+        var vx = num(bg.x, 50, 0, 100), vy = num(bg.y, 50, 0, 100);
+        out.push(H + " #cd-bg video{position:absolute;left:" + +((1 - z) * vx).toFixed(3) + "vw;top:" + +((1 - z) * vy).toFixed(3) + "vh;width:" + z * 100 + "vw;height:" + z * 100 +
+          "vh;object-fit:cover;opacity:0;transition:opacity 0.6s ease-in-out;pointer-events:none}" + H + " #cd-bg video.on{opacity:1}");
+        // the glass clock's fill is the still picture: over a moving video it is frosted white instead
+        out.push(H + ".cd-vid-on #scenes .gclock .fill{background-image:none !important;color:rgba(255, 255, 255, 0.8) !important;filter:none !important;opacity:1 !important}");
       }
       var SCRIM = { top: "linear-gradient(180deg,#000,rgba(0,0,0,.25) 45%,rgba(0,0,0,.5))", bottom: "linear-gradient(0deg,#000,rgba(0,0,0,.2) 50%,rgba(0,0,0,.35))", left: "linear-gradient(90deg,#000,rgba(0,0,0,.3) 60%)", right: "linear-gradient(270deg,#000,rgba(0,0,0,.3) 60%)" };
       if (!col) out.push(H + " #cd-bg b{position:absolute;top:0;left:0;right:0;bottom:0;background:" + (SCRIM[bg.scrim] || "#000") + ";opacity:" + num(bg.darken, 0.15, 0, 0.9) + "}");
@@ -1711,7 +1736,7 @@
       ROOT.classList.remove("cd-bg-missing");
       if (src) {
         var probe = new Image();
-        probe.onload = function () { if (BG.src === src) { BG.ok = true; ROOT.classList.remove("cd-bg-missing"); ROOT.classList.add("cd-bg"); if (D) depthLayer(D); if (hooks.clock) hooks.clock(); tell("couchtv:applied"); } };
+        probe.onload = function () { if (BG.src === src) { BG.ok = true; ROOT.classList.remove("cd-bg-missing"); ROOT.classList.add("cd-bg"); if (D) { depthLayer(D); video(D); } if (hooks.clock) hooks.clock(); tell("couchtv:applied"); } };
         probe.onerror = function () { if (BG.src === src) { BG.ok = false; ROOT.classList.remove("cd-bg"); ROOT.classList.add("cd-bg-missing"); if (hooks.clock) hooks.clock(); tell("couchtv:bg-missing"); } };
         probe.src = src;
       }
@@ -1728,7 +1753,40 @@
     }
     // the hills in front: one picture between the widgets behind (z 0) and in front (z 3)
     depthLayer(d);
+    video(d);
   }
+
+  // ---------------- the video background (bg-video.js) ----------------
+  // It plays only once its still picture has loaded, while the design is on and the home is on
+  // screen: app.js holds it ("away" while an app is in front or the screen saver is up, "idle" under
+  // the ambient clock, "off" with the screen off), and a hidden page holds it too.
+  var VP = null, HOLD = {};
+  function vidRef(d) { var bg = obj(d && d.background); return imgOk(bg.image) && bg.video ? bg.video : ""; }
+  function vidEnv() {
+    var e = hooks.videoEnv ? obj(hooks.videoEnv()) : {}, nav = window.navigator || {}, calm = false;
+    try { calm = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (x) {}
+    return { designer: DESIGNER, lighter: !!e.lighter, powerSave: !!e.powerSave, saveData: !!(nav.connection && nav.connection.saveData), reducedMotion: calm,
+      memory: Number(nav.deviceMemory) || 0, screenPx: ((window.screen && window.screen.width) || innerWidth) * (window.devicePixelRatio || 1),
+      slow: !DESIGNER && window.CouchVideo.slowMarked() };
+  }
+  function vidWanted() { return ON && BG.ok && !document.hidden && !Object.keys(HOLD).some(function (k) { return HOLD[k]; }); }
+  function video(d) {
+    var ref = vidRef(d);
+    if (!window.CouchVideo || (!ref && !VP)) return;
+    if (!VP) {
+      if (!bgEl) return;
+      VP = window.CouchVideo.player(bgEl, { base: function () { return window.CouchDesignCode ? window.CouchDesignCode.base() : ""; }, env: vidEnv,
+        onState: function (s, why) {
+          ROOT.classList.toggle("cd-vid-on", s === "playing");
+          ROOT.setAttribute("data-cd-video", s);
+          if (why) ROOT.setAttribute("data-cd-video-why", why); else ROOT.removeAttribute("data-cd-video-why");
+          if (DESIGNER) { try { window.parent.postMessage({ type: "couchtv:video", seq: SEQ, state: s, why: why }, location.origin); } catch (e) {} }
+        } });
+    }
+    VP.load(ref);
+    VP.play(vidWanted());
+  }
+  if (document.addEventListener) document.addEventListener("visibilitychange", function () { if (VP) VP.play(vidWanted()); });
   // (also once the photo has loaded: before that the hills wait, so they never show over the old scene)
   function depthLayer(d) {
     var src = imgOk(obj(d.background).image), depth = !!(src && BG.ok && depthSrc(obj(d.background), src));
@@ -1792,6 +1850,7 @@
     shelfTurns();
     ROOT.classList.remove("cd", "cd-bg");
     if (depthEl) depthEl.hidden = true;
+    if (VP) VP.load("");
     if (styleEl) styleEl.textContent = "";
     if (dockStyle) dockStyle.textContent = "";
     if (wxEl) wxEl.textContent = "";
@@ -1931,7 +1990,7 @@
     });
     card.appendChild(layer);
     var tag = document.createElement("div");
-    tag.textContent = "Preview";
+    tag.textContent = bg.video ? "Preview, a looping video" : "Preview";
     tag.setAttribute("style", "position:absolute;left:14px;top:12px;padding:4px 12px;border-radius:999px;background:rgba(0,0,0,0.6);font-size:20px;font-weight:650;color:#fff");
     card.appendChild(tag);
     return card;
@@ -2339,6 +2398,11 @@
   window.CouchDesign = {
     home: home,
     on: function () { return ON; },
+    // the video background: app.js holds it while the home is not on screen (name: "away", "idle",
+    // "off"); state() says what it is doing and why ({ state, why, ref }); loops() the built in ones
+    hold: function (name, on) { HOLD[String(name)] = !!on; if (VP) VP.play(vidWanted()); },
+    videoState: function () { return VP ? VP.state() : { state: "off", why: "", ref: "" }; },
+    loops: function () { return window.CouchVideo ? JSON.parse(JSON.stringify(window.CouchVideo.LOOPS)) : []; },
     asking: function () { return !!ASK; },
     // the words a TV will draw from these (the allow list), for the designer to show and warn
     words: function (t) { return SAN.w(t, 120) || ""; },
@@ -2460,8 +2524,10 @@
     off: function () { return offNow(); },
     settingsRow: function (restart) {
       var off = offNow() || (PENDING && store("couchtv.design.no") === hashOf(PENDING));
+      // an honest line when the design's video shows only its still picture, and why
+      var vs = VP ? VP.state() : null, vnote = vs && vs.why && (vs.state === "still" || vs.state === "failed") ? ". Video background: its still picture shows, " + vs.why : "";
       return { kind: "toggle", key: "design-on", label: "Your design", value: off ? "Off" : "On",
-        sub: off ? "Switched off, or not chosen yet. Turn it on to see it." : "Hold Back for 5 seconds to switch it off",
+        sub: off ? "Switched off, or not chosen yet. Turn it on to see it." : "Hold Back for 5 seconds to switch it off" + vnote,
         act: function () { if (off) { setOff(false); if (PENDING) { store("couchtv.design.ok", hashOf(PENDING)); store("couchtv.design.no", null); } } else setOff(true); if (restart) restart(); } };
     },
     flags: flags,
