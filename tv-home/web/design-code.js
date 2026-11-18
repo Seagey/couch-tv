@@ -50,7 +50,19 @@
     if (!m) return false;
     try { var head = atob(m[1].slice(0, 8)); return head.charCodeAt(0) === 0xff && head.charCodeAt(1) === 0xd8 && head.charCodeAt(2) === 0xff; } catch (e) { return false; }
   }
-  // keep only what a design may be: an object, with at most a JPEG background from the store
+  // the cut out of a design's photo (background.depth_image): a PNG or a WebP, checked by its first
+  // bytes (PNG 89 50 4E 47; WebP "RIFF" .... "WEBP"), since it needs see through parts
+  function cutoutOk(u) {
+    var m = /^data:image\/(png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(u || "");
+    if (!m) return false;
+    try {
+      var head = atob(m[2].slice(0, 16));
+      if (m[1] === "png") return head.charCodeAt(0) === 0x89 && head.slice(1, 4) === "PNG";
+      return head.slice(0, 4) === "RIFF" && head.slice(8, 12) === "WEBP";
+    } catch (e) { return false; }
+  }
+  // keep only what a design may be: an object, with at most a JPEG background from the store (and its
+  // PNG or WebP cut out)
   function accept(text) {
     if (typeof text !== "string" || text.length > MAX) return null;
     var j;
@@ -63,6 +75,8 @@
     if (d.background && typeof d.background === "object") {
       var img = d.background.image;
       if (img !== undefined && !(typeof img === "string" && (jpegOk(img) || /^backgrounds\/[A-Za-z0-9_-]+\.(jpe?g|png|webp)$/.test(img)))) delete d.background.image;
+      var cut = d.background.depth_image;
+      if (cut !== undefined && (!d.background.image || !(typeof cut === "string" && (cutoutOk(cut) || /^backgrounds\/[A-Za-z0-9_-]+\.(png|webp)$/.test(cut))))) delete d.background.depth_image;
     }
     return d;
   }

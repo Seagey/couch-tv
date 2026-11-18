@@ -32,6 +32,8 @@
       // stays on the TV: the scenes show behind the design instead
       var bg = obj(d.background);
       if (bg.image !== undefined && !(typeof bg.image === "string" && BUILT_IN_BG.test(bg.image))) delete bg.image;
+      // its cut out (depth_image) is a picture of that photo too: it goes with it
+      if (bg.depth_image !== undefined && !(bg.image && typeof bg.depth_image === "string" && BUILT_IN_BG.test(bg.depth_image))) delete bg.depth_image;
       if (d.background && !Object.keys(bg).length) delete d.background;
       // smart home controls name this house's own devices
       (Array.isArray(d.objects) ? d.objects : []).forEach(function (o) { if (o && typeof o === "object") { delete o.entity; delete o.entities; } });
@@ -80,6 +82,7 @@
     // the gate keeps a design's own background picture; a household photo never goes
     var bg = obj(d.background);
     if (bg.image !== undefined && !(typeof bg.image === "string" && BUILT_IN_BG.test(bg.image))) delete bg.image;
+    if (bg.depth_image !== undefined && !(bg.image && typeof bg.depth_image === "string" && BUILT_IN_BG.test(bg.depth_image))) delete bg.depth_image;
     if (d.background && !Object.keys(bg).length) delete d.background;
     var keys = Object.keys(d).filter(function (k) { return k !== "v"; });
     if (!keys.length) return { error: "There is nothing on this home to share yet." };

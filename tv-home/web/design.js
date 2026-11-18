@@ -121,6 +121,14 @@
     if (/^backgrounds\/[A-Za-z0-9_][A-Za-z0-9_./-]*\.(jpe?g|png|webp)$/i.test(u) && u.indexOf("..") < 0 && u.indexOf("//") < 0) return u;
     return "";   // anything else (http, https, javascript:, file:, //host, ../) is dropped
   }
+  // a cut out has see through parts, so only PNG or WebP (a JPEG has no transparency), by imgOk's rules
+  function depthImgOk(u) { var s = imgOk(u); return s && (/^data:image\/(png|webp);/.test(s) || /\.(png|webp)$/i.test(s)) ? s : ""; }
+  // where the hills in front come from: the design's own cut out, else a built in scene's
+  function depthSrc(bg, src) {
+    if (!src || bg.depth !== true) return "";
+    var own = depthImgOk(bg.depth_image);
+    return own || (DEPTH_SCENE.test(src) ? src.replace(/\.jpg$/, "-fg.webp") : "");
+  }
   function cssUrl(u) { return 'url("' + String(u).replace(/["\\\n]/g, encodeURIComponent) + '")'; }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 
@@ -425,7 +433,13 @@
       put(out.background, "scrim", SAN.pick(bg.scrim, ["top", "bottom", "left", "right", "even"]));
       // depth: a built in scene photo has a cut out of its hills (scene-<name>-fg.webp); drawn between
       // the widgets behind (layer "back") and the ones in front, so a clock can stand behind the hills
-      if (DEPTH_SCENE.test(image)) put(out.background, "depth", SAN.b(bg.depth));
+      // depth_image: the design's own cut out of its photo (a PNG or WebP with see through sky, made in
+      // TV Designer), drawn in the same place over the clock; checked like the photo itself (only from
+      // this TV or inside the design, never a link; the same size limit). With one, depth is on unless
+      // the design says false. A design without it is drawn exactly as before.
+      var cut = depthImgOk(bg.depth_image);
+      if (cut) { out.background.depth_image = cut; put(out.background, "depth", bg.depth === false ? false : true); }
+      else if (DEPTH_SCENE.test(image)) put(out.background, "depth", SAN.b(bg.depth));
     } else if (SAN.c(bg.colour)) {
       out.background = { colour: SAN.c(bg.colour) };   // one plain colour, in a plain colour format
       // or two, as a gradient (the widget presets): two colours and an angle, nothing else
@@ -928,8 +942,10 @@
       var SCRIM = { top: "linear-gradient(180deg,#000,rgba(0,0,0,.25) 45%,rgba(0,0,0,.5))", bottom: "linear-gradient(0deg,#000,rgba(0,0,0,.2) 50%,rgba(0,0,0,.35))", left: "linear-gradient(90deg,#000,rgba(0,0,0,.3) 60%)", right: "linear-gradient(270deg,#000,rgba(0,0,0,.3) 60%)" };
       if (!col) out.push(H + " #cd-bg b{position:absolute;top:0;left:0;right:0;bottom:0;background:" + (SCRIM[bg.scrim] || "#000") + ";opacity:" + num(bg.darken, 0.15, 0, 0.9) + "}");
       // the hills of a built in scene, in front of the widgets behind: placed and darkened like the photo
-      if (bg.depth === true && DEPTH_SCENE.test(src)) {
-        var fgSrc = src.replace(/\.jpg$/, "-fg.webp"), dk = num(bg.darken, 0.15, 0, 0.9);
+      // (or the design's own cut out of its photo, background.depth_image)
+      var fgSrc = depthSrc(bg, src);
+      if (fgSrc) {
+        var dk = num(bg.darken, 0.15, 0, 0.9);
         out.push(H + " #cd-depth{position:fixed;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background-image:" + cssUrl(fgSrc) +
           ";background-repeat:no-repeat;background-size:" + (z * 100) + "vw " + (z * 100) + "vh;background-position:" + num(bg.x, 50, 0, 100) + "% " + num(bg.y, 50, 0, 100) + "%" +
           ";filter:brightness(" + +(1 - dk * 0.85).toFixed(3) + ")" + (num(bg.blur, 0, 0, 40) ? " blur(" + num(bg.blur, 0, 0, 40) / 16 + "rem);transform:scale(1.06)" : "") + "}");
@@ -1668,7 +1684,7 @@
       ROOT.classList.remove("cd-bg-missing");
       if (src) {
         var probe = new Image();
-        probe.onload = function () { if (BG.src === src) { BG.ok = true; ROOT.classList.remove("cd-bg-missing"); ROOT.classList.add("cd-bg"); if (hooks.clock) hooks.clock(); tell("couchtv:applied"); } };
+        probe.onload = function () { if (BG.src === src) { BG.ok = true; ROOT.classList.remove("cd-bg-missing"); ROOT.classList.add("cd-bg"); if (D) depthLayer(D); if (hooks.clock) hooks.clock(); tell("couchtv:applied"); } };
         probe.onerror = function () { if (BG.src === src) { BG.ok = false; ROOT.classList.remove("cd-bg"); ROOT.classList.add("cd-bg-missing"); if (hooks.clock) hooks.clock(); tell("couchtv:bg-missing"); } };
         probe.src = src;
       }
@@ -1684,7 +1700,11 @@
       document.body.insertBefore(bgEl, document.body.firstChild);
     }
     // the hills in front: one picture between the widgets behind (z 0) and in front (z 3)
-    var depth = !!(src && BG.ok && obj(d.background).depth === true && DEPTH_SCENE.test(src));
+    depthLayer(d);
+  }
+  // (also once the photo has loaded: before that the hills wait, so they never show over the old scene)
+  function depthLayer(d) {
+    var src = imgOk(obj(d.background).image), depth = !!(src && BG.ok && depthSrc(obj(d.background), src));
     if (depth && !depthEl) {
       depthEl = document.createElement("div");
       depthEl.id = "cd-depth";
