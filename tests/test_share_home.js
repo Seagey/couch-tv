@@ -17,7 +17,7 @@ const sb = {
 sb.window = sb;
 sb.addEventListener = noop;
 vm.createContext(sb);
-for (const f of ["design.js", "qr.js", "share-home.js"]) vm.runInContext(fs.readFileSync(path.join(web, f), "utf8"), sb);
+for (const f of ["app-catalogue.js", "design.js", "qr.js", "share-home.js"]) vm.runInContext(fs.readFileSync(path.join(web, f), "utf8"), sb);
 const CD = sb.window.CouchDesign, S = sb.window.CouchShare, QR = sb.window.TVQR;
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -29,7 +29,7 @@ const snap = {
   scenes: ["night", "my-own-photo", "fog"], builtIn: BUILT, scene_seconds: 30, clock24: true, clock_style: "liquid",
   glass: "lite", glass_icons: true, glass_amount: 4, ambient_weather: false, ambient_sun_grade: false, lighter: false,
   keep_watching: false, now_playing: true, dock_size: 8,
-  dock: ["com.netflix.ninja", "com.google.android.youtube.tv", "local.sky", "screen:den", "com.netflix.ninja", "not a package", "com.spotify.tv.android"],
+  dock: ["com.netflix.ninja", "com.google.android.youtube.tv", "local.sky", "screen:den", "com.netflix.ninja", "not a package", "com.example.familybank", "com.spotify.tv.android"],
   design: null
 };
 
@@ -38,7 +38,7 @@ let d = plain(S.build(snap));
 ok(d.v === 1, "a design");
 ok(JSON.stringify(d.home.scenes) === JSON.stringify(["night", "fog"]), "only the app's own scenes: an own photo scene stays on the TV");
 ok(d.home.scene_seconds === 30 && d.home.clock === "24h" && d.home.glass === "lite" && d.home.keep_watching === false && d.home.now_playing === true, "the look settings come along");
-ok(JSON.stringify(d.apps.order) === JSON.stringify(["com.netflix.ninja", "com.google.android.youtube.tv", "com.spotify.tv.android"]), "the dock's apps by package, once each, no local or screen tiles, no junk");
+ok(JSON.stringify(d.apps.order) === JSON.stringify(["netflix", "youtube", "spotify"]), "the dock's apps as catalogue ids, once each, no local or screen tile, and no app outside the catalogue (an unusual installed app never leaves the TV)s, no junk");
 ok(d.elements.clock.format === "24h" && d.elements.keep_watching.hidden === true, "the clock format, and Keep watching hidden as it is on the TV");
 ok(Object.keys(d).sort().join() === "apps,elements,home,v", "nothing but apps, elements, home and v");
 

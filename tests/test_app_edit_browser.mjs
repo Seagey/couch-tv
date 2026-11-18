@@ -136,6 +136,15 @@ ok(q.indexOf("Use this design, keep my app changes") >= 0 && q.indexOf("Use this
 await press("ArrowDown", 100); await press("ArrowDown", 100); await press("Enter", 2500);
 ok(Object.keys(await page.evaluate(() => { try { return JSON.parse(localStorage.getItem("couchtv.design.appedits") || "{}"); } catch (e) { return {}; } })).length === 0, "its own apps: the changes on this TV are cleared");
 
+// 6. a shared home's dock order by catalogue ids: each becomes the app this TV has
+await page.goto(BASE + "?mock=1&reset=1");
+await page.evaluate(() => { localStorage.clear(); localStorage.setItem("tvdesigner.design", JSON.stringify({ v: 1, apps: { order: ["stan", "netflix", "iview"] } })); });
+await page.goto(BASE + "?mock=1&design=local");
+await page.waitForFunction(() => document.querySelectorAll("#grid .app").length > 3);
+await page.waitForTimeout(500);
+const first = await page.evaluate(() => [...document.querySelectorAll("#grid .app")].slice(0, 3).map((a) => (a.querySelector(".label span") || a.querySelector(".label") || a).textContent.trim()));
+ok(JSON.stringify(first) === JSON.stringify(["Stan", "Netflix", "ABC iview"]), "a dock order by ids: Stan, Netflix, ABC iview first (" + first.join(", ") + ")");
+
 ok(!errors.length, "no page errors " + errors.join(" | "));
 await browser.close();
 server.close();

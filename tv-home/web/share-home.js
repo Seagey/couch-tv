@@ -49,9 +49,12 @@
       if (snap.dock_size > 0) home.dock_size = snap.dock_size;
       if (typeof snap.clock24 === "boolean") home.clock = snap.clock24 ? "24h" : "12h";
       d = { v: 1, home: home };
-      var dock = (Array.isArray(snap.dock) ? snap.dock : []).filter(function (p, i, a) {
-        return typeof p === "string" && PKG.test(p) && p.indexOf("local.") !== 0 && a.indexOf(p) === i;
-      }).slice(0, 10);
+      // the dock's apps as catalogue ids (app-catalogue.js): an app not in the catalogue never leaves the
+      // TV, so a shared home cannot tell anyone which unusual apps this household has installed
+      var AC = typeof window !== "undefined" && window.CouchApps;
+      var dock = (Array.isArray(snap.dock) ? snap.dock : []).map(function (p) {
+        return typeof p === "string" && PKG.test(p) && p.indexOf("local.") !== 0 && AC ? AC.idOf(p) : null;
+      }).filter(function (p, i, a) { return p && a.indexOf(p) === i; }).slice(0, 10);
       if (dock.length) d.apps = { order: dock };
       d.elements = { clock: { format: snap.clock24 ? "24h" : "12h" } };
       if (snap.keep_watching === false) d.elements.keep_watching = { hidden: true };

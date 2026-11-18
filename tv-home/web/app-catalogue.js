@@ -79,7 +79,7 @@
   a("hotstar", "JioHotstar", "Streaming", IN, false, ["in.startv.hotstar", "in.startv.hotstaronly"], { names: ["Hotstar", "Disney+ Hotstar", "JioHotstar"], colour: "#0f1014" });
   a("jiocinema", "JioCinema", "Streaming", IN, false, ["com.jio.media.ondemand", "com.jio.media.stb.ondemand"], { names: ["JioCinema"], colour: "#d4145a" });
   a("sonyliv", "SonyLIV", "Streaming", IN, false, ["com.sonyliv"], { names: ["Sony LIV", "SonyLIV"], colour: "#000000" });
-  a("zee5", "ZEE5", "Streaming", IN, false, ["com.graymatrix.did", "com.zee5.androidtv"], { names: ["ZEE5"], colour: "#8230c6" });
+  a("zee5", "ZEE5", "Streaming", IN, false, ["com.graymatrix.did"], { names: ["ZEE5"], colour: "#8230c6" });
   a("mxplayer", "MX Player", "Free TV", IN, false, ["com.mxtech.videoplayer.television", "com.mxtech.videoplayer.ad"], { lg: "com.mxplayer.lg", names: ["MX Player TV"], colour: "#1475e1" });
   a("hoichoi", "Hoichoi", "Streaming", IN, false, ["com.viewlift.hoichoi"], { lg: "com.hoichoi.tv", colour: "#e50000" });
   a("aha", "aha", "Streaming", IN, false, ["ahaflix.tv"], { names: ["aha", "aha Telugu"], colour: "#ff6c00" });
