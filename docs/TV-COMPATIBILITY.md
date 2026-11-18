@@ -99,6 +99,7 @@ Not tested by the author. Each line is what someone said worked on their own dev
     HDMI 1 switches to the HDMI input: the passthrough link opens MediaTek's own HDMI view
     (`com.mediatek.wwtv.tvcenter`) and Home comes back to couch-tv. This firmware has no
     `com.xgimi.action.hdmiPlayer` (the Horizon S Pro needs it), so nothing extra was needed.
+    Keystone and focus stay reachable: the Settings tile, TV settings, has a Projector section.
   - *Home.* This unit has no Google launcher installed: the only app that offers a Home screen apart from
     couch-tv is the setup wizard's `RecoveryActivity` (`com.google.android.tungsten.setupwraith`, priority 1,
     ahead of couch-tv's 0). `apply.sh` switched the wizard back on ("an older couch-tv had switched it off")
