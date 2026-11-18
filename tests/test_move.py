@@ -537,47 +537,20 @@ class MoveSteps(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r["note_key"], "note_move_app_only")
         self.assertEqual(r["note_vars"], {"title": "Some Show", "tv": "Den", "app": "Netflix"})
 
-    def only_knows(self, known):
-        """A `play` that only knows the title `known` (404 for anything else), as the real one does."""
-        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False):
-            self.log.append((server._current.get(), "play", title, season, episode))
-            if title != known:
-                raise server.ApiError(404, "could not find it", key="err_title_not_found")
-            return {"title": title, "method": "deeplink", "started": True}
-        return patch.object(server, "play", play)
-
-    async def test_a_title_that_is_show_plus_episode_opens_that_episode(self):
-        self.media[A] = playing("Some Show The One With The Boat", 600_000)
+    async def test_a_near_name_is_never_opened_in_its_place(self):
+        # "Some Show Fancy Dinner" is a series of its own; the finder only knows "Some Show", which
+        # even has an episode called "Fancy Dinner". The move must not open that.
+        self.media[A] = playing("Some Show Fancy Dinner", 600_000)
         asked = []
 
-        async def find(title, type_=None):
-            return {"title": "Some Show", "type": "tv", "jw_id": "ts1"}, []
-
-        async def episode_by_name(jw_id, name):
-            asked.append((jw_id, name))
-            return {"season": 4, "episode": 7}
-        with patch.object(server.finder, "find", find), self.only_knows("Some Show"), \
-             patch.object(server.finder, "episode_by_name", episode_by_name):
+        async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False):
+            asked.append((title, exact))
+            raise server.ApiError(404, "could not find it", key="err_title_not_found")
+        with patch.object(server, "play", play):
             r = await server.move_playing(A, B)
-        self.assertEqual(asked, [("ts1", "the one with the boat")])
-        self.assertEqual([e[2:5] for e in self.did(B, "play")],
-                         [("Some Show The One With The Boat", None, None), ("Some Show", 4, 7)])
-        self.assertTrue(r["started"])
-
-    async def test_a_longer_title_that_is_not_an_episode_is_another_show(self):
-        self.media[A] = playing("Some Show Sweden", 600_000)
-
-        async def find(title, type_=None):
-            return {"title": "Some Show", "type": "tv", "jw_id": "ts1"}, []
-
-        async def episode_by_name(jw_id, name):
-            return None
-        with patch.object(server.finder, "find", find), self.only_knows("Some Show"), \
-             patch.object(server.finder, "episode_by_name", episode_by_name):
-            r = await server.move_playing(A, B)
-        self.assertEqual([e[2] for e in self.did(B, "play")], ["Some Show Sweden"])   # "Some Show" never opened
-        self.assertEqual(self.did(B, "search"), [(B, "search", "netflix", "Some Show Sweden")])
-        self.assertEqual(r["note_key"], "note_move_app_only")
+        self.assertEqual(asked, [("Some Show Fancy Dinner", True)])      # asked once, exactly, and nothing else
+        self.assertEqual(self.did(B, "search"), [(B, "search", "netflix", "Some Show Fancy Dinner")])
+        self.assertEqual((r["started"], r["note_key"]), (False, "note_move_app_only"))
 
     async def test_a_failure_after_the_pause_puts_things_back(self):
         async def play(*a, **k):
@@ -647,9 +620,8 @@ class MoveYouTube(MoveSteps):
     test_a_title_the_finder_does_not_know_opens_the_app_search = None
     test_off_the_spot_seeks_through_the_sync_helper = None
     test_off_the_spot_without_the_helper_says_so = None
-    test_a_title_that_is_show_plus_episode_opens_that_episode = None
-    test_a_longer_title_that_is_not_an_episode_is_another_show = None
     test_a_failure_after_the_pause_puts_things_back = None
+    test_a_near_name_is_never_opened_in_its_place = None
     test_a_profile_screen_that_came_up_late_gets_a_second_go = None
     test_no_second_go_without_a_profile_screen = None
     test_ok_is_not_pressed_when_another_app_has_come_to_the_front = None
@@ -833,12 +805,32 @@ class MoveHelpers(unittest.TestCase):
         self.assertFalse(move.near(None, 5))
         self.assertFalse(move.near(5, None))
 
-    def test_after_title(self):
-        self.assertEqual(move.after_title("Bluey Fancy Restaurant", "Bluey"), "fancy restaurant")
-        self.assertEqual(move.after_title("Bluey", "bluey"), "")
-        self.assertEqual(move.after_title("Blueyish Things", "Bluey"), "")
-        self.assertEqual(move.after_title("Fancy Restaurant", "Bluey"), "")
-        self.assertEqual(move.after_title("Anything", ""), "")
+    def test_youtube_lookup_asks_again_when_the_page_gives_no_sure_answer(self):
+        good = ('<script>var ytInitialData = {"c": [{"videoRenderer": {"videoId": "bbbbbbbbbbb", '
+                '"title": {"simpleText": "A Video"}, "ownerText": {"simpleText": "A Channel"}}}]};</script>')
+        other = ('<script>var ytInitialData = {"c": [{"videoRenderer": {"videoId": "ccccccccccc", '
+                 '"title": {"simpleText": "A Video (reupload)"}, "ownerText": {"simpleText": "Someone"}}}]};</script>')
+        pages = [other, "", good]     # another layout with one wrong video, a failed fetch, then the usual page
+        asked = []
+
+        async def page(query):
+            asked.append(query)
+            return pages[len(asked) - 1] if len(asked) <= len(pages) else ""
+
+        async def no_sleep(_):
+            return None
+        move._found.clear()
+        with patch.object(move, "_results_page", page), patch.object(move.asyncio, "sleep", no_sleep):
+            self.assertEqual(asyncio.run(move.youtube_video_id("A Video", "A Channel")), "bbbbbbbbbbb")
+            self.assertEqual(len(asked), 3)
+            # found once, remembered: no new request
+            self.assertEqual(asyncio.run(move.youtube_video_id("a video", "A CHANNEL")), "bbbbbbbbbbb")
+            self.assertEqual(len(asked), 3)
+            # never sure: three tries, then None, and nothing is remembered
+            self.assertIsNone(asyncio.run(move.youtube_video_id("Another Video", "A Channel")))
+            self.assertEqual(len(asked), 6)
+            self.assertNotIn((move._norm("Another Video"), move._norm("A Channel")), move._found)
+        move._found.clear()
 
     def test_clock(self):
         self.assertEqual([move.clock(x) for x in (0, 83_000, 3_723_000, None)], ["0:00", "1:23", "1:02:03", "0:00"])

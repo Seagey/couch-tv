@@ -59,10 +59,10 @@ the rest from the bridge's API or the remote page in a browser.
 
 | App | Runs | Played | Seconds | Spot | What it needed, or why not |
 |---|---|---|---|---|---|
-| Netflix | 12 | 11 | 15 to 37 | Same spot, by itself or through the sync helper | OK pressed on the Streamer's profile screen (not readable). The one miss: a link opened straight after the wake was covered by the home screen; the 4 second wait fixed it |
-| YouTube | 6 | 6 | 15 to 24 | Same spot, by the link with the time (once 10 s behind, before the 5 second rule) | Nothing |
+| Netflix | 13 | 12 | 15 to 37 | Same spot, by itself or through the sync helper | OK pressed on the Streamer's profile screen (not readable). The one miss: a link opened straight after the wake was covered by the home screen; the 4 second wait fixed it |
+| YouTube | 12 | 10 | 15 to 27 | Same spot, by the link with the time (once 10 s behind, before the 5 second rule) | Nothing. The 2 misses: YouTube sent its results page in another layout and the video was not found, so only YouTube's search opened; the lookup now asks again and remembers a video it found |
 | Prime Video | 3 | 3 | 46 to 48 | Same spot in 2 runs (sync helper), from the start in 1 | Blind OK switched on for it: two presses (profile, then Play) |
-| Disney+ | 7 | 4 | 42 to 48 | Same spot, through the sync helper | The profile is picked by name. The 3 misses came first and were fixed: the show and episode in one title, "Access Sam's profile" as the profile's label, and a profile screen that came up late |
+| Disney+ | 9 | 2 right show, 3 wrong show | 42 to 48 | Same spot, through the sync helper | The profile is picked by name. Right show: "Bluey", 2 of 2 once the profile fixes were in. Wrong show: the series "Bluey Fancy Restaurant" moved as "Bluey" (3 runs), because of title guessing that is now removed; that series is not in the show finder, so it now opens the app's search instead |
 | Plex | 1 | 0 | - | - | On the Sony the bridge saw nothing playing in Plex. And it has no link that opens a Plex title on the other TV |
 | An app not in `bridge/apps.py` | 1 | 0 | - | - | Refused: the bridge has no way to open a title in it |
 
@@ -99,6 +99,9 @@ the rest from the bridge's API or the remote page in a browser.
   the pause), the bridge opens the video again at the first TV's spot. The bridge finds the video by its
   title and channel on YouTube's public search page. If it is not sure which video it is, it opens
   YouTube's search for the title and you pick it.
+  YouTube does not always send that page in the same layout (seen: the same search gave eight results,
+  then one, then eight again), so a page with no sure answer is asked for again, twice at most, and a
+  video that was found is remembered for six hours.
 - **Live TV has no spot.** The channel or app opens; you may land on its home page.
 - **Profile names must match.** The bridge looks for the person's name on the "Who's watching?" screen
   (`app_profiles` in [CONFIG.md](CONFIG.md), People). The label has to be the name, or the name with only
@@ -118,10 +121,11 @@ the rest from the bridge's API or the remote page in a browser.
   that page has Rent or Buy in focus instead of Play (a title that is not in your plan on the other
   TV's account, or a different account there), that OK can rent or buy it. Leave it unset unless you
   accept that, and keep a purchase PIN on the app.
-- **The show has to be one the show finder knows** (it is how the bridge opens a title in an app). A
-  title that is a show's name followed by an episode's name (Disney+: "Bluey Fancy Restaurant") is
-  matched when that episode is found. For anything else the app opens on its search, with the title
-  typed in where the app allows it, and the phone says so.
+- **The show has to be one the show finder knows, by exactly that name** (it is how the bridge opens a
+  title in an app). For anything else the app opens on its search, with the title typed in where the
+  app allows it, and the phone says so. A near name is never opened in its place: an early version
+  took the series "Bluey Fancy Restaurant", which the finder did not know, for the "Fancy Restaurant"
+  episode of "Bluey" and opened the wrong show; that guessing is gone.
 - **Plex cannot be moved.** On the Streamer Plex does say what is playing, but the bridge has no link
   that opens a Plex title on the other TV (`bridge/apps.py` has Plex as "app only"), so only the app
   would open. On the Sony the bridge saw nothing playing in Plex at all.

@@ -4039,22 +4039,6 @@ async def _tv_in_use():
     return any(s.get("package") == front and s.get("state") == "PLAYING" for s in _sessions(out))
 
 
-async def move_show(title):
-    """(show, season, episode) for a title that is a show's name with an episode's name after it.
-    Disney+ reports "Bluey Fancy Restaurant" (seen on a Sony Google TV), which is no show's exact
-    name. Only when the finder's best match is how the title starts AND the rest is the name of
-    exactly one of that show's episodes; anything less sure is None ("Love Is Blind Sweden" is not
-    "Love Is Blind")."""
-    try:
-        best, _ = await finder.find(title)
-        rest = move.after_title(title, best["title"]) if best and best.get("type") == "tv" else ""
-        ep = await finder.episode_by_name(best["jw_id"], rest) if rest else None
-    except Exception as e:
-        log.info("move: episode lookup failed: %s", e)
-        return None
-    return (best["title"], ep["season"], ep["episode"]) if ep else None
-
-
 async def move_open(app, now, session, who, again=False):
     """On TV B: open what `now` says was playing on TV A, in the same app. Uses `play` (the show
     finder, the app's own link, the profile screen and the Play button) for every app it knows, and
@@ -4071,17 +4055,14 @@ async def move_open(app, now, session, who, again=False):
             started, _ = await get_it_playing(app, link, who or cur_who())
             return {"method": "deeplink", "started": started, "video": video}
     else:
-        season, episode = now.get("season"), now.get("episode")
-        for last_try in (False, True):
-            try:
-                return await play(title, season, episode, app["id"], who, resume=not season, exact=True)
-            except ApiError as e:
-                if e.status != 404:
-                    raise
-            show = None if last_try else await move_show(title)
-            if not show:
-                break
-            title, season, episode = show
+        try:
+            # exact: only a show of exactly this name. A near name is another show ("Bluey Fancy
+            # Restaurant" is a series of its own, not the "Fancy Restaurant" episode of "Bluey").
+            return await play(title, now.get("season"), now.get("episode"), app["id"], who,
+                              resume=not now.get("season"), exact=True)
+        except ApiError as e:
+            if e.status != 404:
+                raise
     # The show finder (or YouTube's search) does not know this title: open the app on its search.
     method, _ = await search_in_app(apps.BY_ID[app["id"]], now["title"])
     return {"method": method, "started": False}

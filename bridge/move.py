@@ -5,9 +5,11 @@ Nothing here talks to a TV. It holds the small pure parts the move needs:
 - which YouTube video a title and channel are (a TV's media session carries no video id),
 - the command for the optional seek through the sync helper app (docs/SYNC.md).
 """
+import asyncio
 import json
 import os
 import re
+import time
 import unicodedata
 
 import aiohttp
@@ -38,13 +40,6 @@ def near(a_ms, b_ms, within_ms=NEAR_MS):
     if a_ms is None or b_ms is None:
         return False
     return abs(int(a_ms) - int(b_ms)) <= within_ms
-
-
-def after_title(said, show):
-    """What follows a show's name in what the app said, as whole words: "Bluey Fancy Restaurant" and
-    "Bluey" give "fancy restaurant". "" when it does not start with the show, or nothing follows."""
-    said, show = _norm(said), _norm(show)
-    return said[len(show) + 1:] if show and said.startswith(show + " ") else ""
 
 
 def clock(ms):
@@ -138,22 +133,47 @@ def youtube_pick(results, title, channel=None, duration_ms=None):
     return None
 
 
-async def youtube_video_id(title, channel=None, duration_ms=None):
-    """Search YouTube's public results page for the title and channel the TV reports. None when
-    unsure or when the page cannot be read (a consent page, a change on YouTube's side)."""
-    if not (title or "").strip():
-        return None
-    query = " ".join(x for x in (title, channel) if x)
+_found = {}   # (title, channel) -> (video id, when found): a video moved to and fro is looked up once
+FOUND_KEEP_S = 6 * 3600
+LOOKUP_TRIES = 3
+
+
+async def _results_page(query):
+    """YouTube's results page for a search, or "" when it cannot be had."""
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
             async with session.get(YOUTUBE_RESULTS, params={"search_query": query},
                                    headers={"user-agent": _UA, "accept-language": "en"}) as r:
                 if r.status != 200 or "consent." in str(r.url):
-                    return None
-                html = await r.text()
+                    return ""
+                return await r.text()
     except Exception:
+        return ""
+
+
+async def youtube_video_id(title, channel=None, duration_ms=None):
+    """Search YouTube's public results page for the title and channel the TV reports. None when
+    unsure or when the page cannot be read (a consent page, a change on YouTube's side).
+
+    YouTube does not always send the same page: now and then the results come in another layout,
+    of which this reads one video or none (seen: the very same search gave eight results, then one,
+    then eight again). So a page that gives no sure answer is asked for again, twice at most. A
+    video that was found is remembered for six hours."""
+    if not (title or "").strip():
         return None
-    return youtube_pick(youtube_results(html), title, channel, duration_ms)
+    key = (_norm(title), _norm(channel))
+    hit = _found.get(key)
+    if hit and time.time() - hit[1] < FOUND_KEEP_S:
+        return hit[0]
+    query = " ".join(x for x in (title, channel) if x)
+    for attempt in range(LOOKUP_TRIES):
+        if attempt:
+            await asyncio.sleep(1)
+        video = youtube_pick(youtube_results(await _results_page(query)), title, channel, duration_ms)
+        if video:
+            _found[key] = (video, time.time())
+            return video
+    return None
 
 
 def youtube_link(video_id, seconds=None):
