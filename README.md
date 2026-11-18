@@ -201,6 +201,29 @@ look and scenes, your apps and their order, the people and the quick buttons, wi
 - **[Move to another TV](docs/MOVE.md)**: carry on in another room. One tap on the phone pauses the show here and starts it there, as the same person. New, Android and Google TV with the bridge.
 - **[Updates on the TV](docs/TV-HOME.md#updates)**: off until you say yes. Then the TV tells you about a new version and hands it to Android to install.
 
+## couch-tv Studio (optional)
+
+[couch-tv Studio](https://tvdesigner.sites.underseage.studio) is a website for designing your TV
+home: place the clock, the dock and widgets where you like, then send the design to your TV with a
+short code. It also has a gallery of designs other people made.
+
+- **couch-tv stays free and open source** (MIT). Studio is an optional hosted service, run
+  separately, and its source is not open. You never need it to use couch-tv.
+- **Off until you turn it on.** Installing or updating couch-tv never switches it on. Until someone
+  at the TV turns it on (Home settings, couch-tv Studio) or types a code there, the TV asks Studio
+  for nothing. **Back to my classic home** switches it off again in one step.
+- **What the TV sends to Studio:** the code you typed, with no cookies and no referrer. While a
+  design is on, the TV also fetches the fonts the design names from Studio, and while a news,
+  scores, markets or commute widget is on, it asks Studio once a day whether that source is paused.
+  **Share this home** sends the layout of the home you have now, without names, photos or places.
+- **What never leaves the TV:** your watch history, your people, things typed at home (the note,
+  lists, the guest Wi-Fi password, the house guide, a calendar address) and a Home Assistant token.
+  A design or a share refuses anything that looks like a token or a private key.
+- **What it costs:** making a design and the starter designs are free. Some gallery designs cost a
+  little. The gallery takes a flat 20% of a sale, and the person who made the design keeps 80%,
+  less the card payment fee.
+- Every setting a design can carry, and the checks the TV makes on it: [docs/CONFIG.md, Design](docs/CONFIG.md#design-design-from-couch-tv-studio).
+
 ## One home, many TVs
 
 The same home on Google TV and Android TV, an app on Apple TV, a channel on Roku, and Fire TV,
@@ -213,6 +236,77 @@ Samsung and LG versions, with Beta paths for more.
 </p>
 
 <p align="center"><sub>Apple TV (Beta), Roku and a Fire TV Stick.</sub></p>
+
+## Android permissions, and why
+
+Every permission the Android apps ask for, read from their manifests. Several strong ones are not
+granted when you install: they are granted over ADB, after you allowed that computer or app at the
+TV, and only for the feature that needs them. `tests/test_docs_permissions.py` fails if a manifest
+gains a permission these tables do not explain.
+
+**The TV home** (`tv-home/`, the app called Home, options A and B):
+
+| Permission | Granted | Why |
+|---|---|---|
+| `INTERNET` | On install | The home's own page: your bridge on the home network (option B), the weather, posters, the update check and the widgets you add |
+| `ACCESS_NETWORK_STATE` | On install | To tell whether the TV is online before it asks for anything |
+| `READ_TV_LISTINGS` | By `apply.sh` | Keep watching: reads Android's Watch Next list (what each app says you are part way through). Read only |
+| `PACKAGE_USAGE_STATS` | Only with `SCREEN_TIME=1`, or when you switch Home on in the TV's Usage access screen | The Screen time widget: today's time in each app. Off unless you ask for it |
+| `SYSTEM_ALERT_WINDOW` | By `apply.sh`, only when `config.json` has a doorbell | The doorbell card over whatever is playing. A later `apply.sh` run without a doorbell takes it back |
+| `REQUEST_INSTALL_PACKAGES` | Android asks you once | Updates: hands a new release to Android's installer, which always asks the person at the TV first |
+| `REQUEST_DELETE_PACKAGES` | On install | Hold OK on an app, Uninstall: opens Android's own remove dialog, which always asks first |
+| `WRITE_SECURE_SETTINGS` | By `apply.sh`, on a Fire TV only | Keeps the Home button watch switched on after updates and restarts |
+| `WRITE_SETTINGS` | By `apply.sh` | The screensaver quick button shortens the screen timeout for a moment so the TV starts its own screensaver |
+| `RECEIVE_BOOT_COMPLETED` | On install | Puts the Home button watch back after a restart or an update |
+
+**The on-TV app** (`on-tv/`, Couch TV, option C, the bridge inside the TV):
+
+| Permission | Granted | Why |
+|---|---|---|
+| `INTERNET` | On install | The phone remote's server on your home network, and finding shows |
+| `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE` | On install | To see the network and Wi-Fi connection the phone remote uses |
+| `CHANGE_WIFI_MULTICAST_STATE` | On install | Hears the TV's own wireless debugging port being announced on the network, so the app can connect to the TV's ADB |
+| `WAKE_LOCK` | On install | Keeps Wi-Fi awake so the phone remote can still reach the TV |
+| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` | On install | Keeps the phone remote's server running, declared to Android as "Local-network server for a phone remote control of this TV" |
+| `POST_NOTIFICATIONS` | Not asked for by the app | Lets the notice Android shows while that server runs appear on Android 13 and newer |
+| `RECEIVE_BOOT_COMPLETED` | On install | Starts the server again after a restart or an update |
+| `QUERY_ALL_PACKAGES` | On install | To tell which streaming apps are installed, so the remote can open them. This app is sideloaded, not from a store |
+| `SYSTEM_ALERT_WINDOW` | By the app over the TV's own ADB, after you press Allow | Lets it open apps from the background when you pick one on the phone |
+| `WRITE_SECURE_SETTINGS` | The same way | Switches wireless debugging back on after a restart, and the Home button watch on a Fire TV |
+| `READ_TV_LISTINGS`, `READ_EPG_DATA` | The same way | Keep watching: reads Android's Watch Next rows to name what is playing when an app does not say. Read only |
+| `PACKAGE_USAGE_STATS` | The same way, or from a computer where Fire OS blocks the TV's own ADB | Fire TV only in use: lets the home watch see Amazon's home come forward on Fire OS builds where the accessibility watch never connects |
+
+**The sync helper** (`sync/`, only for [Two TVs, one show](docs/SYNC.md), experimental):
+
+| Permission | Granted | Why |
+|---|---|---|
+| `INTERNET` | On install | A tiny clock answer on the home network, so the computer can time two TVs together. It reveals only the TV's uptime |
+
+**Services the apps hold** (Android binds these; the app does not ask for them):
+
+- **Home button watch** (`FireWatch`, Home) and **home watch** (`WatchService`, Couch TV): accessibility
+  services, off until a computer switches them on. They see which window came forward, by its app and
+  screen name, and put couch-tv's home back when the TV opens its own. They read no screen content.
+  The Home one declares the screen reading capability only because some TVs (a TCL on Android 12)
+  send window events to nothing else.
+- **Home gear button** (`KeyWatch`, Home): an accessibility service you switch on yourself in
+  Accessibility. It catches only the remote's gear button.
+- **TCL placeholder input** (`TclPlaceholderInput`, Home): an empty TV input, switched on only on a
+  TCL, so TCL's start manager lets Home start at power on. It shows nothing and receives nothing.
+- **Sync listener** (`Listener`, sync helper): a notification listener, granted over ADB, only so the
+  helper may read the play position of the show on screen. It does nothing with notifications. Its
+  commands come only from ADB.
+- `tests/fake-player/` and `sync/testplayer/` are test apps for checks on a real TV. They are not
+  in a release.
+
+**What the TV home talks to.** Your bridge or the on-TV app on your home network; Open-Meteo for
+the weather (and air quality, surf and place search when you use them); JustWatch for posters;
+GitHub for the update check (only with updates on); Home Assistant on your home network, if you set
+it up; couch-tv Studio only once it is turned on (above); and, only while that widget is on the
+home, its own source (news feeds, ESPN for scores, Yahoo Finance for markets, OSRM for commute
+times, your own calendar address). The home's page rules allow any https address, because the
+calendar and video links in Home settings are addresses you choose. A design carries no code and
+no outside links, and the TV drops any it finds.
 
 ## Documentation
 

@@ -156,6 +156,16 @@ These were looked at and are not switched off:
 - **Alexa, voice and the remote's services** on any TV: the remote must keep working.
 - **System update apps** of any brand, Chromecast built in (`mediashell`), TV inputs, tuners and HDMI.
 
+## couch-tv itself: permissions, Studio and what the home talks to
+
+Privacy clean is about the TV's own apps. For couch-tv's own apps, the README has:
+
+- [Android permissions, and why](../README.md#android-permissions-and-why): every permission in the
+  apps' manifests, when it is granted and what it is for, and the services the TV home talks to.
+- [couch-tv Studio (optional)](../README.md#couch-tv-studio-optional): the hosted design website.
+  It is off until someone at the TV turns it on, to get a design the TV sends only the code you typed, and your
+  watch history, people, things typed at home and a Home Assistant token never go to it.
+
 ## Sources
 
 The list was written for couch-tv from these references, checked on 13 November 2026. No code from

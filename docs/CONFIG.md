@@ -315,9 +315,9 @@ release opens the app rather than the show.
 | `watch_next_per_app` [5] | The maximum number of Keep watching cards to show from any single app (1 to 20). |
 | `language` [the TV's own language if the home speaks it, else `en`] | The TV home's language until someone picks one in Home settings: `en` (English), `es` (Spanish), `es-MX` (Mexican Spanish), `it` (Italian), `de` (German), `tr` (Turkish), `fr` (French), `sr-Latn-RS` (Serbian Latin), `pl` (Polish), `cs` (Czech), `pt` (Brazilian Portuguese), `nl` (Dutch), `ro` (Romanian) or `zh-CN` (Simplified Chinese). The phone remote has its own choice, "Same as the TV" by default; Romanian is not available as a separate phone language yet. |
 
-## Design (`design`, from the TV Designer)
+## Design (`design`, from couch-tv Studio)
 
-Optional, top level, beside `home`. The TV Designer (a poster style editor for this home) writes it:
+Optional, top level, beside `home`. couch-tv Studio (a website for designing this home) writes it:
 download your design there and paste its `design` key into `config.json`. It is laid over the Night
 home by `tv-home/web/design.js`. **Without a `design` key the home is exactly as before.** Every
 value is checked on the TV, and anything it does not understand is left out.
@@ -341,14 +341,14 @@ people and quick buttons 3x, Keep watching 1.5x); and the remote never lands on 
 hides or moves mostly off the screen. **Holding Back for about 5 seconds** (or pressing it 5 times
 quickly) switches designs off on that TV and shows the normal home. They stay off, whatever design
 arrives next, until **Home settings, Look, Your design** turns them back on. **Words with a phone
-number or a web address are never drawn** (`CouchDesign.flags` finds them; the TV Designer warns
+number or a web address are never drawn** (`CouchDesign.flags` finds them; couch-tv Studio warns
 before download). **A design is kept cheap to draw:** at most 40 objects, 6 frosted cards (and about
 a screen and a bit of frosted area), 8 turned objects, 10 glows, a 16 px background blur, and a
 total under 100 on the speed meter's weights (`CouchDesign.cost`: rain and snow 34, the liquid
 clock 6, and so on); past that the heaviest extras are switched off, rain and snow first. Anything
 over is brought within it, and `CouchDesign.check` says what changed. `background.colour` (a plain
 colour, `#000000` for a black screen) can stand in for `background.image`; a widget object may carry
-`w` and `h`, the box its card fills (the TV Designer's grid sets them).
+`w` and `h`, the box its card fills (couch-tv Studio's grid sets them).
 
 ```json
 "design": {
@@ -377,12 +377,12 @@ colour, `#000000` for a black screen) can stand in for `background.image`; a wid
 | `panel` | On `people`, `quick`, `keep_watching`, `dock`: `glass` (frosted, the default), `solid` (no blur, lighter for a slow TV) or `none`. |
 | `dock` | `icon_shape` `rounded`, `circle` or `square`; `icon_tone` `colour`, `mono` (black and white until focused) or `dim`. |
 | `apps` | `order`: the dock's apps, in order (only those, up to ten; the rest are behind More apps). `hidden`: apps taken off the dock. `tiles.<package>`: `x`, `y`, `scale` for one app's tile. Settings and More apps always stay. |
-| `background` | Your own picture over the scenes: `image` is a file in the app (`backgrounds/...`) or a JPEG, PNG or WebP data URL (the Designer makes these, 1920x1080); never a web address. A picture that does not load leaves the normal scenes. `darken` 0 to 0.9, `zoom` 1 to 4, `x` and `y` 0 to 100 (which part shows when zoomed), `blur` in pixels. The glass clock shows this picture through its digits. `video` (with `image`, which is then its still picture): a short muted loop played over the picture, either a file on the TV (`backgrounds/loop-rain.mp4`, `loop-fire`, `loop-ocean`, `loop-clouds`, or your own in `backgrounds/mine/`) or `store:<id>`, a video the design store keeps; never a web address. MP4 with H.264 or WebM with VP8 or VP9, at most 15 s, 1920x1080 and 8 MB. The picture shows first and stays with Lighter home, in power save, on a TV that drops frames (for a week), while an app is open, and whenever the video cannot play (Home settings, couch-tv Studio, Your design says why). `blur` is not used with a video. `loop-clouds.jpg` with `depth: true` puts the clock behind its hills. |
+| `background` | Your own picture over the scenes: `image` is a file in the app (`backgrounds/...`) or a JPEG, PNG or WebP data URL (couch-tv Studio makes these, 1920x1080); never a web address. A picture that does not load leaves the normal scenes. `darken` 0 to 0.9, `zoom` 1 to 4, `x` and `y` 0 to 100 (which part shows when zoomed), `blur` in pixels. The glass clock shows this picture through its digits. `video` (with `image`, which is then its still picture): a short muted loop played over the picture, either a file on the TV (`backgrounds/loop-rain.mp4`, `loop-fire`, `loop-ocean`, `loop-clouds`, or your own in `backgrounds/mine/`) or `store:<id>`, a video the design store keeps; never a web address. MP4 with H.264 or WebM with VP8 or VP9, at most 15 s, 1920x1080 and 8 MB. The picture shows first and stays with Lighter home, in power save, on a TV that drops frames (for a week), while an app is open, and whenever the video cannot play (Home settings, couch-tv Studio, Your design says why). `blur` is not used with a video. `loop-clouds.jpg` with `depth: true` puts the clock behind its hills. |
 | `texts` | Up to eight lines of your own words: `text` (200 characters), `x`, `y` (the top left corner), `size` in pixels, and the text styles. Older designs; newer ones use `objects` of type `text`. |
 | `rotate`, `shade` | On parts (not the clock or the dock): `rotate` in degrees. On text parts and objects: `shade` `glow` (a wide dark glow) or `panel` (a dark panel behind the words; on the clock, a dark pool under the digits), to read them on a busy photo. |
 | dock layout | On `elements.dock`: `layout` `row` (the default), `column` or `grid` (with `columns`), `icon_size` and `icon_gap` in pixels (112 and 26), `labels` `focus` (the default), `always` or `off`, `label_pos` `below` or `right`, `icon_shape` also `squircle` or `none` (the app's symbol with no tile), `icon_style` `colour`, `mono`, `glass`, `outline` or `dark`. A row too long for the TV's safe area wraps onto more lines instead of running off the screen. The remote follows the shape: up and down move along a column (a side rail), left and right step off it to the shows, and More apps opens in its usual place. With `labels: "always"` a long name shows by its first word. |
 | `apps.tiles.<package>` | Also `icon_shape` and `icon_style` for one app, and `free: true` with `x`, `y` (its top left corner on the screen) and `scale` to put that app anywhere. It stays in the dock's list, so the remote still reaches it and OK still opens it. |
-| `objects` | Up to 80 things of the design's own, each with an `id` (letters, digits, `-`, `_`), `type`, `x`, `y`, `scale`, `rotate`, `opacity`, `hidden`, and `layer` `front` (over the home, the default) or `back` (behind the clock, the dock and the rest). Later in the list is drawn on top. `text`: `text`, `size`, `align` and the text styles. `shape`: `variant` `glass`, `solid`, `outline` or `line`, `w`, `h`, `radius`, `colour`. `clock`: `size`, `format`, `date: true` and `date_format`, text styles. `weather`: `style` `line`, `card` or `big`, `place: false`. `smart`: `kind` (`aircon`, `light`, `speaker`, `camera`, `doorbell`, `network`, `devices`, `vacuum`, `appliance`, `scene`), `style` `tile`, `pill`, `icon` or `card`, `name`, `status`, `value`, `on: false`, `zones` (aircon) or `items` (scene buttons), `panel` `glass`, `solid` or `none`. On the TV a smart home object never shows a reading it does not have: an `aircon` widget reads its room (`entity`, else the first) and lists the other rooms as zones, and a `scene` widget lists the scenes, both from the Home Assistant section of this file through couch-tv's smart home; every other kind, and these two without Home Assistant, shows its name and "Not connected". The demo readings saved in the design show only in the designer, marked Demo. Objects do not take the remote's focus. |
+| `objects` | Up to 80 things of the design's own, each with an `id` (letters, digits, `-`, `_`), `type`, `x`, `y`, `scale`, `rotate`, `opacity`, `hidden`, and `layer` `front` (over the home, the default) or `back` (behind the clock, the dock and the rest). Later in the list is drawn on top. `text`: `text`, `size`, `align` and the text styles. `shape`: `variant` `glass`, `solid`, `outline` or `line`, `w`, `h`, `radius`, `colour`. `clock`: `size`, `format`, `date: true` and `date_format`, text styles. `weather`: `style` `line`, `card` or `big`, `place: false`. `smart`: `kind` (`aircon`, `light`, `speaker`, `camera`, `doorbell`, `network`, `devices`, `vacuum`, `appliance`, `scene`), `style` `tile`, `pill`, `icon` or `card`, `name`, `status`, `value`, `on: false`, `zones` (aircon) or `items` (scene buttons), `panel` `glass`, `solid` or `none`. On the TV a smart home object never shows a reading it does not have: an `aircon` widget reads its room (`entity`, else the first) and lists the other rooms as zones, and a `scene` widget lists the scenes, both from the Home Assistant section of this file through couch-tv's smart home; every other kind, and these two without Home Assistant, shows its name and "Not connected". The demo readings saved in the design show only in couch-tv Studio, marked Demo. Objects do not take the remote's focus. |
 | `home` | Look settings carried with the design: `scenes`, `scene_seconds`, `glass`, `glass_icons`, `glass_amount`, `clock_style`, `ambient_weather`, `ambient_sun_grade`, `dock`, `moving_tiles`, `lighter`, `keep_watching`, `now_playing`, `dock_size`, `clock` (never `video_url`: a design carries no links). They win over the same keys in `home`; Home settings on the TV still win over both. |
 
 **Widgets: OK, sizes and what each needs.** In a widget design, OK on a widget opens its detail
@@ -465,13 +465,13 @@ The whole block must stay under 4 MB (a photo inside it is the big part). The br
 the home as it is, in `/tv/config.js` (option B), and the standalone build carries it. `apply.sh`
 (option A) hands the settings to the app inside an Android intent, which is far too small for a
 photo: there, put the picture in `tv-home/web/backgrounds/mine/`, rebuild the app, and name it in
-`image` (`backgrounds/mine/your-photo.jpg`) instead of the data URL. The TV Designer's download
+`image` (`backgrounds/mine/your-photo.jpg`) instead of the data URL. couch-tv Studio's download
 already does this: a design with your own photo comes as a zip with the photo as its own file and
 the design pointing at it. Not yet tried on a real TV.
 
 **Getting a design by code (`design_store`).** With `"design_store": "https://designs.example"`
 (https only, no path; `http://127.0.0.1` or `localhost` for development), Home settings, Look has
-**Get a design**: type the code the TV Designer's Send to my TV shows (`ABCDE-FGHJK`, or the long
+**Get a design**: type the code couch-tv Studio's Send to my TV shows (`ABCDE-FGHJK`, or the long
 `CTV1-...` one from its QR code). The TV asks that one server, with the code and nothing else (no
 cookies, no referrer), and keeps the design in its own storage (`couchtv.design.fetched`); it wins
 over a `design` in this file until **Remove the design I got**. The only picture it takes is a JPEG

@@ -1,7 +1,7 @@
 # Demo photos
 
 Every picture here is AI generated, not a photo of a real person or a real family. They are used only
-when the home runs in demo mode (the TV Designer preview, `?demo=1`), never on a real TV's own photos.
+when the home runs in demo mode (the couch-tv Studio preview, `?demo=1`), never on a real TV's own photos.
 
 Made with Z-Image Turbo (mflux) at 1536 x 1024, then resized to 1280 px. The generator writes its
 prompt into each original PNG's metadata. Prompts:
