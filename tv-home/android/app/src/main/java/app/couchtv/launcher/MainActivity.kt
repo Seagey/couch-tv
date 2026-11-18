@@ -836,6 +836,35 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun kept(key: String): String? = getSharedPreferences("page", MODE_PRIVATE).getString(key, null)
 
+        // couch-tv Studio's home widgets (AtHome.kt): the things typed at home go in their own store,
+        // left out of Android's backups, never in the page's storage
+        @JavascriptInterface
+        fun keepPrivate(key: String, value: String) {
+            AtHome.prefs(this@MainActivity).edit().putString(key, value).apply()
+        }
+
+        @JavascriptInterface
+        fun keptPrivate(key: String): String? = AtHome.prefs(this@MainActivity).getString(key, null)
+
+        // the Agenda's calendar, read off the page's thread and answered through tv.calendarText
+        @JavascriptInterface
+        fun calendar(url: String, id: String) {
+            if (!Regex("[A-Za-z0-9]{1,40}").matches(id)) return
+            Thread {
+                val (ok, text) = AtHome.calendar(url)
+                main.post { js("window.tv && tv.calendarText && tv.calendarText(" + JSONObject.quote(id) + "," + ok + "," + JSONObject.quote(text) + ")") }
+            }.start()
+        }
+
+        // today's screen time (Android's usage numbers), once usage access is allowed
+        @JavascriptInterface
+        fun screenTime(): String = AtHome.screenTime(this@MainActivity) { pkg ->
+            try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() } catch (e: Exception) { pkg }
+        }
+
+        @JavascriptInterface
+        fun openUsageAccess(): Boolean = AtHome.usageAccessIntent(this@MainActivity)?.let { start(it) } ?: false
+
         // Home settings, "Your photos": the TV's own file picker, where it has one. Many Android TV
         // and Google TV builds ship without one, and then the page offers a web address instead.
         @JavascriptInterface
