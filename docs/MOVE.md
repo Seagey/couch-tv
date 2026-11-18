@@ -79,10 +79,12 @@ the rest from the bridge's API or the remote page in a browser.
   not say what is playing. The bridge never guesses the title from the watch history: that could move
   another show. One case it cannot see: you pick another show inside the app with the TV's remote after
   couch-tv opened one. The first show is the one that moves.
-- **The first TV may not pause** (not proven fixed). Twice, Netflix on the Sony played on through the
-  pause key right after it had been started, while the other TV started too. The same key worked a
-  minute later, and all three pause paths work on the Streamer. The move now tries the key twice, then
-  the sync helper, and says so when the first TV still plays.
+- **The first TV may ignore the pause key.** Netflix played on through the pause key right after it had
+  been started: three times on the Sony during a move, and once in three tries on the Streamer (TV
+  asleep, woken, Netflix started fresh, paused two seconds after it began). The same key worked a
+  minute later. The move tries the key twice and then asks the sync helper to pause the app itself;
+  on the Streamer that took when the key had not. Without the sync helper on the first TV the move can
+  only say that it would not pause. Not yet seen fixed on the Sony.
 - **YouTube needs the same account, with watch history on, on both TVs.** That is how YouTube knows
   where you were. When it starts somewhere else anyway (seen: from the beginning, on a move right after
   the pause), the bridge opens the video again at the first TV's spot. The bridge finds the video by its
