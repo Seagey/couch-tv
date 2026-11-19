@@ -50,7 +50,7 @@ Other TVs: [Will it work on my TV?](#will-it-work-on-my-tv)
 
 ## Updates
 
-The newest release is **0.13.3**, on [the Releases page](https://github.com/Seagey/couch-tv/releases): easier for beginners (a Settings button on every design, a phone only install that no longer asks for the accessibility permission Play Protect flags, plain words on the TV and in the Setup app), guests greeted by name with no computer, and your home into couch-tv Studio ([details](docs/UPDATES.md#19-november-2026-release-0133-easier-for-beginners-guests-by-name-with-no-computer-and-your-home-into-couch-tv-studio)). 0.13.2 brought Ask AI, your own AI agent, smart home set up on the TV and designs on Roku. New in 0.13:
+The newest release is **0.13.4**, on [the Releases page](https://github.com/Seagey/couch-tv/releases): Samsung, with couch-tv Studio, a setup you run yourself with no AI agent (`couch-tv-samsung-setup.zip`), and a Frame that opens couch-tv after Art Mode and goes to Art Mode when the phone says off; plus couch-tv Studio designs in the Apple TV app ([details](docs/UPDATES.md#19-november-2026-release-0134-samsung-with-couch-tv-studio-and-a-setup-that-needs-no-ai-agent)). 0.13.3 made it easier for beginners (a Settings button on every design, a phone only install that no longer asks for the accessibility permission Play Protect flags, plain words on the TV and in the Setup app), greeted guests by name with no computer, and brought your home into couch-tv Studio. 0.13.2 brought Ask AI, your own AI agent, smart home set up on the TV and designs on Roku. New in 0.13:
 
 - **14 November:** custom cards with a web link open in the TV's browser on Android TV, LG and Samsung, thanks ekagra-codes ([#207](docs/UPDATES.md#14-november-2026-custom-cards-with-a-web-link-open-on-android-tv-lg-and-samsung-since-013))
 - **14 November:** choose where the home starts: profiles (as before), Keep watching or apps, thanks nidhalmouldi and ekagra-codes ([#211](docs/UPDATES.md#14-november-2026-choose-where-the-home-starts-profiles-keep-watching-or-apps-since-013))
@@ -161,7 +161,7 @@ and if the TV still says no, it shows how to put couch-tv on with just your phon
 
 | TV system | How |
 |---|---|
-| **Samsung (Tizen)** | [docs/SAMSUNG.md](docs/SAMSUNG.md) |
+| **Samsung (Tizen)** | `couch-tv-samsung-setup.zip` from [the Releases page](https://github.com/Seagey/couch-tv/releases): double-click its installer on a Mac or Windows computer, no AI agent needed ([docs/SAMSUNG.md](docs/SAMSUNG.md#the-quick-way-no-ai-agent-no-paid-plan)) |
 | **LG (webOS)** | [docs/LG.md](docs/LG.md) |
 | **Roku OS** (Roku TVs and sticks) | [docs/ROKU.md](docs/ROKU.md) |
 | **VIDAA** (Hisense's own system) | [docs/VIDAA.md](docs/VIDAA.md) |

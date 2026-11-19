@@ -2,9 +2,20 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.3**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.4**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 19 November 2026: release 0.13.4, Samsung with couch-tv Studio and a setup that needs no AI agent
+
+0.13.4 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Most of it is Samsung: we put couch-tv on a real 2021 Frame the way a beginner would. It also brings couch-tv Studio designs to the Apple TV app and three fixes to the on-TV app. The TV home app only changed its version number, and the classic home looks exactly as it did. Samsung: download `couch-tv-samsung-setup.zip` and run its installer (a Samsung app never updates itself; your settings stay). Option B: `git pull` and restart the bridge. Option C: install the new on-TV APK over the old one. Apple TV: build Couch TV again with Xcode.
+
+- **Install on a Samsung with no AI agent:** `couch-tv-samsung-setup.zip` has the app, double-click installers for Mac and Windows and `START HERE.txt` with every step in plain words. About 30 minutes, free. The installers use the free Apps2Samsung command line tool (3.3.1, GPL-3.0), checked by its SHA-256 fingerprint before it runs. `couch-tv-samsung.wgt` is the app on its own ([docs/SAMSUNG.md](SAMSUNG.md#the-quick-way-no-ai-agent-no-paid-plan)).
+- **couch-tv Studio on Samsung:** the gear tile, couch-tv Studio, Get a design. Done on Samsung's keyboard sends the code, and a design no longer cuts off the bridge.
+- **Honest updates:** the Samsung app says on the home, at most once a day, when a newer couch-tv is out and that the setup is run again.
+- **The Frame (with the bridge):** couch-tv opens after Art Mode; off on the phone is Art Mode, as on the Frame's own remote, never fully off; on from the phone says within about 15 seconds to use the TV's remote if the TV cannot be woken. The bridge learns the TV's network address itself, so `"mac"` is no longer needed.
+- **Apple TV:** Couch TV draws couch-tv Studio designs. It builds with Xcode and was checked in the tvOS 27.2 Simulator on an Apple TV 4K, not yet on a real Apple TV. A widget it does not know keeps its place as a plain card, short cards fit their box, and a video background shows its still ([APPLE-TV.md](APPLE-TV.md#a-design-from-couch-tv-studio)).
+- **On-TV app (option C):** `couch-tv-ontv.apk` no longer lists a Home button watch it does not have in the accessibility settings (and takes out one an earlier copy left); the bookings calendar is read from exactly the address that was checked to be on the internet; the Xiaomi PatchWall switch says the watch is in `couch-tv-ontv-watch.apk`.
 
 ### 19 November 2026: release 0.13.3, easier for beginners, guests by name with no computer, and your home into couch-tv Studio
 
