@@ -131,15 +131,7 @@ class SamsungTV(samsung.SamsungTV):
             if front:
                 self._note(f"TV came on in {self._package_of(front)}, left alone")
                 return
-            try:
-                how = await self._launch_tizen(self.app_id)
-                await asyncio.sleep(3)
-                if await self._front() == self.app_id:
-                    self._note(f"TV came on, opened couch-tv ({how})")
-                else:
-                    self._note(f"TV came on, asked it to open couch-tv ({how}) but it is not on screen")
-            except Exception as e:
-                self._note(f"TV came on, could not open couch-tv: {e}")
+            await self._open_couch()   # up to three tries: the TV can refuse just after Art Mode
         finally:
             self._hook_busy = False
 

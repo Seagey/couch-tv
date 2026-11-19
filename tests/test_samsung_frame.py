@@ -90,6 +90,38 @@ class HookTests(unittest.TestCase):
         self.assertEqual(stand.launched, ["CouchTVApp.Home"])
         self.assertIn("opened couch-tv", tv.hook_log[-1][1])
 
+    def test_a_refused_launch_just_after_art_mode_is_tried_again(self):
+        # 20 Nov 2026, a real 2021 Frame: the first launch after leaving Art Mode failed with "not
+        # answering on the network" and the hook gave up. The second try works.
+        stand = StandIn(["on"])
+        tv = make(stand, self.data)
+        tries = []
+
+        async def launch(app_id, meta=""):
+            tries.append(app_id)
+            if len(tries) == 1:
+                raise TVUnavailable("the frame TV is not answering on the network")
+            stand.launched.append(app_id)
+            return "rest"
+        tv._launch_tizen = launch
+        asyncio.run(tv._hook())
+        self.assertEqual(len(tries), 2)
+        self.assertEqual(stand.launched, ["CouchTVApp.Home"])
+        self.assertIn("opened couch-tv (rest, try 2)", tv.hook_log[-1][1])
+
+    def test_a_launch_that_never_works_stops_after_three_tries(self):
+        stand = StandIn(["on"])
+        tv = make(stand, self.data)
+        tries = []
+
+        async def launch(app_id, meta=""):
+            tries.append(app_id)
+            raise TVUnavailable("the frame TV is not answering on the network")
+        tv._launch_tizen = launch
+        asyncio.run(tv._hook())
+        self.assertEqual(len(tries), 3)
+        self.assertIn("could not open couch-tv", tv.hook_log[-1][1])
+
     def test_art_mode_sleep_timer_is_left_alone_and_does_not_use_up_the_hook(self):
         stand = StandIn(["on", "standby"])
         tv = make(stand, self.data)
