@@ -454,3 +454,22 @@ const tick = () => new Promise((r) => setImmediate(r));
   assert.strictEqual((i18n.match(/look_loop: "Loop"/g) || []).length, 16, 'Loop is a name, the same everywhere');
   console.log('Loop look tests passed.');
 })().catch(function (e) { console.error(e); process.exit(1); });
+
+
+// the bridge's mark of the files goes on every address, so a new encode is fetched past the TV's cache.
+// The shared context's loop state is put back afterwards: the switch tests above finish on later ticks.
+{
+  const keep = { HOME: context.HOME, v: context.loopVariants, b: context.loopBlurOn, ver: context.loopVersion };
+  context.HOME = { loop: { variants: ['day'], blur: true, version: 'abc123def0' } };
+  context.loopReadConfig();
+  const f = context.loopFiles('day');
+  assert.strictEqual(f.video, '/tv/loop/day.mp4?v=abc123def0');
+  assert.strictEqual(f.blur, '/tv/loop/day-blur.mp4?v=abc123def0');
+  assert.strictEqual(f.poster, '/tv/loop/day.jpg?v=abc123def0');
+  assert.strictEqual(f.bposter, '/tv/loop/day-blur.jpg?v=abc123def0');
+  context.HOME = { loop: { variants: ['day'], blur: true } };
+  context.loopReadConfig();
+  assert.strictEqual(context.loopFiles('day').video, '/tv/loop/day.mp4', 'no mark, no suffix');
+  context.HOME = keep.HOME; context.loopVariants = keep.v; context.loopBlurOn = keep.b; context.loopVersion = keep.ver;
+}
+console.log('Loop look version tests passed.');

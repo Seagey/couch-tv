@@ -1072,18 +1072,22 @@
   // the compositor running every frame. So only the buttons are glass; the toast and the rest take
   // the no blur recipe (app.css). No prefetch and no crossfade: a fetch would hold 20 MB on the heap
   // and a crossfade is four decoders at once.
-  var LOOP_DIR = API + "/tv/loop/", LOOP_PHASES = ["dawn", "day", "dusk", "night"];
+  var LOOP_DIR = API + "/tv/loop/", LOOP_PHASES = ["dawn", "day", "dusk", "night"], loopVersion = "";
   var loopVariants = [], loopBlurOn = false, loopCur = "", loopPending = "", loopArmed = false, loopPoster = "", loopOff = false;
   var loopSharp = null, loopBlur = null, loopBox = null, loopMaskKey = null, loopLastT = 0, loopSeekLat = 0, loopSeekAt = 0, loopFirstRow = 0;
   var loopLoadTimer = 0, loopLoadOne = null;   // the load under way: its 4 s timer and its canplaythrough listener
   function loopFiles(v) {
-    return { video: LOOP_DIR + v + ".mp4", blur: LOOP_DIR + v + "-blur.mp4", poster: LOOP_DIR + v + ".jpg", bposter: LOOP_DIR + v + "-blur.jpg" };
+    // the bridge's mark of the files (home.loop.version) goes on each address, so new files made by
+    // make-loop.sh are fetched although the old ones are still good for an hour in the TV's cache
+    var q = loopVersion ? "?v=" + encodeURIComponent(loopVersion) : "";
+    return { video: LOOP_DIR + v + ".mp4" + q, blur: LOOP_DIR + v + "-blur.mp4" + q, poster: LOOP_DIR + v + ".jpg" + q, bposter: LOOP_DIR + v + "-blur.jpg" + q };
   }
   // home.loop from config.js; a missing key is no variants, and Lighter home never plays the blur copy
   function loopReadConfig() {
     var lp = HOME.loop && typeof HOME.loop === "object" ? HOME.loop : {};
     loopVariants = (Array.isArray(lp.variants) ? lp.variants : []).filter(function (v) { return LOOP_PHASES.indexOf(v) >= 0; });
     loopBlurOn = lp.blur === true && !LIGHTER;
+    loopVersion = typeof lp.version === "string" ? lp.version.slice(0, 40) : "";
   }
   // which variant to show now: the sun's phase while Follow the sun is on, else day; a missing file
   // falls back to day, then to the first the bridge has

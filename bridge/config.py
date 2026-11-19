@@ -302,7 +302,24 @@ def loop_files(folder):
     empty list, so the key is always there for the home to read."""
     variants = [v for v in LOOP_VARIANTS if os.path.isfile(os.path.join(folder, v + ".mp4"))]
     blur = bool(variants) and all(os.path.isfile(os.path.join(folder, v + "-blur.mp4")) for v in variants)
-    return {"variants": variants, "blur": blur}
+    return {"variants": variants, "blur": blur, "version": loop_version(folder, variants)}
+
+
+def loop_version(folder, variants):
+    """A short mark of the loop files as they are now (names, sizes and times), which the home adds to
+    the files' addresses: the bridge serves them with an hour of caching, and without it a TV would go
+    on playing the old files for an hour after make-loop.sh made new ones. Empty with no variants."""
+    import hashlib
+    h = hashlib.sha1()
+    for v in variants:
+        for suffix in (".mp4", "-blur.mp4", ".jpg", "-blur.jpg"):
+            p = os.path.join(folder, v + suffix)
+            try:
+                st = os.stat(p)
+            except OSError:
+                continue
+            h.update(f"{v}{suffix}:{st.st_size}:{int(st.st_mtime)}\n".encode())
+    return h.hexdigest()[:10] if variants else ""
 
 
 def _home(h):
@@ -553,7 +570,8 @@ def save_tvs():
 def public():
     """The parts the TV home and the phone remote are allowed to see."""
     import kids   # kids mode: the shelf and the PIN's hash (never the PIN) on each kids profile
-    return {"people": kids.attach(PEOPLE), "weather": WEATHER, "home": HOME,
+    # home.loop is read afresh: make-loop.sh may have run since the bridge started
+    return {"people": kids.attach(PEOPLE), "weather": WEATHER, "home": dict(HOME, loop=loop_files(LOOP_DIR)),
             "tvs": [dict({"id": t["id"], "name": t["name"], "quick": quick_for(t),
                           "extend_devmode": t.get("extend_devmode", True) is not False,
                           "picture_modes": [m["name"] for m in picture_modes(t.get("picture"))]},
