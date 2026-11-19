@@ -285,6 +285,26 @@ def _my_scenes(items):
     return out
 
 
+# The four looks the home can wear. Loop is the video one (docs/LOOP.md): it needs the files below.
+LOOKS = ("night", "classic", "oled", "loop")
+
+# The Loop look's footage, made by scripts/make-loop.sh on this computer (git ignores the folder):
+# <variant>.mp4 and its 160x90 blurred copy <variant>-blur.mp4 for the glass, with a poster of
+# each (<variant>.jpg, <variant>-blur.jpg). One variant per time of day, in this order.
+LOOP_DIR = os.path.join(ROOT, "tv-home", "web", "loop")
+LOOP_VARIANTS = ("dawn", "day", "dusk", "night")
+
+
+def loop_files(folder):
+    """What the Loop look can play from `folder`: the variants whose .mp4 is there, in the order
+    dawn, day, dusk, night, and `blur` true only when every present variant has its blurred copy
+    (one without it would make the glass go dark at that time of day). A missing folder gives an
+    empty list, so the key is always there for the home to read."""
+    variants = [v for v in LOOP_VARIANTS if os.path.isfile(os.path.join(folder, v + ".mp4"))]
+    blur = bool(variants) and all(os.path.isfile(os.path.join(folder, v + "-blur.mp4")) for v in variants)
+    return {"variants": variants, "blur": blur}
+
+
 def _home(h):
     h = h if isinstance(h, dict) else {}
     mine = _my_scenes(h.get("my_scenes"))
@@ -294,7 +314,7 @@ def _home(h):
     out = {
         # Android package names never shown on the home or in More apps (a maker's own clutter).
         "hide_packages": [p for p in dict.fromkeys(hide) if isinstance(p, str) and re.fullmatch(r"[A-Za-z0-9_.]{1,200}", p)],
-        "look": h.get("look") if h.get("look") in ("night", "classic", "oled") else "night",
+        "look": h.get("look") if h.get("look") in LOOKS else "night",
         "scenes": scenes or list(SCENE_IDS),
         "scene_seconds": _int(h.get("scene_seconds"), 20, 5, 3600),
         "dock_size": _int(h.get("dock_size"), DOCK_LIMIT, 1, DOCK_LIMIT),
@@ -399,6 +419,8 @@ def _home(h):
     if src:
         out["custom_cards"] = src[1] if src[0] == "url" else True
     out["watch_next_per_app"] = _int(h.get("watch_next_per_app"), 5, 1, 20)
+    # the Loop look's files on this computer (read only: the bridge builds it, config.json cannot set it)
+    out["loop"] = loop_files(LOOP_DIR)
     out["smart_idle"] = _smart_idle(h.get("smart_idle"))
     if "inputs" in h:
         out["inputs"] = _inputs(h.get("inputs"))

@@ -20,7 +20,16 @@ changes, the change is written here first, with a dated note at the bottom.
 - **Why "null" in the origin list matters:** TV apps (Android WebView, webOS, Tizen) load from local files and send `Origin: null`. Browsers also send `Origin: null` for requests from sandboxed `<iframe>` elements. Because of this browser behavior, an origin allowlist alone cannot block a malicious web page from sending `Origin: null` requests. The pairing key (`pairing_key`) is what truly protects the bridge from malicious cross-origin requests.
 - POST requests with a body must send `Content-Type: application/json` (otherwise rejected with `415`).
 - Use **relative URLs** (`/api/now`) in both front ends. Then they work from any device at home.
-- Static files are sent with `Cache-Control: no-cache`, so a rebuild shows on the next load.
+- Static files are sent with `Cache-Control: no-cache`, so a rebuild shows on the next load. Pictures,
+  fonts and video are `public, max-age=3600` and never compressed.
+- Byte ranges: every static file answers a `Range` request with one byte range (`bytes=0-999`,
+  `bytes=1000-`, `bytes=-500`): `206 Partial Content` with `Content-Range` and `Accept-Ranges: bytes`,
+  `416` with `Content-Range: bytes */<size>` for a range past the end, a malformed one or several at
+  once, and `HEAD` the same with no body. The Loop look's footage under `/tv/loop/` (docs/LOOP.md)
+  is played this way by the TV's media player.
+- `GET /tv/manifest.json`, the launcher's offline copy, lists every file under `tv-home/web/` except
+  `mock*` and the video under `loop/`: the Loop look's footage (up to 80 MB) is streamed from the
+  bridge, never saved on the TV. Its posters (`loop/*.jpg`) are listed, so the offline home shows one.
 - Unknown paths under `/` and `/tv/` fall back to that folder's `index.html` (single page apps work).
 
 ## Shape of every answer
@@ -948,6 +957,10 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- 2026-11-18: The Loop look (New, option B): `home.look` takes `loop`, and `home.loop` (read only,
+  `{"variants": [...], "blur": bool}`) in `/api/config` and `/tv/config.js` says which of its files the
+  bridge has. `/tv/loop/<variant>.mp4`, `-blur.mp4`, `.jpg` and `-blur.jpg` are served with byte ranges;
+  `/tv/manifest.json` skips the video under `loop/` and keeps its posters (docs/LOOP.md).
 - 2026-11-17: Move what is playing to another TV (New): `POST /api/move` (docs/MOVE.md, #268).
 - 2026-11-14: Custom cards (New): `GET /api/custom-cards`, and `home.custom_cards` in `/api/config` and
   `/tv/config.js` (the link, or `true` for a file on the bridge computer).

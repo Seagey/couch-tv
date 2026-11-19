@@ -2232,6 +2232,13 @@ def static_handler(folder, name):
             etag = f"{st.st_mtime_ns:x}-{st.st_size:x}"
             if static_not_modified(request, etag, st.st_mtime):
                 return web.Response(status=304, headers={**headers, "ETag": '"%s"' % etag})
+        # FileResponse answers a Range request by itself (aiohttp 3.14): 206 with Content-Range and
+        # Accept-Ranges: bytes for one byte range (a start and end, a suffix, or open ended), 416
+        # with "bytes */<size>" for a range past the end, a malformed one or several at once, and
+        # HEAD the same way with no body. The Loop look's video (tv-home/web/loop/) depends on it:
+        # the WebView's media player seeks with Range, and a seek at the loop's wrap must not fetch
+        # the whole file again. Pinned by tests/test_loop_serving.py. Media is never compressed,
+        # so a partial answer is always plain bytes.
         resp = web.FileResponse(target, headers=headers)
         if ctype in COMPRESSIBLE_TYPES:
             resp.enable_compression()   # only when the page says it accepts it
@@ -2255,6 +2262,15 @@ def static_not_modified(request, etag, mtime):
 # The TV app copies these files into its own storage, so its home still works with the computer off.
 # The fingerprint changes whenever any file changes; the TV only copies when it does.
 OFFLINE_SKIP = ("mock",)
+
+
+def offline_skips(rel):
+    """True for a file the offline copy leaves out: the mock bridge, and the Loop look's video
+    (loop/, up to 80 MB), which the bridge streams. The loop's posters (loop/*.jpg, a few hundred
+    KB in all) stay in, so a Loop home with the computer off shows a still of its loop (docs/LOOP.md)."""
+    return rel.startswith(OFFLINE_SKIP) or (rel.startswith("loop/") and not rel.endswith(".jpg"))
+
+
 async def h_tv_manifest(request):
     import hashlib
     files, h = [], hashlib.sha256()
@@ -2262,7 +2278,7 @@ async def h_tv_manifest(request):
         for n in sorted(names):
             full = os.path.join(dirpath, n)
             rel = os.path.relpath(full, LAUNCHER_DIR).replace(os.sep, "/")
-            if n.startswith(".") or rel.startswith(OFFLINE_SKIP):
+            if n.startswith(".") or offline_skips(rel):
                 continue
             st = os.stat(full)
             files.append({"path": rel, "size": st.st_size})
@@ -2590,7 +2606,7 @@ def clean_settings(s):
         out["wx_unit"] = s["wx_unit"]
     if s.get("wx_every") in (15, 30, 60):
         out["wx_every"] = s["wx_every"]
-    if s.get("look") in ("night", "oled", "classic"):
+    if s.get("look") in config.LOOKS:
         out["look"] = s["look"]
     idle_photo_seconds = s.get("idle_photo_seconds")
     if type(idle_photo_seconds) is int and idle_photo_seconds in (0, 5, 10, 15, 30, 60):
@@ -4786,6 +4802,8 @@ def make_app():
                         "Keep watching from Plex is off")
         elif config.PLEX_ERROR:
             log.warning("plex: %s; Keep watching from Plex is off", config.PLEX_ERROR)
+        if config.HOME.get("look") == "loop" and not config.HOME["loop"]["variants"]:
+            log.warning("the Loop look has no files yet: run scripts/make-loop.sh on this computer (docs/LOOP.md)")
         for tv_id, t in TVS.items():
             t.on_change(lambda tv_id=tv_id: with_tv(tv_id, push_now))
             t.on_change(lambda tv_id=tv_id: with_tv(tv_id, _maybe_refresh_installed))
