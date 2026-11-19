@@ -497,7 +497,7 @@
   SHORT[QUEUE_NEED] = ["Needs Spotify connected", "On the home computer. OK here shows how", "Needs Spotify"];
   SHORT[C.card.needs[0]] = ["Type your words in couch-tv Studio", "Or a live number from the home computer. OK here shows how", "Type your words"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];
-  var AT = "Settings (top right), Home settings, couch-tv Studio, At home";
+  var AT = "Settings (hold OK), Home settings, couch-tv Studio, At home";
   SHORT[NOTE_NEED] = ["Write a note", AT, "Write a note"];
   SHORT[LIST_NEED] = ["Add a list", AT, "Add a list"];
   SHORT[WIFI_NEED] = ["Add your guest Wi-Fi", AT, "Add Wi-Fi"];

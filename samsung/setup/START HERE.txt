@@ -96,6 +96,10 @@ home. Then download the newest "couch-tv-samsung-setup.zip" from
 github.com/Seagey/couch-tv/releases and run step 4 again. Your settings stay.
 Developer mode can switch itself off after a Samsung software update: then do step 3 again.
 
+The setup cannot find the TV? Switch the TV on with its remote first (on The Frame, a short
+press: it falls asleep by itself). To keep it reachable: Settings, General, Network, Expert
+Settings, Power On with Mobile, On.
+
 
 Want more? (optional)
 ---------------------

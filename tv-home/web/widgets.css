@@ -73,6 +73,8 @@
   display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center;
   color: #fff; font-weight: 700; text-align: center; line-height: 1.05; padding: 0; word-break: break-word; }
 .cw-app.cw-has-icon { color: transparent; }
+/* a Folder tile's four minis: the name hides behind the icon; with no icon (or one that failed) it shows */
+.cw-app.cw-mini.cw-has-icon { font-size: 0 !important; }
 .cw-more { background: rgba(255, 255, 255, 0.16); box-shadow: none; }
 
 .cw-chip { display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; height: 54px; padding: 0 22px; border-radius: 27px;
@@ -154,6 +156,9 @@ html.cd-wmode.expanded .cw-gearchip, html.setting .cw-gearchip { display: none; 
 .cw-gearchip .cw-gearchip-t { display: none; margin: 0 10px 0 10px; }
 .cw-gearchip.cw-focus { background: #fff; color: #111; box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.45); -webkit-transform: none !important; transform: none !important; }
 .cw-gearchip.cw-focus .cw-gearchip-t { display: inline; }
+/* no clear spot on this design (design.js placeGear): hidden until the remote reaches it, so it covers nothing */
+.cw-gearchip.cw-gear-tuck { opacity: 0; }
+.cw-gearchip.cw-gear-tuck.cw-focus { opacity: 1; }
 .cw-tip.cw-tip-settings { white-space: normal; width: 1100px; max-width: 80vw; text-align: center; line-height: 1.35; }
 .cw-tip { position: fixed; left: 50%; bottom: 40px; -webkit-transform: translateX(-50%); transform: translateX(-50%); z-index: 59; padding: 16px 30px; border-radius: 40px;
   background: rgba(10, 10, 14, 0.82); color: #fff; font: 600 25px "Inter", sans-serif; white-space: nowrap; -webkit-transition: opacity 0.6s; transition: opacity 0.6s; }

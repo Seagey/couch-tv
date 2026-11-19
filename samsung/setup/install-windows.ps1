@@ -115,7 +115,8 @@ if ($Found.Count -eq 1) {
 }
 if (-not $Tv) {
   Write-Host ""
-  Write-Host "No TV was found by itself. You can type its address instead."
+  Write-Host "No TV was found by itself. Is the TV switched on? Switch the TV on with its remote first"
+  Write-Host "(on The Frame, a short press), then run this again. Or type its address instead."
   Write-Host "On the TV: Settings, General (or Connection), Network, Network Status, IP Settings."
   $Tv = (Read-Host "The TV's address (four numbers with dots, as the TV shows it)").Trim()
 }
@@ -129,6 +130,7 @@ while ($true) {
   if ($LASTEXITCODE -eq 0) { break }
   Write-Host ""
   Write-Host "The TV is not ready yet. Usually that means one of these:"
+  Write-Host "  - The TV is off or asleep: switch the TV on with its remote first (on The Frame, a short press)."
   Write-Host "  - Developer mode is off: do START HERE.txt step 3."
   Write-Host "  - The address typed in Developer mode is not this computer's ($MyIp)."
   Write-Host "  - The TV was not restarted by holding the power button after Developer mode."

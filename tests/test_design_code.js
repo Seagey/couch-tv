@@ -59,6 +59,14 @@ assert.ok(!ck.ok && ck.count === 10 && /O is never/.test(ck.msg), "an extra wron
 ck = C.checkCode("RSTFD-5EEDNN");
 assert.ok(!ck.ok && /11 letters/.test(ck.msg), "one too many");
 assert.ok(!C.checkCode("").ok && /Nothing was typed/.test(C.checkCode("").msg));
+// 0.13.6: a stray "_" or "." said "That is 10 letters. A code has 10."; now the mark is named
+ck = C.checkCode("RSTFD_5EEDN");
+assert.ok(!ck.ok && /The _ is not part of a code/.test(ck.msg) && /all 10 are there/.test(ck.msg) && !/A code has 10/.test(ck.msg), "a stray _ is named (" + ck.msg + ")");
+ck = C.checkCode("rstfd.5een");
+assert.ok(!ck.ok && /The \. is not part of a code/.test(ck.msg) && !/all 10/.test(ck.msg), "a stray . with a letter missing is named");
+ck = C.checkCode("RS.TF_D5EEDN");
+assert.ok(/The \. and _ are not part/.test(ck.msg), "two marks are both named");
+for (const m of ["RSTFD_5EEDN", "rstfd.5een"]) assert.ok(!/[–—]/.test(C.checkCode(m).msg), "no long dashes in the words");
 assert.ok(C.checkCode("CTV1-" + "A".repeat(43)).ok, "the long code from the QR still works");
 for (const m of ["", "rstf", "RSTFD-5EEDO", "RSTFD-5EEDNN", "rstfd-5een"]) assert.ok(!/[–—]/.test(C.checkCode(m).msg), "no long dashes in the words");
 assert.strictEqual(C.readCode("CTV1-" + "a".repeat(43)), "CTV1-" + "a".repeat(43));

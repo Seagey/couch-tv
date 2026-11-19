@@ -34,6 +34,21 @@ class HomeAskTest {
         assertEquals("Asking the TV...", HomeAsk.buttonLabel(aliasOn = true, asking = true))
     }
 
+    @Test fun theButtonFollowsWhatAndroidSays() {
+        // 0.13.3 on a TCL: the switch was on, Google's home was the default, and the button said Stop
+        assertFalse(HomeAsk.isOn(aliasOn = true, held = false, opensUs = false, googleTv = false))
+        assertEquals("Use as home screen", HomeAsk.buttonLabel(HomeAsk.isOn(true, false, false, false), asking = false))
+        assertTrue(HomeAsk.isOn(aliasOn = true, held = true, opensUs = false, googleTv = false))
+        assertTrue(HomeAsk.isOn(aliasOn = true, held = false, opensUs = true, googleTv = false))
+        assertFalse(HomeAsk.isOn(aliasOn = false, held = true, opensUs = true, googleTv = false))
+        // Google TV: the switch is the truth (the watch only acts while it is on)
+        assertTrue(HomeAsk.isOn(aliasOn = true, held = false, opensUs = false, googleTv = true))
+        val src = File("src/main/java/dev/couchtv/ontv/SetupActivity.kt").readText()
+        assertTrue(src.contains("HomeAsk.buttonLabel(HomeAsk.isOn(App.homeEnabled(this), held, opensUs, google), asking)"))
+        val press = src.substringAfter("homeBtn = button(\"\")").substringBefore("main1.addView(homeBtn)")
+        assertTrue(press.contains("val on = !homeIsOn()"))
+    }
+
     @Test fun googleTvWithTheWatchApkShowsTheButton() {
         // Fable review of 0.13.5: the watch only acts while Use as home screen is on, and the button was
         // hidden on Google TV while off, so the watch APK steps were a dead end

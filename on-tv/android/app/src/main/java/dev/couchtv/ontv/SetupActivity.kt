@@ -116,7 +116,9 @@ class SetupActivity : Activity() {
         main1.addView(button("New phone code") { Auth.newPin(); refresh() })
         homeBtn = button("") {
             if (askSince > 0) return@button   // already asking
-            val on = !App.homeEnabled(this)
+            // what Android reports now decides (HomeAsk.isOn): a switch left on while the TV's own home is the
+            // default asks again instead of switching off
+            val on = !homeIsOn()
             declined = false
             App.setHomeEnabled(this, on); FireHome.poke()
             // No computer: Android's own "default home app" request (plain Android TV 10+), else its Home chooser.
@@ -190,6 +192,8 @@ class SetupActivity : Activity() {
     }
     override fun onNewIntent(i: Intent) { super.onNewIntent(i); refresh() }
 
+    private fun homeIsOn(): Boolean = HomeAsk.isOn(App.homeEnabled(this), HomeRole.held(this), homeOpensUs(), HomeRole.googleTv(this))
+
     /** True when the TV's Home button already opens this app (the HomeAlias), so Open the home would be redundant. */
     private fun homeOpensUs(): Boolean {
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
@@ -225,10 +229,13 @@ class SetupActivity : Activity() {
         val google = HomeRole.googleTv(this)
         val watchApk = BuildConfig.BUILD_TYPE == "watch"
         val asking = askSince > 0 || awaitingRole
-        homeBtn.text = HomeAsk.buttonLabel(App.homeEnabled(this), asking)
+        // read from Android on every refresh (each 1.5 s and on resume), never from a saved flag alone
+        val held = HomeRole.held(this)
+        val opensUs = homeOpensUs()
+        homeBtn.text = HomeAsk.buttonLabel(HomeAsk.isOn(App.homeEnabled(this), held, opensUs, google), asking)
         homeBtn.visibility = if (HomeAsk.showButton(google, watchApk, App.homeEnabled(this))) View.VISIBLE else View.GONE
-        homeNote.text = SetupWords.homeNote(App.homeEnabled(this), HomeRole.held(this), google, watchApk = watchApk,
-            googleHome = HomeRole.googleHome(this), asking = asking, declined = declined && !App.homeEnabled(this))
+        homeNote.text = SetupWords.homeNote(App.homeEnabled(this), held, google, watchApk = watchApk,
+            googleHome = HomeRole.googleHome(this), asking = asking, declined = declined && !App.homeEnabled(this), opensUs = opensUs)
         if (!watchApk) watchNote.text = SetupWords.watchSteps(ip)
     }
 

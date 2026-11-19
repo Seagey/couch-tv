@@ -62,8 +62,13 @@
       if (SHORT.indexOf(c.charAt(i)) >= 0) valid++;
       else if (bad.indexOf(c.charAt(i)) < 0) bad.push(c.charAt(i));
     }
+    // a mark that is not a letter, a space or the dash (a stray "_" or "." from the TV's keyboard): the
+    // letters may all be there, so the count alone said "That is 10 letters. A code has 10."
+    var marks = [];
+    String(s).replace(/[^A-Za-z0-9\s-]/g, function (m) { if (marks.indexOf(m) < 0) marks.push(m); return m; });
     var msg;   // only letters a code can have are counted
     if (!c.length) msg = "Nothing was typed. A code looks like ABCDE-FGHJK.";
+    else if (marks.length) msg = (marks.length === 1 ? "The " + marks[0] + " is" : "The " + marks.join(" and ") + " are") + " not part of a code. Type only the letters and numbers" + (valid === 10 && !bad.length ? ": all 10 are there." : ".");
     else if (bad.length) msg = (bad.length === 1 ? bad[0] + " is" : bad.join(" and ") + " are") + " never in a code. Check that letter on your phone and type it again.";
     else if (valid < 10) msg = "That is " + valid + " of the 10 letters. " + (10 - valid === 1 ? "One is" : (10 - valid) + " are") + " missing: the TV's keyboard can drop a letter typed fast. Type it again, slowly.";
     else msg = "That is " + valid + " letters. A code has 10. Type it again.";

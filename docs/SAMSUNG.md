@@ -47,6 +47,11 @@ What each TV prompt means, in order:
    asks. It makes a certificate for this TV only.
 5. **"Allow Couch TV bridge to connect?"** only appears later, if a bridge is set up (step 5 below).
 
+**"No TV was found" or "The TV is not ready yet".** The first reason is the TV being off or asleep: switch
+the TV on with its remote first (on The Frame, a short press: it falls asleep from Art Mode by itself and
+cannot be woken over the network). To keep it reachable: Settings, General, Network, Expert Settings,
+Power On with Mobile, On. Then Developer mode, the Host PC IP and the restart above.
+
 The AI agent route (paste "Set this up on my TV: github.com/Seagey/couch-tv" into Claude Code or
 another agent) is still there for the bridge; it is an option, never needed for the app.
 

@@ -39,7 +39,7 @@ object SetupWords {
      *  asking: Android's request is on its way. declined: Android's list was closed without Couch TV.
      */
     fun homeNote(useAsHome: Boolean, held: Boolean, googleTv: Boolean, watchApk: Boolean = false, googleHome: Boolean = googleTv,
-                 asking: Boolean = false, declined: Boolean = false): String = when {
+                 asking: Boolean = false, declined: Boolean = false, opensUs: Boolean = held): String = when {
         asking -> "Asking the TV to make Couch TV its home. If the screen goes black, press Back once and the question comes up."
         // the watch only acts while Use as home screen is on (FireHome.onOtherHome), so it is always one of the steps
         googleTv && watchApk && !useAsHome -> "On Google TV the Home button opens Google TV first. To bring your couch-tv home straight back on top: " +
@@ -50,10 +50,13 @@ object SetupWords {
             "Until then, open your couch-tv home from Couch TV in the apps row."
         declined -> "Couch TV is not your home screen: the TV's list was closed without choosing it. Press Use as home screen to ask again."
         !useAsHome -> "Use as home screen asks the TV to make Couch TV its home. No computer needed."
-        held && googleHome && !watchApk -> "Couch TV is your home screen. Press Home on the remote to see it. If Google's home still opens " +
-            "(some TVs, a TCL among them, open it by name), that is expected with the phone only download: see More, Home button from a computer."
-        held -> "Couch TV is your home screen. Press Home on the remote to see it."
-        else -> "If the TV showed a list, choose Couch TV and press Always (or Set as default)."
+        // 0.13.3 said "Couch TV is your home screen" from a saved switch while Google's home was still the
+        // default (TCL beginner test, 19 Nov 2026). Now only what Android reports right now decides the words.
+        !held && !opensUs -> "Couch TV is not your home screen yet: the TV's own home still opens on Home. Press Use as home screen to ask the TV again."
+        held && googleHome && !watchApk -> "Android lists Couch TV as the home app, but on some TVs (a TCL among them) Home still opens Google's home " +
+            "with the phone only download. That is expected: see More, Home button from a computer. Until then, open your couch-tv home from Couch TV in the apps row."
+        !opensUs -> "Android lists Couch TV as the home app, but Home still opens the TV's own home. Open your couch-tv home from Couch TV in the apps row."
+        else -> "Couch TV is your home screen. Press Home on the remote to see it."
     }
 
     /**

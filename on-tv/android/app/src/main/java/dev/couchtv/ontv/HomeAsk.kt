@@ -31,7 +31,15 @@ object HomeAsk {
      */
     fun showButton(googleTv: Boolean, watchApk: Boolean, aliasOn: Boolean): Boolean = !googleTv || watchApk || aliasOn
 
-    /** The button's words: what pressing it does now. */
+    /**
+     * Whether couch-tv counts as the home now, from what Android reports, not the saved switch alone: the
+     * alias on and Android holding it as the home (the role) or the Home intent resolving to it. On Google
+     * TV the switch is the truth (the watch brings couch-tv back only while it is on). 0.13.3 showed "Stop
+     * being the home screen" while Google's home was the default (TCL beginner test, 19 Nov 2026).
+     */
+    fun isOn(aliasOn: Boolean, held: Boolean, opensUs: Boolean, googleTv: Boolean): Boolean = aliasOn && (googleTv || held || opensUs)
+
+    /** The button's words: what pressing it does now (aliasOn: isOn above). */
     fun buttonLabel(aliasOn: Boolean, asking: Boolean): String = when {
         asking -> "Asking the TV..."
         aliasOn -> "Stop being the home screen"

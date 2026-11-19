@@ -43,13 +43,28 @@ class SetupWordsTest {
         assertTrue(gtv.contains("see More, Home button from a computer"))
         // Google's Android TV Home (a TCL): Couch TV held the home role, Home still opened Google's
         val tcl = SetupWords.homeNote(true, true, false, watchApk = false, googleHome = true)
-        assertTrue(tcl.startsWith("Couch TV is your home screen"))
-        assertTrue(tcl.contains("that is expected with the phone only download"))
+        // 0.13.6: never "Couch TV is your home screen" there, since Home still opens Google's home
+        assertTrue(tcl.startsWith("Android lists Couch TV as the home app"))
+        assertFalse(tcl.contains("is your home screen"))
+        assertTrue(tcl.contains("That is expected: see More, Home button from a computer"))
         // a TV with no Google home, or the watch APK: no warning
         assertEquals("Couch TV is your home screen. Press Home on the remote to see it.", SetupWords.homeNote(true, true, false))
         assertEquals("Couch TV is your home screen. Press Home on the remote to see it.",
             SetupWords.homeNote(true, true, false, watchApk = true, googleHome = true))
         assertTrue(SetupWords.homeNote(true, false, true, watchApk = true).contains("Couch TV home watch"))
+    }
+
+    @Test fun saysTheTruthFromAndroidNotASavedSwitch() {
+        // TCL beginner test of 0.13.3: the switch was on, Google's home was still the default, and the screen
+        // said Couch TV is your home screen
+        val stale = SetupWords.homeNote(true, held = false, googleTv = false, opensUs = false)
+        assertTrue(stale.startsWith("Couch TV is not your home screen yet"))
+        assertTrue(stale.contains("Press Use as home screen to ask the TV again"))
+        // Android holds the role but Home resolves to the TV's own home
+        val byName = SetupWords.homeNote(true, held = true, googleTv = false, opensUs = false)
+        assertFalse(byName.contains("is your home screen"))
+        assertTrue(byName.contains("Home still opens the TV's own home"))
+        assertEquals("Couch TV is your home screen. Press Home on the remote to see it.", SetupWords.homeNote(true, held = true, googleTv = false, opensUs = true))
     }
 
     @Test fun theWatchStepsAreExact() {

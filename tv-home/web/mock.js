@@ -158,6 +158,7 @@
     try { var dz = JSON.parse(localStorage.getItem("tvdesigner.design") || "null"); if (dz && typeof dz === "object") cfg.design = dz; } catch (e) {}
   }
   if (arg("follow")) cfg.home.shelf_follows_app = arg("follow") !== "off";   // home.shelf_follows_app
+  if (arg("ontv")) cfg.mode = "on-tv";   // ?ontv=1: served by the on-TV app (no computer behind it)
   window.COUCH_CONFIG = cfg;
 
   // ---------- the launcher's updater (Updater.kt), for ?update= ----------
@@ -168,6 +169,13 @@
     var up = { supported: true, current: "0.3", latest: kind === "latest" ? "0.3" : "0.4",
       title: kind === "latest" ? "" : "0.4: a pretend release for the preview", available: kind !== "latest",
       checked: Date.now() - 20 * 3600000, auto: kind !== "ask", answered: kind !== "ask", busy: "", progress: 0, error: "" };
+    // ?update=ontv: the on-TV app from a phone, which cannot install an update itself (OnTvUpdate.kt):
+    // it hands over the steps instead
+    if (kind === "ontv") {
+      up.manual = true; up.code = "8180170";
+      up.how = "This app came from your phone, so it cannot install an update by itself. Put it on again the same way:";
+      up.steps = ["Open Downloader on this TV (in your apps).", "Type 8180170 in its box and press Go.", "Press Install. Your settings stay."];
+    }
     var tell = function () { if (window.tv && window.tv.update) window.tv.update(JSON.parse(JSON.stringify(up))); };
     window.MOCK_UPDATER = {
       state: function () { return JSON.stringify(up); },

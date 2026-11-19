@@ -518,7 +518,7 @@
   }
   R.solar = function (root, o, b, env) {
     var s = sunToday(env);
-    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Settings (top right), Home settings, Location");
+    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Settings (hold OK), Home settings, Location");
     var at = arc(s.frac);
     add(root, [lab("sun", op(o).label || "Sun"),
       svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.28)", "stroke-width": 3, "stroke-dasharray": "2 9", "stroke-linecap": "round" }),
@@ -649,7 +649,7 @@
   };
 
   // weather
-  function noWx(root, b, env) { return empty(root, b, "partly-cloudy", dataOf(env).wxOff ? "Weather is off on this TV" : "Set your town for the weather", dataOf(env).wxOff ? "Turn it on in Home settings, Weather" : "Settings (top right), Home settings, Location"); }
+  function noWx(root, b, env) { return empty(root, b, "partly-cloudy", dataOf(env).wxOff ? "Weather is off on this TV" : "Set your town for the weather", dataOf(env).wxOff ? "Turn it on in Home settings, Weather" : "Settings (hold OK), Home settings, Location"); }
   R.weather = function (root, o, b, env, sh) {
     var w = weather(env);
     if (!w) return noWx(root, b, env);
@@ -740,7 +740,7 @@
   };
   R.sun = function (root, o, b, env) {
     var s = sunToday(env);
-    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Settings (top right), Home settings, Location");
+    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Settings (hold OK), Home settings, Location");
     var at = arc(s.frac);
     add(root, [lab("sun", op(o).label || "Sun"), svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.3)", "stroke-width": 4, "stroke-dasharray": "2 10", "stroke-linecap": "round" }),
       s.frac > 0 && s.frac < 1 ? S("circle", { cx: at.x, cy: at.y, r: 14, fill: "#ffd60a" }) : null], "flex:1;min-height:0;margin:6px 0"),
@@ -808,7 +808,7 @@
   // a photo box has no panel of its own (the photo is the panel), so with no photo yet its words sat
   // white on whatever was behind (white on a light look's beige): a dark panel under them, always readable
   function noPhotos(root, b) {
-    empty(root, b, "picture", "Add your photos on the TV", "Settings (top right), Home settings, Your photos");
+    empty(root, b, "picture", "Add your photos on the TV", "Settings (hold OK), Home settings, Your photos");
     var bg = null;
     for (var i = 0; i < root.childNodes.length; i++) if (root.childNodes[i].className === "cw-bg") bg = root.childNodes[i];
     if (!bg) { bg = E("div", "cw-bg"); root.insertBefore(bg, root.firstChild); }
@@ -1008,7 +1008,7 @@
     if (b.w < 300 && b.h < 300) {
       // a Tile: four tiny icons, OK opens the folder full screen (like iOS)
       var mini = list.slice(0, 4), s = Math.floor((Math.min(b.w, b.h) - 48 - 12) / 2);
-      add(root, E("div", "cw-grow", "display:flex;flex-wrap:wrap;align-content:center;justify-content:center", mini.map(function (p) { var n = appNode(p, s, env); n.removeAttribute("data-act"); n.style.margin = "3px"; n.style.fontSize = "0"; return n; })));
+      add(root, E("div", "cw-grow", "display:flex;flex-wrap:wrap;align-content:center;justify-content:center", mini.map(function (p) { var n = appNode(p, s, env); n.removeAttribute("data-act"); n.style.margin = "3px"; n.classList.add("cw-mini"); return n; })));
       stop(root, "detail", "folder", q.label || "Apps");
       return;
     }
@@ -1896,8 +1896,8 @@
     var q = op(o), c = dataOf(env).commute || {}, v;
     if (env.demo) { v = { minutes: 16, km: 12.4 }; c = { to: { name: "work" } }; }
     else {
-      if (!c.from) { webEmpty(root, b, "location", "Set your town for the commute", "Settings (top right), Home settings, Location", "Set your town"); root.setAttribute("data-setup", "commute"); return null; }
-      if (!c.to) { webEmpty(root, b, "location", "Set where you drive to", "Settings (top right), Home settings, couch-tv Studio, Commute", "Set where to"); root.setAttribute("data-setup", "commute"); return null; }
+      if (!c.from) { webEmpty(root, b, "location", "Set your town for the commute", "Settings (hold OK), Home settings, Location", "Set your town"); root.setAttribute("data-setup", "commute"); return null; }
+      if (!c.to) { webEmpty(root, b, "location", "Set where you drive to", "Settings (hold OK), Home settings, couch-tv Studio, Commute", "Set where to"); root.setAttribute("data-setup", "commute"); return null; }
       var rec = webOf(env, "commute", c.key);
       if (rec && !rec.ok && rec.err === "empty") { webEmpty(root, b, "location", "No road route between these places", "Check Commute in Home settings", "No route"); return null; }
       if (!webReady(root, b, "location", "commute", rec)) return null;
@@ -1966,7 +1966,7 @@
     if (q.source === "calendar") {
       var st = stayOf(env || {});
       if ((!st || !st.set) && typed) text = withName(greetingOf(text), typed);
-      else if (!st || !st.set) return empty(root, b, "calendar", b.w < 300 ? "Add bookings" : "Add your bookings calendar", "Settings (top right), Home settings, couch-tv Studio, At home");
+      else if (!st || !st.set) return empty(root, b, "calendar", b.w < 300 ? "Add bookings" : "Add your bookings calendar", "Settings (hold OK), Home settings, couch-tv Studio, At home");
       var v = st && st.view;
       if (v && v.phase !== "between") {
         text = withName(text, v.guest || typed);
@@ -2183,7 +2183,7 @@
     if (env.demo) { var de = demoEvents(); return { today: de.map(function (x, i) { return { title: x.title, when: hhmm(x.start, env), col: EV_COL[i], start: x.start, end: x.end }; }), tomorrow: [] }; }
     var c = (athome(env) || {}).cal;
     if (!c || !c.set) { soon(root, b, "calendar", "agenda"); return null; }
-    if (!c.events) { empty(root, b, "calendar", c.err ? (b.w < 300 ? "Calendar not read" : c.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), c.err ? "Settings (top right), Home settings, couch-tv Studio, At home" : ""); return null; }
+    if (!c.events) { empty(root, b, "calendar", c.err ? (b.w < 300 ? "Calendar not read" : c.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), c.err ? "Settings (hold OK), Home settings, couch-tv Studio, At home" : ""); return null; }
     return { today: evDay(c.events, 0, env), tomorrow: evDay(c.events, 1, env) };
   }
   R.agenda = function (root, o, b, env) {
@@ -2328,7 +2328,7 @@
     if (!s || s.why === "off") { soon(root, b, "timer", "screentime"); return null; }
     if (s.why === "tv") { empty(root, b, "timer", b.w < 300 ? "Not on this TV" : "Screen time is not on this TV", "It needs a Google TV, Android TV or Fire TV"); return null; }
     if (s.why === "ontv") { empty(root, b, "timer", b.w < 300 ? "Needs a computer once" : "Screen time needs the couch-tv home app", "Put it on once from a computer with the free Setup app"); return null; }
-    if (!s.ok) { empty(root, b, "timer", s.why === "access" ? (b.w < 300 ? "Allow it first" : "Allow screen time on this TV") : (b.w < 300 ? "Needs an update" : "Needs a newer couch-tv TV home"), s.why === "access" ? "Settings (top right), Home settings, couch-tv Studio, At home" : ""); return null; }
+    if (!s.ok) { empty(root, b, "timer", s.why === "access" ? (b.w < 300 ? "Allow it first" : "Allow screen time on this TV") : (b.w < 300 ? "Needs an update" : "Needs a newer couch-tv TV home"), s.why === "access" ? "Settings (hold OK), Home settings, couch-tv Studio, At home" : ""); return null; }
     return { ok: true, minutes: s.minutes || 0, goal: h.goal || 0, apps: s.apps || [] };
   }
   R.screentime = function (root, o, b, env) {

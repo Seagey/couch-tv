@@ -4766,15 +4766,19 @@
   function aboutRows() {
     var ver = "";
     try { ver = TV && TV.version ? TV.version() : ""; } catch (e) {}
-    var run = ALONE ? "run_alone" : OFFLINE ? "run_off" : data.bridge === false ? "run_quiet" : "run_bridge";
+    // the on-TV app (couch-tv-ontv.apk, put on with just a phone) serves this page from the TV itself:
+    // there is no computer, so it never says "With the computer" (a TCL beginner test, 19 Nov 2026)
+    var run = ALONE || ON_TV ? "run_alone" : OFFLINE ? "run_off" : data.bridge === false ? "run_quiet" : "run_bridge";
     var hs = homeState(), homeRows = [];
     if (hs === "ask") homeRows.push({ kind: "action", key: "make-home", label: t("home_row"), sub: t("home_row_sub"), act: requestHome });
     else if (hs === "google_tv") homeRows.push(info("make-home", t("home_row"), "", t("home_google_tv")));
+    var u = updRead();
+    if (u && u.supported) homeRows.push({ kind: "action", key: "upd-about", label: UPD_ROW, sub: updLine(u), act: openUpdate });
     return homeRows.concat([
       info("ver", t("about_version"), ver || t("about_web")),
       info("code", t("about_code"), REPO_URL),
       info("run", t("about_running"), t(run)),
-      info("kept", t("about_kept"), t(OFFLINE || data.bridge === false ? "kept_tv" : "kept_both")),
+      info("kept", t("about_kept"), t(OFFLINE || ON_TV || data.bridge === false ? "kept_tv" : "kept_both")),
       { kind: "action", key: "restart", label: t("about_restart"), sub: t("about_restart_sub"), act: restartHome },
       { kind: "action", key: "reset", label: t("about_reset"), sub: t("about_reset_sub"), danger: true, confirmText: t("confirm_reset"),
         act: resetSettings }
@@ -4914,11 +4918,37 @@
     var when = new Date(u.checked).toLocaleString(loc, { day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: !CLOCK24 });
     return t("upd_last", { when: when });
   }
+  // Home settings, About, Update couch-tv: the version line, and OK opens the update page (the same rows
+  // as Updates). Nobody on a phone only install was ever told about a new version (a TCL beginner on
+  // 0.13.3, 19 Nov 2026), so it is where people look first. English only for now (needs i18n).
+  var UPD_ROW = "Update couch-tv";
+  function updLine(u) {
+    if (u.busy === "checking") return t("upd_checking");
+    if (u.available || u.refused) return t("upd_gear", { v: u.latest, c: u.current || "" });
+    if (u.checked) return t("about_version") + " " + (u.current || "") + ". " + t("upd_latest");
+    return t("about_version") + " " + (u.current || "") + ". " + t("upd_never");
+  }
+  function openUpdate() {
+    SET.sub = { back: "upd-about", crumb: t("sec_about"), title: function () { return UPD_ROW; }, rows: updateRows };
+    SET.keyFocus = null; SET.ri = 0;
+    var u = updRead();
+    if (u && !u.checked && !u.busy) upd().check();   // never looked yet: look now
+  }
+  // An app that cannot install an update itself (the on-TV app from a phone: Android's installer needs a
+  // permission that brings back Play Protect's block, so it is left out). The app hands the steps over
+  // in u.steps; they are shown one per row, numbered, with the Downloader code big in the first.
+  function manualRows(u) {
+    var steps = Array.isArray(u.steps) ? u.steps : [];
+    return steps.slice(0, 8).map(function (s, i) { return info("upd-step" + i, (i + 1) + ".", "", String(s).slice(0, 300)); });
+  }
   function updateRows() {
     var u = updRead() || {}, busy = u.busy || "";
     var rows = [info("upd-ver", t("about_version"), u.current || "")];
     if (u.latest) rows.push(info("upd-newest", t("upd_newest"), u.latest));   // both numbers side by side
-    if (u.available) {
+    if (u.available && u.manual) {
+      rows.push(info("upd-how", UPD_ROW, "", t("upd_gear", { v: u.latest, c: u.current || "" }) + ". " + (u.how || "")));
+      rows = rows.concat(manualRows(u));
+    } else if (u.available) {
       rows.push({ kind: "action", key: "upd-install", label: t("upd_install", { v: u.latest }),
         sub: busy === "downloading" ? t("upd_downloading", { p: u.progress || 0 }) : busy === "installing" ? t("upd_confirm") : u.title || "",
         act: function () { if (!busy) upd().install(); } });
@@ -5419,7 +5449,12 @@
     if (typingKey(e)) return;   // typing a place or a name: the keys belong to the text box
     if (isOk(e)) {
       e.preventDefault();
-      if (e.repeat || okDown) return;   // a held key repeating: the timer is already running
+      // a held key repeating: Android's long press. The hold happens now (an ADB long press sends the
+      // repeat at once and lets go straight after), so the key up never opens the focused app.
+      if (e.repeat || okDown) {
+        if (e.repeat && okDown && !okHeld) { clearTimeout(okTimer); okHeld = true; pressTile(false); if (!hold()) activate(); ensureFocus(); resetIdlePhoto(); }
+        return;
+      }
       okDown = true; okHeld = false;
       blip(0, 0);
       pressTile(true);
@@ -6004,7 +6039,7 @@
     // screen time
     rows.push(head("Screen time"));
     var s = screenNow(), goal = (r.screen || {}).goal || 0;
-    rows.push(info("ah-screen", "Today", s.ok ? CouchAtHome.hm(s.minutes) : "", s.ok ? "Time in apps on this TV today." : s.why === "access" ? "This TV has not allowed couch-tv to read screen time yet." : s.why === "tv" ? "This TV does not share screen time: it needs a Google TV, Android TV or Fire TV." : s.why === "ontv" ? "Screen time needs the couch-tv home app (couch-tv-home.apk), put on the TV once from a computer with the free Setup app. The phone only app cannot read it." : "Needs the couch-tv home app 0.13.2 or newer: Home settings, Updates."));
+    rows.push(info("ah-screen", "Today", s.ok ? CouchAtHome.hm(s.minutes) : "", s.ok ? "Time in apps on this TV today." : s.why === "access" ? "This TV has not allowed couch-tv to read screen time yet." : s.why === "tv" ? "This TV does not share screen time: it needs a Google TV, Android TV or Fire TV." : s.why === "ontv" ? "Screen time needs couch-tv set up once from a computer, with the free Setup app. The app put on with just a phone cannot read it." : "Needs the couch-tv home app 0.13.2 or newer: Home settings, Updates."));
     rows.push({ kind: "cycle", key: "ah-goal", label: "Daily goal", value: goal ? CouchAtHome.hm(goal) : t("off"), act: function () {
       ahEdit(function (x) { var g = CouchAtHome.GOALS, i = g.indexOf((x.screen || {}).goal || 0); x.screen = { goal: g[(i + 1) % g.length] }; });
     } });

@@ -85,7 +85,8 @@ elif [ "$COUNT" -gt 1 ] 2>/dev/null; then
   TV="$(printf '%s\n' "$LIST" | sed -n "${REPLY}p" | awk '{print $1}')"
 fi
 if [ -z "$TV" ]; then
-  say "" "No TV was found by itself. You can type its address instead."
+  say "" "No TV was found by itself. Is the TV switched on? Switch the TV on with its remote first"
+  say "(on The Frame, a short press), then run this again. Or type its address instead."
   say "On the TV: Settings, General (or Connection), Network, Network Status, IP Settings."
   ask "The TV's address (four numbers with dots, as the TV shows it):"
   TV="$(printf '%s' "$REPLY" | tr -d ' ')"
@@ -99,6 +100,7 @@ while :; do
   CODE=$?
   [ $CODE -eq 0 ] && break
   say "" "The TV is not ready yet. Usually that means one of these:"
+  say "  - The TV is off or asleep: switch the TV on with its remote first (on The Frame, a short press)."
   say "  - Developer mode is off: do START HERE.txt step 3."
   say "  - The address typed in Developer mode is not this computer's ($MYIP)."
   say "  - The TV was not restarted by holding the power button after Developer mode."

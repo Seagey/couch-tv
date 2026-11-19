@@ -2186,7 +2186,58 @@
       GEAR.setAttribute("data-act", "gear"); GEAR.setAttribute("data-name", "Settings"); GEAR.setAttribute("role", "button");
     }
     if (GEAR.parentNode !== document.body) document.body.appendChild(GEAR);
+    placeGear(GEAR);
     return GEAR;
+  }
+  // Where the Settings button goes: a spot clear of every widget, wide enough for it with the word
+  // Settings (it grows when focused), so it never covers a clock or a card (a TCL beginner test, 19 Nov
+  // 2026: it hid the clock on Guest Welcome and the Holidays card on Packed Bento). The corners first,
+  // then along the edges of the screen. A design with no clear spot anywhere: the button hides until
+  // the remote reaches it (Up or Right at the edge of the screen), so it covers nothing while you watch.
+  var GEAR_SIG = "", GEAR_W = 220, GEAR_H = 64;
+  function gearBoxes() {
+    var out = [];
+    [layers.front, layers.back].forEach(function (L) {
+      if (!L) return;
+      [].forEach.call(L.children, function (n) {
+        if (!n.classList || !n.classList.contains("cd-o")) return;
+        var cs = getComputedStyle(n);
+        if (cs.visibility === "hidden" || cs.display === "none") return;
+        var b = (n.querySelector(".cw") || n).getBoundingClientRect();
+        // a picture across the whole screen is a background, not something the button could cover
+        if (b.width < 4 || b.height < 4 || (b.width * b.height > innerWidth * innerHeight * 0.85)) return;
+        out.push({ l: b.left, t: b.top, r: b.right, b: b.bottom });
+      });
+    });
+    return out;
+  }
+  // pure: the first clear spot for a w x h button among the candidates, or null. boxes and the answer in
+  // screen px; a spot is { x, y, right } (right: anchored on its right side, so it grows to the left)
+  function gearSpot(boxes, W, H, w, h) {
+    var pad = 10, cands = [], m, x, y;
+    [28, 8].forEach(function (mg) {
+      cands.push({ x: W - mg - w, y: mg, right: true }, { x: mg, y: mg, right: false }, { x: W - mg - w, y: H - mg - h, right: true }, { x: mg, y: H - mg - h, right: false });
+    });
+    for (x = W - 8 - w; x >= 8; x -= 32) { cands.push({ x: x, y: 8, right: x + w / 2 > W / 2 }); cands.push({ x: x, y: H - 8 - h, right: x + w / 2 > W / 2 }); }
+    for (y = 8; y <= H - 8 - h; y += 32) { cands.push({ x: W - 8 - w, y: y, right: true }); cands.push({ x: 8, y: y, right: false }); }
+    for (m = 0; m < cands.length; m++) {
+      var c = cands[m], hit = boxes.some(function (b) { return c.x < b.r + pad && c.x + w > b.l - pad && c.y < b.b + pad && c.y + h > b.t - pad; });
+      if (!hit) return c;
+    }
+    return null;
+  }
+  function placeGear(g) {
+    if (g.classList.contains("cw-focus")) return;   // never moves under the remote
+    var sig = innerWidth + "x" + innerHeight + "|" + (layers.front ? layers.front.getAttribute("data-sig") : "") + "|" + (layers.back ? layers.back.getAttribute("data-sig") : "");
+    if (sig === GEAR_SIG || !ROOT.classList.contains("cd-wmode")) return;
+    GEAR_SIG = sig;
+    var spot = gearSpot(gearBoxes(), innerWidth, innerHeight, GEAR_W, GEAR_H);
+    g.classList.toggle("cw-gear-tuck", !spot);
+    g.classList.toggle("cw-gear-left", !!spot && !spot.right);
+    if (!spot) { g.style.top = "28px"; g.style.right = "28px"; g.style.left = "auto"; return; }
+    g.style.top = spot.y + "px";
+    if (spot.right) { g.style.right = (innerWidth - spot.x - GEAR_W) + "px"; g.style.left = "auto"; }
+    else { g.style.left = spot.x + "px"; g.style.right = "auto"; }
   }
   var NAV = (function () {
     var cur = null, last = null, sheet = null, okDown = false, okHeld = false, okT = null, okSoon = null, okStart = 0, okLast = 0, okSwallow = false, tipShown = false, tracing = false;
@@ -2384,7 +2435,8 @@
           eds.push(mk(folder ? "Remove from folder" : "Remove", "edit", "remove"));
         }
         if (room && (ctx.slot !== 0 || ctx.max > 1)) eds.push(mk(folder ? "Add app to folder" : "Add app", "edit", "add"));
-        nodes = eds.concat(nodes);
+        // Settings stays first on an app too: one more OK from the hold lands on Settings, never on Change app
+        nodes = [nodes[0]].concat(eds, nodes.slice(1));
       }
       openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes }, "Back to close. Settings here is couch-tv's own: the remote's Settings button opens the TV's menu.");
     }
@@ -2472,7 +2524,7 @@
       if (tipShown || DESIGNER || PREVIEW) return;
       tipShown = true;
       try { if (localStorage.getItem(TIP_USED)) return; } catch (e) {}
-      var t = h("div", "cw-tip cw-tip-settings", null, ["Hold OK, or press OK on the gear in the top corner, for apps and settings. The remote's own Settings button opens the TV's menu."]);
+      var t = h("div", "cw-tip cw-tip-settings", null, ["Hold OK for apps and settings, or go Up or Right to the edge of the screen for the Settings gear. The remote's own Settings button opens the TV's menu."]);
       document.body.appendChild(t);
       setTimeout(function () { t.style.opacity = "0"; setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 700); }, 9000);
     }
@@ -2514,7 +2566,13 @@
       if (ar) { e.preventDefault(); e.stopPropagation(); if (document.documentElement.dir === "rtl") ar = [-ar[0], ar[1]]; move(ar[0], ar[1]); tip(); return; }
       if (okKey(e)) {
         e.preventDefault(); e.stopPropagation();
-        if (e.repeat || okDown) return;
+        if (e.repeat || okDown) {
+          // Android's own long press: the held key comes again as a repeat (an ADB long press sends it at
+          // once, then lets go). A repeat is a hold, so it opens the Home menu now and the key up after it
+          // never opens the focused app (an ADB long press on a TCL opened Netflix, 19 Nov 2026).
+          if (e.repeat && okDown && !okHeld) { clearTimeout(okT); if (okSoon) { clearTimeout(okSoon); okSoon = null; } okHeld = true; okSwallow = true; okLast = Date.now(); holdMenu(); }
+          return;
+        }
         // a TV that sends a held OK as quick down and up pairs (a TCL did): a down soon after an up is
         // the same press going on, so it still counts as held, not as an OK on the widget (a clock's Timers)
         if (okSoon) { clearTimeout(okSoon); okSoon = null; okDown = true; if (Date.now() - okStart >= 650) { clearTimeout(okT); okHeld = true; okSwallow = true; okLast = Date.now(); holdMenu(); } return; }
