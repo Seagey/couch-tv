@@ -5710,6 +5710,10 @@
     var listId = SET.sec + "|" + $("set-head").textContent + "|" + $("set-crumb").textContent;
     var fresh = box.getAttribute("data-list") !== listId;
     var keep = fresh ? 0 : box.scrollTop;
+    var pk = fresh ? 0 : SET.peek || 0;   // read and cleared here, so it never carries to another page
+    SET.peek = 0;
+    if (pk) SET.peeked = listId + "|" + SET.ri;
+    else if (SET.peeked !== listId + "|" + SET.ri) SET.peeked = null;
     box.setAttribute("data-list", listId);
     box.innerHTML = rows.map(rowHTML).join("");
     box.style.scrollBehavior = "auto";
@@ -5725,15 +5729,19 @@
     var f = box.querySelector(".srow.focus");
     if (!f) { box.scrollTop = 0; return; }
     // Up or Down just scrolled lines into view with no row to move to: leave the list there
-    if (SET.peek) {
-      var pk = SET.peek; SET.peek = 0;
+    if (pk) {
       box.scrollTop = Math.max(0, Math.min(box.scrollHeight - box.clientHeight, keep + pk * Math.round(box.clientHeight * 0.6)));
       return;
     }
+    // a redraw for news (an update check, the calendar) while someone reads what they scrolled to:
+    // leave the list where they put it until the focus moves to another row
+    if (SET.peeked) return;
     var top = f.offsetTop, bottom = top + f.offsetHeight, view = box.clientHeight, edge = view / 4;
     // a page just opened whose first button is low down: if it is on screen from the top, start at
-    // the top, so the lines above it (the update steps) are read first
-    if (fresh && bottom <= view) return;
+    // the top, so the lines above it (the update steps) are read first. The list's bottom padding is
+    // its fade, so a button there would show half faded: it does not count as on screen.
+    var fade = parseFloat(getComputedStyle(box).paddingBottom) || 0;
+    if (fresh && bottom <= view - fade) return;
     if (top - edge < box.scrollTop) box.scrollTop = Math.max(0, top - edge);
     else if (bottom + edge > box.scrollTop + view) box.scrollTop = bottom + edge - view;
   }

@@ -224,6 +224,8 @@ async function about(page) {
   const before = await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "");
   ok(/Check for updates now/.test(before), "and the focus stays on the first button (" + before.slice(0, 60) + ")");
   for (let i = 0; i < 8; i++) { await page.keyboard.press("ArrowDown"); await page.waitForTimeout(120); }
+  // every press restarts the smooth scroll, so wait for the list to settle before looking (review, 20 Nov)
+  await page.waitForFunction(() => { const f = document.querySelector(".srow.focus"), box = document.getElementById("set-rows"); if (!f) return false; const a = box.getBoundingClientRect(), b = f.getBoundingClientRect(); return b.top >= a.top - 1 && b.bottom <= a.bottom + 1; }, null, { timeout: 3000 }).catch(() => {});
   ok(await page.evaluate(() => { const f = document.querySelector(".srow.focus"), box = document.getElementById("set-rows"); if (!f) return false; const a = box.getBoundingClientRect(), b = f.getBoundingClientRect(); return b.top >= a.top - 1 && b.bottom <= a.bottom + 1; }), "Down still keeps the focused row on screen");
   ok(!page.errors.length, "no page errors (" + page.errors.join(" | ") + ")");
   await page.close();
