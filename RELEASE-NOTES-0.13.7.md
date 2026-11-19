@@ -5,13 +5,13 @@ We tried 0.13.6 on a real TCL Android TV, the way a beginner would, and on a rea
 ### Do this after updating
 
 - **Option C (the on-TV app):** Home settings, About, Update couch-tv shows the steps, or install the new `couch-tv-ontv.apk` (or `couch-tv-ontv-watch.apk`) over the old one. Your settings stay.
-- **Every other Android TV:** Home settings, Updates, check now, or install `couch-tv-home.apk` over the old one. Both APKs are signed with the same key as every earlier release.
+- **Every other Android TV:** Home settings, Updates, check now, or install `couch-tv-home.apk` over the old one. All four APKs are signed with the same key as every earlier release.
 - **Samsung:** download `couch-tv-samsung-setup.zip` below and run its installer again (step 4 in `START HERE.txt`). Your settings stay.
 - **Option B (a computer at home):** `git pull` and restart the bridge. On a Samsung Frame this brings the new way of opening couch-tv after Art Mode.
 
 ### The remote
 
-- **Hold OK never opens the app, on a TCL too.** 0.13.6 counted a held key as a hold only when Android marked it as a repeat. The TCL's WebView did not mark it, so a long press on Netflix still opened Netflix. Now a second key down with no key up between counts as a hold, marked or not. This is the same on a couch-tv Studio design and on the classic home.
+- **Hold OK on a TCL.** 0.13.6 counted a held key as a hold only when Android marked it as a repeat. The TCL's WebView did not mark it, so a long press on Netflix still opened Netflix. Now a second key down with no key up between counts as a hold, marked or not. This is the same on a couch-tv Studio design and on the classic home.
 - **The Settings gear by arrow.** On Guest Welcome the gear sat on the left, but only Up from the clock on the right reached it. Now the arrow that points at the gear reaches it, on whichever edge it sits, and the arrow back the way you came goes back. A gear hidden until the remote reaches it (Packed Bento) moves exactly as before. The tip on the home now says "the Settings gear at the edge of the screen".
 - Widget help says to hold OK and pick Settings first, since the gear can be on any edge.
 
@@ -28,7 +28,7 @@ On the TCL, Downloader had kept five old copies of the app, the TV ran short of 
 - **Tell me about new versions** off now switches off both the daily look and the note on the home.
 - **Opening couch-tv after Art Mode.** When the Frame came on or left Art Mode, one try at opening couch-tv could fail ("not answering on the network"), and the bridge gave up, leaving Samsung's screen. It now tries up to 3 times, 3 seconds apart, and stops if another app came forward.
 
-Both were checked on a real 2021 Frame.
+The About row with the version and the steps, Check for updates now, and opening after Art Mode were checked on a real 2021 Frame. The Tell me switch and "latest only after GitHub answered" were checked by tests on a computer.
 
 ### Also
 
