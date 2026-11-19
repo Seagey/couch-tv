@@ -2079,6 +2079,18 @@ html.theme-loop .time {
   color: rgba(245, 243, 238, 0.92); -webkit-text-stroke: 0.0625rem rgba(11, 10, 16, 0.6); text-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.55);
 }
 html.theme-loop .time small { display: none; }   /* no am or pm: the loop itself says the time of day, as the signed off mockup showed */
+/* depth (a photo's loop made with make-loop.sh --matte; docs/LOOP.md): the cut-out of what stands in front
+   of the sky, drawn right after the clock so it covers its lower part, with the scrim baked into its colour.
+   app.js sets its rectangle and its transform origin (the screen centre) and runs @keyframes loop-depth on
+   it, timed from the video, so it moves with the push on the compositor. No filter on it: its colours are
+   the video's. The clock and the date line move down 80 px together, so the digits' lower part sits behind
+   the peak (the spire from y 350, the digits from about y 230 to 410) and every digit stays readable.
+   Hidden with the videos while an app is in front (.off) and if the file does not load (.failed) */
+.loop-fg { display: none; }
+html.theme-loop.loop-depth .loop-fg { display: block; position: fixed; margin: 0; pointer-events: none; will-change: transform; }
+html.theme-loop.loop-depth .loop-fg.off, html.theme-loop .loop-fg.failed { display: none; }
+html.theme-loop.loop-depth .time { top: 12.75rem; }
+html.theme-loop.loop-depth .date { top: 9.5rem; }
 
 /* Now playing: one line at the top left (x 96, under the people), an accent dot, the song and the artist,
    then the small media buttons; no card */
@@ -2188,9 +2200,11 @@ html.theme-loop .ncard b { margin-top: 0; font-size: 1.75rem; line-height: 2.125
 html.theme-loop .ncard i { font-size: 1.375rem; color: var(--text-2); }
 html.theme-loop .ncard.focus, html.lighter.theme-loop .ncard.focus { box-shadow: var(--loop-ring); }
 
-/* the dock: 112 px icons at y 912 from x 96, gap 24, radius 24, full opacity, no bar. Focused: a white platter
-   (seen on the Settings and More apps tiles), scale 1.12 and 6 px up, the ring with its gap, the label at y 1032 */
-html.theme-loop .apps { top: auto; bottom: 3.5rem; left: 6rem; right: auto; transform: none; }
+/* the dock: 112 px icons at y 912, centred on the screen (the row above stays on the left axis at x 96), gap 24,
+   radius 24, full opacity, no bar. Focused: a white platter (seen on the Settings and More apps tiles), scale 1.12
+   and 6 px up, the ring with its gap, the label at y 1032. Up and down between the row and the dock land on the
+   nearest tile by its measured centre (app.js nearestInRow), so the centring needs nothing more */
+html.theme-loop .apps { top: auto; bottom: 3.5rem; left: 50%; right: auto; transform: translateX(-50%); }
 html.theme-loop .grid, html.lighter.theme-loop.theme-night .grid {
   padding: 0; border-radius: 0; background: none; box-shadow: none;
   column-gap: 1.5rem; row-gap: 1.5rem; grid-column-gap: 1.5rem; grid-row-gap: 1.5rem;
@@ -2215,7 +2229,7 @@ html.theme-loop .app .label {
 /* More apps: the row and the dock go, one panel on the no blur recipe (x 72 to 1848, y 560 to 1036, radius 24)
    holds the twelve wide grid; three rows show, from y 596, and app.js moves the grid by whole rows on a
    transform inside .grid-clip, a plain rectangular clip inset 24 px, so the radius clips nothing */
-html.theme-loop.expanded .apps { top: 35rem; bottom: auto; left: 4.5rem; right: 4.5rem; height: 29.75rem; border-radius: 1.5rem; background: var(--loop-tint); box-shadow: var(--loop-rim); }
+html.theme-loop.expanded .apps { top: 35rem; bottom: auto; left: 4.5rem; right: 4.5rem; transform: none; height: 29.75rem; border-radius: 1.5rem; background: var(--loop-tint); box-shadow: var(--loop-rim); }
 html.theme-loop.expanded .grid-clip { position: absolute; top: 1.5rem; right: 1.5rem; bottom: 1.5rem; left: 1.5rem; overflow: hidden; }
 html.theme-loop.expanded .grid { padding-top: 0.75rem; transition: transform 160ms var(--ease); }
 html.theme-loop.expanded .hint.on { bottom: calc(100% + 1rem); }

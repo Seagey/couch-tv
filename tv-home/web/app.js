@@ -1072,15 +1072,21 @@
   // the compositor running every frame. So only the buttons are glass; the toast and the rest take
   // the no blur recipe (app.css). No prefetch and no crossfade: a fetch would hold 20 MB on the heap
   // and a crossfade is four decoders at once.
+  // Depth: a photo's loop made with --matte has <v>-fg.png, the part of its first frame in front of the
+  // sky around the clock (scrim baked in), and the bridge passes loop.json as home.loop.meta with
+  // home.loop.fg true. The cut-out is drawn over the clock and moved by the loop's own formula on the
+  // compositor, locked to the video's clock, so the clock sits behind the peak (loopFgInit, below).
   var LOOP_DIR = API + "/tv/loop/", LOOP_PHASES = ["dawn", "day", "dusk", "night"], loopVersion = "";
   var loopVariants = [], loopBlurOn = false, loopCur = "", loopPending = "", loopArmed = false, loopPoster = "", loopOff = false;
+  var loopMeta = null, loopFgOn = false, loopFg = null, loopFgStandIn = "";
   var loopSharp = null, loopBlur = null, loopBox = null, loopMaskKey = null, loopLastT = 0, loopSeekLat = 0, loopSeekAt = 0, loopFirstRow = 0;
   var loopLoadTimer = 0, loopLoadOne = null;   // the load under way: its 4 s timer and its canplaythrough listener
   function loopFiles(v) {
     // the bridge's mark of the files (home.loop.version) goes on each address, so new files made by
     // make-loop.sh are fetched although the old ones are still good for an hour in the TV's cache
     var q = loopVersion ? "?v=" + encodeURIComponent(loopVersion) : "";
-    return { video: LOOP_DIR + v + ".mp4" + q, blur: LOOP_DIR + v + "-blur.mp4" + q, poster: LOOP_DIR + v + ".jpg" + q, bposter: LOOP_DIR + v + "-blur.jpg" + q };
+    return { video: LOOP_DIR + v + ".mp4" + q, blur: LOOP_DIR + v + "-blur.mp4" + q, poster: LOOP_DIR + v + ".jpg" + q, bposter: LOOP_DIR + v + "-blur.jpg" + q,
+      fg: loopFgStandIn || LOOP_DIR + v + "-fg.png" + q };
   }
   // home.loop from config.js; a missing key is no variants, and Lighter home never plays the blur copy
   function loopReadConfig() {
@@ -1088,6 +1094,15 @@
     loopVariants = (Array.isArray(lp.variants) ? lp.variants : []).filter(function (v) { return LOOP_PHASES.indexOf(v) >= 0; });
     loopBlurOn = lp.blur === true && !LIGHTER;
     loopVersion = typeof lp.version === "string" ? lp.version.slice(0, 40) : "";
+    loopMeta = loopMetaOf(lp.meta);
+    loopFgOn = lp.fg === true && !!(loopMeta && loopMeta.fg);
+  }
+  // home.loop.meta (the bridge checked loop.json already): the numbers the cut-out needs, or null
+  function loopMetaOf(m) {
+    var num = function (v) { return typeof v === "number" && isFinite(v); };
+    if (!m || typeof m !== "object" || !num(m.seconds) || m.seconds <= 0 || !num(m.zoom) || !num(m.drift)) return null;
+    var r = m.fg, fg = r && typeof r === "object" && num(r.x) && num(r.y) && num(r.w) && num(r.h) && r.w > 0 && r.h > 0 ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
+    return { seconds: m.seconds, zoom: m.zoom, drift: m.drift, fg: fg };
   }
   // which variant to show now: the sun's phase while Follow the sun is on, else day; a missing file
   // falls back to day, then to the first the bridge has
@@ -1124,13 +1139,26 @@
     loopReadConfig();
     var root = document.documentElement;
     root.style.setProperty("--accent", loopAccent());
-    if (MOCK && !loopVariants.length) loopPoster = "backgrounds/scene-night.jpg";   // a preview with no files: a still stands in
+    loopFg = null; loopFgStandIn = "";
+    root.classList.remove("loop-depth");
+    if (MOCK && !loopVariants.length) {
+      // a preview with no files: a still stands in, and with depth on (mock.js) the Night look's whole
+      // frame cut-out of it stands in for the cut-out
+      loopPoster = "backgrounds/scene-night.jpg";
+      if (loopFgOn) loopFgStandIn = "backgrounds/scene-night-fg.webp";
+    }
     var v = loopVariant();
     if (!v) console.log("loop: the bridge has no loop files (docs/LOOP.md): the scrim" + (loopPoster ? " over a still" : " alone"));
     loopSharp = loopVideoEl("loop-video");
     loopSharp.onerror = function () { console.log("loop: " + loopCur + ".mp4 did not play, the poster stays"); };
     loopSharp.addEventListener("timeupdate", loopTimeUpdate);
+    // the cut-out follows the video's clock: running from its time once it plays, held where it is
+    // when it stops or waits for data (a wrap is caught in loopTimeUpdate)
+    loopSharp.addEventListener("playing", loopFgRun);
+    loopSharp.addEventListener("pause", loopFgRun);
+    loopSharp.addEventListener("waiting", loopFgRun);
     document.body.insertBefore(loopSharp, document.body.firstChild);
+    if (loopFgOn && (v || loopFgStandIn)) loopFgInit();
     if (loopBlurOn && v) {
       loopBox = document.createElement("div");
       loopBox.id = "loop-glass"; loopBox.className = "loop-glass"; loopBox.setAttribute("aria-hidden", "true");
@@ -1143,6 +1171,71 @@
     }
     if (v) loopLoad(v);
     else if (loopPoster) loopSharp.setAttribute("poster", loopPoster);
+    if (loopFgStandIn) loopFg.src = loopFgStandIn;
+  }
+  // The cut-out: one <img> right after the clock in the header (so it paints over the clock and under
+  // the date line and the buttons), at its rectangle from loop.json in rem (the page's rem is 1/120 of
+  // the width, 16 design pixels), scaled about the screen's centre.
+  // Its motion. zoompan shows, at loop time t (T the loop's length, s = sin(2*PI*t/T)), the window of
+  // the picture (width iw) of width iw/z from X = (iw - iw/z)/2 + drift*iw*s, with
+  // z = 1 + zoom*(1 - cos(2*PI*t/T))/2. A point at screen x p at the neutral position (z 1, X 0; the
+  // first frame, which the cut-out and the poster are) is at picture x p*iw/W (W the screen width), so
+  // on screen it is at (p*iw/W - X) * z*W/iw = W/2 + z*(p - W/2) - z*drift*W*s:
+  // scaled by z about the centre, then moved by -z*drift*W*s. CSS reads translateX(a) scale(z) right to
+  // left, the scale about the transform origin first and then the move, which is that mapping with
+  // a = -(drift*100vw)*z*s. The sign: as the window moves right (s > 0) the picture moves left.
+  function loopFgInit() {
+    var m = loopMeta.fg, img = document.createElement("img"), st = img.style, time = $("time");
+    img.id = "loop-fg"; img.className = "loop-fg"; img.alt = "";
+    img.setAttribute("aria-hidden", "true");
+    st.left = m.x / 16 + "rem"; st.top = m.y / 16 + "rem"; st.width = m.w / 16 + "rem"; st.height = m.h / 16 + "rem";
+    st.transformOrigin = (960 - m.x) / 16 + "rem " + (540 - m.y) / 16 + "rem";
+    // the stand-in is the whole frame, so it is cut to the rectangle make-loop.sh writes (x 480, y 162,
+    // w 960, h 318): the header is above the row and the dock, and the whole lake would hide them
+    if (loopFgStandIn) st.clipPath = st.webkitClipPath = "inset(" + [162 - m.y, m.x + m.w - 1440, m.y + m.h - 480, 480 - m.x].map(function (n) { return Math.max(0, n) / 16 + "rem"; }).join(" ") + ")";
+    img.onerror = function () { console.log("loop: the cut-out " + img.src + " did not load, the clock goes back up"); img.classList.add("failed"); document.documentElement.classList.remove("loop-depth"); };
+    img.onload = function () { img.classList.remove("failed"); document.documentElement.classList.add("loop-depth"); };
+    time.parentNode.insertBefore(img, time.nextSibling);
+    if (!document.getElementById("loop-depth-kf")) {
+      var kf = document.createElement("style");
+      kf.id = "loop-depth-kf";
+      kf.textContent = loopKeyframes(loopMeta);
+      document.head.appendChild(kf);
+    }
+    loopFg = img;
+    document.documentElement.classList.add("loop-depth");
+    loopFgHold();
+  }
+  // the motion as @keyframes, a stop every 2.5 percent (41 with both ends, played linear): the curves
+  // between two stops are off by under 0.1 px at the cut-out's corners
+  function loopKeyframes(m) {
+    var out = "@keyframes loop-depth {";
+    for (var i = 0; i <= 40; i++) {
+      var a = 2 * Math.PI * i / 40, z = 1 + m.zoom * (1 - Math.cos(a)) / 2, x = -(m.drift * 100) * z * Math.sin(a);
+      out += " " + i * 2.5 + "% { transform: translateX(" + (+x.toFixed(5)) + "vw) scale(" + (+z.toFixed(6)) + "); }";
+    }
+    return out + " }";
+  }
+  // the animation for loop time t: started t seconds in (a negative delay), running or held there
+  function loopFgAnim(t, run) {
+    var T = loopMeta.seconds;
+    t = isFinite(t) && t > 0 ? t % T : 0;
+    return "loop-depth " + T + "s linear " + (-t).toFixed(3) + "s infinite " + (run ? "running" : "paused");
+  }
+  // set again from scratch (none, a reflow, then the animation), since a changed delay alone does not
+  // move a running animation
+  function loopFgSet(anim) {
+    var st = loopFg.style;
+    st.animation = "none";
+    void loopFg.offsetWidth;
+    st.animation = anim;
+  }
+  // the video's poster is frame 0, the neutral position: held there while a file loads
+  function loopFgHold() { if (loopFg) loopFgSet(loopFgAnim(0, false)); }
+  // on the video's playing, pause and waiting, and at each wrap: its time now, running while it plays
+  function loopFgRun() {
+    if (!loopFg || !loopSharp || loopOff) return;
+    loopFgSet(loopFgAnim(loopSharp.currentTime, !loopSharp.paused && !loopSharp.ended));
   }
   // puts a variant on both elements: per element pause, let go of the file (load() frees the codec), the
   // poster, then the file; one play() for both once each can play through, or after 4 s. A load that
@@ -1153,6 +1246,7 @@
     var f = loopFiles(v), els = [loopSharp, loopBlur].filter(Boolean), ready = 0, started = false;
     clearTimeout(loopLoadTimer);
     if (loopLoadOne) els.forEach(function (el) { el.removeEventListener("canplaythrough", loopLoadOne); });
+    if (loopFg) { loopFg.src = f.fg; loopFgHold(); }   // swapped with the posters (decoded with them in loopTick)
     var go = function () {
       if (started || loopLoadOne !== one) return;   // done, or a later load took over
       started = true; clearTimeout(loopLoadTimer); loopLoadTimer = 0; loopLoadOne = null;
@@ -1185,7 +1279,7 @@
     if (v === loopCur) { loopPending = ""; loopArmed = false; return; }
     if (v === loopPending) return;
     loopPending = v; loopArmed = false;
-    var f = loopFiles(v), imgs = loopBlur ? [f.poster, f.bposter] : [f.poster], done = 0;
+    var f = loopFiles(v), imgs = (loopBlur ? [f.poster, f.bposter] : [f.poster]).concat(loopFg ? [f.fg] : []), done = 0;
     var fin = function () { if (++done >= imgs.length && loopPending === v) loopArmed = true; };
     imgs.forEach(function (src) {
       var im = new Image();
@@ -1203,6 +1297,7 @@
   function loopTimeUpdate() {
     var b = loopAtBoundary(loopSharp);
     if (b.at && loopPending && loopArmed && sceneMayChange()) { loopLoad(loopPending); return; }
+    if (b.wrapped) loopFgRun();
     if (loopBlur) loopSync(b.wrapped);
   }
   // keeps the blur copy on the sharp clip, read at each timeupdate (4 Hz): under 0.2 s nothing, up to
@@ -1296,11 +1391,13 @@
       el.pause(); el.removeAttribute("src"); try { el.load(); } catch (e) {}
       el.classList.add("off");
     });
+    if (loopFg) { loopFg.style.animation = "none"; loopFg.classList.add("off"); }   // hidden with the videos (app.css)
   }
   function loopResume() {
     if (!loopSharp || !loopOff || !active()) return;
     loopOff = false;
     [loopSharp, loopBlur].forEach(function (el) { if (el) el.classList.remove("off"); });
+    if (loopFg) { loopFg.classList.remove("off"); loopFgHold(); }   // at the poster's position until the video plays
     if (loopCur) loopLoad(loopVariant() || loopCur);   // the phase may have moved on while the home was covered
   }
   // More apps as a panel: three rows of twelve show, and the grid moves by whole rows on a transform
@@ -3366,7 +3463,8 @@
       // row of eight fits it. app.css needs to know which tiles end a row and which sit in the last
       // one, to leave the gap off there. Plain rem here, not a custom property:
       // WebViews this old may not have those either.
-      if (NIGHT) $("grid").style.width = (GRID_COLS * dockTileRem() + (GRID_COLS - 1) * 1.625 + 3.5) + "rem";
+      // (the Loop look's dock has no padding, and it is centred, so a wider box would put it off centre)
+      if (NIGHT) $("grid").style.width = (GRID_COLS * dockTileRem() + (GRID_COLS - 1) * 1.625 + (LOOP ? 0 : 3.5)) + "rem";
       var lastRow = Math.floor((gridEls.length - 1) / GRID_COLS) * GRID_COLS;
       gridEls.forEach(function (el, i) {
         if (i % GRID_COLS === GRID_COLS - 1) el.classList.add("end-col");

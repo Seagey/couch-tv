@@ -10,7 +10,8 @@
 //   picture=1           this TV has a picture mode switch (Calibrated and Dynamic)
 //   look=oled           home.look (night, oled, classic, loop)   clock=24h   home.clock     dock=6   home.dock_size
 //                       look=loop: the Loop look with no loop files (home.loop has no variants), so the page
-//                       shows backgrounds/scene-night.jpg as a stand-in for the clip, to check the layout
+//                       shows backgrounds/scene-night.jpg as a stand-in for the clip, to check the layout,
+//                       with the clock behind the peak (depth=0: without the depth cut-out)
 //   scenes=fog,dawn     home.scenes     secs=8      home.scene_seconds     sunsync=1   home.sun_sync
 //   sunrotate=25        home.sun_rotate_minutes (own scenes tagged "when")     datebars=1   home.date_bars
 //   myscenes=[...]      home.my_scenes, as JSON (docs/MAKE-A-SCENE.md), for your own scenes
@@ -80,8 +81,15 @@
   }
   if (arg("picture")) cfg.tvs[0].picture_modes = ["Calibrated", "Dynamic"];
   if (arg("look")) cfg.home.look = arg("look");
-  // the Loop look: what the bridge sends when make-loop.sh has not run, no variants and no blur copy (docs/LOOP.md)
-  if (arg("look") === "loop") cfg.home.loop = { variants: [], blur: false };
+  // the Loop look: what the bridge sends when make-loop.sh has not run, no variants and no blur copy (docs/LOOP.md),
+  // and depth on (depth=0: off), with loop.json's meta: the page then stands the Night look's whole frame
+  // cut-out, backgrounds/scene-night-fg.webp, over the backgrounds/scene-night.jpg stand-in, at the full
+  // screen and with no motion, to check the layering and where the clock sits. That cut-out has no scrim
+  // baked in, so it looks brighter than the TV's, whose make-loop.sh cut-out carries it
+  if (arg("look") === "loop") {
+    cfg.home.loop = { variants: [], blur: false, fg: arg("depth") !== "0",
+      meta: { still: true, seconds: 34, fps: 30, zoom: 0, drift: 0, fg: { x: 0, y: 0, w: 1920, h: 1080 } } };
+  }
   if (arg("idle")) cfg.home.idle_photo_seconds = arg("idle") === "off" ? 0 : Number(arg("idle"));
   if (arg("smartidle")) {
     cfg.home.smart_idle = { enabled: arg("smartidle") !== "off", home_idle_minutes: 15, home_action: "ambient_clock", paused_idle_minutes: 30, quiet_hours: { enabled: false, start: "23:00", end: "06:00", idle_minutes: 15 } };

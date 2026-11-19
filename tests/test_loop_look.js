@@ -29,7 +29,7 @@ function el(tag) {
   const attrs = {}, listeners = {};
   const e = {
     tag, id: '', className: '', textContent: '', _html: '', children: [], style: {}, classList: classes(),
-    parentNode: null, nextSibling: null,
+    parentNode: null,
     setAttribute: (k, v) => { attrs[k] = String(v); }, getAttribute: (k) => (k in attrs ? attrs[k] : null), removeAttribute: (k) => { delete attrs[k]; },
     addEventListener: (n, f) => { (listeners[n] = listeners[n] || []).push(f); },
     removeEventListener: (n, f) => { listeners[n] = (listeners[n] || []).filter((x) => x !== f); },
@@ -43,6 +43,7 @@ function el(tag) {
     offsetLeft: 0, offsetTop: 0, offsetWidth: 0, offsetHeight: 0,
   };
   Object.defineProperty(e, 'firstChild', { get: () => e.children[0] || null });
+  Object.defineProperty(e, 'nextSibling', { get: () => (e.parentNode ? e.parentNode.children[e.parentNode.children.indexOf(e) + 1] || null : null) });
   Object.defineProperty(e, 'innerHTML', {
     get: () => e._html,
     set: (h) => { e._html = h; e.children = (h.match(/<div class="tile /g) || []).map(() => el('div')); },
@@ -67,7 +68,11 @@ Object.assign(inputBtn, { offsetLeft: 80, offsetTop: 0, offsetWidth: 64, offsetH
 qbtns.children = [sleepBtn, inputBtn];
 qbtns.getBoundingClientRect = () => ({ left: 1680, top: 64, width: 144, height: 64 });
 const grid = el('div');
-const els = { qbtns, quick, grid, shelf: el('div'), 'shelf-section': el('div'), 'shelf-title': el('div') };
+// the header's clock column: #time, then the date line (the cut-out goes in between)
+const clockCol = el('div'), timeEl = el('div'), dateEl = el('div'), head = el('head');
+timeEl.id = 'time'; dateEl.id = 'date';
+clockCol.appendChild(timeEl); clockCol.appendChild(dateEl);
+const els = { qbtns, quick, grid, time: timeEl, shelf: el('div'), 'shelf-section': el('div'), 'shelf-title': el('div') };
 const storage = {};
 let decoded = [];
 function Image() {
@@ -82,7 +87,8 @@ const context = {
   setTimeout: (f, ms) => { timers.push({ f, ms }); return timers.length; }, clearTimeout: () => {},
   innerWidth: 1920, innerHeight: 1080,
   localStorage: { getItem: (k) => (k in storage ? storage[k] : null), setItem: (k, v) => { storage[k] = v; }, removeItem: (k) => { delete storage[k]; } },
-  document: { documentElement: root, body, createElement: el, querySelector: (q) => (q === '.scrim' ? scrim : null) },
+  document: { documentElement: root, body, head, createElement: el, querySelector: (q) => (q === '.scrim' ? scrim : null),
+    getElementById: (id) => head.children.find((c) => c.id === id) || null },
   $: (id) => els[id],
   t: (k) => ({ video_card: 'Video', live_card: 'Live' }[k] || k),
   esc: (v) => String(v == null ? '' : v), slim: (u) => u, iconUrl: (pkg) => (pkg ? 'icon:' + pkg : null),
@@ -109,6 +115,7 @@ function part(from, to) {
 vm.runInContext(part('  function lookSetting() {', '  function glassAmount()'), context);
 vm.runInContext(part('  // ---------------- the Loop look', '  // ---------------- the video background'), context);
 vm.runInContext(part('  var followPkg = null', '  // ---------------- custom cards'), context);
+vm.runInContext(part('  function nearestInRow(', '  // which app a grid tile is'), context);
 const tick = () => new Promise((r) => setImmediate(r));
 
 (async function () {
@@ -446,12 +453,151 @@ const tick = () => new Promise((r) => setImmediate(r));
   assert(!/html\.lighter\.theme-loop \.toast/.test(sec), 'Lighter: the toast keeps its fade');
   assert(/\.theme-night \.qbtn \{ min-width: 5\.5rem; height: 5\.5rem;/.test(css), 'the Night rules are still there');
   // mock.js and the words
-  assert(/if \(arg\("look"\) === "loop"\) cfg\.home\.loop = \{ variants: \[\], blur: false \};/.test(mock), 'mock.js answers home.loop with no variants');
+  assert(/if \(arg\("look"\) === "loop"\) \{\n\s*cfg\.home\.loop = \{ variants: \[\], blur: false, fg: arg\("depth"\) !== "0",\n\s*meta: \{ still: true, seconds: 34, fps: 30, zoom: 0, drift: 0, fg: \{ x: 0, y: 0, w: 1920, h: 1080 \} \} \};/.test(mock),
+    'mock.js answers home.loop with no variants, and depth with the whole frame cut-out at the full screen and no motion');
+  assert(/no scrim\n[^\n]*baked in, so it looks brighter than the TV's/.test(mock), 'mock.js says its cut-out has no scrim');
   ['look_loop', 'live_card', 'video_card'].forEach(function (k) {
     const count = (i18n.match(new RegExp('\\b' + k + ':', 'g')) || []).length;
     assert.strictEqual(count, 16, `${k} must exist in all 16 languages (found ${count})`);
   });
   assert.strictEqual((i18n.match(/look_loop: "Loop"/g) || []).length, 16, 'Loop is a name, the same everywhere');
+
+  // ---------------- depth: the moving cut-out over the clock (docs/LOOP.md, the depth effect) ----------------
+  const META = { still: true, seconds: 34, fps: 30, zoom: 0.06, drift: 0.006, fg: { x: 480, y: 162, w: 960, h: 318 } };
+  body.children = [scrim]; head.children = []; clockCol.children = [timeEl, dateEl];
+  context.LOOP = true; context.MOCK = false; context.LIGHTER = false; context.SUN_SYNC = true; context.phase = 'day';
+  root.classList.remove('loop-depth');
+  // no cut-out unless the bridge says fg and meta has its rectangle
+  context.HOME = { loop: { variants: ['day', 'night'], blur: false, meta: META, fg: false } };
+  context.loopInit();
+  assert.strictEqual(context.loopFg, null, 'home.loop.fg false: no cut-out');
+  assert(!root.classList.contains('loop-depth'), 'and the clock stays where it was');
+  context.HOME = { loop: { variants: ['day', 'night'], blur: false, meta: Object.assign({}, META, { fg: null }), fg: true } };
+  context.loopInit();
+  assert.strictEqual(context.loopFg, null, 'meta without a rectangle: no cut-out');
+  context.HOME = { loop: { variants: ['day', 'night'], blur: false, meta: { seconds: 'x' }, fg: true } };
+  context.loopInit();
+  assert.strictEqual(context.loopFg, null, 'meta that makes no sense: no cut-out');
+  // with it: one <img> right after #time, its rectangle in rem, the screen centre as its origin
+  body.children = [scrim];
+  context.HOME = { loop: { variants: ['day', 'night'], blur: false, meta: META, fg: true, version: 'v1' } };
+  context.loopInit();
+  const fg = context.loopFg, sharp2 = context.loopSharp;
+  assert(fg && fg.id === 'loop-fg' && fg.className === 'loop-fg');
+  assert.strictEqual(clockCol.children.indexOf(fg), clockCol.children.indexOf(timeEl) + 1, 'right after the clock, before the date line');
+  assert.strictEqual(fg.getAttribute('aria-hidden'), 'true');
+  assert.deepStrictEqual([fg.style.left, fg.style.top, fg.style.width, fg.style.height], ['30rem', '10.125rem', '60rem', '19.875rem']);
+  assert.strictEqual(fg.style.transformOrigin, '30rem 23.625rem', 'the screen centre (960, 540) from the box at (480, 162)');
+  assert.strictEqual(fg.style.clipPath, undefined, 'no clip on the real cut-out');
+  assert(root.classList.contains('loop-depth'), 'html.loop-depth moves the clock down');
+  assert.strictEqual(fg.src, '/tv/loop/day-fg.png?v=v1', 'the variant playing, with the version mark');
+  // the keyframes, injected once
+  assert.strictEqual(head.children.length, 1);
+  const kfText = head.children[0].textContent;
+  assert.strictEqual(head.children[0].id, 'loop-depth-kf');
+  assert.strictEqual((kfText.match(/% \{ transform:/g) || []).length, 41, '41 stops, every 2.5 percent');
+  const stop = (pct) => {
+    const m = kfText.match(new RegExp(' ' + pct.replace('.', '\\.') + '% \\{ transform: translateX\\((-?[0-9.e-]+)vw\\) scale\\(([0-9.]+)\\); \\}'));
+    assert(m, 'a stop at ' + pct + '%');
+    return [Number(m[1]), Number(m[2])];
+  };
+  const want = (f) => { const a = 2 * Math.PI * f, z = 1 + 0.06 * (1 - Math.cos(a)) / 2; return [-(0.006 * 100) * z * Math.sin(a), z]; };
+  [['0', 0], ['25', 0.25], ['50', 0.5], ['75', 0.75], ['100', 1], ['2.5', 0.025]].forEach(([pct, f]) => {
+    const [x, z] = stop(pct), [wx, wz] = want(f);
+    assert(Math.abs(x - wx) < 1e-5 && Math.abs(z - wz) < 1e-6, pct + '%: ' + x + ' ' + z + ' against ' + wx + ' ' + wz);
+  });
+  assert.deepStrictEqual(stop('0'), [0, 1], 'the start is the neutral position (frame 0, the poster)');
+  assert.deepStrictEqual(stop('25'), [-0.618, 1.03], 'a quarter in: the window has moved right, so the picture left, at half the zoom');
+  assert.deepStrictEqual(stop('50'), [0, 1.06], 'halfway: the deepest zoom, no drift');
+  assert.deepStrictEqual(stop('75'), [0.618, 1.03]);
+  assert(!/filter/.test(kfText));
+  context.loopInit();
+  assert.strictEqual(head.children.length, 1, 'the keyframes go in once');
+  body.children = [scrim]; clockCol.children = [timeEl, dateEl];
+  context.loopInit();
+  const fg2 = context.loopFg, s2 = context.loopSharp;
+  // before the video plays: held at 0, the poster's position
+  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear 0.000s infinite paused', 'loading: paused at 0');
+  s2.fire('canplaythrough');
+  assert.strictEqual(s2.plays, 1);
+  // playing: the delay is minus the video's time
+  s2.currentTime = 12.25; s2.paused = false;
+  s2.fire('playing');
+  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear -12.250s infinite running', 'running from the video time');
+  // a stall holds it where the frame stopped; playing again starts it from there
+  s2.paused = true; s2.currentTime = 13.5; s2.fire('waiting');
+  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear -13.500s infinite paused');
+  s2.paused = false; s2.fire('playing');
+  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear -13.500s infinite running');
+  // the wrap the Loop code already finds restarts it from the new time
+  s2.currentTime = 33.9; context.loopLastT = 33.6; context.loopTimeUpdate();
+  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear -13.500s infinite running', 'no restart mid loop');
+  s2.currentTime = 0.2; context.loopLastT = 33.9; context.loopTimeUpdate();
+  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear -0.200s infinite running', 'restarted at the wrap');
+  assert.strictEqual(context.loopFgAnim(70.5, true), 'loop-depth 34s linear -2.500s infinite running', 'a time past one loop is taken modulo its length');
+  // the variant switch: the cut-out is decoded with the poster, then swapped with it, held until the new file plays
+  decoded = [];
+  context.phase = 'night'; context.loopTick();
+  assert.deepStrictEqual(decoded, ['/tv/loop/night.jpg?v=v1', '/tv/loop/night-fg.png?v=v1'], 'the poster and the cut-out are decoded first');
+  await tick();
+  assert.strictEqual(fg2.src, '/tv/loop/day-fg.png?v=v1', 'not before the boundary');
+  s2.currentTime = 33.9; context.loopLastT = 33.6; context.loopTimeUpdate();
+  assert.strictEqual(s2.src, '/tv/loop/night.mp4?v=v1');
+  assert.strictEqual(fg2.src, '/tv/loop/night-fg.png?v=v1', 'swapped together with the poster');
+  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear 0.000s infinite paused', 'held at 0 while the new file loads');
+  s2.currentTime = 0; s2.paused = false; s2.fire('playing');
+  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear 0.000s infinite running');
+  // tv.pause: hidden with the videos and stopped; tv.resume: back, held, then running with the video
+  context.loopPause();
+  assert(fg2.classList.contains('off'), 'hidden on tv.pause');
+  assert.strictEqual(fg2.style.animation, 'none');
+  s2.fire('pause');
+  assert.strictEqual(fg2.style.animation, 'none', 'the pause event after it changes nothing while away');
+  context.isActive = true;
+  context.loopResume();
+  assert(!fg2.classList.contains('off'));
+  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear 0.000s infinite paused');
+  s2.fire('canplaythrough'); s2.currentTime = 1; s2.paused = false; s2.fire('playing');
+  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear -1.000s infinite running', 'and runs again once the video plays');
+  // the file does not load: hidden, and the clock goes back up; a later one that loads brings both back
+  fg2.onerror();
+  assert(fg2.classList.contains('failed') && !root.classList.contains('loop-depth'));
+  fg2.onload();
+  assert(!fg2.classList.contains('failed') && root.classList.contains('loop-depth'));
+  // the preview: the whole frame stand-in, cut to make-loop.sh's rectangle so the row and the dock stay in view
+  body.children = [scrim]; clockCol.children = [timeEl, dateEl]; context.MOCK = true;
+  context.HOME = { loop: { variants: [], blur: false, fg: true, meta: { still: true, seconds: 34, fps: 30, zoom: 0, drift: 0, fg: { x: 0, y: 0, w: 1920, h: 1080 } } } };
+  context.loopInit();
+  assert.strictEqual(context.loopFg.src, 'backgrounds/scene-night-fg.webp');
+  assert.strictEqual(context.loopSharp.getAttribute('poster'), 'backgrounds/scene-night.jpg');
+  assert.deepStrictEqual([context.loopFg.style.left, context.loopFg.style.width, context.loopFg.style.transformOrigin], ['0rem', '120rem', '60rem 33.75rem']);
+  assert.strictEqual(context.loopFg.style.clipPath, 'inset(10.125rem 30rem 37.5rem 30rem)');
+  assert.strictEqual(context.loopFg.style.animation, 'loop-depth 34s linear 0.000s infinite paused', 'the preview does not move');
+  context.MOCK = false;
+  // app.css: the cut-out only in the Loop look with depth on, no filter, hidden when off or failed; the clock lower
+  assert(/^\.loop-fg \{ display: none; \}$/m.test(sec), 'no cut-out in any other look');
+  assert(/html\.theme-loop\.loop-depth \.loop-fg \{ display: block; position: fixed; margin: 0; pointer-events: none; will-change: transform; \}/.test(sec));
+  assert(/html\.theme-loop\.loop-depth \.loop-fg\.off, html\.theme-loop \.loop-fg\.failed \{ display: none; \}/.test(sec));
+  assert(/html\.theme-loop\.loop-depth \.time \{ top: 12\.75rem; \}/.test(sec), 'the clock from y 204');
+  assert(/html\.theme-loop\.loop-depth \.date \{ top: 9\.5rem; \}/.test(sec), 'the date line from y 152');
+  assert(/html\.theme-loop \.time \{\n\s*display: block; position: fixed; left: 0; right: 0; top: 7\.75rem;/.test(sec), 'without depth the clock stays at y 124');
+  assert(!/animation:\s*none/.test(sec.replace(/html\.theme-loop \.tile\.focus \.face \{ animation: none; \}/, '')), 'no Loop rule (Lighter included) stops the cut-out');
+
+  // ---------------- the dock centred; the More apps panel keeps its full width; up and down find the nearest tile ----------------
+  assert(/html\.theme-loop \.apps \{ top: auto; bottom: 3\.5rem; left: 50%; right: auto; transform: translateX\(-50%\); \}/.test(sec), 'the dock is centred');
+  assert(/html\.theme-loop\.expanded \.apps \{ top: 35rem; bottom: auto; left: 4\.5rem; right: 4\.5rem; transform: none;/.test(sec), 'the panel runs from x 72 to 1848');
+  assert(!/html\.theme-loop[^{]*\.apps[^{]*\{[^}]*transition/.test(sec), 'no transition on the dock');
+  assert(/html\.theme-loop \.shelf \{ top: 37\.25rem; left: 6rem; right: 6rem;/.test(sec), 'the row stays on the left axis');
+  assert(/\(GRID_COLS - 1\) \* 1\.625 \+ \(LOOP \? 0 : 3\.5\)\) \+ "rem"/.test(source), 'an old WebView sizes the Loop dock without the Night padding, so it centres');
+  // twelve 112 px tiles with 24 px gaps, centred: from x 156; the row's cards from x 96, 340 apart
+  const rect = (l, w) => ({ getBoundingClientRect: () => ({ left: l, width: w, top: 0, height: w }) });
+  context.GRID_COLS = 12;
+  context.gridEls = Array.from({ length: 12 }, (_, i) => rect(156 + i * 136, 112));
+  const cardCentre = (i) => 96 + i * 340 + 160;
+  assert.deepStrictEqual([0, 1, 2, 3, 4].map((i) => context.nearestInRow(0, cardCentre(i))), [0, 3, 5, 8, 10], 'each card lands on the dock tile under it');
+  context.gridEls = Array.from({ length: 6 }, (_, i) => rect(564 + i * 136, 112));   // six apps: a shorter dock, still centred
+  assert.deepStrictEqual([0, 1, 2, 3, 4].map((i) => context.nearestInRow(0, cardCentre(i))), [0, 0, 2, 5, 5], "tile centres 620 to 1300");
+  assert(/g = nearestInRow\(0, b\.left \+ b\.width \/ 2\);/.test(source), 'down from a card measures its centre');
   console.log('Loop look tests passed.');
 })().catch(function (e) { console.error(e); process.exit(1); });
 
