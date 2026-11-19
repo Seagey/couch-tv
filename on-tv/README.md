@@ -98,6 +98,15 @@ it can switch wireless debugging back on after a restart, the way Shizuku does).
    Or copy the APK to the TV with a file app and open it there.
 3. On the TV, open **Couch TV**. It shows the address and a phone code.
 
+## Updates
+
+Home settings, About, **Update couch-tv** says which version this TV has and whether a newer one is out
+(it looks on GitHub once a week if you said yes when the home asked, or when you press Check for updates
+now). The app put on with just a phone cannot install an update itself (Android's installer needs a
+permission it leaves out on purpose, so Play Protect lets it through), so OK opens the steps: open
+Downloader, type 8180170, Install. Your settings stay. The watch version updates from a computer with
+`adb install -r couch-tv-ontv-watch.apk`.
+
 ## Pair a phone
 
 1. On the phone, open the address the TV shows, for example `http://192.0.2.10:5400`.

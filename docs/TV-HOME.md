@@ -229,8 +229,15 @@ Unknown sources).
 
 Only the app from the Releases page updates this way. A copy built on your own computer, for example
 with your own scenes, says so and is updated the way you installed it. It still looks for new
-releases and keeps the dot and the line, so you hear when one is out. The on-TV app (option C) does
-not do this yet.
+releases and keeps the dot and the line, so you hear when one is out.
+
+**The on-TV app (option C)** looks the same way (asked once, then weekly, or Check for updates now),
+but it cannot install an update itself: Android's installer needs a permission the phone only APK
+leaves out, so Google Play Protect has nothing new to stop. Instead **Home settings, About, Update
+couch-tv** shows the version line, and OK opens the exact steps: Downloader and its code 8180170 for
+`couch-tv-ontv.apk` (with the full address as a fallback), or `adb install -r` from a computer for
+`couch-tv-ontv-watch.apk`. Your settings stay. The launcher shows the same Update couch-tv row in
+About, which opens its Updates page.
 
 ### About
 

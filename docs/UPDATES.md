@@ -2,9 +2,19 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.5**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.6**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 19 November 2026: release 0.13.6, the TV tells you about updates, and the Settings gear stays clear
+
+0.13.6 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). A second real beginner test on a TCL Android TV, fixed on the TV side. A classic home looks exactly as it did. Option C: install the new on-TV APK over the old one (from now on the TV tells you about the next one). Samsung: run the new `couch-tv-samsung-setup.zip` installer again. Option B: `git pull` and restart the bridge.
+
+- **Update couch-tv:** Home settings, About has an Update couch-tv row with a version line. The on-TV app now looks on GitHub too (weekly if you said yes, or Check for updates now). It cannot install the update itself (that needs a permission the phone only app leaves out, so Play Protect has nothing new to stop), so OK shows the exact Downloader steps and code on the TV.
+- **The Settings gear never covers a widget:** it goes where the design leaves room, or, on a design with none, hides until the remote reaches it (Up or Right at the edge of the screen).
+- **Hold OK never opens the app:** Android's long press counts as a hold at once, so the Home menu opens with Settings first.
+- **The on-TV app says what is true:** the setup screen reads the TV's real home each time instead of a saved switch, and About says "On its own, no computer" on the on-TV app.
+- **Also:** a stray `_` or `.` in a design code is named; a Folder widget app with no icon shows its name; the Samsung installer says to switch the TV on first when it finds none.
 
 ### 19 November 2026: release 0.13.5, fixes from a real beginner on a TCL
 
