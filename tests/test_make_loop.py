@@ -268,7 +268,7 @@ class Depth(unittest.TestCase):
         self.assertIn("[0:v]trim=end_frame=1,scale=in_color_matrix=bt709:in_range=tv:", g)
         # the rectangle FG (480, 162, 960, 318) on the 1280x720 frame, for both the colour and the matte
         self.assertEqual(g.count("crop=640:212:320:108"), 2)
-        self.assertIn("[1:v]scale=1280:720:flags=area,crop=640:212:320:108,alphaextract,", g)
+        self.assertIn("[1:v]scale=1280:720:flags=area,format=yuva444p,crop=640:212:320:108,alphaextract,", g)
         # the feather: min(1, distance to the nearest crop edge / 24), from the pixel centre
         self.assertIn("geq=lum='p(X,Y)*min(1,min(min(X+0.5,W-X-0.5),min(Y+0.5,H-Y-0.5))/24)+0.5'", g)
         self.assertIn("[c][m]alphamerge,format=rgba[fg]", g)

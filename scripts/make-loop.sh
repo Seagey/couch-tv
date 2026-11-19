@@ -307,7 +307,9 @@ for v in $VARIANTS; do
     crop="crop=${FW}:${FH}:${FX}:${FY}"
     fgraph="[0:v]trim=end_frame=1,scale=in_color_matrix=bt709:in_range=tv:flags=bicubic+accurate_rnd+full_chroma_int,format=gbrp,${crop},"
     fgraph="${fgraph}geq=r='$(scrim_channel r "$INK_R")':g='$(scrim_channel g "$INK_G")':b='$(scrim_channel b "$INK_B")',format=gbrap[c];"
-    fgraph="${fgraph}[1:v]scale=1280:720:flags=area,${crop},alphaextract,"
+    # format=yuva444p first: without it ffmpeg 7.1 cannot settle a format for alphaextract after the
+    # scale (seen on the bridge computer: "could not choose their formats: Parsed_alphaextract")
+    fgraph="${fgraph}[1:v]scale=1280:720:flags=area,format=yuva444p,${crop},alphaextract,"
     fgraph="${fgraph}geq=lum='p(X,Y)*min(1,min(min(X+0.5,W-X-0.5),min(Y+0.5,H-Y-0.5))/${FEATHER})+0.5'[m];"
     fgraph="${fgraph}[c][m]alphamerge,format=rgba[fg]"
     run ffmpeg -hide_banner -y -i "$sharp" -i "$MATTE" -filter_complex "$fgraph" -map "[fg]" -frames:v 1 "$OUT/$v-fg.png"
