@@ -217,7 +217,31 @@ class ReleaseBuildTests(unittest.TestCase):
         for banned in ("coming soon", "beta", "press home to open couch-tv"):
             self.assertNotIn(banned, start)
         self.assertIn("about 30 minutes", start)
+        self.assertIn("gpl-3.0", start)   # the licence note for the tool the installers download
 
+
+class ServerHookTests(unittest.TestCase):
+    """server.py makes every "kind": "samsung" TV from samsung_frame, not plain samsung (the shared hook)."""
+
+    def test_make_tv_returns_the_frame_class(self):
+        import server
+        with patch.object(config, "DATA", tempfile.mkdtemp()):
+            tv = server.make_tv({"kind": "samsung", "id": "frame", "name": "Frame", "ip": "192.0.2.5"})
+        self.assertIs(type(tv), samsung_frame.SamsungTV)
+        self.assertEqual(tv.kind, "samsung")
+
+    def test_other_kinds_are_untouched(self):
+        import server
+        with patch.object(config, "DATA", tempfile.mkdtemp()):
+            tv = server.make_tv({"kind": "lg", "id": "lg", "name": "LG", "ip": "192.0.2.6"})
+        self.assertNotIsInstance(tv, samsung_frame.SamsungTV)
+
+    def test_server_imports_samsung_frame_under_samsung(self):
+        with open(os.path.join(ROOT, "bridge", "server.py")) as f:
+            text = f.read()
+        self.assertIn("import samsung\nimport samsung_frame\n", text)
+        self.assertIn("return samsung_frame.SamsungTV(cfg)", text)
+        self.assertNotIn("return samsung.SamsungTV(cfg)", text)
 
 if __name__ == "__main__":
     unittest.main()

@@ -104,5 +104,13 @@ not need one for anything above.
 
 Stuck? couchtv.joshuaseage.com/help/tv-samsung
 
+About Apps2Samsung
+------------------
+The setup downloads Apps2Samsung's command line tool, version 3.3.1, from its own GitHub
+releases (github.com/Apps2Samsung/Apps2Samsung) and checks its SHA-256 fingerprint before it
+runs. Apps2Samsung is a free community tool, not Samsung's, licensed under the GNU General
+Public License version 3 (GPL-3.0). couch-tv does not include or change it. Its source code
+and licence are on that GitHub page.
+
 To remove couch-tv: on the TV, Apps, the cog (Settings), Couch TV, Delete.
 To switch Developer mode off: Apps, 1 2 3 4 5, Developer mode Off, then restart the TV.

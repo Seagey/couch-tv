@@ -17,7 +17,7 @@ Opening by itself at every switch-on and the phone remote need a computer at hom
 
 ## The quick way: no AI agent, no paid plan
 
-Every release from 0.13.3 carries two Samsung files on
+Every release from 0.13.4 carries two Samsung files on
 [the Releases page](https://github.com/Seagey/couch-tv/releases):
 
 - **`couch-tv-samsung-setup.zip`**: the app, a double-click installer for Mac (`Install on
@@ -304,7 +304,7 @@ on a real TV; if an app ends up on the show's page without playing, press OK.
 
 ## couch-tv Studio on a Samsung
 
-The Samsung app carries the same couch-tv Studio as the Android home (from 0.13.3): in couch-tv,
+The Samsung app carries the same couch-tv Studio as the Android home (from 0.13.4): in couch-tv,
 the gear tile (Home settings), **couch-tv Studio**, **Get a design**. OK on the box opens
 Samsung's on-screen keyboard: type the code from the phone's Send sheet with the arrows and OK
 (The Frame's remote needs no number keys for this), then Done. Or, with a bridge, open the

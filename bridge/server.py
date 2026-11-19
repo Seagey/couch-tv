@@ -36,6 +36,7 @@ import store
 import taste
 from tv import TV, TVUnavailable, intent_to_link, check_package, UnsafeInput
 import samsung
+import samsung_frame
 import lg
 import roku
 import appletv
@@ -79,7 +80,7 @@ def make_tv(cfg):
     bridge/panasonic.py), a TiVo OS TV built by Vestel ("kind": "tivo", bridge/tivo.py), an Apple TV
     ("kind": "appletv", bridge/appletv.py) or an Android or Google TV (tv.py)."""
     if cfg.get("kind") == "samsung":
-        return samsung.SamsungTV(cfg)
+        return samsung_frame.SamsungTV(cfg)   # samsung.SamsungTV plus Frame on and off (bridge/samsung_frame.py)
     if cfg.get("kind") == "lg":
         return lg.LGTV(cfg)
     if cfg.get("kind") == "roku":
