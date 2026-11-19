@@ -73,7 +73,9 @@
       supported: true, manual: true, current: MINE, channel: "stable", latest: latest, title: "",
       available: !!(latest && newer(latest, MINE)), refused: false, checked: st.checked || 0,
       auto: st.auto !== false, answered: true, busy: busy, progress: 0, error: error,
-      code: "", how: "couch-tv on a Samsung does not update itself: a computer puts the new one on.", steps: STEPS
+      code: "", how: "couch-tv on a Samsung does not update itself: a computer puts the new one on.", steps: STEPS,
+      // the page draws a QR code for this under the steps, so they can be read on a phone at the computer
+      help_url: "https://couchtv.joshuaseage.com/help/update-couch-tv/"
     });
   }
   function tell() { try { if (window.tv && window.tv.update) window.tv.update(JSON.parse(state())); } catch (e) {} }

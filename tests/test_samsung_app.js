@@ -129,6 +129,9 @@ function updater(version, mem, xhr) {
   assert.strictEqual(st.current, "0.13.6");
   assert.strictEqual(st.available, false);
   assert.ok(st.steps.length >= 2 && /Samsung setup again/.test(st.steps[0]));
+  // never a button that can't work on a Samsung: the steps, and a QR code for them on a phone
+  assert.ok(!st.can_install && !st.self, "a Samsung never installs by itself");
+  assert.strictEqual(st.help_url, "https://couchtv.joshuaseage.com/help/update-couch-tv/");
   s.TVUP.check();   // Check for updates now: no once-a-day limit
   assert.strictEqual(calls.length, 1);
   st = JSON.parse(s.TVUP.state());

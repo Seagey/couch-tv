@@ -148,7 +148,7 @@ object UpdateRules {
             "Install it over this app with Google's adb tool: adb connect, then adb install -r $WATCH_ASSET (the Couch TV screen, More, Home button from a computer, has every step).",
             "Open Couch TV again from your apps.")
         else listOf(
-            "Press Home, then open Downloader from your apps. Not there? Find Downloader by AFTVnews in the TV's Google Play Store and install it first.",
+            "Press Home, then open Downloader from your apps. Not there? Find Downloader by AFTVnews in the TV's app store and install it first.",
             "If Downloader opens on a web page, press Back until you see its Home screen with a box for a web address or code. Move to the box and press OK.",
             "Type $CODE and press Go. If the TV asks whether Downloader may install apps, allow it.",
             "Press Install, then Done. Your settings stay.",

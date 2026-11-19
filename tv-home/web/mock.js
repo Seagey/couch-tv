@@ -196,7 +196,7 @@
       up.how = "Couch TV cannot install an update by itself on this TV right now. Put the new version on the same way as before, over this one. Your settings stay.";
       // the real app's seven steps (UpdateRules.kt), so a preview shows how long the page really is
       up.steps = [
-        "Press Home, then open Downloader from your apps. Not there? Find Downloader by AFTVnews in the TV's Google Play Store and install it first.",
+        "Press Home, then open Downloader from your apps. Not there? Find Downloader by AFTVnews in the TV's app store and install it first.",
         "If Downloader opens on a web page, press Back until you see its Home screen with a box for a web address or code. Move to the box and press OK.",
         "Type 8180170 and press Go. If the TV asks whether Downloader may install apps, allow it.",
         "Press Install, then Done. Your settings stay.",
