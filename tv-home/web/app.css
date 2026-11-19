@@ -2075,8 +2075,12 @@ html.theme-loop .hero, html.theme-loop .place { display: none; }
 .loop-video.off, .loop-blur.off { display: none; }
 /* the glass: the blurred copy inside a box the size of the quick buttons, over the scrim and under the
    header (z-index 1, the header's is 2), seen only through the mask app.js sets on the box */
-.loop-glass { position: fixed; z-index: 1; overflow: hidden; pointer-events: none; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-size: 100% 100%; mask-size: 100% 100%; }
+.loop-glass { position: fixed; z-index: 1; overflow: hidden; pointer-events: none; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-size: 100% 100%; mask-size: 100% 100%; transition: opacity 400ms ease; }
 .loop-blur { position: absolute; object-fit: cover; }
+/* the box is not inside the buttons, so it goes with them on its own: Hide rows when idle and the Ambient
+   music screen fade the quick buttons out, and the blurred shapes would stay where they were. The
+   descendant form, since html carries the class loop-glass too */
+html.idle-photo .loop-glass, html.ambient-active .loop-glass { opacity: 0; visibility: hidden; transition: opacity 400ms ease, visibility 0s linear 400ms; }
 /* the scrim: two gradients on the ink, never animated (percentages of 1080) */
 html.theme-loop .scrim {
   background:
@@ -2153,6 +2157,11 @@ html.theme-loop .qbtns .qbtn span, html.theme-loop #q-picture span, html.theme-l
   font-size: 1.5rem; line-height: 2rem; font-weight: 600; color: var(--text); text-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.55);
 }
 html.theme-loop .qbtns .qbtn.focus span, html.theme-loop #q-picture.focus span, html.theme-loop #q-screensaver.focus span { display: block; }
+/* the button at the screen's edge (the last, at the right; right to left the row runs the other way, so
+   the last is at the left) has 128 px to the edge from its centre: its label lines up with its outer side
+   and runs inwards, so a long one ("Bezig met schakelen…", a TV's own picture mode) is not cut by the edge */
+html.theme-loop .qbtns .qbtn:last-child span, html.theme-loop .qbtns #q-picture:last-child span, html.theme-loop .qbtns #q-screensaver:last-child span { left: auto; right: 0; transform: none; }
+html.theme-loop[dir="rtl"] .qbtns .qbtn:last-child span, html.theme-loop[dir="rtl"] .qbtns #q-picture:last-child span, html.theme-loop[dir="rtl"] .qbtns #q-screensaver:last-child span { left: 0; right: auto; }
 html.theme-loop .qbtn .qmin { font-size: 1.5rem; line-height: 1; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
 html.theme-loop .qbtn.focus, html.lighter.theme-loop .qbtn.focus {
   background: #fff; color: var(--loop-ink); transform: scale(1.10); box-shadow: var(--loop-ring); transition-duration: 160ms; will-change: transform;
@@ -2197,8 +2206,11 @@ html.theme-loop .shelf-head .status { font-size: 1.375rem; }
 html.theme-loop .shelf-none { font-size: 1.625rem; line-height: 11.25rem; color: var(--text-2); text-shadow: none; }
 html.theme-loop .shelf-row { gap: 1.25rem; }
 /* the clip reaches the screen's right edge, so the sixth card is cut by the edge (124 px of it show), while
-   the heading and the first card stay at x 96 */
-html.theme-loop .shelf-clip { padding: 0.75rem 6rem 0.75rem 0.75rem; margin: -0.75rem -6rem -0.75rem -0.75rem; }
+   the heading and the first card stay at x 96. On the first card's side it leaves 16 px: scale 1.05 and the
+   5 px ring reach 13.25 px past the card, and a card that has scrolled out (20 px away) stays hidden.
+   Right to left the row starts at the right, so the two sides swap */
+html.theme-loop .shelf-clip { padding: 0.75rem 6rem 0.75rem 1rem; margin: -0.75rem -6rem -0.75rem -1rem; }
+html.theme-loop[dir="rtl"] .shelf-clip { padding: 0.75rem 1rem 0.75rem 6rem; margin: -0.75rem -1rem -0.75rem -6rem; }
 html.theme-loop .shelf-track { gap: 1.25rem; transition: transform 160ms var(--ease); }
 .lcard { width: 20rem; }
 html.theme-loop .lcard, html.theme-loop .ncard, html.lighter.theme-loop .ncard { transition: transform 120ms var(--ease); }
@@ -2228,8 +2240,8 @@ html.theme-loop .ncard.focus, html.lighter.theme-loop .ncard.focus { box-shadow:
 
 /* the dock: 112 px icons at y 912, centred on the screen (the row above stays on the left axis at x 96), gap 24,
    radius 24, full opacity, no bar. Focused: a white platter (seen on the Settings and More apps tiles), scale 1.12
-   and 6 px up, the ring with its gap, the label at y 1032. Up and down between the row and the dock land on the
-   nearest tile by its measured centre (app.js nearestInRow), so the centring needs nothing more */
+   and 6 px up, the ring with its gap, the label at y 1032. Down from the row lands on the nearest tile by its measured
+   centre (app.js nearestInRow) and Up goes back to the card you were on, so the centring needs nothing more */
 html.theme-loop .apps { top: auto; bottom: 3.5rem; left: 50%; right: auto; transform: translateX(-50%); }
 html.theme-loop .grid, html.lighter.theme-loop.theme-night .grid {
   padding: 0; border-radius: 0; background: none; box-shadow: none;
@@ -2253,11 +2265,18 @@ html.theme-loop .app .label {
   color: var(--text); text-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.55); transition: opacity 160ms var(--ease);
 }
 /* More apps: the row and the dock go, one panel on the no blur recipe (x 72 to 1848, y 560 to 1036, radius 24)
-   holds the twelve wide grid; three rows show, from y 596, and app.js moves the grid by whole rows on a
-   transform inside .grid-clip, a plain rectangular clip inset 24 px, so the radius clips nothing */
+   holds the twelve wide grid; three rows show, from y 596 and x 96, and app.js moves the grid by whole rows
+   on a transform inside .grid-clip, a plain rectangle (x 80 to 1840, y 568 to 1032) inside the radius. The
+   clip leaves room for the focused tile: scale 1.12, 6 px up and the 5 px ring reach 16 px past the tile's
+   side and 19 px above it, and the third row's label ends near y 1025. So the clip does not hide the rows
+   outside the three (the fourth would show from y 1004): app.js marks them .off-window, hidden once the
+   grid's 160 ms move is over, so a row leaving slides out under the clip instead of vanishing */
 html.theme-loop.expanded .apps { top: 35rem; bottom: auto; left: 4.5rem; right: 4.5rem; transform: none; height: 29.75rem; border-radius: 1.5rem; background: var(--loop-tint); box-shadow: var(--loop-rim); }
-html.theme-loop.expanded .grid-clip { position: absolute; top: 1.5rem; right: 1.5rem; bottom: 1.5rem; left: 1.5rem; overflow: hidden; }
-html.theme-loop.expanded .grid { padding-top: 0.75rem; transition: transform 160ms var(--ease); }
+html.theme-loop.expanded .grid-clip { position: absolute; top: 0.5rem; right: 0.5rem; bottom: 0.25rem; left: 0.5rem; overflow: hidden; }
+html.theme-loop.expanded .grid, html.lighter.theme-loop.theme-night.expanded .grid { padding: 1.75rem 1rem 0; }
+html.theme-loop.expanded .grid { transition: transform 160ms var(--ease); }
+html.theme-loop.expanded .app.off-window { visibility: hidden; transition: transform 120ms var(--ease), visibility 0s linear 160ms; }
+html.lighter.theme-loop.expanded .app.off-window { transition: none; }   /* Lighter: the grid jumps, so the row goes at once */
 html.theme-loop.expanded .hint.on { bottom: calc(100% + 1rem); }
 
 /* Lighter home in the Loop look: no blur copy (app.js), the darker tint, and nothing glides: every
@@ -2269,4 +2288,5 @@ html.lighter.theme-loop .sleep-menu .opt, html.lighter.theme-loop .ncard, html.l
 html.lighter.theme-loop .tile.focus, html.lighter.theme-loop .app.focus, html.lighter.theme-loop .qbtn.focus { will-change: auto; }
 @media (prefers-reduced-motion: reduce) {
   html.theme-loop .tile, html.theme-loop .app, html.theme-loop .qbtn, html.theme-loop .person, html.theme-loop .nb, html.theme-loop .shelf-track, html.theme-loop .grid, html.theme-loop .toast { transition: none; }
+  html.theme-loop.expanded .grid, html.theme-loop.expanded .app.off-window { transition: none; }
 }

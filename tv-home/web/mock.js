@@ -419,7 +419,9 @@
           // the videos next to the items, as GET /api/continue sends them (bridge/API.md): made-up titles, no picture
           var videos = empty ? [] : [
             { id: "v1", title: "How a Sydney ferry is built", kind: "video", app: app("youtube", "YouTube", "com.google.android.youtube.tv"), poster: null, backdrop: null, progress: null },
-            { id: "v2", title: "Sourdough for beginners", kind: "video", app: app("youtube", "YouTube", "com.google.android.youtube.tv"), poster: null, backdrop: null, progress: null }
+            { id: "v2", title: "Sourdough for beginners", kind: "video", app: app("youtube", "YouTube", "com.google.android.youtube.tv"), poster: null, backdrop: null, progress: null },
+            // a live stream carries live: true (the Loop look's card says "YouTube · Live")
+            { id: "v3", title: "Harbour webcam", kind: "video", live: true, app: app("youtube", "YouTube", "com.google.android.youtube.tv"), poster: null, backdrop: null, progress: null }
           ];
           return resolve({ ok: true, items: mine, videos: videos });
         }

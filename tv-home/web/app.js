@@ -505,6 +505,9 @@
       .filter(function (q, i, a) { return QUICK_ALL.indexOf(q) >= 0 && a.indexOf(q) === i; });
     THEME = (Q.match(/[?&]theme=([a-z]+)/) || [])[1] || lookSetting();
     if (THEME !== "classic" && THEME !== "oled" && THEME !== "loop") THEME = "night";
+    // couch-tv Studio's own preview (?designer=1) is there to show a design, and no design runs in
+    // the Loop look (start()), so the preview takes the Night look the designs are laid out for
+    if (THEME === "loop" && GATE.preview) THEME = "night";
     setLook(THEME);
     GLASS = glassSetting();
     // not in the Loop look: its material is its own (app.css, the Loop section), and the Night glass rules
@@ -617,7 +620,17 @@
   var ART_RETRY_MS = [1500, 3000, 6000, 12000, 20000, 30000];
   window.kwArtRetry = function (img) {
     var n = +(img.getAttribute("data-retry") || 0);
-    if (n >= ART_RETRY_MS.length) { img.onerror = null; return; }
+    if (n >= ART_RETRY_MS.length) {
+      img.onerror = null;
+      // given up on a Loop look card's picture: the plate with the app's icon, like a card that had none
+      var box = img.parentNode, badge = box && box.querySelector ? box.querySelector(".lbadge") : null;
+      if (box && box.classList && box.classList.contains("lthumb")) {
+        if (badge) badge.className = "picon";
+        box.removeChild(img);
+        box.classList.add("plate");
+      }
+      return;
+    }
     var src = img.getAttribute("data-src") || img.getAttribute("src") || "";
     if (!src) return;
     img.setAttribute("data-src", src);
@@ -1123,7 +1136,7 @@
   // ---------------- the Loop look (home.look "loop"; docs/TV-HOME.md, "The Loop look") ----------------
   // One clip of a place, graded for dawn, day, dusk and night by make-loop.sh on the bridge computer
   // (docs/LOOP.md), plays full screen under one fixed scrim. The bridge says which variants it has in
-  // config.js as home.loop = { variants: [...], blur: true|false }; the files are /tv/loop/<v>.mp4,
+  // config.js as home.loop = { variants: [...], blur: true|false }; the files are loop/<v>.mp4 (LOOP_DIR),
   // <v>-blur.mp4 (a 160x90 blurred copy), <v>.jpg and <v>-blur.jpg (the posters). The variant follows
   // sunPhase() while Follow the sun (sun_sync) is on, else it is day. A change is a cut at the loop
   // boundary, held while keys are moving (sceneMayChange), with the new posters decoded beforehand.
@@ -1139,10 +1152,14 @@
   // sky around the clock (scrim baked in), and the bridge passes loop.json as home.loop.meta with
   // home.loop.fg true. The cut-out is drawn over the clock and moved by the loop's own formula on the
   // compositor, locked to the video's clock, so the clock sits behind the peak (loopFgInit, below).
-  var LOOP_DIR = API + "/tv/loop/", LOOP_PHASES = ["dawn", "day", "dusk", "night"], loopVersion = "";
+  // The files' folder: a page with a bridge address (?api=, the LG and Samsung builds) asks that bridge
+  // for /tv/loop/; any other page asks next to itself, which is /tv/loop/ on the bridge and in the
+  // launcher's offline copy (both serve the page under /tv/) and /loop/ on the standalone site
+  var LOOP_DIR = API ? API + "/tv/loop/" : "loop/", LOOP_PHASES = ["dawn", "day", "dusk", "night"], loopVersion = "";
   var loopVariants = [], loopBlurOn = false, loopCur = "", loopPending = "", loopArmed = false, loopPoster = "", loopOff = false;
   var loopMeta = null, loopFgOn = false, loopFg = null, loopFgStandIn = "";
   var loopSharp = null, loopBlur = null, loopBox = null, loopMaskKey = null, loopLastT = 0, loopSeekLat = 0, loopSeekAt = 0, loopFirstRow = 0;
+  var loopGlassIdle = false;   // no quick button shows: the glass box is hidden and the blur copy paused (loopMask)
   var loopLoadTimer = 0, loopLoadOne = null;   // the load under way: its 4 s timer and its canplaythrough listener
   function loopFiles(v) {
     // the bridge's mark of the files (home.loop.version) goes on each address, so new files made by
@@ -1202,7 +1219,7 @@
     loopReadConfig();
     var root = document.documentElement;
     root.style.setProperty("--accent", loopAccent());
-    loopFg = null; loopFgStandIn = "";
+    loopFg = null; loopFgStandIn = ""; loopOff = false; loopGlassIdle = false;
     root.classList.remove("loop-depth");
     if (MOCK && !loopVariants.length) {
       // a preview with no files: a still stands in, and with depth on (mock.js) the Night look's whole
@@ -1236,6 +1253,8 @@
     if (v) loopLoad(v);
     else if (loopPoster) loopSharp.setAttribute("poster", loopPoster);
     if (loopFgStandIn) loopFg.src = loopFgStandIn;
+    // a kids profile on the couch at start (kidSync ran before this): the posters only, until it leaves
+    if (loopHidden()) loopPause();
   }
   // The cut-out: one <img> right after the clock in the header (so it paints over the clock and under
   // the date line and the buttons), at its rectangle from loop.json in rem (the page's rem is 1/120 of
@@ -1311,6 +1330,7 @@
   // comes while another is under way (the screen off and on again inside 4 s, a cut right after a
   // resume) first drops the earlier one's timer and listeners, so its play() cannot start this one early
   function loopLoad(v) {
+    if (loopOff) return;   // let go (loopPause): loopResume loads again on the way back
     loopCur = v; loopPending = ""; loopArmed = false; loopLastT = 0;
     var f = loopFiles(v), els = [loopSharp, loopBlur].filter(Boolean), ready = 0, started = false;
     clearTimeout(loopLoadTimer);
@@ -1321,10 +1341,11 @@
       started = true; clearTimeout(loopLoadTimer); loopLoadTimer = 0; loopLoadOne = null;
       els.forEach(function (el) {
         el.removeEventListener("canplaythrough", one);
+        if (el === loopBlur && loopGlassIdle) return;   // no button to show it: it waits (loopMask)
         var p = el.play();
         if (p && p.catch) p.catch(function () {});
       });
-      if (loopBlur) loopAlign();
+      if (loopBlur && !loopGlassIdle) loopAlign();
     };
     var one = function () { if (++ready >= els.length) go(); };
     loopLoadOne = one;
@@ -1363,11 +1384,14 @@
     loopLastT = now;
     return { at: !!el.ended || wrapped || (isFinite(d) && d > 0 && d - now < 0.3), wrapped: wrapped };
   }
+  // Nothing while let go: loopPause's load() moves the time back to 0 and queues a timeupdate, which
+  // would read as a wrap and could load an armed variant behind the cover
   function loopTimeUpdate() {
+    if (loopOff) return;
     var b = loopAtBoundary(loopSharp);
     if (b.at && loopPending && loopArmed && sceneMayChange()) { loopLoad(loopPending); return; }
     if (b.wrapped) loopFgRun();
-    if (loopBlur) loopSync(b.wrapped);
+    if (loopBlur && !loopGlassIdle) loopSync(b.wrapped);
   }
   // keeps the blur copy on the sharp clip, read at each timeupdate (4 Hz): under 0.2 s nothing, up to
   // 0.5 s a 3 percent rate pull, above that a seek; after a wrap one seek, since the two stall apart
@@ -1405,7 +1429,17 @@
     if (!loopBox || key === loopMaskKey) return;
     loopMaskKey = key;
     var rects = loopGlassRects();
-    if (!rects.length) { loopBox.style.display = "none"; return; }
+    // no button shows (home.quick empty, or none available): the box hides and the blur copy stops,
+    // keeping its file; when buttons come back it plays again, seeked to the sharp clip
+    if (!rects.length) { loopBox.style.display = "none"; loopGlassIdle = true; loopBlur.pause(); return; }
+    if (loopGlassIdle) {
+      loopGlassIdle = false;
+      if (!loopOff && loopSharp && !loopSharp.paused && loopBlur.getAttribute("src")) {
+        var p = loopBlur.play();
+        if (p && p.catch) p.catch(function () {});
+        loopAlign();
+      }
+    }
     var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     rects.forEach(function (r) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); });
     x0 = Math.floor(x0); y0 = Math.floor(y0);
@@ -1447,14 +1481,19 @@
   function loopNoGlass() {
     if (loopBlur) { loopBlur.pause(); loopBlur.removeAttribute("src"); try { loopBlur.load(); } catch (e) {} }
     if (loopBox && loopBox.parentNode) loopBox.parentNode.removeChild(loopBox);
-    loopBox = null; loopBlur = null; loopMaskKey = null;
+    loopBox = null; loopBlur = null; loopMaskKey = null; loopGlassIdle = false;
     document.documentElement.classList.remove("loop-glass");
   }
-  // an app or the screensaver in front, or the screen off: both clips let go of their files and decoders
-  // (the Cube's launcher measured about 100 MB lighter with them gone); the posters stay for the way back
+  // an app or the screensaver in front, the screen off, the ambient clock or kids mode over the home: both
+  // clips let go of their files and decoders (the Cube's launcher measured about 100 MB lighter with them
+  // gone); the posters stay for the way back. A load still under way is dropped first, so its 4 s timer
+  // cannot play() the emptied clips, and the last time goes back to 0 with them
   function loopPause() {
     if (!loopSharp || loopOff) return;
-    loopOff = true;
+    loopOff = true; loopLastT = 0;
+    clearTimeout(loopLoadTimer); loopLoadTimer = 0;
+    if (loopLoadOne) [loopSharp, loopBlur].forEach(function (el) { if (el) el.removeEventListener("canplaythrough", loopLoadOne); });
+    loopLoadOne = null;
     [loopSharp, loopBlur].forEach(function (el) {
       if (!el) return;
       el.pause(); el.removeAttribute("src"); try { el.load(); } catch (e) {}
@@ -1463,23 +1502,40 @@
     if (loopFg) { loopFg.style.animation = "none"; loopFg.classList.add("off"); }   // hidden with the videos (app.css)
   }
   function loopResume() {
-    if (!loopSharp || !loopOff || !active()) return;
+    if (!loopSharp || !loopOff || !active() || loopHidden()) return;
     loopOff = false;
     [loopSharp, loopBlur].forEach(function (el) { if (el) el.classList.remove("off"); });
     if (loopFg) { loopFg.classList.remove("off"); loopFgHold(); }   // at the poster's position until the video plays
     if (loopCur) loopLoad(loopVariant() || loopCur);   // the phase may have moved on while the home was covered
   }
+  // the page shows but something opaque of its own covers the home: Smart Idle's ambient clock, or kids
+  // mode's shelf (which also hides the header, and with it the cut-out, so its animation starts again
+  // from loopResume's hold and the video's playing, in step)
+  function loopHidden() { return idleAmbientActive || kidsOn(); }
+  // the ambient clock or kids mode came or went (setIdleAmbient, kidSync, kidsUnlocked)
+  function loopCover() {
+    if (!LOOP) return;
+    if (loopHidden()) loopPause(); else loopResume();
+  }
   // More apps as a panel: three rows of twelve show, and the grid moves by whole rows on a transform
-  // inside the panel's plain rectangular clip (app.css), so the focused row is always in view
+  // inside the panel's plain rectangular clip (app.css), so the focused row is always in view. The clip
+  // leaves room round the tiles for the focused one's ring and label, so it does not hide the rows
+  // above and below the three: they carry .off-window (hidden, app.css)
   function loopPanel() {
-    var grid = $("grid");
-    if (!expanded) { loopFirstRow = 0; grid.style.transform = ""; return; }
+    var grid = $("grid"), i;
+    if (!expanded) {
+      loopFirstRow = 0; grid.style.transform = "";
+      for (i = 0; i < gridEls.length; i++) gridEls[i].classList.remove("off-window");
+      return;
+    }
     var inGrid = zone === "grid" || zone === "gear" || zone === "appmenu";
     var row = inGrid ? Math.floor(g / GRID_COLS) : loopFirstRow, rows = Math.ceil(gridEls.length / GRID_COLS);
     if (row < loopFirstRow) loopFirstRow = row;
     if (row > loopFirstRow + 2) loopFirstRow = row - 2;
     loopFirstRow = Math.max(0, Math.min(loopFirstRow, Math.max(0, rows - 3)));
     grid.style.transform = loopFirstRow ? "translateY(" + (-loopFirstRow * 8.5) + "rem)" : "";
+    var from = loopFirstRow * GRID_COLS, to = from + 3 * GRID_COLS;
+    for (i = 0; i < gridEls.length; i++) gridEls[i].classList.toggle("off-window", i < from || i >= to);
   }
   // a card's second line: the app, then the season and episode, the episode's name, or Video or Live
   // for a YouTube video ("HBO Max · S1 E3", "YouTube · Live")
@@ -1622,13 +1678,19 @@
     var q = $("quick").classList.contains("none") ? null : $("qbtns").getBoundingClientRect();
     var p = $("people").getBoundingClientRect();
     var rtl = document.documentElement.dir === "rtl";
+    // the Loop look puts Now playing in the people's column, at the date line's height with one person
+    // or under a tall head icon: of the two, the one that reaches further in is the one to clear
+    var np = LOOP && $("np").classList.contains("on") ? $("np").getBoundingClientRect() : null;
+    if (near(np) && (!near(p) || (rtl ? np.left < p.left : np.right > p.right))) p = np;
     var leftBox = rtl ? q : p;
     var rightBox = rtl ? p : q;
     var hitRight = near(rightBox) && b.right > rightBox.left - rem;
     var hitLeft = near(leftBox) && b.left < leftBox.right + rem;
     if (!hitRight && !hitLeft) return;
-    if (hitRight) d.style.right = (innerWidth - rightBox.left + 1.5 * rem) + "px";
-    if (hitLeft) d.style.left = (leftBox.right + 1.5 * rem) + "px";
+    // Loop: once it moves it stays clear of both sides, since a long Now playing line can push it
+    // over to the quick buttons
+    if (hitRight || (LOOP && near(rightBox))) d.style.right = (innerWidth - rightBox.left + 1.5 * rem) + "px";
+    if (hitLeft || (LOOP && near(leftBox))) d.style.left = (leftBox.right + 1.5 * rem) + "px";
     if (d.scrollWidth > d.clientWidth + 1) d.classList.add("tight");
     if (d.scrollWidth > d.clientWidth + 1) d.classList.add("tighter");
   }
@@ -2063,6 +2125,10 @@
     setTimeout(refreshMusic, key === "play_pause" ? 1500 : 900);
   }
 
+  // the Loop look: the date line makes room for the Now playing line (fitDate) as it comes, goes or
+  // changes, not only on the next minute's tick
+  var npFitKey = "";
+  function npFit(k) { if (LOOP && k !== npFitKey) { npFitKey = k; fitDate(); } }
   function renderNp() {
     var el = $("np"), on = npVisible();
     el.classList.toggle("on", on);
@@ -2073,7 +2139,7 @@
       $("shelf-section").classList.toggle("empty", !anyone && !on);
       $("np-slot").classList.toggle("on", on);
     }
-    if (!on) { el.innerHTML = ""; return; }
+    if (!on) { el.innerHTML = ""; npFit(""); return; }
     var playing = music.state === "playing";
     // the cover from the bridge (Apple's music search); none yet, or none found: a music note
     var art = music.art ? '<img class="np-art" src="' + esc(music.art) + '" alt="" decoding="async" data-err="np">' :
@@ -2085,6 +2151,7 @@
       '<div class="np-ctl">' + btns.map(function (b, i) {
         return '<span class="nb' + (zone === "np" && i === npI ? " focus" : "") + '" role="button" aria-label="' + esc(b[1]) + '">' + ICONS[b[0]] + "</span>";
       }).join("") + "</div>";
+    npFit([music.title, music.artist || music.album || "", btns.length].join("\n"));
   }
   // ---------- Up next queue (a design's queue widget, widgets.js R.queue) ----------
   // The next songs on the Spotify account, from the person's own Spotify sign in: the bridge's
@@ -2558,6 +2625,7 @@
     }
     sceneVideos(!idleAmbientActive);   // no clip decoding behind the ambient clock
     designVideo("idle", idleAmbientActive);
+    loopCover();   // nor the Loop look's
   }
   // a design's video background (design.js, bg-video.js) stops while the home is not on screen
   function designVideo(why, held) { if (typeof CouchDesign !== "undefined" && CouchDesign.hold) CouchDesign.hold(why, held); }
@@ -2754,6 +2822,7 @@
       }).join("");
     }
     renderPop();
+    if (LOOP && npVisible()) fitDate();   // Now playing sits under the people, so it moves with them
   }
 
   function renderPop() {
@@ -2823,6 +2892,7 @@
     var was = kidsOn();
     window.KidsMode.sync(p);
     if (kidsOn() && !was) kidsCover();
+    if (kidsOn() !== was) loopCover();   // the Loop look's clips stop behind the shelf, and come back after it
   }
   // going into kids mode: whatever was open here closes first, so nothing is left behind the shelf
   function kidsCover() {
@@ -2845,6 +2915,7 @@
   function kidsUnlocked(kid, code) {
     var grown = PEOPLE.filter(function (x) { return !window.KidsMode.isKid(x); })[0];
     touched = true;
+    loopCover();   // kids.js has left kids mode already (before kidSync could see it): the Loop look's clips again
     if (grown) {
       who = grown.id; s = 0;
       try { localStorage.setItem("tvhome.who", who); } catch (e) {}
@@ -2978,9 +3049,10 @@
       // bare 320x180 thumbnails, the title and the app under each; no thumbnail: a plate with the app's icon
       track.innerHTML = data.shows.map(function (it) {
         var art = slim(it.backdrop || it.poster), pkg = it.app && it.app.package, ic = pkg ? iconUrl(pkg) : null;
-        var inner = art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async">' +
-            (ic ? '<img class="lbadge" src="' + esc(ic) + '" alt="" onerror="this.remove()">' : "")
-          : (ic ? '<img class="picon" src="' + esc(ic) + '" alt="" onerror="this.remove()">' : "");
+        // a picture that fails is asked for again (#274), through data-err as in the other looks, never inline onerror
+        var inner = art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async" data-err="kwretry">' +
+            (ic ? '<img class="lbadge" src="' + esc(ic) + '" alt="" data-err="remove">' : "")
+          : (ic ? '<img class="picon" src="' + esc(ic) + '" alt="" data-err="remove">' : "");
         return '<div class="tile lcard"><div class="lthumb' + (art ? "" : " plate") + '">' + inner +
           (it.progress ? '<span class="lbar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "") +
           "</div><b>" + esc(it.title) + "</b><i>" + esc(loopSub(it)) + "</i></div>";
@@ -3876,7 +3948,22 @@
     }
     if (zone === "np") {
       var maxNp = Math.max(0, npButtons().length - 1);
-      if (NIGHT) {
+      if (LOOP) {
+        // the Loop look: a line at the top left, under the people and above the row, a stop in the
+        // top row: right past the last button goes on to the quick buttons, up to the people, down
+        // to the row under it (or the dock when the row is empty)
+        if (dx > 0 && npI === maxNp) { if (hasQuick()) { zone = "quick"; qi = 0; } }
+        else if (dx) npI = Math.max(0, Math.min(maxNp, npI + dx));
+        else if (dy < 0) { if (peopleOn()) toPeople(); }
+        else if (dy > 0) {
+          if (cards.length) zone = "shelf";
+          else if (gridEls.length) {
+            var lb = $("np").getBoundingClientRect();
+            g = nearestInRow(0, lb.left + lb.width / 2);
+            zone = "grid";
+          }
+        }
+      } else if (NIGHT) {
         // the first card of the row: right past the last button goes on to the shows
         if (dx > 0 && npI === maxNp) { if (cards.length) { zone = "shelf"; s = 0; } }
         else if (dx) npI = Math.max(0, Math.min(maxNp, npI + dx));
@@ -3900,7 +3987,8 @@
     }
     if (zone === "quick") {
       var nq = quickVisible().length;
-      if (dx < 0 && qi === 0) { if (peopleOn()) toPeople(); }
+      // Loop: Now playing is the stop before the first button (Left from the sleep button)
+      if (dx < 0 && qi === 0) { if (LOOP && npReach()) { zone = "np"; npI = Math.max(0, npButtons().length - 1); } else if (peopleOn()) toPeople(); }
       else if (dx) qi = Math.max(0, Math.min(nq - 1, qi + dx));
       else if (dy > 0) {
         if (!NIGHT && npReach()) zone = "np";
@@ -3918,10 +4006,11 @@
         pi = Math.max(0, Math.min(PEOPLE.length - 1, pi + dx));
       } else if (dy > 0) zone = NIGHT && npReach() ? "np" : cards.length ? "shelf" : "grid";
     } else if (zone === "shelf") {
-      if (dx < 0 && s === 0 && NIGHT && npReach()) { zone = "np"; npI = Math.max(0, npButtons().length - 1); }
+      if (dx < 0 && s === 0 && NIGHT && !LOOP && npReach()) { zone = "np"; npI = Math.max(0, npButtons().length - 1); }
       else if (dx < 0 && s === 0 && !expanded && GRID_COLS === 1 && gridEls.length > 1) { zone = "grid"; g = 0; }   // back onto a side rail
       else if (dx) s = Math.max(0, Math.min(shelfEls.length - 1, s + dx));
-      else if (dy < 0) { if (peopleOn()) toPeople(); else if (!NIGHT && npReach()) zone = "np"; else if (hasQuick()) { zone = "quick"; qi = 0; } }
+      // Loop: Now playing sits straight above the row, under the people
+      else if (dy < 0) { if (LOOP && npReach()) zone = "np"; else if (peopleOn()) toPeople(); else if (!NIGHT && npReach()) zone = "np"; else if (hasQuick()) { zone = "quick"; qi = 0; } }
       else if (dy > 0 && gridEls.length) {
         // land on the app under the show
         var b = shelfEls[s].getBoundingClientRect();
@@ -4603,7 +4692,10 @@
     renderSettings();
     CouchDesignCode.get(typed).then(function () {
       setDesigner(true);   // typing a code is asking for couch-tv Studio: it is on from now
-      SET.msg = "Got it. Your TV asks you about it now.";
+      // no design runs in the Loop look (start()): asking for one by code is asking to see it, so
+      // the home goes back to Night, the look designs are laid out for
+      if (LOOP) { ST.look = "night"; keep("tvhome.look", "night"); saveSettings(); }
+      SET.msg = LOOP ? "Got it. Your TV switches to the Night look and asks you about it now." : "Got it. Your TV asks you about it now.";
       renderSettings();
       setTimeout(restart, 600);   // it starts again and shows "Use this design?" first
     }, function (e) {
@@ -4633,7 +4725,10 @@
         setDesigner(false); SET.msg = "couch-tv Studio is off. Your classic home comes back when you close Home settings.";
       } });
       // a design switched off with Back held, or not chosen yet: it comes back here
-      if (CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.settingsRow) rows.push(CouchDesign.settingsRow(restart));
+      // in the Loop look no design runs (start()), so its row would say On for a design nobody sees
+      if (CFG.design && LOOP) rows.push({ kind: "action", key: "dz-loop", label: "Your design", sub: "Designs show in the Night, Classic and OLED looks. Switch to Night to see it",
+        act: function () { ST.look = "night"; keep("tvhome.look", "night"); saveSettings(); restart(); } });
+      else if (CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.settingsRow) rows.push(CouchDesign.settingsRow(restart));
       commuteRows(rows);
     }
     if (window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) rows.push({ kind: "nav", key: "dz-smart", label: "Smart home",
@@ -4792,7 +4887,8 @@
     });
     // glass panels: off, on, on with no blur (for slower TVs)
     rows.push(head(t("glass_head")));
-    rows.push({ kind: "cycle", key: "glass", label: t("glass"), value: GLASS === "lite" ? t("glass_lite") : GLASS === "on" ? t("on") : t("off"), act: function () {
+    // (not in the Loop look, whose material is its own: html.glass stays off there, readConfig)
+    if (!LOOP) rows.push({ kind: "cycle", key: "glass", label: t("glass"), value: GLASS === "lite" ? t("glass_lite") : GLASS === "on" ? t("on") : t("off"), act: function () {
       GLASS = GLASS === "off" ? "on" : GLASS === "on" ? "lite" : "off"; ST.glass = GLASS; saveSettings(); movingTiles();
     } });
     // the focused tile's slow sway: off by itself with glass "lite", and here for a TV that flickers (#52)
@@ -4801,7 +4897,8 @@
       MOVING = !MOVING; ST.moving_tiles = MOVING; saveSettings(); movingTiles();
     } });
     // the Mac-style dock: the focused app and its neighbours grow in a wave, its name in a bubble above it
-    if (NIGHT) rows.push({ kind: "toggle", key: "dock-mac", label: t("dock_mac"), value: DOCK_MAC ? t("on") : t("off"), act: function () {
+    // (not in the Loop look: its dock has no wave, movingTiles, and a press there would only save "mac" for Night)
+    if (NIGHT && !LOOP) rows.push({ kind: "toggle", key: "dock-mac", label: t("dock_mac"), value: DOCK_MAC ? t("on") : t("off"), act: function () {
       if (LIGHTER) return;   // held off while Lighter home is on
       ST.dock = DOCK_MAC ? "classic" : "mac"; saveSettings(); movingTiles();
     } });
@@ -6908,6 +7005,10 @@
     // With couch-tv Studio off (designer-gate.js) design.js is never started: no keys of its own, no
     // question, no page policy. On, the page policy a design runs under goes in first.
     var designOn = typeof CouchDesign !== "undefined" && !!(GATE.design || GATE.preview);
+    // The Loop look wins: its clip, glass and cut-out are the background, and a design's background,
+    // weather line, layers and dock are laid out for Night. So no design starts in Loop (none of its
+    // decoders either); in every other look a design runs as before
+    if (designOn && LOOP) { designOn = false; console.log("design: not started in the Loop look; it shows in the other looks"); }
     // (videos only from this page, memory, the design store and this TV's own video link)
     if (designOn && typeof CouchDesigner !== "undefined") CouchDesigner.lockPage(document, typeof CouchDesignCode !== "undefined" && CouchDesignCode.mediaSources ? { media: CouchDesignCode.mediaSources(VIDEO_URL) } : null);
     if (designOn) CouchDesign.start(CFG.design, {
