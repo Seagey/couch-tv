@@ -47,4 +47,4 @@ These need the bridge (a computer at home that stays on).
 
 ### Files
 
-`couch-tv-samsung-setup.zip` and `couch-tv-samsung.wgt` (new, for Samsung), `couch-tv-home.apk` (the TV home, options A and B), `couch-tv-ontv.apk` (option C, the phone only download), `couch-tv-ontv-watch.apk` (option C with the home watch, for Fire TV, from a computer), `couch-tv-sync.apk` (two TVs in sync, unchanged since 0.13), `couch-tv-Setup-mac-apple-silicon.zip` (the Setup app, unchanged since 0.13.3), with `SHA256SUMS.txt`.
+`couch-tv-samsung-setup.zip` and `couch-tv-samsung.wgt` (new, for Samsung), `couch-tv-home.apk` (the TV home, options A and B), `couch-tv-ontv.apk` (option C, the phone only download), `couch-tv-ontv-watch.apk` (option C with the home watch, for Fire TV, from a computer), `couch-tv-sync.apk` (two TVs in sync, unchanged since 0.13), with `SHA256SUMS.txt`. The Setup app zips for Mac (Apple silicon and Intel) and Windows are built on GitHub when the release is published, with their own `SHA256SUMS-setup.txt`.
