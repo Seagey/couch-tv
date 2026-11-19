@@ -155,6 +155,8 @@ class SamsungTV(samsung.SamsungTV):
             raise TVUnavailable("the TV did not wake over the network (turn it on with its remote)",
                                 key="err_tv_did_not_wake")
         if now - self._wake_first > WAKE_GIVE_UP and not self.connected:
+            # this "on" is over: the next tap is a new one and sends a packet again, even within 10 s
+            self._wake_first = None
             raise TVUnavailable("the TV did not wake over the network (turn it on with its remote)",
                                 key="err_tv_did_not_wake")
         await super().wake()

@@ -43,6 +43,15 @@
 
   function readChoice(v) { return v === "on" || v === "off" ? v : null; }
 
+  // Whether Home settings shows couch-tv Studio as on. The choice just made at the TV wins: decide()
+  // is only worked out when the home starts, so straight after Turn on couch-tv Studio the row still
+  // read "Off" under "couch-tv Studio is on" (a TCL, 19 Nov 2026).
+  function shownOn(choice, gateOn, designOn) {
+    choice = readChoice(choice);
+    if (choice) return choice === "on";
+    return !!(gateOn || designOn);
+  }
+
   // The page policy a design runs under (it used to sit in index.html for everyone). Only once
   // couch-tv Studio hands design.js a design: a home without one keeps exactly the rules it always had.
   // No inline script, no eval, no plugins, no outside scripts but Spotify's player. Pictures and
@@ -87,5 +96,5 @@
   }
 
   window.CouchDesigner = { KEY: KEY, DEFAULT_STORE: DEFAULT_STORE, DESIGNER_PAGE: DESIGNER_PAGE, POLICY: POLICY,
-    decide: decide, readChoice: readChoice, lockPage: lockPage, policy: policy };
+    decide: decide, readChoice: readChoice, shownOn: shownOn, lockPage: lockPage, policy: policy };
 })();

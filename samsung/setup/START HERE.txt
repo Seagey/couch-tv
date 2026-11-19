@@ -67,6 +67,8 @@ The setup then:
 - opens a browser for your Samsung account sign-in. This is Samsung's own page: couch-tv and
   the setup never see your password. It makes a certificate for your TV only. If Samsung asks
   you to agree or to allow access, say yes, then come back to the setup window.
+  Apps2Samsung keeps that signing certificate on this computer, so the next update is signed
+  the same way. Keep this computer for updates, and do not share the certificate.
 - puts couch-tv on the TV and opens it. (If it is not on screen, open Couch TV from the
   TV's row of apps.)
 

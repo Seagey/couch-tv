@@ -30,11 +30,43 @@ object SetupWords {
         else -> "The phone remote opens apps and changes the volume. For the arrow keys and typing, see More."
     }
 
-    /** The note about the Home button, for this TV. */
-    fun homeNote(useAsHome: Boolean, held: Boolean, googleTv: Boolean): String = when {
-        googleTv -> "On Google TV the Home button always opens Google TV. Open your couch-tv home from Couch TV in the apps row."
+    /**
+     * The note about the Home button, for this TV.
+     *  googleTv: the Google TV home is installed. googleHome: a Google home (Google TV's, or Google's
+     *  Android TV Home, which a TCL kept opening by name although Couch TV was the home app).
+     *  watchApk: this is couch-tv-ontv-watch.apk, which has the Home button watch; the phone only
+     *  download (couch-tv-ontv.apk) does not, because Google Play Protect blocks it there.
+     *  asking: Android's request is on its way. declined: Android's list was closed without Couch TV.
+     */
+    fun homeNote(useAsHome: Boolean, held: Boolean, googleTv: Boolean, watchApk: Boolean = false, googleHome: Boolean = googleTv,
+                 asking: Boolean = false, declined: Boolean = false): String = when {
+        asking -> "Asking the TV to make Couch TV its home. If the screen goes black, press Back once and the question comes up."
+        googleTv && watchApk -> "On Google TV the Home button always opens Google TV first. With Couch TV home watch switched on in the TV's Settings, Accessibility, your couch-tv home comes straight back on top."
+        googleTv -> "On Google TV the Home button always opens Google TV with the phone only download. That is expected. " +
+            "To make Home open couch-tv, put the home watch version on from a computer: see More, Home button from a computer. " +
+            "Until then, open your couch-tv home from Couch TV in the apps row."
+        declined -> "Couch TV is not your home screen: the TV's list was closed without choosing it. Press Use as home screen to ask again."
         !useAsHome -> "Use as home screen asks the TV to make Couch TV its home. No computer needed."
+        held && googleHome && !watchApk -> "Couch TV is your home screen. Press Home on the remote to see it. If Google's home still opens " +
+            "(some TVs, a TCL among them, open it by name), that is expected with the phone only download: see More, Home button from a computer."
         held -> "Couch TV is your home screen. Press Home on the remote to see it."
         else -> "If the TV showed a list, choose Couch TV and press Always (or Set as default)."
+    }
+
+    /**
+     * Behind More, for the phone only download: the exact way to get the Home button watch, which only
+     * couch-tv-ontv-watch.apk has and which is put on from a computer. tvAddress: this TV's address.
+     */
+    fun watchSteps(tvAddress: String?): String {
+        val at = tvAddress ?: "the TV's address"
+        return "Home button from a computer. This app came from your phone (couch-tv-ontv.apk), and Google Play Protect blocks the part " +
+            "that keeps the Home button in an app installed that way. So on Google TV, and on TVs that open Google's home by name, " +
+            "Home keeps opening Google's home. To change that, once: " +
+            "1. On a computer, download couch-tv-ontv-watch.apk from github.com/Seagey/couch-tv/releases/latest. " +
+            "2. Switch on USB debugging on this TV (the steps above). " +
+            "3. On the computer, with Google's adb tool: adb connect $at:5555 (with Wireless debugging, the address and port " +
+            "it shows), then adb install -r couch-tv-ontv-watch.apk " +
+            "(press Allow on the TV if it asks). It goes over this app and keeps your settings. " +
+            "4. On the TV: Settings, Accessibility (on some TVs inside System or Device Preferences), Couch TV home watch, On."
     }
 }

@@ -170,6 +170,52 @@ class WakeTests(unittest.TestCase):
             asyncio.run(tv.wake())
             self.assertEqual(len(sent), 3)
 
+    def test_on_again_right_after_a_failed_wake_sends_a_packet(self):
+        # Fable review of 0.13.4: On tapped again within 10 s of giving up failed at once, with no packet
+        tv = make(StandIn([None]), self.data, mac=MAC_CFG)
+        sent = []
+
+        async def packet():
+            sent.append(1)
+        with patch.object(samsung_frame.samsung.SamsungTV, "wake", lambda self: packet()), \
+                patch.object(samsung_frame, "WAKE_GIVE_UP", 0.05):
+            asyncio.run(tv.wake())
+            time.sleep(0.06)
+            with self.assertRaises(TVUnavailable):
+                asyncio.run(tv.wake())
+            self.assertEqual(len(sent), 1)
+            asyncio.run(tv.wake())   # tapped again a moment later
+            self.assertEqual(len(sent), 2)
+
+
+class PowerHoldTests(unittest.TestCase):
+    """Fable review of 0.13.4: docs/SAMSUNG.md says the bridge never holds power, but /api/key with
+    hold=true (the MCP tool) held it for 3 seconds, which switches a Frame fully off. Now power is one
+    press, and other keys can still be held."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.data = self._tmp.name
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def sent(self, name, hold):
+        tv = make(StandIn(["on"]), self.data)
+        cmds = []
+
+        async def key(code, cmd="Click"):
+            cmds.append((code, cmd))
+        tv._key = key
+        asyncio.run(tv.key(name, hold=hold))
+        return cmds
+
+    def test_power_is_never_held(self):
+        self.assertEqual(self.sent("power", True), [("KEY_POWER", "Click")])
+
+    def test_other_keys_can_still_be_held(self):
+        self.assertEqual(self.sent("ok", True), [("KEY_ENTER", "Press"), ("KEY_ENTER", "Release")])
+
 
 class ReleaseBuildTests(unittest.TestCase):
     def test_release_package_has_no_bridge_no_key_and_the_installers(self):
@@ -218,6 +264,37 @@ class ReleaseBuildTests(unittest.TestCase):
             self.assertNotIn(banned, start)
         self.assertIn("about 30 minutes", start)
         self.assertIn("gpl-3.0", start)   # the licence note for the tool the installers download
+
+    def test_installers_check_the_kept_download_every_run(self):
+        # Fable review of 0.13.4: a tool already on the computer was used with no check. Now the
+        # download is kept, hashed on every run, and the tool is unpacked again from it.
+        with open(os.path.join(ROOT, "samsung", "setup", "Install on Mac.command")) as f:
+            mac = f.read()
+        tool = mac[mac.index("# ---- 1. the install tool ----"):mac.index("# ---- 2. the TV ----")]
+        self.assertNotIn('if [ ! -x "$CLI" ]', tool)
+        self.assertIn('[ "$(sha_of "$TGZ")" != "$SHA" ]', tool)
+        self.assertIn('tar -xzf "$TGZ"', tool.split("fi\n")[-1])   # unpacked after the check, every run
+        self.assertNotIn('rm -f "$TGZ"\n  chmod', tool)
+        with open(os.path.join(ROOT, "samsung", "setup", "install-windows.ps1")) as f:
+            win = f.read()
+        tool = win[win.index("# ---- 1. the install tool ----"):win.index("# ---- 2. the TV ----")]
+        self.assertNotIn("if (-not (Test-Path $Cli))", tool)
+        self.assertIn("if ((Get-Sha $Zip) -ne $Sha[$Arch])", tool)
+        self.assertGreater(tool.index("Expand-Archive"), tool.rindex("Stop-Setup"))
+
+    def test_windows_installer_never_redirects_errors_under_stop(self):
+        # PowerShell 5.1 with $ErrorActionPreference = "Stop": "2>$null" on a program that writes to
+        # its error output throws, so the TV scan could fail on a TV that is there.
+        with open(os.path.join(ROOT, "samsung", "setup", "install-windows.ps1")) as f:
+            win = f.read()
+        self.assertNotIn("2>$null", win)
+        self.assertIn('$ErrorActionPreference = "Continue"', win)
+        self.assertIn("Invoke-CliOutput scan --json", win)
+
+    def test_start_here_says_where_the_certificate_is_kept(self):
+        with open(os.path.join(ROOT, "samsung", "setup", "START HERE.txt")) as f:
+            start = f.read()
+        self.assertIn("Apps2Samsung keeps that signing certificate on this computer", start)
 
 
 class ServerHookTests(unittest.TestCase):

@@ -122,6 +122,12 @@ couch-tv back when that home comes forward, while **Use as home screen** is on. 
 phone only download, from Downloader) leaves it out, because Google Play Protect blocks a sideloaded
 app that has an accessibility service ("App blocked to protect your device", seen on a TCL Google TV
 in November 2026). Both are the same app with the same name and key, so one installs over the other.
+With the plain APK, the Couch TV setup screen says that Google's home keeps the Home button (on Google TV,
+and on a TCL with Google's Android TV Home, which opened it by name although Couch TV held the home role),
+and More, Home button from a computer, gives the steps: `adb connect <tv-ip>:5555`, then
+`adb install -r couch-tv-ontv-watch.apk` (settings stay), then Couch TV home watch on in Settings, Accessibility.
+**Use as home screen** waits a moment after switching the home on before asking Android (a first press
+showed a black screen on that TCL), and if the question is cancelled it switches the home off again.
 If an older guide had you switch it off, switch it back on before the next restart:
 
 ```

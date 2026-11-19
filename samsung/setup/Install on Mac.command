@@ -28,27 +28,30 @@ say "(START HERE.txt, step 3)." ""
 [ -f "$WGT" ] || stop "CouchTV.wgt is not next to this file. Unzip the whole couch-tv-samsung-setup.zip and run it from that folder."
 
 # ---- 1. the install tool ----
-if [ ! -x "$CLI" ]; then
-  case "$(uname -m)" in
-    arm64) ARCH="arm64"; SHA="$A2S_SHA_ARM64" ;;
-    *) ARCH="x64"; SHA="$A2S_SHA_X64" ;;
-  esac
+# The download is kept and checked against its SHA-256 every time, and the tool is unpacked again
+# from it, so a tool changed on this Mac after the first run is never used.
+case "$(uname -m)" in
+  arm64) ARCH="arm64"; SHA="$A2S_SHA_ARM64" ;;
+  *) ARCH="x64"; SHA="$A2S_SHA_X64" ;;
+esac
+TGZ="$TOOLS/cli-$ARCH.tar.gz"
+mkdir -p "$TOOLS" || stop "Could not make a folder for it in your Library."
+sha_of() { shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1; }
+if [ ! -f "$TGZ" ] || [ "$(sha_of "$TGZ")" != "$SHA" ]; then
+  rm -f "$TGZ"
   say "Downloading Apps2Samsung's free install tool ($A2S_VERSION, about 35 MB) from GitHub..."
-  mkdir -p "$TOOLS" || stop "Could not make a folder for it in your Library."
-  TGZ="$TOOLS/cli.tar.gz"
   curl -fL --progress-bar -o "$TGZ" \
     "https://github.com/Apps2Samsung/Apps2Samsung/releases/download/v$A2S_VERSION/Apps2Samsung.Cli-v$A2S_VERSION-osx-$ARCH.tar.gz" \
-    || stop "The download did not work. Check the Mac is online, then run this again."
-  GOT="$(shasum -a 256 "$TGZ" | cut -d' ' -f1)"
-  if [ "$GOT" != "$SHA" ]; then
+    || { rm -f "$TGZ"; stop "The download did not work. Check the Mac is online, then run this again."; }
+  if [ "$(sha_of "$TGZ")" != "$SHA" ]; then
     rm -f "$TGZ"
     stop "The download was not the expected file, so it was not used. Run this again later."
   fi
-  tar -xzf "$TGZ" -C "$TOOLS" apps2samsung-cli || stop "Could not unpack the tool."
-  rm -f "$TGZ"
-  chmod +x "$CLI"
   say "Done." ""
 fi
+rm -f "$CLI"
+tar -xzf "$TGZ" -C "$TOOLS" apps2samsung-cli || stop "Could not unpack the tool."
+chmod +x "$CLI"
 
 # ---- 2. the TV ----
 say "Looking for Samsung TVs on your Wi-Fi (about 10 seconds)..."

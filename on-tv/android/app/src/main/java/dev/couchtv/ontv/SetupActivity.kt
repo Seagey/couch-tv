@@ -40,6 +40,38 @@ class SetupActivity : Activity() {
     private lateinit var connect: Button
     private val tick = object : Runnable { override fun run() { refresh(); main.postDelayed(this, 1500) } }
     private val pinListener: (String?) -> Unit = { main.post { refresh() } }
+    private lateinit var watchNote: TextView
+
+    // Use as home screen (HomeAsk.kt): askSince is when the home alias went on and Android is still to be
+    // asked; awaitingRole is true while Android's own request is on screen; declined after it was closed
+    // without Couch TV. inFront: this screen is in front, so Android's request can go out now.
+    private var askSince = 0L
+    private var awaitingRole = false
+    private var declined = false
+    private var inFront = false
+    private var broughtBack = false
+    private val ask = object : Runnable {
+        override fun run() {
+            if (askSince == 0L) return
+            val since = System.currentTimeMillis() - askSince
+            if (!HomeAsk.readyToAsk(HomeRole.aliasListed(this@SetupActivity), since, inFront && hasWindowFocus())) {
+                if (inFront) main.postDelayed(this, 250)   // not in front: onResume or the window coming back asks
+                return
+            }
+            askSince = 0L
+            if (!HomeRole.held(this@SetupActivity)) awaitingRole = HomeRole.request(this@SetupActivity) == HomeRole.Asked.ROLE
+            refresh()
+        }
+    }
+    // Something came on top while waiting (Google's home put an empty black screen there on a TCL): bring
+    // this screen back once, so the question is not left behind it. If Android does not allow that, the
+    // note says to press Back, and the question goes out when this screen is back.
+    private val bringBack = Runnable {
+        if (askSince > 0 && !inFront && !broughtBack) {
+            broughtBack = true
+            runCatching { startActivity(Intent(this, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) }
+        }
+    }
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
@@ -83,10 +115,13 @@ class SetupActivity : Activity() {
         main1.addView(openHome)
         main1.addView(button("New phone code") { Auth.newPin(); refresh() })
         homeBtn = button("") {
+            if (askSince > 0) return@button   // already asking
             val on = !App.homeEnabled(this)
+            declined = false
             App.setHomeEnabled(this, on); FireHome.poke()
-            // No computer: Android's own "default home app" request (plain Android TV 10+), else its Home chooser
-            if (on && !HomeRole.googleTv(this) && !HomeRole.held(this)) HomeRole.request(this)
+            // No computer: Android's own "default home app" request (plain Android TV 10+), else its Home chooser.
+            // Not at once: Android needs a moment to take in the alias just switched on (HomeAsk.kt).
+            if (on && !HomeRole.googleTv(this) && !HomeRole.held(this)) { askSince = System.currentTimeMillis(); broughtBack = false; main.post(ask) }
             refresh(); updateOpenHome()
         }
         main1.addView(homeBtn)
@@ -112,6 +147,9 @@ class SetupActivity : Activity() {
             (if (android.os.Build.VERSION.SDK_INT >= 33) "This TV runs Android 13 or newer: use Wireless debugging, then Pair device with pairing code, and type that code on your phone at the setup page. " else "") +
             "Careful: never press Revoke USB debugging authorisations.", 14f, CREAM_2).apply { setPadding(0, px(14), 0, 0) })
         more.addView(text("Couch TV cannot turn the TV on: once the TV sleeps, this app sleeps too. Use the TV's own remote.", 14f, CREAM_2))
+        // the phone only download: the exact way to the Home button watch, from a computer (SetupWords.watchSteps)
+        watchNote = text("", 14f, CREAM_2).apply { setPadding(0, px(10), 0, 0) }
+        if (BuildConfig.BUILD_TYPE != "watch") more.addView(watchNote)
         setup = text("", 14f, AMBER); more.addView(setup)
         col.addView(more)
         setContentView(ScrollView(this).apply { setBackgroundColor(GROUND); addView(col) })
@@ -119,10 +157,30 @@ class SetupActivity : Activity() {
         if (Auth.currentPin() == null && Auth.phoneCount() == 0) Auth.newPin()
     }
 
-    override fun onResume() { super.onResume(); Auth.onPin(pinListener); main.post(tick); updateOpenHome() }
-    override fun onPause() { super.onPause(); Auth.offPin(pinListener); main.removeCallbacks(tick) }
+    override fun onResume() {
+        super.onResume(); inFront = true
+        Auth.onPin(pinListener); main.post(tick); updateOpenHome()
+        if (askSince > 0) { main.removeCallbacks(ask); main.post(ask) }
+    }
+    override fun onPause() {
+        super.onPause(); inFront = false
+        Auth.offPin(pinListener); main.removeCallbacks(tick)
+        if (askSince > 0) main.postDelayed(bringBack, 1500)
+    }
+    override fun onWindowFocusChanged(has: Boolean) {
+        super.onWindowFocusChanged(has)
+        if (has && askSince > 0) { main.removeCallbacks(ask); main.post(ask) }
+    }
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data); refresh()
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == HomeRole.REQUEST && awaitingRole) {
+            awaitingRole = false
+            // Android's answer decides, not the button press: Cancel (or Back) leaves the TV's home as it was,
+            // so the alias goes off again and the button says Use as home screen.
+            if (!HomeAsk.keepAliasOn(HomeRole.held(this))) { App.setHomeEnabled(this, false); FireHome.poke(); declined = true }
+            updateOpenHome()
+        }
+        refresh()
     }
     override fun onNewIntent(i: Intent) { super.onNewIntent(i); refresh() }
 
@@ -159,10 +217,14 @@ class SetupActivity : Activity() {
         val s = Adb.status()
         adb.text = SetupWords.keysLine(Adb.connected, s["state"] == "waiting_for_allow" || s["state"] == "connecting", s["state"] == "needs_pairing")
         val google = HomeRole.googleTv(this)
-        homeBtn.text = if (App.homeEnabled(this)) "Stop being the home screen" else "Use as home screen"
+        val watchApk = BuildConfig.BUILD_TYPE == "watch"
+        val asking = askSince > 0 || awaitingRole
+        homeBtn.text = HomeAsk.buttonLabel(App.homeEnabled(this), asking)
         // On Google TV the Home button stays Google's: the button would only confuse, unless it is on (so it can be switched off)
         homeBtn.visibility = if (google && !App.homeEnabled(this)) View.GONE else View.VISIBLE
-        homeNote.text = SetupWords.homeNote(App.homeEnabled(this), HomeRole.held(this), google)
+        homeNote.text = SetupWords.homeNote(App.homeEnabled(this), HomeRole.held(this), google, watchApk = watchApk,
+            googleHome = HomeRole.googleHome(this), asking = asking, declined = declined && !App.homeEnabled(this))
+        if (!watchApk) watchNote.text = SetupWords.watchSteps(ip)
     }
 
     /** The phone address as a QR code (Qr.kt, the same code as the home page draws), black on white with a quiet zone. */

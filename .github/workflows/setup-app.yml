@@ -57,7 +57,10 @@ jobs:
       - name: Build
         run: |
           SEP=$(python -c "import os; print(os.pathsep)")
+          # the release's version in the program's file details (Windows), not PyInstaller's 0.0.0
+          python stamp_version.py windows-file version.txt
           pyinstaller --noconfirm --windowed --name "couch-tv Setup" \
+            --version-file version.txt \
             --osx-bundle-identifier app.couchtv.setup \
             --add-data "couchtv_setup/web${SEP}couchtv_setup/web" \
             --add-data "THIRD-PARTY.md${SEP}." \
@@ -75,6 +78,8 @@ jobs:
           # No Dock icon or window of its own: the setup is the browser page, and the app stops by
           # itself on Close setup or a few minutes after the page is closed.
           plutil -insert LSUIElement -bool true "$APP/Contents/Info.plist"
+          # the release's version (Finder, Get Info), not PyInstaller's 0.0.0; before codesign
+          python stamp_version.py mac-plist "$APP/Contents/Info.plist"
           # Ad hoc signature only (no paid Apple account): macOS asks once, see setup-app/README.md.
           codesign --force --deep --sign - "$APP"
           echo "PROGRAM=$APP/Contents/MacOS/couch-tv Setup" >> "$GITHUB_ENV"

@@ -61,6 +61,22 @@ class IcalTest {
         assertEquals(1, lookups)
     }
 
+    @Test fun triesEachCheckedAddressInOrder() {
+        // Fable review of 0.13.4: only the first address was dialled, so a dead first address (an IPv6
+        // one on a TV with no IPv6) lost the calendar. Each checked address is tried in turn, no others.
+        val dialled = mutableListOf<String>()
+        val got = Ical.read("https://cal.example/x.ics", ip("2001:db8::1", "93.184.216.34", "93.184.216.35"), Ical.Fetch { _, at ->
+            dialled += at.hostAddress!!
+            if (at.hostAddress!!.contains(":")) throw java.net.ConnectException("no route")
+            Ical.Answer(200, null, "BEGIN:VCALENDAR".toByteArray())
+        })
+        assertTrue(got.first)
+        assertEquals(2, dialled.size)
+        assertEquals("93.184.216.34", dialled[1])
+        val none = Ical.read("https://cal.example/x.ics", ip("93.184.216.34", "93.184.216.35"), Ical.Fetch { _, _ -> throw java.io.IOException("down") })
+        assertEquals(Pair(false, "unreachable"), none)
+    }
+
     @Test fun aRedirectIsCheckedAndPinnedAgain() {
         val dns = mapOf("a.example" to "93.184.216.34", "b.example" to "93.184.216.35", "home.example" to ("172." + "16.0.9"))
         val resolve: (String) -> List<InetAddress> = { h -> listOf(InetAddress.getByName(dns.getValue(h))) }

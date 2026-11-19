@@ -39,26 +39,44 @@ if ($Here -like "*\Temp\*" -or -not (Test-Path $Wgt)) {
 }
 
 # ---- 1. the install tool ----
-if (-not (Test-Path $Cli)) {
-  $Arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "x64" }
+# The download is kept and checked against its SHA-256 every time, and the tool is unpacked again
+# from it, so a tool changed on this computer after the first run is never used.
+$Arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "x64" }
+$Zip = Join-Path $Tools "cli-$Arch.zip"
+New-Item -ItemType Directory -Force -Path $Tools | Out-Null
+function Get-Sha($path) { if (Test-Path $path) { (Get-FileHash -Algorithm SHA256 $path).Hash.ToLower() } else { "" } }
+if ((Get-Sha $Zip) -ne $Sha[$Arch]) {
+  if (Test-Path $Zip) { Remove-Item $Zip -Force }
   Write-Host "Downloading Apps2Samsung's free install tool ($A2SVersion, about 35 MB) from GitHub..."
-  New-Item -ItemType Directory -Force -Path $Tools | Out-Null
-  $Zip = Join-Path $Tools "cli.zip"
   try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Apps2Samsung/Apps2Samsung/releases/download/v$A2SVersion/Apps2Samsung.Cli-v$A2SVersion-win-$Arch.zip" -OutFile $Zip
   } catch {
+    if (Test-Path $Zip) { Remove-Item $Zip -Force }
     Stop-Setup "The download did not work. Check the computer is online, then run this again."
   }
-  $Got = (Get-FileHash -Algorithm SHA256 $Zip).Hash.ToLower()
-  if ($Got -ne $Sha[$Arch]) {
+  if ((Get-Sha $Zip) -ne $Sha[$Arch]) {
     Remove-Item $Zip -Force
     Stop-Setup "The download was not the expected file, so it was not used. Run this again later."
   }
-  Expand-Archive -Force -Path $Zip -DestinationPath $Tools
-  Remove-Item $Zip -Force
   Write-Host "Done."
   Write-Host ""
+}
+if (Test-Path $Cli) { Remove-Item $Cli -Force }
+Expand-Archive -Force -Path $Zip -DestinationPath $Tools
+
+# Runs the tool and gives back only what it printed (its standard output). Windows PowerShell 5.1
+# turns anything a program writes to its error output into an error, and with
+# $ErrorActionPreference = "Stop" that ends the setup, even when the error output is thrown away. So for this one call the
+# preference is Continue and the error lines are dropped.
+function Invoke-CliOutput {
+  $before = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    & $Cli @args 2>&1 | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } | Out-String
+  } finally {
+    $ErrorActionPreference = $before
+  }
 }
 
 # ---- 2. the TV ----
@@ -66,7 +84,7 @@ Write-Host "Looking for Samsung TVs on your Wi-Fi (about 10 seconds)..."
 $MyIp = ""
 $Found = @()
 try {
-  $Scan = (& $Cli scan --json 2>$null | Out-String) | ConvertFrom-Json
+  $Scan = (Invoke-CliOutput scan --json) | ConvertFrom-Json
   $MyIp = [string]$Scan.localIp
   foreach ($t in @($Scan.tvs)) {
     $ip = @($t.ip, $t.address, $t.host) | Where-Object { $_ } | Select-Object -First 1

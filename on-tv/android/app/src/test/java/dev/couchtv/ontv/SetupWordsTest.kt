@@ -35,4 +35,42 @@ class SetupWordsTest {
     @Test fun googleTvSaysHomeStaysGoogles() {
         assertTrue(SetupWords.homeNote(true, false, true).contains("Home button always opens Google TV"))
     }
+
+    @Test fun phoneOnlyDownloadSaysHomeStaysGooglesAndWhereTheWatchIs() {
+        // TCL beginner test, 0.13.3: Home kept opening Google's home with no warning on the TV
+        val gtv = SetupWords.homeNote(true, false, true, watchApk = false)
+        assertTrue(gtv.contains("That is expected"))
+        assertTrue(gtv.contains("see More, Home button from a computer"))
+        // Google's Android TV Home (a TCL): Couch TV held the home role, Home still opened Google's
+        val tcl = SetupWords.homeNote(true, true, false, watchApk = false, googleHome = true)
+        assertTrue(tcl.startsWith("Couch TV is your home screen"))
+        assertTrue(tcl.contains("that is expected with the phone only download"))
+        // a TV with no Google home, or the watch APK: no warning
+        assertEquals("Couch TV is your home screen. Press Home on the remote to see it.", SetupWords.homeNote(true, true, false))
+        assertEquals("Couch TV is your home screen. Press Home on the remote to see it.",
+            SetupWords.homeNote(true, true, false, watchApk = true, googleHome = true))
+        assertTrue(SetupWords.homeNote(true, false, true, watchApk = true).contains("Couch TV home watch"))
+    }
+
+    @Test fun theWatchStepsAreExact() {
+        val s = SetupWords.watchSteps("192.0.2.24")
+        assertTrue(s.contains("couch-tv-ontv-watch.apk from github.com/Seagey/couch-tv/releases/latest"))
+        assertTrue(s.contains("adb connect 192.0.2.24:5555"))
+        assertTrue(s.contains("adb install -r couch-tv-ontv-watch.apk"))
+        assertTrue(s.contains("keeps your settings"))
+        assertTrue(s.contains("Couch TV home watch, On"))
+        assertTrue(SetupWords.watchSteps(null).contains("adb connect the TV's address:5555"))
+    }
+
+    @Test fun askingAndCancelSayWhatHappened() {
+        assertTrue(SetupWords.homeNote(true, false, false, asking = true).contains("press Back once"))
+        assertTrue(SetupWords.homeNote(false, false, false, declined = true).startsWith("Couch TV is not your home screen"))
+    }
+
+    @Test fun noLongDashesOrHedges() {
+        val all = listOf(SetupWords.watchSteps("192.0.2.24"), SetupWords.homeNote(true, false, true), SetupWords.homeNote(true, true, false, googleHome = true),
+            SetupWords.homeNote(true, false, false, asking = true), SetupWords.homeNote(false, false, false, declined = true),
+            SetupWords.homeNote(true, false, true, watchApk = true))
+        all.forEach { assertFalse(it, Regex("[–—]|\\bBeta\\b|coming soon", RegexOption.IGNORE_CASE).containsMatchIn(it)) }
+    }
 }

@@ -71,7 +71,14 @@ object Ical {
         for (hop in 0..3) {
             val u = URL(at)
             val addresses = publicAddresses(u.host, resolve) ?: return Pair(false, "that address is not on the internet")
-            val a = try { fetch.get(u, addresses.first()) } catch (e: Exception) { return Pair(false, "unreachable") }
+            // every address was checked: try them in order, so one that does not answer (an IPv6 address
+            // on a TV with no IPv6, say) does not stop the calendar when the next one works
+            var a: Answer? = null
+            for (addr in addresses) {
+                a = try { fetch.get(u, addr) } catch (e: Exception) { null }
+                if (a != null) break
+            }
+            if (a == null) return Pair(false, "unreachable")
             if (a.code in 300..399) {
                 val next = a.location ?: return Pair(false, "http ${a.code}")
                 at = checkUrl(try { URL(URL(at), next).toString() } catch (e: Exception) { null }) ?: return Pair(false, "not a calendar link")

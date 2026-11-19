@@ -38,6 +38,24 @@ assert.strictEqual(load("?mock=1&designstore=https%3A%2F%2Fevil.example%2Fx", {}
 assert.strictEqual(C.readCode("  abcde fghjk "), "ABCDE-FGHJK");
 assert.strictEqual(C.readCode("ABCDE-FGHJ0"), "");
 assert.strictEqual(C.readCode("http://evil"), "");
+
+// 0.13.5: the Check step (a TCL keyboard dropped a letter from "RSTFD-5EEDN"): any case, no dash needed,
+// always shown as ABCDE-FGHJK, and a short or wrong code says plainly what is wrong
+let ck = C.checkCode("rstfd5eedn");
+assert.ok(ck.ok && ck.code === "RSTFD-5EEDN" && ck.shown === "RSTFD-5EEDN", "no dash, lower case: a whole code");
+ck = C.checkCode(" Rstfd - 5eedn ");
+assert.ok(ck.ok && ck.code === "RSTFD-5EEDN", "spaces and a dash anywhere are fine");
+ck = C.checkCode("rstfd-5een");
+assert.ok(!ck.ok && ck.shown === "RSTFD-5EEN" && ck.count === 9 && /9 of the 10 letters/.test(ck.msg) && /One is missing/.test(ck.msg), "a dropped letter: 9 of 10, one missing");
+ck = C.checkCode("rstf");
+assert.ok(!ck.ok && ck.shown === "RSTF" && /6 are missing/.test(ck.msg), "a short start: no dash yet, six missing");
+ck = C.checkCode("RSTFD-5EEDO");
+assert.ok(!ck.ok && /O is never in a code/.test(ck.msg), "a letter codes never use is named");
+ck = C.checkCode("RSTFD-5EEDNN");
+assert.ok(!ck.ok && /11 letters/.test(ck.msg), "one too many");
+assert.ok(!C.checkCode("").ok && /Nothing was typed/.test(C.checkCode("").msg));
+assert.ok(C.checkCode("CTV1-" + "A".repeat(43)).ok, "the long code from the QR still works");
+for (const m of ["", "rstf", "RSTFD-5EEDO", "RSTFD-5EEDNN", "rstfd-5een"]) assert.ok(!/[–—]/.test(C.checkCode(m).msg), "no long dashes in the words");
 assert.strictEqual(C.readCode("CTV1-" + "a".repeat(43)), "CTV1-" + "a".repeat(43));
 
 // the answer: only its design; the only picture a real JPEG inside it

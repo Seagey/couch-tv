@@ -104,4 +104,14 @@ const ontvStore = fs.readFileSync(path.join(__dirname, "../on-tv/android/app/src
 ok(/fun publicConfig\(\)/.test(ontvStore) && !/design_store/.test(ontvStore), "option C: the on-TV app never sets design_store, so the default applies");
 ok(/from\(tvHomeWeb\) \{ into\("tv"\); exclude\("mock\.js"\) \}/.test(fs.readFileSync(path.join(__dirname, "../on-tv/android/app/build.gradle.kts"), "utf8")), "option C: the on-TV app carries this branch's whole TV home (design.js, the catalogue, the gate)");
 
+// 0.13.5, a TCL beginner test: Turn on couch-tv Studio said "couch-tv Studio is on" while the row above
+// still said "Off" and the button "Turn on", because the row read the gate worked out at start. The
+// choice just made wins; with none made, the gate and a design on screen decide.
+ok(G.shownOn("on", false, false) === true, "just turned on: the row says on at once");
+ok(G.shownOn("off", true, true) === false, "Back to my classic home: the row says off at once");
+ok(G.shownOn(null, true, false) === true && G.shownOn(null, false, true) === true, "nothing chosen: the gate or a design on screen");
+ok(G.shownOn(null, false, false) === false && G.shownOn("maybe", false, false) === false, "nothing chosen and nothing on: off");
+const appJs = fs.readFileSync(path.join(web, "app.js"), "utf8");
+ok(/CouchDesigner\.shownOn\(kept\(CouchDesigner\.KEY\)/.test(appJs), "Home settings reads the kept choice, not only the gate from start");
+
 console.log(`${n} couch-tv Studio opt in tests passed.`);

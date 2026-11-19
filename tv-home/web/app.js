@@ -3975,7 +3975,7 @@
   // couch-tv Studio is a name, the same in every language
   function secName(id) { return id === "designer" ? "couch-tv Studio" : t("sec_" + id); }
   function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(SECS[SET.sec][0]); }
-  function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info"; }
+  function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info" && r.kind !== "code"; }
   function firstRow(rows) { for (var i = 0; i < rows.length; i++) if (focusable(rows[i])) return i; return -1; }
   function stepRow(rows, i, d) { for (var j = i + d; j >= 0 && j < rows.length; j += d) if (focusable(rows[j])) return j; return i; }
   function indexOfKey(rows, k) { for (var i = 0; i < rows.length; i++) if (rows[i].key === k) return i; return -1; }
@@ -4146,11 +4146,42 @@
   function designCodeRows(rows) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.base()) return;
     rows.push({ kind: "input", key: "design-get", label: "Get a design", sub: "Type the code couch-tv Studio shows you", act: function () {
-      startTyping({ label: "Type the code from couch-tv Studio (like ABCDE-FGHJK)", value: "", code: true, submit: getDesignByCode });
+      typeDesignCode("");
     } });
     if (DESIGN_FROM_CODE) rows.push({ kind: "action", key: "design-forget", label: "Remove the design I got", sub: "Back to the home as it was", act: function () {
       CouchDesignCode.forget(); SET.dirty = true; SET.msg = "Removed. The home goes back to how it was when you close Home settings.";
     } });
+  }
+  // A design code typed with the remote: a TV's on-screen keyboard can drop a letter typed fast (a TCL,
+  // 19 Nov 2026). While typing, the line under the box shows the code as ABCDE-FGHJK and how many of
+  // the 10 letters are in; OK then shows it big on a Check page before anything is sent. Case, spaces
+  // and the dash do not matter.
+  function typeDesignCode(value) {
+    startTyping({ label: "Type the code from couch-tv Studio (like ABCDE-FGHJK). The dash is not needed.", value: value || "", code: true,
+      live: showCodeSoFar, submit: checkDesignCode });
+    showCodeSoFar(value || "");
+  }
+  function showCodeSoFar(v) {
+    var c = CouchDesignCode.checkCode ? CouchDesignCode.checkCode(v) : null, el = $("set-type-check");
+    if (!el || !c) return;
+    el.textContent = !c.count ? "" : c.ok ? c.shown + "   all 10 letters" : c.shown + "   " + Math.min(c.count, 99) + " of 10 letters";
+  }
+  function checkDesignCode(typed) {
+    var c = CouchDesignCode.checkCode ? CouchDesignCode.checkCode(typed) : { ok: true, code: typed, shown: typed };
+    SET.sub = { back: "design-get", crumb: "couch-tv Studio", title: function () { return "Check the code"; },
+      rows: function () { return codeCheckRows(c, typed); } };
+    SET.col = "rows"; SET.keyFocus = c.ok ? "code-get" : "code-again"; SET.ri = 0;
+    SET.msg = "";
+  }
+  function codeCheckRows(c, typed) {
+    var rows = [{ kind: "code", key: "code-shown", label: c.shown || " ", sub: c.ok ? "Is this the code on your phone? Check each letter." : c.msg }];
+    if (c.ok) rows.push({ kind: "action", key: "code-get", label: "Yes, get this design", sub: "The TV asks you about it before it changes anything", act: function () {
+      SET.sub = null; SET.keyFocus = "design-get"; getDesignByCode(c.code);
+    } });
+    rows.push({ kind: "action", key: "code-again", label: "Type it again", sub: c.ok ? "Fix a letter" : "What you typed stays in the box, so you can fix it", act: function () {
+      SET.sub = null; SET.keyFocus = "design-get"; typeDesignCode(c.ok ? c.shown : String(typed || "").trim());
+    } });
+    return rows;
   }
   function getDesignByCode(typed) {
     SET.msg = "Getting the design...";
@@ -4174,8 +4205,9 @@
     SET.dirty = true;
   }
   function designerRows() {
-    var rows = [], on = GATE.on || (typeof CouchDesign !== "undefined" && CouchDesign.on());
     if (typeof CouchDesigner === "undefined") return [info("dz-none", "couch-tv Studio", "", "Not in this version of the home.")];
+    // the choice kept just now wins over GATE, which is only worked out when the home starts
+    var rows = [], on = !!GATE.preview || CouchDesigner.shownOn(kept(CouchDesigner.KEY), GATE.on, typeof CouchDesign !== "undefined" && CouchDesign.on());
     if (!on) {
       rows.push(info("dz-off", "couch-tv Studio", "Off", "Design your home on your phone, then send it to this TV. While it is off, your home stays exactly as it is."));
       rows.push({ kind: "action", key: "dz-turn-on", label: "Turn on couch-tv Studio", sub: "Nothing changes until you choose a design", act: function () {
@@ -4923,6 +4955,7 @@
     SET.typing = spec;
     var inp = $("set-input");
     $("set-type-label").textContent = spec.label;
+    var chk = $("set-type-check"); if (chk) chk.textContent = "";
     inp.value = spec.value || "";
     inp.type = spec.url ? "url" : "text";
     inp.setAttribute("enterkeyhint", spec.search ? "search" : "done");
@@ -5043,6 +5076,10 @@
   // ---- drawing it ----
   function rowHTML(r, i) {
     if (r.kind === "head") return '<div class="shead">' + esc(r.label) + "</div>";
+    // a design code shown big, one box per letter, so a missing or wrong letter stands out
+    if (r.kind === "code") return '<div class="scode" aria-label="' + esc(r.label) + '"><span class="scode-big">' +
+      String(r.label).split("").map(function (ch) { return ch === "-" ? '<i class="dash">-</i>' : "<i>" + esc(ch) + "</i>"; }).join("") +
+      "</span>" + (r.sub ? "<small>" + esc(r.sub) + "</small>" : "") + "</div>";
     var f = SET.col === "rows" && i === SET.ri, lifted = SET.lift === r.key;
     var cls = "srow k-" + r.kind + (f ? " focus" : "") + (lifted ? " lifted" : "") + (r.danger ? " danger" : "");
     var lead = "";
