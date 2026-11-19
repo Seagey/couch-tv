@@ -204,6 +204,8 @@ S.en = {
   stay_note: 'Paste your bookings calendar link (export or sync calendar) to send it to the TV. It stays on the TV only.',
   stay_sent: 'Sent. The TV reads the bookings now and greets each guest.',
   stay_bad: 'That is not a calendar link. It starts with https://.',
+  err_guest_name_required: "Type the guest's name, or leave it empty to show just Welcome.",
+  err_not_calendar_link: "That is not a calendar link. It starts with https://, or is a calendar app's own link.",
   // first open
   whos_phone: 'Who’s this phone for?',
   onboard_note: '“Keep watching” and suggestions follow whoever is watching. You can swap at the top any time.',
@@ -778,6 +780,8 @@ S['zh-CN'] = {
   stay_note: "粘贴你的预订日历链接（导出或同步日历），发送到电视。它只保存在电视上。",
   stay_sent: "已发送。电视正在读取预订，并会欢迎每位客人。",
   stay_bad: "这不是日历链接。它以 https:// 开头。",
+  err_guest_name_required: "请输入客人姓名，或留空只显示“欢迎”。",
+  err_not_calendar_link: "这不是日历链接。它以 https:// 开头，或是日历应用自己的链接。",
   // first open
   whos_phone: '这部手机主要谁用？',
   onboard_note: '「继续观看」和建议会跟随当前观看者。随时可在顶部切换。',
@@ -2466,6 +2470,8 @@ S.pl = {
   stay_note: "Wklej link do kalendarza rezerwacji (eksport lub synchronizacja kalendarza), aby wysłać go do telewizora. Zostaje tylko na telewizorze.",
   stay_sent: "Wysłano. Telewizor czyta teraz rezerwacje i wita każdego gościa.",
   stay_bad: "To nie jest link do kalendarza. Zaczyna się od https://.",
+  err_guest_name_required: "Wpisz imię gościa albo zostaw puste, aby pokazać samo Witaj.",
+  err_not_calendar_link: "To nie jest link do kalendarza. Zaczyna się od https:// albo jest linkiem aplikacji kalendarza.",
   // first open
   whos_phone: 'Czyj to telefon?',
   onboard_note: '„Kontynuuj oglądanie” i propozycje dopasowują się do tego, kto ogląda. Osobę możesz zmienić u góry w każdej chwili.',

@@ -40,7 +40,7 @@ The steps in docs/SETUP.md are numbered 1 to 6. Option A uses steps 1, 2 and 6. 
    `python3-venv` or use `uv venv --seed .venv` instead. On a Mac the first `python3` or `git` may pop up "install the command line
    developer tools": tell them to press Install and wait a few minutes. That is normal.
 2. **Get the TV apps from the Releases page first.** Download `couch-tv-home.apk` (options A
-   and B) and `couch-tv-ontv.apk` (option C) from
+   and B) and `couch-tv-ontv.apk` (option C; on a Fire TV or for the Xiaomi PatchWall switch, `couch-tv-ontv-watch.apk`, which adds the home watch) from
    [the GitHub Releases page](https://github.com/Seagey/couch-tv/releases) into `dist/` (git
    ignores it), for example `curl -fL -o dist/couch-tv-home.apk
    https://github.com/Seagey/couch-tv/releases/latest/download/couch-tv-home.apk`. Only if that
