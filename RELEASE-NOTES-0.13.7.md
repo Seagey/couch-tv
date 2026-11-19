@@ -34,6 +34,12 @@ Both were checked on a real 2021 Frame.
 
 - **Design codes:** the line under the code box said "10 of 10 letters" with a stray `_` still in the box. It now says to take the mark out.
 
+### From the community
+
+- **The Loop look and YouTube video cards, thanks mattxlau** ([#288](https://github.com/Seagey/couch-tv/pull/288)). Loop is a fourth look next to Night, Classic and OLED: one video of a place, looping, graded for four times of day, with the clock and a few icons set over it. The bridge computer makes the video from a clip or a photo with `scripts/make-loop.sh` (it needs ffmpeg 7), so it is for option B; [docs/LOOP.md](docs/LOOP.md) has the steps. A YouTube video card in Keep watching now opens that exact video, with its own picture, instead of searching for its title.
+- **A quick menu on the Settings key, thanks Gil124** ([#286](https://github.com/Seagey/couch-tv/pull/286)). The remote's Settings button and the gear tile open a menu with Wi-Fi, Bluetooth and Screen off next to Home settings and TV settings, where the TV can open them. It now opens above the gear tile when the dock shows one, not above whichever tile had the focus. `app_keys` can send a button to this menu (`"scan66:gear"`), for a remote whose Settings button Android never reads as Settings (an XGIMI projector).
+- **Move plays a Disney+ film that comes up as its Sing-Along, thanks FromTheGods** ([#285](https://github.com/Seagey/couch-tv/pull/285)). Disney+ links "Tangled" to "Tangled Sing-Along". Move now opens that page, picks the plain film and plays it, and presses nothing when it cannot be sure.
+
 ### Files
 
 `couch-tv-home.apk` (the TV home, options A and B), `couch-tv-ontv.apk` (option C, the phone only download), `couch-tv-ontv-watch.apk` (option C with the home watch, from a computer), `couch-tv-sync.apk` (two TVs in sync, unchanged since 0.13), `couch-tv-samsung-setup.zip` and `couch-tv-samsung.wgt` (Samsung), with `SHA256SUMS.txt`. The Setup app zips for Mac (Apple silicon and Intel) and Windows are built on GitHub when the release is published, with their own `SHA256SUMS-setup.txt`.
