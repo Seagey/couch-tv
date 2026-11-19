@@ -49,7 +49,7 @@ class UpdateRulesTest {
         assertTrue(phone.contains("8180170"))
         assertTrue(phone.contains("github.com/Seagey/couch-tv/releases/latest/download/couch-tv-ontv.apk"))
         assertTrue(UpdateRules.how(false).contains("cannot install an update by itself"))
-        assertTrue(phone.contains("If it says App not installed, the TV is short of space"))   // a real TCL, 20 Nov 2026
+        assertTrue(phone.contains("If it says App not installed, the TV is usually short of space"))   // a real TCL, 20 Nov 2026
         assertTrue(UpdateRules.steps(watch = false).size <= 8)   // the page shows 8 steps at most
         val computer = UpdateRules.steps(watch = true).joinToString(" ")
         assertTrue(computer.contains("adb install -r couch-tv-ontv-watch.apk"))

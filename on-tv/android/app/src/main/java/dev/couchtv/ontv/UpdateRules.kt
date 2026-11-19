@@ -86,7 +86,7 @@ object UpdateRules {
             "Press Install, then Done. Your settings stay.",
             // a real TCL, 20 Nov 2026: Downloader kept five old copies, the TV ran short of space,
             // and Android said only "App not installed"
-            "If it says App not installed, the TV is short of space. In Downloader, open Files, delete the old couch-tv-ontv files, then type $CODE again.",
+            "If it says App not installed, the TV is usually short of space. In Downloader, open Files, delete the old couch-tv-ontv files, then type $CODE again.",
             "Open Couch TV again from your apps.",
             "If the code gives the version you already have, type this address in the box instead: github.com/$REPO/releases/latest/download/$ASSET")
 }

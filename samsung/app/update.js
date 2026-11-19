@@ -81,29 +81,35 @@
   // now: the time; asked: someone pressed Check for updates now (no once-a-day limit, no note)
   function check(now, asked) {
     var st = read();
+    if (!asked && st.auto === false) return;   // Tell me off: no note and no look by itself
     if (!asked && st.latest && newer(st.latest, MINE) && now - (st.shown || 0) > DAY) {
       st.shown = now; save(st); show(st.latest);
     }
-    if (!asked && (st.auto === false || now - (st.checked || 0) < DAY)) return;
+    // "tried" keeps the look to once a day even when it fails; "checked" is only a look that answered,
+    // so a failed one never reads "This is the latest version"
+    if (!asked && now - (st.tried || st.checked || 0) < DAY) return;
     if (typeof navigator !== "undefined" && navigator.onLine === false) { error = "net"; tell(); return; }
-    st.checked = now; save(st);
+    st.tried = now; save(st);
     busy = "checking"; error = ""; tell();
     var x = new XMLHttpRequest();
-    x.open("GET", "https://api.github.com/repos/" + REPO + "/releases/latest");
-    x.setRequestHeader("Accept", "application/vnd.github+json");
-    x.withCredentials = false;
-    x.timeout = 15000;
     x.onload = function () {
       busy = "";
       if (x.status !== 200 || x.responseText.length > 400000) { error = "net"; tell(); return; }
       var latest = fromRelease(x.responseText), s = read();
       s.latest = latest;
+      s.checked = Date.now();
       save(s);
       tell();
       if (!asked && latest && newer(latest, MINE) && Date.now() - (s.shown || 0) > DAY) { s.shown = Date.now(); save(s); show(latest); }
     };
     x.onerror = x.ontimeout = function () { busy = ""; error = "net"; tell(); };
-    x.send();
+    try {
+      x.open("GET", "https://api.github.com/repos/" + REPO + "/releases/latest");
+      x.setRequestHeader("Accept", "application/vnd.github+json");
+      x.withCredentials = false;
+      x.timeout = 15000;
+      x.send();
+    } catch (e) { busy = ""; error = "net"; tell(); }
   }
 
   window.CouchSamsungUpdate = { newer: newer, fromRelease: fromRelease, words: words, state: state };

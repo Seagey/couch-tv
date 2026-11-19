@@ -2355,10 +2355,12 @@
       // sat on the left and only Up from the clock on the right reached it (a TCL, 20 Nov 2026).
       var vw = window.innerWidth || 1920, vh = window.innerHeight || 1080;
       var gx = gs ? (gs.box.l + gs.box.r) / 2 : 0, gy = gs ? (gs.box.t + gs.box.b) / 2 : 0;
-      var shown = gs && gs.box.r - gs.box.l > 1 && gs.box.b - gs.box.t > 1;   // hidden until reached: no size
+      // tucked (hidden until reached, opacity 0, still a 64x64 box): never a stop for arrow geometry
+      var shown = gs && !gs.el.classList.contains("cw-gear-tuck");
       function towardGear() { return (dy < 0 && gy < vh / 2) || (dy > 0 && gy >= vh / 2) || (dx > 0 && gx >= vw / 2) || (dx < 0 && gx < vw / 2); }
       if (gs && cur && cur.id === GEAR_ID) {
-        if (!rest.length || towardGear()) return false;
+        // toward the gear's own edge does nothing, unless it is the way back to where the remote came from
+        if (!rest.length || (towardGear() && !(last && last.to.id === GEAR_ID && last.dir === (-dx) + "," + (-dy)))) return false;
         var fromGear = shown ? step(boxesOf(S), cur, last, dx, dy) : { moved: false };
         if (fromGear.moved && fromGear.cur.id !== GEAR_ID) { cur = fromGear.cur; last = fromGear.last; paint(); return true; }
         var near = rest.slice().sort(function (a, b) { return Math.hypot((a.box.l + a.box.r) / 2 - gx, (a.box.t + a.box.b) / 2 - gy) - Math.hypot((b.box.l + b.box.r) / 2 - gx, (b.box.t + b.box.b) / 2 - gy); })[0];
@@ -2533,7 +2535,7 @@
       if (tipShown || DESIGNER || PREVIEW) return;
       tipShown = true;
       try { if (localStorage.getItem(TIP_USED)) return; } catch (e) {}
-      var t = h("div", "cw-tip cw-tip-settings", null, ["Hold OK for apps and settings, or go Up or Right to the edge of the screen for the Settings gear. The remote's own Settings button opens the TV's menu."]);
+      var t = h("div", "cw-tip cw-tip-settings", null, ["Hold OK for apps and settings, or go to the Settings gear at the edge of the screen. The remote's own Settings button opens the TV's menu."]);
       document.body.appendChild(t);
       setTimeout(function () { t.style.opacity = "0"; setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 700); }, 9000);
     }

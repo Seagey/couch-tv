@@ -77,6 +77,31 @@ for (const id of ["welcome", "bento"]) {
   ok(!page.errors.length, id + ": no page errors (" + page.errors.join(" | ") + ")");
   await page.close();
 }
+{ // a tucked gear (Packed Bento: hidden until reached) is no stop for the arrows, as in 0.13.6
+  const page = await home(preset("bento"));
+  const go = async (id, i, key) => {
+    await page.evaluate(([a, b]) => window.CouchDesign.nav.focus(a, b), [id, i]); await page.waitForTimeout(120);
+    await page.keyboard.press(key); await page.waitForTimeout(150);
+    return page.evaluate(() => window.CouchDesign.nav.current());
+  };
+  const r1 = await go("today", -1, "ArrowRight");
+  ok(r1 && r1.id !== "__gear", "bento: Right from Today does not land on the hidden gear (" + JSON.stringify(r1) + ")");
+  const r2 = await go("apps", 0, "ArrowUp");
+  ok(r2 && r2.id !== "__gear", "bento: Up from the first app does not land on the hidden gear (" + JSON.stringify(r2) + ")");
+  const r3 = await go("today", -1, "ArrowUp");
+  ok(r3 && r3.id === "__gear", "bento: Up at the top edge still reaches it (" + JSON.stringify(r3) + ")");
+  await page.close();
+}
+{ // a gear on the right edge (Morning): Down onto it, then Up goes back the way it came
+  const page = await home(preset("morning"));
+  await page.evaluate(() => window.CouchDesign.nav.focus("hourly", -1)); await page.waitForTimeout(120);
+  await page.keyboard.press("ArrowDown"); await page.waitForTimeout(150);
+  const on = await page.evaluate(() => window.CouchDesign.nav.current());
+  await page.keyboard.press("ArrowUp"); await page.waitForTimeout(150);
+  const back = await page.evaluate(() => window.CouchDesign.nav.current());
+  ok(on.id === "__gear" && back.id === "hourly", "morning: Down onto the gear, Up back to the hourly card (" + JSON.stringify([on, back]) + ")");
+  await page.close();
+}
 { // room at the top right: it stays there, always shown
   const open = { v: 1, background: { colour: "#26303f" }, objects: [{ id: "w0", type: "widget", kind: "welcome", x: 80, y: 60, w: 1160, h: 260 }, { id: "w1", type: "widget", kind: "clock", x: 1380, y: 360, w: 460, h: 160 }] };
   const page = await home(open);
