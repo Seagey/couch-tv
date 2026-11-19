@@ -3,7 +3,8 @@
     python3 tvos/make-project.py
 
 The result is committed; run this again after adding or removing a Swift file. The scene pictures and the
-app logos are not copied into tvos/: a build step copies them from tv-home/web/backgrounds (scene-*, never your
+app logos are not copied into tvos/: a build step copies them from tv-home/web/backgrounds (the scenes and the
+built in backgrounds a couch-tv Studio design may name, never your
 own pictures in mine/) and remote/src/app-logos, so every couch-tv home shows the same ones. Signing settings are not in the project:
 they come from tvos/Config/Base.xcconfig and your own Signing.mine.xcconfig (git ignores it).
 """
@@ -18,7 +19,7 @@ PROJ = os.path.join(HERE, "CouchTV.xcodeproj")
 COPY_PICTURES = """set -e
 dest="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
 mkdir -p "$dest"
-cp "${SRCROOT}/../tv-home/web/backgrounds/"scene-*.jpg "${SRCROOT}/../tv-home/web/backgrounds/"scene-*.webp "$dest/"
+cp "${SRCROOT}/../tv-home/web/backgrounds/"*.jpg "${SRCROOT}/../tv-home/web/backgrounds/"scene-*.webp "$dest/"
 cp "${SRCROOT}/../remote/src/app-logos/"*.png "$dest/"
 """
 

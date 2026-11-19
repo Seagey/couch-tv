@@ -15,6 +15,10 @@
 			isa = PBXBuildFile;
 			fileRef = A3CB2022DF88CD57B17A949E;
 		};
+		45E2121299B8A8056C15DE26 = {
+			isa = PBXBuildFile;
+			fileRef = D06ED2A05FF33678EEEECF9F;
+		};
 		48941E0A3017E09001C924D9 = {
 			isa = PBXBuildFile;
 			fileRef = 88061402747C56CD1815B3DE;
@@ -54,6 +58,14 @@
 		C7D8F91960974694AB0DF15E = {
 			isa = PBXBuildFile;
 			fileRef = 81B537788A87C293D5E76E43;
+		};
+		D0FB41B3310C643EB4846267 = {
+			isa = PBXBuildFile;
+			fileRef = 635CBB8D5097B13D38C8941C;
+		};
+		DD9C12709551D27700C55853 = {
+			isa = PBXBuildFile;
+			fileRef = 7D90925349A4B373418D79C0;
 		};
 		E68F1143A2922C6493C86118 = {
 			isa = PBXBuildFile;
@@ -104,6 +116,18 @@
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
 			path = KidsPIN.swift;
+			sourceTree = "<group>";
+		};
+		635CBB8D5097B13D38C8941C = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = DesignStore.swift;
+			sourceTree = "<group>";
+		};
+		7D90925349A4B373418D79C0 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = DesignView.swift;
 			sourceTree = "<group>";
 		};
 		81B537788A87C293D5E76E43 = {
@@ -160,6 +184,12 @@
 			isa = PBXFileReference;
 			lastKnownFileType = file;
 			path = "CouchInter-SemiBold.ttf";
+			sourceTree = "<group>";
+		};
+		D06ED2A05FF33678EEEECF9F = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = DesignModel.swift;
 			sourceTree = "<group>";
 		};
 		D0D4344AB022A0DCEEAB2CF0 = {
@@ -231,6 +261,9 @@
 			children = (
 				C129780D08ACFC477731A673,
 				D76F38428E4458A5BADC8840,
+				D06ED2A05FF33678EEEECF9F,
+				635CBB8D5097B13D38C8941C,
+				7D90925349A4B373418D79C0,
 				FD69F6CF63D9FD42F4B3BE1D,
 				10D819C9ED8F996417A65BA8,
 				61166329589783918F1F15B2,
@@ -335,7 +368,7 @@
 			name = "Copy scenes and logos";
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\ndest=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmkdir -p \"$dest\"\ncp \"${SRCROOT}/../tv-home/web/backgrounds/\"scene-*.jpg \"${SRCROOT}/../tv-home/web/backgrounds/\"scene-*.webp \"$dest/\"\ncp \"${SRCROOT}/../remote/src/app-logos/\"*.png \"$dest/\"\n";
+			shellScript = "set -e\ndest=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmkdir -p \"$dest\"\ncp \"${SRCROOT}/../tv-home/web/backgrounds/\"*.jpg \"${SRCROOT}/../tv-home/web/backgrounds/\"scene-*.webp \"$dest/\"\ncp \"${SRCROOT}/../remote/src/app-logos/\"*.png \"$dest/\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -347,6 +380,9 @@
 			files = (
 				5830BC5CC0671EC6EE6E74AE,
 				696F194566E05EC5941B9F1A,
+				45E2121299B8A8056C15DE26,
+				D0FB41B3310C643EB4846267,
+				DD9C12709551D27700C55853,
 				4BC51BDBBA42A3D94CACBD99,
 				F0BE681D054846C6913F8FD2,
 				0C35336213867EF6CC71CD4B,

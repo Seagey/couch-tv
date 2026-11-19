@@ -36,6 +36,13 @@ final class HomeModel: ObservableObject {
     @Published var kidsUnlockedFor: String?                   // a kids profile a grown up unlocked, with nobody to move to
     @Published var pin: PinPad?                               // the parent PIN pad, while it is open
     @Published var kidPosters: [String: PlatformImage] = [:]  // shelf pictures, by show id
+    // couch-tv Studio designs (DesignModel.swift, DesignView.swift, DesignStore.swift)
+    @Published var configDesign: Design?                      // config.json "design", from the bridge
+    @Published var keptDesign: Design?                        // got by code, and said yes to
+    @Published var pendingDesign: Design?                     // got by code, waiting for "Use this design?"
+    @Published var designOff = UserDefaults.standard.bool(forKey: "design.off")     // Plain home
+    var designStore: String? = DesignCode.defaultStore        // config.json "design_store" ("" turns it off)
+    var configDesignJSON: Data?
     private var wrongs: [Date] = []
 
     let bridge: BridgeClient
@@ -49,6 +56,7 @@ final class HomeModel: ObservableObject {
         bridge = BridgeClient(link: link)
         state = link == nil ? .notSet : .connecting
         restoreCache()
+        restoreDesign()
         if offline { return }
         finder.onChange = { [weak self] found in
             guard let self else { return }
@@ -163,6 +171,7 @@ final class HomeModel: ObservableObject {
                 let cfg = try? await bridge.get("/api/config")
                 let st = try? await bridge.get("/api/settings")
                 JSON.prefs(home: cfg?["home"] as? [String: Any], settings: st?["settings"] as? [String: Any], into: &p)
+                if let cfg { readDesign(config: cfg) }
                 if p != prefs {
                     let turn = p.sceneSeconds != prefs.sceneSeconds
                     prefs = p
@@ -474,10 +483,13 @@ final class HomeModel: ObservableObject {
         var prefs: HomePrefs
         var dockLine: Int
         var kids: KidsShelf?
+        var design: Data?               // config.json's design, as the bridge sent it (checked again when read)
+        var designStore: String?
     }
 
     private func saveCache() {
-        let c = Cache(apps: apps, people: people, who: who, prefs: prefs, dockLine: dockLine, kids: kids)
+        let c = Cache(apps: apps, people: people, who: who, prefs: prefs, dockLine: dockLine, kids: kids,
+                      design: configDesignJSON, designStore: designStore ?? "")
         if let d = try? JSONEncoder().encode(c) { UserDefaults.standard.set(d, forKey: "home-cache") }
     }
 
@@ -489,6 +501,9 @@ final class HomeModel: ObservableObject {
         prefs = c.prefs
         dockLine = c.dockLine
         kids = c.kids
+        configDesignJSON = c.design
+        configDesign = c.design.flatMap(Design.read(data:))
+        if let s = c.designStore { designStore = s.isEmpty ? nil : s }
     }
 }
 

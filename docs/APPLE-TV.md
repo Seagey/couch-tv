@@ -278,6 +278,40 @@ once a show is open. In each app the child uses:
   kids mode on the last shelf, and a poster opens only Netflix or YouTube, the two apps Couch TV can open by itself.
 - **Not yet run on a real Apple TV** ([APPLE-TV-TESTING.md](APPLE-TV-TESTING.md)).
 
+## A design from couch-tv Studio
+
+Couch TV draws a couch-tv Studio design itself, in SwiftUI, from two places:
+
+- **config.json's `design`**, which the bridge hands over with the rest of the home's settings.
+- **A code typed on the Apple TV:** Settings, Home design, Get a design, then the code from couch-tv Studio
+  (ABCDE-FGHJK, or the long CTV1 one). Couch TV asks couch-tv Studio's store for it (or the `design_store` in
+  config.json), shows the design small and asks "Use this design?". Nothing of it shows until you pick Yes. It is
+  kept on the Apple TV, so it is still there after a restart, and it wins over the one in config.json.
+- **Plain home** in the same place goes back to the usual Couch TV home. **Design** turns the design back on.
+
+What shows:
+
+- The background: a built in photo or the design's own JPEG, with its darkening, zoom, blur and shade, or one
+  colour, or two colours as a straight or round fade.
+- The home's own parts where the design moved, grew, faded or hid them: the clock (12 or 24 hour), the date in
+  any of its five forms, the weather, the people switch, the sleep timer, Keep watching and the dock (as a row, a
+  column or a grid, with the design's icon size, gap, shape and labels).
+- Words in the design's font, weight, colour, shadow and alignment, and shapes: glass, solid, outline and lines,
+  with round corners.
+- Widgets drawn by Couch TV itself: the clocks (plain, tall, glass, flip, analogue, in words, world clocks), the
+  date, this month, a countdown, the weather and the big temperature, a photo or a framed picture from the design,
+  Keep watching (one card or a row), an app, a folder, a dock or a grid of apps, the people switch, quick buttons,
+  a card, a quote, a welcome, and a smart stack taking turns.
+- Every other widget (now playing, the smart home ones, news, sport, shares, the forecast by the hour or the week,
+  photo slideshows, the agenda, notes, lists, timers and the rest) shows as a tidy card with its name and symbol,
+  because Couch TV does not have their live data.
+
+The design is checked the same way as on the other TVs before anything is drawn: only known settings are read,
+numbers are kept to sensible sizes, colours are plain colours, words with a number or a web address are left
+out, and a picture is only a built in one or a JPEG inside the design. The dock can be made small, never gone,
+and Settings is always on the screen, so Plain home is always one press away. Apps open the same way as on the
+usual home, through the bridge.
+
 ## Limits, plainly
 
 - **No home screen replacement.** Apple's home stays first. Couch TV opens when the Apple TV wakes (with the bridge
