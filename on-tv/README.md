@@ -76,7 +76,8 @@ it can switch wireless debugging back on after a restart, the way Shizuku does).
 
 ## Install
 
-1. **Download `couch-tv-ontv.apk` from the GitHub Releases page** (easiest), or build it from the
+1. **Download `couch-tv-ontv.apk` from the GitHub Releases page** (easiest; on a Fire TV or a Xiaomi
+   that should use PatchWall's place, `couch-tv-ontv-watch.apk` instead), or build it from the
    repo root with `sh scripts/build-apk.sh` (JDK 21, the Android SDK and Node 20+, no Gradle
    needed; docs/SETUP.md, "Building the app"). It builds the phone remote first if `remote/dist` is
    missing, then copies the remote and the TV home page into the app, and leaves it at
@@ -114,8 +115,12 @@ Sony Bravia among them) the TV then loops at every restart
 ([docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md#if-your-tv-loops-after-a-restart)). The Couch TV tile in the app row opens
 setup, so choose **Open the home** there to see the home (it appears when the Home button doesn't already open Couch TV), or use option A's `apply.sh`, which takes
 the Home button with a watch and leaves the Google home on.
-The **Couch TV home watch** accessibility service is for Fire TV only. On any other TV it switches
-itself off when you turn it on, and that is expected.
+The **Couch TV home watch** accessibility service is for Fire TV (and the Xiaomi PatchWall switch below).
+On any other TV it switches itself off when you turn it on, and that is expected. **It is only in
+`couch-tv-ontv-watch.apk`**, which you install from a computer. The plain `couch-tv-ontv.apk` (the
+phone only download, from Downloader) leaves it out, because Google Play Protect blocks a sideloaded
+app that has an accessibility service ("App blocked to protect your device", seen on a TCL Google TV
+in November 2026). Both are the same app with the same name and key, so one installs over the other.
 If an older guide had you switch it off, switch it back on before the next restart:
 
 ```
@@ -226,7 +231,7 @@ the remote's PatchWall button and when the screen comes on. Android's default-ho
 reach either. If you would rather have Couch TV there, keep the Home button as it is and switch on
 **Couch TV in PatchWall's place** on the setup page (`http://<tv-ip>:5400/setup`; the card only
 shows on a Xiaomi). It needs the Home button watch (**Couch TV home watch** in Settings,
-Accessibility). Then:
+Accessibility), so install `couch-tv-ontv-watch.apk`. Then:
 
 - **The PatchWall button opens Couch TV.** The remote sends `KEYCODE_BUTTON_5` (scan code 580), and
   Xiaomi's `partnercustomizer` turns it into a start of PatchWall by name. The watch catches that

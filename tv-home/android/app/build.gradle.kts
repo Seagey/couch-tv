@@ -124,7 +124,9 @@ abstract class BundleTvWeb : DefaultTask() {
         }
         return mapOf(
             "people" to people,
-            "weather" to c["weather"],
+            // config.example.json's Sydney is only a sample: a build from it (the GitHub release) has no
+            // place, so the home asks for the town (Home settings, Location) instead of showing Sydney
+            "weather" to (if (file.name == "config.example.json") null else c["weather"]),
             "home" to (c["home"] ?: emptyMap<String, Any?>()),
             "tvs" to tvs,
             "default_tv" to (c["default_tv"] ?: tvs.firstOrNull()?.get("id")),

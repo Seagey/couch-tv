@@ -132,6 +132,10 @@ export const api = {
   // kids mode: the shelves, and changes to them with the parent PIN (bridge/API.md)
   kids: () => call('GET', '/api/kids', null, 20000),
   kidsChange: (body) => call('POST', '/api/kids', body, 20000),
+  // the guest's name for the TV's Welcome widget (bridge/API.md, /api/guest)
+  guest: () => call('GET', '/api/guest', null, 15000),
+  setGuest: (name) => call('POST', '/api/guest', { name }, 15000),
+  setStayLink: (url) => call('POST', '/api/guest', { stay_url: url }, 15000),
 };
 
 // Live TV state: server-sent events, with a slow poll as the fallback when the stream drops.

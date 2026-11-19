@@ -2710,6 +2710,61 @@ async def h_settings_set(request):
     return ok(settings=cleaned, updated=updated)
 
 
+# ---------- the guest's name for the Welcome widget, typed on the TV or the phone remote ----------
+# One per TV (data/guest.<tv>.json): {"name": "Sarah", "at": ms}. The newest of the TV's copy and this
+# one wins (app.js guestSync). Not in the action history or the log: a guest's name is private.
+_GUEST_BAD = re.compile(r"[:/@]|www\.", re.I)
+
+
+def guest_name(v):
+    """One line of up to 38 characters: letters, digits, spaces and ' & , . ! - (app.js and athome.js guestFull)."""
+    if not isinstance(v, str) or _GUEST_BAD.search(v):
+        return ""
+    v = re.sub(r"[\x00-\x1f\x7f\u2028\u2029]+", " ", v)
+    v = "".join(c if (c.isalnum() or c in " '&,.!-") else " " for c in v)
+    return re.sub(r"\s+", " ", v).strip()[:38].strip()
+
+
+def _guest_path():
+    return os.path.join(store.DATA, f"guest.{_current.get()}.json")
+
+
+async def h_guest_get(request):
+    return ok(guest=_guest_now())
+
+
+def _guest_now():
+    g = store._read(_guest_path(), None)
+    if not isinstance(g, dict):
+        g = {}
+    return {"name": guest_name(g.get("name") or ""), "at": int(g.get("at") or 0),
+            "stay_url": g.get("stay_url") if isinstance(g.get("stay_url"), str) else "", "stay_at": int(g.get("stay_at") or 0)}
+
+
+async def h_guest_set(request):
+    """The guest's name, and a bookings link sent from the phone (held only until the TV home takes it
+    into its own store and clears it here; never logged or put in the action history)."""
+    data = await body(request)
+    if "name" not in data and "stay_url" not in data:
+        raise ApiError(400, "name is required (an empty name clears it)", key="err_guest_name_required")
+    g = _guest_now()
+    now = int(time.time() * 1000)
+    if "stay_url" in data:
+        raw = data.get("stay_url") if isinstance(data.get("stay_url"), str) else ""
+        if raw.strip():
+            try:
+                g["stay_url"] = agenda.check_url(raw)
+            except agenda.CalendarError:
+                raise ApiError(400, "That is not a calendar link. It starts with https://, or is a calendar app's own link.", key="err_not_calendar_link")
+            g["stay_at"] = now
+        else:
+            g["stay_url"] = ""
+    if "name" in data:
+        g["name"], g["at"] = guest_name(data.get("name")), now
+    store._write(_guest_path(), g)
+    return ok(guest=g)
+
+
 async def h_calendar(request):
     """The Agenda widget's calendar for a TV whose home this computer runs (bridge/agenda.py). The
     address is the person's own private link: it is never kept, logged or put in the action history."""
@@ -4820,6 +4875,8 @@ def make_app():
     r.add_post("/api/app-order", h_app_order_set)
     r.add_post("/api/calendar", h_calendar)
     r.add_get("/api/stay-names", h_stay_names)
+    r.add_get("/api/guest", h_guest_get)
+    r.add_post("/api/guest", h_guest_set)
     r.add_get("/api/ha/info", h_ha_info)
     r.add_post("/api/ha", h_ha)
     r.add_post("/api/ha/check", h_ha_check)

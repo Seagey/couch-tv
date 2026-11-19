@@ -43,9 +43,10 @@ object Store {
     fun people(): JSONArray = (str("people")?.let { runCatching { JSONArray(it) }.getOrNull() })
         ?: JSONArray().put(JSONObject().put("id", "person1").put("name", "Person 1")).put(JSONObject().put("id", "person2").put("name", "Person 2"))
 
-    /** Weather place for the home screen. Defaults to a public example place; set your own in /setup. */
-    fun weather(): JSONObject = (str("weather")?.let { runCatching { JSONObject(it) }.getOrNull() })
-        ?: JSONObject().put("lat", -33.8688).put("lon", 151.2093).put("place", "Sydney").put("timezone", "Australia/Sydney")
+    /** Weather place for the home screen, set in Home settings, Location or on /setup. Null until one is
+     *  set: the home then asks for the town (never a sample place such as Sydney). */
+    fun weather(): JSONObject? = str("weather")?.let { runCatching { JSONObject(it) }.getOrNull() }
+        ?.takeIf { it.has("lat") && it.has("lon") }
 
     /** Where shows stream (JustWatch): the setup page's Country; without it, the TV's own region when
      *  the TV is not in English (a German TV in Germany: DE, issue #23), else AU. */
@@ -56,7 +57,7 @@ object Store {
     /** The public config the TV home and the phone remote read (same shape as the computer bridge). */
     fun publicConfig(): JSONObject = JSONObject()
         .put("people", Kids.attach(people()))   // a kids profile carries its shelf and its PIN's hash, never the PIN
-        .put("weather", weather())
+        .put("weather", weather() ?: JSONObject.NULL)
         .put("tvs", JSONArray().put(JSONObject().put("id", TV_ID).put("name", tvName()).also {
             // Only a Fire TV changes: its quick buttons gain Bluetooth and Network (its long-press
             // Home menu has neither) and Input (the TV's own HDMI picker).
@@ -73,6 +74,27 @@ object Store {
     fun inputs(): JSONArray = str("inputs")?.let { runCatching { JSONArray(it) }.getOrNull() } ?: JSONArray()
 
     fun tvName(): String = str("tv_name", "This TV") ?: "This TV"
+
+    /** The guest's name for the Welcome widget ("Sarah", "the Nguyen family"), typed on the TV or the
+     *  phone remote, with when it was set (ms). Kept on this TV only. Empty: the widget says just "Welcome". */
+    fun guest(): JSONObject = JSONObject().put("name", str("guest_name") ?: "").put("at", str("guest_at")?.toLongOrNull() ?: 0L)
+        .put("stay_url", str("guest_stay_url") ?: "").put("stay_at", str("guest_stay_at")?.toLongOrNull() ?: 0L)
+    /** A bookings calendar link sent from the phone (typing a long Airbnb link with the TV remote is hard).
+     *  Held only until the home takes it into its own private store, which then clears it here. */
+    fun saveStayUrl(url: String, at: Long = System.currentTimeMillis()) {
+        putStr("guest_stay_url", url.ifEmpty { null }); if (url.isNotEmpty()) putStr("guest_stay_at", at.toString())
+    }
+    fun saveGuest(name: String, at: Long = System.currentTimeMillis()): JSONObject {
+        val clean = guestName(name)
+        putStr("guest_name", clean.ifEmpty { null }); putStr("guest_at", at.toString())
+        return guest()
+    }
+    /** One line of up to 38 characters: letters, digits, spaces and ' & , . ! -; never a link or an address. */
+    fun guestName(v: String?): String {
+        val s = (v ?: "").replace(Regex("[\\u0000-\\u001f\\u007f\\u2028\\u2029]+"), " ")
+        if (Regex("[:/@]|www\\.", RegexOption.IGNORE_CASE).containsMatchIn(s)) return ""
+        return s.replace(Regex("[^\\p{L}\\p{M}0-9 '&,.!-]"), " ").replace(Regex("\\s+"), " ").trim().take(38).trim()
+    }
 
     /** Watch Next in Keep watching (#122), with the TV home app's names and limits (docs/CONFIG.md):
      *  packages never listed, and at most this many cards from any one app (1 to 20, 5 if unset). */

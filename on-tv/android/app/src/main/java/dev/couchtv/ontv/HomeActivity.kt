@@ -322,6 +322,15 @@ class HomeActivity : Activity() {
             refresher.postDelayed(refreshNow, 400)
         }
 
+        /** Words typed on the phone (Type on the TV) put straight into the home's open typing box, with no
+         *  ADB: the home's own page takes them (app.js tv.typeText). True when the home is on screen. */
+        fun typeText(t: String): Boolean {
+            val a = shown?.get() ?: return false
+            if (!a.front || a.isFinishing || a.isDestroyed) return false
+            refresher.post { a.js("window.tv && tv.typeText && tv.typeText(" + org.json.JSONObject.quote(t) + ")") }
+            return true
+        }
+
         /** What onNewIntent does, for when the home came back without a new intent (FireHome.bringForward). */
         fun home() {
             refresher.post { shown?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }?.js("window.tv && tv.home()") }

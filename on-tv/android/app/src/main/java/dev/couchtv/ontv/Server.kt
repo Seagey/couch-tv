@@ -127,6 +127,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             }
             "POST /api/text" -> {
                 val t = body(s).optString("text").ifEmpty { throw ApiError(400, "text is required") }
+                // no ADB (a phone only install): the couch-tv home's own typing box takes the words
+                if (!Adb.connected && HomeActivity.typeText(t)) return json(200, ok().put("into", "home"))
                 Tv.text(t); json(200, ok())
             }
             "GET /api/apps" -> {
@@ -238,6 +240,29 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 val url = WebData.urlFor(src, id) ?: throw ApiError(400, "unknown source")
                 val text = try { WebData.get(src, id, url) } catch (e: Exception) { throw ApiError(502, "The source could not be read just now.") }
                 json(200, ok().put("src", src).put("id", id).put("text", text))
+            }
+            // the Agenda's and the Welcome widget's calendars, read here so a phone only install greets
+            // guests with no computer at home (Ical.kt: https only, internet hosts only, 4 MB)
+            "POST /api/calendar" -> {
+                val (good, text) = Ical.read(body(s).optString("url"))
+                if (good) json(200, ok().put("text", text)) else json(400, err(text))
+            }
+            // names from booking emails need a computer at home that reads them (bridge/bookings.py)
+            "GET /api/stay-names" -> json(200, ok().put("on", false).put("names", JSONArray()))
+            // the guest's name for the Welcome widget, typed on the TV or the phone remote
+            "GET /api/guest" -> json(200, ok().put("guest", Store.guest()))
+            "POST /api/guest" -> {
+                val b = body(s)
+                if (!b.has("name") && !b.has("stay_url")) throw ApiError(400, "name is required (an empty name clears it)")
+                // a bookings link from the phone: checked like /api/calendar's (https, no name or password inside)
+                if (b.has("stay_url")) {
+                    val raw = b.optString("stay_url").trim()
+                    val u = if (raw.isEmpty()) "" else Ical.checkUrl(raw) ?: throw ApiError(400, "That is not a calendar link. It starts with https://, or is a calendar app's own link.")
+                    Store.saveStayUrl(u)
+                }
+                val g = if (b.has("name")) Store.saveGuest(b.optString("name")) else Store.guest()
+                Now.push(); refreshHomeAfter(s)
+                json(200, ok().put("guest", g))
             }
             "POST /api/home-apps" -> {
                 val b = body(s)
@@ -396,7 +421,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         // the TV home's own Home settings (language, place, look...), kept here as they come
         .put("settings", Store.readJson("home-settings.json") as? JSONObject ?: JSONObject())
         .put("updated", Store.str("home_settings_updated") ?: JSONObject.NULL)
-        .put("people", Store.people()).put("weather", Store.weather()).put("country", Store.country()).put("tv_name", Store.tvName())
+        .put("people", Store.people()).put("weather", Store.weather() ?: JSONObject.NULL).put("country", Store.country()).put("tv_name", Store.tvName())
         .put("ask", Ask.status())
         .put("phones", Auth.phoneCount()).put("port", Store.port).put("adb", JSONObject(Adb.status()))
         .put("skip_watch_next", JSONArray(Store.skipWatchNext().sorted())).put("watch_next_per_app", Store.watchNextPerApp())

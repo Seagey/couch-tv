@@ -32,6 +32,13 @@ android {
             // Signed with the local debug key so it installs without a keystore. Use your own key to publish.
             signingConfig = signingConfigs.findByName("fixed") ?: signingConfigs.getByName("debug")
         }
+        // couch-tv-ontv-watch.apk: the release plus the home watch (src/watch/AndroidManifest.xml), for a
+        // computer to install (Fire TV). The plain release has no accessibility service, so Play Protect
+        // lets a phone only install from Downloader through.
+        create("watch") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
