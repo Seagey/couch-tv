@@ -83,7 +83,7 @@
   // ---------------- the words used again and again ----------------
   // the way into Home settings on every home: a design's Settings button (top right), the Hold OK menu, or
   // the classic home's gear. The remote's own Settings button often opens the TV's menu instead, so say so.
-  var OPEN = "Press OK on the gear (top right, or at the end of your apps), then pick Home settings. The remote's Settings button opens the TV's own menu.";
+  var OPEN = "Hold OK and pick Settings (or OK on the gear at the screen edge), then Home settings. The remote's Settings button opens the TV's menu.";
   var SEND = "Tap Send to my TV, then on the TV: Home settings, couch-tv Studio, Get a design, and type the code.";
   function inStudio(what) { return ["Open your design in couch-tv Studio on your phone.", "Tap the widget, then " + what + ".", SEND]; }
   var TOWN = [OPEN, "Go down to Location and press OK.", "Pick Search for a town or city, type your town, then press OK.", "Pick your town in the list. The weather shows within a minute."];

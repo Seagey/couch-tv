@@ -2350,14 +2350,23 @@
       // the Settings button sits over the top right corner, so plain geometry may never reach it: Up or
       // Right at the edge of the screen goes to it, and any arrow from it goes back to the nearest widget
       var gs = find(S, GEAR_ID), rest = S.filter(function (x) { return x.id !== GEAR_ID; });
+      // Since 0.13.6 the gear goes wherever it covers nothing (a corner or an edge, left or right), so
+      // "towards the edge" is towards the side it is on, not always up and right. On Guest Welcome it
+      // sat on the left and only Up from the clock on the right reached it (a TCL, 20 Nov 2026).
+      var vw = window.innerWidth || 1920, vh = window.innerHeight || 1080;
+      var gx = gs ? (gs.box.l + gs.box.r) / 2 : 0, gy = gs ? (gs.box.t + gs.box.b) / 2 : 0;
+      var shown = gs && gs.box.r - gs.box.l > 1 && gs.box.b - gs.box.t > 1;   // hidden until reached: no size
+      function towardGear() { return (dy < 0 && gy < vh / 2) || (dy > 0 && gy >= vh / 2) || (dx > 0 && gx >= vw / 2) || (dx < 0 && gx < vw / 2); }
       if (gs && cur && cur.id === GEAR_ID) {
-        if (!rest.length || dy < 0 || dx > 0) return false;
-        var gc = { x: (gs.box.l + gs.box.r) / 2, y: (gs.box.t + gs.box.b) / 2 };
-        var near = rest.slice().sort(function (a, b) { return Math.hypot((a.box.l + a.box.r) / 2 - gc.x, (a.box.t + a.box.b) / 2 - gc.y) - Math.hypot((b.box.l + b.box.r) / 2 - gc.x, (b.box.t + b.box.b) / 2 - gc.y); })[0];
+        if (!rest.length || towardGear()) return false;
+        var fromGear = shown ? step(boxesOf(S), cur, last, dx, dy) : { moved: false };
+        if (fromGear.moved && fromGear.cur.id !== GEAR_ID) { cur = fromGear.cur; last = fromGear.last; paint(); return true; }
+        var near = rest.slice().sort(function (a, b) { return Math.hypot((a.box.l + a.box.r) / 2 - gx, (a.box.t + a.box.b) / 2 - gy) - Math.hypot((b.box.l + b.box.r) / 2 - gx, (b.box.t + b.box.b) / 2 - gy); })[0];
         cur = { id: near.id, i: near.inner.length ? 0 : -1 }; last = null; paint(); return true;
       }
-      var r = step(boxesOf(rest.length ? rest : S), cur, last, dx, dy);
-      if (gs && !r.moved && cur && (dy < 0 || dx > 0) && !tracing) { last = null; cur = { id: GEAR_ID, i: -1 }; paint(); return true; }
+      // a gear on screen is a stop like any other, so the arrow pointing at it reaches it
+      var r = step(boxesOf(shown && rest.length ? S : rest.length ? rest : S), cur, last, dx, dy);
+      if (gs && !r.moved && cur && towardGear() && !tracing) { last = null; cur = { id: GEAR_ID, i: -1 }; paint(); return true; }
       cur = r.cur; last = r.last;
       paint();
       return true;
@@ -2570,7 +2579,10 @@
           // Android's own long press: the held key comes again as a repeat (an ADB long press sends it at
           // once, then lets go). A repeat is a hold, so it opens the Home menu now and the key up after it
           // never opens the focused app (an ADB long press on a TCL opened Netflix, 19 Nov 2026).
-          if (e.repeat && okDown && !okHeld) { clearTimeout(okT); if (okSoon) { clearTimeout(okSoon); okSoon = null; } okHeld = true; okSwallow = true; okLast = Date.now(); holdMenu(); }
+          // A second down with no up between can only be the key still held, so it counts as a hold
+          // whether or not the browser marks it as a repeat: the TCL's WebView did not (20 Nov 2026,
+          // Netflix opened again with 0.13.6, which waited for e.repeat).
+          if (okDown && !okHeld) { clearTimeout(okT); if (okSoon) { clearTimeout(okSoon); okSoon = null; } okHeld = true; okSwallow = true; okLast = Date.now(); holdMenu(); }
           return;
         }
         // a TV that sends a held OK as quick down and up pairs (a TCL did): a down soon after an up is

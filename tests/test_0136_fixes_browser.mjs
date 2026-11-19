@@ -91,6 +91,19 @@ for (const id of ["welcome", "bento"]) {
   const page = await home(d);
   const g = await gearCheck(page);
   ok(g.shown && g.hits === 0 && g.x < 960 && g.y < 120, "top right taken: it goes to the top left, covering nothing (" + JSON.stringify(g) + ")");
+  // the arrow pointing at it reaches it: Up from the apps under it (a TCL, 20 Nov 2026: only Up from
+  // the far side reached a gear on the left), and Right from it goes back
+  await page.evaluate(() => window.CouchDesign.nav.focus("a", 0)); await page.waitForTimeout(150);
+  await page.keyboard.press("ArrowUp"); await page.waitForTimeout(200);
+  const up = await page.evaluate(() => window.CouchDesign.nav.current());
+  ok(up && up.id === "__gear", "Up from the apps under it reaches the gear (" + JSON.stringify(up) + ")");
+  await page.keyboard.press("ArrowRight"); await page.waitForTimeout(200);
+  const back = await page.evaluate(() => window.CouchDesign.nav.current());
+  ok(back && back.id !== "__gear", "Right from the gear goes back to a widget (" + JSON.stringify(back) + ")");
+  await page.keyboard.press("ArrowLeft"); await page.waitForTimeout(200);
+  await page.keyboard.press("ArrowLeft"); await page.waitForTimeout(200);
+  await page.keyboard.press("ArrowUp"); await page.waitForTimeout(200);
+  ok((await page.evaluate(() => window.CouchDesign.nav.current())).id === "__gear", "and the edge still leads to it");
   await page.close();
 }
 
@@ -110,6 +123,17 @@ for (const id of ["welcome", "bento"]) {
   ok(items[0] === "Settings", "a long press on Netflix opens the Home menu, Settings first (" + items.join(", ") + ")");
   ok(items.indexOf("Change app") > 0, "and the app's own choices after it");
   ok(!calls.length, "Netflix is not opened (" + calls.join(" | ") + ")");
+  // the TCL's WebView: the second down does not say it is a repeat (20 Nov 2026), still a hold
+  await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+  await page.evaluate(() => window.CouchDesign.nav.focus("d", 0));
+  await page.evaluate(() => {
+    const k = (type) => document.dispatchEvent(new KeyboardEvent(type, { key: "Enter", keyCode: 13, repeat: false, bubbles: true, cancelable: true }));
+    k("keydown"); k("keydown"); k("keyup");
+  });
+  await page.waitForTimeout(700);
+  const items2 = await page.evaluate(() => [...document.querySelectorAll(".cw-menu .cw-mi")].map((x) => x.textContent));
+  ok(items2[0] === "Settings", "two downs with no repeat mark open the Home menu too (" + items2.join(", ") + ")");
+  ok(!(await page.evaluate(() => window.__calls.filter((c) => /launch/.test(c)))).length, "and Netflix is not opened");
   // a short OK still opens it
   await page.keyboard.press("Escape"); await page.waitForTimeout(300);
   await page.evaluate(() => window.CouchDesign.nav.focus("d", 0));
@@ -126,6 +150,17 @@ for (const id of ["welcome", "bento"]) {
   });
   await page.waitForTimeout(900);
   ok(!(await page.evaluate(() => window.__calls.filter((c) => /launch/.test(c)))).length, "classic home: a long press opens no app");
+  await page.close();
+}
+{ // the classic home, the TCL's way: two downs, no repeat mark
+  const page = await home(null);
+  await page.evaluate(() => { window.__calls = []; const o = window.MOCK_API; window.MOCK_API = function (m, p, b) { window.__calls.push(p); return o(m, p, b); }; });
+  await page.evaluate(() => {
+    const k = (type) => document.dispatchEvent(new KeyboardEvent(type, { key: "Enter", keyCode: 13, repeat: false, bubbles: true, cancelable: true }));
+    k("keydown"); k("keydown"); k("keyup");
+  });
+  await page.waitForTimeout(900);
+  ok(!(await page.evaluate(() => window.__calls.filter((c) => /launch/.test(c)))).length, "classic home: two downs with no repeat mark open no app");
   await page.close();
 }
 

@@ -4164,7 +4164,10 @@
   function showCodeSoFar(v) {
     var c = CouchDesignCode.checkCode ? CouchDesignCode.checkCode(v) : null, el = $("set-type-check");
     if (!el || !c) return;
-    el.textContent = !c.count ? "" : c.ok ? c.shown + "   all 10 letters" : c.shown + "   " + Math.min(c.count, 99) + " of 10 letters";
+    // a stray mark (a "_" or "." from the TV's keyboard) said "10 of 10 letters" while it was still in the box
+    var mark = /[^A-Za-z0-9\s-]/.exec(String(v || ""));
+    el.textContent = !c.count ? "" : c.ok ? c.shown + "   all 10 letters" : mark ? c.shown + "   take out the " + mark[0] :
+      c.shown + "   " + Math.min(c.count, 99) + " of 10 letters";
   }
   function checkDesignCode(typed) {
     var c = CouchDesignCode.checkCode ? CouchDesignCode.checkCode(typed) : { ok: true, code: typed, shown: typed };
@@ -5453,8 +5456,10 @@
       e.preventDefault();
       // a held key repeating: Android's long press. The hold happens now (an ADB long press sends the
       // repeat at once and lets go straight after), so the key up never opens the focused app.
+      // A second down with no up between is the key still held, repeat mark or not (a TCL's WebView
+      // leaves it off, 20 Nov 2026).
       if (e.repeat || okDown) {
-        if (e.repeat && okDown && !okHeld) { clearTimeout(okTimer); okHeld = true; pressTile(false); if (!hold()) activate(); ensureFocus(); resetIdlePhoto(); }
+        if (okDown && !okHeld) { clearTimeout(okTimer); okHeld = true; pressTile(false); if (!hold()) activate(); ensureFocus(); resetIdlePhoto(); }
         return;
       }
       okDown = true; okHeld = false;
