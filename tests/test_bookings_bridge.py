@@ -42,5 +42,27 @@ class BookingTest(unittest.TestCase):
         self.assertEqual(len(bookings.for_tv([a])), 1)
 
 
+class MailboxTls(unittest.TestCase):
+    def test_the_mail_servers_certificate_and_name_are_checked(self):
+        import ssl
+        from unittest.mock import patch
+        seen = {}
+
+        class Stop(Exception):
+            pass
+
+        def fake(host, port, **kw):
+            seen.update(kw, host=host, port=port)
+            raise Stop()
+        with patch.object(bookings.imaplib, "IMAP4_SSL", fake):
+            with self.assertRaises(Stop):
+                bookings.from_imap({"host": "imap.example.com", "user": "u"}, "app-password")
+        ctx = seen.get("ssl_context")
+        self.assertIsInstance(ctx, ssl.SSLContext, "a context is always given (no unverified default)")
+        self.assertTrue(ctx.check_hostname)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+        self.assertEqual((seen["host"], seen["port"]), ("imap.example.com", 993))
+
+
 if __name__ == "__main__":
     unittest.main()

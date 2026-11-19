@@ -136,6 +136,20 @@ object HomeAssistant {
         else url.protocol + "://" + url.host + (if (url.port > 0) ":" + url.port else "") + url.path.trimEnd('/')
     } catch (e: Exception) { null }
 
+    /**
+     * The address and token a check uses. A typed token goes with the typed address. An empty token
+     * means the one kept on this TV, and then only with the address kept with it: an empty or the same
+     * address gives the kept pair; any other address gives an empty token (refused), so the kept token is
+     * never sent to a new host.
+     */
+    internal fun keptFor(url: String, token: String, kept: Pair<String, String>?): Pair<String, String> {
+        val t = token.trim()
+        if (t.isNotEmpty()) return url to t
+        if (kept == null) return url to ""
+        val asked = if (url.isBlank()) kept.first else cleanBase(url)
+        return if (asked != null && asked == cleanBase(kept.first)) kept.first to kept.second else url to ""
+    }
+
     private fun pretty(entity: String) =
         entity.substringAfter('.').replace('_', ' ').trim().replaceFirstChar { it.uppercase() }
 
@@ -531,10 +545,12 @@ object HomeAssistant {
             main.post {
                 if (!trusted(web.url)) { setupReply(id, JSONObject().put("ok", false).put("error", "refused")); return@post }
                 io.execute {
-                    // an empty token: check again with the one kept (changing the ticks later)
-                    val tok = token.trim().ifEmpty { settings(app)?.token.orEmpty() }
-                    val out = try { check(url, tok) } catch (e: Exception) { JSONObject().put("ok", false).put("error", "unreachable") }
-                    if (out.optBoolean("ok")) pending = (cleanBase(url) ?: "") to tok.trim()
+                    // an empty token: check again with the one kept (changing the ticks later), and only
+                    // with the address kept with it, so the kept token never goes to a new host
+                    val (addr, tok) = keptFor(url, token, settings(app)?.let { it.base to it.token })
+                    val out = if (tok.isEmpty()) JSONObject().put("ok", false).put("error", "token")
+                        else try { check(addr, tok) } catch (e: Exception) { JSONObject().put("ok", false).put("error", "unreachable") }
+                    if (out.optBoolean("ok")) pending = (cleanBase(addr) ?: "") to tok.trim()
                     main.post { setupReply(id, out) }
                 }
             }

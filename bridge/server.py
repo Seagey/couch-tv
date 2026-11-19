@@ -2731,6 +2731,45 @@ HA = smarthome.Home(config.DATA, config.CONFIG.get("home_assistant"), os.environ
 HA.direct = direct.Direct(config.DATA, config.CONFIG)
 
 
+# Endpoints that use a secret kept on this computer (the Home Assistant token, the Hue key, the
+# bookings mailbox password) answer only a TV in config.json, this computer itself, or a caller holding
+# bridge.pairing_key. Without a pairing key a phone or any other device on the Wi-Fi is refused, so it
+# cannot use the kept token or read the guests' names.
+_tv_addrs = {"at": 0.0, "ips": set()}
+
+
+def _tv_ips():
+    if time.time() - _tv_addrs["at"] > 300:
+        ips = set()
+        for c in config.TVS:
+            h = config.tv_host(c)
+            if not h:
+                continue
+            try:
+                ips.update(a[4][0] for a in socket.getaddrinfo(str(h), None))
+            except OSError:
+                pass
+        _tv_addrs.update(at=time.time(), ips=ips)
+    return _tv_addrs["ips"]
+
+
+def secret_caller_ok(request):
+    if config.PAIRING_KEY:
+        return True   # the middleware has already checked the key on every /api/ call
+    ip = client_ip(request)
+    return ip is None or ip in _tv_ips()
+
+
+def tv_or_paired(handler):
+    async def guarded(request):
+        if not secret_caller_ok(request):
+            raise ApiError(403, "Only the TV can do this. To do it from another device, set bridge.pairing_key in config.json.", key="err_tv_only")
+        return await handler(request)
+    guarded.__name__ = handler.__name__
+    return guarded
+
+
+@tv_or_paired
 async def h_direct(request):
     """Set up Hue or AirTouch from the TV: Home settings, couch-tv Studio, Smart home."""
     data = await body(request)
@@ -2759,6 +2798,7 @@ async def h_direct(request):
 BOOKINGS = bookings.Reader(config.CONFIG.get("bookings"), os.environ.get("BOOKINGS_PASSWORD"))
 
 
+@tv_or_paired
 async def h_stay_names(request):
     if not BOOKINGS.on():
         return ok(on=False, names=[])
@@ -2770,6 +2810,7 @@ async def h_ha_info(request):
     return ok(info=HA.info(), status=HA.status())
 
 
+@tv_or_paired
 async def h_ha(request):
     data = await body(request)
     action = str(data.get("action") or "")
@@ -2778,16 +2819,19 @@ async def h_ha(request):
     return ok(result=await HA.answer(action, data.get("entity"), data.get("value")))
 
 
+@tv_or_paired
 async def h_ha_check(request):
     data = await body(request)
     return ok(result=await HA.check(data.get("url"), data.get("token")))
 
 
+@tv_or_paired
 async def h_ha_save(request):
     data = await body(request)
     return ok(result=HA.save(data.get("picks")))
 
 
+@tv_or_paired
 async def h_ha_forget(request):
     return ok(result=HA.forget())
 

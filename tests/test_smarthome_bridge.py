@@ -71,6 +71,24 @@ class SmartHomeTest(unittest.TestCase):
         self.assertEqual(self.home.forget(), {"ok": True})
         self.assertEqual(self.home.status(), {"set": False})
 
+    def test_the_kept_token_never_goes_to_a_new_host(self):
+        run(self.home.check("http://homeassistant.local:8123", TOKEN))
+        self.home.save({"controls": [{"entity": "light.lamp"}]})
+        self.calls.clear()
+        # a blank token with any other address is refused before anything is sent
+        for other in ["http://attacker.example:8123", "http://homeassistant.local:9999", "https://homeassistant.local:8123", "ftp://x"]:
+            self.assertEqual(run(self.home.check(other, ""))["error"], "token", other)
+        self.assertEqual(self.calls, [], "nothing was sent anywhere")
+        # a blank token with no address, or the kept one, uses the kept pair and only the kept host
+        self.assertTrue(run(self.home.check("", ""))["ok"])
+        self.assertTrue(run(self.home.check("http://homeassistant.local:8123/", " "))["ok"])
+        self.assertEqual({c[0] for c in self.calls}, {"http://homeassistant.local:8123"})
+        # with nothing kept, a blank token is simply wrong
+        self.home.forget()
+        self.calls.clear()
+        self.assertEqual(run(self.home.check("http://homeassistant.local:8123", ""))["error"], "token")
+        self.assertEqual(self.calls, [])
+
     def test_only_ticked_things_and_read_first(self):
         self.home.pending = ("http://homeassistant.local:8123", TOKEN)
         self.home.save({"climate": [{"entity": "climate.lounge"}], "controls": [{"entity": "light.lamp"}], "sensors": [{"entity": "sensor.pool"}],

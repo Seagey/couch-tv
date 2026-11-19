@@ -640,13 +640,22 @@ class Home:
 
     # ---------------- set up from the TV
     async def check(self, url, token):
-        base = clean_base(url)
-        if not base:
-            return {"ok": False, "error": "address"}
         tok = str(token or "").strip()
-        if not tok:   # change the ticks later: the token kept on this computer
+        if not tok:
+            # change the ticks later: the token kept on this computer, and only ever with the address
+            # kept with it. A blank token with any other address is refused, so the kept token can never
+            # be sent to a new host.
             s = self.settings()
-            tok = s["token"] if s else ""
+            if not s:
+                return {"ok": False, "error": "token"}
+            asked = clean_base(url) if str(url or "").strip() else s["base"]
+            if asked != s["base"]:
+                return {"ok": False, "error": "token"}
+            base, tok = s["base"], s["token"]
+        else:
+            base = clean_base(url)
+            if not base:
+                return {"ok": False, "error": "address"}
         if not TOKEN.fullmatch(tok):
             return {"ok": False, "error": "token"}
         code, data = await self.call(base, tok, "GET", "/api/", None, 64 * 1024)

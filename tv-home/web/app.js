@@ -6007,7 +6007,9 @@
   }
   function shCheck(token) {
     SH.busy = true; SH.err = ""; SET.msg = "Asking Home Assistant...";
-    window.smartHome.setup.check(SH.addr, token).then(function (r) {
+    // no token: the one kept, with only the address kept with it (an empty address); the kept token
+    // is never sent to a newly typed address
+    window.smartHome.setup.check(token ? SH.addr : "", token).then(function (r) {
       SH.busy = false;
       if (r.ok) { SH.list = r.entities || []; if (!SH.picks) SH.picks = shPicksFrom(window.smartHome.setup.status()); SET.msg = "Connected. " + SH.list.length + " things found: pick what shows on this TV."; }
       else { SH.err = SH_ERR[r.error] || SH_ERR.unreachable; SET.msg = SH.err; }

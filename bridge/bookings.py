@@ -1,7 +1,7 @@
 """Booking emails: read Airbnb's "reservation confirmed" emails and pull out the guest's first name and
 how many are coming, so the TV can say "Welcome, Sarah" without the host typing it.
 
-Taken from guest-tv (tools/guest-tv/bookings.py), which does exactly this for its guest TVs.
+Taken from guest-tv, our sibling project for guest TVs, which reads the same emails the same way.
 Airbnb's calendar link only says "Reserved" (no name, since Dec 2019). The booking email has the name,
 the reservation code (HM...) and the guest count. The TV (app.js, the Welcome widget's guest) asks
 GET /api/stay-names and matches each booking to a stay in its own calendar by the arrival day.
@@ -13,10 +13,14 @@ Two places to read from, both optional, both on this computer only:
                                      BODY.PEEK leaves every email unread)
 
 The names never leave this computer and the TV: not logged, not in the action history, not in a design.
-NOT CHECKED against a real Airbnb email yet (guest-tv wrote it 2 Nov 2026 with no Airbnb account to hand).
-The patterns are loose on purpose, and a name the host types on the TV always wins over one read here.
+What it reads: an email from Airbnb (or forwarded from one, "Fwd:" and "Fw:" taken off) whose subject
+says "Reservation confirmed" or "New booking" with "<name> arrives <month> <day>", in plain text or
+HTML; the reservation code (HM...) and "<n> guests" from its body; and a "cancelled" email with the
+same code takes that booking away. The patterns were written from Airbnb's emails as guest-tv describes
+them and checked against made up emails (tests/fixtures/bookings), so they are loose on purpose, and a
+name the host types on the TV always wins over one read here.
 """
-import datetime as dt, email, email.policy, email.utils, glob, html, imaplib, os, re, time
+import datetime as dt, email, email.policy, email.utils, glob, html, imaplib, os, re, ssl, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INBOX = os.environ.get("BOOKINGS_INBOX") or os.path.join(os.environ.get("COUCH_DATA") or os.path.join(HERE, "data"), "bookings-inbox")
@@ -89,7 +93,9 @@ def from_folder():
 
 def from_imap(cfg, password, days=120):
     """Airbnb emails from the last few months. Read only (BODY.PEEK leaves them unread)."""
-    box = imaplib.IMAP4_SSL(cfg["host"], int(cfg.get("port", 993)), timeout=20)
+    # the mail server's certificate and name are checked (the default context), so the app password is
+    # only ever sent to the real mailbox
+    box = imaplib.IMAP4_SSL(cfg["host"], int(cfg.get("port", 993)), ssl_context=ssl.create_default_context(), timeout=20)
     try:
         box.login(cfg["user"], password)
         box.select(cfg.get("folder", "INBOX"), readonly=True)

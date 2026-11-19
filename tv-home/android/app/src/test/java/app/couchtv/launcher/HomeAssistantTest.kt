@@ -195,6 +195,19 @@ class HomeAssistantTest {
         assertFalse(ok.toString().contains("abcdefghijklmnopqrstuvwxyz0123"))   // the token never comes back
     }
 
+    @Test fun theKeptTokenNeverGoesToANewHost() {
+        val kept = "http://ha.example:8123" to "keptkeptkeptkeptkeptkeptkept01"
+        // an empty token with another address: no token at all, so nothing is sent anywhere
+        assertEquals("", HomeAssistant.keptFor("http://other.example:8123", "", kept).second)
+        assertEquals("", HomeAssistant.keptFor("http://ha.example:9999", " ", kept).second)
+        assertEquals("", HomeAssistant.keptFor("http://ha.example:8123", "", null).second)
+        // an empty token with the kept address, or none: the kept pair
+        assertEquals(kept, HomeAssistant.keptFor("http://ha.example:8123/", "", kept))
+        assertEquals(kept, HomeAssistant.keptFor("", "", kept))
+        // a typed token goes with the typed address, never the kept one
+        assertEquals("http://other.example:8123" to "typedtypedtypedtypedtyped0001", HomeAssistant.keptFor("http://other.example:8123", "typedtypedtypedtypedtyped0001", kept))
+    }
+
     @Test fun nothingWithoutASection() {
         assertEquals("off", HomeAssistant.answerForTest(null, "controls", "", "").getString("error"))
         assertNotNull(HomeAssistant.parseForTest(JSONObject(section.toString()).put("controls", JSONArray())))
