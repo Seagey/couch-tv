@@ -4,7 +4,11 @@ the shared Keep watching row, the picks, the taste and every other reader of the
 A video card hides by its id like any card, and opens the exact video when move.youtube_video_id is
 sure of it (the line keeps the channel and the length the session gave), else YouTube's installed
 build on a search, else the app. A found id is kept on disk (store.video_id, bridge/data/video-ids.json)
-so a restart does not lose it, and the card shows YouTube's own thumbnail for it as its backdrop."""
+so a restart does not lose it, and the card shows YouTube's own thumbnail for it as its backdrop.
+
+Every test gets a data folder of its own (Videos.setUp points store's files at it): the COUCH_DATA
+set below only counts when this module is the first to import config, and under
+`unittest discover` an earlier module has already pointed store at the repo's bridge/data."""
 import asyncio
 import json
 import os
@@ -56,15 +60,36 @@ def no_finder():
     return patch.object(server.finder, "find", new=AsyncMock(side_effect=AssertionError("finder.find was called")))
 
 
+STORE_FILES = {"HISTORY_OLD": "history.json", "HISTORY": "history.jsonl", "IMPORTED": "imported.jsonl",
+               "RECS": "recs.json", "SLEEP": "sleep.json", "HIDDEN": "hidden.json",
+               "VIDEO_IDS": "video-ids.json", "WHO_FILE": "who.json"}
+
+
+def own_data_folder(case):
+    """Point every file store keeps at a new temporary folder for this test, undone afterwards, so a
+    test never reads or writes the bridge's real bridge/data whatever imported config first."""
+    folder = tempfile.mkdtemp(prefix="couchtv-videos-")
+    case.addCleanup(lambda: __import__("shutil").rmtree(folder, ignore_errors=True))
+    for name, file in [("DATA", None)] + list(STORE_FILES.items()):
+        p = patch.object(store, name, folder if file is None else os.path.join(folder, file))
+        p.start()
+        case.addCleanup(p.stop)
+    tmp = os.path.realpath(tempfile.gettempdir())
+    for name in ["DATA"] + list(STORE_FILES):
+        path = os.path.realpath(getattr(store, name))
+        assert path.startswith(tmp + os.sep), f"store.{name} is outside the temporary folder: {path}"
+    store._cache.clear()
+    case.addCleanup(store._cache.clear)
+    return folder
+
+
 class Videos(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self._people = (config.PEOPLE, config.PEOPLE_IDS)
         config.PEOPLE = [{"id": "person1", "name": "Person 1"}, {"id": "person2", "name": "Person 2"}]
         config.PEOPLE_IDS = ["person1", "person2"]
-        for f in (store.HISTORY, store.WHO_FILE, store.HIDDEN, store.VIDEO_IDS):
-            if os.path.exists(f):
-                os.remove(f)
-        store._cache.clear()
+        self.real_video_ids = store.VIDEO_IDS
+        self.data = own_data_folder(self)
         self.tv = next(iter(server.TVS))
         server._current.set(self.tv)
         self._installed = dict(server.installed)
@@ -227,7 +252,7 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(store.videos()), 1)
         self.assertFalse([t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()])
         self.assertEqual(server._video_tasks, {})   # let go once done
-        self.assertIn(server._video_key("How Trains Work", "Some Channel"), server._video_unsure)
+        self.assertIn(server._video_key("How Trains Work", "Some Channel", None), server._video_unsure)
 
     async def test_music_and_streams_are_still_never_logged(self):
         with no_finder():
@@ -373,8 +398,9 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         start.assert_awaited_once_with("youtube://search?query=How%20Trains%20Work", FIRE_YOUTUBE)
         self.assertIn('"method": "search"', body)
         # until the memory runs out: then the lookup is tried once more
-        key = server._video_key("How Trains Work", "Some Channel")
-        server._video_unsure[key] = time.time() - server.VIDEO_UNSURE_KEEP_S - 1
+        key = server._video_key("How Trains Work", "Some Channel", 600000)
+        self.assertEqual(server._video_unsure[key][1], 1, "one unsure answer so far")
+        server._video_unsure[key] = (time.time() - server.VIDEO_UNSURE_KEEP_S - 1, 1)
         self.lookup.return_value = VIDEO_ID
         body, start, launch = await self.open(vid)
         self.assertEqual(self.lookup.await_count, 2)
@@ -497,8 +523,9 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         with open(store.VIDEO_IDS) as f:
             data = json.load(f)
         entry, = data.values()
-        self.assertEqual(entry["id"], VIDEO_ID)
-        self.assertTrue(datetime.fromisoformat(entry["when"]).tzinfo)
+        self.assertEqual(entry[-1]["id"], VIDEO_ID)
+        self.assertIsNone(entry[-1]["length_s"])   # remembered without a length
+        self.assertTrue(datetime.fromisoformat(entry[-1]["when"]).tzinfo)
         # written again: the newer id wins
         store.remember_video_id("How Trains Work", "Some Channel", "abcdefghijk")
         self.assertEqual(store.video_id("How Trains Work", "Some Channel"), "abcdefghijk")
@@ -527,8 +554,8 @@ class Videos(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(store.video_id("How Trains Work", "Some Channel"), text)
             card, = server.continue_videos("person1")
             self.assertEqual((card["backdrop"], card["video_id"]), (None, None), text)
-            self.assertTrue(store.remember_video_id("How Trains Work", "Some Channel", VIDEO_ID), text)
-            self.assertEqual(store.video_id("How Trains Work", "Some Channel"), VIDEO_ID, text)
+            self.assertTrue(store.remember_video_id("How Trains Work", "Some Channel", VIDEO_ID, 600000), text)
+            self.assertEqual(store.video_id("How Trains Work", "Some Channel", 600000), VIDEO_ID, text)
         for task in server._video_tasks.values():
             task.cancel()
 
@@ -538,8 +565,8 @@ class Videos(unittest.IsolatedAsyncioTestCase):
                        "b|": {"id": "bbbbbbbbbbb", "when": "2026-01-01T00:00:00+00:00"},
                        "c|": "not a dict"}, f)
         with patch.object(store, "VIDEO_IDS_MAX", 2):
-            self.assertTrue(store.remember_video_id("d", None, "ddddddddddd"))
-        self.assertEqual(store.video_id("d", None), "ddddddddddd")
+            self.assertTrue(store.remember_video_id("d", None, "ddddddddddd", 60000))
+        self.assertEqual(store.video_id("d", None, 60000), "ddddddddddd")
         with open(store.VIDEO_IDS) as f:
             data = json.load(f)
         self.assertEqual(len(data), 2)
@@ -572,7 +599,7 @@ class Videos(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         self.lookup.assert_awaited_once_with("How Trains Work", "Some Channel", 600000)
-        self.assertEqual(store.video_id("How Trains Work", "Some Channel"), VIDEO_ID)
+        self.assertEqual(store.video_id("How Trains Work", "Some Channel", 600000), VIDEO_ID)
         # an unsure one is not
         self.lookup.return_value = None
         with no_finder():
@@ -580,11 +607,11 @@ class Videos(unittest.IsolatedAsyncioTestCase):
                                   channel="Some Channel", duration_ms=600000)
         await asyncio.sleep(0)
         await asyncio.sleep(0)
-        self.assertIsNone(store.video_id("How Planes Work", "Some Channel"))
+        self.assertIsNone(store.video_id("How Planes Work", "Some Channel", 600000))
 
     async def test_an_open_after_a_restart_deep_links_from_the_id_on_disk_without_the_lookup(self):
         vid = self.video_line(channel="Some Channel", duration_ms=600000)
-        store.remember_video_id("How Trains Work", "Some Channel", VIDEO_ID)
+        store.remember_video_id("How Trains Work", "Some Channel", VIDEO_ID, 600000)
         self.forget_everything_in_memory()
         body, start, launch = await self.open(vid)
         self.lookup.assert_not_awaited()   # the id was on disk: no task, no network
@@ -603,7 +630,7 @@ class Videos(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_card_shows_youtubes_thumbnail_once_the_video_is_known(self):
         self.video_line(channel="Some Channel", duration_ms=600000)
-        store.remember_video_id("How Trains Work", "Some Channel", VIDEO_ID)
+        store.remember_video_id("How Trains Work", "Some Channel", VIDEO_ID, 600000)
         self.forget_everything_in_memory()
         card, = server.continue_videos("person1")
         self.assertEqual((card["backdrop"], card["video_id"]), (THUMBNAIL, VIDEO_ID))
@@ -612,6 +639,7 @@ class Videos(unittest.IsolatedAsyncioTestCase):
                          ("How Trains Work", "video", "youtube", "bridge", None))
         self.assertEqual((card["episode_title"], card["season"], card["episode"]), (None, None, None))
         self.assertEqual(card["app"], {"id": "youtube", "name": "YouTube", "package": FIRE_YOUTUBE})
+        self.assertIs(card["live"], False)   # a video with a length is not live
         self.lookup.assert_not_awaited()   # known: nothing to look up
         self.assertEqual(server._video_tasks, {})
         # and the row carries it
@@ -676,19 +704,249 @@ class Videos(unittest.IsolatedAsyncioTestCase):
 
     async def test_an_unsure_mark_stops_the_row_from_starting_a_lookup_again(self):
         self.video_line(channel="Some Channel", duration_ms=600000)
-        server._video_unsure[server._video_key("How Trains Work", "Some Channel")] = time.time()
+        key = server._video_key("How Trains Work", "Some Channel", 600000)
+        server._video_unsure[key] = (time.time(), 1)
         card, = server.continue_videos("person1")
         self.assertEqual((card["backdrop"], card["video_id"]), (None, None))
         await asyncio.sleep(0)
         self.lookup.assert_not_awaited()
         self.assertEqual(server._video_tasks, {})
         # once the memory runs out the row asks again
-        server._video_unsure[server._video_key("How Trains Work", "Some Channel")] = time.time() - server.VIDEO_UNSURE_KEEP_S - 1
+        server._video_unsure[key] = (time.time() - server.VIDEO_UNSURE_KEEP_S - 1, 1)
         server.continue_videos("person1")
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         self.lookup.assert_awaited_once_with("How Trains Work", "Some Channel", 600000)
 
+
+    # ---------- the saved id is for one length (finding: a weekly video of one title) ----------
+
+    def test_the_saved_id_is_only_given_back_for_the_same_length(self):
+        store.remember_video_id("Weekly update", "Some Channel", "AAAAAAAAAAA", 600000)
+        self.assertEqual(store.video_id("Weekly update", "Some Channel", 600000), "AAAAAAAAAAA")
+        self.assertEqual(store.video_id("Weekly update", "Some Channel", 602900), "AAAAAAAAAAA", "within 3 s")
+        self.assertEqual(store.video_id("Weekly update", "Some Channel", 597000), "AAAAAAAAAAA")
+        self.assertIsNone(store.video_id("Weekly update", "Some Channel", 610000), "10 s apart: another video")
+        self.assertIsNone(store.video_id("Weekly update", "Some Channel", 754000))
+        self.assertIsNone(store.video_id("Weekly update", "Some Channel"), "no length against a saved one")
+        with open(store.VIDEO_IDS) as f:
+            self.assertEqual(json.load(f)[store._video_ids_key("Weekly update", "Some Channel")][-1]["length_s"], 600)
+        # the new one's lookup is kept beside it, each for its own length
+        store.remember_video_id("Weekly update", "Some Channel", "BBBBBBBBBBB", 754000)
+        self.assertEqual(store.video_id("Weekly update", "Some Channel", 754000), "BBBBBBBBBBB")
+        self.assertEqual(store.video_id("Weekly update", "Some Channel", 600000), "AAAAAAAAAAA")
+
+    def test_with_no_length_on_either_side_the_channel_has_to_say(self):
+        store.remember_video_id("A live stream", "Some Channel", "AAAAAAAAAAA")
+        self.assertEqual(store.video_id("A live stream", "Some Channel"), "AAAAAAAAAAA")
+        self.assertIsNone(store.video_id("A live stream", "Some Channel", 600000), "a length against none saved")
+        # a line with no channel has only the length to go by
+        store.remember_video_id("A clip", None, "CCCCCCCCCCC")
+        self.assertIsNone(store.video_id("A clip", None))
+        store.remember_video_id("A clip", None, "CCCCCCCCCCC", 120000)
+        self.assertEqual(store.video_id("A clip", None, 121000), "CCCCCCCCCCC")
+        self.assertIsNone(store.video_id("A clip", None, 300000), "no channel and another length: another video")
+
+    def test_an_older_file_stays_readable(self):
+        # {"id", "when"} as the first version wrote it, and a bare id string: no length saved
+        with open(store.VIDEO_IDS, "w") as f:
+            json.dump({store._video_ids_key("How Trains Work", "Some Channel"): {"id": VIDEO_ID, "when": "2026-01-01T00:00:00+00:00"},
+                       store._video_ids_key("Old Bare", "Some Channel"): "abcdefghijk",
+                       store._video_ids_key("Odd Length", "Some Channel"): {"id": "abcdefghijk", "length_s": "ten"}}, f)
+        self.assertEqual(store.video_id("How Trains Work", "Some Channel"), VIDEO_ID)
+        self.assertEqual(store.video_id("Old Bare", "Some Channel"), "abcdefghijk")
+        self.assertEqual(store.video_id("Odd Length", "Some Channel"), "abcdefghijk", "a length that is not one reads as none")
+        # a line with a length looks again rather than trust an id saved without one
+        self.assertIsNone(store.video_id("How Trains Work", "Some Channel", 600000))
+        self.assertIsNone(store.video_id("Old Bare", "Some Channel", 600000))
+        # and writing over a file that holds a bare string works
+        self.assertTrue(store.remember_video_id("Another", "Some Channel", VIDEO_ID, 1000))
+        self.assertEqual(store.video_id("Old Bare", "Some Channel"), "abcdefghijk")
+
+    async def test_a_newer_video_of_the_same_title_and_channel_is_looked_up_not_the_old_one(self):
+        store.remember_video_id("Weekly update", "Some Channel", "AAAAAAAAAAA", 600000)
+        self.lookup.return_value = "BBBBBBBBBBB"
+        self.assertEqual(await server._find_video("Weekly update", "Some Channel", 754000, 15), "BBBBBBBBBBB")
+        self.lookup.assert_awaited_once_with("Weekly update", "Some Channel", 754000)
+        self.assertEqual(store.video_id("Weekly update", "Some Channel", 754000), "BBBBBBBBBBB")
+        # last week's, played again, keeps its own id beside this week's: no second lookup
+        self.assertEqual(await server._find_video("Weekly update", "Some Channel", 600000, 15), "AAAAAAAAAAA")
+        self.assertEqual(self.lookup.await_count, 1)
+
+    def test_each_length_keeps_its_own_id_up_to_a_few(self):
+        for i, vid in enumerate(["AAAAAAAAAAA", "BBBBBBBBBBB", "CCCCCCCCCCC", "DDDDDDDDDDD", "EEEEEEEEEEE"]):
+            self.assertTrue(store.remember_video_id("Weekly update", "Some Channel", vid, (600 + 100 * i) * 1000))
+        self.assertIsNone(store.video_id("Weekly update", "Some Channel", 600000), "the oldest of five lengths is dropped")
+        self.assertEqual(store.video_id("Weekly update", "Some Channel", 700000), "BBBBBBBBBBB")
+        self.assertEqual(store.video_id("Weekly update", "Some Channel", 1001000), "EEEEEEEEEEE", "within 3 s")
+        # the same length found again replaces its id, and stays one entry
+        store.remember_video_id("Weekly update", "Some Channel", "FFFFFFFFFFF", 700000)
+        self.assertEqual(store.video_id("Weekly update", "Some Channel", 700000), "FFFFFFFFFFF")
+        with open(store.VIDEO_IDS) as f:
+            self.assertEqual(len(json.load(f)[store._video_ids_key("Weekly update", "Some Channel")]), store.VIDEO_IDS_PER_TITLE)
+
+    async def test_the_row_shows_the_new_videos_picture_not_the_old_ones(self):
+        store.remember_video_id("Weekly update", "Some Channel", "AAAAAAAAAAA", 600000)
+        self.video_line("Weekly update", channel="Some Channel", duration_ms=754000)
+        self.lookup.return_value = "BBBBBBBBBBB"
+        card, = server.continue_videos("person1")
+        self.assertEqual((card["video_id"], card["backdrop"]), (None, None), "not last week's")
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        self.lookup.assert_awaited_once_with("Weekly update", "Some Channel", 754000)
+        card, = server.continue_videos("person1")
+        self.assertEqual(card["video_id"], "BBBBBBBBBBB")
+
+    async def test_two_lengths_of_one_title_are_two_lookups_and_two_unsure_marks(self):
+        never = asyncio.Event()
+
+        async def stuck(title, channel=None, duration_ms=None):
+            await never.wait()
+        self.lookup.side_effect = stuck
+        a = server._video_lookup("Weekly update", "Some Channel", 600000)
+        b = server._video_lookup("Weekly update", "Some Channel", 754000)
+        self.assertIsNot(a, b, "a running lookup for one video does not stand in for the other")
+        self.assertIs(server._video_lookup("Weekly update", "Some Channel", 600400), a, "the same video, rounded")
+        a.cancel()
+        b.cancel()
+        server._video_tasks.clear()
+        server._video_unsure[server._video_key("Weekly update", "Some Channel", 600000)] = (time.time(), 1)
+        self.assertTrue(server._video_unsure_lately("Weekly update", "Some Channel", 600000))
+        self.assertFalse(server._video_unsure_lately("Weekly update", "Some Channel", 754000))
+
+    # ---------- the row backs off a video that keeps coming back unsure ----------
+
+    def test_the_rows_wait_doubles_up_to_a_day(self):
+        keep = server.VIDEO_UNSURE_KEEP_S
+        self.assertEqual([server._video_unsure_hold(n) for n in (1, 2, 3, 4)], [keep, 2 * keep, 4 * keep, 8 * keep])
+        self.assertEqual(server._video_unsure_hold(9), server.VIDEO_UNSURE_MAX_S)
+        self.assertEqual(server._video_unsure_hold(500), 24 * 3600)
+
+    async def test_each_unsure_answer_in_a_row_makes_the_row_wait_longer(self):
+        self.video_line(channel="Some Channel", duration_ms=600000)
+        key = server._video_key("How Trains Work", "Some Channel", 600000)
+
+        async def ask_the_row():
+            server.continue_videos("person1")
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+        await ask_the_row()
+        self.assertEqual(self.lookup.await_count, 1)
+        self.assertEqual(server._video_unsure[key][1], 1)
+        # 11 minutes on: the row asks again, unsure again, and now waits 20 minutes
+        server._video_unsure[key] = (time.time() - 11 * 60, 1)
+        await ask_the_row()
+        self.assertEqual(self.lookup.await_count, 2)
+        self.assertEqual(server._video_unsure[key][1], 2)
+        server._video_unsure[key] = (time.time() - 11 * 60, 2)
+        await ask_the_row()
+        self.assertEqual(self.lookup.await_count, 2, "11 minutes is not 20")
+        server._video_unsure[key] = (time.time() - 21 * 60, 2)
+        await ask_the_row()
+        self.assertEqual(self.lookup.await_count, 3)
+        self.assertEqual(server._video_unsure[key][1], 3)
+        # many in a row: a day, never more
+        server._video_unsure[key] = (time.time() - 23 * 3600, 30)
+        await ask_the_row()
+        self.assertEqual(self.lookup.await_count, 3)
+        server._video_unsure[key] = (time.time() - 24 * 3600 - 1, 30)
+        await ask_the_row()
+        self.assertEqual(self.lookup.await_count, 4)
+        # a sure answer forgets the count
+        self.lookup.return_value = VIDEO_ID
+        server._video_unsure[key] = (time.time() - 24 * 3600 - 1, 31)
+        await ask_the_row()
+        self.assertNotIn(key, server._video_unsure)
+
+    async def test_an_ok_press_keeps_the_short_wait(self):
+        vid = self.video_line(channel="Some Channel", duration_ms=600000)
+        key = server._video_key("How Trains Work", "Some Channel", 600000)
+        server._video_unsure[key] = (time.time() - server.VIDEO_UNSURE_KEEP_S - 1, 6)   # the row waits hours
+        self.lookup.return_value = VIDEO_ID
+        body, start, launch = await self.open(vid)
+        self.lookup.assert_awaited_once()   # the press still asks after ten minutes
+        self.assertIn('"method": "deeplink"', body)
+
+    async def test_at_most_two_results_pages_are_fetched_at_once(self):
+        running, most, release = 0, 0, asyncio.Event()
+
+        class Response:
+            status = 200
+            url = "https://www.youtube.com/results"
+
+            async def __aenter__(self):
+                nonlocal running, most
+                running += 1
+                most = max(most, running)
+                await release.wait()
+                return self
+
+            async def __aexit__(self, *exc):
+                nonlocal running
+                running -= 1
+
+            async def text(self):
+                return "<html></html>"
+
+        class Session:
+            def __init__(self, *a, **k):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            def get(self, *a, **k):
+                return Response()
+        with patch.object(move.aiohttp, "ClientSession", Session):
+            fetches = [asyncio.ensure_future(move._results_page(f"video {i}")) for i in range(6)]
+            for _ in range(5):
+                await asyncio.sleep(0)
+            self.assertEqual(running, move.RESULTS_AT_ONCE)
+            release.set()
+            pages = await asyncio.gather(*fetches)
+        self.assertEqual(pages, ["<html></html>"] * 6)
+        self.assertEqual(most, 2)
+        self.assertEqual(move.RESULTS_AT_ONCE, 2)
+
+    # ---------- a live stream says so ----------
+
+    async def test_a_live_stream_is_marked_live_on_its_line_and_its_card(self):
+        with no_finder():
+            await server.log_seen("Al Jazeera English", "Al Jazeera English", self.youtube(), {}, who="person1",
+                                  channel="Al Jazeera English", duration_ms=None)
+            await server.log_seen("How Trains Work", "Some Channel", self.youtube(), {}, who="person1",
+                                  channel="Some Channel", duration_ms=600000)
+            await server.log_seen("No Channel", None, self.youtube(), {}, who="person1")
+        by_title = {v["title"]: v for v in store.videos()}
+        self.assertIs(by_title["Al Jazeera English"].get("live"), True)
+        self.assertNotIn("live", by_title["How Trains Work"])
+        self.assertNotIn("live", by_title["No Channel"], "no channel: nothing says it is live")
+        cards = {c["title"]: c for c in server.continue_videos("person1")}
+        self.assertIs(cards["Al Jazeera English"]["live"], True)
+        self.assertIs(cards["How Trains Work"]["live"], False)
+        self.assertIs(cards["No Channel"]["live"], False)
+        for task in server._video_tasks.values():
+            task.cancel()
+
+    async def test_an_older_line_with_no_length_is_not_called_live(self):
+        # a line written before live was kept: a missing length alone does not make it live
+        self.video_line("Old Line", channel="Some Channel", duration_ms=None)
+        self.video_line("Odd Line", channel="Some Channel", live="yes")
+        cards = {c["title"]: c for c in server.continue_videos("person1")}
+        self.assertIs(cards["Old Line"]["live"], False)
+        self.assertIs(cards["Odd Line"]["live"], False)
+        for task in server._video_tasks.values():
+            task.cancel()
+
+    # ---------- the tests keep off the real data ----------
+
+    def test_every_store_file_is_in_this_tests_own_folder(self):
+        for name in ["DATA"] + list(STORE_FILES):
+            self.assertTrue(os.path.realpath(getattr(store, name)).startswith(os.path.realpath(self.data)), name)
+        self.assertNotEqual(os.path.realpath(self.real_video_ids), os.path.realpath(store.VIDEO_IDS))
 
 if __name__ == "__main__":
     unittest.main()
