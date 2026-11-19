@@ -2535,7 +2535,11 @@
       if (tipShown || DESIGNER || PREVIEW) return;
       tipShown = true;
       try { if (localStorage.getItem(TIP_USED)) return; } catch (e) {}
-      var t = h("div", "cw-tip cw-tip-settings", null, ["Hold OK for apps and settings, or go to the Settings gear at the edge of the screen. The remote's own Settings button opens the TV's menu."]);
+      // a gear hidden until reached (no clear spot on the design) only shows with Up or Right at the edge
+      var tucked = GEAR && GEAR.classList.contains("cw-gear-tuck");
+      var t = h("div", "cw-tip cw-tip-settings", null, [tucked ?
+        "Hold OK for apps and settings, or go Up or Right to the edge of the screen for the Settings gear. The remote's own Settings button opens the TV's menu." :
+        "Hold OK for apps and settings, or go to the Settings gear at the edge of the screen. The remote's own Settings button opens the TV's menu."]);
       document.body.appendChild(t);
       setTimeout(function () { t.style.opacity = "0"; setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 700); }, 9000);
     }

@@ -4079,7 +4079,7 @@
   function arrowAgain(p, dir, now, repeat) { return !!(repeat || (p && p.dir === dir && now - p.last < 1000)); }
   function navState() {
     return [zone, g, s, pi, qi, npI, menuI, pmi, gi, amI, smI, ai, inI, ambI, expanded, !!lift, plift,
-      SET.col, SET.sec, SET.ri, !!SET.lift, !!SET.sub].join("|");
+      SET.col, SET.sec, SET.ri, !!SET.lift, !!SET.sub, SET.peeks || 0].join("|");   // peeks: a scroll with no row to move to is a move, not an end
   }
   // where a list of n entries goes round to: forwards to the first, backwards to the last
   function wrapIndex(n, d) { return d > 0 ? 0 : Math.max(0, n - 1); }
@@ -5598,7 +5598,16 @@
         if (n !== SET.sec) { SET.sec = n; SET.sub = null; SET.msg = ""; SET.keyFocus = null; SET.ri = 0; }
       } else if (dx > 0) enterRows();
     } else if (dy) {
-      SET.ri = stepRow(rows, SET.ri, dy);
+      var to = stepRow(rows, SET.ri, dy);
+      // No row to move to, but lines out of view that way (the update steps sit above the first
+      // button, Check for updates now): scroll them into view and keep the focus where it is (a TCL,
+      // 20 Nov 2026: step 1 was off the top and Up could not reach it).
+      var lb = $("set-rows");
+      if (to === SET.ri && lb && (dy < 0 ? lb.scrollTop > 0 : lb.scrollTop + lb.clientHeight < lb.scrollHeight - 1)) {
+        SET.peek = dy;   // renderSettings scrolls, after it has rebuilt the list
+        SET.peeks = (SET.peeks || 0) + 1;   // so the press does not also go round to the other end
+      }
+      SET.ri = to;
       SET.keyFocus = rows[SET.ri] ? rows[SET.ri].key : null;
     } else if (dx && rows[SET.ri] && rows[SET.ri].adjust) {
       rows[SET.ri].adjust(document.documentElement.dir === "rtl" ? -dx : dx);
@@ -5699,7 +5708,8 @@
     // without animating, so only the small step to the next row is smooth. A different list
     // (another section or page) starts at the top.
     var listId = SET.sec + "|" + $("set-head").textContent + "|" + $("set-crumb").textContent;
-    var keep = box.getAttribute("data-list") === listId ? box.scrollTop : 0;
+    var fresh = box.getAttribute("data-list") !== listId;
+    var keep = fresh ? 0 : box.scrollTop;
     box.setAttribute("data-list", listId);
     box.innerHTML = rows.map(rowHTML).join("");
     box.style.scrollBehavior = "auto";
@@ -5714,7 +5724,16 @@
     // when it gets closer, so short lists and their headings never move
     var f = box.querySelector(".srow.focus");
     if (!f) { box.scrollTop = 0; return; }
+    // Up or Down just scrolled lines into view with no row to move to: leave the list there
+    if (SET.peek) {
+      var pk = SET.peek; SET.peek = 0;
+      box.scrollTop = Math.max(0, Math.min(box.scrollHeight - box.clientHeight, keep + pk * Math.round(box.clientHeight * 0.6)));
+      return;
+    }
     var top = f.offsetTop, bottom = top + f.offsetHeight, view = box.clientHeight, edge = view / 4;
+    // a page just opened whose first button is low down: if it is on screen from the top, start at
+    // the top, so the lines above it (the update steps) are read first
+    if (fresh && bottom <= view) return;
     if (top - edge < box.scrollTop) box.scrollTop = Math.max(0, top - edge);
     else if (bottom + edge > box.scrollTop + view) box.scrollTop = bottom + edge - view;
   }

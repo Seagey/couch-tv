@@ -211,6 +211,20 @@ async function about(page) {
   ok(await page.evaluate(() => document.getElementById("set-head").textContent) === "Update couch-tv", "OK opens the Update couch-tv page");
   ok(/Downloader/.test(up) && /8180170/.test(up) && /cannot install an update by itself/.test(up), "it gives the Downloader steps and code (" + up.slice(0, 240) + ")");
   ok(!/Update to 0\.4/.test(up), "and no Update to button that could not work");
+  // a TCL, 20 Nov 2026: the page opened scrolled to its first button and step 1 was off the top,
+  // with no way up. Step 1 can be seen, by opening at the top or by Up scrolling to it.
+  const seen = (sel) => page.evaluate((s) => {
+    const box = document.getElementById("set-rows"), el = [...box.querySelectorAll(".srow")].find((r) => r.textContent.indexOf(s) >= 0);
+    if (!el) return false;
+    const a = box.getBoundingClientRect(), b = el.getBoundingClientRect();
+    return b.top >= a.top - 1 && b.bottom <= a.bottom + 1;
+  }, sel);
+  for (let i = 0; i < 6 && !(await seen("Press Home, then open Downloader")); i++) { await page.keyboard.press("ArrowUp"); await page.waitForTimeout(250); }
+  ok(await seen("Press Home, then open Downloader"), "step 1 can be seen (open at the top, or Up scrolls to it)");
+  const before = await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "");
+  ok(/Check for updates now/.test(before), "and the focus stays on the first button (" + before.slice(0, 60) + ")");
+  for (let i = 0; i < 8; i++) { await page.keyboard.press("ArrowDown"); await page.waitForTimeout(120); }
+  ok(await page.evaluate(() => { const f = document.querySelector(".srow.focus"), box = document.getElementById("set-rows"); if (!f) return false; const a = box.getBoundingClientRect(), b = f.getBoundingClientRect(); return b.top >= a.top - 1 && b.bottom <= a.bottom + 1; }), "Down still keeps the focused row on screen");
   ok(!page.errors.length, "no page errors (" + page.errors.join(" | ") + ")");
   await page.close();
 }

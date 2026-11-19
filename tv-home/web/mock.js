@@ -186,7 +186,15 @@
     if (kind === "ontv") {
       up.manual = true; up.code = "8180170";
       up.how = "This app came from your phone, so it cannot install an update by itself. Put it on again the same way:";
-      up.steps = ["Open Downloader on this TV (in your apps).", "Type 8180170 in its box and press Go.", "Press Install. Your settings stay."];
+      // the real app's seven steps (UpdateRules.kt), so a preview shows how long the page really is
+      up.steps = [
+        "Press Home, then open Downloader from your apps. Not there? Find Downloader by AFTVnews in the TV's Google Play Store and install it first.",
+        "If Downloader opens on a web page, press Back until you see its Home screen with a box for a web address or code. Move to the box and press OK.",
+        "Type 8180170 and press Go. If the TV asks whether Downloader may install apps, allow it.",
+        "Press Install, then Done. Your settings stay.",
+        "If it says App not installed, the TV is usually short of space. In Downloader, open Files, delete the old couch-tv-ontv files, then type 8180170 again.",
+        "Open Couch TV again from your apps.",
+        "If the code gives the version you already have, type this address in the box instead: github.com/Seagey/couch-tv/releases/latest/download/couch-tv-ontv.apk"];
     }
     var tell = function () { if (window.tv && window.tv.update) window.tv.update(JSON.parse(JSON.stringify(up))); };
     window.MOCK_UPDATER = {
