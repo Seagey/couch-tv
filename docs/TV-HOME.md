@@ -45,6 +45,48 @@ bridge, option B), which the row never shows otherwise. It stays that way while 
 into the row, and the whole row comes back on any other tile, or anywhere else on the home. An app with
 nothing on the go leaves the whole row where it is.
 
+## The Loop look
+
+Home settings, Look, **Loop** (or `home.look` `"loop"`): the background is one short clip of a place,
+looping, and the home is a caption set on it. A centred clock under the date line, bare 320 by 180
+thumbnails in the Keep watching row with the title and the app under each, and a row of 112 px app
+icons with no bar behind them. Nothing animates but the clip and the element gaining focus (a scale,
+160 ms in and 120 ms out). The scenes, the glass clock, the drift and the ambient lighting of the Night
+look are not drawn in it. The focus is a white platter with a 3 px ring outside a 2 px dark gap. The
+small accent (the progress bar, the Now playing dot, a running sleep timer's minutes) follows the
+weather: blue for rain, violet for a storm, grey for fog, and on a clear sky the colour of the sun's
+time of day.
+
+**What it needs.** The bridge (option B) serves the clip from its `loop/` folder, and `make-loop.sh`
+makes the files from one clip of your own or a free stock clip: the same picture graded four ways
+(dawn, day, dusk, night), a small blurred copy of each and two posters each. How to make them, and what
+the bridge tells the home about them (`home.loop` in `config.js`), is in [LOOP.md](LOOP.md). With
+**Follow the sun** on (Look, Follow the sun) the home picks the variant from the sun's height where you
+are, the same way the Night scenes do, and changes at the clip's loop boundary with a plain cut, never
+while the remote is moving; with it off the day grade plays all day. Without the files (no bridge, or
+`make-loop.sh` not run yet) the look shows its scrim over a dark ground and still works; in a preview
+(`index.html?mock=1&look=loop`) the night scene's photo stands in for the clip.
+
+**What is glass, and why only there.** The two quick buttons at the top right are frosted glass: the
+blurred copy of the clip plays in a second, tiny `<video>` behind them and shows only through a mask the
+shape of the buttons, so the TV never blurs anything per frame (a live `backdrop-filter` over video
+redraws the blur every frame, which is why Lighter home removes it elsewhere). Everything else, the
+toast, the plates where a show has no picture, the Settings and More apps tiles, the people switcher,
+the menus and the More apps panel, is a plain dark tint with a light rim. Measured on a Fire TV Cube
+(2 GB, Fire OS 7) in the real launcher: the sharp 720p clip alone took the launcher to about 156 MB
+(80 MB of it GPU textures) at 21 percent CPU with no dropped frames, about 100 MB under the home's
+peak today; the blur copy masked to the two buttons added about 2 MB and 10 percent CPU; the same mask
+at the size of a toast added 18 MB and made the compositor run every frame. So the glass stops at the
+buttons. `home.loop.blur` false, or a blur file that will not play, leaves the buttons on the plain
+tint too.
+
+**Lighter home** in this look plays no blur copy, uses the darker tint, and sets every duration to 0,
+so nothing glides; the toast keeps its fade.
+
+While an app or the screensaver is in front, or the screen is off, both clips let go of their files and
+decoders and the poster stays, so the home costs the TV about as much as a still; they load again when
+the home comes back.
+
 ## Finding every app
 
 On main, in the next release. Only part of your apps fit in the dock on some TVs. Press **Down** on
@@ -156,7 +198,7 @@ effects** (light rain, snow and fog over the scenes), off to start.
 
 ### Look and scenes
 
-- Night scenes or Classic.
+- Night scenes, OLED Cinema, Classic or Loop (see [The Loop look](#the-loop-look)).
 - Which scenes take turns, in what order, how many seconds each.
 - A 12 or 24 hour clock. Until you pick one, an Android TV home follows the TV's own setting (System, Date and time), then the language.
 - Glass panels and a video background: see [Glass and video](#glass-and-video).
