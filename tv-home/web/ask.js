@@ -259,9 +259,17 @@
   // ---------------- what the home computer or the TV app says (GET /api/say) ----------------
   var seen = readJson(SEEN_KEY) || { msg: 0, design: 0 }, pollT = null, firstPoll = true;
   function markSeen() { setItem(SEEN_KEY, JSON.stringify(seen)); }
+  // Opt in: the home computer is asked only once Ask AI is set up on this TV, while the Ask sheet is
+  // open, or while an Ask AI or From your AI widget is on the home. A home with none of them asks nothing.
+  function wanted() {
+    var c = readJson(CFG_KEY);
+    if (c && (c.route || c.provider)) return true;
+    if (sheet) return true;
+    try { return !!(DOC && DOC.querySelector && DOC.querySelector(".cw-k-ask, .cw-k-agent")); } catch (e) { return false; }
+  }
   function poll() {
     var h = home();
-    if (!h.on) return;
+    if (!h.on || !wanted()) return;
     var hd = {}; if (h.key) hd.Authorization = "Bearer " + h.key;
     xhr("GET", h.api + "/api/say" + (h.tv ? "?tv=" + h.tv : ""), hd, null, 8000).then(function (r) {
       var j = null; try { j = JSON.parse(r.text); } catch (e) {}
@@ -290,14 +298,22 @@
     }
     firstPoll = false;
   }
+  // couch-tv Studio is opt in: an agent's design is used only where the person at this TV turned couch-tv
+  // Studio on and designs are not switched off. An agent never turns it on, and never clears an off.
+  function studioOff() {
+    var v = null, off = null;
+    // read as app.js kept() does: the launcher's own store first, then the page's
+    try { var raw = nat() && nat().kept ? nat().kept("tvhome.designer") : null; if (raw == null) raw = W.localStorage.getItem("tvhome.designer"); v = JSON.parse(raw || "null"); } catch (e) {}
+    try { off = W.localStorage.getItem("couchtv.design.off"); } catch (e) {}
+    return v !== "on" || !!off;
+  }
   function useDesign(code) {
     var C = W.CouchDesignCode;
     if (!C || !C.get || !C.readCode(code)) { banner({ from: "couch-tv", text: "A design was sent, but this TV cannot get designs. Update couch-tv.", seconds: 15 }); return; }
+    if (studioOff()) { banner({ from: "couch-tv", text: "Your AI sent a design. couch-tv Studio is switched off on this TV, so it was not used. To use designs, turn it on in Home settings, couch-tv Studio.", seconds: 20 }); return; }
     banner({ from: "couch-tv", text: "Getting the design your AI sent...", seconds: 20 });
     C.get(code).then(function () {
-      // the same as typing a code in Home settings: couch-tv Studio on, then "Use this design?" first
-      try { W.localStorage.setItem("tvhome.designer", JSON.stringify("on")); W.localStorage.removeItem("couchtv.design.off"); } catch (e) {}
-      try { if (nat() && nat().keep) nat().keep("tvhome.designer", JSON.stringify("on")); } catch (e) {}
+      // "Use this design?" comes first, as for a code typed at the TV; this TV's on or off choice is left as it is
       setTimeout(function () { try { W.location.reload(); } catch (e) {} }, 800);
     }, function (e) { banner({ from: "couch-tv", text: (e && e.message) || "That design could not be used.", seconds: 15 }); });
   }
@@ -566,7 +582,7 @@
     ok: function () { if (!sheet) return false; var s = sheet.stops[sheet.cur]; if (s && s.input) { submitted(s.input, s.input.el.value); return true; } if (s && s.ok) s.ok(); return true; },
     type: function (text) { if (!sheet) return false; var s = sheet.stops[sheet.cur]; if (!s || !s.input) return false; s.input.el.value = text; return true; },
     draw: { ask: drawAsk, agent: drawAgent },
-    _test: { baseProblem: baseProblem, isLocalHost: isLocalHost, request: request, answerOf: answerOf, errorOf: errorOf, plain: plain, took: took, keyFor: keyFor, config: config, SYSTEM: SYSTEM,
+    _test: { wanted: wanted, baseProblem: baseProblem, isLocalHost: isLocalHost, request: request, answerOf: answerOf, errorOf: errorOf, plain: plain, took: took, keyFor: keyFor, config: config, SYSTEM: SYSTEM,
       reset: function () { last = null; message = null; seen = { msg: 0, design: 0 }; firstPoll = true; mem = {}; } }
   };
   root.CouchAsk = API;

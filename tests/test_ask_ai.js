@@ -131,16 +131,35 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
     const { A, sb, store } = page("?api=http%3A%2F%2Fbridge%3A5400", {});
     sb.CouchDesignCode = { readCode: (c) => (/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(c) ? c : ""), get: (c) => { got.push(c); return Promise.resolve(); } };
     const now = 1800000000000;
+    // couch-tv Studio is opt in: never chosen, or switched off, an agent's design is not used, and the
+    // choice is left exactly as it was
+    A._test.took({ design: { code: "ABCDE-FGHJK", at: now - 450 } }, now);
+    ok(got.length === 0 && !("tvhome.designer" in store), "Studio never turned on: the design is not fetched and Studio stays as it was");
+    A._test.reset();
+    store["tvhome.designer"] = JSON.stringify("on"); store["couchtv.design.off"] = "1";
+    A._test.took({ design: { code: "ABCDE-FGHJK", at: now - 450 } }, now);
+    ok(got.length === 0 && store["couchtv.design.off"] === "1", "designs switched off: not fetched, and the off is not cleared");
+    delete store["couchtv.design.off"];
+    A._test.reset();
     A._test.took({ ask: { q: "what's on", a: "Bluey", at: now - 1000, by: "Claude on the home computer" }, message: { text: "Dinner is ready", from: "Claude", at: now - 500, seconds: 20 }, design: { code: "ABCDE-FGHJK", at: now - 400 } }, now);
     ok(A.last().a === "Bluey" && A.last().by === "Claude on the home computer", "an answer asked from the phone shows on the TV");
     ok(A.message().text === "Dinner is ready" && A.message().from === "Claude", "the agent's message is kept for the widget");
     ok(got[0] === "ABCDE-FGHJK", "a design code is fetched the way a typed one is");
     await tick(); await new Promise((r) => setTimeout(r, 900));
-    ok(store["tvhome.designer"] === JSON.stringify("on") && sb.reloaded === 1, "couch-tv Studio on, then the page starts again and asks Use this design? first");
+    ok(store["tvhome.designer"] === JSON.stringify("on") && sb.reloaded === 1, "Studio on at this TV: the page starts again and asks Use this design? first");
     A._test.took({ design: { code: "ABCDE-FGHJK", at: now - 400 } }, now + 6000);
     ok(got.length === 1, "the same design is not fetched twice");
     A._test.took({ design: { code: "ABCDE-FGHJK", at: now - 3600000 } }, now);
     ok(got.length === 1, "an old one is not fetched");
+  }
+
+  // 6b. opt in: the home computer is asked for messages only once Ask AI is set up on this TV (or its
+  // sheet is open, or an Ask AI or From your AI widget is on the home)
+  {
+    const { A } = page("?api=http%3A%2F%2Fbridge%3A5400", {});
+    ok(A._test.wanted() === false, "a bridge home with nothing set up never asks GET /api/say");
+    A.save({ provider: "local", base: "http://my-computer.local:11434/v1", model: "llama3.2" });
+    ok(A._test.wanted() === true, "Ask AI set up on this TV: it asks");
   }
 
   // 7. a model at home is the only plain http address the design page lets the TV ask

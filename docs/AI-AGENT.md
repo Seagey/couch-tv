@@ -3,9 +3,12 @@
 Your own AI app (Claude Desktop, Claude Code, Cursor, or any program that speaks MCP or plain HTTP) can:
 
 - **show a message on the TV** ("Dinner is ready"): it pops up over the home and fills the **From your AI**
-  widget;
+  widget. The TV listens for messages only once you opt in: a **From your AI** or **Ask AI** widget on the
+  home, or Ask AI set up on that TV. A home with neither asks the computer nothing;
 - **change the TV home**: design one with couch-tv Studio's own MCP tools and send it as a code; the TV
-  fetches it and asks **Use this design?** first, so nothing changes until someone presses OK;
+  fetches it and asks **Use this design?** first, so nothing changes until someone presses OK. This works
+  only on a TV where couch-tv Studio is turned on (Home settings, couch-tv Studio): an agent never turns it
+  on, and a TV switched back to its classic home stays classic;
 - **drive the TV**: play a show, open an app, press keys, change the volume (the tools that were already there);
 - **read what the TV shows** from Ask AI.
 
@@ -51,7 +54,7 @@ Add it to your app's MCP settings, for example Claude Desktop's `claude_desktop_
 Claude Code: `claude mcp add tv --env BRIDGE_URL=http://tv.example:5400 --env BRIDGE_KEY=... -- /path/to/couch-tv/.venv/bin/python /path/to/couch-tv/bridge/mcp_server.py`.
 Cursor: the same `command`, `args` and `env` in `.cursor/mcp.json`.
 
-To design homes too, add couch-tv Studio's MCP server (`tools/tv-designer/mcp`, its README has the line).
+To design homes too, add couch-tv Studio's own MCP server as well: couch-tv Studio's help gives the line to add.
 Then ask: "Design an autumn home for the lounge TV and put it on the TV." Studio's `send_to_tv` gives a code,
 and this server's `set_home_design` hands the code to the TV.
 

@@ -32,7 +32,7 @@ Set a monthly spend limit with the service. A typical question costs a small fra
 - **On the TV:** OK on the widget, **Ask a question**, then type. On a Google TV or Android TV the TV's own
   keyboard has a microphone: press it and say the question.
 - **On the phone remote:** the **Ask** button (with its microphone). The answer shows on the phone and on
-  the TV's Ask AI widget too (the TV reads `GET /api/say` every few seconds).
+  the TV's Ask AI widget too (the TV reads `GET /api/say` every few seconds, only while an Ask AI or From your AI widget is on the home or Ask AI is set up on the TV).
 
 ## A model at home
 
