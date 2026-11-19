@@ -4446,6 +4446,71 @@ async def move_open(app, now, session, who, again=False, asked=None):
     return {"method": method, "started": False}
 
 
+async def move_sibling_title(app, pkg, title, wrong):
+    """TV B came up on another title (`wrong`) than TV A's (`title`). In the apps of
+    move.SIBLING_TITLE_APPS the right one may be a tile on that other title's own page: open the
+    page, press the one tile that is exactly `title`, then the page's Play button.
+    Returns None when Play was not pressed, True when it was and the app says it is playing, False
+    when it was and the app has not started yet. The caller reads what TV B says it plays either way.
+    Every step that cannot be sure stops: the show finder does not have exactly this title, the page
+    is not the one for `wrong`, no tile or two tiles carry the title, the next page does not name
+    `title`, or a button to pay or sign in is on screen. Only labels the screen reader gives are
+    pressed, never a blind OK."""
+    if app["id"] not in move.SIBLING_TITLE_APPS:
+        return None
+    pressed = False
+
+    async def screen(named):
+        # A title page takes a moment to draw (longer on a slow TV): look again once if the title
+        # that should be on it is not there yet.
+        items = []
+        for wait in (3, 2):
+            await asyncio.sleep(wait)
+            items = await agentic.ui_items()
+            if move.page_names(items, named):
+                break
+        return items
+    try:
+        best, _ = await finder.find(title)
+        # only the very title, as `play` asked for it: the finder's best guess is another show
+        if not best or not (finder.same_title(best["title"], title) or move.same_name(best["title"], title)):
+            return None
+        page = next((p.get("web") for p in best.get("providers") or [] if p["service"] == app["id"]), None)
+        if not move.page_host_ok(app["id"], page):
+            return None
+        await tv.start_intent(page, pkg, cold=False)
+        if not await tv.wait_for_app({pkg}, timeout=8):
+            return None
+        items = await screen(wrong)
+        if not move.page_names(items, wrong):
+            log.info("move: the page %s opened in %s is not the one for %s", title, app["name"], wrong)
+            return None
+        if agentic.stop_labels(items) or move.page_stops(items):
+            log.info("move: a button to pay or sign in is on the page of %s in %s: nothing pressed", wrong, app["name"])
+            return None
+        tile = move.sibling_item(items, title)
+        if not tile:
+            log.info("move: no one tile for %s on the page of %s in %s", title, wrong, app["name"])
+            return None
+        # the screen reader reads whatever is in front: press only while that is still this app
+        if await tv.front_package() != pkg:
+            return None
+        await tv.adb("shell", f"input tap {int(tile['x'])} {int(tile['y'])}", timeout=8)
+        items = await screen(title)
+        button = move.page_play_button(items, agentic._button)
+        if (not button or not move.page_names(items, title) or agentic.stop_labels(items)
+                or move.page_stops(items) or await tv.front_package() != pkg):
+            log.info("move: the tile for %s in %s did not lead to a page that can play it", title, app["name"])
+            return None
+        pressed = True
+        await tv.adb("shell", f"input tap {int(button['x'])} {int(button['y'])}", timeout=8)
+        log.info("move: found %s on the page of %s in %s and pressed %s", title, wrong, app["name"], button["label"])
+        return await wait_until_playing(pkg, timeout=15)
+    except Exception as e:   # the finder, the screen reader or ADB did not answer
+        log.info("move: could not look for %s on the page of %s: %s", title, wrong, e)
+        return False if pressed else None
+
+
 async def _move_state(pkg):
     """The app's playback state on this TV ("PLAYING", "PAUSED", ...), its active session first. None
     when it has no session. "UNKNOWN" when the TV did not answer: that is not a pause, and not a
@@ -4712,6 +4777,25 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
                     started = False
                     await tv.key("pause")
                     log.info("move: %s played %s on %s, not %s: paused it", app["name"], wrong_title, dst, title)
+                    # The right title may be a tile on that title's own page (Disney+ and its
+                    # Sing-Along titles). Once Play has been pressed there, B's own word decides
+                    # again: the right title counts, any other is paused like the first one.
+                    pressed = await move_sibling_title(known, pkg_b, title, there) if there else None
+                    if pressed is not None:
+                        there = None
+                        for _ in range(4):
+                            await media_read(pkg_b, app)
+                            there = media_now.get("title") if media_now.get("title_from") == "app" else None
+                            if there:
+                                break
+                            await asyncio.sleep(2)
+                        if finder.same_title(there, title) or move.same_name(there, title):
+                            wrong_title = None
+                            started = pressed or media_now.get("state") == "playing"
+                            opened_at = time.monotonic()   # B has played this title only from now
+                        else:
+                            wrong_title = there or wrong_title
+                            await tv.key("pause")
             # 7. the backup: only when B is playing and is not near A's spot
             if started:
                 at = media_now.get("position_ms")
