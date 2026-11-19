@@ -5,7 +5,7 @@ Apple TV app. Both were built and checked against a stand-in Apple TV and a stan
 the tvOS Simulator. No real Apple TV has run them yet, so expect something to need fixing. Please [open an issue](https://github.com/Seagey/couch-tv/issues)
 and say how it went (the Apple TV model, tvOS version, what worked and what did not), even if all of it worked.
 
-The design renderer added in 0.13.2 ([below](#a-design-from-couch-tv-studio)) is in the source only: it was compiled and drawn on a Mac, and it has not been built for tvOS or run in the Simulator.
+From 0.13.4 Couch TV builds with Xcode and draws couch-tv Studio designs ([below](#a-design-from-couch-tv-studio)). That was checked in the tvOS 27.2 Simulator on an Apple TV 4K, not yet on a real Apple TV.
 
 ## What you get, in plain words
 
@@ -282,7 +282,7 @@ once a show is open. In each app the child uses:
 
 ## A design from couch-tv Studio
 
-Couch TV's source (0.13.2) has a SwiftUI design renderer. It was compiled and its drawing checked on a Mac; it has not been built for tvOS, so build Couch TV with Xcode to use it. It takes a design from two places:
+Couch TV draws couch-tv Studio designs (from 0.13.4). It builds with Xcode and runs in the tvOS 27.2 Simulator (Apple TV 4K, 4th generation); it has not run on a real Apple TV yet. A video background shows its still picture: Couch TV never plays a design's video. It takes a design from two places:
 
 - **config.json's `design`**, which the bridge hands over with the rest of the home's settings.
 - **A code typed on the Apple TV:** Settings, Home design, Get a design, then the code from couch-tv Studio
@@ -306,7 +306,8 @@ What shows:
   a card, a quote, a welcome, and a smart stack taking turns.
 - Every other widget (now playing, the smart home ones, news, sport, shares, the forecast by the hour or the week,
   photo slideshows, the agenda, notes, lists, timers and the rest) shows as a tidy card with its name and symbol,
-  because Couch TV does not have their live data.
+  because Couch TV does not have their live data. A widget this Couch TV does not know yet (one added to couch-tv
+  Studio later) keeps its place as a plain card, and a short card (a smart home pill) fits its words to the box.
 
 The design is checked the same way as on the other TVs before anything is drawn: only known settings are read,
 numbers are kept to sensible sizes, colours are plain colours, words with a number or a web address are left

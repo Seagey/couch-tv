@@ -446,7 +446,11 @@ struct DesignObject: Equatable, Identifiable {
     }
 
     private static func read(widget s: [String: Any], into o: inout DesignObject, inStack: Bool) -> Bool {
-        guard let kind = DesignGate.pick(s["kind"], DesignWidgets.kinds), !(inStack && kind == "stack") else { return false }
+        // a kind this Apple TV does not know (a newer couch-tv Studio widget) still keeps its place as a plain
+        // "Widget" card, so the design does not have a hole in it. Its own name is never drawn. Not in a stack.
+        let named = DesignGate.pick(s["kind"], DesignWidgets.kinds)
+        let unknown = named == nil && !inStack && (s["kind"] as? String)?.range(of: "^[a-z][a-z0-9_-]{1,31}$", options: .regularExpression) != nil
+        guard let kind = named ?? (unknown ? DesignWidgets.other : nil), !(inStack && kind == "stack") else { return false }
         o.kind = kind
         o.widgetStyle = .read(DesignGate.dict(s["style"]))
         o.opts = .read(kind, DesignGate.dict(s["opts"]))
@@ -580,6 +584,9 @@ enum DesignWidgets {
 
     static func drawsNatively(_ kind: String) -> Bool { native.contains(kind) }
 
+    /// The kind given to a widget this Apple TV does not know: drawn as a plain "Widget" card.
+    static let other = "other"
+
     /// The tile colour each kind has when its style does not pick one (widgets.js TILE).
     static let tile: [String: String] = ["analog": "#f4f1ea", "wordclock": "#0a6fd8", "countdown": "#18793f", "weather": "#1b64b5",
                                          "bigtemp": "#ffb340", "hourly": "#1b64b5", "week": "#1b64b5", "uv": "#ff9f0a", "surf": "#0a6e8a",
@@ -626,7 +633,7 @@ enum DesignWidgets {
             "news": "News", "sports": "Sport", "stocks": "Shares", "commute": "Commute", "wifi": "Wi-Fi", "guide": "House guide",
             "screentime": "Screen time", "ask": "Ask", "agent": "Assistant",
             "light": "Light", "speaker": "Speaker", "network": "Network", "devices": "Devices", "vacuum": "Vacuum",
-            "appliance": "Appliance", "scene": "Scene", "group": "Controls",
+            "appliance": "Appliance", "scene": "Scene", "group": "Controls", other: "Widget",
         ]
         return names[kind] ?? kind.prefix(1).uppercased() + kind.dropFirst()
     }
