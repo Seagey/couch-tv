@@ -97,7 +97,7 @@ abstract class BundleTvWeb : DefaultTask() {
             // the Loop look's footage (loop/, up to 80 MB, made by scripts/make-loop.sh) is streamed from the
             // bridge, never carried in the app: the same rule as the bridge's offline manifest, so the posters
             // (loop/*.jpg) still ship and a Loop home with no bridge shows a still
-            if (rel.startsWith("loop/") && !rel.endsWith(".jpg")) return@forEach
+            if (rel.startsWith("loop/") && (!rel.endsWith(".jpg") || rel.contains("/."))) return@forEach   // and never a run's .staging-<pid>/
             f.copyTo(File(dest, rel), overwrite = true)
         }
         File(dest, "config.js").writeText("window.COUCH_CONFIG = " + JsonOutput.toJson(publicConfig(configJson.get().asFile)) + ";\n")
