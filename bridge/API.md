@@ -959,6 +959,9 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- 2026-11-19: The Loop look's depth effect: `home.loop` also carries `meta` (the folder's `loop.json`
+  from make-loop.sh, checked, or null) and `fg` (true when meta has the cut-out's rectangle and every
+  variant has `/tv/loop/<variant>-fg.png`); its `version` mark covers both (docs/LOOP.md).
 - 2026-11-18: The Loop look (New, option B): `home.look` takes `loop`, and `home.loop` (read only,
   `{"variants": [...], "blur": bool}`) in `/api/config` and `/tv/config.js` says which of its files the
   bridge has. `/tv/loop/<variant>.mp4`, `-blur.mp4`, `.jpg` and `-blur.jpg` are served with byte ranges;

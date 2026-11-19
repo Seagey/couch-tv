@@ -67,6 +67,16 @@ while the remote is moving; with it off the day grade plays all day. Without the
 `make-loop.sh` not run yet) the look shows its scrim over a dark ground and still works; in a preview
 (`index.html?mock=1&look=loop`) the night scene's photo stands in for the clip.
 
+**The dock** is centred on the screen, as in the Night look; the Keep watching row above it stays on the
+left edge, and Up and Down between the two land on the tile nearest the one you were on.
+
+**The clock behind the peak.** Made from a photo with `make-loop.sh --matte` (the lake peak's own
+cut-out works), the clock sits slightly behind the mountain, as in the original design: a cut-out of
+what stands in front of the sky is drawn over the clock's lower part and moves with the slow push, in
+step with the video. The clock and the date line sit 80 px lower then. It needs a photo (a clip's own
+motion cannot be followed), the matte, and the bridge; without them the clock is in front, where it
+always was. [LOOP.md](LOOP.md), the depth effect.
+
 **What is glass, and why only there.** The two quick buttons at the top right are frosted glass: the
 blurred copy of the clip plays in a second, tiny `<video>` behind them and shows only through a mask the
 shape of the buttons, so the TV never blurs anything per frame (a live `backdrop-filter` over video
