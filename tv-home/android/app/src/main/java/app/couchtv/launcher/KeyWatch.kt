@@ -28,8 +28,10 @@ class KeyWatch : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
-        if (!isGear(event)) {
-            val pkg = appFor(this, event) ?: return false   // not ours: Android gets it as usual
+        // `gear` as the target of an app_keys entry makes that button the gear button too ("scan66:gear")
+        val mapped = if (isGear(event)) null else appFor(this, event)
+        if (!isGear(event) && mapped != "gear") {
+            val pkg = mapped ?: return false   // not ours: Android gets it as usual
             Log.i("couchtv-keywatch", "app key keyCode=${event.keyCode} scan=${event.scanCode} -> $pkg")
             if (event.action == KeyEvent.ACTION_UP && event.repeatCount == 0) {
                 runCatching {
