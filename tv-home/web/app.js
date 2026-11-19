@@ -61,7 +61,8 @@
   var MAX_PHOTOS = 50;
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
-  var THEME = "night", NIGHT = true, OLED = false, CLOCK24 = false;
+  // LOOP: the Loop look, laid out like Night (NIGHT stays true in it), see setLook()
+  var THEME = "night", NIGHT = true, OLED = false, LOOP = false, CLOCK24 = false;
   // OLED burn-in protection: micro-shift (±2px) every 60 seconds in the OLED look. The Smart Idle
   // ambient clock uses wider steps (±4px) while it is on screen.
   var OLED_SHIFT_STEPS = [[0,0], [1,1], [-1,1], [2,-1], [-1,-1], [1,-2], [-2,0], [0,1]];
@@ -467,11 +468,8 @@
     QUICK = (Array.isArray(ST.quick) ? ST.quick : TVCFG.quick || ["sleep", "picture"])
       .filter(function (q, i, a) { return QUICK_ALL.indexOf(q) >= 0 && a.indexOf(q) === i; });
     THEME = (Q.match(/[?&]theme=([a-z]+)/) || [])[1] || lookSetting();
-    if (THEME !== "classic" && THEME !== "oled") THEME = "night";
-    NIGHT = THEME === "night";
-    OLED = THEME === "oled";
-    document.documentElement.classList.toggle("theme-night", NIGHT);
-    document.documentElement.classList.toggle("theme-oled", OLED);
+    if (THEME !== "classic" && THEME !== "oled" && THEME !== "loop") THEME = "night";
+    setLook(THEME);
     GLASS = glassSetting();
     document.documentElement.classList.toggle("glass", GLASS !== "off");
     document.documentElement.classList.toggle("glass-lite", GLASS === "lite");
@@ -504,10 +502,10 @@
     glassClasses();
     // a link set in Home settings wins over home.video_url; one from config.json alone means on
     VIDEO_URL = typeof ST.video_url === "string" ? ST.video_url : typeof HOME.video_url === "string" ? HOME.video_url : "";
-    VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true);
+    VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true) && !LOOP;   // the Loop look has its own clip
     GRID_COLS = NIGHT ? 12 : 8;
     DOCK_APPS = Math.max(1, Math.min(10, parseInt(HOME.dock_size, 10) || 10));
-    DOCK_BANNERS = NIGHT && (typeof ST.dock_banners === "boolean" ? ST.dock_banners : HOME.dock_banners === true);
+    DOCK_BANNERS = NIGHT && !LOOP && (typeof ST.dock_banners === "boolean" ? ST.dock_banners : HOME.dock_banners === true);
     document.documentElement.classList.toggle("dock-banners", DOCK_BANNERS);
     initSoundscape();
     if (smartOn()) DOCK_APPS = Math.min(DOCK_APPS, 9);   // the Smart home tile takes one place in the dock
@@ -531,7 +529,23 @@
   }
   function lookSetting() {
     var l = ST.look || kept("tvhome.look") || HOME.look || "night";
-    return (l === "classic" || l === "oled") ? l : "night";
+    return (l === "classic" || l === "oled" || l === "loop") ? l : "night";
+  }
+  // The Loop look (docs/TV-HOME.md, "The Loop look") is laid out like Night (the dock, the row of
+  // cards, the More apps panel), so NIGHT stays true in it; LOOP switches off what Night draws over
+  // its photos (the scenes, the glass clock, the drift, the ambient lighting, home.video_url) and
+  // puts the loop's clip, scrim and glass in their place. html.theme-loop and body.theme-loop carry
+  // its rules in app.css; the Night, Classic and OLED looks keep theirs.
+  function setLook(theme) {
+    THEME = theme;
+    LOOP = THEME === "loop";
+    NIGHT = THEME === "night" || LOOP;
+    OLED = THEME === "oled";
+    var root = document.documentElement;
+    root.classList.toggle("theme-night", NIGHT);
+    root.classList.toggle("theme-oled", OLED);
+    root.classList.toggle("theme-loop", LOOP);
+    if (document.body) document.body.classList.toggle("theme-loop", LOOP);
   }
   function glassAmount() {
     var n = parseInt(ST.glass_amount != null ? ST.glass_amount : HOME.glass_amount, 10);
@@ -547,6 +561,7 @@
     document.documentElement.classList.toggle("still", !MOVING);
     // Mac-style dock (Home settings, Look; home.dock "mac"): off unless chosen, held off by Lighter home
     DOCK_MAC = !LIGHTER && (ST.dock || HOME.dock) === "mac";
+    if (LOOP) DOCK_MAC = false;   // the Loop dock has no wave
     DATE_BARS = HOME.date_bars === true;
     document.documentElement.classList.toggle("dock-mac", DOCK_MAC);
     if (typeof magnify === "function") magnify();
@@ -1038,6 +1053,253 @@
     sceneEls.forEach(function (el, i) { if (el.classList.contains("ready")) drawClocks(el, SCENES[i], hm); });
   }
 
+  // ---------------- the Loop look (home.look "loop"; docs/TV-HOME.md, "The Loop look") ----------------
+  // One clip of a place, graded for dawn, day, dusk and night by make-loop.sh on the bridge computer
+  // (docs/LOOP.md), plays full screen under one fixed scrim. The bridge says which variants it has in
+  // config.js as home.loop = { variants: [...], blur: true|false }; the files are /tv/loop/<v>.mp4,
+  // <v>-blur.mp4 (a 160x90 blurred copy), <v>.jpg and <v>-blur.jpg (the posters). The variant follows
+  // sunPhase() while Follow the sun (sun_sync) is on, else it is day. A change is a cut at the loop
+  // boundary, held while keys are moving (sceneMayChange), with the new posters decoded beforehand.
+  // Glass: the blurred copy plays in a second <video> inside a container the size of the quick
+  // buttons, shown through an SVG mask of their shapes, so nothing is blurred per frame. Measured on
+  // a Fire TV Cube (2 GB) in the launcher's WebView: the sharp 720p clip alone cost the launcher
+  // about 80 MB of GL textures and 21 percent CPU (PSS 156 MB, no dropped frames); the blur copy
+  // masked to the two buttons 2 MB and 10 percent more; the same mask at toast size 18 MB more with
+  // the compositor running every frame. So only the buttons are glass; the toast and the rest take
+  // the no blur recipe (app.css). No prefetch and no crossfade: a fetch would hold 20 MB on the heap
+  // and a crossfade is four decoders at once.
+  var LOOP_DIR = API + "/tv/loop/", LOOP_PHASES = ["dawn", "day", "dusk", "night"];
+  var loopVariants = [], loopBlurOn = false, loopCur = "", loopPending = "", loopArmed = false, loopPoster = "", loopOff = false;
+  var loopSharp = null, loopBlur = null, loopBox = null, loopMaskKey = null, loopLastT = 0, loopSeekLat = 0, loopSeekAt = 0, loopFirstRow = 0;
+  function loopFiles(v) {
+    return { video: LOOP_DIR + v + ".mp4", blur: LOOP_DIR + v + "-blur.mp4", poster: LOOP_DIR + v + ".jpg", bposter: LOOP_DIR + v + "-blur.jpg" };
+  }
+  // home.loop from config.js; a missing key is no variants, and Lighter home never plays the blur copy
+  function loopReadConfig() {
+    var lp = HOME.loop && typeof HOME.loop === "object" ? HOME.loop : {};
+    loopVariants = (Array.isArray(lp.variants) ? lp.variants : []).filter(function (v) { return LOOP_PHASES.indexOf(v) >= 0; });
+    loopBlurOn = lp.blur === true && !LIGHTER;
+  }
+  // which variant to show now: the sun's phase while Follow the sun is on, else day; a missing file
+  // falls back to day, then to the first the bridge has
+  function loopVariant() {
+    if (!loopVariants.length) return "";
+    var want = SUN_SYNC ? sunPhase() : "day";
+    if (loopVariants.indexOf(want) >= 0) return want;
+    if (loopVariants.indexOf("day") >= 0) return "day";
+    return loopVariants[0];
+  }
+  // the accent (the progress fill, the Now playing dot, the sleep timer count): the weather code, and
+  // for a clear sky the same sunPhase() that picks the variant, so the two never disagree at twilight
+  function loopAccent() {
+    var code = data.weather && data.weather.code;
+    if (code == null || !isFinite(code)) return "#F2A33C";
+    code = Number(code);
+    if (code >= 95) return "#C9A3FF";
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "#DCE8F5";
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return "#7FB2E5";
+    if (code === 45 || code === 48) return "#A9B4C2";
+    if (code <= 3) return { dawn: "#F2B463", day: "#7CC4F5", dusk: "#F08A6B", night: "#8E9CFF" }[sunPhase()] || "#F2A33C";
+    return "#F2A33C";
+  }
+  function loopVideoEl(id) {
+    var el = document.createElement("video");
+    el.id = id; el.className = id;
+    el.muted = true; el.loop = true;
+    el.setAttribute("muted", ""); el.setAttribute("loop", ""); el.setAttribute("playsinline", "");
+    el.setAttribute("preload", "auto"); el.setAttribute("aria-hidden", "true");
+    return el;
+  }
+  // start(): the sharp clip at the back of the page, and with blur the glass container just over the scrim
+  function loopInit() {
+    loopReadConfig();
+    var root = document.documentElement;
+    root.style.setProperty("--accent", loopAccent());
+    if (MOCK && !loopVariants.length) loopPoster = "backgrounds/scene-night.jpg";   // a preview with no files: a still stands in
+    var v = loopVariant();
+    if (!v) console.log("loop: the bridge has no loop files (docs/LOOP.md): the scrim" + (loopPoster ? " over a still" : " alone"));
+    loopSharp = loopVideoEl("loop-video");
+    loopSharp.onerror = function () { console.log("loop: " + loopCur + ".mp4 did not play, the poster stays"); };
+    loopSharp.addEventListener("timeupdate", loopTimeUpdate);
+    document.body.insertBefore(loopSharp, document.body.firstChild);
+    if (loopBlurOn && v) {
+      loopBox = document.createElement("div");
+      loopBox.id = "loop-glass"; loopBox.className = "loop-glass"; loopBox.setAttribute("aria-hidden", "true");
+      loopBlur = loopVideoEl("loop-blur");
+      loopBlur.onerror = loopNoGlass;
+      loopBox.appendChild(loopBlur);
+      var scrim = document.querySelector(".scrim");
+      scrim.parentNode.insertBefore(loopBox, scrim.nextSibling);
+      root.classList.add("loop-glass");
+    }
+    if (v) loopLoad(v);
+    else if (loopPoster) loopSharp.setAttribute("poster", loopPoster);
+  }
+  // puts a variant on both elements: per element pause, let go of the file (load() frees the codec), the
+  // poster, then the file; one play() for both once each can play through, or after 4 s
+  function loopLoad(v) {
+    loopCur = v; loopPending = ""; loopArmed = false; loopLastT = 0;
+    var f = loopFiles(v), els = [loopSharp, loopBlur].filter(Boolean), ready = 0, started = false, timer = null;
+    var go = function () {
+      if (started) return;
+      started = true; clearTimeout(timer);
+      els.forEach(function (el) {
+        el.removeEventListener("canplaythrough", one);
+        var p = el.play();
+        if (p && p.catch) p.catch(function () {});
+      });
+      if (loopBlur) loopAlign();
+    };
+    var one = function () { if (++ready >= els.length) go(); };
+    els.forEach(function (el, i) {
+      el.pause();
+      el.removeAttribute("src");
+      try { el.load(); } catch (e) {}
+      el.setAttribute("poster", i ? f.bposter : f.poster);
+      el.addEventListener("canplaythrough", one);
+      el.src = i ? f.blur : f.video;
+    });
+    timer = setTimeout(go, 4000);
+  }
+  // once a minute (clock()): the accent, and the variant for this phase. A new one has its posters
+  // decoded now (new Image, decode) and goes on at the next loop boundary (loopTimeUpdate)
+  function loopTick() {
+    document.documentElement.style.setProperty("--accent", loopAccent());
+    var v = loopVariant();
+    if (!loopSharp || !v || v === loopCur || v === loopPending) return;
+    loopPending = v; loopArmed = false;
+    var f = loopFiles(v), imgs = loopBlur ? [f.poster, f.bposter] : [f.poster], done = 0;
+    var fin = function () { if (++done >= imgs.length && loopPending === v) loopArmed = true; };
+    imgs.forEach(function (src) {
+      var im = new Image();
+      im.onload = function () { if (im.decode) im.decode().then(fin, fin); else fin(); };
+      im.onerror = fin;
+      im.src = src;
+    });
+  }
+  // the loop boundary: ended, a timeupdate within 0.3 s of the end, or the time went back (a wrap)
+  function loopAtBoundary(el) {
+    var now = el.currentTime, d = el.duration, wrapped = now < loopLastT - 1;
+    loopLastT = now;
+    return { at: !!el.ended || wrapped || (isFinite(d) && d > 0 && d - now < 0.3), wrapped: wrapped };
+  }
+  function loopTimeUpdate() {
+    var b = loopAtBoundary(loopSharp);
+    if (b.at && loopPending && loopArmed && sceneMayChange()) { loopLoad(loopPending); return; }
+    if (loopBlur) loopSync(b.wrapped);
+  }
+  // keeps the blur copy on the sharp clip, read at each timeupdate (4 Hz): under 0.2 s nothing, up to
+  // 0.5 s a 3 percent rate pull, above that a seek; after a wrap one seek, since the two stall apart
+  function loopSync(wrapped) {
+    var b = loopBlur, s = loopSharp;
+    if (wrapped) { loopAlign(); return; }
+    if (loopSeekAt && Date.now() - loopSeekAt > 2000) loopSeekAt = 0;   // a seek that never reported back
+    if (b.seeking || loopSeekAt) return;
+    var d = b.currentTime - s.currentTime;
+    if (Math.abs(d) < 0.2) { if (b.playbackRate !== 1) b.playbackRate = 1; }
+    else if (Math.abs(d) <= 0.5) b.playbackRate = d > 0 ? 0.97 : 1.03;
+    else loopAlign();
+  }
+  // a seek lands late by what the decoder takes (up to 29 frames of a 1 s GOP): measured on the first
+  // seek, added to the next ones
+  function loopAlign() {
+    var b = loopBlur, s = loopSharp;
+    if (!b || !s) return;
+    b.playbackRate = 1;
+    var want = s.currentTime + loopSeekLat;
+    if (isFinite(b.duration) && b.duration > 0) want = want % b.duration;
+    loopSeekAt = Date.now();
+    var onSeeked = function () {
+      b.removeEventListener("seeked", onSeeked);
+      if (!loopSeekLat) loopSeekLat = Math.min(0.5, (Date.now() - loopSeekAt) / 1000);
+      loopSeekAt = 0;
+    };
+    b.addEventListener("seeked", onSeeked);
+    try { b.currentTime = want; } catch (e) { loopSeekAt = 0; }
+  }
+  // the glass container and its mask: the bounding box of the quick buttons, and one SVG of their
+  // shapes. Made again only when a button appears or leaves (key: which buttons show), never on focus:
+  // the focus platter is opaque and covers the glass
+  function loopMask(key) {
+    if (!loopBox || key === loopMaskKey) return;
+    loopMaskKey = key;
+    var rects = loopGlassRects();
+    if (!rects.length) { loopBox.style.display = "none"; return; }
+    var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    rects.forEach(function (r) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); });
+    x0 = Math.floor(x0); y0 = Math.floor(y0);
+    var w = Math.ceil(x1 - x0), h = Math.ceil(y1 - y0);
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '">' +
+      rects.map(function (r) {
+        return '<rect x="' + (r.x - x0) + '" y="' + (r.y - y0) + '" width="' + r.w + '" height="' + r.h + '" rx="' + r.rx + '" fill="#000"/>';
+      }).join("") + "</svg>";
+    var url = 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+    var st = loopBox.style;
+    st.display = ""; st.left = x0 + "px"; st.top = y0 + "px"; st.width = w + "px"; st.height = h + "px";
+    st.webkitMaskImage = url; st.maskImage = url;
+    // the blurred copy keeps the sharp clip's cover geometry: full screen, moved up and left by the box
+    var vs = loopBlur.style;
+    vs.left = -x0 + "px"; vs.top = -y0 + "px"; vs.width = innerWidth + "px"; vs.height = innerHeight + "px";
+  }
+  // the glass shapes: each quick button's box as laid out (offsets, so a focused button's scale does
+  // not reach the mask), with half its height as the radius (a circle, or a pill while a timer runs)
+  function loopGlassRects() {
+    var box = $("qbtns"), out = [];
+    if (!box || $("quick").classList.contains("none")) return out;
+    var b = box.getBoundingClientRect();
+    Array.prototype.forEach.call(box.children, function (el) {
+      var w = el.offsetWidth, h = el.offsetHeight;
+      if (!w || !h) return;
+      out.push({ x: b.left + el.offsetLeft - box.offsetLeft, y: b.top + el.offsetTop - box.offsetTop, w: w, h: h, rx: h / 2 });
+    });
+    return out;
+  }
+  // no blur after all (the file failed, or did not play): no container, no mask, and the buttons take
+  // the darker tint (app.css, html without loop-glass)
+  function loopNoGlass() {
+    if (loopBlur) { loopBlur.pause(); loopBlur.removeAttribute("src"); try { loopBlur.load(); } catch (e) {} }
+    if (loopBox && loopBox.parentNode) loopBox.parentNode.removeChild(loopBox);
+    loopBox = null; loopBlur = null; loopMaskKey = null;
+    document.documentElement.classList.remove("loop-glass");
+  }
+  // an app or the screensaver in front, or the screen off: both clips let go of their files and decoders
+  // (the Cube's launcher measured about 100 MB lighter with them gone); the posters stay for the way back
+  function loopPause() {
+    if (!loopSharp || loopOff) return;
+    loopOff = true;
+    [loopSharp, loopBlur].forEach(function (el) {
+      if (!el) return;
+      el.pause(); el.removeAttribute("src"); try { el.load(); } catch (e) {}
+      el.classList.add("off");
+    });
+  }
+  function loopResume() {
+    if (!loopSharp || !loopOff || !active()) return;
+    loopOff = false;
+    [loopSharp, loopBlur].forEach(function (el) { if (el) el.classList.remove("off"); });
+    if (loopCur) loopLoad(loopVariant() || loopCur);   // the phase may have moved on while the home was covered
+  }
+  // More apps as a panel: three rows of twelve show, and the grid moves by whole rows on a transform
+  // inside the panel's plain rectangular clip (app.css), so the focused row is always in view
+  function loopPanel() {
+    var grid = $("grid");
+    if (!expanded) { loopFirstRow = 0; grid.style.transform = ""; return; }
+    var inGrid = zone === "grid" || zone === "gear" || zone === "appmenu";
+    var row = inGrid ? Math.floor(g / GRID_COLS) : loopFirstRow, rows = Math.ceil(gridEls.length / GRID_COLS);
+    if (row < loopFirstRow) loopFirstRow = row;
+    if (row > loopFirstRow + 2) loopFirstRow = row - 2;
+    loopFirstRow = Math.max(0, Math.min(loopFirstRow, Math.max(0, rows - 3)));
+    grid.style.transform = loopFirstRow ? "translateY(" + (-loopFirstRow * 8.5) + "rem)" : "";
+  }
+  // a card's second line: the app, then the season and episode, the episode's name, or Video or Live
+  // for a YouTube video ("HBO Max · S1 E3", "YouTube · Live")
+  function loopSub(it) {
+    var live = it.live === true || it.kind === "live";
+    var what = live ? t("live_card") : it.kind === "video" ? t("video_card") :
+      it.season && it.episode ? "S" + it.season + " E" + it.episode : (it.episode_title || "");
+    return [it.app && it.app.name, what].filter(Boolean).join(" · ");
+  }
+
   // ---------------- the video background (Home settings, Look; home.video_url) ----------------
   // A muted clip that loops in place of the photo, in both looks. The photo stays until the clip
   // really plays, and comes back if it fails or has not started within 20 s. It pauses while the
@@ -1045,6 +1307,7 @@
   var vidTimer = null;
   function startVideo() {
     var v = $("bgvid"), root = document.documentElement;
+    if (LOOP) loopResume();
     if (!VIDEO_ON) return;
     if (v.getAttribute("src") !== VIDEO_URL) {
       root.classList.remove("has-video");
@@ -1066,7 +1329,7 @@
     v.removeAttribute("src");
     try { v.load(); } catch (e) {}
   }
-  function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); sceneVideos(false); }
+  function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); sceneVideos(false); if (LOOP) loopPause(); }
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) { saveFocusNow(); pauseVideo(); }
     else { setIdleAmbient(false); resetSmartIdle(); startVideo(); sceneVideos(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); }
@@ -1313,12 +1576,15 @@
     var a = window.AmbientWeather;
     if (!a) return;
     a.setLighter(LIGHTER || OLD_ENGINE);
-    a.setEnabled(WX_AMBIENT && WX_SHOW);
-    a.setSunGradeEnabled(WX_SUN_GRADE && !LIGHTER && !OLD_ENGINE);
+    a.setEnabled(WX_AMBIENT && WX_SHOW && !LOOP);
+    a.setSunGradeEnabled(WX_SUN_GRADE && !LIGHTER && !OLD_ENGINE && !LOOP);
     updateAmbientWeather();
   }
 
+  // In the Loop look the weather paints the accent and picks the clip's time of day instead (once a
+  // minute from clock(), and when a new reading comes in): no weather canvas, no lighting layer.
   function updateAmbientWeather() {
+    if (LOOP) { loopTick(); return; }
     if (!window.AmbientWeather) return;
     var pos = getSunPos();
     window.AmbientWeather.setWeather(WX_SHOW ? data.weather : null, pos);
@@ -1568,7 +1834,8 @@
   function renderNp() {
     var el = $("np"), on = npVisible();
     el.classList.toggle("on", on);
-    if (NIGHT) {
+    if (LOOP) $("shelf-section").classList.toggle("empty", !rowHasCards() && !CARDS.length);   // Loop: a line at the top left, not a card
+    else if (NIGHT) {
       // the row shows while someone has a show on the go (or videos under the YouTube tile), or while a song plays
       var anyone = rowHasCards();
       $("shelf-section").classList.toggle("empty", !anyone && !on);
@@ -1843,13 +2110,14 @@
     vis.forEach(function (q) {
       var el = $("q-" + q);
       if (q === "sleep") {
-        el.innerHTML = ICONS.moon + "<span>" + esc(m ? t(NIGHT ? "off_in_night" : "off_in", { m: m }) : t("sleep_timer")) + "</span>";
+        // Loop: the minutes left replace the glyph, in the accent (app.css .qmin)
+        el.innerHTML = (LOOP && m ? '<b class="qmin">' + m + "</b>" : ICONS.moon) + "<span>" + esc(m ? t(NIGHT ? "off_in_night" : "off_in", { m: m }) : t("sleep_timer")) + "</span>";
         el.classList.toggle("set", !!m);
       } else if (q === "picture") {
         el.innerHTML = ICONS.picture + "<span>" + esc(picLabel()) + "</span>";
         el.classList.toggle("off", !picCanSet);
       } else if (q === "look") {
-        var nextLbl = THEME === "night" ? t("oled_look") : (THEME === "oled" ? t("classic_look") : t("night_look"));
+        var nextLbl = THEME === "night" ? t("oled_look") : THEME === "oled" ? t("classic_look") : THEME === "classic" ? t("look_loop") : t("night_look");
         el.innerHTML = ICONS.look + "<span>" + esc(nextLbl) + "</span>";
       } else if (q === "soundscape") {
         var curSound = window.Soundscape ? window.Soundscape.current() : "off";
@@ -1878,6 +2146,7 @@
     if (sv) { sv.setAttribute("aria-label", t("quick_screensaver")); sv.setAttribute("title", t("quick_screensaver_sub")); }
     if (qi >= vis.length) qi = Math.max(0, vis.length - 1);
     fitDate();
+    if (LOOP) loopMask(key);   // the glass follows the buttons that show, not the focus
   }
   // a short list straight under the Sleep timer button (#33, thanks alonmustafa), up and down to choose
   function renderMenu() {
@@ -1941,6 +2210,7 @@
   function toggleLook() {
     if (THEME === "night") ST.look = "oled";
     else if (THEME === "oled") ST.look = "classic";
+    else if (THEME === "classic") ST.look = "loop";
     else ST.look = "night";
     keep("tvhome.look", ST.look);
     saveSettings();
@@ -1979,6 +2249,7 @@
       clock();   // the clock rested in the dark
     }
     sceneVideos(!screenOffActive);
+    if (LOOP) { if (screenOffActive) loopPause(); else loopResume(); }
     resetIdlePhoto();
   }
   // Smart Idle & OLED-safe Ambient Clock
@@ -2427,7 +2698,7 @@
     // nobody has anything on the go: no empty box, the photo has the space (unless Now playing
     // is up at night). The people switcher stays: with nothing yet (Netflix tells Android nothing on
     // some TVs, issue #23) it is the only way to say who is watching before anything is played.
-    $("shelf-section").classList.toggle("empty", !anyone && !(NIGHT && npVisible()) && !CARDS.length);
+    $("shelf-section").classList.toggle("empty", !anyone && !(NIGHT && !LOOP && npVisible()) && !CARDS.length);
     // custom cards keep the row (and its heading) even with Keep watching switched off
     document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
     var following = followName();
@@ -2439,6 +2710,21 @@
       var name = PEOPLE[whoIndex()].name;
       track.innerHTML = CARDS.length ? "" : '<p class="shelf-none">' + esc(peopleCount() < 2 ? t("nothing_yet") : t("nothing_for", { name: name })) + "</p>";
       shelfEls = [];
+      addCards(track);
+      return;
+    }
+    if (NIGHT && LOOP) {
+      // bare 320x180 thumbnails, the title and the app under each; no thumbnail: a plate with the app's icon
+      track.innerHTML = data.shows.map(function (it) {
+        var art = slim(it.backdrop || it.poster), pkg = it.app && it.app.package, ic = pkg ? iconUrl(pkg) : null;
+        var inner = art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async">' +
+            (ic ? '<img class="lbadge" src="' + esc(ic) + '" alt="" onerror="this.remove()">' : "")
+          : (ic ? '<img class="picon" src="' + esc(ic) + '" alt="" onerror="this.remove()">' : "");
+        return '<div class="tile lcard"><div class="lthumb' + (art ? "" : " plate") + '">' + inner +
+          (it.progress ? '<span class="lbar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "") +
+          "</div><b>" + esc(it.title) + "</b><i>" + esc(loopSub(it)) + "</i></div>";
+      }).join("");
+      shelfEls = Array.prototype.slice.call(track.children);
       addCards(track);
       return;
     }
@@ -3003,6 +3289,7 @@
   // up a row at a time as the focus moves down into them (Keep watching fades out meanwhile).
   function slideDock() {
     var apps = $("apps-section") || $("grid").parentNode, el = document.documentElement;
+    if (LOOP) { loopPanel(); return; }   // no banners in the Loop look; More apps scrolls by rows instead
     var rows = DOCK_BANNERS && !expanded ? Math.ceil(gridEls.length / GRID_COLS) : 1;
     var row = rows > 1 && (zone === "grid" || zone === "gear" || zone === "appmenu") ? Math.floor(g / GRID_COLS) : 0;
     el.classList.toggle("dock-down", row > 0);
@@ -3959,8 +4246,9 @@
   var SECS_STEPS = [10, 15, 20, 30, 45, 60, 120];
   function lookRows() {
     var look = lookSetting(), st = sceneState(), rows = [head(t("look_head"))];
-    ["night", "oled", "classic"].forEach(function (id) {
-      rows.push({ kind: "choice", key: "look:" + id, label: t("look_" + id), sub: t("look_" + id + "_sub"), checked: look === id,
+    ["night", "oled", "classic", "loop"].forEach(function (id) {
+      // Loop is a name, the same in every language, with no second line (docs/TV-HOME.md, "The Loop look")
+      rows.push({ kind: "choice", key: "look:" + id, label: t("look_" + id), sub: id === "loop" ? "" : t("look_" + id + "_sub"), checked: look === id,
         act: function () { ST.look = id; keep("tvhome.look", id); saveSettings(); } });
     });
     if (look === "classic") {
@@ -5374,7 +5662,8 @@
     mark("app-start");
     clock();
     setInterval(clockTick, 15000);
-    if (NIGHT) {
+    if (LOOP) loopInit();
+    if (NIGHT && !LOOP) {   // the scenes, their clocks and the weather canvas: Night only
       if (window.AmbientWeather) {
         window.AmbientWeather.init($("weather-canvas"), $("ambient-lighting"));
         ambientSync();
@@ -5386,12 +5675,14 @@
       if (!first && SUN_SYNC) first = sunTargetScene();
       showScene(Math.max(0, SCENES.map(function (s) { return s.own ? "own" : s.id; }).indexOf(first)));
       if (SCENES.length > 1) setInterval(nextScene, SCENE_MS);
+      // the clock font must be in before the glass is measured
+      if (document.fonts) document.fonts.load("300 10px Antonio").then(function () { glassShown = ""; clock(); });
+    }
+    if (NIGHT) {
       // the soft tap's audio context, made while the home is idle: made on the first key press it
       // cost that press 112 ms on an LG NANO83 (webOS 26), so the first press after every return
       // from an app lagged
       setTimeout(warmSound, 2000);
-      // the clock font must be in before the glass is measured
-      if (document.fonts) document.fonts.load("300 10px Antonio").then(function () { glassShown = ""; clock(); });
       refreshWeather();
       setInterval(refreshWeather, WX_EVERY * 60000);
     }
@@ -5413,7 +5704,8 @@
     }
     if (TV) data.apps = sortApps(nativeApps() || []);
     if (cached || TV) { render(); mark("home-painted-from-cache"); }
-    if (NIGHT) $("np-slot").appendChild($("np"));   // Now playing: the first card of the row
+    if (LOOP) document.querySelector(".top-left").appendChild($("np"));   // Loop: one line at the top left, under the people
+    else if (NIGHT) $("np-slot").appendChild($("np"));   // Now playing: the first card of the row
     renderQuick();
     if (!OFFLINE) refreshQuick();
     refreshMusic();

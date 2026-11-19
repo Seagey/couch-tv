@@ -8,7 +8,9 @@
 //   quick=sleep,look    tvs[].quick, in order (sleep, picture, look, soundscape, input)
 //   soundscape=rain     home.soundscape: the sound its button starts with (rain, fire, waves, brown)
 //   picture=1           this TV has a picture mode switch (Calibrated and Dynamic)
-//   look=oled           home.look (night, oled, classic)       clock=24h   home.clock     dock=6   home.dock_size
+//   look=oled           home.look (night, oled, classic, loop)   clock=24h   home.clock     dock=6   home.dock_size
+//                       look=loop: the Loop look with no loop files (home.loop has no variants), so the page
+//                       shows backgrounds/scene-night.jpg as a stand-in for the clip, to check the layout
 //   scenes=fog,dawn     home.scenes     secs=8      home.scene_seconds     sunsync=1   home.sun_sync
 //   sunrotate=25        home.sun_rotate_minutes (own scenes tagged "when")     datebars=1   home.date_bars
 //   myscenes=[...]      home.my_scenes, as JSON (docs/MAKE-A-SCENE.md), for your own scenes
@@ -78,6 +80,8 @@
   }
   if (arg("picture")) cfg.tvs[0].picture_modes = ["Calibrated", "Dynamic"];
   if (arg("look")) cfg.home.look = arg("look");
+  // the Loop look: what the bridge sends when make-loop.sh has not run, no variants and no blur copy (docs/LOOP.md)
+  if (arg("look") === "loop") cfg.home.loop = { variants: [], blur: false };
   if (arg("idle")) cfg.home.idle_photo_seconds = arg("idle") === "off" ? 0 : Number(arg("idle"));
   if (arg("smartidle")) {
     cfg.home.smart_idle = { enabled: arg("smartidle") !== "off", home_idle_minutes: 15, home_action: "ambient_clock", paused_idle_minutes: 30, quiet_hours: { enabled: false, start: "23:00", end: "06:00", idle_minutes: 15 } };

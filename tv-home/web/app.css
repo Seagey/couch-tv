@@ -2023,3 +2023,203 @@ html.dock-mac.theme-night .app.hop { animation: dock-hop 520ms 1; }
   html.dock-mac.theme-night .app, html.dock-mac.theme-night .grid, html.dock-mac.theme-night .app .label { transition: none; }
   html.dock-mac.theme-night .app.hop { animation: none; }
 }
+
+/* ================= The Loop look (Home settings, Look, Loop; home.look "loop") =================
+   docs/TV-HOME.md, "The Loop look". One clip of a place, graded for four times of day, plays under one
+   fixed scrim, and the home is a caption set on it: a centred clock under the date line, bare thumbnails,
+   a row of icons with no bar. Laid out like Night (html.theme-night stays on, so the dock, the cards and
+   More apps come from the rules above); these rules change the material. No filter, backdrop-filter or
+   blend mode anywhere: the glass on the quick buttons is a pre-blurred copy of the clip shown through a
+   mask (app.js, loopMask). Only transform and opacity move, and only on the element gaining focus.
+   Measured on a Fire TV Cube (2 GB): the clip alone cost the launcher about 80 MB of GL textures; the
+   blur copy masked to the two buttons 2 MB more; the same mask at toast size 18 MB more and the
+   compositor every frame, so the toast and the rest take the no blur recipe (--loop-tint 0.80). */
+html.theme-loop {
+  --text: #F5F3EE; --text-2: #B8B5AE; --text-3: #B8B5AE;
+  --accent: #F2A33C;            /* app.js loopAccent(): the weather code, and the sun's phase on a clear day */
+  --loop-ink: #0B0A10;
+  --loop-tint: rgba(20, 18, 24, 0.80);
+  --loop-rim: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.14), inset 0 0.0625rem 0 rgba(255, 255, 255, 0.18), inset 0 -0.0625rem 0 rgba(0, 0, 0, 0.28);
+  --loop-ring: 0 0 0 0.125rem #0B0A10, 0 0 0 0.3125rem #FFF;   /* the focus ring: 3 px white outside a 2 px gap of ink */
+}
+html.theme-loop.loop-glass { --loop-tint: rgba(20, 18, 24, 0.65); }   /* over the blurred copy the tint can be lighter */
+html.theme-loop, html.theme-loop body { background: #0B0A10; color: var(--text); }
+html.theme-loop body { font-family: system-ui, Roboto, "Helvetica Neue", Arial, sans-serif; font-weight: 400; letter-spacing: 0; }
+html.theme-loop *, html.theme-loop *::before, html.theme-loop *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+html.theme-loop .bg, html.theme-loop .bgvid, html.theme-loop .scenes, html.theme-loop .ambient-lighting, html.theme-loop .weather-canvas { display: none; }
+html.theme-loop .hero, html.theme-loop .place { display: none; }
+/* the clip: full screen at the back of the page; .off while an app is in front or the screen is off (app.js loopPause) */
+.loop-video { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; background: #0B0A10; }
+.loop-video.off, .loop-blur.off { display: none; }
+/* the glass: the blurred copy inside a box the size of the quick buttons, over the scrim and under the
+   header (z-index 1, the header's is 2), seen only through the mask app.js sets on the box */
+.loop-glass { position: fixed; z-index: 1; overflow: hidden; pointer-events: none; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-size: 100% 100%; mask-size: 100% 100%; }
+.loop-blur { position: absolute; object-fit: cover; }
+/* the scrim: two gradients on the ink, never animated (percentages of 1080) */
+html.theme-loop .scrim {
+  background:
+    linear-gradient(180deg, rgba(11, 10, 16, 0.66) 0%, rgba(11, 10, 16, 0.56) 28%, rgba(11, 10, 16, 0.20) 37%, rgba(11, 10, 16, 0) 43%),
+    linear-gradient(180deg, rgba(11, 10, 16, 0) 44%, rgba(11, 10, 16, 0.55) 55%, rgba(11, 10, 16, 0.74) 64%, rgba(11, 10, 16, 0.84) 76%, rgba(11, 10, 16, 0.84) 100%);
+}
+
+/* the header: safe area 96 at the sides, 64 at the top; one left axis at x 96 */
+html.theme-loop .top { top: 4rem; left: 6rem; right: 6rem; text-shadow: none; }
+html.theme-loop .top-left { gap: 0.75rem; }
+/* the date line: centred at y 72, 34 px 500, middle dots, a 32 px weather glyph */
+html.theme-loop .date { top: 4.5rem; font-size: 2.125rem; line-height: 2.5rem; font-weight: 500; color: var(--text); text-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.55); transition: none; }
+html.theme-loop .date .wx { color: var(--text-2); font-weight: 400; }
+html.theme-loop .date svg { width: 2rem; height: 2rem; vertical-align: -0.4rem; }
+/* the clock: solid, 240 px light, centred, y 124 to 344 (line height 0.9 of 240); its lower edge sits where
+   the top scrim is 0.50, so a 1 px ink stroke and a shadow carry it over the day grade */
+html.theme-loop .time {
+  display: block; position: fixed; left: 0; right: 0; top: 7.75rem; margin: 0; text-align: center; white-space: nowrap;
+  font-size: 15rem; line-height: 0.9; font-weight: 300; letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
+  color: rgba(245, 243, 238, 0.92); -webkit-text-stroke: 0.0625rem rgba(11, 10, 16, 0.6); text-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.55);
+}
+html.theme-loop .time small { font-size: 3rem; font-weight: 400; letter-spacing: 0; margin-left: 0.75rem; -webkit-text-stroke: 0; }
+
+/* Now playing: one line at the top left (x 96, under the people), an accent dot, the song and the artist,
+   then the small media buttons; no card */
+html.theme-loop .np, html.lighter.theme-loop .np {
+  width: auto; max-width: 37.5rem; height: 2rem; margin: 0; padding: 0; border-radius: 0; gap: 0.75rem;
+  background: none; box-shadow: none; font-size: 1.5rem; line-height: 2rem; font-weight: 500; color: var(--text);
+}
+html.theme-loop .np-art { display: none; }
+html.theme-loop .np-t { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+html.theme-loop .np-t::before { content: ""; flex: none; width: 0.75rem; height: 0.75rem; border-radius: 50%; background: var(--accent); }
+html.theme-loop .np-app { display: none; }
+html.theme-loop .np-t b, html.theme-loop .np-t small { display: block; margin: 0; font-size: 1.5rem; line-height: 2rem; font-weight: 500; }
+html.theme-loop .np-t small { color: var(--text-2); }
+html.theme-loop .np-t small:not(:empty)::before { content: "·"; margin-right: 0.5rem; }
+html.theme-loop .np-ctl { gap: 0.25rem; }
+html.theme-loop .nb { width: 2rem; height: 2rem; background: none; transition: transform 120ms var(--ease); }
+html.theme-loop .nb svg { width: 1.125rem; height: 1.125rem; }
+html.theme-loop .nb.focus { background: #fff; color: var(--loop-ink); transform: scale(1.10); box-shadow: var(--loop-ring); transition-duration: 160ms; }
+
+/* the quick buttons: 64 px circles at the right edge, gap 16, a 28 px glyph; glass through the mask (app.js),
+   or the darker tint with no blur copy. Focused: a white platter with the ring, scale 1.10, the label under it
+   at y 140. A running sleep timer shows its minutes in the accent instead of the moon (app.js, .qmin) */
+html.theme-loop .quick { margin-top: 0; }
+html.theme-loop .qbtns { gap: 1rem; }
+html.theme-loop .qbtn, html.theme-loop .qbtn.set, html.lighter.theme-loop .qbtn:not(.focus), html.lighter.theme-loop .qbtn.set {
+  position: relative; min-width: 4rem; width: 4rem; height: 4rem; padding: 0; border-radius: 2rem; justify-content: center;
+  color: #fff; background: var(--loop-tint); box-shadow: var(--loop-rim);
+  transition: transform 120ms var(--ease);
+}
+html.theme-loop .qbtn.off { color: rgba(255, 255, 255, 0.55); }
+html.theme-loop .qbtn svg { width: 1.75rem; height: 1.75rem; }
+html.theme-loop .qbtns .qbtn span, html.theme-loop #q-picture span, html.theme-loop #q-screensaver span {
+  display: none; position: absolute; left: 50%; top: calc(100% + 0.75rem); transform: translateX(-50%); white-space: nowrap;
+  font-size: 1.5rem; line-height: 2rem; font-weight: 600; color: var(--text); text-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.55);
+}
+html.theme-loop .qbtns .qbtn.focus span, html.theme-loop #q-picture.focus span, html.theme-loop #q-screensaver.focus span { display: block; }
+html.theme-loop .qbtn .qmin { font-size: 1.5rem; line-height: 1; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+html.theme-loop .qbtn.focus, html.lighter.theme-loop .qbtn.focus {
+  background: #fff; color: var(--loop-ink); transform: scale(1.10); box-shadow: var(--loop-ring); transition-duration: 160ms; will-change: transform;
+}
+html.theme-loop .qbtn.focus .qmin { color: var(--loop-ink); }
+html.theme-loop .sleep-menu, html.lighter.theme-loop .sleep-menu { border-radius: 1.75rem; background: var(--loop-tint); box-shadow: var(--loop-rim), 0 1rem 2.5rem rgba(0, 0, 0, 0.45); }
+html.theme-loop .sleep-menu .opt { font-size: 1.5rem; font-weight: 500; color: var(--text); transition: transform 120ms var(--ease), background 120ms var(--ease); }
+html.theme-loop .sleep-menu .opt.focus { background: #fff; color: var(--loop-ink); }
+html.theme-loop .quick-note { font-size: 1.375rem; }
+
+/* the people switcher and the menus: the no blur recipe */
+html.theme-loop .people, html.lighter.theme-loop.theme-night .people { background: var(--loop-tint); box-shadow: var(--loop-rim); }
+html.theme-loop .person { font-size: 1.5rem; font-weight: 600; color: var(--text); transition: transform 120ms var(--ease), background 120ms var(--ease), color 120ms var(--ease); }
+html.theme-loop .person.on { background: #fff; color: var(--loop-ink); }
+html.theme-loop .person.focus, html.lighter.theme-loop .person.focus { transform: scale(1.08); box-shadow: var(--loop-ring); transition-duration: 160ms; }
+html.theme-loop .person.focus:not(.on) { background: var(--loop-tint); color: var(--text); }
+html.theme-loop .people.head.focus, html.lighter.theme-loop .people.head.focus { box-shadow: var(--loop-ring); }
+html.theme-loop .gear-pop, html.theme-loop .app-pop, html.theme-loop .people-pop, html.theme-loop .hint.on, html.lighter.theme-loop.theme-night .hint.on,
+html.lighter.theme-loop .gear-pop, html.lighter.theme-loop .app-pop, html.lighter.theme-loop .people-pop {
+  background: var(--loop-tint); box-shadow: var(--loop-rim), 0 1rem 2.5rem rgba(0, 0, 0, 0.45);
+}
+
+/* the toast: centred at y 520 in the open middle, a pill on the no blur recipe (the mask at its size cost
+   the Cube 18 MB and the compositor every frame). Opacity, and a 12 px rise: 200 ms in, 160 ms out */
+html.theme-loop .toast {
+  top: 30.75rem; max-width: 56.25rem; height: 3.5rem; padding: 0.875rem 1.75rem; border-radius: 1.75rem; gap: 0.75rem;
+  background: var(--loop-tint); box-shadow: var(--loop-rim); color: var(--text);
+  font-size: 1.625rem; line-height: 1.75rem; font-weight: 500;
+  transform: translate(-50%, 0.75rem); transition: opacity 160ms var(--ease), transform 160ms var(--ease);
+}
+html.theme-loop .toast.on { transform: translate(-50%, 0); transition-duration: 200ms; }
+html.theme-loop .toast svg { width: 1.75rem; height: 1.75rem; stroke: #fff; }
+
+/* the row: heading at (96, 596), 320x180 thumbnails at y 640 with a 20 px gap (five in the safe area, a sixth
+   cut by the edge), the title and the app under each; a 3 px accent progress bar on the thumbnail's lower
+   edge; no thumbnail: a plate on the no blur recipe with the app's icon at 40 px */
+html.theme-loop .shelf { top: 37.25rem; left: 6rem; right: 6rem; transition: opacity 200ms var(--ease); }
+html.theme-loop .shelf-head { height: 2rem; margin-bottom: 0.75rem; padding-right: 0; }
+html.theme-loop .shelf-head h2 { font-size: 1.625rem; line-height: 2rem; font-weight: 600; letter-spacing: 0; color: var(--text); text-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.55); }
+html.theme-loop .shelf-head .status { font-size: 1.375rem; }
+html.theme-loop .shelf-none { font-size: 1.625rem; line-height: 11.25rem; color: var(--text-2); text-shadow: none; }
+html.theme-loop .shelf-row { gap: 1.25rem; }
+html.theme-loop .shelf-clip { padding: 0.75rem; margin: -0.75rem; }
+html.theme-loop .shelf-track { gap: 1.25rem; transition: transform 160ms var(--ease); }
+.lcard { width: 20rem; }
+html.theme-loop .lcard, html.theme-loop .ncard, html.lighter.theme-loop .ncard { transition: transform 120ms var(--ease); }
+html.theme-loop .lcard.focus, html.theme-loop .ncard.focus { transform: scale(1.05); transition-duration: 160ms; will-change: transform; }
+.lcard .lthumb { position: relative; width: 20rem; height: 11.25rem; border-radius: 0.5rem; overflow: hidden; background: rgba(255, 255, 255, 0.06); }
+.lcard .lthumb::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; border-radius: inherit; box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.12); pointer-events: none; }
+.lcard .thumb { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lcard .lbadge { position: absolute; left: 0.5rem; top: 0.5rem; width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; object-fit: cover; }
+.lcard .lthumb.plate { display: flex; align-items: center; justify-content: center; background: var(--loop-tint); box-shadow: var(--loop-rim); }
+.lcard .picon { width: 2.5rem; height: 2.5rem; border-radius: 0.625rem; object-fit: cover; }
+.lcard .lbar { position: absolute; left: 0; right: 0; bottom: 0; height: 0.1875rem; background: rgba(255, 255, 255, 0.25); }
+.lcard .lbar i { display: block; height: 100%; background: var(--accent); }
+.lcard b { display: block; margin-top: 0.75rem; font-size: 1.75rem; line-height: 2.125rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lcard i { display: block; font-style: normal; font-size: 1.375rem; line-height: 1.75rem; font-weight: 400; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.theme-loop .lcard.focus .lthumb, html.lighter.theme-loop .lcard.focus .lthumb { box-shadow: var(--loop-ring); }
+html.theme-loop .lcard.focus .lthumb::after { display: none; }
+/* custom cards (home.custom_cards) keep the row: the same 320 wide shape on the no blur recipe */
+html.theme-loop .ncard, html.lighter.theme-loop.theme-night .ncard:not(.focus) {
+  flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 0.25rem; width: 20rem; height: 11.25rem; padding: 1rem;
+  border-radius: 0.5rem; background: var(--loop-tint); box-shadow: var(--loop-rim);
+}
+html.theme-loop .ncard .thumb { display: none; }
+html.theme-loop .ncard .nap { font-size: 1.375rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-2); }
+html.theme-loop .ncard b { margin-top: 0; font-size: 1.75rem; line-height: 2.125rem; }
+html.theme-loop .ncard i { font-size: 1.375rem; color: var(--text-2); }
+html.theme-loop .ncard.focus, html.lighter.theme-loop .ncard.focus { box-shadow: var(--loop-ring); }
+
+/* the dock: 112 px icons at y 912 from x 96, gap 24, radius 24, full opacity, no bar. Focused: a white platter
+   (seen on the Settings and More apps tiles), scale 1.12 and 6 px up, the ring with its gap, the label at y 1032 */
+html.theme-loop .apps { top: auto; bottom: 3.5rem; left: 6rem; right: auto; transform: none; }
+html.theme-loop .grid, html.lighter.theme-loop.theme-night .grid {
+  padding: 0; border-radius: 0; background: none; box-shadow: none;
+  column-gap: 1.5rem; row-gap: 1.5rem; grid-column-gap: 1.5rem; grid-row-gap: 1.5rem;
+}
+html.theme-loop .app { transition: transform 120ms var(--ease); }
+html.theme-loop .app .face { border-radius: 1.5rem; corner-shape: round; box-shadow: none; transition: none; }
+html.theme-loop .app:not(.focus) .face img, html.lighter.theme-loop.theme-night .app:not(.focus) .face img { filter: none; opacity: 1; }
+html.theme-loop .face::after { display: none; }
+html.theme-loop .tile.focus .face { animation: none; }
+html.theme-loop .app.focus, html.glass.theme-loop .app.focus { transform: scale(1.12) translateY(-0.375rem); transition-duration: 160ms; will-change: transform; }
+html.theme-loop .app.focus .face, html.lighter.theme-loop.theme-night .app.focus .face, html.glass.theme-loop .app.focus .face { box-shadow: var(--loop-ring); }
+html.theme-loop .app .face.tool { background: var(--loop-tint); box-shadow: var(--loop-rim); }
+html.theme-loop .app .face.tool svg { width: 3rem; height: 3rem; stroke: #fff; stroke-width: 1.6; }
+html.theme-loop .app.focus .face.tool { background: #fff; box-shadow: var(--loop-ring); }
+html.theme-loop .app.focus .face.tool svg { stroke: var(--loop-ink); }
+html.theme-loop .app .face.word { background: var(--loop-tint); box-shadow: var(--loop-rim); color: var(--text); }
+html.theme-loop .app .label {
+  left: -3rem; right: -3rem; top: calc(100% + 0.5rem); font-size: 1.5rem; line-height: 2rem; font-weight: 600;
+  color: var(--text); text-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.55); transition: opacity 160ms var(--ease);
+}
+/* More apps: the row and the dock go, one panel on the no blur recipe (x 72 to 1848, y 560 to 1036, radius 24)
+   holds the twelve wide grid; three rows show, from y 596, and app.js moves the grid by whole rows on a
+   transform inside .grid-clip, a plain rectangular clip inset 24 px, so the radius clips nothing */
+html.theme-loop.expanded .apps { top: 35rem; bottom: auto; left: 4.5rem; right: 4.5rem; height: 29.75rem; border-radius: 1.5rem; background: var(--loop-tint); box-shadow: var(--loop-rim); }
+html.theme-loop.expanded .grid-clip { position: absolute; top: 1.5rem; right: 1.5rem; bottom: 1.5rem; left: 1.5rem; overflow: hidden; }
+html.theme-loop.expanded .grid { padding-top: 0.75rem; transition: transform 160ms var(--ease); }
+html.theme-loop.expanded .hint.on { bottom: calc(100% + 1rem); }
+
+/* Lighter home in the Loop look: no blur copy (app.js), the darker tint, and nothing glides: every
+   duration is 0, except the toast's fade */
+html.lighter.theme-loop .tile, html.lighter.theme-loop .app, html.lighter.theme-loop .qbtn, html.lighter.theme-loop .person, html.lighter.theme-loop .nb,
+html.lighter.theme-loop .shelf-track, html.lighter.theme-loop .shelf, html.lighter.theme-loop .grid, html.lighter.theme-loop .app .label,
+html.lighter.theme-loop .sleep-menu .opt, html.lighter.theme-loop .ncard, html.lighter.theme-loop .tile.focus, html.lighter.theme-loop .app.focus, html.lighter.theme-loop .qbtn.focus { transition-duration: 0ms; }
+html.lighter.theme-loop .tile.focus, html.lighter.theme-loop .app.focus, html.lighter.theme-loop .qbtn.focus { will-change: auto; }
+@media (prefers-reduced-motion: reduce) {
+  html.theme-loop .tile, html.theme-loop .app, html.theme-loop .qbtn, html.theme-loop .person, html.theme-loop .nb, html.theme-loop .shelf-track, html.theme-loop .grid, html.theme-loop .toast { transition: none; }
+}
