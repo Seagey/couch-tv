@@ -44,6 +44,12 @@
   .entry label:first-child { margin-top: 0; }
   .links { display: flex; flex-wrap: wrap; gap: 8px; } .links .btn { margin-top: 8px; }
   .names { color: var(--ink); }
+  :focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+  .pick:focus-within { outline: 3px solid var(--amber); outline-offset: 2px; }
+  #photos.over { border-color: var(--amber); background: #1f1b12; }
+  .drop-hint { display: none; }
+  @media (hover: hover) and (pointer: fine) { .drop-hint { display: block; } }
+  @media (min-width: 720px) { body { padding-top: 32px; } h1 { font-size: 32px; } .jump { margin: 0; padding-left: 0; padding-right: 0; flex-wrap: wrap; } }
 </style>
 </head>
 <body>
@@ -79,6 +85,7 @@
   <section class="card" id="photos">
     <h2>Your photos</h2>
     <p>Photos you add take turns with the scenes behind the clock. They go straight from this phone to the TV, which makes them screen size and keeps them. They never go to couch-tv or any other server.</p>
+    <p class="drop-hint">On a computer you can also drag photos from a folder onto this box.</p>
     <p id="photo-count"></p>
     <div class="photos" id="photo-list"></div>
     <label class="btn go pick" id="photo-pick">Add photos<input id="photo-file" type="file" accept="image/*" multiple aria-label="Add photos"></label>
@@ -335,12 +342,13 @@
     api('POST', '/api/photos/remove', { id: b.getAttribute('data-id') }).then(function () { say('photo-msg', 'Removed.'); return loadSettings(); })
       .catch(function (e) { say('photo-msg', e.message); });
   });
-  $('photo-file').addEventListener('change', function () {
-    var files = Array.prototype.slice.call(this.files || []), done = 0, bad = 0, i = 0, input = this;
-    if (!files.length) return;
+  function sendPhotos(list, done0) {
+    var files = Array.prototype.filter.call(list || [], function (f) { return /^image\//.test(f.type || '') || /\.(jpe?g|png|webp|heic|heif|gif)$/i.test(f.name || ''); });
+    var done = 0, bad = 0, i = 0, lastErr = '';
+    if (!files.length) { say('photo-msg', 'That is not a photo. Pick a JPEG or PNG.'); return; }
     var next = function () {
       if (i >= files.length) {
-        input.value = '';
+        if (done0) done0();
         say('photo-msg', done ? (done === 1 ? 'One photo is on the TV now.' : done + ' photos are on the TV now.') + (bad ? ' ' + bad + ' could not be added.' : '') : 'No photos were added.' + (lastErr ? ' ' + lastErr : ''));
         loadSettings();
         return;
@@ -352,9 +360,18 @@
         .then(function () { done++; }, function (e) { bad++; lastErr = e.message; })
         .then(next);
     };
-    var lastErr = '';
     next();
-  });
+  }
+  $('photo-file').addEventListener('change', function () { var input = this; sendPhotos(input.files, function () { input.value = ''; }); });
+  // on a computer: drag photos from a folder onto the Your photos card
+  var drop = $('photos'), dragDepth = 0;
+  drop.addEventListener('dragenter', function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0) { e.preventDefault(); dragDepth++; drop.classList.add('over'); } });
+  drop.addEventListener('dragover', function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+  drop.addEventListener('dragleave', function () { if (--dragDepth <= 0) { dragDepth = 0; drop.classList.remove('over'); } });
+  drop.addEventListener('drop', function (e) { e.preventDefault(); dragDepth = 0; drop.classList.remove('over'); sendPhotos(e.dataTransfer && e.dataTransfer.files); });
+  // the rest of the window ignores a dropped file, so a missed drop never opens the photo in place of this page
+  window.addEventListener('dragover', function (e) { e.preventDefault(); });
+  window.addEventListener('drop', function (e) { e.preventDefault(); });
 
   // ---------------- At home: handed to the TV home's own store (HomeActivity.atHome) ----------------
   var AH = null, AH_LIM = { lists: 3, items: 40, guide: 8 };
@@ -630,6 +647,18 @@
     if (!confirm('Every phone, including this one, will need the code from the TV again.')) return;
     api('POST', '/api/phones/forget', {}).then(function () { location.reload(); });
   };
+  var ENTER = { 'ah-from': 'ah-note-save', 'ah-ssid': 'ah-wifi-save', 'ah-pass': 'ah-wifi-save', 'ah-cal': 'ah-cal-save', 'ah-guest': 'ah-guest-save',
+    'ah-stay': 'ah-stay-save', 'tv-name': 'save', 'country': 'save', 'ask-key': 'ask-save', 'ask-model': 'ask-save', 'kids-pin': 'kids-save', 'wd-code': 'wd-pair', 'wd-port': 'wd-pair' };
+  Object.keys(ENTER).forEach(function (id) {
+    $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); $(ENTER[id]).click(); } });
+  });
+  // Enter in the town search: the first place found
+  $('town-q').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    e.preventDefault();
+    var b = $('town-list').querySelector('button[data-i]');
+    if (b) b.click(); else findTown(this.value);
+  });
   // only once paired: the pairing screen (shim.js) covers the page until then
   if (window.couchTv && window.couchTv.token()) load();
 </script>

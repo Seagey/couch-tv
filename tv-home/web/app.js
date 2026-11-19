@@ -4496,6 +4496,9 @@
       }
       $("set-phone-head").textContent = t("set_phone");
       $("set-phone-sub").textContent = t("set_phone_sub");
+      // a computer has no camera: the plain address and the code to type on its pairing screen
+      var m = /^http:\/\/([^\/]+)(\/setup)#pin=(\d{6})$/.exec(j.url);
+      $("set-phone-pc").textContent = m ? t("set_phone_pc", { addr: m[1] + m[2], code: m[3].slice(0, 3) + " " + m[3].slice(3) }) : "";
       box.classList.add("on");
       var left = +j.pin_expires_in > 0 ? +j.pin_expires_in * 1000 - 20000 : 60000;
       PHONE_QR.timer = setTimeout(phoneQr, Math.max(15000, left));

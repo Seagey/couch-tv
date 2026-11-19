@@ -113,6 +113,8 @@ async function settingsOpen(q) {
   ok(await page.evaluate(() => document.getElementById("set-phone").classList.contains("on")), "on the on-TV app, Home settings shows Change this on your phone");
   ok(/Change this on your phone/.test(await page.evaluate(() => document.getElementById("set-phone").textContent)), "in plain words");
   ok(await page.evaluate(() => !!document.querySelector("#set-phone-qr svg")), "with a QR");
+  ok(await page.evaluate(() => document.getElementById("set-phone-pc").textContent) === "Or on a computer: tv.example:5400/setup, code 482 913",
+    "and, for a computer, the plain address and the code to type: " + await page.evaluate(() => document.getElementById("set-phone-pc").textContent));
   if (jsQR) {
     // decode from the QR's own modules: draw the svg on a canvas in the page and read its pixels
     const pix = await page.evaluate(async () => {
@@ -131,6 +133,18 @@ async function settingsOpen(q) {
   ok(fit.bottom <= fit.h, "every section, Updates too, still fits on screen with the QR (" + fit.n + " sections, last ends at " + Math.round(fit.bottom) + " of " + fit.h + ")");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "home-settings-qr.png") });
   ok(!page.errors.length, "no page errors: " + page.errors.join("; "));
+  await page.close();
+}
+// the QR, the computer line and all ten sections fit at 1080p in every home language
+for (const lang of ["en", "es", "es-MX", "it", "de", "tr", "fr", "nl", "sr-Latn-RS", "pl", "he", "cs", "pt", "ar", "ro", "zh-CN"]) {
+  const page = await settingsOpen("&ontv=1&update=1&lang=" + lang);
+  const f = await page.evaluate(() => {
+    const a = Array.from(document.querySelectorAll(".ssec")), last = a[a.length - 1].getBoundingClientRect(), pc = document.getElementById("set-phone-pc");
+    return { n: a.length, bottom: last.bottom, h: innerHeight, pc: pc.textContent, raw: /\{(addr|code)\}|set_phone/.test(document.getElementById("set-phone").textContent) };
+  });
+  ok(f.n === 10 && f.bottom <= f.h, lang + ": all ten sections fit under the QR (last ends at " + Math.round(f.bottom) + " of " + f.h + ")");
+  ok(/tv\.example:5400\/setup/.test(f.pc) && /482 913/.test(f.pc) && !f.raw, lang + ": the computer line has the address and the code, no untranslated words");
+  if (SHOTS && (lang === "de" || lang === "ar")) await page.screenshot({ path: path.join(SHOTS, "home-settings-qr-" + lang + ".png") });
   await page.close();
 }
 for (const [q, what] of [["", "a TV the computer bridge drives"], ["&offline=1", "the couch-tv home app with no computer"]]) {
@@ -217,6 +231,74 @@ for (const [q, what] of [["", "a TV the computer bridge drives"], ["&offline=1",
   ok(!/\b(Beta|Experimental|coming soon)\b/i.test(words), "no Beta, Experimental or coming soon");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "phone-home-settings.png"), fullPage: true });
   ok(!page.errors.length, "no page errors: " + page.errors.join("; "));
+  await ctx.close();
+}
+
+// ---- 4. on a computer (1280x800, 1920x1080) and a tablet (768x1024) ----
+for (const [w, h, kind] of [[1280, 800, "computer"], [1920, 1080, "computer"], [768, 1024, "tablet"]]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, isMobile: false, hasTouch: kind === "tablet" });
+  const page = await ctx.newPage();
+  page.errors = []; page.on("pageerror", (e) => page.errors.push(String(e)));
+  await page.route("https://geocoding-api.open-meteo.com/**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ results: [
+    { id: 2, name: "Hobart", latitude: -42.87936, longitude: 147.32941, timezone: "Australia/Hobart", admin1: "Tasmania", country: "Australia", country_code: "AU" }] }) }));
+  const at = w + "x" + h;
+  // typed on a computer: the address alone, no #pin, then the code from the TV
+  const pairs = got.pair.length;
+  await page.goto(ORIGIN + "/setup");
+  await page.waitForSelector("#ctv-pin");
+  ok(true, at + ": opened without a code, the page asks for the code shown on the TV");
+  await page.click("#ctv-pin"); await page.keyboard.type("482 913"); await page.keyboard.press("Enter");
+  await page.waitForFunction(() => window.couchTv && window.couchTv.token() && document.getElementById("people-now").textContent !== "Checking…");
+  ok(got.pair.length === pairs + 1 && got.pair[pairs].pin === "482913", at + ": the code typed with the keyboard (Enter) pairs it");
+  // a readable width, never stretched across a wide screen
+  const lay = await page.evaluate(() => {
+    const m = document.querySelector("main").getBoundingClientRect(), ins = Array.from(document.querySelectorAll("main input:not([type=checkbox]):not([type=file]), main textarea, main select")).filter((x) => x.offsetParent);
+    return { mw: m.width, ml: m.left, mr: innerWidth - m.right, widest: Math.max.apply(null, ins.map((x) => x.getBoundingClientRect().width)), scroll: document.documentElement.scrollWidth > innerWidth };
+  });
+  ok(lay.mw <= 560 && Math.abs(lay.ml - lay.mr) <= 2, at + ": the page is one readable column, centred (" + Math.round(lay.mw) + " px)");
+  ok(lay.widest <= 560 && !lay.scroll, at + ": no form box stretches wider than the column, no sideways scroll");
+  // Tab walks the page top to bottom, with a focus ring
+  await page.focus("#town-q");
+  const order = [];
+  for (let i = 0; i < 14; i++) {
+    await page.keyboard.press("Tab");
+    order.push(await page.evaluate(() => { const e = document.activeElement, r = e.getBoundingClientRect(); return { id: e.id || e.textContent.trim().slice(0, 20), y: r.top + scrollY, ring: getComputedStyle(e).outlineStyle !== "none" || !!e.closest(".pick:focus-within") }; }));
+  }
+  ok(order.every((o, i) => i === 0 || o.y >= order[i - 1].y - 4), at + ": Tab goes down the page in reading order: " + order.map((o) => o.id).join(" > "));
+  ok(order.every((o) => o.ring), at + ": every stop shows where the keyboard is");
+  ok(order.some((o) => o.id === "photo-file"), at + ": Tab reaches Add photos");
+  // Enter submits: the town search picks the first place, a one line box saves its card
+  const sets = got.settings.length;
+  await page.fill("#town-q", "Hobar");
+  await page.waitForSelector("#town-list button");
+  await page.focus("#town-q"); await page.keyboard.press("Enter");
+  await page.waitForFunction(() => /Saved/.test(document.getElementById("town-msg").textContent));
+  ok(got.settings.length === sets + 1 && got.settings[sets].settings_patch.place.name === "Hobart", at + ": Enter in the town search saves the first place");
+  const guests = got.guest.length;
+  await page.fill("#ah-guest", "the Nguyen family"); await page.focus("#ah-guest"); await page.keyboard.press("Enter");
+  await page.waitForFunction(() => /greets/.test(document.getElementById("ah-guest-msg").textContent));
+  ok(got.guest.length === guests + 1 && got.guest[guests].name === "the Nguyen family", at + ": Enter in the guest's name saves it");
+  // photos: the file picker, then a drag from a folder onto the card
+  const png = fs.readFileSync(path.join(ROOT, "remote/public/icons/icon-192.png"));
+  let before = got.photos.length;
+  await page.setInputFiles("#photo-file", { name: "deck.png", mimeType: "image/png", buffer: png });
+  await page.waitForFunction(() => /on the TV now/.test(document.getElementById("photo-msg").textContent));
+  ok(got.photos.length === before + 1, at + ": Add photos (the file picker) sends it");
+  before = got.photos.length;
+  await page.evaluate(() => { document.getElementById("photo-msg").textContent = ""; });
+  const dt = await page.evaluateHandle((b64) => {
+    const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    const d = new DataTransfer(); d.items.add(new File([u], "beach.png", { type: "image/png" })); d.items.add(new File(["just words"], "notes.txt", { type: "text/plain" })); return d;
+  }, png.toString("base64"));
+  await page.dispatchEvent("#photos", "dragenter", { dataTransfer: dt });
+  ok(await page.evaluate(() => document.getElementById("photos").classList.contains("over")), at + ": dragging files over Your photos lights it up");
+  await page.dispatchEvent("#photos", "drop", { dataTransfer: dt });
+  await page.waitForFunction(() => /on the TV now/.test(document.getElementById("photo-msg").textContent));
+  ok(got.photos.length === before + 1 && got.photos[before].type === "image/png", at + ": a photo dropped on the card goes to the TV, and a file that is not a photo is left out");
+  ok(!(await page.evaluate(() => document.getElementById("photos").classList.contains("over"))), at + ": the card goes back to normal after the drop");
+  ok(kind === "tablet" ? true : await page.isVisible(".drop-hint"), at + ": a computer is told it can drag photos in");
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "setup-" + kind + "-" + at + ".png"), fullPage: false });
+  ok(!page.errors.length, at + ": no page errors: " + page.errors.join("; "));
   await ctx.close();
 }
 

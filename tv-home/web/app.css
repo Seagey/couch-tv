@@ -597,6 +597,8 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .set-phone p { margin: 0; display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
 .set-phone b { font-size: 1.5rem; line-height: 1.875rem; font-weight: 700; }
 .set-phone small { font-size: 1.125rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.72); white-space: normal; }
+.set-phone small.set-phone-pc { color: #fff; font-weight: 600; unicode-bidi: plaintext; }
+.set-phone small.set-phone-pc:empty { display: none; }
 .ssec {
   display: flex; align-items: center; gap: 1.25rem; min-height: 4.75rem; padding: 0.5rem 1.5rem 0.5rem 0.875rem; border-radius: 1.5rem;
   font-size: 1.75rem; line-height: 2.25rem; font-weight: 600; color: rgba(255, 255, 255, 0.76);
