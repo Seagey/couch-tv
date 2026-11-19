@@ -3862,6 +3862,11 @@
     keep("tvhome.devmode.asked", String(Date.now()));
     if (TV && TV.launch) TV.launch("com.palmdts.devmode");
   }
+  // the gear tile if the dock shows one, else the tile the focus is on
+  function gearAnchor() {
+    for (var i = 0; i < gridItems.length; i++) if (gridItems[i].kind === "gear" && gridEls[i]) return i;
+    return g;
+  }
   function renderGear() {
     var pop = $("gear-pop");
     var items = gearItems();
@@ -3872,8 +3877,9 @@
     }).join("");
     pop.classList.add("on");
     document.documentElement.classList.add("gearing");
-    // above the gear tile, kept inside the screen's safe area
-    var el = gridEls[g], rem = innerWidth / 120;
+    // above the gear tile (wherever the focus is, so the Settings key always opens it in the same place),
+    // kept inside the screen's safe area
+    var el = gridEls[gearAnchor()], rem = innerWidth / 120;
     if (el) {
       var b = el.getBoundingClientRect(), w = pop.offsetWidth;
       pop.style.left = Math.max(5 * rem, Math.min(innerWidth - w - 5 * rem, b.left + b.width / 2 - w / 2)) + "px";
