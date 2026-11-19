@@ -56,6 +56,11 @@ class ReleaseChannelTest {
         assertTrue(ReleaseChannel.newer("v0.13.4", "0.13"))
         assertFalse(ReleaseChannel.newer("v0.13.4", "0.13.4"))
         assertFalse(ReleaseChannel.newer("v0.13.3", "0.13.4"))
+        // 0.13.5 (the TCL beginner fixes) reaches 0.13.4 and older TVs
+        assertTrue(ReleaseChannel.newer("v0.13.5", "0.13.4"))
+        assertTrue(ReleaseChannel.newer("v0.13.5", "0.13"))
+        assertFalse(ReleaseChannel.newer("v0.13.5", "0.13.5"))
+        assertFalse(ReleaseChannel.newer("v0.13.4", "0.13.5"))
     }
 
     @Test fun theOldRulesStillHoldForEveryReleaseSoFar() {

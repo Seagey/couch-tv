@@ -2,9 +2,18 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.4**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.5**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 19 November 2026: release 0.13.5, fixes from a real beginner on a TCL
+
+0.13.5 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). We put couch-tv on a real TCL Android TV with just a phone, the way a beginner would, and fixed what got in the way. A classic home looks exactly as it did. Option C: install the new on-TV APK over the old one. Samsung: run the new `couch-tv-samsung-setup.zip` installer again. Option B: `git pull` and restart the bridge.
+
+- **Use as home screen (on-TV app):** the first press waits for Android to take in the new home before asking (the TCL showed a black screen); Cancel on Android's question leaves the button at Use as home screen; and with the phone only download the setup screen says plainly that Google's home keeps the Home button, with the exact steps to put `couch-tv-ontv-watch.apk` on from a computer (under More). Checked by tests, not yet on the TCL again.
+- **couch-tv Studio:** the switch row says On or Off the moment you press it. Design codes ignore case, spaces and the dash, show as ABCDE-FGHJK with a letter count while you type, and a big Check page comes before anything is sent.
+- **Samsung:** On tapped again after a TV that did not wake sends the wake again; power is never held (a Frame is never switched fully off from the phone); the installers check the kept Apps2Samsung download every run; the Windows installer no longer stops on a tool warning in PowerShell 5.1; `START HERE.txt` says where the signing certificate is kept.
+- **Also:** the on-TV app's bookings calendar tries each checked address in turn, and the Setup app shows its real version.
 
 ### 19 November 2026: release 0.13.4, Samsung with couch-tv Studio and a setup that needs no AI agent
 
