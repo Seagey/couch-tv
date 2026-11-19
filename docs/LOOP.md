@@ -13,7 +13,8 @@ water. Any clip with a slow push over a still subject works the same way.
 
 - **Option B, the bridge.** The bridge computer makes the footage with ffmpeg and serves it; the
   TV streams it from there. The launcher's offline copy of the home (for when the computer is off)
-  never holds the video: it shows the poster, a still of the loop, with everything else as usual.
+  never holds the video: it shows the poster, a still of the loop (with the clock behind the peak
+  when the loop has its cut-outs), with everything else as usual.
   Option A and option C have no bridge, so no footage: the look is still in the cycle there and shows
   its scrim over a dark ground.
 - **ffmpeg 7 on the bridge computer** (Debian: `sudo apt install ffmpeg`). Not on the Mac you set
@@ -24,6 +25,14 @@ Switch it on with `"look": "loop"` under `home` in `config.json` ([CONFIG.md](CO
 the TV in Home settings, Look, where Look cycles to Loop whether or not the files are there (without
 them it shows its scrim over a dark ground until `make-loop.sh` has run and the home reloaded).
 Night, Classic and OLED are untouched by any of this.
+
+A couch-tv Studio design is not drawn in the Loop look: the home starts no design there (no design
+picture, layers, widgets or video behind the loop), so nothing decodes a picture that the loop would
+cover. The design shows again as soon as you pick another look. In the Loop look Home settings,
+couch-tv Studio says so in a "Your design" row that switches to Night, getting a design by its code
+switches the home to Night so the design's question comes, and Studio's own preview (`?designer=1`)
+always opens in Night. In Home settings the Loop look also
+leaves out the Glass panels and Mac-style dock rows: it has its own glass and its own dock.
 
 ## Picking the footage
 
@@ -45,12 +54,22 @@ On the bridge computer, from the repo:
 scripts/make-loop.sh ~/Downloads/lake.mp4
 ```
 
-It writes `tv-home/web/loop/` (git ignores the folder; never commit it), sixteen files:
+It writes `tv-home/web/loop/` (git ignores the folder; never commit it), seventeen files:
 `dawn.mp4`, `day.mp4`, `dusk.mp4`, `night.mp4`, a `-blur.mp4` copy of each, a `.jpg` and
 `-blur.jpg` poster of each, and `loop.json` (below). A photo made with `--matte` also has a `-fg.png`
-cut-out of each (the depth effect, below). The bridge lists the folder afresh on every read of `config.js` and marks
-the files with a version the home puts on each address, so no restart: pick the Loop look, or press
-Home to reload it, and the new files play.
+cut-out of each (the depth effect, below), twenty-one files in all. The bridge lists the folder afresh
+on every read of `config.js` and marks the files with a version the home puts on each address, so no
+restart: pick the Loop look, or press Home to reload it, and the new files play.
+
+**A run never leaves the folder half made.** The script makes every file in a hidden folder inside
+`loop/` (`.staging-<number>`, every name in it starting with a dot, so neither the bridge nor the
+offline copy lists them) and moves them into place only once every encode has worked. A full run takes
+the old `loop.json` away first, moves each variant's sharp `.mp4` in after its blurred copy, posters
+and cut-out, and puts the new `loop.json` in last; a run without `--matte` removes any older cut-outs,
+which would not match. A TV that loads the home during a run gets the old loop, or for the moment of
+the move the new files with no cut-out (the clock in front), never half a file or new footage under
+the old motion. A run that fails, or that you stop with Ctrl-C, removes the hidden folder and leaves
+the files as they were.
 
 Options: `--seconds 45` for a longer loop (15 to 60, default 30), `--slow 2` to slow the clip,
 `--only night` to remake one variant after changing its grade (with the same `--seconds` and
@@ -77,8 +96,8 @@ What each file is:
 - **The blurred copy** (the glass, below), 160x90, blurred, 10 fps, crf 26 capped at 300 kbps,
   under 1 MB, cut from the finished sharp file so it has the same seam and length.
 - **The posters**, 960x540 JPEG, the first frame of the sharp and of the blurred file. The home
-  shows them until the video plays, and they are the only part of the folder the launcher keeps
-  in its offline copy (the video is streamed from the bridge).
+  shows them until the video plays, and the launcher's offline copy shows them in place of the video
+  (which is streamed from the bridge, never saved on the TV).
 - **`loop.json`**, written once per run: the loop's length and motion, which the bridge passes to the
   home as `home.loop.meta`. For a photo `{"still": true, "seconds": 34, "fps": 30, "zoom": 0.06,
   "sway": 0.3, "fg": {"x": 480, "y": 162, "w": 960, "h": 318}}` (`fg` is null without `--matte`), for
@@ -94,10 +113,20 @@ of BT.601 for a BT.709 file moves the colours by a few levels: unseen on its own
 cut-out, whose colours ffmpeg decoded, would show it. Tagged, the TV and ffmpeg turn the same YUV into
 the same RGB.
 
-The video stays on the bridge computer: `scripts/build-apk.sh` leaves `loop/*.mp4` out of the app
-it builds and `scripts/build-standalone.sh` out of the standalone site, the same way the offline
-manifest does, so a computer that has run `make-loop.sh` still builds an app of the usual size.
-The posters go into both.
+The footage stays on the bridge computer: only the bridge's own copy of the home plays it. What each
+other copy of `tv-home/web` takes from `loop/`, so a computer that has run `make-loop.sh` still builds
+apps of the usual size:
+
+- **The launcher's offline copy** (`/tv/manifest.json`, option B): everything but the video
+  (`loop/*.mp4`). The posters, the cut-outs and `loop.json` are small, so a Loop home with the
+  computer off shows the still of its loop with the clock still behind the peak.
+- **The TV home app** (`scripts/build-apk.sh`): the posters (`loop/*.jpg`) only.
+- **The on-TV app (option C), the LG app and the Samsung app:** nothing from `loop/`. The on-TV app
+  has no bridge to stream from; the LG and Samsung apps read the loop from the bridge's `/tv/loop/`.
+- **The standalone site** (`scripts/build-standalone.sh`): the posters only, and its `config.js`
+  turns the cut-out off (`home.loop.fg` false, no `meta`), so the page never asks for one. The site is
+  public to anyone with its address, and the posters are stills of the photo or clip you made the loop
+  from: the script says so when it finishes.
 
 ## The four variants and when each shows
 
@@ -157,21 +186,32 @@ launcher's WebView (Fire OS 7.7, 2 GB):
 - The WebView plays a muted inline video by itself (the launcher allows it), and seeks inside a
   fully buffered file work.
 
+These numbers are for the video and its glass. They were taken before the photo loop and the depth
+cut-out were added, so the cut-out (one 640x212 picture moved by a CSS animation) is not in them.
+
 ## If it stutters
 
 In this order, each one a smaller step than the next:
 
 1. **Glass off:** remove the `-blur.mp4` files from `tv-home/web/loop/` (or never make them) and
-   reload the home. `home.loop.blur` goes false and the home plays one video, the sharp one.
+   reload the home. `home.loop.blur` goes false and the home plays one video, the sharp one. (With
+   no quick button on the home there is no glass to show, and the blurred copy already pauses.)
 2. **Lighter home** (Home settings, Look, or `home.lighter`): the Loop look takes the fallback
    recipe everywhere, no second video, no mask.
 3. **A shorter or lower loop:** `--seconds 20` makes a smaller file; a clip with less water and
    cloud movement encodes to fewer bits at the same cap.
 4. **Another look.** Night, Classic and OLED are as they were.
 
-A Loop look with no files is not an error: the bridge says so once in its log ("the Loop look has
-no files yet: run scripts/make-loop.sh"), and `home.loop.variants` is empty until the files are
-there.
+A Loop look with no files is not an error: `home.loop.variants` is empty until the files are there,
+and the home shows its scrim over a dark ground. When `config.json` sets `home.look` to `loop`, the
+bridge also says so once in its log as it starts ("the Loop look has no files yet: run
+scripts/make-loop.sh"). A Loop look picked on the TV (Home settings, Look, or the Look quick button)
+logs nothing, so check `home.loop.variants` in `/tv/config.js` there.
+
+**When something covers the home.** While Smart Idle's OLED Ambient Clock or a kids mode home is on
+the screen, both videos pause and the cut-out hides, so nothing decodes behind them; when the home
+comes back they start again, in step. With Hide rows when idle, or while the Ambient music screen is
+open, the glass fades out with the quick buttons.
 
 ## A photo instead of a clip
 
@@ -187,7 +227,9 @@ scripts/make-loop.sh tv-home/web/backgrounds/scene-night@2x.jpg --seconds 34
 ```
 
 The picture is scaled up four times the output width first so the push moves in quarter pixel
-steps, which takes a few minutes per variant on a small box.
+steps, which takes a few minutes per variant on a small box. A photo that is not 16:9 (a phone's 4:3,
+a portrait) is cut to its centre 16:9 band, so keep what matters in the middle; a 16:9 photo is used
+whole.
 
 ## The depth effect: the clock behind the peak
 
@@ -206,7 +248,8 @@ scripts/make-loop.sh tv-home/web/backgrounds/scene-night@2x.jpg --matte tv-home/
 The matte is any image with transparency, aligned with the photo: transparent where the sky is, opaque
 in front of it. For your own photo, step 6 of [MAKE-A-SCENE.md](MAKE-A-SCENE.md) makes one
 (`scene-<id>-fg.webp`). The matte may be smaller than the photo, at the same shape: the script
-scales it to the 1280x720 frame.
+scales it to the 1280x720 frame and cuts it to the same centre 16:9 band as the photo, so the two stay
+in register to within half a 720p pixel whatever the photo's shape.
 `--matte` is for a photo only: a clip's own motion cannot be followed by a still cut-out, so the script
 refuses it there.
 

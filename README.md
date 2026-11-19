@@ -360,12 +360,15 @@ gains a permission these tables do not explain.
 
 **What the TV home talks to.** Your bridge or the on-TV app on your home network; Open-Meteo for
 the weather (and air quality, surf and place search when you use them); JustWatch for posters;
-GitHub for the update check (only with updates on); Home Assistant on your home network, if you set
+YouTube's image host (`i.ytimg.com`) for the picture on a YouTube video card, named by that video's
+id, once the bridge has found the video (option B); GitHub for the update check (only with updates on); Home Assistant on your home network, if you set
 it up; couch-tv Studio only once it is turned on (above); and, only while that widget is on the
 home, its own source (news feeds, ESPN for scores, Yahoo Finance for markets, OSRM for commute
 times, your own calendar address). The home's page rules allow any https address, because the
 calendar and video links in Home settings are addresses you choose. A design carries no code and
-no outside links, and the TV drops any it finds.
+no outside links, and the TV drops any it finds. The bridge (option B) also looks up each YouTube
+video it writes down on YouTube's public results page, by its title and channel, with no key and no
+sign in, to find the exact video for its card.
 
 ## Documentation
 

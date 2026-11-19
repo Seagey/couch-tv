@@ -65,10 +65,14 @@ the bridge tells the home about them (`home.loop` in `config.js`), is in [LOOP.m
 are, the same way the Night scenes do, and changes at the clip's loop boundary with a plain cut, never
 while the remote is moving; with it off the day grade plays all day. Without the files (no bridge, or
 `make-loop.sh` not run yet) the look shows its scrim over a dark ground and still works; in a preview
-(`index.html?mock=1&look=loop`) the night scene's photo stands in for the clip.
+(`index.html?mock=1&look=loop`) the night scene's photo stands in for the clip. A couch-tv Studio design
+is not drawn in this look (it shows again in the other looks), and Home settings leaves out the Glass
+panels and Mac-style dock rows here, since the look has its own. While Smart Idle's OLED Ambient Clock
+or a kids mode home covers it, the clip pauses.
 
 **The dock** is centred on the screen, as in the Night look; the Keep watching row above it stays on the
-left edge, and Up and Down between the two land on the tile nearest the one you were on.
+left edge. Down from a card lands on the dock tile nearest under it, and Up from the dock goes back to
+the card you were on.
 
 **The clock behind the peak.** Made from a photo with `make-loop.sh --matte` (the lake peak's own
 cut-out works), the clock sits slightly behind the mountain, as in the original design: a cut-out of

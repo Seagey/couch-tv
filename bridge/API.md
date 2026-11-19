@@ -30,8 +30,10 @@ changes, the change is written here first, with a dated note at the bottom.
   in its date form (an entity tag in it is not compared, so a stale tag still gets `206`), and an
   unknown range unit gets `416` rather than being ignored.
 - `GET /tv/manifest.json`, the launcher's offline copy, lists every file under `tv-home/web/` except
-  `mock*` and the video under `loop/`: the Loop look's footage (up to 80 MB) is streamed from the
-  bridge, never saved on the TV. Its posters (`loop/*.jpg`) are listed, so the offline home shows one.
+  `mock*`, dotfiles and the video under `loop/` (`loop/*.mp4`): the Loop look's footage (up to 80 MB)
+  is streamed from the bridge, never saved on the TV. The rest of `loop/` is small and listed: the
+  posters (`loop/*.jpg`), so the offline home shows one, the cut-outs (`loop/*-fg.png`), so the clock
+  stays behind the peak there as the `config.js` snapshot's `home.loop.fg` says, and `loop.json`.
 - Unknown paths under `/` and `/tv/` fall back to that folder's `index.html` (single page apps work).
 
 ## Shape of every answer
@@ -593,7 +595,9 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
   minus the ones removed with `/api/continue/hide`, in the shape of an item with `"kind": "video"`,
   `episode_title`, `season`, `episode`, `poster` and `progress` all `null`, and `app` YouTube's
   installed build. The line also keeps the channel and the length the app's media session gave
-  (`channel`, `duration_ms`; a live stream has no length), neither on the card. Once the video's id
+  (`channel`, `duration_ms`; a live stream has no length), neither on the card. A session with a
+  channel and no length is a live stream: its line and card carry `"live": true` (every other video
+  card `"live": false`), and the Loop look's row says "YouTube · Live" under it. Once the video's id
   is known (below) the card carries it as `video_id` and YouTube's own thumbnail for it as
   `backdrop`, `https://i.ytimg.com/vi/<id>/mqdefault.jpg` (320x180, 16:9, no black bars; the TV
   fetches it straight from YouTube's image host, the way it already fetches JustWatch's posters from
@@ -604,13 +608,22 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
   warmed when the line is written), and only when the title matches and the channel or the length
   agrees; a title many channels reuse is told apart by those, and a wrong video is worse than none,
   so otherwise the lookup says unsure. A found id is kept on disk, in `bridge/data/video-ids.json`
-  (the normalised title and channel, the id and when it was found; the newest 500), so a bridge
-  restart does not lose it and a press on a card already found never waits on the network. An unsure
-  answer is remembered ten minutes, in memory only, so the next press on that card goes straight to
-  the search instead of paying the lookup again, and a press that comes while the warm up is still
-  running waits on it (15 s at most) rather than starting a second one. `GET /api/continue` itself
-  may start that lookup in the background, for a card whose id is not yet known and not lately
-  unsure, and answers at once without it, so the next fetch of the row has the picture. A line with
+  (the normalised title and channel, the id, the video's length in whole seconds or null, and when
+  it was found; the newest 500), so a bridge restart does not lose it and a press on a card already
+  found never waits on the network. The saved id is only given back when the length agrees (within
+  3 s, or neither has one and there is a channel): a channel can put out two videos of one title, so
+  another length is looked up afresh and kept beside the first (four lengths per title and channel at
+  most, the oldest dropped). An entry written before
+  the length was kept has none. An unsure answer is remembered in memory only: the next press on
+  that card within ten minutes goes straight to the search instead of paying the lookup again, and a
+  press that comes while the warm up is still running waits on it (15 s at most) rather than
+  starting a second one. `GET /api/continue` itself may start that lookup in the background, for a
+  card whose id is not yet known and not lately unsure, and answers at once without it, so the next
+  fetch of the row has the picture; for the row, "lately" grows with each unsure answer in a row (ten
+  minutes, then twice as long each time, up to a day), so a video the results page never lists the
+  same way is asked about a few times a day, not every ten minutes for the 30 days it stays in the
+  row. However many lookups are under way, the bridge fetches YouTube's results page two at a time
+  at most (the move feature's lookups share that limit). A line with
   neither channel nor length (written by an older bridge, or from a session that gave neither) is
   never looked up: a title alone cannot be sure of the video, so that card has no picture and
   searches. A sure id goes to the build as its
@@ -628,8 +641,8 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
     {"id": "9c1e0b7d4a553f2a", "title": "How Trains Work", "episode_title": null, "season": null, "episode": null,
      "app": {"id": "youtube", "name": "YouTube", "package": "com.amazon.firetv.youtube"},
      "service": "youtube", "poster": null, "backdrop": "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
-     "progress": null, "kind": "video", "last_played": "2030-01-01T19:31:00Z", "source": "bridge",
-     "video_id": "dQw4w9WgXcQ"}]}
+     "progress": null, "kind": "video", "live": false, "last_played": "2030-01-01T19:31:00Z",
+     "source": "bridge", "video_id": "dQw4w9WgXcQ"}]}
   ```
 
 ### `POST /api/sleep` and `GET /api/sleep`
@@ -1007,6 +1020,11 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- 2026-11-19: `/tv/manifest.json` leaves only the Loop look's video (`loop/*.mp4`) out, so the offline
+  copy keeps the cut-outs and `loop.json` beside the posters. A YouTube video card carries `live`
+  (true for a live stream). `bridge/data/video-ids.json` keeps each id with the video's length
+  (`length_s`), one per length (four per title and channel), and a saved id is only used for a video
+  of that length.
 - 2026-11-19: The Loop look's depth effect: `home.loop` also carries `meta` (the folder's `loop.json`
   from make-loop.sh, checked, or null) and `fg` (true when meta has the cut-out's rectangle and every
   variant has `/tv/loop/<variant>-fg.png`); its `version` mark covers both (docs/LOOP.md).
