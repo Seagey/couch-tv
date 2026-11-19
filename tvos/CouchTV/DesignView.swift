@@ -472,17 +472,25 @@ struct DesignTitledCard: View {
         let ink = DesignInk.colour(style: style, panel: panel, look: look, kind: kind)
         GeometryReader { g in
             let s = min(g.size.width, g.size.height)
+            // a short box (a 40 px pill) has room for one line of words only: no icon, less padding,
+            // words no taller than the box, so nothing spills out of it
+            let short = g.size.height < 110
+            let pad = short ? max(2, min(16, g.size.height * 0.12)) : 16
+            let words = short ? max(10, min(40, g.size.height * 0.5)) : max(23, min(40, s * 0.12))
             VStack(spacing: s * 0.07) {
-                Image(systemName: DesignWidgets.symbol(kind)).font(.system(size: max(22, s * 0.2), weight: .light))
+                if !short {
+                    Image(systemName: DesignWidgets.symbol(kind)).font(.system(size: max(22, s * 0.2), weight: .light))
+                }
                 Text(label.flatMap { $0.isEmpty ? nil : $0 } ?? DesignWidgets.title(kind))
-                    .font(HomeFont.inter(max(23, min(40, s * 0.12)), .semibold))
+                    .font(HomeFont.inter(words, .semibold))
                     .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.6)
+                    .lineLimit(short ? 1 : 2)
+                    .minimumScaleFactor(0.5)
             }
             .foregroundStyle(ink)
-            .padding(16)
+            .padding(pad)
             .frame(width: g.size.width, height: g.size.height)
+            .clipped()
         }
         .modifier(DesignPanel(panel: panel, look: look, style: style, radius: DesignLayout.corner(style.corners, w: 400, h: 400), kind: kind))
     }

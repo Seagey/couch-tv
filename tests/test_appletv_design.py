@@ -244,12 +244,13 @@ class Gate(unittest.TestCase):
         s = self.obj("clamped", "s1")
         self.assertEqual((s["w"], s["h"], s["colour"]), (3840, 1, "rgb(10, 20, 30)"))
 
-    def test_unknown_kinds_are_dropped_and_known_ones_without_live_data_get_a_titled_card(self):
+    def test_unknown_kinds_get_a_plain_card_and_known_ones_without_live_data_get_a_titled_card(self):
         self.assertTrue(self.obj("kinds", "nat")["native"])
         fall = self.obj("kinds", "fall")
         self.assertFalse(fall["native"])
         self.assertEqual(fall["title"], "Now playing")
-        self.assertIsNone(self.obj("kinds", "made-up"))
+        made_up = self.obj("kinds", "made-up")   # keeps its place, its own name is never drawn
+        self.assertEqual((made_up["kind"], made_up["native"], made_up["title"]), ("other", False, "Widget"))
         self.assertEqual(self.obj("kinds", "smart1")["kind"], "light")
         self.assertEqual(self.obj("kinds", "stack1")["items"], ["clock", "news"])
         self.assertIsNone(self.obj("kinds", "stack2"))
