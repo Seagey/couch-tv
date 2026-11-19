@@ -106,7 +106,7 @@ class HomeActivity : Activity() {
             // Home settings, About, Update couch-tv: looks at GitHub's releases, never installs (Update.kt)
             addJavascriptInterface(Update.Page(this@HomeActivity, this, base), "TVUP")
             webViewClient = object : WebViewClient() {
-                override fun onPageFinished(view: WebView, url: String) { ready = true; view.requestFocus() }
+                override fun onPageFinished(view: WebView, url: String) { ready = true; view.requestFocus(); sendWaitingAtHome() }
                 override fun onReceivedError(view: WebView, req: WebResourceRequest, err: WebResourceError) {
                     // The server may still be starting: try again shortly.
                     if (req.isForMainFrame) { ready = false; main.postDelayed({ load() }, 700) }
@@ -118,6 +118,11 @@ class HomeActivity : Activity() {
                     val u = req.url
                     if (u.host != "tvos.invalid") return null
                     // a Watch Next card's picture the page cannot load itself (WatchNext.art, #122)
+                    // a photo sent from the phone's Home settings page (Photos.kt), as the home app's own photos are
+                    if (u.pathSegments.firstOrNull() == "photo") {
+                        val f = Photos.file(u.lastPathSegment ?: "") ?: return null
+                        return WebResourceResponse("image/jpeg", null, f.inputStream())
+                    }
                     if (u.pathSegments.firstOrNull() == "art") {
                         val b = WatchNext.art(u.lastPathSegment ?: "") ?: return null
                         return WebResourceResponse("image/jpeg", null, ByteArrayInputStream(b))
@@ -232,6 +237,14 @@ class HomeActivity : Activity() {
         @JavascriptInterface fun tvInputs(): String = Tv.inputs().toString()
         @JavascriptInterface fun openInput(id: String): Boolean = Tv.openInput(id)
         @JavascriptInterface fun openInputs(): Boolean = Tv.openInputs()
+        /** Home settings on the TV took off a photo that came from the phone: its file goes too (Photos.kt). */
+        @JavascriptInterface fun removePhoto(file: String) { Photos.delete(file) }
+    }
+
+    /** At home changes a phone sent while the page was not there yet: handed over once it has loaded. */
+    private fun sendWaitingAtHome() {
+        val list = synchronized(waitingAtHome) { waitingAtHome.toList().also { waitingAtHome.clear() } }
+        list.forEach { js("window.tv && tv.atHomeEdit && tv.atHomeEdit(" + it + ")") }
     }
 
     private fun tvApps(): List<ResolveInfo> = Tv.tvLaunchables().filter { it.activityInfo.packageName != packageName }
@@ -331,6 +344,42 @@ class HomeActivity : Activity() {
             if (!a.front || a.isFinishing || a.isDestroyed) return false
             refresher.post { a.js("window.tv && tv.typeText && tv.typeText(" + org.json.JSONObject.quote(t) + ")") }
             return true
+        }
+
+        /**
+         * At home (the note, lists, guest Wi-Fi, guide, calendar links) from the phone's Home settings page.
+         * The home page keeps them in its own store on this TV (athome.js), so they are handed across the
+         * way typeText hands words in: the page's tv.atHomeRead and tv.atHomeEdit, answered back here.
+         * Works with the home behind an app too, as long as its page is loaded. Null: no page to ask now.
+         */
+        fun atHomeRead(): JSONObject? = ask("window.tv && tv.atHomeRead ? tv.atHomeRead() : null")
+
+        /** Null: the page is not loaded; the change waits (in memory only) and goes in when it loads. */
+        fun atHomeEdit(edit: JSONObject): JSONObject? {
+            val code = "window.tv && tv.atHomeEdit ? tv.atHomeEdit($edit) : null"
+            ask(code)?.let { return it }
+            if (live() != null) return JSONObject().put("ok", false).put("error", "The TV home did not answer. Try again.")
+            synchronized(waitingAtHome) { if (waitingAtHome.size < 20) waitingAtHome += edit.toString() }
+            return null
+        }
+
+        private val waitingAtHome = ArrayList<String>()
+
+        private fun live(): HomeActivity? = shown?.get()?.takeIf { !it.isFinishing && !it.isDestroyed && it.ready && it.web != null }
+
+        /** Runs code in the home page and waits up to 4 s for its answer (an object, as JSON). */
+        private fun ask(code: String): JSONObject? {
+            val a = live() ?: return null
+            val got = java.util.concurrent.atomic.AtomicReference<String?>(null)
+            val done = java.util.concurrent.CountDownLatch(1)
+            refresher.post {
+                val w = a.web
+                if (w == null || !a.ready) done.countDown()
+                else w.evaluateJavascript(code) { v -> got.set(v); done.countDown() }
+            }
+            if (!done.await(4, java.util.concurrent.TimeUnit.SECONDS)) return null
+            val v = got.get()?.takeIf { it.startsWith("{") } ?: return null
+            return runCatching { JSONObject(v) }.getOrNull()
         }
 
         /** What onNewIntent does, for when the home came back without a new intent (FireHome.bringForward). */

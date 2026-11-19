@@ -151,6 +151,13 @@ export default function App() {
   const [screens, setScreens] = useState([]);
   const [tab, setTab] = useState('remote');
   const [sheet, setSheet] = useState(null);
+  // A link from the TV's phone Home settings page (/setup) opens one sheet: /#sheet=people, arrange, kids or more.
+  useEffect(() => {
+    const m = /(?:^#|&)sheet=(people|arrange|kids|more)(?:&|$)/.exec(window.location.hash || '');
+    if (!m) return;
+    try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) { /* old browser */ }
+    setSheet(m[1]);
+  }, []);
   // A sheet adds a history step, so the Android back button (or gesture) closes it instead of the app.
   useEffect(() => {
     const st = window.history.state;

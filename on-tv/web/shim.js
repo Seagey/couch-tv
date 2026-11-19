@@ -4,9 +4,11 @@
 (function () {
   'use strict';
   var KEY = 'couchtv.token';
-  var token = null;
+  var token = null, autoPairing = false;
   try { token = localStorage.getItem(KEY); } catch (e) { /* private mode: the cookie still works */ }
   if (!token) { var m = document.cookie.match(/(?:^|; )couchtv_token=([^;]+)/); if (m) token = decodeURIComponent(m[1]); }
+  // pictures the page shows from the TV (/api/photo/...) carry no header, only the cookie: keep it set
+  else if (!/(?:^|; )couchtv_token=/.test(document.cookie)) document.cookie = 'couchtv_token=' + encodeURIComponent(token) + '; path=/; max-age=31536000; SameSite=Strict';
 
   function isApi(url) {
     try { var u = new URL(url, location.href); return u.origin === location.origin && u.pathname.indexOf('/api/') === 0; } catch (e) { return false; }
@@ -23,7 +25,7 @@
       init.headers = h;
     }
     return realFetch(input, init).then(function (r) {
-      if (r.status === 401 && isApi(url) && !isPair(url)) showPairing('This phone needs to pair with the TV again.');
+      if (r.status === 401 && isApi(url) && !isPair(url) && !autoPairing) showPairing('This phone needs to pair with the TV again.');
       return r;
     });
   };
@@ -82,5 +84,20 @@
   }
 
   window.couchTv = { token: function () { return token; }, pair: showPairing };
+  // A QR on the TV can carry the code: http://<tv>:5400/#pin=123456 (or /setup#pin=...). The code is
+  // taken off the address straight away, so it is not kept in the phone's history or a bookmark. A
+  // phone that is already paired just ignores it.
+  var hashPin = (/(?:^#|&)pin=(\d{6})(?:&|$)/.exec(location.hash || '') || [])[1];
+  if (hashPin) {
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { }
+    if (!token) {
+      autoPairing = true;
+      realFetch('/api/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: hashPin, name: (navigator.platform || 'Phone') }) })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { if (j.ok && j.token) { save(j.token); location.reload(); } else showPairing('That code from the TV has run out. Scan the code on the TV again, or type the 6 digit code shown there.'); })
+        .catch(function () { showPairing('Can’t reach the TV. Check the phone is on the same Wi-Fi as the TV.'); });
+      return;
+    }
+  }
   if (!token) showPairing();
 })();

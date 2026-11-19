@@ -369,7 +369,14 @@ out every computer, so reconnect yours afterwards).
 - `Finder.kt` and `Apps.kt`: the computer bridge's JustWatch lookup, app table and deep-link rules.
 - `web/shim.js`: added to the phone remote's page by the TV app. It pairs the phone and adds the
   token to every call, so the remote itself is unchanged and the same build works with both modes.
-- `web/setup.html`: the phone setup page (ADB, wireless debugging pairing, names, weather, ask).
+- `web/setup.html`: Home settings on the phone (`http://<tv-ip>:5400/setup`): the town (the same
+  Open-Meteo search as the TV), people (through the phone remote's People sheet), photos sent from the
+  phone straight to the TV (made screen size there, `Photos.kt`), At home (note, lists, guest Wi-Fi,
+  house guide, calendar and bookings links, handed into the home page's own store by
+  `HomeActivity.atHome`), Ask, Use as home screen, Smart home where the TV has it, and ADB. Home
+  settings on the TV shows a QR to it (with the pairing code, `#pin=`), and the phone remote's More
+  sheet links to it. Everything stays on the TV and the home Wi-Fi; every setting can still be changed
+  on the TV.
 - Endpoints are those in `bridge/API.md`, plus `/api/pair`, `/api/pair/start`, `/api/adb`,
   `/api/adb/connect`, `/api/adb/pair`, `/api/settings`, `/api/home`, `/api/phones/forget` and `/api/ws`.
 - `GET /api/home` and `POST /api/home {"on": true|false}` (paired, like the rest): the same switch as

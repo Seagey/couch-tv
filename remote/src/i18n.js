@@ -165,6 +165,7 @@ S.en = {
   add_person: 'Add a person',
   // kids mode (Kids.jsx)
   kids_mode: "Kids mode",
+  home_settings_phone: "Home settings on this phone",
   kids_lede: "A kids profile’s TV home shows only the shows on its shelf, and the apps you allow. Leaving it on the TV needs the parent PIN.",
   kids_who: "Whose shelf",
   kids_make: "Make {name} a kids profile",
@@ -741,6 +742,7 @@ S['zh-CN'] = {
   add_person: '添加一个人',
   // kids mode (Kids.jsx)
   kids_mode: "儿童模式",
+  home_settings_phone: "在手机上更改主页设置",
   kids_lede: "儿童资料的电视主页只显示其栏目里的节目，以及你允许的应用。在电视上退出需要家长 PIN。",
   kids_who: "谁的栏目",
   kids_make: "把 {name} 设为儿童资料",
@@ -1307,6 +1309,7 @@ S.es = {
   add_person: 'Añadir una persona',
   // kids mode (Kids.jsx)
   kids_mode: "Modo infantil",
+  home_settings_phone: "Ajustes de inicio en el móvil",
   kids_lede: "El inicio de un perfil infantil muestra solo los programas de su estante y las apps que permitas. Salir de él en el televisor pide el PIN de los padres.",
   kids_who: "Estante de quién",
   kids_make: "Convertir a {name} en perfil infantil",
@@ -1546,6 +1549,7 @@ S.it = {
   add_person: 'Aggiungi una persona',
   // kids mode (Kids.jsx)
   kids_mode: "Modalità bambini",
+  home_settings_phone: "Impostazioni della home sul telefono",
   kids_lede: "La home di un profilo bambini mostra solo i programmi del suo scaffale e le app che consenti. Per uscirne sulla TV serve il PIN dei genitori.",
   kids_who: "Scaffale di chi",
   kids_make: "Rendi {name} un profilo bambini",
@@ -1720,6 +1724,7 @@ S.de = {
   add_person: 'Person hinzufügen',
   // kids mode (Kids.jsx)
   kids_mode: "Kindermodus",
+  home_settings_phone: "Startbildschirm-Einstellungen am Handy",
   kids_lede: "Der TV-Startbildschirm eines Kinderprofils zeigt nur die Sendungen in seinem Regal und die Apps, die du erlaubst. Zum Verlassen am Fernseher braucht es die Eltern-PIN.",
   kids_who: "Wessen Regal",
   kids_make: "{name} zum Kinderprofil machen",
@@ -1896,6 +1901,7 @@ S.tr = {
   add_person: 'Kişi ekle',
   // kids mode (Kids.jsx)
   kids_mode: "Çocuk modu",
+  home_settings_phone: "Ana ekran ayarları telefonda",
   kids_lede: "Bir çocuk profilinin TV ana ekranı yalnızca rafındaki dizileri ve izin verdiğin uygulamaları gösterir. TV’de bu moddan çıkmak ebeveyn PIN’i ister.",
   kids_who: "Kimin rafı",
   kids_make: "{name} için çocuk profili yap",
@@ -2071,6 +2077,7 @@ S['sr-Latn-RS'] = {
   add_person: 'Dodaj osobu',
   // kids mode (Kids.jsx)
   kids_mode: "Dečji režim",
+  home_settings_phone: "Podešavanja početnog ekrana na telefonu",
   kids_lede: "Početni ekran dečjeg profila prikazuje samo emisije sa njegove police i aplikacije koje dozvoliš. Za izlazak na televizoru treba roditeljski PIN.",
   kids_who: "Čija polica",
   kids_make: "Napravi dečji profil za {name}",
@@ -2249,6 +2256,7 @@ S.cs = {
   add_person: 'Přidat osobu',
   // kids mode (Kids.jsx)
   kids_mode: 'Dětský režim',
+  home_settings_phone: 'Nastavení domovské obrazovky v telefonu',
   kids_lede: 'Domovská obrazovka dětského profilu ukazuje jen pořady z jeho police a aplikace, které povolíte. Opustit ho v televizi jde jen s rodičovským PINem.',
   kids_who: 'Čí police',
   kids_make: 'Udělat z profilu {name} dětský profil',
@@ -2431,6 +2439,7 @@ S.pl = {
   add_person: 'Dodaj osobę',
   // kids mode (Kids.jsx)
   kids_mode: 'Tryb dziecięcy',
+  home_settings_phone: 'Ustawienia ekranu głównego na telefonie',
   kids_lede: 'Ekran główny profilu dziecięcego pokazuje tylko programy z jego półki i dozwolone aplikacje. Wyjście z niego na telewizorze wymaga PIN-u rodzica.',
   kids_who: 'Czyja półka',
   kids_make: 'Ustaw profil dziecięcy: {name}',
@@ -2999,6 +3008,7 @@ S.pt = {
   add_person: 'Adicionar pessoa',
   // kids mode (Kids.jsx)
   kids_mode: 'Modo infantil',
+  home_settings_phone: 'Ajustes da tela inicial no celular',
   kids_lede: 'A tela inicial de um perfil infantil mostra só os programas da prateleira dele e os apps que você permitir. Para sair do modo infantil na TV, é preciso o PIN dos pais.',
   kids_who: 'De quem é a prateleira',
   kids_make: 'Tornar {name} um perfil infantil',

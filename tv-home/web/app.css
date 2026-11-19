@@ -587,6 +587,16 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .set-side { display: flex; flex-direction: column; min-height: 0; }
 .set-title { margin: 2.25rem 0 2.5rem 1.25rem; font-size: 2.875rem; line-height: 3.75rem; font-weight: 700; letter-spacing: -0.022em; white-space: nowrap; }
 .set-secs { display: flex; flex-direction: column; gap: 0.375rem; }
+/* on-TV app only: Change this on your phone. Never focusable, so it costs no presses. */
+.set-phone { display: none; align-items: center; gap: 1rem; margin: -1.5rem 0 1.25rem 1.25rem; }
+.set-phone.on { display: flex; }
+.set-phone.on + .set-secs { gap: 0.25rem; }
+.set-phone.on + .set-secs .ssec { min-height: 4.375rem; }   /* ten sections (with Updates) still fit under the QR */
+.set-phone-qr { flex: none; width: 7.5rem; height: 7.5rem; border-radius: 0.75rem; overflow: hidden; background: #fff; }
+.set-phone-qr svg { display: block; width: 100%; height: 100%; }
+.set-phone p { margin: 0; display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.set-phone b { font-size: 1.5rem; line-height: 1.875rem; font-weight: 700; }
+.set-phone small { font-size: 1.125rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.72); white-space: normal; }
 .ssec {
   display: flex; align-items: center; gap: 1.25rem; min-height: 4.75rem; padding: 0.5rem 1.5rem 0.5rem 0.875rem; border-radius: 1.5rem;
   font-size: 1.75rem; line-height: 2.25rem; font-weight: 600; color: rgba(255, 255, 255, 0.76);
