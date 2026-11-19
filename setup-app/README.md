@@ -13,7 +13,7 @@ on afterwards. It can add the phone remote too (the "lives on the TV" app).
 
 | TV | |
 |---|---|
-| **Google TV** (Sony, TCL, Hisense, Philips, Panasonic Google TVs, Chromecast with Google TV, Google TV Streamer and others) | Yes. You type a 6 digit code from the TV's Wireless debugging screen. |
+| **Google TV** (Sony, TCL, Hisense, Toshiba, Philips, Panasonic Google TVs, Chromecast with Google TV, Google TV Streamer and others) | Yes. Android 12 or newer: you type a 6 digit code from the TV's Wireless debugging screen. Android 11 (many 2021 and 2022 Hisense, Toshiba and TCL Google TVs, which have no Wireless debugging): you switch on USB debugging and press Allow when the TV asks; no cable. |
 | **Android TV** 7.1 and newer | Yes if Developer options has Wireless debugging (then as above), or if the TV asks "Allow USB debugging?" over Wi-Fi once Network or USB debugging is on (then you press Allow). |
 | **Fire TV on Fire OS** 6, 7 and 8 (sticks, Cubes, Fire TV TVs) | Yes, with ADB debugging and Allow. Amazon's home flashes up for a moment before couch-tv comes back. |
 
@@ -32,9 +32,10 @@ on afterwards. It can add the phone remote too (the "lives on the TV" app).
 
 A Google TV box (for example the Google TV Streamer) plugged into any of these gets everything.
 
-**Android TVs that need a computer once, not this app:**
-- An Android TV with no Wireless debugging that never shows "Allow USB debugging?" for a new computer over Wi-Fi needs a computer with a USB cable once. The app checks and says so before it changes anything. (An Android 11 TV with only USB debugging did ask, so try first.)
-- Android 6 and 7.0 TVs (for example the Xiaomi Mi TV 4A with PatchWall): couch-tv is experimental there and is set up from a computer with the guide in this README. The app stops and says so.
+**When the TV never asks "Allow USB debugging?":**
+- Some Android TVs and Android 11 Google TVs never ask for a new computer over Wi-Fi (seen on a Toshiba Google TV, Android 11). The app then walks through what usually fixes it, one screen at a time with a Try again each: go to the home screen and wait, switch USB debugging off and on, clear the computers the TV remembers (only when this computer was never allowed), restart the TV. If the TV still says no, it shows how to put couch-tv on with just a phone (the Downloader app, code 8180170, then the Couch TV app shows the address to open on the phone). Nothing is changed on the TV.
+
+**Android 6 and 7.0 TVs** (for example the Xiaomi Mi TV 4A with PatchWall): couch-tv is set up from a computer with the guide in this README. The app stops and says so.
 
 ## Get it
 
@@ -60,7 +61,7 @@ asks once whether you trust it.
 1. Double-click **couch-tv Setup**. macOS says it cannot check it for malicious software. Press **Done** (or OK).
 2. Open **System Settings, Privacy and Security**. Scroll down to the message about couch-tv Setup and press **Open Anyway**. Type your Mac password if it asks.
 3. Double-click the app again and press **Open**.
-4. When it asks to **find devices on your local network**, press **Allow**. That is how it reaches the TV.
+4. When it asks to **find devices on your local network**, press **Allow**. That is how it reaches the TV. If you missed it, the app says "Your Mac blocked this app from finding the TV": open **System Settings, Privacy and Security, Local Network**, switch on **couch-tv Setup**, then press **Look again**.
 
 **Windows:**
 1. Double-click **couch-tv Setup.exe**. If "Windows protected your PC" (SmartScreen) shows, press **More info**, then **Run anyway**.
@@ -68,7 +69,7 @@ asks once whether you trust it.
 3. Keep `couch-tv Setup.exe` in its folder: it needs the `_internal` folder next to it.
 
 The app has no window of its own: the setup is the page in your browser. When you are done, press
-**Close setup**. If you just close the tab, it stops by itself a few minutes later.
+**Close setup**. If you just close the tab, it stops by itself after a few minutes.
 
 ## What it does to the TV
 
@@ -104,7 +105,7 @@ name to Open-Meteo for the weather. No accounts, no tracking, no AI.
 cd setup-app
 python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.txt
 .venv/bin/python -m couchtv_setup                    # opens the page
-.venv/bin/python -m unittest discover -s tests       # 51 tests, no TV needed
+.venv/bin/python -m unittest discover -s tests       # 95 tests, no TV needed
 .venv/bin/python couch-tv-setup.py --self-test       # pairs with itself, as the built app does in CI
 ```
 

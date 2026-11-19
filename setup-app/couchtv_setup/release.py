@@ -113,7 +113,7 @@ def get(name, progress=lambda f, msg=None: None, release=None):
                 f.write(chunk)
                 got += len(chunk)
                 if total:
-                    progress(min(1.0, got / total), f"Downloading {name} ({tag})")
+                    progress(min(1.0, got / total), "Downloading the " + ("couch-tv home" if "home" in name else "phone remote app") + f" ({tag})")
     except (urllib.error.URLError, OSError) as e:
         part.unlink(missing_ok=True)
         raise TvError("The download stopped part way. Check the internet and try again.", "offline") from e

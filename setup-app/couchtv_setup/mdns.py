@@ -101,6 +101,16 @@ def _sockets():
     return socks
 
 
+def send(sock, q):
+    """Sends the question to the mDNS group. A failure keeps where it was going (`dest`), so the page
+    can tell a Mac's Local Network block (errors.py) from anything else."""
+    try:
+        sock.sendto(q, (GROUP, PORT))
+    except OSError as e:
+        e.dest = GROUP
+        raise
+
+
 def browse(services, wait=3.0):
     """Asks for each service and returns what answered: a list of
     {"service", "instance", "ip", "port", "name"} (name is the instance's own label)."""
@@ -110,12 +120,12 @@ def browse(services, wait=3.0):
     socks = _sockets()
     try:
         q = query([s.rstrip(".") for s in services])
-        socks[0].sendto(q, (GROUP, PORT))
+        send(socks[0], q)
         end, resent = time.time() + wait, False
         import select
         while time.time() < end:
             if not resent and time.time() > end - wait / 2:
-                socks[0].sendto(q, (GROUP, PORT))
+                send(socks[0], q)
                 resent = True
             ready, _, _ = select.select(socks, [], [], 0.2)
             for s in ready:

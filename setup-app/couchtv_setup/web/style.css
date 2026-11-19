@@ -27,6 +27,9 @@ h2 { font-size: 20px; margin: 32px 0 8px; }
 .hint { color: var(--soft); }
 .warn { border-left: 3px solid var(--warn); padding: 8px 14px; background: #241a16; border-radius: 6px; }
 .error { border-left: 3px solid var(--warn); padding: 10px 14px; background: #2a1712; border-radius: 6px; }
+.error p { margin: 0; }
+.error details { margin-top: 8px; }
+.error details p { margin-top: 6px; word-break: break-word; }
 ul, ol { padding-left: 22px; }
 li { margin: 6px 0; }
 .tvs { list-style: none; padding: 0; }

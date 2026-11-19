@@ -176,3 +176,11 @@ class FakeTv:
             self.files = {k: v for k, v in self.files.items() if not k.startswith("/data/local/tmp/couchtv-setup")}
             return ""
         return ""
+
+
+def never_allows():
+    """A TV that never lets a new computer in over Wi-Fi: it takes the connection on port 5555 but never
+    shows "Allow USB debugging?" for the new key, so the wait runs out (what adb-shell raises then). Seen on a
+    Toshiba (Hisense made) Google TV on Android 11, 19 November 2026."""
+    from adb_shell.exceptions import AdbTimeoutError
+    raise AdbTimeoutError("Never got one of the expected responses: [b'CNXN'] (transport_timeout_s = 45, read_timeout_s = 10)")

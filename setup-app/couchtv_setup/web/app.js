@@ -5,7 +5,18 @@
   var KEY = document.querySelector('meta[name="setup-key"]').content;
   var OS = document.querySelector('meta[name="setup-os"]').content;
   var $ = function (id) { return document.getElementById(id); };
-  var state = { mode: "setup", ip: null, kind: null, facts: null, route: null, weather: null, remote: false };
+  var state = { mode: "setup", ip: null, kind: null, facts: null, route: null, weather: null, remote: false,
+                look: null, tried: 0, devStep: "dev-classic" };
+
+  // An error from this app's own server: plain words, a code, and the technical part as detail.
+  function problem(j) {
+    var e = new Error(j.error || "That step did not work. Try it again.");
+    e.code = j.code; e.detail = j.detail; e.fix = j.fix;
+    return e;
+  }
+
+  // The page could not reach couch-tv Setup on this computer at all (the app was closed).
+  var LOST = "This page lost touch with couch-tv Setup on this computer. Open the app again, then start over.";
 
   function api(path, body) {
     return fetch(path, {
@@ -14,10 +25,10 @@
       body: JSON.stringify(body || {})
     }).then(function (r) {
       return r.json().then(function (j) {
-        if (!r.ok) { var e = new Error(j.error || "Something went wrong."); e.code = j.code; throw e; }
+        if (!r.ok) throw problem(j);
         return j;
-      });
-    });
+      }, function (x) { var e = new Error(LOST); e.code = "lost_app"; e.detail = String(x); throw e; });
+    }, function (x) { var e = new Error(LOST); e.code = "lost_app"; e.detail = String(x); throw e; });
   }
 
   // A slow step runs as a job; this asks how it is going until it is done.
@@ -28,7 +39,7 @@
           api("/api/job").then(function (j) {
             if (onProgress) onProgress(j.progress || 0, j.message || "");
             if (j.running) return setTimeout(tick, 700);
-            if (j.error) { var e = new Error(j.error); e.code = j.code; return reject(e); }
+            if (j.error) return reject(problem(j));
             resolve(j.result);
           }, reject);
         })();
@@ -42,8 +53,17 @@
     window.scrollTo(0, 0);
   }
 
+  // Plain words on the page; the technical part only behind Details. This computer blocking the app
+  // from the home network gets its own screen with Look again.
   function fail(e) {
-    $("error").textContent = e.message || String(e);
+    if (e && e.code === "local_network_blocked") {
+      text("blocked-text", e.message);
+      show("blocked");
+      return;
+    }
+    text("error-text", (e && e.message) || "That step did not work. Try it again.");
+    text("error-detail", (e && e.detail) || "");
+    $("error-more").hidden = !(e && e.detail);
     $("error").hidden = false;
   }
 
@@ -94,6 +114,7 @@
   function pick(ip, seen) {
     state.ip = ip;
     api("/api/look", { ip: ip }).then(function (r) {
+      state.look = r;
       if (r.kind === "samsung" || r.kind === "lg" || r.kind === "roku") {
         var names = { samsung: "Samsung", lg: "LG", roku: "Roku" };
         text("stop-title", "A " + names[r.kind] + " needs another way");
@@ -134,26 +155,61 @@
   document.querySelectorAll("[data-kind]").forEach(function (b) {
     b.addEventListener("click", function () {
       state.kind = b.dataset.kind;
+      state.tried = 0;
+      var look = state.look || {};
+      // Already answering on the network debugging port: no steps needed, straight to the Allow question.
+      if (state.kind !== "fire" && look.adb_5555) {
+        state.devStep = state.kind === "google" ? "dev-google" : "dev-classic";
+        if (state.kind === "android") classicSteps("android");
+        return allow();
+      }
       if (state.kind === "google") return startGoogle();
-      $("howto-android").hidden = state.kind !== "android";
-      $("howto-fire").hidden = state.kind !== "fire";
-      $("fire-note").hidden = state.kind !== "fire";
-      text("classic-title", state.kind === "fire" ? "Switch on ADB debugging" : "Switch on debugging");
-      show("dev-classic");
+      classicSteps(state.kind);
+    });
+  });
+
+  function classicSteps(which) {
+    $("howto-android").hidden = which !== "android";
+    $("howto-usb").hidden = which !== "usb";
+    $("howto-fire").hidden = which !== "fire";
+    $("fire-note").hidden = which !== "fire";
+    text("classic-title", which === "fire" ? "Switch on ADB debugging" : "Switch on USB debugging");
+    state.devStep = "dev-classic";
+    show("dev-classic");
+  }
+
+  // What this TV showed before anything was switched on decides which way in it needs.
+  var ROUTE_WORDS = {
+    pair: "This TV has Wireless debugging, so you will type a 6 number code from the TV. First, Developer options.",
+    usb: "This TV runs Android 11, so it has no Wireless debugging: you will switch on USB debugging, and the TV asks to allow this computer. No cable is needed. First, Developer options.",
+    unknown: "Google TVs on Android 12 or newer have Wireless debugging. Google TVs on Android 11 (many 2021 and 2022 Hisense, Toshiba and TCL TVs) only have USB debugging, and that works too, with no cable. Switch on Developer options, then pick what your TV shows."
+  };
+
+  function startGoogle() {
+    var route = (state.look && state.look.route) || "unknown";
+    text("route-line", ROUTE_WORDS[route] || ROUTE_WORDS.unknown);
+    state.devStep = "dev-google";
+    show("dev-google");
+  }
+
+  document.querySelectorAll("[data-dev]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      if (b.dataset.dev === "wireless") return startPair();
+      classicSteps("usb");
     });
   });
 
   // ---- Google TV: pairing code ----
 
   var portTimer = null;
-  function startGoogle() {
-    show("dev-google");
+  function startPair() {
+    show("dev-google-pair");
     $("code").value = "";
     $("pair-port").value = "";
     text("pair-status", "");
     clearInterval(portTimer);
     portTimer = setInterval(function () {
-      if ($("pair-port").value || $("dev-google").hidden) return;
+      if ($("pair-port").value || document.querySelector('[data-step="dev-google-pair"]').hidden) return;
       api("/api/pairing-port", { ip: state.ip }).then(function (r) {
         if (r.port && !$("pair-port").value) {
           $("pair-port").value = r.port;
@@ -184,17 +240,54 @@
 
   // ---- Android TV and Fire TV: the Allow prompt ----
 
-  $("connect-go").addEventListener("click", allow);
+  $("connect-go").addEventListener("click", function () { state.tried = 0; allow(); });
+  $("classic-back").addEventListener("click", function () {
+    if (state.kind === "google") { state.devStep = "dev-google"; return show("dev-google"); }
+    show("kind");
+  });
   $("allow-retry").addEventListener("click", allow);
+  $("allow-back").addEventListener("click", function () { clearInterval(countdown); show(state.devStep); });
+  document.querySelectorAll(".fix-try").forEach(function (b) { b.addEventListener("click", allow); });
+  document.querySelectorAll(".fix-back").forEach(function (b) {
+    b.addEventListener("click", function () { show(state.devStep); });
+  });
+  $("fix-again").addEventListener("click", function () { state.tried = 0; allow(); });
+  $("blocked-again").addEventListener("click", scan);
+
+  // The fix screens and the phone route name Fire TV's menus on a Fire TV, the Android menus otherwise.
+  function tvKindWords() {
+    var fire = state.kind === "fire";
+    document.querySelectorAll("[data-tvkind]").forEach(function (el) { el.hidden = (el.dataset.tvkind === "fire") !== fire; });
+  }
+
+  // One try: a short, honest wait with the seconds counting down. If the TV does not let this computer
+  // in, the server names the next fix to show; after the last one comes the phone route, never a dead end.
+  var countdown = null;
   function allow() {
+    var wait = state.tried ? 30 : 45;
     show("allow");
     $("allow-retry").hidden = true;
-    text("allow-status", "Tick Always allow from this computer, then press Allow on the TV. Waiting up to a minute and a half…");
-    job("/api/connect", { ip: state.ip }).then(connected, function (e) {
-      if (e.code === "not_allowed") return show("no-allow");
-      fail(e);
-      $("allow-retry").hidden = false;
+    var left = wait;
+    var say = function () {
+      text("allow-status", "Tick Always allow from this computer, then press Allow on the TV. Waiting " + left + " more seconds…");
+    };
+    say();
+    clearInterval(countdown);
+    countdown = setInterval(function () { if (left > 1) { left -= 1; say(); } }, 1000);
+    job("/api/connect", { ip: state.ip, kind: state.kind, tried: state.tried, wait: wait }).then(function (r) {
+      clearInterval(countdown);
+      connected(r);
+    }, function (e) {
+      clearInterval(countdown);
+      if (e.fix) {
+        state.tried += 1;
+        tvKindWords();
+        return show(e.fix);
+      }
+      if (e.code === "local_network_blocked") return fail(e);
       text("allow-status", "");
+      $("allow-retry").hidden = false;
+      fail(e);
     });
   }
 
@@ -206,7 +299,7 @@
     if (!f.supported) {
       text("stop-title", "This TV is too old");
       text("stop-text", "This app needs Android 7.1 or newer, and this TV has Android " + f.android + ". A Google TV box plugged into the TV can run couch-tv.");
-      text("stop-more", "On Android 6 (for example the Xiaomi Mi TV 4A), couch-tv is experimental and is set up from a computer with the guide on GitHub. Nothing was changed on the TV.");
+      text("stop-more", "On Android 6 (for example the Xiaomi Mi TV 4A), couch-tv is set up from a computer with the guide on GitHub. Nothing was changed on the TV.");
       return show("stop");
     }
     if (state.mode === "undo") return undoPlan();
@@ -359,6 +452,7 @@
   }
   $("close-go").addEventListener("click", closeSetup);
   $("close-go2").addEventListener("click", closeSetup);
+  $("close-go3").addEventListener("click", closeSetup);
   $("close-top").addEventListener("click", closeSetup);
 
   show("welcome");

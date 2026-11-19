@@ -143,3 +143,62 @@ machines (CI builds and smoke tests them); the page in a browser by a person.
 - Verified: unit tests (58) and the smoke test pass against the pretend TV. NOT verified on a real stick: that `pm disable` of the alias and the revoke behave on Fire OS, and that the on-TV app does not re-enable its own alias. That is the re-run asked of the tester.
 
 - Fire OS refuses `pm disable` of the on-TV app's HomeAlias ("Shell cannot change component state", killy10o10, 12 Nov): that is not reported as a failure. The on-TV app's watch is still taken out and its grant revoked, which is what stops it winning. If a phone token for it is ever held, `POST /api/home {"on": false}` on port 5400 is tried; the Setup app holds none today, so on Fire the plan says the home entry is left and why. Before the first connection the device list also shows a name the TV announces over DIAL (SSDP), when it gives one. NOT verified on a real TV: the DIAL name.
+
+## Changes to the plan: a Toshiba beginner test (19 November 2026, setup app 0.13.3)
+
+A beginner test on a Toshiba (Hisense made) Google TV on Android 11, from a Mac
+(`tools/tv-designer/checks/beginner-test-toshiba.md`, items 2, 6 and 9 and Run 2), hit two walls:
+"Something went wrong: OSError" on the first launch, and "This TV did not ask ... needs a USB cable", a
+dead end. seagey: every feature must work or say plainly what it needs, in plain words.
+
+- **Errors are plain words, always.** `errors.py` maps every exception to a sentence and a code; the
+  technical part goes in `detail`, which the page keeps behind a **Details** disclosure. No raw
+  exception name reaches the page (the job runner, the page server's 500 path, the TV's "stopped
+  answering", install and uninstall failures all go through it).
+- **macOS Local Network permission** (the OSError): "No route to host" (EHOSTUNREACH, errno 65 on a
+  Mac) or "Operation not permitted" (EPERM) on a send to a home address (192.168, 10, 172.16) or to the
+  mDNS group, while the internet route is there, or nearly every knock on the /24 failing that way at
+  once, now shows its own screen: "Your Mac blocked this app from finding the TV. Open System Settings,
+  Privacy and Security, Local Network, switch on couch-tv Setup, then press Look again." with a Look
+  again button. Windows gets the firewall's Private networks wording.
+- **Google TV no longer assumes Wireless debugging.** Developer options first (both menu names, System
+  and Device Preferences), then the person picks what the TV shows: Wireless debugging (Android 12 or
+  newer, the 6 number code) or only USB debugging (Android 11 Google TVs, many 2021 and 2022 Hisense,
+  Toshiba and TCL: USB debugging over Wi-Fi, port 5555, no cable, then Allow). A TV already answering on
+  5555 goes straight to the Allow screen.
+- **Which way in, before the steps:** `finder.route_hint()` from what the TV shows unpaired: 5555 open
+  (Allow), Wireless debugging announced over mDNS (code), or an Android version read from the TV's own
+  Cast info (`http://<tv>:8008/setup/eureka_info`) only when a field says it outright (an Android or OS
+  version key, or the SDK level; Cast's own build numbers are ignored). Otherwise the page says both
+  ways. NOT verified on a real TV: whether any TV's Cast info carries such a field. Usually it will
+  not, and then the page shows both, which is the safe answer.
+- **No prompt is never a dead end.** Each try waits 45 seconds (30 on later tries), counted down on
+  the page. When the TV does not let this computer in, the server names the next screen
+  (`steps.no_allow_fixes`), each with a Try again: go to the home screen and wait 10 seconds; switch USB
+  debugging off and on; Revoke USB debugging authorisations (only when this computer was never allowed
+  on this TV, and it says other computers will ask again; not on Fire TV); restart the TV (hold Power,
+  or unplug 10 seconds) and check USB debugging is still on. After those: "This TV will not let a
+  computer in over Wi-Fi. You can still put couch-tv on it with just your phone", the Downloader steps
+  with code 8180170, then the Couch TV app on the TV shows the address to open on the phone. The old
+  "needs a USB cable" stop is gone.
+- **Words:** "experimental" and "later" gone from the page; the TCL line no longer says AUTO_START;
+  the download line says "the couch-tv home", not a file name; "debugging port" gone.
+- **Phone route steps match the real screens** (from a TCL Google TV test the same day): Downloader 2.0.4
+  opens on a news site with adverts and the code box is the # button; the unknown apps prompt is
+  CANCEL or SETTINGS, then a list with a warning; and Google Play Protect can block the install ("App
+  blocked to protect your device"). The page says why Play Protect does it, Install anyway when offered,
+  otherwise pausing its app scan in the Play Store app and switching it back on, or the computer again.
+  NOT verified: the Play Store menu path on every Google TV.
+
+### Verified (19 November 2026, on a Mac, Python 3.11.3, no TV touched)
+
+| What | How | Result |
+|---|---|---|
+| Unit tests | `build/venv/bin/python -m unittest discover -s tests`: 95 tests (63 before, 32 new in `tests/test_beginner.py`: the errno mapping including EHOSTUNREACH 65 and EPERM to each home range, not a block without the internet route or to an internet address or for a file; every other error plain; a TV that never authorises a new key (`faketv.never_allows`) walks home, toggle, revoke, restart, phone route, and without revoke when this computer was allowed before or on Fire TV; port closed ends on the phone route too; each fix is a screen with Try again; the route hint and Cast info parser; banned words on the screens) | OK |
+| The screens | the page run against a pretend network (no scan, no TV), clicked through in a browser: Google TV, Only USB debugging, Done, then each Try again | home, toggle, revoke, restart, phone route, in that order; the blocked Mac screen with Look again |
+| Built app | PyInstaller 6.16.0 as `.github/workflows/setup-app.yml` does, ad hoc signed, `tests/smoke.py` (pairing self test inside the bundle, page, secret, Close setup) | smoke test ok, 13.3 MB zip |
+
+NOT verified: the new screens on a real TV (a Toshiba Google TV on Android 11 would be the test: it should reach the Allow
+screen at once, since 5555 is open, then the fix screens); the Local Network message on a Mac that
+really refused the permission (simulated by errno only); the Intel Mac and Windows builds of this
+commit (CI builds them after a push).

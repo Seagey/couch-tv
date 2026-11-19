@@ -25,7 +25,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import finder, pairing, paths, release, steps
+from . import errors, finder, pairing, paths, release, steps
 from .identity import Identity
 from .tv import Tv, TvError
 
@@ -36,7 +36,8 @@ CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' 
        "frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
 SECRET = secrets.token_urlsafe(24)
 OS = "mac" if sys.platform == "darwin" else "windows" if sys.platform == "win32" else "linux"
-IDLE_S = 180          # the page asks every 20 s; this long without it means the tab is closed
+ALLOW_WAIT_S = 45     # how long one try waits for Allow on the TV; the page counts it down
+IDLE_S = 180         # the page asks every 20 s; this long without it means the tab is closed
 FIRST_S = 600
 
 
@@ -64,6 +65,25 @@ def identity():
     return S.identity
 
 
+def error_payload(e):
+    """What the page gets for any error: plain words, a code, and the technical part only as `detail`
+    (the page keeps it behind Details). Never a raw exception name in the words."""
+    if isinstance(e, TvError):
+        return e.payload()
+    if isinstance(e, pairing.PairingError):
+        root = e.__cause__ or e.__context__
+        if root is not None and errors.is_local_network_block(root, dest=getattr(root, "dest", None)):
+            msg, code, det = errors.explain(root)
+            return {"error": msg, "code": code, "detail": det}
+        out = {"error": str(e), "code": e.code}
+        if root is not None:
+            out["detail"] = errors.detail(root)
+        return out
+    traceback.print_exc()
+    msg, code, det = errors.explain(e)
+    return {"error": msg, "code": code, "detail": det}
+
+
 def run_job(name, fn):
     with S.lock:
         if S.job.get("running"):
@@ -78,13 +98,8 @@ def run_job(name, fn):
     def work():
         try:
             S.job["result"] = fn(progress)
-        except TvError as e:
-            S.job.update(error=str(e), code=e.code)
-        except pairing.PairingError as e:
-            S.job.update(error=str(e), code=e.code)
         except Exception as e:
-            traceback.print_exc()
-            S.job.update(error=f"Something went wrong: {type(e).__name__}. Try that step again.", code="crash")
+            S.job.update(error_payload(e))
         finally:
             S.job["running"] = False
 
@@ -214,12 +229,29 @@ def api(method, path, body):
     if path == "/api/connect":
         ip = home_ip(body)
 
+        kind = str(body.get("kind") or "")
+        try:
+            tried = max(0, int(body.get("tried") or 0))
+            wait = min(max(int(body.get("wait") or ALLOW_WAIT_S), 10), 60)
+        except (TypeError, ValueError):
+            tried, wait = 0, ALLOW_WAIT_S
+
         def connect(progress):
             progress(0.2, "Waiting for you to press Allow on the TV")
-            if not finder.answers(ip, 5555, 2.0):
-                raise TvError("The TV is not answering on its debugging port yet. Check debugging is switched on "
-                              "(see the steps above), then try again.", "closed")
-            return _attach(Tv(ip, identity(), route="tcp", port=5555, allow_wait_s=90), ip, "tcp")
+            r = finder.knock(ip, 5555, 2.0)
+            if r and errors.is_local_network_block(r, dest=ip):
+                raise finder.blocked(r)
+            if r:
+                raise TvError("The TV is not letting computers in yet. Check USB debugging (on Fire TV: ADB debugging) "
+                              "is switched on, as in the steps, then try again.", "closed", errors.detail(r),
+                              fix=steps.next_fix(kind, ip in _known(), tried, closed=True))
+            try:
+                return _attach(Tv(ip, identity(), route="tcp", port=5555, allow_wait_s=wait), ip, "tcp")
+            except TvError as e:
+                if e.code == "not_allowed":
+                    # Never a dead end: the page walks through the real fixes, then the phone route.
+                    e.extra["fix"] = steps.next_fix(kind, ip in _known(), tried)
+                raise
         return run_job("connect", connect)
     if path == "/api/plan":
         tv = need_tv()
@@ -322,10 +354,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             self._send(200, api(method, self.path.split("?")[0], body))
         except (TvError, pairing.PairingError) as e:
-            self._send(400, {"error": str(e), "code": e.code})
+            self._send(400, error_payload(e))
         except Exception as e:
-            traceback.print_exc()
-            self._send(500, {"error": f"Something went wrong: {type(e).__name__}. Try that step again."})
+            self._send(500, error_payload(e))
 
     def do_POST(self):
         if not self.path.startswith("/api/"):

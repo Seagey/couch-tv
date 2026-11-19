@@ -16,6 +16,7 @@ import time
 
 from adb_shell.adb_device import AdbDevice, AdbDeviceTcp
 
+from . import errors
 from .adbtls import TlsTransport
 
 TMP = "/data/local/tmp/couchtv-setup"
@@ -26,11 +27,21 @@ TRIES = 3
 
 
 class TvError(Exception):
-    """A problem to show the person as it is: plain words, no traceback."""
+    """A problem to show the person as it is: plain words, no traceback. `detail` is the technical
+    part, shown only behind the page's Details disclosure; `extra` goes to the page as it is."""
 
-    def __init__(self, message, code=None):
+    def __init__(self, message, code=None, detail=None, **extra):
         super().__init__(message)
         self.code = code
+        self.detail = detail
+        self.extra = extra
+
+    def payload(self):
+        out = {"error": str(self), "code": self.code}
+        if self.detail:
+            out["detail"] = str(self.detail)[:400]
+        out.update(self.extra)
+        return out
 
 
 class Tv:
@@ -44,10 +55,10 @@ class Tv:
         self._open(allow_wait_s)
 
     def _open(self, wait_s=15):
-        if self._opener:
-            self.dev = self._opener()
-            return
         try:
+            if self._opener:
+                self.dev = self._opener()
+                return
             if self.route == "tls":
                 dev = AdbDevice(TlsTransport(self.ip, self.port, self.identity.cert_path, self.identity.key_path),
                                 default_transport_timeout_s=30)
@@ -55,12 +66,16 @@ class Tv:
             else:
                 dev = AdbDeviceTcp(self.ip, self.port, default_transport_timeout_s=max(30, wait_s))
                 dev.connect(rsa_keys=[self.identity.signer()], auth_timeout_s=wait_s)
+        except TvError:
+            raise
         except Exception as e:
+            if errors.is_local_network_block(e, dest=self.ip):
+                raise TvError(errors.blocked_message(), errors.LOCAL_NETWORK_CODE, errors.detail(e)) from e
             if self.route == "tls":
                 raise TvError("The TV did not let this computer in over Wireless debugging. Pair again with a "
-                              "new code from the TV.", "not_paired") from e
-            raise TvError("The TV did not let this computer in. Check that debugging is on, then press Allow "
-                          "on the TV (tick Always allow) and try again.", "not_allowed") from e
+                              "new code from the TV.", "not_paired", errors.detail(e)) from e
+            raise TvError("The TV did not let this computer in. Press Allow on the TV when it asks (tick Always "
+                          "allow), then try again.", "not_allowed", errors.detail(e)) from e
         self.dev = dev
 
     def close(self):
@@ -89,7 +104,10 @@ class Tv:
                         self.reconnect()
                     except Exception as e2:
                         last = e2
-        raise TvError(f"The TV stopped answering ({type(last).__name__}). Is it still on?", "lost")
+        if errors.is_local_network_block(last, dest=self.ip):
+            raise TvError(errors.blocked_message(), errors.LOCAL_NETWORK_CODE, errors.detail(last))
+        raise TvError("The TV stopped answering. Check it is still on and on the same Wi-Fi, then try again.", "lost",
+                      errors.detail(last))
 
     def shell(self, cmd, timeout_s=60):
         return self._retry(lambda: self.dev.shell(cmd, timeout_s=timeout_s, read_timeout_s=timeout_s)) or ""
@@ -153,4 +171,5 @@ class Tv:
                           "different_key")
         if "INSUFFICIENT_STORAGE" in out:
             raise TvError("The TV is out of space. Remove an app you do not use and try again.", "no_space")
-        raise TvError("The TV did not install the app: " + out.strip()[-200:], "install_failed")
+        raise TvError("The TV would not install the app. Restart the TV, then try again.", "install_failed",
+                      out.strip()[-200:])

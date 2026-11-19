@@ -113,6 +113,33 @@ def facts(tv):
     }
 
 
+# When the TV never shows "Allow USB debugging?": the real fixes, in order, each its own screen on the
+# page with a Try again. Then the phone route, so it never ends in a dead end. Seen on a Toshiba
+# (Hisense made) Google TV on Android 11, 19 November 2026: no prompt for a new computer over Wi-Fi.
+FIX_HOME, FIX_TOGGLE, FIX_REVOKE, FIX_RESTART, PHONE_ROUTE = "fix-home", "fix-toggle", "fix-revoke", "fix-restart", "phone-route"
+
+
+def no_allow_fixes(kind, allowed_before, closed=False):
+    """The screens to walk through when the TV did not ask, in order, ending with the phone route.
+    Revoking the TV's list of allowed computers only helps when this computer was never allowed (if it
+    was, the TV knows it already), and it makes every other computer ask again, so it is offered only
+    then. Fire TV has no such item. `closed`: the TV is not even taking connections on its network
+    debugging port, so only switching debugging off and on and a restart can help."""
+    if closed:
+        return [FIX_TOGGLE, FIX_RESTART, PHONE_ROUTE]
+    fixes = [FIX_HOME, FIX_TOGGLE]
+    if kind != "fire" and not allowed_before:
+        fixes.append(FIX_REVOKE)
+    fixes.append(FIX_RESTART)
+    return fixes + [PHONE_ROUTE]
+
+
+def next_fix(kind, allowed_before, tried, closed=False):
+    """The screen after `tried` failed attempts with the fixes (0: the first attempt failed)."""
+    fixes = no_allow_fixes(kind, allowed_before, closed)
+    return fixes[min(max(int(tried), 0), len(fixes) - 1)]
+
+
 def ontv_home(tv, present=None):
     """Is the on-TV app (dev.couchtv.ontv) already this TV's home? Its HomeAlias is switched on (it shows
     in the list of HOME screens) or its WatchService is in the enabled accessibility services. Two
@@ -214,7 +241,7 @@ def plan(tv, f, ambient_off=True, ontv_home_off=True):
     items.append("Leave the TV's own home screen and setup app switched on, so the TV always has them when it starts. "
                  "Nothing is deleted.")
     if f.get("tcl"):
-        items.append("TCL only: let couch-tv start by itself after a restart (TCL's AUTO_START setting).")
+        items.append("TCL only: let couch-tv start by itself after a restart (a TCL setting).")
     warn = watch_warning(other_watches(tv))
     if warn:
         items.append(warn)
@@ -581,7 +608,7 @@ def undo(tv, progress=lambda f, msg=None: None):
         if p in present:
             out = tv.shell(f"pm uninstall {p}", 120)
             if "Success" not in out:
-                raise TvError(f"The TV did not remove {p}: " + out.strip()[-160:], "uninstall_failed")
+                raise TvError("The TV would not remove a couch-tv app. Restart the TV, then try again.", "uninstall_failed", f"{p}: " + out.strip()[-160:])
             done.append("removed " + p)
     tv.shell(f"rm -rf {RECORD_DIR} {RECORD_DIR}.apk {RECORD_DIR}.parts {RECORD_DIR}.b64")
     _save_local(serial(tv), None)
