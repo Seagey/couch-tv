@@ -47,7 +47,9 @@
 //                       "Recently on <app>" (YouTube: two pretend videos, the way the bridge sends them)
 //   update=1            Home settings, Updates, with a pretend 0.4 waiting (update=latest: none
 //                       newer; update=allow: the TV has not let Home install apps yet;
-//                       update=ask: nobody has answered "tell you about new versions?" yet)
+//                       update=ask: nobody has answered "tell you about new versions?" yet;
+//                       update=ontv: the on-TV app's steps and QR code; update=ontv-self: its
+//                       Update to button; update=ontv-space: that button, then short of space)
 //   remoteart=1         the real show posters from JustWatch (otherwise every picture is from this server)
 //   wx=24,2             pretend weather: 24 degrees, Open-Meteo code 2 (partly cloudy)
 //   place=Riverside    weather.place, the name shown beside the weather
@@ -183,9 +185,15 @@
       checked: Date.now() - 20 * 3600000, auto: kind !== "ask", answered: kind !== "ask", busy: "", progress: 0, error: "" };
     // ?update=ontv: the on-TV app from a phone, which cannot install an update itself (OnTvUpdate.kt):
     // it hands over the steps instead
-    if (kind === "ontv") {
-      up.manual = true; up.code = "8180170";
-      up.how = "This app came from your phone, so it cannot install an update by itself. Put it on again the same way:";
+    // ?update=ontv-self: the on-TV app with its own ADB link connected, which installs it by itself
+    // (Update.kt); ?update=ontv-space: the same, but the TV is short of space, so the steps come back
+    var self = kind === "ontv-self" || kind === "ontv-space";
+    if (self) { up.self = true; up.can_install = true; up.manual = false; }
+    if (kind === "ontv" || self) {
+      up.self = true; up.help_url = "https://couchtv.joshuaseage.com/help/update-couch-tv/";
+      if (!self) up.manual = true;
+      up.code = "8180170";
+      up.how = "Couch TV cannot install an update by itself on this TV right now. Put the new version on the same way as before, over this one. Your settings stay.";
       // the real app's seven steps (UpdateRules.kt), so a preview shows how long the page really is
       up.steps = [
         "Press Home, then open Downloader from your apps. Not there? Find Downloader by AFTVnews in the TV's Google Play Store and install it first.",
@@ -211,7 +219,13 @@
           if (up.progress < 100) { tell(); return; }
           clearInterval(timer);
           up.busy = "installing"; tell();
-          setTimeout(function () { up.busy = ""; up.progress = 0; up.error = "cancelled"; tell(); }, 3000);
+          setTimeout(function () {
+            up.busy = ""; up.progress = 0;
+            if (kind === "ontv-space") { up.error = "space"; up.can_install = false; up.manual = true; }
+            else if (kind === "ontv-self") { up.current = up.updated = up.latest; up.available = false; }   // the app would restart here
+            else up.error = "cancelled";
+            tell();
+          }, 3000);
         }, 300);
       },
       auto: function (on) { up.auto = !!on; up.answered = true; tell(); }
