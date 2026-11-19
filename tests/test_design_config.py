@@ -71,6 +71,8 @@ class DesignBlock(unittest.TestCase):
         self.assertNotIn("design_store", public_for({"tvs": TVS}))
         self.assertEqual(public_for({"tvs": TVS, "design_store": "https://Designs.example/"})["design_store"], "https://designs.example")
         self.assertEqual(public_for({"tvs": TVS, "design_store": "http://127.0.0.1:5490"})["design_store"], "http://127.0.0.1:5490")
+        # "" turns getting a design by code off: the TV (web, Roku, Apple TV) is told so, not left to its default
+        self.assertEqual(public_for({"tvs": TVS, "design_store": ""})["design_store"], "")
         for bad in ["http://designs.example", "https://designs.example/x", "javascript:alert(1)", "//evil", "https://a@example.com", 5]:
             self.assertNotIn("design_store", public_for({"tvs": TVS, "design_store": bad}), bad)
 

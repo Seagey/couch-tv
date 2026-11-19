@@ -509,6 +509,8 @@ def _design_store(u):
     design by code. https only (plain http only to this computer, for development); no path."""
     if not isinstance(u, str):
         return None
+    if not u.strip():
+        return ""   # "design_store": "" turns getting a design by code off, and the TV is told so
     m = re.fullmatch(r"(?i)(https://[a-z0-9.-]+(:\d{1,5})?|http://(127\.0\.0\.1|localhost)(:\d{1,5})?)/?", u.strip())
     if not m:
         if u:
@@ -619,4 +621,4 @@ def public():
             "default_tv": DEFAULT_TV, "ask": {"enabled": ASK_ENABLED}, "phone_remote": PHONE_REMOTE,
             # only when config.json has one: without it the home is exactly as before
             **({"design": DESIGN} if DESIGN else {}),
-            **({"design_store": DESIGN_STORE} if DESIGN_STORE else {})}
+            **({"design_store": DESIGN_STORE} if DESIGN_STORE is not None else {})}

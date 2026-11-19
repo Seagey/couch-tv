@@ -6,6 +6,7 @@
     "check": "bsc"
   },
   "devDependencies": {
+    "@rokucommunity/brs": "^0.47.6",
     "@rokucommunity/bslint": "^0.8.0",
     "brighterscript": "^0.70.0"
   }

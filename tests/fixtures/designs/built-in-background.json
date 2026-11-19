@@ -1,0 +1,40 @@
+{
+ "background": {
+  "image": "backgrounds/albury-storm.jpg",
+  "darken": 0.3
+ },
+ "elements": {
+  "dock": {
+   "x": 0,
+   "y": -100,
+   "scale": 0.8
+  },
+  "people": {
+   "x": 600,
+   "y": 10
+  }
+ },
+ "objects": [
+  {
+   "id": "w1",
+   "type": "widget",
+   "kind": "keeprow",
+   "x": 80,
+   "y": 560,
+   "w": 1100,
+   "h": 260,
+   "opts": {
+    "shows": 3
+   }
+  },
+  {
+   "id": "w2",
+   "type": "widget",
+   "kind": "people",
+   "x": 1300,
+   "y": 560,
+   "w": 300,
+   "h": 260
+  }
+ ]
+}
