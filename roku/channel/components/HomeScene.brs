@@ -33,7 +33,9 @@ sub init()
     m.focusIdx = 0
     m.focusSet = false
     m.dockFirst = 0
-    m.zones = { people: [], shelf: [], dock: [] }
+    ' wapps: the app tiles of a couch-tv Studio design (DesignDraw.brs)
+    m.zones = { people: [], shelf: [], wapps: [], dock: [] }
+    m.dockApps = []
     m.fonts = {}
     m.tasks = []
     m.dateWidgets = []
@@ -63,10 +65,13 @@ sub init()
     m.top.findNode("fade").observeField("state", "onFadeState")
     m.top.findNode("tick").control = "start"
     m.top.findNode("refresh").control = "start"
+    designInit()
 
     onTick()
     showScene(0, true)
     m.top.findNode("turn").control = "start"
+    drawDock()
+    designStart()
     loadAll()
 end sub
 
@@ -117,12 +122,13 @@ sub clearGroup(g as Object)
 end sub
 
 ' A web request. onFetched() sorts the answers by their tag.
-sub fetch(tag as String, url as String, method = "GET" as String, body = "" as String)
+sub fetch(tag as String, url as String, method = "GET" as String, body = "" as String, timeout = 8000 as Integer)
     t = CreateObject("roSGNode", "Fetch")
     t.tag = tag
     t.url = url
     t.method = method
     t.body = body
+    t.timeout = timeout
     t.observeField("done", "onFetched")
     m.tasks.push(t)
     t.control = "run"
@@ -246,7 +252,9 @@ sub onFetched(event as Object)
     j = invalid
     if status = 200 and body <> "" then j = ParseJson(body)
 
-    if tag = "config"
+    if tag = "designcode"
+        designFetched(status, body)
+    else if tag = "config"
         if j <> invalid and j.home <> invalid
             if j.home.keep_watching = false then setKeepOn(false)
             if j.home.clock = "24h" then m.clock24 = true
@@ -254,12 +262,20 @@ sub onFetched(event as Object)
             if j.home.scene_seconds <> invalid then setTurn(j.home.scene_seconds)
             if j.home.scenes <> invalid then setSceneOrder(j.home.scenes, [])
         end if
+        if dlIsAA(j)
+            ' a couch-tv Studio design in config.json, and the store a code is asked of
+            m.bridgeCfg = j
+            m.cfgDesign = invalid
+            if dlIsAA(j.design) then m.cfgDesign = j.design
+            designRefresh()
+        end if
     else if tag = "settings"
         if j <> invalid and j.settings <> invalid then applySettings(j.settings)
     else if tag = "people"
         if j <> invalid and j.people <> invalid
             m.people = j.people
             drawTop()
+            designData()
         end if
     else if tag = "who"
         if j <> invalid and j.who <> invalid
@@ -273,10 +289,12 @@ sub onFetched(event as Object)
     else if tag = "weather"
         if j <> invalid and j.temp <> invalid then m.weather = j
         drawDate()
+        designData()
     else if tag = "continue"
         if j <> invalid and j.items <> invalid
             m.shelf = j.items
             drawShelf()
+            designData()
         end if
     else if tag = "apps"
         if j <> invalid and j.apps <> invalid
@@ -315,6 +333,8 @@ end sub
 
 sub applySettings(s as Object)
     if s.keep_watching <> invalid then setKeepOn(s.keep_watching = true)
+    ' Home settings on the TV win over a design's clock
+    if s.clock = "24h" or s.clock = "12h" then m.clockBySettings = true
     if s.clock = "24h" then m.clock24 = true
     if s.clock = "12h" then m.clock24 = false
     if s.wx_unit = "f" then m.fahrenheit = true
@@ -382,12 +402,13 @@ sub onTick()
     dt.toLocalTime()
     h = dt.getHours()
     mi = dt.getMinutes()
-    if not m.clock24
+    c24 = designClock24()
+    if not c24
         h = h mod 12
         if h = 0 then h = 12
     end if
     hh = h.toStr()
-    if m.clock24 and h < 10 then hh = "0" + hh
+    if c24 and h < 10 then hh = "0" + hh
     mm = mi.toStr()
     if mi < 10 then mm = "0" + mm
     m.clock.text = hh + ":" + mm
@@ -398,6 +419,7 @@ sub onTick()
         m.dateText = dateText
         drawDate()
     end if
+    designTick(mi)
 end sub
 
 sub onTurn()
@@ -431,7 +453,8 @@ sub showScene(n as Integer, first as Boolean)
         fg.width = s.fg.w
         fg.height = s.fg.h
         fg.blendColor = shade(s.bright)
-        fg.visible = true
+        ' a design's own background hides the scene, hills and all
+        fg.visible = not (m.design <> invalid and m.design.background <> invalid)
     else
         fg.visible = false
     end if
@@ -473,6 +496,7 @@ sub applyScene(s as Object)
     ah = StrI(a, 16)
     if Len(ah) < 2 then ah = "0" + ah
     m.clock.color = "0x" + s.ink + ah
+    designClock(size, top)
     drawDate()
 end sub
 
@@ -494,20 +518,18 @@ sub onFadeState()
         a.visible = b.visible
         b.opacity = 0
     end for
-    m.clock.opacity = 1
+    m.clock.opacity = m.clockOpacity
 end sub
 
 sub drawDate()
-    top = m.top.findNode("top")
-    for each w in m.dateWidgets
-        top.removeChild(w)
-    end for
+    top = m.dateG
+    clearGroup(top)
     m.dateWidgets = []
     if m.dateText = invalid or m.next = invalid then return
     s = m.next
-    parts = [m.dateText]
-    wx = weatherText()
-    if wx <> "" then parts.push(wx)
+    ' the date and the weather, each as the design says (DesignDraw.brs); with no design, as always
+    parts = designDateParts()
+    if parts.count() = 0 then return
     gap = 20
     widths = []
     total = 0
@@ -528,9 +550,12 @@ sub drawDate()
     pill.loadDisplayMode = "noScale"
     m.dateWidgets.push(pill)
     top.appendChild(pill)
+    ink = s.text
+    dc = designPart(designDateName()).colour
+    if dlIsStr(dc) then ink = Mid(dc, 3, 6)
     for i = 0 to parts.count() - 1
-        color = "0x" + s.text + "F0"
-        if i > 0 then color = "0x" + s.text + "C0"
+        color = "0x" + ink + "F0"
+        if i > 0 then color = "0x" + ink + "C0"
         l = makeLabel(parts[i], "Inter-Medium", 36, color)
         l.translation = [x, y]
         l.height = 44
@@ -539,6 +564,7 @@ sub drawDate()
         top.appendChild(l)
         x = x + widths[i] + gap
     end for
+    designPlace(top, designDateName(), 960, y + 22)
 end sub
 
 function weatherText() as String
@@ -557,13 +583,12 @@ end function
 
 ' ---------- people ----------
 sub drawTop()
-    g = m.top.findNode("top")
-    for each w in m.peopleWidgets
-        g.removeChild(w)
-    end for
+    g = m.peopleG
+    clearGroup(g)
     m.peopleWidgets = []
     m.zones.people = []
-    if m.people.count() < 2
+    designPlace(g, "people", 78, 60)
+    if m.people.count() < 2 or m.xf.people.hidden
         placeFocus()
         return
     end if
@@ -612,7 +637,9 @@ sub drawShelf()
     g = m.top.findNode("shelf")
     clearGroup(g)
     m.zones.shelf = []
-    if not m.keepOn or m.shelf.count() = 0
+    designPlace(g, "keep_watching", 80, 636)
+    designOff = m.design <> invalid and dlFalse(dlAA(m.design.home).keep_watching)
+    if not m.keepOn or m.shelf.count() = 0 or m.xf.keep_watching.hidden or designOff
         placeFocus()
         return
     end if
@@ -697,22 +724,17 @@ sub drawDock()
     m.dockClip.translation = [m.k.dockX + 14, m.k.dockY]
     m.dockClip.clippingRect = { x: -10, y: -10, width: m.k.dockW - 28 + 20, height: m.k.dockH + 20 }
     g.appendChild(m.dockClip)
-    for i = 0 to m.apps.count() - 1
-        a = m.apps[i]
-        tile = CreateObject("roSGNode", "Group")
+    ' the apps in a design's order, without the ones it hides, then Settings (couch-tv Studio designs)
+    design = m.design
+    if design = invalid then design = {}
+    m.dockApps = dlOrderApps(m.apps, design)
+    tiles = []
+    tiles.append(m.dockApps)
+    tiles.push({ id: "_settings", title: "Settings", package: "" })
+    for i = 0 to tiles.count() - 1
+        a = tiles[i]
+        tile = appTile(a, m.k.tile)
         tile.translation = [13 + i * m.k.pitch, 22]
-        bg = CreateObject("roSGNode", "Rectangle")
-        bg.width = m.k.tile
-        bg.height = m.k.tile
-        bg.color = "0x2A2D36FF"
-        tile.appendChild(bg)
-        letter = makeLabel(UCase(Left(a.title, 1)), "Inter-Medium", 56, "0xFFFFFFE0")
-        letter.width = m.k.tile
-        letter.height = m.k.tile
-        letter.horizAlign = "center"
-        letter.vertAlign = "center"
-        tile.appendChild(letter)
-        tile.appendChild(makePoster(logoFor(a), 0, 0, m.k.tile, m.k.tile))
         m.dockClip.appendChild(tile)
         m.zones.dock.push({ x: m.k.dockX + 14 + 13 + i * m.k.pitch, y: m.k.dockY + 22, w: m.k.tile, h: m.k.tile, app: a, node: tile })
     end for
@@ -723,7 +745,9 @@ sub drawDock()
         m.focusIdx = 0
     end if
     if m.focusZone = "dock" and m.focusIdx >= m.zones.dock.count() then m.focusIdx = 0
-    placeFocus()
+    designPlace(g, "dock", 960, m.k.dockY + m.k.dockH)
+    ' a design's own app tiles follow the dock's apps
+    designDraw()
 end sub
 
 ' The bundled logo if there is one, else the Roku's own icon (through the bridge, or from the Roku itself).
@@ -764,9 +788,22 @@ sub placeFocus()
         x = it.x - m.dockFirst * m.k.pitch
     end if
     if m.focusZone = "people" then pad = 8
-    m.focusRing.translation = [x - pad, it.y - pad]
-    m.focusRing.width = it.w + pad * 2
-    m.focusRing.height = it.h + pad * 2
+    ' a part a design moved or grew: the ring goes where the tile now is
+    y = it.y
+    w = it.w
+    h = it.h
+    names = { dock: "dock", shelf: "keep_watching", people: "people" }
+    xf = invalid
+    if names.doesExist(m.focusZone) then xf = m.xf[names[m.focusZone]]
+    if xf <> invalid
+        x = xf.tx + xf.s * x
+        y = xf.ty + xf.s * y
+        w = w * xf.s
+        h = h * xf.s
+    end if
+    m.focusRing.translation = [x - pad, y - pad]
+    m.focusRing.width = w + pad * 2
+    m.focusRing.height = h + pad * 2
     m.focusRing.visible = true
     showFocusName()
 end sub
@@ -774,8 +811,8 @@ end sub
 ' The name of the focused app, over the dock.
 sub showFocusName()
     name = ""
-    if m.focusZone = "dock" and m.zones.dock.count() > 0 and m.focusIdx < m.zones.dock.count()
-        name = m.zones.dock[m.focusIdx].app.title
+    if (m.focusZone = "dock" or m.focusZone = "wapps") and m.focusIdx < m.zones[m.focusZone].count()
+        name = m.zones[m.focusZone][m.focusIdx].app.title
     else if m.focusZone = "shelf" and m.zones.shelf.count() > 0 and m.focusIdx < m.zones.shelf.count()
         name = "Resume " + m.zones.shelf[m.focusIdx].title
     end if
@@ -785,7 +822,7 @@ end sub
 
 ' If the focused row has nothing in it, move to one that has.
 sub pickZone()
-    for each name in ["dock", "shelf", "people"]
+    for each name in ["dock", "wapps", "shelf", "people"]
         if m.zones[name].count() > 0
             m.focusZone = name
             m.focusIdx = 0
@@ -795,13 +832,13 @@ sub pickZone()
 end sub
 
 function neighbour(zone as String, dir as Integer) as String
-    rows = ["people", "shelf", "dock"]
+    rows = ["people", "shelf", "wapps", "dock"]
     i = 0
-    for k = 0 to 2
+    for k = 0 to 3
         if rows[k] = zone then i = k
     end for
     j = i + dir
-    while j >= 0 and j <= 2
+    while j >= 0 and j <= 3
         if m.zones[rows[j]].count() > 0 then return rows[j]
         j = j + dir
     end while
@@ -834,6 +871,10 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     else if key = "OK"
         choose()
         return true
+    else if key = "options"
+        ' the * key: couch-tv Studio (get a design by code, or the plain home)
+        openMenu()
+        return true
     end if
     ' Back and Home are left to the Roku: Back closes the channel, Home goes to Roku's home.
     return false
@@ -843,8 +884,12 @@ sub choose()
     z = m.zones[m.focusZone]
     if z = invalid or m.focusIdx >= z.count() then return
     it = z[m.focusIdx]
-    if m.focusZone = "dock"
+    if m.focusZone = "dock" or m.focusZone = "wapps"
         a = it.app
+        if a.id = "_settings"
+            openMenu()
+            return
+        end if
         say("Opening " + a.title + "...")
         m.pendingLocal = a.id
         if hasBridge() and not m.localApps

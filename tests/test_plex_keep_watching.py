@@ -342,18 +342,18 @@ class NotSetUp(unittest.TestCase):
             self.assertEqual(plex.status()["error"], "PLEX_TOKEN is not set in .env")
 
     def test_the_section_is_read_carefully(self):
-        self.assertEqual(config._plex({"url": "http://plex.local:32400/", "who": " person1 "}), {"url": "http://plex.local:32400", "who": "person1"})
-        self.assertIsNone(config._plex({"url": "http://plex.local:32400", "enabled": False}))
-        self.assertIsNone(config._plex({"url": "plex.local:32400"}))
-        self.assertIn("plex.local:32400", config.PLEX_ERROR)                  # a refused address says why
-        self.assertIsNone(config._plex({"url": "http://plex.local:32400/web?x=1"}))
+        self.assertEqual(config._plex({"url": "http://your-computer.local:32400/", "who": " person1 "}), {"url": "http://your-computer.local:32400", "who": "person1"})
+        self.assertIsNone(config._plex({"url": "http://your-computer.local:32400", "enabled": False}))
+        self.assertIsNone(config._plex({"url": "your-computer.local:32400"}))
+        self.assertIn("your-computer.local:32400", config.PLEX_ERROR)                  # a refused address says why
+        self.assertIsNone(config._plex({"url": "http://your-computer.local:32400/web?x=1"}))
         self.assertIn("no path", config.PLEX_ERROR)
         self.assertIsNone(config._plex({"who": "person1"}))
         self.assertEqual(config.PLEX_ERROR, "the plex section has no url")
         self.assertIsNone(config._plex(None))
         self.assertIsNone(config.PLEX_ERROR)                                   # no section: nothing to say
-        self.assertIsNone(config._plex("http://plex.local:32400"))
-        self.assertIsNone(config._plex({"url": "http://plex.local:32400", "enabled": False}))
+        self.assertIsNone(config._plex("http://your-computer.local:32400"))
+        self.assertIsNone(config._plex({"url": "http://your-computer.local:32400", "enabled": False}))
         self.assertIsNone(config.PLEX_ERROR)
         with patch.object(config, "PLEX", None), patch.object(config, "PLEX_ERROR", "the plex section has no url"):
             self.assertEqual(plex.status(), {"configured": False, "error": "the plex section has no url"})

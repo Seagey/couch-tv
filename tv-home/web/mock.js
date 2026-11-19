@@ -48,8 +48,30 @@
 //   update=1            Home settings, Updates, with a pretend 0.4 waiting (update=latest: none
 //                       newer; update=allow: the TV has not let Home install apps yet;
 //                       update=ask: nobody has answered "tell you about new versions?" yet)
+//   remoteart=1         the real show posters from JustWatch (otherwise every picture is from this server)
+//   wx=24,2             pretend weather: 24 degrees, Open-Meteo code 2 (partly cloudy)
+//   place=Riverside    weather.place, the name shown beside the weather
+//   design=local        design: couch-tv Studio's current design (tools/tv-designer), read from
+//                       this browser's localStorage ("tvdesigner.design"); designer=1 takes live edits
 (function () {
   var q = location.search;
+  // Every picture is made right here: a preview never asks another site for anything, so nobody's
+  // address goes to an image host, and no show's real poster is copied. Each show gets a plain
+  // placeholder (two colours and soft shapes, picked from its name), wide for a backdrop, tall for
+  // a poster. ?remoteart=1 shows the real posters from JustWatch, for development only.
+  var PALETTE = [["#2b3a55", "#c9746b"], ["#1f3d3a", "#d9b26f"], ["#3a2b4f", "#7fa7c9"], ["#4a3426", "#e0a96d"],
+    ["#203040", "#9cc5a1"], ["#3d2233", "#f0b6a0"], ["#26323a", "#b9a7e0"], ["#33402a", "#e6cf8b"]];
+  var localArt = function (p, tall) {
+    if (/[?&]remoteart=1\b/.test(q)) return "";
+    var h = 0; for (var i = 0; i < p.length; i++) h = (h * 31 + p.charCodeAt(i)) >>> 0;
+    var c = PALETTE[h % PALETTE.length], w = tall ? 400 : 640, ht = tall ? 600 : 360, r = (h >>> 8) % 40;
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + " " + ht + '" preserveAspectRatio="xMidYMid slice">' +
+      '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c[0] + '"/><stop offset="1" stop-color="' + c[1] + '"/></linearGradient></defs>' +
+      '<rect width="' + w + '" height="' + ht + '" fill="url(#g)"/>' +
+      '<circle cx="' + Math.round(w * (0.62 + r / 200)) + '" cy="' + Math.round(ht * 0.38) + '" r="' + Math.round(ht * 0.3) + '" fill="#fff" opacity=".14"/>' +
+      '<circle cx="' + Math.round(w * 0.22) + '" cy="' + Math.round(ht * 0.86) + '" r="' + Math.round(ht * 0.42) + '" fill="#000" opacity=".16"/></svg>';
+    return "data:image/svg+xml," + encodeURIComponent(svg);
+  };
   var arg = function (name) { var m = q.match(new RegExp("[?&]" + name + "=([^&]*)")); return m ? decodeURIComponent(m[1]) : null; };
   if (arg("reset")) {
     try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf("mock:") === 0) localStorage.removeItem(k); }); } catch (e) {}
@@ -121,7 +143,7 @@
   // ---------- kids mode, for ?kids= (bridge/kids.py makes the same shape; the PIN here is 1234) ----------
   var KIDS = null;
   if (arg("kids")) {
-    var jwp = function (path) { return "https://images.justwatch.com/poster/" + path; };
+    var jwp = function (path) { return localArt(path, true) || "https://images.justwatch.com/poster/" + path; };
     var iview = { id: "abc-iview", name: "ABC iview", package: "au.net.abc.iview" };
     var shelf = arg("kids") === "empty" ? [] : [
       { id: "bluey", title: "Bluey", service: "abc-iview", app: iview, poster: jwp("185497966/s592/bluey-2018.jpg") },
@@ -141,7 +163,14 @@
   // ?cards=1: home.custom_cards with three sample cards (docs/TV-HOME.md, Custom cards); the third has a
   // javascript: link and a script in its title, which must show as plain text and open nothing
   if (arg("cards")) cfg.home.custom_cards = true;
+  if (arg("place")) cfg.weather.place = arg("place");
+  // ?nowx=1: no place set (a TV set up with just a phone): the home asks for a town, never a sample one
+  if (arg("nowx")) cfg.weather = null;
+  if (arg("design") === "local") {
+    try { var dz = JSON.parse(localStorage.getItem("tvdesigner.design") || "null"); if (dz && typeof dz === "object") cfg.design = dz; } catch (e) {}
+  }
   if (arg("follow")) cfg.home.shelf_follows_app = arg("follow") !== "off";   // home.shelf_follows_app
+  if (arg("ontv")) cfg.mode = "on-tv";   // ?ontv=1: served by the on-TV app (no computer behind it)
   window.COUCH_CONFIG = cfg;
 
   // ---------- the launcher's updater (Updater.kt), for ?update= ----------
@@ -152,6 +181,13 @@
     var up = { supported: true, current: "0.3", latest: kind === "latest" ? "0.3" : "0.4",
       title: kind === "latest" ? "" : "0.4: a pretend release for the preview", available: kind !== "latest",
       checked: Date.now() - 20 * 3600000, auto: kind !== "ask", answered: kind !== "ask", busy: "", progress: 0, error: "" };
+    // ?update=ontv: the on-TV app from a phone, which cannot install an update itself (OnTvUpdate.kt):
+    // it hands over the steps instead
+    if (kind === "ontv") {
+      up.manual = true; up.code = "8180170";
+      up.how = "This app came from your phone, so it cannot install an update by itself. Put it on again the same way:";
+      up.steps = ["Open Downloader on this TV (in your apps).", "Type 8180170 in its box and press Go.", "Press Install. Your settings stay."];
+    }
     var tell = function () { if (window.tv && window.tv.update) window.tv.update(JSON.parse(JSON.stringify(up))); };
     window.MOCK_UPDATER = {
       state: function () { return JSON.stringify(up); },
@@ -210,7 +246,7 @@
   if (ha) {
     var rooms = [
       { entity: "climate.living_room", name: "Living room", state: "cool", action: "cooling", current: 24.5, target: 22,
-        min: 16, max: 30, step: 0.5, modes: ["off", "cool", "heat", "dry", "fan_only", "auto"] },
+        min: 16, max: 30, step: 0.5, modes: ["off", "cool", "heat", "dry", "fan_only", "auto"], fan_modes: ["low", "medium", "high", "auto"], fan: "auto" },
       { entity: "climate.bedroom", name: "Bedroom", state: "off", action: "off", current: 19, target: 21,
         min: 16, max: 30, step: 0.5, modes: ["off", "cool", "heat", "auto"] }
     ];
@@ -219,27 +255,103 @@
       { entity: "script.good_morning", name: "Good morning" }];
     var reply = function (id, r) { setTimeout(function () { if (window.smartHome) window.smartHome.reply(id, r); }, 150); };
     var room = function (e) { return rooms.filter(function (r) { return r.entity === e; })[0]; };
+    // the smart home widgets (HomeAssistant.kt widgets()): the same answers, made up. ?ha=1 has them all;
+    // ?ha=scenes has none of them
+    var W = ha === "scenes" ? null : {
+      controls: [
+        { entity: "light.lounge", name: "Lounge", ok: true, kind: "light", state: "on", on: true, level: 80 },
+        { entity: "light.lamp", name: "Lamp", ok: true, kind: "light", state: "off", on: false },
+        { entity: "fan.bedroom", name: "Ceiling fan", ok: true, kind: "fan", state: "on", on: true, level: 33 },
+        { entity: "cover.blinds", name: "Blinds", ok: true, kind: "cover", state: "closed", on: false, level: 0 },
+        { entity: "switch.heater", name: "Heater", ok: false, kind: "switch" },
+        { entity: "cover.garage", name: "Garage", ok: true, kind: "cover", state: "closed", on: false, blocked: true }],
+      cameras: [{ entity: "camera.backyard", name: "Backyard" }, { entity: "camera.driveway", name: "Driveway" }],
+      sensors: [{ entity: "sensor.pool", name: "Pool", ok: true, value: "26.4", num: 26.4, unit: "°C", cls: "temperature" },
+        { entity: "sensor.rain_today", name: "Rain gauge", ok: true, value: "12", num: 12, unit: "mm" }],
+      speakers: [{ entity: "media_player.kitchen", name: "Kitchen", ok: true, state: "playing", volume: 35, can_volume: true, can_pause: true, title: "Low Tide", artist: "Saltwater Radio" },
+        { entity: "media_player.deck", name: "Deck", ok: true, state: "idle", volume: 20, can_volume: true, can_pause: true }],
+      bellAt: Date.now() - 2 * 3600000
+    };
+    var names = function (l) { return l.map(function (x) { return { entity: x.entity, name: x.name }; }); };
+    function mockStill(entity) {
+      // a made up picture drawn here (never a real camera): sky and a moving bar, so a new still shows
+      var c = document.createElement("canvas"); c.width = 320; c.height = 180;
+      var g = c.getContext && c.getContext("2d");
+      if (!g) return null;
+      g.fillStyle = entity === "doorbell" ? "#4b5563" : "#2f5d50"; g.fillRect(0, 0, 320, 180);
+      g.fillStyle = "#cfe3ff"; g.fillRect(0, 0, 320, 70);
+      g.fillStyle = "#f2c14e"; g.fillRect((Date.now() / 40) % 320, 110, 40, 40);
+      return c.toDataURL("image/jpeg", 0.7);
+    }
     window.TVHA = {
       info: function () {
-        return JSON.stringify({ climate: rooms.map(function (r) { return { entity: r.entity, name: r.name }; }), scenes: scenes, doorbell: true });
+        var o = { climate: rooms.map(function (r) { return { entity: r.entity, name: r.name }; }), scenes: scenes, doorbell: true };
+        if (W) { o.controls = names(W.controls); o.cameras = W.cameras; o.sensors = names(W.sensors); o.speakers = names(W.speakers); o.energy = true; o.doorbell_camera = true; }
+        return JSON.stringify(o);
       },
       request: function (id, action, entity, value) {
         if (ha === "down") return reply(id, action === "climate"
           ? { ok: true, rooms: rooms.map(function (r) { return { entity: r.entity, name: r.name, ok: false }; }) }
           : { ok: false, error: "failed" });
+        if (W) {
+          var ctl = W.controls.filter(function (c) { return c.entity === entity; })[0], sp = W.speakers.filter(function (c) { return c.entity === entity; })[0];
+          if (action === "controls") return reply(id, { ok: true, controls: JSON.parse(JSON.stringify(W.controls)) });
+          if (action === "set") {
+            if (!ctl || !ctl.ok || ctl.blocked) return reply(id, { ok: false, error: "refused" });
+            ctl.on = value === "on" || value === "open"; ctl.state = ctl.kind === "cover" ? (ctl.on ? "open" : "closed") : ctl.on ? "on" : "off";
+            window.MOCK_HA_LAST = action + " " + entity + " " + value;
+            return reply(id, { ok: true });
+          }
+          if (action === "sensors") return reply(id, { ok: true, sensors: W.sensors });
+          if (action === "history") return reply(id, { ok: true, start: Date.now() - 23 * 3600000, points: Array.apply(null, Array(24)).map(function (x, i) { return i < 3 ? null : Math.round((24 + 3 * Math.sin(i / 3.5)) * 10) / 10; }) });
+          if (action === "energy") return reply(id, { ok: true, name: "Solar", start: Date.now() - 14 * 3600000, total: 18.4, battery: 86, power: 2.4, power_unit: "kW",
+            hours: [0, 0, 0, 0, 0, 0, 0.2, 0.9, 1.8, 2.6, 3.1, 3.2, 2.9, 2.2, 1.5].concat([null, null, null, null, null, null, null, null, null]) });
+          if (action === "speakers") return reply(id, { ok: true, speakers: JSON.parse(JSON.stringify(W.speakers)) });
+          if (action === "volume" && sp) { sp.volume = Math.max(0, Math.min(100, parseInt(value, 10) || 0)); window.MOCK_HA_LAST = "volume " + entity + " " + sp.volume; return reply(id, { ok: true }); }
+          if (action === "playpause" && sp) { sp.state = sp.state === "playing" ? "paused" : "playing"; window.MOCK_HA_LAST = "playpause " + entity; return reply(id, { ok: true }); }
+          if (action === "bell") return reply(id, { ok: true, name: "Front door", at: W.bellAt, ringing: false, camera: true, kept: false });
+          if (action === "ringstill") return reply(id, { ok: false, error: "none" });
+          if (action === "still" && (entity === "doorbell" || W.cameras.some(function (c) { return c.entity === entity; }))) { var src = mockStill(entity); return reply(id, src ? { ok: true, src: src } : { ok: false, error: "failed" }); }
+        }
         var r = room(entity);
         if (action === "climate") return reply(id, { ok: true, rooms: rooms.map(function (x) { return Object.assign({ ok: true }, x); }) });
         if (action === "temp" && r) { r.target = Math.max(r.min, Math.min(r.max, parseFloat(value))); return reply(id, { ok: true }); }
         if (action === "mode" && r && r.modes.indexOf(value) >= 0) { r.state = value; r.action = value === "heat" ? "heating" : value === "cool" ? "cooling" : "idle"; return reply(id, { ok: true }); }
+        if (action === "fan" && r && (r.fan_modes || []).indexOf(value) >= 0) { r.fan = value; return reply(id, { ok: true }); }
         if ((action === "on" || action === "off") && r) { r.state = action === "off" ? "off" : "cool"; r.action = action === "off" ? "off" : "cooling"; return reply(id, { ok: true }); }
         if (action === "scene" && scenes.some(function (x) { return x.entity === entity; })) return reply(id, { ok: true });
         reply(id, { ok: false, error: "refused" });
       }
     };
   }
+  // ?hasetup=1: a launcher with nothing set up yet, for Home settings, Smart home (HomeAssistant.kt
+  // setupCheck, setupSave, setupForget). The token "test-token-for-the-preview-only" is the right one.
+  if (arg("hasetup")) {
+    var kept = null, sreply = function (id, r) { setTimeout(function () { if (window.smartHome) window.smartHome.setupReply(id, r); }, 120); };
+    var ENTS = [{ entity: "climate.lounge", name: "Lounge aircon" }, { entity: "scene.movie_night", name: "Movie night" },
+      { entity: "light.lounge", name: "Lounge lamp" }, { entity: "cover.blinds", name: "Blinds" }, { entity: "camera.front", name: "Front door" },
+      { entity: "sensor.pool", name: "Pool", unit: "°C", cls: "temperature" }, { entity: "sensor.solar_today", name: "Solar today", unit: "kWh", cls: "energy" },
+      { entity: "media_player.kitchen", name: "Kitchen speaker" }, { entity: "event.front_door_ding", name: "Front door ding" }];
+    window.TVHA = {
+      info: function () {
+        if (!kept) return "{}";
+        var nm = function (l) { return (l || []).map(function (x) { return { entity: x.entity, name: x.name || x.entity }; }); };
+        return JSON.stringify({ climate: nm(kept.climate), scenes: nm(kept.scenes), controls: nm(kept.controls), cameras: nm(kept.cameras), sensors: nm(kept.sensors), speakers: nm(kept.speakers), energy: !!kept.energy, doorbell: !!kept.doorbell });
+      },
+      request: function (id) { setTimeout(function () { if (window.smartHome) window.smartHome.reply(id, { ok: false, error: "failed" }); }, 100); },
+      setupStatus: function () { return JSON.stringify(kept ? { set: true, host: "homeassistant.local", made_on_tv: true } : { set: false }); },
+      setupCheck: function (id, url, token) {
+        if (!/^https?:\/\/[a-z0-9.-]+(:\d+)?\/?$/i.test(url)) return sreply(id, { ok: false, error: "address" });
+        if (token !== "test-token-for-the-preview-only" && !(token === "" && kept)) return sreply(id, { ok: false, error: "token" });
+        sreply(id, { ok: true, entities: ENTS });
+      },
+      setupSave: function (id, picks) { kept = JSON.parse(picks); window.MOCK_HA_SAVED = kept; sreply(id, { ok: true }); },
+      setupForget: function (id) { kept = null; sreply(id, { ok: true }); }
+    };
+  }
 
   // ---------- a pretend bridge ----------
-  var jw = function (p) { return "https://images.justwatch.com/" + p + ".webp"; };
+  var jw = function (p) { return localArt(p) || "https://images.justwatch.com/" + p + ".webp"; };
   var app = function (id, name, pkg) { return { id: id, name: name, package: pkg }; };
   var shows = [
     { id: "m2", title: "The Bear", season: 3, episode: 2, app: app("disney-plus", "Disney+", "com.disney.disneyplus"), backdrop: jw("backdrop/346664278/s1440/the-bear-2022"), progress: 0.7 },
@@ -271,6 +383,16 @@
       setTimeout(function () {
         if (down) return reject(new Error("The computer isn't answering."));
         // Now playing (#31): ?music=1, a song that previous and next step through, play and pause toggle
+        if (path.indexOf("/api/weather") === 0 && arg("wx")) {
+          var wp = arg("wx").split(",");
+          // with a pretend forecast too, for the widgets (hourly, the week, rain soon, UV)
+          var t0 = parseInt(wp[0], 10) || 22, c0 = parseInt(wp[1], 10) || 0, nw = new Date(), iso = function (d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); };
+          var hourly = [0, 1, 2, 3, 4, 5, 6, 7].map(function (i) { var d = new Date(nw.getTime() + i * 3600000); return { time: iso(d) + "T" + ("0" + d.getHours()).slice(-2) + ":00", temp: t0 + [0, 1, 2, 3, 3, 1, -1, -2][i], code: [c0, 0, 0, 2, 3, 61, 95, 80][i], uv: 6, pop: [0, 0, 5, 10, 20, 60, 80, 70][i] }; });
+          var daily = [0, 1, 2, 3, 4, 5, 6].map(function (i) { var d = new Date(nw.getTime() + i * 86400000); return { date: iso(d), code: [c0, 95, 61, 2, 0, 0, 3][i], hi: t0 + [3, 1, -2, 0, 2, 4, 2][i], lo: t0 - [7, 6, 7, 8, 9, 7, 6][i], sunrise: iso(d) + "T04:41", sunset: iso(d) + "T18:22", uv: 11 }; });
+          return resolve({ ok: true, temp: t0, code: c0, text: "", is_day: true, hourly: hourly, daily: daily, hi: daily[0].hi, lo: daily[0].lo, uv: 11, rain15: [0, 0, 0.1, 0.4, 1.2, 2.8, 3, 1, 0.4, 0, 0, 0] });
+        }
+        // Up next (?queue=1: three made up songs; ?queue=empty: connected, nothing queued; none: Spotify not connected)
+        if (path.indexOf("/api/music/queue") === 0) return resolve({ ok: true, configured: !!arg("queue"), queue: arg("queue") === "empty" ? [] : arg("queue") ? SONGS.map(function (x) { return { title: x[0], artist: x[1], art: null }; }) : null });
         if (path.indexOf("/api/music") === 0) return resolve({ ok: true, music: arg("music") ? mockSong() : null });
         if (path.indexOf("/api/custom-cards") === 0) return resolve({ ok: true, cards: arg("cards") ? [
           { title: "Solar today", subtitle: "Roof panels", value: "18.4 kWh", app: "com.google.android.youtube.tv" },

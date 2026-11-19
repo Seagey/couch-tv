@@ -112,15 +112,15 @@
     var sub = s.season && s.episode ? t("kids_ep", { s: s.season, e: s.episode }) : s.season ? t("kids_season", { s: s.season }) : (s.app ? s.app.name : "");
     var icon = pkg && X.iconUrl(pkg);
     return '<div class="ktile" data-row="1" data-i="' + i + '"><div class="kposter">' +
-      (art ? '<img src="' + esc(art) + '" alt="" decoding="async" onerror="this.remove()">' : "") +
+      (art ? '<img src="' + esc(art) + '" alt="" decoding="async" data-err="remove">' : "") +
       '<span class="kword">' + esc(s.title) + "</span>" +
-      (icon ? '<span class="kbadge"><img src="' + esc(icon) + '" alt="" onerror="this.parentNode.remove()"></span>' : "") +
+      (icon ? '<span class="kbadge"><img src="' + esc(icon) + '" alt="" data-err="parent"></span>' : "") +
       '</div><b class="ktitle">' + esc(s.title) + "</b>" + (sub ? "<small>" + esc(sub) + "</small>" : "") + "</div>";
   }
   function appHTML(a, i) {
     var icon = X.iconUrl(a.package);
     return '<div class="kapp" data-row="2" data-i="' + i + '"><div class="kapp-face">' +
-      (icon ? '<img src="' + esc(icon) + '" alt="" onerror="this.parentNode.textContent=this.getAttribute(\'data-n\')" data-n="' + esc(a.name) + '">' : esc(a.name)) +
+      (icon ? '<img src="' + esc(icon) + '" alt="" data-err="name" data-n="' + esc(a.name) + '">' : esc(a.name)) +
       '</div><span>' + esc(a.name) + "</span></div>";
   }
   function render() {

@@ -185,3 +185,63 @@ async def now_playing():
         except Exception as e:   # network blip or a refused renewal: keep the last reading
             log.warning("Spotify now playing failed: %s", e)
         return _cache["item"]
+
+
+QUEUE_URL = PLAYER_URL + "/queue"
+QUEUE_POLL_S = 15               # the queue changes with each song: a reading this old is fine
+_queue_cache = {"at": 0.0, "items": None, "backoff_until": 0.0}
+
+
+def _cover(images):
+    """The picture nearest 300 px wide, only from Spotify's own picture host."""
+    if not images:
+        return None
+    url = min(images, key=lambda i: abs((i.get("width") or 300) - 300)).get("url") or ""
+    return url if url.startswith("https://i.scdn.co/image/") else None
+
+
+def queue_items(j, most=10):
+    """Spotify's queue answer as the Up next widget's songs: title, artist and cover, at most [most]."""
+    out = []
+    for it in (j or {}).get("queue") or []:
+        if not isinstance(it, dict) or not it.get("name"):
+            continue
+        if it.get("type") == "episode":
+            artist, images = (it.get("show") or {}).get("name") or "", it.get("images") or (it.get("show") or {}).get("images") or []
+        else:
+            artist = ", ".join(a.get("name", "") for a in it.get("artists") or [] if a.get("name"))
+            images = (it.get("album") or {}).get("images") or []
+        out.append({"title": str(it["name"])[:120], "artist": artist[:120], "art": _cover(images)})
+        if len(out) >= most:
+            break
+    return out
+
+
+async def queue():
+    """The next songs on the account (GET /me/player/queue, the scopes the login already asks for), or
+    None when Spotify is not set up here. Cached QUEUE_POLL_S seconds; a failed read keeps the last."""
+    if not client_id() or not _read_tokens():
+        return None
+    async with _lock:
+        t = time.time()
+        if _queue_cache["items"] is not None and (t - _queue_cache["at"] < QUEUE_POLL_S or t < _queue_cache["backoff_until"]):
+            return _queue_cache["items"]
+        _queue_cache["at"] = t
+        try:
+            token = await _access_token()
+            if not token:
+                return None
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=6)) as cs:
+                async with cs.get(QUEUE_URL, headers={"Authorization": "Bearer " + token}) as r:
+                    if r.status == 200:
+                        _queue_cache["items"] = queue_items(await r.json(content_type=None))
+                    elif r.status == 204:
+                        _queue_cache["items"] = []
+                    elif r.status == 429:
+                        wait = int(r.headers.get("Retry-After", "30") or 30)
+                        _queue_cache["backoff_until"] = t + min(max(wait, 5), 600)
+                    else:
+                        log.warning("Spotify queue: HTTP %s", r.status)
+        except Exception as e:   # network blip: keep the last reading
+            log.warning("Spotify queue failed: %s", e)
+        return _queue_cache["items"] if _queue_cache["items"] is not None else []

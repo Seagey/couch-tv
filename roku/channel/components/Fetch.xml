@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- One web request, run on a task (a Roku scene may not make them itself). Set url, method, body and tag,
+<!-- One web request, run on a task (a Roku scene may not make them itself). Set url, method, body, tag and timeout (ms),
      then control = "run"; read status and response when "done" changes. status is -1 when nothing answered. -->
 <component name="Fetch" extends="Task">
     <interface>
@@ -7,6 +7,7 @@
         <field id="method" type="string" value="GET" />
         <field id="body" type="string" />
         <field id="tag" type="string" />
+        <field id="timeout" type="integer" value="8000" />
         <field id="status" type="integer" />
         <field id="response" type="string" />
         <field id="done" type="boolean" />

@@ -1,0 +1,404 @@
+/* Widgets for a design (widgets.js draws them, design.js places them). A widget is one box on the
+   designer's grid (9 x 5 square tiles of 160 px, 40 px gutters, inside the tvOS safe area), drawn in
+   1920 x 1080 pixels and scaled with the design layer. Type never under 23 px.
+   The look of every widget comes from a few variables, set per design (design.look) and per widget
+   (its style): --ink, --sub, --faint, --panel, --rim, --r, --pad, --on, --tile. */
+.cd-layer { --ink: #fff; --sub: rgba(255, 255, 255, 0.74); --faint: rgba(255, 255, 255, 0.5); --panel: rgba(22, 18, 26, 0.38);
+  --rim: rgba(255, 255, 255, 0.14); --solid: #16161b; --paperbg: #f6f2ea; --on: #ffd60a; --focus: #fff; }
+.cw { position: relative; z-index: 0; box-sizing: border-box; border-radius: var(--r, 36px); padding: var(--pad, 24px); display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-flex-direction: column; flex-direction: column; color: var(--ink); font-family: "Inter", sans-serif; -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1; overflow: hidden; text-align: left; line-height: 1.2;
+  -webkit-transition: -webkit-transform 0.16s ease-out, box-shadow 0.16s ease-out; transition: transform 0.16s ease-out, box-shadow 0.16s ease-out; }
+.cw * { box-sizing: border-box; }
+.cw { white-space: normal; }
+/* the panel is its own layer under the content, so its opacity never fades the words */
+.cw > .cw-bg { position: absolute; left: 0; top: 0; right: 0; bottom: 0; border-radius: inherit; z-index: -1; pointer-events: none; }
+.cw-glass > .cw-bg { background: var(--panel); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%);
+  box-shadow: inset 0 0 0 1.5px var(--rim), inset 0 1.5px 0 rgba(255, 255, 255, 0.16); }
+.cw-solid > .cw-bg { background: var(--solid); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.06); }
+.cw-paper { color: #1d1b18; --ink: #1d1b18; --sub: rgba(29, 27, 24, 0.74); --faint: rgba(29, 27, 24, 0.45); }
+.cw-paper > .cw-bg { background: var(--paperbg); }
+.cw-tint > .cw-bg { background: var(--tile, #0a84ff); }
+.cw-bare { padding: 0; border-radius: 0; overflow: visible; }
+.cw-photo { padding: 0; }
+.cw-sh-soft { box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22); }
+.cw-sh-lifted { box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42); }
+.cw-glass.cw-sh-none, .cw-solid.cw-sh-none { box-shadow: none; }
+.cw-glass:not(.cw-sh-none):not(.cw-sh-lifted) { box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22); }
+
+/* type, tvOS sizes */
+.cw-lab { font-size: 25px; font-weight: 650; letter-spacing: 0.01em; color: var(--sub); display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; white-space: nowrap; overflow: hidden; overflow-x: clip; overflow-y: visible; text-overflow: ellipsis; min-width: 0; }
+.cw-lab > * { margin-right: 10px; -webkit-flex: none; flex: none; }
+.cw-t29 { font-size: 29px; font-weight: 560; line-height: 1.22; }
+.cw-t25 { font-size: 25px; font-weight: 560; line-height: 1.25; color: var(--sub); }
+.cw-t23 { font-size: 24px; font-weight: 560; line-height: 1.25; color: var(--sub); }
+.cw-t38 { font-size: 38px; font-weight: 680; line-height: 1.12; letter-spacing: -0.01em; }
+.cw-t48 { font-size: 48px; font-weight: 700; line-height: 1.05; letter-spacing: -0.015em; }
+.cw-big { font-weight: 640; letter-spacing: -0.035em; line-height: 0.92; }
+.cw-grow { -webkit-flex: 1; flex: 1; min-height: 0; }
+.cw-row { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+.cw-col { display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; }
+.cw-sp { -webkit-justify-content: space-between; justify-content: space-between; }
+.cw-center { -webkit-justify-content: center; justify-content: center; -webkit-align-items: center; align-items: center; }
+.cw-dim { color: var(--sub); }
+/* centred unless the design says left or right (widgets.js adds .cw-mid when opts.align is not set):
+   lines of words in the middle, rows of things packed in the middle, an icon on its own in the middle.
+   A renderer that sets its own alignment inline keeps it. */
+.cw-mid { text-align: center; }
+.cw-mid .cw-row:not(.cw-sp), .cw-mid .cw-lab { -webkit-justify-content: center; justify-content: center; }
+.cw-mid > svg, .cw-mid .cw-col > svg { -webkit-align-self: center; align-self: center; }
+.cw-mid .cw-mods { -webkit-justify-content: center; justify-content: center; -webkit-align-content: center; align-content: center; }
+/* one line that ends in "..." when it is too long: never wider than the box it is in (so the "..." shows
+   instead of the words running out of the widget), and cut only at the side, never through the tops of
+   letters or the tails of g, y and Hindi's marks below the line (where overflow-x: clip is known) */
+.cw-ell { white-space: nowrap; overflow: hidden; overflow-x: clip; overflow-y: visible; text-overflow: ellipsis; max-width: 100%; min-width: 0; }
+.cw-fill { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-size: cover; background-position: center; }
+.cw-svg { display: block; overflow: visible; }
+
+/* dots: a stack (down the right) and a slideshow (along the bottom) */
+.cw-dots { position: absolute; right: 18px; top: 50%; -webkit-transform: translateY(-50%); transform: translateY(-50%); display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; z-index: 3; }
+.cw-dots i { display: block; width: 12px; height: 12px; border-radius: 6px; background: currentColor; opacity: 0.45; margin: 5px 0; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); -webkit-transition: height 0.2s; transition: height 0.2s; }
+.cw-dots i.on { height: 30px; opacity: 1; }
+.cw-hdots { display: -webkit-flex; display: flex; -webkit-justify-content: center; justify-content: center; position: absolute; left: 0; right: 0; z-index: 3; }
+.cw-hdots i { display: block; width: 10px; height: 10px; border-radius: 5px; background: #fff; opacity: 0.5; margin: 0 4px; -webkit-transition: width 0.3s; transition: width 0.3s; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }
+.cw-hdots i.on { width: 28px; opacity: 1; }
+
+/* progress */
+.cw-bar { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.22); overflow: hidden; position: relative; -webkit-flex: none; flex: none; }
+.cw-paper .cw-bar { background: rgba(0, 0, 0, 0.1); }
+.cw-bar b { display: block; height: 100%; border-radius: 4px; background: var(--ink); }
+
+/* app icons: the TV's own icon, or the app's name on a tile when there is no icon */
+.cw-app { position: relative; -webkit-flex: none; flex: none; background: #2a2a30 center / cover no-repeat; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25); overflow: hidden;
+  display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center;
+  color: #fff; font-weight: 700; text-align: center; line-height: 1.05; padding: 0; word-break: break-word; }
+.cw-app.cw-has-icon { color: transparent; }
+/* a Folder tile's four minis: the name hides behind the icon; with no icon (or one that failed) it shows */
+.cw-app.cw-mini.cw-has-icon { font-size: 0 !important; }
+.cw-more { background: rgba(255, 255, 255, 0.16); box-shadow: none; }
+
+.cw-chip { display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; height: 54px; padding: 0 22px; border-radius: 27px;
+  font-size: 25px; font-weight: 600; background: rgba(255, 255, 255, 0.14); white-space: nowrap; -webkit-flex: none; flex: none; }
+.cw-chip > svg { margin-right: 10px; }
+.cw-chip.on { background: var(--on); color: #1a1406; }
+.cw-paper .cw-chip { background: rgba(0, 0, 0, 0.06); }
+
+/* Control Centre modules and scene buttons */
+.cw-mods { display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; -webkit-flex: 1; flex: 1; min-height: 0; margin: -10px; -webkit-align-content: stretch; align-content: stretch; }
+.cw-mod { margin: 10px; border-radius: 30px; background: rgba(255, 255, 255, 0.12); padding: 20px; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-justify-content: space-between; justify-content: space-between; min-height: 0; overflow: hidden; color: var(--ink); }
+.cw-mod.on { background: #fff; color: #18171c; --sub: rgba(24, 23, 28, 0.62); }
+.cw-mod .cw-ic { width: 58px; height: 58px; border-radius: 29px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; background: rgba(255, 255, 255, 0.16); -webkit-flex: none; flex: none; }
+.cw-mod.on .cw-ic { background: var(--on); }
+.cw-paper .cw-mod { background: rgba(0, 0, 0, 0.06); }
+
+/* lists */
+.cw-ev { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+.cw-ev > i { display: block; width: 8px; -webkit-align-self: stretch; align-self: stretch; min-height: 50px; border-radius: 4px; margin-right: 16px; -webkit-flex: none; flex: none; }
+.cw-ev > .cw-t29 { -webkit-flex: 1; flex: 1; min-width: 0; }
+.cw-ev > .cw-t25 { margin-left: 12px; }
+.cw-month { display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; text-align: center; font-size: 24px; font-weight: 600; -webkit-align-content: space-around; align-content: space-around; }
+.cw-month span { width: 14.2857%; height: 40px; line-height: 40px; }
+.cw-month .h { color: var(--faint); font-size: 23px; }
+.cw-month .today b { display: inline-block; min-width: 40px; height: 40px; background: #ff453a; color: #fff; border-radius: 20px; font-weight: 700; }
+.cw-li { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; font-size: 27px; font-weight: 560; min-width: 0; }
+.cw-li .bx { width: 32px; height: 32px; border-radius: 16px; border: 3px solid var(--faint); -webkit-flex: none; flex: none; margin-right: 16px; }
+.cw-li.done { color: var(--faint); text-decoration: line-through; }
+.cw-li.done .bx { background: var(--faint); border-color: transparent; }
+
+/* posters */
+.cw-poster { border-radius: 26px; background: #333 center / cover; position: relative; overflow: hidden; }
+.cw-poster:after { content: ""; position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: linear-gradient(180deg, transparent 45%, rgba(0, 0, 0, 0.72)); }
+.cw-poster .cap { position: absolute; left: 22px; right: 22px; bottom: 20px; z-index: 1; color: #fff; }
+
+/* the empty state: what this widget needs on this TV, said plainly in its own box */
+.cw-empty { -webkit-justify-content: center; justify-content: center; }
+.cw-empty .cw-e1 { font-size: 29px; font-weight: 680; line-height: 1.2; margin-top: 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cw-empty .cw-e2 { font-size: 24px; font-weight: 560; color: var(--sub); margin-top: 6px; line-height: 1.25; }
+.cw-empty.cw-tiny .cw-e1 { font-size: 24px; margin-top: 8px; }
+
+/* slideshow and stacks cross fade */
+.cw-layer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; -webkit-transition: opacity 0.9s ease; transition: opacity 0.9s ease; }
+.cw-stack > .cw-slot { position: absolute; left: 0; top: 0; right: 0; bottom: 0; -webkit-transition: opacity 0.6s ease; transition: opacity 0.6s ease; }
+
+/* focus from the remote: the widget lifts, a white ring 6 px out, a deeper shadow */
+.cd-o.cw-o { z-index: 1; }
+.cd-o.cw-o.cw-hasfocus { z-index: 5; }
+.cw.cw-focus { outline: 6px solid var(--focus); outline-offset: 6px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); }
+.cw-bare.cw-focus { outline-offset: 10px; border-radius: 28px; }
+.cw-ifocus { outline: 5px solid var(--focus); outline-offset: 5px; }
+.cw .cw-app.cw-ifocus { -webkit-transform: scale(1.06); transform: scale(1.06); }
+
+/* widget mode: the design's widgets are the home, the home's own parts step aside (design.js) */
+html.cd-wmode header.top, html.cd-wmode .scrim, html.cd-wmode #shelf-section, html.cd-wmode #scenes .gclock, html.cd-wmode #scenes .fg { visibility: hidden !important; }
+html.cd-wmode:not(.expanded) #apps-section { visibility: hidden !important; }
+html.cd-wmode.expanded #cd-front, html.cd-wmode.expanded #cd-back { visibility: hidden; }
+html.cd-wmode #grid .app.focus { outline: none; }
+
+/* the folder opened full screen, and the hold OK menu */
+.cw-sheet { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; -webkit-transform-origin: 0 0; transform-origin: 0 0; z-index: 60;
+  background: rgba(6, 7, 10, 0.72); -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px); color: #fff; font-family: "Inter", sans-serif;
+  display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; }
+.cw-sheet h2 { font-size: 52px; font-weight: 720; letter-spacing: -0.02em; margin: 0 0 48px; }
+.cw-sheet .cw-sheet-apps { display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; -webkit-justify-content: center; justify-content: center; max-width: 1200px; }
+.cw-sheet .cw-sheet-apps .cw-app { margin: 22px; }
+.cw-sheet .cw-hint { margin-top: 40px; font-size: 25px; color: rgba(255, 255, 255, 0.72); }
+.cw-menu .cw-mi { width: 640px; padding: 26px 34px; margin: 10px 0; border-radius: 28px; font-size: 34px; font-weight: 650; background: rgba(255, 255, 255, 0.1); }
+.cw-menu .cw-mi.cw-ifocus { background: #fff; color: #111; outline: none; }
+/* the Settings button on a design (design.js gearChip): top right on every design, so settings are always
+   one press away; it grows into a labelled pill while it has the focus */
+.cw-gearchip { display: none; position: fixed; top: 28px; right: 28px; z-index: 58; height: 64px; min-width: 64px; padding: 0 12px; box-sizing: border-box;
+  border-radius: 32px; background: rgba(10, 10, 14, 0.62); color: #fff; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.28); font: 650 26px "Inter", sans-serif; white-space: nowrap; }
+html.cd-wmode .cw-gearchip { display: -webkit-flex; display: flex; }
+html.cd-wmode.expanded .cw-gearchip, html.setting .cw-gearchip { display: none; }
+.cw-gearchip svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; -webkit-flex: none; flex: none; }
+.cw-gearchip .cw-gearchip-t { display: none; margin: 0 10px 0 10px; }
+.cw-gearchip.cw-focus { background: #fff; color: #111; box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.45); -webkit-transform: none !important; transform: none !important; }
+.cw-gearchip.cw-focus .cw-gearchip-t { display: inline; }
+/* no clear spot on this design (design.js placeGear): hidden until the remote reaches it, so it covers nothing */
+.cw-gearchip.cw-gear-tuck { opacity: 0; }
+.cw-gearchip.cw-gear-tuck.cw-focus { opacity: 1; }
+.cw-tip.cw-tip-settings { white-space: normal; width: 1100px; max-width: 80vw; text-align: center; line-height: 1.35; }
+.cw-tip { position: fixed; left: 50%; bottom: 40px; -webkit-transform: translateX(-50%); transform: translateX(-50%); z-index: 59; padding: 16px 30px; border-radius: 40px;
+  background: rgba(10, 10, 14, 0.82); color: #fff; font: 600 25px "Inter", sans-serif; white-space: nowrap; -webkit-transition: opacity 0.6s; transition: opacity 0.6s; }
+
+/* the detail layer (widget-detail.js): OK on a widget grows it into a sheet over the home, the way the
+   wall tablet's cards open (home-hub wall/app.js). Drawn on a 1920 x 1080 stage scaled to the screen,
+   words 25 px and up, one white focus ring. */
+.cw-strip .cw-e1 { -webkit-line-clamp: 2; }
+.cw-empty.cw-tiny .cw-e1 { -webkit-line-clamp: 2; }
+.cwd-scrim { position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 70; background: rgba(4, 5, 8, 0.55); opacity: 0; -webkit-transition: opacity 0.32s ease; transition: opacity 0.32s ease; }
+.cwd-scrim.on { opacity: 1; }
+.cwd-stage { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; z-index: 71; -webkit-transform-origin: 0 0; transform-origin: 0 0; pointer-events: none;
+  font-family: "Inter", sans-serif; color: #fff; -webkit-font-smoothing: antialiased; font-feature-settings: "tnum" 1; }
+.cwd-stage * { box-sizing: border-box; }
+.cwd-panel { position: absolute; overflow: hidden; border-radius: 44px; background: rgba(22, 24, 32, 0.86); -webkit-backdrop-filter: blur(40px) saturate(160%); backdrop-filter: blur(40px) saturate(160%);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.12), 0 40px 120px rgba(0, 0, 0, 0.5); -webkit-transform-origin: 0 0; transform-origin: 0 0; pointer-events: auto;
+  -webkit-transition: -webkit-transform 0.46s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease; transition: transform 0.46s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease; }
+html.lighter .cwd-panel { background: rgb(24, 26, 34); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.cwd-panel.cwd-fade { opacity: 0; -webkit-transition: opacity 0.2s ease; transition: opacity 0.2s ease; }
+.cwd-panel.cwd-fade.on { opacity: 1; }
+.cwd-panel.closing { -webkit-transition: -webkit-transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.32s ease; transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.32s ease; }
+.cwd-in { position: relative; z-index: 1; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; width: 100%; height: 100%; padding: 56px 64px;
+  opacity: 0; -webkit-transition: opacity 0.26s ease 0.16s; transition: opacity 0.26s ease 0.16s; }
+.cwd-panel.on .cwd-in { opacity: 1; }
+.cwd-panel.closing .cwd-in { opacity: 0; -webkit-transition: opacity 0.1s ease; transition: opacity 0.1s ease; }
+
+/* the header: an icon, the title and a line, and how to get out */
+.cwd-head { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-flex: none; flex: none; }
+.cwd-hic { width: 84px; height: 84px; border-radius: 26px; background: rgba(255, 255, 255, 0.14); display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+  -webkit-justify-content: center; justify-content: center; -webkit-flex: none; flex: none; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); }
+.cwd-htext { margin-left: 28px; min-width: 0; -webkit-flex: 1; flex: 1; }
+.cwd-title { font-size: 56px; font-weight: 760; letter-spacing: -0.025em; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cwd-sub { font-size: 29px; font-weight: 520; color: rgba(255, 255, 255, 0.72); margin-top: 6px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cwd-back { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; height: 60px; padding: 0 26px 0 18px; border-radius: 30px; background: rgba(255, 255, 255, 0.1);
+  font-size: 25px; font-weight: 600; color: rgba(255, 255, 255, 0.82); -webkit-flex: none; flex: none; margin-left: 24px; }
+.cwd-back svg { margin-right: 10px; }
+.cwd-pill { display: inline-block; margin-left: 0; padding: 6px 18px; border-radius: 22px; font-size: 25px; font-weight: 700; color: #16120a; }
+
+/* words */
+.cwd-label { font-size: 25px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); margin: 30px 0 16px; -webkit-flex: none; flex: none; }
+.cwd-text { font-size: 30px; font-weight: 500; line-height: 1.36; color: rgba(255, 255, 255, 0.9); }
+.cwd-text b { font-weight: 720; color: #fff; }
+.cwd-small { font-size: 25px; font-weight: 560; color: rgba(255, 255, 255, 0.72); line-height: 1.3; }
+.cwd-mid { font-size: 34px; font-weight: 680; line-height: 1.2; }
+.cwd-big { font-size: 64px; font-weight: 720; letter-spacing: -0.03em; line-height: 1.02; }
+.cwd-huge { font-size: 200px; font-weight: 300; letter-spacing: -0.05em; line-height: 0.95; }
+.cwd-ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* layout */
+.cwd-row { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+.cwd-col { display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; }
+.cwd-grow { -webkit-flex: 1; flex: 1; min-height: 0; }
+.cwd-center { -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; }
+.cwd-wrap { -webkit-flex-wrap: wrap; flex-wrap: wrap; }
+.cwd-grid { display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; margin: -12px; }
+.cwd-grid > * { margin: 12px; }
+.cwd-list .cwd-li { display: -webkit-flex; display: flex; -webkit-align-items: flex-start; align-items: flex-start; font-size: 30px; font-weight: 520; line-height: 1.32; margin-bottom: 14px; }
+.cwd-bullet { display: block; width: 12px; height: 12px; border-radius: 6px; background: #ffd60a; margin: 15px 20px 0 4px; -webkit-flex: none; flex: none; }
+.cwd-tvrow { display: -webkit-flex; display: flex; -webkit-justify-content: space-between; justify-content: space-between; -webkit-align-items: center; align-items: center; font-size: 28px;
+  font-weight: 560; padding: 14px 0; border-bottom: 1.5px solid rgba(255, 255, 255, 0.1); }
+.cwd-tvrow b { font-weight: 720; padding: 4px 18px; border-radius: 20px; font-size: 25px; margin-left: 20px; -webkit-flex: none; flex: none; }
+.cwd-tv-yes { background: rgba(48, 209, 88, 0.22); color: #6ee28d; }
+.cwd-tv-setup { background: rgba(255, 214, 10, 0.2); color: #ffe066; }
+.cwd-tv-partial { background: rgba(255, 159, 10, 0.2); color: #ffb84d; }
+.cwd-tv-no { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.55); }
+
+/* things the remote stops on, and the ring */
+.cwd-stop { -webkit-transition: -webkit-transform 0.16s ease-out, background 0.16s, box-shadow 0.16s; transition: transform 0.16s ease-out, background 0.16s, box-shadow 0.16s; }
+.cwd-f { outline: 6px solid #fff; outline-offset: 6px; -webkit-transform: scale(1.05); transform: scale(1.05); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); z-index: 2; position: relative; }
+.cwd-press { -webkit-animation: cwd-press 0.24s ease-out; animation: cwd-press 0.24s ease-out; }
+@-webkit-keyframes cwd-press { 50% { -webkit-transform: scale(0.97); } }
+@keyframes cwd-press { 50% { transform: scale(0.97); } }
+.cwd-btn { display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; height: 96px;
+  padding: 0 38px; border-radius: 48px; background: rgba(255, 255, 255, 0.12); font-size: 30px; font-weight: 680; margin-right: 22px; -webkit-flex: none; flex: none; }
+.cwd-btn svg + span { margin-left: 14px; }
+.cwd-btn.cwd-on { background: #64d2ff; color: #06202b; }
+.cwd-btn.cwd-f { background: #fff; color: #111; }
+.cwd-round { width: 120px; height: 120px; padding: 0; border-radius: 60px; }
+.cwd-round.cwd-sm { width: 96px; height: 96px; }
+.cwd-hero { width: 168px; height: 168px; border-radius: 84px; background: #fff; color: #111; margin: 0 34px; }
+.cwd-chip { height: 76px; padding: 0 32px; border-radius: 38px; display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; background: rgba(255, 255, 255, 0.1);
+  font-size: 29px; font-weight: 650; margin: 0 16px 16px 0; }
+.cwd-chip.on { background: #64d2ff; color: #06202b; }
+.cwd-chip.cwd-f { background: #fff; color: #111; }
+.cwd-tile { border-radius: 32px; background: rgba(255, 255, 255, 0.1); display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; }
+.cwd-tile .cwd-big { font-size: 72px; }
+.cwd-tile.cwd-f { background: #fff; color: #111; }
+.cwd-tile.cwd-f .cwd-small { color: rgba(0, 0, 0, 0.6); }
+.cwd-msg { position: absolute; right: 64px; top: 140px; z-index: 3; -webkit-transform: translateY(-12px); transform: translateY(-12px); padding: 18px 34px; border-radius: 40px;
+  background: rgba(255, 255, 255, 0.94); color: #111; font-size: 28px; font-weight: 650; white-space: nowrap; opacity: 0; -webkit-transition: opacity 0.3s, -webkit-transform 0.3s; transition: opacity 0.3s, transform 0.3s; }
+.cwd-msg.on { opacity: 1; -webkit-transform: none; transform: none; }
+.cwd-photos .cwd-msg { top: auto; bottom: 130px; }
+.cwd-tip { z-index: 72; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+
+/* timers */
+.cwd-ringbox { position: relative; width: 420px; height: 420px; -webkit-flex: none; flex: none; }
+.cwd-ringtext { position: absolute; left: 0; top: 0; right: 0; bottom: 0; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; text-align: center; }
+.cwd-ringtext .cwd-huge { font-weight: 400; }
+
+/* rows that slide under the remote */
+.cwd-scroll { overflow: hidden; -webkit-flex: none; flex: none; margin: -20px; padding: 20px; }
+.cwd-scroll.cwd-grow { -webkit-flex: 1; flex: 1; }
+.cwd-track { display: -webkit-flex; display: flex; -webkit-transition: -webkit-transform 0.32s cubic-bezier(0.32, 0.72, 0, 1); transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1); }
+.cwd-hour { width: 132px; height: 196px; -webkit-flex: none; flex: none; margin-right: 14px; border-radius: 28px; background: rgba(255, 255, 255, 0.08); display: -webkit-flex; display: flex;
+  -webkit-flex-direction: column; flex-direction: column; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-around; justify-content: space-around; padding: 14px 0; }
+.cwd-rain { font-size: 25px; font-weight: 700; color: #64d2ff; min-height: 30px; }
+.cwd-day { width: 214px; height: 400px; border-radius: 30px; background: rgba(255, 255, 255, 0.08); display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; padding: 22px 22px 20px; -webkit-flex: none; flex: none; }
+.cwd-day .cwd-small { font-size: 23px; white-space: nowrap; }
+.cwd-range { position: relative; width: 100%; height: 10px; border-radius: 5px; background: rgba(0, 0, 0, 0.3); }
+.cwd-range b { position: absolute; top: 0; height: 100%; border-radius: 5px; background: -webkit-linear-gradient(left, #9fe6a0, #ffd60a, #ff9f0a); background: linear-gradient(90deg, #9fe6a0, #ffd60a, #ff9f0a); }
+.cwd-bars { display: -webkit-flex; display: flex; -webkit-align-items: flex-end; align-items: flex-end; height: 340px; }
+.cwd-bars i { display: block; -webkit-flex: 1; flex: 1; margin: 0 6px; border-radius: 10px; }
+
+/* calendar and moon */
+.cwd-month { width: 520px; }
+.cwd-mgrid { display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; text-align: center; font-size: 30px; font-weight: 600; }
+.cwd-mgrid > span { width: 14.2857%; height: 66px; line-height: 66px; }
+.cwd-mgrid .h { color: rgba(255, 255, 255, 0.5); font-size: 25px; }
+.cwd-mgrid .today b { display: inline-block; min-width: 58px; height: 58px; line-height: 58px; border-radius: 29px; background: #ff453a; color: #fff; }
+.cwd-moons { width: 840px; margin-left: 60px; }
+.cwd-moons > div { width: 14.2857%; margin-bottom: 18px; }
+.cwd-ev { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; font-size: 29px; font-weight: 600; margin-bottom: 14px; }
+.cwd-ev i { display: block; width: 10px; height: 48px; border-radius: 5px; margin-right: 18px; -webkit-flex: none; flex: none; }
+.cwd-ev span { -webkit-flex: 1; flex: 1; min-width: 0; }
+.cwd-ev b { margin-left: 16px; font-weight: 560; color: rgba(255, 255, 255, 0.7); }
+
+/* photos and a camera: the whole screen */
+.cwd-panel.cwd-photos { border-radius: 0; background: #000; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+.cwd-photos .cwd-in { padding: 0; }
+.cwd-pstage { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.cwd-photo { position: absolute; left: 0; top: 0; right: 0; bottom: 0; -webkit-transition: opacity 1s ease; transition: opacity 1s ease; }
+.cwd-pblur { position: absolute; left: -60px; top: -60px; right: -60px; bottom: -60px; background: #111 center / cover no-repeat; -webkit-filter: blur(40px) brightness(0.55); filter: blur(40px) brightness(0.55); }
+html.lighter .cwd-pblur { -webkit-filter: none; filter: none; opacity: 0.25; }
+.cwd-pimg { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: center / contain no-repeat; }
+.cwd-pbar { position: absolute; left: 80px; right: 80px; bottom: 54px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; }
+.cwd-pcount { font-size: 27px; font-weight: 650; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6); }
+.cwd-pdots { display: -webkit-flex; display: flex; }
+.cwd-pdots i { display: block; width: 12px; height: 12px; border-radius: 6px; background: #fff; opacity: 0.45; margin-left: 10px; -webkit-transition: width 0.3s; transition: width 0.3s; }
+.cwd-pdots i.on { width: 36px; opacity: 1; }
+.cwd-pchip { position: absolute; left: 80px; top: 60px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; padding: 14px 26px 14px 18px; border-radius: 34px;
+  background: rgba(0, 0, 0, 0.55); font-size: 27px; font-weight: 650; -webkit-transition: opacity 0.3s; transition: opacity 0.3s; }
+.cwd-pchip svg { margin-right: 10px; }
+.cwd-phint { position: absolute; left: 50%; top: 60px; -webkit-transform: translateX(-50%); transform: translateX(-50%); padding: 14px 30px; border-radius: 34px; background: rgba(0, 0, 0, 0.55);
+  font-size: 26px; font-weight: 600; white-space: nowrap; -webkit-animation: cwd-hint 5s forwards; animation: cwd-hint 5s forwards; }
+@-webkit-keyframes cwd-hint { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes cwd-hint { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+.cwd-live { position: absolute; left: 80px; top: 60px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; padding: 16px 28px; border-radius: 36px; background: rgba(0, 0, 0, 0.55);
+  font-size: 30px; font-weight: 700; }
+.cwd-live i { display: block; width: 16px; height: 16px; border-radius: 8px; background: #ff453a; margin-right: 14px; }
+.cwd-live span { font-weight: 520; color: rgba(255, 255, 255, 0.8); margin-left: 16px; font-size: 26px; }
+
+/* keep watching and apps */
+.cwd-show { width: 600px; -webkit-flex: none; flex: none; margin-right: 32px; border-radius: 30px; padding: 0 0 8px; }
+.cwd-show.cwd-f { outline-offset: 10px; -webkit-transform: scale(1.04); transform: scale(1.04); box-shadow: none; }
+.cwd-art { position: relative; width: 600px; height: 338px; border-radius: 28px; background: #2a2a30 center / cover; overflow: hidden; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4); }
+.cwd-prog { position: absolute; left: 22px; right: 22px; bottom: 20px; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.3); }
+.cwd-prog b { display: block; height: 100%; border-radius: 4px; background: #fff; }
+.cwd-resume { position: absolute; left: 22px; top: 22px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; height: 58px; padding: 0 24px 0 16px; border-radius: 29px;
+  background: #fff; color: #111; font-size: 26px; font-weight: 720; opacity: 0; -webkit-transition: opacity 0.2s; transition: opacity 0.2s; }
+.cwd-resume svg { margin-right: 8px; }
+.cwd-show.cwd-f .cwd-resume { opacity: 1; }
+.cwd-app { width: 224px; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; -webkit-align-items: center; align-items: center; padding: 12px 0; border-radius: 36px; }
+.cwd-app .cwd-small { margin-top: 14px; max-width: 220px; text-align: center; color: #fff; font-weight: 650; }
+.cwd-app.cwd-f { outline: none; box-shadow: none; }
+.cwd-app.cwd-f .cw-app { outline: 6px solid #fff; outline-offset: 6px; }
+
+/* the player */
+.cwd-artbg { position: absolute; left: -80px; top: -80px; right: -80px; bottom: -80px; background: center / cover; -webkit-filter: blur(70px) brightness(0.5) saturate(1.3); filter: blur(70px) brightness(0.5) saturate(1.3); }
+html.lighter .cwd-artbg { -webkit-filter: none; filter: none; opacity: 0.18; }
+.cwd-cover { width: 600px; height: 600px; border-radius: 36px; background: #2a2a30 center / cover; -webkit-flex: none; flex: none; box-shadow: 0 40px 90px rgba(0, 0, 0, 0.5); }
+.cwd-ptitle { font-size: 76px; font-weight: 780; letter-spacing: -0.03em; line-height: 1.04; margin-top: 26px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cwd-partist { font-size: 40px; font-weight: 520; color: rgba(255, 255, 255, 0.76); margin-top: 10px; }
+.cwd-pbar2 { height: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.24); margin-top: 40px; overflow: hidden; }
+.cwd-pbar2 b { display: block; height: 100%; background: #fff; border-radius: 5px; }
+
+/* aircon, scenes, Control Centre */
+.cwd-room { width: 438px; height: 150px; border-radius: 30px; background: rgba(255, 255, 255, 0.08); padding: 20px 26px; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-justify-content: space-between; justify-content: space-between; box-shadow: inset 0 0 0 3px transparent; }
+.cwd-room.sel { box-shadow: inset 0 0 0 3px #64d2ff; background: rgba(100, 210, 255, 0.12); }
+.cwd-scene, .cwd-toggle { width: 384px; height: 196px; border-radius: 34px; background: rgba(255, 255, 255, 0.1); padding: 26px 28px; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-justify-content: space-between; justify-content: space-between; }
+.cwd-toggle { height: 230px; }
+.cwd-toggle.on { background: #fff; color: #18171c; }
+.cwd-toggle.on .cwd-small { color: rgba(24, 23, 28, 0.62); }
+.cwd-sic { width: 76px; height: 76px; border-radius: 38px; background: rgba(255, 255, 255, 0.16); display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; }
+.cwd-toggle.on .cwd-sic { background: #ffd60a; }
+.cwd-scene.cwd-f { background: #fff; color: #111; }
+.cwd-scene.cwd-f .cwd-sic { background: #bf5af2; }
+.cwd-card { width: 520px; height: 220px; border-radius: 34px; background: rgba(255, 255, 255, 0.1); padding: 30px 34px; }
+.cwd-news { padding: 22px 0; border-bottom: 1.5px solid rgba(255, 255, 255, 0.1); border-radius: 18px; }
+.cwd-news.cwd-f { -webkit-transform: none; transform: none; box-shadow: none; outline-offset: 10px; }
+.cwd-game { width: 790px; border-radius: 32px; background: rgba(255, 255, 255, 0.08); padding: 24px 32px; }
+.cwd-dot { display: block; width: 30px; height: 30px; border-radius: 15px; margin-right: 18px; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18); }
+@media (prefers-reduced-motion: reduce) {
+  .cwd-panel, .cwd-track, .cwd-stop, .cwd-photo { -webkit-transition: none !important; transition: none !important; }
+}
+.cwd-dial .cw-t23 { font-size: 29px; color: rgba(255, 255, 255, 0.75); margin-top: 4px; }
+.cwd-room { -webkit-flex: none; flex: none; }
+
+/* things typed at home (athome.js): the note, a list to tick, the Wi-Fi code, the guide, screen time, the agenda's day */
+.cwd-note { max-width: 1500px; font-weight: 700; line-height: 1.16; letter-spacing: -0.015em; white-space: pre-line; overflow-wrap: break-word; text-align: center; max-height: 700px; overflow: hidden; }
+.cwd-item { width: 516px; height: 96px; border-radius: 30px; background: rgba(255, 255, 255, 0.1); display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+  padding: 0 28px; font-size: 32px; font-weight: 620; min-width: 0; }
+.cwd-item .cwd-box { display: block; width: 40px; height: 40px; border-radius: 20px; border: 4px solid rgba(255, 255, 255, 0.6); margin-right: 22px; -webkit-flex: none; flex: none; }
+.cwd-item.done { color: rgba(255, 255, 255, 0.5); text-decoration: line-through; }
+.cwd-item.done .cwd-box { background: #30d158; border-color: #30d158; }
+.cwd-item.cwd-f { background: #fff; color: #111; }
+.cwd-item.cwd-f.done { color: rgba(0, 0, 0, 0.45); }
+.cwd-item.cwd-f .cwd-box { border-color: rgba(0, 0, 0, 0.5); }
+.cwd-qr { width: 640px; height: 640px; border-radius: 40px; background: #fff; padding: 20px; -webkit-flex: none; flex: none; }
+.cwd-gcard { height: auto; min-height: 160px; max-height: 330px; overflow: hidden; }
+.cwd-gcard.cwd-f { background: #fff; color: #111; }
+.cwd-gcard.cwd-f .cwd-text { color: rgba(0, 0, 0, 0.8); }
+.cwd-bar { height: 16px; border-radius: 8px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
+.cwd-bar b { display: block; height: 100%; border-radius: 8px; background: #fff; }
+.cwd-app-time { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; font-size: 30px; font-weight: 620; padding: 14px 20px; border-radius: 24px; margin-bottom: 8px; }
+.cwd-app-time > span { width: 300px; -webkit-flex: none; flex: none; }
+.cwd-app-time .cwd-bar { -webkit-flex: 1; flex: 1; margin: 0 24px; }
+.cwd-app-time > b { width: 130px; text-align: right; -webkit-flex: none; flex: none; }
+.cwd-app-time.cwd-f { background: #fff; color: #111; }
+.cwd-timeline { position: relative; border-radius: 28px; background: rgba(255, 255, 255, 0.06); -webkit-flex: none; flex: none; }
+.cwd-thour { position: absolute; top: 10px; font-size: 25px; font-weight: 600; color: rgba(255, 255, 255, 0.6); padding-left: 8px; border-left: 2px solid rgba(255, 255, 255, 0.16); height: calc(100% - 20px); }
+.cwd-tblock { position: absolute; height: 84px; border-radius: 20px; padding: 0 18px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+  font-size: 26px; font-weight: 700; color: #111; min-width: 0; overflow: hidden; }
+.cwd-tnow { position: absolute; top: 0; bottom: 0; width: 4px; margin-left: -2px; background: #ff453a; border-radius: 2px; }
+.cwd-wkrow { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; font-size: 29px; font-weight: 560; padding: 12px 18px; border-radius: 22px; min-width: 0; }
+.cwd-wkrow b { width: 150px; -webkit-flex: none; flex: none; font-weight: 720; color: #ff9f0a; }
+.cwd-wkrow.cwd-f { background: #fff; color: #111; }
+.cwd-ev.cwd-f { background: #fff; color: #111; border-radius: 18px; padding-right: 14px; }
+.cwd-ev.cwd-f b, .cwd-ev.cwd-f span { color: #111; }
+/* the at home widgets (note, list, Wi-Fi, guide, agenda, on this day, screen time): centred unless the
+   design picks a side, including what they say before they are set up */
+.cw-ah.cw-empty { -webkit-align-items: center; align-items: center; text-align: center; }
+.cw-ah.cw-empty .cw-e1, .cw-ah.cw-empty .cw-e2 { max-width: 100%; }
+/* a wide tile: the icon over the words, both in the middle (beside each other, two wrapped lines leave
+   the words off centre) */
+.cw-ah.cw-strip > .cw-row { -webkit-flex-direction: column; flex-direction: column; -webkit-justify-content: center; justify-content: center; }
+.cw-ah.cw-strip > .cw-row > svg { width: 34px !important; height: 34px !important; }
+.cw-ah.cw-strip > .cw-row > .cw-col { margin-left: 0 !important; margin-top: 6px; -webkit-align-items: center; align-items: center; max-width: 100%; }
+.cw-ah.cw-strip .cw-e1 { text-align: center; font-size: 24px; line-height: 1.2; }

@@ -17,7 +17,7 @@
 # switch the Google home off again.
 #
 # Usage, from the repo root:
-#   TV_IP=<tv address> [TV_NAME=living-room] [DEV_OFF=1] [ADB_PORT=5555] sh tv-home/tools/remove-all.sh
+#   TV_IP=<tv address> [TV_NAME=living-room] [DEV_OFF=1] [ADB_PORT=5555] [EXTRA_APPS="<package>"] sh tv-home/tools/remove-all.sh
 HERE=$(cd "$(dirname "$0")" && pwd)
 PY="${PY:-$HERE/../../.venv/bin/python}"
 T="$HERE/tvadb.py"
@@ -49,7 +49,19 @@ fi
 
 if [ "$UNDO_OK" = 1 ]; then
   echo "2/3  Removing the couch-tv apps"
-  for p in ${APPS:-app.couchtv.launcher dev.couchtv.ontv}; do
+  # EXTRA_APPS: your own older home app that came before couch-tv (a private build of your own),
+  # removed in the same step. Only plain package names, and never the TV's own home or setup app.
+  EXTRA=""
+  for p in ${EXTRA_APPS:-}; do
+    if ! echo "$p" | grep -Eq '^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$'; then
+      note_fail "EXTRA_APPS: $p is not a package name, left alone"
+    elif echo "$p" | grep -Eq '^(com\.google\.|com\.android\.|android$|com\.amazon\.tv\.launcher|com\.tcl\.|com\.mediatek\.|com\.sony\.)|launcher|setupwraith|tvsettings'; then
+      note_fail "EXTRA_APPS: $p looks like part of the TV itself, left alone"
+    else
+      EXTRA="$EXTRA $p"
+    fi
+  done
+  for p in ${APPS:-app.couchtv.launcher dev.couchtv.ontv}$EXTRA; do
     if ! LISTED=$("$PY" "$T" shell "pm list packages $p"); then
       note_fail "checking for $p"
     elif echo "$LISTED" | grep -q "package:$p\$"; then

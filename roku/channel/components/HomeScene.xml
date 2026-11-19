@@ -1,19 +1,26 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!-- The couch-tv home: a photo scene with the clock in it, the date and weather, the people, Keep watching
-     and the apps. The pieces are made in HomeScene.brs; this file only holds what never changes. -->
+     and the apps. The pieces are made in HomeScene.brs; this file only holds what never changes.
+     A couch-tv Studio design (DesignDraw.brs) draws its background in dBg, what sits behind the home's own
+     parts in dBack and what sits in front in dFront. -->
 <component name="HomeScene" extends="Scene">
     <script type="text/brightscript" uri="pkg:/components/HomeScene.brs" />
+    <script type="text/brightscript" uri="pkg:/components/DesignLib.brs" />
+    <script type="text/brightscript" uri="pkg:/components/DesignDraw.brs" />
     <children>
         <Rectangle id="base" width="1920" height="1080" color="0x0B0D12FF" />
+        <Group id="dBg" />
         <Poster id="bgA" width="1920" height="1080" loadDisplayMode="scaleToZoom" />
         <Poster id="bgB" width="1920" height="1080" loadDisplayMode="scaleToZoom" opacity="0" />
         <Label id="clock" wrap="false" />
         <Poster id="fgA" />
         <Poster id="fgB" opacity="0" />
+        <Group id="dBack" />
         <Poster id="scrim" uri="pkg:/images/ui/scrim.png" width="1920" height="1080" loadDisplayMode="scaleToFill" />
         <Group id="top" />
         <Group id="shelf" />
         <Group id="dock" />
+        <Group id="dFront" />
         <Poster id="focus" uri="pkg:/images/ui/focus.9.png" visible="false" />
         <Label id="status" wrap="false" horizAlign="center" translation="[0, 846]" width="1920" height="36" />
         <Animation id="fade" duration="1.6" easeFunction="inOutCubic">

@@ -176,12 +176,16 @@ object FireHome {
         runCatching {
             val cr = c.contentResolver
             val me = "${c.packageName}/${WatchService::class.java.name}"
-            val cur = android.provider.Settings.Secure.getString(cr, "enabled_accessibility_services") ?: ""
-            if (me !in cur.split(':')) {
-                android.provider.Settings.Secure.putString(cr, "enabled_accessibility_services", if (cur.isEmpty()) me else "$cur:$me")
-                Log.i(TAG, "switched the home watch service on")
+            // Only couch-tv-ontv-watch.apk declares the service; the plain APK must not name it.
+            val declared = runCatching {
+                c.packageManager.getServiceInfo(android.content.ComponentName(c, WatchService::class.java), 0); true
+            }.getOrDefault(false)
+            val cur = android.provider.Settings.Secure.getString(cr, "enabled_accessibility_services")
+            FireHomeWindow.watchServices(cur, me, declared)?.let {
+                android.provider.Settings.Secure.putString(cr, "enabled_accessibility_services", it)
+                Log.i(TAG, if (declared) "switched the home watch service on" else "took out the home watch this APK does not have")
             }
-            android.provider.Settings.Secure.putInt(cr, "accessibility_enabled", 1)
+            if (declared) android.provider.Settings.Secure.putInt(cr, "accessibility_enabled", 1)
         }.onFailure { Log.w(TAG, "could not switch the watch service on: ${it.message}") }
     }
 

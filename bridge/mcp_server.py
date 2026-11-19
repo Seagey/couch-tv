@@ -286,5 +286,33 @@ def both_like() -> dict:
     return call("GET", "/api/both", timeout=40)
 
 
+@mcp.tool()
+def show_message(text: str, sender: str | None = None, seconds: int = 30, tv: str | None = None) -> dict:
+    """Show a short message on the TV home (up to 280 characters, plain words, no links). It shows over
+    the home for `seconds` (5 to 600) and in an Ask AI widget if the home has one. sender is the name
+    shown above it (for example "Claude"); "Your AI" if left out. Works over the home computer and the
+    couch-tv TV app (docs/AI-AGENT.md)."""
+    payload = {"text": text, "seconds": seconds}
+    if sender:
+        payload["from"] = sender
+    return call("POST", "/api/say/message", payload, tv=tv)
+
+
+@mcp.tool()
+def set_home_design(code: str, tv: str | None = None) -> dict:
+    """Put a couch-tv Studio design on the TV home by its code (ABCDE-FGHJK, or the long CTV1-... code).
+    Get a code from couch-tv Studio's own MCP server (its send_to_tv tool) or from Send to my TV in
+    couch-tv Studio. The TV fetches the design itself and always asks "Use this design?" first, so tell
+    the person to press OK on the TV. Nothing changes until they do."""
+    return call("POST", "/api/say/design", {"code": code}, tv=tv)
+
+
+@mcp.tool()
+def tv_says(tv: str | None = None) -> dict:
+    """What the TV home is showing from Ask AI and from you: the last question and answer, the last
+    message, and the last design code sent."""
+    return call("GET", "/api/say", tv=tv)
+
+
 if __name__ == "__main__":
     mcp.run()

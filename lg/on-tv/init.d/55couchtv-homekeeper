@@ -1,0 +1,3 @@
+#!/bin/sh
+D=/home/root   # the TV root user's home
+pgrep -f home-keeper.sh >/dev/null || nohup "$D"/couchtv/home-keeper.sh >/dev/null 2>&1 </dev/null &

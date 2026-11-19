@@ -9,6 +9,11 @@ sub go()
     req.setUrl(m.top.url)
     req.addHeader("Content-Type", "application/json")
     req.enableEncodings(true)
+    if LCase(Left(m.top.url, 6)) = "https:"
+        ' couch-tv Studio's design store: checked against the Roku's own list of certificate authorities
+        req.setCertificatesFile("common:/certs/ca-bundle.crt")
+        req.initClientCertificates()
+    end if
     sent = false
     if m.top.method = "POST"
         req.setRequest("POST")
@@ -19,7 +24,9 @@ sub go()
     status = -1
     text = ""
     if sent
-        msg = wait(8000, port)
+        timeout = m.top.timeout
+        if timeout <= 0 then timeout = 8000
+        msg = wait(timeout, port)
         if type(msg) = "roUrlEvent"
             status = msg.getResponseCode()
             text = msg.getString()

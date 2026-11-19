@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 11 and older. The smart home settings hold a Home Assistant token: never in a backup. -->
+<!-- Android 11 and older. The smart home settings hold a Home Assistant token, and athome.xml the
+     things typed at home (guest Wi-Fi password, calendar link, notes): never in a backup. -->
 <full-backup-content>
     <exclude domain="sharedpref" path="ha.xml" />
+    <exclude domain="sharedpref" path="athome.xml" />
 </full-backup-content>

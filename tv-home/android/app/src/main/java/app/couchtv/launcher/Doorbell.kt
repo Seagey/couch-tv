@@ -43,6 +43,18 @@ import java.util.concurrent.Executors
  * doorbell is set up (undo.sh takes it back). Without that grant there is no card, and nothing else
  * changes. Home Assistant not answering: no card, and it keeps quietly asking.
  */
+/**
+ * The last ring this TV saw, for the Doorbell widget (HomeAssistant.kt "bell" and "ringstill"): its
+ * time and the door camera's first still from it. Kept in memory only, never written anywhere, and
+ * gone when the app restarts or the doorbell is taken out of config.json.
+ */
+object DoorbellKept {
+    @Volatile var at = 0L
+    @Volatile var still: ByteArray? = null
+    @Volatile var stillAt = 0L
+    fun clear() { at = 0L; still = null; stillAt = 0L }
+}
+
 object Doorbell {
     private const val CHECK_MS = 3_000L
     private const val PICTURE_MS = 2_000L
@@ -82,6 +94,7 @@ object Doorbell {
         looping = false
         if (watching) { try { c.unregisterReceiver(screen) } catch (e: Exception) {}; watching = false }
         wasOn = null; lastEvent = null
+        if (HomeAssistant.settings(c)?.doorbell == null) DoorbellKept.clear()   // the doorbell was taken out
         hide()
     }
 
@@ -137,6 +150,18 @@ object Doorbell {
     }
 
     private fun ring(c: Context, bell: HomeAssistant.Bell) {
+        val at = System.currentTimeMillis()
+        DoorbellKept.at = at
+        if (bell.camera != null) {
+            io.execute {
+                val s = HomeAssistant.settings(c) ?: return@execute
+                val bmp = HomeAssistant.snapshot(s, 640) ?: return@execute
+                val out = java.io.ByteArrayOutputStream()
+                val small = if (bmp.width > 640) android.graphics.Bitmap.createScaledBitmap(bmp, 640, Math.max(1, bmp.height * 640 / bmp.width), true) else bmp
+                small.compress(android.graphics.Bitmap.CompressFormat.JPEG, 72, out)
+                DoorbellKept.still = out.toByteArray(); DoorbellKept.stillAt = at
+            }
+        }
         main.removeCallbacks(timeUp)
         main.postDelayed(timeUp, RING_MS)
         if (card == null) show(c, bell)

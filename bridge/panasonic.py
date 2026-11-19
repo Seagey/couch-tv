@@ -1,6 +1,6 @@
 """The connection to a Panasonic Viera TV, for "kind": "panasonic" in config.json.
 
-BETA. Written from Panasonic's network remote protocol as it is publicly described, and tested against a
+Written from Panasonic's network remote protocol as it is publicly described, and tested against a
 stand-in TV on the computer (tests/panasonic_standin.py, docs/PANASONIC.md). Turn on "trace" (below) so
 the first owner's log can settle anything in PROTOCOL that a real set answers differently.
 

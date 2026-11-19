@@ -96,6 +96,7 @@ model, Roku OS version, what worked and what did not), even if everything worked
 | Keep watching | From couch-tv's own history only (what you started through couch-tv) |
 | Volume level | No: the Roku reports none, so the phone has up, down and mute only |
 | Languages | English only on the Roku channel (the Android, Samsung and LG homes have six) |
+| couch-tv Studio designs | Yes: from `design` in `config.json`, or by a code typed on the Roku. See [couch-tv Studio designs](#couch-tv-studio-designs) |
 | The quick buttons (sleep timer, look switch) on the home | No. The phone remote's sleep timer works |
 | Picture mode switch, ADB tools, switching the stock home off | No (Android only) |
 
@@ -268,6 +269,24 @@ describes `launch/<id>?contentId=&mediaType=` but names no app and says each cha
 does with the values. Its `mediaType` values are `movie`, `episode`, `season`, `series`, `shortFormVideo`,
 `tvSpecial`, `livefeed` and `sportsevent`. To find your Roku's ids: `curl http://<roku address>:8060/query/apps`.
 If an app does not open, add its id to that app's `ids` in `bridge/apps.py`.
+
+## couch-tv Studio designs
+
+The channel draws a couch-tv Studio design itself, natively, over the home. A design comes two ways:
+
+- **From the bridge.** `design` in `config.json` ([CONFIG.md](CONFIG.md), Design) reaches the Roku with the rest of `/api/config` and shows at once.
+- **By code.** Press **\*** on the remote, or OK on **Settings** at the end of the apps, then **Get a design by code**, and type the code from couch-tv Studio (it looks like ABCDE-FGHJK). The Roku asks the design store (`design_store` in `config.json`, else couch-tv Studio's own) and then asks **Use this design?** before anything changes. A yes is kept on the Roku, so the design is still there after a restart. The same menu has **Go back to the plain home** and, after that, **Show the design**.
+
+Every design goes through the same check as on the other TVs: unknown parts are dropped, numbers are kept in range, colours are `#hex` only, words with a digit, an @ or a web address are not drawn, and the only pictures are a JPEG inside the design or one of couch-tv's own backgrounds.
+
+What shows on a Roku:
+
+- **The background:** a photo (zoom, place, darkening and the shade from one side), one colour, or two colours as a smooth band of shades. couch-tv's own scenes come from the channel; your other backgrounds come from the bridge. A blur, a cut out in front of the clock and a video background are left out, so the photo shows still and sharp.
+- **The home's own parts:** the clock, the date, the weather, the people, Keep watching and the dock can be moved, made bigger or smaller, faded, hidden or recoloured, and the clock and date can use any of their formats. The dock can be made small or faint but never hidden, and Settings stays at its end.
+- **Your apps:** in the design's order, without the ones it hides.
+- **Objects:** words, shapes (glass, solid, outline and line; rounded corners are drawn at one set roundness), clocks (12 or 24 hour, with the date) and the weather as a line, a card or a big number.
+- **Widgets drawn in full:** clock, tall clock, glass clock, flip clock, analogue clock, word clock, date, month, countdown, weather, big temperature, moon, photo, art frame, Keep watching, Keep watching row, people, card, quote, welcome, note, and the app widgets (app, dock, app grid, folder, games), whose tiles the remote reaches with the arrows and opens with OK. A smart stack shows its first widget.
+- **Every other widget,** and smart home objects and sections, show as a tidy card in the design's place and colours with the widget's name on it (for example "Air conditioning" or "News"), because a Roku has no way to reach Home Assistant, the news feeds or the timers.
 
 ## Limits to know
 

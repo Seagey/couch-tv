@@ -1,6 +1,6 @@
 # Testing couch-tv on an older Philips TV (Saphi)
 
-Thank you for offering. couch-tv's Saphi support is new (Beta), and what your TV answers decides how it is
+Thank you for offering. couch-tv's Saphi support is new, and what your TV answers decides how it is
 finished. The first test takes two minutes, needs nothing installed and changes nothing on the TV. Background:
 [PHILIPS-SAPHI.md](PHILIPS-SAPHI.md).
 

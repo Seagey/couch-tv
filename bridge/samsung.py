@@ -544,7 +544,7 @@ class SamsungTV:
     async def key(self, name, hold=False):
         # A power press from the phone should land on couch-tv, like one from the TV's own remote
         # (29 Oct: off and on from the phone left the Frame on Samsung's home).
-        power = isinstance(name, str) and resolve_key(name) == "KEY_POWER" and not hold
+        power = isinstance(name, str) and resolve_key(name) == "KEY_POWER"
         self.quiet_until = 0.0 if power else time.monotonic() + 20
         if isinstance(name, str) and name.strip().lower() == "home":
             # couch-tv's Home is our app; Samsung's own menu is "smart_hub".
@@ -553,10 +553,11 @@ class SamsungTV:
         code = resolve_key(name)
         if not code:
             raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
-        if hold:
-            # A Frame: holding power switches it fully off (a press only goes to Art Mode).
+        # Power is never held (docs/SAMSUNG.md): on a Frame a held power switches it fully off, so a
+        # held power from the phone or the MCP tool is one press, which goes to Art Mode on a Frame.
+        if hold and code != "KEY_POWER":
             await self._key(code, "Press")
-            await asyncio.sleep(3.0 if code == "KEY_POWER" else 0.8)
+            await asyncio.sleep(0.8)
             await self._key(code, "Release")
         else:
             await self._key(code)

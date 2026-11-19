@@ -103,6 +103,8 @@ class HomeActivity : Activity() {
             settings.mediaPlaybackRequiresUserGesture = false
             settings.textZoom = 100
             addJavascriptInterface(Native(), "TVOS")
+            // Home settings, About, Update couch-tv: looks at GitHub's releases, never installs (Update.kt)
+            addJavascriptInterface(Update.Page(this@HomeActivity, this, base), "TVUP")
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) { ready = true; view.requestFocus() }
                 override fun onReceivedError(view: WebView, req: WebResourceRequest, err: WebResourceError) {
@@ -130,7 +132,7 @@ class HomeActivity : Activity() {
 
     private fun load() { web?.loadUrl("$base/tv/") }
 
-    override fun onResume() { super.onResume(); front = true; rebuildIfReleased(); hideBars(); if (ready) js("window.tv && tv.resume()") }
+    override fun onResume() { super.onResume(); front = true; rebuildIfReleased(); hideBars(); if (ready) js("window.tv && tv.resume()"); Update.resumed(this) }
     // the video background stops while an app is in front
     override fun onPause() { super.onPause(); front = false; js("window.tv && tv.pause && tv.pause()") }
     @Volatile private var front = false
@@ -320,6 +322,15 @@ class HomeActivity : Activity() {
         fun refresh() {
             refresher.removeCallbacks(refreshNow)
             refresher.postDelayed(refreshNow, 400)
+        }
+
+        /** Words typed on the phone (Type on the TV) put straight into the home's open typing box, with no
+         *  ADB: the home's own page takes them (app.js tv.typeText). True when the home is on screen. */
+        fun typeText(t: String): Boolean {
+            val a = shown?.get() ?: return false
+            if (!a.front || a.isFinishing || a.isDestroyed) return false
+            refresher.post { a.js("window.tv && tv.typeText && tv.typeText(" + org.json.JSONObject.quote(t) + ")") }
+            return true
         }
 
         /** What onNewIntent does, for when the home came back without a new intent (FireHome.bringForward). */

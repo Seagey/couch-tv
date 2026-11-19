@@ -1,0 +1,52 @@
+[
+ {
+  "id": "showcase",
+  "design": {
+   "v": 1,
+   "background": {"image": "backgrounds/scene-golden.jpg", "darken": 0.3, "zoom": 1.1, "x": 40, "y": 60, "blur": 2, "scrim": "bottom"},
+   "elements": {
+    "clock": {"hidden": true},
+    "date": {"x": -560, "y": 0, "format": "full", "colour": "#ffe9c7"},
+    "weather": {"x": 560, "y": 0},
+    "people": {"hidden": true},
+    "keep_watching": {"hidden": true},
+    "dock": {"icon_size": 96, "icon_gap": 22, "labels": "always", "icon_shape": "squircle", "panel": "glass"}
+   },
+   "texts": [{"text": "Good morning, Seage house", "x": 80, "y": 150, "size": 64, "font": "serif", "weight": 600, "colour": "#ffffff", "shadow": "strong"}],
+   "objects": [
+    {"id": "glass1", "type": "shape", "variant": "glass", "x": 60, "y": 250, "w": 560, "h": 360, "radius": 36, "layer": "back"},
+    {"id": "clk", "type": "widget", "kind": "clock", "x": 80, "y": 270, "w": 520, "h": 200, "opts": {"format": "12h", "ampm": true, "date": true, "align": "left"}},
+    {"id": "an", "type": "widget", "kind": "analog", "x": 660, "y": 250, "w": 300, "h": 300, "opts": {"seconds": true}},
+    {"id": "wx", "type": "widget", "kind": "weather", "x": 1000, "y": 250, "w": 420, "h": 180},
+    {"id": "cd", "type": "widget", "kind": "countdown", "x": 1460, "y": 250, "w": 380, "h": 300, "opts": {"label": "Christmas", "month": 12, "day": 25, "unit": "sleeps"}},
+    {"id": "mo", "type": "widget", "kind": "month", "x": 1000, "y": 450, "w": 420, "h": 380},
+    {"id": "wc", "type": "widget", "kind": "worldclock", "x": 1460, "y": 580, "w": 380, "h": 250, "opts": {"label": "Family", "cities": ["Europe/London", "America/New_York", "javascript:alert(1)"]}},
+    {"id": "keep", "type": "widget", "kind": "keep", "x": 80, "y": 640, "w": 520, "h": 190},
+    {"id": "np", "type": "widget", "kind": "nowplaying", "x": 660, "y": 590, "w": 300, "h": 240},
+    {"id": "line1", "type": "shape", "variant": "line", "x": 80, "y": 230, "w": 1760, "h": 2, "colour": "rgba(255, 255, 255, 0.5)"},
+    {"id": "mystery", "type": "widget", "kind": "teleporter", "x": 0, "y": 0, "w": 200, "h": 200},
+    {"id": "evil", "type": "text", "text": "Call 1800 123 456", "x": 10, "y": 10}
+   ],
+   "look": {"panel": "rgba(30, 20, 10, 0.25)", "accent": "#ff9f43", "ink": "url(javascript:1)"}
+  }
+ },
+ {
+  "id": "gradient-folders",
+  "design": {
+   "background": {"colour": "#ff7a59", "colour2": "#7b5cff", "angle": 150},
+   "elements": {"clock": {"hidden": true}, "date": {"hidden": true}, "weather": {"hidden": true}, "dock": {"hidden": true}, "keep_watching": {"hidden": true}, "quick": {"hidden": true}},
+   "objects": [
+    {"id": "welcome", "type": "widget", "kind": "welcome", "x": 80, "y": 80, "w": 1000, "h": 260, "opts": {"kicker": "Kia ora", "text": "Welcome home", "sub": "Make yourself comfortable", "align": "left"}},
+    {"id": "tall", "type": "widget", "kind": "tallclock", "x": 1180, "y": 60, "w": 660, "h": 300},
+    {"id": "fold", "type": "widget", "kind": "folder", "x": 80, "y": 400, "w": 560, "h": 420, "opts": {"label": "Watch", "apps": ["netflix", "youtube", "disney", "stan", "iview", "prime"], "cols": 3}},
+    {"id": "big", "type": "widget", "kind": "bigtemp", "x": 680, "y": 400, "w": 380, "h": 420},
+    {"id": "quote", "type": "widget", "kind": "quote", "x": 1100, "y": 400, "w": 740, "h": 220, "opts": {"text": "Home is where the couch is", "sub": "Everyone"}},
+    {"id": "card", "type": "widget", "kind": "card", "x": 1100, "y": 650, "w": 360, "h": 170, "opts": {"label": "Reminder", "text": "Bins out tonight", "icon": "leaf"}, "style": {"panel": "paper"}},
+    {"id": "wordc", "type": "widget", "kind": "wordclock", "x": 1480, "y": 650, "w": 360, "h": 170},
+    {"id": "stack", "type": "widget", "kind": "stack", "x": 80, "y": 860, "w": 560, "h": 160, "items": [{"kind": "date", "opts": {"dfmt": "full", "show": "both"}}, {"kind": "clock"}], "turn": 10},
+    {"id": "dock", "type": "widget", "kind": "dock", "x": 680, "y": 860, "w": 1160, "h": 160, "opts": {"apps": ["spotify", "apple tv"]}},
+    {"id": "aircon", "type": "smart", "kind": "aircon", "x": 1480, "y": 30, "w": 200, "h": 20}
+   ]
+  }
+ }
+]

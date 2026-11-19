@@ -127,6 +127,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             }
             "POST /api/text" -> {
                 val t = body(s).optString("text").ifEmpty { throw ApiError(400, "text is required") }
+                // no ADB (a phone only install): the couch-tv home's own typing box takes the words
+                if (!Adb.connected && HomeActivity.typeText(t)) return json(200, ok().put("into", "home"))
                 Tv.text(t); json(200, ok())
             }
             "GET /api/apps" -> {
@@ -155,7 +157,21 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 if (Kids.isKid(body(s).optString("who").ifEmpty { Now.who })) throw ApiError(403, "Ask is off for a kids profile.")
                 if (!Ask.enabled) throw ApiError(501, "Ask is off in on-TV mode. To switch it on, add your own API key (Claude, OpenAI and others) or the address of a model at home on the setup page.")
                 val b = body(s)
-                json(200, Ask.ask(b.optString("text").ifEmpty { throw ApiError(400, "text is required") }, b.optString("who").ifEmpty { Now.who }))
+                val text = b.optString("text").ifEmpty { throw ApiError(400, "text is required") }
+                val r = Ask.ask(text, b.optString("who").ifEmpty { Now.who })
+                Say.asked(text, r.optString("reply"), "Your AI service, from the couch-tv TV app")   // shows on the TV home too
+                json(200, r)
+            }
+            // Ask AI on the TV home, and messages and designs from the person's own AI agent (Say.kt, docs/AI-AGENT.md)
+            "GET /api/say" -> json(200, ok(Say.snapshot()))
+            "POST /api/say/message" -> {
+                val b = body(s)
+                val m = try { Say.message(b.optString("text"), b.optString("from"), if (b.has("seconds")) b.optInt("seconds", 30) else null) } catch (e: IllegalArgumentException) { throw ApiError(400, e.message ?: "bad message") }
+                json(200, ok().put("message", m))
+            }
+            "POST /api/say/design" -> {
+                val d = try { Say.design(body(s).optString("code")) } catch (e: IllegalArgumentException) { throw ApiError(400, e.message ?: "bad code") }
+                json(200, ok().put("design", d).put("asks_first", true))   // the TV always asks "Use this design?" first
             }
             "GET /api/recs" -> json(200, ok().put("updated", Now.iso()).put("continue", Now.continueItems(q("who"))).put("picks", JSONArray()))
             "GET /api/continue" -> json(200, ok().put("items", Now.continueItems(q("who"))))
@@ -218,6 +234,36 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "POST /api/volume" -> volume(body(s))
             "GET /api/screenshot" -> newFixedLengthResponse(Response.Status.OK, "image/png", Tv.screenshot().inputStream(), -1).noStore()
             "GET /api/weather" -> json(200, ok(Weather.get() ?: throw ApiError(503, "No weather right now.")))
+            // the web widgets' relay (WebData.kt): news feeds and share prices, by id only
+            "GET /api/webdata" -> {
+                val src = q("src") ?: ""; val id = q("id") ?: ""
+                val url = WebData.urlFor(src, id) ?: throw ApiError(400, "unknown source")
+                val text = try { WebData.get(src, id, url) } catch (e: Exception) { throw ApiError(502, "The source could not be read just now.") }
+                json(200, ok().put("src", src).put("id", id).put("text", text))
+            }
+            // the Agenda's and the Welcome widget's calendars, read here so a phone only install greets
+            // guests with no computer at home (Ical.kt: https only, internet hosts only, 4 MB)
+            "POST /api/calendar" -> {
+                val (good, text) = Ical.read(body(s).optString("url"))
+                if (good) json(200, ok().put("text", text)) else json(400, err(text))
+            }
+            // names from booking emails need a computer at home that reads them (bridge/bookings.py)
+            "GET /api/stay-names" -> json(200, ok().put("on", false).put("names", JSONArray()))
+            // the guest's name for the Welcome widget, typed on the TV or the phone remote
+            "GET /api/guest" -> json(200, ok().put("guest", Store.guest()))
+            "POST /api/guest" -> {
+                val b = body(s)
+                if (!b.has("name") && !b.has("stay_url")) throw ApiError(400, "name is required (an empty name clears it)")
+                // a bookings link from the phone: checked like /api/calendar's (https, no name or password inside)
+                if (b.has("stay_url")) {
+                    val raw = b.optString("stay_url").trim()
+                    val u = if (raw.isEmpty()) "" else Ical.checkUrl(raw) ?: throw ApiError(400, "That is not a calendar link. It starts with https://, or is a calendar app's own link.")
+                    Store.saveStayUrl(u)
+                }
+                val g = if (b.has("name")) Store.saveGuest(b.optString("name")) else Store.guest()
+                Now.push(); refreshHomeAfter(s)
+                json(200, ok().put("guest", g))
+            }
             "POST /api/home-apps" -> {
                 val b = body(s)
                 Store.writeJson("home-apps.json", JSONObject().put("apps", b.optJSONArray("apps") ?: JSONArray()).put("line", b.optInt("line", 10)))
@@ -375,13 +421,14 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         // the TV home's own Home settings (language, place, look...), kept here as they come
         .put("settings", Store.readJson("home-settings.json") as? JSONObject ?: JSONObject())
         .put("updated", Store.str("home_settings_updated") ?: JSONObject.NULL)
-        .put("people", Store.people()).put("weather", Store.weather()).put("country", Store.country()).put("tv_name", Store.tvName())
+        .put("people", Store.people()).put("weather", Store.weather() ?: JSONObject.NULL).put("country", Store.country()).put("tv_name", Store.tvName())
         .put("ask", Ask.status())
         .put("phones", Auth.phoneCount()).put("port", Store.port).put("adb", JSONObject(Adb.status()))
         .put("skip_watch_next", JSONArray(Store.skipWatchNext().sorted())).put("watch_next_per_app", Store.watchNextPerApp())
         .put("watch_next", JSONObject().put("granted", WatchNext.granted()).put("listed", WatchNext.listed()))
         // Xiaomi only: Couch TV in PatchWall's place (FireHome); the setup page shows the switch when xiaomi is true
         .put("xiaomi", FireHome.isXiaomi).put("patchwall_replace", Store.bool("patchwall_replace")).put("watch", WatchService.connected)
+        .put("watch_apk", BuildConfig.BUILD_TYPE == "watch")   // only couch-tv-ontv-watch.apk has the Home button watch
         .put("inputs", Store.inputs())
 
     /** {"people": [...]} replaces the list; {"order": [ids]} only reorders it. */

@@ -49,9 +49,10 @@ network as the stick.
    ```sh
    adb connect <stick-ip>:5555
    ```
-4. **Install** `couch-tv-ontv.apk` from [the Releases page](https://github.com/Seagey/couch-tv/releases):
+4. **Install** `couch-tv-ontv-watch.apk` from [the Releases page](https://github.com/Seagey/couch-tv/releases)
+   (the on-TV app with the home watch a Fire TV needs; the plain `couch-tv-ontv.apk` leaves it out):
    ```sh
-   adb -s <stick-ip>:5555 install couch-tv-ontv.apk
+   adb -s <stick-ip>:5555 install couch-tv-ontv-watch.apk
    ```
 5. **Open Couch TV** on the stick and press **Use as home screen**. Skip Connect ADB unless you
    want the phone remote's keys.

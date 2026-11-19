@@ -49,7 +49,7 @@ installed first time, the remote was accepted, and power and the app on screen r
 **Fourth real LG, 9 November 2026** ([issue #46](https://github.com/Seagey/couch-tv/issues/46)): an
 LG on webOS 4.10.2 (2018/2019 firmware), with the bridge on a Windows 11 laptop. The clock, weather,
 scenes, the profile switch, the dock and the phone remote (off and on too) worked, with the
-reporter's own layout fallbacks for the older browser, which are not in couch-tv yet (see Limits).
+reporter's own layout fallbacks for the older browser (couch-tv now has its own, see Limits).
 
 **Fifth real LG, 9 November 2026** ([issue #56](https://github.com/Seagey/couch-tv/issues/56),
 reported by ChrisFWCB): an LG OLED77GXPUA (2020, US) on webOS 5.6.2, firmware 04.64.00, wired
@@ -522,9 +522,11 @@ the phone says so and you use the TV's remote.
   firmware does not allow it (webOS 5.6.2 and 6.5.3 both refuse it), so there the app row stays empty
   until the bridge is on **and** the TV has accepted the remote (step 6). With no bridge, build with
   `--apps` (step 3) to bake the list in.
-- **webOS 4** (2018 and 2019 models) has no CSS grid or flex `gap`, so the app row and cards stack
-  badly; couch-tv does not have fallbacks for that yet ([#46](https://github.com/Seagey/couch-tv/issues/46)).
-  Its power on: webOS 4 has no `system/turnOn`, so the bridge tries `turnOnScreen` and then
+- **webOS 4** (2018 and 2019 models, Chrome 53) has no CSS grid or flex `gap`. The home lays the app
+  row, the cards and Home settings out with flexbox and margins there instead (`html.old-engine` and
+  `html.no-flex-gap` in app.css, [#46](https://github.com/Seagey/couch-tv/issues/46)), and lg/build.py
+  rounds in-between font weights (620) to a hundred for it. A couch-tv Studio design's own layout has no
+  such fallbacks yet. Its power on: webOS 4 has no `system/turnOn`, so the bridge tries `turnOnScreen` and then
   Wake-on-LAN (with "Mobile TV On, Turn on via Wi-Fi" switched on).
 - **A new input tile can be hidden by a saved app order.** If you have already arranged your apps
   (`data.order`), a tile added later through `home.inputs` lands below the More apps line. Move it

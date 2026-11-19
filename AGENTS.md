@@ -40,13 +40,13 @@ The steps in docs/SETUP.md are numbered 1 to 6. Option A uses steps 1, 2 and 6. 
    `python3-venv` or use `uv venv --seed .venv` instead. On a Mac the first `python3` or `git` may pop up "install the command line
    developer tools": tell them to press Install and wait a few minutes. That is normal.
 2. **Get the TV apps from the Releases page first.** Download `couch-tv-home.apk` (options A
-   and B) and `couch-tv-ontv.apk` (option C) from
+   and B) and `couch-tv-ontv.apk` (option C; on a Fire TV or for the Xiaomi PatchWall switch, `couch-tv-ontv-watch.apk`, which adds the home watch) from
    [the GitHub Releases page](https://github.com/Seagey/couch-tv/releases) into `dist/` (git
    ignores it), for example `curl -fL -o dist/couch-tv-home.apk
    https://github.com/Seagey/couch-tv/releases/latest/download/couch-tv-home.apk`. Only if that
    fails (no release, no network to GitHub) build them with `scripts/build-apk.sh` (docs/SETUP.md,
-   "Building the app"). An Android 6 TV also needs a build: the 0.12 apps need Android 7.1, and
-   Android 6 support is on main for the next release.
+   "Building the app"). Android 6 TVs work from the 0.13 apps; 0.12 and older need
+   Android 7.1.
 3. Note what else the computer has: macOS or Linux, and Node 20.19+ or 22.12+ (option B, and a build of the
    option C app). A build also needs JDK 21 and the Android SDK (platform 34), installed only
    after the yes (step 3). If a JDK is needed, do **not** use `brew install --cask temurin@21` or `sudo`: they ask for a password the agent
@@ -183,8 +183,8 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   picture mode, apply.sh, ADB and the quick buttons). The ids and deep links in its table are unverified:
   if one does not open, find the Roku's real id with `query/apps` and say what you found. Afterwards ask
   them to open an issue on GitHub saying how it went, and write down for them what worked and what did not.
-- **Beta paths: Hisense VIDAA, Philips (Titan OS and Saphi), Fire TV on Vega OS, VIZIO, Panasonic.** Each
-  is a supported path, marked Beta. Do not say no. What they share, and what you say plainly every time:
+- **Computer at home paths: Hisense VIDAA, Philips (Titan OS and Saphi), Fire TV on Vega OS, VIZIO, Panasonic.** Each
+  is a supported path. Do not say no. What they share, and what you say plainly every time:
   they need **a computer at home that stays on** (without one, nothing on these paths works), and **the
   maker's own Home button still opens the maker's own home**; couch-tv opens itself on top, it does not
   replace that home. None of them has run on a real TV yet, so ask them to open an issue on GitHub
@@ -192,7 +192,7 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   Also offer the Google TV box as the way to get everything. The checks below only read, but they still
   wait for the yes in step 3, and anything that shows a PIN or opens a page on the TV waits for it too.
 - **Hisense VIDAA:** offer the VIDAA path in [docs/VIDAA.md](docs/VIDAA.md): "There is a VIDAA version of
-  couch-tv, in Beta. There is nothing to install on the TV: a computer at home that stays on opens
+  couch-tv. There is nothing to install on the TV: a computer at home that stays on opens
   couch-tv's home in the TV's own browser every time the TV is switched on (on older firmware it may also
   go on the app row as a tile). It is not a true home screen: the remote's Home button still opens VIDAA's
   home, and that cannot change without rooting the TV, which couch-tv never does. The phone remote works:
@@ -209,7 +209,7 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   A computer is still needed once, to point the tile at the site. Run
   `scripts/vidaa-check.py <tv address>` first, and never suggest or walk them through rooting the TV.
 - **Philips on Titan OS** (no Google button, a home of "Lifestyle" rows; mostly Europe): offer the remote now
-  and do not promise the home yet. "There is a Philips Titan OS version of couch-tv, in Beta. The **phone
+  and do not promise the home yet. "There is a Philips Titan OS version of couch-tv. The **phone
   remote works now**: power, keys, volume, inputs, opening the TV's apps, and the assistant on top of those.
   couch-tv's own home **needs a Titan app** to open on the TV: a couch-tv app in Titan's store, or Titan's
   DevView developer app with a developer account. Neither is there yet, so for now the home stays Philips's.
@@ -220,7 +220,7 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   pairing key: they save their own with `scripts/philips-secret.py`. Never use the TV's developer debug
   port. Testing guide: [docs/PHILIPS-TITAN-TESTING.md](docs/PHILIPS-TITAN-TESTING.md).
 - **Older Philips with Saphi** (not Android, not Titan OS; roughly 2015 to 2019): offer the Saphi path and do
-  not promise a home screen. "There is a Saphi version of couch-tv, in Beta. With a computer at home that
+  not promise a home screen. "There is a Saphi version of couch-tv. With a computer at home that
   stays on, you get the phone remote, and if your TV offers a browser to its network remote, couch-tv's
   page opens in that browser every time the TV is switched on. It is not a real home screen: the browser's
   bar can show and the remote's Home button still opens Philips's menu. Many of these TVs need no pairing;
@@ -230,19 +230,19 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   [docs/PHILIPS-SAPHI.md](docs/PHILIPS-SAPHI.md). Never send `activities/browser` before the yes: it opens
   a page on the TV. Testing guide: [docs/PHILIPS-SAPHI-TESTING.md](docs/PHILIPS-SAPHI-TESTING.md).
 - **Fire TV on Vega OS:** offer the path in [docs/FIRE-VEGA.md](docs/FIRE-VEGA.md), and say plainly that it
-  is Beta, that it needs a free Amazon Developer account, Amazon's Vega tools on a Mac or Linux computer, a
+  needs a computer at home that stays on, that it needs a free Amazon Developer account, Amazon's Vega tools on a Mac or Linux computer, a
   USB cable once and a computer at home that stays on, that Amazon's Home button still opens Amazon's
   home, that the phone remote only works while couch-tv is in front (no volume, no power off), and that only
   Netflix and YouTube open from the phone. Follow docs/FIRE-VEGA-TESTING.md, and run `scripts/check-vega.py`
   first. Never root anything.
 - **VIZIO (SmartCast or VIZIO OS):** offer the remote and do not promise the home. "There is a VIZIO version
-  of couch-tv, in Beta, and it is the **phone remote only**: power, keys, volume, switching inputs, opening
+  of couch-tv, and it is the **phone remote only**: power, keys, volume, switching inputs, opening
   apps such as Netflix and YouTube, and the assistant on top of those, with a computer at home that stays
   on. couch-tv's own home page **does not open on a VIZIO by itself**: VIZIO OS has no browser, takes no
   outside apps, and its app programme is closed. The remote's Home button opens VIZIO's home. Apps open on their own page
   and you pick the show; there is no 'what is playing' title, no typing from the phone and no screenshots.
   You type a PIN the TV shows once." If they choose the remote, follow [docs/VIZIO.md](docs/VIZIO.md): run
-  `scripts/vizio-check.py <tv address>` first (`--pair` shows a PIN on the TV). **Beta, only if they ask
+  `scripts/vizio-check.py <tv address>` first (`--pair` shows a PIN on the TV). **Only if they ask
   for the home:** `scripts/vizio-web.py` loads couch-tv's home in the TV's own webview (docs/VIZIO.md, "The
   home"). It has been tried on one set (a V4K65X-0810), it waits for the yes in step 3 like everything that
   changes the TV, and it is run by hand: the bridge never opens it by itself. Use only the script, which
@@ -250,7 +250,7 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   persists to the TV's NVRAM and can leave the TV's menus dead until a factory reset. Never open a router
   port. Testing guide: [docs/VIZIO-TESTING.md](docs/VIZIO-TESTING.md).
 - **Panasonic Viera (My Home Screen, or older Vieras with network control):** offer the Panasonic path in
-  [docs/PANASONIC.md](docs/PANASONIC.md): "There is a Panasonic version of couch-tv, in Beta. There is
+  [docs/PANASONIC.md](docs/PANASONIC.md): "There is a Panasonic version of couch-tv. There is
   nothing to install on the TV: a computer at home that stays on opens couch-tv's home in the TV's web
   browser a few seconds after the TV is switched on. It is not a true home screen: the browser's own bar
   stays visible, and the remote's Home button still opens Panasonic's home. The phone remote works: keys,
@@ -259,7 +259,7 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   pair." A Panasonic Google TV model is a normal couch-tv TV, not this path. Run
   `scripts/panasonic-check.py <tv address>` first (it presses no key); pairing with `--pair` makes the TV
   show a PIN.
-- **Apple TV (Beta):** do not say no. Offer the path in [docs/APPLE-TV.md](docs/APPLE-TV.md), and say first,
+- **Apple TV:** do not say no. Offer the path in [docs/APPLE-TV.md](docs/APPLE-TV.md), and say first,
   plainly: "With a computer at home that stays on, the phone remote works on an Apple TV: arrows, OK, Back,
   Play, sleep and wake, and opening any app. You type a PIN the Apple TV shows once. couch-tv's home also
   comes as an Apple TV app, Couch TV, with the same scenes, clock, Keep watching and apps, and the computer
@@ -272,8 +272,8 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   TV went. Run `scripts/appletv-check.py` (read only) before the yes, pair only after it. Couch TV needs a
   Mac: without one, offer the remote only. Signing in to Xcode is theirs to do (never ask for the Apple ID
   password), and their team id goes only in `tvos/Config/Signing.mine.xcconfig`, which git ignores.
-- **TiVo OS on a TV built by Vestel (JVC, Telefunken and others, Beta):** do not say no. Offer the path in
-  [docs/TIVO.md](docs/TIVO.md), and say first, plainly: "There is a TiVo OS version of couch-tv, in Beta,
+- **TiVo OS on a TV built by Vestel (JVC, Telefunken and others):** do not say no. Offer the path in
+  [docs/TIVO.md](docs/TIVO.md), and say first, plainly: "There is a TiVo OS version of couch-tv,
   worked out on one real JVC. There is nothing to install on the TV. With a computer at home that stays on,
   the phone remote works, and couch-tv opens itself in the TV's own browser a little while after the TV is
   switched on. You add couch-tv once as the first Speed Dial tile in that browser, typing its address with
@@ -451,15 +451,25 @@ If they say yes to the air conditioning or the doorbell card:
    sound.
 4. **Then always ask: "Are there any other smart home devices you want on the TV?"** Map what they
    say to what couch-tv can do, and say plainly what it cannot:
-   - Lights, blinds, fans, a "movie night" mood, a "good night" routine: a **scene or script
-     tile**. If they have no scene for it yet, they make one in Home Assistant (Settings,
-     Automations and scenes) and give you its `scene.*` or `script.*` name. Up to 10 tiles.
+   - A "movie night" mood, a "good night" routine: a **scene or script tile**. If they have no
+     scene for it yet, they make one in Home Assistant (Settings, Automations and scenes) and give
+     you its `scene.*` or `script.*` name. Up to 10 tiles.
+   - Single lights, switches, fans and blinds: `controls` (up to 16 `light.*`, `switch.*`, `fan.*`,
+     `cover.*`), for a couch-tv Studio design's Control Centre widget. Never a garage door or gate.
    - More air conditioners or heaters: more `climate` rooms.
-   - Other cameras: only the doorbell's camera, and only as stills. Say so.
+   - Other cameras: `cameras` (up to 4 `camera.*`), for a design's Camera widget, stills only (a new
+     one every 2 seconds, never video). Say so.
+   - The pool, a rain gauge, humidity: `sensors` (up to 8 `sensor.*`). Solar or the power meter:
+     `energy` (one `sensor.*` for today's kWh or the power in W, and a battery if they have one).
+     Speakers: `speakers` (up to 6 `media_player.*`). Each is for a design's widget of that name.
    - Locks, alarms, garage doors: **not supported, on purpose** (nothing that opens the house from
      a TV remote). Say so.
-   - Anything that is not in Home Assistant (a separate app, a hub Home Assistant does not know):
-     not supported yet. Say so; it may work if they add it to Home Assistant first.
+   - Anything that is not in Home Assistant yet (Tuya or Smart Life, Google Nest, Alexa devices, Apple
+     Home, Matter, a brand's own app): it shows once it is added to Home Assistant. The TV walks them
+     through it: Home settings, couch-tv Studio, Smart home, Add a device we don't list.
+   - They can also do all of this on the TV with no computer and no `config.json`: Home settings,
+     couch-tv Studio, Smart home (address, a pasted token, then tick what shows). On Samsung, LG and
+     the other web TVs the same screen works through the bridge. Tell them both ways exist.
 5. Write it down for the plan. In step 3, read it back as one line ("Smart home: the living room
    and bedroom air conditioning, the Movie night and Good night tiles, and the front door doorbell
    card, which needs 'display over other apps' switched on"), along with everything else, and
@@ -491,7 +501,7 @@ exactly what changes:
   TV always has them when it starts; a small Home button watch (an accessibility service that only looks at which
   window came forward; it declares the screen reading capability only because some TVs send events to nothing else, and never reads the screen) puts couch-tv on top when the TV opens its own home, which may flash up for
   a moment. Nothing is deleted.
-  - **Privacy clean (Beta, opt in):** only if they ask, `PRIVACY=1` adds the apps in
+  - **Privacy clean (opt in):** only if they ask, `PRIVACY=1` adds the apps in
     `tv-home/tools/privacy-list.txt` that the TV has (ACR, ad and telemetry apps) to the switch off
     set, through the same safety check. Run it with `DRY_RUN=1` first and show them the list. Never
     tell them it removes all tracking; point them to docs/PRIVACY.md for the menu switches. Never add
@@ -589,7 +599,7 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
 ## Two TVs in sync (only if they ask)
 
 If someone asks for two TVs to play the same show together, read [docs/SYNC.md](docs/SYNC.md) and
-follow it, including its section for you. It is experimental: say so, say how little it has been
+follow it, including its section for you. Say how little it has been
 tried, and say that Samsung, LG, VIDAA, VIZIO, Panasonic and Roku cannot do it (a Google TV box or Fire TV stick
 plugged in fixes that). It needs the same read back and the same clear yes as everything else
 before it touches a TV: `sync/install.sh` changes each TV, and `calibrate` and `play` make both TVs

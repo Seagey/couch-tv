@@ -1,6 +1,6 @@
 # couch-tv on a TiVo OS TV (JVC, Telefunken and other Vestel built sets)
 
-## Status: New, Beta
+## Status: New
 
 The TiVo OS path is new. It was worked out in November 2026 on one real TV, a **JVC LT-50VUQ3455** (TiVo
 OS, software V.2.85.2.0, Vestel chassis MB180), with its owner in front of the screen. What ran on that TV

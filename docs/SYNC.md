@@ -1,10 +1,10 @@
-# Two TVs, one show (experimental)
+# Two TVs, one show
 
 Put the same show on two TVs and have them play within a few hundredths of a second of each other.
 Useful when two rooms are watching the same match, or when you walk from one room to the other and
 do not want to hear an echo.
 
-**This is experimental.** It has run on two TVs in one house, with YouTube and Netflix. Everything
+It has run on two TVs in one house, with YouTube and Netflix. Everything
 below says what was measured and what was not. If it works (or does not) on yours, please open an
 issue and say which TV, which Android version and which app.
 
@@ -51,10 +51,10 @@ Do not copy our delay numbers. They belong to our two TVs. Measure yours with `c
 ## What works
 
 - **Android TV and Google TV** (Android 7.1 or newer). Tested on two.
-- **Fire TV sticks:** they are Android underneath, so in principle yes. Not tested. Amazon blocks some
+- **Fire TV sticks:** they are Android underneath, so yes. Amazon blocks some
   things on newer Fire OS, so the permission step may fail. Please report.
 - **YouTube and Netflix:** tested. Both let another app move their place in the show.
-- **Apple TV app, Disney+, Stan, Prime Video and anything else:** untested. An app can only be synced
+- **Apple TV app, Disney+, Stan, Prime Video and anything else:** it depends on the app. An app can only be synced
   if it shows up as a media session that accepts seeking. `sync.py dry` tells you (it prints `seek=True`
   or `seek=False`). If `seek=False`, it cannot be done with that app.
 

@@ -37,7 +37,7 @@ home button unless you switch that on.
 
 - **Yes:** Android TV and Google TV (Chromecast with Google TV, Google TV Streamer, Sony, TCL,
   Hisense, Philips and other Google TV sets), Nvidia Shield, and Fire TV on Fire OS. Android 7.1 or newer
-  (Android 6 is experimental and needs the app built from main until the next release).
+  (Android 6 works from 0.13).
 - **No:** Samsung (Tizen), LG (webOS), Roku, Apple TV, Hisense VIDAA, and Fire TV sticks on Vega OS.
   These do not run Android apps. Use the computer bridge for those where it can reach them.
 
@@ -76,7 +76,8 @@ it can switch wireless debugging back on after a restart, the way Shizuku does).
 
 ## Install
 
-1. **Download `couch-tv-ontv.apk` from the GitHub Releases page** (easiest), or build it from the
+1. **Download `couch-tv-ontv.apk` from the GitHub Releases page** (easiest; on a Fire TV or a Xiaomi
+   that should use PatchWall's place, `couch-tv-ontv-watch.apk` instead), or build it from the
    repo root with `sh scripts/build-apk.sh` (JDK 21, the Android SDK and Node 20+, no Gradle
    needed; docs/SETUP.md, "Building the app"). It builds the phone remote first if `remote/dist` is
    missing, then copies the remote and the TV home page into the app, and leaves it at
@@ -97,6 +98,15 @@ it can switch wireless debugging back on after a restart, the way Shizuku does).
    Or copy the APK to the TV with a file app and open it there.
 3. On the TV, open **Couch TV**. It shows the address and a phone code.
 
+## Updates
+
+Home settings, About, **Update couch-tv** says which version this TV has and whether a newer one is out
+(it looks on GitHub once a week if you said yes when the home asked, or when you press Check for updates
+now). The app put on with just a phone cannot install an update itself (Android's installer needs a
+permission it leaves out on purpose, so Play Protect lets it through), so OK opens the steps: open
+Downloader, type 8180170, Install. Your settings stay. The watch version updates from a computer with
+`adb install -r couch-tv-ontv-watch.apk`.
+
 ## Pair a phone
 
 1. On the phone, open the address the TV shows, for example `http://192.0.2.10:5400`.
@@ -114,8 +124,22 @@ Sony Bravia among them) the TV then loops at every restart
 ([docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md#if-your-tv-loops-after-a-restart)). The Couch TV tile in the app row opens
 setup, so choose **Open the home** there to see the home (it appears when the Home button doesn't already open Couch TV), or use option A's `apply.sh`, which takes
 the Home button with a watch and leaves the Google home on.
-The **Couch TV home watch** accessibility service is for Fire TV only. On any other TV it switches
-itself off when you turn it on, and that is expected.
+The **Couch TV home watch** accessibility service is for Fire TV, for a TV that opens its own home by name, and for the Xiaomi PatchWall switch below.
+On a TV where the Home key opens the maker's own home by name (a Haier, a TCL, another Google TV), it also brings
+couch-tv back when that home comes forward, while **Use as home screen** is on. **It is only in
+`couch-tv-ontv-watch.apk`**, which you install from a computer. The plain `couch-tv-ontv.apk` (the
+phone only download, from Downloader) leaves it out, because Google Play Protect blocks a sideloaded
+app that has an accessibility service ("App blocked to protect your device", seen on a TCL Google TV
+in November 2026). Both are the same app with the same name and key, so one installs over the other.
+With the plain APK, the Couch TV setup screen says that Google's home keeps the Home button (on Google TV,
+and on a TCL with Google's Android TV Home, which opened it by name although Couch TV held the home role),
+and More, Home button from a computer, gives the steps: `adb connect <tv-ip>:5555` (with Wireless debugging,
+`adb pair` with the address, port and code from Pair device with pairing code first), then
+`adb install -r couch-tv-ontv-watch.apk` (settings stay), then Couch TV home watch on in Settings, Accessibility,
+then **Use as home screen** on the Couch TV setup screen: the watch only acts while that is on. With the watch APK
+the button shows on Google TV too (with the plain APK it is hidden there while off).
+**Use as home screen** waits a moment after switching the home on before asking Android (a first press
+showed a black screen on that TCL), and if the question is cancelled it switches the home off again.
 If an older guide had you switch it off, switch it back on before the next restart:
 
 ```
@@ -226,7 +250,7 @@ the remote's PatchWall button and when the screen comes on. Android's default-ho
 reach either. If you would rather have Couch TV there, keep the Home button as it is and switch on
 **Couch TV in PatchWall's place** on the setup page (`http://<tv-ip>:5400/setup`; the card only
 shows on a Xiaomi). It needs the Home button watch (**Couch TV home watch** in Settings,
-Accessibility). Then:
+Accessibility), so install `couch-tv-ontv-watch.apk`. Then:
 
 - **The PatchWall button opens Couch TV.** The remote sends `KEYCODE_BUTTON_5` (scan code 580), and
   Xiaomi's `partnercustomizer` turns it into a start of PatchWall by name. The watch catches that

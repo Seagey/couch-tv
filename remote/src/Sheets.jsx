@@ -385,6 +385,71 @@ export function PeopleSheet({ open, onClose, onSaved }) {
   );
 }
 
+// Same Type on the TV form as More, focused from the main controls so iOS can raise the keyboard
+// inside the tap (#216). Always mounted; App opens the sheet then focuses the input synchronously.
+export const TypeSheet = forwardRef(function TypeSheet({ open, onClose, onText }, inputRef) {
+  const [typed, setTyped] = useState('');
+  useEffect(() => { if (open) setTyped(''); }, [open]);
+  return (
+    <Sheet open={open} onClose={onClose} title={t('type_on_tv')} className="type-sheet">
+      <form className="ask-field glass" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { tick(); onText(typed.trim()); setTyped(''); } }}>
+        <input ref={inputRef} value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={t('type_placeholder')}
+          enterKeyHint="send" aria-label="Text to type on the TV" autoComplete="off" autoCorrect="on" />
+        <button type="submit" className="round solid small" aria-label={t('send_to_tv')} disabled={!typed.trim()}
+          onPointerDown={(e) => e.preventDefault()}><Ic.Send size={18} /></button>
+      </form>
+      <p className="note">{t('type_note')}</p>
+    </Sheet>
+  );
+});
+
+// The guest's name for the TV's Welcome widget: typed here, shown on the TV at once (no computer needed
+// with the on-TV app). Empty shows just Welcome.
+function GuestName({ open }) {
+  const [name, setName] = useState('');
+  const [msg, setMsg] = useState('');
+  const [gone, setGone] = useState(false);
+  const [stay, setStay] = useState('');
+  const [stayMsg, setStayMsg] = useState('');
+  // the bookings calendar link: pasted here, sent to the TV (typing a long link with the TV remote is hard)
+  const sendStay = () => {
+    const u = stay.trim();
+    if (!u) return;
+    tick();
+    api.setStayLink(u).then(() => { setStay(''); setStayMsg(t('stay_sent')); })
+      .catch((e) => setStayMsg(e.status === 404 ? t('guest_needs_update') : e.status === 400 ? t('stay_bad') : tBridge(e.key, e.vars, e.message)));
+  };
+  useEffect(() => {
+    if (!open) return;
+    setMsg(''); setStayMsg('');
+    api.guest().then((j) => { setGone(false); setName(j?.guest?.name || ''); }).catch((e) => { if (e.status === 404) setGone(true); });
+  }, [open]);
+  const save = () => {
+    tick();
+    api.setGuest(name.trim()).then((j) => { const n = j?.guest?.name || ''; setName(n); setMsg(n ? t('guest_saved', { name: n }) : t('guest_cleared')); })
+      .catch((e) => setMsg(e.status === 404 ? t('guest_needs_update') : tBridge(e.key, e.vars, e.message)));
+  };
+  return (
+    <section className="more-block guest-block">
+      <h3><Ic.People size={16} /> {t('guest_name')}</h3>
+      {gone ? <p className="note">{t('guest_needs_update')}</p> : (
+        <>
+          <form className="ask-field glass" onSubmit={(e) => { e.preventDefault(); save(); }}>
+            <input value={name} maxLength={38} onChange={(e) => setName(e.target.value)} placeholder={t('guest_placeholder')} enterKeyHint="done" aria-label={t('guest_name')} />
+            <button type="submit" className="round solid small" aria-label={t('guest_save')}><Ic.Send size={18} /></button>
+          </form>
+          <p className="note" role="status">{msg || t('guest_note')}</p>
+          <form className="ask-field glass" onSubmit={(e) => { e.preventDefault(); sendStay(); }}>
+            <input value={stay} onChange={(e) => setStay(e.target.value)} placeholder={t('stay_placeholder')} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="send" aria-label={t('stay_link')} />
+            <button type="submit" className="round solid small" aria-label={t('stay_send')}><Ic.Send size={18} /></button>
+          </form>
+          <p className="note" role="status">{stayMsg || t('stay_note')}</p>
+        </>
+      )}
+    </section>
+  );
+}
+
 export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnds, onSleep, onKey, onText, sleepError, tvs, tvId, onTv, canMove, onMove, picture, pictureInfo, onPicture, onArrange, onPeople, onKids }, ref) {
   const [typed, setTyped] = useState('');
   const sheetEl = useRef(null);
@@ -462,6 +527,8 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
         <button className="pill glass arrange-open" onClick={() => { tick(); onPeople(); }}><Ic.People size={18} /> {t('people')}</button>
       </div>
       <button className="pill glass arrange-open kids-open" onClick={() => { tick(); onKids(); }}><Ic.Lock size={18} /> {t('kids_mode')}</button>
+
+      <GuestName open={open} />
 
       {/* this phone's language: "Same as the TV" follows the TV home's Home settings */}
       <section className="more-block">

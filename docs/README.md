@@ -26,7 +26,7 @@ Every couch-tv guide in one place, grouped by what you want to do.
 | [REMOTES.md](REMOTES.md) | TV remotes, game controllers and keyboards: which keys do what |
 | [ASK-PROVIDERS.md](ASK-PROVIDERS.md) | Which AI services on-TV mode can use to answer "put on Bluey", and how to set one up |
 | [IMPORT.md](../bridge/IMPORT.md) | Bring in your past Netflix and YouTube history so the picks start smart (option B) |
-| [SYNC.md](SYNC.md) | Two TVs, one show: play the same show on two TVs in step (experimental) |
+| [SYNC.md](SYNC.md) | Two TVs, one show: play the same show on two TVs in step |
 | [MOVE.md](MOVE.md) | Move what is playing to another TV from the phone remote, and its limits (option B, new) |
 | [UPDATES.md](UPDATES.md) | The full update history, release by release |
 

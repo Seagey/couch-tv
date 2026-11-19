@@ -1,17 +1,16 @@
 # couch-tv on a VIZIO TV (SmartCast and VIZIO OS)
 
-## Status: New (Beta)
+## Status: New
 
 **This is new, and nobody has run it on a real VIZIO yet.** It was written in November 2026 from VIZIO's
 own public app list and from public notes on the SmartCast API (the open pyvizio library and the
 community Vizio_SmartCast_API notes), and tested against a pretend VIZIO on a computer
-(`tests/vizio_standin.py`). Nothing was copied from another project. Expect something to need fixing.
-If you have a VIZIO, you would be the first: please run the first test below and
+(`tests/vizio_standin.py`). Nothing was copied from another project. If you have a VIZIO, please run the first test below and
 [open an issue](https://github.com/Seagey/couch-tv/issues) with what it printed.
 
 **Update (14 Nov 2026):** a tester (lukionsp, #206) paired a real set, a V4K65X-0810 on VIZIO OS
-86.920.9.3, and loaded couch-tv's home in its webview with the Beta below. That is one set: other models and
-firmwares still want testing.
+86.920.9.3, and loaded couch-tv's home in its webview with the webview path below. Other models and
+firmwares may differ, so please report how yours goes.
 
 Not technical? [VIZIO-TESTING.md](VIZIO-TESTING.md) is a step by step guide to the first test.
 
@@ -31,7 +30,7 @@ the TV by itself (below, "The home"). With the bridge running on a computer that
 
 | | VIZIO |
 |---|---|
-| couch-tv's home on the TV | **Beta, tried on one set (V4K65X-0810).** You load it in the TV's own webview with a script. See "The home" |
+| couch-tv's home on the TV | **Tried on one set (V4K65X-0810).** You load it in the TV's own webview with a script. See "The home" |
 | Phone remote: arrows, OK, Back, Menu, Home | Built (Home opens VIZIO's own home). The key codes come from one public source |
 | Power off, and on from standby | Built |
 | Power on from fully off | Only with Wake on LAN, and not in Eco mode |
@@ -47,7 +46,7 @@ the TV by itself (below, "The home"). With the bridge running on a computer that
 
 ## The home
 
-**Beta: couch-tv's home can open on a VIZIO, in the TV's own webview.** This is new, tried on one set only
+**couch-tv's home can open on a VIZIO, in the TV's own webview.** This is new, tried on one set only
 (a V4K65X-0810 on VIZIO OS 86.920.9.3, thanks lukionsp, #206), and unofficial. It uses an undocumented part
 of the SmartCast API, so a firmware update could break it. It is off unless you run it: the bridge never
 opens the webview by itself, at start, at power on or from the phone. You run `scripts/vizio-web.py` when
@@ -213,7 +212,7 @@ launch and inputs. These rest on one source or our own reading:
 
 ## Limits to know
 
-- couch-tv's home opens only in the TV's webview, through the Beta above, when you run the script, and
+- couch-tv's home opens only in the TV's webview, through the webview path above, when you run the script, and
   only while the bridge runs. The Home button on the VIZIO remote still goes to VIZIO's own home.
 - VIZIO's Home button and home row are VIZIO's.
 - Pairing needs the PIN on the TV once. If the TV is reset, or forgets the bridge, pair again.

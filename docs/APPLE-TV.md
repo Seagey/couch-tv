@@ -1,9 +1,11 @@
-# couch-tv on an Apple TV (Beta)
+# couch-tv on an Apple TV
 
-**New, Beta.** Two parts: the phone remote (the bridge talks to the Apple TV) and **Couch TV**, couch-tv's home as an
+**New.** Two parts: the phone remote (the bridge talks to the Apple TV) and **Couch TV**, couch-tv's home as an
 Apple TV app. Both were built and checked against a stand-in Apple TV and a stand-in bridge on a computer, and Couch TV also runs in
 the tvOS Simulator. No real Apple TV has run them yet, so expect something to need fixing. Please [open an issue](https://github.com/Seagey/couch-tv/issues)
 and say how it went (the Apple TV model, tvOS version, what worked and what did not), even if all of it worked.
+
+From 0.13.4 Couch TV builds with Xcode and draws couch-tv Studio designs ([below](#a-design-from-couch-tv-studio)). That was checked in the tvOS 27.2 Simulator on an Apple TV 4K, not yet on a real Apple TV.
 
 ## What you get, in plain words
 
@@ -13,12 +15,12 @@ and say how it went (the Apple TV model, tvOS version, what worked and what did 
 | Sleep and wake from the phone | Yes |
 | Opening an app from the phone (Netflix, YouTube, Disney+, Prime Video, Apple TV and the rest the Apple TV lists) | Yes. The app opens on its own home page: pick the show there, nothing presses Play for you |
 | "Put on Bluey" (find and play) | Finds where it streams, opens that app. No deep link into the show |
-| couch-tv's home screen on the TV | **New, Beta:** Couch TV, an app with the same scenes, glass clock, date and weather, people switch, Keep watching and dock as the other TVs. You put it on the Apple TV yourself with Xcode on a Mac ([below](#the-home-app-couch-tv)) |
+| couch-tv's home screen on the TV | **New:** Couch TV, an app with the same scenes, glass clock, date and weather, people switch, Keep watching and dock as the other TVs. You put it on the Apple TV yourself with Xcode on a Mac ([below](#the-home-app-couch-tv)) |
 | Opening couch-tv by itself when the Apple TV wakes | Yes, once Couch TV is installed and the bridge is running, like the Samsung and LG paths |
 | Replacing or coming before Apple's own home screen | **No, and it cannot be done.** tvOS lets no app replace the home, and couch-tv never jailbreaks anything. Apple's Home button still opens Apple's home |
 | Typing from the phone, screenshots, what is playing, a volume level | No (see "Limits") |
 | More than one TV on one phone remote | Yes, like the Roku and the LG: one bridge, several entries in `config.json` |
-| Kids mode (only a shelf of shows you picked, behind a parent PIN) | **New, Beta:** in Couch TV, with the bridge. Netflix, Disney+, Apple TV and YouTube posters open the show, other apps open on their home. Pair it with Apple's Restrictions ([Kids mode](#kids-mode)) |
+| Kids mode (only a shelf of shows you picked, behind a parent PIN) | **New:** in Couch TV, with the bridge. Netflix, Disney+, Apple TV and YouTube posters open the show, other apps open on their home. Pair it with Apple's Restrictions ([Kids mode](#kids-mode)) |
 
 The phone remote costs nothing and needs no Apple account. Couch TV is free with your own Apple ID, but Apple makes a
 free signature run out after 7 days, so a Mac at home signs it again twice a week (a script does it).
@@ -169,7 +171,7 @@ anything else in couch-tv.
 
 ## Kids mode
 
-**New, Beta, on main.** Kids mode ([CONFIG.md](CONFIG.md#kids-mode)) works in Couch TV too. Idea from Natalie Bruss
+**New, on main.** Kids mode ([CONFIG.md](CONFIG.md#kids-mode)) works in Couch TV too. Idea from Natalie Bruss
 (@nataliebruss on Instagram). It is off unless you set it up: nothing changes for a household with no kids profile.
 
 When the person watching is a kids profile, Couch TV shows only their shelf: big posters of the shows you picked, and
@@ -277,6 +279,41 @@ once a show is open. In each app the child uses:
 - **The computer has to stay on** for posters, opening shows and apps, and PIN changes. With it off, Couch TV stays in
   kids mode on the last shelf, and a poster opens only Netflix or YouTube, the two apps Couch TV can open by itself.
 - **Not yet run on a real Apple TV** ([APPLE-TV-TESTING.md](APPLE-TV-TESTING.md)).
+
+## A design from couch-tv Studio
+
+Couch TV draws couch-tv Studio designs (from 0.13.4). It builds with Xcode and runs in the tvOS 27.2 Simulator (Apple TV 4K, 4th generation); it has not run on a real Apple TV yet. A video background shows its still picture: Couch TV never plays a design's video. It takes a design from two places:
+
+- **config.json's `design`**, which the bridge hands over with the rest of the home's settings.
+- **A code typed on the Apple TV:** Settings, Home design, Get a design, then the code from couch-tv Studio
+  (ABCDE-FGHJK, or the long CTV1 one). Couch TV asks couch-tv Studio's store for it (or the `design_store` in
+  config.json), shows the design small and asks "Use this design?". Nothing of it shows until you pick Yes. It is
+  kept on the Apple TV, so it is still there after a restart, and it wins over the one in config.json.
+- **Plain home** in the same place goes back to the usual Couch TV home. **Design** turns the design back on.
+
+What shows:
+
+- The background: a built in photo or the design's own JPEG, with its darkening, zoom, blur and shade, or one
+  colour, or two colours as a straight or round fade.
+- The home's own parts where the design moved, grew, faded or hid them: the clock (12 or 24 hour), the date in
+  any of its five forms, the weather, the people switch, the sleep timer, Keep watching and the dock (as a row, a
+  column or a grid, with the design's icon size, gap, shape and labels).
+- Words in the design's font, weight, colour, shadow and alignment, and shapes: glass, solid, outline and lines,
+  with round corners.
+- Widgets drawn by Couch TV itself: the clocks (plain, tall, glass, flip, analogue, in words, world clocks), the
+  date, this month, a countdown, the weather and the big temperature, a photo or a framed picture from the design,
+  Keep watching (one card or a row), an app, a folder, a dock or a grid of apps, the people switch, quick buttons,
+  a card, a quote, a welcome, and a smart stack taking turns.
+- Every other widget (now playing, the smart home ones, news, sport, shares, the forecast by the hour or the week,
+  photo slideshows, the agenda, notes, lists, timers and the rest) shows as a tidy card with its name and symbol,
+  because Couch TV does not have their live data. A widget this Couch TV does not know yet (one added to couch-tv
+  Studio later) keeps its place as a plain card, and a short card (a smart home pill) fits its words to the box.
+
+The design is checked the same way as on the other TVs before anything is drawn: only known settings are read,
+numbers are kept to sensible sizes, colours are plain colours, words with a number or a web address are left
+out, and a picture is only a built in one or a JPEG inside the design. The dock can be made small, never gone,
+and Settings is always on the screen, so Plain home is always one press away. Apps open the same way as on the
+usual home, through the bridge.
 
 ## Limits, plainly
 

@@ -26,6 +26,7 @@
     } catch (e) {}
   }
   if (LOG) {
+    send("log", "page start " + location.search);
     window.addEventListener("error", function (e) { send("log", "error: " + e.message + " at " + e.filename + ":" + e.lineno); });
     ["log", "warn", "error"].forEach(function (k) {
       var orig = console[k];
@@ -39,7 +40,20 @@
         send("dom", "<!-- " + location.href + " -->\n" + document.documentElement.outerHTML);
       }, 9000);
     });
-    document.addEventListener("keydown", function (e) { send("log", "key " + e.keyCode + " " + e.key); }, true);
+    // and the screen again 2.5 seconds after the last key: a Samsung gives no screenshots, so this
+    // is how a test sees where a key landed
+    ["input", "change", "focus", "blur"].forEach(function (k) {
+      document.addEventListener(k, function (e) {
+        var t = e.target || {};
+        if (t.tagName === "INPUT") send("log", k + " #" + t.id + " value=" + String(t.value || "").slice(0, 60));
+      }, true);
+    });
+    var after = null;
+    window.addEventListener("keydown", function (e) {
+      send("log", "key " + e.keyCode + " " + e.key);
+      clearTimeout(after);
+      after = setTimeout(function () { send("dom", "<!-- " + location.href + " -->\n" + document.documentElement.outerHTML); }, 2500);
+    }, true);
   }
 
   // ---------- the apps on this TV ----------
@@ -219,6 +233,25 @@
       e.stopImmediatePropagation();
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "ContextMenu", bubbles: true }));
     }
+  }, true);
+
+  // ---------- Samsung's on-screen keyboard ----------
+  // Its Done key reaches the page as keyCode 65376 ("Select"), not Enter, so a code typed for Get a
+  // design was never sent, and the keyboard stayed up (seen on a 2021 Frame, 19 Nov 2026). Done in a
+  // text box now counts as Enter (the home's own typing then sends it) and closes the keyboard.
+  // Text typed from the phone remote (the bridge's /api/text) arrives just after its Done, so the
+  // Enter waits a moment for the box to hold what was typed.
+  var IME_DONE = 65376;
+  document.addEventListener("keydown", function (e) {
+    var box = document.activeElement;
+    if (e.keyCode !== IME_DONE || !box || box.tagName !== "INPUT") return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    setTimeout(function () {
+      if (document.activeElement !== box) return;
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      try { if (document.activeElement === box) box.blur(); } catch (err) {}
+    }, 400);
   }, true);
 
   // ---------- jobs only an app on the TV may do (bridge/samsung.py open_title) ----------

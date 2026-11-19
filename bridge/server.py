@@ -25,6 +25,7 @@ from aiohttp import web
 
 import apps
 import config
+import agenda
 import custom_cards
 import finder
 import history_import
@@ -35,6 +36,7 @@ import store
 import taste
 from tv import TV, TVUnavailable, intent_to_link, check_package, UnsafeInput
 import samsung
+import samsung_frame
 import lg
 import roku
 import appletv
@@ -45,7 +47,12 @@ import vizio
 import panasonic
 import tivo
 import spotify_now
+import webdata
 import plex
+import smarthome
+import bookings
+import direct
+import say
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -73,7 +80,7 @@ def make_tv(cfg):
     bridge/panasonic.py), a TiVo OS TV built by Vestel ("kind": "tivo", bridge/tivo.py), an Apple TV
     ("kind": "appletv", bridge/appletv.py) or an Android or Google TV (tv.py)."""
     if cfg.get("kind") == "samsung":
-        return samsung.SamsungTV(cfg)
+        return samsung_frame.SamsungTV(cfg)   # samsung.SamsungTV plus Frame on and off (bridge/samsung_frame.py)
     if cfg.get("kind") == "lg":
         return lg.LGTV(cfg)
     if cfg.get("kind") == "roku":
@@ -916,12 +923,13 @@ def resume_link(app_id, link, title):
     return link
 
 
-async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False):
-    """`exact`: only a result with this title will do (finder.same_title); the search's best guess
-    for a name it does not know is a 404 instead of another show."""
+async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False,
+               same=None):
+    """`exact`: only a result with this title will do (finder.same_title, or `same` when given); the
+    search's best guess for a name it does not know is a 404 instead of another show."""
     await installed_packages()
     best, _ = await finder.find(title)
-    if not best or (exact and not finder.same_title(best["title"], title)):
+    if not best or (exact and not (same or finder.same_title)(best["title"], title)):
         raise ApiError(404, f"could not find {title}", key="err_title_not_found", vars={"title": title})
     providers = best["providers"]
     ep_info = None
@@ -2136,6 +2144,22 @@ async def h_ask(request):
     return ok(**result)
 
 
+# ---------- Ask AI on the TV, and messages and designs from the person's own AI agent (say.py) ----------
+async def h_say(request):
+    return ok(**say.snapshot(_current.get(), claude._last.get(_current.get() or "default")))
+
+
+async def h_say_message(request):
+    data = await body(request)
+    return ok(message=say.message(_current.get(), data.get("text"), data.get("from"), data.get("seconds")))
+
+
+async def h_say_design(request):
+    data = await body(request)
+    # the TV fetches it and always asks "Use this design?" first: someone at the TV says yes
+    return ok(design=say.design(_current.get(), data.get("code")), asks_first=True)
+
+
 async def h_recs(request):
     who = store.norm_who(request.query.get("who"))
     picks, updated = await claude.cached_recs(who, lang=home_settings().get("settings", {}).get("lang"))
@@ -2478,6 +2502,21 @@ async def h_weather(request):
     return ok(**w)
 
 
+# ---------- the web widgets' relay (bridge/webdata.py): news feeds and share prices, by id only ----------
+async def h_webdata(request):
+    src, ident = request.query.get("src", ""), request.query.get("id", "")
+    # only the TV home asks this, and it shows its own words for a failure (widgets.js), so the answer
+    # carries no message key for the phone remote
+    try:
+        text = await webdata.get(src, ident)
+    except webdata.BadSource as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+    except Exception as e:  # the source is down or slow: the home keeps its last answer and asks again
+        log.warning("webdata %s: %s", src, e)
+        return web.json_response({"ok": False, "error": "The source could not be read just now."}, status=502)
+    return ok(src=src, id=ident, text=text)
+
+
 # ---------- custom cards (home.custom_cards, bridge/custom_cards.py) ----------
 async def h_custom_cards(request):
     """The household's own cards for the TV home: display only, cleaned and capped. Empty when off."""
@@ -2706,6 +2745,187 @@ async def h_settings_set(request):
     store._write(_settings_path(), {"settings": cleaned, "updated": updated})
     record_action(request, "settings", {"keys": sorted(cleaned)}, True)
     return ok(settings=cleaned, updated=updated)
+
+
+# ---------- the guest's name for the Welcome widget, typed on the TV or the phone remote ----------
+# One per TV (data/guest.<tv>.json): {"name": "Sarah", "at": ms}. The newest of the TV's copy and this
+# one wins (app.js guestSync). Not in the action history or the log: a guest's name is private.
+_GUEST_BAD = re.compile(r"[:/@]|www\.", re.I)
+
+
+def guest_name(v):
+    """One line of up to 38 characters: letters, digits, spaces and ' & , . ! - (app.js and athome.js guestFull)."""
+    if not isinstance(v, str) or _GUEST_BAD.search(v):
+        return ""
+    v = re.sub(r"[\x00-\x1f\x7f\u2028\u2029]+", " ", v)
+    v = "".join(c if (c.isalnum() or c in " '&,.!-") else " " for c in v)
+    return re.sub(r"\s+", " ", v).strip()[:38].strip()
+
+
+def _guest_path():
+    return os.path.join(store.DATA, f"guest.{_current.get()}.json")
+
+
+async def h_guest_get(request):
+    return ok(guest=_guest_now())
+
+
+def _guest_now():
+    g = store._read(_guest_path(), None)
+    if not isinstance(g, dict):
+        g = {}
+    return {"name": guest_name(g.get("name") or ""), "at": int(g.get("at") or 0),
+            "stay_url": g.get("stay_url") if isinstance(g.get("stay_url"), str) else "", "stay_at": int(g.get("stay_at") or 0)}
+
+
+async def h_guest_set(request):
+    """The guest's name, and a bookings link sent from the phone (held only until the TV home takes it
+    into its own store and clears it here; never logged or put in the action history)."""
+    data = await body(request)
+    if "name" not in data and "stay_url" not in data:
+        raise ApiError(400, "name is required (an empty name clears it)", key="err_guest_name_required")
+    g = _guest_now()
+    now = int(time.time() * 1000)
+    if "stay_url" in data:
+        raw = data.get("stay_url") if isinstance(data.get("stay_url"), str) else ""
+        if raw.strip():
+            try:
+                g["stay_url"] = agenda.check_url(raw)
+            except agenda.CalendarError:
+                raise ApiError(400, "That is not a calendar link. It starts with https://, or is a calendar app's own link.", key="err_not_calendar_link")
+            g["stay_at"] = now
+        else:
+            g["stay_url"] = ""
+    if "name" in data:
+        g["name"], g["at"] = guest_name(data.get("name")), now
+    store._write(_guest_path(), g)
+    return ok(guest=g)
+
+
+async def h_calendar(request):
+    """The Agenda widget's calendar for a TV whose home this computer runs (bridge/agenda.py). The
+    address is the person's own private link: it is never kept, logged or put in the action history."""
+    data = await body(request)
+    try:
+        text = await agenda.fetch(data.get("url"))
+    except agenda.CalendarError as e:
+        # the TV words this itself (app.js calRefresh): no phone message key, just the short reason
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+    return ok(text=text)
+
+
+# ---------- smart home for a web TV (bridge/smarthome.py) ----------
+# The address and token stay on this computer: the page gets names and readings only. Nothing here
+# goes in the action history or the log (a reading or a name is the household's own).
+HA = smarthome.Home(config.DATA, config.CONFIG.get("home_assistant"), os.environ.get("HOME_ASSISTANT_TOKEN"))
+# Philips Hue and AirTouch 5 with no Home Assistant (bridge/direct.py): their lights and zones join
+# the same answers, for every TV this computer serves
+HA.direct = direct.Direct(config.DATA, config.CONFIG)
+
+
+# Endpoints that use a secret kept on this computer (the Home Assistant token, the Hue key, the
+# bookings mailbox password) answer only a TV in config.json, this computer itself, or a caller holding
+# bridge.pairing_key. Without a pairing key a phone or any other device on the Wi-Fi is refused, so it
+# cannot use the kept token or read the guests' names.
+_tv_addrs = {"at": 0.0, "ips": set()}
+
+
+def _tv_ips():
+    if time.time() - _tv_addrs["at"] > 300:
+        ips = set()
+        for c in config.TVS:
+            h = config.tv_host(c)
+            if not h:
+                continue
+            try:
+                ips.update(a[4][0] for a in socket.getaddrinfo(str(h), None))
+            except OSError:
+                pass
+        _tv_addrs.update(at=time.time(), ips=ips)
+    return _tv_addrs["ips"]
+
+
+def secret_caller_ok(request):
+    if config.PAIRING_KEY:
+        return True   # the middleware has already checked the key on every /api/ call
+    ip = client_ip(request)
+    return ip is None or ip in _tv_ips()
+
+
+def tv_or_paired(handler):
+    async def guarded(request):
+        if not secret_caller_ok(request):
+            raise ApiError(403, "Only the TV can do this. To do it from another device, set bridge.pairing_key in config.json.", key="err_tv_only")
+        return await handler(request)
+    guarded.__name__ = handler.__name__
+    return guarded
+
+
+@tv_or_paired
+async def h_direct(request):
+    """Set up Hue or AirTouch from the TV: Home settings, couch-tv Studio, Smart home."""
+    data = await body(request)
+    what, d = str(data.get("action") or ""), HA.direct
+    if what == "status":
+        r = {"ok": True}
+    elif what == "hue_pair":
+        r = await d.hue_pair(data.get("address"))
+    elif what == "hue_lights":
+        r = {"ok": True, "lights": await d.hue_all(), "picked": (d.hue() or {}).get("lights", [])}
+    elif what == "hue_save":
+        r = d.hue_save(data.get("lights"))
+    elif what == "airtouch_find":
+        r = await d.airtouch_find()
+    elif what == "airtouch_save":
+        r = await d.airtouch_save(data.get("address"), data.get("zones"))
+    elif what in ("hue_forget", "airtouch_forget"):
+        r = d.forget(what.split("_")[0])
+    else:
+        r = {"ok": False, "error": "refused"}
+    return ok(result=r, status=d.status())
+
+
+# Guest names from booking emails, the way guest-tv gets them (bridge/bookings.py): Airbnb's calendar
+# link has no names, its "reservation confirmed" emails do. Kept on this computer and the TV only.
+BOOKINGS = bookings.Reader(config.CONFIG.get("bookings"), os.environ.get("BOOKINGS_PASSWORD"))
+
+
+@tv_or_paired
+async def h_stay_names(request):
+    if not BOOKINGS.on():
+        return ok(on=False, names=[])
+    names = await asyncio.get_running_loop().run_in_executor(None, BOOKINGS.read)
+    return ok(on=True, names=names, read=bool(not BOOKINGS.errors))
+
+
+async def h_ha_info(request):
+    return ok(info=HA.info(), status=HA.status())
+
+
+@tv_or_paired
+async def h_ha(request):
+    data = await body(request)
+    action = str(data.get("action") or "")
+    if action not in smarthome.ACTIONS:
+        return ok(result={"ok": False, "error": "refused"})
+    return ok(result=await HA.answer(action, data.get("entity"), data.get("value")))
+
+
+@tv_or_paired
+async def h_ha_check(request):
+    data = await body(request)
+    return ok(result=await HA.check(data.get("url"), data.get("token")))
+
+
+@tv_or_paired
+async def h_ha_save(request):
+    data = await body(request)
+    return ok(result=HA.save(data.get("picks")))
+
+
+@tv_or_paired
+async def h_ha_forget(request):
+    return ok(result=HA.forget())
 
 
 async def h_sleep_get(request):
@@ -3023,6 +3243,12 @@ async def music_now():
 
 async def h_music(request):
     return ok(music=await music_now())
+
+
+async def h_music_queue(request):
+    """The Up next widget: the next songs on the Spotify account (bridge/spotify_now.py), or queue None
+    when Spotify is not connected here. TVs do not share any app's queue, so Spotify is the only source."""
+    return ok(configured=spotify_now.status()["connected"], queue=await spotify_now.queue())
 
 
 # ---------- Spotify's now playing for the whole account (bridge/spotify_now.py, optional) ----------
@@ -4323,7 +4549,8 @@ def move_target(src, wanted=None):
 
 
 async def _tv_in_use():
-    """Is someone watching this TV: it is on, and the app in front says it is playing."""
+    """Is someone watching this TV: it is on, and the app in front says it is playing (or
+    buffering, or winding: a moment of BUFFERING in the same app is still someone watching)."""
     if not (tv.connected and tv.is_on and await tv.adb_ready()):
         return False
     try:
@@ -4331,15 +4558,36 @@ async def _tv_in_use():
         front = await tv.front_package()
     except Exception:
         return False   # it could not say: treat it as free
-    return any(s.get("package") == front and s.get("state") == "PLAYING" for s in _sessions(out))
+    return any(s.get("package") == front and STATES.get(s.get("state")) in ("playing", "buffering")
+               for s in _sessions(out))
 
 
-async def move_open(app, now, session, who, again=False):
+def move_asked(now, pkg):
+    """The title the bridge itself opened in this app, when the app now names another one. None when
+    the app gives no title of its own, or the same one, or the bridge opened nothing in this app in
+    the last three hours (the rule the move already uses for an app that gives no title).
+
+    Disney+, asked for the show "Bluey", plays the series "Bluey Fancy Restaurant"; asked for the
+    film "Moana", it plays "Moana Sing-Along" (seen on a Sony Google TV and a Google TV Streamer).
+    The show finder knows neither of those names, so the move could only open the app's search. Call
+    this on TV A."""
+    item = playing["item"]
+    if not (now.get("title") and now.get("title_from") == "app" and item and item.get("title")
+            and item.get("package") == pkg and item.get("ts", 0) > time.time() - MOVE_OPENED_S):
+        return None
+    if finder.same_title(item["title"], now["title"]) or move.same_name(item["title"], now["title"]):
+        return None
+    return item["title"]
+
+
+async def move_open(app, now, session, who, again=False, asked=None):
     """On TV B: open what `now` says was playing on TV A, in the same app. Uses `play` (the show
     finder, the app's own link, the profile screen and the Play button) for every app it knows, and
     a video link for YouTube. Returns `play`'s answer; "video" is the YouTube id when one was found.
     `again`: a second go at an app that is already open (YouTube is not started afresh then; the
-    others follow their own "cold" rule in apps.py, as any `play` does)."""
+    others follow their own "cold" rule in apps.py, as any `play` does).
+    `asked`: the title the bridge itself opened on TV A when the app then named another one
+    (move_asked). It is opened only when the show finder does not know the app's own name."""
     title = now["title"]
     if app["id"] == "youtube":
         video = await move.youtube_video_id(title, (session or {}).get("subtitle"), (session or {}).get("duration"))
@@ -4351,26 +4599,112 @@ async def move_open(app, now, session, who, again=False):
             started, _ = await get_it_playing(app, link, who or cur_who())
             return {"method": "deeplink", "started": started, "video": video}
     else:
+        # exact: only a show of exactly this name. A near name is another show ("Bluey Fancy
+        # Restaurant" is a series of its own, not the "Fancy Restaurant" episode of "Bluey").
+        # A name with no Latin letter or digit: finder.same_title reads it as empty and turns it
+        # down even when the finder has that very title, so play compares those with the move's
+        # own check. The check runs inside play, on the very result it opens: a lookup made here
+        # first could differ from the one play makes.
+        same = None if finder._norm(title) else move.same_name
         try:
-            # exact: only a show of exactly this name. A near name is another show ("Bluey Fancy
-            # Restaurant" is a series of its own, not the "Fancy Restaurant" episode of "Bluey").
             return await play(title, now.get("season"), now.get("episode"), app["id"], who,
-                              resume=not now.get("season"), exact=True)
+                              resume=not now.get("season"), exact=True, same=same)
         except ApiError as e:
             if e.status != 404:
                 raise
+        if asked:
+            # The finder does not know the name the app gives (Disney+ plays the series "Bluey Fancy
+            # Restaurant" when asked for "Bluey", and the finder has no such series). The link the
+            # bridge opened on TV A got it there, so the same link is the way to it on TV B. The
+            # caller still compares what the two TVs say they play, and pauses TV B if they differ.
+            log.info("move: the show finder does not know %s; opening %s, which got it playing on the first TV",
+                     title, asked)
+            try:
+                # the episode TV A is on now (it may have played on past the one the bridge opened)
+                return await play(asked, now.get("season"), now.get("episode"), app["id"], who,
+                                  resume=not now.get("season"), exact=True,
+                                  same=None if finder._norm(asked) else move.same_name) | {"asked": asked}
+            except ApiError as e:
+                if e.status != 404:
+                    raise
     # The show finder (or YouTube's search) does not know this title: open the app on its search.
     method, _ = await search_in_app(apps.BY_ID[app["id"]], now["title"])
     return {"method": method, "started": False}
 
 
+async def move_sibling_title(app, pkg, title, wrong):
+    """TV B came up on another title (`wrong`) than TV A's (`title`). In the apps of
+    move.SIBLING_TITLE_APPS the right one may be a tile on that other title's own page: open the
+    page, press the one tile that is exactly `title`, then the page's Play button.
+    Returns None when Play was not pressed, True when it was and the app says it is playing, False
+    when it was and the app has not started yet. The caller reads what TV B says it plays either way.
+    Every step that cannot be sure stops: the show finder does not have exactly this title, the page
+    is not the one for `wrong`, no tile or two tiles carry the title, the next page does not name
+    `title`, or a button to pay or sign in is on screen. Only labels the screen reader gives are
+    pressed, never a blind OK."""
+    if app["id"] not in move.SIBLING_TITLE_APPS:
+        return None
+    pressed = False
+
+    async def screen(named):
+        # A title page takes a moment to draw (longer on a slow TV): look again once if the title
+        # that should be on it is not there yet.
+        items = []
+        for wait in (3, 2):
+            await asyncio.sleep(wait)
+            items = await agentic.ui_items()
+            if move.page_names(items, named):
+                break
+        return items
+    try:
+        best, _ = await finder.find(title)
+        # only the very title, as `play` asked for it: the finder's best guess is another show
+        if not best or not (finder.same_title(best["title"], title) or move.same_name(best["title"], title)):
+            return None
+        page = next((p.get("web") for p in best.get("providers") or [] if p["service"] == app["id"]), None)
+        if not move.page_host_ok(app["id"], page):
+            return None
+        await tv.start_intent(page, pkg, cold=False)
+        if not await tv.wait_for_app({pkg}, timeout=8):
+            return None
+        items = await screen(wrong)
+        if not move.page_names(items, wrong):
+            log.info("move: the page %s opened in %s is not the one for %s", title, app["name"], wrong)
+            return None
+        if agentic.stop_labels(items) or move.page_stops(items):
+            log.info("move: a button to pay or sign in is on the page of %s in %s: nothing pressed", wrong, app["name"])
+            return None
+        tile = move.sibling_item(items, title)
+        if not tile:
+            log.info("move: no one tile for %s on the page of %s in %s", title, wrong, app["name"])
+            return None
+        # the screen reader reads whatever is in front: press only while that is still this app
+        if await tv.front_package() != pkg:
+            return None
+        await tv.adb("shell", f"input tap {int(tile['x'])} {int(tile['y'])}", timeout=8)
+        items = await screen(title)
+        button = move.page_play_button(items, agentic._button)
+        if (not button or not move.page_names(items, title) or agentic.stop_labels(items)
+                or move.page_stops(items) or await tv.front_package() != pkg):
+            log.info("move: the tile for %s in %s did not lead to a page that can play it", title, app["name"])
+            return None
+        pressed = True
+        await tv.adb("shell", f"input tap {int(button['x'])} {int(button['y'])}", timeout=8)
+        log.info("move: found %s on the page of %s in %s and pressed %s", title, wrong, app["name"], button["label"])
+        return await wait_until_playing(pkg, timeout=15)
+    except Exception as e:   # the finder, the screen reader or ADB did not answer
+        log.info("move: could not look for %s on the page of %s: %s", title, wrong, e)
+        return False if pressed else None
+
+
 async def _move_state(pkg):
     """The app's playback state on this TV ("PLAYING", "PAUSED", ...), its active session first. None
-    when it has no session or the TV did not answer."""
+    when it has no session. "UNKNOWN" when the TV did not answer: that is not a pause, and not a
+    screen to press OK on."""
     try:
         out = await tv.adb("shell", "dumpsys media_session", timeout=8)
     except Exception:
-        return None
+        return "UNKNOWN"
     mine = [s for s in _sessions(out) if s.get("package") == pkg and s.get("state")]
     mine.sort(key=lambda s: not s.get("active"))
     return mine[0]["state"] if mine else None
@@ -4394,7 +4728,7 @@ async def move_pause(pkg):
         else:
             continue
         await asyncio.sleep(1)
-        if await _move_state(pkg) != "PLAYING":
+        if await _move_state(pkg) not in ("PLAYING", "UNKNOWN"):
             return True
     log.warning("move: %s would not pause on %s", pkg, tv.name)
     return False
@@ -4444,7 +4778,7 @@ async def move_nudge(app, tries=3):
         state = await _move_state(pkg)
         if state == "PAUSED":
             await tv.key("play")
-        elif state not in ("PLAYING", "BUFFERING"):
+        elif state not in ("PLAYING", "BUFFERING", "UNKNOWN"):
             await tv.key("ok")
             log.info("move: pressed OK on a screen that cannot be read")
         if await move_wait_playing(pkg, timeout=12):
@@ -4516,6 +4850,7 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
             item = playing["item"]
             if not (item and item.get("package") == pkg and item.get("ts", 0) > time.time() - MOVE_OPENED_S):
                 now["title"] = None
+        asked = move_asked(now, pkg)
         who = cur_who()
         from_name = tv.name
     if app and app["id"] is None:
@@ -4584,7 +4919,7 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
             # "Who's watching?" and then drop the show), the person's profile, and play
             await tv.adb("shell", "am", "force-stop", pkg_b)
             opened_at = time.monotonic()
-            opened = await move_open(known, now, session, who)
+            opened = await move_open(known, now, session, who, asked=asked)
             started = bool(opened.get("started"))
             if not started and opened.get("method") == "deeplink":
                 # A fresh start is slow (YouTube began a few seconds after `play` stopped waiting, on
@@ -4594,14 +4929,17 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
                     # The profile screen came up after `play` had looked and given up (Disney+ from
                     # a fresh start on a Google TV Streamer). Open it once more: the profile is
                     # picked this time, and the link is opened again behind it.
-                    opened = await move_open(known, now, session, who, again=True)
+                    opened = await move_open(known, now, session, who, again=True, asked=asked)
                     started = bool(opened.get("started")) or await move_wait_playing(pkg_b, timeout=8)
             if paused_here:
                 # Netflix starts playback over about ten seconds after it first plays (measured on a
                 # Sony Google TV), so a pause before that comes undone. Look once more now, and again
                 # at the end, so the two TVs do not play on side by side.
                 with on_tv(src):
-                    source_paused = await _move_state(pkg) != "PLAYING" or await move_pause(pkg)
+                    if await _move_state(pkg) in ("PLAYING", "UNKNOWN"):
+                        source_paused = await move_pause(pkg)
+                    else:
+                        source_paused = True
             # Is it the same title? Only the two TVs' own words count here, not what the bridge
             # asked for: Disney+, asked for the show "Bluey", played the series "Bluey Fancy
             # Restaurant" (seen on a Sony Google TV and a Google TV Streamer). When both apps name
@@ -4609,11 +4947,41 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
             if started:
                 await media_read(pkg_b, app)
                 there = media_now.get("title") if media_now.get("title_from") == "app" else None
-                if now.get("title_from") == "app" and there and not finder.same_title(there, title):
-                    wrong_title = there
+                # A show opened by the name the bridge asked for on TV A (move_asked) is only right
+                # if TV B says so itself. An app names its show a few seconds after it starts, so
+                # look again before giving up; a TV B that names nothing has not confirmed it.
+                unconfirmed = opened.get("asked")
+                for _ in range(3 if unconfirmed else 0):
+                    if there:
+                        break
+                    await asyncio.sleep(2)
+                    await media_read(pkg_b, app)
+                    there = media_now.get("title") if media_now.get("title_from") == "app" else None
+                same = finder.same_title(there, title) or move.same_name(there, title)
+                if now.get("title_from") == "app" and (there or unconfirmed) and not same:
+                    wrong_title = there or unconfirmed
                     started = False
                     await tv.key("pause")
-                    log.info("move: %s played %s on %s, not %s: paused it", app["name"], there, dst, title)
+                    log.info("move: %s played %s on %s, not %s: paused it", app["name"], wrong_title, dst, title)
+                    # The right title may be a tile on that title's own page (Disney+ and its
+                    # Sing-Along titles). Once Play has been pressed there, B's own word decides
+                    # again: the right title counts, any other is paused like the first one.
+                    pressed = await move_sibling_title(known, pkg_b, title, there) if there else None
+                    if pressed is not None:
+                        there = None
+                        for _ in range(4):
+                            await media_read(pkg_b, app)
+                            there = media_now.get("title") if media_now.get("title_from") == "app" else None
+                            if there:
+                                break
+                            await asyncio.sleep(2)
+                        if finder.same_title(there, title) or move.same_name(there, title):
+                            wrong_title = None
+                            started = pressed or media_now.get("state") == "playing"
+                            opened_at = time.monotonic()   # B has played this title only from now
+                        else:
+                            wrong_title = there or wrong_title
+                            await tv.key("pause")
             # 7. the backup: only when B is playing and is not near A's spot
             if started:
                 at = media_now.get("position_ms")
@@ -4626,6 +4994,10 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
                         at = media_now.get("position_ms")
                         if move.near(spot, at):
                             break
+                    if seek and media_now.get("state") != "playing":
+                        # the seek, or the link opened again, may leave it paused or stopped: only
+                        # a TV that plays counts as moved (and lets TV A be turned off)
+                        started = await move_wait_playing(pkg, timeout=12)
             # B may be ahead of A's spot by as long as it has had to play since the link was opened
             played_ms = int((time.monotonic() - opened_at) * 1000)
             off_spot = (started and spot is not None and at is not None
@@ -4650,8 +5022,12 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
     powered_off = False
     if started:
         with on_tv(src):
-            # never leave both TVs playing without saying so; a pause that landed late counts
-            source_paused = await _move_state(pkg) != "PLAYING" or await move_pause(pkg)
+            # never leave both TVs playing without saying so; a pause that landed late counts, a TV
+            # that does not answer does not
+            if await _move_state(pkg) in ("PLAYING", "UNKNOWN"):
+                source_paused = await move_pause(pkg)
+            else:
+                source_paused = True
     if power_off and started:
         with on_tv(src):
             if tv.is_on:
@@ -4720,6 +5096,9 @@ def make_app():
     r.add_get("/api/find", h_find)
     r.add_post("/api/play", h_play)
     r.add_post("/api/ask", h_ask)
+    r.add_get("/api/say", h_say)
+    r.add_post("/api/say/message", h_say_message)
+    r.add_post("/api/say/design", h_say_design)
     r.add_get("/api/tizen/next", h_tizen_next)
     r.add_post("/api/tizen/answer", h_tizen_answer)
     r.add_get("/api/webos/apps", h_webos_apps)
@@ -4759,15 +5138,27 @@ def make_app():
     r.add_post("/api/kids", h_kids_set)
     r.add_post("/api/who", h_who_set)
     r.add_get("/api/weather", h_weather)
+    r.add_get("/api/webdata", h_webdata)
     r.add_get("/api/custom-cards", h_custom_cards)
     r.add_get("/api/config", h_config)
     r.add_post("/api/home-apps", h_home_apps)
     r.add_get("/api/app-order", h_app_order_get)
     r.add_post("/api/app-order", h_app_order_set)
+    r.add_post("/api/calendar", h_calendar)
+    r.add_get("/api/stay-names", h_stay_names)
+    r.add_get("/api/guest", h_guest_get)
+    r.add_post("/api/guest", h_guest_set)
+    r.add_get("/api/ha/info", h_ha_info)
+    r.add_post("/api/ha", h_ha)
+    r.add_post("/api/ha/check", h_ha_check)
+    r.add_post("/api/ha/save", h_ha_save)
+    r.add_post("/api/ha/forget", h_ha_forget)
+    r.add_post("/api/ha/direct", h_direct)
     r.add_get("/api/settings", h_settings_get)
     r.add_post("/api/settings", h_settings_set)
     r.add_get("/api/continue", h_continue)
     r.add_get("/api/music", h_music)
+    r.add_get("/api/music/queue", h_music_queue)
     r.add_get("/api/spotify/login", h_spotify_login)
     r.add_get("/api/spotify/callback", h_spotify_callback)
     r.add_get("/api/spotify/status", h_spotify_status)

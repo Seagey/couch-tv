@@ -1,6 +1,6 @@
 """The connection to a VIZIO TV on SmartCast or VIZIO OS, for "kind": "vizio" in config.json.
 
-NEW (BETA). Tested against a stand in TV on the computer only (tests/vizio_standin.py,
+Tested against a stand in TV on the computer only (tests/vizio_standin.py,
 docs/VIZIO.md). Not one line of this has been seen from a real VIZIO yet: expect the first tester to
 find something that needs fixing. scripts/vizio-check.py prints what the TV really answers, and
 "trace": true logs every request and answer with the PIN and the token hidden.
@@ -28,7 +28,7 @@ means one source or our own reading. None of it is seen on a real set yet.
 THE HOME: the bridge does not open couch-tv's page on a VIZIO by itself. VIZIO OS has no browser, takes
 no sideloaded app, and its developer programme is a closed partner scheme. So this is a phone remote:
 power, keys, volume, inputs and opening apps, and open_home() says so plainly. The remote's Home (and
-the phone's Home) press VIZIO's own Home. BETA (#206, tried on one set, a V4K65X-0810): the owner can
+the phone's Home) press VIZIO's own Home. On one set (#206, a V4K65X-0810) the owner can
 load the page in the TV's own webview with scripts/vizio-web.py, through launch_web() and the allow
 list in web_launch_body() (name space 4, WEB_APP_IDS only, never APP_ID 1).
 
@@ -658,11 +658,11 @@ class VizioTV:
         return "web"
 
     async def open_home(self):
-        # The bridge never opens the home on a VIZIO by itself, with or without "web_app": the Beta
-        # webview path is run by the owner with scripts/vizio-web.py (docs/VIZIO.md, "The home").
+        # The bridge never opens the home on a VIZIO by itself, with or without "web_app": the webview
+        # path is run by the owner with scripts/vizio-web.py (docs/VIZIO.md, "The home").
         raise TVUnavailable(
             "couch-tv's home cannot open on a VIZIO TV by itself: VIZIO OS has no browser and takes no "
-            "outside apps. couch-tv is the phone remote here. A Beta loads it in the TV's own webview "
+            "outside apps. couch-tv is the phone remote here. A script loads it in the TV's own webview "
             "with scripts/vizio-web.py (docs/VIZIO.md, \"The home\")",
             key="err_vizio_no_home",
         )

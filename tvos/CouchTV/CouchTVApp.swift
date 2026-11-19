@@ -1,4 +1,4 @@
-// Couch TV for Apple TV (Beta): the couch-tv home as a native tvOS app. tvOS has no web view, so this
+// Couch TV for Apple TV: the couch-tv home as a native tvOS app. tvOS has no web view, so this
 // draws the TV home's Night look again in SwiftUI and talks to the same bridge (docs/APPLE-TV.md).
 import SwiftUI
 
@@ -15,7 +15,9 @@ struct CouchTVApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if model.kidsOn { KidsView() } else { HomeView() }      // kids mode: only the shelf (KidsView.swift)
+                if model.kidsOn { KidsView() }                          // kids mode: only the shelf (KidsView.swift)
+                else if model.design != nil { DesignHomeView() }        // a couch-tv Studio design (DesignView.swift)
+                else { HomeView() }
             }
                 .environmentObject(model)
                 .onAppear { model.start() }
@@ -25,6 +27,11 @@ struct CouchTVApp: App {
                 }
                 .fullScreenCover(isPresented: Binding(get: { model.showMore && !model.kidsOn }, set: { model.showMore = $0 })) {
                     MoreAppsView().environmentObject(model)
+                }
+                // a design got by code: "Use this design?" before anything of it shows
+                .fullScreenCover(isPresented: Binding(get: { model.pendingDesign != nil && !model.kidsOn && !model.showSettings },
+                                                      set: { if !$0 && model.pendingDesign != nil { model.useDesign(false) } })) {
+                    if let d = model.pendingDesign { DesignAskView(design: d).environmentObject(model) }
                 }
                 .preferredColorScheme(.dark)
                 .onChange(of: phase) { _, now in

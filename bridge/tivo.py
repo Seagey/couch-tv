@@ -1,7 +1,7 @@
 """The connection to a TiVo OS TV built by Vestel (JVC, Telefunken, Medion and others), for "kind": "tivo"
 in config.json.
 
-BETA. Run on one real TV so far: a JVC LT-50VUQ3455 (TiVo OS, software V.2.85.2.0, Vestel chassis MB180,
+Run on one real TV so far: a JVC LT-50VUQ3455 (TiVo OS, software V.2.85.2.0, Vestel chassis MB180,
 browser Vewd Core 4.23 on Chrome 108). Confirmed there: finding the TV, the key format, volume up and
 down, the browser key, and the four keys that get couch-tv's page on screen. The lines marked UNCONFIRMED
 come from public descriptions of older Vestel sets and have not run on TiVo OS. Turn on "trace" (below)

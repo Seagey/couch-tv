@@ -108,7 +108,7 @@ object Now {
 
     private fun inQuietHours(qh: JSONObject): Boolean {
         if (!qh.optBoolean("enabled", false)) return false
-        val tzId = Store.weather().optString("timezone", "auto")
+        val tzId = Store.weather()?.optString("timezone", "auto") ?: "auto"
         val tz = if (tzId.isNotEmpty() && tzId != "auto") java.util.TimeZone.getTimeZone(tzId) else java.util.TimeZone.getDefault()
         val cal = java.util.Calendar.getInstance(tz)
         val cur = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)

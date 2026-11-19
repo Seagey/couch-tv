@@ -5,6 +5,7 @@ Fixes for problems seen on real TVs, starting with a TV that goes round in a res
 - [If your TV loops after a restart](#if-your-tv-loops-after-a-restart)
 - [TCL: Home goes back to Google TV after every restart](#tcl-home-goes-back-to-google-tv-after-every-restart)
 - [If Disney+ (or another app) signs you out after the TV turns off](#if-disney-or-another-app-signs-you-out-after-the-tv-turns-off)
+- [Moving along the rows feels slow](#moving-along-the-rows-feels-slow)
 - [Something else stuck](#something-else-stuck)
 
 ## If your TV loops after a restart
@@ -67,8 +68,7 @@ On the same TV these were switched off with no ill effect over an evening of use
 ## TCL: Home goes back to Google TV after every restart
 
 On a TCL Google TV (reported on a TCL Smart TV Pro, Android 14) the TV's own boot manager can stop
-the Home button watch from starting, so Home falls back to Google TV after each restart. On main, in
-the next release, couch-tv adds an empty TV input on TCL TVs only, which TCL lets start at boot. Open the app once after
+the Home button watch from starting, so Home falls back to Google TV after each restart. Since 0.13, couch-tv adds an empty TV input on TCL TVs only, which TCL lets start at boot. Open the app once after
 installing so it is switched on. Other TVs are unchanged and show no new input. This is unconfirmed
 until it is tested on a real TCL.
 
@@ -120,6 +120,25 @@ When the TV turns off, the bridge closes the app completely. The next time you o
 fresh with the Wi-Fi already up, and you stay signed in. Sign in once more after adding it. Without a
 bridge (options A and C), close the app before you turn the TV off (Settings, Apps, the app, Force
 stop).
+
+## Moving along the rows feels slow
+
+If Lighter home and switching off Glass panels and the Video background did not help, the cost may not be the page at all. On some TVs the GPU cannot composite a 1080p window at 60 frames a second, so the page runs at 60 but the screen shows 30. That was the case on an XGIMI Elfin Flip Plus ([#197](https://github.com/Seagey/couch-tv/issues/197)).
+
+**Try it for a minute** (needs ADB, so option A or B; reversible):
+
+```sh
+adb shell wm size 1280x720      # the whole TV draws at 720p
+# move along the rows for a minute, then:
+adb shell wm size reset         # undo
+```
+
+If the rows turn smooth, the GPU is the limit. Keep it for couch-tv only, without changing the rest of the TV:
+
+1. Put `"render_height": 720` under `home` in `config.json` (see [CONFIG.md](CONFIG.md)).
+2. Run `tv-home/tools/apply.sh`, or restart the home.
+
+To undo it, remove the key or set it to `0`. Text and pictures are a little softer than at full size. If it helps, or does not, please say which TV and Android version on [#197](https://github.com/Seagey/couch-tv/issues/197).
 
 ## Something else stuck
 

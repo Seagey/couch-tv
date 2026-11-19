@@ -447,6 +447,16 @@ def _home(h):
     # lighter home for a slow box (#58): no blur, no soft shadows, a still photo, smaller pictures
     if isinstance(h.get("lighter"), bool):
         out["lighter"] = h["lighter"]
+    # draw the home at a lower resolution and let the TV scale it up (weak GPUs, MediaTek/Mali projectors):
+    # the app reads it from the saved settings, so it only needs to get through here
+    if isinstance(h.get("render_height"), int) and not isinstance(h.get("render_height"), bool) and 360 <= h["render_height"] <= 2160:
+        out["render_height"] = h["render_height"]
+    # remote buttons that open an app (KeyWatch.kt): "KEYCODE_BUTTON_3:org.smarttube.stable", "190:pkg" or "scan384:pkg"
+    if isinstance(h.get("app_keys"), list):
+        keys = [k for k in h["app_keys"] if isinstance(k, str) and re.fullmatch(
+            r"(KEYCODE_[A-Z0-9_]{1,40}|\d{1,4}|scan\d{1,4}):[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+", k)]
+        if keys:
+            out["app_keys"] = keys[:30]
     # "always": the 4K copies on a 4K panel whose interface is drawn at 1080 (#191). false: a 4K screen with a weak chip keeps the 1080 backgrounds (lg/build.py then leaves the 4K copies out)
     if isinstance(h.get("hi_res"), bool) or h.get("hi_res") == "always":
         out["hi_res"] = h["hi_res"]
@@ -554,6 +564,79 @@ def _inputs(raw_list):
 
 HOME = _home(CONFIG.get("home"))
 
+
+# A design is untrusted input that runs on a TV. tv-home/web/design.js is the real gate (it rebuilds
+# the design from an allowed list); this is a second one, so nothing that looks like a link or markup
+# is even handed to the home: such a value is dropped, with a note.
+_DESIGN_PICTURE = re.compile(r"^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$")
+_DESIGN_BAD = re.compile(r"(?i)(\b(javascript|vbscript|https?|ftp|file|blob)\s*:|^\s*//|<\s*/?\s*(script|iframe|object|embed|svg|img|style|link)\b|\bon\w+\s*=|url\s*\(|@import|expression\s*\()")
+
+
+def _design_clean(v, depth=0, dropped=None):
+    if depth > 8:
+        return None
+    if isinstance(v, dict):
+        out = {}
+        for k, x in list(v.items())[:200]:
+            if not isinstance(k, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,200}", k):
+                dropped.append(str(k)[:40])
+                continue
+            c = _design_clean(x, depth + 1, dropped)
+            if c is not None:
+                out[k] = c
+        return out
+    if isinstance(v, list):
+        return [c for c in (_design_clean(x, depth + 1, dropped) for x in v[:200]) if c is not None]
+    if isinstance(v, str):
+        if _DESIGN_PICTURE.match(v):
+            return v
+        if len(v) > 2000 or _DESIGN_BAD.search(v):
+            dropped.append(v[:40])
+            return None
+        return v
+    if isinstance(v, bool) or v is None:
+        return v
+    if isinstance(v, (int, float)):
+        return v if abs(v) < 1e9 else None
+    return None
+
+
+def _design(d):
+    """couch-tv Studio's design block (docs/CONFIG.md, "Design"), cleaned of anything that looks like
+    a link or markup, then handed to the TV home, whose design.js checks every value again. Only an
+    object, and not too big for the TV to keep (an uploaded background travels inside it)."""
+    if not isinstance(d, dict) or not d:
+        return None
+    if len(json.dumps(d)) > 4_000_000:
+        print("config: design is over 4 MB (a smaller background picture fixes it), the home stays as it is")
+        return None
+    dropped = []
+    clean = _design_clean(d, 0, dropped)
+    if dropped:
+        print("config: design: left out %d value(s) that looked like a link or markup" % len(dropped))
+    return clean or None
+
+
+DESIGN = _design(CONFIG.get("design"))
+
+
+def _design_store(u):
+    """couch-tv Studio's design store (docs/CONFIG.md, "Design"): the one server the TV may ask for a
+    design by code. https only (plain http only to this computer, for development); no path."""
+    if not isinstance(u, str):
+        return None
+    if not u.strip():
+        return ""   # "design_store": "" turns getting a design by code off, and the TV is told so
+    m = re.fullmatch(r"(?i)(https://[a-z0-9.-]+(:\d{1,5})?|http://(127\.0\.0\.1|localhost)(:\d{1,5})?)/?", u.strip())
+    if not m:
+        if u:
+            print("config: design_store must be an https address with no path, it was left out")
+        return None
+    return m.group(1).lower()
+
+
+DESIGN_STORE = _design_store(CONFIG.get("design_store"))
+
 # the source of the custom cards (home.custom_cards), kept here: the TV only sees HOME["custom_cards"]
 CUSTOM_CARDS = custom_cards.source((CONFIG.get("home") or {}).get("custom_cards") if isinstance(CONFIG.get("home"), dict) else None,
                                    os.path.dirname(os.path.abspath(CONFIG_FILE)))
@@ -652,4 +735,7 @@ def public():
                          # input tiles for this TV only (its own HDMI devices); else home.inputs
                          **({"inputs": _inputs(t["inputs"])} if isinstance(t.get("inputs"), list) else {}))
                      for t in TVS],
-            "default_tv": DEFAULT_TV, "ask": {"enabled": ASK_ENABLED}, "phone_remote": PHONE_REMOTE}
+            "default_tv": DEFAULT_TV, "ask": {"enabled": ASK_ENABLED}, "phone_remote": PHONE_REMOTE,
+            # only when config.json has one: without it the home is exactly as before
+            **({"design": DESIGN} if DESIGN else {}),
+            **({"design_store": DESIGN_STORE} if DESIGN_STORE is not None else {})}

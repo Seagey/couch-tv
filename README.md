@@ -50,36 +50,36 @@ Other TVs: [Will it work on my TV?](#will-it-work-on-my-tv)
 
 ## Updates
 
-The newest release is **0.12** (9 November 2026), on [the Releases page](https://github.com/Seagey/couch-tv/releases). These are on main, in the next release:
+The newest release is **0.13.6**, on [the Releases page](https://github.com/Seagey/couch-tv/releases): the TV tells you when a new couch-tv is out (Home settings, About, Update couch-tv, now on the on-TV app too), the Settings gear never covers a widget, and Hold OK never opens the app ([details](docs/UPDATES.md#19-november-2026-release-0136-the-tv-tells-you-about-updates-and-the-settings-gear-stays-clear)). 0.13.5 brought fixes from a real beginner on a TCL (Use as home screen asks properly and Cancel means no, the TV says plainly when Google keeps the Home button, and design codes are easy to type with the remote) ([details](docs/UPDATES.md#19-november-2026-release-0135-fixes-from-a-real-beginner-on-a-tcl)). 0.13.4 brought Samsung, with couch-tv Studio, a setup you run yourself with no AI agent (`couch-tv-samsung-setup.zip`), and a Frame that opens couch-tv after Art Mode and goes to Art Mode when the phone says off; plus couch-tv Studio designs in the Apple TV app ([details](docs/UPDATES.md#19-november-2026-release-0134-samsung-with-couch-tv-studio-and-a-setup-that-needs-no-ai-agent)). 0.13.3 made it easier for beginners (a Settings button on every design, a phone only install that no longer asks for the accessibility permission Play Protect flags, plain words on the TV and in the Setup app), greeted guests by name with no computer, and brought your home into couch-tv Studio. 0.13.2 brought Ask AI, your own AI agent, smart home set up on the TV and designs on Roku. New in 0.13:
 
-- **14 November:** custom cards with a web link open in the TV's browser on Android TV, LG and Samsung, thanks ekagra-codes ([#207](docs/UPDATES.md#14-november-2026-custom-cards-with-a-web-link-open-on-android-tv-lg-and-samsung-on-main-in-the-next-release))
-- **14 November:** choose where the home starts: profiles (as before), Keep watching or apps, thanks nidhalmouldi and ekagra-codes ([#211](docs/UPDATES.md#14-november-2026-choose-where-the-home-starts-profiles-keep-watching-or-apps-on-main-in-the-next-release))
+- **14 November:** custom cards with a web link open in the TV's browser on Android TV, LG and Samsung, thanks ekagra-codes ([#207](docs/UPDATES.md#14-november-2026-custom-cards-with-a-web-link-open-on-android-tv-lg-and-samsung-since-013))
+- **14 November:** choose where the home starts: profiles (as before), Keep watching or apps, thanks nidhalmouldi and ekagra-codes ([#211](docs/UPDATES.md#14-november-2026-choose-where-the-home-starts-profiles-keep-watching-or-apps-since-013))
 
-- **15 November:** the clock follows the TV's 12 or 24 hour setting, and Keep watching stays in view while you remove a show, thanks devmaliakbar and Hiren-Patel1 ([#221, #218](docs/UPDATES.md#15-november-2026-the-clock-follows-the-tvs-12-or-24-hour-setting-and-keep-watching-stays-in-view-while-you-remove-a-show-on-main-in-the-next-release))
-- **14 November:** Restart home in Home settings, About, thanks janooh37-hue ([#217](docs/UPDATES.md#14-november-2026-restart-home-in-home-settings-about-on-main-in-the-next-release))
-- **14 November:** two more real LGs (a NANO80TNA app only, a 28TQ515S with the bridge in Docker on a Synology), and `--apps tv` pairs by itself, thanks Anshul7171 and adri07 ([#219](docs/UPDATES.md#14-november-2026-two-more-real-lgs-and---apps-tv-pairs-by-itself-on-main-in-the-next-release), #220)
-- **14 November:** on a VIZIO, couch-tv's home in the TV's own webview, Beta, tried on one set, thanks lukionsp ([#206](docs/UPDATES.md#14-november-2026-vizio-couch-tvs-home-in-the-tvs-own-webview-beta-on-main-in-the-next-release))
-- **14 November:** input tiles for each TV, and a picture on an input tile, thanks BireshwarChakravarty ([#205](docs/UPDATES.md#14-november-2026-input-tiles-for-each-tv-and-a-picture-on-an-input-tile-on-main-in-the-next-release))
-- **14 November:** an LG goes back to couch-tv in about half a second, and input tiles switch straight to HDMI, thanks BireshwarChakravarty ([#204](docs/UPDATES.md#14-november-2026-lg-goes-back-to-couch-tv-in-about-half-a-second-and-input-tiles-switch-straight-to-hdmi-on-main-in-the-next-release))
-- **14 November:** remove a card from Keep watching on the phone remote, and it returns when you play the show again, thanks poinch ([#176](docs/UPDATES.md#14-november-2026-remove-a-card-from-keep-watching-on-the-phone-remote-on-main-in-the-next-release))
-- **14 November:** your own cards on the home from a small JSON file, display only, thanks geissmannz on Instagram for the idea ([custom cards](docs/UPDATES.md#14-november-2026-your-own-cards-on-the-home-without-changing-couch-tv-on-main-in-the-next-release))
-- **14 November:** the bridge's messages in Polish, and the assistant answers in the home's language, thanks Azumi0 ([#196](docs/UPDATES.md#14-november-2026-polish-bridge-messages-and-the-assistant-answers-in-polish-on-main-in-the-next-release))
-- **14 November:** a TV settings quick button, and Settings opens on its own screen, thanks syedhabibtirmizi ([#190](docs/UPDATES.md#14-november-2026-a-tv-settings-quick-button-and-settings-opens-on-its-own-screen-on-main-in-the-next-release))
-- **14 November:** the TV home installs over paired Wireless debugging, tested on an Epson LS300, thanks mazzanfar ([#194](docs/UPDATES.md#14-november-2026-tv-home-over-paired-wireless-debugging-tested-on-an-epson-ls300-on-main-in-the-next-release))
-- **14 November:** the Look button and Home settings changes show at once on the TV home, thanks clembgrn and syedhabibtirmizi ([#185](docs/UPDATES.md#14-november-2026-the-look-button-and-home-settings-changes-show-at-once-on-the-tv-home-on-main-in-the-next-release))
-- **14 November:** the phone remote is complete in Brazilian Portuguese, thanks scursel ([#195](docs/UPDATES.md#14-november-2026-the-phone-remote-is-complete-in-brazilian-portuguese-on-main-in-the-next-release))
-- **14 November:** Czech is complete on the TV home and the phone remote speaks Czech, thanks slezaCZ ([#180](docs/UPDATES.md#14-november-2026-czech-is-complete-and-the-phone-remote-speaks-czech-on-main-in-the-next-release))
-- **14 November:** `home.hi_res: "always"` loads the sharper 4K scenes on a 4K TV that draws its interface at 1080, thanks Hiren-Patel1 ([#191](docs/UPDATES.md#14-november-2026-sharper-scenes-on-a-4k-tv-that-draws-its-interface-at-1080-on-main-in-the-next-release))
-- **14 November:** an app banner that is not 16:9 keeps its proportions instead of being squeezed, thanks niravsaxena30 ([#181](docs/UPDATES.md#14-november-2026-an-app-banner-that-is-not-169-is-no-longer-squeezed-on-main-in-the-next-release))
-- **13 November:** the TV home speaks Czech, thanks slezaCZ ([#178](docs/UPDATES.md#13-november-2026-czech-on-the-tv-home-on-main-in-the-next-release))
-- **13 November:** Bell Streamer's Fibe TV home is replaced by couch-tv (Beta, untested), thanks Sparkybabcia ([#168](docs/UPDATES.md#13-november-2026-bell-streamer-with-fibe-tv-as-its-home-beta-on-main-in-the-next-release))
-- **13 November:** Privacy clean (Beta): `PRIVACY=1` switches off known tracking, ad and ACR apps, reversibly ([docs/PRIVACY.md](docs/PRIVACY.md), [details](docs/UPDATES.md#13-november-2026-privacy-clean-beta-on-main))
-- **13 November:** the home comes back to the tile you left after Settings, thanks IshMehta ([#166](docs/UPDATES.md#13-november-2026-the-home-comes-back-to-the-tile-you-left-on-main-in-the-next-release))
-- **13 November:** on Fire OS 7 Couch TV comes back without the 5 second wait, thanks atul016 ([#162](docs/UPDATES.md#13-november-2026-fire-os-7-brings-couch-tv-back-without-the-5-second-wait-on-main-in-the-next-release))
-- **13 November:** the Next song button skips the track again on a Mi Box, thanks NathanGlasby ([#158](docs/UPDATES.md#13-november-2026-the-next-song-button-skips-the-track-again-on-main-in-the-next-release))
-- **14 November:** Brazilian Portuguese on the TV home and the phone remote, thanks scursel ([#193](docs/UPDATES.md#14-november-2026-brazilian-portuguese-on-the-tv-home-and-the-phone-remote-on-main-in-the-next-release))
-- **14 November:** Polish on the TV home and the phone remote, thanks Azumi0 ([#184](docs/UPDATES.md#14-november-2026-polish-on-the-tv-home-and-the-phone-remote-on-main-in-the-next-release))
-- **13 November:** the TV home speaks Hebrew, right to left, thanks YuvalHir ([#153](docs/UPDATES.md#13-november-2026-hebrew-and-right-to-left-layout-on-the-tv-home-on-main-in-the-next-release))
+- **15 November:** the clock follows the TV's 12 or 24 hour setting, and Keep watching stays in view while you remove a show, thanks devmaliakbar and Hiren-Patel1 ([#221, #218](docs/UPDATES.md#15-november-2026-the-clock-follows-the-tvs-12-or-24-hour-setting-and-keep-watching-stays-in-view-while-you-remove-a-show-since-013))
+- **14 November:** Restart home in Home settings, About, thanks janooh37-hue ([#217](docs/UPDATES.md#14-november-2026-restart-home-in-home-settings-about-since-013))
+- **14 November:** two more real LGs (a NANO80TNA app only, a 28TQ515S with the bridge in Docker on a Synology), and `--apps tv` pairs by itself, thanks Anshul7171 and adri07 ([#219](docs/UPDATES.md#14-november-2026-two-more-real-lgs-and---apps-tv-pairs-by-itself-since-013), #220)
+- **14 November:** on a VIZIO, couch-tv's home in the TV's own webview, tried on one set, thanks lukionsp ([#206](docs/UPDATES.md#14-november-2026-vizio-couch-tvs-home-in-the-tvs-own-webview-beta-since-013))
+- **14 November:** input tiles for each TV, and a picture on an input tile, thanks BireshwarChakravarty ([#205](docs/UPDATES.md#14-november-2026-input-tiles-for-each-tv-and-a-picture-on-an-input-tile-since-013))
+- **14 November:** an LG goes back to couch-tv in about half a second, and input tiles switch straight to HDMI, thanks BireshwarChakravarty ([#204](docs/UPDATES.md#14-november-2026-lg-goes-back-to-couch-tv-in-about-half-a-second-and-input-tiles-switch-straight-to-hdmi-since-013))
+- **14 November:** remove a card from Keep watching on the phone remote, and it returns when you play the show again, thanks poinch ([#176](docs/UPDATES.md#14-november-2026-remove-a-card-from-keep-watching-on-the-phone-remote-since-013))
+- **14 November:** your own cards on the home from a small JSON file, display only, thanks geissmannz on Instagram for the idea ([custom cards](docs/UPDATES.md#14-november-2026-your-own-cards-on-the-home-without-changing-couch-tv-since-013))
+- **14 November:** the bridge's messages in Polish, and the assistant answers in the home's language, thanks Azumi0 ([#196](docs/UPDATES.md#14-november-2026-polish-bridge-messages-and-the-assistant-answers-in-polish-since-013))
+- **14 November:** a TV settings quick button, and Settings opens on its own screen, thanks syedhabibtirmizi ([#190](docs/UPDATES.md#14-november-2026-a-tv-settings-quick-button-and-settings-opens-on-its-own-screen-since-013))
+- **14 November:** the TV home installs over paired Wireless debugging, tested on an Epson LS300, thanks mazzanfar ([#194](docs/UPDATES.md#14-november-2026-tv-home-over-paired-wireless-debugging-tested-on-an-epson-ls300-since-013))
+- **14 November:** the Look button and Home settings changes show at once on the TV home, thanks clembgrn and syedhabibtirmizi ([#185](docs/UPDATES.md#14-november-2026-the-look-button-and-home-settings-changes-show-at-once-on-the-tv-home-since-013))
+- **14 November:** the phone remote is complete in Brazilian Portuguese, thanks scursel ([#195](docs/UPDATES.md#14-november-2026-the-phone-remote-is-complete-in-brazilian-portuguese-since-013))
+- **14 November:** Czech is complete on the TV home and the phone remote speaks Czech, thanks slezaCZ ([#180](docs/UPDATES.md#14-november-2026-czech-is-complete-and-the-phone-remote-speaks-czech-too-since-013))
+- **14 November:** `home.hi_res: "always"` loads the sharper 4K scenes on a 4K TV that draws its interface at 1080, thanks Hiren-Patel1 ([#191](docs/UPDATES.md#14-november-2026-sharper-scenes-on-a-4k-tv-that-draws-its-interface-at-1080-since-013))
+- **14 November:** an app banner that is not 16:9 keeps its proportions instead of being squeezed, thanks niravsaxena30 ([#181](docs/UPDATES.md#14-november-2026-an-app-banner-that-is-not-169-is-no-longer-squeezed-since-013))
+- **13 November:** the TV home speaks Czech, thanks slezaCZ ([#178](docs/UPDATES.md#13-november-2026-czech-on-the-tv-home-since-013))
+- **13 November:** Bell Streamer's Fibe TV home is replaced by couch-tv, thanks Sparkybabcia ([#168](docs/UPDATES.md#13-november-2026-bell-streamer-with-fibe-tv-as-its-home-beta-since-013))
+- **13 November:** Privacy clean: `PRIVACY=1` switches off known tracking, ad and ACR apps, reversibly ([docs/PRIVACY.md](docs/PRIVACY.md), [details](docs/UPDATES.md#13-november-2026-privacy-clean-beta-on-main))
+- **13 November:** the home comes back to the tile you left after Settings, thanks IshMehta ([#166](docs/UPDATES.md#13-november-2026-the-home-comes-back-to-the-tile-you-left-since-013))
+- **13 November:** on Fire OS 7 Couch TV comes back without the 5 second wait, thanks atul016 ([#162](docs/UPDATES.md#13-november-2026-fire-os-7-brings-couch-tv-back-without-the-5-second-wait-since-013))
+- **13 November:** the Next song button skips the track again on a Mi Box, thanks NathanGlasby ([#158](docs/UPDATES.md#13-november-2026-the-next-song-button-skips-the-track-again-since-013))
+- **14 November:** Brazilian Portuguese on the TV home and the phone remote, thanks scursel ([#193](docs/UPDATES.md#14-november-2026-brazilian-portuguese-on-the-tv-home-and-the-phone-remote-since-013))
+- **14 November:** Polish on the TV home and the phone remote, thanks Azumi0 ([#184](docs/UPDATES.md#14-november-2026-polish-on-the-tv-home-and-the-phone-remote-since-013))
+- **13 November:** the TV home speaks Hebrew, right to left, thanks YuvalHir ([#153](docs/UPDATES.md#13-november-2026-hebrew-and-right-to-left-layout-on-the-tv-home-since-013))
 
 Every change, with credits: [docs/UPDATES.md](docs/UPDATES.md).
 
@@ -102,23 +102,23 @@ A is the TV home only, B adds the computer bridge, C lives on the TV ([the three
 | [Google TV](docs/PLATFORMS.md#google-tv-and-android-tv) | Yes | Yes | Partial |
 | [Google TV box](docs/PLATFORMS.md#google-tv-and-android-tv) | Yes | Yes | Partial |
 | [Older Android TV](docs/PLATFORMS.md#google-tv-and-android-tv) | Yes | Yes | Yes |
-| [Android 6 TV](docs/PLATFORMS.md#all-tvs-in-one-table) | Experimental | Not tested | Experimental |
+| [Android 6 TV](docs/PLATFORMS.md#all-tvs-in-one-table) | Works with 0.13 or later | Not reported | Works with 0.13 or later |
 | [XGIMI projector](docs/PLATFORMS.md#all-tvs-in-one-table) | Yes | Not reported | Yes |
-| [Nvidia Shield](docs/PLATFORMS.md#google-tv-and-android-tv) | Yes, untested | Yes | Yes, untested |
+| [Nvidia Shield](docs/PLATFORMS.md#google-tv-and-android-tv) | Yes | Yes | Yes |
 | [Fire TV on Fire OS](docs/PLATFORMS.md#fire-tv-on-fire-os) | Partial | Partial | Partial |
-| [Fire TV on Vega OS](docs/PLATFORMS.md#fire-tv-on-vega-os) | App only | Beta | No |
+| [Fire TV on Vega OS](docs/PLATFORMS.md#fire-tv-on-vega-os) | App only | With a computer at home | No |
 | [Samsung](docs/PLATFORMS.md#samsung) | App only | As an app | No |
 | [LG](docs/PLATFORMS.md#lg) | App only | As an app | No |
 | [Roku](docs/PLATFORMS.md#roku) | App only | As a channel | No |
-| [Hisense VIDAA](docs/PLATFORMS.md#hisense-vidaa) | App only | Beta | No |
-| [Philips with Titan OS](docs/PLATFORMS.md#philips-with-titan-os) | Not yet | Remote only, Beta | No |
-| [Older Philips with Saphi](docs/PLATFORMS.md#older-philips-with-saphi) | No | Beta | No |
-| [VIZIO](docs/PLATFORMS.md#vizio) | No | Remote, Beta (home in the TV's webview by hand, Beta, one set) | No |
-| [Panasonic Viera](docs/PLATFORMS.md#panasonic-viera) | No | Beta | No |
-| [Apple TV](docs/PLATFORMS.md#apple-tv) | No | Beta | No |
-| [TiVo OS](docs/PLATFORMS.md#tivo-os) | No | Beta | No |
+| [Hisense VIDAA](docs/PLATFORMS.md#hisense-vidaa) | App only | With a computer at home | No |
+| [Philips with Titan OS](docs/PLATFORMS.md#philips-with-titan-os) | Not yet | Remote only, with a computer at home | No |
+| [Older Philips with Saphi](docs/PLATFORMS.md#older-philips-with-saphi) | No | With a computer at home | No |
+| [VIZIO](docs/PLATFORMS.md#vizio) | No | Remote, with a computer at home (home in the TV's webview by hand, one set) | No |
+| [Panasonic Viera](docs/PLATFORMS.md#panasonic-viera) | No | With a computer at home | No |
+| [Apple TV](docs/PLATFORMS.md#apple-tv) | No | With a computer at home | No |
+| [TiVo OS](docs/PLATFORMS.md#tivo-os) | No | With a computer at home | No |
 
-**Beta** means a computer at home that stays on, and the maker's own Home button still opens the maker's own home.
+**With a computer at home** means a computer at home that stays on, and the maker's own Home button still opens the maker's own home.
 
 **It depends on the model, not the brand.** Open **Settings, System, About** (or **Device Preferences, About**) on the TV: "Android TV OS" means yes ([brand by brand](docs/TV-BRANDS.md)).
 
@@ -142,6 +142,49 @@ Five scenes take turns every 20 seconds, each with a big glass clock that sits j
 scenery: the peaks, the volcano and the misty hills overlap the digits, and on the lake the clock
 floats with its reflection under the water. Or pick the Classic look, your own photos, or
 [a scene you design yourself](docs/MAKE-A-SCENE.md).
+
+## The easy way: couch-tv Setup
+
+A free app for Mac and Windows that puts couch-tv's home screen on a **Google TV, Android TV or
+Fire TV** with no command line and no AI agent. It opens a page in your browser and walks you
+through it: Developer options with the TV remote, a 6 digit code (Google TV on Android 12 or newer)
+or one Allow press (Android TV, and Google TV on Android 11), then it installs couch-tv from this
+repo's Releases, checks it, sets it up the way `apply.sh` does (option A), and can add the phone
+remote. It shows the plan and waits for your yes before it changes anything, and it can undo all of
+it. Download it from [the Releases page](https://github.com/Seagey/couch-tv/releases) (the Mac zip
+and the Windows zip); how to open it the first time: [setup-app/README.md](setup-app/README.md).
+
+If the TV never shows "Allow USB debugging?", the app walks you through the fixes one at a time,
+and if the TV still says no, it shows how to put couch-tv on with just your phone instead.
+
+**Other TVs, not through this app** (each has its own way, most with a computer at home that stays on):
+
+| TV system | How |
+|---|---|
+| **Samsung (Tizen)** | `couch-tv-samsung-setup.zip` from [the Releases page](https://github.com/Seagey/couch-tv/releases): double-click its installer on a Mac or Windows computer, no AI agent needed ([docs/SAMSUNG.md](docs/SAMSUNG.md#the-quick-way-no-ai-agent-no-paid-plan)) |
+| **LG (webOS)** | [docs/LG.md](docs/LG.md) |
+| **Roku OS** (Roku TVs and sticks) | [docs/ROKU.md](docs/ROKU.md) |
+| **VIDAA** (Hisense's own system) | [docs/VIDAA.md](docs/VIDAA.md) |
+| **Apple TV (tvOS)** | [docs/APPLE-TV.md](docs/APPLE-TV.md) |
+| **Fire TV on Vega OS** (Fire TV Stick 4K Select, Fire TV Stick HD 2026, Fire TV Stick 4K 3rd gen) | [docs/FIRE-VEGA.md](docs/FIRE-VEGA.md) |
+| **Panasonic with My Home Screen** | [docs/PANASONIC.md](docs/PANASONIC.md) (Panasonic's Fire TV and Google TV models work with this app) |
+| **TiVo OS** on any brand | [docs/TIVO.md](docs/TIVO.md) |
+| **Philips with Titan OS or Saphi** | [docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md), [docs/PHILIPS-SAPHI.md](docs/PHILIPS-SAPHI.md) (Philips Google TV and Android TV models work with this app) |
+
+A Google TV box (for example the Google TV Streamer) plugged into any of these gets everything.
+Android 6 and 7.0 TVs (for example the Xiaomi Mi TV 4A with PatchWall) are set up from a computer
+with the steps below; the app says so before it changes anything.
+
+The Fire TV setup builds on couch-tv-setup by killy10o10.
+
+### Community tools
+
+Made by people outside this repo, not checked by us after the version named:
+- [couch-tv-setup](https://github.com/killy10o10/couch-tv-setup) by killy10o10: a setup app for
+  couch-tv's "lives on the TV" app on Fire TV sticks, with an optional switch off for Amazon's
+  advert and tracking apps (we reviewed v0.1.2: [setup-app/REVIEW-killy10o10.md](setup-app/REVIEW-killy10o10.md)).
+
+## Setting it up with an AI agent
 
 <p align="center">
   <img src="docs/screens/home-night.jpg" alt="Night" width="32%">
@@ -197,14 +240,51 @@ look and scenes, your apps and their order, the people and the quick buttons, wi
 - **[Smart home](docs/TV-HOME.md#smart-home)**: air conditioning, scenes and a doorbell card from Home Assistant. Off unless you add it.
 - **[Sixteen languages](docs/TV-HOME.md#languages)**: English, Spanish, Mexican Spanish, Italian, German, French, Turkish, Serbian, Polish, Dutch, Hebrew, Czech, Brazilian Portuguese, Arabic, Romanian and Simplified Chinese.
 - **[Your own photos](docs/TV-HOME.md#your-own-photos)**: from a USB drive, the TV or the web, taking turns with the scenes.
-- **[Two TVs, one show](docs/SYNC.md)**: start the same show on two TVs at once, so two rooms do not echo. Experimental.
+- **[Two TVs, one show](docs/SYNC.md)**: start the same show on two TVs at once, so two rooms do not echo.
 - **[Move to another TV](docs/MOVE.md)**: carry on in another room. One tap on the phone pauses the show here and starts it there, as the same person. New, Android and Google TV with the bridge.
 - **[Updates on the TV](docs/TV-HOME.md#updates)**: off until you say yes. Then the TV tells you about a new version and hands it to Android to install.
+
+## couch-tv Studio (optional)
+
+[couch-tv Studio](https://tvdesigner.sites.underseage.studio) is a website for designing your TV
+home: place the clock, the dock and widgets where you like, then send the design to your TV with a
+short code. It also has a gallery of designs other people made.
+
+- **couch-tv stays free and open source** (MIT). Studio is an optional hosted service, run
+  separately, and its source is not open. You never need it to use couch-tv.
+- **Off until you turn it on.** Installing or updating couch-tv never switches it on. Until someone
+  at the TV turns it on (Home settings, couch-tv Studio) or types a code there, the TV asks Studio
+  for nothing. **Back to my classic home** switches it off again in one step.
+- **What the TV sends to Studio:** the code you typed, with no cookies and no referrer. While a
+  design is on, the TV also fetches the fonts the design names from Studio, and the design's
+  background video, if it has one, by the video's id and a size (720p or 1080p, short clip or long
+  loop), with no cookies and no referrer; once it has played, the TV keeps its own copy and does
+  not ask again. While a news,
+  scores, markets or commute widget is on, it asks Studio once a day whether that source is paused.
+  **Open this home in couch-tv Studio** (called Share this home on 0.13.0 to 0.13.2) sends the
+  layout of the home you have now, without names, photos, places, keys or calendar links.
+- **Bring the home you have now into Studio.** On the TV: Home settings, couch-tv Studio, **Open this
+  home in couch-tv Studio**. The TV shows a QR code and a 10 letter code; scan it, or type the code
+  under "Already use couch-tv from GitHub?" on Studio's start screen. It opens as a design you can change, keep
+  in My designs and send back. Only the look (scenes, clock, glass, the dock's style and size,
+  Keep watching and Now playing on or off) and the dock's apps go, in order. A TV older than 0.13
+  cannot do this: on the computer that set it up, open Studio, press **Open my config.json** and
+  pick the `config.json` in your couch-tv folder. It brings the look from `home`; your people,
+  weather place, bridge, Home Assistant and Plex sections are left out on purpose. Never pick `.env`:
+  it only holds keys, and Studio does not need it. Step by step, with pictures: Studio's help,
+  "Bring your couch-tv home into Studio".
+- **What never leaves the TV:** your watch history, your people, things typed at home (the note,
+  lists, the guest Wi-Fi password, the house guide, a calendar address) and a Home Assistant token.
+  A design or a share refuses anything that looks like a token or a private key.
+- **What it costs:** making a design and the starter designs are free. Some gallery designs cost a
+  little. The gallery takes a flat 20% of a sale, and the person who made the design keeps 80%,
+  less the card payment fee.
+- Every setting a design can carry, and the checks the TV makes on it: [docs/CONFIG.md, Design](docs/CONFIG.md#design-design-from-couch-tv-studio).
 
 ## One home, many TVs
 
 The same home on Google TV and Android TV, an app on Apple TV, a channel on Roku, and Fire TV,
-Samsung and LG versions, with Beta paths for more.
+Samsung and LG versions, with more paths for other TVs.
 
 <p align="center">
   <img src="docs/screens/appletv-home.jpg" alt="Couch TV on Apple TV" width="32%">
@@ -212,7 +292,80 @@ Samsung and LG versions, with Beta paths for more.
   <img src="docs/screens/firestick-home.jpg" alt="couch-tv on a Fire TV Stick" width="32%">
 </p>
 
-<p align="center"><sub>Apple TV (Beta), Roku and a Fire TV Stick.</sub></p>
+<p align="center"><sub>Apple TV, Roku and a Fire TV Stick.</sub></p>
+
+## Android permissions, and why
+
+Every permission the Android apps ask for, read from their manifests. Several strong ones are not
+granted when you install: they are granted over ADB, after you allowed that computer or app at the
+TV, and only for the feature that needs them. `tests/test_docs_permissions.py` fails if a manifest
+gains a permission these tables do not explain.
+
+**The TV home** (`tv-home/`, the app called Home, options A and B):
+
+| Permission | Granted | Why |
+|---|---|---|
+| `INTERNET` | On install | The home's own page: your bridge on the home network (option B), the weather, posters, the update check and the widgets you add |
+| `ACCESS_NETWORK_STATE` | On install | To tell whether the TV is online before it asks for anything |
+| `READ_TV_LISTINGS` | By `apply.sh` | Keep watching: reads Android's Watch Next list (what each app says you are part way through). Read only |
+| `PACKAGE_USAGE_STATS` | Only with `SCREEN_TIME=1`, or when you switch Home on in the TV's Usage access screen | The Screen time widget: today's time in each app. Off unless you ask for it |
+| `SYSTEM_ALERT_WINDOW` | By `apply.sh`, only when `config.json` has a doorbell | The doorbell card over whatever is playing. A later `apply.sh` run without a doorbell takes it back |
+| `BLUETOOTH_CONNECT` | Android 12 and newer: only when you press OK on a Batteries widget and pick Allow on Android's question | The Batteries widget: the charge left in remotes and controllers paired with the TV. Only their names and levels, kept on the TV |
+| `BLUETOOTH` | On install, Android 11 and older only | The same Batteries widget, on older Android: lists the paired remotes and controllers |
+| `REQUEST_INSTALL_PACKAGES` | Android asks you once | Updates: hands a new release to Android's installer, which always asks the person at the TV first |
+| `REQUEST_DELETE_PACKAGES` | On install | Hold OK on an app, Uninstall: opens Android's own remove dialog, which always asks first |
+| `WRITE_SECURE_SETTINGS` | By `apply.sh`, on a Fire TV only | Keeps the Home button watch switched on after updates and restarts |
+| `WRITE_SETTINGS` | By `apply.sh` | The screensaver quick button shortens the screen timeout for a moment so the TV starts its own screensaver |
+| `RECEIVE_BOOT_COMPLETED` | On install | Puts the Home button watch back after a restart or an update |
+
+**The on-TV app** (`on-tv/`, Couch TV, option C, the bridge inside the TV):
+
+| Permission | Granted | Why |
+|---|---|---|
+| `INTERNET` | On install | The phone remote's server on your home network, and finding shows |
+| `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE` | On install | To see the network and Wi-Fi connection the phone remote uses |
+| `CHANGE_WIFI_MULTICAST_STATE` | On install | Hears the TV's own wireless debugging port being announced on the network, so the app can connect to the TV's ADB |
+| `WAKE_LOCK` | On install | Keeps Wi-Fi awake so the phone remote can still reach the TV |
+| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` | On install | Keeps the phone remote's server running, declared to Android as "Local-network server for a phone remote control of this TV" |
+| `POST_NOTIFICATIONS` | Not asked for by the app | Lets the notice Android shows while that server runs appear on Android 13 and newer |
+| `RECEIVE_BOOT_COMPLETED` | On install | Starts the server again after a restart or an update |
+| `QUERY_ALL_PACKAGES` | On install | To tell which streaming apps are installed, so the remote can open them. This app is sideloaded, not from a store |
+| `SYSTEM_ALERT_WINDOW` | By the app over the TV's own ADB, after you press Allow | Lets it open apps from the background when you pick one on the phone |
+| `WRITE_SECURE_SETTINGS` | The same way | Switches wireless debugging back on after a restart, and the Home button watch on a Fire TV |
+| `READ_TV_LISTINGS`, `READ_EPG_DATA` | The same way | Keep watching: reads Android's Watch Next rows to name what is playing when an app does not say. Read only |
+| `PACKAGE_USAGE_STATS` | The same way, or from a computer where Fire OS blocks the TV's own ADB | Fire TV only in use: lets the home watch see Amazon's home come forward on Fire OS builds where the accessibility watch never connects |
+
+**The sync helper** (`sync/`, only for [Two TVs, one show](docs/SYNC.md)):
+
+| Permission | Granted | Why |
+|---|---|---|
+| `INTERNET` | On install | A tiny clock answer on the home network, so the computer can time two TVs together. It reveals only the TV's uptime |
+
+**Services the apps hold** (Android binds these; the app does not ask for them):
+
+- **Home button watch** (`FireWatch`, Home) and **home watch** (`WatchService`, Couch TV): accessibility
+  services, off until a computer switches them on. They see which window came forward, by its app and
+  screen name, and put couch-tv's home back when the TV opens its own. They read no screen content.
+  The Home one declares the screen reading capability only because some TVs (a TCL on Android 12)
+  send window events to nothing else.
+- **Home gear button** (`KeyWatch`, Home): an accessibility service you switch on yourself in
+  Accessibility. It catches only the remote's gear button.
+- **TCL placeholder input** (`TclPlaceholderInput`, Home): an empty TV input, switched on only on a
+  TCL, so TCL's start manager lets Home start at power on. It shows nothing and receives nothing.
+- **Sync listener** (`Listener`, sync helper): a notification listener, granted over ADB, only so the
+  helper may read the play position of the show on screen. It does nothing with notifications. Its
+  commands come only from ADB.
+- `tests/fake-player/` and `sync/testplayer/` are test apps for checks on a real TV. They are not
+  in a release.
+
+**What the TV home talks to.** Your bridge or the on-TV app on your home network; Open-Meteo for
+the weather (and air quality, surf and place search when you use them); JustWatch for posters;
+GitHub for the update check (only with updates on); Home Assistant on your home network, if you set
+it up; couch-tv Studio only once it is turned on (above); and, only while that widget is on the
+home, its own source (news feeds, ESPN for scores, Yahoo Finance for markets, OSRM for commute
+times, your own calendar address). The home's page rules allow any https address, because the
+calendar and video links in Home settings are addresses you choose. A design carries no code and
+no outside links, and the TV drops any it finds.
 
 ## Documentation
 
@@ -248,6 +401,9 @@ Everything else: [docs/](docs/README.md).
 - The Bluetooth and Network buttons, Amazon YouTube support and the Fire TV Stick guide came from
   the [killy10o10 fork](https://github.com/killy10o10/couch-tv); the unpaired TV guard from the
   [Justin1491 fork](https://github.com/Justin1491/couch-tv).
+- couch-tv Setup (`setup-app/`): the Fire TV setup builds on
+  [couch-tv-setup](https://github.com/killy10o10/couch-tv-setup) by killy10o10 (MIT); the reused
+  parts and their notice are in `setup-app/THIRD-PARTY.md`.
 
 ## Shout me a coffee
 

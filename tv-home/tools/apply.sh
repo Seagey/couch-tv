@@ -31,11 +31,13 @@
 # APK defaults to the one scripts/build-apk.sh builds. KEEP_SETUP is no longer needed: the setup
 # wizard always stays on.
 #
-# Privacy clean (Beta, opt in, docs/PRIVACY.md): PRIVACY=1 also switches off the known tracking, ad
+# Privacy clean (opt in, docs/PRIVACY.md): PRIVACY=1 also switches off the known tracking, ad
 # and ACR apps from privacy-list.txt that this TV has, through the same safety check and undo list
 # as EXTRA_OFF. Without PRIVACY=1 nothing about it changes.
 # Dry run: DRY_RUN=1 only lists what would be switched off and left on, and why. It installs
 # nothing, switches nothing off and writes no files. Without TV_IP it prints the privacy list.
+# Screen time (opt in): SCREEN_TIME=1 lets the home read Android's usage numbers for couch-tv Studio's
+# Screen time widget (usage access). They stay on the TV. undo.sh takes it back.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
@@ -209,6 +211,11 @@ esac
 # The screensaver quick button cuts the screen timeout for a moment (its own screensaver refuses
 # apps), which needs "modify system settings".
 "$PY" "$T" shell "appops set app.couchtv.launcher WRITE_SETTINGS allow" > /dev/null 2>&1 || true
+# couch-tv Studio's Screen time widget reads Android's usage numbers: only with SCREEN_TIME=1.
+# Without it nothing changes (a switch made in the TV's own Usage access screen stays as it is).
+if [ "${SCREEN_TIME:-}" = 1 ]; then
+  "$PY" "$T" shell "appops set app.couchtv.launcher GET_USAGE_STATS allow" > /dev/null 2>&1 || true
+fi
 
 echo "2/4  Keeping the TV's own home and setup on"
 present=$("$PY" "$T" shell "pm list packages" | sed 's/package://')
@@ -284,6 +291,29 @@ if echo "$present" | grep -qx -E "com.google.android.apps.tv.launcherx|com.googl
   esac
   "$PY" "$T" shell "settings put secure accessibility_enabled 1"
   echo "     the Home button watch is on (the TV's own home may flash up, then couch-tv comes back)"
+fi
+
+# Remote buttons that open an app (home.app_keys in config.json, KeyWatch.kt): the TV hands such a
+# button to no app, so the accessibility service that sees keys first is switched on, only when the
+# list is not empty. Any other accessibility service already on is kept.
+if [ "$DRY" != 1 ] && "$PY" -c "import sys; sys.path.insert(0, '$ROOT/bridge'); import config; sys.exit(0 if config._home(config.CONFIG.get('home') or {}).get('app_keys') else 1)" 2>/dev/null; then
+  KEYWATCH=app.couchtv.launcher/.KeyWatch
+  "$PY" "$T" shell "pm grant app.couchtv.launcher android.permission.WRITE_SECURE_SETTINGS" > /dev/null 2>&1 || true
+  CUR=$("$PY" "$T" shell "settings get secure enabled_accessibility_services" | tr -d '\r')
+  # The force-stop above leaves a listed service showing as crashed and never rebound (issue #37, as for
+  # the Home watch): take it out of the list and put it back so Android binds it again.
+  REST=$(echo "$CUR" | tr ':' '\n' | grep -v -e KeyWatch -e '^null$' -e '^$' | paste -sd: - || true)
+  if [ -z "$REST" ]; then
+    "$PY" "$T" shell "settings delete secure enabled_accessibility_services" > /dev/null
+    NEW=$KEYWATCH
+  else
+    "$PY" "$T" shell "settings put secure enabled_accessibility_services $REST" > /dev/null
+    NEW="$REST:$KEYWATCH"
+  fi
+  sleep 2
+  "$PY" "$T" shell "settings put secure enabled_accessibility_services $NEW"
+  "$PY" "$T" shell "settings put secure accessibility_enabled 1"
+  echo "     the remote's app buttons are on (home.app_keys)"
 fi
 
 # Tell the bridge's daily guard what to keep switched off (a Google TV update can switch ambient

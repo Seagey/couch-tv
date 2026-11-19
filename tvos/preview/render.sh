@@ -4,6 +4,10 @@
 #
 #   tvos/preview/render.sh <bridge address> <code or pairing key> [out folder]
 #   tvos/preview/render.sh 127.0.0.1:5455 123456 build/tvos-preview
+#
+# couch-tv Studio designs (DesignView.swift), no bridge needed: a file of designs, one PNG each, plus the
+# "Use this design?" question and Settings:
+#   tvos/preview/render.sh --designs tests/fixtures/designs-tvos/showcase.json build/tvos-preview
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)

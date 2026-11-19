@@ -56,7 +56,7 @@ needs the first's TV set up the same way (developer mode on).
 ## What you need
 
 **For every option:**
-- A **Google TV or Android TV** (Android 7.1 or newer; Android 6 is experimental and needs apps built from main for now) with Developer options and debugging on
+- A **Google TV or Android TV** (Android 7.1 or newer; Android 6 needs apps built from main for now) with Developer options and debugging on
   (step 1).
 - A computer on the same Wi-Fi to set it up from: macOS or Linux with **Python 3.11 or newer**
   (`python3 --version`). Missing or older: on macOS `brew install python@3.11` or the installer
@@ -257,8 +257,8 @@ a show. Put visitors on a guest Wi-Fi network (most routers have one) so they ca
 
 To require a password on your home network, set `"pairing_key"` under `"bridge"` in `config.json`. The
 phone remote pairs once by typing it (or opening `http://your-computer.local:5400/?pair=<key>`), and the
-TV homes carry their key. On a Google TV, Android TV or Fire TV that needs a TV home app newer than
-0.12 (on main, in the next release: build it until then), and the Samsung, LG and Roku apps are built
+TV homes carry their key. On a Google TV, Android TV or Fire TV that needs a TV home app of
+0.13 or newer, and the Samsung, LG and Roku apps are built
 again with the key. See [Switching the pairing key on](CONFIG.md#switching-the-pairing-key-on)
 for how to switch it on and update your TVs.
 
@@ -298,8 +298,8 @@ maker's own) and the setup app stay installed and switched on, so the TV always 
 Home button watch puts couch-tv on top whenever the TV opens its own home, which may flash up for a
 moment first. Only ambient mode (the idle adverts) and any ad trackers you name in `EXTRA_OFF` are
 switched off, and `apply.sh` refuses to switch off anything the TV may need to start. Add
-`PRIVACY=1` to also switch off the known tracking and ad apps it finds (Beta,
-[PRIVACY.md](PRIVACY.md)). Nothing is deleted. It also hands the app your `config.json` settings (people, weather, clock, look, quick
+`PRIVACY=1` to also switch off the known tracking and ad apps it finds
+([PRIVACY.md](PRIVACY.md)). Nothing is deleted. It also hands the app your `config.json` settings (people, weather, clock, look, quick
 buttons) for its built-in copy. **Read the Undo section before you run it.** It is safe to run as
 often as you like, and on a TV set up by couch-tv 0.10 or older it switches the Google TV home and
 the setup app back on ([why](TROUBLESHOOTING.md#if-your-tv-loops-after-a-restart)).
@@ -323,7 +323,7 @@ do the install instead of `apply.sh`:
    It connects to the TV over Wi-Fi with ADB, so the TV asks you to allow it. Open **Setup
    Launcher**, pick couch-tv, then restart the TV.
 
-**Option A with no computer at all, making it the home** (issue #98, on main, in the next release). If couch-tv installed and
+**Option A with no computer at all, making it the home** (issue #98, since 0.13). If couch-tv installed and
 shows up as an app but the Home button still opens the TV's own home, there is no computer step
 left. On a plain Android TV 10 or newer, couch-tv asks Android to make it the home:
 
@@ -334,9 +334,10 @@ left. On a plain Android TV 10 or newer, couch-tv asks Android to make it the ho
 - Some Android TV 11 builds also show **Select a home app** the first time you press Home. Pick
   couch-tv and **Always**.
 - **Home still opens the TV's own home?** Some TVs (a Haier, issue #98) open their own launcher by
-  name and ignore Android's default home. In the on-TV app press **Home button watch** and switch
-  on **Couch TV home watch**: it brings couch-tv back when the TV's own home comes forward. It sees
-  which screen came forward and reads nothing else.
+  name and ignore Android's default home. From a computer, install `couch-tv-ontv-watch.apk` (the
+  plain `couch-tv-ontv.apk` no longer has the watch), then switch on **Couch TV home watch** in the
+  TV's own Settings, Accessibility: it brings couch-tv back when the TV's own home comes forward. It
+  sees which screen came forward and reads nothing else.
 - **Google TV is different.** Google's own home can keep the Home button, so asking Android is not
   enough there. A computer runs `apply.sh` once, which switches on the Home button watch that
   brings couch-tv back when Home opens Google's.
@@ -379,7 +380,7 @@ needed: `tv-home/android/gradlew` fetches Gradle 8.11.1 by itself.
    JAVA_HOME=/path/to/jdk-21 ANDROID_HOME=/path/to/android-sdk sh scripts/build-apk.sh
    ```
    It prints where the APKs are (`dist/couch-tv-home.apk`, plus `dist/couch-tv-ontv.apk` for
-   option C, and `dist/couch-tv-sync.apk`, the experimental two TV sync helper,
+   option C, and `dist/couch-tv-sync.apk`, the two TV sync helper,
    [SYNC.md](SYNC.md)). The on-TV app carries the phone remote inside it, so for that one the script builds
    `remote/` first, which needs **Node 20.19 or newer**. `apply.sh` finds `dist/couch-tv-home.apk`
    by itself.

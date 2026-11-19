@@ -48,6 +48,7 @@ object Auth {
             return null
         }
         pin = null
+        lastPairedAt = System.currentTimeMillis()
         notifyPin()
         val token = hex(32)
         val list = tokens()
@@ -68,6 +69,9 @@ object Auth {
     }
 
     fun phoneCount() = tokens().length()
+
+    /** When a phone last paired (ms, 0: not since the app started), so the setup screen can say so. */
+    @Volatile var lastPairedAt = 0L
 
     fun forgetAll() = Store.putStr("tokens", "[]")
 

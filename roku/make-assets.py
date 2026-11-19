@@ -105,6 +105,16 @@ def ui():
     panel(os.path.join(d, "focus.9.png"), "rgba(255,255,255,0.10)", "rgba(255,255,255,0.95)", 6)
     panel(os.path.join(d, "pill.9.png"), "rgba(255,255,255,0.14)", "rgba(255,255,255,0.28)", 2, radius=22, size=64)
     panel(os.path.join(d, "pill-on.9.png"), "rgba(255,255,255,0.95)", "rgba(255,255,255,0.95)", 2, radius=22, size=64)
+    design_shapes(d)
+
+
+def design_shapes(d):
+    """White shapes a couch-tv Studio design tints to its own colours (DesignDraw.brs): a filled rounded
+    panel, its outline, and a disc for the moon and the clock face's middle."""
+    panel(os.path.join(d, "round.9.png"), "white", "white", 1)
+    panel(os.path.join(d, "line.9.png"), "none", "white", 3)
+    run("magick", "-size", "256x256", "xc:none", "-fill", "white", "-draw", "circle 128,128 128,2", "-strip",
+        "PNG32:" + os.path.join(d, "disc.png"))
     # the shade under Keep watching and the dock: clear for the top 60%, then to half black
     run("magick", "-size", "1x648", "xc:none", "(", "-size", "1x432", "gradient:rgba(0,0,0,0)-rgba(0,0,0,0.5)", ")",
         "-append", "-strip", "PNG32:" + os.path.join(d, "scrim.png"))

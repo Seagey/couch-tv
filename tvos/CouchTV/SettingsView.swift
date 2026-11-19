@@ -10,6 +10,9 @@ struct SettingsView: View {
     @State private var busy = false
     @State private var problem = ""
     @State private var done = ""
+    @State private var code = ""
+    @State private var fetching = false
+    @State private var designNote = ""
     @Environment(\.flatGlass) private var flat
 
     var body: some View {
@@ -61,11 +64,21 @@ struct SettingsView: View {
                     if model.prefs.clock24 != nil {
                         note("Set on the bridge (Home settings on the phone), which wins over this.")
                     }
+                    section("Home design").padding(.top, 28)
+                    if model.hasDesign {
+                        HStack(spacing: 20) {
+                            pill(tag: "design-on", title: "Design", on: !model.designOff) { model.setPlainHome(false); designNote = "" }
+                            pill(tag: "plain", title: "Plain home", on: model.designOff) { model.setPlainHome(true); designNote = "" }
+                        }
+                    }
+                    field("Get a design: type its code", text: $code, prompt: "ABCDE-FGHJK", width: 760)
+                    pill(tag: "get-design", title: fetching ? "Getting it…" : "Get a design") { getDesign() }
+                    if !designNote.isEmpty { note(designNote) }
                     section("Good to know").padding(.top, 28)
                     note("Apple's Home button still opens Apple's home: tvOS lets no app replace it. With the bridge running, Couch TV opens by itself when the Apple TV wakes.")
                     note("Apps open through the bridge, because a tvOS app cannot open another app by itself. A few (YouTube, Netflix, Spotify) also open without it.")
                     note("Without the bridge the clock, the date and the scenes still work, and the apps you saw last stay in the dock.")
-                    note(["Couch TV", Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String, "(Beta)"]
+                    note(["Couch TV", Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String]
                         .compactMap { $0 }.joined(separator: " "))
                 }
                 .frame(width: 760, alignment: .leading)
@@ -115,6 +128,23 @@ struct SettingsView: View {
         }
     }
 
+    /// A design by code from couch-tv Studio: once it arrives, Settings closes and the home asks "Use this design?".
+    private func getDesign() {
+        guard !fetching else { return }
+        fetching = true
+        designNote = ""
+        Task {
+            if let why = await model.getDesign(code: code) {
+                designNote = why
+            } else {
+                code = ""
+                model.showSettings = false
+                dismiss()
+            }
+            fetching = false
+        }
+    }
+
     // MARK: pieces
 
     private func section(_ t: String) -> some View {
@@ -125,7 +155,7 @@ struct SettingsView: View {
         Text(t).font(HomeFont.inter(23)).foregroundStyle(.white.opacity(0.78)).fixedSize(horizontal: false, vertical: true)
     }
 
-    private func field(_ label: String, text: Binding<String>, prompt: String) -> some View {
+    private func field(_ label: String, text: Binding<String>, prompt: String, width: CGFloat = 900) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label).font(HomeFont.inter(21, .medium)).foregroundStyle(.white.opacity(0.7))
             if flat {      // the preview renderer cannot draw a text field: a look-alike
@@ -133,7 +163,7 @@ struct SettingsView: View {
                     .font(HomeFont.inter(29))
                     .foregroundStyle(.white.opacity(text.wrappedValue.isEmpty ? 0.45 : 0.95))
                     .padding(.horizontal, 24)
-                    .frame(width: 900, height: 66, alignment: .leading)
+                    .frame(width: width, height: 66, alignment: .leading)
                     .glass(14)
             } else {
                 TextField(prompt, text: text)
@@ -142,7 +172,7 @@ struct SettingsView: View {
                     #if os(tvOS)
                     .textInputAutocapitalization(.never)
                     #endif
-                    .frame(width: 900)
+                    .frame(width: width)
             }
         }
     }

@@ -80,7 +80,7 @@
 
   <section class="card" id="xiaomi" style="display:none">
     <h2>Xiaomi: Couch TV in PatchWall's place (optional, off by default)</h2>
-    <p>The remote's PatchWall button opens Couch TV, PatchWall opens Couch TV instead, and Couch TV opens when the TV is switched on, unless the TV is going back to an HDMI input. The Home button is not changed. It needs the Home button watch switched on in Settings, Accessibility (Couch TV home watch); with this on, that watch also checks each remote key for the PatchWall button and passes every other key on.</p>
+    <p>The remote's PatchWall button opens Couch TV, PatchWall opens Couch TV instead, and Couch TV opens when the TV is switched on, unless the TV is going back to an HDMI input. The Home button is not changed. It needs the Home button watch, which is only in couch-tv-ontv-watch.apk (install it from a computer over this app: on-tv/README.md), switched on in Settings, Accessibility (Couch TV home watch); with this on, that watch also checks each remote key for the PatchWall button and passes every other key on.</p>
     <label class="check"><input type="checkbox" id="pw-on"> Couch TV in PatchWall's place</label>
     <p id="pw-state"></p>
     <div class="row"><button class="go" id="pw-save">Save</button></div>
@@ -141,7 +141,9 @@
       if (j.xiaomi) {
         $('xiaomi').style.display = '';
         $('pw-on').checked = !!j.patchwall_replace;
-        $('pw-state').textContent = j.watch ? '' : 'The Home button watch is off: switch on Couch TV home watch in the TV\'s Settings, Accessibility.';
+        $('pw-state').textContent = j.watch ? '' : j.watch_apk
+          ? 'The Home button watch is off: switch on Couch TV home watch in the TV\'s Settings, Accessibility.'
+          : 'This app has no Home button watch (Google Play Protect blocks it in an app installed from a phone). For this, install couch-tv-ontv-watch.apk over it from a computer (on-tv/README.md), then switch on Couch TV home watch in the TV\'s Settings, Accessibility.';
       }
       loadInputs();
       showAsk(j.ask);

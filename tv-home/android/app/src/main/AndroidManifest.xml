@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Android's Watch Next list: what each app says you are in the middle of (keep watching, no computer needed). -->
     <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+    <!-- couch-tv Studio's Screen time widget: Android's usage numbers. Not granted on install: apply.sh
+         allows it over ADB only with SCREEN_TIME=1, or the person switches on Home in Usage access. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <!-- Smart home, only with a doorbell set up: the doorbell card over whatever is playing.
          Not granted on install: apply.sh grants it over ADB only when config.json has a doorbell. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -23,6 +26,11 @@
          apply.sh grants once over ADB. -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- couch-tv Studio's Batteries widget (Batteries.kt): the charge left in the remotes and controllers
+         paired with this TV. Android 12 and newer ask "Nearby devices" first (OK on the widget asks once,
+         or pm grant over ADB); older Android needs BLUETOOTH to list paired devices. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />

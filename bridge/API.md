@@ -293,7 +293,10 @@ inputs (HDMI and the rest) on TVs that have one.
 ```
 
 ### `POST /api/text`
-Types text into whatever text box is open on the TV (a search box).
+Types text into whatever text box is open on the TV (a search box). On Android this is `input text`,
+so only ASCII letters, digits and plain punctuation are safe. Thai, Chinese, Korean and other
+non-Latin text must be typed with the TV's own on-screen keyboard; non-Latin text comes back as
+`BufferOverflowException`.
 ```json
 {"text": "bluey"}
 ```
@@ -508,6 +511,15 @@ are `POST /api/key` with `previous`, `play_pause` and `next`.
  "art": "https://is1-ssl.mzstatic.com/.../600x600bb.jpg", "position": 42.5, "duration": 215.0}}
 ```
 
+### `GET /api/music/queue`
+The Up next widget: the next songs in the Spotify queue (at most 10: `title`, `artist`, `art` from
+Spotify's own picture host or `null`), read with the Spotify login above (bridge/spotify_now.py, the
+same scopes), at most every 15 seconds. `queue` is `null` when Spotify is not connected on this
+bridge, `[]` when nothing is queued. No other music app shares its queue.
+```json
+{"ok": true, "configured": true, "queue": [{"title": "Low Tide", "artist": "Saltwater Radio", "art": "https://i.scdn.co/image/..."}]}
+```
+
 ### `GET /api/custom-cards`
 The household's own cards (`home.custom_cards`, docs/TV-HOME.md "Custom cards"), read from the file
 or link, cleaned and capped: at most 8, `title` (40 characters), optional `subtitle` (60), `value`
@@ -516,6 +528,18 @@ reads the source at most once a minute and keeps the last good cards when it can
 key is not set.
 ```json
 {"ok": true, "cards": [{"title": "Solar today", "value": "18.4 kWh", "app": "com.example.solar"}]}
+```
+
+### `GET /api/webdata?src=news&id=abc`
+The relay for the TV home's web widgets (`tv-home/web/widget-web.js`, `bridge/webdata.py`): a news feed
+or a share price sends no CORS header, so the home asks here. `src` is `news` (`id` one of `abc`,
+`abc-justin`, `abc-sport`, `abc-business`, `sbs`, `guardian`, `bbc`, `rnz`) or `stocks` (`id` up to 8
+Yahoo symbols joined by commas, like `^AXJO,BHP.AX,AUDUSD=X`). Anything else is 400: it never takes a
+link. The answer is the source's own text (the home reads it); kept 10 minutes for news, 2 for prices;
+502 when the source cannot be read. The launcher (`http://tvos.invalid/webdata`) and the on-TV app
+answer the same way.
+```json
+{"ok": true, "src": "news", "id": "abc", "text": "<?xml version=\"1.0\"?><rss>..."}
 ```
 
 ### `GET /api/continue`
@@ -744,6 +768,23 @@ Unknown keys and wrong shapes are dropped. Larger than 32 KB answers `413`. With
 A) the TV keeps them alone. The on-TV app (option C) keeps them in its own `/api/settings` under
 the same `settings` key, next to its setup settings.
 
+### Calendar: `POST /api/calendar`
+For couch-tv Studio's Agenda widget on a TV whose home this computer runs (a Samsung, LG, Philips,
+TiVo OS or Panasonic TV, or a Hisense with a computer): a web page cannot read a Google, Apple or
+Outlook calendar itself. The TV sends the calendar's private address it keeps (Home settings, couch-tv
+Studio, At home) and gets the calendar's words back:
+
+```json
+{"url": "https://calendar.example.com/private-abc/basic.ics"}
+{"ok": true, "text": "BEGIN:VCALENDAR\r\n..."}
+```
+A calendar app's own link (the same address with a scheme ending in `cal`) is read as `https://`. Only https, no name or password in the address, no address on the
+home network or this computer (every redirect is checked the same way, at most 3), 4 MB at most, and
+only an answer that is a calendar: anything else is `400` with a short reason (`not a calendar link`,
+`that address is not on the internet`, `http 404`, `not a calendar`, `too big`, `unreachable`), never
+the address. The bridge keeps nothing: the address is not stored, logged or put in the action history
+(`bridge/agenda.py`).
+
 ### `GET /api/history`
 ```json
 {"ok": true, "items": [{"title": "Bluey", "service": "abc-iview", "who": "person1",
@@ -925,6 +966,13 @@ would do (for testing). `GET` says whether it is armed and why it last stopped.
 `{"app": "netflix"}` or empty for the app on screen: force stops it, opens it again and carries
 on with what was playing (the show page, which resumes where the profile was up to; YouTube
 reopens its search for the video).
+
+### `POST /api/quit-app`
+`{"package": "com.netflix.ninja"}` (an app name works too): force stops the app over ADB and does
+nothing else, so it is not opened again (`/api/restart-app` does that). The home screen, couch-tv and
+the apps that are part of how the TV works are refused with 403. The TV home's hold OK menu on an
+app tile (Restart app, Quit app) uses this and `/api/restart-app`, and only offers them when the
+bridge is connected.
 
 ### `GET /api/latest?title=...`
 The newest episode available (season, episode, name, date, apps), announced upcoming releases,

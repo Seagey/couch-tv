@@ -11,7 +11,7 @@ struct Render {
     static func main() async {
         let args = CommandLine.arguments
         guard args.count >= 5 else {
-            print("usage: render <repo folder> <bridge address> <code or key> <out folder>")
+            print("usage: render <repo folder> <bridge address> <code or key> <out folder>, or render <repo folder> --designs <file.json> <out folder>")
             exit(2)
         }
         let root = URL(fileURLWithPath: args[1])
@@ -22,6 +22,10 @@ struct Render {
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
 
         let model = HomeModel(link: nil, offline: true)
+        if args[2] == "--designs" {
+            await designs(model: model, file: URL(fileURLWithPath: args[3]), out: out)
+            return
+        }
         if let why = await model.connect(address: args[2], secret: args[3]) {
             print("could not connect: \(why)")
             exit(1)
@@ -90,5 +94,63 @@ struct Render {
         if let card = model.items.first { model.resume(card) }
         try? await Task.sleep(nanoseconds: 2_000_000_000)
         print("status: \(model.message)")
+    }
+
+    /// couch-tv Studio designs drawn by DesignView.swift, with no bridge: a file of designs (a list of
+    /// {"id", "design"}, or one design), sample people, weather and apps, one PNG each.
+    ///   render <repo folder> --designs <file.json> <out folder>
+    @MainActor
+    static func designs(model: HomeModel, file: URL, out: URL) async {
+        guard let data = try? Data(contentsOf: file), let j = try? JSONSerialization.jsonObject(with: data) else {
+            print("could not read \(file.path)")
+            exit(1)
+        }
+        let list: [(String, Any)] = (j as? [[String: Any]])?.map { (($0["id"] as? String) ?? "design", $0["design"] as Any) }
+            ?? [("design", j)]
+        model.people = [Person(id: "person1", name: "Alex"), Person(id: "person2", name: "Sam")]
+        model.who = "person1"
+        model.weather = Weather(temp: 23, code: 2, isDay: true, text: nil)
+        model.apps = [("com.netflix.Netflix", "Netflix", "com.netflix.ninja"), ("com.google.ios.youtube", "YouTube", "com.google.android.youtube.tv"),
+                      ("com.disney.disneyplus", "Disney+", "com.disney.disneyplus"), ("au.com.stan.ios", "Stan", "au.com.stan.and"),
+                      ("au.net.abc.iview", "ABC iview", "au.net.abc.iview"), ("com.spotify.client", "Spotify", "com.spotify.tv.android"),
+                      ("com.amazon.aiv.AIVApp", "Prime Video", "com.amazon.amazonvideo.livingroom"), ("com.apple.TVWatchList", "Apple TV", "com.apple.atve.androidtv.appletv")]
+            .map { DockApp(id: $0.0, title: $0.1, package: $0.2) }
+        model.dockLine = 10
+        model.items = [ContinueItem(id: "c1", title: "Bluey", season: 3, episode: 12, appName: "ABC iview", appPackage: "au.net.abc.iview", progress: 0.4),
+                       ContinueItem(id: "c2", title: "The Bear", season: 2, episode: 4, appName: "Disney+", appPackage: "com.disney.disneyplus", progress: 0.7)]
+        var when = DateComponents()
+        (when.year, when.month, when.day, when.hour, when.minute) = (2026, 10, 27, 8, 47)
+        let now = Calendar.current.date(from: when) ?? Date()
+        for (id, raw) in list {
+            guard let d = Design.read(raw) else { print("not a design: \(id)"); continue }
+            let v = DesignHomeView(design: d, now: now).environmentObject(model).environment(\.previewFocus, model.apps.first.map { "app:" + $0.id })
+                .environment(\.flatGlass, true).frame(width: 1920, height: 1080).environment(\.colorScheme, .dark)
+            let r = ImageRenderer(content: v)
+            r.scale = 1
+            guard let cg = r.cgImage else { print("no picture for \(id)"); continue }
+            let url = out.appendingPathComponent("design-\(id).png")
+            try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?.write(to: url)
+            let native = d.objects.filter { $0.type == "widget" }.map { ($0.kind ?? "") + (DesignWidgets.drawsNatively($0.kind ?? "") ? "" : "*") }
+            print("wrote \(url.path)  widgets: \(native.joined(separator: " "))")
+        }
+        // the question a design got by code brings, and Settings with its design rows
+        if let first = list.first.flatMap({ Design.read($0.1) }) {
+            for (name, view) in [("design-ask", AnyView(DesignAskView(design: first, now: now))), ("design-settings", AnyView(SettingsView()))] {
+                configDesignShot(model: model, name: name, view: view, out: out)
+            }
+        }
+    }
+
+    @MainActor
+    static func configDesignShot(model: HomeModel, name: String, view: AnyView, out: URL) {
+        model.configDesign = Design()
+        let v = view.environmentObject(model).environment(\.previewFocus, "ask:yes").environment(\.flatGlass, true)
+            .frame(width: 1920, height: 1080).environment(\.colorScheme, .dark)
+        let r = ImageRenderer(content: v)
+        r.scale = 1
+        guard let cg = r.cgImage else { print("no picture for \(name)"); return }
+        let url = out.appendingPathComponent(name + ".png")
+        try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?.write(to: url)
+        print("wrote \(url.path)")
     }
 }

@@ -1,7 +1,9 @@
 package app.couchtv.launcher
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
@@ -76,6 +78,28 @@ class MainActivity : Activity() {
 
     private val prefs by lazy { getSharedPreferences("home", MODE_PRIVATE) }
 
+    /**
+     * `home.render_height` (config.json): draw the home this many pixels high in its own hardware layer and
+     * scale that layer up to the screen. A weak GPU (a MediaTek projector's Mali-G52) cannot composite a
+     * 1080p WebView at 60 fps but does at 720p. (FLAG_SCALED does nothing useful on Android 11: it only makes
+     * a smaller window.) The density is lowered by the same factor, so the page still lays out on the same
+     * dp canvas and only the pixels behind it are fewer. 0 or missing: the screen's own size.
+     */
+    private fun renderHeight(base: Context): Int = runCatching {
+        val cfg = base.getSharedPreferences("home", MODE_PRIVATE).getString("config", null) ?: return 0
+        JSONObject(cfg).optJSONObject("home")?.optInt("render_height", 0) ?: 0
+    }.getOrDefault(0)
+
+    override fun attachBaseContext(base: Context) {
+        val h = renderHeight(base)
+        val screen = base.resources.displayMetrics.heightPixels
+        if (h in 360 until screen) {
+            val c = Configuration(base.resources.configuration)
+            c.densityDpi = Math.round(c.densityDpi * h.toFloat() / screen)
+            super.attachBaseContext(base.createConfigurationContext(c))
+        } else super.attachBaseContext(base)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         shown = java.lang.ref.WeakReference(this)
@@ -96,7 +120,16 @@ class MainActivity : Activity() {
         runCatching { WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG) }
         CrashGuard.install(this)   // the WebView puts its own crash handler in front: ours goes first again
         root = FrameLayout(this).apply { setBackgroundColor(GROUND) }
-        setContentView(root)
+        val screenSize = android.graphics.Point().also { runCatching { @Suppress("DEPRECATION") windowManager.defaultDisplay.getRealSize(it) } }
+        val renderH = renderHeight(this)
+        if (renderH in 360 until screenSize.y) {
+            // The whole home is laid out and drawn at renderH pixels high in its own hardware layer, and that
+            // layer is scaled up to the screen: the page rasterises at the lower size, the GPU only blits it.
+            val k = screenSize.y.toFloat() / renderH
+            setContentView(root, android.view.ViewGroup.LayoutParams(Math.round(screenSize.x / k), renderH))
+            root.pivotX = 0f; root.pivotY = 0f; root.scaleX = k; root.scaleY = k
+            root.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        } else setContentView(root)
         hideSystemBars()
         intent?.let { readExtras(it) }
         io.execute { warmApps() }
@@ -260,6 +293,8 @@ class MainActivity : Activity() {
         // The home screen never exits on BACK; the page decides what BACK means.
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (event.action == KeyEvent.ACTION_UP && pageReady) js("window.tv && tv.back()")
+            // held: a design's way out (Back held about 5 s switches it off), so the page hears the repeats
+            else if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount > 0 && pageReady) js("window.CouchDesign && CouchDesign.backHeld && CouchDesign.backHeld()")
             return true
         }
         return super.dispatchKeyEvent(event)
@@ -421,6 +456,12 @@ class MainActivity : Activity() {
                 val u = req.url
                 if (u.host == OFFLINE_HOST) return offlineFile(u.path ?: "")
                 if (u.host != "tvos.invalid") return null
+                if (u.pathSegments.firstOrNull() == "webdata") {
+                    // the web widgets' relay (WebData.kt): news feeds and share prices, by id only
+                    val (code, body) = WebData.answer(u)
+                    return WebResourceResponse("application/json", "utf-8", code, if (code == 200) "OK" else "Error",
+                        mapOf("Cache-Control" to "no-store", "Access-Control-Allow-Origin" to "*"), ByteArrayInputStream(body.toByteArray(Charsets.UTF_8)))
+                }
                 if (u.pathSegments.firstOrNull() == "photo") {
                     // the household's own photos (Home settings), copied in by the file picker
                     val f = photoFile(u.lastPathSegment ?: "") ?: return null
@@ -592,7 +633,8 @@ class MainActivity : Activity() {
             "jpg", "jpeg" -> "image/jpeg"
             "png" -> "image/png"
             "webp" -> "image/webp"
-            "mp4" -> "video/mp4"   // a scene's own clip (home.my_scenes[].video)
+            "mp4" -> "video/mp4"   // a scene's own clip (home.my_scenes[].video), a design's loop (background.video)
+            "webm" -> "video/webm"
             "svg" -> "image/svg+xml"
             "woff2" -> "font/woff2"
             else -> "application/octet-stream"
@@ -624,6 +666,10 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun launch(pkg: String): Boolean = launchPackage(pkg)
 
+        /** This launcher relays the web widgets' sources (WebData.kt, http://tvos.invalid/webdata). */
+        @JavascriptInterface
+        fun webData(): Boolean = true
+
         /** Opens an http(s) web link in the TV's browser (used by custom cards with a url). */
         @JavascriptInterface
         fun openUrl(url: String): Boolean {
@@ -643,6 +689,14 @@ class MainActivity : Activity() {
         /** The TV's own 12 or 24 hour setting (System, Date and time), so the clock follows it until Home settings picks one (#221). */
         @JavascriptInterface
         fun is24Hour(): Boolean = android.text.format.DateFormat.is24HourFormat(this@MainActivity)
+
+        /** Is the TV saving power (Android's power save mode)? A design's video background then keeps its still picture (bg-video.js). */
+        @JavascriptInterface
+        fun powerSave(): Boolean = try {
+            getSystemService(android.os.PowerManager::class.java)?.isPowerSaveMode ?: false
+        } catch (e: Exception) {
+            false
+        }
 
         /** Is couch-tv the home? "held", "google_tv" (explain the Home button watch) or "ask" (HomeRole.kt, #98). */
         @JavascriptInterface
@@ -863,6 +917,47 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun kept(key: String): String? = getSharedPreferences("page", MODE_PRIVATE).getString(key, null)
 
+        // couch-tv Studio's Batteries widget (Batteries.kt): the paired remotes and controllers and their charge
+        @JavascriptInterface
+        fun batteries(): String = Batteries.read(this@MainActivity)
+
+        // Android 12 and newer: Android's own "Nearby devices" question, once, from the widget's OK
+        @JavascriptInterface
+        fun askBatteries(): Boolean {
+            if (Batteries.allowed(this@MainActivity)) return true
+            runOnUiThread { try { requestPermissions(arrayOf(android.Manifest.permission.BLUETOOTH_CONNECT), 78) } catch (e: Exception) {} }
+            return false
+        }
+
+        // couch-tv Studio's home widgets (AtHome.kt): the things typed at home go in their own store,
+        // left out of Android's backups, never in the page's storage
+        @JavascriptInterface
+        fun keepPrivate(key: String, value: String) {
+            AtHome.prefs(this@MainActivity).edit().putString(key, value).apply()
+        }
+
+        @JavascriptInterface
+        fun keptPrivate(key: String): String? = AtHome.prefs(this@MainActivity).getString(key, null)
+
+        // the Agenda's calendar, read off the page's thread and answered through tv.calendarText
+        @JavascriptInterface
+        fun calendar(url: String, id: String) {
+            if (!Regex("[A-Za-z0-9]{1,40}").matches(id)) return
+            Thread {
+                val (ok, text) = AtHome.calendar(url)
+                main.post { js("window.tv && tv.calendarText && tv.calendarText(" + JSONObject.quote(id) + "," + ok + "," + JSONObject.quote(text) + ")") }
+            }.start()
+        }
+
+        // today's screen time (Android's usage numbers), once usage access is allowed
+        @JavascriptInterface
+        fun screenTime(): String = AtHome.screenTime(this@MainActivity) { pkg ->
+            try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() } catch (e: Exception) { pkg }
+        }
+
+        @JavascriptInterface
+        fun openUsageAccess(): Boolean = AtHome.usageAccessIntent(this@MainActivity)?.let { start(it) } ?: false
+
         // Home settings, "Your photos": the TV's own file picker, where it has one. Many Android TV
         // and Google TV builds ship without one, and then the page offers a web address instead.
         @JavascriptInterface
@@ -938,6 +1033,7 @@ class MainActivity : Activity() {
             while (bounds.outWidth / (sample * 2) >= 1920 && bounds.outHeight / (sample * 2) >= 1080) sample *= 2
             val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
             val raw = contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, opts) } ?: return null
+            var taken = ""
             val turn = try {
                 contentResolver.openInputStream(uri)?.use {
                     val exif = if (Build.VERSION.SDK_INT >= 24) android.media.ExifInterface(it) else {
@@ -945,6 +1041,8 @@ class MainActivity : Activity() {
                         val tmp = java.io.File.createTempFile("exif", ".jpg", cacheDir)
                         try { tmp.outputStream().use { o -> it.copyTo(o) }; android.media.ExifInterface(tmp.path) } finally { tmp.delete() }
                     }
+                    // the day it was taken goes in its name, for On this day (athome.js nameDate)
+                    taken = AtHome.takenNote(exif.getAttribute(android.media.ExifInterface.TAG_DATETIME_ORIGINAL) ?: exif.getAttribute(android.media.ExifInterface.TAG_DATETIME))
                     when (exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) {
                         6 -> 90f; 3 -> 180f; 8 -> 270f; else -> 0f
                     }
@@ -955,7 +1053,7 @@ class MainActivity : Activity() {
             val scale = minOf(1f, maxOf(1920f / w, 1080f / h))
             val m = android.graphics.Matrix().apply { postRotate(turn); postScale(scale, scale) }
             val bmp = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, m, true)
-            val name = "p" + System.currentTimeMillis().toString(36) + "-" + (1000 + (Math.random() * 9000).toInt()) + ".jpg"
+            val name = "p" + System.currentTimeMillis().toString(36) + "-" + (1000 + (Math.random() * 9000).toInt()) + taken + ".jpg"
             java.io.File(photoDir, name).outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 88, it) }
             if (bmp !== raw) bmp.recycle()
             raw.recycle()

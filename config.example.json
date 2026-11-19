@@ -45,7 +45,7 @@
   "screens": [],
   "plex": {
     "enabled": false,
-    "url": "http://plex.local:32400",
+    "url": "http://your-computer.local:32400",
     "who": "person1"
   },
   "home_assistant": {

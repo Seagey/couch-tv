@@ -34,7 +34,10 @@ thing that fails:
    home and setup app, which couch-tv 0.10 and older switched off), switches off the Home button
    watch, and makes the home the TV had before couch-tv the home again.
 2. Removes the couch-tv apps (the home screen app `app.couchtv.launcher` and the "lives on the TV"
-   app `dev.couchtv.ontv`).
+   app `dev.couchtv.ontv`). If you also had a home app of your own from before couch-tv (a private
+   build you made yourself), name its package and it goes in the same step:
+   `EXTRA_APPS="<its package>"`. It refuses anything that looks like part of the TV itself, such as
+   the TV's own home or setup app.
 3. Switches off network debugging, USB debugging and Developer options. Leave out `DEV_OFF=1` to
    keep Developer options on.
 

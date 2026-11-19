@@ -118,7 +118,11 @@ class SecondOff(unittest.TestCase):
             async def json(self):
                 return {"state": "off"}
 
-        tv_id = server._current.get()
+        # another test file in the same run may have left _current on a TV it made and took away:
+        # point it at a TV this server has, and put it back afterwards
+        tv_id = server._current.get() if server._current.get() in server.TVS else next(iter(server.TVS))
+        token = server._current.set(tv_id)
+        self.addCleanup(server._current.reset, token)
         with patch.object(server, "tv", fake), patch.object(server, "power_on", power_on), \
                 patch.object(server, "body", lambda r: r.json()), \
                 patch.object(server, "record_action", lambda *a, **k: None), \

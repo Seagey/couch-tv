@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Beta: open a web page (couch-tv's home) on a VIZIO OS / SmartCast TV.
+"""Open a web page (couch-tv's home) on a VIZIO OS / SmartCast TV.
 
 VIZIO OS has an internal "web-app launcher" name space. PUT /app/launch with
 NAME_SPACE 4 and a web-launcher APP_ID passes MESSAGE through as a URL the TV's
@@ -160,7 +160,7 @@ async def do_launch(a):
 
 
 def main():
-    p = argparse.ArgumentParser(description="Open a web page on a VIZIO OS TV (Beta).")
+    p = argparse.ArgumentParser(description="Open a web page on a VIZIO OS TV.")
     p.add_argument("address", help="the TV's IP address")
     p.add_argument("--probe", action="store_true", help="find which launcher APP_ID this TV accepts")
     p.add_argument("--url", help="the http:// or https:// page to open on the TV (with --app-id)")

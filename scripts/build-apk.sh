@@ -2,7 +2,8 @@
 # Builds the couch-tv TV apps (release APKs) and prints where they are.
 #   dist/couch-tv-home.apk    the TV home (options A and B), from tv-home/android
 #   dist/couch-tv-ontv.apk    the "lives on the TV" app (option C), from on-tv/android, if present
-#   dist/couch-tv-sync.apk    the two TVs in sync helper (experimental, docs/SYNC.md), from sync/android, if present
+#   dist/couch-tv-ontv-watch.apk  the same, plus the home watch (Fire TV, or installed from a computer)
+#   dist/couch-tv-sync.apk    the two TVs in sync helper (docs/SYNC.md), from sync/android, if present
 #
 # Needs JDK 21 and the Android SDK with platform 34 and build tools 34 (docs/SETUP.md, "Building the
 # app"). Gradle itself is not needed: the Gradle wrapper (tv-home/android/gradlew) fetches 8.11.1.
@@ -62,15 +63,18 @@ if [ -f "$ROOT/on-tv/android/settings.gradle.kts" ] || [ -f "$ROOT/on-tv/android
   fi
   if [ -f "$ROOT/remote/dist/index.html" ]; then
     echo "Building the on-TV app (option C)"
-    "$GW" -p "$ROOT/on-tv/android" --no-daemon -q clean assembleRelease
+    "$GW" -p "$ROOT/on-tv/android" --no-daemon -q clean assembleRelease assembleWatch
     cp "$ROOT/on-tv/android/app/build/outputs/apk/release/app-release.apk" "$ROOT/dist/couch-tv-ontv.apk"
+    # the same app plus the home watch, for Fire TV and TVs set up from a computer (on-tv/README.md)
+    cp "$ROOT/on-tv/android/app/build/outputs/apk/watch/app-watch.apk" "$ROOT/dist/couch-tv-ontv-watch.apk"
     OUT="$OUT
-$ROOT/dist/couch-tv-ontv.apk"
+$ROOT/dist/couch-tv-ontv.apk
+$ROOT/dist/couch-tv-ontv-watch.apk"
   fi
 fi
 
 if [ -f "$ROOT/sync/android/settings.gradle.kts" ]; then
-  echo "Building the sync helper (two TVs in sync, experimental)"
+  echo "Building the sync helper (two TVs in sync)"
   "$GW" -p "$ROOT/sync/android" --no-daemon -q clean assembleRelease
   cp "$ROOT/sync/android/app/build/outputs/apk/release/app-release.apk" "$ROOT/dist/couch-tv-sync.apk"
   OUT="$OUT

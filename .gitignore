@@ -62,3 +62,6 @@ xcuserdata/
 *.p12
 *.cer
 *.certSigningRequest
+
+# the ambient loops as rendered (tv-home/tools/loops/make-loops.mjs); copies go in tv-home/web/backgrounds/
+tv-home/tools/loops/out/
