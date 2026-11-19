@@ -2,8 +2,8 @@
 # Make the Loop look's footage: one clip graded for four times of day, looping without a seam,
 # with a tiny blurred copy of each for the glass and a poster of each (docs/LOOP.md).
 #
-#   scripts/make-loop.sh <input clip> [--out <dir>] [--seconds <15 to 60>] [--slow <factor>]
-#                        [--only <dawn|day|dusk|night>] [--dry-run]
+#   scripts/make-loop.sh <input clip or photo> [--out <dir>] [--seconds <15 to 60>] [--slow <factor>]
+#                        [--only <dawn|day|dusk|night>] [--still] [--dry-run]
 #
 #   --out      where the files go. Default tv-home/web/loop in this repo (git ignores it; the bridge
 #              serves it at /tv/loop/ and reads it at start, so restart the bridge afterwards).
@@ -11,6 +11,11 @@
 #              longer than that, divided by --slow (a 31 s loop at --slow 2 needs a 15.5 s clip).
 #   --slow     slow the clip down: 2 plays a 60 fps clip at half speed, 1 (default) leaves it.
 #   --only     make one variant instead of all four.
+#   --still    the input is a photo (a .jpg, .png or .webp is taken as one anyway): the loop is a slow
+#              push into the picture and back out over its whole length, 6 percent at most, with a
+#              little sideways drift, which starts and ends on the same frame, so it needs no seam.
+#              The home's own scenes work: tv-home/web/backgrounds/scene-night@2x.jpg is the lake peak
+#              the design mockup used. Use the @2x file: the push crops into it. --slow is ignored.
 #   --dry-run  print every ffmpeg command and write nothing, not even the folder.
 #
 # Runs on the bridge computer with ffmpeg 7 (Debian: apt install ffmpeg). Per variant it writes
@@ -48,6 +53,7 @@ OUT="$HERE/../tv-home/web/loop"
 SECONDS_LEN=30
 SLOW=1
 ONLY=""
+STILL=0
 DRY=0
 INPUT=""
 
@@ -57,6 +63,7 @@ while [ $# -gt 0 ]; do
     --seconds) SECONDS_LEN="$2"; shift 2 ;;
     --slow) SLOW="$2"; shift 2 ;;
     --only) ONLY="$2"; shift 2 ;;
+    --still) STILL=1; shift ;;
     --dry-run) DRY=1; shift ;;
     -h|--help) usage ;;
     -*) echo "make-loop.sh: unknown option $1" >&2; usage ;;
@@ -65,6 +72,7 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$INPUT" ] || usage
+case "$INPUT" in *.jpg|*.jpeg|*.JPG|*.JPEG|*.png|*.PNG|*.webp|*.WEBP) STILL=1 ;; esac
 case "$SECONDS_LEN" in
   ''|*[!0-9]*) echo "make-loop.sh: --seconds must be a whole number from 15 to 60" >&2; exit 2 ;;
 esac
@@ -118,7 +126,7 @@ run() {
 if [ "$DRY" -eq 0 ]; then
   command -v ffmpeg >/dev/null 2>&1 || { echo "make-loop.sh: ffmpeg is not installed (Debian: sudo apt install ffmpeg)" >&2; exit 1; }
   [ -f "$INPUT" ] || { echo "make-loop.sh: no such clip: $INPUT" >&2; exit 1; }
-  if command -v ffprobe >/dev/null 2>&1; then
+  if [ "$STILL" -eq 0 ] && command -v ffprobe >/dev/null 2>&1; then
     DUR=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$INPUT" 2>/dev/null || echo 0)
     NEED=$(awk -v s="$SECONDS_LEN" -v f="$SLOW" 'BEGIN { printf "%.2f", (s + 1) / f }')
     if awk -v d="$DUR" -v n="$NEED" 'BEGIN { exit !(d + 0 < n + 0) }'; then
@@ -136,14 +144,27 @@ for v in $VARIANTS; do
   # The sharp file. One graph: the clip slowed, conformed to 1280x720 at 30 fps (scaled to cover,
   # then cropped, so a 4K or a 16:10 clip fills the frame), the grade, the first L+1 seconds split
   # into body and head, and the two dissolved as the header says.
-  graph="[0:v]setpts=${SLOW}*PTS,fps=30,scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,format=yuv420p,$(grade "$v"),trim=duration=${BASE_LEN},setpts=PTS-STARTPTS,split=2[c0][c1];"
-  # xfade wants both inputs at a constant frame rate and a trim leaves them marked variable, so fps=30 again on each
-  graph="$graph[c0]trim=start=${BODY_START}:duration=${BODY_LEN},setpts=PTS-STARTPTS,fps=30[body];"
-  graph="$graph[c1]trim=duration=1,setpts=PTS-STARTPTS,fps=30[head];"
-  graph="$graph[body][head]xfade=transition=fade:duration=1:offset=${XFADE_OFFSET}[out]"
+  if [ "$STILL" -eq 1 ]; then
+    # A photo. The picture is first scaled up four times the output width, so the push moves in
+    # quarter pixel steps and does not judder, then zoompan takes one 1280x720 window per frame: the
+    # zoom eases from 1 to 1.06 and back over the N = 30 L frames of the loop (a raised cosine, so
+    # the first and the last frame are the same window and the motion is still at both), while the
+    # window drifts 0.6 percent of the width sideways and back on the same period. No seam needed.
+    N=$((30 * SECONDS_LEN))
+    graph="[0:v]scale=5120:-2,zoompan=z='1+0.06*(1-cos(2*PI*on/${N}))/2':x='(iw-iw/zoom)/2+0.006*iw*sin(2*PI*on/${N})':y='(ih-ih/zoom)/2':d=1:s=1280x720:fps=30,format=yuv420p,$(grade "$v"),trim=duration=${SECONDS_LEN},setpts=PTS-STARTPTS[out]"
+    IN_ARGS="-loop 1 -framerate 30 -t ${SECONDS_LEN}"
+  else
+    graph="[0:v]setpts=${SLOW}*PTS,fps=30,scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,format=yuv420p,$(grade "$v"),trim=duration=${BASE_LEN},setpts=PTS-STARTPTS,split=2[c0][c1];"
+    # xfade wants both inputs at a constant frame rate and a trim leaves them marked variable, so fps=30 again on each
+    graph="$graph[c0]trim=start=${BODY_START}:duration=${BODY_LEN},setpts=PTS-STARTPTS,fps=30[body];"
+    graph="$graph[c1]trim=duration=1,setpts=PTS-STARTPTS,fps=30[head];"
+    graph="$graph[body][head]xfade=transition=fade:duration=1:offset=${XFADE_OFFSET}[out]"
+    IN_ARGS=""
+  fi
   # -keyint_min and -sc_threshold hold the GOP at exactly 30 frames: x264 would otherwise put an
   # extra keyframe wherever it sees a cut, and the home's seek at the wrap counts on one second.
-  run ffmpeg -hide_banner -y -i "$INPUT" -filter_complex "$graph" -map "[out]" \
+  # shellcheck disable=SC2086
+  run ffmpeg -hide_banner -y $IN_ARGS -i "$INPUT" -filter_complex "$graph" -map "[out]" \
     -c:v libx264 -profile:v main -level 4.0 -pix_fmt yuv420p -preset slow -crf 20 \
     -maxrate 4M -bufsize 8M -r 30 -g 30 -keyint_min 30 -sc_threshold 0 -an -movflags +faststart "$sharp"
   # The glass copy, from the finished sharp file: the same seam, the same length, a tenth of the

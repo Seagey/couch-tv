@@ -153,3 +153,19 @@ In this order, each one a smaller step than the next:
 A Loop look with no files is not an error: the bridge says so once in its log ("the Loop look has
 no files yet: run scripts/make-loop.sh"), and `home.loop.variants` is empty until the files are
 there.
+
+## A photo instead of a clip
+
+`make-loop.sh` takes a photo too (`.jpg`, `.png` or `.webp`, or any file with `--still`): the loop
+becomes a slow push into the picture and back out over its whole length, six percent at most with a
+little sideways drift, eased so the first and the last frame are the same window and the motion is
+still at both. No seam, no footage to find, and the same four grades, blurred copies and posters. The
+home's own scenes work: `tv-home/web/backgrounds/scene-night@2x.jpg` is the lake peak the design
+mockup used (use the `@2x` file, the push crops into it). On the bridge computer:
+
+```
+scripts/make-loop.sh tv-home/web/backgrounds/scene-night@2x.jpg --seconds 34
+```
+
+The picture is scaled up four times the output width first so the push moves in quarter pixel
+steps, which takes a few minutes per variant on a small box.

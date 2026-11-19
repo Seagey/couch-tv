@@ -155,3 +155,36 @@ class DryRun(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StillPhoto(unittest.TestCase):
+    """A photo makes a loop too: a slow push in and back out, no seam, the same four grades."""
+
+    def dry(self, *args):
+        out = subprocess.run(["bash", SCRIPT, *args, "--dry-run"], capture_output=True, text=True)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        return [l for l in out.stdout.splitlines() if l.startswith("ffmpeg ")]
+
+    def test_a_photo_is_pushed_into_with_no_seam(self):
+        cmds = self.dry("/nowhere/scene-night@2x.jpg", "--seconds", "34")
+        sharp = [c for c in cmds if "-filter_complex" in c]
+        self.assertEqual(len(sharp), 4)
+        for c in sharp:
+            args = shlex.split(c)
+            graph = args[args.index("-filter_complex") + 1]
+            self.assertIn("-loop", args); self.assertEqual(args[args.index("-loop") + 1], "1")
+            self.assertEqual(args[args.index("-t") + 1], "34", "the photo is looped for the loop's length")
+            self.assertIn("zoompan=z='1+0.06*(1-cos(2*PI*on/1020))/2'", graph, "N = 30 x 34 frames, eased in and out")
+            self.assertIn("scale=5120:-2", graph, "scaled up first so the push does not judder")
+            self.assertIn("trim=duration=34", graph)
+            self.assertNotIn("xfade", graph, "a raised cosine needs no seam")
+            self.assertNotIn("setpts=1*PTS", graph, "--slow is not applied to a photo")
+        self.assertIn("colorbalance=rh=0.12", shlex.split(sharp[0])[shlex.split(sharp[0]).index("-filter_complex") + 1], "dawn keeps its grade")
+        # the blur copy and the posters are made the same way as for a clip
+        self.assertEqual(len([c for c in cmds if "gblur" in c]), 4)
+        self.assertEqual(len([c for c in cmds if "-frames:v" in c]), 8)
+
+    def test_still_flag_takes_a_clip_as_a_photo(self):
+        cmds = self.dry("/nowhere/frame.mp4", "--still", "--seconds", "20")
+        graph = shlex.split(cmds[0])[shlex.split(cmds[0]).index("-filter_complex") + 1]
+        self.assertIn("zoompan=", graph); self.assertNotIn("xfade", graph)
