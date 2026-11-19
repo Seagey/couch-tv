@@ -43,6 +43,60 @@ class IcalTest {
         assertEquals(Pair(false, "that address is not on the internet"), Ical.read("https://router.example/x.ics", ip("127.0.0.1")))
     }
 
+    @Test fun connectsToTheAddressItCheckedAndLooksUpOnce() {
+        // Fable review of 0.13.3: the name was checked, then looked up again on connect. A name that
+        // answers an internet address first and an address in the house second must not reach the house.
+        var lookups = 0
+        val rebinding: (String) -> List<InetAddress> = { _ ->
+            lookups++
+            listOf(InetAddress.getByName(if (lookups == 1) "93.184.216.34" else "192.0.2.1".replace("192.0.2", "10.0.0")))
+        }
+        val dialled = mutableListOf<String>()
+        val got = Ical.read("https://cal.example/x.ics", rebinding, Ical.Fetch { u, at ->
+            dialled += "${u.host}@${at.hostAddress}"
+            Ical.Answer(200, null, "BEGIN:VCALENDAR\r\nEND:VCALENDAR".toByteArray())
+        })
+        assertTrue(got.first)
+        assertEquals(listOf("cal.example@93.184.216.34"), dialled)
+        assertEquals(1, lookups)
+    }
+
+    @Test fun aRedirectIsCheckedAndPinnedAgain() {
+        val dns = mapOf("a.example" to "93.184.216.34", "b.example" to "93.184.216.35", "home.example" to ("172." + "16.0.9"))
+        val resolve: (String) -> List<InetAddress> = { h -> listOf(InetAddress.getByName(dns.getValue(h))) }
+        val dialled = mutableListOf<String>()
+        val fetch = Ical.Fetch { u, at ->
+            dialled += at.hostAddress!!
+            when (u.host) {
+                "a.example" -> Ical.Answer(302, "https://b.example/c.ics", null)
+                else -> Ical.Answer(200, null, "BEGIN:VCALENDAR".toByteArray())
+            }
+        }
+        assertTrue(Ical.read("https://a.example/x.ics", resolve, fetch).first)
+        assertEquals(listOf("93.184.216.34", "93.184.216.35"), dialled)
+        val toHouse = Ical.Fetch { _, _ -> Ical.Answer(302, "https://home.example/", null) }
+        assertEquals(Pair(false, "that address is not on the internet"), Ical.read("https://a.example/x.ics", resolve, toHouse))
+        val plainHttp = Ical.Fetch { _, _ -> Ical.Answer(301, "http://b.example/c.ics", null) }
+        assertEquals(Pair(false, "not a calendar link"), Ical.read("https://a.example/x.ics", resolve, plainHttp))
+    }
+
+    @Test fun answersAreReadPlainOrChunkedAndCapped() {
+        fun parse(s: String) = Ical.parseAnswer(s.toByteArray(Charsets.ISO_8859_1).inputStream())
+        val plain = parse("HTTP/1.0 200 OK\r\nContent-Type: text/calendar\r\n\r\nBEGIN:VCALENDAR\r\n")
+        assertEquals(200, plain.code)
+        assertEquals("BEGIN:VCALENDAR\r\n", String(plain.body!!))
+        val moved = parse("HTTP/1.1 302 Found\r\nLocation: https://b.example/c.ics\r\n\r\n")
+        assertEquals(302, moved.code)
+        assertEquals("https://b.example/c.ics", moved.location)
+        val chunked = parse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n6\r\nBEGIN:\r\n9\r\nVCALENDAR\r\n0\r\n\r\n")
+        assertEquals("BEGIN:VCALENDAR", String(chunked.body!!))
+        val big = Ical.parseAnswer(("HTTP/1.0 200 OK\r\n\r\n").toByteArray().inputStream().let { head ->
+            java.io.SequenceInputStream(head, java.io.ByteArrayInputStream(ByteArray(5 * 1024 * 1024)))
+        })
+        assertNull(big.body)
+        assertEquals(Pair(false, "too big"), Ical.read("https://a.example/x.ics", ip("93.184.216.34")) { _, _ -> big })
+    }
+
     @Test fun calendarWordsOnly() {
         assertTrue(Ical.isCalendar("BEGIN:VCALENDAR\r\nVERSION:2.0"))
         assertFalse(Ical.isCalendar("<html>sign in</html>"))

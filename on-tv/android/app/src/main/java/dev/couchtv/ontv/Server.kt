@@ -428,6 +428,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         .put("watch_next", JSONObject().put("granted", WatchNext.granted()).put("listed", WatchNext.listed()))
         // Xiaomi only: Couch TV in PatchWall's place (FireHome); the setup page shows the switch when xiaomi is true
         .put("xiaomi", FireHome.isXiaomi).put("patchwall_replace", Store.bool("patchwall_replace")).put("watch", WatchService.connected)
+        .put("watch_apk", BuildConfig.BUILD_TYPE == "watch")   // only couch-tv-ontv-watch.apk has the Home button watch
         .put("inputs", Store.inputs())
 
     /** {"people": [...]} replaces the list; {"order": [ids]} only reorders it. */

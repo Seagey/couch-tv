@@ -1,7 +1,6 @@
 package dev.couchtv.ontv
 
 import java.io.ByteArrayOutputStream
-import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.URL
 
@@ -14,7 +13,8 @@ import java.net.URL
  *  - only https, no name or password inside the link, no spaces, at most 2000 characters; a calendar
  *    app's own link (its scheme ends in "cal") is read as https;
  *  - only a host out on the internet: nothing in this house and not this TV, checked again on every
- *    redirect (at most three), so a paired phone cannot use the TV to look around the home network;
+ *    redirect (at most three), so a paired phone cannot use the TV to look around the home network.
+ *    The connection goes to the address that was checked, never a second lookup (DNS rebinding);
  *  - at most 4 MB, and only an answer that is a calendar.
  * The link is a password (it opens the calendar): it is never written down or logged here.
  */
@@ -32,11 +32,11 @@ object Ical {
         return u
     }
 
-    /** True when every address of the host is out on the internet (not private, this TV, or a local name). */
-    fun publicHost(host: String, resolve: (String) -> List<InetAddress> = { InetAddress.getAllByName(it).toList() }): Boolean {
-        val all = try { resolve(host) } catch (e: Exception) { return false }
-        if (all.isEmpty()) return false
-        return all.none { a ->
+    /** The host's addresses when every one is out on the internet (not private, this TV, or a local name), else null. */
+    fun publicAddresses(host: String, resolve: (String) -> List<InetAddress> = { InetAddress.getAllByName(it).toList() }): List<InetAddress>? {
+        val all = try { resolve(host) } catch (e: Exception) { return null }
+        if (all.isEmpty()) return null
+        val inHouse = all.any { a ->
             a.isAnyLocalAddress || a.isLoopbackAddress || a.isLinkLocalAddress || a.isSiteLocalAddress || a.isMulticastAddress ||
                 // IPv6 unique local (fc00::/7) and IPv4 shared (100.64/10) and reserved (240/4) ranges
                 (a.address.size == 16 && (a.address[0].toInt() and 0xfe) == 0xfc) ||
@@ -44,45 +44,125 @@ object Ical {
                 (a.address.size == 4 && (a.address[0].toInt() and 0xff) >= 240) ||
                 (a.address.size == 4 && (a.address[0].toInt() and 0xff) == 0)
         }
+        return if (inHouse) null else all
     }
+
+    /** True when every address of the host is out on the internet (not private, this TV, or a local name). */
+    fun publicHost(host: String, resolve: (String) -> List<InetAddress> = { InetAddress.getAllByName(it).toList() }): Boolean =
+        publicAddresses(host, resolve) != null
 
     /** True when the words are a calendar (BEGIN:VCALENDAR near the start). */
     fun isCalendar(text: String) = text.take(2000).contains("BEGIN:VCALENDAR", ignoreCase = true)
 
+    /** One answer: the status, the Location header, the body (null when it was over MAX_BYTES). */
+    class Answer(val code: Int, val location: String?, val body: ByteArray?)
+
+    /**
+     * Fetches one https link from the address that was checked. The name is looked up once, in read(),
+     * and the connection goes to that address: looking it up again on connect would let a name that
+     * answered with an internet address the first time answer with one in the house the second time.
+     */
+    fun interface Fetch { fun get(url: URL, at: InetAddress): Answer }
+
     /** Reads the calendar. (true, its words) or (false, a short reason that never holds the link). Blocking. */
-    fun read(raw: String?, resolve: (String) -> List<InetAddress> = { InetAddress.getAllByName(it).toList() }): Pair<Boolean, String> {
+    fun read(raw: String?, resolve: (String) -> List<InetAddress> = { InetAddress.getAllByName(it).toList() },
+             fetch: Fetch = Fetch { u, at -> httpsGet(u, at) }): Pair<Boolean, String> {
         var at = checkUrl(raw) ?: return Pair(false, "not a calendar link")
         for (hop in 0..3) {
             val u = URL(at)
-            if (!publicHost(u.host, resolve)) return Pair(false, "that address is not on the internet")
-            val c = try { u.openConnection() as HttpURLConnection } catch (e: Exception) { return Pair(false, "unreachable") }
-            try {
-                c.instanceFollowRedirects = false
-                c.connectTimeout = 10000; c.readTimeout = 20000; c.useCaches = false
-                c.setRequestProperty("Accept", "text/calendar, text/plain;q=0.5")
-                val code = c.responseCode
-                if (code in 300..399) {
-                    val next = c.getHeaderField("Location") ?: return Pair(false, "http $code")
-                    at = checkUrl(URL(URL(at), next).toString()) ?: return Pair(false, "not a calendar link")
-                    continue
-                }
-                if (code !in 200..299) return Pair(false, "http $code")
-                val out = ByteArrayOutputStream()
-                c.inputStream.use { inp ->
-                    val buf = ByteArray(16384)
-                    while (true) {
-                        val n = inp.read(buf); if (n < 0) break
-                        out.write(buf, 0, n)
-                        if (out.size() > MAX_BYTES) return Pair(false, "too big")
-                    }
-                }
-                val text = out.toString("UTF-8")
-                if (!isCalendar(text)) return Pair(false, "not a calendar")
-                return Pair(true, text)
-            } catch (e: Exception) {
-                return Pair(false, "unreachable")
-            } finally { c.disconnect() }
+            val addresses = publicAddresses(u.host, resolve) ?: return Pair(false, "that address is not on the internet")
+            val a = try { fetch.get(u, addresses.first()) } catch (e: Exception) { return Pair(false, "unreachable") }
+            if (a.code in 300..399) {
+                val next = a.location ?: return Pair(false, "http ${a.code}")
+                at = checkUrl(try { URL(URL(at), next).toString() } catch (e: Exception) { null }) ?: return Pair(false, "not a calendar link")
+                continue
+            }
+            if (a.code !in 200..299) return Pair(false, "http ${a.code}")
+            val body = a.body ?: return Pair(false, "too big")
+            val text = String(body, Charsets.UTF_8)
+            if (!isCalendar(text)) return Pair(false, "not a calendar")
+            return Pair(true, text)
         }
         return Pair(false, "too many redirects")
+    }
+
+    /**
+     * GET over TLS to the given address, with the link's own name for SNI and the certificate check, so
+     * the certificate must still be for that name. HTTP/1.0 and Connection: close, so the answer is plain
+     * bytes to the end (a chunked answer is read too, in case a server sends one anyway).
+     */
+    fun httpsGet(u: URL, at: InetAddress): Answer {
+        val port = if (u.port > 0) u.port else 443
+        val plain = java.net.Socket()
+        try {
+            plain.connect(java.net.InetSocketAddress(at, port), 10000)
+            plain.soTimeout = 20000
+        } catch (e: Exception) { plain.close(); throw e }
+        val tls = (javax.net.ssl.SSLSocketFactory.getDefault() as javax.net.ssl.SSLSocketFactory)
+            .createSocket(plain, u.host, port, true) as javax.net.ssl.SSLSocket
+        tls.use { s ->
+            s.startHandshake()
+            if (!javax.net.ssl.HttpsURLConnection.getDefaultHostnameVerifier().verify(u.host, s.session)) {
+                throw java.io.IOException("certificate is not for this name")
+            }
+            val path = (u.path.ifEmpty { "/" }) + (u.query?.let { "?$it" } ?: "")
+            val host = if (u.port > 0 && u.port != 443) "${u.host}:${u.port}" else u.host
+            val req = "GET $path HTTP/1.0\r\nHost: $host\r\nAccept: text/calendar, text/plain;q=0.5\r\n" +
+                "User-Agent: couch-tv\r\nConnection: close\r\n\r\n"
+            s.outputStream.write(req.toByteArray(Charsets.ISO_8859_1))
+            s.outputStream.flush()
+            return parseAnswer(java.io.BufferedInputStream(s.inputStream))
+        }
+    }
+
+    /** Reads an HTTP/1.x answer: status line, headers, then the body up to MAX_BYTES. */
+    fun parseAnswer(inp: java.io.InputStream): Answer {
+        fun line(): String? {
+            val b = ByteArrayOutputStream()
+            while (true) {
+                val c = inp.read()
+                if (c < 0) return if (b.size() == 0) null else b.toString("ISO-8859-1")
+                if (c == '\n'.code) return b.toString("ISO-8859-1").trimEnd('\r')
+                b.write(c)
+                if (b.size() > 16384) throw java.io.IOException("header too long")
+            }
+        }
+        val status = line() ?: throw java.io.IOException("no answer")
+        val code = Regex("^HTTP/\\d(?:\\.\\d)? (\\d{3})").find(status)?.groupValues?.get(1)?.toInt()
+            ?: throw java.io.IOException("not http")
+        var location: String? = null
+        var chunked = false
+        var headers = 0
+        while (true) {
+            val h = line() ?: break
+            if (h.isEmpty()) break
+            if (++headers > 200) throw java.io.IOException("too many headers")
+            val k = h.substringBefore(':').trim().lowercase()
+            val v = h.substringAfter(':', "").trim()
+            if (k == "location") location = v
+            if (k == "transfer-encoding" && v.lowercase().contains("chunked")) chunked = true
+        }
+        val out = ByteArrayOutputStream()
+        val buf = ByteArray(16384)
+        fun copy(limit: Long): Boolean {   // false when over MAX_BYTES
+            var left = limit
+            while (left > 0) {
+                val n = inp.read(buf, 0, minOf(buf.size.toLong(), left).toInt())
+                if (n < 0) break
+                out.write(buf, 0, n)
+                left -= n
+                if (out.size() > MAX_BYTES) return false
+            }
+            return true
+        }
+        if (chunked) {
+            while (true) {
+                val size = line()?.substringBefore(';')?.trim()?.toLongOrNull(16) ?: break
+                if (size == 0L) break
+                if (size > MAX_BYTES || !copy(size)) return Answer(code, location, null)
+                line()   // the CRLF after each chunk
+            }
+        } else if (!copy(Long.MAX_VALUE)) return Answer(code, location, null)
+        return Answer(code, location, out.toByteArray())
     }
 }
