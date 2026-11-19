@@ -232,7 +232,8 @@
   }
   // { id, link, expires, every }: link is what the QR holds
   function openInbox() {
-    return inboxCall({ op: "open" }).then(function (j) {
+    // a store with no inbox (an older couch-tv Studio, or one's own store) answers 404: not "ran out"
+    return inboxCall({ op: "open" }).catch(function (e) { throw e && e.kind === "gone" ? inboxFail("offline") : e; }).then(function (j) {
       if (typeof j.id !== "string" || !/^[A-Za-z0-9_-]{22}$/.test(j.id)) throw inboxFail("offline");
       var secs = Math.max(60, Math.min(1800, +j.expires_in || 600)), every = Math.max(3, Math.min(30, +j.poll_every || 4));
       return { id: j.id, link: base() + "/design/#inbox=" + j.id, expires: Date.now() + secs * 1000, every: every * 1000 };

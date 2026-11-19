@@ -134,6 +134,10 @@ const ID = "AbCdEfGhIjKlMnOpQrStUv";
   await assert.rejects(C.takeInbox(ID), (e) => e.kind === "gone"); n++;
 }
 {
+  const { C } = home({ design_store: "https://designs.example" }, () => [404, {}]);
+  await assert.rejects(C.openInbox(), (e) => e.kind === "offline" && /type the code/.test(e.message), "a store with no inbox: not ran out"); n++;
+}
+{
   const { C } = home({ design_store: "https://designs.example" }, () => [200, { state: "ok", code: "https://evil.example/x.json" }]);
   await assert.rejects(C.takeInbox(ID), (e) => e.kind === "gone", "a link is never taken for a code"); n++;
 }

@@ -160,6 +160,8 @@ extension HomeModel {
         guard let (status, data) = await inboxCall(["op": "open"]) else {
             return .failure(InboxProblem(words: "Could not reach couch-tv Studio. Check the Apple TV is online, or type the code instead."))
         }
+        // a store with no inbox (an older couch-tv Studio, or one's own store) answers 404
+        if status == 404 { return .failure(InboxProblem(words: "This design store has no phone inbox. Type the code instead.")) }
         guard status == 200, let box = DesignInbox.read(data, base: base) else {
             return .failure(InboxProblem(words: "couch-tv Studio is busy. Type the code instead, or try again in a few minutes."))
         }
