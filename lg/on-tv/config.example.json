@@ -1,0 +1,61 @@
+{
+  "bridge": {
+    "host": "TV_ADDRESS",
+    "port": 5400,
+    "fallback_hosts": [],
+    "pairing_key": "SET_A_RANDOM_KEY"
+  },
+  "default_tv": "lounge",
+  "tvs": [
+    {
+      "id": "lounge",
+      "name": "Lounge",
+      "kind": "lg",
+      "ip": "127.0.0.1",
+      "mac": "",
+      "wake_on_lan": false,
+      "extend_devmode": false,
+      "back_to_couch": true,
+      "quick": [
+        "look",
+        "input"
+      ]
+    }
+  ],
+  "people": [
+    {
+      "id": "home",
+      "name": "Home"
+    }
+  ],
+  "home": {
+    "look": "night",
+    "scenes": [
+      "night",
+      "golden",
+      "water",
+      "fog",
+      "dawn"
+    ],
+    "scene_seconds": 20,
+    "dock_size": 10,
+    "hi_res": false,
+    "lighter": true,
+    "clock": "24h",
+    "hide_packages": [
+      "org.webosbrew.inputhook"
+    ],
+    "sun_sync": true
+  },
+  "phone_remote": true,
+  "ask": {
+    "enabled": false
+  },
+  "weather": {
+    "lat": 0.0,
+    "lon": 0.0,
+    "place": "Your city",
+    "timezone": "Europe/London"
+  },
+  "country": "GB"
+}

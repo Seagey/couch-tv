@@ -149,6 +149,19 @@ def css_var_fallbacks(css):
     return re.sub(r"(?<![\w-])([a-z-]+)\s*:\s*([^;{}]*var\(--[^;{}]*)", sub, css)
 
 
+def font_weight_fallbacks(css):
+    """Before Chrome 62 (webOS 3.x and 4.x) font-weight takes only 100, 200 ... 900, so a weight such as
+    620 drops and the heading falls back to regular. Put the nearest hundred (a 50 rounds down) just
+    before it: newer engines still read the exact weight after it."""
+    def sub(m):
+        n = int(m.group(1))
+        if n % 100 == 0 or not 1 <= n <= 1000:
+            return m.group(0)
+        plain = min(900, max(100, (n + 49) // 100 * 100))
+        return f"font-weight: {plain}{m.group(2) or ''}; {m.group(0)}"
+    return re.sub(r"(?<![\w-])font-weight\s*:\s*(\d+)(\s*!important)?(?=\s*[;}])", sub, css)
+
+
 def _plain(name):
     """The app's name the way lg/app/webos.js compares them: lower case, letters and digits only."""
     return re.sub(r"[^a-z0-9]", "", str(name or "").lower())
@@ -288,7 +301,12 @@ def main():
     with open(css_path) as f:
         css = f.read()
     with open(css_path, "w") as f:
-        f.write(css_var_fallbacks(css))
+        f.write(font_weight_fallbacks(css_var_fallbacks(css)))
+    css_path = os.path.join(stage, "widgets.css")
+    with open(css_path, encoding="utf-8") as f:
+        css = f.read()
+    with open(css_path, "w", encoding="utf-8") as f:
+        f.write(font_weight_fallbacks(css))
 
     # index.html: the LG side loads before the bridge settings and app.js
     index = os.path.join(stage, "index.html")

@@ -4276,12 +4276,32 @@ async def _tv_in_use():
                for s in _sessions(out))
 
 
-async def move_open(app, now, session, who, again=False):
+def move_asked(now, pkg):
+    """The title the bridge itself opened in this app, when the app now names another one. None when
+    the app gives no title of its own, or the same one, or the bridge opened nothing in this app in
+    the last three hours (the rule the move already uses for an app that gives no title).
+
+    Disney+, asked for the show "Bluey", plays the series "Bluey Fancy Restaurant"; asked for the
+    film "Moana", it plays "Moana Sing-Along" (seen on a Sony Google TV and a Google TV Streamer).
+    The show finder knows neither of those names, so the move could only open the app's search. Call
+    this on TV A."""
+    item = playing["item"]
+    if not (now.get("title") and now.get("title_from") == "app" and item and item.get("title")
+            and item.get("package") == pkg and item.get("ts", 0) > time.time() - MOVE_OPENED_S):
+        return None
+    if finder.same_title(item["title"], now["title"]) or move.same_name(item["title"], now["title"]):
+        return None
+    return item["title"]
+
+
+async def move_open(app, now, session, who, again=False, asked=None):
     """On TV B: open what `now` says was playing on TV A, in the same app. Uses `play` (the show
     finder, the app's own link, the profile screen and the Play button) for every app it knows, and
     a video link for YouTube. Returns `play`'s answer; "video" is the YouTube id when one was found.
     `again`: a second go at an app that is already open (YouTube is not started afresh then; the
-    others follow their own "cold" rule in apps.py, as any `play` does)."""
+    others follow their own "cold" rule in apps.py, as any `play` does).
+    `asked`: the title the bridge itself opened on TV A when the app then named another one
+    (move_asked). It is opened only when the show finder does not know the app's own name."""
     title = now["title"]
     if app["id"] == "youtube":
         video = await move.youtube_video_id(title, (session or {}).get("subtitle"), (session or {}).get("duration"))
@@ -4306,6 +4326,21 @@ async def move_open(app, now, session, who, again=False):
         except ApiError as e:
             if e.status != 404:
                 raise
+        if asked:
+            # The finder does not know the name the app gives (Disney+ plays the series "Bluey Fancy
+            # Restaurant" when asked for "Bluey", and the finder has no such series). The link the
+            # bridge opened on TV A got it there, so the same link is the way to it on TV B. The
+            # caller still compares what the two TVs say they play, and pauses TV B if they differ.
+            log.info("move: the show finder does not know %s; opening %s, which got it playing on the first TV",
+                     title, asked)
+            try:
+                # the episode TV A is on now (it may have played on past the one the bridge opened)
+                return await play(asked, now.get("season"), now.get("episode"), app["id"], who,
+                                  resume=not now.get("season"), exact=True,
+                                  same=None if finder._norm(asked) else move.same_name) | {"asked": asked}
+            except ApiError as e:
+                if e.status != 404:
+                    raise
     # The show finder (or YouTube's search) does not know this title: open the app on its search.
     method, _ = await search_in_app(apps.BY_ID[app["id"]], now["title"])
     return {"method": method, "started": False}
@@ -4464,6 +4499,7 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
             item = playing["item"]
             if not (item and item.get("package") == pkg and item.get("ts", 0) > time.time() - MOVE_OPENED_S):
                 now["title"] = None
+        asked = move_asked(now, pkg)
         who = cur_who()
         from_name = tv.name
     if app and app["id"] is None:
@@ -4532,7 +4568,7 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
             # "Who's watching?" and then drop the show), the person's profile, and play
             await tv.adb("shell", "am", "force-stop", pkg_b)
             opened_at = time.monotonic()
-            opened = await move_open(known, now, session, who)
+            opened = await move_open(known, now, session, who, asked=asked)
             started = bool(opened.get("started"))
             if not started and opened.get("method") == "deeplink":
                 # A fresh start is slow (YouTube began a few seconds after `play` stopped waiting, on
@@ -4542,7 +4578,7 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
                     # The profile screen came up after `play` had looked and given up (Disney+ from
                     # a fresh start on a Google TV Streamer). Open it once more: the profile is
                     # picked this time, and the link is opened again behind it.
-                    opened = await move_open(known, now, session, who, again=True)
+                    opened = await move_open(known, now, session, who, again=True, asked=asked)
                     started = bool(opened.get("started")) or await move_wait_playing(pkg_b, timeout=8)
             if paused_here:
                 # Netflix starts playback over about ten seconds after it first plays (measured on a
@@ -4560,12 +4596,22 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
             if started:
                 await media_read(pkg_b, app)
                 there = media_now.get("title") if media_now.get("title_from") == "app" else None
+                # A show opened by the name the bridge asked for on TV A (move_asked) is only right
+                # if TV B says so itself. An app names its show a few seconds after it starts, so
+                # look again before giving up; a TV B that names nothing has not confirmed it.
+                unconfirmed = opened.get("asked")
+                for _ in range(3 if unconfirmed else 0):
+                    if there:
+                        break
+                    await asyncio.sleep(2)
+                    await media_read(pkg_b, app)
+                    there = media_now.get("title") if media_now.get("title_from") == "app" else None
                 same = finder.same_title(there, title) or move.same_name(there, title)
-                if now.get("title_from") == "app" and there and not same:
-                    wrong_title = there
+                if now.get("title_from") == "app" and (there or unconfirmed) and not same:
+                    wrong_title = there or unconfirmed
                     started = False
                     await tv.key("pause")
-                    log.info("move: %s played %s on %s, not %s: paused it", app["name"], there, dst, title)
+                    log.info("move: %s played %s on %s, not %s: paused it", app["name"], wrong_title, dst, title)
             # 7. the backup: only when B is playing and is not near A's spot
             if started:
                 at = media_now.get("position_ms")

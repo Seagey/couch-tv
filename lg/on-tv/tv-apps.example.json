@@ -1,0 +1,57 @@
+[
+ {
+  "id": "io.strem.tv.beta",
+  "title": "StremioBrew",
+  "icon": ""
+ },
+ {
+  "id": "youtube.leanback.v4",
+  "title": "YouTube AdFree",
+  "icon": ""
+ },
+ {
+  "id": "spotify-beehive",
+  "title": "Spotify - Music and Podcasts",
+  "icon": ""
+ },
+ {
+  "id": "netflix",
+  "title": "Netflix",
+  "icon": ""
+ },
+ {
+  "id": "amazon",
+  "title": "Prime Video",
+  "icon": ""
+ },
+ {
+  "id": "com.disney.disneyplus-prod",
+  "title": "Disney+",
+  "icon": ""
+ },
+ {
+  "id": "com.webos.app.browser",
+  "title": "Web Browser",
+  "icon": ""
+ },
+ {
+  "id": "com.webos.app.photovideo",
+  "title": "Photo & Video",
+  "icon": ""
+ },
+ {
+  "id": "com.webos.app.music",
+  "title": "Music",
+  "icon": ""
+ },
+ {
+  "id": "com.wbd.stream",
+  "title": "Max",
+  "icon": ""
+ },
+ {
+  "id": "org.webosbrew.hbchannel",
+  "title": "Homebrew Channel",
+  "icon": ""
+ }
+]
