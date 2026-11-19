@@ -11,6 +11,7 @@ import os
 import re
 import time
 import unicodedata
+import urllib.parse
 
 import aiohttp
 
@@ -48,6 +49,66 @@ def same_name(a, b):
     titles are both empty to it and never match."""
     a, b = _norm(a), _norm(b)
     return bool(a) and a == b
+
+
+# ---------- the right title is one tile away ----------
+# Apps where the show finder's one link for a title was seen to open another title whose own page
+# lists the right one. Disney+: JustWatch's link for the film "Tangled" (and for "Moana") is the
+# page of "Tangled Sing-Along", a title of its own in Disney+, and the plain film is a tile under
+# Suggested on that page (read from a Sony Google TV, 19 Nov 2026). Only apps seen on a real TV.
+SIBLING_TITLE_APPS = {"disney-plus": "disneyplus.com"}   # app -> the only site its title pages are on
+PAGE_PLAY_BUTTONS = ("play", "resume")   # what a title page's main button says
+# Anything on the page that reads like paying, signing in or agreeing to something: nothing is pressed
+# then. Wider than agentic.stop_labels on purpose: Disney+ draws a button's words on a part that is
+# not itself pressable (its CONTINUE and RESTART are), and "Rent" or "CA$4.99" are not stop words there.
+PAGE_STOP = re.compile(
+    r"\b(rent|buy|purchase|pay|pay now|payment|subscribe|upgrade|unlock|premium|checkout|confirm|trial|join|"
+    r"member|agree|register|sign in|sign-in|sign up|log in|login|password|pin|redeem)\b", re.I)
+PAGE_PRICE = re.compile(r"(?:^|\s)(?:[A-Z]{1,3})?[$£€]\s?\d|\b\d+[.,]\d\d\b")
+
+
+def page_stops(items):
+    """Short labels on a title page that mean money, an account or an agreement, pressable or not.
+    Long ones are a description or a tile ("Rent, Select for details on this title., ...")."""
+    return [i["label"] for i in items
+            if len((i.get("label") or "").strip()) <= 40
+            and (PAGE_STOP.search(i["label"]) or PAGE_PRICE.search(i["label"]))]
+
+
+def page_play_button(items, button):
+    """The page's own main button. `button(items, *words)` is agentic._button. A bare "Continue" is
+    also what a dialog over the page says, so it only counts next to "Restart", as Disney+ shows
+    the two on the page of a film that was started before."""
+    words = PAGE_PLAY_BUTTONS + (("continue",) if button(items, "restart") else ())
+    return button(items, *words)
+
+
+def page_host_ok(app_id, url):
+    """Is this link on the app's own site, and nowhere else."""
+    site = SIBLING_TITLE_APPS.get(app_id)
+    host = (urllib.parse.urlsplit(url or "").hostname or "").lower()
+    return bool(site) and (url or "").startswith("https://") and (host == site or host.endswith("." + site))
+
+
+def page_names(items, title):
+    """Is this title named on the screen: a label that is the title and nothing more."""
+    return any(same_name(i.get("label"), title) for i in items)
+
+
+def sibling_item(items, title):
+    """The one pressable tile on a title page that is this title: its label starts with the title
+    and then a comma (Disney+: "Tangled, Select for details on this title., 1 of 8 items.").
+    "Tangled Sing-Along, ..." and "Tangled Ever After, ..." are other titles. None when no tile is
+    it, or more than one is: a guess here would start another film.
+    A longer title with a comma in that very place starts this way too ("Monsters, Inc., Select
+    ..." for a film called "Monsters"), so a tile is only a way to a page: the caller presses Play
+    there only when that page names the title and nothing more."""
+    want = (title or "").strip().casefold()
+    if not want:
+        return None
+    hits = [i for i in items if i.get("clickable") and "x" in i and "y" in i
+            and (i.get("label") or "").strip().casefold().startswith(want + ",")]
+    return hits[0] if len(hits) == 1 else None
 
 
 def clock(ms):
