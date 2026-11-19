@@ -2091,6 +2091,12 @@ html.theme-loop.loop-depth .loop-fg { display: block; position: fixed; margin: 0
 html.theme-loop.loop-depth .loop-fg.off, html.theme-loop .loop-fg.failed { display: none; }
 html.theme-loop.loop-depth .time { top: 12.75rem; }
 html.theme-loop.loop-depth .date { top: 9.5rem; }
+/* the Ambient music screen (z 45) opens under the header (z 50), which holds the clock and the cut-out: while
+   it is open the cut-out is hidden, by visibility so its animation keeps time with the video for when the
+   screen closes, and the clock and the date line go back up, clear of the album art (from about y 340) */
+html.theme-loop.loop-depth.ambient-active:not(.ambient-minimized) .loop-fg { visibility: hidden; }
+html.theme-loop.loop-depth.ambient-active:not(.ambient-minimized) .time { top: 7.75rem; }
+html.theme-loop.loop-depth.ambient-active:not(.ambient-minimized) .date { top: 4.5rem; }
 
 /* Now playing: one line at the top left (x 96, under the people), an accent dot, the song and the artist,
    then the small media buttons; no card */

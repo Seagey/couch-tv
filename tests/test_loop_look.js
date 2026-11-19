@@ -50,7 +50,7 @@ function el(tag) {
   });
   if (tag === 'video') {
     Object.assign(e, {
-      currentTime: 0, duration: 30, playbackRate: 1, seeking: false, ended: false, paused: true, loads: 0, plays: 0, pauses: 0,
+      currentTime: 0, duration: 30, playbackRate: 1, seeking: false, ended: false, paused: true, readyState: 4, loads: 0, plays: 0, pauses: 0,
       pause: () => { e.pauses++; e.paused = true; }, play: () => { e.plays++; e.paused = false; return { catch: () => {} }; }, load: () => { e.loads++; },
     });
     Object.defineProperty(e, 'src', { get: () => attrs.src || '', set: (v) => { attrs.src = v; } });
@@ -518,16 +518,21 @@ const tick = () => new Promise((r) => setImmediate(r));
   const fg2 = context.loopFg, s2 = context.loopSharp;
   // before the video plays: held at 0, the poster's position
   assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear 0.000s infinite paused', 'loading: paused at 0');
+  // the 4 s timer's play() before the file can play: waiting comes with paused false, and it stays held at 0
+  s2.paused = false; s2.readyState = 1; s2.fire('waiting');
+  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear 0.000s infinite paused', 'play() with no data yet: still held at 0');
+  s2.paused = true; s2.readyState = 4;
   s2.fire('canplaythrough');
   assert.strictEqual(s2.plays, 1);
   // playing: the delay is minus the video's time
   s2.currentTime = 12.25; s2.paused = false;
   s2.fire('playing');
   assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear -12.250s infinite running', 'running from the video time');
-  // a stall holds it where the frame stopped; playing again starts it from there
-  s2.paused = true; s2.currentTime = 13.5; s2.fire('waiting');
-  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear -13.500s infinite paused');
-  s2.paused = false; s2.fire('playing');
+  // a stall holds it where the frame stopped (paused stays false, as on a real media element, and readyState
+  // drops to HAVE_CURRENT_DATA); playing again starts it from there
+  s2.currentTime = 13.5; s2.readyState = 2; s2.fire('waiting');
+  assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear -13.500s infinite paused', 'a stall holds it');
+  s2.readyState = 4; s2.fire('playing');
   assert.strictEqual(fg2.style.animation, 'loop-depth 34s linear -13.500s infinite running');
   // the wrap the Loop code already finds restarts it from the new time
   s2.currentTime = 33.9; context.loopLastT = 33.6; context.loopTimeUpdate();
@@ -580,6 +585,10 @@ const tick = () => new Promise((r) => setImmediate(r));
   assert(/html\.theme-loop\.loop-depth \.loop-fg\.off, html\.theme-loop \.loop-fg\.failed \{ display: none; \}/.test(sec));
   assert(/html\.theme-loop\.loop-depth \.time \{ top: 12\.75rem; \}/.test(sec), 'the clock from y 204');
   assert(/html\.theme-loop\.loop-depth \.date \{ top: 9\.5rem; \}/.test(sec), 'the date line from y 152');
+  // the Ambient music screen opens under the header: the cut-out hidden there, keeping time, and the clock back up
+  assert(/html\.theme-loop\.loop-depth\.ambient-active:not\(\.ambient-minimized\) \.loop-fg \{ visibility: hidden; \}/.test(sec), 'no cut-out over the music screen');
+  assert(/html\.theme-loop\.loop-depth\.ambient-active:not\(\.ambient-minimized\) \.time \{ top: 7\.75rem; \}/.test(sec), 'the clock clear of the album art');
+  assert(/html\.theme-loop\.loop-depth\.ambient-active:not\(\.ambient-minimized\) \.date \{ top: 4\.5rem; \}/.test(sec));
   assert(/html\.theme-loop \.time \{\n\s*display: block; position: fixed; left: 0; right: 0; top: 7\.75rem;/.test(sec), 'without depth the clock stays at y 124');
   assert(!/animation:\s*none/.test(sec.replace(/html\.theme-loop \.tile\.focus \.face \{ animation: none; \}/, '')), 'no Loop rule (Lighter included) stops the cut-out');
 

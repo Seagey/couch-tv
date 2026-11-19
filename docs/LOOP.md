@@ -248,7 +248,10 @@ position is at `W/2 + z*(p - W/2) - sway*(z - 1)/2*W*sin(2*PI*t/T)` at loop time
 `translateX(-(sway*(z - 1)/2*100vw)*sin) scale(z)` about the centre. That runs as a CSS animation on the
 compositor (keyframes every 2.5 percent, 0.11 px off at most), started with a delay of minus the video's
 time when the video plays, again at each wrap, after a variant switch and when the home comes back;
-held at 0, the poster's position, while a file loads; hidden while an app is in front. The clock and
+held at 0, the poster's position, while a file loads, and where the frame stopped while the video waits
+for data (a stall leaves the video's `paused` false, so the home goes by `readyState`); hidden while an
+app is in front. While the Ambient music screen is open the cut-out is hidden (it keeps time, so it is
+in place when the screen closes) and the clock and the date line go back up, clear of the album art. The clock and
 the date line move down 80 px with it: the digits run from about y 231 to 405, and the spire, from
 y 350, covers a little of the colon and the inner digits, each still readable. Lighter home keeps it,
 since the video keeps moving.

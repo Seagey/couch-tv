@@ -1153,7 +1153,8 @@
     loopSharp.onerror = function () { console.log("loop: " + loopCur + ".mp4 did not play, the poster stays"); };
     loopSharp.addEventListener("timeupdate", loopTimeUpdate);
     // the cut-out follows the video's clock: running from its time once it plays, held where it is
-    // when it stops or waits for data (a wrap is caught in loopTimeUpdate)
+    // when it stops or waits for data (a wrap is caught in loopTimeUpdate). waiting comes with paused
+    // still false, so loopFgRun holds on readyState, not on paused
     loopSharp.addEventListener("playing", loopFgRun);
     loopSharp.addEventListener("pause", loopFgRun);
     loopSharp.addEventListener("waiting", loopFgRun);
@@ -1234,10 +1235,13 @@
   }
   // the video's poster is frame 0, the neutral position: held there while a file loads
   function loopFgHold() { if (loopFg) loopFgSet(loopFgAnim(0, false)); }
-  // on the video's playing, pause and waiting, and at each wrap: its time now, running while it plays
+  // on the video's playing, pause and waiting, and at each wrap: its time now, running only while it
+  // plays. A stall (waiting, or play() from loopLoad's 4 s timer before the file can play) leaves paused
+  // false but readyState under HAVE_FUTURE_DATA (3), with the frame standing still: held there too
   function loopFgRun() {
     if (!loopFg || !loopSharp || loopOff) return;
-    loopFgSet(loopFgAnim(loopSharp.currentTime, !loopSharp.paused && !loopSharp.ended));
+    var s = loopSharp;
+    loopFgSet(loopFgAnim(s.currentTime, !s.paused && !s.ended && s.readyState >= 3));
   }
   // puts a variant on both elements: per element pause, let go of the file (load() frees the codec), the
   // poster, then the file; one play() for both once each can play through, or after 4 s. A load that
