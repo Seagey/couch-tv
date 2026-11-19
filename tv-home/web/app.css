@@ -2078,7 +2078,7 @@ html.theme-loop .time {
   font-size: 15rem; line-height: 0.9; font-weight: 300; letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
   color: rgba(245, 243, 238, 0.92); -webkit-text-stroke: 0.0625rem rgba(11, 10, 16, 0.6); text-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.55);
 }
-html.theme-loop .time small { font-size: 3rem; font-weight: 400; letter-spacing: 0; margin-left: 0.75rem; -webkit-text-stroke: 0; }
+html.theme-loop .time small { display: none; }   /* no am or pm: the loop itself says the time of day, as the signed off mockup showed */
 
 /* Now playing: one line at the top left (x 96, under the people), an accent dot, the song and the artist,
    then the small media buttons; no card */
