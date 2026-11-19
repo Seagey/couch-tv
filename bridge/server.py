@@ -2239,6 +2239,12 @@ def static_handler(folder, name):
         # the WebView's media player seeks with Range, and a seek at the loop's wrap must not fetch
         # the whole file again. Pinned by tests/test_loop_serving.py. Media is never compressed,
         # so a partial answer is always plain bytes.
+        # Two corners aiohttp leaves as they are, accepted here: If-Range is honoured only in its
+        # date form (an entity tag in it is not compared, so a Range request with a stale tag still
+        # gets 206 of the new file; RFC 9110 wants the whole file), and an unknown range unit
+        # ("bits=0-9") gets 416 where the RFC says to ignore the header. The tag case needs
+        # make-loop.sh re-run while the TV plays, and Chromium's media loader compares each 206's
+        # validators and starts the load again when they change, so no splice was seen.
         resp = web.FileResponse(target, headers=headers)
         if ctype in COMPRESSIBLE_TYPES:
             resp.enable_compression()   # only when the page says it accepts it

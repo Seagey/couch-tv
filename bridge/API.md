@@ -26,7 +26,9 @@ changes, the change is written here first, with a dated note at the bottom.
   `bytes=1000-`, `bytes=-500`): `206 Partial Content` with `Content-Range` and `Accept-Ranges: bytes`,
   `416` with `Content-Range: bytes */<size>` for a range past the end, a malformed one or several at
   once, and `HEAD` the same with no body. The Loop look's footage under `/tv/loop/` (docs/LOOP.md)
-  is played this way by the TV's media player.
+  is played this way by the TV's media player. Not done, as aiohttp has it: `If-Range` counts only
+  in its date form (an entity tag in it is not compared, so a stale tag still gets `206`), and an
+  unknown range unit gets `416` rather than being ignored.
 - `GET /tv/manifest.json`, the launcher's offline copy, lists every file under `tv-home/web/` except
   `mock*` and the video under `loop/`: the Loop look's footage (up to 80 MB) is streamed from the
   bridge, never saved on the TV. Its posters (`loop/*.jpg`) are listed, so the offline home shows one.

@@ -21,7 +21,9 @@ if [ -d "$OUT" ] && [ -n "$(ls -A "$OUT" 2>/dev/null)" ] && [ ! -f "$OUT/.couch-
   exit 1
 fi
 mkdir -p "$OUT"
-rsync -a --delete --exclude '.couch-standalone' --exclude '.vercel/' --exclude 'config.js' --exclude '.DS_Store' "$ROOT/tv-home/web/" "$OUT/"
+# loop/*.mp4: the Loop look's footage (up to 80 MB, scripts/make-loop.sh) is the bridge's to stream, never
+# the site's to hold; its posters (loop/*.jpg) come along as in the launcher's offline copy
+rsync -a --delete --exclude '.couch-standalone' --exclude '.vercel/' --exclude 'config.js' --exclude '.DS_Store' --exclude 'loop/*.mp4' "$ROOT/tv-home/web/" "$OUT/"
 
 # config.js: the settings the bridge would hand the page, less what only the bridge uses, plus the
 # standalone switch app.js reads. No keys and no TV addresses go in, and the weather's place is rounded

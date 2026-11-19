@@ -127,7 +127,8 @@ class DryRun(unittest.TestCase):
     def test_bad_arguments_stop_before_anything_prints(self):
         for args in ((CLIP, "--dry-run", "--seconds", "14"), (CLIP, "--dry-run", "--seconds", "61"),
                      (CLIP, "--dry-run", "--seconds", "abc"), (CLIP, "--dry-run", "--only", "noon"),
-                     (CLIP, "--dry-run", "--slow", "fast"), ("--dry-run",), (CLIP, "--dry-run", "--bogus")):
+                     (CLIP, "--dry-run", "--slow", "fast"), (CLIP, "--dry-run", "--slow", "0"),
+                     (CLIP, "--dry-run", "--slow", "0.0"), ("--dry-run",), (CLIP, "--dry-run", "--bogus")):
             p, cmds, _ = run(*args)
             self.assertNotEqual(p.returncode, 0, args)
             self.assertEqual(cmds, [], args)

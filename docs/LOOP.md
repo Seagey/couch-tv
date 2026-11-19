@@ -75,6 +75,11 @@ What each file is:
   shows them until the video plays, and they are the only part of the folder the launcher keeps
   in its offline copy (the video is streamed from the bridge).
 
+The video stays on the bridge computer: `scripts/build-apk.sh` leaves `loop/*.mp4` out of the app
+it builds and `scripts/build-standalone.sh` out of the standalone site, the same way the offline
+manifest does, so a computer that has run `make-loop.sh` still builds an app of the usual size.
+The posters go into both.
+
 ## The four variants and when each shows
 
 The home already works out the sun's height at `weather.lat` and `weather.lon` (`sunPhase()` in

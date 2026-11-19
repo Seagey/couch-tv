@@ -74,6 +74,8 @@ fi
 case "$SLOW" in
   ''|*[!0-9.]*|.|*.*.*) echo "make-loop.sh: --slow must be a number, for example 1 or 2" >&2; exit 2 ;;
 esac
+# 0 passes the pattern: it would put every frame at timestamp 0 (setpts=0*PTS)
+awk -v f="$SLOW" 'BEGIN { exit !(f > 0) }' || { echo "make-loop.sh: --slow must be more than 0" >&2; exit 2; }
 VARIANTS="dawn day dusk night"
 if [ -n "$ONLY" ]; then
   case " $VARIANTS " in
