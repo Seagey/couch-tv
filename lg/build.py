@@ -58,6 +58,20 @@ LOGOS = os.path.join(ROOT, "remote", "src", "app-logos")
 OUT = os.path.join(ROOT, "build", "lg")
 
 
+def web_ignore(*patterns):
+    """shutil.copytree's ignore for tv-home/web: `patterns` anywhere, and the Loop look's folder at
+    the top (loop/, up to 80 MB of footage and stills from scripts/make-loop.sh, git ignored). The
+    LG app reads the loop from the bridge's /tv/loop/, so nothing in it is ever needed here."""
+    by_pattern = shutil.ignore_patterns(*patterns)
+
+    def ignore(folder, names):
+        out = set(by_pattern(folder, names))
+        if os.path.abspath(folder) == os.path.abspath(WEB) and "loop" in names:
+            out.add("loop")
+        return out
+    return ignore
+
+
 def _tar_gz(entries):
     """entries: (name in the archive, bytes or None for a folder). Same order every time."""
     buf = io.BytesIO()
@@ -285,7 +299,7 @@ def main():
     skip = ["mock.js", ".*"]
     if (config.HOME or {}).get("hi_res") is False:
         skip.append("*@2x.*")    # home.hi_res false: the 4K copies are never shown, so leave them out
-    shutil.copytree(WEB, stage, ignore=shutil.ignore_patterns(*skip))
+    shutil.copytree(WEB, stage, ignore=web_ignore(*skip))
     for name in os.listdir(os.path.join(HERE, "app")):
         shutil.copy(os.path.join(HERE, "app", name), stage)
     os.makedirs(os.path.join(stage, "logos"))

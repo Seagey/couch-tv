@@ -75,6 +75,10 @@ val copyWeb by tasks.registering(Copy::class) {
     into(layout.projectDirectory.dir("src/main/assets/www"))
     from(remoteDist) { into("remote") }
     from(tvHomeWeb) { into("tv"); exclude("mock.js") }
+    // tv-home/web/loop/: the Loop look's footage and stills (up to 80 MB, scripts/make-loop.sh), git
+    // ignored and only ever shown from the bridge; the on-TV app never uses them, so they stay out.
+    val tvLoop = File(tvHomeWeb, "loop").absoluteFile.normalize()
+    exclude { it.file.absoluteFile.normalize().startsWith(tvLoop) }
     from(file("../../web")) { into("ontv") }
     doFirst {
         if (!File(remoteDist, "index.html").isFile) throw GradleException("No phone remote build at $remoteDist. Run npm run build in remote/ first.")

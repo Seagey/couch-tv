@@ -20,7 +20,20 @@ changes, the change is written here first, with a dated note at the bottom.
 - **Why "null" in the origin list matters:** TV apps (Android WebView, webOS, Tizen) load from local files and send `Origin: null`. Browsers also send `Origin: null` for requests from sandboxed `<iframe>` elements. Because of this browser behavior, an origin allowlist alone cannot block a malicious web page from sending `Origin: null` requests. The pairing key (`pairing_key`) is what truly protects the bridge from malicious cross-origin requests.
 - POST requests with a body must send `Content-Type: application/json` (otherwise rejected with `415`).
 - Use **relative URLs** (`/api/now`) in both front ends. Then they work from any device at home.
-- Static files are sent with `Cache-Control: no-cache`, so a rebuild shows on the next load.
+- Static files are sent with `Cache-Control: no-cache`, so a rebuild shows on the next load. Pictures,
+  fonts and video are `public, max-age=3600` and never compressed.
+- Byte ranges: every static file answers a `Range` request with one byte range (`bytes=0-999`,
+  `bytes=1000-`, `bytes=-500`): `206 Partial Content` with `Content-Range` and `Accept-Ranges: bytes`,
+  `416` with `Content-Range: bytes */<size>` for a range past the end, a malformed one or several at
+  once, and `HEAD` the same with no body. The Loop look's footage under `/tv/loop/` (docs/LOOP.md)
+  is played this way by the TV's media player. Not done, as aiohttp has it: `If-Range` counts only
+  in its date form (an entity tag in it is not compared, so a stale tag still gets `206`), and an
+  unknown range unit gets `416` rather than being ignored.
+- `GET /tv/manifest.json`, the launcher's offline copy, lists every file under `tv-home/web/` except
+  `mock*`, dotfiles and the video under `loop/` (`loop/*.mp4`): the Loop look's footage (up to 80 MB)
+  is streamed from the bridge, never saved on the TV. The rest of `loop/` is small and listed: the
+  posters (`loop/*.jpg`), so the offline home shows one, the cut-outs (`loop/*-fg.png`), so the clock
+  stays behind the peak there as the `config.js` snapshot's `home.loop.fg` says, and `loop.json`.
 - Unknown paths under `/` and `/tv/` fall back to that folder's `index.html` (single page apps work).
 
 ## Shape of every answer
@@ -576,22 +589,60 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
 - `videos`, next to `items`: the YouTube videos this person watched on this TV, a list of their own.
   YouTube stays out of `items` (it would bury everything else), and a video's name is never looked
   up (matched to a film, it would put that film in the household's taste, issue #23): a video that
-  played the minute is written by the name YouTube gave it, with no picture, and shows only here, for
-  the home to put under the YouTube tile and nowhere else. Never in the picks, the taste or
+  played the minute is written by the name YouTube gave it (with no picture until the video is found,
+  below), and shows only here, for the home to put under the YouTube tile and nowhere else. Never in the picks, the taste or
   `GET /api/history`. One card per title (the newest), newest first, at most 10, within 30 days,
   minus the ones removed with `/api/continue/hide`, in the shape of an item with `"kind": "video"`,
-  `episode_title`, `season`, `episode`, `poster`, `backdrop` and `progress` all `null`, and `app`
-  YouTube's installed build. `/api/continue/open` with a video's id opens that build on YouTube's
-  search for the title (`"method": "search"`; Amazon's YouTube lists `https://www.youtube.com` links in
-  its intent filter, read with `dumpsys package` on a Fire TV Cube, but opening the search link there
-  has not been tried yet), or the app alone where the link does not take (`"method": "app"`), never
-  through the show finder. Its answer is `{"title", "service": "youtube", "app", "method", "note"}`.
+  `episode_title`, `season`, `episode`, `poster` and `progress` all `null`, and `app` YouTube's
+  installed build. The line also keeps the channel and the length the app's media session gave
+  (`channel`, `duration_ms`; a live stream has no length), neither on the card. A session with a
+  channel and no length is a live stream: its line and card carry `"live": true` (every other video
+  card `"live": false`), and the Loop look's row says "YouTube · Live" under it. Once the video's id
+  is known (below) the card carries it as `video_id` and YouTube's own thumbnail for it as
+  `backdrop`, `https://i.ytimg.com/vi/<id>/mqdefault.jpg` (320x180, 16:9, no black bars; the TV
+  fetches it straight from YouTube's image host, the way it already fetches JustWatch's posters from
+  theirs); until then both are `null`, and the page shows the title alone. The thumbnail on the
+  TV's screen is not yet tested on a real TV; the lookup and the watch link are (a Fire TV Cube).
+  `/api/continue/open` with a video's id opens the exact video when it can: the id comes from
+  YouTube's public results page (the same lookup the move feature uses, no key and no sign in, and
+  warmed when the line is written), and only when the title matches and the channel or the length
+  agrees; a title many channels reuse is told apart by those, and a wrong video is worse than none,
+  so otherwise the lookup says unsure. A found id is kept on disk, in `bridge/data/video-ids.json`
+  (the normalised title and channel, the id, the video's length in whole seconds or null, and when
+  it was found; the newest 500), so a bridge restart does not lose it and a press on a card already
+  found never waits on the network. The saved id is only given back when the length agrees (within
+  3 s, or neither has one and there is a channel): a channel can put out two videos of one title, so
+  another length is looked up afresh and kept beside the first (four lengths per title and channel at
+  most, the oldest dropped). An entry written before
+  the length was kept has none. An unsure answer is remembered in memory only: the next press on
+  that card within ten minutes goes straight to the search instead of paying the lookup again, and a
+  press that comes while the warm up is still running waits on it (15 s at most) rather than
+  starting a second one. `GET /api/continue` itself may start that lookup in the background, for a
+  card whose id is not yet known and not lately unsure, and answers at once without it, so the next
+  fetch of the row has the picture; for the row, "lately" grows with each unsure answer in a row (ten
+  minutes, then twice as long each time, up to a day), so a video the results page never lists the
+  same way is asked about a few times a day, not every ten minutes for the 30 days it stays in the
+  row. However many lookups are under way, the bridge fetches YouTube's results page two at a time
+  at most (the move feature's lookups share that limit). A line with
+  neither channel nor length (written by an older bridge, or from a session that gave neither) is
+  never looked up: a title alone cannot be sure of the video, so that card has no picture and
+  searches. A sure id goes to the build as its
+  watch link with no time in it, and YouTube resumes it from the account's own history
+  (`"method": "deeplink"`, `"video_id"` the id; tested on a Fire TV Cube with Amazon's YouTube, which
+  played that very video from where it was left). Unsure, a lookup that fails or takes longer than
+  15 s, or a link that does not take: the build opens on YouTube's search for the title
+  (`"method": "search"`; Amazon's YouTube on a Fire TV shows its home for the web search link, so there
+  the bridge sends the `youtube://search?query=` link Alexa's voice search uses, which opens its results
+  page, tested on that Cube), or the app alone where that does not take either (`"method": "app"`),
+  never through the show finder. Its answer is `{"title", "service": "youtube", "app", "method",
+  "video_id", "note"}`, `video_id` null unless the method is `deeplink`.
   ```json
   {"ok": true, "items": [], "videos": [
     {"id": "9c1e0b7d4a553f2a", "title": "How Trains Work", "episode_title": null, "season": null, "episode": null,
      "app": {"id": "youtube", "name": "YouTube", "package": "com.amazon.firetv.youtube"},
-     "service": "youtube", "poster": null, "backdrop": null, "progress": null, "kind": "video",
-     "last_played": "2030-01-01T19:31:00Z", "source": "bridge"}]}
+     "service": "youtube", "poster": null, "backdrop": "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
+     "progress": null, "kind": "video", "live": false, "last_played": "2030-01-01T19:31:00Z",
+     "source": "bridge", "video_id": "dQw4w9WgXcQ"}]}
   ```
 
 ### `POST /api/sleep` and `GET /api/sleep`
@@ -969,6 +1020,18 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- 2026-11-19: `/tv/manifest.json` leaves only the Loop look's video (`loop/*.mp4`) out, so the offline
+  copy keeps the cut-outs and `loop.json` beside the posters. A YouTube video card carries `live`
+  (true for a live stream). `bridge/data/video-ids.json` keeps each id with the video's length
+  (`length_s`), one per length (four per title and channel), and a saved id is only used for a video
+  of that length.
+- 2026-11-19: The Loop look's depth effect: `home.loop` also carries `meta` (the folder's `loop.json`
+  from make-loop.sh, checked, or null) and `fg` (true when meta has the cut-out's rectangle and every
+  variant has `/tv/loop/<variant>-fg.png`); its `version` mark covers both (docs/LOOP.md).
+- 2026-11-18: The Loop look (New, option B): `home.look` takes `loop`, and `home.loop` (read only,
+  `{"variants": [...], "blur": bool}`) in `/api/config` and `/tv/config.js` says which of its files the
+  bridge has. `/tv/loop/<variant>.mp4`, `-blur.mp4`, `.jpg` and `-blur.jpg` are served with byte ranges;
+  `/tv/manifest.json` skips the video under `loop/` and keeps its posters (docs/LOOP.md).
 - 2026-11-17: Move what is playing to another TV (New): `POST /api/move` (docs/MOVE.md, #268).
 - 2026-11-14: Custom cards (New): `GET /api/custom-cards`, and `home.custom_cards` in `/api/config` and
   `/tv/config.js` (the link, or `true` for a file on the bridge computer).

@@ -7,6 +7,11 @@ History is kept forever. Two append-only JSON-lines files, oldest first:
   videos() lists them.
 - imported.jsonl: what came from the owner's own downloads (Netflix viewing activity, YouTube
   watch history), see history_import.py. Each line has a "key" so re-importing a file adds nothing twice.
+
+Small keyed files next to them, read and written whole under one lock: hidden.json (Keep watching
+cards removed by hand), who.json (who is on the couch), sleep.json, recs.json, and video-ids.json
+(the YouTube video id found for a video line's title and channel, with the video's length, so a
+bridge restart does not lose it; at most VIDEO_IDS_MAX entries, the oldest dropped first).
 """
 import json
 import os
@@ -17,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 
 import config
 import messages
+import move   # the video id pattern and the title key, so there is one copy of each
 
 DATA = config.DATA
 HISTORY_OLD = os.path.join(DATA, "history.json")  # the older capped list, read once and moved over
@@ -25,6 +31,10 @@ IMPORTED = os.path.join(DATA, "imported.jsonl")
 RECS = os.path.join(DATA, "recs.json")
 SLEEP = os.path.join(DATA, "sleep.json")
 HIDDEN = os.path.join(DATA, "hidden.json")  # Keep watching cards removed by hand: "tv|who|title" -> when
+VIDEO_IDS = os.path.join(DATA, "video-ids.json")  # "title|channel" (move._norm) -> {"id", "length_s", "when"}
+VIDEO_IDS_MAX = 500
+# How far apart two lengths can be and still be the same video: the tolerance move.youtube_pick uses.
+VIDEO_LENGTH_SLACK_S = 3
 _lock = threading.Lock()
 _cache = {}  # path -> (mtime, size, items oldest first)
 
@@ -264,6 +274,100 @@ def hide_keep_watching(h):
         data = _read(HIDDEN, {})
         data[f"{h.get('tv')}|{h.get('who')}|{key}"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         _write(HIDDEN, data)
+
+
+def _video_ids_key(title, channel):
+    """The key a video's id is kept under: the title and the channel the way move's lookup tells
+    them apart (move._norm), so a title many channels reuse keeps one id per channel."""
+    return move._norm(title) + "|" + move._norm(channel)
+
+
+def _length_s(duration_ms):
+    """A session's length in whole seconds, or None when it gave none (a live stream, an older line)."""
+    if isinstance(duration_ms, bool) or not isinstance(duration_ms, (int, float)) or duration_ms <= 0:
+        return None
+    return round(duration_ms / 1000)
+
+
+VIDEO_IDS_PER_TITLE = 4   # lengths kept for one title and channel ("Weekly update" each week)
+
+
+def _video_entries(entry):
+    """The saved (id, length_s, when) for one title and channel, newest last. An entry is a list of
+    objects (one per length), or, from before that, one object or a bare id string. Anything not
+    shaped like an id (move.YOUTUBE_ID) is left out, whatever is in the file."""
+    items = entry if isinstance(entry, list) else [entry]
+    out = []
+    for e in items:
+        if isinstance(e, str):
+            vid, saved, when = e, None, ""
+        elif isinstance(e, dict):
+            vid, saved, when = e.get("id"), e.get("length_s"), e.get("when")
+            if isinstance(saved, bool) or not isinstance(saved, (int, float)) or saved <= 0:
+                saved = None
+            if not isinstance(when, str):
+                when = ""
+        else:
+            continue
+        if isinstance(vid, str) and move.YOUTUBE_ID.fullmatch(vid):
+            out.append((vid, saved, when))
+    return out
+
+
+def _same_length(saved, length):
+    return (saved is None and length is None) or (
+        saved is not None and length is not None and abs(saved - length) <= VIDEO_LENGTH_SLACK_S)
+
+
+def video_id(title, channel, duration_ms=None):
+    """The YouTube video id found for this title and channel on an earlier lookup, or None. A
+    channel can put out two videos of one title ("Weekly update"), so each length keeps its own id
+    (VIDEO_IDS_PER_TITLE of them), and an id is only given back when the video's length agrees
+    with the one saved with it, within VIDEO_LENGTH_SLACK_S, or when neither has a length and there
+    is a channel to be sure by. Anything else reads as unknown, so a new lookup runs. An entry
+    written before the length was kept (an object with no "length_s", or a bare id string) has no
+    length. A file that is not an object (hand edited) reads as empty, the way remember_video_id
+    treats it."""
+    data = _read(VIDEO_IDS, {})
+    entry = data.get(_video_ids_key(title, channel)) if isinstance(data, dict) else None
+    length = _length_s(duration_ms)
+    for vid, saved, _ in reversed(_video_entries(entry)):
+        if _same_length(saved, length):
+            if saved is None and not move._norm(channel):
+                return None
+            return vid
+    return None
+
+
+def remember_video_id(title, channel, vid, duration_ms=None):
+    """Keep a found video id on disk for this title and channel, with the length it was found for
+    (`duration_ms`, None for a live stream), so a bridge restart and the six hours move's own
+    memory lasts do not lose it and an OK press never waits on the network for a video already
+    found. An id for the same length replaces the one kept; another length is kept beside it, up to
+    VIDEO_IDS_PER_TITLE. True when written. An id not shaped like one is refused, False and nothing
+    written (this is called with the lookup's own answer in a background task, never with a
+    person's input, so it is not a keyed ValueError like norm_who's). The file holds VIDEO_IDS_MAX
+    titles at most: past that the least recently written are dropped."""
+    if not (isinstance(vid, str) and move.YOUTUBE_ID.fullmatch(vid)):
+        return False
+    key = _video_ids_key(title, channel)
+    length = _length_s(duration_ms)
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with _lock:
+        data = _read(VIDEO_IDS, {})
+        if not isinstance(data, dict):
+            data = {}
+        kept = [e for e in _video_entries(data.pop(key, None)) if not _same_length(e[1], length)]
+        kept.append((vid, length, now))
+        # written again: it goes to the end, the newest
+        data[key] = [{"id": v, "length_s": l, "when": w} for v, l, w in kept[-VIDEO_IDS_PER_TITLE:]]
+        if len(data) > VIDEO_IDS_MAX:
+            def when(kv):
+                # always a string, so a hand edited "when" of another type cannot break the sort
+                return max([w for _, _, w in _video_entries(kv[1])] or [""])
+            data = dict(sorted(data.items(), key=when)[-VIDEO_IDS_MAX:])   # stable: equal times keep their order
+        _write(VIDEO_IDS, data)
+    return True
 
 
 WHO_FILE = os.path.join(DATA, "who.json")
