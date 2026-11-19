@@ -5,7 +5,9 @@ printed commands with shlex (the script prints them as a shell would take them) 
 encode, the seam arithmetic, the grades and the file names (docs/LOOP.md).
 """
 import os
+import re
 import shlex
+import signal
 import shutil
 import subprocess
 import tempfile
@@ -15,6 +17,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "scripts", "make-loop.sh")
 CLIP = "/nowhere/at all/lake.mp4"
 T = ",scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,trim="
+# a photo, and its matte, scaled to cover and cut to the centre 16:9 band (the whole picture when it is
+# 16:9 already): the photo at four times the output size, the matte at the output size
+PHOTO_169 = "scale=5120:2880:force_original_aspect_ratio=increase,format=yuv444p,crop=5120:2880,"
+MATTE_169 = "scale=1280:720:force_original_aspect_ratio=increase:flags=area,format=yuva444p,crop=1280:720,"
 
 
 def run(*args, out=None):
@@ -28,6 +34,17 @@ def arg_after(cmd, flag):
     return cmd[cmd.index(flag) + 1]
 
 
+STAGED = re.compile(r"^(.*)/\.staging-[0-9]+/\.([^/]+)$")
+
+
+def final(path):
+    """Where a file made in the run's staging folder (<out>/.staging-<pid>/.<name>) ends up: <out>/<name>.
+    Every ffmpeg output is made there and moved into place only when all of them have worked."""
+    m = STAGED.match(path)
+    assert m, "not in the staging folder: " + path
+    return m.group(1) + "/" + m.group(2)
+
+
 class DryRun(unittest.TestCase):
     def test_prints_four_commands_per_variant_in_order_and_writes_nothing(self):
         tmp = tempfile.mkdtemp()
@@ -37,7 +54,7 @@ class DryRun(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertFalse(os.path.exists(out), "a dry run must not even make the folder")
         self.assertEqual(len(cmds), 16)
-        outputs = [c[-1] for c in cmds]
+        outputs = [final(c[-1]) for c in cmds]
         self.assertEqual([os.path.basename(o) for o in outputs],
                          [n for v in ("dawn", "day", "dusk", "night")
                           for n in (v + ".mp4", v + "-blur.mp4", v + ".jpg", v + "-blur.jpg")])
@@ -57,7 +74,7 @@ class DryRun(unittest.TestCase):
         self.assertIn("-an", sharp)
         graph = arg_after(sharp, "-filter_complex")
         self.assertIn("fps=30,scale=1280:720:force_original_aspect_ratio=increase:out_color_matrix=bt709:out_range=tv,crop=1280:720,format=yuv420p", graph)
-        self.assertEqual(sharp[-1], os.path.join(out, "dawn.mp4"))
+        self.assertEqual(final(sharp[-1]), os.path.join(out, "dawn.mp4"))
 
     def test_seam_arithmetic_for_the_default_length(self):
         # L = 30: base 31 s, body from 1 s for 30 s, head 1 s, dissolve at offset 29 for 1 s
@@ -86,7 +103,7 @@ class DryRun(unittest.TestCase):
 
     def test_the_four_grades(self):
         _, cmds, _ = run(CLIP, "--dry-run")
-        graphs = {c[-1].rsplit("/", 1)[1][:-4]: arg_after(c, "-filter_complex") for c in cmds if c[-1].endswith(".mp4") and "-filter_complex" in c}
+        graphs = {final(c[-1]).rsplit("/", 1)[1][:-4]: arg_after(c, "-filter_complex") for c in cmds if c[-1].endswith(".mp4") and "-filter_complex" in c}
         self.assertEqual(set(graphs), {"dawn", "day", "dusk", "night"})
         # each grade is followed by the conversion back to BT.709 limited range (docs/LOOP.md, colour)
         self.assertIn("format=yuv420p,null%s" % T, graphs["day"])   # the source, no grade
@@ -100,37 +117,42 @@ class DryRun(unittest.TestCase):
     def test_blur_copy_is_cut_from_the_finished_sharp_file(self):
         _, cmds, out = run(CLIP, "--dry-run", "--only", "dusk")
         sharp, blur, poster, blur_poster = cmds
-        self.assertEqual(arg_after(blur, "-i"), os.path.join(out, "dusk.mp4"))
+        self.assertEqual(arg_after(blur, "-i"), sharp[-1])
+        self.assertEqual(final(arg_after(blur, "-i")), os.path.join(out, "dusk.mp4"))
         self.assertEqual(arg_after(blur, "-vf"), "scale=160:90,gblur=sigma=2,fps=10")
         for flag, want in (("-crf", "26"), ("-maxrate", "300k"), ("-bufsize", "600k"), ("-r", "10"),
                            ("-g", "10"), ("-pix_fmt", "yuv420p"), ("-profile:v", "main"), ("-level", "4.0"),
                            ("-movflags", "+faststart")):
             self.assertEqual(arg_after(blur, flag), want, flag)
         self.assertIn("-an", blur)
-        self.assertEqual(blur[-1], os.path.join(out, "dusk-blur.mp4"))
+        self.assertEqual(final(blur[-1]), os.path.join(out, "dusk-blur.mp4"))
 
     def test_posters_are_the_first_frame_at_960x540(self):
         _, cmds, out = run(CLIP, "--dry-run", "--only", "night")
         sharp, blur, poster, blur_poster = cmds
-        self.assertEqual(arg_after(poster, "-i"), os.path.join(out, "night.mp4"))
+        self.assertEqual(final(arg_after(poster, "-i")), os.path.join(out, "night.mp4"))
         self.assertEqual(arg_after(poster, "-frames:v"), "1")
         self.assertTrue(arg_after(poster, "-vf").startswith("scale=960:540"))
-        self.assertEqual(poster[-1], os.path.join(out, "night.jpg"))
-        self.assertEqual(arg_after(blur_poster, "-i"), os.path.join(out, "night-blur.mp4"))
+        self.assertEqual(final(poster[-1]), os.path.join(out, "night.jpg"))
+        self.assertEqual(final(arg_after(blur_poster, "-i")), os.path.join(out, "night-blur.mp4"))
         self.assertEqual(arg_after(blur_poster, "-frames:v"), "1")
         self.assertTrue(arg_after(blur_poster, "-vf").startswith("scale=960:540"))
-        self.assertEqual(blur_poster[-1], os.path.join(out, "night-blur.jpg"))
+        self.assertEqual(final(blur_poster[-1]), os.path.join(out, "night-blur.jpg"))
 
     def test_only_makes_one_variant(self):
         _, cmds, out = run(CLIP, "--dry-run", "--only", "night")
-        self.assertEqual([os.path.basename(c[-1]) for c in cmds],
+        self.assertEqual([os.path.basename(final(c[-1])) for c in cmds],
                          ["night.mp4", "night-blur.mp4", "night.jpg", "night-blur.jpg"])
 
     def test_bad_arguments_stop_before_anything_prints(self):
         for args in ((CLIP, "--dry-run", "--seconds", "14"), (CLIP, "--dry-run", "--seconds", "61"),
                      (CLIP, "--dry-run", "--seconds", "abc"), (CLIP, "--dry-run", "--only", "noon"),
                      (CLIP, "--dry-run", "--slow", "fast"), (CLIP, "--dry-run", "--slow", "0"),
-                     (CLIP, "--dry-run", "--slow", "0.0"), ("--dry-run",), (CLIP, "--dry-run", "--bogus")):
+                     (CLIP, "--dry-run", "--slow", "0.0"), ("--dry-run",), (CLIP, "--dry-run", "--bogus"),
+                     (CLIP, "--dry-run", "--seconds", "0"), (CLIP, "--dry-run", "--seconds", "00"),
+                     (CLIP, "--dry-run", "--seconds", "014"), (CLIP, "--dry-run", "--seconds", "061"),
+                     (CLIP, "--dry-run", "--seconds", "100"),
+                     (CLIP, "--dry-run", "--seconds", "99999999999999999999")):
             p, cmds, _ = run(*args)
             self.assertNotEqual(p.returncode, 0, args)
             self.assertEqual(cmds, [], args)
@@ -155,10 +177,6 @@ class DryRun(unittest.TestCase):
         self.assertIn("xfade", head)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class StillPhoto(unittest.TestCase):
     """A photo makes a loop too: a slow push in and back out, no seam, the same four grades."""
 
@@ -177,7 +195,8 @@ class StillPhoto(unittest.TestCase):
             self.assertIn("-loop", args); self.assertEqual(args[args.index("-loop") + 1], "1")
             self.assertEqual(args[args.index("-t") + 1], "34", "the photo is looped for the loop's length")
             self.assertIn("zoompan=z='1+0.06*(1-cos(2*PI*on/1020))/2'", graph, "N = 30 x 34 frames, eased in and out")
-            self.assertIn("scale=5120:-2", graph, "scaled up first so the push does not judder")
+            self.assertIn("[0:v]" + PHOTO_169 + "zoompan=", graph,
+                          "scaled up first so the push does not judder, and cut to 16:9")
             self.assertIn("trim=duration=34", graph)
             self.assertNotIn("xfade", graph, "a raised cosine needs no seam")
             self.assertNotIn("setpts=1*PTS", graph, "--slow is not applied to a photo")
@@ -250,7 +269,7 @@ class Depth(unittest.TestCase):
 
     def test_one_more_command_per_variant_the_png_last(self):
         cmds, _ = self.fg_cmd()
-        self.assertEqual([os.path.basename(c[-1]) for c in cmds],
+        self.assertEqual([os.path.basename(final(c[-1])) for c in cmds],
                          ["night.mp4", "night-blur.mp4", "night.jpg", "night-blur.jpg", "night-fg.png"])
         p, lines = dry_lines(PHOTO, "--matte", MATTE)
         self.assertEqual(len([l for l in lines if l.startswith("ffmpeg ")]), 20)
@@ -259,7 +278,8 @@ class Depth(unittest.TestCase):
         cmds, _ = self.fg_cmd()
         fg = cmds[-1]
         ins = [fg[i + 1] for i, a in enumerate(fg) if a == "-i"]
-        self.assertTrue(ins[0].endswith("/night.mp4"), "the finished sharp file: its colours are the video's")
+        self.assertEqual(ins[0], cmds[0][-1], "the finished sharp file: its colours are the video's")
+        self.assertTrue(final(ins[0]).endswith("/night.mp4"))
         self.assertEqual(ins[1], MATTE)
         self.assertEqual(arg_after(fg, "-map"), "[fg]")
         self.assertEqual(arg_after(fg, "-frames:v"), "1")
@@ -268,7 +288,8 @@ class Depth(unittest.TestCase):
         self.assertIn("[0:v]trim=end_frame=1,scale=in_color_matrix=bt709:in_range=tv:", g)
         # the rectangle FG (480, 162, 960, 318) on the 1280x720 frame, for both the colour and the matte
         self.assertEqual(g.count("crop=640:212:320:108"), 2)
-        self.assertIn("[1:v]scale=1280:720:flags=area,format=yuva444p,crop=640:212:320:108,alphaextract,", g)
+        # the matte is cut to its centre 16:9 band exactly as the photo is, so the two stay in register
+        self.assertIn("[1:v]" + MATTE_169 + "crop=640:212:320:108,alphaextract,", g)
         # the feather: min(1, distance to the nearest crop edge / 24), from the pixel centre
         self.assertIn("geq=lum='p(X,Y)*min(1,min(min(X+0.5,W-X-0.5),min(Y+0.5,H-Y-0.5))/24)+0.5'", g)
         self.assertIn("[c][m]alphamerge,format=rgba[fg]", g)
@@ -287,7 +308,7 @@ class Depth(unittest.TestCase):
         self.assertIn("zoompan=z='1+%g*(1-cos(2*PI*on/1020))/2'" % meta["zoom"], g)
         self.assertIn("x='(iw-iw/zoom)/2*(1+%g*sin(2*PI*on/1020))+(iw/zoom-trunc(iw/zoom))/2+0.5'" % meta["sway"], g)
         self.assertIn("y='(ih-ih/zoom)/2+(ih/zoom-trunc(ih/zoom))/2+0.5'", g)
-        self.assertIn("scale=5120:-2,format=yuv444p,zoompan=", g, "4:4:4, so zoompan places the window to the whole pixel")
+        self.assertIn("format=yuv444p,crop=5120:2880,zoompan=", g, "4:4:4, so zoompan places the window to the whole pixel")
         with open(SCRIPT, encoding="utf-8") as f:
             text = f.read()
         self.assertIn("ZOOM=0.06\nSWAY=0.3\n", text)
@@ -428,3 +449,210 @@ class Depth(unittest.TestCase):
                 self.assertAlmostEqual(geq(exprs[ch], Y, 200), want, places=6, msg=(Y, ch))
         # the first row: its centre is 162.75 on the screen, on the top gradient between 0 and 28 percent
         self.assertAlmostEqual(css_ramp(stops[0], 162.75), 0.66 - 0.10 * 162.75 / 302.4, places=9)
+
+
+class Seconds(unittest.TestCase):
+    """--seconds is read as a decimal number everywhere: bash arithmetic would read 020 as octal (16)."""
+
+    def test_a_leading_zero_is_the_same_loop_as_without(self):
+        for secs in ("020", "0020", "019"):
+            want = str(int(secs))
+            _, lines = dry_lines(PHOTO, "--seconds", secs, "--only", "day")
+            self.assertEqual(loop_json(lines)["seconds"], int(want), secs)   # valid JSON, and decimal
+            sharp = shlex.split([l for l in lines if l.startswith("ffmpeg ")][0])
+            self.assertEqual(arg_after(sharp, "-t"), want)
+            g = arg_after(sharp, "-filter_complex")
+            self.assertIn("on/%d)" % (30 * int(want)), g, "the push's period is the loop's length")
+            self.assertIn("trim=duration=%s," % want, g)
+            p, lines = dry_lines(CLIP, "--seconds", secs, "--only", "day")
+            self.assertEqual(p.returncode, 0, p.stderr)
+            self.assertNotIn("value too great", p.stderr)
+            g = arg_after(shlex.split([l for l in lines if l.startswith("ffmpeg ")][0]), "-filter_complex")
+            n = int(want)
+            self.assertIn("trim=duration=%d," % (n + 1), g)
+            self.assertIn("[c0]trim=start=1:duration=%d," % n, g)
+            self.assertIn("offset=%d[out]" % (n - 1), g)
+
+
+class SixteenByNine(unittest.TestCase):
+    """A photo of another shape is cut to its centre 16:9 band, and the matte the same way, so the loop is
+    not squashed and the cut-out stays on the peak."""
+
+    def cover(self, iw, ih, ow, oh):
+        """scale=ow:oh:force_original_aspect_ratio=increase then crop=ow:oh, as ffmpeg 7.1 does them
+        (libavfilter/scale_eval.c rounds the other side to the nearest pixel; crop centres, whole pixels):
+        the scaled size and the crop's corner."""
+        def rescale(a, b, c):   # av_rescale, to the nearest
+            return (a * b + c // 2) // c
+        sw, sh = max(ow, rescale(oh, iw, ih)), max(oh, rescale(ow, ih, iw))
+        return sw, sh, (sw - ow) // 2, (sh - oh) // 2
+
+    def test_photo_and_matte_are_scaled_to_cover_and_cut_to_the_frame(self):
+        p, lines = dry_lines(PHOTO, "--matte", MATTE, "--only", "dawn")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        cmds = [shlex.split(l) for l in lines if l.startswith("ffmpeg ")]
+        self.assertTrue(arg_after(cmds[0], "-filter_complex").startswith("[0:v]" + PHOTO_169 + "zoompan="))
+        self.assertIn("[1:v]" + MATTE_169, arg_after(cmds[-1], "-filter_complex"))
+
+    def test_a_16_9_picture_is_left_whole(self):
+        for iw, ih in ((1920, 1080), (3840, 2160), (5120, 2880), (1280, 720)):
+            self.assertEqual(self.cover(iw, ih, 5120, 2880), (5120, 2880, 0, 0))
+            self.assertEqual(self.cover(iw, ih, 1280, 720), (1280, 720, 0, 0))
+
+    def test_another_shape_is_cut_not_squashed(self):
+        self.assertEqual(self.cover(4032, 3024, 5120, 2880), (5120, 3840, 0, 480), "a phone's 4:3")
+        self.assertEqual(self.cover(1080, 1920, 5120, 2880), (5120, 9102, 0, 3111), "a portrait")
+        self.assertEqual(self.cover(3440, 1440, 5120, 2880), (6880, 2880, 880, 0), "wider than 16:9")
+
+    def test_a_smaller_matte_of_the_same_shape_stays_in_register(self):
+        # a point of the photo and the same point of a matte at full, half or a quarter the size land
+        # within half a 720p pixel of each other on the 1280x720 frame (the matte's crop is whole 720p
+        # pixels, the photo's whole quarter pixels), which the 24 pixel feather and the matte's soft
+        # edge take up; a 16:9 photo is not cut at all
+        for iw, ih in ((4032, 3024), (1080, 1920), (3440, 1440), (6000, 4000), (3000, 2000)):
+            sw, sh, px, py = self.cover(iw, ih, 5120, 2880)
+            for k in (1, 2, 4):
+                mw, mh, mx, my = self.cover(iw // k, ih // k, 1280, 720)
+                for fu, fv in ((0.3, 0.4), (0.5, 0.5), (0.7, 0.6), (0.45, 0.35)):
+                    a = ((fu * sw - px) / 4, (fv * sh - py) / 4)
+                    b = (fu * mw - mx, fv * mh - my)
+                    self.assertLessEqual(max(abs(a[0] - b[0]), abs(a[1] - b[1])), 0.5 + 1e-9, (iw, ih, k, fu, fv))
+
+
+STUB_FFMPEG = """#!/bin/sh
+# make-loop.sh's tests: an ffmpeg that writes "new" to its output (its last argument), logs it, fails on
+# the output named by STUB_FAIL and hangs on the one named by STUB_HANG
+for last in "$@"; do :; done
+echo "$last" >> "$STUB_LOG"
+if [ -n "$STUB_FAIL" ]; then case "$last" in *"$STUB_FAIL") exit 1 ;; esac; fi
+if [ -n "$STUB_HANG" ]; then case "$last" in *"$STUB_HANG") : > "$STUB_LOG.hang"; sleep 30 ;; esac; fi
+printf 'new\\n' > "$last"
+"""
+STUB_FFPROBE = """#!/bin/sh
+case "$*" in *pix_fmt*) echo rgba ;; *) echo 100 ;; esac
+"""
+NAMES = [v + s for v in ("dawn", "day", "dusk", "night") for s in (".mp4", "-blur.mp4", ".jpg", "-blur.jpg", "-fg.png")]
+OLD_JSON = '{"still": true, "seconds": 34, "fps": 30, "zoom": 0.06, "sway": 0.3, "fg": {"x": 480, "y": 162, "w": 960, "h": 318}}\n'
+
+
+class Staging(unittest.TestCase):
+    """A real run, with a stand-in ffmpeg: nothing reaches the served folder until every encode has
+    worked, loop.json goes in last, and a run that fails or is stopped leaves the folder as it was."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.bin = os.path.join(self.tmp, "bin")
+        os.makedirs(self.bin)
+        for name, text in (("ffmpeg", STUB_FFMPEG), ("ffprobe", STUB_FFPROBE)):
+            path = os.path.join(self.bin, name)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+            os.chmod(path, 0o755)
+        self.out = os.path.join(self.tmp, "loop")
+        os.makedirs(self.out)
+        for n in NAMES:
+            with open(os.path.join(self.out, n), "w", encoding="utf-8") as f:
+                f.write("old\n")
+        with open(os.path.join(self.out, "loop.json"), "w", encoding="utf-8") as f:
+            f.write(OLD_JSON)
+        self.before = self.folder()
+        self.photo = os.path.join(self.tmp, "my photo.jpg")
+        self.matte = os.path.join(self.tmp, "matte.webp")
+        for path in (self.photo, self.matte):
+            with open(path, "wb") as f:
+                f.write(b"\x00")
+        self.log = os.path.join(self.tmp, "ffmpeg.log")
+
+    def folder(self):
+        out = {}
+        for n in sorted(os.listdir(self.out)):
+            with open(os.path.join(self.out, n), encoding="utf-8") as f:
+                out[n] = f.read()
+        return out
+
+    def env(self, **extra):
+        e = dict(os.environ, PATH=self.bin + os.pathsep + "/usr/bin:/bin", STUB_LOG=self.log)
+        e.update(extra)
+        return e
+
+    def outputs(self):
+        with open(self.log, encoding="utf-8") as f:
+            return f.read().splitlines()
+
+    def test_a_run_that_works_moves_everything_in_and_leaves_no_staging_folder(self):
+        p = subprocess.run(["bash", SCRIPT, self.photo, "--matte", self.matte, "--seconds", "20", "--out", self.out],
+                           capture_output=True, text=True, env=self.env())
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(len(self.outputs()), 20)
+        for o in self.outputs():
+            final(o)   # every encode wrote into the staging folder, none into the served one
+        now = self.folder()
+        self.assertEqual(sorted(now), sorted(NAMES + ["loop.json"]), "no staging folder or dotfile left")
+        self.assertTrue(all(now[n] == "new\n" for n in NAMES))
+        self.assertIn('"seconds": 20', now["loop.json"])
+        # loop.json goes last, after the old one was taken away first; each variant's .mp4 after its companions
+        moves = [l for l in p.stdout.splitlines() if l.startswith(("mv ", "rm "))]
+        self.assertEqual(moves[0], "rm -f " + os.path.join(self.out, "loop.json"))
+        self.assertTrue(moves[-1].endswith(" " + os.path.join(self.out, "loop.json")), moves[-1])
+        dsts = [shlex.split(m)[-1] for m in moves[1:-1]]
+        for v in ("dawn", "day", "dusk", "night"):
+            mine = [os.path.basename(d) for d in dsts if os.path.basename(d).startswith(v)]
+            self.assertEqual(mine[-1], v + ".mp4")
+            self.assertEqual(sorted(mine), sorted([v + s for s in (".mp4", "-blur.mp4", ".jpg", "-blur.jpg", "-fg.png")]))
+
+    def test_without_a_matte_the_old_cut_outs_go(self):
+        p = subprocess.run(["bash", SCRIPT, self.photo, "--out", self.out],
+                           capture_output=True, text=True, env=self.env())
+        self.assertEqual(p.returncode, 0, p.stderr)
+        now = self.folder()
+        self.assertEqual(sorted(now), sorted([n for n in NAMES if not n.endswith("-fg.png")] + ["loop.json"]))
+        self.assertIn('"fg": null', now["loop.json"])
+
+    def test_a_failed_encode_leaves_the_folder_as_it_was(self):
+        p = subprocess.run(["bash", SCRIPT, self.photo, "--matte", self.matte, "--seconds", "20", "--out", self.out],
+                           capture_output=True, text=True, env=self.env(STUB_FAIL="/.dusk-fg.png"))
+        self.assertNotEqual(p.returncode, 0)
+        self.assertTrue(any(o.endswith("/.dawn.mp4") for o in self.outputs()), "it got some way first")
+        self.assertEqual(self.folder(), self.before, "old files, old loop.json, no staging folder")
+
+    def test_a_stopped_run_leaves_the_folder_as_it_was(self):
+        p = subprocess.Popen(["bash", SCRIPT, self.photo, "--matte", self.matte, "--out", self.out],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             env=self.env(STUB_HANG="/.day.mp4"), start_new_session=True)
+        try:
+            for _ in range(200):
+                if os.path.exists(self.log + ".hang"):
+                    break
+                p.poll()
+                self.assertIsNone(p.returncode, "the run ended before the hang")
+                import time
+                time.sleep(0.05)
+            self.assertTrue(os.path.exists(self.log + ".hang"))
+            os.killpg(p.pid, signal.SIGTERM)   # as Ctrl-C or a kill would: the script and its ffmpeg
+            p.wait(timeout=20)
+        finally:
+            if p.poll() is None:
+                os.killpg(p.pid, signal.SIGKILL)
+                p.wait()
+        self.assertNotEqual(p.returncode, 0)
+        self.assertEqual(self.folder(), self.before, "old files, old loop.json, no staging folder")
+
+    def test_only_keeps_loop_json_in_place_while_it_moves_its_variant_in(self):
+        with open(os.path.join(self.out, "loop.json"), "w", encoding="utf-8") as f:
+            f.write('{"still": true, "seconds": 30, "fps": 30, "zoom": 0.06, "sway": 0.3, "fg": null}\n')
+        p = subprocess.run(["bash", SCRIPT, self.photo, "--only", "dusk", "--out", self.out],
+                           capture_output=True, text=True, env=self.env())
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertNotIn("rm -f " + os.path.join(self.out, "loop.json"), p.stdout)
+        now = self.folder()
+        for n in NAMES:
+            if n.startswith("dusk"):
+                self.assertEqual(now.get(n), None if n.endswith("-fg.png") else "new\n", n)
+            else:
+                self.assertEqual(now[n], "old\n", n)
+        self.assertNotIn(".staging", " ".join(os.listdir(self.out)))
+
+
+if __name__ == "__main__":
+    unittest.main()

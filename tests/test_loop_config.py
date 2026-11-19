@@ -83,10 +83,6 @@ class LoopFiles(unittest.TestCase):
         self.assertIn("loop", config.HOME)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class LoopVersion(unittest.TestCase):
     def setUp(self):
         import tempfile, shutil
@@ -223,3 +219,52 @@ class LoopMeta(unittest.TestCase):
             loop = config.public()["home"]["loop"]
         self.assertEqual(loop["meta"], GOOD)
         self.assertIs(loop["fg"], True)
+
+
+class Staging(unittest.TestCase):
+    """make-loop.sh makes a run's files in <folder>/.staging-<pid>/, every name there starting with a dot,
+    and moves them in at the end: nothing there, and no dotfile or temp name, is listed, versioned or read."""
+
+    def setUp(self):
+        self.folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.folder, True)
+        config._loop_json_told.clear()
+
+    def stage(self):
+        stage = os.path.join(self.folder, ".staging-4242")
+        names = [v + s for v in config.LOOP_VARIANTS for s in (".mp4", "-blur.mp4", ".jpg", "-blur.jpg", "-fg.png")]
+        touch(stage, *names, *["." + n for n in names])
+        import json
+        for name in ("loop.json", ".loop.json"):
+            with open(os.path.join(stage, name), "w", encoding="utf-8") as f:
+                json.dump(GOOD, f)
+        return stage
+
+    def test_a_run_under_way_is_not_listed(self):
+        empty = config.loop_files(self.folder)
+        self.stage()
+        self.assertEqual(config.loop_files(self.folder), empty)
+        self.assertEqual(config.loop_files(self.folder),
+                         {"variants": [], "blur": False, "version": "", "meta": None, "fg": False})
+
+    def test_dotfiles_and_temp_names_are_not_variants(self):
+        touch(self.folder, ".dawn.mp4", ".dawn-blur.mp4", "dawn.mp4.part", "dawn.part.mp4", ".new-day.mp4",
+              "day.mp4.tmp", "dusk.mp4~", ".night.mp4", ".night-fg.png", ".loop.json")
+        out = config.loop_files(self.folder)
+        self.assertEqual((out["variants"], out["blur"], out["meta"], out["fg"], out["version"]), ([], False, None, False, ""))
+
+    def test_staged_files_do_not_change_the_version_or_the_meta_of_the_files_in_place(self):
+        import json
+        touch(self.folder, "day.mp4", "day-blur.mp4", "day-fg.png")
+        with open(os.path.join(self.folder, "loop.json"), "w", encoding="utf-8") as f:
+            json.dump(dict(GOOD, seconds=20), f)
+        before = config.loop_files(self.folder)
+        self.stage()
+        touch(self.folder, ".day.mp4", ".loop.json")
+        after = config.loop_files(self.folder)
+        self.assertEqual(after, before)
+        self.assertEqual(after["meta"]["seconds"], 20, "the loop.json in place, not the staged one")
+
+
+if __name__ == "__main__":
+    unittest.main()

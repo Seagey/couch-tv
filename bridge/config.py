@@ -308,7 +308,12 @@ def loop_files(folder):
     empty list, so the key is always there for the home to read. `meta` is loop.json when it is
     there and sound, else None; `fg` is true only when meta has a cut-out rectangle and every
     present variant has its <variant>-fg.png (one without it would lose the depth at that time of
-    day)."""
+    day).
+
+    Only those exact names count, in `folder` itself: make-loop.sh makes each run's files in a hidden
+    folder inside it (.staging-<pid>/.dawn.mp4 and so on) and moves them in only when every encode has
+    worked, loop.json last, so a run under way, or one that failed or was stopped, is never listed. A
+    dotfile, a temp name (dawn.mp4.part, .dawn.mp4) or anything in a subfolder is not a variant."""
     variants = [v for v in LOOP_VARIANTS if os.path.isfile(os.path.join(folder, v + ".mp4"))]
     blur = bool(variants) and all(os.path.isfile(os.path.join(folder, v + "-blur.mp4")) for v in variants)
     meta = loop_meta(folder)
