@@ -140,7 +140,8 @@ if ($Code -eq 3) {
 if ($Code -ne 0) { Stop-Setup "couch-tv did not go on the TV. What went wrong is above. Help: couchtv.joshuaseage.com/help/tv-samsung" }
 
 Write-Host ""
-Write-Host "couch-tv is on your TV and open."
+& $Cli launch CouchTVApp.Home --tv $Tv | Out-Null
+Write-Host "couch-tv is on your TV. If it is not on screen, open it from the TV's row of apps (Couch TV)."
 Write-Host ""
 Write-Host "Next, on the TV:"
 Write-Host "  - Settings, General, Smart Features, Autorun Last App: On (couch-tv comes back when the TV does)."

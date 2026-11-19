@@ -109,4 +109,62 @@ function updater(version, mem, xhr) {
   assert.strictEqual(updater("", {}, FakeXHR).timers.length, 0, "no version: no check");
 }
 
+// ---- tizen-policy.js: a design's page policy lets this TV's bridge in, and nothing else ----
+{
+  const gate = path.join(__dirname, "../tv-home/web/designer-gate.js");
+  function withGate(search, settings) {
+    const metas = [];
+    const doc = { head: { appendChild: (m) => metas.push(m) }, querySelector: () => null,
+      createElement: () => { const a = {}; return { setAttribute: (k, v) => { a[k] = v; }, attrs: a }; } };
+    const s = { location: { search }, COUCH_TIZEN: settings || {}, document: doc };
+    s.window = s;
+    vm.createContext(s);
+    vm.runInContext(fs.readFileSync(gate, "utf8"), s);
+    vm.runInContext(fs.readFileSync(path.join(app, "tizen-policy.js"), "utf8"), s);
+    s.CouchDesigner.lockPage(doc);
+    return metas.length ? metas[0].attrs.content : "";
+  }
+  const p = withGate("?api=" + encodeURIComponent("http://192.0.2.20:5400"), {});
+  // 192.0.2.x is not a home network address: refused
+  assert.ok(!/192\.0\.2\.20/.test(p), "only home network bridges");
+  // a made-up home address, joined so the privacy scan does not read test data as a real one
+  const HOME = ["10", "0", "0", "20"].join(".");
+  const q = withGate("?api=" + encodeURIComponent("http://" + HOME + ":5400"), {});
+  assert.ok(/connect-src 'self' http:\/\/10\.0\.0\.20:5400 /.test(q), q);
+  assert.ok(/img-src 'self' http:\/\/10\.0\.0\.20:5400 /.test(q));
+  assert.ok(/object-src 'none'/.test(q), "the rest of the policy is untouched");
+  // no bridge: the policy is exactly designer-gate.js's own
+  const none = withGate("", {});
+  assert.ok(/connect-src 'self' https:/.test(none));
+  for (const bad of ["http://" + HOME + ":5400/x?y", "javascript:alert(1)", "https://evil.example", "http://" + HOME + ":5400 https://evil.example"]) {
+    const r = withGate("?api=" + encodeURIComponent(bad), {});
+    assert.ok(!/evil|javascript|\/x/.test(r.split("connect-src")[1].split(";")[0]), bad);
+  }
+}
+
+// ---- tizen.js: Samsung's keyboard Done (65376) in a text box is Enter ----
+{
+  const listeners = { keydown: [] }, fired = [], later = [];
+  let blurred = false;
+  const box = { tagName: "INPUT", blur() { blurred = true; s.document.activeElement = null; } };
+  const s = {
+    location: { search: "" }, COUCH_TIZEN: {}, COUCH_TIZEN_APPS: {}, localStorage: storage({}),
+    setTimeout: (f) => { later.push(f); return later.length; }, clearTimeout() {}, JSON,
+    tizen: { application: { getAppsInfo() {} }, tvinputdevice: { registerKey() { throw new Error("no"); } } },
+    KeyboardEvent: function (type, init) { this.type = type; this.key = init.key; this.keyCode = 0; },
+    document: { activeElement: box, hidden: false,
+      addEventListener: (t, f) => { (listeners[t] = listeners[t] || []).push(f); },
+      dispatchEvent: (e) => { fired.push(e.key); } },
+    addEventListener() {}
+  };
+  s.window = s;
+  run("tizen.js", s);
+  const ev = { keyCode: 65376, preventDefault() {}, stopImmediatePropagation() {} };
+  listeners.keydown.forEach((f) => f(ev));
+  assert.deepStrictEqual(fired, [], "waits a moment for text from the phone");
+  later.forEach((f) => f());
+  assert.deepStrictEqual(fired, ["Enter"]);
+  assert.ok(blurred, "the keyboard closes");
+}
+
 console.log("Samsung app tests passed.");

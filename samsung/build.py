@@ -114,6 +114,10 @@ def main():
                              '<script src="settings.js"></script>\n<script src="kept.js"></script>\n'
                              '<script src="tizen-apps.js"></script>\n'
                              '<script src="tizen.js"></script>\n<script src="update.js"></script>\n' + tag)
+    gate = '<script src="designer-gate.js"></script>'
+    if gate not in html:
+        raise SystemExit("tv-home/web/index.html no longer loads designer-gate.js; update samsung/build.py")
+    html = html.replace(gate, gate + '\n<script src="tizen-policy.js"></script>')
     with open(index, "w") as f:
         f.write(html)
 

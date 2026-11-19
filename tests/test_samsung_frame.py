@@ -182,7 +182,7 @@ class ReleaseBuildTests(unittest.TestCase):
             settings = z.read("settings.js").decode()
             index = z.read("index.html").decode()
             xml = z.read("config.xml").decode()
-        for f in ("boot.html", "kept.js", "update.js", "design-code.js", "designer-gate.js", "tizen.js"):
+        for f in ("boot.html", "kept.js", "update.js", "design-code.js", "designer-gate.js", "tizen.js", "tizen-policy.js"):
             self.assertIn(f, names)
         self.assertIn('"bridge": ""', settings)
         self.assertIn('"key": ""', settings)
@@ -190,6 +190,7 @@ class ReleaseBuildTests(unittest.TestCase):
         self.assertRegex(xml, r'version="\d+\.\d+\.\d+"')
         self.assertLess(index.index("settings.js"), index.index("kept.js"))
         self.assertLess(index.index("kept.js"), index.index("tizen.js"))
+        self.assertLess(index.index("designer-gate.js"), index.index("tizen-policy.js"))
         with zipfile.ZipFile(os.path.join(build, "couch-tv-samsung-setup.zip")) as z:
             names = set(z.namelist())
             mode = z.getinfo("couch-tv for Samsung/Install on Mac.command").external_attr >> 16

@@ -118,7 +118,7 @@ TV on the computer:
 Frame TVs: "off" from the phone, the sleep timer and a short press of power go to **Art Mode**, as
 the Frame's own remote does. The bridge never holds power, so a Frame is never switched fully off
 from the phone. The hook treats Art Mode as off, so leaving Art Mode counts as switching the TV on.
-It waits until the TV says twice in a row (within 12 seconds) that it is on and out of Art Mode,
+It waits until the TV says twice in a row (within 15 seconds) that it is on and out of Art Mode,
 then opens couch-tv (`bridge/samsung_frame.py`). A Frame leaving Art Mode can say "standby" for a
 moment on its way to the picture; one whose Art Mode sleep timer ran out says "standby" and stays.
 The first is opened, the second left alone ("Art Mode ended and the TV went to sleep, left alone"),
@@ -311,6 +311,14 @@ Samsung's on-screen keyboard: type the code from the phone's Send sheet with the
 keyboard and type the code from the phone remote's **Type on the TV**. **Open this home in
 couch-tv Studio** shows a QR code for the phone. The TV asks the design store itself, so this works
 with no bridge too.
+
+Tested on a 2021 Frame, 19 November 2026: the code went in through the phone path (the bridge's
+`/api/text` into Samsung's keyboard), the "Use this design?" question came up, and Use this design
+put the design on the home. Two Samsung fixes came out of that test, both in `samsung/app`:
+Samsung's keyboard reports Done as key 65376, not Enter, so `tizen.js` turns Done in a text box into
+Enter (the code was never sent before); and a design's page policy refused the bridge, because on a
+Samsung the page is a file on the TV and the bridge another computer on plain http, so
+`tizen-policy.js` adds this TV's own bridge (and nothing else) to it.
 
 ## Building a release
 

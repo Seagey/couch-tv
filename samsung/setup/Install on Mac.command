@@ -121,7 +121,8 @@ if [ $CODE -eq 3 ]; then
 fi
 [ $CODE -eq 0 ] || stop "couch-tv did not go on the TV. What went wrong is above. Help: couchtv.joshuaseage.com/help/tv-samsung"
 
-say "" "couch-tv is on your TV and open." ""
+"$CLI" launch CouchTVApp.Home --tv "$TV" >/dev/null 2>&1
+say "" "couch-tv is on your TV. If it is not on screen, open it from the TV's row of apps (Couch TV)." ""
 say "Next, on the TV:"
 say "  - Settings, General, Smart Features, Autorun Last App: On (couch-tv comes back when the TV does)."
 say "  - To open couch-tv: press Home on the Samsung remote, then pick Couch TV in the row of apps."

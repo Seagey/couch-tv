@@ -31,7 +31,7 @@ import config
 import samsung
 from tv import TVUnavailable
 
-HOOK_SETTLE = 12.0    # seconds the hook waits for the TV to say it is really on
+HOOK_SETTLE = 15.0    # seconds the hook waits for the TV to say it is really on (a 2021 Frame took 9)
 HOOK_STEP = 1.0
 WAKE_GIVE_UP = 14.0   # seconds of wake packets before the phone is told to use the TV's remote
 MAC = re.compile(r"^[0-9A-Fa-f]{2}([:-][0-9A-Fa-f]{2}){5}$")
