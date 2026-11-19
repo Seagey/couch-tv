@@ -52,6 +52,12 @@ object Adb {
     @Volatile var state: String = "off"; private set           // off | connecting | waiting_for_allow | connected | needs_pairing | failed
     @Volatile var lastError: String? = null; private set
     @Volatile var tlsPort: Int? = null; private set
+    /**
+     * The last "Allow debugging?" wait ran out with no answer at all. On a real TCL (20 Nov 2026) adbd
+     * kept an earlier question it believed was still open (it had been hidden behind another app) and
+     * never showed a new one, until the TV was restarted.
+     */
+    @Volatile var unanswered = false; private set
 
     private val mgr by lazy { Manager(ctx) }
 
@@ -70,7 +76,7 @@ object Adb {
         "connected" to connected, "route" to route, "state" to state, "error" to lastError,
         "tls_paired" to paired, "tls_port" to tlsPort, "ever_allowed" to everAllowed,
         "can_self_enable" to canWriteSecure(), "overlay" to Settings.canDrawOverlays(ctx),
-        "sdk" to Build.VERSION.SDK_INT, "probe" to lastProbe,
+        "sdk" to Build.VERSION.SDK_INT, "probe" to lastProbe, "unanswered" to unanswered,
     )
 
     /**
@@ -147,6 +153,11 @@ object Adb {
             val ok = f.get(limitMs, TimeUnit.MILLISECONDS)
             Log.i(TAG, "$r $host:$port: library connect returned $ok after ${System.currentTimeMillis() - started} ms")
             if (ok) return onConnected(r)
+            // the whole wait went by with no Allow and no refusal: the TV never asked (see unanswered)
+            if (r == "tcp" && allowSeconds > 8 && System.currentTimeMillis() - started >= allowSeconds * 1000 - 2000) {
+                unanswered = true
+                note(SetupWords.NOT_ASKED)
+            }
             note("$host:$port: no answer to \"Allow debugging?\" in time (or the TV refused)." +
                 if (Build.VERSION.SDK_INT >= 33) " On Android 13+ the TV may never ask: pair wireless debugging on the setup page instead." else " Press Connect again.")
         } catch (e: java.util.concurrent.TimeoutException) {
@@ -235,7 +246,7 @@ object Adb {
     }
 
     private fun onConnected(r: String): Boolean {
-        route = r; state = "connected"; lastError = null
+        route = r; state = "connected"; lastError = null; unanswered = false
         Store.putBool("adb_ok_once", true)
         if (r == "tcp") Store.putBool("adb_ok_tcp", true)
         Log.i(TAG, "connected over $r")

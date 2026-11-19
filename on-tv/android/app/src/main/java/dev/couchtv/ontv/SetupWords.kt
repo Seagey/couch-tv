@@ -23,9 +23,13 @@ object SetupWords {
     }
 
     /** What the phone remote can do now, without the word ADB. */
-    fun keysLine(connected: Boolean, waiting: Boolean, needsPairing: Boolean): String = when {
+    /** The "Allow debugging?" wait ran out and the TV never asked (Adb.unanswered). */
+    const val NOT_ASKED = "The TV did not show its Allow debugging question. Restart the TV, then try again."
+
+    fun keysLine(connected: Boolean, waiting: Boolean, needsPairing: Boolean, notAsked: Boolean = false): String = when {
         connected -> "The phone remote can press every key and type on the TV."
         waiting -> "Look at the TV: if it asks \"Allow debugging?\", tick Always allow and press OK."
+        notAsked -> NOT_ASKED
         needsPairing -> "The phone remote opens apps and changes the volume. For the arrow keys and typing, see More."
         else -> "The phone remote opens apps and changes the volume. For the arrow keys and typing, see More."
     }

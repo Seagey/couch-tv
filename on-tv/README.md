@@ -102,9 +102,13 @@ it can switch wireless debugging back on after a restart, the way Shizuku does).
 
 Home settings, About, **Update couch-tv** says which version this TV has and whether a newer one is out
 (it looks on GitHub once a week if you said yes when the home asked, or when you press Check for updates
-now). The app put on with just a phone cannot install an update itself (Android's installer needs a
-permission it leaves out on purpose, so Play Protect lets it through), so OK opens the steps: open
-Downloader, type 8180170, Install. Your settings stay. The watch version updates from a computer with
+now). Once the phone remote can press keys (the app's own link to the TV, "Let the phone press keys"),
+**Update to ...** does it all: it downloads the new version from GitHub, checks it (GitHub only, the
+size and SHA-256 GitHub lists, this app, newer, the same signing key) and installs it over that link,
+then Couch TV opens again. Your settings stay. The app still leaves out Android's install permission
+on purpose, so Play Protect lets it through. Without that link (or on a Fire TV that blocks it), the
+page shows the steps instead, with a QR code that opens them on your phone: open Downloader, type
+8180170, Install. The watch version without the link updates from a computer with
 `adb install -r couch-tv-ontv-watch.apk`.
 
 If Downloader says **App not installed**, the TV is usually short of space: Downloader keeps every copy

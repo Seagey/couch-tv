@@ -77,6 +77,8 @@ class UpdateRulesTest {
         assertTrue(UpdateRules.gitHubHost("release-assets.githubusercontent.com"))
         assertFalse(UpdateRules.gitHubHost("github.com.evil.example"))
         assertFalse(UpdateRules.gitHubHost("githubusercontent.com.example"))
+        assertFalse(UpdateRules.gitHubHost("evilgithubusercontent.com"))
+        assertFalse(UpdateRules.gitHubHost("githubusercontent.com"))
     }
 
     @Test fun readsWhatTheInstallSaid() {

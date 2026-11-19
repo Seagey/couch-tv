@@ -236,7 +236,7 @@ class SetupActivity : Activity() {
         code.text = SetupWords.pairLine(p, Auth.phoneCount(), ago)
         next.text = SetupWords.nextLine(p, Auth.phoneCount(), homeOpensUs())
         val s = Adb.status()
-        adb.text = SetupWords.keysLine(Adb.connected, s["state"] == "waiting_for_allow" || s["state"] == "connecting", s["state"] == "needs_pairing")
+        adb.text = SetupWords.keysLine(Adb.connected, s["state"] == "waiting_for_allow" || s["state"] == "connecting", s["state"] == "needs_pairing", Adb.unanswered)
         val google = HomeRole.googleTv(this)
         val watchApk = BuildConfig.BUILD_TYPE == "watch"
         val asking = askSince > 0 || awaitingRole

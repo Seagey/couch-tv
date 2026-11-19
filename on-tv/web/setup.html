@@ -135,6 +135,7 @@
     var s = $('adb-status');
     if (a.connected) { s.className = 'status ok'; s.textContent = 'Connected (' + (a.route === 'tls' ? 'wireless debugging' : 'port 5555') + ').'; }
     else if (a.state === 'waiting_for_allow' || a.state === 'connecting') { s.className = 'status'; s.textContent = 'Waiting. Accept "Allow debugging?" on the TV.'; }
+    else if (a.unanswered) { s.className = 'status bad'; s.textContent = 'The TV did not show its Allow debugging question. Restart the TV, then try again.'; }
     else { s.className = 'status bad'; s.textContent = 'Not connected.' + (a.error ? ' (' + a.error + ')' : ''); }
   }
   function load() {
@@ -293,15 +294,17 @@
     var st = $('upd-steps');
     st.style.display = newer && !u.can_install ? '' : 'none';
     st.innerHTML = newer && !u.can_install ? (u.steps || []).map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') +
-      (u.help_url ? '<li style="list-style:none"><a href="' + esc(u.help_url) + '" target="_blank" rel="noopener">The same steps with pictures</a></li>' : '') : '';
+      (u.help_url ? '<li style="list-style:none"><a href="' + esc(u.help_url) + '" target="_blank" rel="noopener">The same steps on the help page</a></li>' : '') : '';
     clearInterval(updPoll);
     if (u.busy) updPoll = setInterval(loadUpd, 1500);
   }
   function loadUpd() {
     api('GET', '/api/update').then(function (u) {
-      if (updWaiting && u.current !== updFrom) { updWaiting = false; $('upd-msg').textContent = 'Updated to ' + u.current + '. Your settings stay.'; }
+      var done = updWaiting && u.current !== updFrom;
+      if (done) updWaiting = false;
       if (u.busy === 'installing') { updWaiting = true; updFrom = u.current; }
       showUpd(u);
+      if (done) $('upd-msg').textContent = 'Updated to ' + u.current + '. Your settings stay.';
       if (updWaiting && !u.busy) updWaiting = false;
     }).catch(function () {
       // Android stops the app while it replaces it: keep asking until the new one answers

@@ -117,7 +117,7 @@ object Update {
         check(c, false)
     }
 
-    fun check(c: Context, manual: Boolean) {
+    @Synchronized fun check(c: Context, manual: Boolean) {
         val app = c.applicationContext
         if (busy.isNotEmpty()) return
         busy = "checking"
@@ -141,8 +141,8 @@ object Update {
             }
             busy = ""
             changed(app)
-            // an update that went on: the copy it left behind on the TV goes
-            if (s.getString("pending", "") == BuildConfig.VERSION_NAME && Adb.connected) {
+            // a copy an earlier try left on the TV goes, whenever nothing is installing (review, L3)
+            if (Adb.connected && busy.isEmpty()) {
                 runCatching { Adb.shell("rm -f ${UpdateRules.TMP_APK} ${UpdateRules.TMP_LOG}", 8000) }
             }
             File(app.cacheDir, "update").deleteRecursively()
@@ -151,10 +151,10 @@ object Update {
 
     /**
      * "Update to ...": download, check, copy to the TV, install over the app's own ADB link. Android stops
-     * this app while it replaces it; the shell line on the TV opens Couch TV again (only if it was on
-     * screen when the update started).
+     * this app while it replaces it; the shell line on the TV opens Couch TV again (only if it is on
+     * screen when the install starts).
      */
-    fun install(c: Context) {
+    @Synchronized fun install(c: Context) {
         val app = c.applicationContext
         val s = store(app)
         val latest = s.getString("latest", "") ?: ""
@@ -163,30 +163,33 @@ object Update {
         val url = s.getString("url", "") ?: ""
         val digest = s.getString("digest", "") ?: ""
         val size = s.getLong("size", 0L)
-        val reopen = App.inForeground
         busy = "downloading"
         progress = 0
         error = ""
         changed(app)
         io.execute {
-            val file = File(File(app.cacheDir, "update").apply { mkdirs() }, UpdateRules.asset(watch()))
-            var why = try {
+            val dir = File(app.cacheDir, "update").apply { mkdirs() }
+            val file = File(dir, UpdateRules.asset(watch()))
+            // room for the download, the copy on the TV and Android's own staged copy, or a full TV is
+            // told plainly instead of "Can't reach GitHub" (review, F1)
+            var why = if (dir.usableSpace < size * 5 / 2) "space" else try {
                 download(app, url, file, size)
                 verify(app, file, digest, size)
             } catch (x: Exception) {
                 Log.w(TAG, "download: ${x.message}")
-                "net"
+                if (UpdateRules.failure(x.message ?: "") == "space") "space" else "net"
             }
-            if (why == "other_key") s.edit().putString("other_key", latest).apply()
             if (why.isEmpty()) {
                 busy = "installing"
                 progress = 100
                 changed(app)
-                why = try { put(app, file, latest, reopen) } catch (x: Exception) {
+                why = try { put(app, file, latest) } catch (x: Exception) {
                     Log.w(TAG, "install: ${x.message}")
                     if (x.message?.startsWith("push failed") == true) UpdateRules.failure(x.message ?: "") else "adb"
                 }
             }
+            // another key, from the file's own signer or from what pm said (review, L4)
+            if (why == "other_key") s.edit().putString("other_key", latest).apply()
             file.delete()
             if (why.isNotEmpty()) {
                 s.edit().remove("pending").apply()
@@ -203,12 +206,15 @@ object Update {
      * Copies the checked file to the TV and installs it there as ADB's shell user. "" once it says
      * Success (Android is about to stop this app), else why not.
      */
-    private fun put(app: Context, file: File, latest: String, reopen: Boolean): String {
+    private fun put(app: Context, file: File, latest: String): String {
         if (!Adb.connected && !Adb.ensure()) return "adb"
+        // first: wakes a stale link (Adb reconnects once), and clears what an earlier try left (review, L2)
+        Adb.shell("rm -f ${UpdateRules.TMP_APK} ${UpdateRules.TMP_LOG}", 8000)
         Adb.push(file, UpdateRules.TMP_APK)
-        file.delete()   // the TV may be short of space: one copy at a time
+        file.delete()   // the app's copy goes as soon as the TV has its own, so pm's staging has the room
         store(app).edit().putString("pending", latest).commit()
-        Adb.shell(UpdateRules.installScript(app.packageName, reopen), 15_000)
+        // read now, not when Update was pressed: someone may have gone back to a show meanwhile (review, L1)
+        Adb.shell(UpdateRules.installScript(app.packageName, App.inForeground), 15_000)
         val until = System.currentTimeMillis() + 5 * 60_000L
         while (System.currentTimeMillis() < until) {
             Thread.sleep(1000)
@@ -317,7 +323,12 @@ object Update {
     class Page(c: Context, private val web: WebView, private val base: String) {
         private val app = c.applicationContext
         init { listener = { json -> runCatching { web.evaluateJavascript("window.tv && tv.update && tv.update($json)", null) } } }
-        @JavascriptInterface fun state(): String = Update.state(app)
+        @JavascriptInterface fun state(): String {
+            val json = Update.state(app)
+            // the page has had "Updated to ..." (it says it once): let it go a moment later (review, L3)
+            if (JSONObject(json).optString("updated").isNotEmpty()) main.postDelayed({ store(app).edit().remove("pending").apply() }, 10_000)
+            return json
+        }
         @JavascriptInterface fun check() { main.post { if (trusted()) Update.check(app, true) } }
         @JavascriptInterface fun install() { main.post { if (trusted()) Update.install(app) } }
         @JavascriptInterface fun auto(on: Boolean) { main.post { if (trusted()) setAuto(app, on) } }

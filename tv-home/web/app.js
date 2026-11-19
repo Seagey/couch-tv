@@ -5501,9 +5501,9 @@
     if (u.latest) rows.push(info("upd-newest", t("upd_newest"), u.latest));   // both numbers side by side
     if (u.available && u.manual) {
       rows.push(info("upd-how", UPD_ROW, "", t("upd_gear", { v: u.latest, c: u.current || "" }) + ". " + (u.how || "")));
-      rows = rows.concat(manualRows(u));
-      // the on-TV app: the same steps on a phone, so nobody has to remember them (a TCL, 20 Nov 2026)
+      // the same steps on a phone, so nobody has to remember them (a TCL, 20 Nov 2026): first, before the steps
       if (u.help_url && window.TVQR) rows.push({ kind: "qr", key: "upd-qr", url: u.help_url, label: tUpd("upd_qr") });
+      rows = rows.concat(manualRows(u));
     } else if (u.available) {
       // u.self: the on-TV app installs it by itself (no Android question), then opens again
       rows.push({ kind: "action", key: "upd-install", label: t("upd_install", { v: u.latest }),

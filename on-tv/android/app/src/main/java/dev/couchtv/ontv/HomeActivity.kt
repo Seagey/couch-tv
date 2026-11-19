@@ -103,7 +103,8 @@ class HomeActivity : Activity() {
             settings.mediaPlaybackRequiresUserGesture = false
             settings.textZoom = 100
             addJavascriptInterface(Native(), "TVOS")
-            // Home settings, About, Update couch-tv: looks at GitHub's releases, never installs (Update.kt)
+            // Home settings, About, Update couch-tv: looks at GitHub's releases; with the app's own ADB link,
+            // Update to installs one itself after the launcher's checks, else it shows the steps (Update.kt)
             addJavascriptInterface(Update.Page(this@HomeActivity, this, base), "TVUP")
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) { ready = true; view.requestFocus() }
