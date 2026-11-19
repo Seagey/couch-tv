@@ -839,3 +839,43 @@ enum DesignCode {
         return d
     }
 }
+
+// MARK: Get a design from your phone (DesignStore.swift asks; tv-home/web/design-code.js openInbox, takeInbox)
+
+/// A one time inbox at couch-tv Studio: the QR holds `link`; the phone puts a design code in it, and this
+/// Apple TV asks for it every `every` seconds while the screen showing the QR is open, and only then.
+/// Only a code ever comes back, and it is got exactly as a typed one: "Use this design?" first, always.
+struct DesignInbox: Equatable {
+    let id: String
+    let link: String
+    let expires: Date
+    let every: Double
+
+    static func validId(_ s: String) -> Bool {
+        s.count == 22 && s.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-") }
+    }
+
+    /// The store's answer to "open", or nil when it is not one.
+    static func read(_ data: Data, base: String, now: Date = Date()) -> DesignInbox? {
+        guard let j = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let id = j["id"] as? String, validId(id) else { return nil }
+        let secs = min(1800, max(60, (j["expires_in"] as? Double) ?? 600))
+        let every = min(30, max(3, (j["poll_every"] as? Double) ?? 4))
+        return DesignInbox(id: id, link: base + "/design/#inbox=" + id, expires: now.addingTimeInterval(secs), every: every)
+    }
+
+    enum Take: Equatable { case waiting, code(String), gone, problem(String) }
+
+    /// The store's answer to "take": a code (read as a typed one), still waiting, or run out.
+    static func readTake(status: Int, data: Data) -> Take {
+        if status == 404 { return .gone }
+        guard status == 200, let j = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            return .problem("Could not reach couch-tv Studio. Check the Apple TV is online, or type the code instead.")
+        }
+        if j["state"] as? String == "ok" {
+            guard let c = j["code"] as? String, let code = DesignCode.read(c) else { return .gone }
+            return .code(code)
+        }
+        return .waiting
+    }
+}

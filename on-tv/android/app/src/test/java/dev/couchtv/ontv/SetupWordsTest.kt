@@ -13,6 +13,17 @@ class SetupWordsTest {
         assertEquals("Phone code  123 456", SetupWords.pairLine("123456", 0, null))
     }
 
+    @Test fun oneScanPairsWithTheCodeInTheFragment() {
+        assertEquals("http://192.0.2.5:5400/#pin=123456", SetupWords.qrLink("http://192.0.2.5:5400", "123456"))
+        // no live code: the plain address; no network: no QR
+        assertEquals("http://192.0.2.5:5400", SetupWords.qrLink("http://192.0.2.5:5400", null))
+        assertEquals(null, SetupWords.qrLink(null, "123456"))
+        // only six digits ever go in, and never in the query string (a request line can be logged)
+        assertEquals("http://192.0.2.5:5400", SetupWords.qrLink("http://192.0.2.5:5400", "12345a"))
+        assertFalse(SetupWords.qrLink("http://192.0.2.5:5400", "123456")!!.contains("?"))
+        assertTrue(SetupWords.nextLine("123456", 0, false).contains("scan"))
+    }
+
     @Test fun saysPairedRightAfterPairing() {
         // the report: after pairing the TV said "Phone code: press New phone code", which looks like it failed
         assertEquals("Your phone is paired", SetupWords.pairLine(null, 1, 5_000))

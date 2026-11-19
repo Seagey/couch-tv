@@ -63,11 +63,13 @@ def message(tv, text, sender=None, seconds=None):
     return m
 
 
-def design(tv, code):
+def design(tv, code, sender=None):
+    """sender: "phone" when the phone remote's Send a design sent it (the TV then says "from your
+    phone"); anything else is an AI agent. Only these two words ever reach the TV."""
     c = read_code(code)
     if not c:
         raise ValueError("code must be a couch-tv Studio design code, like ABCDE-FGHJK or CTV1-...")
-    d = {"id": next(_ids), "code": c, "at": int(time.time() * 1000)}
+    d = {"id": next(_ids), "code": c, "at": int(time.time() * 1000), "from": "phone" if sender == "phone" else "ai"}
     _tv(tv)["design"] = d
     return d
 

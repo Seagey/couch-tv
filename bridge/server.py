@@ -2157,7 +2157,7 @@ async def h_say_message(request):
 async def h_say_design(request):
     data = await body(request)
     # the TV fetches it and always asks "Use this design?" first: someone at the TV says yes
-    return ok(design=say.design(_current.get(), data.get("code")), asks_first=True)
+    return ok(design=say.design(_current.get(), data.get("code"), data.get("from")), asks_first=True)
 
 
 async def h_recs(request):

@@ -60,7 +60,13 @@ class SayHttp(AioHTTPTestCase):
             r = await self.client.post("/api/say/design", json={"code": "abcde-fghjk"})
             j = await r.json()
             self.assertEqual(j["design"]["code"], "ABCDE-FGHJK")
+            self.assertEqual(j["design"]["from"], "ai")
             self.assertTrue(j["asks_first"])
+            # the phone remote's Send a design: the TV says "from your phone"; any other word is "ai"
+            j = await (await self.client.post("/api/say/design", json={"code": "abcde-fghjk", "from": "phone"})).json()
+            self.assertEqual(j["design"]["from"], "phone")
+            j = await (await self.client.post("/api/say/design", json={"code": "abcde-fghjk", "from": "<script>"})).json()
+            self.assertEqual(j["design"]["from"], "ai")
             r = await self.client.post("/api/say/design", json={"code": "javascript:alert(1)"})
             self.assertEqual(r.status, 400)
             claude._last[server.DEFAULT_TV] = {"text": "what's on", "reply": "Bluey at 7", "ts": time.time()}

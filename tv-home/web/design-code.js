@@ -197,5 +197,57 @@
     return media;
   }
 
-  window.CouchDesignCode = { base: base, readCode: readCode, checkCode: checkCode, get: get, kept: kept, forget: forget, accept: accept, lockImages: lockImages, mediaSources: mediaSources };
+  // ---- Get a design from your phone: the design inbox (couch-tv Studio's /api/inbox) ----
+  // The TV asks the same store for an inbox (a random id the store makes), shows a QR of
+  // <store>/design/#inbox=<id>, and then, only while that screen is open, asks every few seconds
+  // whether a code is in it. The phone puts a design code in it from couch-tv Studio. Only a code
+  // ever comes back, and it goes through get() like a typed one: "Use this design?" first, always.
+  // The TV pulls; nothing connects to it. Text/plain, so old TV browsers send it without a preflight.
+  var INBOX_MSG = {
+    gone: "That code ran out. Press OK for a new one.",
+    offline: "Could not reach couch-tv Studio. Check the TV is online, or type the code instead.",
+    busy: "couch-tv Studio is busy. Type the code instead, or try again in a few minutes."
+  };
+  function inboxFail(k) { var e = new Error(INBOX_MSG[k]); e.kind = k; return e; }
+  function inboxCall(body) {
+    var b = base();
+    if (!b || typeof fetch !== "function") return Promise.reject(inboxFail("offline"));
+    var ctl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, TIMEOUT);
+    return fetch(b + "/api/inbox", {
+      method: "POST", mode: "cors", credentials: "omit", cache: "no-store", referrerPolicy: "no-referrer", redirect: "error",
+      headers: { "content-type": "text/plain" }, body: JSON.stringify(body), signal: ctl ? ctl.signal : undefined
+    }).then(function (r) {
+      clearTimeout(timer);
+      if (r.status === 404) throw inboxFail("gone");
+      if (r.status === 503 || r.status === 429) throw inboxFail("busy");
+      if (!r.ok) throw inboxFail("offline");
+      return r.text();
+    }, function () { clearTimeout(timer); throw inboxFail("offline"); }).then(function (t) {
+      var j = null;
+      try { j = JSON.parse(t); } catch (e) {}
+      if (!j || typeof j !== "object") throw inboxFail("offline");
+      return j;
+    });
+  }
+  // { id, link, expires, every }: link is what the QR holds
+  function openInbox() {
+    return inboxCall({ op: "open" }).then(function (j) {
+      if (typeof j.id !== "string" || !/^[A-Za-z0-9_-]{22}$/.test(j.id)) throw inboxFail("offline");
+      var secs = Math.max(60, Math.min(1800, +j.expires_in || 600)), every = Math.max(3, Math.min(30, +j.poll_every || 4));
+      return { id: j.id, link: base() + "/design/#inbox=" + j.id, expires: Date.now() + secs * 1000, every: every * 1000 };
+    });
+  }
+  // "" while nothing is in it yet, else the design code (checked as a typed one is)
+  function takeInbox(id) {
+    return inboxCall({ op: "take", id: String(id || "") }).then(function (j) {
+      if (j.state !== "ok") return "";
+      var c = readCode(j.code);
+      if (!c) throw inboxFail("gone");
+      return c;
+    });
+  }
+
+  window.CouchDesignCode = { base: base, readCode: readCode, checkCode: checkCode, get: get, kept: kept, forget: forget, accept: accept, lockImages: lockImages, mediaSources: mediaSources,
+    openInbox: openInbox, takeInbox: takeInbox };
 })();

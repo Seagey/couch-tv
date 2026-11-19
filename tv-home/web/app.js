@@ -4485,6 +4485,7 @@
   }
   // Closing starts the page again when anything changed, so the look, scenes and words all agree.
   function closeSettings() {
+    stopInbox();   // Get a design from your phone asks the store only while its screen is open
     if (SET.typing) stopTyping();
     if (SET.lift) dropRow();
     $("settings").classList.remove("on");
@@ -4501,7 +4502,7 @@
   // couch-tv Studio is a name, the same in every language
   function secName(id) { return id === "designer" ? "couch-tv Studio" : t("sec_" + id); }
   function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(SECS[SET.sec][0]); }
-  function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info" && r.kind !== "code"; }
+  function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info" && r.kind !== "code" && r.kind !== "qr"; }
   function firstRow(rows) { for (var i = 0; i < rows.length; i++) if (focusable(rows[i])) return i; return -1; }
   function stepRow(rows, i, d) { for (var j = i + d; j >= 0 && j < rows.length; j += d) if (focusable(rows[j])) return j; return i; }
   function indexOfKey(rows, k) { for (var i = 0; i < rows.length; i++) if (rows[i].key === k) return i; return -1; }
@@ -4674,9 +4675,73 @@
     rows.push({ kind: "input", key: "design-get", label: "Get a design", sub: "Type the code couch-tv Studio shows you", act: function () {
       typeDesignCode("");
     } });
+    // the fewest presses on the TV: scan, choose on the phone, press Send to my TV (no typing here).
+    // Right under Get a design, so the rows above stay where couch-tv Studio's pictured steps show them.
+    if (CouchDesignCode.openInbox && window.TVQR) rows.push({ kind: "nav", key: "design-phone", label: "Get a design from your phone",
+      sub: "Scan a code with your phone and choose a design there. No typing on the TV", act: openPhoneInbox });
     if (DESIGN_FROM_CODE) rows.push({ kind: "action", key: "design-forget", label: "Remove the design I got", sub: "Back to the home as it was", act: function () {
       CouchDesignCode.forget(); SET.dirty = true; SET.msg = "Removed. The home goes back to how it was when you close Home settings.";
     } });
+  }
+  // Get a design from your phone (design-code.js openInbox, takeInbox): a QR of couch-tv Studio with a
+  // one time inbox in it. While this screen is open, and only then, the TV asks the store every few
+  // seconds whether the phone put a design code in it; nothing connects to the TV. A code that comes
+  // is got exactly as a typed one (getDesignByCode), so "Use this design?" comes first, always.
+  var INBOX = null;   // { state: "opening" | "waiting" | "gone" | "error", id, link, expires, every, timer, misses, msg }
+  function inboxShown() { return zone === "settings" && !!SET.sub && SET.sub.id === "phone-inbox"; }
+  function stopInbox() { if (INBOX && INBOX.timer) clearTimeout(INBOX.timer); INBOX = null; }
+  function openPhoneInbox() {
+    stopInbox();
+    SET.sub = { id: "phone-inbox", back: "design-phone", crumb: "couch-tv Studio", title: function () { return "Get a design from your phone"; }, rows: inboxRows };
+    SET.col = "rows"; SET.keyFocus = "inbox-type"; SET.ri = 0; SET.msg = "";
+    var mine = INBOX = { state: "opening", misses: 0 };
+    renderSettings();
+    CouchDesignCode.openInbox().then(function (b) {
+      if (INBOX !== mine) return;
+      mine.state = "waiting"; mine.id = b.id; mine.link = b.link; mine.expires = b.expires; mine.every = b.every;
+      if (inboxShown()) renderSettings();
+      nextInboxLook(mine);
+    }, function (e) {
+      if (INBOX !== mine) return;
+      mine.state = "error"; mine.msg = (e && e.message) || "";
+      if (inboxShown()) renderSettings();
+    });
+  }
+  function nextInboxLook(mine) { clearTimeout(mine.timer); mine.timer = setTimeout(function () { lookInInbox(mine); }, mine.every || 4000); }
+  function lookInInbox(mine) {
+    // the screen was closed, or another inbox replaced this one: stop asking
+    if (INBOX !== mine || !inboxShown()) { if (INBOX === mine) stopInbox(); return; }
+    if (Date.now() > mine.expires) { mine.state = "gone"; renderSettings(); return; }
+    CouchDesignCode.takeInbox(mine.id).then(function (code) {
+      if (INBOX !== mine || !inboxShown()) return;
+      if (!code) { mine.misses = 0; nextInboxLook(mine); return; }
+      stopInbox();
+      SET.sub = null; SET.keyFocus = "design-phone";
+      getDesignByCode(code);
+    }, function (e) {
+      if (INBOX !== mine || !inboxShown()) return;
+      if (e && e.kind === "gone") { mine.state = "gone"; renderSettings(); return; }
+      // a Wi-Fi blip: keep asking a few more times before saying so
+      if (++mine.misses < 5) { nextInboxLook(mine); return; }
+      mine.state = "error"; mine.msg = (e && e.message) || ""; renderSettings();
+    });
+  }
+  function inboxRows() {
+    var b = INBOX || { state: "gone" }, rows = [];
+    if (b.state === "waiting" && b.link) {
+      rows.push({ kind: "qr", key: "inbox-qr", link: b.link, label: "Scan this with your phone's camera",
+        sub: "On your phone, choose a design in couch-tv Studio and press Send to my TV. This TV then asks you before it changes anything." });
+      rows.push(info("inbox-wait", "Waiting for your phone", "", "This code works once, for 10 minutes, while this screen is open."));
+    } else if (b.state === "opening") {
+      rows.push(info("inbox-opening", "Making a code for your phone..."));
+    } else {
+      rows.push(info("inbox-gone", b.state === "error" ? (b.msg || "Could not reach couch-tv Studio.") : "That code ran out."));
+      rows.push({ kind: "action", key: "inbox-new", label: "Show a new code", act: openPhoneInbox });
+    }
+    rows.push({ kind: "action", key: "inbox-type", label: "Type the code on the TV instead", sub: "If your phone can't scan the code", act: function () {
+      stopInbox(); SET.sub = null; SET.keyFocus = "design-get"; typeDesignCode("");
+    } });
+    return rows;
   }
   // A design code typed with the remote: a TV's on-screen keyboard can drop a letter typed fast (a TCL,
   // 19 Nov 2026). While typing, the line under the box shows the code as ABCDE-FGHJK and how many of
@@ -5659,6 +5724,13 @@
     if (r.kind === "code") return '<div class="scode" aria-label="' + esc(r.label) + '"><span class="scode-big">' +
       String(r.label).split("").map(function (ch) { return ch === "-" ? '<i class="dash">-</i>' : "<i>" + esc(ch) + "</i>"; }).join("") +
       "</span>" + (r.sub ? "<small>" + esc(r.sub) + "</small>" : "") + "</div>";
+    // a QR for the phone (qr.js, drawn here: the link never leaves the TV to be drawn)
+    if (r.kind === "qr") {
+      var svg = "";
+      try { svg = window.TVQR.svg(r.link, 300).outerHTML; } catch (e) {}
+      return '<div class="sqr">' + (svg ? '<span class="sqr-code">' + svg + "</span>" : "") +
+        '<span class="sl"><b>' + esc(r.label) + "</b>" + (r.sub ? "<small>" + esc(r.sub) + "</small>" : "") + "</span></div>";
+    }
     var f = SET.col === "rows" && i === SET.ri, lifted = SET.lift === r.key;
     var cls = "srow k-" + r.kind + (f ? " focus" : "") + (lifted ? " lifted" : "") + (r.danger ? " danger" : "");
     var lead = "";

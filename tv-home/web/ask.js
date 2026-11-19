@@ -265,6 +265,9 @@
     var c = readJson(CFG_KEY);
     if (c && (c.route || c.provider)) return true;
     if (sheet) return true;
+    // a TV that can get designs listens for one sent from the phone remote (Send a design), so a
+    // design chosen on the phone needs no presses on the TV but the "Use this design?" answer
+    if (W.CouchDesignCode && W.CouchDesignCode.base && W.CouchDesignCode.base()) return true;
     try { return !!(DOC && DOC.querySelector && DOC.querySelector(".cw-k-ask, .cw-k-agent")); } catch (e) { return false; }
   }
   function poll() {
@@ -294,7 +297,7 @@
     var d = j.design;
     if (d && d.code && (d.at || 0) > (seen.design || 0)) {
       seen.design = d.at || now; markSeen();
-      if (now - (d.at || now) < 600000) useDesign(d.code);
+      if (now - (d.at || now) < 600000) useDesign(d.code, d.from === "phone" ? "phone" : "ai");
     }
     firstPoll = false;
   }
@@ -307,11 +310,12 @@
     try { off = W.localStorage.getItem("couchtv.design.off"); } catch (e) {}
     return v !== "on" || !!off;
   }
-  function useDesign(code) {
-    var C = W.CouchDesignCode;
+  // who: "phone" (the phone remote's Send a design) or "ai" (the person's own AI agent)
+  function useDesign(code, who) {
+    var C = W.CouchDesignCode, by = who === "phone" ? "your phone" : "your AI";
     if (!C || !C.get || !C.readCode(code)) { banner({ from: "couch-tv", text: "A design was sent, but this TV cannot get designs. Update couch-tv.", seconds: 15 }); return; }
-    if (studioOff()) { banner({ from: "couch-tv", text: "Your AI sent a design. couch-tv Studio is switched off on this TV, so it was not used. To use designs, turn it on in Home settings, couch-tv Studio.", seconds: 20 }); return; }
-    banner({ from: "couch-tv", text: "Getting the design your AI sent...", seconds: 20 });
+    if (studioOff()) { banner({ from: "couch-tv", text: "A design came from " + by + ". couch-tv Studio is switched off on this TV, so it was not used. To use designs, turn it on in Home settings, couch-tv Studio.", seconds: 20 }); return; }
+    banner({ from: "couch-tv", text: "Getting the design from " + by + "...", seconds: 20 });
     C.get(code).then(function () {
       // "Use this design?" comes first, as for a code typed at the TV; this TV's on or off choice is left as it is
       setTimeout(function () { try { W.location.reload(); } catch (e) {} }, 800);

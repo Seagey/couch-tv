@@ -134,6 +134,48 @@ extension HomeModel {
     }
 }
 
+// MARK: Get a design from your phone (tv-home/web/design-code.js openInbox, takeInbox)
+
+extension HomeModel {
+    private func inboxCall(_ body: [String: String]) async -> (Int, Data)? {
+        guard let base = designStore, let url = URL(string: base + "/api/inbox") else { return nil }
+        var r = URLRequest(url: url)
+        r.httpMethod = "POST"
+        r.setValue("text/plain", forHTTPHeaderField: "Content-Type")
+        r.httpShouldHandleCookies = false
+        r.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        let c = URLSessionConfiguration.ephemeral
+        c.timeoutIntervalForRequest = 15
+        c.httpCookieStorage = nil
+        c.urlCache = nil
+        let session = URLSession(configuration: c, delegate: NoRedirects(), delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        guard let (data, resp) = try? await session.data(for: r) else { return nil }
+        return ((resp as? HTTPURLResponse)?.statusCode ?? 0, data)
+    }
+
+    /// A new inbox, or what went wrong in plain words.
+    func openInbox() async -> Result<DesignInbox, InboxProblem> {
+        guard let base = designStore else { return .failure(InboxProblem(words: "Getting a design is switched off on the bridge (config.json design_store).")) }
+        guard let (status, data) = await inboxCall(["op": "open"]) else {
+            return .failure(InboxProblem(words: "Could not reach couch-tv Studio. Check the Apple TV is online, or type the code instead."))
+        }
+        guard status == 200, let box = DesignInbox.read(data, base: base) else {
+            return .failure(InboxProblem(words: "couch-tv Studio is busy. Type the code instead, or try again in a few minutes."))
+        }
+        return .success(box)
+    }
+
+    func takeInbox(_ box: DesignInbox) async -> DesignInbox.Take {
+        guard let (status, data) = await inboxCall(["op": "take", "id": box.id]) else {
+            return .problem("Could not reach couch-tv Studio. Check the Apple TV is online, or type the code instead.")
+        }
+        return DesignInbox.readTake(status: status, data: data)
+    }
+}
+
+struct InboxProblem: Error { let words: String }
+
 /// The design store is asked once, at its own address: a redirect is refused (design-code.js redirect: "error").
 private final class NoRedirects: NSObject, URLSessionTaskDelegate {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,

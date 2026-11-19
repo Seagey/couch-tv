@@ -81,6 +81,35 @@
     });
   }
 
+  // One scan pairs: the TV's QR is http://<tv>:5400/#pin=123456 (SetupWords.qrLink). The code is
+  // taken out of the address at once (so it is not kept in the history or a bookmark), then used
+  // once, exactly as if it had been typed. It only ever travels in the request body of /api/pair.
+  // The rest of the fragment (a #design=<code> from couch-tv Studio) is left for the remote.
+  var pinFromQr = null;
+  try {
+    var hm = /(^|[#&])pin=(\d{6})(?=&|$)/.exec(location.hash || '');
+    if (hm) {
+      pinFromQr = hm[2];
+      var rest = (location.hash || '').replace(/^#/, '').split('&').filter(function (p) { return p && p.indexOf('pin=') !== 0; }).join('&');
+      history.replaceState(history.state, '', location.pathname + location.search + (rest ? '#' + rest : ''));
+    }
+  } catch (e) { pinFromQr = null; }
+  function pairWith(code, then) {
+    return realFetch('/api/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: code, name: (navigator.platform || 'Phone') }) })
+      .then(function (r) { return r.json(); }).then(then);
+  }
+  function pairFromQr() {
+    pairWith(pinFromQr, function (j) {
+      if (j.ok && j.token) { save(j.token); location.reload(); }
+      else showPairing(j.error || 'That code has expired. Ask the TV for a new one.');
+    }).catch(function () { showPairing('Can’t reach the TV. Check this phone is on the same Wi-Fi as the TV.'); });
+  }
+
   window.couchTv = { token: function () { return token; }, pair: showPairing };
-  if (!token) showPairing();
+  if (pinFromQr) {
+    // already paired with a token the TV still knows: nothing to do. Otherwise pair with the scanned code.
+    if (!token) pairFromQr();
+    else realFetch('/api/health', { headers: { Authorization: 'Bearer ' + token } }).then(function (r) { return r.json(); })
+      .then(function (j) { if (!j || j.auth !== 'ok') pairFromQr(); }).catch(function () { pairFromQr(); });
+  } else if (!token) showPairing();
 })();

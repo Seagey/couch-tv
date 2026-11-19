@@ -45,11 +45,12 @@ object Say {
         return m
     }
 
+    /** from: "phone" when the phone remote's Send a design sent it; anything else is an AI agent. */
     @Synchronized
-    fun design(code: String?, now: Long = System.currentTimeMillis()): JSONObject {
+    fun design(code: String?, now: Long = System.currentTimeMillis(), from: String? = null): JSONObject {
         val c = readCode(code)
         if (c.isEmpty()) throw IllegalArgumentException("code must be a couch-tv Studio design code, like ABCDE-FGHJK or CTV1-...")
-        val d = JSONObject().put("id", nextId++).put("code", c).put("at", now)
+        val d = JSONObject().put("id", nextId++).put("code", c).put("at", now).put("from", if (from == "phone") "phone" else "ai")
         design = d
         return d
     }

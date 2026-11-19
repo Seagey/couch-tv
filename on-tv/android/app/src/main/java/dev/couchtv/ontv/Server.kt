@@ -170,7 +170,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 json(200, ok().put("message", m))
             }
             "POST /api/say/design" -> {
-                val d = try { Say.design(body(s).optString("code")) } catch (e: IllegalArgumentException) { throw ApiError(400, e.message ?: "bad code") }
+                val b = body(s)
+                val d = try { Say.design(b.optString("code"), from = b.optString("from")) } catch (e: IllegalArgumentException) { throw ApiError(400, e.message ?: "bad code") }
                 json(200, ok().put("design", d).put("asks_first", true))   // the TV always asks "Use this design?" first
             }
             "GET /api/recs" -> json(200, ok().put("updated", Now.iso()).put("continue", Now.continueItems(q("who"))).put("picks", JSONArray()))
