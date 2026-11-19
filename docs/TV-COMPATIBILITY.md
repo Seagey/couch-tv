@@ -42,6 +42,11 @@ receivers. So option B on a VIZIO is the phone remote and the assistant, not a h
 Home Assistant's Cast dashboards or a DashCast style tool can try showing couch-tv's page that way and report
 back ([VIZIO.md](VIZIO.md), "One open experiment"); couch-tv has no code for it.
 
+**couch-tv Setup** (the desktop app in `setup-app/`) does option A, plus the phone remote from option C, on
+Google TV, Android TV 7.1 and newer and Fire OS. The other systems above have their own way (linked in the
+table), not through the app. When a TV never asks "Allow USB debugging?" over Wi-Fi, the app walks through
+the fixes and then the phone only way; Android 6 and 7.0 TVs are set up from a computer with docs/SETUP.md.
+
 ## Reported by people using it
 
 Not tested by the author. Each line is what someone said worked on their own device.
@@ -238,3 +243,8 @@ Not tested by the author. Each line is what someone said worked on their own dev
   [webOS developer mode](https://webostv.developer.lge.com/develop/getting-started/developer-mode-app),
   [webosbrew](https://www.webosbrew.org/devmode/)
 - Android TV Remote protocol: [androidtv-remote](https://github.com/kud/androidtv-remote)
+- Panasonic: [Expert Reviews, Fire TV and TiVo OS in the 2024 range](https://www.expertreviews.co.uk/tvs/panasonic-debuts-fire-tv-and-tivo-os-options),
+  [What Hi-Fi, Panasonic's switch to Fire OS](https://www.whathifi.com/features/panasonics-switch-to-fire-os-for-its-new-tvs-might-be-controversial-but-i-think-its-a-great-move)
+  (no Panasonic on Vega OS found, checked 11 Nov 2026)
+- Philips: [9to5Google, Titan OS on all 2026 Philips TVs](https://9to5google.com/2026/03/23/google-tv-just-lost-a-big-tv-brand-to-web-app-based-titan-os/),
+  [Expert Reviews, Titan OS](https://www.expertreviews.co.uk/technology/tvs-home-cinema/titan-os-hands-on-preview)

@@ -143,6 +143,49 @@ scenery: the peaks, the volcano and the misty hills overlap the digits, and on t
 floats with its reflection under the water. Or pick the Classic look, your own photos, or
 [a scene you design yourself](docs/MAKE-A-SCENE.md).
 
+## The easy way: couch-tv Setup
+
+A free app for Mac and Windows that puts couch-tv's home screen on a **Google TV, Android TV or
+Fire TV** with no command line and no AI agent. It opens a page in your browser and walks you
+through it: Developer options with the TV remote, a 6 digit code (Google TV on Android 12 or newer)
+or one Allow press (Android TV, and Google TV on Android 11), then it installs couch-tv from this
+repo's Releases, checks it, sets it up the way `apply.sh` does (option A), and can add the phone
+remote. It shows the plan and waits for your yes before it changes anything, and it can undo all of
+it. Download it from [the Releases page](https://github.com/Seagey/couch-tv/releases) (the Mac zip
+and the Windows zip); how to open it the first time: [setup-app/README.md](setup-app/README.md).
+
+If the TV never shows "Allow USB debugging?", the app walks you through the fixes one at a time,
+and if the TV still says no, it shows how to put couch-tv on with just your phone instead.
+
+**Other TVs, not through this app** (each has its own way, most with a computer at home that stays on):
+
+| TV system | How |
+|---|---|
+| **Samsung (Tizen)** | [docs/SAMSUNG.md](docs/SAMSUNG.md) |
+| **LG (webOS)** | [docs/LG.md](docs/LG.md) |
+| **Roku OS** (Roku TVs and sticks) | [docs/ROKU.md](docs/ROKU.md) |
+| **VIDAA** (Hisense's own system) | [docs/VIDAA.md](docs/VIDAA.md) |
+| **Apple TV (tvOS)** | [docs/APPLE-TV.md](docs/APPLE-TV.md) |
+| **Fire TV on Vega OS** (Fire TV Stick 4K Select, Fire TV Stick HD 2026, Fire TV Stick 4K 3rd gen) | [docs/FIRE-VEGA.md](docs/FIRE-VEGA.md) |
+| **Panasonic with My Home Screen** | [docs/PANASONIC.md](docs/PANASONIC.md) (Panasonic's Fire TV and Google TV models work with this app) |
+| **TiVo OS** on any brand | [docs/TIVO.md](docs/TIVO.md) |
+| **Philips with Titan OS or Saphi** | [docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md), [docs/PHILIPS-SAPHI.md](docs/PHILIPS-SAPHI.md) (Philips Google TV and Android TV models work with this app) |
+
+A Google TV box (for example the Google TV Streamer) plugged into any of these gets everything.
+Android 6 and 7.0 TVs (for example the Xiaomi Mi TV 4A with PatchWall) are set up from a computer
+with the steps below; the app says so before it changes anything.
+
+The Fire TV setup builds on couch-tv-setup by killy10o10.
+
+### Community tools
+
+Made by people outside this repo, not checked by us after the version named:
+- [couch-tv-setup](https://github.com/killy10o10/couch-tv-setup) by killy10o10: a setup app for
+  couch-tv's "lives on the TV" app on Fire TV sticks, with an optional switch off for Amazon's
+  advert and tracking apps (we reviewed v0.1.2: [setup-app/REVIEW-killy10o10.md](setup-app/REVIEW-killy10o10.md)).
+
+## Setting it up with an AI agent
+
 <p align="center">
   <img src="docs/screens/home-night.jpg" alt="Night" width="32%">
   <img src="docs/screens/home-golden.jpg" alt="Golden hour" width="32%">
@@ -358,6 +401,9 @@ Everything else: [docs/](docs/README.md).
 - The Bluetooth and Network buttons, Amazon YouTube support and the Fire TV Stick guide came from
   the [killy10o10 fork](https://github.com/killy10o10/couch-tv); the unpaired TV guard from the
   [Justin1491 fork](https://github.com/Justin1491/couch-tv).
+- couch-tv Setup (`setup-app/`): the Fire TV setup builds on
+  [couch-tv-setup](https://github.com/killy10o10/couch-tv-setup) by killy10o10 (MIT); the reused
+  parts and their notice are in `setup-app/THIRD-PARTY.md`.
 
 ## Shout me a coffee
 
