@@ -2,9 +2,17 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.7**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.8**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 20 November 2026: release 0.13.8, Home settings pages open at the top
+
+0.13.8 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). One fix from testing 0.13.7 on a real TCL Android TV. Option C: install the new on-TV APK over the old one. Samsung: run the new `couch-tv-samsung-setup.zip` installer again. Option B: `git pull` and restart the bridge.
+
+- **Home settings pages open at the top:** on the TCL, the Update couch-tv page opened scrolled to its first button, so the version line and step 1 were off the top and Up could not reach them. Now a page whose first button fits opens at the top, and Up or Down with no row to move to scrolls the hidden lines into view instead of going round to the other end. A redraw while you read leaves the list where you put it. Checked in a browser, not yet on the TCL again.
+- **The tip for a hidden gear:** on designs where the gear is hidden until reached, the home's tip says Up or Right to the edge again.
+- **Updating from 0.13.7 with the on-TV app:** the 0.13.7 page you update from still opens scrolled down, so its step 1 may be off the top: press Home, then open Downloader from your apps.
 
 ### 20 November 2026: release 0.13.7, Hold OK on a TCL, the gear by arrow, and Samsung updates
 
