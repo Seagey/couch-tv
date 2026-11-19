@@ -46,6 +46,25 @@ OUT = os.path.join(ROOT, "build", "samsung")
 RELEASE_DIR = "couch-tv for Samsung"
 
 
+def web_ignore(release=False):
+    """shutil.copytree's ignore for tv-home/web: the mock bridge and dotfiles anywhere, and the Loop
+    look's folder at the top (loop/, up to 80 MB of footage and stills from scripts/make-loop.sh, git
+    ignored). The Samsung app reads the loop from the bridge's /tv/loop/, so nothing in it is ever
+    needed here. A release (`release`) also leaves out backgrounds/mine, the photos of this computer's
+    own home, so the file everyone downloads never carries them."""
+    by_pattern = shutil.ignore_patterns("mock.js", ".*")
+
+    def ignore(folder, names):
+        out = set(by_pattern(folder, names))
+        here = os.path.abspath(folder)
+        if here == os.path.abspath(WEB) and "loop" in names:
+            out.add("loop")
+        if release and here == os.path.abspath(os.path.join(WEB, "backgrounds")) and "mine" in names:
+            out.add("mine")
+        return out
+    return ignore
+
+
 def couch_version():
     """couch-tv's version (the TV home's versionName), also the Samsung app's version."""
     with open(GRADLE) as f:
@@ -70,7 +89,7 @@ def main():
     stage = os.path.join(OUT, "app")
     if os.path.isdir(stage):
         shutil.rmtree(stage)
-    shutil.copytree(WEB, stage, ignore=shutil.ignore_patterns("mock.js", ".*"))
+    shutil.copytree(WEB, stage, ignore=web_ignore(a.release))
     for name in os.listdir(os.path.join(HERE, "app")):
         shutil.copy(os.path.join(HERE, "app", name), stage)
     shutil.copy(ICON, os.path.join(stage, "icon.png"))

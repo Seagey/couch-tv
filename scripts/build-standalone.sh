@@ -8,7 +8,8 @@
 #
 # Then deploy the folder to a static host, for example: cd build/standalone && npx vercel deploy --prod
 # The site is public to anyone who has its address (it sends noindex, so search engines skip it), and
-# it carries everything in tv-home/web, including your own photos in backgrounds/mine.
+# it carries everything in tv-home/web, including your own photos in backgrounds/mine and the Loop
+# look's posters in loop/ (stills of the photo make-loop.sh was given).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${1:-$ROOT/build/standalone}"
@@ -21,7 +22,14 @@ if [ -d "$OUT" ] && [ -n "$(ls -A "$OUT" 2>/dev/null)" ] && [ ! -f "$OUT/.couch-
   exit 1
 fi
 mkdir -p "$OUT"
-rsync -a --delete --exclude '.couch-standalone' --exclude '.vercel/' --exclude 'config.js' --exclude '.DS_Store' "$ROOT/tv-home/web/" "$OUT/"
+# loop/: only the posters (loop/*.jpg) come along, as in the launcher's own copy. The footage (up to
+# 80 MB, scripts/make-loop.sh) is the bridge's to stream, never the site's to hold, and the cut-outs
+# (loop/*-fg.png) and loop.json stay out too: config.js below turns the cut-out off, so nothing asks
+# for them, and a public site carries no more of the photo than it shows. rsync --delete never removes
+# a file an exclude covers, so loop/ is cleared first: a cut-out an older build copied does not linger.
+rm -rf "$OUT/loop"
+rsync -a --delete --exclude '.couch-standalone' --exclude '.vercel/' --exclude 'config.js' --exclude '.DS_Store' \
+  --include '/loop/*.jpg' --exclude '/loop/*' "$ROOT/tv-home/web/" "$OUT/"
 
 # config.js: the settings the bridge would hand the page, less what only the bridge uses, plus the
 # standalone switch app.js reads. No keys and no TV addresses go in, and the weather's place is rounded
@@ -39,6 +47,12 @@ for k in ("lat", "lon"):
     if isinstance(w.get(k), (int, float)):
         w[k] = round(w[k], 2)
 c["weather"] = w
+# the Loop look's cut-out stays on the bridge computer (the rsync above leaves loop/*-fg.png and
+# loop.json out), so the page must not ask for it: no depth, no loop numbers
+home = dict(c.get("home") or {})
+if isinstance(home.get("loop"), dict):
+    home["loop"] = dict(home["loop"], fg=False, meta=None)
+    c["home"] = home
 with open(sys.argv[1], "w") as f:
     f.write("window.COUCH_CONFIG = " + json.dumps(c) + ";\nwindow.COUCH_STANDALONE = true;\n")
 EOF
@@ -60,4 +74,4 @@ cat > "$OUT/vercel.json" <<'EOF'
 EOF
 : > "$OUT/.couch-standalone"
 echo "built the standalone home in $OUT ($(du -sh "$OUT" | cut -f1))"
-echo "anyone with the site's address sees what is in it: your people's names, any kids PIN's hash (use a PIN you use nowhere else) and backgrounds/mine"
+echo "anyone with the site's address sees what is in it: your people's names, any kids PIN's hash (use a PIN you use nowhere else), backgrounds/mine and loop/ (stills of the photo your Loop look was made from)"

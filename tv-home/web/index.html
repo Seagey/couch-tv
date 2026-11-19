@@ -16,6 +16,8 @@
 <!-- Night look only: five scenes that take turns (photo, glass clock, the cut-out in front), built by app.js -->
 <!-- the video background, when one is set (Home settings, Look): app.js starts it, app.css shows it
      once it plays. Over the photo, under the scenes' clocks (their photos step aside for it). -->
+<!-- the Loop look (home.look "loop"): app.js puts its two <video> elements and the glass container in by itself,
+     the sharp clip first in the body and the glass just after the scrim; nothing of it is here in the other looks -->
 <video class="bgvid" id="bgvid" muted loop playsinline preload="none" aria-hidden="true"></video>
 <div class="scenes" id="scenes" aria-hidden="true"></div>
 <!-- Ambient Weather & Solar Celestial Lighting Overlays -->
@@ -102,7 +104,8 @@
 
   <section class="apps" id="apps-section" aria-label="Apps">
     <p class="hint" id="hint" aria-live="polite"></p>
-    <div class="grid" id="grid"></div>
+    <!-- the Loop look: More apps scrolls the grid by whole rows inside this plain rectangular clip (app.css) -->
+    <div class="grid-clip" id="grid-clip"><div class="grid" id="grid"></div></div>
   </section>
 </main>
 

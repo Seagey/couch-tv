@@ -57,7 +57,7 @@ The round buttons at the top right of the home. Any of these, in the order you l
 |---|---|---|
 | `sleep` | Sleep timer: 15, 30, 60 or 90 minutes, then the TV turns off. With `bedtime_dim` on, the couch-tv home dims into a warm bedtime amber during the final 15 minutes. With no bridge, the TV launcher app keeps the timer and opens the screensaver at the end. | The bridge or the TV launcher app |
 | `picture` | Flips between the TV's two picture modes in `picture.modes`. | The bridge, ADB, and a `picture` entry |
-| `look` | Cycles the home through the Night scenes, OLED (the Classic grid on pure black) and the Classic look. This TV remembers the choice. | Nothing |
+| `look` | Cycles the home through the Night scenes, OLED (the Classic grid on pure black), the Classic look and Loop ([LOOP.md](LOOP.md); with no loop files yet it shows its scrim over a dark ground). This TV remembers the choice. | Nothing |
 | `soundscape` | Ambient sleep sounds: each press goes Gentle rain, Fireplace, Ocean waves, Brown noise, off. Made on the TV itself with Web Audio, so there are no sound files and nothing to download. It plays only after someone presses it, stops when an app or the screensaver comes in front, fades over the last 15 minutes of a sleep timer and stops when the timer runs out. Not in the default buttons. | Nothing |
 | `headphones` | Opens the TV's own Bluetooth settings screen, where headphones are paired and picked. Nothing is read from the request and no device addresses leave the bridge. Not in the default buttons. | The bridge and ADB, or the TV home launcher or on-TV app |
 | `screen_off` | Audio-only / Screen off mode: turns off the display (pitch black canvas for OLEDs and drops hardware backlight on Android TV) while sleep soundscapes, Spotify, and sleep timers keep playing in the dark. Pressing any button on the remote wakes the screen and is absorbed so no unwanted actions occur. | Nothing |
@@ -139,8 +139,19 @@ out the same way. The phone's People sheet keeps these marks when it renames or 
   On a Fire TV the bridge knows Amazon's builds of YouTube, Prime Video and HBO Max (other package
   names than the Google TV ones), so it opens the one the TV has and their shows reach Keep watching.
   YouTube videos are kept as a list of their own that the home shows only for the YouTube tile, never
-  in the shared row or the household's taste: a video is written by the name YouTube gave it, with no
-  picture, and opening it searches YouTube for that name.
+  in the shared row or the household's taste: a video is written by the name YouTube gave it (and the
+  channel and length the app reported). Opening it plays the exact video when YouTube's public
+  results page is sure of it from the title and the channel or the length, resumed from the
+  account's own history; otherwise (unsure, or a line with neither channel nor length) it searches
+  YouTube for the name. Once the video is found the card shows YouTube's own thumbnail for it, which
+  the TV fetches straight from YouTube's image host, the way it already fetches JustWatch posters;
+  the found id is kept in `bridge/data/video-ids.json` with the video's length, so a bridge restart
+  does not lose it, and a channel's second video of the same title (another length) is looked up
+  afresh and kept beside the first rather than given its id. The bridge fetches YouTube's results page two at a
+  time at most, and a video the lookup stays unsure of is asked about less and less often (ten
+  minutes, then twice as long each time, up to once a day) while its card sits in the row. A live
+  stream's card says so: the Loop look's row shows "YouTube · Live" under it. The thumbnail on a real
+  TV's screen is not yet tested; the lookup and the watch link are (a Fire TV Cube).
 - **With no computer (option A),** Keep watching is Android's own Watch Next list, plus the
   Continue Watching channel of apps that put nothing in Watch Next but keep a home screen row of
   their own instead: so far Stremio. Both are read the same read only way, with no account and no
@@ -271,7 +282,8 @@ release opens the app rather than the show.
 
 | Key | What it does |
 |---|---|
-| `look` ["night"] | `night`: the scenes with the big glass clock. `oled`: the Classic grid of app banners on pure black (no photo, no video, no scenes), with a glowing focus ring and a one or two pixel nudge of the home once a minute against burn-in. Night and Classic are unchanged, and nothing goes black unless this is chosen. `classic`: your photos (or five built in) behind a grid of app banners, changing every 90 seconds unless `keep_photo` is on. The `look` quick button cycles Night, OLED and Classic on each TV, and `?theme=` overrides them for a preview. |
+| `look` ["night"] | `night`: the scenes with the big glass clock. `loop`: one video of a place, graded for dawn, day, dusk and night, under a centred clock, bare thumbnails and a dock with no bar; option B only, and it needs the footage made by `scripts/make-loop.sh` ([LOOP.md](LOOP.md)). `oled`: the Classic grid of app banners on pure black (no photo, no video, no scenes), with a glowing focus ring and a one or two pixel nudge of the home once a minute against burn-in. Night and Classic are unchanged, and nothing goes black unless this is chosen. `classic`: your photos (or five built in) behind a grid of app banners, changing every 90 seconds unless `keep_photo` is on. The `look` quick button cycles Night, OLED, Classic and Loop on each TV, whether or not the loop files are there, and `?theme=` overrides them for a preview. A couch-tv Studio `design` is not drawn in the Loop look; it shows again in the other looks. |
+| `loop` (read only) | Built by the bridge, not read from `config.json`: `{"variants": [...], "blur": true, "version": "...", "meta": {...}, "fg": true}`, the Loop look's variants whose `.mp4` is in `tv-home/web/loop/` (in the order `dawn`, `day`, `dusk`, `night`), whether every one of them has its blurred glass copy, a mark of the files that the home puts on their addresses, `meta` the folder's `loop.json` (the loop's length and motion, or null), and `fg` true when `meta` has the cut-out's rectangle and every variant has its `-fg.png` (the clock behind the peak). The bridge reads the folder afresh on every request, so after `scripts/make-loop.sh` no restart is needed. Empty when there are no files; when `look` here is `loop`, the bridge also says so once in its log as it starts (a Loop look picked on the TV logs nothing). [LOOP.md](LOOP.md). |
 | `scenes` [all five] | Which Night scenes take turns, and in what order. Any of `night`, `golden`, `water`, `fog`, `dawn`, and the ids of your own scenes. One scene stays put. |
 | `my_scenes` [none] | Your own scenes from any photo, each with its clock designed: where it sits, its size and font, the date above or below it, light or dark text, `cutout` for the skyline in front of the clock, and `video` for a looping clip behind it. Made with `tv-home/tools/make-scene.py`; [MAKE-A-SCENE.md](MAKE-A-SCENE.md) has every key. They take turns after the scenes in `scenes` unless they are listed there. Option A needs the app rebuilt with the scene's pictures inside (that guide says how). |
 | `scene_seconds` [20] | How long each scene shows. 5 or more. |
@@ -296,7 +308,7 @@ release opens the app rather than the show.
 | `clock_style` [`frosted`] | The Night look's clock: `frosted` (the photo's frosted copy, as before) or `liquid` (clear glass digits that bend the photo behind them a little, with a bright rim and a soft edge). Home settings, Look, Clock style wins over it. |
 | `wx_unit` [`c`] | The weather's temperature unit: `c` (Celsius) or `f` (Fahrenheit). Home settings, Weather, Units wins over it. |
 | `video_url` [none] | A looping, muted video background in place of the photo, in both looks: the address of an MP4 or MOV (`https://...`, or `http://` for a computer at home). Given here it is on; Home settings, Look switches it off or changes the link. The photo stays if the clip does not play. |
-| `sun_sync` [`false`] | Follow the sun. `true` picks the Night look's scene from the sun's height at `weather.lat` and `weather.lon`: Dawn in the morning twilight, Waterline in the day (Fog when the weather is overcast or rainy), Golden hour in the evening and Night after dark, instead of rotating every `scene_seconds`. A scene you switched off is skipped. With no place set it goes by the clock. Home settings, Look, Scenes, Follow the sun wins over it (ekagra-codes, #57). |
+| `sun_sync` [`false`] | Follow the sun. `true` picks the Night look's scene from the sun's height at `weather.lat` and `weather.lon`: Dawn in the morning twilight, Waterline in the day (Fog when the weather is overcast or rainy), Golden hour in the evening and Night after dark, instead of rotating every `scene_seconds`. A scene you switched off is skipped. With no place set it goes by the clock. In the Loop look it picks the loop's variant the same way (night below -6 degrees, dawn while the sun rises to +10, day above, dusk as it sets back to -6), cutting at the loop's wrap; off, the Loop look shows `day` all day ([LOOP.md](LOOP.md)). Home settings, Look, Scenes, Follow the sun wins over it (ekagra-codes, #57). |
 | `sun_rotate_minutes` [`25`] | With `sun_sync` on and own scenes tagged with `when` (see [MAKE-A-SCENE.md](MAKE-A-SCENE.md)), how long each scene of the current time of day stays before the next one in that group takes its turn, 5 to 240. Without any tagged scene nothing changes. |
 | `date_bars` [`false`] | `true` puts a thin vertical bar between the day, the place and the weather on the Night look's date line, in place of the dots (`Monday 16 November │ Sydney │ 17° Cloudy`). Off, the line is exactly as before. |
 | `ambient_weather` [`false`] | Soft rain, snow, fog and thunderstorm effects drawn over the Night look's scenes when Open-Meteo reports that weather for your place. Off unless you switch it on. It also needs Weather on, stops while an app or Settings is open, and never runs under Lighter home or on an old WebView. Home settings, Weather, Ambient weather effects wins over it (ekagra-codes, #88). |
@@ -319,7 +331,8 @@ release opens the app rather than the show.
 
 Optional, top level, beside `home`. couch-tv Studio (a website for designing this home) writes it:
 download your design there and paste its `design` key into `config.json`. It is laid over the Night
-home by `tv-home/web/design.js`. **Without a `design` key the home is exactly as before.** Every
+home by `tv-home/web/design.js`. The Loop look draws no design (its loop is the background); pick
+another look to see it. **Without a `design` key the home is exactly as before.** Every
 value is checked on the TV, and anything it does not understand is left out.
 
 **A design is treated as untrusted.** Before anything is drawn, the home rebuilds it from an

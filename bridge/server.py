@@ -832,6 +832,20 @@ SEARCH_LINKS = {
     "youtube": "https://www.youtube.com/results?search_query={q}",
 }
 
+# The same, for a build of the app that wants another link: Amazon's YouTube on a Fire TV takes the
+# web results link but shows its home, and opens its results page for the link Alexa's own voice
+# search sends it (youtube://search?query=..., with or without &isVoice=true, with or without the
+# BROWSABLE category; its results page takes about ten seconds to draw). Tested on a Fire TV Cube,
+# Fire OS 7.7, YouTube 24.40, cold and already open.
+SEARCH_LINKS_BY_PACKAGE = {
+    "com.amazon.firetv.youtube": "youtube://search?query={q}",
+}
+
+
+def search_link(app, pkg):
+    """The search link for this app as this TV has it: the build's own if it needs one, else the app's."""
+    return SEARCH_LINKS_BY_PACKAGE.get(pkg) or SEARCH_LINKS.get(app["id"])
+
 
 # Apps not on JustWatch that open a title's page by its IMDb id, tested on this TV (DEEPLINKS.md).
 # Nuvio takes only the show or film: "nuvio://series/tt22202452:1:8" is read as one id and fails.
@@ -866,7 +880,7 @@ async def search_in_app(app, title, best=None):
                 return "deeplink", f"Opened the {title} page in {app['name']}."
         except Exception as e:
             log.warning("title link failed for %s: %s", app["id"], e)
-    link = SEARCH_LINKS.get(app["id"]) if tv.kind == "android" else None
+    link = search_link(app, pkg) if tv.kind == "android" else None
     if link:
         await tv.start_intent(link.format(q=quote(title)), pkg)
         if await tv.wait_for_app({pkg}, timeout=8):
@@ -2242,6 +2256,19 @@ def static_handler(folder, name):
             etag = f"{st.st_mtime_ns:x}-{st.st_size:x}"
             if static_not_modified(request, etag, st.st_mtime):
                 return web.Response(status=304, headers={**headers, "ETag": '"%s"' % etag})
+        # FileResponse answers a Range request by itself (aiohttp 3.14): 206 with Content-Range and
+        # Accept-Ranges: bytes for one byte range (a start and end, a suffix, or open ended), 416
+        # with "bytes */<size>" for a range past the end, a malformed one or several at once, and
+        # HEAD the same way with no body. The Loop look's video (tv-home/web/loop/) depends on it:
+        # the WebView's media player seeks with Range, and a seek at the loop's wrap must not fetch
+        # the whole file again. Pinned by tests/test_loop_serving.py. Media is never compressed,
+        # so a partial answer is always plain bytes.
+        # Two corners aiohttp leaves as they are, accepted here: If-Range is honoured only in its
+        # date form (an entity tag in it is not compared, so a Range request with a stale tag still
+        # gets 206 of the new file; RFC 9110 wants the whole file), and an unknown range unit
+        # ("bits=0-9") gets 416 where the RFC says to ignore the header. The tag case needs
+        # make-loop.sh re-run while the TV plays, and Chromium's media loader compares each 206's
+        # validators and starts the load again when they change, so no splice was seen.
         resp = web.FileResponse(target, headers=headers)
         if ctype in COMPRESSIBLE_TYPES:
             resp.enable_compression()   # only when the page says it accepts it
@@ -2265,6 +2292,18 @@ def static_not_modified(request, etag, mtime):
 # The TV app copies these files into its own storage, so its home still works with the computer off.
 # The fingerprint changes whenever any file changes; the TV only copies when it does.
 OFFLINE_SKIP = ("mock",)
+
+
+def offline_skips(rel):
+    """True for a file the offline copy leaves out: the mock bridge, and the Loop look's video
+    (loop/*.mp4, up to 80 MB), which the bridge streams. The rest of loop/ is small and stays in:
+    the posters (loop/*.jpg, a few hundred KB in all), so a Loop home with the computer off shows a
+    still of its loop, the cut-outs (loop/*-fg.png, tens of KB), so the clock stays behind the
+    peak over that still instead of dropping and jumping back up when the picture is missing, and
+    loop.json (docs/LOOP.md)."""
+    return rel.startswith(OFFLINE_SKIP) or (rel.startswith("loop/") and rel.endswith(".mp4"))
+
+
 async def h_tv_manifest(request):
     import hashlib
     files, h = [], hashlib.sha256()
@@ -2272,7 +2311,7 @@ async def h_tv_manifest(request):
         for n in sorted(names):
             full = os.path.join(dirpath, n)
             rel = os.path.relpath(full, LAUNCHER_DIR).replace(os.sep, "/")
-            if n.startswith(".") or rel.startswith(OFFLINE_SKIP):
+            if n.startswith(".") or offline_skips(rel):
                 continue
             st = os.stat(full)
             files.append({"path": rel, "size": st.st_size})
@@ -2615,7 +2654,7 @@ def clean_settings(s):
         out["wx_unit"] = s["wx_unit"]
     if s.get("wx_every") in (15, 30, 60):
         out["wx_every"] = s["wx_every"]
-    if s.get("look") in ("night", "oled", "classic"):
+    if s.get("look") in config.LOOKS:
         out["look"] = s["look"]
     idle_photo_seconds = s.get("idle_photo_seconds")
     if type(idle_photo_seconds) is int and idle_photo_seconds in (0, 5, 10, 15, 30, 60):
@@ -3050,13 +3089,33 @@ def continue_videos(who=None):
     """The YouTube videos this person watched on this TV (store.keep_videos): one card per title, newest
     first, up to 10, within 30 days, minus the ones removed by hand. A list of its own, next to Keep
     watching's "items", so the home can show it for the YouTube tile alone and never in the shared row.
-    The card's app is YouTube's installed build (Amazon's on a Fire TV), like any item's."""
+    The card's app is YouTube's installed build (Amazon's on a Fire TV), like any item's.
+
+    A video whose id is known (store.video_id, found by the lookup and kept on disk) carries it as
+    "video_id" and YouTube's own thumbnail for it as "backdrop" (video_thumbnail; the page draws the
+    backdrop first, and the TV fetches it straight from YouTube's image host, as it does JustWatch's
+    posters). Without one, and with the channel or the length to be sure by, the lookup is started
+    in the background (_video_lookup, never awaited here: this is a plain function called from the
+    handler) unless it said unsure lately or is already running, so the next fetch of the row has the
+    picture. A line with neither channel nor length keeps no picture and starts no lookup. A line
+    log_seen marked live (a channel and no length) carries "live": true, so the card can say so;
+    every other card carries "live": false."""
     who = who or cur_who()
     app = apps.describe_package(pkg_of(apps.BY_ID["youtube"]))
-    return [{"id": h["id"], "title": h["title"], "episode_title": None, "season": None, "episode": None,
-             "app": app, "service": "youtube", "poster": None, "backdrop": None, "progress": None,
-             "kind": "video", "last_played": h.get("when"), "source": "bridge"}
-            for h in store.keep_videos(_current.get(), who)]
+    cards = []
+    for h in store.keep_videos(_current.get(), who):
+        video_id = None
+        if h.get("channel") or h.get("duration_ms"):
+            video_id = store.video_id(h["title"], h.get("channel"), h.get("duration_ms"))
+            if not video_id and not _video_unsure_lately(h["title"], h.get("channel"), h.get("duration_ms"),
+                                                         backoff=True):
+                _video_lookup(h["title"], h.get("channel"), h.get("duration_ms"))
+        cards.append({"id": h["id"], "title": h["title"], "episode_title": None, "season": None, "episode": None,
+                      "app": app, "service": "youtube", "poster": None,
+                      "backdrop": video_thumbnail(video_id) if video_id else None, "progress": None,
+                      "kind": "video", "live": h.get("live") is True, "last_played": h.get("when"), "source": "bridge",
+                      "video_id": video_id})
+    return cards
 
 
 def request_base(request):
@@ -3247,32 +3306,169 @@ async def h_continue(request):
     return ok(items=continue_items(who, request_base(request)), videos=continue_videos(who))
 
 
+# How long an OK press on a video card waits for the video's id. The lookup was warmed when the
+# line was written, so it is usually remembered; a fresh one goes to YouTube's results page up to
+# three times (move.LOOKUP_TRIES, 10 s each), and the card must not sit on that.
+OPEN_VIDEO_LOOKUP_S = 15
+# How long an unsure answer is remembered. move only remembers a found id, and an unsure lookup
+# costs three fetches and 2 s at least (15 s when YouTube is slow), which an OK press must not pay
+# again and again for a video the results page does not list the same way.
+VIDEO_UNSURE_KEEP_S = 10 * 60
+# The row (continue_videos) waits longer each time the same video comes back unsure: twice as long
+# as the time before, up to a day. A video the results page never lists the same way, or a home
+# whose every fetch meets a consent page, is then asked about a few times a day, not every ten
+# minutes for the 30 days it stays in the row. An OK press keeps the short wait above.
+VIDEO_UNSURE_MAX_S = 24 * 3600
+# YouTube's own thumbnail for a video, public, 320x180 and 16:9 with no black bars (hqdefault.jpg
+# is 4:3 with bars, and maxresdefault.jpg is not there for every video). The TV fetches it straight
+# from YouTube's image host, as it already fetches JustWatch's posters from theirs.
+VIDEO_THUMBNAIL = "https://i.ytimg.com/vi/{id}/mqdefault.jpg"
+_video_tasks = {}    # (title, channel, length) -> the lookup task while it runs
+_video_unsure = {}   # (title, channel, length) -> (when the lookup last said unsure, how many times in a row)
+
+
+def _video_key(title, channel, duration_ms=None):
+    """A video the way the lookup tells them apart: its title, its channel and its length in whole
+    seconds (None without one), since a channel can put out two videos of one title."""
+    return (move._norm(title), move._norm(channel), store._length_s(duration_ms))
+
+
+def video_thumbnail(video_id):
+    """The picture a video card shows, YouTube's own thumbnail for the id (VIDEO_THUMBNAIL), or None
+    for anything not shaped like an id, so nothing else ever reaches the link."""
+    if not move.YOUTUBE_ID.fullmatch(str(video_id or "")):
+        return None
+    return VIDEO_THUMBNAIL.format(id=video_id)
+
+
+def _video_unsure_hold(tries):
+    """How long the row leaves a video alone after `tries` unsure answers in a row: VIDEO_UNSURE_KEEP_S,
+    doubled for each one after the first, up to VIDEO_UNSURE_MAX_S."""
+    return min(VIDEO_UNSURE_KEEP_S * 2 ** min(max(tries, 1) - 1, 20), VIDEO_UNSURE_MAX_S)
+
+
+def _video_unsure_lately(title, channel, duration_ms=None, backoff=False):
+    """True while the lookup's last unsure answer for this video is younger than VIDEO_UNSURE_KEEP_S,
+    or with `backoff` (the row) younger than _video_unsure_hold of the unsure answers in a row."""
+    mark = _video_unsure.get(_video_key(title, channel, duration_ms))
+    if not mark:
+        return False
+    when, tries = mark if isinstance(mark, tuple) else (mark, 1)
+    hold = _video_unsure_hold(tries) if backoff else VIDEO_UNSURE_KEEP_S
+    return time.time() - when < hold
+
+
+def _video_lookup(title, channel, duration_ms):
+    """The task that finds the video's id (move.youtube_video_id), one per title and channel at a
+    time: log_seen starts it as soon as the line is written, continue_videos starts it for a card
+    without a picture, and an OK press that comes while it runs waits on the same task instead of
+    starting a second lookup. The loop keeps only weak references to tasks, so _video_tasks holds
+    it until it is done. The task gives the id, or None when the lookup was unsure or failed (no
+    network, a consent page: logged at debug level only), and an unsure answer is remembered in
+    _video_unsure with how many came in a row (_video_unsure_lately). A found id is kept on disk
+    with the length (store.remember_video_id), and an id already there for that length is given
+    back at once as a done future: no task, no network."""
+    key = _video_key(title, channel, duration_ms)
+    task = _video_tasks.get(key)
+    if task is not None and not task.done():
+        return task
+    known = store.video_id(title, channel, duration_ms)
+    if known:
+        done = asyncio.get_running_loop().create_future()
+        done.set_result(known)
+        return done
+
+    async def look():
+        try:
+            video = await move.youtube_video_id(title, channel, duration_ms)
+        except Exception as e:
+            log.debug("video lookup for %s failed: %s", title, e)
+            video = None
+        if video:
+            _video_unsure.pop(key, None)
+            try:
+                store.remember_video_id(title, channel, video, duration_ms)
+            except Exception as e:
+                log.warning("could not keep the video id for %s: %s", title, e)
+        else:
+            prior = _video_unsure.get(key)
+            _video_unsure[key] = (time.time(), 1 + (prior[1] if isinstance(prior, tuple) else 0))
+        log.debug("video lookup for %s: %s", title, video or "unsure")
+        return video
+
+    def forget(t):
+        if _video_tasks.get(key) is t:
+            del _video_tasks[key]
+
+    task = asyncio.ensure_future(look())
+    _video_tasks[key] = task
+    task.add_done_callback(forget)
+    return task
+
+
+async def _find_video(title, channel, duration_ms, timeout):
+    """The video's id for an OK press, or None: at once from disk when an earlier lookup found it
+    (store.video_id), at once None when the lookup said unsure in the last VIDEO_UNSURE_KEEP_S (not
+    the row's longer wait: a press asks again after that), else from the lookup (the warm up still
+    running, or a fresh one) within `timeout`. Past that the lookup runs on by itself, for the next
+    press, and this one goes without."""
+    known = store.video_id(title, channel, duration_ms)
+    if known:
+        return known
+    if _video_unsure_lately(title, channel, duration_ms):
+        return None
+    try:
+        return await asyncio.wait_for(asyncio.shield(_video_lookup(title, channel, duration_ms)), timeout=timeout)
+    except Exception as e:
+        log.info("video lookup for %s gave nothing: %s: %s", title, type(e).__name__, e)
+        return None
+
+
 async def open_video(h):
-    """A video card opens YouTube's installed build on a search for the video's name: never through
-    play() and the show finder (a video's name matched to a film would open the film, issue #23), and
-    with no stored link (the media session gives the title, not the video's id). Amazon's YouTube on
-    a Fire TV Cube lists https://www.youtube.com links in its intent filter (read with dumpsys package:
-    VIEW, BROWSABLE, www.youtube.com); opening the search link there has not been tried on a real Fire
-    TV yet. Where the link does not take, the app itself opens."""
+    """A video card opens the exact video when it can, else YouTube's search for its name, else the
+    app. Never through play() and the show finder (a video's name matched to a film would open the
+    film, issue #23). The media session gives the title, the channel and the length, not the video's
+    id, so the id comes from YouTube's public results page (move.youtube_video_id, the move feature's
+    lookup, no key and no sign in): a sure match on the title and the channel or the length, or
+    "unsure", because a wrong video is worse than none. A sure id goes to the installed build as its
+    watch link, and YouTube resumes it from the account's own history (seen on a Fire TV Cube, Amazon's
+    build: the link played that very video from where it was left, 420 s in). Unsure, or a link that
+    does not take: the search link this build takes (search_link: Amazon's YouTube wants
+    youtube://search?query=, the web results link only opens its home), then the app itself. A line
+    with neither channel nor length (written before they were kept, or from a session that gave
+    neither) goes straight to the search: a title alone cannot be sure of the video."""
     from urllib.parse import quote
     app = apps.BY_ID["youtube"]
     pkg = pkg_of(app)
     title = h["title"]
-    method = None
+    method = video_id = None
     if tv.kind == "android":
-        try:
-            await tv.start_intent(SEARCH_LINKS["youtube"].format(q=quote(title)), pkg)
-            if await tv.wait_for_app({pkg}, timeout=8):
-                method = "search"
-        except Exception as e:
-            log.warning("YouTube search link failed: %s", e)
-    if method == "search":
+        if h.get("channel") or h.get("duration_ms"):
+            video_id = await _find_video(title, h.get("channel"), h.get("duration_ms"), OPEN_VIDEO_LOOKUP_S)
+        if video_id:
+            try:
+                await tv.start_intent(move.youtube_link(video_id), pkg)
+                if await tv.wait_for_app({pkg}, timeout=8):
+                    method = "deeplink"
+            except Exception as e:
+                log.warning("YouTube watch link failed: %s", e)
+        if method is None:
+            try:
+                await tv.start_intent(search_link(app, pkg).format(q=quote(title)), pkg)
+                if await tv.wait_for_app({pkg}, timeout=8):
+                    method = "search"
+            except Exception as e:
+                log.warning("YouTube search link failed: %s", e)
+    if method == "deeplink":
+        note = f"Opened {title} in {app['name']}."
+    elif method == "search":
         note = f"Opened {app['name']} search for {title}."
     else:
         await launch_app(app)
         method, note = "app", f"Opened {app['name']}. Search for {title} on the TV."
     note_key, note_vars = _search_note_fields(method, app, title)
     return {"title": title, "service": "youtube", "app": apps.describe_package(pkg), "method": method,
+            "video_id": video_id if method == "deeplink" else None,
             "note": note, **messages.note_fields(note_key, note_vars)}
 
 
@@ -3618,13 +3814,22 @@ async def media_read(pkg, app):
     if pos is not None and pos < 0:
         pos = None
     title, episode_title, source_title = s.get("title"), s.get("subtitle"), "app"
+    # the subtitle as the app sent it, before resolve_episode may swap an episode name in: for a
+    # YouTube video it is the channel (seen on a Fire TV Cube: description=<title>, <channel>, null)
+    s["app_subtitle"] = s.get("subtitle")
     if generic_title(title, pkg, app):   # "PrimeVideo" while a film plays: try the queue's title
         title = s.get("queue_title") if not generic_title(s.get("queue_title"), pkg, app) else None
         if not title:
             episode_title = None
     s["title"] = title
     ep = {}
-    if title:
+    if title and (app or {}).get("id") == "youtube":
+        # a video never goes to the show finder (issue #23): a channel named like a show and a video
+        # named like one of its episodes would come back as that episode, with the show's name swapped
+        # into the title, and the video line, its id lookup and a move would all carry the wrong title.
+        # The session's title and subtitle (the channel) stay as they are.
+        pass
+    elif title:
         ep = await resolve_episode(title, episode_title, (app or {}).get("id") in YEAR_SUBTITLE_APPS)
         # Some apps (Paramount+) send the episode name first and the show second: "A Different
         # Corner, Mobland". Use the field that matched the show, or the poster comes from the wrong one.
@@ -3716,7 +3921,8 @@ async def media_watch_loop():
                     said = (_wn_num(media_now.get("season")), _wn_num(media_now.get("episode")))
                     moved = ours and all(said) and said != (_wn_num(item.get("season")), _wn_num(item.get("episode")))
                     if not ours or moved:
-                        await log_seen(s["title"], s.get("subtitle"), app, dict(media_now))
+                        await log_seen(s["title"], s.get("subtitle"), app, dict(media_now),
+                                       channel=s.get("app_subtitle"), duration_ms=s.get("duration"))
                         if moved:
                             item["season"], item["episode"] = said
                 untitled_step(pkg, app, bool(s and s.get("state") == "PLAYING" and not s.get("title")), pos,
@@ -3902,20 +4108,31 @@ async def h_watch_next_get(request):
               rows=rows)
 
 
-async def log_seen(title, subtitle, app, now=None, who=None, method="seen", poster=None):
+async def log_seen(title, subtitle, app, now=None, who=None, method="seen", poster=None,
+                   channel=None, duration_ms=None):
     """Log a show seen playing, with the season and episode media_read worked out (`now`, a copy of
     media_now), on this TV for the person on the couch here (or `who`, the person picked when it
     played). Only a show of the same name gets the finder's title and picture; a near miss keeps the
     app's own title and no picture. Music and streams are never logged (NOT_KEPT); a YouTube video
-    is written as a video line, by its own name and with no lookup (see NOT_KEPT)."""
+    is written as a video line, by its own name with no show finder (see NOT_KEPT), with the channel
+    (`channel`, the session's own subtitle) and the session's length (`duration_ms`, None for a live
+    stream) that open_video needs to find the exact video. A session with a channel and no length
+    is a live stream, and its line says so ("live": true) for the card. The lookup is warmed in a
+    task of its own (_video_lookup) so the card's open finds it remembered; the watch loop never
+    waits on it. With neither channel nor length there is nothing to be sure by, so no lookup: the
+    card searches."""
     if app.get("id") == "youtube":
         if method != "seen":
             return
         store.add_history({"title": title, "year": None, "type": "video", "poster": None, "backdrop": None,
                            "service": "youtube", "who": who if who is not None else cur_who(),
                            "tv": _current.get(), "season": None, "episode": None, "episode_title": None,
+                           "channel": channel or None, "duration_ms": duration_ms or None,
+                           **({"live": True} if channel and not duration_ms else {}),
                            "when": now_iso(), "method": method})
         log.info("logged video %s on %s (%s)", title, app["name"], method)
+        if channel or duration_ms:
+            _video_lookup(title, channel or None, duration_ms or None)
         return
     if app.get("id") in NOT_KEPT:
         return
@@ -5013,6 +5230,8 @@ def make_app():
                         "Keep watching from Plex is off")
         elif config.PLEX_ERROR:
             log.warning("plex: %s; Keep watching from Plex is off", config.PLEX_ERROR)
+        if config.HOME.get("look") == "loop" and not config.HOME["loop"]["variants"]:
+            log.warning("the Loop look has no files yet: run scripts/make-loop.sh on this computer (docs/LOOP.md)")
         for tv_id, t in TVS.items():
             t.on_change(lambda tv_id=tv_id: with_tv(tv_id, push_now))
             t.on_change(lambda tv_id=tv_id: with_tv(tv_id, _maybe_refresh_installed))

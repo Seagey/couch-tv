@@ -207,15 +207,34 @@ FOUND_KEEP_S = 6 * 3600
 LOOKUP_TRIES = 3
 
 
+# How many fetches of YouTube's results page run at once, for the whole bridge: the YouTube row
+# can start a lookup for every card it shows (ten a person), and each is up to LOOKUP_TRIES
+# fetches, which must not all go out from the home's address together.
+RESULTS_AT_ONCE = 2
+_results_gate = (None, None)   # (the event loop, its asyncio.Semaphore of RESULTS_AT_ONCE)
+
+
+def _results_slot():
+    """The one asyncio.Semaphore every results page fetch waits on, made again for a new event loop
+    (a semaphore that has made a task wait belongs to that loop, and tests run a loop each)."""
+    global _results_gate
+    loop = asyncio.get_running_loop()
+    if _results_gate[0] is not loop:
+        _results_gate = (loop, asyncio.Semaphore(RESULTS_AT_ONCE))
+    return _results_gate[1]
+
+
 async def _results_page(query):
-    """YouTube's results page for a search, or "" when it cannot be had."""
+    """YouTube's results page for a search, or "" when it cannot be had. At most RESULTS_AT_ONCE
+    of these run at a time (_results_slot); the others wait their turn."""
     try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-            async with session.get(YOUTUBE_RESULTS, params={"search_query": query},
-                                   headers={"user-agent": _UA, "accept-language": "en"}) as r:
-                if r.status != 200 or "consent." in str(r.url):
-                    return ""
-                return await r.text()
+        async with _results_slot():
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+                async with session.get(YOUTUBE_RESULTS, params={"search_query": query},
+                                       headers={"user-agent": _UA, "accept-language": "en"}) as r:
+                    if r.status != 200 or "consent." in str(r.url):
+                        return ""
+                    return await r.text()
     except Exception:
         return ""
 
