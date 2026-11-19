@@ -215,6 +215,7 @@
       if (LIGHTER === LOW_END || typeof ST.lighter === "boolean") return;   // already so, or chosen meanwhile
       LIGHTER = LOW_END;
       document.documentElement.classList.toggle("lighter", LIGHTER);
+      if (LOOP) loopLighter();
       if (late) { ambientSync(); movingTiles(); renderShelf(); paintFocus(); }   // else the settings code goes on to do these
     };
     var r = lowEndDecision(o);
@@ -471,8 +472,11 @@
     if (THEME !== "classic" && THEME !== "oled" && THEME !== "loop") THEME = "night";
     setLook(THEME);
     GLASS = glassSetting();
-    document.documentElement.classList.toggle("glass", GLASS !== "off");
-    document.documentElement.classList.toggle("glass-lite", GLASS === "lite");
+    // not in the Loop look: its material is its own (app.css, the Loop section), and the Night glass rules
+    // on html.glass outrank it (a slab behind the dock, a pill behind the date line, the glass tint on the
+    // quick buttons); the Glass setting is kept for the next Night look
+    document.documentElement.classList.toggle("glass", GLASS !== "off" && !LOOP);
+    document.documentElement.classList.toggle("glass-lite", GLASS === "lite" && !LOOP);
     // Lighter home: what was chosen in Home settings, else home.lighter, else on for a WebView with no
     // CSS grid (Android 6 and older, a 1 GB box), where blur, soft shadows and drift make it crawl (#59);
     // with none of those, lowEnd() turns it on by itself on a TV it finds low end.
@@ -1071,6 +1075,7 @@
   var LOOP_DIR = API + "/tv/loop/", LOOP_PHASES = ["dawn", "day", "dusk", "night"];
   var loopVariants = [], loopBlurOn = false, loopCur = "", loopPending = "", loopArmed = false, loopPoster = "", loopOff = false;
   var loopSharp = null, loopBlur = null, loopBox = null, loopMaskKey = null, loopLastT = 0, loopSeekLat = 0, loopSeekAt = 0, loopFirstRow = 0;
+  var loopLoadTimer = 0, loopLoadOne = null;   // the load under way: its 4 s timer and its canplaythrough listener
   function loopFiles(v) {
     return { video: LOOP_DIR + v + ".mp4", blur: LOOP_DIR + v + "-blur.mp4", poster: LOOP_DIR + v + ".jpg", bposter: LOOP_DIR + v + "-blur.jpg" };
   }
@@ -1136,13 +1141,17 @@
     else if (loopPoster) loopSharp.setAttribute("poster", loopPoster);
   }
   // puts a variant on both elements: per element pause, let go of the file (load() frees the codec), the
-  // poster, then the file; one play() for both once each can play through, or after 4 s
+  // poster, then the file; one play() for both once each can play through, or after 4 s. A load that
+  // comes while another is under way (the screen off and on again inside 4 s, a cut right after a
+  // resume) first drops the earlier one's timer and listeners, so its play() cannot start this one early
   function loopLoad(v) {
     loopCur = v; loopPending = ""; loopArmed = false; loopLastT = 0;
-    var f = loopFiles(v), els = [loopSharp, loopBlur].filter(Boolean), ready = 0, started = false, timer = null;
+    var f = loopFiles(v), els = [loopSharp, loopBlur].filter(Boolean), ready = 0, started = false;
+    clearTimeout(loopLoadTimer);
+    if (loopLoadOne) els.forEach(function (el) { el.removeEventListener("canplaythrough", loopLoadOne); });
     var go = function () {
-      if (started) return;
-      started = true; clearTimeout(timer);
+      if (started || loopLoadOne !== one) return;   // done, or a later load took over
+      started = true; clearTimeout(loopLoadTimer); loopLoadTimer = 0; loopLoadOne = null;
       els.forEach(function (el) {
         el.removeEventListener("canplaythrough", one);
         var p = el.play();
@@ -1151,6 +1160,7 @@
       if (loopBlur) loopAlign();
     };
     var one = function () { if (++ready >= els.length) go(); };
+    loopLoadOne = one;
     els.forEach(function (el, i) {
       el.pause();
       el.removeAttribute("src");
@@ -1159,14 +1169,17 @@
       el.addEventListener("canplaythrough", one);
       el.src = i ? f.blur : f.video;
     });
-    timer = setTimeout(go, 4000);
+    loopLoadTimer = setTimeout(go, 4000);
   }
   // once a minute (clock()): the accent, and the variant for this phase. A new one has its posters
-  // decoded now (new Image, decode) and goes on at the next loop boundary (loopTimeUpdate)
+  // decoded now (new Image, decode) and goes on at the next loop boundary (loopTimeUpdate); the
+  // playing one wanted again (Follow the sun switched off before the cut) drops what was pending
   function loopTick() {
     document.documentElement.style.setProperty("--accent", loopAccent());
     var v = loopVariant();
-    if (!loopSharp || !v || v === loopCur || v === loopPending) return;
+    if (!loopSharp || !v) return;
+    if (v === loopCur) { loopPending = ""; loopArmed = false; return; }
+    if (v === loopPending) return;
     loopPending = v; loopArmed = false;
     var f = loopFiles(v), imgs = loopBlur ? [f.poster, f.bposter] : [f.poster], done = 0;
     var fin = function () { if (++done >= imgs.length && loopPending === v) loopArmed = true; };
@@ -1253,6 +1266,13 @@
       out.push({ x: b.left + el.offsetLeft - box.offsetLeft, y: b.top + el.offsetTop - box.offsetTop, w: w, h: h, rx: h / 2 });
     });
     return out;
+  }
+  // Lighter home switched on while the look is up (Home settings, or lowEnd() deciding after the home
+  // drew): the blur copy goes the same way. Switched off again, the glass comes back at the next start
+  // (loopInit reads the setting once), so the page is never asked to make a second decoder on the fly
+  function loopLighter() {
+    if (LIGHTER) loopNoGlass();
+    loopBlurOn = loopBlurOn && !LIGHTER;
   }
   // no blur after all (the file failed, or did not play): no container, no mask, and the buttons take
   // the darker tint (app.css, html without loop-glass)
@@ -4389,7 +4409,7 @@
       } });
     rows.push({ kind: "toggle", key: "lighter", label: t("lighter"), value: LIGHTER ? t("on") : t("off"), act: function () {
       LIGHTER = !LIGHTER; ST.lighter = LIGHTER; saveSettings();
-      document.documentElement.classList.toggle("lighter", LIGHTER); ambientSync(); movingTiles(); renderShelf(); paintFocus();
+      document.documentElement.classList.toggle("lighter", LIGHTER); if (LOOP) loopLighter(); ambientSync(); movingTiles(); renderShelf(); paintFocus();
     } });
     rows.push({ kind: "toggle", key: "glass-icons", label: t("glass_icons"), value: GLASS_ICONS ? t("on") : t("off"), act: function () {
       GLASS_ICONS = !GLASS_ICONS; ST.glass_icons = GLASS_ICONS; saveSettings();

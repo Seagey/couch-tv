@@ -3,7 +3,8 @@
 A fourth look for the home, next to Night, Classic and OLED. The background is one video of a
 place, looping, graded for four times of day; the interface is a caption set on it: a centred
 clock under the date line, five bare thumbnails, a row of icons with no bar, and frosted glass on
-the two quick buttons and the toast. Nothing else moves: the picture is the only thing that does.
+the two quick buttons; the toast and everything else take the same recipe without the blur. Nothing
+else moves: the picture is the only thing that does.
 
 The design is one place, a jagged peak reflected in a still lake with a slow drone push over the
 water. Any clip with a slow push over a still subject works the same way.
@@ -13,14 +14,16 @@ water. Any clip with a slow push over a still subject works the same way.
 - **Option B, the bridge.** The bridge computer makes the footage with ffmpeg and serves it; the
   TV streams it from there. The launcher's offline copy of the home (for when the computer is off)
   never holds the video: it shows the poster, a still of the loop, with everything else as usual.
-  Option A and option C have no bridge, so no Loop look.
+  Option A and option C have no bridge, so no footage: the look is still in the cycle there and shows
+  its scrim over a dark ground.
 - **ffmpeg 7 on the bridge computer** (Debian: `sudo apt install ffmpeg`). Not on the Mac you set
   things up from, unless the bridge runs there.
 - **One clip**, yours or a stock one. See the next section.
 
 Switch it on with `"look": "loop"` under `home` in `config.json` ([CONFIG.md](CONFIG.md)), or on
-the TV in Home settings, Look, where Look cycles to Loop once the bridge has the files. Night,
-Classic and OLED are untouched by any of this.
+the TV in Home settings, Look, where Look cycles to Loop whether or not the files are there (without
+them it shows its scrim over a dark ground until `make-loop.sh` has run and the bridge restarted).
+Night, Classic and OLED are untouched by any of this.
 
 ## Picking the footage
 
@@ -99,8 +102,9 @@ element. Over a video that is a blur of a whole region sixty times a second; the
 already had to take it out of today's home over still photos. So in the Loop look the blur is
 baked into a file: the bridge serves a 160x90 blurred copy of the playing variant, the home plays
 it in a second, hidden video kept in step with the sharp one, and shows it only through the shapes
-of the glass (the two quick buttons, and the toast while one is up) with a mask the page rebuilds
-only when a glass element appears or leaves. Nothing is blurred per frame. The two videos drift
+of the glass (the two quick buttons) with a mask the page rebuilds only when a button appears or
+leaves. The toast takes the same shape on the no blur tint: the Cube measurement below decided that.
+Nothing is blurred per frame. The two videos drift
 apart a little at each wrap, and the page pulls them back together; through a blur that does not
 show.
 

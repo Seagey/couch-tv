@@ -2028,7 +2028,9 @@ html.dock-mac.theme-night .app.hop { animation: dock-hop 520ms 1; }
    docs/TV-HOME.md, "The Loop look". One clip of a place, graded for four times of day, plays under one
    fixed scrim, and the home is a caption set on it: a centred clock under the date line, bare thumbnails,
    a row of icons with no bar. Laid out like Night (html.theme-night stays on, so the dock, the cards and
-   More apps come from the rules above); these rules change the material. No filter, backdrop-filter or
+   More apps come from the rules above); these rules change the material. html.glass and html.glass-lite are
+   never on in this look (app.js readConfig): the Night glass rules on them outrank these and would put a
+   slab behind the dock, a pill behind the date line and the glass tint on the buttons. No filter, backdrop-filter or
    blend mode anywhere: the glass on the quick buttons is a pre-blurred copy of the clip shown through a
    mask (app.js, loopMask). Only transform and opacity move, and only on the element gaining focus.
    Measured on a Fire TV Cube (2 GB): the clip alone cost the launcher about 80 MB of GL textures; the
@@ -2129,6 +2131,7 @@ html.theme-loop .person { font-size: 1.5rem; font-weight: 600; color: var(--text
 html.theme-loop .person.on { background: #fff; color: var(--loop-ink); }
 html.theme-loop .person.focus, html.lighter.theme-loop .person.focus { transform: scale(1.08); box-shadow: var(--loop-ring); transition-duration: 160ms; }
 html.theme-loop .person.focus:not(.on) { background: var(--loop-tint); color: var(--text); }
+html.theme-loop .people.head { transition: transform 120ms var(--ease); }   /* the ring switches at once */
 html.theme-loop .people.head.focus, html.lighter.theme-loop .people.head.focus { box-shadow: var(--loop-ring); }
 html.theme-loop .gear-pop, html.theme-loop .app-pop, html.theme-loop .people-pop, html.theme-loop .hint.on, html.lighter.theme-loop.theme-night .hint.on,
 html.lighter.theme-loop .gear-pop, html.lighter.theme-loop .app-pop, html.lighter.theme-loop .people-pop {
@@ -2155,7 +2158,9 @@ html.theme-loop .shelf-head h2 { font-size: 1.625rem; line-height: 2rem; font-we
 html.theme-loop .shelf-head .status { font-size: 1.375rem; }
 html.theme-loop .shelf-none { font-size: 1.625rem; line-height: 11.25rem; color: var(--text-2); text-shadow: none; }
 html.theme-loop .shelf-row { gap: 1.25rem; }
-html.theme-loop .shelf-clip { padding: 0.75rem; margin: -0.75rem; }
+/* the clip reaches the screen's right edge, so the sixth card is cut by the edge (124 px of it show), while
+   the heading and the first card stay at x 96 */
+html.theme-loop .shelf-clip { padding: 0.75rem 6rem 0.75rem 0.75rem; margin: -0.75rem -6rem -0.75rem -0.75rem; }
 html.theme-loop .shelf-track { gap: 1.25rem; transition: transform 160ms var(--ease); }
 .lcard { width: 20rem; }
 html.theme-loop .lcard, html.theme-loop .ncard, html.lighter.theme-loop .ncard { transition: transform 120ms var(--ease); }
@@ -2195,8 +2200,9 @@ html.theme-loop .app .face { border-radius: 1.5rem; corner-shape: round; box-sha
 html.theme-loop .app:not(.focus) .face img, html.lighter.theme-loop.theme-night .app:not(.focus) .face img { filter: none; opacity: 1; }
 html.theme-loop .face::after { display: none; }
 html.theme-loop .tile.focus .face { animation: none; }
-html.theme-loop .app.focus, html.glass.theme-loop .app.focus { transform: scale(1.12) translateY(-0.375rem); transition-duration: 160ms; will-change: transform; }
-html.theme-loop .app.focus .face, html.lighter.theme-loop.theme-night .app.focus .face, html.glass.theme-loop .app.focus .face { box-shadow: var(--loop-ring); }
+/* z-index: in the More apps panel (row gap 24) the label sits 8 to 40 px under the tile, over the next row */
+html.theme-loop .app.focus { transform: scale(1.12) translateY(-0.375rem); transition-duration: 160ms; will-change: transform; z-index: 1; }
+html.theme-loop .app.focus .face, html.lighter.theme-loop.theme-night .app.focus .face { box-shadow: var(--loop-ring); }
 html.theme-loop .app .face.tool { background: var(--loop-tint); box-shadow: var(--loop-rim); }
 html.theme-loop .app .face.tool svg { width: 3rem; height: 3rem; stroke: #fff; stroke-width: 1.6; }
 html.theme-loop .app.focus .face.tool { background: #fff; box-shadow: var(--loop-ring); }
@@ -2216,7 +2222,8 @@ html.theme-loop.expanded .hint.on { bottom: calc(100% + 1rem); }
 
 /* Lighter home in the Loop look: no blur copy (app.js), the darker tint, and nothing glides: every
    duration is 0, except the toast's fade */
-html.lighter.theme-loop .tile, html.lighter.theme-loop .app, html.lighter.theme-loop .qbtn, html.lighter.theme-loop .person, html.lighter.theme-loop .nb,
+html.lighter.theme-loop .tile, html.lighter.theme-loop .app, html.lighter.theme-loop .qbtn, html.lighter.theme-loop .qbtn:not(.focus), html.lighter.theme-loop .qbtn.set,
+html.lighter.theme-loop .people.head, html.lighter.theme-loop .person, html.lighter.theme-loop .nb,
 html.lighter.theme-loop .shelf-track, html.lighter.theme-loop .shelf, html.lighter.theme-loop .grid, html.lighter.theme-loop .app .label,
 html.lighter.theme-loop .sleep-menu .opt, html.lighter.theme-loop .ncard, html.lighter.theme-loop .tile.focus, html.lighter.theme-loop .app.focus, html.lighter.theme-loop .qbtn.focus { transition-duration: 0ms; }
 html.lighter.theme-loop .tile.focus, html.lighter.theme-loop .app.focus, html.lighter.theme-loop .qbtn.focus { will-change: auto; }
