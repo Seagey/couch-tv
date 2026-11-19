@@ -22,7 +22,7 @@ water. Any clip with a slow push over a still subject works the same way.
 
 Switch it on with `"look": "loop"` under `home` in `config.json` ([CONFIG.md](CONFIG.md)), or on
 the TV in Home settings, Look, where Look cycles to Loop whether or not the files are there (without
-them it shows its scrim over a dark ground until `make-loop.sh` has run and the bridge restarted).
+them it shows its scrim over a dark ground until `make-loop.sh` has run and the home reloaded).
 Night, Classic and OLED are untouched by any of this.
 
 ## Picking the footage
@@ -47,8 +47,9 @@ scripts/make-loop.sh ~/Downloads/lake.mp4
 
 It writes `tv-home/web/loop/` (git ignores the folder; never commit it), sixteen files:
 `dawn.mp4`, `day.mp4`, `dusk.mp4`, `night.mp4`, a `-blur.mp4` copy of each, and a `.jpg` and
-`-blur.jpg` poster of each. Then restart the bridge, which reads the folder when it starts, and
-pick the Loop look.
+`-blur.jpg` poster of each. The bridge lists the folder afresh on every read of `config.js` and marks
+the files with a version the home puts on each address, so no restart: pick the Loop look, or press
+Home to reload it, and the new files play.
 
 Options: `--seconds 45` for a longer loop (15 to 60, default 30), `--slow 2` to slow the clip,
 `--only night` to remake one variant after changing its grade, `--out <dir>` for another folder,
@@ -143,7 +144,7 @@ launcher's WebView (Fire OS 7.7, 2 GB):
 In this order, each one a smaller step than the next:
 
 1. **Glass off:** remove the `-blur.mp4` files from `tv-home/web/loop/` (or never make them) and
-   restart the bridge. `home.loop.blur` goes false and the home plays one video, the sharp one.
+   reload the home. `home.loop.blur` goes false and the home plays one video, the sharp one.
 2. **Lighter home** (Home settings, Look, or `home.lighter`): the Loop look takes the fallback
    recipe everywhere, no second video, no mask.
 3. **A shorter or lower loop:** `--seconds 20` makes a smaller file; a clip with less water and

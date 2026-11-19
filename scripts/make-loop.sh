@@ -6,7 +6,7 @@
 #                        [--only <dawn|day|dusk|night>] [--still] [--dry-run]
 #
 #   --out      where the files go. Default tv-home/web/loop in this repo (git ignores it; the bridge
-#              serves it at /tv/loop/ and reads it at start, so restart the bridge afterwards).
+#              serves it at /tv/loop/ and lists it afresh on every read, so no restart afterwards).
 #   --seconds  how long the loop is, 15 to 60, default 30. The clip must be at least one second
 #              longer than that, divided by --slow (a 31 s loop at --slow 2 needs a 15.5 s clip).
 #   --slow     slow the clip down: 2 plays a 60 fps clip at half speed, 1 (default) leaves it.
@@ -180,5 +180,5 @@ for v in $VARIANTS; do
 done
 
 if [ "$DRY" -eq 0 ]; then
-  echo "done: $(ls "$OUT" | wc -l | tr -d ' ') files in $OUT. Restart the bridge so it sees them, then pick the Loop look."
+  echo "done: $(ls "$OUT" | wc -l | tr -d ' ') files in $OUT. Pick the Loop look, or press Home to reload it: the bridge lists them as they are now."
 fi
