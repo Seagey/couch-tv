@@ -66,6 +66,11 @@ class ReleaseChannelTest {
         assertTrue(ReleaseChannel.newer("v0.13.6", "0.13"))
         assertFalse(ReleaseChannel.newer("v0.13.6", "0.13.6"))
         assertFalse(ReleaseChannel.newer("v0.13.5", "0.13.6"))
+        // 0.13.7 (Hold OK on a TCL, the gear by arrow, Samsung About) reaches 0.13.6 and older TVs
+        assertTrue(ReleaseChannel.newer("v0.13.7", "0.13.6"))
+        assertTrue(ReleaseChannel.newer("v0.13.7", "0.13"))
+        assertFalse(ReleaseChannel.newer("v0.13.7", "0.13.7"))
+        assertFalse(ReleaseChannel.newer("v0.13.6", "0.13.7"))
     }
 
     @Test fun theOldRulesStillHoldForEveryReleaseSoFar() {

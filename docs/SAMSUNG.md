@@ -69,7 +69,9 @@ same job and is the route if you would rather not use a community tool.
 **How it updates.** A Samsung app cannot update itself: only a computer can put an app on the TV.
 The app asks GitHub once a day whether a newer release with a Samsung file is out
 (`samsung/app/update.js`, nothing about the TV is sent) and, if so, says on the home for 25 seconds:
-run the Samsung setup again. Nothing installs by itself.
+run the Samsung setup again. Nothing installs by itself. Home settings, About shows the version on
+the TV and an **Update couch-tv** row with the same steps and Check for updates now; switching off
+Tell me about new versions stops the daily look and the note.
 
 ## Test status
 

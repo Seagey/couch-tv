@@ -107,6 +107,10 @@ permission it leaves out on purpose, so Play Protect lets it through), so OK ope
 Downloader, type 8180170, Install. Your settings stay. The watch version updates from a computer with
 `adb install -r couch-tv-ontv-watch.apk`.
 
+If Downloader says **App not installed**, the TV is usually short of space: Downloader keeps every copy
+it fetched (a real TCL had five). In Downloader, open Files, delete the old couch-tv-ontv files, then
+type 8180170 again.
+
 ## Pair a phone
 
 1. On the phone, open the address the TV shows, for example `http://192.0.2.10:5400`.

@@ -236,8 +236,10 @@ but it cannot install an update itself: Android's installer needs a permission t
 leaves out, so Google Play Protect has nothing new to stop. Instead **Home settings, About, Update
 couch-tv** shows the version line, and OK opens the exact steps: Downloader and its code 8180170 for
 `couch-tv-ontv.apk` (with the full address as a fallback), or `adb install -r` from a computer for
-`couch-tv-ontv-watch.apk`. Your settings stay. The launcher shows the same Update couch-tv row in
-About, which opens its Updates page.
+`couch-tv-ontv-watch.apk`. Your settings stay. If Downloader says App not installed, the TV is
+usually short of space: the steps say to delete the old couch-tv-ontv files in Downloader's Files and
+type the code again. The launcher shows the same Update couch-tv row in About, which opens its
+Updates page.
 
 ### About
 

@@ -2,9 +2,19 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.6**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.7**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 20 November 2026: release 0.13.7, Hold OK on a TCL, the gear by arrow, and Samsung updates
+
+0.13.7 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Fixes from testing 0.13.6 on a real TCL Android TV and a real 2021 Samsung Frame. A classic home looks exactly as it did. Option C: install the new on-TV APK over the old one (or follow Home settings, About, Update couch-tv). Samsung: run the new `couch-tv-samsung-setup.zip` installer again. Option B: `git pull` and restart the bridge.
+
+- **Hold OK never opens the app, on a TCL too:** the TCL's WebView did not mark the held key as a repeat, so 0.13.6 still opened Netflix on a long press. A second key down with no key up between now counts as a hold, on a couch-tv Studio design and on the classic home. Checked in a browser, not yet on the TCL again.
+- **The Settings gear by arrow:** the arrow that points at the gear reaches it, on whichever edge it sits. A gear hidden until reached (Packed Bento) moves as before. The tip says "the Settings gear at the edge of the screen".
+- **On-TV app update steps:** if Downloader says App not installed, the TV is usually short of space, and the steps say how to delete the old copies in Downloader's Files.
+- **Samsung:** Home settings, About shows the real version (it said "Web preview") and an Update couch-tv row with the steps; Check for updates now works; Tell me about new versions switches the daily look and the note off. When the TV comes on or leaves Art Mode, the bridge tries opening couch-tv up to 3 times. Both checked on a real Frame.
+- **Also:** the line under the design code box says to take out a stray mark.
 
 ### 19 November 2026: release 0.13.6, the TV tells you about updates, and the Settings gear stays clear
 
