@@ -368,6 +368,10 @@ class Home:
         self.limits, self.read_controls, self.read_speakers = {}, {}, {}
         self.pending = None
         self.call = self._call
+        self.direct = None   # Philips Hue and AirTouch 5 with no Home Assistant (bridge/direct.py)
+
+    def _direct_on(self):
+        return bool(self.direct and self.direct.on())
 
     # where the set up lives
     def _path(self):
@@ -441,27 +445,63 @@ class Home:
     # ---------------- what the page may ask
     def info(self):
         s = self.settings()
-        if not s:
+        if not s and not self._direct_on():
             return {}
 
         def names(lst):
             return [{"entity": n["entity"], "name": n["name"] or pretty(n["entity"])} for n in lst]
-        return {"climate": names(s["climate"]), "scenes": names(s["scenes"]), "doorbell": s["doorbell"] is not None,
-                "controls": names(s["controls"]), "cameras": names(s["cameras"]), "sensors": names(s["sensors"]),
-                "speakers": names(s["speakers"]), "energy": s["energy"] is not None,
-                "doorbell_camera": bool(s["doorbell"] and s["doorbell"]["camera"])}
+        if s:
+            o = {"climate": names(s["climate"]), "scenes": names(s["scenes"]), "doorbell": s["doorbell"] is not None,
+                 "controls": names(s["controls"]), "cameras": names(s["cameras"]), "sensors": names(s["sensors"]),
+                 "speakers": names(s["speakers"]), "energy": s["energy"] is not None,
+                 "doorbell_camera": bool(s["doorbell"] and s["doorbell"]["camera"])}
+        else:
+            o = {"climate": [], "scenes": [], "doorbell": False, "controls": [], "cameras": [], "sensors": [], "speakers": [],
+                 "energy": False, "doorbell_camera": False}
+        if self._direct_on():
+            o["climate"] = o["climate"] + self.direct.airtouch_names()
+            h = self.direct.hue()
+            if h:
+                o["controls"] = o["controls"] + [{"entity": "light.hue_" + i, "name": self.direct.names["hue"].get(i) or "Light " + i} for i in h["lights"]]
+        return o
 
     def status(self):
         s = self.settings()
+        d = self.direct.status() if self.direct else {}
         if not s:
-            return {"set": False}
+            return {"set": False, "direct": d} if self.direct else {"set": False}
         ids = lambda lst: [n["entity"] for n in lst]  # noqa: E731
-        return {"set": True, "host": urllib.parse.urlsplit(s["base"]).hostname or "", "made_on_tv": self.made_on_tv(),
+        return {"set": True, "direct": d, "host": urllib.parse.urlsplit(s["base"]).hostname or "", "made_on_tv": self.made_on_tv(),
                 "climate": ids(s["climate"]), "scenes": ids(s["scenes"]), "controls": ids(s["controls"]), "cameras": ids(s["cameras"]),
                 "sensors": ids(s["sensors"]), "speakers": ids(s["speakers"]), "energy": (s["energy"] or {}).get("entity", ""), "battery": (s["energy"] or {}).get("battery") or "",
                 "doorbell": (s["doorbell"] or {}).get("entity", ""), "doorbell_camera": (s["doorbell"] or {}).get("camera") or ""}
 
     async def answer(self, action, entity="", value="", now_ms=None):
+        r = await self._direct_answer(action, str(entity or ""), str(value if value is not None else ""))
+        if r is not None:
+            return r
+        return await self._ha_answer(action, entity, value, now_ms)
+
+    async def _direct_answer(self, action, entity, value):
+        """Hue lights and AirTouch zones, by their own names; None means it is Home Assistant's to answer."""
+        if not self._direct_on():
+            return None
+        d = self.direct
+        if action in ("temp", "on", "off", "mode", "fan") and entity.startswith("climate.airtouch_"):
+            return await d.airtouch_ask(action, entity, value)
+        if action == "set" and entity.startswith("light.hue_"):
+            return await d.hue_set(entity, value)
+        if action == "climate":
+            rooms = (await self._ha_answer("climate", "", "")).get("rooms", []) if self.settings() else []
+            return {"ok": True, "rooms": rooms + await d.airtouch_rooms()}
+        if action == "controls":
+            ctl = (await self._ha_answer("controls", "", "")).get("controls", []) if self.settings() else []
+            return {"ok": True, "controls": ctl + await d.hue_lights()}
+        if not self.settings():
+            return {"ok": True, "sensors": []} if action == "sensors" else {"ok": True, "speakers": []} if action == "speakers" else {"ok": False, "error": "refused"}
+        return None
+
+    async def _ha_answer(self, action, entity="", value="", now_ms=None):
         s = self.settings()
         if not s:
             return {"ok": False, "error": "off"}

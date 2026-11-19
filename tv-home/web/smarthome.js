@@ -36,10 +36,16 @@
   // the launcher (Google TV, Android TV, Fire TV), or on a TV whose home a computer runs (Samsung, LG,
   // Hisense, Philips, TiVo OS, Panasonic) that computer's bridge (useBridge below): the same asks
   function native() { return window.TVHA || BRIDGE || null; }
+  var DIRECT = null;   // { api, climate, controls }: see useDirect
   function info() {
     if (INFO) return INFO;
     try { INFO = JSON.parse(native().info() || "{}") || {}; } catch (e) { INFO = {}; }
     INFO.climate = Array.isArray(INFO.climate) ? INFO.climate : [];
+    INFO.controls = Array.isArray(INFO.controls) ? INFO.controls : [];
+    if (DIRECT && window.TVHA) {   // the home computer's Hue lights and AirTouch zones (askBridge)
+      INFO.climate = INFO.climate.concat(DIRECT.climate);
+      INFO.controls = INFO.controls.concat(DIRECT.controls);
+    }
     INFO.scenes = Array.isArray(INFO.scenes) ? INFO.scenes : [];
     // the smart home widgets (HomeAssistant.kt info()): names and entities only
     ["controls", "cameras", "sensors", "speakers"].forEach(function (k) { INFO[k] = Array.isArray(INFO[k]) ? INFO[k] : []; });
@@ -62,7 +68,29 @@
 
   // ---------------- asking the launcher ----------------
   var seq = 0, waiting = {};
+  // Philips Hue lights and AirTouch 5 zones set up on the home computer with no Home Assistant
+  // (bridge/direct.py): on a Google TV or Android TV that also has a computer at home, the launcher
+  // answers Home Assistant and the computer answers these, merged into one list
+  var DIRECT_RE = /^(light\.hue_|climate\.airtouch_)\d+$/;
+  function askBridge(action, entity, value) {
+    return DIRECT.api("POST", "/api/ha", { action: action, entity: entity || "", value: value == null ? "" : String(value) }, 20000)
+      .then(function (r) { return r && r.result && typeof r.result === "object" ? r.result : { ok: false }; }, function () { return { ok: false, error: "bridge" }; });
+  }
   function ask(action, entity, value) {
+    if (DIRECT && window.TVHA) {
+      if (DIRECT_RE.test(entity || "")) return askBridge(action, entity, value);
+      if (action === "climate" || action === "controls") {
+        var key = action === "climate" ? "rooms" : "controls";
+        return Promise.all([askNative(action, entity, value), askBridge(action, "", "")]).then(function (a) {
+          var own = a[0] && a[0].ok ? a[0][key] || [] : [], far = a[1] && a[1].ok ? (a[1][key] || []).filter(function (x) { return x && DIRECT_RE.test(x.entity); }) : [];
+          if (!(a[0] && a[0].ok) && !far.length) return a[0] || { ok: false };
+          var o = { ok: true }; o[key] = own.concat(far); return o;
+        });
+      }
+    }
+    return askNative(action, entity, value);
+  }
+  function askNative(action, entity, value) {
     return new Promise(function (resolve) {
       var id = "r" + (++seq).toString(36);
       var timer = setTimeout(function () { delete waiting[id]; resolve({ ok: false, error: "timeout" }); }, ANSWER_MS);
@@ -382,8 +410,20 @@
   // (bridge/smarthome.py, /api/ha): the same asks, the same allow lists, and the token stays on that
   // computer (bridge/data/), never in the page. app.js calls useBridge(api) when it runs from a bridge.
   var BRIDGE = null, BINFO = "{}", BSTATUS = '{"set":false}';
+  // a Google TV or Android TV with a computer at home: only the computer's own Hue and AirTouch
+  function useDirect(api) {
+    if (!window.TVHA || DIRECT || typeof api !== "function") return;
+    api("GET", "/api/ha/info", null, 15000).then(function (r) {
+      var i = r && r.info && typeof r.info === "object" ? r.info : {};
+      var pick = function (l) { return (Array.isArray(l) ? l : []).filter(function (x) { return x && DIRECT_RE.test(x.entity); }); };
+      var d = { api: api, climate: pick(i.climate), controls: pick(i.controls) };
+      if (!d.climate.length && !d.controls.length) return;
+      DIRECT = d; reload();
+    }, function () {});
+  }
   function useBridge(api) {
-    if (window.TVHA || BRIDGE || typeof api !== "function") return;
+    if (window.TVHA) { useDirect(api); return; }
+    if (BRIDGE || typeof api !== "function") return;
     var post = function (path, body, id, cb) {
       api("POST", path, body, 20000).then(function (r) { cb(id, r && r.result && typeof r.result === "object" ? r.result : { ok: false }); }, function () { cb(id, { ok: false, error: "bridge" }); });
     };
@@ -435,6 +475,8 @@
   };
 
   window.smartHome = {
+    // Hue or AirTouch was set up on the home computer from this TV: read its list again
+    rebridge: function (api) { if (window.TVHA) { DIRECT = null; reload(); useDirect(api); } else bridgeInfo(); },
     useBridge: useBridge, setup: setup, setupReply: setupReply, reload: reload,
     enabled: enabled, live: live, still: still, stillOk: stillOk,
     available: available, open: open, close: close, move: move, ok: ok, paint: paint, reply: reply,

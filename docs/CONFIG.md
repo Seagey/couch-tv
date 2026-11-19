@@ -643,6 +643,33 @@ opens the house from a TV remote), and anything Home Assistant cannot reach (Sma
 we don't list, says how to add one). On Samsung, LG and the other web TVs smart home needs the home
 computer on; the doorbell card that slides in over apps needs a Google TV, Android TV or Fire TV.
 
+## Philips Hue and AirTouch 5 with no Home Assistant (option B)
+
+With a computer at home, couch-tv talks to a Philips Hue bridge and an AirTouch 5 aircon console
+itself, the way Home Assistant would, on every TV it serves (Google TV and Android TV too, beside any
+Home Assistant things). Set both up on the TV: Home settings, couch-tv Studio, Smart home.
+
+- **Philips Hue:** type the Hue bridge's address (Hue app, Settings, Bridges, the i button), press the
+  round button on top of the Hue bridge, then Pair within 30 seconds. Tick up to 16 lights. They show
+  as `light.hue_<number>` in a design's Control Centre widget: on and off, with the brightness shown.
+- **AirTouch 5:** Find the console (it answers on the Wi-Fi), then Connect. Each zone shows as a room
+  in the Smart home tile and the Aircon widget: on, off and its own temperature (zones the console
+  runs by percentage switch on and off only). Cooling or heating stays as set on the wall: couch-tv
+  never changes the unit's mode from a TV remote. A TV cannot open the console's own port (TCP 9005)
+  from a web page, so AirTouch always goes through the home computer. It needs `airtouch5py`, which is
+  in `bridge/requirements.txt`.
+
+What the TV sets up is kept in `bridge/data/direct.json` (mode 600, git ignores it). The Hue key never
+goes to the page. The same can be written by hand:
+
+```json
+"hue": { "bridge": "192.0.2.30", "lights": ["1", "4"] },
+"airtouch": { "ip": "192.0.2.31", "zones": ["Living", "Bed 1"] }
+```
+
+with the Hue key in `.env` as `HUE_USERNAME=` (made by pressing the button and sending
+`{"devicetype": "couch-tv#home"}` to `http://<hue bridge>/api`). `zones` left out shows every zone.
+
 ## Guests: names and times from a bookings calendar
 
 For a holiday let or a guest room. A couch-tv Studio design's **Welcome** widget can take the guest's

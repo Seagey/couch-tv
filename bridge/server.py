@@ -50,6 +50,7 @@ import webdata
 import plex
 import smarthome
 import bookings
+import direct
 import say
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -2725,6 +2726,32 @@ async def h_calendar(request):
 # The address and token stay on this computer: the page gets names and readings only. Nothing here
 # goes in the action history or the log (a reading or a name is the household's own).
 HA = smarthome.Home(config.DATA, config.CONFIG.get("home_assistant"), os.environ.get("HOME_ASSISTANT_TOKEN"))
+# Philips Hue and AirTouch 5 with no Home Assistant (bridge/direct.py): their lights and zones join
+# the same answers, for every TV this computer serves
+HA.direct = direct.Direct(config.DATA, config.CONFIG)
+
+
+async def h_direct(request):
+    """Set up Hue or AirTouch from the TV: Home settings, couch-tv Studio, Smart home."""
+    data = await body(request)
+    what, d = str(data.get("action") or ""), HA.direct
+    if what == "status":
+        r = {"ok": True}
+    elif what == "hue_pair":
+        r = await d.hue_pair(data.get("address"))
+    elif what == "hue_lights":
+        r = {"ok": True, "lights": await d.hue_all(), "picked": (d.hue() or {}).get("lights", [])}
+    elif what == "hue_save":
+        r = d.hue_save(data.get("lights"))
+    elif what == "airtouch_find":
+        r = await d.airtouch_find()
+    elif what == "airtouch_save":
+        r = await d.airtouch_save(data.get("address"), data.get("zones"))
+    elif what in ("hue_forget", "airtouch_forget"):
+        r = d.forget(what.split("_")[0])
+    else:
+        r = {"ok": False, "error": "refused"}
+    return ok(result=r, status=d.status())
 
 
 # Guest names from booking emails, the way guest-tv gets them (bridge/bookings.py): Airbnb's calendar
@@ -4708,6 +4735,7 @@ def make_app():
     r.add_post("/api/ha/check", h_ha_check)
     r.add_post("/api/ha/save", h_ha_save)
     r.add_post("/api/ha/forget", h_ha_forget)
+    r.add_post("/api/ha/direct", h_direct)
     r.add_get("/api/settings", h_settings_get)
     r.add_post("/api/settings", h_settings_set)
     r.add_get("/api/continue", h_continue)

@@ -6044,12 +6044,81 @@
         S.save(shSection(SH.picks)).then(function (r) { SET.msg = r.ok ? "Saved. Smart home is on this TV." : SH_ERR[r.error] || SH_ERR.picks; if (r.ok) SH.list = null; if (zone === "settings") renderSettings(); });
       } });
     }
+    if (!OFFLINE && !MOCK && !PREVIEW) directRows(rows);
     rows.push(head("A device we don't list"));
     rows.push({ kind: "nav", key: "sh-more", label: "Add a device we don't list", sub: "Tuya and Smart Life, Google Nest, Alexa, Apple Home, Matter, Hue, aircon and solar brands, and anything with a web address", act: openSmartMore });
     if (st.set) rows.push({ kind: "action", key: "sh-forget", label: "Disconnect smart home", danger: true, sub: "Removes the address and token from this TV. Also delete the token in Home Assistant.", act: function () {
       S.forget().then(function () { SH.list = null; SH.picks = null; SET.msg = "Smart home is off on this TV."; if (zone === "settings") renderSettings(); });
     } });
     return rows;
+  }
+  // ---- Philips Hue and AirTouch 5 with no Home Assistant, through the home computer (bridge/direct.py) ----
+  // The Hue bridge is paired by its round link button; the AirTouch console is found on the Wi-Fi. A TV
+  // cannot open the AirTouch console's own port from this page, so both live on the home computer, which
+  // keeps the Hue key (bridge/data/direct.json) and never sends it here.
+  var DIR = { st: null, hueAddr: "", atAddr: "", lights: null, picked: [] };
+  var DIR_ERR = { address: "That is not an address on your home Wi-Fi. It looks like 192.168.1.x, with a number for the x.",
+    button: "Press the round button on top of the Hue bridge, then pick Pair within 30 seconds.",
+    unreachable: "Nothing answered at that address. Check it is on and on the same Wi-Fi as the home computer.",
+    not_hue: "Something answered, but it is not a Hue bridge.", none: "No AirTouch console answered on the Wi-Fi. Type its address instead (on the console: Settings, Network).",
+    library: "The home computer needs one more part for AirTouch: run bridge/.venv/bin/pip install -r bridge/requirements.txt on it, then restart couch-tv there.",
+    pair: "Pair the Hue bridge first.", refused: "That could not be done.", bridge: "The home computer did not answer. Check couch-tv is running on it." };
+  function dirAsk(body, then) {
+    SET.msg = "Asking the home computer...";
+    if (zone === "settings") renderSettings();
+    api("POST", "/api/ha/direct", body, 25000).then(function (r) {
+      DIR.st = r && r.status || DIR.st;
+      var res = r && r.result || { ok: false };
+      SET.msg = res.ok ? "" : DIR_ERR[res.error] || DIR_ERR.refused;
+      if (res.ok && then) then(res);
+      if (res.ok && window.smartHome && window.smartHome.rebridge) window.smartHome.rebridge(api);
+      if (zone === "settings") renderSettings();
+    }, function () { SET.msg = DIR_ERR.bridge; if (zone === "settings") renderSettings(); });
+  }
+  function directRows(rows) {
+    if (!DIR.st) { DIR.st = {}; dirAsk({ action: "status" }); }
+    var st = DIR.st || {};
+    rows.push(head("Philips Hue, straight from the Hue bridge"));
+    rows.push(info("dh-intro", "", "", "No Home Assistant needed. The home computer talks to the Hue bridge on your Wi-Fi, and the lights you tick show in a design's Control Centre widget."));
+    if (st.hue) rows.push(info("dh-on", "Paired", st.hue_lights ? st.hue_lights + " lights show" : "No lights ticked yet", ""));
+    rows.push({ kind: "input", key: "dh-addr", label: "Hue bridge address", value: DIR.hueAddr, sub: "In the Hue app: Settings, Bridges, the i button, IP address.", act: function () {
+      ahType("Hue bridge address", DIR.hueAddr, function (v) { DIR.hueAddr = String(v || "").trim(); }, true);
+    } });
+    rows.push({ kind: "action", key: "dh-pair", label: "Pair", sub: "Press the round button on top of the Hue bridge first, then pick this within 30 seconds", act: function () {
+      dirAsk({ action: "hue_pair", address: DIR.hueAddr }, function (r) { DIR.lights = r.lights || []; DIR.picked = []; SET.msg = "Paired. Tick the lights to show."; });
+    } });
+    if (st.hue) rows.push({ kind: "nav", key: "dh-lights", label: "Pick the lights", value: st.hue_lights ? st.hue_lights + " picked" : "None", act: function () {
+      dirAsk({ action: "hue_lights" }, function (r) { DIR.lights = r.lights || []; DIR.picked = (r.picked || []).slice(); openDirectLights(); });
+    } });
+    if (st.hue) rows.push({ kind: "action", key: "dh-forget", label: "Unpair the Hue bridge", danger: true, sub: "The home computer forgets it. Also remove couch-tv in the Hue app: Settings, Apps", act: function () { dirAsk({ action: "hue_forget" }); } });
+    rows.push(head("AirTouch 5 aircon, straight from the console"));
+    rows.push(info("dt-intro", "", "", "No Home Assistant needed. Each zone shows as a room you can switch on and off and set the temperature of. Cooling or heating stays as set on the wall."));
+    if (st.airtouch) rows.push(info("dt-on", "Connected", "", ""));
+    rows.push({ kind: "action", key: "dt-find", label: "Find the console", sub: "Looks for an AirTouch 5 on the Wi-Fi", act: function () {
+      dirAsk({ action: "airtouch_find" }, function (r) { DIR.atAddr = (r.found || [])[0] || DIR.atAddr; SET.msg = "Found it. Pick Connect."; });
+    } });
+    rows.push({ kind: "input", key: "dt-addr", label: "Console address", value: DIR.atAddr, sub: "Found above, or on the console: Settings, Network.", act: function () {
+      ahType("AirTouch console address", DIR.atAddr, function (v) { DIR.atAddr = String(v || "").trim(); }, true);
+    } });
+    rows.push({ kind: "action", key: "dt-save", label: "Connect", sub: "Reads the zones once to check", act: function () {
+      dirAsk({ action: "airtouch_save", address: DIR.atAddr }, function (r) { SET.msg = "Connected: " + (r.zones || []).length + " zones. Open the Smart home tile in your apps."; });
+    } });
+    if (st.airtouch) rows.push({ kind: "action", key: "dt-forget", label: "Disconnect the AirTouch", danger: true, sub: "The aircon is not changed", act: function () { dirAsk({ action: "airtouch_forget" }); } });
+  }
+  function openDirectLights() {
+    var up = SET.sub;
+    SET.sub = { up: up, back: "dh-lights", crumb: "Smart home", title: function () { return "Hue lights"; }, rows: function () {
+      var rows = [info("dh-most", "", "", "Pick up to 16. They show in this order.")];
+      (DIR.lights || []).forEach(function (l) {
+        rows.push({ kind: "check", key: "dh-l:" + l.id, label: l.name, checked: DIR.picked.indexOf(l.id) >= 0, act: function () {
+          var i = DIR.picked.indexOf(l.id);
+          if (i >= 0) DIR.picked.splice(i, 1); else if (DIR.picked.length < 16) DIR.picked.push(l.id); else SET.msg = "That is the most. Untick one first.";
+        } });
+      });
+      rows.push({ kind: "action", key: "dh-save", label: "Save", act: function () { SET.sub = up; dirAsk({ action: "hue_save", lights: DIR.picked }, function () { SET.msg = "Saved. Add a Control Centre widget in couch-tv Studio to see them."; }); } });
+      return rows;
+    } };
+    SET.keyFocus = null; SET.ri = 0;
   }
   function openSmartGroup(g, have) {
     var up = SET.sub;
@@ -6077,8 +6146,8 @@
     ["Amazon Alexa", "Alexa itself has no way in, but the plugs and lights in it do: add each by its own brand (often Tuya, TP-Link, Hue or Matter)."],
     ["Apple Home", "In the Home app, open the device, Turn On Pairing Mode, and copy the code. Then in the Home Assistant phone app: Add device, Matter."],
     ["Matter or Thread devices", "In the Home Assistant phone app: Settings, Devices and services, Add device, Add Matter device, then scan the code on the device."],
-    ["Philips Hue", "Add integration, Philips Hue, then press the round button on the Hue bridge."],
-    ["Aircon", "Add integration and search for the brand: Daikin, Mitsubishi (MELCloud), Fujitsu, Panasonic, LG, Sensibo, AirTouch 5 (it finds the console by itself)."],
+    ["Philips Hue", "With a computer at home: Philips Hue, straight from the Hue bridge, on the Smart home page (no Home Assistant). Or in Home Assistant: Add integration, Philips Hue, then press the round button on the Hue bridge."],
+    ["Aircon", "Add integration and search for the brand: Daikin, Mitsubishi (MELCloud), Fujitsu, Panasonic, LG, Sensibo, AirTouch 5 (it finds the console by itself). With a computer at home, AirTouch 5 also works with no Home Assistant: on the Smart home page."],
     ["Solar and batteries", "Add integration: Fronius, Enphase, SolarEdge, SMA, GoodWe or Tesla Powerwall. Then pick its today total under Solar or power meter."],
     ["Plugs, cameras and speakers", "TP-Link Kasa and Tapo, Shelly, LIFX, Reolink, Ring, Eufy, Sonos, Google Cast: Add integration and search for the brand."],
     ["Anything with a web address or MQTT", "A home made sensor, a Raspberry Pi or a router: Home Assistant's RESTful, MQTT or Webhook integrations make it a sensor or a switch, which then shows here."],
@@ -6282,7 +6351,8 @@
   function start() {
     readConfig();
     // a TV whose home a computer runs (no launcher): smart home goes through that computer's bridge
-    if (!TV && !OFFLINE && !MOCK && !PREVIEW && window.smartHome && window.smartHome.useBridge) window.smartHome.useBridge(api);
+    // (on a Google TV or Android TV with a computer at home, only its Hue lights and AirTouch zones)
+    if (!OFFLINE && !MOCK && !PREVIEW && window.smartHome && window.smartHome.useBridge) window.smartHome.useBridge(api);
     // a design got by code: pictures only from here, the store and the hosts this TV already uses
     if (DESIGN_FROM_CODE && CouchDesignCode.lockImages) CouchDesignCode.lockImages((ST.photos || []).map(function (p) { return p && p.url; }), VIDEO_URL);
     // couch-tv Studio's design block (design.js): nothing happens without one, unless the page is
