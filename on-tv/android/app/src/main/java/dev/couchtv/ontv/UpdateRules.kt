@@ -125,12 +125,15 @@ object UpdateRules {
      * nohup, nothing left open), because Android stops this app while it replaces it, and that closes
      * the app's ADB link. Then it deletes the copy, and on Success opens the app again (reopen: only
      * when Couch TV was on screen, so an update started from a phone never takes over a show).
+     * The trailing sleep matters: on a real TCL (Android 11) the app's plain "shell:" stream ends the
+     * moment the outer sh exits, and adbd then hangs up its process group before the background
+     * child has called setsid, so the install never ran. Two seconds lets it leave the group first.
      */
     fun installScript(pkg: String, reopen: Boolean): String {
         require(Regex("[A-Za-z0-9_.]+").matches(pkg))
         val back = if (reopen) "; grep -q Success $TMP_LOG && am start -n $pkg/.SetupActivity --ez updated true" else ""
         val body = "pm install -r $TMP_APK > $TMP_LOG 2>&1; rm -f $TMP_APK$back"
-        return "rm -f $TMP_LOG; \$(command -v setsid) nohup sh -c '$body' > /dev/null 2>&1 < /dev/null &"
+        return "rm -f $TMP_LOG; \$(command -v setsid) nohup sh -c '$body' > /dev/null 2>&1 < /dev/null & sleep 2"
     }
 
     /** Offered: newer than this app, and the release has this app's file. */

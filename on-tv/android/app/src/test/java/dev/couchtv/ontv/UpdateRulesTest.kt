@@ -98,7 +98,8 @@ class UpdateRulesTest {
         assertTrue(s.contains("setsid"))
         assertTrue(s.contains("rm -f /data/local/tmp/couch-tv-update.apk"))
         assertTrue(s.contains("grep -q Success /data/local/tmp/couch-tv-update.txt && am start -n dev.couchtv.ontv/.SetupActivity --ez updated true"))
-        assertTrue(s.trim().endsWith("&"))
+        // in the background, and the outer shell waits for it to leave adbd's process group (a real TCL)
+        assertTrue(s.trim().endsWith("< /dev/null & sleep 2"))
         // started from a phone while a show is on: it installs, and leaves the show on screen
         assertFalse(UpdateRules.installScript("dev.couchtv.ontv", reopen = false).contains("am start"))
     }
