@@ -179,8 +179,10 @@ INK_R=11; INK_G=10; INK_B=16
 SCRIM_TOP="0:0.66 28:0.56 37:0.20 43:0"
 SCRIM_BOTTOM="44:0 55:0.55 64:0.74 76:0.84 100:0.84"
 
-# Colour: to BT.709 limited range (scale's conversion) before the encode, and the tags on it.
-TO709="scale=out_color_matrix=bt709:out_range=tv,format=yuv420p"
+# Colour: to BT.709 limited range (scale's conversion) before the encode, and the tags on it. ffmpeg 7
+# takes an encode's colour tags from its frames, so -color_primaries and -color_trc below are not
+# enough after a filter (they came out "unknown"): setparams writes them on the frames themselves.
+TO709="scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv"
 TAGS709="-colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv"
 # the posters are JPEG: BT.601 full range by definition
 POSTER_VF="in_color_matrix=bt709:in_range=tv:out_color_matrix=bt601:out_range=pc,format=yuvj420p"

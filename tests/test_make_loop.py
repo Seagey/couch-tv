@@ -16,7 +16,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "scripts", "make-loop.sh")
 CLIP = "/nowhere/at all/lake.mp4"
-T = ",scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,trim="
+T = ",scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,trim="
 # a photo, and its matte, scaled to cover and cut to the centre 16:9 band (the whole picture when it is
 # 16:9 already): the photo at four times the output size, the matte at the output size
 PHOTO_169 = "scale=5120:2880:force_original_aspect_ratio=increase,format=yuv444p,crop=5120:2880,"
@@ -254,7 +254,7 @@ class Colour(unittest.TestCase):
     def test_a_photo_is_converted_after_zoompan_and_after_the_grade(self):
         _, lines = dry_lines(PHOTO, "--only", "dusk")
         graph = arg_after(shlex.split(lines[1]), "-filter_complex")
-        self.assertIn(":s=1280x720:fps=30,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,colorbalance=rm=0.14", graph)
+        self.assertIn(":s=1280x720:fps=30,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,colorbalance=rm=0.14", graph)
         self.assertIn("eq=brightness=-0.05" + T, graph)
 
 
