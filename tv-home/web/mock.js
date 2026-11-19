@@ -152,6 +152,8 @@
   // javascript: link and a script in its title, which must show as plain text and open nothing
   if (arg("cards")) cfg.home.custom_cards = true;
   if (arg("place")) cfg.weather.place = arg("place");
+  // ?nowx=1: no place set (a TV set up with just a phone): the home asks for a town, never a sample one
+  if (arg("nowx")) cfg.weather = null;
   if (arg("design") === "local") {
     try { var dz = JSON.parse(localStorage.getItem("tvdesigner.design") || "null"); if (dz && typeof dz === "object") cfg.design = dz; } catch (e) {}
   }

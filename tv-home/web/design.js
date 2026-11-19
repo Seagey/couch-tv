@@ -1275,6 +1275,7 @@
   ].join("\n");
 
   var ICON = {
+    gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="6.8"/><path d="M12 2.5v2.7M12 18.8v2.7M2.5 12h2.7M18.8 12h2.7M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M5.3 18.7l1.9-1.9M16.8 7.2l1.9-1.9"/></svg>',
     aircon: '<svg viewBox="0 0 24 24"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/></svg>',
     light: '<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>',
     speaker: '<svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2.5"/><circle cx="12" cy="14" r="3"/><circle cx="12" cy="7.5" r="0.9"/></svg>',
@@ -1471,7 +1472,7 @@
     try { data = hooks.data ? hooks.data() : null; } catch (e) { data = null; }
     // sport: the design has a Scores widget (the Game Day preset), so its Up next is the game hero
     var sport = !!(D && list(D.objects).some(function (o) { o = obj(o); return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return obj(it).kind === "sports"; }); }));
-    return { demo: !!(FORCE_DEMO || DEMO_ON), preview: PREVIEW, designer: DESIGNER, data: data, look: obj(D && D.look), sport: sport,
+    return { demo: !!(FORCE_DEMO || DEMO_ON), preview: PREVIEW, card: IN_CARD, designer: DESIGNER, data: data, look: obj(D && D.look), sport: sport,
       edits: DESIGNER || PREVIEW ? null : editsOf,
       clock24: hooks.clock24 ? hooks.clock24() : false, ha: !!(window.smartHome && window.smartHome.enabled && window.smartHome.enabled()), rooms: LIVE.rooms,
       icon: function (name, size, set) { return icon(name, size, set); }, colour: colour, imgOk: imgOk };
@@ -2083,6 +2084,7 @@
   // A design got by code (design-code.js) is always asked about until accepted here: no preview mode
   // or address switch skips it.
   var FROM_CODE = false;
+  var IN_CARD = false;
   function needsConfirm(d) {
     if (FROM_CODE) return store("couchtv.design.ok") !== hashOf(d);
     if (DESIGNER) return false;
@@ -2104,15 +2106,18 @@
     card.appendChild(back);
     var layer = document.createElement("div");
     layer.setAttribute("style", "position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;transform:scale(" + k + ");font-family:Inter, sans-serif;color:#fff");
-    list(clean.objects).forEach(function (o) {
-      if (o.hidden) return;
-      var m = place(o), n = h("div", "cd-o cd-o-" + o.type, { left: m.x + "px", top: m.y + "px", transform: "rotate(" + m.r + "deg) scale(" + m.s + ")" }, [fitBox(inner(o), o)]);
-      layer.appendChild(n);
-    });
+    IN_CARD = true;   // the "Use this design?" card: drawn before this TV's app list is read (widgets.js appsFor)
+    try {
+      list(clean.objects).forEach(function (o) {
+        if (o.hidden) return;
+        var m = place(o), n = h("div", "cd-o cd-o-" + o.type, { left: m.x + "px", top: m.y + "px", transform: "rotate(" + m.r + "deg) scale(" + m.s + ")" }, [fitBox(inner(o), o)]);
+        layer.appendChild(n);
+      });
+    } finally { IN_CARD = false; }
     card.appendChild(layer);
     var tag = document.createElement("div");
     tag.textContent = bg.video ? "Preview, a looping video" : "Preview";
-    tag.setAttribute("style", "position:absolute;left:14px;top:12px;padding:4px 12px;border-radius:999px;background:rgba(0,0,0,0.6);font-size:20px;font-weight:650;color:#fff");
+    tag.setAttribute("style", "position:absolute;right:14px;bottom:12px;padding:4px 12px;border-radius:999px;background:rgba(0,0,0,0.6);font-size:20px;font-weight:650;color:#fff");
     card.appendChild(tag);
     return card;
   }
@@ -2126,7 +2131,7 @@
     var col = document.createElement("div"); col.setAttribute("style", "flex:1;min-width:0");
     var h1 = document.createElement("div"); h1.textContent = "A new home design arrived. Use this design?";
     h1.setAttribute("style", "font-size:3.25rem;line-height:4rem;font-weight:700;letter-spacing:-0.01em");
-    var p = document.createElement("div"); p.textContent = "Someone else made it, and it may have words or pictures they chose. Keep my home leaves your TV exactly as it is.";
+    var p = document.createElement("div"); p.textContent = "Check it looks right first: its words and pictures are the ones whoever made it chose. Keep my home leaves your TV exactly as it is.";
     p.setAttribute("style", "margin-top:1.25rem;font-size:1.75rem;line-height:2.375rem;color:rgba(255,255,255,0.82);max-width:44rem");
     var row = document.createElement("div"); row.setAttribute("style", "margin-top:2.5rem;display:flex;flex-direction:column;align-items:flex-start;gap:1.25rem");
     var mk = function (label, big) { var b = document.createElement("div"); b.textContent = label; b.setAttribute("style", "padding:" + (big ? "1.375rem 3rem" : "1rem 2.25rem") + ";border-radius:3rem;font-size:" + (big ? "2rem" : "1.625rem") + ";font-weight:700;background:rgba(255,255,255,0.12)"); row.appendChild(b); return b; };
@@ -2171,8 +2176,20 @@
   // focused box across the movement first, nearest edge, then most overlap, then top or left; else
   // the nearest by edge distance plus twice the sideways gap. Going back the opposite way returns to
   // where you came from. Nothing wraps round the screen.
+  // the Settings button on a design (html.cd-wmode only, widgets.css .cw-gearchip): top right, small,
+  // never in couch-tv Studio or a preview. OK on it opens Home settings, like the gear tile on the classic home.
+  var GEAR = null, GEAR_ID = "__gear", TIP_USED = "couchtv.wtip.used";
+  function gearChip() {
+    if (DESIGNER || PREVIEW || !document.body) return null;
+    if (!GEAR) {
+      GEAR = h("div", "cw-gearchip", null, [icon("gear", 40), h("span", "cw-gearchip-t", null, ["Settings"])]);
+      GEAR.setAttribute("data-act", "gear"); GEAR.setAttribute("data-name", "Settings"); GEAR.setAttribute("role", "button");
+    }
+    if (GEAR.parentNode !== document.body) document.body.appendChild(GEAR);
+    return GEAR;
+  }
   var NAV = (function () {
-    var cur = null, last = null, sheet = null, okDown = false, okHeld = false, okT = null, tipShown = false, tracing = false;
+    var cur = null, last = null, sheet = null, okDown = false, okHeld = false, okT = null, okSoon = null, okStart = 0, okLast = 0, okSwallow = false, tipShown = false, tracing = false;
     function rectOf(el) { var r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; }
     function stops() {
       var out = [], look = [];
@@ -2191,6 +2208,9 @@
       // a home of things only to look at (a bedside clock): every widget is a stop, and OK on one
       // opens the Hold OK menu, so the remote always shows where it is and always reaches the apps
       if (!out.length) look.forEach(function (s) { if (!s.el.hasAttribute("data-act")) { s.el.setAttribute("data-act", "menu"); s.el.setAttribute("data-name", "Home menu"); } out.push(s); });
+      // the Settings button in the top corner: on every design, always there and always reachable
+      var g = gearChip();
+      if (g && g.offsetWidth > 0) out.push({ id: GEAR_ID, wrap: g, el: g, box: rectOf(g), inner: [] });
       return out;
     }
     function beyond(from, b, dx, dy) {
@@ -2228,7 +2248,8 @@
         if (S[k].act === "app" || (S[k].el && S[k].el.getAttribute && S[k].el.getAttribute("data-act") === "app")) return { id: S[k].id, i: -1 };
         for (var j = 0; j < S[k].inner.length; j++) if ((S[k].innerAct || [])[j] === "app" || (S[k].inner[j].getAttribute && S[k].inner[j].getAttribute("data-act") === "app")) return { id: S[k].id, i: j };
       }
-      var tl = S.slice().sort(function (a, b) { return (a.box.t - b.box.t) || (a.box.l - b.box.l); })[0];
+      var notGear = S.filter(function (x) { return x.id !== GEAR_ID; });
+      var tl = (notGear.length ? notGear : S).slice().sort(function (a, b) { return (a.box.t - b.box.t) || (a.box.l - b.box.l); })[0];
       return { id: tl.id, i: tl.inner.length ? 0 : -1 };
     }
     function shown() { return ON && ROOT.classList.contains("cd-wmode") && !(DESIGNER && ROOT.classList.contains("cd-edit")); }
@@ -2275,7 +2296,17 @@
       var s = cur && find(S, cur.id);
       // a stack: left and right flick through it
       if (s && dx && !tracing && s.el.hasAttribute("data-stack") && window.CouchWidgets && window.CouchWidgets.flick(s.el, dx)) { last = null; return true; }
-      var r = step(boxesOf(S), cur, last, dx, dy);
+      // the Settings button sits over the top right corner, so plain geometry may never reach it: Up or
+      // Right at the edge of the screen goes to it, and any arrow from it goes back to the nearest widget
+      var gs = find(S, GEAR_ID), rest = S.filter(function (x) { return x.id !== GEAR_ID; });
+      if (gs && cur && cur.id === GEAR_ID) {
+        if (!rest.length || dy < 0 || dx > 0) return false;
+        var gc = { x: (gs.box.l + gs.box.r) / 2, y: (gs.box.t + gs.box.b) / 2 };
+        var near = rest.slice().sort(function (a, b) { return Math.hypot((a.box.l + a.box.r) / 2 - gc.x, (a.box.t + a.box.b) / 2 - gc.y) - Math.hypot((b.box.l + b.box.r) / 2 - gc.x, (b.box.t + b.box.b) / 2 - gc.y); })[0];
+        cur = { id: near.id, i: near.inner.length ? 0 : -1 }; last = null; paint(); return true;
+      }
+      var r = step(boxesOf(rest.length ? rest : S), cur, last, dx, dy);
+      if (gs && !r.moved && cur && (dy < 0 || dx > 0) && !tracing) { last = null; cur = { id: GEAR_ID, i: -1 }; paint(); return true; }
       cur = r.cur; last = r.last;
       paint();
       return true;
@@ -2297,6 +2328,7 @@
       el.classList.remove("cd-flash"); void el.offsetWidth; el.classList.add("cd-flash");
       if (what === "detail" || what === "folder") { openDetail(el); return; }
       if (what === "menu") { holdMenu(); return; }
+      if (what === "gear") tipUsed();
       if (what === "edit" || what === "pick") { edit(what === "pick" ? "pick" : arg, arg); return; }
       if (what === "addapp" && !DESIGNER) { EDIT = appCtx(); if (EDIT) picker("add"); return; }
       if (what === "missing" && !DESIGNER) { say("Not on this TV. Install it from the App Store in More apps, or hold OK to change it."); return; }
@@ -2333,12 +2365,15 @@
     function paintSheet() { if (sheet) sheet.nodes.forEach(function (n, k) { n.classList.toggle("cw-ifocus", k === sheet.i); }); }
     function closeSheet() { if (sheet && sheet.el.parentNode) sheet.el.parentNode.removeChild(sheet.el); sheet = null; paint(); }
     function holdMenu() {
+      tipUsed();
       var mk = function (label, what, arg) { var n = h("div", "cw-mi", null, [label]); n.setAttribute("data-act", what); n.setAttribute("data-name", label); if (arg) n.setAttribute("data-arg", arg); return n; };
       var t = target(), w = t;
       while (w && !(w.classList && w.classList.contains("cw"))) w = w.parentNode;
-      var nodes = [mk("All apps", "more"), mk("Settings", "gear"), mk("Smart home", "smart")];
+      // Settings first: the tip says "Hold OK for apps and settings", so OK straight after holding (or a TV
+      // that sends one more OK) lands on settings, never on a widget's own page (a clock's Timers)
+      var nodes = [mk("Settings", "gear"), mk("All apps", "more"), mk("Smart home", "smart")];
       var layer = w && w.getAttribute("data-detail");
-      if (layer && window.CouchDetail) { var op = mk("Open " + (window.CouchDetail.title(layer) || "this widget"), "detail"); op.__root = w; nodes.unshift(op); }
+      if (layer && window.CouchDetail) { var op = mk("Open " + (window.CouchDetail.title(layer) || "this widget"), "detail"); op.__root = w; nodes.splice(2, 0, op); }
       // an app in a dock, row, folder or app tile: change, move or remove it, or add one (kept on this TV)
       var ctx = EDIT = appCtx();
       if (ctx) {
@@ -2351,7 +2386,7 @@
         if (room && (ctx.slot !== 0 || ctx.max > 1)) eds.push(mk(folder ? "Add app to folder" : "Add app", "edit", "add"));
         nodes = eds.concat(nodes);
       }
-      openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes }, "Back to close");
+      openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes }, "Back to close. Settings here is couch-tv's own: the remote's Settings button opens the TV's menu.");
     }
     // ---- changing a container's apps with the remote ----
     var EDIT = null, MOVING = null, FORCE_SLOT = null;
@@ -2430,14 +2465,18 @@
       if (el.__root) { openDetail(el.__root); return; }
       act(el);
     }
+    // the way to settings, said on screen every time the home opens until someone has used it once
+    // (the Settings button or the Hold OK menu): many remotes' own Settings button opens the TV's menu,
+    // not couch-tv's, so a beginner has no other way to find it
     function tip() {
-      if (tipShown || DESIGNER) return;
+      if (tipShown || DESIGNER || PREVIEW) return;
       tipShown = true;
-      try { if (localStorage.getItem("couchtv.wtip")) return; localStorage.setItem("couchtv.wtip", "1"); } catch (e) { return; }
-      var t = h("div", "cw-tip", null, ["Hold OK for all apps and settings"]);
+      try { if (localStorage.getItem(TIP_USED)) return; } catch (e) {}
+      var t = h("div", "cw-tip cw-tip-settings", null, ["Hold OK, or press OK on the gear in the top corner, for apps and settings. The remote's own Settings button opens the TV's menu."]);
       document.body.appendChild(t);
-      setTimeout(function () { t.style.opacity = "0"; setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 700); }, 6000);
+      setTimeout(function () { t.style.opacity = "0"; setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 700); }, 9000);
     }
+    function tipUsed() { try { localStorage.setItem(TIP_USED, "1"); } catch (e) {} }
     var ARW = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], Up: [0, -1], Down: [0, 1], Left: [-1, 0], Right: [1, 0] };
     var ARC = { 38: [0, -1], 40: [0, 1], 37: [-1, 0], 39: [1, 0], 19: [0, -1], 20: [0, 1], 21: [-1, 0], 22: [1, 0] };
     function arrowOf(e) { return ARW[e.key] || ((!e.key || e.key === "Unidentified") ? ARC[e.keyCode] : null) || null; }
@@ -2452,7 +2491,14 @@
         e.preventDefault(); e.stopPropagation();
         if (backKey(e)) { closeSheet(); return; }
         var a = arrowOf(e);
-        if (a) sheetKey(e, a); else if (okKey(e) && !e.repeat) sheetKey(e, null);
+        if (a) sheetKey(e, a);
+        else if (okKey(e) && !e.repeat) {
+          // the same held OK still coming in as quick down and up pairs after the menu opened: not a choice
+          var now0 = Date.now();
+          if (okSwallow && now0 - okLast < 260) { okLast = now0; return; }
+          okSwallow = false; okLast = now0;
+          sheetKey(e, null);
+        }
         return;
       }
       if (!ours()) return;
@@ -2469,18 +2515,25 @@
       if (okKey(e)) {
         e.preventDefault(); e.stopPropagation();
         if (e.repeat || okDown) return;
+        // a TV that sends a held OK as quick down and up pairs (a TCL did): a down soon after an up is
+        // the same press going on, so it still counts as held, not as an OK on the widget (a clock's Timers)
+        if (okSoon) { clearTimeout(okSoon); okSoon = null; okDown = true; if (Date.now() - okStart >= 650) { clearTimeout(okT); okHeld = true; okSwallow = true; okLast = Date.now(); holdMenu(); } return; }
         if (!cur) { move(0, 0); }
-        okDown = true; okHeld = false;
-        okT = setTimeout(function () { okHeld = true; holdMenu(); }, 650);
+        okDown = true; okHeld = false; okStart = Date.now();
+        okT = setTimeout(function () { okHeld = true; if (okSoon) { clearTimeout(okSoon); okSoon = null; } okSwallow = true; okLast = Date.now(); holdMenu(); }, 650);
       }
     }
     function keyup(e) {
+      if (okSwallow && okKey(e)) okLast = Date.now();
       if (window.CouchDetail && window.CouchDetail.isOpen() && !okDown) { e.preventDefault(); e.stopPropagation(); window.CouchDetail.keyup(e); return; }
       if (!okDown || !okKey(e)) return;
       e.preventDefault(); e.stopPropagation();
-      clearTimeout(okT); okDown = false;
-      if (!okHeld) act(target());
-      okHeld = false;
+      okDown = false;
+      if (okHeld) { clearTimeout(okT); okHeld = false; return; }
+      // wait a moment before acting: another down straight after means the OK is still held
+      var heldFor = Date.now() - okStart;
+      var tg = target();
+      okSoon = setTimeout(function () { okSoon = null; clearTimeout(okT); if (!okHeld) { var now = target(); act(now && now.isConnected ? now : tg); } okHeld = false; }, heldFor < 400 ? 140 : 90);
     }
     var bound = false;
     return {
@@ -2489,8 +2542,9 @@
         if (!shown()) { if (sheet) closeSheet(); if (window.CouchDetail && window.CouchDetail.isOpen()) window.CouchDetail.close(true); paint(); return; }
         if (!cur) { var S = stops(); cur = startStop(S); }
         paint();
+        tip();
       },
-      reset: function () { cur = null; last = null; closeSheet(); if (window.CouchDetail && window.CouchDetail.isOpen()) window.CouchDetail.close(true); },
+      reset: function () { cur = null; last = null; tipShown = false; closeSheet(); if (window.CouchDetail && window.CouchDetail.isOpen()) window.CouchDetail.close(true); },
       move: move, activate: function () { act(target()); }, current: function () { return cur ? { id: cur.id, i: cur.i } : null },
       // put the focus on a widget (and an item in it): the designer and the tests
       focus: function (id, i) { cur = { id: String(id), i: typeof i === "number" ? i : -1 }; last = null; paint(); },

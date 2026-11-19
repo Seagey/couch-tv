@@ -70,7 +70,10 @@
     else if (k === "name" && p) p.textContent = n.getAttribute("data-n");
     else if (k === "kwretry" && window.kwArtRetry) window.kwArtRetry(n);   // a Keep watching picture is asked for again (#274)
   }, true);
-  var WXCFG = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
+  // No place set yet (no config.json weather, nothing picked in Home settings, Location): no weather and
+  // no made up town. The weather tiles ask for a town instead (widgets.js noWx), never a sample place.
+  var WX_NONE = { lat: null, lon: null, place: "", timezone: "auto" };
+  var WXCFG = WX_NONE;
   var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "tvsettings", "screensaver", "extend"];
   // The most personal photos this TV keeps (also MAX_PHOTOS in bridge/server.py and MainActivity.kt).
   var MAX_PHOTOS = 50;
@@ -826,7 +829,9 @@
       var bar = DATE_BARS ? '<i class="vbar"></i>' : "";
       date.innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' + bar +
         (place ? '<span class="wx-place">' + (DATE_BARS ? esc(place) + bar : " · " + esc(place) + " · ") + "</span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
-        '<span class="ww">' + (DATE_BARS ? " " : " · ") + esc(wxText(w)) + "</span></span>" : "") + "</span>";
+        '<span class="ww">' + (DATE_BARS ? " " : " · ") + esc(wxText(w)) + "</span></span>" : "") +
+        // no town yet (never a made up one): say once, in the weather's place, where to pick it
+        (!w && NIGHT && WX_SHOW && !CD && !wxPlaceSet() ? '<span class="wx wx-ask">' + bar + (DATE_BARS ? "" : " · ") + esc(t("wx_ask", { home: t("gear_home"), loc: t("sec_location") })) + "</span>" : "") + "</span>";
     }
     var ic = $("idle-clock"), idate = $("idle-date"), iwx = $("idle-wx");
     if (ic) ic.innerHTML = hm + (c24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
@@ -1384,6 +1389,7 @@
 
   // The bridge's reading for the place in config.json, or straight from Open-Meteo with no bridge
   // or when Home settings chose another place. Hidden when Home settings switched the weather off.
+  function wxPlaceSet() { return !!(WXCFG && WXCFG.lat != null && WXCFG.lon != null && isFinite(WXCFG.lat) && isFinite(WXCFG.lon)); }
   function wantsForecast() { return typeof CouchDesign !== "undefined" && CouchDesign.wantsForecast && CouchDesign.wantsForecast(); }
   function refreshWeather() {
     var fc = wantsForecast();
@@ -1393,6 +1399,8 @@
     }
     // a preview (?mock=1) never asks Open-Meteo itself: the designer talks to nobody else (wxlive=1: a test that does)
     var direct = (!MOCK || /[?&]wxlive=1/.test(Q)) && (OFFLINE || fc || !!(ST.place && isFinite(ST.place.lat)));
+    // no town yet: nothing to ask for (the weather tiles say "Set your town for the weather")
+    if (direct && !wxPlaceSet()) { data.weather = null; updateAmbientWeather(); return Promise.resolve(); }
     return (direct ? weatherDirect(fc) : api("GET", "/api/weather")).then(function (j) {
       data.weather = j;
       if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("weather", [j && j.temp, j && j.code, j && j.daily && j.daily.length]);
@@ -3884,7 +3892,7 @@
   var SET = { col: "secs", sec: 0, ri: 0, keyFocus: null, sub: null, lift: null, confirm: null, dirty: false, typing: null,
     msg: "", geo: { q: "", list: null, busy: false, err: false } };
   var REPO_URL = "github.com/Seagey/couch-tv";
-  var WX_DEFAULT = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
+  var WX_DEFAULT = WX_NONE;
   var pushTimer = null;
 
   function loadSettings() {
@@ -4925,6 +4933,13 @@
     renderSettings();
     try { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) {}
   }
+  function typeIn(s) {
+    if (!SET.typing || zone !== "settings" || typeof s !== "string") return false;
+    var inp = $("set-input"), at = typeof inp.selectionStart === "number" ? inp.selectionStart : inp.value.length, end = typeof inp.selectionEnd === "number" ? inp.selectionEnd : at;
+    inp.value = (inp.value.slice(0, at) + s.replace(/[\r\n]+/g, " ") + inp.value.slice(end)).slice(0, 2000);
+    try { inp.focus(); inp.setSelectionRange(at + s.length, at + s.length); } catch (e) {}
+    return true;
+  }
   function stopTyping() {
     SET.typing = null;
     $("set-type").classList.remove("on");
@@ -5570,7 +5585,9 @@
       // play an app gave no title for (Netflix sends none, Prime only its own name, issue #23).
       KW_ON ? sendWatchNext() : Promise.resolve(),
       // kids mode: the shelves as the phone left them (kids.js)
-      window.KidsMode ? window.KidsMode.refresh() : Promise.resolve()
+      window.KidsMode ? window.KidsMode.refresh() : Promise.resolve(),
+      // the guest's name, if the phone remote changed it
+      guestSync()
     ];
     return Promise.all(jobs.map(function (p) { return p.then(function () { return true; }, function () { return false; }); }))
       .then(function (ok) {
@@ -5749,7 +5766,7 @@
   var SCR = { at: 0, v: null };
   function screenNow() {
     if (!TV) return { ok: false, why: "tv" };
-    if (!TV.screenTime) return { ok: false, why: "update" };
+    if (!TV.screenTime) return { ok: false, why: ON_TV ? "ontv" : "update" };
     if (!SCR.v || Date.now() - SCR.at > 60000) { SCR.at = Date.now(); try { SCR.v = JSON.parse(TV.screenTime()); } catch (e) { SCR.v = { ok: false, why: "error" }; } }
     return SCR.v || { ok: false, why: "error" };
   }
@@ -5757,7 +5774,7 @@
   // what the widgets get (design.js hooks.data): only what is set, never a pretend value
   function homeView() {
     if (!AH) return null;
-    var r = AH.store.get(), out = { note: r.note || null, lists: r.lists || [], wifi: null, guide: r.guide || [], goal: (r.screen || {}).goal || 0 };
+    var r = AH.store.get(), out = { note: r.note || null, lists: r.lists || [], wifi: null, guide: r.guide || [], goal: (r.screen || {}).goal || 0, guest: (r.guest && r.guest.name) || "" };
     if (r.wifi) out.wifi = { ssid: r.wifi.ssid, pass: r.wifi.pass, sec: r.wifi.sec, hidden: r.wifi.hidden, qr: CouchAtHome.wifiQr(r.wifi) };
     // a calendar link with nothing read yet: read it now, not at the next minute
     if (r.cal && !CAL.events && !CAL.busy && !CAL.err && ahWants("agenda")) setTimeout(function () { calRefresh(false); }, 0);
@@ -5789,12 +5806,41 @@
     if (m && AH.store.tick(+m[1], +m[2])) ahChanged();
     return true;
   }
+  // the guest's name now: typed on this TV (At home, Guests) or on the phone remote (More, Guest's name).
+  // With the on-TV app or a computer at home the newest of the two wins, so both show the same name.
+  function guestSet(name) {
+    var at = Date.now();
+    ahEdit(function (x) { var n = CouchAtHome.guestFull(name); if (n) x.guest = { name: n, at: at }; else x.guest = { name: "", at: at }; });
+    ahWrite("tvhome.athome.guestat", at);
+    if (!OFFLINE && !MOCK && !PREVIEW) api("POST", "/api/guest", { name: CouchAtHome.guestFull(name) }).then(function () {}, function () {});
+  }
+  function guestSync() {
+    if (!AH || OFFLINE || MOCK || PREVIEW) return Promise.resolve();
+    return api("GET", "/api/guest").then(function (j) {
+      var g = j && j.guest, mine = ahRead("tvhome.athome.guestat") || 0, local = (AH.store.get().guest || {}).name || "";
+      if (!g) return;
+      // a bookings link sent from the phone remote: into this TV's own store, then cleared on the phone's side
+      var su = g.stay_url ? CouchAtHome.calUrl(g.stay_url) : "";
+      if (su) {
+        STAY.err = ""; STAY.at = 0;
+        ahEdit(function (x) { x.stay = x.stay || {}; x.stay.url = su; }, "Got it. The bookings link from the phone is on this TV now.");
+        api("POST", "/api/guest", { stay_url: "" }).then(function () {}, function () {});
+        stayRefresh(true);
+      }
+      if ((+g.at || 0) > mine) {
+        var n = CouchAtHome.guestFull(g.name || "");
+        ahWrite("tvhome.athome.guestat", +g.at);
+        if (n !== local) { AH.store.edit(function (x) { x.guest = { name: n, at: +g.at }; }); ahChanged(); }
+      } else if (mine > (+g.at || 0)) api("POST", "/api/guest", { name: local }).then(function () {}, function () {});
+    }, function () {});
+  }
   // anything private typed here stops a Share this home that somehow holds it
   function ahPrivateWords() {
     if (!AH) return [];
     var r = AH.store.get(), w = [];
     if (r.wifi) w.push(r.wifi.ssid, r.wifi.pass);
     if (r.note) w.push(r.note.text);
+    if (r.guest && r.guest.name) w.push(r.guest.name);
     if (r.cal) w.push(r.cal.url);
     if (r.stay) { if (r.stay.url) w.push(r.stay.url); Object.keys(r.stay.names || {}).forEach(function (k) { w.push(r.stay.names[k]); }); }
     (r.guide || []).forEach(function (g) { w.push(g.text); });
@@ -5875,7 +5921,8 @@
         ahType("Paste or type the calendar's private address (it starts with https)", "", function (v) {
           var u = CouchAtHome.calUrl(v);
           if (!u) { SET.msg = "That is not a calendar link. It starts with https://, or is a calendar app's own link."; return; }
-          ahEdit(function (x) { x.cal = { url: u }; }, "Got it. The Agenda reads it now.");
+          CAL.err = ""; CAL.at = 0;   // a new link starts clean: no old "did not answer" under "Got it"
+          ahEdit(function (x) { x.cal = { url: u }; }, "Got it. Reading the calendar now.");
           calRefresh(true);
         }, true);
       } });
@@ -5885,15 +5932,20 @@
     }
     // guests: the bookings calendar for the Welcome widget's name and times
     rows.push(head("Guests"));
+    var gname = (r.guest && r.guest.name) || "";
+    rows.push({ kind: "input", key: "ah-guest", label: "Guest's name", value: gname || "No name",
+      sub: gname ? "The Welcome widget says: Welcome, " + gname + ". Leave it empty to show just Welcome." : "Type who is staying, like Sarah or the Nguyen family. Empty, the Welcome widget says just Welcome. The phone remote can change it too (More, Guest's name).",
+      act: function () { ahType("The guest's name (leave it empty to show just Welcome)", gname, function (v) { guestSet(v); SET.msg = CouchAtHome.guestFull(v) ? "The Welcome widget now greets " + CouchAtHome.guestFull(v) + "." : "The Welcome widget now says just Welcome."; }); } });
     var sr = r.stay || {}, shost = sr.url ? CouchAtHome.calHost(sr.url) : "", sv = stayView(r);
     rows.push({ kind: "input", key: "ah-stay", label: sr.url ? "Change the bookings link" : "Add a bookings calendar link", value: shost || (r.cal ? "Using the Agenda's" : ""),
       sub: sr.url || r.cal ? (STAY.err || (STAY.events ? (sv && sv.phase !== "between" ? (sv.guest || "A guest") + " is booked now" : sv && sv.next ? "Next stay starts " + shortDay(sv.next.from) : "No stays in the next two months") + ", read at " + timeStr(new Date(STAY.at)) : STAY.busy ? "Reading it..." : "Read when a Welcome widget with guest names is on the home"))
         : "Airbnb, Booking.com or VRBO's calendar link (export or sync calendar). The Welcome widget greets each guest and shows check out. Keep it private.",
       act: function () {
-        ahType("Paste or type the bookings calendar's private address (it starts with https)", "", function (v) {
+        ahType("Paste or type the bookings calendar's private address. Long links are easier from the phone remote: More, Type on the TV", "", function (v) {
           var u = CouchAtHome.calUrl(v);
           if (!u) { SET.msg = "That is not a calendar link. It starts with https://, or is a calendar app's own link."; return; }
-          ahEdit(function (x) { x.stay = x.stay || {}; x.stay.url = u; }, "Got it. The Welcome widget reads it now.");
+          STAY.err = ""; STAY.at = 0;
+          ahEdit(function (x) { x.stay = x.stay || {}; x.stay.url = u; }, "Got it. Reading the bookings calendar now.");
           stayRefresh(true);
         }, true);
       } });
@@ -5915,7 +5967,7 @@
     // screen time
     rows.push(head("Screen time"));
     var s = screenNow(), goal = (r.screen || {}).goal || 0;
-    rows.push(info("ah-screen", "Today", s.ok ? CouchAtHome.hm(s.minutes) : "", s.ok ? "Time in apps on this TV today." : s.why === "access" ? "This TV has not allowed couch-tv to read screen time yet." : s.why === "tv" ? "This TV does not share screen time: it needs a Google TV, Android TV or Fire TV." : "Needs a newer couch-tv TV home."));
+    rows.push(info("ah-screen", "Today", s.ok ? CouchAtHome.hm(s.minutes) : "", s.ok ? "Time in apps on this TV today." : s.why === "access" ? "This TV has not allowed couch-tv to read screen time yet." : s.why === "tv" ? "This TV does not share screen time: it needs a Google TV, Android TV or Fire TV." : s.why === "ontv" ? "Screen time needs the couch-tv home app (couch-tv-home.apk), put on the TV once from a computer with the free Setup app. The phone only app cannot read it." : "Needs the couch-tv home app 0.13.2 or newer: Home settings, Updates."));
     rows.push({ kind: "cycle", key: "ah-goal", label: "Daily goal", value: goal ? CouchAtHome.hm(goal) : t("off"), act: function () {
       ahEdit(function (x) { var g = CouchAtHome.GOALS, i = g.indexOf((x.screen || {}).goal || 0); x.screen = { goal: g[(i + 1) % g.length] }; });
     } });
@@ -6189,7 +6241,10 @@
     // Android's "default home app" chooser closed (HomeRole.kt, #98)
     homeAnswered: function (held) { homeAnswered(held); },
     // a calendar the launcher read for the Agenda widget (MainActivity.calendar)
-    calendarText: function (id, ok, text) { calendarText(id, ok, text); } };
+    calendarText: function (id, ok, text) { calendarText(id, ok, text); },
+    // words typed on the phone remote (Type on the TV) when the TV app cannot press keys (the on-TV app
+    // with no ADB): they go into the typing box Home settings has open, at the cursor. False: no box open.
+    typeText: function (s) { return typeIn(s); } };
 
   // ---------------- the web widgets (widget-web.js): headlines, scores, markets, the commute ----------------
   // Asked only while such a widget is on the home, each source at most once per refresh, the last

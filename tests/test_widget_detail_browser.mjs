@@ -135,10 +135,13 @@ for (const [layer, w, q] of CASES) {
   ok(new Set(reads).size === 3, "timer: it changes each second (" + reads.join(", ") + ")");
   await page.close();
 }
-{ // Hold OK on a widget whose own buttons do things: Open is the first item
+{ // Hold OK on a widget whose own buttons do things: Settings first (a beginner's way in, TCL and Toshiba
+  // tests, 19 Nov 2026), then All apps, then Open for the widget's own page
   const page = await home([["scenes", 0, 0, 8, 4]], "&ha=1");
   await page.keyboard.down("Enter"); await page.waitForTimeout(900); await page.keyboard.up("Enter"); await page.waitForTimeout(300);
-  ok(/Open Scenes/.test(await page.evaluate(() => (document.querySelector(".cw-menu .cw-mi") || {}).textContent || "")), "hold OK: Open Scenes comes first");
+  const items = await page.evaluate(() => [...document.querySelectorAll(".cw-menu .cw-mi")].map((n) => n.textContent));
+  ok(items[0] === "Settings" && items[1] === "All apps" && items[2] === "Open Scenes", "hold OK: Settings, All apps, then Open Scenes (" + items.join(", ") + ")");
+  await press(page, "ArrowDown", 200); await press(page, "ArrowDown", 200);
   await press(page, "Enter", 800);
   ok((await cur(page) || {}).name === "scenes", "hold OK: Open opens the layer");
   await page.close();

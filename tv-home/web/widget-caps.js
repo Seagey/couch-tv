@@ -81,7 +81,9 @@
   }
 
   // ---------------- the words used again and again ----------------
-  var OPEN = "Press Settings on the remote (or OK on the gear at the end of your apps), then pick Home settings.";
+  // the way into Home settings on every home: a design's Settings button (top right), the Hold OK menu, or
+  // the classic home's gear. The remote's own Settings button often opens the TV's menu instead, so say so.
+  var OPEN = "Press OK on the gear (top right, or at the end of your apps), then pick Home settings. The remote's Settings button opens the TV's own menu.";
   var SEND = "Tap Send to my TV, then on the TV: Home settings, couch-tv Studio, Get a design, and type the code.";
   function inStudio(what) { return ["Open your design in couch-tv Studio on your phone.", "Tap the widget, then " + what + ".", SEND]; }
   var TOWN = [OPEN, "Go down to Location and press OK.", "Pick Search for a town or city, type your town, then press OK.", "Pick your town in the list. The weather shows within a minute."];
@@ -170,7 +172,7 @@
       setup: setup("designer", inStudio("pick the date and type its name")), until: "Always shows the count", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     date: { name: "Date", status: "works", what: "Today's date, with the weather if you like", needs: ["Nothing for the date. The weather line needs your town"],
-      setup: setup("nothing", ["Nothing to set up for the date.", "For the weather line, set your town: " + OPEN.charAt(0).toLowerCase() + OPEN.slice(1), "Go down to Location, pick Search for a town or city, type your town, then press OK."]),
+      setup: setup("nothing", ["Nothing to set up for the date.", "For the weather, " + OPEN.charAt(0).toLowerCase() + OPEN.slice(1), "Go down to Location, pick Search for a town or city, type your town, then press OK."]),
       until: "Always shows the date", build: "",
       ok: "Opens Calendar: this month and today", platforms: EVERY(), sizes: sz(["line", "wline", "tile", "small"], [2, 1]) },
     month: { name: "Month", status: "works", what: "This month's calendar, with today marked", needs: ["Nothing: it uses the TV's own clock"],
@@ -495,7 +497,7 @@
   SHORT[QUEUE_NEED] = ["Needs Spotify connected", "On the home computer. OK here shows how", "Needs Spotify"];
   SHORT[C.card.needs[0]] = ["Type your words in couch-tv Studio", "Or a live number from the home computer. OK here shows how", "Type your words"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];
-  var AT = "Home settings, couch-tv Studio, At home";
+  var AT = "Settings (top right), Home settings, couch-tv Studio, At home";
   SHORT[NOTE_NEED] = ["Write a note", AT, "Write a note"];
   SHORT[LIST_NEED] = ["Add a list", AT, "Add a list"];
   SHORT[WIFI_NEED] = ["Add your guest Wi-Fi", AT, "Add Wi-Fi"];

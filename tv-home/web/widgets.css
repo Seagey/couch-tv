@@ -143,6 +143,18 @@ html.cd-wmode #grid .app.focus { outline: none; }
 .cw-sheet .cw-hint { margin-top: 40px; font-size: 25px; color: rgba(255, 255, 255, 0.72); }
 .cw-menu .cw-mi { width: 640px; padding: 26px 34px; margin: 10px 0; border-radius: 28px; font-size: 34px; font-weight: 650; background: rgba(255, 255, 255, 0.1); }
 .cw-menu .cw-mi.cw-ifocus { background: #fff; color: #111; outline: none; }
+/* the Settings button on a design (design.js gearChip): top right on every design, so settings are always
+   one press away; it grows into a labelled pill while it has the focus */
+.cw-gearchip { display: none; position: fixed; top: 28px; right: 28px; z-index: 58; height: 64px; min-width: 64px; padding: 0 12px; box-sizing: border-box;
+  border-radius: 32px; background: rgba(10, 10, 14, 0.62); color: #fff; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.28); font: 650 26px "Inter", sans-serif; white-space: nowrap; }
+html.cd-wmode .cw-gearchip { display: -webkit-flex; display: flex; }
+html.cd-wmode.expanded .cw-gearchip, html.setting .cw-gearchip { display: none; }
+.cw-gearchip svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; -webkit-flex: none; flex: none; }
+.cw-gearchip .cw-gearchip-t { display: none; margin: 0 10px 0 10px; }
+.cw-gearchip.cw-focus { background: #fff; color: #111; box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.45); -webkit-transform: none !important; transform: none !important; }
+.cw-gearchip.cw-focus .cw-gearchip-t { display: inline; }
+.cw-tip.cw-tip-settings { white-space: normal; width: 1100px; max-width: 80vw; text-align: center; line-height: 1.35; }
 .cw-tip { position: fixed; left: 50%; bottom: 40px; -webkit-transform: translateX(-50%); transform: translateX(-50%); z-index: 59; padding: 16px 30px; border-radius: 40px;
   background: rgba(10, 10, 14, 0.82); color: #fff; font: 600 25px "Inter", sans-serif; white-space: nowrap; -webkit-transition: opacity 0.6s; transition: opacity 0.6s; }
 

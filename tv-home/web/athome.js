@@ -76,6 +76,9 @@
     if (url) out.cal = { url: url };
     var st = cleanStay(r.stay);
     if (st) out.stay = st;
+    // the guest's name now, for the Welcome widget (typed on the TV or the phone remote)
+    var gn = guestFull(obj(r.guest).name);
+    if (gn) out.guest = { name: gn, at: isFinite(obj(r.guest).at) ? +obj(r.guest).at : 0 };
     var goal = +obj(r.screen).goal;
     if (GOALS.indexOf(goal) > 0) out.screen = { goal: goal };
     return out;
@@ -112,6 +115,13 @@
     w = w.replace(/^['-]+|['-]+$/g, "");
     if (w.length < 2 || NOT_NAMES.test(w)) return "";
     return w.charAt(0).toUpperCase() + w.slice(1);
+  }
+  // the name of the guest staying now, as the Welcome widget shows it after the greeting ("Sarah",
+  // "the Nguyen family"): one line of up to 38 characters, letters, digits, spaces and ' & , . ! -.
+  // Never a link or an address. The same rule as Store.guestName in the on-TV app and bridge/guest.py.
+  function guestFull(v) {
+    if (typeof v !== "string" || /[:/@]|www\./i.test(v)) return "";
+    return line(v, 200).replace(/[^A-Za-z0-9\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF\u0590-\u06FF\u0E00-\u0E7F\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF '&,.!-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 38).trim();
   }
   // the guest's first name from a calendar event's title, or "" when the title only says it is booked:
   // "Reserved - Sarah Smith" (VRBO and many channel managers), "Sarah Smith (HM2AB3CD4E)", "Stay: Sarah",
@@ -448,7 +458,7 @@
   }
 
   var API = { KEY: KEY, LIM: LIM, SEC: SEC, GOALS: GOALS, clean: clean, calUrl: calUrl, calHost: calHost, wifiQr: wifiQr, parseIcs: parseIcs, isIcs: isIcs,
-    TIMES_IN: TIMES_IN, TIMES_OUT: TIMES_OUT, guestName: guestName, guestWord: guestWord, staysOf: staysOf, stayNow: stayNow, dayKey: dayKey,
+    TIMES_IN: TIMES_IN, TIMES_OUT: TIMES_OUT, guestName: guestName, guestWord: guestWord, guestFull: guestFull, staysOf: staysOf, stayNow: stayNow, dayKey: dayKey,
     exifDate: exifDate, nameDate: nameDate, onThisDay: onThisDay, hm: hm, goalLine: goalLine, store: store };
   root.CouchAtHome = API;
   if (typeof module !== "undefined" && module.exports) module.exports = API;

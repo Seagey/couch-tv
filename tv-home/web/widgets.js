@@ -141,6 +141,9 @@
     else if (want.length || want.edited) {
       want.forEach(function (k) {
         var A = cat(), hit = null, i;
+        // the TV's app list not read yet (the "Use this design?" preview draws before it is): never
+        // "Not on this TV" for an app that may well be there; the catalogue's own picture instead
+        if (A && A.get(k) && !have.length && env.card) { out.push(k); keys.push(k); return; }
         if (A && A.get(k)) { hit = A.resolve(k, have); out.push(hit ? hit.package : "missing:" + k); keys.push(k); return; }
         for (i = 0; i < have.length; i++) if (have[i].package === k) hit = have[i];
         if (hit) { out.push(k); keys.push(k); }   // an app picked on this TV, or an old design's package name
@@ -515,7 +518,7 @@
   }
   R.solar = function (root, o, b, env) {
     var s = sunToday(env);
-    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Home settings, Location");
+    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Settings (top right), Home settings, Location");
     var at = arc(s.frac);
     add(root, [lab("sun", op(o).label || "Sun"),
       svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.28)", "stroke-width": 3, "stroke-dasharray": "2 9", "stroke-linecap": "round" }),
@@ -646,7 +649,7 @@
   };
 
   // weather
-  function noWx(root, b, env) { return empty(root, b, "partly-cloudy", dataOf(env).wxOff ? "Weather is off on this TV" : "Set your town for the weather", dataOf(env).wxOff ? "Turn it on in Home settings, Weather" : "Home settings, Location"); }
+  function noWx(root, b, env) { return empty(root, b, "partly-cloudy", dataOf(env).wxOff ? "Weather is off on this TV" : "Set your town for the weather", dataOf(env).wxOff ? "Turn it on in Home settings, Weather" : "Settings (top right), Home settings, Location"); }
   R.weather = function (root, o, b, env, sh) {
     var w = weather(env);
     if (!w) return noWx(root, b, env);
@@ -737,7 +740,7 @@
   };
   R.sun = function (root, o, b, env) {
     var s = sunToday(env);
-    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Home settings, Location");
+    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Settings (top right), Home settings, Location");
     var at = arc(s.frac);
     add(root, [lab("sun", op(o).label || "Sun"), svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.3)", "stroke-width": 4, "stroke-dasharray": "2 10", "stroke-linecap": "round" }),
       s.frac > 0 && s.frac < 1 ? S("circle", { cx: at.x, cy: at.y, r: 14, fill: "#ffd60a" }) : null], "flex:1;min-height:0;margin:6px 0"),
@@ -802,12 +805,24 @@
   };
 
   // photos
-  function noPhotos(root, b) { return empty(root, b, "picture", "Add your photos on the TV", "Home settings, Your photos"); }
+  // a photo box has no panel of its own (the photo is the panel), so with no photo yet its words sat
+  // white on whatever was behind (white on a light look's beige): a dark panel under them, always readable
+  function noPhotos(root, b) {
+    empty(root, b, "picture", "Add your photos on the TV", "Settings (top right), Home settings, Your photos");
+    var bg = null;
+    for (var i = 0; i < root.childNodes.length; i++) if (root.childNodes[i].className === "cw-bg") bg = root.childNodes[i];
+    if (!bg) { bg = E("div", "cw-bg"); root.insertBefore(bg, root.firstChild); }
+    bg.style.background = "rgba(18, 18, 22, 0.78)"; bg.style.borderRadius = "inherit";
+    root.style.color = "#fff"; root.style.setProperty("--ink", "#fff"); root.style.setProperty("--sub", "rgba(255, 255, 255, 0.78)");
+    root.classList.add("cw-photo-empty");
+    return root;
+  }
   function cssImg(u) { return 'url("' + String(u).replace(/["\\\n()]/g, encodeURIComponent) + '")'; }
   function photoLayer(u, fit) { return E("div", "cw-fill", "background-image:" + cssImg(u) + ";background-size:" + (fit === "contain" ? "contain;background-repeat:no-repeat" : "cover")); }
   function caption(root, q) {
     if (!q.caption) return;
-    add(root, E("div", "", "position:absolute;left:0;right:0;bottom:0;padding:70px 28px 24px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.6));z-index:2", [E("div", "cw-t29", "font-weight:650;color:#fff", [q.caption]), q.sub ? E("div", "cw-t23", "color:rgba(255,255,255,.82)", [q.sub]) : null]));
+    // a scrim strong enough for white words on any photo, even a white sky or snow
+    add(root, E("div", "", "position:absolute;left:0;right:0;bottom:0;padding:80px 28px 24px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.55) 45%,rgba(0,0,0,.78));z-index:2", [E("div", "cw-t29", "font-weight:650;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.5)", [q.caption]), q.sub ? E("div", "cw-t23", "color:rgba(255,255,255,.9);text-shadow:0 1px 8px rgba(0,0,0,.5)", [q.sub]) : null]));
   }
   function dayIndex(n, secs) { return n ? Math.floor(Date.now() / (secs * 1000)) % n : 0; }
   R.photo = function (root, o, b, env) {
@@ -1881,8 +1896,8 @@
     var q = op(o), c = dataOf(env).commute || {}, v;
     if (env.demo) { v = { minutes: 16, km: 12.4 }; c = { to: { name: "work" } }; }
     else {
-      if (!c.from) { webEmpty(root, b, "location", "Set your town for the commute", "Home settings, Location", "Set your town"); root.setAttribute("data-setup", "commute"); return null; }
-      if (!c.to) { webEmpty(root, b, "location", "Set where you drive to", "Home settings, couch-tv Studio, Commute", "Set where to"); root.setAttribute("data-setup", "commute"); return null; }
+      if (!c.from) { webEmpty(root, b, "location", "Set your town for the commute", "Settings (top right), Home settings, Location", "Set your town"); root.setAttribute("data-setup", "commute"); return null; }
+      if (!c.to) { webEmpty(root, b, "location", "Set where you drive to", "Settings (top right), Home settings, couch-tv Studio, Commute", "Set where to"); root.setAttribute("data-setup", "commute"); return null; }
       var rec = webOf(env, "commute", c.key);
       if (rec && !rec.ok && rec.err === "empty") { webEmpty(root, b, "location", "No road route between these places", "Check Commute in Home settings", "No route"); return null; }
       if (!webReady(root, b, "location", "commute", rec)) return null;
@@ -1927,14 +1942,34 @@
     lines[0] = m[1] + ", " + name + m[2];
     return lines.join("\n");
   }
+  // couch-tv Studio's sample words in its starter designs (app/templates.js): on a real TV they are a
+  // stranger's name and a made up house, so they never show there. The greeting stays.
+  var WELCOME_SAMPLE = { "Welcome, Ella and friends": "Welcome", "Hi Ruby!": "Hi!" };
+  var WELCOME_SAMPLE_LINES = ["Headland House, North Point", "Tuesday to Sunday. Night two of five", "Three sleeps till the beach"];
+  function realTv(env) { return !!env && !env.demo && !env.designer && !env.preview; }
+  // the greeting with the name taken off: "Welcome, Smith family" -> "Welcome", "Hi Ruby!" stays
+  function greetingOf(text) { var lines = text.split("\n"), i = lines[0].indexOf(", "); if (i > 0) lines[0] = lines[0].slice(0, i) + (/[.!]+$/.exec(lines[0]) || [""])[0]; return lines.join("\n"); }
   R.welcome = function (root, o, b, env) {
     var q = op(o), align = q.align || "center", text = q.text || "Welcome";
+    // on a TV: never the starter design's sample words; the guest's name typed on the TV or the phone
+    // remote (At home, Guests) goes after the greeting
+    var real = realTv(env), typed = real ? String((athome(env) || {}).guest || "") : "";
+    if (real) {
+      var q1 = {}, k1;
+      for (k1 in q) if (Object.prototype.hasOwnProperty.call(q, k1)) q1[k1] = q[k1];
+      if (Object.prototype.hasOwnProperty.call(WELCOME_SAMPLE, text)) text = WELCOME_SAMPLE[text];
+      if (WELCOME_SAMPLE_LINES.indexOf(q1.kicker) >= 0) delete q1.kicker;
+      if (WELCOME_SAMPLE_LINES.indexOf(q1.sub) >= 0) delete q1.sub;
+      q = q1;
+      if (typed && q.source !== "calendar") text = withName(greetingOf(text), typed);
+    }
     if (q.source === "calendar") {
       var st = stayOf(env || {});
-      if (!st || !st.set) return empty(root, b, "calendar", b.w < 300 ? "Add bookings" : "Add your bookings calendar", "Home settings, couch-tv Studio, At home");
-      var v = st.view;
+      if ((!st || !st.set) && typed) text = withName(greetingOf(text), typed);
+      else if (!st || !st.set) return empty(root, b, "calendar", b.w < 300 ? "Add bookings" : "Add your bookings calendar", "Settings (top right), Home settings, couch-tv Studio, At home");
+      var v = st && st.view;
       if (v && v.phase !== "between") {
-        text = withName(text, v.guest);
+        text = withName(text, v.guest || typed);
         if (q.times !== false) { var sl = stayLine(v, env || {}); if (sl) { var q2 = {}; for (var k in q) if (Object.prototype.hasOwnProperty.call(q, k)) q2[k] = q[k]; q2.sub = sl; q = q2; } }
       }
     }
@@ -2148,7 +2183,7 @@
     if (env.demo) { var de = demoEvents(); return { today: de.map(function (x, i) { return { title: x.title, when: hhmm(x.start, env), col: EV_COL[i], start: x.start, end: x.end }; }), tomorrow: [] }; }
     var c = (athome(env) || {}).cal;
     if (!c || !c.set) { soon(root, b, "calendar", "agenda"); return null; }
-    if (!c.events) { empty(root, b, "calendar", c.err ? (b.w < 300 ? "Calendar not read" : c.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), c.err ? "Home settings, couch-tv Studio, At home" : ""); return null; }
+    if (!c.events) { empty(root, b, "calendar", c.err ? (b.w < 300 ? "Calendar not read" : c.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), c.err ? "Settings (top right), Home settings, couch-tv Studio, At home" : ""); return null; }
     return { today: evDay(c.events, 0, env), tomorrow: evDay(c.events, 1, env) };
   }
   R.agenda = function (root, o, b, env) {
@@ -2292,7 +2327,8 @@
     var h = athome(env), s = h && h.screen;
     if (!s || s.why === "off") { soon(root, b, "timer", "screentime"); return null; }
     if (s.why === "tv") { empty(root, b, "timer", b.w < 300 ? "Not on this TV" : "Screen time is not on this TV", "It needs a Google TV, Android TV or Fire TV"); return null; }
-    if (!s.ok) { empty(root, b, "timer", s.why === "access" ? (b.w < 300 ? "Allow it first" : "Allow screen time on this TV") : (b.w < 300 ? "Needs an update" : "Needs a newer couch-tv TV home"), s.why === "access" ? "Home settings, couch-tv Studio, At home" : ""); return null; }
+    if (s.why === "ontv") { empty(root, b, "timer", b.w < 300 ? "Needs a computer once" : "Screen time needs the couch-tv home app", "Put it on once from a computer with the free Setup app"); return null; }
+    if (!s.ok) { empty(root, b, "timer", s.why === "access" ? (b.w < 300 ? "Allow it first" : "Allow screen time on this TV") : (b.w < 300 ? "Needs an update" : "Needs a newer couch-tv TV home"), s.why === "access" ? "Settings (top right), Home settings, couch-tv Studio, At home" : ""); return null; }
     return { ok: true, minutes: s.minutes || 0, goal: h.goal || 0, apps: s.apps || [] };
   }
   R.screentime = function (root, o, b, env) {
