@@ -7,6 +7,7 @@ and edit it. config.json is in .gitignore: it never gets committed.
 Secrets never go in here. They are environment variables (see env.example).
 """
 import json
+import logging
 import os
 import re
 import shutil
@@ -290,35 +291,107 @@ LOOKS = ("night", "classic", "oled", "loop")
 
 # The Loop look's footage, made by scripts/make-loop.sh on this computer (git ignores the folder):
 # <variant>.mp4 and its 160x90 blurred copy <variant>-blur.mp4 for the glass, with a poster of
-# each (<variant>.jpg, <variant>-blur.jpg). One variant per time of day, in this order.
+# each (<variant>.jpg, <variant>-blur.jpg). One variant per time of day, in this order. A photo's
+# loop made with --matte also has <variant>-fg.png, the cut-out the home draws over the clock, and
+# every run writes loop.json, the loop's length and motion (docs/LOOP.md, the depth effect).
 LOOP_DIR = os.path.join(ROOT, "tv-home", "web", "loop")
 LOOP_VARIANTS = ("dawn", "day", "dusk", "night")
+LOOP_SCREEN = (1920, 1080)   # the home's design pixels, which loop.json's fg rectangle is in
+_log = logging.getLogger("config")
+_loop_json_told = set()      # the loop.json files (path, size, time) already logged as ignored
 
 
 def loop_files(folder):
     """What the Loop look can play from `folder`: the variants whose .mp4 is there, in the order
     dawn, day, dusk, night, and `blur` true only when every present variant has its blurred copy
     (one without it would make the glass go dark at that time of day). A missing folder gives an
-    empty list, so the key is always there for the home to read."""
+    empty list, so the key is always there for the home to read. `meta` is loop.json when it is
+    there and sound, else None; `fg` is true only when meta has a cut-out rectangle and every
+    present variant has its <variant>-fg.png (one without it would lose the depth at that time of
+    day)."""
     variants = [v for v in LOOP_VARIANTS if os.path.isfile(os.path.join(folder, v + ".mp4"))]
     blur = bool(variants) and all(os.path.isfile(os.path.join(folder, v + "-blur.mp4")) for v in variants)
-    return {"variants": variants, "blur": blur, "version": loop_version(folder, variants)}
+    meta = loop_meta(folder)
+    fg = bool(variants) and bool(meta and meta["fg"]) and \
+        all(os.path.isfile(os.path.join(folder, v + "-fg.png")) for v in variants)
+    return {"variants": variants, "blur": blur, "version": loop_version(folder, variants), "meta": meta, "fg": fg}
+
+
+def _in_range(v, lo, hi):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and lo <= v <= hi
+
+
+def _whole(v):
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def loop_meta(folder):
+    """loop.json from make-loop.sh: {"still", "seconds", "fps", "zoom", "drift", "fg"}, checked:
+    seconds 15 to 60, fps 30, zoom 0 to 0.2, drift 0 to 0.05, fg null or whole numbers x, y, w, h
+    with the rectangle inside the 1920x1080 screen. None when the file is missing; when it is there
+    but not sound, None and one log line (once for each version of the file, since this is read on
+    every request for config.js)."""
+    path = os.path.join(folder, "loop.json")
+    try:
+        st = os.stat(path)
+    except FileNotFoundError:
+        return None
+    except OSError as e:
+        return _loop_meta_bad(path, None, "it could not be read (%s)" % e)
+    try:
+        with open(path, encoding="utf-8") as f:
+            m = json.load(f)
+    except (OSError, ValueError) as e:
+        return _loop_meta_bad(path, st, "it could not be read (%s)" % e)
+    if not isinstance(m, dict):
+        return _loop_meta_bad(path, st, "it is not an object")
+    fg = m.get("fg")
+    sw, sh = LOOP_SCREEN
+    why = None
+    if not isinstance(m.get("still"), bool):
+        why = "still is not true or false"
+    elif not _in_range(m.get("seconds"), 15, 60):
+        why = "seconds is not from 15 to 60"
+    elif m.get("fps") != 30 or isinstance(m.get("fps"), bool):
+        why = "fps is not 30"
+    elif not _in_range(m.get("zoom"), 0, 0.2):
+        why = "zoom is not from 0 to 0.2"
+    elif not _in_range(m.get("drift"), 0, 0.05):
+        why = "drift is not from 0 to 0.05"
+    elif fg is not None:
+        if not (isinstance(fg, dict) and all(_whole(fg.get(k)) for k in ("x", "y", "w", "h"))):
+            why = "fg is not whole numbers x, y, w and h"
+        elif not (fg["x"] >= 0 and fg["y"] >= 0 and fg["w"] > 0 and fg["h"] > 0
+                  and fg["x"] + fg["w"] <= sw and fg["y"] + fg["h"] <= sh):
+            why = "fg is not inside the %dx%d screen" % (sw, sh)
+    if why:
+        return _loop_meta_bad(path, st, why)
+    return {"still": m["still"], "seconds": m["seconds"], "fps": 30, "zoom": m["zoom"], "drift": m["drift"],
+            "fg": None if fg is None else {k: fg[k] for k in ("x", "y", "w", "h")}}
+
+
+def _loop_meta_bad(path, st, why):
+    key = (path, st.st_size, st.st_mtime_ns) if st else (path, why)
+    if key not in _loop_json_told:
+        _loop_json_told.add(key)
+        _log.warning("the Loop look ignores %s: %s; run scripts/make-loop.sh again (docs/LOOP.md)", path, why)
+    return None
 
 
 def loop_version(folder, variants):
     """A short mark of the loop files as they are now (names, sizes and times), which the home adds to
     the files' addresses: the bridge serves them with an hour of caching, and without it a TV would go
-    on playing the old files for an hour after make-loop.sh made new ones. Empty with no variants."""
+    on playing the old files for an hour after make-loop.sh made new ones. loop.json counts too, as the
+    cut-out's motion lives there. Empty with no variants."""
     import hashlib
     h = hashlib.sha1()
-    for v in variants:
-        for suffix in (".mp4", "-blur.mp4", ".jpg", "-blur.jpg"):
-            p = os.path.join(folder, v + suffix)
-            try:
-                st = os.stat(p)
-            except OSError:
-                continue
-            h.update(f"{v}{suffix}:{st.st_size}:{int(st.st_mtime)}\n".encode())
+    names = [v + suffix for v in variants for suffix in (".mp4", "-blur.mp4", ".jpg", "-blur.jpg", "-fg.png")]
+    for name in names + ["loop.json"]:
+        try:
+            st = os.stat(os.path.join(folder, name))
+        except OSError:
+            continue
+        h.update(f"{name}:{st.st_size}:{int(st.st_mtime)}\n".encode())
     return h.hexdigest()[:10] if variants else ""
 
 

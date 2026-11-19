@@ -18,7 +18,8 @@ def touch(folder, *names):
 
 
 def without_version(d):
-    return {k: v for k, v in d.items() if k != "version"}
+    """variants and blur only: the version mark, loop.json and the cut-outs have their own tests below"""
+    return {k: v for k, v in d.items() if k not in ("version", "meta", "fg")}
 
 class LoopLook(unittest.TestCase):
     def test_loop_is_a_look(self):
@@ -110,3 +111,114 @@ class LoopVersion(unittest.TestCase):
             self.assertEqual(config.public()["home"]["loop"]["variants"], [])
             touch(self.folder, "night.mp4")
             self.assertEqual(config.public()["home"]["loop"]["variants"], ["night"], "no restart needed after make-loop.sh")
+
+
+GOOD = {"still": True, "seconds": 34, "fps": 30, "zoom": 0.06, "drift": 0.006, "fg": {"x": 480, "y": 162, "w": 960, "h": 318}}
+
+
+class LoopMeta(unittest.TestCase):
+    """loop.json and the cut-outs (docs/LOOP.md, the depth effect): meta when sound, fg only when complete."""
+
+    def setUp(self):
+        import tempfile, shutil
+        self.folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.folder, True)
+        config._loop_json_told.clear()
+
+    def write(self, obj):
+        import json
+        with open(os.path.join(self.folder, "loop.json"), "w", encoding="utf-8") as f:
+            f.write(obj if isinstance(obj, str) else json.dumps(obj))
+
+    def test_no_loop_json_no_meta_and_no_fg(self):
+        touch(self.folder, "day.mp4", "day-fg.png")
+        out = config.loop_files(self.folder)
+        self.assertIsNone(out["meta"])
+        self.assertIs(out["fg"], False)
+
+    def test_a_sound_loop_json_is_passed_on(self):
+        touch(self.folder, "day.mp4", "night.mp4")
+        self.write(GOOD)
+        self.assertEqual(config.loop_files(self.folder)["meta"], GOOD)
+        self.write(dict(GOOD, fg=None, still=False, zoom=0, drift=0, seconds=15))
+        self.assertEqual(config.loop_files(self.folder)["meta"]["fg"], None)
+
+    def test_fg_only_when_meta_has_a_rectangle_and_every_variant_its_png(self):
+        touch(self.folder, "day.mp4", "night.mp4", "day-fg.png")
+        self.write(GOOD)
+        self.assertIs(config.loop_files(self.folder)["fg"], False, "night has no cut-out")
+        touch(self.folder, "night-fg.png")
+        self.assertIs(config.loop_files(self.folder)["fg"], True)
+        self.write(dict(GOOD, fg=None))
+        self.assertIs(config.loop_files(self.folder)["fg"], False, "a run without --matte: no depth")
+        # a cut-out with no video is not a variant and does not count
+        self.write(GOOD)
+        touch(self.folder, "dusk-fg.png")
+        self.assertIs(config.loop_files(self.folder)["fg"], True)
+
+    def test_fg_needs_variants(self):
+        touch(self.folder, "day-fg.png")
+        self.write(GOOD)
+        self.assertIs(config.loop_files(self.folder)["fg"], False)
+
+    def test_anything_out_of_range_is_ignored_with_one_log_line(self):
+        touch(self.folder, "day.mp4", "day-fg.png")
+        bad = [
+            "not json", "[1, 2]", dict(GOOD, seconds=14), dict(GOOD, seconds=61), dict(GOOD, seconds="34"),
+            dict(GOOD, fps=60), dict(GOOD, fps=True), dict(GOOD, zoom=0.3), dict(GOOD, zoom=-0.01),
+            dict(GOOD, drift=0.06), dict(GOOD, still="yes"), {k: v for k, v in GOOD.items() if k != "still"},
+            dict(GOOD, fg={"x": 480, "y": 162, "w": 960}), dict(GOOD, fg={"x": 480.5, "y": 162, "w": 960, "h": 318}),
+            dict(GOOD, fg={"x": 1000, "y": 162, "w": 960, "h": 318}), dict(GOOD, fg={"x": 0, "y": 900, "w": 960, "h": 318}),
+            dict(GOOD, fg={"x": -3, "y": 162, "w": 960, "h": 318}), dict(GOOD, fg={"x": 0, "y": 0, "w": 0, "h": 318}),
+            dict(GOOD, fg={"x": True, "y": 162, "w": 960, "h": 318}), dict(GOOD, fg=[480, 162, 960, 318]),
+        ]
+        import time
+        for i, b in enumerate(bad):
+            self.write(b)
+            t = time.time() + i + 1
+            os.utime(os.path.join(self.folder, "loop.json"), (t, t))   # each a new version of the file
+            with self.assertLogs("config", level="WARNING") as logs:
+                out = config.loop_files(self.folder)
+            self.assertIsNone(out["meta"], b)
+            self.assertIs(out["fg"], False, b)
+            self.assertEqual(len(logs.output), 1, b)
+            self.assertIn("loop.json", logs.output[0])
+            # the same file read again (every config.js request): no second line
+            with self.assertNoLogs("config", level="WARNING"):
+                config.loop_files(self.folder)
+
+    def test_the_edges_of_the_ranges_are_accepted(self):
+        touch(self.folder, "day.mp4")
+        for ok in (dict(GOOD, seconds=15), dict(GOOD, seconds=60), dict(GOOD, zoom=0, drift=0), dict(GOOD, zoom=0.2, drift=0.05),
+                   dict(GOOD, fg={"x": 0, "y": 0, "w": 1920, "h": 1080})):
+            self.write(ok)
+            self.assertEqual(config.loop_files(self.folder)["meta"], ok)
+
+    def test_unknown_keys_are_left_out(self):
+        touch(self.folder, "day.mp4")
+        self.write(dict(GOOD, extra="x", fg=dict(GOOD["fg"], z=1)))
+        self.assertEqual(config.loop_files(self.folder)["meta"], GOOD)
+
+    def test_the_version_follows_loop_json_and_the_cut_outs(self):
+        import time
+        touch(self.folder, "day.mp4")
+        v0 = config.loop_files(self.folder)["version"]
+        self.write(GOOD)
+        v1 = config.loop_files(self.folder)["version"]
+        self.assertNotEqual(v1, v0, "loop.json counts")
+        touch(self.folder, "day-fg.png")
+        v2 = config.loop_files(self.folder)["version"]
+        self.assertNotEqual(v2, v1, "a cut-out counts")
+        with open(os.path.join(self.folder, "day-fg.png"), "ab") as f:
+            f.write(b"x")
+        os.utime(os.path.join(self.folder, "day-fg.png"), (time.time() + 5, time.time() + 5))
+        self.assertNotEqual(config.loop_files(self.folder)["version"], v2, "a new cut-out gives a new mark")
+
+    def test_public_carries_meta_and_fg(self):
+        from unittest.mock import patch
+        touch(self.folder, "night.mp4", "night-fg.png")
+        self.write(GOOD)
+        with patch.object(config, "LOOP_DIR", self.folder):
+            loop = config.public()["home"]["loop"]
+        self.assertEqual(loop["meta"], GOOD)
+        self.assertIs(loop["fg"], True)
