@@ -95,11 +95,19 @@
     web: ["Keep the home computer on: it runs couch-tv for this TV.", "Start a show from couch-tv's home (Netflix, YouTube and some others).", "Come back to the home: the show is waiting here."],
     vidaa: ["Needs a computer at home that stays on, running couch-tv (setup option B). The website home cannot do this.", "Start a show from couch-tv's home.", "Come back to the home: the show is waiting here."]
   };
-  var SMART_HOME = {
-    android: ["Needs Home Assistant, the smart home app, running at home.", "Whoever set up couch-tv adds your rooms once on their computer (setup guide, Smart home) and puts couch-tv on the TV again.", "Press Home: your rooms show here."],
-    web: ["Not possible on this TV: smart home controls need a Google TV, Android TV or Fire TV."],
-    vidaa: ["Not possible on this TV: smart home controls need a Google TV, Android TV or Fire TV."]
-  };
+  // smart home is set up on the TV itself (Home settings, couch-tv Studio, Smart home): the launcher
+  // talks to Home Assistant on a Google TV, Android TV or Fire TV; on a TV whose home a computer runs,
+  // that computer does (bridge/smarthome.py)
+  var SH_CONNECT = "Go down to couch-tv Studio, then Smart home. Type Home Assistant's address, then paste a token with the phone remote's Type on the TV (the steps are on the screen).";
+  function shSteps(what, after) {
+    var pick = "Tick your " + what + ", then pick Save and show on the home.";
+    return {
+      android: ["Needs Home Assistant, the smart home app, running at home. Not in it yet? Smart home, Add a device we don't list, shows how.", OPEN, SH_CONNECT, pick].concat(after || []).slice(0, 5),
+      web: ["Needs Home Assistant running at home, and the home computer on: it talks to Home Assistant for this TV.", OPEN, SH_CONNECT, pick].concat(after || []).slice(0, 5),
+      vidaa: ["Needs a computer at home that stays on, running couch-tv (setup option B): the website home cannot reach Home Assistant.", OPEN, SH_CONNECT, pick]
+    };
+  }
+  var SMART_HOME = shSteps("rooms and scenes", ["Press Home: they show here."]);
   var APPS_ORDER = [OPEN, "Go down to Apps and press OK.", "OK moves an app between the home, More apps and hidden. Hold OK on an app to move it along."];
 
   // things typed at home: Home settings, couch-tv Studio, At home (athome.js), kept on the TV only
@@ -124,13 +132,9 @@
   var PHOTOS_NEED = "Your photos on the TV, or one photo put in the widget";
   var WATCH_NEED = "The couch-tv TV app or a computer at home that stays on";
   var HA_NEED = "Home Assistant (a smart home app) running at home";
-  // the smart home widgets (group C): every one is set up once on a computer, then needs no computer
-  function haSteps(what) {
-    var after = [].slice.call(arguments, 1);
-    return { android: ["Needs Home Assistant, the smart home app, running at home.", "Whoever set up couch-tv adds your " + what + " once on a computer (setup guide, Smart home), then puts couch-tv on the TV again."].concat(after),
-      web: SMART_HOME.web.slice(), vidaa: SMART_HOME.vidaa.slice() };
-  }
-  var HA_PLAT = function () { return plat("setup", "no", "no", { android: "Set up once from a computer; after that no computer is needed.", web: "Smart home needs a Google TV, Android TV or Fire TV.", vidaa: "Smart home needs a Google TV, Android TV or Fire TV." }); };
+  // the smart home widgets (group C): set up on the TV (Home settings, couch-tv Studio, Smart home)
+  function haSteps(what) { return shSteps(what, [].slice.call(arguments, 1)); }
+  var HA_PLAT = function () { return plat("setup", "computer", "computer", { android: "Set up on the TV: Home settings, couch-tv Studio, Smart home. No computer needed.", web: "The home computer talks to Home Assistant for this TV.", vidaa: "Needs a computer at home: the website home cannot reach Home Assistant." }); };
   // the Up next queue: Spotify's queue, read with the person's own Spotify sign in
   var QUEUE_NEED = "Spotify connected on the home computer, or on the website home on a Hisense";
   var SPOTIFY_ON = "On that computer, connect Spotify once: open the couch-tv Spotify page on it and sign in (setup guide, Spotify Now playing).";
@@ -285,36 +289,36 @@
         vidaa: ["With a home computer that stays on: connect Spotify once on it (open the couch-tv Spotify page on it and sign in).", "With the website home and no computer: sign in to Spotify once on your own couch-tv site (setup guide, Hisense VIDAA, Spotify).", "Play music in Spotify: the next songs in your queue show here."] }),
       until: "\"Needs Spotify connected\", and where it is set up", build: "",
       ok: "Opens the next ten songs, big", platforms: plat("computer", "computer", "setup", { android: "Needs a home computer with Spotify connected (setup option B). Only Spotify shares its queue.", web: "Works while the home computer is on, with Spotify connected on it.", vidaa: "Works with the home computer, or the website home with Spotify signed in." }), sizes: sz(["small", "tall", "large"], [4, 4]) },
-    speakers: { name: "Speakers", status: "setup", what: "Each speaker, what it plays and its volume", needs: [HA_NEED, "Your speakers added once on a computer"],
-      setup: setup("computer", haSteps("speakers (up to 6, any Home Assistant knows)", "Press Home: each speaker and its volume show here. OK opens them: louder, quieter, play and pause.")),
+    speakers: { name: "Speakers", status: "setup", what: "Each speaker, what it plays and its volume", needs: [HA_NEED, "Your speakers picked on the TV"],
+      setup: setup("tv", haSteps("speakers (up to 6, any Home Assistant knows)", "Press Home: each speaker and its volume show here. OK opens them: louder, quieter, play and pause.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens the speakers: louder, quieter, play and pause for each", platforms: HA_PLAT(), sizes: sz(["wtile", "small", "tall"], [4, 2]) },
 
     // ---------- smart home (Home Assistant, through the Android home) ----------
-    aircon: { name: "Aircon", status: "setup", what: "A room's set temperature, what it is now, and the other rooms", needs: [HA_NEED, "Your aircon rooms added once on a computer"],
-      setup: setup("computer", SMART_HOME), until: "\"Needs Home Assistant\", and where it is set up", build: "",
-      ok: "Opens Aircon: every room, warmer and cooler, on and off, mode and fan", platforms: plat("setup", "no", "no", { android: "Set up once from a computer; after that no computer is needed.", web: "Smart home needs a Google TV, Android TV or Fire TV.", vidaa: "Smart home needs a Google TV, Android TV or Fire TV." }), sizes: sz(["tile", "wtile", "small", "tall", "medium", "large"], [2, 2]) },
-    scenes: { name: "Scenes", status: "setup", what: "Your Home Assistant scenes as big buttons (Movie night, Goodnight)", needs: [HA_NEED, "Your scenes added once on a computer"],
-      setup: setup("computer", SMART_HOME), until: "\"Needs Home Assistant\", and where it is set up", build: "",
-      ok: "OK on a button runs it. On a tile, OK opens every button", platforms: plat("setup", "no", "no", { android: "Set up once from a computer; after that no computer is needed.", web: "Smart home needs a Google TV, Android TV or Fire TV.", vidaa: "Smart home needs a Google TV, Android TV or Fire TV." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
-    controls: { name: "Control Centre", status: "setup", what: "Lights, switches, fans and blinds as big switches", needs: [HA_NEED, "Your lights and switches added once on a computer"],
-      setup: setup("computer", haSteps("lights, switches, fans and blinds (up to 16)", "Press Home: your switches show here. OK opens them big, and OK on one switches it.", "Locks, alarms, garage doors and gates never show: nothing that opens the house from a TV remote.")),
+    aircon: { name: "Aircon", status: "setup", what: "A room's set temperature, what it is now, and the other rooms", needs: [HA_NEED, "Your aircon rooms picked on the TV"],
+      setup: setup("tv", SMART_HOME), until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      ok: "Opens Aircon: every room, warmer and cooler, on and off, mode and fan", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "tall", "medium", "large"], [2, 2]) },
+    scenes: { name: "Scenes", status: "setup", what: "Your Home Assistant scenes as big buttons (Movie night, Goodnight)", needs: [HA_NEED, "Your scenes picked on the TV"],
+      setup: setup("tv", SMART_HOME), until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      ok: "OK on a button runs it. On a tile, OK opens every button", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
+    controls: { name: "Control Centre", status: "setup", what: "Lights, switches, fans and blinds as big switches", needs: [HA_NEED, "Your lights and switches picked on the TV"],
+      setup: setup("tv", haSteps("lights, switches, fans and blinds (up to 16)", "Press Home: your switches show here. OK opens them big, and OK on one switches it.", "Locks, alarms, garage doors and gates never show: nothing that opens the house from a TV remote.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens Control Centre: every switch big, OK on one switches it", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "medium", "wide", "large"], [2, 2]) },
-    camera: { name: "Camera", status: "setup", what: "A still picture from a camera, new every 2 seconds (no video)", needs: [HA_NEED, "Your cameras added once on a computer"],
-      setup: setup("computer", haSteps("cameras (up to 4)", "Press Home: a still from the camera shows here, new every 2 seconds while the home is on screen. There is no live video and no sound.")),
+    camera: { name: "Camera", status: "setup", what: "A still picture from a camera, new every 2 seconds (no video)", needs: [HA_NEED, "Your cameras picked on the TV"],
+      setup: setup("tv", haSteps("cameras (up to 4)", "Press Home: a still from the camera shows here, new every 2 seconds while the home is on screen. There is no live video and no sound.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens the camera full screen, a new still every 2 seconds; Left and Right reach your other cameras", platforms: HA_PLAT(), sizes: sz(["wtile", "small", "medium", "large"], [4, 2]) },
-    doorbell: { name: "Doorbell", status: "setup", what: "When the doorbell last rang, with a picture", needs: [HA_NEED, "Your doorbell added once on a computer"],
-      setup: setup("computer", haSteps("doorbell and its camera", "Press Home: when it last rang shows here, with the picture the TV kept from that ring, or the door now.")),
+    doorbell: { name: "Doorbell", status: "setup", what: "When the doorbell last rang, with a picture", needs: [HA_NEED, "Your doorbell picked on the TV"],
+      setup: setup("tv", haSteps("doorbell and its camera", "Press Home: when it last rang shows here, with the picture the TV kept from that ring, or the door now.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens the last ring full screen: the picture from the ring, then the door now", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
-    energy: { name: "Solar and energy", status: "setup", what: "Power made or used today, by the hour", needs: [HA_NEED, "Your solar or energy sensor added once on a computer"],
-      setup: setup("computer", haSteps("solar or power meter (kWh today, or watts)", "Press Home: today by the hour shows here, with power now and the battery if there is one.")),
+    energy: { name: "Solar and energy", status: "setup", what: "Power made or used today, by the hour", needs: [HA_NEED, "Your solar or energy sensor picked on the TV"],
+      setup: setup("tv", haSteps("solar or power meter (kWh today, or watts)", "Press Home: today by the hour shows here, with power now and the battery if there is one.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens Energy: today by the hour, power now and the battery", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "medium", "wide"], [2, 2]) },
-    sensor: { name: "Sensor", status: "setup", what: "One reading (the pool, the rain gauge, humidity) and its last 24 hours", needs: [HA_NEED, "Your sensors added once on a computer"],
-      setup: setup("computer", haSteps("sensors (up to 8: the pool, a rain gauge, humidity)", "Press Home: the reading shows here, with its last 24 hours.")),
+    sensor: { name: "Sensor", status: "setup", what: "One reading (the pool, the rain gauge, humidity) and its last 24 hours", needs: [HA_NEED, "Your sensors picked on the TV"],
+      setup: setup("tv", haSteps("sensors (up to 8: the pool, a rain gauge, humidity)", "Press Home: the reading shows here, with its last 24 hours.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens the reading big with its last 24 hours; Left and Right reach your other sensors", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     // the launcher reads Android's own Bluetooth battery levels (tv-home/android Batteries.kt)
@@ -406,8 +410,16 @@
       ok: "Opens the drive: how long, how far, and when to leave", platforms: plat("setup", "computer", "setup", { android: "The places are kept on the TV. Drive time without traffic.", web: "Works while the home computer is on. The places are kept on the TV." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- guests and the room ----------
-    welcome: { name: "Welcome words", status: "works", what: "A greeting in your own words", needs: ["The words, typed in couch-tv Studio"],
-      setup: setup("designer", inStudio("type the words (no numbers or web addresses)")), until: "Always shows the words", build: "",
+    welcome: { name: "Welcome words", status: "works", what: "A greeting in your own words, or each guest by name with their check in or check out time from your bookings calendar", needs: ["The words, typed in couch-tv Studio", "For guest names: your Airbnb, Booking.com or VRBO calendar link, typed on the TV"],
+      setup: setup("designer", {
+        android: inStudio("type the words (no numbers or web addresses). For guest names, pick Guest name from: Bookings calendar").concat([
+          "On the TV: Home settings, couch-tv Studio, At home, Guests. Paste your Airbnb, Booking.com or VRBO calendar link with the phone remote's Type on the TV.",
+          "Set Check in from and Check out by. Airbnb's link has no names: type each guest's first name once under Next guest."]),
+        web: inStudio("type the words (no numbers or web addresses). For guest names, pick Guest name from: Bookings calendar").concat([
+          "On the TV: Home settings, couch-tv Studio, At home, Guests, and type your bookings calendar link. The home computer reads it, so keep it on.",
+          "Set Check in from and Check out by. Airbnb's link has no names: type each guest's first name once under Next guest."]),
+        vidaa: inStudio("type the words (no numbers or web addresses)").concat(["Guest names from a bookings calendar need a computer at home that stays on, running couch-tv (setup option B). The website home cannot read a calendar."]) }),
+      until: "Always shows the words. With guest names on and no bookings link yet: \"Add your bookings calendar\", and where", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["wline", "wtile", "medium", "wide"], [4, 1]) },
     quick: { name: "Quick buttons", status: "works", what: "Sleep timer, picture mode, look, input and more", needs: ["Nothing: buttons this TV cannot do are left out"],
       setup: setup("tv", { android: [OPEN, "Go down to Quick buttons and press OK.", "OK shows or hides a button. Hold OK on one to move it along.", "Or pick this widget's own buttons in couch-tv Studio."],
@@ -479,7 +491,7 @@
   SHORT[TOWN_NEED] = ["Set your town", "Home settings, Location", "Set your town"];
   SHORT[PHOTOS_NEED] = ["Add your photos", "Home settings, Look and scenes, Your photos", "Add photos"];
   SHORT[WATCH_NEED] = ["Needs the couch-tv TV app or a home computer", "OK here shows how", "Needs setting up"];
-  SHORT[HA_NEED] = ["Needs Home Assistant", "Set up once on a computer. OK here shows how", "Needs Home Assistant"];
+  SHORT[HA_NEED] = ["Needs Home Assistant", "Home settings, couch-tv Studio, Smart home", "Needs Home Assistant"];
   SHORT[QUEUE_NEED] = ["Needs Spotify connected", "On the home computer. OK here shows how", "Needs Spotify"];
   SHORT[C.card.needs[0]] = ["Type your words in couch-tv Studio", "Or a live number from the home computer. OK here shows how", "Type your words"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];

@@ -1,0 +1,12 @@
+From: Airbnb <automated@example.com>
+To: host@example.com
+Subject: Reservation confirmed - Sarah Nguyen arrives Nov 2
+Date: Thu, 15 Oct 2026 09:12:00 +1100
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body><h1>New booking confirmed! Sarah arrives Nov 2.</h1>
+<p>Send a message to confirm check-in details or welcome Sarah.</p>
+<table><tr><td>Check-in</td><td>Mon, Nov 2</td></tr><tr><td>Checkout</td><td>Thu, Nov 5</td></tr>
+<tr><td>Guests</td><td>3 guests</td></tr><tr><td>Confirmation code</td><td>HMTEST1234</td></tr></table>
+</body></html>

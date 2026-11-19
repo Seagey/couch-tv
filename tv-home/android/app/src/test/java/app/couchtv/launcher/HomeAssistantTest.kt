@@ -149,6 +149,52 @@ class HomeAssistantTest {
         assertEquals("none", ask("ringstill").getString("error"))
     }
 
+    // ---- set up on the TV (Home settings, Smart home): no computer
+
+    @Test fun pickableListsOnlyWhatCouchTvCanShow() {
+        val all = JSONArray("""[
+            {"entity_id":"light.lounge","attributes":{"friendly_name":"Lounge lamp"}},
+            {"entity_id":"lock.front_door","attributes":{}},
+            {"entity_id":"alarm_control_panel.house","attributes":{}},
+            {"entity_id":"cover.garage_door","attributes":{}},
+            {"entity_id":"cover.blinds","attributes":{"device_class":"garage"}},
+            {"entity_id":"cover.lounge_blinds","attributes":{"device_class":"blind"}},
+            {"entity_id":"sensor.pool","attributes":{"unit_of_measurement":"°C","device_class":"temperature","friendly_name":"Pool"}},
+            {"entity_id":"climate.bedroom","attributes":{}},
+            {"entity_id":"automation.morning","attributes":{}},
+            {"entity_id":"Bad Id","attributes":{}}
+        ]""")
+        val p = HomeAssistant.pickable(all)
+        val ids = (0 until p.length()).map { p.getJSONObject(it).getString("entity") }
+        assertEquals(listOf("climate.bedroom", "cover.lounge_blinds", "light.lounge", "sensor.pool"), ids)
+        val pool = p.getJSONObject(3)
+        assertEquals("Pool", pool.getString("name")); assertEquals("°C", pool.getString("unit"))
+        assertEquals("Bedroom", p.getJSONObject(0).getString("name"))   // no friendly name: from the id
+    }
+
+    @Test fun checkSaysWhatIsWrongInPlainWords() {
+        assertEquals("address", HomeAssistant.check("ftp://ha.example", "abcdefghijklmnopqrstuvwxyz0123").getString("error"))
+        assertEquals("address", HomeAssistant.check("http://user:pw@192.0.2.5:8123", "abcdefghijklmnopqrstuvwxyz0123").getString("error"))
+        assertEquals("token", HomeAssistant.check("http://ha.example:8123", "short").getString("error"))
+        HomeAssistant.fake = { _, path, _ -> if (path == "/api/") 401 to null else 404 to null }
+        assertEquals("token", HomeAssistant.check("http://ha.example:8123", "abcdefghijklmnopqrstuvwxyz0123").getString("error"))
+        HomeAssistant.fake = { _, _, _ -> -1 to null }
+        assertEquals("unreachable", HomeAssistant.check("http://ha.example:8123", "abcdefghijklmnopqrstuvwxyz0123").getString("error"))
+        HomeAssistant.fake = { _, path, _ -> if (path == "/api/") 200 to "<html>router</html>".toByteArray() else 404 to null }
+        assertEquals("not_ha", HomeAssistant.check("http://192.0.2.1", "abcdefghijklmnopqrstuvwxyz0123").getString("error"))
+        HomeAssistant.fake = { _, path, _ ->
+            when (path) {
+                "/api/" -> 200 to """{"message":"API running."}""".toByteArray()
+                "/api/states" -> 200 to """[{"entity_id":"light.lounge","attributes":{}},{"entity_id":"lock.door","attributes":{}}]""".toByteArray()
+                else -> 404 to null
+            }
+        }
+        val ok = HomeAssistant.check("http://ha.example:8123/", "abcdefghijklmnopqrstuvwxyz0123")
+        assertTrue(ok.getBoolean("ok"))
+        assertEquals(1, ok.getJSONArray("entities").length())
+        assertFalse(ok.toString().contains("abcdefghijklmnopqrstuvwxyz0123"))   // the token never comes back
+    }
+
     @Test fun nothingWithoutASection() {
         assertEquals("off", HomeAssistant.answerForTest(null, "controls", "", "").getString("error"))
         assertNotNull(HomeAssistant.parseForTest(JSONObject(section.toString()).put("controls", JSONArray())))

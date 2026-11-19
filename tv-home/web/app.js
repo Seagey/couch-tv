@@ -4178,6 +4178,8 @@
       if (CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.settingsRow) rows.push(CouchDesign.settingsRow(restart));
       commuteRows(rows);
     }
+    if (window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) rows.push({ kind: "nav", key: "dz-smart", label: "Smart home",
+      sub: window.smartHome.setup.status().set ? "Connected. Change what shows, or add a device" : "Connect Home Assistant: your aircon, lights, cameras, speakers and more", act: openSmartSetup });
     if (on && AH) rows.push({ kind: "nav", key: "dz-athome", label: "At home", sub: "A note, lists, guest Wi-Fi, a house guide, your calendar and screen time, for your widgets", act: openAtHome });
     designCodeRows(rows);
     rows.push({ kind: "action", key: "dz-share", label: "Share this home", sub: "Open it in couch-tv Studio on your phone. No names, photos or places are sent.", act: shareHome });
@@ -5667,6 +5669,49 @@
     });
   }
 
+  // guests: the bookings calendar (Airbnb, Booking.com, VRBO, or the Agenda's own calendar), read the
+  // same way as the Agenda's and as often, for the Welcome widget's guest name and check out time.
+  // Five weeks back (a long stay that started a while ago) and two months on are kept, on this TV only.
+  var STAY = { at: 0, events: null, err: "", busy: false, url: "" };
+  function stayLink(r) { r = r || AH.store.get(); return (r.stay && r.stay.url) || (r.cal && r.cal.url) || ""; }
+  function stayRefresh(force) {
+    if (!AH) return;
+    var url = stayLink();
+    if (!url) { STAY = { at: 0, events: null, err: "", busy: false, url: "" }; ahWrite("tvhome.athome.stay", null); return; }
+    if (STAY.url !== url) { STAY.url = url; STAY.events = null; STAY.at = 0; STAY.err = ""; var kept0 = ahRead("tvhome.athome.stay"); if (kept0 && kept0.host === CouchAtHome.calHost(url) && Array.isArray(kept0.events)) { STAY.events = kept0.events; STAY.at = kept0.at || 0; } }
+    if (STAY.busy || (!force && Date.now() - STAY.at < CAL_MS && STAY.events)) return;
+    STAY.busy = true;
+    // guest names from the booking emails a home computer reads (bridge/bookings.py, as guest-tv does):
+    // only with a bridge; with none, Airbnb guests' names are typed once in At home
+    if (!OFFLINE && !MOCK && !PREVIEW) api("GET", "/api/stay-names", null, 30000).then(function (j) {
+      STAY.mail = j && j.on && Array.isArray(j.names) ? j.names.slice(0, 60) : null; STAY.mailOn = !!(j && j.on); ahChanged();
+    }, function () {});
+    calFetch(url).then(function (text) {
+      STAY.busy = false;
+      if (!CouchAtHome.isIcs(text)) { STAY.err = "That link is not a calendar. Check it is the calendar's private address (iCal or .ics)."; ahChanged(); return; }
+      var d = new Date(), from = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - 35 * 86400000;
+      STAY.events = CouchAtHome.parseIcs(text, from, from + 100 * 86400000, 200);
+      STAY.at = Date.now(); STAY.err = "";
+      ahWrite("tvhome.athome.stay", { host: CouchAtHome.calHost(url), at: STAY.at, events: STAY.events });
+      ahChanged();
+      if (zone === "settings") renderSettings();
+    }, function (e) {
+      STAY.busy = false;
+      var why = String((e && e.message) || "");
+      STAY.err = /blocked/.test(why) ? "This TV cannot read that calendar by itself. It needs the couch-tv TV home or a computer at home." : /http 40[134]/.test(why) ? "The calendar said no. Check the link is the private address and still works." : "The calendar did not answer. couch-tv tries again soon.";
+      STAY.at = Date.now() - CAL_MS + 2 * 60000;
+      ahChanged();
+      if (zone === "settings") renderSettings();
+    });
+  }
+  // where the house is in a stay now: CouchAtHome.stayNow with the times and names kept on this TV
+  function stayView(r) {
+    r = r || AH.store.get();
+    var url = stayLink(r), s = r.stay || {};
+    if (!url || !STAY.events) return null;
+    return CouchAtHome.stayNow(STAY.events, Date.now(), { checkin: s.checkin, checkout: s.checkout, names: s.names, mail: STAY.mail, host: CouchAtHome.calHost(url), family: !s.url });
+  }
+
   // when each photo was taken: the launcher notes it in the file name when a photo is added ("-t" and
   // the date, from the photo's own EXIF block); a photo by web address has its date read from its own
   // bytes once (if its host lets the TV read them) or from a date in its name. Kept on this TV.
@@ -5714,6 +5759,9 @@
     // a calendar link with nothing read yet: read it now, not at the next minute
     if (r.cal && !CAL.events && !CAL.busy && !CAL.err && ahWants("agenda")) setTimeout(function () { calRefresh(false); }, 0);
     out.cal = { set: !!r.cal, events: CAL.events, err: CAL.err, at: CAL.at, can: calCan() };
+    // the Welcome widget's guest (name source "calendar" in a design): the stay now, from this TV's link
+    if (stayLink(r) && !STAY.events && !STAY.busy && !STAY.err && ahWants("welcome")) setTimeout(function () { stayRefresh(false); }, 0);
+    out.stay = { set: !!stayLink(r), view: stayView(r), err: STAY.err, at: STAY.at, can: calCan() };
     var ps = photoDates();
     out.memory = { photos: ps.length, dated: ps.filter(function (p) { return p.date; }).length, today: CouchAtHome.onThisDay(ps, new Date()) };
     out.screen = ahWants("screentime") ? screenNow() : { ok: false, why: "off" };
@@ -5723,6 +5771,7 @@
   function ahTick() {
     if (!AH || typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on()) return;
     if (ahWants("agenda")) calRefresh(false);
+    if (ahWants("welcome")) { stayRefresh(false); var sv = stayView(); CouchDesign.dataChanged("stay", sv ? [sv.phase, sv.guest, sv.checkout] : null); }
     if (ahWants("memory")) photoDatesRead();
     if (ahWants("screentime")) { var s = screenNow(); CouchDesign.dataChanged("screentime", [s.ok, s.minutes]); }
     // a new day: today's events, On this day's photos (the page drew the first day when it started)
@@ -5744,6 +5793,7 @@
     if (r.wifi) w.push(r.wifi.ssid, r.wifi.pass);
     if (r.note) w.push(r.note.text);
     if (r.cal) w.push(r.cal.url);
+    if (r.stay) { if (r.stay.url) w.push(r.stay.url); Object.keys(r.stay.names || {}).forEach(function (k) { w.push(r.stay.names[k]); }); }
     (r.guide || []).forEach(function (g) { w.push(g.text); });
     return w;
   }
@@ -5830,6 +5880,35 @@
       rows.push({ kind: "action", key: "ah-cal-now", label: "Read the calendar now", act: function () { calRefresh(true); SET.msg = "Reading the calendar..."; } });
       rows.push({ kind: "action", key: "ah-cal-clear", label: "Remove the calendar link", danger: true, act: function () { ahEdit(function (x) { delete x.cal; }, "The calendar link is removed from this TV."); calRefresh(true); } });
     }
+    // guests: the bookings calendar for the Welcome widget's name and times
+    rows.push(head("Guests"));
+    var sr = r.stay || {}, shost = sr.url ? CouchAtHome.calHost(sr.url) : "", sv = stayView(r);
+    rows.push({ kind: "input", key: "ah-stay", label: sr.url ? "Change the bookings link" : "Add a bookings calendar link", value: shost || (r.cal ? "Using the Agenda's" : ""),
+      sub: sr.url || r.cal ? (STAY.err || (STAY.events ? (sv && sv.phase !== "between" ? (sv.guest || "A guest") + " is booked now" : sv && sv.next ? "Next stay starts " + shortDay(sv.next.from) : "No stays in the next two months") + ", read at " + timeStr(new Date(STAY.at)) : STAY.busy ? "Reading it..." : "Read when a Welcome widget with guest names is on the home"))
+        : "Airbnb, Booking.com or VRBO's calendar link (export or sync calendar). The Welcome widget greets each guest and shows check out. Keep it private.",
+      act: function () {
+        ahType("Paste or type the bookings calendar's private address (it starts with https)", "", function (v) {
+          var u = CouchAtHome.calUrl(v);
+          if (!u) { SET.msg = "That is not a calendar link. It starts with https://, or is a calendar app's own link."; return; }
+          ahEdit(function (x) { x.stay = x.stay || {}; x.stay.url = u; }, "Got it. The Welcome widget reads it now.");
+          stayRefresh(true);
+        }, true);
+      } });
+    rows.push({ kind: "cycle", key: "ah-stay-in", label: "Check in from", value: sr.checkin || "15:00", act: function () {
+      ahEdit(function (x) { var l = CouchAtHome.TIMES_IN, s = x.stay = x.stay || {}; s.checkin = l[(l.indexOf(s.checkin || "15:00") + 1) % l.length]; });
+    } });
+    rows.push({ kind: "cycle", key: "ah-stay-out", label: "Check out by", value: sr.checkout || "10:00", act: function () {
+      ahEdit(function (x) { var l = CouchAtHome.TIMES_OUT, s = x.stay = x.stay || {}; s.checkout = l[(l.indexOf(s.checkout || "10:00") + 1) % l.length]; });
+    } });
+    // Airbnb's link has no names: the host types one per stay (it wins over a name in the calendar)
+    var target = sv && sv.phase !== "between" ? sv : sv && sv.next;
+    if (target) rows.push({ kind: "input", key: "ah-stay-name", label: (sv && sv.phase !== "between" ? "This stay's guest" : "Next guest") + ", from " + shortDay(target.from),
+      value: target.guest || "No name", sub: STAY.mailOn ? "Read from your booking emails by the home computer. Type a name here to use another." : "Airbnb's calendar has no names: type the first name once, or let a home computer read your booking emails (setup guide, Guests).", act: function () {
+        ahType("The guest's first name for this stay", target.guest || "", function (v) {
+          ahEdit(function (x) { var s = x.stay = x.stay || {}; s.names = s.names || {}; var w = CouchAtHome.guestWord(v); if (w) s.names[target.key] = w; else delete s.names[target.key]; });
+        });
+      } });
+    if (sr.url) rows.push({ kind: "action", key: "ah-stay-clear", label: "Remove the bookings link", danger: true, act: function () { ahEdit(function (x) { if (x.stay) delete x.stay.url; }, "The bookings link is removed from this TV."); stayRefresh(true); } });
     // screen time
     rows.push(head("Screen time"));
     var s = screenNow(), goal = (r.screen || {}).goal || 0;
@@ -5841,6 +5920,7 @@
     return rows;
   }
   function timeStr(d) { var h = d.getHours(), m = d.getMinutes(); return CLOCK24 ? h + ":" + (m < 10 ? "0" : "") + m : (h % 12 || 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? "am" : "pm"); }
+  function shortDay(ms) { var d = new Date(ms); return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()] + " " + d.getDate() + " " + ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getMonth()]; }
   function openList(li) {
     var up = SET.sub;
     SET.sub = { up: up, back: "ah-list:" + li, crumb: "At home", title: function () { var l = (AH.store.get().lists || [])[li]; return l ? l.name : ""; }, rows: function () {
@@ -5880,6 +5960,136 @@
         { kind: "input", key: "ah-g-text", label: "Words", sub: g.text || "None yet", act: function () { typeGuideWords(gi); } },
         { kind: "action", key: "ah-g-remove", label: "Remove from the guide", danger: true, act: function () { ahEdit(function (x) { x.guide.splice(gi, 1); }); SET.sub = up; SET.keyFocus = "ah-guide-add"; } }
       ];
+    } };
+    SET.keyFocus = null; SET.ri = 0;
+  }
+
+  // ---- Home settings, couch-tv Studio, Smart home: Home Assistant set up on the TV, no computer ----
+  // The launcher (HomeAssistant.kt) or, on a TV whose home a computer runs, that computer's bridge
+  // checks the address and token and lists what Home Assistant has; the person ticks what shows. The
+  // token is handed over once and never comes back to this page. English only, like the rest of the
+  // couch-tv Studio section (needs i18n).
+  var SH = { addr: "http://homeassistant.local:8123", list: null, picks: null, busy: false, err: "" };
+  var SH_GROUPS = [
+    ["climate", "Air conditioning and heating", /^climate\./, 8],
+    ["scenes", "Scenes and scripts", /^(scene|script)\./, 10],
+    ["controls", "Lights, switches, fans and blinds", /^(light|switch|fan|cover)\./, 16],
+    ["cameras", "Cameras (a still picture, never video)", /^camera\./, 4],
+    ["sensors", "Sensors (the pool, rain, humidity)", /^sensor\./, 8],
+    ["speakers", "Speakers", /^media_player\./, 6],
+    ["doorbell", "Doorbell", /^(event|binary_sensor|input_boolean)\./, 1],
+    ["doorbell_camera", "The doorbell's camera", /^camera\./, 1],
+    ["energy", "Solar or power meter", /^sensor\./, 1],
+    ["battery", "Home battery (%)", /^sensor\./, 1]
+  ];
+  var SH_ERR = { address: "That is not an address. It looks like http://homeassistant.local:8123 or http://192.168.1.20:8123.",
+    token: "Home Assistant did not accept that token. Make a new one and paste the whole of it.",
+    unreachable: "The TV could not reach Home Assistant at that address. Check it is on and on the same Wi-Fi. If homeassistant.local does not work, use its number address from Home Assistant: Settings, System, Network.",
+    not_ha: "Something answered at that address, but it is not Home Assistant. Check the address and the port (usually 8123).",
+    refused: "This copy of the home cannot set up smart home.", bridge: "The home computer did not answer. Check couch-tv is running on it.",
+    timeout: "That took too long. Try again.", check: "Connect first, then pick what shows.", picks: "That could not be kept. Pick again." };
+  function shPicksFrom(st) {
+    var p = {}; ["climate", "scenes", "controls", "cameras", "sensors", "speakers"].forEach(function (k) { p[k] = Array.isArray(st[k]) ? st[k].slice() : []; });
+    ["doorbell", "doorbell_camera", "energy"].forEach(function (k) { p[k] = st[k] ? [st[k]] : []; });
+    p.battery = st.battery ? [st.battery] : [];
+    return p;
+  }
+  // the ticks as HomeAssistant.kt reads a section (docs/CONFIG.md, Smart home)
+  function shSection(p) {
+    var named = function (l) { return (l || []).map(function (e) { return { entity: e }; }); };
+    var out = { climate: named(p.climate), scenes: named(p.scenes), controls: named(p.controls), cameras: named(p.cameras), sensors: named(p.sensors), speakers: named(p.speakers) };
+    if (p.doorbell && p.doorbell[0]) out.doorbell = p.doorbell_camera && p.doorbell_camera[0] ? { entity: p.doorbell[0], camera: p.doorbell_camera[0] } : { entity: p.doorbell[0] };
+    if (p.energy && p.energy[0]) out.energy = p.battery && p.battery[0] ? { entity: p.energy[0], battery: p.battery[0] } : { entity: p.energy[0] };
+    return out;
+  }
+  function shCheck(token) {
+    SH.busy = true; SH.err = ""; SET.msg = "Asking Home Assistant...";
+    window.smartHome.setup.check(SH.addr, token).then(function (r) {
+      SH.busy = false;
+      if (r.ok) { SH.list = r.entities || []; if (!SH.picks) SH.picks = shPicksFrom(window.smartHome.setup.status()); SET.msg = "Connected. " + SH.list.length + " things found: pick what shows on this TV."; }
+      else { SH.err = SH_ERR[r.error] || SH_ERR.unreachable; SET.msg = SH.err; }
+      if (zone === "settings") renderSettings();
+    });
+  }
+  function openSmartSetup() {
+    SH.list = null; SH.err = ""; SH.picks = null;
+    SET.sub = { back: "dz-smart", crumb: "couch-tv Studio", title: function () { return "Smart home"; }, rows: smartRows };
+    SET.keyFocus = null; SET.ri = 0;
+  }
+  function smartRows() {
+    var S = window.smartHome.setup, st = S.status(), rows = [];
+    rows.push(info("sh-intro", "", "", "Shows your air conditioning, lights, cameras, speakers, solar and more through Home Assistant, the free smart home app that talks to over 2,000 brands. Everything stays on this TV" + (TV ? "." : " and the home computer.")));
+    if (st.set) rows.push(info("sh-on", "Connected", st.host || "", "Pick Change what shows to add or take away things."));
+    rows.push(head("1. Home Assistant at home"));
+    rows.push(info("sh-ha", "", "", "Already have it? Go to step 2. If not: it runs on a small box (Home Assistant Green) or a spare computer at home, and finds most smart devices by itself. Start at home-assistant.io/installation on your phone."));
+    rows.push(head("2. Connect"));
+    rows.push({ kind: "input", key: "sh-addr", label: "Home Assistant's address", value: SH.addr, sub: "Usually http://homeassistant.local:8123. Or its number address from Home Assistant: Settings, System, Network.", act: function () {
+      ahType("Home Assistant's address", SH.addr, function (v) { v = String(v || "").trim(); if (v) SH.addr = /^https?:\/\//i.test(v) ? v : "http://" + v; }, true);
+    } });
+    rows.push({ kind: "input", key: "sh-token", label: st.set ? "Paste a new token" : "Paste a token", value: st.set ? "Kept on this TV" : "",
+      sub: "In Home Assistant on your phone: tap your name (bottom left), Security, Long-lived access tokens, Create token, name it TV, then copy it. Paste it here with the phone remote's Type on the TV. Best made as a separate user for the TV, not an administrator.", act: function () {
+        ahType("Paste the long-lived access token", "", function (v) { v = String(v || "").trim(); if (v) shCheck(v); }, true);
+      } });
+    if (st.set && !SH.list) rows.push({ kind: "action", key: "sh-change", label: "Change what shows", sub: "Reads what Home Assistant has now, with the kept token", act: function () { shCheck(""); } });
+    if (SH.list) {
+      rows.push(head("3. Pick what shows"));
+      SH_GROUPS.forEach(function (g) {
+        var have = SH.list.filter(function (e) { return g[2].test(e.entity) && (g[0] !== "energy" || /^(k|M)?Wh?$/.test(e.unit || "")) && (g[0] !== "battery" || e.unit === "%"); });
+        if (!have.length) return;
+        var picked = (SH.picks[g[0]] || []).filter(function (id) { return have.some(function (e) { return e.entity === id; }); });
+        rows.push({ kind: "nav", key: "sh-g:" + g[0], label: g[1], value: picked.length ? picked.length + " picked" : "None", act: function () { openSmartGroup(g, have); } });
+      });
+      rows.push({ kind: "action", key: "sh-save", label: "Save and show on the home", sub: "Then add the widgets in couch-tv Studio, or open the Smart home tile in your apps", act: function () {
+        SET.msg = "Saving...";
+        S.save(shSection(SH.picks)).then(function (r) { SET.msg = r.ok ? "Saved. Smart home is on this TV." : SH_ERR[r.error] || SH_ERR.picks; if (r.ok) SH.list = null; if (zone === "settings") renderSettings(); });
+      } });
+    }
+    rows.push(head("A device we don't list"));
+    rows.push({ kind: "nav", key: "sh-more", label: "Add a device we don't list", sub: "Tuya and Smart Life, Google Nest, Alexa, Apple Home, Matter, Hue, aircon and solar brands, and anything with a web address", act: openSmartMore });
+    if (st.set) rows.push({ kind: "action", key: "sh-forget", label: "Disconnect smart home", danger: true, sub: "Removes the address and token from this TV. Also delete the token in Home Assistant.", act: function () {
+      S.forget().then(function () { SH.list = null; SH.picks = null; SET.msg = "Smart home is off on this TV."; if (zone === "settings") renderSettings(); });
+    } });
+    return rows;
+  }
+  function openSmartGroup(g, have) {
+    var up = SET.sub;
+    SET.sub = { up: up, back: "sh-g:" + g[0], crumb: "Smart home", title: function () { return g[1]; }, rows: function () {
+      var cur = SH.picks[g[0]] = SH.picks[g[0]] || [];
+      var rows = [info("sh-g-most", "", "", g[3] === 1 ? "Pick one." : "Pick up to " + g[3] + ". They show in this order.")];
+      have.forEach(function (e) {
+        rows.push({ kind: "check", key: "sh-e:" + e.entity, label: e.name, sub: e.entity + (e.unit ? ", " + e.unit : ""), checked: cur.indexOf(e.entity) >= 0, act: function () {
+          var i = cur.indexOf(e.entity);
+          if (i >= 0) cur.splice(i, 1);
+          else if (g[3] === 1) { cur.length = 0; cur.push(e.entity); }
+          else if (cur.length < g[3]) cur.push(e.entity);
+          else SET.msg = "That is the most for this. Untick one first.";
+        } });
+      });
+      return rows;
+    } };
+    SET.keyFocus = null; SET.ri = 0;
+  }
+  // the brands people ask about, each with the way into Home Assistant (then it shows in step 3)
+  var SH_MORE = [
+    ["How it works", "Add the device to Home Assistant first, then come back here and pick Change what shows: it is in the list. In Home Assistant: Settings, Devices and services, Add integration, then search for the brand."],
+    ["Tuya, Smart Life, Arlec Grid Connect, Deta", "Add integration, Tuya. Home Assistant shows a QR code: scan it with the Smart Life or Tuya app."],
+    ["Google Home and Nest", "Nest thermostats, cameras and doorbells: Add integration, Google Nest. Other Google Home devices: share them to Home Assistant with Matter (below)."],
+    ["Amazon Alexa", "Alexa itself has no way in, but the plugs and lights in it do: add each by its own brand (often Tuya, TP-Link, Hue or Matter)."],
+    ["Apple Home", "In the Home app, open the device, Turn On Pairing Mode, and copy the code. Then in the Home Assistant phone app: Add device, Matter."],
+    ["Matter or Thread devices", "In the Home Assistant phone app: Settings, Devices and services, Add device, Add Matter device, then scan the code on the device."],
+    ["Philips Hue", "Add integration, Philips Hue, then press the round button on the Hue bridge."],
+    ["Aircon", "Add integration and search for the brand: Daikin, Mitsubishi (MELCloud), Fujitsu, Panasonic, LG, Sensibo, AirTouch 5 (it finds the console by itself)."],
+    ["Solar and batteries", "Add integration: Fronius, Enphase, SolarEdge, SMA, GoodWe or Tesla Powerwall. Then pick its today total under Solar or power meter."],
+    ["Plugs, cameras and speakers", "TP-Link Kasa and Tapo, Shelly, LIFX, Reolink, Ring, Eufy, Sonos, Google Cast: Add integration and search for the brand."],
+    ["Anything with a web address or MQTT", "A home made sensor, a Raspberry Pi or a router: Home Assistant's RESTful, MQTT or Webhook integrations make it a sensor or a switch, which then shows here."],
+    ["Still not there?", "Search the brand at home-assistant.io/integrations on your phone. If it is listed there, it works here."]
+  ];
+  function openSmartMore() {
+    var up = SET.sub;
+    SET.sub = { up: up, back: "sh-more", crumb: "Smart home", title: function () { return "Add a device we don't list"; }, rows: function () {
+      var rows = SH_MORE.map(function (m, i) { return info("sh-m:" + i, m[0], "", m[1]); });
+      if (window.smartHome.setup.status().set) rows.push({ kind: "action", key: "sh-again", label: "Check again", sub: "Reads what Home Assistant has now", act: function () { SET.sub = up; shCheck(""); } });
+      return rows;
     } };
     SET.keyFocus = null; SET.ri = 0;
   }
@@ -6071,6 +6281,8 @@
 
   function start() {
     readConfig();
+    // a TV whose home a computer runs (no launcher): smart home goes through that computer's bridge
+    if (!TV && !OFFLINE && !MOCK && !PREVIEW && window.smartHome && window.smartHome.useBridge) window.smartHome.useBridge(api);
     // a design got by code: pictures only from here, the store and the hosts this TV already uses
     if (DESIGN_FROM_CODE && CouchDesignCode.lockImages) CouchDesignCode.lockImages((ST.photos || []).map(function (p) { return p && p.url; }), VIDEO_URL);
     // couch-tv Studio's design block (design.js): nothing happens without one, unless the page is

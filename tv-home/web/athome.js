@@ -81,6 +81,111 @@
     return out;
   }
 
+  // ---------------- guests from a bookings calendar ----------------
+  // The way guest-tv does it (tools/guest-tv server.py ical_stays and stay_of): the private calendar
+  // link Airbnb, Booking.com or VRBO gives a host (or any Google, Apple or Outlook calendar), one event
+  // per stay, read every 15 minutes. Kept on this TV with the rest of At home:
+  //   url       the bookings link; left out, the Agenda's calendar link is read instead
+  //   checkin   "15:00", checkout "10:00": the house's times (calendars hold days, not times)
+  //   names     { "2026-11-21": "Sarah" }: a name typed on the TV for the stay starting that day.
+  //             Airbnb's link says only "Reserved" (no names since 2019), so a typed name wins.
+  var TIMES_IN = ["12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
+  var TIMES_OUT = ["08:00", "09:00", "10:00", "11:00", "12:00"];
+  function hhmmOk(v, list, dflt) { return list.indexOf(v) >= 0 ? v : dflt; }
+  function cleanStay(s) {
+    s = obj(s);
+    var out = {}, any = false, url = calUrl(s.url);
+    if (url) { out.url = url; any = true; }
+    if (typeof s.checkin === "string" && TIMES_IN.indexOf(s.checkin) >= 0) { out.checkin = s.checkin; any = true; }
+    if (typeof s.checkout === "string" && TIMES_OUT.indexOf(s.checkout) >= 0) { out.checkout = s.checkout; any = true; }
+    var names = {}, keys = Object.keys(obj(s.names)).filter(function (k) { return /^\d{4}-\d{2}-\d{2}$/.test(k); }).sort().slice(-40);
+    keys.forEach(function (k) { var n = guestWord(s.names[k]); if (n) names[k] = n; });
+    if (Object.keys(names).length) { out.names = names; any = true; }
+    return any ? out : null;
+  }
+  // one person's name as the TV shows it: a first name, letters only, never a booking code or a number
+  var NOT_NAMES = /^(reserved|reservation|booked|booking|bookings|closed|blocked|block|not|available|unavailable|airbnb|vrbo|homeaway|stayz|guest|guests|stay|busy|hold|owner|occupied|private|event|new|confirmed|tentative|check|in|out)$/i;
+  function guestWord(v) {
+    if (typeof v === "string" && /[:/@]|www\./i.test(v)) return "";   // never a link or an address
+    var w = line(v, 30).replace(/[^A-Za-zÀ-ɏͰ-ϿЀ-ӿ' -]/g, " ").replace(/\s+/g, " ").trim();
+    w = w.split(" ")[0] || "";
+    w = w.replace(/^['-]+|['-]+$/g, "");
+    if (w.length < 2 || NOT_NAMES.test(w)) return "";
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }
+  // the guest's first name from a calendar event's title, or "" when the title only says it is booked:
+  // "Reserved - Sarah Smith" (VRBO and many channel managers), "Sarah Smith (HM2AB3CD4E)", "Stay: Sarah",
+  // "Sarah" (a calendar the host keeps). "Reserved", "Airbnb (Not available)", "CLOSED - Not available" give "".
+  function guestName(title) {
+    var t = line(title, 120).replace(/\([^)]*\)/g, " ").replace(/\b[A-Z]{2}[A-Z0-9]{6,12}\b/g, " ").trim();
+    if (!t) return "";
+    var parts = t.split(/\s+[-\u2013\u2014|:]\s+|:\s+/);
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var p = parts[i].trim();
+      if (!p || /not available|blocked|closed|unavailable/i.test(p)) continue;
+      p = p.replace(/^(reserved|booked|booking|stay|guest|guests|check in|arriving)\s+(for\s+|by\s+)?/i, "").replace(/^the\s+/i, "");
+      var w = guestWord(p);
+      if (w) return w;
+    }
+    return "";
+  }
+  // a bookings calendar's own word for the host's blocked days. Booking.com writes every booking as
+  // "CLOSED - Not available", so from a Booking.com link those are stays; from Airbnb and others a
+  // "Not available" or "Blocked" event is the host's own days off, not a guest.
+  function isBlock(title, host) {
+    if (/(^|\.)booking\.com$/i.test(host || "")) return false;
+    return /not available|blocked|unavailable|owner block/i.test(title || "");
+  }
+  function dayKey(ms) { var d = new Date(ms); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  function atTime(dayMs, hhmm) { var d = new Date(dayMs), p = String(hhmm).split(":"); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), +p[0], +p[1] || 0).getTime(); }
+  // the stays in a calendar's events (parseIcs): an all day event of a night or more, or a timed one of
+  // 12 hours or more. [{ from, to (the first and last day, midnight), guest, key }], soonest first.
+  // opts.family: the family's own calendar (the Agenda's link, no bookings link), where a birthday is
+  // an all day event too, so only an event whose title says it is a stay counts ("Stay: Sarah",
+  // "Guests: the Smiths", "Reserved", "Booked").
+  var STAY_WORD = /^\s*(stay|staying|guest|guests|reserved|booked|booking|airbnb|visit|visiting)\b/i;
+  function staysOf(events, opts) {
+    opts = obj(opts);
+    var names = obj(opts.names), out = [];
+    arr(events).forEach(function (e) {
+      if (!e || !isFinite(e.start) || !isFinite(e.end)) return;
+      if (opts.family && !STAY_WORD.test(e.title || "")) return;
+      var nights = Math.round((new Date(e.end).setHours(0, 0, 0, 0) - new Date(e.start).setHours(0, 0, 0, 0)) / 86400000);
+      if (nights < 1 || (!e.allDay && e.end - e.start < 12 * 3600000)) return;
+      if (isBlock(e.title, opts.host)) return;
+      var from = new Date(e.start).setHours(0, 0, 0, 0), to = new Date(e.end).setHours(0, 0, 0, 0), key = dayKey(from);
+      // a name from the booking emails the home computer reads (bridge/bookings.py, as guest-tv does),
+      // matched by the arrival day ("11-21")
+      var mail = arr(opts.mail).filter(function (m) { return m && m.arrives === key.slice(5); })[0];
+      out.push({ from: from, to: to, key: key, nights: nights, guest: names[key] || (mail && guestWord(mail.guest)) || guestName(e.title), typed: !!names[key], guests: mail && +mail.guests > 0 ? +mail.guests : 0 });
+    });
+    out.sort(function (a, b) { return a.from - b.from; });
+    return out;
+  }
+  // where the house is in a stay at `now` (guest-tv's stay_of): "arrival" (today, before check in),
+  // "before" (tomorrow), "during", "lastday" (today is check out day), or "between" with the next stay.
+  // { phase, guest, from, to, checkin, checkout (ms), nights, night, next }
+  function stayNow(events, now, opts) {
+    opts = obj(opts);
+    var t = isFinite(now) ? +now : Date.now(), today = new Date(t).setHours(0, 0, 0, 0);
+    var cin = hhmmOk(opts.checkin, TIMES_IN, "15:00"), cout = hhmmOk(opts.checkout, TIMES_OUT, "10:00");
+    var stays = staysOf(events, opts), next = null;
+    for (var i = 0; i < stays.length; i++) {
+      var s = stays[i], ci = atTime(s.from, cin), co = atTime(s.to, cout);
+      if (t >= co) continue;
+      var view = { guest: s.guest, guests: s.guests, typed: s.typed, key: s.key, from: s.from, to: s.to, checkin: ci, checkout: co, nights: s.nights };
+      if (s.from - 86400000 <= today) {
+        view.phase = t < ci ? (today === s.from ? "arrival" : "before") : today === s.to ? "lastday" : "during";
+        view.night = Math.min(s.nights, Math.max(1, Math.round((today - s.from) / 86400000) + 1));
+        view.next = stays[i + 1] ? { guest: stays[i + 1].guest, key: stays[i + 1].key, from: stays[i + 1].from } : null;
+        return view;
+      }
+      next = view;
+      break;
+    }
+    return { phase: "between", guest: "", next: next };
+  }
+
   // ---------------- the guest Wi-Fi join code ----------------
   // The words phone cameras read (iOS 11 and Android 10 on): WIFI:T:WPA;S:<name>;P:<password>;;
   // with \ ; , : and " escaped by a backslash. T:WPA also covers WPA2 and WPA3; no password is
@@ -343,6 +448,7 @@
   }
 
   var API = { KEY: KEY, LIM: LIM, SEC: SEC, GOALS: GOALS, clean: clean, calUrl: calUrl, calHost: calHost, wifiQr: wifiQr, parseIcs: parseIcs, isIcs: isIcs,
+    TIMES_IN: TIMES_IN, TIMES_OUT: TIMES_OUT, guestName: guestName, guestWord: guestWord, staysOf: staysOf, stayNow: stayNow, dayKey: dayKey,
     exifDate: exifDate, nameDate: nameDate, onThisDay: onThisDay, hm: hm, goalLine: goalLine, store: store };
   root.CouchAtHome = API;
   if (typeof module !== "undefined" && module.exports) module.exports = API;

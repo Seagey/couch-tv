@@ -33,7 +33,9 @@
   var INFO = null;
   var S = { open: false, rooms: null, down: false, row: 0, col: 0, msg: "", busy: {}, timer: null };
 
-  function native() { return window.TVHA || null; }
+  // the launcher (Google TV, Android TV, Fire TV), or on a TV whose home a computer runs (Samsung, LG,
+  // Hisense, Philips, TiVo OS, Panasonic) that computer's bridge (useBridge below): the same asks
+  function native() { return window.TVHA || BRIDGE || null; }
   function info() {
     if (INFO) return INFO;
     try { INFO = JSON.parse(native().info() || "{}") || {}; } catch (e) { INFO = {}; }
@@ -375,7 +377,65 @@
       controls: LIVE.controls, sensors: LIVE.sensors, hist: LIVE.hist, energy: LIVE.energy, speakers: LIVE.speakers, bell: LIVE.bell, ring: LIVE.ring, stills: LIVE.stills };
   }
 
+  // ---------------- a TV whose home a computer runs ----------------
+  // No launcher there, so the bridge on the home computer talks to Home Assistant for the TV
+  // (bridge/smarthome.py, /api/ha): the same asks, the same allow lists, and the token stays on that
+  // computer (bridge/data/), never in the page. app.js calls useBridge(api) when it runs from a bridge.
+  var BRIDGE = null, BINFO = "{}", BSTATUS = '{"set":false}';
+  function useBridge(api) {
+    if (window.TVHA || BRIDGE || typeof api !== "function") return;
+    var post = function (path, body, id, cb) {
+      api("POST", path, body, 20000).then(function (r) { cb(id, r && r.result && typeof r.result === "object" ? r.result : { ok: false }); }, function () { cb(id, { ok: false, error: "bridge" }); });
+    };
+    BRIDGE = {
+      info: function () { return BINFO; },
+      request: function (id, action, entity, value) { post("/api/ha", { action: action, entity: entity, value: value }, id, reply); },
+      setupStatus: function () { return BSTATUS; },
+      setupCheck: function (id, url, token) { post("/api/ha/check", { url: url, token: token }, id, setupReply); },
+      setupSave: function (id, picks) { var p = null; try { p = JSON.parse(picks); } catch (e) {} post("/api/ha/save", { picks: p }, id, function (i, r) { bridgeInfo(); setupReply(i, r); }); },
+      setupForget: function (id) { post("/api/ha/forget", {}, id, function (i, r) { bridgeInfo(); setupReply(i, r); }); }
+    };
+    BRIDGE.api = api;
+    bridgeInfo();
+  }
+  function bridgeInfo() {
+    if (!BRIDGE) return;
+    BRIDGE.api("GET", "/api/ha/info", null, 15000).then(function (r) {
+      if (!r || typeof r !== "object") return;
+      BINFO = JSON.stringify(r.info || {}); BSTATUS = JSON.stringify(r.status || { set: false });
+      reload();
+    }, function () {});
+  }
+  // what is set up changed (a set up saved on this TV): read it again and draw the home again
+  function reload() {
+    INFO = null;
+    LIVE.controls = LIVE.sensors = LIVE.speakers = LIVE.energy = LIVE.bell = null; LIVE.at = {};
+    changed("info", native() ? native().info() : "");
+  }
+
+  // ---------------- set up on the TV (Home settings, Smart home) ----------------
+  var setupWaiting = {}, setupSeq = 0;
+  function setupAsk(fn) {
+    return new Promise(function (resolve) {
+      var id = "s" + (++setupSeq).toString(36);
+      var timer = setTimeout(function () { delete setupWaiting[id]; resolve({ ok: false, error: "timeout" }); }, 30000);
+      setupWaiting[id] = function (r) { clearTimeout(timer); resolve(r && typeof r === "object" ? r : { ok: false }); };
+      try { fn(id); } catch (e) { clearTimeout(timer); delete setupWaiting[id]; resolve({ ok: false, error: "native" }); }
+    });
+  }
+  function setupReply(id, r) { var f = setupWaiting[id]; if (f) { delete setupWaiting[id]; f(r); } }
+  var setup = {
+    // can this TV set up smart home itself (the launcher, or the home computer's bridge)?
+    can: function () { var n = native(); return !!(n && n.setupCheck); },
+    status: function () { try { return JSON.parse(native().setupStatus() || "{}") || {}; } catch (e) { return { set: false }; } },
+    // checks an address and token; an empty token checks again with the one kept on the TV
+    check: function (url, token) { return setupAsk(function (id) { native().setupCheck(id, String(url || ""), String(token || "")); }); },
+    save: function (picks) { return setupAsk(function (id) { native().setupSave(id, JSON.stringify(picks || {})); }).then(function (r) { if (r.ok) reload(); return r; }); },
+    forget: function () { return setupAsk(function (id) { native().setupForget(id); }).then(function (r) { reload(); return r; }); }
+  };
+
   window.smartHome = {
+    useBridge: useBridge, setup: setup, setupReply: setupReply, reload: reload,
     enabled: enabled, live: live, still: still, stillOk: stillOk,
     available: available, open: open, close: close, move: move, ok: ok, paint: paint, reply: reply,
     isOpen: function () { return S.open; }, icon: ICONS.home,

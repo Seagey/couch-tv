@@ -302,6 +302,31 @@
       }
     };
   }
+  // ?hasetup=1: a launcher with nothing set up yet, for Home settings, Smart home (HomeAssistant.kt
+  // setupCheck, setupSave, setupForget). The token "test-token-for-the-preview-only" is the right one.
+  if (arg("hasetup")) {
+    var kept = null, sreply = function (id, r) { setTimeout(function () { if (window.smartHome) window.smartHome.setupReply(id, r); }, 120); };
+    var ENTS = [{ entity: "climate.lounge", name: "Lounge aircon" }, { entity: "scene.movie_night", name: "Movie night" },
+      { entity: "light.lounge", name: "Lounge lamp" }, { entity: "cover.blinds", name: "Blinds" }, { entity: "camera.front", name: "Front door" },
+      { entity: "sensor.pool", name: "Pool", unit: "°C", cls: "temperature" }, { entity: "sensor.solar_today", name: "Solar today", unit: "kWh", cls: "energy" },
+      { entity: "media_player.kitchen", name: "Kitchen speaker" }, { entity: "event.front_door_ding", name: "Front door ding" }];
+    window.TVHA = {
+      info: function () {
+        if (!kept) return "{}";
+        var nm = function (l) { return (l || []).map(function (x) { return { entity: x.entity, name: x.name || x.entity }; }); };
+        return JSON.stringify({ climate: nm(kept.climate), scenes: nm(kept.scenes), controls: nm(kept.controls), cameras: nm(kept.cameras), sensors: nm(kept.sensors), speakers: nm(kept.speakers), energy: !!kept.energy, doorbell: !!kept.doorbell });
+      },
+      request: function (id) { setTimeout(function () { if (window.smartHome) window.smartHome.reply(id, { ok: false, error: "failed" }); }, 100); },
+      setupStatus: function () { return JSON.stringify(kept ? { set: true, host: "homeassistant.local", made_on_tv: true } : { set: false }); },
+      setupCheck: function (id, url, token) {
+        if (!/^https?:\/\/[a-z0-9.-]+(:\d+)?\/?$/i.test(url)) return sreply(id, { ok: false, error: "address" });
+        if (token !== "test-token-for-the-preview-only" && !(token === "" && kept)) return sreply(id, { ok: false, error: "token" });
+        sreply(id, { ok: true, entities: ENTS });
+      },
+      setupSave: function (id, picks) { kept = JSON.parse(picks); window.MOCK_HA_SAVED = kept; sreply(id, { ok: true }); },
+      setupForget: function (id) { kept = null; sreply(id, { ok: true }); }
+    };
+  }
 
   // ---------- a pretend bridge ----------
   var jw = function (p) { return localArt(p) || "https://images.justwatch.com/" + p + ".webp"; };

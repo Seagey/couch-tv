@@ -72,7 +72,9 @@ object HomeAssistant {
      */
     fun readExtras(ctx: Context, i: Intent) {
         val v = i.getStringExtra("ha_b64")?.trim() ?: return
-        val e = store(ctx).edit()
+        // apply.sh sends "none" when config.json has no section: a set up made on the TV itself stays
+        if ((v.isEmpty() || v == "none") && store(ctx).getBoolean("made_on_tv", false)) return
+        val e = store(ctx).edit().remove("made_on_tv")
         val json = if (v.isEmpty() || v == "none") null else try {
             String(android.util.Base64.decode(v, android.util.Base64.DEFAULT), Charsets.UTF_8)
                 .takeIf { parse(JSONObject(it)) != null }
@@ -398,6 +400,85 @@ object HomeAssistant {
         return "data:image/jpeg;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
     }
 
+    // ---------------------------------------------------------------- set up on the TV (no computer)
+    //
+    // Home settings, Smart home: the person types Home Assistant's address and pastes a token (the phone
+    // remote's Type on the TV), the TV checks them and lists what Home Assistant has that couch-tv can
+    // show, and the person ticks what they want. The section is then kept exactly as apply.sh would
+    // keep it, so everything else (the checks, the allow lists, the doorbell) is unchanged. The page
+    // hands the token over once; it is never handed back, and a later change of ticks reuses the kept one.
+
+    private val PICKABLE = Regex("(climate|scene|script|light|switch|fan|cover|camera|sensor|media_player|event|binary_sensor|input_boolean)\\.[a-z0-9_]{1,64}")
+    // the same ids config.json refuses (docs/CONFIG.md): nothing that opens the house
+    private val OPENS_HOUSE = Regex("(cover|switch)\\.[a-z0-9_]*(garage|gate|door|lock)[a-z0-9_]*")
+    private const val MOST_LISTED = 400
+
+    /** Home Assistant's /api/states, cut to what couch-tv can show: entity, name, and for a sensor its unit. */
+    internal fun pickable(states: JSONArray): JSONArray {
+        val out = mutableListOf<JSONObject>()
+        for (k in 0 until states.length()) {
+            val st = states.optJSONObject(k) ?: continue
+            val ent = st.optString("entity_id")
+            if (!PICKABLE.matches(ent) || OPENS_HOUSE.matches(ent)) continue
+            val a = st.optJSONObject("attributes") ?: JSONObject()
+            if (ent.startsWith("cover.") && a.optString("device_class") in HaReadings.HOUSE_OPENERS) continue
+            val o = JSONObject().put("entity", ent).put("name", a.optString("friendly_name").trim().take(40).ifEmpty { pretty(ent) })
+            a.optString("unit_of_measurement").takeIf { it.length in 1..12 && !it.contains('<') }?.let { o.put("unit", it) }
+            a.optString("device_class").takeIf { it.matches(Regex("[a-z_]{1,32}")) }?.let { o.put("cls", it) }
+            out.add(o)
+        }
+        out.sortWith(compareBy({ it.optString("entity").substringBefore('.') }, { it.optString("name").lowercase() }))
+        return JSONArray(out.take(MOST_LISTED))
+    }
+
+    /**
+     * Checks an address and a token: { ok, entities } or { ok: false, error: "address" | "token" |
+     * "unreachable" | "not_ha" }. Only the address typed is ever called, with no redirect followed.
+     */
+    fun check(url: String, token: String): JSONObject {
+        val base = cleanBase(url) ?: return JSONObject().put("ok", false).put("error", "address")
+        val tok = token.trim().takeIf { TOKEN.matches(it) } ?: return JSONObject().put("ok", false).put("error", "token")
+        val s = Settings(base, tok, emptyList(), emptyList(), null)
+        val (code, body) = call(s, "GET", "/api/", null, 64 * 1024)
+        when {
+            code == 401 || code == 403 -> return JSONObject().put("ok", false).put("error", "token")
+            code == -1 -> return JSONObject().put("ok", false).put("error", "unreachable")
+            code != 200 || body == null || !String(body, Charsets.UTF_8).contains("API running") -> return JSONObject().put("ok", false).put("error", "not_ha")
+        }
+        val (c2, all) = call(s, "GET", "/api/states", null, 12 * 1024 * 1024)
+        if (c2 != 200 || all == null) return JSONObject().put("ok", false).put("error", "unreachable")
+        val list = try { pickable(JSONArray(String(all, Charsets.UTF_8))) } catch (e: Exception) { return JSONObject().put("ok", false).put("error", "not_ha") }
+        return JSONObject().put("ok", true).put("entities", list)
+    }
+
+    /** Keeps a section made on the TV, with the address and token it was checked with. False when it does not check out. */
+    fun keep(ctx: Context, picks: JSONObject, base: String, token: String): Boolean {
+        val o = JSONObject(picks.toString()).put("url", base).put("token", token)
+        if (parse(o) == null) return false
+        store(ctx).edit().putString(KEY, o.toString()).putBoolean("made_on_tv", true).commit()
+        cached = null; cachedFrom = null
+        Doorbell.start(ctx)
+        return true
+    }
+
+    /** Smart home off on this TV: the section, address and token are gone. */
+    fun forget(ctx: Context) {
+        store(ctx).edit().remove(KEY).remove("made_on_tv").commit()
+        cached = null; cachedFrom = null
+        Doorbell.start(ctx)
+    }
+
+    /** What the set up screen shows: the host only (never the token or the whole address) and what is ticked. */
+    fun status(ctx: Context): JSONObject {
+        val s = settings(ctx) ?: return JSONObject().put("set", false)
+        fun ids(l: List<Named>) = JSONArray(l.map { it.entity })
+        return JSONObject().put("set", true).put("host", try { URL(s.base).host } catch (e: Exception) { "" })
+            .put("made_on_tv", store(ctx).getBoolean("made_on_tv", false))
+            .put("climate", ids(s.climate)).put("scenes", ids(s.scenes)).put("controls", ids(s.controls)).put("cameras", ids(s.cameras))
+            .put("sensors", ids(s.sensors)).put("speakers", ids(s.speakers)).put("energy", s.energy?.entity ?: "").put("battery", s.energy?.battery ?: "")
+            .put("doorbell", s.doorbell?.entity ?: "").put("doorbell_camera", s.doorbell?.camera ?: "")
+    }
+
     /** The page's question, answered as the launcher would (tests: HomeAssistantTest). */
     internal fun answerForTest(s: Settings?, action: String, entity: String, value: String): JSONObject = answer(s, action, entity, value)
 
@@ -435,6 +516,55 @@ object HomeAssistant {
                     main.post { reply(id, out) }
                 }
             }
+        }
+
+        // The set up screen (Home settings, Smart home). The address and token checked last are held here
+        // in memory only, so the page never has to hand the token over twice.
+        @Volatile private var pending: Pair<String, String>? = null
+
+        @JavascriptInterface
+        fun setupStatus(): String = try { status(app).toString() } catch (e: Exception) { "{\"set\":false}" }
+
+        @JavascriptInterface
+        fun setupCheck(id: String, url: String, token: String) {
+            if (!ids.matches(id)) return
+            main.post {
+                if (!trusted(web.url)) { setupReply(id, JSONObject().put("ok", false).put("error", "refused")); return@post }
+                io.execute {
+                    // an empty token: check again with the one kept (changing the ticks later)
+                    val tok = token.trim().ifEmpty { settings(app)?.token.orEmpty() }
+                    val out = try { check(url, tok) } catch (e: Exception) { JSONObject().put("ok", false).put("error", "unreachable") }
+                    if (out.optBoolean("ok")) pending = (cleanBase(url) ?: "") to tok.trim()
+                    main.post { setupReply(id, out) }
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun setupSave(id: String, picks: String) {
+            if (!ids.matches(id)) return
+            main.post {
+                if (!trusted(web.url)) { setupReply(id, JSONObject().put("ok", false).put("error", "refused")); return@post }
+                io.execute {
+                    val p = pending ?: settings(app)?.let { it.base to it.token }
+                    val ok = p != null && try { keep(app, JSONObject(picks), p.first, p.second) } catch (e: Exception) { false }
+                    main.post { setupReply(id, JSONObject().put("ok", ok).apply { if (!ok) put("error", if (p == null) "check" else "picks") }) }
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun setupForget(id: String) {
+            if (!ids.matches(id)) return
+            main.post {
+                if (!trusted(web.url)) { setupReply(id, JSONObject().put("ok", false).put("error", "refused")); return@post }
+                pending = null
+                io.execute { forget(app); main.post { setupReply(id, JSONObject().put("ok", true)) } }
+            }
+        }
+
+        private fun setupReply(id: String, out: JSONObject) {
+            try { web.evaluateJavascript("window.smartHome && smartHome.setupReply && smartHome.setupReply(\"$id\", $out)", null) } catch (e: Exception) {}
         }
 
         private fun trusted(url: String?): Boolean {

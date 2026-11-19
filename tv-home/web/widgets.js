@@ -1907,8 +1907,37 @@
   };
 
   // guests and the room
-  R.welcome = function (root, o, b) {
+  // the guest from the bookings calendar this TV reads (At home, Guests), for a Welcome widget whose
+  // design says the name comes from the calendar. The name and the times never come from the design.
+  function stayOf(env) {
+    if (env.demo) { var t0 = now(), d0 = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + 2, 10).getTime(); return { set: true, view: { phase: "during", guest: "Sarah", checkout: d0 } }; }
+    return (athome(env) || {}).stay || null;
+  }
+  // "Check out Sunday at 10am", "Check in from 3pm", "Check out today at 10am"
+  function stayLine(v, env) {
+    var t = now(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
+    var dayWord = function (ms) { var d = new Date(ms).setHours(0, 0, 0, 0); return d === today ? "today" : d === today + 86400000 ? "tomorrow" : DAYS[new Date(ms).getDay()]; };
+    if (v.phase === "arrival" || v.phase === "before") return "Check in " + (v.phase === "before" ? "tomorrow " : "") + "from " + hhmm(v.checkin, env);
+    if (v.phase === "during" || v.phase === "lastday") return "Check out " + dayWord(v.checkout) + " at " + hhmm(v.checkout, env);
+    return "";
+  }
+  function withName(text, name) {
+    if (!name) return text;
+    var lines = text.split("\n"), m = /^(.*?)([.!]*)$/.exec(lines[0]);
+    lines[0] = m[1] + ", " + name + m[2];
+    return lines.join("\n");
+  }
+  R.welcome = function (root, o, b, env) {
     var q = op(o), align = q.align || "center", text = q.text || "Welcome";
+    if (q.source === "calendar") {
+      var st = stayOf(env || {});
+      if (!st || !st.set) return empty(root, b, "calendar", b.w < 300 ? "Add bookings" : "Add your bookings calendar", "Home settings, couch-tv Studio, At home");
+      var v = st.view;
+      if (v && v.phase !== "between") {
+        text = withName(text, v.guest);
+        if (q.times !== false) { var sl = stayLine(v, env || {}); if (sl) { var q2 = {}; for (var k in q) if (Object.prototype.hasOwnProperty.call(q, k)) q2[k] = q[k]; q2.sub = sl; q = q2; } }
+      }
+    }
     var lines = text.split("\n").length, fs = clamp(Math.min((b.h - (q.kicker ? 50 : 0) - (q.sub ? 50 : 0)) / (1.08 * lines), b.w / (Math.max(8, Math.max.apply(null, text.split("\n").map(function (l) { return l.length; }))) * 0.6)), 30, 120);
     var bare = root.classList.contains("cw-bare"), sh = bare ? ";text-shadow:0 3px 24px rgba(0,0,0,.28)" : "";
     add(root, E("div", "cw-col", "height:100%;justify-content:center;text-align:" + align + ";align-items:" + (align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start"), [

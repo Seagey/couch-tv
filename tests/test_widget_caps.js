@@ -81,7 +81,7 @@ CAPS.kinds().forEach((k) => {
 });
 ok(CAPS.steps("surf", "Google TV").join(" ").indexOf("beach town") > 0, "surf: the steps say to pick the nearest beach town");
 ok(CAPS.steps("photo", "Tizen").join(" ").indexOf("web address") > 0 && CAPS.steps("photo", "Google TV").join(" ").indexOf("USB") > 0, "photos: by web address on a Samsung, from USB on a Google TV");
-ok(CAPS.need("aircon", "Tizen") === "no" && CAPS.need("aircon", "Google TV") === "setup", "aircon: not possible on a Samsung, set up on a Google TV");
+ok(CAPS.need("aircon", "Tizen") === "computer" && CAPS.need("aircon", "Google TV") === "setup" && CAPS.steps("aircon", "Google TV").join(" ").indexOf("Smart home") > 0, "aircon: set up on a Google TV (Home settings, Smart home), through the home computer on a Samsung");
 ok(CAPS.need("clock", "Roku OS") === "no" && /not possible/i.test(CAPS.steps("clock", "Roku OS")[0]), "a Roku: not possible, and says so");
 
 // 3. sizes: the shape of tools/tv-designer/app/grid.js W[kind]; named sizes smallest first, none under min

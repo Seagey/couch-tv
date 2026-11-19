@@ -48,6 +48,8 @@ import tivo
 import spotify_now
 import webdata
 import plex
+import smarthome
+import bookings
 import say
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -2719,6 +2721,50 @@ async def h_calendar(request):
     return ok(text=text)
 
 
+# ---------- smart home for a web TV (bridge/smarthome.py) ----------
+# The address and token stay on this computer: the page gets names and readings only. Nothing here
+# goes in the action history or the log (a reading or a name is the household's own).
+HA = smarthome.Home(config.DATA, config.CONFIG.get("home_assistant"), os.environ.get("HOME_ASSISTANT_TOKEN"))
+
+
+# Guest names from booking emails, the way guest-tv gets them (bridge/bookings.py): Airbnb's calendar
+# link has no names, its "reservation confirmed" emails do. Kept on this computer and the TV only.
+BOOKINGS = bookings.Reader(config.CONFIG.get("bookings"), os.environ.get("BOOKINGS_PASSWORD"))
+
+
+async def h_stay_names(request):
+    if not BOOKINGS.on():
+        return ok(on=False, names=[])
+    names = await asyncio.get_running_loop().run_in_executor(None, BOOKINGS.read)
+    return ok(on=True, names=names, read=bool(not BOOKINGS.errors))
+
+
+async def h_ha_info(request):
+    return ok(info=HA.info(), status=HA.status())
+
+
+async def h_ha(request):
+    data = await body(request)
+    action = str(data.get("action") or "")
+    if action not in smarthome.ACTIONS:
+        return ok(result={"ok": False, "error": "refused"})
+    return ok(result=await HA.answer(action, data.get("entity"), data.get("value")))
+
+
+async def h_ha_check(request):
+    data = await body(request)
+    return ok(result=await HA.check(data.get("url"), data.get("token")))
+
+
+async def h_ha_save(request):
+    data = await body(request)
+    return ok(result=HA.save(data.get("picks")))
+
+
+async def h_ha_forget(request):
+    return ok(result=HA.forget())
+
+
 async def h_sleep_get(request):
     return ok(ends=sleep["ends"])
 
@@ -4656,6 +4702,12 @@ def make_app():
     r.add_get("/api/app-order", h_app_order_get)
     r.add_post("/api/app-order", h_app_order_set)
     r.add_post("/api/calendar", h_calendar)
+    r.add_get("/api/stay-names", h_stay_names)
+    r.add_get("/api/ha/info", h_ha_info)
+    r.add_post("/api/ha", h_ha)
+    r.add_post("/api/ha/check", h_ha_check)
+    r.add_post("/api/ha/save", h_ha_save)
+    r.add_post("/api/ha/forget", h_ha_forget)
     r.add_get("/api/settings", h_settings_get)
     r.add_post("/api/settings", h_settings_set)
     r.add_get("/api/continue", h_continue)

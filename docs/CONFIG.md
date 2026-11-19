@@ -513,9 +513,27 @@ their default order.
 ## Smart home (optional, through Home Assistant)
 
 Off unless you add it. With no `home_assistant` section (or `"enabled": false`, as in
-`config.example.json`) nothing changes on anyone's TV: no tile, no calls to anything, no extra
-permission. It works with option A (no computer) and option B (bridge), because the TV app talks to
-Home Assistant itself; the bridge never reads this section and never passes it on.
+`config.example.json`) and nothing set up on the TV, nothing changes on anyone's TV: no tile, no calls
+to anything, no extra permission. It works with option A (no computer) and option B (bridge), because
+the TV app talks to Home Assistant itself.
+
+**Set up on the TV, no computer and no file.** Home settings, couch-tv Studio, **Smart home**: type
+Home Assistant's address (usually `http://homeassistant.local:8123`), paste a long-lived access token
+with the phone remote's Type on the TV, and the TV lists everything Home Assistant has that couch-tv
+can show (never locks, alarms, garage doors or gates). Tick what you want and pick **Save and show on
+the home**. The TV keeps the address and token in the app's own private store, exactly as if
+`apply.sh` had sent this section; the page never gets the token back. **Change what shows** reads Home
+Assistant again with the kept token, and **Disconnect smart home** removes both. A later `apply.sh`
+with no `home_assistant` section leaves a set up made on the TV alone; one with a section replaces it.
+**Add a device we don't list** walks through getting a device into Home Assistant first (Tuya and
+Smart Life, Google Nest, Alexa devices, Apple Home and Matter, Hue, aircon, solar, and anything with a
+web address or MQTT through Home Assistant's RESTful, MQTT or Webhook integrations).
+
+**Samsung, LG, Hisense, Philips, TiVo OS and Panasonic** (a computer runs the home): the same Smart
+home screen works, and the bridge talks to Home Assistant for the TV (`bridge/smarthome.py`, `/api/ha`).
+The address, token and ticks are kept in `bridge/data/home-assistant.json` (mode 600, git ignores it);
+without one the bridge uses this section and `HOME_ASSISTANT_TOKEN`. The website home on a VIDAA with
+no computer cannot reach Home Assistant.
 
 You need [Home Assistant](https://www.home-assistant.io/) already running at home, on the same home
 network as the TV. It is the hub that knows your air conditioner, doorbell and cameras (Daikin,
@@ -621,9 +639,40 @@ come from Home Assistant's history, so a sensor Home Assistant does not record s
 one that writes many times a second may be too much to draw (it then says so).
 
 **Not supported:** live camera video, locks, alarms, garage doors and gates (on purpose: nothing that
-opens the house from a TV remote), and anything outside Home Assistant. On Samsung, LG, Hisense
-VIDAA and the other web TVs there is no smart home at all: it needs a Google TV, Android TV or Fire
-TV.
+opens the house from a TV remote), and anything Home Assistant cannot reach (Smart home, Add a device
+we don't list, says how to add one). On Samsung, LG and the other web TVs smart home needs the home
+computer on; the doorbell card that slides in over apps needs a Google TV, Android TV or Fire TV.
+
+## Guests: names and times from a bookings calendar
+
+For a holiday let or a guest room. A couch-tv Studio design's **Welcome** widget can take the guest's
+name from a calendar (Guest name from: Bookings calendar): "Welcome, Sarah" from the day before check in
+until check out, with "Check in from 3pm" or "Check out Sunday at 10am" under it. Between stays it shows
+the design's own words. This is the way guest-tv does it (`tools/guest-tv`, `ical_stays` and `stay_of`).
+
+On the TV: Home settings, couch-tv Studio, At home, **Guests**. Paste the calendar link Airbnb
+(Calendar, Availability, Connect calendars, Export calendar), Booking.com or VRBO gives you, and set
+**Check in from** and **Check out by** (calendars hold days, not times). Without a bookings link the
+Agenda's own calendar is read, and there only events titled like "Stay: Sarah" count. The link, the
+times and the names stay on the TV; nothing goes in a design. It is read every 15 minutes, by the TV
+itself on a Google TV, Android TV or Fire TV, and by the home computer on the web TVs.
+
+Where the name comes from, first that has one:
+1. A name typed on the TV for that stay (At home, Guests, Next guest).
+2. Airbnb's "reservation confirmed" emails, read by the home computer (option B), matched by arrival day.
+   Airbnb's calendar link only says "Reserved"; the email has the first name and the number of guests.
+   Either save the emails into `bridge/data/bookings-inbox/` or let the bridge read the mailbox (read
+   only, every email left unread):
+
+   ```json
+   "bookings": { "imap": { "host": "imap.gmail.com", "user": "you@example.com" } }
+   ```
+
+   with an app password (not your real password) in `.env` as `BOOKINGS_PASSWORD=...`. The names stay on
+   that computer and the TV (`/api/stay-names`). Written from guest-tv's reader and its made up sample
+   emails: not yet checked against a real Airbnb email.
+3. The calendar event's own title: VRBO and many channel managers write "Reserved - Sarah Smith";
+   Booking.com and Airbnb write no name.
 
 Preview with no TV and no Home Assistant: `?mock=1&ha=1` (see the end of this page). The doorbell
 card is drawn by the app itself, so it cannot be previewed in a browser.
