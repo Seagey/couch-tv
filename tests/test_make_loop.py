@@ -199,6 +199,10 @@ CSS = os.path.join(ROOT, "tv-home", "web", "app.css")
 
 
 def dry_lines(*args):
+    # a folder that is not there unless the test names one, so a loop.json of this computer's own never
+    # meets --only
+    if "--out" not in args:
+        args = args + ("--out", os.path.join(tempfile.gettempdir(), "make-loop-never-written"))
     p = subprocess.run(["bash", SCRIPT, *args, "--dry-run"], capture_output=True, text=True)
     return p, p.stdout.splitlines()
 
@@ -274,31 +278,91 @@ class Depth(unittest.TestCase):
             self.assertEqual(v % 3, 0)
         self.assertEqual([v * 2 // 3 for v in (480, 162, 960, 318)], [320, 108, 640, 212])
 
-    def test_zoom_and_drift_are_the_same_numbers_in_zoompan_and_loop_json(self):
+    def test_zoom_and_sway_are_the_same_numbers_in_zoompan_and_loop_json(self):
         cmds, lines = self.fg_cmd()
         meta = loop_json(lines)
-        self.assertEqual(meta, {"still": True, "seconds": 34, "fps": 30, "zoom": 0.06, "drift": 0.006,
+        self.assertEqual(meta, {"still": True, "seconds": 34, "fps": 30, "zoom": 0.06, "sway": 0.3,
                                 "fg": {"x": 480, "y": 162, "w": 960, "h": 318}})
         g = arg_after(cmds[0], "-filter_complex")
         self.assertIn("zoompan=z='1+%g*(1-cos(2*PI*on/1020))/2'" % meta["zoom"], g)
-        self.assertIn("x='(iw-iw/zoom)/2+%g*iw*sin(2*PI*on/1020)'" % meta["drift"], g)
+        self.assertIn("x='(iw-iw/zoom)/2*(1+%g*sin(2*PI*on/1020))+(iw/zoom-trunc(iw/zoom))/2+0.5'" % meta["sway"], g)
+        self.assertIn("y='(ih-ih/zoom)/2+(ih/zoom-trunc(ih/zoom))/2+0.5'", g)
+        self.assertIn("scale=5120:-2,format=yuv444p,zoompan=", g, "4:4:4, so zoompan places the window to the whole pixel")
         with open(SCRIPT, encoding="utf-8") as f:
             text = f.read()
-        self.assertIn("ZOOM=0.06\nDRIFT=0.006\n", text)
+        self.assertIn("ZOOM=0.06\nSWAY=0.3\n", text)
         self.assertNotIn("1+0.06*", text.split("set -eu", 1)[1], "zoompan reads the variables, not its own copy")
 
-    def test_frame_zero_is_the_neutral_position(self):
+    def zoompan(self, on, n=1020, iw=5120, ih=2880, zoom=0.06, sway=0.3):
+        """What ffmpeg 7.1's zoompan does with the script's expressions (libavfilter/vf_zoompan.c): the
+        window w = int(iw/zoom), x evaluated, clamped into 0 .. iw - w and made a whole pixel, the same
+        for y (4:4:4, so no even rounding)."""
         import math
-        n = 1020
-        z = 1 + 0.06 * (1 - math.cos(2 * math.pi * 0 / n)) / 2
-        x = (5120 - 5120 / z) / 2 + 0.006 * 5120 * math.sin(0)
-        self.assertEqual((z, x), (1.0, 0.0))
+        z = min(max(1 + zoom * (1 - math.cos(2 * math.pi * on / n)) / 2, 1), 10)
+        w, h = int(iw * (1.0 / z)), int(ih * (1.0 / z))
+        dx = (iw - iw / z) / 2 * (1 + sway * math.sin(2 * math.pi * on / n)) + (iw / z - math.trunc(iw / z)) / 2 + 0.5
+        dy = (ih - ih / z) / 2 + (ih / z - math.trunc(ih / z)) / 2 + 0.5
+        x, y = int(min(max(dx, 0), max(iw - w, 0))), int(min(max(dy, 0), max(ih - h, 0)))
+        return z, x, y, w, h
+
+    def test_frame_zero_is_the_neutral_position(self):
+        self.assertEqual(self.zoompan(0), (1.0, 0, 0, 5120, 2880))
+
+    def test_the_video_follows_the_formula_the_home_moves_the_cut_out_by(self):
+        # every frame of a 34 s loop, at the cut-out's corners and on the peak: where zoompan puts the point
+        # against where the page's translateX(-sway*(z-1)/2*100vw*s) scale(z) about the centre puts it
+        import math
+        worst = 0
+        for on in range(1020):
+            z, x, y, w, h = self.zoompan(on)
+            s = math.sin(2 * math.pi * on / 1020)
+            for p, q in ((480, 162), (1440, 162), (480, 480), (1440, 480), (950, 350)):
+                vx, vy = (p * 5120 / 1920 - x) * 1920 / w, (q * 2880 / 1080 - y) * 1080 / h
+                px, py = 960 + z * (p - 960) - 0.3 * (z - 1) / 2 * 1920 * s, 540 + z * (q - 540)
+                worst = max(worst, math.hypot(vx - px, vy - py))
+        self.assertLess(worst, 0.5, "under half a screen pixel on every frame (2.7 px with the old drift)")
+
+    def test_the_sway_never_asks_for_more_room_than_the_zoom_leaves(self):
+        import math
+        for on in range(1020):
+            z = 1 + 0.06 * (1 - math.cos(2 * math.pi * on / 1020)) / 2
+            room = 5120 - 5120 / z
+            x = room / 2 * (1 + 0.3 * math.sin(2 * math.pi * on / 1020))
+            self.assertTrue(0 <= x <= room, on)
 
     def test_loop_json_without_a_matte_and_for_a_clip(self):
         _, lines = dry_lines(PHOTO, "--seconds", "20", "--only", "day")
-        self.assertEqual(loop_json(lines), {"still": True, "seconds": 20, "fps": 30, "zoom": 0.06, "drift": 0.006, "fg": None})
+        self.assertEqual(loop_json(lines), {"still": True, "seconds": 20, "fps": 30, "zoom": 0.06, "sway": 0.3, "fg": None})
         _, lines = dry_lines(CLIP, "--seconds", "45", "--only", "day")
-        self.assertEqual(loop_json(lines), {"still": False, "seconds": 45, "fps": 30, "zoom": 0, "drift": 0, "fg": None})
+        self.assertEqual(loop_json(lines), {"still": False, "seconds": 45, "fps": 30, "zoom": 0, "sway": 0, "fg": None})
+
+    def test_only_may_not_change_the_loop_json_the_other_variants_were_made_with(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        _, lines = dry_lines(PHOTO, "--matte", MATTE, "--seconds", "34")
+        made = [l for l in lines if l.startswith("# would write ")][0].split("loop.json: ", 1)[1]
+        with open(os.path.join(tmp, "loop.json"), "w", encoding="utf-8") as f:
+            f.write(made + "\n")
+        before = os.listdir(tmp)
+        for args in (("--seconds", "20", "--matte", MATTE), ("--matte", MATTE), ("--seconds", "34"), ()):
+            p, lines = dry_lines(PHOTO, *args, "--only", "night", "--out", tmp)
+            self.assertEqual(p.returncode, 2, args)
+            self.assertIn("would change loop.json", p.stderr)
+            self.assertEqual([l for l in lines if l.startswith("ffmpeg ")], [], args)
+        p, lines = dry_lines(CLIP, "--seconds", "34", "--only", "night", "--out", tmp)
+        self.assertEqual(p.returncode, 2, "a clip over a photo's loop")
+        # the same loop as before: allowed, and all four without --only may change it
+        p, lines = dry_lines(PHOTO, "--matte", MATTE, "--seconds", "34", "--only", "night", "--out", tmp)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        p, lines = dry_lines(PHOTO, "--seconds", "20", "--out", tmp)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(loop_json(lines)["seconds"], 20)
+        self.assertEqual(os.listdir(tmp), before, "dry runs wrote nothing")
+        # an older loop.json (the drift of the first version): --only is refused, so all four are remade
+        with open(os.path.join(tmp, "loop.json"), "w", encoding="utf-8") as f:
+            f.write(made.replace('"sway": 0.3', '"drift": 0.006') + "\n")
+        p, _ = dry_lines(PHOTO, "--matte", MATTE, "--seconds", "34", "--only", "night", "--out", tmp)
+        self.assertEqual(p.returncode, 2)
 
     def test_a_dry_run_with_a_matte_writes_nothing(self):
         tmp = tempfile.mkdtemp()

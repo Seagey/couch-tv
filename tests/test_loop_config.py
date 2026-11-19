@@ -113,7 +113,7 @@ class LoopVersion(unittest.TestCase):
             self.assertEqual(config.public()["home"]["loop"]["variants"], ["night"], "no restart needed after make-loop.sh")
 
 
-GOOD = {"still": True, "seconds": 34, "fps": 30, "zoom": 0.06, "drift": 0.006, "fg": {"x": 480, "y": 162, "w": 960, "h": 318}}
+GOOD = {"still": True, "seconds": 34, "fps": 30, "zoom": 0.06, "sway": 0.3, "fg": {"x": 480, "y": 162, "w": 960, "h": 318}}
 
 
 class LoopMeta(unittest.TestCase):
@@ -140,7 +140,7 @@ class LoopMeta(unittest.TestCase):
         touch(self.folder, "day.mp4", "night.mp4")
         self.write(GOOD)
         self.assertEqual(config.loop_files(self.folder)["meta"], GOOD)
-        self.write(dict(GOOD, fg=None, still=False, zoom=0, drift=0, seconds=15))
+        self.write(dict(GOOD, fg=None, still=False, zoom=0, sway=0, seconds=15))
         self.assertEqual(config.loop_files(self.folder)["meta"]["fg"], None)
 
     def test_fg_only_when_meta_has_a_rectangle_and_every_variant_its_png(self):
@@ -166,7 +166,8 @@ class LoopMeta(unittest.TestCase):
         bad = [
             "not json", "[1, 2]", dict(GOOD, seconds=14), dict(GOOD, seconds=61), dict(GOOD, seconds="34"),
             dict(GOOD, fps=60), dict(GOOD, fps=True), dict(GOOD, zoom=0.3), dict(GOOD, zoom=-0.01),
-            dict(GOOD, drift=0.06), dict(GOOD, still="yes"), {k: v for k, v in GOOD.items() if k != "still"},
+            dict(GOOD, sway=1.01), dict(GOOD, sway=-0.1), dict(GOOD, still="yes"),
+            {k: v for k, v in GOOD.items() if k != "sway"}, dict({k: v for k, v in GOOD.items() if k != "sway"}, drift=0.006), {k: v for k, v in GOOD.items() if k != "still"},
             dict(GOOD, fg={"x": 480, "y": 162, "w": 960}), dict(GOOD, fg={"x": 480.5, "y": 162, "w": 960, "h": 318}),
             dict(GOOD, fg={"x": 1000, "y": 162, "w": 960, "h": 318}), dict(GOOD, fg={"x": 0, "y": 900, "w": 960, "h": 318}),
             dict(GOOD, fg={"x": -3, "y": 162, "w": 960, "h": 318}), dict(GOOD, fg={"x": 0, "y": 0, "w": 0, "h": 318}),
@@ -189,7 +190,7 @@ class LoopMeta(unittest.TestCase):
 
     def test_the_edges_of_the_ranges_are_accepted(self):
         touch(self.folder, "day.mp4")
-        for ok in (dict(GOOD, seconds=15), dict(GOOD, seconds=60), dict(GOOD, zoom=0, drift=0), dict(GOOD, zoom=0.2, drift=0.05),
+        for ok in (dict(GOOD, seconds=15), dict(GOOD, seconds=60), dict(GOOD, zoom=0, sway=0), dict(GOOD, zoom=0.2, sway=1),
                    dict(GOOD, fg={"x": 0, "y": 0, "w": 1920, "h": 1080})):
             self.write(ok)
             self.assertEqual(config.loop_files(self.folder)["meta"], ok)

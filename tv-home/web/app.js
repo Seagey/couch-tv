@@ -1100,9 +1100,9 @@
   // home.loop.meta (the bridge checked loop.json already): the numbers the cut-out needs, or null
   function loopMetaOf(m) {
     var num = function (v) { return typeof v === "number" && isFinite(v); };
-    if (!m || typeof m !== "object" || !num(m.seconds) || m.seconds <= 0 || !num(m.zoom) || !num(m.drift)) return null;
+    if (!m || typeof m !== "object" || !num(m.seconds) || m.seconds <= 0 || !num(m.zoom) || !num(m.sway)) return null;
     var r = m.fg, fg = r && typeof r === "object" && num(r.x) && num(r.y) && num(r.w) && num(r.h) && r.w > 0 && r.h > 0 ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
-    return { seconds: m.seconds, zoom: m.zoom, drift: m.drift, fg: fg };
+    return { seconds: m.seconds, zoom: m.zoom, sway: m.sway, fg: fg };
   }
   // which variant to show now: the sun's phase while Follow the sun is on, else day; a missing file
   // falls back to day, then to the first the bridge has
@@ -1177,13 +1177,15 @@
   // the date line and the buttons), at its rectangle from loop.json in rem (the page's rem is 1/120 of
   // the width, 16 design pixels), scaled about the screen's centre.
   // Its motion. zoompan shows, at loop time t (T the loop's length, s = sin(2*PI*t/T)), the window of
-  // the picture (width iw) of width iw/z from X = (iw - iw/z)/2 + drift*iw*s, with
-  // z = 1 + zoom*(1 - cos(2*PI*t/T))/2. A point at screen x p at the neutral position (z 1, X 0; the
-  // first frame, which the cut-out and the poster are) is at picture x p*iw/W (W the screen width), so
-  // on screen it is at (p*iw/W - X) * z*W/iw = W/2 + z*(p - W/2) - z*drift*W*s:
-  // scaled by z about the centre, then moved by -z*drift*W*s. CSS reads translateX(a) scale(z) right to
-  // left, the scale about the transform origin first and then the move, which is that mapping with
-  // a = -(drift*100vw)*z*s. The sign: as the window moves right (s > 0) the picture moves left.
+  // the picture (width iw) of width iw/z from X = (iw - iw/z)/2 * (1 + sway*s), with
+  // z = 1 + zoom*(1 - cos(2*PI*t/T))/2 (sway is a share of the room the zoom leaves on each side, so
+  // ffmpeg never clamps the window; make-loop.sh). A point at screen x p at the neutral position (z 1,
+  // X 0; the first frame, which the cut-out and the poster are) is at picture x p*iw/W (W the screen
+  // width), so on screen it is at (p*iw/W - X) * z*W/iw = z*p - (z - 1)*W/2*(1 + sway*s)
+  // = W/2 + z*(p - W/2) - sway*(z - 1)/2*W*s: scaled by z about the centre, then moved by
+  // -sway*(z - 1)/2*W*s. CSS reads translateX(a) scale(z) right to left, the scale about the transform
+  // origin first and then the move, which is that mapping with a = -(sway*(z - 1)/2*100vw)*s. The sign:
+  // as the window moves right (s > 0) the picture moves left.
   function loopFgInit() {
     var m = loopMeta.fg, img = document.createElement("img"), st = img.style, time = $("time");
     img.id = "loop-fg"; img.className = "loop-fg"; img.alt = "";
@@ -1207,11 +1209,11 @@
     loopFgHold();
   }
   // the motion as @keyframes, a stop every 2.5 percent (41 with both ends, played linear): the curves
-  // between two stops are off by under 0.1 px at the cut-out's corners
+  // between two stops are off by 0.11 px at most at the cut-out's corners
   function loopKeyframes(m) {
     var out = "@keyframes loop-depth {";
     for (var i = 0; i <= 40; i++) {
-      var a = 2 * Math.PI * i / 40, z = 1 + m.zoom * (1 - Math.cos(a)) / 2, x = -(m.drift * 100) * z * Math.sin(a);
+      var a = 2 * Math.PI * i / 40, z = 1 + m.zoom * (1 - Math.cos(a)) / 2, x = -(m.sway * (z - 1) / 2 * 100) * Math.sin(a);
       out += " " + i * 2.5 + "% { transform: translateX(" + (+x.toFixed(5)) + "vw) scale(" + (+z.toFixed(6)) + "); }";
     }
     return out + " }";

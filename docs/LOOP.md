@@ -53,7 +53,9 @@ the files with a version the home puts on each address, so no restart: pick the 
 Home to reload it, and the new files play.
 
 Options: `--seconds 45` for a longer loop (15 to 60, default 30), `--slow 2` to slow the clip,
-`--only night` to remake one variant after changing its grade, `--out <dir>` for another folder,
+`--only night` to remake one variant after changing its grade (with the same `--seconds` and
+`--matte` as the run that made the others: `loop.json` is one file for all four, so the script refuses
+an `--only` run that would change it), `--out <dir>` for another folder,
 `--matte <image>` for the depth effect (a photo only), `--dry-run` to print every ffmpeg command and the
 `loop.json` it would write, and write nothing. A run takes a few minutes per
 variant on a small computer: the encode is `-preset slow` on purpose, for the smallest file at
@@ -79,10 +81,11 @@ What each file is:
   in its offline copy (the video is streamed from the bridge).
 - **`loop.json`**, written once per run: the loop's length and motion, which the bridge passes to the
   home as `home.loop.meta`. For a photo `{"still": true, "seconds": 34, "fps": 30, "zoom": 0.06,
-  "drift": 0.006, "fg": {"x": 480, "y": 162, "w": 960, "h": 318}}` (`fg` is null without `--matte`), for
-  a clip `{"still": false, "seconds": 30, "fps": 30, "zoom": 0, "drift": 0, "fg": null}`. The bridge
-  ignores a file whose numbers are out of range (seconds 15 to 60, fps 30, zoom 0 to 0.2, drift 0 to
-  0.05, the rectangle in whole pixels inside 1920x1080) and says so once in its log.
+  "sway": 0.3, "fg": {"x": 480, "y": 162, "w": 960, "h": 318}}` (`fg` is null without `--matte`), for
+  a clip `{"still": false, "seconds": 30, "fps": 30, "zoom": 0, "sway": 0, "fg": null}`. The bridge
+  ignores a file whose numbers are out of range (seconds 15 to 60, fps 30, zoom 0 to 0.2, sway 0 to
+  1, the rectangle in whole pixels inside 1920x1080), or one without `sway` (the first version's
+  `drift`, a different motion), and says so once in its log.
 
 **Colour.** Every encode is converted to BT.709 limited range (the HD standard) and tagged as such
 (`-colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv`), and the posters to
@@ -173,8 +176,8 @@ there.
 ## A photo instead of a clip
 
 `make-loop.sh` takes a photo too (`.jpg`, `.png` or `.webp`, or any file with `--still`): the loop
-becomes a slow push into the picture and back out over its whole length, six percent at most with a
-little sideways drift, eased so the first and the last frame are the same window and the motion is
+becomes a slow push into the picture and back out over its whole length, six percent at most, swaying a
+little sideways, eased so the first and the last frame are the same window and the motion is
 still at both. No seam, no footage to find, and the same four grades, blurred copies and posters. The
 home's own scenes work: `tv-home/web/backgrounds/scene-night@2x.jpg` is the lake peak the design
 mockup used (use the `@2x` file, the push crops into it). On the bridge computer:
@@ -190,7 +193,7 @@ steps, which takes a few minutes per variant on a small box.
 
 The original couch-tv design puts the clock behind the mountain: in the Night look, a transparent copy
 of everything in front of the sky (`backgrounds/<scene>-fg.webp`) is drawn over the clock. The Loop look
-does the same for a photo's loop, with one difference: the picture moves (the push and the drift), so a
+does the same for a photo's loop, with one difference: the picture moves (the push and the sway), so a
 still cut-out would slide out of register. It does not need to be still. The motion is a formula, so the
 home moves the cut-out by the same formula, locked to the video's clock.
 
@@ -211,7 +214,8 @@ refuses it there.
 
 - **Colour:** the finished sharp file's first frame, decoded as BT.709 limited range, so its colours are
   the video's, grade and all. The first frame is the neutral position: zoompan's zoom
-  `z = 1 + 0.06*(1 - cos(2*PI*on/N))/2` is 1 and its drift `0.006*iw*sin(2*PI*on/N)` is 0 at `on = 0`.
+  `z = 1 + 0.06*(1 - cos(2*PI*on/N))/2` is 1 at `on = 0`, which leaves no room to sway, so the window is
+  the whole picture.
 - **The rectangle:** x 480, y 162, w 960, h 318 on the 1920x1080 screen, around the clock and the peak.
   Each is a multiple of 3, so on the 1280x720 frame it is x 320, y 108, w 640, h 212 in whole pixels.
 - **Alpha:** the matte scaled to 1280x720, the same crop, multiplied by `min(1, d/24)`, `d` the distance
@@ -224,16 +228,25 @@ refuses it there.
   `ys = 1.5*(Y+108) + 0.75`. It is one `geq` expression per channel with `st()` and `ld()`, which
   ffmpeg 7.1 has; `tests/test_make_loop.py` checks it against `app.css`.
 
-The zoom and the drift are two variables in the script (`ZOOM=0.06`, `DRIFT=0.006`), used by both
-zoompan and `loop.json`, so the two can never differ.
+The zoom and the sway are two variables in the script (`ZOOM=0.06`, `SWAY=0.3`), used by both
+zoompan and `loop.json`, so the two can never differ. zoompan's window at frame `on` is
+`iw/z` wide from `x = (iw - iw/z)/2 * (1 + 0.3*sin(2*PI*on/N))`: centred, then moved sideways by 0.3 of
+the room the zoom leaves on each side, up to 11 screen pixels. The sway is a share of that room because
+zoompan clamps `x` into it: the first version drifted by 0.6 percent of the width, which asked for more
+room than there was in the first and last 4 s of a 34 s loop, and the video then left the formula by up
+to 2.2 screen pixels, a doubled edge on the spire. zoompan also makes `x` and `y` whole pixels (even ones
+for 4:2:0 input) and the window `int(iw/z)` wide, so the picture goes in as 4:4:4, each expression adds
+0.5 to round, and `x` and `y` add half of what `int()` takes off the window. Simulated over the 1020
+frames of a 34 s loop (`tests/test_make_loop.py` models zoompan's arithmetic), the video stays within
+0.43 screen pixels of the formula at the cut-out's corners and on the peak, where it was 2.7.
 
 **What the home does.** With `home.loop.fg` true (the bridge sets it when `loop.json` has the rectangle
 and every variant has its cut-out), the home puts one image right after the clock, so it covers the
 clock's lower part and stays under the date line and the buttons, at the rectangle, scaled about the
 screen's centre. Its motion is zoompan's mapping in screen space: a point at x `p` at the neutral
-position is at `W/2 + z*(p - W/2) - z*drift*W*sin(2*PI*t/T)` at loop time `t`, which is
-`translateX(-(drift*100vw)*z*sin) scale(z)` about the centre. That runs as a CSS animation on the
-compositor (keyframes every 2.5 percent, under 0.1 px off), started with a delay of minus the video's
+position is at `W/2 + z*(p - W/2) - sway*(z - 1)/2*W*sin(2*PI*t/T)` at loop time `t`, which is
+`translateX(-(sway*(z - 1)/2*100vw)*sin) scale(z)` about the centre. That runs as a CSS animation on the
+compositor (keyframes every 2.5 percent, 0.11 px off at most), started with a delay of minus the video's
 time when the video plays, again at each wrap, after a variant switch and when the home comes back;
 held at 0, the poster's position, while a file loads; hidden while an app is in front. The clock and
 the date line move down 80 px with it: the digits run from about y 231 to 405, and the spire, from

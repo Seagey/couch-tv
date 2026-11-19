@@ -88,7 +88,7 @@
   // baked in, so it looks brighter than the TV's, whose make-loop.sh cut-out carries it
   if (arg("look") === "loop") {
     cfg.home.loop = { variants: [], blur: false, fg: arg("depth") !== "0",
-      meta: { still: true, seconds: 34, fps: 30, zoom: 0, drift: 0, fg: { x: 0, y: 0, w: 1920, h: 1080 } } };
+      meta: { still: true, seconds: 34, fps: 30, zoom: 0, sway: 0, fg: { x: 0, y: 0, w: 1920, h: 1080 } } };
   }
   if (arg("idle")) cfg.home.idle_photo_seconds = arg("idle") === "off" ? 0 : Number(arg("idle"));
   if (arg("smartidle")) {

@@ -453,7 +453,7 @@ const tick = () => new Promise((r) => setImmediate(r));
   assert(!/html\.lighter\.theme-loop \.toast/.test(sec), 'Lighter: the toast keeps its fade');
   assert(/\.theme-night \.qbtn \{ min-width: 5\.5rem; height: 5\.5rem;/.test(css), 'the Night rules are still there');
   // mock.js and the words
-  assert(/if \(arg\("look"\) === "loop"\) \{\n\s*cfg\.home\.loop = \{ variants: \[\], blur: false, fg: arg\("depth"\) !== "0",\n\s*meta: \{ still: true, seconds: 34, fps: 30, zoom: 0, drift: 0, fg: \{ x: 0, y: 0, w: 1920, h: 1080 \} \} \};/.test(mock),
+  assert(/if \(arg\("look"\) === "loop"\) \{\n\s*cfg\.home\.loop = \{ variants: \[\], blur: false, fg: arg\("depth"\) !== "0",\n\s*meta: \{ still: true, seconds: 34, fps: 30, zoom: 0, sway: 0, fg: \{ x: 0, y: 0, w: 1920, h: 1080 \} \} \};/.test(mock),
     'mock.js answers home.loop with no variants, and depth with the whole frame cut-out at the full screen and no motion');
   assert(/no scrim\n[^\n]*baked in, so it looks brighter than the TV's/.test(mock), 'mock.js says its cut-out has no scrim');
   ['look_loop', 'live_card', 'video_card'].forEach(function (k) {
@@ -463,7 +463,7 @@ const tick = () => new Promise((r) => setImmediate(r));
   assert.strictEqual((i18n.match(/look_loop: "Loop"/g) || []).length, 16, 'Loop is a name, the same everywhere');
 
   // ---------------- depth: the moving cut-out over the clock (docs/LOOP.md, the depth effect) ----------------
-  const META = { still: true, seconds: 34, fps: 30, zoom: 0.06, drift: 0.006, fg: { x: 480, y: 162, w: 960, h: 318 } };
+  const META = { still: true, seconds: 34, fps: 30, zoom: 0.06, sway: 0.3, fg: { x: 480, y: 162, w: 960, h: 318 } };
   body.children = [scrim]; head.children = []; clockCol.children = [timeEl, dateEl];
   context.LOOP = true; context.MOCK = false; context.LIGHTER = false; context.SUN_SYNC = true; context.phase = 'day';
   root.classList.remove('loop-depth');
@@ -501,15 +501,15 @@ const tick = () => new Promise((r) => setImmediate(r));
     assert(m, 'a stop at ' + pct + '%');
     return [Number(m[1]), Number(m[2])];
   };
-  const want = (f) => { const a = 2 * Math.PI * f, z = 1 + 0.06 * (1 - Math.cos(a)) / 2; return [-(0.006 * 100) * z * Math.sin(a), z]; };
+  const want = (f) => { const a = 2 * Math.PI * f, z = 1 + 0.06 * (1 - Math.cos(a)) / 2; return [-(0.3 * (z - 1) / 2 * 100) * Math.sin(a), z]; };
   [['0', 0], ['25', 0.25], ['50', 0.5], ['75', 0.75], ['100', 1], ['2.5', 0.025]].forEach(([pct, f]) => {
     const [x, z] = stop(pct), [wx, wz] = want(f);
     assert(Math.abs(x - wx) < 1e-5 && Math.abs(z - wz) < 1e-6, pct + '%: ' + x + ' ' + z + ' against ' + wx + ' ' + wz);
   });
   assert.deepStrictEqual(stop('0'), [0, 1], 'the start is the neutral position (frame 0, the poster)');
-  assert.deepStrictEqual(stop('25'), [-0.618, 1.03], 'a quarter in: the window has moved right, so the picture left, at half the zoom');
-  assert.deepStrictEqual(stop('50'), [0, 1.06], 'halfway: the deepest zoom, no drift');
-  assert.deepStrictEqual(stop('75'), [0.618, 1.03]);
+  assert.deepStrictEqual(stop('25'), [-0.45, 1.03], 'a quarter in: the window has moved right, so the picture left, at half the zoom');
+  assert.deepStrictEqual(stop('50'), [0, 1.06], 'halfway: the deepest zoom, centred');
+  assert.deepStrictEqual(stop('75'), [0.45, 1.03]);
   assert(!/filter/.test(kfText));
   context.loopInit();
   assert.strictEqual(head.children.length, 1, 'the keyframes go in once');
@@ -566,7 +566,7 @@ const tick = () => new Promise((r) => setImmediate(r));
   assert(!fg2.classList.contains('failed') && root.classList.contains('loop-depth'));
   // the preview: the whole frame stand-in, cut to make-loop.sh's rectangle so the row and the dock stay in view
   body.children = [scrim]; clockCol.children = [timeEl, dateEl]; context.MOCK = true;
-  context.HOME = { loop: { variants: [], blur: false, fg: true, meta: { still: true, seconds: 34, fps: 30, zoom: 0, drift: 0, fg: { x: 0, y: 0, w: 1920, h: 1080 } } } };
+  context.HOME = { loop: { variants: [], blur: false, fg: true, meta: { still: true, seconds: 34, fps: 30, zoom: 0, sway: 0, fg: { x: 0, y: 0, w: 1920, h: 1080 } } } };
   context.loopInit();
   assert.strictEqual(context.loopFg.src, 'backgrounds/scene-night-fg.webp');
   assert.strictEqual(context.loopSharp.getAttribute('poster'), 'backgrounds/scene-night.jpg');

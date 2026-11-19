@@ -326,8 +326,9 @@ def _whole(v):
 
 
 def loop_meta(folder):
-    """loop.json from make-loop.sh: {"still", "seconds", "fps", "zoom", "drift", "fg"}, checked:
-    seconds 15 to 60, fps 30, zoom 0 to 0.2, drift 0 to 0.05, fg null or whole numbers x, y, w, h
+    """loop.json from make-loop.sh: {"still", "seconds", "fps", "zoom", "sway", "fg"}, checked:
+    seconds 15 to 60, fps 30, zoom 0 to 0.2, sway 0 to 1 (a share of the room the zoom leaves, so
+    ffmpeg never clamps it), fg null or whole numbers x, y, w, h
     with the rectangle inside the 1920x1080 screen. None when the file is missing; when it is there
     but not sound, None and one log line (once for each version of the file, since this is read on
     every request for config.js)."""
@@ -356,8 +357,8 @@ def loop_meta(folder):
         why = "fps is not 30"
     elif not _in_range(m.get("zoom"), 0, 0.2):
         why = "zoom is not from 0 to 0.2"
-    elif not _in_range(m.get("drift"), 0, 0.05):
-        why = "drift is not from 0 to 0.05"
+    elif not _in_range(m.get("sway"), 0, 1):
+        why = "sway is not from 0 to 1"
     elif fg is not None:
         if not (isinstance(fg, dict) and all(_whole(fg.get(k)) for k in ("x", "y", "w", "h"))):
             why = "fg is not whole numbers x, y, w and h"
@@ -366,7 +367,7 @@ def loop_meta(folder):
             why = "fg is not inside the %dx%d screen" % (sw, sh)
     if why:
         return _loop_meta_bad(path, st, why)
-    return {"still": m["still"], "seconds": m["seconds"], "fps": 30, "zoom": m["zoom"], "drift": m["drift"],
+    return {"still": m["still"], "seconds": m["seconds"], "fps": 30, "zoom": m["zoom"], "sway": m["sway"],
             "fg": None if fg is None else {k: fg[k] for k in ("x", "y", "w", "h")}}
 
 

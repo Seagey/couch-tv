@@ -10,10 +10,12 @@
 #   --seconds  how long the loop is, 15 to 60, default 30. The clip must be at least one second
 #              longer than that, divided by --slow (a 31 s loop at --slow 2 needs a 15.5 s clip).
 #   --slow     slow the clip down: 2 plays a 60 fps clip at half speed, 1 (default) leaves it.
-#   --only     make one variant instead of all four.
+#   --only     make one variant instead of all four. loop.json is one file for all four, so this is
+#              refused when the folder's loop.json says something else (another --seconds, --matte or
+#              not, a clip instead of a photo): remake all four then.
 #   --still    the input is a photo (a .jpg, .png or .webp is taken as one anyway): the loop is a slow
-#              push into the picture and back out over its whole length, 6 percent at most, with a
-#              little sideways drift, which starts and ends on the same frame, so it needs no seam.
+#              push into the picture and back out over its whole length, 6 percent at most, swaying a
+#              little sideways, which starts and ends on the same frame, so it needs no seam.
 #              The home's own scenes work: tv-home/web/backgrounds/scene-night@2x.jpg is the lake peak
 #              the design mockup used. Use the @2x file: the push crops into it. --slow is ignored.
 #   --matte    a photo only: a copy of the photo, aligned with it, that is transparent where the sky is
@@ -29,8 +31,8 @@
 #   <variant>-blur.jpg  960x540 poster, the first frame of the blurred file
 #   <variant>-fg.png    with --matte: 640x212 RGBA, the cut-out over the clock (below, "The depth cut-out")
 # and once, loop.json: the loop's length and motion for the home, which moves the cut-out with it:
-#   {"still": true, "seconds": L, "fps": 30, "zoom": 0.06, "drift": 0.006, "fg": {"x": 480, "y": 162, "w": 960, "h": 318}}
-#   (fg null without --matte; a clip is {"still": false, "seconds": L, "fps": 30, "zoom": 0, "drift": 0, "fg": null})
+#   {"still": true, "seconds": L, "fps": 30, "zoom": 0.06, "sway": 0.3, "fg": {"x": 480, "y": 162, "w": 960, "h": 318}}
+#   (fg null without --matte; a clip is {"still": false, "seconds": L, "fps": 30, "zoom": 0, "sway": 0, "fg": null})
 #
 # Colour. Every encode is converted to and tagged as BT.709, limited range (the HD standard), so the
 # TV's decoder and ffmpeg turn the same YUV into the same RGB. Untagged, a decoder guesses, and a guess
@@ -58,8 +60,18 @@
 # The blurred copy is cut from the finished sharp file, so it has the same seam and length.
 #
 # The depth cut-out (--matte, a photo only). The photo's loop moves by a formula, so the home can move a
-# still cut-out with it. zoompan takes, for output frame on = 0 .. N-1 (N = 30 L), the window
-#   z = 1 + ZOOM*(1-cos(2*PI*on/N))/2,  x = (iw-iw/z)/2 + DRIFT*iw*sin(2*PI*on/N),  y = (ih-ih/z)/2
+# still cut-out with it. zoompan takes, for output frame on = 0 .. N-1 (N = 30 L), the window of width
+# iw/z from
+#   z = 1 + ZOOM*(1-cos(2*PI*on/N))/2,  x = (iw-iw/z)/2 * (1 + SWAY*sin(2*PI*on/N)),  y = (ih-ih/z)/2
+# that is, centred, then moved sideways by SWAY of the room the zoom leaves on each side. zoompan clamps
+# x into 0 .. iw - w, so the motion must never ask for more than that room: a drift in a share of the
+# width did, for the first and last 4 s of a 34 s loop, and the video then left the formula by up to
+# 2.2 screen pixels (the cut-out showed a doubled edge on the spire). With SWAY at most 1 it cannot.
+# zoompan also makes x and y whole pixels (by truncation; even ones for 4:2:0 input) and the window's
+# width int(iw/z), so the picture goes in as 4:4:4, each expression adds 0.5 to round, and x and y add
+# half of what int() takes off the window, so the whole pixel window is centred on the formula's.
+# Simulated over the 1020 frames of a 34 s loop at the cut-out's corners and on the peak, the video
+# then stays within 0.43 screen pixels of the formula (it was 2.7 with the clamp and the even rounding).
 # Frame 0 has z = 1 and x = 0: the whole picture, the neutral position. The cut-out is taken from it:
 #   colour  the finished sharp file's first frame decoded to RGB as BT.709 limited (so its colours are
 #           exactly the video's, grade and all), cropped to the screen rectangle FG (x 480, y 162,
@@ -77,7 +89,7 @@
 
 set -eu
 
-usage() { sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,/^#   --dry-run/p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/../tv-home/web/loop"
@@ -140,9 +152,11 @@ grade() {
 
 # The photo's push, used by zoompan and written into loop.json for the home, from these two numbers
 # only, so the two can never differ: the zoom at its deepest (1 + ZOOM at the loop's middle) and the
-# sideways drift as a share of the width.
+# sideways sway as a share of the room the zoom leaves on each side (0 to 1, so zoompan never clamps
+# it; 0.3 moves the picture at most 11 screen pixels, about what the earlier drift of 0.6 percent of
+# the width did).
 ZOOM=0.06
-DRIFT=0.006
+SWAY=0.3
 
 # The cut-out's screen rectangle (1920x1080 design pixels, each a multiple of 3) and the same on the
 # 1280x720 frame; the feather in 720p pixels; the ink and the scrim's two gradients as app.css draws
@@ -180,9 +194,19 @@ scrim_channel() {
 
 if [ "$STILL" -eq 1 ]; then
   if [ -n "$MATTE" ]; then FG_JSON="{\"x\": $FG_X, \"y\": $FG_Y, \"w\": $FG_W, \"h\": $FG_H}"; else FG_JSON="null"; fi
-  LOOP_JSON="{\"still\": true, \"seconds\": $SECONDS_LEN, \"fps\": 30, \"zoom\": $ZOOM, \"drift\": $DRIFT, \"fg\": $FG_JSON}"
+  LOOP_JSON="{\"still\": true, \"seconds\": $SECONDS_LEN, \"fps\": 30, \"zoom\": $ZOOM, \"sway\": $SWAY, \"fg\": $FG_JSON}"
 else
-  LOOP_JSON="{\"still\": false, \"seconds\": $SECONDS_LEN, \"fps\": 30, \"zoom\": 0, \"drift\": 0, \"fg\": null}"
+  LOOP_JSON="{\"still\": false, \"seconds\": $SECONDS_LEN, \"fps\": 30, \"zoom\": 0, \"sway\": 0, \"fg\": null}"
+fi
+# loop.json is one file for all four variants, and the home moves every variant's cut-out by it. --only
+# leaves the other variants' files as they are, so it may not change it: a 20 s loop.json over 34 s
+# files would move their cut-outs on the wrong period. (This only reads, so a dry run checks it too.)
+if [ -n "$ONLY" ] && [ -f "$OUT/loop.json" ] && [ "$(cat "$OUT/loop.json")" != "$LOOP_JSON" ]; then
+  echo "make-loop.sh: --only $ONLY would change loop.json, which the other variants were made with:" >&2
+  echo "  now:  $(cat "$OUT/loop.json")" >&2
+  echo "  this: $LOOP_JSON" >&2
+  echo "Run it again without --only to remake all four, or with the same --seconds and --matte as before." >&2
+  exit 2
 fi
 
 # The seam arithmetic from the header, as numbers.
@@ -239,12 +263,16 @@ for v in $VARIANTS; do
   # into body and head, and the two dissolved as the header says.
   if [ "$STILL" -eq 1 ]; then
     # A photo. The picture is first scaled up four times the output width, so the push moves in
-    # quarter pixel steps and does not judder, then zoompan takes one 1280x720 window per frame: the
+    # quarter pixel steps and does not judder, and made 4:4:4, so zoompan places the window to the
+    # whole pixel and not to the even one. Then zoompan takes one 1280x720 window per frame: the
     # zoom eases from 1 to 1.06 and back over the N = 30 L frames of the loop (a raised cosine, so
     # the first and the last frame are the same window and the motion is still at both), while the
-    # window drifts 0.6 percent of the width sideways and back on the same period. No seam needed.
+    # window sways sideways inside the room the zoom leaves and back on the same period (the header
+    # has the formula and the rounding terms). No seam needed.
     N=$((30 * SECONDS_LEN))
-    graph="[0:v]scale=5120:-2,zoompan=z='1+${ZOOM}*(1-cos(2*PI*on/${N}))/2':x='(iw-iw/zoom)/2+${DRIFT}*iw*sin(2*PI*on/${N})':y='(ih-ih/zoom)/2':d=1:s=1280x720:fps=30,${TO709},$(grade "$v"),${TO709},trim=duration=${SECONDS_LEN},setpts=PTS-STARTPTS[out]"
+    zx="(iw-iw/zoom)/2*(1+${SWAY}*sin(2*PI*on/${N}))+(iw/zoom-trunc(iw/zoom))/2+0.5"
+    zy="(ih-ih/zoom)/2+(ih/zoom-trunc(ih/zoom))/2+0.5"
+    graph="[0:v]scale=5120:-2,format=yuv444p,zoompan=z='1+${ZOOM}*(1-cos(2*PI*on/${N}))/2':x='${zx}':y='${zy}':d=1:s=1280x720:fps=30,${TO709},$(grade "$v"),${TO709},trim=duration=${SECONDS_LEN},setpts=PTS-STARTPTS[out]"
     IN_ARGS="-loop 1 -framerate 30 -t ${SECONDS_LEN}"
   else
     graph="[0:v]setpts=${SLOW}*PTS,fps=30,scale=1280:720:force_original_aspect_ratio=increase:out_color_matrix=bt709:out_range=tv,crop=1280:720,format=yuv420p,$(grade "$v"),${TO709},trim=duration=${BASE_LEN},setpts=PTS-STARTPTS,split=2[c0][c1];"
