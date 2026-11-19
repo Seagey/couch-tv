@@ -3423,7 +3423,7 @@
     if (document.documentElement.dir === "rtl") dx = -dx;
     if (zone === "settings") { setMove(dx, dy); return; }
     if (zone === "smart") { window.smartHome.move(dx, dy); return; }
-    if (zone === "gear") { if (dy) { gi = Math.max(0, Math.min(1, gi + dy)); renderGear(); } return; }
+    if (zone === "gear") { if (dy) { gi = Math.max(0, Math.min(gearItems().length - 1, gi + dy)); renderGear(); } return; }
     if (zone === "appmenu") { if (dy) { amI = Math.max(0, Math.min(amItems.length - 1, amI + dy)); renderAppMenu(); } return; }
     if (zone === "shelfmenu") { if (dy) { smI = Math.max(0, Math.min(smItems.length - 1, smI + dy)); renderShelfMenu(); } return; }
     if (zone === "updask") { if (dy) { ai = Math.max(0, Math.min(1, ai + dy)); renderAsk(); } return; }
@@ -3596,7 +3596,7 @@
       renderSettings();
       return;
     }
-    if (zone === "gear") { if (dy) { gi = wrapIndex(2, dy); renderGear(); } return; }
+    if (zone === "gear") { if (dy) { gi = wrapIndex(gearItems().length, dy); renderGear(); } return; }
     if (zone === "appmenu") { if (dy) { amI = wrapIndex(amItems.length, dy); renderAppMenu(); } return; }
     if (zone === "shelfmenu") { if (dy) { smI = wrapIndex(smItems.length, dy); renderShelfMenu(); } return; }
     if (zone === "updask") { if (dy) { ai = wrapIndex(2, dy); renderAsk(); } return; }
@@ -3753,7 +3753,7 @@
     touched = true;
     if (zone === "settings") { setActivate(); return; }
     if (zone === "smart") { window.smartHome.ok(); return; }
-    if (zone === "gear") { if (gi === 0) openSettings(); else openTvSettings(); return; }
+    if (zone === "gear") { var gIt = gearItems()[gi]; if (gIt) gIt.act(); return; }
     if (zone === "appmenu") { doAppMenu(); return; }
     if (zone === "shelfmenu") { doShelfMenu(); return; }
     if (zone === "updask") { answerAsk(ai === 0); return; }
@@ -3833,8 +3833,24 @@
   function openSmart() { zone = "smart"; clearFocus(); window.smartHome.open(); }
   function closeSmart() { window.smartHome.close(); zone = "grid"; }
 
-  // ---------------- the gear tile's menu: Home settings or the TV's own settings ----------------
+  // ---------------- the gear tile's menu: Home settings, the TV's own settings, and quick controls ----------------
   var gi = 0;
+  // Home settings and TV settings always; then, where the TV or the on-TV app can do it (#200), Wi-Fi,
+  // Bluetooth and Screen off. They open the same screens and do the same thing as their quick buttons,
+  // so the Settings key reaches them even when the quick row is off. Nothing is toggled from here:
+  // Android keeps Wi-Fi, Bluetooth and brightness to the system screens on Android TV 10 and newer.
+  function gearItems() {
+    var items = [
+      { ic: ICONS.sliders, ti: t("gear_home"), sub: updReady() ? t("upd_gear", { v: UPD.latest, c: UPD.current || "" }) : t("gear_home_sub"), act: openSettings },
+      { ic: ICONS.gear, ti: t("gear_tv"), sub: t("gear_tv_sub"), act: openTvSettings }
+    ];
+    if (nativeSettingsScreen() || (ON_TV && !OFFLINE)) {
+      items.push({ ic: ICONS.network, ti: t("network"), sub: t("net_sub"), act: function () { closeGear(); paintFocus(); openSettingsScreen("network"); } });
+      items.push({ ic: ICONS.bluetooth, ti: t("bluetooth"), sub: t("bt_sub"), act: function () { closeGear(); paintFocus(); openSettingsScreen("bluetooth"); } });
+    }
+    items.push({ ic: ICONS.screen_off, ti: t("screen_off"), sub: "", act: function () { closeGear(); paintFocus(); toggleScreenOff(true); } });
+    return items;
+  }
   function openGear() {
     zone = "gear"; gi = 0;
     renderGear();
@@ -3848,11 +3864,11 @@
   }
   function renderGear() {
     var pop = $("gear-pop");
-    var items = [[ICONS.sliders, t("gear_home"), updReady() ? t("upd_gear", { v: UPD.latest, c: UPD.current || "" }) : t("gear_home_sub")],
-      [ICONS.gear, t("gear_tv"), t("gear_tv_sub")]];
+    var items = gearItems();
+    if (gi >= items.length) gi = items.length - 1;
     pop.innerHTML = items.map(function (it, i) {
-      return '<div class="grow' + (i === gi ? " focus" : "") + '" role="menuitem"><i>' + it[0] + "</i><span><b>" + esc(it[1]) +
-        "</b><small>" + esc(it[2]) + "</small></span></div>";
+      return '<div class="grow' + (i === gi ? " focus" : "") + '" role="menuitem"><i>' + it.ic + "</i><span><b>" + esc(it.ti) +
+        "</b>" + (it.sub ? "<small>" + esc(it.sub) + "</small>" : "") + "</span></div>";
     }).join("");
     pop.classList.add("on");
     document.documentElement.classList.add("gearing");
