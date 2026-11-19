@@ -340,6 +340,45 @@ object Adb {
         }
     }
 
+    /**
+     * Copies a file onto the TV over ADB's sync service (what `adb push` uses), as ADB's shell user, so
+     * `pm install` can read it from /data/local/tmp. Throws with Android's own words when the TV says no
+     * (short of space, say).
+     */
+    fun push(file: java.io.File, remote: String, timeoutMs: Long = 180_000) {
+        val s = stream("sync:")
+        val f = io.submit<Unit> {
+            val out = s.openOutputStream()
+            val inp = java.io.DataInputStream(s.openInputStream())
+            fun head(id: String, n: Int) = java.nio.ByteBuffer.allocate(8).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                .put(id.toByteArray(Charsets.US_ASCII)).putInt(n).array()
+            // SEND "path,mode": a plain file, rw-r--r--
+            val spec = "$remote,${0x8000 or 0x1a4}".toByteArray()
+            out.write(head("SEND", spec.size) + spec)
+            file.inputStream().use { fin ->
+                val buf = ByteArray(64 * 1024)
+                while (true) {
+                    val n = fin.read(buf)
+                    if (n < 0) break
+                    out.write(head("DATA", n)); out.write(buf, 0, n)
+                }
+            }
+            out.write(head("DONE", (System.currentTimeMillis() / 1000).toInt()))
+            out.flush()
+            val id = ByteArray(4).also { inp.readFully(it) }.toString(Charsets.US_ASCII)
+            val len = java.nio.ByteBuffer.wrap(ByteArray(4).also { inp.readFully(it) }).order(java.nio.ByteOrder.LITTLE_ENDIAN).int
+            if (id != "OKAY") {
+                val why = if (id == "FAIL" && len in 1..4096) ByteArray(len).also { inp.readFully(it) }.toString(Charsets.UTF_8) else id
+                throw java.io.IOException("push failed: $why")
+            }
+            runCatching { out.write(head("QUIT", 0)); out.flush() }
+        }
+        try { f.get(timeoutMs, TimeUnit.MILLISECONDS) }
+        catch (e: java.util.concurrent.ExecutionException) { throw (e.cause as? Exception) ?: e }
+        catch (e: java.util.concurrent.TimeoutException) { f.cancel(true); throw java.io.IOException("push timed out") }
+        finally { runCatching { s.close() } }
+    }
+
     // A long-lived shell for key presses, so a press does not wait for a new stream and its output.
     @Volatile private var keyShell: Pair<AdbStream, OutputStream>? = null
 

@@ -43,6 +43,66 @@ class UpdateRulesTest {
         assertNull(UpdateRules.read("""{"tag_name":""}""", watch = false))
     }
 
+    private val sha = "a".repeat(64)
+    private fun asset(name: String, url: String, digest: String = "sha256:$sha", size: Long = 44_412_953) =
+        """{"name":"$name","browser_download_url":"$url","digest":"$digest","size":$size}"""
+    private fun full(vararg assets: String) = """{"tag_name":"v0.13.9","name":"couch-tv 0.13.9","prerelease":false,"draft":false,"assets":[${assets.joinToString(",")}]}"""
+
+    @Test fun installsOnlyAFileFromThisReleaseWithItsChecks() {
+        val good = "https://github.com/Seagey/couch-tv/releases/download/v0.13.9/couch-tv-ontv.apk"
+        val f = UpdateRules.read(full(asset("couch-tv-ontv.apk", good)), watch = false)!!
+        assertEquals(good, f.url)
+        assertEquals(sha, f.digest)
+        assertEquals(44_412_953L, f.size)
+        assertTrue(f.installable)
+        // the watch copy takes its own file only
+        val w = UpdateRules.read(full(asset("couch-tv-ontv.apk", good), asset("couch-tv-ontv-watch.apk", good.replace("ontv.apk", "ontv-watch.apk"))), watch = true)!!
+        assertTrue(w.url.endsWith("couch-tv-ontv-watch.apk"))
+        // anywhere else, no SHA-256, or no size: nothing to install (the steps instead)
+        for (bad in listOf(
+            asset("couch-tv-ontv.apk", "https://example.com/couch-tv-ontv.apk"),
+            asset("couch-tv-ontv.apk", "http://github.com/Seagey/couch-tv/releases/download/v0.13.9/couch-tv-ontv.apk"),
+            asset("couch-tv-ontv.apk", "https://github.com/someone/couch-tv/releases/download/v0.13.9/couch-tv-ontv.apk"),
+            asset("couch-tv-ontv.apk", "https://github.com/Seagey/couch-tv/releases/download/../../x/couch-tv-ontv.apk"),
+            asset("couch-tv-ontv.apk", good, digest = ""),
+            asset("couch-tv-ontv.apk", good, digest = "sha256:1234"),
+            asset("couch-tv-ontv.apk", good, size = 0))) {
+            assertFalse(bad, UpdateRules.read(full(bad), watch = false)!!.installable)
+        }
+    }
+
+    @Test fun downloadsOnlyFromGitHub() {
+        assertTrue(UpdateRules.gitHubHost("github.com"))
+        assertTrue(UpdateRules.gitHubHost("objects.githubusercontent.com"))
+        assertTrue(UpdateRules.gitHubHost("release-assets.githubusercontent.com"))
+        assertFalse(UpdateRules.gitHubHost("github.com.evil.example"))
+        assertFalse(UpdateRules.gitHubHost("githubusercontent.com.example"))
+    }
+
+    @Test fun readsWhatTheInstallSaid() {
+        assertNull(UpdateRules.installResult(""))
+        assertNull(UpdateRules.installResult("Performing Streamed Install\n"))
+        assertEquals("", UpdateRules.installResult("Performing Streamed Install\nSuccess\n"))
+        assertEquals("space", UpdateRules.installResult("Failure [INSTALL_FAILED_INSUFFICIENT_STORAGE: Failed to override installation location]"))
+        assertEquals("other_key", UpdateRules.installResult("Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Package dev.couchtv.ontv signatures do not match]"))
+        assertEquals("not_newer", UpdateRules.installResult("Failure [INSTALL_FAILED_VERSION_DOWNGRADE]"))
+        assertEquals("failed", UpdateRules.installResult("Failure [INSTALL_FAILED_INVALID_APK]"))
+        assertEquals("failed", UpdateRules.installResult("Error: Unable to open file"))
+        assertEquals("space", UpdateRules.failure("push failed: couldn't write: No space left on device"))
+    }
+
+    @Test fun theInstallRunsApartFromTheAppAndOpensItAgain() {
+        val s = UpdateRules.installScript("dev.couchtv.ontv", reopen = true)
+        assertTrue(s.contains("pm install -r /data/local/tmp/couch-tv-update.apk > /data/local/tmp/couch-tv-update.txt"))
+        assertTrue(s.contains("nohup sh -c"))
+        assertTrue(s.contains("setsid"))
+        assertTrue(s.contains("rm -f /data/local/tmp/couch-tv-update.apk"))
+        assertTrue(s.contains("grep -q Success /data/local/tmp/couch-tv-update.txt && am start -n dev.couchtv.ontv/.SetupActivity --ez updated true"))
+        assertTrue(s.trim().endsWith("&"))
+        // started from a phone while a show is on: it installs, and leaves the show on screen
+        assertFalse(UpdateRules.installScript("dev.couchtv.ontv", reopen = false).contains("am start"))
+    }
+
     @Test fun stepsSayExactlyWhatToDo() {
         val phone = UpdateRules.steps(watch = false).joinToString(" ")
         assertTrue(phone.contains("Downloader"))
