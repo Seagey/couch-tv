@@ -2,9 +2,21 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.2**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.3**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 19 November 2026: release 0.13.3, easier for beginners, guests by name with no computer, and your home into couch-tv Studio
+
+0.13.3 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Both TV apps are 0.13.3 and install over 0.13.2. A classic home, with couch-tv Studio off and a town set, looks exactly as it did. Option B: `git pull` and restart the bridge. We set couch-tv up from scratch on two real Google TVs (Android 11) the way a beginner would, and fixed what got in the way:
+
+- **Guests by name with just a phone:** type the guest's name on the TV (At home, Guests) or the phone remote (More, Guest's name); the on-TV app reads the bookings calendar itself; the phone can send the bookings link to the TV. A TV never shows couch-tv Studio's sample guest or house.
+- **Google Play Protect lets the phone only install through:** `couch-tv-ontv.apk` has no accessibility service. A Fire TV installs `couch-tv-ontv-watch.apk` from a computer instead.
+- **Settings you can always find:** a Settings button on every design, Hold OK starts with Settings (also on TVs that send a held OK as quick presses), and the home says the remote's own Settings button opens the TV's menu.
+- **Plain words:** the Couch TV screen has a QR code, says when the phone is paired, and keeps the tools under More. The Setup app (now on the release) explains the Mac's Local Network switch and walks an Android 11 Google TV through USB debugging over Wi-Fi, with no dead end.
+- **No made up town** for the weather (the classic home says where to pick one), no false "Not on this TV" in the card that asks before a new design is used, readable photo tiles, and the couch-tv logo on both TV apps.
+- **Open this home in couch-tv Studio** (it was Share this home) brings a GitHub home onto couch-tv Studio.
+- `remove-all.sh` takes `EXTRA_APPS` for a home app of your own from before couch-tv.
 
 ### 19 November 2026: release 0.13.2, Ask AI, your own AI agent, guests by name, smart home on every TV, and designs on Roku
 

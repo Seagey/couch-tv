@@ -50,7 +50,7 @@ Other TVs: [Will it work on my TV?](#will-it-work-on-my-tv)
 
 ## Updates
 
-The newest release is **0.13.2**, on [the Releases page](https://github.com/Seagey/couch-tv/releases): Ask AI, your own AI agent, guests by name, smart home set up on the TV (Philips Hue and AirTouch 5 too, with no Home Assistant), and couch-tv Studio designs on Roku ([details](docs/UPDATES.md#19-november-2026-release-0132-ask-ai-your-own-ai-agent-guests-by-name-smart-home-on-every-tv-and-designs-on-roku)). New in 0.13:
+The newest release is **0.13.3**, on [the Releases page](https://github.com/Seagey/couch-tv/releases): easier for beginners (a Settings button on every design, a phone only install Google Play Protect lets through, plain words on the TV and in the Setup app), guests greeted by name with no computer, and your home into couch-tv Studio ([details](docs/UPDATES.md#19-november-2026-release-0133-easier-for-beginners-guests-by-name-with-no-computer-and-your-home-into-couch-tv-studio)). 0.13.2 brought Ask AI, your own AI agent, smart home set up on the TV and designs on Roku. New in 0.13:
 
 - **14 November:** custom cards with a web link open in the TV's browser on Android TV, LG and Samsung, thanks ekagra-codes ([#207](docs/UPDATES.md#14-november-2026-custom-cards-with-a-web-link-open-on-android-tv-lg-and-samsung-since-013))
 - **14 November:** choose where the home starts: profiles (as before), Keep watching or apps, thanks nidhalmouldi and ekagra-codes ([#211](docs/UPDATES.md#14-november-2026-choose-where-the-home-starts-profiles-keep-watching-or-apps-since-013))
