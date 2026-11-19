@@ -12,7 +12,7 @@ The newest release is **0.13.6**. The TV apps come from [the Releases page](http
 
 - **Update couch-tv:** Home settings, About has an Update couch-tv row with a version line. The on-TV app now looks on GitHub too (weekly if you said yes, or Check for updates now). It cannot install the update itself (that needs a permission the phone only app leaves out, so Play Protect has nothing new to stop), so OK shows the exact Downloader steps and code on the TV.
 - **The Settings gear never covers a widget:** it goes where the design leaves room, or, on a design with none, hides until the remote reaches it (Up or Right at the edge of the screen).
-- **Hold OK never opens the app:** Android's long press counts as a hold at once, so the Home menu opens with Settings first.
+- **Hold OK never opens the app on a Studio design:** Android's long press counts as a hold at once, so the Home menu opens with Settings first. The classic looks keep their own hold.
 - **The on-TV app says what is true:** the setup screen reads the TV's real home each time instead of a saved switch, and About says "On its own, no computer" on the on-TV app.
 - **Also:** a stray `_` or `.` in a design code is named; a Folder widget app with no icon shows its name; the Samsung installer says to switch the TV on first when it finds none.
 

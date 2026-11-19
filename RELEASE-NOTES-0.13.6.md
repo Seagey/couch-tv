@@ -23,7 +23,7 @@ A TCL owner on 0.13.3 was never told that a newer version existed. Now **Home se
 
 ### The remote
 
-- **Hold OK never opens the app.** A long press on Netflix opened Netflix. Android sends a held key as a repeat, and the home used to wait for its own timer; a press that let go quickly after the repeat counted as a short one. Now the repeat counts as a hold at once, on a design and on the classic home: the Home menu opens with Settings first, and the app does not open. Settings is first on an app's menu too.
+- **Hold OK never opens the app.** A long press on Netflix opened Netflix. Android sends a held key as a repeat, and the home used to wait for its own timer; a press that let go quickly after the repeat counted as a short one. Now, on a couch-tv Studio design, the repeat counts as a hold at once: the Home menu opens with Settings first, and the app does not open. Settings is first on an app's menu too. The classic looks keep their own hold: the night look opens the app's menu (Move, Hide).
 
 ### The on-TV app's setup screen says what is true
 
