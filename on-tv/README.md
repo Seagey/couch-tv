@@ -115,8 +115,9 @@ Sony Bravia among them) the TV then loops at every restart
 ([docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md#if-your-tv-loops-after-a-restart)). The Couch TV tile in the app row opens
 setup, so choose **Open the home** there to see the home (it appears when the Home button doesn't already open Couch TV), or use option A's `apply.sh`, which takes
 the Home button with a watch and leaves the Google home on.
-The **Couch TV home watch** accessibility service is for Fire TV (and the Xiaomi PatchWall switch below).
-On any other TV it switches itself off when you turn it on, and that is expected. **It is only in
+The **Couch TV home watch** accessibility service is for Fire TV, for a TV that opens its own home by name, and for the Xiaomi PatchWall switch below.
+On a TV where the Home key opens the maker's own home by name (a Haier, a TCL, another Google TV), it also brings
+couch-tv back when that home comes forward, while **Use as home screen** is on. **It is only in
 `couch-tv-ontv-watch.apk`**, which you install from a computer. The plain `couch-tv-ontv.apk` (the
 phone only download, from Downloader) leaves it out, because Google Play Protect blocks a sideloaded
 app that has an accessibility service ("App blocked to protect your device", seen on a TCL Google TV
