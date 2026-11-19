@@ -2,9 +2,21 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.1**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.2**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 19 November 2026: release 0.13.2, Ask AI, your own AI agent, guests by name, smart home on every TV, and designs on Roku and Apple TV
+
+0.13.2 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Both TV apps are 0.13.2 and install over 0.13.1. A classic home, with couch-tv Studio off, looks exactly as it did. Option B: `git pull`, then `.venv/bin/pip install -r bridge/requirements.txt` (AirTouch 5 needs `airtouch5py`), and restart the bridge.
+
+- **Ask AI** ([docs/ASK-AI.md](ASK-AI.md)): a widget and a sheet on the TV, answered by the AI you pick (Claude, OpenAI, Gemini, OpenRouter, Groq, Mistral, any OpenAI compatible service, a model at home, or couch-tv at home). The key stays on the TV.
+- **Your own AI agent** ([docs/AI-AGENT.md](AI-AGENT.md)) can put a message on the TV or send it a design, which asks "Use this design?" first.
+- **Guests by name:** At home, Guests reads your bookings calendar link with your check in and check out times, and a Welcome widget set to the calendar greets the guest by name. With a computer at home, the name can come from Airbnb's "reservation confirmed" emails ([CONFIG.md, Guests](CONFIG.md#guests-names-and-times-from-a-bookings-calendar)).
+- **Smart home set up on the TV:** Home settings, couch-tv Studio, Smart home, on Google TV and Android TV and, through the computer at home, on Samsung, LG and the other web TVs. **Add a device we don't list** says how to bring Tuya, Nest, Alexa, Apple Home, Matter and brand apps into Home Assistant.
+- **Philips Hue and AirTouch 5 with no Home Assistant**, with a computer at home ([CONFIG.md](CONFIG.md#philips-hue-and-airtouch-5-with-no-home-assistant-option-b)): pair the Hue bridge with its button and tick lights; find the AirTouch console and each zone becomes a room (on, off, temperature; the mode stays as set on the wall).
+- **couch-tv Studio designs on Roku and Apple TV**, drawn by the channel and by Couch TV themselves, from `design` in `config.json` or a code typed on the TV ([ROKU.md](ROKU.md#couch-tv-studio-designs), [APPLE-TV.md](APPLE-TV.md#a-design-from-couch-tv-studio)). Widgets they cannot draw show as a tidy card with their name. The Roku one has not run on a real Roku yet.
+- **Batteries** widget for paired Bluetooth remotes, controllers and headphones (Google TV and Android TV), typed custom cards on every TV, named timers, and plainer words for what each TV needs.
 
 ### 19 November 2026: release 0.13.1, long video loops for official designs, and the Wi-Fi join code draws again
 
