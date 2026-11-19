@@ -418,7 +418,7 @@ class SamsungTV:
                 await asyncio.sleep(3)
                 front = await self._front()
                 if front == self.app_id:
-                    self._note(f"TV came on, opened couch-tv (try {attempt})")
+                    self._note(f"TV came on, opened couch-tv (on screen after try {attempt})")
                     return
                 if front:
                     self._note(f"TV came on in {self._package_of(front)}, left alone")

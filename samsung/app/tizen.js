@@ -212,6 +212,8 @@
     launch: launch,
     iconUrl: iconUrl,
     bannerUrl: function () { return null; },
+    // Home settings, About: couch-tv's version (it said "Web preview" on a Samsung, 20 Nov 2026)
+    version: function () { return String(S.version || ""); },
     kept: function (k) { try { return localStorage.getItem("tvos." + k); } catch (e) { return null; } },
     keep: function (k, v) { try { localStorage.setItem("tvos." + k, v); } catch (e) {} },
     // the input button goes through the bridge (it presses Source); a web app cannot open that list

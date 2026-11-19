@@ -59,29 +59,60 @@
     setTimeout(hide, 25000);
   }
 
-  function check(now) {
+  var busy = "", error = "";
+  // Home settings, About and Updates read this (window.TVUP, the same shape as the Android apps').
+  // A Samsung app cannot install anything, so it is "manual": the page shows the steps below.
+  var STEPS = [
+    "On your computer, open the couch-tv Samsung setup again: couch-tv-samsung-setup.zip from couch-tv's Releases page on GitHub, then Install on Mac or Install on Windows.",
+    "Keep this TV switched on. The setup puts the new couch-tv on it, and your settings stay.",
+    "Help: " + HELP
+  ];
+  function state() {
+    var st = read(), latest = String(st.latest || "");
+    return JSON.stringify({
+      supported: true, manual: true, current: MINE, channel: "stable", latest: latest, title: "",
+      available: !!(latest && newer(latest, MINE)), refused: false, checked: st.checked || 0,
+      auto: st.auto !== false, answered: true, busy: busy, progress: 0, error: error,
+      code: "", how: "couch-tv on a Samsung does not update itself: a computer puts the new one on.", steps: STEPS
+    });
+  }
+  function tell() { try { if (window.tv && window.tv.update) window.tv.update(JSON.parse(state())); } catch (e) {} }
+
+  // now: the time; asked: someone pressed Check for updates now (no once-a-day limit, no note)
+  function check(now, asked) {
     var st = read();
-    if (st.latest && newer(st.latest, MINE) && now - (st.shown || 0) > DAY) {
+    if (!asked && st.latest && newer(st.latest, MINE) && now - (st.shown || 0) > DAY) {
       st.shown = now; save(st); show(st.latest);
     }
-    if (now - (st.checked || 0) < DAY || (typeof navigator !== "undefined" && navigator.onLine === false)) return;
+    if (!asked && (st.auto === false || now - (st.checked || 0) < DAY)) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) { error = "net"; tell(); return; }
     st.checked = now; save(st);
+    busy = "checking"; error = ""; tell();
     var x = new XMLHttpRequest();
     x.open("GET", "https://api.github.com/repos/" + REPO + "/releases/latest");
     x.setRequestHeader("Accept", "application/vnd.github+json");
     x.withCredentials = false;
     x.timeout = 15000;
     x.onload = function () {
-      if (x.status !== 200 || x.responseText.length > 400000) return;
+      busy = "";
+      if (x.status !== 200 || x.responseText.length > 400000) { error = "net"; tell(); return; }
       var latest = fromRelease(x.responseText), s = read();
       s.latest = latest;
       save(s);
-      if (latest && newer(latest, MINE) && Date.now() - (s.shown || 0) > DAY) { s.shown = Date.now(); save(s); show(latest); }
+      tell();
+      if (!asked && latest && newer(latest, MINE) && Date.now() - (s.shown || 0) > DAY) { s.shown = Date.now(); save(s); show(latest); }
     };
+    x.onerror = x.ontimeout = function () { busy = ""; error = "net"; tell(); };
     x.send();
   }
 
-  window.CouchSamsungUpdate = { newer: newer, fromRelease: fromRelease, words: words };
+  window.CouchSamsungUpdate = { newer: newer, fromRelease: fromRelease, words: words, state: state };
   if (!MINE || /[?&](mock|designer=1)\b/.test(location.search)) return;
+  window.TVUP = {
+    state: state,
+    check: function () { if (!busy) check(Date.now(), true); },
+    install: function () {},   // nothing to install on the TV: the page shows the steps
+    auto: function (on) { var st = read(); st.auto = !!on; save(st); tell(); }
+  };
   setTimeout(function () { if (!document.hidden) check(Date.now()); }, 20000);   // after the home has settled
 })();

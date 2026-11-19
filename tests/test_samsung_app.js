@@ -108,6 +108,40 @@ function updater(version, mem, xhr) {
   assert.strictEqual(calls.length, 1, "once a day at most");
   assert.strictEqual(updater("", {}, FakeXHR).timers.length, 0, "no version: no check");
 }
+{
+  // Home settings, About on a Samsung: an Update couch-tv row with the version and the steps
+  // (20 Nov 2026 on a real Frame it said "Web preview" and had no row)
+  const calls = [];
+  function FakeXHR() {}
+  FakeXHR.prototype.open = function (m, u) { calls.push(u); };
+  FakeXHR.prototype.setRequestHeader = function () {};
+  FakeXHR.prototype.send = function () {
+    this.status = 200;
+    this.responseText = JSON.stringify({ tag_name: "v0.13.7", assets: [{ name: "couch-tv-samsung-setup.zip" }] });
+    this.onload();
+  };
+  const mem = {};
+  const { s } = updater("0.13.6", mem, FakeXHR);
+  assert.ok(s.TVUP, "window.TVUP is there");
+  let st = JSON.parse(s.TVUP.state());
+  assert.strictEqual(st.supported, true);
+  assert.strictEqual(st.manual, true);
+  assert.strictEqual(st.current, "0.13.6");
+  assert.strictEqual(st.available, false);
+  assert.ok(st.steps.length >= 2 && /Samsung setup again/.test(st.steps[0]));
+  s.TVUP.check();   // Check for updates now: no once-a-day limit
+  assert.strictEqual(calls.length, 1);
+  st = JSON.parse(s.TVUP.state());
+  assert.strictEqual(st.latest, "0.13.7");
+  assert.strictEqual(st.available, true);
+  s.TVUP.check();
+  assert.strictEqual(calls.length, 2, "asking again looks again");
+  s.TVUP.auto(false);
+  assert.strictEqual(JSON.parse(s.TVUP.state()).auto, false);
+  const off = updater("0.13.6", mem, FakeXHR);
+  off.timers[0]();
+  assert.strictEqual(calls.length, 2, "with the weekly look off, nothing is asked by itself");
+}
 
 // ---- tizen-policy.js: a design's page policy lets this TV's bridge in, and nothing else ----
 {

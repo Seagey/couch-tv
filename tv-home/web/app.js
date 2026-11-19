@@ -4960,7 +4960,9 @@
     else if (u.checked && !u.available && !busy) rows.push(info("upd-latest", t("upd_latest")));
     rows.push({ kind: "toggle", key: "upd-auto", label: t("upd_auto"), value: u.auto ? t("on") : t("off"),
       act: function () { upd().auto(!u.auto); } });
-    rows.push(info("upd-note", t("upd_note")));
+    // "It always asks before it installs one" is only true where the TV installs it: not on a Samsung
+    // or the on-TV app (manual), whose own steps say how (a real Frame, 20 Nov 2026)
+    if (!u.manual) rows.push(info("upd-note", t("upd_note")));
     return rows;
   }
 
