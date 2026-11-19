@@ -4185,7 +4185,7 @@
       sub: window.smartHome.setup.status().set ? "Connected. Change what shows, or add a device" : "Connect Home Assistant: your aircon, lights, cameras, speakers and more", act: openSmartSetup });
     if (on && AH) rows.push({ kind: "nav", key: "dz-athome", label: "At home", sub: "A note, lists, guest Wi-Fi, a house guide, your calendar and screen time, for your widgets", act: openAtHome });
     designCodeRows(rows);
-    rows.push({ kind: "action", key: "dz-share", label: "Share this home", sub: "Open it in couch-tv Studio on your phone. No names, photos or places are sent.", act: shareHome });
+    rows.push({ kind: "action", key: "dz-share", label: "Open this home in couch-tv Studio", sub: "Change it on your phone or computer. Names, photos, places, keys and calendar links stay on this TV.", act: shareHome });
     return rows;
   }
   // The home as it is now, for Share this home (share-home.js keeps only what a design is made of)
@@ -4195,7 +4195,7 @@
       scenes: SCENES.map(function (x) { return x.id; }), builtIn: BUILT_IN.map(function (x) { return x.id; }),
       scene_seconds: SCENE_MS / 1000, clock24: CLOCK24, clock_style: CLOCK_LIQUID ? "liquid" : undefined,
       glass: GLASS, glass_icons: GLASS_ICONS, glass_amount: GLASS_AMT, ambient_weather: WX_AMBIENT, ambient_sun_grade: WX_SUN_GRADE,
-      lighter: LIGHTER, keep_watching: KW_ON, now_playing: NP_ON, dock_size: DOCK_APPS,
+      lighter: LIGHTER, keep_watching: KW_ON, now_playing: NP_ON, dock_size: DOCK_APPS, dock_style: DOCK_MAC ? "mac" : "classic", moving_tiles: MOVING,
       dock: arr.items.slice(0, arr.line).filter(function (it) { return !it.kind || it.kind === "app"; }).map(function (it) { return it.package; }),
       design: CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.on() ? CFG.design : null
     };
@@ -4216,7 +4216,7 @@
     var r = CouchShare.prepare(homeSnapshot(), privateWords(), typeof CouchDesign !== "undefined" ? CouchDesign : null);
     if (r.error) { SET.msg = r.error; renderSettings(); return; }
     var base = typeof CouchDesignCode !== "undefined" ? CouchDesignCode.base() : "";
-    SET.msg = "Sharing this home...";
+    SET.msg = "Getting a code for couch-tv Studio...";
     renderSettings();
     CouchShare.send(base, r.design).then(function (res) {
       SET.msg = "";

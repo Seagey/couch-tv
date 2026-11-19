@@ -77,6 +77,30 @@ ok(S.privateHits({ a: "Al" }, ["Al"]).length === 0, "names under three letters a
 r = S.prepare({ builtIn: [], dock: [] }, [], CD);
 ok(r.design || r.error, "an empty home still answers");
 
+// 4b. Open this home in couch-tv Studio (0.13.3): the dock's style and Moving tiles come along, and the
+// keys, tokens and calendar links a TV holds never do
+d = plain(S.build(Object.assign({}, snap, { dock_style: "mac", moving_tiles: false })));
+ok(d.home.dock === "mac" && d.home.moving_tiles === false, "the Mac-style dock and Moving tiles come along");
+r = S.prepare(Object.assign({}, snap, { dock_style: "mac", moving_tiles: false }), [], CD);
+ok(r.design.home.dock === "mac" && r.design.home.moving_tiles === false, "and pass design.js's gate");
+d = plain(S.build(Object.assign({}, snap, { dock_style: "rainbow" })));
+ok(d.home.dock === undefined, "a dock style that is not one of the two stays behind");
+const HA = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhYmMifQ.c2lnbmF0dXJl";
+const AIKEY = "sk-" + "ant-api03-" + "Zx9".repeat(16);
+const CAL = "web" + "cal:/" + "/calendar.example/private/basic" + ".ics";   // split so the privacy scan does not take it for a real link
+for (const [what, word] of [["a Home Assistant token", HA], ["an AI key", AIKEY], ["a calendar link", CAL], ["a calendar file name", "family.ics"]]) {
+  r = S.prepare(Object.assign({}, snap, { design: { v: 1, objects: [{ id: "t1", type: "text", text: "x " + word, x: 1, y: 1 }] } }), [], CD);
+  ok(!r.design || !JSON.stringify(r.design).includes(word), what + " in a design's words never leaves the TV");
+  ok(S.privateHits({ a: word }, []).length > 0, what + " is found by the last check");
+}
+// a widget holding its own settings (an At home calendar, a smart home light): nothing of the house goes
+r = S.prepare(Object.assign({}, snap, { design: { v: 1, objects: [{ id: "w1", type: "widget", kind: "calendar", x: 100, y: 100, opts: { ics: CAL, token: HA, key: AIKEY } }, { id: "s1", type: "smart", kind: "light", entity: "light.kitchen", entities: ["light.a"] }] } }), [], CD);
+const out = JSON.stringify(r.design || {});
+ok(!out.includes("cal.example") && !out.includes("eyJ") && !out.includes("sk-ant") && !out.includes("light.kitchen"), "a widget's link, token, key and entity stay on the TV");
+// the snapshot's own fields that are not a look never travel, whatever the TV hands share-home.js
+d = plain(S.build(Object.assign({}, snap, { people: ["Robin Example"], ha_token: HA, ai_key: AIKEY, calendar: CAL, place: "Riverside" })));
+ok(!/Robin|eyJ|sk-ant|cal\.example|Riverside/.test(JSON.stringify(d)), "people, tokens, keys, calendars and the place in the snapshot are not copied");
+
 // 5. what is sent, and what comes back
 async function sends() {
   let seen = null;

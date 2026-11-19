@@ -23,7 +23,8 @@
   // snap: what app.js knows about the home now (homeSnapshot): {
   //   scenes: [ids], builtIn: [ids of the app's own scenes], scene_seconds, clock24, clock_style,
   //   glass, glass_icons, glass_amount, ambient_weather, ambient_sun_grade, lighter, keep_watching,
-  //   now_playing, dock_size, dock: [packages, in order], design: the design on now (or null) }
+  //   now_playing, dock_size, dock_style ("classic" or "mac"), moving_tiles, dock: [packages, in order],
+  //   design: the design on now (or null) }
   function build(snap) {
     snap = obj(snap);
     var d;
@@ -48,7 +49,9 @@
       if (scenes.length) home.scenes = scenes;
       if (snap.scene_seconds > 0) home.scene_seconds = Math.round(snap.scene_seconds);
       ["glass", "clock_style"].forEach(function (k) { if (typeof snap[k] === "string") home[k] = snap[k]; });
-      ["glass_icons", "ambient_weather", "ambient_sun_grade", "lighter", "keep_watching", "now_playing"].forEach(function (k) { if (typeof snap[k] === "boolean") home[k] = snap[k]; });
+      ["glass_icons", "ambient_weather", "ambient_sun_grade", "lighter", "keep_watching", "now_playing", "moving_tiles"].forEach(function (k) { if (typeof snap[k] === "boolean") home[k] = snap[k]; });
+      // the Night dock's style (classic, or the Mac-style wave)
+      if (snap.dock_style === "mac" || snap.dock_style === "classic") home.dock = snap.dock_style;
       if (snap.glass_amount > 0) home.glass_amount = snap.glass_amount;
       if (snap.dock_size > 0) home.dock_size = snap.dock_size;
       if (typeof snap.clock24 === "boolean") home.clock = snap.clock24 ? "24h" : "12h";
@@ -75,7 +78,7 @@
       if (s.length >= 3 && low.indexOf(s) >= 0) hits.push("name");
     });
     if (/\b(\d{1,3}\.){3}\d{1,3}\b/.test(text)) hits.push("address");
-    if (/(https?|ftp|file|javascript|data):|\/\//i.test(text)) hits.push("link");
+    if (/(https?|ftp|file|javascript|data):|\/\/|\.ics\b/i.test(text)) hits.push("link");
     if (/[^\s"@]+@[^\s"@]+\.[a-z]{2,}/i.test(text)) hits.push("email");
     if (/\b([0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b/i.test(text)) hits.push("hardware address");
     // a key or a token (a Home Assistant long-lived token is a JWT, eyJ...; a bearer header; a long run
@@ -151,7 +154,7 @@
     line("Open this home in couch-tv Studio", "font-size:3rem;line-height:3.75rem;font-weight:700");
     line("Point your phone's camera at the code. Or go to " + res.page + " and type this code:", "margin-top:1.25rem;font-size:1.75rem;line-height:2.375rem;color:rgba(255,255,255,0.82)");
     line(res.code, "margin-top:1.5rem;font-size:4.5rem;font-weight:700;letter-spacing:0.08em;font-variant-numeric:tabular-nums");
-    line("The code works once, for 30 minutes. Only the look and your apps were shared: no names, photos or places.", "margin-top:1.5rem;font-size:1.5rem;line-height:2.125rem;color:rgba(255,255,255,0.66)");
+    line("The code works once, for 30 minutes. Only the look and your apps left this TV. People's names, photos, places, smart home keys, AI keys and calendar links stay here.", "margin-top:1.5rem;font-size:1.5rem;line-height:2.125rem;color:rgba(255,255,255,0.66)");
     line("Press Back or OK to close.", "margin-top:1.5rem;font-size:1.4375rem;color:rgba(255,255,255,0.6)");
     box.appendChild(qr);
     box.appendChild(col);

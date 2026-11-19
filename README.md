@@ -218,7 +218,18 @@ short code. It also has a gallery of designs other people made.
   loop), with no cookies and no referrer; once it has played, the TV keeps its own copy and does
   not ask again. While a news,
   scores, markets or commute widget is on, it asks Studio once a day whether that source is paused.
-  **Share this home** sends the layout of the home you have now, without names, photos or places.
+  **Open this home in couch-tv Studio** (called Share this home on 0.13.0 to 0.13.2) sends the
+  layout of the home you have now, without names, photos, places, keys or calendar links.
+- **Bring the home you have now into Studio.** On the TV: Home settings, couch-tv Studio, **Open this
+  home in couch-tv Studio**. The TV shows a QR code and a 10 letter code; scan it, or type the code
+  under "Already use couch-tv from GitHub?" on Studio's start screen. It opens as a design you can change, keep
+  in My designs and send back. Only the look (scenes, clock, glass, the dock's style and size,
+  Keep watching and Now playing on or off) and the dock's apps go, in order. A TV older than 0.13
+  cannot do this: on the computer that set it up, open Studio, press **Open my config.json** and
+  pick the `config.json` in your couch-tv folder. It brings the look from `home`; your people,
+  weather place, bridge, Home Assistant and Plex sections are left out on purpose. Never pick `.env`:
+  it only holds keys, and Studio does not need it. Step by step, with pictures: Studio's help,
+  "Bring your couch-tv home into Studio".
 - **What never leaves the TV:** your watch history, your people, things typed at home (the note,
   lists, the guest Wi-Fi password, the house guide, a calendar address) and a Home Assistant token.
   A design or a share refuses anything that looks like a token or a private key.

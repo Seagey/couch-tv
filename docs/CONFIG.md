@@ -407,7 +407,7 @@ entries, a calendar's private address, and a daily screen time goal. Privacy:
   `athome` store, which Android's backups and device transfers leave out (like the Home Assistant token);
   on a TV that runs the home as a web page, in that page's storage. It is not in `config.json`, not in
   Home settings' copy the bridge keeps (`/api/settings`), never in a design (design.js drops every option
-  these widgets could carry), never in Share this home (which also refuses to share if any of it turns
+  these widgets could carry), never in Open this home in couch-tv Studio (which also refuses to share if any of it turns
   up), and never sent to couch-tv Studio or any server of couch-tv's.
 - The calendar address is a password: Home settings shows only its host. The Android home reads it
   itself (https only, no cookies, at most 3 https redirects, 4 MB, and only an answer that is a
