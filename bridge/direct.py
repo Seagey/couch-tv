@@ -1,6 +1,6 @@
 """Philips Hue and AirTouch 5 straight from this computer, with no Home Assistant.
 
-The same method guest-tv uses for its guest TVs (tools/guest-tv devices.py and server.py):
+The same method guest-tv, our sibling project for guest TVs, uses:
   - Philips Hue: the Hue bridge's own local API (http://<hue bridge>/api/<user>/...). The user is made
     once by pressing the round link button on top of the Hue bridge, then "Pair" within 30 seconds.
     Each Hue light shows as a control named light.hue_<number>, beside any Home Assistant ones.

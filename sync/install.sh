@@ -1,6 +1,6 @@
 #!/bin/sh
 # Puts the sync helper (dev.couchtv.sync) on one TV, switches on its one permission, and checks it.
-# Experimental, see docs/SYNC.md. Needs the same yes as anything else that changes a TV.
+# See docs/SYNC.md. Needs the same yes as anything else that changes a TV.
 #
 #   sh sync/install.sh <tv address>            install, grant, check
 #   sh sync/install.sh --undo <tv address>     take it off again

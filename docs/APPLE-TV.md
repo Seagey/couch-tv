@@ -5,6 +5,8 @@ Apple TV app. Both were built and checked against a stand-in Apple TV and a stan
 the tvOS Simulator. No real Apple TV has run them yet, so expect something to need fixing. Please [open an issue](https://github.com/Seagey/couch-tv/issues)
 and say how it went (the Apple TV model, tvOS version, what worked and what did not), even if all of it worked.
 
+The design renderer added in 0.13.2 ([below](#a-design-from-couch-tv-studio)) is in the source only: it was compiled and drawn on a Mac, and it has not been built for tvOS or run in the Simulator.
+
 ## What you get, in plain words
 
 | | Apple TV |
@@ -280,7 +282,7 @@ once a show is open. In each app the child uses:
 
 ## A design from couch-tv Studio
 
-Couch TV draws a couch-tv Studio design itself, in SwiftUI, from two places:
+Couch TV's source (0.13.2) has a SwiftUI design renderer. It was compiled and its drawing checked on a Mac; it has not been built for tvOS, so build Couch TV with Xcode to use it. It takes a design from two places:
 
 - **config.json's `design`**, which the bridge hands over with the rest of the home's settings.
 - **A code typed on the Apple TV:** Settings, Home design, Get a design, then the code from couch-tv Studio

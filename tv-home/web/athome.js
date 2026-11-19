@@ -82,7 +82,7 @@
   }
 
   // ---------------- guests from a bookings calendar ----------------
-  // The way guest-tv does it (tools/guest-tv server.py ical_stays and stay_of): the private calendar
+  // The way guest-tv, our sibling project for guest TVs, does it: the private calendar
   // link Airbnb, Booking.com or VRBO gives a host (or any Google, Apple or Outlook calendar), one event
   // per stay, read every 15 minutes. Kept on this TV with the rest of At home:
   //   url       the bookings link; left out, the Agenda's calendar link is read instead

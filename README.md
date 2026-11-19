@@ -50,7 +50,7 @@ Other TVs: [Will it work on my TV?](#will-it-work-on-my-tv)
 
 ## Updates
 
-The newest release is **0.13.2**, on [the Releases page](https://github.com/Seagey/couch-tv/releases): Ask AI, your own AI agent, guests by name, smart home set up on the TV (Philips Hue and AirTouch 5 too, with no Home Assistant), and couch-tv Studio designs on Roku and Apple TV ([details](docs/UPDATES.md#19-november-2026-release-0132-ask-ai-your-own-ai-agent-guests-by-name-smart-home-on-every-tv-and-designs-on-roku-and-apple-tv)). New in 0.13:
+The newest release is **0.13.2**, on [the Releases page](https://github.com/Seagey/couch-tv/releases): Ask AI, your own AI agent, guests by name, smart home set up on the TV (Philips Hue and AirTouch 5 too, with no Home Assistant), and couch-tv Studio designs on Roku ([details](docs/UPDATES.md#19-november-2026-release-0132-ask-ai-your-own-ai-agent-guests-by-name-smart-home-on-every-tv-and-designs-on-roku)). New in 0.13:
 
 - **14 November:** custom cards with a web link open in the TV's browser on Android TV, LG and Samsung, thanks ekagra-codes ([#207](docs/UPDATES.md#14-november-2026-custom-cards-with-a-web-link-open-on-android-tv-lg-and-samsung-since-013))
 - **14 November:** choose where the home starts: profiles (as before), Keep watching or apps, thanks nidhalmouldi and ekagra-codes ([#211](docs/UPDATES.md#14-november-2026-choose-where-the-home-starts-profiles-keep-watching-or-apps-since-013))
@@ -58,7 +58,7 @@ The newest release is **0.13.2**, on [the Releases page](https://github.com/Seag
 - **15 November:** the clock follows the TV's 12 or 24 hour setting, and Keep watching stays in view while you remove a show, thanks devmaliakbar and Hiren-Patel1 ([#221, #218](docs/UPDATES.md#15-november-2026-the-clock-follows-the-tvs-12-or-24-hour-setting-and-keep-watching-stays-in-view-while-you-remove-a-show-since-013))
 - **14 November:** Restart home in Home settings, About, thanks janooh37-hue ([#217](docs/UPDATES.md#14-november-2026-restart-home-in-home-settings-about-since-013))
 - **14 November:** two more real LGs (a NANO80TNA app only, a 28TQ515S with the bridge in Docker on a Synology), and `--apps tv` pairs by itself, thanks Anshul7171 and adri07 ([#219](docs/UPDATES.md#14-november-2026-two-more-real-lgs-and---apps-tv-pairs-by-itself-since-013), #220)
-- **14 November:** on a VIZIO, couch-tv's home in the TV's own webview, Beta, tried on one set, thanks lukionsp ([#206](docs/UPDATES.md#14-november-2026-vizio-couch-tvs-home-in-the-tvs-own-webview-beta-since-013))
+- **14 November:** on a VIZIO, couch-tv's home in the TV's own webview, tried on one set, thanks lukionsp ([#206](docs/UPDATES.md#14-november-2026-vizio-couch-tvs-home-in-the-tvs-own-webview-beta-since-013))
 - **14 November:** input tiles for each TV, and a picture on an input tile, thanks BireshwarChakravarty ([#205](docs/UPDATES.md#14-november-2026-input-tiles-for-each-tv-and-a-picture-on-an-input-tile-since-013))
 - **14 November:** an LG goes back to couch-tv in about half a second, and input tiles switch straight to HDMI, thanks BireshwarChakravarty ([#204](docs/UPDATES.md#14-november-2026-lg-goes-back-to-couch-tv-in-about-half-a-second-and-input-tiles-switch-straight-to-hdmi-since-013))
 - **14 November:** remove a card from Keep watching on the phone remote, and it returns when you play the show again, thanks poinch ([#176](docs/UPDATES.md#14-november-2026-remove-a-card-from-keep-watching-on-the-phone-remote-since-013))

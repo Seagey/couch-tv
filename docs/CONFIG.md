@@ -675,7 +675,7 @@ with the Hue key in `.env` as `HUE_USERNAME=` (made by pressing the button and s
 For a holiday let or a guest room. A couch-tv Studio design's **Welcome** widget can take the guest's
 name from a calendar (Guest name from: Bookings calendar): "Welcome, Sarah" from the day before check in
 until check out, with "Check in from 3pm" or "Check out Sunday at 10am" under it. Between stays it shows
-the design's own words. This is the way guest-tv does it (`tools/guest-tv`, `ical_stays` and `stay_of`).
+the design's own words. This is the way guest-tv, our sibling project for guest TVs, does it.
 
 On the TV: Home settings, couch-tv Studio, At home, **Guests**. Paste the calendar link Airbnb
 (Calendar, Availability, Connect calendars, Export calendar), Booking.com or VRBO gives you, and set

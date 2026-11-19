@@ -525,7 +525,7 @@ the phone says so and you use the TV's remote.
 - **webOS 4** (2018 and 2019 models, Chrome 53) has no CSS grid or flex `gap`. The home lays the app
   row, the cards and Home settings out with flexbox and margins there instead (`html.old-engine` and
   `html.no-flex-gap` in app.css, [#46](https://github.com/Seagey/couch-tv/issues/46)), and lg/build.py
-  rounds in-between font weights (620) to a hundred for it. A TV Designer design's own layout has no
+  rounds in-between font weights (620) to a hundred for it. A couch-tv Studio design's own layout has no
   such fallbacks yet. Its power on: webOS 4 has no `system/turnOn`, so the bridge tries `turnOnScreen` and then
   Wake-on-LAN (with "Mobile TV On, Turn on via Wi-Fi" switched on).
 - **A new input tile can be hidden by a saved app order.** If you have already arranged your apps
