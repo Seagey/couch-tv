@@ -14,6 +14,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "scripts", "make-loop.sh")
 CLIP = "/nowhere/at all/lake.mp4"
+T = ",scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,trim="
 
 
 def run(*args, out=None):
@@ -55,7 +56,7 @@ class DryRun(unittest.TestCase):
             self.assertEqual(arg_after(sharp, flag), want, flag)
         self.assertIn("-an", sharp)
         graph = arg_after(sharp, "-filter_complex")
-        self.assertIn("fps=30,scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,format=yuv420p", graph)
+        self.assertIn("fps=30,scale=1280:720:force_original_aspect_ratio=increase:out_color_matrix=bt709:out_range=tv,crop=1280:720,format=yuv420p", graph)
         self.assertEqual(sharp[-1], os.path.join(out, "dawn.mp4"))
 
     def test_seam_arithmetic_for_the_default_length(self):
@@ -87,11 +88,12 @@ class DryRun(unittest.TestCase):
         _, cmds, _ = run(CLIP, "--dry-run")
         graphs = {c[-1].rsplit("/", 1)[1][:-4]: arg_after(c, "-filter_complex") for c in cmds if c[-1].endswith(".mp4") and "-filter_complex" in c}
         self.assertEqual(set(graphs), {"dawn", "day", "dusk", "night"})
-        self.assertIn("format=yuv420p,null,trim=", graphs["day"])   # the source, no grade
-        self.assertIn("format=yuv420p,colorbalance=rh=0.12:bh=-0.08:bs=0.06,trim=", graphs["dawn"])
-        self.assertIn("format=yuv420p,colorbalance=rm=0.14:bm=-0.10,eq=brightness=-0.05,trim=", graphs["dusk"])
+        # each grade is followed by the conversion back to BT.709 limited range (docs/LOOP.md, colour)
+        self.assertIn("format=yuv420p,null%s" % T, graphs["day"])   # the source, no grade
+        self.assertIn("format=yuv420p,colorbalance=rh=0.12:bh=-0.08:bs=0.06%s" % T, graphs["dawn"])
+        self.assertIn("format=yuv420p,colorbalance=rm=0.14:bm=-0.10,eq=brightness=-0.05%s" % T, graphs["dusk"])
         # the curves points keep their quotes through the printed shell line
-        self.assertIn("format=yuv420p,curves=master='0/0 0.5/0.36 1/0.82',eq=saturation=0.55,colorbalance=bs=0.16,trim=", graphs["night"])
+        self.assertIn("format=yuv420p,curves=master='0/0 0.5/0.36 1/0.82',eq=saturation=0.55,colorbalance=bs=0.16%s" % T, graphs["night"])
         for g in graphs.values():
             self.assertNotIn("colorbalance", g.split("[c0]")[1])   # the grade is applied once, before the split
 
@@ -188,3 +190,177 @@ class StillPhoto(unittest.TestCase):
         cmds = self.dry("/nowhere/frame.mp4", "--still", "--seconds", "20")
         graph = shlex.split(cmds[0])[shlex.split(cmds[0]).index("-filter_complex") + 1]
         self.assertIn("zoompan=", graph); self.assertNotIn("xfade", graph)
+
+
+TAGS = ("-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv")
+PHOTO = "/nowhere/scene-night@2x.jpg"
+MATTE = "/nowhere/scene-night-fg@2x.webp"
+CSS = os.path.join(ROOT, "tv-home", "web", "app.css")
+
+
+def dry_lines(*args):
+    p = subprocess.run(["bash", SCRIPT, *args, "--dry-run"], capture_output=True, text=True)
+    return p, p.stdout.splitlines()
+
+
+def loop_json(lines):
+    import json
+    js = [l for l in lines if l.startswith("# would write ") and "loop.json: " in l]
+    assert len(js) == 1, lines
+    return json.loads(js[0].split("loop.json: ", 1)[1])
+
+
+def has_run(cmd, seq):
+    return any(cmd[i:i + len(seq)] == list(seq) for i in range(len(cmd)))
+
+
+class Colour(unittest.TestCase):
+    """Every encode is BT.709 limited range and says so, so the TV decodes the colours ffmpeg did."""
+
+    def test_sharp_and_blur_carry_the_tags_and_the_posters_are_jpeg_range(self):
+        for args in ((CLIP, "--only", "day"), (PHOTO, "--only", "day")):
+            _, lines = dry_lines(*args)
+            cmds = [shlex.split(l) for l in lines if l.startswith("ffmpeg ")]
+            sharp, blur, poster, blur_poster = cmds
+            self.assertTrue(has_run(sharp, TAGS), args)
+            self.assertTrue(has_run(blur, TAGS), args)
+            for c in (poster, blur_poster):
+                vf = arg_after(c, "-vf")
+                self.assertIn("in_color_matrix=bt709:in_range=tv:out_color_matrix=bt601:out_range=pc,format=yuvj420p", vf)
+
+    def test_a_photo_is_converted_after_zoompan_and_after_the_grade(self):
+        _, lines = dry_lines(PHOTO, "--only", "dusk")
+        graph = arg_after(shlex.split(lines[1]), "-filter_complex")
+        self.assertIn(":s=1280x720:fps=30,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,colorbalance=rm=0.14", graph)
+        self.assertIn("eq=brightness=-0.05" + T, graph)
+
+
+class Depth(unittest.TestCase):
+    """--matte: the cut-out over the clock, and loop.json for the home (docs/LOOP.md, the depth effect)."""
+
+    def fg_cmd(self, *extra):
+        p, lines = dry_lines(PHOTO, "--matte", MATTE, "--seconds", "34", "--only", "night", *extra)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        cmds = [shlex.split(l) for l in lines if l.startswith("ffmpeg ")]
+        return cmds, lines
+
+    def test_one_more_command_per_variant_the_png_last(self):
+        cmds, _ = self.fg_cmd()
+        self.assertEqual([os.path.basename(c[-1]) for c in cmds],
+                         ["night.mp4", "night-blur.mp4", "night.jpg", "night-blur.jpg", "night-fg.png"])
+        p, lines = dry_lines(PHOTO, "--matte", MATTE)
+        self.assertEqual(len([l for l in lines if l.startswith("ffmpeg ")]), 20)
+
+    def test_the_cut_out_is_the_first_frame_of_the_sharp_file_and_the_matte(self):
+        cmds, _ = self.fg_cmd()
+        fg = cmds[-1]
+        ins = [fg[i + 1] for i, a in enumerate(fg) if a == "-i"]
+        self.assertTrue(ins[0].endswith("/night.mp4"), "the finished sharp file: its colours are the video's")
+        self.assertEqual(ins[1], MATTE)
+        self.assertEqual(arg_after(fg, "-map"), "[fg]")
+        self.assertEqual(arg_after(fg, "-frames:v"), "1")
+        g = arg_after(fg, "-filter_complex")
+        # frame 0, decoded as it was encoded
+        self.assertIn("[0:v]trim=end_frame=1,scale=in_color_matrix=bt709:in_range=tv:", g)
+        # the rectangle FG (480, 162, 960, 318) on the 1280x720 frame, for both the colour and the matte
+        self.assertEqual(g.count("crop=640:212:320:108"), 2)
+        self.assertIn("[1:v]scale=1280:720:flags=area,crop=640:212:320:108,alphaextract,", g)
+        # the feather: min(1, distance to the nearest crop edge / 24), from the pixel centre
+        self.assertIn("geq=lum='p(X,Y)*min(1,min(min(X+0.5,W-X-0.5),min(Y+0.5,H-Y-0.5))/24)+0.5'", g)
+        self.assertIn("[c][m]alphamerge,format=rgba[fg]", g)
+
+    def test_the_rectangle_is_whole_on_both_frames(self):
+        for v in (480, 162, 960, 318):
+            self.assertEqual(v % 3, 0)
+        self.assertEqual([v * 2 // 3 for v in (480, 162, 960, 318)], [320, 108, 640, 212])
+
+    def test_zoom_and_drift_are_the_same_numbers_in_zoompan_and_loop_json(self):
+        cmds, lines = self.fg_cmd()
+        meta = loop_json(lines)
+        self.assertEqual(meta, {"still": True, "seconds": 34, "fps": 30, "zoom": 0.06, "drift": 0.006,
+                                "fg": {"x": 480, "y": 162, "w": 960, "h": 318}})
+        g = arg_after(cmds[0], "-filter_complex")
+        self.assertIn("zoompan=z='1+%g*(1-cos(2*PI*on/1020))/2'" % meta["zoom"], g)
+        self.assertIn("x='(iw-iw/zoom)/2+%g*iw*sin(2*PI*on/1020)'" % meta["drift"], g)
+        with open(SCRIPT, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("ZOOM=0.06\nDRIFT=0.006\n", text)
+        self.assertNotIn("1+0.06*", text.split("set -eu", 1)[1], "zoompan reads the variables, not its own copy")
+
+    def test_frame_zero_is_the_neutral_position(self):
+        import math
+        n = 1020
+        z = 1 + 0.06 * (1 - math.cos(2 * math.pi * 0 / n)) / 2
+        x = (5120 - 5120 / z) / 2 + 0.006 * 5120 * math.sin(0)
+        self.assertEqual((z, x), (1.0, 0.0))
+
+    def test_loop_json_without_a_matte_and_for_a_clip(self):
+        _, lines = dry_lines(PHOTO, "--seconds", "20", "--only", "day")
+        self.assertEqual(loop_json(lines), {"still": True, "seconds": 20, "fps": 30, "zoom": 0.06, "drift": 0.006, "fg": None})
+        _, lines = dry_lines(CLIP, "--seconds", "45", "--only", "day")
+        self.assertEqual(loop_json(lines), {"still": False, "seconds": 45, "fps": 30, "zoom": 0, "drift": 0, "fg": None})
+
+    def test_a_dry_run_with_a_matte_writes_nothing(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        out = os.path.join(tmp, "loop")
+        p, _ = dry_lines(PHOTO, "--matte", MATTE, "--out", out)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertFalse(os.path.exists(out))
+
+    def test_a_matte_with_a_clip_is_refused(self):
+        p, lines = dry_lines(CLIP, "--matte", MATTE)
+        self.assertNotEqual(p.returncode, 0)
+        self.assertIn("photo only", p.stderr)
+        self.assertEqual([l for l in lines if l.startswith("ffmpeg ")], [])
+
+    def test_the_scrim_is_baked_in_as_app_css_draws_it(self):
+        # the gradients in the script are the ones in app.css
+        import re
+        with open(CSS, encoding="utf-8") as f:
+            css = f.read()
+        block = css[css.index("html.theme-loop .scrim {"):]
+        grads = re.findall(r"linear-gradient\(180deg, ([^)]*\)[^l]*?)\)(?:,|;)", block[:block.index("}")])
+        stops = [[(float(p), float(a)) for a, p in re.findall(r"rgba\(11, 10, 16, ([0-9.]+)\) ([0-9.]+)%", g)] for g in grads]
+        self.assertEqual(len(stops), 2, grads)
+        with open(SCRIPT, encoding="utf-8") as f:
+            text = f.read()
+        def script_stops(name):
+            line = re.search(r'^%s="([^"]*)"' % name, text, re.M).group(1)
+            return [tuple(float(x) for x in s.split(":")) for s in line.split()]
+        self.assertEqual(script_stops("SCRIM_TOP"), stops[0])
+        self.assertEqual(script_stops("SCRIM_BOTTOM"), stops[1])
+        self.assertIn("INK_R=11; INK_G=10; INK_B=16", text)
+
+        # and the geq expression computes c*(1-a) + ink*a at each row's centre on the screen
+        cmds, _ = self.fg_cmd()
+        g = arg_after(cmds[-1], "-filter_complex")
+        exprs = dict(re.findall(r"\b([rgb])='([^']*)'", g))
+        self.assertEqual(set(exprs), {"r", "g", "b"})
+
+        def css_ramp(st, y):
+            if y <= st[0][0] * 10.8:
+                return st[0][1]
+            for (p0, a0), (p1, a1) in zip(st, st[1:]):
+                if y < p1 * 10.8:
+                    return a0 + (a1 - a0) * (y - p0 * 10.8) / ((p1 - p0) * 10.8)
+            return st[-1][1]
+
+        def geq(expr, Y, c):
+            mem = {}
+            env = {"st": lambda i, v: mem.__setitem__(int(i), v) or v, "ld": lambda i: mem[int(i)],
+                   "lt": lambda a, b: 1 if a < b else 0, "iff": lambda q, a, b: a if q else b,
+                   "min": min, "r": lambda x, y: c, "g": lambda x, y: c, "b": lambda x, y: c, "X": 0, "Y": Y}
+            val = None
+            for part in re.sub(r"\bif\(", "iff(", expr).split(";"):
+                val = eval(part, {"__builtins__": {}}, env)
+            return val
+
+        for Y in (0, 1, 50, 120, 150, 190, 200, 211):
+            ys = (Y + 108) * 1.5 + 0.75
+            a = 1 - (1 - css_ramp(stops[0], ys)) * (1 - css_ramp(stops[1], ys))
+            for ch, ink in (("r", 11), ("g", 10), ("b", 16)):
+                want = 200 * (1 - a) + ink * a + 0.5
+                self.assertAlmostEqual(geq(exprs[ch], Y, 200), want, places=6, msg=(Y, ch))
+        # the first row: its centre is 162.75 on the screen, on the top gradient between 0 and 28 percent
+        self.assertAlmostEqual(css_ramp(stops[0], 162.75), 0.66 - 0.10 * 162.75 / 302.4, places=9)
