@@ -63,8 +63,8 @@ class DryRun(unittest.TestCase):
         _, cmds, _ = run(CLIP, "--dry-run")
         graph = arg_after(cmds[0], "-filter_complex")
         self.assertIn("trim=duration=31,setpts=PTS-STARTPTS,split=2[c0][c1]", graph)
-        self.assertIn("[c0]trim=start=1:duration=30,setpts=PTS-STARTPTS[body]", graph)
-        self.assertIn("[c1]trim=duration=1,setpts=PTS-STARTPTS[head]", graph)
+        self.assertIn("[c0]trim=start=1:duration=30,setpts=PTS-STARTPTS,fps=30[body]", graph)
+        self.assertIn("[c1]trim=duration=1,setpts=PTS-STARTPTS,fps=30[head]", graph)
         self.assertIn("[body][head]xfade=transition=fade:duration=1:offset=29[out]", graph)
 
     def test_seam_arithmetic_follows_seconds(self):

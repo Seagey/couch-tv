@@ -137,8 +137,9 @@ for v in $VARIANTS; do
   # then cropped, so a 4K or a 16:10 clip fills the frame), the grade, the first L+1 seconds split
   # into body and head, and the two dissolved as the header says.
   graph="[0:v]setpts=${SLOW}*PTS,fps=30,scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,format=yuv420p,$(grade "$v"),trim=duration=${BASE_LEN},setpts=PTS-STARTPTS,split=2[c0][c1];"
-  graph="$graph[c0]trim=start=${BODY_START}:duration=${BODY_LEN},setpts=PTS-STARTPTS[body];"
-  graph="$graph[c1]trim=duration=1,setpts=PTS-STARTPTS[head];"
+  # xfade wants both inputs at a constant frame rate and a trim leaves them marked variable, so fps=30 again on each
+  graph="$graph[c0]trim=start=${BODY_START}:duration=${BODY_LEN},setpts=PTS-STARTPTS,fps=30[body];"
+  graph="$graph[c1]trim=duration=1,setpts=PTS-STARTPTS,fps=30[head];"
   graph="$graph[body][head]xfade=transition=fade:duration=1:offset=${XFADE_OFFSET}[out]"
   # -keyint_min and -sc_threshold hold the GOP at exactly 30 frames: x264 would otherwise put an
   # extra keyframe wherever it sees a cut, and the home's seek at the wrap counts on one second.
