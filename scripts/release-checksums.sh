@@ -5,7 +5,7 @@
 #
 # In the release steps, after scripts/build-apk.sh and before `gh release create`:
 #   sh scripts/release-checksums.sh
-#   gh release create vX.Y dist/couch-tv-home.apk dist/couch-tv-ontv.apk dist/couch-tv-sync.apk dist/SHA256SUMS.txt ...
+#   gh release create vX.Y dist/couch-tv-home.apk dist/couch-tv-ontv.apk dist/couch-tv-ontv-watch.apk dist/couch-tv-sync.apk dist/SHA256SUMS.txt ...
 # For a release that is already out: gh release upload vX.Y dist/SHA256SUMS.txt
 set -e
 cd "$(dirname "$0")/../dist"

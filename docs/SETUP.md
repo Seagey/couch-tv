@@ -334,9 +334,10 @@ left. On a plain Android TV 10 or newer, couch-tv asks Android to make it the ho
 - Some Android TV 11 builds also show **Select a home app** the first time you press Home. Pick
   couch-tv and **Always**.
 - **Home still opens the TV's own home?** Some TVs (a Haier, issue #98) open their own launcher by
-  name and ignore Android's default home. In the on-TV app press **Home button watch** and switch
-  on **Couch TV home watch**: it brings couch-tv back when the TV's own home comes forward. It sees
-  which screen came forward and reads nothing else.
+  name and ignore Android's default home. From a computer, install `couch-tv-ontv-watch.apk` (the
+  plain `couch-tv-ontv.apk` no longer has the watch), then switch on **Couch TV home watch** in the
+  TV's own Settings, Accessibility: it brings couch-tv back when the TV's own home comes forward. It
+  sees which screen came forward and reads nothing else.
 - **Google TV is different.** Google's own home can keep the Home button, so asking Android is not
   enough there. A computer runs `apply.sh` once, which switches on the Home button watch that
   brings couch-tv back when Home opens Google's.

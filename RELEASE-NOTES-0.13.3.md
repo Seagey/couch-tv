@@ -6,7 +6,7 @@ We set couch-tv up from scratch on two real Google TVs (a Toshiba and a TCL, bot
 
 - **Update the TV apps:** Home settings, Updates, check now, or install the APKs below over the old ones. They are signed with the same key as every earlier release, so they install over 0.13.2 and keep your settings.
 - **Option B:** `git pull` and restart the bridge (for the guest's name from the phone).
-- **A Fire TV running the on-TV app:** install `couch-tv-ontv-watch.apk` (see below), not `couch-tv-ontv.apk`.
+- **Did you switch on "Couch TV home watch" in 0.13.2 or earlier?** Then install `couch-tv-ontv-watch.apk` from a computer, not the plain `couch-tv-ontv.apk`. That is every Fire TV, and also a TCL, a Haier, another Google TV or a Xiaomi PatchWall TV where the watch held the Home button. The watch is what makes the Home button open couch-tv. The plain APK no longer has it, so on those TVs the Home button would go back to the TV's own home without a word. After installing, switch **Couch TV home watch** on again in the TV's Settings, Accessibility if it is off. Everyone else uses the plain `couch-tv-ontv.apk`, which installs without the Play Protect block.
 
 ### Guests by name, with just a phone
 
@@ -23,7 +23,7 @@ We set couch-tv up from scratch on two real Google TVs (a Toshiba and a TCL, bot
 
 ### The phone only install
 
-- **Google Play Protect no longer blocks it.** `couch-tv-ontv.apk` (the one the Downloader code installs) has no accessibility service, which is what made Play Protect say "App blocked to protect your device". The home watch for Fire TV moved to `couch-tv-ontv-watch.apk`, installed from a computer.
+- **Aimed at the Google Play Protect block.** On a TCL Google TV, Play Protect said "App blocked to protect your device" because the app asked for the accessibility permission. The main app, `couch-tv-ontv.apk` (the one the Downloader code installs), no longer asks for it, so that is no longer what Play Protect sees. We have not yet tried it on a real TV, so Play Protect may still say something. The home watch moved to `couch-tv-ontv-watch.apk`, installed from a computer (see the top).
 - **The Couch TV screen is plain words:** a QR code to scan with your phone (the address is under it too), "Your phone is paired" straight after pairing, and the extra tools (keys and typing from the phone, developer settings) under More. On Google TV it says plainly that the Home button stays Google's, and to open your home from Couch TV in the apps row. The button that wrapped one letter per line is fixed.
 - **A couch-tv icon and banner** for both TV apps, so you can find Couch TV in the apps row.
 
@@ -36,7 +36,7 @@ We set couch-tv up from scratch on two real Google TVs (a Toshiba and a TCL, bot
 
 ### Weather, apps and photos
 
-- **No made up town.** With no place set, the weather tiles say "Set your town for the weather" and the classic home says where to pick one, instead of showing Sydney.
+- **No made up town.** With no place set, the weather asks for your town (the tiles say "Set your town for the weather" and the classic home says where to pick one) instead of showing Sydney.
 - **No false "Not on this TV".** The "Use this design?" preview no longer marks every app as missing before the TV has listed its apps.
 - **Photo tiles stay readable:** an empty photo tile has a dark panel under its words, and captions sit on a stronger shade on any photo.
 - **Screen time** says what it needs on the phone only app (the couch-tv home app, put on once from a computer), instead of "needs a newer couch-tv TV home".
@@ -60,4 +60,4 @@ Already use couch-tv from GitHub and want to design on the new platform? You do 
 
 ### Files
 
-`couch-tv-home.apk` (the TV home, options A and B), `couch-tv-ontv.apk` (option C, the phone only download), `couch-tv-ontv-watch.apk` (option C with the home watch, for Fire TV, from a computer), `couch-tv-sync.apk` (two TVs in sync, unchanged since 0.13), `couch-tv-Setup-mac-apple-silicon.zip`, with `SHA256SUMS.txt`.
+`couch-tv-home.apk` (the TV home, options A and B), `couch-tv-ontv.apk` (option C, the phone only download), `couch-tv-ontv-watch.apk` (option C with the home watch, for anyone who had it on: Fire TV, TCL, Haier, other Google TVs, Xiaomi PatchWall, from a computer), `couch-tv-sync.apk` (two TVs in sync, unchanged since 0.13), `couch-tv-Setup-mac-apple-silicon.zip`, with `SHA256SUMS.txt`.
