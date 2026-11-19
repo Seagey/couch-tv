@@ -34,6 +34,20 @@ class HomeAskTest {
         assertEquals("Asking the TV...", HomeAsk.buttonLabel(aliasOn = true, asking = true))
     }
 
+    @Test fun googleTvWithTheWatchApkShowsTheButton() {
+        // Fable review of 0.13.5: the watch only acts while Use as home screen is on, and the button was
+        // hidden on Google TV while off, so the watch APK steps were a dead end
+        assertTrue(HomeAsk.showButton(googleTv = true, watchApk = true, aliasOn = false))
+        assertFalse(HomeAsk.showButton(googleTv = true, watchApk = false, aliasOn = false))
+        assertTrue(HomeAsk.showButton(googleTv = true, watchApk = false, aliasOn = true))
+        assertTrue(HomeAsk.showButton(googleTv = false, watchApk = false, aliasOn = false))
+        val src = File("src/main/java/dev/couchtv/ontv/SetupActivity.kt").readText()
+        assertTrue(src.contains("HomeAsk.showButton(google, watchApk, App.homeEnabled(this))"))
+        // and nothing reopens the setup screen once it is gone
+        val destroy = src.substringAfter("override fun onDestroy()").substringBefore("override fun ")
+        assertTrue(destroy.contains("main.removeCallbacks(bringBack)") && destroy.contains("main.removeCallbacks(ask)"))
+    }
+
     @Test fun theSetupScreenUsesTheAnswer() {
         // SetupActivity is Android code, so read it: the result turns the alias off when couch-tv is not the
         // home, and the request is posted (waits), never sent straight from the button

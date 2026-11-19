@@ -41,9 +41,12 @@ object SetupWords {
     fun homeNote(useAsHome: Boolean, held: Boolean, googleTv: Boolean, watchApk: Boolean = false, googleHome: Boolean = googleTv,
                  asking: Boolean = false, declined: Boolean = false): String = when {
         asking -> "Asking the TV to make Couch TV its home. If the screen goes black, press Back once and the question comes up."
+        // the watch only acts while Use as home screen is on (FireHome.onOtherHome), so it is always one of the steps
+        googleTv && watchApk && !useAsHome -> "On Google TV the Home button opens Google TV first. To bring your couch-tv home straight back on top: " +
+            "press Use as home screen, then switch on Couch TV home watch in the TV's Settings, Accessibility."
         googleTv && watchApk -> "On Google TV the Home button always opens Google TV first. With Couch TV home watch switched on in the TV's Settings, Accessibility, your couch-tv home comes straight back on top."
         googleTv -> "On Google TV the Home button always opens Google TV with the phone only download. That is expected. " +
-            "To make Home open couch-tv, put the home watch version on from a computer: see More, Home button from a computer. " +
+            "To make Home open couch-tv, put the home watch version on from a computer, then press Use as home screen: see More, Home button from a computer. " +
             "Until then, open your couch-tv home from Couch TV in the apps row."
         declined -> "Couch TV is not your home screen: the TV's list was closed without choosing it. Press Use as home screen to ask again."
         !useAsHome -> "Use as home screen asks the TV to make Couch TV its home. No computer needed."
@@ -64,9 +67,12 @@ object SetupWords {
             "Home keeps opening Google's home. To change that, once: " +
             "1. On a computer, download couch-tv-ontv-watch.apk from github.com/Seagey/couch-tv/releases/latest. " +
             "2. Switch on USB debugging on this TV (the steps above). " +
-            "3. On the computer, with Google's adb tool: adb connect $at:5555 (with Wireless debugging, the address and port " +
-            "it shows), then adb install -r couch-tv-ontv-watch.apk " +
-            "(press Allow on the TV if it asks). It goes over this app and keeps your settings. " +
-            "4. On the TV: Settings, Accessibility (on some TVs inside System or Device Preferences), Couch TV home watch, On."
+            "3. On the computer, with Google's adb tool: adb connect $at:5555, then adb install -r couch-tv-ontv-watch.apk " +
+            "(press Allow on the TV if it asks). With Wireless debugging instead: first Pair device with pairing code on the TV, " +
+            "and run adb pair with the address, port and code that screen shows; then adb connect with the address and port on the " +
+            "Wireless debugging screen itself, then the same adb install -r. It goes over this app and keeps your settings. " +
+            "4. On the TV: Settings, Accessibility (on some TVs inside System or Device Preferences), Couch TV home watch, On. " +
+            "5. Back here, press Use as home screen (if the button says Stop being the home screen, it is already on). " +
+            "The watch only brings couch-tv back while that is on."
     }
 }

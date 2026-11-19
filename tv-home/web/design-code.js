@@ -57,14 +57,17 @@
     var c = s.toUpperCase().replace(/[^A-Z0-9]/g, "");
     var shown = c.length > 5 ? c.slice(0, 5) + "-" + c.slice(5) : c;
     if (full) return { ok: true, code: full, shown: full, count: 10, msg: "" };
-    var bad = [];
-    for (var i = 0; i < c.length; i++) if (SHORT.indexOf(c.charAt(i)) < 0 && bad.indexOf(c.charAt(i)) < 0) bad.push(c.charAt(i));
-    var msg;
+    var bad = [], valid = 0;
+    for (var i = 0; i < c.length; i++) {
+      if (SHORT.indexOf(c.charAt(i)) >= 0) valid++;
+      else if (bad.indexOf(c.charAt(i)) < 0) bad.push(c.charAt(i));
+    }
+    var msg;   // only letters a code can have are counted
     if (!c.length) msg = "Nothing was typed. A code looks like ABCDE-FGHJK.";
     else if (bad.length) msg = (bad.length === 1 ? bad[0] + " is" : bad.join(" and ") + " are") + " never in a code. Check that letter on your phone and type it again.";
-    else if (c.length < 10) msg = "That is " + c.length + " of the 10 letters. " + (10 - c.length === 1 ? "One is" : (10 - c.length) + " are") + " missing: the TV's keyboard can drop a letter typed fast. Type it again, slowly.";
-    else msg = "That is " + c.length + " letters. A code has 10. Type it again.";
-    return { ok: false, code: "", shown: shown, count: c.length, msg: msg };
+    else if (valid < 10) msg = "That is " + valid + " of the 10 letters. " + (10 - valid === 1 ? "One is" : (10 - valid) + " are") + " missing: the TV's keyboard can drop a letter typed fast. Type it again, slowly.";
+    else msg = "That is " + valid + " letters. A code has 10. Type it again.";
+    return { ok: false, code: "", shown: shown, count: valid, msg: msg };
   }
   function jpegOk(u) {
     var m = /^data:image\/jpeg;base64,([A-Za-z0-9+/]+={0,2})$/.exec(u || "");

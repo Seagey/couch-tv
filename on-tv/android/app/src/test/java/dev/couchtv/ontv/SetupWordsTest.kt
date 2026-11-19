@@ -60,6 +60,15 @@ class SetupWordsTest {
         assertTrue(s.contains("keeps your settings"))
         assertTrue(s.contains("Couch TV home watch, On"))
         assertTrue(SetupWords.watchSteps(null).contains("adb connect the TV's address:5555"))
+        // Wireless debugging pairs first (Fable review of 0.13.5)
+        assertTrue(s.indexOf("adb pair") in 0 until s.indexOf("adb connect with the address and port"))
+        // the watch only acts while Use as home screen is on, so that is a step, after the watch is switched on
+        assertTrue(s.indexOf("press Use as home screen") > s.indexOf("Couch TV home watch, On"))
+    }
+
+    @Test fun googleTvWordsNameUseAsHomeScreen() {
+        assertTrue(SetupWords.homeNote(false, false, true, watchApk = true).contains("press Use as home screen, then switch on Couch TV home watch"))
+        assertTrue(SetupWords.homeNote(true, false, true, watchApk = false).contains("then press Use as home screen"))
     }
 
     @Test fun askingAndCancelSayWhatHappened() {

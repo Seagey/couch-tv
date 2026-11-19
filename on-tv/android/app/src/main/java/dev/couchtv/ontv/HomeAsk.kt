@@ -24,6 +24,13 @@ object HomeAsk {
     /** After Android answered (or the person came back from its Home screen): keep the alias on only if couch-tv is now the home. */
     fun keepAliasOn(heldNow: Boolean): Boolean = heldNow
 
+    /**
+     * Whether the setup screen shows the button. On Google TV with the phone only download the Home button
+     * stays Google's, so the button would only confuse unless it is on (so it can be switched off). With the
+     * watch APK it is always shown: the Home button watch only brings couch-tv back while it is on.
+     */
+    fun showButton(googleTv: Boolean, watchApk: Boolean, aliasOn: Boolean): Boolean = !googleTv || watchApk || aliasOn
+
     /** The button's words: what pressing it does now. */
     fun buttonLabel(aliasOn: Boolean, asking: Boolean): String = when {
         asking -> "Asking the TV..."

@@ -67,7 +67,7 @@ class SetupActivity : Activity() {
     // this screen back once, so the question is not left behind it. If Android does not allow that, the
     // note says to press Back, and the question goes out when this screen is back.
     private val bringBack = Runnable {
-        if (askSince > 0 && !inFront && !broughtBack) {
+        if (askSince > 0 && !inFront && !broughtBack && !isFinishing && !isDestroyed) {
             broughtBack = true
             runCatching { startActivity(Intent(this, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) }
         }
@@ -167,6 +167,12 @@ class SetupActivity : Activity() {
         Auth.offPin(pinListener); main.removeCallbacks(tick)
         if (askSince > 0) main.postDelayed(bringBack, 1500)
     }
+    override fun onDestroy() {
+        // nothing left to ask or to bring back once this screen is gone (bringBack would reopen it)
+        askSince = 0L
+        main.removeCallbacks(ask); main.removeCallbacks(bringBack); main.removeCallbacks(tick)
+        super.onDestroy()
+    }
     override fun onWindowFocusChanged(has: Boolean) {
         super.onWindowFocusChanged(has)
         if (has && askSince > 0) { main.removeCallbacks(ask); main.post(ask) }
@@ -220,8 +226,7 @@ class SetupActivity : Activity() {
         val watchApk = BuildConfig.BUILD_TYPE == "watch"
         val asking = askSince > 0 || awaitingRole
         homeBtn.text = HomeAsk.buttonLabel(App.homeEnabled(this), asking)
-        // On Google TV the Home button stays Google's: the button would only confuse, unless it is on (so it can be switched off)
-        homeBtn.visibility = if (google && !App.homeEnabled(this)) View.GONE else View.VISIBLE
+        homeBtn.visibility = if (HomeAsk.showButton(google, watchApk, App.homeEnabled(this))) View.VISIBLE else View.GONE
         homeNote.text = SetupWords.homeNote(App.homeEnabled(this), HomeRole.held(this), google, watchApk = watchApk,
             googleHome = HomeRole.googleHome(this), asking = asking, declined = declined && !App.homeEnabled(this))
         if (!watchApk) watchNote.text = SetupWords.watchSteps(ip)
