@@ -373,9 +373,11 @@ class Layout(unittest.TestCase):
 
     def test_widgets_drawn_or_shown_as_a_titled_card(self):
         t = texts(self.every["layout"])
-        self.assertIn("Lounge", t)                 # the aircon widget: its own label
-        self.assertIn("Air conditioning", t)       # and its kind, in plain words
-        self.assertIn("News", t)
+        j = " ".join(t)
+        self.assertNotIn("Lounge", j)              # the aircon widget: never a label from the design
+        self.assertIn("Aircon:", j)                # its name, and that it is not on this TV
+        self.assertIn("not on this TV", j)
+        self.assertIn("Headlines:", j)
         self.assertIn("Bedroom", t)                # the smart object
         self.assertIn("Smart home", t)             # the section
         self.assertIn("Waxing gibbous", t)         # the stack shows its first widget
@@ -578,7 +580,7 @@ class Scene(unittest.TestCase):
         c = self.r["config"]
         self.assertFalse(c["scenes"])                    # its own background hides the scene
         self.assertTrue(any(u.startswith("tmp:/couchtv-design-") and u.endswith(".jpg") for u in c["dBg"]["uris"]))
-        for words in ("Good evening", "Welcome home\nRelax", "Lounge", "Air conditioning", "“Be kind”", "Bedroom"):
+        for words in ("Good evening", "Welcome home\nRelax", "Aircon:", "not on this TV", "“Be kind”", "Bedroom"):
             self.assertIn(words, c["dFront"]["text"] + c["dBack"]["text"])
         self.assertGreater(c["zones"]["wapps"], 3)       # the design's app tiles are stops for the remote
         self.assertEqual(c["zones"]["dock"], 4)          # Prime Video hidden, Settings still there

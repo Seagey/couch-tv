@@ -459,7 +459,85 @@ struct DesignPanel: ViewModifier {
     }
 }
 
-/// The card for a kind drawn without live data here: its symbol and its name, nothing more.
+/// A kind this Apple TV does not draw says so by its name (widget-caps.js name), with where it does show.
+/// Never a label from the design (a surf widget's beach, an aircon's room): there is no data here behind it.
+enum DesignNotHere {
+    static let names: [String: String] = [
+        "clock": "Digital clock", "tallclock": "Tall clock", "glassclock": "Glass clock", "analog": "Analogue clock",
+        "flipclock": "Flip clock", "wordclock": "Time in words", "solar": "Sun clock", "worldclock": "World clocks",
+        "countdown": "Countdown", "date": "Date", "month": "Month", "timer": "Timer", "weather": "Weather",
+        "bigtemp": "Big number", "hourly": "Hourly", "week": "This week", "rain": "Rain soon", "uv": "UV index",
+        "sun": "Sunrise and sunset", "moon": "Moon", "air": "Air quality", "surf": "Surf", "photo": "Photo",
+        "slideshow": "Slideshow", "mosaic": "Photo mosaic", "artframe": "Art frame", "memory": "On this day",
+        "keep": "Keep watching", "keeprow": "Keep watching row", "upnext": "Up next", "picks": "Picks for you", "app": "One app",
+        "folder": "App folder", "dock": "Dock", "appgrid": "App grid", "games": "Games", "nowplaying": "Now playing",
+        "soundscape": "Soundscape", "queue": "Up next queue", "speakers": "Speakers", "aircon": "Aircon", "scenes": "Scenes",
+        "controls": "Control Centre", "camera": "Camera", "doorbell": "Doorbell", "energy": "Solar and energy",
+        "sensor": "Sensor", "battery": "Batteries", "bins": "Bin night", "people": "People", "agenda": "Agenda",
+        "note": "Family note", "list": "List", "card": "Custom card", "quote": "Quote", "word": "Word of the day",
+        "news": "Headlines", "sports": "Scores", "stocks": "Markets", "commute": "Commute", "welcome": "Welcome words",
+        "quick": "Quick buttons", "wifi": "Guest Wi-Fi", "guide": "House guide", "screentime": "Screen time", "ask": "Ask AI",
+        "agent": "From your AI", "stack": "Smart stack"
+    ]
+    static let line = "Shows on Google TV, Android TV and Fire TV"
+    static func name(_ kind: String) -> String { names[kind] ?? "This widget" }
+    static func title(_ kind: String) -> String { name(kind) + ": not on this TV" }
+}
+
+/// couch-tv Studio's sample words in its starter designs (app/templates.js), as widgets.js WELCOME_SAMPLE
+/// and WELCOME_SAMPLE_LINES: on a real TV they are a stranger's name and a made up house, so they never
+/// show. The greeting stays.
+enum DesignWelcomeSample {
+    static let text: [String: String] = ["Welcome, Ella and friends": "Welcome", "Hi Ruby!": "Hi!"]
+    static let lines: [String] = ["Headland House, North Point", "Tuesday to Sunday. Night two of five", "Three sleeps till the beach"]
+    static func greeting(_ t: String?) -> String? { t.map { text[$0] ?? (lines.contains($0) ? "Welcome" : $0) } }
+    static func line(_ t: String?) -> String? { t.flatMap { lines.contains($0) ? nil : $0 } }
+}
+
+/// The card for a kind not drawn here: its symbol, "<name>: not on this TV", and where it shows.
+struct DesignNotHereCard: View {
+    let kind: String
+    let look: DesignLook
+    let style: DesignWidgetStyle
+
+    var body: some View {
+        let p = DesignWidgets.panel(kind, style)
+        let panel = p == "none" ? "glass" : p
+        let ink = DesignInk.colour(style: style, panel: panel, look: look, kind: kind)
+        GeometryReader { g in
+            let s = min(g.size.width, g.size.height)
+            // a short box (a 40 px pill) has room for the title alone, on one line
+            let short = g.size.height < 110
+            let pad = short ? max(2, min(16, g.size.height * 0.12)) : 16
+            let words = short ? max(10, min(40, g.size.height * 0.5)) : max(23, min(40, s * 0.12))
+            VStack(spacing: s * 0.05) {
+                if !short && g.size.height >= 220 {
+                    Image(systemName: DesignWidgets.symbol(kind)).font(.system(size: max(22, s * 0.16), weight: .light))
+                }
+                Text(DesignNotHere.title(kind))
+                    .font(HomeFont.inter(words, .semibold))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(short ? 1 : 2)
+                    .minimumScaleFactor(0.5)
+                if !short {
+                    Text(DesignNotHere.line)
+                        .font(HomeFont.inter(max(20, words * 0.7)))
+                        .opacity(0.72)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.5)
+                }
+            }
+            .foregroundStyle(ink)
+            .padding(pad)
+            .frame(width: g.size.width, height: g.size.height)
+            .clipped()
+        }
+        .modifier(DesignPanel(panel: panel, look: look, style: style, radius: DesignLayout.corner(style.corners, w: 400, h: 400), kind: kind))
+    }
+}
+
+/// The card for a kind drawn here that has no live data yet: its symbol and its name, nothing more.
 struct DesignTitledCard: View {
     let kind: String
     let label: String?
@@ -738,7 +816,9 @@ struct DesignWidget: View {
         let kind = o.kind ?? "card"
         if kind == "stack" {
             DesignWidget(design: design, widget: stackChild(o), date: date, focus: focus)
-        } else if !DesignWidgets.drawsNatively(kind) || !hasData(kind) {
+        } else if !DesignWidgets.drawsNatively(kind) {
+            DesignNotHereCard(kind: kind, look: design.look, style: o.widgetStyle)
+        } else if !hasData(kind) {
             DesignTitledCard(kind: kind, label: o.opts.label, look: design.look, style: o.widgetStyle)
         } else {
             let panel = DesignWidgets.panel(kind, o.widgetStyle)
@@ -969,10 +1049,10 @@ struct DesignWidget: View {
             .padding(24)
         case "welcome":
             VStack(alignment: stackAlign(o.align), spacing: 8) {
-                if let k = o.kicker, !k.isEmpty { Text(k.uppercased()).kerning(2).font(HomeFont.inter(24, .semibold)).foregroundStyle(sub) }
-                Text(o.text.flatMap { $0.isEmpty ? nil : $0 } ?? "Welcome").font(HomeFont.inter(min(96, max(40, h * 0.3)), .semibold))
+                if let k = DesignWelcomeSample.line(o.kicker), !k.isEmpty { Text(k.uppercased()).kerning(2).font(HomeFont.inter(24, .semibold)).foregroundStyle(sub) }
+                Text(DesignWelcomeSample.greeting(o.text).flatMap { $0.isEmpty ? nil : $0 } ?? "Welcome").font(HomeFont.inter(min(96, max(40, h * 0.3)), .semibold))
                     .multilineTextAlignment(textAlign(o.align)).minimumScaleFactor(0.4)
-                if let s = o.sub, !s.isEmpty { Text(s).font(HomeFont.inter(28)).foregroundStyle(sub).multilineTextAlignment(textAlign(o.align)) }
+                if let s = DesignWelcomeSample.line(o.sub), !s.isEmpty { Text(s).font(HomeFont.inter(28)).foregroundStyle(sub).multilineTextAlignment(textAlign(o.align)) }
             }
             .shadow(color: .black.opacity(0.3), radius: 14, y: 2)
             .frame(width: w, height: h, alignment: frameAlign(o.align))
