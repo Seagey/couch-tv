@@ -23,13 +23,19 @@ TD (not git; backups in scratchpad td-backup-nl-photo/, same relative paths):
 - market/api/publish.mjs: dropWidgetPhotos(raw) before gating.
 - tests: server/tests/widget-photo.test.mjs (7 pass), server/tests-cloud/widget-photo.test.mjs, scripts/widget-photo-checks.mjs (browser), scripts/ws-studio-panel-checks.mjs section 6 updated to the new truth.
 
-## Test counts so far
+Roku (round 3, commit 34d2fdf):
+- roku/channel/components/DesignLib.brs: dlSanWOpts keeps opts.image (dlImgOk: real JPEG/PNG inside the design, built in, or kept:N), so a smart stack item keeps its photo like a widget on its own (the top level check in dlSanObject moved here).
+- roku/channel/components/DesignDraw.brs: designKeep files every widget photo AND each stack item's photo in cachefs: (designKeepPhoto, numbered 1 to 99), so none stays inline in the registry (15000 chars).
+- tests/test_roku_design.py: +3 tests (Gate.test_a_smart_stack_item_keeps_its_own_photo_like_a_widget_on_its_own; SceneWidgetPhotos x2: two photos each over 15000 chars, design kept, registry has kept:1.jpg/kept:2.jpg and no data:, the kept design draws both). The scene copy maps cachefs:/ to tmp:/cachefs- (brs has no cachefs volume). Without the .brs fix: 3 of 34 fail; with it 34/34.
+
+## Test counts (round 3, 21 Nov)
+- CT: python3 -m unittest discover -s tests -p "test_roku*.py" -> 90/90 OK (test_roku_design 34/34). Needs `npm ci --prefix roku` once.
+- CT: node tests/test_share_home.js 59 pass; node tests/test_widget_own_photo.js 116 pass
 - cd TD/server; node --test --test-concurrency=2 --test-timeout=180000 tests/*.test.mjs  -> 129/129 pass
 - cd TD/server; node cloud/test-local.mjs  -> 117/117 pass (local Supabase, includes the 3 widget-photo cloud tests)
-- node tests/test_share_home.js (CT) 59 pass; node tests/test_widget_own_photo.js (CT) 116 pass
+- Browser, 20 Nov 19:29 (previous builder): widget-photo-checks.mjs 26/26 (log scratchpad wp-run.log). Rerun pending below.
 
 ## Left
-1. Browser check: designer PORT=5591 node TD/app/server.mjs; store DATA_DIR=<scratch>/wp-store DESIGNER_ORIGINS=http://127.0.0.1:5591 PORT=5490 node TD/server/store.mjs; take browser.lock; node TD/scripts/widget-photo-checks.mjs 5591; rmdir lock. (First run broke on addWidget without an empty grid; fixed, rerunning.)
-2. Run node TD/scripts/ws-studio-panel-checks.mjs (starts its own designer) under the browser lock.
-3. Stop the two servers (pids in scratchpad wp-designer.pid, wp-store.pid).
-4. Report. Known, not fixed (Group 2 renderers): Roku DesignDraw.brs designKeep only files top level opts.image, so a smart stack item's photo stays inline and can push the registry text past 15000 (design not kept); Roku dlSanWOpts drops items' image. tvOS fine. Market gallery and cloud saves do not keep widget photos (by design, message shown).
+1. Browser check under browser.lock: designer PORT=5591 node TD/app/server.mjs; store DATA_DIR=<scratch>/wp-store DESIGNER_ORIGINS=http://127.0.0.1:5591 PORT=5490 node TD/server/store.mjs; node TD/scripts/widget-photo-checks.mjs 5591; stop both servers; rmdir lock.
+2. node TD/scripts/ws-studio-panel-checks.mjs (starts and stops its own designer) under the same lock.
+3. Report. Supabase migration 20261120120000_widget_photos.sql is NOT on the live database: the coordinator asks the owner. Market gallery and cloud saves do not keep widget photos (by design, message shown). tvOS fine.
