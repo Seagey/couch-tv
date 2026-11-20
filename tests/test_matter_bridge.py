@@ -21,6 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FAKE_SERVICE = os.path.join(HERE, "fixtures", "fake_matter_service.py")
 sys.path.insert(0, os.path.join(HERE, "..", "bridge"))
 import matter  # noqa: E402
+REAL_MULTICAST_BLOCKED = matter.multicast_blocked   # ServiceTest patches it; its own test needs the real one
 
 LIGHT = json.load(open(os.path.join(HERE, "fixtures", "matter-light-node.json")))
 
@@ -362,6 +363,11 @@ class ServiceTest(unittest.TestCase):
 
     def setUp(self):
         self.dir = tempfile.mkdtemp()
+        # the computer running the tests may itself lack Local Network permission: the answers here
+        # are about the service's errors, so multicast is taken as allowed unless a test says otherwise
+        p = patch.object(matter, "multicast_blocked", return_value=False)
+        p.start()
+        self.addCleanup(p.stop)
 
     def test_devices_commands_and_live_changes(self):
         async def go():
@@ -652,6 +658,51 @@ class ServiceTest(unittest.TestCase):
                 await m.stop()
                 await server.cleanup()
         run(go())
+
+    def test_local_network_blocked_on_a_mac(self):
+        """Launchd run on the MacBook, 21 Nov: with no Local Network permission mDNS fails with errno 65 and
+        every add ends "expired". The answer then says why: error unreachable, reason local_network."""
+        async def go():
+            fake = FakeService([])
+            m, server = await self.started(fake)
+            try:
+                fake.answers["commission_with_code"] = {"error_code": 1, "reason": "not-discovered", "details": ""}
+                with patch.object(matter, "multicast_blocked", return_value=True):
+                    r = await m.commission("06409137006")
+                self.assertEqual((r["error"], r["reason"]), ("unreachable", "local_network"))
+                self.assertIn("Local Network", r["note"])
+                with patch.object(matter, "multicast_blocked", return_value=False):
+                    r = await m.commission("06409137006")
+                self.assertEqual((r["error"], r["reason"]), ("expired", "expired"))
+                # a wrong passcode is the code, never the permission
+                fake.answers["commission_with_code"] = {"error_code": 1, "reason": "passcode-mismatch", "details": ""}
+                with patch.object(matter, "multicast_blocked", return_value=True):
+                    self.assertEqual((await m.commission("06409137006"))["reason"], "wrong_code")
+            finally:
+                await m.stop()
+                await server.cleanup()
+        run(go())
+
+    def test_multicast_blocked_reads_the_errno(self):
+        import errno
+        import socket
+
+        class Sock:
+            def __init__(self, err):
+                self.err = err
+
+            def sendto(self, data, addr):
+                if self.err:
+                    raise OSError(self.err, "x")
+
+            def close(self):
+                pass
+        with patch.object(matter.sys, "platform", "darwin"):
+            for err, want in ((None, False), (errno.EHOSTUNREACH, True), (errno.EACCES, False)):
+                with patch.object(socket, "socket", lambda *a, e=err: Sock(e)):
+                    self.assertEqual(REAL_MULTICAST_BLOCKED(), want, err)
+        with patch.object(matter.sys, "platform", "linux"):
+            self.assertFalse(REAL_MULTICAST_BLOCKED())
 
     def test_already_added(self):
         """Live run 21 Nov: the same device shared a second time answers error already, not unreachable."""

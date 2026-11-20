@@ -21,7 +21,7 @@ Read first: coord/nolater-common.md and coord/matter-contract.md (changes 1 to 1
   bridge/API.md, tests/test_matter_bridge.py (31 tests), tests/fixtures/fake_matter_service.py,
   tests/fixtures/matter-light-node.json.
 - Fable NO-GO (coord/fable-1121-nl-matter-bridge.md): items 1-4 and 6-15 fixed and tested. Item 5
-  (launchd) NOT done: see below.
+  (launchd) run with the owner's approval on 21 Nov: see "Item 5" below.
 
 - Checker NO-GO at 50ac34c (A to G and a nit), fixed after it: joined names ("GarageDoor", "Gate_1",
   "Door1") split before the name rule; thread_route and why_not off the event loop (to_thread,
@@ -30,7 +30,7 @@ Read first: coord/nolater-common.md and coord/matter-contract.md (changes 1 to 1
   device type in matter.js 0.18's Matter 1.5 model: Closure 560, Closure Panel 561, Closure Controller
   574 is a controller); setup script passes paths by environment and checks @matter/nodejs's checksum
   against the lock (tampered copy: exit 1, tried on the MacBook); zero width and text direction
-  controls stripped from names. Item 5 waits on the owner: do not try it.
+  controls stripped from names.
 
 - Contract changes 14 and 15 (harness nl-matter-fixtures 09be187): every refusal carries a reason
   (commission wrong_code, expired, thread, unreachable, already, not_certified, failed, not_ready,
@@ -61,12 +61,17 @@ Read first: coord/nolater-common.md and coord/matter-contract.md (changes 1 to 1
   fixtures back to 1 fabric, lock released, bridge stopped.
 
 ## Not done, and why
-- Item 5, the bridge as a launchd job adding a device: `launchctl bootstrap` on the MacBook was refused
-  by this session's permission classifier (twice: once with the plist in ~/Library/LaunchAgents, once
-  with it in ~/mb-nlb). Needs the owner to allow it, or to run it: copy
-  bridge/examples/couch-tv-bridge.plist.example with the REPLACE paths set, bootstrap, `fx share light`,
-  add it from the phone page or POST /api/matter/commission, write the result into docs/MATTER.md
-  ("Mac: the bridge as a launchd service"), then bootout and delete the plist.
+- Item 5, the bridge as a launchd job (owner approved, 21 Nov): bootstrapped on the MacBook with the
+  example plist (label com.couchtv.bridge-test, ~/mb-nlb, port 8796): running, bridge answered, Matter
+  ready, but adding the shared light failed 3 of 3 ("expired" after 30 s). Cause measured with a probe
+  run as a launchd job (scratchpad nl-matter-bridge-live/netprobe.py): multicast to 224.0.0.251 and
+  ff02::fb fails with errno 65 (No route to host); from ssh all sends work. Same with the Python in an
+  app bundle with NSLocalNetworkUsageDescription (launchd or `open`). It is macOS Local Network
+  permission, which only a person at the Mac can grant (System Settings, Privacy and Security, Local
+  Network); editing that setting from an agent is not allowed. The bridge now answers reason
+  `local_network` with that note (tried live under launchd). Left: the owner switches on the Python
+  (or ~/mb-nlb/CouchTVBridge.app, kept there for it) once at the MacBook; then bootstrap the example
+  plist again and add the light (steps in docs/MATTER.md). Job booted out, plist deleted, lock released.
 - A real share from the Google Home or Apple Home app, and a real Thread device: these need the
   owner at home with his phone and his own devices. An agent cannot do them.
 

@@ -81,12 +81,28 @@ Privacy and Security, Local Network, switch on Terminal (or node).
 
 **Mac: the bridge as a launchd service** (docs/SETUP.md step 5). The Matter service is a child of the
 bridge, so it runs inside the same launchd job, and stopping the job (`launchctl bootout`, which sends
-SIGTERM) stops the service too: tried on the MacBook by sending the bridge SIGTERM, the service ended
-and its pid file was removed. Adding a device with the bridge as a launchd job (rather than started
-from Terminal) has **not been tried yet**. If Matter finds nothing that way while it works when the
-bridge is started from Terminal, it is the Local Network permission above: macOS asks once for the
-program launchd starts (the Python in `.venv`), so start the job once while you are at the Mac and
-press Allow, or switch it on under System Settings, Privacy and Security, Local Network.
+SIGTERM) stops the service too (tried: the service ended and its pid file was removed).
+
+**It needs the Local Network permission, and with launchd nobody is asked.** Tried on the MacBook
+(macOS 27, Apple silicon) on 21 Nov 2026 with `bridge/examples/couch-tv-bridge.plist.example` (a test
+label, the venv's Python from `uv`, port 8796): the job started (`state = running`), the bridge
+answered and Matter was ready in 2 seconds, but adding the shared test light failed 3 times out of 3
+after 30 seconds ("the device did not answer"). The cause, measured with a small probe run as a
+launchd job: **every multicast send failed with errno 65, No route to host** (mDNS to 224.0.0.251 and
+ff02::fb, which is how Matter finds a device), while the same probe from a Terminal or ssh session
+sent all of them. The same happened with the Python copied into a small app bundle with its own
+identity and `NSLocalNetworkUsageDescription` (issue #42's way), started by launchd or by `open`: macOS
+blocks it until someone switches it on. No one was at the Mac to press Allow, so a working add under
+launchd is still to be seen.
+
+What the bridge does about it: when an add fails because nothing answered and the bridge itself cannot
+send multicast, it answers error `unreachable`, reason `local_network`, with a note saying where to
+switch it on, instead of "expired" (tried live under launchd: that answer, in 30 seconds). What the
+person does, once, at the Mac: System Settings, Privacy and Security, Local Network, switch on the
+program the job runs (the Python, or the app bundle), then add the device again. If the Python is not
+listed there, start the bridge once from Terminal (Terminal then asks), or use a python.org or Homebrew
+Python for the venv, as docs/SETUP.md step 5 says. Starting the bridge from Terminal works at once: every
+live test here ran that way.
 
 **Linux and Raspberry Pi: Thread devices.** A Matter device on Thread (most Eve, Nanoleaf and
 IKEA ones) is reached through a Thread border router (a Google Nest hub, an Apple TV or HomePod, a
@@ -146,7 +162,7 @@ caller with `bridge.pairing_key`.
 
 **Every refusal has a `reason`** (contract changes 14 and 15), a key the TV screens word in every
 language. Commission: `wrong_code`, `expired`, `thread`, `unreachable`, `already`, `not_certified`,
-`failed`, `not_ready`, `busy` (another device is still being added: answered at once, never queued),
+`failed`, `not_ready`, `local_network` (a Mac that does not let the bridge look on the home network), `busy` (another device is still being added: answered at once, never queued),
 `blocked` or `unsupported` (with error `not_allowed`), `address`, `port` or `link_local`, and while
 Matter is not ready the reason it is not. Command: `not_found` (no such device), `bad_request` (an
 action or value this device does not take), `not_ready` (the device is not answering),
@@ -189,7 +205,7 @@ point, °C, in half degrees). A cover's `on` opens it and `off` closes it. Senso
 
 ## What was tested, and how
 
-- `tests/test_matter_bridge.py` (39 tests, all pass): every domain mapped from Matter attributes, including a
+- `tests/test_matter_bridge.py` (41 tests, all pass): every domain mapped from Matter attributes, including a
   real node (the SDK's virtual light, `tests/fixtures/matter-light-node.json`, read by the service
   after a share); locks, alarms, garage doors and a lock behind a Matter bridge never shown, never
   switched, never renamed or removed; what each action sends; the error keys; adding by address;
@@ -240,4 +256,4 @@ point, °C, in half degrees). A cover's `on` opens it and `off` closes it. Senso
   from the Google Home or Apple Home app (the share was made by a second controller with the same
   Open Commissioning Window step those apps use). The real share from those apps and a real Thread
   device need someone at home with their own phone and devices; they are the first thing to try
-  there. Adding a device with the bridge running as a launchd job (above) is also not tried yet.
+  there. Adding a device with the bridge as a launchd job needs one Allow at the Mac first (above).

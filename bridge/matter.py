@@ -521,6 +521,26 @@ def thread_route():
         return True   # cannot tell: do not blame Thread
 
 
+def multicast_blocked():
+    """True when this process may not send multicast on the home network: a Mac where the program
+    running the bridge has no Local Network permission. Seen on the MacBook with the bridge as a
+    launchd job: mDNS to 224.0.0.251 and ff02::fb failed with errno 65 (No route to host) while
+    unicast went out, so Matter found no device and every add ended "expired" after 30 s. Only macOS
+    has this rule; elsewhere the answer is False."""
+    if sys.platform != "darwin":
+        return False
+    import errno
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.sendto(b"\x00" * 12, ("224.0.0.251", 5353))   # an empty mDNS header: asks nothing
+        return False
+    except OSError as e:
+        return e.errno in (errno.EHOSTUNREACH, errno.ENETUNREACH)
+    finally:
+        s.close()
+
+
 # ---------------------------------------------------------------- colours
 
 def rgb_to_hs(r, g, b):
@@ -713,6 +733,9 @@ def short_private_dir(key):
 
 
 STARTING = "Matter is starting. Try again in a minute."
+LOCAL_NETWORK_NOTE = ("macOS does not let the bridge look for devices on your home network yet. On the home computer: "
+                      "System Settings, Privacy and Security, Local Network, switch on Couch TV bridge (or Python), "
+                      "then try again.")
 BUSY_NOTE = "Couch TV is still adding another device. Try again when it has finished."
 LOCK_NOTE = "Couch TV does not add locks, alarms or garage doors. It is still in your other home app."
 UNSUPPORTED_NOTE = ("Couch TV cannot show or work this kind of device (it shows lights, plugs, fans, blinds, air "
@@ -1361,6 +1384,9 @@ class Matter:
         else:
             key, note = "unreachable", "The device could not be added. Make a new code and try again."
             reason = "failed"
+        if key in ("expired", "unreachable", "thread") and reason is None and await asyncio.to_thread(multicast_blocked):
+            # not the code or the device: this Mac blocks the bridge from looking (Local Network permission)
+            key, note, reason = "unreachable", LOCAL_NETWORK_NOTE, "local_network"
         log.info("matter: adding a device failed (%s, %s)", e.reason, e.code)
         return {"ok": False, "device_ids": [], "error": key, "reason": reason or key, "note": note}
 
