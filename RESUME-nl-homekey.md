@@ -24,5 +24,11 @@ Scratchpad below = the shared scratchpad named in coord/resume-builder-brief.md 
 ## APKs (scratchpad/hk-apks, built 21 Nov from the final code)
 plain22.apk (assembleRelease, 22/0.13.9), watch22.apk (assembleWatch), plain21.apk (versionCode 21 / 0.13.8 test build: build.gradle.kts edited, built, restored; git diff empty).
 
+## Round 4 (21 Nov, 05:38 to 05:45): final checks, all on the final code
+- Browser (under browser.lock, scratchpad/hk-r3-browser.log): test_homekey_browser 327 checks, test_one_button_update_browser 29, test_phone_settings_browser 129, test_tcl_fixes_browser 26: all pass.
+- Kotlin testReleaseUnitTest: 135 tests, 0 failures, 0 errors, 0 skipped (HomeKeyRulesTest 15, SetupWordsTest 14); results from 05:27, after the last Kotlin edit (05:26), gradle up to date.
+- Node: the 15 regression tests listed above all pass (widget_caps 4548 checks).
+- Emulator proof 33 of 33 (05:29) on APKs built 05:27, after the last Kotlin edit. No emulator running now.
+
 ## Left
 Nothing in scope. Release gate owned by the coordinator: the help page https://couchtv.joshuaseage.com/help/home-button/ must be deployed (Fable item 2).
