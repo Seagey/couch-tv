@@ -281,8 +281,11 @@
       return;
     }
     var icon = { remote: "remote", controller: "games", headphones: "headphones", keyboard: "edit", other: "bluetooth" };
+    // red below this widget's own "Red below" (5 to 50, else 20), as on the widget (widgets.js R.battery)
+    var low = +kit().setting(o, env, "low", 20);
+    if (!isFinite(low) || low < 5 || low > 50) low = 20;
     S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:30px", (bt.devices || []).length ? bt.devices.map(function (x) {
-      return E("div", "cwd-tvrow", "", [E("span", "", "display:flex;align-items:center;gap:18px", [ic(icon[x.kind] || "bluetooth", 40), x.name]), E("b", x.level < 20 ? "cwd-tv-no" : "cwd-tv-yes", "", [x.level + "%"])]);
+      return E("div", "cwd-tvrow", "", [E("span", "", "display:flex;align-items:center;gap:18px", [ic(icon[x.kind] || "bluetooth", 40), x.name]), E("b", x.level < low ? "cwd-tv-no" : "cwd-tv-yes", "", [x.level + "%"])]);
     }) : [E("div", "cwd-text", "", ["No paired device reports its charge right now. Remotes and controllers that do show here by themselves."])]));
   };
   // Ask AI (ask.js): the last question and answer in full, then Ask and Set up, which open the Ask sheet
@@ -613,7 +616,8 @@
   // Control Centre, camera, headlines and scores: couch-tv Studio shows what they will look like; a TV
   // shows their setup record (widgets.js draws them empty there, which opens B.setup)
   // Control Centre: every switch big. OK switches one through the launcher (HomeAssistant.kt "set"),
-  // which only switches what config.json names and never opens a garage door, gate or door.
+  // which only switches what config.json names. A lock, alarm, garage door, gate or door never shows at
+// all (widgets.js houseSafe); one that somehow reached this list is still never switched.
   B.controls = function (o, env) {
     var H = kit().ha, demo = !!env.demo, info = H.haOf(env).info || {};
     if (!demo && !(info.controls && info.controls.length)) return B.setup(o, env);
@@ -627,10 +631,7 @@
       S.readAt = Date.now();
       S.api.ha("controls").then(function (r) {
         if (!S || !r || !r.ok) { if (S && !items) { items = []; draw(); msg("Home Assistant is not answering"); } return; }
-        var want = kit().setting(o, env, "switches"), l = r.controls || [];
-        if (Object.prototype.toString.call(want) !== "[object Array]") want = null;
-        if (want && want.length) l = want.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
-        items = l; draw();
+        items = H.pickedOf(H.houseSafe(r.controls || []), kit().setting(o, env, "switches")); draw();
       });
     };
     var draw = function () {
@@ -641,10 +642,10 @@
       (items || []).slice(0, 16).forEach(function (c) {
         var on = c.ok !== false && c.on;
         grid.appendChild(F(E("div", "cwd-toggle" + (on ? " on" : ""), c.ok === false ? "opacity:.6" : "", [E("div", "cwd-sic", "", [ic(c.icon || H.ctlIcon(c), 44, on ? "#1a1406" : "#fff", "solid")]),
-          E("div", "cwd-mid cwd-ell", "", [c.name || ""]), E("div", "cwd-small", "", [c.blocked ? H.ctlWord(c) + ", not from the TV" : H.ctlWord(c)])]), function () {
+          E("div", "cwd-mid cwd-ell", "", [c.name || ""]), E("div", "cwd-small", "", [H.ctlWord(c)])]), function () {
           if (demo || S.api.designer) { c.on = !c.on; designerSays(); draw(); return; }
           if (c.ok === false) return msg(c.name + " is not answering");
-          if (c.blocked) return msg("Garage doors, gates and doors are never opened from the TV");
+          if (c.blocked) return msg("Locks, alarms, garage doors and gates never open from Couch TV");
           if (!S.api.ha) return msg("Home Assistant is not set up on this TV");
           var want = c.kind === "cover" ? (c.on ? "close" : "open") : (c.on ? "off" : "on");
           c.on = !c.on; draw();
@@ -823,10 +824,7 @@
       S.api.ha("speakers").then(function (r) {
         if (!S || joinT) return;
         if (!r || !r.ok) { if (!list) { list = []; draw(); msg("Home Assistant is not answering"); } return; }
-        var want = kit().setting(o, env, "players"), l = r.speakers || [];
-        if (Object.prototype.toString.call(want) !== "[object Array]") want = null;
-        if (want && want.length) l = want.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
-        list = l; draw();
+        list = H.pickedOf((r.speakers || []).filter(function (c) { return c && c.entity; }), kit().setting(o, env, "players")); draw();
       });
     };
     var draw = function () {

@@ -118,6 +118,7 @@ class SmartHomeTest(unittest.TestCase):
     def test_climate_rooms_carry_home_assistants_own_unit(self):
         # the aircon widget draws a room in the home's unit only when the room says its own (widgets.js roomUnit)
         self.home.pending = ("http://homeassistant.local:8123", TOKEN)
+        self.home.listed = {k: "" for k in STATES}   # what a check listed (a later save keeps only those)
         self.home.save({"climate": [{"entity": "climate.lounge"}]})
         self.unit = "°F"
         rooms = run(self.home.answer("climate"))["rooms"]
@@ -129,6 +130,83 @@ class SmartHomeTest(unittest.TestCase):
         self.home.save({"climate": [{"entity": "climate.lounge"}]})
         self.unit = "kelvin"
         self.assertNotIn("unit", run(self.home.answer("climate"))["rooms"][0])
+
+    def test_a_failed_unit_read_is_asked_again(self):
+        # Home Assistant's /api/config down, then up: no unit while it is down, and it is asked again
+        self.home.pending = ("http://homeassistant.local:8123", TOKEN)
+        self.home.listed = {k: "" for k in STATES}
+        self.home.save({"climate": [{"entity": "climate.lounge"}]})
+        real, down = self.home.call, [True]
+
+        async def flaky(base, token, method, path, body=None, limit=0):
+            if path == "/api/config" and down[0]:
+                self.calls.append((base, method, path, body))
+                return -1, None
+            return await real(base, token, method, path, body, limit)
+        self.home.call = flaky
+        self.unit = "°F"
+        self.assertNotIn("unit", run(self.home.answer("climate"))["rooms"][0], "no unit while Home Assistant does not say")
+        down[0] = False
+        self.assertEqual(run(self.home.answer("climate"))["rooms"][0]["unit"], "°F", "asked again once it answers")
+        run(self.home.answer("climate"))
+        self.assertEqual(len([c for c in self.calls if c[2] == "/api/config"]), 2, "asked twice (failed, then answered), then kept")
+
+    def test_scenes_and_scripts_that_open_the_house(self):
+        # the owner's rule: locks, alarms, garage doors and gates never show on the TV, so no scene or
+        # script named for one is kept, and no scene that sets one is listed or run
+        more = {
+            "scene.movie": {"entity_id": "scene.movie", "state": "x", "attributes": {"entity_id": ["light.lamp"]}},
+            "scene.leaving": {"entity_id": "scene.leaving", "state": "x", "attributes": {"entity_id": ["light.lamp", "lock.front"]}},
+            "scene.away": {"entity_id": "scene.away", "state": "x", "attributes": {"entity_id": ["alarm_control_panel.house"]}},
+            "scene.home": {"entity_id": "scene.home", "state": "x", "attributes": {"entity_id": ["cover.blinds"]}},   # cover.blinds is a garage door
+            "scene.disarm_alarm": {"entity_id": "scene.disarm_alarm", "state": "x", "attributes": {}},
+            "script.open_garage": {"entity_id": "script.open_garage", "state": "off", "attributes": {}},
+            "script.unlock_front_door": {"entity_id": "script.unlock_front_door", "state": "off", "attributes": {}},
+            "script.morning": {"entity_id": "script.morning", "state": "off", "attributes": {}},
+            "switch.alarm_siren": {"entity_id": "switch.alarm_siren", "state": "off", "attributes": {}},
+            "switch.garagedoor": {"entity_id": "switch.garagedoor", "state": "off", "attributes": {}},
+        }
+        STATES.update(more)
+        try:
+            ids = [e["entity"] for e in smarthome.pickable(list(STATES.values()))]
+            for bad in ("scene.leaving", "scene.away", "scene.home", "scene.disarm_alarm", "script.open_garage", "script.unlock_front_door",
+                        "switch.alarm_siren", "switch.garagedoor", "cover.blinds", "lock.front"):
+                self.assertNotIn(bad, ids, bad + " is never offered")
+            self.assertIn("scene.movie", ids)
+            self.assertIn("script.morning", ids)
+            # config.json (or an older set up) naming them: the named ones are never kept
+            s = smarthome.parse({"url": "http://ha:8123", "token": TOKEN, "scenes": [{"entity": e} for e in
+                                 ("scene.movie", "script.open_garage", "scene.disarm_alarm", "script.unlock_front_door", "scene.leaving", "scene.home", "script.morning")],
+                                 "controls": [{"entity": e} for e in ("switch.alarm_siren", "switch.garagedoor", "cover.frontgate", "switch.doorlock", "cover.garage2", "light.lamp")]})
+            self.assertEqual([n["entity"] for n in s["scenes"]], ["scene.movie", "scene.leaving", "scene.home", "script.morning"])
+            self.assertEqual([n["entity"] for n in s["controls"]], ["light.lamp"])
+            h = smarthome.Home(self.dir, {"url": "http://homeassistant.local:8123", "scenes": s and [{"entity": n["entity"]} for n in s["scenes"]]}, TOKEN)
+            h.call = self.home.call
+            self.assertEqual([n["entity"] for n in h.info()["scenes"]], ["scene.movie", "scene.leaving", "scene.home", "script.morning"])
+            self.calls.clear()
+            # a scene that sets a lock or a garage door: refused, and nothing is switched
+            for bad in ("scene.leaving", "scene.home", "script.open_garage"):
+                self.assertEqual(run(h.answer("scene", bad))["error"], "refused", bad)
+            self.assertFalse([c for c in self.calls if c[1] == "POST"], "nothing was run")
+            self.assertTrue(run(h.answer("scene", "scene.movie"))["ok"])
+            self.assertEqual(self.calls[-1][2], "/api/services/scene/turn_on")
+            self.assertTrue(run(h.answer("scene", "script.morning"))["ok"])
+            self.assertEqual(self.calls[-1][2], "/api/services/script/turn_on")
+        finally:
+            for k in more:
+                STATES.pop(k, None)
+
+    def test_a_garage_door_by_its_class_reads_blocked_and_never_opens(self):
+        # cover.blinds is a garage door to Home Assistant: kept from config.json by its id, read "blocked"
+        # (the TV then leaves it out of every list, smarthome.js houseSafe), and never switched
+        h = smarthome.Home(self.dir, {"url": "http://homeassistant.local:8123", "controls": [{"entity": "cover.blinds"}, {"entity": "light.lamp"}]}, TOKEN)
+        h.call = self.home.call
+        c = {x["entity"]: x for x in run(h.answer("controls"))["controls"]}
+        self.assertTrue(c["cover.blinds"]["blocked"])
+        self.assertNotIn("blocked", c["light.lamp"])
+        for v in ("open", "close", "on", "off", "toggle"):
+            self.assertEqual(run(h.answer("set", "cover.blinds", v))["error"], "refused", v)
+        self.assertFalse([x for x in self.calls if x[1] == "POST"])
 
     def test_config_section_with_env_token(self):
         h = smarthome.Home(self.dir, {"url": "http://ha:8123", "scenes": [{"entity": "scene.movie"}]}, TOKEN)

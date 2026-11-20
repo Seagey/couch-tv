@@ -279,8 +279,9 @@
         min: 16, max: 30, step: 0.5, modes: ["off", "cool", "heat", "auto"] }
     ];
     if (ha === "scenes") rooms = [];
+    // the last two open the house: the TV never lists them (smarthome.js houseSafe)
     var scenes = [{ entity: "scene.movie_night", name: "Movie night" }, { entity: "scene.lights_off", name: "Lights off" },
-      { entity: "script.good_morning", name: "Good morning" }];
+      { entity: "script.good_morning", name: "Good morning" }, { entity: "script.open_garage", name: "Open garage" }, { entity: "scene.disarm_alarm", name: "Disarm alarm" }];
     var reply = function (id, r) { setTimeout(function () { if (window.smartHome) window.smartHome.reply(id, r); }, 150); };
     var room = function (e) { return rooms.filter(function (r) { return r.entity === e; })[0]; };
     // the smart home widgets (HomeAssistant.kt widgets()): the same answers, made up. ?ha=1 has them all;
@@ -292,7 +293,9 @@
         { entity: "fan.bedroom", name: "Ceiling fan", ok: true, kind: "fan", state: "on", on: true, level: 33 },
         { entity: "cover.blinds", name: "Blinds", ok: true, kind: "cover", state: "closed", on: false, level: 0 },
         { entity: "switch.heater", name: "Heater", ok: false, kind: "switch" },
-        { entity: "cover.garage", name: "Garage", ok: true, kind: "cover", state: "closed", on: false, blocked: true }],
+        { entity: "cover.garage", name: "Garage", ok: true, kind: "cover", state: "closed", on: false, blocked: true },
+        // a garage door Home Assistant calls one, with a name that does not say so: "blocked" when read
+        { entity: "cover.big_roller", name: "Big roller", ok: true, kind: "cover", state: "closed", on: false, blocked: true }],
       cameras: [{ entity: "camera.backyard", name: "Backyard" }, { entity: "camera.driveway", name: "Driveway" }],
       sensors: [{ entity: "sensor.pool", name: "Pool", ok: true, value: "26.4", num: 26.4, unit: "°C", cls: "temperature" },
         { entity: "sensor.rain_today", name: "Rain gauge", ok: true, value: "12", num: 12, unit: "mm" }],

@@ -674,7 +674,7 @@
       var st = sunTimes(now(), own.lat, own.lon);
       s = st ? { rise: sunAt(st.rise, own.timezone), set: sunAt(st.set, own.timezone), frac: clamp((now() - st.rise) / (st.set - st.rise), -0.1, 1.1) } : null;
     }
-    if (!s) return empty(root, b, "sun", own ? "No sunrise in " + own.name + " today" : "Set your town for the sun", own ? "" : "Settings (hold OK), Edit on the TV, Place");
+    if (!s) return empty(root, b, "sun", own ? "No sunrise in " + own.name + " today" : "Set your town for the sun", own ? "" : "Hold OK, then Edit on the TV, then Place");
     var at = arc(s.frac);
     add(root, [lab("sun", own && own.name ? own.name : op(o).label || "Sun"),
       svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.28)", "stroke-width": 3, "stroke-dasharray": "2 9", "stroke-linecap": "round" }),
@@ -1399,10 +1399,20 @@
     var ha = haOf(env), want = setting(o, env, "players");
     if (Object.prototype.toString.call(want) !== "[object Array]") want = null;
     if (!ha.speakers) return ha.speakers;
-    var l = ha.speakers.filter(function (s) { return s && s.entity; });
-    if (want && want.length) l = want.map(function (e) { return l.filter(function (s) { return s.entity === e; })[0]; }).filter(Boolean);
-    return l;
+    return pickedOf(ha.speakers.filter(function (s) { return s && s.entity; }), want);
   }
+  // the ones picked for this widget, in the order picked; none picked, or none of them still in Smart
+  // home, gives every one (Control Centre, Speakers and Scenes all do the same)
+  function pickedOf(l, want) {
+    if (Object.prototype.toString.call(want) !== "[object Array]" || !want.length) return l;
+    var p = want.map(function (e) { return l.filter(function (x) { return (x.entity || x[2]) === e; })[0]; }).filter(Boolean);
+    return p.length ? p : l;
+  }
+  // nothing that opens the house ever shows on the TV: a lock, an alarm, a garage door, gate or door
+  // (by its id, or a blind Home Assistant calls one: "blocked"), nor a scene or script named for one
+  // (HomeAssistant.kt and bridge/smarthome.py OPENS_HOUSE, the same words)
+  var OPENS_HOUSE = /^(cover|switch|script|scene)\.[a-z0-9_]*(garage|gate|door|lock|alarm)[a-z0-9_]*$|^(lock|alarm_control_panel)\./;
+  function houseSafe(l) { return Array.isArray(l) ? l.filter(function (x) { return x && !x.blocked && !OPENS_HOUSE.test(String(x.entity || (Array.isArray(x) ? x[2] : "") || "")); }) : l; }
   function spkWord(s) { return s.ok === false ? "Not answering" : s.state === "off" || s.state === "standby" ? "Off" : s.muted ? "Muted" : s.volume != null ? s.volume + "%" : s.state === "playing" ? "Playing" : "On"; }
   function spkSong(s) { return s.ok === false ? "" : s.title ? s.title + (s.artist ? ", " + s.artist : "") : s.state === "playing" ? "Playing" : s.state === "paused" ? "Paused" : s.state === "off" ? "" : "Not playing"; }
   R.speakers = function (root, o, b, env) {
@@ -1507,14 +1517,9 @@
   var SCENE_DEMO = [["movie", "Movie night", "scene.movie_night"], ["bedtime", "Goodnight", "scene.goodnight"], ["morning", "Morning", "script.morning"], ["away", "Away", "scene.away"], ["party", "Party", "scene.party"], ["dinner", "Dinner", "scene.dinner"]];
   function scenesOf(env, o) {
     if (env.demo) return SCENE_DEMO;
-    var l = (dataOf(env).scenes || []).map(function (s) { return [/^script\./.test(s.entity || "") ? "play" : "favourite", String(s.name || s.entity || ""), String(s.entity || "")]; }).filter(function (s) { return s[2]; });
+    var l = houseSafe((dataOf(env).scenes || []).map(function (s) { return [/^script\./.test(s.entity || "") ? "play" : "favourite", String(s.name || s.entity || ""), String(s.entity || "")]; }).filter(function (s) { return s[2]; }));
     // the scenes picked for this widget on this TV (none picked: every one set up in Smart home)
-    var want = o ? setting(o, env, "scenes") : null;
-    if (Object.prototype.toString.call(want) === "[object Array]" && want.length) {
-      var picked = want.map(function (e) { return l.filter(function (x) { return x[2] === e; })[0]; }).filter(Boolean);
-      if (picked.length) l = picked;
-    }
-    return l;
+    return pickedOf(l, o ? setting(o, env, "scenes") : null);
   }
   R.scenes = function (root, o, b, env) {
     var list = scenesOf(env, o);
@@ -1563,7 +1568,7 @@
   var NOT_ANSWERING = "Home Assistant is not answering";
 
   // Control Centre: lights, switches, fans and blinds
-  function ctlIcon(c) { return c.kind === "cover" ? (c.blocked ? "garage" : "blinds") : c.kind === "fan" ? "fan" : c.kind === "switch" ? "outlet" : c.on ? "light" : "light-off"; }
+  function ctlIcon(c) { return c.kind === "cover" ? "blinds" : c.kind === "fan" ? "fan" : c.kind === "switch" ? "outlet" : c.on ? "light" : "light-off"; }
   function ctlWord(c) {
     if (c.ok === false) return "Not answering";
     if (c.kind === "cover") return c.on ? "Open" + (c.level != null && c.level < 100 ? " " + c.level + "%" : "") : "Closed";
@@ -1576,10 +1581,7 @@
       return q.controls.map(function (c, i) { var d = DEMO_HA.controls[i % DEMO_HA.controls.length]; return { entity: "demo." + i, name: c.name || d.name, ok: true, kind: d.kind, on: i % 2 === 0, icon: c.icon }; });
     }
     if (!ha.controls) return ha.controls;
-    var l = ha.controls.filter(function (c) { return c && c.entity; });
-    var sw = setting(o, env, "switches");
-    if (Object.prototype.toString.call(sw) === "[object Array]" && sw.length) l = sw.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
-    return l;
+    return pickedOf(houseSafe(ha.controls.filter(function (c) { return c && c.entity; })), setting(o, env, "switches"));
   }
   // one switch in its own box: icon over name over state in a tall box, icon beside them in a short one;
   // each line fitted, the name left out whole (never cut) if it cannot fit
@@ -2771,7 +2773,7 @@
       athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
   };
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
-  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, queueOf: queueOf, coverOk: coverOk, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
+  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, pickedOf: pickedOf, houseSafe: houseSafe, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, queueOf: queueOf, coverOk: coverOk, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
   // what the web widgets' detail layers share with them (widget-detail.js)
   window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS, demoScores: demoScores, gameStatus: gameStatus, shortScore: shortScore, demoQuote: demoQuote, upDown: upDown, commuteOf: commuteOf, picksOf: picksOf };
 })();

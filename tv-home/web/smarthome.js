@@ -49,6 +49,7 @@
     INFO.scenes = Array.isArray(INFO.scenes) ? INFO.scenes : [];
     // the smart home widgets (HomeAssistant.kt info()): names and entities only
     ["controls", "cameras", "sensors", "speakers"].forEach(function (k) { INFO[k] = Array.isArray(INFO[k]) ? INFO[k] : []; });
+    INFO.controls = INFO.controls.filter(houseSafe); INFO.scenes = INFO.scenes.filter(houseSafe);
     INFO.energy = INFO.energy === true; INFO.doorbell = INFO.doorbell === true; INFO.doorbell_camera = INFO.doorbell_camera === true;
     return INFO;
   }
@@ -76,7 +77,24 @@
     return DIRECT.api("POST", "/api/ha", { action: action, entity: entity || "", value: value == null ? "" : String(value) }, 20000)
       .then(function (r) { return r && r.result && typeof r.result === "object" ? r.result : { ok: false }; }, function () { return { ok: false, error: "bridge" }; });
   }
+  // Nothing that opens the house ever shows on the TV: a lock, an alarm, a garage door, gate or door,
+  // nor a scene or script named for one (HomeAssistant.kt and bridge/smarthome.py OPENS_HOUSE, the same
+  // words). A blind Home Assistant itself calls a garage door, gate or door comes back "blocked" when it
+  // is read: from then on it is left out of every list too (Control Centre, its pick list, the phone).
+  var OPENS_HOUSE = /^(cover|switch|script|scene)\.[a-z0-9_]*(garage|gate|door|lock|alarm)[a-z0-9_]*$|^(lock|alarm_control_panel)\./;
+  var OPENERS = {};
+  function houseSafe(x) { var e = x && typeof x.entity === "string" ? x.entity : ""; return !!e && !x.blocked && !OPENERS[e] && !OPENS_HOUSE.test(e); }
+  function safeControls(r) {
+    if (!r || !r.ok || !Array.isArray(r.controls)) return r;
+    r.controls.forEach(function (c) { if (c && c.blocked && typeof c.entity === "string") OPENERS[c.entity] = true; });
+    if (INFO) INFO.controls = INFO.controls.filter(houseSafe);
+    r.controls = r.controls.filter(houseSafe);
+    return r;
+  }
   function ask(action, entity, value) {
+    return action === "controls" ? askAny(action, entity, value).then(safeControls) : askAny(action, entity, value);
+  }
+  function askAny(action, entity, value) {
     if (DIRECT && window.TVHA) {
       if (DIRECT_RE.test(entity || "")) return askBridge(action, entity, value);
       if (action === "climate" || action === "controls") {

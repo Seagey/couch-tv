@@ -12,8 +12,9 @@ Where the set up comes from, in order:
   2. config.json's "home_assistant" section with HOME_ASSISTANT_TOKEN in .env (docs/CONFIG.md).
 
 Only what is ticked may be read or changed. Nothing that opens the house: locks and alarms are never
-allowed, and a cover or switch whose id or device class says garage, gate, door or lock is read but
-never switched. Every call goes to the set up address only, never follows a redirect, and gives up
+allowed, a cover, switch, scene or script whose id says garage, gate, door, lock or alarm is never kept,
+a blind whose device class says garage, gate or door is read "blocked" (never shown on the TV) and
+never switched, and a scene that sets any of them never runs. Every call goes to the set up address only, never follows a redirect, and gives up
 after a few seconds.
 
     /api/ha/info    GET  { info, status }: names only (what HomeAssistant.kt info() and status() say)
@@ -39,7 +40,9 @@ SENSOR = re.compile(r"sensor\.[a-z0-9_]{1,64}")
 SPEAKER = re.compile(r"media_player\.[a-z0-9_]{1,64}")
 TOKEN = re.compile(r"[A-Za-z0-9._-]{20,1024}")
 PICKABLE = re.compile(r"(climate|scene|script|light|switch|fan|cover|camera|sensor|media_player|event|binary_sensor|input_boolean)\.[a-z0-9_]{1,64}")
-OPENS_HOUSE = re.compile(r"(cover|switch)\.[a-z0-9_]*(garage|gate|door|lock)[a-z0-9_]*")
+# nothing that opens the house: a cover, switch, script or scene named for a garage, gate, door, lock or
+# alarm is never listed, kept or switched (HomeAssistant.kt OPENS_HOUSE, the same)
+OPENS_HOUSE = re.compile(r"(cover|switch|script|scene)\.[a-z0-9_]*(garage|gate|door|lock|alarm)[a-z0-9_]*")
 HOUSE_OPENERS = {"garage", "gate", "door"}
 MODES = ["off", "heat", "cool", "heat_cool", "auto", "dry", "fan_only"]
 FAN = re.compile(r"[A-Za-z0-9 _-]{1,24}")
@@ -86,7 +89,7 @@ def parse(o):
             if not isinstance(x, dict):
                 continue
             ent = str(x.get("entity") or "").strip()
-            if not ok.fullmatch(ent) or any(n["entity"] == ent for n in out):
+            if not ok.fullmatch(ent) or OPENS_HOUSE.fullmatch(ent) or any(n["entity"] == ent for n in out):
                 continue
             out.append({"entity": ent, "name": str(x.get("name") or "").strip()[:40]})
         return out
@@ -205,6 +208,20 @@ def speaker(n, st):
     if artist:
         o["artist"] = artist[:80]
     return o
+
+
+def scene_opens_house(attrs, cover_class):
+    """A scene that sets a lock, an alarm, or a garage door, gate or door (by its id, or a blind whose
+    device class cover_class(entity) gives is one): never listed and never run from a TV. Home Assistant
+    lists what a scene sets in its "entity_id" attribute (HaReadings.sceneOpensHouse, the same)."""
+    ids = attrs.get("entity_id") if isinstance(attrs, dict) else None
+    for e in ids if isinstance(ids, list) else []:
+        e = str(e)
+        if e.startswith(("lock.", "alarm_control_panel.")) or OPENS_HOUSE.fullmatch(e):
+            return True
+        if e.startswith("cover.") and cover_class(e) in HOUSE_OPENERS:
+            return True
+    return False
 
 
 def ha_unit(cfg):
@@ -344,6 +361,8 @@ def series(a):
 
 def pickable(states):
     out = []
+    classes = {str(st.get("entity_id")): (st.get("attributes") or {}).get("device_class")
+               for st in (states if isinstance(states, list) else []) if isinstance(st, dict) and isinstance(st.get("attributes"), dict)}
     for st in states if isinstance(states, list) else []:
         if not isinstance(st, dict):
             continue
@@ -352,6 +371,8 @@ def pickable(states):
             continue
         a = st.get("attributes") or {}
         if ent.startswith("cover.") and a.get("device_class") in HOUSE_OPENERS:
+            continue
+        if ent.startswith("scene.") and scene_opens_house(a, lambda e: classes.get(e)):
             continue
         o = {"entity": ent, "name": (str(a.get("friendly_name") or "").strip()[:40] or pretty(ent))}
         u = a.get("unit_of_measurement")
@@ -523,8 +544,11 @@ class Home:
         climate = any(c["entity"] == entity for c in s["climate"])
         if action == "climate":
             if self.unit is None and s["climate"]:
-                self.unit = ha_unit(await self._json(s, "/api/config", 64 * 1024)) or ""
-            return {"ok": True, "rooms": [room(n, await self.state(s, n["entity"]), self.limits, self.unit) for n in s["climate"]]}
+                cfg = await self._json(s, "/api/config", 64 * 1024)
+                # kept only when Home Assistant answered: a failed read is asked again next time
+                if cfg is not None:
+                    self.unit = ha_unit(cfg) or ""
+            return {"ok": True, "rooms": [room(n, await self.state(s, n["entity"]), self.limits, self.unit or "") for n in s["climate"]]}
         if action == "temp":
             lim, want = self.limits.get(entity), _num(value)
             if not climate or not lim or want is None:
@@ -547,8 +571,19 @@ class Home:
             return done(await self.service(s, "climate", "turn_on" if action == "on" else "turn_off", idd))
         if action == "scene":
             sc = next((x for x in s["scenes"] if x["entity"] == entity), None)
-            if not sc:
+            if not sc or OPENS_HOUSE.fullmatch(entity):
                 return refused
+            if entity.startswith("scene."):
+                # a scene that sets a lock, an alarm, a garage door, gate or door never runs from a TV
+                st = await self.state(s, entity)
+                if not st:
+                    return failed
+                covers = {}
+                for e in (st.get("attributes") or {}).get("entity_id") or []:
+                    if str(e).startswith("cover.") and str(e) not in covers:
+                        covers[str(e)] = (((await self.state(s, str(e))) or {}).get("attributes") or {}).get("device_class")
+                if scene_opens_house(st.get("attributes"), lambda e: covers.get(e)):
+                    return refused
             return done(await self.service(s, sc["entity"].split(".")[0], "turn_on", idd))
         if action == "controls":
             out = []

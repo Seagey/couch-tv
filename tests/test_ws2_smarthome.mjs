@@ -109,6 +109,7 @@ async function draw(o, env, opts) {
       window.CouchDetail.open(from, env, { designer: false });
       const st = document.querySelector(".cwd-stage");
       out.layer = st ? st.textContent.replace(/\s+/g, " ").trim() : "";
+      out.layerRed = st ? st.querySelectorAll(".cwd-tv-no").length : -1;
       window.CouchDetail.close(true);
     }
     return out;
@@ -121,13 +122,16 @@ const ROOMS = [
 const HA = {
   info: { controls: [1], cameras: [{ entity: "camera.backyard", name: "Backyard" }, { entity: "camera.driveway", name: "Driveway" }],
     sensors: [{ entity: "sensor.pool", name: "Pool" }, { entity: "sensor.rain_today", name: "Rain gauge" }], speakers: [1], energy: true, doorbell: true, doorbell_camera: true },
-  controls: [{ entity: "light.lounge", name: "Lounge", ok: true, kind: "light", on: true }, { entity: "light.lamp", name: "Lamp", ok: true, kind: "light", on: false }],
+  controls: [{ entity: "light.lounge", name: "Lounge", ok: true, kind: "light", on: true }, { entity: "light.lamp", name: "Lamp", ok: true, kind: "light", on: false },
+    { entity: "cover.garage", name: "Garage", ok: true, kind: "cover", on: false, blocked: true }, { entity: "cover.big_roller", name: "Big roller", ok: true, kind: "cover", on: false, blocked: true }],
   sensors: [{ entity: "sensor.pool", name: "Pool", ok: true, value: "26.4", num: 26.4, unit: "°C", cls: "temperature" }, { entity: "sensor.rain_today", name: "Rain gauge", ok: true, value: "12", num: 12, unit: "mm" }],
   hist: {}, energy: { ok: true, name: "Solar", total: 18.4, power: 2.4, power_unit: "kW", hours: [0, 0, 0, 0, 0, 0, 0.2, 0.9, 1.8, 2.6, 3.1, 3.2] },
   speakers: [{ entity: "media_player.kitchen", name: "Kitchen", ok: true, state: "playing", volume: 35 }, { entity: "media_player.deck", name: "Deck", ok: true, state: "idle", volume: 20 }],
   bell: { ok: true, name: "Front door", at: Date.now() - 3600000, ringing: false, camera: true, kept: false }, stills: {}
 };
-const SCENES = [{ entity: "scene.movie_night", name: "Movie night" }, { entity: "scene.lights_off", name: "Lights off" }, { entity: "script.good_morning", name: "Good morning" }];
+const SCENES = [{ entity: "scene.movie_night", name: "Movie night" }, { entity: "scene.lights_off", name: "Lights off" }, { entity: "script.good_morning", name: "Good morning" },
+  { entity: "script.open_garage", name: "Open garage" }, { entity: "scene.disarm_alarm", name: "Disarm alarm" }, { entity: "script.unlock_front_door", name: "Unlock front door" }];
+const OPENERS = /Garage|Big roller|Open garage|Disarm alarm|Unlock front door/;
 const env = (wset, extra) => Object.assign({ rooms: ROOMS, data: { ha: HA, scenes: SCENES, place: HOME, wset: wset ? { x: wset } : {} } }, extra || {});
 const W = (kind, opts, size) => Object.assign({ id: "x", kind, opts: opts || {} }, size || {});
 
@@ -157,6 +161,12 @@ group = "controls";
   ok(/Lamp/.test(r.text) && !/Lounge/.test(r.text), "controls Lights and switches picked: only the lamp: " + r.text);
   r = await draw(W("controls"), env({}));
   ok(/Lounge/.test(r.text) && /Lamp/.test(r.text), "controls cleared: every one again");
+  r = await draw(W("controls"), env(), { layer: true });
+  ok(!OPENERS.test(r.text) && !OPENERS.test(r.layer) && /Lounge/.test(r.layer), "controls: a garage door never shows, by its name or by what Home Assistant calls it, on the widget or OK's layer (owner's rule): " + r.text + " / " + r.layer);
+  r = await draw(W("controls"), env({ switches: ["cover.big_roller", "cover.garage"] }), { layer: true });
+  ok(!OPENERS.test(r.text) && !OPENERS.test(r.layer) && /Lounge/.test(r.text), "controls: even picked, a garage door never shows (every safe one instead): " + r.text);
+  r = await draw(W("controls"), env({ switches: ["light.gone_from_smart_home"] }), { layer: true });
+  ok(/Lounge/.test(r.text) && /Lamp/.test(r.text) && /Lounge/.test(r.layer) && /Lamp/.test(r.layer), "controls: a pick no longer in Smart home gives every one, on the widget and its layer: " + r.text);
   r = await draw(W("controls"), { data: { ha: {} } });
   ok(r.empty && !/Lounge/.test(r.text), "controls with no Home Assistant: its setup card, no demo switches");
 }
@@ -188,8 +198,9 @@ group = "sensor";
   ok(/Pool/.test(r.text) && /26\.4/.test(r.text) && !/Spa/.test(r.text), "sensor, none picked: the first sensor by its own name: " + r.text);
   r = await draw(W("sensor", { label: "Gauge" }), env({ reading: "sensor.rain_today" }));
   ok(/Gauge/.test(r.text) && /12/.test(r.text) && /mm/.test(r.text) && !/26\.4/.test(r.text), "sensor picked on this TV: the rain gauge's reading, with the design's heading: " + r.text);
-  r = await draw(W("sensor"), env({ reading: "sensor.rain_today", label: "Rain" }));
-  has(r.text, "Rain", "sensor Heading typed on this TV");
+  r = await draw(W("sensor"), env({ reading: "sensor.rain_today", label: "Tank" }));
+  has(r.text, "Tank", "sensor Heading typed on this TV");
+  hasNot(r.text, "Rain gauge", "sensor Heading typed on this TV replaces the sensor's own name");
   r = await draw(W("sensor"), env({}));
   ok(/Pool/.test(r.text) && /26\.4/.test(r.text), "sensor cleared: the first sensor again");
 }
@@ -217,6 +228,8 @@ group = "solar";
   ok(r.text !== small.text, "sun clock, a short box: the picked place's times too: " + r.text + " vs " + small.text);
   r = await draw(W("solar"), env({}));
   ok(r.text === home, "sun clock cleared: the home's town again");
+  r = await draw(W("solar"), { data: { ha: HA, wset: {} } });
+  ok(/Set your town for the sun/.test(r.text) && /Hold OK, then Edit on the TV, then Place/.test(r.text), "sun clock with no town: says the real way to set one: " + r.text);
 }
 group = "battery";
 {
@@ -230,6 +243,14 @@ group = "battery";
   ok(/Remote/.test(r.text) && /Charge it soon/.test(r.text), "batteries, a short box: the lowest one, the remote: " + r.text);
   r = await draw(W("battery"), env({}));
   ok(r.red === 1, "batteries cleared: back to red below 20%");
+  r = await draw(W("battery"), env(), { layer: true });
+  ok(r.layerRed === 1 && /Remote/.test(r.layer), "batteries, OK's layer: only the remote red under the default 20%: red " + r.layerRed);
+  r = await draw(W("battery"), env({ low: 50 }), { layer: true });
+  ok(r.layerRed === 2, "batteries Red below 50: OK's layer shows the headset red too: red " + r.layerRed);
+  r = await draw(W("battery", { low: 5 }), env(), { layer: true });
+  ok(r.layerRed === 0, "batteries: the design's Red below 5 in OK's layer: none red: " + r.layerRed);
+  r = await draw(W("battery"), env({ low: 99 }), { layer: true });
+  ok(r.layerRed === 1, "batteries: an out of range Red below in OK's layer falls back to 20: red " + r.layerRed);
 }
 group = "speakers";
 {
@@ -239,6 +260,8 @@ group = "speakers";
   ok(/Deck/.test(r.text) && !/Kitchen/.test(r.text), "speakers picked on this TV: only the deck: " + r.text);
   r = await draw(W("speakers"), env({}));
   ok(/Kitchen/.test(r.text) && /Deck/.test(r.text), "speakers cleared: every one again");
+  r = await draw(W("speakers"), env({ players: ["media_player.gone_from_smart_home"] }), { layer: true });
+  ok(/Kitchen/.test(r.text) && /Deck/.test(r.text) && /Kitchen/.test(r.layer) && /Deck/.test(r.layer), "speakers: a pick no longer in Smart home gives every one, on the widget and its layer: " + r.text);
 }
 group = "scenes";
 {
@@ -251,6 +274,12 @@ group = "scenes";
   has(r.text, "1 scene", "scenes as a tile counts the picked ones");
   r = await draw(W("scenes"), env({}));
   ok(/Movie night/.test(r.text), "scenes cleared: every scene again");
+  r = await draw(W("scenes"), env(), { layer: true });
+  ok(!OPENERS.test(r.text) && !OPENERS.test(r.layer) && /3 scenes/.test(r.layer), "scenes: a scene or script for a garage, alarm or lock never shows (owner's rule): " + r.text);
+  r = await draw(W("scenes"), env({ scenes: ["script.open_garage"] }), { layer: true });
+  ok(!OPENERS.test(r.text) && !OPENERS.test(r.layer) && /Movie night/.test(r.text), "scenes: even picked, one that opens the house never shows: " + r.text);
+  r = await draw(W("scenes"), env({ scenes: ["scene.gone_from_smart_home"] }), { layer: true });
+  ok(/Movie night/.test(r.text) && /3 scenes/.test(r.layer), "scenes: a pick no longer in Smart home gives every one: " + r.text);
   r = await draw(W("scenes"), { data: {} });
   ok(r.empty && !/Movie night/.test(r.text), "scenes with none from Home Assistant: its setup card, no demo scenes");
 }
@@ -368,6 +397,7 @@ TV = tv;
     ok(pg.head.indexOf(NAMES[k]) >= 0, NAMES[k] + ": Edit on the TV opens its own page: " + pg.head);
     const t = pg.rows.join(" | ");
     want[k].forEach((l) => ok(t.indexOf(l) >= 0, NAMES[k] + ": its page has " + l + ": " + t.slice(0, 300)));
+    if (k === "controls" || k === "scenes") ok(!OPENERS.test(t), NAMES[k] + ": its pick list never has a garage door, a lock or an alarm (owner's rule): " + t.slice(0, 400));
     await closeSettings(tv);
   }
 }
@@ -386,8 +416,8 @@ group = "device pick on the TV";
   ok(/^\s*Bedroom/.test((await onScreen(tv, idOf("aircon"))).text), "the aircon on screen now shows the bedroom: " + (await onScreen(tv, idOf("aircon"))).text);
   // the switches: a tick list of what Smart home has; ticking one shows only it
   pg = await editOnTv(tv, idOf("controls"));
-  const ticks = pg.rows.filter((r) => /^(Lounge|Lamp|Ceiling fan|Blinds|Heater|Garage)/.test(r));
-  ok(ticks.length >= 5, "Control Centre page: a tick for each switch this TV has: " + pg.rows.join(" | "));
+  const ticks = pg.rows.filter((r) => /^(Lounge|Lamp|Ceiling fan|Blinds|Heater|Garage|Big roller)/.test(r));
+  ok(ticks.length === 5 && !OPENERS.test(pg.rows.join(" | ")), "Control Centre page: a tick for each switch this TV has, never a garage door: " + pg.rows.join(" | "));
   await tv.evaluate(() => { const r = [...document.querySelectorAll("#set-rows .srow")]; const i = r.findIndex((e) => /^Lamp/.test(e.textContent.trim())); window.__lamp = i; });
   const li = await tv.evaluate(() => window.__lamp), at = await tv.evaluate(() => [...document.querySelectorAll("#set-rows .srow")].findIndex((e) => e.classList.contains("focus")));
   for (let k = 0; k < li - at; k++) await press(tv, "ArrowDown", 80);
@@ -406,11 +436,38 @@ group = "device pick on the TV";
   ok(cam.type === "device" && cam.options.some((o) => o[0] === "camera.driveway" && o[1] === "Driveway") && cam.options[0][0] === "", "the phone is handed the cameras this TV has, after The first one: " + JSON.stringify(cam.options));
   const sc = view.find((w) => w.kind === "scenes").settings.find((s) => s.key === "scenes");
   ok(sc.many && sc.options.length === 3 && sc.options.every((o) => /^(scene|script)\./.test(o[0])), "the scenes list is the scenes and scripts only: " + JSON.stringify(sc.options));
+  const sw = view.find((w) => w.kind === "controls").settings.find((s) => s.key === "switches");
+  ok(sw.options.length === 5 && !sw.options.some((o) => /garage|big_roller/.test(o[0])), "the phone is handed the switches without a garage door: " + JSON.stringify(sw.options));
+  ok(!sc.options.some((o) => /open_garage|disarm_alarm|unlock/.test(o[0])), "the phone is handed no scene or script that opens the house: " + JSON.stringify(sc.options));
   const sp = view.find((w) => w.kind === "speakers").settings.find((s) => s.key === "players");
   ok(sp.options.every((o) => /^media_player\./.test(o[0])) && sp.options.length === 2, "the speakers list is the speakers only");
   // a device from the phone that this TV does not have is refused
   const bad = await tv.evaluate((id) => window.tv.atHomeEdit({ widget_set: { key: id + "|camera", values: { cam: "camera.someone_elses" } } }), idOf("camera"));
   ok(!bad.ok, "a camera this TV does not have is refused: " + JSON.stringify(bad));
+  const garage = await tv.evaluate((id) => window.tv.atHomeEdit({ widget_set: { key: id + "|controls", values: { switches: ["cover.garage", "cover.big_roller"] } } }), idOf("controls"));
+  const kept = await tv.evaluate(() => window.tv.atHomeRead().design.widgets.find((w) => w.kind === "controls").settings.find((s) => s.key === "switches").value);
+  ok(!(kept || []).some((e) => /garage|big_roller/.test(e)), "a garage door sent from a phone is never kept: " + JSON.stringify(garage) + " " + JSON.stringify(kept));
+  // a ticked switch that later leaves Smart home: it drops out of the saved list when the ticks change,
+  // so it never counts toward the most and unticking every one gives every one again
+  const lamp = await tv.evaluate((id) => window.tv.atHomeEdit({ widget_set: { key: id + "|controls", values: { switches: ["light.lamp"] } } }), idOf("controls"));
+  ok(lamp.ok, "the lamp ticked again: " + JSON.stringify(lamp));
+  await tv.evaluate(() => { const was = window.TVHA.info; window.TVHA.info = () => { const o = JSON.parse(was()); o.controls = o.controls.filter((c) => c.entity !== "light.lamp"); return JSON.stringify(o); }; window.smartHome.reload(); });
+  await tv.waitForTimeout(500);
+  pg = await editOnTv(tv, idOf("controls"));
+  ok(!pg.rows.some((r) => /^Lamp/.test(r)), "the lamp left Smart home: no tick for it: " + pg.rows.join(" | "));
+  await tv.evaluate(() => { const r = [...document.querySelectorAll("#set-rows .srow")]; window.__lounge = r.findIndex((e) => /^Lounge/.test(e.textContent.trim())); });
+  const lo = await tv.evaluate(() => window.__lounge), at2 = await tv.evaluate(() => [...document.querySelectorAll("#set-rows .srow")].findIndex((e) => e.classList.contains("focus")));
+  for (let k = 0; k < lo - at2; k++) await press(tv, "ArrowDown", 80);
+  await press(tv, "Enter", 400);   // tick the lounge
+  let saved = await tv.evaluate(() => window.tv.atHomeRead().design.widgets.find((w) => w.kind === "controls").settings.find((s) => s.key === "switches").value);
+  ok(JSON.stringify(saved) === JSON.stringify(["light.lounge"]), "ticking the lounge keeps only the lounge, not the lamp that left: " + JSON.stringify(saved));
+  await press(tv, "Enter", 400);   // untick it
+  saved = await tv.evaluate(() => window.tv.atHomeRead().design.widgets.find((w) => w.kind === "controls").settings.find((s) => s.key === "switches").value);
+  ok(saved === null || saved === undefined || (Array.isArray(saved) && !saved.length), "unticking it gives every one again: " + JSON.stringify(saved));
+  await closeSettings(tv);
+  await openSettings(tv); await goSec(tv, "Designs");
+  ok(/Lights and switches: Every one in Smart home/.test((await rowsText(tv)).join(" | ")), "Widgets on this home says every one again");
+  await closeSettings(tv);
 }
 
 group = "on the phone";
@@ -454,6 +511,19 @@ await phone.waitForFunction(() => document.querySelectorAll("#w-list details").l
   ok(/Recycling/.test((await onScreen(tv, idOf("bins"))).text), "and the first bin, Recycling, when picked: " + (await onScreen(tv, idOf("bins"))).text);
   // battery, energy, doorbell, aircon toggles and numbers from the phone change the TV's widgets
   const tk = (k) => idOf(k) + "|" + k;
+  const before = (await onScreen(tv, idOf("energy"))).text;
+  let e = await tv.evaluate((k) => window.tv.atHomeEdit({ widget_set: { key: k, values: { label: "Roof panels" } } }), tk("energy"));
+  await tv.waitForTimeout(800);
+  ok(e.ok && /Roof panels/.test((await onScreen(tv, idOf("energy"))).text), "energy Heading from the phone shows on the TV: " + (await onScreen(tv, idOf("energy"))).text);
+  e = await tv.evaluate((k) => window.tv.atHomeEdit({ widget_set: { key: k, values: { label: null } } }), tk("energy"));
+  await tv.waitForTimeout(800);
+  ok(e.ok && (await onScreen(tv, idOf("energy"))).text === before, "energy Heading cleared from the phone: as before");
+  e = await tv.evaluate((k) => window.tv.atHomeEdit({ widget_set: { key: k, values: { label: "Front gate bell" } } }), tk("doorbell"));
+  await tv.waitForTimeout(800);
+  ok(e.ok && /Front gate bell/.test((await onScreen(tv, idOf("doorbell"))).text), "doorbell Heading from the phone shows on the TV: " + (await onScreen(tv, idOf("doorbell"))).text);
+  e = await tv.evaluate((k) => window.tv.atHomeEdit({ widget_set: { key: k, values: { entity: "climate.living_room" } } }), tk("aircon"));
+  await tv.waitForTimeout(800);
+  ok(e.ok && /^\s*Living room/.test((await onScreen(tv, idOf("aircon"))).text), "aircon Room from the phone (the TV had the bedroom): the living room on the TV: " + (await onScreen(tv, idOf("aircon"))).text);
   let r = await tv.evaluate((k) => window.tv.atHomeEdit({ widget_set: { key: k, values: { low: 45 } } }), tk("battery"));
   ok(r.ok, "Red below from the phone saves");
   r = await tv.evaluate((k) => window.tv.atHomeEdit({ widget_set: { key: k, values: { low: 90 } } }), tk("battery"));
@@ -483,6 +553,29 @@ group = "only while on screen";
   const keys = await phone.evaluate(() => [...document.querySelectorAll("#w-list details")].map((d) => d.getAttribute("data-key")));
   ["camera", "scenes", "battery"].forEach((k) => ok(keys.indexOf(idOf(k) + "|" + k) < 0, NAMES[k] + " is gone from the phone's Widgets on this TV"));
   left.forEach((k) => ok(keys.indexOf(idOf(k) + "|" + k) >= 0, NAMES[k] + " stays on the phone"));
+}
+{
+  // the rest leave too, in two steps (bins last), so every one of the eleven is seen to go
+  for (const [keep, gone] of [[["bins"], KINDS.filter((k) => k !== "bins")], [["aircon"], ["bins"]]]) {
+    await tv.evaluate((dz) => localStorage.setItem("tvdesigner.design", JSON.stringify(dz)), design(keep));
+    await tv.goto(ORIGIN + "/tv-home/web/index.html?mock=1&ha=1&design=local");
+    await tv.waitForFunction(() => window.tv && document.getElementById("settings") && window.CouchDesign && window.CouchDesign.on());
+    await tv.waitForTimeout(1500);
+    await openSettings(tv); await goSec(tv, "Designs");
+    const rows = (await rowsText(tv)).join(" | ");
+    gone.forEach((k) => ok(rows.indexOf(NAMES[k] + ",") < 0, NAMES[k] + " is gone from Widgets on this home once it leaves the design"));
+    ok(rows.indexOf(NAMES[keep[0]] + ",") >= 0, NAMES[keep[0]] + " stays while it is on the design");
+    await closeSettings(tv);
+    const pg = await editOnTv(tv, idOf(keep[0]));
+    ok(!!pg && pg.head.indexOf(NAMES[keep[0]]) >= 0, NAMES[keep[0]] + " keeps Edit on the TV, the only one on screen");
+    await closeSettings(tv);
+    await phone.reload();
+    await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
+    await phone.waitForFunction(() => document.querySelectorAll("#w-list details").length > 0, null, { timeout: 10000 });
+    const keys = await phone.evaluate(() => [...document.querySelectorAll("#w-list details")].map((d) => d.getAttribute("data-key")));
+    gone.forEach((k) => ok(keys.indexOf(idOf(k) + "|" + k) < 0, NAMES[k] + " is gone from the phone's Widgets on this TV"));
+    ok(keys.indexOf(idOf(keep[0]) + "|" + keep[0]) >= 0, NAMES[keep[0]] + " stays on the phone");
+  }
   ok(!tv.errors.length, "no TV page errors: " + tv.errors.join("; "));
   ok(!phone.errors.length, "no phone page errors: " + phone.errors.join("; "));
 }

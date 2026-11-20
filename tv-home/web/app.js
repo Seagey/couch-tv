@@ -7692,7 +7692,9 @@
         opts.forEach(function (o, i) {
           var on = picked.indexOf(String(o[0])) >= 0;
           rows.push({ kind: "check", key: id + ":" + i, label: String(o[1]), checked: on, act: function () {
-            var now = (Array.isArray(wsCur(w, s)) ? wsCur(w, s) : []).filter(function (x) { return String(x) !== String(o[0]); });
+            // only what can still be picked here: one gone from the TV (a device taken out of Smart
+            // home) drops out, so it never counts toward the most and unticking all gives every one
+            var now = (Array.isArray(wsCur(w, s)) ? wsCur(w, s) : []).filter(function (x) { return String(x) !== String(o[0]) && opts.some(function (y) { return String(y[0]) === String(x); }); });
             if (!on) { if (now.length >= most) { SET.msg = "Up to " + most + ". Untick one first."; return; } now.push(o[0]); }
             set(now.length ? now : null);
           } });

@@ -55,7 +55,7 @@ class HomeAssistantTest {
     }
 
     @Test fun onlyAllowedEntitiesAreKept() {
-        assertEquals(listOf("light.lounge", "cover.garage", "fan.bed"), s.controls.map { it.entity })   // no lock
+        assertEquals(listOf("light.lounge", "fan.bed"), s.controls.map { it.entity })   // no lock, and a garage door never shows (as the bridge)
         assertEquals(listOf("camera.backyard"), s.cameras.map { it.entity })
         assertEquals("sensor.battery", s.energy!!.battery)
         val bad = JSONObject(section.toString()).put("energy", JSONObject().put("entity", "lock.x"))
@@ -67,7 +67,7 @@ class HomeAssistantTest {
         assertEquals("refused", ask("set", "light.lounge", "on").getString("error"))   // not read yet
         assertTrue(calls.none { it.startsWith("POST") })
         val r = ask("controls")
-        assertEquals(3, r.getJSONArray("controls").length())
+        assertEquals(2, r.getJSONArray("controls").length())
         assertTrue(ask("set", "light.lounge", "on").getBoolean("ok"))
         assertTrue(calls.last().startsWith("POST /api/services/light/turn_on {\"entity_id\":\"light.lounge\"}"))
     }
@@ -211,5 +211,100 @@ class HomeAssistantTest {
     @Test fun nothingWithoutASection() {
         assertEquals("off", HomeAssistant.answerForTest(null, "controls", "", "").getString("error"))
         assertNotNull(HomeAssistant.parseForTest(JSONObject(section.toString()).put("controls", JSONArray())))
+    }
+
+    // ---- the aircon widget: Home Assistant's own temperature unit (/api/config), asked once
+
+    private fun unitSetUp(host: String, config: () -> Pair<Int, ByteArray?>): HomeAssistant.Settings {
+        state("climate.living", "cool", "{\"temperature\":72,\"current_temperature\":75}")
+        HomeAssistant.fake = { method, path, _ ->
+            calls.add("$method $path")
+            when {
+                path == "/api/config" -> config()
+                path.startsWith("/api/states/") -> states[path.removePrefix("/api/states/")]?.let { 200 to it.toByteArray() } ?: (404 to null)
+                else -> 404 to null
+            }
+        }
+        // each test its own address: the unit is kept per Home Assistant address
+        return HomeAssistant.parseForTest(JSONObject(section.toString()).put("url", "http://$host:8123"))!!
+    }
+
+    @Test fun theRoomsCarryHomeAssistantsOwnUnitAskedOnce() {
+        val u = unitSetUp("unit-f.example") { 200 to """{"unit_system":{"temperature":"°F","length":"mi"}}""".toByteArray() }
+        val a = HomeAssistant.answerForTest(u, "climate", "", "")
+        assertEquals("°F", a.getJSONArray("rooms").getJSONObject(0).getString("unit"))
+        val b = HomeAssistant.answerForTest(u, "climate", "", "")
+        assertEquals("°F", b.getJSONArray("rooms").getJSONObject(0).getString("unit"))
+        assertEquals(1, calls.count { it == "GET /api/config" })   // asked once
+    }
+
+    @Test fun aFailedUnitReadGivesNoUnitAndIsAskedAgain() {
+        var up = false
+        val u = unitSetUp("unit-down.example") { if (up) 200 to """{"unit_system":{"temperature":"°C"}}""".toByteArray() else 500 to null }
+        val a = HomeAssistant.answerForTest(u, "climate", "", "")
+        assertTrue(a.getBoolean("ok"))
+        assertFalse(a.getJSONArray("rooms").getJSONObject(0).has("unit"))   // no unit, never a guess
+        up = true
+        val b = HomeAssistant.answerForTest(u, "climate", "", "")
+        assertEquals("°C", b.getJSONArray("rooms").getJSONObject(0).getString("unit"))
+        assertEquals(2, calls.count { it == "GET /api/config" })   // asked again after the failure
+    }
+
+    @Test fun anOddUnitIsNoUnit() {
+        val u = unitSetUp("unit-odd.example") { 200 to """{"unit_system":{"temperature":"K"}}""".toByteArray() }
+        assertFalse(HomeAssistant.answerForTest(u, "climate", "", "").getJSONArray("rooms").getJSONObject(0).has("unit"))
+    }
+
+    // ---- nothing that opens the house: scenes and scripts too (owner's rule)
+
+    @Test fun scenesAndScriptsThatOpenTheHouseAreNeverKept() {
+        val o = JSONObject(section.toString()).put("scenes", JSONArray("""[{"entity":"scene.movie_night"},{"entity":"script.open_garage"},
+            {"entity":"script.unlock_front_door"},{"entity":"scene.disarm_alarm"},{"entity":"scene.goodnight"}]"""))
+            .put("controls", JSONArray("""[{"entity":"switch.garagedoor"},{"entity":"cover.frontgate"},{"entity":"switch.doorlock"},
+            {"entity":"cover.garage2"},{"entity":"switch.alarm_siren"},{"entity":"light.lounge"}]"""))
+        val k = HomeAssistant.parseForTest(o)!!
+        assertEquals(listOf("scene.movie_night", "scene.goodnight"), k.scenes.map { it.entity })
+        assertEquals(listOf("light.lounge"), k.controls.map { it.entity })
+        // asked anyway: refused, and nothing is sent to Home Assistant
+        val r = HomeAssistant.answerForTest(k, "scene", "script.open_garage", "")
+        assertEquals("refused", r.getString("error"))
+        assertTrue(calls.none { it.startsWith("POST") })
+    }
+
+    @Test fun aSceneThatSetsALockAnAlarmOrAGarageNeverRuns() {
+        val o = JSONObject(section.toString()).put("scenes", JSONArray("""[{"entity":"scene.movie_night"},{"entity":"scene.leaving"},
+            {"entity":"scene.away"},{"entity":"scene.home"},{"entity":"script.morning"}]"""))
+        val k = HomeAssistant.parseForTest(o)!!
+        state("scene.movie_night", "2025-11-18T03:00:00+00:00", "{\"entity_id\":[\"light.lounge\",\"cover.blinds\"]}")
+        state("cover.blinds", "closed", "{\"device_class\":\"blind\"}")
+        state("scene.leaving", "2025-11-18T03:00:00+00:00", "{\"entity_id\":[\"light.lounge\",\"lock.front\"]}")
+        state("scene.away", "2025-11-18T03:00:00+00:00", "{\"entity_id\":[\"alarm_control_panel.house\"]}")
+        state("scene.home", "2025-11-18T03:00:00+00:00", "{\"entity_id\":[\"cover.big_roller\"]}")
+        state("cover.big_roller", "closed", "{\"device_class\":\"garage\"}")
+        for (e in listOf("scene.leaving", "scene.away", "scene.home")) {
+            assertEquals(e, "refused", HomeAssistant.answerForTest(k, "scene", e, "").getString("error"))
+        }
+        assertTrue(calls.none { it.startsWith("POST") })
+        assertTrue(HomeAssistant.answerForTest(k, "scene", "scene.movie_night", "").getBoolean("ok"))
+        assertTrue(calls.last().startsWith("POST /api/services/scene/turn_on"))
+        assertTrue(HomeAssistant.answerForTest(k, "scene", "script.morning", "").getBoolean("ok"))   // a script lists nothing: its name decides
+        assertTrue(calls.last().startsWith("POST /api/services/script/turn_on"))
+    }
+
+    @Test fun pickableLeavesOutScenesAndScriptsThatOpenTheHouse() {
+        val all = JSONArray("""[
+            {"entity_id":"scene.movie_night","attributes":{"entity_id":["light.lounge"]}},
+            {"entity_id":"scene.leaving","attributes":{"entity_id":["lock.front"]}},
+            {"entity_id":"scene.away","attributes":{"entity_id":["alarm_control_panel.house"]}},
+            {"entity_id":"scene.home","attributes":{"entity_id":["cover.big_roller"]}},
+            {"entity_id":"cover.big_roller","attributes":{"device_class":"garage"}},
+            {"entity_id":"scene.disarm_alarm","attributes":{}},
+            {"entity_id":"script.open_garage","attributes":{}},
+            {"entity_id":"script.unlock_front_door","attributes":{}},
+            {"entity_id":"switch.alarm_siren","attributes":{}},
+            {"entity_id":"script.morning","attributes":{}}
+        ]""")
+        val p = HomeAssistant.pickable(all)
+        assertEquals(listOf("scene.movie_night", "script.morning"), (0 until p.length()).map { p.getJSONObject(it).getString("entity") })
     }
 }

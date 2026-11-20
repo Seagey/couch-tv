@@ -46,6 +46,10 @@ class HaWidgetsConfig(unittest.TestCase):
         self.assertEqual([c["entity"] for c in ha["controls"]],
                          ["light.lounge", "switch.heater", "fan.bed", "cover.blinds", "light.front_door_light"])
         self.assertIn("nothing that opens the house", err)
+        # a script or scene named for a garage, gate, door, lock or alarm is refused the same way
+        ha, err = self.section(scenes=["scene.movie", "script.open_garage", "scene.alarm_off", "script.front_door_unlock", "script.good_night"])
+        self.assertEqual([s["entity"] for s in ha["scenes"]], ["scene.movie", "script.good_night"])
+        self.assertIn("nothing that opens the house", err)
 
     def test_limits_and_bad_ids(self):
         ha, _ = self.section(cameras=[f"camera.c{i}" for i in range(6)] + ["sensor.x"],

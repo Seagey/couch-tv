@@ -17,8 +17,34 @@ object HaReadings {
     class Named(val entity: String, val name: String)
 
     // Covers that open the house: never switched from a TV remote (locks and alarms are never even
-    // allowed in config.json). A cover with one of these device classes reads, but "set" refuses it.
+    // allowed in config.json). A cover with one of these device classes reads "blocked", which the page
+    // leaves out of every list (smarthome.js houseSafe), and "set" refuses it.
     val HOUSE_OPENERS = setOf("garage", "gate", "door")
+    private val OPENER_ID = Regex("(cover|switch|script|scene)\\.[a-z0-9_]*(garage|gate|door|lock|alarm)[a-z0-9_]*")
+
+    /**
+     * A scene that sets a lock, an alarm, or a garage door, gate or door (by its id, or a blind whose
+     * device class [coverClass] gives is one) opens the house: never listed and never run from a TV.
+     * Home Assistant lists what a scene sets in its "entity_id" attribute.
+     */
+    fun sceneOpensHouse(attrs: JSONObject?, coverClass: (String) -> String?): Boolean {
+        val l = attrs?.optJSONArray("entity_id") ?: return false
+        for (i in 0 until l.length()) {
+            val e = l.optString(i)
+            if (e.startsWith("lock.") || e.startsWith("alarm_control_panel.") || OPENER_ID.matches(e)) return true
+            if (e.startsWith("cover.") && coverClass(e) in HOUSE_OPENERS) return true
+        }
+        return false
+    }
+
+    /** One entity's device class in Home Assistant's /api/states answer, or null. */
+    fun deviceClass(states: JSONArray, entity: String): String? {
+        for (k in 0 until states.length()) {
+            val st = states.optJSONObject(k) ?: continue
+            if (st.optString("entity_id") == entity) return st.optJSONObject("attributes")?.optString("device_class")
+        }
+        return null
+    }
 
     private val UNIT = Regex("[^\\u0000-\\u001f<>]{1,12}")
 

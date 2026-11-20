@@ -104,7 +104,7 @@ object HomeAssistant {
                 if (out.size >= most) break
                 val x = a.optJSONObject(k) ?: continue
                 val ent = x.optString("entity").trim()
-                if (!ok.matches(ent) || out.any { it.entity == ent }) continue
+                if (!ok.matches(ent) || OPENS_HOUSE.matches(ent) || out.any { it.entity == ent }) continue
                 out.add(Named(ent, x.optString("name").trim().take(40)))   // no name: Home Assistant's own
             }
             return out
@@ -307,6 +307,11 @@ object HomeAssistant {
             }
             "scene" -> {
                 val sc = s.scenes.firstOrNull { it.entity == entity } ?: return refused
+                // a scene that sets a lock, an alarm, a garage door, gate or door is never run from a TV
+                if (sc.entity.startsWith("scene.")) {
+                    val st = state(s, sc.entity) ?: return JSONObject().put("ok", false).put("error", "failed")
+                    if (HaReadings.sceneOpensHouse(st.optJSONObject("attributes")) { state(s, it)?.optJSONObject("attributes")?.optString("device_class") }) return refused
+                }
                 done(service(s, sc.entity.substringBefore('.'), "turn_on", id))
             }
             else -> widgets(s, action, entity, value) ?: refused
@@ -439,8 +444,9 @@ object HomeAssistant {
     // hands the token over once; it is never handed back, and a later change of ticks reuses the kept one.
 
     private val PICKABLE = Regex("(climate|scene|script|light|switch|fan|cover|camera|sensor|media_player|event|binary_sensor|input_boolean)\\.[a-z0-9_]{1,64}")
-    // the same ids config.json refuses (docs/CONFIG.md): nothing that opens the house
-    private val OPENS_HOUSE = Regex("(cover|switch)\\.[a-z0-9_]*(garage|gate|door|lock)[a-z0-9_]*")
+    // nothing that opens the house: a cover, switch, script or scene named for a garage, gate, door,
+    // lock or alarm is never listed, kept or switched (bridge/smarthome.py OPENS_HOUSE, the same)
+    private val OPENS_HOUSE = Regex("(cover|switch|script|scene)\\.[a-z0-9_]*(garage|gate|door|lock|alarm)[a-z0-9_]*")
     private const val MOST_LISTED = 400
 
     /** Home Assistant's /api/states, cut to what couch-tv can show: entity, name, and for a sensor its unit. */
@@ -452,6 +458,7 @@ object HomeAssistant {
             if (!PICKABLE.matches(ent) || OPENS_HOUSE.matches(ent)) continue
             val a = st.optJSONObject("attributes") ?: JSONObject()
             if (ent.startsWith("cover.") && a.optString("device_class") in HaReadings.HOUSE_OPENERS) continue
+            if (ent.startsWith("scene.") && HaReadings.sceneOpensHouse(a) { HaReadings.deviceClass(states, it) }) continue
             val o = JSONObject().put("entity", ent).put("name", a.optString("friendly_name").trim().take(40).ifEmpty { pretty(ent) })
             a.optString("unit_of_measurement").takeIf { it.length in 1..12 && !it.contains('<') }?.let { o.put("unit", it) }
             a.optString("device_class").takeIf { it.matches(Regex("[a-z_]{1,32}")) }?.let { o.put("cls", it) }
