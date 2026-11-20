@@ -37,7 +37,9 @@ class MatterResolver(
         val wrapped = object : ChipMdnsCallback {
             override fun handleServiceResolve(name: String?, type: String?, host: String?, address: String?, port: Int, txt: MutableMap<String, ByteArray>?, cb: Long, ctx: Long) {
                 if (address == null && fromCache("not found on the network")) return
-                if (done.compareAndSet(false, true)) chipMdnsCallback.handleServiceResolve(name, type, host, address, port, txt, cb, ctx)
+                // with an address the library copies the host name and reads the text entries: never null then
+                if (done.compareAndSet(false, true)) chipMdnsCallback.handleServiceResolve(name, type,
+                    if (address != null) host ?: address else host, address, port, if (address != null) txt ?: HashMap() else txt, cb, ctx)
             }
             override fun handleServiceBrowse(names: Array<out String>?, type: String?, cb: Long, ctx: Long) =
                 chipMdnsCallback.handleServiceBrowse(names, type, cb, ctx)

@@ -301,7 +301,7 @@ object MatterModel {
                 long(ep.attr(OCCUPANCY, 0L))?.let { if (it and 1L != 0L) "on" else "off" } ?: "unknown" }
             BOOLEAN_STATE -> { a.put("device_class", "contact")
                 // StateValue true: in contact (the door is shut); Home Assistant's contact is "on" when open
-                (ep.attr(BOOLEAN_STATE, 0L) as? Boolean)?.let { if (it) "off" else "on" } ?: "unknown" }
+                (ep.attr(BOOLEAN_STATE, 0L) as? Boolean)?.let { a.put("reading", if (it) "closed" else "open"); if (it) "off" else "on" } ?: "unknown" }
             AIR_QUALITY -> { a.put("device_class", "aqi")
                 num(ep.attr(PM25, 0L))?.let { a.put("pm25", it) }
                 long(ep.attr(AIR_QUALITY, 0L))?.let { AIR.getOrElse(it.toInt()) { "unknown" } } ?: "unknown" }

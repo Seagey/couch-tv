@@ -96,7 +96,7 @@ class MatterModelTest {
         }
         by["matter:9:5"]!!.let { assertEquals("19.9", it.getString("state")); assertEquals("°C", it.getJSONObject("attributes").getString("unit_of_measurement")); assertEquals("temperature", it.getJSONObject("attributes").getString("device_class")) }
         by["matter:9:6"]!!.let { assertEquals("55", it.getString("state")); assertEquals("%", it.getJSONObject("attributes").getString("unit_of_measurement")) }
-        by["matter:9:7"]!!.let { assertEquals("off", it.getString("state")); assertEquals("contact", it.getJSONObject("attributes").getString("device_class")) }
+        by["matter:9:7"]!!.let { assertEquals("off", it.getString("state")); assertEquals("contact", it.getJSONObject("attributes").getString("device_class")); assertEquals("closed", it.getJSONObject("attributes").getString("reading")) }
         by["matter:9:8"]!!.let { assertEquals("on", it.getString("state")); assertEquals("occupancy", it.getJSONObject("attributes").getString("device_class")) }
         by["matter:9:9"]!!.let { assertEquals("100", it.getString("state")); assertEquals("lx", it.getJSONObject("attributes").getString("unit_of_measurement")) }
         // several things on one node: the endpoint number tells them apart

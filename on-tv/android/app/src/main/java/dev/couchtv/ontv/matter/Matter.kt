@@ -279,8 +279,7 @@ object Matter {
             if (ids.length() == 0 && snapshot(node).isNotEmpty()) {
                 // a lock, an alarm or a garage door (or nothing the TV can show): the TV leaves it again
                 leave(node)
-                return JSONObject().put("ok", true).put("device_ids", ids)
-                    .put("note", "That device is not something the TV shows (locks, alarms and garage doors never show), so the TV did not keep it.")
+                return fail("not_allowed", "That device is not something the TV shows (locks, alarms and garage doors never show), so the TV did not keep it.")
             }
             changed()
             JSONObject().put("ok", true).put("device_ids", ids)
