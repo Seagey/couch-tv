@@ -11,9 +11,8 @@ Branch nl-phonepage, worktree wt-nl-phonepage, from integrate-0.13.9. nl-remote 
 ## Tests (last run, all green)
 - `.venv/bin/python -m unittest tests.test_phone_page_bridge` 35 tests; whole Python suite 88/88 files.
 - `node tests/test_phone_page.js` 18; all JS unit files 62/62.
-- Browser (take scratchpad browser.lock; COUCHTV_PLAYWRIGHT=".../tools/tv-designer/market"): test_phone_settings_bridge_browser.mjs 76, test_phone_settings_browser.mjs 129, test_phone_settings_stale 12, test_widget_detail_browser 296, test_design_settings_browser 107 (before the cherry-picks; a rerun after them was in progress).
+- Browser (take scratchpad browser.lock; COUCHTV_PLAYWRIGHT=".../tools/tv-designer/market"): test_phone_settings_bridge_browser.mjs 76, test_phone_settings_browser.mjs 129, test_phone_settings_stale 12, test_widget_detail_browser 296, test_design_settings_browser 107 ; after the cherry-picks rerun: bridge 76, on-TV 129, phone link fresh 9, design settings 107, all rc=0.
 - Gradle (gradle.lock): tv-home testDebugUnitTest 69 tests (PhoneServerTest 18), assembleDebug ok. on-tv gradle needs remote/dist (npm run build in remote/) in this worktree.
 
 ## Left
-- Confirm the browser rerun after the cherry-picks (the four tests above plus test_phone_link_fresh_browser.mjs).
-- Report to the coordinator.
+- Nothing for this job. Not done: a real-TV check (not essential; covered by browser and emulated tests).
