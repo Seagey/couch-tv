@@ -4,11 +4,20 @@ Task: virtual Matter devices on the MacBook, a contract test that runs against a
 the Matter API, docs/MATTER-TESTING.md, and a "Test kit" section at the bottom of the contract file
 (coord/matter-contract.md, the live copy).
 
-## Status: all work done (21 Nov 2026); only a final non-WIP commit and the report are left
+## Status: test kit done and committed (8a8c089, eac44ae, 21 Nov 2026)
 
-Next steps for the next agent: (1) `git -C <worktree> commit --allow-empty -m "Matter test kit: ..."`
-(final, not WIP; the pre-commit privacy scan takes several minutes when other agents scan too);
-(2) report: run 6 261/0/0, negative control 241/20/2, build-fixtures exit 0, Test kit appended to
+Left: run the harness against nl-matter-bridge once that branch has a final (non WIP) commit.
+How: `git -C <bridge worktree> archive <commit> bridge scripts config.example.json | ssh macbook 'tar -x -C ~/mf-bridge'`
+(~/mf-bridge already has .venv with bridge/requirements.txt, matter-server 1.6.0 installed by
+scripts/matter-setup.sh, and config.json: port 5495, pairing_key mf_contract_test_key, matter test_devices true);
+start it inside a live ssh session (run_in_background):
+`ssh macbook 'cd ~/mf-bridge && exec .venv/bin/python bridge/server.py >> /tmp/mf-bridge.log 2>&1'`;
+then `python3 tests/matter_contract.py --api http://<macbook-ip>:5495 --token mf_contract_test_key --report <scratchpad>/mf-bridge-runN.json`;
+stop with `ssh macbook 'pkill -f mf-bridge/'`. Check `fx fabrics` is all 1 first (the bridge agent runs the
+same harness against its own bridge on port 8796; never run at the same time).
+Bridge WIP 0001e84, the bridge agent's own run (scratchpad nl-matter-bridge-live/run1.txt): 255 pass / 4 fail / 2 warn
+(already answered unreachable; light brightness and color_temp_kelvin missing while off; offline never unavailable).
+Earlier results: reference run 6 261/0/0, negative control 241/20/2, build-fixtures exit 0, Test kit appended to
 coord/matter-contract.md. Note for the coordinator: the scratchpad copy of matter-contract.md has
 changes 10 to 12 that coord/matter-contract.md lacks; the harness already accepts `not_allowed`
 and `already` from them.
