@@ -13,6 +13,7 @@ export class ApiError extends Error {
 // nothing is added to any call, exactly as before more than one TV existed.
 let tvId = null;
 export const setTvId = (id) => { tvId = id || null; };
+export const getTvId = () => tvId;
 const withTv = (path) => (tvId ? `${path}${path.includes('?') ? '&' : '?'}tv=${encodeURIComponent(tvId)}` : path);
 
 let apiKey = null;
@@ -127,6 +128,7 @@ export const api = {
   savePeople: (people) => call('POST', '/api/people', { people }),
   settings: () => call('GET', '/api/settings'),   // the TV home's Home settings (its language)
   health: () => call('GET', '/api/health'),
+  athome: () => call('GET', '/api/athome', null, 15000),   // the TV home's At home view: the design's widgets with settings
   pair: (key) => call('POST', '/api/pair', { key }),
   find: (title) => call('GET', `/api/find?title=${encodeURIComponent(title)}`, null, 20000),
   // kids mode: the shelves, and changes to them with the parent PIN (bridge/API.md)

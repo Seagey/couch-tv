@@ -132,6 +132,7 @@ class MainActivity : Activity() {
         } else setContentView(root)
         hideSystemBars()
         intent?.let { readExtras(it) }
+        startPhonePage()   // option A only: the phone's Home settings page, from this TV (PhoneServer.kt)
         io.execute { warmApps() }
         // An app installed, removed or renamed (or the TV's language changed): the list is read again,
         // in the background, instead of on every return to the home.
@@ -186,6 +187,7 @@ class MainActivity : Activity() {
         super.onNewIntent(intent)
         if (intent.hasExtra("bridge") || intent.hasExtra("config_b64")) {
             readExtras(intent)
+            startPhonePage()   // a computer added: its own page from now on, this one stops (none: it starts)
             pageReady = false
             offline = false
             connect()
@@ -334,6 +336,63 @@ class MainActivity : Activity() {
 
     /** No bridge anywhere (option A): the built-in copy is the home, and nothing to look for. */
     private fun alone() = prefs.getString("bridge", null) == null && BuildConfig.BRIDGES.isEmpty()
+
+    // ---------------------------------------------------------------- the phone's Home settings page
+
+    /**
+     * With no computer at home (option A), this TV serves the phone's Home settings page itself
+     * (PhoneServer.kt) on the home Wi-Fi, port 5400 (5401 if that is taken). With a computer, the computer
+     * serves it (bridge/phonepage.py), so nothing listens here. One server for the life of the app.
+     */
+    private fun startPhonePage() {
+        // a computer was added (apply.sh with BRIDGE_URL): the computer serves the page now, nothing listens here
+        if (!alone()) { phone?.let { runCatching { it.stop() } }; phone = null; return }
+        if (phone != null) return
+        val store = object : PhoneAuth.Store {
+            private val sp = applicationContext.getSharedPreferences("phonepage", MODE_PRIVATE)
+            override fun get(key: String): String? = sp.getString(key, null)
+            override fun put(key: String, value: String?) { sp.edit().apply { if (value == null) remove(key) else putString(key, value) }.apply() }
+        }
+        val auth = PhoneAuth(store)
+        for (port in listOf(PhoneServer.PORT, PhoneServer.PORT + 1)) {
+            val srv = PhoneServer(PhoneHost(applicationContext), auth, port)
+            if (runCatching { srv.start(fi.iki.elonen.NanoHTTPD.SOCKET_READ_TIMEOUT, true) }.isSuccess) { phone = srv; return }
+        }
+    }
+
+    /** What the phone's page needs from Android: this app's files, and the home page through evaluateJavascript. */
+    private class PhoneHost(private val app: android.content.Context) : PhoneServer.Host {
+        override fun asset(path: String): java.io.InputStream? = runCatching { app.assets.open(path) }.getOrNull()
+        override fun page(code: String): JSONObject? {
+            val a = shown?.get()?.takeIf { !it.isFinishing && !it.isDestroyed && it.pageReady && it.web != null } ?: return null
+            val got = java.util.concurrent.atomic.AtomicReference<String?>(null)
+            val done = java.util.concurrent.CountDownLatch(1)
+            a.main.post {
+                val w = a.web
+                if (w == null || !a.pageReady) done.countDown() else w.evaluateJavascript(code) { v -> got.set(v); done.countDown() }
+            }
+            if (!done.await(4, java.util.concurrent.TimeUnit.SECONDS)) return null
+            val v = got.get()?.takeIf { it.startsWith("{") } ?: return null
+            return runCatching { JSONObject(v) }.getOrNull()
+        }
+        override fun addPhoto(file: java.io.File): String? = shown?.get()?.copyPhoto(android.net.Uri.fromFile(file))
+        override fun photo(name: String): java.io.File? {
+            if (!Regex("[A-Za-z0-9_-]{1,64}\\.jpg").matches(name)) return null
+            return java.io.File(java.io.File(app.filesDir, "photos"), name).takeIf { it.isFile }
+        }
+        override fun deletePhoto(name: String) { photo(name)?.delete() }
+        override fun homeState(): JSONObject = JSONObject().put("on", true).put("held", HomeRole.held(app))
+        // the code was used or thrown away: Home settings' QR (and Edit on your phone) ask for the new one at once
+        override fun codeChanged() {
+            val a = shown?.get() ?: return
+            a.main.post { a.js("window.tv && tv.phoneLink && tv.phoneLink()") }
+        }
+        override fun showCode(code: String) {
+            val a = shown?.get() ?: return
+            a.main.post { a.js("window.tv && tv.phonePage && tv.phonePage('code', " + JSONObject.quote(code) + ")") }
+        }
+        override fun tmpDir(): java.io.File = app.cacheDir
+    }
 
     private fun connect() {
         if (probing) return
@@ -670,6 +729,11 @@ class MainActivity : Activity() {
         /** This launcher relays the web widgets' sources (WebData.kt, http://tvos.invalid/webdata). */
         @JavascriptInterface
         fun webData(): Boolean = true
+
+        /** The phone's Home settings page on this TV with no computer (PhoneServer.kt): its address with a
+         *  pairing code, for Home settings' QR and Hold OK, Edit on your phone. "null": no page here. */
+        @JavascriptInterface
+        fun phoneLink(): String = phone?.link(PhoneServer.lanAddress())?.toString() ?: "null"
 
         /** Opens an http(s) web link in the TV's browser (used by custom cards with a url). */
         @JavascriptInterface
@@ -1841,6 +1905,8 @@ class MainActivity : Activity() {
 
     companion object {
         @Volatile private var shown: java.lang.ref.WeakReference<MainActivity>? = null
+        /** The phone's Home settings page with no computer (option A), started once for the app's life. */
+        @Volatile private var phone: PhoneServer? = null
 
         /** True while the home is resumed (in front). FireWatch checks this after a move to front on Android 10 (issue #202). */
         fun isInFront(): Boolean = shown?.get()?.resumed == true

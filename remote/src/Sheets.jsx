@@ -2,10 +2,12 @@ import { forwardRef, useEffect, useRef, useState } from 'react';
 import * as Ic from './icons.jsx';
 import { usePushUp } from './gestures.js';
 import { tick } from './haptics.js';
-import { api } from './api.js';
+import { api, getTvId } from './api.js';
 import { logoFor } from './appLogos.js';
 import { t, tBridge, LANGS, choice, setChoice, locale } from './i18n.js';
-import { readDesignCode, studioLink, newNonce, NONCE_KEY, WORDS as DW } from './designSend.js';
+import { readDesignCode, studioLink, newNonce, NONCE_KEY, dsw, setTranslate } from './designSend.js';
+setTranslate(t);
+import { hasPhonePage, widgetsOf, phonePageLink, setupLink } from './phonePage.js';
 
 export const Sheet = forwardRef(function Sheet({ open, onClose, title, children, className = '', fromTop = false, closeDrag, extra = null }, ref) {
   return (
@@ -197,7 +199,7 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
       )}
       <form className="ask-field glass" onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <input ref={inputRef} value={text} onChange={onType} onKeyDown={onKey} enterKeyHint="send"
-          placeholder={thread.length ? t('reply') : t('put_on')} aria-label={thread.length ? 'Reply to Claude' : 'What do you want to watch?'} autoComplete="off" autoCorrect="on" />
+          placeholder={thread.length ? t('reply') : t('put_on')} aria-label={thread.length ? t('reply').replace(/…$/, '') : 'What do you want to watch?'} autoComplete="off" autoCorrect="on" />
         {canListen && <button type="button" className={`round glass ask-mic ${listening ? 'listening' : ''}`} aria-label={listening ? 'Stop listening' : 'Speak'}
           onPointerDown={(e) => e.preventDefault()} onClick={listen}><Ic.Mic size={20} /></button>}
         <button type="submit" className="round solid ask-send" aria-label="Send" disabled={!text.trim() || busy}
@@ -451,6 +453,46 @@ function GuestName({ open }) {
   );
 }
 
+// Home settings on this phone, and Widgets on this TV: the phone's Home settings page (/setup). The on-TV
+// app serves it (its pairing script sets window.couchTv); a home computer serves it once its
+// /api/health says phone_page (a computer without the page never says so, so nothing shows there).
+// Each widget on the TV's design with settings of its own (the same records the page draws:
+// widget-caps.js settings, pre: true, where tv or phone, handed over in the At home view) opens the page
+// at that widget (#widget=<id>), where its settings change the same way the page changes them.
+function PhonePage({ open }) {
+  const [has, setHas] = useState(() => typeof window !== 'undefined' && !!window.couchTv);
+  const [widgets, setWidgets] = useState([]);
+  useEffect(() => {
+    if (!open) return;
+    let gone = false;
+    const onTv = typeof window !== 'undefined' && !!window.couchTv;
+    (onTv ? Promise.resolve(true) : api.health().then((h) => hasPhonePage(false, h), () => false)).then((yes) => {
+      if (gone) return;
+      setHas(yes);
+      if (!yes) { setWidgets([]); return; }
+      api.athome().then((j) => { if (!gone) setWidgets(widgetsOf(j)); }, () => { if (!gone) setWidgets([]); });
+    });
+    return () => { gone = true; };
+  }, [open]);
+  if (!has) return null;
+  return (
+    <>
+      <a className="pill glass arrange-open kids-open" href={setupLink(getTvId())} onClick={() => tick()}><Ic.Gear size={18} /> {t('home_settings_phone')}</a>
+      {widgets.length > 0 && (
+        <section className="more-block phone-widgets">
+          <h3><Ic.Grid size={16} /> {t('widgets_on_tv')}</h3>
+          <div className="widget-links">
+            {widgets.map((w) => (
+              <a key={w.key} className="pill glass arrange-open" href={phonePageLink(w, getTvId())} onClick={() => tick()}>{w.title || w.name}</a>
+            ))}
+          </div>
+          <p className="note">{t('widgets_on_tv_note')}</p>
+        </section>
+      )}
+    </>
+  );
+}
+
 // Send a design (designSend.js): a code from couch-tv Studio, pasted or typed here instead of on the
 // TV, and a link to Studio that brings the code back here by itself. English only for now, like the
 // TV home's couch-tv Studio rows.
@@ -460,7 +502,7 @@ function DesignSend({ onDesign, can = true }) {
   const submit = async (e) => {
     e.preventDefault();
     const c = readDesignCode(code);
-    if (!c) { setMsg(DW.notCode); return; }
+    if (!c) { setMsg(dsw('notCode')); return; }
     tick();
     const r = await onDesign(c);
     setMsg(r.words);
@@ -475,20 +517,20 @@ function DesignSend({ onDesign, can = true }) {
   };
   if (!can) return (
     <section className="more-block design-send">
-      <h3><Ic.Sparkle size={16} /> {DW.title}</h3>
-      <p className="note">{DW.cannot}</p>
+      <h3><Ic.Sparkle size={16} /> {dsw('title')}</h3>
+      <p className="note">{dsw('cannot')}</p>
     </section>
   );
   return (
     <section className="more-block design-send">
-      <h3><Ic.Sparkle size={16} /> {DW.title}</h3>
+      <h3><Ic.Sparkle size={16} /> {dsw('title')}</h3>
       <form className="ask-field glass" onSubmit={submit}>
-        <input value={code} onChange={(e) => { setCode(e.target.value); setMsg(''); }} placeholder={DW.placeholder} enterKeyHint="send"
+        <input value={code} onChange={(e) => { setCode(e.target.value); setMsg(''); }} placeholder={dsw('placeholder')} enterKeyHint="send"
           autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false} aria-label="Design code" />
-        <button type="submit" className="round solid small" aria-label={DW.send} disabled={!code.trim()}><Ic.Send size={18} /></button>
+        <button type="submit" className="round solid small" aria-label={dsw('send')} disabled={!code.trim()}><Ic.Send size={18} /></button>
       </form>
-      <p className="note" role="status">{msg || DW.note}</p>
-      <a className="pill glass arrange-open" href={studioLink(typeof location !== 'undefined' ? location.host : '')} onClick={toStudio}>{DW.choose}</a>
+      <p className="note" role="status">{msg || dsw('note')}</p>
+      <a className="pill glass arrange-open" href={studioLink(typeof location !== 'undefined' ? location.host : '')} onClick={toStudio}>{dsw('choose')}</a>
     </section>
   );
 }
@@ -572,11 +614,7 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
         <button className="pill glass arrange-open" onClick={() => { tick(); onPeople(); }}><Ic.People size={18} /> {t('people')}</button>
       </div>
       <button className="pill glass arrange-open kids-open" onClick={() => { tick(); onKids(); }}><Ic.Lock size={18} /> {t('kids_mode')}</button>
-      {/* Home settings on this phone: the page the on-TV app serves (/setup). Only there: the computer
-          bridge has no such page, and window.couchTv is only set by the on-TV app's pairing script. */}
-      {typeof window !== 'undefined' && window.couchTv && (
-        <a className="pill glass arrange-open kids-open" href="/setup" onClick={() => tick()}><Ic.Gear size={18} /> {t('home_settings_phone')}</a>
-      )}
+      <PhonePage open={open} />
 
       <GuestName open={open} />
 

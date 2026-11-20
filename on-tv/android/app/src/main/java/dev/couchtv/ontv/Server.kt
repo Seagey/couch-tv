@@ -107,21 +107,27 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "/api/health" -> {
                 val a = authed(s)
                 val o = JSONObject().put("ok", true).put("mode", "on-tv").put("version", BuildConfig.VERSION_NAME).put("auth", if (a) "ok" else "required")
+                    .put("phone_page", true)   // this TV serves the phone's Home settings page (/setup)
                 if (a) o.put("tv_connected", true).put("adb", Adb.connected)
                 return json(200, o)
             }
+            // Pairing: 15 wrong codes in 10 minutes lock both for 10 minutes (Auth, PairLock). A new code
+            // only when none is live with time left (Auth.pinForQr), so asking again never swaps the
+            // code a QR on the TV or someone typing is using.
             "/api/pair/start" -> {
                 if (m != Method.POST) throw ApiError(405, "POST only")
-                Auth.newPin()
+                pairLocked()?.let { return it }
+                Auth.pinForQr()
                 App.showPin()
-                return json(200, ok().put("digits", 6).put("expires_in", 180).put("note", "The code is on the TV now."))
+                return json(200, ok().put("digits", 6).put("expires_in", Auth.pinSecondsLeft()).put("note", "The code is on the TV now."))
             }
             "/api/pair" -> {
                 if (m != Method.POST) throw ApiError(405, "POST only")
                 val b = body(s)
+                pairLocked()?.let { return it }
                 Thread.sleep(400)   // slows guessing a little more
                 val token = Auth.pair(b.optString("pin"), b.optString("name").ifEmpty { null })
-                    ?: return json(401, err(if (Auth.currentPin() == null) "That code has expired. Ask the TV for a new one." else "That code is not right. Check the TV."))
+                    ?: return pairLocked() ?: json(401, err(if (Auth.currentPin() == null) "That code has expired. Ask the TV for a new one." else "That code is not right. Check the TV."))
                 Now.push()
                 return json(200, ok().put("token", token))
             }
@@ -732,6 +738,14 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         // single page apps: unknown paths get index.html (files with an extension get a 404)
         if (clean.substringAfterLast('/').contains('.')) return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
         return if (inject) index(root) else asset("$root/index.html")
+    }
+
+    /** 429 while pairing is locked (too many wrong codes), else null. */
+    private fun pairLocked(): Response? {
+        val secs = Auth.lockedFor()
+        if (secs <= 0) return null
+        return json(429, err("Too many wrong codes. Wait ${(secs + 59) / 60} minutes, then try again.").put("retry_after", secs))
+            .apply { addHeader("Retry-After", secs.toString()) }
     }
 
     /** The phone remote's index.html with the on-TV pairing script added first. */

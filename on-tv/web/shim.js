@@ -5,10 +5,19 @@
   'use strict';
   var KEY = 'couchtv.token';
   var token = null, autoPairing = false;
-  try { token = localStorage.getItem(KEY); } catch (e) { /* private mode: the cookie still works */ }
-  if (!token) { var m = document.cookie.match(/(?:^|; )couchtv_token=([^;]+)/); if (m) token = decodeURIComponent(m[1]); }
-  // pictures the page shows from the TV (/api/photo/...) carry no header, only the cookie: keep it set
-  else if (!/(?:^|; )couchtv_token=/.test(document.cookie)) document.cookie = 'couchtv_token=' + encodeURIComponent(token) + '; path=/; max-age=31536000; SameSite=Strict';
+  // the home computer's own phone remote keeps its pairing key as couchtv.key: a phone that paired the remote
+  // there opens the Home settings page (/setup on the same computer) already paired
+  try { token = localStorage.getItem(KEY) || localStorage.getItem('couchtv.key'); } catch (e) { }
+  // no cookie any more: a cookie is sent to every web service on the same computer, whatever its port (on a
+  // home computer the token is its pairing key). An older page's cookie is moved into storage and taken off.
+  // The page fetches its photos with the header instead (setup.html photoUrl).
+  var m = document.cookie.match(/(?:^|; )couchtv_token=([^;]+)/);
+  if (m) {
+    if (!token) { token = decodeURIComponent(m[1]); try { localStorage.setItem(KEY, token); } catch (e) { } }
+    document.cookie = 'couchtv_token=; path=/; max-age=0; SameSite=Strict';
+  }
+  // the TV this page is for, where a home computer runs more than one (setup.html TVQ, the same rule)
+  var TVQ = (/[?&]tv=([A-Za-z0-9_-]{1,40})(?:&|$)/.exec(location.search) || [])[1] || '';
 
   function isApi(url) {
     try { var u = new URL(url, location.href); return u.origin === location.origin && u.pathname.indexOf('/api/') === 0; } catch (e) { return false; }
@@ -43,7 +52,6 @@
   function save(t) {
     token = t;
     try { localStorage.setItem(KEY, t); } catch (e) { }
-    document.cookie = 'couchtv_token=' + encodeURIComponent(t) + '; path=/; max-age=31536000; SameSite=Strict';
   }
 
   var shown = false;
@@ -66,7 +74,7 @@
       var pin = document.getElementById('ctv-pin'), msg = document.getElementById('ctv-msg');
       document.getElementById('ctv-ask').onclick = function () {
         msg.textContent = 'Asking the TV…';
-        realFetch('/api/pair/start', { method: 'POST' }).then(function (r) { return r.json(); })
+        realFetch('/api/pair/start' + (TVQ ? '?tv=' + TVQ : ''), { method: 'POST' }).then(function (r) { return r.json(); })
           .then(function (j) { msg.textContent = j.ok ? 'The code is on the TV now.' : (j.error || 'The TV did not answer.'); })
           .catch(function () { msg.textContent = 'Can’t reach the TV.'; });
       };
@@ -119,5 +127,11 @@
       realFetch('/api/health', { headers: { Authorization: 'Bearer ' + token } }).then(function (r) { return r.json(); })
         .then(function (j) { if (!j || j.auth !== 'ok') pairFromQr(); else autoPairing = false; }).catch(function () { pairFromQr(); });
     }
-  } else if (!token) showPairing();
+  } else if (!token) {
+    // a home computer with no pairing key set answers every call already (auth "ok"): nothing to pair.
+    // Anything else (the on-TV app, a computer with a key) shows the pairing screen as before.
+    realFetch('/api/health').then(function (r) { return r.json(); })
+      .then(function (j) { if (j && j.auth === 'ok' && j.mode !== 'on-tv') { save('open'); location.reload(); } else showPairing(); })
+      .catch(function () { showPairing(); });
+  }
 })();

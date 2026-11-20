@@ -68,7 +68,7 @@ export function canSend(kind) { return kind !== 'roku' && kind !== 'appletv' && 
 
 export const WORDS = {
   title: 'Send a design',
-  note: 'Paste or type a code from couch-tv Studio. The TV asks Use this design? Pick Use this design there, then press OK. No typing on the TV.',
+  note: 'Paste the code from couch-tv Studio. Then on the TV, pick Use this design and press OK.',
   placeholder: 'ABCDE-FGHJK',
   send: 'Send to the TV',
   choose: 'Choose a design in couch-tv Studio',
@@ -82,6 +82,15 @@ export const WORDS = {
   askLater: 'Not now',
 };
 
+// The words in the phone's language: i18n.js has each as ds_<name> in every phone language block, and
+// the app hands its t() over (setTranslate). Without it (the node tests) or for a missing word: WORDS.
+let tr = null;
+export function setTranslate(fn) { tr = typeof fn === 'function' ? fn : null; }
+export function dsw(name) {
+  const v = tr ? tr('ds_' + name) : null;
+  return v && v !== 'ds_' + name ? v : WORDS[name];
+}
+
 // what to say after a send: the answer of POST /api/say/design ({ listening } says whether the TV home
 // asked for news in the last half minute)
-export function sentWords(answer) { return answer && answer.listening === false ? WORDS.notListening : WORDS.sent; }
+export function sentWords(answer) { return answer && answer.listening === false ? dsw('notListening') : dsw('sent'); }

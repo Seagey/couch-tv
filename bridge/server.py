@@ -55,6 +55,7 @@ import bookings
 import direct
 import matter
 import say
+import phonepage
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -62,6 +63,7 @@ REMOTE_DIR = os.path.join(ROOT, "remote", "dist")
 LAUNCHER_DIR = os.path.join(ROOT, "tv-home", "web")
 TITAN_DIR = os.path.join(ROOT, "titan")   # the start page a Titan OS app opens (docs/PHILIPS-TITAN.md), and a TiVo OS tile
 SHIM_PATH = os.path.join(HERE, "web", "shim.js")
+PHONE_PAGE_DIR = os.path.join(ROOT, "on-tv", "web")   # the phone's Home settings page (setup.html, shim.js)
 PORT = int(os.environ.get("PORT") or config.BRIDGE["port"])
 HOME_TZ = ZoneInfo(config.TIMEZONE)   # the home's time zone (weather.timezone in config.json)
 
@@ -172,16 +174,23 @@ def now_iso():
     return datetime.now(HOME_TZ).isoformat(timespec="seconds")
 
 
+def settings_stamp():
+    """Home settings' "updated": to the millisecond, so a phone change in the same second as the TV's
+    last copy still counts as newer (the seen merge, h_settings_set)."""
+    return datetime.now(HOME_TZ).isoformat(timespec="milliseconds")
+
+
 def cur_who():
     """Who is on the couch at the TV this request or loop is for (each TV keeps its own)."""
     return store.current_who(_current.get())
 
 
 class ApiError(Exception):
-    def __init__(self, status, message, key=None, vars=None):
+    def __init__(self, status, message, key=None, vars=None, retry_after=None):
         super().__init__(message)
         self.status, self.message = status, message
         self.key, self.vars = key, vars
+        self.retry_after = retry_after   # seconds, for a 429: the Retry-After header and retry_after field
 
 
 def ok(**fields):
@@ -308,6 +317,8 @@ def extract_auth_key(request):
     q_key = (request.query.get("key") or request.query.get("token") or "").strip()
     if q_key:
         return q_key
+    # (no cookie: the phone's Home settings page fetches its photos with the header, so the key is never in
+    # a cookie, which every other web service on this computer would be sent too)
     return None
 
 
@@ -333,6 +344,53 @@ _failed_attempts = {}
 RATE_LIMIT_MAX = 5
 RATE_LIMIT_WINDOW = 60.0
 RATE_LIMIT_ADDRESSES = 1000   # memory bound: at most this many addresses are remembered
+
+
+# The Apple TV's six digit codes, across every address (20 Nov 2026, as the on-TV app's PairLock): 15
+# wrong codes at /api/appletv/claim within 10 minutes, while a code is live, lock that claim for 10
+# minutes (429). Per address limits alone let many addresses keep guessing six digits. Only while a code
+# is live, so nobody can keep it locked when no Apple TV is pairing. The pairing key (/api/pair) and the
+# VIDAA and Panasonic claim codes are long, so they keep only the per address limit above: a lock there
+# would let one caller shut the owner out. The clock is monotonic, so a clock change can't open it.
+PAIR_LOCK_MAX = 15
+PAIR_LOCK_WINDOW = 600.0
+PAIR_LOCK_SECS = 600.0
+_pair_wrong = []          # times of wrong tries, oldest first
+_pair_locked_until = [0.0]
+
+
+def pair_locked_for(now=None):
+    """Seconds pairing stays locked (0: open)."""
+    now = time.monotonic() if now is None else now
+    left = _pair_locked_until[0] - now
+    return int(-(-left // 1)) if left > 0 else 0
+
+
+def pair_wrong(now=None):
+    """Counts one wrong pairing try; True when it has just locked pairing."""
+    now = time.monotonic() if now is None else now
+    cutoff = now - PAIR_LOCK_WINDOW
+    while _pair_wrong and _pair_wrong[0] <= cutoff:
+        _pair_wrong.pop(0)
+    _pair_wrong.append(now)
+    if len(_pair_wrong) >= PAIR_LOCK_MAX:
+        _pair_locked_until[0] = now + PAIR_LOCK_SECS
+        _pair_wrong.clear()
+        return True
+    return False
+
+
+def pair_lock_reset():
+    _pair_wrong.clear()
+    _pair_locked_until[0] = 0.0
+
+
+def check_pair_lock():
+    left = pair_locked_for()
+    if left > 0:
+        mins = max(1, -(-left // 60))
+        raise ApiError(429, f"Too many wrong codes. Wait {mins} min, then try again.",
+                       key="err_pairing_locked", vars={"minutes": mins}, retry_after=left)
 
 
 def client_ip(request):
@@ -411,7 +469,10 @@ def record_action(request, tool, args, success):
 # The Spotify login (bridge/spotify_now.py) is opened in a browser on the bridge computer, and Spotify's
 # redirect back can't carry the pairing key: it is guarded by _loopback_only and a one-time state instead.
 OPEN_PATHS = {"/api/health", "/api/pair", "/api/vidaa/claim", "/api/appletv/claim",
-              "/api/spotify/login", "/api/spotify/callback"}
+              "/api/spotify/login", "/api/spotify/callback", "/api/pair/start"}
+# POSTs whose body is not JSON: a photo from the phone's Home settings page (the picture itself, read as a
+# stream after the key is checked) and "Show a code on the TV" (no body at all)
+RAW_POSTS = {"/api/photos", "/api/pair/start"}
 
 
 @web.middleware
@@ -434,7 +495,7 @@ async def middleware(request, handler):
     else:
         try:
             # 3. Refuse POST without application/json (couch-tv#73)
-            if request.method == "POST" and request.content_type != "application/json":
+            if request.method == "POST" and request.content_type != "application/json" and request.path not in RAW_POSTS:
                 raise ApiError(415, "Content-Type must be application/json", key="err_content_type_json")
 
             # 4. Check pairing key authentication & rate limiting for protected API endpoints (couch-tv#73)
@@ -458,7 +519,7 @@ async def middleware(request, handler):
                     raise ApiError(401, "pairing key required", key="err_pairing_key_required")
 
             tv_id = request.query.get("tv")
-            if not tv_id and request.method == "POST" and request.body_exists:
+            if not tv_id and request.method == "POST" and request.body_exists and request.path not in RAW_POSTS:
                 try:
                     data = await request.json()  # aiohttp keeps the body, handlers read it again
                     tv_id = data.get("tv") if isinstance(data, dict) else None
@@ -475,7 +536,10 @@ async def middleware(request, handler):
             _current.set(tv_id)
             resp = await handler(request)
         except ApiError as e:
-            resp = web.json_response({"ok": False, "error": e.message, **messages.err_fields(e)}, status=e.status)
+            extra = {"retry_after": e.retry_after} if e.retry_after else {}
+            resp = web.json_response({"ok": False, "error": e.message, **messages.err_fields(e), **extra}, status=e.status)
+            if e.retry_after:
+                resp.headers["Retry-After"] = str(e.retry_after)
         except TVUnavailable as e:
             resp = web.json_response({"ok": False, "error": str(e), **messages.err_fields(e)}, status=503)
         except ValueError as e:
@@ -607,6 +671,15 @@ def now_payload():
 
 
 # ---------- handlers ----------
+def serves_phone_page(app):
+    """Whether this computer serves the phone's Home settings page (/setup): the phone remote shows
+    Home settings on this phone, and Widgets on this TV, only then."""
+    try:
+        return any((r.resource.get_info().get("path") == "/setup") for r in app.router.routes() if r.resource is not None)
+    except Exception:
+        return False
+
+
 async def h_health(request):
     authed = is_authed(request)
     return ok(
@@ -615,11 +688,14 @@ async def h_health(request):
         version="1",
         auth="ok" if authed else "required",
         paired=authed,
+        phone_page=serves_phone_page(request.app),
     )
 
 
 async def h_pair(request):
     b = await body(request)
+    if "pin" in b and "key" not in b:
+        return await pair_with_code(request, b.get("pin"))
     given = str(b.get("key") or "").strip()
     if not config.PAIRING_KEY:
         return ok(paired=True, note="no pairing key required",
@@ -1172,11 +1248,14 @@ async def h_appletv_claim(request):
     data = await body(request)
     code = str(data.get("code") or "").strip()
     ip = client_ip(request)
+    check_pair_lock()
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong codes. Please wait a minute.", key="err_too_many_codes")
     found = appletv_codes.pop(code, None) if re.fullmatch(r"\d{6}", code) else None
     if not found or found[0] <= time.monotonic() or found[1] not in TVS:
         record_failed_attempt(ip, code)
+        if any(exp > time.monotonic() for exp, _ in appletv_codes.values()):
+            pair_wrong()   # only while a code is live: nobody can keep the claim locked
         await asyncio.sleep(0.3)
         raise ApiError(401, "that code is not valid (a code works once, for ten minutes)", key="err_invalid_code_10m")
     t = TVS[found[1]]
@@ -2180,6 +2259,286 @@ async def h_recs(request):
                               "continue": continue_items(who, request_base(request)), "picks": picks})
 
 
+# ---------- the phone's Home settings page (on-tv/web/setup.html), served here for a bridge TV ----------
+# Same page and endpoints as the on-TV app's /setup (Server.kt), with the bridge's own key: the 6 digit
+# code from the TV's Home settings QR (or "Show a code on the TV") is swapped for the pairing key, the
+# key the phone remote pairs with. At home and a design's widget settings stay in the TV home's own
+# store: they are handed to it through phonepage.py (the TV home asks GET /api/phone/inbox).
+PHONE_KEYS = ("place", "photos")          # Home settings keys the phone's page changes (SettingsMerge.PHONE_KEYS)
+PHONE_PATCH_KEYS = {"place"}              # what settings_patch may change (Server.kt PATCH_KEYS)
+ATHOME_EDIT_KEYS = {"note", "lists", "wifi", "guide", "cal_url", "stay_url", "checkin", "checkout", "widget_set", "design_apps"}
+_TV_ID_SAFE = re.compile(r"[A-Za-z0-9_-]{1,40}")
+_pair_start_at = [0.0]
+_photo_one = [None]   # (loop, asyncio.Semaphore(1)), made in the running loop: one phone photo decoded at a time
+
+
+def _same_site_only(request):
+    """The code calls answer only the phone's page itself (its own http address) or a client with no
+    Origin: never Origin null or file:, which any web page can send from a sandboxed frame (the TV apps
+    that send those never pair by code)."""
+    origin = (request.headers.get("Origin") or "").strip().lower()
+    if origin and not origin.startswith(("http://", "https://")):
+        raise ApiError(403, "forbidden origin", key="err_something_wrong")
+
+
+async def pair_with_code(request, pin):
+    """POST /api/pair {"pin": "123456"}: the code shown on the TV, once, for the pairing key."""
+    _same_site_only(request)
+    check_pair_lock()   # 15 wrong codes in 10 minutes, while a code was live, lock code pairing for 10 minutes
+    ip = client_ip(request)
+    # one address: 5 different wrong codes in 10 minutes, then it waits (about 720 guesses a day at most)
+    if is_rate_limited(ip):
+        raise ApiError(429, "Too many wrong codes. Wait a minute, then try again.", key="err_too_many_codes")
+    wait = phonepage.address_wait(ip, PAIR_LOCK_WINDOW, time.monotonic())
+    if wait:
+        mins = max(1, -(-wait // 60))
+        raise ApiError(429, f"Too many wrong codes. Wait {mins} min, then try again.",
+                       key="err_pairing_locked", vars={"minutes": mins}, retry_after=wait)
+    await asyncio.sleep(0.4)   # slows guessing a little more (Server.kt)
+    check_pair_lock()   # (a lock made while this one waited)
+    was_live = phonepage.current_pin() is not None
+    if not phonepage.pair(pin, ip):
+        if was_live:
+            # only a guess at a live code counts (with no code there is nothing to guess, so nobody can keep
+            # pairing locked that way), and the same wrong code again from one address is not a new guess
+            record_failed_attempt(ip, "pin:" + str(pin))
+            if phonepage.counts_for_lock(ip, pin, PAIR_LOCK_WINDOW, time.monotonic()):
+                pair_wrong()
+        raise ApiError(401, "That code has expired. Ask the TV for a new one." if not phonepage.current_pin()
+                       else "That code is not right. Check the TV.", key="err_code_expired" if not phonepage.current_pin() else "err_code_wrong")
+    # no pairing key set: every call is open already, so there is nothing to hand over
+    return ok(paired=True, token=config.PAIRING_KEY or "open")
+
+
+async def h_pair_start(request):
+    """"Show a code on the TV" on the phone's pairing screen: the TV's live code (the one in its QR), or a new
+    one when it has 90 s or less left, shown as a line on that TV's home. Never swaps a live code."""
+    _same_site_only(request)
+    check_pair_lock()
+    now = time.time()
+    if now - _pair_start_at[0] < 5:
+        raise ApiError(429, "A code is on the TV already. Wait a moment, then ask again.", key="err_code_on_tv")
+    _pair_start_at[0] = now
+    phonepage.show_pin(_current.get())
+    return ok(digits=6, expires_in=phonepage.pin_seconds_left(), note="The code is on the TV now.", **messages.note_fields("note_code_on_tv"))
+
+
+def phone_extras():
+    """What the phone's Home settings page reads besides the settings: that this is a home computer
+    (the page leaves out what only the on-TV app does), the people and the town now."""
+    w = config.WEATHER or {}
+    kind = next((t.get("kind") for t in TV_CONFIG["tvs"] if t["id"] == _current.get()), None)
+    # what draws this TV's home: the couch-tv home page ("web": Samsung, LG, Android TV...), the Roku channel,
+    # the Apple TV app, or nothing of couch-tv's (a VIZIO: the phone remote only). Only the web home keeps At
+    # home, your photos and a design's widgets; the others take the town and the people from here.
+    home = {"roku": "roku", "appletv": "appletv", "vizio": "none"}.get(kind, "web")
+    return {"mode": "bridge", "home": home, "people": [{"id": p["id"], "name": p["name"]} for p in config.PEOPLE],
+            "weather": {"place": w.get("place")} if w.get("place") else None,
+            "tv_name": next((t.get("name") for t in TV_CONFIG["tvs"] if t["id"] == _current.get()), "") or ""}
+
+
+def _write_settings(settings):
+    updated = settings_stamp()
+    store._write(_settings_path(), {"settings": settings, "updated": updated})
+    phonepage.settings_changed(_current.get(), updated)
+    return updated
+
+
+def settings_patch(p):
+    """The phone's change to Home settings: only the keys it names (null takes one out), so a town picked
+    on the phone never undoes a look picked on the TV. "place" is the home's Location, as the TV saves it."""
+    if not isinstance(p, dict) or not p:
+        raise ApiError(400, "settings_patch must be an object", key="err_body_must_be_json_object")
+    for k in p:
+        if k not in PHONE_PATCH_KEYS:
+            raise ApiError(400, f"{k} is not changed from the phone", key="err_unknown_key", vars={"key": k})
+    pl = p.get("place")
+    if pl is not None:
+        if not isinstance(pl, dict):
+            raise ApiError(400, "place must be an object or null", key="err_body_must_be_json_object")
+        if not (_num(pl.get("lat"), -90, 90) and _num(pl.get("lon"), -180, 180)) or not str(pl.get("name") or "").strip():
+            raise ApiError(400, "place needs a name, and lat and lon as numbers", key="err_body_must_be_json_object")
+    s = dict(home_settings()["settings"])
+    for k, v in p.items():
+        if v is None:
+            s.pop(k, None)
+        else:
+            s[k] = v
+    s = clean_settings(s)
+    updated = _write_settings(s)
+    return {"settings": s, "updated": updated}
+
+
+async def h_phone_link(request):
+    """For the TV home's Home settings QR and Hold OK, Edit on your phone: this computer's /setup with a
+    pairing code inside (#pin=, the phone remote's pairing QR format). Only the TV home asks (it has the
+    key); the address is the one the TV reached this computer by, so the phone on the same Wi-Fi can too."""
+    host = (request.headers.get("Host") or "").strip()
+    name = host_name(host)
+    if not name or name in ("localhost", "::1") or name.startswith("127."):
+        ip = lan_ipv4()
+        if not ip:
+            raise ApiError(503, "This computer is not on a network yet.", key="err_something_wrong")
+        host = f"{ip}:{PORT}"
+    check_pair_lock()   # locked: no QR with a code that cannot work (the TV home hides it and asks again)
+    tv = _current.get()
+    q = f"?tv={tv}" if tv != DEFAULT_TV and _TV_ID_SAFE.fullmatch(tv) else ""
+    pin = phonepage.pin_for_qr(tv)
+    return ok(url=f"http://{host}/setup{q}#pin={pin}", pin_expires_in=phonepage.pin_seconds_left())
+
+
+def _athome_answer(r):
+    if r is None:
+        return ok(live=False, queued=True)
+    if r.get("refused"):
+        raise ApiError(409, str(r.get("error") or "Open the Couch TV home on the TV first, then save again."), key="err_tv_home_closed")
+    if not r.get("ok"):
+        raise ApiError(400, str(r.get("error") or "That did not save."), key="err_something_wrong")
+    return ok(live=True, athome=r.get("athome") if isinstance(r.get("athome"), dict) else {})
+
+
+async def h_athome_get(request):
+    view = phonepage.read(_current.get())
+    return ok(live=False) if view is None else ok(live=True, athome=view)
+
+
+async def h_athome_set(request):
+    data = await body(request)
+    e = data.get("edit")
+    if not isinstance(e, dict) or not e:
+        raise ApiError(400, "edit is required", key="err_body_must_be_json_object")
+    if phonepage.json_size(e) > phonepage.EDIT_MAX:
+        raise ApiError(413, "That is too much to send at once.", key="err_too_big")
+    bad = [k for k in e if k not in ATHOME_EDIT_KEYS]
+    if bad:
+        raise ApiError(400, f"{bad[0]} is not changed from the phone", key="err_unknown_key", vars={"key": bad[0]})
+    try:
+        r = await phonepage.edit(_current.get(), e)
+    except phonepage.Refused as x:
+        raise ApiError(x.status, str(x), key=x.key)
+    return _athome_answer(r)
+
+
+async def h_phone_inbox(request):
+    """The TV home's side: the phone's changes waiting for it, and what else it should know now."""
+    return ok(**phonepage.inbox(_current.get()))
+
+
+async def h_phone_view(request):
+    data = await body(request)
+    v = data.get("athome")
+    if v is not None and not isinstance(v, dict):
+        raise ApiError(400, "athome must be an object or null", key="err_body_must_be_json_object")
+    if phonepage.json_size(v) > phonepage.VIEW_MAX:
+        raise ApiError(413, "too big", key="err_too_big")
+    phonepage.take_view(_current.get(), v)
+    return ok()
+
+
+async def h_phone_done(request):
+    data = await body(request)
+    eid, result = data.get("id"), data.get("result")
+    if not isinstance(eid, int) or isinstance(eid, bool) or not isinstance(result, dict):
+        raise ApiError(400, "id (a number) and result (an object) are required", key="err_body_must_be_json_object")
+    if phonepage.json_size(result) > phonepage.VIEW_MAX:
+        raise ApiError(413, "too big", key="err_too_big")
+    return ok(taken=phonepage.done(_current.get(), eid, result))
+
+
+def _photo_count(s):
+    return len(s.get("photos") or [])
+
+
+def _listed_photos():
+    names = set()
+    for t in TV_CONFIG["tvs"]:
+        d = store._read(os.path.join(store.DATA, f"settings.{t['id']}.json"), None)
+        for ph in ((d or {}).get("settings") or {}).get("photos") or []:
+            if isinstance(ph, dict) and isinstance(ph.get("file"), str):
+                names.add(ph["file"])
+    return names
+
+
+async def h_photos_add(request):
+    """A photo from the phone's Home settings page: the picture itself is the body (up to 25 MB), read
+    only after the key was checked (the middleware). A refused upload closes the connection, so its
+    unread bytes are never taken as the next request."""
+    def refuse(status, msg):
+        resp = web.json_response({"ok": False, "error": msg}, status=status)
+        resp.force_close()
+        return resp
+    length = request.content_length
+    if not length:
+        return refuse(400, "No photo came through. Try again.")
+    if length > phonepage.PHOTO_MAX_UPLOAD:
+        return refuse(413, "That photo is too big. Pick one under 25 MB.")
+    if _photo_count(home_settings()["settings"]) >= MAX_PHOTOS:
+        return refuse(409, f"The TV holds {MAX_PHOTOS} photos. Remove one first.")
+    raw = bytearray()
+    async for chunk in request.content.iter_chunked(64 * 1024):
+        raw.extend(chunk)
+        if len(raw) > phonepage.PHOTO_MAX_UPLOAD:
+            return refuse(413, "That photo is too big. Pick one under 25 MB.")
+    loop = asyncio.get_running_loop()
+    if _photo_one[0] is None or _photo_one[0][0] is not loop:
+        _photo_one[0] = (loop, asyncio.Semaphore(1))
+    try:
+        # one photo at a time: decoding a big picture takes a lot of memory, and a small home computer
+        # must never decode several at once
+        async with _photo_one[0][1]:
+            name = await asyncio.get_running_loop().run_in_executor(None, phonepage.make_photo, bytes(raw), store.DATA)
+    except phonepage.Refused as x:
+        return refuse(x.status, str(x))
+    s = dict(home_settings()["settings"])
+    photos = list(s.get("photos") or [])
+    if len(photos) >= MAX_PHOTOS:
+        os.remove(os.path.join(phonepage.photo_dir(store.DATA), name))
+        return refuse(409, f"The TV holds {MAX_PHOTOS} photos. Remove one first.")
+    pid = format(int(time.time() * 1000), "x")[-8:] + secrets.token_hex(2)
+    photo = {"id": pid, "file": name}
+    photos.append(photo)
+    s["photos"] = photos
+    _write_settings(clean_settings(s))
+    phonepage.drop_strays(store.DATA, _listed_photos())
+    return ok(photo=photo, count=len(photos))
+
+
+async def h_photos_remove(request):
+    data = await body(request)
+    pid = data.get("id")
+    s = dict(home_settings()["settings"])
+    photos = [p for p in (s.get("photos") or []) if isinstance(p, dict)]
+    gone = next((p for p in photos if p.get("id") == pid), None) if isinstance(pid, str) and pid else None
+    if gone is None:
+        raise ApiError(404, "That photo is not on the TV any more.", key="err_not_found")
+    s["photos"] = [p for p in photos if p is not gone]
+    _write_settings(clean_settings(s))
+    path = phonepage.photo_path(store.DATA, gone.get("file"))
+    if path and gone.get("file") not in _listed_photos():
+        with contextlib.suppress(OSError):
+            os.remove(path)
+    return ok(count=len(s["photos"]))
+
+
+async def h_photo_get(request):
+    """A photo the phone sent, for the TV home's scenes and the phone page's list (the key is needed)."""
+    path = phonepage.photo_path(store.DATA, request.match_info.get("name"))
+    if not path:
+        raise ApiError(404, "no such photo", key="err_not_found")
+    # the name is new for every photo, so the TV may keep it; private: never in a shared cache
+    return web.FileResponse(path, headers={"Content-Type": "image/jpeg", "Cache-Control": "private, max-age=86400"})
+
+
+async def h_setup_page(request):
+    return web.FileResponse(os.path.join(PHONE_PAGE_DIR, "setup.html"),
+                            headers={"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache"})
+
+
+async def h_setup_shim(request):
+    return web.FileResponse(os.path.join(PHONE_PAGE_DIR, "shim.js"),
+                            headers={"Content-Type": "application/javascript", "Cache-Control": "no-cache"})
+
+
 async def h_api_missing(request):
     raise ApiError(404, "no such endpoint", key="err_no_such_endpoint")
 
@@ -2484,35 +2843,50 @@ WMO = {0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Cloudy", 45: "Fog"
        61: "Light rain", 63: "Rain", 65: "Heavy rain", 66: "Rain", 67: "Rain",
        80: "Showers", 81: "Showers", 82: "Heavy showers", 95: "Storms", 96: "Storms", 99: "Storms"}
 weather_cache = {"at": 0.0, "data": None}
+_weather_by_town = {}   # a TV whose town was picked in Home settings (the TV or the phone's page): {(lat, lon): cache}
 
 
-async def get_weather():
-    if weather_cache["data"] and time.time() - weather_cache["at"] < WEATHER_EVERY:
-        return weather_cache["data"]
+def tv_town():
+    """This TV's town from its Home settings (the TV's Location, or the phone's Home settings page), else None:
+    Roku and Apple TV read the weather from here, so a town picked on the phone reaches them too."""
+    pl = home_settings()["settings"].get("place")
+    if isinstance(pl, dict) and _num(pl.get("lat"), -90, 90) and _num(pl.get("lon"), -180, 180):
+        return {"lat": pl["lat"], "lon": pl["lon"], "place": str(pl.get("name") or "")[:40],
+                "timezone": str(pl.get("timezone") or "auto")}
+    return None
+
+
+async def get_weather(at=None):
+    cache = weather_cache if at is None else _weather_by_town.setdefault((at["lat"], at["lon"]), {"at": 0.0, "data": None})
+    if len(_weather_by_town) > 20:
+        _weather_by_town.clear()
+    where = at or dict(WEATHER_AT, timezone=config.WEATHER["timezone"])
+    if cache["data"] and time.time() - cache["at"] < WEATHER_EVERY:
+        return cache["data"]
     import aiohttp
     url = ("https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
            "&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min"
-           "&timezone={tz}&forecast_days=1").format(tz=config.WEATHER["timezone"].replace("/", "%2F"), **WEATHER_AT)
+           "&timezone={tz}&forecast_days=1").format(tz=str(where["timezone"]).replace("/", "%2F"), lat=where["lat"], lon=where["lon"])
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as s:
             async with s.get(url) as r:
                 j = await r.json()
         cur, day = j["current"], j.get("daily", {})
         code = int(cur.get("weather_code", -1))
-        weather_cache["data"] = {
-            "place": WEATHER_AT["place"], "temp": round(cur["temperature_2m"]),
+        cache["data"] = {
+            "place": where["place"], "temp": round(cur["temperature_2m"]),
             "code": code, "text": WMO.get(code, ""), "is_day": bool(cur.get("is_day")),
             "high": round(day["temperature_2m_max"][0]) if day.get("temperature_2m_max") else None,
             "low": round(day["temperature_2m_min"][0]) if day.get("temperature_2m_min") else None,
         }
-        weather_cache["at"] = time.time()
+        cache["at"] = time.time()
     except Exception as e:  # keep the last good reading; the home shows the date alone without one
         log.warning("weather: %s", e)
-    return weather_cache["data"]
+    return cache["data"]
 
 
 async def h_weather(request):
-    w = await get_weather()
+    w = await get_weather(tv_town())
     if not w:
         raise ApiError(503, "No weather right now.", key="err_no_weather")
     return ok(**w)
@@ -2661,6 +3035,8 @@ def clean_settings(s):
         # two decimals is the town, never the house
         out["place"] = {"name": str(p.get("name") or "")[:80], "lat": round(p["lat"], 2), "lon": round(p["lon"], 2),
                         "timezone": str(p.get("timezone") or "auto")[:64]}
+        if isinstance(p.get("area"), str) and p["area"].strip():   # the region and country the TV shows under the town
+            out["place"]["area"] = p["area"].strip()[:80]
     if isinstance(s.get("wx_show"), bool):
         out["wx_show"] = s["wx_show"]
     if s.get("wx_unit") in ("c", "f"):
@@ -2802,21 +3178,60 @@ def clean_widget_settings(w):
 
 
 async def h_settings_get(request):
-    return ok(**home_settings())
+    return ok(**home_settings(), **phone_extras())
 
 
 async def h_settings_set(request):
     data = await body(request)
+    if "settings" not in data and "settings_patch" in data:
+        return ok(**settings_patch(data.get("settings_patch")), **phone_extras())
     s = data.get("settings")
     if not isinstance(s, dict):
         raise ApiError(400, "settings (an object) is required", key="err_settings_object_required")
     if len(json.dumps(s)) > SETTINGS_MAX:
         raise ApiError(413, "settings are too big", key="err_settings_too_big")
     cleaned = clean_settings(s)
-    updated = now_iso()
+    # The TV home sends its whole copy with "seen", the "updated" it last read. If the phone's Home
+    # settings page changed the town or a photo since, the TV's copy is older: those keys stay as they
+    # are here, and "kept" tells the TV home to take them (the on-TV app's SettingsMerge, the same rule).
+    kept = []
+    seen = data.get("seen")
+    now = home_settings()
+    if isinstance(seen, str) and seen and now["updated"] and seen != now["updated"]:
+        for k in PHONE_KEYS:
+            if k in now["settings"]:
+                cleaned[k] = now["settings"][k]
+            else:
+                cleaned.pop(k, None)
+            kept.append(k)
+    elif not isinstance(seen, str):
+        # an older TV home sends no "seen" and knows nothing of the phone's photos: they stay listed
+        mine = [p for p in (now["settings"].get("photos") or []) if isinstance(p, dict) and phonepage.PHOTO_NAME.fullmatch(str(p.get("file") or ""))]
+        have = {p.get("id") for p in (cleaned.get("photos") or []) if isinstance(p, dict)}
+        add = [p for p in mine if p.get("id") not in have]
+        if add:
+            cleaned["photos"] = (list(cleaned.get("photos") or []) + add)[:MAX_PHOTOS]
+            kept.append("photos")
+    before = _listed_photos()
+    updated = settings_stamp()
     store._write(_settings_path(), {"settings": cleaned, "updated": updated})
+    _drop_unlisted_photos(before)
     record_action(request, "settings", {"keys": sorted(cleaned)}, True)
-    return ok(settings=cleaned, updated=updated)
+    return ok(settings=cleaned, updated=updated, kept=kept)
+
+
+def _drop_unlisted_photos(before):
+    """A phone photo taken off on the TV: its file goes now (it was listed, so no upload is in flight),
+    and any older file nobody lists goes too."""
+    after = _listed_photos()
+    if before == after:
+        return
+    for f in before - after:
+        path = phonepage.photo_path(store.DATA, f)
+        if path:
+            with contextlib.suppress(OSError):
+                os.remove(path)
+    phonepage.drop_strays(store.DATA, after)
 
 
 # ---------- the guest's name for the Welcome widget, typed on the TV or the phone remote ----------
@@ -5351,6 +5766,20 @@ def make_app():
     r.add_post("/api/matter/rename", h_matter_rename)
     r.add_get("/api/settings", h_settings_get)
     r.add_post("/api/settings", h_settings_set)
+    # the phone's Home settings page (phonepage.py) and the TV home's side of it
+    r.add_post("/api/pair/start", h_pair_start)
+    r.add_get("/api/phone-link", h_phone_link)
+    r.add_get("/api/athome", h_athome_get)
+    r.add_post("/api/athome", h_athome_set)
+    r.add_get("/api/phone/inbox", h_phone_inbox)
+    r.add_post("/api/phone/view", h_phone_view)
+    r.add_post("/api/phone/done", h_phone_done)
+    r.add_post("/api/photos", h_photos_add)
+    r.add_post("/api/photos/remove", h_photos_remove)
+    r.add_get("/api/photo/{name}", h_photo_get)
+    r.add_get("/setup", h_setup_page)
+    r.add_get("/setup/", h_setup_page)
+    r.add_get("/ontv/shim.js", h_setup_shim)
     r.add_get("/api/continue", h_continue)
     r.add_get("/api/music", h_music)
     r.add_get("/api/music/queue", h_music_queue)

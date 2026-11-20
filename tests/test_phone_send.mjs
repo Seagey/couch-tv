@@ -48,7 +48,7 @@ const app = fs.readFileSync(path.join(root, "remote/src/App.jsx"), "utf8");
 ok(/replaceState\([^)]*rest\)/.test(app), "the code leaves the address before it is sent");
 ok(app.includes("!window.couchTv.token()"), "an unpaired phone pairs first and keeps the code for after");
 ok(/if \(nonceMatches\(nonce, kept\)\) \{ try \{ localStorage\.removeItem\(NONCE_KEY\);[^\n]*sendNow\(code\); \}\n\s*else setOffer\(code\);/.test(app), "a link's code asks first unless the nonce matches, and a nonce works once");
-ok(app.includes("DESIGN_WORDS.ask") && app.includes("DESIGN_WORDS.askLater"), "Send this design to the TV? with Send and Not now");
+ok(app.includes("dsw('ask')") && app.includes("dsw('askLater')"), "Send this design to the TV? with Send and Not now");
 // F1: the TV's question starts on Keep my home, so the words never say just press OK
 ok(!/press OK when|you press OK/i.test(WORDS.sent + WORDS.note), "never just press OK");
 eq(WORDS.sent, "Sent. On the TV, pick Use this design, then press OK.");

@@ -167,14 +167,14 @@ object UpdateRules {
 
     /** The line above the steps. */
     fun how(watch: Boolean): String =
-        if (watch) "This copy of Couch TV has the Home button watch, so it was put on from a computer, and it updates from a computer the same way. Your settings stay."
+        if (watch) "This is the Home button version of Couch TV. It was put on from a computer, and it updates from a computer the same way. Your settings stay."
         else "Couch TV cannot install an update by itself on this TV right now. Put the new version on the same way as before, over this one. Your settings stay."
 
     /** The exact steps, one per row on the TV. */
     fun steps(watch: Boolean): List<String> =
         if (watch) listOf(
             "On a computer, download $WATCH_ASSET from github.com/$REPO/releases/latest.",
-            "Install it over this app with Google's adb tool: adb connect, then adb install -r $WATCH_ASSET (the Couch TV screen, More, Home button from a computer, has every step).",
+            "Put it on from the computer the same way as before, over this one. On the TV, Couch TV, More help, Home button from a computer, has every step.",
             "Open Couch TV again from your apps.")
         else listOf(
             "Press Home, then open Downloader from your apps. Not there? Find Downloader by AFTVnews in the TV's app store and install it first.",
