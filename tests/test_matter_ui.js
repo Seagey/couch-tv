@@ -227,5 +227,79 @@ const SHARED = () => [
     ok(made2.length === 1 && made2[0].closed, "no stream: closed once, and the page keeps asking instead");
   }
 
+  // ---- the controllers' committed answers (nl-matter-android ea574c2, nl-matter-bridge 8254a5a) ----
+  {
+    // the on-TV app joins a lock and leaves it again: 200, ok, no ids, a note
+    const T = page({ tvha: true, devices: SHARED() });
+    const api0 = T.api;
+    let removeNote = false;
+    const api = (method, p, body) => {
+      if (p === "/api/matter/commission" && body.code === "12345678902") return Promise.resolve({ ok: true, device_ids: [], note: "That device is not something the TV shows (locks, alarms and garage doors never show), so the TV did not keep it." });
+      if (p === "/api/matter/commission" && body.code === "20000000000") return Promise.reject(new Error("not_allowed"));   // the bridge: 400 { error: "not_allowed" }
+      if (p === "/api/matter/commission" && body.code === "34970112332" && removeNote === "already") return Promise.reject(new Error("already"));
+      if (p === "/api/matter/remove" && removeNote === true) { const r = api0(method, p, body); return r.then(() => ({ ok: true, removed: [body.id], note: "The device did not answer, so the TV forgot it." })); }
+      if (p === "/api/matter/command" && body.id === "matter:1:1") return Promise.resolve({ ok: true, device: { id: "matter:1:1", name: "Lounge lamp", domain: "light", state: body.action, attributes: { brightness: 128 } } });
+      if (p === "/api/matter/command" && body.action === "on" && body.id === "matter:2:1") return Promise.reject(new Error("unavailable"));   // the bridge: { ok: false, error: "unavailable" }
+      return api0(method, p, body);
+    };
+    T.H.useBridge(api); await flush();
+    const lock = await T.M.commission("1234 567 8902");
+    ok(lock.ok === false && lock.error === "not_allowed" && /locks/.test(lock.note), "the on-TV app's left-again lock reads as not added: " + JSON.stringify(lock));
+    const lock2 = await T.M.commission("20000000000");
+    ok(lock2.ok === false && lock2.error === "not_allowed", "the bridge's not_allowed: " + JSON.stringify(lock2));
+    removeNote = "already";
+    const again = await T.M.commission("34970112332");
+    ok(again.ok === false && again.error === "already", "the on-TV app's already: " + JSON.stringify(again));
+    removeNote = true;
+    const gone = await T.M.remove("switch.matter_a1b2_3");
+    ok(gone.ok === true && gone.unanswered === true, "a remove whose device did not answer says so: " + JSON.stringify(gone));
+    // the command answer's device: its new readings at once, before the list is read again
+    ok(T.M.list().find((x) => x.entity === "light.matter_1_1").words === "Light, on", "the lamp is on");
+    const off = await T.M.ask("set", "light.matter_1_1", "off");
+    ok(off.ok && T.M.list().find((x) => x.entity === "light.matter_1_1").words === "Light, off", "the answer's device (no top level state) is read at once: " + JSON.stringify(off));
+    const fail = await T.M.ask("set", "switch.matter_2_1", "on");
+    ok(fail.ok === false && fail.error === "failed", "a device that does not answer: the widget hears failed");
+  }
+
+  // ---- the launcher's own Matter: window.TVMATTER.request(id, method, path, body) -> CouchMatter.reply(id, json string) ----
+  {
+    const asked = [];
+    const T = page({ devices: [] });
+    const sb = T.sb;
+    const store = SHARED();
+    let refuse = false;
+    sb.TVMATTER = {
+      request: (id, method, p, body) => {
+        asked.push([method, p, body]);
+        const b = body ? JSON.parse(body) : {};
+        let r;
+        if (refuse) r = { ok: false, error: "refused" };
+        else if (p === "/api/matter/devices") r = { devices: store, ready: true, version: 3 };
+        else if (p === "/api/matter/rename") { store.find((x) => x.id === b.id).name = b.name; r = { ok: true, name: b.name }; }
+        else if (p === "/api/matter/commission") r = { ok: false, error: "expired", note: "The code has run out.", device_ids: [] };
+        else if (p === "/api/matter/command") r = { ok: false, error: "No Matter device with that id.", status: 404 };
+        else r = { ok: false, error: "no such Matter call", status: 404 };
+        setTimeout(() => sb.CouchMatter.reply(id, JSON.stringify(r)), 0);
+      }
+    };
+    // matter.js read again with TVMATTER there from the start, as the launcher's WebView has it
+    vm.runInContext(fs.readFileSync(path.join(WEB, "matter.js"), "utf8"), sb);
+    await flush();
+    const M = sb.CouchMatter;
+    ok(M.on() && M.count() === 6 && asked[0][1] === "/api/matter/devices", "the launcher asks its own Matter at once, with no bridge: " + M.count());
+    const rn = await M.rename("light.matter_1_1", "Reading lamp");
+    ok(rn.ok && M.list()[0].name === "Reading lamp" && asked.some((a) => a[1] === "/api/matter/rename" && JSON.parse(a[2]).id === "matter:1:1"), "renamed through TVMATTER by the contract id");
+    const ex = await M.commission("34970112332");
+    ok(ex.ok === false && ex.error === "expired" && ex.note === "The code has run out.", "an expired code through TVMATTER keeps its key and note: " + JSON.stringify(ex));
+    const bad = await M.ask("set", "light.matter_1_1", "off");
+    ok(bad.ok === false && bad.error === "failed", "a plain sentence error is a failure, never a crash");
+    // a page the launcher does not trust: ok false, refused, so Matter is not on
+    const U = page({ devices: [] });
+    U.sb.TVMATTER = { request: (id) => setTimeout(() => U.sb.CouchMatter.reply(id, JSON.stringify({ ok: false, error: "refused" })), 0) };
+    vm.runInContext(fs.readFileSync(path.join(WEB, "matter.js"), "utf8"), U.sb);
+    await flush();
+    ok(!U.sb.CouchMatter.on(), "refused by the launcher: Matter stays off, nothing shows");
+  }
+
   console.log("ok " + n + " Matter UI checks");
 })().catch((e) => { console.error(e); process.exit(1); });

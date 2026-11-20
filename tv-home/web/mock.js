@@ -411,7 +411,8 @@
               MD.push({ id: "matter:" + node + ":1", name: "Matter light", domain: "light", state: "off", attributes: {} });
               return resolve({ ok: true, device_ids: ["matter:" + node + ":1"] });
             }
-            return reject(new Error("expired"));
+            // 20000000000: a lock shared by mistake (the bridge's answer, 400 not_allowed)
+            return reject(new Error(code === "20000000000" ? "not_allowed" : "expired"));
           }
           var d = dev(body && body.id);
           if (!d) return reject(new Error("refused"));
@@ -435,7 +436,7 @@
   }
 
   // ---------- a pretend bridge ----------
-  var jw =function (p) { return localArt(p) || "https://images.justwatch.com/" + p + ".webp"; };
+  var jw = function (p) { return localArt(p) || "https://images.justwatch.com/" + p + ".webp"; };
   var app = function (id, name, pkg) { return { id: id, name: name, package: pkg }; };
   var shows = [
     { id: "m2", title: "The Bear", season: 3, episode: 2, app: app("disney-plus", "Disney+", "com.disney.disneyplus"), backdrop: jw("backdrop/346664278/s1440/the-bear-2022"), progress: 0.7 },

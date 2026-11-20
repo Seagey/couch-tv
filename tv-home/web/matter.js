@@ -2,11 +2,15 @@
 // has in Google Home, Apple Home, SmartThings or Alexa, shared to Couch TV with a pairing code. The TV
 // (the on-TV app's Server.kt) or the home computer (bridge/server.py) is then one more Matter
 // controller, and answers /api/matter/* (the Matter contract):
-//   GET  /api/matter/devices   -> { devices: [{ id: "matter:<node>:<endpoint>", name, domain, state, attributes }], ready, note? }
-//   POST /api/matter/commission { code }            -> { ok, device_ids, error? }
-//   POST /api/matter/command    { id, action, value } -> { ok, state }
-//   POST /api/matter/remove     { id }              -> { ok }
-//   POST /api/matter/rename     { id, name }        -> { ok }
+//   GET  /api/matter/devices   -> { devices: [{ id: "matter:<node>:<endpoint>", name, domain, state, attributes }], ready, note?, version }
+//   GET  /api/matter/events    -> server-sent "event: matter", the same JSON as /api/matter/devices
+//   POST /api/matter/commission { code }            -> { ok, device_ids, error?, note? }  (error: expired, wrong_code,
+//                                                       unreachable, thread; the on-TV app also "already", the bridge "not_allowed")
+//   POST /api/matter/command    { id, action, value } -> { ok, state, device }  (error: refused, unavailable, failed)
+//   POST /api/matter/remove     { id }              -> { ok, removed, note? }
+//   POST /api/matter/rename     { id, name }        -> { ok, name }
+// Checked against nl-matter-android ea574c2 (Server.kt, Matter.kt, MatterPage.kt) and nl-matter-bridge
+// 8254a5a (bridge/matter.py, server.py).
 // Nothing here talks to a device itself, and nothing is kept in the page.
 //
 // Every screen reads Matter devices exactly as it reads Home Assistant ones (smarthome.js merges them):
@@ -83,7 +87,13 @@
       return new Promise(function (resolve, reject) {
         var id = "m" + (++seq).toString(36);
         var timer = setTimeout(function () { delete waiting[id]; reject(new Error("timeout")); }, ms || ANSWER_MS);
-        waiting[id] = function (r) { clearTimeout(timer); resolve(r); };
+        // an answer with ok false fails here too, as app.js's api does (MatterPage.kt answers
+        // { ok: false, error: key or plain sentence, note? })
+        waiting[id] = function (r) {
+          clearTimeout(timer);
+          if (r && r.ok === false) { var e = new Error(String(r.error || "failed")); e.note = typeof r.note === "string" ? r.note : ""; reject(e); }
+          else resolve(r);
+        };
         try { nat.request(id, method, path, body ? JSON.stringify(body) : ""); }
         catch (e) { clearTimeout(timer); delete waiting[id]; reject(e); }
       });
@@ -102,7 +112,8 @@
   // an answer with ok false comes back from app.js's api as a thrown error whose message is the key
   function failed(e) {
     var m = e && e.message ? String(e.message) : "failed";
-    return { ok: false, error: /^[a-z_]{2,24}$/.test(m) ? m : "failed", note: /^[a-z_]{2,24}$/.test(m) ? "" : m.slice(0, 200) };
+    var key = /^[a-z_]{2,24}$/.test(m);
+    return { ok: false, error: key ? m : "failed", note: (key ? (e && typeof e.note === "string" ? e.note : "") : m).slice(0, 200) };
   }
 
   function refresh(maxAge) {
@@ -219,6 +230,9 @@
       r = unwrap(r);
       if (r.ok === false) return { ok: false, error: r.error === "refused" ? "refused" : "failed" };
       if (typeof r.state === "string") d.state = r.state.slice(0, 24);
+      // both controllers answer the whole device after the change: its new readings at once
+      var now = r.device && r.device.id === d.id ? clean([r.device])[0] : null;
+      if (now && now.domain === d.domain) { d.state = now.state; d.attributes = now.attributes; }
       MT.at = 0;   // read it back next time
       return { ok: true };
     }, function (e) { var f = failed(e); return { ok: false, error: f.error === "refused" ? "refused" : "failed" }; });
@@ -281,8 +295,11 @@
       r = unwrap(r);
       if (r.ok === false) return { ok: false, error: r.error || "failed", note: typeof r.note === "string" ? r.note : "" };
       MT.at = 0;
+      var ids = Array.isArray(r.device_ids) ? r.device_ids : [];
+      // the on-TV app joins a lock, an alarm or a garage door, sees what it is and leaves it again:
+      // ok, no ids and a note (the bridge says error "not_allowed"). Either way, nothing was added.
+      if (!ids.length && typeof r.note === "string" && r.note) return refresh().then(function () { return { ok: false, error: "not_allowed", note: r.note }; });
       return refresh().then(function () {
-        var ids = Array.isArray(r.device_ids) ? r.device_ids : [];
         return { ok: true, added: MT.devices.filter(function (d) { return ids.indexOf(d.id) >= 0; }).map(function (d) { return d.name; }) };
       });
     }, failed);
@@ -294,7 +311,9 @@
       r = unwrap(r);
       if (r.ok === false) return { ok: false, error: r.error || "failed" };
       MT.at = 0;
-      return refresh().then(function () { return { ok: true }; });
+      // a device that did not answer is forgotten anyway; its home app may still list the TV
+      var quiet = typeof r.note === "string" && r.note !== "";
+      return refresh().then(function () { return { ok: true, unanswered: quiet }; });
     }, failed);
   }
   function rename(entity, name) {
@@ -337,6 +356,7 @@
     signature: function () { return MT.sig; },
     entityOf: entityOf
   };
-  // a preview (mock.js ?matter=1) has a pretend controller and no bridge
-  if (typeof root.MOCK_MATTER === "function") refresh();
+  // a preview (mock.js ?matter=1) has a pretend controller and no bridge; the launcher's own Matter
+  // (window.TVMATTER, MatterPage.kt) answers with no bridge at all, so it is asked at once
+  if (typeof root.MOCK_MATTER === "function" || (root.TVMATTER && typeof root.TVMATTER.request === "function")) refresh();
 })(typeof window !== "undefined" ? window : this);

@@ -816,6 +816,8 @@
     code: 'That is not a Matter code. It has 11 numbers, like 3497 011 2332.', expired: 'That code ran out. Make a new one in the app and paste it in straight away.',
     wrong_code: 'The device did not take that code. Make a new one in the app and try again.', unreachable: 'The TV could not reach the device. Check it is on and near the TV\'s Wi-Fi.',
     thread: 'The device uses Thread, and the TV cannot reach your Thread network. A Google or Apple hub (Nest Hub, HomePod mini, Apple TV) must be on at home.',
+    already: 'That device is on this TV already.', not_allowed: 'Couch TV never adds locks, alarms or garage doors, so it was not added. It stays in your other app.',
+    unavailable: 'The device is not answering. Check it is switched on.',
     refused: 'That could not be done.', failed: 'That did not work. Try again.' };
   var MT_KIND = { light: 'Light', switch: 'Plug or switch', fan: 'Fan', cover: 'Blind', climate: 'Thermostat', sensor: 'Sensor' };
   var VD = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]];
@@ -859,7 +861,9 @@
       j = mtOf(j);
       if (j.ok === false) throw new Error(j.error || 'failed');
       $('matter-code').value = '';
-      say('matter-msg', 'Added. It shows on the TV now, in your smart home widgets and Home settings, Smart home.');
+      // the TV joined a lock, an alarm or a garage door and left it again (ok, no ids, a note)
+      if (!(j.device_ids || []).length && j.note) { say('matter-msg', MT_ERR.not_allowed); return loadMatter(); }
+      say('matter-msg', (j.device_ids || []).length ? 'Added. It shows on the TV now, in your smart home widgets and Home settings, Smart home.' : 'Added. It shows here once the device answers.');
       return loadMatter();
     }).catch(function (e) { say('matter-msg', mtErr(e)); }).then(function () { $('matter-add').disabled = false; });
   };
@@ -870,7 +874,10 @@
     if (b.getAttribute('data-mt') === 'remove') {
       if (!confirm('Remove ' + name + ' from the TV? It stays in your Google, Apple, SmartThings or Alexa app.')) return;
       say('matter-msg', 'Removing…');
-      api('POST', '/api/matter/remove', { id: id }).then(function () { say('matter-msg', name + ' is off the TV.'); return loadMatter(); }).catch(function (e) { say('matter-msg', mtErr(e)); });
+      api('POST', '/api/matter/remove', { id: id }).then(function (j) {
+        say('matter-msg', name + ' is off the TV.' + (mtOf(j).note ? ' The device did not answer, so your other app may still list the TV. You can take it off there.' : ''));
+        return loadMatter();
+      }).catch(function (e) { say('matter-msg', mtErr(e)); });
     } else {
       var v = prompt('A name for ' + name, name);
       v = String(v == null ? '' : v).trim().slice(0, 40);

@@ -7087,8 +7087,11 @@
     code: "That is not a Matter code. It has 11 numbers, like 3497 011 2332.", expired: "That code ran out. Make a new one in the app and type it in straight away.",
     wrong_code: "The device did not take that code. Make a new one in the app and try again.", unreachable: "The TV could not reach the device. Check it is on and near the TV's Wi-Fi.",
     thread: "The device uses Thread, and the TV cannot reach your Thread network. A Google or Apple hub (Nest Hub, HomePod mini, Apple TV) must be on at home.",
+    already: "That device is on this TV already.", not_allowed: "Couch TV never adds locks, alarms or garage doors, so it was not added. It stays in your other app.",
+    unavailable: "The device is not answering. Check it is switched on.",
     refused: "That could not be done.", timeout: "That took too long. Try again.", off: "Matter is not on for this TV yet.", failed: "That did not work. Try again." };
-  function mtSay(r) { return MT_ERR[r && r.error] || (r && r.note) || MT_ERR.failed; }
+  // a key in plain words; a controller's own sentence only when there is no key for it
+  function mtSay(r) { return (r && r.error !== "failed" && MT_ERR[r.error]) || (r && r.note) || MT_ERR[r && r.error] || MT_ERR.failed; }
   var MT_APPS = [
     ["Google Home", "Touch and hold the device, then Settings, Linked Matter apps and services, Link apps and services, Use pairing code."],
     ["Apple Home", "Open the device, then its settings. Near the bottom pick Turn On Pairing Mode, then Copy Code. The code lasts 5 minutes."],
@@ -7131,7 +7134,7 @@
     if (zone === "settings") renderSettings();
     M.commission(c.code).then(function (r) {
       MT_ADD.busy = false;
-      SET.msg = r.ok ? (r.added && r.added.length ? "Added: " + r.added.join(", ") + "." : "Added.") + " It shows in your smart home widgets now." : mtSay(r);
+      SET.msg = r.ok ? (r.added && r.added.length ? "Added: " + r.added.join(", ") + ". It shows in your smart home widgets now." : "Added. It shows here once the device answers.") : mtSay(r);
       if (zone === "settings") renderSettings();
     });
   }
@@ -7152,7 +7155,7 @@
         } },
         { kind: "action", key: "mt-remove", label: "Remove from this TV", danger: true, confirmText: "Press OK again to remove it", sub: "It stays in your Google, Apple, SmartThings or Alexa app.", act: function () {
           SET.msg = "Removing...";
-          M.remove(entity).then(function (r) { SET.msg = r.ok ? "Removed from this TV." : mtSay(r); if (r.ok) SET.sub = up; if (zone === "settings") renderSettings(); });
+          M.remove(entity).then(function (r) { SET.msg = r.ok ? "Removed from this TV." + (r.unanswered ? " The device did not answer, so your other app may still list the TV. You can take it off there." : "") : mtSay(r); if (r.ok) SET.sub = up; if (zone === "settings") renderSettings(); });
         } }];
     } };
     SET.keyFocus = null; SET.ri = 0;

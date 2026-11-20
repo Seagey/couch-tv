@@ -42,11 +42,13 @@ const server = http.createServer((req, res) => {
       if (url === "/api/matter/devices") return json(200, { devices: MD, ready: true });
       if (url === "/api/matter/commission") {
         if (body.code === "34970112332") { MD.push({ id: "matter:9:1", name: "Matter light", domain: "light", state: "off", attributes: {} }); return json(200, { ok: true, device_ids: ["matter:9:1"] }); }
+        // the on-TV app (Matter.kt, ea574c2): a lock joins, the TV sees what it is and leaves it again
+        if (body.code === "12345678902") return json(200, { ok: true, device_ids: [], note: "That device is not something the TV shows (locks, alarms and garage doors never show), so the TV did not keep it." });
         return json(400, { ok: false, error: "expired" });
       }
       const d = MD.find((x) => body && x.id === body.id);
       if (url === "/api/matter/rename" && d) { d.name = body.name; return json(200, { ok: true }); }
-      if (url === "/api/matter/remove" && d) { MD.splice(MD.indexOf(d), 1); return json(200, { ok: true }); }
+      if (url === "/api/matter/remove" && d) { MD.splice(MD.indexOf(d), 1); return json(200, d.id === "matter:1:1" ? { ok: true, removed: [d.id], note: "The device did not answer, so the TV forgot it." } : { ok: true, removed: [d.id] }); }
       if (url.indexOf("/api/matter/") === 0) return json(400, { ok: false, error: "refused" });
       return json(404, { ok: false, error: "no such endpoint" });
     });
@@ -150,6 +152,9 @@ console.log("Running Matter UI browser tests...");
   await type("749701123365521327694");
   await page.waitForTimeout(400);
   ok(/That code ran out/.test(await said()), "a code that ran out says so plainly");
+  await type("2000 000 0000");
+  await page.waitForTimeout(400);
+  ok(/never adds locks, alarms or garage doors/.test(await said()), "a lock shared by mistake says so plainly (the bridge's not_allowed)");
   await type("3497 011 2332");
   await page.waitForFunction(() => /Added: Matter light/.test(document.querySelector("#settings").textContent), null, { timeout: 6000 }).catch(() => {});
   ok(/Added: Matter light/.test(await said()), "added, by name");
@@ -206,13 +211,17 @@ console.log("Running Matter UI browser tests...");
   ok(/One of those numbers is wrong/.test(await msg()) && !phoneAsked.some((x) => /commission/.test(x)), "a typo is caught on the phone, nothing sent");
   await page.fill("#matter-code", "749701123365521327694"); await page.click("#matter-add"); await page.waitForTimeout(600);
   ok(/That code ran out/.test(await msg()), "a code that ran out: " + await msg());
+  await page.fill("#matter-code", "1234 567 8902"); await page.click("#matter-add"); await page.waitForTimeout(600);
+  ok(/never adds locks, alarms or garage doors/.test(await msg()) && !/Added/.test(await msg()), "a lock the TV left again is not called added: " + await msg());
   await page.fill("#matter-code", "3497-011-2332"); await page.click("#matter-add"); await page.waitForTimeout(800);
   ok(/Added/.test(await msg()) && /Matter light/.test(await page.evaluate(() => document.getElementById("matter-list").textContent)), "added and listed: " + await msg());
   ok(phoneAsked.some((x) => x === '/api/matter/commission {"code":"34970112332"}'), "the code is sent as plain numbers");
   await page.click('#matter-list li[data-id="matter:9:1"] button[data-mt="rename"]'); await page.waitForTimeout(700);
   ok(/Desk lamp/.test(await page.evaluate(() => document.getElementById("matter-list").textContent)), "renamed");
   await page.click('#matter-list li[data-id="matter:9:1"] button[data-mt="remove"]'); await page.waitForTimeout(700);
-  ok(!/Desk lamp/.test(await page.evaluate(() => document.getElementById("matter-list").textContent)) && /off the TV/.test(await msg()), "removed");
+  ok(!/Desk lamp/.test(await page.evaluate(() => document.getElementById("matter-list").textContent)) && /off the TV/.test(await msg()) && !/did not answer/.test(await msg()), "removed");
+  await page.click('#matter-list li[data-id="matter:1:1"] button[data-mt="remove"]'); await page.waitForTimeout(700);
+  ok(/Lounge lamp is off the TV\. The device did not answer/.test(await msg()), "a device that did not answer: removed, and it says the other app may still list the TV: " + await msg());
   const small = await page.evaluate(() => Array.prototype.filter.call(document.querySelectorAll("#matter button, #matter input"), (e) => e.offsetParent && e.getBoundingClientRect().height < 40).length);
   ok(small === 0, "every button and box at least 40 px tall");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "matter-phone-after.png") });
