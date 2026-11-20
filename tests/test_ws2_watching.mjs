@@ -407,6 +407,20 @@ const tv = TV = await tvPage(design, "&ontv=1");
   // Hold OK on a widget that stayed: it is its own, never one that left
   const m = await holdOn(tv, "okeeprow");
   ok(m.args.indexOf("okeeprow|keeprow") >= 0 && !m.args.some((a) => /odock|ostack|okeep\|/.test(a || "")), "Hold OK offers only the widget there: " + m.args.join(","));
+  // then every one of the 14 taken off (only a clock left): each leaves every screen
+  await newDesign(tv, { v: 1, background: { colour: "#1d3a4f" }, elements: design.elements, objects: [{ id: "oclock", type: "widget", kind: "clock", x: 40, y: 40, w: 400, h: 200 }] }, "&ontv=1");
+  const v2 = await phoneView(tv);
+  KINDS.forEach((k) => ok(!v2.widgets.some((x) => x.kind === k || x.key.indexOf("o" + k) === 0), k + " off the design: gone from the phone's list"));
+  const rows2 = await homeRows(tv);
+  KINDS.forEach((k) => ok(rows2.indexOf(NAMES[k] + ", ") < 0, k + " off the design: gone from Home settings, Widgets on this home"));
+  await phone.reload();
+  await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
+  await phone.waitForTimeout(1500);
+  const titles2 = await phone.evaluate(() => [...document.querySelectorAll("#w-list summary")].map((e) => e.textContent).join(" | "));
+  KINDS.forEach((k) => ok(titles2.indexOf(NAMES[k] + ", ") < 0, k + " off the design: gone from the phone page"));
+  const m2 = await holdOn(tv, "oclock");
+  ok(!m2.args.some((a) => KINDS.some((k) => (a || "").endsWith("|" + k))), "Hold OK on the clock offers none of the 14: " + m2.args.join(","));
+  ok(!(await tv.evaluate((ks) => ks.some((k) => !!document.querySelector('.cw-o[data-obj="o' + k + '"]')), KINDS)), "none of the 14 is drawn on the home");
   ok(!phone.errors.length, "no phone page errors: " + phone.errors.join("; "));
   await ctx.close();
 }

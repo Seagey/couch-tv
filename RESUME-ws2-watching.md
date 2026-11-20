@@ -48,6 +48,9 @@ Branch ws2-watching off integrate-0.13.9 (4a705fe). No push, tag or version bump
   worktrees was refused by the permission check (not bypassed). The parsers (spotify_now.card_item,
   queue_items) are unchanged on this branch.
 
+- test_ws2_watching.mjs extended: all 14 kinds taken off the design (only a clock left) leave the phone's list,
+  Home settings Widgets on this home, the phone page, Hold OK and the home. Rerun 21 Nov 05:55 under the lock: 216 pass.
+
 ## Next steps
 None in scope. Branch is ready to merge.
 Nothing runs on the MacBook or an emulator.
