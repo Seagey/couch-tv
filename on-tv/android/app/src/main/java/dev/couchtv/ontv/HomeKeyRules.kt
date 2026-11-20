@@ -136,11 +136,16 @@ object HomeKeyRules {
         watchApk && installingAt != 0L -> "finish"
         watchApk -> if (turnedOn) "clear" else ""
         installingAt == 0L -> if (turnedOn) "undo" else ""
+        // the TV clock went backwards after the mark was written: the window cannot be judged, so it is over
+        now < installingAt -> "undo"
         now - installingAt > INSTALL_WINDOW -> "undo"
         else -> "wait"
     }
 
     /** After resumeStep: switch Use as home screen off again (only what this try switched on, only when it did not finish). */
+    /** How long to wait before resume() looks again: never longer than the window (a clock that jumped cannot make it days). */
+    fun waitMs(installingAt: Long, now: Long): Long = (installingAt + INSTALL_WINDOW - now).coerceIn(0L, INSTALL_WINDOW) + 1000
+
     fun homeOffOnResume(step: String, turnedOn: Boolean) = step == "undo" && turnedOn
 
     /**

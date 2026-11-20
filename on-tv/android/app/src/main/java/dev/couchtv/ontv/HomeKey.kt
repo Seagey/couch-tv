@@ -203,7 +203,7 @@ object HomeKey {
         error = "slow"; phase = ""; progress = 0
         changed(app)
         val at = store(app).getLong("installing", System.currentTimeMillis())
-        main.postDelayed({ resume(app) }, maxOf(0L, at + HomeKeyRules.INSTALL_WINDOW - System.currentTimeMillis()) + 1000)
+        main.postDelayed({ resume(app) }, HomeKeyRules.waitMs(at, System.currentTimeMillis()))
     }
 
     /** App.onCreate: carry on after the install restarted the app as the watch APK. */
@@ -221,7 +221,7 @@ object HomeKey {
             }
             "clear" -> st.edit().remove(TURNED_ON).apply()
             // still the phone version: the install may still be going (this process is new, so nothing is watching it)
-            "wait" -> main.postDelayed({ resume(app) }, at + HomeKeyRules.INSTALL_WINDOW - now + 1000)
+            "wait" -> main.postDelayed({ resume(app) }, HomeKeyRules.waitMs(at, now))
             "undo" -> {
                 // the install never finished: forget it, and Home off again if that try switched it on
                 if (HomeKeyRules.homeOffOnResume(step, turnedOn(app))) Log.w(TAG, "an unfinished try: Use as home screen off again")

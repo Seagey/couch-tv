@@ -47,5 +47,9 @@ plain22.apk (assembleRelease, 22/0.13.9), watch22.apk (assembleWatch), plain21.a
 - Unit tests now write a real log: scratchpad/hk-r6-unit.sh writes scratchpad/hk-r6-unit.log (every class with counts, from the XML of that run).
 - Counts: Kotlin 138 tests, 0 failures (HomeKeyRulesTest 18, SetupWordsTest 14); emulator 48 of 48, S and A to D (scratchpad/hk-emu-r6.log, pictures in scratchpad/hk-emu-out-r6, all from 07:32 to 07:35); 15 node tests pass (widget_caps 4548). Browser (scratchpad/hk-r6-browser.log, 07:59 to 08:01): homekey 344, one button update 29, phone settings 129, TCL fixes 26, all pass. Emulator stopped.
 
+## Round 7 (21 Nov, 08:05): GO at 7db1c68, one low
+- A TV clock that goes backwards after "installing" is written: HomeKeyRules.resumeStep answers "undo" when now < installingAt; both resume() waits use HomeKeyRules.waitMs, capped at INSTALL_WINDOW + 1 s (never days, never negative). Unit test aClockThatGoesBackwardsNeverWaitsForDays.
+- Kotlin 139 tests, 0 failures (HomeKeyRulesTest 19, SetupWordsTest 14), scratchpad/hk-r7-unit.log. No emulator rerun (asked for none).
+
 ## Left
 Nothing in scope. Release gate owned by the coordinator: the help page https://couchtv.joshuaseage.com/help/home-button/ must be deployed (Fable item 2).

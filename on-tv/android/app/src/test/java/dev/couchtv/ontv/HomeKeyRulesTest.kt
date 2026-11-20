@@ -194,9 +194,27 @@ class HomeKeyRulesTest {
         assertTrue(put.contains("return \"slow\""))
         assertFalse(put.contains("return \"failed\""))
         assertTrue(hk.contains("\"wait\" -> slow(app)"))
-        assertTrue(hk.contains("main.postDelayed({ resume(app) }, maxOf(0L, at + HomeKeyRules.INSTALL_WINDOW"))
+        assertTrue(hk.contains("main.postDelayed({ resume(app) }, HomeKeyRules.waitMs(at, System.currentTimeMillis()))"))
+        assertTrue(hk.contains("main.postDelayed({ resume(app) }, HomeKeyRules.waitMs(at, now))"))
+        assertFalse(hk.contains("INSTALL_WINDOW - now"))
         assertTrue(hk.contains("store(app).getLong(\"installing\", 0L), System.currentTimeMillis(), false) == \"wait\") {\n                error = \"slow\""))
         assertTrue(hk.contains("if (error == \"slow\") error = \"failed\""))
+    }
+
+    @Test fun aClockThatGoesBackwardsNeverWaitsForDays() {
+        val w = HomeKeyRules.INSTALL_WINDOW
+        val t0 = 9_000_000_000L
+        // the clock went back after the mark was written: the window is over, Home off again if this try switched it on
+        assertEquals("undo", HomeKeyRules.resumeStep(false, t0, t0 - 1, turnedOn = true))
+        assertEquals("undo", HomeKeyRules.resumeStep(false, t0, t0 - 3L * 24 * 3600_000, turnedOn = true))
+        assertTrue(HomeKeyRules.homeOffOnResume("undo", true))
+        // the watch APK still finishes whatever the clock says
+        assertEquals("finish", HomeKeyRules.resumeStep(true, t0, t0 - 1, turnedOn = true))
+        // the wait is never longer than the window, and never negative
+        assertEquals(w + 1000, HomeKeyRules.waitMs(t0, t0 - 3L * 24 * 3600_000))
+        assertEquals(w + 1000, HomeKeyRules.waitMs(t0, t0))
+        assertEquals(w / 2 + 1000, HomeKeyRules.waitMs(t0, t0 + w / 2))
+        assertEquals(1000L, HomeKeyRules.waitMs(t0, t0 + w + 5))
     }
 
     @Test fun theCodeKeepsTheFlagAndTheWordsTrue() {
