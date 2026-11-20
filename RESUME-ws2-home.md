@@ -33,6 +33,8 @@ memory, screentime, wifi, card, photo, slideshow, mosaic, artframe. Every settin
 - Browser: test_widget_detail_browser.mjs 296. test_widget_fit_all.mjs 8. test_ws2_home.mjs 263 (second green run).
   test_ws_tv.mjs 1115. test_design_settings_browser.mjs 108.
 
+- Real data, 21 Nov: Google's public Australian holidays .ics (calendar.google.com, 135 KB) parsed by athome.js parseIcs: isIcs true, 10 events in the next 120 days (Christmas Eve first). Agenda reads exactly this. The other kinds read what is kept on this TV (At home, people, photos, screen time) or the home computer's live cards; none is a web service.
+
 ## Left
 Nothing in scope. Branch finished (no push, tag or bump). Merge note: no file in common with nl-photo, so the two merge cleanly (checked with git diff --name-only
 against integrate-0.13.9).
