@@ -44,6 +44,8 @@ object DiscoveryModel {
         /** True when an address sits in a Thread prefix a border router announced (omr), so it is a Thread device. */
         val onThread: Boolean,
         val sources: Set<String>,
+        /** The TXT record as key to value bytes, as the Matter controller wants it. */
+        val txt: Map<String, ByteArray> = emptyMap(),
     ) {
         /** Addresses the controller should try, best first: routable IPv6, IPv4, then link-local IPv6. */
         val addresses: List<String> get() =
@@ -294,7 +296,7 @@ object DiscoveryModel {
                         host = srv[n.key]?.target?.toString()?.takeUnless { it.endsWith(".nsdhost") },
                         port = srv[n.key]?.port,
                         ipv4 = a4, ipv6 = a6, onThread = onThread,
-                        sources = sources[n.key]?.toSet() ?: emptySet(),
+                        sources = sources[n.key]?.toSet() ?: emptySet(), txt = t,
                     )
                 }
             }
