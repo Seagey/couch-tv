@@ -2485,7 +2485,18 @@
       sheet = { el: el, nodes: items.nodes, i: 0 };
       paintSheet();
     }
-    function paintSheet() { if (sheet) sheet.nodes.forEach(function (n, k) { n.classList.toggle("cw-ifocus", k === sheet.i); }); }
+    function paintSheet() {
+      if (!sheet) return;
+      sheet.nodes.forEach(function (n, k) { n.classList.toggle("cw-ifocus", k === sheet.i); });
+      // a long app list (Add app, Change app): the list scrolls so the app the remote is on stays in view
+      // (a TCL, 20 Nov 2026: the list ran off the screen and the remote seemed to do nothing)
+      var box = sheet.el.querySelector(".cw-sheet-apps"), n = sheet.nodes[sheet.i];
+      if (box && n && box.scrollHeight > box.clientHeight) {
+        var top = n.offsetTop, bot = top + n.offsetHeight + 40;   // the list is positioned, so offsetTop is inside it
+        if (top - 24 < box.scrollTop) box.scrollTop = Math.max(0, top - 24);
+        else if (bot > box.scrollTop + box.clientHeight) box.scrollTop = bot - box.clientHeight;
+      }
+    }
     function closeSheet() { if (sheet && sheet.el.parentNode) sheet.el.parentNode.removeChild(sheet.el); sheet = null; paint(); }
     function holdMenu() {
       tipUsed();

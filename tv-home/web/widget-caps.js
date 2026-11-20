@@ -537,6 +537,8 @@
     on: function (kind, platform) { var c = C[kind]; return c && c.platforms[platform] ? c.platforms[platform].on : "no"; },
     need: function (kind, platform) { var c = C[kind]; return c && c.platforms[platform] ? c.platforms[platform].need : "no"; },
     steps: steps,
+    // the widget's own settings (WIDGET-SETTINGS-CONTRACT.md): [] when it has none
+    settings: function (kind) { var c = C[kind]; return (c && c.settings) || []; },
     // "" or the line saying why a widget is marked unofficial (its source is unofficial)
     beta: function (kind) { var c = C[kind]; return (c && c.beta) || ""; },
     card: card

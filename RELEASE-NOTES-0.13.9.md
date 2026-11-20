@@ -54,6 +54,14 @@ For TVs where typing a code with the remote is slow, such as Samsung, LG and App
 
 On a real TCL the TV kept an earlier question it thought was still open and never showed a new one, so the app waited for nothing. When the whole wait passes with no answer, the setup screen and the phone page now say: "No answer from the TV. If it did not show its Allow debugging question, restart the TV, then try again."
 
+### From the community
+
+- **An Inputs tile for a simple home, thanks Gil124** ([#296](https://github.com/Seagey/couch-tv/pull/296)). A switch in Home settings, Keep watching (or `home.input_tile`) puts an Inputs tile first in the dock, so each HDMI port is one press from the apps. It is off unless you turn it on.
+- **The Classic and OLED grid keeps the focus on screen, thanks Gil124** ([#294](https://github.com/Seagey/couch-tv/pull/294)). With many apps, the grid now slides up a row at a time.
+- **A way to measure a TV, thanks Gil124** ([#293](https://github.com/Seagey/couch-tv/pull/293)). `tv-home/tools/bench-tv.py` measures frames, memory and cold start; [docs/PERFORMANCE.md](docs/PERFORMANCE.md) has the steps.
+- **Two TVs in sync: review fixes, thanks FromTheGods** ([#295](https://github.com/Seagey/couch-tv/pull/295)).
+- **Bring back an app the home hides:** `home.show_packages`, for example the Google TV app.
+
 ### Files
 
 `couch-tv-home.apk` (the TV home, options A and B), `couch-tv-ontv.apk` (option C, the phone only download), `couch-tv-ontv-watch.apk` (option C with the home watch, from a computer), `couch-tv-sync.apk` (two TVs in sync, unchanged since 0.13), `couch-tv-samsung-setup.zip` and `couch-tv-samsung.wgt` (Samsung), with `SHA256SUMS.txt`. The Setup app zips for Mac (Apple silicon and Intel) and Windows are built on GitHub when the release is published, with their own `SHA256SUMS-setup.txt`.
