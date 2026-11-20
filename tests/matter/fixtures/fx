@@ -1,0 +1,3 @@
+#!/bin/sh
+# Virtual Matter devices for the contract test. Runs on the MacBook: see fx.py and docs/MATTER-TESTING.md.
+exec python3 "$HOME/matter-fixtures/fx.py" "$@"
