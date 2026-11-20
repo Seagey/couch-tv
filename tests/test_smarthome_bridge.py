@@ -282,8 +282,32 @@ class SmartHomeTest(unittest.TestCase):
             ("binary_sensor.front_gate", {"device_class": "door"}), ("binary_sensor.garage_door", {"device_class": "garage_door"}),
             ("binary_sensor.back", {"device_class": "lock"}), ("binary_sensor.hall_window", {"device_class": "window"}),
             ("binary_sensor.front_doorbell", {}), ("event.front_door_ding", {"device_class": "doorbell"}),
+            ("binary_sensor.side_gate", {}), ("binary_sensor.shed", {"friendly_name": "Garage door"}), ("binary_sensor.doorbell_button", {}),
             ("sensor.front_door_lock", {}), ("sensor.alarm_state", {}), ("sensor.garage_temp", {"unit_of_measurement": "°C"}))]
-        self.assertEqual([e["entity"] for e in smarthome.pickable(states)], ["binary_sensor.front_doorbell", "event.front_door_ding", "sensor.garage_temp"])
+        self.assertEqual([e["entity"] for e in smarthome.pickable(states)],
+                         ["binary_sensor.doorbell_button", "binary_sensor.front_doorbell", "event.front_door_ding", "sensor.garage_temp"])
+
+    def test_a_scene_found_to_open_the_house_is_no_longer_drawn(self):
+        # picked earlier (config.json, or before it was changed in Home Assistant): a refused run takes its tile away
+        more = {"scene.evening": {"entity_id": "scene.evening", "state": "x", "attributes": {"entity_id": ["light.lamp", "lock.front"]}},
+                "script.arrive": {"entity_id": "script.arrive", "state": "off", "attributes": {"friendly_name": "Open the garage"}},
+                "scene.movie3": {"entity_id": "scene.movie3", "state": "x", "attributes": {"entity_id": ["light.lamp"]}}}
+        STATES.update(more)
+        try:
+            h = smarthome.Home(self.dir, {"url": "http://homeassistant.local:8123", "scenes": [{"entity": e} for e in more]}, TOKEN)
+            h.call = self.home.call
+            self.assertEqual([n["entity"] for n in h.info()["scenes"]], ["scene.evening", "script.arrive", "scene.movie3"])
+            self.assertEqual(run(h.answer("scene", "scene.evening"))["error"], "refused")
+            self.assertEqual(run(h.answer("scene", "script.arrive"))["error"], "refused")
+            self.assertTrue(run(h.answer("scene", "scene.movie3"))["ok"])
+            self.assertEqual([n["entity"] for n in h.info()["scenes"]], ["scene.movie3"], "the refused ones no longer draw a tile")
+            # a failed read is not a refusal: the tile stays
+            STATES.pop("scene.movie3")
+            self.assertEqual(run(h.answer("scene", "scene.movie3"))["error"], "failed")
+            self.assertEqual([n["entity"] for n in h.info()["scenes"]], ["scene.movie3"])
+        finally:
+            for k in more:
+                STATES.pop(k, None)
 
     def test_config_section_with_env_token(self):
         h = smarthome.Home(self.dir, {"url": "http://ha:8123", "scenes": [{"entity": "scene.movie"}]}, TOKEN)

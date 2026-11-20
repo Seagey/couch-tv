@@ -390,12 +390,30 @@ class HomeAssistantTest {
             {"entity_id":"binary_sensor.back","attributes":{"device_class":"lock"}},
             {"entity_id":"binary_sensor.hall_window","attributes":{"device_class":"window"}},
             {"entity_id":"binary_sensor.front_doorbell","attributes":{}},
+            {"entity_id":"binary_sensor.side_gate","attributes":{}},
+            {"entity_id":"binary_sensor.shed","attributes":{"friendly_name":"Garage door"}},
+            {"entity_id":"binary_sensor.doorbell_button","attributes":{}},
             {"entity_id":"event.front_door_ding","attributes":{"device_class":"doorbell"}},
             {"entity_id":"sensor.front_door_lock","attributes":{}},
             {"entity_id":"sensor.alarm_state","attributes":{}},
             {"entity_id":"sensor.garage_temp","attributes":{"unit_of_measurement":"°C"}}
         ]""")
         val p = HomeAssistant.pickable(all)
-        assertEquals(listOf("binary_sensor.front_doorbell", "event.front_door_ding", "sensor.garage_temp"), (0 until p.length()).map { p.getJSONObject(it).getString("entity") })
+        assertEquals(listOf("binary_sensor.doorbell_button", "binary_sensor.front_doorbell", "event.front_door_ding", "sensor.garage_temp"), (0 until p.length()).map { p.getJSONObject(it).getString("entity") })
+    }
+
+    @Test fun aSceneFoundToOpenTheHouseIsRemembered() {
+        val k = HomeAssistant.parseForTest(JSONObject(section.toString()).put("scenes", JSONArray("""[{"entity":"scene.evening"},{"entity":"script.arrive"},{"entity":"scene.movie3"}]""")))!!
+        state("scene.evening", "x", "{\"entity_id\":[\"lock.front\"]}")
+        state("script.arrive", "off", "{\"friendly_name\":\"Open the garage\"}")
+        state("scene.movie3", "x", "{\"entity_id\":[\"light.lounge\"]}")
+        HomeAssistant.refusedScenes.clear()
+        assertEquals("refused", HomeAssistant.answerForTest(k, "scene", "scene.evening", "").getString("error"))
+        assertEquals("refused", HomeAssistant.answerForTest(k, "scene", "script.arrive", "").getString("error"))
+        assertTrue(HomeAssistant.answerForTest(k, "scene", "scene.movie3", "").getBoolean("ok"))
+        assertEquals(setOf("scene.evening", "script.arrive"), HomeAssistant.refusedScenes.toSet())
+        states.remove("scene.movie3")   // a failed read is not a refusal
+        assertEquals("failed", HomeAssistant.answerForTest(k, "scene", "scene.movie3", "").getString("error"))
+        assertEquals(setOf("scene.evening", "script.arrive"), HomeAssistant.refusedScenes.toSet())
     }
 }

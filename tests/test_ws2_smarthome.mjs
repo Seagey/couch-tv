@@ -547,6 +547,28 @@ await phone.waitForFunction(() => document.querySelectorAll("#w-list details").l
   ok(!r.ok, "Red below out of range is refused");
 }
 
+group = "a scene that opens the house";
+{
+  // picked earlier, then the TV refuses to run it (Home Assistant names it for a lock, or it sets one):
+  // its button goes from the widget and from the pick lists at once
+  await tv.evaluate(() => {
+    const was = window.TVHA.request;
+    window.TVHA.request = function (id, action, entity, value) {
+      if (action === "scene" && entity === "scene.lights_off") return setTimeout(() => window.smartHome.reply(id, { ok: false, error: "refused" }), 50);
+      return was.apply(this, arguments);
+    };
+  });
+  ok(/Lights off/.test((await onScreen(tv, idOf("scenes"))).text), "the scenes widget shows Lights off before it is run: " + (await onScreen(tv, idOf("scenes"))).text);
+  const r = await tv.evaluate(() => window.smartHome.request("scene", "scene.lights_off"));
+  ok(r && r.error === "refused", "running it is refused: " + JSON.stringify(r));
+  await tv.waitForTimeout(1500);
+  const after = (await onScreen(tv, idOf("scenes"))).text;
+  ok(!/Lights off/.test(after) && /Movie night/.test(after), "its button is gone, the rest show: " + after);
+  const opts = await tv.evaluate(() => window.tv.atHomeRead().design.widgets.find((w) => w.kind === "scenes").settings.find((x) => x.key === "scenes").options.map((o) => o[0]));
+  ok(opts.indexOf("scene.lights_off") < 0 && opts.indexOf("scene.movie_night") >= 0, "and from the scenes pick list: " + opts.join(","));
+  ok(!tv.errors.length, "no TV page errors: " + tv.errors.join("; "));
+}
+
 group = "only while on screen";
 {
   // the design changes: the camera, scenes and battery leave it

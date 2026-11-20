@@ -110,7 +110,19 @@
     return r;
   }
   function ask(action, entity, value) {
-    return action === "controls" ? askAny(action, entity, value).then(safeControls) : askAny(action, entity, value);
+    if (action === "controls") return askAny(action, entity, value).then(safeControls);
+    if (action === "scene") return askAny(action, entity, value).then(function (r) { return sceneRefused(entity, r); });
+    return askAny(action, entity, value);
+  }
+  // a scene or script picked earlier that the TV or computer refuses to run (it opens the house): its
+  // button goes from every list at once, as the bridge's info() leaves it out from then on
+  function sceneRefused(entity, r) {
+    if (r && r.ok === false && r.error === "refused" && typeof entity === "string" && entity) {
+      OPENERS[entity] = true;
+      if (INFO) INFO.scenes = INFO.scenes.filter(houseSafe);
+      changed("info", native() ? native().info() : "");
+    }
+    return r;
   }
   function askAny(action, entity, value) {
     if (DIRECT && window.TVHA) {

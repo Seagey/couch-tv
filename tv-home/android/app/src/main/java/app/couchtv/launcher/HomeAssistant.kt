@@ -312,14 +312,14 @@ object HomeAssistant {
                 val failed = JSONObject().put("ok", false).put("error", "failed")
                 val st = state(s, sc.entity) ?: return failed
                 val a = st.optJSONObject("attributes") ?: JSONObject()
-                if (HaReadings.opensHouse(sc.entity, a)) return refused
+                if (HaReadings.opensHouse(sc.entity, a)) { refusedScenes.add(sc.entity); return refused }
                 if (sc.entity.startsWith("scene.")) {
                     val members = HashMap<String, JSONObject>()
                     for (e in HaReadings.sceneMembers(a)) {
                         if ((e.startsWith("cover.") || e.startsWith("switch.")) && e !in members)
                             members[e] = state(s, e)?.let { it.optJSONObject("attributes") ?: JSONObject() } ?: return failed
                     }
-                    if (HaReadings.sceneOpensHouse(a) { members[it] }) return refused
+                    if (HaReadings.sceneOpensHouse(a) { members[it] }) { refusedScenes.add(sc.entity); return refused }
                 }
                 done(service(s, sc.entity.substringBefore('.'), "turn_on", id))
             }
@@ -332,6 +332,8 @@ object HomeAssistant {
     // What was last read for each control (is it a garage door?) and speaker (can its volume be
     // set?), to check a switch or a volume against: nothing is switched that was not read first.
     private val readControls = ConcurrentHashMap<String, Boolean>()
+    // scenes and scripts a run found open the house: info() leaves them out (bridge/smarthome.py refused_scenes)
+    internal val refusedScenes: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val readSpeakers = ConcurrentHashMap<String, JSONObject>()
     internal var clock: () -> Long = { System.currentTimeMillis() }
     private const val HOUR = 3_600_000L
@@ -470,6 +472,7 @@ object HomeAssistant {
             if (ent.startsWith("scene.") && HaReadings.sceneOpensHouse(a) { HaReadings.attributes(states, it) }) continue
             // a door, gate or lock as a reading; a sensor with no unit named for one ("Front door lock")
             if (ent.startsWith("binary_sensor.") && a.optString("device_class") in HaReadings.OPENING_SENSORS) continue
+            if (ent.startsWith("binary_sensor.") && a.optString("device_class").isEmpty() && HaReadings.opensHouse("switch." + ent.substringAfter('.'), a)) continue
             if (ent.startsWith("sensor.") && a.optString("unit_of_measurement").isEmpty() && HaReadings.opensHouse("switch." + ent.substringAfter('.'), a)) continue
             val o = JSONObject().put("entity", ent).put("name", a.optString("friendly_name").trim().take(40).ifEmpty { pretty(ent) })
             a.optString("unit_of_measurement").takeIf { it.length in 1..12 && !it.contains('<') }?.let { o.put("unit", it) }

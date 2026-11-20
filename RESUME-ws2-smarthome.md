@@ -26,17 +26,18 @@ Last review: coord/fable-1121-ws2-smarthome-partial.md (NO-GO, partial). Every f
   6. "group." members make a scene refused.
   7. control() sets blocked before the not-answering return; a blocked one is remembered, so "set" refuses it; the bridge's info() drops it. (Android info() lives in nl-haqr's moved file: add the same filter there at merge, see below; the page already drops it, smarthome.js OPENERS.)
   9. test_widget_detail_browser counts one check on every path. 10. widget-detail.js comment indent.
+- GO at 0735b43; then three lows: a scene or script refused for opening the house is kept in refused_scenes and left out of the bridge's info() (smarthome.js also drops its button at once on any refused run, every platform); the Smart home row says "So is anything Home Assistant names for a garage, gate, door, lock or alarm."; a binary_sensor with no device class whose "switch." + id or name fails the house test is never listed (doorbells stay).
 
 ## Merge notes
 - nl-haqr (trial merge in a scratch worktree, then removed): conflicts in bridge/smarthome.py, tv-home/tools/home-config.py, HomeAssistant.kt (the OPENS_HOUSE lines: take this branch's; keep nl-haqr's REFUSED_WAIT line), tests/test_ha_widgets_config.py (keep both sides), docs/CONFIG.md (take this branch's two table rows, nl-haqr's paragraph). Resolved that way (scratchpad/ws2sh-resolve.py), everything passed: Android tv-home app.couchtv.ha HomeAssistantTest 22, HaReadingsTest 15, HaSignInTest 11, HaPhoneTest 5, HaRealTest 1 skipped; on-tv unit tests all passed; pytest smarthome_bridge + ha_widgets_config + ha_phone_bridge 32; test_opens_house.js 343.
-- After the nl-haqr merge: add "self.unit = None" to keep_sign_in and keep_picks in bridge/smarthome.py; in HomeAssistant.kt info(ctx) use names(s.controls.filter { readControls[it.entity] != true }).
+- After the nl-haqr merge: add "self.unit = None" to keep_sign_in and keep_picks in bridge/smarthome.py; in HomeAssistant.kt info(ctx) use names(s.controls.filter { readControls[it.entity] != true }), and names(s.scenes.filter { it.entity !in refusedScenes }) in info(ctx) (HomeAssistant.refusedScenes is already filled by the "scene" action on this branch; info() lives only in nl-haqr's moved file, so it is added there at merge). Until then the page drops a refused scene itself (smarthome.js sceneRefused).
 - Other branches: see the Fable review's merge notes (widget-caps.js, app.js wsOptions, nl-remote English lines; the new Smart home row is English only).
 
 ## Tests (all green, 21 Nov, at ca013e4 and the final commit)
 - node: test_opens_house.js 343, test_ws_schema.js 3760, test_widget_caps.js 4548, test_ha_token_never_leaves.js 28, test_design_widgets.js 221, test_design_sections.js passed.
-- pytest tests/test_smarthome_bridge.py tests/test_ha_widgets_config.py: 20 passed.
-- Android (scratchpad/ws2sh-gradle.sh, gradle lock): HomeAssistantTest 22, HaReadingsTest 15.
-- Browser (scratchpad/smarthome-run.sh under browser.lock, logs scratchpad/smarthome-results/): test_ws2_smarthome 238, test_smart_widgets_browser 56, test_widget_detail_browser 296, test_widget_fit_all 8 (1640 boxes, 0 problems), test_design_settings_browser 107, test_phone_settings_browser 129, test_integrations_browser 34, test_ws_tv 1115.
+- pytest tests/test_smarthome_bridge.py tests/test_ha_widgets_config.py: 21 passed.
+- Android (scratchpad/ws2sh-gradle.sh, gradle lock): HomeAssistantTest 23, HaReadingsTest 15.
+- Browser (scratchpad/smarthome-run.sh under browser.lock, logs scratchpad/smarthome-results/): test_ws2_smarthome 243, test_smart_widgets_browser 56, test_widget_detail_browser 296, test_widget_fit_all 8 (1640 boxes, 0 problems), test_design_settings_browser 107, test_phone_settings_browser 129, test_integrations_browser 34, test_ws_tv 1115.
 - In browser tests press Back slowly: five Back presses within 4 s switch a design off (design.js escapeDesign).
 
 ## Left

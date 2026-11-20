@@ -404,6 +404,8 @@ def pickable(states):
         # a door, gate or lock as a reading; a sensor with no unit named for one ("Front door lock")
         if ent.startswith("binary_sensor.") and a.get("device_class") in OPENING_SENSORS:
             continue
+        if ent.startswith("binary_sensor.") and not a.get("device_class") and opens_house("switch." + ent.split(".", 1)[1], a):
+            continue   # no class, but named for a door, gate or lock (a doorbell is not)
         if ent.startswith("sensor.") and not a.get("unit_of_measurement") and opens_house("switch." + ent.split(".", 1)[1], a):
             continue
         o = {"entity": ent, "name": (str(a.get("friendly_name") or "").strip()[:40] or pretty(ent))}
@@ -428,6 +430,7 @@ class Home:
         self.config_section = config_section
         self.env_token = env_token
         self.limits, self.read_controls, self.read_speakers = {}, {}, {}
+        self.refused_scenes = set()   # scenes and scripts a run found open the house: no longer drawn
         self.unit = None   # Home Assistant's temperature unit, read once from /api/config
         self.pending = None
         self.call = self._call
@@ -514,7 +517,7 @@ class Home:
         def names(lst):
             return [{"entity": n["entity"], "name": n["name"] or pretty(n["entity"])} for n in lst]
         if s:
-            o = {"climate": names(s["climate"]), "scenes": names(s["scenes"]), "doorbell": s["doorbell"] is not None,
+            o = {"climate": names(s["climate"]), "scenes": names([n for n in s["scenes"] if n["entity"] not in self.refused_scenes]), "doorbell": s["doorbell"] is not None,
                  "controls": names([n for n in s["controls"] if not self.read_controls.get(n["entity"])]), "cameras": names(s["cameras"]), "sensors": names(s["sensors"]),
                  "speakers": names(s["speakers"]), "energy": s["energy"] is not None,
                  "doorbell_camera": bool(s["doorbell"] and s["doorbell"]["camera"])}
@@ -612,6 +615,7 @@ class Home:
                 return failed
             a = st.get("attributes") if isinstance(st.get("attributes"), dict) else {}
             if opens_house(entity, a):
+                self.refused_scenes.add(entity)
                 return refused
             if entity.startswith("scene."):
                 members = {}
@@ -622,6 +626,7 @@ class Home:
                             return failed
                         members[e] = m.get("attributes") if isinstance(m.get("attributes"), dict) else {}
                 if scene_opens_house(a, lambda e: members.get(e)):
+                    self.refused_scenes.add(entity)
                     return refused
             return done(await self.service(s, sc["entity"].split(".")[0], "turn_on", idd))
         if action == "controls":
@@ -772,7 +777,7 @@ class Home:
         if not parse(o):
             return {"ok": False, "error": "picks"}
         self._write(o)
-        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear(); self.unit = None
+        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear(); self.unit = None; self.refused_scenes.clear()
         return {"ok": True}
 
     def forget(self):
@@ -781,7 +786,7 @@ class Home:
             os.remove(self._path())
         except OSError:
             pass
-        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear(); self.unit = None
+        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear(); self.unit = None; self.refused_scenes.clear()
         return {"ok": True}
 
 

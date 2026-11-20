@@ -7241,7 +7241,7 @@
       var cur = SH.picks[g[0]] = SH.picks[g[0]] || [];
       var rows = [info("sh-g-most", "", "", g[3] === 1 ? "Pick one." : "Pick up to " + g[3] + ". They show in this order.")];
       // nothing that opens the house is offered (bridge/smarthome.py and HomeAssistant.kt pickable): say so
-      if (g[0] === "controls" || g[0] === "scenes") rows.push(info("sh-g-house", "", "", "Locks, alarms, garage doors and gates are left out. So is anything with garage, gate, door, lock or alarm in its Home Assistant name."));
+      if (g[0] === "controls" || g[0] === "scenes") rows.push(info("sh-g-house", "", "", "Locks, alarms, garage doors and gates are left out. So is anything Home Assistant names for a garage, gate, door, lock or alarm."));
       have.forEach(function (e) {
         rows.push({ kind: "check", key: "sh-e:" + e.entity, label: e.name, sub: e.unit || "", checked: cur.indexOf(e.entity) >= 0, act: function () {
           var i = cur.indexOf(e.entity);
