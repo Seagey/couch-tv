@@ -7329,7 +7329,17 @@
   function webStart() {
     if (WEB || typeof CouchWidgetWeb === "undefined" || !CouchDesign.widgetsOf || (MOCK && !/[?&]weblive=1/.test(Q))) return;
     WEB = CouchWidgetWeb.loader({
-      widgets: function () { return CouchDesign.widgetsOf(Object.keys(CouchWidgetWeb.SOURCES)); },
+      // each as it is on this TV: its own settings over the design's (a source, a competition or a
+      // watchlist picked on the TV is the one fetched), and a news source "Best for your country" as the feed
+      widgets: function () {
+        var W = window.CouchWidgets, env = { data: { wset: wsData(), country: homeCountry() } };
+        return CouchDesign.widgetsOf(Object.keys(CouchWidgetWeb.SOURCES)).map(function (w) {
+          if (!W || !W.withSettings) return w;
+          w = W.withSettings(w, env);
+          if (w.kind === "news" && W.feedFor) w = Object.assign({}, w, { opts: Object.assign({}, w.opts, { feed: W.feedFor((w.opts || {}).feed, env) }) });
+          return w;
+        });
+      },
       canRelay: webRelayOk, relay: webRelay,
       json: function (url) { return fetch(url).then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); }); },
       // the last answers, on this TV only (headlines and prices, never anything about the household)
@@ -7410,6 +7420,19 @@
     api("POST", "/api/continue/open", { id: it.id, who: p.owner }, 60000)
       .then(function (res) { status(res.note ? tBridge(res.note_key, res.note_vars, res.note) : ""); })
       .catch(function (e) { if (TV && it.app && TV.launch(it.app.package)) { status(""); return; } status(tBridge(e.key, e.vars, e.message)); });
+  }
+  // each Commute widget with its own Where to (or From): the same shape as commuteData, by the widget's id
+  function commuteByData() {
+    var out = {};
+    if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CouchDesign.widgetList) return out;
+    var home = commutePlaces();
+    CouchDesign.widgetList().filter(function (w) { return w.kind === "commute"; }).forEach(function (w) {
+      var to = cleanPlace(wsOf(w.key).to), from = cleanPlace(wsOf(w.key).from) || home.from;
+      if (!to) return;
+      out[w.id] = { from: from ? { name: from.name } : null, to: { name: to.name },
+        key: typeof CouchWidgetWeb !== "undefined" ? CouchWidgetWeb.routeKey(from, to) : null };
+    });
+    return out;
   }
   function commuteData() {
     var p = commutePlaces();
@@ -7547,7 +7570,9 @@
     out.timezone = typeof p.timezone === "string" && /^([A-Z][A-Za-z_]{1,30}(\/[A-Z][A-Za-z_-]{1,30}){1,2}|auto|UTC|GMT)$/.test(p.timezone) ? p.timezone : "auto";
     return out;
   }
-  function placeKey(p) { return Math.round(+p.lat * 100) / 100 + "," + Math.round(+p.lon * 100) / 100; }
+  // the same key the widgets look a place up by (widgets.js placeKey): two decimals each
+  function placeKey(p) { return (+p.lat).toFixed(2) + "," + (+p.lon).toFixed(2); }
+  function homeCountry() { try { return (window.I18N && I18N.country && I18N.country()) || ""; } catch (e) { return ""; } }
   // the place a widget's reading is for: its place setting (surf "place", the weather widgets' "town"),
   // never the Commute's two ends (they are its route, read by the commute itself)
   function wsPlace(key) {
@@ -7871,7 +7896,8 @@
           // each widget's own settings on this TV, by its id (WIDGET-SETTINGS-CONTRACT.md), and the
           // temperature unit Home settings chose ("c" or "f"); a widget with a place of its own gets that
           // place's weather (and swell or air) in wxFor[<its id>], else it reads weather, the home's town
-          wset: wsData(), unit: WX_F ? "f" : "c", wxFor: wxForData() };
+          wset: wsData(), unit: WX_F ? "f" : "c", wxAt: WX_SHOW && data.weather && data.weather.at ? data.weather.at : {}, wxBy: wxForData(),
+          commuteBy: commuteByData(), country: homeCountry() };
       },
       // the detail layers (widget-detail.js) ask Home Assistant through smarthome.js, never directly
       ha: function (action, entity, value) {

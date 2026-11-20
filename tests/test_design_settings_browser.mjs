@@ -309,6 +309,9 @@ await phone.waitForFunction(() => document.getElementById("design-line").style.d
   await tv.waitForTimeout(1500);
   ok(asked.some((a) => /^marine.* -38\.37,144\.28/.test(a)), "the swell is asked for Bells Beach: " + asked.filter((a) => /^marine/.test(a)).join("; "));
   ok(asked.some((a) => /^api\.open-meteo.* -38\.37,144\.28/.test(a)), "with Bells Beach's own forecast");
+  // the widget reads it (data().wset, data().wxAt): Bells Beach's own swell, named by its real place
+  await tv.waitForFunction(() => { const t = (document.querySelector('.cw-o[data-obj="s"]') || {}).textContent || ""; return /Bells Beach/.test(t) && /2\.3/.test(t); }, null, { timeout: 10000 });
+  ok(true, "the surf widget shows Bells Beach and its 2.3 m swell (the design's label beside it is the renderer's choice, tests/test_ws_tv.mjs)");
   ok(/Beach: Bells Beach/.test(await phone.textContent('#w-list details[data-key="s|surf"]')), "the phone shows the new beach, its box still open");
   if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, "phone-surf-place.png"), fullPage: true });
   await phone.click('#w-list details[data-key="s|surf"] button[data-wclear]');

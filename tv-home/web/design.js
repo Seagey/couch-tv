@@ -2789,7 +2789,8 @@
     // which of these widget kinds are on the home (air and surf ask their own free services only then)
     wantsKinds: function (kinds) { var on = {}; if (D && ON) list(D.objects).forEach(function (o) { o = obj(o); if (o.type === "widget") [o].concat(list(o.items)).forEach(function (it) { if (kinds.indexOf(obj(it).kind) >= 0) on[obj(it).kind] = 1; }); }); return Object.keys(on); },
     // the web widgets on the home, each with its options (widget-web.js asks only for these)
-    widgetsOf: function (kinds) { var out = []; if (D && ON) list(D.objects).forEach(function (o) { o = obj(o); if (o.type === "widget") [o].concat(list(o.items)).forEach(function (it) { it = obj(it); if (kinds.indexOf(it.kind) >= 0) out.push({ kind: it.kind, opts: obj(it.opts) }); }); }); return out; },
+    // (each with its id, "<stack id>/<its place>" for a widget in a stack, so its own settings can be read)
+    widgetsOf: function (kinds) { var out = []; if (D && ON) list(D.objects).forEach(function (o) { o = obj(o); if (o.type === "widget") [o].concat(list(o.items)).forEach(function (it, i) { it = obj(it); if (kinds.indexOf(it.kind) >= 0) out.push({ id: i ? o.id + "/" + (i - 1) : o.id, kind: it.kind, opts: obj(it.opts) }); }); }); return out; },
     wantsForecast: function () { return !!(D && ON && list(D.objects).some(function (o) { o = obj(o); return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return ["weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "air", "surf", "date"].indexOf(it.kind) >= 0; }); })); },
     nogo: function (part) { var pb = PART_BOX.filter(function (x) { return x[0] === part; })[0], n = pb && document.querySelector(pb[1]); return !!(n && n.getAttribute("data-nogo")); },
     // where the remote starts on the dock: the first app, as couch-tv does; with no app showing (a
