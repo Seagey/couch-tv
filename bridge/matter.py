@@ -8,26 +8,26 @@ Assistant devices. Nothing leaves the person's own home app: removing a device h
 The controller is the Open Home Foundation Matter Server ("matter-server" on npm, Apache 2.0): Home
 Assistant's own Matter controller, written on matter.js, so the same code runs on a Mac (Apple
 silicon or Intel), Linux and a Raspberry Pi with nothing to compile. This module starts it as the
-bridge's own service (bridge/matter/, installed by scripts/matter-setup.sh), listening on this
-computer only (127.0.0.1), with its fabric keys in bridge/data/matter (mode 700), and talks to it
-over its WebSocket API. The same API is spoken by python-matter-server, so config.json's
-"matter": {"server": "ws://host:port/ws"} can point at one already running (in Docker on Linux,
-for example) instead.
+bridge's own service (bridge/matter/, installed by scripts/matter-setup.sh), with its fabric keys in
+bridge/data/matter (mode 700), and talks to it over its WebSocket API. The service listens on no
+network port at all: only on a unix socket in a folder only this user can open (mode 700), so no
+web page and no other user on this computer can reach it.
 
 Every device reaches the TV in the shape the contract fixes (the same as a Home Assistant entity):
     { id: "matter:<node>:<endpoint>", name, domain, state, attributes }
 Locks, alarms and garage doors (and gates and doors) never show and can never be switched.
 
-    GET  /api/matter/devices   -> { devices, ready, note? }
-    POST /api/matter/commission { code } -> { ok, device_ids, error?, note? }
+    GET  /api/matter/devices   -> { devices, ready, version, reason?, note? }
+    POST /api/matter/commission { code, address? } -> { ok, device_ids, error?, reason?, note? }
     POST /api/matter/command   { id, action, value? } -> { ok, state, device? }
-    POST /api/matter/remove    { id } -> { ok }
-    POST /api/matter/rename    { id, name } -> { ok }
-Live state: every change is pushed to the TV pages as an "event: matter" on /api/events.
+    POST /api/matter/remove    { id } -> { ok, removed, reason?, note? }
+    POST /api/matter/rename    { id, name } -> { ok, name }
+Live state: every change is pushed to the TV pages as an "event: matter" on /api/matter/events.
 """
 import asyncio
 import atexit
 import colorsys
+import hashlib
 import itertools
 import json
 import logging
@@ -36,8 +36,10 @@ import os
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
+import tempfile
 import time
 
 log = logging.getLogger("couch.matter")
@@ -46,9 +48,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SERVICE_DIR = os.path.join(HERE, "matter")
 ENTRY = os.path.join(SERVICE_DIR, "node_modules", "matter-server", "dist", "esm", "bin.js")
 NODE_MIN = (22, 13)
-PORT = 5581          # not 5580, where Home Assistant's own Matter server may already listen
+SOCKET = "ws.sock"
+SOCKET_MAX = 100     # a unix socket path must fit in 104 bytes on macOS (108 on Linux)
 NAMES_FILE = "matter-names.json"
+FORGOTTEN_FILE = "matter-forgotten.json"
 FABRIC_LABEL = "Couch TV"
+MATTER_PORT = 5540   # the port every Matter device listens on; the service only ever tries this one
+LOG_MAX = 5 * 1024 * 1024
+LOG_CHECK = 60       # seconds between looks at the service's log size
 
 # ---------------------------------------------------------------- the device model
 
@@ -70,7 +77,34 @@ SENSORS = {770: "temperature", 775: "humidity", 262: "illuminance", 773: "pressu
 # never shown, never switched: door lock, smoke and CO alarm, the Matter 1.5 closures (garage doors, gates)
 BLOCKED_TYPES = {10, 118, 560, 561, 562}
 BLOCKED_CLUSTERS = {DOOR_LOCK, SMOKE_CO}
-OPENS_HOUSE = re.compile(r"garage|gate|door|lock", re.I)
+# A name that says the thing opens the house: a garage door, a gate, a door or a lock, as whole words
+# ("Outdoor blind", "Margate blind" and "Block out blind" are blinds), in every language the home
+# speaks: English, German, Dutch, French, Spanish, Italian, Portuguese, Turkish, Serbian (Latin),
+# Polish, Czech, Hebrew and Arabic. Used on blinds, plugs and on/off only lights (a garage door
+# opener is usually one of those) and on every name typed on the TV.
+OPENS_HOUSE_WORDS = [
+    r"garages?", r"gates?", r"doors?", r"locks?",                                              # en
+    r"garagen\w*", r"tore?", r"\w*(?:tür|tuer)(?:e|en)?", r"\w*schlo(?:ss|ß)",                 # de
+    r"\w*(?:einfahrts|hof|garten|roll|schiebe|flügel|fluegel)tore?",
+    r"(?:voor|achter|garage|zij|tuin|schuif|kantel|rol|kelder|balkon|terras)?deur(?:en)?",       # nl
+    r"(?:garage|toegangs|tuin|rol|schuif|inrit)?poort(?:en)?", r"slot(?:en)?", r"(?:tuin|toegangs|schuif|draai|inrit)?hek(?:ken)?",
+    r"portails?", r"portes?", r"serrures?", r"barrières?",                                      # fr
+    r"garajes?", r"cocheras?", r"puertas?", r"port[oó]n(?:es)?", r"verjas?", r"cerraduras?",    # es
+    r"cancelas?", r"cerrojos?",
+    r"portas?", r"portone", r"portoni", r"cancell[oi]", r"serratur[ae]", r"basculante",          # it
+    r"garage[mn]s?", r"port[ãa]o", r"port[õo]es", r"fechaduras?",                                # pt
+    r"garaj\w*", r"kap[ıi]\w*", r"kilit\w*", r"kilid\w*",                                        # tr
+    r"gara[žz]\w*", r"kapij\w*", r"vrata", r"brav[au]",                                          # sr, pl, cs
+    r"bram(?:a|y|ę|ie|ą|ka|ki|kę)?", r"drzwi", r"zam(?:ek|ka|ku|ki|kiem)",
+    r"gar[áa][žz]\w*", r"br[áa]n(?:a|y|u|ou|ě)", r"dve[řr]\w*", r"z[áa]m(?:ek|ku|ky|kem)",
+    r"[הבלמו]?(?:מוסך|שער|דלת|מנעול)",                                                         # he
+    r"(?:ال)?(?:مرآب|كراج|جراج|بوابة|باب|قفل)",                                                  # ar
+]
+OPENS_HOUSE = re.compile(r"(?<!\w)(?:" + "|".join(OPENS_HOUSE_WORDS) + r")(?!\w)", re.I)
+
+
+def opens_house(name):
+    return bool(name) and bool(OPENS_HOUSE.search(str(name)))
 
 MODES = {"off": 0, "heat_cool": 1, "cool": 3, "heat": 4, "fan_only": 7, "dry": 8}
 MODE_OF = {0: "off", 1: "heat_cool", 3: "cool", 4: "heat", 5: "heat", 6: "cool", 7: "fan_only", 8: "dry", 9: "auto"}
@@ -179,6 +213,7 @@ def _light(node, ep, clusters):
             elif on and _a(node, ep, COLOUR, 8) == 1:
                 x, y = _a(node, ep, COLOUR, 3, 0) / 65536, _a(node, ep, COLOUR, 4, 0) / 65536
                 attrs["xy_color"] = [round(x, 4), round(y, 4)]
+                attrs["hs_color"] = xy_to_hs(x, y)     # the screens read hs_color whichever way the lamp keeps it
         if modes:
             attrs["supported_color_modes"] = modes
             mode = _a(node, ep, COLOUR, 8)
@@ -292,11 +327,27 @@ def _sensor(node, ep, clusters, cls):
     return ("unknown" if v is None else str(v)), attrs
 
 
+def tidy_name(s):
+    """A name as the TV may show it (the NAME rule: 1 to 40 characters, no control characters, no < or >), or None."""
+    if not isinstance(s, str):
+        return None
+    s = re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f\x7f<>]", " ", s)).strip()[:40].strip()
+    return s if s and NAME.fullmatch(s) else None
+
+
 def node_name(node, ep):
     for v in (_a(node, ep, BRIDGED, 5), _a(node, ep, BRIDGED, 3), _a(node, 0, BASIC, 5), _a(node, 0, BASIC, 3)):
-        if isinstance(v, str) and v.strip():
-            return v.strip()[:40]
+        v = tidy_name(v)
+        if v:
+            return v
     return None
+
+
+def hidden_by_name(domain, clusters, name):
+    """True when a blind, a plug or an on/off only light is called a garage door, gate, door or lock."""
+    if domain in ("cover", "switch") or (domain == "light" and not {LEVEL, COLOUR} & set(clusters)):
+        return opens_house(name)
+    return False
 
 
 WORDS = {"light": "Light", "switch": "Plug", "fan": "Fan", "cover": "Blind", "climate": "Air conditioner",
@@ -324,7 +375,7 @@ def devices_of(node, names=None):
             base = "%s %s" % (base, WORDS.get(cls, "").lower())    # "Eve Weather temperature"
         seen[base] = seen.get(base, 0) + 1
         name = names.get(did) or (base if seen[base] == 1 else "%s %d" % (base, seen[base]))
-        if domain == "cover" and (OPENS_HOUSE.search(name) or OPENS_HOUSE.search(base)):
+        if hidden_by_name(domain, eps[ep], name) or hidden_by_name(domain, eps[ep], base):
             continue   # a garage door, gate or door: never shown, never moved
         types = device_types(node, ep)
         if domain == "light":
@@ -388,18 +439,39 @@ def clean_code(code):
     return d
 
 
-def clean_address(a):
-    """"host", "host:port" or "[v6]:port" -> the address alone (the service finds the port itself), or None."""
+ADDRESS_NOTES = {
+    "address": "That device address does not look right. Type its number from your router, or leave it empty.",
+    "port": "Couch TV can only reach a Matter device on port 5540. Leave the port out, or leave the address empty "
+            "so Couch TV looks for the device itself.",
+    "link_local": "An address starting fe80 cannot be used here. Leave the address empty so Couch TV looks for "
+                  "the device itself, or type its other address.",
+}
+
+
+def address_problem(a):
+    """(ip, None) for "host", "host:5540", "[v6]" or "[v6]:5540", else (None, reason): "address" (not an
+    IP address), "port" (a port other than 5540: the Matter service only ever tries 5540) or "link_local"
+    (an fe80 address: the service ignores those and looks for the device instead)."""
     import ipaddress
     s = str(a or "").strip()
-    m = re.fullmatch(r"\[([0-9a-fA-F:.%a-zA-Z0-9]+)\](?::\d{1,5})?", s) or re.fullmatch(r"([0-9.]+)(?::\d{1,5})?", s) or re.fullmatch(r"([0-9a-fA-F:]+(?:%[A-Za-z0-9]+)?)", s)
+    m = re.fullmatch(r"\[([0-9a-fA-F:.]+(?:%[A-Za-z0-9]+)?)\](?::(\d{1,5}))?", s) or re.fullmatch(r"([0-9.]+)(?::(\d{1,5}))?", s) \
+        or re.fullmatch(r"([0-9a-fA-F:]+(?:%[A-Za-z0-9]+)?)()", s)
     if not m:
-        return None
+        return None, "address"
     try:
-        ipaddress.ip_address(m.group(1).split("%")[0])
+        ip = ipaddress.ip_address(m.group(1).split("%")[0])
     except ValueError:
-        return None
-    return m.group(1)
+        return None, "address"
+    if m.group(2) and int(m.group(2)) != MATTER_PORT:
+        return None, "port"
+    if ip.version == 6 and ip.is_link_local:
+        return None, "link_local"
+    return m.group(1), None
+
+
+def clean_address(a):
+    """The address the Matter service is given, or None (address_problem says why)."""
+    return address_problem(a)[0]
 
 
 def thread_route():
@@ -430,6 +502,23 @@ def rgb_to_xy(r, g, b):
     X, Y, Z = r * 0.4124 + g * 0.3576 + b * 0.1805, r * 0.2126 + g * 0.7152 + b * 0.0722, r * 0.0193 + g * 0.1192 + b * 0.9505
     t = X + Y + Z
     return (0.3127, 0.3290) if t == 0 else (X / t, Y / t)
+
+
+def xy_to_hs(x, y):
+    """CIE xy (what a lamp in xy mode keeps) -> [hue 0 to 360, saturation 0 to 100], or None."""
+    if not (isinstance(x, (int, float)) and isinstance(y, (int, float))) or y <= 0 or x < 0 or x + y > 1:
+        return None
+    X, Y, Z = x / y, 1.0, (1 - x - y) / y
+    rgb = [3.2406 * X - 1.5372 * Y - 0.4986 * Z, -0.9689 * X + 1.8758 * Y + 0.0415 * Z, 0.0557 * X - 0.2040 * Y + 1.0570 * Z]
+    rgb = [max(0.0, c) for c in rgb]
+    top = max(rgb)
+    if top <= 0:
+        return None
+
+    def gamma(c):
+        return 12.92 * c if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055
+    h, s, _ = colorsys.rgb_to_hsv(*(gamma(c / top) for c in rgb))
+    return [round(h * 360) % 360, round(s * 100)]
 
 
 def parse_colour(value):
@@ -555,24 +644,104 @@ def node_version(node="node"):
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 
+def _off(v):
+    return v is False or str(v).strip().lower() in ("false", "no", "off", "0")
+
+
+def _on(v):
+    return v is True or str(v).strip().lower() in ("true", "yes", "on", "1")
+
+
+def short_private_dir(key):
+    """A folder with a short path that only this user can open, for the service's socket when the
+    bridge's own folder is too deep for one (a unix socket path must fit in 104 bytes on macOS)."""
+    uid = os.getuid()
+    name = "couchtv-matter-%d-%s" % (uid, hashlib.sha256(key.encode()).hexdigest()[:8])
+    for base in (tempfile.gettempdir(), "/tmp"):
+        d = os.path.join(base, name)
+        if len(os.path.join(d, SOCKET).encode()) > SOCKET_MAX:
+            continue
+        try:
+            os.mkdir(d, 0o700)
+        except FileExistsError:
+            pass
+        except OSError:
+            continue
+        try:
+            st = os.lstat(d)       # never follows a link someone else left there
+            if stat.S_ISDIR(st.st_mode) and st.st_uid == uid:
+                if stat.S_IMODE(st.st_mode) != 0o700:
+                    os.chmod(d, 0o700)
+                return d
+        except OSError:
+            pass
+    return tempfile.mkdtemp(prefix="ctvm-", dir="/tmp")   # someone else holds the usual name: a fresh one
+
+
+STARTING = "Matter is starting. Try again in a minute."
+LOCK_NOTE = "Couch TV does not add locks, alarms or garage doors. It is still in your other home app."
+UNSUPPORTED_NOTE = ("Couch TV cannot show or work this kind of device (it shows lights, plugs, fans, blinds, air "
+                    "conditioners and sensors), so it left it again. It is still in your other home app.")
+OFFLINE_NOTE = ("The device was not answering, so Couch TV forgot it without telling it. If your other home app "
+                "still lists Couch TV for this device, remove it there too.")
+NOT_ANSWERING_NOTE = ("The device did not answer, so Couch TV forgot it here and leaves it properly the next time "
+                      "it answers. It is still in your other home app.")
+NAME_HIDES_NOTE = "Couch TV never shows a garage door, gate, door or lock, so that name would hide this device. Pick another name."
+DISCOVERY_S = 30       # how long the service looks for the device (left to itself it looks for minutes)
+COMMISSION_WAIT = 150  # the discovery time plus adding it, over Thread too
+
+
+def already(dev, action, value):
+    """True when the action changes nothing the device would report, so the answer need not wait for a report."""
+    d, st, a = dev["domain"], dev["state"], dev["attributes"]
+    v = _number(value)
+    if d == "cover":
+        pos = a.get("current_position")
+        want = {"on": 100, "off": 0}.get(action, None if v is None else round(max(0, min(100, v))))
+        return action in ("on", "off", "level", "position") and pos is not None and pos == want
+    if action == "on":
+        return st == "on" if d != "climate" else False
+    if action == "off":
+        return st == "off"
+    if action == "mode":
+        return d == "climate" and st == str(value or "")
+    if action == "level" and v is not None:
+        if d == "light":
+            return st == "off" if v <= 0 else st == "on" and a.get("level") == max(1, min(100, round(v)))
+        if d == "fan":
+            return a.get("percentage") == int(max(0, min(100, v)))
+    if action == "target" and v is not None and d == "climate":
+        return a.get("temperature") == round(max(a.get("min_temp", 7), min(a.get("max_temp", 35), v)) * 2) / 2
+    return False
+
+
 class Matter:
     """This computer's Matter controller. `on_change(devices)` is called (at most every quarter second)
-    when a device is added, removed, renamed or changes state."""
+    when a device is added, removed, renamed or changes state.
 
-    def __init__(self, data_dir, section=None, on_change=None):
+    `socket_path` and `spawn=False` are for the tests: talk to a pretend service on that socket instead
+    of starting the real one."""
+
+    def __init__(self, data_dir, section=None, on_change=None, socket_path=None, spawn=True):
         section = section if isinstance(section, dict) else {}
         self.data_dir = data_dir
-        self.enabled = section.get("enabled", True) is not False
-        self.server_url = str(section.get("server") or "").strip() or None
-        self.port = int(section.get("port") or PORT)
-        self.test_devices = bool(section.get("test_devices"))   # development boards and the SDK's sample apps
-        self.node_bin = str(section.get("node") or "") or shutil.which("node") or "node"
+        self.enabled = not _off(section.get("enabled", True))
+        self.spawn = spawn
+        self.test_devices = _on(section.get("test_devices"))   # development boards and the SDK's sample apps
+        node = section.get("node")
+        self.node_bin = node.strip() if isinstance(node, str) and node.strip() else (shutil.which("node") or "node")
+        for old in ("server", "port"):
+            if old in section:
+                log.warning("matter: config.json matter.%s is no longer used: the bridge runs its own Matter service "
+                            "on a private socket (docs/MATTER.md)", old)
         self.on_change = on_change
         self.nodes = {}
         self.ready = False
+        self.reason = None
         self.note = None
         self.proc = None
         self.ws = None
+        self._sock = socket_path
         self._ids = itertools.count(1)
         self._pending = {}
         self._tasks = []
@@ -580,11 +749,12 @@ class Matter:
         self._push = None
         self._last_mode = {}
         self._names = self._load_names()
+        self._forgotten = self._load_forgotten()
         self._heard = {}   # node id -> when it last reported a change
         self.version = 0
         self._atexit = False
 
-    # ---------------- names kept here
+    # ---------------- names kept here, and devices left that did not answer
     def _names_path(self):
         return os.path.join(self.data_dir, NAMES_FILE)
 
@@ -596,25 +766,44 @@ class Matter:
         except (OSError, ValueError):
             return {}
 
-    def _save_names(self):
+    def _write(self, name, obj):
         os.makedirs(self.data_dir, exist_ok=True)
-        tmp = self._names_path() + ".tmp"
+        path = os.path.join(self.data_dir, name)
+        tmp = path + ".tmp"
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as f:
-            json.dump(self._names, f)
-        os.replace(tmp, self._names_path())
+            json.dump(obj, f)
+        os.replace(tmp, path)
+
+    def _save_names(self):
+        self._write(NAMES_FILE, self._names)
+
+    def _load_forgotten(self):
+        try:
+            with open(os.path.join(self.data_dir, FORGOTTEN_FILE)) as f:
+                o = json.load(f)
+            return {str(x) for x in o if re.fullmatch(r"\d{1,20}", str(x))} if isinstance(o, list) else set()
+        except (OSError, ValueError, TypeError):
+            return set()
+
+    def _save_forgotten(self):
+        self._write(FORGOTTEN_FILE, sorted(self._forgotten))
 
     # ---------------- what the TV reads
     def devices(self):
         out = []
         for nid in sorted(self.nodes, key=lambda n: int(n) if str(n).isdigit() else 0):
-            out += devices_of(self.nodes[nid], self._names)
+            if nid not in self._forgotten:
+                out += devices_of(self.nodes[nid], self._names)
         return out
 
     def answer(self):
         o = {"devices": self.devices(), "ready": self.ready, "version": self.version}
-        if self.note and not self.ready:
-            o["note"] = self.note
+        if not self.ready:
+            if self.reason:
+                o["reason"] = self.reason
+            if self.note:
+                o["note"] = self.note
         return o
 
     def _changed(self):
@@ -633,63 +822,89 @@ class Matter:
 
     # ---------------- start and stop
     def why_not(self):
-        """Plain words for why Matter cannot start here, or None."""
+        """(reason key, plain words) for why Matter cannot start here, or None. The keys are for the screens,
+        which say it in the TV's language: off, not_installed, node_missing, node_old."""
         if not self.enabled:
-            return "Matter is switched off on the home computer (config.json, matter, enabled)."
-        if self.server_url:
+            return "off", "Matter is switched off on the home computer (config.json, matter, enabled)."
+        if not self.spawn:
             return None
         if not os.path.isfile(ENTRY):
-            return "Matter needs a one time set up on the home computer: run scripts/matter-setup.sh in the couch-tv folder there."
+            return "not_installed", "Matter needs a one time set up on the home computer: run scripts/matter-setup.sh in the couch-tv folder there."
         v = node_version(self.node_bin)
         if not v:
-            return "Matter needs Node.js 22.13 or newer on the home computer. It is not installed there."
+            return "node_missing", "Matter needs Node.js 22.13 or newer on the home computer. It is not installed there."
         if v < NODE_MIN:
-            return "Matter needs Node.js 22.13 or newer on the home computer. It has %d.%d." % v
+            return "node_old", "Matter needs Node.js 22.13 or newer on the home computer. It has %d.%d." % v
         return None
 
     async def start(self):
-        self.note = self.why_not()
-        if self.note:
+        why = self.why_not()
+        if why:
+            self.reason, self.note = why
             log.info("matter: %s", self.note)
             return
-        self.note = "Matter is starting. Try again in a minute."
-        if not self.server_url:
+        self.reason, self.note = "starting", STARTING
+        if self.spawn:
             self._tasks.append(asyncio.ensure_future(self._service_loop()))
+            self._tasks.append(asyncio.ensure_future(self._log_loop()))
         self._tasks.append(asyncio.ensure_future(self._connect_loop()))
 
     async def stop(self):
         self._stopping = True
         for t in self._tasks:
             t.cancel()
+        await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._tasks = []
         if self.ws is not None and not self.ws.closed:
             await self.ws.close()
+        if self._push:
+            self._push.cancel()
+            self._push = None
         await self._end_service()
 
     def _pidfile(self):
         return os.path.join(self._storage(), "service.pid")
 
-    def _end_leftover(self):
-        """A service left running by a bridge that was killed holds the port and the fabric store: end it.
-        Only a process whose command line is this bridge's own Matter service is touched."""
+    def _logpath(self):
+        return os.path.join(self._storage(), "service.log")
+
+    @staticmethod
+    async def _command_line(pid):
+        """The command line of a process, or "" (Linux: /proc; macOS: ps)."""
+        try:
+            with open("/proc/%d/cmdline" % pid, "rb") as f:
+                return f.read().replace(b"\0", b" ").decode(errors="replace")
+        except OSError:
+            pass
+        try:
+            p = await asyncio.create_subprocess_exec("ps", "-p", str(pid), "-o", "command=", stdout=asyncio.subprocess.PIPE,
+                                                     stderr=asyncio.subprocess.DEVNULL)
+            out, _ = await asyncio.wait_for(p.communicate(), 5)
+            return out.decode(errors="replace")
+        except (OSError, asyncio.TimeoutError):
+            return ""
+
+    async def _end_leftover(self):
+        """A service left running by a bridge that was killed holds the fabric store: end it. Only a
+        process whose command line is this bridge's own Matter service is touched. True when one was ended."""
         try:
             with open(self._pidfile()) as f:
                 pid = int(f.read().strip())
         except (OSError, ValueError):
-            return
+            return False
+        cmd = await self._command_line(pid)
+        if not (ENTRY in cmd and self._storage() in cmd):
+            return False
+        log.info("matter: ending a Matter service left running (pid %s)", pid)
         try:
-            cmd = subprocess.run(["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True, timeout=5).stdout
-        except (OSError, subprocess.SubprocessError):
-            return
-        if ENTRY in cmd and self._storage() in cmd:
-            log.info("matter: ending a Matter service left running (pid %s)", pid)
-            try:
-                os.kill(pid, signal.SIGTERM)
-                for _ in range(40):
-                    time.sleep(0.2)
-                    os.kill(pid, 0)
-                os.kill(pid, signal.SIGKILL)
-            except OSError:
-                pass
+            os.kill(pid, signal.SIGTERM)
+            for _ in range(40):
+                await asyncio.sleep(0.2)
+                os.kill(pid, 0)
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+        return True
 
     def _kill_at_exit(self):
         p = self.proc
@@ -708,6 +923,11 @@ class Matter:
             except asyncio.TimeoutError:
                 p.kill()
                 await p.wait()
+        if p:
+            try:
+                os.remove(self._pidfile())
+            except OSError:
+                pass
 
     def _storage(self):
         d = os.path.join(self.data_dir, "matter")
@@ -718,30 +938,54 @@ class Matter:
             pass
         return d
 
+    def socket_path(self):
+        """Where the service listens: a unix socket in a folder only this user can open (mode 700), never
+        a network port, so no web page and no other user of this computer can reach it."""
+        if not self._sock:
+            p = os.path.join(self._storage(), SOCKET)
+            if len(p.encode()) > SOCKET_MAX:
+                p = os.path.join(short_private_dir(self._storage()), SOCKET)
+            self._sock = p
+        return self._sock
+
     def service_args(self):
-        args = [self.node_bin, ENTRY, "--storage-path", self._storage(), "--port", str(self.port),
-                "--listen-address", "127.0.0.1", "--disable-dashboard", "--default-fabric-label", FABRIC_LABEL,
-                "--log-level", "warn"]
+        args = [self.node_bin, ENTRY, "--storage-path", self._storage(), "--listen-address", self.socket_path(),
+                "--disable-dashboard", "--disable-ota", "--disable-thread-diagnostics",
+                "--default-fabric-label", FABRIC_LABEL, "--log-level", "warn"]
         if self.test_devices:
             args.append("--enable-test-net-dcl")
         return args
 
+    def _trim_log(self):
+        """Keeps the service's log under 5 MB while it runs: the full log goes to service.log.1 and the
+        log starts again (the service writes to the end of it, wherever that is)."""
+        path = self._logpath()
+        try:
+            if os.path.getsize(path) <= LOG_MAX:
+                return False
+            shutil.copyfile(path, path + ".1")
+            os.truncate(path, 0)
+            return True
+        except OSError:
+            return False
+
+    async def _log_loop(self):
+        while not self._stopping:
+            await asyncio.sleep(LOG_CHECK)
+            self._trim_log()
+
     async def _service_loop(self):
         wait = 3
         while not self._stopping:
-            logpath = os.path.join(self._storage(), "service.log")
-            try:
-                if os.path.getsize(logpath) > 5 * 1024 * 1024:
-                    os.replace(logpath, logpath + ".1")
-            except OSError:
-                pass
+            logpath = self._logpath()
+            self._trim_log()
             started = time.time()
-            self._end_leftover()
+            await self._end_leftover()
             try:
                 with open(logpath, "ab") as lf:
                     self.proc = await asyncio.create_subprocess_exec(*self.service_args(), stdin=asyncio.subprocess.DEVNULL,
                                                                      stdout=lf, stderr=lf, cwd=SERVICE_DIR)
-                log.info("matter: the Matter service started (pid %s, port %s)", self.proc.pid, self.port)
+                log.info("matter: the Matter service started (pid %s, %s)", self.proc.pid, self.socket_path())
                 with open(self._pidfile(), "w") as f:
                     f.write(str(self.proc.pid))
                 if not self._atexit:
@@ -756,34 +1000,33 @@ class Matter:
             if self._stopping:
                 return
             log.warning("matter: the Matter service stopped (%s); starting it again in %ss (log: %s)", code, wait, logpath)
-            self.ready, self.note = False, "Matter stopped on the home computer. It is starting again."
+            self.ready, self.reason, self.note = False, "stopped", "Matter stopped on the home computer. It is starting again."
             await asyncio.sleep(wait)
             wait = 3 if time.time() - started > 300 else min(wait * 2, 120)
 
     async def _connect_loop(self):
         import aiohttp
-        url = self.server_url or "ws://127.0.0.1:%d/ws" % self.port
-        async with aiohttp.ClientSession() as session:
-            while not self._stopping:
-                try:
-                    async with session.ws_connect(url, heartbeat=30, max_msg_size=64 * 1024 * 1024) as ws:
+        while not self._stopping:
+            try:
+                async with aiohttp.ClientSession(connector=aiohttp.UnixConnector(path=self.socket_path())) as session:
+                    async with session.ws_connect("http://localhost/ws", heartbeat=30, max_msg_size=64 * 1024 * 1024) as ws:
                         self.ws = ws
                         await self._listen(ws)
-                except asyncio.CancelledError:
-                    raise
-                except Exception as e:
-                    log.debug("matter: not connected (%s)", e)
-                self.ws = None
-                if self.ready:
-                    log.warning("matter: lost the Matter service; trying again")
-                self.ready = False
-                if not self.note or self.note.startswith("Matter is starting") is False:
-                    self.note = "Matter is starting. Try again in a minute."
-                for f in self._pending.values():
-                    if not f.done():
-                        f.set_exception(ConnectionError("lost the Matter service"))
-                self._pending.clear()
-                await asyncio.sleep(2)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                log.debug("matter: not connected (%s)", e)
+            self.ws = None
+            if self.ready:
+                log.warning("matter: lost the Matter service; trying again")
+            self.ready = False
+            if self.reason != "stopped":
+                self.reason, self.note = "starting", STARTING
+            for f in self._pending.values():
+                if not f.done():
+                    f.set_exception(ConnectionError("lost the Matter service"))
+            self._pending.clear()
+            await asyncio.sleep(2)
 
     async def _listen(self, ws):
         import aiohttp
@@ -794,11 +1037,28 @@ class Matter:
         try:
             nodes = await self.request("start_listening", {}, timeout=120)
             self.nodes = {str(n["node_id"]): n for n in nodes or [] if isinstance(n, dict)}
-            self.ready, self.note = True, None
+            done = {n for n in self._forgotten if n not in self.nodes}
+            if done:
+                self._forgotten -= done
+                self._save_forgotten()
+            for nid in sorted(self._forgotten):
+                self._tasks.append(asyncio.ensure_future(self._leave_again(nid)))
+            self.ready, self.reason, self.note = True, None, None
             self._changed()
             await reader
         finally:
             reader.cancel()
+
+    async def _leave_again(self, nid):
+        """A device forgotten while it did not answer: leave its fabric properly now."""
+        try:
+            await self.request("remove_node", {"node_id": int(nid)}, timeout=60)
+        except (MatterError, ConnectionError) as e:
+            log.info("matter: leaving node %s again failed (%s)", nid, e)
+            return
+        self._forgotten.discard(nid)
+        self._save_forgotten()
+        self.nodes.pop(nid, None)
 
     async def _read(self, ws):
         import aiohttp
@@ -823,6 +1083,9 @@ class Matter:
             self.nodes[str(data.get("node_id"))] = data
         elif name == "node_removed":
             self.nodes.pop(str(data), None)
+            if str(data) in self._forgotten:
+                self._forgotten.discard(str(data))
+                self._save_forgotten()
         elif name == "attribute_updated" and isinstance(data, list) and len(data) == 3:
             n = self.nodes.get(str(data[0]))
             if n is None:
@@ -847,56 +1110,83 @@ class Matter:
         except asyncio.TimeoutError:
             self._pending.pop(mid, None)
             raise MatterError("timeout", None, "no answer")
+        except ConnectionError as e:
+            raise MatterError("not_ready", None, str(e))
         if "error_code" in d:
             raise MatterError(d.get("reason") or "error", d.get("error_code"), str(d.get("details") or ""))
         return d.get("result")
 
     # ---------------- what the TV asks
-    def _find(self, did):
+    def _node_of(self, did):
+        """(node id, node, endpoint) for any id of a node this computer holds, shown or not, else (None, None, None)."""
         m = re.fullmatch(r"matter:(\d{1,20}):(\d{1,5})", str(did or ""))
-        if not m:
+        if not m or m.group(1) in self._forgotten:
             return None, None, None
         node = self.nodes.get(m.group(1))
+        if not node or int(m.group(2)) not in endpoints(node):
+            return None, None, None
+        return m.group(1), node, int(m.group(2))
+
+    def _find(self, did):
+        nid, node, ep = self._node_of(did)
         if not node:
             return None, None, None
         dev = next((d for d in devices_of(node, self._names) if d["id"] == did), None)
-        return (dev, node, int(m.group(2))) if dev else (None, None, None)
+        return (dev, node, ep) if dev else (None, None, None)
+
+    async def _leave(self, nid):
+        """Leave a node's fabric. True when the service did it. Otherwise the node is forgotten here
+        anyway (never shown again) and left properly the next time the service is reached."""
+        try:
+            await self.request("remove_node", {"node_id": int(nid)}, timeout=60)
+            return True
+        except MatterError as e:
+            log.info("matter: leaving node %s failed (%s %s); forgotten here", nid, e.reason, e.code)
+            self._forgotten.add(str(nid))
+            self._save_forgotten()
+            return False
 
     async def commission(self, code, address=None):
         c = clean_code(code)
         if not c:
             return {"ok": False, "device_ids": [], "error": "wrong_code",
                     "note": "That code does not look right. Check the 11 digits, or make a new code in the other app."}
+        ip = None
+        if address not in (None, ""):
+            ip, why = address_problem(address)
+            if not ip:
+                return {"ok": False, "device_ids": [], "error": "unreachable", "reason": why, "note": ADDRESS_NOTES[why]}
         if not self.ready:
-            return {"ok": False, "device_ids": [], "error": "unreachable", "note": self.note or "Matter is not ready on the home computer."}
+            return {"ok": False, "device_ids": [], "error": "unreachable", "reason": self.reason or "starting",
+                    "note": self.note or STARTING}
         try:
             # a wrong code is known in seconds, but the service keeps looking for another device with the
-            # same discriminator until its discovery time runs out (three minutes when left to itself)
-            if address:
-                ip = clean_address(address)
-                if not ip:
-                    return {"ok": False, "device_ids": [], "error": "unreachable", "note": "That device address does not look right."}
+            # same discriminator until its discovery time runs out (minutes when left to itself)
+            if ip:
                 pin = (await self.request("parse_onboarding_payload", {"code": c}, timeout=15)) or {}
                 pin = pin.get("setup_pin_code") or next((x.get("setup_pin_code") for x in pin.get("payloads") or []), None)
                 if not pin:
                     return {"ok": False, "device_ids": [], "error": "wrong_code", "note": "That code did not work."}
-                node = await self.request("commission_on_network", {"setup_pin_code": pin, "ip_addr": ip}, timeout=330)
+                node = await self.request("commission_on_network", {"setup_pin_code": pin, "ip_addr": ip,
+                                                                     "discovery_timeout_s": DISCOVERY_S}, timeout=COMMISSION_WAIT)
             else:
-                node = await self.request("commission_with_code", {"code": c, "network_only": True, "discovery_timeout_s": 30}, timeout=330)
+                node = await self.request("commission_with_code", {"code": c, "network_only": True,
+                                                                   "discovery_timeout_s": DISCOVERY_S}, timeout=COMMISSION_WAIT)
         except MatterError as e:
             return self._commission_error(e)
-        if not isinstance(node, dict):
+        if not isinstance(node, dict) or node.get("node_id") is None:
             return {"ok": False, "device_ids": [], "error": "unreachable", "note": "The device did not answer."}
-        self.nodes[str(node["node_id"])] = node
-        if blocked_only(node):
-            # a lock, an alarm or a garage door: Couch TV never holds the keys to open the house
-            try:
-                await self.request("remove_node", {"node_id": node["node_id"]}, timeout=60)
-            except MatterError:
-                pass
-            self.nodes.pop(str(node["node_id"]), None)
-            return {"ok": False, "device_ids": [], "error": "not_allowed",
-                    "note": "Couch TV does not add locks, alarms or garage doors. It is still in your other home app."}
+        nid = str(node["node_id"])
+        self.nodes[nid] = node
+        if not devices_of(node, self._names):
+            # a lock, an alarm, a garage door, or a kind of device Couch TV cannot show: never kept on
+            # this computer's fabric, where it would be invisible and could not be removed from the TV
+            blocked = blocked_only(node) or any(kind_of(node, ep, cl) for ep, cl in endpoints(node).items() if ep)
+            await self._leave(nid)
+            self.nodes.pop(nid, None)
+            self._changed()
+            return {"ok": False, "device_ids": [], "error": "not_allowed", "reason": "blocked" if blocked else "unsupported",
+                    "note": LOCK_NOTE if blocked else UNSUPPORTED_NOTE}
         self._changed()
         return {"ok": True, "device_ids": [d["id"] for d in devices_of(node, self._names)]}
 
@@ -915,6 +1205,8 @@ class Matter:
                 key, note = "unreachable", "The device stopped answering. Check it is switched on and try again."
         elif e.reason == "attestation-rejected":
             key, note = "unreachable", "This device is not a certified Matter device, so it cannot be added."
+        elif e.reason == "not_ready":
+            key, note = "unreachable", STARTING
         else:
             key, note = "unreachable", "The device could not be added. Make a new code and try again."
         log.info("matter: adding a device failed (%s, %s)", e.reason, e.code)
@@ -935,6 +1227,7 @@ class Matter:
         if dev["domain"] == "climate" and dev["state"] != "off":
             self._last_mode[did] = dev["state"]
         nid = str(node["node_id"])
+        wait = not already(dev, action, value)   # nothing will change: no report is coming, so no wait for one
         sent = time.monotonic()
         try:
             for s in steps:
@@ -945,8 +1238,8 @@ class Matter:
                     r = await self.request("write_attribute", {"node_id": node["node_id"], "attribute_path": s[1], "value": s[2]}, timeout=20)
                     if isinstance(r, list) and any(isinstance(x, dict) and x.get("Status") not in (0, None) for x in r):
                         raise MatterError("status", None, "write refused")
-            # the device's own report of the change: the first one within 2 seconds, then until it goes quiet
-            while time.monotonic() - sent < 2.5:
+            # the device's own report of the change: the first one within 2.5 seconds, then until it goes quiet
+            while wait and time.monotonic() - sent < 2.5:
                 heard = self._heard.get(nid, 0)
                 if heard > sent and time.monotonic() - heard > 0.3:
                     break
@@ -959,16 +1252,14 @@ class Matter:
         return {"ok": True, "state": now["state"], "device": now}
 
     async def remove(self, did):
-        dev, node, _ = self._find(did)
-        if not dev:
+        """Couch TV leaves the device's fabric: every id of that node goes, shown or not. A device that
+        does not answer is forgotten here anyway (contract change 7), with a note saying so."""
+        nid, node, _ = self._node_of(did)
+        if not node:
             return {"ok": False, "error": "refused"}
-        try:
-            await self.request("remove_node", {"node_id": node["node_id"]}, timeout=60)
-        except MatterError as e:
-            log.info("matter: removing %s failed (%s %s)", did, e.reason, e.code)
-            return {"ok": False, "error": "failed"}
-        nid = str(node["node_id"])
         removed = [d["id"] for d in devices_of(node, self._names)]
+        offline = node.get("available") is False
+        left = await self._leave(nid)
         self.nodes.pop(nid, None)
         gone = [k for k in self._names if k.startswith("matter:%s:" % nid)]
         for k in gone:
@@ -976,13 +1267,20 @@ class Matter:
         if gone:
             self._save_names()
         self._changed()
-        return {"ok": True, "removed": removed}
+        out = {"ok": True, "removed": removed}
+        if not left:
+            out.update(reason="not_answering", note=NOT_ANSWERING_NOTE)
+        elif offline:
+            out.update(reason="offline", note=OFFLINE_NOTE)
+        return out
 
     def rename(self, did, name):
-        dev, _, _ = self._find(did)
+        dev, node, ep = self._find(did)
         name = re.sub(r"\s+", " ", str(name or "")).strip()
         if not dev or not NAME.fullmatch(name):
             return {"ok": False, "error": "refused"}
+        if hidden_by_name(dev["domain"], endpoints(node).get(ep, set()), name):
+            return {"ok": False, "error": "refused", "reason": "opens_house", "note": NAME_HIDES_NOTE}
         self._names[did] = name
         self._save_names()
         self._changed()

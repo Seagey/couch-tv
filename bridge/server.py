@@ -3009,12 +3009,14 @@ def _matter_event():
 
 
 def push_matter(_devices=None):
-    """Every TV page this computer serves gets the new device list at once ("event: matter"), on
-    /api/matter/events (the same as the on-TV app's) and on /api/events."""
+    """Every page listening on /api/matter/events (behind the pairing rule, the same as the on-TV app's)
+    gets the new device list at once ("event: matter"). Never on /api/events, which has no such rule."""
     payload = _matter_event()
-    for q in [e[0] for e in list(events_clients)] + list(matter_clients):
+    for q in list(matter_clients):
         if q.qsize() < 20:
             q.put_nowait(payload)
+        else:
+            matter_clients.discard(q)   # a page that stopped reading
 
 
 MATTER = matter.Matter(config.DATA, config.CONFIG.get("matter"), on_change=push_matter)
