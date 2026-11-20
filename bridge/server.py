@@ -178,10 +178,11 @@ def cur_who():
 
 
 class ApiError(Exception):
-    def __init__(self, status, message, key=None, vars=None):
+    def __init__(self, status, message, key=None, vars=None, retry_after=None):
         super().__init__(message)
         self.status, self.message = status, message
         self.key, self.vars = key, vars
+        self.retry_after = retry_after   # seconds, for a 429: the Retry-After header and retry_after field
 
 
 def ok(**fields):
@@ -335,11 +336,12 @@ RATE_LIMIT_WINDOW = 60.0
 RATE_LIMIT_ADDRESSES = 1000   # memory bound: at most this many addresses are remembered
 
 
-# Pairing across every address (20 Nov 2026, as the on-TV app's PairLock): 15 wrong tries at
-# /api/pair, /api/appletv/claim or /api/vidaa/claim within 10 minutes, from anywhere, lock those three
-# for 10 minutes (429). Six digit codes are the weak spot: per address limits alone let many addresses
-# keep guessing. API calls that carry the key keep only the per address limit above, so a paired phone
-# is never locked out by someone else's guesses.
+# The Apple TV's six digit codes, across every address (20 Nov 2026, as the on-TV app's PairLock): 15
+# wrong codes at /api/appletv/claim within 10 minutes, while a code is live, lock that claim for 10
+# minutes (429). Per address limits alone let many addresses keep guessing six digits. Only while a code
+# is live, so nobody can keep it locked when no Apple TV is pairing. The pairing key (/api/pair) and the
+# VIDAA and Panasonic claim codes are long, so they keep only the per address limit above: a lock there
+# would let one caller shut the owner out. The clock is monotonic, so a clock change can't open it.
 PAIR_LOCK_MAX = 15
 PAIR_LOCK_WINDOW = 600.0
 PAIR_LOCK_SECS = 600.0
@@ -349,14 +351,14 @@ _pair_locked_until = [0.0]
 
 def pair_locked_for(now=None):
     """Seconds pairing stays locked (0: open)."""
-    now = time.time() if now is None else now
+    now = time.monotonic() if now is None else now
     left = _pair_locked_until[0] - now
     return int(-(-left // 1)) if left > 0 else 0
 
 
 def pair_wrong(now=None):
     """Counts one wrong pairing try; True when it has just locked pairing."""
-    now = time.time() if now is None else now
+    now = time.monotonic() if now is None else now
     cutoff = now - PAIR_LOCK_WINDOW
     while _pair_wrong and _pair_wrong[0] <= cutoff:
         _pair_wrong.pop(0)
@@ -377,8 +379,8 @@ def check_pair_lock():
     left = pair_locked_for()
     if left > 0:
         mins = max(1, -(-left // 60))
-        raise ApiError(429, f"Too many wrong codes. Wait {mins} minutes, then try again.",
-                       key="err_pairing_locked", vars={"minutes": mins})
+        raise ApiError(429, f"Too many wrong codes. Wait {mins} min, then try again.",
+                       key="err_pairing_locked", vars={"minutes": mins}, retry_after=left)
 
 
 def client_ip(request):
@@ -521,7 +523,10 @@ async def middleware(request, handler):
             _current.set(tv_id)
             resp = await handler(request)
         except ApiError as e:
-            resp = web.json_response({"ok": False, "error": e.message, **messages.err_fields(e)}, status=e.status)
+            extra = {"retry_after": e.retry_after} if e.retry_after else {}
+            resp = web.json_response({"ok": False, "error": e.message, **messages.err_fields(e), **extra}, status=e.status)
+            if e.retry_after:
+                resp.headers["Retry-After"] = str(e.retry_after)
         except TVUnavailable as e:
             resp = web.json_response({"ok": False, "error": str(e), **messages.err_fields(e)}, status=503)
         except ValueError as e:
@@ -683,14 +688,12 @@ async def h_pair(request):
     # Checked after the body is read, with no await before the key is compared and the miss is
     # recorded: checked before it, parallel requests could all pass while their bodies arrive.
     ip = client_ip(request)
-    check_pair_lock()
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong pairing keys. Please wait a minute.", key="err_too_many_pairing_keys")
     if not given:
         raise ApiError(400, "pairing key is required", key="err_pairing_key_required")
     if not key_matches(given):
         record_failed_attempt(ip, given)
-        pair_wrong()
         await asyncio.sleep(0.3)
         raise ApiError(401, "That pairing key is not right. Check config.json.", key="err_pairing_key_wrong")
     return ok(paired=True, token=config.PAIRING_KEY, note="paired",
@@ -1236,7 +1239,8 @@ async def h_appletv_claim(request):
     found = appletv_codes.pop(code, None) if re.fullmatch(r"\d{6}", code) else None
     if not found or found[0] <= time.monotonic() or found[1] not in TVS:
         record_failed_attempt(ip, code)
-        pair_wrong()
+        if any(exp > time.monotonic() for exp, _ in appletv_codes.values()):
+            pair_wrong()   # only while a code is live: nobody can keep the claim locked
         await asyncio.sleep(0.3)
         raise ApiError(401, "that code is not valid (a code works once, for ten minutes)", key="err_invalid_code_10m")
     t = TVS[found[1]]
@@ -1507,14 +1511,12 @@ async def h_vidaa_claim(request):
     data = await body(request)
     code = data.get("code")
     ip = client_ip(request)
-    check_pair_lock()
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong codes. Please wait a minute.", key="err_too_many_codes")
     for tv_id, t in TVS.items():
         if t.kind in ("vidaa", "panasonic") and t.claim(code):
             return ok(key=config.PAIRING_KEY, tv=tv_id)
     record_failed_attempt(ip, str(code))
-    pair_wrong()
     await asyncio.sleep(0.3)
     raise ApiError(401, "that code is not valid (codes work once, for two minutes)", key="err_invalid_code_2m")
 

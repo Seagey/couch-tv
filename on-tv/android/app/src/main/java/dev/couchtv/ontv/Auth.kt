@@ -22,7 +22,7 @@ object Auth {
     private val listeners = mutableListOf<(String?) -> Unit>()
 
     /** The clock, so the unit tests can move time on. */
-    @Volatile var clock: () -> Long = { System.currentTimeMillis() }
+    @Volatile var clock: () -> Long = { android.os.SystemClock.elapsedRealtime() }
     /** Wrong tries across every code. */
     val lock = PairLock()
 
@@ -52,7 +52,7 @@ object Auth {
      * show with more than 30 seconds left (so a code someone is typing is not swapped), else a new one. Shown only inside the QR, on
      * the TV's own screen, exactly as visible as the code the setup screen shows.
      */
-    @Synchronized fun pinForQr(): String = currentPin()?.takeIf { pinSecondsLeft() > 30 } ?: newPin()
+    @Synchronized fun pinForQr(minLeft: Int = 30): String = currentPin()?.takeIf { pinSecondsLeft() > minLeft } ?: newPin()
 
     fun onPin(fn: (String?) -> Unit) { synchronized(listeners) { listeners += fn } }
     fun offPin(fn: (String?) -> Unit) { synchronized(listeners) { listeners -= fn } }
@@ -61,12 +61,12 @@ object Auth {
     /** Returns a new token for the right code, null for a wrong one (or while pairing is locked). */
     @Synchronized fun pair(code: String?, name: String?): String? {
         if (lock.lockedFor(clock()) > 0) return null
-        val live = currentPin()
+        // no live code: nothing to guess, and not counted, so nobody can keep pairing locked while no
+        // code is on the TV
+        val live = currentPin() ?: return null
         val given = code?.filter { it.isDigit() }.orEmpty()
-        if (live == null || !MessageDigest.isEqual(given.toByteArray(), live.toByteArray())) {
-            // a try with no live code counts too: it is still a guess
-            if (lock.wrong(clock()) && pin != null) { pin = null; notifyPin() }
-            if (live == null) return null
+        if (!MessageDigest.isEqual(given.toByteArray(), live.toByteArray())) {
+            if (lock.wrong(clock())) { pin = null; notifyPin(); return null }
             wrong += 1
             if (wrong >= 5 && pin != null) { pin = null; notifyPin() }
             return null

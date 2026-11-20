@@ -132,7 +132,7 @@ try {
   const capsTv = await page.evaluate(async () => {
     window.I18N.set("pl");
     window.CouchCapsWords.words["Units"] = { pl: "Jednostki" };
-    const d = document.createElement("b"); d.textContent = "Units"; document.body.appendChild(d);
+    const d = document.createElement("b"); d.className = "cw-tip"; d.textContent = "Units"; document.body.appendChild(d);
     await new Promise((r) => setTimeout(r, 50)); const t = d.textContent; d.remove(); return t;
   });
   ok(capsTv === "Jednostki", "the same caps-words line on the TV home: " + capsTv);

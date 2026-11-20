@@ -1,6 +1,7 @@
-"""Pairing across every address (20 Nov 2026, the bridge's half of S1): 15 wrong tries at /api/pair,
-/api/appletv/claim or /api/vidaa/claim within 10 minutes, from any address, answer 429 on all three for
-10 minutes. Calls that carry the right key are never locked, so a paired phone keeps working."""
+"""The Apple TV's six digit codes across every address (20 Nov 2026, the bridge's half of S1): 15 wrong
+codes at /api/appletv/claim within 10 minutes, while a code is live, answer 429 there for 10 minutes, with
+Retry-After. The long pairing key (/api/pair) and the VIDAA and Panasonic claim are never locked, so one
+caller can't shut the owner out. Calls that carry the right key are never locked."""
 import json
 import os
 import sys
@@ -73,39 +74,50 @@ class PairLockEndpoints(unittest.IsolatedAsyncioTestCase):
     def post(self, path, data):
         return self.client.post(path, headers={"Content-Type": "application/json"}, data=json.dumps(data))
 
-    async def test_wrong_tries_across_paths_lock_all_three(self):
-        n = 0
-        for i in range(5):
-            r = await self.post("/api/pair", {"key": f"wrong{i}"}); n += 1
+    def live_code(self):
+        server.appletv_codes["999999"] = (server.time.monotonic() + 600, "living-room")
+
+    async def test_wrong_apple_tv_codes_lock_the_claim_while_a_code_is_live(self):
+        self.live_code()
+        for i in range(14):
+            r = await self.post("/api/appletv/claim", {"code": f"{100000 + i}"})
             self.assertEqual(r.status, 401)
-        for i in range(5):
-            r = await self.post("/api/appletv/claim", {"code": f"{100000 + i}"}); n += 1
-            self.assertEqual(r.status, 401)
-        for i in range(4):
-            r = await self.post("/api/vidaa/claim", {"code": f"{200000 + i}"}); n += 1
-            self.assertEqual(r.status, 401)
-        self.assertEqual(n, 14)
         self.assertEqual(server.pair_locked_for(), 0)
-        r = await self.post("/api/vidaa/claim", {"code": "299999"})
-        self.assertEqual(r.status, 401)       # the 15th is still answered, and locks
+        r = await self.post("/api/appletv/claim", {"code": "123456"})
+        self.assertEqual(r.status, 401)          # the 15th is still answered, and locks
         self.assertGreater(server.pair_locked_for(), 590)
-        for path, data in (("/api/pair", {"key": "couchpass123"}), ("/api/appletv/claim", {"code": "123456"}),
-                           ("/api/vidaa/claim", {"code": "123456"})):
-            r = await self.post(path, data)
-            self.assertEqual(r.status, 429, path)
-            j = await r.json()
-            self.assertEqual(j.get("error_key"), "err_pairing_locked")
-            self.assertIn("Wait 10 minutes", j.get("error", ""))
+        r = await self.post("/api/appletv/claim", {"code": "999999"})
+        self.assertEqual(r.status, 429)
+        j = await r.json()
+        self.assertEqual(j.get("error_key"), "err_pairing_locked")
+        self.assertIn("Wait 10 min", j.get("error", ""))
+        self.assertGreater(j.get("retry_after", 0), 590)
+        self.assertGreater(int(r.headers.get("Retry-After", "0")), 590)
         # a phone already holding the key keeps working
         r = await self.client.get("/api/now", headers={"Authorization": "Bearer couchpass123"})
         self.assertEqual(r.status, 200)
 
-    async def test_the_right_key_while_open_still_pairs(self):
-        for i in range(14):
-            await self.post("/api/pair", {"key": f"nope{i}"})
+    async def test_no_live_code_no_lock(self):
+        for i in range(30):
+            r = await self.post("/api/appletv/claim", {"code": f"{100000 + i}"})
+            self.assertIn(r.status, (401, 429))
+            self.assertNotEqual((await r.json()).get("error_key"), "err_pairing_locked")
+        self.assertEqual(server.pair_locked_for(), 0)
+
+    async def test_the_same_wrong_key_never_locks_the_owner_out(self):
+        # one caller repeating one wrong key: the owner's right key still pairs (the key is long, no lock)
+        for i in range(40):
+            await self.post("/api/pair", {"key": "wrong-key"})
+        self.assertEqual(server.pair_locked_for(), 0)
         r = await self.post("/api/pair", {"key": "couchpass123"})
         self.assertEqual(r.status, 200)
         self.assertEqual((await r.json()).get("token"), "couchpass123")
+
+    async def test_vidaa_claim_is_never_locked(self):
+        for i in range(30):
+            r = await self.post("/api/vidaa/claim", {"code": f"c{i}"})
+            self.assertNotEqual((await r.json()).get("error_key"), "err_pairing_locked")
+        self.assertEqual(server.pair_locked_for(), 0)
 
 
 if __name__ == "__main__":

@@ -120,7 +120,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "/api/pair/start" -> {
                 if (m != Method.POST) throw ApiError(405, "POST only")
                 pairLocked()?.let { return it }
-                Auth.pinForQr()
+                Auth.pinForQr(minLeft = 90)   // someone is about to type it: at least 90 s to do so
                 App.showPin()
                 return json(200, ok().put("digits", 6).put("expires_in", Auth.pinSecondsLeft()).put("note", "The code is on the TV now."))
             }
@@ -366,6 +366,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             // QR (#pin=, the phone remote's pairing QR format), so a phone that never paired goes straight in.
             "GET /api/phone-link" -> {
                 val ip = App.lanAddress() ?: throw ApiError(503, "This TV is not on a network yet.")
+                pairLocked()?.let { return it }   // locked: no code to show, the page hides the QR and asks again
                 val pin = Auth.pinForQr()
                 json(200, ok().put("url", SetupWords.qrLink("http://$ip:${Store.port}", pin, "/setup")).put("pin_expires_in", Auth.pinSecondsLeft())
                     .put("phones", Auth.phoneCount()))
@@ -734,7 +735,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
     private fun pairLocked(): Response? {
         val secs = Auth.lockedFor()
         if (secs <= 0) return null
-        return json(429, err("Too many wrong codes. Wait ${(secs + 59) / 60} minutes, then try again.").put("retry_after", secs))
+        return json(429, err("Too many wrong codes. Wait ${(secs + 59) / 60} min, then try again.").put("retry_after", secs))
             .apply { addHeader("Retry-After", secs.toString()) }
     }
 

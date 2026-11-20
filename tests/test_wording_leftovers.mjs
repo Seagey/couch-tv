@@ -37,7 +37,7 @@ for (const [where, S] of [["TV", TV], ["phone", R]]) {
   }
   ok(S.en.err_ask_disabled === "Ask AI is switched off.", where + ": Ask AI is switched off.");
   ok(S.en.err_lg_adb_android_only === "That only works on an Android TV. This is an LG TV.", where + ": That only works on an Android TV");
-  ok(/^Too many wrong codes\. Wait \{minutes\} minutes/.test(S.en.err_pairing_locked) && S["zh-CN"].err_pairing_locked.includes("{minutes}") && S.pl.err_pairing_locked.includes("{minutes}"), where + ": the pairing lock's words in en, zh-CN and pl");
+  ok(/^Too many wrong codes\. Wait \{minutes\} min,/.test(S.en.err_pairing_locked) && S["zh-CN"].err_pairing_locked.includes("{minutes}") && S.pl.err_pairing_locked.includes("{minutes}"), where + ": the pairing lock's words in en, zh-CN and pl");
   // the same placeholders in every language
   const holes = (s) => (String(s).match(/\{\w+\}/g) || []).sort().join(",");
   const diff = Object.keys(S.en).filter((k) => /^(err|note)_/.test(k)).filter((k) => ["zh-CN", "pl"].some((l) => S[l][k] != null && holes(S[l][k]) !== holes(S.en[k])));
@@ -63,10 +63,10 @@ const ur = read("on-tv/android/app/src/main/java/dev/couchtv/ontv/UpdateRules.kt
 ok(ur.includes("This is the Home button version of Couch TV.") && !ur.includes("has the Home button watch"), "UpdateRules: the Home button version");
 ok(!/"[^"]*adb (connect|install)[^"]*"/.test(ur), "UpdateRules: no adb commands on screen");
 
-// 5. Couch TV on screen (couch-tv stays in links, file names and couch-tv Studio)
+// 5. Couch TV on screen (couch-tv stays in links, file names, couch-tv Studio, and the name the Hue app shows: bridge/direct.py devicetype couch-tv#home)
 for (const [where, S] of [["TV", TV], ["phone", R]]) {
   const left = [];
-  for (const l of Object.keys(S)) for (const k of Object.keys(S[l] || {})) if (typeof S[l][k] === "string" && /couch-tv(?! Studio|-ontv|-home)/.test(S[l][k]) && k !== "about_code") left.push(l + "." + k);
+  for (const l of Object.keys(S)) for (const k of Object.keys(S[l] || {})) if (typeof S[l][k] === "string" && /couch-tv(?! Studio|-ontv|-home)/.test(S[l][k]) && k !== "about_code" && k !== "tw_hue_unpair_sub") left.push(l + "." + k);
   ok(left.length === 0, where + ": couch-tv only as a name of a link, file or couch-tv Studio: " + left.slice(0, 6).join(", "));
 }
 
@@ -83,10 +83,10 @@ for (const l of tvLangs) {
   const copied = tw.filter((k) => blk[k] === TV.en[k] && !/^(Designs|Widgets on this home)$/.test(TV.en[k]) && !(l === "pt" && /^Designs/.test(blk[k])));
   ok(copied.length <= 2, l + ": translated, not English copied: " + copied.slice(0, 4).join(", "));
 }
-// each English tw_ word is a line app.js or design.js draws
-const src = read("tv-home/web/app.js") + read("tv-home/web/design.js");
+// each English tw_ word is a line app.js, design.js or design-code.js (the phone inbox's messages) draws
+const src = read("tv-home/web/app.js") + read("tv-home/web/design.js") + read("tv-home/web/design-code.js");
 const notDrawn = tw.filter((k) => !src.includes(JSON.stringify(TV.en[k])) && !src.includes('"' + TV.en[k].split("{")[0]));
-ok(notDrawn.length === 0, "every TV word is drawn by app.js or design.js: " + notDrawn.join(", "));
+ok(notDrawn.length === 0, "every TV word is drawn by app.js, design.js or design-code.js: " + notDrawn.join(", "));
 ok(/<script src="i18n\.js"><\/script>\s*<script src="caps-words\.js"><\/script>\s*<script src="tv-words\.js"><\/script>/.test(read("tv-home/web/index.html")), "caps-words.js and tv-words.js load right after i18n.js");
 
 // 7. Send a design on the phone: every ds_ word in all 11 phone blocks
@@ -105,5 +105,24 @@ for (const [l, tl] of [["de", "de"], ["pl", "pl"], ["pt", "pt"], ["cs", "cs"], [
   ok(R[l].ds_sent.includes(btn) || R[l].ds_sent.includes("“" + btn + "”"), l + ": Send a design names the TV's button as the TV shows it: " + btn);
 }
 ok(!/DW\.|DESIGN_WORDS\./.test(sheets + read("remote/src/App.jsx")), "the phone draws Send a design through dsw()");
+
+// Fable's NO-GO of 20 Nov: the words it named
+ok(TV.de.tw_keep_home === "Meinen Startbildschirm behalten" && TV.de.tw_check_first.includes("Meinen Startbildschirm behalten lässt"), "de: Meinen Startbildschirm behalten, button and note");
+// Get a design's line means typing on the TV the code the phone shows (not typing on the phone)
+const typeHere = { de: /Gib hier den Code ein, den couch-tv Studio auf deinem Handy zeigt/, pl: /Wpisz tutaj kod, który couch-tv Studio pokazuje/, ar: /اكتب هنا الرمز الذي يعرضه/, he: /הקלידו כאן את הקוד ש-couch-tv Studio מציג/, nl: /Typ hier de code die/, cs: /Napište sem kód, který/, pt: /Digite aqui o código que/, "sr-Latn-RS": /Ukucajte ovde kod koji/, tr: /gösterdiği kodu buraya yaz/, ro: /Tastează aici codul pe care/ };
+for (const [l, re] of Object.entries(typeHere)) ok(re.test(TV[l].tw_type_code_phone), l + ": Get a design is typed on the TV: " + TV[l].tw_type_code_phone);
+// Arabic and Hebrew: addresses and codes in left to right isolates
+for (const l of ["ar", "he"]) {
+  for (const k of ["tw_scan_widget", "set_phone_pc", "tw_ha_connected_to_host_scan_to_ch"]) {
+    const holes = TV.en[k].match(/\{\w+\}(\/setup)?/g);
+    ok(holes.every((h) => TV[l][k].includes("⁦" + h + "⁩")), l + " " + k + ": every address and code isolated");
+  }
+}
+// the error keys say nothing about "this phone" on the TV (the TV shows them too)
+for (const l of ["en", "zh-CN", "pl"]) for (const k of ["err_invalid_pairing_key", "err_pairing_key_required"]) ok(!/this phone|这部手机|ten telefon|tego telefonu/.test(TV[l][k]), "TV " + l + " " + k + ": no this phone");
+// the phone can't press keys: the real fix, in the words of Android's menu
+for (const [where, S] of [["TV", TV], ["phone", R]]) ok(S.en.err_adb_not_on === "On the TV, switch on USB debugging in Developer options, then press Allow.", where + ": err_adb_not_on");
+// the lock's message says "min", the same on the TV, the bridge, the on-TV app and the phone page
+ok(/Wait \{mins\} min, then try again\./.test(read("bridge/server.py")) && /Wait \$\{\(secs \+ 59\) \/ 60\} min, then try again\./.test(read("on-tv/android/app/src/main/java/dev/couchtv/ontv/Server.kt")) && read("tv-home/web/phone-words.js").includes('"Too many wrong codes. Wait {minutes} min, then try again."'), "Wait N min, then try again: bridge, on-TV app and phone page");
 
 console.log("wording leftovers: " + n + " checks passed");

@@ -424,7 +424,7 @@
           if (cfg.mode !== "on-tv") return reject(new Error("no such endpoint"));
           // the tests change the code (mock:phonePin) or make the call fail (mock:phoneLinkFail)
           var mp = null, mf = null; try { mp = localStorage.getItem("mock:phonePin"); mf = localStorage.getItem("mock:phoneLinkFail"); } catch (e) {}
-          if (mf) return reject(new Error("Too many wrong codes. Wait 10 minutes, then try again."));
+          if (mf) return reject(new Error("Too many wrong codes. Wait 10 min, then try again."));
           return resolve({ ok: true, url: "http://tv.example:5400/setup#pin=" + (/^\d{6}$/.test(mp || "") ? mp : "482913"), pin_expires_in: 170, phones: 1 });
         }
         // Now playing (#31): ?music=1, a song that previous and next step through, play and pause toggle

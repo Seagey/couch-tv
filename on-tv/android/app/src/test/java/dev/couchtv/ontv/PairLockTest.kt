@@ -18,7 +18,7 @@ class PairLockTest {
     private var now = 1_000_000_000L
 
     @Before fun setUp() { Auth.clock = { now }; Auth.lock.reset() }
-    @After fun tearDown() { Auth.clock = { System.currentTimeMillis() }; Auth.lock.reset() }
+    @After fun tearDown() { Auth.lock.reset() }
 
     @Test fun fourteenWrongTriesStayOpenTheFifteenthLocks() {
         val l = PairLock()
@@ -60,11 +60,11 @@ class PairLockTest {
         assertEquals(0, Auth.lockedFor())
     }
 
-    @Test fun triesWithNoLiveCodeCountToo() {
+    @Test fun triesWithNoLiveCodeDoNotCount() {
         Auth.newPin(); now += 200_000           // the code ran out
         assertNull(Auth.currentPin())
-        repeat(15) { assertNull(Auth.pair("123456", "x")) }
-        assertTrue(Auth.lockedFor() > 0)
+        repeat(30) { assertNull(Auth.pair("123456", "x")) }
+        assertEquals(0, Auth.lockedFor())       // nothing to guess: nobody can keep pairing locked
     }
 
     @Test fun theLockThrowsAwayTheLiveCodeAndTellsTheListeners() {
