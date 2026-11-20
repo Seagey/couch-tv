@@ -342,7 +342,7 @@ console.log("Running Matter UI browser tests...");
     ["link_local", "commission", "unreachable"], ["busy", "commission", "failed"], ["processor", "commission", "unsupported"], ["android_old", "commission", "unsupported"],
     ["starting", "commission", "unreachable"], ["opens_house", "rename", "refused"], ["offline", "remove", ""], ["not_answering", "remove", ""],
     ["not_found", "rename", "refused"], ["not_allowed", "rename", "refused"], ["bad_request", "remove", "failed"], ["bad_name", "rename", "bad_request"],
-    ["not_ready", "remove", "failed"], ["device_refused", "rename", "failed"], ["failed", "remove", "failed"], ["not_answering", "rename", "failed"]];
+    ["not_ready", "remove", "failed"], ["device_refused", "rename", "failed"], ["failed", "remove", "failed"], ["not_answering", "rename", "failed"], ["not_certified", "commission", "not_allowed"]];
   for (const [k, what, err] of cases) {
     nextReply = { url: "/api/matter/" + what, code: err ? 400 : 200, body: err ? { ok: false, error: err, reason: k, note: "Raw English note." } : { ok: true, removed: ["matter:5:1"], reason: k, note: "Raw English note." } };
     if (what === "commission") { await page.fill("#matter-code", "3497-011-2332"); await page.click("#matter-add"); }
