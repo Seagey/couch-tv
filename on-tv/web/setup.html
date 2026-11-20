@@ -6,6 +6,9 @@
 <meta name="referrer" content="no-referrer">
 <title>Home settings</title>
 <script src="/ontv/shim.js"></script>
+<!-- the page in the TV's language (tv-home/web/phone-words.js, with the widget settings words in caps-words.js) -->
+<script src="/tv/caps-words.js"></script>
+<script src="/tv/phone-words.js"></script>
 <style>
   :root { color-scheme: dark; --bg:#0b0b0d; --card:#16161a; --line:#2c2c33; --ink:#f2ead8; --dim:#bdb6a7; --amber:#ffb52e; --bad:#ff7a6b; --good:#7ddc8a; }
   * { box-sizing: border-box; }
@@ -804,6 +807,7 @@
   function loadSettings() {
     return api('GET', '/api/settings').then(function (j) {
       SETTINGS = j;
+      if (window.PhoneWords) window.PhoneWords.set(j.settings && j.settings.lang);   // the TV's language, when it has one
       showTown(); showPeople(); showPhotos();
       $('tv-name').value = j.tv_name || ''; $('country').value = j.country || '';
       $('ask-on').checked = !!j.ask.enabled;

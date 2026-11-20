@@ -108,6 +108,11 @@ object HaPhone {
                 val js = file("ha-picks.js") ?: return Reply(404, "text/plain", "Not found".toByteArray())
                 return Reply(200, "application/javascript", js)
             }
+            // the page's words in the TV's language (phone-words.js) and the widget settings words it shares
+            "GET /ha/phone-words.js", "GET /ha/caps-words.js" -> {
+                val js = file(p.removePrefix("/ha/")) ?: return Reply(404, "text/plain", "Not found".toByteArray())
+                return Reply(200, "application/javascript", js)
+            }
             "GET /ha/done" -> return done(app, query)
         }
         val s = live(k) ?: return fail("expired", 403)

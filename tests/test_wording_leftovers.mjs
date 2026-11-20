@@ -87,7 +87,7 @@ for (const l of tvLangs) {
 const src = read("tv-home/web/app.js") + read("tv-home/web/design.js");
 const notDrawn = tw.filter((k) => !src.includes(JSON.stringify(TV.en[k])) && !src.includes('"' + TV.en[k].split("{")[0]));
 ok(notDrawn.length === 0, "every TV word is drawn by app.js or design.js: " + notDrawn.join(", "));
-ok(/<script src="i18n\.js"><\/script>\s*<script src="tv-words\.js"><\/script>/.test(read("tv-home/web/index.html")), "tv-words.js loads right after i18n.js");
+ok(/<script src="i18n\.js"><\/script>\s*<script src="caps-words\.js"><\/script>\s*<script src="tv-words\.js"><\/script>/.test(read("tv-home/web/index.html")), "caps-words.js and tv-words.js load right after i18n.js");
 
 // 7. Send a design on the phone: every ds_ word in all 11 phone blocks
 const ds = Object.keys(R.en).filter((k) => k.indexOf("ds_") === 0);
