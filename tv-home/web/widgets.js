@@ -261,7 +261,8 @@
   function tempC(w) { return w && w.tempC !== undefined ? w.tempC : w ? w.temp : null; }
   // where a weather, sun, air or surf widget reads: a place picked for this widget on this TV
   // (its own forecast, app.js data().wxAt["<lat>,<lon>"] or data().wxBy["<object id>"]), else the home's town
-  function pickedPlace(o, env) { return o ? placeVal(tvSet(o, env, "place")) : null; }
+  // the surf's beach is its "place"; every other weather widget's place is its "town" (widget-caps.js)
+  function pickedPlace(o, env) { return o ? placeVal(tvSet(o, env, o.kind === "surf" ? "place" : "town")) : null; }
   function placeKey(p) { return (+p.lat).toFixed(2) + "," + (+p.lon).toFixed(2); }
   function wxSrc(o, env) {
     var d = dataOf(env), p = pickedPlace(o, env);
@@ -324,7 +325,12 @@
     var own = (o && o.opts && o.opts.image) ? [o.opts.image] : [];
     if (own.length) return own;
     if (env.demo) return ["beach", "birthday", "camp", "dog", "nan", "surf", "hike"].map(demoImg);
-    return (dataOf(env).photos || []).slice(0, 50);
+    var all = (dataOf(env).photos || []).slice(0, 50), pick = o && (o.kind === "photo" || o.kind === "artframe") ? tvSet(o, env, "photo") : undefined;
+    if (pick !== undefined && pick !== "first") {
+      if (isFinite(pick) && all[+pick]) return [all[+pick]];
+      if (all.indexOf(pick) >= 0) return [pick];
+    }
+    return all;
   }
   function people(env) {
     if (env.demo) return [["character-curly", "Alex", 1, "a"], ["character-bun", "Sam", 0, "b"], ["character-pigtails", "Ruby", 0, "c"]];
@@ -507,11 +513,13 @@
   var TV_KEYS = { entity: "id", cam: "id", reading: "id", feed: "id", league: "id", sport: "id", format: "id", unit: "id", dfmt: "id", fit: "id",
     label: "word", team: "word", list: "word", image: "url",
     players: "ids", switches: "ids", tickers: "ids", cities: "ids", apps: "ids",
-    arrive_h: "num", arrive_m: "num", buffer: "num", day: "num", month: "num", year: "num", count: "num", shows: "num", seconds_each: "num", anchor: "num", weekday: "num",
-    weekdays: "bool", hilo: "bool", seconds: "bool", date: "bool", ampm: "bool", place: "bool" };
+    arrive_h: "num", arrive_m: "num", buffer: "num", day: "num", month: "num", year: "num", count: "num", shows: "num", seconds_each: "num", anchor: "num", weekday: "day",
+    weekdays: "bool", hilo: "bool", seconds: "bool", date: "bool", ampm: "bool", place: "bool", alt: "bool", thisweek: "id", bin_a: "word", bin_b: "word", photo: "url" };
+  var PLACE_KEYS = ["place", "town", "to", "from"];
   function tvVal(type, v) {
     if (type === "num") { v = +v; return isFinite(v) ? v : undefined; }
     if (type === "bool") return typeof v === "boolean" ? v : undefined;
+    if (type === "day") return v === "none" ? v : isFinite(v) && +v >= 0 && +v <= 6 ? +v : undefined;
     if (type === "ids") return Object.prototype.toString.call(v) === "[object Array]" ? v.filter(function (x) { return typeof x === "string" && x.length <= 120; }).slice(0, 16) : undefined;
     if (type === "id") return typeof v === "string" && v.length <= 120 ? v : typeof v === "boolean" ? v : undefined;
     if (type === "word") return typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 60) || undefined : typeof v === "number" && isFinite(v) ? v : undefined;
@@ -531,7 +539,7 @@
     for (k in src) if (Object.prototype.hasOwnProperty.call(src, k)) opts[k] = src[k];
     for (k in ws) {
       if (!Object.prototype.hasOwnProperty.call(ws, k)) continue;
-      if (k === "place" && placeVal(ws[k])) { tv.place = placeVal(ws[k]); continue; }
+      if (PLACE_KEYS.indexOf(k) >= 0 && placeVal(ws[k])) { tv[k] = placeVal(ws[k]); continue; }
       if (!TV_KEYS[k] || (k === "apps" && APP_KINDS.indexOf(o.kind) >= 0)) continue;   // an app container's apps: Hold OK's own edits (env.edits)
       var v = tvVal(TV_KEYS[k], ws[k]);
       if (v === undefined) continue;
@@ -667,21 +675,24 @@
       return E("div", "cw-row cw-sp", "", [E("div", "cw-t29 cw-ell", "min-width:0", [name(tz)]), E("div", "cw-t38", "flex:none;margin-left:12px", [t ? t.t : ""])]);
     }))]);
   };
-  function daysTo(month, day) {
+  function daysTo(month, day, year) {
     var t = now(), y = t.getFullYear(), today = new Date(y, t.getMonth(), t.getDate()), target = new Date(y, month - 1, day);
+    if (isFinite(year) && year > 1999) return Math.round((new Date(+year, month - 1, day) - today) / 86400000);   // a one off day (may have passed)
     if (target < today) target = new Date(y + 1, month - 1, day);
     return Math.round((target - today) / 86400000);
   }
   var STARTER_DAYS = { christmas: "12/25", "christmas day": "12/25", "new year": "1/1", "new year's day": "1/1", "new years day": "1/1", "australia day": "1/26", halloween: "10/31", "valentine's day": "2/14" };
   R.countdown = function (root, o, b) {
-    var q = op(o), month = +q.month || 12, day = +q.day || 25, n = daysTo(month, day), unit = q.unit || "sleeps";
+    var q = op(o), month = +q.month || 12, day = +q.day || 25, yr = q.year === undefined || q.year === "every" ? NaN : +q.year, n = daysTo(month, day, yr), unit = q.unit || "sleeps";
     var label = q.label || (month === 12 && day === 25 ? "Christmas" : "The big day");
     // a starter name kept after the date changed: the date itself, never "Christmas" over 3 March
     if (STARTER_DAYS[String(label).toLowerCase()] && STARTER_DAYS[String(label).toLowerCase()] !== month + "/" + day) label = day + " " + MONTHS[month - 1];
     var num = unit === "weeks" ? Math.round(n / 7) : n;
-    var u = n === 0 ? "It's today!" : unit === "weeks" ? (num === 1 ? "week to go" : "weeks to go") : unit === "days" ? (n === 1 ? "day to go" : "days to go") : (n === 1 ? "sleep to go" : "sleeps to go");
+    var gone = n < 0;
+    if (gone) n = -n;
+    var u = gone ? "It has been and gone" : n === 0 ? "It's today!" : unit === "weeks" ? (num === 1 ? "week to go" : "weeks to go") : unit === "days" ? (n === 1 ? "day to go" : "days to go") : (n === 1 ? "sleep to go" : "sleeps to go");
     var tiny = b.h < 200, fs = clamp(Math.min((b.h - (tiny ? 84 : 110)) * 0.95, (b.w - 48) / (String(num).length * 0.62)), 44, 200);
-    add(root, [b.w < 300 ? E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--sub)", [label]) : lab(q.icon || "calendar", label, "rgba(255,255,255,.9)"), E("div", "cw-grow"), n === 0 ? null : E("div", "cw-big", "font-size:" + px(fs), [String(num)]), tiny && n ? null : E("div", "cw-t29 cw-ell", "font-weight:650", [u])]);
+    add(root, [b.w < 300 ? E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--sub)", [label]) : lab(q.icon || "calendar", label, "rgba(255,255,255,.9)"), E("div", "cw-grow"), n === 0 || gone ? null : E("div", "cw-big", "font-size:" + px(fs), [String(num)]), tiny && n && !gone ? null : E("div", "cw-t29 cw-ell", "font-weight:650", [u])]);
     var lb = root.querySelector(".cw-lab"); if (lb && root.classList.contains("cw-tint")) lb.style.color = "var(--sub)";
   };
   R.date = function (root, o, b, env) {
@@ -1749,14 +1760,16 @@
   };
 
   // lists and the family
+  // the bin night: 0 (Sunday) to 6, or null when not set yet (nothing, or "none")
+  function binDay(q) { var v = q.weekday; if (v === undefined || v === null || v === "" || v === "none") return null; v = +v; return isFinite(v) && v >= 0 && v <= 6 ? Math.round(v) : null; }
   R.bins = function (root, o, b, env) {
     var q = op(o), d = now();
-    var wd = q.weekday === undefined ? 3 : q.weekday, ahead = (wd - d.getDay() + 7) % 7;
+    var wd = binDay(q) === null ? 3 : binDay(q), ahead = (wd - d.getDay() + 7) % 7;
     var when = ahead === 0 ? "Tonight" : ahead === 1 ? "Tomorrow night" : DAYS[wd] + " night";
     var night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + ahead), week = Math.floor((night.getTime() / 86400000 - (q.anchor || 0)) / 7);
     var a = [q.lid_a || "#ffd60a", q.bin_a || "Recycling"], c = [q.lid_b || "#30d158", q.bin_b || "Garden"];
     var bins = q.alt ? [["#ff453a", "Rubbish"], week % 2 === 0 ? a : c] : [a, c];
-    if (!env.demo && q.weekday === undefined) return empty(root, b, "calendar", "Set your bin night in couch-tv Studio", "Pick the night and the bins");
+    if (!env.demo && binDay(q) === null) return empty(root, b, "calendar", "Set your bin night in this widget's settings", "Pick the night and the bins");
     var bs = b.h < 300 ? 48 : 62;
     add(root, [lab("calendar", op(o).label || "Bin night"), E("div", b.h < 300 ? "cw-t29" : "cw-t38", "margin-top:12px;font-weight:700", [when]), E("div", "cw-grow"),
       E("div", "cw-row", "", bins.map(function (x, i) {
@@ -1949,8 +1962,14 @@
     }
     return l;
   }
+  // "auto" (Best for your country): BBC World in the UK, RNZ in New Zealand, else ABC News
+  function feedFor(v, env) {
+    if (v && v !== "auto") return v;
+    var c = String(dataOf(env).country || "").toUpperCase();
+    return c === "GB" || c === "UK" ? "bbc" : c === "NZ" ? "rnz" : "abc";
+  }
   function newsOf(root, o, b, env) {
-    var WW = window.CouchWidgetWeb, q = op(o), feed = WW ? WW.feedOf(setting(o, env, "feed")) : "abc", src = WW ? WW.FEEDS[feed].name : "", name = webName(q.label, src, WW ? WW.FEEDS : null) || src || "Headlines";
+    var WW = window.CouchWidgetWeb, q = op(o), feed = WW ? WW.feedOf(feedFor(setting(o, env, "feed"), env)) : "abc", src = WW ? WW.FEEDS[feed].name : "", name = webName(q.label, src, WW ? WW.FEEDS : null) || src || "Headlines";
     if (env.demo) return { name: name, from: name !== src ? src : "", items: DEMO_NEWS.map(function (x) { return { title: x[0], at: Date.now() - x[1] * 3600000 }; }) };
     var rec = webOf(env, "news", feed);
     return webReady(root, b, "info", "news", rec) ? { name: name, from: name !== src ? src : "", items: rec.v || [], stale: !!rec.stale, at: rec.at } : null;
@@ -2068,7 +2087,10 @@
   // traffic. The design only says when to arrive (opts.arrive_h, arrive_m), the minutes to spare and
   // its label: never a place.
   function commuteOf(root, o, b, env) {
-    var q = op(o), c = dataOf(env).commute || {}, v;
+    // the drive for this widget's own Where to (app.js data().commuteBy["<object id>"]), else the home's
+    var q = op(o), cb = dataOf(env).commuteBy, c = (cb && o.id !== undefined && cb[o.id]) || dataOf(env).commute || {}, v;
+    var toTv = placeVal(tvSet(o, env, "to"));
+    if (toTv && !(cb && cb[o.id]) && !env.demo) c = { from: c.from, to: toTv, key: null };
     if (env.demo) { v = { minutes: 16, km: 12.4 }; c = { to: { name: "work" } }; }
     else {
       if (!c.from) { webEmpty(root, b, "location", "Set your town for the commute", "Settings (hold OK), Home settings, Location", "Set your town"); root.setAttribute("data-setup", "commute"); return null; }
@@ -2080,10 +2102,11 @@
     }
     // in couch-tv Studio a design with no arrive by time shows 8:30 as its example
     var bufS = setting(o, env, "buffer"), ahS = setting(o, env, "arrive_h"), amS = setting(o, env, "arrive_m"), wdS = setting(o, env, "weekdays");
-    var WW = window.CouchWidgetWeb, spare = bufS === undefined ? 10 : +bufS, ah = ahS !== undefined ? +ahS : env.demo ? 8 : undefined, am = ahS !== undefined ? +amS || 0 : 30;
+    var hasAh = ahS !== undefined && ahS !== null && ahS !== "" && ahS !== "off" && isFinite(+ahS);
+    var WW = window.CouchWidgetWeb, spare = bufS === undefined || !isFinite(+bufS) ? 10 : +bufS, ah = hasAh ? +ahS : env.demo ? 8 : undefined, am = hasAh ? +amS || 0 : 30;
     var lb = WW && ah !== undefined ? WW.leaveBy(v.minutes, ah, am, spare, now().getTime(), wdS) : null;
     var arrive = ah !== undefined ? fmt12(new Date(2000, 0, 1, ah, am)) : "";
-    return { minutes: v.minutes, km: v.km, label: q.label || "To " + (c.to.name || "work"), leave: lb ? (lb.day ? lb.day + ", leave by " : "Leave by ") + fmt12(lb.at) : "", arrive: arrive, stale: !env.demo && !!(webOf(env, "commute", c.key) || {}).stale };
+    return { minutes: v.minutes, km: v.km, label: (tvSet(o, env, "label") || (o.__design || q).label) || "To " + (c.to.name || "work"), leave: lb ? (lb.day ? lb.day + ", leave by " : "Leave by ") + fmt12(lb.at) : "", arrive: arrive, stale: !env.demo && !!(webOf(env, "commute", c.key) || {}).stale };
   }
   function line(text, size, extra, a, drop) { var e = fitT(E("div", "", WRAP + "font-size:" + size + "px;line-height:1.22;flex:none;text-align:" + a + ";" + (extra || ""), [text])); return drop ? dropT(e, drop) : e; }
   R.commute = function (root, o, b, env) {
@@ -2279,8 +2302,8 @@
       E("div", "cw-col", "margin-left:20px;min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:680", [m.name]), E("div", "cw-t23 cw-ell", "", [m.full])])]));
   };
   CR.bins = function (root, o, b, env) {
-    var q = op(o), d = now(), wd = q.weekday === undefined ? 3 : q.weekday, ahead = (wd - d.getDay() + 7) % 7;
-    if (!env.demo && q.weekday === undefined) return empty(root, b, "calendar", "Set your bin night in couch-tv Studio", "");
+    var q = op(o), d = now(), wd = binDay(q) === null ? 3 : binDay(q), ahead = (wd - d.getDay() + 7) % 7;
+    if (!env.demo && binDay(q) === null) return empty(root, b, "calendar", "Set your bin night in this widget's settings", "");
     var when = ahead === 0 ? "Tonight" : ahead === 1 ? "Tomorrow" : DAYS[wd].slice(0, 3) + " night";
     var night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + ahead), week = Math.floor((night.getTime() / 86400000 - (q.anchor || 0)) / 7);
     var A = q.lid_a || "#ffd60a", B = q.lid_b || "#30d158", lids = q.alt ? ["#ff453a", week % 2 === 0 ? A : B] : [A, B];
@@ -2424,12 +2447,11 @@
         : [["Milk", 0], ["Bread", 1], ["Avocados", 0], ["Sunscreen", 0], ["Dog food", 0], ["Lemons", 1], ["Coffee", 0], ["Bin bags", 0]];
       return { at: 0, name: op(o).label || "Shopping", todo: todo, items: items.map(function (x) { return { t: x[0], done: !!x[1] }; }) };
     }
-    var ls = (athome(env) || {}).lists || [], pick = setting(o, env, "list"), want = String(((o.__design || op(o)).label) || "").toLowerCase(), at = 0, found = false, i;
+    var ls = (athome(env) || {}).lists || [], pick = setting(o, env, "list", "first"), at = 0, i;
     if (!ls.length) return null;
-    // picked on this TV: its name, or its place in the list (0, 1, 2)
-    if (typeof pick === "number" && isFinite(pick) && ls[pick]) { at = pick; found = true; }
-    else if (pick !== undefined && pick !== null && pick !== "") for (i = 0; i < ls.length; i++) if (ls[i].name.toLowerCase() === String(pick).toLowerCase()) { at = i; found = true; break; }
-    if (!found) for (i = 0; i < ls.length; i++) if (want && ls[i].name.toLowerCase() === want) { at = i; break; }
+    // picked on this TV: its name, or its place in the list (0, 1, 2); "first" (the default) is the first
+    if (typeof pick === "number" && isFinite(pick) && ls[pick]) at = pick;
+    else if (pick !== "first" && pick !== undefined && pick !== null && pick !== "") for (i = 0; i < ls.length; i++) if (ls[i].name.toLowerCase() === String(pick).toLowerCase()) { at = i; break; }
     return { at: at, name: ls[at].name, todo: /to ?do|task|work/i.test(ls[at].name), items: ls[at].items };
   }
   R.list = function (root, o, b, env) {
@@ -2631,6 +2653,8 @@
     withSettings: function (o, env) { return withSettings(o, env || {}); },
     // "f" or "c": the unit the widgets draw temperatures in (Home settings, Weather, Units)
     unitOf: function (env) { return unitF(env || {}) ? "f" : "c"; },
+    // a Headlines widget's feed id: its own setting, "auto" picked by the home's country (data().country)
+    feedFor: function (v, env) { return feedFor(v, env || {}); },
     // a widget drawn by its own file (ask.js: Ask AI and From your AI): draw(root, o, b, env), and
     // optionally its own drawing for a box under 200 px tall
     define: function (kind, draw, small) { if (typeof draw === "function" && /^[a-z]{2,16}$/.test(kind)) { R[kind] = draw; if (typeof small === "function") CR[kind] = small; } },
@@ -2668,7 +2692,7 @@
       roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
       airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, surfPlace: surfPlace, pickedPlace: pickedPlace, compass: compass,
       // this widget's own settings and honest headings (WIDGET-SETTINGS-CONTRACT.md)
-      setting: setting, tvSet: tvSet, devName: devName, webName: webName, unitF: unitF, roomUnit: roomUnit, tconv: tconv, sensorConv: sensorConv, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
+      setting: setting, tvSet: tvSet, devName: devName, webName: webName, feedFor: feedFor, unitF: unitF, roomUnit: roomUnit, tconv: tconv, sensorConv: sensorConv, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
       // things typed at home (athome.js through app.js)
       athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
   };

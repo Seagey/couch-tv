@@ -894,7 +894,7 @@
   function webRec(env, src, id) { var f = wk().webOf; return f ? f(env, src, id) : null; }
   function updated(rec) { if (!rec || !rec.at) return ""; var d = new Date(rec.at), h = d.getHours(), m = d.getMinutes(); return "Updated " + ((h % 12) || 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? "am" : "pm") + (rec.stale ? ", not lately" : ""); }
   B.news = function (o, env) {
-    var WW = window.CouchWidgetWeb, q = op(o), feed = WW ? WW.feedOf(kit().setting(o, env, "feed")) : "abc", src = WW ? WW.FEEDS[feed].name : "", name = kit().webName(q.label, src, WW ? WW.FEEDS : null) || src || "Headlines", rec = null, items;
+    var WW = window.CouchWidgetWeb, q = op(o), feed = WW ? WW.feedOf(kit().feedFor(kit().setting(o, env, "feed"), env)) : "abc", src = WW ? WW.FEEDS[feed].name : "", name = kit().webName(q.label, src, WW ? WW.FEEDS : null) || src || "Headlines", rec = null, items;
     if (env.demo) items = (wk().DEMO_NEWS || []).map(function (x) { return { title: x[0], at: Date.now() - x[1] * 3600000 }; });
     else { rec = webRec(env, "news", feed); if (!rec || !rec.ok || !rec.v || !rec.v.length) return B.setup(o, env); items = rec.v; }
     S.body.appendChild(head("info", name, [name !== src && src ? "From " + src : "", rec ? updated(rec) : ""].filter(Boolean).join(". ") || "The latest headlines", "#ff453a"));
