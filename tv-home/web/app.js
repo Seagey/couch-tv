@@ -5643,6 +5643,7 @@
     else if (hs === "google_tv") homeRows.push(info("make-home", t("home_row"), "", t("home_google_tv")));
     var u = updRead();
     if (u && u.supported) homeRows.push({ kind: "action", key: "upd-about", label: UPD_ROW, sub: updLine(u), act: openUpdate });
+    homeRows = homeRows.concat(hkRows());
     return homeRows.concat([
       info("ver", t("about_version"), ver || t("about_web")),
       info("code", t("about_code"), REPO_URL),
@@ -5853,6 +5854,28 @@
     // "It always asks before it installs one" is only true where the TV installs it: not on a Samsung
     // or the on-TV app (manual), whose own steps say how (a real Frame, 20 Nov 2026)
     if (!u.manual) rows.push(info("upd-note", tUpd(u.self ? "upd_note_self" : "upd_note")));
+    return rows;
+  }
+
+  // ---- Make Home open Couch TV (the on-TV app's HomeKey.kt, window.TVHK) ----
+  // On Google TV, and TVs that open Google's home by name, one press gets the Home button version from
+  // GitHub, checks it, puts it on over the app's own link to the TV and switches its Home button watch on.
+  // Without that link: one line and a QR code for the computer steps. Nothing at all where Home already
+  // opens the default home, or without the on-TV app. mock.js stands in for previews (?homekey=...).
+  function hk() { return window.TVHK || window.MOCK_HOMEKEY || null; }
+  function hkRead() { var h = hk(); try { return h ? JSON.parse(h.state()) : null; } catch (e) { return null; } }
+  function hkChanged() { if (zone === "settings") renderSettings(); }
+  function hkRows() {
+    var h = hkRead(), v = h && h.view;
+    if (!v || v === "hidden") return [];
+    var err = h.error ? (h.error === "net" ? t("upd_err_net") : h.error === "not_bound" ? t("hk_err_not_bound") : t("hk_err")) : "";
+    if (v === "done") return [info("hk", t("hk_row"), "", t("hk_done"))];
+    if (v === "busy") return [{ kind: "action", key: "hk", label: t("hk_row"),
+      sub: h.phase === "downloading" ? t("upd_downloading", { p: h.progress || 0 }) : t("hk_working"), act: function () {} }];
+    if (v === "ready") return [{ kind: "action", key: "hk", label: t("hk_row"),
+      sub: err || t(h.watch_apk ? "hk_sub_watch" : "hk_sub"), act: function () { var x = hk(); if (x) x.start(); } }];
+    var rows = [info("hk", t("hk_row"), "", (err ? err + " " : "") + t("hk_steps"))];
+    if (h.help_url && window.TVQR) rows.push({ kind: "qr", key: "hk-qr", url: h.help_url, label: t("hk_qr") });
     return rows;
   }
 
@@ -7296,6 +7319,8 @@
     photosAdded: function (names) { photosAdded(names); },
     // the launcher's updater has news (Updater.kt)
     update: function (state) { updChanged(state); },
+    // Make Home open Couch TV moved on (the on-TV app's HomeKey.kt)
+    homekey: function () { hkChanged(); },
     // Android's "default home app" chooser closed (HomeRole.kt, #98)
     homeAnswered: function (held) { homeAnswered(held); },
     // a calendar the launcher read for the Agenda widget (MainActivity.calendar)

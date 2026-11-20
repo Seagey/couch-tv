@@ -317,6 +317,9 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "GET /api/update" -> json(200, ok(JSONObject(Update.state(ctx))))
             "POST /api/update/check" -> { Update.check(ctx, true); json(200, ok(JSONObject(Update.state(ctx)))) }
             "POST /api/update/install" -> { Update.install(ctx); json(200, ok(JSONObject(Update.state(ctx)))) }
+            // Make Home open Couch TV (HomeKey.kt): the watch APK from GitHub over its own ADB link, then the watch on
+            "GET /api/homekey" -> json(200, ok(JSONObject(HomeKey.state(ctx))))
+            "POST /api/homekey/start" -> { HomeKey.start(ctx); json(200, ok(JSONObject(HomeKey.state(ctx)))) }
             // Step-by-step handshake with every packet logged (tag couchtv.adb, "diag:"). See AdbDiag.
             "POST /api/adb/diag" -> {
                 val b = body(s)

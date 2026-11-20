@@ -30,6 +30,8 @@ class App : Application() {
         runCatching { Security.insertProviderAt(org.conscrypt.Conscrypt.newProvider(), 1) }
         Store.init(this); Adb.init(this); Tv.init(this)
         instance = this
+        // after "Make Home open Couch TV" put the watch APK on over this one: switch its watch on and check it (HomeKey)
+        HomeKey.resume(this)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityResumed(a: Activity) { resumed++ }
             override fun onActivityPaused(a: Activity) { resumed-- }

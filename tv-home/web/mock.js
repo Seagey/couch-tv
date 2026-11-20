@@ -238,6 +238,41 @@
     };
   }
 
+  // ---------- Make Home open Couch TV (the on-TV app's HomeKey.kt), for ?homekey= ----------
+  // ready: one press, downloads, installs, switches the watch on, done. steps: no link, the QR code.
+  // done: already done. watch: the Home button version is on, its watch is off. fail: the watch never connects.
+  if (arg("homekey")) {
+    var hkKind = arg("homekey");
+    var hks = { view: hkKind === "watch" || hkKind === "fail" ? "ready" : hkKind, phase: "", progress: 0, error: "",
+      watch_apk: hkKind === "watch", help_url: "https://couchtv.joshuaseage.com/help/home-button/" };
+    var hkTell = function () { if (window.tv && window.tv.homekey) window.tv.homekey(JSON.parse(JSON.stringify(hks))); };
+    window.MOCK_HOMEKEY = {
+      state: function () { return JSON.stringify(hks); },
+      start: function () {
+        if (hks.view !== "ready") return;
+        hks.error = ""; hks.view = "busy";
+        var end = function () {
+          hks.phase = "switching"; hks.progress = 0; hkTell();
+          setTimeout(function () {
+            hks.phase = "";
+            if (hkKind === "fail") { hks.view = "ready"; hks.error = "not_bound"; }
+            else { hks.view = "done"; hks.watch_apk = true; }
+            hkTell();
+          }, 1200);
+        };
+        if (hks.watch_apk) { end(); return; }
+        hks.phase = "downloading"; hkTell();
+        var timer = setInterval(function () {
+          hks.progress += 20;
+          if (hks.progress < 100) { hkTell(); return; }
+          clearInterval(timer);
+          hks.phase = "installing"; hkTell();
+          setTimeout(end, 1200);   // the app would close and open again here
+        }, 300);
+      }
+    };
+  }
+
   // ---------- the TV's apps ----------
   var apps = [
     ["com.google.android.youtube.tv", "YouTube", "#f2f2f2"], ["com.netflix.ninja", "Netflix", "#ffffff"],
