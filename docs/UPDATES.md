@@ -6,18 +6,27 @@ The newest release is **0.13.9**. The TV apps come from [the Releases page](http
 
 ## November 2026
 
-### 20 November 2026: release 0.13.9, one button updates, Home settings on your phone, and designs sent from the phone
+### 20 November 2026: release 0.13.9, one button updates, Home settings on your phone, settings for each widget, and plain words
 
-0.13.9 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Fewer presses with the TV remote. A classic home looks exactly as it did. Option C: this one update still goes the old way (Home settings, About, Update couch-tv, then Downloader, or install the new on-TV APK over the old one); the next one is one button. Samsung: run the new `couch-tv-samsung-setup.zip` installer again. Option B: `git pull` and restart the bridge.
+0.13.9 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Fewer presses with the TV remote, settings for each widget, and plain words. The standard home (no design) looks exactly as it did. Option C: this one update still goes the old way (Home settings, About, Update couch-tv, then Downloader, or install the new on-TV APK over the old one); the next one is one button. Samsung: run the new `couch-tv-samsung-setup.zip` installer again. Option B: `git pull` and restart the bridge.
 
 - **Update to, with one button (on-TV app):** with the app's own link to the TV (Let the phone press keys, once), Home settings, Updates has one Update to button that downloads, checks and installs the update and opens couch-tv again, settings kept. The phone's setup page has it too. Without the link, or after a failed try, the steps show with a QR code that opens them on your phone. Tried on a real TCL.
 - **No crash after an update reopens couch-tv (on-TV app):** on a real TCL, 0.13.8 crashed about ten seconds after an update opened it again. Fixed.
 - **Home settings on your phone or a computer (on-TV app):** a Change this on your phone QR code in Home settings, with the address and a code to type for a computer. The town, people, kids mode, your photos, At home and the Ask AI key can all be set there. Everything stays changeable on the TV.
 - **Pair the phone in one scan (on-TV app):** the QR on the app's setup screen carries the pairing code. Typing the code still works.
 - **Send a design from the phone:** the phone remote's TV menu has Send a design, and a link to couch-tv Studio that sends the design you pick. The TV asks Use this design? first. Not on a Roku or an Apple TV: type the code on the TV there.
-- **Get a design from your phone:** Home settings, couch-tv Studio, Get a design from your phone shows a QR code; choose a design on the phone and press Send to my TV. On the couch-tv home on Android TV, Samsung and LG, and in Couch TV's settings on an Apple TV. On a Roku, type the code.
+- **Get a design from your phone:** Home settings, Designs, Get a design from your phone shows a QR code; choose a design on the phone and press Send to my TV. On the couch-tv home on Android TV, Samsung and LG, and in Couch TV's settings on an Apple TV. On a Roku, type the code.
 - **When the TV never asks "Allow debugging?":** after the whole wait, the setup screen and the phone page say "No answer from the TV. If it did not show its Allow debugging question, restart the TV, then try again."
 - **Samsung:** Home settings, About shows a QR code under the update steps that opens them on your phone.
+- **Settings for each widget:** hold OK on a widget and pick Settings for this widget, or Home settings, Designs, Widgets on this home, or on the on-TV app's phone page, Widgets on this TV. Two weather widgets can show two towns, and each Commute widget has its own Where to and Leave from. Kept in the TV's Home settings (and the computer at home, if there is one), never in a design.
+- **What you can set:** °F in every widget, news by country (Best for your country picks ABC News, BBC World or RNZ) and how many headlines, the scores competition and your team, a markets watchlist of up to six, bin night with bins that take turns, and a countdown to a one off year or every year.
+- **Honest widget headings:** the surf widget names the real beach, and device widgets their own names.
+- **Home settings that follow your design:** on the TV and the phone, only the settings your design uses, with Show all settings for the rest. On the phone each section opens and closes, and the design's apps are listed to change there.
+- **The Couch Original design:** a new couch-tv Studio template with the clock behind the mountains, the scenes taking turns or one picked, one long app row, and Keep watching only if you want it.
+- **Apple TV and Roku show designs:** drawn by Couch TV itself, with a widget it can't draw there left out and named, like "Surf: not on this TV". Apple TV: build Couch TV again. Roku: put the channel on again.
+- **The app list scrolls:** Add app (the "+") and Change app keep the app you are on in view.
+- **Plain words:** the app is called Couch TV everywhere on screen; the Home settings section couch-tv Studio is now Designs (Back to the standard home); ADB on the TV is now Let the phone press keys, with Newer TVs and Older TVs steps and Android's own menu names kept exact; widgets say the Couch TV app on this TV or a home computer, never option B or C; the phone remote says the home computer, not the bridge; Home Assistant's token is the access key. Every language has the new words.
+- **Not in this release:** putting a photo in a widget from couch-tv Studio (Studio does not offer it).
 
 ### 20 November 2026: release 0.13.8, Home settings pages open at the top
 
