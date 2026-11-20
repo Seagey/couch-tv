@@ -695,6 +695,7 @@
         else {
           var err = new Error((j && j.error) || t("bridge_no", { status: x.status }));
           if (j && j.error_key) { err.key = j.error_key; err.vars = j.error_vars; }
+          if (j && typeof j === "object") err.reply = j;   // the whole answer (matter.js reads its reason and note)
           reject(err);
         }
       };
@@ -7077,6 +7078,93 @@
     SET.keyFocus = null; SET.ri = 0;
   }
 
+  // ---- Home settings, Smart home, Matter devices (matter.js) ----
+  // The lights, plugs, fans, blinds, thermostats and sensors already in Google Home, Apple Home,
+  // SmartThings or Alexa, shared to this TV with a pairing code. They show under the Home Assistant
+  // rows of the Smart home screen, each with Rename and Remove, and Add a Matter device says where each
+  // app keeps the code. Only where a Matter controller answers (this TV's app or the home computer).
+  // Every line is in the TV's language: mw(key) reads matter-words.js (one table for the TV and the phone).
+  function mw(key, vars) { var W = window.CouchMatterWords; return W ? W.t(key, vars) : key; }
+  // the error keys the screens put in words (matter.js's checks, the controllers' answers)
+  var MT_ERR = { short: 1, typo: 1, code: 1, expired: 1, wrong_code: 1, unreachable: 1, thread: 1, already: 1, not_allowed: 1, unavailable: 1, name_hides: 1, refused: 1, unsupported: 1, busy: 1, timeout: 1, off: 1, failed: 1 };
+  // a controller's reason key (contract change 14): why Matter is not ready, or why a device was not
+  // added, moved, renamed or fully removed; worded before the error key
+  var MT_WHY = { off: 1, not_installed: 1, node_missing: 1, node_old: 1, starting: 1, stopped: 1, android_old: 1, processor: 1, not_started: 1, busy: 1,
+    blocked: 1, unsupported: 1, address: 1, port: 1, link_local: 1, offline: 1, not_answering: 1, opens_house: 1,
+    not_found: 1, not_allowed: 1, bad_request: 1, bad_name: 1, not_ready: 1, device_refused: 1, failed: 1, not_certified: 1, local_network: 1 };
+  // a key in plain words; a controller's own sentence only when there is no key for it
+  function mtSay(r) {
+    r = r || {};
+    if (r.reason && MT_WHY[r.reason]) return mw("why_" + r.reason);   // the home computer's Matter is not running
+    if (r.error && r.error !== "failed" && MT_ERR[r.error]) return mw("err_" + r.error);
+    return r.note || mw("err_failed");
+  }
+  var MT_APPS = [["brand_google", "app_google"], ["brand_apple", "app_apple"], ["SmartThings", "app_smartthings"], ["Alexa", "app_alexa"]];
+  function matterRows(rows) {
+    var M = window.CouchMatter;
+    if (!M || !M.on()) return rows;
+    rows.push(head(mw("title")));
+    if (!M.ready()) rows.push(info("mt-wait", "", "", MT_WHY[M.reason()] ? mw("why_" + M.reason()) : M.note() || mw("getting_ready")));
+    M.list().forEach(function (d) {
+      rows.push({ kind: "nav", key: "mt-d:" + d.entity, label: d.name, value: d.words, act: function () { openMatterDevice(d.entity); } });
+    });
+    rows.push({ kind: "nav", key: "mt-add", label: mw("add"), sub: mw("add_sub"), act: openMatterAdd });
+    return rows;
+  }
+  function openMatterAdd() {
+    var up = SET.sub;
+    MT_ADD.link = "";
+    if (ON_TV && !OFFLINE) api("GET", "/api/phone-link").then(function (j) { if (j && /^http:\/\/[^\/]+\/setup/.test(j.url || "")) { MT_ADD.link = j.url; if (zone === "settings") renderSettings(); } }, function () {});
+    SET.sub = { up: up, back: "mt-add", crumb: "Smart home", title: function () { return mw("add"); }, rows: function () {
+      var rows = [info("mt-how", "", "", mw("how"))];
+      if (MT_ADD.link && window.TVQR) rows.push({ kind: "qr", key: "mt-qr", link: MT_ADD.link, label: mw("easier"), sub: mw("easier_sub") });
+      rows.push({ kind: "input", key: "mt-code", label: mw("type"), value: MT_ADD.busy ? mw("adding_short") : "", sub: mw("type_sub"), act: function () {
+        if (MT_ADD.busy) return;
+        ahType(mw("type_label"), "", function (v) { matterAdd(v); });
+      } });
+      rows.push(head(mw("where")));
+      MT_APPS.forEach(function (a, i) { rows.push(info("mt-app:" + i, /^brand_/.test(a[0]) ? mw(a[0]) : a[0], "", mw(a[1]))); });
+      return rows;
+    } };
+    SET.keyFocus = null; SET.ri = 0;
+  }
+  var MT_ADD = { busy: false, link: "" };
+  function matterAdd(text) {
+    var M = window.CouchMatter, c = M.checkCode(text);
+    if (!c.ok) { SET.msg = mtSay(c); if (zone === "settings") renderSettings(); return; }
+    MT_ADD.busy = true; SET.msg = mw("adding");
+    if (zone === "settings") renderSettings();
+    M.commission(c.code).then(function (r) {
+      MT_ADD.busy = false;
+      SET.msg = r.ok ? (r.added && r.added.length ? mw("added_names", { names: r.added.join(", ") }) : mw("added_later")) : mtSay(r);
+      if (zone === "settings") renderSettings();
+    });
+  }
+  function openMatterDevice(entity) {
+    var up = SET.sub, M = window.CouchMatter;
+    var dev = function () { return M.list().filter(function (d) { return d.entity === entity; })[0]; };
+    SET.sub = { up: up, back: "mt-d:" + entity, crumb: "Smart home", title: function () { var d = dev(); return d ? d.name : mw("device"); }, rows: function () {
+      var d = dev();
+      if (!d) return [info("mt-gone", "", "", mw("gone"))];
+      return [info("mt-now", d.words, "", ""),
+        { kind: "input", key: "mt-rename", label: mw("rename"), value: d.name, sub: mw("rename_sub"), act: function () {
+          ahType(mw("name_for", { name: d.name }), d.name, function (v) {
+            v = String(v || "").trim();
+            if (!v) return;
+            SET.msg = mw("saving");
+            // a name that would hide it: matter.js's own check (name_hides) or the controller's reason opens_house
+            M.rename(entity, v).then(function (r) { SET.msg = r.ok ? mw("renamed") : mtSay(r); if (zone === "settings") renderSettings(); });
+          });
+        } },
+        { kind: "action", key: "mt-remove", label: mw("remove_tv"), danger: true, confirmText: mw("press_ok"), sub: mw("stays"), act: function () {
+          SET.msg = mw("removing");
+          M.remove(entity).then(function (r) { SET.msg = r.ok ? mw("removed") + (MT_WHY[r.reason] ? " " + mw("why_" + r.reason) : r.unanswered ? " " + mw("no_answer") : "") : mtSay(r); if (r.ok) SET.sub = up; if (zone === "settings") renderSettings(); });
+        } }];
+    } };
+    SET.keyFocus = null; SET.ri = 0;
+  }
+  if (window.CouchMatter) window.CouchMatter.onChange(function () { if (zone === "settings") renderSettings(); });
+
   // ---- Home settings, couch-tv Studio, Smart home: Home Assistant set up on the TV, no computer ----
   // The launcher (HomeAssistant.kt) or, on a TV whose home a computer runs, that computer's bridge
   // checks the address and token and lists what Home Assistant has; the person ticks what shows. The
@@ -7128,7 +7216,8 @@
   }
   function openSmartSetup() {
     SH.list = null; SH.err = ""; SH.picks = null;
-    SET.sub = { back: "dz-smart", crumb: "Designs", title: function () { return "Smart home"; }, rows: smartRows };
+    SET.sub = { back: "dz-smart", crumb: "Designs", title: function () { return "Smart home"; }, rows: function () { return matterRows(smartRows()); } };
+    if (window.CouchMatter && window.CouchMatter.on()) window.CouchMatter.refresh();
     SET.keyFocus = null; SET.ri = 0;
   }
   function smartRows() {
@@ -7864,6 +7953,9 @@
     readConfig();
     // a TV whose home a computer runs (no launcher): smart home goes through that computer's bridge
     // (on a Google TV or Android TV with a computer at home, only its Hue lights and AirTouch zones)
+    // Matter's live push (matter.js): an EventSource sends no header, so the bridge's address carries the
+    // pairing key (?token=; the bridge reads it there and logs no addresses, access_log=None) and the TV
+    api.events = function (p) { var q = [KEY ? "token=" + encodeURIComponent(KEY) : "", TV_ID ? "tv=" + TV_ID : ""].filter(Boolean).join("&"); return API + p + (q ? "?" + q : ""); };
     if (!OFFLINE && !MOCK && !PREVIEW && window.smartHome && window.smartHome.useBridge) window.smartHome.useBridge(api);
     // a design got by code: pictures only from here, the store and the hosts this TV already uses
     if (DESIGN_FROM_CODE && CouchDesignCode.lockImages) CouchDesignCode.lockImages((ST.photos || []).map(function (p) { return p && p.url; }), VIDEO_URL);

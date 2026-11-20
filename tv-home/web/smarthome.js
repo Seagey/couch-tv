@@ -49,19 +49,21 @@
     INFO.scenes = Array.isArray(INFO.scenes) ? INFO.scenes : [];
     // the smart home widgets (HomeAssistant.kt info()): names and entities only
     ["controls", "cameras", "sensors", "speakers"].forEach(function (k) { INFO[k] = Array.isArray(INFO[k]) ? INFO[k] : []; });
+    // Matter devices shared from Google Home, Apple Home, SmartThings or Alexa (matter.js): the same lists
+    if (window.CouchMatter) window.CouchMatter.merge(INFO);
     INFO.energy = INFO.energy === true; INFO.doorbell = INFO.doorbell === true; INFO.doorbell_camera = INFO.doorbell_camera === true;
     return INFO;
   }
   // anything at all set up for this TV (the widgets need no climate or scenes)
   function enabled() {
-    if (!native()) return false;
+    if (!native() && !matterOn()) return false;
     var i = info();
     return i.climate.length > 0 || i.scenes.length > 0 || i.controls.length > 0 || i.cameras.length > 0 || i.sensors.length > 0 ||
       i.speakers.length > 0 || i.energy || i.doorbell;
   }
   // The tile shows only when there is something for this screen (a doorbell alone has no screen).
   function available() {
-    if (!native()) return false;
+    if (!native() && !matterOn()) return false;
     var i = info();
     return i.climate.length > 0 || i.scenes.length > 0;
   }
@@ -76,7 +78,26 @@
     return DIRECT.api("POST", "/api/ha", { action: action, entity: entity || "", value: value == null ? "" : String(value) }, 20000)
       .then(function (r) { return r && r.result && typeof r.result === "object" ? r.result : { ok: false }; }, function () { return { ok: false, error: "bridge" }; });
   }
+  function matterOn() { return !!(window.CouchMatter && window.CouchMatter.on()); }
+  // a Matter device goes to its controller (matter.js); a list (rooms, switches, sensors) is the
+  // launcher's or bridge's with Matter's added, the way the computer's Hue and AirTouch are
   function ask(action, entity, value) {
+    var M = window.CouchMatter;
+    if (!M || !M.on()) return askHome(action, entity, value);
+    if (entity && M.owns(entity)) return M.ask(action, entity, value);
+    var key = M.reads(action);
+    if (!key || entity) return askHome(action, entity, value);
+    var home = native() ? askHome(action, "", value) : Promise.resolve({ ok: false, error: "off" });
+    return Promise.all([home, M.read(action)]).then(function (a) {
+      var list = { rooms: "climate", controls: "controls", sensors: "sensors" }[key];
+      var mine = a[0] && a[0].ok ? (a[0][key] || []).filter(function (x) { return !(x && M.owns(x.entity)); })
+        : info()[list].filter(function (x) { return !M.owns(x.entity); }).map(function (x) { return { entity: x.entity, name: x.name, ok: false }; });
+      var far = a[1] && a[1].ok ? a[1][key] || [] : [];
+      if (!(a[0] && a[0].ok) && !(a[1] && a[1].ok)) return a[0] || { ok: false };
+      var o = { ok: true }; o[key] = mine.concat(far); return o;
+    });
+  }
+  function askHome(action, entity, value) {
     if (DIRECT && window.TVHA) {
       if (DIRECT_RE.test(entity || "")) return askBridge(action, entity, value);
       if (action === "climate" || action === "controls") {
@@ -422,6 +443,7 @@
     }, function () {});
   }
   function useBridge(api) {
+    if (window.CouchMatter) window.CouchMatter.use(api);   // Matter devices through the same server
     if (window.TVHA) { useDirect(api); return; }
     if (BRIDGE || typeof api !== "function") return;
     var post = function (path, body, id, cb) {
@@ -450,7 +472,7 @@
   function reload() {
     INFO = null;
     LIVE.controls = LIVE.sensors = LIVE.speakers = LIVE.energy = LIVE.bell = null; LIVE.at = {};
-    changed("info", native() ? native().info() : "");
+    changed("info", (native() ? native().info() : "") + (window.CouchMatter ? window.CouchMatter.signature() : ""));
   }
 
   // ---------------- set up on the TV (Home settings, Smart home) ----------------
