@@ -7344,7 +7344,14 @@
         });
       },
       canRelay: webRelayOk, relay: webRelay,
-      json: function (url) { return fetch(url).then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); }); },
+      // never left waiting: an answer that has not come in 15 seconds is given up (so the source is asked again)
+      json: function (url) {
+        var ac = typeof AbortController !== "undefined" ? new AbortController() : null, tm = ac ? setTimeout(function () { ac.abort(); }, 15000) : 0;
+        var done = function () { if (tm) clearTimeout(tm); };
+        var ask = fetch(url, ac ? { signal: ac.signal } : undefined).then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); }).then(function (j) { done(); return j; }, function (e) { done(); throw e; });
+        // an older TV browser without AbortController: the same 15 seconds, by a race
+        return ac ? ask : Promise.race([ask, new Promise(function (ok, no) { setTimeout(function () { no(new Error("timeout")); }, 15000); })]);
+      },
       // the last answers, on this TV only (headlines and prices, never anything about the household)
       load: function () { try { return JSON.parse(localStorage.getItem(PFX + "tvhome.webdata") || "null"); } catch (e) { return null; } },
       save: function (o) { try { localStorage.setItem(PFX + "tvhome.webdata", JSON.stringify(o)); } catch (e) {} },
@@ -7546,7 +7553,7 @@
   }
   function wsOptions(s, w) { return s.type === "tvlist" ? tvlistOptions(s.from) : s.type === "team" ? teamOptions(w).map(function (t) { return [t.name, t.name]; }) : s.options; }
   // Scores, Your team: the competition this widget shows now (its Competition setting), and ESPN's own
-  // team list for it, read with the scores (widget-web.js; Big Bash and cricket have none: [] means typed)
+  // team list for it, read with the scores (widget-web.js; cricket has none: [] means typed)
   function teamLeague(w) {
     var r = w && (w.settings || []).filter(function (x) { return x.key === "league"; })[0], W0 = window.CouchWidgetWeb;
     return W0 ? W0.leagueOf(r ? wsCur(w, r) : (w && w.opts || {}).league) : "nrl";
@@ -7562,7 +7569,8 @@
   // a typed team checked against the teams in the competition's games: { name } when it is one of them
   function teamCheck(w, x) {
     var v = teamAnswer(w), W0 = window.CouchWidgetWeb, t = W0 && x ? W0.teamOf(x, v) : null;
-    return { team: t, league: W0 ? W0.LEAGUES[teamLeague(w)].name : "", seen: W0 ? W0.teamList(v).length : 0 };
+    var lg = teamLeague(w);
+    return { team: t, league: W0 ? (lg === "cricket" ? "cricket" : W0.LEAGUES[lg].name) : "", seen: W0 ? W0.teamList(v).length : 0 };
   }
   // "sets": bins, Which bin goes out this week, also sets the count the widget keeps from (anchor):
   // the coming bin night is week 0 for the first bin, week 1 for the second
@@ -7748,7 +7756,7 @@
             if (s.type === "calendar" && x) { x = window.CouchAtHome ? CouchAtHome.calUrl(x) : ""; if (!x) { SET.msg = "That is not a calendar link. It starts with https://."; return; } }
             if (s.many) { var parts = x.split(",").map(function (y) { return y.trim(); }).filter(Boolean).slice(0, isFinite(s.max) ? +s.max : 6); set(parts.length ? parts : null); }
             else if (s.type === "team" && x) {
-              // no list for this competition (Big Bash, cricket): checked against the teams in its games
+              // no list for this competition (cricket has no list): checked against the teams in its games
               var tc = teamCheck(w, x);
               set(tc.team ? tc.team.name : x);
               SET.msg = tc.team ? "Saved: " + tc.team.name + "." : "Saved. No " + x + " in the " + tc.league + " games Couch TV can see now: it shows once they play.";

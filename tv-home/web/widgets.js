@@ -1861,11 +1861,11 @@
   function wordOf(o, env) {
     var W0 = window.CouchWords || {}, lang = String(setting(o, env, "lang") || "en"), list = (W0.wordsIn && W0.wordsIn[lang]) || null;
     if (!list) { lang = "en"; list = W0.words || [["Petrichor", "noun", "The smell of rain on dry ground."]]; }
-    return { w: list[dayOfYear() % list.length], head: lang === "en" ? "Word of the day" : WORD_LANG[lang] + " word of the day", meaning: setting(o, env, "meaning") !== false };
+    return { w: list[dayOfYear() % list.length], lang: lang, head: lang === "en" ? "Word of the day" : "Word of the day, in " + WORD_LANG[lang], meaning: setting(o, env, "meaning") !== false };
   }
   R.word = function (root, o, b, env) {
     var x = wordOf(o, env || {}), w = x.w;
-    add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-lab", "", [x.head]), E("div", "cw-t48", "margin-top:10px;font-size:" + px(clamp(b.w / 7, 40, 64)), [w[0]]),
+    add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-lab", "white-space:normal;overflow:visible;text-overflow:clip", [E("span", "", "white-space:normal;margin-right:0;flex:0 1 auto;min-width:0", [x.head])]), E("div", "cw-t48", "margin-top:10px;font-size:" + px(clamp(b.w / 7, 40, 64)), [w[0]]),
       E("div", "cw-t25", "font-style:italic;margin-top:4px", [w[1]]), b.h >= 300 && x.meaning ? E("div", "cw-t25", "color:var(--ink);margin-top:14px", [w[2]]) : null]));
   };
   // ---------------- the web widgets: news, scores, markets, the commute (widget-web.js) ----------------
@@ -2025,17 +2025,25 @@
     return webReady(root, b, "info", "news", rec) ? { name: name, from: name !== src ? src : "", items: rec.v || [], stale: !!rec.stale, at: rec.at } : null;
   }
   function agoOf(at) { var WW = window.CouchWidgetWeb; return WW && at ? WW.ago(at, now().getTime()) : ""; }
-  function headline(x, a, first, size) {
-    return dropT(E("div", "", "min-width:0;flex:none;" + (first ? "" : "margin-top:16px"), [x.at ? E("div", "cw-t23", "color:#ff453a;font-weight:700;text-align:" + a, [agoOf(x.at)]) : null,
-      fitT(E("div", "", WRAP + "font-size:" + (size || 29) + "px;line-height:1.22;font-weight:640;margin-top:4px;text-align:" + a, [x.title]))]), first ? 1 : 2);
+  // keep: a headline the person asked for (How many headlines): it is never left out, its words get
+  // smaller instead, and its time goes first
+  function headline(x, a, first, size, keep) {
+    var ago = x.at ? E("div", "cw-t23", "color:#ff453a;font-weight:700;text-align:" + a, [agoOf(x.at)]) : null;
+    if (ago && keep) dropT(ago, 4);
+    var el = E("div", "cw-hl", "min-width:0;flex:none;" + (first ? "" : "margin-top:16px"), [ago,
+      fitT(E("div", "", WRAP + "font-size:" + (size || 29) + "px;line-height:1.22;font-weight:640;margin-top:4px;text-align:" + a, [x.title]))]);
+    return keep ? el : dropT(el, first ? 1 : 2);
   }
+  // How many headlines: "auto" as many as fit, or 1 or 2, which always show (a design's older 3 or 4 is 2)
+  function newsWant(o, env) { var w = setting(o, env, "count"); return w === "auto" || w === undefined || w === null || !isFinite(+w) || +w < 1 ? 0 : Math.min(2, Math.round(+w)); }
   R.news = function (root, o, b, env) {
     var N = newsOf(root, o, b, env), a = alignOf(o);
     if (!N) return;
     if (!N.items.length) return webEmpty(root, b, "info", WEB_WORDS.news[2], "", WEB_SHORT.news[2]);
-    var n = clamp(Math.floor((b.h - 70) / 110), 1, 5), want = setting(o, env, "count");
-    if (want !== "auto" && isFinite(+want) && +want >= 1) n = Math.min(n, Math.round(+want));
-    webBody(root, a, [webHead("info", N.name, a), N.stale ? line("Not updated lately", 24, "color:var(--sub)", a, 3) : N.from && b.h >= 300 ? line("From " + N.from, 24, "color:var(--sub)", a, 3) : null, E("div", "", "height:14px;flex:none")].concat(N.items.slice(0, n).map(function (x, i) { return headline(x, a, i === 0); })));
+    var want = newsWant(o, env), n = want || clamp(Math.floor((b.h - 70) / 110), 1, 5);
+    // the number asked for fills the box: each headline as big as its share of the room allows
+    var size = want ? clamp(((b.h - 48 - 54) / want - 40) / (3 * 1.22), 25, 40) : 29;
+    webBody(root, a, [webHead("info", N.name, a), N.stale ? line("Not updated lately", 24, "color:var(--sub)", a, 3) : N.from && b.h >= 300 ? line("From " + N.from, 24, "color:var(--sub)", a, 3) : null, E("div", "", "height:14px;flex:none")].concat(N.items.slice(0, n).map(function (x, i) { return headline(x, a, i === 0, size, !!want); })));
   };
 
   // Scores: one league's round from ESPN's public scoreboard (widget-web.js), live games first, then
@@ -2055,14 +2063,16 @@
     var real = WW && WW.LEAGUES && WW.LEAGUES[id] ? WW.LEAGUES[id].name : v.league, name = webName(q.label, real, WW && WW.LEAGUES) || real || v.league || "Scores";
     var t = now().getTime(), team = String(setting(o, env, "team") || "").trim(), mode = setting(o, env, "games") || "all";
     // the team, checked against the competition's own teams: a team from another competition says so
-    var known = team && WW && !env.demo ? WW.teamOf(team, v) : null, wrong = !!team && !!WW && !env.demo && !known && WW.teamList(v).length >= 4;
-    var tname = known ? known.short || known.name : team;
+    // "not in" only when the competition's own ladder was read (v.teams): the teams in this round's games
+    // are never the whole competition, so a team missing from them just has no game right now
+    var known = team && WW && !env.demo ? WW.teamOf(team, v) : null, wrong = !!team && !!WW && !env.demo && !known && !!(v.teams && v.teams.length >= 4);
+    var tname = known ? known.short || known.name : team, realIn = id === "cricket" ? "cricket" : real;
     if (mode !== "all" && !team) mode = mode === "mine" ? "nomine" : mode;
     if (mode === "nomine") { webEmpty(root, b, "tv", "Pick your team", "This widget shows only your team's games: pick it in this widget's settings, hold OK on the widget", "Pick a team"); root.setAttribute("data-setup", "sports"); return null; }
-    if (wrong && mode === "mine") { webEmpty(root, b, "tv", team + " is not in the " + real, "Pick your team again in this widget's settings: hold OK on the widget", "Not in the " + real); return null; }
+    if (wrong && mode === "mine") { webEmpty(root, b, "tv", team + " is not in the " + realIn, "Pick your team again in this widget's settings: hold OK on the widget", "Not in the " + realIn); return null; }
     var season = WW ? WW.seasonOf(v.games || [], t) : { off: "" };
-    var offWords = season.off === "over" ? "The " + real + " season is over" : season.off === "soon" ? "The " + real + " season starts " + WW.kickoff(season.at, t, env.clock24) : "";
-    if (!v.games || !v.games.length) { webEmpty(root, b, "tv", "No " + real + " games right now", "Scores show here when the next round starts", "No games"); return null; }
+    var offWords = season.off === "over" ? "The " + realIn + " season is over" : season.off === "soon" ? "The " + realIn + " season starts " + WW.kickoff(season.at, t, env.clock24) : "";
+    if (!v.games || !v.games.length) { webEmpty(root, b, "tv", "No " + realIn + " games right now", "Scores show here when the next round starts", "No games"); return null; }
     var games = WW ? WW.scoreFilter(v.games, known ? known.name : team, mode, t) : v.games;
     if (!games.length) {
       var next = WW ? WW.scoreFilter(v.games, known ? known.name : team, "all", t).filter(function (g) { return g.state === "pre"; }).sort(function (x, y) { return x.at - y.at; })[0] : null;
@@ -2071,7 +2081,7 @@
       return null;
     }
     return { name: name, round: season.off ? "" : v.round || "", stale: v.stale, games: games, off: season.off === "over" ? "Season over" : season.off === "soon" ? "Starts " + WW.kickoff(season.at, t, env.clock24) : "",
-      warn: wrong ? team + " is not in the " + real : "" };
+      warn: wrong ? team + " is not in the " + realIn : "", warnShort: wrong ? "Not in the " + realIn : "" };
   }
   // a result in plain words: "Full time", "Full time, extra time", "Full time, penalties"
   var FULL = { ot: "extra time", aet: "extra time", pens: "penalties", so: "a shoot out" };
@@ -2183,7 +2193,7 @@
     var WW = window.CouchWidgetWeb, spare = bufS === undefined || !isFinite(+bufS) ? 10 : +bufS, ah = hasAh ? +ahS : env.demo ? 8 : undefined, am = hasAh ? +amS || 0 : 30;
     var lb = WW && ah !== undefined ? WW.leaveBy(v.minutes, ah, am, spare, now().getTime(), wdS) : null;
     var arrive = ah !== undefined ? fmt12(new Date(2000, 0, 1, ah, am)) : "";
-    return { minutes: v.minutes, km: v.km, label: (tvSet(o, env, "label") || (o.__design || q).label) || "To " + (c.to.name || "work"), leave: lb ? (lb.day ? lb.day + ", leave by " : "Leave by ") + fmt12(lb.at) : "", arrive: arrive, stale: !env.demo && !!(webOf(env, "commute", c.key) || {}).stale };
+    return { minutes: v.minutes, km: v.km, label: (tvSet(o, env, "label") || (o.__design || q).label) || "To " + (c.to.name || "work"), leave: lb ? (lb.day ? lb.day + ", leave by " : "Leave by ") + fmt12(lb.at) : "", leaveAt: lb ? fmt12(lb.at) : "", leaveDay: lb ? (lb.day === "Tomorrow" ? lb.day : lb.day.slice(0, 3)) : "", arrive: arrive, stale: !env.demo && !!(webOf(env, "commute", c.key) || {}).stale };
   }
   function line(text, size, extra, a, drop) { var e = fitT(E("div", "", WRAP + "font-size:" + size + "px;line-height:1.22;flex:none;text-align:" + a + ";" + (extra || ""), [text])); return drop ? dropT(e, drop) : e; }
   R.commute = function (root, o, b, env) {
@@ -2391,7 +2401,12 @@
   };
   CR.word = function (root, o, b, env) {
     var x = wordOf(o, env || {}), w = x.w;
-    add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-t48 cw-ell", "font-size:" + px(clamp((b.w - 48) / (w[0].length * 0.6), 30, 56)), [w[0]]), E("div", "cw-t25 cw-ell", "font-style:italic;margin-top:4px", [w[1] + (b.w >= 600 && x.meaning ? ". " + w[2] : "")])]));
+    // Show what it means: the meaning under the word (another language: how to say it, then the meaning),
+    // wrapping and sized to fit; off, only what kind of word it is or how to say it
+    var sub = x.meaning ? (x.lang === "en" ? w[2] : w[1] + ". " + w[2]) : w[1];
+    add(root, E("div", "cw-col", "height:100%;min-height:0;justify-content:center", [E("div", "cw-t48 cw-ell", "flex:none;font-size:" + px(clamp((b.w - 48) / (w[0].length * 0.6), 30, x.meaning ? 44 : 56)), [w[0]]),
+      fitT(E("div", "", WRAP + "font-size:25px;line-height:1.22;flex:none;margin-top:4px;" + (x.meaning ? "color:var(--ink)" : "font-style:italic"), [sub]))]));
+    fitLater(root);
   };
   CR.battery = function (root, o, b, env) {
     var bt = batteriesOf(env), x = bt && bt.devices && bt.devices[0];
@@ -2408,28 +2423,38 @@
     if (!N.items.length) return webEmpty(root, b, "info", WEB_WORDS.news[2], "", WEB_SHORT.news[2]);
     // two lines of words at about 12 px a letter: the newest headline of the first five that fits whole
     var room = Math.floor((b.w - 48) / 12) * 2, x = N.items.slice(0, 5).filter(function (h) { return h.title.length <= room; })[0] || N.items.slice(0, 5).sort(function (p, q) { return p.title.length - q.title.length; })[0];
-    webBody(root, a, [line([N.name, agoOf(x.at)].filter(Boolean).join(" · "), 24, "color:#ff453a;font-weight:700", a, 2), line(x.title, 29, "font-weight:640;margin-top:4px", a)]);
+    // one row tall has room for one whole headline only, whatever number is asked for (widget-caps.js says so)
+    var hl = line(x.title, 29, "font-weight:640;margin-top:4px", a); hl.className = "cw-hl";
+    webBody(root, a, [line([N.name, agoOf(x.at)].filter(Boolean).join(" · "), 24, "color:#ff453a;font-weight:700", a, 2), hl]);
   };
   CR.sports = function (root, o, b, env) {
     var V = scoresOf(root, o, b, env), a = alignOf(o);
     if (!V) return;
     var g = V.games[0];
-    webBody(root, a, [teamRow(g.teams[0], g, 25), E("div", "", "height:4px;flex:none"), teamRow(g.teams[1], g, 25), dropT(statusLine(gameStatus(g, env), a), 2)]);
+    // a team from another competition: said where the first game's status would be
+    webBody(root, a, [teamRow(g.teams[0], g, 25), E("div", "", "height:4px;flex:none"), teamRow(g.teams[1], g, 25), V.warn ? statusLine({ text: V.warnShort, live: true }, a) : dropT(statusLine(gameStatus(g, env), a), 2)]);
   };
   CR.stocks = function (root, o, b, env) {
     var V = stocksOf(root, o, b, env), a = alignOf(o), WW = window.CouchWidgetWeb;
     if (!V) return;
     var x = V.quotes[0];
     if (b.w < 300) {
-      return webBody(root, a, [line(WW ? WW.change(x) || "0%" : "", 44, "font-weight:740;color:" + upDown(x.change), a), line(x.name, 25, "font-weight:650;margin-top:4px", a)]);
+      return webBody(root, a, [line(WW ? WW.change(x) || "0%" : "", 44, "font-weight:740;color:" + upDown(x.change), a), line(x.name, 25, "font-weight:650;margin-top:4px", a),
+        V.price ? line(WW ? WW.price(x) : String(x.price), 23, "color:var(--sub);margin-top:2px", a) : null]);
     }
+    // Show the price: the first one with its price; off, the first two with only their move
+    if (V.price) return webBody(root, a, [quoteRow(x, a, true, true)]);
     webBody(root, a, V.quotes.slice(0, 2).map(function (q, i) { return quoteRow(q, a, false, i === 0); }));
   };
   CR.commute = function (root, o, b, env) {
     var V = commuteOf(root, o, b, env), a = alignOf(o);
     if (!V) return;
+    // an arrive by time: when to leave, the day too when it is not today (Weekdays only off can make it Saturday)
+    if (b.w < 300 && V.leaveAt) return webBody(root, a, [line(V.leaveDay ? V.leaveDay + ", leave" : "Leave", 24, "color:var(--sub);font-weight:650", a), line(V.leaveAt, 36, "font-weight:740;margin-top:2px", a), line(V.minutes + " min drive", 23, "color:var(--sub);margin-top:2px", a, 2)]);
     if (b.w < 300) return webBody(root, a, [E("div", "cw-row", "justify-content:" + jc(a) + ";flex:none", [ic("location", 30, "currentColor")]), line(V.minutes + " min", 44, "font-weight:740;margin-top:4px", a), V.label.length <= 10 ? line(V.label, 24, "font-weight:650;margin-top:2px", a, 2) : null]);
-    webBody(root, a, [line(V.minutes + " min", 44, "font-weight:740", a), line(V.label, 25, "font-weight:650;margin-top:2px", a, 3), line(V.leave || "The usual drive, no live traffic", 24, "color:var(--sub);margin-top:2px", a, 2)]);
+    // when to leave, short enough for one line ("Tomorrow, leave 7:53am"); the place goes first if room runs out
+    webBody(root, a, [line(V.minutes + " min", 44, "font-weight:740", a), line(V.label, 25, "font-weight:650;margin-top:2px", a, 3),
+      V.leaveAt ? line((V.leaveDay ? V.leaveDay + ", leave " : "Leave by ") + V.leaveAt, 24, "font-weight:680;margin-top:2px", a) : line("The usual drive, no live traffic", 24, "color:var(--sub);margin-top:2px", a, 2)]);
   };
 
   // ---------------- things typed at home (athome.js, through app.js): kept on this TV only ----------------

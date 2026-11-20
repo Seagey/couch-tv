@@ -373,6 +373,13 @@
   function labelRow(K, iconName, text) {
     return K.E("div", "cw-lab", "max-width:100%;flex:none", [K.ic(iconName, 30, "currentColor"), K.E("span", "cw-ell", "flex:0 1 auto;min-width:0;margin-right:0", [text])]);
   }
+  // the question over its answer: up to two lines, wrapping (a question longer than that is shortened
+  // at a word, never cut mid line); rows says how many lines it takes
+  function askRow(K, text, w) {
+    var f = fitWords(text, w - 40, 2 * 25 * 1.22, 25), per = Math.max(1, Math.floor((w - 40) / (f.fs * 0.58)));
+    return { rows: f.text.length > per * 0.82 ? 2 : 1, el: K.E("div", "cw-lab", "max-width:100%;flex:none;white-space:normal;overflow:visible;text-overflow:clip;align-items:flex-start", [K.ic("mic", 30, "currentColor"),
+      K.E("span", "", "flex:0 1 auto;min-width:0;margin-right:0;font-size:" + f.fs + "px;line-height:1.22;overflow-wrap:break-word", [f.text])]) };
+  }
   // the empty card, at the side the design picks (widgets.js empty() is always in the middle)
   function blank(K, root, o, b, iconName, line, sub) {
     var a = o && o.opts && o.opts.align;
@@ -396,10 +403,10 @@
     if (v && !(env && env.demo) && !v.pending && !kept(K, o, env, v.at)) v = null;
     if (!(env && env.demo) && !s.ready) return blank(K, root, o, b, "mic", tiny ? "Set up Ask AI" : "Ask AI: pick who answers", "OK here sets it up, step by step");
     if (!v || !v.q) return blank(K, root, o, b, "mic", tiny ? "Ask AI" : "Ask anything", "Press OK, then type or say it. Or use Ask on the phone remote");
-    var a = v.pending ? "Thinking..." : v.err ? v.err : v.a, w = b.w - 48, by = b.h >= 300, h = b.h - 48 - 40 - 12 - (by ? 44 : 0);
+    var a = v.pending ? "Thinking..." : v.err ? v.err : v.a, w = b.w - 48, by = b.h >= 300, qr = askRow(K, v.q, w), h = b.h - 48 - 40 - (qr.rows - 1) * 31 - 12 - (by ? 44 : 0);
     if (b.w < 300) { var f0 = fitWords(a, w, b.h - 48, 34); K.add(root, col(K, o, root, [K.E("div", "", "font-size:" + f0.fs + "px;font-weight:650;line-height:1.2", [f0.text])])); return root; }
     var f = fitWords(a, w, h, 64);
-    K.add(root, col(K, o, root, [labelRow(K, "mic", v.q),
+    K.add(root, col(K, o, root, [qr.el,
       K.E("div", "", "max-width:100%;font-size:" + f.fs + "px;font-weight:680;line-height:1.2;margin-top:12px;letter-spacing:-.01em;overflow-wrap:break-word", [f.text]),
       by ? K.E("div", "cw-t23 cw-ell", "max-width:100%;margin-top:14px;color:var(--sub)", [v.pending ? "Asking " + (v.by || "your AI") : "Answered by " + (v.by || "your AI")]) : null]));
     return root;

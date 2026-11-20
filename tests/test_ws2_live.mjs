@@ -404,7 +404,7 @@ const ESPN_TODAY = LIVE ? null : { nrl: "Roosters", afl: "Sydney Swans", epl: "M
   ok(/^Word of the day/.test(t), "Word of the day in English: " + t);
   const es = await tvp.evaluate(() => { const d = new Date(), i = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000); const l = window.CouchWords.wordsIn.es; return l[i % l.length]; });
   await edit(tvp, "wd|word", { lang: "es" });
-  t = await waitW(tvp, "wd", "Spanish word of the day", "Words in Spanish");
+  t = await waitW(tvp, "wd", "Word of the day, in Spanish", "Words in Spanish");
   ok(t.indexOf(es[0]) >= 0 && t.indexOf(es[2]) >= 0, "today's Spanish word and what it means: " + t);
   await edit(tvp, "wd|word", { meaning: false });
   await tvp.waitForTimeout(500); t = await wtext(tvp, "wd");
@@ -446,7 +446,7 @@ const ESPN_TODAY = LIVE ? null : { nrl: "Roosters", afl: "Sydney Swans", epl: "M
   await phone.evaluate(() => { const d = [...document.querySelectorAll("#w-list details.wbox")].find((x) => /^Word of the day/.test(x.querySelector("summary").textContent)); d.open = true; });
   const sel = phone.locator('#w-list select[data-ws="lang"]');
   await sel.selectOption("fr");
-  const t = await waitW(tvp, "wd", "French word of the day", "the phone's Words in French");
+  const t = await waitW(tvp, "wd", "Word of the day, in French", "the phone's Words in French");
   ok(/French/.test(t), "the phone's pick shows on the TV");
   const teamSel = await phone.evaluate(() => !!document.querySelector('#w-list [data-ws="team"]'));
   ok(teamSel, "the phone has Your team for Scores");

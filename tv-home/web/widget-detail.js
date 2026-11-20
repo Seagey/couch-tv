@@ -303,7 +303,10 @@
   // From your AI (ask.js): the last message in full, and how to connect an agent (docs/AI-AGENT.md)
   B.agent = function (o, env) {
     var A = window.CouchAsk, m = env.demo ? { from: "Claude", text: "Your new autumn design is on its way. Press OK on the TV when it asks." } : A && A.message();
-    S.body.appendChild(head("phone", "From your AI", m ? "From " + m.from : "Your own AI agent can write to this TV", "#5e5ce6"));
+    // Show each message and Show who sent it, as on the widget: an older message waits quietly here too
+    var keep = kit().setting(o, env, "keep"), who = kit().setting(o, env, "who");
+    if (m && !env.demo && ((keep === "hour" && m.at && Date.now() - m.at > 3600000) || (keep === "day" && m.at && Date.now() - m.at > 86400000))) m = null;
+    S.body.appendChild(head("phone", "From your AI", m ? (who === false ? "From your AI" : "From " + m.from) : "Your own AI agent can write to this TV", "#5e5ce6"));
     if (m) S.body.appendChild(E("div", "cwd-note", "margin-top:24px;font-size:" + px(clamp(Math.sqrt(1500 * 300 / Math.max(10, m.text.length) / 1.6), 36, 84)), [m.text]));
     var C = window.CouchWidgetCaps, steps = C ? C.steps("agent", "android") : [];
     S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:24px", [label("Connect your AI agent"),

@@ -574,10 +574,10 @@
     list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Home settings, Designs, At home.", "tv", ON_TV, true, { from: "lists", "private": true })],
     news: [st("feed", "News source", "choice", "auto", "Where the headlines come from. Best for your country picks ABC News in Australia, BBC World in the UK and RNZ in New Zealand.", "design", ALL, true,
       { options: FEED_OPTS }),
-      st("count", "How many headlines", "choice", "auto", "As many as fit shows more on a bigger widget.", "design", ALL, true, { options: [["auto", "As many as fit"], [1, "1"], [2, "2"], [3, "3"], [4, "4"]] })],
+      st("count", "How many headlines", "choice", "auto", "As many as fit shows more on a bigger widget. 1 or 2 always show, their words sized to fit, except on a widget one row tall, which has room for one.", "design", ALL, true, { options: [["auto", "As many as fit"], [1, "1"], [2, "2"]] })],
     sports: [
       st("league", "Competition", "choice", "nrl", "Which games show here.", "design", ALL, true, { options: LEAGUE_OPTS }),
-      st("team", "Your team", "team", "", "Pick from the competition's teams. Big Bash and cricket have no list: type the team's name and Couch TV checks it against the games it can see.", "design", ALL, true, { league: "league" }),
+      st("team", "Your team", "team", "", "Pick from the competition's teams. Cricket has no list: type the team's name and Couch TV checks it against the games it can see.", "design", ALL, true, { league: "league" }),
       st("games", "Which games", "choice", "all", "Only my team needs your team picked above.", "design", ALL, true, { options: [["all", "Every game"], ["live", "Live games and my team"], ["mine", "Only my team"]] })
     ],
     stocks: [st("tickers", "Shares and prices", "text", ["^AXJO", "AUDUSD=X", "BTC-AUD"], "Up to six, with commas between. A share's code like BHP.AX, ^AXJO for the ASX 200, AUDUSD=X for the dollar, BTC-AUD for Bitcoin.", "design", ALL, true,
@@ -600,7 +600,7 @@
     word: [
       st("lang", "Words in", "choice", "en", "Another language shows an everyday word, how to say it and what it means.", "design", ALL, true,
         { options: [["en", "English"], ["es", "Spanish"], ["fr", "French"], ["it", "Italian"], ["de", "German"], ["ja", "Japanese"]] }),
-      st("meaning", "Show what it means", "toggle", true, "Off leaves it as a guess until you open it.", "design", ALL, true)
+      st("meaning", "Show what it means", "toggle", true, "Off shows only the word and how to say it, or for English what kind of word it is.", "design", ALL, true)
     ],
     ask: [st("keep", "Show the last answer", "choice", "always", "No keeps your questions private: the widget always just invites the next one.", "design", ALL, true,
       { options: [["always", "Until the next question"], ["hour", "For an hour"], ["never", "No"]] })],

@@ -400,11 +400,17 @@
       },
       // the round, and ESPN's team list for the Your team picker once a week (a list that cannot be read
       // leaves the round as it is: the picker then offers the teams seen in the games)
+      // A ladder that hangs never holds up the scores: after 8 seconds (h.ladderWait) the kept list is used.
       get: function (h, id) {
-        var L = LEAGUES[id], t = h.now ? h.now() : Date.now(), kept = TEAMS[id];
-        var teams = !L.teams || (kept && t - kept.at < 7 * 24 * 60 * MIN) ? Promise.resolve(kept ? kept.list : null)
-          : h.json(L.teams).then(function (j) { var l = parseTeams(j); if (l.length) TEAMS[id] = { at: t, list: l }; return l.length ? l : kept ? kept.list : null; }, function () { return kept ? kept.list : null; });
-        return Promise.all([h.json(L.url), teams]).then(function (r) { var v = parseScores(r[0], id); if (r[1] && r[1].length) v.teams = r[1]; return v; });
+        var L = LEAGUES[id], t = h.now ? h.now() : Date.now(), kept = TEAMS[id], keptList = function () { return kept ? kept.list : null; };
+        var teams = !L.teams || (kept && t - kept.at < 7 * 24 * 60 * MIN) ? Promise.resolve(keptList())
+          : Promise.race([h.json(L.teams).then(function (j) { var l = parseTeams(j); if (l.length) TEAMS[id] = { at: t, list: l }; return l.length ? l : keptList(); }, keptList),
+            new Promise(function (r) { setTimeout(function () { r(keptList()); }, isFinite(h.ladderWait) ? h.ladderWait : 8000); })]);
+        return Promise.all([h.json(L.url), teams]).then(function (r) {
+          var v = parseScores(r[0], id), k = TEAMS[id];
+          if (r[1] && r[1].length) { v.teams = r[1]; v.teamsAt = k && k.list === r[1] ? k.at : t; }
+          return v;
+        });
       }
     },
     stocks: {
@@ -443,10 +449,18 @@
   //      relay(src, id): a Promise of the source's text through it, json(url): a Promise of JSON from a
   //      source that allows pages,
   //      load(): the last answers kept on this TV, save(o), changed(): the widgets draw again,
-  //      now(): ms, hidden(): true while the home is not on screen }
+  //      now(): ms, hidden(): true while the home is not on screen, ladderWait: ms a ladder may take (8000) }
   function Loader(h) {
     var web = {}, busy = {}, timer = null;
     try { var kept = h.load && h.load(); if (kept && typeof kept === "object") Object.keys(SOURCES).forEach(function (s) { if (kept[s] && typeof kept[s] === "object") web[s] = kept[s]; }); } catch (e) {}
+    // each competition's ladder kept with its last answer: a reload uses it until it is a week old,
+    // rather than asking ESPN for it again
+    try {
+      Object.keys(web.sports || {}).forEach(function (id) {
+        var r = web.sports[id], v = r && r.v;
+        if (LEAGUES[id] && v && v.teams && v.teams.length && isFinite(v.teamsAt) && (!TEAMS[id] || TEAMS[id].at < v.teamsAt)) TEAMS[id] = { at: +v.teamsAt, list: v.teams };
+      });
+    } catch (e) {}
     function now() { return h.now ? h.now() : Date.now(); }
     function wanted() {
       var out = {};
