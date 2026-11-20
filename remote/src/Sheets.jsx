@@ -493,7 +493,14 @@ function DesignSend({ onDesign, can = true }) {
   );
 }
 
-export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnds, onSleep, onKey, onText, sleepError, tvs, tvId, onTv, canMove, onMove, picture, pictureInfo, onPicture, onArrange, onPeople, onKids, onDesign, canSendDesign = true }, ref) {
+// g32: the keys of a Samsung's own remote that the phone remote has no button for (a smart monitor's
+// owner wanted Esc: that is Exit). Each name is one the bridge turns into the Samsung's KEY_ code
+// (bridge/samsung.py KEYS); tests/test_social_bugs_bridge.py checks both lists agree.
+const MORE_KEYS = [['return', 'key_return'], ['exit', 'key_exit'], ['smart_hub', 'key_smart_hub'], ['tools', 'key_tools'], ['info', 'key_info'],
+  ['guide', 'key_guide'], ['source', 'key_source'], ['channel_list', 'key_channel_list'],
+  ['red', 'key_red'], ['green', 'key_green'], ['yellow', 'key_yellow'], ['blue', 'key_blue']];
+
+export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnds, onSleep, onKey, onText, sleepError, tvs, tvId, onTv, canMove, onMove, picture, pictureInfo, onPicture, onArrange, onPeople, onKids, onDesign, canSendDesign = true, kind, onScene }, ref) {
   const [typed, setTyped] = useState('');
   const sheetEl = useRef(null);
   const setRefs = (el) => { sheetEl.current = el; if (typeof ref === 'function') ref(el); else if (ref) ref.current = el; };
@@ -561,6 +568,30 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
       </section>
 
       <DesignSend onDesign={onDesign} can={canSendDesign} />
+
+      {/* g34: change the scene behind the clock from the sofa; the sheet stays open for the next press */}
+      {onScene && (
+        <section className="more-block scene-block">
+          <h3><Ic.Sparkle size={16} /> {t('scene_head')}</h3>
+          <div className="chips-row">
+            <button className="chip glass" onClick={() => { tick(); onScene('prev'); }}>{t('scene_prev')}</button>
+            <button className="chip glass" onClick={() => { tick(); onScene('next'); }}>{t('scene_next')}</button>
+          </div>
+          <p className="note">{t('scene_note')}</p>
+        </section>
+      )}
+
+      {kind === 'samsung' && (
+        <section className="more-block more-keys">
+          <h3><Ic.Keyboard size={16} /> {t('more_keys')}</h3>
+          <div className="chips-row chips-wrap">
+            {MORE_KEYS.map(([k, label]) => (
+              <button key={k} className="chip glass" onClick={() => { tick(); onKey(k); }}>{t(label)}</button>
+            ))}
+          </div>
+          <p className="note">{t('more_keys_note')}</p>
+        </section>
+      )}
 
       <div className="more-grid">
         <button className="tile glass" onClick={() => { tick(); onKey('captions'); }}><Ic.Captions /> {t('subtitles')}</button>

@@ -138,6 +138,8 @@ export const api = {
   setStayLink: (url) => call('POST', '/api/guest', { stay_url: url }, 15000),
   // a couch-tv Studio design code for the TV home (designSend.js); the TV asks "Use this design?" first
   sendDesign: (code) => call('POST', '/api/say/design', { code, from: 'phone' }),
+  // the next or the previous scene on the TV home (g34); the home reads it from /api/say
+  scene: (pick) => call('POST', '/api/say/scene', { pick }),
 };
 
 // Live TV state: server-sent events, with a slow poll as the fallback when the stream drops.

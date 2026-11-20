@@ -183,6 +183,34 @@
     try { var at = Number(localStorage.getItem(SLOW_KEY)); return !!at && (now || Date.now()) - at < LIMIT.slowDays * 86400000; } catch (e) { return false; }
   }
 
+  // ---------------------------------------------------------------- a decoder that shows only green (g33)
+  // A TCL QM8K owner saw a green screen. A video decoder that fails without an error draws its empty
+  // frames as flat green (YUV all zero). A clip that plays is looked at once, small (32x18): if nearly
+  // every pixel is that green, the clip goes and the still picture stays, and this TV is marked like one
+  // that drops frames (SLOW_KEY), so no background video is tried here for a week. A page that may not
+  // read the frame (another site's clip) is never judged green.
+  function greenFrame(v) {
+    try {
+      if (!v || !(v.videoWidth > 0)) return false;
+      var c = document.createElement("canvas"); c.width = 32; c.height = 18;
+      var x = c.getContext("2d"); x.drawImage(v, 0, 0, 32, 18);
+      var d = x.getImageData(0, 0, 32, 18).data, n = 0;
+      for (var i = 0; i < d.length; i += 4) if (d[i + 1] >= 90 && d[i] <= 60 && d[i + 2] <= 60 && d[i + 1] > 2 * Math.max(d[i], d[i + 2])) n++;
+      return n >= 0.85 * (d.length / 4);
+    } catch (e) { return false; }
+  }
+  var GREEN_KEY = "couchtv.video.green";
+  function markSlow() { var t = String(Date.now()); try { localStorage.setItem(SLOW_KEY, t); localStorage.setItem(GREEN_KEY, t); } catch (e) {} }
+  // the home's own clips (the video link, a scene's clip) stay off for a week after a green one
+  function greenMarked(now) {
+    try { var at = Number(localStorage.getItem(GREEN_KEY)); return !!at && (now || Date.now()) - at < LIMIT.slowDays * 86400000; } catch (e) { return false; }
+  }
+  // looks at a playing clip after 1.5 s and again at 5 s; onGreen() once if it shows only green
+  function watchGreen(v, onGreen) {
+    var gone = false, look = function () { if (!gone && v.getAttribute("src") && !v.paused && greenFrame(v)) { gone = true; markSlow(); onGreen(); } };
+    setTimeout(look, 1500); setTimeout(look, 5000);
+  }
+
   // ---------------------------------------------------------------- the player
   // host: the element the <video> goes in (design.js's #cd-bg, before its shade). o: {
   //   base(): the design store's address, env(): tier() input, onState(state, why) }
@@ -271,6 +299,7 @@
           clearTimeout(watch);
           watch = setTimeout(checkFrames, 8000);
           stuckWatch(g, e.currentTime, 0);
+          watchGreen(e, function () { if (g === gen) fail("this TV showed the video as green"); });
         };
         e.onerror = function () { if (g === gen) fail("this TV could not play it"); };
         e.src = url;
@@ -359,5 +388,6 @@
   })();
 
   window.CouchVideo = { LIMIT: LIMIT, LOOPS: LOOPS, SLOW_KEY: SLOW_KEY, refOk: refOk, storeId: storeId, localOk: localOk,
-    sniff: sniff, tier: function (env) { return tierOf(env).tier; }, tierWhy: tierOf, slowMarked: slowMarked, player: player };
+    sniff: sniff, tier: function (env) { return tierOf(env).tier; }, tierWhy: tierOf, slowMarked: slowMarked, player: player,
+    greenFrame: greenFrame, watchGreen: watchGreen, greenMarked: greenMarked, GREEN_KEY: GREEN_KEY };
 })();

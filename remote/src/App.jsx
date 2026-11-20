@@ -267,6 +267,9 @@ export default function App() {
   const [wakeError, setWakeError] = useState(null);
   useEffect(() => { if (tv?.power === 'on') setWakeError(null); }, [tv?.power]);
   const onKey = (key, hold) => run(api.key(key, hold));
+  // g34: the next or the previous scene. The sheet stays open and nothing reloads; a TV whose home is
+  // not on screen changes once it is, and the phone says so
+  const onScene = (pick) => api.scene(pick).then((j) => { if (j && j.listening === false) say(t('scene_not_open')); }).catch((e) => say(tBridge(e.key, e.vars, e.message), 'err'));
   const onVolume = (a) => run(api.volume(a));
   // A fully off TV leaves the Wi-Fi; the bridge tries Wake-on-LAN for up to 25 s, then gives up.
   const onWake = async () => {
@@ -457,7 +460,8 @@ export default function App() {
       <MoreSheet ref={moreSheet} open={sheet === 'more'} tvs={tvs} tvId={tvId || 'living-room'} onTv={(id) => { tick(); chooseTv(id); }}
         canMove={!offState && ['playing', 'paused', 'buffering'].includes(tv?.playing?.state) && Boolean(tv?.playing?.title)} onMove={onMove}
         picture={tv?.picture} pictureInfo={pictureInfo} onPicture={onPicture} onClose={() => setSheet(null)} sleepEnds={sleepEnds} sleepError={sleepError} onSleep={onSleep}
-        onKey={onKey} onText={sendText} onArrange={() => setSheet('arrange')} onPeople={() => setSheet('people')} onKids={() => setSheet('kids')} onDesign={sendDesign} canSendDesign={canSend((thisTv || (tvs.length === 1 ? tvs[0] : null))?.kind)} />
+        onKey={onKey} onText={sendText} onArrange={() => setSheet('arrange')} onPeople={() => setSheet('people')} onKids={() => setSheet('kids')} onDesign={sendDesign} canSendDesign={canSend((thisTv || (tvs.length === 1 ? tvs[0] : null))?.kind)}
+        kind={(thisTv || (tvs.length === 1 ? tvs[0] : null))?.kind} onScene={onScene} />
       <ArrangeSheet open={sheet === 'arrange'} onClose={() => setSheet(null)} tvName={thisTv?.name} hidden={hidden} />
       <KidsSheet open={sheet === 'kids'} onClose={() => setSheet(null)} onChanged={loadConfig} />
       <PinSheet ask={pinAsk} onClose={() => setPinAsk(null)} />

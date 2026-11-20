@@ -302,6 +302,12 @@
       seen.design = d.at || now; markSeen();
       if (now - (d.at || now) < 600000) useDesign(d.code, d.from === "phone" ? "phone" : "ai");
     }
+    // the phone remote's Scene buttons (g34): the next or the previous scene, if it was pressed in the last minute
+    var sc = j.scene;
+    if (sc && (sc.pick === "next" || sc.pick === "prev") && (sc.at || 0) > (seen.scene || 0)) {
+      seen.scene = sc.at || now; markSeen();
+      if (now - (sc.at || now) < 60000 && W.tv && W.tv.scene) W.tv.scene(sc.pick);
+    }
     firstPoll = false;
   }
   // couch-tv Studio is opt in: an agent's design is used only where the person at this TV turned couch-tv

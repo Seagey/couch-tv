@@ -9,6 +9,8 @@ import org.json.JSONObject
  *  POST /api/say/message        {"text", "from"?, "seconds"?} a short plain message for the TV home
  *  POST /api/say/design         {"code"} a couch-tv Studio design code; the TV home fetches the design
  *                               itself and asks "Use this design?" first, as when the code is typed
+ *  POST /api/say/scene          {"pick": "next" | "prev"} the phone remote's Scene buttons (g34): the home
+ *                               shows the next or the previous scene (or photo)
  * Kept in memory only. Plain Kotlin with no Android in it, so SayTest.kt checks it on the computer.
  */
 object Say {
@@ -19,6 +21,7 @@ object Say {
     private var message: JSONObject? = null
     private var design: JSONObject? = null
     private var ask: JSONObject? = null
+    private var scene: JSONObject? = null
 
     fun plain(s: String?, limit: Int): String =
         (s ?: "").replace(Regex("[\\x00-\\x08\\x0b-\\x1f\\x7f]"), " ").replace(Regex("[ \\t]+"), " ").trim()
@@ -55,6 +58,15 @@ object Say {
         return d
     }
 
+    /** The phone remote's Scene buttons: only "next" or "prev" ever reaches the TV home. */
+    @Synchronized
+    fun scene(pick: String?, now: Long = System.currentTimeMillis()): JSONObject {
+        if (pick != "next" && pick != "prev") throw IllegalArgumentException("pick must be next or prev")
+        val s = JSONObject().put("id", nextId++).put("pick", pick).put("at", now)
+        scene = s
+        return s
+    }
+
     /** Called after every ask (Server.kt, POST /api/ask), so the answer shows on the TV too. */
     @Synchronized
     fun asked(question: String, reply: String?, by: String, now: Long = System.currentTimeMillis()) {
@@ -63,7 +75,7 @@ object Say {
 
     @Synchronized
     fun snapshot(): JSONObject = JSONObject().put("message", message ?: JSONObject.NULL)
-        .put("design", design ?: JSONObject.NULL).put("ask", ask ?: JSONObject.NULL)
+        .put("design", design ?: JSONObject.NULL).put("scene", scene ?: JSONObject.NULL).put("ask", ask ?: JSONObject.NULL)
 
     /** The TV home asks every 6 s while it is open; 30 s of silence means it is not. */
     const val HEARD_MS = 30_000L
@@ -76,5 +88,5 @@ object Say {
     fun listening(now: Long = System.currentTimeMillis()): Boolean = heardAt > 0 && now - heardAt < HEARD_MS
 
     @Synchronized
-    fun clear() { message = null; design = null; ask = null; heardAt = 0L }
+    fun clear() { message = null; design = null; scene = null; ask = null; heardAt = 0L }
 }

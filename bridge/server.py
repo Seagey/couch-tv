@@ -2172,6 +2172,13 @@ async def h_say_design(request):
               listening=say.listening(_current.get()))
 
 
+async def h_say_scene(request):
+    data = await body(request)
+    sc = say.scene(_current.get(), data.get("pick"))   # anything but next or prev: a 400
+    # listening false: the TV home is not on screen now, so the phone remote says it changes once it is
+    return ok(scene=sc, listening=say.listening(_current.get()))
+
+
 async def h_recs(request):
     who = store.norm_who(request.query.get("who"))
     picks, updated = await claude.cached_recs(who, lang=home_settings().get("settings", {}).get("lang"))
@@ -5210,6 +5217,7 @@ def make_app():
     r.add_get("/api/say", h_say)
     r.add_post("/api/say/message", h_say_message)
     r.add_post("/api/say/design", h_say_design)
+    r.add_post("/api/say/scene", h_say_scene)
     r.add_get("/api/tizen/next", h_tizen_next)
     r.add_post("/api/tizen/answer", h_tizen_answer)
     r.add_get("/api/webos/apps", h_webos_apps)

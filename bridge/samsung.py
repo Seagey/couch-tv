@@ -62,6 +62,10 @@ KEYS = {
     "guide": "KEY_GUIDE", "input": "KEY_SOURCE", "captions": "KEY_CAPTION",
     "channel_up": "KEY_CHUP", "channel_down": "KEY_CHDOWN",
     **{str(n): f"KEY_{n}" for n in range(10)},
+    # the phone remote's More keys sheet (g32: a Samsung smart monitor's owner wanted Esc and the other
+    # keys of the monitor's own remote); "exit" above is the Esc of a monitor
+    "return": "KEY_RETURN", "tools": "KEY_TOOLS", "source": "KEY_SOURCE", "channel_list": "KEY_CH_LIST",
+    "red": "KEY_RED", "green": "KEY_GREEN", "yellow": "KEY_YELLOW", "blue": "KEY_CYAN",
 }
 
 
