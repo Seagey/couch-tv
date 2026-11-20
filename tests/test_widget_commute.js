@@ -81,7 +81,9 @@ ok(fri.day === "Monday" && WW.leaveBy(27, 8, 30, 10, new Date(2026, 10, 20, 9, 0
   const cl = K.kept(CD, "commute", { arrive_h: 99, arrive_m: -1, buffer: 500 });
   ok(cl.arrive_h === 23 && cl.arrive_m === 0 && cl.buffer === 60, "times out of range are held to the day (" + JSON.stringify(cl) + ")");
   const app = fs.readFileSync(path.join(__dirname, "../tv-home/web/app.js"), "utf8");
-  ok(/keep\("tvhome\.commute", \{ name: pl\.name, lat: pl\.lat, lon: pl\.lon \}\)/.test(app) && !/ST\.commute/.test(app), "the place is kept on the TV under its own key, not in the settings the bridge keeps");
+  // (the Commute's own Where to is a widget setting now: it rides Home settings in ST.widgets, to the TV app or
+  // the computer at home, never a design; 0.13.8's place under tvhome.commute is still read, and only cleared)
+  ok(!/ST\.commute/.test(app) && !/keep\("tvhome\.commute", \{/.test(app) && /cleanPlace\(kept\("tvhome\.commute"\)\)/.test(app), "the place is a widget setting (Home settings), never in a design; the old tvhome.commute is only read or cleared");
   ok(/var cm = kept\("tvhome\.commute"\); if \(cm && cm\.name\) w\.push/.test(app), "Share this home treats the place as private: a share holding it is stopped");
   const sb = { window: {} }; sb.window = sb;
   require("vm").runInNewContext(fs.readFileSync(path.join(__dirname, "../tv-home/web/share-home.js"), "utf8"), sb);
