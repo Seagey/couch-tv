@@ -479,6 +479,9 @@ def _home(h):
     # false hides the whole Keep watching row and stops the home asking for it. Home settings win over it.
     if isinstance(h.get("keep_watching"), bool):
         out["keep_watching"] = h["keep_watching"]
+    # true puts an Inputs tile first in the dock (#154). Home settings win over it.
+    if isinstance(h.get("input_tile"), bool):
+        out["input_tile"] = h["input_tile"]
     # true makes the row follow the app the remote is on ("Recently on <app>"). Home settings win over it.
     if isinstance(h.get("shelf_follows_app"), bool):
         out["shelf_follows_app"] = h["shelf_follows_app"]
