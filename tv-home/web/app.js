@@ -4660,7 +4660,7 @@
   var SET_ALL = false;
   var WX_USE = ["weather", "bigtemp", "hourly", "week", "rain", "uv", "air", "surf", "date", "clock", "glassclock"];
   var PLACE_USE = WX_USE.concat(["sun", "solar", "worldclock", "commute", "moon"]);
-  var CLOCK_USE = ["clock", "tallclock", "glassclock", "flipclock", "worldclock", "analog", "timer", "agenda"];
+  var CLOCK_USE = ["clock", "tallclock", "glassclock", "flipclock", "worldclock", "analog", "timer", "agenda", "welcome", "sports"];
   var PHOTO_USE = ["photo", "slideshow", "mosaic", "artframe", "memory"];
   var KW_USE = ["keep", "keeprow", "upnext", "picks"];
   var PEOPLE_USE = ["people", "keep", "keeprow", "upnext", "picks", "screentime"];
@@ -4685,7 +4685,7 @@
     var p = u.parts || {}, has = function (list) { return (u.kinds || []).some(function (k) { return list.indexOf(k) >= 0; }); };
     var wx = !!(p.weather || has(WX_USE));
     return {
-      lookPick: false,                                        // the design is the look (Loop would switch it off)
+      lookPick: !u.background,                                // a design with its own background is the look (Loop would switch it off)
       scenes: !u.background,                                  // scenes show only behind a design with no background
       video: !u.background,
       photos: !u.background || has(PHOTO_USE),
@@ -4703,7 +4703,7 @@
       weather: wx || WX_AMBIENT || WX_SUN_GRADE,
       apps: !!p.dock,
       people: !!(p.people || has(PEOPLE_USE)),
-      quick: !!p.quick,
+      quick: !!(p.quick || has(["quick"])),
       athome: has(ATHOME_USE)
     };
   }
@@ -5078,7 +5078,7 @@
       if (CFG.design && LOOP) rows.push({ kind: "action", key: "dz-loop", label: "Your design", sub: "Designs show in the Night, Classic and OLED looks. Switch to Night to see it",
         act: function () { ST.look = "night"; keep("tvhome.look", "night"); saveSettings(); restart(); } });
       else if (CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.settingsRow) rows.push(CouchDesign.settingsRow(restart));
-      commuteRows(rows);
+      // (the Commute's Where to is its own page now, Widgets on this home; tvhome.commute stays the 0.13.8 fallback)
       widgetRows(rows);   // each widget on the design with settings of its own
     }
     if (window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) rows.push({ kind: "nav", key: "dz-smart", label: "Smart home",
@@ -5108,6 +5108,8 @@
     // where the household drives to (the Commute widget's place, kept on this TV)
     var cm = kept("tvhome.commute"); if (cm && cm.name) w.push(String(cm.name));
     try { w.push(location.hostname); } catch (e) {}
+    // every place a widget was given on this TV (a beach, where you drive to): its name and area
+    Object.keys(wsAll()).forEach(function (k) { var v = wsAll()[k]; Object.keys(v).forEach(function (n) { var p = v[n]; if (p && typeof p === "object" && !Array.isArray(p) && isFinite(p.lat)) w.push(p.name, p.area); }); });
     w = w.concat(ahPrivateWords());
     return w.filter(function (x) { return typeof x === "string" && x.length >= 3 && !/^(home\.tvos\.invalid|localhost|127\.0\.0\.1)$/.test(x); });
   }
@@ -7388,13 +7390,14 @@
   // The commute's two places, kept on this TV only (never in a design, never sent to the bridge): from
   // the town set in Location (or config.json's weather place), to the place picked in Home settings,
   // couch-tv Studio, Commute. Both are towns or suburbs from the place search, about a kilometre wide.
-  function commutePlaces() {
+  // w: one Commute widget (the web loader asks for each: widget-web.js places(w)); none: the first one
+  function commutePlaces(w) {
     var pl = ST.place && isFinite(ST.place.lat) && isFinite(ST.place.lon) ? { name: ST.place.name, lat: ST.place.lat, lon: ST.place.lon }
       : CFG.weather && isFinite(CFG.weather.lat) && isFinite(CFG.weather.lon) ? { name: String(CFG.weather.place || "").split(",")[0], lat: CFG.weather.lat, lon: CFG.weather.lon } : null;
     var to = kept("tvhome.commute");
     // the Commute widget's own settings (Widgets on this home: Where to, and From when it is not the
     // home's town) win over the older Commute rows' place
-    var cw = typeof CouchDesign !== "undefined" && CouchDesign.widgetList && CouchDesign.on() ? CouchDesign.widgetList().filter(function (w) { return w.kind === "commute"; })[0] : null;
+    var cw = typeof CouchDesign !== "undefined" && CouchDesign.widgetList && CouchDesign.on() ? CouchDesign.widgetList().filter(function (x) { return x.kind === "commute" && (!w || w.id === undefined || x.id === w.id); })[0] : null;
     if (cw) { var wt = cleanPlace(wsOf(cw.key).to), wf = cleanPlace(wsOf(cw.key).from); if (wt) to = wt; if (wf) pl = { name: wf.name, lat: wf.lat, lon: wf.lon }; }
     return { from: pl, to: to && isFinite(to.lat) && isFinite(to.lon) ? { name: String(to.name || ""), lat: +to.lat, lon: +to.lon } : null };
   }
@@ -7518,8 +7521,57 @@
   function wsCur(w, s) {
     var v = wsOf(w.key)[s.key];
     if (v !== undefined && v !== null && v !== "") return v;
+    // bins, Which bin goes out this week: read back from the count the widget keeps (anchor)
+    if (s.sets === "anchor") {
+      var an = wsOf(w.key).anchor !== undefined ? +wsOf(w.key).anchor : +(w.opts || {}).anchor;
+      if (isFinite(an) && (wsOf(w.key).anchor !== undefined || (w.opts || {}).anchor !== undefined)) {
+        var wk = Math.floor((binNight(w).getTime() / 86400000 - an) / 7);
+        return ((wk % 2) + 2) % 2 === 0 ? "a" : "b";
+      }
+    }
     v = (w.opts || {})[s.key];
     return v !== undefined && v !== null && v !== "" ? v : s.def;
+  }
+  // the coming bin night (the widget's weekday), local midnight, as the bins widget counts it
+  function binNight(w) {
+    var o = (w.settings || []).filter(function (x) { return x.key === "weekday"; })[0], wd = +(o ? (wsOf(w.key).weekday !== undefined ? wsOf(w.key).weekday : (w.opts || {}).weekday) : (w.opts || {}).weekday);
+    if (!isFinite(wd) || wd < 0 || wd > 6) wd = 3;
+    var d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + (wd - d.getDay() + 7) % 7);
+  }
+  // A new design never takes the last one's widget changes by accident. When the design on screen is not
+  // the one these values were set on: a value that overrides a design's own choice (store "design": a
+  // news source, a clock format) is dropped everywhere; a value kept on the TV (store "tv": a beach, where
+  // you drive to) stays, keyed by widget id and kind, so it only ever applies to that same widget again.
+  // The same design starting again changes nothing.
+  function wsNewDesign() {
+    if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CFG.design) return;
+    var s = JSON.stringify(CFG.design), h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    var mark = String(h), was = ST.widgets_design;
+    if (was === mark) return;
+    var C = window.CouchWidgetCaps, all = wsAll(), changed = false;
+    if (was !== undefined) Object.keys(all).forEach(function (key) {
+      var kind = key.split("|")[1] || "", recs = C && C.settings ? C.settings(kind) : [];
+      Object.keys(all[key]).forEach(function (k) {
+        var r = recs.filter(function (x) { return x && (x.key === k || x.sets === k); })[0];
+        if (!r || r.store !== "tv") { delete all[key][k]; changed = true; }
+      });
+      if (!Object.keys(all[key]).length) delete all[key];
+    });
+    ST.widgets = all;
+    ST.widgets_design = mark;
+    keepSettings(true);
+    if (!OFFLINE && data.bridge !== false) { clearTimeout(pushTimer); pushTimer = setTimeout(function () { pushSettings(kept(ST_KEY)); }, 400); }
+    if (changed && CouchDesign.dataChanged) CouchDesign.dataChanged("wset", JSON.stringify(all));
+  }
+  // one setting saved, and what follows from it: a "sets" setting writes its own count; a new bin night
+  // keeps the same bin going out this week
+  function wsSave(w, s, v) {
+    var keep = s.key === "weekday" ? w.settings.filter(function (r) { return r.sets === "anchor" && wsOf(w.key).anchor !== undefined; }).map(function (r) { return [r, wsCur(w, r)]; }) : [];
+    wsSet(w.key, s.key, v);
+    if (s.sets) { if (v === null || v === undefined) wsSet(w.key, s.sets, null); else wsSets(w, s, v); }
+    keep.forEach(function (p) { wsSets(w, p[0], p[1]); });
   }
   // "when": a setting that only means something once another one is set ({ alt: true }; "set": any
   // value but "off" or none)
@@ -7543,10 +7595,10 @@
   // the coming bin night is week 0 for the first bin, week 1 for the second
   function wsSets(w, s, v) {
     if (s.sets !== "anchor") return;
-    var o = w.settings.filter(function (x) { return x.key === "weekday"; })[0], wd = +(o ? wsCur(w, o) : (w.opts || {}).weekday);
-    if (!isFinite(wd)) wd = 3;
-    var d = new Date(), night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + (wd - d.getDay() + 7) % 7);
-    wsSet(w.key, "anchor", Math.floor(night.getTime() / 86400000) - (v === "b" ? 7 : 0));
+    // the day before the coming bin night, in whole days: the widget's count (local midnight / one day)
+    // is then just past it in every time zone, so this week is week 0 for the first bin
+    var night = binNight(w);
+    wsSet(w.key, "anchor", Math.round(Date.UTC(night.getFullYear(), night.getMonth(), night.getDate()) / 86400000) - 1 - (v === "b" ? 7 : 0));
   }
   function wsAll() { var w = ST.widgets; return w && typeof w === "object" && !Array.isArray(w) ? w : {}; }
   function wsOf(key) { var v = wsAll()[key]; return v && typeof v === "object" && !Array.isArray(v) ? v : {}; }
@@ -7626,9 +7678,9 @@
   function townName() { return String((WXCFG && WXCFG.place) || "").split(",")[0]; }
   // a setting's value now, in words (a private one never shows itself)
   function wsWords(s, v) {
-    if (s.type === "place") { var p = cleanPlace(v); return p ? p.name : townName() ? townName() + " (your home's town)" : "Not set"; }
+    if (s.type === "place") { var p = cleanPlace(v); return p ? p.name : s.key === "to" ? "Not set" : townName() ? townName() + " (your home's town)" : "Not set"; }
     if (v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length)) return s.many ? "None picked" : "Not set";
-    if (s.private) return "Set";
+    if (s.private && s.type !== "tvlist" && s.type !== "choice") return "Set";
     if (s.type === "toggle") return v ? t("on") : t("off");
     var opts = wsOptions(s), name = function (x) { var o = opts.filter(function (y) { return String(y[0]) === String(x); })[0]; return o ? String(o[1]) : String(x); };
     if (Array.isArray(v)) return v.map(s.type === "choice" || s.type === "tvlist" ? name : String).join(", ");
@@ -7666,7 +7718,7 @@
   function oneWidgetRows(w) {
     var rows = [], vals = wsOf(w.key), shown = w.settings.filter(function (s) { return wsShown(w, s); });
     shown.forEach(function (s) {
-      var id = w.key + ":" + s.key, v = vals[s.key], cur = wsCur(w, s), set = function (x) { wsSet(w.key, s.key, x); wsSets(w, s, x); };
+      var id = w.key + ":" + s.key, v = vals[s.key], cur = wsCur(w, s), set = function (x) { wsSave(w, s, x); };
       var opts = wsOptions(s);
       if (shown.length > 1 && (s.type === "place" || s.many)) rows.push(head(s.label));
       if (s.type === "place") { placeRows(w, s, rows); return; }
@@ -7696,7 +7748,7 @@
         var lo = isFinite(s.min) ? +s.min : 0, hi = isFinite(s.max) ? +s.max : 100, st = isFinite(s.step) && +s.step > 0 ? +s.step : 1;
         rows.push({ kind: "cycle", key: id, label: s.label, sub: s.help, value: cur === undefined || cur === null || cur === "" ? "Not set" : String(cur), act: function () {
           var n = isFinite(+cur) && cur !== null && cur !== "" ? +cur + st : lo;
-          set(n > hi ? lo : Math.round(n * 1000) / 1000);
+          n = Math.round((n - lo) / st) * st + lo; set(n > hi ? lo : Math.round(n * 1000) / 1000);
         } });
       } else if (s.type === "app") {
         var apps = arrangeItems().items.filter(function (x) { return (!x.kind || x.kind === "app") && x.package && !/^(screen|input):/.test(x.package); });
@@ -7735,25 +7787,25 @@
   // a place setting: the town search (the same one as Location), kept on this TV only
   var WPLACE = { key: "", q: "", list: null, busy: false, err: false }, wgeoTimer = null, wgeoTicket = 0;
   function placeRows(w, s, rows) {
-    var own = wsPlace(w.key), g = WPLACE.key === w.key ? WPLACE : (WPLACE = { key: w.key, q: "", list: null, busy: false, err: false });
-    rows.push(info("wp-now", s.label, wsWords(s, own), s.help));
-    rows.push({ kind: "input", key: "wp-search", label: "Search for a place", sub: s.coast ? "A beach, or the town by it" : "A town or suburb", value: g.q, act: function () {
+    var own = cleanPlace(wsOf(w.key)[s.key]), pk = w.key + ":" + s.key, g = WPLACE.key === pk ? WPLACE : { key: pk, q: "", list: null, busy: false, err: false };
+    rows.push(info("wp-now:" + s.key, s.label, wsWords(s, own), s.help));
+    rows.push({ kind: "input", key: "wp-search:" + s.key, label: "Search for a place", sub: s.coast ? "A beach, or the town by it" : "A town or suburb", value: g.q, act: function () {
       startTyping({ label: s.coast ? "Type a beach or the town by it" : "Type a town or suburb", value: g.q, search: true,
-        live: function (q) { findWidgetPlace(w.key, q, false); }, submit: function (q) { findWidgetPlace(w.key, q, true); } });
+        live: function (q) { findWidgetPlace(pk, q, false); }, submit: function (q) { findWidgetPlace(pk, q, true); } });
     } });
     if (g.busy) rows.push(info("wp-busy", t("loc_searching")));
     else if (g.err) rows.push(info("wp-err", t("loc_error")));
     else if (g.list && !g.list.length) rows.push(info("wp-none", t("loc_none", { q: g.q })));
     (g.list || []).forEach(function (pl, i) {
-      rows.push({ kind: "choice", key: "wplace:" + i, label: pl.name, sub: pl.area, checked: !!(own && own.lat === pl.lat && own.lon === pl.lon), act: function () {
+      rows.push({ kind: "choice", key: "wplace:" + s.key + ":" + i, label: pl.name, sub: pl.area, checked: !!(own && own.lat === pl.lat && own.lon === pl.lon), act: function () {
         var p = cleanPlace(pl);
         if (!p) return;
         wsSet(w.key, s.key, p);
-        SET.msg = w.name + " now shows " + p.name + ".";
+        SET.msg = s.key === "to" ? "Where to: " + p.name + "." : w.name + " now shows " + p.name + ".";
         WPLACE.list = null; WPLACE.q = "";
       } });
     });
-    if (own) rows.push({ kind: "action", key: "wp-town", label: "Use your home's town instead", act: function () { wsSet(w.key, s.key, null); SET.msg = w.name + " uses your home's town again."; } });
+    if (own) rows.push({ kind: "action", key: "wp-town:" + s.key, label: s.key === "to" ? "Forget where you drive to" : "Use your home's town instead", act: function () { wsSet(w.key, s.key, null); SET.msg = s.key === "to" ? "Forgotten." : w.name + " uses your home's town again."; } });
   }
   function findWidgetPlace(key, q, go) {
     clearTimeout(wgeoTimer);
@@ -7767,7 +7819,7 @@
       geocode(q).then(function (list) {
         if (ticket !== wgeoTicket) return;
         WPLACE = { key: key, q: q, list: list, busy: false, err: false };
-        if (go && list.length && !SET.typing) { SET.col = "rows"; SET.keyFocus = "wplace:0"; }
+        if (go && list.length && !SET.typing) { SET.col = "rows"; SET.keyFocus = "wplace:" + String(key).split(":").pop() + ":0"; }
         if (zone === "settings") renderSettings();
       }, function () {
         if (ticket !== wgeoTicket) return;
@@ -7801,7 +7853,7 @@
           settings: w.settings.filter(function (s) { return s.where.indexOf("phone") >= 0 && s.type !== "image"; }).map(function (s) {
             var cur = wsCur(w, s), o = { key: s.key, label: s.label, type: s.type, help: s.help, many: s.many, coast: s.coast, store: s.store, min: s.min, max: s.max, step: s.step,
               options: wsOptions(s), shown: wsShown(w, s), own: vals[s.key] !== undefined, words: wsWords(s, cur) };
-            o.value = s.private ? (cur ? true : null) : cur === undefined ? null : cur;
+            o.value = s.private && s.type !== "tvlist" && s.type !== "choice" ? (cur ? true : null) : cur === undefined ? null : cur;
             return o;
           }) };
       }),
@@ -7824,7 +7876,7 @@
       Object.keys(vals).forEach(function (k) {
         var s = w.settings.filter(function (x) { return x.key === k; })[0], v = vals[k];
         if (!s || s.where.indexOf("phone") < 0) { bad = bad || "That setting is not on this widget."; return; }
-        if (v === null) { wsSet(w.key, k, null); return; }
+        if (v === null) { wsSet(w.key, k, null); if (s.sets) wsSet(w.key, s.sets, null); return; }
         var opts = wsOptions(s), one = function (x) { var o = opts.filter(function (y) { return String(y[0]) === String(x); })[0]; return o ? o[0] : undefined; };
         if (s.type === "place") { v = cleanPlace(v); if (!v) { bad = "That place could not be used. Search for it again."; return; } }
         else if ((s.type === "choice" || s.type === "tvlist") && s.many) {
@@ -7839,8 +7891,7 @@
         else if (s.type === "calendar") { v = String(v).trim().slice(0, 600); v = window.CouchAtHome ? CouchAtHome.calUrl(v) : ""; if (!v) { bad = "That is not a calendar link. It starts with https://."; return; } }
         else if (s.type === "apps" || s.type === "device") { bad = "Change that on the TV."; return; }
         else if (s.type !== "choice" && s.type !== "tvlist") v = String(v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 80);
-        wsSet(w.key, k, v);
-        wsSets(w, s, v);
+        wsSave(w, s, v);
       });
       if (bad) return { ok: false, error: bad };
     } else return { ok: false, error: "Nothing to change." };
@@ -7930,6 +7981,7 @@
       },
       fromCode: DESIGN_FROM_CODE
     });
+    if (designOn) wsNewDesign();
     if (designOn) webStart();
     kidsInit();
     kidSync();   // a kids profile on the couch: its shelf before anything else shows

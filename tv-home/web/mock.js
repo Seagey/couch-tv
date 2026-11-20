@@ -75,6 +75,11 @@
     return "data:image/svg+xml," + encodeURIComponent(svg);
   };
   var arg = function (name) { var m = q.match(new RegExp("[?&]" + name + "=([^&]*)")); return m ? decodeURIComponent(m[1]) : null; };
+  // the Home settings keys the bridge keeps (bridge/server.py clean_settings); keep the two lists alike
+  var BRIDGE_KEYS = ["lang", "place", "wx_show", "wx_unit", "wx_every", "look", "idle_photo_seconds", "keep_photo", "keep_photo_pick", "glass", "glass_icons",
+    "moving_tiles", "dock", "lighter", "glass_amount", "clock_style", "now_playing", "keep_watching", "ambient_music", "sun_sync", "ambient_weather",
+    "ambient_sun_grade", "nav_sound", "start_focus", "glass_focus", "video", "video_url", "scene_order", "scenes_off", "scene_seconds", "clock", "photos",
+    "hidden_apps", "quick", "soundscape", "smart_idle", "input_tile", "shelf_follows_app", "widgets", "widgets_design"];
   if (arg("reset")) {
     try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf("mock:") === 0) localStorage.removeItem(k); }); } catch (e) {}
   }
@@ -488,6 +493,9 @@
             // as the on-TV app does (Server.kt): a TV that saves an older copy than the server's keeps the
             // server's town and photos, which the phone's Home settings page may have changed since
             var was = store.get("api.settings"), next = Object.assign({}, body.settings || {});
+            // a computer at home (the bridge, server.py clean_settings) keeps only the keys it knows: a
+            // preview drops the rest the same way, so a key the bridge would lose shows up here first
+            if (!arg("ontv")) Object.keys(next).forEach(function (k) { if (BRIDGE_KEYS.indexOf(k) < 0) delete next[k]; });
             if (body.seen && was && was.updated && body.seen !== was.updated) ["place", "photos"].forEach(function (k) { if (was.settings && k in was.settings) next[k] = was.settings[k]; else delete next[k]; });
             store.set("api.settings", { settings: next, updated: new Date(Math.max(Date.now(), was && was.updated ? Date.parse(was.updated) + 1 : 0)).toISOString() });
           }

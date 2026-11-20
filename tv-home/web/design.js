@@ -2512,7 +2512,8 @@
       var pid = pw && pw.getAttribute("data-obj");
       if (pid && !DESIGNER && Caps && Caps.settings) {
         var wid = w && typeof w.__at === "function" && w.getAttribute("data-kind") === "stack" ? pid + "/" + w.__at() : pid;
-        var mine = widgetList().filter(function (x) { return x.id === wid && Caps.settings(x.kind).length > 0; })[0];
+        // only a widget with a setting the TV or the phone offers now (pre: true), as Home settings lists them
+        var mine = widgetList().filter(function (x) { return x.id === wid && Caps.settings(x.kind).some(function (s) { return s && s.pre === true && (!Array.isArray(s.where) || s.where.indexOf("tv") >= 0 || s.where.indexOf("phone") >= 0); }); })[0];
         if (mine) nodes.splice(1, 0, mk("Settings for this widget", "wset", mine.key));
       }
       openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes }, "Back to close. Settings here is couch-tv's own: the remote's Settings button opens the TV's menu.");
