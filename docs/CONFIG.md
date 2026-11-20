@@ -801,8 +801,14 @@ called DNS rebinding). But the TV apps load from files and send `Origin: null`, 
 accept `null`, and any web page can send `null` too (from a sandboxed frame). So the origin check
 alone cannot tell the TV from a hostile page. **Only the pairing key closes that gap.** With it on:
 
-- every `/api/` call except `/api/health` and `/api/pair` needs the key
-  (`Authorization: Bearer <key>`, `X-API-Key: <key>` or `?token=<key>`);
+- every `/api/` call except `/api/health`, `/api/pair` and `/api/pair/start` needs the key
+  (`Authorization: Bearer <key>`, `X-API-Key: <key>` or `?token=<key>`). Never a cookie;
+- the phone's Home settings page (`/setup`) pairs with the 6 digit code from the TV's QR, or one asked for
+  with `/api/pair/start` (the code shows only on the TV; asking again never swaps a live code). A code lasts
+  3 minutes, works once, and 5 wrong tries throw it away. Both calls refuse `Origin: null` and `file:`
+  (HTTP 403), so a hostile page in a sandboxed frame cannot ask for codes or read the key. 15 wrong codes
+  within 10 minutes while a code is live, from at least three addresses (one address adds at most 5, and
+  the same wrong code again is not counted), lock code pairing for 10 minutes; the key itself is never locked;
 - after 5 different wrong keys from one address within a minute, that address gets HTTP 429 for the
   rest of that minute, whatever key it sends. The same wrong key sent again does not count, so a phone
   or TV still holding an old key does not lock itself out, and the bridge computer itself

@@ -115,6 +115,8 @@ try {
     await pg.route(ORIGIN + "/api/settings*", (rt) => rt.fulfill(J({ ok: true, mode: "launcher", settings: {}, people: [{ id: "sam", name: "Sam" }], weather: null })));
     await pg.route(ORIGIN + "/api/athome*", (rt) => rt.fulfill(J({ ok: true, live: true, athome: { note: null, lists: [], guide: [], stay: {} } })));
     await pg.route(ORIGIN + "/api/home*", (rt) => rt.fulfill(J({ ok: true, on: true, held: false, fire_tv: false, watch: false })));
+    let forgot = 0;
+    await pg.route(ORIGIN + "/api/phones*", (rt) => { if (rt.request().method() === "POST") { forgot++; rt.fulfill(J({ ok: true, phones: 0 })); } else rt.fulfill(J({ ok: true, phones: 2 })); });
     await pg.goto(ORIGIN + "/setup");
     await pg.waitForFunction(() => document.getElementById("people-now").textContent === "Sam");
     await pg.evaluate(() => document.querySelectorAll("main > section.fold.shut").forEach((s) => s.classList.remove("shut")));
@@ -122,7 +124,13 @@ try {
     ok(await pg.isHidden("#to-remote") && await pg.isHidden("#people-links"), "launcher: no links to a phone remote that is not there");
     ok(/on the TV: Home settings, People/.test(await pg.textContent("#people-how")), "launcher: people are changed on the TV, it says where");
     ok(await pg.isHidden("#home-off") && await pg.isVisible("#home"), "launcher: Use as home screen shows Android's own step, never a switch off");
-    for (const id of ["tv", "kids-first", "ask", "upd", "tvname", "keys", "phones-card"]) ok(await pg.isHidden("#" + id), "launcher: left out #" + id);
+    for (const id of ["tv", "kids-first", "ask", "upd", "tvname", "keys"]) ok(await pg.isHidden("#" + id), "launcher: left out #" + id);
+    // its own paired phones (Fable 9): listed, and Forget every phone asks the app
+    await pg.waitForFunction(() => /2 phones are paired/.test(document.getElementById("phones").textContent), null, { timeout: 8000 });
+    ok(await pg.isVisible("#phones-card") && await pg.isVisible("#forget"), "launcher: the Phones card shows its paired phones and Forget every phone");
+    pg.once("dialog", (d) => d.accept());
+    await Promise.all([pg.waitForRequest((r) => r.url().endsWith("/api/phones/forget") && r.method() === "POST"), pg.click("#forget")]);
+    ok(forgot === 1, "launcher: Forget every phone asks the TV to forget them");
     ok(!pg.errors.length, "launcher: no page errors: " + pg.errors.join("; "));
     await ctxL.close();
   }
@@ -146,6 +154,22 @@ try {
     ok(!athomeAsked, "Roku: At home is not asked for");
     ok(!pg.errors.length, "Roku: no page errors: " + pg.errors.join("; "));
     await ctxR.close();
+  }
+  // a VIZIO (Fable 10): it shows its own home and nothing asks for the weather there, so only the people
+  {
+    const ctxV = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
+    const pg = await ctxV.newPage();
+    pg.errors = []; pg.on("pageerror", (e) => pg.errors.push(String(e)));
+    await pg.addInitScript((k) => { localStorage.setItem("couchtv.key", k); }, KEY);
+    await pg.route(ORIGIN + "/api/settings*", async (rt) => { const r = await rt.fetch(); const j = await r.json(); j.home = "none"; rt.fulfill({ contentType: "application/json", body: JSON.stringify(j) }); });
+    await pg.goto(ORIGIN + "/setup");
+    await pg.waitForFunction(() => document.getElementById("people-now").textContent !== "Checking…");
+    for (const id of ["town", "photos", "athome", "widgets", "dapps"]) ok(await pg.isHidden("#" + id), "VIZIO: left out #" + id);
+    ok(await pg.isHidden('.jump a[href="#town"]'), "VIZIO: no Town chip either");
+    ok(await pg.isVisible("#people"), "VIZIO: the people are there");
+    ok(/only the people are here/.test(await pg.textContent("#intro-from")), "VIZIO: it says only the people are here");
+    ok(!pg.errors.length, "VIZIO: no page errors: " + pg.errors.join("; "));
+    await ctxV.close();
   }
   // a home computer with no pairing key (the default): nothing to pair, the page opens straight away
   {
@@ -226,7 +250,10 @@ try {
   ok(bytes.length < big.length, "smaller than what the phone sent (" + bytes.length + " < " + big.length + ")");
   await phone.waitForFunction(() => document.querySelectorAll("#photo-list .photo img").length === 1);
   ok(await phone.evaluate(() => { const i = document.querySelector("#photo-list .photo img"); return new Promise((r) => { if (i.complete) r(i.naturalWidth); else { i.onload = () => r(i.naturalWidth); i.onerror = () => r(0); } }); }) === 1620,
-    "the phone page shows it (with its cookie), 1620 wide");
+    "the phone page shows it (fetched with the key in the header), 1620 wide");
+  ok(await phone.evaluate(() => /^blob:/.test(document.querySelector("#photo-list .photo img").src)), "shown from the phone's memory (a blob), not by a link");
+  ok(!(await ctx.cookies()).some((c) => c.name === "couchtv_token") && await phone.evaluate(() => !/couchtv_token/.test(document.cookie)),
+    "the pairing key is never in a cookie (Fable 11)");
   await until(() => tvPage.evaluate(() => { try { return (JSON.parse(localStorage.getItem("tvhome.settings")).s.photos || []).length === 1; } catch (e) { return false; } }).catch(() => false), "the TV home takes the photo");
   await until(() => tvPage.evaluate(() => !!(window.tv && window.CouchPhonePage) && document.readyState === "complete").catch(() => false), "the TV home is back");
   await tvPage.waitForTimeout(1500);
@@ -262,6 +289,24 @@ try {
   await tvPage.waitForFunction(() => !document.querySelector(".phone-code"), null, { timeout: 15000 });
   ok(true, "the line goes once the code is used");
   await ctx2.close();
+  // the QR never keeps a used code (Fable 7), and Show a code on the TV never swaps the QR's code (Fable 3)
+  await tvPage.evaluate(() => window.tv.settingsKey()); await tvPage.waitForTimeout(300); await press(tvPage, "Enter", 1200);
+  await tvPage.waitForFunction(() => document.getElementById("set-phone").classList.contains("on"), null, { timeout: 8000 });
+  const qrCode = () => tvPage.evaluate(() => document.getElementById("set-phone-pc").textContent.replace(/\D/g, "").slice(-6));
+  const a1 = await qrCode();
+  const st = await fetch(ORIGIN + "/api/pair/start", { method: "POST" });
+  ok(st.status === 200, "Show a code on the TV answers");
+  const shown = await tvPage.waitForFunction(() => { const e = document.querySelector(".phone-code"); return e && e.textContent; }, null, { timeout: 15000 }).then((h) => h.jsonValue());
+  ok(shown.replace(/\D/g, "") === a1 && await qrCode() === a1, "Show a code on the TV shows the QR's own code, and the QR keeps it: " + a1);
+  const used = await fetch(ORIGIN + "/api/pair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pin: a1 }) });
+  ok(used.status === 200, "a phone uses the QR's code");
+  const t0 = Date.now();
+  await until(async () => { const c = await qrCode(); return c && c !== a1; }, "the QR draws a new code", 15000);
+  ok(true, "the QR shows a new code " + (Date.now() - t0) + " ms after its code was used (no dead code left on screen)");
+  const fresh = await qrCode();
+  const re = await fetch(ORIGIN + "/api/pair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pin: fresh }) });
+  ok(re.status === 200, "and that new code pairs");
+  await press(tvPage, "Escape", 300); await press(tvPage, "Backspace", 300);
   ok(!tvPage.errors.length, "no page errors on the TV home: " + tvPage.errors.join("; "));
   await tvPage.close();
 } finally {
