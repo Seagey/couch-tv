@@ -34,6 +34,16 @@ object Auth {
     /** The code to show on the TV now, or null if none is live. */
     fun currentPin(): String? = if (pin != null && System.currentTimeMillis() < pinUntil) pin else null
 
+    /** Seconds the live code has left (0: none), so a QR holding it can be made again in time. */
+    fun pinSecondsLeft(): Int = if (currentPin() == null) 0 else ((pinUntil - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0)
+
+    /**
+     * The code for Home settings' "Change this on your phone" QR: the live one if a code is already on
+     * show with more than 30 seconds left (so a code someone is typing is not swapped), else a new one. Shown only inside the QR, on
+     * the TV's own screen, exactly as visible as the code the setup screen shows.
+     */
+    @Synchronized fun pinForQr(): String = currentPin()?.takeIf { pinSecondsLeft() > 30 } ?: newPin()
+
     fun onPin(fn: (String?) -> Unit) { synchronized(listeners) { listeners += fn } }
     fun offPin(fn: (String?) -> Unit) { synchronized(listeners) { listeners -= fn } }
     private fun notifyPin() { val p = currentPin(); synchronized(listeners) { listeners.toList() }.forEach { it(p) } }

@@ -230,7 +230,7 @@ class SetupActivity : Activity() {
             qr.visibility = if (phoneUrl != null) View.VISIBLE else View.GONE
         }
         address.text = if (phoneUrl != null) "Or type  $phoneUrl" else "This TV is not on a network yet. Connect it to Wi-Fi first."
-        setup.text = if (phoneUrl != null) "Setup page for the phone:  $phoneUrl/setup" else ""
+        setup.text = if (phoneUrl != null) "Home settings on your phone:  $phoneUrl/setup" else ""
         val p = Auth.currentPin()
         val ago = Auth.lastPairedAt.takeIf { it > 0 }?.let { System.currentTimeMillis() - it }
         code.text = SetupWords.pairLine(p, Auth.phoneCount(), ago)

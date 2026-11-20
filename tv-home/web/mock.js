@@ -404,6 +404,11 @@
     return new Promise(function (resolve, reject) {
       setTimeout(function () {
         if (down) return reject(new Error("The computer isn't answering."));
+        // ?ontv=1: Home settings' Change this on your phone QR (the on-TV app's /api/phone-link)
+        if (path.indexOf("/api/phone-link") === 0) {
+          if (cfg.mode !== "on-tv") return reject(new Error("no such endpoint"));
+          return resolve({ ok: true, url: "http://tv.example:5400/setup#pin=482913", pin_expires_in: 170, phones: 1 });
+        }
         // Now playing (#31): ?music=1, a song that previous and next step through, play and pause toggle
         if (path.indexOf("/api/weather") === 0 && arg("wx")) {
           var wp = arg("wx").split(",");
@@ -478,7 +483,13 @@
         }
         if (path.indexOf("/api/play") === 0) return resolve({ ok: true, note: body.title + " is playing." });
         if (path.indexOf("/api/settings") === 0) {
-          if (method === "POST") store.set("api.settings", { settings: body.settings || {}, updated: new Date().toISOString() });
+          if (method === "POST") {
+            // as the on-TV app does (Server.kt): a TV that saves an older copy than the server's keeps the
+            // server's town and photos, which the phone's Home settings page may have changed since
+            var was = store.get("api.settings"), next = Object.assign({}, body.settings || {});
+            if (body.seen && was && was.updated && body.seen !== was.updated) ["place", "photos"].forEach(function (k) { if (was.settings && k in was.settings) next[k] = was.settings[k]; else delete next[k]; });
+            store.set("api.settings", { settings: next, updated: new Date(Math.max(Date.now(), was && was.updated ? Date.parse(was.updated) + 1 : 0)).toISOString() });
+          }
           var st = store.get("api.settings") || { settings: {}, updated: null };
           return resolve({ ok: true, settings: st.settings, updated: st.updated });
         }

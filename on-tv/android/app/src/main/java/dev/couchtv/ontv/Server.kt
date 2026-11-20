@@ -80,6 +80,24 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
     private fun api(s: IHTTPSession): Response {
         val path = s.uri.removeSuffix("/")
         val m = s.method
+        // A photo from the phone's Home settings page: the picture itself is the body (up to 25 MB),
+        // read here as a stream, never as JSON. A refused upload closes the connection, so its unread
+        // bytes are never taken as the next request.
+        if (m == Method.POST && path == "/api/photos") {
+            if (!authed(s)) return json(401, err("pair this phone first")).apply { closeConnection(true) }
+            val len = s.headers["content-length"]?.toLongOrNull() ?: 0L
+            return try {
+                val p = Photos.add(s.inputStream, len)
+                refreshHomeAfter(s)
+                json(200, ok().put("photo", p).put("count", photoCount()))
+            } catch (e: ApiError) { json(e.status, err(e.message ?: "error")).apply { closeConnection(true) } }
+        }
+        // a photo's picture for the phone page's list (the cookie the page pairs with carries the token)
+        if (m == Method.GET && path.startsWith("/api/photo/")) {
+            if (!authed(s)) return json(401, err("pair this phone first"))
+            val f = Photos.file(path.removePrefix("/api/photo/")) ?: return json(404, err("no such photo"))
+            return newFixedLengthResponse(Response.Status.OK, "image/jpeg", f.inputStream(), f.length()).noStore()
+        }
         // Always read the body first: an unread body would be taken as the start of the next request
         // on a kept-alive connection (seen in testing after a 401).
         bodies[s] = readBody(s)
@@ -329,6 +347,36 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 json(200, homeState())
             }
             "POST /api/phones/forget" -> { Auth.forgetAll(); json(200, ok().put("note", "Every phone must pair again.")) }
+            // ---- Home settings on the phone (/setup) ----
+            // Home settings, "Change this on your phone": this TV's own page and a pairing code inside the
+            // QR (#pin=, the phone remote's pairing QR format), so a phone that never paired goes straight in.
+            "GET /api/phone-link" -> {
+                val ip = App.lanAddress() ?: throw ApiError(503, "This TV is not on a network yet.")
+                val pin = Auth.pinForQr()
+                json(200, ok().put("url", "http://$ip:${Store.port}/setup#pin=$pin").put("pin_expires_in", Auth.pinSecondsLeft())
+                    .put("phones", Auth.phoneCount()))
+            }
+            "POST /api/photos/remove" -> {
+                if (!Photos.remove(body(s).optString("id"))) throw ApiError(404, "That photo is not on the TV any more.")
+                refreshHomeAfter(s)
+                json(200, ok().put("count", photoCount()))
+            }
+            // At home (the family note, lists, guest Wi-Fi, house guide, calendar links): kept in the home
+            // page's own store on this TV, so the app hands them across to the page (HomeActivity.atHome).
+            "GET /api/athome" -> {
+                val r = HomeActivity.atHomeRead()
+                json(200, if (r == null) ok().put("live", false) else ok().put("live", true).put("athome", r))
+            }
+            "POST /api/athome" -> {
+                val e = body(s).optJSONObject("edit") ?: throw ApiError(400, "edit is required")
+                val r = HomeActivity.atHomeEdit(e)
+                when {
+                    r == null -> json(200, ok().put("live", false).put("queued", true))
+                    r.optBoolean("refused") -> json(409, err(r.optString("error")))
+                    !r.optBoolean("ok") -> json(400, err(r.optString("error", "That did not save.")))
+                    else -> json(200, ok().put("live", true).put("athome", r.optJSONObject("athome") ?: JSONObject()))
+                }
+            }
             else -> json(404, err("no such endpoint: $m $path"))
         }
     }
@@ -478,12 +526,47 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         Store.writeJson("app-order.json", JSONObject().put("order", JSONArray(order)).put("line", line.coerceIn(0, 10)))
     }
 
+    private fun photoCount(): Int = (Store.readJson("home-settings.json") as? JSONObject)?.optJSONArray("photos")?.length() ?: 0
+
     private fun saveSettings(b: JSONObject) {
         Ask.save(b)   // first: a wrong Ask setting answers 400 before anything else in the request is saved
         b.optJSONObject("settings")?.let {
             if (it.toString().length > 32_000) throw ApiError(413, "settings are too big")
-            Store.writeJson("home-settings.json", it)
-            Store.putStr("home_settings_updated", Now.iso())
+            // The home sends its whole copy with "seen", the "updated" it last read. If the copy here has
+            // changed since (the phone's Home settings page: the town, a photo), the home's copy is older:
+            // the keys the phone changes stay as they are here. One lock with the phone's own writes.
+            synchronized(Store) {
+                val seen = b.optString("seen").ifEmpty { null }
+                val now = Store.str("home_settings_updated")
+                if (seen != null && now != null && seen != now) {
+                    SettingsMerge.keepServer(it, Store.readJson("home-settings.json") as? JSONObject)
+                }
+                Store.writeJson("home-settings.json", it)
+                Store.putStr("home_settings_updated", Now.iso())
+            }
+        }
+        // The phone's Home settings page changes only the keys it names (null takes one out), so a
+        // town picked on the phone never undoes a look picked on the TV. Same keys and shapes as the
+        // home's own Home settings (app.js ST); "place" is the home's Location, {name, area, lat, lon, timezone}.
+        b.optJSONObject("settings_patch")?.let { p ->
+            val keys = p.keys().asSequence().toList()
+            keys.forEach { k -> if (k !in PATCH_KEYS) throw ApiError(400, "$k is not changed from the phone") }
+            if (p.has("place") && !p.isNull("place")) {
+                val pl = p.opt("place") as? JSONObject ?: throw ApiError(400, "place must be an object or null")
+                val lat = pl.optDouble("lat", Double.NaN); val lon = pl.optDouble("lon", Double.NaN)
+                if (lat.isNaN() || lon.isNaN() || lat !in -90.0..90.0 || lon !in -180.0..180.0 || pl.optString("name").isBlank())
+                    throw ApiError(400, "place needs a name, and lat and lon as numbers")
+            }
+            Store.editHomeSettings { hs -> keys.forEach { k -> if (p.isNull(k)) hs.remove(k) else hs.put(k, p.get(k)) } }
+            // the weather the phone remote and /api/weather use follows the same town
+            if (p.has("place")) {
+                val pl = p.optJSONObject("place")
+                if (pl == null) Store.putStr("weather", null)
+                else Store.putStr("weather", JSONObject().put("lat", pl.getDouble("lat")).put("lon", pl.getDouble("lon"))
+                    .put("place", listOf(pl.optString("name"), pl.optString("area")).filter { it.isNotBlank() }.joinToString(", ").take(40))
+                    .put("timezone", pl.optString("timezone", "auto").take(40)).toString())
+                Weather.clear()
+            }
         }
         b.optJSONArray("people")?.let { arr ->
             val clean = JSONArray()
@@ -658,5 +741,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         private const val TAG = "couchtv.server"
         /** The dock tile pictures the home has for an input (docs/CONFIG.md, home.inputs). */
         private val INPUT_ICONS = setOf("hdmi", "cable", "pc", "ps5", "xbox", "switch")
+        /** Home settings keys the phone's Home settings page may change (settings_patch). Photos have their own calls. */
+        private val PATCH_KEYS = setOf("place")
     }
 }

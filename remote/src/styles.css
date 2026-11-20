@@ -572,6 +572,8 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
 
 /* kids mode (Kids.jsx) */
 .kids-open { width: 100%; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+a.pill { color: inherit; text-decoration: none; box-sizing: border-box; }
+a.pill.glass:active { background: var(--glass-press); transition: none; }
 .kids-sheet .more-block { margin-top: 18px; }
 .kids-sheet .chips-row .chip svg { vertical-align: -2px; }
 .kids-pin input:not(:placeholder-shown) { letter-spacing: 0.3em; }

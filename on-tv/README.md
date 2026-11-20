@@ -373,7 +373,14 @@ out every computer, so reconnect yours afterwards).
 - `Finder.kt` and `Apps.kt`: the computer bridge's JustWatch lookup, app table and deep-link rules.
 - `web/shim.js`: added to the phone remote's page by the TV app. It pairs the phone and adds the
   token to every call, so the remote itself is unchanged and the same build works with both modes.
-- `web/setup.html`: the phone setup page (ADB, wireless debugging pairing, names, weather, ask).
+- `web/setup.html`: Home settings on the phone (`http://<tv-ip>:5400/setup`): the town (the same
+  Open-Meteo search as the TV), people (through the phone remote's People sheet), photos sent from the
+  phone straight to the TV (made screen size there, `Photos.kt`), At home (note, lists, guest Wi-Fi,
+  house guide, calendar and bookings links, handed into the home page's own store by
+  `HomeActivity.atHome`), Ask, Use as home screen, Smart home where the TV has it, and ADB. Home
+  settings on the TV shows a QR to it (with the pairing code, `#pin=`), and the phone remote's More
+  sheet links to it. Everything stays on the TV and the home Wi-Fi; every setting can still be changed
+  on the TV.
 - Endpoints are those in `bridge/API.md`, plus `/api/pair`, `/api/pair/start`, `/api/adb`,
   `/api/adb/connect`, `/api/adb/pair`, `/api/settings`, `/api/home`, `/api/phones/forget` and `/api/ws`.
 - `GET /api/home` and `POST /api/home {"on": true|false}` (paired, like the rest): the same switch as
@@ -388,6 +395,27 @@ out every computer, so reconnect yours afterwards).
 - A save from a phone or setup tool (`POST /api/settings`, `/api/app-order` or `/api/people`) shows
   on the TV straight away: the home page reads them again as if it had just come back on screen.
   Saves the home page makes itself are left alone.
+- Home settings on the phone (all paired, like the rest):
+  - `POST /api/settings {"settings_patch": {"place": {name, area, lat, lon, timezone} | null}}`
+    changes only the town (the home's own place shape); any other key is a 400.
+  - `POST /api/settings {"settings": {...}, "seen": "<updated>"}` is the home's whole copy. `seen` is
+    the `updated` the home last read (`"none"` if there was no copy then). When it is not the server's
+    current `updated`, the home's copy is older, so `place` and `photos` stay as the server has them
+    (present or not). The answer carries the copy kept, which the home takes.
+  - `POST /api/photos` with the picture itself as the body (JPEG, PNG and the like, up to 25 MB and
+    100 megapixels): turned upright, made no bigger than 1920 by 1080, kept on the TV, added to the
+    photos. Answers `{"photo": {id, file}, "count"}`; 413 too big, 415 not a picture, 409 when 50 are
+    on the TV already. `GET /api/photo/<file>` gives one back (the phone page's list).
+    `POST /api/photos/remove {"id"}` takes one off and deletes its file.
+  - `GET /api/athome`: the home page's At home words (`live: false` when the home page is not
+    loaded). A calendar or bookings link comes back as its host only.
+  - `POST /api/athome {"edit": {note, lists, wifi, guide, cal_url, stay_url, checkin, checkout}}`:
+    handed into the home page's own store. With the page not loaded, the change waits in the app's
+    storage (`queued: true`) until it loads, except lists and the guide (sent whole), which answer
+    409, as does a 21st waiting change.
+  - `GET /api/phone-link`: `{"url": "http://<tv>:5400/setup#pin=NNNNNN", "pin_expires_in"}` for Home
+    settings' QR and its computer line. The code is the live one, or a new one when that has 30
+    seconds or less left.
 
 ## Tests
 

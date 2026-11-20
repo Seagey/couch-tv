@@ -171,6 +171,9 @@
 
     // ---- the settings screen ----
     set_title: "Home settings",
+    set_phone: "Change this on your phone",
+    set_phone_sub: "Scan with the phone's camera, on the same Wi-Fi as the TV.",
+    set_phone_pc: "Or on a computer: {addr}, code {code}",
     sec_language: "Language",
     sec_location: "Location",
     sec_weather: "Weather",
@@ -987,6 +990,9 @@
 
     // ---- the settings screen ----
     set_title: "主页设置",
+    set_phone: "在手机上更改",
+    set_phone_sub: "用手机相机扫描。手机和电视要连同一个 Wi-Fi。",
+    set_phone_pc: "或在电脑上打开：{addr}，代码 {code}",
     sec_language: "语言",
     sec_location: "位置",
     sec_weather: "天气",
@@ -1749,6 +1755,9 @@
 
     // ---- the settings screen ----
     set_title: "Nastavení domovské obrazovky",
+    set_phone: "Změňte to v telefonu",
+    set_phone_sub: "Naskenujte fotoaparátem telefonu. Telefon musí být na stejné Wi-Fi jako televize.",
+    set_phone_pc: "Nebo na počítači: {addr}, kód {code}",
     sec_language: "Jazyk",
     sec_location: "Poloha",
     sec_weather: "Počasí",
@@ -2213,6 +2222,9 @@
     tv_settings_none: "No se han podido abrir los ajustes del televisor.",
 
     set_title: "Ajustes de inicio",
+    set_phone: "Cámbialo desde el móvil",
+    set_phone_sub: "Escanéalo con la cámara del móvil. Tiene que estar en la misma wifi que la tele.",
+    set_phone_pc: "O en un ordenador: {addr}, código {code}",
     sec_language: "Idioma",
     sec_location: "Ubicación",
     sec_weather: "El tiempo",
@@ -2543,6 +2555,9 @@
     tv_settings_none: "No se pudo abrir la configuración de la TV.",
 
     set_title: "Configuración de inicio",
+    set_phone: "Cámbialo desde tu celular",
+    set_phone_sub: "Escanéalo con la cámara del celular. Tiene que estar en la misma red wifi que la tele.",
+    set_phone_pc: "O en una computadora: {addr}, código {code}",
     sec_weather: "Clima",
     sec_look: "Vista y escenas",
     n_secs: "{n} segundos",
@@ -2798,6 +2813,9 @@
     tv_settings_none: "Non è stato possibile aprire le impostazioni della TV.",
 
     set_title: "Impostazioni della home",
+    set_phone: "Cambialo dal telefono",
+    set_phone_sub: "Inquadra con la fotocamera del telefono. Deve essere sulla stessa rete Wi-Fi del televisore.",
+    set_phone_pc: "Oppure dal computer: {addr}, codice {code}",
     sec_language: "Lingua",
     sec_location: "Località",
     sec_weather: "Meteo",
@@ -3210,6 +3228,9 @@
 
     // ---- the settings screen ----
     set_title: "Startbildschirm-Einstellungen",
+    set_phone: "Am Handy ändern",
+    set_phone_sub: "Mit der Handykamera scannen. Das Handy muss im selben WLAN sein wie der Fernseher.",
+    set_phone_pc: "Oder am Computer: {addr}, Code {code}",
     sec_language: "Sprache",
     sec_location: "Ort",
     sec_weather: "Wetter",
@@ -3622,6 +3643,9 @@
 
     // ---- the settings screen ----
     set_title: "Ana ekran ayarları",
+    set_phone: "Telefonundan değiştir",
+    set_phone_sub: "Telefonun kamerasıyla tara. Telefon, televizyonla aynı Wi-Fi ağında olmalı.",
+    set_phone_pc: "Ya da bilgisayarda: {addr}, kod {code}",
     sec_language: "Dil",
     sec_location: "Konum",
     sec_weather: "Hava durumu",
@@ -4017,6 +4041,9 @@
 
     // ---- the settings screen ----
     set_title: "Réglages de l'accueil",
+    set_phone: "Modifiez-le sur votre téléphone",
+    set_phone_sub: "Scannez avec l'appareil photo du téléphone, sur le même Wi-Fi que la télé.",
+    set_phone_pc: "Ou sur un ordinateur : {addr}, code {code}",
     sec_language: "Langue",
     sec_location: "Lieu",
     sec_weather: "Météo",
@@ -4452,6 +4479,9 @@
 
     // ---- the settings screen ----
     set_title: "Startinstellingen",
+    set_phone: "Wijzig dit op je telefoon",
+    set_phone_sub: "Scan met de camera van je telefoon, op dezelfde wifi als de tv.",
+    set_phone_pc: "Of op een computer: {addr}, code {code}",
     sec_language: "Taal",
     sec_location: "Locatie",
     sec_weather: "Weer",
@@ -4876,6 +4906,9 @@
 
     // ---- the settings screen ----
     set_title: "Podešavanja početnog ekrana",
+    set_phone: "Promenite ovo na telefonu",
+    set_phone_sub: "Skenirajte kamerom telefona. Telefon mora biti na istoj Wi-Fi mreži kao televizor.",
+    set_phone_pc: "Ili na računaru: {addr}, kod {code}",
     sec_language: "Jezik",
     sec_location: "Lokacija",
     sec_weather: "Vreme",
@@ -5308,6 +5341,9 @@
 
     // ---- the settings screen ----
     set_title: "Ustawienia ekranu głównego",
+    set_phone: "Zmień to na telefonie",
+    set_phone_sub: "Zeskanuj aparatem telefonu. Telefon musi być w tej samej sieci Wi-Fi co telewizor.",
+    set_phone_pc: "Albo na komputerze: {addr}, kod {code}",
     sec_language: "Język",
     sec_location: "Lokalizacja",
     sec_weather: "Pogoda",
@@ -6107,6 +6143,9 @@
     gear_tv_sub: "Wi-Fi, תמונה, קול ושאר הגדרות הטלוויזיה",
     tv_settings_none: "לא ניתן לפתוח את הגדרות הטלוויזיה.",
     set_title: "הגדרות מסך הבית",
+    set_phone: "לשנות את זה בטלפון",
+    set_phone_sub: "סרקו במצלמת הטלפון. הטלפון צריך להיות באותה רשת Wi-Fi כמו הטלוויזיה.",
+    set_phone_pc: "או במחשב: {addr}, קוד {code}",
     sec_language: "שפה",
     sec_location: "מיקום",
     sec_weather: "מזג אוויר",
@@ -6525,6 +6564,9 @@
     gear_tv_sub: "Wi-Fi, imagem, som e o resto da TV",
     tv_settings_none: "Não foi possível abrir os ajustes da própria TV.",
     set_title: "Ajustes da tela inicial",
+    set_phone: "Altere isso no celular",
+    set_phone_sub: "Escaneie com a câmera do celular. Ele precisa estar no mesmo Wi-Fi da TV.",
+    set_phone_pc: "Ou no computador: {addr}, código {code}",
     sec_language: "Idioma",
     sec_location: "Local",
     sec_weather: "Clima",
@@ -6952,6 +6994,9 @@
     gear_tv_sub: "شبكة Wi-Fi والصورة والصوت وبقية إعدادات التلفزيون",
     tv_settings_none: "تعذر فتح إعدادات هذا التلفزيون.",
     set_title: "إعدادات الرئيسية",
+    set_phone: "غيّر هذا من هاتفك",
+    set_phone_sub: "امسح الرمز بكاميرا الهاتف. يجب أن يكون على شبكة Wi-Fi نفسها التي يتصل بها التلفزيون.",
+    set_phone_pc: "أو على الكمبيوتر: {addr}، الرمز {code}",
     sec_language: "اللغة",
     sec_location: "الموقع",
     sec_weather: "الطقس",
@@ -7380,6 +7425,9 @@
     gear_tv_sub: "Wi-Fi, imagine, sunet și restul setărilor TV",
     tv_settings_none: "Setările proprii ale televizorului nu au putut fi deschise.",
     set_title: "Setările ecranului principal",
+    set_phone: "Schimbă asta din telefon",
+    set_phone_sub: "Scanează cu camera telefonului, în aceeași rețea Wi-Fi ca televizorul.",
+    set_phone_pc: "Sau pe un calculator: {addr}, cod {code}",
     sec_language: "Limbă",
     sec_location: "Locație",
     sec_weather: "Vreme",

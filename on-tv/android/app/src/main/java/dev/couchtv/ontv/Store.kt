@@ -37,6 +37,20 @@ object Store {
         tmp.renameTo(File(dir, name))
     }
 
+    /**
+     * One change to the TV home's own Home settings (home-settings.json, the page's ST), read, changed
+     * and written under one lock, so a phone adding a photo and a phone changing the town at the same
+     * moment both stay. The home picks the new copy up on its next refresh (syncSettings in app.js).
+     */
+    @Synchronized fun editHomeSettings(fn: (JSONObject) -> Unit): JSONObject {
+        val hs = readJson("home-settings.json") as? JSONObject ?: JSONObject()
+        fn(hs)
+        if (hs.toString().length > 32_000) throw ApiError(413, "settings are too big")
+        writeJson("home-settings.json", hs)
+        putStr("home_settings_updated", Now.iso())
+        return hs
+    }
+
     // ---------- settings the household can change from the phone (/setup) ----------
     val port get() = int("port", 5400)
 

@@ -527,6 +527,11 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
         <button className="pill glass arrange-open" onClick={() => { tick(); onPeople(); }}><Ic.People size={18} /> {t('people')}</button>
       </div>
       <button className="pill glass arrange-open kids-open" onClick={() => { tick(); onKids(); }}><Ic.Lock size={18} /> {t('kids_mode')}</button>
+      {/* Home settings on this phone: the page the on-TV app serves (/setup). Only there: the computer
+          bridge has no such page, and window.couchTv is only set by the on-TV app's pairing script. */}
+      {typeof window !== 'undefined' && window.couchTv && (
+        <a className="pill glass arrange-open kids-open" href="/setup" onClick={() => tick()}><Ic.Gear size={18} /> {t('home_settings_phone')}</a>
+      )}
 
       <GuestName open={open} />
 

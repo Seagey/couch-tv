@@ -4430,9 +4430,28 @@
     keep(ST_KEY, rec);
     return rec;
   }
+  // SEEN: the server's "updated" this TV last read. Sent with every save, so a server that has had a
+  // newer change since (the phone's Home settings page: the town, a photo) keeps that change instead of
+  // taking this TV's older copy whole; the copy it keeps comes back here.
+  var SEEN = null;
   function pushSettings(rec) {
-    return api("POST", "/api/settings", { settings: rec.s })
-      .then(function () { rec.pending = false; keep(ST_KEY, rec); }, function () {});
+    var body = { settings: rec.s };
+    if (SEEN !== null) body.seen = SEEN || "none";   // "none": it had no copy when this TV last looked
+    return api("POST", "/api/settings", body)
+      .then(function (j) {
+        rec.pending = false; keep(ST_KEY, rec);
+        if (j && j.updated) SEEN = j.updated;
+        var back = j && j.settings && typeof j.settings === "object" && !Array.isArray(j.settings) ? j.settings : null;
+        if (ON_TV && back && canon(back) !== canon(ST)) takeServerSettings(back);   // the on-TV app may keep the phone's town or photos; a bridge answers with what it was sent
+      }, function () {});
+  }
+  // the server's copy is newer: use it. Under Home settings the screen is drawn again and the home
+  // starts again when it closes; anywhere else the home starts again now.
+  function takeServerSettings(remote) {
+    ST = remote;
+    keepSettings(false);
+    if (zone !== "settings") restart();
+    else { SET.dirty = true; if (!SET.typing && !SET.lift) renderSettings(); }
   }
   // Kept on this TV straight away; handed to the bridge a moment later (pending until it has it).
   function saveSettings() {
@@ -4453,15 +4472,14 @@
   function syncSettings() {
     return api("GET", "/api/settings").then(function (j) {
       var rec = kept(ST_KEY), remote = j.settings && typeof j.settings === "object" && !Array.isArray(j.settings) ? j.settings : null;
-      if (rec && rec.pending) return pushSettings(rec);
+      if (SEEN === null || !rec || !rec.pending) SEEN = j.updated || "";   // a pending copy keeps the older SEEN it was made from
+      if (rec && rec.pending) return pushSettings(rec);   // SEEN is still the older one: the server keeps any newer phone change
       if (!remote || (!j.updated && !Object.keys(remote).length)) {   // the bridge has none yet: it gets ours
         if (Object.keys(ST).length) return pushSettings(keepSettings(true));
         return null;
       }
       if (canon(remote) === canon(ST)) return null;
-      ST = remote;
-      keepSettings(false);
-      if (zone !== "settings") restart();
+      takeServerSettings(remote);
       return null;
     });
   }
@@ -4473,6 +4491,38 @@
     $("settings").setAttribute("aria-label", t("set_title"));
   }
 
+  // Change this on your phone: only where this TV itself serves the phone's Home settings page (the
+  // on-TV app, /setup). The QR holds the page's address and, so a phone that has never paired goes
+  // straight in, the pairing code (#pin=, the phone remote's pairing QR format). A code lasts three
+  // minutes, so the QR is made again before it runs out. Not focusable: it costs no presses, and every
+  // setting stays here on the TV too. The computer bridge serves no such page, so a TV it drives
+  // (Samsung, LG, VIDAA, Roku...) and the couch-tv home app never show it.
+  var PHONE_QR = { timer: 0, url: "" };
+  function phoneQr() {
+    var box = $("set-phone");
+    clearTimeout(PHONE_QR.timer);
+    if (!box) return;
+    var off = function () { box.classList.remove("on"); PHONE_QR.url = ""; };
+    if (!ON_TV || OFFLINE || !window.TVQR || zone !== "settings") { off(); return; }
+    api("GET", "/api/phone-link").then(function (j) {
+      if (zone !== "settings" || !j || !/^http:\/\/[^\/]+\/setup/.test(j.url || "")) { off(); return; }
+      if (j.url !== PHONE_QR.url) {
+        var qr = $("set-phone-qr");
+        qr.innerHTML = "";
+        try { qr.appendChild(window.TVQR.svg(j.url, 120)); } catch (e) { off(); return; }
+        PHONE_QR.url = j.url;
+      }
+      $("set-phone-head").textContent = t("set_phone");
+      $("set-phone-sub").textContent = t("set_phone_sub");
+      // a computer has no camera: the plain address and the code to type on its pairing screen
+      var m = /^http:\/\/([^\/]+)(\/setup)#pin=(\d{6})$/.exec(j.url);
+      $("set-phone-pc").textContent = m ? t("set_phone_pc", { addr: m[1] + m[2], code: m[3].slice(0, 3) + " " + m[3].slice(3) }) : "";
+      box.classList.add("on");
+      var left = +j.pin_expires_in > 0 ? +j.pin_expires_in * 1000 - 20000 : 60000;
+      PHONE_QR.timer = setTimeout(phoneQr, Math.max(15000, left));
+    }, off);
+  }
+
   function openSettings() {
     closeGear();
     zone = "settings";
@@ -4482,6 +4532,7 @@
     $("settings").classList.add("on");
     document.documentElement.classList.add("setting");
     renderSettings();
+    phoneQr();
   }
   // Closing starts the page again when anything changed, so the look, scenes and words all agree.
   function closeSettings() {
@@ -4489,12 +4540,14 @@
     if (SET.lift) dropRow();
     $("settings").classList.remove("on");
     document.documentElement.classList.remove("setting");
+    clearTimeout(PHONE_QR.timer);
     zone = "grid";
     if (window.AmbientWeather) window.AmbientWeather.resume();
     if (SET.dirty) { SET.dirty = false; restart(); return; }
     paintFocus();
     resetIdlePhoto();
     refreshCards(true);
+    if (!OFFLINE) refresh();   // a change from the phone made while it was open shows now
   }
 
   // ---- rows ----
@@ -6179,6 +6232,9 @@
   // tv.home, then the launcher's tv.resume); the second ask gets the first's result.
   var refreshAt = 0, refreshing = null;
   function refresh() {
+    // Home settings open: nothing is reshuffled under it, but a change from the phone's Home settings
+    // page still comes in (the town, a photo), so the next change made here does not undo it
+    if (zone === "settings" && !lift && !OFFLINE && data.bridge !== false) return syncSettings().then(function () {}, function () {});
     // never reshuffle under something being moved, or under the settings screen
     if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart" || zone === "updask") return Promise.resolve();
     if (refreshing && Date.now() - refreshAt < 1500) return refreshing;
@@ -6499,6 +6555,47 @@
         if (n !== local) { AH.store.edit(function (x) { x.guest = { name: n, at: +g.at }; }); ahChanged(); }
       } else if (mine > (+g.at || 0)) api("POST", "/api/guest", { name: local }).then(function () {}, function () {});
     }, function () {});
+  }
+  // At home from the phone's Home settings page (/setup on the on-TV app, the TV's own LAN page): the
+  // app hands the phone's words in here (HomeActivity.atHome, the same way as typeText), so they stay
+  // in this TV's own store like words typed with the remote. What the phone may read back: everything
+  // it can change, except a calendar link, which comes back as its host only (the rest is its password).
+  function atHomeView() {
+    if (!AH) return null;
+    var r = AH.store.get(), st = r.stay || {};
+    return { note: r.note ? { text: r.note.text, from: r.note.from || "" } : null, lists: r.lists || [], wifi: r.wifi || null, guide: r.guide || [],
+      cal: r.cal ? { host: CouchAtHome.calHost(r.cal.url) } : null,
+      stay: { host: st.url ? CouchAtHome.calHost(st.url) : "", checkin: st.checkin || "15:00", checkout: st.checkout || "10:00" },
+      guest: (r.guest && r.guest.name) || "", lim: CouchAtHome.LIM, times_in: CouchAtHome.TIMES_IN, times_out: CouchAtHome.TIMES_OUT };
+  }
+  // e: { note: {text, from} or null, lists: [...], wifi: {...} or null, guide: [...], cal_url: "https://..." or "" to remove,
+  //      stay_url, checkin, checkout }. Only the parts named change; athome.js clean() checks the whole record.
+  function atHomeEdit(e) {
+    if (!AH || !e || typeof e !== "object") return { ok: false, error: "At home is not in this version of the home." };
+    var has = function (k) { return Object.prototype.hasOwnProperty.call(e, k); };
+    var bad = "";
+    var cal = has("cal_url") ? (e.cal_url ? CouchAtHome.calUrl(e.cal_url) : "") : null;
+    var stay = has("stay_url") ? (e.stay_url ? CouchAtHome.calUrl(e.stay_url) : "") : null;
+    if ((has("cal_url") && e.cal_url && !cal) || (has("stay_url") && e.stay_url && !stay)) bad = "That is not a calendar link. It starts with https://, or is a calendar app's own link.";
+    if (bad) return { ok: false, error: bad };
+    AH.store.edit(function (x) {
+      if (has("note")) { if (e.note && String(e.note.text || "").trim()) x.note = { text: e.note.text, from: e.note.from || "", at: Date.now() }; else delete x.note; }
+      if (has("lists")) x.lists = Array.isArray(e.lists) ? e.lists : [];
+      if (has("wifi")) { if (e.wifi && String(e.wifi.ssid || "").trim()) x.wifi = e.wifi; else delete x.wifi; }
+      if (has("guide")) x.guide = Array.isArray(e.guide) ? e.guide : [];
+      if (cal !== null) { if (cal) x.cal = { url: cal }; else delete x.cal; }
+      if (stay !== null || has("checkin") || has("checkout")) {
+        var s = x.stay = x.stay || {};
+        if (stay !== null) { if (stay) s.url = stay; else delete s.url; }
+        if (has("checkin")) s.checkin = e.checkin;
+        if (has("checkout")) s.checkout = e.checkout;
+      }
+    });
+    ahChanged();
+    if (cal !== null) { CAL.err = ""; CAL.at = 0; calRefresh(true); }
+    if (stay !== null) { STAY.err = ""; STAY.at = 0; stayRefresh(true); }
+    if (zone === "settings") renderSettings();
+    return { ok: true, athome: atHomeView() };
   }
   // anything private typed here stops a Share this home that somehow holds it
   function ahPrivateWords() {
@@ -6910,7 +7007,10 @@
     calendarText: function (id, ok, text) { calendarText(id, ok, text); },
     // words typed on the phone remote (Type on the TV) when the TV app cannot press keys (the on-TV app
     // with no ADB): they go into the typing box Home settings has open, at the cursor. False: no box open.
-    typeText: function (s) { return typeIn(s); } };
+    typeText: function (s) { return typeIn(s); },
+    // At home from the phone's Home settings page (the on-TV app's /setup), handed in by the app
+    atHomeRead: function () { return atHomeView(); },
+    atHomeEdit: function (e) { return atHomeEdit(e); } };
 
   // ---------------- the web widgets (widget-web.js): headlines, scores, markets, the commute ----------------
   // Asked only while such a widget is on the home, each source at most once per refresh, the last
