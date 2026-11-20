@@ -49,12 +49,24 @@
   // Hisense VIDAA: a computer at home, or the home as a website with no computer (docs/VIDAA.md); the
   // website cannot open apps.
   var VIDAA = ["VIDAA"];
-  // Roku, Apple TV, Fire TV on Vega OS, Philips on Titan OS, VIZIO and unknown TVs: their couch-tv
-  // (where there is one) does not draw couch-tv Studio designs.
+  // Roku and Apple TV: Couch TV draws designs itself there (roku/channel/components/DesignLib.brs
+  // dlWNative, tvos/CouchTV/DesignModel.swift DesignWidgets.native), but only these kinds; any other
+  // kind is not on that TV. Both need a computer at home that stays on to open Couch TV.
+  var NATIVE = {
+    "Roku OS": ["clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "countdown", "date", "month", "weather", "bigtemp", "moon", "photo", "artframe",
+      "keep", "keeprow", "app", "folder", "dock", "appgrid", "games", "people", "card", "quote", "welcome", "note"],
+    tvOS: ["clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "worldclock", "countdown", "date", "month", "weather", "bigtemp", "photo", "artframe",
+      "keep", "keeprow", "app", "folder", "dock", "appgrid", "games", "people", "quick", "card", "quote", "welcome", "stack"]
+  };
+  var NATIVE_NAME = { "Roku OS": "Roku", tvOS: "Apple TV" };
+  function drawnOn(kind, p) { return !!NATIVE[p] && NATIVE[p].indexOf(kind) >= 0; }
+  // Fire TV on Vega OS, Philips on Titan OS, VIZIO and unknown TVs: their couch-tv (where there is one)
+  // does not draw couch-tv Studio designs.
   var NO_HOME = "couch-tv Studio designs do not show on this TV yet.";
-  var NOT_HERE = ["Not possible on this TV: couch-tv Studio designs show on Google TV, Android TV, Fire TV, Samsung, LG, Hisense, Philips (older), TiVo OS and Panasonic TVs."];
+  var NOT_HERE = ["Not possible on this TV: couch-tv Studio designs show on Google TV, Android TV, Fire TV, Samsung, LG, Hisense, Philips (older), TiVo OS, Panasonic, Roku and Apple TV."];
+  var NOT_NATIVE = "Shows on Google TV, Android TV and Fire TV.";
 
-  function groupOf(p) { return ANDROID.indexOf(p) >= 0 ? "android" : WEB.indexOf(p) >= 0 ? "web" : VIDAA.indexOf(p) >= 0 ? "vidaa" : "none"; }
+  function groupOf(p) { return ANDROID.indexOf(p) >= 0 ? "android" : WEB.indexOf(p) >= 0 ? "web" : VIDAA.indexOf(p) >= 0 ? "vidaa" : NATIVE[p] ? "native" : "none"; }
   // the older "on" from the honest need: on a Samsung or LG the home itself runs from the computer, so
   // a widget that works the moment the home runs was always "yes" there
   function onOf(need, group) { return need === "works" ? "yes" : need === "no" ? "no" : need === "computer" && group === "web" ? "yes" : "setup"; }
@@ -477,12 +489,179 @@
       ok: "OK opens what the widget showing opens. Left and Right flick through", platforms: EVERY(), sizes: sz([], [2, 2]) }
   };
 
+  // ---------------- each widget's own settings (docs/WIDGET-SETTINGS-CONTRACT.md) ----------------
+  // A setting: { key, label, type, default, help } as the contract says, plus (WIDGET-SETTINGS-SPEC.md
+  // section 5):
+  //   store  "design": a public choice kept in the design (widget.opts[key]), which the TV may still
+  //                     override for this widget (ST.widgets["<id>|<kind>"][key]);
+  //          "tv":     kept on this TV only (ST.widgets), never in a design
+  //   where  the screens that offer it: "studio", "tv" (Hold OK and Home settings), "phone"
+  //   pre    true when it is needed before launch
+  // and, by type: options [[value, label], ...] (choice), min max step (number), domain and many and
+  // max (device), many and max (text: a list of words), from (tvlist: "lists", "photos", "people",
+  // "calendars"), coast (place: beaches only), league (team: the key of the setting naming the
+  // competition), when (only shown while another setting has this value, { key: value }), sets (the
+  // design key a screen writes from this choice, worked out when it is saved), suggest (text: ready made
+  // values to pick), private (never leaves the TV and the home Wi-Fi), needs ({ apps, bridge, ha }).
+  // Two types beyond the contract's list: "tvlist" (one of the things kept on this TV: its lists, its
+  // photos) and "image" (one photo put in the widget in couch-tv Studio).
+  var ALL = ["studio", "tv", "phone"], ON_TV = ["tv", "phone"], STUDIO = ["studio"];
+  function st(key, label, type, dflt, help, store, where, pre, more) {
+    var s = { key: key, label: label, type: type, "default": dflt, help: help, store: store, where: where.slice(), pre: !!pre };
+    if (more) Object.keys(more).forEach(function (k) { s[k] = more[k]; });
+    return s;
+  }
+  var MONTHS = [[1, "January"], [2, "February"], [3, "March"], [4, "April"], [5, "May"], [6, "June"], [7, "July"], [8, "August"], [9, "September"], [10, "October"], [11, "November"], [12, "December"]];
+  var YEARS = [["every", "Every year"]];
+  for (var yr = 2026; yr <= 2040; yr++) YEARS.push([String(yr), String(yr)]);
+  var HOURS = [["off", "No time set"]];
+  for (var hr = 0; hr < 24; hr++) HOURS.push([hr, (hr % 12 || 12) + (hr < 12 ? "am" : "pm")]);
+  var MINUTES = [];
+  for (var mn = 0; mn < 60; mn += 5) MINUTES.push([mn, (mn < 10 ? "0" : "") + mn + " past the hour"]);
+  var DAYS = [[0, "Sunday"], [1, "Monday"], [2, "Tuesday"], [3, "Wednesday"], [4, "Thursday"], [5, "Friday"], [6, "Saturday"]];
+  // the fixed lists the TV reads from (widget-web.js FEEDS, LEAGUES, TICKER_NAMES): ids, never links
+  var FEED_OPTS = [["auto", "Best for your country"], ["abc", "ABC News"], ["abc-justin", "ABC News, just in"], ["abc-sport", "ABC Sport"], ["abc-business", "ABC Business"],
+    ["sbs", "SBS News"], ["guardian", "The Guardian Australia"], ["bbc", "BBC World"], ["rnz", "RNZ"]];
+  var LEAGUE_OPTS = [["afl", "AFL"], ["nrl", "NRL"], ["aleague", "A-League"], ["epl", "Premier League"], ["nba", "NBA"], ["bbl", "Big Bash"], ["cricket", "Cricket"]];
+  var TICKER_OPTS = [["^AXJO", "ASX 200"], ["^AORD", "All Ords"], ["AUDUSD=X", "Australian dollar in US dollars"], ["AUDNZD=X", "Australian dollar in NZ dollars"],
+    ["AUDEUR=X", "Australian dollar in euros"], ["AUDGBP=X", "Australian dollar in pounds"], ["AUDJPY=X", "Australian dollar in yen"], ["BTC-AUD", "Bitcoin"], ["ETH-AUD", "Ether"],
+    ["^GSPC", "S&P 500"], ["^IXIC", "Nasdaq"], ["^DJI", "Dow Jones"], ["^FTSE", "FTSE 100"], ["^NZ50", "NZX 50"], ["^N225", "Nikkei"], ["GC=F", "Gold"], ["CL=F", "Oil"]];
+  // the sport apps Up next's game mode looks in (widgets.js SPORT_APPS): any one of them will do
+  var SPORT_APP_PKGS = ["au.com.kayosports.tv", "au.com.foxtel.atv", "au.com.ninenow.ctv", "com.swm.live", "au.com.tenplay", "dazn"];
+
+  var CLOCK_FMT = function () { return st("format", "12 or 24 hour", "choice", "auto", "Follow this TV uses the clock set in Home settings, Look and scenes.", "design", ALL, true,
+    { options: [["auto", "Follow this TV"], ["12h", "12 hour"], ["24h", "24 hour"]] }); };
+  var HEADING = function (help, pre) { return st("label", "Heading", "text", "", help, "design", ALL, pre !== false, { max: 40 }); };
+  var PHOTO = function () { return st("photo", "Photo", "tvlist", "first", "Which of this TV's photos shows here. Add photos in Home settings, Look and scenes, Your photos.", "tv", ON_TV, true, { from: "photos" }); };
+  var IMAGE = function () { return st("image", "Photo in the widget", "image", "", "Or put one photo in the widget itself. It shows on every TV this design goes to.", "design", STUDIO, true); };
+  var HA = { ha: true };
+
+  // before launch (WIDGET-SETTINGS-SPEC.md section 2, the P items)
+  var SETTINGS = {
+    clock: [CLOCK_FMT()], tallclock: [CLOCK_FMT()], glassclock: [CLOCK_FMT()], flipclock: [CLOCK_FMT()],
+    countdown: [
+      st("label", "Name", "text", "", "What you are counting down to, like Ella's birthday.", "design", ALL, true, { max: 40 }),
+      st("day", "Day", "number", 25, "The day of the month.", "design", ALL, true, { min: 1, max: 31, step: 1 }),
+      st("month", "Month", "choice", 12, "", "design", ALL, true, { options: MONTHS }),
+      st("year", "Year", "choice", "every", "Pick a year for a one off day, like a wedding. Every year counts to the same day each year.", "design", ALL, true, { options: YEARS }),
+      st("unit", "Count in", "choice", "sleeps", "", "design", ALL, true, { options: [["sleeps", "Sleeps"], ["days", "Days"], ["weeks", "Weeks"]] })
+    ],
+    weather: [st("place", "Show the town name", "toggle", true, "Turn off to show only the weather.", "design", ALL, true)],
+    bigtemp: [st("place", "Show the town name", "toggle", true, "Turn off to show only the temperature.", "design", ALL, true)],
+    surf: [st("place", "Beach", "place", "", "Where the swell is read. Empty uses this home's town.", "tv", ON_TV, true, { coast: true, "private": true })],
+    photo: [PHOTO(), IMAGE()],
+    artframe: [PHOTO(), IMAGE()],
+    upnext: [st("sport", "Game mode", "choice", "auto", "On shows the last game watched in Kayo, Foxtel, 9Now, 7plus, 10 or DAZN. Automatic turns it on when the home also shows scores.", "design", ALL, true,
+      { options: [["auto", "Automatic"], [true, "On"], [false, "Off"]], needs: { apps: SPORT_APP_PKGS.slice() } })],
+    aircon: [st("entity", "Room", "device", "", "Which aircon shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "climate", needs: HA })],
+    controls: [st("switches", "Lights and switches", "device", [], "Which ones show here. None picked shows every one picked in Smart home. Locks, alarms and garage doors never show.", "tv", ON_TV, true,
+      { domain: ["light", "switch", "fan", "cover"], many: true, max: 16, needs: HA })],
+    camera: [st("cam", "Camera", "device", "", "Which camera shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "camera", needs: HA }),
+      HEADING("Empty shows the camera's own name.")],
+    sensor: [st("reading", "Sensor", "device", "", "Which sensor shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "sensor", needs: HA }),
+      HEADING("Empty shows the sensor's own name.")],
+    doorbell: [HEADING("Empty shows the doorbell's own name.")],
+    energy: [HEADING("Empty shows the name from your smart home.")],
+    list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Home settings, couch-tv Studio, At home.", "tv", ON_TV, true, { from: "lists" }),
+      HEADING("Empty shows the list's own name.")],
+    news: [st("feed", "News source", "choice", "auto", "Where the headlines come from. Best for your country picks ABC News in Australia, BBC World in the UK and RNZ in New Zealand.", "design", ALL, true,
+      { options: FEED_OPTS })],
+    sports: [
+      st("league", "Competition", "choice", "nrl", "Which games show here.", "design", ALL, true, { options: LEAGUE_OPTS }),
+      st("team", "Your team", "team", "", "Your team's game shows first. Pick from the teams in the competition.", "design", ALL, true, { league: "league" })
+    ],
+    stocks: [st("tickers", "Shares and prices", "text", ["^AXJO", "AUDUSD=X", "BTC-AUD"], "Up to six. Pick one here, or type a share's code, like BHP.AX.", "design", ALL, true,
+      { many: true, max: 6, suggest: TICKER_OPTS })],
+    commute: [
+      st("to", "Where to", "place", "", "The town or suburb you drive to. Kept on this TV only.", "tv", ON_TV, true, { "private": true }),
+      st("arrive_h", "Arrive by", "choice", "off", "Couch TV says when to leave to get there by then.", "design", ALL, true, { options: HOURS }),
+      st("arrive_m", "Minutes past the hour", "choice", 0, "", "design", ALL, true, { options: MINUTES, when: { arrive_h: "set" } })
+    ],
+    bins: [
+      st("weekday", "Bin night", "choice", 0, "The night the bins go out.", "design", ALL, true, { options: DAYS }),
+      st("alt", "Taking turns", "toggle", false, "On when the two bins go out on alternate weeks.", "design", ALL, true),
+      st("thisweek", "Which bin goes out this week", "choice", "a", "Pick the one going out this week and Couch TV keeps count from there.", "design", ALL, true,
+        { options: [["a", "First bin"], ["b", "Second bin"]], when: { alt: true }, sets: "anchor" }),
+      st("bin_a", "First bin", "text", "Recycling", "", "design", ALL, true, { max: 20 }),
+      st("bin_b", "Second bin", "text", "Garden", "", "design", ALL, true, { max: 20 })
+    ]
+  };
+  // after launch (the L items in section 2): added to the end of each list, so a screen showing only
+  // `pre` settings keeps its order
+  var TOWN = function (what) { return st("town", "Place", "place", "", "Where " + what + " is for. Empty uses this home's town.", "tv", ON_TV, false, { "private": true }); };
+  var CITY_OPTS = [["Australia/Brisbane", "Brisbane"], ["Australia/Sydney", "Sydney"], ["Australia/Perth", "Perth"], ["Pacific/Auckland", "Auckland"], ["Asia/Tokyo", "Tokyo"],
+    ["Asia/Singapore", "Singapore"], ["Europe/London", "London"], ["Europe/Paris", "Paris"], ["America/New_York", "New York"], ["America/Los_Angeles", "Los Angeles"]];
+  var LIDS = [["#ffd60a", "Yellow"], ["#30d158", "Green"], ["#ff453a", "Red"], ["#0a84ff", "Blue"], ["#8e8e93", "Grey"], ["#1d1b18", "Black"], ["#a2845e", "Brown"], ["#bf5af2", "Purple"]];
+  var LATER = {
+    clock: [st("seconds", "Show seconds", "toggle", false, "", "design", ALL, false)],
+    analog: [st("seconds", "Second hand", "toggle", true, "", "design", ALL, false)],
+    solar: [TOWN("the sun")],
+    worldclock: [st("cities", "Cities", "choice", [], "Up to four. None picked shows this TV's own town and London.", "design", ALL, false, { options: CITY_OPTS, many: true, max: 4 })],
+    date: [
+      st("dfmt", "Date style", "choice", "auto", "", "design", ALL, false,
+        { options: [["auto", "Day and date"], ["short", "Short"], ["numeric", "Numbers only"], ["weekday", "Day of the week"], ["day_month", "Day and month"], ["full", "Day and date in full"]] }),
+      st("place", "Show the town name", "toggle", true, "", "design", ALL, false)
+    ],
+    timer: [st("minutes", "Quick start", "choice", 0, "OK on the widget starts a timer this long.", "design", ALL, false,
+      { options: [[0, "Ask each time"], [5, "5 minutes"], [10, "10 minutes"], [15, "15 minutes"], [20, "20 minutes"], [30, "30 minutes"], [45, "45 minutes"], [60, "1 hour"]] })],
+    weather: [TOWN("the weather")], bigtemp: [TOWN("the temperature")], week: [TOWN("the forecast")],
+    hourly: [TOWN("the forecast"), st("hours", "How many hours", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [4, "4"], [6, "6"], [8, "8"]] })],
+    rain: [TOWN("the rain")], uv: [TOWN("the UV")], sun: [TOWN("sunrise and sunset")],
+    moon: [st("hemi", "Moon seen from", "choice", "auto", "The moon looks the other way up south of the equator.", "tv", ON_TV, false,
+      { options: [["auto", "This home's town"], ["south", "The south"], ["north", "The north"]] })],
+    air: [TOWN("the air quality"), st("scale", "Scale", "choice", "auto", "", "tv", ON_TV, false, { options: [["auto", "Best for your country"], ["eu", "European"], ["us", "American"]] })],
+    surf: [
+      st("units", "Wave height in", "choice", "auto", "", "tv", ON_TV, false, { options: [["auto", "Best for your country"], ["m", "Metres"], ["ft", "Feet"]] }),
+      st("wind", "Wind in", "choice", "auto", "", "tv", ON_TV, false, { options: [["auto", "Best for your country"], ["kmh", "Kilometres an hour"], ["kn", "Knots"]] })
+    ],
+    photo: [st("fit", "Fill or fit", "choice", "cover", "Fit shows the whole photo with a border.", "design", ALL, false, { options: [["cover", "Fill the box"], ["contain", "Fit the whole photo"]] })],
+    slideshow: [st("shuffle", "Shuffle", "toggle", false, "", "design", ALL, false)],
+    mosaic: [st("count", "How many photos", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [3, "3"], [4, "4"], [5, "5"]] })],
+    artframe: [st("mat", "Frame colour", "choice", "#fbf8f1", "", "design", ALL, false,
+      { options: [["#fbf8f1", "Cream"], ["#ffffff", "White"], ["#1d1b18", "Black"], ["#8e8e93", "Grey"]] })],
+    keep: [st("person", "Whose shows", "tvlist", "auto", "Whoever is watching follows the person picked on the home.", "tv", ON_TV, false, { from: "people" })],
+    keeprow: [st("shows", "How many shows", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [2, "2"], [3, "3"], [4, "4"], [5, "5"]] })],
+    upnext: [st("apps", "Only from these apps", "apps", [], "None picked takes shows from any app.", "design", ALL, false)],
+    dock: [st("more", "All apps at the end", "toggle", true, "", "design", ALL, false)],
+    soundscape: [st("volume", "Volume", "number", 50, "", "tv", ON_TV, false, { min: 0, max: 100, step: 10 })],
+    speakers: [st("players", "Speakers", "device", [], "Which speakers show here. None picked shows every one picked in Smart home.", "tv", ON_TV, false,
+      { domain: "media_player", many: true, max: 6, needs: HA })],
+    scenes: [st("scenes", "Scenes", "device", [], "Which scenes show here. None picked shows every one picked in Smart home.", "tv", ON_TV, false,
+      { domain: ["scene", "script"], many: true, max: 10, needs: HA })],
+    agenda: [
+      st("calendars", "Calendars", "tvlist", "all", "Which of this TV's calendars show here.", "tv", ON_TV, false, { from: "calendars" }),
+      st("days", "Days", "choice", "two", "", "design", ALL, false, { options: [["today", "Today"], ["two", "Today and tomorrow"], ["week", "This week"]] })
+    ],
+    bins: [
+      st("lid_a", "First bin's lid", "choice", "#ffd60a", "", "design", ALL, false, { options: LIDS }),
+      st("lid_b", "Second bin's lid", "choice", "#30d158", "", "design", ALL, false, { options: LIDS })
+    ],
+    news: [st("count", "How many headlines", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [1, "1"], [2, "2"], [3, "3"], [4, "4"]] })],
+    sports: [st("games", "Which games", "choice", "all", "", "design", ALL, false, { options: [["all", "Every game"], ["live", "Live games and my team"], ["mine", "Only my team"]] })],
+    stocks: [st("price", "Show the price", "toggle", true, "Off shows only how much it moved.", "design", ALL, false)],
+    commute: [
+      st("buffer", "Minutes to spare", "number", 10, "", "design", ALL, false, { min: 0, max: 60, step: 5 }),
+      st("weekdays", "Weekdays only", "toggle", true, "Off works out the drive for weekends too.", "design", ALL, false),
+      st("from", "Leave from", "place", "", "Empty leaves from this home's town. Kept on this TV only.", "tv", ON_TV, false, { "private": true })
+    ],
+    wifi: [st("hidepass", "Hide the password", "toggle", false, "On shows only the code to scan.", "tv", ON_TV, false)]
+  };
+  Object.keys(LATER).forEach(function (k) { SETTINGS[k] = (SETTINGS[k] || []).concat(LATER[k]); });
+  Object.keys(SETTINGS).forEach(function (k) { if (C[k]) C[k].settings = SETTINGS[k]; });
+
   // A widget couch-tv cannot fill yet always shows the same card on a TV (widgets.js soon()), so its
   // `until` says exactly that, rather than each record wording it its own way
   Object.keys(C).forEach(function (k) {
     if (C[k].status === "not-built") C[k].until = "A card on the widget: \"" + C[k].name + ": not on this TV\" and what it needs. OK on it shows this.";
     // a TV whose couch-tv does not draw designs gets the same one step everywhere
     C[k].setup.steps.none = NOT_HERE.slice();
+    // Roku and Apple TV: works (or set up first, as on a Samsung) for a kind Couch TV draws there, not
+    // possible for the rest, with the honest line
+    Object.keys(NATIVE).forEach(function (p) {
+      var c = C[k], web = c.platforms.Tizen.need, need = c.status === "not-built" || !drawnOn(k, p) ? "no" : web === "computer" || web === "works" ? "works" : web;
+      c.platforms[p] = { on: onOf(need, "native"), need: need,
+        note: need === "no" ? (c.status === "not-built" ? DEFAULT_NOTE.no : NOT_NATIVE) : "Couch TV draws this on your " + NATIVE_NAME[p] + ", opened by the computer at home." };
+    });
   });
 
   // the setup card a TV shows for a widget that has nothing real to show yet: the first line says what
@@ -523,13 +702,17 @@
     var c = C[kind];
     if (!c) return [];
     var g = ["android", "web", "vidaa", "none"].indexOf(platform) >= 0 ? platform : groupOf(platform);
+    // Roku and Apple TV: the kinds Couch TV draws there are set up as on a TV a computer runs
+    if (g === "native") return c.status === "not-built" ? (c.setup.steps.web || c.setup.steps.android).slice() : drawnOn(kind, platform) ? c.setup.steps.web.slice() : [NOT_NATIVE];
     return (c.setup.steps[g] || c.setup.steps.android).slice();
   }
 
   var API = {
     v: 2,
     platforms: PLATFORMS.slice(),
-    groups: { android: ANDROID.slice(), web: WEB.slice(), vidaa: VIDAA.slice() },
+    groups: { android: ANDROID.slice(), web: WEB.slice(), vidaa: VIDAA.slice(), native: Object.keys(NATIVE) },
+    // the kinds Couch TV draws itself on a Roku ("Roku OS") or an Apple TV ("tvOS"); [] elsewhere
+    native: function (platform) { return (NATIVE[platform] || []).slice(); },
     groupOf: groupOf,
     kinds: function () { return Object.keys(C); },
     get: function (kind) { return C[kind] || null; },
