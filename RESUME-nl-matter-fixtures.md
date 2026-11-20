@@ -4,7 +4,15 @@ Task: virtual Matter devices on the MacBook, a contract test that runs against a
 the Matter API, docs/MATTER-TESTING.md, and a "Test kit" section at the bottom of the contract file
 (coord/matter-contract.md, the live copy).
 
-## Status: test kit done and committed (8a8c089, eac44ae, 21 Nov 2026)
+## Status: test kit done and committed (8a8c089, eac44ae, 9621b8a and the last commit, 21 Nov 2026)
+
+Coordinator fixes done: `fx fabrics <name>` answers {name, fabrics} again (no name: {devices: [...]}),
+the harness reads both (fabrics_of); one-run-at-a-time lock (~/matter-fixtures.lock via `fx lock/unlock`,
+harness waits up to --lock-wait 900 s, exit 3 when held, always unlocks, `fx unlock --force` after a dead run);
+tests/matter/fixtures/private-copy.py + docs (One run at a time, or a private copy). Proof:
+tests/test_matter_fixtures.py 10/10 OK; reference run 7 with the lock 261/0/0 (231 s); live second run
+refused with exit 3. fx.py, private-copy.py and reference_server.py are deployed to ~/matter-fixtures.
+A trial private copy sits in ~/mf-copy-check on the MacBook (not started; harmless).
 
 Left: run the harness against nl-matter-bridge once that branch has a final (non WIP) commit.
 How: `git -C <bridge worktree> archive <commit> bridge scripts config.example.json | ssh macbook 'tar -x -C ~/mf-bridge'`

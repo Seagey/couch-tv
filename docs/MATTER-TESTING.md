@@ -116,7 +116,9 @@ python3 tests/matter_contract.py --api ... --fx "ssh macbook ma-fixtures/fx"
 The shared kit uses ports 5541 to 5548 and short discriminators 1 to 8. An 11 digit code carries
 only the short discriminator, and 15 means "no device" to the test, so a copy has 0 and 9 to 14
 left: 7 for 8 devices. By default the copy's alarm reuses 8 (it is only shared, never added by its
-factory code). A second private copy at the same time needs other ports and its own `--nibbles`.
+factory code). Its share code then matches the shared kit's alarm too, so while both run the
+`forbidden` group can, rarely, reach the wrong alarm (the passcode differs, so it only fails, it
+never adds the wrong one). A second private copy at the same time needs other ports and its own `--nibbles`.
 Stop a copy with `ssh macbook ma-fixtures/fx stop` when done.
 
 ## What it checks
@@ -150,6 +152,11 @@ Against the reference server on the MacBook, after a clean restart with `--reset
 list 53, commands 78 (light, plug, thermostat, cover, fan, sensors), live 13, events 3, rename 6,
 forbidden 14, offline 2, remove 31. The reference server is also the worked example of every
 mapping in the contract.
+
+Again after the lock was added (run 7, the only controller on the devices, lock held from start to
+end and gone afterwards, every device back on 1 fabric): **261 passed, 0 failed, 0 warnings, 231 s.**
+A second run started meanwhile with `--lock-wait 0` stopped at once with exit code 3 and the
+message naming the first run, and left its lock alone. `tests/test_matter_fixtures.py`: 10 tests OK.
 
 ```sh
 ssh macbook ~/matter-spike/connectedhomeip/.environment/pigweed-venv/bin/python3 \
