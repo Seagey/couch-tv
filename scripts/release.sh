@@ -17,7 +17,8 @@
 #          that name here or on GitHub, gh signed in, a clean tree (untracked files too), dist built
 #          from this very commit (BUILT-FROM), the 6 line SHA256SUMS.txt, shasum -a 256 -c, and the full
 #          release check with --version (the version inside the APKs, a higher versionCode). Only then
-#          git push, the tag, and the GitHub release with the 6 files and SHA256SUMS.txt.
+#          the tag, one atomic push of main and the tag (both or neither), and the GitHub release with
+#          the 6 files and SHA256SUMS.txt. BUILT-FROM holds the commit and the SHA-256 of SHA256SUMS.txt.
 #
 # Always checked against the key TVs already have (4e): --signer defaults to the couch-tv release
 # certificate below and is always passed; for Seagey/couch-tv no other is accepted. --previous (last
@@ -48,8 +49,15 @@ while [ $# -gt 0 ]; do
 done
 case "$STEP" in build|sums|publish) ;; *) usage ;; esac
 echo "$SIGNER" | grep -Eq '^[0-9a-f]{64}$' || { echo "--signer must be a SHA-256 (64 hex characters)"; exit 2; }
-if [ "$REPO" = Seagey/couch-tv ] && [ "$SIGNER" != "$CERT" ]; then
-  echo "--signer must be couch-tv's own certificate ($CERT) for $REPO: TVs refuse any other"; exit 2
+# L2: couch-tv's own releases take only its own certificate, however REPO is spelt and whatever the
+# remote's name: also when the git remote points at Seagey/couch-tv
+lower() { echo "$1" | tr '[:upper:]' '[:lower:]'; }
+REMOTE_URL=$(git -C "$ROOT" remote get-url "$REMOTE" 2>/dev/null || true)
+OURS=0
+[ "$(lower "$REPO")" = seagey/couch-tv ] && OURS=1
+case "$(lower "$REMOTE_URL")" in *seagey/couch-tv*) OURS=1 ;; esac
+if [ $OURS = 1 ] && [ "$SIGNER" != "$CERT" ]; then
+  echo "--signer must be couch-tv's own certificate ($CERT) for Seagey/couch-tv: TVs refuse any other"; exit 2
 fi
 case "$PREVIOUS" in
   /*) [ -f "$PREVIOUS" ] || { echo "--previous $PREVIOUS: no such file"; exit 2; } ;;
@@ -143,7 +151,12 @@ do_build() {
   echo "$head" > "$DIST/BUILT-FROM"
   echo "BUILD DONE from $head"
   do_sums
+  # the second line ties dist to these very files: a file swapped in later (and sums run again) no
+  # longer matches what this build checked
+  sums_sha >> "$DIST/BUILT-FROM"
 }
+
+sums_sha() { shasum -a 256 "$DIST/SHA256SUMS.txt" | awk '{print $1}'; }
 
 do_publish() {
   [ -n "$VERSION" ] || { echo "publish needs --version, for example --version 0.13.9"; exit 2; }
@@ -152,9 +165,11 @@ do_publish() {
   [ -f "$notes" ] || { echo "$notes is missing"; exit 1; }
   # 4d, M1, M3: every check first, while nothing has left this computer
   [ -z "$(git -C "$ROOT" status --short)" ] || { echo "uncommitted or untracked files: stop"; exit 1; }
-  [ -f "$DIST/BUILT-FROM" ] && [ "$(cat "$DIST/BUILT-FROM")" = "$(git -C "$ROOT" rev-parse HEAD)" ] \
+  [ -f "$DIST/BUILT-FROM" ] && [ "$(sed -n 1p "$DIST/BUILT-FROM")" = "$(git -C "$ROOT" rev-parse HEAD)" ] \
     || { echo "dist was not built from this commit: run build again"; exit 1; }
   sums_ok
+  [ "$(sed -n 2p "$DIST/BUILT-FROM")" = "$(sums_sha)" ] \
+    || { echo "dist holds files that build did not make (SHA256SUMS.txt changed since build): run build again"; exit 1; }
   check
   if git -C "$ROOT" rev-parse -q --verify "refs/tags/$tag" >/dev/null; then echo "tag $tag already exists here: stop"; exit 1; fi
   git -C "$ROOT" fetch -q "$REMOTE" || exit 1
@@ -164,9 +179,9 @@ do_publish() {
   gh auth status >/dev/null 2>&1 || { echo "gh is not signed in (gh auth login): stop before pushing anything"; exit 1; }
   git -C "$ROOT" merge-base --is-ancestor "$REMOTE/main" HEAD || { echo "main moved: stop"; exit 1; }
   echo "=== every check passed; publishing $tag to $REPO"
-  git -C "$ROOT" push "$REMOTE" HEAD:main || exit 1
+  # main and the tag go up together or not at all (--atomic); a refused push takes the local tag back
   git -C "$ROOT" tag -a "$tag" -m "couch-tv $VERSION" || exit 1
-  git -C "$ROOT" push "$REMOTE" "$tag" || exit 1
+  git -C "$ROOT" push --atomic "$REMOTE" HEAD:main "refs/tags/$tag" || { git -C "$ROOT" tag -d "$tag"; exit 1; }
   (cd "$DIST" && gh release create "$tag" --repo "$REPO" --title "couch-tv $VERSION" --notes-file "$notes" --verify-tag \
     $FILES SHA256SUMS.txt) || exit 1
   gh release view "$tag" --repo "$REPO" --json url,assets --jq '.url, (.assets | length)'

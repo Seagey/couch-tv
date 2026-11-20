@@ -34,6 +34,8 @@ case "$3" in
   status) printf "%s" "${FAKE_STATUS:-}" ;;
   rev-parse) if [ "$4" = HEAD ]; then echo "${FAKE_HEAD}"; elif [ -n "${FAKE_LOCAL_TAG:-}" ]; then exit 0; else exit 1; fi ;;
   ls-remote) printf "%s" "${FAKE_REMOTE_TAG:-}" ;;
+  remote) [ -n "${FAKE_REMOTE_URL:-}" ] || exit 2; echo "$FAKE_REMOTE_URL" ;;
+  push) exit "${FAKE_PUSH_RC:-0}" ;;
 esac
 exit 0
 """
@@ -106,8 +108,12 @@ class ReleaseScript(unittest.TestCase):
         p = subprocess.run(["bash", str(self.r / "scripts/release.sh"), *args], capture_output=True, text=True, env=e, timeout=30)
         return p.returncode, p.stdout + p.stderr
 
-    def log(self):
+    def raw_log(self):
         return self.calls.read_text().splitlines() if self.calls.exists() else []
+
+    def log(self):
+        """Every call but the read of the remote's address, which each run makes for the L2 pin."""
+        return [l for l in self.raw_log() if " remote get-url " not in l]
 
     def sums(self):
         return (self.dist / "SHA256SUMS.txt").read_text().splitlines()
@@ -115,7 +121,8 @@ class ReleaseScript(unittest.TestCase):
     def built(self, head=HEAD):
         """sums as build leaves them: SHA256SUMS.txt and BUILT-FROM, then a fresh call log."""
         self.assertEqual(self.run_step("sums", "--previous", str(self.prev))[0], 0)
-        (self.dist / "BUILT-FROM").write_text(head + "\n")
+        sha = hashlib.sha256((self.dist / "SHA256SUMS.txt").read_bytes()).hexdigest()
+        (self.dist / "BUILT-FROM").write_text(f"{head}\n{sha}\n")
         self.calls.unlink()
 
     # --- arguments (4e, 4f, L1, L2)
@@ -155,6 +162,29 @@ class ReleaseScript(unittest.TestCase):
         rc, out = self.run_step("sums", "--previous", str(self.prev), "--signer", "a" * 64, REPO="Seagey/couch-tv")
         self.assertEqual(rc, 2, out)
         self.assertEqual(self.log(), [])
+
+    def test_the_pin_holds_however_repo_is_spelt(self):
+        for repo in ("seagey/couch-tv", "SEAGEY/COUCH-TV", "Seagey/Couch-TV"):
+            rc, out = self.run_step("sums", "--previous", str(self.prev), "--signer", "a" * 64, REPO=repo)
+            self.assertEqual(rc, 2, f"{repo}: {out}")
+        self.assertEqual(self.raw_log(), [f"git -C {self.r} remote get-url origin"] * 3)
+
+    def test_the_pin_holds_when_the_remote_is_couch_tv(self):
+        # REPO says a fork, but the git remote is couch-tv's own: still only couch-tv's certificate
+        for url in ("ssh://github.com/Seagey/couch-tv.git", "https://github.com/seagey/COUCH-TV"):
+            rc, out = self.run_step("sums", "--previous", str(self.prev), "--signer", "a" * 64,
+                                    REPO="someone/couch-tv", FAKE_REMOTE_URL=url)
+            self.assertEqual(rc, 2, f"{url}: {out}")
+        self.assertFalse(any(l.startswith("check ") for l in self.log()))
+        # the remote named by REMOTE is the one looked at
+        rc, out = self.run_step("sums", "--previous", str(self.prev), "--signer", "a" * 64,
+                                REPO="someone/couch-tv", REMOTE="upstream", FAKE_REMOTE_URL="https://github.com/Seagey/couch-tv")
+        self.assertEqual(rc, 2, out)
+        self.assertIn(f"git -C {self.r} remote get-url upstream", self.raw_log())
+        # a fork's own remote: its own signer is fine
+        rc, out = self.run_step("sums", "--previous", str(self.prev), "--signer", "a" * 64,
+                                REPO="someone/couch-tv", FAKE_REMOTE_URL="https://github.com/someone/couch-tv")
+        self.assertEqual(rc, 0, out)
 
     def test_a_fork_passes_its_own_signer(self):
         other = "a" * 64
@@ -198,7 +228,8 @@ class ReleaseScript(unittest.TestCase):
         (self.dist / "BUILT-FROM").write_text("an older commit\n")
         rc, out = self.build(GRADLE_LOCK=str(self.lock))
         self.assertEqual(rc, 0, out)
-        self.assertEqual((self.dist / "BUILT-FROM").read_text().strip(), HEAD)
+        sha = hashlib.sha256((self.dist / "SHA256SUMS.txt").read_bytes()).hexdigest()
+        self.assertEqual((self.dist / "BUILT-FROM").read_text().splitlines(), [HEAD, sha])
         self.assertEqual([l.split()[1] for l in self.sums()], FILES)
         self.assertEqual((self.dist / "couch-tv-ontv-watch.apk").read_text().strip(), f"{self.r}/on-tv/android watch")
         log = self.log()
@@ -262,12 +293,45 @@ class ReleaseScript(unittest.TestCase):
         auth = next(i for i, l in enumerate(log) if l == "gh auth status")
         self.assertLess(max(check, local_tag, remote_tag, auth), first_push)
         self.assertEqual(log[check], f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev} --version 9.9.9")
-        self.assertTrue(any(l.startswith("git -C") and "push origin HEAD:main" in l for l in log))
-        self.assertTrue(any("tag -a v9.9.9" in l for l in log))
+        # the tag first, then ONE atomic push of main and the tag, then the GitHub release
+        tag = next(i for i, l in enumerate(log) if "tag -a v9.9.9 -m couch-tv 9.9.9" in l)
+        pushes = [l for l in log if " push " in l]
+        self.assertEqual(pushes, [f"git -C {self.r} push --atomic origin HEAD:main refs/tags/v9.9.9"])
+        create_i = next(i for i, l in enumerate(log) if l.startswith("gh release create v9.9.9"))
+        self.assertLess(tag, first_push)
+        self.assertLess(first_push, create_i)
         create = [l for l in log if l.startswith("gh release create v9.9.9")]
         self.assertEqual(len(create), 1)
         self.assertTrue(create[0].endswith(" ".join(FILES) + " SHA256SUMS.txt"), create[0])
         self.assertNotIn("stray.apk", create[0])
+        self.assertFalse(any("tag -d" in l for l in log))
+
+    def test_a_refused_push_leaves_no_tag_and_no_release(self):
+        self.built()
+        rc, out = self.publish(FAKE_PUSH_RC="1")
+        self.assertEqual(rc, 1, out)
+        log = self.log()
+        push = next(i for i, l in enumerate(log) if " push --atomic " in l)
+        self.assertEqual(log[push + 1], f"git -C {self.r} tag -d v9.9.9")
+        self.assertFalse(any(l.startswith("gh release create") for l in log))
+        self.assertEqual(sum(1 for l in log if " push " in l), 1)
+
+    def test_files_swapped_in_after_build_stop_publish(self):
+        # item 3: build checked these files; one swapped in later and sums run again matches the
+        # commit and SHA256SUMS.txt, but not the sums build recorded in BUILT-FROM
+        self.built()
+        (self.dist / "couch-tv-ontv.apk").write_bytes(b"another on-TV APK")
+        self.assertEqual(self.run_step("sums", "--previous", str(self.prev))[0], 0)
+        self.calls.unlink()
+        rc, out = self.publish()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("SHA256SUMS.txt changed since build", out)
+        self.assertEqual(self.pushes(), [])
+        # a BUILT-FROM with only the commit (no sums line) stops too
+        (self.dist / "BUILT-FROM").write_text(HEAD + "\n")
+        rc, out = self.publish()
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(self.pushes(), [])
 
     def test_publish_stops_on_a_badly_formed_version(self):
         self.built()

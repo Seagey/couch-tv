@@ -38,21 +38,31 @@ strip-intel.py, fakes/ and their .log).
   not verify is a listed error, not a traceback. L6 on-TV per processor unpacked limits = the
   UpdateRules.kt figures (the test reads them from the Kotlin source).
 
+## Last three (checker GO on 04c33ce), each with tests and mutants
+- 1 No partial release: the tag is made first, then ONE `git push --atomic <remote> HEAD:main refs/tags/vX`
+  (main and the tag both or neither); a refused push deletes the local tag (`git tag -d`) and stops
+  before gh release create.
+- 2 The certificate pin: REPO compared case-insensitively with seagey/couch-tv, and also applied when
+  `git remote get-url $REMOTE` contains seagey/couch-tv (any case).
+- 3 BUILT-FROM line 2 = SHA-256 of SHA256SUMS.txt after build's own sums; publish compares it, so a file
+  swapped in after build (and sums run again) stops publish (exit 1).
+
 ## Test counts (21 Nov, after the last change)
 - python3 -I tests/test_release_apks.py: 29 tests OK (1 skipped: RealBuild). With
   COUCHTV_RELEASE_DIST=<scratchpad>/mp/dist, COUCHTV_RELEASE_ARGS of --release --matter --signer 5b5ef392...2116
   --version 0.13.9 --previous '<abs>/wt-release-0138/dist/couch-tv-ontv.apk' (quoted: shlex) and
   ANDROID_HOME=~/Library/Android/sdk: 29/29 OK. With --version 0.13.10 RealBuild fails, as it must.
-- python3 -I tests/test_release_script.py: 29 tests OK (stand-in check, gradlew, Samsung build, git, gh:
+- python3 -I tests/test_release_script.py: 33 tests OK (stand-in check, gradlew, Samsung build, git, gh:
   nothing leaves).
 - bash <scratchpad>/mp-fix/neg.sh (real APKs): 9 passed, 0 failed.
-- bash <scratchpad>/mp-fix/rr.sh (release.sh on real APKs, real check, fake git/gh): 16 passed, 0 failed
-  (good build: 6 lines, shasum -c, publish reaches push after every check; publish as 0.13.10 exit 5;
-  --previous with the same versionCode exit 5; BUILT-FROM of another commit exit 1; wt-release-0139/dist
-  without Matter exit 5; swapped on-TV files exit 5; relative --previous exit 2; 0 pushes on every stop).
+- bash <scratchpad>/mp-fix/rr.sh (release.sh on real APKs, real check, fake git/gh): 18 passed, 0 failed
+  (good build: 6 lines, shasum -c, then tag, one atomic push, gh release create; publish as 0.13.10 exit 5;
+  --previous with the same versionCode exit 5; BUILT-FROM of another commit exit 1; the 0.13.8 on-TV APK
+  swapped in after build exit 1; wt-release-0139/dist without Matter: sums exit 5, publish exit 1;
+  swapped on-TV files exit 5; relative --previous exit 2; 0 pushes on every stop).
 - bash <scratchpad>/mp-fix/rc.sh: release-checksums.sh 6 lines, check ok, shasum -c 6 OK.
 - python3 -I <scratchpad>/mp-fix/mut.py <worktree>: 14/14 mutants killed (check script).
-- python3 -I <scratchpad>/mp-fix/mut-release.py <worktree>: 21/21 mutants killed (release.sh).
+- python3 -I <scratchpad>/mp-fix/mut-release.py <worktree>: 29/29 mutants killed (release.sh).
 - bash <scratchpad>/mp-fix/unit.sh (gradle lock, clean testDebugUnitTest, on-tv): UpdateRulesTest 13/13,
   all 125 tests, 0 failures, 0 errors.
 
