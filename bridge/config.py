@@ -652,7 +652,10 @@ CUSTOM_CARDS = custom_cards.source((CONFIG.get("home") or {}).get("custom_cards"
                                    os.path.dirname(os.path.abspath(CONFIG_FILE)))
 
 # ---------- quick settings (per TV) and picture modes ----------
-QUICK_IDS = ["sleep", "picture", "look", "soundscape", "screen_off", "input", "screensaver", "headphones", "tvsettings", "extend"]
+# Every button the TV home offers (QUICK_ALL in tv-home/web/app.js): an id missing here is dropped from
+# the bridge's copy of Home settings, and the TV takes that copy back, so the button vanished (g31).
+QUICK_IDS = ["sleep", "picture", "look", "soundscape", "screen_off", "input", "screensaver", "headphones", "tvsettings", "extend",
+             "bluetooth", "network"]
 
 
 def quick_for(tv_cfg):
