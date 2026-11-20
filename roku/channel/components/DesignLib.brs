@@ -470,6 +470,9 @@ function dlSanWOpts(raw as Dynamic) as Object
     dlPut(out, "place", dlBool(src.place))
     dlPut(out, "hilo", dlBool(src.hilo))
     dlPut(out, "shows", dlNum(src.shows, 1, 5, true))
+    ' a photo inside the design, for a widget on its own or an item in a smart stack: only a JPEG (or PNG),
+    ' a built in picture, or kept:N (a design this channel kept files its photos; kept:N names no other file)
+    dlPut(out, "image", dlImgOk(src.image, true))
     if dlIsList(src.apps)
         apps = []
         for each p in src.apps
@@ -548,8 +551,6 @@ function dlSanObject(raw as Dynamic) as Dynamic
         if not dlSanWidget(src, out, false) then return invalid
         if out.w = invalid then out.w = 360
         if out.h = invalid then out.h = 360
-        ' a photo inside the design: only a JPEG (or PNG) or a built in picture
-        dlPut(out.opts, "image", dlImgOk(dlAA(src.opts).image, true))
     end if
     return out
 end function

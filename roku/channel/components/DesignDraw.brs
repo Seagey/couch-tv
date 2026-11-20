@@ -404,13 +404,14 @@ function designKeep(d as Object) as Boolean
         name = designKeepFile(bg.image, 0)
         if name = "" then bg.delete("image") else bg.image = name
     end if
-    i = 0
+    ' a widget's own photo, and the photo of each item in a smart stack, each a file of its own (1 to 99)
+    n = 0
     for each o in dlList(d.objects)
-        i = i + 1
-        if dlIsAA(o) and dlIsAA(o.opts) and dlIsStr(o.opts.image) and Left(o.opts.image, 5) = "data:"
-            name = ""
-            if i < 40 then name = designKeepFile(o.opts.image, i)
-            if name = "" then o.opts.delete("image") else o.opts.image = name
+        if dlIsAA(o)
+            n = designKeepPhoto(o, n)
+            for each it in dlList(o.items)
+                if dlIsAA(it) then n = designKeepPhoto(it, n)
+            end for
         end if
     end for
     text = FormatJson(d)
@@ -419,6 +420,17 @@ function designKeep(d as Object) as Boolean
     m.reg.delete("ok")
     m.reg.delete("off")
     return m.reg.flush()
+end function
+
+' files o.opts.image when it is a picture inside the design (n photos filed so far); a photo that cannot
+' be filed is left out, so the design is never kept with it inline
+function designKeepPhoto(o as Object, n as Integer) as Integer
+    if not dlIsAA(o.opts) or not dlIsStr(o.opts.image) or Left(o.opts.image, 5) <> "data:" then return n
+    n = n + 1
+    name = ""
+    if n < 100 then name = designKeepFile(o.opts.image, n)
+    if name = "" then o.opts.delete("image") else o.opts.image = name
+    return n
 end function
 
 function designKeepFile(u as String, n as Integer) as String

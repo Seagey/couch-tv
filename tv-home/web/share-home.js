@@ -19,6 +19,16 @@
 
   function obj(v) { return v && typeof v === "object" && !Array.isArray(v) ? v : {}; }
   function copy(v) { return JSON.parse(JSON.stringify(v)); }
+  // a photo put in a Photo or Art frame widget (or a smart stack's) is the household's own too: it stays
+  // on the TV, and the shared widget shows the photos added on the other TV
+  function ownWidgetPhotos(d) {
+    (Array.isArray(d.objects) ? d.objects : []).forEach(function (o) {
+      [o].concat(o && Array.isArray(o.items) ? o.items : []).forEach(function (w) {
+        var op = w && w.opts;
+        if (op && typeof op === "object" && op.image !== undefined && !(typeof op.image === "string" && BUILT_IN_BG.test(op.image))) delete op.image;
+      });
+    });
+  }
 
   // snap: what app.js knows about the home now (homeSnapshot): {
   //   scenes: [ids], builtIn: [ids of the app's own scenes], scene_seconds, clock24, clock_style,
@@ -42,6 +52,7 @@
       if (d.background && !Object.keys(bg).length) delete d.background;
       // smart home controls name this house's own devices
       (Array.isArray(d.objects) ? d.objects : []).forEach(function (o) { if (o && typeof o === "object") { delete o.entity; delete o.entities; } });
+      ownWidgetPhotos(d);
     } else {
       var home = {};
       var built = Array.isArray(snap.builtIn) ? snap.builtIn : [];
@@ -99,6 +110,7 @@
     if (bg.depth_image !== undefined && !(bg.image && typeof bg.depth_image === "string" && BUILT_IN_BG.test(bg.depth_image))) delete bg.depth_image;
     if (bg.video !== undefined && !(bg.image && typeof bg.video === "string" && BUILT_IN_VID.test(bg.video))) delete bg.video;
     if (d.background && !Object.keys(bg).length) delete d.background;
+    ownWidgetPhotos(d);
     var keys = Object.keys(d).filter(function (k) { return k !== "v"; });
     if (!keys.length) return { error: "There is nothing on this home to share yet." };
     var hits = privateHits(d, secrets);
