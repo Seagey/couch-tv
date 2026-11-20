@@ -114,8 +114,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 if (a) o.put("tv_connected", true).put("adb", Adb.connected)
                 return json(200, o)
             }
-            // Pairing: 15 wrong codes in 10 minutes from one address lock both for that address, 60 from all for
-            // everyone, for 10 minutes (Auth, PairLock). A new code
+            // Pairing (Auth, PairLock): 5 different wrong codes in 10 minutes from one address make that address
+            // wait (429), and 15 in 10 minutes from all addresses lock both for everyone for 10 minutes. A new code
             // only when none is live with time left (Auth.pinForQr), so asking again never swaps the
             // code a QR on the TV or someone typing is using.
             "/api/pair/start" -> {

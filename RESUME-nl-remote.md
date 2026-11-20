@@ -57,6 +57,15 @@ also refuses private 192.168 addresses in any file: tests use 192.0.2.x.
   New phone-words line "Pairing…". tests/test_shim_words_browser.mjs.
 - de tw_escaped, tw_add_list_in and tw_screen_old say "Startbildschirm-Einstellungen".
 
+## Round 3 (GO at 04e294b, three small fixes)
+- bridge/server.py: a caller with no address (ip None, as nl-phonepage calls check_pair_lock()/pair_wrong())
+  counts only toward the 15 for everyone, never a shared "" address; pair_locked_for applies the per address
+  wait only when ip is given. Test test_tries_with_no_address_lock_nobody_and_count_toward_fifteen.
+  tests/test_pair_lock_bridge.py: 12 OK.
+- Server.kt pairing comment: 5 per address in 10 min, 15 for everyone.
+- Clock options read as a format in every language (de 12-Stunden-Format, pl 12-godzinny, ar نظام 12 ساعة, ...).
+  test_phone_words.mjs 25 checks; caps-words-todo 0 of 158 left; wording leftovers 139; tv words cover 9.
+
 ## Round 2 test counts, 21 Nov (the round 2 commit)
 - gradle on-tv `testDebugUnitTest --rerun` (scratchpad nlr-gradle.sh, gradle lock): 173 tests, 0 failures,
   1 skipped (PairLockTest 13, SetupWordsTest 15).

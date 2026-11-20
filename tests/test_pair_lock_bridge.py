@@ -47,6 +47,21 @@ class PairLockRules(unittest.TestCase):
         self.assertEqual(server.pair_locked_for(1005.0, ip="192.0.2.6"), 0)
         self.assertEqual(server.pair_locked_for(1600.0, ip="192.0.2.5"), 0)
 
+    # coordinator 21 Nov, at merge: callers that pass no address (nl-phonepage's check_pair_lock()/pair_wrong())
+    # never share one "" address, so they never lock anyone alone; they still count toward the 15
+    def test_tries_with_no_address_lock_nobody_and_count_toward_fifteen(self):
+        for i in range(5):
+            self.assertFalse(server.pair_wrong(1000.0 + i))
+        self.assertEqual(server.pair_locked_for(1005.0), 0)
+        self.assertEqual(server.pair_locked_for(1005.0, ip="192.0.2.5"), 0)
+        self.assertEqual(len(server._pair_all.tries), 5)
+        self.assertEqual(len(server._pair_by_address), 0)
+        for i in range(9):
+            server.pair_wrong(1006.0 + i)
+        self.assertTrue(server.pair_wrong(1015.0))      # the 15th, no address at all: locks everyone
+        self.assertGreater(server.pair_locked_for(1015.0), 590)
+        self.assertGreater(server.pair_locked_for(1015.0, ip="192.0.2.5"), 590)
+
     # coordinator 21 Nov (1): the same wrong code again from one address is not a new try
     def test_the_same_wrong_code_six_times_counts_once(self):
         for _ in range(6):

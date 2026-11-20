@@ -394,9 +394,10 @@ def _address_tries(k, now):
 
 
 def pair_locked_for(now=None, ip=None):
-    """Seconds pairing stays locked for this caller (0: open): its own wait or the lock for everyone."""
+    """Seconds pairing stays locked for this caller (0: open): its own wait or the lock for everyone. With no
+    address (ip None: the computer itself, or a caller that passes none) only the lock for everyone applies."""
     now = time.monotonic() if now is None else now
-    mine = _address_tries(pair_address_key(ip), now)
+    mine = _address_tries(pair_address_key(ip), now) if ip is not None else []
     wait = 0
     if len(mine) >= PAIR_ADDRESS_MAX:
         wait = max(1, int(-(-(mine[0][0] + PAIR_LOCK_WINDOW - now) // 1)))
@@ -407,6 +408,8 @@ def pair_wrong(now=None, ip=None, guess=None):
     """Counts one wrong pairing try from this caller (the same wrong guess again from it is not counted);
     True when it has just locked pairing for everyone."""
     now = time.monotonic() if now is None else now
+    if ip is None:   # no address: counts only toward the lock for everyone, never a shared "" address
+        return _pair_all.wrong(now)
     k = pair_address_key(ip)
     mine = _address_tries(k, now)
     if guess is not None and any(g == guess for _, g in mine):
