@@ -17,18 +17,26 @@ Last review: coord/fable-1121-ws2-smarthome-partial.md (NO-GO, partial). Every f
   9. Sensor heading test types "Tank" and checks "Rain gauge" is gone; the phone now changes energy and doorbell headings and the aircon room (checked on the TV).
   10. "Leaving" is tested for all 11 kinds (TV list and phone).
 - Words: controls help and steps say locks, alarms, garage doors and gates never show on Couch TV; scenes help says the same and that a script does what it was built to do.
+- Re-check fixes (coord message 21 Nov, NO-GO at e969815), all done:
+  1. One token-aware house test in every copy (bridge/smarthome.py OPENS_HOUSE, HaReadings.kt OPENS_HOUSE which HomeAssistant.kt uses, home-config.py with ^$, smarthome.js and widgets.js as a lookbehind-free opensHouse() function): garage, gate (not gateway), door (not doorbell, not after in/out), lock (not clock or block), alarm, disarm. tests/fixtures/opens_house_ids.json: 52 refuse, 32 pass (Fable's 51 and the haqr checker's 49, doorbell_relay now passes); tests/test_opens_house.js runs it on the two JS copies, the bridge and home-config.py (343 checks); HomeAssistantTest, test_smarthome_bridge.py, test_ha_widgets_config.py and test_ws2_smarthome.mjs run it too.
+  2. Home Assistant's friendly name: domain + "." + slug(name) goes through the same test: pickable skips it, control() sets blocked for cover/switch, the scene action reads the state (scripts too) and refuses. Names in other languages are not caught.
+  3. A scene whose blind or switch cannot be read runs nothing ("failed"); members' names count too.
+  4. Smart home, Lights and Scenes groups: an info row says what is left out (English: this screen has no other language block on this branch).
+  5. pickable: binary_sensor door, garage_door, lock, opening, window never listed; a sensor with no unit whose "switch." + id fails the test never listed; doorbells stay.
+  6. "group." members make a scene refused.
+  7. control() sets blocked before the not-answering return; a blocked one is remembered, so "set" refuses it; the bridge's info() drops it. (Android info() lives in nl-haqr's moved file: add the same filter there at merge, see below; the page already drops it, smarthome.js OPENERS.)
+  9. test_widget_detail_browser counts one check on every path. 10. widget-detail.js comment indent.
 
 ## Merge notes
-- nl-haqr: trial merge (git merge-tree HEAD nl-haqr) is clean for every code and test file; HomeAssistant.kt, HaReadings.kt and HomeAssistantTest.kt follow the rename to tv-home/android/shared (the OPENS_HOUSE lines, the two HomeAssistantTest lines and home-config.py are byte for byte nl-haqr's). Only docs/CONFIG.md conflicts (the scenes and controls rows of the table): take this branch's two rows (a garage door "never shows", not "is shown but never switched"), keep nl-haqr's paragraph.
-- After the nl-haqr merge: add "self.unit = None" to keep_sign_in and keep_picks in bridge/smarthome.py (they clear limits there).
-- Other branches: see the Fable review's merge notes (widget-caps.js, app.js wsOptions, nl-remote English lines).
+- nl-haqr (trial merge in a scratch worktree, then removed): conflicts in bridge/smarthome.py, tv-home/tools/home-config.py, HomeAssistant.kt (the OPENS_HOUSE lines: take this branch's; keep nl-haqr's REFUSED_WAIT line), tests/test_ha_widgets_config.py (keep both sides), docs/CONFIG.md (take this branch's two table rows, nl-haqr's paragraph). Resolved that way (scratchpad/ws2sh-resolve.py), everything passed: Android tv-home app.couchtv.ha HomeAssistantTest 22, HaReadingsTest 15, HaSignInTest 11, HaPhoneTest 5, HaRealTest 1 skipped; on-tv unit tests all passed; pytest smarthome_bridge + ha_widgets_config + ha_phone_bridge 32; test_opens_house.js 343.
+- After the nl-haqr merge: add "self.unit = None" to keep_sign_in and keep_picks in bridge/smarthome.py; in HomeAssistant.kt info(ctx) use names(s.controls.filter { readControls[it.entity] != true }).
+- Other branches: see the Fable review's merge notes (widget-caps.js, app.js wsOptions, nl-remote English lines; the new Smart home row is English only).
 
-## Tests (all green, 21 Nov, at 20f7792 plus this notes commit)
-- node: test_ws_schema.js 3760, test_widget_caps.js 4548, test_ha_token_never_leaves.js 28, test_design_widgets.js 221, test_design_sections.js passed.
-- pytest tests/test_smarthome_bridge.py tests/test_ha_widgets_config.py: 15 passed.
-- Android (scratchpad/ws2sh-gradle.sh, gradle lock): HomeAssistantTest 18 (6 new), HaReadingsTest 15, BUILD SUCCESSFUL.
-- Trial merge with nl-haqr 5964f11 in a scratch worktree (removed after): tv-home app.couchtv.ha HomeAssistantTest 18, HaReadingsTest 15, HaSignInTest 11, HaPhoneTest 5, HaRealTest 1 skipped; on-tv testDebugUnitTest all passed; pytest smarthome_bridge + ha_widgets_config + ha_phone_bridge 27 passed. nl-haqr since moved to a0d4474 (no change to HomeAssistant.kt, HaReadings.kt or smarthome.py); merge-tree still conflicts only in docs/CONFIG.md.
-- Browser (scratchpad/smarthome-run.sh under browser.lock, logs scratchpad/smarthome-results/): test_ws2_smarthome 236, test_smart_widgets_browser 56, test_widget_detail_browser 296, test_widget_fit_all 8 (1640 boxes, 0 problems), test_design_settings_browser 107, test_phone_settings_browser 129, test_integrations_browser 34, test_ws_tv 1115.
+## Tests (all green, 21 Nov, at ca013e4 and the final commit)
+- node: test_opens_house.js 343, test_ws_schema.js 3760, test_widget_caps.js 4548, test_ha_token_never_leaves.js 28, test_design_widgets.js 221, test_design_sections.js passed.
+- pytest tests/test_smarthome_bridge.py tests/test_ha_widgets_config.py: 20 passed.
+- Android (scratchpad/ws2sh-gradle.sh, gradle lock): HomeAssistantTest 22, HaReadingsTest 15.
+- Browser (scratchpad/smarthome-run.sh under browser.lock, logs scratchpad/smarthome-results/): test_ws2_smarthome 238, test_smart_widgets_browser 56, test_widget_detail_browser 296, test_widget_fit_all 8 (1640 boxes, 0 problems), test_design_settings_browser 107, test_phone_settings_browser 129, test_integrations_browser 34, test_ws_tv 1115.
 - In browser tests press Back slowly: five Back presses within 4 s switch a design off (design.js escapeDesign).
 
 ## Left
