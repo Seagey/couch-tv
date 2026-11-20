@@ -54,7 +54,8 @@ Read first: coord/nolater-common.md and coord/matter-contract.md (changes 1 to 1
 - SIGTERM to the bridge (what `launchctl bootout` sends): the Matter service ended, pid file removed.
 
 - Harness 09be187 (343 checks) against the working tree before the busy/reason commit: 342 passed,
-  1 failed (thermostat hvac_action, fixed after). The final run is in the report and the commit after.
+  1 failed (thermostat hvac_action, fixed after). Final: 6b5d5ca on ~/mf-bridge with the committed 09be187 harness:
+  **343 passed, 0 failed, 0 warnings, 343 checks, 257 s** (busy in 0.0 s, HTTP 400; already with a reason).
 - After the checker round, a217c13 on ~/mf-bridge with the committed harness (nl-matter-fixtures
   6b82489, with the fixtures lock): **261 passed, 0 failed, 0 warnings, 261 checks, 248 s**; all eight
   fixtures back to 1 fabric, lock released, bridge stopped.
