@@ -32,6 +32,7 @@ const MD = [
 ];
 const phoneAsked = [];
 let notReady = "";   // a reason key (bridge/matter.py): the phone page says it in its own words
+let nextReply = null;   // one answer the test sets for the next call to that path (a controller's reason key)
 let unsupported = false;   // the on-TV app on a TV that cannot add Matter devices (nl-matter-android ae3e6c1)
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".ttf": "font/ttf" };
 const server = http.createServer((req, res) => {
@@ -41,6 +42,7 @@ const server = http.createServer((req, res) => {
     let b = ""; req.on("data", (d) => (b += d)); req.on("end", () => {
       const body = b ? JSON.parse(b) : null;
       if (url.indexOf("/api/matter/") === 0) phoneAsked.push(url + " " + (b || ""));
+      if (nextReply && url === nextReply.url) { const r = nextReply; nextReply = null; return json(r.code, r.body); }
       if (url === "/api/matter/devices") return json(200, notReady ? { devices: [], ready: false, reason: notReady, note: "Node.js 18 or newer is needed (found 16)." } : { devices: MD, ready: true });
       if (url === "/api/matter/commission") {
         if (unsupported) return json(400, { ok: false, error: "unsupported", note: "This TV cannot run the Matter controller." });
@@ -324,6 +326,27 @@ console.log("Running Matter UI browser tests...");
   await page.fill("#matter-code", "3497-011-2332"); await page.click("#matter-add"); await page.waitForTimeout(600);
   ok(/This TV can't add Matter devices/.test(await msg()), "a commission the TV cannot do: " + await msg());
   unsupported = false;
+  // contract change 14: every reason key, as the controllers send it, worded on the phone (never the raw note)
+  const en = (k) => page.evaluate((key) => window.CouchMatterWords.en(key), k);
+  for (const k of ["off", "not_installed", "node_missing", "node_old", "starting", "stopped", "android_old", "processor", "not_started", "busy"]) {
+    notReady = k;
+    await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 });
+    ok(await page.evaluate(() => document.getElementById("matter-note").textContent) === await en("why_" + k), "phone, not ready, reason " + k);
+  }
+  notReady = "";
+  await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none" && /Hallway/.test(document.getElementById("matter-list").textContent), null, { timeout: 8000 });
+  const cases = [["blocked", "commission", "not_allowed"], ["unsupported", "commission", "not_allowed"], ["address", "commission", "unreachable"], ["port", "commission", "unreachable"],
+    ["link_local", "commission", "unreachable"], ["busy", "commission", "failed"], ["processor", "commission", "unsupported"], ["android_old", "commission", "unsupported"],
+    ["starting", "commission", "unreachable"], ["opens_house", "rename", "refused"], ["offline", "remove", ""], ["not_answering", "remove", ""]];
+  for (const [k, what, err] of cases) {
+    nextReply = { url: "/api/matter/" + what, code: err ? 400 : 200, body: err ? { ok: false, error: err, reason: k, note: "Raw English note." } : { ok: true, removed: ["matter:5:1"], reason: k, note: "Raw English note." } };
+    if (what === "commission") { await page.fill("#matter-code", "3497-011-2332"); await page.click("#matter-add"); }
+    else { answer = "Garden lamp"; await page.click('#matter-list li[data-id="matter:5:1"] button[data-mt="' + what + '"]'); }
+    await page.waitForTimeout(600);
+    const m = await msg(), w = await en("why_" + k);
+    ok(m.indexOf(w) >= 0 && !/Raw English note/.test(m), "phone, " + what + " " + (err || "ok") + ", reason " + k + ": " + m);
+  }
+  nextReply = null;
   ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
   await page.close();
 }

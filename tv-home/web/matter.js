@@ -319,11 +319,11 @@
     if (!d) return Promise.resolve({ ok: false, error: "refused" });
     return call("POST", "/api/matter/remove", { id: d.id }, ANSWER_MS).then(function (r) {
       r = unwrap(r);
-      if (r.ok === false) return { ok: false, error: r.error || "failed" };
+      if (r.ok === false) return { ok: false, error: r.error || "failed", reason: why(r.reason) };
       MT.at = 0;
       // a device that did not answer is forgotten anyway; its home app may still list the TV
       var quiet = typeof r.note === "string" && r.note !== "";
-      return refresh().then(function () { return { ok: true, unanswered: quiet }; });
+      return refresh().then(function () { return { ok: true, unanswered: quiet, reason: why(r.reason) }; });
     }, failed);
   }
   function rename(entity, name) {
@@ -335,7 +335,7 @@
     if (d.domain !== "climate" && d.domain !== "sensor" && HIDES.test(name)) return Promise.resolve({ ok: false, error: "name_hides" });
     return call("POST", "/api/matter/rename", { id: d.id, name: name }, ANSWER_MS).then(function (r) {
       r = unwrap(r);
-      if (r.ok === false) return { ok: false, error: r.error || "failed" };
+      if (r.ok === false) return { ok: false, error: r.error || "failed", reason: why(r.reason) };
       MT.at = 0;
       return refresh().then(function () { return { ok: true }; });
     }, failed);

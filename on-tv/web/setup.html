@@ -818,8 +818,10 @@
   // every line in the TV's language: mw(key) reads tv-home/web/matter-words.js (the TV uses the same table)
   function mw(key, vars) { var W = window.CouchMatterWords; return W ? W.t(key, vars) : key; }
   var MT_ERR = { short: 1, typo: 1, code: 1, expired: 1, wrong_code: 1, unreachable: 1, thread: 1, already: 1, not_allowed: 1, unavailable: 1, name_hides: 1, refused: 1, unsupported: 1, failed: 1 };
-  // why Matter is not ready (a reason key from the controller)
-  var MT_WHY = { off: 1, not_installed: 1, node_missing: 1, node_old: 1, starting: 1, stopped: 1, android_old: 1, processor: 1 };
+  // a controller's reason key (contract change 14): why Matter is not ready, or why a device was not
+  // added, moved, renamed or fully removed; worded before the error key
+  var MT_WHY = { off: 1, not_installed: 1, node_missing: 1, node_old: 1, starting: 1, stopped: 1, android_old: 1, processor: 1, not_started: 1, busy: 1,
+    blocked: 1, unsupported: 1, address: 1, port: 1, link_local: 1, offline: 1, not_answering: 1, opens_house: 1 };
   var MT_HIDES = /\b(garages?|gates?|doors?|locks?)\b/i;
   var MT_KIND = { light: 1, switch: 1, fan: 1, cover: 1, climate: 1, sensor: 1 };
   var VD = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]];
@@ -900,7 +902,8 @@
       if (!confirm(mw('confirm_remove', { name: name }))) return;
       say('matter-msg', mw('removing'));
       api('POST', '/api/matter/remove', { id: id }).then(function (j) {
-        say('matter-msg', mw('off_tv', { name: name }) + (mtOf(j).note ? ' ' + mw('no_answer') : ''));
+        var rj = mtOf(j);
+        say('matter-msg', mw('off_tv', { name: name }) + (MT_WHY.hasOwnProperty(rj.reason) ? ' ' + mw('why_' + rj.reason) : rj.note ? ' ' + mw('no_answer') : ''));
         return loadMatter();
       }).catch(function (e) { say('matter-msg', mtErr(e)); });
     } else {
@@ -911,7 +914,7 @@
       if (MT_HIDES.test(v) && domain !== 'climate' && domain !== 'sensor') { say('matter-msg', mw('err_name_hides')); return; }
       say('matter-msg', mw('saving'));
       api('POST', '/api/matter/rename', { id: id, name: v }).then(function () { say('matter-msg', mw('renamed')); return loadMatter(); })
-        .catch(function (e) { say('matter-msg', e && (e.message === 'refused' || e.message === 'not_allowed') ? mw('err_name_hides') : mtErr(e)); });
+        .catch(function (e) { var why = e && e.reply && MT_WHY.hasOwnProperty(e.reply.reason); say('matter-msg', !why && e && (e.message === 'refused' || e.message === 'not_allowed') ? mw('err_name_hides') : mtErr(e)); });
     }
   };
   // a photo of a QR code, read on this phone where the browser can (Chrome on Android); the code is
