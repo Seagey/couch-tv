@@ -139,7 +139,7 @@ caller with `bridge.pairing_key`.
 | `GET /api/matter/events` | Server sent events: `event: matter`, the same JSON as `/devices`, at once and within a quarter second of any change. Only here, behind the pairing rule: never on `/api/events`, which any device on the Wi-Fi may open. A page that reads slowly keeps at most the 20 newest lists. |
 | `POST /api/matter/commission {code, address?}` | `{ ok, device_ids }`, or HTTP 400 with `{ ok: false, error, reason?, note, device_ids: [] }`. `error` is `wrong_code`, `expired`, `unreachable`, `thread`, `already` (the device is on Couch TV already) or `not_allowed` (`reason` `blocked`: a lock, an alarm or a garage door; `unsupported`: a kind of device Couch TV cannot show). A failed add answers within about 30 seconds (the service looks for the device for 30 seconds). See the address rules below. |
 | `POST /api/matter/command {id, action, value?}` | `{ ok, state, device }`, answered once the device itself reported the change (at most about 2.5 seconds; at once when the action changes nothing). |
-| `POST /api/matter/remove {id}` | `{ ok, removed, reason?, note? }`. A device is one Matter node: every id of it goes, also one the name rule hides. Couch TV leaves the device's fabric; the device stays in the person's own home app. A device that is `unavailable` is forgotten anyway (`reason` `offline`, a note to remove Couch TV in the other app too if it is listed there), and one that does not answer the leave is forgotten here and left properly the next time it answers (`reason` `not_answering`). |
+| `POST /api/matter/remove {id}` | `{ ok, removed, reason?, note? }`. A device is one Matter node: every id of it goes, also one the name rule hides. Couch TV leaves the device's fabric: it asks the device itself to drop Couch TV (RemoveFabric), checks it can no longer reach it, tries twice more if it still can, then lets the service forget it. The device stays in the person's own home app. A device that is `unavailable` is forgotten anyway (`reason` `offline`, a note to remove Couch TV in the other app too if it is listed there), and one that does not answer the leave is forgotten here and left properly the next time it answers (`reason` `not_answering`). |
 | `POST /api/matter/rename {id, name}` | `{ ok, name }`. 1 to 40 characters, no control characters, no `<` or `>`, kept on this computer only. A name the name rule would hide is refused: `{ ok: false, error: "refused", reason: "opens_house", note }`. |
 
 **Address rules** (`address` on commission, contract change 5): `host`, `host:5540`, `[v6]` or
@@ -211,7 +211,22 @@ point, °C, in half degrees). A cover's `on` opens it and `off` closes it. Senso
   the Raspberry Pi 4 and 5 kind; 21 seconds on x86_64 under emulation), the `expired` answer from
   the real service, a clean stop, storage mode 700. Docker's own network on a Mac cannot reach
   the home network, so adding a real device on Linux was not tried.
+- The Matter contract test (`tests/matter_contract.py`, branch nl-matter-fixtures, 16 groups, every
+  state read back from the device itself) against this bridge on the MacBook, with eight real Matter
+  devices from connectedhomeip v1.6.1.0 (light, plug, thermostat, cover, fan, four sensors, lock,
+  smoke alarm) shared one at a time by a second controller the way Google Home shares them:
+  **261 passed, 0 failed, 0 warnings, 261 checks, 249 s** (21 Nov 2026). That covers adding by code
+  and QR, the error keys, every command on every device, changes made elsewhere showing within
+  10 seconds, the event stream, rename, the lock and the alarm refused and left (back to 1 fabric),
+  a plug switched off showing `unavailable` and coming back, and every device back to 1 fabric after
+  remove. The first run found four faults (a second share answered `unreachable`, an off light had no
+  level, a stopped plug never showed `unavailable`, the lock and alarm kept Couch TV's keys); each
+  was fixed and has its own test in `tests/test_matter_bridge.py`. One run in four also showed an
+  occupancy report arriving late and a third fabric on the light for a moment after a second share;
+  neither came back in the last run.
 - Not tried at all: a 32 bit Raspberry Pi (Node.js 22 has 32 bit ARM builds and nothing here is
   compiled, but there was no 32 bit machine or emulator), a real Thread device, and a real share
   from the Google Home or Apple Home app (the share was made by a second controller with the same
-  Open Commissioning Window step those apps use).
+  Open Commissioning Window step those apps use). The real share from those apps and a real Thread
+  device need someone at home with their own phone and devices; they are the first thing to try
+  there. Adding a device with the bridge running as a launchd job (above) is also not tried yet.

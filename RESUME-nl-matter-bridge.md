@@ -25,11 +25,16 @@ Read first: coord/nolater-common.md and coord/matter-contract.md (changes 1 to 1
 
 ## Test results (21 Nov)
 - `<repo>/.venv/bin/python -m unittest discover -s tests -p "test_matter_bridge.py"`: 31/31 OK.
-- Full suite `-p "test_*.py"`: see the final report / commit message.
+- Full suite `-p "test_*.py"`: Ran 1379, OK (skipped 58) on the final code (was 1363 before this branch's new tests).
 - Contract harness (wt-nl-matter-fixtures tests/matter_contract.py) against this bridge on the
   MacBook (~/mb-nlb, port 8796, test_devices on): run 1 (WIP 0001e84) 255 pass / 4 fail / 2 warn;
   the four fails and two warns were fixed (already, light attrs, unavailable probe, leave only once
-  connected). Later runs: see the commit message and the final report.
+  connected). Run 2: 259/0/2 (lock and alarm kept keys: the service only decommissions with a live
+  subscription). Run 3: 258/3/0 (plug kept its fabric after restart; once: occupancy late, light 3
+  fabrics for a moment). Run 4 on the final code (RemoveFabric sent by Couch TV, checked, retried):
+  **261 passed, 0 failed, 0 warnings, 261 checks, 249 s**; all eight fixtures back to 1 fabric after.
+- The harness copy used: scratchpad nl-matter-bridge-live/matter_contract.py = the fixtures branch's
+  file with fabrics() accepting fx's newer {name: {...}} answer (fx.py on the MacBook changed 05:51).
 - SIGTERM to the bridge (what `launchctl bootout` sends): the Matter service ended, pid file removed.
 
 ## Not done, and why

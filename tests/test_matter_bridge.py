@@ -443,7 +443,7 @@ class ServiceTest(unittest.TestCase):
                     self.assertTrue(r["note"].endswith("It is still in your other home app."))
                 self.assertEqual(m.devices(), [])
                 # leaving fails (the device stopped answering): it is forgotten here and left again later
-                fake.answers["remove_node"] = {"error_code": 5, "details": "no answer"}
+                fake.answers["remove_node"] = {"error_code": 4, "details": "no answer"}
                 fake.answers["commission_with_code"] = {"result": speaker}
                 fake.nodes[40] = speaker   # the service still holds it
                 r = await m.commission("06409137006")
@@ -455,34 +455,57 @@ class ServiceTest(unittest.TestCase):
                 await server.cleanup()
         run(go())
 
-    def test_leaves_only_once_connected(self):
-        """Live run 21 Nov: the service only tells a device to drop its fabric while it holds a live
-        connection; straight after adding it has none, so the lock kept Couch TV's keys. Couch TV now
-        waits for the connection (node_updated, available) before it leaves."""
+    def test_the_device_is_told_to_drop_the_fabric(self):
+        """Live run 21 Nov: the service's remove_node only tells a device to drop its fabric while it
+        holds a live subscription; straight after adding it has none, so the fixture lock and alarm kept
+        Couch TV's keys. Couch TV now reads the fabric index the device gave it and sends RemoveFabric
+        itself, then lets the service forget the node."""
         async def go():
-            fake = FakeService([])
+            fake = FakeService([PLUG])
             m, server = await self.started(fake)
             try:
-                seen = []
-                orig = m._event
+                holds = {"n": 1}     # how many reads still answer as Couch TV (the fabric is there)
 
-                def spy(name, data):
-                    seen.append(name)
-                    orig(name, data)
-                m._event = spy
+                def read(a):
+                    if a["attribute_path"] != "0/62/5":
+                        return {"result": {}}
+                    if holds["n"] <= 0:
+                        return {"error_code": 4, "details": "no session"}
+                    holds["n"] -= 1
+                    return {"result": {"0/62/5": 3}}
+                fake.answers["read_attribute"] = read
+                fake.answers["device_command"] = {"error_code": 0, "details": "session closed"}   # what the device does
                 fake.answers["commission_with_code"] = {"result": LOCK}
                 r = await m.commission("06409137006")
                 self.assertEqual(r["error"], "not_allowed")
-                self.assertEqual(seen[:2], ["node_updated", "node_removed"])   # connected first, then left
-                # a device that never connects is still left after CONNECT_WAIT, never kept
-                fake.connect_after_add = False
-                fake.answers["commission_with_code"] = {"result": SMOKE}
-                with patch.object(matter, "CONNECT_WAIT", 0.6):
-                    t = time.monotonic()
-                    r = await m.commission("06409137006")
-                    self.assertGreaterEqual(time.monotonic() - t, 0.5)
+                tail = [c for c in fake.calls if c[0] != "start_listening"][-4:]
+                self.assertEqual(tail, [("read_attribute", {"node_id": 14, "attribute_path": "0/62/5"}),
+                                        ("device_command", {"node_id": 14, "endpoint_id": 0, "cluster_id": 62,
+                                                            "command_name": "RemoveFabric", "payload": {"fabricIndex": 3}}),
+                                        ("read_attribute", {"node_id": 14, "attribute_path": "0/62/5"}),
+                                        ("remove_node", {"node_id": 14})])
+                # the same on remove from the TV; a device that missed the first RemoveFabric gets a second
+                holds["n"] = 2
+                n = len(fake.calls)
+                r = await m.remove("matter:10:1")
+                self.assertEqual(r["removed"], ["matter:10:1"])
+                self.assertEqual([c[0] for c in fake.calls[n:]], ["read_attribute", "device_command", "read_attribute",
+                                                                  "device_command", "read_attribute", "remove_node"])
+                # live run: after RemoveFabric the service often lets the node go by itself, so remove_node
+                # answers "node does not exist": that is a clean leave, nothing kept for later
+                fake.answers["remove_node"] = {"error_code": 5, "details": "Node 15 does not exist"}
+                fake.answers["commission_with_code"] = {"result": GARAGE}
+                r = await m.commission("06409137006")
                 self.assertEqual(r["error"], "not_allowed")
-                self.assertIn(("remove_node", {"node_id": SMOKE["node_id"]}), fake.calls)
+                self.assertFalse(os.path.exists(os.path.join(self.dir, "matter-forgotten.json")))
+                fake.answers.pop("remove_node")
+                # a device that does not take the command is still forgotten by the service, never kept
+                holds["n"] = 9
+                fake.answers["commission_with_code"] = {"result": SMOKE}
+                r = await m.commission("06409137006")
+                self.assertEqual(r["error"], "not_allowed")
+                self.assertEqual(fake.calls[-1], ("remove_node", {"node_id": SMOKE["node_id"]}))
+                self.assertEqual(m.devices(), [])
             finally:
                 await m.stop()
                 await server.cleanup()
@@ -583,7 +606,7 @@ class ServiceTest(unittest.TestCase):
                 self.assertEqual((r["ok"], r["removed"], r["reason"]), (True, ["matter:20:1"], "offline"))
                 self.assertIn("remove it there", r["note"])
                 # the service cannot leave it (an error, or no answer): forgotten here anyway, and left later
-                fake.answers["remove_node"] = {"error_code": 5, "details": "Node 10 is not reachable"}
+                fake.answers["remove_node"] = {"error_code": 4, "details": "Node 10 is not reachable"}
                 r = await m.remove("matter:10:1")
                 self.assertEqual((r["ok"], r["removed"], r["reason"]), (True, ["matter:10:1"], "not_answering"))
                 self.assertNotIn("matter:10:1", [d["id"] for d in m.devices()])

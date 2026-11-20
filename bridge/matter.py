@@ -688,10 +688,10 @@ OFFLINE_NOTE = ("The device was not answering, so Couch TV forgot it without tel
 NOT_ANSWERING_NOTE = ("The device did not answer, so Couch TV forgot it here and leaves it properly the next time "
                       "it answers. It is still in your other home app.")
 NAME_HIDES_NOTE = "Couch TV never shows a garage door, gate, door or lock, so that name would hide this device. Pick another name."
-CONNECT_WAIT = 15      # after adding a device that is not kept: how long to wait for the live connection leaving needs
 PROBE_EVERY = 15       # seconds between looks for devices that went quiet
 PROBE_QUIET = 45       # a device not heard from for this long is asked for one value
 PROBE_TIMEOUT = 10     # and is shown unavailable when it does not answer within this
+NODE_NOT_EXISTS = 5    # the service's error code for a node it does not hold
 DISCOVERY_S = 30       # how long the service looks for the device (left to itself it looks for minutes)
 COMMISSION_WAIT = 150  # the discovery time plus adding it, over Thread too
 
@@ -756,7 +756,6 @@ class Matter:
         self._names = self._load_names()
         self._forgotten = self._load_forgotten()
         self._heard = {}   # node id -> when it last reported a change
-        self._live = set()   # nodes the service has had a live connection to
         self._down = set()   # nodes that stopped answering a check (shown unavailable until they answer)
         self.version = 0
         self._atexit = False
@@ -1064,6 +1063,7 @@ class Matter:
 
     async def _leave_again(self, nid):
         """A device forgotten while it did not answer: leave its fabric properly now."""
+        await self._tell_to_drop(nid)
         try:
             await self.request("remove_node", {"node_id": int(nid)}, timeout=60)
         except (MatterError, ConnectionError) as e:
@@ -1095,7 +1095,6 @@ class Matter:
         if name in ("node_added", "node_updated") and isinstance(data, dict):
             self.nodes[str(data.get("node_id"))] = data
             if data.get("available") is True:
-                self._live.add(str(data.get("node_id")))
                 self._down.discard(str(data.get("node_id")))
         elif name == "node_removed":
             self.nodes.pop(str(data), None)
@@ -1193,13 +1192,54 @@ class Matter:
         dev = next((d for d in devices_of(node, self._names) if d["id"] == did), None)
         return (dev, node, ep) if dev else (None, None, None)
 
-    async def _leave(self, nid):
-        """Leave a node's fabric. True when the service did it. Otherwise the node is forgotten here
-        anyway (never shown again) and left properly the next time the service is reached."""
+    async def _tell_to_drop(self, nid):
+        """Asks the device itself to drop Couch TV's fabric (OperationalCredentials RemoveFabric with the
+        fabric index it gave us). The service's remove_node only does that while it holds a live
+        subscription to the device, and straight after adding a device it has none: the fixture lock
+        and alarm kept Couch TV's keys that way.
+
+        The device usually drops the secure session before it answers, so the answer says nothing:
+        Couch TV checks instead. If it can still read the device as itself, the fabric is still there
+        and it tries again (a device just restarted can miss the first one: the plug did, live).
+        True when the device no longer answers Couch TV after a RemoveFabric."""
+        sent = False
+        for attempt in range(3):
+            try:
+                r = await self.request("read_attribute", {"node_id": int(nid), "attribute_path": "0/62/5"},
+                                       timeout=20 if attempt == 0 else 10)
+            except MatterError as e:
+                if sent:
+                    return True      # Couch TV cannot reach it as itself any more: the fabric is gone
+                log.info("matter: node %s did not answer before leaving (%s %s)", nid, e.reason, e.code)
+                return False
+            idx = r.get("0/62/5") if isinstance(r, dict) else None
+            if not isinstance(idx, int) or idx <= 0:
+                return False
+            try:
+                await self.request("device_command", {"node_id": int(nid), "endpoint_id": 0, "cluster_id": 62,
+                                                      "command_name": "RemoveFabric", "payload": {"fabricIndex": idx}}, timeout=15)
+            except MatterError:
+                pass                 # the expected end: the session closed under the answer
+            sent = True
+            await asyncio.sleep(1)
+        log.info("matter: node %s still answers Couch TV after three RemoveFabric", nid)
+        return False
+
+    async def _leave(self, nid, tell=True):
+        """Leave a node's fabric: the device is told to drop it, then the service forgets the node. True
+        when the service did it. Otherwise the node is forgotten here anyway (never shown again) and
+        left properly the next time the service is reached."""
+        if tell:
+            await self._tell_to_drop(nid)
         try:
             await self.request("remove_node", {"node_id": int(nid)}, timeout=60)
             return True
         except MatterError as e:
+            if e.code == NODE_NOT_EXISTS:
+                # the device took RemoveFabric and the service let the node go by itself (seen live):
+                # it is left, nothing to do later
+                self.nodes.pop(str(nid), None)
+                return True
             log.info("matter: leaving node %s failed (%s %s); forgotten here", nid, e.reason, e.code)
             self._forgotten.add(str(nid))
             self._save_forgotten()
@@ -1241,13 +1281,6 @@ class Matter:
             # a lock, an alarm, a garage door, or a kind of device Couch TV cannot show: never kept on
             # this computer's fabric, where it would be invisible and could not be removed from the TV
             blocked = blocked_only(node) or any(kind_of(node, ep, cl) for ep, cl in endpoints(node).items() if ep)
-            # The service only tells a device to drop its fabric once it holds a live connection to it;
-            # straight after adding it has none yet and would only forget it here, leaving the device
-            # with Couch TV's keys (seen with the fixture lock). So wait for the connection first.
-            for _ in range(max(1, round(CONNECT_WAIT / 0.2))):
-                if nid in self._live:
-                    break
-                await asyncio.sleep(0.2)
             await self._leave(nid)
             self.nodes.pop(nid, None)
             self._changed()
@@ -1327,7 +1360,7 @@ class Matter:
             return {"ok": False, "error": "refused"}
         removed = [d["id"] for d in devices_of(node, self._names)]
         offline = node.get("available") is False
-        left = await self._leave(nid)
+        left = await self._leave(nid, tell=not offline)
         self.nodes.pop(nid, None)
         gone = [k for k in self._names if k.startswith("matter:%s:" % nid)]
         for k in gone:
