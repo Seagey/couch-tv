@@ -298,6 +298,10 @@ class Ref:
         if not ok:
             if "setup code is incorrect" in logs or "Integrity check failed" in logs or "Invalid argument" in logs:
                 return web.json_response({"ok": False, "error": "wrong_code", "note": "That code is not right."})
+            if re.search(r"0x0+7E\b|FabricConflict|fabric already|Fabric exists", logs, re.I):
+                # contract change 11: the device is already on this controller (CHIP_ERROR_FABRIC_EXISTS)
+                return web.json_response({"ok": False, "error": "already",
+                                          "note": "This device is already on Couch TV."})
             note = "No device answered to that code. Get a new code and try again."
             if "raw-errors" in self.breaks:
                 note = "CHIP Error 0x00000032: Timeout"
@@ -321,9 +325,12 @@ class Ref:
             forbidden = []
         if forbidden or not eps:
             await self.c.cmd(f"pairing unpair {node}")
+            if forbidden:  # contract change 10/11: refused, and the controller leaves its fabric at once
+                return web.json_response({"ok": False, "error": "not_allowed", "device_ids": [],
+                                          "note": "Locks, alarms and garage doors are not added to Couch TV."},
+                                         status=400)
             return web.json_response({"ok": True, "device_ids": [],
-                                      "note": "Locks and alarms are not added." if forbidden else
-                                      "There is nothing on this device that Couch TV can show."})
+                                      "note": "There is nothing on this device that Couch TV can show."})
         self.db["nodes"][str(node)] = {"eps": eps}
         self.save()
         return web.json_response({"ok": True, "device_ids": [f"matter:{node}:{ep}" for ep in eps]})

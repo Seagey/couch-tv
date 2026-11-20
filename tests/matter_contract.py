@@ -27,6 +27,9 @@ import urllib.request
 
 ALLOWED_DOMAINS = {"light", "switch", "fan", "cover", "climate", "sensor"}
 ERROR_KEYS = {"expired", "wrong_code", "unreachable", "thread"}
+# Added to the contract later (changes 10 and 11): a shared lock, alarm or garage door, and a device
+# that is already on this controller.
+EXTRA_ERROR_KEYS = {"not_allowed", "already"}
 GROUPS = ["auth", "errors", "commission", "list", "light", "plug", "thermostat", "cover", "fan", "sensors",
           "live", "events", "rename", "forbidden", "offline", "remove"]
 CONTROLLED = ["light", "plug", "thermostat", "cover", "fan", "sensors"]
@@ -308,6 +311,27 @@ class Run:
             if n in self.ids:
                 continue
             self.commission(n, use_qr=(n == "sensors"))
+        if "light" in self.ids:
+            self.share_again("light")
+
+    def share_again(self, name):
+        """Contract change 11: a device shared to the same controller twice answers error "already"
+        (or ok with the ids it already has). Either way no second entry and no third fabric."""
+        before = by_id(self.api.devices()[2])
+        sh = self.fx.share(name, 300)
+        s, o, dt = self.api.commission(sh["manual"], self.address(name))
+        info(f"{name} shared again: answered {s} {json.dumps(o)[:200]} in {dt:.1f} s")
+        same = o.get("ok") is True and sorted(o.get("device_ids") or []) == sorted(self.ids[name])
+        check(f"commission: {name} shared a second time answers error 'already' (or its same ids)",
+              (o.get("ok") is False and o.get("error") == "already") or same, f"answered {s} {json.dumps(o)[:200]}")
+        if o.get("note") is not None:
+            check(f"commission: the note for a second share is plain words", plain(o["note"]), repr(o["note"]))
+        after = by_id(self.api.devices()[2])
+        check(f"commission: {name} shared a second time adds no entry", set(after) == set(before),
+              f"new: {sorted(set(after) - set(before))}, gone: {sorted(set(before) - set(after))}")
+        self.fx.run("revoke", name)
+        check(f"commission: {name} shared a second time still has 2 fabrics (home + the implementation)",
+              wait_for(lambda: self.fx.fabrics(name) == 2, 15, 2), f"the device reports {self.fx.fabrics(name)} fabrics")
 
     def entity(self, name, ep=1):
         if name not in self.node:
@@ -695,6 +719,11 @@ class Run:
             ids = o.get("device_ids") or []
             info(f"{name}: commission answered {s} {json.dumps(o)[:200]} in {dt:.1f} s")
             check(f"forbidden: commissioning the {name} returns no device ids", not ids, f"device_ids={ids}")
+            if o.get("ok") is False:  # contract change 10/11: error "not_allowed" (ok true with no ids is also fine)
+                check(f"forbidden: the {name} is refused with error 'not_allowed'", o.get("error") == "not_allowed",
+                      f"answered {s} {json.dumps(o)[:200]}")
+            if o.get("note") is not None:
+                check(f"forbidden: the note for the {name} is plain words", plain(o["note"]), repr(o["note"]))
             after = by_id(self.api.devices()[2])
             new = set(after) - before_list
             check(f"forbidden: the {name} is not listed", not new, f"new entries: {[after[i] for i in new]}")

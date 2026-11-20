@@ -100,7 +100,7 @@ own answer.
 |---|---|
 | auth | devices and command refuse a call without the token (401/403); devices answers `{devices, ready}` |
 | errors | malformed code, bad check digit, bad QR text: `wrong_code` in under 15 s. A code no device answers to, and a shared code whose window was closed: `expired` or `unreachable`. The right device with the wrong passcode: `wrong_code`. Every `note` is plain words (no "CHIP", hex, stack traces, under 240 characters). The light is not joined after any of them |
-| commission | each device by its shared 11 digit code (sensors by the QR text): `ok`, `device_ids` like `matter:<node>:<ep>`, one node, new, under 120 s, and the device now really has 2 fabrics |
+| commission | each device by its shared 11 digit code (sensors by the QR text): `ok`, `device_ids` like `matter:<node>:<ep>`, one node, new, under 120 s, and the device now really has 2 fabrics. The light shared a second time: error `already` (or its same ids), no new entry, still 2 fabrics |
 | list | exactly the expected endpoints per device, domain, not unavailable, `device_class` and `unit_of_measurement` (°C, %) for sensors, sensor readings match the device, climate has `current_temperature temperature min_temp max_temp hvac_modes` and its state is one of `hvac_modes`, cover `current_position`, fan `percentage`, light `brightness` or `level` and `color_temp_kelvin` |
 | light | on, off, toggle; level 50 (%) = CurrentLevel 120 to 134; temp 2700 (K) = 370 mireds; colour `#0000ff` = hue 240° (or xy blue) and `"120,100"`; the entity shows about 50% |
 | plug | on, off, toggle, toggle; `level` refused |
@@ -111,20 +111,41 @@ own answer.
 | live | changes made elsewhere (the home controller, like Google Home or a wall switch) show in the list within 10 s: light off, on, 25%; plug on; blind closed; setpoint 19 °C; fan 30%; occupancy 1 and 0; contact closed and open |
 | events | `version` goes up after a change; `GET /api/matter/events` sends `event: matter` with the device list at once and again after a change (WARN, not FAIL, if there is no stream) |
 | rename | to "Lounge lamp" and the list shows it; empty, 41 characters and unknown ids refused |
-| forbidden | the lock and the smoke alarm: no `device_ids`, never listed, no domain outside the six, their state untouched; WARN if the implementation keeps its keys to them (it should leave their fabric) |
+| forbidden | the lock and the smoke alarm: no `device_ids` (an `ok: false` answer must carry error `not_allowed`), a plain `note`, never listed, no domain outside the six, their state untouched; WARN if the implementation keeps its keys to them (it should leave their fabric) |
 | offline | the plug stopped: `unavailable` within 90 s; started again: on/off within 90 s |
 | remove | `ok`, `removed` lists every id of the node, every endpoint leaves the list, the device is back to 1 fabric, and it still answers the home controller (it stays in the person's Google or Apple home) |
 
-## Proven on 20 Nov 2026
+## Proven on 21 Nov 2026
 
-Against the reference server on the MacBook: see the counts in the contract file's "Test kit"
-section. The reference server is also the worked example of every mapping in the contract.
+Against the reference server on the MacBook, after a clean restart with `--reset`:
+**261 passed, 0 failed, 0 warnings, 261 checks, 230 s.** By group: auth 2, errors 25, commission 34,
+list 53, commands 78 (light, plug, thermostat, cover, fan, sensors), live 13, events 3, rename 6,
+forbidden 14, offline 2, remove 31. The reference server is also the worked example of every
+mapping in the contract.
 
 ```sh
 ssh macbook ~/matter-spike/connectedhomeip/.environment/pigweed-venv/bin/python3 \
     ~/matter-fixtures/reference_server.py --port 5490 --token test --reset
 python3 tests/matter_contract.py --api http://<macbook-ip>:5490 --token test
 ```
+
+**The test catches real bugs (negative control).** The reference has four known bugs it can switch
+on: `--break cover-percent,lock-listed,no-live,raw-errors`. With all four on, the same test gave
+**241 passed, 20 failed, 2 warnings, 263 checks**, and every bug was caught:
+
+| Bug switched on | What it does | Caught by |
+|---|---|---|
+| `raw-errors` | a failed commission answers "CHIP Error 0x00000032: Timeout" as the note | 2 FAIL (errors: note is plain words) |
+| `cover-percent` | cover position sent as % closed instead of % open | 2 FAIL (command: cover position 30 and 100) |
+| `no-live` | a device's state is read once and never again | 11 FAIL (8 live, 2 events, 1 offline), plus 1 FAIL in remove: the plug kept the reference's fabric because its stale session never reconnected |
+| `lock-listed` | the lock and the alarm are listed as a switch | 4 FAIL (no device ids, not listed, for each) and 2 WARN (keys kept) |
+
+After a broken run, `ssh macbook matter-fixtures/fx evict` takes the leftover controller off the
+devices (it took the reference's fabric off the plug, the lock and the alarm).
+
+`build-fixtures.sh` ran on the MacBook on 21 Nov 2026: exit 0, 13 s with everything already built
+(ninja: no work to do; the chef patch already in place, so not applied twice). A build from nothing
+takes about 3 minutes.
 
 ## Things the reference server ran into (so the real ones do not)
 
@@ -138,6 +159,10 @@ python3 tests/matter_contract.py --api http://<macbook-ip>:5490 --token test
 - Matter's WindowCovering counts % closed in hundredths; Home Assistant's `current_position` is % open.
 - A fan with an OnOff cluster turns only while OnOff is on: PercentSetting alone does not start it.
 - A commissioning window must be 180 to 900 s; shorter is refused with INVALID_COMMAND.
+- A device shared a second time to a controller that already has it fails in about 1.5 s with
+  CHIP error 0x7E (the fabric exists): answer `already`, and keep the one entry it has.
+- A lock or an alarm: read its device types right after commissioning, leave its fabric at once
+  and answer `not_allowed` with a plain note (HTTP 400).
 
 ## Rebuilding the devices
 
