@@ -2740,6 +2740,62 @@ def clean_settings(s):
                              "fade_with_sleep": sc.get("fade_with_sleep") is not False}
     if isinstance(s.get("smart_idle"), dict):
         out["smart_idle"] = config._smart_idle(s["smart_idle"])
+    # the Inputs tile (#154) and the row that follows the app: the TV writes both, so the copy keeps them
+    for k in ("input_tile", "shelf_follows_app"):
+        if isinstance(s.get(k), bool):
+            out[k] = s[k]
+    if isinstance(s.get("widgets_design"), str) and re.fullmatch(r"-?[0-9]{1,12}", s["widgets_design"]):   # which design the widget settings were set on
+        out["widgets_design"] = s["widgets_design"]
+    w = clean_widget_settings(s.get("widgets"))
+    if w is not None:
+        out["widgets"] = w
+    return out
+
+
+_WS_KEY = re.compile(r"[A-Za-z0-9_/-]{1,70}\|[a-z]{1,20}")
+_WS_NAME = re.compile(r"[A-Za-z0-9_]{1,30}")
+
+
+def _ws_value(v):
+    """One widget setting's value, in a shape the TV home writes, or None to drop it."""
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return v if v == v and v not in (float("inf"), float("-inf")) else None
+    if isinstance(v, str):
+        return v if len(v) <= 600 else None
+    if isinstance(v, list):
+        if len(v) > 16 or not all((isinstance(x, str) and len(x) <= 600) or (isinstance(x, (int, float)) and not isinstance(x, bool) and x == x) for x in v):
+            return None
+        return list(v)
+    if isinstance(v, dict) and _num(v.get("lat"), -90, 90) and _num(v.get("lon"), -180, 180):
+        # a place: the town, never the house (two decimals)
+        p = {"name": str(v.get("name") or "")[:60], "lat": round(v["lat"], 2), "lon": round(v["lon"], 2), "timezone": str(v.get("timezone") or "auto")[:64]}
+        if v.get("area"):
+            p["area"] = str(v["area"])[:80]
+        return p
+    return None
+
+
+def clean_widget_settings(w):
+    """Each widget's own settings (ST.widgets in the TV home: docs/WIDGET-SETTINGS-CONTRACT.md):
+    { "<object id>|<kind>": { "<setting>": value } }. Kept as the TV wrote them, checked, so the copy
+    the bridge hands back never drops them (and the home never starts again for nothing)."""
+    if not isinstance(w, dict):
+        return None
+    out = {}
+    for k in list(w)[:60]:
+        if not isinstance(k, str) or not _WS_KEY.fullmatch(k) or not isinstance(w[k], dict):
+            continue
+        vals = {}
+        for name in list(w[k])[:16]:
+            if not isinstance(name, str) or not _WS_NAME.fullmatch(name):
+                continue
+            v = _ws_value(w[k][name])
+            if v is not None:
+                vals[name] = v
+        if vals:
+            out[k] = vals
     return out
 
 

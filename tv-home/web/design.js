@@ -387,7 +387,7 @@
   var OPT = {
     label: function (v) { return SAN.w(v, 40); }, text: function (v) { return SAN.w(v, 120); }, sub: function (v) { return SAN.w(v, 80); },
     kicker: function (v) { return SAN.w(v, 60); }, caption: function (v) { return SAN.w(v, 60); },
-    format: function (v) { return SAN.pick(v, ["12h", "24h"]); }, ampm: SAN.b, seconds: SAN.b, date: SAN.b,
+    format: function (v) { return SAN.pick(v, ["auto", "12h", "24h"]); }, ampm: SAN.b, seconds: SAN.b, date: SAN.b,
     align: function (v) { return SAN.pick(v, ["left", "center", "right"]); },
     show: function (v) { return SAN.pick(v, ["date", "weather", "both"]); }, dfmt: function (v) { return SAN.pick(v, DATE_KEYS); },
     cities: function (v) { return SAN.list(v, 4, tzOk); },
@@ -406,7 +406,7 @@
     },
     cols: function (v) { return SAN.n(v, 1, 6, true); }, names: SAN.b, more: SAN.b,
     image: function (v) { return imgOk(v) || undefined; }, fit: function (v) { return SAN.pick(v, ["cover", "contain"]); },
-    seconds_each: function (v) { return SAN.n(v, 5, 600, true); }, count: function (v) { return SAN.n(v, 1, 8, true); },
+    seconds_each: function (v) { return SAN.n(v, 5, 600, true); }, count: function (v) { return v === "auto" ? "auto" : SAN.n(v, 1, 8, true); },
     mat: SAN.c, weekday: function (v) { return SAN.n(v, 0, 6, true); }, alt: SAN.b, anchor: function (v) { return SAN.n(v, 0, 100000, true); },
     lid_a: SAN.c, lid_b: SAN.c, bin_a: function (v) { return SAN.w(v, 20); }, bin_b: function (v) { return SAN.w(v, 20); },
     quick: function (v) { return SAN.list(v, 6, function (q) { return SAN.pick(q, QUICK_IDS); }); },
@@ -416,7 +416,13 @@
     controls: function (v) { return SAN.list(v, 8, function (c) { c = obj(c); var o = {}; put(o, "icon", SAN.pick(c.icon, CTL_ICONS)); put(o, "name", SAN.w(c.name, 24)); return o.icon ? o : undefined; }); },
     shows: function (v) { return SAN.n(v, 1, 5, true); },
     // the web widgets (widget-web.js): a source picked from a fixed list, never a link
-    feed: function (v) { return SAN.pick(v, WEB_FEEDS); },
+    feed: function (v) { return SAN.pick(v, ["auto"].concat(WEB_FEEDS)); },
+    // the widget settings Studio can set (widget-caps.js settings, store "design"): a year or "every" (a
+    // countdown that comes round each year), a timer's quick start, how many hours, shuffle, the price, the
+    // agenda's days and which games
+    year: function (v) { return v === "every" ? "every" : SAN.n(v, 2026, 2040, true); }, minutes: function (v) { return SAN.n(v, 0, 240, true); },
+    hours: function (v) { return v === "auto" ? "auto" : SAN.n(v, 1, 24, true); }, shuffle: SAN.b, price: SAN.b,
+    days: function (v) { return SAN.pick(v, ["today", "two", "week"]); }, games: function (v) { return SAN.pick(v, ["all", "live", "mine"]); },
     league: function (v) { return SAN.pick(v, WEB_LEAGUES); }, team: function (v) { return SAN.w(v, 24); },
     // share symbols as Yahoo writes them (BHP.AX, ^AXJO, AUDUSD=X, BTC-AUD): never a link or a word
     tickers: function (v) { return SAN.list(v, 6, function (s) { s = typeof s === "string" ? s.trim().toUpperCase() : ""; return /^\^?[A-Z0-9]{1,8}([.=-][A-Z0-9]{1,4})?$/.test(s) ? s : undefined; }); },
@@ -428,15 +434,15 @@
   var WEB_FEEDS = ["abc", "abc-justin", "abc-sport", "abc-business", "sbs", "guardian", "bbc", "rnz"];
   var WOPT = {
     clock: "format ampm seconds date align", tallclock: "format align", glassclock: "format scene", analog: "seconds", flipclock: "format",
-    wordclock: "", solar: "", worldclock: "label cities", countdown: "label month day unit icon", date: "show dfmt align place", month: "", timer: "label",
-    weather: "place hilo night", bigtemp: "place", hourly: "place", week: "place", rain: "label", uv: "label", sun: "label", moon: "", air: "label", surf: "label",
-    photo: "image fit caption sub", slideshow: "seconds_each caption sub", mosaic: "count", artframe: "image mat caption sub", memory: "align",
+    wordclock: "", solar: "", worldclock: "label cities", countdown: "label month day year unit icon", date: "show dfmt align place", month: "", timer: "label minutes",
+    weather: "place hilo night", bigtemp: "place", hourly: "place hours", week: "place", rain: "label", uv: "label", sun: "label", moon: "", air: "label", surf: "label",
+    photo: "image fit caption sub", slideshow: "seconds_each caption sub shuffle", mosaic: "count", artframe: "image mat caption sub", memory: "align",
     keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",
     app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "label apps",
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "",
-    bins: "label weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label align", note: "align", list: "label icon align",
-    card: "label text icon", quote: "text sub", word: "", news: "feed label align", sports: "label league team align", stocks: "label tickers align", commute: "label arrive_h arrive_m buffer weekdays align",
+    bins: "label weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label align days", note: "align", list: "label icon align",
+    card: "label text icon", quote: "text sub", word: "", news: "feed label align count", sports: "label league team align games", stocks: "label tickers align price", commute: "label arrive_h arrive_m buffer weekdays align",
     welcome: "kicker text sub align source times", quick: "quick align", wifi: "align", guide: "align", screentime: "align", ask: "label align", agent: "label align", stack: ""
   };
   // The smart home and music widgets: which of the TV's own Home Assistant things a widget shows,
@@ -1482,6 +1488,42 @@
   }
   function saveEdits() { try { if (Object.keys(EDITS).length) localStorage.setItem(EDITS_KEY, JSON.stringify(EDITS)); else localStorage.removeItem(EDITS_KEY); } catch (e) {} }
   function editsOf(id, kind) { var e = EDITS[id + "|" + kind]; return Array.isArray(e) ? e.slice() : null; }
+  // Each widget's own settings (docs/WIDGET-SETTINGS-CONTRACT.md) are kept by app.js in Home settings
+  // (ST.widgets["<id>|<kind>"]), never here and never in a design; widgets read them as env.wset, by the
+  // widget's id. A widget in a smart stack has the id "<stack id>/<its place in the stack>".
+  // Every widget on the home now, a stack's widgets too: [{ key, id, kind, label, x, y, w, h }].
+  function widgetList() {
+    var out = [], seen = {};
+    if (D && ON) list(D.objects).forEach(function (o) {
+      o = obj(o);
+      if (o.type !== "widget") return;
+      var each = o.kind === "stack" ? list(o.items).map(function (it, i) { return { id: o.id + "/" + i, it: obj(it) }; }) : [{ id: o.id, it: o }];
+      each.forEach(function (e) {
+        var key = e.id + "|" + e.it.kind;
+        if (!e.it.kind || seen[key]) return;
+        seen[key] = 1;
+        out.push({ key: key, id: e.id, kind: e.it.kind, label: obj(e.it.opts).label || "", opts: JSON.parse(JSON.stringify(obj(e.it.opts))), x: +o.x || 0, y: +o.y || 0, w: +o.w || 0, h: +o.h || 0 });
+      });
+    });
+    return out;
+  }
+  // every container of apps on the home a person may change (the same ones Hold OK changes)
+  function appWidgets() {
+    var W = window.CouchWidgets, A = window.CouchApps, out = [];
+    if (!(D && ON) || !W || !W.appKinds) return out;
+    var env = wenv(), have = W.installedApps(env);
+    list(D.objects).forEach(function (o) {
+      o = obj(o);
+      if (o.type !== "widget" || W.appKinds().indexOf(o.kind) < 0) return;
+      var keys = W.appKeys(o, env);
+      out.push({ key: o.id + "|" + o.kind, kind: o.kind, label: obj(o.opts).label || "", max: W.appMax(o.kind), edited: !!EDITS[o.id + "|" + o.kind],
+        apps: keys.map(function (k) {
+          var c = A && A.get(k), hit = c ? A.resolve(k, have) : have.filter(function (a) { return a.package === k; })[0];
+          return { key: k, name: c ? c.name : hit ? String(hit.name || k) : String(k).split(".").pop(), missing: !hit };
+        }) });
+    });
+    return out;
+  }
   // what a widget may know: demo data in the designer, else what this TV really has (app.js hooks)
   var DATA_V = 0, DATA_KEYS = {};
   function wenv() {
@@ -1491,6 +1533,8 @@
     var sport = !!(D && list(D.objects).some(function (o) { o = obj(o); return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return obj(it).kind === "sports"; }); }));
     return { demo: !!(FORCE_DEMO || DEMO_ON), preview: PREVIEW, card: IN_CARD, designer: DESIGNER, data: data, look: obj(D && D.look), sport: sport,
       edits: DESIGNER || PREVIEW ? null : editsOf,
+      // each widget's own settings on this TV, by its id (app.js data().wset); none in the designer or a preview
+      wset: DESIGNER || PREVIEW || FORCE_DEMO || DEMO_ON ? null : (data && data.wset) || null,
       clock24: hooks.clock24 ? hooks.clock24() : false, ha: !!(window.smartHome && window.smartHome.enabled && window.smartHome.enabled()), rooms: LIVE.rooms,
       icon: function (name, size, set) { return icon(name, size, set); }, colour: colour, imgOk: imgOk };
   }
@@ -2477,6 +2521,18 @@
         // Settings stays first on an app too: one more OK from the hold lands on Settings, never on Change app
         nodes = [nodes[0]].concat(eds, nodes.slice(1));
       }
+      // the widget's own settings (widget-caps.js settings, docs/WIDGET-SETTINGS-CONTRACT.md): "Settings
+      // for this widget", right after Settings, opens its page in Home settings (app.js). A smart stack:
+      // the widget showing in it now.
+      var pw = w, Caps = window.CouchWidgetCaps;
+      while (pw && !(pw.getAttribute && pw.getAttribute("data-obj"))) pw = pw.parentNode;
+      var pid = pw && pw.getAttribute("data-obj");
+      if (pid && !DESIGNER && Caps && Caps.settings) {
+        var wid = w && typeof w.__at === "function" && w.getAttribute("data-kind") === "stack" ? pid + "/" + w.__at() : pid;
+        // only a widget with a setting the TV or the phone offers now (pre: true), as Home settings lists them
+        var mine = widgetList().filter(function (x) { return x.id === wid && Caps.settings(x.kind).some(function (s) { return s && s.pre === true && (!Array.isArray(s.where) || s.where.indexOf("tv") >= 0 || s.where.indexOf("phone") >= 0); }); })[0];
+        if (mine) nodes.splice(1, 0, mk("Settings for this widget", "wset", mine.key));
+      }
       openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes }, "Back to close. Settings here is couch-tv's own: the remote's Settings button opens the TV's menu.");
     }
     // ---- changing a container's apps with the remote ----
@@ -2704,6 +2760,42 @@
     fontOf: function (name) { return fontOf(name); }, fontsOf: function (d) { return fontsOf(sanitize(d)); },
     // the apps changed on this TV with the remote (Hold OK), by "<object id>|<kind>"
     appEdits: function () { return JSON.parse(JSON.stringify(EDITS)); },
+    // What the design on screen uses, for Home settings (app.js) and the phone's Home settings page: the
+    // home's own parts it shows, whether it has its own background, and its widget kinds. { on: false }
+    // with no design on screen. Names and kinds only, nothing private.
+    uses: function () {
+      if (!(D && ON)) return { on: false };
+      var el = obj(D.elements), kinds = {}, glass = false, bg = obj(D.background);
+      var shown = function (k) { if (obj(el[k]).hidden === true) return false; try { return !this.hides(k); } catch (e) { return true; } }.bind(this);
+      list(D.objects).forEach(function (o) {
+        o = obj(o);
+        if (o.type !== "widget") { kinds["obj:" + o.type] = 1; return; }
+        [o].concat(list(o.items)).forEach(function (it) { kinds[obj(it).kind] = 1; if (wpanel(obj(it)) === "glass") glass = true; });
+      });
+      return { on: true, parts: { clock: obj(el.clock).hidden !== true, date: shown("date"), weather: shown("weather"), people: shown("people"),
+        quick: shown("quick"), keep_watching: shown("keep_watching"), dock: obj(el.dock).hidden !== true },
+        background: !!(bg.image || bg.colour || bg.video), kinds: Object.keys(kinds).filter(function (k) { return k.indexOf("obj:") < 0; }),
+        objects: Object.keys(kinds).filter(function (k) { return k.indexOf("obj:") === 0; }).map(function (k) { return k.slice(4); }), glass: glass };
+    },
+    // every widget on the home now, a stack's widgets too: [{ key: "<id>|<kind>", id, kind, label, x, y, w, h }]
+    widgetList: function () { return widgetList(); },
+    // the design's containers of apps, and changing one's apps the way Hold OK does (null: its own apps again)
+    appWidgets: function () { return appWidgets(); },
+    setApps: function (key, keys) {
+      var w = appWidgets().filter(function (a) { return a.key === key; })[0];
+      if (!w) return { ok: false, error: "That app row is not on this design any more." };
+      if (keys === null) delete EDITS[key];
+      else {
+        if (!Array.isArray(keys)) return { ok: false, error: "No apps were sent." };
+        var A = window.CouchApps, seen = {}, clean = [];
+        keys.forEach(function (k) { if (pkgOk(k) && KEEP.indexOf(k) < 0) { var id = (A && !A.get(k) && A.idOf(k)) || k; if (!seen[id]) { seen[id] = 1; clean.push(id); } } });
+        if (clean.length > w.max) return { ok: false, error: "That holds " + w.max + (w.max === 1 ? " app." : " apps.") };
+        EDITS[key] = clean;
+      }
+      saveEdits();
+      if (D && ON) objects(D);
+      return { ok: true };
+    },
     wact: function () { return WACT.slice(); },
     wopts: function () { return JSON.parse(JSON.stringify(WOPT)); },
     wstyle: function () { return JSON.parse(JSON.stringify(WSTYLE)); },
@@ -2715,7 +2807,8 @@
     // which of these widget kinds are on the home (air and surf ask their own free services only then)
     wantsKinds: function (kinds) { var on = {}; if (D && ON) list(D.objects).forEach(function (o) { o = obj(o); if (o.type === "widget") [o].concat(list(o.items)).forEach(function (it) { if (kinds.indexOf(obj(it).kind) >= 0) on[obj(it).kind] = 1; }); }); return Object.keys(on); },
     // the web widgets on the home, each with its options (widget-web.js asks only for these)
-    widgetsOf: function (kinds) { var out = []; if (D && ON) list(D.objects).forEach(function (o) { o = obj(o); if (o.type === "widget") [o].concat(list(o.items)).forEach(function (it) { it = obj(it); if (kinds.indexOf(it.kind) >= 0) out.push({ kind: it.kind, opts: obj(it.opts) }); }); }); return out; },
+    // (each with its id, "<stack id>/<its place>" for a widget in a stack, so its own settings can be read)
+    widgetsOf: function (kinds) { var out = []; if (D && ON) list(D.objects).forEach(function (o) { o = obj(o); if (o.type === "widget") [o].concat(list(o.items)).forEach(function (it, i) { it = obj(it); if (kinds.indexOf(it.kind) >= 0) out.push({ id: i ? o.id + "/" + (i - 1) : o.id, kind: it.kind, opts: obj(it.opts) }); }); }); return out; },
     wantsForecast: function () { return !!(D && ON && list(D.objects).some(function (o) { o = obj(o); return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return ["weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "air", "surf", "date"].indexOf(it.kind) >= 0; }); })); },
     nogo: function (part) { var pb = PART_BOX.filter(function (x) { return x[0] === part; })[0], n = pb && document.querySelector(pb[1]); return !!(n && n.getAttribute("data-nogo")); },
     // where the remote starts on the dock: the first app, as couch-tv does; with no app showing (a
@@ -2887,7 +2980,12 @@
         .filter(function (it) { return hidden.indexOf(it.package) < 0; });
       var lim = D && D.elements && D.elements.dock && D.elements.dock.max_apps;
       if (lim) max = Math.min(max || 10, lim);
-      return out.filter(function (it) { return !free(it); }).slice(0, Math.max(1, max || 10)).concat(out.filter(free));
+      // the input tiles pinned on this TV (an HDMI port as its own tile, set on the TV or the phone) stay
+      // in a design's dock as they do in the standard one: after its apps, taking dock places, never
+      // pushed out by the design's own order (they are this TV's, so no design names them)
+      var pin = function (it) { return /^input:/.test(it.package || ""); }, pins = shown.filter(pin);
+      var apps = out.filter(function (it) { return !free(it) && !pin(it); });
+      return apps.slice(0, Math.max(1, (max || 10) - pins.length)).concat(pins, out.filter(free));
     }
   };
 })();

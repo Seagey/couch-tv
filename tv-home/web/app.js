@@ -1866,7 +1866,7 @@
     if (direct && !wxPlaceSet()) { data.weather = null; updateAmbientWeather(); return Promise.resolve(); }
     return (direct ? weatherDirect(fc) : api("GET", "/api/weather")).then(function (j) {
       data.weather = j;
-      if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("weather", [j && j.temp, j && j.code, j && j.daily && j.daily.length]);
+      if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("weather", [j && j.temp, j && j.code, j && j.daily && j.daily.length, j && j.marine && j.marine.wave, j && j.air && j.air.aqi, j && j.at]);
       clock();
       updateAmbientWeather();
     }, function () {});
@@ -1879,9 +1879,13 @@
     82: "wx_heavy_showers", 95: "wx_storms", 96: "wx_storms", 99: "wx_storms" };
   // With a forecast widget on a design, the same one call grows (widgets/CATALOGUE.md "Data plumbing" 1):
   // hourly, daily and the next hours of rain, still free, keyless and one request per refresh.
-  function weatherDirect(forecast) {
-    var url = "https://api.open-meteo.com/v1/forecast?latitude=" + WXCFG.lat + "&longitude=" + WXCFG.lon +
-      "&current=temperature_2m,weather_code,is_day&timezone=" + encodeURIComponent(WXCFG.timezone || "auto") +
+  // P: the place to read (the home's town when left out). Only the home's reading goes on to the
+  // widgets' own places (airAndSurf), so each place is asked once per refresh.
+  function weatherDirect(forecast, P) {
+    var home = !P;
+    P = P || WXCFG;
+    var url = "https://api.open-meteo.com/v1/forecast?latitude=" + P.lat + "&longitude=" + P.lon +
+      "&current=temperature_2m,weather_code,is_day&timezone=" + encodeURIComponent(P.timezone || "auto") +
       (forecast ? "&hourly=temperature_2m,weather_code,uv_index,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max&minutely_15=precipitation&forecast_days=7&forecast_minutely_15=12" : "&forecast_days=1");
     return fetch(url).then(function (r) { return r.json(); }).then(function (j) {
       var c = j.current, code = Math.round(c.weather_code);
@@ -1894,30 +1898,50 @@
         if (out.daily.length) { out.hi = Math.round(out.daily[0].hi); out.lo = Math.round(out.daily[0].lo); out.uv = Math.round(out.daily[0].uv || 0); }
         if (Dd.precipitation_probability_max) out.daily.forEach(function (d, i) { d.pop = Dd.precipitation_probability_max[i]; });
       }
-      return airAndSurf(out);
+      return home ? airAndSurf(out) : out;
     });
   }
-  // Only while an air or surf widget is on the home: Open-Meteo's free air quality and marine
-  // services for the same rounded place (widget-caps.js "air", "surf"). A failure leaves the rest.
+  // Open-Meteo's free air quality and marine services for one rounded place
+  function wxNowAt(times) { var h = new Date(), iso = h.getFullYear() + "-" + ("0" + (h.getMonth() + 1)).slice(-2) + "-" + ("0" + h.getDate()).slice(-2) + "T" + ("0" + h.getHours()).slice(-2) + ":00"; return Math.max(0, (times || []).indexOf(iso)); }
+  function wxAt(p) { return "latitude=" + p.lat + "&longitude=" + p.lon + "&timezone=" + encodeURIComponent(p.timezone || "auto"); }
+  function airFor(p) {
+    return fetch("https://air-quality-api.open-meteo.com/v1/air-quality?" + wxAt(p) + "&current=european_aqi&hourly=european_aqi&forecast_days=2")
+      .then(function (r) { return r.json(); }).then(function (j) {
+        var H = j.hourly || {}, i = wxNowAt(H.time);
+        return j.current && isFinite(j.current.european_aqi) ? { aqi: j.current.european_aqi, hourly: (H.european_aqi || []).slice(i, i + 12).filter(function (v) { return v != null; }) } : null;
+      });
+  }
+  function surfFor(p) {
+    return Promise.all([
+      fetch("https://marine-api.open-meteo.com/v1/marine?" + wxAt(p) + "&current=wave_height,wave_period,wave_direction&hourly=wave_height&forecast_days=2").then(function (r) { return r.json(); }),
+      fetch("https://api.open-meteo.com/v1/forecast?" + wxAt(p) + "&current=wind_speed_10m,wind_direction_10m&forecast_days=1").then(function (r) { return r.json(); })
+    ]).then(function (j) {
+      var c = j[0].current || {}, H = j[0].hourly || {}, i = wxNowAt(H.time), wc = j[1].current || {};
+      return { wave: c.wave_height == null ? NaN : c.wave_height, period: c.wave_period, dir: c.wave_direction, wind: wc.wind_speed_10m, windDir: wc.wind_direction_10m,
+        hourly: (H.wave_height || []).slice(i, i + 12).filter(function (v) { return v != null; }) };
+    });
+  }
+  // While an air or surf widget is on the home: the home town's air and swell (widget-caps.js "air",
+  // "surf"). Then every widget with a place of its own (its "place" setting, Home settings or the phone)
+  // gets that place's own reading: one forecast per distinct place, the swell only for a surf widget's
+  // place, the air only for an air widget's. They go in out.at["lat,lon"] (data().wxFor hands each widget
+  // its own). A failure leaves the rest.
   function airAndSurf(out) {
     var want = typeof CouchDesign !== "undefined" && CouchDesign.wantsKinds ? CouchDesign.wantsKinds(["air", "surf"]) : [];
-    if (!want.length) return out;
-    var at = "latitude=" + WXCFG.lat + "&longitude=" + WXCFG.lon + "&timezone=" + encodeURIComponent(WXCFG.timezone || "auto");
-    var nowAt = function (times) { var h = new Date(), iso = h.getFullYear() + "-" + ("0" + (h.getMonth() + 1)).slice(-2) + "-" + ("0" + h.getDate()).slice(-2) + "T" + ("0" + h.getHours()).slice(-2) + ":00"; return Math.max(0, (times || []).indexOf(iso)); };
-    var jobs = [];
-    if (want.indexOf("air") >= 0) jobs.push(fetch("https://air-quality-api.open-meteo.com/v1/air-quality?" + at + "&current=european_aqi&hourly=european_aqi&forecast_days=2")
-      .then(function (r) { return r.json(); }).then(function (j) {
-        var H = j.hourly || {}, i = nowAt(H.time);
-        if (j.current && isFinite(j.current.european_aqi)) out.air = { aqi: j.current.european_aqi, hourly: (H.european_aqi || []).slice(i, i + 12).filter(function (v) { return v != null; }) };
+    var own = wsPlaces(), jobs = [], places = {};
+    var bare = function (kind) { return own.every(function (w) { return w.kind !== kind; }) || (CouchDesign.widgetList && CouchDesign.widgetList().some(function (w) { return w.kind === kind && !wsPlace(w.key); })); };
+    if (want.indexOf("air") >= 0 && bare("air")) jobs.push(airFor(WXCFG).then(function (a) { if (a) out.air = a; }, function () {}));
+    if (want.indexOf("surf") >= 0 && bare("surf")) jobs.push(surfFor(WXCFG).then(function (m) { out.marine = m; }, function () {}));
+    own.forEach(function (w) { var k = placeKey(w.place); (places[k] = places[k] || { p: w.place, kinds: {} }).kinds[w.kind] = 1; });
+    Object.keys(places).forEach(function (k) {
+      var e = places[k];
+      jobs.push(weatherDirect(true, e.p).then(function (wx) {
+        var more = [];
+        if (e.kinds.surf) more.push(surfFor(e.p).then(function (m) { wx.marine = m; }, function () {}));
+        if (e.kinds.air) more.push(airFor(e.p).then(function (a) { if (a) wx.air = a; }, function () {}));
+        return Promise.all(more).then(function () { wx.place = e.p.name; (out.at = out.at || {})[k] = wx; });
       }, function () {}));
-    if (want.indexOf("surf") >= 0) jobs.push(Promise.all([
-      fetch("https://marine-api.open-meteo.com/v1/marine?" + at + "&current=wave_height,wave_period,wave_direction&hourly=wave_height&forecast_days=2").then(function (r) { return r.json(); }),
-      fetch("https://api.open-meteo.com/v1/forecast?" + at + "&current=wind_speed_10m,wind_direction_10m&forecast_days=1").then(function (r) { return r.json(); })
-    ]).then(function (j) {
-      var c = j[0].current || {}, H = j[0].hourly || {}, i = nowAt(H.time), wc = j[1].current || {};
-      out.marine = { wave: c.wave_height == null ? NaN : c.wave_height, period: c.wave_period, dir: c.wave_direction, wind: wc.wind_speed_10m, windDir: wc.wind_direction_10m,
-        hourly: (H.wave_height || []).slice(i, i + 12).filter(function (v) { return v != null; }) };
-    }, function () {}));
+    });
     return Promise.all(jobs).then(function () { return out; });
   }
 
@@ -4154,7 +4178,7 @@
     if (zone === "settings") {
       if (!dy) return;   // left and right change a value or the column
       if (SET.col === "secs") {
-        var n = wrapIndex(SECS.length, dy);
+        var n = wrapIndex(secsNow().length, dy);
         if (n !== SET.sec) { SET.sec = n; SET.sub = null; SET.msg = ""; SET.keyFocus = null; SET.ri = 0; }
       } else {
         var rows = rowsNow(), r = stepRow(rows, dy > 0 ? -1 : rows.length, dy);
@@ -4591,7 +4615,7 @@
     closeGear();
     zone = "settings";
     if (window.AmbientWeather) window.AmbientWeather.pause();
-    SET.col = "secs"; SET.sec = 0; SET.ri = 0; SET.keyFocus = null; SET.sub = null; SET.lift = null; SET.confirm = null; SET.msg = "";
+    SET.col = "secs"; SET.sec = 0; SET.ri = 0; SET.keyFocus = null; SET.sub = null; SET.lift = null; SET.confirm = null; SET.msg = ""; SET_ALL = false;
     clearFocus();
     $("settings").classList.add("on");
     document.documentElement.classList.add("setting");
@@ -4618,7 +4642,7 @@
   // ---- rows ----
   // couch-tv Studio is a name, the same in every language
   function secName(id) { return id === "designer" ? "couch-tv Studio" : t("sec_" + id); }
-  function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(SECS[SET.sec][0]); }
+  function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(secsNow()[SET.sec][0]); }
   function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info" && r.kind !== "code" && r.kind !== "qr"; }
   function firstRow(rows) { for (var i = 0; i < rows.length; i++) if (focusable(rows[i])) return i; return -1; }
   function stepRow(rows, i, d) { for (var j = i + d; j >= 0 && j < rows.length; j += d) if (focusable(rows[j])) return j; return i; }
@@ -4626,7 +4650,120 @@
   function head(label) { return { kind: "head", key: "h:" + label, label: label }; }
   function info(key, label, value, sub) { return { kind: "info", key: key, label: label, value: value, sub: sub }; }
 
-  function sectionRows(id) {
+  // ---- design aware Home settings ----
+  // With a couch-tv Studio design on screen, Home settings (and the phone's Home settings page, through
+  // atHomeView) shows only the sections and rows that change something the design shows: no dock rows
+  // when its dock is hidden, no scenes, video or photos when it has its own background, and so on. One
+  // line at the top says so, with Show all settings (until Home settings closes). With no design, or the
+  // design switched off, everything shows as before. The rules, row by row: docs/TV-HOME.md is not
+  // needed; they are all here, in useRules.
+  var SET_ALL = false;
+  var WX_USE = ["weather", "bigtemp", "hourly", "week", "rain", "uv", "air", "surf", "date", "clock", "glassclock"];
+  var PLACE_USE = WX_USE.concat(["sun", "solar", "worldclock", "commute", "moon"]);
+  var CLOCK_USE = ["clock", "tallclock", "glassclock", "flipclock", "worldclock", "analog", "timer", "agenda", "welcome", "sports"];
+  var PHOTO_USE = ["photo", "slideshow", "mosaic", "artframe", "memory"];
+  var KW_USE = ["keep", "keeprow", "upnext", "picks"];
+  var PEOPLE_USE = ["people", "keep", "keeprow", "upnext", "picks", "screentime"];
+  var ATHOME_USE = ["note", "list", "wifi", "guide", "agenda", "welcome", "screentime"];
+  function designUse() {
+    if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CouchDesign.uses) return null;
+    try { var u = CouchDesign.uses(); return u && u.on ? u : null; } catch (e) { return null; }
+  }
+  // what the design on screen uses; null: no design, so every setting shows
+  // (worked out once per moment: a key press draws Home settings, which asks several times, and a slow TV
+  // should not measure the design's parts each time)
+  var RULES = { at: 0, r: null };
+  function useRules() {
+    var now = Date.now();
+    if (now - RULES.at < 250) return RULES.r;
+    RULES = { at: now, r: workRules() };
+    return RULES.r;
+  }
+  function workRules() {
+    var u = designUse();
+    if (!u) return null;
+    var p = u.parts || {}, has = function (list) { return (u.kinds || []).some(function (k) { return list.indexOf(k) >= 0; }); };
+    var wx = !!(p.weather || has(WX_USE));
+    return {
+      lookPick: !u.background,                                // a design with its own background is the look (Loop would switch it off)
+      scenes: !u.background,                                  // scenes show only behind a design with no background
+      video: !u.background,
+      photos: !u.background || has(PHOTO_USE),
+      clock: !!(p.clock || has(CLOCK_USE)),
+      clockStyle: !!p.clock,
+      glass: !!(p.clock || p.dock || p.keep_watching || u.glass),
+      dockLook: !!p.dock,
+      keepWatching: !!(p.keep_watching || has(KW_USE)),
+      shelfFollow: !!(p.keep_watching && p.dock),
+      startFocus: !!(p.dock || p.keep_watching || p.people),
+      inputTile: false,                                       // the Inputs tile never shows with a design (inputsTileItem)
+      inputs: !!p.dock,                                       // pinned input tiles: in the design's dock (design.js dock), not in its app widgets
+      wxNumbers: wx,
+      location: wx || has(PLACE_USE) || WX_AMBIENT || WX_SUN_GRADE,
+      weather: wx || WX_AMBIENT || WX_SUN_GRADE,
+      apps: !!p.dock,
+      people: !!(p.people || has(PEOPLE_USE)),
+      quick: !!(p.quick || has(["quick"])),
+      athome: has(ATHOME_USE)
+    };
+  }
+  function secsNow() {
+    var r = SET_ALL ? null : useRules();
+    if (!r) return SECS;
+    return SECS.filter(function (sc) { var id = sc[0]; return r[id] === undefined || r[id] !== false; });
+  }
+  // the row keys each rule hides (a heading goes when nothing under it is left)
+  var ROW_RULE = { "keep-photo": "scenes", "keep-photo-pick": "scenes", "photos-count-look": "scenes", "sun-sync": "scenes", "scene-secs": "scenes",
+    clock: "clock", "clock-style": "clockStyle", glass: "glass", "glass-amount": "glass", "glass-note": "glass",
+    "moving-tiles": "dockLook", "dock-mac": "dockLook", "glass-icons": "dockLook", "glass-focus": "dockLook",
+    "keep-watching": "keepWatching", "shelf-follows-app": "shelfFollow", "start-focus": "startFocus", "idle-photo-seconds": "startFocus", "input-tile": "inputTile",
+    video: "video", "video-url": "video", "video-rm": "video", "video-note": "video",
+    "photos-count": "photos", "photo-pick": "photos", "photo-nopick": "photos", "photo-url": "photos", "photos-note": "photos", "photos-storage": "photos",
+    "wx-unit": "wxNumbers", "wx-every": "wxNumbers" };
+  function rowRule(key) {
+    if (ROW_RULE[key]) return ROW_RULE[key];
+    if (/^look:/.test(key)) return "lookPick";
+    if (/^scene:/.test(key)) return "scenes";
+    if (/^photo-rm:/.test(key)) return "photos";
+    return null;
+  }
+  function designBanner() {
+    return SET_ALL ? [info("dz-banner", "Every setting is showing", "", "Some are for parts this couch-tv Studio design doesn't show."),
+      { kind: "action", key: "set-fewer", label: "Show only what this design uses", act: function () { setAll(false); } }]
+      : [info("dz-banner", "This home uses a couch-tv Studio design", "", "Settings for parts it doesn't show are hidden."),
+        { kind: "action", key: "set-all", label: "Show all settings", sub: "Or go back to the standard home in couch-tv Studio", act: function () { setAll(true); } }];
+  }
+  function setAll(on) {
+    var id = secsNow()[SET.sec] && secsNow()[SET.sec][0];
+    SET_ALL = !!on;
+    var i = secsNow().map(function (s) { return s[0]; }).indexOf(id);
+    SET.sec = i >= 0 ? i : 0;
+    SET.keyFocus = on ? "set-fewer" : "set-all";
+    SET.msg = on ? "Showing every setting until you close Home settings." : "";
+  }
+  function designAware(id, rows) {
+    var u = designUse(), r = SET_ALL ? null : useRules();
+    if (!u) return rows;
+    if (r) {
+      var hideHead = {};
+      if (!r.lookPick) hideHead[t("look_head")] = 1;
+      if (!r.scenes) hideHead[t("scenes_head")] = 1;
+      rows = rows.filter(function (row) {
+        if (row.kind === "head") return !hideHead[row.label];
+        var rule = rowRule(row.key);
+        return !rule || r[rule] !== false;
+      });
+      // a heading with nothing left under it goes too
+      rows = rows.filter(function (row, i) { return row.kind !== "head" || (rows[i + 1] && rows[i + 1].kind !== "head"); });
+    }
+    // the line that says so, at the top of the first section and of couch-tv Studio
+    var first = secsNow()[0] && secsNow()[0][0];
+    if (id === first || id === "designer") rows = designBanner().concat(rows);
+    return rows;
+  }
+
+  function sectionRows(id) { return designAware(id, sectionRowsAll(id)); }
+  function sectionRowsAll(id) {
     if (id === "updates") return updateRows();
     if (id === "language") return languageRows();
     if (id === "location") return locationRows();
@@ -4941,7 +5078,8 @@
       if (CFG.design && LOOP) rows.push({ kind: "action", key: "dz-loop", label: "Your design", sub: "Designs show in the Night, Classic and OLED looks. Switch to Night to see it",
         act: function () { ST.look = "night"; keep("tvhome.look", "night"); saveSettings(); restart(); } });
       else if (CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.settingsRow) rows.push(CouchDesign.settingsRow(restart));
-      commuteRows(rows);
+      // (the Commute's Where to is its own page now, Widgets on this home; tvhome.commute stays the 0.13.8 fallback)
+      widgetRows(rows);   // each widget on the design with settings of its own
     }
     if (window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) rows.push({ kind: "nav", key: "dz-smart", label: "Smart home",
       sub: window.smartHome.setup.status().set ? "Connected. Change what shows, or add a device" : "Connect Home Assistant: your aircon, lights, cameras, speakers and more", act: openSmartSetup });
@@ -4970,6 +5108,8 @@
     // where the household drives to (the Commute widget's place, kept on this TV)
     var cm = kept("tvhome.commute"); if (cm && cm.name) w.push(String(cm.name));
     try { w.push(location.hostname); } catch (e) {}
+    // every place a widget was given on this TV (a beach, where you drive to): its name and area
+    Object.keys(wsAll()).forEach(function (k) { var v = wsAll()[k]; Object.keys(v).forEach(function (n) { var p = v[n]; if (p && typeof p === "object" && !Array.isArray(p) && isFinite(p.lat)) w.push(p.name, p.area); }); });
     w = w.concat(ahPrivateWords());
     return w.filter(function (x) { return typeof x === "string" && x.length >= 3 && !/^(home\.tvos\.invalid|localhost|127\.0\.0\.1)$/.test(x); });
   }
@@ -5806,7 +5946,7 @@
     SET.confirm = null;
     if (SET.col === "secs") {
       if (dy) {
-        var n = Math.max(0, Math.min(SECS.length - 1, SET.sec + dy));
+        var n = Math.max(0, Math.min(secsNow().length - 1, SET.sec + dy));
         if (n !== SET.sec) { SET.sec = n; SET.sub = null; SET.msg = ""; SET.keyFocus = null; SET.ri = 0; }
       } else if (dx > 0) enterRows();
     } else if (dy) {
@@ -5916,12 +6056,12 @@
       else SET.col = "secs";
     }
     $("set-title").textContent = t("set_title");
-    $("set-secs").innerHTML = SECS.map(function (sc, i) {
+    $("set-secs").innerHTML = secsNow().map(function (sc, i) {
       var cls = "ssec" + (i === SET.sec ? (SET.col === "secs" ? " focus" : " on") : "");
       return '<div class="' + cls + '"><i>' + ICONS[sc[1]] + "</i><span>" + esc(secName(sc[0])) + "</span></div>";
     }).join("");
     $("set-crumb").textContent = SET.sub ? SET.sub.crumb : "";
-    $("set-head").textContent = SET.sub ? SET.sub.title() : secName(SECS[SET.sec][0]);
+    $("set-head").textContent = SET.sub ? SET.sub.title() : secName(secsNow()[SET.sec][0]);
     var box = $("set-rows");
     // Rebuilding the rows drops the list back to the top on some TV engines (a 2020 Samsung,
     // Tizen 5.5), and the smooth scroll below then ran from the top down to the row: every move
@@ -6715,11 +6855,16 @@
     return { note: r.note ? { text: r.note.text, from: r.note.from || "" } : null, lists: r.lists || [], wifi: r.wifi || null, guide: r.guide || [],
       cal: r.cal ? { host: CouchAtHome.calHost(r.cal.url) } : null,
       stay: { host: st.url ? CouchAtHome.calHost(st.url) : "", checkin: st.checkin || "15:00", checkout: st.checkout || "10:00" },
-      guest: (r.guest && r.guest.name) || "", lim: CouchAtHome.LIM, times_in: CouchAtHome.TIMES_IN, times_out: CouchAtHome.TIMES_OUT };
+      guest: (r.guest && r.guest.name) || "", lim: CouchAtHome.LIM, times_in: CouchAtHome.TIMES_IN, times_out: CouchAtHome.TIMES_OUT,
+      // the design on screen, so the phone shows only what it uses (designView): rides along with At home,
+      // the one answer the on-TV app already asks this page for, so no new way into the TV is needed
+      design: designView() };
   }
   // e: { note: {text, from} or null, lists: [...], wifi: {...} or null, guide: [...], cal_url: "https://..." or "" to remove,
   //      stay_url, checkin, checkout }. Only the parts named change; athome.js clean() checks the whole record.
+  // The design's own widgets from the phone (widget_set, design_apps) go to designEdit, outside At home.
   function atHomeEdit(e) {
+    if (e && typeof e === "object" && (e.widget_set || e.design_apps)) return designEdit(e);
     if (!AH || !e || typeof e !== "object") return { ok: false, error: "At home is not in this version of the home." };
     var has = function (k) { return Object.prototype.hasOwnProperty.call(e, k); };
     var bad = "";
@@ -7186,7 +7331,17 @@
   function webStart() {
     if (WEB || typeof CouchWidgetWeb === "undefined" || !CouchDesign.widgetsOf || (MOCK && !/[?&]weblive=1/.test(Q))) return;
     WEB = CouchWidgetWeb.loader({
-      widgets: function () { return CouchDesign.widgetsOf(Object.keys(CouchWidgetWeb.SOURCES)); },
+      // each as it is on this TV: its own settings over the design's (a source, a competition or a
+      // watchlist picked on the TV is the one fetched), and a news source "Best for your country" as the feed
+      widgets: function () {
+        var W = window.CouchWidgets, env = { data: { wset: wsData(), country: homeCountry() } };
+        return CouchDesign.widgetsOf(Object.keys(CouchWidgetWeb.SOURCES)).map(function (w) {
+          if (!W || !W.withSettings) return w;
+          w = W.withSettings(w, env);
+          if (w.kind === "news" && W.feedFor) w = Object.assign({}, w, { opts: Object.assign({}, w.opts, { feed: W.feedFor((w.opts || {}).feed, env) }) });
+          return w;
+        });
+      },
       canRelay: webRelayOk, relay: webRelay,
       json: function (url) { return fetch(url).then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); }); },
       // the last answers, on this TV only (headlines and prices, never anything about the household)
@@ -7235,10 +7390,15 @@
   // The commute's two places, kept on this TV only (never in a design, never sent to the bridge): from
   // the town set in Location (or config.json's weather place), to the place picked in Home settings,
   // couch-tv Studio, Commute. Both are towns or suburbs from the place search, about a kilometre wide.
-  function commutePlaces() {
+  // w: one Commute widget (the web loader asks for each: widget-web.js places(w)); none: the first one
+  function commutePlaces(w) {
     var pl = ST.place && isFinite(ST.place.lat) && isFinite(ST.place.lon) ? { name: ST.place.name, lat: ST.place.lat, lon: ST.place.lon }
       : CFG.weather && isFinite(CFG.weather.lat) && isFinite(CFG.weather.lon) ? { name: String(CFG.weather.place || "").split(",")[0], lat: CFG.weather.lat, lon: CFG.weather.lon } : null;
     var to = kept("tvhome.commute");
+    // the Commute widget's own settings (Widgets on this home: Where to, and From when it is not the
+    // home's town) win over the older Commute rows' place
+    var cw = typeof CouchDesign !== "undefined" && CouchDesign.widgetList && CouchDesign.on() ? CouchDesign.widgetList().filter(function (x) { return x.kind === "commute" && (!w || w.id === undefined || x.id === w.id); })[0] : null;
+    if (cw) { var wt = cleanPlace(wsOf(cw.key).to), wf = cleanPlace(wsOf(cw.key).from); if (wt) to = wt; if (wf) pl = { name: wf.name, lat: wf.lat, lon: wf.lon }; }
     return { from: pl, to: to && isFinite(to.lat) && isFinite(to.lon) ? { name: String(to.name || ""), lat: +to.lat, lon: +to.lon } : null };
   }
   // Picks for you: each person's Keep watching (no kids or guest profiles' shows are picked for others)
@@ -7263,6 +7423,19 @@
     api("POST", "/api/continue/open", { id: it.id, who: p.owner }, 60000)
       .then(function (res) { status(res.note ? tBridge(res.note_key, res.note_vars, res.note) : ""); })
       .catch(function (e) { if (TV && it.app && TV.launch(it.app.package)) { status(""); return; } status(tBridge(e.key, e.vars, e.message)); });
+  }
+  // each Commute widget with its own Where to (or From): the same shape as commuteData, by the widget's id
+  function commuteByData() {
+    var out = {};
+    if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CouchDesign.widgetList) return out;
+    var home = commutePlaces();
+    CouchDesign.widgetList().filter(function (w) { return w.kind === "commute"; }).forEach(function (w) {
+      var to = cleanPlace(wsOf(w.key).to), from = cleanPlace(wsOf(w.key).from) || home.from;
+      if (!to) return;
+      out[w.id] = { from: from ? { name: from.name } : null, to: { name: to.name },
+        key: typeof CouchWidgetWeb !== "undefined" ? CouchWidgetWeb.routeKey(from, to) : null };
+    });
+    return out;
   }
   function commuteData() {
     var p = commutePlaces();
@@ -7323,6 +7496,411 @@
     webChanged();
   }
 
+  // ---------------- each widget's own settings (docs/WIDGET-SETTINGS-CONTRACT.md) ----------------
+  // Every widget on the design now with a `settings` list in widget-caps.js gets its own page: Hold OK
+  // on it, "Settings for this widget" (design.js), or Home settings, couch-tv Studio, "Widgets on this
+  // home", where each is named by kind and where it sits ("Surf, top right"). The phone's Home settings
+  // page shows the same list ("Widgets on this TV", designView). Nothing here is written per widget: each
+  // row is drawn from the setting's type. Values live in Home settings, ST.widgets["<id>|<kind>"] =
+  // { key: value }, so they ride /api/settings to the on-TV app or the computer at home like every other
+  // Home setting, never in a design and never on a couch-tv server. Widgets read them as env.wset[<id>]
+  // (data().wset). A widget that leaves the design keeps its values, unseen, until it comes back.
+  var WS_TYPES = { pick: "choice", onoff: "toggle" };   // the spec's names for the contract's types
+  function wsRecords(kind) {
+    var C = window.CouchWidgetCaps, list = C && C.settings ? C.settings(kind) : [];
+    return (Array.isArray(list) ? list : []).filter(function (s) { return s && /^[A-Za-z0-9_]{1,30}$/.test(s.key || "") && (!Array.isArray(s.where) || s.where.indexOf("tv") >= 0 || s.where.indexOf("phone") >= 0); })
+      .map(function (s) {
+        return { key: s.key, label: String(s.label || s.key), type: WS_TYPES[s.type] || s.type || "text", help: String(s.help || s.sub || ""), options: Array.isArray(s.options) ? s.options : [],
+          def: s["default"] !== undefined ? s["default"] : s.def, private: !!s["private"], min: s.min, max: s.max, step: s.step, domain: s.domain || "", coast: !!s.coast,
+          pre: s.pre === true, many: !!s.many, from: s.from || "", when: s.when && typeof s.when === "object" ? s.when : null, sets: s.sets || "", store: s.store || "tv",
+          where: Array.isArray(s.where) ? s.where : ["tv", "phone"] };
+      // only the settings a widget really reads now (pre: true); the rest wait for their renderers
+      }).filter(function (s) { return s.pre && (s.where.indexOf("tv") >= 0 || s.where.indexOf("phone") >= 0); });
+  }
+  // a setting's value now: set on this TV, else what the design says (o.opts), else its default
+  function wsCur(w, s) {
+    var v = wsOf(w.key)[s.key];
+    if (v !== undefined && v !== null && v !== "") return v;
+    // bins, Which bin goes out this week: read back from the count the widget keeps (anchor)
+    if (s.sets === "anchor") {
+      var an = wsOf(w.key).anchor !== undefined ? +wsOf(w.key).anchor : +(w.opts || {}).anchor;
+      if (isFinite(an) && (wsOf(w.key).anchor !== undefined || (w.opts || {}).anchor !== undefined)) {
+        var wk = Math.floor((binNight(w).getTime() / 86400000 - an) / 7);
+        return ((wk % 2) + 2) % 2 === 0 ? "a" : "b";
+      }
+    }
+    // the Commute's Where to set with 0.13.8's Commute rows (kept on this TV, tvhome.commute) still counts
+    if (w.kind === "commute" && s.key === "to") { var old = cleanPlace(kept("tvhome.commute")); if (old) return old; }
+    v = (w.opts || {})[s.key];
+    return v !== undefined && v !== null && v !== "" ? v : s.def;
+  }
+  // the coming bin night (the widget's weekday), local midnight, as the bins widget counts it
+  function binNight(w) {
+    var o = (w.settings || []).filter(function (x) { return x.key === "weekday"; })[0], wd = +(o ? (wsOf(w.key).weekday !== undefined ? wsOf(w.key).weekday : (w.opts || {}).weekday) : (w.opts || {}).weekday);
+    if (!isFinite(wd) || wd < 0 || wd > 6) wd = 3;
+    var d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + (wd - d.getDay() + 7) % 7);
+  }
+  // A new design never takes the last one's widget changes by accident. When the design on screen is not
+  // the one these values were set on: a value that overrides a design's own choice (store "design": a
+  // news source, a clock format) is dropped everywhere; a value kept on the TV (store "tv": a beach, where
+  // you drive to) stays, keyed by widget id and kind, so it only ever applies to that same widget again.
+  // The same design starting again changes nothing.
+  function wsNewDesign() {
+    if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CFG.design) return;
+    var s = JSON.stringify(CFG.design), h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    var mark = String(h), was = ST.widgets_design;
+    if (was === mark) return;
+    var C = window.CouchWidgetCaps, all = wsAll(), changed = false;
+    if (was !== undefined) Object.keys(all).forEach(function (key) {
+      var kind = key.split("|")[1] || "", recs = C && C.settings ? C.settings(kind) : [];
+      Object.keys(all[key]).forEach(function (k) {
+        var r = recs.filter(function (x) { return x && (x.key === k || x.sets === k); })[0];
+        if (!r || r.store !== "tv") { delete all[key][k]; changed = true; }
+      });
+      if (!Object.keys(all[key]).length) delete all[key];
+    });
+    ST.widgets = all;
+    ST.widgets_design = mark;
+    keepSettings(true);
+    if (!OFFLINE && data.bridge !== false) { clearTimeout(pushTimer); pushTimer = setTimeout(function () { pushSettings(kept(ST_KEY)); }, 400); }
+    if (changed && CouchDesign.dataChanged) CouchDesign.dataChanged("wset", JSON.stringify(all));
+  }
+  // one setting saved, and what follows from it: a "sets" setting writes its own count; a new bin night
+  // keeps the same bin going out this week
+  function wsSave(w, s, v) {
+    var keep = s.key === "weekday" ? w.settings.filter(function (r) { return r.sets === "anchor" && wsOf(w.key).anchor !== undefined; }).map(function (r) { return [r, wsCur(w, r)]; }) : [];
+    wsSet(w.key, s.key, v);
+    if (s.sets) { if (v === null || v === undefined) wsSet(w.key, s.sets, null); else wsSets(w, s, v); }
+    keep.forEach(function (p) { wsSets(w, p[0], p[1]); });
+  }
+  // "when": a setting that only means something once another one is set ({ alt: true }; "set": any
+  // value but "off" or none)
+  function wsShown(w, s) {
+    if (!s.when) return true;
+    return Object.keys(s.when).every(function (k) {
+      var o = w.settings.filter(function (x) { return x.key === k; })[0], v = o ? wsCur(w, o) : (w.opts || {})[k], want = s.when[k];
+      return want === "set" ? v !== undefined && v !== null && v !== "" && v !== "off" && v !== false : String(v) === String(want);
+    });
+  }
+  // a list from this TV itself (type tvlist): its photos, people, lists or calendars, as [value, words]
+  function tvlistOptions(from) {
+    if (from === "photos") return (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && p.id; }).map(function (p, i) { return [p.id, "Photo " + (i + 1)]; });
+    if (from === "people") return NOBODY ? [] : PEOPLE.map(function (p) { return [p.id, p.name]; });
+    if (from === "lists") return AH ? (AH.store.get().lists || []).map(function (l) { return [l.name, l.name]; }) : [];
+    if (from === "calendars") return AH && AH.store.get().cal ? [["main", "Your calendar"]] : [];
+    return [];
+  }
+  function wsOptions(s) { return s.type === "tvlist" ? tvlistOptions(s.from) : s.options; }
+  // "sets": bins, Which bin goes out this week, also sets the count the widget keeps from (anchor):
+  // the coming bin night is week 0 for the first bin, week 1 for the second
+  function wsSets(w, s, v) {
+    if (s.sets !== "anchor") return;
+    // the day before the coming bin night, in whole days: the widget's count (local midnight / one day)
+    // is then just past it in every time zone, so this week is week 0 for the first bin
+    var night = binNight(w);
+    wsSet(w.key, "anchor", Math.round(Date.UTC(night.getFullYear(), night.getMonth(), night.getDate()) / 86400000) - 1 - (v === "b" ? 7 : 0));
+  }
+  function wsAll() { var w = ST.widgets; return w && typeof w === "object" && !Array.isArray(w) ? w : {}; }
+  function wsOf(key) { var v = wsAll()[key]; return v && typeof v === "object" && !Array.isArray(v) ? v : {}; }
+  function wsSet(key, k, v) {
+    var all = ST.widgets = wsAll(), rec = all[key] = wsOf(key);
+    if (v === null || v === undefined || v === "") delete rec[k]; else rec[k] = v;
+    if (!Object.keys(rec).length) delete all[key];
+    saveSettings();
+    // a place changed: read the weather for it now (the Commute reads its own route)
+    if (/\|commute$/.test(key)) { if (WEB) WEB.tick(); webChanged(); }
+    else if (wsRecords(String(key).split("|")[1] || "").some(function (s) { return s.key === k && s.type === "place"; })) refreshWeather();
+    if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("wset", JSON.stringify(wsAll()));
+  }
+  // a place as the place search gives it (two decimals: the town, never a house)
+  function cleanPlace(p) {
+    p = p && typeof p === "object" ? p : {};
+    var lat = Math.round(+p.lat * 100) / 100, lon = Math.round(+p.lon * 100) / 100, name = String(p.name || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 60);
+    if (!name || p.lat === null || p.lon === null || p.lat === "" || p.lon === "" || !isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+    var out = { name: name, lat: lat, lon: lon }, area = String(p.area || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 80);
+    if (area) out.area = area;
+    out.timezone = typeof p.timezone === "string" && /^([A-Z][A-Za-z_]{1,30}(\/[A-Z][A-Za-z_-]{1,30}){1,2}|auto|UTC|GMT)$/.test(p.timezone) ? p.timezone : "auto";
+    return out;
+  }
+  // the same key the widgets look a place up by (widgets.js placeKey): two decimals each
+  function placeKey(p) { return (+p.lat).toFixed(2) + "," + (+p.lon).toFixed(2); }
+  function homeCountry() { try { return (window.I18N && I18N.country && I18N.country()) || ""; } catch (e) { return ""; } }
+  // the place a widget's reading is for: its place setting (surf "place", the weather widgets' "town"),
+  // never the Commute's two ends (they are its route, read by the commute itself)
+  function wsPlace(key) {
+    var kind = String(key).split("|")[1] || "", vals = wsOf(key);
+    if (kind === "commute") return null;
+    var s = wsRecords(kind).filter(function (x) { return x.type === "place" && cleanPlace(vals[x.key]); })[0];
+    return s ? cleanPlace(vals[s.key]) : null;
+  }
+  // the widgets on the design now with a place of their own: [{ key, id, kind, place }]
+  function wsPlaces() {
+    if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CouchDesign.widgetList) return [];
+    return CouchDesign.widgetList().map(function (w) { return { key: w.key, id: w.id, kind: w.kind, place: wsPlace(w.key) }; }).filter(function (w) { return w.place; });
+  }
+  // what the widgets read (data()): wset by widget id, and each widget's own weather for its own place
+  function wsData() {
+    var out = {};
+    if (typeof CouchDesign === "undefined" || !CouchDesign.widgetList || !CouchDesign.on()) return out;
+    CouchDesign.widgetList().forEach(function (w) { var v = wsOf(w.key); if (Object.keys(v).length) out[w.id] = JSON.parse(JSON.stringify(v)); });
+    return out;
+  }
+  function wxForData() {
+    var out = {}, at = data.weather && data.weather.at;
+    if (!at || !WX_SHOW) return out;
+    wsPlaces().forEach(function (w) { var k = placeKey(w.place); if (at[k]) out[w.id] = at[k]; });
+    return out;
+  }
+  function widgetName(kind) {
+    var C = window.CouchWidgetCaps, r = C && C.get ? C.get(kind) : null;
+    return (r && r.name) || kind;
+  }
+  // where a widget sits, in words: "top right", "middle left", "bottom", "in the middle" (a stack's
+  // widget: "top right, in a stack")
+  function whereWords(w) {
+    var cx = w.x + w.w / 2, cy = w.y + w.h / 2;
+    var col = cx < 640 ? "left" : cx < 1280 ? "" : "right", row = cy < 360 ? "top" : cy < 720 ? "middle" : "bottom";
+    var words = row === "middle" && !col ? "in the middle" : row + " " + (col || "middle");
+    return /\//.test(w.id) ? words + ", in a stack" : words;
+  }
+  // the widgets on screen with settings of their own: [{ key, id, kind, label, settings, name, title }]
+  function widgetsWithSettings() {
+    if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CouchDesign.widgetList) return [];
+    var list = CouchDesign.widgetList().map(function (w) { w.settings = wsRecords(w.kind); w.name = widgetName(w.kind); return w; }).filter(function (w) { return w.settings.length > 0; });
+    list.forEach(function (w) {
+      w.title = w.name + ", " + whereWords(w);
+      // two of a kind in the same part of the screen: number them
+      var same = list.filter(function (x) { return x.name === w.name && whereWords(x) === whereWords(w); });
+      if (same.length > 1) w.title += " " + (same.indexOf(w) + 1);
+    });
+    return list;
+  }
+  function townName() { return String((WXCFG && WXCFG.place) || "").split(",")[0]; }
+  // a setting's value now, in words (a private one never shows itself)
+  function wsWords(s, v) {
+    if (s.type === "place") { var p = cleanPlace(v); return p ? p.name : s.key === "to" ? "Not set" : townName() ? townName() + " (your home's town)" : "Not set"; }
+    if (v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length)) return s.many ? "None picked" : "Not set";
+    if (s.private && s.type !== "tvlist" && s.type !== "choice") return "Set";
+    if (s.type === "toggle") return v ? t("on") : t("off");
+    var opts = wsOptions(s), name = function (x) { var o = opts.filter(function (y) { return String(y[0]) === String(x); })[0]; return o ? String(o[1]) : String(x); };
+    if (Array.isArray(v)) return v.map(s.type === "choice" || s.type === "tvlist" ? name : String).join(", ");
+    if (s.type === "choice" || s.type === "tvlist") return name(v);
+    if (s.type === "app") { var it = arrangeItems().items.filter(function (x) { return x.package === v || (window.CouchApps && window.CouchApps.idOf(x.package) === v); })[0]; return it ? it.name : String(v); }
+    return String(v);
+  }
+  function widgetRows(rows) {
+    var list = widgetsWithSettings();
+    if (!list.length) return;
+    rows.push(head("Widgets on this home"));
+    list.forEach(function (w) {
+      var s = w.settings[0];
+      rows.push({ kind: "nav", key: "wset:" + w.key, label: w.title, sub: s.label + ": " + wsWords(s, wsCur(w, s)), act: function () { openWidget(w.key); } });
+    });
+  }
+  function widgetByKey(key) { return widgetsWithSettings().filter(function (x) { return x.key === key; })[0] || null; }
+  function openWidget(key) {
+    var up = SET.sub;
+    SET.sub = { up: up, back: "wset:" + key, crumb: "Widgets on this home", title: function () { var w = widgetByKey(key); return w ? w.title : ""; },
+      rows: function () { var w = widgetByKey(key); return w ? oneWidgetRows(w) : [info("w-gone", "This widget is not on the home now")]; } };
+    SET.col = "rows"; SET.keyFocus = null; SET.ri = 0;
+  }
+  // Hold OK on a widget, Settings for this widget: Home settings straight at its page, on every TV the
+  // home runs on (the launcher, Samsung, LG and the other web TVs)
+  function openWidgetPage(key) {
+    if (!widgetByKey(key)) return;
+    openSettings();
+    var i = secsNow().map(function (s) { return s[0]; }).indexOf("designer");
+    if (i >= 0) SET.sec = i;
+    openWidget(key);
+    renderSettings();
+  }
+  // each setting's rows on the TV, by its type
+  function oneWidgetRows(w) {
+    var rows = [], vals = wsOf(w.key), shown = w.settings.filter(function (s) { return wsShown(w, s); });
+    shown.forEach(function (s) {
+      var id = w.key + ":" + s.key, v = vals[s.key], cur = wsCur(w, s), set = function (x) { wsSave(w, s, x); };
+      var opts = wsOptions(s);
+      if (shown.length > 1 && (s.type === "place" || s.many)) rows.push(head(s.label));
+      if (s.type === "place") { placeRows(w, s, rows); return; }
+      if ((s.type === "choice" || s.type === "tvlist") && s.many) {
+        // a list: one tick per choice (up to the setting's max, 4 when it says none)
+        var picked = Array.isArray(cur) ? cur.map(String) : [], most = isFinite(s.max) ? +s.max : 4;
+        if (!opts.length) rows.push(info(id, s.label, "Nothing to pick on this TV yet", s.help));
+        opts.forEach(function (o, i) {
+          var on = picked.indexOf(String(o[0])) >= 0;
+          rows.push({ kind: "check", key: id + ":" + i, label: String(o[1]), checked: on, act: function () {
+            var now = (Array.isArray(wsCur(w, s)) ? wsCur(w, s) : []).filter(function (x) { return String(x) !== String(o[0]); });
+            if (!on) { if (now.length >= most) { SET.msg = "Up to " + most + ". Untick one first."; return; } now.push(o[0]); }
+            set(now.length ? now : null);
+          } });
+        });
+        if (s.help) rows.push(info(id + ":help", "", "", s.help));
+      } else if ((s.type === "choice" || s.type === "tvlist") && opts.length) {
+        rows.push({ kind: "cycle", key: id, label: s.label, sub: s.help, value: wsWords(s, cur), act: function () {
+          var i = opts.map(function (o) { return String(o[0]); }).indexOf(String(cur)), o = opts[(i + 1) % opts.length];
+          set(o[0]);
+        } });
+      } else if (s.type === "tvlist") {
+        rows.push(info(id, s.label, "Nothing to pick on this TV yet", s.from === "photos" ? "Add photos in Look and scenes, Your photos" : s.from === "lists" ? "Add a list in couch-tv Studio, At home" : s.help));
+      } else if (s.type === "toggle") {
+        rows.push({ kind: "toggle", key: id, label: s.label, sub: s.help, value: cur ? t("on") : t("off"), act: function () { set(!cur); } });
+      } else if (s.type === "number") {
+        var lo = isFinite(s.min) ? +s.min : 0, hi = isFinite(s.max) ? +s.max : 100, st = isFinite(s.step) && +s.step > 0 ? +s.step : 1;
+        rows.push({ kind: "cycle", key: id, label: s.label, sub: s.help, value: cur === undefined || cur === null || cur === "" ? "Not set" : String(cur), act: function () {
+          var n = isFinite(+cur) && cur !== null && cur !== "" ? +cur + st : lo;
+          n = Math.round((n - lo) / st) * st + lo; set(n > hi ? lo : Math.round(n * 1000) / 1000);
+        } });
+      } else if (s.type === "app") {
+        var apps = arrangeItems().items.filter(function (x) { return (!x.kind || x.kind === "app") && x.package && !/^(screen|input):/.test(x.package); });
+        rows.push({ kind: "cycle", key: id, label: s.label, sub: s.help, value: wsWords(s, cur), act: function () {
+          var keys = apps.map(function (x) { return (window.CouchApps && window.CouchApps.idOf(x.package)) || x.package; }), i = keys.indexOf(cur);
+          if (keys.length) set(keys[(i + 1) % keys.length]);
+        } });
+      } else if (s.type === "apps") {
+        rows.push(info(id, s.label, "", "On the home, hold OK on an app in it: Change app, Move, Remove or Add app. Or use Home settings on your phone."));
+      } else if (s.type === "device") {
+        var sh = window.smartHome && window.smartHome.setup && window.smartHome.setup.can();
+        rows.push(info(id, s.label, wsWords(s, cur), s.help || "Picked from what this TV shows from Home Assistant"));
+        if (sh) rows.push({ kind: "nav", key: id + ":smart", label: "Smart home", sub: "Pick the devices this TV shows", act: openSmartSetup });
+      } else if (s.type === "image") {
+        return;   // a picture is put in the widget in couch-tv Studio
+      } else {
+        // text, a team, a calendar link and anything newer: typed. A list of words (many) is typed with
+        // commas between. A calendar link or anything private shows only "Set".
+        rows.push({ kind: "input", key: id, label: s.label, sub: s.help || (s.private ? "Kept on this TV and your home Wi-Fi only" : ""), value: wsWords(s, cur), act: function () {
+          var was = s.private ? "" : Array.isArray(cur) ? cur.join(", ") : typeof cur === "string" ? cur : "";
+          startTyping({ label: s.label + (s.many ? ", with commas between" : ""), value: was, url: s.type === "calendar", submit: function (x) {
+            x = String(x || "").trim().slice(0, s.type === "calendar" ? 600 : s.many ? 200 : 80);
+            if (s.type === "calendar" && x) { x = window.CouchAtHome ? CouchAtHome.calUrl(x) : ""; if (!x) { SET.msg = "That is not a calendar link. It starts with https://."; return; } }
+            if (s.many) { var parts = x.split(",").map(function (y) { return y.trim(); }).filter(Boolean).slice(0, isFinite(s.max) ? +s.max : 6); set(parts.length ? parts : null); }
+            else set(x);
+            SET.msg = x ? "Saved." : "Cleared.";
+          } });
+        } });
+      }
+      // a value set on this TV over the design's own: one press back to the design's
+      if (v !== undefined && v !== "" && s.type !== "place") rows.push({ kind: "action", key: id + ":clear", label: s.store === "design" ? "Use the design's " + s.label.toLowerCase() : "Clear " + s.label.toLowerCase(), act: function () { wsSet(w.key, s.key, null); if (s.sets) wsSet(w.key, s.sets, null); } });
+    });
+    rows.push(info("w-kept", "Changed here, kept on this TV only, never in a design."));
+    return rows;
+  }
+  // a place setting: the town search (the same one as Location), kept on this TV only
+  var WPLACE = { key: "", q: "", list: null, busy: false, err: false }, wgeoTimer = null, wgeoTicket = 0;
+  function placeRows(w, s, rows) {
+    var own = cleanPlace(wsOf(w.key)[s.key]) || (w.kind === "commute" && s.key === "to" ? cleanPlace(kept("tvhome.commute")) : null), pk = w.key + ":" + s.key, g = WPLACE.key === pk ? WPLACE : { key: pk, q: "", list: null, busy: false, err: false };
+    rows.push(info("wp-now:" + s.key, s.label, wsWords(s, own), s.help));
+    rows.push({ kind: "input", key: "wp-search:" + s.key, label: "Search for a place", sub: s.coast ? "A beach, or the town by it" : "A town or suburb", value: g.q, act: function () {
+      startTyping({ label: s.coast ? "Type a beach or the town by it" : "Type a town or suburb", value: g.q, search: true,
+        live: function (q) { findWidgetPlace(pk, q, false); }, submit: function (q) { findWidgetPlace(pk, q, true); } });
+    } });
+    if (g.busy) rows.push(info("wp-busy", t("loc_searching")));
+    else if (g.err) rows.push(info("wp-err", t("loc_error")));
+    else if (g.list && !g.list.length) rows.push(info("wp-none", t("loc_none", { q: g.q })));
+    (g.list || []).forEach(function (pl, i) {
+      rows.push({ kind: "choice", key: "wplace:" + s.key + ":" + i, label: pl.name, sub: pl.area, checked: !!(own && own.lat === pl.lat && own.lon === pl.lon), act: function () {
+        var p = cleanPlace(pl);
+        if (!p) return;
+        wsSet(w.key, s.key, p);
+        SET.msg = s.key === "to" ? "Where to: " + p.name + "." : w.name + " now shows " + p.name + ".";
+        WPLACE.list = null; WPLACE.q = "";
+      } });
+    });
+    if (own) rows.push({ kind: "action", key: "wp-town:" + s.key, label: s.key === "to" ? "Forget where you drive to" : "Use your home's town instead", act: function () { wsSet(w.key, s.key, null); if (w.kind === "commute" && s.key === "to") { keep("tvhome.commute", null); webChanged(); } SET.msg = s.key === "to" ? "Forgotten." : w.name + " uses your home's town again."; } });
+  }
+  function findWidgetPlace(key, q, go) {
+    clearTimeout(wgeoTimer);
+    q = (q || "").trim();
+    WPLACE = { key: key, q: q, list: null, busy: false, err: false };
+    if (q.length < 2) { if (zone === "settings") renderSettings(); return; }
+    var run = function () {
+      var ticket = ++wgeoTicket;
+      WPLACE.busy = true;
+      if (zone === "settings") renderSettings();
+      geocode(q).then(function (list) {
+        if (ticket !== wgeoTicket) return;
+        WPLACE = { key: key, q: q, list: list, busy: false, err: false };
+        if (go && list.length && !SET.typing) { SET.col = "rows"; SET.keyFocus = "wplace:" + String(key).split(":").pop() + ":0"; }
+        if (zone === "settings") renderSettings();
+      }, function () {
+        if (ticket !== wgeoTicket) return;
+        WPLACE = { key: key, q: q, list: null, busy: false, err: true };
+        if (zone === "settings") renderSettings();
+      });
+    };
+    if (go) run(); else wgeoTimer = setTimeout(run, 500);
+  }
+
+  // What the phone's Home settings page needs to show only what this design uses (atHomeView): the
+  // phone sections to hide, every widget on the design with settings (its records and values; a private
+  // value only says it is set), the design's app rows and the TV's apps to pick from. Nothing secret.
+  function designView() {
+    var r = useRules();
+    if (!r) return { on: false };
+    var hide = [];
+    if (!r.location) hide.push("town");
+    if (!r.people) hide.push("people");
+    if (!r.photos) hide.push("photos");
+    if (!r.athome) hide.push("athome");
+    if (!r.inputs) hide.push("inputs");
+    var installed = [];
+    try { installed = arrangeItems().items.filter(function (it) { return (!it.kind || it.kind === "app") && it.package && !/^(screen|input):/.test(it.package); }).map(function (it) { return { key: (window.CouchApps && window.CouchApps.idOf(it.package)) || it.package, name: String(it.name || it.package) }; }); } catch (e) {}
+    return { on: true, hide: hide, inputs: !!r.inputs, town: townName(),
+      // each setting as the phone draws it: its record, the choices (a TV list resolved here), the value
+      // now (a private one only says it is set), whether it was changed on this TV, and whether it shows
+      widgets: widgetsWithSettings().map(function (w) {
+        var vals = wsOf(w.key);
+        return { key: w.key, kind: w.kind, name: w.name, title: w.title,
+          settings: w.settings.filter(function (s) { return s.where.indexOf("phone") >= 0 && s.type !== "image"; }).map(function (s) {
+            var cur = wsCur(w, s), o = { key: s.key, label: s.label, type: s.type, help: s.help, many: s.many, coast: s.coast, store: s.store, min: s.min, max: s.max, step: s.step,
+              options: wsOptions(s), shown: wsShown(w, s), own: vals[s.key] !== undefined, words: wsWords(s, cur) };
+            o.value = s.private && s.type !== "tvlist" && s.type !== "choice" ? (cur ? true : null) : cur === undefined ? null : cur;
+            return o;
+          }) };
+      }),
+      apps: CouchDesign.appWidgets ? CouchDesign.appWidgets().map(function (a) { a.name = widgetName(a.kind); return a; }) : [], installed: installed };
+  }
+  // The design's own widgets from the phone (through the on-TV app's At home hand over, HomeActivity):
+  // widget_set: { key, values: { <setting>: value or null } }, design_apps: { key, apps } (apps null: the
+  // design's own). Each value is checked against the widget's settings record; values land in
+  // ST.widgets, exactly where the TV's own rows put them.
+  function designEdit(e) {
+    if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on()) return { ok: false, error: "No couch-tv Studio design is on the TV now." };
+    if (e.design_apps && typeof e.design_apps === "object") {
+      var r = CouchDesign.setApps(String(e.design_apps.key || ""), e.design_apps.apps === null ? null : e.design_apps.apps);
+      if (!r.ok) return r;
+    } else if (e.widget_set && typeof e.widget_set === "object") {
+      var w = widgetByKey(String(e.widget_set.key || "")), vals = e.widget_set.values;
+      if (!w) return { ok: false, error: "That widget is not on the home now." };
+      if (!vals || typeof vals !== "object") return { ok: false, error: "Nothing to change." };
+      var bad = "";
+      Object.keys(vals).forEach(function (k) {
+        var s = w.settings.filter(function (x) { return x.key === k; })[0], v = vals[k];
+        if (!s || s.where.indexOf("phone") < 0) { bad = bad || "That setting is not on this widget."; return; }
+        if (v === null) { wsSet(w.key, k, null); if (s.sets) wsSet(w.key, s.sets, null); return; }
+        var opts = wsOptions(s), one = function (x) { var o = opts.filter(function (y) { return String(y[0]) === String(x); })[0]; return o ? o[0] : undefined; };
+        if (s.type === "place") { v = cleanPlace(v); if (!v) { bad = "That place could not be used. Search for it again."; return; } }
+        else if ((s.type === "choice" || s.type === "tvlist") && s.many) {
+          if (!Array.isArray(v)) { bad = "That choice is not one of the choices."; return; }
+          v = v.map(one).filter(function (x, i, a) { return x !== undefined && a.indexOf(x) === i; }).slice(0, isFinite(s.max) ? +s.max : 4);
+          if (!v.length) v = null;
+        }
+        else if (s.type === "choice" || s.type === "tvlist") { v = one(v); if (v === undefined) { bad = "That choice is not one of the choices."; return; } }
+        else if (s.many) { v = (Array.isArray(v) ? v : String(v).split(",")).map(function (x) { return String(x).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 30); }).filter(Boolean).slice(0, isFinite(s.max) ? +s.max : 6); if (!v.length) v = null; }
+        else if (s.type === "toggle") { if (typeof v !== "boolean") { bad = "That needs on or off."; return; } }
+        else if (s.type === "number") { v = +v; if (!isFinite(v) || (isFinite(s.min) && v < +s.min) || (isFinite(s.max) && v > +s.max)) { bad = "That number is out of range."; return; } }
+        else if (s.type === "calendar") { v = String(v).trim().slice(0, 600); v = window.CouchAtHome ? CouchAtHome.calUrl(v) : ""; if (!v) { bad = "That is not a calendar link. It starts with https://."; return; } }
+        else if (s.type === "apps" || s.type === "device") { bad = "Change that on the TV."; return; }
+        else if (s.type !== "choice" && s.type !== "tvlist") v = String(v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 80);
+        wsSave(w, s, v);
+      });
+      if (bad) return { ok: false, error: bad };
+    } else return { ok: false, error: "Nothing to change." };
+    if (zone === "settings") renderSettings();
+    return { ok: true, athome: atHomeView() };
+  }
+
   function start() {
     readConfig();
     // a TV whose home a computer runs (no launcher): smart home goes through that computer's bridge
@@ -7367,7 +7945,12 @@
           // the commute's two places by name only, and the drive's id (Home settings; never in a design)
           commute: commuteData(),
           // everyone's Keep watching on this TV, for Picks for you (widget-web.js picks; stays on the TV)
-          household: householdData() };
+          household: householdData(),
+          // each widget's own settings on this TV, by its id (WIDGET-SETTINGS-CONTRACT.md), and the
+          // temperature unit Home settings chose ("c" or "f"); a widget with a place of its own gets that
+          // place's weather (and swell or air) in wxFor[<its id>], else it reads weather, the home's town
+          wset: wsData(), unit: WX_F ? "f" : "c", wxAt: WX_SHOW && data.weather && data.weather.at ? data.weather.at : {}, wxBy: wxForData(),
+          commuteBy: commuteByData(), country: homeCountry() };
       },
       // the detail layers (widget-detail.js) ask Home Assistant through smarthome.js, never directly
       ha: function (action, entity, value) {
@@ -7388,6 +7971,7 @@
         else if (what === "pick") playPick(parseInt(arg, 10) || 0);
         else if (what === "more") { dockBack = null; expanded = true; zone = "grid"; g = 0; renderGrid(); paintFocus(); }
         else if (what === "gear") openGear();
+        else if (what === "place" || what === "wset") openWidgetPage(arg);
         else if (what === "smart") openSmart();
         else if (what === "quick") { var qv = quickVisible(), qn = qv.indexOf(arg); if (qn >= 0) { qi = qn; quickAction(); } else if (arg === "soundscape") cycleSoundscape(); }
         else if (what === "person") { pickWho(arg); renderPeople(); }
@@ -7399,6 +7983,7 @@
       },
       fromCode: DESIGN_FROM_CODE
     });
+    if (designOn) wsNewDesign();
     if (designOn) webStart();
     kidsInit();
     kidSync();   // a kids profile on the couch: its shelf before anything else shows
