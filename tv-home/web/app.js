@@ -3654,12 +3654,30 @@
   function slideDock() {
     var apps = $("apps-section") || $("grid").parentNode, el = document.documentElement;
     if (LOOP) { loopPanel(); return; }   // no banners in the Loop look; More apps scrolls by rows instead
+    if (!NIGHT) { classicScroll(apps, el); return; }
     var rows = DOCK_BANNERS && !expanded ? Math.ceil(gridEls.length / GRID_COLS) : 1;
     var row = rows > 1 && (zone === "grid" || zone === "gear" || zone === "appmenu") ? Math.floor(g / GRID_COLS) : 0;
     el.classList.toggle("dock-down", row > 0);
     if (rows <= 1) { apps.style.bottom = ""; apps.style.transform = ""; return; }
     apps.style.bottom = (2.875 - (rows - 1) * BANNER_ROW_REM) + "rem";
     apps.style.transform = "translateX(-50%) translateY(" + (-row * BANNER_ROW_REM) + "rem)";
+  }
+
+  // Classic and OLED: eight tiles to a row, and only the first rows fit under the clock. When More apps
+  // lists more than that, the grid slides up by whole rows so the tile under the remote stays on the
+  // screen (#203: with 15+ apps the focus went below the screen and nothing scrolled). The Keep watching
+  // row and the header (clock, people, quick buttons) fade out while the grid is up, since it slides under them.
+  function classicScroll(apps, el) {
+    var shift = 0, step = 0;
+    if (gridEls.length > GRID_COLS && (zone === "grid" || zone === "gear" || zone === "appmenu")) {
+      step = gridEls[GRID_COLS].offsetTop - gridEls[0].offsetTop;   // a tile row and the gap under it
+      var rem = innerWidth / 120, tileH = gridEls[0].offsetHeight;
+      // the last row that fits: its tile, the name under it and a margin must end above the screen's edge
+      var fit = step > 0 ? Math.max(1, Math.floor((innerHeight - 6 * rem - tileH - apps.offsetTop) / step) + 1) : 1;
+      shift = Math.max(0, Math.floor(g / GRID_COLS) - (fit - 1)) * step;
+    }
+    el.classList.toggle("grid-scrolled", shift > 0);
+    apps.style.transform = shift > 0 ? "translateY(-" + shift + "px)" : "";
   }
 
   // The Night dock tile's width in rem: a square icon, or a 16:9 TV banner as tall as the icon.
