@@ -60,8 +60,8 @@ class PinRules(unittest.TestCase):
 
     def test_five_wrong_throw_it_away(self):
         c = phonepage.new_pin(now=1000)
-        wrong = "000000" if c != "000000" else "111111"
-        for _ in range(5):
+        for i in range(5):   # five different wrong codes (the same one again is not a new try)
+            wrong = "%06d" % (100000 + i) if c != "%06d" % (100000 + i) else "999999"
             self.assertFalse(phonepage.pair(wrong, now=1001))
         self.assertIsNone(phonepage.current_pin(now=1001))
         self.assertFalse(phonepage.pair(c, now=1001))
@@ -231,6 +231,46 @@ class PhonePageApp(AioHTTPTestCase):
             self.assertEqual(st, 200)
             st, j = await self.j("POST", "/api/pair", {"pin": link["url"][-6:]}, headers={"X-Test-Ip": "192.0.2.7"})
             self.assertEqual((st, j.get("token")), (200, KEY))
+
+    async def test_same_wrong_code_never_kills_the_qr_code(self):
+        # N1: one phone sending "000000" again and again (6 times here, 20 rounds) never throws the QR's code away
+        with self.from_ip():
+            for rnd in range(20):
+                st, link = await self.j("GET", "/api/phone-link")
+                pin = link["url"][-6:]
+                bad = "000000" if pin != "000000" else "111111"
+                for _ in range(6):
+                    st, j = await self.j("POST", "/api/pair", {"pin": bad}, headers={"X-Test-Ip": "192.0.2.66"})
+                    self.assertEqual(st, 401)
+                self.assertEqual(phonepage.current_pin(), pin, "round %d" % rnd)
+                st, j = await self.j("POST", "/api/pair", {"pin": pin}, headers={"X-Test-Ip": "192.0.2.7"})
+                self.assertEqual((st, j.get("token")), (200, KEY), "round %d" % rnd)
+            self.assertEqual(server.pair_locked_for(), 0)
+
+    def test_same_wrong_code_rule(self):
+        c = phonepage.new_pin(now=1000)
+        bad = "000000" if c != "000000" else "111111"
+        for _ in range(6):
+            self.assertFalse(phonepage.pair(bad, "192.0.2.66", now=1001))
+        self.assertEqual(phonepage.current_pin(now=1001), c)
+        self.assertTrue(phonepage.pair(c, "192.0.2.7", now=1002))
+
+    async def test_one_address_five_wrong_codes_in_ten_minutes(self):
+        # N2: an address with 5 different wrong codes waits until the oldest is 10 minutes old (about 720 a day)
+        with self.from_ip():
+            st = await self.guesses("192.0.2.66", 5)
+            self.assertEqual(st, [401] * 5)
+            server._failed_attempts.clear()   # past the one minute limit: the 10 minute one still holds
+            phonepage.new_pin()
+            st, j = await self.j("POST", "/api/pair", {"pin": "222333"}, headers={"X-Test-Ip": "192.0.2.66"})
+            self.assertEqual((st, j.get("error_key")), (429, "err_pairing_locked"))
+            self.assertGreater(j.get("retry_after", 0), 590)
+            # nobody else waits, and the right code still pairs from another phone
+            st, j = await self.j("POST", "/api/pair", {"pin": phonepage.current_pin()}, headers={"X-Test-Ip": "192.0.2.7"})
+            self.assertEqual(st, 200)
+            # 10 minutes on, the address may try again
+            self.assertEqual(phonepage.address_wait("192.0.2.66", server.PAIR_LOCK_WINDOW, server.time.monotonic() + 601), 0)
+        self.assertEqual(phonepage.address_wait(None, server.PAIR_LOCK_WINDOW), 0)   # never the computer itself
 
     async def test_no_live_code_never_counts(self):
         # with no code on the TV there is nothing to guess: 60 tries from 12 addresses lock nothing
@@ -591,6 +631,17 @@ class PhonePageApp(AioHTTPTestCase):
         r = await self.client.post("/api/photos", data=b.getvalue(), headers={**self.H, "Content-Type": "image/png"})
         self.assertEqual(r.status, 413)
         self.assertIn("too big", (await r.json())["error"])
+
+    @unittest.skipIf(Image is None, "Pillow is not installed")
+    async def test_png_over_forty_megapixels_is_too_big(self):
+        # N3: a PNG or WebP is decoded whole, so 40 megapixels at most (a JPEG keeps 100: it is decoded smaller)
+        for size, want in (((7000, 7000), 413), ((6000, 6000), 200)):
+            b = io.BytesIO()
+            Image.new("1", size).save(b, "PNG")
+            r = await self.client.post("/api/photos", data=b.getvalue(), headers={**self.H, "Content-Type": "image/png"})
+            self.assertEqual(r.status, want, size)
+            if want == 413:
+                self.assertIn("40 megapixels", (await r.json())["error"])
 
     @unittest.skipIf(Image is None, "Pillow is not installed")
     async def test_big_jpeg_decoded_small(self):

@@ -790,8 +790,10 @@ code for a computer), and Hold OK on a widget offers Edit on your phone. Code: `
 - `GET /api/phone-link` (the TV home asks, with the key): `{"url": "http://<this computer>:5400/setup#pin=NNNNNN", "pin_expires_in": 170}`.
   The address is the one the TV reached the bridge by; `?tv=<id>` is added for a TV that is not the default.
 - `POST /api/pair` `{"pin": "123456"}`: the code shown on the TV, for the pairing key (`{"token": "<key>"}`,
-  the key the phone remote pairs with). A code lasts 3 minutes, is used once, and 5 wrong tries throw it
-  away; wrong codes count towards the 5 wrong keys a minute per address. 15 wrong codes in 10 minutes while a
+  the key the phone remote pairs with). A code lasts 3 minutes, is used once, and 5 different wrong tries throw it
+  away (the same wrong code again from one address is not a new try); wrong codes count towards the 5 wrong keys
+  a minute per address, and an address with 5 different wrong codes in 10 minutes waits (`429`
+  `err_pairing_locked`, `retry_after`) until the oldest is 10 minutes old. 15 wrong codes in 10 minutes while a
   code is live lock code pairing for 10 minutes (`429` with `retry_after` and `Retry-After`); one address adds
   at most 5 of them and the same wrong code again is not counted, so one caller alone never locks it, and a try
   with no live code never counts. `POST /api/pair/start` (no key, no body, `?tv=<id>` for a TV that is not the

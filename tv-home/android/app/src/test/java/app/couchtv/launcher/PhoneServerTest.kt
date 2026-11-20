@@ -119,8 +119,7 @@ class PhoneServerTest {
         var now = 1_000L
         val a = PhoneAuth(MapStore()) { now }
         val pin = a.newPin()
-        val wrong = if (pin == "000000") "111111" else "000000"
-        repeat(5) { assertNull(a.pair(wrong, null)) }
+        repeat(5) { assertNull(a.pair(wrongFor(pin, it), null)) }   // five different wrong codes
         assertNull(a.currentPin())
         assertNull(a.pair(pin, null))
         val p2 = a.newPin(); now += PhoneAuth.PIN_MS + 1
@@ -177,11 +176,39 @@ class PhoneServerTest {
         assertTrue(a.addressLimited("192.0.2.5"))
         assertFalse(a.addressLimited("192.0.2.6"))   // nobody else waits
         now += 61_000
+        assertTrue(a.addressLimited("192.0.2.5"))   // N2: 10 minutes, not one
+        now += 540_000
         assertFalse(a.addressLimited("192.0.2.5"))
         // the same wrong code again is not a new guess
         val b = PhoneAuth(MapStore()) { now }
         b.newPin(); repeat(4) { b.pair(wrongFor(b.currentPin(), 0), null, "x") }
         assertFalse(b.addressLimited("x"))
+    }
+
+    @Test fun sameWrongCodeNeverKillsTheQrCode() {
+        // N1: one phone sending "000000" 6 times leaves the code in the QR working
+        val pin = srv.auth.pinForQr()
+        val bad = if (pin == "000000") "111111" else "000000"
+        repeat(6) { assertEquals(401, call("POST", "/api/pair", "{\"pin\":\"$bad\"}").status) }
+        assertEquals(pin, srv.auth.currentPin())
+        assertEquals(200, call("POST", "/api/pair", "{\"pin\":\"$pin\"}").status)
+        // and in PhoneAuth itself, from one address
+        val a = PhoneAuth(MapStore())
+        val p = a.newPin()
+        repeat(6) { assertNull(a.pair(if (p == "000000") "111111" else "000000", null, "192.0.2.66")) }
+        assertNotNull(a.pair(p, null, "192.0.2.7"))
+    }
+
+    @Test fun pairNeedsJsonAndTheTvsOwnAddress() {
+        // N4: a form post from another page, or a name pointed at the TV (DNS rebinding), never reaches pairing
+        val pin = srv.auth.pinForQr()
+        val body = "{\"pin\":\"$pin\"}"
+        assertEquals(415, rawPost("/api/pair", body, "http://127.0.0.1:$port", type = "text/plain"))
+        assertEquals(415, rawPost("/api/pair", body, "http://127.0.0.1:$port", type = "application/x-www-form-urlencoded"))
+        assertEquals(403, rawPost("/api/pair", body, "http://evil.example:$port", host = "evil.example:$port"))
+        assertEquals(403, rawPost("/api/pair", body, "http://localhost:$port", host = "localhost:$port"))
+        assertEquals(pin, srv.auth.currentPin())   // not used, not counted
+        assertEquals(200, rawPost("/api/pair", body, "http://[::1]:$port", host = "[::1]:$port", type = "application/json; charset=utf-8"))
     }
 
     @Test fun noLiveCodeNeverCounts() {
@@ -216,10 +243,10 @@ class PhoneServerTest {
     }
 
     /** One POST with an Origin header (HttpURLConnection will not send one): its status. */
-    private fun rawPost(path: String, body: String, origin: String): Int = Socket("127.0.0.1", port).use { s ->
+    private fun rawPost(path: String, body: String, origin: String, host: String = "127.0.0.1:$port", type: String = "application/json"): Int = Socket("127.0.0.1", port).use { s ->
         s.soTimeout = 5000
         val b = body.toByteArray()
-        s.getOutputStream().write(("POST $path HTTP/1.1\r\nHost: 127.0.0.1:$port\r\nOrigin: $origin\r\nContent-Type: application/json\r\n" +
+        s.getOutputStream().write(("POST $path HTTP/1.1\r\nHost: $host\r\nOrigin: $origin\r\nContent-Type: $type\r\n" +
             "Content-Length: ${b.size}\r\nConnection: close\r\n\r\n").toByteArray() + b)
         s.getInputStream().bufferedReader().readLine().split(' ')[1].toInt()
     }

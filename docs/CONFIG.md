@@ -805,7 +805,10 @@ alone cannot tell the TV from a hostile page. **Only the pairing key closes that
   (`Authorization: Bearer <key>`, `X-API-Key: <key>` or `?token=<key>`). Never a cookie;
 - the phone's Home settings page (`/setup`) pairs with the 6 digit code from the TV's QR, or one asked for
   with `/api/pair/start` (the code shows only on the TV; asking again never swaps a live code). A code lasts
-  3 minutes, works once, and 5 wrong tries throw it away. Both calls refuse `Origin: null` and `file:`
+  3 minutes, works once, and 5 different wrong tries throw it away (the same wrong code again from the same
+  address is not a new try, so one phone cannot kill the QR's code). One address gets 5 different wrong codes
+  in 10 minutes, then waits (HTTP 429) until the oldest is 10 minutes old: about 720 guesses a day at most,
+  never the bridge computer itself. Both calls refuse `Origin: null` and `file:`
   (HTTP 403), so a hostile page in a sandboxed frame cannot ask for codes or read the key. 15 wrong codes
   within 10 minutes while a code is live, from at least three addresses (one address adds at most 5, and
   the same wrong code again is not counted), lock code pairing for 10 minutes; the key itself is never locked;

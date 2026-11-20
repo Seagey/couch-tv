@@ -39,7 +39,8 @@ LOCK_PER_ADDRESS = 5    # one address adds at most this many wrong codes to the 
 
 _ids = itertools.count(1)
 # gen: changes whenever the code does (made, used, thrown away), so the TV home redraws its QR at once
-_pin = {"code": None, "until": 0.0, "wrong": 0, "tv": None, "shown_until": 0.0, "gen": 0}
+# guessed: (address, wrong code) pairs already tried on this code; the same one again is not a new try
+_pin = {"code": None, "until": 0.0, "wrong": 0, "tv": None, "shown_until": 0.0, "gen": 0, "guessed": set()}
 _tvs = {}
 _lock_tries = {}        # address -> [(time, guess fingerprint)], the wrong codes it added to the pairing lock
 
@@ -57,14 +58,14 @@ def reset():
     """Forget everything (tests)."""
     _tvs.clear()
     _lock_tries.clear()
-    _pin.update(code=None, until=0.0, wrong=0, tv=None, shown_until=0.0, gen=0)
+    _pin.update(code=None, until=0.0, wrong=0, tv=None, shown_until=0.0, gen=0, guessed=set())
 
 
 # ---------------------------------------------------------------- pairing codes
 
 def new_pin(tv=None, show=False, now=None):
     now = time.time() if now is None else now
-    _pin.update(code="%06d" % secrets.randbelow(1_000_000), until=now + PIN_SECS, wrong=0, tv=tv,
+    _pin.update(code="%06d" % secrets.randbelow(1_000_000), until=now + PIN_SECS, wrong=0, tv=tv, guessed=set(),
                 shown_until=now + PIN_SECS if show else 0.0, gen=_pin["gen"] + 1)
     return _pin["code"]
 
@@ -106,13 +107,19 @@ def show_pin(tv, now=None):
     return code
 
 
-def pair(code, now=None):
-    """True for the live code (used up by it), False otherwise; 5 wrong tries throw the code away."""
+def pair(code, ip=None, now=None):
+    """True for the live code (used up by it), False otherwise; 5 different wrong tries throw the code away.
+    The same wrong code again from the same address is not a new try, so one phone repeating "000000" can
+    never kill the code in the TV's QR."""
     live = current_pin(now)
     if not live:
         return False
     given = "".join(ch for ch in str(code or "") if ch.isdigit())
     if not secrets.compare_digest(given.encode(), live.encode()):
+        seen = (ip or "this computer", given[:12])
+        if seen in _pin["guessed"]:
+            return False
+        _pin["guessed"].add(seen)
         _pin["wrong"] += 1
         if _pin["wrong"] >= PIN_WRONG_MAX:
             _drop_pin()
@@ -140,6 +147,19 @@ def counts_for_lock(ip, code, window, now=None):
     while len(_lock_tries) > 1000:   # memory bound, as server.RATE_LIMIT_ADDRESSES
         _lock_tries.pop(next(iter(_lock_tries)))
     return True
+
+
+def address_wait(ip, window, now=None):
+    """Seconds one address waits (0: none): 5 different wrong codes from it within the lock's window (10
+    minutes) and it waits until the oldest falls out, nobody else does. About 720 guesses a day at most,
+    instead of 7,200. Never the computer itself."""
+    if not ip:
+        return 0
+    now = time.time() if now is None else now
+    mine = sorted(t[0] for t in _lock_tries.get(ip, []) if now - t[0] < window)
+    if len(mine) < LOCK_PER_ADDRESS:
+        return 0
+    return max(1, int(-(-(mine[-LOCK_PER_ADDRESS] + window - now) // 1)))
 
 
 def shown_pin(tv, now=None):
@@ -255,6 +275,7 @@ def json_size(v):
 PHOTO_MAX_UPLOAD = 25 * 1024 * 1024
 PHOTO_W, PHOTO_H = 1920, 1080
 PHOTO_MAX_PIXELS = 100_000_000
+PHOTO_MAX_PIXELS_OTHER = 40_000_000   # a PNG or WebP (decoded whole): 40 megapixels at most
 PHOTO_FORMATS = ["JPEG", "PNG", "WEBP"]   # what a phone sends as a photo (a JPEG with a second picture opens as MPO)
 PHOTO_NAME = re.compile(r"bridge[a-z0-9]{6,40}\.jpg")
 STRAY_AGE_S = 3600     # a file nobody lists is deleted only once it is an hour old (an upload in flight is never)
@@ -307,6 +328,9 @@ def make_photo(raw, data):
     # a picture far bigger than any camera's (a crafted PNG of a few KB can claim this) is refused before decoding
     if w * h > PHOTO_MAX_PIXELS:
         raise too_big
+    # a PNG or WebP is decoded whole (only a JPEG can be decoded smaller): a lower limit keeps the memory down
+    if img.format not in ("JPEG", "MPO") and w * h > PHOTO_MAX_PIXELS_OTHER:
+        raise Refused(413, "That picture is too big. Send it as a JPEG, or pick one under 40 megapixels.")
     try:
         if img.format in ("JPEG", "MPO"):
             # a JPEG is decoded at 1/2, 1/4 or 1/8 size when that is still at least screen size: a 50 megapixel

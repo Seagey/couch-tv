@@ -46,10 +46,11 @@ class PhoneAuth(private val store: Store, private val clock: () -> Long = System
     // Wrong codes per phone address: [time, the guess] within the lock's window
     private val byAddress = LinkedHashMap<String, ArrayDeque<Pair<Long, String>>>()
 
-    /** 5 different wrong codes from one address within a minute: that address waits (429), nobody else does. */
+    /** 5 different wrong codes from one address within 10 minutes: that address waits (429), nobody else does
+     *  (about 720 guesses a day at most, instead of 7,200). */
     @Synchronized fun addressLimited(addr: String?): Boolean {
         val now = clock()
-        return (byAddress[addr ?: ""]?.count { now - it.first < ADDRESS_WINDOW_MS } ?: 0) >= ADDRESS_MAX
+        return (byAddress[addr ?: ""]?.count { now - it.first < LOCK_WINDOW_MS } ?: 0) >= ADDRESS_MAX
     }
 
     /**
@@ -72,9 +73,11 @@ class PhoneAuth(private val store: Store, private val clock: () -> Long = System
                 mine.addLast(now to given.take(12))
                 while (byAddress.size > 1000) byAddress.remove(byAddress.keys.first())
                 if (counts && lock.wrong(now)) { pin = null; return null }
+                // only a new guess counts against this code: one phone sending the same wrong code again and
+                // again never throws the QR's code away
+                wrong += 1
+                if (wrong >= WRONG_MAX) pin = null
             }
-            wrong += 1
-            if (wrong >= WRONG_MAX) pin = null
             return null
         }
         pin = null
@@ -107,8 +110,7 @@ class PhoneAuth(private val store: Store, private val clock: () -> Long = System
     companion object {
         const val PIN_MS = 3 * 60_000L
         const val WRONG_MAX = 5
-        const val ADDRESS_MAX = 5                 // different wrong codes from one address in a minute, then 429 there
-        const val ADDRESS_WINDOW_MS = 60_000L
+        const val ADDRESS_MAX = 5                 // different wrong codes from one address in 10 minutes, then 429 there
         const val LOCK_PER_ADDRESS = 5            // the most one address adds to the lock (PairLock) in its window
         const val LOCK_WINDOW_MS = 10 * 60_000L
         private const val KEY = "tokens"

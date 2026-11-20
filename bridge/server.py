@@ -2285,12 +2285,18 @@ async def pair_with_code(request, pin):
     _same_site_only(request)
     check_pair_lock()   # 15 wrong codes in 10 minutes, while a code was live, lock code pairing for 10 minutes
     ip = client_ip(request)
+    # one address: 5 different wrong codes in 10 minutes, then it waits (about 720 guesses a day at most)
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong codes. Wait a minute, then try again.", key="err_too_many_codes")
+    wait = phonepage.address_wait(ip, PAIR_LOCK_WINDOW, time.monotonic())
+    if wait:
+        mins = max(1, -(-wait // 60))
+        raise ApiError(429, f"Too many wrong codes. Wait {mins} min, then try again.",
+                       key="err_pairing_locked", vars={"minutes": mins}, retry_after=wait)
     await asyncio.sleep(0.4)   # slows guessing a little more (Server.kt)
     check_pair_lock()   # (a lock made while this one waited)
     was_live = phonepage.current_pin() is not None
-    if not phonepage.pair(pin):
+    if not phonepage.pair(pin, ip):
         if was_live:
             # only a guess at a live code counts (with no code there is nothing to guess, so nobody can keep
             # pairing locked that way), and the same wrong code again from one address is not a new guess

@@ -24,16 +24,23 @@ Bridge serves /setup + /ontv/shim.js and the page's calls (bridge/phonepage.py, 
 16. Counts below are this run's.
 Also: launcher serves /tv/phone-words.js and /tv/caps-words.js from www/tv when bundled (nl-remote's words files), 404 otherwise.
 
+## 21 Nov, second check (NO-GO at 79e1a4c, N1 to N4)
+- N1: the same wrong code again from the same address is not a new try (bridge phonepage.pair(code, ip): _pin["guessed"], reset by new_pin; launcher PhoneAuth: wrong += 1 only for a new guess). Probe: 0 of 20 QR codes killed.
+- N2: one address gets 5 different wrong codes per 10 minutes, then 429 err_pairing_locked with retry_after (bridge phonepage.address_wait; launcher addressLimited over LOCK_WINDOW_MS). Probe: 15 in 30 simulated minutes, about 720 a day. docs/CONFIG.md and bridge/API.md updated.
+- N3: a PNG or WebP over 40 megapixels answers 413 (PHOTO_MAX_PIXELS_OTHER); JPEG keeps 100.
+- N4: launcher /api/pair needs Content-Type application/json (415) and a Host that is an IP address or the TV's own address (403).
+- Do not rebase or drop the cherry-picks: the coordinator merges with normal merges.
+
 ## Tests (21 Nov run)
-- Python: test_phone_page_bridge 48, test_pair_lock_bridge 6 (nl-remote's file), test_bridge_phone_page_flag 3. Whole suite one file at a time (scratchpad nlpp/run_py_all.sh): 88 of 88 files, 1405 tests.
+- Python: test_phone_page_bridge 52 (after N1 to N4), test_pair_lock_bridge 6 (nl-remote's file), test_bridge_phone_page_flag 3. Whole suite one file at a time (scratchpad nlpp/run_py_all.sh): 88 of 88 files, 1405 tests.
 - Browser, all rc=0: phone_settings_bridge 93, phone_settings (on-TV) 129, phone_link_fresh 9, remote_phone_page_browser 15, design_settings 107, widget_detail 295, tv_words 12.
 - JS: node tests/test_phone_page.js 22, tests/test_remote_phone_page.mjs 51; all JS unit files: scratchpad nlpp/run_js_units.sh, 71 of 71 (the two emulator sims, keep-watching-sim and now-playing-sim, need adb emulators and are not unit tests).
-- Gradle tv-home (gradle.lock, scratchpad nlpp/gradle_tvhome.sh): testDebugUnitTest 79 tests, 0 failures (PhoneServerTest 28), assembleDebug ok.
+- Gradle tv-home (gradle.lock, scratchpad nlpp/gradle_tvhome.sh): testDebugUnitTest 81 tests, 0 failures (PhoneServerTest 30, after N1 to N4), assembleDebug ok.
 - Browser (browser.lock, scratchpad nlpp/run_browser.sh; needs remote/dist: remote/node_modules is a symlink to ../../repo/remote/node_modules, excluded in .git/info/exclude, then npm run build in remote/).
 
 ## Merge notes
 - nl-haqr: git merge-tree HEAD nl-haqr is clean (PhoneServer Host.codeChanged sits apart from its Host.ha; the status line is the same as its).
-- nl-remote: conflicts in on-TV Auth.kt, Server.kt, PairLockTest.kt, setup.html, Sheets.jsx, phonePage.js, i18n files, design.js, mock.js, index.html, tv-words.js and tests: merge nl-remote first, then rebase this branch and drop the three cherry-picks. bridge/server.py auto-merges. The new English lines in setup.html applyMode need entries in nl-remote's phone-words.js.
+- nl-remote: conflicts in on-TV Auth.kt, Server.kt, PairLockTest.kt, setup.html, Sheets.jsx, phonePage.js, i18n files, design.js, mock.js, index.html, tv-words.js and tests: the coordinator merges with normal merges (no rebase). bridge/server.py auto-merges. The new English lines in setup.html applyMode need entries in nl-remote's phone-words.js.
 - Not in this branch: the on-TV app's own Auth.kt live code rule (nl-remote M1, in nl-remote 6ce5e20).
 
 ## Left

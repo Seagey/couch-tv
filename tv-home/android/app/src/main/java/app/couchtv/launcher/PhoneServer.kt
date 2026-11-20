@@ -96,10 +96,13 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
             }
             "POST /api/pair" -> {
                 sameSiteOnly(s)
+                // a JSON body only (a plain form from another web page cannot send one), to this TV by its address
+                if (s.headers["content-type"]?.substringBefore(';')?.trim()?.lowercase() != "application/json") throw Refused(415, "body must be JSON")
+                ownHost(s)
                 val b = readJson(s, 4 * 1024)
                 checkLock()
                 val addr = s.headers["remote-addr"]
-                if (auth.addressLimited(addr)) throw Refused(429, "Too many wrong codes. Wait a minute, then try again.")
+                if (auth.addressLimited(addr)) throw Refused(429, "Too many wrong codes from this phone. Wait 10 min, then try again.")
                 Thread.sleep(400)   // slows guessing a little more
                 val before = auth.currentPin()
                 val token = auth.pair(b.optString("pin"), b.optString("name").ifEmpty { null }, addr)
@@ -196,6 +199,16 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
 
     /** The code calls answer the page itself (its own http address) or a client with no Origin, never Origin null or
      *  file:, which any web page can send from a sandboxed frame (nothing on a TV pairs here by code). */
+    /** The Host the request names is an IP address (the TV's, from its QR) or the TV's own address, never a name: a
+     *  web page that points a name of its own at the TV (DNS rebinding) cannot reach pairing. */
+    private fun ownHost(s: IHTTPSession) {
+        val h = s.headers["host"]?.trim()?.lowercase() ?: throw Refused(403, "forbidden host")
+        val name = if (h.startsWith("[")) h.substringAfter('[').substringBefore(']') else h.substringBeforeLast(':').takeIf { h.count { it == ':' } == 1 } ?: h
+        val ip4 = Regex("(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})").matchEntire(name)?.groupValues?.drop(1)?.all { it.toInt() <= 255 } == true
+        val ip6 = h.startsWith("[") && name.isNotEmpty() && name.all { it.isDigit() || it in 'a'..'f' || it == ':' || it == '.' }
+        if (!ip4 && !ip6 && name != lanAddress()) throw Refused(403, "forbidden host")
+    }
+
     private fun sameSiteOnly(s: IHTTPSession) {
         val o = s.headers["origin"]?.trim()?.lowercase() ?: return
         if (o.isNotEmpty() && !o.startsWith("http://") && !o.startsWith("https://")) throw Refused(403, "forbidden origin")
