@@ -7529,6 +7529,8 @@
         return ((wk % 2) + 2) % 2 === 0 ? "a" : "b";
       }
     }
+    // the Commute's Where to set with 0.13.8's Commute rows (kept on this TV, tvhome.commute) still counts
+    if (w.kind === "commute" && s.key === "to") { var old = cleanPlace(kept("tvhome.commute")); if (old) return old; }
     v = (w.opts || {})[s.key];
     return v !== undefined && v !== null && v !== "" ? v : s.def;
   }
@@ -7787,7 +7789,7 @@
   // a place setting: the town search (the same one as Location), kept on this TV only
   var WPLACE = { key: "", q: "", list: null, busy: false, err: false }, wgeoTimer = null, wgeoTicket = 0;
   function placeRows(w, s, rows) {
-    var own = cleanPlace(wsOf(w.key)[s.key]), pk = w.key + ":" + s.key, g = WPLACE.key === pk ? WPLACE : { key: pk, q: "", list: null, busy: false, err: false };
+    var own = cleanPlace(wsOf(w.key)[s.key]) || (w.kind === "commute" && s.key === "to" ? cleanPlace(kept("tvhome.commute")) : null), pk = w.key + ":" + s.key, g = WPLACE.key === pk ? WPLACE : { key: pk, q: "", list: null, busy: false, err: false };
     rows.push(info("wp-now:" + s.key, s.label, wsWords(s, own), s.help));
     rows.push({ kind: "input", key: "wp-search:" + s.key, label: "Search for a place", sub: s.coast ? "A beach, or the town by it" : "A town or suburb", value: g.q, act: function () {
       startTyping({ label: s.coast ? "Type a beach or the town by it" : "Type a town or suburb", value: g.q, search: true,
@@ -7805,7 +7807,7 @@
         WPLACE.list = null; WPLACE.q = "";
       } });
     });
-    if (own) rows.push({ kind: "action", key: "wp-town:" + s.key, label: s.key === "to" ? "Forget where you drive to" : "Use your home's town instead", act: function () { wsSet(w.key, s.key, null); SET.msg = s.key === "to" ? "Forgotten." : w.name + " uses your home's town again."; } });
+    if (own) rows.push({ kind: "action", key: "wp-town:" + s.key, label: s.key === "to" ? "Forget where you drive to" : "Use your home's town instead", act: function () { wsSet(w.key, s.key, null); if (w.kind === "commute" && s.key === "to") { keep("tvhome.commute", null); webChanged(); } SET.msg = s.key === "to" ? "Forgotten." : w.name + " uses your home's town again."; } });
   }
   function findWidgetPlace(key, q, go) {
     clearTimeout(wgeoTimer);
