@@ -57,7 +57,8 @@ Everything else `fx` can do:
 | `fx read <name> <cluster> <attribute> [endpoint]` | Read one attribute from the device itself, JSON |
 | `fx do <name> <chip-tool args>` | Run any chip-tool command as the home controller, `NODE` is replaced by the node id. Example: `fx do light onoff toggle NODE 1` (a change "made in Google Home") |
 | `fx pipe <name> '<json>'` | Change a sensor out of band: `fx pipe sensors '{"Name":"SetOccupancy","EndpointId":4,"Occupancy":1}'`, `'{"Name":"SetBooleanState","EndpointId":3,"NewState":true}'` |
-| `fx fabrics <name>` | How many controllers the device has (1 = only home) |
+| `fx fabrics <name>` | How many controllers the device has (1 = only home): `{"name", "fabrics"}`. With no name: `{"devices": [{"name", "fabrics"}, ...]}` for all 8 |
+| `fx lock <token> [about]`, `fx unlock <token>` | The one-run-at-a-time lock the contract test takes (below). `fx unlock --force` frees a lock left by a run that died |
 | `fx evict [names]` | Remove every controller but home from the devices (cleans up after a run that did not remove its devices) |
 | `fx log <name> [n]` | The device's own log |
 | `fx codes` | The factory codes |
@@ -90,6 +91,33 @@ It prints `PASS`/`FAIL`/`WARN` per check, then the counts, and exits 1 on any FA
 about 4 minutes. If a run stops half way, the devices may still belong to the implementation:
 the test refuses to start then. Remove them in the implementation, or `fx evict` (and the
 implementation then holds stale entries: remove those too).
+
+### One run at a time, or a private copy
+
+Two contract runs on the same devices corrupt each other (a light that answers "busy", a device on
+3 fabrics). So the test takes a lock on the MacBook before it starts: the folder
+`~/matter-fixtures.lock`, made with `mkdir` (atomic), with who holds it and since when in
+`owner.json`. If another run holds it, the test says whose run it is and tries again every 30 s for
+up to 15 minutes (`--lock-wait <seconds>`), then stops with exit code 3. It always gives the lock
+back when it ends, also after a crash, Ctrl+C or a kill (SIGTERM, SIGHUP). Only `kill -9` or a lost
+connection can leave it behind: then `ssh macbook matter-fixtures/fx unlock --force`.
+`tests/test_matter_fixtures.py` proves the lock and the `fx fabrics` answer the test reads.
+
+A builder who runs often can make a private copy with its own ports, discriminators, device storage,
+home controller and lock (`~/<name>.lock`), so it never waits and never meets anyone:
+
+```sh
+scp tests/matter/fixtures/private-copy.py macbook:matter-fixtures/
+ssh macbook python3 matter-fixtures/private-copy.py ma-fixtures --port 5741
+ssh macbook ma-fixtures/fx up
+python3 tests/matter_contract.py --api ... --fx "ssh macbook ma-fixtures/fx"
+```
+
+The shared kit uses ports 5541 to 5548 and short discriminators 1 to 8. An 11 digit code carries
+only the short discriminator, and 15 means "no device" to the test, so a copy has 0 and 9 to 14
+left: 7 for 8 devices. By default the copy's alarm reuses 8 (it is only shared, never added by its
+factory code). A second private copy at the same time needs other ports and its own `--nibbles`.
+Stop a copy with `ssh macbook ma-fixtures/fx stop` when done.
 
 ## What it checks
 

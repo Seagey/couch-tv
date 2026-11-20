@@ -19,7 +19,10 @@ Usage (on the MacBook, or from anywhere as `ssh macbook ~/matter-fixtures/fx <cm
   fx read <name> <cluster> <attribute> [endpoint]   read one attribute through "home", JSON value
   fx do <name> <chip-tool args...>                   run any chip-tool cluster command as "home"
                                                      (node id is filled in: use NODE / EP words)
-  fx fabrics <name>       JSON: how many fabrics (controllers) the device is on
+  fx fabrics <name>       JSON {name, fabrics}: how many fabrics (controllers) the device is on
+  fx fabrics              JSON {devices: [{name, fabrics}, ...]} for every device
+  fx lock <token> [about] take the one-run-at-a-time lock (~/matter-fixtures.lock); JSON {ok, held_by?}
+  fx unlock <token>       give it back (`fx unlock --force` after a run that died)
   fx evict [names]        remove every controller but "home" from the devices (clean up a failed run)
   fx pipe <name> <json>   send an out-of-band command to the device (sensor changes etc.)
   fx log <name> [n]       last n lines of the device's own log
@@ -438,6 +441,62 @@ def names_from(args):
     return args
 
 
+def fabrics_answer(args):
+    """`fx fabrics <name>` answers {"name", "fabrics"} (what tests/matter_contract.py reads);
+    `fx fabrics` with no name or several answers {"devices": [{"name", "fabrics"}, ...]}."""
+    names = names_from(args)
+    if len(args) == 1:
+        return fabrics(names[0])
+    return {"devices": [fabrics(n) for n in names]}
+
+
+# One contract run at a time on these devices: two runs at once see each other's controllers
+# (3 fabrics, "busy"). The lock is a folder next to this kit (~/matter-fixtures.lock; a private
+# copy in ~/<other> gets ~/<other>.lock), taken with mkdir so it is atomic.
+LOCKDIR = FX.rstrip("/") + ".lock"
+
+
+def lock_info():
+    try:
+        with open(os.path.join(LOCKDIR, "owner.json")) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def take_lock(token, about=""):
+    """Takes the run lock for `token`. Answers {"ok": true} or {"ok": false, "held_by": {...}}."""
+    if not token:
+        raise SystemExit("fx lock <token> [about]: a token is needed (the same one unlocks)")
+    try:
+        os.mkdir(LOCKDIR)
+    except FileExistsError:
+        held = lock_info()
+        if held.get("token") == token:
+            return {"ok": True, "again": True}
+        held = {k: v for k, v in held.items() if k != "token"}
+        held["age_s"] = int(time.time() - held["since"]) if "since" in held else None
+        return {"ok": False, "held_by": held, "lock": LOCKDIR}
+    with open(os.path.join(LOCKDIR, "owner.json"), "w") as f:
+        json.dump({"token": token, "about": about, "since": time.time(),
+                   "since_text": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
+    return {"ok": True, "lock": LOCKDIR}
+
+
+def drop_lock(token):
+    """Gives the run lock back. Only its own token frees it, or `--force` (after a run that died)."""
+    if not os.path.isdir(LOCKDIR):
+        return {"ok": True, "held": False}
+    held = lock_info()
+    if token != "--force" and held.get("token") not in (None, token):
+        return {"ok": False, "held_by": {k: v for k, v in held.items() if k != "token"}}
+    owner = os.path.join(LOCKDIR, "owner.json")
+    if os.path.exists(owner):
+        os.remove(owner)
+    os.rmdir(LOCKDIR)
+    return {"ok": True, "held": False}
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(__doc__)
@@ -468,7 +527,11 @@ def main(argv):
     elif cmd == "do":
         out(do(args[0], args[1:]))
     elif cmd == "fabrics":
-        out({n: fabrics(n) for n in names_from(args)})
+        out(fabrics_answer(args))
+    elif cmd == "lock":
+        out(take_lock(args[0] if args else "", " ".join(args[1:])))
+    elif cmd == "unlock":
+        out(drop_lock(args[0] if args else ""))
     elif cmd == "evict":
         out([evict(n) for n in names_from(args)])
     elif cmd == "pipe":

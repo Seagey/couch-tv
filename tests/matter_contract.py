@@ -19,6 +19,8 @@ import json
 import os
 import re
 import shlex
+import signal
+import socket
 import subprocess
 import sys
 import time
@@ -133,7 +135,44 @@ class Fx:
         return self.run("share", name, secs)
 
     def fabrics(self, name):
-        return self.run("fabrics", name)["fabrics"]
+        return fabrics_of(self.run("fabrics", name), name)
+
+    def lock(self, token, about):
+        return self.run("lock", token, about, timeout=60)
+
+    def unlock(self, token):
+        return self.run("unlock", token, timeout=60)
+
+
+def fabrics_of(answer, name):
+    """The fabric count from `fx fabrics <name>`: {"name", "fabrics"} (also takes the
+    {"devices": [...]} form `fx fabrics` gives for several devices)."""
+    if "fabrics" in answer:
+        return answer["fabrics"]
+    for d in answer.get("devices", []):
+        if d.get("name") == name:
+            return d["fabrics"]
+    raise KeyError(f"fx fabrics answered no count for {name}: {json.dumps(answer)[:200]}")
+
+
+def take_fixture_lock(fx, about, wait_s, every=30):
+    """One contract run at a time on the shared fixtures (two at once corrupt each other: a busy
+    light, 3 fabrics). Waits up to wait_s for the lock; answers the token, or None if still held."""
+    token = f"{socket.gethostname()}-{os.getpid()}-{int(time.time())}"
+    end = time.time() + wait_s
+    while True:
+        r = fx.lock(token, about)
+        if r.get("ok"):
+            return token
+        held = r.get("held_by") or {}
+        msg = (f"The Matter fixtures are in use by another run ({held.get('about') or 'unknown'}, "
+               f"since {held.get('since_text', '?')}, {held.get('age_s', '?')} s ago).")
+        if time.time() + every > end:
+            print(msg + f" Gave up after {wait_s:.0f} s. If that run died, free it with: "
+                  f"{' '.join(fx.cmd)} unlock --force", file=sys.stderr, flush=True)
+            return None
+        print(msg + f" Waiting, trying again in {every} s.", file=sys.stderr, flush=True)
+        time.sleep(every)
 
 
 def wait_for(fn, timeout, every=1.0):
@@ -808,6 +847,10 @@ def main():
     ap.add_argument("--address", help="send `address` <host>:<device port> with every commission (skips "
                                       "discovery; for an emulator without multicast). host = the MacBook's IP")
     ap.add_argument("--report", help="write the results as JSON here")
+    ap.add_argument("--lock-wait", type=float, default=900,
+                    help="seconds to wait while another run holds the fixtures lock (default 900)")
+    ap.add_argument("--no-lock", action="store_true",
+                    help="skip the one-run-at-a-time lock (only for a private copy nobody else uses)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
     VERBOSE = args.verbose
@@ -823,6 +866,27 @@ def main():
         groups = [g for g in GROUPS if g in groups]
 
     api, fx = Api(args.api, args.token, args.timeout), Fx(args.fx)
+    if args.no_lock:
+        return run_all(args, groups, api, fx)
+    token = take_fixture_lock(fx, f"contract run against {args.api}", args.lock_wait)
+    if not token:
+        return 3
+
+    def stop(signum, frame):  # a kill still gives the lock back (finally below)
+        raise SystemExit(128 + signum)
+    for s in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(s, stop)
+    try:
+        return run_all(args, groups, api, fx)
+    finally:
+        try:
+            fx.unlock(token)
+        except Exception as e:
+            print(f"Could not give the fixtures lock back ({e}). Free it with: {args.fx} unlock --force",
+                  file=sys.stderr)
+
+
+def run_all(args, groups, api, fx):
     st = fx.run("status")
     down = [d["name"] for d in st["devices"] if not d["running"] or not d["in_home"]]
     if down:
