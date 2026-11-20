@@ -1671,7 +1671,8 @@ async def get_it_playing(app, link, who):
 async def wait_until_playing(pkg, timeout=30, seen=None):
     """True once the app's media session says PLAYING and its position moves on (a profile
     screen or a stuck page never gets there). Netflix started fresh takes about 20 s.
-    `seen`, when given, gets "at": the moment (time.monotonic) it was first read as playing."""
+    `seen`, when given, gets "at": the moment (time.monotonic) it was first read as playing and has
+    been ever since; a read that is not playing takes it away again."""
     end = time.monotonic() + timeout
     first = None
     while time.monotonic() < end:
@@ -1683,6 +1684,8 @@ async def wait_until_playing(pkg, timeout=30, seen=None):
         s = next((s for s in _sessions(out) if s.get("package") == pkg and s.get("state")), None)
         if not s or s["state"] != "PLAYING" or s.get("position") is None:
             first = None
+            if seen is not None:
+                seen.pop("at", None)   # it stopped again: it has not been playing since then
             continue
         if first is None:
             first = s["position"]
@@ -4671,9 +4674,8 @@ async def move_sibling_title(app, pkg, title, wrong):
     move.SIBLING_TITLE_APPS the right one may be a tile on that other title's own page: open the
     page, press the one tile that is exactly `title`, then the page's Play button.
     Returns None when Play was not pressed. When it was: (playing, since), whether the app says it
-    is playing yet and the moment (time.monotonic) TV B was first read as playing after the press;
-    when it has not been yet, the moment the wait ended. The caller reads what TV B says it plays
-    either way.
+    is playing yet and the moment (time.monotonic) TV B was first read as playing after the press,
+    None when it has not been yet. The caller reads what TV B says it plays either way.
     Every step that cannot be sure stops: the show finder does not have exactly this title, the page
     is not the one for `wrong`, no tile or two tiles carry the title, the next page does not name
     `title`, or a button to pay or sign in is on screen. Only labels the screen reader gives are
@@ -4728,10 +4730,10 @@ async def move_sibling_title(app, pkg, title, wrong):
         await tv.adb("shell", f"input tap {int(button['x'])} {int(button['y'])}", timeout=8)
         log.info("move: found %s on the page of %s in %s and pressed %s", title, wrong, app["name"], button["label"])
         playing = await wait_until_playing(pkg, timeout=15, seen=seen)
-        return playing, seen.get("at") or time.monotonic()
+        return playing, seen.get("at")
     except Exception as e:   # the finder, the screen reader or ADB did not answer
         log.info("move: could not look for %s on the page of %s: %s", title, wrong, e)
-        return (False, seen.get("at") or time.monotonic()) if pressed else None
+        return (False, seen.get("at")) if pressed else None
 
 
 async def _move_state(pkg):
@@ -5014,6 +5016,8 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
                             if look:
                                 await asyncio.sleep(2)
                             await media_read(pkg_b, app)
+                            if since is None and media_now.get("state") == "playing":
+                                since = time.monotonic()   # it started after the wait: playing from here
                             there = media_now.get("title") if media_now.get("title_from") == "app" else None
                             same = finder.same_title(there, title) or move.same_name(there, title)
                             if same or (there and not (finder.same_title(there, before)
@@ -5022,7 +5026,8 @@ async def move_playing(src, dst, power_off=False, force=False, request=None, pin
                         if same:
                             wrong_title = None
                             started = b_plays or media_now.get("state") == "playing"
-                            opened_at = since   # B has played this title since it was first seen to
+                            if since is not None:
+                                opened_at = since   # B has played this title since it was first read to
                         else:
                             wrong_title = there or wrong_title
                             await tv.key("pause")
