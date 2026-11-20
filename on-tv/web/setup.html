@@ -835,7 +835,7 @@
     var v = h.view;
     $('hk').style.display = v === 'hidden' ? 'none' : '';
     $('hk-line').className = 'status' + (v === 'done' ? ' ok' : '');
-    $('hk-line').textContent = h.words || '';
+    $('hk-line').textContent = h.words_phone || h.words || '';
     var b = $('hk-go');
     b.style.display = v === 'ready' || v === 'busy' ? '' : 'none';
     b.textContent = h.button || 'Make Home open Couch TV';

@@ -83,10 +83,13 @@ object HomeKeyRules {
         val after = switchOnLines(pkg, services, tcl, homeOn).toMutableList()
         if (reopen) after += "am start -n $pkg/.SetupActivity"
         val tail = after.joinToString("; ") { "$it > /dev/null 2>&1" }
-        val body = "pm install -r $TMP_APK > $TMP_LOG 2>&1; rm -f $TMP_APK; grep -q Success $TMP_LOG && { $tail; }"
+        val body = "pm install -r $TMP_APK > $TMP_LOG 2>&1; rm -f $TMP_APK; grep -qx Success $TMP_LOG && { $tail; }"
         // the body is in double quotes for the outer sh: it holds single quotes of its own
         require(!body.contains('"') && !body.contains('`') && !body.contains("\\"))
-        return "rm -f $TMP_LOG; \$(command -v setsid) nohup sh -c \"$body\" > /dev/null 2>&1 < /dev/null & sleep 2"
+        // and the outer sh would expand a $ inside those double quotes: an inner class in another service's
+        // name (com.a/com.a.Outer$Inner) would arrive as com.a/com.a.Outer and switch that service off
+        val quoted = body.replace("$", "\\$")
+        return "rm -f $TMP_LOG; \$(command -v setsid) nohup sh -c \"$quoted\" > /dev/null 2>&1 < /dev/null & sleep 2"
     }
 
     /** The downloaded watch APK may go on: this app, and not older than it (the same version only adds the watch). */
@@ -111,6 +114,12 @@ object HomeKeyRules {
         else -> "steps"
     }
 
+    /**
+     * Whether the watch is doing its job. Fire OS 6 (Android 7.1, SDK 25) runs Amazon's own accessibility
+     * manager and never binds it (FireHome.kt, #50): there usage access does the watching instead.
+     */
+    fun watching(connected: Boolean, fireTv: Boolean, sdk: Int, usageAllowed: Boolean) = connected || (fireTv && sdk <= 25 && usageAllowed)
+
     /** Whether this TV needs the watch for the Home button: Google TV, a Google home by name, or a Fire TV. */
     fun needed(googleHome: Boolean, fireTv: Boolean) = googleHome || fireTv
 
@@ -118,9 +127,21 @@ object HomeKeyRules {
     const val BUTTON = "Make Home open Couch TV"
     const val READY = "One press: Couch TV gets the Home button version from GitHub, checks it and puts it on over this one, then switches its Home button watch on. Your settings stay."
     const val READY_WATCH = "One press switches on the Couch TV home watch, so the Home button brings Couch TV back."
-    const val DONE = "Home opens Couch TV. Press Home on the remote to try it."
+    const val DONE = "The Home button watch is on, so Home should bring Couch TV back. Press Home on the remote to check."
     const val STEPS = "This needs Couch TV to press keys on this TV first: open More, then Let the phone press keys. Or do it once from a computer: scan the code for the steps."
     const val STEPS_FIRE = "This Fire TV does not let Couch TV press keys by itself. Do it once from a computer: scan the code for the steps."
+    /** The phone page: it has its own Let the phone press keys section, and the steps are on the page. */
+    const val STEPS_PHONE = "This needs Couch TV to press keys on this TV first: use Let the phone press keys on this page, then come back here. Or do it once from a computer: the steps below."
+    const val STEPS_FIRE_PHONE = "This Fire TV does not let Couch TV press keys by itself. Do it once from a computer: the steps below."
+    /** Where Accessibility is on most TVs (a Google TV has it under Settings, a TCL Android TV under Device Preferences). */
+    const val ACCESSIBILITY = "Settings, Accessibility (on some TVs inside System or Device Preferences), Couch TV home watch"
+
+    /** The computer steps, one per row. A Fire TV has no such menu for the watch: its part is on the help page. */
+    fun steps(fireTv: Boolean): List<String> = listOf(
+        "On a computer, download couch-tv-ontv-watch.apk from github.com/${UpdateRules.REPO}/releases/latest.",
+        "Install it over this app with Google's adb tool: adb connect, then adb install -r couch-tv-ontv-watch.apk. Your settings stay.",
+        if (fireTv) "On a Fire TV, switch the watch on with the steps on the help page." else "On the TV: $ACCESSIBILITY, On.",
+        "Open Couch TV and press Use as home screen.")
 
     fun busyWords(phase: String, progress: Int): String = when (phase) {
         "checking" -> "Looking on GitHub…"
@@ -129,7 +150,7 @@ object HomeKeyRules {
         else -> "Switching the Home button watch on…"
     }
 
-    fun errorWords(error: String): String = when (error) {
+    fun errorWords(error: String, fireTv: Boolean = false): String = when (error) {
         "" -> ""
         "net" -> "Can't reach GitHub. Check the TV's Wi-Fi and try again."
         "bad" -> "The download did not check out, so nothing was installed."
@@ -137,7 +158,10 @@ object HomeKeyRules {
         "not_newer" -> "This TV has a newer Couch TV than the one on GitHub, so nothing was installed. Try again after the next release."
         "space" -> "Not installed: the TV is short of space. Free some space, then try again."
         "adb" -> "Couch TV lost its link to the TV, so nothing changed. Press Let the phone press keys, then try again."
-        "not_bound" -> "Couch TV is on, but the TV did not switch its Home button watch on. Open the TV's Settings, Accessibility, Couch TV home watch, and switch it on."
+        "update_busy" -> "Couch TV is checking for an update right now. Press again in a moment."
+        "not_bound" -> if (fireTv) "Couch TV is on, but the TV did not switch its Home button watch on. The help page has the steps for a Fire TV: couchtv.joshuaseage.com/help/home-button"
+            else "Couch TV is on, but the TV did not switch its Home button watch on. Open the TV's $ACCESSIBILITY, and switch it on."
         else -> "That did not work, and nothing changed. Try again, or use the computer steps."
     }
+
 }

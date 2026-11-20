@@ -42,64 +42,79 @@ object HomeKey {
     private fun canWriteSecure(c: Context) = c.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == android.content.pm.PackageManager.PERMISSION_GRANTED
     private fun link() = Adb.connected || Adb.everAllowed || Adb.paired
     private fun needed(c: Context) = HomeKeyRules.needed(HomeRole.googleHome(c), FireHome.isFireTv)
+    /** Fire OS blocks an app's own ADB (Adb.FIRE_BLOCKED): then the one press cannot work there. */
+    private fun fireBlocked() = FireHome.isFireTv && (Adb.lastError ?: "").contains(Adb.FIRE_BLOCKED)
+    /**
+     * The watch is doing its job. Fire OS 6 (Android 7.1) runs Amazon's own accessibility manager and never
+     * binds it (FireHome.kt, #50): there usage access does the watching instead.
+     */
+    private fun watchOn() = HomeKeyRules.watching(WatchService.connected, FireHome.isFireTv, Build.VERSION.SDK_INT, FireHome.usageAllowed)
+    private fun viewNow(app: Context, busy: Boolean) = HomeKeyRules.view(needed(app), watchApk(), watchOn(), App.homeEnabled(app), busy,
+        link() && !fireBlocked(), canWriteSecure(app))
 
     fun state(c: Context): String {
         val app = c.applicationContext
-        val v = HomeKeyRules.view(needed(app), watchApk(), WatchService.connected, App.homeEnabled(app), working,
-            link(), canWriteSecure(app))
-        val fireBlocked = FireHome.isFireTv && (Adb.lastError ?: "").contains(Adb.FIRE_BLOCKED)
+        val v = viewNow(app, working)
+        val fire = fireBlocked()
         val words = when (v) {
             "busy" -> HomeKeyRules.busyWords(phase, progress)
             "done" -> HomeKeyRules.DONE
             "ready" -> if (watchApk()) HomeKeyRules.READY_WATCH else HomeKeyRules.READY
-            "steps" -> if (FireHome.isFireTv) HomeKeyRules.STEPS_FIRE else HomeKeyRules.STEPS
+            "steps" -> if (fire) HomeKeyRules.STEPS_FIRE else HomeKeyRules.STEPS
             else -> ""
         }
+        // the phone page has no More button and no code to scan: its own section and the steps under it
+        val phoneWords = if (v == "steps") (if (fire) HomeKeyRules.STEPS_FIRE_PHONE else HomeKeyRules.STEPS_PHONE) else words
         return JSONObject()
             .put("view", v)
             .put("phase", phase).put("progress", progress)
-            .put("error", error).put("error_words", HomeKeyRules.errorWords(error))
+            .put("error", error).put("error_words", HomeKeyRules.errorWords(error, FireHome.isFireTv))
+            .put("words_phone", phoneWords)
             .put("button", HomeKeyRules.BUTTON)
             .put("words", words)
-            .put("watch_apk", watchApk()).put("watch", WatchService.connected).put("home_on", App.homeEnabled(app))
-            .put("fire_tv", FireHome.isFireTv).put("fire_blocked", fireBlocked)
+            .put("watch_apk", watchApk()).put("watch", watchOn()).put("home_on", App.homeEnabled(app))
+            .put("fire_tv", FireHome.isFireTv).put("fire_blocked", fire)
             .put("help_url", HomeKeyRules.HELP_URL)
-            .put("steps", JSONArray(stepsList()))
+            .put("steps", JSONArray(HomeKeyRules.steps(FireHome.isFireTv)))
             .toString()
     }
-
-    /** The computer steps, one per row (the setup screen's More has them in full: SetupWords.watchSteps). */
-    private fun stepsList() = listOf(
-        "On a computer, download couch-tv-ontv-watch.apk from github.com/${UpdateRules.REPO}/releases/latest.",
-        "Install it over this app with Google's adb tool: adb connect, then adb install -r couch-tv-ontv-watch.apk. Your settings stay.",
-        "On the TV: Settings, Accessibility, Couch TV home watch, On.",
-        "Open Couch TV and press Use as home screen.")
 
     private fun changed(c: Context) {
         val json = state(c)
         main.post { listener?.let { runCatching { it(json) } } }
     }
 
-    /** The press. Does nothing while something is already happening, or when there is nothing to do. */
-    @Synchronized fun start(c: Context) {
+    /**
+     * The press. Does nothing while something is already happening, or when there is nothing to do. The
+     * check and the start happen under Update's own lock (Update.install and Update.check are synchronized
+     * on it), so an update and this never start together; an update check in the way is said on screen.
+     */
+    fun start(c: Context) {
         val app = c.applicationContext
-        if (working || Update.working) return
-        val v = HomeKeyRules.view(needed(app), watchApk(), WatchService.connected, App.homeEnabled(app), false, link(), canWriteSecure(app))
-        if (v != "ready") return
-        error = ""
-        // the watch only acts while Use as home screen is on (FireHome.onOtherHome)
-        if (!App.homeEnabled(app)) App.setHomeEnabled(app, true)
-        if (watchApk()) {
-            phase = "switching"; changed(app)
-            io.execute { finish(app) }
-            return
+        synchronized(Update) {
+            if (working) return
+            if (Update.working) { error = "update_busy"; changed(app); return }
+            if (viewNow(app, false) != "ready") return
+            error = ""
+            if (watchApk()) {
+                // the watch only acts while Use as home screen is on (FireHome.onOtherHome)
+                if (!App.homeEnabled(app)) App.setHomeEnabled(app, true)
+                phase = "switching"; changed(app)
+                io.execute { finish(app) }
+                return
+            }
+            phase = "checking"; progress = 0
         }
-        phase = "checking"; progress = 0; changed(app)
+        changed(app)
         io.execute { fetchAndInstall(app) }
     }
 
+    /** Use as home screen, switched on by this try just before the install: off again if the install fails, so "nothing changed" is true. */
+    @Volatile private var homeTurnedOn = false
+
     private fun fail(app: Context, why: String) {
         Log.w(TAG, "stopped: $why")
+        if (homeTurnedOn) { runCatching { App.setHomeEnabled(app, false) }; homeTurnedOn = false }
         error = why; phase = ""; progress = 0
         store(app).edit().remove("installing").apply()
         changed(app)
@@ -124,12 +139,14 @@ object HomeKey {
             }
             if (why.isNotEmpty()) return fail(app, why)
             phase = "installing"; progress = 100; changed(app)
+            // the watch only acts while Use as home screen is on: switched on now, once everything has checked out
+            if (!App.homeEnabled(app)) { App.setHomeEnabled(app, true); homeTurnedOn = true }
             val r = try { put(app, file) } catch (x: Exception) {
                 Log.w(TAG, "install: ${x.message}")
                 if (x.message?.startsWith("push failed") == true) UpdateRules.failure(x.message ?: "") else "adb"
             }
             // "" means Android said Success: it is about to stop this app, and resume() carries on
-            if (r.isNotEmpty()) fail(app, r)
+            if (r.isNotEmpty()) fail(app, r) else homeTurnedOn = false
         } finally { file.delete() }
     }
 
@@ -183,12 +200,12 @@ object HomeKey {
             changed(app)
         } catch (x: Exception) {
             Log.w(TAG, "switch on: ${x.message}")
-            fail(app, if (WatchService.connected) "" else "not_bound")
+            fail(app, if (watchOn()) "" else "not_bound")
         }
     }
 
     private fun switchOn(app: Context, rebind: Boolean): Boolean {
-        if (WatchService.connected && !rebind) { reassertHome(app); return true }
+        if (watchOn() && !rebind) { reassertHome(app); return true }
         val pkg = app.packageName
         val cr = app.contentResolver
         val now = Settings.Secure.getString(cr, "enabled_accessibility_services")
@@ -203,10 +220,10 @@ object HomeKey {
         reassertHome(app)
         val until = System.currentTimeMillis() + 10_000L
         while (System.currentTimeMillis() < until) {
-            if (WatchService.connected) return true
+            if (watchOn()) return true
             Thread.sleep(500)
         }
-        return WatchService.connected
+        return watchOn()
     }
 
     /** The list, written with the secure settings grant when the app has it, else over ADB. */

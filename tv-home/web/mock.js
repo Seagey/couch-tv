@@ -245,6 +245,9 @@
     var hkKind = arg("homekey");
     var hks = { view: hkKind === "watch" || hkKind === "fail" ? "ready" : hkKind, phase: "", progress: 0, error: "",
       watch_apk: hkKind === "watch", help_url: "https://couchtv.joshuaseage.com/help/home-button/" };
+    // fire: a Fire TV that blocks the link. otherkey, updbusy: a try that stopped, with its reason
+    if (hkKind === "fire") { hks.view = "steps"; hks.fire_tv = true; hks.fire_blocked = true; }
+    if (hkKind === "otherkey" || hkKind === "updbusy") { hks.view = "ready"; hks.error = hkKind === "otherkey" ? "other_key" : "update_busy"; }
     var hkTell = function () { if (window.tv && window.tv.homekey) window.tv.homekey(JSON.parse(JSON.stringify(hks))); };
     window.MOCK_HOMEKEY = {
       state: function () { return JSON.stringify(hks); },

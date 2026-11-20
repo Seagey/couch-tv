@@ -32,13 +32,16 @@ const TOKEN = "t0k3n";
 const HS = { settings: { lang: "en", photos: [] }, people: [], weather: null, country: "AU", tv_name: "Lounge",
   ask: { enabled: false, provider: "anthropic", base: "", model: "", has_key: false }, phones: 1, port: 5400,
   adb: { connected: true, sdk: 34, state: "connected" }, xiaomi: false, inputs: [] };
+const DONE_K = "The Home button watch is on, so Home should bring Couch TV back. Press Home on the remote to check.";
+const STEPS_PHONE = "This needs Couch TV to press keys on this TV first: use Let the phone press keys on this page, then come back here. Or do it once from a computer: the steps below.";
 const READY = "One press: Couch TV gets the Home button version from GitHub, checks it and puts it on over this one, then switches its Home button watch on. Your settings stay.";
 let HK = null, hkGets = 0, hkDown = 0, starts = 0;
 const hkState = (view, extra) => Object.assign({ view, phase: "", progress: 0, error: "", error_words: "", button: "Make Home open Couch TV",
-  words: view === "ready" ? READY : view === "done" ? "Home opens Couch TV. Press Home on the remote to try it." : view === "steps"
+  words: view === "ready" ? READY : view === "done" ? DONE_K : view === "steps"
     ? "This needs Couch TV to press keys on this TV first: open More, then Let the phone press keys. Or do it once from a computer: scan the code for the steps." : "",
+  words_phone: view === "ready" ? READY : view === "done" ? DONE_K : view === "steps" ? STEPS_PHONE : "",
   help_url: HELP, steps: ["On a computer, download couch-tv-ontv-watch.apk from github.com/Seagey/couch-tv/releases/latest.", "Install it over this app with Google's adb tool: adb connect, then adb install -r couch-tv-ontv-watch.apk. Your settings stay.",
-    "On the TV: Settings, Accessibility, Couch TV home watch, On.", "Open Couch TV and press Use as home screen."] }, extra || {});
+    "On the TV: Settings, Accessibility (on some TVs inside System or Device Preferences), Couch TV home watch, On.", "Open Couch TV and press Use as home screen."] }, extra || {});
 const send = (res, code, o) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(o)); };
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, "http://x");
@@ -120,8 +123,8 @@ async function focusRow(page, re) {
   ok(true, "OK: Downloading… with a percentage");
   await page.waitForFunction(() => /Working on it\. Couch TV may close and open again by itself\./.test(document.getElementById("set-rows").textContent), null, { timeout: 6000 });
   ok(true, "then that it is working, and Couch TV may close and open again");
-  await page.waitForFunction(() => /Home opens Couch TV\./.test(document.getElementById("set-rows").textContent), null, { timeout: 6000 });
-  ok(true, "then: Home opens Couch TV.");
+  await page.waitForFunction(() => /The Home button watch is on, so Home should bring Couch TV back\. Press Home to check\./.test(document.getElementById("set-rows").textContent), null, { timeout: 6000 });
+  ok(true, "then: the watch is on, Home should bring Couch TV back, press Home to check");
   ok(!page.errors.length, "no page errors (" + page.errors.join(" | ") + ")");
   await page.close();
 }
@@ -144,7 +147,7 @@ async function focusRow(page, re) {
   ok(await focusRow(page, /^Make Home open Couch TV/), "the row takes focus");
   await page.keyboard.press("Enter");
   await page.waitForFunction(() => /did not switch the Home button watch on/.test(document.getElementById("set-rows").textContent), null, { timeout: 6000 });
-  ok(/Open the TV's Settings, Accessibility, Couch TV home watch, and switch it on\./.test(await rows(page)), "a plain line says where to switch it on");
+  ok(/Open the TV's Settings, Accessibility \(on some TVs inside System or Device Preferences\), Couch TV home watch, and switch it on\./.test(await rows(page)), "a plain line says where to switch it on, menus and all");
   ok(!page.errors.length, "no page errors (" + page.errors.join(" | ") + ")");
   await page.close();
   const w = await about("watch");
@@ -152,8 +155,19 @@ async function focusRow(page, re) {
   await w.close();
   const d = await about("done");
   const r = await rows(d);
-  ok(/Home opens Couch TV\./.test(r) && !(await d.evaluate(() => !!document.querySelector(".sqr"))), "done: one line, nothing to press");
+  ok(/Home should bring Couch TV back/.test(r) && !(await d.evaluate(() => !!document.querySelector(".sqr"))), "done: one hedged line, nothing to press");
   await d.close();
+  const fire = await about("fire");
+  const fr = await rows(fire);
+  ok(/This Fire TV does not let Couch TV press keys by itself\. Do it once from a computer\./.test(fr) && !/Let the phone press keys/.test(fr), "a Fire TV that blocks the link gets its own line (" + fr.slice(0, 200) + ")");
+  ok(await fire.evaluate(() => !!document.querySelector(".sqr svg")), "and the QR code");
+  await fire.close();
+  const ok2 = await about("otherkey");
+  ok(/built on another computer, so it cannot take GitHub's version/.test(await rows(ok2)), "a try that stopped gives the real reason, as the other screens do");
+  await ok2.close();
+  const ub = await about("updbusy");
+  ok(/checking for an update right now\. Press again in a moment\./.test(await rows(ub)), "an update check in the way is said on screen");
+  await ub.close();
   const h = await about("hidden");
   ok(!/Make Home open Couch TV/.test(await rows(h)), "a TV where Home already works shows nothing");
   await h.close();
@@ -164,7 +178,8 @@ async function focusRow(page, re) {
   await page.goto(HOME + "?mock=1&ontv=1&homekey=ready");
   await page.waitForFunction(() => window.I18N);
   const res = await page.evaluate(() => {
-    const keys = ["hk_row", "hk_sub", "hk_sub_watch", "hk_done", "hk_working", "hk_steps", "hk_qr", "hk_err", "hk_err_not_bound"];
+    const keys = ["hk_row", "hk_sub", "hk_sub_watch", "hk_done", "hk_working", "hk_steps", "hk_qr", "hk_err", "hk_err_not_bound",
+      "hk_steps_fire", "hk_err_not_bound_fire", "hk_err_other_key", "hk_err_not_newer", "hk_err_space", "hk_err_adb", "hk_wait_update"];
     const out = {};
     const L = typeof window.I18N.langs === "function" ? window.I18N.langs() : window.I18N.langs; const langs = (L || []).map((l) => l.id || l);
     for (const id of langs) { window.I18N.set(id); out[id] = keys.map((k) => window.I18N.t(k)); }
@@ -179,6 +194,11 @@ async function focusRow(page, re) {
     ok(res[id].every((w) => !/[–—]/.test(w)), id + " has no long dashes");
   }
   ok(res.en.every((w) => !/[–—]|beta|experimental|coming soon/i.test(w)), "English is plain words");
+  // every language names where Accessibility is (the menu note) in its not_bound line, and the help page in the Fire one
+  for (const id of ids) {
+    ok(/[(（].+[)）]/.test(res[id][8]), id + ": the Accessibility line says where it is on some TVs");
+    ok(res[id][10].includes("couchtv.joshuaseage.com/help/home-button"), id + ": the Fire TV line points to the help page");
+  }
   await page.close();
 }
 
@@ -202,7 +222,7 @@ async function phone() {
   ok((await page.textContent("#hk-line")) === READY, "with the line that says what it does");
   ok(!(await page.isVisible("#hk-steps")), "and no computer steps");
   await page.click("#hk-go");
-  await page.waitForFunction(() => /Home opens Couch TV/.test(document.getElementById("hk-line").textContent), null, { timeout: 12000 });
+  await page.waitForFunction(() => /Home should bring Couch TV back/.test(document.getElementById("hk-line").textContent), null, { timeout: 12000 });
   ok(starts === 1, "one press, one start");
   ok(await page.evaluate(() => document.getElementById("hk-line").classList.contains("ok")), "the result in green");
   ok(!(await page.isVisible("#hk-go")), "and no button any more");
@@ -215,6 +235,8 @@ async function phone() {
   HK = hkState("steps");
   const { ctx, page } = await phone();
   ok(!(await page.isVisible("#hk-go")), "no link: no button");
+  const pl = await page.textContent("#hk-line");
+  ok(pl === STEPS_PHONE && !/More|scan/.test(pl), "the phone's own line: its Let the phone press keys section and the steps below (" + pl + ")");
   const steps = await page.$$eval("#hk-steps li", (l) => l.map((x) => x.textContent));
   ok(steps.length === 5 && /couch-tv-ontv-watch\.apk/.test(steps[0]) && /Use as home screen/.test(steps[3]), "the four computer steps (" + steps.length + ")");
   ok((await page.getAttribute("#hk-steps a", "href")) === HELP, "and the help page link");

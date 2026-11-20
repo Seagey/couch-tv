@@ -70,7 +70,7 @@ class HomeKeyRulesTest {
         assertTrue(s.contains("setsid) nohup sh -c \""))
         assertTrue(s.endsWith("& sleep 2"))
         val install = s.indexOf("pm install -r ${HomeKeyRules.TMP_APK} > ${HomeKeyRules.TMP_LOG}")
-        val gate = s.indexOf("grep -q Success ${HomeKeyRules.TMP_LOG} && {")
+        val gate = s.indexOf("grep -qx Success ${HomeKeyRules.TMP_LOG} && {")
         assertTrue(install > 0 && gate > install)
         // everything that switches the watch on is behind the Success check, in this order
         val order = listOf("appops set $pkg AUTO_START allow", "enabled_accessibility_services 'com.a/.Talk:$me'",
@@ -83,6 +83,94 @@ class HomeKeyRulesTest {
         assertFalse(HomeKeyRules.installScript(pkg, me, false, true, reopen = false).contains("am start"))
         // its own files, never Update's
         assertFalse(s.contains(UpdateRules.TMP_APK) || s.contains(UpdateRules.TMP_LOG))
+    }
+
+    /**
+     * Fable review of 265f08b: the line runs inside double quotes in an outer sh, which expanded a $ in
+     * another service's name (com.a/com.a.Outer$Inner arrived as com.a/com.a.Outer, switching it off). Run the
+     * real line through /bin/sh with stand-in commands and check what each one received.
+     */
+    @Test fun theShellLineHandsEveryNameOverWhole() {
+        val dir = java.nio.file.Files.createTempDirectory("hkcheck").toFile()
+        try {
+            val bin = java.io.File(dir, "bin").apply { mkdirs() }
+            val tmp = java.io.File(dir, "tmp").apply { mkdirs() }
+            val out = java.io.File(dir, "out.txt")
+            for (c in listOf("appops", "settings", "cmd", "am")) java.io.File(bin, c).apply {
+                writeText("#!/bin/sh\nprintf '%s\\n' \"$c \$*\" >> \"\$HKOUT\"\n"); setExecutable(true) }
+            java.io.File(bin, "pm").apply { writeText("#!/bin/sh\necho Success\n"); setExecutable(true) }
+            java.io.File(tmp, "couch-tv-homekey.apk").writeText("x")
+            val other = "com.a/com.a.Outer\$Inner"
+            val services = HomeKeyRules.withWatch(other, pkg)
+            val line = HomeKeyRules.installScript(pkg, services, tcl = true, homeOn = true, reopen = true)
+                .replace("/data/local/tmp", tmp.path)
+            val pb = ProcessBuilder("/bin/sh", "-c", line).directory(dir)
+            pb.environment()["PATH"] = bin.path + ":" + System.getenv("PATH")
+            pb.environment()["HKOUT"] = out.path
+            pb.redirectErrorStream(true)
+            assertEquals(0, pb.start().waitFor())
+            val until = System.currentTimeMillis() + 10_000
+            while (System.currentTimeMillis() < until && !(out.isFile && out.readText().contains("am start"))) Thread.sleep(100)
+            val got = out.readText().trim().lines()
+            assertEquals(listOf(
+                "appops set $pkg AUTO_START allow",
+                "settings put secure enabled_accessibility_services $other:$me",
+                "settings put secure accessibility_enabled 1",
+                "cmd package set-home-activity $pkg/.HomeAlias",
+                "am start -n $pkg/.SetupActivity"), got)
+            // the copy went, and the log holds what pm said
+            assertFalse(java.io.File(tmp, "couch-tv-homekey.apk").exists())
+            assertEquals("Success", java.io.File(tmp, "couch-tv-homekey.txt").readText().trim())
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test fun aFailedInstallSwitchesNothingOn() {
+        val dir = java.nio.file.Files.createTempDirectory("hkcheck").toFile()
+        try {
+            val bin = java.io.File(dir, "bin").apply { mkdirs() }
+            val tmp = java.io.File(dir, "tmp").apply { mkdirs() }
+            val out = java.io.File(dir, "out.txt")
+            for (c in listOf("appops", "settings", "cmd", "am")) java.io.File(bin, c).apply {
+                writeText("#!/bin/sh\nprintf '%s\\n' \"$c \$*\" >> \"\$HKOUT\"\n"); setExecutable(true) }
+            // a line that only mentions Success is not a Success (grep -x)
+            java.io.File(bin, "pm").apply { writeText("#!/bin/sh\necho 'Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: not Success]'\n"); setExecutable(true) }
+            val line = HomeKeyRules.installScript(pkg, me, tcl = false, homeOn = true, reopen = true).replace("/data/local/tmp", tmp.path)
+            val pb = ProcessBuilder("/bin/sh", "-c", line).directory(dir)
+            pb.environment()["PATH"] = bin.path + ":" + System.getenv("PATH")
+            pb.environment()["HKOUT"] = out.path
+            assertEquals(0, pb.start().waitFor())
+            val log = java.io.File(tmp, "couch-tv-homekey.txt")
+            val until = System.currentTimeMillis() + 10_000
+            while (System.currentTimeMillis() < until && !(log.isFile && log.readText().isNotEmpty())) Thread.sleep(100)
+            Thread.sleep(500)
+            assertFalse(out.exists())
+            assertEquals("other_key", UpdateRules.installResult(log.readText()))
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test fun fireOs6WatchesWithUsageAccess() {
+        assertTrue(HomeKeyRules.watching(connected = true, fireTv = false, sdk = 34, usageAllowed = false))
+        assertTrue(HomeKeyRules.watching(connected = false, fireTv = true, sdk = 25, usageAllowed = true))
+        assertFalse(HomeKeyRules.watching(connected = false, fireTv = true, sdk = 25, usageAllowed = false))
+        assertFalse(HomeKeyRules.watching(connected = false, fireTv = true, sdk = 28, usageAllowed = true))
+        assertFalse(HomeKeyRules.watching(connected = false, fireTv = false, sdk = 25, usageAllowed = true))
+    }
+
+    @Test fun menuNamesAndFireTv() {
+        assertTrue(HomeKeyRules.steps(false)[2].contains("Accessibility (on some TVs inside System or Device Preferences), Couch TV home watch, On"))
+        assertTrue(HomeKeyRules.steps(true)[2].contains("help page"))
+        assertFalse(HomeKeyRules.steps(true)[2].contains("Accessibility"))
+        assertTrue(HomeKeyRules.errorWords("not_bound").contains("(on some TVs inside System or Device Preferences)"))
+        assertTrue(HomeKeyRules.errorWords("not_bound", fireTv = true).contains("couchtv.joshuaseage.com/help/home-button"))
+        assertFalse(HomeKeyRules.errorWords("not_bound", fireTv = true).contains("Accessibility"))
+        // the phone page: its own section and the steps under it, no More button and no code to scan
+        listOf(HomeKeyRules.STEPS_PHONE, HomeKeyRules.STEPS_FIRE_PHONE).forEach {
+            assertTrue(it, it.contains("the steps below")); assertFalse(it, it.contains("More")); assertFalse(it, it.contains("scan"))
+        }
+        assertTrue(HomeKeyRules.STEPS_PHONE.contains("Let the phone press keys on this page"))
+        assertTrue(HomeKeyRules.errorWords("update_busy").contains("checking for an update"))
+        // never a promise the code cannot check: the watch is on, Home should bring Couch TV back
+        assertTrue(HomeKeyRules.DONE.contains("should") && HomeKeyRules.DONE.contains("check"))
     }
 
     @Test(expected = IllegalArgumentException::class) fun refusesAStrangePackageName() {
@@ -118,7 +206,8 @@ class HomeKeyRulesTest {
     @Test fun plainWords() {
         val all = listOf(HomeKeyRules.BUTTON, HomeKeyRules.READY, HomeKeyRules.READY_WATCH, HomeKeyRules.DONE, HomeKeyRules.STEPS, HomeKeyRules.STEPS_FIRE) +
             listOf("checking", "downloading", "installing", "switching").map { HomeKeyRules.busyWords(it, 40) } +
-            listOf("net", "bad", "other_key", "not_newer", "space", "adb", "not_bound", "failed").map { HomeKeyRules.errorWords(it) }
+            listOf("net", "bad", "other_key", "not_newer", "space", "adb", "not_bound", "update_busy", "failed").map { HomeKeyRules.errorWords(it) } +
+            listOf(HomeKeyRules.STEPS_PHONE, HomeKeyRules.STEPS_FIRE_PHONE, HomeKeyRules.errorWords("not_bound", true))
         val bad = Regex("[–—]|\\bBeta\\b|experimental|coming soon|\\bADB\\b|accessibility service|couch-tv(?![-./])", RegexOption.IGNORE_CASE)
         all.forEach { assertTrue(it, it.isNotEmpty()); assertFalse(it, bad.containsMatchIn(it)) }
         assertEquals("", HomeKeyRules.errorWords(""))
@@ -126,9 +215,9 @@ class HomeKeyRulesTest {
         assertTrue(HomeKeyRules.READY.contains("Your settings stay"))
         assertTrue(HomeKeyRules.HELP_URL.startsWith("https://couchtv.joshuaseage.com/help/"))
         // every error says what to do next or that nothing changed
-        listOf("net", "bad", "other_key", "not_newer", "space", "adb", "not_bound", "failed").forEach {
+        listOf("net", "bad", "other_key", "not_newer", "space", "adb", "not_bound", "update_busy", "failed").forEach {
             val w = HomeKeyRules.errorWords(it)
-            assertTrue(w, w.contains("try again", true) || w.contains("nothing", true) || w.contains("computer steps") || w.contains("switch it on"))
+            assertTrue(w, w.contains("try again", true) || w.contains("nothing", true) || w.contains("computer steps") || w.contains("switch it on") || w.contains("press again", true))
         }
     }
 

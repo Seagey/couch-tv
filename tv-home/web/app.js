@@ -5865,16 +5865,27 @@
   function hk() { return window.TVHK || window.MOCK_HOMEKEY || null; }
   function hkRead() { var h = hk(); try { return h ? JSON.parse(h.state()) : null; } catch (e) { return null; } }
   function hkChanged() { if (zone === "settings") renderSettings(); }
+  // the real reason, as the setup screen and the phone page give it (HomeKeyRules.errorWords)
+  function hkErr(h) {
+    var e = h.error || "";
+    if (!e) return "";
+    if (e === "net") return t("upd_err_net");
+    if (e === "bad") return t("upd_err_bad");
+    if (e === "not_bound") return t(h.fire_tv ? "hk_err_not_bound_fire" : "hk_err_not_bound");
+    if (e === "update_busy") return t("hk_wait_update");
+    if (e === "other_key" || e === "not_newer" || e === "space" || e === "adb") return t("hk_err_" + e);
+    return t("hk_err");
+  }
   function hkRows() {
     var h = hkRead(), v = h && h.view;
     if (!v || v === "hidden") return [];
-    var err = h.error ? (h.error === "net" ? t("upd_err_net") : h.error === "not_bound" ? t("hk_err_not_bound") : t("hk_err")) : "";
+    var err = hkErr(h);
     if (v === "done") return [info("hk", t("hk_row"), "", t("hk_done"))];
     if (v === "busy") return [{ kind: "action", key: "hk", label: t("hk_row"),
       sub: h.phase === "downloading" ? t("upd_downloading", { p: h.progress || 0 }) : t("hk_working"), act: function () {} }];
     if (v === "ready") return [{ kind: "action", key: "hk", label: t("hk_row"),
       sub: err || t(h.watch_apk ? "hk_sub_watch" : "hk_sub"), act: function () { var x = hk(); if (x) x.start(); } }];
-    var rows = [info("hk", t("hk_row"), "", (err ? err + " " : "") + t("hk_steps"))];
+    var rows = [info("hk", t("hk_row"), "", (err ? err + " " : "") + t(h.fire_blocked ? "hk_steps_fire" : "hk_steps"))];
     if (h.help_url && window.TVQR) rows.push({ kind: "qr", key: "hk-qr", url: h.help_url, label: t("hk_qr") });
     return rows;
   }
