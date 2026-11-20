@@ -16,6 +16,42 @@ const now = Date.parse('2026-11-17T08:00:00Z'), day = 86400000;
 const base = { now: now, days: 7 };
 const d = (o) => decide(Object.assign({}, base, o));
 
+// a kept answer from the future (a clock set back) is not trusted: measured again
+assert.strictEqual(d({ setting: 'auto', memory: 4, cached: { low: true, t: now + day } }), null, 'a kept answer dated tomorrow is redone');
+assert.strictEqual(d({ setting: 'auto', memory: 4, cached: { low: true, t: now + 60 * day, moving: true }, movingDays: 30 }), null, 'a moving answer from the future too');
+// a strike: this week counts, older or from the future does not
+const sk = js.match(/function strikeOk\(k, now, days\) \{[^\n]*\}/);
+assert(sk, 'strikeOk is in app.js');
+const strikeOk = new Function(sk[0] + '; return strikeOk;')();
+assert.strictEqual(strikeOk({ strike: 1, t: now - 2 * day }, now, 7), true, 'a strike two days old counts');
+assert.strictEqual(strikeOk({ strike: 1, t: now - 8 * day }, now, 7), false, 'a strike eight days old does not');
+assert.strictEqual(strikeOk({ strike: 1, t: now + day }, now, 7), false, 'a strike dated tomorrow does not');
+assert.strictEqual(strikeOk(null, now, 7), false, 'no strike');
+assert.strictEqual(strikeOk({ strike: 1 }, now, 7), false, 'a strike with no time does not');
+// the rest frame time: the 20th percentile of 20 frames, read again 2 s later after an arrow press
+const idf = js.match(/  function idleFrames\(done\) \{[\s\S]*?\n  \}\n/);
+assert(idf, 'idleFrames is in app.js');
+{
+  const runIdle = (frames, keyAgo) => {
+    let i = 0, now = 5000, waits = [], got;
+    const raf = (cb) => { const t = frames[Math.min(i, frames.length - 1)]; i++; cb(t); };
+    const perf = { now: () => now };
+    const st = (fn, ms) => { waits.push(ms); now += ms; fn(); };
+    const f = new Function('requestAnimationFrame', 'performance', 'setTimeout', 'LOW_END_KEY_AT', idf[0] + '; return idleFrames;')(raf, perf, st, now - keyAgo);
+    f((ms) => { got = ms; });
+    return { got, waits };
+  };
+  // 21 timestamps: 16 frames of 16.7 ms and 4 slow ones of 50 ms; the median would still be 16.7, the 20th percentile is
+  const ts = [0]; for (let k = 0; k < 20; k++) ts.push(ts[ts.length - 1] + (k % 5 === 4 ? 50 : 16.7));
+  const r1 = runIdle(ts, 10000);
+  assert(Math.abs(r1.got - 16.7) < 0.01 && r1.waits.length === 0, 'no recent press: read at once, the 20th percentile (' + r1.got + ')');
+  // a 30 Hz screen with a few 66 ms frames: 33.3
+  const ts2 = [0]; for (let k = 0; k < 20; k++) ts2.push(ts2[ts2.length - 1] + (k % 4 === 3 ? 66.6 : 33.3));
+  assert(Math.abs(runIdle(ts2, 10000).got - 33.3) < 0.01, '30 Hz screen: 33.3');
+  const r2 = runIdle(ts, 300);
+  assert.deepStrictEqual(r2.waits, [2000], 'an arrow 0.3 s ago: read again 2 s later');
+  assert(Math.abs(r2.got - 16.7) < 0.01, 'and then read');
+}
 // the setting wins, either way
 assert.deepStrictEqual(d({ setting: true, memory: 8 }), { low: true, why: 'setting' });
 assert.deepStrictEqual(d({ setting: false, memory: 1 }), { low: false, why: 'setting' });

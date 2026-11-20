@@ -207,19 +207,23 @@
     // the focus moving along a row stuttered: low end on the second start that says so, a first strike otherwise
     if (typeof o.navMs === "number" && o.navMs > lim) return o.navStrike ? { low: true, why: "moving" } : { low: false, why: "strike" };
     var days = o.cached && o.cached.moving ? (o.movingDays || 30) : o.days;
-    if (o.cached && typeof o.cached.low === "boolean" && o.now - o.cached.t < days * 86400000) return { low: o.cached.low, why: "measured" };
+    if (o.cached && typeof o.cached.low === "boolean" && o.now >= o.cached.t && o.now - o.cached.t < days * 86400000) return { low: o.cached.low, why: "measured" };
     if (typeof o.medianMs === "number") return { low: o.medianMs > lim, why: "measured" };
     return null;   // measure first
   }
-  // the screen's own frame time at rest: the median of 20 frames with nothing added
+  // the screen's own frame time at rest: the 20th percentile of 20 frames with nothing added (a slow frame or
+  // two does not count), read 2 s later if an arrow was pressed in the last second (the focus is still moving)
+  var LOW_END_KEY_AT = -1e9;
+  window.addEventListener("keydown", function () { LOW_END_KEY_AT = performance.now(); }, true);
   function idleFrames(done) {
+    if (performance.now() - LOW_END_KEY_AT < 1000) { setTimeout(function () { idleFrames(done); }, 2000); return; }
     var d = [], last = 0;
     var step = function (t) {
       if (last) d.push(t - last);
       last = t;
       if (d.length < 20) { requestAnimationFrame(step); return; }
       d.sort(function (x, y) { return x - y; });
-      done(d[d.length >> 1]);
+      done(d[Math.floor(d.length * 0.2)]);
     };
     requestAnimationFrame(step);
   }
@@ -246,6 +250,8 @@
       requestAnimationFrame(step);
     });
   }
+  // a strike from this week counts; one from the future (a clock set back) does not
+  function strikeOk(k, now, days) { return !!(k && k.strike >= 1 && typeof k.t === "number" && now >= k.t && now - k.t < days * 86400000); }
   // later, and only while the home is showing (a TV playing a show in front measures nothing)
   function whenShown(ms, fn) {
     setTimeout(function go() { if (document.hidden) setTimeout(go, 5000); else fn(); }, ms);
@@ -258,7 +264,7 @@
     try { cached = JSON.parse(localStorage.getItem(LOW_END_KEY) || "null"); } catch (e) {}
     try { strike = JSON.parse(localStorage.getItem(LOW_END_NAV) || "null"); } catch (e) {}
     var o = { setting: "auto", memory: navigator.deviceMemory, cached: cached, now: Date.now(), days: LOW_END_DAYS, movingDays: LOW_END_MOVING_DAYS,
-      navStrike: !!(strike && strike.strike >= 1 && Date.now() - strike.t < LOW_END_DAYS * 86400000) };
+      navStrike: strikeOk(strike, Date.now(), LOW_END_DAYS) };
     // late: after a measurement, when the home is already drawn (redraw it as the settings row does)
     var apply = function (r, late) {
       LOW_END = r.low; LOW_END_WHY = r.why;

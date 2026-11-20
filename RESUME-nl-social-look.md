@@ -37,3 +37,6 @@ Branch nl-social-look off integrate-0.13.9 (4a705fe). Rules: scratchpad nolater-
   screen clock and design clocks.
 - Counts: node suite 61/0; test_look_switches_browser 76; test_lag_perf_browser 9; test_ws_tv 1115; test_design_settings_browser 107;
   test_look_switches_bridge 5; test_hi_res 4.
+- Round 3 (GO at ba09566, two lows): idleFrames 20th percentile and a 2 s retry after an arrow in the last 1 s; future
+  timestamps ignored for the kept answer and the strike (strikeOk). test_low_end.js passes (new unit checks), node suite 61/0,
+  test_look_switches_browser 76.
