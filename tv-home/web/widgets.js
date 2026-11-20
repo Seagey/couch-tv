@@ -1868,8 +1868,10 @@
     // Live number, picked on this TV by its title: only that card; each in turn otherwise
     var live = env.demo ? "turns" : String(setting(o, env, "live", "turns")), one = cards.filter(function (x) { return String(x.title || "") === live; });
     if (one.length) cards = one;
-    var c = cards[dayIndex(cards.length, 20)];
-    add(root, [E("div", "cw-lab", "", [String(c.title || "")]), E("div", "cw-grow"), E("div", "cw-big", "overflow-wrap:anywhere;font-size:" + px(Math.min(clamp(b.h / 3.2, 44, 96), fitPx(String(c.value || "").split(/\s+/).sort(function (x, y) { return y.length - x.length; })[0], b.w - 48, 96))), [String(c.value || "")])]);
+    var c = cards[dayIndex(cards.length, 20)], cvWords = String(c.value || "").split(/\s+/), cvFs = Math.min(clamp(b.h / 3.2, 44, 96), fitPx(cvWords.slice().sort(function (x, y) { return y.length - x.length; })[0], b.w - 48, 96));
+    // on a tile the title takes two lines, so the number gets what is left under it (up to two lines)
+    if (b.w < 300) cvFs = clamp(Math.min(cvFs, (b.h - 48 - 57) / (1.04 * Math.min(2, cvWords.length))), 23, 96);
+    add(root, [b.w < 300 ? E("div", "", "flex:none;max-width:100%;font-size:23px;font-weight:650;color:var(--sub);line-height:1.15;" + lines(2), [String(c.title || "")]) : E("div", "cw-lab", "", [String(c.title || "")]), E("div", "cw-grow"), E("div", "cw-big", "overflow-wrap:anywhere;font-size:" + px(cvFs) + (b.w < 300 ? ";line-height:1.04" : ""), [String(c.value || "")])]);
   };
   R.quote = function (root, o, b) {
     var q = op(o), words = window.CouchWords || { quotes: ["Slow mornings are the good ones."] };
@@ -2195,11 +2197,12 @@
     return (athome(env) || {}).stay || null;
   }
   // "Check out Sunday at 10am", "Check in from 3pm", "Check out today at 10am"
-  function stayLine(v, env) {
+  // short: for a widget one or two rows high ("Check out Mon 10:00am")
+  function stayLine(v, env, short) {
     var t = now(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
-    var dayWord = function (ms) { var d = new Date(ms).setHours(0, 0, 0, 0); return d === today ? "today" : d === today + 86400000 ? "tomorrow" : DAYS[new Date(ms).getDay()]; };
+    var dayWord = function (ms) { var d = new Date(ms).setHours(0, 0, 0, 0), w = DAYS[new Date(ms).getDay()]; return d === today ? "today" : d === today + 86400000 ? "tomorrow" : short ? w.slice(0, 3) : w; };
     if (v.phase === "arrival" || v.phase === "before") return "Check in " + (v.phase === "before" ? "tomorrow " : "") + "from " + hhmm(v.checkin, env);
-    if (v.phase === "during" || v.phase === "lastday") return "Check out " + dayWord(v.checkout) + " at " + hhmm(v.checkout, env);
+    if (v.phase === "during" || v.phase === "lastday") return "Check out " + dayWord(v.checkout) + (short ? " " : " at ") + hhmm(v.checkout, env);
     return "";
   }
   function withName(text, name) {
@@ -2255,15 +2258,23 @@
       var v = st && st.view;
       if (v && v.phase !== "between") {
         text = withName(text, v.guest || typed);
-        if (q.times !== false) { var sl = stayLine(v, env || {}); if (sl) { var q2 = {}; for (var k in q) if (Object.prototype.hasOwnProperty.call(q, k)) q2[k] = q[k]; q2.sub = sl; q = q2; } }
+        if (q.times !== false) { var sl = stayLine(v, env || {}, b.h < 200); if (sl) { var q2 = {}; for (var k in q) if (Object.prototype.hasOwnProperty.call(q, k)) q2[k] = q[k]; q2.sub = sl; q = q2; } }
       }
     }
-    var lines = text.split("\n").length, fs = clamp(Math.min((b.h - (q.kicker ? 50 : 0) - (q.sub ? 50 : 0)) / (1.08 * lines), b.w / (Math.max(8, Math.max.apply(null, text.split("\n").map(function (l) { return l.length; }))) * 0.6)), 30, 120);
+    // on a widget one or two rows high the line under is one small line, and the greeting gets the rest
+    var short = b.h < 200, subH = q.sub ? (short ? 37 : 50) : 0;
+    var lines = text.split("\n").length, fs = clamp(Math.min((b.h - 48 - (q.kicker ? 50 : 0) - subH) / (1.08 * lines), b.w / (Math.max(8, Math.max.apply(null, text.split("\n").map(function (l) { return l.length; }))) * 0.6)), 30, 120);
     var bare = root.classList.contains("cw-bare"), sh = bare ? ";text-shadow:0 3px 24px rgba(0,0,0,.28)" : "";
+    if (b.h < 100 && q.sub) {
+      add(root, E("div", "cw-row", "width:100%;height:100%;align-items:center;justify-content:" + (align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start"), [
+        E("div", "", "flex:none;font-size:30px;font-weight:740;line-height:1.04;white-space:nowrap;color:var(--ink)" + sh, [text.split("\n")[0]]),
+        one1("cw-t23", "flex:0 1 auto;min-width:0;margin-left:16px;font-weight:650;color:var(--sub)" + sh, q.sub)]));
+      return;
+    }
     add(root, E("div", "cw-col", "height:100%;justify-content:center;text-align:" + align + ";align-items:" + (align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start"), [
       q.kicker ? E("div", "", "font-size:23px;font-weight:720;letter-spacing:.14em;text-transform:uppercase;opacity:.86;margin-bottom:12px" + sh, [q.kicker]) : null,
       E("div", "", "font-size:" + px(fs) + ";font-weight:740;line-height:1.04;letter-spacing:-.025em;white-space:pre-line;color:var(--ink)" + sh, [text]),
-      q.sub ? ((o.style || {}).accent ? E("div", "", "margin-top:16px;display:inline-block;padding:10px 24px;border-radius:30px;background:#fff;font-size:32px;font-weight:760;color:" + o.style.accent, [q.sub]) : E("div", "cw-t29", "margin-top:14px;font-weight:650;color:var(--sub)" + sh, [q.sub])) : null]));
+      q.sub ? ((o.style || {}).accent ? E("div", "", "margin-top:16px;display:inline-block;padding:10px 24px;border-radius:30px;background:#fff;font-size:32px;font-weight:760;color:" + o.style.accent, [q.sub]) : (short ? one1("cw-t23", "margin-top:6px;font-weight:650;color:var(--sub)" + sh, q.sub) : E("div", "cw-t29", "margin-top:14px;font-weight:650;color:var(--sub)" + sh, [q.sub]))) : null]));
   };
   var QNAMES = { sleep: ["sleep-timer", "Sleep timer"], picture: ["picture", "Picture"], look: ["picture", "Look"], soundscape: ["rain", "Soundscape"], screen_off: ["power", "Screen off"],
     headphones: ["headphones", "Headphones"], input: ["input", "Input"], bluetooth: ["bluetooth", "Bluetooth"], network: ["wifi", "Network"], tvsettings: ["settings", "TV settings"], screensaver: ["picture", "Screensaver"] };
@@ -2492,7 +2503,7 @@
     }
     if (a.wait) { empty(root, b, "calendar", a.err ? (b.w < 300 ? "Calendar not read" : a.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), a.err ? "Settings (hold OK), Home settings, Designs, At home" : ""); return null; }
     var out = { days: days, today: evDay(a.events, 0, env), tomorrow: days === "today" ? [] : evDay(a.events, 1, env), week: [] };
-    if (days === "week") for (var k = 0; k < 7; k++) evDay(a.events, k, env).forEach(function (x) { if (k && out.week.some(function (y) { return y.start === x.start && y.title === x.title; })) return; x.when = (k ? DAYS[new Date(dayStart(now()) + k * 86400000 + 43200000).getDay()].slice(0, 3) + " " : "") + x.when; x.col = EV_COL[out.week.length % EV_COL.length]; out.week.push(x); });
+    if (days === "week") for (var k = 0; k < 7; k++) evDay(a.events, k, env).forEach(function (x) { if (k && out.week.some(function (y) { return y.start === x.start && y.title === x.title; })) return; x.when = (k ? DAYS[new Date(dayStart(now()) + k * 86400000 + 43200000).getDay()].slice(0, 3) + " " : "") + x.when; x.col = EV_COL[out.week.length % EV_COL.length]; x.k = k; out.week.push(x); });
     return out;
   }
   // never a fixed word for a day over the wrong day (a starter's "Tomorrow" over today's events): the
@@ -2512,8 +2523,16 @@
     var heading = wk ? agendaWeek(op(o).label) : agendaHeading(op(o).label, !ag.today.length && ag.tomorrow.length);
     var none = wk ? "this week" : ag.days === "today" ? "today" : "today or tomorrow";
     if (b.h < 200) {
-      // a tile or a wide tile: the day, what is next and when
-      add(root, ahCol(a, [one1("cw-t23", "font-weight:750;color:#ff453a", b.w < 300 ? (ag.today.length || !nx || wk ? day : "TOMORROW") : day + (ag.today.length || !nx || wk ? "" : ", tomorrow")),
+      // a tile or a wide tile: the day, what is next and when. On a tile the day is the event's own
+      // ("SUN 22"), with its time alone under it, and the title may take two lines
+      if (b.w < 300) {
+        var k1 = nx ? (wk ? nx.k || 0 : ag.today.length ? 0 : 1) : 0, d1 = new Date(dayStart(d) + k1 * 86400000 + 43200000);
+        add(root, ahCol(a, [one1("cw-t23", "font-weight:750;color:#ff453a", DAYS[d1.getDay()].slice(0, 3).toUpperCase() + " " + d1.getDate()),
+          E("div", "cw-t25", "flex:none;max-width:100%;font-weight:700;color:var(--ink);margin-top:4px;line-height:1.15;" + lines(2), [nx ? nx.title : "Nothing on"]),
+          one1("cw-t23", "", nx ? (wk && nx.k ? nx.when.replace(/^\S+ /, "") : nx.when) : none)]));
+        return;
+      }
+      add(root, ahCol(a, [one1("cw-t23", "font-weight:750;color:#ff453a", day + (ag.today.length || !nx || wk ? "" : ", tomorrow")),
         one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", nx ? nx.title : "Nothing on"), one1("cw-t23", "", nx ? nx.when : none)]));
       return;
     }
@@ -2524,9 +2543,10 @@
         one1("cw-t23", "", nx ? (ag.today.length || wk ? "" : "Tomorrow, ") + nx.when + (list.length > 1 ? ", then " + (list.length - 1) + " more" : "") : none)]));
       return;
     }
-    var n = clamp(Math.floor((b.h - 48 - 50) / 72), 1, 8), more = list.length > n ? list.length - (n - 1) : 0, shown = more ? list.slice(0, n - 1) : list;
+    var n = clamp(Math.floor((b.h - 48 - 50) / (b.w < 600 ? 92 : 72)), 1, 8), more = list.length > n ? list.length - (n - 1) : 0, shown = more ? list.slice(0, n - 1) : list;
     add(root, ahCol(a, [ahLab("calendar", heading + (list.length ? " · " + list.length + (list.length === 1 ? " event" : " events") : "")),
       list.length ? E("div", "cw-col", "max-width:100%;margin-top:14px;flex:none;align-items:" + (a === "right" ? "flex-end" : "flex-start"), shown.map(function (e) {
+        if (b.w < 600) return E("div", "cw-ev", "max-width:100%;margin-top:14px", [E("i", "", "background:" + e.col), E("div", "cw-col", "flex:0 1 auto;min-width:0", [E("div", "cw-t29 cw-ell", "max-width:100%", [e.title]), E("div", "cw-t23", "", [e.when])])]);
         return E("div", "cw-ev", "max-width:100%;margin-top:14px", [E("i", "", "background:" + e.col), E("div", "cw-t29 cw-ell", "flex:0 1 auto;min-width:0", [e.title]), E("div", "cw-t25", "flex:none;margin-left:16px", [e.when])]);
       }).concat(more ? [one1("cw-t23", "margin-top:14px", "and " + more + " more")] : [])) : one1("cw-t29", "font-weight:680;margin-top:16px", "Nothing on " + none)]));
   };
@@ -2539,8 +2559,8 @@
     if (!n) return soon(root, b, "edit", "note");
     // Show who it is from: "From Mum" above the words, on a narrow tile the name alone (23 px fits there)
     // the words as big as they fit (the quote's rule), wrapping, and "..." on the last line that fits
-    var fromH = n.from && b.h >= 140 && setting(o, env, "byline") !== false ? 40 : 0, room = Math.max(30, b.h - 48 - fromH), len = Math.max(8, n.text.length);
-    var fs = clamp(Math.min(Math.sqrt((b.w - 48) * room / len / 1.7), room / 1.2, 64), 25, 64), max = Math.max(1, Math.floor(room / (fs * 1.18)));
+    var fromH = n.from && b.h >= 140 && setting(o, env, "byline") !== false ? (b.w < 300 ? 28 : 40) : 0, room = Math.max(30, b.h - 48 - fromH), len = Math.max(8, n.text.length);
+    var fs = clamp(Math.min(Math.sqrt((b.w - 48) * room / len / 1.7), room / 1.2, 64), 23, 64), max = Math.max(1, Math.floor(room / (fs * 1.18)));
     add(root, ahCol(a, [fromH ? one1("cw-t23", "font-weight:700;color:var(--sub)", (b.w < 300 ? "" : "From ") + n.from) : null,
       E("div", "", "flex:none;max-width:100%;font-size:" + px(fs) + ";font-weight:680;line-height:1.18;margin-top:" + (fromH ? 8 : 0) + "px;letter-spacing:-.01em;white-space:pre-line;" + lines(max), [n.text])]));
   };
@@ -2598,15 +2618,17 @@
     var a = ahAlign(root, o), w = wifiOf(env);
     if (!w || !w.ssid) return soon(root, b, "wifi", "wifi");
     if (b.h < 200 || b.w < 200) { add(root, ahCol(a, [ahLab("wifi", "Guest Wi-Fi"), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", w.ssid), one1("cw-t23", "", "OK shows the code")])); return; }
-    var narrow = b.w < 600, qs = Math.max(80, narrow ? Math.min(b.h - 48 - 46, b.w - 48) : b.h - 48), code = qrNode(w.qr, qs - 24);
+    var nopass = w.sec === "nopass" || !w.pass, hideSet = !nopass && setting(o, env, "hidepass") === true;
+    var narrow = b.w < 600, pwLine = narrow && !nopass && !hideSet, qs = Math.max(80, narrow ? Math.min(b.h - 48 - 46 - (pwLine ? 32 : 0), b.w - 48) : b.h - 48), code = qrNode(w.qr, qs - 24);
     var box = E("div", "", "width:" + px(qs) + ";height:" + px(qs) + ";border-radius:22px;background:#fff;padding:12px;flex:none;overflow:hidden", [code || E("div", "cw-t23", "color:#1d1b18;padding:8px;" + lines(4), ["The name and password are too long for a code"])]);
-    if (narrow) { add(root, ahCol(a, [box, one1("cw-t25", "margin-top:10px;font-weight:650;color:var(--ink)", w.ssid)])); return; }
     // Hide the password (set on this TV): the code still joins, the words never show (a name and password too long for a code always show the words)
-    var nopass = w.sec === "nopass" || !w.pass, hide = !nopass && !!code && setting(o, env, "hidepass") === true;
+    var hide = hideSet && !!code;
+    if (narrow) { add(root, ahCol(a, [box, one1("cw-t25", "margin-top:10px;font-weight:650;color:var(--ink)", w.ssid), pwLine || (!nopass && !code) ? one1("cw-t23", "color:var(--sub)", w.pass) : null])); return; }
+    var roomy = b.w >= 1000;
     add(root, E("div", "cw-row", "width:100%;height:100%;justify-content:" + FLEX[a], [box,
       E("div", "cw-col", "margin-left:30px;min-width:0;flex:0 1 auto;max-width:" + px(b.w - 48 - qs - 30), [ahLab("wifi", "Guest Wi-Fi"), one1("cw-t48", "margin-top:10px", w.ssid),
-        one1("cw-t29 cw-dim", "margin-top:6px", nopass ? "No password" : hide ? "The password is in the code" : "Password"), nopass || hide ? null : one1("cw-t38", "", w.pass),
-        one1("cw-t23", "margin-top:10px", "Point your phone camera at the code")])]));
+        one1("cw-t29 cw-dim", "margin-top:6px", nopass ? "No password" : hide ? (roomy ? "The password is in the code" : "Password in the code") : "Password"), nopass || hide ? null : one1("cw-t38", "", w.pass),
+        one1("cw-t23", "margin-top:10px", roomy ? "Point your phone camera at the code" : "Scan with a phone camera")])]));
   };
   CR.wifi = R.wifi;
 
@@ -2687,7 +2709,7 @@
     // the total as big as fits the room it has (beside the apps, half the box)
     var appsW = Math.min(340, (b.w - 48) * 0.45), room = apps.length ? b.w - 48 - appsW - 40 : b.w - 48, fs = clamp(Math.min((b.h - 48 - (b.h < 200 ? 64 : 110)) / 0.92, room / (total.length * 0.6)), 24, 140);
     var main = ahCol(apps.length ? "center" : a, [b.h >= 200 || b.w >= 300 ? ahLab("timer", "Screen time") : ic("timer", 30, "currentColor"), E("div", "cw-big", "flex:none;max-width:100%;white-space:nowrap;font-size:" + px(fs) + ";margin-top:" + (b.h < 200 ? 2 : 12) + "px", [total]),
-      one1(gl ? "cw-t25" : "cw-t23", "color:var(--ink);font-weight:650;margin-top:" + (b.h < 200 ? 0 : 8) + "px", gl || "In apps today"),
+      one1(gl ? "cw-t25" : "cw-t23", "color:var(--ink);font-weight:650;margin-top:" + (b.h < 200 ? 0 : 8) + "px", b.w < 300 ? (s.goal ? (s.minutes > s.goal ? hm(s.minutes - s.goal) + " over" : s.minutes < s.goal ? hm(s.goal - s.minutes) + " left" : "On goal") : "Today") : gl || "In apps today"),
       s.goal && b.h >= 200 ? E("div", "cw-bar", "flex:none;width:100%;max-width:320px;margin-top:16px;height:14px;border-radius:7px;background:rgba(255,255,255,.25)", [E("b", "", "width:" + Math.round(clamp(s.minutes / s.goal, 0, 1) * 100) + "%;background:" + (s.minutes > s.goal ? "#ffd60a" : "#fff"))]) : null], apps.length ? "width:auto;max-width:" + px(room) + ";flex:0 1 auto" : "");
     if (!apps.length) { add(root, main); return; }
     // beside the apps: the two side by side, as one group in the middle (or to the side picked)

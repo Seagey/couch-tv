@@ -83,7 +83,7 @@ const kit = T.W.kit;
   // no code (here no TVQR, as with a name and password too long for one): the password words always show
   const env = { data: { home: { wifi: { ssid: "salt-and-sun", pass: "summer-swell", sec: "WPA", qr: "WIFI:T:WPA;S:salt-and-sun;P:summer-swell;;" } } }, wset: { f1: { hidepass: true } } };
   const t = txt(T.W.render({ kind: "wifi", id: "f1", w: 760, h: 360 }, env));
-  ok(/summer-swell/.test(t) && !/The password is in the code/.test(t), "Hide the password with no code to scan: the password still shows (" + t + ")");
+  ok(/summer-swell/.test(t) && !/in the code/.test(t), "Hide the password with no code to scan: the password still shows (" + t + ")");
 }
 
 // ---- 5. Agenda with every calendar, one failed ----

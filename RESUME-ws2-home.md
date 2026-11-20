@@ -43,11 +43,25 @@ memory, screentime, wifi, card, photo, slideshow, mosaic, artframe. Every settin
 9. Words: 28 settings here; welcome needs say the words can be typed on the TV or the phone too.
 New tests/test_ws2_home_dates.js (TZ=Australia/Sydney set inside): 33 checks; the DST check fails on the old app.js.
 
-## Test counts (21 Nov, after the NO-GO fixes, this worktree, scratchpad ws2home-browser-run.sh, results in ws2home-results)
+## Checker size probe (probe4) at b5c2c9e, fixed (21 Nov)
+- Welcome on a wide tile: the line under is one small line ("Check out Mon 10:00am" there) and the greeting gets the
+  rest; on a wide line (760x60) the greeting and the line under sit side by side.
+- Note on a tile: the name line is 28 px and the words may go to 23 px. Guest Wi-Fi Small shows the password under the
+  name, so Hide the password changes it; under 1000 px wide "Password in the code" and "Scan with a phone camera".
+- Agenda tile: the event's own day ("SUN 22") and its time, the title on two lines; Agenda tall (under 600 px wide):
+  each time on its own line. Custom card tile: a live number's title on two lines and the number fitted under it.
+  Screen time tile: "5m over", "15m left", "On goal" or "Today".
+- New tests/test_ws2_home_visible.mjs (from probe4): every kind, every listed size (line to full), every setting vs
+  the default, words measured character by character, a SAME list of 24 with reasons, EMPTY_OK of 1. The clock is a
+  time near 10:00 found so each slideshow setting and the card's each in turn really differ; photo picks are never the
+  default photo. 334 cases, 951 checks.
+
+## Test counts (21 Nov, after probe4, this worktree, scratchpad ws2home-browser-run.sh, results in ws2home-results)
 - node: test_ws_schema.js 4130, test_widget_caps.js 4548, test_athome.js 80, test_design_widgets.js 221,
   test_ws2_home_photo.js 94, test_ws2_home_dates.js 33.
-- Browser: test_ws2_home.mjs 269, test_widget_fit_all.mjs 8, test_widget_detail_browser.mjs 295 or 296 (its focus
-  round trip checks only count when the focus moves), test_ws_tv.mjs 1115, test_design_settings_browser.mjs 108.
+- Browser: test_ws2_home_visible.mjs 952 (334 cases, 24 SAME), test_ws2_home.mjs 269, test_widget_fit_all.mjs 8,
+  test_widget_detail_browser.mjs 296 (295 on some runs: its focus round trip checks count only when the focus moves),
+  test_ws_tv.mjs 1115, test_design_settings_browser.mjs 108.
 
 ## Left
 Nothing in scope. Branch finished (no push, tag or bump). Merge note: no file in common with nl-photo, so the two merge cleanly (checked with git diff --name-only

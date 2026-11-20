@@ -213,7 +213,7 @@ ok((await draw({ id: "p1", kind: "mosaic", opts: { count: "auto" } }, phData, nu
   ok(/Bins/.test(gl.layer) && /Around here/.test(gl.layer) && !/Check out/.test(gl.layer) && /2 things to know/.test(gl.layer), "guide: its detail layer shows the same parts: " + gl.layer.slice(0, 80));
   const wd = { home: { wifi: { ssid: "salt-and-sun", pass: "summer-swell", sec: "WPA", qr: "WIFI:T:WPA;S:salt-and-sun;P:summer-swell;;" } } };
   await cycle("wifi.hidepass", { id: "f1", kind: "wifi" }, wd, { hidepass: true }, (d, s) => {
-    ok(/summer-swell/.test(d.text) && !/summer-swell/.test(s.text) && /The password is in the code/.test(s.text) && /<svg/.test(s.html), "wifi.hidepass: the password words go, the code stays");
+    ok(/summer-swell/.test(d.text) && !/summer-swell/.test(s.text) && /(The password is|Password) in the code/.test(s.text) && /<svg/.test(s.html), "wifi.hidepass: the password words go, the code stays");
   });
   const wl = await draw({ id: "f1", kind: "wifi" }, wd, { hidepass: true }, null, true);
   ok(!/summer-swell/.test(wl.layer) && /salt-and-sun/.test(wl.layer), "wifi: its detail layer hides the password too");
