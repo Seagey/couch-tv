@@ -24,9 +24,30 @@ Branch ws2-watching off integrate-0.13.9 (4a705fe). No push, tag or version bump
 - test_ws_tv.mjs 1115 OK, test_design_settings_browser.mjs 108 OK, test_widget_detail_browser.mjs 295 OK (before the rowBreaks change).
 - test_widget_fit_all.mjs failed on folder (max-width fix); replaced by rowBreaks; rerun pending.
 
+## Session 21 Nov (05:10 to 05:35), stopped by the coordinator
+- Worktree was clean at bf32b38; no code changes this session.
+- node tests/test_ws_schema.js 4430 pass, tests/test_widget_caps.js 4548 pass, all 61 tests/test_*.js node files pass.
+- Browser suites NOT rerun: watching-run.sh (checked: points at wt-ws2-watching) waited 20 min on browser.lock held by other branches
+  (wt-ws2-home was running test_widget_detail_browser.mjs) and was stopped before it got the lock. No lock of ours left behind.
+  The logs in scratchpad/watching-out/ are all from 20 Nov 19:12 to 19:24 (fit_all OK 8 checks, 1640 boxes, 0 problems; ws2_watching 172 pass).
+- Real data checked (read only, local home bridge 127.0.0.1:5400, no TV touched):
+  /api/history 29 real items (title, app, who, tv fields) = keep/keeprow/upnext/picks source shape;
+  /api/people 2 real people = Whose shows options. /api/music/queue answers "no such endpoint" there (that bridge is wt-home, older build),
+  and /api/music reads the TV's media sessions over ADB, so nowplaying/queue live data was NOT called (TV off limits).
+  Soundscape is made on the TV (no service). Apps/dock/folder/appgrid/games/app/quick come from the TV's own app list and buttons (not called: /api/apps asks the TV).
+
+## Session 21 Nov (05:38 to 06:05): finished
+- watching-run.sh (checked: T= points at wt-ws2-watching, output in scratchpad/watching-out) ran all five
+  browser suites under browser.lock, one at a time, every one exit 0, on bf32b38 code (no code change since):
+  test_widget_fit_all.mjs OK 8 checks (1640 boxes, 67 kinds, 0 problems); test_ws2_watching.mjs 172 pass
+  (27 settings changed and cleared); test_ws_tv.mjs 1115 OK; test_design_settings_browser.mjs 108 OK;
+  test_widget_detail_browser.mjs 296 OK.
+- Node: test_ws_schema.js 4430 pass, test_widget_caps.js 4548 pass, all 61 tests/test_*.js pass.
+- Not possible here: a live Spotify call for nowplaying/queue. The bridge on 127.0.0.1:5400 is an older build
+  (/api/spotify/status and /api/music/queue answer "no such endpoint"), and looking for Spotify tokens in other
+  worktrees was refused by the permission check (not bypassed). The parsers (spotify_now.card_item,
+  queue_items) are unchanged on this branch.
+
 ## Next steps
-1. Rerun browser suites (one at a time, under the lock):
-   zsh <session scratchpad>/watching-run.sh test_widget_fit_all.mjs test_ws2_watching.mjs test_ws_tv.mjs test_design_settings_browser.mjs test_widget_detail_browser.mjs
-   Results: scratchpad/watching-out/summary.txt and <test>.log. Lock rule: mkdir scratchpad/browser.lock first, rmdir after.
-2. Fix anything red, commit, report to the coordinator (table per kind).
+None in scope. Branch is ready to merge.
 Nothing runs on the MacBook or an emulator.
