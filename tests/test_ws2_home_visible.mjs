@@ -98,6 +98,8 @@ try {
     const D = {
       agenda: { home: { cal: { set: true, events: main }, books: { set: true, events: books } } },
       agendaClear: { home: { cal: { set: true, events: main.slice(1) }, books: { set: false } } },
+      // nothing today or tomorrow, only the dentist three days out
+      agendaFar: { home: { cal: { set: true, events: main.slice(2) }, books: { set: false } } },
       people: { people: [{ id: "b", name: "Sam" }, { id: "c", name: "Jordan" }, { id: "d", name: "Riley" }], who: "b" },
       note: { home: { note: { text: "Dinner at 6. Feed Max!", from: "Mum" } } },
       list: { home: { lists: [{ name: "Shopping", items: [{ t: "Milk", done: false }, { t: "Avocados", done: false }, { t: "Bread", done: true }, { t: "Eggs", done: true }] }, { name: "Jobs", items: [{ t: "Mow the lawn", done: false }] }] } },
@@ -157,7 +159,8 @@ try {
     const V = {
       agenda: [["default", {}, "agenda"], ["calendars main", { calendars: "main" }, "agenda"], ["calendars bookings", { calendars: "bookings" }, "agenda"],
         ["calendars bookings vs main", { calendars: "bookings" }, "agenda", "calendars main"], ["days week", { days: "week" }, "agenda"],
-        ["default clear", {}, "agendaClear"], ["days today (clear day)", { days: "today" }, "agendaClear", "default clear"], ["days week (clear day)", { days: "week" }, "agendaClear", "default clear"]],
+        ["default clear", {}, "agendaClear"], ["days today (clear day)", { days: "today" }, "agendaClear", "default clear"], ["days week (clear day)", { days: "week" }, "agendaClear", "default clear"],
+        ["default far", {}, "agendaFar"], ["days week (far)", { days: "week" }, "agendaFar", "default far"]],
       people: [["default", {}, "people"], ["who Jordan", { who: ["c"] }, "people"], ["names off", { names: false }, "people"]],
       note: [["default", {}, "note"], ["byline off", { byline: false }, "note"]],
       list: [["default", {}, "list"], ["list Jobs", { list: "Jobs" }, "list"], ["done off", { done: false }, "list"]],

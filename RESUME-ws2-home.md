@@ -59,7 +59,7 @@ New tests/test_ws2_home_dates.js (TZ=Australia/Sydney set inside): 33 checks; th
 ## Test counts (21 Nov, after probe4, this worktree, scratchpad ws2home-browser-run.sh, results in ws2home-results)
 - node: test_ws_schema.js 4130, test_widget_caps.js 4548, test_athome.js 80, test_design_widgets.js 221,
   test_ws2_home_photo.js 94, test_ws2_home_dates.js 33.
-- Browser: test_ws2_home_visible.mjs 952 (334 cases, 24 SAME), test_ws2_home.mjs 269, test_widget_fit_all.mjs 8,
+- Browser: test_ws2_home_visible.mjs 982 (346 cases, 24 SAME; agenda with only an event 3 days out: tile "till Mon", tall wraps "Nothing on today or tomorrow"), test_ws2_home.mjs 269, test_widget_fit_all.mjs 8,
   test_widget_detail_browser.mjs 296 (295 on some runs: its focus round trip checks count only when the focus moves),
   test_ws_tv.mjs 1115, test_design_settings_browser.mjs 108.
 

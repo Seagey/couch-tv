@@ -2529,7 +2529,7 @@
         var k1 = nx ? (wk ? nx.k || 0 : ag.today.length ? 0 : 1) : 0, d1 = new Date(dayStart(d) + k1 * 86400000 + 43200000);
         add(root, ahCol(a, [one1("cw-t23", "font-weight:750;color:#ff453a", DAYS[d1.getDay()].slice(0, 3).toUpperCase() + " " + d1.getDate()),
           E("div", "cw-t25", "flex:none;max-width:100%;font-weight:700;color:var(--ink);margin-top:4px;line-height:1.15;" + lines(2), [nx ? nx.title : "Nothing on"]),
-          one1("cw-t23", "", nx ? (wk && nx.k ? nx.when.replace(/^\S+ /, "") : nx.when) : none)]));
+          one1("cw-t23", "", nx ? (wk && nx.k ? nx.when.replace(/^\S+ /, "") : nx.when) : ag.days === "two" ? "till " + DAYS[new Date(dayStart(d) + 2 * 86400000 + 43200000).getDay()].slice(0, 3) : none)]));
         return;
       }
       add(root, ahCol(a, [one1("cw-t23", "font-weight:750;color:#ff453a", day + (ag.today.length || !nx || wk ? "" : ", tomorrow")),
@@ -2548,7 +2548,7 @@
       list.length ? E("div", "cw-col", "max-width:100%;margin-top:14px;flex:none;align-items:" + (a === "right" ? "flex-end" : "flex-start"), shown.map(function (e) {
         if (b.w < 600) return E("div", "cw-ev", "max-width:100%;margin-top:14px", [E("i", "", "background:" + e.col), E("div", "cw-col", "flex:0 1 auto;min-width:0", [E("div", "cw-t29 cw-ell", "max-width:100%", [e.title]), E("div", "cw-t23", "", [e.when])])]);
         return E("div", "cw-ev", "max-width:100%;margin-top:14px", [E("i", "", "background:" + e.col), E("div", "cw-t29 cw-ell", "flex:0 1 auto;min-width:0", [e.title]), E("div", "cw-t25", "flex:none;margin-left:16px", [e.when])]);
-      }).concat(more ? [one1("cw-t23", "margin-top:14px", "and " + more + " more")] : [])) : one1("cw-t29", "font-weight:680;margin-top:16px", "Nothing on " + none)]));
+      }).concat(more ? [one1("cw-t23", "margin-top:14px", "and " + more + " more")] : [])) : b.w < 600 ? E("div", "cw-t29", "font-weight:680;margin-top:16px;max-width:100%;" + lines(2), ["Nothing on " + none]) : one1("cw-t29", "font-weight:680;margin-top:16px", "Nothing on " + none)]));
   };
   CR.agenda = R.agenda;
 
