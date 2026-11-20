@@ -36,6 +36,24 @@ Kinds: weather, bigtemp, hourly, rain, uv, sun, moon, air, surf (week stays with
   The test now measures what shows: each element's words, character by character, inside its own box
   and the widget's and before any "…" (draw().leaves, .seen). The size matrix compares what shows;
   every own place name must show at least 4 letters; the high and the clock words must show in full.
+- Gate NO-GO at 45ad888 (names still cut: 4 letters was too weak), fixed:
+  - No word is cut anywhere now, for every kind, every listed size, every setting value, at 10:00 and
+    19:30: tests/test_ws2_weather_visible.mjs (from the gate's probe3), 386 cases.
+  - Weather wide tile under 460: no icon; place cw-t25, sky words, "High N°" each on their own line.
+  - Tiles with a place of its own (weather, Big number, Air, UV, Sun): 16 px padding, the name over two
+    lines broken between words (widgets.js TWO), a smaller number; Air tile band word two lines too.
+  - Air wide tile: "Air", then the place on its own line, the number 72 px.
+  - Rain wide tile: the place as the heading, the rain line under it.
+  - Under 600 wide, a place of its own is the heading by itself (wxHead(o, env, dflt, b)): rain, UV,
+    air, sun.
+  - Hourly small: the place on its own line; the sky column keeps its room. Hourly wide tile: 5 hours
+    fit (room / 60), so 4 changes it; with a place's name 2 fit.
+  - Surf wide tile: the wind under the swell (Wind in works there now), no icon beside its own place.
+  - Moon wide tile: the phase over two lines.
+  - Weather and surf wide tiles: columns spread edge to edge (the fit audit's centring), surf unit 23 px.
+  - Help lines: Show the town name (weather, Big number) and Show the high and low say what a tile shows.
+  - Main test: names fit in full (Long Beach at every size, Port Macquarie from the wide tile up),
+    surf wide tile shows knots; SAME is 3 cases now.
 
 ## Merge (Fable finding 3)
 
@@ -44,7 +62,7 @@ take this branch's weather lines in the before launch block whole; in tests/test
 branch's weather entries in PRE and its LATER without surf and weather. "Keep both sides" duplicates
 keys (LATER is concatenated onto SETTINGS).
 
-## Tests, 21 Nov 2026 after the re-check fixes (all pass)
+## Tests, 21 Nov 2026 after the gate fixes (all pass)
 
     node tests/test_ws_schema.js                 3809 checks (84 settings on 45 kinds)
     node tests/test_widget_caps.js               4548 checks
@@ -52,11 +70,13 @@ keys (LATER is concatenated onto SETTINGS).
     python3 tests/test_ws_native.py              OK (12 skipped); test_widget_settings_bridge.py OK
     browser (take <scratchpad>/browser.lock with mkdir first, rmdir after), via
     zsh <scratchpad>/ws2-weather-run.sh (logs in <scratchpad>/ws2-weather-logs/):
-      tests/test_ws2_weather.mjs                 597 checks (same count at any time of day)
+      tests/test_ws2_weather.mjs                 623 checks (same count at any time of day)
+      tests/test_ws2_weather_visible.mjs         1116 checks (386 cases, 70 the same by design)
       tests/test_ws_tv.mjs                       1115 checks
       tests/test_design_settings_browser.mjs     107 checks
       tests/test_widget_detail_browser.mjs       296 checks
       tests/test_widget_fit_all.mjs              1640 boxes, 0 problems, 8 checks
+    WS2_SOFT=1 lists every failure in either weather test instead of stopping at the first.
     Fable's read only probe (<scratchpad>/fable-ws2-weather/probe.mjs <worktree>): 71 size cases, no
     spill; the only no change cases are a tile with nothing to hide, the surf wide tile (no wind
     drawn) and hours 8 where 8 already fit; real Open-Meteo end to end for Sydney and Bells Beach

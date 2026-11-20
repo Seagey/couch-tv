@@ -25,7 +25,9 @@ try { chromium = createRequire(path.join(process.env.COUCHTV_PLAYWRIGHT || proce
 catch (e) { console.log("SKIP: Playwright is not installed (set COUCHTV_PLAYWRIGHT to a folder that has it)"); process.exit(0); }
 
 let n = 0;
-const ok = (c, m) => { assert.ok(c, m); n++; };
+// WS2_SOFT=1: list every failure at the end instead of stopping at the first
+const soft = [];
+const ok = (c, m) => { if (process.env.WS2_SOFT && !c) { soft.push(m); return; } assert.ok(c, m); n++; };
 const has = (text, want, m) => ok(text.indexOf(want) >= 0, (m || "") + ": wanted \"" + want + "\" in \"" + text.slice(0, 300) + "\"");
 const hasNot = (text, bad, m) => ok(text.indexOf(bad) < 0, (m || "") + ": \"" + bad + "\" must not show in \"" + text.slice(0, 300) + "\"");
 
@@ -133,6 +135,12 @@ async function draw(o, env, opts, pg) {
     return out;
   }, [o, env, opts || null]);
 }
+// what a person sees: the words that show (not the ones cut off) and the pictures
+const drawnSig = (r) => r.seen + " || " + r.svgs.join(";");
+// how much of a name shows (at least 4 letters, or all of a short one, counts as named)
+const shown = (r, name) => Math.max(0, ...r.leaves.filter((l) => l.raw.indexOf(name) >= 0).map((l) => Math.min(name.length, l.vis - l.raw.indexOf(name))));
+const named = (r, name, m) => ok(shown(r, name) >= Math.min(4, name.length), m + ": wanted at least " + Math.min(4, name.length) + " letters of \"" + name + "\" to show, " + shown(r, name) + " do: " + r.seen);
+const fits = (r, want, m) => { const l = r.leaves.filter((x) => x.t.indexOf(want) >= 0); ok(l.length && l.every((x) => x.fit), m + ": \"" + want + "\" shows in full: " + JSON.stringify(l.map((x) => [x.t, x.vis]))); };
 const pad = (v) => String(v).padStart(2, "0");
 const isoH = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":00";
 const day = (i) => { const d = new Date(); d.setDate(d.getDate() + i); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
@@ -147,6 +155,7 @@ function wx(temp, extra, uvs, rain) {
 const HOME = { name: "Hillside", lat: -33.6, lon: 151.1 };
 const BEACH = { name: "Long Beach", lat: -33.5, lon: 151.4, timezone: "Australia/Sydney" };
 const PERTH = { name: "Perth", lat: -31.95, lon: 115.86, timezone: "Australia/Perth" };
+const PMQ = { name: "Port Macquarie", lat: -31.43, lon: 152.91, timezone: "Australia/Sydney" };
 const LONDON = { name: "London", lat: 51.51, lon: -0.13, timezone: "Europe/London" };
 const KEY = (p) => (+p.lat).toFixed(2) + "," + (+p.lon).toFixed(2);
 const marine = (wave) => ({ wave, period: 9, dir: 120, wind: 37.04, windDir: 200, hourly: [wave, wave, wave] });
@@ -229,7 +238,7 @@ const mark = (k, name) => { tested[k] = name; };
   const r = await draw(o, env({ r: { town: BEACH } }));
   has(r.text, "Rain soon, Long Beach", "rain, Place: the heading says where"); ok(/Heavy rain from|Rain from/.test(r.text), "rain, Place: that place's rain: " + r.text);
   const c = await draw(Object.assign({}, o, { w: 460, h: 180 }), env({ r: { town: BEACH } }));
-  has(c.text, "Long Beach:", "rain, small: the place too");
+  has(c.text, "Long Beach", "rain, small: the place too"); fits(c, "Long Beach", "rain wide tile, the place in full"); fits(c, "Heavy rain from", "rain wide tile, the rain line in full");
   ok((await draw(o, env({ r: {} }))).text === d0.text, "rain: cleared, the default again");
   mark("rain.town", "1. rain");
 }
@@ -340,16 +349,8 @@ const VARY = {
 const SAME = {
   "weather.place tile": "a tile shows no town name to hide (only a widget's own place, checked below)",
   "bigtemp.place tile": "a tile shows no town name to hide (only a widget's own place, checked below)",
-  "weather.hilo tile": "a tile shows only the sky and the temperature, no high and low",
-  "surf.wind wtile": "the wide tile shows only the swell, no wind",
-  "hourly.hours wtile": "a wide tile fits 4 hours, so 4 is what it already shows"
+  "weather.hilo tile": "a tile shows only the sky and the temperature, no high and low"
 };
-// what a person sees: the words that show (not the ones cut off) and the pictures
-const drawnSig = (r) => r.seen + " || " + r.svgs.join(";");
-// how much of a name shows (at least 4 letters, or all of a short one, counts as named)
-const shown = (r, name) => Math.max(0, ...r.leaves.filter((l) => l.raw.indexOf(name) >= 0).map((l) => Math.min(name.length, l.vis - l.raw.indexOf(name))));
-const named = (r, name, m) => ok(shown(r, name) >= Math.min(4, name.length), m + ": wanted at least " + Math.min(4, name.length) + " letters of \"" + name + "\" to show, " + shown(r, name) + " do: " + r.seen);
-const fits = (r, want, m) => { const l = r.leaves.filter((x) => x.t.indexOf(want) >= 0); ok(l.length && l.every((x) => x.fit), m + ": \"" + want + "\" shows in full: " + JSON.stringify(l.map((x) => [x.t, x.vis]))); };
 let matrix = 0;
 const wrong = [];
 for (const kind of Object.keys(VARY)) {
@@ -372,7 +373,7 @@ ok(!wrong.length, "every setting changes the drawing at every size, but:\n  " + 
 // every setting of every kind is in the matrix, at every size the kind comes in
 Object.keys(VARY).forEach((k) => ok(CAPS0.settings(k).map((x) => x.key).sort().join() === Object.keys(VARY[k]).sort().join(), k + ": the matrix varies every one of its settings"));
 const want = Object.keys(VARY).reduce((t, k) => t + sizesOf(k).length * Object.keys(VARY[k]).length, 0);
-ok(Object.keys(SAME).length === 5, "5 setting x size cases draw the same, each with its reason: " + Object.keys(SAME).join(", "));
+ok(Object.keys(SAME).length === 3, "3 setting x size cases draw the same, each with its reason: " + Object.keys(SAME).join(", "));
 ok(matrix === want && want === 67, "the size matrix: " + matrix + " setting x size cases of " + want);
 // the wide tile of the weather (Fable finding 1), exactly
 {
@@ -406,6 +407,11 @@ ok(matrix === want && want === 67, "the size matrix: " + matrix + " setting x si
   hasNot(e2.text, "28°", "weather wide tile at 7:30pm, Show the high and low off");
   await eve.close();
 }
+// the surf's wide tile has room for the wind, in its own unit
+{
+  const r = await draw({ id: "x", kind: "surf", opts: {}, w: 360, h: 160 }, env({ x: { wind: "kn" } }));
+  fits(r, "knots", "surf wide tile, Wind in knots"); fits(r, "swell", "surf wide tile, the swell");
+}
 // a widget with a place of its own names it at every size (Fable finding 2)
 {
   const OWN = { weather: ["town", BEACH], bigtemp: ["town", BEACH], hourly: ["town", BEACH], rain: ["town", BEACH], uv: ["town", BEACH], sun: ["town", PERTH], air: ["town", BEACH], surf: ["place", BEACH] };
@@ -413,7 +419,8 @@ ok(matrix === want && want === 67, "the size matrix: " + matrix + " setting x si
   for (const kind of Object.keys(OWN)) for (const sz of sizesOf(kind)) {
     const [w, h] = PX[sz], [key, pl] = OWN[kind];
     const r = await draw({ id: "x", kind, opts: {}, w, h }, env({ x: { [key]: pl } }));
-    named(r, pl.name, kind + " " + sz + " (" + w + " x " + h + ") with a place of its own names it");
+    fits(r, pl.name, kind + " " + sz + " (" + w + " x " + h + ") with a place of its own names it, in full");
+    if (sz !== "tile") fits(await draw({ id: "x", kind, opts: {}, w, h }, env({ x: { [key]: PMQ } }, { wxAt: Object.assign({}, base.wxAt, { [KEY(PMQ)]: base.wxAt[KEY(BEACH)] }) })), "Port Macquarie", kind + " " + sz + ", Port Macquarie in full");
   }
   // "Show the town name" off hides a widget's own place on the tiles too
   for (const kind of ["weather", "bigtemp"]) {
@@ -611,8 +618,8 @@ await phone.waitForFunction(() => document.querySelectorAll("#w-list details").l
   await tv.waitForFunction(() => /2\.6/.test((document.querySelector('.cw-o[data-obj="sf"]') || {}).textContent || "") && /66/.test((document.querySelector('.cw-o[data-obj="aq"]') || {}).textContent || ""), null, { timeout: 10000 });
   ok(asked.some((a) => /^marine.* -38\.37,144\.28/.test(a)), "the swell is asked for Bells Beach");
   ok(asked.some((a) => /^air-quality.* -38\.37,144\.28 european_aqi,us_aqi/.test(a)), "the air is asked for Bells Beach, both scales");
-  const want = { bt: ["Bells Beach", "30°"], hr: ["Bells Beach", "30°"], rn: ["Rain soon, Bells Beach", "ain from"], uv: ["UV index, Bells Beach", "12"],
-    aq: ["Air quality, Bells Beach", "66"], sf: ["Bells Beach", "2.6"], sn: ["Sun, Bells Beach"] };
+  const want = { bt: ["Bells Beach", "30°"], hr: ["Bells Beach", "30°"], rn: ["Bells Beach", "ain from"], uv: ["Bells Beach", "12"],
+    aq: ["Bells Beach", "66"], sf: ["Bells Beach", "2.6"], sn: ["Bells Beach"] };   // 460 wide: the place's name is the heading
   for (const id of Object.keys(want)) { const t = await objText(tv, id); want[id].forEach((w) => has(t, w, id + " on the TV, its own place")); }
   // the TV's own choices for air, surf and the moon, drawn
   await tv.evaluate(() => { window.tv.atHomeEdit({ widget_set: { key: "aq|air", values: { scale: "us" } } }); window.tv.atHomeEdit({ widget_set: { key: "sf|surf", values: { units: "ft", wind: "kn" } } });
@@ -681,4 +688,5 @@ await tv.close();
 
 await browser.close();
 server.close();
+if (soft.length) { console.log(soft.length + " FAILED:\n" + soft.join("\n")); process.exit(1); }
 console.log("All " + n + " checks passed.");

@@ -565,9 +565,9 @@
     ],
     // the weather widgets (WIDGET-SETTINGS-SPEC.md section 2, Weather): each one's own place, read for
     // that place alone (app.js airAndSurf), and its own units
-    weather: [WX_TOWN("the weather"), st("place", "Show the town name", "toggle", true, "Turn off to show only the weather.", "design", ALL, true),
-      st("hilo", "Show the high and low", "toggle", true, "Turn off to show only the temperature and the sky.", "design", ALL, true), DEGREES()],
-    bigtemp: [WX_TOWN("the temperature"), st("place", "Show the town name", "toggle", true, "Turn off to show only the temperature.", "design", ALL, true), DEGREES()],
+    weather: [WX_TOWN("the weather"), st("place", "Show the town name", "toggle", true, "Turn off to show only the weather. A tile names only a place picked for it.", "design", ALL, true),
+      st("hilo", "Show the high and low", "toggle", true, "Turn off to show only the temperature and the sky. A tile shows only those already.", "design", ALL, true), DEGREES()],
+    bigtemp: [WX_TOWN("the temperature"), st("place", "Show the town name", "toggle", true, "Turn off to show only the temperature. A tile names only a place picked for it.", "design", ALL, true), DEGREES()],
     hourly: [WX_TOWN("the forecast"), st("hours", "How many hours", "choice", "auto", "A small widget shows only as many as fit.", "design", ALL, true,
       { options: [["auto", "As many as fit"], [4, "4"], [6, "6"], [8, "8"]] }), DEGREES()],
     rain: [WX_TOWN("the rain")],
