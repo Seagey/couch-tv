@@ -236,6 +236,12 @@ class MainActivity : Activity() {
         if (appCache == null) io.execute { warmApps() }   // otherwise the package receiver below keeps the list fresh
         io.execute { watchNextCache = readWatchNext().toString() }   // off the page's thread: TV.watchNext() answers from here
         Updater.resumed(this)   // the daily look for a new release (Home settings, Updates)
+        // Some TVs (a Hisense Google TV) stop the on-TV app (option C) in standby and refuse
+        // to restart it by themselves. Its BootReceiver is exported and starts its server on any
+        // intent, so poke it whenever the home comes forward. Harmless when it is not installed.
+        runCatching {
+            sendBroadcast(Intent("dev.couchtv.WAKE").setComponent(android.content.ComponentName("dev.couchtv.ontv", "dev.couchtv.ontv.BootReceiver")))
+        }
     }
 
     override fun onDestroy() {

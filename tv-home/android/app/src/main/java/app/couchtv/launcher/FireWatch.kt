@@ -246,7 +246,9 @@ class FireWatch : AccessibilityService() {
         private fun isNokiaMy() = Build.MANUFACTURER.equals("My", ignoreCase = true)
         /** Skyworth 4K Google TV Stick (Android 14): the same quick Home press race left the Google home up (#256). */
         private fun isSkyworth() = Build.MANUFACTURER.equals("SkyworthDigital", ignoreCase = true)
-        private fun catchesHomeKey() = isXiaomi() || isKtc() || isSony() || isNokiaMy() || isSkyworth()
+        /** Hisense Google TV (#202): Home from inside an app took ~3-5 s (app exit, Google home, then the swap). */
+        private fun isHisense() = Build.MANUFACTURER.equals("Hisense", ignoreCase = true)
+        private fun catchesHomeKey() = isXiaomi() || isKtc() || isSony() || isNokiaMy() || isSkyworth() || isHisense()
         const val GOOGLE_TV_HOME = "com.google.android.apps.tv.launcherx"
         const val ANDROID_TV_HOME = "com.google.android.tvlauncher"
         /** Bell's Fibe TV app (Bell Streamer, Canada): its MainTvActivity is the box's HOME, and also its live TV. */

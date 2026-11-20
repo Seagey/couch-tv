@@ -106,10 +106,10 @@ class HomeActivity : Activity() {
             // Home settings, About, Update couch-tv: looks at GitHub's releases, never installs (Update.kt)
             addJavascriptInterface(Update.Page(this@HomeActivity, this, base), "TVUP")
             webViewClient = object : WebViewClient() {
-                override fun onPageFinished(view: WebView, url: String) { ready = true; view.requestFocus() }
+                override fun onPageFinished(view: WebView, url: String) { if (url.startsWith(base)) { ready = true; view.requestFocus() } }
                 override fun onReceivedError(view: WebView, req: WebResourceRequest, err: WebResourceError) {
                     // The server may still be starting: try again shortly.
-                    if (req.isForMainFrame) { ready = false; main.postDelayed({ load() }, 700) }
+                    if (req.isForMainFrame) { ready = false; view.loadUrl("about:blank"); main.postDelayed({ load() }, 700) }
                 }
                 // Only the home page itself may load here: its restart() (a new look, scenes, timer)
                 // reloads it with location.replace, which was cancelled along with everything else.
@@ -130,7 +130,24 @@ class HomeActivity : Activity() {
             }
         }
 
-    private fun load() { web?.loadUrl("$base/tv/") }
+    /**
+     * After a cold start the home opens before the app's server listens, and the
+     * WebView showed Chrome's "ERR_CONNECTION_REFUSED" page for ~10 s. Wait (on the plain ground
+     * colour) until the port answers, up to 30 s, then load; onReceivedError still retries after that.
+     */
+    private fun load() {
+        Thread {
+            val until = System.currentTimeMillis() + 30_000
+            while (System.currentTimeMillis() < until) {
+                val up = runCatching {
+                    java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", Store.port), 300) }
+                }.isSuccess
+                if (up) break
+                Thread.sleep(250)
+            }
+            main.post { web?.loadUrl("$base/tv/") }
+        }.start()
+    }
 
     override fun onResume() { super.onResume(); front = true; rebuildIfReleased(); hideBars(); if (ready) js("window.tv && tv.resume()"); Update.resumed(this) }
     // the video background stops while an app is in front
