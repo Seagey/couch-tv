@@ -449,6 +449,18 @@
   // ---------------- the renderers: R[kind](root, o, b, env, sh) ----------------
   var R = {};
   var op = function (o) { return o.opts || {}; };
+  // A widget's own setting (WIDGET-SETTINGS-CONTRACT.md): what was set for this widget on this TV
+  // (env.wset, kept on the TV only, keyed by the design object's id), else what couch-tv Studio set
+  // (o.opts), else the default in its widget-caps.js `settings` record, else dflt.
+  function setting(o, env, key, dflt) {
+    var id = o && o.id, ws = env && env.wset && id && env.wset[id];
+    if (ws && ws[key] !== undefined && ws[key] !== null && ws[key] !== "") return ws[key];
+    var v = op(o || {})[key];
+    if (v !== undefined && v !== null && v !== "") return v;
+    var caps = window.CouchWidgetCaps && window.CouchWidgetCaps.settings ? window.CouchWidgetCaps.settings(o && o.kind) : [];
+    for (var i = 0; i < caps.length; i++) if (caps[i].key === key && caps[i].default !== undefined) return caps[i].default;
+    return dflt;
+  }
 
   // clocks
   R.clock = function (root, o, b, env) {
@@ -2427,6 +2439,7 @@
   window.CouchWidgets = {
     config: CW,
     kinds: function () { return Object.keys(R); },
+    setting: setting,
     // a widget drawn by its own file (ask.js: Ask AI and From your AI): draw(root, o, b, env), and
     // optionally its own drawing for a box under 200 px tall
     define: function (kind, draw, small) { if (typeof draw === "function" && /^[a-z]{2,16}$/.test(kind)) { R[kind] = draw; if (typeof small === "function") CR[kind] = small; } },
