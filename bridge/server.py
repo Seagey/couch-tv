@@ -2214,12 +2214,12 @@ async def pair_with_code(request, pin):
     """POST /api/pair {"pin": "123456"}: the code shown on the TV, once, for the pairing key."""
     ip = client_ip(request)
     if is_rate_limited(ip):
-        raise ApiError(429, "Too many wrong codes. Wait a minute, then try again.")
+        raise ApiError(429, "Too many wrong codes. Wait a minute, then try again.", key="err_phone_too_many_codes")
     await asyncio.sleep(0.4)   # slows guessing a little more (Server.kt)
     if not phonepage.pair(pin):
         record_failed_attempt(ip, "pin:" + str(pin))
         raise ApiError(401, "That code has expired. Ask the TV for a new one." if not phonepage.current_pin()
-                       else "That code is not right. Check the TV.")
+                       else "That code is not right. Check the TV.", key="err_phone_code_wrong")
     # no pairing key set: every call is open already, so there is nothing to hand over
     return ok(paired=True, token=config.PAIRING_KEY or "open")
 
@@ -2228,10 +2228,10 @@ async def h_pair_start(request):
     """"Show a code on the TV" on the phone's pairing screen: a new code, shown on that TV's home."""
     now = time.time()
     if now - _pair_start_at[0] < 5:
-        raise ApiError(429, "A code is on the TV already. Wait a moment, then ask again.")
+        raise ApiError(429, "A code is on the TV already. Wait a moment, then ask again.", key="err_phone_code_shown")
     _pair_start_at[0] = now
     phonepage.new_pin(_current.get(), show=True)
-    return ok(digits=6, expires_in=phonepage.PIN_SECS, note="The code is on the TV now.")
+    return ok(digits=6, expires_in=phonepage.PIN_SECS, note="The code is on the TV now.", **messages.note_fields("note_phone_code_shown"))
 
 
 def phone_extras():
@@ -2254,16 +2254,16 @@ def settings_patch(p):
     """The phone's change to Home settings: only the keys it names (null takes one out), so a town picked
     on the phone never undoes a look picked on the TV. "place" is the home's Location, as the TV saves it."""
     if not isinstance(p, dict) or not p:
-        raise ApiError(400, "settings_patch must be an object")
+        raise ApiError(400, "settings_patch must be an object", key="err_phone_patch_object")
     for k in p:
         if k not in PHONE_PATCH_KEYS:
-            raise ApiError(400, f"{k} is not changed from the phone")
+            raise ApiError(400, f"{k} is not changed from the phone", key="err_phone_not_changed")
     pl = p.get("place")
     if pl is not None:
         if not isinstance(pl, dict):
-            raise ApiError(400, "place must be an object or null")
+            raise ApiError(400, "place must be an object or null", key="err_phone_place_object")
         if not (_num(pl.get("lat"), -90, 90) and _num(pl.get("lon"), -180, 180)) or not str(pl.get("name") or "").strip():
-            raise ApiError(400, "place needs a name, and lat and lon as numbers")
+            raise ApiError(400, "place needs a name, and lat and lon as numbers", key="err_phone_place_shape")
     s = dict(home_settings()["settings"])
     for k, v in p.items():
         if v is None:
@@ -2284,7 +2284,7 @@ async def h_phone_link(request):
     if not name or name in ("localhost", "::1") or name.startswith("127."):
         ip = lan_ipv4()
         if not ip:
-            raise ApiError(503, "This computer is not on a network yet.")
+            raise ApiError(503, "This computer is not on a network yet.", key="err_phone_no_network")
         host = f"{ip}:{PORT}"
     tv = _current.get()
     q = f"?tv={tv}" if tv != DEFAULT_TV and _TV_ID_SAFE.fullmatch(tv) else ""
@@ -2296,9 +2296,9 @@ def _athome_answer(r):
     if r is None:
         return ok(live=False, queued=True)
     if r.get("refused"):
-        raise ApiError(409, str(r.get("error") or "Open the Couch TV home on the TV first, then save again."))
+        raise ApiError(409, str(r.get("error") or "Open the Couch TV home on the TV first, then save again."), key="err_phone_tv_home_closed")
     if not r.get("ok"):
-        raise ApiError(400, str(r.get("error") or "That did not save."))
+        raise ApiError(400, str(r.get("error") or "That did not save."), key="err_phone_not_saved")
     return ok(live=True, athome=r.get("athome") if isinstance(r.get("athome"), dict) else {})
 
 
@@ -2311,16 +2311,16 @@ async def h_athome_set(request):
     data = await body(request)
     e = data.get("edit")
     if not isinstance(e, dict) or not e:
-        raise ApiError(400, "edit is required")
+        raise ApiError(400, "edit is required", key="err_phone_edit_required")
     if phonepage.json_size(e) > phonepage.EDIT_MAX:
-        raise ApiError(413, "That is too much to send at once.")
+        raise ApiError(413, "That is too much to send at once.", key="err_phone_too_much")
     bad = [k for k in e if k not in ATHOME_EDIT_KEYS]
     if bad:
-        raise ApiError(400, f"{bad[0]} is not changed from the phone")
+        raise ApiError(400, f"{bad[0]} is not changed from the phone", key="err_phone_not_changed")
     try:
         r = await phonepage.edit(_current.get(), e)
     except phonepage.Refused as x:
-        raise ApiError(x.status, str(x))
+        raise ApiError(x.status, str(x), key="err_phone_refused")
     return _athome_answer(r)
 
 
@@ -2333,9 +2333,9 @@ async def h_phone_view(request):
     data = await body(request)
     v = data.get("athome")
     if v is not None and not isinstance(v, dict):
-        raise ApiError(400, "athome must be an object or null")
+        raise ApiError(400, "athome must be an object or null", key="err_phone_view_object")
     if phonepage.json_size(v) > phonepage.VIEW_MAX:
-        raise ApiError(413, "too big")
+        raise ApiError(413, "too big", key="err_phone_too_big")
     phonepage.take_view(_current.get(), v)
     return ok()
 
@@ -2344,9 +2344,9 @@ async def h_phone_done(request):
     data = await body(request)
     eid, result = data.get("id"), data.get("result")
     if not isinstance(eid, int) or isinstance(eid, bool) or not isinstance(result, dict):
-        raise ApiError(400, "id (a number) and result (an object) are required")
+        raise ApiError(400, "id (a number) and result (an object) are required", key="err_phone_done_shape")
     if phonepage.json_size(result) > phonepage.VIEW_MAX:
-        raise ApiError(413, "too big")
+        raise ApiError(413, "too big", key="err_phone_too_big")
     return ok(taken=phonepage.done(_current.get(), eid, result))
 
 
@@ -2409,7 +2409,7 @@ async def h_photos_remove(request):
     photos = [p for p in (s.get("photos") or []) if isinstance(p, dict)]
     gone = next((p for p in photos if p.get("id") == pid), None) if isinstance(pid, str) and pid else None
     if gone is None:
-        raise ApiError(404, "That photo is not on the TV any more.")
+        raise ApiError(404, "That photo is not on the TV any more.", key="err_phone_photo_gone")
     s["photos"] = [p for p in photos if p is not gone]
     _write_settings(clean_settings(s))
     path = phonepage.photo_path(store.DATA, gone.get("file"))
@@ -2423,7 +2423,7 @@ async def h_photo_get(request):
     """A photo the phone sent, for the TV home's scenes and the phone page's list (the key is needed)."""
     path = phonepage.photo_path(store.DATA, request.match_info.get("name"))
     if not path:
-        raise ApiError(404, "no such photo")
+        raise ApiError(404, "no such photo", key="err_phone_no_photo")
     # the name is new for every photo, so the TV may keep it; private: never in a shared cache
     return web.FileResponse(path, headers={"Content-Type": "image/jpeg", "Cache-Control": "private, max-age=86400"})
 
@@ -2742,35 +2742,50 @@ WMO = {0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Cloudy", 45: "Fog"
        61: "Light rain", 63: "Rain", 65: "Heavy rain", 66: "Rain", 67: "Rain",
        80: "Showers", 81: "Showers", 82: "Heavy showers", 95: "Storms", 96: "Storms", 99: "Storms"}
 weather_cache = {"at": 0.0, "data": None}
+_weather_by_town = {}   # a TV whose town was picked in Home settings (the TV or the phone's page): {(lat, lon): cache}
 
 
-async def get_weather():
-    if weather_cache["data"] and time.time() - weather_cache["at"] < WEATHER_EVERY:
-        return weather_cache["data"]
+def tv_town():
+    """This TV's town from its Home settings (the TV's Location, or the phone's Home settings page), else None:
+    Roku and Apple TV read the weather from here, so a town picked on the phone reaches them too."""
+    pl = home_settings()["settings"].get("place")
+    if isinstance(pl, dict) and _num(pl.get("lat"), -90, 90) and _num(pl.get("lon"), -180, 180):
+        return {"lat": pl["lat"], "lon": pl["lon"], "place": str(pl.get("name") or "")[:40],
+                "timezone": str(pl.get("timezone") or "auto")}
+    return None
+
+
+async def get_weather(at=None):
+    cache = weather_cache if at is None else _weather_by_town.setdefault((at["lat"], at["lon"]), {"at": 0.0, "data": None})
+    if len(_weather_by_town) > 20:
+        _weather_by_town.clear()
+    where = at or dict(WEATHER_AT, timezone=config.WEATHER["timezone"])
+    if cache["data"] and time.time() - cache["at"] < WEATHER_EVERY:
+        return cache["data"]
     import aiohttp
     url = ("https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
            "&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min"
-           "&timezone={tz}&forecast_days=1").format(tz=config.WEATHER["timezone"].replace("/", "%2F"), **WEATHER_AT)
+           "&timezone={tz}&forecast_days=1").format(tz=str(where["timezone"]).replace("/", "%2F"), lat=where["lat"], lon=where["lon"])
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as s:
             async with s.get(url) as r:
                 j = await r.json()
         cur, day = j["current"], j.get("daily", {})
         code = int(cur.get("weather_code", -1))
-        weather_cache["data"] = {
-            "place": WEATHER_AT["place"], "temp": round(cur["temperature_2m"]),
+        cache["data"] = {
+            "place": where["place"], "temp": round(cur["temperature_2m"]),
             "code": code, "text": WMO.get(code, ""), "is_day": bool(cur.get("is_day")),
             "high": round(day["temperature_2m_max"][0]) if day.get("temperature_2m_max") else None,
             "low": round(day["temperature_2m_min"][0]) if day.get("temperature_2m_min") else None,
         }
-        weather_cache["at"] = time.time()
+        cache["at"] = time.time()
     except Exception as e:  # keep the last good reading; the home shows the date alone without one
         log.warning("weather: %s", e)
-    return weather_cache["data"]
+    return cache["data"]
 
 
 async def h_weather(request):
-    w = await get_weather()
+    w = await get_weather(tv_town())
     if not w:
         raise ApiError(503, "No weather right now.", key="err_no_weather")
     return ok(**w)

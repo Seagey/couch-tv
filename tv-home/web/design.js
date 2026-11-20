@@ -2535,9 +2535,9 @@
       }
       // the widget's own settings (widget-caps.js settings, docs/WIDGET-SETTINGS-CONTRACT.md), right after
       // Settings: "Edit on the TV" opens its page in Home settings (app.js), and "Edit on your phone" shows
-      // a QR code that opens the phone's Home settings page at this widget, already paired. Only where this
-      // TV serves that page (the on-TV app: hooks.phoneLink); a TV the home computer runs, and the Couch TV
-      // home app, show Edit on the TV alone. A smart stack: the widget showing in it now. Every kind, so a
+      // a QR code that opens the phone's Home settings page at this widget, already paired. Only where that
+      // page exists (hooks.phoneLink: the on-TV app, the home computer for a TV it runs, the Couch TV home
+      // app's own page with no computer); anywhere else, Edit on the TV alone. A smart stack: the widget showing in it now. Every kind, so a
       // widget with nothing to set says so in a line, never with an item that does nothing.
       var pw = w, Caps = window.CouchWidgetCaps, note = "";
       while (pw && !(pw.getAttribute && pw.getAttribute("data-obj"))) pw = pw.parentNode;
@@ -2563,13 +2563,14 @@
       var fail = function () { say("The phone page is not ready on this TV. Use Edit on the TV instead."); };
       if (typeof hooks.phoneLink !== "function" || !window.TVQR) { fail(); return; }
       hooks.phoneLink().then(function (url) {
-        var m = /^http:\/\/([^\/#]+)\/setup#pin=(\d{6})$/.exec(url || "");
+        // the TV itself, or the home computer for a TV it runs (with ?tv= when it runs more than one)
+        var m = /^http:\/\/([^\/#?]+)(\/setup(?:\?tv=[A-Za-z0-9_-]+)?)#pin=(\d{6})$/.exec(url || "");
         if (!m) { fail(); return; }
         var link = url + "&widget=" + encodeURIComponent(id), box = h("div", "cw-qr", { background: "#fff", padding: "24px", "border-radius": "24px", display: "inline-block" }, []);
         try { box.appendChild(window.TVQR.svg(link, 420)); } catch (e) { fail(); return; }
         box.setAttribute("data-link", link);
         openSheet("Edit on your phone", { nodes: [box] }, "Scan with your phone's camera: it opens this widget's settings, already paired. Or on a computer: " +
-          m[1] + "/setup, code " + m[2].slice(0, 3) + " " + m[2].slice(3) + ". Back to close.");
+          m[1] + m[2] + ", code " + m[3].slice(0, 3) + " " + m[3].slice(3) + ". Back to close.");
       }, fail);
     }
     // ---- changing a container's apps with the remote ----

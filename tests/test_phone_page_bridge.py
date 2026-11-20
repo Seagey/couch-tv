@@ -116,6 +116,7 @@ class PhonePageApp(AioHTTPTestCase):
         r.add_post("/api/photos/remove", server.h_photos_remove)
         r.add_get("/api/photo/{name}", server.h_photo_get)
         r.add_get("/setup", server.h_setup_page)
+        r.add_get("/api/weather", server.h_weather)
         r.add_get("/ontv/shim.js", server.h_setup_shim)
         return app
 
@@ -234,6 +235,17 @@ class PhonePageApp(AioHTTPTestCase):
         # the TV home learns at its next ask that Home settings changed
         st, box = await self.j("GET", "/api/phone/inbox?home=1")
         self.assertEqual(box["settings_at"], g["updated"])
+
+    async def test_town_from_the_phone_is_the_weather_for_roku_and_apple_tv(self):
+        # Roku and Apple TV read the weather from the bridge (GET /api/weather), not from Open-Meteo themselves
+        server._weather_by_town.clear()
+        server._weather_by_town[(-38.33, 144.32)] = {"at": time.time(), "data": {"place": "Torquay", "temp": 19}}
+        server.weather_cache.update({"at": time.time(), "data": {"place": "Sydney", "temp": 25}})
+        st, w = await self.j("GET", "/api/weather")
+        self.assertEqual(w["place"], "Sydney")   # no town picked: config.json's
+        await self.j("POST", "/api/settings", {"settings_patch": {"place": {"name": "Torquay", "lat": -38.3312, "lon": 144.3242, "timezone": "Australia/Melbourne"}}})
+        st, w = await self.j("GET", "/api/weather")
+        self.assertEqual((w["place"], w["temp"]), ("Torquay", 19))
 
     async def test_settings_patch_checked(self):
         for patch_ in ({"look": "night"}, {"place": "Torquay"}, {"place": {"name": "x", "lat": 95, "lon": 0}},

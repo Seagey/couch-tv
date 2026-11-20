@@ -130,7 +130,7 @@ def inbox(tv, now=None):
     pin = shown_pin(tv, now / 1000)
     return {"edits": [{"id": e["id"], "edit": e["edit"]} for e in edits],
             "fast": now - s["phone_at"] < FAST_MS or pin is not None,
-            "pin": pin, "settings_at": s["settings_at"]}
+            "pin": pin, "settings_at": s["settings_at"], "want_view": s["view"] is None}
 
 
 def done(tv, edit_id, result):

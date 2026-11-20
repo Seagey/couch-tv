@@ -411,6 +411,10 @@
       setTimeout(function () {
         if (down) return reject(new Error("The computer isn't answering."));
         // ?ontv=1: Home settings' Change this on your phone QR (the on-TV app's /api/phone-link)
+        // ?phonepage=bridge: the home computer serves the page (bridge/phonepage.py); bridge2: for its
+        // second TV (?tv=); anything else that is not the on-TV app: an older computer with no such page
+        if (path.indexOf("/api/phone-link") === 0 && arg("phonepage") === "bridge") return resolve({ ok: true, url: "http://my-computer.local:5400/setup#pin=482913", pin_expires_in: 170 });
+        if (path.indexOf("/api/phone-link") === 0 && arg("phonepage") === "bridge2") return resolve({ ok: true, url: "http://my-computer.local:5400/setup?tv=bedroom#pin=482913", pin_expires_in: 170 });
         if (path.indexOf("/api/phone-link") === 0) {
           if (cfg.mode !== "on-tv") return reject(new Error("no such endpoint"));
           return resolve({ ok: true, url: "http://tv.example:5400/setup#pin=482913", pin_expires_in: 170, phones: 1 });
