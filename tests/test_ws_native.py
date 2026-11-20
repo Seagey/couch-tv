@@ -180,5 +180,57 @@ class RokuDraws(unittest.TestCase):
         self.assertEqual(len(native_kinds_roku()), 26)
 
 
+ORIGINAL = {"v": 1, "home": {"dock": "classic"}, "elements": {"clock": {"at": "scene", "behind": True}}}
+
+
+class AppleTvSceneClock(unittest.TestCase):
+    """The Couch Original template (clock.at "scene", behind, no background): the Apple TV draws the built in
+    scenes themselves (SceneBackdrop: the clock behind the hills, on the water of the Waterline scene), and
+    the design's home.scenes picks one scene or several taking turns. Checked through the gate on
+    COUCHTV_SWIFT_HOST, plus the view's source."""
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("appletv_design_tests", Path(__file__).parent / "test_appletv_design.py")
+        at = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(at)
+        cls.out = at.checker({"designs": {
+            "original": ORIGINAL,
+            "one": dict(ORIGINAL, home={"scenes": ["water"]}),
+            "bad": dict(ORIGINAL, home={"scenes": ["night", "../x", "Fog", "__proto__x" * 9, 3]}),
+            "photo": dict(ORIGINAL, background={"image": "backgrounds/scene-night.jpg"}),
+            "plain": {"v": 1, "elements": {"clock": {"at": "somewhere", "behind": "yes"}}},
+            "hidden": {"v": 1, "elements": {"clock": {"at": "scene", "hidden": True}}}}})
+
+    def setUp(self):
+        if self.out is None:
+            self.skipTest("no working Swift compiler here; set COUCHTV_SWIFT_HOST to a Mac with one")
+
+    def d(self, name):
+        return self.out["designs"][name]
+
+    def test_the_original_keeps_at_and_behind_and_uses_the_scenes(self):
+        c = self.d("original")["elements"]["clock"]
+        self.assertEqual((c["at"], c["behind"]), ("scene", True))
+        self.assertTrue(self.d("original")["home"]["sceneClock"])
+        self.assertEqual(self.d("original")["home"]["scenes"], [])
+
+    def test_one_scene_or_several(self):
+        self.assertEqual(self.d("one")["home"]["scenes"], ["water"])
+        self.assertEqual(self.d("bad")["home"]["scenes"], ["night"])
+
+    def test_a_background_or_another_at_keeps_the_designs_own_clock(self):
+        self.assertFalse(self.d("photo")["home"]["sceneClock"])
+        self.assertFalse(self.d("plain")["home"]["sceneClock"])
+        self.assertIsNone(self.d("plain")["elements"]["clock"]["at"])
+        self.assertIsNone(self.d("plain")["elements"]["clock"]["behind"])
+        self.assertFalse(self.d("hidden")["home"]["sceneClock"])
+
+    def test_the_view_draws_the_scene_and_no_second_clock(self):
+        src = VIEW.read_text()
+        self.assertRegex(src, r"if d\.sceneClock \{[^}]*SceneBackdrop\(look: look")
+        self.assertIn('if d.shows("clock") && !d.sceneClock {', src)
+        self.assertIn("design.home.scenes.filter", src)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -63,8 +63,9 @@ struct DesignCheck {
         }
         s["elements"] = d.elements.mapValues { p -> [String: Any] in
             ["x": p.place.x, "y": p.place.y, "scale": p.place.scale, "opacity": p.place.opacity, "hidden": p.place.hidden,
-             "format": n(p.format), "colour": n(p.type.colour), "font": n(p.type.font)]
+             "format": n(p.format), "colour": n(p.type.colour), "font": n(p.type.font), "at": n(p.at), "behind": n(p.behind)]
         }
+        s["home"] = ["scenes": d.home.scenes, "sceneClock": d.sceneClock]
         s["texts"] = d.texts.map { ["text": $0.text, "x": $0.place.x, "size": n($0.size)] }
         s["objects"] = d.objects.map { o -> [String: Any] in
             let b = DesignLayout.box(o)

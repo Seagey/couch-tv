@@ -37,7 +37,16 @@ struct DesignCanvas: View {
     var body: some View {
         let d = design
         ZStack(alignment: .topLeading) {
-            DesignBackdrop(background: d.background, look: model.look)
+            if d.sceneClock {
+                // the Night home: the scenes themselves, the clock behind the hills (and on the water)
+                let late = Calendar.current.component(.hour, from: date) >= 21 || Calendar.current.component(.hour, from: date) < 6
+                let look = sceneLook
+                SceneBackdrop(look: look, time: DesignDates.time(date, clock24: clock24), late: late)
+                    .id(look.id)
+                    .transition(.opacity)
+            } else {
+                DesignBackdrop(background: d.background, look: model.look)
+            }
             ForEach(d.drawOrder.filter { $0.layer == "back" }) { o in DesignObjectView(design: d, object: o, date: date, focus: focus) }
             parts
             ForEach(d.texts) { t in
@@ -65,6 +74,19 @@ struct DesignCanvas: View {
         .environment(\.designClock24, d.home.clock.map { $0 == "24h" } ?? model.clock24)
     }
 
+    private var clock24: Bool {
+        let p = design.part("clock") ?? DesignPart()
+        return p.format.map { $0 == "24h" } ?? (design.home.clock.map { $0 == "24h" } ?? model.clock24)
+    }
+
+    /// The scene on now: the design's own scenes (one, or several taking turns with the home's), else the home's.
+    private var sceneLook: SceneLook {
+        let known = Set(SceneLook.all.map(\.id))
+        let mine = design.home.scenes.filter { known.contains($0) }
+        if mine.isEmpty { return model.look }
+        return SceneLook.byId(mine[model.sceneIndex % mine.count])
+    }
+
     private var hasSettingsWidget: Bool {
         design.objects.contains { ["quick", "dock"].contains($0.kind ?? "") && !$0.place.hidden }
     }
@@ -73,7 +95,7 @@ struct DesignCanvas: View {
 
     @ViewBuilder private var parts: some View {
         let d = design
-        if d.shows("clock") {
+        if d.shows("clock") && !d.sceneClock {
             let p = d.part("clock") ?? DesignPart()
             let c24 = p.format.map { $0 == "24h" } ?? (d.home.clock.map { $0 == "24h" } ?? model.clock24)
             DesignWords(text: DesignDates.time(date, clock24: c24), size: 400, type: p.type, look: d.look,
