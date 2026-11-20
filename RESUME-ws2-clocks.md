@@ -30,6 +30,32 @@ Worktree: tools/couch-tv/wt-ws2-clocks, branch ws2-clocks off integrate-0.13.9 (
 - After that: sections 2 to 5 of the test have never run yet (every setting changed and cleared via tv.atHomeEdit,
   layers, phone list, widget removed from the design).
 
+## Findings, 21 Nov 05:35 (second builder, stopped by the coordinator)
+- Node tests still green on 21 Nov: test_ws_schema.js 4019, test_widget_caps.js 4545, test_design_widgets.js 221,
+  test_design_code.js, test_widget_pause.js (36), test_design_words.js.
+- DBG run (20 Nov data, first kind only): Hold OK opens the menu (Settings, Edit on the TV, ...), ArrowDown focuses
+  Edit on the TV, but after OK Home settings NEVER opens: a trace on #set-head's textContent setter recorded no
+  write at all, so "Designs" in the old DEBUG lines is the stale head left over from the earlier Home settings
+  section (closeSettings only hides it). So the act "wset" path does not reach openWidgetPage, or
+  openWidgetPage returns early at `if (!widgetByKey(key)) return;` (app.js ~7663). Not yet known which.
+  Path: design.js keydown (sheet open) -> sheetKey -> closeSheet -> act(el) -> hooks.act("wset", key) ->
+  app.js act -> openWidgetPage(key). Suspects: widgetByKey(key) null (widgetsWithSettings uses
+  CouchDesign.widgetList keys; holdMenu's mine.key comes from design.js widgetList() internal; compare the two
+  keys), or the OK swallowed by okSwallow (design.js keydown, 260 ms window).
+  Next DBG run already instrumented (DBG=1 only): logs window keydown/keyup with sheetOpen, every
+  CouchDesign.widgetList call, settings class and widgetList keys, then exits after the first kind.
+  Quick check in the page instead: `tv` has no openWidgetPage; evaluate CouchDesign.widgetList().map(w=>w.key)
+  vs the data-arg on the ".cw-sheet .cw-mi[data-act=wset]" node.
+- Also: for kinds after the first, the old DEBUG showed foc "" and foc2 "All apps": a follow-on of the first
+  failure (state left over), recheck after the fix.
+- Test fix made: "wo cities" case expected New York in the default, but a 400x300 world clock shows only 2
+  cities (widgets.js R.worldclock, by height): now checks Sydney (home town) by default and Tokyo+London, no
+  Sydney, when set. Not run yet.
+- Debug lines to REMOVE before the final commit: tests/test_ws2_clocks.mjs, the `if (process.env.DBG)` blocks
+  around the Hold OK loop (trace of #set-head, key log, HEAD + process.exit) and the two DEBUG/DEBUG2 console.log lines.
+- Browser lock was busy 05:16 to 05:35+ with watching-run.sh (another group's batch); clocks-run.sh waits on
+  it by itself. clocks-run.sh checked: points at wt-ws2-clocks. No lock held by this builder, nothing running.
+
 ## Next steps
 1. Fix the Hold OK test (or the real bug if it is one), remove the debug prints.
 2. Get test_ws2_clocks.mjs green; then run test_ws_tv.mjs, test_design_settings_browser.mjs, test_widget_detail_browser.mjs,

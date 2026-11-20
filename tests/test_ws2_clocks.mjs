@@ -187,16 +187,10 @@ const LABELS = { clock: ["12 or 24 hour", "Show seconds", "Show the date", "Show
 for (const [id, kind] of W12) {
   const items = await holdOn(tvp, id);
   ok(items[0] === "Settings" && items[1] === "Edit on the TV", kind + ": Hold OK offers Edit on the TV (" + items.join(", ") + ")", kind);
-  const foc = await tvp.evaluate(() => (document.querySelector(".cw-sheet .cw-ifocus") || {}).textContent || "");
   await press(tvp, "ArrowDown", 120);
-  const foc2 = await tvp.evaluate(() => (document.querySelector(".cw-sheet .cw-ifocus") || {}).textContent || "");
-  await tvp.keyboard.down("Enter"); await tvp.waitForTimeout(300);
-  const h1 = await tvp.textContent("#set-head");
-  await tvp.keyboard.up("Enter"); await tvp.waitForTimeout(400);
+  await press(tvp, "Enter", 600);
+  ok(await tvp.evaluate(() => document.getElementById("settings").classList.contains("on")), kind + ": Edit on the TV opens Home settings", kind);
   const head = await tvp.textContent("#set-head"), rows = (await rowsText(tvp)).join(" | ");
-  if (!head.includes(NAMES[kind])) console.log("DEBUG2", h1, JSON.stringify(tvp.errors));
-  if (!head.includes(NAMES[kind])) console.log("DEBUG", kind, JSON.stringify({ foc, foc2, head, rows: rows.slice(0, 200) }));
-  if (process.env.DBG) { console.log("HEAD", kind, head); await closeSettings(tvp); continue; }
   ok(head.includes(NAMES[kind]), kind + ": Edit on the TV opens its own page: " + head, kind);
   ok(LABELS[kind].every((l) => rows.includes(l)), kind + ": its page has a row for each setting: " + rows.slice(0, 300), kind);
   if (kind === "date") ok(!rows.includes("Show the town name"), "date: Show the town name waits until the weather shows (when)", kind);
@@ -222,7 +216,7 @@ const CASES = [
   ["f", "format=12h", null, { format: "12h" }, (a) => /0742/.test(a.text.replace(/\s/g, ""))],
   ["wc", "precise", null, { precise: true }, (a, b) => /Eighteen minutes to eight/.test(a.text) && /Twenty to eight/.test(b.text)],
   ["wc", "dayline", null, { dayline: false }, (a, b) => /Friday evening/.test(b.text) && !/Friday/.test(a.text)],
-  ["wo", "cities", null, { cities: ["Asia/Tokyo", "Europe/London"] }, (a, b) => /Tokyo/.test(a.text) && /London/.test(a.text) && !/New York/.test(a.text) && /New York/.test(b.text)],
+  ["wo", "cities", null, { cities: ["Asia/Tokyo", "Europe/London"] }, (a, b) => /Tokyo/.test(a.text) && /London/.test(a.text) && !/Sydney/.test(a.text) && /Sydney/.test(b.text) && !/Tokyo/.test(b.text)],
   ["wo", "format=24h", { cities: ["Asia/Tokyo"] }, { format: "24h" }, (a, b) => /17:42/.test(a.text) && /5:42\s*pm/.test(b.text)],
   ["wo", "label", null, { label: "Family" }, (a, b) => /Family/.test(a.text) && /World clock/.test(b.text) && !/World clock/.test(a.text)],
   ["cd", "label", null, { label: "Ella's party" }, (a, b) => /Ella's party/.test(a.text) && /Christmas/.test(b.text)],
