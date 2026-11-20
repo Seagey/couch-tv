@@ -59,7 +59,8 @@ class HaPage(ctx: Context, private val web: WebView) {
             if (!trusted(web.url)) { setupReply(id, JSONObject().put("ok", false).put("error", "refused")); return@post }
             io.execute {
                 val out = try {
-                    val port = HaServer.ensure(app)
+                    // one launcher server: the phone page's (PhoneServer.kt, option A) when it runs, else the small one
+                    val port = MainActivity.phonePagePort() ?: HaServer.ensure(app)
                     if (port == null) JSONObject().put("ok", false).put("error", "port")
                     else HaPhone.start(app, HaPhone.lanAddress(app), port)
                 } catch (e: Exception) { JSONObject().put("ok", false).put("error", "port") }

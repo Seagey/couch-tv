@@ -6,6 +6,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -97,5 +98,15 @@ class HaRealTest {
         // disconnect: Home Assistant forgets the refresh token
         assertTrue(HaAuth.revoke(base, tokens.refresh!!))
         assertEquals(401, HaAuth.refresh(base, tokens.refresh!!, client).first)
+
+        // Home Assistant signed the TV out: the TV's next call is refused, it says sign in again, and it does
+        // not ask Home Assistant again within the minute
+        HomeAssistant.clock = { System.currentTimeMillis() + 7_200_000L }   // the access token made above has run out too
+        assertNull(HomeAssistant.state(s, "climate.hvac"))
+        assertTrue("sign in again", HomeAssistant.signInAgain(s))
+        var asked = 0
+        HaAuth.fake = { _, _, _ -> asked++; 500 to null }
+        try { assertNull(HomeAssistant.state(s, "climate.hvac")) } finally { HaAuth.fake = null }
+        assertEquals("not asked again within the minute", 0, asked)
     }
 }

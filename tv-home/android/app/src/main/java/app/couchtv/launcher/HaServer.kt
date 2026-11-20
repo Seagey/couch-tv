@@ -13,16 +13,21 @@ import java.net.URLDecoder
 import java.util.concurrent.Executors
 
 /**
- * The launcher has no web server, so smart home set up from a phone gets this small one: it only
- * answers /ha (HaPhone.kt) and nothing else, and only runs while someone is setting up. It starts
- * when Home settings, Smart home opens and stops by itself 30 minutes after the screen last asked
- * for it. Plain HTTP on the home network, one short request per connection, at most 64 KB a body.
- * The on-TV app (dev.couchtv.ontv) uses its own server on 5400; this one takes 5401, or the next
- * free port up to 5409.
+ * Smart home set up from a phone when the launcher runs no other server. With no computer at home
+ * (option A) the phone's Home settings page server (PhoneServer.kt, 5400 or 5401) is running and
+ * answers /ha itself, so this one never starts (HaPage.phone asks MainActivity.phonePagePort first):
+ * one launcher server, not two. Otherwise (a computer at home that the launcher talks to) this small
+ * one answers /ha (HaPhone.kt) and nothing else, and only while someone is setting up: it starts when
+ * Home settings, Smart home opens and stops by itself 30 minutes after the screen last asked for it.
+ * Plain HTTP on the home network address only, one short request per connection, at most 64 KB a body.
+ * Its ports, 5402 to 5409, are never the phone page's (5400, 5401) nor the on-TV app's (5400), so
+ * neither can take the other's port whichever starts first.
  */
 object HaServer {
     private const val TAG = "couchtv.haserver"
     private const val IDLE_MS = 30 * 60_000L
+    /** Never PhoneServer.PORT or PORT + 1 (the phone page) nor 5400 (the on-TV app). */
+    internal val PORTS = 5402..5409
     @Volatile private var socket: ServerSocket? = null
     @Volatile private var lastAsked = 0L
     // enough for a phone page and its few files at once; a slow or silent client gives up after 5 s
@@ -36,7 +41,7 @@ object HaServer {
         val app = ctx.applicationContext
         // only on the home network address the QR code names, never every interface
         val lan = HaPhone.lanAddress(app) ?: return null
-        for (port in 5401..5409) {
+        for (port in PORTS) {
             val ss = try { ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(java.net.InetAddress.getByName(lan), port)) } } catch (e: Exception) { continue }
             socket = ss
             Thread({ loop(app, ss) }, "ha-server").apply { isDaemon = true }.start()

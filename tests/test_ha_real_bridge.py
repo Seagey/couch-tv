@@ -99,8 +99,9 @@ async def main():
             res = await r.json()
             ok(res.get("type") == "create_entry", "test user signed in on Home Assistant")
             # a forged state is refused (and burns nothing)
-            r = await ph.get(T + "/ha/done?code=x&state=forged", allow_redirects=False)
-            ok(r.status == 302 and "e=expired" in r.headers["Location"], "a forged state is refused")
+            for q_ in ("code=x&state=forged", "code=x", "", "code=x&state="):
+                r = await ph.get(T + "/ha/done?" + q_, allow_redirects=False)
+                ok(r.status == 302 and r.headers["Location"] == "/ha/?e=expired" and k not in r.headers["Location"], "a forged or missing state is refused with no key in Location (%s)" % (q_ or "nothing"))
             r = await ph.get(T + "/ha/done?" + urllib.parse.urlencode({"code": res["result"], "state": q["state"]}), allow_redirects=False)
             ok(r.status == 302 and r.headers["Location"].endswith("#devices"), "code swapped on the bridge, phone sent to its devices")
             kept = json.load(open(home._path()))
@@ -149,9 +150,24 @@ async def main():
             home.access[kept["refresh_token"]] = ("bogus-access-token-that-ha-will-refuse-1234", 10 ** 11)
             c = (await (await tv.post(T + "/api/ha", json={"action": "climate"})).json())["result"]
             ok(c["ok"] and grants == ["refresh_token", "refresh_token"], "a refused access token is refreshed once and works")
-            # a second sign in to the same Home Assistant keeps the ticks
-            # disconnect: Home Assistant revokes the refresh token
+            # Home Assistant signs the TV out (its refresh token revoked there): the TV waits a minute before
+            # asking again, and the TV and the phone say sign in again
             refresh = kept["refresh_token"]
+            r = await ph.post(HA + "/auth/revoke", data={"token": refresh})
+            ok(r.status == 200, "Home Assistant revoked the TV's refresh token")
+            home.access.pop(refresh, None)
+            n0 = len(grants)
+            await tv.post(T + "/api/ha", json={"action": "climate"})
+            ok(len(grants) == n0 + 1 and home.status()["signin_again"], "the refused refresh token: the TV status says sign in again")
+            await tv.post(T + "/api/ha", json={"action": "climate"})
+            await tv.post(T + "/api/ha", json={"action": "controls"})
+            ok(len(grants) == n0 + 1, "and Home Assistant is not asked again within the minute (%d asks)" % (len(grants) - n0))
+            st = await (await ph.get(T + "/ha/api/state?k=" + k)).json()
+            ok(st["ok"] and st["signin_again"], "the phone page is told to sign in again")
+            home.clock = lambda: 10 ** 10 + 61
+            await tv.post(T + "/api/ha", json={"action": "climate"})
+            ok(len(grants) == n0 + 2, "after a minute it is tried again")
+            # disconnect: Home Assistant revokes the refresh token
             r = await (await ph.post(T + "/ha/api/forget", json={"k": k})).json()
             ok(r["ok"] and not os.path.exists(home._path()), "disconnect forgets the set up")
             r = await ph.post(HA + "/auth/token", data={"grant_type": "refresh_token", "refresh_token": refresh, "client_id": T + "/"})

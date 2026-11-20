@@ -147,6 +147,11 @@ class PhoneBridgeTest(unittest.TestCase):
         self.assertEqual(kept["climate"], [{"entity": "climate.lounge", "name": "Lounge aircon"}])
         self.assertNotIn("doorbell", kept); self.assertNotIn("extra", kept)
         self.assertEqual(kept["url"], "http://ha.example:8123")
+        # a name kept before stays when the phone sends the id alone (ha-picks.js section sends ids only)
+        self.home.listed = {"climate.lounge": "Lounge aircon"}
+        self.assertTrue(self.home.keep_picks({"climate": [{"entity": "climate.lounge", "name": "Living room"}]}))
+        self.assertTrue(self.home.keep_picks({"climate": [{"entity": "climate.lounge"}]}))
+        self.assertEqual(self.home.settings()["climate"], [{"entity": "climate.lounge", "name": "Living room"}])
         self.home.listed = None
         self.assertFalse(self.home.keep_picks({"climate": [{"entity": "climate.lounge"}]}))   # nothing listed yet: nothing kept
 

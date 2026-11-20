@@ -347,7 +347,8 @@ class MainActivity : Activity() {
     /**
      * With no computer at home (option A), this TV serves the phone's Home settings page itself
      * (PhoneServer.kt) on the home Wi-Fi, port 5400 (5401 if that is taken). With a computer, the computer
-     * serves it (bridge/phonepage.py), so nothing listens here. One server for the life of the app.
+     * serves it (bridge/phonepage.py), so nothing listens here. One server for the life of the app. It also
+     * answers smart home set up from a phone (/ha, PhoneHost.ha), so HaServer.kt does not start beside it.
      */
     private fun startPhonePage() {
         if (!alone() || phone != null) return
@@ -390,6 +391,11 @@ class MainActivity : Activity() {
             a.main.post { a.js("window.tv && tv.phonePage && tv.phonePage('code', " + JSONObject.quote(code) + ")") }
         }
         override fun tmpDir(): java.io.File = app.cacheDir
+        // smart home set up from a phone on this same server (HaPhone.kt): no second server, no second port
+        override fun ha(method: String, path: String, query: Map<String, String>, body: String, hostHeader: String?, port: Int) =
+            HaPhone.handle(app, method, path, query, body, hostHeader, port) { name ->
+                runCatching { app.assets.open("www/tv/" + name).use { it.readBytes() } }.getOrNull()
+            }
     }
 
     private fun connect() {
@@ -1904,6 +1910,9 @@ class MainActivity : Activity() {
         @Volatile private var shown: java.lang.ref.WeakReference<MainActivity>? = null
         /** The phone's Home settings page with no computer (option A), started once for the app's life. */
         @Volatile private var phone: PhoneServer? = null
+
+        /** The port of the phone's Home settings page server while it runs (it serves /ha too), else null. */
+        fun phonePagePort(): Int? = phone?.takeIf { it.isAlive }?.listeningPort?.takeIf { it > 0 }
 
         /** True while the home is resumed (in front). FireWatch checks this after a move to front on Android 10 (issue #202). */
         fun isInFront(): Boolean = shown?.get()?.resumed == true

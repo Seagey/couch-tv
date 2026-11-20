@@ -106,11 +106,16 @@ class HaPhoneTest {
         assertNull("nothing listed yet: nothing kept", HomeAssistant.rebuilt(section, null))
         HomeAssistant.listedForTest(mapOf("climate.lounge" to "Lounge aircon", "light.lamp" to "Lamp", "script.open_garage" to "Open garage"))
         val o = HomeAssistant.rebuilt(section, null)!!
-        assertEquals("""[{"entity":"climate.lounge","name":"Lounge aircon"}]""", o.getJSONArray("climate").toString())
-        assertEquals("""[{"entity":"light.lamp","name":"Reading"}]""", o.getJSONArray("controls").toString())   // cover.main was not listed
+        fun pairs(k: String) = o.getJSONArray(k).let { a -> (0 until a.length()).map { a.getJSONObject(it).let { e -> e.getString("entity") to e.getString("name") } } }
+        assertEquals(listOf("climate.lounge" to "Lounge aircon"), pairs("climate"))   // Home Assistant's own name
+        assertEquals(listOf("light.lamp" to "Reading"), pairs("controls"))   // the name given kept; cover.main was not listed
         assertEquals(0, o.getJSONArray("scenes").length())   // a script that opens the garage is never kept
         assertFalse(o.has("extra")); assertFalse(o.has("token"))
         assertEquals("refresh-made-up-for-a-test-0000001", o.getString("refresh_token"))
+        // a name kept before stays when the phone sends the id alone (ha-picks.js section sends ids only)
+        val old = HomeAssistant.parseForTest(JSONObject().put("url", "http://ha.example:8123").put("token", "t".repeat(30))
+            .put("climate", JSONArray().put(JSONObject().put("entity", "climate.lounge").put("name", "Living room"))))
+        assertEquals("Living room", HomeAssistant.rebuilt(section, old)!!.getJSONArray("climate").getJSONObject(0).getString("name"))
     }
 
     @Test fun scenesAndScriptsThatOpenTheHouseNeverShow() {
