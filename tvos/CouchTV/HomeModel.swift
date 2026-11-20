@@ -29,6 +29,7 @@ final class HomeModel: ObservableObject {
     @Published var sleepEnds: Date?
     @Published var message = ""
     @Published var sceneIndex = 0
+    @Published var sceneTurn = 0         // every turn, even when the home keeps one scene: a design's own scenes take turns by it
     @Published var showSettings = false
     @Published var showMore = false
     @Published var posters: [String: PlatformImage] = [:]     // Keep watching pictures, by card id
@@ -140,7 +141,9 @@ final class HomeModel: ObservableObject {
             while !Task.isCancelled {
                 let secs = self?.prefs.sceneSeconds ?? 20
                 try? await Task.sleep(nanoseconds: UInt64(secs * 1_000_000_000))
-                guard let self, !Task.isCancelled, self.scenes.count > 1 else { continue }
+                guard let self, !Task.isCancelled else { continue }
+                withAnimation(.easeInOut(duration: 1.6)) { self.sceneTurn &+= 1 }
+                guard self.scenes.count > 1 else { continue }
                 withAnimation(.easeInOut(duration: 1.6)) { self.sceneIndex = (self.sceneIndex + 1) % self.scenes.count }
             }
         }

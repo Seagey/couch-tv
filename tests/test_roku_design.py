@@ -373,9 +373,11 @@ class Layout(unittest.TestCase):
 
     def test_widgets_drawn_or_shown_as_a_titled_card(self):
         t = texts(self.every["layout"])
-        self.assertIn("Lounge", t)                 # the aircon widget: its own label
-        self.assertIn("Air conditioning", t)       # and its kind, in plain words
-        self.assertIn("News", t)
+        j = " ".join(t)
+        self.assertNotIn("Lounge", j)              # the aircon widget: never a label from the design
+        self.assertIn("Aircon:", j)                # its name, and that it is not on this TV
+        self.assertIn("not on this TV", j)
+        self.assertIn("Headlines:", j)
         self.assertIn("Bedroom", t)                # the smart object
         self.assertIn("Smart home", t)             # the section
         self.assertIn("Waxing gibbous", t)         # the stack shows its first widget
@@ -519,6 +521,14 @@ end sub
 '''
 
 
+def scene_today(year=False):
+    """Today's date as the scene draws it ("Friday 20 November"): the scene reads the real clock
+    (roDateTime, local time), not NOW."""
+    import datetime
+    t = datetime.datetime.now()
+    return f"{t:%A} {t.day} {t:%B}" + (f" {t.year}" if year else "")
+
+
 def run_scene(design, answer):
     import re
     import shutil
@@ -570,7 +580,7 @@ class Scene(unittest.TestCase):
         self.assertEqual(p["dBg"]["count"], {"Group": 1})
         self.assertEqual(p["zones"]["dock"], 5)          # four apps and Settings
         self.assertEqual(p["zones"]["wapps"], 0)
-        self.assertIn("Thursday 19 November", p["top"]["text"])
+        self.assertIn(scene_today(), p["top"]["text"])   # the scene runs on the real clock
         self.assertIn("23°C  Partly cloudy", p["top"]["text"])
         self.assertIn("Netflix", p["focus"]["name"])
 
@@ -578,13 +588,13 @@ class Scene(unittest.TestCase):
         c = self.r["config"]
         self.assertFalse(c["scenes"])                    # its own background hides the scene
         self.assertTrue(any(u.startswith("tmp:/couchtv-design-") and u.endswith(".jpg") for u in c["dBg"]["uris"]))
-        for words in ("Good evening", "Welcome home\nRelax", "Lounge", "Air conditioning", "“Be kind”", "Bedroom"):
+        for words in ("Good evening", "Welcome home\nRelax", "Aircon:", "not on this TV", "“Be kind”", "Bedroom"):
             self.assertIn(words, c["dFront"]["text"] + c["dBack"]["text"])
         self.assertGreater(c["zones"]["wapps"], 3)       # the design's app tiles are stops for the remote
         self.assertEqual(c["zones"]["dock"], 4)          # Prime Video hidden, Settings still there
         self.assertEqual(c["zones"]["people"], 0)        # the design hides the people
         self.assertAlmostEqual(c["dockxf"], 0.5)         # made small, never gone
-        self.assertIn("Thursday 19 November 2026", c["top"]["text"])   # the full format
+        self.assertIn(scene_today(True), c["top"]["text"])   # the full format
         self.assertIn("Springfield  23°C", c["top"]["text"])            # with its place, without words
 
     def test_remote_reaches_the_design_apps_and_back_to_the_dock(self):

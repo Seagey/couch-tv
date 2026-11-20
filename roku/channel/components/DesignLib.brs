@@ -1183,7 +1183,91 @@ function dlWTitle(kind as String) as String
     return "Widget"
 end function
 
-' the kinds drawn here; any other is its panel with its name
+' each widget's name as couch-tv Studio and the TV home say it (widget-caps.js name), for the card of a
+' kind not drawn here
+function dlWName(kind as String) as String
+    n = { clock: "Digital clock", tallclock: "Tall clock", glassclock: "Glass clock", analog: "Analogue clock", flipclock: "Flip clock", wordclock: "Time in words", solar: "Sun clock", worldclock: "World clocks", countdown: "Countdown", date: "Date", month: "Month", timer: "Timer", weather: "Weather", bigtemp: "Big number", hourly: "Hourly", week: "This week", rain: "Rain soon", uv: "UV index", sun: "Sunrise and sunset", moon: "Moon", air: "Air quality", surf: "Surf", photo: "Photo", slideshow: "Slideshow", mosaic: "Photo mosaic", artframe: "Art frame", memory: "On this day", keep: "Keep watching", keeprow: "Keep watching row", upnext: "Up next", picks: "Picks for you", app: "One app", folder: "App folder", dock: "Dock", appgrid: "App grid", games: "Games", nowplaying: "Now playing", soundscape: "Soundscape", queue: "Up next queue", speakers: "Speakers", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre", camera: "Camera", doorbell: "Doorbell", energy: "Solar and energy", sensor: "Sensor", battery: "Batteries", bins: "Bin night", people: "People", agenda: "Agenda", note: "Family note", list: "List", card: "Custom card", quote: "Quote", word: "Word of the day", news: "Headlines", sports: "Scores", stocks: "Markets", commute: "Commute", welcome: "Welcome words", quick: "Quick buttons", wifi: "Guest Wi-Fi", guide: "House guide", screentime: "Screen time", ask: "Ask AI", agent: "From your AI", stack: "Smart stack" }
+    if n.doesExist(kind) then return n[kind]
+    return "This widget"
+end function
+
+' the words on a kind this Roku does not draw: its name, said plainly, and where it does show. Never a
+' label from the design (a surf widget's beach, an aircon's room): there is no data here behind it.
+function dlNotHereWords(kind as String) as Object
+    return { title: dlWName(kind) + ": not on this TV", line: "Shows on Google TV, Android TV and Fire TV" }
+end function
+
+' the card for a kind not drawn here. The title and the line each go on two lines when one would be too
+' small to read, and a short box (a 40 px pill) has the title alone.
+sub dlNotHere(out as Object, kind as String, x as Float, y as Float, w as Float, h as Float, style as Object, look as Object, op as Float)
+    wd = dlNotHereWords(kind)
+    items = []
+    panel = dlOr(style.panel, "glass")
+    if panel = "none" then panel = "glass"
+    dlPanel(items, panel, x, y, w, h, style, look)
+    ink = dlInk(panel, style, look)
+    dimc = dlMix(ink, Left(ink, 8) + "00", 0.3)
+    pad = dlPad(w, h)
+    if h < 110 then pad = Int(dlMin(16, h * 0.12))
+    iw = w - pad * 2
+    ih = h - pad * 2
+    if h < 110
+        size = dlFit(wd.title, "Inter-Medium", iw, ih * 0.8, 40)
+        items.push(dlLabel(wd.title, x + pad, y + (h - size * 1.3) / 2, iw, size * 1.3, "Inter-Medium", size, ink, "center"))
+    else
+        cut = Instr(1, wd.title, ": ")
+        tl = [wd.title]
+        big = dlFit(wd.title, "Inter-Medium", iw, ih * 0.3, 44)
+        if big < 24
+            tl = [Left(wd.title, cut), Mid(wd.title, cut + 2)]
+            big = dlMin(dlFit(tl[0], "Inter-Medium", iw, ih * 0.22, 44), dlFit(tl[1], "Inter-Medium", iw, ih * 0.22, 44))
+        end if
+        sl = [wd.line]
+        ss = dlFit(wd.line, "Inter-Regular", iw, ih * 0.16, dlMin(30, big * 0.7))
+        if ss < 18
+            sl = ["Shows on Google TV,", "Android TV and Fire TV"]
+            ss = dlFit(sl[1], "Inter-Regular", iw, ih * 0.14, dlMin(30, big * 0.7))
+            ' still too small to read: the title alone
+            if ss < 18 then sl = []
+        end if
+        total = tl.count() * big * 1.3
+        if sl.count() > 0 then total = total + big * 0.4 + sl.count() * ss * 1.3
+        ty = y + (h - total) / 2
+        for each t in tl
+            items.push(dlLabel(t, x + pad, ty, iw, big * 1.3, "Inter-Medium", big, ink, "center"))
+            ty = ty + big * 1.3
+        end for
+        if sl.count() > 0 then ty = ty + big * 0.4
+        for each t in sl
+            items.push(dlLabel(t, x + pad, ty, iw, ss * 1.3, "Inter-Regular", ss, dimc, "center"))
+            ty = ty + ss * 1.3
+        end for
+    end if
+    for each it in items
+        it.o = it.o * op
+        out.push(it)
+    end for
+end sub
+
+' couch-tv Studio's sample words in its starter designs (app/templates.js), as widgets.js WELCOME_SAMPLE
+' and WELCOME_SAMPLE_LINES: on a real TV they are a stranger's name and a made up house, so they never
+' show. The greeting stays.
+function dlWelcomeText(text as String) as String
+    sample = { "Welcome, Ella and friends": "Welcome", "Hi Ruby!": "Hi!" }
+    if sample.doesExist(text) then return sample[text]
+    ' a sample line used as the greeting itself: the plain greeting
+    if text <> "" and dlWelcomeLine(text) = "" then return "Welcome"
+    return text
+end function
+
+function dlWelcomeLine(line as String) as String
+    for each s in ["Headland House, North Point", "Tuesday to Sunday. Night two of five", "Three sleeps till the beach"]
+        if s = line then return ""
+    end for
+    return line
+end function
+
+' the kinds drawn here; any other is the card that says it is not on this TV
 function dlWNative(kind as String) as Boolean
     for each k in ["clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "countdown", "date", "month", "weather", "bigtemp", "moon", "photo", "artframe", "keep", "keeprow", "app", "folder", "dock", "appgrid", "games", "people", "card", "quote", "welcome", "note"]
         if k = kind then return true
@@ -1280,13 +1364,7 @@ sub dlWidget(out as Object, o as Object, ctx as Object, look as Object)
         return
     end if
     if not dlWNative(kind)
-        sub1 = ""
-        title = dlWTitle(kind)
-        if dlIsStr(op.label) and op.label <> "" and op.label <> title
-            sub1 = title
-            title = op.label
-        end if
-        dlCard(out, title, sub1, x, y, w, h, st, look, alpha)
+        dlNotHere(out, kind, x, y, w, h, st, look, alpha)
         return
     end if
     items = []
@@ -1489,9 +1567,9 @@ sub dlWidget(out as Object, o as Object, ctx as Object, look as Object)
             if body <> "" then body = Chr(8220) + body + Chr(8221)
             bottom = dlOr(op.sub, "")
         else if kind = "welcome"
-            top = dlOr(op.kicker, "")
-            body = dlOr(op.text, "Welcome")
-            bottom = dlOr(op.sub, "")
+            top = dlWelcomeLine(dlOr(op.kicker, ""))
+            body = dlWelcomeText(dlOr(op.text, "Welcome"))
+            bottom = dlWelcomeLine(dlOr(op.sub, ""))
         else
             body = "Note"
         end if
