@@ -88,6 +88,16 @@ test_widget_fit_all OK 8 (1640 boxes, 0 problems); test_ws_tv 1115; test_widget_
 its only conditional checks are the Right/Left or Down/Up moves inside a layer); test_design_settings_browser 108;
 test_ws_schema 4445; test_widget_caps 4548; 61 node files pass.
 
+## Gate 3 follow up (21 Nov 09:46)
+- App grid row gap 16 when the inner box is under 400 high (gy = H0 < 400 ? 16 : 40): a medium grid with names
+  now fits 2 rows, so Apps across changes it (cols 2 and 4 differ from As many as fit 3).
+- SAME: the medium entries removed; only the two true ones are back (cols 3 = As many as fit; cols 2 vs 1, since 2
+  rows means at least 2 across). NSAME pinned at 45.
+- Not done, on purpose: the optional Keep tile title at 21 px. test_widget_fit_all enforces the owner's 23 px
+  minimum and failed with it (4 problems), so it stays at 23.
+Tests: visible 1722 pass (592 cases, 144 same by design, 45 named); test_ws2_watching 231; fit_all OK 8 (0 problems);
+test_ws_tv 1115; test_widget_detail_browser 296; test_design_settings_browser 108; schema 4445; caps 4548; 61 node files.
+
 ## Next steps
 None in scope. Branch is ready to merge.
 Nothing runs on the MacBook or an emulator.

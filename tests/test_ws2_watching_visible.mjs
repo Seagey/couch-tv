@@ -73,18 +73,14 @@ const SAME = {
   "appgrid small cols 2": "a small grid fits 2 rows, so its 4 apps go 2 across, which is what it shows already",
   "appgrid small cols 2 vs 1": "a small grid fits 2 rows, so its 4 apps go 2 across",
   "appgrid small names off": "a small grid shows no names (the help says so)",
-  "appgrid medium cols 1": "a medium grid fits one row with names, so its 4 apps go 4 across",
-  "appgrid medium cols 2": "a medium grid fits one row with names, so its 4 apps go 4 across",
-  "appgrid medium cols 3": "a medium grid fits one row with names, so its 4 apps go 4 across",
-  "appgrid medium cols 4": "a medium grid fits one row with names: 4 across is what it shows already",
-  "appgrid medium cols 2 vs 1": "a medium grid fits one row with names, so its 4 apps go 4 across",
-  "appgrid medium cols 3 vs 2": "a medium grid fits one row with names, so its 4 apps go 4 across",
-  "appgrid medium cols 4 vs 3": "a medium grid fits one row with names, so its 4 apps go 4 across",
+  "appgrid medium cols 3": "As many as fit is 3 across on a medium grid, which is what it shows already",
+  "appgrid medium cols 2 vs 1": "a medium grid fits 2 rows with names, so its 4 apps go at least 2 across",
   "appgrid large cols 2": "As many as fit is 2 across here, which is what it shows already",
   "appgrid xl cols 2": "As many as fit is 2 across here, which is what it shows already",
   // Quick buttons: a tile holds one button
   "quick tile quick six": "a tile holds one button, and the first is the sleep timer either way"
 };
+const NSAME = 45;   // how many cases SAME names (pinned, so a new one is a decision)
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" };
 const PAGE = '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="widgets.css"></head><body style="margin:0;width:1920px;height:1080px;background:#26303f">' +
   ["icon-sets.js", "design-icons.js", "app-catalogue.js", "widgets.js", "widget-caps.js", "widget-web.js", "widget-detail.js"].map((s) => '<script src="' + s + '"></script>').join("") + "</body></html>";
@@ -236,7 +232,7 @@ try {
 }
 // every reason in SAME is a real case (none left over from an older layout)
 Object.keys(SAME).forEach((k) => ok(usedSame[k], "SAME names a real case: " + k));
-ok(Object.keys(SAME).length === 50, "50 setting x size cases draw the same, each with its reason");
+ok(Object.keys(SAME).length === NSAME, NSAME + " setting x size cases draw the same, each with its reason");
 console.log("  " + cases.all + " kind x size x setting x time cases, " + cases.same + " of them the same by design (" + Object.keys(SAME).length + " named in SAME)");
 if (soft.length) { console.log(soft.length + " FAILED:\n" + soft.join("\n")); process.exit(1); }
 console.log("All " + n + " checks passed.");

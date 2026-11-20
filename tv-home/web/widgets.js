@@ -1259,7 +1259,7 @@
     // more across when the rows would not fit
     var W0 = Math.max(1, b.w - 48), H0 = Math.max(1, b.h - 48), names = !small && setting(o, env, "names") !== false;
     var cols = small ? colsOf(o, env) || 2 : colsOf(o, env) || clamp(Math.round(Math.sqrt(list.length * W0 / H0)), 1, 8);
-    var gx = 40, gy = 40, nameH = names ? 52 : 0, maxRows = Math.max(1, Math.floor(H0 / (72 + gy + nameH)));
+    var gx = 40, gy = H0 < 400 ? 16 : 40, nameH = names ? 52 : 0, maxRows = Math.max(1, Math.floor(H0 / (72 + gy + nameH)));
     cols = Math.min(list.length, Math.max(cols, Math.ceil(list.length / maxRows)));
     var rows = Math.ceil(list.length / cols), a = Math.floor(Math.min((W0 - cols * gx) / cols, (H0 - rows * gy - rows * nameH) / rows));
     add(root, E("div", "", "display:flex;flex-wrap:wrap;justify-content:center;align-content:center;height:100%", rowBreaks(list.map(function (p, i) {
