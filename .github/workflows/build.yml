@@ -62,6 +62,15 @@ jobs:
       - name: Signing fingerprints
         run: for f in dist/*.apk; do echo "$f"; "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$f" | grep -i "SHA-256"; done
 
+      - name: Release APK check
+        # one APK per app with every processor inside, the same names, compressed native libraries, one
+        # signer (scripts/check-release-apks.py), and that check's own tests. --matter: both on-TV APKs
+        # must carry Matter's controller for both ARM processors (it lands with Matter, nl-matter-android)
+        run: |
+          python tests/test_release_apks.py
+          python tests/test_release_script.py
+          sh scripts/release-checksums.sh --matter
+
       - uses: actions/upload-artifact@v4
         with:
           name: couch-tv-test-apks

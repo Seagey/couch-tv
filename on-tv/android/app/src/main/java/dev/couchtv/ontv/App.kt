@@ -29,6 +29,10 @@ class App : Application() {
         // TLS 1.3 for wireless debugging on every Android version (the ADB library asks for it).
         runCatching { Security.insertProviderAt(org.conscrypt.Conscrypt.newProvider(), 1) }
         Store.init(this); Adb.init(this); Tv.init(this)
+        // Matter: the resolver with the IPv6 fallback and the Thread route check (before the first Matter call)
+        runCatching { dev.couchtv.ontv.matter.DiscoveryChipResolver.install(this) }.onFailure { Log.w("couchtv", "matter discovery: ${it.message}") }
+        // Matter devices added before: start the controller and their live state (no library load if none)
+        runCatching { dev.couchtv.ontv.matter.Matter.init(this) }.onFailure { Log.w("couchtv", "matter init: ${it.message}") }
         instance = this
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityResumed(a: Activity) { resumed++ }

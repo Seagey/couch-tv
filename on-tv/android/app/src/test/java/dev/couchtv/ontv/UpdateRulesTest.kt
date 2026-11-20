@@ -122,4 +122,78 @@ class UpdateRulesTest {
             assertFalse("no Beta: $s", s.contains("Beta") || s.contains("coming soon", ignoreCase = true))
         }
     }
+
+    // ---------------------------------------------------------------- Matter: one APK, every processor inside
+
+    private val dl = "https://github.com/Seagey/couch-tv/releases/download/v0.14"
+    private val lookalikes = listOf("couch-tv-ontv-arm64-v8a.apk", "couch-tv-ontv-armeabi-v7a.apk", "couch-tv-ontv.apk.sha256",
+        "couch-tv-ontv-watch-arm64-v8a.apk", "couch-tv-ontv.apk.zip", "couch-tv-home.apk", "SHA256SUMS.txt")
+
+    @Test fun takesExactlyItsOwnFileWhateverElseTheReleaseHas() {
+        val shaOf = mapOf("couch-tv-ontv.apk" to "b".repeat(64), "couch-tv-ontv-watch.apk" to "c".repeat(64))
+        fun a(n: String) = asset(n, "$dl/$n", "sha256:" + (shaOf[n] ?: "d".repeat(64)), size = if (n in shaOf) 45_792_606L else 1_000L)
+        // lookalikes before and after the real file, in both orders
+        for (order in listOf(lookalikes + shaOf.keys, shaOf.keys.toList() + lookalikes, lookalikes.reversed() + shaOf.keys.reversed())) {
+            val json = full(*order.map(::a).toTypedArray())
+            for (watch in listOf(false, true)) {
+                val want = UpdateRules.asset(watch)
+                val f = UpdateRules.read(json, watch)!!
+                assertTrue(f.installable)
+                assertEquals("$dl/$want", f.url)
+                assertEquals(shaOf[want], f.digest)
+                assertEquals(45_792_606L, f.size)
+            }
+        }
+    }
+
+    @Test fun aReleaseWithOnlyPerProcessorFilesOffersNothing() {
+        // the TV's Downloader code and the latest/download link cannot pick a processor, so a release
+        // without the one file is never offered (scripts/check-release-apks.py stops it being made)
+        val json = full(*lookalikes.map { asset(it, "$dl/$it") }.toTypedArray())
+        for (watch in listOf(false, true)) {
+            val f = UpdateRules.read(json, watch)!!
+            assertFalse(f.hasAsset)
+            assertFalse(f.installable)
+            assertFalse(UpdateRules.offered(f.version, "0.13.9", f.hasAsset))
+        }
+    }
+
+    @Test fun theFileMustBeTheOneItsNameSays() {
+        // GitHub's name says couch-tv-ontv.apk but the address is another file: not installed
+        for (url in listOf("$dl/couch-tv-ontv-arm64-v8a.apk", "$dl/couch-tv-ontv-watch.apk", "$dl/xcouch-tv-ontv.apk.zip")) {
+            assertFalse(url, UpdateRules.read(full(asset("couch-tv-ontv.apk", url)), watch = false)!!.installable)
+        }
+        assertFalse(UpdateRules.read(full(asset("couch-tv-ontv-watch.apk", "$dl/couch-tv-ontv.apk")), watch = true)!!.installable)
+    }
+
+    @Test fun everyWayInKeepsItsName() {
+        // the names and the code every path uses: Update now, Make Home open Couch TV, Downloader, Studio
+        assertEquals("couch-tv-ontv.apk", UpdateRules.asset(watch = false))
+        assertEquals("couch-tv-ontv-watch.apk", UpdateRules.asset(watch = true))
+        assertEquals("8180170", UpdateRules.CODE)
+        val phone = UpdateRules.steps(watch = false).joinToString(" ")
+        assertTrue(phone.contains("Type 8180170"))
+        assertTrue(phone.contains("github.com/Seagey/couch-tv/releases/latest/download/couch-tv-ontv.apk"))
+        assertTrue(UpdateRules.steps(watch = true).joinToString(" ").contains("couch-tv-ontv-watch.apk"))
+    }
+
+    @Test fun spaceCountsTheLibrariesAndroidUnpacks() {
+        // fable NO-GO 21 Nov, 10: the libraries are compressed in the APK, so Android also writes them out
+        // on install: 15.7 MB on a 64 bit ARM TV, 8.6 MB on a 32 bit one, on top of 2.5 times the file
+        val apk = 45_792_606L   // couch-tv-ontv.apk with Matter, measured
+        assertEquals(apk * 5 / 2 + 15_700_000L, UpdateRules.spaceNeeded(apk, "arm64-v8a"))
+        assertEquals(apk * 5 / 2 + 8_600_000L, UpdateRules.spaceNeeded(apk, "armeabi-v7a"))
+        assertEquals(apk * 5 / 2 + 2_600_000L, UpdateRules.spaceNeeded(apk, "x86_64"))
+        assertEquals(apk * 5 / 2 + 2_400_000L, UpdateRules.spaceNeeded(apk, "x86"))
+        // a processor we do not know, or none reported: the largest, never too little
+        assertEquals(apk * 5 / 2 + 15_700_000L, UpdateRules.spaceNeeded(apk, null))
+        assertEquals(apk * 5 / 2 + 15_700_000L, UpdateRules.spaceNeeded(apk, "riscv64"))
+        // what the old rule let through now says "space": 120 MB free on a 64 bit TV is 4.2 MB short
+        val free = 120_000_000L
+        assertTrue(free >= apk * 5 / 2)
+        assertTrue(free < UpdateRules.spaceNeeded(apk, "arm64-v8a"))
+        // each figure covers what was measured in the real APK (lib/<abi> uncompressed, bytes)
+        val measured = mapOf("arm64-v8a" to 15_646_680L, "armeabi-v7a" to 8_586_668L, "x86_64" to 2_536_560L, "x86" to 2_309_184L)
+        for ((abi, bytes) in measured) assertTrue(abi, UpdateRules.unpacked(abi) >= bytes)
+    }
 }
