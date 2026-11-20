@@ -46,6 +46,12 @@ Rules: scratchpad nolater-common.md and matter-contract.md. Base integrate-0.13.
 - The phone card's heading is its fold button (foldSetup): fillMatterWords puts the words on the button.
 - Final counts: see the final commit message and the report (node tests, browser run).
 
+## Done 21 Nov, review fixes (after GO at 9680f42)
+- Live push with a pairing key: app.js sets api.events(path) = API + path + ?token=KEY&tv=TV_ID before useBridge; matter.js listen() uses it (the bridge reads ?token= on every /api/ route, access_log=None).
+- COMMISSION_MS 150000. Token house test (ws2-smarthome opensHouse rules, joined names) in matter.js hides() and setup.html mtHides(). rename(): unknown id -> refused + reason not_found, empty -> bad_name; name_hides only from the local check or reason opens_house.
+- Words: why_port "usually 5540"; err_unreachable and err_thread say Couch TV; added_phone path Home settings, Designs, Smart home.
+- Counts: test_matter_ui 102, test_matter_words 119, 66/66 node tests, browser 102.
+
 ## Left
 Nothing in scope. Notes for the merge: resolve ws2-smarthome and nl-remote as written under Trial merges; the 2 failing trial tests are ws2-smarthome lines with no nl-remote tw_ words (not Matter). The phone card has no address field, so the address/port/link_local reasons are worded but only reachable if a later screen sends an address. On 21 Nov `node tv-designer/scripts/help-check.mjs` was run once without the browser lock by mistake (105/105 passed).
 
