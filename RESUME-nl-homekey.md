@@ -1,21 +1,28 @@
 # RESUME nl-homekey (Make Home open Couch TV)
 
-Worktree: tools/couch-tv/wt-nl-homekey, branch nl-homekey (base integrate-0.13.9). Rules: scratchpad/nolater-common.md.
-Scratchpad below = the session scratchpad folder that holds nolater-common.md (session b061a7d7, under the private tmp claude folder).
+Worktree: tools/couch-tv/wt-nl-homekey, branch nl-homekey (base integrate-0.13.9). Rules: coord/nolater-common.md, coord/resume-builder-brief.md.
+Scratchpad below = the shared scratchpad named in coord/resume-builder-brief.md (session b061a7d7, under the private tmp claude folder).
 
 ## Done
 - 265f08b: the feature (HomeKey.kt, HomeKeyRules.kt, setup screen, /api/homekey, setup.html, app.js About rows, i18n 16 blocks, mock.js ?homekey=, TD help article home-button).
-- Round 2 (Fable NO-GO fixes, this WIP commit): `$` escaped in the install line (+ /bin/sh stub test, proven to fail without the fix); grep -qx Success; Fire OS 6 counts usage access as watching; Fire words when the link is blocked; start() check-and-set under synchronized(Update), "update_busy" said on screen; Use as home screen switched on only just before the install (and off again if it fails); Accessibility menu note everywhere (Kotlin, i18n all 16 blocks); Fire TV points to the help page; phone page has its own steps line (words_phone); setup screen button in its own row, dimmed not disabled; /api/homekey/start needs JSON content type; About row gives the real reason; DONE words hedged ("should ... press Home to check"). TD help/src/articles.mjs Fire TV step (backups: scratchpad/td-backup-nl-homekey and td-backup-nl-homekey-round2), help rebuilt.
+- 36dfe03 (round 2, Fable NO-GO 0736 fixes): all 9 items plus the low ones, each checked against the code on 21 Nov (round 3):
+  1 `$` escaped (HomeKeyRules.installScript, /bin/sh stub test theShellLineHandsEveryNameOverWhole); 3 HomeKeyRules.watching for Fire OS 6;
+  4 link() && !fireBlocked, STEPS_FIRE, app.js hk_steps_fire; 5 start() under synchronized(Update), update_busy on screen;
+  6 setHomeEnabled just before put() (watch APK path keeps its own), switched off again on a failed install; 7 menu note in Kotlin, i18n 16 blocks, Fire TV step points to the help page, TD article;
+  8 words_phone / STEPS_PHONE; 9 hkBtn in its own row, dimmed not disabled; low: grep -qx, /api/homekey/start 415 without JSON, hkErr real reasons, DONE hedged.
+- Round 3 (21 Nov):
+  - update_busy words were only true while Update checks; HomeKey.start also refuses while Update downloads or installs. Now "Couch TV is busy with an update right now. Press again in a moment." in Kotlin and all 16 i18n blocks (1c95b6f).
+  - SetupWords.homeNote's two Google TV watch lines got the menu note "(on some TVs inside System or Device Preferences)" (Google TV keeps Accessibility under System); SetupWordsTest asserts it.
+  - Emulator proof script fixed and kept in the repo as tests/emu_homekey.mjs (was scratchpad/hk-emu.mjs): the DONE words are hedged now; GitHub's 0.13.8 (what scenario A installs) has no /api/homekey, so its 404 answer means "the new version is up"; the home check now reads Android's HOME role holder (Google TV's resolve-activity always ranks launcherx first, priority 2, whatever the default is; checked by hand: set-home-activity says Success and the role moves to dev.couchtv.ontv), with a before check that Google TV holds the role first.
 
-## Test counts
-- Kotlin testReleaseUnitTest: 135 tests, 0 failures (HomeKeyRulesTest 15). Run: `scratchpad/hk-gradle.sh testReleaseUnitTest` (takes the gradle lock).
-- tests/test_homekey_browser.mjs: 185 checks passed in round 1; round 2 version NOT yet confirmed green at the time of this commit (was waiting on the browser lock). Run: take scratchpad/browser.lock, `COUCHTV_PLAYWRIGHT=".../tools/tv-designer/market" node tests/test_homekey_browser.mjs`, rmdir the lock.
-- Also green in round 1: test_one_button_update_browser 29, test_phone_settings_browser 129, test_tcl_fixes_browser 26, i18n node tests (zh, arabic, polish, romanian), test_design_words, test_settings_key. Rerun after round 2.
+## Test counts (round 3, 21 Nov)
+- Kotlin testReleaseUnitTest: 135 tests, 0 failures, 0 skipped (HomeKeyRulesTest 15, SetupWordsTest 14). Run: `scratchpad/hk-gradle.sh testReleaseUnitTest` (takes the gradle lock).
+- Emulator proof (couchtv_gtv34, Android 14 Google TV, emulator-5594): 33 of 33 passed on the final APKs. Run: `node tests/emu_homekey.mjs emulator-5594 scratchpad/hk-apks <out dir>`.
+- Node tests: zh, arabic, polish, romanian i18n, design_words, settings_key, custom_cards, headphones_ui, keep_watching_toggle, screensaver_early_resume, loop_look, start_focus, shelf_follows_app, weather_header, widget_caps (4548 checks): all pass.
+- Browser: see the final commit message (scratchpad/hk-r3-browser.sh runs them under the browser lock).
+
+## APKs (scratchpad/hk-apks, built 21 Nov from the final code)
+plain22.apk (assembleRelease, 22/0.13.9), watch22.apk (assembleWatch), plain21.apk (versionCode 21 / 0.13.8 test build: build.gradle.kts edited, built, restored; git diff empty).
 
 ## Left
-1. Confirm round 2 browser test green; rerun the regression browser tests above.
-2. Rebuild APKs: `scratchpad/hk-gradle.sh assembleRelease assembleWatch`, copy to scratchpad/hk-apks/plain22.apk and watch22.apk. plain21.apk (versionCode 21 test build of OUR code, same debug key as GitHub v0.13.8) must be rebuilt too: temporarily set versionCode 21 / versionName 0.13.8 in on-tv/android/app/build.gradle.kts, assembleRelease, copy, RESTORE the file (git diff must be empty).
-3. Emulator proof, only when no other emulator runs (`adb devices`, `pgrep -fl qemu-system`) and load allows:
-   `~/Library/Android/sdk/emulator/emulator -avd couchtv_gtv34 -port 5594 -read-only -no-window -no-audio -no-snapshot -no-boot-anim -memory 2048 -gpu swiftshader_indirect` (background), wait for `adb -s emulator-5594 shell getprop sys.boot_completed` = 1, then
-   `node scratchpad/hk-emu.mjs emulator-5594 scratchpad/hk-apks scratchpad/hk-emu-out`. Always `-s emulator-5594` (real TVs are on this adb). Then `adb -s emulator-5594 emu kill`.
-4. Commit (non-WIP) with counts, report to coordinator (commits, files, shared hunks, counts, what's not done).
+Nothing in scope. Release gate owned by the coordinator: the help page https://couchtv.joshuaseage.com/help/home-button/ must be deployed (Fable item 2).

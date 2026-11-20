@@ -66,6 +66,10 @@ class SetupWordsTest {
         assertEquals("Couch TV is your home screen. Press Home on the remote to see it.",
             SetupWords.homeNote(true, true, false, watchApk = true, googleHome = true))
         assertTrue(SetupWords.homeNote(true, false, true, watchApk = true).contains("Couch TV home watch"))
+        // Google TV keeps Accessibility under System: both watch lines say where else to look (review, menu names)
+        listOf(SetupWords.homeNote(false, false, true, watchApk = true), SetupWords.homeNote(true, false, true, watchApk = true)).forEach {
+            assertTrue(it, it.contains("Settings, Accessibility (on some TVs inside System or Device Preferences)"))
+        }
     }
 
     @Test fun saysTheTruthFromAndroidNotASavedSwitch() {

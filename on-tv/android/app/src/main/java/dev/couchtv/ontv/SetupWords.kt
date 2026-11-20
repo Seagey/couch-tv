@@ -60,8 +60,8 @@ object SetupWords {
         asking -> "Asking the TV to make Couch TV its home. If the screen goes black, press Back once and the question comes up."
         // the watch only acts while Use as home screen is on (FireHome.onOtherHome), so it is always one of the steps
         googleTv && watchApk && !useAsHome -> "On Google TV the Home button opens Google TV first. To bring your Couch TV home straight back on top: " +
-            "press Use as home screen, then switch on Couch TV home watch in the TV's Settings, Accessibility."
-        googleTv && watchApk -> "On Google TV the Home button always opens Google TV first. With Couch TV home watch switched on in the TV's Settings, Accessibility, your Couch TV home comes straight back on top."
+            "press Use as home screen, then switch on Couch TV home watch in the TV's Settings, Accessibility (on some TVs inside System or Device Preferences)."
+        googleTv && watchApk -> "On Google TV the Home button always opens Google TV first. With Couch TV home watch switched on in the TV's Settings, Accessibility (on some TVs inside System or Device Preferences), your Couch TV home comes straight back on top."
         googleTv -> "On Google TV the Home button always opens Google TV first, with the version you put on from your phone. That is normal. " +
             "To make Home open Couch TV, press Make Home open Couch TV once Couch TV can press keys on this TV. Or put the Home button version on from a computer (see More, Home button from a computer), then press Use as home screen. " +
             "Until then, open your Couch TV home from Couch TV in the apps row."
