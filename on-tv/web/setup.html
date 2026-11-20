@@ -240,7 +240,7 @@
     <details class="wbox"><summary data-mw="brand_smartthings"></summary><div><p data-mw="app_smartthings"></p></div></details>
     <details class="wbox"><summary data-mw="brand_alexa"></summary><div><p data-mw="app_alexa"></p></div></details>
     <label for="matter-code" data-mw="step2"></label>
-    <input id="matter-code" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" data-mw-placeholder="placeholder">
+    <input id="matter-code" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" data-mw-hint="placeholder">
     <button class="go" id="matter-add" type="button" data-mw="add_btn"></button>
     <label class="btn quiet pick" id="matter-scan" style="display:none"><span data-mw="photo"></span><input type="file" accept="image/*" capture="environment" id="matter-photo"></label>
     <div class="msg" id="matter-msg" role="status"></div>
@@ -854,7 +854,7 @@
     if (l === mtLang) return;
     mtLang = l;
     Array.prototype.forEach.call(document.querySelectorAll('[data-mw]'), function (e) { e.textContent = mw(e.getAttribute('data-mw')); });
-    Array.prototype.forEach.call(document.querySelectorAll('[data-mw-placeholder]'), function (e) { e.setAttribute('placeholder', mw(e.getAttribute('data-mw-placeholder'))); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mw-hint]'), function (e) { e.setAttribute('placeholder', mw(e.getAttribute('data-mw-hint'))); });
     Array.prototype.forEach.call(document.querySelectorAll('[data-mw-aria]'), function (e) { e.setAttribute('aria-label', mw(e.getAttribute('data-mw-aria'))); });
   }
   fillMatterWords();

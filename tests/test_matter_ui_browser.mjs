@@ -222,13 +222,16 @@ console.log("Running Matter UI browser tests...");
 {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   page.errors = []; page.on("pageerror", (e) => page.errors.push(String(e)));
-  await page.addInitScript(() => { window.PhoneWords = { lang: () => "fr" }; });
+  // on this branch a stand in; with nl-remote merged its phone-words.js replaces it and reads the kept language
+  await page.addInitScript(() => { try { localStorage.setItem("couchtv.phone.lang", "fr"); } catch (e) {} window.PhoneWords = { lang: () => "fr" }; });
   await page.goto(ORIGIN + "/setup#matter");
   await page.waitForFunction(() => document.getElementById("matter").style.display !== "none" && /Lounge|Hallway/.test(document.getElementById("matter-list").textContent), null, { timeout: 8000 });
   const list = await page.evaluate(() => document.getElementById("matter-list").textContent);
   ok(/Lampe/.test(list) && /Thermostat/.test(list) && /Renommer/.test(list) && /Retirer/.test(list) && !/Rename/.test(list), "French: kinds and buttons: " + list.slice(0, 120));
   await page.fill("#matter-code", "3497-011-2333"); await page.click("#matter-add"); await page.waitForTimeout(300);
   ok(/Un des chiffres est faux/.test(await page.evaluate(() => document.getElementById("matter-msg").textContent)), "French: a typo");
+  const head = await page.evaluate(() => [document.querySelector("#matter h2").textContent, document.getElementById("matter-add").textContent, document.getElementById("matter-code").placeholder, document.getElementById("jump-matter").textContent]);
+  ok(head[0] === "Appareils Matter" && head[1] === "Ajouter à la télé" && /chiffres/.test(head[2]) && head[3] === "Matter", "French: the card's own heading, button and hint: " + JSON.stringify(head));
   ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
   await page.close();
 }

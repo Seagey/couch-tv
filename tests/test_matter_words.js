@@ -93,7 +93,7 @@ for (const m of card.matchAll(/\s(?:placeholder|aria-label|title)="([^"]+)"/g)) 
 ok(leftEn.length === 0, "no English written in the phone card: " + leftEn.join(" | "));
 const jump = /<a href="#matter"[^>]*>([^<]*)<\/a>/.exec(setup);
 ok(jump && jump[1] === "" && /data-mw="brand_matter"/.test(jump[0]), "the Matter jump link is filled too");
-const cardKeys = [...card.matchAll(/data-mw(?:-placeholder|-aria)?="([a-z0-9_]+)"/g)].map((m) => m[1]).concat(["brand_matter"]);
+const cardKeys = [...card.matchAll(/data-mw(?:-hint|-aria)?="([a-z0-9_]+)"/g)].map((m) => m[1]).concat(["brand_matter"]);
 ok(cardKeys.length === 18 && cardKeys.every((k) => keys.indexOf(k) >= 0), "the card's 18 keys are in the table: " + cardKeys.length + " " + cardKeys.filter((k) => keys.indexOf(k) < 0).join(", "));
 const brands = ["Google Home", "Apple Home", "SmartThings", "Alexa", "Matter"];
 const lines = cardKeys.map((k) => W.en(k));
