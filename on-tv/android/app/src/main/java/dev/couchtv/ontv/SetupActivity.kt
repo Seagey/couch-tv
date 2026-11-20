@@ -139,15 +139,13 @@ class SetupActivity : Activity() {
         main1.addView(moreBtn)
         col.addView(main1)
         homeNote = text("", 15f, CREAM_2); col.addView(homeNote)
-        // its own row, so the long label never squeezes the row above off a 1280 wide screen
-        val hkBtnRow = row()
-        hkBtn = button(HomeKeyRules.BUTTON) { HomeKey.start(this); refresh() }
-        hkBtnRow.addView(hkBtn)
-        hkBtnRow.visibility = View.GONE
-        col.addView(hkBtnRow)
-        val hkRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        // one row under homeNote: the help page QR, the button (only while one press can do it), and the words beside it,
+        // so the words never run off the bottom of a 1080 high screen
+        val hkRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, px(14), 0, 0) }
         hkQr = ImageView(this).apply { layoutParams = LinearLayout.LayoutParams(px(120), px(120)).apply { rightMargin = px(20) }; visibility = View.GONE }
         hkRow.addView(hkQr)
+        hkBtn = button(HomeKeyRules.BUTTON) { HomeKey.start(this); refresh() }.apply { visibility = View.GONE }
+        hkRow.addView(hkBtn)
         hkLine = text("", 15f, AMBER).apply { layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) }
         hkRow.addView(hkLine)
         col.addView(hkRow)
@@ -277,12 +275,13 @@ class SetupActivity : Activity() {
         val s = org.json.JSONObject(HomeKey.state(this))
         val v = s.optString("view")
         val hadFocus = hkBtn.hasFocus()
-        (hkBtn.parent as View).visibility = if (v == "ready" || v == "busy") View.VISIBLE else View.GONE
+        hkBtn.visibility = if (v == "ready" || v == "busy") View.VISIBLE else View.GONE
         // never disabled: a disabled button loses the D pad focus. Dimmed while busy; HomeKey.start ignores a second press.
         hkBtn.alpha = if (v == "ready") 1f else 0.5f
-        if (hadFocus && (hkBtn.parent as View).visibility != View.VISIBLE) moreBtn.requestFocus()
+        if (hadFocus && hkBtn.visibility != View.VISIBLE) moreBtn.requestFocus()
         val err = s.optString("error_words")
-        hkLine.text = listOf(err, s.optString("words")).filter { it.isNotEmpty() }.joinToString(" ")
+        // a failed press on the ready view: the reason alone (with the ready words too it runs to four lines)
+        hkLine.text = if (err.isNotEmpty() && v == "ready") err else listOf(err, s.optString("words")).filter { it.isNotEmpty() }.joinToString(" ")
         hkLine.visibility = if (hkLine.text.isEmpty()) View.GONE else View.VISIBLE
         val wantQr = v == "steps"
         if (wantQr && !hkQrShown) qrBitmap(HomeKeyRules.HELP_URL)?.let { hkQr.setImageBitmap(it); hkQrShown = true }

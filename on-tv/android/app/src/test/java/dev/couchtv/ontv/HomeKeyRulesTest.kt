@@ -148,6 +148,50 @@ class HomeKeyRulesTest {
         } finally { dir.deleteRecursively() }
     }
 
+    @Test fun aRestartNeverLosesWhatThisTrySwitchedOn() {
+        val w = HomeKeyRules.INSTALL_WINDOW
+        val t0 = 1_000_000L
+        // the watch APK after the install: finish, Home stays on (never switched off)
+        assertEquals("finish", HomeKeyRules.resumeStep(true, t0, t0 + 5_000, turnedOn = true))
+        assertFalse(HomeKeyRules.homeOffOnResume("finish", true))
+        assertEquals("clear", HomeKeyRules.resumeStep(true, 0L, t0, turnedOn = true))
+        assertFalse(HomeKeyRules.homeOffOnResume("clear", true))
+        assertEquals("", HomeKeyRules.resumeStep(true, 0L, t0, turnedOn = false))
+        // the phone version while the install may still be going: wait, Home untouched
+        assertEquals("wait", HomeKeyRules.resumeStep(false, t0, t0 + 1_000, turnedOn = true))
+        assertEquals("wait", HomeKeyRules.resumeStep(false, t0, t0 + w, turnedOn = true))
+        assertFalse(HomeKeyRules.homeOffOnResume("wait", true))
+        // the phone version after the window: the install is over, Home off again (only if this try switched it on)
+        assertEquals("undo", HomeKeyRules.resumeStep(false, t0, t0 + w + 1, turnedOn = true))
+        assertTrue(HomeKeyRules.homeOffOnResume("undo", true))
+        assertEquals("undo", HomeKeyRules.resumeStep(false, t0, t0 + w + 1, turnedOn = false))
+        assertFalse(HomeKeyRules.homeOffOnResume("undo", false))
+        // the app stopped after Home went on but before the install began: off again at once
+        assertEquals("undo", HomeKeyRules.resumeStep(false, 0L, t0, turnedOn = true))
+        assertTrue(HomeKeyRules.homeOffOnResume("undo", true))
+        // nothing was going: nothing to do
+        assertEquals("", HomeKeyRules.resumeStep(false, 0L, t0, turnedOn = false))
+    }
+
+    @Test fun theCodeKeepsTheFlagAndTheWordsTrue() {
+        // HomeKey and SetupActivity are Android code, so read them
+        val hk = java.io.File("src/main/java/dev/couchtv/ontv/HomeKey.kt").readText()
+        // the flag is in the store before Use as home screen goes on, and gone after a Success
+        assertTrue(hk.contains("store(app).edit().putBoolean(TURNED_ON, true).commit(); App.setHomeEnabled(app, true)"))
+        assertTrue(hk.contains("if (r.isNotEmpty()) fail(app, r) else store(app).edit().remove(TURNED_ON).commit()"))
+        assertFalse(hk.contains("homeTurnedOn"))
+        assertTrue(hk.contains("HomeKeyRules.resumeStep(watchApk(), at, now, turnedOn(app))"))
+        // the busy words go once the update is over; a blocked Fire TV gets its steps, not a second "could not connect"
+        assertTrue(hk.contains("if (error == \"update_busy\" && !Update.working) error = \"\""))
+        assertTrue(hk.contains("error = if (why == \"adb\" && fireBlocked()) \"\" else why"))
+        // the setup screen: one row (QR, button, words beside it), the button hidden by default, the reason alone after a failed press
+        val sa = java.io.File("src/main/java/dev/couchtv/ontv/SetupActivity.kt").readText()
+        assertFalse(sa.contains("hkBtnRow"))
+        assertTrue(sa.contains("hkRow.addView(hkQr)\n") && sa.indexOf("hkRow.addView(hkQr)") < sa.indexOf("hkRow.addView(hkBtn)") && sa.indexOf("hkRow.addView(hkBtn)") < sa.indexOf("hkRow.addView(hkLine)"))
+        assertTrue(sa.contains("button(HomeKeyRules.BUTTON) { HomeKey.start(this); refresh() }.apply { visibility = View.GONE }"))
+        assertTrue(sa.contains("hkLine.text = if (err.isNotEmpty() && v == \"ready\") err else"))
+    }
+
     @Test fun fireOs6WatchesWithUsageAccess() {
         assertTrue(HomeKeyRules.watching(connected = true, fireTv = false, sdk = 34, usageAllowed = false))
         assertTrue(HomeKeyRules.watching(connected = false, fireTv = true, sdk = 25, usageAllowed = true))

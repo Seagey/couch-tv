@@ -5,6 +5,9 @@
 // B: watch build (22, my code), watch off: the one press switches it on, the app checks it connected (its own
 //    continuation), Home then lands on Couch TV.
 // C: plain build 22 against GitHub's older 0.13.8: refused as not_newer, nothing installed.
+// D: plain build 21, the copy to the TV made to fail after every check passed (a folder where the APK goes):
+//    an error, and Use as home screen off again (this try switched it on just before the copy).
+// A, C and D also check the words under the button end above the bottom of the 1080 high screen.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -35,6 +38,14 @@ function tap(re) {
   }
   return null;
 }
+// the bottom edge of the first node on screen whose text starts with the prefix (-1: not on screen)
+function bottomOf(prefix) {
+  for (const m of ui().matchAll(/<node [^>]*?text="([^"]*)"[^>]*?bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g)) {
+    if (m[1].startsWith(prefix)) return +m[5];
+  }
+  return -1;
+}
+const homeListed = () => /dev\.couchtv\.ontv/.test(sh("cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME"));
 const shot = (name) => { try { fs.writeFileSync(path.join(OUT, name + ".png"), execFileSync(ADB, ["-s", SERIAL, "exec-out", "screencap", "-p"], { timeout: 30000 })); } catch (e) {} };
 const front = () => (sh("dumpsys activity activities | grep -m1 topResumedActivity").match(/u0 ([^\s}]+)/) || [])[1] || "";
 const bound = () => /dev\.couchtv\.ontv\/\.?(dev\.couchtv\.ontv\.)?WatchService/.test(sh("dumpsys accessibility | grep -i -A3 'Bound services'"));
@@ -114,6 +125,8 @@ await fresh("plain21.apk");
   rec("A: before the press Google TV holds the HOME role", !role0.includes(PKG), role0);
   rec("A: the phone version on Google TV with the link: view ready", s.json && s.json.view === "ready" && s.json.watch_apk === false, JSON.stringify(s.json && { view: s.json.view }));
   sh("am start -n " + PKG + "/.SetupActivity"); await sleep(1500); shot("A-setup-before");
+  const bA = bottomOf("One press");
+  rec("A: the words under the button are all on screen (bottom at most 1053)", bA > 0 && bA <= 1053, bA);
   const st = await call("POST", "/api/homekey/start", {});
   rec("A: start answers busy", st.json && st.json.view === "busy", JSON.stringify(st.json && { view: st.json.view, phase: st.json.phase }));
   const seen = new Set(); let lastJson = null; const until = Date.now() + 240000; let down = 0;
@@ -158,6 +171,29 @@ await fresh("plain22.apk");
   rec("C: GitHub's older version is refused (not_newer), with plain words", w.last && w.last.error === "not_newer" && /newer Couch TV than the one on GitHub/.test(w.last.error_words), JSON.stringify(w.last && { view: w.last.view, error: w.last.error }));
   rec("C: nothing was installed (still the phone version, 22)", /versionCode=22/.test(sh("dumpsys package " + PKG + " | grep versionCode")) && !/WatchService/.test(sh("dumpsys package " + PKG + " | grep -i WatchService | head -1")));
   sh("am start -n " + PKG + "/.SetupActivity"); await sleep(1500); shot("C-setup-refused");
+  const bC = bottomOf("This TV has a newer");
+  rec("C: the refusal words are all on screen (bottom at most 1053)", bC > 0 && bC <= 1053, bC);
+}
+
+// ---------- D: plain build 21, the copy to the TV fails after every check passed ----------
+await fresh("plain21.apk");
+{
+  const s0 = await call("GET", "/api/homekey");
+  rec("D: before the press Use as home screen is off", s0.json && s0.json.home_on === false && !homeListed(), JSON.stringify(s0.json && { view: s0.json.view, home_on: s0.json.home_on }));
+  // a folder where the APK copy goes: rm -f cannot take it away, so the copy fails
+  sh("mkdir /data/local/tmp/couch-tv-homekey.apk");
+  const st = await call("POST", "/api/homekey/start", {});
+  rec("D: start answers busy", st.json && st.json.view === "busy", JSON.stringify(st.json && { view: st.json.view, phase: st.json.phase }));
+  const w = await waitHk((h) => h.view !== "busy", 240000);
+  rec("D: it got past the checks to installing, then stopped with an error", w.last && !!w.last.error && w.seen.has("busy:installing"), JSON.stringify(w.last && { view: w.last.view, error: w.last.error }) + " seen " + [...w.seen].join(","));
+  rec("D: Use as home screen is off again (home_on false)", w.last && w.last.home_on === false, w.last && w.last.home_on);
+  rec("D: Android does not list Couch TV as a home", !homeListed(), sh("cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME"));
+  rec("D: nothing was installed (still the phone version, 21)", /versionCode=21/.test(sh("dumpsys package " + PKG + " | grep versionCode")));
+  sh("am start -n " + PKG + "/.SetupActivity"); await sleep(1500); shot("D-setup-failed");
+  const ew = (w.last && w.last.error_words) || "";
+  const bD = ew ? bottomOf(ew.slice(0, 20)) : -1;
+  rec("D: the error words are all on screen (bottom at most 1053)", bD > 0 && bD <= 1053, bD + " " + ew);
+  sh("rmdir /data/local/tmp/couch-tv-homekey.apk");
 }
 
 try { adb("uninstall", PKG); } catch (e) {}

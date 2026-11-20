@@ -26,7 +26,7 @@ home (the person came without a computer, or `apply.sh` could not run), on a pla
 newer the app asks Android itself: it offers "Make couch-tv your home screen?" the first time it
 opens, and Home settings, About repeats it. The on-TV app does the same from **Use as home screen**.
 On Google TV that does not hold the Home key: run `apply.sh` from a computer for the Home button
-watch, or, with the on-TV app (newer than 0.13.9) once its own link to the TV is connected, press **Make Home
+watch, or, with the on-TV app (0.13.9 or newer) once its own link to the TV is connected, press **Make Home
 open Couch TV** on its setup screen (on-tv/README.md, "Use it as the home screen"): it puts the watch version
 on and switches the watch on by itself, with the TCL steps below. Never switch off or uninstall the TV's own home to make this work.
 

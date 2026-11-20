@@ -153,7 +153,7 @@ and More, Home button from a computer, gives the steps: `adb connect <tv-ip>:555
 `adb install -r couch-tv-ontv-watch.apk` (settings stay), then Couch TV home watch on in Settings, Accessibility,
 then **Use as home screen** on the Couch TV setup screen: the watch only acts while that is on. With the watch APK
 the button shows on Google TV too (with the plain APK it is hidden there while off).
-**Make Home open Couch TV, no computer (newer than 0.13.9).** Once Couch TV can press keys on the TV (its own link to the
+**Make Home open Couch TV, no computer (0.13.9 or newer).** Once Couch TV can press keys on the TV (its own link to the
 TV, More, Let the phone press keys: the same link Update to ... uses), the setup screen, the phone's Home settings
 page and Home settings, About on the TV show **Make Home open Couch TV** on Google TV, on a TV with Google's
 Android TV Home, and on a Fire TV whose Fire OS still allows the link. One press (HomeKey.kt, rules in

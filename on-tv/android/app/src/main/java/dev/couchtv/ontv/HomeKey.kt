@@ -54,6 +54,8 @@ object HomeKey {
 
     fun state(c: Context): String {
         val app = c.applicationContext
+        // the update that was in the way is over: its words go
+        if (error == "update_busy" && !Update.working) error = ""
         val v = viewNow(app, working)
         val fire = fireBlocked()
         val words = when (v) {
@@ -109,13 +111,23 @@ object HomeKey {
         io.execute { fetchAndInstall(app) }
     }
 
-    /** Use as home screen, switched on by this try just before the install: off again if the install fails, so "nothing changed" is true. */
-    @Volatile private var homeTurnedOn = false
+    /**
+     * Use as home screen, switched on by this try just before the install: off again if the install fails, so
+     * "nothing changed" is true. Kept in the store, so a restart in the middle does not lose it (resume()).
+     */
+    private const val TURNED_ON = "home_turned_on"
+    private fun turnedOn(app: Context) = store(app).getBoolean(TURNED_ON, false)
+    private fun undoHome(app: Context) {
+        if (turnedOn(app)) runCatching { App.setHomeEnabled(app, false) }
+        store(app).edit().remove(TURNED_ON).commit()
+    }
 
     private fun fail(app: Context, why: String) {
         Log.w(TAG, "stopped: $why")
-        if (homeTurnedOn) { runCatching { App.setHomeEnabled(app, false) }; homeTurnedOn = false }
-        error = why; phase = ""; progress = 0
+        undoHome(app)
+        // Fire OS blocks the app's own link: the Fire TV steps already say so, a second "could not connect" only mixes the message
+        error = if (why == "adb" && fireBlocked()) "" else why
+        phase = ""; progress = 0
         store(app).edit().remove("installing").apply()
         changed(app)
     }
@@ -140,13 +152,13 @@ object HomeKey {
             if (why.isNotEmpty()) return fail(app, why)
             phase = "installing"; progress = 100; changed(app)
             // the watch only acts while Use as home screen is on: switched on now, once everything has checked out
-            if (!App.homeEnabled(app)) { App.setHomeEnabled(app, true); homeTurnedOn = true }
+            if (!App.homeEnabled(app)) { store(app).edit().putBoolean(TURNED_ON, true).commit(); App.setHomeEnabled(app, true) }
             val r = try { put(app, file) } catch (x: Exception) {
                 Log.w(TAG, "install: ${x.message}")
                 if (x.message?.startsWith("push failed") == true) UpdateRules.failure(x.message ?: "") else "adb"
             }
             // "" means Android said Success: it is about to stop this app, and resume() carries on
-            if (r.isNotEmpty()) fail(app, r) else homeTurnedOn = false
+            if (r.isNotEmpty()) fail(app, r) else store(app).edit().remove(TURNED_ON).commit()
         } finally { file.delete() }
     }
 
@@ -175,16 +187,27 @@ object HomeKey {
     /** App.onCreate: carry on after the install restarted the app as the watch APK. */
     fun resume(c: Context) {
         val app = c.applicationContext
-        val at = store(app).getLong("installing", 0L)
-        if (at == 0L) return
-        if (!watchApk()) {
-            // still the phone version: the install never finished (this process is new, so nothing is watching it)
-            if (System.currentTimeMillis() - at > 10 * 60_000L) store(app).edit().remove("installing").apply()
-            return
+        if (working) return   // a new press in this process already owns the marks
+        val st = store(app)
+        val at = st.getLong("installing", 0L)
+        val now = System.currentTimeMillis()
+        when (val step = HomeKeyRules.resumeStep(watchApk(), at, now, turnedOn(app))) {
+            "finish" -> {
+                st.edit().remove("installing").remove(TURNED_ON).apply()
+                phase = "switching"; changed(app)
+                io.execute { finish(app) }
+            }
+            "clear" -> st.edit().remove(TURNED_ON).apply()
+            // still the phone version: the install may still be going (this process is new, so nothing is watching it)
+            "wait" -> main.postDelayed({ resume(app) }, at + HomeKeyRules.INSTALL_WINDOW - now + 1000)
+            "undo" -> {
+                // the install never finished: forget it, and Home off again if that try switched it on
+                if (HomeKeyRules.homeOffOnResume(step, turnedOn(app))) Log.w(TAG, "an unfinished try: Use as home screen off again")
+                undoHome(app)
+                st.edit().remove("installing").apply()
+                changed(app)
+            }
         }
-        store(app).edit().remove("installing").apply()
-        phase = "switching"; changed(app)
-        io.execute { finish(app) }
     }
 
     /**

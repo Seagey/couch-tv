@@ -120,6 +120,29 @@ object HomeKeyRules {
      */
     fun watching(connected: Boolean, fireTv: Boolean, sdk: Int, usageAllowed: Boolean) = connected || (fireTv && sdk <= 25 && usageAllowed)
 
+    /** How long an install may take before a restart of the phone version counts it as over (pm install waits up to 5 minutes). */
+    const val INSTALL_WINDOW = 10 * 60_000L
+
+    /**
+     * What HomeKey.resume does when the app starts. The try's marks survive a restart in the "homekey" store:
+     * installingAt (0: none) and turnedOn (this try switched Use as home screen on).
+     *  "finish"  the watch APK is on after an install: switch the watch on (Home stays on)
+     *  "clear"   the watch APK, no install going: only forget turnedOn (Home stays on)
+     *  "wait"    the phone version, the install may still be going: look again when the window ends
+     *  "undo"    the phone version, the install is over or never started: forget it, and Home off again when turnedOn
+     *  ""        nothing to do
+     */
+    fun resumeStep(watchApk: Boolean, installingAt: Long, now: Long, turnedOn: Boolean): String = when {
+        watchApk && installingAt != 0L -> "finish"
+        watchApk -> if (turnedOn) "clear" else ""
+        installingAt == 0L -> if (turnedOn) "undo" else ""
+        now - installingAt > INSTALL_WINDOW -> "undo"
+        else -> "wait"
+    }
+
+    /** After resumeStep: switch Use as home screen off again (only what this try switched on, only when it did not finish). */
+    fun homeOffOnResume(step: String, turnedOn: Boolean) = step == "undo" && turnedOn
+
     /** Whether this TV needs the watch for the Home button: Google TV, a Google home by name, or a Fire TV. */
     fun needed(googleHome: Boolean, fireTv: Boolean) = googleHome || fireTv
 
