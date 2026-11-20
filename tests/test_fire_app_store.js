@@ -6,7 +6,7 @@ const context = {
   data: { apps: [], screens: [], order: null }, expanded: false,
   STANDALONE: false, NIGHT: true, HIDDEN_TV: [], g: 0, lift: null,
   gridItems: [], gridEls: Array(12), hintFlash: '',
-  resolveInputs: () => [], toolItems: () => [{ kind: 'gear' }],
+  resolveInputs: () => [], inputsTileItem: () => null, toolItems: () => [{ kind: 'gear' }],
   moreItem: () => ({ kind: 'more' }), t: key => key,
   renderGrid() { context.gridItems = context.dockList(); },
   paintFocus() {}, persistOrder() {}, flash() {},

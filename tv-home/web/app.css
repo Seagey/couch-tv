@@ -256,6 +256,11 @@ html.settled .tile.focus .face, html.settled .tile.focus .face::after { animatio
 }
 .app { width: var(--app-w); height: var(--app-h); }
 .app .face { border-radius: 0.625rem; }
+/* Classic and OLED: More apps with many apps slides the grid up a row at a time (classicScroll in app.js) */
+html:not(.theme-night):not(.theme-loop) .apps { transition: transform 160ms var(--ease); }
+html.lighter:not(.theme-night):not(.theme-loop) .apps { transition: none; }
+/* while the grid is up, what it slides under steps aside: the cards, the clock, the people and the quick buttons */
+.grid-scrolled:not(.theme-night) .shelf, .grid-scrolled:not(.theme-night) .top { opacity: 0; transition: opacity 160ms var(--ease); }
 .app.focus { transform: scale(1.16); }
 .app .label {
   position: absolute; left: -2rem; right: -2rem; top: calc(100% + 0.625rem); text-align: center;

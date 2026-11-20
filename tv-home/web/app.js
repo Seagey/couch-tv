@@ -325,6 +325,7 @@
     "com.limelight", "com.google.android.play.games", "com.google.android.videos"
   ];
   var GRID_COLS = 12, GRID_MAX = 24;
+  var INPUT_TILE = false;
   var DOCK_APPS = 10;   // Night: apps in the dock before Settings and More apps (home.dock_size)
   var DOCK_BANNERS = false;   // Night: the dock shows each app's wide TV banner instead of its square icon (home.dock_banners)
   var BANNER_COLS = 6;        // wide tiles: six to a row; the rows below show one at a time, moving down
@@ -528,6 +529,8 @@
     NP_ON = typeof ST.now_playing === "boolean" ? ST.now_playing : HOME.now_playing !== false;
     // the Keep watching row: Home settings win over home.keep_watching; off hides it and stops fetching it
     KW_ON = typeof ST.keep_watching === "boolean" ? ST.keep_watching : HOME.keep_watching !== false;
+    // an Inputs tile first in the dock (#154): Home settings win over home.input_tile; off unless switched on
+    INPUT_TILE = typeof ST.input_tile === "boolean" ? ST.input_tile : HOME.input_tile === true;
     document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
     // the row follows the app the remote is on: Home settings win over home.shelf_follows_app; off unless switched on
     SHELF_FOLLOW = typeof ST.shelf_follows_app === "boolean" ? ST.shelf_follows_app : HOME.shelf_follows_app === true;
@@ -554,6 +557,11 @@
     CLOCK24 = clock24();
     (Array.isArray(HOME.hide_packages) ? HOME.hide_packages : []).forEach(function (p) {
       if (typeof p === "string" && HIDDEN.indexOf(p) < 0) HIDDEN.push(p);
+    });
+    // home.show_packages: bring an app back that the built-in list hides (the Google TV app, say). Never this app itself.
+    (Array.isArray(HOME.show_packages) ? HOME.show_packages : []).forEach(function (p) {
+      var i = typeof p === "string" && p !== "app.couchtv.launcher" ? HIDDEN.indexOf(p) : -1;
+      if (i >= 0) HIDDEN.splice(i, 1);
     });
     HIDDEN_TV = (Array.isArray(ST.hidden_apps) ? ST.hidden_apps : []).filter(function (p) { return typeof p === "string"; });
     SCENE_LIB = BUILT_IN.concat(myScenes(HOME.my_scenes));
@@ -2664,7 +2672,7 @@
   // port by the TV's own name for it (ARC or eARC only where that label says so; Android has no public
   // way to read it), the devices HDMI-CEC found behind it, then Bluetooth and Network. A TV that lists
   // no inputs keeps its own input screen. ?mock=1&inputs=4 stands in four ports for a preview.
-  var inI = 0, inItems = [];
+  var inI = 0, inItems = [], inFrom = "quick";   // inFrom: "grid" when the Inputs tile opened it
   function inputList() {
     try {
       if (TV && TV.tvInputs) return JSON.parse(TV.tvInputs()) || [];
@@ -2682,6 +2690,7 @@
       inItems.push({ act: "bluetooth", icon: ICONS.bluetooth, label: t("bluetooth"), sub: t("bt_sub") });
       inItems.push({ act: "network", icon: ICONS.network, label: t("network"), sub: t("net_sub") });
     }
+    inFrom = zone === "grid" ? "grid" : "quick";
     inI = 0; zone = "inputs";
     renderInputMenu();
   }
@@ -2693,8 +2702,23 @@
     }).join("");
     pop.classList.add("on");
     hintFlash = t("inputs_hint"); renderHint();
-    // under the Input button, kept inside the screen's safe area
-    var el = quickEls[qi], rem = innerWidth / 120;
+    // under the Input button, or above the Inputs tile, kept inside the screen's safe area
+    var rem = innerWidth / 120;
+    if (inFrom === "grid") {
+      var tile = gridEls[g];
+      if (tile) {
+        var tb = tile.getBoundingClientRect(), tw = pop.offsetWidth, th = pop.offsetHeight;
+        if (tb.top - th - 2.25 * rem >= 3.75 * rem) {   // room above the tile (the Night dock)
+          pop.style.left = Math.max(5 * rem, Math.min(innerWidth - tw - 5 * rem, tb.left + tb.width / 2 - tw / 2)) + "px";
+          pop.style.top = (tb.top - th - 2.25 * rem) + "px";
+        } else {   // no room above (a Classic or OLED grid): beside the tile, never over it
+          pop.style.left = Math.max(5 * rem, Math.min(innerWidth - tw - 5 * rem, tb.right + 1.25 * rem)) + "px";
+          pop.style.top = Math.max(3.75 * rem, Math.min(innerHeight - th - 3.75 * rem, tb.top + tb.height / 2 - th / 2)) + "px";
+        }
+      }
+      return;
+    }
+    var el = quickEls[qi];
     if (el) {
       var b = el.getBoundingClientRect(), w = pop.offsetWidth;
       pop.style.left = Math.max(5 * rem, Math.min(innerWidth - w - 5 * rem, b.right - w)) + "px";
@@ -2704,7 +2728,7 @@
   function closeInputMenu() {
     $("inputs-pop").classList.remove("on");
     hintFlash = "";
-    if (zone === "inputs") zone = "quick";
+    if (zone === "inputs") zone = inFrom === "grid" ? "grid" : "quick";
   }
   function doInputMenu() {
     var it = inItems[inI];
@@ -3200,6 +3224,14 @@
   // the remaining days are there to use by hand (the quick button does the Extend for you).
   function devOn() { return devCan() && TVCFG.extend_devmode !== false; }
   function devItem() { return { kind: "devmode", name: t("dev_app"), package: "com.palmdts.devmode" }; }
+  // The Inputs tile (#154): first in the dock, opens the same Input menu as the Input quick button, so
+  // HDMI is one press from where the apps are. Only where that menu has something to open.
+  function inputsTileItem() {
+    if (!INPUT_TILE || (typeof CouchDesign !== "undefined" && CouchDesign.on())) return null;
+    if (OFFLINE && !nativeInputs() && !inputList().length) return null;
+    return { kind: "inputs", name: t("input"), package: "inputs:menu" };
+  }
+
   function toolItems() {
     var list = [];
     if (smartOn()) list.push(smartItem());
@@ -3252,6 +3284,8 @@
     var extra = apps.filter(tucked);
     var inputs = resolveInputs();
     list = list.concat(inputs);
+    var inTile = inputsTileItem();
+    if (inTile) list.unshift(inTile);
     data.screens.forEach(function (sc) { list.push({ kind: "screen", id: sc.id, name: sc.name, ready: sc.ready, note: sc.note, noteKey: sc.note_key, noteVars: sc.note_vars }); });
     var tools = toolItems();
     if (expanded) return list.concat(extra, tools);
@@ -3294,6 +3328,11 @@
     var list = expanded ? arr.items.slice() : arr.items.slice(0, arr.line);
     // a design's own dock: its apps in its order, without the ones it hides (design.js)
     if (!expanded && typeof CouchDesign !== "undefined" && CouchDesign.on()) list = CouchDesign.dock(arr.items, list, DOCK_APPS);
+    var inTile = inputsTileItem();
+    if (inTile) {
+      if (!expanded && list.length >= DOCK_APPS) list = list.slice(0, DOCK_APPS - 1);   // it takes one place, like a pinned input
+      list.unshift(inTile);
+    }
     list = list.concat(toolItems());
     if (!expanded && !(STANDALONE && !data.apps.length)) list.push(moreItem());   // standalone: no app list behind it
     // apps a design put out on the screen come after Settings and More apps, so Right along the dock
@@ -3357,7 +3396,7 @@
   function holdApp() {
     var a = gridItems[g];
     if (!a || a.kind === "more") return false;
-    if (a.kind === "gear" || a.kind === "smart" || a.kind === "devmode" || a.kind === "screen") { flash(t("stays_put", { name: a.name })); return true; }
+    if (a.kind === "gear" || a.kind === "inputs" || a.kind === "smart" || a.kind === "devmode" || a.kind === "screen") { flash(t("stays_put", { name: a.name })); return true; }
     if (a.kind !== "app") return startMove();
     openAppMenu(a);
     return true;
@@ -3637,6 +3676,7 @@
     var face;
     if (it.kind === "screen") face = '<div class="face tool">' + ICONS.screen + "</div>";
     else if (it.kind === "input") face = inputFace(it);
+    else if (it.kind === "inputs") face = '<div class="face tool">' + ICONS.input + "</div>";
     else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
     else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
     else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
@@ -3654,12 +3694,30 @@
   function slideDock() {
     var apps = $("apps-section") || $("grid").parentNode, el = document.documentElement;
     if (LOOP) { loopPanel(); return; }   // no banners in the Loop look; More apps scrolls by rows instead
+    if (!NIGHT) { classicScroll(apps, el); return; }
     var rows = DOCK_BANNERS && !expanded ? Math.ceil(gridEls.length / GRID_COLS) : 1;
     var row = rows > 1 && (zone === "grid" || zone === "gear" || zone === "appmenu") ? Math.floor(g / GRID_COLS) : 0;
     el.classList.toggle("dock-down", row > 0);
     if (rows <= 1) { apps.style.bottom = ""; apps.style.transform = ""; return; }
     apps.style.bottom = (2.875 - (rows - 1) * BANNER_ROW_REM) + "rem";
     apps.style.transform = "translateX(-50%) translateY(" + (-row * BANNER_ROW_REM) + "rem)";
+  }
+
+  // Classic and OLED: eight tiles to a row, and only the first rows fit under the clock. When More apps
+  // lists more than that, the grid slides up by whole rows so the tile under the remote stays on the
+  // screen (#203: with 15+ apps the focus went below the screen and nothing scrolled). The Keep watching
+  // row and the header (clock, people, quick buttons) fade out while the grid is up, since it slides under them.
+  function classicScroll(apps, el) {
+    var shift = 0, step = 0;
+    if (gridEls.length > GRID_COLS && (zone === "grid" || zone === "gear" || zone === "appmenu")) {
+      step = gridEls[GRID_COLS].offsetTop - gridEls[0].offsetTop;   // a tile row and the gap under it
+      var rem = innerWidth / 120, tileH = gridEls[0].offsetHeight;
+      // the last row that fits: its tile, the name under it and a margin must end above the screen's edge
+      var fit = step > 0 ? Math.max(1, Math.floor((innerHeight - 6 * rem - tileH - apps.offsetTop) / step) + 1) : 1;
+      shift = Math.max(0, Math.floor(g / GRID_COLS) - (fit - 1)) * step;
+    }
+    el.classList.toggle("grid-scrolled", shift > 0);
+    apps.style.transform = shift > 0 ? "translateY(-" + shift + "px)" : "";
   }
 
   // The Night dock tile's width in rem: a square icon, or a 16:9 TV banner as tall as the icon.
@@ -3670,6 +3728,7 @@
     var face;
     if (it.kind === "screen") face = '<div class="face tool">' + ICONS.screen + "</div>";
     else if (it.kind === "input") face = inputFace(it);
+    else if (it.kind === "inputs") face = '<div class="face tool">' + ICONS.input + "</div>";
     else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
     else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
     else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
@@ -3841,7 +3900,11 @@
     if (zone === "shelfmenu") { if (shelfEls[s]) shelfEls[s].classList.add("focus"); renderShelfMenu(); return; }
     if (zone === "updask") { renderAsk(); return; }
     if (zone === "menu") { renderMenu(); return; }
-    if (zone === "inputs") { if (quickEls[qi]) quickEls[qi].classList.add("focus"); renderInputMenu(); return; }
+    if (zone === "inputs") {
+      var from = inFrom === "grid" ? gridEls[g] : quickEls[qi];
+      if (from) from.classList.add("focus");
+      renderInputMenu(); return;
+    }
     if (zone === "pmenu") { renderPop(); $("people").classList.add("focus"); return; }
     if (zone === "np") {
       if (!npReach()) { zone = shelfReach() ? "shelf" : "grid"; paintFocus(); return; }
@@ -4304,6 +4367,7 @@
     if (!a) return;
     if (a.kind === "more") { dockBack = null; expanded = true; renderGrid(); paintFocus(); return; }
     if (a.kind === "gear") { openGear(); return; }
+    if (a.kind === "inputs") { openInputs(); return; }
     if (a.kind === "smart") { openSmart(); return; }
     if (a.kind === "devmode") { openDevMode(); return; }
     if (a.kind === "input") {
@@ -4893,7 +4957,7 @@
       scenes: SCENES.map(function (x) { return x.id; }), builtIn: BUILT_IN.map(function (x) { return x.id; }),
       scene_seconds: SCENE_MS / 1000, clock24: CLOCK24, clock_style: CLOCK_LIQUID ? "liquid" : undefined,
       glass: GLASS, glass_icons: GLASS_ICONS, glass_amount: GLASS_AMT, ambient_weather: WX_AMBIENT, ambient_sun_grade: WX_SUN_GRADE,
-      lighter: LIGHTER, keep_watching: KW_ON, now_playing: NP_ON, dock_size: DOCK_APPS, dock_style: DOCK_MAC ? "mac" : "classic", moving_tiles: MOVING,
+      lighter: LIGHTER, keep_watching: KW_ON, input_tile: INPUT_TILE, now_playing: NP_ON, dock_size: DOCK_APPS, dock_style: DOCK_MAC ? "mac" : "classic", moving_tiles: MOVING,
       dock: arr.items.slice(0, arr.line).filter(function (it) { return !it.kind || it.kind === "app"; }).map(function (it) { return it.package; }),
       design: CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.on() ? CFG.design : null
     };
@@ -5057,6 +5121,10 @@
       document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
       if (!KW_ON) { data.shows = []; shelfEls = []; s = 0; }
       renderShelf(); renderNp();
+    } });
+    // an Inputs tile first in the dock (home.input_tile), for a simple home: HDMI one press from the apps (#154)
+    rows.push({ kind: "toggle", key: "input-tile", label: t("input_tile"), sub: t("input_tile_sub"), value: INPUT_TILE ? t("on") : t("off"), act: function () {
+      INPUT_TILE = !INPUT_TILE; ST.input_tile = INPUT_TILE; saveSettings();
     } });
     // the row follows the app the remote is on (home.shelf_follows_app): only that app's cards, as "Recently on <app>"
     rows.push({ kind: "toggle", key: "shelf-follows-app", label: t("shelf_follow"), sub: t("shelf_follow_sub"), value: SHELF_FOLLOW ? t("on") : t("off"), act: function () {

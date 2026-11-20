@@ -410,6 +410,8 @@ def _home(h):
     out = {
         # Android package names never shown on the home or in More apps (a maker's own clutter).
         "hide_packages": [p for p in dict.fromkeys(hide) if isinstance(p, str) and re.fullmatch(r"[A-Za-z0-9_.]{1,200}", p)],
+        # Android package names the built-in hidden list would hide, shown anyway (the Google TV app, say).
+        "show_packages": [p for p in dict.fromkeys(h.get("show_packages") if isinstance(h.get("show_packages"), list) else []) if isinstance(p, str) and re.fullmatch(r"[A-Za-z0-9_.]{1,200}", p)],
         "look": h.get("look") if h.get("look") in LOOKS else "night",
         "scenes": scenes or list(SCENE_IDS),
         "scene_seconds": _int(h.get("scene_seconds"), 20, 5, 3600),
@@ -479,6 +481,9 @@ def _home(h):
     # false hides the whole Keep watching row and stops the home asking for it. Home settings win over it.
     if isinstance(h.get("keep_watching"), bool):
         out["keep_watching"] = h["keep_watching"]
+    # true puts an Inputs tile first in the dock (#154). Home settings win over it.
+    if isinstance(h.get("input_tile"), bool):
+        out["input_tile"] = h["input_tile"]
     # true makes the row follow the app the remote is on ("Recently on <app>"). Home settings win over it.
     if isinstance(h.get("shelf_follows_app"), bool):
         out["shelf_follows_app"] = h["shelf_follows_app"]

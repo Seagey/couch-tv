@@ -172,6 +172,7 @@
     try { var dz = JSON.parse(localStorage.getItem("tvdesigner.design") || "null"); if (dz && typeof dz === "object") cfg.design = dz; } catch (e) {}
   }
   if (arg("follow")) cfg.home.shelf_follows_app = arg("follow") !== "off";   // home.shelf_follows_app
+  if (arg("inputtile")) cfg.home.input_tile = arg("inputtile") !== "off";   // home.input_tile (#154)
   if (arg("ontv")) cfg.mode = "on-tv";   // ?ontv=1: served by the on-TV app (no computer behind it)
   window.COUCH_CONFIG = cfg;
 
