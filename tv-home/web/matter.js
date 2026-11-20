@@ -48,6 +48,9 @@
       if (DOMAINS.indexOf(domain) < 0) return;   // locks, alarms and anything new never show
       var a = d.attributes && typeof d.attributes === "object" ? d.attributes : {};
       if (domain === "cover" && OPENERS.indexOf(String(a.device_class || "")) >= 0) return;
+      // a blind or a plug named as a garage door, gate, door or lock is hidden too (the controllers do the
+      // same; this page never relies on them): nothing that opens the house is ever listed or moved here
+      if ((domain === "cover" || domain === "switch") && HIDES.test(String(d.name || ""))) return;
       var entity = entityOf(d.id, domain);
       if (!entity || seen[entity]) return;
       seen[entity] = true;

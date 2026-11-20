@@ -88,6 +88,44 @@ const SHARED = () => [
     });
   }
 
+  // ---- nothing that opens the house: a Matter lock, alarm or garage door is never listed, read or moved,
+  // even if a controller sent one (they refuse them; this page does not rely on that) ----
+  {
+    const OPENS = [
+      { id: "matter:20:1", name: "Front door", domain: "lock", state: "locked", attributes: {} },
+      { id: "matter:21:1", name: "House alarm", domain: "alarm_control_panel", state: "armed_away", attributes: {} },
+      { id: "matter:22:1", name: "Roller", domain: "cover", state: "closed", attributes: { device_class: "garage" } },
+      { id: "matter:23:1", name: "Side", domain: "cover", state: "closed", attributes: { device_class: "gate" } },
+      { id: "matter:24:1", name: "Patio", domain: "cover", state: "closed", attributes: { device_class: "door" } },
+      { id: "matter:25:1", name: "Garage door", domain: "cover", state: "closed", attributes: { current_position: 0 } },
+      { id: "matter:26:1", name: "Front gate opener", domain: "switch", state: "off", attributes: {} },
+      { id: "matter:27:1", name: "Back door lock", domain: "switch", state: "off", attributes: {} },
+      { id: "matter:28:1", name: "Doorbell chime", domain: "binary_sensor", state: "off", attributes: {} }
+    ];
+    const KEEP = [{ id: "matter:29:1", name: "Garage light", domain: "light", state: "on", attributes: { brightness: 255 } }, { id: "matter:30:1", name: "Front door", domain: "sensor", state: "on", attributes: { device_class: "contact" } }];
+    const T = page({ tvha: true, devices: OPENS.concat(KEEP) });
+    T.H.useBridge(T.api);
+    await flush();
+    const ents = T.M.list().map((d) => d.entity);
+    ok(ents.join() === "light.matter_29_1,sensor.matter_30_1", "only the light and the door sensor are listed: " + ents);
+    T.H.reload();
+    const info = T.H.live().info, all = JSON.stringify(info);
+    ok(!/matter_2[0-8]_/.test(all), "none is in the lists the widgets and pick lists read");
+    const ctl = await T.H.request("controls");
+    ok(ctl.ok && !ctl.controls.some((c) => /matter_2[0-8]_/.test(c.entity)), "none is in Control Centre's readings");
+    T.asked.length = 0;
+    for (const e of ["lock.matter_20_1", "alarm_control_panel.matter_21_1", "cover.matter_22_1", "cover.matter_23_1", "cover.matter_24_1", "cover.matter_25_1", "switch.matter_26_1", "switch.matter_27_1"]) {
+      ok(!T.M.owns(e), e + " is not a Matter device of this page");
+      await T.M.ask("set", e, e.indexOf("cover") === 0 ? "open" : "on");
+    }
+    ok(!T.asked.some((a) => a[2] === "/api/matter/command"), "and none is ever sent a command");
+    // the phone card lists by the same rule
+    const html = fs.readFileSync(path.join(__dirname, "../on-tv/web/setup.html"), "utf8");
+    const src = /var MT_HIDES = [^\n]*\n/.exec(html)[0] + /var MT_OK = [^\n]*\n/.exec(html)[0] + /function mtShows\(d\) \{[\s\S]*?\n  \}\n/.exec(html)[0];
+    const shows = vm.runInNewContext(src + "; mtShows", {});
+    ok(OPENS.every((d) => !shows(d)) && KEEP.every((d) => shows(d)), "the phone card lists by the same rule: " + OPENS.filter(shows).map((d) => d.name).join(", "));
+  }
+
   // ---- a Google TV with Home Assistant (TVHA) and Matter through the on-TV server or bridge ----
   {
     const T = page({ tvha: true, devices: SHARED() });

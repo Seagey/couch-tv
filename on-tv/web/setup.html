@@ -849,6 +849,12 @@
     return k && !/^[a-z_]+$/.test(k) ? k : mw('err_failed');
   }
   var MT_OK = ['light', 'switch', 'fan', 'cover', 'climate', 'sensor'];
+  // what the card lists: never a lock or an alarm (not these kinds), a garage door, gate or door blind, nor a
+  // blind or plug named as one (the same rule as matter.js)
+  function mtShows(d) {
+    return !!d && typeof d.id === 'string' && MT_OK.indexOf(d.domain) >= 0 && !(d.domain === 'cover' && /^(garage|gate|door)$/.test((d.attributes || {}).device_class || '')) &&
+      !((d.domain === 'cover' || d.domain === 'switch') && MT_HIDES.test(String(d.name || '')));
+  }
   // the card's own lines (data-mw keys) in the language, drawn again when the language changes
   var mtLang = null;
   function fillMatterWords() {
@@ -868,7 +874,7 @@
     var note = j.ready === false ? (why || j.note || mw('getting_ready')) : (j.note || '');
     $('matter-note').style.display = note ? '' : 'none'; $('matter-note').textContent = note;
     var list = (Array.isArray(j.devices) ? j.devices : []).filter(function (d) {
-      return d && typeof d.id === 'string' && MT_OK.indexOf(d.domain) >= 0 && !(d.domain === 'cover' && /^(garage|gate|door)$/.test((d.attributes || {}).device_class || ''));
+      return mtShows(d);
     });
     // the name and kind ride on the row (data-name, data-domain), so a name in another language never
     // changes what Rename and Remove send
