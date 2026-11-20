@@ -340,7 +340,9 @@ console.log("Running Matter UI browser tests...");
   await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none" && /Hallway/.test(document.getElementById("matter-list").textContent), null, { timeout: 8000 }); await unfold(page);
   const cases = [["blocked", "commission", "not_allowed"], ["unsupported", "commission", "not_allowed"], ["address", "commission", "unreachable"], ["port", "commission", "unreachable"],
     ["link_local", "commission", "unreachable"], ["busy", "commission", "failed"], ["processor", "commission", "unsupported"], ["android_old", "commission", "unsupported"],
-    ["starting", "commission", "unreachable"], ["opens_house", "rename", "refused"], ["offline", "remove", ""], ["not_answering", "remove", ""]];
+    ["starting", "commission", "unreachable"], ["opens_house", "rename", "refused"], ["offline", "remove", ""], ["not_answering", "remove", ""],
+    ["not_found", "rename", "refused"], ["not_allowed", "rename", "refused"], ["bad_request", "remove", "failed"], ["bad_name", "rename", "bad_request"],
+    ["not_ready", "remove", "failed"], ["device_refused", "rename", "failed"], ["failed", "remove", "failed"], ["not_answering", "rename", "failed"]];
   for (const [k, what, err] of cases) {
     nextReply = { url: "/api/matter/" + what, code: err ? 400 : 200, body: err ? { ok: false, error: err, reason: k, note: "Raw English note." } : { ok: true, removed: ["matter:5:1"], reason: k, note: "Raw English note." } };
     if (what === "commission") { await page.fill("#matter-code", "3497-011-2332"); await page.click("#matter-add"); }
@@ -349,6 +351,10 @@ console.log("Running Matter UI browser tests...");
     const m = await msg(), w = await en("why_" + k);
     ok(m.indexOf(w) >= 0 && !/Raw English note/.test(m), "phone, " + what + " " + (err || "ok") + ", reason " + k + ": " + m);
   }
+  // the on-TV app: a second commission while one runs (error busy)
+  nextReply = { url: "/api/matter/commission", code: 409, body: { ok: false, error: "busy", note: "Raw English note." } };
+  await page.fill("#matter-code", "3497-011-2332"); await page.click("#matter-add"); await page.waitForTimeout(600);
+  ok(await msg() === await en("err_busy"), "phone, commission error busy: " + await msg());
   nextReply = null;
   ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
   await page.close();
