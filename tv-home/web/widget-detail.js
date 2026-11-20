@@ -340,7 +340,7 @@
     var w = kit().wifiOf(env);
     if (!w || !w.ssid) return B.setup(o, env);
     S.body.appendChild(head("wifi", "Guest Wi-Fi", "Join from a phone", "#0a84ff"));
-    var code = kit().qrNode(w.qr, 600), nopass = w.sec === "nopass" || !w.pass, hide = !nopass && kit().setting(o, env, "hidepass") === true;
+    var code = kit().qrNode(w.qr, 600), nopass = w.sec === "nopass" || !w.pass, hide = !nopass && !!code && kit().setting(o, env, "hidepass") === true;
     S.body.appendChild(E("div", "cwd-row cwd-grow", "margin-top:30px", [
       E("div", "cwd-qr", "", [code || E("div", "cwd-text", "color:#111", ["The name and password are too long for a code. Type them in instead."])]),
       E("div", "cwd-col", "margin-left:80px;min-width:0;flex:1", [label("Network"), E("div", "cwd-big cwd-ell", "", [w.ssid]), label(nopass ? "No password" : hide ? "The password is in the code" : "Password"), nopass || hide ? null : E("div", "cwd-big cwd-ell", "", [w.pass]),
@@ -423,7 +423,7 @@
     set(a, list[at]); b.style.opacity = "0";
     var dots = E("div", "cwd-pdots"), count = E("div", "cwd-pcount"), pause = E("div", "cwd-pchip", "", [ic("pause", 30, "#fff", "solid"), "Paused"]);
     var paint = function () {
-      count.textContent = (mem ? (kit().memoryWeek(o, env) ? "This week, " : "On this day, ") + (kit().setting(o, env, "ago") === false ? "in " + (kit().now().getFullYear() - mem[at].years) : kit().yearsAgo(mem[at].years).toLowerCase()) + (list.length > 1 ? ". " : "") : "") + (list.length > 1 || !mem ? (at + 1) + " of " + list.length : "");
+      count.textContent = (mem ? (kit().memoryWeek(o, env) ? "This week, " : "On this day, ") + (kit().setting(o, env, "ago") === false ? "in " + (mem[at].year || kit().now().getFullYear() - mem[at].years) : kit().yearsAgo(mem[at].years).toLowerCase()) + (list.length > 1 ? ". " : "") : "") + (list.length > 1 || !mem ? (at + 1) + " of " + list.length : "");
       while (dots.firstChild) dots.removeChild(dots.firstChild);
       for (var i = 0; i < Math.min(list.length, 12); i++) dots.appendChild(E("i", i === at % 12 ? "on" : ""));
       pause.style.opacity = paused ? "1" : "0";

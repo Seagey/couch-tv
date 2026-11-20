@@ -339,14 +339,14 @@
     var own = (o && o.opts && o.opts.image) ? [o.opts.image] : [];
     if (own.length) return own;
     if (env.demo) return ["beach", "birthday", "camp", "dog", "nan", "surf", "hike"].map(demoImg);
-    var all = (dataOf(env).photos || []).slice(0, 50), pick = o && (o.kind === "photo" || o.kind === "artframe") ? tvSet(o, env, "photo") : undefined;
+    var every = dataOf(env).photos || [], all = every.slice(0, 50), pick = o && (o.kind === "photo" || o.kind === "artframe") ? tvSet(o, env, "photo") : undefined;
     if (pick !== undefined && pick !== "first") {
       // picked on this TV by the photo's id (Home settings, Your photos): its picture is the one at the
-      // same place in the photos this TV hands over (app.js homeView photoIds)
+      // same place in the photos this TV hands over (app.js homeView photoIds), the 51st and on too
       var ids = ((dataOf(env).home || {}).photoIds) || [], at = ids.indexOf(pick);
-      if (at >= 0 && all[at]) return [all[at]];
-      if (isFinite(pick) && all[+pick]) return [all[+pick]];
-      if (all.indexOf(pick) >= 0) return [pick];
+      if (at >= 0 && every[at]) return [every[at]];
+      if (isFinite(pick) && every[+pick]) return [every[+pick]];
+      if (every.indexOf(pick) >= 0) return [pick];
     }
     return all;
   }
@@ -1008,8 +1008,9 @@
   };
   // a list in an order mixed by a seed (the day): the same order all day, every photo once
   function mixed(list, seed) {
-    var out = list.slice(), x = (seed * 2654435761) % 4294967296;
-    for (var k = out.length - 1; k > 0; k--) { x = (x * 1103515245 + 12345) % 2147483648; var j = x % (k + 1), t = out[k]; out[k] = out[j]; out[j] = t; }
+    // a Park and Miller count: every product stays under 2^47, so no number is ever rounded
+    var out = list.slice(), x = (Math.abs(Math.floor(seed)) % 2147483646) + 1;
+    for (var k = out.length - 1; k > 0; k--) { x = (x * 48271) % 2147483647; var j = x % (k + 1), t = out[k]; out[k] = out[j]; out[j] = t; }
     return out;
   }
   R.slideshow = function (root, o, b, env) {
@@ -2472,15 +2473,17 @@
     var h = athome(env) || {}, pick = String(setting(o, env, "calendars", "all")), c = h.cal || {}, k = h.books || {};
     var useMain = pick !== "bookings" && !!c.set, useBooks = pick !== "main" && !!k.set;
     if (!useMain && !useBooks) return null;
-    if ((useMain && !c.events) || (useBooks && !k.events && !useMain)) return { wait: true, err: (useMain ? c.err : k.err) || "" };
-    var evs = (useMain ? c.events : []).concat(useBooks && k.events ? k.events : []);
+    // with both, what was read shows even when the other calendar failed; the error only when neither was read
+    var main = useMain ? c.events : null, bk = useBooks ? k.events : null;
+    if (!main && !bk) return { wait: true, err: (useMain && c.err) || (useBooks && k.err) || "" };
+    var evs = (main || []).concat(bk || []);
     evs.sort(function (a, z) { return a.start - z.start; });
     return { events: evs };
   }
   // Days: today, today and tomorrow (tomorrow once today is clear), or the next seven days
   function agendaOf(root, b, env, o) {
     var days = String(setting(o, env, "days", "two"));
-    if (env.demo) { var de = demoEvents(); return { days: days, today: de.map(function (x, i) { return { title: x.title, when: hhmm(x.start, env), col: EV_COL[i], start: x.start, end: x.end }; }), tomorrow: [], week: [] }; }
+    if (env.demo) { var dl = demoEvents().map(function (x, i) { return { title: x.title, when: hhmm(x.start, env), col: EV_COL[i], start: x.start, end: x.end }; }); return { days: days, today: dl, tomorrow: [], week: dl }; }
     var a = agendaEvents(o, env);
     if (!a) {
       var pick = String(setting(o, env, "calendars", "all"));
@@ -2534,10 +2537,11 @@
   R.note = function (root, o, b, env) {
     var a = ahAlign(root, o), n = noteOf(env);
     if (!n) return soon(root, b, "edit", "note");
+    // Show who it is from: "From Mum" above the words, on a narrow tile the name alone (23 px fits there)
     // the words as big as they fit (the quote's rule), wrapping, and "..." on the last line that fits
-    var fromH = n.from && b.h >= 200 && setting(o, env, "byline") !== false ? 40 : 0, room = Math.max(30, b.h - 48 - fromH), len = Math.max(8, n.text.length);
+    var fromH = n.from && b.h >= 140 && setting(o, env, "byline") !== false ? 40 : 0, room = Math.max(30, b.h - 48 - fromH), len = Math.max(8, n.text.length);
     var fs = clamp(Math.min(Math.sqrt((b.w - 48) * room / len / 1.7), room / 1.2, 64), 25, 64), max = Math.max(1, Math.floor(room / (fs * 1.18)));
-    add(root, ahCol(a, [fromH ? one1("cw-t23", "font-weight:700;color:var(--sub)", "From " + n.from) : null,
+    add(root, ahCol(a, [fromH ? one1("cw-t23", "font-weight:700;color:var(--sub)", (b.w < 300 ? "" : "From ") + n.from) : null,
       E("div", "", "flex:none;max-width:100%;font-size:" + px(fs) + ";font-weight:680;line-height:1.18;margin-top:" + (fromH ? 8 : 0) + "px;letter-spacing:-.01em;white-space:pre-line;" + lines(max), [n.text])]));
   };
   CR.note = R.note;
@@ -2568,7 +2572,9 @@
     var left = items.filter(function (x) { return !x.done; }), lc = l.todo ? "#0a84ff" : root.classList.contains("cw-paper") ? "#1f9d55" : "#30d158", icon = op(o).icon || "check";
     var count = left.length ? left.length + (l.todo ? " to do" : " left") : l.items.length ? "All done" : "Nothing on it yet";
     if (b.h < 200) {
-      add(root, ahCol(a, [ahLab(icon, l.name, lc), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", count),
+      // Show ticked items, on a short list: how many are ticked, after what is left
+      var ticked = items.length - left.length;
+      add(root, ahCol(a, [ahLab(icon, l.name, lc), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", count + (left.length && ticked ? ", " + ticked + " ticked" : "")),
         left.length ? one1("cw-t23", "", left.slice(0, 4).map(function (x) { return x.t; }).join(", ")) : null]));
       return;
     }
@@ -2595,8 +2601,8 @@
     var narrow = b.w < 600, qs = Math.max(80, narrow ? Math.min(b.h - 48 - 46, b.w - 48) : b.h - 48), code = qrNode(w.qr, qs - 24);
     var box = E("div", "", "width:" + px(qs) + ";height:" + px(qs) + ";border-radius:22px;background:#fff;padding:12px;flex:none;overflow:hidden", [code || E("div", "cw-t23", "color:#1d1b18;padding:8px;" + lines(4), ["The name and password are too long for a code"])]);
     if (narrow) { add(root, ahCol(a, [box, one1("cw-t25", "margin-top:10px;font-weight:650;color:var(--ink)", w.ssid)])); return; }
-    // Hide the password (set on this TV): the code still joins, the words never show
-    var nopass = w.sec === "nopass" || !w.pass, hide = !nopass && setting(o, env, "hidepass") === true;
+    // Hide the password (set on this TV): the code still joins, the words never show (a name and password too long for a code always show the words)
+    var nopass = w.sec === "nopass" || !w.pass, hide = !nopass && !!code && setting(o, env, "hidepass") === true;
     add(root, E("div", "cw-row", "width:100%;height:100%;justify-content:" + FLEX[a], [box,
       E("div", "cw-col", "margin-left:30px;min-width:0;flex:0 1 auto;max-width:" + px(b.w - 48 - qs - 30), [ahLab("wifi", "Guest Wi-Fi"), one1("cw-t48", "margin-top:10px", w.ssid),
         one1("cw-t29 cw-dim", "margin-top:6px", nopass ? "No password" : hide ? "The password is in the code" : "Password"), nopass || hide ? null : one1("cw-t38", "", w.pass),
@@ -2647,13 +2653,17 @@
   R.memory = function (root, o, b, env) {
     var a = ahAlign(root, o), list = memoryOf(root, b, env, o);
     if (!list) return;
-    // Show how long ago: "3 years ago", or off, the year it was taken
-    var ago = setting(o, env, "ago") !== false, wk = memoryWeek(o, env), say = function (q) { return tiny || !ago ? String(now().getFullYear() - q.years) : yearsAgo(q.years); };
-    var p = list[dayIndex(list.length, 20)], tiny = b.w < 300 || b.h < 200, img = photoLayer(p.src);
+    // Show how long ago: "3 years ago", or off, the year it was taken. On a narrow tile the number is
+    // big and "years ago" goes on a small line under it, so the words still fit
+    var ago = setting(o, env, "ago") !== false, wk = memoryWeek(o, env), narrow = b.w < 300;
+    var say = function (q) { return !ago ? String(q.year || now().getFullYear() - q.years) : narrow ? String(q.years) : yearsAgo(q.years); };
+    var under = function (q) { return q.years === 1 ? "year ago" : "years ago"; };
+    var p = list[dayIndex(list.length, 20)], tiny = narrow || b.h < 200, img = photoLayer(p.src);
     var big = one1("cw-t48", "color:#fff;font-size:" + px(tiny ? 34 : b.h < 300 ? 38 : 48) + ";text-shadow:0 2px 18px rgba(0,0,0,.5)", say(p));
+    var sub = ago && narrow ? one1("cw-t23", "color:#fff;font-weight:650;text-shadow:0 2px 12px rgba(0,0,0,.5)", under(p)) : null;
     add(root, [img, E("div", "cw-fill", "background:radial-gradient(ellipse at center,rgba(0,0,0,.5),rgba(0,0,0,.18) 70%)"),
-      E("div", "cw-fill", "z-index:2;padding:18px;display:flex", [ahCol(a, [b.h >= 200 && b.w >= 300 ? one1("cw-t23", "color:rgba(255,255,255,.92);text-transform:uppercase;letter-spacing:.08em;font-weight:700;text-shadow:0 2px 12px rgba(0,0,0,.5)", wk ? "This week" : "On this day") : null, big])])]);
-    if (list.length > 1) live(root, 20000, function () { var q = list[dayIndex(list.length, 20)]; img.style.backgroundImage = cssImg(q.src); big.textContent = say(q); });
+      E("div", "cw-fill", "z-index:2;padding:18px;display:flex", [ahCol(a, [b.h >= 200 && b.w >= 300 ? one1("cw-t23", "color:rgba(255,255,255,.92);text-transform:uppercase;letter-spacing:.08em;font-weight:700;text-shadow:0 2px 12px rgba(0,0,0,.5)", wk ? "This week" : "On this day") : null, big, sub])])]);
+    if (list.length > 1) live(root, 20000, function () { var q = list[dayIndex(list.length, 20)]; img.style.backgroundImage = cssImg(q.src); big.textContent = say(q); if (sub) sub.textContent = under(q); });
   };
   CR.memory = R.memory;
 
@@ -2815,7 +2825,7 @@
       // this widget's own settings and honest headings (WIDGET-SETTINGS-CONTRACT.md)
       setting: setting, tvSet: tvSet, devName: devName, webName: webName, feedFor: feedFor, unitF: unitF, roomUnit: roomUnit, tconv: tconv, sensorConv: sensorConv, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
       // things typed at home (athome.js through app.js)
-      athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guidePart: guidePart, agendaEvents: agendaEvents, memoryList: memoryList, memoryWeek: memoryWeek, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
+      athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guidePart: guidePart, agendaEvents: agendaEvents, memoryList: memoryList, memoryWeek: memoryWeek, mixed: mixed, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
   };
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
   window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, queueOf: queueOf, coverOk: coverOk, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };

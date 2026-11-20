@@ -142,7 +142,7 @@ async function shown(wset) { const r = await draw({ id: "p1", kind: "slideshow" 
   const at = (secs) => Math.floor(Date.now() / (secs * 1000)) % PH.length;
   const w10 = await shown({ seconds_each: 10 }), e10 = at(10), w300 = await shown({ seconds_each: 300 }), e300 = at(300), wd = await shown(null), ed = at(20);
   ok(w10 === e10 && w300 === e300 && wd === ed, "slideshow.seconds_each: the photo now follows 10 seconds, 5 minutes and the default 20 (" + [w10, e10, w300, e300, wd, ed] + ")");
-  const mixedAt = await page.evaluate((ph) => { const seed = Math.floor(Date.now() / 86400000); const out = ph.slice(); let x = (seed * 2654435761) % 4294967296; for (let k = out.length - 1; k > 0; k--) { x = (x * 1103515245 + 12345) % 2147483648; const j = x % (k + 1), t = out[k]; out[k] = out[j]; out[j] = t; } return out; }, PH);
+  const mixedAt = await page.evaluate((ph) => { const seed = Math.floor(Date.now() / 86400000); const out = ph.slice(); let x = (seed % 2147483646) + 1; for (let k = out.length - 1; k > 0; k--) { x = (x * 48271) % 2147483647; const j = x % (k + 1), t = out[k]; out[k] = out[j]; out[j] = t; } return out; }, PH);
   const sh = await draw({ id: "p1", kind: "slideshow" }, phData, { shuffle: true, seconds_each: 300 });
   const want = mixedAt[at(300)], first = (/url\(&quot;([^&]*)&quot;\)|url\("([^"]*)"\)/.exec(sh.html) || []);
   ok((first[1] || first[2]) === want, "slideshow.shuffle: on, the photo now is from today's mixed order (" + want + ")");
@@ -224,6 +224,45 @@ ok((await draw({ id: "p1", kind: "mosaic", opts: { count: "auto" } }, phData, nu
   const sd = { home: { screen: { ok: true, minutes: 125, apps: [{ name: "YouTube", minutes: 52 }, { name: "ABC iview", minutes: 31 }, { name: "Netflix", minutes: 20 }, { name: "Stan", minutes: 12 }, { name: "Kayo", minutes: 10 }] }, goal: 120 } };
   await cycle("screentime.appcount 0", { id: "s1", kind: "screentime" }, sd, { appcount: 0 }, (d, s) => ok(/YouTube/.test(d.text) && /Kayo/.test(d.text) && !/YouTube/.test(s.text) && /2h 5m/.test(s.text), "screentime.appcount: None shows only the total: " + s.text), [1000, 400]);
   await cycle("screentime.appcount 3", { id: "s1", kind: "screentime" }, sd, { appcount: 3 }, (d, s) => ok(/Netflix/.test(s.text) && !/Stan|Kayo/.test(s.text), "screentime.appcount: 3 apps: " + s.text), [1000, 400]);
+}
+
+// ---- the small sizes (tools/tv-designer/app/grid.js: tile 160x160, wide tile 360x160): each setting
+// still shows, and the words it adds fit their box (scrollWidth no more than clientWidth) ----
+async function fit(o, data, wset, size, word) {
+  return page.evaluate(([o, data, wset, size, word]) => {
+    document.querySelectorAll(".ws-host").forEach((h) => h.remove());
+    const host = document.createElement("div");
+    host.className = "ws-host cw-o"; host.style.cssText = "position:absolute;left:40px;top:40px";
+    document.body.appendChild(host);
+    const env = { data: Object.assign({}, data, wset ? { wset: { [o.id]: wset } } : {}) };
+    const root = window.CouchWidgets.render(Object.assign({ w: size[0], h: size[1] }, o), env);
+    root.style.width = size[0] + "px"; root.style.height = size[1] + "px";
+    host.appendChild(root);
+    // the smallest element holding the word, and is it cut (wider than its box, or past the widget's edge)
+    const els = [...root.querySelectorAll("*")].filter((e) => e.textContent.includes(word) && ![...e.children].some((c) => c.textContent.includes(word)));
+    const r0 = root.getBoundingClientRect();
+    return { text: root.textContent.replace(/\s+/g, " ").trim(), found: els.length,
+      size: els.map((e) => e.scrollWidth + "/" + e.clientWidth + " r" + Math.round(e.getBoundingClientRect().right - r0.right) + " b" + Math.round(e.getBoundingClientRect().bottom - r0.bottom)).join(" "),
+      cut: els.some((e) => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > r0.right + 1 || e.getBoundingClientRect().bottom > r0.bottom + 1) };
+  }, [o, data, wset || null, size, word]);
+}
+{
+  const memD = { home: { memory: { photos: 4, dated: 3, today: [{ src: "demo/camp.jpg", years: 3, year: 2023 }], week: [] } } };
+  for (const size of [[160, 160], [360, 160]]) {
+    const a = await fit({ id: "m1", kind: "memory" }, memD, null, size, "ago"), y = await fit({ id: "m1", kind: "memory" }, memD, { ago: false }, size, "2023");
+    ok(a.found && !a.cut && y.found && !y.cut && !/ago/.test(y.text), "memory.ago at " + size.join("x") + ": how long ago fits (" + a.text + "), off the year (" + y.text + ")");
+  }
+  const nd = { home: { note: { text: "Dinner at 6. Feed Max!", from: "Mum" } } };
+  for (const size of [[160, 160], [360, 160]]) {
+    const a = await fit({ id: "n1", kind: "note" }, nd, null, size, "Mum"), b = await fit({ id: "n1", kind: "note" }, nd, { byline: false }, size, "Dinner");
+    ok(a.found && !a.cut && !/Mum/.test(b.text) && (size[0] < 300 || /From Mum/.test(a.text)), "note.byline at " + size.join("x") + ": who it is from fits (" + a.size + "), and off it goes (" + a.text + " / " + b.text + ")");
+  }
+  const ld = { home: { lists: [{ name: "Shopping", items: [{ t: "Milk", done: false }, { t: "Avocados", done: false }, { t: "Bread", done: true }, { t: "Eggs", done: true }] }] } };
+  const lon = await fit({ id: "l1", kind: "list" }, ld, null, [360, 160], "ticked"), loff = await fit({ id: "l1", kind: "list" }, ld, { done: false }, [360, 160], "left");
+  ok(lon.found && !lon.cut && /2 left, 2 ticked/.test(lon.text) && !/ticked/.test(loff.text), "list.done at 360x160: ticked counted and it fits, off not (" + lon.text + " / " + loff.text + ")");
+  const sd = { home: { screen: { ok: true, minutes: 125, apps: [{ name: "YouTube", minutes: 52 }, { name: "ABC iview", minutes: 31 }, { name: "Netflix", minutes: 20 }] }, goal: 120 } };
+  const sm = await fit({ id: "s1", kind: "screentime" }, sd, null, [760, 360], "YouTube"), s0 = await fit({ id: "s1", kind: "screentime" }, sd, { appcount: 0 }, [760, 360], "2h 5m");
+  ok(sm.found && !sm.cut && !/YouTube/.test(s0.text), "screentime.appcount on Medium (760x360), the smallest size its help names: the apps fit, None hides them");
 }
 
 // ---- Welcome words: greeting, line under, name from, times ----

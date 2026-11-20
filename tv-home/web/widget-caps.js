@@ -430,7 +430,7 @@
       ok: "Opens the drive: how long, how far, and when to leave", platforms: plat("setup", "computer", "setup", { android: "The places are kept on the TV. Drive time without traffic.", web: "Works while the home computer is on. The places are kept on the TV." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- guests and the room ----------
-    welcome: { name: "Welcome words", status: "works", what: "A greeting in your own words, or each guest by name with their check in or check out time from your bookings calendar", needs: ["The words, typed in couch-tv Studio", "For guest names: your Airbnb, Booking.com or VRBO calendar link, typed on the TV"],
+    welcome: { name: "Welcome words", status: "works", what: "A greeting in your own words, or each guest by name with their check in or check out time from your bookings calendar", needs: ["The words, typed in couch-tv Studio, or on the TV (hold OK on the widget, Edit on the TV) or the phone", "For guest names: your Airbnb, Booking.com or VRBO calendar link, typed on the TV"],
       setup: setup("designer", {
         android: inStudio("type the words (no numbers or web addresses). For guest names, pick Guest name from: Bookings calendar").concat([
           "On the TV: Home settings, Designs, At home, Guests. Paste your Airbnb, Booking.com or VRBO calendar link with the phone remote's Type on the TV.",
@@ -665,14 +665,14 @@
     people: [
       st("who", "Who shows", "tvlist", [], "None picked shows everyone. Add people in Home settings, People.", "tv", ON_TV, true, { from: "people", many: true, max: 8, "private": true }),
       st("names", "Show names", "toggle", true, "Off shows only each person's picture.", "design", ALL, true)],
-    note: [st("byline", "Show who it is from", "toggle", true, "The name typed under From with the note.", "design", ALL, true)],
+    note: [st("byline", "Show who it is from", "toggle", true, "The name typed under From with the note. On a tile, only the name shows.", "design", ALL, true)],
     // the list always draws its own name, so it has no heading of its own
     list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Home settings, Designs, At home.", "tv", ON_TV, true, { from: "lists", "private": true }),
       st("done", "Show ticked items", "toggle", true, "Off hides what is already ticked.", "design", ALL, true)],
     guide: [st("sections", "Parts of the guide", "tvlist", [], "Which parts show here. None picked shows them all. Write the guide in Home settings, Designs, At home.", "tv", ON_TV, true,
       { from: "guide", many: true, max: 8, "private": true })],
     wifi: [st("hidepass", "Hide the password", "toggle", false, "On shows only the code to scan.", "tv", ON_TV, true)],
-    screentime: [st("appcount", "Apps shown", "choice", "auto", "Apps show beside the total on a wide widget.", "design", ALL, true,
+    screentime: [st("appcount", "Apps shown", "choice", "auto", "Apps show beside the total on a Medium widget or bigger.", "design", ALL, true,
       { options: [["auto", "As many as fit"], [0, "None, only the total"], [3, "3"], [5, "5"]] })],
     welcome: [
       st("text", "Greeting", "text", "Welcome", "The big words, like Welcome or Hi there.", "design", ALL, true, { max: 80 }),

@@ -6789,10 +6789,12 @@
   function booksEvents(r) {
     if (!STAY.events) return null;
     var s = r.stay || {}, out = [];
+    // the end of that day, by the calendar (a daylight saving day is 23 or 25 hours, never a fixed 24)
+    var dayAfter = function (ms) { var d = new Date(ms); return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(); };
     CouchAtHome.staysOf(STAY.events, { names: s.names, mail: STAY.mail, host: CouchAtHome.calHost(s.url) }).forEach(function (x) {
       var who = x.guest ? ", " + x.guest : "";
-      out.push({ title: "Check in" + who, start: x.from, end: x.from + 86400000, allDay: true });
-      out.push({ title: "Check out" + who, start: x.to, end: x.to + 86400000, allDay: true });
+      out.push({ title: "Check in" + who, start: x.from, end: dayAfter(x.from), allDay: true });
+      out.push({ title: "Check out" + who, start: x.to, end: dayAfter(x.to), allDay: true });
     });
     return out;
   }
