@@ -2,12 +2,14 @@
 // owner's socials (the 0.13.9 social build list, rows g01, g17, g23, g30):
 //  g17 Show the clock: off hides the time (and the big scene clock in Night), the date moves up into its place,
 //      and it stays off after Home settings close and after a reload. On (the default) changes nothing.
-//  g30 Sharp pictures on a 4K TV: on a 1080 page, Always loads the @2x picture, Auto and Off the 1080 one.
+//  g30 Sharp pictures on a 4K TV: on a 1080 page, Always loads the @2x picture, Auto and Off the 1080 one; OK goes
+//      Auto, Off, Always.
 //  g23 Moving tiles and Mac-style dock under Lighter home: the row says "Off while Lighter home is on", OK asks
 //      "Turn off Lighter home?", a second OK turns Lighter home off and the switch on. With Lighter home off
 //      the dock turns Mac at once.
-//  g01 A 4 GB TV whose frames are slow gets Lighter home by itself, with a one time note on the home; one that
-//      only stutters while the focus moves along a row gets it too; an 8 GB TV is never measured.
+//  g01 A 4 GB TV whose frames are slow against its screen's refresh gets Lighter home by itself, with a one time
+//      note; a smooth 30 Hz screen does not; a busy start up and a one off stutter while moving do not (two
+//      strikes); a second start that stutters does; an 8 GB TV is never measured.
 //  #203 Picking Classic in Look applies straight away, and Lighter home turning itself on never changes the look.
 //  The new words in all 16 languages.
 // Needs Playwright (Chromium). Without it the test says so and passes:
@@ -49,15 +51,17 @@ async function home(q, opt = {}) {
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.addInitScript((o) => {
     Object.defineProperty(navigator, "deviceMemory", { get: () => o.memory || 8 });
-    if (o.slowMs) {   // a slow TV: each frame the page sees is slowMs after the last
-      const raf = window.requestAnimationFrame.bind(window); let t = 0;
-      window.requestAnimationFrame = (cb) => raf(() => { t += o.slowMs; cb(t); });
-    }
-    if (o.slowNav) {   // smooth while still, slow only once an arrow has been pressed
-      const raf = window.requestAnimationFrame.bind(window); let t = 0, slow = false;
-      window.addEventListener("keydown", (e) => { if (/^Arrow/.test(e.key)) slow = true; }, true);
-      window.requestAnimationFrame = (cb) => raf(() => { t += slow ? o.slowNav : 16.7; cb(t); });
-    }
+    // the frames the page sees: refreshMs apart (the screen's own rate, 16.7 unless given), or slower:
+    //   slowMs: every frame; slowVeil: while an animation runs (the still check's veil); slowNav: from the first
+    //   arrow press; slowUntil: for the first slowUntil ms after the page opens (a busy start up)
+    const raf = window.requestAnimationFrame.bind(window); let t = 0, nav = false, anim = 0;
+    window.addEventListener("keydown", (e) => { if (/^Arrow/.test(e.key)) nav = true; }, true);
+    const an = Element.prototype.animate;
+    Element.prototype.animate = function () { const a = an.apply(this, arguments); anim++; const c = a.cancel.bind(a); let done = false; const end = () => { if (!done) { done = true; anim--; } }; a.cancel = () => { end(); c(); }; a.addEventListener("finish", end); return a; };
+    window.requestAnimationFrame = (cb) => raf(() => {
+      const slow = o.slowMs || (o.slowVeil && anim > 0 && o.slowVeil) || (o.slowNav && nav && o.slowNav) || (o.slowUntil && performance.now() < o.slowUntil && 40);
+      t += slow || o.refreshMs || 16.7; cb(t);
+    });
   }, opt);
   if (!opt.keep) { await page.goto(BASE + "?mock=1&reset=1"); await page.evaluate((s) => { localStorage.clear(); for (const k in s) localStorage.setItem(k, s[k]); }, opt.storage || {}); }
   await page.goto(BASE + "?mock=1" + q);
@@ -140,17 +144,20 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
   ok((await goRow(page, "Sharp pictures on a 4K TV")).value === "Auto", "the row starts on Auto");
   ok(/memory/.test((await focusRow(page)).sub), "with the memory note: " + (await focusRow(page)).sub);
   await press(page, "Enter", 300);
-  ok((await focusRow(page)).value === "Always", "OK: Always");
+  ok((await focusRow(page)).value === "Off", "OK: Off (the costly Always comes last)");
+  await closeSettings(page);
+  ok(!/@2x/.test(await bgSrc(page)), "Off: the 1080 picture: " + await bgSrc(page));
+  await openLook(page);
+  await goRow(page, "Sharp pictures on a 4K TV");
+  await press(page, "Enter", 300);
+  ok((await focusRow(page)).value === "Always", "OK again: Always");
   await closeSettings(page);
   await page.waitForFunction(() => /@2x/.test((document.querySelector("#bg img.on") || {}).src || ""), null, { timeout: 8000 }).catch(() => {});
   ok(/@2x\.jpg$/.test(await bgSrc(page)), "Always loads the 4K picture: " + await bgSrc(page));
   await openLook(page);
   await goRow(page, "Sharp pictures on a 4K TV");
   await press(page, "Enter", 300);
-  ok((await focusRow(page)).value === "Off", "OK again: Off");
-  await closeSettings(page);
-  await page.waitForFunction(() => !/@2x/.test((document.querySelector("#bg img.on") || {}).src || ""), null, { timeout: 8000 }).catch(() => {});
-  ok(!/@2x/.test(await bgSrc(page)), "Off: the 1080 picture again: " + await bgSrc(page));
+  ok((await focusRow(page)).value === "Auto", "and back to Auto");
   await page.close();
   // Night scenes too, from home.hi_res "always"
   const night = await home("&look=night&hires=always");
@@ -199,35 +206,64 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
 }
 
 // ---- g01 Lighter home by itself, with a one time note; #203 the look never changes with it ----
+// The still check runs 20 s after the home opens; arrow presses count from 30 s.
 {
   const NOTE = "This TV is a bit slow, so Lighter home is on. Home settings, Look and scenes to change it.";
-  // 4 GB, 30 ms frames: measured (4 s after the home opens, for 1.5 s), Lighter home on, the note once
-  let page = await home("&look=night", { memory: 4, slowMs: 30 });
-  ok(!(await cls(page, "lighter")), "4 GB: not decided by memory any more");
-  await page.waitForFunction(() => document.documentElement.classList.contains("lighter"), null, { timeout: 12000 });
-  ok(true, "4 GB with 30 ms frames: Lighter home turned itself on");
+  const store = (page) => page.evaluate(() => ({ "tvhome.lowend": localStorage.getItem("tvhome.lowend"), "tvhome.lowend_nav": localStorage.getItem("tvhome.lowend_nav") }));
+  const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null));
+  const until = (page, ms) => page.waitForFunction((x) => performance.now() > x, ms, { timeout: ms + 5000 });
+  const walk = async (page) => { for (let k = 0; k < 8 && !(await cls(page, "lighter")); k++) await press(page, k % 2 ? "ArrowLeft" : "ArrowRight", 650); };
+  // 4 GB, a 60 Hz screen, 30 ms frames in the still check: Lighter home on, the note once
+  let page = await home("&look=night", { memory: 4, slowVeil: 30 });
+  await until(page, 15000);
+  ok(!(await cls(page, "lighter")) && !(await page.evaluate(() => localStorage.getItem("tvhome.lowend"))), "4 GB: not decided by memory, and nothing measured in the first 15 s");
+  await page.waitForFunction(() => document.documentElement.classList.contains("lighter"), null, { timeout: 15000 });
+  ok(true, "4 GB with 30 ms frames on a 60 Hz screen: Lighter home turned itself on");
   await page.waitForFunction(() => document.getElementById("toast").classList.contains("on"), null, { timeout: 4000 });
   const toast = await page.evaluate(() => document.getElementById("toast").textContent);
   ok(toast === NOTE, "the one time note: " + toast);
   ok(await cls(page, "theme-night") && !(await cls(page, "theme-oled")), "#203: the look stays Night");
   const kept = await page.evaluate(() => JSON.parse(localStorage.getItem("tvhome.lowend")));
-  ok(kept && kept.low === true && kept.ms >= 29, "kept for a week: " + JSON.stringify(kept));
+  ok(kept && kept.low === true && kept.ms >= 29 && kept.idle < 20, "kept for a week, with the screen's refresh: " + JSON.stringify(kept));
   await page.reload(); await page.waitForFunction(() => window.tv); await page.waitForTimeout(3500);
   ok(await cls(page, "lighter"), "after a reload: on straight away from the kept answer");
   ok(!(await page.evaluate(() => document.getElementById("toast").classList.contains("on"))), "the note is not shown a second time");
   await page.close();
-  // 4 GB, smooth: stays off
-  page = await home("&look=night", { memory: 4 });
-  await page.waitForTimeout(6500);
-  ok(!(await cls(page, "lighter")), "4 GB with smooth frames: Lighter home stays off");
-  ok((await page.evaluate(() => JSON.parse(localStorage.getItem("tvhome.lowend")))).low === false, "and that is kept");
+  // a smooth 30 Hz screen (33.3 ms frames everywhere): not a slow TV
+  page = await home("&look=night", { memory: 4, refreshMs: 33.3 });
+  await page.waitForFunction(() => localStorage.getItem("tvhome.lowend"), null, { timeout: 30000 });
+  let k1 = await page.evaluate(() => JSON.parse(localStorage.getItem("tvhome.lowend")));
+  ok(!(await cls(page, "lighter")) && k1.low === false && k1.idle > 30, "a smooth 30 Hz screen stays off: " + JSON.stringify(k1));
+  await until(page, 31000); await walk(page);
+  ok(!(await cls(page, "lighter")) && !(await page.evaluate(() => localStorage.getItem("tvhome.lowend_nav"))), "and moving along the row at 30 Hz is no strike");
   await page.close();
-  // smooth while still, 33 ms frames only while the focus moves along a row
+  // a 30 Hz screen that is really slow (50 ms frames in the still check): on
+  page = await home("&look=night", { memory: 4, refreshMs: 33.3, slowVeil: 50 });
+  await page.waitForFunction(() => document.documentElement.classList.contains("lighter"), null, { timeout: 30000 });
+  ok(true, "a 30 Hz screen with 50 ms frames: on");
+  await page.close();
+  // a busy start up: 40 ms frames for the first 15 s, presses then; smooth after: nothing changes
+  page = await home("&look=night", { memory: 4, slowUntil: 15000 });
+  await walk(page);
+  ok(!(await page.evaluate(() => localStorage.getItem("tvhome.lowend_nav"))), "presses in the first 30 s do not count");
+  await until(page, 31000); await walk(page);
+  k1 = await page.evaluate(() => JSON.parse(localStorage.getItem("tvhome.lowend")));
+  ok(!(await cls(page, "lighter")) && k1.low === false && !(await page.evaluate(() => localStorage.getItem("tvhome.lowend_nav"))), "busy start up, smooth after: off, no strike " + JSON.stringify(k1));
+  await page.close();
+  // a one off spike: the first start stutters while moving (a strike only), the next is smooth (forgotten)
   page = await home("&look=night", { memory: 4, slowNav: 33 });
-  await page.waitForTimeout(6500);
-  ok(!(await cls(page, "lighter")), "smooth when still: off");
-  for (let k = 0; k < 6 && !(await cls(page, "lighter")); k++) { await press(page, k % 2 ? "ArrowLeft" : "ArrowRight", 650); }
-  ok(await cls(page, "lighter"), "stuttering along the row: Lighter home on");
+  await until(page, 31000); await walk(page);
+  const s1 = await store(page);
+  ok(!(await cls(page, "lighter")) && JSON.parse(s1["tvhome.lowend_nav"] || "{}").strike === 1, "first stutter: a strike, Lighter home stays off " + s1["tvhome.lowend_nav"]);
+  await page.close();
+  page = await home("&look=night", { memory: 4, storage: clean(s1) });
+  await until(page, 31000); await walk(page);
+  ok(!(await cls(page, "lighter")) && !(await page.evaluate(() => localStorage.getItem("tvhome.lowend_nav"))), "next start smooth: still off, the strike forgotten");
+  await page.close();
+  // two strikes: the next start stutters too, so Lighter home goes on, with the note, kept 30 days
+  page = await home("&look=night", { memory: 4, storage: clean(s1), slowNav: 33 });
+  await until(page, 31000); await walk(page);
+  ok(await cls(page, "lighter"), "a second start that stutters: Lighter home on");
   const k2 = await page.evaluate(() => JSON.parse(localStorage.getItem("tvhome.lowend")));
   ok(k2.low === true && k2.moving === true, "kept, marked as measured while moving: " + JSON.stringify(k2));
   await page.waitForFunction(() => document.getElementById("toast").classList.contains("on"), null, { timeout: 4000 });
@@ -235,12 +271,12 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
   await page.close();
   // 8 GB, slow frames: never measured, never on
   page = await home("&look=night", { memory: 8, slowMs: 30 });
-  await page.waitForTimeout(6500);
+  await until(page, 23000);
   ok(!(await cls(page, "lighter")) && !(await page.evaluate(() => localStorage.getItem("tvhome.lowend"))), "8 GB: not measured, stays off");
   await page.close();
-  // a choice wins: Lighter home chosen off in Home settings is never overridden
+  // a choice wins: Lighter home chosen off is never overridden
   page = await home("&look=night&lighter=off", { memory: 4, slowMs: 30 });
-  await page.waitForTimeout(6500);
+  await until(page, 23000);
   ok(!(await cls(page, "lighter")), "home.lighter false: never turned on");
   await page.close();
 }

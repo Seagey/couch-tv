@@ -29,10 +29,23 @@ assert.deepStrictEqual(d({ setting: 'auto', memory: 4, medianMs: 30 }), { low: t
 assert.deepStrictEqual(d({ setting: 'auto', memory: 4, medianMs: 14 }), { low: false, why: 'measured' }, '4 GB at 14 ms frames is not');
 assert.deepStrictEqual(d({ setting: false, memory: 4, medianMs: 30 }), { low: false, why: 'setting' }, 'a chosen setting always wins');
 assert.deepStrictEqual(d({ setting: true, memory: 8, medianMs: 10 }), { low: true, why: 'setting' }, 'a chosen setting always wins');
-// the frames while the focus moves along a row: a stutter there wins over a smooth still measurement
-assert.deepStrictEqual(d({ setting: 'auto', memory: 4, medianMs: 15, navMs: 33 }), { low: true, why: 'moving' });
-assert.deepStrictEqual(d({ setting: 'auto', memory: 4, cached: { low: false, t: now - day }, navMs: 33 }), { low: true, why: 'moving' }, 'a kept "not low end" gives way to a stutter while moving');
-assert.deepStrictEqual(d({ setting: 'auto', memory: 4, cached: { low: false, t: now - day }, navMs: 17 }), { low: false, why: 'measured' });
+// the frames while the focus moves along a row: two strikes (a stutter on a second start within a week)
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, medianMs: 15, navMs: 33 }), { low: false, why: 'strike' }, 'a first stutter is only a strike');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, medianMs: 15, navMs: 33, navStrike: true }), { low: true, why: 'moving' }, 'the second one turns it on');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, cached: { low: false, t: now - day }, navMs: 33, navStrike: true }), { low: true, why: 'moving' }, 'a kept "not low end" gives way to a second stutter');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, cached: { low: false, t: now - day }, navMs: 17, navStrike: true }), { low: false, why: 'measured' }, 'smooth this time: not low end');
+// slow is against the screen's own refresh (#review: a smooth 30, 25 or 24 Hz screen is not a slow TV)
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 33.3, medianMs: 34 }), { low: false, why: 'measured' }, '30 Hz screen, 34 ms frames: smooth');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 40, medianMs: 41 }), { low: false, why: 'measured' }, '25 Hz screen: smooth');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 41.7, medianMs: 42 }), { low: false, why: 'measured' }, '24 Hz screen: smooth');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 16.7, medianMs: 30 }), { low: true, why: 'measured' }, '60 Hz screen, 30 ms frames: low end');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 33.3, medianMs: 50 }), { low: true, why: 'measured' }, '30 Hz screen, 50 ms frames: low end');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 33.3, medianMs: 15, navMs: 34, navStrike: true }), { low: false, why: 'measured' }, '30 Hz screen moving at its own rate: smooth');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 200, medianMs: 60 }), { low: true, why: 'measured' }, 'a refresh over 42 ms counts as 42 (a stalled measurement is not a screen)');
+// a stutter result is kept 30 days, a still measurement a week
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, cached: { low: true, t: now - 20 * day, moving: true }, movingDays: 30 }), { low: true, why: 'measured' }, 'moving: kept 30 days');
+assert.strictEqual(d({ setting: 'auto', memory: 4, cached: { low: true, t: now - 31 * day, moving: true }, movingDays: 30 }), null, 'and redone after');
+assert.strictEqual(d({ setting: 'auto', memory: 4, cached: { low: true, t: now - 8 * day } }), null, 'a still measurement: a week');
 assert.deepStrictEqual(d({ setting: 'auto', memory: 8, navMs: 40 }), { low: false, why: 'memory' }, '8 GB is not measured');
 // 2 GB (the measured TV) or no figure: a measurement, unless one from this week is kept
 assert.strictEqual(d({ setting: 'auto', memory: 2 }), null, '2 GB is measured');
@@ -47,6 +60,10 @@ assert.deepStrictEqual(d({ setting: 'auto', memory: 2, medianMs: 22 }), { low: f
 // a low end TV gets Lighter home itself (no second switch), only when nobody has chosen
 assert(/function lowEnd\(\) \{\n    var chosen = typeof ST\.lighter === "boolean" \|\| typeof HOME\.lighter === "boolean";\n    if \(chosen \|\| OLD_ENGINE\) return;/.test(js), 'a choice in Home settings or home.lighter, or an old WebView, is never overridden');
 assert(/LIGHTER = LOW_END;\n      document\.documentElement\.classList\.toggle\("lighter", LIGHTER\);/.test(js), 'a low end TV turns on Lighter home');
+assert(/if \(LIGHTER === LOW_END \|\| typeof ST\.lighter === "boolean" \|\| typeof HOME\.lighter === "boolean"\) return;/.test(js), 'a choice made meanwhile, here or in config.json, is never overridden');
+assert(/LOW_END_WAIT = 20000, LOW_END_NAV_FROM = 30000/.test(js), 'the still check 20 s after start, presses counted from 30 s');
+assert(/if \(performance\.now\(\) < LOW_END_NAV_FROM \|\| document\.hidden \|\| !o\.idleMs\) return;/.test(js), 'presses at start up, or with an app in front, do not count');
+assert(/function whenShown\(ms, fn\) \{\n    setTimeout\(function go\(\) \{ if \(document\.hidden\) setTimeout\(go, 5000\); else fn\(\); \}, ms\);/.test(js), 'nothing is measured while the home is hidden');
 assert(!/frost-lite|low_end/.test(js) && !/frost-lite/.test(css), 'no separate low end switch or style');
 // the settled focus holds still
 assert(/html\.settled \.tile\.focus \.face, html\.settled \.tile\.focus \.face::after \{ animation-play-state: paused; \}/.test(css), 'settled pauses the sway and the glint');

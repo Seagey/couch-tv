@@ -190,50 +190,79 @@
   // that moves makes every frosted panel be drawn again each frame: 60 frames a second at rest, 22 with a
   // focused tile's sway, 47 with the blur off. When nobody has chosen (Home settings, Look, Lighter home,
   // or home.lighter), the TV decides: navigator.deviceMemory where it is clear (1 GB or less: low end, 8 or
-  // more: not), otherwise a 1.5 s measurement of frame times with something moving, kept for a week, and
-  // the frames while the focus really moves along a row (the first arrow presses after the home opens).
+  // more: not), otherwise a 1.5 s measurement of frame times with something moving, 20 s after the home opens,
+  // kept for a week, and the frames while the focus really moves along a row (arrow presses from 30 s on).
   // 4 GB is measured too (#197, #213, g01): a 4 GB Google TV Streamer, Homatics or TCL stuttered and never got it.
+  // A frame is slow against the screen's own refresh, measured at rest first: a smooth 30, 25 or 24 Hz screen
+  // (33, 40, 42 ms frames) is not a slow TV. A stutter while moving counts only on a second start within a week
+  // (two strikes), so one busy stretch never locks Lighter home on; that answer is then kept for 30 days.
   var LOW_END = false, LOW_END_WHY = "", LOW_END_KEY = "tvhome.lowend", LOW_END_DAYS = 7, LOW_END_TOLD = "tvhome.lighter_told";
+  var LOW_END_NAV = "tvhome.lowend_nav", LOW_END_MOVING_DAYS = 30, LOW_END_WAIT = 20000, LOW_END_NAV_FROM = 30000;
   function lowEndDecision(o) {
     if (o.setting === true || o.setting === false) return { low: o.setting, why: "setting" };
     if (typeof o.memory === "number" && o.memory > 0 && o.memory <= 1) return { low: true, why: "memory" };
     if (typeof o.memory === "number" && o.memory >= 8) return { low: false, why: "memory" };
-    if (typeof o.navMs === "number" && o.navMs > 22) return { low: true, why: "moving" };   // the focus moving along a row stuttered
-    if (o.cached && typeof o.cached.low === "boolean" && o.now - o.cached.t < o.days * 86400000) return { low: o.cached.low, why: "measured" };
-    if (typeof o.medianMs === "number") return { low: o.medianMs > 22, why: "measured" };
+    // slow: over 22 ms, or 1.3 frames of a slower screen (its refresh at rest, at most 42 ms: 24 Hz)
+    var lim = Math.max(22, Math.min(o.idleMs || 16.7, 42) * 1.3);
+    // the focus moving along a row stuttered: low end on the second start that says so, a first strike otherwise
+    if (typeof o.navMs === "number" && o.navMs > lim) return o.navStrike ? { low: true, why: "moving" } : { low: false, why: "strike" };
+    var days = o.cached && o.cached.moving ? (o.movingDays || 30) : o.days;
+    if (o.cached && typeof o.cached.low === "boolean" && o.now - o.cached.t < days * 86400000) return { low: o.cached.low, why: "measured" };
+    if (typeof o.medianMs === "number") return { low: o.medianMs > lim, why: "measured" };
     return null;   // measure first
   }
-  // frame times for 1.5 s while a screen sized, nearly clear layer fades a little (it makes every frosted
-  // panel be drawn again each frame, as a focused tile's sway does); the median frame, in ms
-  function measureFrames(done) {
-    var veil = document.createElement("div"), d = [], last = 0, end = 0;
-    veil.setAttribute("aria-hidden", "true");
-    veil.style.cssText = "position:fixed;top:0;right:0;bottom:0;left:0;z-index:1;pointer-events:none;background:rgba(0,0,0,0.01);will-change:opacity";
-    document.body.appendChild(veil);
-    var a = veil.animate ? veil.animate([{ opacity: 1 }, { opacity: 0.5 }], { duration: 1500, iterations: 1 }) : null;
+  // the screen's own frame time at rest: the median of 20 frames with nothing added
+  function idleFrames(done) {
+    var d = [], last = 0;
     var step = function (t) {
-      if (!end) end = t + 1500;
       if (last) d.push(t - last);
       last = t;
-      if (t < end) { requestAnimationFrame(step); return; }
-      if (a) a.cancel();
-      veil.remove();
+      if (d.length < 20) { requestAnimationFrame(step); return; }
       d.sort(function (x, y) { return x - y; });
-      done(d.length ? d[d.length >> 1] : 16.7);
+      done(d[d.length >> 1]);
     };
     requestAnimationFrame(step);
+  }
+  // frame times for 1.5 s while a screen sized, nearly clear layer fades a little (it makes every frosted
+  // panel be drawn again each frame, as a focused tile's sway does); the median frame, in ms, and the
+  // screen's own frame time at rest, measured just before
+  function measureFrames(done) {
+    idleFrames(function (idle) {
+      var veil = document.createElement("div"), d = [], last = 0, end = 0;
+      veil.setAttribute("aria-hidden", "true");
+      veil.style.cssText = "position:fixed;top:0;right:0;bottom:0;left:0;z-index:1;pointer-events:none;background:rgba(0,0,0,0.01);will-change:opacity";
+      document.body.appendChild(veil);
+      var a = veil.animate ? veil.animate([{ opacity: 1 }, { opacity: 0.5 }], { duration: 1500, iterations: 1 }) : null;
+      var step = function (t) {
+        if (!end) end = t + 1500;
+        if (last) d.push(t - last);
+        last = t;
+        if (t < end) { requestAnimationFrame(step); return; }
+        if (a) a.cancel();
+        veil.remove();
+        d.sort(function (x, y) { return x - y; });
+        done(d.length ? d[d.length >> 1] : 16.7, idle);
+      };
+      requestAnimationFrame(step);
+    });
+  }
+  // later, and only while the home is showing (a TV playing a show in front measures nothing)
+  function whenShown(ms, fn) {
+    setTimeout(function go() { if (document.hidden) setTimeout(go, 5000); else fn(); }, ms);
   }
   // decides once nobody has chosen Lighter home; turns it on, as the Home settings row does, if low end
   function lowEnd() {
     var chosen = typeof ST.lighter === "boolean" || typeof HOME.lighter === "boolean";
     if (chosen || OLD_ENGINE) return;   // a choice, or an old WebView that is already Lighter
-    var cached = null;
+    var cached = null, strike = null;
     try { cached = JSON.parse(localStorage.getItem(LOW_END_KEY) || "null"); } catch (e) {}
-    var o = { setting: "auto", memory: navigator.deviceMemory, cached: cached, now: Date.now(), days: LOW_END_DAYS };
+    try { strike = JSON.parse(localStorage.getItem(LOW_END_NAV) || "null"); } catch (e) {}
+    var o = { setting: "auto", memory: navigator.deviceMemory, cached: cached, now: Date.now(), days: LOW_END_DAYS, movingDays: LOW_END_MOVING_DAYS,
+      navStrike: !!(strike && strike.strike >= 1 && Date.now() - strike.t < LOW_END_DAYS * 86400000) };
     // late: after a measurement, when the home is already drawn (redraw it as the settings row does)
     var apply = function (r, late) {
       LOW_END = r.low; LOW_END_WHY = r.why;
-      if (LIGHTER === LOW_END || typeof ST.lighter === "boolean") return;   // already so, or chosen meanwhile
+      if (LIGHTER === LOW_END || typeof ST.lighter === "boolean" || typeof HOME.lighter === "boolean") return;   // already so, or chosen meanwhile
       LIGHTER = LOW_END;
       document.documentElement.classList.toggle("lighter", LIGHTER);
       if (LOOP) loopLighter();
@@ -242,34 +271,38 @@
     };
     var r = lowEndDecision(o);
     if (r) { apply(r); if (!r.low && r.why !== "setting" && r.why !== "memory") lowEndNav(o, apply); return; }
-    // measure once the home has drawn, when nothing else is starting up (once, however often settings apply)
+    // measure once the home has drawn and start up is over (once, however often settings apply)
     if (lowEnd.pending) return;
     lowEnd.pending = true;
-    setTimeout(function () {
-      measureFrames(function (ms) {
-        o.medianMs = ms; lowEnd.pending = false;
+    whenShown(LOW_END_WAIT, function () {
+      measureFrames(function (ms, idle) {
+        o.medianMs = ms; o.idleMs = idle; lowEnd.pending = false;
         var m = lowEndDecision(o);
-        try { localStorage.setItem(LOW_END_KEY, JSON.stringify({ low: m.low, t: Date.now(), ms: Math.round(ms * 10) / 10 })); } catch (e) {}
+        try { localStorage.setItem(LOW_END_KEY, JSON.stringify({ low: m.low, t: Date.now(), ms: Math.round(ms * 10) / 10, idle: Math.round(idle * 10) / 10 })); } catch (e) {}
         apply(m, true);
         if (!m.low) lowEndNav(o, apply);
       });
-    }, 4000);
+    });
   }
   // The frames while the focus really moves (g01): for 600 ms after each arrow press on the home, until 90
-  // frames are in. A TV that passes the still measurement but stutters along a row gets Lighter home too.
-  // Nothing runs between presses, and it stops for good once it has its frames (once per start).
+  // frames are in. A TV that passes the still measurement but stutters along a row gets Lighter home too,
+  // on the second start that stutters (two strikes). Presses in the first 30 s, while the TV is still starting
+  // its own apps, do not count; nothing runs between presses, and it stops for good once it has its frames.
   function lowEndNav(o, apply) {
     if (lowEndNav.on) return;
     lowEndNav.on = true;
     var d = [], until = 0, last = 0, running = false;
+    // the screen's own refresh, if the still measurement did not run this start (a kept answer)
+    if (!o.idleMs) whenShown(LOW_END_WAIT, function () { idleFrames(function (idle) { o.idleMs = idle; }); });
     var step = function (t) {
       if (last) d.push(t - last);
       last = t;
       if (d.length >= 90) { finish(); return; }
-      if (t < until) requestAnimationFrame(step); else { running = false; last = 0; }
+      if (t < until && !document.hidden) requestAnimationFrame(step); else { running = false; last = 0; }
     };
     var onKey = function (e) {
-      if (!/^Arrow/.test(e.key || "") || zone === "settings" || LIGHTER || typeof ST.lighter === "boolean") return;
+      if (!/^Arrow/.test(e.key || "") || zone === "settings" || LIGHTER || typeof ST.lighter === "boolean" || typeof HOME.lighter === "boolean") return;
+      if (performance.now() < LOW_END_NAV_FROM || document.hidden || !o.idleMs) return;   // start up, an app in front, no refresh yet
       until = performance.now() + 600;
       if (!running) { running = true; requestAnimationFrame(step); }
     };
@@ -278,6 +311,10 @@
       d.sort(function (x, y) { return x - y; });
       o.navMs = d[d.length >> 1];
       var m = lowEndDecision(o);
+      try {
+        if (m && m.why === "strike") localStorage.setItem(LOW_END_NAV, JSON.stringify({ strike: 1, t: Date.now(), ms: Math.round(o.navMs * 10) / 10 }));
+        else localStorage.removeItem(LOW_END_NAV);   // smooth this time: a one off spike is forgotten
+      } catch (e) {}
       if (!m || !m.low) return;
       try { localStorage.setItem(LOW_END_KEY, JSON.stringify({ low: true, t: Date.now(), ms: Math.round(o.navMs * 10) / 10, moving: true })); } catch (e) {}
       apply(m, true);
@@ -5250,7 +5287,7 @@
     // draws its interface at 1080 (#191). Off: the 1080 copies, for a 4K TV that stutters (four times the memory)
     var hr = hiResSetting();
     rows.push({ kind: "cycle", key: "hi-res", label: t("hi_res"), sub: t("hi_res_sub"), value: t("hi_res_" + hr), act: function () {
-      ST.hi_res = hr === "auto" ? "always" : hr === "always" ? "off" : "auto"; saveSettings();
+      ST.hi_res = hr === "auto" ? "off" : hr === "off" ? "always" : "auto"; saveSettings();   // Auto, Off, Always: the costly one last
       if (!NIGHT) showPhoto();   // Classic and OLED: the photo again at once; the Night scenes when settings close
     } });
     rows.push({ kind: "cycle", key: "idle-photo-seconds", label: t("idle_photo"), sub: t("idle_photo_sub"),
