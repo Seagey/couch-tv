@@ -350,6 +350,7 @@ class HomeEndpoints(Base):
         for p in self._p:
             p.start()
         server._failed_attempts.clear()
+        server.pair_lock_reset()   # the lock across addresses (test_pair_lock_bridge.py)
         server.appletv_codes.clear()
         app = web.Application(middlewares=[server.middleware])
         for path, h in (("/api/appletv/hello", server.h_appletv_hello), ("/api/appletv/apps", server.h_appletv_apps)):

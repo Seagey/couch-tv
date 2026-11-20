@@ -334,6 +334,52 @@ RATE_LIMIT_WINDOW = 60.0
 RATE_LIMIT_ADDRESSES = 1000   # memory bound: at most this many addresses are remembered
 
 
+# Pairing across every address (20 Nov 2026, as the on-TV app's PairLock): 15 wrong tries at
+# /api/pair, /api/appletv/claim or /api/vidaa/claim within 10 minutes, from anywhere, lock those three
+# for 10 minutes (429). Six digit codes are the weak spot: per address limits alone let many addresses
+# keep guessing. API calls that carry the key keep only the per address limit above, so a paired phone
+# is never locked out by someone else's guesses.
+PAIR_LOCK_MAX = 15
+PAIR_LOCK_WINDOW = 600.0
+PAIR_LOCK_SECS = 600.0
+_pair_wrong = []          # times of wrong tries, oldest first
+_pair_locked_until = [0.0]
+
+
+def pair_locked_for(now=None):
+    """Seconds pairing stays locked (0: open)."""
+    now = time.time() if now is None else now
+    left = _pair_locked_until[0] - now
+    return int(-(-left // 1)) if left > 0 else 0
+
+
+def pair_wrong(now=None):
+    """Counts one wrong pairing try; True when it has just locked pairing."""
+    now = time.time() if now is None else now
+    cutoff = now - PAIR_LOCK_WINDOW
+    while _pair_wrong and _pair_wrong[0] <= cutoff:
+        _pair_wrong.pop(0)
+    _pair_wrong.append(now)
+    if len(_pair_wrong) >= PAIR_LOCK_MAX:
+        _pair_locked_until[0] = now + PAIR_LOCK_SECS
+        _pair_wrong.clear()
+        return True
+    return False
+
+
+def pair_lock_reset():
+    _pair_wrong.clear()
+    _pair_locked_until[0] = 0.0
+
+
+def check_pair_lock():
+    left = pair_locked_for()
+    if left > 0:
+        mins = max(1, -(-left // 60))
+        raise ApiError(429, f"Too many wrong codes. Wait {mins} minutes, then try again.",
+                       key="err_pairing_locked", vars={"minutes": mins})
+
+
 def client_ip(request):
     """The address to rate limit, or None for the computer itself (the MCP server, Claude, scripts:
     anything on the bridge computer can read config.json anyway, and a local reverse proxy would
@@ -626,12 +672,14 @@ async def h_pair(request):
     # Checked after the body is read, with no await before the key is compared and the miss is
     # recorded: checked before it, parallel requests could all pass while their bodies arrive.
     ip = client_ip(request)
+    check_pair_lock()
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong pairing keys. Please wait a minute.", key="err_too_many_pairing_keys")
     if not given:
         raise ApiError(400, "pairing key is required", key="err_pairing_key_required")
     if not key_matches(given):
         record_failed_attempt(ip, given)
+        pair_wrong()
         await asyncio.sleep(0.3)
         raise ApiError(401, "That pairing key is not right. Check config.json.", key="err_pairing_key_wrong")
     return ok(paired=True, token=config.PAIRING_KEY, note="paired",
@@ -1171,11 +1219,13 @@ async def h_appletv_claim(request):
     data = await body(request)
     code = str(data.get("code") or "").strip()
     ip = client_ip(request)
+    check_pair_lock()
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong codes. Please wait a minute.", key="err_too_many_codes")
     found = appletv_codes.pop(code, None) if re.fullmatch(r"\d{6}", code) else None
     if not found or found[0] <= time.monotonic() or found[1] not in TVS:
         record_failed_attempt(ip, code)
+        pair_wrong()
         await asyncio.sleep(0.3)
         raise ApiError(401, "that code is not valid (a code works once, for ten minutes)", key="err_invalid_code_10m")
     t = TVS[found[1]]
@@ -1446,12 +1496,14 @@ async def h_vidaa_claim(request):
     data = await body(request)
     code = data.get("code")
     ip = client_ip(request)
+    check_pair_lock()
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong codes. Please wait a minute.", key="err_too_many_codes")
     for tv_id, t in TVS.items():
         if t.kind in ("vidaa", "panasonic") and t.claim(code):
             return ok(key=config.PAIRING_KEY, tv=tv_id)
     record_failed_attempt(ip, str(code))
+    pair_wrong()
     await asyncio.sleep(0.3)
     raise ApiError(401, "that code is not valid (codes work once, for two minutes)", key="err_invalid_code_2m")
 

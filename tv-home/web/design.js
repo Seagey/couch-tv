@@ -2570,6 +2570,7 @@
         box.setAttribute("data-link", link);
         openSheet("Edit on your phone", { nodes: [box] }, "Scan with your phone's camera: it opens this widget's settings, already paired. Or on a computer: " +
           m[1] + "/setup, code " + m[2].slice(0, 3) + " " + m[2].slice(3) + ". Back to close.");
+        if (sheet) sheet.phone = id;   // drawn again when the code changes (phoneAgain)
       }, fail);
     }
     // ---- changing a container's apps with the remote ----
@@ -2747,6 +2748,8 @@
       focus: function (id, i) { cur = { id: String(id), i: typeof i === "number" ? i : -1 }; last = null; paint(); },
       moving: function () { return !!MOVING; },
       sheetOpen: function () { return !!sheet; },
+      // the phone code changed (the on-TV app, Auth.onPin): an open Edit on your phone draws its new QR
+      phoneAgain: function () { if (sheet && sheet.phone) phoneSheet(sheet.phone); },
       back: function () { if (window.CouchDetail && window.CouchDetail.isOpen()) { window.CouchDetail.close(); return true; } if (sheet) { closeSheet(); return true; } return false; },
       detail: function () { var t = target(); if (t) openDetail(t); },
       // the designer's Remote path: from every stop, where each press goes
