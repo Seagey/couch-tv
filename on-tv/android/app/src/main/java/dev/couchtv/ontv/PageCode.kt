@@ -9,4 +9,10 @@ object PageCode {
 
     /** JSON for the page, parsed there (JSON.parse), never run as code. */
     fun json(json: String): String = "JSON.parse(" + string(json) + ")"
+
+    /** Asked of the page before waiting At home changes go in: true only on the loaded home. */
+    const val CAN_TAKE_AT_HOME = "!!(window.tv && tv.atHomeEdit)"
+
+    /** evaluateJavascript's answer to CAN_TAKE_AT_HOME: the boolean true only (a string comes back quoted and does not count). */
+    fun isTrue(answer: String?): Boolean = answer == "true"
 }

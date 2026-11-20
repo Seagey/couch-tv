@@ -242,7 +242,14 @@ class HomeActivity : Activity() {
     }
 
     /** At home changes a phone sent while the page was not there yet: handed over once it has loaded. */
-    private fun sendWaitingAtHome() = takeWaiting().forEach { js("window.tv && tv.atHomeEdit && tv.atHomeEdit(" + PageCode.json(it) + ")") }
+    private fun sendWaitingAtHome() {
+        if (!hasWaiting()) return
+        // onPageFinished also comes after a failed load (the server still starting): only a page that
+        // really is the home, with tv.atHomeEdit, gets the waiting changes; otherwise they keep waiting
+        web?.evaluateJavascript(PageCode.CAN_TAKE_AT_HOME) { answer ->
+            if (PageCode.isTrue(answer)) takeWaiting().forEach { js("window.tv && tv.atHomeEdit && tv.atHomeEdit(" + PageCode.json(it) + ")") }
+        }
+    }
 
     private fun tvApps(): List<ResolveInfo> = Tv.tvLaunchables().filter { it.activityInfo.packageName != packageName }
         .sortedBy { it.loadLabel(packageManager).toString().lowercase() }
@@ -375,6 +382,7 @@ class HomeActivity : Activity() {
         private const val WAIT_MAX = 20
         private val waitLock = Any()
         private fun waiting(): JSONArray = Store.str(WAIT_KEY)?.let { runCatching { JSONArray(it) }.getOrNull() } ?: JSONArray()
+        private fun hasWaiting(): Boolean = waiting().length() > 0
         private fun takeWaiting(): List<String> = synchronized(waitLock) {
             val a = waiting(); Store.putStr(WAIT_KEY, null)
             (0 until a.length()).mapNotNull { a.optJSONObject(it)?.toString() }

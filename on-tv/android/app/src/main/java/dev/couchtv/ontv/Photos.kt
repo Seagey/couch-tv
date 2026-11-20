@@ -133,9 +133,37 @@ object Photos {
      * delete the file, or left by an upload that failed half way): deleted on each upload.
      */
     private fun dropStrays() = runCatching {
-        val list = (Store.readJson("home-settings.json") as? JSONObject)?.optJSONArray("photos") ?: JSONArray()
-        val keep = (0 until list.length()).mapNotNull { list.optJSONObject(it)?.optString("file") }.toSet()
-        dir().listFiles()?.forEach { f -> if (f.name.startsWith("phone") && f.name.endsWith(".jpg") && f.name !in keep) f.delete() }
+        // no settings file to read (gone, or half written): delete nothing
+        val hs = Store.readJson("home-settings.json") as? JSONObject ?: return@runCatching
+        val names = dir().listFiles()?.map { it.name }?.toSet() ?: return@runCatching
+        val (delete, missing) = strays(hs.optJSONArray("photos") ?: JSONArray(), names)
+        delete.forEach { File(dir(), it).delete() }
+        // a phone photo listed with no file (a stale copy brought it back after it was removed) would
+        // show as a blank scene: it comes off the list
+        if (missing.isNotEmpty()) Store.editHomeSettings { s ->
+            val now = s.optJSONArray("photos") ?: return@editHomeSettings
+            val out = JSONArray()
+            for (i in 0 until now.length()) { val p = now.optJSONObject(i) ?: continue; if (p.optString("id") !in missing) out.put(p) }
+            s.put("photos", out)
+        }
+    }
+
+    /**
+     * From the photos list and the files in the photos folder: the phone photo files no entry lists (to
+     * delete), and the ids of phone photo entries whose file is gone (to take off the list). Photos from
+     * a web address or the home app's own picker (not "phone...jpg") are never touched.
+     */
+    fun strays(list: JSONArray, files: Set<String>): Pair<Set<String>, Set<String>> {
+        val phone = { n: String -> n.startsWith("phone") && n.endsWith(".jpg") }
+        val listed = HashSet<String>(); val missing = HashSet<String>()
+        for (i in 0 until list.length()) {
+            val p = list.optJSONObject(i) ?: continue
+            val f = p.optString("file")
+            if (f.isEmpty()) continue
+            listed += f
+            if (phone(f) && f !in files) missing += p.optString("id")
+        }
+        return files.filter { phone(it) && it !in listed }.toSet() to missing
     }
 
     /** Deletes a photo file the page has dropped (Home settings on the TV, Remove photo). */

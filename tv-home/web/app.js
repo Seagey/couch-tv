@@ -4442,7 +4442,7 @@
         rec.pending = false; keep(ST_KEY, rec);
         if (j && j.updated) SEEN = j.updated;
         var back = j && j.settings && typeof j.settings === "object" && !Array.isArray(j.settings) ? j.settings : null;
-        if (back && canon(back) !== canon(ST)) takeServerSettings(back);
+        if (ON_TV && back && canon(back) !== canon(ST)) takeServerSettings(back);   // the on-TV app may keep the phone's town or photos; a bridge answers with what it was sent
       }, function () {});
   }
   // the server's copy is newer: use it. Under Home settings the screen is drawn again and the home

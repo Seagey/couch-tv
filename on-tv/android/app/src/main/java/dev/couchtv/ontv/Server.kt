@@ -535,8 +535,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 val seen = b.optString("seen").ifEmpty { null }
                 val now = Store.str("home_settings_updated")
                 if (seen != null && now != null && seen != now) {
-                    val cur = Store.readJson("home-settings.json") as? JSONObject
-                    if (cur != null) for (k in PHONE_KEYS) if (cur.has(k)) it.put(k, cur.get(k))
+                    SettingsMerge.keepServer(it, Store.readJson("home-settings.json") as? JSONObject)
                 }
                 Store.writeJson("home-settings.json", it)
                 Store.putStr("home_settings_updated", Now.iso())
@@ -740,8 +739,5 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         private val INPUT_ICONS = setOf("hdmi", "cable", "pc", "ps5", "xbox", "switch")
         /** Home settings keys the phone's Home settings page may change (settings_patch). Photos have their own calls. */
         private val PATCH_KEYS = setOf("place")
-        /** Home settings keys the phone's page changes (the town, and photos through /api/photos): an older
-         *  whole copy from the home keeps the server's (saveSettings, "seen"). */
-        private val PHONE_KEYS = listOf("place", "photos")
     }
 }

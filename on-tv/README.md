@@ -391,6 +391,27 @@ out every computer, so reconnect yours afterwards).
 - A save from a phone or setup tool (`POST /api/settings`, `/api/app-order` or `/api/people`) shows
   on the TV straight away: the home page reads them again as if it had just come back on screen.
   Saves the home page makes itself are left alone.
+- Home settings on the phone (all paired, like the rest):
+  - `POST /api/settings {"settings_patch": {"place": {name, area, lat, lon, timezone} | null}}`
+    changes only the town (the home's own place shape); any other key is a 400.
+  - `POST /api/settings {"settings": {...}, "seen": "<updated>"}` is the home's whole copy. `seen` is
+    the `updated` the home last read (`"none"` if there was no copy then). When it is not the server's
+    current `updated`, the home's copy is older, so `place` and `photos` stay as the server has them
+    (present or not). The answer carries the copy kept, which the home takes.
+  - `POST /api/photos` with the picture itself as the body (JPEG, PNG and the like, up to 25 MB and
+    100 megapixels): turned upright, made no bigger than 1920 by 1080, kept on the TV, added to the
+    photos. Answers `{"photo": {id, file}, "count"}`; 413 too big, 415 not a picture, 409 when 50 are
+    on the TV already. `GET /api/photo/<file>` gives one back (the phone page's list).
+    `POST /api/photos/remove {"id"}` takes one off and deletes its file.
+  - `GET /api/athome`: the home page's At home words (`live: false` when the home page is not
+    loaded). A calendar or bookings link comes back as its host only.
+  - `POST /api/athome {"edit": {note, lists, wifi, guide, cal_url, stay_url, checkin, checkout}}`:
+    handed into the home page's own store. With the page not loaded, the change waits in the app's
+    storage (`queued: true`) until it loads, except lists and the guide (sent whole), which answer
+    409, as does a 21st waiting change.
+  - `GET /api/phone-link`: `{"url": "http://<tv>:5400/setup#pin=NNNNNN", "pin_expires_in"}` for Home
+    settings' QR and its computer line. The code is the live one, or a new one when that has 30
+    seconds or less left.
 
 ## Tests
 
