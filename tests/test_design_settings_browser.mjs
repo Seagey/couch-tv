@@ -193,7 +193,8 @@ TV = tv;
   const studio = (await rowsText(tv)).join(" | ");
   ok(/Surf, middle left/.test(studio) && /Beach: Sydney \(your home's town\)/.test(studio), "couch-tv Studio, Widgets on this home: the surf widget by kind and place, with its beach now: " + studio);
   ok(/Headlines, top right/.test(studio) && /News source: ABC News/.test(studio), "and the headlines with the design's source");
-  ok(!/Welcome words|Guest Wi-Fi|House guide|App grid,/.test(studio), "widgets with no settings of their own are not listed");
+  ok(!/Welcome words|Guest Wi-Fi|House guide/.test(studio), "widgets with no settings of their own are not listed");
+  ok(/App grid, bottom middle/.test(studio) && /Apps: Netflix, Stan/.test(studio), "the app grid is listed with its apps (ws2-watching: its apps are its settings)");
   await closeSettings(tv);
 }
 // Hold OK on the surf widget: Edit on the TV, right after Settings, opens its page (a TV the computer runs: no phone item)
@@ -341,7 +342,7 @@ await phone.waitForFunction(() => document.getElementById("design-line").style.d
 {
   ok(/Widgets on this TV/.test(await phone.textContent("#widgets .fold-btn")), "the phone's section is Widgets on this TV");
   const titles = await phone.evaluate(() => [...document.querySelectorAll("#w-list summary")].map((e) => e.textContent));
-  ok(titles.join(",") === "Surf, middle left,Headlines, top right", "one box per widget with settings, named like the TV names it: " + titles.join(" / "));
+  ok(titles.join(",") === "Surf, middle left,Headlines, top right,App grid, bottom middle", "one box per widget with settings, named like the TV names it: " + titles.join(" / "));
   await phone.click('#w-list details[data-key="s|surf"] summary');
   const words = await phone.textContent('#w-list details[data-key="s|surf"]');
   ok(/Beach: Sydney \(your home's town\)/.test(words), "the surf widget's beach on the phone: " + words.slice(0, 80));

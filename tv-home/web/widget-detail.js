@@ -442,16 +442,17 @@
 
   // keep watching: every show on the go, Resume on each
   B.keep = function (o, env) {
-    var list = kit().shows(env).slice(0, 10);
+    // the widget's own "Whose shows" (a person on this TV), else whoever is watching
+    var list = (kit().showsFor ? kit().showsFor(o, env) : kit().shows(env)).slice(0, 10);
     if (!list.length) return B.setup(o, env);
-    var d = kit().dataOf(env), who = (d.people || []).filter(function (p) { return p.id === d.who; })[0];
-    S.body.appendChild(head("tv", "Keep watching", (env.demo ? "Alex" : who ? who.name : "") ? "What " + (env.demo ? "Alex" : who.name) + " has on the go" : "What you have on the go", "#e50914"));
+    var d = kit().dataOf(env), who = (d.people || []).filter(function (p) { return p.id === d.who; })[0], name = env.demo ? "Alex" : list[0].owner || (who ? who.name : "");
+    S.body.appendChild(head("tv", "Keep watching", name ? "What " + name + " has on the go" : "What you have on the go", "#e50914"));
     var track = E("div", "cwd-track");
     list.forEach(function (s, i) {
       track.appendChild(F(E("div", "cwd-show", "", [E("div", "cwd-art", s.art ? "background-image:" + kit().cssImg(s.art) : "", [s.progress ? E("div", "cwd-prog", "", [E("b", "", "width:" + Math.round(s.progress * 100) + "%")]) : null,
         E("div", "cwd-resume", "", [ic("play", 30, "#111", "solid"), "Resume"])]),
         E("div", "cwd-row", "margin-top:18px", [s.app ? kit().appIcon(s.app, 44, env) : null, E("div", "cwd-col", "margin-left:14px;min-width:0", [E("div", "cwd-mid cwd-ell", "", [s.title]), E("div", "cwd-small cwd-ell", "", [s.sub || ""])])])]),
-        function () { if (designerSays()) return; S.api.act("show", String(i)); close(true); }, s.title));
+        function () { if (designerSays()) return; S.api.act(s.act || "show", s.arg !== undefined ? s.arg : String(i)); close(true); }, s.title));
     });
     S.body.appendChild(E("div", "cwd-scroll cwd-grow", "margin-top:40px", [track]));
     var at = S.from ? parseInt(S.from.getAttribute("data-at") || "0", 10) : 0;
@@ -929,7 +930,7 @@
   };
   // every pick, from what everyone at home has on the go on this TV; Resume plays it
   B.picks = function (o, env) {
-    var list = wk().picksOf ? wk().picksOf(env) : [];
+    var list = wk().picksFor ? wk().picksFor(o, env) : wk().picksOf ? wk().picksOf(env) : [];
     if (!list.length) return B.setup(o, env);
     S.body.appendChild(head("favourite", op(o).label || "Picks for you", "From what everyone at home is watching on this TV", "#bf5af2"));
     var track = E("div", "cwd-track");
@@ -937,7 +938,7 @@
       track.appendChild(F(E("div", "cwd-show", "", [E("div", "cwd-art", s.art ? "background-image:" + kit().cssImg(s.art) : "", [s.progress ? E("div", "cwd-prog", "", [E("b", "", "width:" + Math.round(s.progress * 100) + "%")]) : null,
         E("div", "cwd-resume", "", [ic("play", 30, "#111", "solid"), "Play"])]),
         E("div", "cwd-row", "margin-top:18px", [s.app ? kit().appIcon(s.app, 44, env) : null, E("div", "cwd-col", "margin-left:14px;min-width:0", [E("div", "cwd-mid", "overflow-wrap:anywhere", [s.title]), E("div", "cwd-small", "", [s.why || ""])])])]),
-        function () { if (designerSays()) return; S.api.act("pick", String(i)); close(true); }, s.title));
+        function () { if (designerSays()) return; S.api.act("pick", String(s.at !== undefined ? s.at : i)); close(true); }, s.title));
     });
     S.body.appendChild(E("div", "cwd-scroll cwd-grow", "margin-top:40px", [track]));
   };

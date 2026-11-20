@@ -461,6 +461,10 @@
   // align: centred unless the design says left or right (seagey, 18 Nov 2026)
   WOPT.controls = "label controls cols switches align"; WOPT.camera = "label cam align"; WOPT.doorbell = "label align"; WOPT.energy = "label align";
   WOPT.sensor = "label reading align"; WOPT.speakers = "label players align"; WOPT.queue = "label align";
+  // the watching, apps and music widgets' own settings (widget-caps.js settings, store "design")
+  OPT.mix = function (v) { return SAN.pick(v, ["all", "others", "mine"]); }; OPT.buttons = SAN.b; OPT.cover = SAN.b;
+  OPT.turn = function (v) { return SAN.pick(v, [0, 10, 20, 30, 60]); };
+  WOPT.picks = "label align mix"; WOPT.nowplaying = "buttons cover"; WOPT.queue = "label align count"; WOPT.stack = "turn";
   function sanWStyle(src) {
     src = obj(src);
     var out = {};
@@ -1497,7 +1501,8 @@
     if (D && ON) list(D.objects).forEach(function (o) {
       o = obj(o);
       if (o.type !== "widget") return;
-      var each = o.kind === "stack" ? list(o.items).map(function (it, i) { return { id: o.id + "/" + i, it: obj(it) }; }) : [{ id: o.id, it: o }];
+      // a smart stack has settings of its own (when it moves on), then each of its widgets has its own
+      var each = o.kind === "stack" ? [{ id: o.id, it: o }].concat(list(o.items).map(function (it, i) { return { id: o.id + "/" + i, it: obj(it) }; })) : [{ id: o.id, it: o }];
       each.forEach(function (e) {
         var key = e.id + "|" + e.it.kind;
         if (!e.it.kind || seen[key]) return;
@@ -2552,6 +2557,9 @@
           nodes.splice.apply(nodes, [1, 0].concat(eds2));
         } else if (widgetList().some(function (x) { return x.id === wid; })) note = "Nothing to set for this widget on the TV. Change how it looks in couch-tv Studio.";
       }
+      // a smart stack: its own settings (when it moves on) after the widget showing in it
+      if (pid && !DESIGNER && Caps && Caps.settings && wid !== pid && widgetList().some(function (x) { return x.id === pid && x.kind === "stack"; }) &&
+        Caps.settings("stack").some(function (s) { return s && s.pre === true; })) nodes.splice(nodes.indexOf(nodes.filter(function (n) { return n.getAttribute("data-act") === "gear"; })[0]) + 1 + (mine ? eds2.length : 0), 0, mk("Edit the stack on the TV", "wset", pid + "|stack"));
       openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes, note: note }, "Back to close. Settings here is Couch TV's own: the remote's Settings button opens the TV's menu.");
     }
     // Edit on your phone: a QR code with the phone's Home settings page, the pairing code and this widget
