@@ -85,5 +85,19 @@ def snapshot(tv, last_ask=None):
     return out
 
 
+HEARD_MS = 30_000   # the TV home asks every 6 s while it is open; 30 s of silence means it is not
+
+
+def heard(tv, now=None):
+    """The TV home itself asked (GET /api/say?home=1): it is open and will see a design sent now."""
+    _tv(tv)["heard"] = int(now if now is not None else time.time() * 1000)
+
+
+def listening(tv, now=None):
+    """Whether the TV home asked in the last 30 seconds, so a design sent now shows at once."""
+    at = _tv(tv).get("heard") or 0
+    return (int(now if now is not None else time.time() * 1000)) - at < HEARD_MS
+
+
 def clear():
     _state.clear()

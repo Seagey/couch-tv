@@ -9,7 +9,7 @@ import { AskSheet, MoreSheet, TypeSheet, ArrangeSheet, PeopleSheet, Onboarding }
 import { KidsSheet, PinSheet } from './Kids.jsx';
 import { usePullDown, usePageDrag } from './gestures.js';
 import { t, tBridge, useLang, setTvLang } from './i18n.js';
-import { takeDesignFromHash, WORDS as DESIGN_WORDS } from './designSend.js';
+import { takeDesignFromHash, nonceMatches, sentWords, canSend, NONCE_KEY, WORDS as DESIGN_WORDS } from './designSend.js';
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -314,19 +314,28 @@ export default function App() {
   const openAsk = () => { tick(); flushSync(() => setSheet('ask')); askInput.current?.focus({ preventScroll: true }); };
   const openType = () => { tick(); flushSync(() => setSheet('type')); typeInput.current?.focus({ preventScroll: true }); };
   const sendText = (text) => run(api.text(text), t('sent_to_tv'));
-  // Send a design (designSend.js): true when the TV home has it and will ask "Use this design?"
-  const sendDesign = async (code) => { try { await api.sendDesign(code); tick(); return true; } catch { return false; } };
-  // couch-tv Studio's Send to my TV opens this page at #design=CODE: send it once, at once. The code is
-  // taken out of the address first, so a reload or a saved bookmark never sends it again.
+  // Send a design (designSend.js): the words to show (sent, sent but the home is not open, or failed)
+  const sendDesign = async (code) => {
+    try { const r = await api.sendDesign(code); tick(); return { ok: true, words: sentWords(r) }; }
+    catch { return { ok: false, words: DESIGN_WORDS.failed }; }
+  };
+  // couch-tv Studio's Send to my TV opens this page at #design=CODE. The code is taken out of the address
+  // first, so a reload or a saved bookmark never offers it again. It is sent with no tap only when Studio
+  // handed back the nonce this phone made for that trip (Choose a design in couch-tv Studio), once;
+  // any other link asks first: Send this design to the TV?
+  const [offer, setOffer] = useState(null);
+  const sendNow = (code) => sendDesign(code).then((r) => say(r.words, r.ok ? 'info' : 'err'));
   useEffect(() => {
-    const { code, rest } = takeDesignFromHash(window.location.hash);
     if (!/(^|[#&])design=/.test(window.location.hash)) return;
     // on the couch-tv TV app a phone not paired yet pairs first (on-tv/web/shim.js), then the page
-    // reloads with the code still in the address and sends it then
+    // reloads with the code still in the address
     if (window.couchTv && typeof window.couchTv.token === 'function' && !window.couchTv.token()) return;
+    const { code, nonce, rest } = takeDesignFromHash(window.location.hash);
     try { window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + rest); } catch { /* old browser */ }
     if (!code) { say(DESIGN_WORDS.notCode, 'err'); return; }
-    sendDesign(code).then((ok) => say(ok ? DESIGN_WORDS.sent : DESIGN_WORDS.failed, ok ? 'info' : 'err'));
+    const kept = store.get(NONCE_KEY);
+    if (nonceMatches(nonce, kept)) { try { localStorage.removeItem(NONCE_KEY); } catch { /* private mode */ } sendNow(code); }
+    else setOffer(code);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sleepEnds = tv?.sleep?.ends;
@@ -425,12 +434,21 @@ export default function App() {
         </main>
       )}
       {toast && <div key={toast.id} className={`toast glass ${toast.kind}`} role="status">{toast.text}</div>}
+      {offer && (
+        <div className="design-offer glass" role="dialog" aria-label={DESIGN_WORDS.ask}>
+          <p>{DESIGN_WORDS.ask} <b>{offer}</b></p>
+          <div className="design-offer-row">
+            <button type="button" className="pill solid" onClick={() => { const c = offer; setOffer(null); sendNow(c); }}>{DESIGN_WORDS.askSend}</button>
+            <button type="button" className="pill glass" onClick={() => setOffer(null)}>{DESIGN_WORDS.askLater}</button>
+          </div>
+        </div>
+      )}
       <AskSheet ref={askInput} open={sheet === 'ask'} onClose={() => setSheet(null)} who={who} recs={recs} onAsk={onAsk} onDone={(reply) => say(reply)} />
       <TypeSheet ref={typeInput} open={sheet === 'type'} onClose={() => setSheet(null)} onText={sendText} />
       <MoreSheet ref={moreSheet} open={sheet === 'more'} tvs={tvs} tvId={tvId || 'living-room'} onTv={(id) => { tick(); chooseTv(id); }}
         canMove={!offState && ['playing', 'paused', 'buffering'].includes(tv?.playing?.state) && Boolean(tv?.playing?.title)} onMove={onMove}
         picture={tv?.picture} pictureInfo={pictureInfo} onPicture={onPicture} onClose={() => setSheet(null)} sleepEnds={sleepEnds} sleepError={sleepError} onSleep={onSleep}
-        onKey={onKey} onText={sendText} onArrange={() => setSheet('arrange')} onPeople={() => setSheet('people')} onKids={() => setSheet('kids')} onDesign={sendDesign} />
+        onKey={onKey} onText={sendText} onArrange={() => setSheet('arrange')} onPeople={() => setSheet('people')} onKids={() => setSheet('kids')} onDesign={sendDesign} canSendDesign={canSend(thisTv?.kind)} />
       <ArrangeSheet open={sheet === 'arrange'} onClose={() => setSheet(null)} tvName={thisTv?.name} hidden={hidden} />
       <KidsSheet open={sheet === 'kids'} onClose={() => setSheet(null)} onChanged={loadConfig} />
       <PinSheet ask={pinAsk} onClose={() => setPinAsk(null)} />

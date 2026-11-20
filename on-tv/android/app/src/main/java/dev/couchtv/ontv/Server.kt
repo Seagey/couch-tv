@@ -163,7 +163,10 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 json(200, r)
             }
             // Ask AI on the TV home, and messages and designs from the person's own AI agent (Say.kt, docs/AI-AGENT.md)
-            "GET /api/say" -> json(200, ok(Say.snapshot()))
+            "GET /api/say" -> {
+                if (q("home") == "1") Say.heard()   // the TV home itself (ask.js), not an agent reading it
+                json(200, ok(Say.snapshot()))
+            }
             "POST /api/say/message" -> {
                 val b = body(s)
                 val m = try { Say.message(b.optString("text"), b.optString("from"), if (b.has("seconds")) b.optInt("seconds", 30) else null) } catch (e: IllegalArgumentException) { throw ApiError(400, e.message ?: "bad message") }
@@ -172,7 +175,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "POST /api/say/design" -> {
                 val b = body(s)
                 val d = try { Say.design(b.optString("code"), from = b.optString("from")) } catch (e: IllegalArgumentException) { throw ApiError(400, e.message ?: "bad code") }
-                json(200, ok().put("design", d).put("asks_first", true))   // the TV always asks "Use this design?" first
+                // listening false: the home is not open now; it shows the design when it opens (within 10 minutes)
+                json(200, ok().put("design", d).put("asks_first", true).put("listening", Say.listening()))   // the TV always asks "Use this design?" first
             }
             "GET /api/recs" -> json(200, ok().put("updated", Now.iso()).put("continue", Now.continueItems(q("who"))).put("picks", JSONArray()))
             "GET /api/continue" -> json(200, ok().put("items", Now.continueItems(q("who"))))

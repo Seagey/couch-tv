@@ -39,6 +39,13 @@ class SayTest {
         assertEquals("ai", Say.design("abcde-fghjk", from = "<b>Mum's phone</b>").getString("from"))
     }
 
+    @Test fun listeningOnlyWhileTheHomeAsks() {
+        assertFalse(Say.listening(1_000_000))
+        Say.heard(1_000_000)
+        assertTrue(Say.listening(1_000_000 + 29_000))
+        assertFalse(Say.listening(1_000_000 + 31_000))
+    }
+
     @Test fun snapshotHoldsTheLatestOfEach() {
         assertTrue(Say.snapshot().isNull("message"))
         Say.design("abcde-fghjk")

@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { readDesignCode, takeDesignFromHash, studioLink, STUDIO, WORDS } from "../remote/src/designSend.js";
+import { readDesignCode, takeDesignFromHash, studioLink, newNonce, nonceMatches, canSend, sentWords, STUDIO, WORDS } from "../remote/src/designSend.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 let n = 0;
@@ -21,15 +21,24 @@ eq(readDesignCode(" abcde fghjk "), "ABCDE-FGHJK");
 eq(readDesignCode("ABCDE-FGHJ1"), "", "1 is never in a code");
 eq(readDesignCode("javascript:alert(1)"), "");
 eq(readDesignCode("ctv1-" + "A".repeat(43)), "CTV1-" + "A".repeat(43));
-eq(takeDesignFromHash("#design=abcde-fghjk"), { code: "ABCDE-FGHJK", rest: "" });
-eq(takeDesignFromHash("#tab=watch&design=ABCDE-FGHJK"), { code: "ABCDE-FGHJK", rest: "#tab=watch" });
-eq(takeDesignFromHash("#design=%3Cscript%3E"), { code: "", rest: "" }, "not a code: nothing sent");
-eq(takeDesignFromHash("#design=%E0%A4%A"), { code: "", rest: "" }, "a broken escape is not a crash");
-eq(takeDesignFromHash(""), { code: "", rest: "" });
+eq(takeDesignFromHash("#design=abcde-fghjk"), { code: "ABCDE-FGHJK", nonce: "", rest: "" });
+eq(takeDesignFromHash("#tab=watch&design=ABCDE-FGHJK"), { code: "ABCDE-FGHJK", nonce: "", rest: "#tab=watch" });
+eq(takeDesignFromHash("#design=%3Cscript%3E"), { code: "", nonce: "", rest: "" }, "not a code: nothing sent");
+eq(takeDesignFromHash("#design=%E0%A4%A"), { code: "", nonce: "", rest: "" }, "a broken escape is not a crash");
+eq(takeDesignFromHash(""), { code: "", nonce: "", rest: "" });
+const NONCE = newNonce();
+ok(/^[A-Za-z0-9_-]{22}$/.test(NONCE) && NONCE !== newNonce(), "a nonce is 16 random bytes");
+eq(takeDesignFromHash("#design=ABCDE-FGHJK&n=" + NONCE), { code: "ABCDE-FGHJK", nonce: NONCE, rest: "" }, "the nonce comes back and leaves the address");
+eq(takeDesignFromHash("#design=ABCDE-FGHJK&n=short").nonce, "", "not a nonce");
+// F3: only the round trip this phone started sends with no tap
+ok(nonceMatches(NONCE, NONCE), "the nonce this phone kept: no tap");
+ok(!nonceMatches(NONCE, null) && !nonceMatches("", "") && !nonceMatches(newNonce(), NONCE), "any other link asks first");
 // Studio is told this page's address only when it is a home address
 // a made up home name (built from parts so the privacy scan does not read it as a real one)
 const HOMEHOST = ["tv", "home", "arpa"].join(".");
 eq(studioLink(HOMEHOST + ":5400"), STUDIO + "/design/#tv=" + HOMEHOST + "%3A5400");
+eq(studioLink(HOMEHOST + ":5400", NONCE), STUDIO + "/design/#tv=" + HOMEHOST + "%3A5400&n=" + NONCE, "the link to Studio carries the nonce");
+eq(studioLink("8.8.8.8:5400", NONCE), STUDIO + "/design/", "no home address: no nonce either");
 eq(studioLink("8.8.8.8:5400"), STUDIO + "/design/");
 eq(studioLink("example.com"), STUDIO + "/design/", "a public host is never passed on");
 eq(studioLink("evil.com#x"), STUDIO + "/design/");
@@ -38,6 +47,19 @@ for (const w of Object.values(WORDS)) ok(!/[–—]|\bbeta\b|experimental|coming
 const app = fs.readFileSync(path.join(root, "remote/src/App.jsx"), "utf8");
 ok(/replaceState\([^)]*rest\)/.test(app), "the code leaves the address before it is sent");
 ok(app.includes("!window.couchTv.token()"), "an unpaired phone pairs first and keeps the code for after");
+ok(/if \(nonceMatches\(nonce, kept\)\) \{ try \{ localStorage\.removeItem\(NONCE_KEY\);[^\n]*sendNow\(code\); \}\n\s*else setOffer\(code\);/.test(app), "a link's code asks first unless the nonce matches, and a nonce works once");
+ok(app.includes("DESIGN_WORDS.ask") && app.includes("DESIGN_WORDS.askLater"), "Send this design to the TV? with Send and Not now");
+// F1: the TV's question starts on Keep my home, so the words never say just press OK
+ok(!/press OK when|you press OK/i.test(WORDS.sent + WORDS.note), "never just press OK");
+eq(WORDS.sent, "Sent. On the TV, pick Use this design, then press OK.");
+// F2: a home that is not open now
+eq(sentWords({ ok: true, listening: false }), "Sent. Open the couch-tv home on the TV in the next 10 minutes.");
+eq(sentWords({ ok: true, listening: true }), WORDS.sent);
+eq(sentWords({ ok: true }), WORDS.sent, "an older home computer that does not say: Sent");
+ok(!canSend("roku") && !canSend("appletv") && canSend("samsung") && canSend("android") && canSend(undefined), "no Send a design on a Roku or an Apple TV");
+eq(WORDS.cannot, "On this TV, type the code on the TV instead.");
+const sheets = fs.readFileSync(path.join(root, "remote/src/Sheets.jsx"), "utf8");
+ok(/if \(r\.ok\) setCode\(''\)/.test(sheets), "on a failure the code stays in the box");
 const api = fs.readFileSync(path.join(root, "remote/src/api.js"), "utf8");
 ok(api.includes("call('POST', '/api/say/design', { code, from: 'phone' })"), "Send a design uses the home's own /api/say/design");
 
@@ -135,7 +157,7 @@ const ID = "AbCdEfGhIjKlMnOpQrStUv";
 }
 {
   const { C } = home({ design_store: "https://designs.example" }, () => [404, {}]);
-  await assert.rejects(C.openInbox(), (e) => e.kind === "offline" && /type the code/.test(e.message), "a store with no inbox: not ran out"); n++;
+  await assert.rejects(C.openInbox(), (e) => e.kind === "none" && e.message === "This design store has no phone inbox. Type the code instead.", "a store with no inbox: says so, not ran out"); n++;
 }
 {
   const { C } = home({ design_store: "https://designs.example" }, () => [200, { state: "ok", code: "https://evil.example/x.json" }]);
@@ -151,6 +173,7 @@ ok(appjs.includes('label: "Get a design from your phone"'), "the row is in Home 
 ok(/function lookInInbox[\s\S]{0,200}!inboxShown\(\)/.test(appjs), "it asks only while its screen is open");
 ok(/function closeSettings\(\) \{\s*stopInbox\(\);/.test(appjs), "closing Home settings stops it");
 ok(/takeInbox\(mine\.id\)[\s\S]{0,400}getDesignByCode\(code\)/.test(appjs), "a code from the inbox goes through Use this design? like a typed one");
+ok(/takeInbox\(mine\.id\)\.then\(function \(code\) \{[\s\S]{0,300}if \(code\) \{[\s\S]{0,200}getDesignByCode\(code\);\s*return;/.test(appjs), "a code that comes back after the screen closed is still got");
 const ask = fs.readFileSync(path.join(root, "tv-home/web/ask.js"), "utf8");
 ok(ask.includes('d.from === "phone" ? "phone" : "ai"'), "the TV says where a design came from");
 

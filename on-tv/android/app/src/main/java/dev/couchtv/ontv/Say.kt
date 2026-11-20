@@ -65,6 +65,16 @@ object Say {
     fun snapshot(): JSONObject = JSONObject().put("message", message ?: JSONObject.NULL)
         .put("design", design ?: JSONObject.NULL).put("ask", ask ?: JSONObject.NULL)
 
+    /** The TV home asks every 6 s while it is open; 30 s of silence means it is not. */
+    const val HEARD_MS = 30_000L
+    @Volatile private var heardAt = 0L
+
+    /** The TV home itself asked (GET /api/say?home=1): it is open and sees a design sent now. */
+    fun heard(now: Long = System.currentTimeMillis()) { heardAt = now }
+
+    /** Whether the TV home asked in the last 30 seconds (POST /api/say/design answers it as "listening"). */
+    fun listening(now: Long = System.currentTimeMillis()): Boolean = heardAt > 0 && now - heardAt < HEARD_MS
+
     @Synchronized
-    fun clear() { message = null; design = null; ask = null }
+    fun clear() { message = null; design = null; ask = null; heardAt = 0L }
 }

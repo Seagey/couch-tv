@@ -259,8 +259,11 @@
   // ---------------- what the home computer or the TV app says (GET /api/say) ----------------
   var seen = readJson(SEEN_KEY) || { msg: 0, design: 0 }, pollT = null, firstPoll = true;
   function markSeen() { setItem(SEEN_KEY, JSON.stringify(seen)); }
-  // Opt in: the home computer is asked only once Ask AI is set up on this TV, while the Ask sheet is
-  // open, or while an Ask AI or From your AI widget is on the home. A home with none of them asks nothing.
+  // Who asks: a home that can get designs (a design store set, the usual case) asks every 6 s so a design
+  // sent from the phone shows at once; otherwise only once Ask AI is set up on this TV, while the Ask
+  // sheet is open, or while an Ask AI or From your AI widget is on the home. ?home=1 tells the home
+  // computer or the TV app it is the home asking (say.py heard), so the phone remote can say whether
+  // the TV will see a design now.
   function wanted() {
     var c = readJson(CFG_KEY);
     if (c && (c.route || c.provider)) return true;
@@ -274,7 +277,7 @@
     var h = home();
     if (!h.on || !wanted()) return;
     var hd = {}; if (h.key) hd.Authorization = "Bearer " + h.key;
-    xhr("GET", h.api + "/api/say" + (h.tv ? "?tv=" + h.tv : ""), hd, null, 8000).then(function (r) {
+    xhr("GET", h.api + "/api/say?home=1" + (h.tv ? "&tv=" + h.tv : ""), hd, null, 8000).then(function (r) {
       var j = null; try { j = JSON.parse(r.text); } catch (e) {}
       if (!j || j.ok === false) return;
       took(j, Date.now());

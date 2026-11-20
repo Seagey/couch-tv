@@ -4713,11 +4713,16 @@
     if (INBOX !== mine || !inboxShown()) { if (INBOX === mine) stopInbox(); return; }
     if (Date.now() > mine.expires) { mine.state = "gone"; renderSettings(); return; }
     CouchDesignCode.takeInbox(mine.id).then(function (code) {
+      // a code is handed out once (the store deletes it as it answers): one that comes back after the
+      // screen was closed is still got, so the phone's send is never lost. "Use this design?" still asks.
+      if (code) {
+        if (INBOX === mine) stopInbox();
+        if (inboxShown()) { SET.sub = null; SET.keyFocus = "design-phone"; }
+        getDesignByCode(code);
+        return;
+      }
       if (INBOX !== mine || !inboxShown()) return;
-      if (!code) { mine.misses = 0; nextInboxLook(mine); return; }
-      stopInbox();
-      SET.sub = null; SET.keyFocus = "design-phone";
-      getDesignByCode(code);
+      mine.misses = 0; nextInboxLook(mine);
     }, function (e) {
       if (INBOX !== mine || !inboxShown()) return;
       if (e && e.kind === "gone") { mine.state = "gone"; renderSettings(); return; }

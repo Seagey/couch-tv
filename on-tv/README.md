@@ -122,7 +122,7 @@ type 8180170 again.
 
 To send a design from the phone: in the phone remote, pull down the TV menu, **Send a design**, and
 paste the code from couch-tv Studio (or tap **Choose a design in couch-tv Studio**, which brings the
-code back by itself). The TV asks "Use this design?" and you press OK.
+code back by itself). The TV asks "Use this design?": pick **Use this design**, then press OK.
 
 A code lasts 3 minutes, works once, and is thrown away after 5 wrong tries. **Forget phones** on
 the TV, or on the setup page, signs every phone out.

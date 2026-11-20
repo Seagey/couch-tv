@@ -258,7 +258,7 @@ struct PhoneDesignView: View {
                         .font(HomeFont.inter(29)).foregroundStyle(.white.opacity(0.85)).fixedSize(horizontal: false, vertical: true)
                     Text(words).font(HomeFont.inter(27, .medium)).foregroundStyle(.white.opacity(0.7)).fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 24) {
-                        if box == nil || words.hasPrefix("That code ran out") {
+                        if box == nil {   // ran out or never opened: a run out QR is taken off the screen
                             Button("Show a new code") { round += 1 }
                         }
                         Button("Type the code instead") { close(false) }
@@ -283,10 +283,10 @@ struct PhoneDesignView: View {
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: UInt64(b.every * 1_000_000_000))
             if Task.isCancelled { return }
-            if Date() > b.expires { words = "That code ran out. Press Show a new code."; return }
+            if Date() > b.expires { box = nil; words = "That code ran out. Press Show a new code."; return }
             switch await model.takeInbox(b) {
             case .waiting: misses = 0
-            case .gone: words = "That code ran out. Press Show a new code."; return
+            case .gone: box = nil; words = "That code ran out. Press Show a new code."; return
             case .problem(let why):
                 misses += 1
                 if misses >= 5 { words = why; box = nil; return }

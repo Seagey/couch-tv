@@ -279,6 +279,15 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
   background: rgba(40, 40, 46, 0.72); animation: toast-in 0.35s var(--ease) both;
 }
 .toast.err { background: rgba(110, 26, 26, 0.75); }
+/* a design code that came by link: asked before it is sent (designSend.js) */
+.design-offer {
+  position: fixed; z-index: 41; left: 50%; top: calc(var(--sa-t) + 60px); transform: translateX(-50%);
+  width: min(92vw, 420px); padding: 16px; border-radius: 22px; background: rgba(28, 28, 34, 0.94); text-align: center;
+}
+.design-offer p { margin: 0 0 12px; font-size: 16px; line-height: 1.4; }
+.design-offer b { display: block; margin-top: 4px; font-size: 22px; letter-spacing: 0.06em; }
+.design-offer-row { display: flex; gap: 10px; justify-content: center; }
+.design-offer-row .pill { min-height: 44px; padding: 0 22px; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -10px); } }
 
 /* Sheets */
