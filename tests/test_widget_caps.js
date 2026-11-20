@@ -82,7 +82,11 @@ CAPS.kinds().forEach((k) => {
 ok(CAPS.steps("surf", "Google TV").join(" ").indexOf("beach town") > 0, "surf: the steps say to pick the nearest beach town");
 ok(CAPS.steps("photo", "Tizen").join(" ").indexOf("web address") > 0 && CAPS.steps("photo", "Google TV").join(" ").indexOf("USB") > 0, "photos: by web address on a Samsung, from USB on a Google TV");
 ok(CAPS.need("aircon", "Tizen") === "computer" && CAPS.need("aircon", "Google TV") === "setup" && CAPS.steps("aircon", "Google TV").join(" ").indexOf("Smart home") > 0, "aircon: set up on a Google TV (Home settings, Smart home), through the home computer on a Samsung");
-ok(CAPS.need("clock", "Roku OS") === "no" && /not possible/i.test(CAPS.steps("clock", "Roku OS")[0]), "a Roku: not possible, and says so");
+// Roku and Apple TV draw designs themselves (DesignLib.brs, DesignView.swift), but only some kinds
+ok(CAPS.need("clock", "Roku OS") === "works" && CAPS.need("clock", "tvOS") === "works", "a Roku and an Apple TV draw the clock");
+ok(CAPS.need("surf", "Roku OS") === "no" && /^Shows on Google TV/.test(CAPS.steps("surf", "Roku OS")[0]), "a Roku: no surf, and says so");
+ok(CAPS.need("worldclock", "tvOS") === "works" && CAPS.need("worldclock", "Roku OS") === "no", "world clocks on an Apple TV, not on a Roku");
+ok(CAPS.need("clock", "Vega OS") === "no" && /not possible/i.test(CAPS.steps("clock", "Vega OS")[0]), "a Fire TV on Vega OS: not possible, and says so");
 
 // 3. sizes: the shape of tools/tv-designer/app/grid.js W[kind]; named sizes smallest first, none under min
 CAPS.kinds().forEach((k) => {

@@ -31,7 +31,7 @@ ok(!!block, "design.js has WOPT");
 block[1].replace(/(\w+): "([^"]*)"/g, (m, k, v) => { WOPT[k] = v.split(/\s+/).filter(Boolean); });
 DJ.replace(/WOPT\.(\w+) = "([^"]*)"/g, (m, k, v) => { WOPT[k] = v.split(/\s+/).filter(Boolean); });
 // design keys this branch adds before design.js learns them (asked of the design.js owner)
-const PENDING_WOPT = ["countdown.year"];
+const PENDING_WOPT = ["countdown.year", "timer.minutes", "hourly.hours", "slideshow.shuffle", "agenda.days", "news.count", "sports.games", "stocks.price"];
 
 // the renderers (widgets.js R.<kind>)
 const WJ = fs.readFileSync(path.join(web, "widgets.js"), "utf8");
@@ -86,7 +86,8 @@ CAPS.kinds().forEach((kind) => {
           wordsOk(o[1], at + " option");
         });
         ok(new Set(s.options.map(valOf)).size === s.options.length, at + ": option values differ");
-        ok(s.options.some((o) => sameVal(o[0], d)), at + ": default is one of the options");
+        if (s.many) ok(isArr(d) && typeof s.max === "number" && d.length <= s.max && d.every((v) => s.options.some((o) => sameVal(o[0], v))), at + ": several picked, from the options, up to max");
+        else ok(s.options.some((o) => sameVal(o[0], d)), at + ": default is one of the options");
         break;
       case "toggle": ok(typeof d === "boolean", at + ": toggle default is on or off"); break;
       case "number":
@@ -150,6 +151,29 @@ ok(beach.key === "place" && beach.type === "place" && beach.coast === true && be
 const WW = fs.readFileSync(path.join(web, "widget-web.js"), "utf8");
 CAPS.settings("news")[0].options.forEach((o) => { if (o[0] !== "auto") ok(WW.indexOf("\"" + o[0] + "\": {") >= 0 || WW.indexOf(" " + o[0] + ": {") >= 0, "news source " + o[0] + " is a feed the TV reads"); });
 CAPS.settings("sports")[0].options.forEach((o) => ok(new RegExp("\\b" + o[0] + ": \\{ name: \"" + o[1] + "\"").test(WW), "competition " + o[0] + " is " + o[1] + " on the TV"));
+// the later settings (L items) are there too, after the before launch ones
+const LATER = { surf: ["units", "wind"], commute: ["buffer", "weekdays", "from"], weather: ["town"], speakers: ["players"], agenda: ["calendars", "days"], sports: ["games"] };
+Object.keys(LATER).forEach((kind) => {
+  const list = CAPS.settings(kind), firstLater = list.findIndex((s) => !s.pre);
+  ok(list.slice(firstLater).every((s) => !s.pre), kind + ": before launch settings come first");
+  LATER[kind].forEach((key) => ok(list.some((s) => s.key === key && s.pre === false), kind + " has the later setting " + key));
+});
+// Roku and Apple TV draw some kinds themselves: those work there, every other kind is not on that TV
+["Roku OS", "tvOS"].forEach((p) => {
+  const drawnThere = CAPS.native(p);
+  ok(drawnThere.length >= 20 && CAPS.groupOf(p) === "native", p + " is a native group");
+  CAPS.kinds().forEach((k) => {
+    const need = CAPS.need(k, p), steps = CAPS.steps(k, p);
+    if (drawnThere.indexOf(k) < 0) ok(need === "no" && steps.length === 1, k + " is not on " + p);
+    else ok(need !== "no" && steps.length >= 1 && !/^Shows on Google TV/.test(steps[0]), k + " shows on " + p);
+  });
+});
+// the kinds each native TV draws (DesignLib.brs dlWNative, DesignModel.swift DesignWidgets.native)
+const ROOT = path.join(__dirname, "..");
+const brs = fs.readFileSync(path.join(ROOT, "roku/channel/components/DesignLib.brs"), "utf8").match(/function dlWNative[\s\S]*?\[([^\]]*)\]/)[1];
+ok(JSON.stringify(JSON.parse("[" + brs + "]").sort()) === JSON.stringify(CAPS.native("Roku OS").sort()), "the Roku list matches DesignLib.brs");
+const swift = fs.readFileSync(path.join(ROOT, "tvos/CouchTV/DesignModel.swift"), "utf8").match(/static let native: Set<String> = \[([^\]]*)\]/)[1];
+ok(JSON.stringify(JSON.parse("[" + swift + "]").sort()) === JSON.stringify(CAPS.native("tvOS").sort()), "the Apple TV list matches DesignModel.swift");
 // a kind with no settings says so with an empty list
 ok(isArr(CAPS.settings("stack")) && CAPS.settings("nope").length === 0, "no settings is an empty list");
 
