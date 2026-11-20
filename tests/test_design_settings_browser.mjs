@@ -257,8 +257,21 @@ async function holdOn(page, id) {
   ok(q && q.link === "http://tv.example:5400/setup#pin=482913&widget=s", "the QR opens the phone page at this widget, already paired: " + (q && q.link));
   ok(q && /Or on a computer: tv\.example:5400\/setup, code 482 913\./.test(q.hint), "with the computer line under it: " + (q && q.hint));
   ok(q && !/[–—]/.test(q.hint + q.title), "no dashes");
+  // M3 (21 Nov): while it is open the sheet asks the TV again every 20 s and draws the new code
+  const qrNow = () => ontv.evaluate(() => { const s = document.querySelector(".cw-sheet .cw-qr"); return s ? s.getAttribute("data-link") : null; });
+  await ontv.evaluate(() => localStorage.setItem("mock:phonePin", "555666"));
+  await ontv.waitForTimeout(21000);
+  ok((await qrNow()) === "http://tv.example:5400/setup#pin=555666&widget=s", "20 s later the open QR shows the TV's new code: " + await qrNow());
   await press(ontv, "Escape", 300);
   ok(!(await ontv.evaluate(() => window.CouchDesign.nav.sheetOpen())), "Back closes the QR");
+  // pairing locked (the TV answers 429): the open QR goes away, never a dead code on show
+  await holdOn(ontv, "s"); await press(ontv, "ArrowDown", 120); await press(ontv, "ArrowDown", 120); await press(ontv, "Enter", 800);
+  ok(/pin=555666/.test((await qrNow()) || ""), "the QR is open again");
+  await ontv.evaluate(() => localStorage.setItem("mock:phoneLinkFail", "1"));
+  await ontv.waitForTimeout(21000);
+  ok((await qrNow()) === null, "when the TV stops giving a code (locked), the QR goes within 20 s");
+  await ontv.evaluate(() => { localStorage.removeItem("mock:phoneLinkFail"); localStorage.removeItem("mock:phonePin"); });
+  if (await ontv.evaluate(() => window.CouchDesign.nav.sheetOpen())) await press(ontv, "Escape", 300);
   // a widget with nothing to set: still no QR item on the on-TV app
   const m3 = await holdOn(ontv, "g");
   ok(m3.items.indexOf("Edit on your phone") < 0 && m3.items.indexOf("Edit on the TV") < 0 && /Nothing to set for this widget/.test(m3.note), "House guide on the on-TV app: the line, no Edit items");

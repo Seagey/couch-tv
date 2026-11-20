@@ -20,6 +20,7 @@ import threading
 import time
 import traceback
 import urllib.parse
+import urllib.error
 import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -294,6 +295,16 @@ def api(method, path, body):
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
                 return json.load(r)
+        except urllib.error.HTTPError as e:
+            # the TV answered: say what it said (429 after too many wrong codes: "Wait 10 min, then try again.")
+            try:
+                said = (json.loads(e.read().decode("utf-8", "replace")) or {}).get("error")
+            except Exception:
+                said = None
+            if said:
+                raise TvError(str(said)[:200], "remote_locked" if e.code == 429 else "remote_said") from e
+            raise TvError("The phone remote app on the TV is not answering yet. Open Couch TV on the TV once, then try again.",
+                          "remote_down") from e
         except Exception as e:
             raise TvError("The phone remote app on the TV is not answering yet. Open Couch TV on the TV once, then try again.",
                           "remote_down") from e

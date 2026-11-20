@@ -2571,7 +2571,19 @@
         box.setAttribute("data-link", link);
         openSheet("Edit on your phone", { nodes: [box] }, "Scan with your phone's camera: it opens this widget's settings, already paired. Or on a computer: " +
           m[1] + m[2] + ", code " + m[3].slice(0, 3) + " " + m[3].slice(3) + ". Back to close.");
-        if (sheet) sheet.phone = id;   // drawn again when the code changes (phoneAgain)
+        if (!sheet) return;
+        sheet.phone = id;   // drawn again when the code changes (phoneAgain)
+        // and asked again every 20 s while it is open: a code that changed or ran out is never left on show
+        var mine = sheet;
+        (function again() {
+          setTimeout(function () {
+            if (sheet !== mine) return;
+            hooks.phoneLink().then(function (u2) {
+              if (sheet !== mine) return;
+              if (u2 !== url) phoneSheet(id); else again();
+            }, function () { if (sheet === mine) phoneSheet(id); });
+          }, 20000);
+        })();
       }, fail);
     }
     // ---- changing a container's apps with the remote ----

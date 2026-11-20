@@ -7269,7 +7269,7 @@
     var st = SHP.st || S.status(), rows = [];
     // one QR code and one short line; the rest (which Home Assistant, signing in, what shows, the
     // brands we don't list) is on the phone
-    if (SHP.url && window.TVQR) rows.push({ kind: "qr", key: "sh-qr", link: SHP.url,
+    if (SHP.url && window.TVQR) rows.push({ kind: "qr", key: "sh-qr", link: SHP.url + (window.I18N && /\?/.test(SHP.url) ? "&l=" + encodeURIComponent(window.I18N.lang()) : ""),   // the phone page speaks the TV's language (phone-words.js)
       label: st.signin_again ? "Sign in again. Home Assistant signed this TV out: scan with your phone."
         : st.set ? "Connected to " + (st.host || "Home Assistant") + ". Scan to change what shows." : SHP.seen ? "Carry on with your phone." : "Scan with your phone to connect your home." });
     else rows.push(info("sh-wait", "", "", SHP.err || "Getting ready..."));

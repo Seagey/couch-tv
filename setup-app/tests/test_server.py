@@ -79,5 +79,39 @@ class Server(unittest.TestCase):
             self.assertNotIn("–", text, f)
 
 
+class RemoteCode(unittest.TestCase):
+    """Show a code: when the TV's pairing is locked (429), the page says the TV's own words."""
+
+    def setUp(self):
+        self.tv, self.ip = server.S.tv, server.S.ip
+        server.S.tv, server.S.ip = object(), "192.0.2.9"
+
+    def tearDown(self):
+        server.S.tv, server.S.ip = self.tv, self.ip
+
+    def answer(self, code, raw):
+        import io
+        from unittest import mock
+
+        err = urllib.error.HTTPError("http://192.0.2.9:5400/api/pair/start", code, "x", {}, io.BytesIO(raw))
+        with mock.patch.object(server.urllib.request, "urlopen", side_effect=err):
+            with self.assertRaises(server.TvError) as c:
+                server.api("POST", "/api/remote/code", {})
+        return c.exception
+
+    def test_locked_says_the_tvs_words(self):
+        e = self.answer(429, json.dumps({"error": "Wait 10 min, then try again.", "retry_after": 600}).encode())
+        self.assertEqual(str(e), "Wait 10 min, then try again.")
+        self.assertEqual(e.code, "remote_locked")
+
+    def test_other_answer_with_words(self):
+        e = self.answer(403, b'{"error": "Pairing is off on this TV."}')
+        self.assertEqual((str(e), e.code), ("Pairing is off on this TV.", "remote_said"))
+
+    def test_answer_with_no_words_is_not_answering(self):
+        e = self.answer(500, b"<html>oops</html>")
+        self.assertEqual(e.code, "remote_down")
+
+
 if __name__ == "__main__":
     unittest.main()

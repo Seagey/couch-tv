@@ -53,20 +53,65 @@ try {
   // Spanish: a line drawn later is swapped as it is drawn
   await page.evaluate(() => window.I18N.set("es"));
   const swapped = await page.evaluate(async () => {
-    const d = document.createElement("div"); d.innerHTML = "<b>Turn on designs</b><small>Nothing changes until you choose a design</small><i>Edit on your phone</i>";
+    const d = document.createElement("div"); d.className = "cw-sheet"; d.innerHTML = "<b>Turn on designs</b><small>Nothing changes until you choose a design</small><i>Edit on your phone</i>";
     document.body.appendChild(d); await new Promise((r) => setTimeout(r, 50));
     const out = d.innerText; d.remove(); return out;
   });
   ok(/Activar los diseños/.test(swapped) && /No cambia nada hasta que elijas un diseño/.test(swapped) && /Editar en el móvil/.test(swapped), "Spanish rows: " + swapped.replace(/\n/g, " | "));
   // a changed line (a redraw that sets the text) is swapped too
   const redraw = await page.evaluate(async () => {
-    const d = document.createElement("div"); d.textContent = "x"; document.body.appendChild(d); await new Promise((r) => setTimeout(r, 30));
+    const d = document.createElement("div"); d.className = "cw-tip"; d.textContent = "x"; document.body.appendChild(d); await new Promise((r) => setTimeout(r, 30));
     d.firstChild.data = "Show all settings"; await new Promise((r) => setTimeout(r, 50)); const out = d.textContent; d.remove(); return out;
   });
   ok(redraw === "Mostrar todos los ajustes", "a redrawn line: " + redraw);
+  // only where these words are drawn: the home itself, and a value a person typed, stay as they are
+  const outside = await page.evaluate(async () => {
+    const a = document.createElement("div"); a.textContent = "Show all settings"; document.body.appendChild(a);
+    const b = document.createElement("div"); b.className = "cw-sheet"; b.innerHTML = '<span class="sv">Show all settings</span><span class="sv">Not set</span>'; document.body.appendChild(b);
+    await new Promise((r) => setTimeout(r, 50));
+    const out = [a.textContent, b.children[0].textContent, b.children[1].textContent]; a.remove(); b.remove(); return out;
+  });
+  ok(outside[0] === "Show all settings", "outside Home settings and the sheets: left alone");
+  ok(outside[1] === "Show all settings" && outside[2] === "Sin configurar", "a typed value stays; Couch TV's own Not set is translated: " + outside.join(" | "));
   // a line with gaps keeps what is in them
   const tpl = await page.evaluate(() => window.CouchTvWords.words("Scan with your phone's camera: it opens this widget's settings, already paired. Or on a computer: 192.0.2.7:5400/setup, code 123 456. Back to close."));
   ok(/^Escanéalo con la cámara del móvil/.test(tpl) && tpl.indexOf("192.0.2.7:5400/setup") > 0 && tpl.indexOf("123 456") > 0, "the phone QR line keeps the address and code: " + tpl);
+  // whole lines: the gaps, the spaces around a line, nothing more and nothing less
+  const whole = await page.evaluate(() => {
+    const W = window.CouchTvWords.words, t = window.I18N.t;
+    return [
+      [W("Scan with your phone's camera: it opens this widget's settings, already paired. Or on a computer: 192.0.2.7:5400/setup, code 123 456. Back to close."), t("tw_scan_widget", { addr: "192.0.2.7:5400", code: "123 456" })],
+      [W("\n   Show all settings  "), "\n   Mostrar todos los ajustes  "],
+      [W("Connected to homeassistant.local:8123. Scan to change what shows."), t("tw_ha_connected_to_host_scan_to_ch", { host: "homeassistant.local:8123" })],
+      [W("Updated to 0.13.9. Your settings stay."), "Actualizado a 0.13.9. Tus ajustes se mantienen."],
+      [W("Where to: Byron Bay, NSW."), "Destino: Byron Bay, NSW."],
+      [W("Up to 4. Untick one first."), "Hasta 4. Desmarca uno primero."],
+      [W("Update Couch TV"), "Actualizar Couch TV"],
+      [W("Smart home"), window.I18N.strings.es.smart_home],
+      [W("Scan with your phone's camera: it opens this widget's settings"), null]   // a part of a line is not a line
+    ];
+  });
+  whole.forEach((p, i) => ok(p[0] === p[1], "whole line " + i + ": " + JSON.stringify(p[0]) + " is " + JSON.stringify(p[1])));
+  // the banner after Back is held, and the "Use this design?" card's own words, but never the design's words in its preview
+  const banner = await page.evaluate(async () => {
+    const b = document.createElement("div"); b.className = "cd-escaped"; b.textContent = "Design switched off. This is the normal home. Turn it back on in Home settings, Designs.";
+    const a = document.createElement("div"); a.className = "cd-ask"; a.innerHTML = '<div>Keep my home</div><div class="cd-o"><div>Keep my home</div></div><div class="sv">Kept on this TV</div>';
+    document.body.appendChild(b); document.body.appendChild(a); await new Promise((r) => setTimeout(r, 60));
+    const out = [b.textContent, a.children[0].textContent, a.children[1].textContent, a.children[2].textContent]; b.remove(); a.remove(); return out;
+  });
+  ok(banner[0] === "Diseño desactivado. Este es el inicio normal. Vuelve a activarlo en Ajustes de inicio, Diseños.", "the switched off banner: " + banner[0]);
+  ok(banner[1] === "Mantener mi inicio" && banner[2] === "Keep my home", "the card's button, not the design's own words: " + banner.slice(1, 3).join(" | "));
+  ok(banner[3] === "Guardada en este televisor", "Couch TV's own value Kept on this TV: " + banner[3]);
+  // Arabic and Hebrew: the address and the code read left to right inside the line (U+2066 ... U+2069)
+  for (const l of ["ar", "he"]) {
+    await page.evaluate((x) => window.I18N.set(x), l);
+    const iso = await page.evaluate(() => [window.CouchTvWords.words("Scan with your phone's camera: it opens this widget's settings, already paired. Or on a computer: 192.0.2.7:5400/setup, code 123 456. Back to close."),
+      window.I18N.t("set_phone_pc", { addr: "192.0.2.7:5400/setup", code: "123 456" }), window.CouchTvWords.words("Connected to homeassistant.local. Scan to change what shows.")]);
+    ok(iso[0].includes("⁦192.0.2.7:5400/setup⁩") && iso[0].includes("⁦123 456⁩"), l + ": the sheet line isolates the address and code: " + JSON.stringify(iso[0]));
+    ok(iso[1].includes("⁦192.0.2.7:5400/setup⁩") && iso[1].includes("⁦123 456⁩"), l + ": the computer line isolates them: " + JSON.stringify(iso[1]));
+    ok(iso[2].includes("⁦homeassistant.local⁩"), l + ": the Smart home line isolates the address");
+  }
+  await page.evaluate(() => window.I18N.set("es"));
   // Mexico: its own words where it says it differently, Spain's elsewhere
   await page.evaluate(() => window.I18N.set("es-MX"));
   ok(await page.evaluate(() => window.CouchTvWords.words("Edit on your phone") === "Editar en el celular"), "es-MX: celular");

@@ -217,6 +217,9 @@ class Phone:
         r.add_get("/ha", guard(self.h_page))
         r.add_get("/ha/", guard(self.h_page))
         r.add_get("/ha/ha-picks.js", guard(self.h_picks))
+        # the page's words in the TV's language, and the widget settings words it shares (phone-words.js)
+        r.add_get("/ha/phone-words.js", guard(self.h_phone_words))
+        r.add_get("/ha/caps-words.js", guard(self.h_caps_words))
         r.add_get("/ha/done", guard(self.h_done))
         r.add_get("/ha/api/state", guard(self.h_state))
         r.add_post("/ha/api/signin", guard(self.h_signin))
@@ -226,6 +229,12 @@ class Phone:
 
     async def h_picks(self, request):
         return self._file("ha-picks.js", "application/javascript")
+
+    async def h_phone_words(self, request):
+        return self._file("phone-words.js", "application/javascript")
+
+    async def h_caps_words(self, request):
+        return self._file("caps-words.js", "application/javascript")
 
     async def h_page(self, request):
         return self._file("ha-phone.html", "text/html")

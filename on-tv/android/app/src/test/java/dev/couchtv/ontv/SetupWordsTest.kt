@@ -39,6 +39,15 @@ class SetupWordsTest {
         assertEquals("No phone yet: press New phone code", SetupWords.pairLine(null, 0, null))
     }
 
+    @Test fun lockedSaysSoInsteadOfACodeThatWouldBeRefused() {
+        // Fable 0814 item 2: while pairing is locked for everyone the screen shows the lock and its time
+        assertEquals("Too many wrong codes. Pairing opens again in 10 min", SetupWords.pairLine("123456", 0, null, 600))
+        assertEquals("Too many wrong codes. Pairing opens again in 1 min", SetupWords.pairLine(null, 1, null, 30))
+        assertTrue(SetupWords.nextLine(null, 0, false, 600).endsWith("press New phone code."))
+        assertEquals("Phone code  123 456", SetupWords.pairLine("123456", 0, null, 0))
+        listOf(SetupWords.pairLine(null, 0, null, 600), SetupWords.nextLine(null, 0, false, 600)).forEach { assertFalse(it, jargon.containsMatchIn(it) || it.contains("–") || it.contains("—")) }
+    }
+
     @Test fun firstScreenHasNoJargon() {
         val all = listOf(SetupWords.pairLine(null, 0, null), SetupWords.nextLine("123456", 0, false), SetupWords.nextLine(null, 1, true),
             SetupWords.keysLine(false, false, false), SetupWords.keysLine(true, false, false), SetupWords.keysLine(false, false, true),

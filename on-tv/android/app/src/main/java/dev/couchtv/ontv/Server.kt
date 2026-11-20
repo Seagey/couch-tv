@@ -114,23 +114,24 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 if (a) o.put("tv_connected", true).put("adb", Adb.connected)
                 return json(200, o)
             }
-            // Pairing: 15 wrong codes in 10 minutes lock both for 10 minutes (Auth, PairLock). A new code
+            // Pairing (Auth, PairLock): 5 different wrong codes in 10 minutes from one address make that address
+            // wait (429), and 15 in 10 minutes from all addresses lock both for everyone for 10 minutes. A new code
             // only when none is live with time left (Auth.pinForQr), so asking again never swaps the
             // code a QR on the TV or someone typing is using.
             "/api/pair/start" -> {
                 if (m != Method.POST) throw ApiError(405, "POST only")
-                pairLocked()?.let { return it }
-                Auth.pinForQr()
+                pairLocked(s.remoteIpAddress)?.let { return it }
+                Auth.pinForQr(minLeft = 90)   // someone is about to type it: at least 90 s to do so
                 App.showPin()
                 return json(200, ok().put("digits", 6).put("expires_in", Auth.pinSecondsLeft()).put("note", "The code is on the TV now."))
             }
             "/api/pair" -> {
                 if (m != Method.POST) throw ApiError(405, "POST only")
                 val b = body(s)
-                pairLocked()?.let { return it }
+                pairLocked(s.remoteIpAddress)?.let { return it }
                 Thread.sleep(400)   // slows guessing a little more
-                val token = Auth.pair(b.optString("pin"), b.optString("name").ifEmpty { null })
-                    ?: return pairLocked() ?: json(401, err(if (Auth.currentPin() == null) "That code has expired. Ask the TV for a new one." else "That code is not right. Check the TV."))
+                val token = Auth.pair(b.optString("pin"), b.optString("name").ifEmpty { null }, s.remoteIpAddress)
+                    ?: return pairLocked(s.remoteIpAddress) ?: json(401, err(if (Auth.currentPin() == null) "That code has expired. Ask the TV for a new one." else "That code is not right. Check the TV."))
                 Now.push()
                 return json(200, ok().put("token", token))
             }
@@ -368,6 +369,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             // QR (#pin=, the phone remote's pairing QR format), so a phone that never paired goes straight in.
             "GET /api/phone-link" -> {
                 val ip = App.lanAddress() ?: throw ApiError(503, "This TV is not on a network yet.")
+                pairLocked(null, everyone = true)?.let { return it }   // locked for every phone: no code to show, the page hides the QR and asks again
                 val pin = Auth.pinForQr()
                 json(200, ok().put("url", SetupWords.qrLink("http://$ip:${Store.port}", pin, "/setup")).put("pin_expires_in", Auth.pinSecondsLeft())
                     .put("phones", Auth.phoneCount()))
@@ -779,18 +781,19 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         return if (inject) index(root) else asset("$root/index.html")
     }
 
-    /** 429 while pairing is locked (too many wrong codes), else null. */
-    private fun pairLocked(): Response? {
-        val secs = Auth.lockedFor()
+    /** 429 while pairing is locked for this address (too many wrong codes), or for everyone, else null. */
+    private fun pairLocked(addr: String?, everyone: Boolean = false): Response? {
+        val secs = if (everyone) Auth.lockedEverywhere() else Auth.lockedFor(addr)
         if (secs <= 0) return null
-        return json(429, err("Too many wrong codes. Wait ${(secs + 59) / 60} minutes, then try again.").put("retry_after", secs))
+        return json(429, err("Too many wrong codes. Wait ${(secs + 59) / 60} min, then try again.").put("retry_after", secs))
             .apply { addHeader("Retry-After", secs.toString()) }
     }
 
     /** The phone remote's index.html with the on-TV pairing script added first. */
     private fun index(root: String): Response {
         val html = assets.open("$root/index.html").bufferedReader().readText()
-        val tag = "<script src=\"/ontv/shim.js\"></script>"
+        // the pairing box speaks the phone remote's language: phone-words.js (its table only, data-manual), then shim.js
+        val tag = "<script src=\"/tv/phone-words.js\" data-manual></script><script src=\"/ontv/shim.js\"></script>"
         val out = if (html.contains("<head>")) html.replaceFirst("<head>", "<head>$tag") else tag + html
         return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", out).noCache()
     }

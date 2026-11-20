@@ -35,7 +35,7 @@ S.en = {
   ds_send: "Send to the TV",
   ds_note: "Paste the code from couch-tv Studio. Then on the TV, pick Use this design and press OK.",
   ds_title: "Send a design",
-  err_pairing_locked: "Too many wrong codes. Wait {minutes} minutes, then try again.",
+  err_pairing_locked: "Too many wrong codes. Wait {minutes} min, then try again.",
   widgets_on_tv_note: "Tap a widget to change its settings in Home settings on this phone.",
   widgets_on_tv: "Widgets on this TV",
   // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
@@ -241,7 +241,7 @@ S.en = {
   ask_popular_reason: "Popular in {country} this week",
   ask_still_working: "Still working on it. Give it a minute and watch the TV.",
   ask_still_working_doing: "Still working on it, {doing}. Give it a minute and watch the TV.",
-  err_adb_not_on: "The phone can't press keys on this TV yet. On the TV, open Couch TV, More help, Let the phone press keys.",
+  err_adb_not_on: "On the TV, switch on USB debugging in Developer options, then press Allow.",
   err_after_must_be_number: "after must be a number",
   err_already_kids_profile: "That is a kids profile already.",
   err_app_did_not_come_up: "asked the TV to open {app} but it did not come up",
@@ -839,7 +839,7 @@ S['zh-CN'] = {
   ask_popular_reason: "{country} 本周热门",
   ask_still_working: "还在处理，请稍等一分钟并看下电视。",
   ask_still_working_doing: "还在处理（{doing}），请稍等一分钟并看下电视。",
-  err_adb_not_on: "手机还不能在这台电视上按键。在电视上打开 Couch TV，选择“更多帮助”，再选“让手机按键”。",
+  err_adb_not_on: "在电视上的“开发者选项”里打开“USB 调试”，然后按“允许”。",
   err_after_must_be_number: "after 必须是数字",
   err_already_kids_profile: "那已经是儿童资料了。",
   err_app_did_not_come_up: "让电视打开 {app}，但它没起来",
@@ -1219,6 +1219,8 @@ S['zh-CN'] = {
 };
 
 S.es = {
+  err_pairing_locked: "Demasiados códigos incorrectos. Espera {minutes} min y vuelve a intentarlo.",
+  err_adb_not_on: "En la TV, activa Depuración por USB en Opciones para desarrolladores y luego pulsa Permitir.",
   ds_askLater: "Ahora no",
   ds_askSend: "Enviar",
   ds_ask: "¿Enviar este diseño al televisor?",
@@ -1232,7 +1234,6 @@ S.es = {
   ds_note: "Pega el código de couch-tv Studio. Luego, en el televisor, elige Usar este diseño y pulsa OK.",
   ds_title: "Enviar un diseño",
   widgets_on_tv_note: "Toca un widget para cambiar sus ajustes en los ajustes de inicio de este móvil.",
-  err_pairing_locked: "Demasiados códigos incorrectos. Espera {minutes} min y vuelve a intentarlo.",
   err_code_wrong: "Ese código no es correcto. Mira la tele.",
   err_code_expired: "Ese código ha caducado. Pide uno nuevo a la tele.",
   err_code_on_tv: "Ya hay un código en la tele. Espera un momento y vuelve a pedirlo.",
@@ -1499,6 +1500,8 @@ S['es-MX'] = {
 };
 
 S.it = {
+  err_pairing_locked: "Troppi codici sbagliati. Aspetta {minutes} min, poi riprova.",
+  err_adb_not_on: "Sulla TV, attiva Debug USB in Opzioni sviluppatore, poi premi Consenti.",
   ds_askLater: "Non ora",
   ds_askSend: "Invia",
   ds_ask: "Inviare questo design alla TV?",
@@ -1512,7 +1515,6 @@ S.it = {
   ds_note: "Incolla il codice di couch-tv Studio. Poi sulla TV scegli Usa questo design e premi OK.",
   ds_title: "Invia un design",
   widgets_on_tv_note: "Tocca un widget per cambiarne le impostazioni nelle impostazioni della home su questo telefono.",
-  err_pairing_locked: "Troppi codici sbagliati. Aspetta {minutes} min, poi riprova.",
   err_code_wrong: "Quel codice non è giusto. Controlla la TV.",
   err_code_expired: "Quel codice è scaduto. Chiedi alla TV un codice nuovo.",
   err_code_on_tv: "C'è già un codice sulla TV. Aspetta un momento, poi chiedi di nuovo.",
@@ -1692,6 +1694,8 @@ S.it = {
 };
 
 S.de = {
+  err_pairing_locked: "Zu viele falsche Codes. Warte {minutes} Min. und versuche es dann noch einmal.",
+  err_adb_not_on: "Schalte am Fernseher in den Entwickleroptionen USB-Debugging ein und drücke dann Zulassen.",
   ds_askLater: "Nicht jetzt",
   ds_askSend: "Senden",
   ds_ask: "Dieses Design an den Fernseher senden?",
@@ -1705,7 +1709,6 @@ S.de = {
   ds_note: "Füge den Code von couch-tv Studio ein. Wähle dann am Fernseher Dieses Design verwenden und drücke OK.",
   ds_title: "Design senden",
   widgets_on_tv_note: "Tippe auf ein Widget, um seine Einstellungen in den Startbildschirm-Einstellungen auf diesem Handy zu ändern.",
-  err_pairing_locked: "Zu viele falsche Codes. Warte {minutes} Min. und versuch es dann noch einmal.",
   err_code_wrong: "Dieser Code stimmt nicht. Schau auf den Fernseher.",
   err_code_expired: "Dieser Code ist abgelaufen. Lass dir auf dem Fernseher einen neuen zeigen.",
   err_code_on_tv: "Auf dem Fernseher steht schon ein Code. Warte kurz und frag dann noch einmal.",
@@ -1890,6 +1893,8 @@ S.de = {
 
 // Turkish. The words for the same things match the TV home's Turkish (tv-home/web/i18n.js).
 S.tr = {
+  err_pairing_locked: "Çok fazla yanlış kod. {minutes} dk bekle, sonra yeniden dene.",
+  err_adb_not_on: "Televizyonda Geliştirici seçenekleri içinde USB hata ayıklamayı aç, sonra İzin ver'e bas.",
   ds_askLater: "Şimdi değil",
   ds_askSend: "Gönder",
   ds_ask: "Bu tasarım TV'ye gönderilsin mi?",
@@ -1903,7 +1908,6 @@ S.tr = {
   ds_note: "couch-tv Studio'daki kodu yapıştır. Sonra TV'de Bu tasarımı kullan'ı seç ve OK'e bas.",
   ds_title: "Tasarım gönder",
   widgets_on_tv_note: "Ayarlarını bu telefondaki ana ekran ayarlarında değiştirmek için bir widget'a dokun.",
-  err_pairing_locked: "Çok fazla yanlış kod girildi. {minutes} dakika bekle, sonra yeniden dene.",
   err_code_wrong: "Bu kod doğru değil. Televizyona bak.",
   err_code_expired: "Bu kodun süresi doldu. Televizyondan yeni bir kod iste.",
   err_code_on_tv: "Televizyonda zaten bir kod var. Biraz bekle, sonra yeniden iste.",
@@ -2087,6 +2091,8 @@ S.tr = {
 };
 
 S['sr-Latn-RS'] = {
+  err_pairing_locked: "Previše pogrešnih kodova. Sačekajte {minutes} min, pa pokušajte ponovo.",
+  err_adb_not_on: "Na televizoru uključite Otklanjanje grešaka sa USB-a u Opcijama za programere, pa pritisnite Dozvoli.",
   ds_askLater: "Ne sada",
   ds_askSend: "Pošalji",
   ds_ask: "Poslati ovaj dizajn na TV?",
@@ -2100,7 +2106,6 @@ S['sr-Latn-RS'] = {
   ds_note: "Nalepite kod iz couch-tv Studio. Zatim na TV-u izaberite Koristi ovaj dizajn i pritisnite OK.",
   ds_title: "Pošalji dizajn",
   widgets_on_tv_note: "Dodirni vidžet da promeniš njegova podešavanja u podešavanjima početnog ekrana na ovom telefonu.",
-  err_pairing_locked: "Previše pogrešnih kodova. Sačekajte {minutes} min, pa pokušajte ponovo.",
   err_code_wrong: "Taj kod nije tačan. Pogledajte televizor.",
   err_code_expired: "Taj kod je istekao. Zatražite novi od televizora.",
   err_code_on_tv: "Na televizoru već stoji kod. Sačekajte malo, pa zatražite ponovo.",
@@ -2284,6 +2289,8 @@ S['sr-Latn-RS'] = {
 };
 
 S.cs = {
+  err_pairing_locked: "Příliš mnoho špatných kódů. Počkejte {minutes} min a zkuste to znovu.",
+  err_adb_not_on: "Na televizi zapněte Ladění přes USB v Možnostech pro vývojáře a pak stiskněte Povolit.",
   ds_askLater: "Teď ne",
   ds_askSend: "Poslat",
   ds_ask: "Poslat tento návrh do televize?",
@@ -2297,7 +2304,6 @@ S.cs = {
   ds_note: "Vložte kód z couch-tv Studio. Pak na televizi vyberte Použít tento návrh a stiskněte OK.",
   ds_title: "Poslat návrh",
   widgets_on_tv_note: "Klepnutím na widget změníte jeho nastavení v nastavení domovské obrazovky v tomto telefonu.",
-  err_pairing_locked: "Příliš mnoho špatných kódů. Počkejte {minutes} min a zkuste to znovu.",
   err_code_wrong: "Tento kód není správný. Podívejte se na televizi.",
   err_code_expired: "Platnost kódu vypršela. Požádejte televizi o nový.",
   err_code_on_tv: "Kód už je na televizi. Chvíli počkejte a pak požádejte znovu.",
@@ -2704,7 +2710,7 @@ S.pl = {
   ask_popular_reason: "Popularne w kraju {country} w tym tygodniu",
   ask_still_working: "Nadal nad tym pracuję. Poczekaj chwilę i spójrz na telewizor.",
   ask_still_working_doing: "Nadal nad tym pracuję ({doing}). Poczekaj chwilę i spójrz na telewizor.",
-  err_adb_not_on: "Telefon nie może jeszcze naciskać przycisków na tym telewizorze. Na telewizorze otwórz Couch TV, Więcej pomocy, Pozwól telefonowi naciskać przyciski.",
+  err_adb_not_on: "Na telewizorze włącz Debugowanie USB w Opcjach programistycznych, a potem naciśnij Zezwól.",
   err_after_must_be_number: "Parametr after musi być liczbą",
   err_already_kids_profile: "To jest już profil dziecięcy.",
   err_app_did_not_come_up: "Poproszono telewizor o otwarcie {app}, ale aplikacja się nie uruchomiła",
@@ -3085,6 +3091,8 @@ S.pl = {
 
 // Portuguese (Brazil), translated locally from en.
 S.pt = {
+  err_pairing_locked: "Muitos códigos errados. Espere {minutes} min e tente de novo.",
+  err_adb_not_on: "Na TV, ative a Depuração USB nas Opções do desenvolvedor e depois aperte Permitir.",
   ds_askLater: "Agora não",
   ds_askSend: "Enviar",
   ds_ask: "Enviar este design para a TV?",
@@ -3098,7 +3106,6 @@ S.pt = {
   ds_note: "Cole o código do couch-tv Studio. Depois, na TV, escolha Usar este design e aperte OK.",
   ds_title: "Enviar um design",
   widgets_on_tv_note: "Toque em um widget para mudar as configurações dele nos ajustes da tela inicial neste celular.",
-  err_pairing_locked: "Códigos errados demais. Espere {minutes} min e tente de novo.",
   err_code_wrong: "Esse código não está certo. Confira na TV.",
   err_code_expired: "Esse código expirou. Peça um novo à TV.",
   err_code_on_tv: "Já tem um código na TV. Espere um pouco e peça de novo.",
