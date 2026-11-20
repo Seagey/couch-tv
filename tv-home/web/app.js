@@ -4501,7 +4501,7 @@
   // couch-tv Studio is a name, the same in every language
   function secName(id) { return id === "designer" ? "couch-tv Studio" : t("sec_" + id); }
   function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(SECS[SET.sec][0]); }
-  function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info" && r.kind !== "code"; }
+  function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info" && r.kind !== "code" && r.kind !== "qr"; }
   function firstRow(rows) { for (var i = 0; i < rows.length; i++) if (focusable(rows[i])) return i; return -1; }
   function stepRow(rows, i, d) { for (var j = i + d; j >= 0 && j < rows.length; j += d) if (focusable(rows[j])) return j; return i; }
   function indexOfKey(rows, k) { for (var i = 0; i < rows.length; i++) if (rows[i].key === k) return i; return -1; }
@@ -5460,6 +5460,22 @@
   // as Updates). Nobody on a phone only install was ever told about a new version (a TCL beginner on
   // 0.13.3, 19 Nov 2026), so it is where people look first. English only for now (needs i18n).
   var UPD_ROW = "Update couch-tv";
+  // The on-TV app's own update words (it installs by itself over its ADB link, Update.kt), English only
+  // like its steps, which come from the app.
+  var UPD_ONTV = {
+    upd_err_space: "Not installed: the TV is short of space. Nothing changed. Use the steps above, or free some space and check again.",
+    upd_err_adb: "Couch TV lost its link to the TV, so nothing was installed. Use the steps above.",
+    upd_self_sub: "Downloads it, checks it and installs it. Your settings stay.",
+    upd_installing_self: "Installing. Couch TV closes and opens again by itself.",
+    upd_done: "Updated to {v}. Your settings stay.",
+    upd_note_self: "Updates come from couch-tv's releases on GitHub. With Tell me on, the TV looks once a week. Nothing is installed until you choose Update, and your settings stay as they are.",
+    upd_qr: "Scan to keep these steps on your phone."
+  };
+  function tUpd(k, v) {
+    var s = UPD_ONTV[k];
+    if (s == null) return t(k, v);
+    return v ? s.replace(/\{(\w+)\}/g, function (m, x) { return v[x] != null ? v[x] : m; }) : s;
+  }
   function updLine(u) {
     if (u.busy === "checking") return t("upd_checking");
     if (u.available || u.refused) return t("upd_gear", { v: u.latest, c: u.current || "" });
@@ -5485,22 +5501,26 @@
     if (u.latest) rows.push(info("upd-newest", t("upd_newest"), u.latest));   // both numbers side by side
     if (u.available && u.manual) {
       rows.push(info("upd-how", UPD_ROW, "", t("upd_gear", { v: u.latest, c: u.current || "" }) + ". " + (u.how || "")));
+      // the same steps on a phone, so nobody has to remember them (a TCL, 20 Nov 2026): first, before the steps
+      if (u.help_url && window.TVQR) rows.push({ kind: "qr", key: "upd-qr", url: u.help_url, label: tUpd("upd_qr") });
       rows = rows.concat(manualRows(u));
     } else if (u.available) {
+      // u.self: the on-TV app installs it by itself (no Android question), then opens again
       rows.push({ kind: "action", key: "upd-install", label: t("upd_install", { v: u.latest }),
-        sub: busy === "downloading" ? t("upd_downloading", { p: u.progress || 0 }) : busy === "installing" ? t("upd_confirm") : u.title || "",
+        sub: busy === "downloading" ? t("upd_downloading", { p: u.progress || 0 }) : busy === "installing" ? tUpd(u.self ? "upd_installing_self" : "upd_confirm")
+          : u.self ? tUpd("upd_self_sub") : u.title || "",
         act: function () { if (!busy) upd().install(); } });
     }
     rows.push({ kind: "action", key: "upd-check", label: t("upd_check"), sub: busy === "checking" ? t("upd_checking") : updWhen(u),
       act: function () { if (!busy) upd().check(); } });
-    if (u.error) rows.push(info("upd-err", t("upd_err_" + u.error)));
+    if (u.error) rows.push(info("upd-err", tUpd("upd_err_" + u.error)));
     else if (u.refused) rows.push(info("upd-err", t("upd_err_other_key")));
     else if (u.checked && !u.available && !busy) rows.push(info("upd-latest", t("upd_latest")));
     rows.push({ kind: "toggle", key: "upd-auto", label: t("upd_auto"), value: u.auto ? t("on") : t("off"),
       act: function () { upd().auto(!u.auto); } });
     // "It always asks before it installs one" is only true where the TV installs it: not on a Samsung
     // or the on-TV app (manual), whose own steps say how (a real Frame, 20 Nov 2026)
-    if (!u.manual) rows.push(info("upd-note", t("upd_note")));
+    if (!u.manual) rows.push(info("upd-note", tUpd(u.self ? "upd_note_self" : "upd_note")));
     return rows;
   }
 
@@ -5659,6 +5679,8 @@
     if (r.kind === "code") return '<div class="scode" aria-label="' + esc(r.label) + '"><span class="scode-big">' +
       String(r.label).split("").map(function (ch) { return ch === "-" ? '<i class="dash">-</i>' : "<i>" + esc(ch) + "</i>"; }).join("") +
       "</span>" + (r.sub ? "<small>" + esc(r.sub) + "</small>" : "") + "</div>";
+    // a QR code drawn in the page (qr.js), with one line beside it: the update steps on a phone
+    if (r.kind === "qr") return '<div class="sqr"><span class="sqr-code" data-qr="' + esc(r.url) + '"></span><small>' + esc(r.label) + "</small></div>";
     var f = SET.col === "rows" && i === SET.ri, lifted = SET.lift === r.key;
     var cls = "srow k-" + r.kind + (f ? " focus" : "") + (lifted ? " lifted" : "") + (r.danger ? " danger" : "");
     var lead = "";
@@ -5716,6 +5738,9 @@
     else if (SET.peeked !== listId + "|" + SET.ri) SET.peeked = null;
     box.setAttribute("data-list", listId);
     box.innerHTML = rows.map(rowHTML).join("");
+    Array.prototype.forEach.call(box.querySelectorAll("[data-qr]"), function (n) {
+      try { n.appendChild(window.TVQR.svg(n.getAttribute("data-qr"), 240)); } catch (e) { n.parentNode.style.display = "none"; }
+    });
     box.style.scrollBehavior = "auto";
     box.scrollTop = keep;
     void box.offsetHeight;   // apply the jump now, before smooth scrolling comes back on
@@ -7153,6 +7178,11 @@
     initSettings();
     // Home settings gets an Updates section, before About, where the launcher can update itself
     if (updRead() && UPD.supported) SECS.splice(SECS.length - 1, 0, ["updates", "download"]);
+    // back from Update to ... on the on-TV app: say so once
+    if (UPD && UPD.updated && kept("tvhome.update.done") !== UPD.updated) {
+      keep("tvhome.update.done", UPD.updated);
+      status(tUpd("upd_done", { v: UPD.updated }));
+    }
     mark("app-start");
     clock();
     setInterval(clockTick, 15000);

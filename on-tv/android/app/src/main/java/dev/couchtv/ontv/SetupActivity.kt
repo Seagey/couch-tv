@@ -76,6 +76,9 @@ class SetupActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         App.startService(this)
+        // Back from "Update to ..." (Update.kt): the shell line on the TV opens this screen once the new
+        // version is on, because the home screen is not exported. The home was on screen, so it goes back there.
+        if (backFromUpdate(intent)) { finish(); return }
         val dp = resources.displayMetrics.density
         fun px(v: Int) = (v * dp).toInt()
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(px(56), px(32), px(56), px(32)) }
@@ -190,7 +193,15 @@ class SetupActivity : Activity() {
         }
         refresh()
     }
-    override fun onNewIntent(i: Intent) { super.onNewIntent(i); refresh() }
+    override fun onNewIntent(i: Intent) { super.onNewIntent(i); if (backFromUpdate(i)) return; refresh() }
+
+    /** Opens the home when the intent comes from the update's shell line, once (the extra goes). */
+    private fun backFromUpdate(i: Intent?): Boolean {
+        if (i?.getBooleanExtra("updated", false) != true) return false
+        i.removeExtra("updated")
+        startActivity(Intent(this, HomeActivity::class.java))
+        return true
+    }
 
     private fun homeIsOn(): Boolean = HomeAsk.isOn(App.homeEnabled(this), HomeRole.held(this), homeOpensUs(), HomeRole.googleTv(this))
 
@@ -225,7 +236,7 @@ class SetupActivity : Activity() {
         code.text = SetupWords.pairLine(p, Auth.phoneCount(), ago)
         next.text = SetupWords.nextLine(p, Auth.phoneCount(), homeOpensUs())
         val s = Adb.status()
-        adb.text = SetupWords.keysLine(Adb.connected, s["state"] == "waiting_for_allow" || s["state"] == "connecting", s["state"] == "needs_pairing")
+        adb.text = SetupWords.keysLine(Adb.connected, s["state"] == "waiting_for_allow" || s["state"] == "connecting", s["state"] == "needs_pairing", Adb.unanswered)
         val google = HomeRole.googleTv(this)
         val watchApk = BuildConfig.BUILD_TYPE == "watch"
         val asking = askSince > 0 || awaitingRole

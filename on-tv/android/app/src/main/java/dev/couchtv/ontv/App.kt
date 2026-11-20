@@ -135,11 +135,8 @@ class BridgeService : Service() {
             .setSmallIcon(R.drawable.icon).setOngoing(true).build()
         // The typed startForeground and FOREGROUND_SERVICE_TYPE_SPECIAL_USE only exist on Android 14.
         // Older TVs (Android 9 to 13) crash on them, so they get the plain call.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else {
-            startForeground(1, n)
-        }
+        note = n
+        foreground()
         val wm = applicationContext.getSystemService(WifiManager::class.java)
         wifiLock = runCatching { wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "couchtv").apply { acquire() } }.getOrNull()
         multicast = runCatching { wm.createMulticastLock("couchtv-mdns").apply { setReferenceCounted(false); acquire() } }.getOrNull()
@@ -182,7 +179,21 @@ class BridgeService : Service() {
         } catch (e: Exception) { Log.e("couchtv", "server failed to start", e) }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int { startServer(); return START_STICKY }
+    private var note: Notification? = null
+
+    private fun foreground() {
+        val n = note ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(1, n)
+        }
+    }
+
+    // Every startForegroundService needs its own startForeground. Two at once (the app opened again by
+    // an update's shell line while Android sends MY_PACKAGE_REPLACED) crashed 0.13.8 on a real TCL
+    // ten seconds later, so each start says it again; it costs nothing when already in front.
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int { runCatching { foreground() }; startServer(); return START_STICKY }
 
     private val screenOn = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) { FireHome.onScreenOn() }

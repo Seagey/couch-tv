@@ -110,6 +110,15 @@
     <div class="msg" id="ask-msg" role="status"></div>
   </section>
 
+  <section class="card" id="upd">
+    <h2>Couch TV version</h2>
+    <p class="status" id="upd-line">Checking…</p>
+    <button class="go" id="upd-install" style="display:none"></button>
+    <button id="upd-check">Check for updates now</button>
+    <div class="msg" id="upd-msg" role="status"></div>
+    <ol id="upd-steps" style="display:none"></ol>
+  </section>
+
   <section class="card">
     <h2>Phones</h2>
     <p id="phones"></p>
@@ -126,6 +135,7 @@
     var s = $('adb-status');
     if (a.connected) { s.className = 'status ok'; s.textContent = 'Connected (' + (a.route === 'tls' ? 'wireless debugging' : 'port 5555') + ').'; }
     else if (a.state === 'waiting_for_allow' || a.state === 'connecting') { s.className = 'status'; s.textContent = 'Waiting. Accept "Allow debugging?" on the TV.'; }
+    else if (a.unanswered) { s.className = 'status bad'; s.textContent = 'No answer from the TV. If it did not show its Allow debugging question, restart the TV, then try again.'; }
     else { s.className = 'status bad'; s.textContent = 'Not connected.' + (a.error ? ' (' + a.error + ')' : ''); }
   }
   function load() {
@@ -160,7 +170,7 @@
     $('adb-msg').textContent = 'Connecting. Look at the TV.';
     api('POST', '/api/adb/connect', {}).then(function () {
       clearInterval(poll); var n = 0;
-      poll = setInterval(function () { n++; api('GET', '/api/adb').then(function (a) { showAdb(a); if (a.connected || n > 30) { clearInterval(poll); $('adb-msg').textContent = a.connected ? 'Done.' : ''; } }); }, 1500);
+      poll = setInterval(function () { n++; api('GET', '/api/adb').then(function (a) { showAdb(a); if (a.connected || n > 200 || (n > 2 && a.state !== 'waiting_for_allow' && a.state !== 'connecting')) { clearInterval(poll); $('adb-msg').textContent = a.connected ? 'Done.' : ''; } }); }, 1500);
     }).catch(function (e) { $('adb-msg').textContent = e.message; });
   };
   $('wd-pair').onclick = function () {
@@ -260,6 +270,55 @@
   $('ask-clear').onclick = function () {
     api('POST', '/api/settings', { ask_key: '', ask_enabled: false }).then(function () { $('ask-msg').textContent = 'Key removed.'; load(); });
   };
+  // Couch TV version: the same update as the TV's Home settings, Updates (Update.kt). With the TV's own
+  // ADB connected, Update to installs it; otherwise the steps, and the help page for them.
+  var UPD_ERR = {
+    net: "Can't reach GitHub. Check the TV's Wi-Fi and try again.",
+    bad: 'The download did not check out, so nothing was installed.',
+    other_key: 'This copy of Couch TV was built on another computer, so it cannot take this update.',
+    space: 'Not installed: the TV is short of space. Free some space on the TV, then try again.',
+    adb: 'Couch TV lost its link to the TV, so nothing was installed.',
+    failed: 'Android did not install the update. Nothing changed.'
+  };
+  var updPoll = null, updFrom = '', updWaiting = false;
+  function showUpd(u) {
+    var newer = u.available && u.latest;
+    $('upd-line').textContent = newer ? 'Version ' + u.latest + ' is out (this TV has ' + u.current + ').'
+      : 'Version ' + u.current + '. ' + (u.checked ? 'This is the latest version.' : 'Not checked yet.');
+    var b = $('upd-install');
+    b.style.display = newer && u.can_install ? '' : 'none';
+    b.textContent = 'Update to ' + u.latest;
+    b.disabled = !!u.busy;
+    $('upd-msg').textContent = u.busy === 'checking' ? 'Checking…' : u.busy === 'downloading' ? 'Downloading… ' + (u.progress || 0) + '%'
+      : u.busy === 'installing' ? 'Installing. Couch TV restarts by itself.' : u.error ? (UPD_ERR[u.error] || UPD_ERR.failed) : '';
+    var st = $('upd-steps');
+    st.style.display = newer && !u.can_install ? '' : 'none';
+    st.innerHTML = newer && !u.can_install ? (u.steps || []).map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') +
+      (u.help_url ? '<li style="list-style:none"><a href="' + esc(u.help_url) + '" target="_blank" rel="noopener">The same steps on the help page</a></li>' : '') : '';
+    clearInterval(updPoll);
+    if (u.busy) updPoll = setInterval(loadUpd, 1500);
+  }
+  function loadUpd() {
+    api('GET', '/api/update').then(function (u) {
+      var done = updWaiting && u.current !== updFrom;
+      if (done) updWaiting = false;
+      if (u.busy === 'installing') { updWaiting = true; updFrom = u.current; }
+      showUpd(u);
+      if (done) $('upd-msg').textContent = 'Updated to ' + u.current + '. Your settings stay.';
+      if (updWaiting && !u.busy) updWaiting = false;
+    }).catch(function () {
+      // Android stops the app while it replaces it: keep asking until the new one answers
+      if (updWaiting) $('upd-msg').textContent = 'Installing. Couch TV restarts by itself, then this page comes back.';
+    });
+  }
+  $('upd-install').onclick = function () {
+    $('upd-install').disabled = true;
+    api('POST', '/api/update/install', {}).then(showUpd).catch(function (e) { $('upd-msg').textContent = e.message; });
+  };
+  $('upd-check').onclick = function () {
+    api('POST', '/api/update/check', {}).then(showUpd).catch(function (e) { $('upd-msg').textContent = e.message; });
+  };
+  loadUpd();
   $('forget').onclick = function () {
     if (!confirm('Every phone, including this one, will need the code from the TV again.')) return;
     api('POST', '/api/phones/forget', {}).then(function () { location.reload(); });

@@ -287,10 +287,13 @@ Only the app from the Releases page updates this way. A copy built on your own c
 with your own scenes, says so and is updated the way you installed it. It still looks for new
 releases and keeps the dot and the line, so you hear when one is out.
 
-**The on-TV app (option C)** looks the same way (asked once, then weekly, or Check for updates now),
-but it cannot install an update itself: Android's installer needs a permission the phone only APK
-leaves out, so Google Play Protect has nothing new to stop. Instead **Home settings, About, Update
-couch-tv** shows the version line, and OK opens the exact steps: Downloader and its code 8180170 for
+**The on-TV app (option C)** looks the same way (asked once, then weekly, or Check for updates now).
+When its own link to the TV is connected (the phone remote can press keys), **Update to ...** downloads
+the release, checks it the way the launcher does and installs it over that link (ADB's shell user,
+`pm install -r`), then opens Couch TV again if it was on screen when the install started; it still leaves out Android's install permission, so
+Google Play Protect has nothing new to stop. Without the link (never connected, or a Fire TV that
+blocks it) or after a try that failed, **Home settings, About, Update couch-tv** shows the version
+line, and OK opens the exact steps, with a QR code that opens them on a phone: Downloader and its code 8180170 for
 `couch-tv-ontv.apk` (with the full address as a fallback), or `adb install -r` from a computer for
 `couch-tv-ontv-watch.apk`. Your settings stay. If Downloader says App not installed, the TV is
 usually short of space: the steps say to delete the old couch-tv-ontv files in Downloader's Files and

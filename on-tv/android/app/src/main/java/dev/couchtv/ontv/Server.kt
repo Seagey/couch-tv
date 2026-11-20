@@ -290,6 +290,10 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 json(if (r.optBoolean("ok")) 200 else 502, r)
             }
             "POST /api/adb/disconnect" -> { Adb.disconnect(); json(200, ok()) }
+            // Update couch-tv from the phone's TV setup page: the same state and install as the TV's Home settings (Update.kt)
+            "GET /api/update" -> json(200, ok(JSONObject(Update.state(ctx))))
+            "POST /api/update/check" -> { Update.check(ctx, true); json(200, ok(JSONObject(Update.state(ctx)))) }
+            "POST /api/update/install" -> { Update.install(ctx); json(200, ok(JSONObject(Update.state(ctx)))) }
             // Step-by-step handshake with every packet logged (tag couchtv.adb, "diag:"). See AdbDiag.
             "POST /api/adb/diag" -> {
                 val b = body(s)
