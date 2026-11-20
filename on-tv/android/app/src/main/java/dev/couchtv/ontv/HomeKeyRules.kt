@@ -158,7 +158,7 @@ object HomeKeyRules {
         "not_newer" -> "This TV has a newer Couch TV than the one on GitHub, so nothing was installed. Try again after the next release."
         "space" -> "Not installed: the TV is short of space. Free some space, then try again."
         "adb" -> "Couch TV lost its link to the TV, so nothing changed. Press Let the phone press keys, then try again."
-        "update_busy" -> "Couch TV is checking for an update right now. Press again in a moment."
+        "update_busy" -> "Couch TV is busy with an update right now. Press again in a moment."
         "not_bound" -> if (fireTv) "Couch TV is on, but the TV did not switch its Home button watch on. The help page has the steps for a Fire TV: couchtv.joshuaseage.com/help/home-button"
             else "Couch TV is on, but the TV did not switch its Home button watch on. Open the TV's $ACCESSIBILITY, and switch it on."
         else -> "That did not work, and nothing changed. Try again, or use the computer steps."

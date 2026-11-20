@@ -166,7 +166,7 @@ async function focusRow(page, re) {
   ok(/built on another computer, so it cannot take GitHub's version/.test(await rows(ok2)), "a try that stopped gives the real reason, as the other screens do");
   await ok2.close();
   const ub = await about("updbusy");
-  ok(/checking for an update right now\. Press again in a moment\./.test(await rows(ub)), "an update check in the way is said on screen");
+  ok(/busy with an update right now\. Press again in a moment\./.test(await rows(ub)), "an update in the way is said on screen");
   await ub.close();
   const h = await about("hidden");
   ok(!/Make Home open Couch TV/.test(await rows(h)), "a TV where Home already works shows nothing");

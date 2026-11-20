@@ -168,7 +168,7 @@ class HomeKeyRulesTest {
             assertTrue(it, it.contains("the steps below")); assertFalse(it, it.contains("More")); assertFalse(it, it.contains("scan"))
         }
         assertTrue(HomeKeyRules.STEPS_PHONE.contains("Let the phone press keys on this page"))
-        assertTrue(HomeKeyRules.errorWords("update_busy").contains("checking for an update"))
+        assertTrue(HomeKeyRules.errorWords("update_busy").contains("busy with an update"))
         // never a promise the code cannot check: the watch is on, Home should bring Couch TV back
         assertTrue(HomeKeyRules.DONE.contains("should") && HomeKeyRules.DONE.contains("check"))
     }

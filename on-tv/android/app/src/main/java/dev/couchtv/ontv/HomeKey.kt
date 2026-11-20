@@ -87,7 +87,7 @@ object HomeKey {
     /**
      * The press. Does nothing while something is already happening, or when there is nothing to do. The
      * check and the start happen under Update's own lock (Update.install and Update.check are synchronized
-     * on it), so an update and this never start together; an update check in the way is said on screen.
+     * on it), so an update and this never start together; an update in the way (checking, downloading or installing) is said on screen.
      */
     fun start(c: Context) {
         val app = c.applicationContext
