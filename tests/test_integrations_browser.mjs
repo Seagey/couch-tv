@@ -155,6 +155,11 @@ console.log("Running integrations browser tests...");
   ok(/Connected to homeassistant\.local/.test(s1.line), "the phone signed in: the TV says so by itself (" + s1.line + ")");
   ok(/Disconnect/.test(s1.text), "and offers Disconnect");
   ok(await page.evaluate(() => window.smartHome.enabled()), "smart home is on: the widgets read it again");
+  // Home Assistant refused the TV's refresh token: the TV says Sign in again by itself, and the QR stays
+  await page.evaluate(() => window.MOCK_HA_SIGNED_OUT());
+  await page.waitForTimeout(3600);
+  s1 = await shot();
+  ok(s1.qr === 1 && /^Sign in again\./.test(s1.line), "signed out by Home Assistant: the TV says Sign in again (" + s1.line + ")");
   ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
   await page.close();
 }
