@@ -652,6 +652,15 @@ def now_payload():
 
 
 # ---------- handlers ----------
+def serves_phone_page(app):
+    """Whether this computer serves the phone's Home settings page (/setup): the phone remote shows
+    Home settings on this phone, and Widgets on this TV, only then."""
+    try:
+        return any((r.resource.get_info().get("path") == "/setup") for r in app.router.routes() if r.resource is not None)
+    except Exception:
+        return False
+
+
 async def h_health(request):
     authed = is_authed(request)
     return ok(
@@ -660,6 +669,7 @@ async def h_health(request):
         version="1",
         auth="ok" if authed else "required",
         paired=authed,
+        phone_page=serves_phone_page(request.app),
     )
 
 
