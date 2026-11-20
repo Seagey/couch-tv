@@ -1862,8 +1862,17 @@
     }
     // a preview (?mock=1) never asks Open-Meteo itself: the designer talks to nobody else (wxlive=1: a test that does)
     var direct = (!MOCK || /[?&]wxlive=1/.test(Q)) && (OFFLINE || fc || !!(ST.place && isFinite(ST.place.lat)));
-    // no town yet: nothing to ask for (the weather tiles say "Set your town for the weather")
-    if (direct && !wxPlaceSet()) { data.weather = null; updateAmbientWeather(); return Promise.resolve(); }
+    // no town yet: nothing to ask for the home (the weather tiles say "Set your town for the weather"),
+    // but a widget with a place of its own still gets that place's reading
+    if (direct && !wxPlaceSet()) {
+      if (!wsPlaces().length) { data.weather = null; updateAmbientWeather(); return Promise.resolve(); }
+      return airAndSurf({}).then(function (j) {
+        data.weather = j;
+        if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("weather", [j.at && Object.keys(j.at).join(";"), Date.now()]);
+        clock();
+        updateAmbientWeather();
+      }, function () {});
+    }
     return (direct ? weatherDirect(fc) : api("GET", "/api/weather")).then(function (j) {
       data.weather = j;
       if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("weather", [j && j.temp, j && j.code, j && j.daily && j.daily.length, j && j.marine && j.marine.wave, j && j.air && j.air.aqi, j && j.at]);
@@ -1905,10 +1914,12 @@
   function wxNowAt(times) { var h = new Date(), iso = h.getFullYear() + "-" + ("0" + (h.getMonth() + 1)).slice(-2) + "-" + ("0" + h.getDate()).slice(-2) + "T" + ("0" + h.getHours()).slice(-2) + ":00"; return Math.max(0, (times || []).indexOf(iso)); }
   function wxAt(p) { return "latitude=" + p.lat + "&longitude=" + p.lon + "&timezone=" + encodeURIComponent(p.timezone || "auto"); }
   function airFor(p) {
-    return fetch("https://air-quality-api.open-meteo.com/v1/air-quality?" + wxAt(p) + "&current=european_aqi&hourly=european_aqi&forecast_days=2")
+    return fetch("https://air-quality-api.open-meteo.com/v1/air-quality?" + wxAt(p) + "&current=european_aqi,us_aqi&hourly=european_aqi,us_aqi&forecast_days=2")
       .then(function (r) { return r.json(); }).then(function (j) {
-        var H = j.hourly || {}, i = wxNowAt(H.time);
-        return j.current && isFinite(j.current.european_aqi) ? { aqi: j.current.european_aqi, hourly: (H.european_aqi || []).slice(i, i + 12).filter(function (v) { return v != null; }) } : null;
+        var H = j.hourly || {}, i = wxNowAt(H.time), keep = function (l) { return (l || []).slice(i, i + 12).filter(function (v) { return v != null; }); };
+        // both scales: the widget's Scale setting picks one (widgets.js airIn)
+        return j.current && isFinite(j.current.european_aqi) ? { aqi: j.current.european_aqi, hourly: keep(H.european_aqi),
+          us: isFinite(j.current.us_aqi) ? j.current.us_aqi : NaN, usHourly: keep(H.us_aqi) } : null;
       });
   }
   function surfFor(p) {
@@ -1928,10 +1939,10 @@
   // its own). A failure leaves the rest.
   function airAndSurf(out) {
     var want = typeof CouchDesign !== "undefined" && CouchDesign.wantsKinds ? CouchDesign.wantsKinds(["air", "surf"]) : [];
-    var own = wsPlaces(), jobs = [], places = {};
+    var own = wsPlaces(), jobs = [], places = {}, home = wxPlaceSet();
     var bare = function (kind) { return own.every(function (w) { return w.kind !== kind; }) || (CouchDesign.widgetList && CouchDesign.widgetList().some(function (w) { return w.kind === kind && !wsPlace(w.key); })); };
-    if (want.indexOf("air") >= 0 && bare("air")) jobs.push(airFor(WXCFG).then(function (a) { if (a) out.air = a; }, function () {}));
-    if (want.indexOf("surf") >= 0 && bare("surf")) jobs.push(surfFor(WXCFG).then(function (m) { out.marine = m; }, function () {}));
+    if (home && want.indexOf("air") >= 0 && bare("air")) jobs.push(airFor(WXCFG).then(function (a) { if (a) out.air = a; }, function () {}));
+    if (home && want.indexOf("surf") >= 0 && bare("surf")) jobs.push(surfFor(WXCFG).then(function (m) { out.marine = m; }, function () {}));
     own.forEach(function (w) { var k = placeKey(w.place); (places[k] = places[k] || { p: w.place, kinds: {} }).kinds[w.kind] = 1; });
     Object.keys(places).forEach(function (k) {
       var e = places[k];

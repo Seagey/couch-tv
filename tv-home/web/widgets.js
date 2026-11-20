@@ -243,9 +243,15 @@
   // °F: Home settings, Weather, Units (app.js data().unit, "f" or "c"). The forecast is always Celsius;
   // every temperature a widget draws is turned into the home's unit here, once
   function unitF(env) { var d = dataOf(env); return d.unit === "f" || d.wx_unit === "f" || (env && env.unit === "f"); }
+  // a weather widget's own "Temperature in" (widget-caps.js degrees, kept on this TV): "c" or "f" wins
+  // over Home settings; "auto" (or none) follows Home settings
+  function wxF(env, o) {
+    var u = o ? setting(o, env, "degrees") : "";
+    return u === "f" ? true : u === "c" ? false : unitF(env);
+  }
   function fOf(c) { return c === undefined || c === null || !isFinite(c) ? c : Math.round(c * 9 / 5 + 32); }
-  function inUnit(w, env) {
-    if (!w || !unitF(env)) return w;
+  function inUnit(w, env, o) {
+    if (!w || !wxF(env, o)) return w;
     var x = {}, k;
     for (k in w) if (Object.prototype.hasOwnProperty.call(w, k)) x[k] = w[k];
     x.unit = "f"; x.tempC = w.temp; x.temp = fOf(w.temp); x.hi = fOf(w.hi); x.lo = fOf(w.lo);
@@ -284,12 +290,12 @@
     if (env.demo) {
       var hr = now().getHours(); DEMO_WX.is_day = hr >= 6 && hr < 19; demoFull();
       DEMO_WX.ahead = dayAhead(DEMO_WX, DEMO_WX.days);
-      return inUnit(DEMO_WX, env);
+      return inUnit(DEMO_WX, env, o);
     }
     var src = wxSrc(o, env), w = src.w, d = { place: src.place };
     if (dataOf(env).wxOff || !w || w.temp === undefined || w.temp === null) return null;
     var cNow = Math.round(w.temp);
-    if (unitF(env)) w = rawF(w);
+    if (wxF(env, o)) w = rawF(w);
     var out = { place: (src.place && src.place.name) || "", picked: src.picked, temp: Math.round(w.temp), code: w.code, is_day: dayNow(w, d), hi: rnd(w.hi), lo: rnd(w.lo), uv: w.uv, aqi: w.aqi };
     // each hour is night or day by that day's own sunrise and sunset when the forecast has them
     var sunOf = {};
@@ -309,6 +315,12 @@
       if (out.uv === undefined && w.daily[0].uv !== undefined) out.uv = Math.round(w.daily[0].uv);
       out.ahead = dayAhead(out, out.days);
     }
+    // sun protection today: from when the UV reaches 3 to when it falls under 3 (the hourly UV, worked
+    // out to the nearest 10 minutes between hours); only today's hours, from now on
+    if (w.hourly && w.hourly.length) {
+      var uvWin = uvWindow(w.hourly, ymd(now()));
+      if (uvWin) { out.uvFrom = uvWin.from; out.uvTo = uvWin.to; }
+    }
     if (w.rain15 && w.rain15.length) {
       var mx = Math.max.apply(null, w.rain15.concat([0.5]));
       out.rain = w.rain15.slice(0, 12).map(function (v) { return Math.round(clamp(v / mx, 0.03, 1) * 100); });
@@ -316,9 +328,71 @@
       out.rainFrom = first < 0 ? "" : hm(Date.now() + first * 900000);
       out.rainMax = Math.max.apply(null, w.rain15);
     }
-    if (unitF(env)) { out.unit = "f"; out.tempC = cNow; }
+    if (wxF(env, o)) { out.unit = "f"; out.tempC = cNow; }
     return out;
   }
+
+  // [{ time, uv }] from now: { from, to } as "9:40am" words (from is "" while the UV is 3 or more now)
+  function uvWindow(hs, today) {
+    var at = function (i, j) {
+      var a = +hs[i].uv, b2 = +hs[j].uv, t0 = new Date(hs[i].time).getTime(), f = a === b2 ? 0 : clamp((3 - a) / (b2 - a), 0, 1);
+      var d = new Date(Math.round((t0 + f * 3600000) / 600000) * 600000);
+      return fmt12(d);
+    };
+    var on = function (i) { return hs[i] && isFinite(+hs[i].uv) && +hs[i].uv >= 3 && String(hs[i].time || "").slice(0, 10) === today; };
+    var first = -1, last = -1;
+    for (var i = 0; i < hs.length; i++) if (on(i)) { if (first < 0) first = i; last = i; } else if (first >= 0) break;
+    if (first < 0) return null;
+    return { from: first === 0 ? "" : at(first - 1, first), to: last + 1 < hs.length ? at(last, last + 1) : "" };
+  }
+  function uvLine(w) { return w.uvFrom && w.uvTo ? "Sun protection " + w.uvFrom + " to " + w.uvTo : w.uvTo ? "Sun protection until " + w.uvTo : ""; }
+  // a heading that says where a weather widget's reading is from when it has a place of its own
+  function wxHead(o, env, dflt) {
+    var l = op(o).label || dflt, p = pickedPlace(o, env);
+    return p && p.name && String(l).toLowerCase() !== p.name.toLowerCase() ? l + ", " + p.name : l;
+  }
+  // how many hours an Hourly widget shows: its "How many hours", never more than fit (at least `min`
+  // pixels a column), else as many as fit
+  function hoursN(o, env, fit, roomPx, have) {
+    var h = +setting(o, env, "hours");
+    if (!isFinite(h) || h < 1) return Math.min(fit, have);
+    return clamp(Math.min(Math.round(h), Math.max(2, roomPx)), 1, have);
+  }
+  // the moon seen from the south is the other way round: "south" or "north" set on this TV, else the
+  // home's town (its latitude), else its country
+  var SOUTH_LANDS = ["AU", "NZ", "ZA", "AR", "CL", "UY", "PY", "BO", "PE", "BR", "FJ", "PG", "NA", "BW", "LS", "SZ", "MZ", "MG", "MU", "ZW", "ZM", "MW", "AO"];
+  function moonSouth(o, env) {
+    var h = o ? setting(o, env || {}, "hemi") : "auto";
+    if (h === "south") return true;
+    if (h === "north") return false;
+    var p = dataOf(env || {}).place;
+    if (p && coord(p.lat)) return +p.lat < 0;
+    return SOUTH_LANDS.indexOf(String(dataOf(env || {}).country || "").toUpperCase()) >= 0;
+  }
+  var MIRROR = "transform:scaleX(-1)";
+  // the air quality scale: "eu" (European, 0 to 100 and over) or "us" (American, 0 to 500)
+  function airScale(o, env) {
+    var s = o ? setting(o, env || {}, "scale") : "auto";
+    if (s === "eu" || s === "us") return s;
+    return String(dataOf(env || {}).country || "").toUpperCase() === "US" ? "us" : "eu";
+  }
+  function usBand(v) { return v <= 50 ? ["Good", "#30d158"] : v <= 100 ? ["Moderate", "#ffd60a"] : v <= 150 ? ["Unhealthy for some", "#ff9f0a"] : v <= 200 ? ["Unhealthy", "#ff453a"] : v <= 300 ? ["Very unhealthy", "#bf5af2"] : ["Hazardous", "#8e2c48"]; }
+  // the reading in the widget's scale: { v, band, pct (where on the bar), hourly, scale, name }
+  function airIn(a, o, env) {
+    var sc = airScale(o, env), us = sc === "us" && isFinite(a.us);
+    var v = Math.round(us ? a.us : a.aqi);
+    return { v: v, band: us ? usBand(v) : aqiBand(v), pct: us ? clamp(v / 300 * 100, 2, 96) : clamp(v, 2, 96), scale: us ? "us" : "eu",
+      hourly: us ? a.usHourly || [] : a.hourly || [], bandOf: us ? usBand : aqiBand, top: us ? 150 : 40,
+      name: us ? "American air quality index (0 to 500)" : "European air quality index" };
+  }
+  // the surf's units: wave height "m" or "ft", the wind "kmh", "kn" or "mph"; "auto" goes by the country
+  function surfUnits(o, env) {
+    var us = String(dataOf(env || {}).country || "").toUpperCase() === "US";
+    var u = o ? setting(o, env || {}, "units") : "auto", wd = o ? setting(o, env || {}, "wind") : "auto";
+    return { h: u === "m" || u === "ft" ? u : us ? "ft" : "m", w: wd === "kmh" || wd === "kn" || wd === "mph" ? wd : us ? "mph" : "kmh" };
+  }
+  function waveIn(m, u) { if (!isFinite(m)) return ""; if (u.h === "ft") { var f = m * 3.28084; return String(f < 10 ? Math.round(f * 2) / 2 : Math.round(f)); } return String(Math.round(m * 10) / 10); }
+  function windIn(kmh, u) { return Math.round(u.w === "kn" ? kmh / 1.852 : u.w === "mph" ? kmh / 1.609344 : kmh) + (u.w === "kn" ? " knots" : u.w === "mph" ? " mph" : " km/h"); }
 
   var SHOWS = [["Bluey", "S3 E4, Hammerbarn", "au.net.abc.iview", "scene-golden", 0.6], ["Fisk", "S2 E1", "au.net.abc.iview", "albury-storm", 0.3],
     ["The Bear", "S3 E2", "com.disney.disneyplus", "scene-night", 0.8], ["Slow Horses", "S4 E5", "com.apple.atve.androidtv.appletv", "grose-valley", 0.4],
@@ -398,13 +472,21 @@
     return { rise: rise, set: set };
   }
   function fmt12(d) { var h = d.getHours(), m = d.getMinutes(); return (h % 12 || 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? "am" : "pm"); }
+  function tzFmt(d, tz) {
+    try {
+      var m = /(\d{1,2}):(\d{2})\s*([ap]m)/i.exec(d.toLocaleTimeString("en-AU", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }));
+      return m ? m[1] + ":" + m[2] + m[3].toLowerCase() : "";
+    } catch (e) { return ""; }
+  }
   function sunToday(env, o) {
     var w = weather(env, o);
     if (env.demo) return { rise: "5:41am", set: "7:22pm", frac: 0.42 };
-    var p = wxSrc(o, env).place, t = now();
+    var src = wxSrc(o, env), p = src.place, t = now();
     if (p && isFinite(p.lat) && isFinite(p.lon)) {
       var s = sunTimes(t, +p.lat, +p.lon);
-      if (s) return { rise: fmt12(s.rise), set: fmt12(s.set), frac: clamp((t - s.rise) / (s.set - s.rise), -0.1, 1.1) };
+      // a place of its own in another time zone: its sunrise by its own clock, as that town sees it
+      var f = function (d) { return src.picked && p.timezone && p.timezone !== "auto" ? tzFmt(d, p.timezone) || fmt12(d) : fmt12(d); };
+      if (s) return { rise: f(s.rise), set: f(s.set), frac: clamp((t - s.rise) / (s.set - s.rise), -0.1, 1.1) };
     }
     if (w && w.sunrise) return { rise: w.sunrise, set: w.sunset, frac: 0.5 };
     return null;
@@ -856,7 +938,7 @@
     var w = weather(env, o);
     if (!w) return noWx(root, b, env, o);
     if (!w.hourly) return empty(root, b, "clock", "The hourly forecast is on its way", "");
-    var n = clamp(Math.floor((b.w - 48) / 110), 3, w.hourly.length), ink = rgba(sh.ink, 1);
+    var n = hoursN(o, env, clamp(Math.floor((b.w - 48) / 110), 3, w.hourly.length), Math.floor((b.w - 48) / 72), w.hourly.length), ink = rgba(sh.ink, 1);
     var next = w.hourly.slice(1).filter(function (h) { return h[1] >= 51; })[0];
     add(root, [E("div", "cw-row cw-sp", "", [E("div", "", "min-width:0;flex:0 1 auto", [E("div", "cw-t29 cw-ell", "font-weight:640", [w.place || "Here"]), E("div", "cw-big", "font-size:72px;margin-top:4px", [w.temp + "°"])]),
       E("div", "cw-col", "text-align:right;align-items:flex-end;min-width:0;max-width:55%;margin-left:16px;flex:0 1 auto", [ic(wxIcon(w.code, w.is_day), 44, ink, "solid"), E("div", "cw-t25 cw-ell", "color:var(--ink);font-weight:600", [next ? wxWords(next[1]) + " from " + next[0] : wxWords(w.code)]), w.hi !== undefined ? E("div", "cw-t23 cw-ell", "", ["H:" + w.hi + "° L:" + w.lo + "°"]) : null])]),
@@ -886,7 +968,7 @@
     if (!w) return noWx(root, b, env, o);
     if (!w.rain) return empty(root, b, "rain", "Rain soon is on its way", "");
     var heavy = (w.rainMax || 3) >= 2.5;
-    add(root, [lab("rain", op(o).label || "Rain soon"), E("div", "cw-t38", "margin-top:10px", [w.rainFrom ? (heavy ? "Heavy rain from " : "Rain from ") + w.rainFrom : "No rain coming"]),
+    add(root, [lab("rain", wxHead(o, env, "Rain soon")), E("div", "cw-t38", "margin-top:10px", [w.rainFrom ? (heavy ? "Heavy rain from " : "Rain from ") + w.rainFrom : "No rain coming"]),
       E("div", "cw-grow cw-row", "align-items:flex-end;margin-top:14px", w.rain.map(function (v) { return E("i", "", "display:block;flex:1;margin:0 4px;height:" + v + "%;border-radius:6px;background:#64d2ff"); })),
       E("div", "cw-row cw-sp cw-t23", "margin-top:8px", [E("span", "", "", ["Now"]), E("span", "", "", ["+1h"]), E("span", "", "", ["+2h"]), E("span", "", "", ["+3h"])])]);
   };
@@ -894,24 +976,24 @@
     var w = weather(env, o);
     if (!w || w.uv === undefined) return w ? empty(root, b, "sun", "UV is on its way", "") : noWx(root, b, env, o);
     var band = w.uv < 3 ? "Low" : w.uv < 6 ? "Moderate" : w.uv < 8 ? "High" : w.uv < 11 ? "Very high" : "Extreme";
-    add(root, [lab("sun", op(o).label || "UV index"), E("div", "cw-big", "font-size:" + px(b.h < 300 ? 64 : 96) + ";margin-top:8px", [String(w.uv)]), E("div", "cw-t29", "font-weight:680", [band]), E("div", "cw-grow"),
+    add(root, [lab("sun", wxHead(o, env, "UV index")), E("div", "cw-big", "font-size:" + px(b.h < 300 ? 64 : 96) + ";margin-top:8px", [String(w.uv)]), E("div", "cw-t29", "font-weight:680", [band]), E("div", "cw-grow"),
       E("div", "cw-bar", "background:linear-gradient(90deg,#34c759,#ffd60a,#ff9f0a,#ff3b30,#af52de);overflow:visible", [E("i", "", "position:absolute;left:" + clamp(w.uv / 12 * 100, 2, 96) + "%;top:-6px;width:20px;height:20px;border-radius:10px;background:#fff;border:3px solid #ff6a3d;display:block")]),
-      b.h >= 300 && w.uvFrom ? E("div", "cw-t23", "color:var(--ink);margin-top:12px", ["Sun protection " + w.uvFrom + " to " + w.uvTo]) : null]);
+      b.h >= 300 && uvLine(w) ? E("div", "cw-t23", "color:var(--ink);margin-top:12px", [uvLine(w)]) : null]);
   };
   R.sun = function (root, o, b, env) {
     var s = sunToday(env, o);
     if (!s) return empty(root, b, "sun", "Set your town for the sun", "Settings (hold OK), Home settings, Location");
     var at = arc(s.frac);
-    add(root, [lab("sun", op(o).label || "Sun"), svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.3)", "stroke-width": 4, "stroke-dasharray": "2 10", "stroke-linecap": "round" }),
+    add(root, [lab("sun", o.kind === "sun" ? wxHead(o, env, "Sun") : op(o).label || "Sun"), svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.3)", "stroke-width": 4, "stroke-dasharray": "2 10", "stroke-linecap": "round" }),
       s.frac > 0 && s.frac < 1 ? S("circle", { cx: at.x, cy: at.y, r: 14, fill: "#ffd60a" }) : null], "flex:1;min-height:0;margin:6px 0"),
       E("div", "cw-row cw-sp", "", [E("div", "cw-t29", "", ["↑ " + s.rise]), b.w >= 300 ? E("div", "cw-t29", "", ["↓ " + s.set]) : null])]);
   };
-  R.moon = function (root, o, b) {
-    var m = moon(now()), r = 44, f = m.f, s = Math.max(60, Math.min(b.w - 48, b.h - 150) * 0.85);
+  R.moon = function (root, o, b, env) {
+    var m = moon(now()), r = 44, f = m.f, s = Math.max(60, Math.min(b.w - 48, b.h - 150) * 0.85), flip = moonSouth(o, env) ? MIRROR : "";
     // the lit part: a half disc and an ellipse whose width follows the phase
     var waxing = f < 0.5, k = Math.cos(f * 2 * Math.PI), ex = Math.abs(k) * r;
     var lit = S("path", { d: "M50 6 A44 44 0 0 " + (waxing ? 1 : 0) + " 50 94 A" + ex + " 44 0 0 " + ((waxing ? k > 0 : k < 0) ? 0 : 1) + " 50 6Z", fill: "#f2efe6" });
-    add(root, [E("div", "cw-lab", "", ["Moon"]), E("div", "cw-grow cw-row cw-center", "", [svg("0 0 100 100", s, s, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit])]),
+    add(root, [E("div", "cw-lab", "", ["Moon"]), E("div", "cw-grow cw-row cw-center", "", [svg("0 0 100 100", s, s, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit], flip)]),
       E("div", "cw-t29", "", [m.name]), b.h >= 280 ? E("div", "cw-t23", "", [m.full]) : null]);
   };
   // air quality: the European AQI from Open-Meteo's free air quality service (app.js asks for it only
@@ -925,14 +1007,14 @@
   R.air = function (root, o, b, env) {
     var a = airOf(env, o);
     if (!a) return weather(env, o) ? empty(root, b, "wind", "Waiting for the air quality", "From Open-Meteo, every refresh") : noWx(root, b, env, o);
-    var v = Math.round(a.aqi), band = aqiBand(v);
+    var q = airIn(a, o, env), v = q.v, band = q.band;
     if (b.h < 200) {
-      add(root, b.w < 300 ? [lab("wind", op(o).label || "Air"), E("div", "cw-grow"), E("div", "cw-big", "font-size:56px;color:" + band[1], [String(v)]), E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--ink)", [band[0]])]
-        : E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("wind", op(o).label || "Air quality"), E("div", "cw-t29 cw-ell", "font-weight:700;margin-top:8px", [band[0]])]), E("div", "cw-big", "font-size:84px;color:" + band[1], [String(v)])]));
+      add(root, b.w < 300 ? [lab("wind", wxHead(o, env, "Air")), E("div", "cw-grow"), E("div", "cw-big", "font-size:56px;color:" + band[1], [String(v)]), E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--ink)", [band[0]])]
+        : E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("wind", wxHead(o, env, "Air quality")), E("div", "cw-t29 cw-ell", "font-weight:700;margin-top:8px", [band[0]])]), E("div", "cw-big", "font-size:84px;color:" + band[1], [String(v)])]));
       return;
     }
-    add(root, [lab("wind", op(o).label || "Air quality"), E("div", "cw-big", "font-size:96px;margin-top:8px;color:" + band[1], [String(v)]), E("div", "cw-t29", "font-weight:680", [band[0]]), E("div", "cw-grow"),
-      E("div", "cw-bar", "background:linear-gradient(90deg,#30d158,#a4e05a,#ffd60a,#ff9f0a,#ff453a,#bf5af2);overflow:visible", [E("i", "", "position:absolute;left:" + clamp(v, 2, 96) + "%;top:-6px;width:20px;height:20px;border-radius:10px;background:#fff;border:3px solid #111;display:block")])]);
+    add(root, [lab("wind", wxHead(o, env, "Air quality")), E("div", "cw-big", "font-size:96px;margin-top:8px;color:" + band[1], [String(v)]), E("div", "cw-t29", "font-weight:680", [band[0]]), E("div", "cw-grow"),
+      E("div", "cw-bar", "background:linear-gradient(90deg," + (q.scale === "us" ? "#30d158,#ffd60a,#ff9f0a,#ff453a,#bf5af2,#8e2c48" : "#30d158,#a4e05a,#ffd60a,#ff9f0a,#ff453a,#bf5af2") + ");overflow:visible", [E("i", "", "position:absolute;left:" + q.pct + "%;top:-6px;width:20px;height:20px;border-radius:10px;background:#fff;border:3px solid #111;display:block")])]);
   };
   // surf: swell from Open-Meteo's free marine service for the sea nearest the town, and the wind from
   // the forecast (app.js asks only while a surf widget is on the home)
@@ -959,8 +1041,9 @@
     if (!isFinite(m.wave)) return empty(root, b, "wind", "No surf reading here", "The sea is too far from " + (pk && pk.name ? pk.name : "your town"));
     var place = surfPlace(o, env);
     var swell = compass(m.dir) + " swell" + (isFinite(m.period) ? ", " + Math.round(m.period) + "s" : "");
-    var wind = isFinite(m.wind) ? compass(m.windDir) + " " + Math.round(m.wind) + " km/h" : "";
-    var big = E("div", "cw-big", "font-size:" + px(b.h < 200 ? 64 : 92), [String(Math.round(m.wave * 10) / 10), E("span", "", "font-size:.4em", ["m"])]);
+    var u = env.demo ? { h: "m", w: "kmh" } : surfUnits(o, env);
+    var wind = isFinite(m.wind) ? compass(m.windDir) + " " + windIn(m.wind, u) : "";
+    var big = E("div", "cw-big", "font-size:" + px(b.h < 200 ? 64 : 92), [waveIn(m.wave, u), E("span", "", "font-size:.4em", [u.h === "ft" ? "ft" : "m"])]);
     if (b.h < 200) {
       add(root, E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("wind", place, "rgba(255,255,255,.88)"), E("div", "cw-t25 cw-ell", "color:#fff;margin-top:6px", [swell])]), big]));
       return;
@@ -2298,7 +2381,7 @@
     var w = weather(env, o);
     if (!w) return noWx(root, b, env, o);
     if (!w.hourly) return empty(root, b, "clock", "The hourly forecast is on its way", "");
-    var n = clamp(Math.floor((b.w - 48) / 76), 2, 5), ink = rgba(sh.ink, 1);
+    var n = hoursN(o, env, clamp(Math.floor((b.w - 48) / 76), 2, 5), Math.floor((b.w - 48) / 64), w.hourly.length), ink = rgba(sh.ink, 1);
     add(root, E("div", "cw-row cw-sp", "height:100%", w.hourly.slice(0, n).map(function (h) {
       return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink)", [h[0]]), E("div", "", "margin:4px 0", [ic(wxIcon(h[1], !h[3]), 34, ink, "solid")]), E("div", "", "font-size:27px;font-weight:650", [h[2] + "°"])]);
     })));
@@ -2317,7 +2400,8 @@
     if (!w) return noWx(root, b, env, o);
     if (!w.rain) return empty(root, b, "rain", "Rain soon is on its way", "");
     var heavy = (w.rainMax || 3) >= 2.5;
-    add(root, [E("div", "cw-t29 cw-ell", "font-weight:700", [w.rainFrom ? (heavy ? "Heavy rain from " : "Rain from ") + w.rainFrom : "No rain coming"]),
+    var pr = pickedPlace(o, env), rl = w.rainFrom ? (heavy ? "Heavy rain from " : "Rain from ") + w.rainFrom : "No rain coming";
+    add(root, [E("div", "cw-t29 cw-ell", "font-weight:700", [pr && pr.name ? pr.name + ": " + rl.charAt(0).toLowerCase() + rl.slice(1) : rl]),
       E("div", "cw-grow cw-row", "align-items:flex-end;margin-top:10px", w.rain.map(function (v) { return E("i", "", "display:block;flex:1;margin:0 3px;height:" + v + "%;border-radius:5px;background:#64d2ff"); }))]);
   };
   CR.uv = function (root, o, b, env) {
@@ -2325,19 +2409,20 @@
     if (!w || w.uv === undefined) return w ? empty(root, b, "sun", "UV is on its way", "") : noWx(root, b, env, o);
     var band = w.uv < 3 ? "Low" : w.uv < 6 ? "Moderate" : w.uv < 8 ? "High" : w.uv < 11 ? "Very high" : "Extreme";
     if (b.w < 300) return mini(root, b, "sun", String(w.uv), band);
-    mini(root, b, "sun", String(w.uv), "UV index", band + (w.uvFrom ? ", " + w.uvFrom + " to " + w.uvTo : ""));
+    var pu = pickedPlace(o, env);
+    mini(root, b, "sun", String(w.uv), pu && pu.name ? "UV, " + pu.name : "UV index", band + (w.uvFrom && w.uvTo ? ", " + w.uvFrom + " to " + w.uvTo : w.uvTo ? ", until " + w.uvTo : ""));
   };
-  CR.moon = function (root, o, b) {
-    var m = moon(now()), r = 44, f = m.f, waxing = f < 0.5, k = Math.cos(f * 2 * Math.PI), ex = Math.abs(k) * r;
+  CR.moon = function (root, o, b, env) {
+    var m = moon(now()), r = 44, f = m.f, waxing = f < 0.5, k = Math.cos(f * 2 * Math.PI), ex = Math.abs(k) * r, flip = moonSouth(o, env) ? MIRROR : "";
     var lit = S("path", { d: "M50 6 A44 44 0 0 " + (waxing ? 1 : 0) + " 50 94 A" + ex + " 44 0 0 " + ((waxing ? k > 0 : k < 0) ? 0 : 1) + " 50 6Z", fill: "#f2efe6" });
     if (b.w < 300) {
       // a tile: the moon, and its name under it
       root.style.padding = "16px";
-      add(root, E("div", "cw-col", "height:100%;align-items:center;justify-content:space-between", [svg("0 0 100 100", 78, 78, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit]),
+      add(root, E("div", "cw-col", "height:100%;align-items:center;justify-content:space-between", [svg("0 0 100 100", 78, 78, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit], flip),
         E("div", "cw-t23 cw-ell", "font-weight:680;color:var(--ink);max-width:100%", [m.name.replace(/^Waxing |^Waning /, "")])]));
       return;
     }
-    add(root, E("div", "cw-row", "height:100%", [svg("0 0 100 100", b.h - 48, b.h - 48, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit]),
+    add(root, E("div", "cw-row", "height:100%", [svg("0 0 100 100", b.h - 48, b.h - 48, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit], flip),
       E("div", "cw-col", "margin-left:20px;min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:680", [m.name]), E("div", "cw-t23 cw-ell", "", [m.full])])]));
   };
   CR.bins = function (root, o, b, env) {
@@ -2733,7 +2818,7 @@
       appNode: appNode, appsFor: appsFor, appName: appName, appIcon: appIcon, demoImg: demoImg, bgImg: bgImg,
       sunToday: sunToday, sunTimes: sunTimes, moon: moon, tzTime: tzTime, CITY: CITY, DAYS: DAYS, MONTHS: MONTHS, longDate: longDate, clockParts: clockParts,
       roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
-      airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, surfPlace: surfPlace, pickedPlace: pickedPlace, compass: compass,
+      airOf: airOf, aqiBand: aqiBand, airIn: airIn, surfOf: surfOf, surfUnits: surfUnits, waveIn: waveIn, windIn: windIn, moonSouth: moonSouth, wxHead: wxHead, uvLine: uvLine, surfPlace: surfPlace, pickedPlace: pickedPlace, compass: compass,
       // this widget's own settings and honest headings (WIDGET-SETTINGS-CONTRACT.md)
       setting: setting, tvSet: tvSet, devName: devName, webName: webName, feedFor: feedFor, unitF: unitF, roomUnit: roomUnit, tconv: tconv, sensorConv: sensorConv, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
       // things typed at home (athome.js through app.js)

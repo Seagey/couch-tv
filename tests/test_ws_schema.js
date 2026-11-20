@@ -129,8 +129,9 @@ CAPS.kinds().forEach((kind) => {
 // marked pre, and is a kind the TV draws
 const PRE = {
   clock: ["format"], tallclock: ["format"], glassclock: ["format"], flipclock: ["format"],
-  countdown: ["label", "day", "month", "year"], weather: ["place"], bigtemp: ["place"],
-  surf: ["place"], photo: ["photo", "image"], artframe: ["photo", "image"], upnext: ["sport"],
+  countdown: ["label", "day", "month", "year"], weather: ["place", "hilo", "town", "degrees"], bigtemp: ["place", "town", "degrees"],
+  hourly: ["town", "hours", "degrees"], rain: ["town"], uv: ["town"], sun: ["town"], moon: ["hemi"], air: ["town", "scale"],
+  surf: ["place", "units", "wind"], photo: ["photo", "image"], artframe: ["photo", "image"], upnext: ["sport"],
   aircon: ["entity"], controls: ["switches"], camera: ["cam", "label"], sensor: ["reading", "label"],
   doorbell: ["label"], energy: ["label"], list: ["list"], news: ["feed"], sports: ["league", "team"],
   stocks: ["tickers"], commute: ["to", "arrive_h"], bins: ["thisweek"]
@@ -152,7 +153,7 @@ const WW = fs.readFileSync(path.join(web, "widget-web.js"), "utf8");
 CAPS.settings("news")[0].options.forEach((o) => { if (o[0] !== "auto") ok(WW.indexOf("\"" + o[0] + "\": {") >= 0 || WW.indexOf(" " + o[0] + ": {") >= 0, "news source " + o[0] + " is a feed the TV reads"); });
 CAPS.settings("sports")[0].options.forEach((o) => ok(new RegExp("\\b" + o[0] + ": \\{ name: \"" + o[1] + "\"").test(WW), "competition " + o[0] + " is " + o[1] + " on the TV"));
 // the later settings (L items) are there too, after the before launch ones
-const LATER = { surf: ["units", "wind"], commute: ["buffer", "weekdays", "from"], weather: ["town"], speakers: ["players"], agenda: ["calendars", "days"], sports: ["games"] };
+const LATER = { commute: ["buffer", "weekdays", "from"], speakers: ["players"], agenda: ["calendars", "days"], sports: ["games"] };
 Object.keys(LATER).forEach((kind) => {
   const list = CAPS.settings(kind), firstLater = list.findIndex((s) => !s.pre);
   ok(list.slice(firstLater).every((s) => !s.pre), kind + ": before launch settings come first");

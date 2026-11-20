@@ -368,41 +368,42 @@
   };
 
   // moon: tonight and the next four weeks
-  function moonSvg(f, s) {
+  function moonSvg(f, s, flip) {
     var S2 = kit().S, r = 44, waxing = f < 0.5, k = Math.cos(f * 2 * Math.PI), ex = Math.abs(k) * r;
     return kit().svg("0 0 100 100", s, s, [S2("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }),
-      S2("path", { d: "M50 6 A44 44 0 0 " + (waxing ? 1 : 0) + " 50 94 A" + ex + " 44 0 0 " + ((waxing ? k > 0 : k < 0) ? 0 : 1) + " 50 6Z", fill: "#f2efe6" })]);
+      S2("path", { d: "M50 6 A44 44 0 0 " + (waxing ? 1 : 0) + " 50 94 A" + ex + " 44 0 0 " + ((waxing ? k > 0 : k < 0) ? 0 : 1) + " 50 6Z", fill: "#f2efe6" })], flip ? "transform:scaleX(-1)" : "");
   }
-  B.moon = function () {
-    var d = kit().now(), m = kit().moon(d);
+  // the moon the way it looks from this home's half of the world (the widget's Moon seen from)
+  B.moon = function (o, env) {
+    var d = kit().now(), m = kit().moon(d), south = kit().moonSouth(o, env);
     S.body.appendChild(head("clear-night", "Moon", m.name + ". " + m.full, "#3a3a6a"));
     var grid = E("div", "cwd-mgrid cwd-moons", "");
     for (var i = 0; i < 28; i++) {
       var dd = new Date(d.getTime() + i * 86400000), mm = kit().moon(dd);
-      grid.appendChild(E("div", "cwd-col", "align-items:center", [moonSvg(mm.f, 74), E("div", "cwd-small", "", [i === 0 ? "Tonight" : kit().DAYS[dd.getDay()].slice(0, 3) + " " + dd.getDate()])]));
+      grid.appendChild(E("div", "cwd-col", "align-items:center", [moonSvg(mm.f, 74, south), E("div", "cwd-small", "", [i === 0 ? "Tonight" : kit().DAYS[dd.getDay()].slice(0, 3) + " " + dd.getDate()])]));
     }
-    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "align-items:center;width:520px", [moonSvg(m.f, 380), E("div", "cwd-big", "margin-top:24px", [m.name])]), grid]));
+    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "align-items:center;width:520px", [moonSvg(m.f, 380, south), E("div", "cwd-big", "margin-top:24px", [m.name])]), grid]));
   };
 
   // air quality and surf
   B.air = function (o, env) {
     var a = kit().airOf(env, o);
     if (!a) return B.setup(o, env);
-    var v = Math.round(a.aqi), band = kit().aqiBand(v);
-    var SAY = { Good: "A good day to open the windows.", Fair: "Fine for nearly everyone.", Moderate: "Sensitive people may want to take it easy outside.", Poor: "Keep windows shut if anyone has asthma.", "Very poor": "Best to stay inside and keep windows shut.", "Extremely poor": "Stay inside. Smoke or dust is likely." };
-    S.body.appendChild(head("wind", "Air quality", band[0] + ". " + (SAY[band[0]] || ""), band[1]));
-    var hs = a.hourly || [], top = Math.max.apply(null, hs.concat([40]));
-    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "color:" + band[1], [String(v)]), E("div", "cwd-big", "", [band[0]]), E("div", "cwd-small", "margin-top:12px", ["European air quality index, from Open-Meteo"])]),
-      hs.length ? E("div", "cwd-col cwd-grow", "", [label("Next 12 hours"), E("div", "cwd-bars", "", hs.slice(0, 12).map(function (x) { return E("i", "", "height:" + Math.round(clamp(x / top, 0.06, 1) * 100) + "%;background:" + kit().aqiBand(x)[1]); })),
+    var q = kit().airIn(a, o, env), v = q.v, band = q.band;
+    var SAY = { "Unhealthy for some": "Anyone with asthma or a heart or lung problem should take it easy outside.", Unhealthy: "Everyone should take it easy outside.", "Very unhealthy": "Best to stay inside and keep windows shut.", Hazardous: "Stay inside. Smoke or dust is likely.", Good: "A good day to open the windows.", Fair: "Fine for nearly everyone.", Moderate: "Sensitive people may want to take it easy outside.", Poor: "Keep windows shut if anyone has asthma.", "Very poor": "Best to stay inside and keep windows shut.", "Extremely poor": "Stay inside. Smoke or dust is likely." };
+    S.body.appendChild(head("wind", kit().wxHead(o, env, "Air quality"), band[0] + ". " + (SAY[band[0]] || ""), band[1]));
+    var hs = q.hourly, top = Math.max.apply(null, hs.concat([q.top]));
+    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "color:" + band[1], [String(v)]), E("div", "cwd-big", "", [band[0]]), E("div", "cwd-small", "margin-top:12px", [q.name + ", from Open-Meteo"])]),
+      hs.length ? E("div", "cwd-col cwd-grow", "", [label("Next 12 hours"), E("div", "cwd-bars", "", hs.slice(0, 12).map(function (x) { return E("i", "", "height:" + Math.round(clamp(x / top, 0.06, 1) * 100) + "%;background:" + q.bandOf(x)[1]); })),
         E("div", "cwd-row cwd-small", "justify-content:space-between;margin-top:10px", [E("span", "", "", ["Now"]), E("span", "", "", ["+6h"]), E("span", "", "", ["+12h"])])]) : null]));
   };
   B.surf = function (o, env) {
     var m = kit().surfOf(env, o);
     if (!m || !isFinite(m.wave)) return B.setup(o, env);
-    var place = kit().surfPlace(o, env);
-    S.body.appendChild(head("wind", place, kit().compass(m.dir) + " swell, " + Math.round(m.period || 0) + " seconds" + (isFinite(m.wind) ? ". Wind " + kit().compass(m.windDir) + " " + Math.round(m.wind) + " km/h" : ""), "#0a6e8a"));
+    var place = kit().surfPlace(o, env), u = env.demo ? { h: "m", w: "kmh" } : kit().surfUnits(o, env);
+    S.body.appendChild(head("wind", place, kit().compass(m.dir) + " swell, " + Math.round(m.period || 0) + " seconds" + (isFinite(m.wind) ? ". Wind " + kit().compass(m.windDir) + " " + kit().windIn(m.wind, u) : ""), "#0a6e8a"));
     var hs = m.hourly || [], top = Math.max.apply(null, hs.concat([0.5]));
-    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "", [String(Math.round(m.wave * 10) / 10), E("span", "", "font-size:.36em", [" m"])]), E("div", "cwd-big", "", ["Swell now"])]),
+    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "", [kit().waveIn(m.wave, u), E("span", "", "font-size:.36em", [u.h === "ft" ? " ft" : " m"])]), E("div", "cwd-big", "", ["Swell now"])]),
       hs.length ? E("div", "cwd-col cwd-grow", "", [label("Swell, the next 12 hours"), E("div", "cwd-bars", "", hs.slice(0, 12).map(function (x) { return E("i", "", "height:" + Math.round(clamp(x / top, 0.06, 1) * 100) + "%;background:#64d2ff"); })),
         E("div", "cwd-row cwd-small", "justify-content:space-between;margin-top:10px", [E("span", "", "", ["Now"]), E("span", "", "", ["+6h"]), E("span", "", "", ["+12h"])])]) : null]));
   };
