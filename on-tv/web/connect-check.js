@@ -80,23 +80,6 @@
       pt: 'Coloque o celular no mesmo Wi-Fi da TV, não numa rede de convidados nem nos dados móveis. Veja se a TV está ligada. Depois carregue esta página de novo.',
       ro: 'Conectează telefonul la același Wi-Fi ca televizorul, nu la o rețea pentru oaspeți și nu la datele mobile. Verifică dacă televizorul e pornit. Apoi reîncarcă această pagină.',
       'zh-CN': '让手机连接和电视相同的 Wi-Fi，不要用访客网络，也不要用移动数据。确认电视已开机。然后重新加载此页面。' },
-    other_network_h: { en: 'The phone is on a different network from the TV.', es: 'El teléfono está en otra red que la tele.', 'es-MX': 'El celular está en otra red que la tele.', it: 'Il telefono è su una rete diversa dalla TV.', de: 'Das Handy ist in einem anderen Netz als der Fernseher.', fr: "Le téléphone est sur un autre réseau que la TV.", tr: 'Telefon TV\'den farklı bir ağda.', 'sr-Latn-RS': 'Telefon je na drugoj mreži od televizora.', pl: 'Telefon jest w innej sieci niż telewizor.', nl: 'De telefoon zit op een ander netwerk dan de tv.', cs: 'Telefon je v jiné síti než televize.', he: 'הטלפון ברשת אחרת מהטלוויזיה.', ar: 'الهاتف على شبكة مختلفة عن التلفزيون.', pt: 'O celular está numa rede diferente da TV.', ro: 'Telefonul e în altă rețea decât televizorul.', 'zh-CN': '手机和电视不在同一个网络。' },
-    other_network_f: { en: 'Put the phone on the same Wi-Fi as the TV. A guest network keeps phones away from the TV.',
-      es: 'Pon el teléfono en la misma Wi-Fi que la tele. Una red de invitados aparta los teléfonos de la tele.',
-      'es-MX': 'Conecta el celular a la misma Wi-Fi que la tele. Una red de invitados aleja los celulares de la tele.',
-      it: 'Metti il telefono sulla stessa Wi-Fi della TV. Una rete ospiti tiene i telefoni lontani dalla TV.',
-      de: 'Verbinde das Handy mit demselben WLAN wie den Fernseher. Ein Gästenetz hält Handys vom Fernseher fern.',
-      fr: "Mets le téléphone sur le même Wi-Fi que la TV. Un réseau invité tient les téléphones à l'écart de la TV.",
-      tr: 'Telefonu TV ile aynı Wi-Fi\'ye bağla. Misafir ağı telefonları TV\'den uzak tutar.',
-      'sr-Latn-RS': 'Povežite telefon na isti Wi-Fi kao televizor. Mreža za goste drži telefone dalje od televizora.',
-      pl: 'Połącz telefon z tą samą siecią Wi-Fi co telewizor. Sieć dla gości odcina telefony od telewizora.',
-      nl: 'Zet de telefoon op dezelfde wifi als de tv. Een gastnetwerk houdt telefoons weg van de tv.',
-      cs: 'Připojte telefon ke stejné Wi-Fi jako televizi. Síť pro hosty drží telefony mimo televizi.',
-      he: 'חברו את הטלפון לאותה רשת Wi-Fi של הטלוויזיה. רשת אורחים מרחיקה טלפונים מהטלוויזיה.',
-      ar: 'صِل الهاتف بشبكة Wi-Fi نفسها التي يتصل بها التلفزيون. شبكة الضيوف تُبعد الهواتف عن التلفزيون.',
-      pt: 'Coloque o celular no mesmo Wi-Fi da TV. Uma rede de convidados deixa os celulares longe da TV.',
-      ro: 'Conectează telefonul la același Wi-Fi ca televizorul. O rețea pentru oaspeți ține telefoanele departe de televizor.',
-      'zh-CN': '让手机连接和电视相同的 Wi-Fi。访客网络会把手机和电视隔开。' },
     fire_blocked_h: { en: 'This Fire TV stops Couch TV pressing keys by itself.', es: 'Este Fire TV no deja que Couch TV pulse teclas por sí solo.', 'es-MX': 'Este Fire TV no deja que Couch TV presione teclas por sí solo.', it: 'Questo Fire TV impedisce a Couch TV di premere i tasti da solo.', de: 'Dieser Fire TV lässt Couch TV nicht selbst Tasten drücken.', fr: "Ce Fire TV empêche Couch TV d'appuyer seul sur les touches.", tr: 'Bu Fire TV, Couch TV\'nin kendi başına tuşlara basmasını engelliyor.', 'sr-Latn-RS': 'Ovaj Fire TV ne dozvoljava da Couch TV sam pritiska tastere.', pl: 'Ten Fire TV nie pozwala Couch TV samemu naciskać klawiszy.', nl: 'Deze Fire TV laat Couch TV niet zelf toetsen indrukken.', cs: 'Tento Fire TV nedovolí Couch TV mačkat tlačítka sám.', he: 'ה-Fire TV הזה לא נותן ל-Couch TV ללחוץ על מקשים בעצמו.', ar: 'جهاز Fire TV هذا يمنع Couch TV من الضغط على الأزرار بنفسه.', pt: 'Este Fire TV impede o Couch TV de apertar teclas sozinho.', ro: 'Acest Fire TV nu lasă Couch TV să apese singur taste.', 'zh-CN': '这台 Fire TV 不让 Couch TV 自己按键。' },
     fire_blocked_f: { en: 'Amazon switched this off in a Fire TV update. For keys and typing from the phone, you need a home computer running Couch TV.',
       es: 'Amazon lo desactivó en una actualización de Fire TV. Para teclas y escribir desde el teléfono, necesitas un ordenador en casa con Couch TV.',
@@ -115,22 +98,38 @@
       ro: 'Amazon a oprit asta într-o actualizare Fire TV. Pentru taste și scris de pe telefon ai nevoie de un calculator acasă care rulează Couch TV.',
       'zh-CN': '亚马逊在一次 Fire TV 更新中关闭了这个功能。要用手机按键和打字，需要家里有一台运行 Couch TV 的电脑。' },
     debugging_off_h: { en: 'Debugging is off on the TV.', es: 'La depuración está desactivada en la tele.', it: 'Il debug è disattivato sulla TV.', de: 'Debugging ist am Fernseher aus.', fr: 'Le débogage est désactivé sur la TV.', tr: 'TV\'de hata ayıklama kapalı.', 'sr-Latn-RS': 'Otklanjanje grešaka je isključeno na televizoru.', pl: 'Debugowanie jest wyłączone w telewizorze.', nl: 'Foutopsporing staat uit op de tv.', cs: 'Ladění je na televizi vypnuté.', he: 'ניפוי הבאגים כבוי בטלוויזיה.', ar: 'تصحيح الأخطاء متوقف على التلفزيون.', pt: 'A depuração está desligada na TV.', ro: 'Depanarea este oprită pe televizor.', 'zh-CN': '电视上的调试已关闭。' },
-    debugging_off_f: { en: 'On the TV open Settings, System, About and press OK on Build seven times. Then in Developer options switch on USB debugging (some TVs call it Network debugging or ADB debugging).',
-      es: 'En la tele abre Ajustes, Sistema, Información y pulsa OK en Compilación siete veces. Luego, en Opciones para desarrolladores, activa Depuración por USB (algunas teles lo llaman Depuración de red o Depuración ADB).',
-      'es-MX': 'En la tele abre Configuración, Sistema, Información y presiona OK en Compilación siete veces. Luego, en Opciones para desarrolladores, activa Depuración por USB (algunas teles lo llaman Depuración de red o Depuración ADB).',
-      it: 'Sulla TV apri Impostazioni, Sistema, Informazioni e premi OK su Build sette volte. Poi in Opzioni sviluppatore attiva Debug USB (su alcune TV si chiama Debug di rete o Debug ADB).',
-      de: 'Öffne am Fernseher Einstellungen, System, Info und drücke siebenmal OK auf Build. Schalte dann in den Entwickleroptionen USB-Debugging ein (manche Fernseher nennen es Netzwerk-Debugging oder ADB-Debugging).',
-      fr: "Sur la TV, ouvre Paramètres, Système, À propos et appuie sept fois sur OK sur Build. Puis dans Options pour les développeurs, active Débogage USB (certaines TV l'appellent Débogage réseau ou Débogage ADB).",
-      tr: 'TV\'de Ayarlar, Sistem, Hakkında\'yı aç ve Yapı numarasında yedi kez OK\'a bas. Sonra Geliştirici seçenekleri\'nde USB hata ayıklama\'yı aç (bazı TV\'lerde adı Ağ hata ayıklama veya ADB hata ayıklama).',
-      'sr-Latn-RS': 'Na televizoru otvorite Podešavanja, Sistem, Osnovni podaci i sedam puta pritisnite OK na Verzija. Zatim u Opcijama za programere uključite Otklanjanje grešaka sa USB-a (na nekim televizorima se zove Mrežno otklanjanje grešaka ili ADB otklanjanje grešaka).',
-      pl: 'Na telewizorze otwórz Ustawienia, System, Informacje i siedem razy naciśnij OK na Kompilacja. Potem w Opcjach programisty włącz Debugowanie USB (na niektórych telewizorach to Debugowanie sieciowe lub Debugowanie ADB).',
-      nl: 'Open op de tv Instellingen, Systeem, Over en druk zeven keer op OK bij Build. Zet daarna in Ontwikkelaarsopties USB-foutopsporing aan (sommige tv\'s noemen het Netwerkfoutopsporing of ADB-foutopsporing).',
-      cs: 'Na televizi otevřete Nastavení, Systém, Informace a sedmkrát stiskněte OK na Sestavení. Pak v Možnostech pro vývojáře zapněte Ladění přes USB (na některých televizích se jmenuje Ladění přes síť nebo Ladění ADB).',
-      he: 'בטלוויזיה פתחו הגדרות, מערכת, מידע ולחצו OK על Build שבע פעמים. אחר כך באפשרויות למפתחים הפעילו ניפוי באגים ב-USB (בחלק מהטלוויזיות זה נקרא ניפוי באגים ברשת או ניפוי באגים ADB).',
-      ar: 'على التلفزيون افتح الإعدادات، النظام، حول واضغط OK على رقم الإصدار سبع مرات. ثم في خيارات المطور شغّل تصحيح أخطاء USB (في بعض أجهزة التلفزيون اسمه تصحيح أخطاء الشبكة أو تصحيح أخطاء ADB).',
-      pt: 'Na TV abra Configurações, Sistema, Sobre e aperte OK em Build sete vezes. Depois, em Opções do desenvolvedor, ative Depuração USB (algumas TVs chamam de Depuração de rede ou Depuração ADB).',
-      ro: 'Pe televizor deschide Setări, Sistem, Despre și apasă OK pe Versiune de șapte ori. Apoi în Opțiuni dezvoltator pornește Depanare USB (unele televizoare îi spun Depanare prin rețea sau Depanare ADB).',
-      'zh-CN': '在电视上打开设置、系统、关于，在版本号上按 OK 七次。然后在开发者选项中打开 USB 调试（有些电视叫网络调试或 ADB 调试）。' },
+    debugging_off_f: { en: 'On the TV open Settings, System, About and press OK on Build seven times (older Android TV: Settings, Device Preferences, About). Then in Developer options switch on USB debugging (some TVs call it Network debugging or ADB debugging).',
+      es: 'En la tele abre Ajustes, Sistema, Información y pulsa OK en Compilación siete veces (Android TV más antiguo: Ajustes, Preferencias del dispositivo, Información). Luego, en Opciones para desarrolladores, activa Depuración por USB (algunas teles lo llaman Depuración de red o Depuración ADB).',
+      'es-MX': 'En la tele abre Configuración, Sistema, Información y presiona OK en Compilación siete veces (Android TV más antigua: Configuración, Preferencias del dispositivo, Información). Luego, en Opciones para desarrolladores, activa Depuración por USB (algunas teles lo llaman Depuración de red o Depuración ADB).',
+      it: 'Sulla TV apri Impostazioni, Sistema, Informazioni e premi OK su Build sette volte (Android TV più vecchie: Impostazioni, Preferenze dispositivo, Informazioni). Poi in Opzioni sviluppatore attiva Debug USB (su alcune TV si chiama Debug di rete o Debug ADB).',
+      de: 'Öffne am Fernseher Einstellungen, System, Info und drücke siebenmal OK auf Build (älteres Android TV: Einstellungen, Geräteeinstellungen, Info). Schalte dann in den Entwickleroptionen USB-Debugging ein (manche Fernseher nennen es Netzwerk-Debugging oder ADB-Debugging).',
+      fr: "Sur la TV, ouvre Paramètres, Système, À propos et appuie sept fois sur OK sur Build (Android TV plus ancienne : Paramètres, Préférences de l'appareil, À propos). Puis dans Options pour les développeurs, active Débogage USB (certaines TV l'appellent Débogage réseau ou Débogage ADB).",
+      tr: 'TV\'de Ayarlar, Sistem, Hakkında\'yı aç ve Yapı numarasında yedi kez OK\'a bas (eski Android TV: Ayarlar, Cihaz Tercihleri, Hakkında). Sonra Geliştirici seçenekleri\'nde USB hata ayıklama\'yı aç (bazı TV\'lerde adı Ağ hata ayıklama veya ADB hata ayıklama).',
+      'sr-Latn-RS': 'Na televizoru otvorite Podešavanja, Sistem, Osnovni podaci i sedam puta pritisnite OK na Verzija (stariji Android TV: Podešavanja, Podešavanja uređaja, Osnovni podaci). Zatim u Opcijama za programere uključite Otklanjanje grešaka sa USB-a (na nekim televizorima se zove Mrežno otklanjanje grešaka ili ADB otklanjanje grešaka).',
+      pl: 'Na telewizorze otwórz Ustawienia, System, Informacje i siedem razy naciśnij OK na Kompilacja (starszy Android TV: Ustawienia, Ustawienia urządzenia, Informacje). Potem w Opcjach programisty włącz Debugowanie USB (na niektórych telewizorach to Debugowanie sieciowe lub Debugowanie ADB).',
+      nl: 'Open op de tv Instellingen, Systeem, Over en druk zeven keer op OK bij Build (oudere Android TV: Instellingen, Apparaatvoorkeuren, Over). Zet daarna in Ontwikkelaarsopties USB-foutopsporing aan (sommige tv\'s noemen het Netwerkfoutopsporing of ADB-foutopsporing).',
+      cs: 'Na televizi otevřete Nastavení, Systém, Informace a sedmkrát stiskněte OK na Sestavení (starší Android TV: Nastavení, Předvolby zařízení, Informace). Pak v Možnostech pro vývojáře zapněte Ladění přes USB (na některých televizích se jmenuje Ladění přes síť nebo Ladění ADB).',
+      he: 'בטלוויזיה פתחו הגדרות, מערכת, מידע ולחצו OK על Build שבע פעמים (Android TV ישן יותר: הגדרות, העדפות מכשיר, מידע). אחר כך באפשרויות למפתחים הפעילו ניפוי באגים ב-USB (בחלק מהטלוויזיות זה נקרא ניפוי באגים ברשת או ניפוי באגים ADB).',
+      ar: 'على التلفزيون افتح الإعدادات، النظام، حول واضغط OK على رقم الإصدار سبع مرات (Android TV الأقدم: الإعدادات، الإعدادات المفضّلة للجهاز، حول). ثم في خيارات المطور شغّل تصحيح أخطاء USB (في بعض أجهزة التلفزيون اسمه تصحيح أخطاء الشبكة أو تصحيح أخطاء ADB).',
+      pt: 'Na TV abra Configurações, Sistema, Sobre e aperte OK em Build sete vezes (Android TV mais antiga: Configurações, Preferências do dispositivo, Sobre). Depois, em Opções do desenvolvedor, ative Depuração USB (algumas TVs chamam de Depuração de rede ou Depuração ADB).',
+      ro: 'Pe televizor deschide Setări, Sistem, Despre și apasă OK pe Versiune de șapte ori (Android TV mai vechi: Setări, Preferințe dispozitiv, Despre). Apoi în Opțiuni dezvoltator pornește Depanare USB (unele televizoare îi spun Depanare prin rețea sau Depanare ADB).',
+      'zh-CN': '在电视上打开设置、系统、关于，在版本号上按 OK 七次（较旧的 Android TV：设置、设备偏好设置、关于）。然后在开发者选项中打开 USB 调试（有些电视叫网络调试或 ADB 调试）。' },
+    debugging_off_fire_f: { en: 'On the Fire TV open Settings, My Fire TV, About and press OK on the device name seven times. Then go back to My Fire TV, Developer options, and switch on ADB debugging.',
+      es: 'En el Fire TV abre Configuración, Mi Fire TV, Acerca de y pulsa OK siete veces en el nombre del dispositivo. Luego vuelve a Mi Fire TV, Opciones para desarrolladores, y activa Depuración ADB.',
+      'es-MX': 'En el Fire TV abre Configuración, Mi Fire TV, Acerca de y presiona OK siete veces en el nombre del dispositivo. Luego regresa a Mi Fire TV, Opciones para desarrolladores, y activa Depuración ADB.',
+      it: 'Sul Fire TV apri Impostazioni, La mia Fire TV, Informazioni e premi OK sette volte sul nome del dispositivo. Poi torna a La mia Fire TV, Opzioni sviluppatore, e attiva Debug ADB.',
+      de: 'Öffne am Fire TV Einstellungen, Mein Fire TV, Info und drücke siebenmal OK auf den Gerätenamen. Geh dann zurück zu Mein Fire TV, Entwickleroptionen, und schalte ADB-Debugging ein.',
+      fr: "Sur la Fire TV, ouvre Paramètres, Ma Fire TV, À propos et appuie sept fois sur OK sur le nom de l'appareil. Puis reviens à Ma Fire TV, Options pour les développeurs, et active Débogage ADB.",
+      tr: 'Fire TV\'de Settings, My Fire TV, About\'u aç ve cihaz adında yedi kez OK\'a bas. Sonra My Fire TV, Developer options\'a dön ve ADB debugging\'i aç.',
+      'sr-Latn-RS': 'Na Fire TV-u otvorite Settings, My Fire TV, About i sedam puta pritisnite OK na nazivu uređaja. Zatim se vratite na My Fire TV, Developer options, i uključite ADB debugging.',
+      pl: 'Na Fire TV otwórz Settings, My Fire TV, About i siedem razy naciśnij OK na nazwie urządzenia. Potem wróć do My Fire TV, Developer options, i włącz ADB debugging.',
+      nl: 'Open op de Fire TV Instellingen, Mijn Fire TV, Info en druk zeven keer op OK bij de apparaatnaam. Ga daarna terug naar Mijn Fire TV, Ontwikkelaarsopties, en zet ADB-foutopsporing aan.',
+      cs: 'Na Fire TV otevřete Settings, My Fire TV, About a sedmkrát stiskněte OK na názvu zařízení. Pak se vraťte do My Fire TV, Developer options, a zapněte ADB debugging.',
+      he: 'ב-Fire TV פתחו Settings, My Fire TV, About ולחצו OK שבע פעמים על שם המכשיר. אחר כך חזרו ל-My Fire TV, Developer options, והפעילו ADB debugging.',
+      ar: 'على Fire TV افتح Settings، My Fire TV، About واضغط OK سبع مرات على اسم الجهاز. ثم ارجع إلى My Fire TV، Developer options، وشغّل ADB debugging.',
+      pt: 'No Fire TV abra Configurações, Meu Fire TV, Sobre e aperte OK sete vezes no nome do dispositivo. Depois volte a Meu Fire TV, Opções do desenvolvedor, e ative Depuração ADB.',
+      ro: 'Pe Fire TV deschide Settings, My Fire TV, About și apasă OK de șapte ori pe numele dispozitivului. Apoi întoarce-te la My Fire TV, Developer options, și pornește ADB debugging.',
+      'zh-CN': '在 Fire TV 上打开 Settings、My Fire TV、About，在设备名称上按 OK 七次。然后回到 My Fire TV、Developer options，打开 ADB debugging。' },
     waiting_allow_h: { en: 'The TV is waiting for you.', es: 'La tele te está esperando.', it: 'La TV ti sta aspettando.', de: 'Der Fernseher wartet auf dich.', fr: "La TV t'attend.", tr: 'TV seni bekliyor.', 'sr-Latn-RS': 'Televizor vas čeka.', pl: 'Telewizor na ciebie czeka.', nl: 'De tv wacht op je.', cs: 'Televize na vás čeká.', he: 'הטלוויזיה מחכה לכם.', ar: 'التلفزيون ينتظرك.', pt: 'A TV está esperando você.', ro: 'Televizorul te așteaptă.', 'zh-CN': '电视在等你操作。' },
     waiting_allow_f: { en: 'Look at the TV. When it asks Allow debugging, tick Always allow and press Allow.',
       es: 'Mira la tele. Cuando pregunte si permites la depuración, marca Permitir siempre y pulsa Permitir.',
@@ -217,22 +216,22 @@
       ro: 'În Remedierea erorilor wireless de pe televizor alege Asociază dispozitivul folosind codul de asociere. Scrie mai sus codul de 6 cifre și apasă Trimite codul.',
       'zh-CN': '在电视的无线调试中选择使用配对码配对设备。在上面输入 6 位数代码，然后按发送代码。' },
     port_closed_h: { en: "The TV's debugging connection is closed.", es: 'La conexión de depuración de la tele está cerrada.', it: 'La connessione di debug della TV è chiusa.', de: 'Die Debugging-Verbindung des Fernsehers ist zu.', fr: 'La connexion de débogage de la TV est fermée.', tr: 'TV\'nin hata ayıklama bağlantısı kapalı.', 'sr-Latn-RS': 'Veza za otklanjanje grešaka na televizoru je zatvorena.', pl: 'Połączenie debugowania telewizora jest zamknięte.', nl: 'De foutopsporingsverbinding van de tv is dicht.', cs: 'Ladicí spojení televize je zavřené.', he: 'חיבור ניפוי הבאגים של הטלוויזיה סגור.', ar: 'اتصال تصحيح الأخطاء في التلفزيون مغلق.', pt: 'A conexão de depuração da TV está fechada.', ro: 'Conexiunea de depanare a televizorului e închisă.', 'zh-CN': '电视的调试连接已关闭。' },
-    port_closed_f: { en: 'Some TVs close it after a restart. In Developer options switch Wireless debugging (or Network debugging) off and on again, then press Check now.',
-      es: 'Algunas teles la cierran al reiniciarse. En Opciones para desarrolladores desactiva y vuelve a activar Depuración inalámbrica (o Depuración de red) y pulsa Comprobar ahora.',
-      'es-MX': 'Algunas teles la cierran al reiniciarse. En Opciones para desarrolladores desactiva y vuelve a activar Depuración inalámbrica (o Depuración de red) y presiona Revisar ahora.',
-      it: 'Alcune TV la chiudono dopo un riavvio. In Opzioni sviluppatore disattiva e riattiva Debug wireless (o Debug di rete), poi premi Controlla ora.',
-      de: 'Manche Fernseher schließen sie nach einem Neustart. Schalte in den Entwickleroptionen Debugging über WLAN (oder Netzwerk-Debugging) aus und wieder ein und drücke dann Jetzt prüfen.',
-      fr: "Certaines TV la ferment après un redémarrage. Dans Options pour les développeurs, désactive puis réactive Débogage sans fil (ou Débogage réseau), puis appuie sur Vérifier maintenant.",
-      tr: 'Bazı TV\'ler yeniden başlatınca bunu kapatır. Geliştirici seçenekleri\'nde Kablosuz hata ayıklama\'yı (veya Ağ hata ayıklama\'yı) kapatıp yeniden aç, sonra Şimdi kontrol et\'e bas.',
-      'sr-Latn-RS': 'Neki televizori je zatvore posle ponovnog pokretanja. U Opcijama za programere isključite pa ponovo uključite Bežično otklanjanje grešaka (ili Mrežno otklanjanje grešaka), zatim pritisnite Proveri sada.',
-      pl: 'Niektóre telewizory zamykają je po ponownym uruchomieniu. W Opcjach programisty wyłącz i włącz ponownie Debugowanie bezprzewodowe (lub Debugowanie sieciowe), potem naciśnij Sprawdź teraz.',
-      nl: 'Sommige tv\'s sluiten die na een herstart. Zet in Ontwikkelaarsopties Draadloze foutopsporing (of Netwerkfoutopsporing) uit en weer aan, en druk daarna op Nu controleren.',
-      cs: 'Některé televize ho po restartu zavřou. V Možnostech pro vývojáře vypněte a znovu zapněte Bezdrátové ladění (nebo Ladění přes síť) a pak stiskněte Zkontrolovat teď.',
-      he: 'יש טלוויזיות שסוגרות אותו אחרי הפעלה מחדש. באפשרויות למפתחים כבו והדליקו שוב ניפוי באגים אלחוטי (או ניפוי באגים ברשת), ואז לחצו לבדוק עכשיו.',
-      ar: 'بعض أجهزة التلفزيون تغلقه بعد إعادة التشغيل. في خيارات المطور أوقف تصحيح الأخطاء اللاسلكي (أو تصحيح أخطاء الشبكة) ثم شغّله من جديد، ثم اضغط افحص الآن.',
-      pt: 'Algumas TVs fecham ao reiniciar. Em Opções do desenvolvedor, desligue e ligue de novo a Depuração por Wi-Fi (ou a Depuração de rede) e aperte Verificar agora.',
-      ro: 'Unele televizoare o închid după o repornire. În Opțiuni dezvoltator oprește și pornește din nou Remedierea erorilor wireless (sau Depanare prin rețea), apoi apasă Verifică acum.',
-      'zh-CN': '有些电视重启后会关闭它。在开发者选项中把无线调试（或网络调试）关掉再打开，然后按立即检查。' },
+    port_closed_f: { en: 'Some TVs close it after a restart. In Developer options switch Wireless debugging (or Network debugging) off and on again, then press Let the phone press keys.',
+      es: 'Algunas teles la cierran al reiniciarse. En Opciones para desarrolladores desactiva y vuelve a activar Depuración inalámbrica (o Depuración de red) y pulsa Dejar que el móvil pulse teclas.',
+      'es-MX': 'Algunas teles la cierran al reiniciarse. En Opciones para desarrolladores desactiva y vuelve a activar Depuración inalámbrica (o Depuración de red) y presiona Dejar que el celular presione teclas.',
+      it: 'Alcune TV la chiudono dopo un riavvio. In Opzioni sviluppatore disattiva e riattiva Debug wireless (o Debug di rete), poi premi Fai premere i tasti al telefono.',
+      de: 'Manche Fernseher schließen sie nach einem Neustart. Schalte in den Entwickleroptionen Debugging über WLAN (oder Netzwerk-Debugging) aus und wieder ein und drücke dann Handy Tasten drücken lassen.',
+      fr: "Certaines TV la ferment après un redémarrage. Dans Options pour les développeurs, désactive puis réactive Débogage sans fil (ou Débogage réseau), puis appuie sur Laisser le téléphone appuyer sur les touches.",
+      tr: 'Bazı TV\'ler yeniden başlatınca bunu kapatır. Geliştirici seçenekleri\'nde Kablosuz hata ayıklama\'yı (veya Ağ hata ayıklama\'yı) kapatıp yeniden aç, sonra Telefon tuşlara bassın\'a bas.',
+      'sr-Latn-RS': 'Neki televizori je zatvore posle ponovnog pokretanja. U Opcijama za programere isključite pa ponovo uključite Bežično otklanjanje grešaka (ili Mrežno otklanjanje grešaka), zatim pritisnite Neka telefon pritiska tastere.',
+      pl: 'Niektóre telewizory zamykają je po ponownym uruchomieniu. W Opcjach programisty wyłącz i włącz ponownie Debugowanie bezprzewodowe (lub Debugowanie sieciowe), potem naciśnij Pozwól telefonowi naciskać klawisze.',
+      nl: 'Sommige tv\'s sluiten die na een herstart. Zet in Ontwikkelaarsopties Draadloze foutopsporing (of Netwerkfoutopsporing) uit en weer aan, en druk daarna op Telefoon toetsen laten indrukken.',
+      cs: 'Některé televize ho po restartu zavřou. V Možnostech pro vývojáře vypněte a znovu zapněte Bezdrátové ladění (nebo Ladění přes síť) a pak stiskněte Nechat telefon mačkat tlačítka.',
+      he: 'יש טלוויזיות שסוגרות אותו אחרי הפעלה מחדש. באפשרויות למפתחים כבו והדליקו שוב ניפוי באגים אלחוטי (או ניפוי באגים ברשת), ואז לחצו על לאפשר לטלפון ללחוץ על מקשים.',
+      ar: 'بعض أجهزة التلفزيون تغلقه بعد إعادة التشغيل. في خيارات المطور أوقف تصحيح الأخطاء اللاسلكي (أو تصحيح أخطاء الشبكة) ثم شغّله من جديد، ثم اضغط السماح للهاتف بالضغط على الأزرار.',
+      pt: 'Algumas TVs fecham ao reiniciar. Em Opções do desenvolvedor, desligue e ligue de novo a Depuração por Wi-Fi (ou a Depuração de rede) e aperte Deixar o celular apertar teclas.',
+      ro: 'Unele televizoare o închid după o repornire. În Opțiuni dezvoltator oprește și pornește din nou Remedierea erorilor wireless (sau Depanare prin rețea), apoi apasă Lasă telefonul să apese taste.',
+      'zh-CN': '有些电视重启后会关闭它。在开发者选项中把无线调试（或网络调试）关掉再打开，然后按让手机按键。' },
     no_wireless_h: { en: 'This TV has no Wireless debugging.', es: 'Esta tele no tiene depuración inalámbrica.', it: 'Questa TV non ha il debug wireless.', de: 'Dieser Fernseher hat kein Debugging über WLAN.', fr: "Cette TV n'a pas de débogage sans fil.", tr: 'Bu TV\'de kablosuz hata ayıklama yok.', 'sr-Latn-RS': 'Ovaj televizor nema bežično otklanjanje grešaka.', pl: 'Ten telewizor nie ma debugowania bezprzewodowego.', nl: 'Deze tv heeft geen draadloze foutopsporing.', cs: 'Tato televize nemá bezdrátové ladění.', he: 'לטלוויזיה הזו אין ניפוי באגים אלחוטי.', ar: 'هذا التلفزيون لا يحتوي على تصحيح الأخطاء اللاسلكي.', pt: 'Esta TV não tem depuração por Wi-Fi.', ro: 'Acest televizor nu are remedierea erorilor wireless.', 'zh-CN': '这台电视没有无线调试。' },
     no_wireless_f: { en: 'It is Android 10 or older, and that is fine. In Developer options switch on Network debugging (on some TVs, USB debugging), then press Let the phone press keys.',
       es: 'Tiene Android 10 o anterior, y no pasa nada. En Opciones para desarrolladores activa Depuración de red (en algunas teles, Depuración por USB) y pulsa Dejar que el móvil pulse teclas.',
@@ -253,7 +252,7 @@
     unknown_h: { en: "The check couldn't find the cause.", es: 'La comprobación no encontró la causa.', 'es-MX': 'La revisión no encontró la causa.', it: 'Il controllo non ha trovato la causa.', de: 'Die Prüfung hat die Ursache nicht gefunden.', fr: "La vérification n'a pas trouvé la cause.", tr: 'Kontrol nedeni bulamadı.', 'sr-Latn-RS': 'Provera nije pronašla uzrok.', pl: 'Sprawdzenie nie znalazło przyczyny.', nl: 'De controle heeft de oorzaak niet gevonden.', cs: 'Kontrola nenašla příčinu.', he: 'הבדיקה לא מצאה את הסיבה.', ar: 'لم يجد الفحص السبب.', pt: 'A verificação não encontrou a causa.', ro: 'Verificarea nu a găsit cauza.', 'zh-CN': '检查没有找到原因。' },
     unknown_f: { en: 'Press Copy a report and send it with your question.', es: 'Pulsa Copiar un informe y envíalo con tu pregunta.', 'es-MX': 'Presiona Copiar un reporte y envíalo con tu pregunta.', it: 'Premi Copia un resoconto e invialo con la tua domanda.', de: 'Drücke Bericht kopieren und schick ihn mit deiner Frage.', fr: 'Appuie sur Copier un rapport et envoie-le avec ta question.', tr: 'Rapor kopyala\'ya bas ve sorunla birlikte gönder.', 'sr-Latn-RS': 'Pritisnite Kopiraj izveštaj i pošaljite ga uz pitanje.', pl: 'Naciśnij Kopiuj raport i wyślij go razem z pytaniem.', nl: 'Druk op Een verslag kopiëren en stuur het mee met je vraag.', cs: 'Stiskněte Zkopírovat zprávu a pošlete ji se svou otázkou.', he: 'לחצו העתקת דוח ושלחו אותו עם השאלה שלכם.', ar: 'اضغط نسخ تقرير وأرسله مع سؤالك.', pt: 'Aperte Copiar um relatório e envie junto com sua pergunta.', ro: 'Apasă Copiază un raport și trimite-l împreună cu întrebarea ta.', 'zh-CN': '按复制报告，把它和你的问题一起发出。' }
   };
-  var CODES = ['ok', 'unreachable', 'other_network', 'fire_blocked', 'debugging_off', 'waiting_allow', 'allow_unanswered', 'ethernet', 'wireless_off', 'needs_pairing', 'port_closed', 'no_wireless', 'unknown'];
+  var CODES = ['ok', 'unreachable', 'fire_blocked', 'debugging_off', 'waiting_allow', 'allow_unanswered', 'ethernet', 'wireless_off', 'needs_pairing', 'port_closed', 'no_wireless', 'unknown'];
 
   function pick(list) {
     for (var i = 0; i < list.length; i++) {
@@ -295,7 +294,7 @@
       '<p class="status cc-head" role="status"></p><p class="cc-fix"></p><p class="msg cc-msg" role="status"></p>' +
       '<textarea class="cc-report" readonly rows="8" style="display:none;width:100%;font:13px/1.35 ui-monospace,monospace"></textarea>';
     var q = function (c) { return el.querySelector('.' + c); };
-    var last = { code: null, report: '' };
+    var last = { code: null, report: '', fire: false };
     function words() {
       var l = lang();
       el.setAttribute('dir', RTL[l] ? 'rtl' : 'ltr');
@@ -312,7 +311,7 @@
       el.setAttribute('data-code', code);
       q('cc-head').className = 'status cc-head ' + (code === 'ok' ? 'ok' : 'bad');
       q('cc-head').textContent = code === 'ok' ? t('ok', l) : t(code + '_h', l);
-      q('cc-fix').textContent = code === 'ok' ? '' : t(code + '_f', l);
+      q('cc-fix').textContent = code === 'ok' ? '' : t(last.fire && W[code + '_fire_f'] ? code + '_fire_f' : code + '_f', l);
     }
     function run() {
       var l = lang();
@@ -323,6 +322,7 @@
       return Promise.race([api('GET', '/api/adb/check'), late]).then(function (j) {
         clearTimeout(timer);
         if (j.lang && !tvLang) { tvLang = j.lang; words(); l = lang(); }
+        last.fire = !!j.fire_tv;
         last.code = CODES.indexOf(j.code) >= 0 ? j.code : 'unknown';
         last.report = reportFor(j, last.code, l);
         show(last.code);
@@ -330,6 +330,7 @@
       }, function (e) {
         clearTimeout(timer);
         // fetch failing outright (TypeError) or no answer in time: the phone can't reach the TV
+        last.fire = false;
         last.code = (e && e.name === 'TypeError') ? 'unreachable' : 'unknown';
         last.report = reportFor(null, last.code, l, e && e.message);
         show(last.code);

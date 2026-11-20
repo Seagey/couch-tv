@@ -151,14 +151,13 @@ with the fix:
 | What it says | What to do |
 |---|---|
 | The phone can't reach the TV | Phone and TV on the same Wi-Fi: not a guest network, not mobile data. Check the TV is on, then load the page again. |
-| The phone is on a different network from the TV | The same, seen from the TV: a guest network keeps phones away from the TV. |
 | The TV is on a network cable | Wireless debugging (Android 11 and newer) only works on Wi-Fi. Join the Wi-Fi on the TV, or use the older TVs steps with Network debugging, which works on a cable. |
-| Debugging is off on the TV | Settings, System (or Device Preferences), About: press OK on Build seven times. Then Developer options, USB debugging on (some TVs call it Network debugging or ADB debugging). |
+| Debugging is off on the TV | Settings, System, About (older Android TV: Settings, Device Preferences, About): press OK on Build seven times. Then Developer options, USB debugging on (some TVs call it Network debugging or ADB debugging). On a Fire TV: Settings, My Fire TV, About, press OK on the device name seven times, then My Fire TV, Developer options, ADB debugging on. |
 | Wireless debugging is off | Developer options, Wireless debugging on, tick Always allow on this network, then the newer TVs steps. |
 | Wireless debugging is on, but Couch TV is not paired yet | Wireless debugging, Pair device with pairing code, and type the 6 digit code on the phone. |
 | This TV has no Wireless debugging | Android 10 or older: Network debugging (on some TVs USB debugging), then Let the phone press keys. |
 | The TV is waiting for you, or nobody answered the TV's Allow question | Press Let the phone press keys and look at the TV straight away: tick Always allow and press Allow. If no question shows, restart the TV and try again. |
-| The TV's debugging connection is closed | Some TVs close it after a restart: switch Wireless debugging (or Network debugging) off and on, then Check now. |
+| The TV's debugging connection is closed | Some TVs close it after a restart: switch Wireless debugging (or Network debugging) off and on again, then press Let the phone press keys. |
 | This Fire TV stops Couch TV pressing keys by itself | Amazon switched it off in a Fire TV update. Keys and typing from the phone need a home computer running couch-tv (option B). |
 
 Still stuck: press **Copy a report** and paste it into your question or a GitHub issue. It holds the

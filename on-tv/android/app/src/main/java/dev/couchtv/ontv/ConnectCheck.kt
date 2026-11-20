@@ -38,29 +38,32 @@ object ConnectCheck {
         /** The phone's address is on the TV's own network. null when it can't tell. */
         val phoneSameNetwork: Boolean? = true,
         val fireBlocked: Boolean = false,
+        /** A Fire TV (Build.MANUFACTURER Amazon): Fire OS has only ADB debugging on port 5555, never Wireless debugging. */
+        val fireTv: Boolean = false,
         val lastError: String? = null,
     )
 
     /** Every answer the check can give, in the order it looks. The page has words for each. */
-    val CODES = listOf("ok", "other_network", "fire_blocked", "debugging_off", "waiting_allow", "allow_unanswered",
+    val CODES = listOf("ok", "fire_blocked", "debugging_off", "waiting_allow", "allow_unanswered",
         "ethernet", "wireless_off", "needs_pairing", "port_closed", "no_wireless", "unknown")
 
     fun diagnose(f: Facts): String {
         if (f.connected) return "ok"
-        if (f.phoneSameNetwork == false) return "other_network"
+        // the phone's network is only in the report: the TV's ADB is its own (127.0.0.1), so another
+        // network or VLAN never stops key presses, and blaming it would hide the real cause
         if (f.fireBlocked) return "fire_blocked"
         if (f.debuggingOn == false) return "debugging_off"
         if (f.state == "waiting_for_allow" || f.state == "connecting") return "waiting_allow"
         if (f.unanswered) return "allow_unanswered"
         // the port answers but Couch TV was not let in: the Allow question was missed or refused
         if (f.port5555Open) return "allow_unanswered"
-        if (f.sdk >= 30) {
+        if (f.sdk >= 30 && !f.fireTv) {
             if (f.onEthernet && !f.onWifi) return "ethernet"
             if (f.wirelessOn == false) return "wireless_off"
             if (!f.tlsPaired) return "needs_pairing"
             return "port_closed"
         }
-        // Android 10 or older: no Wireless debugging menu, only plain port 5555
+        // Android 10 or older, and every Fire TV: no Wireless debugging menu, only plain port 5555
         return if (f.everAllowed) "port_closed" else "no_wireless"
     }
 
@@ -103,7 +106,7 @@ object ConnectCheck {
         "Network: " + when { f.onWifi -> "Wi-Fi"; f.onEthernet -> "Ethernet"; else -> "none" },
         "Phone on the same network: ${yn(f.phoneSameNetwork)}",
         "Debugging on: ${yn(f.debuggingOn)}",
-        "Wireless debugging on: " + (if (f.sdk < 30) "not on this Android" else yn(f.wirelessOn)),
+        "Wireless debugging on: " + (if (f.fireTv) "not on Fire TV" else if (f.sdk < 30) "not on this Android" else yn(f.wirelessOn)),
         "Paired for wireless debugging: ${yn(f.tlsPaired)}",
         "Allowed before: ${yn(f.everAllowed)}",
         "Port 5555 answers: ${yn(f.port5555Open)}",
@@ -121,7 +124,7 @@ object ConnectCheck {
         return mapOf(
             "code" to code, "sdk" to f.sdk, "on_wifi" to f.onWifi, "on_ethernet" to f.onEthernet,
             "debugging_on" to f.debuggingOn, "wireless_on" to f.wirelessOn, "port_5555" to f.port5555Open,
-            "same_network" to f.phoneSameNetwork, "tls_paired" to f.tlsPaired, "state" to f.state,
+            "same_network" to f.phoneSameNetwork, "fire_tv" to f.fireTv, "tls_paired" to f.tlsPaired, "state" to f.state,
             // the words follow the TV's Home settings language
             "lang" to ((Store.readJson("home-settings.json") as? org.json.JSONObject)?.optString("lang")?.ifEmpty { null }),
             "report" to report(f, code, "${Build.MANUFACTURER} ${Build.MODEL}", Build.VERSION.RELEASE ?: "?", BuildConfig.VERSION_NAME),
@@ -151,6 +154,7 @@ object ConnectCheck {
             port5555Open = Adb.portOpen(5555),
             phoneSameNetwork = sameNetwork(phoneIp, tvIp ?: App.lanAddress(), prefix),
             fireBlocked = err?.contains(Adb.FIRE_BLOCKED) == true,
+            fireTv = Build.MANUFACTURER.equals("Amazon", ignoreCase = true),
             lastError = err,
         )
     }

@@ -27,7 +27,7 @@ const ok = (c, m) => { assert.ok(c, m); n++; };
 // the codes the TV's check can answer, read from the Kotlin so the two never drift apart
 const kt = fs.readFileSync(path.join(ROOT, "on-tv/android/app/src/main/java/dev/couchtv/ontv/ConnectCheck.kt"), "utf8");
 const KT_CODES = [...kt.match(/val CODES = listOf\(([^)]*)\)/)[1].matchAll(/"(\w+)"/g)].map((m) => m[1]);
-ok(KT_CODES.length === 12 && KT_CODES.includes("ethernet") && KT_CODES.includes("allow_unanswered"), "codes read from ConnectCheck.kt: " + KT_CODES.join(","));
+ok(KT_CODES.length === 11 && KT_CODES.includes("ethernet") && KT_CODES.includes("allow_unanswered"), "codes read from ConnectCheck.kt: " + KT_CODES.join(","));
 
 const TOKEN = "t0k3n";
 const REPORT = "Couch TV report\nApp: on-TV 0.13.9\nTV: TCL 55C735, Android 14 (API 34)\nNetwork: Ethernet\nCheck says: ethernet\nLast error: [address]:5555 closed";
@@ -109,6 +109,15 @@ try {
   ok(/Wi-Fi/.test(s.fix) && /Network debugging/.test(s.fix), "Ethernet: Wireless debugging needs Wi-Fi, or Network debugging");
   CHECK = { code: "debugging_off" }; await checkNow(page); s = await state(page);
   ok(/Build seven times/.test(s.fix) && /USB debugging/.test(s.fix) && /Network debugging/.test(s.fix), "debugging off: Build seven times, USB or Network debugging");
+  ok(/older Android TV: Settings, Device Preferences, About/.test(s.fix), "debugging off: the older Android TV path too");
+  // a Fire TV (the TV says fire_tv): its own menus, ADB debugging, never Wireless debugging
+  CHECK = { code: "debugging_off", fire_tv: true }; await checkNow(page); s = await state(page);
+  ok(s.head === W.debugging_off_h.en && s.fix === W.debugging_off_fire_f.en && /My Fire TV, About/.test(s.fix) && /ADB debugging/.test(s.fix) && !/Wireless/.test(s.fix), "Fire TV, debugging off: " + s.fix);
+  CHECK = { code: "no_wireless", fire_tv: true }; await checkNow(page); s = await state(page);
+  ok(s.fix === W.no_wireless_f.en, "Fire TV, other answers keep their own words");
+  CHECK = { code: "port_closed" }; await checkNow(page); s = await state(page);
+  ok(/off and on again, then press Let the phone press keys\.$/.test(s.fix), "port closed: ends with the button the page has: " + s.fix);
+  ok(!("other_network_h" in W) && !KT_CODES.includes("other_network"), "no answer blames the phone's network");
   CHECK = { code: "no_wireless" }; await checkNow(page); s = await state(page);
   ok(/Android 10 or older/.test(s.fix) && /Let the phone press keys/.test(s.fix), "no Wireless debugging: Network debugging and the button");
   CHECK = { code: "allow_unanswered" }; await checkNow(page); s = await state(page);

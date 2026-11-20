@@ -16,6 +16,15 @@ Brief: g12 "Can't connect?" check + Copy a report (setup.html, Server.kt), g16 S
 - scratchpad/nlss/run-phone-tests.sh (browser lock; 4 phone page browser tests)
 - scratchpad/nlss/gradle.sh testDebugUnitTest (gradle lock)
 
+## Checker round 1 (NO-GO at 66aaac9), fixed
+- other_network removed (the TV's ADB is 127.0.0.1, the phone's network never blocks keys); "Phone on the same network" stays in the report only
+- debugging_off words name the older Android TV path; Fire TVs (fire_tv, Build.MANUFACTURER Amazon) get debugging_off_fire_f and go to the plain 5555 answers only
+- port_closed ends with "then press Let the phone press keys"
+
+## Merge note (nl-remote)
+- setup.html is English on this branch; connect-check.js's translated fixes name the buttons as nl-remote's phone-words.js translates them, so the words match once nl-remote merges. Ship with nl-remote.
+- setup.html head: nl-remote adds caps-words.js and phone-words.js script tags after shim.js, this branch adds connect-check.js there too. Keep all of them (adjacent script tags).
+
 ## Not done
 - step photos from a real TV in START-HERE (needs an owner-approved TCL/Frame session)
 - tools/ig-comment-dm/facts.md LG lines (buildlist row; not in this brief)

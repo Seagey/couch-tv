@@ -13,10 +13,21 @@ class ConnectCheckTest {
 
     @Test fun connectedIsOk() = assertEquals("ok", ConnectCheck.diagnose(g.copy(connected = true, route = "tls", state = "connected")))
 
-    @Test fun phoneOnAnotherNetwork() {
-        assertEquals("other_network", ConnectCheck.diagnose(g.copy(phoneSameNetwork = false, debuggingOn = false)))
-        // can't tell (IPv6, no TV address): not blamed on the network
-        assertEquals("debugging_off", ConnectCheck.diagnose(g.copy(phoneSameNetwork = null, debuggingOn = false)))
+    @Test fun phoneNetworkNeverBlamed() {
+        // the TV's ADB is its own (127.0.0.1): a phone on another network or VLAN never stops key presses
+        assertEquals("debugging_off", ConnectCheck.diagnose(g.copy(phoneSameNetwork = false, debuggingOn = false)))
+        assertEquals("needs_pairing", ConnectCheck.diagnose(g.copy(phoneSameNetwork = false, wirelessOn = true)))
+        assertFalse(ConnectCheck.CODES.contains("other_network"))
+    }
+
+    @Test fun fireTvUsesPlainPortOnly() {
+        // Fire OS on Android 9 or 11: never Wireless debugging, ethernet or pairing answers
+        val fire = ConnectCheck.Facts(sdk = 30, fireTv = true)
+        assertEquals("no_wireless", ConnectCheck.diagnose(fire.copy(state = "failed")))
+        assertEquals("no_wireless", ConnectCheck.diagnose(fire.copy(onWifi = false, onEthernet = true, wirelessOn = false)))
+        assertEquals("port_closed", ConnectCheck.diagnose(fire.copy(everAllowed = true, state = "failed")))
+        assertEquals("debugging_off", ConnectCheck.diagnose(fire.copy(debuggingOn = false)))
+        assertTrue(ConnectCheck.report(fire, "no_wireless", "Amazon AFTKA", "11", "0.13.9").contains("Wireless debugging on: not on Fire TV"))
     }
 
     @Test fun fireTvBlocked() = assertEquals("fire_blocked", ConnectCheck.diagnose(old.copy(fireBlocked = true, port5555Open = true)))
@@ -60,7 +71,7 @@ class ConnectCheckTest {
 
     @Test fun everyCodeIsReachableAndKnown() {
         val seen = setOf(
-            ConnectCheck.diagnose(g.copy(connected = true)), ConnectCheck.diagnose(g.copy(phoneSameNetwork = false)),
+            ConnectCheck.diagnose(g.copy(connected = true)),
             ConnectCheck.diagnose(g.copy(fireBlocked = true)), ConnectCheck.diagnose(g.copy(debuggingOn = false)),
             ConnectCheck.diagnose(g.copy(state = "connecting")), ConnectCheck.diagnose(g.copy(unanswered = true)),
             ConnectCheck.diagnose(g.copy(onWifi = false, onEthernet = true)), ConnectCheck.diagnose(g.copy(wirelessOn = false)),
