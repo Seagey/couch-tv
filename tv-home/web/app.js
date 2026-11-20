@@ -6591,7 +6591,8 @@
       // the order arranged on the phone (or with this TV's remote)
       NIGHT ? api("GET", "/api/app-order").then(bridgeOrder) : Promise.resolve(),
       // Home settings: the bridge keeps a copy, so the phone and this TV agree
-      syncSettings(),
+      // (a new design's widget values are sorted only after this first look, so the phone's town or photos win)
+      syncSettings().then(wsAfterSync, function (e) { wsAfterSync(); throw e; }),
       // Android's Watch Next rows: this app may read them, the bridge's ADB may not. They name a
       // play an app gave no title for (Netflix sends none, Prime only its own name, issue #23).
       KW_ON ? sendWatchNext() : Promise.resolve(),
@@ -7387,7 +7388,7 @@
     return WEB_PAUSE.wait;
   }
   function webChanged() { clearTimeout(webTimer); webTimer = setTimeout(function () { if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("web"); }, 150); }
-  // The commute's two places, kept on this TV only (never in a design, never sent to the bridge): from
+  // The commute's two places, never in a design or on couch-tv servers (a widget's own ride Home settings to the bridge or the TV app; the 0.13.8 one stays on the TV): from
   // the town set in Location (or config.json's weather place), to the place picked in Home settings,
   // couch-tv Studio, Commute. Both are towns or suburbs from the place search, about a kilometre wide.
   // w: one Commute widget (the web loader asks for each: widget-web.js places(w)); none: the first one
@@ -7442,59 +7443,6 @@
     return { from: p.from ? { name: p.from.name } : null, to: p.to ? { name: p.to.name } : null,
       key: typeof CouchWidgetWeb !== "undefined" ? CouchWidgetWeb.routeKey(p.from, p.to) : null };
   }
-  // Home settings, couch-tv Studio, Commute: shown while a design has a Commute widget (English only,
-  // like the rest of this section)
-  var cgeoTimer = null, cgeoTicket = 0;
-  function commuteRows(rows) {
-    if (typeof CouchDesign === "undefined" || !CouchDesign.widgetsOf || !CouchDesign.widgetsOf(["commute"]).length) return;
-    var p = commutePlaces(), g = SET.cgeo || (SET.cgeo = { q: "", list: null, busy: false, err: false });
-    rows.push(head("Commute"));
-    rows.push(info("cm-from", "From", p.from ? p.from.name : "Not set", p.from ? "Your town in Location" : "Set your town in Location first"));
-    rows.push({ kind: "input", key: "cm-search", label: "Where to", sub: p.to ? p.to.name : "Type the town or suburb you drive to", value: g.q, act: function () {
-      startTyping({ label: "Type the town or suburb you drive to", value: g.q, search: true,
-        live: function (q) { findCommute(q, false); }, submit: function (q) { findCommute(q, true); } });
-    } });
-    if (g.busy) rows.push(info("cm-busy", t("loc_searching")));
-    else if (g.err) rows.push(info("cm-err", t("loc_error")));
-    else if (g.list && !g.list.length) rows.push(info("cm-none", t("loc_none", { q: g.q })));
-    (g.list || []).forEach(function (pl, i) {
-      rows.push({ kind: "choice", key: "cplace:" + i, label: pl.name, sub: pl.area, checked: !!(p.to && p.to.lat === pl.lat && p.to.lon === pl.lon), act: function () { chooseCommute(pl); } });
-    });
-    if (p.to) rows.push({ kind: "action", key: "cm-forget", label: "Forget where you drive to", sub: "Removes it from this TV", act: function () {
-      keep("tvhome.commute", null); SET.msg = "Forgotten. The Commute widget asks for a place again."; webChanged();
-    } });
-    rows.push(info("cm-note", "Kept on this TV only, never in a design. The route uses the suburb, never your address."));
-  }
-  function findCommute(q, go) {
-    clearTimeout(cgeoTimer);
-    q = (q || "").trim();
-    SET.cgeo = SET.cgeo || {};
-    SET.cgeo.q = q;
-    if (q.length < 2) { SET.cgeo = { q: q, list: null, busy: false, err: false }; if (zone === "settings") renderSettings(); return; }
-    var run = function () {
-      var ticket = ++cgeoTicket;
-      SET.cgeo.busy = true; SET.cgeo.err = false;
-      if (zone === "settings") renderSettings();
-      geocode(q).then(function (list) {
-        if (ticket !== cgeoTicket) return;
-        SET.cgeo = { q: q, list: list, busy: false, err: false };
-        if (go && list.length && !SET.typing) { SET.col = "rows"; SET.keyFocus = "cplace:0"; }
-        if (zone === "settings") renderSettings();
-      }, function () {
-        if (ticket !== cgeoTicket) return;
-        SET.cgeo = { q: q, list: null, busy: false, err: true };
-        if (zone === "settings") renderSettings();
-      });
-    };
-    if (go) run(); else cgeoTimer = setTimeout(run, 500);
-  }
-  function chooseCommute(pl) {
-    // the town or suburb from the place search (two decimals: about a kilometre), never an address
-    keep("tvhome.commute", { name: pl.name, lat: pl.lat, lon: pl.lon });
-    SET.msg = "Commute set: to " + pl.name + ".";
-    if (WEB) WEB.tick();
-    webChanged();
-  }
 
   // ---------------- each widget's own settings (docs/WIDGET-SETTINGS-CONTRACT.md) ----------------
   // Every widget on the design now with a `settings` list in widget-caps.js gets its own page: Hold OK
@@ -7520,8 +7468,8 @@
   // a setting's value now: set on this TV, else what the design says (o.opts), else its default
   function wsCur(w, s) {
     var v = wsOf(w.key)[s.key];
-    if (v !== undefined && v !== null && v !== "") return v;
-    // bins, Which bin goes out this week: read back from the count the widget keeps (anchor)
+    // bins, Which bin goes out this week: always worked out from the count the widget keeps (anchor), so
+    // it is right next week too and a new bin night never flips the turn
     if (s.sets === "anchor") {
       var an = wsOf(w.key).anchor !== undefined ? +wsOf(w.key).anchor : +(w.opts || {}).anchor;
       if (isFinite(an) && (wsOf(w.key).anchor !== undefined || (w.opts || {}).anchor !== undefined)) {
@@ -7529,6 +7477,7 @@
         return ((wk % 2) + 2) % 2 === 0 ? "a" : "b";
       }
     }
+    if (v !== undefined && v !== null && v !== "") return v;
     // the Commute's Where to set with 0.13.8's Commute rows (kept on this TV, tvhome.commute) still counts
     if (w.kind === "commute" && s.key === "to") { var old = cleanPlace(kept("tvhome.commute")); if (old) return old; }
     v = (w.opts || {})[s.key];
@@ -7546,9 +7495,12 @@
   // news source, a clock format) is dropped everywhere; a value kept on the TV (store "tv": a beach, where
   // you drive to) stays, keyed by widget id and kind, so it only ever applies to that same widget again.
   // The same design starting again changes nothing.
+  // the widgets a design has (their ids and kinds, sorted): moving or restyling a widget is the same design
+  var WS_NEW_WAIT = false;
+  function wsAfterSync() { if (WS_NEW_WAIT) { WS_NEW_WAIT = false; wsNewDesign(); } }
   function wsNewDesign() {
-    if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CFG.design) return;
-    var s = JSON.stringify(CFG.design), h = 0;
+    if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CFG.design || !CouchDesign.widgetList) return;
+    var s = CouchDesign.widgetList().map(function (w) { return w.key; }).sort().join(","), h = 0;
     for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
     var mark = String(h), was = ST.widgets_design;
     if (was === mark) return;
@@ -7783,10 +7735,10 @@
       // a value set on this TV over the design's own: one press back to the design's
       if (v !== undefined && v !== "" && s.type !== "place") rows.push({ kind: "action", key: id + ":clear", label: s.store === "design" ? "Use the design's " + s.label.toLowerCase() : "Clear " + s.label.toLowerCase(), act: function () { wsSet(w.key, s.key, null); if (s.sets) wsSet(w.key, s.sets, null); } });
     });
-    rows.push(info("w-kept", "Changed here, kept on this TV only, never in a design."));
+    rows.push(info("w-kept", "Kept in this TV's Home settings (and the computer at home, if this TV has one). Never in a design, never sent to couch-tv."));
     return rows;
   }
-  // a place setting: the town search (the same one as Location), kept on this TV only
+  // a place setting: the town search (the same one as Location), kept in Home settings (the TV, and the computer at home or the TV app), never in a design or on couch-tv servers
   var WPLACE = { key: "", q: "", list: null, busy: false, err: false }, wgeoTimer = null, wgeoTicket = 0;
   function placeRows(w, s, rows) {
     var own = cleanPlace(wsOf(w.key)[s.key]) || (w.kind === "commute" && s.key === "to" ? cleanPlace(kept("tvhome.commute")) : null), pk = w.key + ":" + s.key, g = WPLACE.key === pk ? WPLACE : { key: pk, q: "", list: null, busy: false, err: false };
@@ -7889,7 +7841,14 @@
         else if (s.type === "choice" || s.type === "tvlist") { v = one(v); if (v === undefined) { bad = "That choice is not one of the choices."; return; } }
         else if (s.many) { v = (Array.isArray(v) ? v : String(v).split(",")).map(function (x) { return String(x).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 30); }).filter(Boolean).slice(0, isFinite(s.max) ? +s.max : 6); if (!v.length) v = null; }
         else if (s.type === "toggle") { if (typeof v !== "boolean") { bad = "That needs on or off."; return; } }
-        else if (s.type === "number") { v = +v; if (!isFinite(v) || (isFinite(s.min) && v < +s.min) || (isFinite(s.max) && v > +s.max)) { bad = "That number is out of range."; return; } }
+        else if (s.type === "number") {
+          v = +v;
+          if (!isFinite(v) || (isFinite(s.min) && v < +s.min) || (isFinite(s.max) && v > +s.max)) { bad = "That number is out of range."; return; }
+          // to the setting's step, as the TV's own row does (5.5 with a step of 1 is 6)
+          var st0 = isFinite(s.step) && +s.step > 0 ? +s.step : 1, lo0 = isFinite(s.min) ? +s.min : 0;
+          v = Math.round((Math.round((v - lo0) / st0) * st0 + lo0) * 1000) / 1000;
+          if (isFinite(s.max) && v > +s.max) v -= st0;
+        }
         else if (s.type === "calendar") { v = String(v).trim().slice(0, 600); v = window.CouchAtHome ? CouchAtHome.calUrl(v) : ""; if (!v) { bad = "That is not a calendar link. It starts with https://."; return; } }
         else if (s.type === "apps" || s.type === "device") { bad = "Change that on the TV."; return; }
         else if (s.type !== "choice" && s.type !== "tvlist") v = String(v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 80);
@@ -7983,7 +7942,7 @@
       },
       fromCode: DESIGN_FROM_CODE
     });
-    if (designOn) wsNewDesign();
+    if (designOn) { if (OFFLINE) wsNewDesign(); else WS_NEW_WAIT = true; }
     if (designOn) webStart();
     kidsInit();
     kidSync();   // a kids profile on the couch: its shelf before anything else shows

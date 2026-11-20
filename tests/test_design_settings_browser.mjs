@@ -393,11 +393,21 @@ await ctx.close();
   await tv.waitForTimeout(900);
   const copy = await tv.evaluate(() => (JSON.parse(localStorage.getItem("mock:api.settings") || "{}").settings || {}).widgets);
   ok(copy && copy["n|news"] && copy["n|news"].feed === "rnz" && copy["s|surf"] && copy["s|surf"].place.name === "Bells Beach", "the bridge's copy keeps each widget's settings: " + JSON.stringify(copy));
+  // the same design sent again with a widget moved: the same widgets, so every change stays
+  const moved = JSON.parse(JSON.stringify(design));
+  moved.objects.filter((o) => o.id === "n")[0].x -= 10;
+  await tv.evaluate((d) => localStorage.setItem("tvdesigner.design", JSON.stringify(d)), moved);
+  await tv.goto(HOME + "?mock=1&wxlive=1&design=local");
+  await tv.waitForFunction(() => window.CouchDesign && window.CouchDesign.on() && document.querySelector('.cw-o[data-obj="n"] .cw'));
+  await tv.waitForTimeout(1500);
+  const kept2 = await tv.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || localStorage.getItem("tvhome.settings") || "{}"); return (r.s || r).widgets || {}; });
+  ok(kept2["n|news"] && kept2["n|news"].feed === "rnz", "a widget moved 10 px is the same design: the news source stays (" + JSON.stringify(kept2["n|news"]) + ")");
   // a new design: the news source (a design choice) is dropped, the beach (kept on the TV) stays
   const next = JSON.parse(JSON.stringify(design));
   next.objects = next.objects.concat([
     { id: "b", type: "widget", kind: "bins", x: 1300, y: 700, w: 460, h: 300, opts: { weekday: 2, alt: true } },
-    { id: "c", type: "widget", kind: "commute", x: 1300, y: 340, w: 560, h: 300 }]);
+    { id: "c", type: "widget", kind: "commute", x: 1300, y: 340, w: 560, h: 300 },
+    { id: "cd", type: "widget", kind: "countdown", x: 600, y: 700, w: 460, h: 300, opts: { label: "Holidays", month: 12, day: 20 } }]);
   await tv.evaluate((d) => localStorage.setItem("tvdesigner.design", JSON.stringify(d)), next);
   await tv.goto(HOME + "?mock=1&wxlive=1&design=local");
   await tv.waitForFunction(() => window.CouchDesign && window.CouchDesign.on() && document.querySelector('.cw-o[data-obj="b"] .cw'));
@@ -420,6 +430,10 @@ await ctx.close();
   ok((await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "b|bins", values: { thisweek: null } } }))).ok, "clearing it");
   const cleared = await tv.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || localStorage.getItem("tvhome.settings") || "{}"); return ((r.s || r).widgets || {})["b|bins"] || {}; });
   ok(cleared.anchor === undefined, "takes its count off too");
+  // a number from the phone is rounded to the setting's step, as on the TV
+  ok((await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "cd|countdown", values: { day: 5.5 } } }))).ok, "a countdown day of 5.5 from the phone");
+  const day = await tv.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || localStorage.getItem("tvhome.settings") || "{}"); return ((r.s || r).widgets || {})["cd|countdown"].day; });
+  ok(day === 6, "is kept as 6, the setting's whole step: " + day);
   // the commute: Where to says Not set (never the home's town), and its clear row says what it does
   const cm = await tv.evaluate(() => window.tv.atHomeRead().design.widgets.filter((w) => w.key === "c|commute")[0]);
   const to = cm.settings.filter((s) => s.key === "to")[0];

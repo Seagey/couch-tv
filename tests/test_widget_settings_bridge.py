@@ -31,6 +31,8 @@ class WidgetSettingsBridgeTests(unittest.TestCase):
              "list": list(range(17)), "obj": {"no": "place"}, "deep": [{"a": 1}]}, "b|news": "not a dict"}
         out = server.clean_settings({"widgets": w})["widgets"]
         self.assertEqual(out, {"a|surf": {"ok": 1}})
+        # every number in a list is finite too
+        self.assertEqual(server.clean_settings({"widgets": {"b|stocks": {"tickers": ["BHP.AX", float("inf")]}}})["widgets"], {})
 
     def test_limits(self):
         w = {"w%d|news" % i: {"feed": "abc"} for i in range(80)}

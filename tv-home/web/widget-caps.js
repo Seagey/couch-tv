@@ -581,7 +581,7 @@
     stocks: [st("tickers", "Shares and prices", "text", ["^AXJO", "AUDUSD=X", "BTC-AUD"], "Up to six. Pick one here, or type a share's code, like BHP.AX.", "design", ALL, true,
       { many: true, max: 6, suggest: TICKER_OPTS })],
     commute: [
-      st("to", "Where to", "place", "", "The town or suburb you drive to. Kept on this TV only.", "tv", ON_TV, true, { "private": true }),
+      st("to", "Where to", "place", "", "The town or suburb you drive to. Kept in this TV's Home settings, never in a design.", "tv", ON_TV, true, { "private": true }),
       st("arrive_h", "Arrive by", "choice", "off", "Couch TV says when to leave to get there by then.", "design", ALL, true, { options: HOURS }),
       st("arrive_m", "Minutes past the hour", "choice", 0, "For 8:30am, pick 8am above and 30 past the hour here.", "design", ALL, true, { options: MINUTES, when: { arrive_h: "set" } })
     ],
@@ -650,7 +650,7 @@
     commute: [
       st("buffer", "Minutes to spare", "number", 10, "", "design", ALL, false, { min: 0, max: 60, step: 5 }),
       st("weekdays", "Weekdays only", "toggle", true, "Off works out the drive for weekends too.", "design", ALL, false),
-      st("from", "Leave from", "place", "", "Empty leaves from this home's town. Kept on this TV only.", "tv", ON_TV, false, { "private": true })
+      st("from", "Leave from", "place", "", "Empty leaves from this home's town. Kept in this TV's Home settings, never in a design.", "tv", ON_TV, false, { "private": true })
     ],
     wifi: [st("hidepass", "Hide the password", "toggle", false, "On shows only the code to scan.", "tv", ON_TV, false)]
   };
