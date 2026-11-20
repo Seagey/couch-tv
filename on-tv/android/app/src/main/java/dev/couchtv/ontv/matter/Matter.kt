@@ -65,7 +65,9 @@ object Matter {
     private const val TAG = "couchtv.matter"
     private const val VENDOR_ID = 0xFFF4           // the test vendor id; devices accept any vendor id for an extra admin
     private const val KV_PREFS = "chip.platform.KeyValueStore"
-    private const val COMMISSION_TIMEOUT_S = 240L
+    // the contract wants an answer within 120 s; a code no device answers to never ends by itself
+    // (discovery keeps looking), and a phone page gives up long before 4 minutes
+    private const val COMMISSION_TIMEOUT_S = 100L
     private const val COMMAND_TIMEOUT_S = 20L
 
     /** The discovery module (matter-discovery) can supply its own resolver (IPv6 fallback for Android 11). */
@@ -78,6 +80,8 @@ object Matter {
     private var controller: ChipDeviceController? = null
     @Volatile var ready = false; private set
     @Volatile var note: String? = null; private set
+    /** Why Matter can never run on this TV (Android 6, or an Intel processor), decided at [init]; null = it can. */
+    @Volatile var unsupported: String? = null; private set
     private val io = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "matter").apply { isDaemon = true } }
 
     // live state
@@ -97,6 +101,8 @@ object Matter {
     /** At app start: only if devices were added before (no library load otherwise). */
     fun init(c: Context) {
         ctx = c.applicationContext
+        unsupported = MatterSupport.check(ctx)
+        note = unsupported
         store = MatterStore(File(ctx.filesDir, "matter"))
         store.nodes().forEach { nodes[it.node] = it; live[it.node] = deepCopy(it.snapshot); reachable[it.node] = false }
         if (nodes.isNotEmpty()) io.execute { start() }
@@ -105,6 +111,8 @@ object Matter {
     /** Loads the library and makes the controller, once. False (and [note] says why) if it can't. */
     @Synchronized fun start(): Boolean {
         if (controller != null) return true
+        // Android 6 or an Intel TV: never load the library (on Android 6 it would fail to link)
+        unsupported?.let { note = it; return false }
         try {
             ChipDeviceController.loadJni()
         } catch (e: Throwable) {
@@ -178,9 +186,10 @@ object Matter {
         nodes.values.sortedBy { it.added }.forEach { s ->
             MatterModel.devices(s.node, snapshot(s.node), reachable[s.node] == true, s.names).forEach { list.put(it) }
         }
-        val o = JSONObject().put("devices", list).put("ready", ready || (nodes.isEmpty() && note == null)).put("version", version.get())
+        val o = JSONObject().put("devices", list).put("ready", MatterSupport.ready(unsupported, ready, nodes.isEmpty(), note)).put("version", version.get())
         val n = note ?: if (nodes.isNotEmpty() && !ready) "Starting Matter. Your devices show in a moment." else null
         if (n != null) o.put("note", n)
+        MatterSupport.reason(unsupported)?.let { o.put("reason", it) }
         return o
     }
 
@@ -231,7 +240,8 @@ object Matter {
     fun commission(code: String?, address: String? = null): JSONObject = synchronized(commissionLock) {
         val parsed = MatterCode.parse(code)
         if (parsed is MatterCode.Parsed.Bad) return fail(parsed.key, parsed.note)
-        if (!start()) return JSONObject().put("ok", false).put("error", "unreachable").put("note", note)
+        if (!start()) return JSONObject().put("ok", false).put("error", if (unsupported != null) "unsupported" else "unreachable")
+            .put("note", note).put("device_ids", JSONArray())
         val c = controller!!
         val text = when (parsed) { is MatterCode.Parsed.Manual -> parsed.digits; is MatterCode.Parsed.Qr -> parsed.text; else -> "" }
         val node = store.nextNodeId()
