@@ -4643,7 +4643,11 @@
       box.classList.add("on");
       var left = +j.pin_expires_in > 0 ? +j.pin_expires_in * 1000 - 20000 : 60000;
       PHONE_QR.timer = setTimeout(phoneQr, Math.max(15000, left));
-    }, off);
+    }, function () {
+      // no answer (the app busy, a code locked after wrong tries): hide it, never a dead code, and ask again
+      off();
+      if (zone === "settings") PHONE_QR.timer = setTimeout(phoneQr, 10000);
+    });
   }
 
   function openSettings() {
@@ -7323,6 +7327,8 @@
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
+    // the phone code changed (HomeActivity, Auth.onPin): the QR and computer line draw the new one
+    phoneLink: function () { PHONE_QR.url = ""; phoneQr(); if (typeof CouchDesign !== "undefined" && CouchDesign.nav && CouchDesign.nav.phoneAgain) CouchDesign.nav.phoneAgain(); },
     resume: function () { PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
     // (and a design's video background lets go of the TV's decoder, which the app may need)

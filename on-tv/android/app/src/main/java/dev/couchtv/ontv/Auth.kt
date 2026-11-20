@@ -10,7 +10,9 @@ import java.security.SecureRandom
  * every API call must carry that token. The TV keeps only a SHA-256 of each token.
  *
  * Limits: a code lasts 3 minutes, and 5 wrong tries throw it away (a new one has to be shown on the
- * TV). So guessing is about 5 in a million per code someone can see on the screen.
+ * TV). So guessing is about 5 in a million per code someone can see on the screen. Across codes,
+ * 15 wrong tries in 10 minutes lock pairing (/api/pair and /api/pair/start answer 429) for 10 minutes,
+ * so asking for code after code (each with its 5 tries) can't be used to keep guessing.
  */
 object Auth {
     private val rnd = SecureRandom()
@@ -19,6 +21,14 @@ object Auth {
     @Volatile private var wrong = 0
     private val listeners = mutableListOf<(String?) -> Unit>()
 
+    /** The clock, so the unit tests can move time on. */
+    @Volatile var clock: () -> Long = { System.currentTimeMillis() }
+    /** Wrong tries across every code. */
+    val lock = PairLock()
+
+    /** Seconds until pairing opens again (0: open). */
+    fun lockedFor(): Int = lock.lockedFor(clock())
+
     /** Token the TV's own home page uses (set as a cookie in its WebView). Never shown anywhere. */
     val internalToken: String by lazy {
         Store.str("internal_token") ?: hex(32).also { Store.putStr("internal_token", it) }
@@ -26,16 +36,16 @@ object Auth {
 
     @Synchronized fun newPin(): String {
         val p = String.format("%06d", rnd.nextInt(1_000_000))
-        pin = p; pinUntil = System.currentTimeMillis() + 3 * 60_000; wrong = 0
+        pin = p; pinUntil = clock() + 3 * 60_000; wrong = 0
         notifyPin()
         return p
     }
 
     /** The code to show on the TV now, or null if none is live. */
-    fun currentPin(): String? = if (pin != null && System.currentTimeMillis() < pinUntil) pin else null
+    fun currentPin(): String? = if (pin != null && clock() < pinUntil) pin else null
 
     /** Seconds the live code has left (0: none), so a QR holding it can be made again in time. */
-    fun pinSecondsLeft(): Int = if (currentPin() == null) 0 else ((pinUntil - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0)
+    fun pinSecondsLeft(): Int = if (currentPin() == null) 0 else ((pinUntil - clock()) / 1000).toInt().coerceAtLeast(0)
 
     /**
      * The code for Home settings' "Change this on your phone" QR: the live one if a code is already on
@@ -48,17 +58,21 @@ object Auth {
     fun offPin(fn: (String?) -> Unit) { synchronized(listeners) { listeners -= fn } }
     private fun notifyPin() { val p = currentPin(); synchronized(listeners) { listeners.toList() }.forEach { it(p) } }
 
-    /** Returns a new token for the right code, null for a wrong one. */
+    /** Returns a new token for the right code, null for a wrong one (or while pairing is locked). */
     @Synchronized fun pair(code: String?, name: String?): String? {
-        val live = currentPin() ?: return null
+        if (lock.lockedFor(clock()) > 0) return null
+        val live = currentPin()
         val given = code?.filter { it.isDigit() }.orEmpty()
-        if (!MessageDigest.isEqual(given.toByteArray(), live.toByteArray())) {
+        if (live == null || !MessageDigest.isEqual(given.toByteArray(), live.toByteArray())) {
+            // a try with no live code counts too: it is still a guess
+            if (lock.wrong(clock()) && pin != null) { pin = null; notifyPin() }
+            if (live == null) return null
             wrong += 1
-            if (wrong >= 5) { pin = null; notifyPin() }
+            if (wrong >= 5 && pin != null) { pin = null; notifyPin() }
             return null
         }
         pin = null
-        lastPairedAt = System.currentTimeMillis()
+        lastPairedAt = clock()
         notifyPin()
         val token = hex(32)
         val list = tokens()
