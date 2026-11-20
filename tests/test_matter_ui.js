@@ -301,5 +301,31 @@ const SHARED = () => [
     ok(!U.sb.CouchMatter.on(), "refused by the launcher: Matter stays off, nothing shows");
   }
 
+  // ---- coordinator 21 Nov (Fable on nl-matter-bridge): reason keys, names that would hide a device ----
+  {
+    const T = page({ tvha: true, devices: [], ready: false, note: "Node.js 18 or newer is needed." });
+    const api0 = T.api;
+    T.H.useBridge((m, p, b) => p === "/api/matter/devices" ? Promise.resolve({ ok: true, devices: [], ready: false, reason: "node_old", note: "Node.js 18 or newer is needed.", version: 1 }) : api0(m, p, b)); await flush();
+    ok(T.M.on() && !T.M.ready() && T.M.reason() === "node_old", "the not ready reason key is kept for the screens");
+    const U = page({ tvha: true, devices: [], ready: false });
+    U.H.useBridge((m, p, b) => p === "/api/matter/devices" ? Promise.resolve({ devices: [], ready: false, reason: "<b>x</b>" }) : U.api(m, p, b)); await flush();
+    ok(U.M.reason() === "", "a reason that is not a key is dropped");
+    const V = page({ tvha: true, devices: SHARED() });
+    V.H.useBridge(V.api); await flush();
+    V.asked.length = 0;
+    const r1 = await V.M.rename("light.matter_1_1", "Garage door light");
+    const r2 = await V.M.rename("switch.matter_2_1", "Front gate");
+    const r3 = await V.M.rename("cover.matter_4_1", "Back door blind");
+    ok([r1, r2, r3].every((r) => r.ok === false && r.error === "name_hides") && !V.asked.some((a) => a[2] === "/api/matter/rename"), "names that would hide a light, plug or blind are caught first, nothing sent");
+    const r4 = await V.M.rename("cover.matter_4_1", "Outdoor blind");
+    const r5 = await V.M.rename("switch.matter_2_1", "Block out lamp");
+    const r6 = await V.M.rename("sensor.matter_6_1", "Back door temperature");
+    ok(r4.ok && r5.ok && r6.ok, "Outdoor, Block out and a sensor by the back door are fine: " + JSON.stringify([r4, r5, r6]));
+    const W2 = page({ tvha: true, devices: SHARED() });
+    W2.H.useBridge((m, p, b) => p === "/api/matter/rename" ? Promise.reject(new Error("refused")) : W2.api(m, p, b)); await flush();
+    const r7 = await W2.M.rename("cover.matter_4_1", "Portail");
+    ok(r7.ok === false && r7.error === "refused", "a name the bridge turns down (another language) comes back refused for the screen to explain");
+  }
+
   console.log("ok " + n + " Matter UI checks");
 })().catch((e) => { console.error(e); process.exit(1); });

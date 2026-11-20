@@ -7087,9 +7087,18 @@
     code: "That is not a Matter code. It has 11 numbers, like 3497 011 2332.", expired: "That code ran out. Make a new one in the app and type it in straight away.",
     wrong_code: "The device did not take that code. Make a new one in the app and try again.", unreachable: "The TV could not reach the device. Check it is on and near the TV's Wi-Fi.",
     thread: "The device uses Thread, and the TV cannot reach your Thread network. A Google or Apple hub (Nest Hub, HomePod mini, Apple TV) must be on at home.",
-    already: "That device is on this TV already.", not_allowed: "Couch TV never adds locks, alarms or garage doors, so it was not added. It stays in your other app.",
+    already: "That device is on this TV already.",
+    not_allowed: "That device is not one Couch TV shows, so it was not added. Couch TV shows lights, plugs, fans, blinds, thermostats and sensors, never locks, alarms or garage doors. It stays in your other app.",
     unavailable: "The device is not answering. Check it is switched on.",
+    name_hides: "Pick another name. Couch TV hides anything called a garage, gate, door or lock, so this device would disappear.",
     refused: "That could not be done.", timeout: "That took too long. Try again.", off: "Matter is not on for this TV yet.", failed: "That did not work. Try again." };
+  // why Matter is not ready on the home computer (bridge/matter.py's reason key), in plain words
+  var MT_WHY = { off: "Matter is switched off on the home computer. Whoever set up Couch TV there can switch it on.",
+    not_installed: "Matter is not set up on the home computer yet. Whoever set up Couch TV there can add it.",
+    node_missing: "The home computer needs Node.js for Matter, and it is not there yet. Whoever set up Couch TV there can add it.",
+    node_old: "The home computer's Node.js is too old for Matter. Whoever set up Couch TV there can update it.",
+    starting: "Matter is starting on the home computer. Try again in a minute.",
+    stopped: "Matter stopped on the home computer. It starts again by itself; if it does not, restart the home computer." };
   // a key in plain words; a controller's own sentence only when there is no key for it
   function mtSay(r) { return (r && r.error !== "failed" && MT_ERR[r.error]) || (r && r.note) || MT_ERR[r && r.error] || MT_ERR.failed; }
   var MT_APPS = [
@@ -7102,7 +7111,7 @@
     var M = window.CouchMatter;
     if (!M || !M.on()) return rows;
     rows.push(head("Matter devices"));
-    if (!M.ready()) rows.push(info("mt-wait", "", "", M.note() || "Matter is getting ready on this TV. Try again in a minute."));
+    if (!M.ready()) rows.push(info("mt-wait", "", "", MT_WHY[M.reason()] || M.note() || "Matter is getting ready on this TV. Try again in a minute."));
     M.list().forEach(function (d) {
       rows.push({ kind: "nav", key: "mt-d:" + d.entity, label: d.name, value: d.words, act: function () { openMatterDevice(d.entity); } });
     });
@@ -7150,7 +7159,8 @@
             v = String(v || "").trim();
             if (!v) return;
             SET.msg = "Saving...";
-            M.rename(entity, v).then(function (r) { SET.msg = r.ok ? "Renamed." : mtSay(r); if (zone === "settings") renderSettings(); });
+            // a name the controller turns down is one that would hide the device (bridge/matter.py)
+            M.rename(entity, v).then(function (r) { SET.msg = r.ok ? "Renamed." : mtSay(r.error === "refused" || r.error === "not_allowed" ? { error: "name_hides" } : r); if (zone === "settings") renderSettings(); });
           });
         } },
         { kind: "action", key: "mt-remove", label: "Remove from this TV", danger: true, confirmText: "Press OK again to remove it", sub: "It stays in your Google, Apple, SmartThings or Alexa app.", act: function () {

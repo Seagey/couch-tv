@@ -31,6 +31,7 @@ const MD = [
   { id: "matter:8:1", name: "Garage", domain: "cover", state: "closed", attributes: { device_class: "garage" } }
 ];
 const phoneAsked = [];
+let notReady = "";   // a reason key (bridge/matter.py): the phone page says it in its own words
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".ttf": "font/ttf" };
 const server = http.createServer((req, res) => {
   const url = req.url.split("?")[0];
@@ -39,7 +40,7 @@ const server = http.createServer((req, res) => {
     let b = ""; req.on("data", (d) => (b += d)); req.on("end", () => {
       const body = b ? JSON.parse(b) : null;
       if (url.indexOf("/api/matter/") === 0) phoneAsked.push(url + " " + (b || ""));
-      if (url === "/api/matter/devices") return json(200, { devices: MD, ready: true });
+      if (url === "/api/matter/devices") return json(200, notReady ? { devices: [], ready: false, reason: notReady, note: "Node.js 18 or newer is needed (found 16)." } : { devices: MD, ready: true });
       if (url === "/api/matter/commission") {
         if (body.code === "34970112332") { MD.push({ id: "matter:9:1", name: "Matter light", domain: "light", state: "off", attributes: {} }); return json(200, { ok: true, device_ids: ["matter:9:1"] }); }
         // the on-TV app (Matter.kt, ea574c2): a lock joins, the TV sees what it is and leaves it again
@@ -154,7 +155,7 @@ console.log("Running Matter UI browser tests...");
   ok(/That code ran out/.test(await said()), "a code that ran out says so plainly");
   await type("2000 000 0000");
   await page.waitForTimeout(400);
-  ok(/never adds locks, alarms or garage doors/.test(await said()), "a lock shared by mistake says so plainly (the bridge's not_allowed)");
+  ok(/never locks, alarms or garage doors/.test(await said()), "a lock shared by mistake says so plainly (the bridge's not_allowed)");
   await type("3497 011 2332");
   await page.waitForFunction(() => /Added: Matter light/.test(document.querySelector("#settings").textContent), null, { timeout: 6000 }).catch(() => {});
   ok(/Added: Matter light/.test(await said()), "added, by name");
@@ -163,7 +164,11 @@ console.log("Running Matter UI browser tests...");
   ok(/Matter light/.test(all), "the new light is listed: " + all);
   ok(await page.evaluate(() => window.smartHome.live().info.controls.some((c) => c.entity === "light.matter_27_1" || /matter_\d+_1/.test(c.entity) && c.name === "Matter light")), "and the widgets' list has it");
   ok(await toRow(/^Matter light/), "the new light's row"); await press(page, "Enter", 400);
-  ok(await toRow(/^Rename/), "Rename"); await type("Porch light");
+  ok(await toRow(/^Rename/), "Rename");
+  await page.evaluate(() => { window.MOCK_MATTER_LOG.length = 0; });
+  await type("Garage door light");
+  ok(/Pick another name/.test(await said()) && !(await page.evaluate(() => window.MOCK_MATTER_LOG.some((l) => /rename/.test(l)))), "a name that would hide the light is turned down on the TV, nothing sent");
+  await type("Porch light");
   ok(/Renamed/.test(await said()), "renamed");
   ok(await toRow(/^Remove from this TV/), "Remove"); await press(page, "Enter", 300);
   ok(/Press OK again to remove it/.test(await page.evaluate(() => document.querySelector(".srow.focus").textContent)), "asks once more first");
@@ -171,6 +176,20 @@ console.log("Running Matter UI browser tests...");
   ok(/Removed from this TV/.test(await said()), "removed");
   all = (await rows()).join(" | ");
   ok(!/Porch light|Matter light/.test(all), "and it is gone from the list");
+  ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
+  await page.close();
+}
+
+// 2a. the home computer says why Matter is not ready (a reason key): the TV says it in its own words
+{
+  const page = await home("&matter=nodeold&hasetup=1", [["controls", {}]]);
+  await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await press(page, "Enter", 400);
+  for (let i = 0; i < 14 && !(await page.evaluate(() => /Designs/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press(page, "ArrowDown");
+  await press(page, "ArrowRight");
+  for (let i = 0; i < 80 && !/^Smart home/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "")); i++) await press(page, "ArrowDown", 90);
+  await press(page, "Enter", 500);
+  const t = await page.evaluate(() => document.querySelector("#settings").textContent);
+  ok(/Matter devices/.test(t) && /Node\.js is too old for Matter/.test(t) && !/found 16/.test(t), "not ready: the reason in plain words, never the English note");
   ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
   await page.close();
 }
@@ -192,7 +211,8 @@ console.log("Running Matter UI browser tests...");
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   page.errors = []; page.on("pageerror", (e) => page.errors.push(String(e)));
   await page.addInitScript(() => { try { localStorage.setItem("couchtv.token", "test-token"); } catch (e) {} });
-  page.on("dialog", (d) => d.accept(d.type() === "prompt" ? "Desk lamp" : undefined));
+  let answer = "Desk lamp";
+  page.on("dialog", (d) => d.accept(d.type() === "prompt" ? answer : undefined));
   await page.goto(ORIGIN + "/setup#matter");
   await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 });
   ok(await page.evaluate(() => document.getElementById("jump-matter").style.display !== "none"), "the Matter chip shows");
@@ -212,10 +232,14 @@ console.log("Running Matter UI browser tests...");
   await page.fill("#matter-code", "749701123365521327694"); await page.click("#matter-add"); await page.waitForTimeout(600);
   ok(/That code ran out/.test(await msg()), "a code that ran out: " + await msg());
   await page.fill("#matter-code", "1234 567 8902"); await page.click("#matter-add"); await page.waitForTimeout(600);
-  ok(/never adds locks, alarms or garage doors/.test(await msg()) && !/Added/.test(await msg()), "a lock the TV left again is not called added: " + await msg());
+  ok(/never locks, alarms or garage doors/.test(await msg()) && !/Added/.test(await msg()), "a lock the TV left again is not called added: " + await msg());
   await page.fill("#matter-code", "3497-011-2332"); await page.click("#matter-add"); await page.waitForTimeout(800);
   ok(/Added/.test(await msg()) && /Matter light/.test(await page.evaluate(() => document.getElementById("matter-list").textContent)), "added and listed: " + await msg());
   ok(phoneAsked.some((x) => x === '/api/matter/commission {"code":"34970112332"}'), "the code is sent as plain numbers");
+  answer = "Garage door light"; phoneAsked.length = 0;
+  await page.click('#matter-list li[data-id="matter:9:1"] button[data-mt="rename"]'); await page.waitForTimeout(500);
+  ok(/Pick another name/.test(await msg()) && !phoneAsked.some((x) => /rename/.test(x)), "a name that would hide the light is turned down on the phone, nothing sent: " + await msg());
+  answer = "Desk lamp";
   await page.click('#matter-list li[data-id="matter:9:1"] button[data-mt="rename"]'); await page.waitForTimeout(700);
   ok(/Desk lamp/.test(await page.evaluate(() => document.getElementById("matter-list").textContent)), "renamed");
   await page.click('#matter-list li[data-id="matter:9:1"] button[data-mt="remove"]'); await page.waitForTimeout(700);
@@ -225,6 +249,11 @@ console.log("Running Matter UI browser tests...");
   const small = await page.evaluate(() => Array.prototype.filter.call(document.querySelectorAll("#matter button, #matter input"), (e) => e.offsetParent && e.getBoundingClientRect().height < 40).length);
   ok(small === 0, "every button and box at least 40 px tall");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "matter-phone-after.png") });
+  notReady = "node_old";
+  await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 });
+  const why = await page.evaluate(() => document.getElementById("matter-note").textContent);
+  ok(/Node.js is too old for Matter/.test(why) && !/found 16/.test(why), "not ready: the reason key in plain words, not the English note: " + why);
+  notReady = "";
   ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
   await page.close();
 }

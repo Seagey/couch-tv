@@ -24,11 +24,12 @@
 
   var DOMAINS = ["light", "switch", "fan", "cover", "climate", "sensor"];
   var OPENERS = ["garage", "gate", "door"];
+  var HIDES = /\b(garages?|gates?|doors?|locks?)\b/i;
   var MODES = ["off", "heat", "cool", "heat_cool", "auto", "dry", "fan_only"];
   var DOWN = ["unavailable", "unknown", ""];
   var FRESH_MS = 2000, ANSWER_MS = 20000, COMMISSION_MS = 120000;
 
-  var MT = { api: null, devices: [], by: {}, ready: false, note: "", reached: false, at: 0, pending: null, sig: "", watchers: [] };
+  var MT = { api: null, devices: [], by: {}, ready: false, note: "", reason: "", reached: false, at: 0, pending: null, sig: "", watchers: [] };
 
   // ---------------- the ids ----------------
   function entityOf(id, domain) {
@@ -58,12 +59,15 @@
     if (r && typeof r === "object" && !Array.isArray(r.devices) && r.result && typeof r.result === "object") return r.result;
     return r && typeof r === "object" ? r : {};
   }
-  function signature() { return MT.devices.map(function (d) { return d.entity + "=" + d.name; }).join("|") + "#" + MT.ready + "#" + MT.note; }
+  function signature() { return MT.devices.map(function (d) { return d.entity + "=" + d.name; }).join("|") + "#" + MT.ready + "#" + MT.reason + "#" + MT.note; }
   function put(r) {
     r = unwrap(r);
     MT.reached = true;
     MT.ready = r.ready !== false;
     MT.note = typeof r.note === "string" ? r.note.slice(0, 200) : "";
+    // why it is not ready, as a key the screens put in their own words (the bridge: off, not_installed,
+    // node_missing, node_old, starting, stopped); the English note only where there is no key
+    MT.reason = typeof r.reason === "string" && /^[a-z_]{2,24}$/.test(r.reason) ? r.reason : "";
     MT.devices = clean(r.devices);
     MT.by = {};
     MT.devices.forEach(function (d) { MT.by[d.entity] = d; });
@@ -320,6 +324,9 @@
     var d = MT.by[entity];
     name = String(name == null ? "" : name).replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 40);
     if (!d || !name) return Promise.resolve({ ok: false, error: "refused" });
+    // the controllers hide a light, plug or blind named as a garage door, gate, door or lock (so it is
+    // never opened from the TV), and the bridge refuses such a name: caught here first, in plain words
+    if (d.domain !== "climate" && d.domain !== "sensor" && HIDES.test(name)) return Promise.resolve({ ok: false, error: "name_hides" });
     return call("POST", "/api/matter/rename", { id: d.id, name: name }, ANSWER_MS).then(function (r) {
       r = unwrap(r);
       if (r.ok === false) return { ok: false, error: r.error || "failed" };
@@ -345,6 +352,7 @@
     on: function () { return MT.reached; },
     ready: function () { return MT.reached && MT.ready; },
     note: function () { return MT.note; },
+    reason: function () { return MT.reason; },
     count: function () { return MT.devices.length; },
     refresh: refresh,
     owns: function (entity) { return owns(entity) && !!MT.by[entity]; },
