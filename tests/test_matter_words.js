@@ -76,7 +76,7 @@ for (const m of matterJs.matchAll(/\b(st_[a-z]+|kind_[a-z]+)\b/g)) asked.add(m[1
 const unknown = [...asked].filter((k) => keys.indexOf(k) < 0);
 ok(asked.size >= 75, "keys the screens ask for: " + asked.size);
 ok(unknown.length === 0, "every key asked for is in the table: " + unknown.join(", "));
-ok(objKeys(appSec, "MT_ERR").length >= 16 && objKeys(setupSec, "MT_ERR").length >= 14 && objKeys(appSec, "MT_WHY").length === 26 && objKeys(setupSec, "MT_WHY").length === 26, "the error and reason keys are read from both screens");
+ok(objKeys(appSec, "MT_ERR").length >= 16 && objKeys(setupSec, "MT_ERR").length >= 14 && objKeys(appSec, "MT_WHY").length === 27 && objKeys(setupSec, "MT_WHY").length === 27, "the error and reason keys are read from both screens");
 // the on-TV app's own reasons and error (nl-matter-android ae3e6c1): an Android 6 TV, an Intel TV
 const NEWER = { err_busy: ["busy", "MT_ERR", "The TV is busy adding another device. Try again in a minute."], why_android_old: ["android_old", "MT_WHY", "Matter needs Android 7 or newer on this TV."], why_processor: ["processor", "MT_WHY", "This TV's processor can't run Matter."], err_unsupported: ["unsupported", "MT_ERR", "This TV can't add Matter devices."] };
 Object.keys(NEWER).forEach((k) => {
@@ -87,7 +87,7 @@ Object.keys(NEWER).forEach((k) => {
 // contract change 14: every reason key, worded on the TV (app.js's own mtSay, run here) and present on the phone
 const REASONS = ["blocked", "unsupported", "address", "port", "link_local", "offline", "not_answering", "opens_house", "off", "not_installed",
   "node_missing", "node_old", "starting", "stopped", "android_old", "processor", "not_started", "busy",
-  "not_found", "not_allowed", "bad_request", "bad_name", "not_ready", "device_refused", "failed", "not_certified"];   // not_found to failed: nl-matter-android 9a4b3fe; not_certified: the bridge
+  "not_found", "not_allowed", "bad_request", "bad_name", "not_ready", "device_refused", "failed", "not_certified", "local_network"];   // not_found to failed: nl-matter-android 9a4b3fe; not_certified, local_network: the bridge
 const tvSay = (() => {
   const pick = (re) => { const m = re.exec(appSec); if (!m) throw new Error("app.js: " + re); return m[0]; };
   const src = pick(/function mw\(key, vars\) \{[^\n]*\}/) + "\n" + pick(/var MT_ERR = \{[^}]*\};/) + "\n" + pick(/var MT_WHY = \{[^}]*\};/) + "\n" +
