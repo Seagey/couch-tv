@@ -16,5 +16,6 @@ Scratch: <scratchpad>/nlsb/ (run-browser.sh both|new|base, gradle.sh, node-suite
 - [x] g34 /api/say/scene (bridge, on-TV Say.kt + SayTest), ask.js, app.js phoneScene, remote buttons: bridge, remote, browser g34
 - [x] g24 icon packs (home.icon_set, Look Icon style, bridge keeps it): tests/test_icon_packs.py, browser g24. Own icons already exist since 0.13 (app-icons.sh)
 
-## Left
-- browser run (base and new) waiting on the lock; then node, python, test_ws_tv.mjs; final commit; report.
+## Done (21 Nov)
+- tests/test_social_bugs_browser.mjs 82/82 (base integrate-0.13.9: 43 fail), test_social_bugs_remote.mjs 36/36 (base: g34 fails, g32 times out),
+  test_ws_tv.mjs OK 1115, node 64/64 files, python 1301 passed / 7 failed (same 7 fail on base), SayTest 8/8.

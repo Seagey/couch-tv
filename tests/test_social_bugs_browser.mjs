@@ -240,7 +240,7 @@ try {
   // ------------------------------------------------------------------ g29
   await guard("g29", async () => {
     current = "g29";
-    const page = await fresh({ userAgent: "Mozilla/5.0 (Linux; Android 14; MT9216 Build/UP1A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" });
+    let page = await fresh({ userAgent: "Mozilla/5.0 (Linux; Android 14; MT9216 Build/UP1A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" });
     await open(page, "&look=night&lighter=off");
     await page.evaluate(() => { window.__calls = []; const real = window.MOCK_API; window.MOCK_API = function (m, p, b) { window.__calls.push([m, p, b]); return real.apply(this, arguments); }; });
     const box = (sel, i) => page.evaluate(([s, i]) => { const e = document.querySelectorAll(s)[i || 0]; if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, cls: e.className, name: e.textContent.trim().slice(0, 30) }; }, [sel, i]);
@@ -264,8 +264,12 @@ try {
     await page.mouse.click(card.x, card.y);
     await page.waitForTimeout(400);
     ok(await page.evaluate(() => window.__calls.some((c) => /^\/api\/(continue\/open|play|launch)/.test(c[1]) && c !== window.__calls[0])), "a click on the tile opens the show");
-    // Home settings rows
-    await page.evaluate(() => window.tv.home && window.tv.home());
+    ok(page.errors.length === 0, "no page errors on the home (" + page.errors.join(" | ") + ")");
+    await page.close();
+    // Home settings: a section and a row, on a fresh home (as when someone picks up the air mouse to change a setting)
+    page = await fresh({ userAgent: "Mozilla/5.0 (Linux; Android 14; MT9216 Build/UP1A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" });
+    await open(page, "&look=night&lighter=off");
+    await page.mouse.move(100, 100); await page.mouse.move(110, 110);
     await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await page.keyboard.press("Enter"); await page.waitForTimeout(400);
     const look = await page.evaluate(() => { const i = [...document.querySelectorAll("#set-secs > *")].findIndex((e) => /^Look/.test(e.textContent)); return i; });
     const lookBox = await box("#set-secs > *", look);
@@ -277,11 +281,12 @@ try {
     ok(rowI >= 0, "the Glass app icons row is there");
     // the row is further down the list: the wheel (an air mouse's scroll) brings it into view first
     await page.mouse.wheel(0, 400); await page.waitForTimeout(200);
-    await page.evaluate((i) => { const r = document.querySelectorAll("#set-rows > .srow")[i]; r.scrollIntoView({ block: "center" }); }, rowI);
-    await page.waitForTimeout(200);
+    await page.evaluate((i) => { const r = document.querySelectorAll("#set-rows > .srow")[i]; r.scrollIntoView({ block: "center", behavior: "instant" }); }, rowI);
+    await page.waitForTimeout(400);
     const before = await page.evaluate((i) => document.querySelectorAll("#set-rows > .srow")[i].textContent, rowI);
     const rb = await box("#set-rows > .srow", rowI);
     await page.mouse.move(rb.x, rb.y, { steps: 3 });
+    await page.waitForTimeout(200);
     await page.mouse.click(rb.x, rb.y);
     await page.waitForTimeout(300);
     const after = await page.evaluate(() => { const r = [...document.querySelectorAll("#set-rows > .srow")].find((e) => /^Glass app icons/.test(e.textContent)); return r ? r.textContent : ""; });
