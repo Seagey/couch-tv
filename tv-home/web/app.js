@@ -7086,9 +7086,9 @@
   // Every line is in the TV's language: mw(key) reads matter-words.js (one table for the TV and the phone).
   function mw(key, vars) { var W = window.CouchMatterWords; return W ? W.t(key, vars) : key; }
   // the error keys the screens put in words (matter.js's checks, the controllers' answers)
-  var MT_ERR = { short: 1, typo: 1, code: 1, expired: 1, wrong_code: 1, unreachable: 1, thread: 1, already: 1, not_allowed: 1, unavailable: 1, name_hides: 1, refused: 1, timeout: 1, off: 1, failed: 1 };
+  var MT_ERR = { short: 1, typo: 1, code: 1, expired: 1, wrong_code: 1, unreachable: 1, thread: 1, already: 1, not_allowed: 1, unavailable: 1, name_hides: 1, refused: 1, unsupported: 1, timeout: 1, off: 1, failed: 1 };
   // why Matter is not ready on the home computer (bridge/matter.py's reason key)
-  var MT_WHY = { off: 1, not_installed: 1, node_missing: 1, node_old: 1, starting: 1, stopped: 1 };
+  var MT_WHY = { off: 1, not_installed: 1, node_missing: 1, node_old: 1, starting: 1, stopped: 1, android_old: 1, processor: 1 };
   // a key in plain words; a controller's own sentence only when there is no key for it
   function mtSay(r) {
     r = r || {};

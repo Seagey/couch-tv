@@ -76,7 +76,14 @@ for (const m of matterJs.matchAll(/\b(st_[a-z]+|kind_[a-z]+)\b/g)) asked.add(m[1
 const unknown = [...asked].filter((k) => keys.indexOf(k) < 0);
 ok(asked.size >= 75, "keys the screens ask for: " + asked.size);
 ok(unknown.length === 0, "every key asked for is in the table: " + unknown.join(", "));
-ok(objKeys(appSec, "MT_ERR").length >= 15 && objKeys(setupSec, "MT_ERR").length >= 13 && objKeys(appSec, "MT_WHY").length === 6 && objKeys(setupSec, "MT_WHY").length === 6, "the error and reason keys are read from both screens");
+ok(objKeys(appSec, "MT_ERR").length >= 16 && objKeys(setupSec, "MT_ERR").length >= 14 && objKeys(appSec, "MT_WHY").length === 8 && objKeys(setupSec, "MT_WHY").length === 8, "the error and reason keys are read from both screens");
+// the on-TV app's own reasons and error (nl-matter-android ae3e6c1): an Android 6 TV, an Intel TV
+const NEWER = { why_android_old: ["android_old", "MT_WHY", "Matter needs Android 7 or newer on this TV."], why_processor: ["processor", "MT_WHY", "This TV's processor can't run Matter."], err_unsupported: ["unsupported", "MT_ERR", "This TV can't add Matter devices."] };
+Object.keys(NEWER).forEach((k) => {
+  const [key, obj, en] = NEWER[k];
+  ok(objKeys(appSec, obj).indexOf(key) >= 0 && objKeys(setupSec, obj).indexOf(key) >= 0, key + " is read on the TV and the phone");
+  ok(W.en(k) === en && LANGS.every((l) => { const v = W.t(k, null, l); return v && v !== en; }), key + " in plain English and in all 15 languages: " + W.t(k, null, "de"));
+});
 // matter.js's English stand ins are the table's English
 const en = /var EN = \{([\s\S]*?)\};/.exec(matterJs)[1];
 const enPairs = [...en.matchAll(/([a-z_]+): "([^"]*)"/g)];

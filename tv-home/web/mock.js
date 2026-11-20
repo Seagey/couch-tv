@@ -403,8 +403,8 @@
       return new Promise(function (resolve, reject) {
         setTimeout(function () {
           if (mt === "down") return reject(new Error("bridge_down"));
-          // ?matter=nodeold: the home computer's Node.js is too old (bridge/matter.py's reason key)
-          if (path.indexOf("/api/matter/devices") === 0) return resolve(mt === "nodeold" ? { ok: true, devices: [], ready: false, reason: "node_old", note: "Node.js 18 or newer is needed (found 16)." } : { devices: JSON.parse(JSON.stringify(MD)), ready: true });
+          // ?matter=nodeold: the home computer's Node.js is too old (bridge/matter.py's reason key); ?matter=androidold: an Android 6 TV (the on-TV app's reason key)
+          if (path.indexOf("/api/matter/devices") === 0) return resolve(mt === "nodeold" || mt === "androidold" ? { ok: true, devices: [], ready: false, reason: mt === "nodeold" ? "node_old" : "android_old", note: "Node.js 18 or newer is needed (found 16)." } : { devices: JSON.parse(JSON.stringify(MD)), ready: true });
           if (path === "/api/matter/commission") {
             var code = String(body && body.code || "");
             if (code === "34970112332" || /^MT:/.test(code)) {

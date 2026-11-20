@@ -32,6 +32,7 @@ const MD = [
 ];
 const phoneAsked = [];
 let notReady = "";   // a reason key (bridge/matter.py): the phone page says it in its own words
+let unsupported = false;   // the on-TV app on a TV that cannot add Matter devices (nl-matter-android ae3e6c1)
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".ttf": "font/ttf" };
 const server = http.createServer((req, res) => {
   const url = req.url.split("?")[0];
@@ -42,6 +43,7 @@ const server = http.createServer((req, res) => {
       if (url.indexOf("/api/matter/") === 0) phoneAsked.push(url + " " + (b || ""));
       if (url === "/api/matter/devices") return json(200, notReady ? { devices: [], ready: false, reason: notReady, note: "Node.js 18 or newer is needed (found 16)." } : { devices: MD, ready: true });
       if (url === "/api/matter/commission") {
+        if (unsupported) return json(400, { ok: false, error: "unsupported", note: "This TV cannot run the Matter controller." });
         if (body.code === "34970112332") { MD.push({ id: "matter:9:1", name: "Matter light", domain: "light", state: "off", attributes: {} }); return json(200, { ok: true, device_ids: ["matter:9:1"] }); }
         // the on-TV app (Matter.kt, ea574c2): a lock joins, the TV sees what it is and leaves it again
         if (body.code === "12345678902") return json(200, { ok: true, device_ids: [], note: "That device is not something the TV shows (locks, alarms and garage doors never show), so the TV did not keep it." });
@@ -194,6 +196,20 @@ console.log("Running Matter UI browser tests...");
   await page.close();
 }
 
+// 2e. an Android 6 TV (the on-TV app's reason android_old): the TV says it in plain words
+{
+  const page = await home("&matter=androidold&hasetup=1", [["controls", {}]]);
+  await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await press(page, "Enter", 400);
+  for (let i = 0; i < 14 && !(await page.evaluate(() => /Designs/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press(page, "ArrowDown");
+  await press(page, "ArrowRight");
+  for (let i = 0; i < 80 && !/^Smart home/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "")); i++) await press(page, "ArrowDown", 90);
+  await press(page, "Enter", 500);
+  const t = await page.evaluate(() => document.querySelector("#settings").textContent);
+  ok(/Matter needs Android 7 or newer on this TV/.test(t) && !/found 16/.test(t), "Android 6 TV: the reason in plain words");
+  ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
+  await page.close();
+}
+
 // 2c. the TV in German: the Matter rows, the device's words and the add screen in German
 {
   const page = await home("&matter=1&hasetup=1", [["controls", {}]]);
@@ -223,9 +239,10 @@ console.log("Running Matter UI browser tests...");
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   page.errors = []; page.on("pageerror", (e) => page.errors.push(String(e)));
   // on this branch a stand in; with nl-remote merged its phone-words.js replaces it and reads the kept language
-  await page.addInitScript(() => { try { localStorage.setItem("couchtv.phone.lang", "fr"); } catch (e) {} window.PhoneWords = { lang: () => "fr" }; });
+  await page.addInitScript(() => { try { localStorage.setItem("couchtv.token", "test-token"); localStorage.setItem("couchtv.phone.lang", "fr"); } catch (e) {} window.PhoneWords = { lang: () => "fr" }; });
   await page.goto(ORIGIN + "/setup#matter");
-  await page.waitForFunction(() => document.getElementById("matter").style.display !== "none" && /Lounge|Hallway/.test(document.getElementById("matter-list").textContent), null, { timeout: 8000 });
+  await page.waitForFunction(() => document.getElementById("matter").style.display !== "none" && /Lounge|Hallway/.test(document.getElementById("matter-list").textContent), null, { timeout: 8000 })
+    .catch((e) => { throw new Error("phone page in French never showed its Matter list; page errors: " + page.errors.join(" | ")); });
   const list = await page.evaluate(() => document.getElementById("matter-list").textContent);
   ok(/Lampe/.test(list) && /Thermostat/.test(list) && /Renommer/.test(list) && /Retirer/.test(list) && !/Rename/.test(list), "French: kinds and buttons: " + list.slice(0, 120));
   await page.fill("#matter-code", "3497-011-2333"); await page.click("#matter-add"); await page.waitForTimeout(300);
@@ -295,7 +312,18 @@ console.log("Running Matter UI browser tests...");
   await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 });
   const why = await page.evaluate(() => document.getElementById("matter-note").textContent);
   ok(/Node.js is too old for Matter/.test(why) && !/found 16/.test(why), "not ready: the reason key in plain words, not the English note: " + why);
-  notReady = "";
+  // the on-TV app on an Android 6 TV and on an Intel TV (reason keys), and a commission it cannot do
+  for (const [key, re] of [["android_old", /needs Android 7 or newer/], ["processor", /processor can't run Matter/]]) {
+    notReady = key;
+    await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 });
+    const w = await page.evaluate(() => document.getElementById("matter-note").textContent);
+    ok(re.test(w) && !/found 16/.test(w), "not ready, " + key + ": in plain words: " + w);
+  }
+  notReady = ""; unsupported = true;
+  await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 });
+  await page.fill("#matter-code", "3497-011-2332"); await page.click("#matter-add"); await page.waitForTimeout(600);
+  ok(/This TV can't add Matter devices/.test(await msg()), "a commission the TV cannot do: " + await msg());
+  unsupported = false;
   ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
   await page.close();
 }
