@@ -107,6 +107,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "/api/health" -> {
                 val a = authed(s)
                 val o = JSONObject().put("ok", true).put("mode", "on-tv").put("version", BuildConfig.VERSION_NAME).put("auth", if (a) "ok" else "required")
+                    .put("phone_page", true)   // this TV serves the phone's Home settings page (/setup)
                 if (a) o.put("tv_connected", true).put("adb", Adb.connected)
                 return json(200, o)
             }

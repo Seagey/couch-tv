@@ -592,3 +592,7 @@ a.pill.glass:active { background: var(--glass-press); transition: none; }
 .kids-found img { width: 64px; height: 96px; border-radius: 8px; object-fit: cover; flex: none; }
 .kids-found b { font-size: 16px; }
 .kids-off { width: 100%; margin-top: 12px; color: var(--err); }
+
+/* Widgets on this TV (Sheets.jsx PhonePage): one link per widget, opening the phone Home settings page at it */
+.widget-links { display: flex; flex-direction: column; gap: 8px; }
+.widget-links .arrange-open { margin: 0; }
