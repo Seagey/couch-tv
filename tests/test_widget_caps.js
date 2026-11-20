@@ -64,8 +64,8 @@ const MENUS = ["Home settings", "Location", "Search for a town or city", "Look a
   // couch-tv Studio, At home (things typed at home)
   "At home", "Write a note", "From", "Add a list", "Add an item", "Network name", "Password", "Add to the guide", "Add a calendar link", "Allow screen time", "Daily goal"];
 MENUS.forEach((m) => ok(i18n.indexOf('"' + m + '"') >= 0 || appSrc.indexOf('"' + m + '"') >= 0, "the TV has a menu called " + m));
-const SECTIONS = ["Language", "Location", "Weather", "Look and scenes", "Apps", "People", "Quick buttons", "couch-tv Studio", "About"];
-const JARGON = /Open-Meteo|bridge|endpoint|config\.json|apply\.sh|entit(y|ies)|EXIF|RSS|iCal|\.kt\b|\bAPI\b|WebView|launcher/;
+const SECTIONS = ["Language", "Location", "Weather", "Look and scenes", "Apps", "People", "Quick buttons", "Designs", "About"];
+const JARGON = /Open-Meteo|bridge|endpoint|config\.json|apply\.sh|entit(y|ies)|EXIF|RSS|iCal|\.kt\b|\bAPI\b|WebView|launcher|\boption [ABC]\b|couch-tv(?! Studio)/;
 const NEEDS = ["works", "setup", "computer", "no"];
 CAPS.kinds().forEach((k) => {
   const c = CAPS.get(k), st = c.setup.steps;

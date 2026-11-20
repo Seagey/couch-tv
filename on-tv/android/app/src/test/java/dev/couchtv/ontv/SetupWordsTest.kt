@@ -53,14 +53,14 @@ class SetupWordsTest {
     @Test fun phoneOnlyDownloadSaysHomeStaysGooglesAndWhereTheWatchIs() {
         // TCL beginner test, 0.13.3: Home kept opening Google's home with no warning on the TV
         val gtv = SetupWords.homeNote(true, false, true, watchApk = false)
-        assertTrue(gtv.contains("That is expected"))
+        assertTrue(gtv.contains("That is normal"))
         assertTrue(gtv.contains("see More, Home button from a computer"))
         // Google's Android TV Home (a TCL): Couch TV held the home role, Home still opened Google's
         val tcl = SetupWords.homeNote(true, true, false, watchApk = false, googleHome = true)
         // 0.13.6: never "Couch TV is your home screen" there, since Home still opens Google's home
         assertTrue(tcl.startsWith("Android lists Couch TV as the home app"))
         assertFalse(tcl.contains("is your home screen"))
-        assertTrue(tcl.contains("That is expected: see More, Home button from a computer"))
+        assertTrue(tcl.contains("That is normal: see More, Home button from a computer"))
         // a TV with no Google home, or the watch APK: no warning
         assertEquals("Couch TV is your home screen. Press Home on the remote to see it.", SetupWords.homeNote(true, true, false))
         assertEquals("Couch TV is your home screen. Press Home on the remote to see it.",
@@ -93,6 +93,16 @@ class SetupWordsTest {
         assertTrue(s.indexOf("adb pair") in 0 until s.indexOf("adb connect with the address and port"))
         // the watch only acts while Use as home screen is on, so that is a step, after the watch is switched on
         assertTrue(s.indexOf("press Use as home screen") > s.indexOf("Couch TV home watch, On"))
+    }
+
+    @Test fun theProductIsCalledCouchTv() {
+        // 0.13.9 plain words: the name on screen is Couch TV; couch-tv stays only in file names and links
+        val all = listOf(SetupWords.nextLine(null, 1, true), SetupWords.homeNote(true, false, true),
+            SetupWords.homeNote(false, false, true, watchApk = true), SetupWords.homeNote(true, false, true, watchApk = true),
+            SetupWords.homeNote(true, true, false, watchApk = false, googleHome = true), SetupWords.watchSteps(null))
+        all.forEach { assertFalse(it, Regex("couch-tv(?![-./])").containsMatchIn(it)) }
+        all.forEach { assertFalse(it, it.contains("phone only download") || it.contains("home watch version")) }
+        assertTrue(SetupWords.watchSteps(null).contains("for someone comfortable with a computer"))
     }
 
     @Test fun googleTvWordsNameUseAsHomeScreen() {

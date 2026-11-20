@@ -140,17 +140,18 @@ class SetupActivity : Activity() {
         val more1 = row()
         connect = button("Let the phone press keys") { adb.text = "Connecting. If the TV asks \"Allow debugging?\", tick Always allow and press OK."; Thread { Adb.ensure(interactive = true); main.post { refresh() } }.start() }
         more1.addView(connect)
-        more1.addView(button("TV developer settings") { runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) } })
+        more1.addView(button("Open Developer options") { runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) } })
         // the home watch is only in couch-tv-ontv-watch.apk (installed from a computer): Play Protect blocks it in a phone only install
-        if (BuildConfig.BUILD_TYPE == "watch") more1.addView(button("Keep couch-tv on Home") { runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } })
+        if (BuildConfig.BUILD_TYPE == "watch") more1.addView(button("Keep Couch TV on Home") { runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } })
         more1.addView(button("Forget phones") { Auth.forgetAll(); refresh() })
         more.addView(more1)
         more.addView(text("For the arrow keys and typing from your phone, the TV has to let Couch TV press keys. One time only: " +
             "on the TV open Settings, then System (or Device Preferences), then About, and press OK on Build seven times. " +
             "Then in Developer options switch on USB debugging, and Network debugging or Wireless debugging if the TV has one. " +
+            "These let Couch TV press keys on this TV. Only a device you press Allow for can use them. " +
             "Come back here and press Let the phone press keys, then Allow on the TV. " +
-            (if (android.os.Build.VERSION.SDK_INT >= 33) "This TV runs Android 13 or newer: use Wireless debugging, then Pair device with pairing code, and type that code on your phone at the setup page. " else "") +
-            "Careful: never press Revoke USB debugging authorisations.", 14f, CREAM_2).apply { setPadding(0, px(14), 0, 0) })
+            (if (android.os.Build.VERSION.SDK_INT >= 33) "This TV runs Android 13 or newer: use Wireless debugging, then Pair device with pairing code, and type that code on your phone, in Home settings, Let the phone press keys. " else "") +
+            "Careful: never press Revoke USB debugging authorizations.", 14f, CREAM_2).apply { setPadding(0, px(14), 0, 0) })
         more.addView(text("Couch TV cannot turn the TV on: once the TV sleeps, this app sleeps too. Use the TV's own remote.", 14f, CREAM_2))
         // the phone only download: the exact way to the Home button watch, from a computer (SetupWords.watchSteps)
         watchNote = text("", 14f, CREAM_2).apply { setPadding(0, px(10), 0, 0) }

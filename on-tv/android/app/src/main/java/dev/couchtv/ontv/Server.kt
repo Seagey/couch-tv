@@ -173,11 +173,11 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             }
             "POST /api/ask" -> {
                 if (Kids.isKid(body(s).optString("who").ifEmpty { Now.who })) throw ApiError(403, "Ask is off for a kids profile.")
-                if (!Ask.enabled) throw ApiError(501, "Ask is off in on-TV mode. To switch it on, add your own API key (Claude, OpenAI and others) or the address of a model at home on the setup page.")
+                if (!Ask.enabled) throw ApiError(501, "Ask AI is off. To switch it on, open Home settings on your phone, Ask AI, and add a key from an AI service (or a model on a home computer).")
                 val b = body(s)
                 val text = b.optString("text").ifEmpty { throw ApiError(400, "text is required") }
                 val r = Ask.ask(text, b.optString("who").ifEmpty { Now.who })
-                Say.asked(text, r.optString("reply"), "Your AI service, from the couch-tv TV app")   // shows on the TV home too
+                Say.asked(text, r.optString("reply"), "Your AI service, from the Couch TV app")   // shows on the TV home too
                 json(200, r)
             }
             // Ask AI on the TV home, and messages and designs from the person's own AI agent (Say.kt, docs/AI-AGENT.md)

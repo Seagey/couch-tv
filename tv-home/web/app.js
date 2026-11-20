@@ -4641,7 +4641,7 @@
 
   // ---- rows ----
   // couch-tv Studio is a name, the same in every language
-  function secName(id) { return id === "designer" ? "couch-tv Studio" : t("sec_" + id); }
+  function secName(id) { return id === "designer" ? "Designs" : t("sec_" + id); }
   function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(secsNow()[SET.sec][0]); }
   function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info" && r.kind !== "code" && r.kind !== "qr"; }
   function firstRow(rows) { for (var i = 0; i < rows.length; i++) if (focusable(rows[i])) return i; return -1; }
@@ -4731,7 +4731,7 @@
     return SET_ALL ? [info("dz-banner", "Every setting is showing", "", "Some are for parts this couch-tv Studio design doesn't show."),
       { kind: "action", key: "set-fewer", label: "Show only what this design uses", act: function () { setAll(false); } }]
       : [info("dz-banner", "This home uses a couch-tv Studio design", "", "Settings for parts it doesn't show are hidden."),
-        { kind: "action", key: "set-all", label: "Show all settings", sub: "Or go back to the standard home in couch-tv Studio", act: function () { setAll(true); } }];
+        { kind: "action", key: "set-all", label: "Show all settings", sub: "Or go back to the standard home in Designs", act: function () { setAll(true); } }];
   }
   function setAll(on) {
     var id = secsNow()[SET.sec] && secsNow()[SET.sec][0];
@@ -4926,7 +4926,7 @@
   // that one server for the code typed here; nothing connects to the TV. English only for now (needs i18n).
   function designCodeRows(rows) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.base()) return;
-    rows.push({ kind: "input", key: "design-get", label: "Get a design", sub: "Type the code couch-tv Studio shows you", act: function () {
+    rows.push({ kind: "input", key: "design-get", label: "Get a design", sub: "Type the code from couch-tv Studio on your phone", act: function () {
       typeDesignCode("");
     } });
     // the fewest presses on the TV: scan, choose on the phone, press Send to my TV (no typing here).
@@ -4946,7 +4946,7 @@
   function stopInbox() { if (INBOX && INBOX.timer) clearTimeout(INBOX.timer); INBOX = null; }
   function openPhoneInbox() {
     stopInbox();
-    SET.sub = { id: "phone-inbox", back: "design-phone", crumb: "couch-tv Studio", title: function () { return "Get a design from your phone"; }, rows: inboxRows };
+    SET.sub = { id: "phone-inbox", back: "design-phone", crumb: "Designs", title: function () { return "Get a design from your phone"; }, rows: inboxRows };
     SET.col = "rows"; SET.keyFocus = "inbox-type"; SET.ri = 0; SET.msg = "";
     var mine = INBOX = { state: "opening", misses: 0 };
     renderSettings();
@@ -5021,7 +5021,7 @@
   }
   function checkDesignCode(typed) {
     var c = CouchDesignCode.checkCode ? CouchDesignCode.checkCode(typed) : { ok: true, code: typed, shown: typed };
-    SET.sub = { back: "design-get", crumb: "couch-tv Studio", title: function () { return "Check the code"; },
+    SET.sub = { back: "design-get", crumb: "Designs", title: function () { return "Check the code"; },
       rows: function () { return codeCheckRows(c, typed); } };
     SET.col = "rows"; SET.keyFocus = c.ok ? "code-get" : "code-again"; SET.ri = 0;
     SET.msg = "";
@@ -5052,7 +5052,7 @@
       if (zone === "settings") renderSettings();
     });
   }
-  // ---- couch-tv Studio (designer-gate.js): opt in, and one step back to the classic home ----
+  // ---- Designs (designer-gate.js, couch-tv Studio designs): opt in, and one step back to the standard home ----
   // English only for now, like the rows above (needs i18n). The section's name is the product's.
   function setDesigner(on) {
     keep(CouchDesigner.KEY, on ? "on" : "off");
@@ -5061,17 +5061,17 @@
     SET.dirty = true;
   }
   function designerRows() {
-    if (typeof CouchDesigner === "undefined") return [info("dz-none", "couch-tv Studio", "", "Not in this version of the home.")];
+    if (typeof CouchDesigner === "undefined") return [info("dz-none", "Designs", "", "Not in this version of the home.")];
     // the choice kept just now wins over GATE, which is only worked out when the home starts
     var rows = [], on = !!GATE.preview || CouchDesigner.shownOn(kept(CouchDesigner.KEY), GATE.on, typeof CouchDesign !== "undefined" && CouchDesign.on());
     if (!on) {
-      rows.push(info("dz-off", "couch-tv Studio", "Off", "Design your home on your phone, then send it to this TV. While it is off, your home stays exactly as it is."));
-      rows.push({ kind: "action", key: "dz-turn-on", label: "Turn on couch-tv Studio", sub: "Nothing changes until you choose a design", act: function () {
-        setDesigner(true); SET.msg = "couch-tv Studio is on. Get a design below, or close Home settings.";
+      rows.push(info("dz-off", "Designs", "Off", "Design your home on your phone, then send it to this TV. While it is off, your home stays exactly as it is."));
+      rows.push({ kind: "action", key: "dz-turn-on", label: "Turn on designs", sub: "Nothing changes until you choose a design", act: function () {
+        setDesigner(true); SET.msg = "Designs are on. Get a design below, or close Home settings.";
       } });
     } else {
-      rows.push({ kind: "action", key: "dz-classic", label: "Back to my classic home", sub: "Turns couch-tv Studio off in one step. Your design is kept for later.", act: function () {
-        setDesigner(false); SET.msg = "couch-tv Studio is off. Your classic home comes back when you close Home settings.";
+      rows.push({ kind: "action", key: "dz-classic", label: "Back to the standard home", sub: "Turns designs off in one step. Your design is kept for later.", act: function () {
+        setDesigner(false); SET.msg = "Designs are off. The standard home comes back when you close Home settings.";
       } });
       // a design switched off with Back held, or not chosen yet: it comes back here
       // in the Loop look no design runs (start()), so its row would say On for a design nobody sees
@@ -5790,7 +5790,7 @@
   // Home settings, About, Update couch-tv: the version line, and OK opens the update page (the same rows
   // as Updates). Nobody on a phone only install was ever told about a new version (a TCL beginner on
   // 0.13.3, 19 Nov 2026), so it is where people look first. English only for now (needs i18n).
-  var UPD_ROW = "Update couch-tv";
+  var UPD_ROW = "Update Couch TV";
   // The on-TV app's own update words (it installs by itself over its ADB link, Update.kt), English only
   // like its steps, which come from the app.
   var UPD_ONTV = {
@@ -5799,7 +5799,7 @@
     upd_self_sub: "Downloads it, checks it and installs it. Your settings stay.",
     upd_installing_self: "Installing. Couch TV closes and opens again by itself.",
     upd_done: "Updated to {v}. Your settings stay.",
-    upd_note_self: "Updates come from couch-tv's releases on GitHub. With Tell me on, the TV looks once a week. Nothing is installed until you choose Update, and your settings stay as they are.",
+    upd_note_self: "Updates come from Couch TV's releases on GitHub. With Tell me on, the TV looks once a week. Nothing is installed until you choose Update, and your settings stay as they are.",
     upd_qr: "Scan to keep these steps on your phone."
   };
   function tUpd(k, v) {
@@ -6684,7 +6684,7 @@
     CAL.busy = true;
     calFetch(url).then(function (text) {
       CAL.busy = false;
-      if (!CouchAtHome.isIcs(text)) { CAL.err = "That link is not a calendar. Check it is the private address (iCal format) of the calendar."; ahChanged(); return; }
+      if (!CouchAtHome.isIcs(text)) { CAL.err = "That link is not a calendar. Use the calendar's private link. In Google Calendar it is called Secret address in iCal format."; ahChanged(); return; }
       var win = calWindow();
       CAL.events = CouchAtHome.parseIcs(text, win.from, win.to, 60);
       CAL.at = Date.now(); CAL.err = "";
@@ -6694,7 +6694,7 @@
     }, function (e) {
       CAL.busy = false;
       var why = String((e && e.message) || "");
-      CAL.err = /blocked/.test(why) ? "This TV cannot read that calendar by itself. It needs the couch-tv TV home or a computer at home." : /http 40[134]/.test(why) ? "The calendar said no. Check the link is the private address and still works." : "The calendar did not answer. couch-tv tries again soon.";
+      CAL.err = /blocked/.test(why) ? "This TV cannot read that calendar by itself. It needs the Couch TV app on this TV or a home computer." : /http 40[134]/.test(why) ? "The calendar said no. Check the link is the private address and still works." : "The calendar did not answer. Couch TV tries again soon.";
       CAL.at = Date.now() - CAL_MS + 2 * 60000;   // try again in two minutes
       ahChanged();
       if (zone === "settings") renderSettings();
@@ -6720,7 +6720,7 @@
     }, function () {});
     calFetch(url).then(function (text) {
       STAY.busy = false;
-      if (!CouchAtHome.isIcs(text)) { STAY.err = "That link is not a calendar. Check it is the calendar's private address (iCal or .ics)."; ahChanged(); return; }
+      if (!CouchAtHome.isIcs(text)) { STAY.err = "That link is not a calendar. Use the bookings calendar link from Airbnb, Booking.com or VRBO."; ahChanged(); return; }
       var d = new Date(), from = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - 35 * 86400000;
       STAY.events = CouchAtHome.parseIcs(text, from, from + 100 * 86400000, 200);
       STAY.at = Date.now(); STAY.err = "";
@@ -6730,7 +6730,7 @@
     }, function (e) {
       STAY.busy = false;
       var why = String((e && e.message) || "");
-      STAY.err = /blocked/.test(why) ? "This TV cannot read that calendar by itself. It needs the couch-tv TV home or a computer at home." : /http 40[134]/.test(why) ? "The calendar said no. Check the link is the private address and still works." : "The calendar did not answer. couch-tv tries again soon.";
+      STAY.err = /blocked/.test(why) ? "This TV cannot read that calendar by itself. It needs the Couch TV app on this TV or a home computer." : /http 40[134]/.test(why) ? "The calendar said no. Check the link is the private address and still works." : "The calendar did not answer. Couch TV tries again soon.";
       STAY.at = Date.now() - CAL_MS + 2 * 60000;
       ahChanged();
       if (zone === "settings") renderSettings();
@@ -6908,11 +6908,11 @@
   // Home settings, couch-tv Studio, At home: one page with the note, lists, Wi-Fi, guide, calendar and
   // screen time; a list and a guide entry each open their own page. English only for now, like the
   // rest of the couch-tv Studio section (needs i18n).
-  var AH_INTRO = "Words for your couch-tv Studio widgets. They stay on this TV: never in a design, Share this home or couch-tv Studio. Typing is quicker with Type on the TV in the phone remote.";
+  var AH_INTRO = "Words for the widgets on your home. They stay on this TV and never go into a design or Share this home. Typing is quicker with Type on the TV in the phone remote.";
   function ahEdit(fn, msg) { AH.store.edit(fn); ahChanged(); if (msg) SET.msg = msg; }
   function ahType(label, value, submit, url) { startTyping({ label: label, value: value || "", url: !!url, submit: submit }); }
   function openAtHome() {
-    SET.sub = { back: "dz-athome", crumb: "couch-tv Studio", title: function () { return "At home"; }, rows: atHomeRows };
+    SET.sub = { back: "dz-athome", crumb: "Designs", title: function () { return "At home"; }, rows: atHomeRows };
     SET.keyFocus = null; SET.ri = 0;
   }
   function atHomeRows() {
@@ -7025,11 +7025,11 @@
     // screen time
     rows.push(head("Screen time"));
     var s = screenNow(), goal = (r.screen || {}).goal || 0;
-    rows.push(info("ah-screen", "Today", s.ok ? CouchAtHome.hm(s.minutes) : "", s.ok ? "Time in apps on this TV today." : s.why === "access" ? "This TV has not allowed couch-tv to read screen time yet." : s.why === "tv" ? "This TV does not share screen time: it needs a Google TV, Android TV or Fire TV." : s.why === "ontv" ? "Screen time needs couch-tv set up once from a computer, with the free Setup app. The app put on with just a phone cannot read it." : "Needs the couch-tv home app 0.13.2 or newer: Home settings, Updates."));
+    rows.push(info("ah-screen", "Today", s.ok ? CouchAtHome.hm(s.minutes) : "", s.ok ? "Time in apps on this TV today." : s.why === "access" ? "This TV has not allowed Couch TV to read screen time yet." : s.why === "tv" ? "This TV does not share screen time: it needs a Google TV, Android TV or Fire TV." : s.why === "ontv" ? "Screen time needs Couch TV set up once from a computer, with the free Setup app. The app put on with just a phone cannot read it." : "Needs the Couch TV home app 0.13.2 or newer: Home settings, Updates."));
     rows.push({ kind: "cycle", key: "ah-goal", label: "Daily goal", value: goal ? CouchAtHome.hm(goal) : t("off"), act: function () {
       ahEdit(function (x) { var g = CouchAtHome.GOALS, i = g.indexOf((x.screen || {}).goal || 0); x.screen = { goal: g[(i + 1) % g.length] }; });
     } });
-    if (s.why === "access" && TV && TV.openUsageAccess) rows.push({ kind: "action", key: "ah-screen-allow", label: "Allow screen time", sub: "Opens the TV's Usage access list: switch on Home", act: function () { if (!TV.openUsageAccess()) SET.msg = "This TV has no such screen. Ask whoever set up couch-tv to switch on screen time from their computer."; SCR.at = 0; } });
+    if (s.why === "access" && TV && TV.openUsageAccess) rows.push({ kind: "action", key: "ah-screen-allow", label: "Allow screen time", sub: "Opens the TV's Usage access list: switch on Home", act: function () { if (!TV.openUsageAccess()) SET.msg = "This TV has no such screen. Ask whoever set up Couch TV to switch on screen time from their computer."; SCR.at = 0; } });
     return rows;
   }
   function timeStr(d) { var h = d.getHours(), m = d.getMinutes(); return CLOCK24 ? h + ":" + (m < 10 ? "0" : "") + m : (h % 12 || 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? "am" : "pm"); }
@@ -7096,10 +7096,10 @@
     ["battery", "Home battery (%)", /^sensor\./, 1]
   ];
   var SH_ERR = { address: "That is not an address. It looks like http://homeassistant.local:8123 or http://192.168.1.20:8123.",
-    token: "Home Assistant did not accept that token. Make a new one and paste the whole of it.",
+    token: "Home Assistant did not accept that key. Make a new one and paste all of it.",
     unreachable: "The TV could not reach Home Assistant at that address. Check it is on and on the same Wi-Fi. If homeassistant.local does not work, use its number address from Home Assistant: Settings, System, Network.",
     not_ha: "Something answered at that address, but it is not Home Assistant. Check the address and the port (usually 8123).",
-    refused: "This copy of the home cannot set up smart home.", bridge: "The home computer did not answer. Check couch-tv is running on it.",
+    refused: "This copy of the home cannot set up smart home.", bridge: "The home computer did not answer. Check Couch TV is running on it.",
     timeout: "That took too long. Try again.", check: "Connect first, then pick what shows.", picks: "That could not be kept. Pick again." };
   function shPicksFrom(st) {
     var p = {}; ["climate", "scenes", "controls", "cameras", "sensors", "speakers"].forEach(function (k) { p[k] = Array.isArray(st[k]) ? st[k].slice() : []; });
@@ -7128,7 +7128,7 @@
   }
   function openSmartSetup() {
     SH.list = null; SH.err = ""; SH.picks = null;
-    SET.sub = { back: "dz-smart", crumb: "couch-tv Studio", title: function () { return "Smart home"; }, rows: smartRows };
+    SET.sub = { back: "dz-smart", crumb: "Designs", title: function () { return "Smart home"; }, rows: smartRows };
     SET.keyFocus = null; SET.ri = 0;
   }
   function smartRows() {
@@ -7141,11 +7141,11 @@
     rows.push({ kind: "input", key: "sh-addr", label: "Home Assistant's address", value: SH.addr, sub: "Usually http://homeassistant.local:8123. Or its number address from Home Assistant: Settings, System, Network.", act: function () {
       ahType("Home Assistant's address", SH.addr, function (v) { v = String(v || "").trim(); if (v) SH.addr = /^https?:\/\//i.test(v) ? v : "http://" + v; }, true);
     } });
-    rows.push({ kind: "input", key: "sh-token", label: st.set ? "Paste a new token" : "Paste a token", value: st.set ? "Kept on this TV" : "",
-      sub: "In Home Assistant on your phone: tap your name (bottom left), Security, Long-lived access tokens, Create token, name it TV, then copy it. Paste it here with the phone remote's Type on the TV. Best made as a separate user for the TV, not an administrator.", act: function () {
-        ahType("Paste the long-lived access token", "", function (v) { v = String(v || "").trim(); if (v) shCheck(v); }, true);
+    rows.push({ kind: "input", key: "sh-token", label: st.set ? "Paste a new access key" : "Paste the access key", value: st.set ? "Kept on this TV" : "",
+      sub: "This key lets the TV read Home Assistant. In Home Assistant on your phone: tap your name (bottom left), Security, Long-lived access tokens, Create token, name it TV, then copy it. Paste it here with the phone remote's Type on the TV. Best made as a separate user for the TV, not your main account.", act: function () {
+        ahType("Paste the access key from Home Assistant", "", function (v) { v = String(v || "").trim(); if (v) shCheck(v); }, true);
       } });
-    if (st.set && !SH.list) rows.push({ kind: "action", key: "sh-change", label: "Change what shows", sub: "Reads what Home Assistant has now, with the kept token", act: function () { shCheck(""); } });
+    if (st.set && !SH.list) rows.push({ kind: "action", key: "sh-change", label: "Change what shows", sub: "Reads what Home Assistant has now, with the saved key", act: function () { shCheck(""); } });
     if (SH.list) {
       rows.push(head("3. Pick what shows"));
       SH_GROUPS.forEach(function (g) {
@@ -7154,7 +7154,7 @@
         var picked = (SH.picks[g[0]] || []).filter(function (id) { return have.some(function (e) { return e.entity === id; }); });
         rows.push({ kind: "nav", key: "sh-g:" + g[0], label: g[1], value: picked.length ? picked.length + " picked" : "None", act: function () { openSmartGroup(g, have); } });
       });
-      rows.push({ kind: "action", key: "sh-save", label: "Save and show on the home", sub: "Then add the widgets in couch-tv Studio, or open the Smart home tile in your apps", act: function () {
+      rows.push({ kind: "action", key: "sh-save", label: "Save and show on the home", sub: "Then add the widgets in your design on your phone, or open the Smart home tile in your apps", act: function () {
         SET.msg = "Saving...";
         S.save(shSection(SH.picks)).then(function (r) { SET.msg = r.ok ? "Saved. Smart home is on this TV." : SH_ERR[r.error] || SH_ERR.picks; if (r.ok) SH.list = null; if (zone === "settings") renderSettings(); });
       } });
@@ -7162,7 +7162,7 @@
     if (!OFFLINE && !MOCK && !PREVIEW) directRows(rows);
     rows.push(head("A device we don't list"));
     rows.push({ kind: "nav", key: "sh-more", label: "Add a device we don't list", sub: "Tuya and Smart Life, Google Nest, Alexa, Apple Home, Matter, Hue, aircon and solar brands, and anything with a web address", act: openSmartMore });
-    if (st.set) rows.push({ kind: "action", key: "sh-forget", label: "Disconnect smart home", danger: true, sub: "Removes the address and token from this TV. Also delete the token in Home Assistant.", act: function () {
+    if (st.set) rows.push({ kind: "action", key: "sh-forget", label: "Disconnect smart home", danger: true, sub: "Removes the address and key from this TV. Also delete the key in Home Assistant (Security, Long-lived access tokens).", act: function () {
       S.forget().then(function () { SH.list = null; SH.picks = null; SET.msg = "Smart home is off on this TV."; if (zone === "settings") renderSettings(); });
     } });
     return rows;
@@ -7176,8 +7176,8 @@
     button: "Press the round button on top of the Hue bridge, then pick Pair within 30 seconds.",
     unreachable: "Nothing answered at that address. Check it is on and on the same Wi-Fi as the home computer.",
     not_hue: "Something answered, but it is not a Hue bridge.", none: "No AirTouch console answered on the Wi-Fi. Type its address instead (on the console: Settings, Network).",
-    library: "The home computer needs one more part for AirTouch: run bridge/.venv/bin/pip install -r bridge/requirements.txt on it, then restart couch-tv there.",
-    pair: "Pair the Hue bridge first.", refused: "That could not be done.", bridge: "The home computer did not answer. Check couch-tv is running on it." };
+    library: "The home computer needs an update for AirTouch. Whoever set up Couch TV can run the AirTouch step in the setup guide.",
+    pair: "Pair the Hue bridge first.", refused: "That could not be done.", bridge: "The home computer did not answer. Check Couch TV is running on it." };
   function dirAsk(body, then) {
     SET.msg = "Asking the home computer...";
     if (zone === "settings") renderSettings();
@@ -7205,7 +7205,7 @@
     if (st.hue) rows.push({ kind: "nav", key: "dh-lights", label: "Pick the lights", value: st.hue_lights ? st.hue_lights + " picked" : "None", act: function () {
       dirAsk({ action: "hue_lights" }, function (r) { DIR.lights = r.lights || []; DIR.picked = (r.picked || []).slice(); openDirectLights(); });
     } });
-    if (st.hue) rows.push({ kind: "action", key: "dh-forget", label: "Unpair the Hue bridge", danger: true, sub: "The home computer forgets it. Also remove couch-tv in the Hue app: Settings, Apps", act: function () { dirAsk({ action: "hue_forget" }); } });
+    if (st.hue) rows.push({ kind: "action", key: "dh-forget", label: "Unpair the Hue bridge", danger: true, sub: "The home computer forgets it. Also remove couch-tv (the name the Hue app shows) in the Hue app: Settings, Apps", act: function () { dirAsk({ action: "hue_forget" }); } });
     rows.push(head("AirTouch 5 aircon, straight from the console"));
     rows.push(info("dt-intro", "", "", "No Home Assistant needed. Each zone shows as a room you can switch on and off and set the temperature of. Cooling or heating stays as set on the wall."));
     if (st.airtouch) rows.push(info("dt-on", "Connected", "", ""));
@@ -7241,7 +7241,7 @@
       var cur = SH.picks[g[0]] = SH.picks[g[0]] || [];
       var rows = [info("sh-g-most", "", "", g[3] === 1 ? "Pick one." : "Pick up to " + g[3] + ". They show in this order.")];
       have.forEach(function (e) {
-        rows.push({ kind: "check", key: "sh-e:" + e.entity, label: e.name, sub: e.entity + (e.unit ? ", " + e.unit : ""), checked: cur.indexOf(e.entity) >= 0, act: function () {
+        rows.push({ kind: "check", key: "sh-e:" + e.entity, label: e.name, sub: e.unit || "", checked: cur.indexOf(e.entity) >= 0, act: function () {
           var i = cur.indexOf(e.entity);
           if (i >= 0) cur.splice(i, 1);
           else if (g[3] === 1) { cur.length = 0; cur.push(e.entity); }
@@ -7261,8 +7261,8 @@
     ["Amazon Alexa", "Alexa itself has no way in, but the plugs and lights in it do: add each by its own brand (often Tuya, TP-Link, Hue or Matter)."],
     ["Apple Home", "In the Home app, open the device, Turn On Pairing Mode, and copy the code. Then in the Home Assistant phone app: Add device, Matter."],
     ["Matter or Thread devices", "In the Home Assistant phone app: Settings, Devices and services, Add device, Add Matter device, then scan the code on the device."],
-    ["Philips Hue", "With a computer at home: Philips Hue, straight from the Hue bridge, on the Smart home page (no Home Assistant). Or in Home Assistant: Add integration, Philips Hue, then press the round button on the Hue bridge."],
-    ["Aircon", "Add integration and search for the brand: Daikin, Mitsubishi (MELCloud), Fujitsu, Panasonic, LG, Sensibo, AirTouch 5 (it finds the console by itself). With a computer at home, AirTouch 5 also works with no Home Assistant: on the Smart home page."],
+    ["Philips Hue", "With a home computer: Philips Hue, straight from the Hue bridge, on the Smart home page (no Home Assistant). Or in Home Assistant: Add integration, Philips Hue, then press the round button on the Hue bridge."],
+    ["Aircon", "Add integration and search for the brand: Daikin, Mitsubishi (MELCloud), Fujitsu, Panasonic, LG, Sensibo, AirTouch 5 (it finds the console by itself). With a home computer, AirTouch 5 also works with no Home Assistant: on the Smart home page."],
     ["Solar and batteries", "Add integration: Fronius, Enphase, SolarEdge, SMA, GoodWe or Tesla Powerwall. Then pick its today total under Solar or power meter."],
     ["Plugs, cameras and speakers", "TP-Link Kasa and Tapo, Shelly, LIFX, Reolink, Ring, Eufy, Sonos, Google Cast: Add integration and search for the brand."],
     ["Anything with a web address or MQTT", "A home made sensor, a Raspberry Pi or a router: Home Assistant's RESTful, MQTT or Webhook integrations make it a sensor or a switch, which then shows here."],
@@ -7695,7 +7695,7 @@
           set(o[0]);
         } });
       } else if (s.type === "tvlist") {
-        rows.push(info(id, s.label, "Nothing to pick on this TV yet", s.from === "photos" ? "Add photos in Look and scenes, Your photos" : s.from === "lists" ? "Add a list in couch-tv Studio, At home" : s.help));
+        rows.push(info(id, s.label, "Nothing to pick on this TV yet", s.from === "photos" ? "Add photos in Look and scenes, Your photos" : s.from === "lists" ? "Add a list in Home settings, Designs, At home" : s.help));
       } else if (s.type === "toggle") {
         rows.push({ kind: "toggle", key: id, label: s.label, sub: s.help, value: cur ? t("on") : t("off"), act: function () { set(!cur); } });
       } else if (s.type === "number") {
@@ -7735,7 +7735,7 @@
       // a value set on this TV over the design's own: one press back to the design's
       if (v !== undefined && v !== "" && s.type !== "place") rows.push({ kind: "action", key: id + ":clear", label: s.store === "design" ? "Use the design's " + s.label.toLowerCase() : "Clear " + s.label.toLowerCase(), act: function () { wsSet(w.key, s.key, null); if (s.sets) wsSet(w.key, s.sets, null); } });
     });
-    rows.push(info("w-kept", "Kept in this TV's Home settings (and the computer at home, if this TV has one). Never in a design, never sent to couch-tv."));
+    rows.push(info("w-kept", "Kept in this TV's Home settings (and the home computer, if this TV has one). Never in a design, never sent to Couch TV."));
     return rows;
   }
   // a place setting: the town search (the same one as Location), kept in Home settings (the TV, and the computer at home or the TV app), never in a design or on couch-tv servers

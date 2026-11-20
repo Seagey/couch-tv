@@ -2087,7 +2087,7 @@
     clear();
     var t = document.createElement("div");
     t.className = "cd-escaped";
-    t.textContent = "Design switched off. This is the normal home. Turn it back on in Home settings, couch-tv Studio.";
+    t.textContent = "Design switched off. This is the normal home. Turn it back on in Home settings, Designs.";
     t.setAttribute("style", "position:fixed;left:50%;top:2rem;transform:translateX(-50%);z-index:60;padding:0.875rem 1.5rem;border-radius:2rem;background:rgba(16,16,20,0.9);color:#fff;font-size:1.4375rem;font-weight:600");
     document.body.appendChild(t);
     setTimeout(function () { t.remove(); }, 6000);
@@ -2533,7 +2533,7 @@
         var mine = widgetList().filter(function (x) { return x.id === wid && Caps.settings(x.kind).some(function (s) { return s && s.pre === true && (!Array.isArray(s.where) || s.where.indexOf("tv") >= 0 || s.where.indexOf("phone") >= 0); }); })[0];
         if (mine) nodes.splice(1, 0, mk("Settings for this widget", "wset", mine.key));
       }
-      openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes }, "Back to close. Settings here is couch-tv's own: the remote's Settings button opens the TV's menu.");
+      openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes }, "Back to close. Settings here is Couch TV's own: the remote's Settings button opens the TV's menu.");
     }
     // ---- changing a container's apps with the remote ----
     var EDIT = null, MOVING = null, FORCE_SLOT = null;

@@ -145,7 +145,7 @@
     var route = c.route === "home" && h.on ? "home" : own ? "own" : h.on && c.route !== "own" ? "home" : "";
     return { ready: !!route, route: route, own: own, homeAvailable: h.on, provider: p ? p.id : "", providerName: p ? p.name : "",
       base: c.base, model: c.model, hasKey: !!key, needsKey: !!(p && p.key && !(p.wire === "openai" && isLocalHost(hostOf(c.base)))),
-      by: route === "home" ? "Your couch-tv at home" : p ? p.name + (c.model ? ", " + c.model : "") : "" };
+      by: route === "home" ? "Your Couch TV at home" : p ? p.name + (c.model ? ", " + c.model : "") : "" };
   }
 
   // ---------------- one request to a service ----------------
@@ -228,17 +228,17 @@
         var j = null; try { j = JSON.parse(r.text); } catch (e) {}
         if (r.status >= 200 && r.status < 300 && j && j.ok !== false) return plain(j.say || j.reply || "Done.", 1200);
         if (r.status === 409) throw new Error("The home computer's Claude ask is switched off (ask.enabled in config.json). Pick Set up to use your own AI service instead.");
-        if (r.status === 501) throw new Error("Ask is off in the couch-tv TV app. Add your key on its setup page, or pick Set up to use your own AI service here.");
+        if (r.status === 501) throw new Error("Ask is off in the Couch TV app on this TV. Add your key on its setup page, or pick Set up to use your own AI service here.");
         if (r.status === 403) throw new Error("Ask is off for a kids profile.");
-        throw new Error(plain((j && j.error) || "couch-tv at home could not answer just now.", 200));
-      }, function () { throw new Error("couch-tv at home did not answer. Is the computer or the TV app on?"); });
+        throw new Error(plain((j && j.error) || "Couch TV at home could not answer just now.", 200));
+      }, function () { throw new Error("Couch TV at home did not answer. Is the computer or the TV app on?"); });
     } else {
       var c = config(), rq = request(c, keyFor(c), text), wire = (provider(c.provider) || {}).wire;
       job = xhr("POST", rq.url, rq.headers, rq.body, 60000).then(function (r) {
         if (r.status < 200 || r.status >= 300) throw new Error(errorOf(r.status, r.text));
         var j = null; try { j = JSON.parse(r.text); } catch (e) {}
         var a = answerOf(wire, j);
-        if (a === null) throw new Error("The service answered in a way couch-tv does not understand. Check the model name.");
+        if (a === null) throw new Error("The service answered in a way Couch TV does not understand. Check the model name.");
         return plain(a, 1200) || "(no words in the answer)";
       }, function (e) {
         var local = isLocalHost(hostOf(c.base));
@@ -287,7 +287,7 @@
   function took(j, now) {
     var a = j.ask;
     if (a && a.q && (!last || (a.at || 0) > (last.at || 0) + 500 || (last.pending && plain(a.q) === last.q && !a.pending && a.a))) {
-      if (!(last && last.pending && !a.a)) { last = { q: plain(a.q, 400), a: plain(a.a, 1200), by: String(a.by || "Your couch-tv at home"), at: a.at || now, pending: !!a.pending }; changed(); }
+      if (!(last && last.pending && !a.a)) { last = { q: plain(a.q, 400), a: plain(a.a, 1200), by: String(a.by || "Your Couch TV at home"), at: a.at || now, pending: !!a.pending }; changed(); }
     }
     var m = j.message;
     if (m && m.text && (m.at || 0) > (seen.msg || 0)) {
@@ -316,13 +316,13 @@
   // who: "phone" (the phone remote's Send a design) or "ai" (the person's own AI agent)
   function useDesign(code, who) {
     var C = W.CouchDesignCode, by = who === "phone" ? "your phone" : "your AI";
-    if (!C || !C.get || !C.readCode(code)) { banner({ from: "couch-tv", text: "A design was sent, but this TV cannot get designs. Update couch-tv.", seconds: 15 }); return; }
-    if (studioOff()) { banner({ from: "couch-tv", text: "A design came from " + by + ". couch-tv Studio is switched off on this TV, so it was not used. To use designs, turn it on in Home settings, couch-tv Studio.", seconds: 20 }); return; }
-    banner({ from: "couch-tv", text: "Getting the design from " + by + "...", seconds: 20 });
+    if (!C || !C.get || !C.readCode(code)) { banner({ from: "Couch TV", text: "A design was sent, but this TV cannot get designs. Update Couch TV.", seconds: 15 }); return; }
+    if (studioOff()) { banner({ from: "Couch TV", text: "A design came from " + by + ". Designs are switched off on this TV, so it was not used. To use designs, turn them on in Home settings, Designs.", seconds: 20 }); return; }
+    banner({ from: "Couch TV", text: "Getting the design from " + by + "...", seconds: 20 });
     C.get(code).then(function () {
       // "Use this design?" comes first, as for a code typed at the TV; this TV's on or off choice is left as it is
       setTimeout(function () { try { W.location.reload(); } catch (e) {} }, 800);
-    }, function (e) { banner({ from: "couch-tv", text: (e && e.message) || "That design could not be used.", seconds: 15 }); });
+    }, function (e) { banner({ from: "Couch TV", text: (e && e.message) || "That design could not be used.", seconds: 15 }); });
   }
   function startPolling() {
     if (pollT || !home().on) return;
@@ -398,7 +398,7 @@
     var K = kit(); if (!K) return root;
     var m = env && env.demo ? DEMO_MSG : message, tiny = b.w < 300 || b.h < 220;
     if (!m) {
-      if (!home().on) return blank(K, root, o, b, "phone", tiny ? "Connect your AI" : "Connect your AI agent", "It needs the couch-tv TV app or a home computer. OK here shows how");
+      if (!home().on) return blank(K, root, o, b, "phone", tiny ? "Connect your AI" : "Connect your AI agent", "It needs the Couch TV app on this TV or a home computer. OK here shows how");
       return blank(K, root, o, b, "phone", tiny ? "No messages yet" : "Nothing from your AI yet", "OK here shows how to connect it");
     }
     var w = b.w - 48;
@@ -490,11 +490,11 @@
   function viewSetup(b) {
     var s = status(), h = home();
     line(b, "cask-h", "Who answers your questions?");
-    line(b, "cask-p", "Pick one. Your key stays on this TV and is only ever sent to the service you pick. couch-tv never sees it and never pays for it.");
-    if (h.on) button(b, "couch-tv at home" + (s.route === "home" ? "  (in use)" : ""), function () { save({ route: "home" }); show("setup"); },
-      "The home computer's Claude on your own Claude plan, or the couch-tv TV app with the key on its setup page");
+    line(b, "cask-p", "Pick one. Your key stays on this TV and is only ever sent to the service you pick. Couch TV never sees it and never pays for it.");
+    if (h.on) button(b, "Couch TV at home" + (s.route === "home" ? "  (in use)" : ""), function () { save({ route: "home" }); show("setup"); },
+      "The home computer's Claude on your own Claude plan, or the Couch TV app on this TV with the key on its setup page");
     PROVIDERS.forEach(function (p) {
-      button(b, p.name + (s.route === "own" && s.provider === p.id ? "  (in use)" : s.provider === p.id ? "  (saved)" : ""), function () { show("service", p.id); }, p.key ? "Your own key" : "No key: a computer at home runs it");
+      button(b, p.name + (s.route === "own" && s.provider === p.id ? "  (in use)" : s.provider === p.id ? "  (saved)" : ""), function () { show("service", p.id); }, p.key ? "Your own key" : "No key: a home computer runs it");
     });
     if (s.provider || s.route) button(b, "Remove Ask AI from this TV", function () { forget(); show("setup"); }, "Deletes the key and the choices kept on this TV");
   }

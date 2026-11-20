@@ -53,11 +53,11 @@ ok(app.includes("DESIGN_WORDS.ask") && app.includes("DESIGN_WORDS.askLater"), "S
 ok(!/press OK when|you press OK/i.test(WORDS.sent + WORDS.note), "never just press OK");
 eq(WORDS.sent, "Sent. On the TV, pick Use this design, then press OK.");
 // F2: a home that is not open now
-eq(sentWords({ ok: true, listening: false }), "Sent. Open the couch-tv home on the TV in the next 10 minutes.");
+eq(sentWords({ ok: true, listening: false }), "Sent. Open the Couch TV home on the TV in the next 10 minutes.");
 eq(sentWords({ ok: true, listening: true }), WORDS.sent);
 eq(sentWords({ ok: true }), WORDS.sent, "an older home computer that does not say: Sent");
 ok(!canSend("roku") && !canSend("appletv") && canSend("samsung") && canSend("android") && canSend(undefined), "no Send a design on a Roku or an Apple TV");
-eq(WORDS.cannot, "On this TV, type the code on the TV instead.");
+eq(WORDS.cannot, "This TV can't take a design from the phone: type the code on the TV, in Home settings, Designs, Get a design.");
 const sheets = fs.readFileSync(path.join(root, "remote/src/Sheets.jsx"), "utf8");
 ok(/if \(r\.ok\) setCode\(''\)/.test(sheets), "on a failure the code stays in the box");
 const api = fs.readFileSync(path.join(root, "remote/src/api.js"), "utf8");

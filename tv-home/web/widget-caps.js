@@ -64,8 +64,8 @@
   function drawnOn(kind, p) { return !!NATIVE[p] && NATIVE[p].indexOf(kind) >= 0; }
   // Fire TV on Vega OS, Philips on Titan OS, VIZIO and unknown TVs: their couch-tv (where there is one)
   // does not draw couch-tv Studio designs.
-  var NO_HOME = "couch-tv Studio designs do not show on this TV yet.";
-  var NOT_HERE = ["Not possible on this TV: couch-tv Studio designs show on Google TV, Android TV, Fire TV, Samsung, LG, Hisense, Philips (older), TiVo OS, Panasonic, Roku and Apple TV."];
+  var NO_HOME = "Designs don't show on this TV.";
+  var NOT_HERE = ["Not possible on this TV: designs show on Google TV, Android TV, Fire TV, Samsung, LG, Hisense, Philips (older), TiVo OS, Panasonic, Roku and Apple TV."];
   var NOT_NATIVE = "Shows on Google TV, Android TV and Fire TV.";
   var NATIVE_PHOTO = { photo: true, artframe: true };
   var NATIVE_PHOTO_NOTE = "Shows the photo put in the widget in couch-tv Studio. This TV's own photos do not show here.";
@@ -86,10 +86,10 @@
     });
     return out;
   }
-  var DEFAULT_NOTE = { works: "Works with nothing to set up.", setup: "Works once it is set up.", computer: "Needs a computer at home that stays on, running couch-tv.", no: "Not possible on this TV." };
+  var DEFAULT_NOTE = { works: "Works with nothing to set up.", setup: "Works once it is set up.", computer: "Needs a home computer that stays on, running Couch TV.", no: "Not possible on this TV." };
   // the usual three: works on the Android home, needs the home computer on a web TV, works on a VIDAA
   // (the website home with no computer, or the computer)
-  var EVERY = function () { return plat("works", "computer", "works", { web: "Works while the home computer is on (it runs couch-tv for this TV)." }); };
+  var EVERY = function () { return plat("works", "computer", "works", { web: "Works while the home computer is on (it runs Couch TV for this TV)." }); };
   var NOWHERE = function (why) { return plat("no", "no", "no", { android: why, web: why, vidaa: why }); };
   function sz(s, min, x) { var o = { s: s, min: min }; if (x) o.x = x; return o; }
   // steps for each group; one list given for "all" is used for every group
@@ -102,36 +102,36 @@
   // the way into Home settings on every home: a design's Settings button (top right), the Hold OK menu, or
   // the classic home's gear. The remote's own Settings button often opens the TV's menu instead, so say so.
   var OPEN = "Hold OK and pick Settings (or OK on the gear at the screen edge), then Home settings. The remote's Settings button opens the TV's menu.";
-  var SEND = "Tap Send to my TV, then on the TV: Home settings, couch-tv Studio, Get a design, and type the code.";
+  var SEND = "Tap Send to my TV, then on the TV: Home settings, Designs, Get a design, and type the code.";
   function inStudio(what) { return ["Open your design in couch-tv Studio on your phone.", "Tap the widget, then " + what + ".", SEND]; }
   var TOWN = [OPEN, "Go down to Location and press OK.", "Pick Search for a town or city, type your town, then press OK.", "Pick your town in the list. The weather shows within a minute."];
   var BEACH = [OPEN, "Go down to Location and press OK.", "Pick Search for a town or city, type the beach town nearest you, then press OK.", "Pick it in the list. The swell shows within a minute (inland towns have no swell)."];
   var PHOTOS_ANDROID = [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add photos from a USB drive or this TV, and choose up to 50 photos.", "Or put one photo in the widget itself, in couch-tv Studio."];
   var PHOTOS_LINK = [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add a photo from a web address, type the photo's address, then press OK.", "Or put one photo in the widget itself, in couch-tv Studio."];
   var NOTHING = ["Nothing to set up."];
-  var NOT_YET = ["Nothing to set up: couch-tv cannot show this yet."];
+  var NOT_YET = ["Nothing to set up: Couch TV cannot show this."];
   var WATCH = {
-    android: ["Ask whoever set up couch-tv to add the couch-tv TV app (setup option C) or a home computer that stays on (option B).", "Start a show from couch-tv's home.", "Come back to the home: the show is waiting here."],
-    web: ["Keep the home computer on: it runs couch-tv for this TV.", "Start a show from couch-tv's home (Netflix, YouTube and some others).", "Come back to the home: the show is waiting here."],
-    vidaa: ["Needs a computer at home that stays on, running couch-tv (setup option B). The website home cannot do this.", "Start a show from couch-tv's home.", "Come back to the home: the show is waiting here."]
+    android: ["Needs the Couch TV app on this TV, or a home computer that stays on. Ask whoever set up Couch TV.", "Start a show from Couch TV's home.", "Come back to the home: the show is waiting here."],
+    web: ["Keep the home computer on: it runs Couch TV for this TV.", "Start a show from Couch TV's home (Netflix, YouTube and some others).", "Come back to the home: the show is waiting here."],
+    vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot do this.", "Start a show from Couch TV's home.", "Come back to the home: the show is waiting here."]
   };
   // smart home is set up on the TV itself (Home settings, couch-tv Studio, Smart home): the launcher
   // talks to Home Assistant on a Google TV, Android TV or Fire TV; on a TV whose home a computer runs,
   // that computer does (bridge/smarthome.py)
-  var SH_CONNECT = "Go down to couch-tv Studio, then Smart home. Type Home Assistant's address, then paste a token with the phone remote's Type on the TV (the steps are on the screen).";
+  var SH_CONNECT = "Go down to Designs, then Smart home. Type Home Assistant's address, then paste its access key with the phone remote's Type on the TV (the steps are on the screen).";
   function shSteps(what, after) {
     var pick = "Tick your " + what + ", then pick Save and show on the home.";
     return {
       android: ["Needs Home Assistant, the smart home app, running at home. Not in it yet? Smart home, Add a device we don't list, shows how.", OPEN, SH_CONNECT, pick].concat(after || []).slice(0, 5),
       web: ["Needs Home Assistant running at home, and the home computer on: it talks to Home Assistant for this TV.", OPEN, SH_CONNECT, pick].concat(after || []).slice(0, 5),
-      vidaa: ["Needs a computer at home that stays on, running couch-tv (setup option B): the website home cannot reach Home Assistant.", OPEN, SH_CONNECT, pick]
+      vidaa: ["Needs a home computer that stays on, running Couch TV: the website home cannot reach Home Assistant.", OPEN, SH_CONNECT, pick]
     };
   }
   var SMART_HOME = shSteps("rooms and scenes", ["Press Home: they show here."]);
   var APPS_ORDER = [OPEN, "Go down to Apps and press OK.", "OK moves an app between the home, More apps and hidden. Hold OK on an app to move it along."];
 
   // things typed at home: Home settings, couch-tv Studio, At home (athome.js), kept on the TV only
-  var AT_HOME = "Go down to couch-tv Studio, then pick At home.";
+  var AT_HOME = "Go down to Designs, then pick At home.";
   var TYPE_PHONE = "Typing is quicker with the phone remote: Type on the TV puts the words in the box.";
   var TYPE_TV = "Type with the TV remote's keyboard, then press OK.";
   function typed(first) { return { android: [OPEN, AT_HOME].concat(first, [TYPE_PHONE]).slice(0, 5), web: [OPEN, AT_HOME].concat(first, [TYPE_TV]).slice(0, 5), vidaa: [OPEN, AT_HOME].concat(first, [TYPE_TV]).slice(0, 5) }; }
@@ -144,20 +144,20 @@
   var DATED_NEED = "Your photos on the TV, with the day each was taken";
   var SCREEN_NEED = "A Google TV, Android TV or Fire TV that allows screen time";
   // Ask AI and From your AI (ask.js)
-  var ASK_NEED = "The AI you choose: Claude, OpenAI, Google Gemini or another service, a model at home, or couch-tv at home";
-  var AGENT_NEED = "The couch-tv TV app or a computer at home running couch-tv, for your agent to reach the TV";
+  var ASK_NEED = "The AI you choose: Claude, OpenAI, Google Gemini or another service, a model at home, or Couch TV at home";
+  var AGENT_NEED = "The Couch TV app on this TV or a home computer running Couch TV, for your agent to reach the TV";
   var OPEN_ASK = "Move to the Ask AI widget and press OK, then pick Set up.";
 
   var TOWN_NEED = "Your town, set on the TV";
   var PHOTOS_NEED = "Your photos on the TV, or one photo put in the widget";
-  var WATCH_NEED = "The couch-tv TV app or a computer at home that stays on";
+  var WATCH_NEED = "The Couch TV app on this TV or a home computer that stays on";
   var HA_NEED = "Home Assistant (a smart home app) running at home";
   // the smart home widgets (group C): set up on the TV (Home settings, couch-tv Studio, Smart home)
   function haSteps(what) { return shSteps(what, [].slice.call(arguments, 1)); }
-  var HA_PLAT = function () { return plat("setup", "computer", "computer", { android: "Set up on the TV: Home settings, couch-tv Studio, Smart home. No computer needed.", web: "The home computer talks to Home Assistant for this TV.", vidaa: "Needs a computer at home: the website home cannot reach Home Assistant." }); };
+  var HA_PLAT = function () { return plat("setup", "computer", "computer", { android: "Set up on the TV: Home settings, Designs, Smart home. No computer needed.", web: "The home computer talks to Home Assistant for this TV.", vidaa: "Needs a home computer: the website home cannot reach Home Assistant." }); };
   // the Up next queue: Spotify's queue, read with the person's own Spotify sign in
   var QUEUE_NEED = "Spotify connected on the home computer, or on the website home on a Hisense";
-  var SPOTIFY_ON = "On that computer, connect Spotify once: open the couch-tv Spotify page on it and sign in (setup guide, Spotify Now playing).";
+  var SPOTIFY_ON = "On that computer, connect Spotify once: open the Couch TV Spotify page on it and sign in (setup guide, Spotify Now playing).";
 
   var C = {
     // ---------- time ----------
@@ -168,7 +168,7 @@
     tallclock: { name: "Tall clock", status: "works", what: "Tall thin digits that fill the space", needs: ["Nothing: it uses the TV's own clock"],
       setup: setup("nothing", NOTHING), until: "Always shows the time", build: "",
       ok: "Opens Timers", platforms: EVERY(), sizes: sz(["tile", "wtile", "small", "medium", "wide", "xl", "hero", "full"], [2, 2]) },
-    glassclock: { name: "Glass clock", status: "works", what: "Big digits filled with the scene's photo", needs: ["Nothing: the scenes come with couch-tv"],
+    glassclock: { name: "Glass clock", status: "works", what: "Big digits filled with the scene's photo", needs: ["Nothing: the scenes come with Couch TV"],
       setup: setup("nothing", NOTHING), until: "Always shows the time", build: "",
       ok: "Opens Timers", platforms: EVERY(), sizes: sz(["wtile", "small", "medium", "wide", "xl", "hero"], [4, 2]) },
     analog: { name: "Analogue clock", status: "works", what: "A clock face with hands", needs: ["Nothing: it uses the TV's own clock"],
@@ -248,7 +248,7 @@
       ok: "Opens the picture full screen, without the frame", platforms: plat("setup", "computer:partial", "setup:partial", { web: "Photos are added by web address on this TV (no USB).", vidaa: "Photos are added by web address on this TV (no USB)." }), sizes: sz(["small", "tall", "large", "xl", "hero", "full"], [4, 4]) },
     memory: { name: "On this day", status: "setup", what: "Your photos taken on this date in other years, with how long ago", needs: [DATED_NEED, "Photos taken on this day in another year"],
       setup: setup("tv", {
-        android: [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add photos from a USB drive or this TV, and choose your photos. couch-tv notes the day each was taken.", "Photos added before this version have no day: add them again.", "On the day, the widget shows the photos from that date in other years."],
+        android: [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add photos from a USB drive or this TV, and choose your photos. Couch TV notes the day each was taken.", "Photos added before this version have no day: add them again.", "On the day, the widget shows the photos from that date in other years."],
         web: [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add a photo from a web address, type the photo's address, then press OK.", "The day comes from the photo itself, when its address lets the TV read it, or from a date in its name (like IMG_20231118)."],
         vidaa: [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add a photo from a web address, type the photo's address, then press OK.", "The day comes from the photo itself, when its address lets the TV read it, or from a date in its name (like IMG_20231118)."] }),
       until: "\"Add your photos\"; then \"No photos from this day\" on days with none, never another day's photo", build: "",
@@ -258,13 +258,13 @@
     // ---------- watching ----------
     keep: { name: "Keep watching", status: "setup", what: "The show you were watching, ready to carry on", needs: [WATCH_NEED],
       setup: setup("computer", WATCH), until: "\"Nothing to keep watching yet\": shows you start on this TV appear here", build: "",
-      ok: "Opens Keep watching: every show on the go, each with Resume", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from couch-tv's home.", vidaa: "Only with a computer at home: the website home cannot." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
+      ok: "Opens Keep watching: every show on the go, each with Resume", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from Couch TV's home.", vidaa: "Only with a home computer: the website home cannot." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
     keeprow: { name: "Keep watching row", status: "setup", what: "Two to five shows, with how far you got", needs: [WATCH_NEED],
       setup: setup("computer", WATCH), until: "\"Nothing to keep watching yet\"", build: "",
-      ok: "OK on a poster plays it. Hold OK, then Open, for the whole list", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from couch-tv's home.", vidaa: "Only with a computer at home: the website home cannot." }), sizes: sz(["medium", "wide", "hero"], [6, 2]) },
+      ok: "OK on a poster plays it. Hold OK, then Open, for the whole list", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from Couch TV's home.", vidaa: "Only with a home computer: the website home cannot." }), sizes: sz(["medium", "wide", "hero"], [6, 2]) },
     upnext: { name: "Up next", status: "setup", what: "One show filling the space, with Resume and Start over. Beside Scores it shows your last game", needs: [WATCH_NEED],
       setup: setup("computer", WATCH), until: "\"Nothing to keep watching yet\", or \"No game to pick up\"", build: "",
-      ok: "Resume plays it. Hold OK, then Open, for the whole list", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from couch-tv's home.", vidaa: "Only with a computer at home: the website home cannot." }), sizes: sz(["medium", "wide", "xl", "hero", "full"], [8, 4]) },
+      ok: "Resume plays it. Hold OK, then Open, for the whole list", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from Couch TV's home.", vidaa: "Only with a home computer: the website home cannot." }), sizes: sz(["medium", "wide", "xl", "hero", "full"], [8, 4]) },
     // made on the TV from its own Keep watching (widget-web.js picks): no outside service, nothing leaves
     picks: { name: "Picks for you", status: "setup", what: "Shows the others at home are watching, and your own shows left part way, each ready to play",
       needs: [WATCH_NEED],
@@ -272,43 +272,43 @@
         web: WATCH.web.concat(["Picks come from what everyone at home has on the go: add people in Home settings, People."]),
         vidaa: WATCH.vidaa.concat(["Picks come from what everyone at home has on the go: add people in Home settings, People."]) }),
       until: "\"No picks yet\" until shows are on the go on this TV", build: "",
-      ok: "Opens every pick with Play. OK on a poster plays it", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from couch-tv's home.", vidaa: "Only with a computer at home: the website home cannot." }), sizes: sz(["small", "medium", "wide"], [4, 3]) },
+      ok: "Opens every pick with Play. OK on a poster plays it", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from Couch TV's home.", vidaa: "Only with a home computer: the website home cannot." }), sizes: sz(["small", "medium", "wide"], [4, 3]) },
 
     // ---------- apps ----------
     app: { name: "One app", status: "works", what: "One app as a big icon", needs: ["The app installed on this TV"],
       setup: setup("tv", { android: ["Go to More apps at the end of your apps, then open App Store.", "Find the app and install it.", "Press Home: it shows in this widget."],
-        web: ["Install the app from the TV's own app store.", "Keep the home computer on: it opens apps for couch-tv."],
-        vidaa: ["Install the app from the TV's own app store.", "Needs a computer at home to open it: the website home cannot open apps."] }),
+        web: ["Install the app from the TV's own app store.", "Keep the home computer on: it opens apps for Couch TV."],
+        vidaa: ["Install the app from the TV's own app store.", "Needs a home computer to open it: the website home cannot open apps."] }),
       until: "\"This app is not on this TV\"", build: "",
-      ok: "Opens the app", platforms: plat("works", "computer", "computer", { vidaa: "Needs a computer at home: the website home cannot open apps." }), sizes: sz(["tile", "small"], [2, 2]) },
+      ok: "Opens the app", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz(["tile", "small"], [2, 2]) },
     folder: { name: "App folder", status: "works", what: "A box of apps with a name", needs: ["The apps, picked in couch-tv Studio and installed on this TV"],
       setup: setup("designer", inStudio("pick the apps for it").concat(["Or on the TV: hold OK on an app to change, move or remove it, or on Add app to add one."])), until: "Apps this TV does not have are dimmed: \"Not on this TV\"", build: "",
-      ok: "Opens the folder full screen, every app big", platforms: plat("works", "computer", "computer", { vidaa: "Needs a computer at home: the website home cannot open apps." }), sizes: sz(["tile", "small", "tall", "medium", "large"], [2, 2]) },
+      ok: "Opens the folder full screen, every app big", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz(["tile", "small", "tall", "medium", "large"], [2, 2]) },
     dock: { name: "Dock", status: "works", what: "A row of your apps", needs: ["Nothing: it shows this TV's apps"],
       setup: setup("nothing", ["Nothing to set up. Hold OK on an app to change, move or remove it."].concat(APPS_ORDER.slice(0))), until: "Always shows the TV's apps", build: "",
-      ok: "OK on an app opens it. The last one opens all your apps", platforms: plat("works", "computer", "computer", { vidaa: "Needs a computer at home: the website home cannot open apps." }), sizes: sz([], [6, 2], [["row8", "Short row", 8, 2], ["row12", "Row", 12, 2], ["row18", "Full row", 18, 2]]) },
+      ok: "OK on an app opens it. The last one opens all your apps", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz([], [6, 2], [["row8", "Short row", 8, 2], ["row12", "Row", 12, 2], ["row18", "Full row", 18, 2]]) },
     appgrid: { name: "App grid", status: "works", what: "Rows of apps with their names", needs: ["Nothing: it shows this TV's apps"],
       setup: setup("nothing", ["Nothing to set up. Hold OK on an app to change, move or remove it."].concat(APPS_ORDER.slice(0))), until: "Always shows the TV's apps", build: "",
-      ok: "OK on an app opens it", platforms: plat("works", "computer", "computer", { vidaa: "Needs a computer at home: the website home cannot open apps." }), sizes: sz(["small", "medium", "large", "xl"], [4, 4]) },
+      ok: "OK on an app opens it", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz(["small", "medium", "large", "xl"], [4, 4]) },
     games: { name: "Games", status: "works", what: "Game apps as tall tiles", needs: ["Game apps installed on this TV"],
       setup: setup("designer", inStudio("pick the game apps").concat(["Or on the TV: hold OK on a game to change, move or remove it."])), until: "Games this TV does not have are dimmed: \"Not on this TV\"", build: "",
-      ok: "OK on a game opens it", platforms: plat("works", "computer", "computer", { vidaa: "Needs a computer at home: the website home cannot open apps." }), sizes: sz(["small", "medium", "wide"], [4, 3]) },
+      ok: "OK on a game opens it", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz(["small", "medium", "wide"], [4, 3]) },
 
     // ---------- music ----------
     nowplaying: { name: "Now playing", status: "setup", what: "The song playing on this TV: cover, song and artist", needs: [WATCH_NEED],
-      setup: setup("computer", { android: ["Ask whoever set up couch-tv to add the couch-tv TV app (setup option C) or a home computer that stays on (option B).", OPEN, "Go down to Look and scenes, then Now playing card, and make it On.", "Play music in Spotify or any music app."],
+      setup: setup("computer", { android: ["Needs the Couch TV app on this TV, or a home computer that stays on. Ask whoever set up Couch TV.", OPEN, "Go down to Look and scenes, then Now playing card, and make it On.", "Play music in Spotify or any music app."],
         web: ["Not possible on this TV: it does not say what is playing."], vidaa: ["Not possible on this TV: it does not say what is playing."] }),
       until: "\"Nothing playing\" while nothing plays", build: "",
       ok: "Opens the player: back, play or pause, next, volume", platforms: plat("setup", "no", "no", { web: "This TV does not say what is playing.", vidaa: "This TV does not say what is playing." }), sizes: sz(["tile", "wtile", "small", "medium", "large"], [2, 2]) },
-    soundscape: { name: "Soundscape", status: "works", what: "Rain, fire, waves or soft noise, played by the home", needs: ["Nothing: the sounds come with couch-tv"],
+    soundscape: { name: "Soundscape", status: "works", what: "Rain, fire, waves or soft noise, played by the home", needs: ["Nothing: the sounds come with Couch TV"],
       setup: setup("nothing", ["Nothing to set up.", "Move to the widget and press OK to start or stop the sound."]), until: "Always ready", build: "",
       ok: "Starts or stops the sound", platforms: EVERY(), sizes: sz(["tile", "wtile"], [2, 2]) },
     queue: { name: "Up next queue", status: "setup", what: "The next songs in your Spotify queue", needs: [QUEUE_NEED, "Only Spotify: TVs and other music apps do not share their queue"],
-      setup: setup("computer", { android: ["Needs a computer at home that stays on, running couch-tv (setup option B).", SPOTIFY_ON, "Play music in Spotify on any phone, computer or speaker: the next songs in your queue show here."],
-        web: ["Keep the home computer on: it runs couch-tv for this TV.", SPOTIFY_ON, "Play music in Spotify on any phone, computer or speaker: the next songs in your queue show here."],
-        vidaa: ["With a home computer that stays on: connect Spotify once on it (open the couch-tv Spotify page on it and sign in).", "With the website home and no computer: sign in to Spotify once on your own couch-tv site (setup guide, Hisense VIDAA, Spotify).", "Play music in Spotify: the next songs in your queue show here."] }),
+      setup: setup("computer", { android: ["Needs a home computer that stays on, running Couch TV.", SPOTIFY_ON, "Play music in Spotify on any phone, computer or speaker: the next songs in your queue show here."],
+        web: ["Keep the home computer on: it runs Couch TV for this TV.", SPOTIFY_ON, "Play music in Spotify on any phone, computer or speaker: the next songs in your queue show here."],
+        vidaa: ["With a home computer that stays on: connect Spotify once on it (open the Couch TV Spotify page on it and sign in).", "With the website home and no computer: sign in to Spotify once on your own Couch TV site (setup guide, Hisense VIDAA, Spotify).", "Play music in Spotify: the next songs in your queue show here."] }),
       until: "\"Needs Spotify connected\", and where it is set up", build: "",
-      ok: "Opens the next ten songs, big", platforms: plat("computer", "computer", "setup", { android: "Needs a home computer with Spotify connected (setup option B). Only Spotify shares its queue.", web: "Works while the home computer is on, with Spotify connected on it.", vidaa: "Works with the home computer, or the website home with Spotify signed in." }), sizes: sz(["small", "tall", "large"], [4, 4]) },
+      ok: "Opens the next ten songs, big", platforms: plat("computer", "computer", "setup", { android: "Needs a home computer with Spotify connected. Only Spotify shares its queue.", web: "Works while the home computer is on, with Spotify connected on it.", vidaa: "Works with the home computer, or the website home with Spotify signed in." }), sizes: sz(["small", "tall", "large"], [4, 4]) },
     speakers: { name: "Speakers", status: "setup", what: "Each speaker, what it plays and its volume", needs: [HA_NEED, "Your speakers picked on the TV"],
       setup: setup("tv", haSteps("speakers (up to 6, any Home Assistant knows)", "Press Home: each speaker and its volume show here. OK opens them: louder, quieter, play and pause.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
@@ -361,13 +361,13 @@
       setup: setup("tv", [OPEN, "Go down to People and press OK.", "Pick Add a person, type a name, then press OK. Do it for everyone who watches.", "OK on a name in the widget switches whose shows you see. It does not sign anyone in or out of Netflix."]),
       until: "\"Add people in Home settings\"", build: "",
       ok: "OK on a name makes them the one watching", platforms: plat("setup", "computer", "setup"), sizes: sz(["line", "wline", "wtile"], [4, 1]) },
-    agenda: { name: "Agenda", status: "setup", what: "Today's events with times and colours, from your own calendar", needs: [CAL_NEED, "Something to read the calendar: the couch-tv TV home, or a computer at home"],
+    agenda: { name: "Agenda", status: "setup", what: "Today's events with times and colours, from your own calendar", needs: [CAL_NEED, "Something to read the calendar: the Couch TV app on this TV, or a home computer"],
       setup: setup("tv", {
-        android: ["Find your calendar's private address on a phone or computer. Google Calendar: the calendar's Settings, Secret address.", OPEN, "Go down to couch-tv Studio, pick At home, then Add a calendar link.", "Type the address, or paste it with Type on the TV in the phone remote. Today's events show within a minute."],
-        web: ["Find your calendar's private address on a phone or computer. Google Calendar: the calendar's Settings, Secret address.", OPEN, "Go down to couch-tv Studio, pick At home, then Add a calendar link.", "Type the address with the TV remote's keyboard. The home computer reads the calendar for this TV, so keep it on."],
-        vidaa: ["Needs a computer at home that stays on, running couch-tv (setup option B). The website home cannot read a calendar.", "Find your calendar's private address. Google Calendar: the calendar's Settings, Secret address.", OPEN, "Go down to couch-tv Studio, pick At home, then Add a calendar link, and type the address."] }),
+        android: ["Find your calendar's private address on a phone or computer. Google Calendar: the calendar's Settings, Secret address.", OPEN, "Go down to Designs, pick At home, then Add a calendar link.", "Type the address, or paste it with Type on the TV in the phone remote. Today's events show within a minute."],
+        web: ["Find your calendar's private address on a phone or computer. Google Calendar: the calendar's Settings, Secret address.", OPEN, "Go down to Designs, pick At home, then Add a calendar link.", "Type the address with the TV remote's keyboard. The home computer reads the calendar for this TV, so keep it on."],
+        vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot read a calendar.", "Find your calendar's private address. Google Calendar: the calendar's Settings, Secret address.", OPEN, "Go down to Designs, pick At home, then Add a calendar link, and type the address."] }),
       until: "\"Add your calendar\"; then \"Nothing on today or tomorrow\" when the calendar is clear", build: "",
-      ok: "Opens the day: every event on a timeline, then the rest of the week", platforms: plat("setup", "computer", "computer", { android: "The TV reads the calendar itself. The address stays on this TV, never in a design.", web: "The home computer reads the calendar for this TV.", vidaa: "Needs a computer at home: the website home cannot read a calendar." }),
+      ok: "Opens the day: every event on a timeline, then the rest of the week", platforms: plat("setup", "computer", "computer", { android: "The TV reads the calendar itself. The address stays on this TV, never in a design.", web: "The home computer reads the calendar for this TV.", vidaa: "Needs a home computer: the website home cannot read a calendar." }),
       sizes: sz(["tile", "wtile", "small", "tall", "medium", "large"], [2, 2]) },
     note: { name: "Family note", status: "setup", what: "A sticky note typed at home, with who it is from", needs: [NOTE_NEED],
       setup: setup("tv", typed(["Pick Write a note, type it, then press OK. Pick From to say who it is from."])), until: "\"Write a note\", and where", build: "",
@@ -381,51 +381,51 @@
     // a typed card (a title and words from the design) shows on every TV; a live number from home is the
     // extra that needs the computer at home (bridge/custom_cards.py)
     card: { name: "Custom card", status: "works", what: "Your own title and words, or a live number from your home: solar today, the pool",
-      needs: ["Your title and words, typed in couch-tv Studio", "For a live number: a computer at home that stays on, running couch-tv"],
-      setup: setup("designer", inStudio("type a title and its words").concat(["For a live number: on the home computer, add it to couch-tv's settings under Custom cards, with no words in the widget."])),
+      needs: ["Your title and words, typed in couch-tv Studio", "For a live number: a home computer that stays on, running Couch TV"],
+      setup: setup("designer", inStudio("type a title and its words").concat(["For a live number: on the home computer, add it to Couch TV's settings under Custom cards, with no words in the widget."])),
       until: "Always shows your words. A card for a live number with no computer: \"Needs a home computer\", and where", build: "",
       ok: "Opens every custom card big", platforms: EVERY(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
-    quote: { name: "Quote", status: "works", what: "A short line for the day, or your own words", needs: ["Nothing: the lines come with couch-tv"],
+    quote: { name: "Quote", status: "works", what: "A short line for the day, or your own words", needs: ["Nothing: the lines come with Couch TV"],
       setup: setup("nothing", ["Nothing to set up.", "For your own words: open your design in couch-tv Studio, tap the widget and type them.", SEND]), until: "Always shows a line", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["wtile", "small", "medium", "wide"], [4, 2]) },
-    word: { name: "Word of the day", status: "works", what: "A word and what it means", needs: ["Nothing: the words come with couch-tv"],
+    word: { name: "Word of the day", status: "works", what: "A word and what it means", needs: ["Nothing: the words come with Couch TV"],
       setup: setup("nothing", NOTHING), until: "Always shows a word", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["wtile", "small", "medium"], [4, 2]) },
     // the feed is read through couch-tv itself (the launcher, the on-TV app or the home computer's
     // bridge: widget-web.js, /api/webdata), never a server of ours; ABC News unless the design picks another
     news: { name: "Headlines", status: "works", what: "One to four of the latest headlines from a news feed you pick (ABC News unless you choose another)",
-      needs: ["Nothing on a Google TV, Android TV or Fire TV: couch-tv reads the feed itself", "On other TVs, the home computer, which reads the feed for the TV"],
+      needs: ["Nothing on a Google TV, Android TV or Fire TV: Couch TV reads the feed itself", "On other TVs, the home computer, which reads the feed for the TV"],
       setup: setup("designer", {
         android: ["Nothing to set up: the headlines come from ABC News.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source: ABC News, SBS, The Guardian, BBC or RNZ.", SEND],
         web: ["Keep the home computer on: it reads the news feed for this TV.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source: ABC News, SBS, The Guardian, BBC or RNZ.", SEND],
-        vidaa: ["Needs a computer at home that stays on, running couch-tv (setup option B). The website home cannot read news feeds.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source.", SEND] }),
+        vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot read news feeds.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source.", SEND] }),
       until: "\"Getting the headlines\" for a moment. If the feed cannot be read, it says so and tries again in a few minutes", build: "",
-      ok: "Opens the headlines: the latest six, with how long ago each came out", platforms: plat("works", "computer", "computer", { android: "couch-tv on the TV reads the feed: no computer needed.", vidaa: "Needs a computer at home: the website home cannot read news feeds." }), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
+      ok: "Opens the headlines: the latest six, with how long ago each came out", platforms: plat("works", "computer", "computer", { android: "Couch TV on the TV reads the feed: no computer needed.", vidaa: "Needs a home computer: the website home cannot read news feeds." }), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
     // ESPN's public scoreboards, asked by the TV itself (free, no key; unofficial, so they may change)
-    sports: { name: "Scores", status: "works", beta: "Unofficial source: a free feed that may change. couch-tv can pause it for every TV, and then the widget says the feed is paused.", what: "This round's games with their scores, live ones first: AFL, NRL, A-League, Premier League, NBA, Big Bash or cricket",
+    sports: { name: "Scores", status: "works", beta: "Unofficial source: a free feed that may change. Couch TV can pause it for every TV, and then the widget says the feed is paused.", what: "This round's games with their scores, live ones first: AFL, NRL, A-League, Premier League, NBA, Big Bash or cricket",
       needs: ["Nothing: the TV reads the scores itself (the NRL unless you pick another)"],
       setup: setup("designer", {
         android: ["Nothing to set up: the widget shows the NRL.", "To pick another competition or your team, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket, and type your team if you like.", SEND],
-        web: ["Keep the home computer on: it runs couch-tv for this TV.", "To pick another competition or your team, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket, and type your team if you like.", SEND],
+        web: ["Keep the home computer on: it runs Couch TV for this TV.", "To pick another competition or your team, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket, and type your team if you like.", SEND],
         vidaa: ["Nothing to set up: the widget shows the NRL.", "To pick another competition or your team, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket, and type your team if you like.", SEND] }),
       until: "\"Getting the scores\" for a moment; \"No NRL games this week\" between seasons", build: "",
-      ok: "Opens the round: every game with its score, live ones marked, and when the rest start", platforms: plat("works", "computer", "works", { web: "Works while the home computer is on (it runs couch-tv for this TV)." }), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
+      ok: "Opens the round: every game with its score, live ones marked, and when the rest start", platforms: plat("works", "computer", "works", { web: "Works while the home computer is on (it runs Couch TV for this TV)." }), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
     // Yahoo Finance's chart data (free, no key, unofficial), read through couch-tv itself (the launcher,
     // the on-TV app or the home computer's bridge: widget-web.js, /api/webdata), never a server of ours
-    stocks: { name: "Markets", status: "works", beta: "Unofficial source: a free feed that may change. couch-tv can pause it for every TV, and then the widget says the feed is paused.", what: "Your watchlist: the ASX 200, the dollar and Bitcoin unless you pick others, each with today's move. ASX prices are about 20 minutes late",
-      needs: ["Nothing on a Google TV, Android TV or Fire TV: couch-tv reads the prices itself", "On other TVs, the home computer, which reads the prices for the TV"],
+    stocks: { name: "Markets", status: "works", beta: "Unofficial source: a free feed that may change. Couch TV can pause it for every TV, and then the widget says the feed is paused.", what: "Your watchlist: the ASX 200, the dollar and Bitcoin unless you pick others, each with today's move. ASX prices are about 20 minutes late",
+      needs: ["Nothing on a Google TV, Android TV or Fire TV: Couch TV reads the prices itself", "On other TVs, the home computer, which reads the prices for the TV"],
       setup: setup("designer", {
         android: ["Nothing to set up: it shows the ASX 200, the Australian dollar and Bitcoin.", "To pick your own, open your design in couch-tv Studio on your phone.", "Tap the widget, then type up to six share codes, like BHP.AX or CBA.AX for ASX shares.", SEND],
         web: ["Keep the home computer on: it reads the prices for this TV.", "To pick your own, open your design in couch-tv Studio on your phone.", "Tap the widget, then type up to six share codes, like BHP.AX or CBA.AX for ASX shares.", SEND],
-        vidaa: ["Needs a computer at home that stays on, running couch-tv (setup option B). The website home cannot read share prices.", "To pick your own, open your design in couch-tv Studio on your phone.", "Tap the widget, then type up to six share codes, like BHP.AX.", SEND] }),
+        vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot read share prices.", "To pick your own, open your design in couch-tv Studio on your phone.", "Tap the widget, then type up to six share codes, like BHP.AX.", SEND] }),
       until: "\"Getting the prices\" for a moment. If they cannot be read, it says so and tries again in a few minutes", build: "",
-      ok: "Opens the watchlist: each price, today's move and today's line", platforms: plat("works", "computer", "computer", { android: "couch-tv on the TV reads the prices: no computer needed.", vidaa: "Needs a computer at home: the website home cannot read share prices." }), sizes: sz(["tile", "wtile", "small", "tall"], [2, 2]) },
+      ok: "Opens the watchlist: each price, today's move and today's line", platforms: plat("works", "computer", "computer", { android: "Couch TV on the TV reads the prices: no computer needed.", vidaa: "Needs a home computer: the website home cannot read share prices." }), sizes: sz(["tile", "wtile", "small", "tall"], [2, 2]) },
     // OSRM's free route server with OpenStreetMap roads, asked by the TV itself: the usual drive, no live
     // traffic (that needs a paid map service). Both places stay on the TV (Location, and Commute in
     // couch-tv Studio's section of Home settings), never in a design
     commute: { name: "Commute", status: "setup", what: "The usual drive to work or school by road, and when to leave to arrive on time. No live traffic",
       needs: ["Your town, and where you drive to, set on the TV (never in the design)"],
-      setup: setup("tv", [OPEN, "Go down to Location and set your town, if it is not set yet.", "Go down to couch-tv Studio, then Commute, Where to. Type the town or suburb you drive to and pick it.", "For when to leave: in couch-tv Studio on your phone, tap the widget and set the arrive by time, then send it again."]),
+      setup: setup("tv", [OPEN, "Go down to Location and set your town, if it is not set yet.", "Go down to Designs, then Commute, Where to. Type the town or suburb you drive to and pick it.", "For when to leave: in couch-tv Studio on your phone, tap the widget and set the arrive by time, then send it again."]),
       until: "\"Set where you drive to\", and where", build: "",
       ok: "Opens the drive: how long, how far, and when to leave", platforms: plat("setup", "computer", "setup", { android: "The places are kept on the TV. Drive time without traffic.", web: "Works while the home computer is on. The places are kept on the TV." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
@@ -433,12 +433,12 @@
     welcome: { name: "Welcome words", status: "works", what: "A greeting in your own words, or each guest by name with their check in or check out time from your bookings calendar", needs: ["The words, typed in couch-tv Studio", "For guest names: your Airbnb, Booking.com or VRBO calendar link, typed on the TV"],
       setup: setup("designer", {
         android: inStudio("type the words (no numbers or web addresses). For guest names, pick Guest name from: Bookings calendar").concat([
-          "On the TV: Home settings, couch-tv Studio, At home, Guests. Paste your Airbnb, Booking.com or VRBO calendar link with the phone remote's Type on the TV.",
+          "On the TV: Home settings, Designs, At home, Guests. Paste your Airbnb, Booking.com or VRBO calendar link with the phone remote's Type on the TV.",
           "Set Check in from and Check out by. Airbnb's link has no names: type each guest's first name once under Next guest."]),
         web: inStudio("type the words (no numbers or web addresses). For guest names, pick Guest name from: Bookings calendar").concat([
-          "On the TV: Home settings, couch-tv Studio, At home, Guests, and type your bookings calendar link. The home computer reads it, so keep it on.",
+          "On the TV: Home settings, Designs, At home, Guests, and type your bookings calendar link. The home computer reads it, so keep it on.",
           "Set Check in from and Check out by. Airbnb's link has no names: type each guest's first name once under Next guest."]),
-        vidaa: inStudio("type the words (no numbers or web addresses)").concat(["Guest names from a bookings calendar need a computer at home that stays on, running couch-tv (setup option B). The website home cannot read a calendar."]) }),
+        vidaa: inStudio("type the words (no numbers or web addresses)").concat(["Guest names from a bookings calendar need a home computer that stays on, running Couch TV. The website home cannot read a calendar."]) }),
       until: "Always shows the words. With guest names on and no bookings link yet: \"Add your bookings calendar\", and where", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["wline", "wtile", "medium", "wide"], [4, 1]) },
     quick: { name: "Quick buttons", status: "works", what: "Sleep timer, picture mode, look, input and more", needs: ["Nothing: buttons this TV cannot do are left out"],
@@ -456,7 +456,7 @@
       ok: "Opens the whole guide", platforms: plat("setup", "computer", "setup", KEPT), sizes: sz(["wtile", "small", "tall"], [4, 2]) },
     screentime: { name: "Screen time", status: "setup", what: "Time in apps on this TV today, against a daily goal", needs: [SCREEN_NEED],
       setup: setup("tv", {
-        android: ["Ask whoever set up couch-tv to switch on screen time from their computer (it allows one Android permission).", OPEN, "Or go down to couch-tv Studio, pick At home, then Allow screen time, and switch on Home.", "Pick Daily goal for the time left each day."],
+        android: ["Ask whoever set up Couch TV to switch on screen time from their computer (it allows one Android permission).", OPEN, "Or go down to Designs, pick At home, then Allow screen time, and switch on Home.", "Pick Daily goal for the time left each day."],
         web: ["Not possible on this TV: only Google TV, Android TV and Fire TV share screen time."],
         vidaa: ["Not possible on this TV: only Google TV, Android TV and Fire TV share screen time."] }),
       until: "\"Allow screen time on this TV\", and where", build: "",
@@ -465,28 +465,28 @@
 
     // ---------- your own AI (ask.js, docs/ASK-AI.md and docs/AI-AGENT.md) ----------
     ask: { name: "Ask AI", status: "setup", what: "Ask anything by voice or typing, answered on the TV by the AI you pick",
-      needs: [ASK_NEED, "Your own key for that service, kept on this TV (a model on a computer at home needs none)"],
+      needs: [ASK_NEED, "Your own key for that service, kept on this TV (a model on a home computer needs none)"],
       setup: setup("tv", {
-        android: [OPEN_ASK, "Pick who answers: Claude, OpenAI, Google Gemini, OpenRouter, Groq, Mistral, a model at home (Ollama, LM Studio), another service, or couch-tv at home.",
+        android: [OPEN_ASK, "Pick who answers: Claude, OpenAI, Google Gemini, OpenRouter, Groq, Mistral, a model at home (Ollama, LM Studio), another service, or Couch TV at home.",
           "Type the model name if it asks, then the key. With the phone remote, Type on the TV pastes it. The key stays on this TV.", "Pick Use it and try it: an answer shows on the TV.",
           "To ask: OK on the widget, then type, or press the microphone on the TV's keyboard and say it. Ask on the phone remote shows its answer here too."],
-        web: [OPEN_ASK, "Pick who answers. couch-tv at home uses Claude on the home computer with your own Claude plan; or pick a service and type your own key.", "Pick Use it and try it: an answer shows on the TV.", "To ask: OK on the widget and type, or use Ask on the phone remote (its microphone too)."],
+        web: [OPEN_ASK, "Pick who answers. Couch TV at home uses Claude on the home computer with your own Claude plan; or pick a service and type your own key.", "Pick Use it and try it: an answer shows on the TV.", "To ask: OK on the widget and type, or use Ask on the phone remote (its microphone too)."],
         vidaa: [OPEN_ASK, "Pick who answers: a service with your own key, or a model at home.", "Type the model name and the key with the TV remote, then pick Use it and try it.", "To ask: OK on the widget and type."] }),
       until: "\"Ask AI: pick who answers\", and OK sets it up step by step", build: "",
       ok: "Opens Ask AI: the answer in full, Ask a question and Set up",
-      platforms: plat("setup", "setup", "setup", { android: "Your own key on this TV, a model at home, or couch-tv at home. Speak with the TV keyboard's microphone or the phone remote.",
+      platforms: plat("setup", "setup", "setup", { android: "Your own key on this TV, a model at home, or Couch TV at home. Speak with the TV keyboard's microphone or the phone remote.",
         web: "Your own key on this TV, or the home computer's Claude on your own plan. Speak with the phone remote's microphone.", vidaa: "Your own key or a model at home, typed with the TV remote." }),
       sizes: sz(["wtile", "small", "medium", "wide", "large"], [4, 2]) },
     agent: { name: "From your AI", status: "setup", what: "Messages your own AI agent sends to the TV. The agent can also put a couch-tv Studio design on the TV (you press OK first)",
       needs: [AGENT_NEED, "An AI app that can use tools (MCP), such as Claude Desktop, Claude Code or Cursor, or any program on your network"],
       setup: setup("computer", [
-        "Needs the couch-tv TV app (setup option C) or a computer at home running couch-tv (option B): they hold the TV's own address for your agent.",
-        "In your AI app, add couch-tv's TV tools with the TV app's or home computer's address and pairing key. The guide Connect your own AI agent has the lines to copy.",
+        "Needs the Couch TV app on this TV, or a home computer running Couch TV: they hold the TV's own address for your agent.",
+        "In your AI app, add Couch TV's TV tools with the TV app's or home computer's address and pairing key. The guide Connect your own AI agent has the lines to copy.",
         "Ask your AI: \"Show 'Dinner is ready' on the TV\". It shows over the home and in this widget.",
         "To change the home: ask it to design one with couch-tv Studio's tools and send it. The TV asks \"Use this design?\" first: press OK."]),
       until: "\"Connect your AI agent\", and OK shows how", build: "",
       ok: "Opens the last message in full, and how to connect your agent",
-      platforms: plat("computer", "computer", "computer", { android: "Through the couch-tv TV app (no computer at home needed) or a computer at home.", web: "Works while the home computer is on.", vidaa: "Needs a computer at home running couch-tv: the website home has nothing an agent can reach." }),
+      platforms: plat("computer", "computer", "computer", { android: "Through the Couch TV app on this TV (no computer at home needed) or a home computer.", web: "Works while the home computer is on.", vidaa: "Needs a home computer running Couch TV: the website home has nothing an agent can reach." }),
       sizes: sz(["wtile", "small", "medium", "wide"], [4, 2]) },
 
     // ---------- a smart stack (not a widget of its own: up to 10 widgets taking turns) ----------
@@ -571,7 +571,7 @@
     doorbell: [HEADING_TV("Type a heading for this TV. Empty shows the doorbell's own name.")],
     energy: [HEADING_TV("Type a heading for this TV. Empty shows the name from your smart home.")],
     // the list always draws its own name, so it has no heading of its own
-    list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Home settings, couch-tv Studio, At home.", "tv", ON_TV, true, { from: "lists", "private": true })],
+    list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Home settings, Designs, At home.", "tv", ON_TV, true, { from: "lists", "private": true })],
     news: [st("feed", "News source", "choice", "auto", "Where the headlines come from. Best for your country picks ABC News in Australia, BBC World in the UK and RNZ in New Zealand.", "design", ALL, true,
       { options: FEED_OPTS })],
     sports: [
@@ -669,7 +669,7 @@
     Object.keys(NATIVE).forEach(function (p) {
       var c = C[k], web = c.platforms.Tizen.need, need = c.status === "not-built" || !drawnOn(k, p) ? "no" : NATIVE_PHOTO[k] ? "setup" : web === "computer" || web === "works" ? "works" : web;
       c.platforms[p] = { on: onOf(need, "native"), need: need,
-        note: need === "no" ? (c.status === "not-built" ? DEFAULT_NOTE.no : NOT_NATIVE) : NATIVE_PHOTO[k] ? NATIVE_PHOTO_NOTE : "Couch TV draws this on your " + NATIVE_NAME[p] + ", opened by the computer at home." };
+        note: need === "no" ? (c.status === "not-built" ? DEFAULT_NOTE.no : NOT_NATIVE) : NATIVE_PHOTO[k] ? NATIVE_PHOTO_NOTE : "Couch TV draws this on your " + NATIVE_NAME[p] + ", opened by the home computer." };
     });
   });
 
@@ -680,12 +680,12 @@
   // [the line, where to go, the line for a tile (two short lines at most)]
   SHORT[TOWN_NEED] = ["Set your town", "Home settings, Location", "Set your town"];
   SHORT[PHOTOS_NEED] = ["Add your photos", "Home settings, Look and scenes, Your photos", "Add photos"];
-  SHORT[WATCH_NEED] = ["Needs the couch-tv TV app or a home computer", "OK here shows how", "Needs setting up"];
-  SHORT[HA_NEED] = ["Needs Home Assistant", "Home settings, couch-tv Studio, Smart home", "Needs Home Assistant"];
+  SHORT[WATCH_NEED] = ["Needs the Couch TV app on this TV or a home computer", "OK here shows how", "Needs setting up"];
+  SHORT[HA_NEED] = ["Needs Home Assistant", "Home settings, Designs, Smart home", "Needs Home Assistant"];
   SHORT[QUEUE_NEED] = ["Needs Spotify connected", "On the home computer. OK here shows how", "Needs Spotify"];
   SHORT[C.card.needs[0]] = ["Type your words in couch-tv Studio", "Or a live number from the home computer. OK here shows how", "Type your words"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];
-  var AT = "Settings (hold OK), Home settings, couch-tv Studio, At home";
+  var AT = "Settings (hold OK), Home settings, Designs, At home";
   SHORT[NOTE_NEED] = ["Write a note", AT, "Write a note"];
   SHORT[LIST_NEED] = ["Add a list", AT, "Add a list"];
   SHORT[WIFI_NEED] = ["Add your guest Wi-Fi", AT, "Add Wi-Fi"];
@@ -699,7 +699,7 @@
   // tiny: the box is a tile, so the line has to fit two short lines (OK opens the whole record)
   function card(kind, tiny) {
     var c = C[kind];
-    if (!c) return { line: tiny ? "Needs an update" : "This widget needs a newer couch-tv", sub: "" };
+    if (!c) return { line: tiny ? "Needs an update" : "This widget needs a newer Couch TV", sub: "" };
     if (c.status === "not-built") return { line: tiny ? "Not on this TV" : c.name + ": not on this TV", sub: c.needs[0].replace(/^Needs /, "It needs ") };
     var s = SHORT[c.needs[0]];
     if (s) return { line: tiny ? s[2] : s[0], sub: s[1] };
@@ -733,7 +733,7 @@
       }
       out.push(s);
     });
-    if (onTv) out.push("Set on the computer at home that opens Couch TV on your " + NATIVE_NAME[p] + ".");
+    if (onTv) out.push("Set on the home computer that opens Couch TV on your " + NATIVE_NAME[p] + ".");
     return out;
   }
 

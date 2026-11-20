@@ -51,26 +51,26 @@ try {
   const rowsText = () => page.evaluate(() => document.getElementById("set-rows").textContent);
   const msg = () => page.evaluate(() => document.getElementById("set-msg").textContent);
   const head = () => page.evaluate(() => document.getElementById("set-head").textContent);
-  const studioValue = () => page.evaluate(() => { const r = [...document.querySelectorAll("#set-rows .srow")].find((x) => (x.querySelector("b") || {}).textContent === "couch-tv Studio"); return r ? ((r.querySelector(".sv") || {}).textContent || "") : null; });
+  const studioValue = () => page.evaluate(() => { const r = [...document.querySelectorAll("#set-rows .srow")].find((x) => (x.querySelector("b") || {}).textContent === "Designs"); return r ? ((r.querySelector(".sv") || {}).textContent || "") : null; });
   const toRow = async (re) => { for (let i = 0; i < 40; i++) { if (re.test(await focused())) return true; await press("ArrowDown", 120); } return false; };
 
   await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await press("Enter", 400);   // the gear menu, then Home settings
-  for (let i = 0; i < 16 && !(await page.evaluate(() => /couch-tv Studio/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press("ArrowDown");
+  for (let i = 0; i < 16 && !(await page.evaluate(() => /Designs/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press("ArrowDown");
   await press("ArrowRight");
 
   // 1. the Studio row follows the switch at once
   ok(await studioValue() === "Off", "before: the row says Off");
-  ok(await toRow(/^Turn on couch-tv Studio/), "a Turn on row");
+  ok(await toRow(/^Turn on designs/), "a Turn on row");
   await press("Enter", 300);
-  ok(/couch-tv Studio is on/.test(await msg()), "it says couch-tv Studio is on");
+  ok(/Designs are on/.test(await msg()), "it says designs are on");
   let rows = await rowsText();
-  ok(await studioValue() !== "Off" && !/Turn on couch-tv Studio/.test(rows), "and the row no longer says Off or Turn on (" + rows.slice(0, 120) + ")");
-  ok(/Back to my classic home/.test(rows), "the way back is there at once");
-  ok(await toRow(/^Back to my classic home/), "Back to my classic home row");
+  ok(await studioValue() !== "Off" && !/Turn on designs/.test(rows), "and the row no longer says Off or Turn on (" + rows.slice(0, 120) + ")");
+  ok(/Back to the standard home/.test(rows), "the way back is there at once");
+  ok(await toRow(/^Back to the standard home/), "Back to the standard home row");
   await press("Enter", 300);
   rows = await rowsText();
-  ok(await studioValue() === "Off" && /Turn on couch-tv Studio/.test(rows), "switched off: the row says Off again at once");
-  ok(await toRow(/^Turn on couch-tv Studio/), "Turn on again"); await press("Enter", 300);
+  ok(await studioValue() === "Off" && /Turn on designs/.test(rows), "switched off: the row says Off again at once");
+  ok(await toRow(/^Turn on designs/), "Turn on again"); await press("Enter", 300);
 
   // 2. a design code, typed with a letter dropped, then right
   ok(await toRow(/^Get a design/), "a Get a design row");

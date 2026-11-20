@@ -81,13 +81,13 @@
   var B = {};
 
   // the setup record (widget-caps.js), for a widget with nothing real to show yet
-  var STATUS = { works: ["Works on this TV", "#30d158"], setup: ["Set it up first", "#ffd60a"], computer: ["Needs a home computer", "#ff9f0a"], no: ["Not possible on this TV", "#8e8e93"], "not-built": ["Not on couch-tv yet", "#ff9f0a"] };
+  var STATUS = { works: ["Works on this TV", "#30d158"], setup: ["Set it up first", "#ffd60a"], computer: ["Needs a home computer", "#ff9f0a"], no: ["Not possible on this TV", "#8e8e93"], "not-built": ["Not in Couch TV", "#ff9f0a"] };
   B.setup = function (o, env) {
     // Ask AI and From your AI with nothing to show yet open their own layer, which sets them up
     if ((o.kind === "ask" || o.kind === "agent") && B[o.kind]) return B[o.kind](o, env || {});
     var kind = (S.from && S.from.getAttribute("data-setup")) || o.kind, C = window.CouchWidgetCaps, c = C && C.get(kind);
     S.panel.classList.add("cwd-setup");
-    if (!c) { S.body.appendChild(head("info", "This widget", "It needs a newer couch-tv")); return; }
+    if (!c) { S.body.appendChild(head("info", "This widget", "It needs a newer Couch TV")); return; }
     // what each kind of TV needs for it (widget-caps.js platforms[p].need), the best of its group
     var RANK = ["works", "setup", "computer", "no"];
     var group = function (keys) { var best = 3; keys.forEach(function (k) { var p = c.platforms[k], i = RANK.indexOf(p ? p.need || (p.on === "yes" ? "works" : p.on === "no" ? "no" : "setup") : "no"); if (i >= 0 && i < best) best = i; }); return RANK[best]; };
@@ -276,7 +276,7 @@
     if (!bt) return B.setup(o, env);
     S.body.appendChild(head("bolt", "Batteries", bt.need === "permission" ? "Android asks first" : "Paired with this TV by Bluetooth", "#30d158"));
     if (bt.need === "permission") {
-      S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:30px", [E("div", "cwd-text", "", ["To read the charge of your remotes and controllers, Android asks once to let couch-tv see nearby devices. OK below shows Android's question: pick Allow."]),
+      S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:30px", [E("div", "cwd-text", "", ["To read the charge of your remotes and controllers, Android asks once to let Couch TV see nearby devices. OK below shows Android's question: pick Allow."]),
         E("div", "cwd-row", "margin-top:30px", [F(btn("check", "Ask Android now"), function () { if (designerSays()) return; var ok = false; try { ok = T.askBatteries(); } catch (e) {} msg(ok ? "Already allowed. Close and open the widget again." : "Pick Allow on Android's question, then press Back."); }, "Allow")])]));
       return;
     }
@@ -294,7 +294,7 @@
     var row = E("div", "cwd-row", "margin-top:30px", [F(btn("mic", st.ready || env.demo ? "Ask a question" : "Set it up now"), go(st.ready ? "ask" : "setup"), "Ask"), F(btn("settings", "Set up"), go("setup"), "Set up")]);
     var words = v && v.q ? [label("You asked"), E("div", "cwd-text", "", [v.q]), label(v.pending ? "Thinking" : "The answer"), E("div", "cwd-note", "font-size:" + px(clamp(Math.sqrt(1500 * 420 / Math.max(10, String(v.err || v.a || "").length) / 1.6), 36, 84)), [v.pending ? "..." : v.err || v.a])]
       : [E("div", "cwd-text", "margin-top:30px", [st.ready ? "Ask anything. Type it, or press OK on the box and then the microphone on the TV's keyboard. Ask on the phone remote shows its answer here too."
-        : "Ask AI answers with the AI you pick: your own Claude, OpenAI, Gemini or another service with your own key kept on this TV, a model on a computer at home, or couch-tv at home. couch-tv never pays for it and never sees your key."])];
+        : "Ask AI answers with the AI you pick: your own Claude, OpenAI, Gemini or another service with your own key kept on this TV, a model on a home computer, or Couch TV at home. Couch TV never pays for it and never sees your key."])];
     S.body.appendChild(E("div", "cwd-col cwd-grow", "", words.concat([row])));
   };
   // From your AI (ask.js): the last message in full, and how to connect an agent (docs/AI-AGENT.md)
@@ -309,7 +309,7 @@
   B.note = function (o, env) {
     var n = env.demo ? { text: "Dinner at 6. Feed Max!", from: "Mum" } : (kit().athome(env) || {}).note;
     if (!n || !n.text) return B.setup(o, env);
-    S.body.appendChild(head("edit", "Family note", n.from ? "From " + n.from : "Change it in Home settings, couch-tv Studio, At home", "#c79a00"));
+    S.body.appendChild(head("edit", "Family note", n.from ? "From " + n.from : "Change it in Home settings, Designs, At home", "#c79a00"));
     var fs = clamp(Math.sqrt(1500 * 640 / Math.max(10, n.text.length) / 1.6), 44, 120);
     S.body.appendChild(E("div", "cwd-col cwd-grow cwd-center", "", [E("div", "cwd-note", "font-size:" + px(fs), [n.text])]));
   };
@@ -320,7 +320,7 @@
     S.body.appendChild(head("check", l.name, "", l.todo ? "#0a84ff" : "#30d158"));
     var sub = function () { S.subEl.textContent = (left() ? left() + " to do" : l.items.length ? "All done" : "Nothing on it yet") + (l.items.length ? ". OK ticks an item." : ""); };
     sub();
-    if (!l.items.length) { S.body.appendChild(E("div", "cwd-text", "margin-top:40px", ["Add to this list in Home settings, couch-tv Studio, At home, or with Type on the TV in the phone remote."])); return; }
+    if (!l.items.length) { S.body.appendChild(E("div", "cwd-text", "margin-top:40px", ["Add to this list in Home settings, Designs, At home, or with Type on the TV in the phone remote."])); return; }
     var grid = E("div", "cwd-grid", "align-content:flex-start;margin-top:30px");
     l.items.forEach(function (it, i) {
       var row = E("div", "cwd-item" + (it.done ? " done" : ""), "", [E("i", "cwd-box"), E("span", "cwd-ell", "", [it.t])]);
@@ -360,7 +360,7 @@
     S.body.appendChild(head("timer", "Screen time today", goal && CA ? CA.goalLine(s.minutes, goal) : "Time in apps on this TV today", "#5e5ce6"));
     var max = Math.max(1, (s.apps[0] || {}).minutes || 1);
     var left = E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "font-size:180px", [hm(s.minutes)]), goal ? E("div", "cwd-bar", "margin-top:30px", [E("b", "", "width:" + Math.round(clamp(s.minutes / goal, 0, 1) * 100) + "%;background:" + (s.minutes > goal ? "#ffd60a" : "#fff"))]) : null,
-      E("div", "cwd-small", "margin-top:20px", [goal ? "Daily goal " + hm(goal) + ", set in Home settings" : "Set a daily goal in Home settings, couch-tv Studio, At home"])]);
+      E("div", "cwd-small", "margin-top:20px", [goal ? "Daily goal " + hm(goal) + ", set in Home settings" : "Set a daily goal in Home settings, Designs, At home"])]);
     var right = E("div", "cwd-col", "margin-left:80px;flex:1;min-width:0", [label("By app")].concat(s.apps.length ? s.apps.slice(0, 7).map(function (a) {
       return F(E("div", "cwd-app-time", "", [E("span", "cwd-ell", "", [a.name || a.package || ""]), E("div", "cwd-bar", "", [E("b", "", "width:" + Math.round(a.minutes / max * 100) + "%")]), E("b", "", "", [hm(a.minutes)])]), null, a.name || a.package);
     }) : [E("div", "cwd-text", "", ["No apps yet today."])]));

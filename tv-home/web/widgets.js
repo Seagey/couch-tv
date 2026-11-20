@@ -478,7 +478,7 @@
   // the setup card: what this widget needs and where that is set up, from widget-caps.js (never from a
   // design). OK on it opens the same record in full (widget-detail.js, the setup layer).
   function soon(root, b, iconName, kind) {
-    var C = window.CouchWidgetCaps, c = C ? C.card(kind, b.w < 300 && b.h < 300) : { line: "Not on couch-tv yet", sub: "" };
+    var C = window.CouchWidgetCaps, c = C ? C.card(kind, b.w < 300 && b.h < 300) : { line: "Not in Couch TV", sub: "" };
     root.setAttribute("data-setup", kind);
     return empty(root, b, iconName, c.line, c.sub);
   }
@@ -1954,10 +1954,10 @@
   // the plain words for each web widget: [still asking, could not read it, nothing there, no relay on
   // this TV], and the same for a box too small for a sentence
   var WEB_WORDS = {
-    news: ["Getting the headlines", "The headlines could not be read just now", "No headlines in this feed right now", "Headlines need a home computer or a newer couch-tv"],
-    sports: ["Getting the scores", "The scores could not be read just now", "No games right now", "Scores need a newer couch-tv"],
-    stocks: ["Getting the prices", "The prices could not be read just now", "No prices for these right now", "Prices need a home computer or a newer couch-tv"],
-    commute: ["Working out the drive", "The drive could not be worked out just now", "No road route between these places", "Commute needs a newer couch-tv"]
+    news: ["Getting the headlines", "The headlines could not be read just now", "No headlines in this feed right now", "Headlines need a home computer or a newer Couch TV"],
+    sports: ["Getting the scores", "The scores could not be read just now", "No games right now", "Scores need a newer Couch TV"],
+    stocks: ["Getting the prices", "The prices could not be read just now", "No prices for these right now", "Prices need a home computer or a newer Couch TV"],
+    commute: ["Working out the drive", "The drive could not be worked out just now", "No road route between these places", "Commute needs a newer Couch TV"]
   };
   var WEB_SHORT = { news: ["Getting news", "News failed", "No news", "Needs set up"], sports: ["Getting scores", "Scores failed", "No games", "Needs set up"],
     stocks: ["Getting prices", "Prices failed", "No prices", "Needs set up"], commute: ["Working it out", "Drive failed", "No route", "Needs set up"] };
@@ -1978,8 +1978,8 @@
     // switched off for every TV by the design store (an unofficial source that changed): calm, no steps
     else if (rec.err === "paused") webEmpty(root, b, iconName, "This feed is paused", "It comes back on its own", "Paused");
     else if (rec.err === "relay") { webEmpty(root, b, iconName, w[3], "OK here shows how", s[3]); root.setAttribute("data-setup", kind); }
-    else if (rec.err === "empty") webEmpty(root, b, iconName, w[2], "couch-tv looks again soon", s[2]);
-    else webEmpty(root, b, iconName, w[1], "couch-tv tries again in a few minutes", s[1]);
+    else if (rec.err === "empty") webEmpty(root, b, iconName, w[2], "Couch TV looks again soon", s[2]);
+    else webEmpty(root, b, iconName, w[1], "Couch TV tries again in a few minutes", s[1]);
     return false;
   }
   var DEMO_NEWS = [["Coastal highway upgrade finishes a month early", 1], ["Storm season outlook: a wetter summer than usual", 2], ["Matildas name squad for December friendlies", 3], ["Petrol prices ease ahead of the holidays", 4],
@@ -2209,7 +2209,7 @@
     if (q.source === "calendar") {
       var st = stayOf(env || {});
       if ((!st || !st.set) && typed) text = withName(greetingOf(text), typed);
-      else if (!st || !st.set) return empty(root, b, "calendar", b.w < 300 ? "Add bookings" : "Add your bookings calendar", "Settings (hold OK), Home settings, couch-tv Studio, At home");
+      else if (!st || !st.set) return empty(root, b, "calendar", b.w < 300 ? "Add bookings" : "Add your bookings calendar", "Settings (hold OK), Home settings, Designs, At home");
       var v = st && st.view;
       if (v && v.phase !== "between") {
         text = withName(text, v.guest || typed);
@@ -2428,7 +2428,7 @@
     if (env.demo) { var de = demoEvents(); return { today: de.map(function (x, i) { return { title: x.title, when: hhmm(x.start, env), col: EV_COL[i], start: x.start, end: x.end }; }), tomorrow: [] }; }
     var c = (athome(env) || {}).cal;
     if (!c || !c.set) { soon(root, b, "calendar", "agenda"); return null; }
-    if (!c.events) { empty(root, b, "calendar", c.err ? (b.w < 300 ? "Calendar not read" : c.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), c.err ? "Settings (hold OK), Home settings, couch-tv Studio, At home" : ""); return null; }
+    if (!c.events) { empty(root, b, "calendar", c.err ? (b.w < 300 ? "Calendar not read" : c.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), c.err ? "Settings (hold OK), Home settings, Designs, At home" : ""); return null; }
     return { today: evDay(c.events, 0, env), tomorrow: evDay(c.events, 1, env) };
   }
   // never a fixed word for a day over the wrong day (a starter's "Tomorrow" over today's events): the
@@ -2587,8 +2587,8 @@
     var h = athome(env), s = h && h.screen;
     if (!s || s.why === "off") { soon(root, b, "timer", "screentime"); return null; }
     if (s.why === "tv") { empty(root, b, "timer", b.w < 300 ? "Not on this TV" : "Screen time is not on this TV", "It needs a Google TV, Android TV or Fire TV"); return null; }
-    if (s.why === "ontv") { empty(root, b, "timer", b.w < 300 ? "Needs a computer once" : "Screen time needs the couch-tv home app", "Put it on once from a computer with the free Setup app"); return null; }
-    if (!s.ok) { empty(root, b, "timer", s.why === "access" ? (b.w < 300 ? "Allow it first" : "Allow screen time on this TV") : (b.w < 300 ? "Needs an update" : "Needs a newer couch-tv TV home"), s.why === "access" ? "Settings (hold OK), Home settings, couch-tv Studio, At home" : ""); return null; }
+    if (s.why === "ontv") { empty(root, b, "timer", b.w < 300 ? "Needs a computer once" : "Screen time needs the Couch TV home app", "Put it on once from a computer with the free Setup app"); return null; }
+    if (!s.ok) { empty(root, b, "timer", s.why === "access" ? (b.w < 300 ? "Allow it first" : "Allow screen time on this TV") : (b.w < 300 ? "Needs an update" : "Needs a newer Couch TV"), s.why === "access" ? "Settings (hold OK), Home settings, Designs, At home" : ""); return null; }
     return { ok: true, minutes: s.minutes || 0, goal: h.goal || 0, apps: s.apps || [] };
   }
   R.screentime = function (root, o, b, env) {
@@ -2620,7 +2620,7 @@
     // Words and icons sit in the middle unless the design sets opts.align (widgets.css .cw-mid); a
     // renderer that places something itself still does
     if (!op(o).align) root.classList.add("cw-mid");
-    try { (draw || function (r) { empty(r, b, "info", "This widget needs a newer couch-tv", ""); })(root, o, b, env, sh); }
+    try { (draw || function (r) { empty(r, b, "info", "This widget needs a newer Couch TV", ""); })(root, o, b, env, sh); }
     catch (e) { empty(root, b, "info", "This widget could not be drawn", ""); }
     // a label's words in their own box, so a long one ends in "..." (centred or not) instead of being cut
     [].forEach.call(root.querySelectorAll ? root.querySelectorAll(".cw-lab") : [], function (l) {

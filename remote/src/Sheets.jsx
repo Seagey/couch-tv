@@ -44,7 +44,7 @@ const loadThread = () => {
   } catch { return []; }
 };
 const saveThread = (items) => { try { sessionStorage.setItem(THREAD_KEY, JSON.stringify({ at: Date.now(), items })); } catch { /* private mode */ } };
-const friendly = (e) => (e?.key === 'err_bridge_unreachable' || e?.message === 'Can’t reach the bridge' ? t('cant_reach_wifi') : tBridge(e?.key, e?.vars, e?.message));
+const friendly = (e) => (e?.key === 'err_bridge_unreachable' || e?.message === 'Can’t reach the home computer' ? t('cant_reach_wifi') : tBridge(e?.key, e?.vars, e?.message));
 
 export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAsk, onDone }, inputRef) {
   const [text, setText] = useState('');

@@ -24,8 +24,8 @@ export const LANGS = [
 const S = {};
 S.en = {
   // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
-  devmode_gone: 'couch-tv is no longer installed on the TV. Developer Mode probably ran out. Switch Developer Mode on again and ask Claude to reinstall couch-tv.',
-  devmode_runs_out: 'Developer Mode runs out in {days} days, and then LG removes couch-tv. Turn the TV on for a minute so it can be renewed, or press Extend in the Developer Mode app on the TV.',
+  devmode_gone: 'Couch TV is no longer installed on the TV. Developer Mode probably ran out. Switch Developer Mode on again, then ask whoever set up Couch TV to put it back.',
+  devmode_runs_out: 'Developer Mode runs out in {days} days, and then LG removes Couch TV. Turn the TV on for a minute so it can be renewed, or press Extend in the Developer Mode app on the TV.',
   devmode_not_renewed_left: 'Developer Mode has not been renewed for {days} days ({left} days left). It renews the next time the TV is on.',
   devmode_not_renewed: 'Developer Mode has not been renewed for {days} days. It renews the next time the TV is on.',
 
@@ -87,7 +87,7 @@ S.en = {
   opened: 'Opened {app}',
   opening: 'Opening {app}',
   not_set_up: 'Not set up yet',
-  sleep_needs_update: 'The sleep timer needs the next bridge update.',
+  sleep_needs_update: 'The sleep timer needs a newer Couch TV on the home computer.',
   sleep_set: 'Sleep timer: {n} minutes',
   sleep_off: 'Sleep timer off',
   idle_auto_off: 'TV auto-off in {n} min (paused)',
@@ -154,13 +154,13 @@ S.en = {
   // Arrange apps and People
   arrange_lede: 'Drag an app by its handle. Apps above the line are in the TV’s dock (up to {max}); the rest are behind More apps. Settings is always last.',
   loading_apps: 'Loading the TV’s apps…',
-  no_apps_yet: 'This TV has not told the bridge its apps yet. Press Home on the TV, then open this again.',
+  no_apps_yet: 'This TV hasn\'t shared its apps yet. Press Home on the TV, then open this again.',
   more_apps: 'More apps',
   dock_full: 'The dock holds {max} apps, so the ones under it moved behind More apps.',
   saved_home: 'Saved. Press Home on the TV to see it.',
   people_lede: 'In the order the TV shows them. Drag the handle to move someone, tap a name to change it.',
   nobody: 'Nobody yet. The TV shows everything until you add someone.',
-  removed: 'Removed {name}. Their watch history stays on the bridge.',
+  removed: 'Removed {name}. Their watch history stays saved.',
   added: 'Added {name}.',
   add_person: 'Add a person',
   // kids mode (Kids.jsx)
@@ -191,14 +191,14 @@ S.en = {
   kids_off_done: "Kids mode is off for {name}.",
   kids_on_done: "{name} is a kids profile now. Add some shows.",
   kids_leave_pin: "{name} is in kids mode on the TV. Type the parent PIN to switch.",
-  kids_needs_update: "Kids mode needs a newer couch-tv on the computer.",
+  kids_needs_update: "Kids mode needs a newer Couch TV on the home computer.",
   guest_name: "Guest's name",
   guest_placeholder: "Sarah, or the Nguyen family",
   guest_save: "Show this name",
   guest_note: "The Welcome widget on the TV says Welcome and this name. Leave it empty to show just Welcome.",
   guest_saved: "The TV now greets {name}.",
   guest_cleared: "The TV now says just Welcome.",
-  guest_needs_update: "Guest names need couch-tv 0.13.3 or newer on the TV (or on the computer at home).",
+  guest_needs_update: "Guest names need Couch TV 0.13.3 or newer on the TV (or on the computer at home).",
   stay_link: 'Bookings calendar link',
   stay_placeholder: 'Paste the Airbnb, Booking.com or VRBO calendar link',
   stay_send: 'Send the link to the TV',
@@ -217,8 +217,8 @@ S.en = {
   snag_note: 'Nothing on the TV has changed.',
   reload: 'Reload the remote',
   // bridge & API messages (err_*, note_*, ask_*)
-  err_bridge_timeout: "The bridge is taking too long. Try again.",
-  err_bridge_unreachable: "Can’t reach the bridge",
+  err_bridge_timeout: "The home computer is taking too long. Try again.",
+  err_bridge_unreachable: "Can’t reach the home computer",
   err_tv_not_connected: "TV not connected",
   err_not_found: "Not found",
   err_something_wrong: "Something went wrong",
@@ -226,7 +226,7 @@ S.en = {
   ask_popular_reason: "Popular in {country} this week",
   ask_still_working: "Still working on it. Give it a minute and watch the TV.",
   ask_still_working_doing: "Still working on it, {doing}. Give it a minute and watch the TV.",
-  err_adb_not_on: "ADB is not on",
+  err_adb_not_on: "The phone can't press keys on this TV yet.",
   err_after_must_be_number: "after must be a number",
   err_already_kids_profile: "That is a kids profile already.",
   err_app_did_not_come_up: "asked the TV to open {app} but it did not come up",
@@ -601,8 +601,8 @@ S.en = {
 
 S['zh-CN'] = {
   // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
-  devmode_gone: 'couch-tv 已不在电视上了，开发者模式大概到期了。请重新打开开发者模式，再让 Claude 重新安装 couch-tv。',
-  devmode_runs_out: '开发者模式还有 {days} 天到期，到期后 LG 会卸载 couch-tv。让电视开机一分钟即可续期，或在电视上的开发者模式应用里点「延长」。',
+  devmode_gone: 'Couch TV 已不在电视上了，开发者模式大概到期了。请重新打开开发者模式，再请帮你设置 Couch TV 的人把它装回来。',
+  devmode_runs_out: '开发者模式还有 {days} 天到期，到期后 LG 会卸载 Couch TV。让电视开机一分钟即可续期，或在电视上的开发者模式应用里点「延长」。',
   devmode_not_renewed_left: '开发者模式已经 {days} 天没有续期（还剩 {left} 天）。电视下次开机时会自动续期。',
   devmode_not_renewed: '开发者模式已经 {days} 天没有续期。电视下次开机时会自动续期。',
 
@@ -664,7 +664,7 @@ S['zh-CN'] = {
   opened: '已打开 {app}',
   opening: '正在打开 {app}',
   not_set_up: '尚未设置',
-  sleep_needs_update: '睡眠定时需要桥接下个版本更新。',
+  sleep_needs_update: '睡眠定时需要家里电脑上更新的 Couch TV。',
   sleep_set: '睡眠定时：{n} 分钟',
   sleep_off: '睡眠定时已关闭',
   idle_auto_off: '{n} 分钟后自动关机（已暂停）',
@@ -731,13 +731,13 @@ S['zh-CN'] = {
   // Arrange apps and People
   arrange_lede: '拖动应用右侧的手柄。线以上的应用会放在电视底座栏（最多 {max} 个），其余藏在「更多应用」后面。设置永远在最后。',
   loading_apps: '正在加载电视上的应用…',
-  no_apps_yet: '电视还没有把应用列表告诉桥接。请在电视上按 Home，然后重新打开这里。',
+  no_apps_yet: '电视还没有分享它的应用列表。请在电视上按 Home，然后重新打开这里。',
   more_apps: '更多应用',
   dock_full: '底座栏最多 {max} 个应用，下面的已移到「更多应用」后面。',
   saved_home: '已保存。在电视上按 Home 查看。',
   people_lede: '按电视上的显示顺序排列。拖动右侧手柄移动，点名字可改名。',
   nobody: '还没有人。在添加人之前，电视会显示所有内容。',
-  removed: '已移除 {name}。他们的观看记录会保留在桥接上。',
+  removed: '已移除 {name}。他们的观看记录会保留。',
   added: '已添加 {name}。',
   add_person: '添加一个人',
   // kids mode (Kids.jsx)
@@ -768,14 +768,14 @@ S['zh-CN'] = {
   kids_off_done: "已为 {name} 关闭儿童模式。",
   kids_on_done: "{name} 现在是儿童资料了。添加一些节目吧。",
   kids_leave_pin: "{name} 在电视上处于儿童模式。输入家长 PIN 可切换。",
-  kids_needs_update: "儿童模式需要电脑上更新的 couch-tv。",
+  kids_needs_update: "儿童模式需要家里电脑上更新的 Couch TV。",
   guest_name: "客人姓名",
   guest_placeholder: "例如 小王，或 王家",
   guest_save: "显示这个名字",
   guest_note: "电视上的欢迎小组件会显示“欢迎”和这个名字。留空则只显示“欢迎”。",
   guest_saved: "电视现在欢迎 {name}。",
   guest_cleared: "电视现在只显示“欢迎”。",
-  guest_needs_update: "客人姓名需要电视（或家里的电脑）上的 couch-tv 0.13.3 或更新版本。",
+  guest_needs_update: "客人姓名需要电视（或家里的电脑）上的 Couch TV 0.13.3 或更新版本。",
   stay_link: "预订日历链接",
   stay_placeholder: "粘贴 Airbnb、Booking.com 或 VRBO 的日历链接",
   stay_send: "把链接发送到电视",
@@ -794,8 +794,8 @@ S['zh-CN'] = {
   snag_note: '电视上的内容没有任何变化。',
   reload: '重新加载遥控',
   // bridge & API messages (err_*, note_*, ask_*)
-  err_bridge_timeout: "桥接响应太慢，请重试。",
-  err_bridge_unreachable: "连不上桥接",
+  err_bridge_timeout: "家里的电脑响应太慢，请重试。",
+  err_bridge_unreachable: "连不上家里的电脑",
   err_tv_not_connected: "电视未连接",
   err_not_found: "未找到",
   err_something_wrong: "出了点问题",
@@ -803,7 +803,7 @@ S['zh-CN'] = {
   ask_popular_reason: "{country} 本周热门",
   ask_still_working: "还在处理，请稍等一分钟并看下电视。",
   ask_still_working_doing: "还在处理（{doing}），请稍等一分钟并看下电视。",
-  err_adb_not_on: "ADB 未开启",
+  err_adb_not_on: "手机还不能在这台电视上按键。",
   err_after_must_be_number: "after 必须是数字",
   err_already_kids_profile: "那已经是儿童资料了。",
   err_app_did_not_come_up: "让电视打开 {app}，但它没起来",
@@ -1178,8 +1178,8 @@ S['zh-CN'] = {
 
 S.es = {
   // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
-  devmode_gone: 'couch-tv ya no está instalado en el televisor. Seguramente se acabó Developer Mode. Vuelve a activar Developer Mode y pídele a Claude que reinstale couch-tv.',
-  devmode_runs_out: 'Developer Mode se acaba en {days} días y entonces LG quita couch-tv. Enciende el televisor un minuto para que se renueve, o pulsa Extend en la app Developer Mode del televisor.',
+  devmode_gone: 'Couch TV ya no está instalado en el televisor. Seguramente se acabó Developer Mode. Vuelve a activar Developer Mode y pide a quien configuró Couch TV que lo vuelva a poner.',
+  devmode_runs_out: 'Developer Mode se acaba en {days} días y entonces LG quita Couch TV. Enciende el televisor un minuto para que se renueve, o pulsa Extend en la app Developer Mode del televisor.',
   devmode_not_renewed_left: 'Developer Mode lleva {days} días sin renovarse (quedan {left} días). Se renueva la próxima vez que el televisor esté encendido.',
   devmode_not_renewed: 'Developer Mode lleva {days} días sin renovarse. Se renueva la próxima vez que el televisor esté encendido.',
 
@@ -1240,7 +1240,7 @@ S.es = {
   opened: 'Se ha abierto {app}',
   opening: 'Abriendo {app}',
   not_set_up: 'Todavía no está configurada',
-  sleep_needs_update: 'El temporizador necesita la próxima actualización del ordenador.',
+  sleep_needs_update: 'El temporizador necesita un Couch TV más nuevo en el ordenador de casa.',
   sleep_set: 'Temporizador: {n} minutos',
   sleep_off: 'Temporizador quitado',
   picture_now: 'Imagen: {mode}',
@@ -1304,7 +1304,7 @@ S.es = {
   saved_home: 'Guardado. Pulsa Inicio en el televisor para verlo.',
   people_lede: 'En el orden en que salen en el televisor. Arrastra el asa para mover a alguien y toca un nombre para cambiarlo.',
   nobody: 'Todavía no hay nadie. El televisor lo muestra todo hasta que añadas a alguien.',
-  removed: 'Se ha quitado a {name}. Su historial se queda en el ordenador.',
+  removed: 'Se ha quitado a {name}. Su historial se queda guardado.',
   added: 'Se ha añadido a {name}.',
   add_person: 'Añadir una persona',
   // kids mode (Kids.jsx)
@@ -1335,7 +1335,7 @@ S.es = {
   kids_off_done: "El modo infantil está desactivado para {name}.",
   kids_on_done: "{name} ya es un perfil infantil. Añade algunos programas.",
   kids_leave_pin: "{name} está en modo infantil en el televisor. Escribe el PIN de los padres para cambiar.",
-  kids_needs_update: "El modo infantil necesita un couch-tv más nuevo en el ordenador.",
+  kids_needs_update: "El modo infantil necesita un Couch TV más nuevo en el ordenador de casa.",
   whos_phone: '¿De quién es este móvil?',
   onboard_note: '«Seguir viendo» y las sugerencias siguen a quien esté viendo. Puedes cambiarlo arriba cuando quieras.',
   home_screen: 'Ponlo en la pantalla de inicio',
@@ -1348,8 +1348,8 @@ S.es = {
 
 S['es-MX'] = {
   // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
-  devmode_gone: 'couch-tv ya no está instalado en la TV. Seguramente se acabó Developer Mode. Vuelve a activar Developer Mode y pídele a Claude que reinstale couch-tv.',
-  devmode_runs_out: 'Developer Mode se acaba en {days} días y entonces LG quita couch-tv. Prende la TV un minuto para que se renueve, o presiona Extend en la app Developer Mode de la TV.',
+  devmode_gone: 'Couch TV ya no está instalado en la TV. Seguramente se acabó Developer Mode. Vuelve a activar Developer Mode y pide a quien configuró Couch TV que lo vuelva a poner.',
+  devmode_runs_out: 'Developer Mode se acaba en {days} días y entonces LG quita Couch TV. Prende la TV un minuto para que se renueve, o presiona Extend en la app Developer Mode de la TV.',
   devmode_not_renewed_left: 'Developer Mode lleva {days} días sin renovarse (quedan {left} días). Se renueva la próxima vez que la TV esté prendida.',
   devmode_not_renewed: 'Developer Mode lleva {days} días sin renovarse. Se renueva la próxima vez que la TV esté prendida.',
 
@@ -1375,7 +1375,7 @@ S['es-MX'] = {
   still_cant_reach: 'Todavía no se puede conectar con la TV',
   not_on_tv: '{title} está en {service}, que esta TV no tiene.',
   opened: 'Se abrió {app}',
-  sleep_needs_update: 'El temporizador necesita la próxima actualización de la computadora.',
+  sleep_needs_update: 'El temporizador necesita un Couch TV más nuevo en la computadora de casa.',
   sent_to_tv: 'Enviado a la TV',
   couldnt_load: 'No se pudo cargar en este momento.',
   shows_wait: 'Lo que veas en la TV te va a esperar aquí.',
@@ -1403,7 +1403,7 @@ S['es-MX'] = {
   saved_home: 'Guardado. Presiona Inicio en la TV para verlo.',
   people_lede: 'En el orden en que salen en la TV. Arrastra el asa para mover a alguien y toca un nombre para cambiarlo.',
   nobody: 'Todavía no hay nadie. La TV muestra todo hasta que agregues a alguien.',
-  removed: 'Se quitó a {name}. Su historial se queda en la computadora.',
+  removed: 'Se quitó a {name}. Su historial se queda guardado.',
   added: 'Se agregó a {name}.',
   add_person: 'Agregar una persona',
   whos_phone: '¿De quién es este celular?',
@@ -1418,8 +1418,8 @@ S.it = {
   kw_remove: 'Rimuovi {title} da Continua a guardare',
   kw_removed: '{title} rimosso da Continua a guardare.',
   // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
-  devmode_gone: 'couch-tv non è più installata sulla TV. Probabilmente la Developer Mode è scaduta. Riattiva la Developer Mode e chiedi a Claude di reinstallare couch-tv.',
-  devmode_runs_out: 'La Developer Mode scade tra {days} giorni, e poi LG rimuove couch-tv. Accendi la TV per un minuto così si rinnova, oppure premi Extend nell’app Developer Mode sulla TV.',
+  devmode_gone: 'Couch TV non è più installata sulla TV. Probabilmente la Developer Mode è scaduta. Riattiva la Developer Mode e chiedi a chi ha configurato Couch TV di rimetterla.',
+  devmode_runs_out: 'La Developer Mode scade tra {days} giorni, e poi LG rimuove Couch TV. Accendi la TV per un minuto così si rinnova, oppure premi Extend nell’app Developer Mode sulla TV.',
   devmode_not_renewed_left: 'La Developer Mode non si rinnova da {days} giorni (ne restano {left}). Si rinnova la prossima volta che la TV è accesa.',
   devmode_not_renewed: 'La Developer Mode non si rinnova da {days} giorni. Si rinnova la prossima volta che la TV è accesa.',
 
@@ -1480,7 +1480,7 @@ S.it = {
   opened: 'Aperta {app}',
   opening: 'Apro {app}',
   not_set_up: 'Non ancora configurata',
-  sleep_needs_update: 'Il timer di spegnimento ha bisogno del prossimo aggiornamento del computer.',
+  sleep_needs_update: 'Il timer di spegnimento richiede un Couch TV più recente sul computer di casa.',
   sleep_set: 'Timer di spegnimento: {n} minuti',
   sleep_off: 'Timer di spegnimento tolto',
   picture_now: 'Immagine: {mode}',
@@ -1544,7 +1544,7 @@ S.it = {
   saved_home: 'Salvato. Premi Home sulla TV per vederlo.',
   people_lede: 'Nell’ordine in cui le mostra la TV. Trascina la maniglia per spostare qualcuno, tocca un nome per cambiarlo.',
   nobody: 'Ancora nessuno. La TV mostra tutto finché non aggiungi qualcuno.',
-  removed: 'Tolto {name}. La sua cronologia resta sul computer.',
+  removed: 'Tolto {name}. La sua cronologia resta salvata.',
   added: 'Aggiunto {name}.',
   add_person: 'Aggiungi una persona',
   // kids mode (Kids.jsx)
@@ -1575,7 +1575,7 @@ S.it = {
   kids_off_done: "La modalità bambini è disattivata per {name}.",
   kids_on_done: "{name} ora è un profilo bambini. Aggiungi qualche programma.",
   kids_leave_pin: "{name} è in modalità bambini sulla TV. Digita il PIN dei genitori per cambiare.",
-  kids_needs_update: "La modalità bambini richiede un couch-tv più recente sul computer.",
+  kids_needs_update: "La modalità bambini richiede un Couch TV più recente sul computer di casa.",
   whos_phone: 'Di chi è questo telefono?',
   onboard_note: '«Continua a guardare» e i suggerimenti seguono chi sta guardando. Puoi cambiarlo in alto quando vuoi.',
   home_screen: 'Mettilo nella schermata Home',
@@ -1588,8 +1588,8 @@ S.it = {
 
 S.de = {
   // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
-  devmode_gone: 'couch-tv ist nicht mehr auf dem Fernseher installiert. Wahrscheinlich ist der Developer Mode abgelaufen. Schalte den Developer Mode wieder ein und bitte Claude, couch-tv neu zu installieren.',
-  devmode_runs_out: 'Der Developer Mode läuft in {days} Tagen ab, dann entfernt LG couch-tv. Schalte den Fernseher für eine Minute ein, damit er verlängert wird, oder drücke Extend in der App Developer Mode auf dem Fernseher.',
+  devmode_gone: 'Couch TV ist nicht mehr auf dem Fernseher installiert. Wahrscheinlich ist der Developer Mode abgelaufen. Schalte den Developer Mode wieder ein und bitte die Person, die Couch TV eingerichtet hat, es wieder aufzuspielen.',
+  devmode_runs_out: 'Der Developer Mode läuft in {days} Tagen ab, dann entfernt LG Couch TV. Schalte den Fernseher für eine Minute ein, damit er verlängert wird, oder drücke Extend in der App Developer Mode auf dem Fernseher.',
   devmode_not_renewed_left: 'Der Developer Mode wurde seit {days} Tagen nicht verlängert (noch {left} Tage). Er wird verlängert, sobald der Fernseher das nächste Mal an ist.',
   devmode_not_renewed: 'Der Developer Mode wurde seit {days} Tagen nicht verlängert. Er wird verlängert, sobald der Fernseher das nächste Mal an ist.',
 
@@ -1651,7 +1651,7 @@ S.de = {
   opened: '{app} geöffnet',
   opening: '{app} wird geöffnet',
   not_set_up: 'Noch nicht eingerichtet',
-  sleep_needs_update: 'Der Sleep-Timer braucht das nächste Bridge-Update.',
+  sleep_needs_update: 'Der Sleep-Timer braucht ein neueres Couch TV auf dem Computer zu Hause.',
   sleep_set: 'Sleep-Timer: {n} Minuten',
   sleep_off: 'Sleep-Timer aus',
   picture_now: 'Bild: {mode}',
@@ -1713,13 +1713,13 @@ S.de = {
   // Arrange apps and People
   arrange_lede: 'Zieh eine App an ihrem Griff. Apps über der Linie sind im Dock des Fernsehers (bis zu {max}); der Rest liegt unter Weitere Apps. Einstellungen ist immer zuletzt.',
   loading_apps: 'Die Apps des Fernsehers werden geladen…',
-  no_apps_yet: 'Dieser Fernseher hat der Bridge seine Apps noch nicht gemeldet. Drück am Fernseher auf Home und öffne das hier dann noch einmal.',
+  no_apps_yet: 'Dieser Fernseher hat seine Apps noch nicht geteilt. Drück am Fernseher auf Home und öffne das hier dann noch einmal.',
   more_apps: 'Weitere Apps',
   dock_full: 'Ins Dock passen {max} Apps, deshalb sind die darunter zu Weitere Apps gewandert.',
   saved_home: 'Gespeichert. Drück am Fernseher auf Home, um es zu sehen.',
   people_lede: 'In der Reihenfolge, in der der Fernseher sie zeigt. Zieh am Griff, um jemanden zu verschieben, tipp auf einen Namen, um ihn zu ändern.',
   nobody: 'Noch niemand. Der Fernseher zeigt alles, bis du jemanden hinzufügst.',
-  removed: '{name} entfernt. Der Verlauf bleibt auf der Bridge.',
+  removed: '{name} entfernt. Der Verlauf bleibt gespeichert.',
   added: '{name} hinzugefügt.',
   add_person: 'Person hinzufügen',
   // kids mode (Kids.jsx)
@@ -1750,7 +1750,7 @@ S.de = {
   kids_off_done: "Der Kindermodus ist für {name} aus.",
   kids_on_done: "{name} ist jetzt ein Kinderprofil. Füge ein paar Sendungen hinzu.",
   kids_leave_pin: "{name} ist am Fernseher im Kindermodus. Gib zum Wechseln die Eltern-PIN ein.",
-  kids_needs_update: "Der Kindermodus braucht ein neueres couch-tv auf dem Computer.",
+  kids_needs_update: "Der Kindermodus braucht ein neueres Couch TV auf dem Computer zu Hause.",
   // first open
   whos_phone: 'Wem gehört dieses Handy?',
   onboard_note: '„Weiterschauen“ und Vorschläge richten sich danach, wer gerade schaut. Du kannst oben jederzeit wechseln.',
@@ -1765,8 +1765,8 @@ S.de = {
 // Turkish. The words for the same things match the TV home's Turkish (tv-home/web/i18n.js).
 S.tr = {
   // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
-  devmode_gone: 'couch-tv artık TV’de yüklü değil. Developer Mode’un süresi büyük olasılıkla doldu. Developer Mode’u yeniden aç ve Claude’dan couch-tv’yi yeniden yüklemesini iste.',
-  devmode_runs_out: 'Developer Mode’un süresi {days} gün içinde doluyor, ardından LG couch-tv’yi kaldırır. Yenilenmesi için TV’yi bir dakikalığına aç ya da TV’deki Developer Mode uygulamasında Extend’e bas.',
+  devmode_gone: 'Couch TV artık TV’de yüklü değil. Developer Mode’un süresi büyük olasılıkla doldu. Developer Mode’u yeniden aç ve Couch TV’yi kuran kişiden onu geri yüklemesini iste.',
+  devmode_runs_out: 'Developer Mode’un süresi {days} gün içinde doluyor, ardından LG Couch TV’yi kaldırır. Yenilenmesi için TV’yi bir dakikalığına aç ya da TV’deki Developer Mode uygulamasında Extend’e bas.',
   devmode_not_renewed_left: 'Developer Mode {days} gündür yenilenmedi ({left} gün kaldı). TV bir sonraki açılışında yenilenir.',
   devmode_not_renewed: 'Developer Mode {days} gündür yenilenmedi. TV bir sonraki açılışında yenilenir.',
 
@@ -1828,7 +1828,7 @@ S.tr = {
   opened: '{app} açıldı',
   opening: '{app} açılıyor',
   not_set_up: 'Henüz ayarlanmadı',
-  sleep_needs_update: 'Uyku zamanlayıcısı için bilgisayardaki bir sonraki güncelleme gerekiyor.',
+  sleep_needs_update: 'Uyku zamanlayıcısı için ev bilgisayarında daha yeni bir Couch TV gerekiyor.',
   sleep_set: 'Uyku zamanlayıcısı: {n} dakika',
   sleep_off: 'Uyku zamanlayıcısı kapalı',
   picture_now: 'Resim: {mode}',
@@ -1890,13 +1890,13 @@ S.tr = {
   // Arrange apps and People
   arrange_lede: 'Bir uygulamayı tutamağından sürükle. Çizginin üstündekiler TV’nin dock’unda (en fazla {max}); gerisi Diğer uygulamalar’da. Ayarlar her zaman sonda.',
   loading_apps: 'TV’nin uygulamaları yükleniyor…',
-  no_apps_yet: 'Bu TV uygulamalarını bilgisayara henüz bildirmedi. TV’de Ana ekran’a bas, sonra bunu yeniden aç.',
+  no_apps_yet: 'Bu TV uygulamalarını henüz paylaşmadı. TV’de Ana ekran’a bas, sonra bunu yeniden aç.',
   more_apps: 'Diğer uygulamalar',
   dock_full: 'Dock’a {max} uygulama sığıyor, bu yüzden altındakiler Diğer uygulamalar’a geçti.',
   saved_home: 'Kaydedildi. Görmek için TV’de Ana ekran’a bas.',
   people_lede: 'TV’nin gösterdiği sırayla. Birini taşımak için tutamağı sürükle, değiştirmek için ismine dokun.',
   nobody: 'Henüz kimse yok. Birini ekleyene kadar TV her şeyi gösterir.',
-  removed: '{name} kaldırıldı. İzleme geçmişi bilgisayarda kalır.',
+  removed: '{name} kaldırıldı. İzleme geçmişi kayıtlı kalır.',
   added: '{name} eklendi.',
   add_person: 'Kişi ekle',
   // kids mode (Kids.jsx)
@@ -1927,7 +1927,7 @@ S.tr = {
   kids_off_done: "{name} için çocuk modu kapalı.",
   kids_on_done: "{name} artık bir çocuk profili. Birkaç dizi ekle.",
   kids_leave_pin: "{name} TV’de çocuk modunda. Değiştirmek için ebeveyn PIN’ini gir.",
-  kids_needs_update: "Çocuk modu bilgisayarda daha yeni bir couch-tv gerektirir.",
+  kids_needs_update: "Çocuk modu ev bilgisayarında daha yeni bir Couch TV gerektirir.",
   // first open
   whos_phone: 'Bu telefon kimin?',
   onboard_note: '“İzlemeye devam et” ve öneriler, kim izliyorsa ona göre değişir. Üstten istediğin zaman değiştirebilirsin.',
@@ -1941,8 +1941,8 @@ S.tr = {
 
 S['sr-Latn-RS'] = {
   // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
-  devmode_gone: 'couch-tv više nije instaliran na televizoru. Verovatno je istekao Developer Mode. Ponovo uključi Developer Mode i zatraži da se couch-tv ponovo instalira.',
-  devmode_runs_out: 'Developer Mode ističe za {days} dana, nakon čega LG uklanja couch-tv. Uključi televizor na minut da bi se produžio ili pritisni Extend u aplikaciji Developer Mode na televizoru.',
+  devmode_gone: 'Couch TV više nije instaliran na televizoru. Verovatno je istekao Developer Mode. Ponovo uključi Developer Mode i zamoli osobu koja je podesila Couch TV da ga vrati.',
+  devmode_runs_out: 'Developer Mode ističe za {days} dana, nakon čega LG uklanja Couch TV. Uključi televizor na minut da bi se produžio ili pritisni Extend u aplikaciji Developer Mode na televizoru.',
   devmode_not_renewed_left: 'Developer Mode nije obnovljen {days} dana ({left} dana je preostalo). Obnoviće se kada se televizor sledeći put uključi.',
   devmode_not_renewed: 'Developer Mode nije obnovljen {days} dana. Obnoviće se kada se televizor sledeći put uključi.',
 
@@ -2004,7 +2004,7 @@ S['sr-Latn-RS'] = {
   opened: 'Otvoreno: {app}',
   opening: 'Otvaranje: {app}',
   not_set_up: 'Još nije podešeno',
-  sleep_needs_update: 'Tajmer za isključivanje zahteva noviju verziju računarskog dela.',
+  sleep_needs_update: 'Tajmer za isključivanje zahteva noviju verziju Couch TV-a na kućnom računaru.',
   sleep_set: 'Tajmer za isključivanje: {n} minuta',
   sleep_off: 'Tajmer za isključivanje je ugašen',
   picture_now: 'Slika: {mode}',
@@ -2066,13 +2066,13 @@ S['sr-Latn-RS'] = {
   // Arrange apps and People
   arrange_lede: 'Prevuci aplikaciju pomoću ručice. Aplikacije iznad linije su u traci TV-a (najviše {max}); ostale su u Ostalim aplikacijama. Podešavanja su uvek poslednja.',
   loading_apps: 'Učitavanje aplikacija sa TV-a…',
-  no_apps_yet: 'TV još nije poslao spisak aplikacija računaru. Pritisni Home na TV-u pa otvori ovo ponovo.',
+  no_apps_yet: 'TV još nije podelio spisak aplikacija. Pritisni Home na TV-u pa otvori ovo ponovo.',
   more_apps: 'Ostale aplikacije',
   dock_full: 'U traku staje {max} aplikacija, pa su ostale premeštene u Ostale aplikacije.',
   saved_home: 'Sačuvano. Pritisni Home na TV-u da vidiš promenu.',
   people_lede: 'Redosled je isti kao na TV-u. Prevuci ručicu da pomeriš osobu ili dodirni ime da ga promeniš.',
   nobody: 'Još nema osoba. Dok ih ne dodaš, TV prikazuje sve.',
-  removed: 'Uklonjeno: {name}. Istorija gledanja ostaje sačuvana na računaru.',
+  removed: 'Uklonjeno: {name}. Istorija gledanja ostaje sačuvana.',
   added: 'Dodato: {name}.',
   add_person: 'Dodaj osobu',
   // kids mode (Kids.jsx)
@@ -2103,7 +2103,7 @@ S['sr-Latn-RS'] = {
   kids_off_done: "Dečji režim je isključen za {name}.",
   kids_on_done: "{name} sada ima dečji profil. Dodaj nekoliko emisija.",
   kids_leave_pin: "{name} je u dečjem režimu na televizoru. Unesi roditeljski PIN za promenu.",
-  kids_needs_update: "Dečjem režimu treba novija verzija couch-tv na računaru.",
+  kids_needs_update: "Dečjem režimu treba novija verzija Couch TV-a na kućnom računaru.",
   // first open
   whos_phone: 'Za koga je ovaj telefon?',
   onboard_note: 'Red Nastavi gledanje i predlozi prate osobu koja gleda. Možeš je promeniti na vrhu u bilo kom trenutku.',
@@ -2117,8 +2117,8 @@ S['sr-Latn-RS'] = {
 
 S.cs = {
   // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
-  devmode_gone: 'couch-tv už v televizi není nainstalovaný. Nejspíš vypršel Režim vývojáře. Zapněte Režim vývojáře znovu a požádejte Clauda, ať couch-tv přeinstaluje.',
-  devmode_runs_out: 'Režim vývojáře vyprší za {days} dní a LG pak couch-tv odstraní. Zapněte televizi na minutu, aby se mohl prodloužit, nebo v aplikaci Developer Mode v televizi stiskněte Extend.',
+  devmode_gone: 'Couch TV už v televizi není nainstalovaný. Nejspíš vypršel Režim vývojáře. Zapněte Režim vývojáře znovu a požádejte toho, kdo Couch TV nastavoval, ať ho vrátí.',
+  devmode_runs_out: 'Režim vývojáře vyprší za {days} dní a LG pak Couch TV odstraní. Zapněte televizi na minutu, aby se mohl prodloužit, nebo v aplikaci Developer Mode v televizi stiskněte Extend.',
   devmode_not_renewed_left: 'Režim vývojáře se neprodloužil {days} dní (zbývá {left} dní). Prodlouží se, až bude televize příště zapnutá.',
   devmode_not_renewed: 'Režim vývojáře se neprodloužil {days} dní. Prodlouží se, až bude televize příště zapnutá.',
 
@@ -2180,7 +2180,7 @@ S.cs = {
   opened: 'Otevřeno: {app}',
   opening: 'Otevírám {app}',
   not_set_up: 'Zatím nenastaveno',
-  sleep_needs_update: 'Časovač vypnutí potřebuje příští aktualizaci počítačového mostu.',
+  sleep_needs_update: 'Časovač vypnutí potřebuje novější Couch TV v domácím počítači.',
   sleep_set: 'Časovač vypnutí: {n} minut',
   sleep_off: 'Časovač vypnutí vypnut',
   idle_auto_off: 'Televize se vypne za {n} min (pozastaveno)',
@@ -2245,13 +2245,13 @@ S.cs = {
   // Arrange apps and People
   arrange_lede: 'Aplikaci přesunete tažením za úchyt. Aplikace nad čarou jsou na liště televize (nejvýš {max}), ostatní jsou v Dalších aplikacích. Nastavení je vždy poslední.',
   loading_apps: 'Načítám aplikace z televize…',
-  no_apps_yet: 'Televize počítačovému mostu ještě neposlala seznam aplikací. Stiskněte v televizi Domů a otevřete tohle znovu.',
+  no_apps_yet: 'Televize ještě nesdílela seznam aplikací. Stiskněte v televizi Domů a otevřete tohle znovu.',
   more_apps: 'Další aplikace',
   dock_full: 'Na liště je místo pro {max} aplikací, takže ty pod ní se přesunuly do Dalších aplikací.',
   saved_home: 'Uloženo. Uvidíte to po stisku Domů v televizi.',
   people_lede: 'V pořadí, v jakém je ukazuje televize. Tažením za úchyt někoho přesunete, klepnutím na jméno ho změníte.',
   nobody: 'Zatím nikdo. Dokud někoho nepřidáte, televize ukazuje všechno.',
-  removed: '{name} odebrán(a). Historie sledování zůstává v počítačovém mostu.',
+  removed: '{name} odebrán(a). Historie sledování zůstává uložená.',
   added: '{name} přidán(a).',
   add_person: 'Přidat osobu',
   // kids mode (Kids.jsx)
@@ -2282,7 +2282,7 @@ S.cs = {
   kids_off_done: 'Dětský režim pro {name} je vypnutý.',
   kids_on_done: '{name} má teď dětský profil. Přidejte pár pořadů.',
   kids_leave_pin: '{name} je v televizi v dětském režimu. Přepnete po zadání rodičovského PINu.',
-  kids_needs_update: 'Dětský režim potřebuje v počítači novější couch-tv.',
+  kids_needs_update: 'Dětský režim potřebuje v domácím počítači novější Couch TV.',
   // first open
   whos_phone: 'Pro koho je tento telefon?',
   onboard_note: '„Pokračovat ve sledování“ a tipy se řídí tím, kdo se dívá. Nahoře to můžete kdykoli přepnout.',
@@ -2298,8 +2298,8 @@ S.cs = {
 // counted noun right after a number (Polish plurals change with it): "{n} min", "{n} s".
 S.pl = {
   // LG Developer Mode warnings, from the bridge (devmode warning_key / warning_vars)
-  devmode_gone: 'couch-tv nie jest już zainstalowany na telewizorze. Prawdopodobnie wygasł Developer Mode. Włącz ponownie Developer Mode i poproś Claude’a o ponowną instalację couch-tv.',
-  devmode_runs_out: 'Developer Mode wkrótce wygaśnie (pozostało dni: {days}), a wtedy LG usunie couch-tv. Włącz telewizor na minutę, żeby Developer Mode mógł się odnowić, albo naciśnij Extend w aplikacji Developer Mode na telewizorze.',
+  devmode_gone: 'Couch TV nie jest już zainstalowany na telewizorze. Prawdopodobnie wygasł Developer Mode. Włącz ponownie Developer Mode i poproś osobę, która konfigurowała Couch TV, o ponowną instalację.',
+  devmode_runs_out: 'Developer Mode wkrótce wygaśnie (pozostało dni: {days}), a wtedy LG usunie Couch TV. Włącz telewizor na minutę, żeby Developer Mode mógł się odnowić, albo naciśnij Extend w aplikacji Developer Mode na telewizorze.',
   devmode_not_renewed_left: 'Developer Mode nie został odnowiony (dni bez odnowienia: {days}, pozostało dni: {left}). Odnowi się przy następnym włączeniu telewizora.',
   devmode_not_renewed: 'Developer Mode nie został odnowiony (dni bez odnowienia: {days}). Odnowi się przy następnym włączeniu telewizora.',
 
@@ -2361,7 +2361,7 @@ S.pl = {
   opened: 'Otwarto: {app}',
   opening: 'Otwieranie: {app}',
   not_set_up: 'Ten ekran nie jest jeszcze skonfigurowany.',
-  sleep_needs_update: 'Wyłącznik czasowy wymaga nowszej wersji couch-tv na komputerze.',
+  sleep_needs_update: 'Wyłącznik czasowy wymaga nowszej wersji Couch TV na komputerze w domu.',
   sleep_set: 'Wyłącznik czasowy: {n} min',
   sleep_off: 'Wyłącznik czasowy wyłączony',
   idle_auto_off: 'Automatyczne wyłączenie TV za {n} min (pauza)',
@@ -2428,13 +2428,13 @@ S.pl = {
   // Arrange apps and People
   arrange_lede: 'Przeciągnij aplikację za uchwyt. Aplikacje nad linią są na ekranie głównym telewizora (maks. {max}), pozostałe w „Więcej aplikacji”. Ustawienia są zawsze na końcu.',
   loading_apps: 'Wczytywanie aplikacji telewizora…',
-  no_apps_yet: 'Ten telewizor nie przesłał jeszcze komputerowi listy aplikacji. Naciśnij Home na telewizorze, a potem otwórz to ponownie.',
+  no_apps_yet: 'Ten telewizor nie udostępnił jeszcze listy aplikacji. Naciśnij Home na telewizorze, a potem otwórz to ponownie.',
   more_apps: 'Więcej aplikacji',
   dock_full: 'Na ekranie głównym mieści się maks. {max}, więc aplikacje pod linią przeniesiono do „Więcej aplikacji”.',
   saved_home: 'Zapisano. Naciśnij Home na telewizorze, aby to zobaczyć.',
   people_lede: 'W kolejności, w jakiej pokazuje je telewizor. Przeciągnij uchwyt, aby kogoś przesunąć, albo dotknij imienia, aby je zmienić.',
   nobody: 'Na razie nikogo. Dopóki nikogo nie dodasz, telewizor pokazuje wszystko.',
-  removed: 'Usunięto: {name}. Historia oglądania zostaje na komputerze.',
+  removed: 'Usunięto: {name}. Historia oglądania zostaje zapisana.',
   added: 'Dodano: {name}.',
   add_person: 'Dodaj osobę',
   // kids mode (Kids.jsx)
@@ -2465,14 +2465,14 @@ S.pl = {
   kids_off_done: 'Wyłączono tryb dziecięcy: {name}.',
   kids_on_done: '{name} ma teraz profil dziecięcy. Dodaj kilka programów.',
   kids_leave_pin: '{name}: na telewizorze jest włączony tryb dziecięcy. Wpisz PIN rodzica, aby przełączyć.',
-  kids_needs_update: 'Tryb dziecięcy wymaga nowszej wersji couch-tv na komputerze.',
+  kids_needs_update: 'Tryb dziecięcy wymaga nowszej wersji Couch TV na komputerze w domu.',
   guest_name: "Imię gościa",
   guest_placeholder: "Anna albo rodzina Nowaków",
   guest_save: "Pokaż to imię",
   guest_note: "Widżet powitania na telewizorze mówi Witaj i to imię. Zostaw puste, aby pokazać samo Witaj.",
   guest_saved: "Telewizor wita teraz: {name}.",
   guest_cleared: "Telewizor mówi teraz samo Witaj.",
-  guest_needs_update: "Imiona gości wymagają couch-tv 0.13.3 lub nowszego na telewizorze (albo na komputerze w domu).",
+  guest_needs_update: "Imiona gości wymagają Couch TV 0.13.3 lub nowszego na telewizorze (albo na komputerze w domu).",
   stay_link: "Link do kalendarza rezerwacji",
   stay_placeholder: "Wklej link do kalendarza z Airbnb, Booking.com albo VRBO",
   stay_send: "Wyślij link do telewizora",
@@ -2491,8 +2491,8 @@ S.pl = {
   snag_note: 'Na telewizorze nic się nie zmieniło.',
   reload: 'Wczytaj pilota ponownie',
   // komunikaty mostka i API (err_*, note_*, ask_*)
-  err_bridge_timeout: "Mostek odpowiada zbyt długo. Spróbuj ponownie.",
-  err_bridge_unreachable: "Nie można połączyć się z mostkiem",
+  err_bridge_timeout: "Komputer w domu odpowiada zbyt długo. Spróbuj ponownie.",
+  err_bridge_unreachable: "Nie można połączyć się z komputerem w domu",
   err_tv_not_connected: "Telewizor nie jest połączony",
   err_not_found: "Nie znaleziono",
   err_something_wrong: "Coś poszło nie tak",
@@ -2500,7 +2500,7 @@ S.pl = {
   ask_popular_reason: "Popularne w kraju {country} w tym tygodniu",
   ask_still_working: "Nadal nad tym pracuję. Poczekaj chwilę i spójrz na telewizor.",
   ask_still_working_doing: "Nadal nad tym pracuję ({doing}). Poczekaj chwilę i spójrz na telewizor.",
-  err_adb_not_on: "ADB nie jest włączone",
+  err_adb_not_on: "Telefon nie może jeszcze naciskać przycisków na tym telewizorze.",
   err_after_must_be_number: "Parametr after musi być liczbą",
   err_already_kids_profile: "To jest już profil dziecięcy.",
   err_app_did_not_come_up: "Poproszono telewizor o otwarcie {app}, ale aplikacja się nie uruchomiła",
@@ -2875,8 +2875,8 @@ S.pl = {
 
 // Portuguese (Brazil), translated locally from en.
 S.pt = {
-  devmode_gone: 'O couch-tv não está mais instalado na TV. O Modo Desenvolvedor provavelmente expirou. Ligue o Modo Desenvolvedor de novo e peça para o Claude reinstalar o couch-tv.',
-  devmode_runs_out: 'O Modo Desenvolvedor expira em {days} dias, e aí a LG remove o couch-tv. Ligue a TV por um minuto para ele se renovar, ou aperte Estender no app Modo Desenvolvedor da TV.',
+  devmode_gone: 'O Couch TV não está mais instalado na TV. O Modo Desenvolvedor provavelmente expirou. Ligue o Modo Desenvolvedor de novo e peça a quem configurou o Couch TV para colocá-lo de volta.',
+  devmode_runs_out: 'O Modo Desenvolvedor expira em {days} dias, e aí a LG remove o Couch TV. Ligue a TV por um minuto para ele se renovar, ou aperte Estender no app Modo Desenvolvedor da TV.',
   devmode_not_renewed_left: 'O Modo Desenvolvedor não é renovado há {days} dias ({left} dias restantes). Ele se renova na próxima vez que a TV for ligada.',
   devmode_not_renewed: 'O Modo Desenvolvedor não é renovado há {days} dias. Ele se renova na próxima vez que a TV for ligada.',
   both: 'Ambos',
@@ -2936,7 +2936,7 @@ S.pt = {
   opened: 'Abriu {app}',
   opening: 'Abrindo {app}',
   not_set_up: 'Ainda não configurado',
-  sleep_needs_update: 'O temporizador precisa da próxima atualização do bridge.',
+  sleep_needs_update: 'O temporizador precisa de um Couch TV mais recente no computador de casa.',
   sleep_set: 'Temporizador: {n} minutos',
   sleep_off: 'Temporizador desligado',
   idle_auto_off: 'TV desliga em {n} min (pausado)',
@@ -2997,13 +2997,13 @@ S.pt = {
   cant_reach_wifi: 'Não foi possível alcançar a TV. O celular está no Wi-Fi de casa?',
   arrange_lede: 'Arraste um app pela alça. Os apps acima da linha ficam no dock da TV (até {max}); o resto fica atrás de Mais apps. Ajustes é sempre o último.',
   loading_apps: 'Carregando os apps da TV…',
-  no_apps_yet: 'Esta TV ainda não contou os apps dela ao bridge. Aperte Home na TV, depois abra isto de novo.',
+  no_apps_yet: 'Esta TV ainda não compartilhou os apps dela. Aperte Home na TV, depois abra isto de novo.',
   more_apps: 'Mais apps',
   dock_full: 'O dock cabe {max} apps, então os que estavam embaixo foram para trás de Mais apps.',
   saved_home: 'Salvo. Aperte Home na TV para ver.',
   people_lede: 'Na ordem em que a TV mostra. Arraste a alça para mover alguém, toque em um nome para alterar.',
   nobody: 'Ninguém ainda. A TV mostra tudo até você adicionar alguém.',
-  removed: 'Removido {name}. O histórico de audiência dele continua no bridge.',
+  removed: 'Removido {name}. O histórico de audiência dele continua salvo.',
   added: 'Adicionado {name}.',
   add_person: 'Adicionar pessoa',
   // kids mode (Kids.jsx)
@@ -3034,7 +3034,7 @@ S.pt = {
   kids_off_done: 'O modo infantil está desligado para {name}.',
   kids_on_done: '{name} agora é um perfil infantil. Adicione alguns programas.',
   kids_leave_pin: '{name} está no modo infantil na TV. Digite o PIN dos pais para trocar.',
-  kids_needs_update: 'O modo infantil precisa de um couch-tv mais recente no computador.',
+  kids_needs_update: 'O modo infantil precisa de um Couch TV mais recente no computador de casa.',
   whos_phone: 'Para quem é este celular?',
   onboard_note: '"Continuar assistindo" e as sugestões seguem quem está assistindo. Dá para trocar no topo a qualquer momento.',
   home_screen: 'Colocar na tela inicial',

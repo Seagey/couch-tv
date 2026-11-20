@@ -79,13 +79,13 @@ console.log("Running at home browser tests...");
   await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await press(page, "Enter", 300);   // the gear menu, then Home settings
   await page.waitForTimeout(400);
   // down the sections to couch-tv Studio, into its rows, down to At home
-  for (let i = 0; i < 14 && !(await page.evaluate(() => /couch-tv Studio/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press(page, "ArrowDown");
+  for (let i = 0; i < 14 && !(await page.evaluate(() => /Designs/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press(page, "ArrowDown");
   await press(page, "ArrowRight");
   const toRow = async (re) => { for (let i = 0; i < 40; i++) { const t = await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || ""); if (re.test(t)) return true; await press(page, "ArrowDown", 120); } return false; };
   const type = async (words) => { await press(page, "Enter", 250); await page.fill("#set-input", words); await press(page, "Enter", 300); };
   const atHomeRow = await toRow(/^At home/);
   if (!atHomeRow) console.log("DEBUG", await page.evaluate(() => document.getElementById("set-head").textContent + " | " + ((document.querySelector(".srow.focus") || {}).textContent || "none") + " | " + document.getElementById("set-rows").textContent.slice(0, 300)));
-  ok(atHomeRow, "Home settings, couch-tv Studio has At home");
+  ok(atHomeRow, "Home settings, Designs has At home");
   await press(page, "Enter", 300);
   ok(/At home/.test(await page.evaluate(() => document.getElementById("set-head").textContent)), "At home opens");
   ok(await toRow(/Write a note/), "a row to write the note"); await type("Dinner at 6. Feed Max!");

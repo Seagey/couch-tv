@@ -22,8 +22,10 @@ for (const f of files) {
   ok(left.length === 0, f + ": no words say TV Designer (" + left.join(", ").slice(0, 120) + ")");
 }
 const app = fs.readFileSync(path.join(web, "app.js"), "utf8");
-ok(/id === "designer" \? "couch-tv Studio"/.test(app), "Home settings names the section couch-tv Studio");
-ok(/label: "Turn on couch-tv Studio"/.test(app), "Turn on couch-tv Studio");
+ok(/id === "designer" \? "Designs"/.test(app), "Home settings names the section Designs (0.13.9; the website keeps the name couch-tv Studio)");
+ok(/label: "Turn on designs"/.test(app) && !/label: "Turn on couch-tv Studio"/.test(app), "Turn on designs");
+ok(/label: "Back to the standard home"/.test(app) && !/classic home/.test(app), "Back to the standard home, never the classic home");
+ok(/sub: "Type the code from couch-tv Studio on your phone"/.test(app), "Get a design still names the couch-tv Studio website");
 ok(/Open this home in couch-tv Studio/.test(fs.readFileSync(path.join(web, "share-home.js"), "utf8")), "Share this home says couch-tv Studio");
 // the ids, keys and links do not change
 ok(/\["designer", "designer"\]/.test(app), "the section id is still designer");

@@ -73,7 +73,7 @@
 <body>
 <main>
   <h1>Home settings</h1>
-  <p>This page comes from your TV, over your home Wi-Fi. What you change here shows on the TV in a moment, and everything here can still be changed on the TV too. Nothing typed here goes to couch-tv or anyone else. <a href="/">Back to the remote</a></p>
+  <p>This page comes from your TV, over your home Wi-Fi. What you change here shows on the TV in a moment, and everything here can still be changed on the TV too. Nothing typed here goes to Couch TV or anyone else. <a href="/">Back to the remote</a></p>
 
   <nav class="jump" aria-label="Sections">
     <a href="#widgets" id="jump-widgets" style="display:none">Widgets</a><a href="#dapps" id="jump-dapps" style="display:none">Apps</a><a href="#town">Town</a><a href="#people">People</a><a href="#photos">Photos</a><a href="#athome">At home</a><a href="#ask">Ask AI</a><a href="#home">Home screen</a><a href="#smart" id="jump-smart" style="display:none">Smart home</a><a href="#tv">This TV</a>
@@ -82,12 +82,12 @@
   <div class="card" id="design-line" style="display:none" role="status">
     <p class="now" id="design-line-text">This home uses a couch-tv Studio design. Settings for parts it doesn't show are hidden.</p>
     <button class="quiet" id="design-all" type="button">Show all settings</button>
-    <p>To go back to the standard home: on the TV, Home settings, couch-tv Studio, then the row that turns couch-tv Studio off.</p>
+    <p>To go back to the standard home: on the TV, Home settings, Designs, then Back to the standard home.</p>
   </div>
 
   <section class="card" id="widgets" style="display:none">
     <h2>Widgets on this TV</h2>
-    <p>Each widget on the TV's design with something to set, named by where it sits on the screen. What you choose is kept in the TV's Home settings (and the computer at home, if it has one). Never in a design, never sent to couch-tv.</p>
+    <p>Each widget on the TV's design with something to set, named by where it sits on the screen. What you choose is kept in the TV's Home settings (and the home computer, if it has one). Never in a design, never sent to Couch TV.</p>
     <div id="w-list"></div>
     <div class="msg" id="w-msg" role="status"></div>
   </section>
@@ -122,7 +122,7 @@
 
   <section class="card" id="photos">
     <h2>Your photos</h2>
-    <p>Photos you add take turns with the scenes behind the clock. They go straight from this phone to the TV, which makes them screen size and keeps them. They never go to couch-tv or any other server.</p>
+    <p>Photos you add take turns with the scenes behind the clock. They go straight from this phone to the TV, which makes them screen size and keeps them. They never go to Couch TV or any other server.</p>
     <p class="drop-hint">On a computer you can also drag photos from a folder onto this box.</p>
     <p id="photo-count"></p>
     <div class="photos" id="photo-list"></div>
@@ -132,7 +132,7 @@
 
   <section class="card" id="athome">
     <h2>At home</h2>
-    <p>Words for your couch-tv Studio widgets: a family note, lists, the guest Wi-Fi, a house guide and your calendars. They stay on the TV, never in a design or Share this home.</p>
+    <p>Words for the widgets on your home: a family note, lists, the guest Wi-Fi, a house guide and your calendars. They stay on this TV. They are never put in a design or in Share this home.</p>
     <p class="status" id="ah-state"></p>
 
     <div class="sub">
@@ -195,14 +195,15 @@
   </section>
 
   <section class="card" id="ask">
-    <h2>Ask AI (optional, off by default)</h2>
-    <p>Ask lets you say "put on Bluey" and have an AI find it and press the buttons. On-TV mode has no AI until you pick a service and add your own key: Claude, OpenAI, Google Gemini, OpenRouter, Groq, Mistral, or a model running on a computer at home. Use a key made only for this TV, with a monthly spend limit set with the service: the key is stored on the TV, and anyone with ADB access to the TV could read it. Each ask is a few short model calls. On Claude Haiku 5.5 that costs about a fifth of a US cent; other services and models price differently.</p>
+    <h2>Ask AI</h2>
+    <p class="status">Off until you set it up</p>
+    <p>Say "put on Bluey" and an AI finds it and presses the buttons for you. Ask AI is off until you pick an AI service and add its key: Claude, OpenAI, Google Gemini, OpenRouter, Groq, Mistral, or a model running on a home computer. The key is kept on this TV, so use one made only for it, with a monthly spending limit set at the service. Each ask costs a little: on Claude Haiku 5.5 about a fifth of a US cent; other services and models price differently.</p>
     <label for="ask-service">AI service</label>
     <select id="ask-service"></select>
     <label for="ask-base">Web address</label><input id="ask-base" type="text" autocomplete="off" spellcheck="false">
     <label for="ask-model">Model name</label><input id="ask-model" type="text" autocomplete="off" spellcheck="false">
     <p id="ask-hint"></p>
-    <label for="ask-key">API key (leave empty to keep the current one)</label><input id="ask-key" type="password" autocomplete="off">
+    <label for="ask-key">Key from the AI service (API key). Leave it empty to keep the one saved.</label><input id="ask-key" type="password" autocomplete="off">
     <label class="check"><input type="checkbox" id="ask-on"> Switch ask on</label>
     <p id="ask-state"></p>
     <div class="row"><button class="go" id="ask-save">Save ask</button><button id="ask-clear">Remove key</button></div>
@@ -213,7 +214,7 @@
     <h2>Use as home screen</h2>
     <p class="status" id="home-state">Checking…</p>
     <p id="home-note"></p>
-    <button class="go" id="home-on">Use couch-tv as the home screen</button>
+    <button class="go" id="home-on">Use Couch TV as the home screen</button>
     <button class="quiet" id="home-off" style="display:none">Stop using it as the home screen</button>
     <div class="msg" id="home-msg" role="status"></div>
   </section>
@@ -236,28 +237,28 @@
   </section>
 
   <section class="card">
-    <h2>ADB on the TV</h2>
-    <p>Keys, typing, power off and "what's playing" need the TV's own debugging switched on. Opening apps and volume work without it.</p>
+    <h2>Let the phone press keys</h2>
+    <p>The arrow keys, typing, turning the TV off and showing what's playing need one TV setting switched on, once. Opening apps and the volume work without it.</p>
     <p class="status" id="adb-status">Checking…</p>
     <p id="adb-advice"></p>
     <div id="routes">
     <div id="route-wd">
-    <h3>Wireless debugging pairing (Android 11 and newer, best for Google TV)</h3>
+    <h3>Newer TVs (Google TV, Android 11 or newer)</h3>
     <ol>
-      <li>On the TV: Settings, System, About, press Build seven times to unlock Developer options. On an older Android TV it is Settings, Device Preferences, About.</li>
-      <li>Developer options, <b>Wireless debugging</b>, switch it on, and on "Allow wireless debugging on this network?" tick <b>Always allow on this network</b> and choose Allow. The TV must be on Wi-Fi.</li>
-      <li>Careful: <b>Revoke USB debugging authorizations</b> sits right next to Wireless debugging in that list. Never press OK on it.</li>
+      <li>On the TV: Settings, System, About. Press OK on Build seven times. This shows a hidden menu called Developer options. (Older Android TV: Settings, Device Preferences, About.)</li>
+      <li>In Developer options, switch on <b>Wireless debugging</b>. This lets Couch TV press keys on this TV. When the TV asks "Allow wireless debugging on this network?", tick <b>Always allow on this network</b> and choose Allow. The TV must be on Wi-Fi.</li>
+      <li>Careful: <b>Revoke USB debugging authorizations</b> sits right next to Wireless debugging in that list. Never press OK on it: it would undo this setup.</li>
       <li>In Wireless debugging choose <b>Pair device with pairing code</b>. Leave that screen open on the TV.</li>
-      <li>Type the 6 digit code here. The port is optional (it is found on its own).</li>
+      <li>Type the 6 digit code from that screen here. You can leave the port number empty: Couch TV finds it.</li>
     </ol>
-    <div class="row"><div><label for="wd-code">Pairing code</label><input id="wd-code" inputmode="numeric" maxlength="6"></div>
-      <div><label for="wd-port">Port (optional)</label><input id="wd-port" inputmode="numeric" maxlength="5"></div></div>
-    <button class="go" id="wd-pair">Pair</button>
+    <div class="row"><div><label for="wd-code">Code on the TV</label><input id="wd-code" inputmode="numeric" maxlength="6"></div>
+      <div><label for="wd-port">Port number (you can leave this empty)</label><input id="wd-port" inputmode="numeric" maxlength="5"></div></div>
+    <button class="go" id="wd-pair">Send the code</button>
     </div>
     <div id="route-tcp">
-    <h3>Network debugging on port 5555 (older Android TV, Fire TV, Shield)</h3>
-    <p>Switch on Developer options and Network (or USB) debugging, press Connect, then on the TV tick <b>Always allow</b> and press Allow. Some newer Google TVs never show that question: use pairing above instead.</p>
-    <button class="go" id="adb-connect">Connect</button>
+    <h3>Older TVs (Fire TV, Shield, older Android TV)</h3>
+    <p>In Developer options, switch on <b>Network debugging</b> (on some TVs, <b>USB debugging</b>). This lets Couch TV press keys on this TV. Then press Let the phone press keys. On the TV, tick <b>Always allow</b> and press Allow. Some newer Google TVs never ask: use the newer TVs steps instead.</p>
+    <button class="go" id="adb-connect">Let the phone press keys</button>
     </div>
     </div>
     <div class="msg" id="adb-msg" role="status"></div>
@@ -277,7 +278,7 @@
 
   <section class="card" id="xiaomi" style="display:none">
     <h2>Xiaomi: Couch TV in PatchWall's place (optional, off by default)</h2>
-    <p>The remote's PatchWall button opens Couch TV, PatchWall opens Couch TV instead, and Couch TV opens when the TV is switched on, unless the TV is going back to an HDMI input. The Home button is not changed. It needs the Home button watch, which is only in couch-tv-ontv-watch.apk (install it from a computer over this app: on-tv/README.md), switched on in Settings, Accessibility (Couch TV home watch); with this on, that watch also checks each remote key for the PatchWall button and passes every other key on.</p>
+    <p>The remote's PatchWall button opens Couch TV, PatchWall opens Couch TV instead, and Couch TV opens when the TV is switched on, unless the TV is going back to an HDMI input. The Home button is not changed. It needs the Home button version of Couch TV (couch-tv-ontv-watch.apk), put on from a computer (the steps are on the TV: Couch TV, More, Home button from a computer), switched on in the TV's Settings, Accessibility, Couch TV home watch; with this on, that watch also checks each remote key for the PatchWall button and passes every other key on.</p>
     <label class="check"><input type="checkbox" id="pw-on"> Couch TV in PatchWall's place</label>
     <p id="pw-state"></p>
     <div class="row"><button class="go" id="pw-save">Save</button></div>
@@ -285,8 +286,8 @@
   </section>
 
   <section class="card" id="inputs" style="display:none">
-    <h2>Input tiles (optional, off by default)</h2>
-    <p>A set-top box, a camera or a games console on an HDMI port can sit in the home's app row as its own tile, next to Settings. OK on the tile switches the TV straight to that port. Tick the ports you want and give each a name. Up to 6; they take dock places, so the last apps move behind More apps.</p>
+    <h2>HDMI tiles on the home</h2>
+    <p>A set-top box, camera or games console plugged into the TV (HDMI 1, HDMI 2 and so on) can have its own tile in the apps row, next to Settings. OK on the tile switches the TV to it. Tick the ones you use and name them. Up to 6. Each one takes an app's place, so your last apps move to More apps.</p>
     <div id="in-list"></div>
     <div class="row"><button class="go" id="in-save">Save</button></div>
     <div class="msg" id="in-msg" role="status"></div>
@@ -429,7 +430,7 @@
     say(msgId, 'Saving…');
     return api('POST', '/api/athome', { edit: edit }).then(function (j) {
       if (j.live) { AH = j.athome; showAtHome(); say(msgId, okText); takeDesign(AH && AH.design); }
-      else say(msgId, 'Sent. The TV takes it as soon as the couch-tv home is open on it.');
+      else say(msgId, 'Sent. The TV takes it as soon as the Couch TV home is open on it.');
     }).catch(function (e) { say(msgId, e.message); });
   }
   function listRow(l, i) {
@@ -462,13 +463,13 @@
   }
   function wholeLists(live) {
     ['ah-list-add', 'ah-lists-save', 'ah-guide-add', 'ah-guide-save'].forEach(function (id) { $(id).disabled = !live; });
-    say('ah-lists-msg', live ? '' : 'Lists can be changed once the couch-tv home is open on the TV.');
-    say('ah-guide-msg', live ? '' : 'The guide can be changed once the couch-tv home is open on the TV.');
+    say('ah-lists-msg', live ? '' : 'Lists can be changed once the Couch TV home is open on the TV.');
+    say('ah-guide-msg', live ? '' : 'The guide can be changed once the Couch TV home is open on the TV.');
   }
   function loadAtHome() {
     return api('GET', '/api/athome').then(function (j) {
       if (j.live) { AH = j.athome; showAtHome(); wholeLists(true); $('ah-state').className = 'status'; say('ah-state', ''); takeDesign(AH && AH.design); }
-      else { wholeLists(false); $('ah-state').className = 'status bad'; say('ah-state', 'Open the couch-tv home on the TV, then reload this page, to see what is saved there. A note, the Wi-Fi, calendar links and the guest\'s name saved here wait on the TV until its home opens.'); }
+      else { wholeLists(false); $('ah-state').className = 'status bad'; say('ah-state', 'Open the Couch TV home on the TV, then reload this page, to see what is saved there. A note, the Wi-Fi, calendar links and the guest\'s name saved here wait on the TV until its home opens.'); }
     }).catch(function (e) { say('ah-state', e.status === 404 ? 'This TV app needs an update for At home from the phone.' : e.message); });
   }
   $('ah-note-save').onclick = function () { ahSend({ note: { text: $('ah-note').value, from: $('ah-from').value } }, 'ah-note-msg', $('ah-note').value.trim() ? 'The note is on the TV.' : 'The note is cleared.'); };
@@ -593,7 +594,7 @@
     $('inputs').style.display = inOk ? '' : 'none';
     var note = $('in-design');
     if (!note) { note = document.createElement('p'); note.id = 'in-design'; $('in-list').parentNode.insertBefore(note, $('in-list')); }
-    note.textContent = d && !d.inputs ? 'This design hides the dock, so input tiles show only on the standard home.' : '';
+    note.textContent = d && !d.inputs ? 'This design hides the dock, so HDMI tiles show only on the standard home.' : '';
     $('design-line').style.display = d ? '' : 'none';
     $('design-line-text').textContent = SHOW_ALL ? 'Every setting is showing. Some are for parts this couch-tv Studio design doesn\'t show.' : 'This home uses a couch-tv Studio design. Settings for parts it doesn\'t show are hidden.';
     $('design-all').textContent = SHOW_ALL ? 'Show only what this design uses' : 'Show all settings';
@@ -746,10 +747,10 @@
   function showHome(h) {
     var on = !!h.on, held = !!h.held;
     $('home-state').className = 'status ' + (on && (held || h.fire_tv) ? 'ok' : '');
-    $('home-state').textContent = !on ? 'couch-tv is not the home screen.' : held ? 'couch-tv is the home screen.' : h.fire_tv ? (h.watch ? 'couch-tv is the home screen.' : 'Switched on, but the Home button watch is off.') : 'Switched on. One step left on the TV.';
+    $('home-state').textContent = !on ? 'Home opens the TV\'s own home.' : held ? 'Couch TV is the home screen.' : h.fire_tv ? (h.watch ? 'Couch TV is the home screen.' : 'The Home button opens Couch TV, but Keep Couch TV on Home is off.') : 'Switched on. One step left on the TV.';
     $('home-note').textContent = !on ? 'The TV keeps its own home until you choose. Everything else on this page works either way.'
       : held || (h.fire_tv && h.watch) ? 'Press Home on the TV remote to check.'
-      : h.fire_tv ? 'On a Fire TV the Home button watch brings couch-tv back. It is in couch-tv-ontv-watch.apk, switched on in the TV\'s Settings, Accessibility.'
+      : h.fire_tv ? 'On a Fire TV, Keep Couch TV on Home brings it back. It is in the Home button version of Couch TV: switch on Couch TV home watch in the TV\'s Settings, Accessibility.'
       : 'Press Home on the TV remote. If the TV asks which app to use, pick Couch TV with the TV remote, then Always (or Set as default). The TV asks that itself; a phone cannot answer it.';
     $('home-on').style.display = on ? 'none' : '';
     $('home-off').style.display = on ? '' : 'none';
@@ -760,7 +761,7 @@
     api('POST', '/api/home', { on: on }).then(function (h) { showHome(h); say('home-msg', ''); }).catch(function (e) { say('home-msg', e.message); });
   }
   $('home-on').onclick = function () { setHome(true); };
-  $('home-off').onclick = function () { if (confirm('Home on the TV remote goes back to the TV\'s own home. couch-tv stays installed.')) setHome(false); };
+  $('home-off').onclick = function () { if (confirm('Home on the TV remote goes back to the TV\'s own home. Couch TV stays installed.')) setHome(false); };
 
   // ---------------- smart home: Home Assistant's sign in, on this phone (served by the TV under /ha) ----------------
   function loadSmart() {
@@ -778,10 +779,10 @@
   // ---------------- this TV ----------------
   function showAdb(a) {
     var s = $('adb-status');
-    if (a.connected) { s.className = 'status ok'; s.textContent = 'Connected (' + (a.route === 'tls' ? 'wireless debugging' : 'port 5555') + ').'; }
-    else if (a.state === 'waiting_for_allow' || a.state === 'connecting') { s.className = 'status'; s.textContent = 'Waiting. Accept "Allow debugging?" on the TV.'; }
+    if (a.connected) { s.className = 'status ok'; s.textContent = 'The phone can press keys.'; }
+    else if (a.state === 'waiting_for_allow' || a.state === 'connecting') { s.className = 'status'; s.textContent = 'Look at the TV. If it asks "Allow debugging?", tick Always allow and press OK.'; }
     else if (a.unanswered) { s.className = 'status bad'; s.textContent = 'No answer from the TV. If it did not show its Allow debugging question, restart the TV, then try again.'; }
-    else { s.className = 'status bad'; s.textContent = 'Not connected.' + (a.error ? ' (' + a.error + ')' : ''); }
+    else { s.className = 'status bad'; s.textContent = 'The phone can\'t press keys yet.' + (a.error ? ' ' + a.error : ''); }
   }
   function loadSettings() {
     return api('GET', '/api/settings').then(function (j) {
@@ -793,8 +794,8 @@
         $('xiaomi').style.display = '';
         $('pw-on').checked = !!j.patchwall_replace;
         $('pw-state').textContent = j.watch ? '' : j.watch_apk
-          ? 'The Home button watch is off: switch on Couch TV home watch in the TV\'s Settings, Accessibility.'
-          : 'This app has no Home button watch (Google Play Protect blocks it in an app installed from a phone). For this, install couch-tv-ontv-watch.apk over it from a computer (on-tv/README.md), then switch on Couch TV home watch in the TV\'s Settings, Accessibility.';
+          ? 'Keep Couch TV on Home is off: switch on Couch TV home watch in the TV\'s Settings, Accessibility.'
+          : 'This version of Couch TV can\'t keep the Home button: Google Play Protect blocks that part in apps put on from a phone. To get it, put the Home button version (couch-tv-ontv-watch.apk) on from a computer (Couch TV on the TV, More, Home button from a computer), then switch on Couch TV home watch in the TV\'s Settings, Accessibility.';
       }
       showAsk(j.ask);
       $('phones').textContent = j.phones + (j.phones === 1 ? ' phone is' : ' phones are') + ' paired with this TV.';
@@ -802,7 +803,7 @@
       // Android 13+ (most Google TVs): pairing first, 5555 second. Older TVs: the other way round.
       if (j.adb.sdk < 30) { $('route-wd').style.display = 'none'; }
       else if (j.adb.sdk < 33) { $('routes').insertBefore($('route-tcp'), $('route-wd')); }
-      $('adb-advice').textContent = j.adb.sdk >= 33 ? 'This TV runs Android 13 or newer: use wireless debugging pairing.' : '';
+      $('adb-advice').textContent = j.adb.sdk >= 33 ? 'This TV is Android 13 or newer: use the newer TVs steps.' : '';
     }).catch(function (e) { $('town-now').textContent = e.message; });
   }
   function load() { loadSettings(); loadInputs(); loadAtHome(); loadHome(); loadSmart(); }
@@ -905,7 +906,7 @@
     // honest about a design with no row for them: never "the home shows them" when it will not
     var noRow = DESIGN && DESIGN.on && !DESIGN.inputs;
     api('POST', '/api/settings', { inputs: list }).then(function () {
-      $('in-msg').textContent = !list.length ? 'Saved. No input tiles.' : noRow ? 'Saved. This design hides the dock, so they show only on the standard home.' : 'Saved. The home shows them now.';
+      $('in-msg').textContent = !list.length ? 'Saved. No HDMI tiles.' : noRow ? 'Saved. This design hides the dock, so they show only on the standard home.' : 'Saved. The home shows them now.';
       loadSettings();
     })
       .catch(function (e) { $('in-msg').textContent = e.message; });
@@ -920,7 +921,7 @@
     bad: 'The download did not check out, so nothing was installed.',
     other_key: 'This copy of Couch TV was built on another computer, so it cannot take this update.',
     space: 'Not installed: the TV is short of space. Free some space on the TV, then try again.',
-    adb: 'Couch TV lost its link to the TV, so nothing was installed.',
+    adb: 'Couch TV lost its connection to this TV, so nothing was installed. Try again, or use the steps below.',
     failed: 'Android did not install the update. Nothing changed.'
   };
   var updPoll = null, updFrom = '', updWaiting = false;

@@ -201,8 +201,8 @@ async function about(page) {
   await page.evaluate(() => { const p = document.getElementById("gear-pop"); if (p && p.classList.contains("ask")) window.MOCK_UPDATER.auto(true); });
   await page.keyboard.press("Escape"); await page.waitForTimeout(300);
   const rows = await about(page);
-  ok(!/With the computer/.test(rows) && /On its own, no computer/.test(rows), "on-TV app: Running says no computer (" + rows.slice(0, 200) + ")");
-  ok(!/On this TV and the computer/.test(rows) && /On this TV/.test(rows), "on-TV app: settings are kept on this TV");
+  ok(!/With a home computer/.test(rows) && /On its own, no computer/.test(rows), "on-TV app: Running says no computer (" + rows.slice(0, 200) + ")");
+  ok(!/On this TV and the home computer/.test(rows) && /On this TV/.test(rows), "on-TV app: settings are kept on this TV");
   ok(/Update couch-tv/.test(rows) && /Version 0\.4 is out \(this TV has 0\.3\)/.test(rows), "About: Update couch-tv with the version line");
   await page.keyboard.press("ArrowRight"); await page.waitForTimeout(200);
   for (let i = 0; i < 12 && !/^Update couch-tv/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "")); i++) { await page.keyboard.press("ArrowDown"); await page.waitForTimeout(120); }

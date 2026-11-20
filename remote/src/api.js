@@ -76,8 +76,8 @@ async function call(method, path, body, ms = 12000) {
     });
   } catch (e) {
     throw e.name === 'AbortError'
-      ? new ApiError('The bridge is taking too long. Try again.', 408, 'err_bridge_timeout')
-      : new ApiError('Can’t reach the bridge', 0, 'err_bridge_unreachable');
+      ? new ApiError('The home computer is taking too long. Try again.', 408, 'err_bridge_timeout')
+      : new ApiError('Can’t reach the home computer', 0, 'err_bridge_unreachable');
   } finally {
     clearTimeout(t);
   }

@@ -84,7 +84,7 @@ object Ask {
 
     fun ask(text: String, who: String?): JSONObject {
         val cfg = config()
-        if (!cfg.ready) throw ApiError(501, "Ask is off in on-TV mode.")
+        if (!cfg.ready) throw ApiError(501, "Ask AI is off.")
         val started = System.currentTimeMillis()
         val system = "You control a TV through tools. Do what the person asks with the fewest tool calls, then reply in one or two short plain sentences. " +
             "Apps on this TV: ${installedApps()}. Only open apps from this list. " +

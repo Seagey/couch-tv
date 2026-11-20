@@ -164,7 +164,7 @@ TV = tv;
   await openSettings(tv);
   const s = await secs(tv);
   ok(!s.includes("Apps") && !s.includes("People") && !s.includes("Quick buttons"), "with the design: no Apps, People or Quick buttons (" + s.join(", ") + ")");
-  ok(s.includes("Location") && s.includes("Weather") && s.includes("couch-tv Studio") && s.includes("Language") && s.includes("About"), "the town and weather stay: the surf report reads them");
+  ok(s.includes("Location") && s.includes("Weather") && s.includes("Designs") && s.includes("Language") && s.includes("About"), "the town and weather stay: the surf report reads them");
   const top = (await rowsText(tv)).slice(0, 2).join(" | ");
   ok(/This home uses a couch-tv Studio design/.test(top) && /Settings for parts it doesn't show are hidden/.test(top) && /Show all settings/.test(top), "one line at the top says so, with Show all settings: " + top);
   await goSec(tv, "Look and scenes");
@@ -189,7 +189,7 @@ TV = tv;
   ok(!(await secs(tv)).includes("Apps"), "closing Home settings goes back to only what the design uses");
 
   // ---- 3. each widget's own settings, drawn from widget-caps.js settings (pre: true only) ----
-  await goSec(tv, "couch-tv Studio");
+  await goSec(tv, "Designs");
   const studio = (await rowsText(tv)).join(" | ");
   ok(/Surf, middle left/.test(studio) && /Beach: Sydney \(your home's town\)/.test(studio), "couch-tv Studio, Widgets on this home: the surf widget by kind and place, with its beach now: " + studio);
   ok(/Headlines, top right/.test(studio) && /News source: ABC News/.test(studio), "and the headlines with the design's source");
@@ -439,7 +439,7 @@ await ctx.close();
   const to = cm.settings.filter((s) => s.key === "to")[0];
   ok(to && to.words === "Not set", "Commute, Where to: Not set until it is picked (" + (to && to.words) + ")");
   ok((await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "c|commute", values: { to: { name: "Geelong", lat: -38.15, lon: 144.36, timezone: "Australia/Melbourne" } } } }))).ok, "Where to from the phone");
-  await openSettings(tv); await goSec(tv, "couch-tv Studio");
+  await openSettings(tv); await goSec(tv, "Designs");
   const studio = (await rowsText(tv)).join(" | ");
   ok(/Commute, middle right/.test(studio) && !/Where to\b.*Type the town or suburb you drive to/.test(studio), "the Commute is one row in Widgets on this home, the old Commute rows are gone: " + studio.slice(0, 500));
   await closeSettings(tv);
