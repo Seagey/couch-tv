@@ -153,6 +153,11 @@ const WATCH = { who: "sam", shows: MINE, apps: INSTALLED, bridge: true,
   ok(f.empty && /Nothing to keep watching from Prime Video/.test(f.text), "upnext, only Prime Video with none on the go says so: " + f.text);
   ok(/Bluey/.test(g.text), "upnext: the design's ABC iview, by catalogue id"); tested("upnext", "apps");
   ok(/Ozark/.test((await draw(o, WATCH, {})).text), "upnext: cleared, any app again");
+  // at most 6 apps, however it was saved: Netflix 7th is left out, so Ozark never shows
+  const six = ["prime", "binge", "sbs", "7plus", "9now", "10play"];
+  const h = await draw(o, WATCH, { apps: six.concat(["netflix"]) }), i = await draw(o, WATCH, { apps: six.slice(0, 5).concat(["netflix"]) });
+  ok(h.empty && !/Ozark/.test(h.text), "upnext: a 7th app is left out (6 at most): " + h.text.slice(0, 60));
+  ok(/Ozark/.test(i.text), "upnext: Netflix as the 6th app counts");
 }
 // picks: heading, picks from
 {
@@ -165,6 +170,20 @@ const WATCH = { who: "sam", shows: MINE, apps: INSTALLED, bridge: true,
   ok(c.acts.filter((x) => /^pick:/.test(x)).every((x) => +x.split(":")[1] >= 2), "picks: your own picks keep their place in the whole list, so OK plays the right one: " + c.acts.join(","));
   tested("picks", "mix");
   ok(/For Sam/.test(d.text) && /Picks for you/.test(a.text), "picks, Heading"); tested("picks", "label");
+  // the full screen Picks (OK on it) says which picks it holds
+  const sub = (wset) => page.evaluate(([o, d, wset]) => {
+    const env = { data: Object.assign({}, d, wset ? { wset: { [o.id]: wset } } : {}) };
+    const host = document.createElement("div"); host.className = "cw-o"; host.setAttribute("data-obj", o.id); document.body.appendChild(host);
+    const r = window.CouchWidgets.render(o, env); host.appendChild(r);
+    window.CouchDetail.open(r, env, {});
+    const t = (document.querySelector(".cwd-panel") || {}).textContent || "";
+    window.CouchDetail.close(true); host.remove(); return t;
+  }, [o, HH, wset || null]);
+  const sa = await sub(), sb = await sub({ mix: "others" }), sc = await sub({ mix: "mine" }), sd = await sub({});
+  ok(/From what everyone at home is watching on this TV/.test(sa), "picks full screen: everyone by default: " + sa.slice(0, 120));
+  ok(/What others at home are watching/.test(sb) && !/From what everyone/.test(sb), "picks full screen, Only what others are watching: " + sb.slice(0, 120));
+  ok(/Shows you left part way/.test(sc) && !/From what everyone/.test(sc), "picks full screen, Only your own shows: " + sc.slice(0, 120));
+  ok(/From what everyone at home is watching on this TV/.test(sd), "picks full screen: cleared, everyone again");
 }
 // nowplaying: buttons, cover
 {
@@ -390,6 +409,24 @@ const tv = TV = await tvPage(design, "&ontv=1");
   await phone.waitForTimeout(800);
   const mix = await tv.evaluate(() => window.tv.atHomeRead().design.widgets.filter((w) => w.key === "opicks|picks")[0].settings.filter((s) => s.key === "mix")[0]);
   ok(mix.own && mix.value === "others", "Picks from, picked on the phone page, is kept on the TV: " + JSON.stringify(mix.value));
+  // Only from these apps takes 6 ticks at most on the phone page
+  await phone.click('#w-list details[data-key="oupnext|upnext"] summary');
+  const BOX = 'input[data-wmany][data-wk="oupnext|upnext"][data-ws="apps"]';
+  ok(/Pick up to 6\./.test(await phone.evaluate(() => (document.querySelector('#w-list details[data-key="oupnext|upnext"]') || {}).textContent || "")), "the phone page says: Pick up to 6.");
+  for (let k = 0; k < 7; k++) {
+    const boxes = await phone.$$(BOX);
+    if (await boxes[k].isEnabled()) { await boxes[k].click(); await phone.waitForTimeout(500); }
+  }
+  const st6 = await phone.evaluate((b) => [...document.querySelectorAll(b)].map((c) => (c.checked ? "x" : "") + (c.disabled ? "d" : "")), BOX);
+  ok(st6.filter((x) => x === "x").length === 6 && st6.slice(6).every((x) => x === "d"), "6 ticked, the rest can't be ticked: " + st6.join(","));
+  const up = await tv.evaluate(() => window.tv.atHomeRead().design.widgets.filter((w) => w.key === "oupnext|upnext")[0].settings.filter((s) => s.key === "apps")[0]);
+  ok(Array.isArray(up.value) && up.value.length === 6, "the TV keeps 6 apps: " + JSON.stringify(up.value));
+  await (await phone.$$(BOX))[0].click(); await phone.waitForTimeout(500);
+  const st5 = await phone.evaluate((b) => [...document.querySelectorAll(b)].map((c) => (c.checked ? "x" : "") + (c.disabled ? "d" : "")), BOX);
+  ok(st5.filter((x) => x === "x").length === 5 && st5.every((x) => x !== "d"), "one taken off: every box can be ticked again: " + st5.join(","));
+  for (let k = 0; k < 8 && await phone.$(BOX + ":checked"); k++) { await phone.click(BOX + ":checked"); await phone.waitForTimeout(500); }
+  const up0 = await tv.evaluate(() => window.tv.atHomeRead().design.widgets.filter((w) => w.key === "oupnext|upnext")[0].settings.filter((s) => s.key === "apps")[0]);
+  ok(!up0.own || !up0.value || !up0.value.length, "all taken off: back to any app: " + JSON.stringify(up0));
   // the widgets taken off the design leave every screen
   await newDesign(tv, without, "&ontv=1");
   const v = await phoneView(tv);
@@ -407,6 +444,18 @@ const tv = TV = await tvPage(design, "&ontv=1");
   // Hold OK on a widget that stayed: it is its own, never one that left
   const m = await holdOn(tv, "okeeprow");
   ok(m.args.indexOf("okeeprow|keeprow") >= 0 && !m.args.some((a) => /odock|ostack|okeep\|/.test(a || "")), "Hold OK offers only the widget there: " + m.args.join(","));
+  // a stack whose turn Studio set at the top (o.turn, Studio's Turns), showing a widget with nothing to set
+  const bares = await tv.evaluate(() => ["date", "analog", "moon", "sun", "month"].filter((k) => !window.CouchWidgetCaps.settings(k).some((s) => s && s.pre === true && (!Array.isArray(s.where) || s.where.indexOf("tv") >= 0 || s.where.indexOf("phone") >= 0))));
+  const bare = bares.length >= 2 ? bares[0] : "";
+  await newDesign(tv, { v: 1, background: { colour: "#1d3a4f" }, elements: design.elements, objects: [{ id: "ostack", type: "widget", kind: "stack", x: 40, y: 40, w: 600, h: 300, turn: 60, items: bare ? [{ kind: bares[0] }, { kind: bares[1] }] : [{ kind: "clock" }, { kind: "date" }] }] }, "&ontv=1");
+  const sv = (await phoneView(tv)).widgets.filter((x) => x.key === "ostack|stack")[0];
+  const tset = sv && sv.settings.filter((s) => s.key === "turn")[0];
+  ok(tset && String(tset.value) === "60" && tset.words === "Every minute", "a stack turned by Studio's Turns (top level 60) shows Every minute: " + JSON.stringify(tset));
+  if (bare) {
+    const ms = await holdOn(tv, "ostack");
+    ok(ms.items.indexOf("Edit the stack on the TV") > 0 && ms.items.indexOf("Edit on the TV") < 0, "Hold OK on a stack of " + bares.slice(0, 2).join(" and ") + ": Edit the stack on the TV only (" + ms.items.join(", ") + ")");
+    ok(ms.note === "Nothing to set for the widget showing now.", "and the note says the widget showing has nothing to set: " + ms.note);
+  } else console.log("  (every widget has a setting now: the stack note check has no widget to show)");
   // then every one of the 14 taken off (only a clock left): each leaves every screen
   await newDesign(tv, { v: 1, background: { colour: "#1d3a4f" }, elements: design.elements, objects: [{ id: "oclock", type: "widget", kind: "clock", x: 40, y: 40, w: 400, h: 200 }] }, "&ontv=1");
   const v2 = await phoneView(tv);

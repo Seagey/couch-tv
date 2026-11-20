@@ -1507,7 +1507,10 @@
         var key = e.id + "|" + e.it.kind;
         if (!e.it.kind || seen[key]) return;
         seen[key] = 1;
-        out.push({ key: key, id: e.id, kind: e.it.kind, label: obj(e.it.opts).label || "", opts: JSON.parse(JSON.stringify(obj(e.it.opts))), x: +o.x || 0, y: +o.y || 0, w: +o.w || 0, h: +o.h || 0 });
+        var x = JSON.parse(JSON.stringify(obj(e.it.opts)));
+        // Studio's own Turns control keeps the stack's turn at the top (o.turn), the way the TV reads it
+        if (e.it.kind === "stack" && x.turn === undefined && e.it.turn !== undefined) x.turn = e.it.turn;
+        out.push({ key: key, id: e.id, kind: e.it.kind, label: obj(e.it.opts).label || "", opts: x, x: +o.x || 0, y: +o.y || 0, w: +o.w || 0, h: +o.h || 0 });
       });
     });
     return out;
@@ -2559,7 +2562,11 @@
       }
       // a smart stack: its own settings (when it moves on) after the widget showing in it
       if (pid && !DESIGNER && Caps && Caps.settings && wid !== pid && widgetList().some(function (x) { return x.id === pid && x.kind === "stack"; }) &&
-        Caps.settings("stack").some(function (s) { return s && s.pre === true; })) nodes.splice(nodes.indexOf(nodes.filter(function (n) { return n.getAttribute("data-act") === "gear"; })[0]) + 1 + (mine ? eds2.length : 0), 0, mk("Edit the stack on the TV", "wset", pid + "|stack"));
+        Caps.settings("stack").some(function (s) { return s && s.pre === true; })) {
+        nodes.splice(nodes.indexOf(nodes.filter(function (n) { return n.getAttribute("data-act") === "gear"; })[0]) + 1 + (mine ? eds2.length : 0), 0, mk("Edit the stack on the TV", "wset", pid + "|stack"));
+        // the stack itself has something to set: only the widget showing now has nothing
+        if (!mine) note = "Nothing to set for the widget showing now.";
+      }
       openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes, note: note }, "Back to close. Settings here is Couch TV's own: the remote's Settings button opens the TV's menu.");
     }
     // Edit on your phone: a QR code with the phone's Home settings page, the pairing code and this widget

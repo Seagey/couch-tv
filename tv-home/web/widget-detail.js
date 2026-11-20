@@ -932,7 +932,8 @@
   B.picks = function (o, env) {
     var list = wk().picksFor ? wk().picksFor(o, env) : wk().picksOf ? wk().picksOf(env) : [];
     if (!list.length) return B.setup(o, env);
-    S.body.appendChild(head("favourite", op(o).label || "Picks for you", "From what everyone at home is watching on this TV", "#bf5af2"));
+    var mix = kit().setting ? kit().setting(o, env, "mix") : null;
+    S.body.appendChild(head("favourite", op(o).label || "Picks for you", mix === "mine" ? "Shows you left part way" : mix === "others" ? "What others at home are watching" : "From what everyone at home is watching on this TV", "#bf5af2"));
     var track = E("div", "cwd-track");
     list.forEach(function (s, i) {
       track.appendChild(F(E("div", "cwd-show", "", [E("div", "cwd-art", s.art ? "background-image:" + kit().cssImg(s.art) : "", [s.progress ? E("div", "cwd-prog", "", [E("b", "", "width:" + Math.round(s.progress * 100) + "%")]) : null,

@@ -51,6 +51,19 @@ Branch ws2-watching off integrate-0.13.9 (4a705fe). No push, tag or version bump
 - test_ws2_watching.mjs extended: all 14 kinds taken off the design (only a clock left) leave the phone's list,
   Home settings Widgets on this home, the phone page, Hold OK and the home. Rerun 21 Nov 05:55 under the lock: 216 pass.
 
+## Checker GO at b6a0a1b, then five fixes (21 Nov)
+1. TD tools/tv-designer/app/designer.js HAND_KEYS gets "turn" (backup: scratchpad/td-backup-ws2-watching/app/designer.js),
+   so Studio draws only its own Turns control. Check: node scratchpad/ws2-watching-handkeys.cjs <designer.js> <widget-caps.js>
+   OK 3 (the backup fails it, as it should).
+2. design.js widgetList: a stack's top level o.turn reaches its settings (phone shows Every minute for 60).
+3. widget-detail.js Picks full screen subtitle follows Picks from (mine, others, everyone).
+4. design.js Hold OK on a stack showing a widget with nothing to set: note "Nothing to set for the widget showing now."
+5. setup.html (generic): a many choice setting with max takes no more ticks (Pick up to N., the rest disabled);
+   widgets.js R.upnext uses at most the caps max (6) apps.
+These screens' words are English only (design.js notes, widget-detail, setup.html have no language blocks).
+Tests: test_ws2_watching 230 pass; test_ws_tv 1115 OK; test_widget_detail_browser 296 OK; test_ws_schema 4430;
+test_widget_caps 4548; all 61 node files pass.
+
 ## Next steps
 None in scope. Branch is ready to merge.
 Nothing runs on the MacBook or an emulator.

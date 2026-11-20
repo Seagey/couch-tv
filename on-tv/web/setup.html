@@ -635,10 +635,13 @@
         '<p>Only the name you type goes to Open-Meteo, the free weather service the TV already uses. The TV keeps the place, never a street.</p>';
     }
     if ((s.type === 'choice' || s.type === 'tvlist') && s.many) {
-      var picked = (Array.isArray(s.value) ? s.value : []).map(String);
-      return '<fieldset style="border:0;padding:0;margin:12px 0 0"><legend class="now">' + esc(s.label) + '</legend>' + (s.options.length ? s.options.map(function (o, i) {
-        return '<label class="check"><input type="checkbox" data-wmany="' + i + '"' + data + (picked.indexOf(String(o[0])) >= 0 ? ' checked' : '') + '> ' + esc(String(o[1])) + '</label>';
-      }).join('') : '<p>Nothing to pick on this TV yet.</p>') + '</fieldset>' + help + back;
+      var picked = (Array.isArray(s.value) ? s.value : []).map(String), most = isFinite(s.max) && +s.max > 0 ? +s.max : 0;
+      // a setting with a most (Up next: 6 apps) takes no more ticks than that
+      var full = most && s.options.filter(function (o) { return picked.indexOf(String(o[0])) >= 0; }).length >= most;
+      return '<fieldset style="border:0;padding:0;margin:12px 0 0"' + (most ? ' data-wmost="' + most + '"' : '') + '><legend class="now">' + esc(s.label) + '</legend>' + (s.options.length ? s.options.map(function (o, i) {
+        var on = picked.indexOf(String(o[0])) >= 0;
+        return '<label class="check"><input type="checkbox" data-wmany="' + i + '"' + data + (on ? ' checked' : full ? ' disabled' : '') + '> ' + esc(String(o[1])) + '</label>';
+      }).join('') + (most ? '<p class="wmost">Pick up to ' + most + '.</p>' : '') : '<p>Nothing to pick on this TV yet.</p>') + '</fieldset>' + help + back;
     }
     if (s.type === 'choice' || s.type === 'tvlist') {
       if (!s.options.length) return '<p>' + esc(s.label) + ': nothing to pick on this TV yet.</p>' + help;
@@ -695,8 +698,12 @@
     if (t.hasAttribute('data-wpick')) { var s = wsSetting(key, k), o = s && s.options.filter(function (x) { return String(x[0]) === t.value; })[0]; if (o) wsSend(key, k, o[0]); }
     else if (t.hasAttribute('data-wtog')) wsSend(key, k, t.checked);
     else if (t.hasAttribute('data-wmany')) {
-      var sm = wsSetting(key, k), list = Array.prototype.filter.call(t.closest('fieldset').querySelectorAll('input[data-wmany]'), function (c) { return c.checked; })
+      var fs = t.closest('fieldset'), most = +fs.getAttribute('data-wmost') || 0, boxes = Array.prototype.slice.call(fs.querySelectorAll('input[data-wmany]'));
+      if (most && t.checked && boxes.filter(function (c) { return c.checked; }).length > most) t.checked = false;
+      if (most) { var n = boxes.filter(function (c) { return c.checked; }).length; boxes.forEach(function (c) { c.disabled = !c.checked && n >= most; }); }
+      var sm = wsSetting(key, k), list = boxes.filter(function (c) { return c.checked; })
         .map(function (c) { return sm.options[+c.getAttribute('data-wmany')][0]; });
+      if (most) list = list.slice(0, most);
       wsSend(key, k, list.length ? list : null);
     }
   });

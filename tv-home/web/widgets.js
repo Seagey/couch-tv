@@ -1126,9 +1126,14 @@
     SPORT_APPS.forEach(function (p) { if (have.indexOf(p) >= 0 && names.length < 3) names.push(APPS[p] || p); });
     return names.length ? names.slice(0, -1).join(", ") + (names.length > 1 ? " or " : "") + names[names.length - 1] : "";
   }
+  // Only from these apps holds at most its setting's max (6), however it was saved
+  function upnextMost() {
+    var C = window.CouchWidgetCaps, s = C && C.settings ? C.settings("upnext").filter(function (x) { return x && x.key === "apps"; })[0] : null;
+    return s && isFinite(s.max) ? +s.max : 6;
+  }
   R.upnext = function (root, o, b, env) {
     var only = setting(o, env, "apps"), sport = upnextSport(o, env);
-    only = Object.prototype.toString.call(only) === "[object Array]" ? only.filter(function (k) { return typeof k === "string"; }) : [];
+    only = Object.prototype.toString.call(only) === "[object Array]" ? only.filter(function (k) { return typeof k === "string"; }).slice(0, upnextMost()) : [];
     var want = only.length ? only : sport ? SPORT_APPS : null;
     // each show keeps its place in Keep watching: Resume opens that one (app.js "show" is its index)
     var list = shows(env).map(function (x, i) { x.i = i; return x; });
