@@ -53,6 +53,7 @@ import plex
 import smarthome
 import bookings
 import direct
+import matter
 import say
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -2999,6 +3000,81 @@ async def h_ha_forget(request):
     return ok(result=HA.forget())
 
 
+# ---------- Matter devices shared from Google Home, Apple Home, SmartThings or Alexa (bridge/matter.py, docs/MATTER.md)
+matter_clients = set()
+
+
+def _matter_event():
+    return "event: matter\ndata: " + json.dumps({"ok": True, **MATTER.answer()}) + "\n\n"
+
+
+def push_matter(_devices=None):
+    """Every TV page this computer serves gets the new device list at once ("event: matter"), on
+    /api/matter/events (the same as the on-TV app's) and on /api/events."""
+    payload = _matter_event()
+    for q in [e[0] for e in list(events_clients)] + list(matter_clients):
+        if q.qsize() < 20:
+            q.put_nowait(payload)
+
+
+MATTER = matter.Matter(config.DATA, config.CONFIG.get("matter"), on_change=push_matter)
+
+
+@tv_or_paired
+async def h_matter_devices(request):
+    return ok(**MATTER.answer())
+
+
+@tv_or_paired
+async def h_matter_events(request):
+    headers = {"Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    origin = request.headers.get("Origin")
+    if origin and is_allowed_origin(request, origin):
+        headers.update({"Access-Control-Allow-Origin": origin, "Vary": "Origin"})
+    resp = web.StreamResponse(headers=headers)
+    await resp.prepare(request)
+    q = asyncio.Queue()
+    matter_clients.add(q)
+    try:
+        await resp.write(_matter_event().encode())
+        while True:
+            try:
+                msg = await asyncio.wait_for(q.get(), timeout=20)
+            except asyncio.TimeoutError:
+                msg = ": keepalive\n\n"
+            await resp.write(msg.encode())
+    except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, asyncio.CancelledError):
+        pass
+    finally:
+        matter_clients.discard(q)
+    return resp
+
+
+@tv_or_paired
+async def h_matter_commission(request):
+    data = await body(request)
+    r = await MATTER.commission(data.get("code"), data.get("address"))
+    return web.json_response(r, status=200 if r.get("ok") else 400)
+
+
+@tv_or_paired
+async def h_matter_command(request):
+    data = await body(request)
+    return web.json_response(await MATTER.command(data.get("id"), data.get("action"), data.get("value")))
+
+
+@tv_or_paired
+async def h_matter_remove(request):
+    data = await body(request)
+    return web.json_response(await MATTER.remove(data.get("id")))
+
+
+@tv_or_paired
+async def h_matter_rename(request):
+    data = await body(request)
+    return web.json_response(MATTER.rename(data.get("id"), data.get("name")))
+
+
 async def h_sleep_get(request):
     return ok(ends=sleep["ends"])
 
@@ -5265,6 +5341,12 @@ def make_app():
     r.add_post("/api/ha/save", h_ha_save)
     r.add_post("/api/ha/forget", h_ha_forget)
     r.add_post("/api/ha/direct", h_direct)
+    r.add_get("/api/matter/devices", h_matter_devices)
+    r.add_get("/api/matter/events", h_matter_events)
+    r.add_post("/api/matter/commission", h_matter_commission)
+    r.add_post("/api/matter/command", h_matter_command)
+    r.add_post("/api/matter/remove", h_matter_remove)
+    r.add_post("/api/matter/rename", h_matter_rename)
     r.add_get("/api/settings", h_settings_get)
     r.add_post("/api/settings", h_settings_set)
     r.add_get("/api/continue", h_continue)
@@ -5323,8 +5405,10 @@ def make_app():
             if t.paired:
                 app["loops"] += [for_tv(tv_id, keep_disabled_loop), for_tv(tv_id, media_watch_loop)]
         app["bonjour"] = await advertise_for_appletv()
+        await MATTER.start()
 
     async def on_cleanup(_):
+        await MATTER.stop()
         if finder._session and not finder._session.closed:
             await finder._session.close()
         if app.get("bonjour"):
