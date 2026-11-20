@@ -407,6 +407,11 @@ class HomeActivity : Activity() {
             return runCatching { JSONObject(v) }.getOrNull()
         }
 
+        /** A phone signed in to Home Assistant, saved its ticks or disconnected (app.couchtv.ha.HaPhone): the home reads smart home again. */
+        fun smartChanged() {
+            refresher.post { shown?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }?.js("window.smartHome && smartHome.phoneChanged && smartHome.phoneChanged()") }
+        }
+
         /** What onNewIntent does, for when the home came back without a new intent (FireHome.bringForward). */
         fun home() {
             refresher.post { shown?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }?.js("window.tv && tv.home()") }

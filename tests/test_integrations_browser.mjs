@@ -121,12 +121,40 @@ console.log("Running integrations browser tests...");
   ok(saved && saved.controls[0].entity === "light.lounge" && saved.climate[0].entity === "climate.lounge", "the ticks are kept the way the launcher reads them");
   ok(saved && !("token" in saved) && !("url" in saved), "the page never sends the token twice: the launcher holds it");
   ok(await page.evaluate(() => window.smartHome.enabled() && window.smartHome.available()), "smart home is on, the Smart home screen too");
-  ok(await toRow(/Add a device we don't list/), "the guide for other devices"); await press(page, "Enter", 300);
+  // the long guide moved to the phone page (ha-phone.html); the TV keeps one line
   const more = await rowsText();
-  ["Tuya", "Google Home", "Apple Home", "Matter", "Alexa", "AirTouch 5", "MQTT"].forEach((w) => ok(more.indexOf(w) >= 0, "the guide covers " + w));
+  ok(/A device we don't list/.test(more) && /home-assistant\.io\/integrations/.test(more), "one line for devices we don't list");
+  ok(!/Tuya/.test(more), "the long guide is not on the TV");
   const kept = await page.evaluate(() => { const o = []; for (let i = 0; i < localStorage.length; i++) o.push(localStorage.getItem(localStorage.key(i))); return o.join(" ") + location.href; });
   ok(kept.indexOf("test-token-for-the-preview-only") < 0, "the token is in no storage of the page and not in the address");
   ok(seen.every((u) => u.indexOf("test-token") < 0), "and never went to a server");
+  ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
+  await page.close();
+}
+
+// 3. smart home set up from a phone (the launcher's HaPage.phone): one QR code and one short line
+{
+  const page = await home("&hasetup=phone", [["controls", { label: "Lights" }]]);
+  await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await press(page, "Enter", 400);
+  for (let i = 0; i < 14 && !(await page.evaluate(() => /Designs/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press(page, "ArrowDown");
+  await press(page, "ArrowRight");
+  const toRow = async (re) => { for (let i = 0; i < 60; i++) { const t = await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || ""); if (re.test(t)) return true; await press(page, "ArrowDown", 100); } return false; };
+  ok(await toRow(/^Smart home/), "Home settings, Designs has Smart home");
+  ok(/Connect Home Assistant from your phone/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent)), "its row says it is done from a phone");
+  await press(page, "Enter", 800);
+  const shot = () => page.evaluate(() => ({ qr: document.querySelectorAll("#set-rows .sqr").length, svg: !!document.querySelector("#set-rows .sqr svg"),
+    line: ((document.querySelector("#set-rows .sqr b") || {}).textContent || ""), rows: document.querySelectorAll("#set-rows .srow").length, text: document.getElementById("set-rows").textContent }));
+  let s1 = await shot();
+  ok(s1.qr === 1 && s1.svg, "one QR code, drawn in the page");
+  ok(s1.line === "Scan with your phone to connect your home.", "one short line: " + s1.line);
+  ok(s1.rows <= 1 && !/token|key|Tuya|Paste/i.test(s1.text), "nothing else to do on the TV (" + s1.rows + " row: Hue or AirTouch)");
+  await page.screenshot({ path: path.join(process.env.SHOTS || "/tmp", "tv-smart-home-qr.png") });
+  await page.evaluate(() => window.MOCK_HA_PHONE_SIGN_IN());
+  await page.waitForTimeout(3600);
+  s1 = await shot();
+  ok(/Connected to homeassistant\.local/.test(s1.line), "the phone signed in: the TV says so by itself (" + s1.line + ")");
+  ok(/Disconnect/.test(s1.text), "and offers Disconnect");
+  ok(await page.evaluate(() => window.smartHome.enabled()), "smart home is on: the widgets read it again");
   ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
   await page.close();
 }

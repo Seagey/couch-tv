@@ -51,6 +51,7 @@ import spotify_now
 import webdata
 import plex
 import smarthome
+import haphone
 import bookings
 import direct
 import say
@@ -2970,7 +2971,18 @@ async def h_stay_names(request):
 
 
 async def h_ha_info(request):
-    return ok(info=HA.info(), status=HA.status())
+    # phone: this bridge serves the phone page that sets smart home up (bridge/haphone.py, /ha)
+    return ok(info=HA.info(), status=dict(HA.status(), phone=True))
+
+
+# Smart home set up from a phone: the TV shows a QR code for /ha (bridge/haphone.py). One entry URL,
+# /ha/?k=<key>, which another page (a phone Home settings page) may link to through /api/ha/phone.
+HA_PHONE = haphone.Phone(HA, LAUNCHER_DIR, PORT, lan_ipv4)
+
+
+@tv_or_paired
+async def h_ha_phone(request):
+    return ok(result=HA_PHONE.start())
 
 
 @tv_or_paired
@@ -2996,7 +3008,8 @@ async def h_ha_save(request):
 
 @tv_or_paired
 async def h_ha_forget(request):
-    return ok(result=HA.forget())
+    HA_PHONE.stop()
+    return ok(result=await HA.disconnect())
 
 
 async def h_sleep_get(request):
@@ -5264,6 +5277,8 @@ def make_app():
     r.add_post("/api/ha/check", h_ha_check)
     r.add_post("/api/ha/save", h_ha_save)
     r.add_post("/api/ha/forget", h_ha_forget)
+    r.add_post("/api/ha/phone", h_ha_phone)
+    HA_PHONE.routes(r)
     r.add_post("/api/ha/direct", h_direct)
     r.add_get("/api/settings", h_settings_get)
     r.add_post("/api/settings", h_settings_set)

@@ -410,6 +410,8 @@
   // (bridge/smarthome.py, /api/ha): the same asks, the same allow lists, and the token stays on that
   // computer (bridge/data/), never in the page. app.js calls useBridge(api) when it runs from a bridge.
   var BRIDGE = null, BINFO = "{}", BSTATUS = '{"set":false}';
+  // the on-TV app's server says it serves the phone page (status.phone); a computer's bridge does not
+  var BRIDGE_PHONE = false;
   // a Google TV or Android TV with a computer at home: only the computer's own Hue and AirTouch
   function useDirect(api) {
     if (!window.TVHA || DIRECT || typeof api !== "function") return;
@@ -433,7 +435,8 @@
       setupStatus: function () { return BSTATUS; },
       setupCheck: function (id, url, token) { post("/api/ha/check", { url: url, token: token }, id, setupReply); },
       setupSave: function (id, picks) { var p = null; try { p = JSON.parse(picks); } catch (e) {} post("/api/ha/save", { picks: p }, id, function (i, r) { bridgeInfo(); setupReply(i, r); }); },
-      setupForget: function (id) { post("/api/ha/forget", {}, id, function (i, r) { bridgeInfo(); setupReply(i, r); }); }
+      setupForget: function (id) { post("/api/ha/forget", {}, id, function (i, r) { bridgeInfo(); setupReply(i, r); }); },
+      phone: function (id) { post("/api/ha/phone", {}, id, setupReply); }
     };
     BRIDGE.api = api;
     bridgeInfo();
@@ -443,6 +446,7 @@
     BRIDGE.api("GET", "/api/ha/info", null, 15000).then(function (r) {
       if (!r || typeof r !== "object") return;
       BINFO = JSON.stringify(r.info || {}); BSTATUS = JSON.stringify(r.status || { set: false });
+      BRIDGE_PHONE = !!(r.status && r.status.phone);
       reload();
     }, function () {});
   }
@@ -471,13 +475,26 @@
     // checks an address and token; an empty token checks again with the one kept on the TV
     check: function (url, token) { return setupAsk(function (id) { native().setupCheck(id, String(url || ""), String(token || "")); }); },
     save: function (picks) { return setupAsk(function (id) { native().setupSave(id, JSON.stringify(picks || {})); }).then(function (r) { if (r.ok) reload(); return r; }); },
-    forget: function () { return setupAsk(function (id) { native().setupForget(id); }).then(function (r) { reload(); return r; }); }
+    forget: function () { return setupAsk(function (id) { native().setupForget(id); }).then(function (r) { reload(); return r; }); },
+    // set up from a phone (HaPhone.kt): the launcher, or the on-TV app's server. A computer's bridge
+    // does not serve the phone page, so there the TV keeps its own screens.
+    canPhone: function () { var n = native(); return !!(n && n.phone) && (n !== BRIDGE || BRIDGE_PHONE); },
+    // { ok, url, seen, set, host, count }: the address for the QR code and what is kept now. Asking
+    // again while the screen is open keeps the same address.
+    phone: function () { return setupAsk(function (id) { native().phone(id); }); }
   };
+  // a phone signed in, saved or disconnected: read what is set up again, and tell the open screen
+  var phoneWatchers = [];
+  function phoneChanged() {
+    if (BRIDGE) bridgeInfo(); else reload();
+    phoneWatchers.forEach(function (f) { try { f(); } catch (e) {} });
+  }
 
   window.smartHome = {
     // Hue or AirTouch was set up on the home computer from this TV: read its list again
     rebridge: function (api) { if (window.TVHA) { DIRECT = null; reload(); useDirect(api); } else bridgeInfo(); },
     useBridge: useBridge, setup: setup, setupReply: setupReply, reload: reload,
+    phoneChanged: phoneChanged, onPhone: function (f) { if (typeof f === "function" && phoneWatchers.indexOf(f) < 0) phoneWatchers.push(f); },
     enabled: enabled, live: live, still: still, stillOk: stillOk,
     available: available, open: open, close: close, move: move, ok: ok, paint: paint, reply: reply,
     isOpen: function () { return S.open; }, icon: ICONS.home,

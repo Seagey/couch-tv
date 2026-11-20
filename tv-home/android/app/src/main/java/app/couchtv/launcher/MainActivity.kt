@@ -51,6 +51,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import app.couchtv.ha.HaPhone
+import app.couchtv.ha.HomeAssistant
 
 /**
  * The TV home screen. Shows the page the bridge serves at /tv/ full screen. If the bridge cannot be
@@ -131,6 +133,10 @@ class MainActivity : Activity() {
             root.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         } else setContentView(root)
         hideSystemBars()
+        // smart home (app.couchtv.ha): a new or removed doorbell restarts its watch; a phone that signed
+        // in or saved (HaPhone.kt) makes the page read what is set up again, at once
+        HomeAssistant.changed = { c -> Doorbell.start(c) }
+        HaPhone.onChange = { main.post { js("window.smartHome && smartHome.reload && smartHome.reload(); window.smartHome && smartHome.phoneChanged && smartHome.phoneChanged()") } }
         intent?.let { readExtras(it) }
         io.execute { warmApps() }
         // An app installed, removed or renamed (or the TV's language changed): the list is read again,
@@ -422,7 +428,7 @@ class MainActivity : Activity() {
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.textZoom = 100
         addJavascriptInterface(Native(), "TVOS")
-        addJavascriptInterface(HomeAssistant.Page(this@MainActivity, this), "TVHA")   // smart home, see HomeAssistant.kt
+        addJavascriptInterface(HaPage(this@MainActivity, this), "TVHA")   // smart home, see HaPage.kt
         addJavascriptInterface(Updater.Page(this@MainActivity, this), "TVUP")   // updates from GitHub releases, see Updater.kt
         webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {
