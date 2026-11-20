@@ -257,7 +257,18 @@
     if (w.ahead) { x.ahead = cp(w.ahead); x.ahead.hi = fOf(w.ahead.hi); x.ahead.lo = fOf(w.ahead.lo); }
     return x;
   }
+  // the forecast as Open-Meteo gives it (Celsius, unrounded) in °F, so each number is rounded once
+  function rawF(w) {
+    var c = function (v) { return v === undefined || v === null || !isFinite(v) ? v : v * 9 / 5 + 32; };
+    var cp = function (a) { var y = {}; for (var j in a) if (Object.prototype.hasOwnProperty.call(a, j)) y[j] = a[j]; return y; };
+    var x = cp(w);
+    x.temp = c(w.temp); x.hi = c(w.hi); x.lo = c(w.lo);
+    if (w.hourly) x.hourly = w.hourly.map(function (h) { var y = cp(h); y.temp = c(h.temp); return y; });
+    if (w.daily) x.daily = w.daily.map(function (d) { var y = cp(d); y.lo = c(d.lo); y.hi = c(d.hi); return y; });
+    return x;
+  }
   // the temperature in Celsius, whatever unit it is drawn in (the colour of the day goes by it)
+  function rnd(v) { return v === undefined || v === null || !isFinite(v) ? v : Math.round(v); }
   function tempC(w) { return w && w.tempC !== undefined ? w.tempC : w ? w.temp : null; }
   // where a weather, sun, air or surf widget reads: a place picked for this widget on this TV
   // (its own forecast, app.js data().wxAt["<lat>,<lon>"] or data().wxBy["<object id>"]), else the home's town
@@ -277,7 +288,9 @@
     }
     var src = wxSrc(o, env), w = src.w, d = { place: src.place };
     if (dataOf(env).wxOff || !w || w.temp === undefined || w.temp === null) return null;
-    var out = { place: (src.place && src.place.name) || "", picked: src.picked, temp: Math.round(w.temp), code: w.code, is_day: dayNow(w, d), hi: w.hi, lo: w.lo, uv: w.uv, aqi: w.aqi };
+    var cNow = Math.round(w.temp);
+    if (unitF(env)) w = rawF(w);
+    var out = { place: (src.place && src.place.name) || "", picked: src.picked, temp: Math.round(w.temp), code: w.code, is_day: dayNow(w, d), hi: rnd(w.hi), lo: rnd(w.lo), uv: w.uv, aqi: w.aqi };
     // each hour is night or day by that day's own sunrise and sunset when the forecast has them
     var sunOf = {};
     (w.daily || []).forEach(function (x) { if (x && x.date) sunOf[x.date] = [new Date(x.sunrise), new Date(x.sunset)]; });
@@ -303,7 +316,8 @@
       out.rainFrom = first < 0 ? "" : hm(Date.now() + first * 900000);
       out.rainMax = Math.max.apply(null, w.rain15);
     }
-    return inUnit(out, env);
+    if (unitF(env)) { out.unit = "f"; out.tempC = cNow; }
+    return out;
   }
 
   var SHOWS = [["Bluey", "S3 E4, Hammerbarn", "au.net.abc.iview", "scene-golden", 0.6], ["Fisk", "S2 E1", "au.net.abc.iview", "albury-storm", 0.3],
@@ -511,14 +525,16 @@
   // which TV settings a renderer reads in place of the design's opts, and the shape each must have
   // (they come from Home settings on this TV, still checked: a css value is never taken from them)
   var TV_KEYS = { entity: "id", cam: "id", reading: "id", feed: "id", league: "id", sport: "id", format: "id", unit: "id", dfmt: "id", fit: "id",
-    label: "word", team: "word", list: "word", image: "url",
+    label: "word", team: "word", list: "word",
     players: "ids", switches: "ids", tickers: "ids", cities: "ids", apps: "ids",
-    arrive_h: "num", arrive_m: "num", buffer: "num", day: "num", month: "num", year: "num", count: "num", shows: "num", seconds_each: "num", anchor: "num", weekday: "day",
+    arrive_h: "num", arrive_m: "num", buffer: "num", day: "mday", month: "month", year: "num", count: "num", shows: "num", seconds_each: "num", anchor: "num", weekday: "day",
     weekdays: "bool", hilo: "bool", seconds: "bool", date: "bool", ampm: "bool", place: "bool", alt: "bool", thisweek: "id", bin_a: "word", bin_b: "word", photo: "url" };
   var PLACE_KEYS = ["place", "town", "to", "from"];
   function tvVal(type, v) {
     if (type === "num") { v = +v; return isFinite(v) ? v : undefined; }
     if (type === "bool") return typeof v === "boolean" ? v : undefined;
+    if (type === "month") { v = +v; return isFinite(v) && v >= 1 && v <= 12 ? Math.round(v) : undefined; }
+    if (type === "mday") { v = +v; return isFinite(v) && v >= 1 && v <= 31 ? Math.round(v) : undefined; }
     if (type === "day") return v === "none" ? v : isFinite(v) && +v >= 0 && +v <= 6 ? +v : undefined;
     if (type === "ids") return Object.prototype.toString.call(v) === "[object Array]" ? v.filter(function (x) { return typeof x === "string" && x.length <= 120; }).slice(0, 16) : undefined;
     if (type === "id") return typeof v === "string" && v.length <= 120 ? v : typeof v === "boolean" ? v : undefined;
@@ -527,22 +543,37 @@
     return undefined;
   }
   // a place picked on this TV ({ name, lat, lon, timezone }), never one from a design
-  function placeVal(p) { return p && typeof p === "object" && isFinite(p.lat) && isFinite(p.lon) && p.lat !== null && p.lon !== null ? { name: String(p.name || "").slice(0, 60), lat: +p.lat, lon: +p.lon, timezone: typeof p.timezone === "string" ? p.timezone : "" } : null; }
+  function coord(v) { return typeof v === "number" ? isFinite(v) : typeof v === "string" && v.trim() !== "" && isFinite(+v); }
+  function placeVal(p) {
+    if (!p || typeof p !== "object" || !coord(p.lat) || !coord(p.lon) || (p.name !== undefined && typeof p.name !== "string")) return null;
+    return { name: (p.name || "").slice(0, 60), lat: +p.lat, lon: +p.lon, timezone: typeof p.timezone === "string" ? p.timezone : "" };
+  }
   // the widget as it is on this TV: its design, with what was set for it on this TV over its opts.
   // o.__tv keeps what came from the TV (checked), o.__design the design's own opts
   function withSettings(o, env) {
-    var ws = wsetOf(o, env);
-    if (!ws || !o) return o;
-    var x = {}, k;
+    var ws = wsetOf(o, env), x = {}, k;
+    if (!o) return o;
+    if (!ws) {
+      // nothing set on this TV: the design as it is (a widget drawn again keeps no old TV values)
+      if (!o.__tv && !o.__design) return o;
+      for (k in o) if (Object.prototype.hasOwnProperty.call(o, k) && k !== "__tv" && k !== "__design") x[k] = o[k];
+      if (o.__design) x.opts = o.__design;
+      return x;
+    }
     for (k in o) if (Object.prototype.hasOwnProperty.call(o, k)) x[k] = o[k];
-    var opts = {}, src = o.opts || {}, tv = {};
+    var opts = {}, src = o.__design || o.opts || {}, tv = {};
     for (k in src) if (Object.prototype.hasOwnProperty.call(src, k)) opts[k] = src[k];
     for (k in ws) {
       if (!Object.prototype.hasOwnProperty.call(ws, k)) continue;
+      if (ws[k] === null || ws[k] === undefined || ws[k] === "") continue;
       if (PLACE_KEYS.indexOf(k) >= 0 && placeVal(ws[k])) { tv[k] = placeVal(ws[k]); continue; }
       if (!TV_KEYS[k] || (k === "apps" && APP_KINDS.indexOf(o.kind) >= 0)) continue;   // an app container's apps: Hold OK's own edits (env.edits)
       var v = tvVal(TV_KEYS[k], ws[k]);
-      if (v === undefined) continue;
+      if (v === undefined) {
+        // a number set back to its word default on this TV ("every" year, arrive by "off"): the design's number goes too
+        if (TV_KEYS[k] === "num" && /^(auto|every|off|none)$/.test(String(ws[k]))) { delete opts[k]; tv[k] = ws[k]; }
+        continue;
+      }
       tv[k] = v; opts[k] = v;
     }
     x.opts = opts; x.__tv = tv; x.__design = src;
@@ -654,7 +685,8 @@
   R.worldclock = function (root, o, b) {
     // the TV's own time zone is called by its own town (the place set for the weather), not the zone's city
     var here = ""; try { here = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
-    var cities = (op(o).cities && op(o).cities.length ? op(o).cities : homeCities(here, 4)).slice(0, b.w > b.h * 1.6 ? 4 : Math.max(2, Math.floor((b.h - 90) / 90)));
+    var own = (Object.prototype.toString.call(op(o).cities) === "[object Array]" ? op(o).cities : []).filter(function (tz) { return typeof tz === "string" && !!tzTime(tz); });
+    var cities = (own.length ? own : homeCities(here, 4)).slice(0, b.w > b.h * 1.6 ? 4 : Math.max(2, Math.floor((b.h - 90) / 90)));
     var town = (dataOf(arguments[3] || {}).place || {}).name || "";
     var name = function (tz) { return tz === here && town ? town : CITY[tz] || tz.split("/").pop().replace(/_/g, " "); };
     if (b.w > b.h * 1.6) {
@@ -686,7 +718,7 @@
     var q = op(o), month = +q.month || 12, day = +q.day || 25, yr = q.year === undefined || q.year === "every" ? NaN : +q.year, n = daysTo(month, day, yr), unit = q.unit || "sleeps";
     var label = q.label || (month === 12 && day === 25 ? "Christmas" : "The big day");
     // a starter name kept after the date changed: the date itself, never "Christmas" over 3 March
-    if (STARTER_DAYS[String(label).toLowerCase()] && STARTER_DAYS[String(label).toLowerCase()] !== month + "/" + day) label = day + " " + MONTHS[month - 1];
+    if ((tvSet(o, null, "day") !== undefined || tvSet(o, null, "month") !== undefined) && tvSet(o, null, "label") === undefined && STARTER_DAYS[String(label).toLowerCase()] && STARTER_DAYS[String(label).toLowerCase()] !== month + "/" + day) label = day + " " + MONTHS[month - 1];
     var num = unit === "weeks" ? Math.round(n / 7) : n;
     var gone = n < 0;
     if (gone) n = -n;
@@ -1350,6 +1382,7 @@
   // Speakers: each Home Assistant speaker (media_player.* named in config.json) and its volume
   function speakersOf(env, o) {
     var ha = haOf(env), want = setting(o, env, "players");
+    if (Object.prototype.toString.call(want) !== "[object Array]") want = null;
     if (!ha.speakers) return ha.speakers;
     var l = ha.speakers.filter(function (s) { return s && s.entity; });
     if (want && want.length) l = want.map(function (e) { return l.filter(function (s) { return s.entity === e; })[0]; }).filter(Boolean);
@@ -1391,8 +1424,8 @@
   function noHa(root, b, iconName, kind) { return soon(root, b, iconName || "home", kind || "aircon"); }
   function dial(s, set, cur, r, env) {
     // the arc goes by Celsius (16 to 30); the numbers are drawn in the home's unit
-    var setC = r && roomUnit(r) === "f" ? (set - 32) * 5 / 9 : set, frac = clamp((setC - 16) / 14, 0, 1);
-    if (r) { set = tconv(set, r, env); if (cur !== null && cur !== undefined) cur = Math.round(tconv(cur, r, env) * 10) / 10; }
+    var setC = r && (roomUnit(r) === "f" || (!roomUnit(r) && set > 50)) ? (set - 32) * 5 / 9 : set, frac = clamp((setC - 16) / 14, 0, 1);
+    if (r) { var inF = roomUnit(r) && unitF(env || {}); set = tconv(set, r, env); if (cur !== null && cur !== undefined) cur = inF ? Math.round(tconv(cur, r, env)) : Math.round(tconv(cur, r, env) * 10) / 10; }
     return E("div", "", "position:relative;width:" + px(s) + ";height:" + px(s) + ";flex:none", [svg("0 0 100 100", s, s, [
       S("circle", { cx: 50, cy: 50, r: 42, fill: "none", stroke: "rgba(255,255,255,.16)", "stroke-width": 8, "stroke-dasharray": "198 66", "stroke-linecap": "round", transform: "rotate(135 50 50)" }),
       S("circle", { cx: 50, cy: 50, r: 42, fill: "none", stroke: "#64d2ff", "stroke-width": 8, "stroke-dasharray": Math.round(198 * frac) + " 300", "stroke-linecap": "round", transform: "rotate(135 50 50)" })]),
@@ -1415,15 +1448,19 @@
     var u = String((r && (r.unit || r.temperature_unit)) || "");
     if (/f/i.test(u)) return "f";
     if (/c/i.test(u)) return "c";
-    return r && isFinite(r.max) && r.max > 50 ? "f" : "c";
+    return null;   // not said: drawn as Home Assistant gives it, never guessed
   }
   function tconv(v, r, env) {
     if (v === null || v === undefined || !isFinite(v) || !r) return v;
     var d = dataOf(env || {}), want = unitF(env || {}) ? "f" : d.unit === "c" || d.wx_unit === "c" ? "c" : null, have = roomUnit(r);
-    if (!want || want === have) return v;
+    if (!want || !have || want === have) return v;
     return want === "f" ? v * 9 / 5 + 32 : (v - 32) * 5 / 9;
   }
-  function tdeg(v, r, env) { return v == null || !isFinite(v) ? "--" : (Math.round(tconv(v, r, env) * 10) / 10) + "°"; }
+  function tdeg(v, r, env) {
+    if (v == null || !isFinite(v)) return "--";
+    var x = tconv(v, r, env), f = r && roomUnit(r) && unitF(env || {});
+    return (f ? Math.round(x) : Math.round(x * 10) / 10) + "°";
+  }
   R.aircon = function (root, o, b, env) {
     var rooms = roomsOf(env);
     if (!rooms.length) return noHa(root, b, "aircon", "aircon");
@@ -1519,7 +1556,7 @@
     if (!ha.controls) return ha.controls;
     var l = ha.controls.filter(function (c) { return c && c.entity; });
     var sw = setting(o, env, "switches");
-    if (sw && sw.length) l = sw.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
+    if (Object.prototype.toString.call(sw) === "[object Array]" && sw.length) l = sw.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
     return l;
   }
   // one switch in its own box: icon over name over state in a tall box, icon beside them in a short one;
@@ -1583,7 +1620,7 @@
   R.camera = function (root, o, b, env) {
     var ha = haOf(env), info = ha.info || {}, q = op(o), cams = info.cameras || [], al = alignOf(o), W = b.w - 48;
     if (!env.demo && !cams.length) return soonFit(root, b, "camera", "camera");
-    var want = setting(o, env, "cam"), cam = cams.filter(function (c) { return c.entity === want; })[0] || cams[0], name = devName(o, env, "cam", cam.name, "Camera");
+    var want = setting(o, env, "cam"), cam = cams.filter(function (c) { return c.entity === want; })[0] || cams[0], name = devName(o, env, cam.entity === want ? "cam" : null, cam.name, "Camera");
     var src = env.demo ? demoImg("dog") : (ha.stills || {})[cam.entity];
     var pic = E("div", "cw-fill", "background:#1c1f24 center/cover;" + (src ? "background-image:" + cssImg(src) : ""));
     var EVERY2 = "A still every 2 seconds", say = function (t) { return fitWords(root, t, W, 24, 1, 560, "color:rgba(255,255,255,.86)"); };
@@ -1698,7 +1735,7 @@
     var n = names.filter(function (s) { return s.entity === want; })[0] || names[0];
     if (!n) return null;
     var s = (ha.sensors || []).filter(function (x) { return x.entity === n.entity; })[0];
-    return { entity: n.entity, name: devName(o, env, "reading", (s && s.name) || n.name, "Sensor"), s: s, read: !!ha.sensors, hist: (ha.hist || {})[n.entity] };
+    return { entity: n.entity, name: devName(o, env, n.entity === want ? "reading" : null, (s && s.name) || n.name, "Sensor"), s: s, read: !!ha.sensors, hist: (ha.hist || {})[n.entity] };
   }
   // the reading and its unit on one line, as big as fits
   function sensorValue(root, t, width, max) {
@@ -2090,7 +2127,8 @@
     // the drive for this widget's own Where to (app.js data().commuteBy["<object id>"]), else the home's
     var q = op(o), cb = dataOf(env).commuteBy, c = (cb && o.id !== undefined && cb[o.id]) || dataOf(env).commute || {}, v;
     var toTv = placeVal(tvSet(o, env, "to"));
-    if (toTv && !(cb && cb[o.id]) && !env.demo) c = { from: c.from, to: toTv, key: null };
+    // its own Where to: the drive the loader fetched for this widget (widget-web.js keys it the same way)
+    if (toTv && !(cb && cb[o.id]) && !env.demo) c = { from: c.from, to: toTv, key: window.CouchWidgetWeb && c.from ? window.CouchWidgetWeb.routeKey(c.from, toTv) : null };
     if (env.demo) { v = { minutes: 16, km: 12.4 }; c = { to: { name: "work" } }; }
     else {
       if (!c.from) { webEmpty(root, b, "location", "Set your town for the commute", "Settings (hold OK), Home settings, Location", "Set your town"); root.setAttribute("data-setup", "commute"); return null; }
@@ -2233,7 +2271,8 @@
   };
   CR.worldclock = function (root, o, b, env) {
     var here = ""; try { here = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
-    var cities = (op(o).cities && op(o).cities.length ? op(o).cities : homeCities(here, 2)), town = (dataOf(env || {}).place || {}).name || "";
+    var own = (Object.prototype.toString.call(op(o).cities) === "[object Array]" ? op(o).cities : []).filter(function (tz) { return typeof tz === "string" && !!tzTime(tz); });
+    var cities = own.length ? own : homeCities(here, 2), town = (dataOf(env || {}).place || {}).name || "";
     var name = function (tz) { return tz === here && town ? town : CITY[tz] || tz.split("/").pop().replace(/_/g, " "); };
     if (b.w < 300) { var t = tzTime(cities[0]); return mini(root, b, null, t ? t.t.replace(/[ap]m$/, "") : "", name(cities[0])); }
     add(root, E("div", "cw-col", "height:100%;justify-content:space-around", cities.slice(0, 2).map(function (tz) {
@@ -2398,6 +2437,7 @@
   function agendaHeading(label, tomorrow) {
     var day = tomorrow ? "Tomorrow" : "Today", l = String(label || "").trim();
     if (!l || DAY_WORDS.test(l) || l.toLowerCase() === day.toLowerCase()) return day;
+    if (/\b(today|tonight|tomorrow)\b/i.test(l)) return day;
     return l + ", " + day.toLowerCase();
   }
   R.agenda = function (root, o, b, env) {
@@ -2449,9 +2489,12 @@
     }
     var ls = (athome(env) || {}).lists || [], pick = setting(o, env, "list", "first"), at = 0, i;
     if (!ls.length) return null;
-    // picked on this TV: its name, or its place in the list (0, 1, 2); "first" (the default) is the first
-    if (typeof pick === "number" && isFinite(pick) && ls[pick]) at = pick;
-    else if (pick !== "first" && pick !== undefined && pick !== null && pick !== "") for (i = 0; i < ls.length; i++) if (ls[i].name.toLowerCase() === String(pick).toLowerCase()) { at = i; break; }
+    // picked on this TV: its name, or its place in the list (0, 1, 2); with nothing picked ("first", the
+    // default), the list the design's heading names (a starter's "To do"), else the first
+    var named = false;
+    if ((typeof pick === "number" || (typeof pick === "string" && /^\d+$/.test(pick))) && ls[+pick]) { at = +pick; named = true; }
+    else if (pick !== "first" && pick !== undefined && pick !== null && pick !== "") for (i = 0; i < ls.length; i++) if (ls[i].name.toLowerCase() === String(pick).toLowerCase()) { at = i; named = true; break; }
+    if (!named) { var lbl = String((o.__design || op(o)).label || "").toLowerCase(); if (lbl) for (i = 0; i < ls.length; i++) if (ls[i].name.toLowerCase() === lbl) { at = i; break; } }
     return { at: at, name: ls[at].name, todo: /to ?do|task|work/i.test(ls[at].name), items: ls[at].items };
   }
   R.list = function (root, o, b, env) {
@@ -2569,7 +2612,7 @@
   // ---------------- one widget, a stack, the API ----------------
   function one(o, b, env) {
     // what was set for this widget on this TV goes over the design's opts (the detail layer gets the same)
-    o = withSettings(o, env);
+    try { o = withSettings(o, env); } catch (e) {}
     var sh = shell(o, b, env), root = sh.root, st = o.style || {};
     CTX = { icons: st.icons || (env.look && env.look.icons) || "line" };
     var draw = (b.h < 200 && CR[o.kind]) || R[o.kind];

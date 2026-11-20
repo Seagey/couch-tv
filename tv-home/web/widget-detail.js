@@ -628,6 +628,7 @@
       S.api.ha("controls").then(function (r) {
         if (!S || !r || !r.ok) { if (S && !items) { items = []; draw(); msg("Home Assistant is not answering"); } return; }
         var want = kit().setting(o, env, "switches"), l = r.controls || [];
+        if (Object.prototype.toString.call(want) !== "[object Array]") want = null;
         if (want && want.length) l = want.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
         items = l; draw();
       });
@@ -677,7 +678,7 @@
     var cams = door ? [{ entity: "doorbell", name: kit().devName(o, env, null, bell && bell.name, "Doorbell") }] : (demo ? [{ entity: "camera.backyard", name: op(o).label || "Backyard" }, { entity: "camera.driveway", name: "Driveway" }] : info.cameras);
     var want = kit().setting(o, env, "cam"), sel = Math.max(0, cams.map(function (c) { return c.entity; }).indexOf(want));
     // the camera this widget shows goes by its own heading (the same as the widget's); the rest by their names
-    if (!door && !demo && cams[sel]) { cams = cams.slice(); var c0 = {}; for (var ck in cams[sel]) c0[ck] = cams[sel][ck]; c0.name = kit().devName(o, env, "cam", c0.name, "Camera"); cams[sel] = c0; }
+    if (!door && !demo && cams[sel] && cams[sel].entity === want) { cams = cams.slice(); var c0 = {}; for (var ck in cams[sel]) c0[ck] = cams[sel][ck]; c0.name = kit().devName(o, env, "cam", c0.name, "Camera"); cams[sel] = c0; }
     var showRing = !!(ring || (demo && door));
     var img = E("div", "cwd-pimg", "background-size:contain;background-color:#000"), nameEl = E("b", "", "font-weight:680"), subEl = E("span");
     var stage = E("div", "cwd-pstage", "", [E("div", "cwd-photo", "", [img]), E("div", "cwd-live", "", [E("i"), nameEl, subEl])]);
@@ -823,6 +824,7 @@
         if (!S || joinT) return;
         if (!r || !r.ok) { if (!list) { list = []; draw(); msg("Home Assistant is not answering"); } return; }
         var want = kit().setting(o, env, "players"), l = r.speakers || [];
+        if (Object.prototype.toString.call(want) !== "[object Array]") want = null;
         if (want && want.length) l = want.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
         list = l; draw();
       });
