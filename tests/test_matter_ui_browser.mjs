@@ -71,6 +71,8 @@ const ORIGIN = "http://127.0.0.1:" + server.address().port;
 const BASE = ORIGIN + "/tv-home/web/index.html";
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
+// the phone page folds each section: open the Matter card so its box and buttons can be used
+const unfold = (page) => page.evaluate(() => { const b = document.querySelector("#matter .fold-btn"); if (b && document.getElementById("matter").classList.contains("shut")) b.click(); });
 const press = async (page, k, wait) => { await page.keyboard.press(k); await page.waitForTimeout(wait || 220); };
 
 const browser = await chromium.launch();
@@ -245,11 +247,12 @@ console.log("Running Matter UI browser tests...");
   await page.goto(ORIGIN + "/setup#matter");
   await page.waitForFunction(() => document.getElementById("matter").style.display !== "none" && /Lounge|Hallway/.test(document.getElementById("matter-list").textContent), null, { timeout: 8000 })
     .catch((e) => { throw new Error("phone page in French never showed its Matter list; page errors: " + page.errors.join(" | ")); });
+  await unfold(page);
   const list = await page.evaluate(() => document.getElementById("matter-list").textContent);
   ok(/Lampe/.test(list) && /Thermostat/.test(list) && /Renommer/.test(list) && /Retirer/.test(list) && !/Rename/.test(list), "French: kinds and buttons: " + list.slice(0, 120));
   await page.fill("#matter-code", "3497-011-2333"); await page.click("#matter-add"); await page.waitForTimeout(300);
   ok(/Un des chiffres est faux/.test(await page.evaluate(() => document.getElementById("matter-msg").textContent)), "French: a typo");
-  const head = await page.evaluate(() => [document.querySelector("#matter h2").textContent, document.getElementById("matter-add").textContent, document.getElementById("matter-code").placeholder, document.getElementById("jump-matter").textContent]);
+  const head = await page.evaluate(() => [(document.querySelector("#matter h2 .fold-btn") || {}).textContent, document.getElementById("matter-add").textContent, document.getElementById("matter-code").placeholder, document.getElementById("jump-matter").textContent]);
   ok(head[0] === "Appareils Matter" && head[1] === "Ajouter à la télé" && /chiffres/.test(head[2]) && head[3] === "Matter", "French: the card's own heading, button and hint: " + JSON.stringify(head));
   ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
   await page.close();
@@ -311,18 +314,18 @@ console.log("Running Matter UI browser tests...");
   ok(small === 0, "every button and box at least 40 px tall");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "matter-phone-after.png") });
   notReady = "node_old";
-  await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 });
+  await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 }); await unfold(page);
   const why = await page.evaluate(() => document.getElementById("matter-note").textContent);
   ok(/Node.js is too old for Matter/.test(why) && !/found 16/.test(why), "not ready: the reason key in plain words, not the English note: " + why);
   // the on-TV app on an Android 6 TV and on an Intel TV (reason keys), and a commission it cannot do
   for (const [key, re] of [["android_old", /needs Android 7 or newer/], ["processor", /processor can't run Matter/]]) {
     notReady = key;
-    await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 });
+    await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 }); await unfold(page);
     const w = await page.evaluate(() => document.getElementById("matter-note").textContent);
     ok(re.test(w) && !/found 16/.test(w), "not ready, " + key + ": in plain words: " + w);
   }
   notReady = ""; unsupported = true;
-  await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 });
+  await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 }); await unfold(page);
   await page.fill("#matter-code", "3497-011-2332"); await page.click("#matter-add"); await page.waitForTimeout(600);
   ok(/This TV can't add Matter devices/.test(await msg()), "a commission the TV cannot do: " + await msg());
   unsupported = false;
@@ -330,11 +333,11 @@ console.log("Running Matter UI browser tests...");
   const en = (k) => page.evaluate((key) => window.CouchMatterWords.en(key), k);
   for (const k of ["off", "not_installed", "node_missing", "node_old", "starting", "stopped", "android_old", "processor", "not_started", "busy"]) {
     notReady = k;
-    await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 });
+    await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 }); await unfold(page);
     ok(await page.evaluate(() => document.getElementById("matter-note").textContent) === await en("why_" + k), "phone, not ready, reason " + k);
   }
   notReady = "";
-  await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none" && /Hallway/.test(document.getElementById("matter-list").textContent), null, { timeout: 8000 });
+  await page.reload(); await page.waitForFunction(() => document.getElementById("matter").style.display !== "none" && /Hallway/.test(document.getElementById("matter-list").textContent), null, { timeout: 8000 }); await unfold(page);
   const cases = [["blocked", "commission", "not_allowed"], ["unsupported", "commission", "not_allowed"], ["address", "commission", "unreachable"], ["port", "commission", "unreachable"],
     ["link_local", "commission", "unreachable"], ["busy", "commission", "failed"], ["processor", "commission", "unsupported"], ["android_old", "commission", "unsupported"],
     ["starting", "commission", "unreachable"], ["opens_house", "rename", "refused"], ["offline", "remove", ""], ["not_answering", "remove", ""]];

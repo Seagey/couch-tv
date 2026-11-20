@@ -861,7 +861,8 @@
     var l = window.CouchMatterWords ? window.CouchMatterWords.lang() : 'en';
     if (l === mtLang) return;
     mtLang = l;
-    Array.prototype.forEach.call(document.querySelectorAll('[data-mw]'), function (e) { e.textContent = mw(e.getAttribute('data-mw')); });
+    // the heading became the card's fold button (foldSetup): its words go on the button, never over it
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mw]'), function (e) { (e.querySelector('.fold-btn') || e).textContent = mw(e.getAttribute('data-mw')); });
     Array.prototype.forEach.call(document.querySelectorAll('[data-mw-hint]'), function (e) { e.setAttribute('placeholder', mw(e.getAttribute('data-mw-hint'))); });
     Array.prototype.forEach.call(document.querySelectorAll('[data-mw-aria]'), function (e) { e.setAttribute('aria-label', mw(e.getAttribute('data-mw-aria'))); });
   }
