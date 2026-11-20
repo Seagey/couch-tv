@@ -25,24 +25,25 @@ when no PhoneServer runs (a launcher with a computer at home). HaServer's ports 
 9 refused refresh token: 60 s backoff, status signin_again, "Sign in again" on TV (app.js) and phone.
 10 stale comments fixed, SHOTS only, refresh token cases in test_ha_token_never_leaves.js.
 
-## Status (21 Nov, stopped by the coordinator mid run)
+## Status (21 Nov, resumed run)
 All 10 Fable items are implemented (table above) and the port unify (one launcher server) is done.
-Tests run green at this point: test_ha_phone_bridge 12/12, test_smarthome_bridge 5/5, test_ha_widgets_config 6/6,
-test_ha_phone_setup.js 26, test_ha_token_never_leaves.js 31, test_phone_page.js 18; real Home Assistant:
-test_ha_real_bridge.py 45 checks (incl. forged /ha/done and the sign out backoff); gradle: launcher 89 tests 0 fail
-(PhoneServerTest 21 incl. 3 new /ha tests, HaPhoneTest 5, HaRealTest 1 run against real HA), on-TV 172 tests 0 fail
-(before the last HaPhoneTest/HaRealTest additions: rerun both).
+Item 9 words: "Sign in again" and the TV's QR line now also in all 16 language blocks (i18n.js tw_ha_signin_again,
+tw_ha_signed_out, swapped on screen by tv-words.js).
+Green on 21 Nov (real Home Assistant = MacBook ha-haqr through the tunnel on 18124):
+- python: test_ha_phone_bridge 12, test_smarthome_bridge 5, test_ha_widgets_config 6, test_bridge_phone_page_flag 3,
+  test_phone_page_bridge 36; node: test_ha_phone_setup.js 26, test_ha_token_never_leaves.js 31, test_phone_page.js 18.
+- real HA: tests/test_ha_real_bridge.py 45 checks.
+- gradle (haqr/gradle-tests.sh <wt> both, HA_E2E_URL set): launcher 89 tests 0 fail 0 skipped (PhoneServerTest 21,
+  HaPhoneTest 5, HaRealTest 1 against real HA); on-TV 172 tests 0 fail 0 skipped (HaPhoneTest 5, HaRealTest 1).
+- emulator couchtv_gtv34 (-read-only, port 5610), launcher debug APK, real HA:
+  haqr/e2e_launcher_oneserver.py emulator-5610 5400: 26 checks (on-TV app stopped, phone page on 5400, nothing on 5402..5409);
+  the same with 5401: 26 checks (the on-TV app installed there holds 5400, the launcher's phone page took 5401 and /ha with it);
+  haqr/e2e_launcher_haserver.py (launcher started with --es bridge, so no phone page; HaServer on 5402, bound to the
+  LAN address, reached with `adb emu redir add tcp:15403:5402`): 16 checks.
 
 ## Left (exact next steps)
-1. Rerun gradle (scratchpad haqr/gradle-tests.sh <worktree> both) with the tunnel up, so HaRealTest's new backoff
-   checks run on both apps; count tests.
-2. Browser: test_integrations_browser.mjs (new Sign in again check, mock MOCK_HA_SIGNED_OUT) and
-   haqr/browser-tests2.sh (phone_browser.mjs now checks 4 forged /ha/done and the expired message). Not run yet:
-   the browser lock was held by another agent the whole time.
-3. Emulator proof of the one server path: launcher debug APK is built (tv-home/android/app/build/outputs/apk/debug);
-   boot couchtv_gtv34 with -read-only -no-window -port 5610, install, start, adb forward tcp:15402 tcp:5400 and
-   the WebView devtools to tcp:9335, run scratchpad haqr/e2e_launcher_oneserver.py emulator-5610. Always pass -s
-   emulator-5610 to adb: adb devices also showed the forbidden TV ending .4.32 port 5555, connected by someone else.
-4. MacBook: colima was OFF at start; this run started it and stopped it again with ha-haqr. Start both for step 1
-   to 3 (colima start; docker start ha-haqr) and stop both after.
-5. Final non WIP commit and report.
+1. Browser: haqr/browser-tests3.sh (takes the browser lock once: test_integrations_browser.mjs incl. Sign in again
+   in English and German, then phone_browser.mjs through HA's real sign in page with 4 forged /ha/done). Log:
+   haqr/browser-run-1121.log. Waiting for the browser lock (held by another agent since 05:45).
+2. MacBook: stop ha-haqr and colima after (docker stop ha-haqr; colima stop); close the 18124 tunnel.
+3. Final non WIP commit and report.

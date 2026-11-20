@@ -160,6 +160,13 @@ console.log("Running integrations browser tests...");
   await page.waitForTimeout(3600);
   s1 = await shot();
   ok(s1.qr === 1 && /^Sign in again\./.test(s1.line), "signed out by Home Assistant: the TV says Sign in again (" + s1.line + ")");
+  // and in the TV's language (tv-words.js, tw_ha_* in i18n.js)
+  await page.evaluate(() => window.I18N.set("de"));
+  await page.waitForTimeout(3600);
+  s1 = await shot();
+  ok(/^Erneut anmelden\. Home Assistant hat diesen Fernseher abgemeldet/.test(s1.line), "in German too (" + s1.line + ")");
+  ok(await page.evaluate(() => window.CouchTvWords.words("Sign in again") === "Erneut anmelden"), "the short Sign in again line in German");
+  await page.evaluate(() => window.I18N.set("en"));
   ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
   await page.close();
 }
