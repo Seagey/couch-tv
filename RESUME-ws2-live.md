@@ -29,10 +29,23 @@ Brief: scratchpad swarm2-common.md. Kinds: sports, news, stocks, commute, word, 
 - LIVE: node probes hit ESPN (7), Yahoo, OSRM, 8 RSS feeds: all real answers. Headless Chromium is refused by ESPN
   (403 for "HeadlessChrome"), so LIVE=1 routes the page's requests through node fetch.
 
+## Results 21 Nov 2026 (resumed builder, after the ladder switch)
+- test_ws2_live.mjs fixture mode: All 203 passed (node 116 + browser).
+- test_ws2_live.mjs LIVE=1: All 195 passed against the real services. ESPN live answers, all 7 shown on
+  the widget: afl 9 games "Starts 17 Mar"; nrl 1 "Season over", Roosters 19 v Knights 18; aleague 2,
+  Western Sydney 4 v Adelaide Utd 2; epl 7, Man City v Fulham; nba 9, Hawks v Hornets; bbl 1 "Starts 12 Dec",
+  Melbourne Renegades v Perth Scorchers; cricket 9, New Zealand 368 v India 159/1 live.
+- node: test_ws_schema 3889, test_widget_caps 4545, test_widget_sports 72, test_widget_pause 36: all pass.
+- Nothing red, so no code changed in this session.
+
+## Results 21 Nov 2026, second resumed builder (06:00 to 07:00)
+- Browser run under the lock (scratchpad live/locked.sh, log live/run-1121.log), all after the ladder switch:
+  test_ws2_live 203, test_design_settings_browser 107, test_web_widgets_browser 48, test_ws_tv 1115,
+  test_widget_detail_browser 296, test_widget_fit_all 8 (1640 boxes, 67 kinds, 0 problems),
+  test_phone_settings_browser 129. All passed.
+- node: every tests/test_*.js file, 61 of 61 pass (test_ws_schema 3889, test_widget_caps 4545,
+  test_widget_sports 72, test_widget_pause 36).
+- Nothing red, no code changed. Work is finished: final commit is not WIP.
+
 ## Next steps
-1. Run under the browser lock: `zsh <scratchpad>/live/locked.sh test_ws2_live.mjs LIVE` (lock dir
-   scratchpad/browser.lock; script waits for it and always removes it). Fix anything red.
-2. Rerun test_design_settings_browser, test_web_widgets_browser, test_ws_tv, test_widget_detail_browser,
-   test_widget_fit_all once more after the ladder switch.
-3. Commit (privacy hook: no home suburb, no private IPs, no fixture with emails/phones), then report table.
-Nothing runs on the MacBook or an emulator.
+None. Branch is ready to merge. Nothing runs on the MacBook or an emulator.
