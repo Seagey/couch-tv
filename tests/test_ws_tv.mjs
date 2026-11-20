@@ -345,6 +345,9 @@ const ROOMS = [{ entity: "climate.living", name: "Living", unit: "°C", ok: true
   const both = [];
   for (const anchor of [0, 7]) both.push((await draw({ id: "b9", kind: "bins", opts: {} }, { data: { wset: { b9: { weekday: wd, alt: true, anchor, bin_a: "Paper", bin_b: "Green waste" } } } })).text);
   ok(both[0] !== both[1], "bins: the week set on this TV (anchor) picks which bin goes out");
+  // no Where to yet: the widget's own settings, never the old Home settings Commute rows
+  d = await draw({ id: "cm0", kind: "commute", opts: {}, h: 460 }, { data: { commute: { from: { name: "Hillside", lat: -33.87, lon: 151.21 } } } });
+  has(d.text, "this widget's settings: hold OK on the widget", "commute with no Where to: where to set it"); hasNot(d.text, "Studio, Commute", "commute: no old Commute rows");
   // two Commute widgets, each its own Where to and its own drive
   const now = Date.now(), from = { name: "Hillside", lat: -33.87, lon: 151.21 }, to2 = { name: "Long Beach", lat: -33.75, lon: 151.3 };
   const k2 = await page.evaluate(([f, t]) => window.CouchWidgetWeb.routeKey(f, t), [from, to2]);
