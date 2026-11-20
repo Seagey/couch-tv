@@ -41,7 +41,12 @@ Roku (round 3, commit 34d2fdf):
 - Browser checks NOT rerun: browser.lock was held by other branches from 05:16 to at least 05:37. No lock of ours left behind, no server of ours running.
 - `npm ci --prefix roku` was run in this worktree (roku/node_modules, git ignored) for brs and bsc.
 
-## Left
-1. Browser check under browser.lock: designer PORT=5591 node TD/app/server.mjs; store DATA_DIR=<scratch>/wp-store DESIGNER_ORIGINS=http://127.0.0.1:5591 PORT=5490 node TD/server/store.mjs; node TD/scripts/widget-photo-checks.mjs 5591; stop both servers; rmdir lock.
-2. node TD/scripts/ws-studio-panel-checks.mjs (starts and stops its own designer) under the same lock.
-3. Report. Supabase migration 20261120120000_widget_photos.sql is NOT on the live database: the coordinator asks the owner. Market gallery and cloud saves do not keep widget photos (by design, message shown). tvOS fine.
+## Round 4 (21 Nov 05:40 to 05:55): all checks rerun, finished
+- No TD or CT code changed this round. All counts rerun on the current TD files:
+  - CT: test_roku* 90/90 OK; test_share_home 59 pass; test_widget_own_photo 116 pass
+  - TD server: node --test tests/*.test.mjs 129/129 pass; node cloud/test-local.mjs 117/117 pass
+  - Browser (under browser.lock, 05:51:48 to 05:53:34; script scratchpad nl-photo-browser-run.sh, log nl-photo-browser-r4.log): widget-photo-checks.mjs 26 of 26 passed; ws-studio-panel-checks.mjs 80 of 80 passed. 106 PASS lines, 0 FAIL. Both servers stopped, lock freed.
+- Note: widget-photo-checks.mjs reads the TV gate from couch-tv/wt-studio-src/tv-home/web (a TD script constant), not this worktree; this worktree's gate is covered by test_widget_own_photo.js.
+
+## Left (nothing in scope)
+- Supabase migration 20261120120000_widget_photos.sql is NOT on the live database: the coordinator asks the owner. Market gallery and cloud saves do not keep widget photos (by design, message shown). tvOS fine.
