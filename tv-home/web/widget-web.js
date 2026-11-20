@@ -338,8 +338,13 @@
       }
     },
     commute: {
-      // the places come from the TV (h.places), never from the widget's options
-      key: function (w, h) { var p = h.places ? h.places() : null; return p ? routeKey(p.from, p.to) : null; },
+      // the places come from the TV (h.places(w)), never from the widget's options: each Commute widget
+      // its own drive. A Where to set for this widget on this TV (w.__tv.to, from
+      // CouchWidgets.withSettings: kept on the TV only) goes over the home's own Where to
+      key: function (w, h) {
+        var p = h.places ? h.places(w) : null, own = w && w.__tv && placeOk(w.__tv.to) ? w.__tv.to : null;
+        return p ? routeKey(p.from, own || p.to) : null;
+      },
       every: function () { return 6 * 60 * MIN; },
       get: function (h, id) {
         var url = routeUrl(id);

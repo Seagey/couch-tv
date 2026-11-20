@@ -174,8 +174,8 @@ const HA = {
 }
 
 // ================= 4. aircon: each widget its own room, temperatures in the home's unit =================
-const ROOMS = [{ entity: "climate.living", name: "Living", ok: true, state: "cool", target: 22, current: 24, min: 16, max: 30, step: 0.5, modes: ["off", "cool"] },
-  { entity: "climate.bed", name: "Bedroom", ok: true, state: "heat", target: 20, current: 18, min: 16, max: 30, step: 0.5, modes: ["off", "heat"] }];
+const ROOMS = [{ entity: "climate.living", name: "Living", unit: "°C", ok: true, state: "cool", target: 22, current: 24, min: 16, max: 30, step: 0.5, modes: ["off", "cool"] },
+  { entity: "climate.bed", name: "Bedroom", unit: "°C", ok: true, state: "heat", target: 20, current: 18, min: 16, max: 30, step: 0.5, modes: ["off", "heat"] }];
 {
   let r = await draw({ id: "a1", kind: "aircon", opts: {} }, { rooms: ROOMS, data: { wset: { a2: { entity: "climate.bed" } } } });
   has(r.text, "Living", "aircon with nothing picked: the first room");
@@ -183,7 +183,7 @@ const ROOMS = [{ entity: "climate.living", name: "Living", ok: true, state: "coo
   has(r.text, "Bedroom", "a second aircon widget: its own room"); has(r.text, "20°", "aircon in °C");
   r = await draw({ id: "a2", kind: "aircon", opts: {} }, { rooms: ROOMS, data: { unit: "f", wset: { a2: { entity: "climate.bed" } } } }, { layer: true });
   has(r.text, "68°", "aircon in °F: 20 °C set is 68"); hasNot(r.text, "20°", "aircon °F: no Celsius left");
-  has(r.layer, "68°", "aircon layer in °F"); has(r.layer, "64.4°", "aircon layer: the room now in °F");
+  has(r.layer, "68°", "aircon layer in °F"); has(r.layer, "64°", "aircon layer: the room now in whole °F");
   // a Home Assistant already in °F is left alone on a °F home
   const FROOM = [{ entity: "climate.us", name: "Den", ok: true, state: "cool", target: 72, current: 75, min: 60, max: 86, step: 1, modes: ["off", "cool"] }];
   r = await draw({ id: "a3", kind: "aircon", opts: {}, w: 360, h: 360 }, { rooms: FROOM, data: { unit: "f" } });
@@ -226,7 +226,7 @@ const ROOMS = [{ entity: "climate.living", name: "Living", ok: true, state: "coo
 {
   const home = { home: { lists: [{ name: "Shopping", items: [{ t: "Milk", done: false }] }, { name: "Jobs", items: [{ t: "Mow the lawn", done: false }] }] } };
   let r = await draw({ id: "l1", kind: "list", opts: { label: "Jobs" } }, { data: home });
-  has(r.text, "Shopping", "list with nothing picked: the first list, under its own name");
+  has(r.text, "Mow the lawn", "list with nothing picked: the list its design heading names (a starter's To do)");
   r = await draw({ id: "l1", kind: "list", opts: {} }, { data: Object.assign({ wset: { l1: { list: "Jobs" } } }, home) });
   has(r.text, "Mow the lawn", "list picked on this TV by name");
   r = await draw({ id: "l1", kind: "list", opts: {} }, { data: Object.assign({ wset: { l1: { list: 1 } } }, home) });
@@ -235,7 +235,7 @@ const ROOMS = [{ entity: "climate.living", name: "Living", ok: true, state: "coo
   r = await draw({ id: "st", kind: "stack", turn: 0, items: [{ kind: "list", opts: {} }] }, { data: Object.assign({ wset: { "st/0": { list: "Jobs" } } }, home) });
   has(r.text, "Mow the lawn", "a stack item's own setting");
   // countdown: a starter "Christmas" never counts to another day; a one off year counts to that day
-  r = await draw({ id: "cd", kind: "countdown", opts: { label: "Christmas", day: 3, month: 3 } }, { data: {} });
+  r = await draw({ id: "cd", kind: "countdown", opts: { label: "Christmas" } }, { data: { wset: { cd: { day: 3, month: 3 } } } });
   has(r.text, "3 March", "countdown: the date, not Christmas"); hasNot(r.text, "Christmas", "countdown");
   r = await draw({ id: "cd", kind: "countdown", opts: { label: "Our wedding", day: 1, month: 1, year: 2000 + 1 } }, { data: {} });
   has(r.text, "been and gone", "countdown: a one off day that has passed");
@@ -290,6 +290,69 @@ const ROOMS = [{ entity: "climate.living", name: "Living", ok: true, state: "coo
   // the designer still shows the demo
   const d = await draw({ id: "dm", kind: "surf", opts: { label: "North Point" } }, { demo: true, data: {} });
   has(d.text, "North Point", "couch-tv Studio's demo keeps the design's words");
+}
+
+// ================= 10. review fixes, bins and each Commute widget's own drive =================
+{
+  const r = await page.evaluate(() => {
+    const W = window.CouchWidgets, ws = (o, w) => W.withSettings(o, { data: { wset: { [o.id]: w } } });
+    const a = ws({ id: "a", kind: "countdown", opts: { year: 2030, label: "Wedding" } }, { label: "", year: "every", day: null, image: "x.jpg" });
+    const p = ws({ id: "p", kind: "surf", opts: {} }, { place: { name: { x: 1 }, lat: 1, lon: 2 } });
+    const q = ws({ id: "q", kind: "surf", opts: {} }, { place: { name: "Hillside", lat: "-33.6", lon: "151.1" } });
+    const e = ws({ id: "e", kind: "surf", opts: {} }, { place: { name: "X", lat: "", lon: 2 } });
+    const m = ws({ id: "m", kind: "countdown", opts: {} }, { month: 13, day: 40 });
+    const again = W.withSettings(a, { data: {} });
+    return { label: a.opts.label, year: a.opts.year, yearTv: a.__tv.year, image: a.opts.image, badName: p.__tv.place, strLat: q.__tv.place && q.__tv.place.lat, emptyLat: e.__tv.place,
+      month: m.opts.month, day: m.opts.day, againTv: "__tv" in again, againYear: again.opts.year };
+  });
+  ok(r.label === "Wedding", "an empty TV value leaves the design's"); ok(r.year === undefined && r.yearTv === "every", "a number set back to Every year drops the design's year");
+  ok(r.image === undefined, "a picture is never taken from the TV settings"); ok(r.badName === undefined && r.emptyLat === undefined, "a place with a wrong name or an empty latitude is not a place");
+  ok(r.strLat === -33.6, "a place with numbers as words is read"); ok(r.month === undefined && r.day === undefined, "a month or day out of range is not taken");
+  ok(r.againTv === false && r.againYear === 2030, "drawn again with nothing set: the design as it is, no old TV values");
+
+  let d = await draw({ id: "y1", kind: "countdown", opts: { label: "Our wedding", day: 1, month: 1, year: 2001 } }, { data: { wset: { y1: { year: "every" } } } });
+  hasNot(d.text, "been and gone", "countdown set back to every year on this TV counts to next year");
+  d = await draw({ id: "y2", kind: "countdown", opts: { label: "Christmas", day: 3, month: 3 } }, { data: {} });
+  has(d.text, "Christmas", "countdown: a name and date both from the design stay as they are");
+  // the device's heading only when the device picked on this TV is the one shown
+  d = await draw({ id: "c9", kind: "camera", opts: { label: "Backyard" } }, { data: { ha: HA, wset: { c9: { cam: "camera.gone" } } } });
+  has(d.text, "Front door cam", "camera: a pick that is not there shows the camera's own name"); hasNot(d.text, "Backyard", "camera: missing pick");
+  d = await draw({ id: "s9", kind: "sensor", opts: { label: "The pool" } }, { data: { ha: HA, wset: { s9: { reading: "sensor.gone" } } } });
+  hasNot(d.text, "The pool", "sensor: missing pick, its own name");
+  // agenda: a heading with a day in it never shows over another day
+  const t0 = new Date(); t0.setHours(23, 0, 0, 0);
+  d = await draw({ id: "g9", kind: "agenda", opts: { label: "Tomorrow's plans" }, w: 960, h: 560 }, { data: { home: { cal: { set: true, events: [{ title: "Netball", start: t0.getTime(), end: t0.getTime() + 1800000 }] } } } });
+  has(d.text, "Today", "agenda: a heading with a day word gives way"); hasNot(d.text, "Tomorrow's", "agenda");
+  // °F: each number rounded once (24.4 °C is 75.9 °F, so 76, not 75)
+  d = await draw({ id: "f9", kind: "bigtemp", opts: {} }, { data: { weather: wx(24.4), place: HOME, unit: "f" } });
+  has(d.text, "76°", "°F rounded once");
+  // an aircon room that does not say its unit is drawn as Home Assistant gives it
+  d = await draw({ id: "a9", kind: "aircon", opts: {}, w: 360, h: 360 }, { rooms: [{ entity: "climate.x", name: "Study", ok: true, state: "cool", target: 22, current: 23, min: 16, max: 30, modes: ["off", "cool"] }], data: { unit: "f" } });
+  has(d.text, "22°", "aircon with no unit: never guessed");
+  // lists: a numeric pick as words; speakers and switches only as lists
+  const home = { home: { lists: [{ name: "Shopping", items: [{ t: "Milk", done: false }] }, { name: "Jobs", items: [{ t: "Mow the lawn", done: false }] }] } };
+  d = await draw({ id: "l9", kind: "list", opts: {} }, { data: Object.assign({ wset: { l9: { list: "1" } } }, home) });
+  has(d.text, "Mow the lawn", "list picked as \"1\"");
+  d = await draw({ id: "p9", kind: "speakers", opts: { players: "media_player.a" } }, { data: { ha: HA } });
+  has(d.text, "Kitchen", "speakers: a broken players value shows them all"); has(d.text, "Deck", "speakers: all");
+  // world clock: a city this TV cannot tell the time of is left out
+  d = await draw({ id: "w9", kind: "worldclock", opts: {}, w: 460, h: 460 }, { data: { place: HOME, wset: { w9: { cities: ["Not/AZone", "Europe/London"] } } } });
+  has(d.text, "London", "world clock: the real city"); hasNot(d.text, "AZone", "world clock: a broken zone left out");
+  // bins set on this TV: taking turns, which week, the names
+  const wd = new Date().getDay();
+  d = await draw({ id: "b9", kind: "bins", opts: { weekday: "none" } }, { data: { wset: { b9: { weekday: wd, alt: true, anchor: 0, bin_a: "Paper", bin_b: "Green waste" } } } });
+  ok(/Paper|Green waste/.test(d.text) && /Rubbish/.test(d.text), "bins: taking turns and the names set on this TV: " + d.text);
+  const both = [];
+  for (const anchor of [0, 7]) both.push((await draw({ id: "b9", kind: "bins", opts: {} }, { data: { wset: { b9: { weekday: wd, alt: true, anchor, bin_a: "Paper", bin_b: "Green waste" } } } })).text);
+  ok(both[0] !== both[1], "bins: the week set on this TV (anchor) picks which bin goes out");
+  // two Commute widgets, each its own Where to and its own drive
+  const now = Date.now(), from = { name: "Hillside", lat: -33.87, lon: 151.21 }, to2 = { name: "Long Beach", lat: -33.75, lon: 151.3 };
+  const k2 = await page.evaluate(([f, t]) => window.CouchWidgetWeb.routeKey(f, t), [from, to2]);
+  const data = { commute: { from, to: { name: "Riverton" }, key: "k1" }, web: { commute: { k1: { ok: true, at: now, v: { minutes: 21, km: 18 } }, [k2]: { ok: true, at: now, v: { minutes: 34, km: 30 } } } } };
+  d = await draw({ id: "cm1", kind: "commute", opts: {} }, { data });
+  has(d.text, "21", "commute one: the home's Where to"); has(d.text, "Riverton", "commute one");
+  d = await draw({ id: "cm2", kind: "commute", opts: {} }, { data: Object.assign({ wset: { cm2: { to: to2 } } }, data) });
+  has(d.text, "34", "commute two: its own drive"); has(d.text, "Long Beach", "commute two: its own Where to"); hasNot(d.text, "Riverton", "commute two");
 }
 
 ok(errors.length === 0, "no page errors: " + errors.join(" | "));
