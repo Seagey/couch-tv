@@ -97,4 +97,14 @@ class SetupWordsTest {
             SetupWords.homeNote(true, false, true, watchApk = true))
         all.forEach { assertFalse(it, Regex("[–—]|\\bBeta\\b|coming soon", RegexOption.IGNORE_CASE).containsMatchIn(it)) }
     }
+
+    @Test fun saysPlainlyWhenTheTvNeverAnswered() {
+        // the whole Allow debugging wait went by with no answer (a real TCL kept a hidden question open)
+        assertEquals(SetupWords.NOT_ASKED, SetupWords.keysLine(false, false, false, notAsked = true))
+        assertTrue(SetupWords.NOT_ASKED.contains("restart the TV"))
+        // a new wait under way wins over the old no answer
+        assertTrue(SetupWords.keysLine(false, true, false, notAsked = true).startsWith("Look at the TV"))
+        // connected wins over everything
+        assertEquals("The phone remote can press every key and type on the TV.", SetupWords.keysLine(true, false, false, notAsked = true))
+    }
 }

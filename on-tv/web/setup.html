@@ -135,7 +135,7 @@
     var s = $('adb-status');
     if (a.connected) { s.className = 'status ok'; s.textContent = 'Connected (' + (a.route === 'tls' ? 'wireless debugging' : 'port 5555') + ').'; }
     else if (a.state === 'waiting_for_allow' || a.state === 'connecting') { s.className = 'status'; s.textContent = 'Waiting. Accept "Allow debugging?" on the TV.'; }
-    else if (a.unanswered) { s.className = 'status bad'; s.textContent = 'The TV did not show its Allow debugging question. Restart the TV, then try again.'; }
+    else if (a.unanswered) { s.className = 'status bad'; s.textContent = 'No answer from the TV. If it did not show its Allow debugging question, restart the TV, then try again.'; }
     else { s.className = 'status bad'; s.textContent = 'Not connected.' + (a.error ? ' (' + a.error + ')' : ''); }
   }
   function load() {
@@ -170,7 +170,7 @@
     $('adb-msg').textContent = 'Connecting. Look at the TV.';
     api('POST', '/api/adb/connect', {}).then(function () {
       clearInterval(poll); var n = 0;
-      poll = setInterval(function () { n++; api('GET', '/api/adb').then(function (a) { showAdb(a); if (a.connected || n > 30) { clearInterval(poll); $('adb-msg').textContent = a.connected ? 'Done.' : ''; } }); }, 1500);
+      poll = setInterval(function () { n++; api('GET', '/api/adb').then(function (a) { showAdb(a); if (a.connected || n > 200 || (n > 2 && a.state !== 'waiting_for_allow' && a.state !== 'connecting')) { clearInterval(poll); $('adb-msg').textContent = a.connected ? 'Done.' : ''; } }); }, 1500);
     }).catch(function (e) { $('adb-msg').textContent = e.message; });
   };
   $('wd-pair').onclick = function () {

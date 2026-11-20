@@ -290,7 +290,7 @@ releases and keeps the dot and the line, so you hear when one is out.
 **The on-TV app (option C)** looks the same way (asked once, then weekly, or Check for updates now).
 When its own link to the TV is connected (the phone remote can press keys), **Update to ...** downloads
 the release, checks it the way the launcher does and installs it over that link (ADB's shell user,
-`pm install -r`), then opens Couch TV again; it still leaves out Android's install permission, so
+`pm install -r`), then opens Couch TV again if it was on screen when the install started; it still leaves out Android's install permission, so
 Google Play Protect has nothing new to stop. Without the link (never connected, or a Fire TV that
 blocks it) or after a try that failed, **Home settings, About, Update couch-tv** shows the version
 line, and OK opens the exact steps, with a QR code that opens them on a phone: Downloader and its code 8180170 for

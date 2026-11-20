@@ -105,7 +105,7 @@ Home settings, About, **Update couch-tv** says which version this TV has and whe
 now). Once the phone remote can press keys (the app's own link to the TV, "Let the phone press keys"),
 **Update to ...** does it all: it downloads the new version from GitHub, checks it (GitHub only, the
 size and SHA-256 GitHub lists, this app, newer, the same signing key) and installs it over that link,
-then Couch TV opens again. Your settings stay. The app still leaves out Android's install permission
+then Couch TV opens again if it was on screen (an update started from a phone leaves the show on). Your settings stay. The app still leaves out Android's install permission
 on purpose, so Play Protect lets it through. Without that link (or on a Fire TV that blocks it), the
 page shows the steps instead, with a QR code that opens them on your phone: open Downloader, type
 8180170, Install. The watch version without the link updates from a computer with

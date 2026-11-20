@@ -90,6 +90,7 @@ object Adb {
         closeQuietly()
         state = "connecting"
         lastError = null
+        if (interactive) unanswered = false
         // Some Android 13+ Google TVs never show "Allow debugging?" for a new key on 5555 (seen on one
         // TV after its Google home was switched off), so do not make people wait 2 minutes there.
         allowSeconds = if (!interactive) 8L else if (Build.VERSION.SDK_INT >= 33 && !Store.bool("adb_ok_tcp")) 45L else 120L
@@ -153,12 +154,12 @@ object Adb {
             val ok = f.get(limitMs, TimeUnit.MILLISECONDS)
             Log.i(TAG, "$r $host:$port: library connect returned $ok after ${System.currentTimeMillis() - started} ms")
             if (ok) return onConnected(r)
-            // the whole wait went by with no Allow and no refusal: the TV never asked (see unanswered)
-            if (r == "tcp" && allowSeconds > 8 && System.currentTimeMillis() - started >= allowSeconds * 1000 - 2000) {
+            // the whole 2 minute wait went by with no Allow and no refusal: nobody pressed, Cancel, or the TV
+            // never showed the question at all (see unanswered). Said once, in place of the note below.
+            if (r == "tcp" && allowSeconds >= 120 && System.currentTimeMillis() - started >= allowSeconds * 1000 - 2000) {
                 unanswered = true
                 note(SetupWords.NOT_ASKED)
-            }
-            note("$host:$port: no answer to \"Allow debugging?\" in time (or the TV refused)." +
+            } else note("$host:$port: no answer to \"Allow debugging?\" in time (or the TV refused)." +
                 if (Build.VERSION.SDK_INT >= 33) " On Android 13+ the TV may never ask: pair wireless debugging on the setup page instead." else " Press Connect again.")
         } catch (e: java.util.concurrent.TimeoutException) {
             note("$host:$port: library connect hung for ${limitMs / 1000} s, closed it")
