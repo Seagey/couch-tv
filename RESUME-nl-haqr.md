@@ -41,9 +41,10 @@ Green on 21 Nov (real Home Assistant = MacBook ha-haqr through the tunnel on 181
   haqr/e2e_launcher_haserver.py (launcher started with --es bridge, so no phone page; HaServer on 5402, bound to the
   LAN address, reached with `adb emu redir add tcp:15403:5402`): 16 checks.
 
-## Left (exact next steps)
-1. Browser: haqr/browser-tests3.sh (takes the browser lock once: test_integrations_browser.mjs incl. Sign in again
-   in English and German, then phone_browser.mjs through HA's real sign in page with 4 forged /ha/done). Log:
-   haqr/browser-run-1121.log. Waiting for the browser lock (held by another agent since 05:45).
-2. MacBook: stop ha-haqr and colima after (docker stop ha-haqr; colima stop); close the 18124 tunnel.
-3. Final non WIP commit and report.
+- browser (lock taken): test_integrations_browser.mjs 40 checks (Sign in again in English and German),
+  test_tv_words_browser.mjs 12 checks (every tw_ word in every language), haqr/phone_browser.mjs 18 checks through
+  Home Assistant's real sign in page (4 forged /ha/done with no key, "That took too long. Try again.").
+- MacBook ha-haqr and colima stopped again, tunnel closed, emulator killed.
+
+## Left
+Nothing. Done 21 Nov.
