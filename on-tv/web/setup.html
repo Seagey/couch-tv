@@ -77,7 +77,7 @@
   <p><span id="intro-from">This page comes from your TV, over your home Wi-Fi.</span> What you change here shows on the TV in a moment, and everything here can still be changed on the TV too. Nothing typed here goes to Couch TV or anyone else. <a href="/" id="to-remote">Back to the remote</a></p>
 
   <nav class="jump" aria-label="Sections">
-    <a href="#widgets" id="jump-widgets" style="display:none">Widgets</a><a href="#dapps" id="jump-dapps" style="display:none">Apps</a><a href="#town">Town</a><a href="#people">People</a><a href="#photos">Photos</a><a href="#athome">At home</a><a href="#ask">Ask AI</a><a href="#home">Home screen</a><a href="#smart" id="jump-smart" style="display:none">Smart home</a><a href="#tv">This TV</a>
+    <a href="#widgets" id="jump-widgets" style="display:none">Widgets</a><a href="#dapps" id="jump-dapps" style="display:none">Apps</a><a href="#town">Town</a><a href="#people">People</a><a href="#photos">Photos</a><a href="#athome">At home</a><a href="#ask">Ask AI</a><a href="#home">Home button</a><a href="#smart" id="jump-smart" style="display:none">Smart home</a><a href="#tv">This TV</a>
   </nav>
 
   <div class="card" id="design-line" style="display:none" role="status">
@@ -212,11 +212,11 @@
   </section>
 
   <section class="card" id="home">
-    <h2>Use as home screen</h2>
+    <h2>Home button</h2>
     <p class="status" id="home-state">Checking…</p>
     <p id="home-note"></p>
-    <button class="go" id="home-on">Use Couch TV as the home screen</button>
-    <button class="quiet" id="home-off" style="display:none">Stop using it as the home screen</button>
+    <button class="go" id="home-on">Make the Home button open Couch TV</button>
+    <button class="quiet" id="home-off" style="display:none">Make the Home button open the TV's own home again</button>
     <div class="msg" id="home-msg" role="status"></div>
   </section>
 
@@ -764,7 +764,7 @@
   function showHome(h) {
     var on = !!h.on, held = !!h.held;
     $('home-state').className = 'status ' + (on && (held || h.fire_tv) ? 'ok' : '');
-    $('home-state').textContent = !on ? 'Home opens the TV\'s own home.' : held ? 'Couch TV is the home screen.' : h.fire_tv ? (h.watch ? 'Couch TV is the home screen.' : 'The Home button opens Couch TV, but Keep Couch TV on Home is off.') : 'Switched on. One step left on the TV.';
+    $('home-state').textContent = !on ? 'Home opens the TV\'s own home.' : held ? 'The Home button opens Couch TV.' : h.fire_tv ? (h.watch ? 'The Home button opens Couch TV.' : 'The Home button opens Couch TV, but Keep Couch TV on Home is off.') : 'Switched on. One step left on the TV.';
     $('home-note').textContent = !on ? 'The TV keeps its own home until you choose. Everything else on this page works either way.'
       : held || (h.fire_tv && h.watch) ? 'Press Home on the TV remote to check.'
       : h.fire_tv ? 'On a Fire TV, Keep Couch TV on Home brings it back. It is in the Home button version of Couch TV: switch on Couch TV home watch in the TV\'s Settings, Accessibility.'

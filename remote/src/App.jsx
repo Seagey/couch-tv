@@ -9,7 +9,7 @@ import { AskSheet, MoreSheet, TypeSheet, ArrangeSheet, PeopleSheet, Onboarding }
 import { KidsSheet, PinSheet } from './Kids.jsx';
 import { usePullDown, usePageDrag } from './gestures.js';
 import { t, tBridge, useLang, setTvLang } from './i18n.js';
-import { takeDesignFromHash, nonceMatches, sentWords, canSend, NONCE_KEY, WORDS as DESIGN_WORDS } from './designSend.js';
+import { takeDesignFromHash, nonceMatches, sentWords, canSend, NONCE_KEY, dsw } from './designSend.js';
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -326,7 +326,7 @@ export default function App() {
   // Send a design (designSend.js): the words to show (sent, sent but the home is not open, or failed)
   const sendDesign = async (code) => {
     try { const r = await api.sendDesign(code); tick(); return { ok: true, words: sentWords(r) }; }
-    catch { return { ok: false, words: DESIGN_WORDS.failed }; }
+    catch { return { ok: false, words: dsw('failed') }; }
   };
   // couch-tv Studio's Send to my TV opens this page at #design=CODE. The code is taken out of the address
   // first, so a reload or a saved bookmark never offers it again. It is sent with no tap only when Studio
@@ -341,7 +341,7 @@ export default function App() {
     if (window.couchTv && typeof window.couchTv.token === 'function' && !window.couchTv.token()) return;
     const { code, nonce, rest } = takeDesignFromHash(window.location.hash);
     try { window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + rest); } catch { /* old browser */ }
-    if (!code) { say(DESIGN_WORDS.notCode, 'err'); return; }
+    if (!code) { say(dsw('notCode'), 'err'); return; }
     const kept = store.get(NONCE_KEY);
     if (nonceMatches(nonce, kept)) { try { localStorage.removeItem(NONCE_KEY); } catch { /* private mode */ } sendNow(code); }
     else setOffer(code);
@@ -444,11 +444,11 @@ export default function App() {
       )}
       {toast && <div key={toast.id} className={`toast glass ${toast.kind}`} role="status">{toast.text}</div>}
       {offer && (
-        <div className="design-offer glass" role="dialog" aria-label={DESIGN_WORDS.ask}>
-          <p>{DESIGN_WORDS.ask} <b>{offer}</b></p>
+        <div className="design-offer glass" role="dialog" aria-label={dsw('ask')}>
+          <p>{dsw('ask')} <b>{offer}</b></p>
           <div className="design-offer-row">
-            <button type="button" className="pill solid" onClick={() => { const c = offer; setOffer(null); sendNow(c); }}>{DESIGN_WORDS.askSend}</button>
-            <button type="button" className="pill glass" onClick={() => setOffer(null)}>{DESIGN_WORDS.askLater}</button>
+            <button type="button" className="pill solid" onClick={() => { const c = offer; setOffer(null); sendNow(c); }}>{dsw('askSend')}</button>
+            <button type="button" className="pill glass" onClick={() => setOffer(null)}>{dsw('askLater')}</button>
           </div>
         </div>
       )}
