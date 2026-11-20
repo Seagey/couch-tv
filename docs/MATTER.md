@@ -62,7 +62,9 @@ It installs as little as it can: `--omit=optional` leaves out the Bluetooth and 
 packages in the lock, three of them with install scripts that compile code), which the bridge never
 uses, and `--ignore-scripts` runs nothing that was downloaded. matter.js marks its Node.js network
 layer (`@matter/nodejs`) optional too and cannot start without it, so the script puts that one back
-at the version and checksum in the lock file. Tried on an Apple silicon Mac (Node.js 26.13): 87
+at the version and checksum in the lock file, and stops if the installed copy's checksum differs.
+matter-server 1.6.0 pins a nightly build of matter.js (`0.18.1-alpha.0-20261114-e4326a175`), not a
+numbered release; the lock file holds it at that exact build and checksum. Tried on an Apple silicon Mac (Node.js 26.13): 87
 packages, the service started and added the test devices.
 
 Then restart the bridge. It starts the Matter service by itself, and again if it ever stops. The
@@ -207,7 +209,7 @@ point, °C, in half degrees). A cover's `on` opens it and `off` closes it. Senso
   own report. The SDK's virtual lock (`chip-lock-app`): refused with `not_allowed`, the bridge left
   its fabric again, and it never showed in the device list.
 - Linux, in Docker (colima) on that Mac, from a clean copy with `node:22-bookworm` (Node.js 22.23.5,
-  Python 3.11): `scripts/matter-setup.sh`, the 15 tests, the service ready (2.2 seconds on arm64,
+  Python 3.11): `scripts/matter-setup.sh`, the bridge's Matter tests (15 then), the service ready (2.2 seconds on arm64,
   the Raspberry Pi 4 and 5 kind; 21 seconds on x86_64 under emulation), the `expired` answer from
   the real service, a clean stop, storage mode 700. Docker's own network on a Mac cannot reach
   the home network, so adding a real device on Linux was not tried.

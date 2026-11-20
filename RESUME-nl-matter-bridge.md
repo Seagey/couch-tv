@@ -23,9 +23,18 @@ Read first: coord/nolater-common.md and coord/matter-contract.md (changes 1 to 1
 - Fable NO-GO (coord/fable-1121-nl-matter-bridge.md): items 1-4 and 6-15 fixed and tested. Item 5
   (launchd) NOT done: see below.
 
+- Checker NO-GO at 50ac34c (A to G and a nit), fixed after it: joined names ("GarageDoor", "Gate_1",
+  "Door1") split before the name rule; thread_route and why_not off the event loop (to_thread,
+  _commission_error async); /api/matter/events writes time out after MATTER_WRITE_WAIT (30 s);
+  Closure Control 260 and Closure Dimension 261 clusters blocked, 562 dropped from BLOCKED_TYPES (not a
+  device type in matter.js 0.18's Matter 1.5 model: Closure 560, Closure Panel 561, Closure Controller
+  574 is a controller); setup script passes paths by environment and checks @matter/nodejs's checksum
+  against the lock (tampered copy: exit 1, tried on the MacBook); zero width and text direction
+  controls stripped from names. Item 5 waits on the owner: do not try it.
+
 ## Test results (21 Nov)
-- `<repo>/.venv/bin/python -m unittest discover -s tests -p "test_matter_bridge.py"`: 31/31 OK.
-- Full suite `-p "test_*.py"`: Ran 1379, OK (skipped 58) on the final code (was 1363 before this branch's new tests).
+- `<repo>/.venv/bin/python -m unittest discover -s tests -p "test_matter_bridge.py"`: 36/36 OK (after the checker round).
+- Full suite `-p "test_*.py"`: Ran 1384, OK (skipped 58) after the checker round (1379 at 50ac34c, 1363 before this branch).
 - Contract harness (wt-nl-matter-fixtures tests/matter_contract.py) against this bridge on the
   MacBook (~/mb-nlb, port 8796, test_devices on): run 1 (WIP 0001e84) 255 pass / 4 fail / 2 warn;
   the four fails and two warns were fixed (already, light attrs, unavailable probe, leave only once

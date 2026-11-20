@@ -29,7 +29,7 @@ fi
 
 if [ "${1:-}" = "--check" ]; then
   if [ -f "$ENTRY" ]; then
-    echo "matter: installed ($(node -p "require('$DIR/node_modules/matter-server/package.json').version"), Node.js $V)"
+    echo "matter: installed ($(D="$DIR" node -p "require(process.env.D + '/node_modules/matter-server/package.json').version"), Node.js $V)"
     exit 0
   fi
   echo "matter: not installed yet (run scripts/matter-setup.sh)"
@@ -42,7 +42,16 @@ fi
 # optional too, and the service cannot start without it, so that one is put back, at the version and
 # checksum in package-lock.json. --ignore-scripts: nothing downloaded runs while it installs.
 npm ci --prefix "$DIR" --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund --loglevel=error
-NODEJS=$(node -p "require('$DIR/package-lock.json').packages['node_modules/@matter/nodejs'].version")
+NODEJS=$(D="$DIR" node -p "require(process.env.D + '/package-lock.json').packages['node_modules/@matter/nodejs'].version")
 npm install --prefix "$DIR" --no-save --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund --loglevel=error "@matter/nodejs@$NODEJS"
+# The one package installed by name must be the very file the lock pins (same checksum), or nothing runs.
+if ! D="$DIR" node -e '
+  const want = require(process.env.D + "/package-lock.json").packages["node_modules/@matter/nodejs"];
+  const got = require(process.env.D + "/node_modules/.package-lock.json").packages["node_modules/@matter/nodejs"] || {};
+  process.exit(want && want.integrity && got.integrity === want.integrity && got.version === want.version ? 0 : 1);
+'; then
+  echo "matter: @matter/nodejs does not match the checksum in bridge/matter/package-lock.json. Nothing was started."
+  exit 1
+fi
 node "$ENTRY" --version >/dev/null
-echo "matter: installed $(node -p "require('$DIR/node_modules/matter-server/package.json').version") in bridge/matter. Restart the bridge to start it."
+echo "matter: installed $(D="$DIR" node -p "require(process.env.D + '/node_modules/matter-server/package.json').version") in bridge/matter. Restart the bridge to start it."

@@ -65,6 +65,7 @@ BASIC, BRIDGED, DESCRIPTOR = 40, 57, 29
 TEMP, HUMID, LUX, PRESSURE, OCCUPANCY, BOOLEAN = 1026, 1029, 1024, 1027, 1030, 69
 AIR, PM25, CO2 = 91, 1066, 1037
 DOOR_LOCK, SMOKE_CO = 257, 92
+CLOSURE_CONTROL, CLOSURE_DIMENSION = 260, 261
 ICD = 70    # ICD management: a sleepy battery device
 
 # Matter device types (Device Library) to the contract's domains
@@ -76,8 +77,11 @@ CLIMATES = {769, 114}                          # thermostat, room air conditione
 SENSORS = {770: "temperature", 775: "humidity", 262: "illuminance", 773: "pressure", 263: "occupancy",
            21: "contact", 44: "aqi"}
 # never shown, never switched: door lock, smoke and CO alarm, the Matter 1.5 closures (garage doors, gates)
-BLOCKED_TYPES = {10, 118, 560, 561, 562}
-BLOCKED_CLUSTERS = {DOOR_LOCK, SMOKE_CO}
+# Device types (matter.js 0.18 standard model, Matter 1.5): door lock 10, smoke and CO alarm 118, Closure
+# 560 (garage doors, gates and the like), Closure Panel 561. Clusters: door lock 257, smoke and CO alarm
+# 92, Closure Control 260 (0x0104) and Closure Dimension 261 (0x0105), which only closures serve.
+BLOCKED_TYPES = {10, 118, 560, 561}
+BLOCKED_CLUSTERS = {DOOR_LOCK, SMOKE_CO, CLOSURE_CONTROL, CLOSURE_DIMENSION}
 # A name that says the thing opens the house: a garage door, a gate, a door or a lock, as whole words
 # ("Outdoor blind", "Margate blind" and "Block out blind" are blinds), in every language the home
 # speaks: English, German, Dutch, French, Spanish, Italian, Portuguese, Turkish, Serbian (Latin),
@@ -105,13 +109,22 @@ OPENS_HOUSE = re.compile(r"(?<!\w)(?:" + "|".join(OPENS_HOUSE_WORDS) + r")(?!\w)
 
 
 def opens_house(name):
-    return bool(name) and bool(OPENS_HOUSE.search(str(name)))
+    """True when a name says garage door, gate, door or lock. Joined names count too: "GarageDoor",
+    "MyGarage", "Garage2", "Gate_1" and "Door1" are split at a small letter followed by a capital and
+    at digits and underscores before the whole word match ("Outdoor blind" stays a blind)."""
+    if not name:
+        return False
+    s = re.sub(r"(?<=[a-zà-ÿ])(?=[A-ZÀ-Þ])", " ", str(name))
+    s = re.sub(r"[\d_]+", " ", s)
+    return bool(OPENS_HOUSE.search(s))
 
 MODES = {"off": 0, "heat_cool": 1, "cool": 3, "heat": 4, "fan_only": 7, "dry": 8}
 MODE_OF = {0: "off", 1: "heat_cool", 3: "cool", 4: "heat", 5: "heat", 6: "cool", 7: "fan_only", 8: "dry", 9: "auto"}
 AIR_WORDS = {0: "unknown", 1: "good", 2: "fair", 3: "moderate", 4: "poor", 5: "very_poor", 6: "extremely_poor"}
 ACTIONS = {"on", "off", "toggle", "level", "colour", "temp", "target", "mode", "position"}
-NAME = re.compile(r"[^\x00-\x1f<>]{1,40}")
+# no control characters, no < or >, and no zero width or text direction controls (a name could hide or
+# reorder words with them): U+200B to U+200F, U+202A to U+202E, U+2066 to U+2069
+NAME = re.compile(r"[^\x00-\x1f\x7f<>\u200b-\u200f\u202a-\u202e\u2066-\u2069]{1,40}")
 
 
 def _a(node, ep, cluster, attr, default=None):
@@ -332,7 +345,7 @@ def tidy_name(s):
     """A name as the TV may show it (the NAME rule: 1 to 40 characters, no control characters, no < or >), or None."""
     if not isinstance(s, str):
         return None
-    s = re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f\x7f<>]", " ", s)).strip()[:40].strip()
+    s = re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f\x7f<>\u200b-\u200f\u202a-\u202e\u2066-\u2069]", " ", s)).strip()[:40].strip()
     return s if s and NAME.fullmatch(s) else None
 
 
@@ -849,7 +862,7 @@ class Matter:
         return None
 
     async def start(self):
-        why = self.why_not()
+        why = await asyncio.to_thread(self.why_not)   # runs node --version: never on the event loop
         if why:
             self.reason, self.note = why
             log.info("matter: %s", self.note)
@@ -1272,7 +1285,7 @@ class Matter:
                 node = await self.request("commission_with_code", {"code": c, "network_only": True,
                                                                    "discovery_timeout_s": DISCOVERY_S}, timeout=COMMISSION_WAIT)
         except MatterError as e:
-            return self._commission_error(e)
+            return await self._commission_error(e)
         if not isinstance(node, dict) or node.get("node_id") is None:
             return {"ok": False, "device_ids": [], "error": "unreachable", "note": "The device did not answer."}
         nid = str(node["node_id"])
@@ -1289,7 +1302,7 @@ class Matter:
         self._changed()
         return {"ok": True, "device_ids": [d["id"] for d in devices_of(node, self._names)]}
 
-    def _commission_error(self, e):
+    async def _commission_error(self, e):
         details = e.details.lower()
         if e.reason in ("passcode-mismatch", "invalid-payload") or "passcode" in details or "invalid" in details and "code" in details:
             key, note = "wrong_code", "That code did not work. Make a new code in the other app and type it in again."
@@ -1299,7 +1312,7 @@ class Matter:
             key, note = "expired", ("The device did not answer to that code. A shared code works for a few minutes only: "
                                     "make a new one and try again, with the device switched on.")
         elif e.reason == "timeout" or "timeout" in details or "timed out" in details:
-            if not thread_route():
+            if not await asyncio.to_thread(thread_route):   # netstat or ip: never on the event loop
                 key, note = "thread", ("The home computer cannot reach your Thread network. A Thread hub (a Google Nest hub, "
                                        "an Apple TV or HomePod, or a SmartThings hub) must be on, on the same Wi-Fi.")
             else:

@@ -147,6 +147,42 @@ class ModelTest(unittest.TestCase):
         self.assertEqual(matter.devices_of(node(32, {1: ([257], {"6/0": True, "8/0": 100})}, basic={"0/40/5": "Garage"}))[0]["name"], "Garage")
         self.assertEqual(matter.devices_of(node(33, {1: ([43], {"514/0": 0})}, basic={"0/40/5": "Garage fan"}))[0]["domain"], "fan")
 
+    def test_joined_names(self):
+        """Checker 21 Nov (A): names written as one word or with a number still say garage door, gate or door."""
+        def cover(nm):
+            return bool(matter.devices_of(node(30, {1: ([514], {"258/14": 2500})}, basic={"0/40/5": nm})))
+        for nm in ("GarageDoor", "Garage2", "MyGarage", "Gate_1", "Door1", "garage_door", "FrontGate"):
+            self.assertFalse(cover(nm), nm)
+            self.assertTrue(matter.opens_house(nm), nm)
+        for nm in ("Outdoor blind", "Indoor blind", "Margate blind", "Blind 2", "Bedroom_blind", "LoungeBlind"):
+            self.assertTrue(cover(nm), nm)
+        self.assertFalse(matter.opens_house(""))
+        self.assertFalse(matter.opens_house(None))
+
+    def test_closures_are_blocked(self):
+        """Checker 21 Nov (D): Matter 1.5 Closure Control (0x0104) and Closure Dimension (0x0105) clusters and the
+        Closure (560) and Closure Panel (561) device types never show, whatever else the endpoint serves."""
+        self.assertEqual((matter.CLOSURE_CONTROL, matter.CLOSURE_DIMENSION), (0x0104, 0x0105))
+        self.assertEqual(matter.BLOCKED_TYPES, {10, 118, 560, 561})
+        for cl in (0x0104, 0x0105):
+            n = node(60, {1: ([], {"6/0": True, "%d/0" % cl: 0})})
+            self.assertEqual(one(n), [], cl)
+            self.assertTrue(matter.blocked_only(n))
+            n = node(61, {1: ([514], {"258/14": 0, "%d/0" % cl: 0})}, basic={"0/40/5": "Lounge blind"})
+            self.assertEqual(one(n), [], cl)
+        for t in (560, 561):
+            self.assertEqual(one(node(62, {1: ([t], {"6/0": True})})), [], t)
+
+    def test_no_hidden_text_controls_in_names(self):
+        """Checker 21 Nov (G): zero width and text direction controls never reach the screen."""
+        for ch in ("\u200b", "\u200f", "\u202a", "\u202e", "\u2066", "\u2069", "\x7f"):
+            self.assertIsNone(matter.NAME.fullmatch("Lounge" + ch + "lamp"), repr(ch))
+            self.assertEqual(matter.tidy_name("Lounge" + ch + "lamp"), "Lounge lamp", repr(ch))
+        # "Gar\u200bage door" must not slip past the name rule
+        n = node(63, {1: ([514], {"258/14": 0})}, basic={"0/40/5": "Garage\u200b door"})
+        self.assertEqual(one(n), [])
+        self.assertTrue(matter.NAME.fullmatch("Café lamp"))
+
     def test_device_names_follow_the_name_rule(self):
         """Fable 11: a device's own label goes through the same rule as a typed name."""
         n = node(34, {1: ([266], {"6/0": True})}, basic={"0/40/5": "  <b>Kettle</b>\n\x07plug  " + "x" * 60})
@@ -894,6 +930,56 @@ class EndpointTest(unittest.TestCase):
                 patch.object(server, "_tv_ips", return_value={"192.0.2.5"}):
             r = run(server.h_matter_devices(req))
             self.assertTrue({"ok", "devices", "ready", "version"} <= set(json.loads(r.body)))
+
+    def test_a_stuck_page_is_let_go(self):
+        """Checker 21 Nov (C): a page that stops reading cannot hold the event handler: a write that takes
+        longer than MATTER_WRITE_WAIT ends it like a reset, and the listener is removed."""
+        import server
+        from aiohttp.test_utils import make_mocked_request
+
+        class Stuck:
+            def __init__(self, *a, **k):
+                self.writes = 0
+
+            async def prepare(self, request):
+                return None
+
+            async def write(self, data):
+                self.writes += 1
+                await asyncio.sleep(3600)
+
+        async def go():
+            req = make_mocked_request("GET", "/api/matter/events")
+            with patch.object(server.config, "PAIRING_KEY", ""), patch.object(server, "client_ip", return_value="192.0.2.5"), \
+                    patch.object(server, "_tv_ips", return_value={"192.0.2.5"}), patch.object(server.web, "StreamResponse", Stuck), \
+                    patch.object(server, "MATTER_WRITE_WAIT", 0.2):
+                t = time.monotonic()
+                resp = await asyncio.wait_for(server.h_matter_events(req), 5)
+                self.assertLess(time.monotonic() - t, 2)
+                self.assertEqual(resp.writes, 1)
+                self.assertEqual(server.matter_clients, set())
+        run(go())
+
+    def test_nothing_blocks_the_event_loop(self):
+        """Checker 21 Nov (B): node --version (start) and netstat or ip (a commission timeout) run in a thread."""
+        import threading
+        seen = {}
+
+        def where(key, value):
+            def f(*a, **k):
+                seen[key] = threading.current_thread() is threading.main_thread()
+                return value
+            return f
+
+        async def go():
+            m = matter.Matter(tempfile.mkdtemp(), {}, spawn=True)
+            with patch.object(m, "why_not", where("why_not", ("off", "Matter is switched off."))):
+                await m.start()
+            self.assertEqual((m.reason, seen["why_not"]), ("off", False))
+            with patch.object(matter, "thread_route", where("thread_route", False)):
+                r = await m._commission_error(matter.MatterError("timeout", None, "timed out"))
+            self.assertEqual((r["error"], seen["thread_route"]), ("thread", False))
+        run(go())
 
     def test_push_only_to_matter_listeners(self):
         """Fable 1: /api/events has no pairing rule, so Matter names and states never go there."""

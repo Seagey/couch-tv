@@ -3002,6 +3002,7 @@ async def h_ha_forget(request):
 
 # ---------- Matter devices shared from Google Home, Apple Home, SmartThings or Alexa (bridge/matter.py, docs/MATTER.md)
 matter_clients = set()
+MATTER_WRITE_WAIT = 30   # seconds a page may take to read one event before it is let go (it reconnects)
 
 
 def _matter_event():
@@ -3037,15 +3038,15 @@ async def h_matter_events(request):
     q = asyncio.Queue()
     matter_clients.add(q)
     try:
-        await resp.write(_matter_event().encode())
+        await asyncio.wait_for(resp.write(_matter_event().encode()), MATTER_WRITE_WAIT)
         while True:
             try:
                 msg = await asyncio.wait_for(q.get(), timeout=20)
             except asyncio.TimeoutError:
                 msg = ": keepalive\n\n"
-            await resp.write(msg.encode())
-    except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, asyncio.CancelledError):
-        pass
+            await asyncio.wait_for(resp.write(msg.encode()), MATTER_WRITE_WAIT)
+    except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, asyncio.CancelledError, asyncio.TimeoutError):
+        pass   # gone, or stuck for 30 seconds: the same, the page reconnects
     finally:
         matter_clients.discard(q)
     return resp
