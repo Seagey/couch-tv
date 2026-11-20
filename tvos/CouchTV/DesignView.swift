@@ -45,7 +45,7 @@ struct DesignCanvas: View {
                     .id(look.id)
                     .transition(.opacity)
             } else {
-                DesignBackdrop(background: d.background, look: model.look)
+                DesignBackdrop(background: d.background, look: sceneLook)
             }
             ForEach(d.drawOrder.filter { $0.layer == "back" }) { o in DesignObjectView(design: d, object: o, date: date, focus: focus) }
             parts
@@ -84,7 +84,7 @@ struct DesignCanvas: View {
         let known = Set(SceneLook.all.map(\.id))
         let mine = design.home.scenes.filter { known.contains($0) }
         if mine.isEmpty { return model.look }
-        return SceneLook.byId(mine[model.sceneIndex % mine.count])
+        return SceneLook.byId(mine[model.sceneTurn % mine.count])
     }
 
     private var hasSettingsWidget: Bool {
@@ -105,7 +105,12 @@ struct DesignCanvas: View {
                 .moved(p.place, anchor: .top)
                 .at(0, 120)
         }
-        if d.shows("date") || (d.shows("weather") && model.weather != nil) {
+        if d.sceneClock && d.shows("date") {
+            // the scene's own date line, where and in the colour each scene puts it (dark on the Fog scene's pale sky)
+            DateLine(look: sceneLook, date: date)
+                .id("date-" + sceneLook.id)
+                .transition(.opacity)
+        } else if d.shows("date") || (d.shows("weather") && model.weather != nil) {
             HStack(spacing: 18) {
                 if d.shows("date") {
                     let p = d.part("date") ?? DesignPart()
@@ -539,9 +544,10 @@ struct DesignNotHereCard: View {
                 Text(DesignNotHere.title(kind))
                     .font(HomeFont.inter(words, .semibold))
                     .multilineTextAlignment(.center)
-                    .lineLimit(short ? 1 : 2)
+                    .lineLimit(short ? 1 : (g.size.width < 200 ? 3 : 2))
                     .minimumScaleFactor(0.5)
-                if !short {
+                // the line only where it can be read; a small box has the title alone
+                if g.size.height >= 160 && g.size.width >= 240 {
                     Text(DesignNotHere.line)
                         .font(HomeFont.inter(max(20, words * 0.7)))
                         .opacity(0.72)

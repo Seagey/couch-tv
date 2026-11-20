@@ -134,6 +134,8 @@ class RokuDraws(unittest.TestCase):
             w("own", "welcome", 1000, 500, 900, 300, text="Welcome, Smith family", sub="Tuesday to Sunday. Night two of five"),
             w("asText", "welcome", 1000, 820, 900, 200, text="Headland House, North Point"),
             w("clock", "clock", 1000, 0, 480, 240),
+            w("small", "energy", 1600, 0, 180, 180),
+            w("tiny", "commute", 1600, 300, 150, 120),
         ]
         cls.lay = rd.run_brs([("layout", [design(objs), rd.CTX])])[0]["layout"]
         cls.labels = [i for i in rd.items(cls.lay) if i["k"] == "label"]
@@ -162,8 +164,25 @@ class RokuDraws(unittest.TestCase):
         self.assertLessEqual(pill[0]["y"] + pill[0]["h"], 441)
 
     def test_words_fit_their_boxes(self):
+        # the width DesignLib.brs reckons with (dlTextWidth: characters x size x 0.54 for Inter Medium,
+        # 0.52 for Inter Regular) is inside each label's box, and every size is one a TV can read
+        k = {"Inter-Medium": 0.54, "Inter-Regular": 0.52, "Antonio-Light": 0.4}
+        notes = [i for i in self.labels if "not on this TV" in i["text"] or i["text"].startswith("Shows on")
+                 or i["text"] in ("not on this TV", "Android TV and Fire TV")]
+        self.assertGreater(len(notes), 6)
+        for i in notes:
+            widest = max(len(l) for l in i["text"].split("\n"))
+            self.assertLessEqual(widest * i["size"] * k[i["font"]], i["w"] + 1, i)
+            self.assertGreaterEqual(i["size"], 12, i)
+
+    def test_a_small_box_has_the_title_and_the_line_only_when_it_reads(self):
+        small = " ".join(self.inside(1600, 0, 180, 180))
+        self.assertIn("Solar and energy", small)
         for i in self.labels:
-            self.assertGreaterEqual(i["size"], 12)
+            if i["text"].startswith("Shows on") or i["text"] == "Android TV and Fire TV":
+                self.assertGreaterEqual(i["size"], 18, i)
+        tiny = self.inside(1600, 300, 150, 120)
+        self.assertTrue(tiny and "Commute" in " ".join(tiny))
 
     def test_welcome_starter_words_never_show(self):
         joined = " | ".join(self.t)
@@ -230,6 +249,16 @@ class AppleTvSceneClock(unittest.TestCase):
         self.assertRegex(src, r"if d\.sceneClock \{[^}]*SceneBackdrop\(look: look")
         self.assertIn('if d.shows("clock") && !d.sceneClock {', src)
         self.assertIn("design.home.scenes.filter", src)
+        self.assertIn("mine[model.sceneTurn % mine.count]", src)
+        self.assertIn("DesignBackdrop(background: d.background, look: sceneLook)", src)
+        self.assertRegex(src, r"if d\.sceneClock && d\.shows\(\"date\"\) \{\s*\n[^\n]*\n\s*DateLine\(look: sceneLook, date: date\)")
+        model = (ROOT / "tvos" / "CouchTV" / "HomeModel.swift").read_text()
+        self.assertRegex(model, r"self\.sceneTurn &\+= 1 \}\s*\n\s*guard self\.scenes\.count > 1")
+
+    def test_the_not_here_card_shows_its_line_only_where_it_reads(self):
+        body = re.search(r"struct DesignNotHereCard: View \{(.*?)\n\}", VIEW.read_text(), re.S).group(1)
+        self.assertIn("if g.size.height >= 160 && g.size.width >= 240 {", body)
+        self.assertIn("g.size.width < 200 ? 3 : 2", body)
 
 
 if __name__ == "__main__":

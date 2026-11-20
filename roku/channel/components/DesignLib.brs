@@ -1183,7 +1183,7 @@ function dlWTitle(kind as String) as String
     return "Widget"
 end function
 
-'' each widget's name as couch-tv Studio and the TV home say it (widget-caps.js name), for the card of a
+' each widget's name as couch-tv Studio and the TV home say it (widget-caps.js name), for the card of a
 ' kind not drawn here
 function dlWName(kind as String) as String
     n = { clock: "Digital clock", tallclock: "Tall clock", glassclock: "Glass clock", analog: "Analogue clock", flipclock: "Flip clock", wordclock: "Time in words", solar: "Sun clock", worldclock: "World clocks", countdown: "Countdown", date: "Date", month: "Month", timer: "Timer", weather: "Weather", bigtemp: "Big number", hourly: "Hourly", week: "This week", rain: "Rain soon", uv: "UV index", sun: "Sunrise and sunset", moon: "Moon", air: "Air quality", surf: "Surf", photo: "Photo", slideshow: "Slideshow", mosaic: "Photo mosaic", artframe: "Art frame", memory: "On this day", keep: "Keep watching", keeprow: "Keep watching row", upnext: "Up next", picks: "Picks for you", app: "One app", folder: "App folder", dock: "Dock", appgrid: "App grid", games: "Games", nowplaying: "Now playing", soundscape: "Soundscape", queue: "Up next queue", speakers: "Speakers", aircon: "Aircon", scenes: "Scenes", controls: "Control Centre", camera: "Camera", doorbell: "Doorbell", energy: "Solar and energy", sensor: "Sensor", battery: "Batteries", bins: "Bin night", people: "People", agenda: "Agenda", note: "Family note", list: "List", card: "Custom card", quote: "Quote", word: "Word of the day", news: "Headlines", sports: "Scores", stocks: "Markets", commute: "Commute", welcome: "Welcome words", quick: "Quick buttons", wifi: "Guest Wi-Fi", guide: "House guide", screentime: "Screen time", ask: "Ask AI", agent: "From your AI", stack: "Smart stack" }
@@ -1194,7 +1194,7 @@ end function
 ' the words on a kind this Roku does not draw: its name, said plainly, and where it does show. Never a
 ' label from the design (a surf widget's beach, an aircon's room): there is no data here behind it.
 function dlNotHereWords(kind as String) as Object
-    return { title: dlWName(kind) + ": not on this TV", sub: "Shows on Google TV, Android TV and Fire TV" }
+    return { title: dlWName(kind) + ": not on this TV", line: "Shows on Google TV, Android TV and Fire TV" }
 end function
 
 ' the card for a kind not drawn here. The title and the line each go on two lines when one would be too
@@ -1222,19 +1222,22 @@ sub dlNotHere(out as Object, kind as String, x as Float, y as Float, w as Float,
             tl = [Left(wd.title, cut), Mid(wd.title, cut + 2)]
             big = dlMin(dlFit(tl[0], "Inter-Medium", iw, ih * 0.22, 44), dlFit(tl[1], "Inter-Medium", iw, ih * 0.22, 44))
         end if
-        sl = [wd.sub]
-        ss = dlFit(wd.sub, "Inter-Regular", iw, ih * 0.16, dlMin(30, big * 0.7))
+        sl = [wd.line]
+        ss = dlFit(wd.line, "Inter-Regular", iw, ih * 0.16, dlMin(30, big * 0.7))
         if ss < 18
             sl = ["Shows on Google TV,", "Android TV and Fire TV"]
             ss = dlFit(sl[1], "Inter-Regular", iw, ih * 0.14, dlMin(30, big * 0.7))
+            ' still too small to read: the title alone
+            if ss < 18 then sl = []
         end if
-        total = tl.count() * big * 1.3 + big * 0.4 + sl.count() * ss * 1.3
+        total = tl.count() * big * 1.3
+        if sl.count() > 0 then total = total + big * 0.4 + sl.count() * ss * 1.3
         ty = y + (h - total) / 2
         for each t in tl
             items.push(dlLabel(t, x + pad, ty, iw, big * 1.3, "Inter-Medium", big, ink, "center"))
             ty = ty + big * 1.3
         end for
-        ty = ty + big * 0.4
+        if sl.count() > 0 then ty = ty + big * 0.4
         for each t in sl
             items.push(dlLabel(t, x + pad, ty, iw, ss * 1.3, "Inter-Regular", ss, dimc, "center"))
             ty = ty + ss * 1.3

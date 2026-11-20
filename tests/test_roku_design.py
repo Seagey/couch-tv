@@ -521,6 +521,14 @@ end sub
 '''
 
 
+def scene_today(year=False):
+    """Today's date as the scene draws it ("Friday 20 November"): the scene reads the real clock
+    (roDateTime, local time), not NOW."""
+    import datetime
+    t = datetime.datetime.now()
+    return f"{t:%A} {t.day} {t:%B}" + (f" {t.year}" if year else "")
+
+
 def run_scene(design, answer):
     import re
     import shutil
@@ -572,7 +580,7 @@ class Scene(unittest.TestCase):
         self.assertEqual(p["dBg"]["count"], {"Group": 1})
         self.assertEqual(p["zones"]["dock"], 5)          # four apps and Settings
         self.assertEqual(p["zones"]["wapps"], 0)
-        self.assertIn("Thursday 19 November", p["top"]["text"])
+        self.assertIn(scene_today(), p["top"]["text"])   # the scene runs on the real clock
         self.assertIn("23°C  Partly cloudy", p["top"]["text"])
         self.assertIn("Netflix", p["focus"]["name"])
 
@@ -586,7 +594,7 @@ class Scene(unittest.TestCase):
         self.assertEqual(c["zones"]["dock"], 4)          # Prime Video hidden, Settings still there
         self.assertEqual(c["zones"]["people"], 0)        # the design hides the people
         self.assertAlmostEqual(c["dockxf"], 0.5)         # made small, never gone
-        self.assertIn("Thursday 19 November 2026", c["top"]["text"])   # the full format
+        self.assertIn(scene_today(True), c["top"]["text"])   # the full format
         self.assertIn("Springfield  23°C", c["top"]["text"])            # with its place, without words
 
     def test_remote_reaches_the_design_apps_and_back_to_the_dock(self):
