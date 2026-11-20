@@ -66,8 +66,9 @@ object Matter {
     private const val VENDOR_ID = 0xFFF4           // the test vendor id; devices accept any vendor id for an extra admin
     private const val KV_PREFS = "chip.platform.KeyValueStore"
     // the contract wants an answer within 120 s; a code no device answers to never ends by itself
-    // (discovery keeps looking), and a phone page gives up long before 4 minutes
-    private const val COMMISSION_TIMEOUT_S = 100L
+    // (discovery keeps looking), and a phone page gives up long before 4 minutes. One deadline for
+    // every stage together (pairing, then the first report).
+    private const val COMMISSION_TIMEOUT_S = 110L
     private const val COMMAND_TIMEOUT_S = 20L
 
     /** The discovery module (matter-discovery) can supply its own resolver (IPv6 fallback for Android 11). */
@@ -82,6 +83,8 @@ object Matter {
     @Volatile var note: String? = null; private set
     /** Why Matter can never run on this TV (Android 6, or an Intel processor), decided at [init]; null = it can. */
     @Volatile var unsupported: String? = null; private set
+    /** Why the controller did not start ("processor": the library would not load; "not_started"), else null. */
+    @Volatile private var startFailed: String? = null
     private val io = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "matter").apply { isDaemon = true } }
 
     // live state
@@ -117,7 +120,7 @@ object Matter {
             ChipDeviceController.loadJni()
         } catch (e: Throwable) {
             Log.w(TAG, "no controller library", e)
-            note = "Matter does not work on this TV: its processor is not one the Matter part of Couch TV was built for."
+            note = MatterSupport.NOTE_PROCESSOR; startFailed = "processor"
             return false
         }
         try {
@@ -142,14 +145,14 @@ object Matter {
                 io.execute { c.continueCommissioning(ptr, true) }
             })
             controller = c
-            ready = true; note = null
+            ready = true; note = null; startFailed = null
             backupFabric()
             nodes.keys.forEach { subscribe(it, 0) }
             Log.i(TAG, "controller ready, ${nodes.size} devices, ${paa.size} PAA roots")
             return true
         } catch (e: Throwable) {
             Log.w(TAG, "controller start failed", e)
-            note = "Matter could not start on this TV."
+            note = "Matter could not start on this TV."; startFailed = "not_started"
             return false
         }
     }
@@ -189,9 +192,13 @@ object Matter {
         val o = JSONObject().put("devices", list).put("ready", MatterSupport.ready(unsupported, ready, nodes.isEmpty(), note)).put("version", version.get())
         val n = note ?: if (nodes.isNotEmpty() && !ready) "Starting Matter. Your devices show in a moment." else null
         if (n != null) o.put("note", n)
-        MatterSupport.reason(unsupported)?.let { o.put("reason", it) }
+        reasonKey()?.let { o.put("reason", it) }
         return o
     }
+
+    /** Why Matter is not ready, as a key the screens word in every language (contract change 14). */
+    private fun reasonKey(): String? = MatterSupport.reason(unsupported) ?: startFailed
+        ?: if (nodes.isNotEmpty() && !ready) "starting" else null
 
     private fun snapshot(node: Long): MatterNode = live[node]?.let { deepCopy(it) } ?: emptyMap()
 
@@ -231,35 +238,52 @@ object Matter {
     private val primedWaits = ConcurrentHashMap<Long, CountDownLatch>()
     /** While commissioning with an address: (node, address) for [lastAddress]. */
     @Volatile private var hint: Pair<Long, Pair<String, Int>>? = null
-    private val commissionLock = Any()
+    private val commissionLock = java.util.concurrent.locks.ReentrantLock()
 
     /**
-     * POST /api/matter/commission { code, address? }. [address] ("host" or "host:port") skips network
-     * discovery: for a device the TV can't find by itself, and for tests on an emulator.
+     * POST /api/matter/commission { code, address? }. [address] ("host", "host:port" or "[v6]:port",
+     * number addresses only) skips network discovery: for a device the TV can't find by itself, and for
+     * tests on an emulator. One at a time: a second one while the first runs answers at once ("busy").
+     * Every answer comes within [COMMISSION_TIMEOUT_S] seconds, all stages together.
      */
-    fun commission(code: String?, address: String? = null): JSONObject = synchronized(commissionLock) {
+    fun commission(code: String?, address: String? = null): JSONObject {
         val parsed = MatterCode.parse(code)
         if (parsed is MatterCode.Parsed.Bad) return fail(parsed.key, parsed.note)
+        val at = if (address.isNullOrBlank()) null else MatterCode.address(address)
+        if (at?.reason != null) return fail("unreachable", at.note!!).put("reason", at.reason)
+        if (!commissionLock.tryLock()) return fail("busy", "The TV is adding another device right now. Try again in a minute.").put("reason", "busy")
+        try { return commissionLocked(parsed, at) } finally { commissionLock.unlock() }
+    }
+
+    private fun commissionLocked(parsed: MatterCode.Parsed, at: MatterCode.Address?): JSONObject {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(COMMISSION_TIMEOUT_S)
+        fun left() = maxOf(0L, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime()))
         if (!start()) return JSONObject().put("ok", false).put("error", if (unsupported != null) "unsupported" else "unreachable")
-            .put("note", note).put("device_ids", JSONArray())
+            .put("note", note).put("device_ids", JSONArray()).apply { reasonKey()?.let { put("reason", it) } }
         val c = controller!!
         val text = when (parsed) { is MatterCode.Parsed.Manual -> parsed.digits; is MatterCode.Parsed.Qr -> parsed.text; else -> "" }
         val node = store.nextNodeId()
         val p = Pending(node); pending = p
         try {
             val params = CommissionParameters.Builder().build()
-            if (!address.isNullOrBlank()) {
-                val payload = runCatching {
-                    if (parsed is MatterCode.Parsed.Qr) OnboardingPayloadParser().parseQrCode(text) else OnboardingPayloadParser().parseManualPairingCode(text)
-                }.getOrElse { return fail("wrong_code", MatterCode.NOTES["wrong_code"]!!) }
-                val (host, port) = splitHostPort(address.trim())
-                hint = node to (host to port)   // the device keeps this address once it joins: find it there too
-                val disc = if (payload.hasShortDiscriminator) payload.getShortDiscriminatorValue() else payload.getLongDiscriminatorValue()
-                c.pairDeviceWithAddress(node, host, port, disc, payload.setupPinCode, params)
-            } else {
-                c.pairDeviceWithCode(node, text, false, true, params)
+            try {
+                if (at != null) {
+                    val payload = runCatching {
+                        if (parsed is MatterCode.Parsed.Qr) OnboardingPayloadParser().parseQrCode(text) else OnboardingPayloadParser().parseManualPairingCode(text)
+                    }.getOrElse { return fail("wrong_code", MatterCode.NOTES["wrong_code"]!!) }
+                    hint = node to (at.host to at.port)   // the device keeps this address once it joins: find it there too
+                    val disc = if (payload.hasShortDiscriminator) payload.getShortDiscriminatorValue() else payload.getLongDiscriminatorValue()
+                    c.pairDeviceWithAddress(node, at.host, at.port, disc, payload.setupPinCode, params)
+                } else {
+                    c.pairDeviceWithCode(node, text, false, true, params)
+                }
+            } catch (e: Exception) {
+                // the controller refused to start pairing at all: plain words, never its own error text
+                Log.w(TAG, "pairing node $node did not start", e)
+                runCatching { c.stopDevicePairing(node) }
+                return fail("unreachable", MatterCode.NOTES["unreachable"]!!)
             }
-            if (!p.done.await(COMMISSION_TIMEOUT_S, TimeUnit.SECONDS)) p.fail(p.stage, MatterCode.ERR_TIMEOUT)
+            if (!p.done.await(left(), TimeUnit.MILLISECONDS)) p.fail(p.stage, MatterCode.ERR_TIMEOUT)
             if (p.error != 0L) {
                 runCatching { c.stopDevicePairing(node) }
                 val addr = runCatching { c.getNetworkLocation(node)?.ipAddress }.getOrNull()
@@ -281,7 +305,7 @@ object Matter {
             val first = CountDownLatch(1)
             primedWaits[node] = first
             subscribe(node, 0)
-            first.await(30, TimeUnit.SECONDS)
+            first.await(minOf(30_000L, left()), TimeUnit.MILLISECONDS)
             primedWaits.remove(node)
             val ids = JSONArray()
             MatterModel.devices(node, snapshot(node), true, saved.names).forEach { ids.put(it.getString("id")) }
@@ -289,20 +313,14 @@ object Matter {
             if (ids.length() == 0 && snapshot(node).isNotEmpty()) {
                 // a lock, an alarm or a garage door (or nothing the TV can show): the TV leaves it again
                 leave(node)
-                return fail("not_allowed", "That device is not something the TV shows (locks, alarms and garage doors never show), so the TV did not keep it.")
+                return fail("not_allowed", "That device is not something the TV shows (locks, alarms and garage doors never show), so the TV did not keep it.").put("reason", "blocked")
             }
             changed()
-            JSONObject().put("ok", true).put("device_ids", ids)
+            return JSONObject().put("ok", true).put("device_ids", ids)
         } finally { pending = null; hint = null }
     }
 
     private fun fail(key: String, note: String) = JSONObject().put("ok", false).put("error", key).put("note", note).put("device_ids", JSONArray())
-
-    private fun splitHostPort(a: String): Pair<String, Int> {
-        if (a.startsWith("[")) return a.substring(1).substringBefore(']') to (a.substringAfter("]:", "").toIntOrNull() ?: 5540)
-        if (a.count { it == ':' } == 1) return a.substringBefore(':') to (a.substringAfter(':').toIntOrNull() ?: 5540)
-        return a to 5540
-    }
 
     // ---- subscriptions (live state)
 
@@ -323,7 +341,7 @@ object Matter {
     // off the Matter thread: calling the controller from its own callback waits forever
     private fun subscribeOn(c: ChipDeviceController, node: Long, ptr: Long, attempt: Int) {
         val paths = listOf(ChipAttributePath.newInstance(ChipPathId.forWildcard(), ChipPathId.forWildcard(), ChipPathId.forWildcard()))
-        c.subscribeToPath(SubscriptionEstablishedCallback { id -> Log.i(TAG, "node $node subscribed ($id)"); setReachable(node, true); primedWaits[node]?.countDown() },
+        c.subscribeToPath(SubscriptionEstablishedCallback { id -> Log.i(TAG, "node $node subscribed ($id)"); setReachable(node, true); primed(node) },
             ResubscriptionAttemptCallback { cause, next -> Log.i(TAG, "node $node resubscribing in $next ms (0x${cause.toString(16)})"); setReachable(node, false) },
             object : ReportCallback {
                 override fun onError(attributePath: ChipAttributePath?, eventPath: ChipEventPath?, e: Exception) {
@@ -331,6 +349,23 @@ object Matter {
                 }
                 override fun onReport(nodeState: NodeState) { merge(node, nodeState) }
             }, ptr, paths, emptyList(), 1, 60, true, false, 0)
+    }
+
+    private val checked = ConcurrentHashMap.newKeySet<Long>()
+
+    /**
+     * Every value of a node has been reported once. While it is being added, the commission call
+     * decides. Otherwise (the first report came after commission stopped waiting, or after a restart):
+     * a node that shows nothing on the TV (a slow lock, alarm or garage door) is left at once.
+     */
+    private fun primed(node: Long) {
+        primedWaits[node]?.let { it.countDown(); checked.add(node); return }
+        if (!checked.add(node)) return
+        val s = nodes[node] ?: return
+        if (MatterModel.devices(node, snapshot(node), true, s.names).isEmpty()) {
+            Log.w(TAG, "node $node shows nothing on the TV (a lock, an alarm, a garage door or an unknown kind): leaving it")
+            io.execute { leave(node) }
+        }
     }
 
     private fun retry(node: Long, attempt: Int) {
@@ -389,17 +424,21 @@ object Matter {
 
     // ---- commands
 
-    class Refused(val status: Int, msg: String) : Exception(msg)
+    /** A refused call: HTTP [status], plain words, and a [reason] key the screens word in every language. */
+    class Refused(val status: Int, msg: String, val reason: String = when (status) {
+        404 -> "not_found"; 403 -> "not_allowed"; 400 -> "bad_request"; 503 -> "not_ready"; 504 -> "not_answering"; 502 -> "device_refused"; else -> "failed"
+    }) : Exception(msg)
 
     /** POST /api/matter/command { id, action, value? } */
     fun command(id: String, action: String, value: Any?): JSONObject {
         val (node, ep) = MatterModel.parseId(id) ?: throw Refused(404, "No Matter device with that id.")
         val saved = nodes[node] ?: throw Refused(404, "No Matter device with that id.")
         val epData = snapshot(node)[ep] ?: throw Refused(404, "No Matter device with that id.")
-        val domain = MatterModel.domainOf(epData, MatterModel.nameOf(snapshot(node), ep, saved.names[id]))
+        val snap = snapshot(node)
+        val domain = MatterModel.domainOf(epData, MatterModel.nameOf(snap, ep, null), MatterModel.nameOf(snap, ep, saved.names[id]))
             ?: throw Refused(403, "That device can't be controlled from the TV.")
         val steps = try { MatterModel.plan(domain, action, value, epData) } catch (e: MatterModel.BadCommand) { throw Refused(400, e.message ?: "bad command") }
-        if (!start()) throw Refused(503, note ?: "Matter is not ready.")
+        if (!start()) throw Refused(503, note ?: "Matter is not ready.", reasonKey() ?: "not_ready")
         val c = controller!!
         val ptr = connect(c, node)
         for (s in steps) {
@@ -453,12 +492,22 @@ object Matter {
 
     // ---- rename and remove
 
-    /** POST /api/matter/rename { id, name }: 1 to 40 characters, kept here. */
-    fun rename(id: String, name: String?): JSONObject {
-        val (node, _) = MatterModel.parseId(id) ?: throw Refused(404, "No Matter device with that id.")
+    /**
+     * POST /api/matter/rename { id, name }: 1 to 40 characters, kept here. Only an id the TV shows;
+     * never a name that would hide the device (a garage door, gate, door or lock: reason opens_house),
+     * so a rename can neither bring a hidden device back nor make one vanish by mistake.
+     */
+    @Synchronized fun rename(id: String, name: String?): JSONObject {
+        val (node, ep) = MatterModel.parseId(id) ?: throw Refused(404, "No Matter device with that id.")
         val s = nodes[node] ?: throw Refused(404, "No Matter device with that id.")
-        val n = name?.trim()?.replace(Regex("\\s+"), " ").orEmpty()
-        if (n.isEmpty() || n.length > 40) throw Refused(400, "A name is 1 to 40 characters.")
+        val snap = snapshot(node)
+        if (MatterModel.devices(node, snap, true, s.names).none { it.optString("id") == id }) throw Refused(404, "No Matter device with that id.")
+        val n = MatterModel.cleanName(name)
+        if (n.isEmpty() || n.length > 40) throw Refused(400, "A name is 1 to 40 characters.", "bad_name")
+        val epData = snap[ep] ?: throw Refused(404, "No Matter device with that id.")
+        val domain = MatterModel.domainOf(epData, MatterModel.nameOf(snap, ep, null))
+        if (MatterModel.hiddenByName(domain, epData, n))
+            throw Refused(400, "Couch TV never shows a garage door, gate, door or lock, so that name would hide this device. Pick another name.", "opens_house")
         s.names[id] = n
         persist(); changed()
         return JSONObject().put("ok", true).put("name", n)
@@ -473,24 +522,29 @@ object Matter {
         val (node, _) = MatterModel.parseId(id) ?: throw Refused(404, "No Matter device with that id.")
         if (!nodes.containsKey(node)) throw Refused(404, "No Matter device with that id.")
         val ids = JSONArray(); MatterModel.devices(node, snapshot(node), true, nodes[node]!!.names).forEach { ids.put(it.getString("id")) }
+        val wasReachable = reachable[node] == true
         val left = leave(node)
         return JSONObject().put("ok", true).put("removed", ids).apply {
             if (!left) put("note", "The device did not answer, so the TV forgot it. It may still list the TV as a connected service; you can remove that in your home app.")
+                .put("reason", if (wasReachable) "not_answering" else "offline")
         }
     }
 
     /** Takes the TV off the device's fabric and forgets it. True if the device confirmed. */
     private fun leave(node: Long): Boolean {
         var left = false
-        if (start()) {
-            val latch = CountDownLatch(1)
-            controller!!.unpairDeviceCallback(node, object : UnpairDeviceCallback {
-                override fun onError(status: Int, remoteDeviceId: Long) { latch.countDown() }
-                override fun onSuccess(remoteDeviceId: Long) { left = true; latch.countDown() }
-            })
-            latch.await(COMMAND_TIMEOUT_S, TimeUnit.SECONDS)
-            runCatching { controller!!.shutdownSubscriptions(controller!!.fabricIndex, node) }
-        }
+        // whatever the controller does (an exception included), the TV forgets the device below
+        runCatching {
+            if (start()) {
+                val latch = CountDownLatch(1)
+                controller!!.unpairDeviceCallback(node, object : UnpairDeviceCallback {
+                    override fun onError(status: Int, remoteDeviceId: Long) { latch.countDown() }
+                    override fun onSuccess(remoteDeviceId: Long) { left = true; latch.countDown() }
+                })
+                latch.await(COMMAND_TIMEOUT_S, TimeUnit.SECONDS)
+            }
+        }.onFailure { Log.w(TAG, "leaving node $node", it) }
+        runCatching { controller?.let { it.shutdownSubscriptions(it.fabricIndex, node) } }
         retries.remove(node)?.cancel(false)
         nodes.remove(node); live.remove(node); reachable.remove(node)
         persist(); backupFabric(); changed()

@@ -32,8 +32,8 @@ class MatterPage(ctx: Context, private val web: WebView) {
             if (!trusted(web.url)) { reply(id, JSONObject().put("ok", false).put("error", "refused")); return@post }
             io.execute {
                 val out = try { answer(method.uppercase(), path, runCatching { JSONObject(body ?: "{}") }.getOrDefault(JSONObject())) }
-                    catch (e: Matter.Refused) { JSONObject().put("ok", false).put("error", e.message ?: "error").put("status", e.status) }
-                    catch (e: Exception) { JSONObject().put("ok", false).put("error", "Matter could not do that just now.") }
+                    catch (e: Matter.Refused) { JSONObject().put("ok", false).put("error", e.message ?: "error").put("status", e.status).put("reason", e.reason) }
+                    catch (e: Exception) { android.util.Log.w("couchtv.matter", "$method $path", e); JSONObject().put("ok", false).put("error", "Matter could not do that just now.").put("status", 500).put("reason", "failed") }
                 main.post { reply(id, out) }
             }
         }

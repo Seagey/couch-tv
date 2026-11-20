@@ -645,7 +645,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             }
             else -> json(404, err("no such Matter call"))
         }
-    } catch (e: dev.couchtv.ontv.matter.Matter.Refused) { json(e.status, err(e.message ?: "error")) }
+    } catch (e: dev.couchtv.ontv.matter.Matter.Refused) { json(e.status, err(e.message ?: "error").put("reason", e.reason)) }
+    catch (e: Exception) { Log.w("couchtv.matter", "$route", e); json(500, err("Matter could not do that just now.").put("reason", "failed")) }
 
     private fun stream(q: LinkedBlockingQueue<String>, onClose: () -> Unit): Response {
         val input = object : InputStream() {

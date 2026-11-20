@@ -44,6 +44,17 @@ Worktree: tools/couch-tv/wt-nl-matter-android, branch nl-matter-android (base in
 - Android 6 (AVD matter23, API 23 arm64, MacBook): release APK installs; devices = ready false, note "Matter needs Android 7 or newer on this TV.", reason android_old; commission = 400 error "unsupported"; events stream sends the same at once; libCHIPController.so is in the app's lib folder but not in the process maps (0): never loaded. 5 checks.
 - Intel TV install: no Intel emulator on Apple silicon; proof is the APK listing above and the release check.
 
+## Done 21 Nov (session 4): checker NO-GO at ae3e6c1, all 8 items
+1. Backups: launcher backup_rules.xml and both sections of data_extraction_rules.xml leave out sharedpref chip.platform.KeyValueStore.xml, chip.platform.ConfigurationManager.xml and file matter/. on-TV manifest has dataExtractionRules (new res/xml/data_extraction_rules.xml: root, file, database, sharedpref, external out of cloud-backup and device-transfer). tests/test_matter_backup_rules.py: 4 pass (3 of 4 fail on the ae3e6c1 files). Built APKs: on-TV rules 10 excludes, launcher 5 + 10.
+2. House rule: MatterModel.OPENS_HOUSE_WORDS = the bridge's 13 language list word for word (scratchpad ma-parity.py: 52 = 52, same; 58 names, 0 disagreements with bridge/matter.py 50ac34c). hiddenByName on cover, switch and on/off only light; domainOf checks the device's own name AND the custom one; CamelCase split, digits and underscores to spaces (GarageDoor, Garage2, MyGarage, Gate_1, Door1); cleanName drops control/format (bidi, zero width) characters, also on device names. rename: 404 unless the id is in devices(), refuses a name that would hide it (400, reason opens_house), @Synchronized.
+3. primed(): on a node's first SubscriptionEstablished outside a commission, a node that shows nothing is left at once.
+4. Pair calls wrapped (exception -> unreachable, plain note); address checked (MatterCode.address: number address, port 1 to 65535, bare fe80 refused) -> unreachable with reason address / port / link_local; leave() runCatching so the TV always forgets; Server.matter and MatterPage catch everything else -> 500 "Matter could not do that just now." reason failed.
+5. Release (R8) launcher on matter34 via TVMATTER (ma-cdp2.py): 9 passed, 0 failed.
+6. One deadline of 110 s for every stage; a second commission answers at once: error busy, reason busy.
+7. rename as in 2.
+8. devices reasons: android_old, processor, not_started, starting. Refused answers carry reason (not_found, not_allowed, bad_request, bad_name, opens_house, not_ready or the devices reason, not_answering, device_refused, failed). commission not_allowed has reason blocked; remove note has reason offline / not_answering.
+Tests: on-TV unit 184 run, 0 failed, 1 skipped (new MatterOpensHouseTest 7, MatterAddressTest 3). Contract (nl-matter-fixtures 6b82489 harness, --no-lock, private ~/ma-fixtures refreshed from the new fx.py): 261 passed, 0 failed, 0 warnings, 261 checks (list 51: the stale test lamp is gone). Live probe (scratchpad ma-probe.py, on-TV app on matter34 with the fixtures plug): 16 passed, 0 failed (address reasons x3, busy at once, first answer 110 s, rename refusals x4 incl. Porte du garage and GarageDoor, cleanName, 404 reasons, remove). Release check ok on all three APKs.
+
 ## Left
 Nothing in this branch. For others (in the final report):
 - matter-ui: setup.html MT_ERR has no "unsupported"; MT_WHY has no "android_old" / "processor" (the note is English only).

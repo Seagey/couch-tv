@@ -88,4 +88,48 @@ object MatterCode {
             else -> "unreachable"
         }
     }
+
+    // ---------------------------------------------------------------- an address typed with the code
+
+    /** A checked address: [host] and [port], or [reason] ("address", "port", "link_local") and a plain [note]. */
+    data class Address(val host: String = "", val port: Int = 0, val reason: String? = null, val note: String? = null)
+
+    const val MATTER_PORT = 5540
+    private val V4 = Regex("""^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$""")
+    private val V6 = Regex("""^[0-9A-Fa-f:.]{2,45}$""")
+    private val SCOPE = Regex("""^[A-Za-z0-9_.]{1,16}$""")
+    val ADDRESS_NOTES = mapOf(
+        "address" to "That address is not one the TV can use. It is four numbers with dots between them, or an IPv6 address. Leave it empty and the TV finds the device itself.",
+        "port" to "The port after the address must be a number from 1 to 65535. Leave it out and the TV uses the Matter port.",
+        "link_local" to "That address only works together with the name of the TV's network connection, for example %wlan0. Leave it empty and the TV finds the device itself.",
+    )
+
+    /**
+     * "host", "host:port", "[v6]:port" or a bare IPv6 address. Only number addresses: the TV never
+     * looks a name up here (that would go to whatever DNS server the network gives).
+     */
+    fun address(raw: String): Address {
+        val a = raw.trim()
+        fun bad(r: String) = Address(reason = r, note = ADDRESS_NOTES[r])
+        val host: String
+        var portText: String? = null
+        when {
+            a.startsWith("[") -> {
+                if (!a.contains(']')) return bad("address")
+                host = a.substring(1).substringBefore(']')
+                val rest = a.substringAfter(']')
+                if (rest.isNotEmpty()) { if (!rest.startsWith(":")) return bad("address"); portText = rest.substring(1) }
+            }
+            a.count { it == ':' } == 1 -> { host = a.substringBefore(':'); portText = a.substringAfter(':') }
+            else -> host = a
+        }
+        val port = if (portText == null) MATTER_PORT else portText.takeIf { t -> t.isNotEmpty() && t.length <= 5 && t.all { it.isDigit() } }?.toInt()?.takeIf { it in 1..65535 } ?: return bad("port")
+        if (V4.matches(host)) return Address(host, port)
+        val bare = host.substringBefore('%')
+        val scope = if (host.contains('%')) host.substringAfter('%') else null
+        if (!host.contains(':') || !V6.matches(bare) || (scope != null && !SCOPE.matches(scope))) return bad("address")
+        val ip = runCatching { java.net.InetAddress.getByName(bare) }.getOrNull() as? java.net.Inet6Address ?: return bad("address")
+        if (ip.isLinkLocalAddress && scope == null) return bad("link_local")
+        return Address(host, port)
+    }
 }

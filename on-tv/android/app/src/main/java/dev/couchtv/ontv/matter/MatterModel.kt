@@ -58,7 +58,66 @@ object MatterModel {
     val SENSOR_TYPES = setOf(0x0302L, 0x0307L, 0x0106L, 0x0107L, 0x0015L, 0x002CL)
     /** Door lock, door lock controller, smoke/CO alarm, closure, closure panel, closure controller. */
     val BLOCKED_TYPES = setOf(0x000AL, 0x000BL, 0x0076L, 0x0230L, 0x0231L, 0x023EL)
-    private val GARAGE_WORDS = Regex("""\b(garage|gate|roller door|door opener)\b""", RegexOption.IGNORE_CASE)
+    /**
+     * A name that says the thing opens the house: a garage door, a gate, a door or a lock, as whole words
+     * ("Outdoor blind", "Margate blind" and "Block out blind" are blinds), in every language the home
+     * speaks: English, German, Dutch, French, Spanish, Italian, Portuguese, Turkish, Serbian (Latin),
+     * Polish, Czech, Hebrew and Arabic. The same list as the bridge (bridge/matter.py OPENS_HOUSE_WORDS),
+     * word for word, so both hide the same devices. `\w` there is Python's Unicode word character: here
+     * [WORD] (Android's regex has no UNICODE_CHARACTER_CLASS).
+     */
+    val OPENS_HOUSE_WORDS = listOf(
+        """garages?""", """gates?""", """doors?""", """locks?""",                                              // en
+        """garagen\w*""", """tore?""", """\w*(?:tür|tuer)(?:e|en)?""", """\w*schlo(?:ss|ß)""",                 // de
+        """\w*(?:einfahrts|hof|garten|roll|schiebe|flügel|fluegel)tore?""",
+        """(?:voor|achter|garage|zij|tuin|schuif|kantel|rol|kelder|balkon|terras)?deur(?:en)?""",       // nl
+        """(?:garage|toegangs|tuin|rol|schuif|inrit)?poort(?:en)?""", """slot(?:en)?""", """(?:tuin|toegangs|schuif|draai|inrit)?hek(?:ken)?""",
+        """portails?""", """portes?""", """serrures?""", """barrières?""",                                      // fr
+        """garajes?""", """cocheras?""", """puertas?""", """port[oó]n(?:es)?""", """verjas?""", """cerraduras?""",    // es
+        """cancelas?""", """cerrojos?""",
+        """portas?""", """portone""", """portoni""", """cancell[oi]""", """serratur[ae]""", """basculante""",          // it
+        """garage[mn]s?""", """port[ãa]o""", """port[õo]es""", """fechaduras?""",                                // pt
+        """garaj\w*""", """kap[ıi]\w*""", """kilit\w*""", """kilid\w*""",                                        // tr
+        """gara[žżz]\w*""", """kapij\w*""", """vrata""", """brav[au]""",                                          // sr, pl, cs
+        """bram(?:a|y|ę|ie|ą|ka|ki|kę)?""", """drzwi""", """zam(?:ek|ka|ku|ki|kiem)""",
+        """gar[áa][žz]\w*""", """br[áa]n(?:a|y|u|ou|ě)""", """dve[řr]\w*""", """z[áa]m(?:ek|ku|ky|kem)""",
+        """[הבלמו]?(?:מוסך|שער|דלת|מנעול)""",                                                         // he
+        """(?:ال)?(?:مرآب|كراج|جراج|بوابة|باب|قفل)""",                                                  // ar
+    )
+    private const val WORD = """[\p{L}\p{M}\p{N}_]"""
+    private val OPENS_HOUSE: Regex = java.util.regex.Pattern.compile(
+        "(?<!$WORD)(?:" + OPENS_HOUSE_WORDS.joinToString("|").replace("""\w""", WORD) + ")(?!$WORD)",
+        java.util.regex.Pattern.CASE_INSENSITIVE or java.util.regex.Pattern.UNICODE_CASE).toRegex()
+
+    /**
+     * A typed name, tidied: control characters (new lines, tabs) become spaces, format characters (zero
+     * width marks, direction marks) go, so "Gar<zero width space>age" is "Garage"; spaces collapsed.
+     */
+    fun cleanName(raw: String?): String =
+        raw.orEmpty().replace(Regex("""\p{Cc}"""), " ").replace(Regex("""\p{Cf}"""), "").replace(Regex("""\s+"""), " ").trim()
+
+    private val CAMEL = Regex("""(?<=[a-zà-ÿ])(?=[A-ZÀ-Þ])""")
+    private val DIGITS = Regex("""[\d_]+""")
+
+    /**
+     * Joined names count too ("GarageDoor", "Garage2", "MyGarage", "Gate_1", "Door1"): CamelCase is split
+     * and digits and underscores become spaces before the whole word match (the bridge does the same).
+     */
+    fun opensHouse(name: String?): Boolean {
+        if (name.isNullOrEmpty()) return false
+        val s = DIGITS.replace(CAMEL.replace(cleanName(name), " "), " ")
+        return OPENS_HOUSE.containsMatchIn(s)
+    }
+
+    /**
+     * True when a blind, a plug or an on/off only light is called a garage door, gate, door or lock (a
+     * garage door opener is usually one of those): never shown, never switched. Same rule as the bridge.
+     */
+    fun hiddenByName(domain: String?, ep: Map<Long, Map<Long, Any?>>, name: String?): Boolean {
+        val clusters = servers(ep)
+        val opener = domain == "cover" || domain == "switch" || (domain == "light" && LEVEL !in clusters && COLOR !in clusters)
+        return opener && opensHouse(name)
+    }
 
     /** The attributes the controller subscribes to on every node (wildcard endpoint), as cluster to attribute ids. */
     val SUBSCRIBE: Map<Long, List<Long>> = linkedMapOf(
@@ -131,8 +190,12 @@ object MatterModel {
     private fun servers(ep: Map<Long, Map<Long, Any?>>): Set<Long> =
         (ep.attr(DESCRIPTOR, 1L) as? List<*>)?.mapNotNull { long(it) }?.toSet() ?: ep.keys
 
-    /** The domain for one endpoint, or null when it is not something the TV shows (or is blocked). */
-    fun domainOf(ep: Map<Long, Map<Long, Any?>>, name: String = ""): String? {
+    /**
+     * The domain for one endpoint, or null when it is not something the TV shows (or is blocked).
+     * [names]: the device's own name and the name the person gave it; either one that opens the house
+     * hides it (so a rename can never bring a garage door back).
+     */
+    fun domainOf(ep: Map<Long, Map<Long, Any?>>, vararg names: String?): String? {
         val types = deviceTypes(ep)
         val clusters = servers(ep)
         if (types.any { it in BLOCKED_TYPES } || clusters.any { it in BLOCKED_CLUSTERS }) return null
@@ -153,7 +216,7 @@ object MatterModel {
             clusters.any { it in SENSOR_CLUSTERS } -> "sensor"
             else -> null
         }
-        if (d == "cover" && GARAGE_WORDS.containsMatchIn(name)) return null   // a garage door or gate made as a blind
+        if (names.any { hiddenByName(d, ep, it) }) return null   // a garage door, gate, door or lock made as a blind, plug or plain light
         return d
     }
     private val SENSOR_CLUSTERS = listOf(TEMPERATURE, HUMIDITY, ILLUMINANCE, OCCUPANCY, BOOLEAN_STATE, AIR_QUALITY, PM25)
@@ -164,7 +227,7 @@ object MatterModel {
         val ep = node[endpoint] ?: emptyMap()
         val root = node[0] ?: emptyMap()
         val pick = listOf(ep.attr(BRIDGED_BASIC, 5L), ep.attr(BRIDGED_BASIC, 3L), root.attr(BASIC, 5L), root.attr(BASIC, 3L))
-            .map { (it as? String)?.trim().orEmpty() }.firstOrNull { it.isNotEmpty() }
+            .map { cleanName(it as? String) }.firstOrNull { it.isNotEmpty() }
         val base = pick ?: "Matter device"
         // more than one thing on the same node: say which one
         val shown = node.keys.count { it != 0 && domainOf(node[it] ?: emptyMap()) != null }
@@ -182,7 +245,7 @@ object MatterModel {
             val ep = node[endpoint] ?: continue
             val id = id(nodeId, endpoint)
             val name = nameOf(node, endpoint, names[id])
-            val domain = domainOf(ep, name) ?: continue
+            val domain = domainOf(ep, nameOf(node, endpoint, null), name) ?: continue
             val bridgedReachable = ep.attr(BRIDGED_BASIC, 0x11L) as? Boolean
             val a = JSONObject().put("friendly_name", name)
             var state = describe(domain, ep, a)

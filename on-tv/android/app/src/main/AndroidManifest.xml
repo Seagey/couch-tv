@@ -63,6 +63,7 @@
         android:theme="@style/Couch"
         android:usesCleartextTraffic="true"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:supportsRtl="false">
 
         <!-- The setup screen: the "Couch TV" tile in the TV's app list. -->
