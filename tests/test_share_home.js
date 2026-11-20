@@ -58,6 +58,20 @@ d = plain(S.build(Object.assign({}, snap, { design: { v: 1, background: { image:
 ok(d.background === undefined, "a photo from backgrounds/mine stays on the TV");
 d = plain(S.build(Object.assign({}, snap, { design: { v: 1, background: { image: "backgrounds/beach.jpg" } } })));
 ok(d.background.image === "backgrounds/beach.jpg", "one of the app's own backgrounds may go");
+// a photo put in a Photo or Art frame widget, or in a smart stack's, is the household's own too
+const JPEG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ";
+const wp = { v: 1, objects: [
+  { id: "p1", type: "widget", kind: "photo", size: "4x3", opts: { image: JPEG, caption: "Our dog", fit: "contain" } },
+  { id: "a1", type: "widget", kind: "artframe", size: "4x3", opts: { image: "backgrounds/mine/us.jpg", mat: "#ffffff" } },
+  { id: "a2", type: "widget", kind: "artframe", size: "4x3", opts: { image: "backgrounds/scene-night.jpg" } },
+  { id: "s1", type: "widget", kind: "stack", size: "4x3", items: [{ kind: "photo", opts: { image: JPEG } }, { kind: "clock" }] }] };
+d = plain(S.build(Object.assign({}, snap, { design: wp })));
+ok(d.objects[0].opts.image === undefined && d.objects[0].opts.caption === "Our dog" && d.objects[0].opts.fit === "contain", "a photo in a Photo widget stays on the TV, its caption and fit go");
+ok(d.objects[1].opts.image === undefined && d.objects[1].opts.mat === "#ffffff", "a photo from backgrounds/mine in an Art frame stays on the TV");
+ok(d.objects[2].opts.image === "backgrounds/scene-night.jpg", "one of the app's own pictures in an Art frame may go");
+ok(d.objects[3].items[0].opts.image === undefined, "a photo in a smart stack's Photo stays on the TV");
+r = S.prepare(Object.assign({}, snap, { design: wp }), [], CD);
+ok(r.design && !JSON.stringify(r.design).includes("data:"), "after the gate, still no photo of the household in the shared design");
 r = S.prepare(Object.assign({}, snap, { design: on }), ["Robin Example"], CD);
 ok(r.design && !(r.design.background && r.design.background.image), "after the gate too, no photo");
 ok(!JSON.stringify(r.design).includes("climate."), "after the gate too, no entity");
