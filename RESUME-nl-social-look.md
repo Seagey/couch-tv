@@ -16,10 +16,16 @@ Branch nl-social-look off integrate-0.13.9 (4a705fe). Rules: scratchpad nolater-
 - docs CONFIG.md, TV-HOME.md. tests/test_low_end.js updated, test_loop_look.js regex for heldByLighter.
 - tests/test_look_switches_browser.mjs written (note: closing Home settings reloads the page and drops ?theme=, use look=).
 
-## Left
-- perf: headless rAF shows 16.7 ms everywhere at 6x throttle; probe2 (trace PipelineReporter + main thread ms) in scratchpad/look-perf.
-- perf cuts in app.css, tests/test_lag_perf_browser.mjs, docs/PERFORMANCE.md, run browser suites.
+- Perf cuts: cut 1 html.amb-fx (ambientSync) hides the empty weather canvas and lighting tint; cut 2 Night people and
+  quick buttons drop the live blur (app.css end). tests/test_lag_perf_browser.mjs, docs/PERFORMANCE.md section.
+- tests/test_look_switches_bridge.py (bridge keys).
 
-## Tests
-- Baseline node suite (all tests/test_*.js): 61 passed, 0 failed.
-- Script: scratchpad/look-node-suite.sh <worktree>
+## Left
+- Nothing in scope. Not done on purpose: no real TV run (bench-tv.py on the TCL), no GitHub replies (read only).
+
+## Tests (final, 21 Nov)
+- node suite (all tests/test_*.js): 61 passed, 0 failed (baseline 61).
+- browser: test_look_switches_browser 71 checks; test_lag_perf_browser 9 checks; test_ws_tv 1115 checks;
+  test_design_settings_browser 107 checks.
+- python: test_look_switches_bridge 5; test_hi_res 4; test_start_focus 4; test_production_features 16; others touching clean_settings pass.
+- Run browser tests with scratchpad/look-browser.sh <tests...> (takes the browser lock).

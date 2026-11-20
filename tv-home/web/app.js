@@ -1893,6 +1893,10 @@
     a.setLighter(LIGHTER || OLD_ENGINE);
     a.setEnabled(WX_AMBIENT && WX_SHOW && !LOOP);
     a.setSunGradeEnabled(WX_SUN_GRADE && !LIGHTER && !OLD_ENGINE && !LOOP);
+    // g01: the two full screen layers (the weather canvas and the lighting tint) only while one of them is in
+    // use. Left in the page empty, they sat over the scenes and made the browser give the panels and tiles
+    // above them layers of their own: 5.8 ms of main thread commit per arrow press at 6x CPU throttle, 0.8 without
+    document.documentElement.classList.toggle("amb-fx", ((WX_AMBIENT && WX_SHOW) || WX_SUN_GRADE) && !LIGHTER && !OLD_ENGINE && !LOOP);
     updateAmbientWeather();
   }
 

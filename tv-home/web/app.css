@@ -87,6 +87,7 @@ body {
   pointer-events: none;
   z-index: 0;
 }
+html:not(.amb-fx) .weather-canvas, html:not(.amb-fx) .ambient-lighting,   /* g01: not in the page unless in use (ambientSync) */
 .lighter .weather-canvas, .lighter .ambient-lighting,
 .old-engine .weather-canvas, .old-engine .ambient-lighting {
   display: none !important;
@@ -2319,3 +2320,12 @@ html.lighter.theme-loop .tile.focus, html.lighter.theme-loop .app.focus, html.li
 /* Home settings, Look, Show the clock off (home.show_clock false, g17): no time in any look and no big scene
    clock in Night; the date moves up into the clock's place (the time is out of the layout, not just clear) */
 html.no-clock .time, html.no-clock .scene .gclock { display: none; }
+
+/* g01 cut 2 (Night and its glass, not Loop): the people and the quick buttons at the top keep their tint but drop the
+   live blur. A TV redraws every blurred panel on every frame the dock or the cards move, and these small panels
+   each cost a blur of their own: at 6x CPU throttle 7.3 to 8.7 ms of drawing per arrow press with them, 4.0 without
+   (docs/PERFORMANCE.md). The dock, the cards and the date keep their glass. */
+html.theme-night:not(.theme-loop) .people:not(.focus), html.theme-night:not(.theme-loop) .qbtn:not(.focus) {
+  -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(30, 20, 28, 0.62);
+}
+html.glass.theme-night:not(.theme-loop) .people:not(.focus), html.glass.theme-night:not(.theme-loop) .qbtn:not(.focus) { background: var(--glass-solid); }
