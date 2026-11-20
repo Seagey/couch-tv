@@ -262,7 +262,10 @@
 </main>
 <script>
   var $ = function (id) { return document.getElementById(id); };
-  var esc = function (s) { return String(s).replace(/[&<>"]/g, ''); };
+  // words shown in the page: escaped, so "Fish & chips" stays "Fish & chips"
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  // an id the page looks up again with a selector (data-id, data-name): no quotes, markup characters or spaces
+  var idOf = function (s) { return String(s).replace(/[&<>"'\\\s]/g, ''); };   // as before: TV input ids (com.maker.tvinput/.HdmiService/HW2) keep everything else
   function api(method, path, body) {
     return fetch(path, { method: method, headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
       .then(function (r) { return r.json().then(function (j) { if (!r.ok || j.ok === false) { var e = new Error(j.error || ('error ' + r.status)); e.status = r.status; throw e; } return j; }); });
@@ -333,7 +336,7 @@
     $('photo-list').innerHTML = list.map(function (p) {
       var src = p.file ? '/api/photo/' + encodeURIComponent(p.file) : /^https:\/\//.test(p.url) ? p.url : '';
       return '<div class="photo">' + (src ? '<img alt="" loading="lazy" referrerpolicy="no-referrer" src="' + esc(src) + '">' : '') +
-        '<button type="button" aria-label="Remove this photo" data-id="' + esc(p.id) + '">×</button></div>';
+        '<button type="button" aria-label="Remove this photo" data-id="' + idOf(p.id) + '">×</button></div>';
     }).join('');
   }
   $('photo-list').addEventListener('click', function (e) {
@@ -408,12 +411,17 @@
     $('ah-in').innerHTML = opts(a.times_in || ['12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'], st.checkin || '15:00');
     $('ah-out').innerHTML = opts(a.times_out || ['08:00', '09:00', '10:00', '11:00', '12:00'], st.checkout || '10:00');
     if (a.guest != null) $('ah-guest').value = a.guest;
-    $('ah-list-add').disabled = (a.lists || []).length >= (AH_LIM.lists || 3);
+    $('ah-list-add').disabled = !AH || (a.lists || []).length >= (AH_LIM.lists || 3);
+  }
+  function wholeLists(live) {
+    ['ah-list-add', 'ah-lists-save', 'ah-guide-add', 'ah-guide-save'].forEach(function (id) { $(id).disabled = !live; });
+    say('ah-lists-msg', live ? '' : 'Lists can be changed once the couch-tv home is open on the TV.');
+    say('ah-guide-msg', live ? '' : 'The guide can be changed once the couch-tv home is open on the TV.');
   }
   function loadAtHome() {
     return api('GET', '/api/athome').then(function (j) {
-      if (j.live) { AH = j.athome; showAtHome(); $('ah-state').className = 'status'; say('ah-state', ''); }
-      else { $('ah-state').className = 'status bad'; say('ah-state', 'Open the couch-tv home on the TV to see what is saved there. Anything you save here still reaches the TV once the home is open.'); }
+      if (j.live) { AH = j.athome; showAtHome(); wholeLists(true); $('ah-state').className = 'status'; say('ah-state', ''); }
+      else { wholeLists(false); $('ah-state').className = 'status bad'; say('ah-state', 'Open the couch-tv home on the TV, then reload this page, to see what is saved there. A note, the Wi-Fi, calendar links and the guest\'s name saved here wait on the TV until its home opens.'); }
     }).catch(function (e) { say('ah-state', e.status === 404 ? 'This TV app needs an update for At home from the phone.' : e.message); });
   }
   $('ah-note-save').onclick = function () { ahSend({ note: { text: $('ah-note').value, from: $('ah-from').value } }, 'ah-note-msg', $('ah-note').value.trim() ? 'The note is on the TV.' : 'The note is cleared.'); };
@@ -623,9 +631,9 @@
       j.pinned.forEach(function (p) { if (p.id) pinned[p.id] = p.label; });
       $('in-list').innerHTML = j.inputs.map(function (x, i) {
         var name = x.label || ('Input ' + (i + 1)), on = pinned[x.id] !== undefined;
-        return '<label class="check"><input type="checkbox" data-id="' + esc(x.id) + '"' + (on ? ' checked' : '') + '> ' + esc(name) +
+        return '<label class="check"><input type="checkbox" data-id="' + idOf(x.id) + '"' + (on ? ' checked' : '') + '> ' + esc(name) +
           (x.devices.length ? ' (' + esc(x.devices.join(', ')) + ')' : '') + '</label>' +
-          '<input maxlength="30" placeholder="Name on the tile, for example Set-top box" data-name="' + esc(x.id) + '" value="' + esc(on ? pinned[x.id] : '') + '">';
+          '<input maxlength="30" placeholder="Name on the tile, for example Set-top box" data-name="' + idOf(x.id) + '" value="' + esc(on ? pinned[x.id] : '') + '">';
       }).join('');
       $('inputs').style.display = '';
     }).catch(function () {});

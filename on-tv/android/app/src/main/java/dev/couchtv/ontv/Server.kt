@@ -368,6 +368,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 val r = HomeActivity.atHomeEdit(e)
                 when {
                     r == null -> json(200, ok().put("live", false).put("queued", true))
+                    r.optBoolean("refused") -> json(409, err(r.optString("error")))
                     !r.optBoolean("ok") -> json(400, err(r.optString("error", "That did not save.")))
                     else -> json(200, ok().put("live", true).put("athome", r.optJSONObject("athome") ?: JSONObject()))
                 }
@@ -527,17 +528,31 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         Ask.save(b)   // first: a wrong Ask setting answers 400 before anything else in the request is saved
         b.optJSONObject("settings")?.let {
             if (it.toString().length > 32_000) throw ApiError(413, "settings are too big")
-            Store.writeJson("home-settings.json", it)
-            Store.putStr("home_settings_updated", Now.iso())
+            // The home sends its whole copy with "seen", the "updated" it last read. If the copy here has
+            // changed since (the phone's Home settings page: the town, a photo), the home's copy is older:
+            // the keys the phone changes stay as they are here. One lock with the phone's own writes.
+            synchronized(Store) {
+                val seen = b.optString("seen").ifEmpty { null }
+                val now = Store.str("home_settings_updated")
+                if (seen != null && now != null && seen != now) {
+                    val cur = Store.readJson("home-settings.json") as? JSONObject
+                    if (cur != null) for (k in PHONE_KEYS) if (cur.has(k)) it.put(k, cur.get(k))
+                }
+                Store.writeJson("home-settings.json", it)
+                Store.putStr("home_settings_updated", Now.iso())
+            }
         }
         // The phone's Home settings page changes only the keys it names (null takes one out), so a
         // town picked on the phone never undoes a look picked on the TV. Same keys and shapes as the
         // home's own Home settings (app.js ST); "place" is the home's Location, {name, area, lat, lon, timezone}.
         b.optJSONObject("settings_patch")?.let { p ->
             val keys = p.keys().asSequence().toList()
-            keys.forEach { k -> if (k !in PATCH_KEYS) throw ApiError(400, "$k cannot be changed from the phone yet") }
-            p.optJSONObject("place")?.let { pl ->
-                if (!pl.has("lat") || !pl.has("lon") || pl.optString("name").isBlank()) throw ApiError(400, "place needs name, lat and lon")
+            keys.forEach { k -> if (k !in PATCH_KEYS) throw ApiError(400, "$k is not changed from the phone") }
+            if (p.has("place") && !p.isNull("place")) {
+                val pl = p.opt("place") as? JSONObject ?: throw ApiError(400, "place must be an object or null")
+                val lat = pl.optDouble("lat", Double.NaN); val lon = pl.optDouble("lon", Double.NaN)
+                if (lat.isNaN() || lon.isNaN() || lat !in -90.0..90.0 || lon !in -180.0..180.0 || pl.optString("name").isBlank())
+                    throw ApiError(400, "place needs a name, and lat and lon as numbers")
             }
             Store.editHomeSettings { hs -> keys.forEach { k -> if (p.isNull(k)) hs.remove(k) else hs.put(k, p.get(k)) } }
             // the weather the phone remote and /api/weather use follows the same town
@@ -725,5 +740,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         private val INPUT_ICONS = setOf("hdmi", "cable", "pc", "ps5", "xbox", "switch")
         /** Home settings keys the phone's Home settings page may change (settings_patch). Photos have their own calls. */
         private val PATCH_KEYS = setOf("place")
+        /** Home settings keys the phone's page changes (the town, and photos through /api/photos): an older
+         *  whole copy from the home keeps the server's (saveSettings, "seen"). */
+        private val PHONE_KEYS = listOf("place", "photos")
     }
 }

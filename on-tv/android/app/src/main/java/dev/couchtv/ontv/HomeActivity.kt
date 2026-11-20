@@ -242,10 +242,7 @@ class HomeActivity : Activity() {
     }
 
     /** At home changes a phone sent while the page was not there yet: handed over once it has loaded. */
-    private fun sendWaitingAtHome() {
-        val list = synchronized(waitingAtHome) { waitingAtHome.toList().also { waitingAtHome.clear() } }
-        list.forEach { js("window.tv && tv.atHomeEdit && tv.atHomeEdit(" + it + ")") }
-    }
+    private fun sendWaitingAtHome() = takeWaiting().forEach { js("window.tv && tv.atHomeEdit && tv.atHomeEdit(" + PageCode.json(it) + ")") }
 
     private fun tvApps(): List<ResolveInfo> = Tv.tvLaunchables().filter { it.activityInfo.packageName != packageName }
         .sortedBy { it.loadLabel(packageManager).toString().lowercase() }
@@ -342,7 +339,7 @@ class HomeActivity : Activity() {
         fun typeText(t: String): Boolean {
             val a = shown?.get() ?: return false
             if (!a.front || a.isFinishing || a.isDestroyed) return false
-            refresher.post { a.js("window.tv && tv.typeText && tv.typeText(" + org.json.JSONObject.quote(t) + ")") }
+            refresher.post { a.js("window.tv && tv.typeText && tv.typeText(" + PageCode.string(t) + ")") }
             return true
         }
 
@@ -354,16 +351,35 @@ class HomeActivity : Activity() {
          */
         fun atHomeRead(): JSONObject? = ask("window.tv && tv.atHomeRead ? tv.atHomeRead() : null")
 
-        /** Null: the page is not loaded; the change waits (in memory only) and goes in when it loads. */
+        /**
+         * Null: the page is not loaded; the change waits on this TV (the app's own storage, kept across a
+         * restart) and goes in when the page loads. Lists and the guide are sent whole, so they are only
+         * taken while the page can say what is there now ("refused" otherwise), never queued blind.
+         */
         fun atHomeEdit(edit: JSONObject): JSONObject? {
-            val code = "window.tv && tv.atHomeEdit ? tv.atHomeEdit($edit) : null"
+            val code = "window.tv && tv.atHomeEdit ? tv.atHomeEdit(" + PageCode.json(edit.toString()) + ") : null"
             ask(code)?.let { return it }
             if (live() != null) return JSONObject().put("ok", false).put("error", "The TV home did not answer. Try again.")
-            synchronized(waitingAtHome) { if (waitingAtHome.size < 20) waitingAtHome += edit.toString() }
+            if (edit.has("lists") || edit.has("guide"))
+                return JSONObject().put("ok", false).put("refused", true).put("error", "Open the couch-tv home on the TV first, then save again.")
+            synchronized(waitLock) {
+                val list = waiting()
+                if (list.length() >= WAIT_MAX) return JSONObject().put("ok", false).put("refused", true)
+                    .put("error", "The TV is holding $WAIT_MAX changes already. Open the couch-tv home on the TV, then save again.")
+                Store.putStr(WAIT_KEY, list.put(edit).toString())
+            }
             return null
         }
 
-        private val waitingAtHome = ArrayList<String>()
+        private const val WAIT_KEY = "athome_waiting"
+        private const val WAIT_MAX = 20
+        private val waitLock = Any()
+        private fun waiting(): JSONArray = Store.str(WAIT_KEY)?.let { runCatching { JSONArray(it) }.getOrNull() } ?: JSONArray()
+        private fun takeWaiting(): List<String> = synchronized(waitLock) {
+            val a = waiting(); Store.putStr(WAIT_KEY, null)
+            (0 until a.length()).mapNotNull { a.optJSONObject(it)?.toString() }
+        }
+
 
         private fun live(): HomeActivity? = shown?.get()?.takeIf { !it.isFinishing && !it.isDestroyed && it.ready && it.web != null }
 

@@ -21,6 +21,13 @@ class PhotosTest {
         assertEquals(0 to 0, Photos.fit(0, 600))
     }
 
+    @Test fun hugePicturesAreRefusedBeforeDecoding() {
+        assertTrue(Photos.tooManyPixels(20000, 20000))          // 400 MP, a crafted file could claim this
+        assertTrue(Photos.tooManyPixels(65535, 65535))          // no Int overflow
+        assertTrue(!Photos.tooManyPixels(8064, 6048))           // a 48 MP phone photo is fine
+        assertTrue(!Photos.tooManyPixels(10000, 10000))         // exactly 100 MP is allowed
+    }
+
     @Test fun decodeStepKeepsAtLeastTheTargetSize() {
         assertEquals(2, Photos.sampleSize(4032, 3024, 1440, 1080))
         assertEquals(1, Photos.sampleSize(1920, 1080, 1920, 1080))

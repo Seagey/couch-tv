@@ -89,7 +89,9 @@
   // phone that is already paired just ignores it.
   var hashPin = (/(?:^#|&)pin=(\d{6})(?:&|$)/.exec(location.hash || '') || [])[1];
   if (hashPin) {
-    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { }
+    // only the code comes off: anything else in the hash (#sheet=..., #design=...) stays for the page
+    var rest = location.hash.replace(/^#/, '').split('&').filter(function (p) { return p && !/^pin=/.test(p); }).join('&');
+    try { history.replaceState(null, '', location.pathname + location.search + (rest ? '#' + rest : '')); } catch (e) { }
     if (!token) {
       autoPairing = true;
       realFetch('/api/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: hashPin, name: (navigator.platform || 'Phone') }) })

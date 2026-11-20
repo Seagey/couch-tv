@@ -4430,9 +4430,28 @@
     keep(ST_KEY, rec);
     return rec;
   }
+  // SEEN: the server's "updated" this TV last read. Sent with every save, so a server that has had a
+  // newer change since (the phone's Home settings page: the town, a photo) keeps that change instead of
+  // taking this TV's older copy whole; the copy it keeps comes back here.
+  var SEEN = null;
   function pushSettings(rec) {
-    return api("POST", "/api/settings", { settings: rec.s })
-      .then(function () { rec.pending = false; keep(ST_KEY, rec); }, function () {});
+    var body = { settings: rec.s };
+    if (SEEN !== null) body.seen = SEEN || "none";   // "none": it had no copy when this TV last looked
+    return api("POST", "/api/settings", body)
+      .then(function (j) {
+        rec.pending = false; keep(ST_KEY, rec);
+        if (j && j.updated) SEEN = j.updated;
+        var back = j && j.settings && typeof j.settings === "object" && !Array.isArray(j.settings) ? j.settings : null;
+        if (back && canon(back) !== canon(ST)) takeServerSettings(back);
+      }, function () {});
+  }
+  // the server's copy is newer: use it. Under Home settings the screen is drawn again and the home
+  // starts again when it closes; anywhere else the home starts again now.
+  function takeServerSettings(remote) {
+    ST = remote;
+    keepSettings(false);
+    if (zone !== "settings") restart();
+    else { SET.dirty = true; if (!SET.typing && !SET.lift) renderSettings(); }
   }
   // Kept on this TV straight away; handed to the bridge a moment later (pending until it has it).
   function saveSettings() {
@@ -4453,15 +4472,14 @@
   function syncSettings() {
     return api("GET", "/api/settings").then(function (j) {
       var rec = kept(ST_KEY), remote = j.settings && typeof j.settings === "object" && !Array.isArray(j.settings) ? j.settings : null;
-      if (rec && rec.pending) return pushSettings(rec);
+      if (SEEN === null || !rec || !rec.pending) SEEN = j.updated || "";   // a pending copy keeps the older SEEN it was made from
+      if (rec && rec.pending) return pushSettings(rec);   // SEEN is still the older one: the server keeps any newer phone change
       if (!remote || (!j.updated && !Object.keys(remote).length)) {   // the bridge has none yet: it gets ours
         if (Object.keys(ST).length) return pushSettings(keepSettings(true));
         return null;
       }
       if (canon(remote) === canon(ST)) return null;
-      ST = remote;
-      keepSettings(false);
-      if (zone !== "settings") restart();
+      takeServerSettings(remote);
       return null;
     });
   }
@@ -4529,6 +4547,7 @@
     paintFocus();
     resetIdlePhoto();
     refreshCards(true);
+    if (!OFFLINE) refresh();   // a change from the phone made while it was open shows now
   }
 
   // ---- rows ----
@@ -6188,6 +6207,9 @@
   // tv.home, then the launcher's tv.resume); the second ask gets the first's result.
   var refreshAt = 0, refreshing = null;
   function refresh() {
+    // Home settings open: nothing is reshuffled under it, but a change from the phone's Home settings
+    // page still comes in (the town, a photo), so the next change made here does not undo it
+    if (zone === "settings" && !lift && !OFFLINE && data.bridge !== false) return syncSettings().then(function () {}, function () {});
     // never reshuffle under something being moved, or under the settings screen
     if (lift || zone === "pmenu" || zone === "settings" || zone === "gear" || zone === "smart" || zone === "updask") return Promise.resolve();
     if (refreshing && Date.now() - refreshAt < 1500) return refreshing;

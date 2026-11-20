@@ -469,7 +469,13 @@
         }
         if (path.indexOf("/api/play") === 0) return resolve({ ok: true, note: body.title + " is playing." });
         if (path.indexOf("/api/settings") === 0) {
-          if (method === "POST") store.set("api.settings", { settings: body.settings || {}, updated: new Date().toISOString() });
+          if (method === "POST") {
+            // as the on-TV app does (Server.kt): a TV that saves an older copy than the server's keeps the
+            // server's town and photos, which the phone's Home settings page may have changed since
+            var was = store.get("api.settings"), next = Object.assign({}, body.settings || {});
+            if (body.seen && was && was.updated && body.seen !== was.updated) ["place", "photos"].forEach(function (k) { if (was.settings && k in was.settings) next[k] = was.settings[k]; });
+            store.set("api.settings", { settings: next, updated: new Date(Math.max(Date.now(), was && was.updated ? Date.parse(was.updated) + 1 : 0)).toISOString() });
+          }
           var st = store.get("api.settings") || { settings: {}, updated: null };
           return resolve({ ok: true, settings: st.settings, updated: st.updated });
         }

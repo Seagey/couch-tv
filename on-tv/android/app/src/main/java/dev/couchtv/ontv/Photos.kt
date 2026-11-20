@@ -66,6 +66,8 @@ object Photos {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(tmp.path, bounds)
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw ApiError(415, "That is not a photo the TV can read. Send a JPEG or PNG.")
+            // a picture far bigger than any camera's (a crafted PNG of a few KB can claim this) is refused before decoding
+            if (tooManyPixels(bounds.outWidth, bounds.outHeight)) throw ApiError(413, "That photo is too big. Pick one under 100 megapixels.")
             val exif = runCatching { ExifInterface(tmp.path) }.getOrNull()
             val turn = when (exif?.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
                 ExifInterface.ORIENTATION_ROTATE_90 -> 90; ExifInterface.ORIENTATION_ROTATE_180 -> 180; ExifInterface.ORIENTATION_ROTATE_270 -> 270; else -> 0
@@ -103,7 +105,9 @@ object Photos {
                 }
             } catch (e: Exception) { f.delete(); throw e }
             return p
-        } finally { tmp.delete() }
+        } catch (e: OutOfMemoryError) {
+            throw ApiError(413, "That photo is too big for this TV. Pick a smaller one.")
+        } finally { tmp.delete(); dropStrays() }
     }
 
     /** Takes one photo off the home (by its id in ST.photos) and deletes the file if it came from a phone. */
@@ -119,6 +123,19 @@ object Photos {
         }
         gone?.optString("file")?.takeIf { it.isNotEmpty() }?.let { delete(it) }
         return gone != null
+    }
+
+    /** More than 100 megapixels: refused. */
+    fun tooManyPixels(w: Int, h: Int): Boolean = w.toLong() * h > 100_000_000L
+
+    /**
+     * Phone photos no longer in Home settings' list (taken off on the TV while its page had no way to
+     * delete the file, or left by an upload that failed half way): deleted on each upload.
+     */
+    private fun dropStrays() = runCatching {
+        val list = (Store.readJson("home-settings.json") as? JSONObject)?.optJSONArray("photos") ?: JSONArray()
+        val keep = (0 until list.length()).mapNotNull { list.optJSONObject(it)?.optString("file") }.toSet()
+        dir().listFiles()?.forEach { f -> if (f.name.startsWith("phone") && f.name.endsWith(".jpg") && f.name !in keep) f.delete() }
     }
 
     /** Deletes a photo file the page has dropped (Home settings on the TV, Remove photo). */

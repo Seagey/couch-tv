@@ -38,6 +38,7 @@ const got = { pair: [], settings: [], athome: [], photos: [], guest: [], home: [
 const HS = { settings: { lang: "en", photos: [] }, people: [{ id: "sam", name: "Sam" }, { id: "alex", name: "Alex" }], weather: null, country: "AU", tv_name: "Lounge",
   ask: { enabled: false, provider: "anthropic", base: "", model: "", has_key: false }, phones: 1, port: 5400,
   adb: { connected: false, sdk: 34, state: "idle" }, xiaomi: false, inputs: [] };
+let AH_LIVE = true;
 let AH = { note: null, lists: [], wifi: null, guide: [], cal: null, stay: { host: "", checkin: "15:00", checkout: "10:00" }, guest: "" };
 const send = (res, code, o) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(o)); };
 const server = http.createServer((req, res) => {
@@ -66,10 +67,13 @@ const server = http.createServer((req, res) => {
         return send(res, 200, { ok: true, photo: p, count: HS.settings.photos.length });
       }
       if (u.pathname.startsWith("/api/photo/")) { res.writeHead(200, { "content-type": "image/png" }); res.end(fs.readFileSync(path.join(ROOT, "remote/public/icons/icon-192.png"))); return; }
-      if (route === "GET /api/athome") return send(res, 200, { ok: true, live: true, athome: AH });
+      if (route === "GET /api/athome") return send(res, 200, AH_LIVE ? { ok: true, live: true, athome: AH } : { ok: true, live: false });
       if (route === "POST /api/athome") {
         const e = body().edit; got.athome.push(e);
         if ("note" in e) AH.note = e.note;
+        if (!AH_LIVE) return ("lists" in e || "guide" in e) ? send(res, 409, { ok: false, error: "Open the couch-tv home on the TV first, then save again." }) : send(res, 200, { ok: true, live: false, queued: true });
+        if ("lists" in e) AH.lists = e.lists;
+        if ("guide" in e) AH.guide = e.guide;
         if ("cal_url" in e) AH.cal = e.cal_url ? { host: new URL(e.cal_url).hostname } : null;
         return send(res, 200, { ok: true, live: true, athome: AH });
       }
@@ -218,6 +222,32 @@ for (const [q, what] of [["", "a TV the computer bridge drives"], ["&offline=1",
   await page.click("#ah-cal-save");
   await page.waitForFunction(() => document.getElementById("ah-cal-now").textContent === "calendar.example.com");
   ok(await page.inputValue("#ah-cal") === "", "a calendar link is not left on the page once sent");
+  // words with & < > " in them come back exactly, and a ticked item stays ticked (review B2)
+  AH.lists = [{ name: "Fish & \"chips\"", items: [{ t: "Fish & chips", done: true }, { t: "<b>Milk</b> 'n' bread", done: false }] }];
+  AH.guide = [{ title: "Bins & <recycling>", text: "Tuesday \"night\" & Friday" }];
+  await page.evaluate(() => loadAtHome());
+  await page.waitForSelector("#ah-lists .entry");
+  ok(await page.inputValue("#ah-lists .l-name") === 'Fish & "chips"', "a list name with & and quotes shows exactly");
+  ok(await page.inputValue("#ah-lists .l-items") === "Fish & chips\n<b>Milk</b> 'n' bread", "items with & and < > show exactly, as words");
+  ok(await page.inputValue("#ah-guide .g-title") === "Bins & <recycling>" && await page.inputValue("#ah-guide .g-text") === 'Tuesday "night" & Friday', "the guide too");
+  ok(await page.$("#ah-lists b") === null, "nothing typed turns into markup on the page");
+  await page.click("#ah-lists-save");
+  await page.waitForFunction(() => /lists are on the TV/.test(document.getElementById("ah-lists-msg").textContent));
+  const sent = got.athome[got.athome.length - 1].lists[0];
+  ok(sent.name === 'Fish & "chips"' && sent.items[0].t === "Fish & chips" && sent.items[0].done === true && sent.items[1].t === "<b>Milk</b> 'n' bread",
+    "saved back unchanged, and the ticked item is still ticked: " + JSON.stringify(sent));
+  // the TV's home is not open: lists and the guide (sent whole) cannot be saved blind (review B3)
+  AH_LIVE = false;
+  await page.evaluate(() => loadAtHome());
+  await page.waitForFunction(() => document.getElementById("ah-lists-save").disabled);
+  ok(await page.evaluate(() => ["ah-list-add", "ah-lists-save", "ah-guide-add", "ah-guide-save"].every((id) => document.getElementById(id).disabled)),
+    "with the TV's home not open, Add and Save for the lists and the guide are off");
+  ok(/once the couch-tv home is open/.test(await page.textContent("#ah-lists-msg")), "and the page says why");
+  ok(!(await page.isDisabled("#ah-note-save")), "a note can still be sent, to wait on the TV");
+  await page.fill("#ah-note", "Gone to the beach"); await page.click("#ah-note-save");
+  await page.waitForFunction(() => /as soon as the couch-tv home is open/.test(document.getElementById("ah-note-msg").textContent));
+  ok(true, "a waiting note says it reaches the TV once its home opens");
+  AH_LIVE = true;
   // use as home screen
   await page.click("#home-on");
   await page.waitForFunction(() => /One step left/.test(document.getElementById("home-state").textContent));
@@ -231,6 +261,17 @@ for (const [q, what] of [["", "a TV the computer bridge drives"], ["&offline=1",
   ok(!/\b(Beta|Experimental|coming soon)\b/i.test(words), "no Beta, Experimental or coming soon");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "phone-home-settings.png"), fullPage: true });
   ok(!page.errors.length, "no page errors: " + page.errors.join("; "));
+  await ctx.close();
+}
+
+// the code comes off the address, anything else in it stays (#sheet=, #design=)
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
+  const page = await ctx.newPage();
+  await page.goto(ORIGIN + "/setup#sheet=people&pin=482913");
+  await page.waitForFunction(() => window.couchTv && window.couchTv.token());
+  await page.waitForLoadState("load");
+  ok(new URL(page.url()).hash === "#sheet=people", "#pin= is taken off and #sheet= stays: " + page.url());
   await ctx.close();
 }
 
