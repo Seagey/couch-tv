@@ -13,6 +13,7 @@ Every couch-tv guide in one place, grouped by what you want to do.
 | [PLATFORMS.md](PLATFORMS.md) | What works on each kind of TV, in full |
 | [TV-COMPATIBILITY.md](TV-COMPATIBILITY.md) | Which TVs work, per platform and per option (A, B and C) |
 | [TV-BRANDS.md](TV-BRANDS.md) | Brands that sell more than one kind of TV, and how to tell which one you have |
+| [PERFORMANCE.md](PERFORMANCE.md) | Measure how the home runs on your TV (frames, memory, cold start) and compare with others |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Fixes for problems seen on real TVs, starting with a TV that loops after a restart |
 | [UNINSTALL.md](UNINSTALL.md) | Take couch-tv off your TV and switch everything back on |
 
