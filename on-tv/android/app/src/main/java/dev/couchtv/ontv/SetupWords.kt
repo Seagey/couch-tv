@@ -14,9 +14,22 @@ object SetupWords {
         else -> "No phone yet: press New phone code"
     }
 
+    /**
+     * What the QR holds: the phone address, plus the live code after a # so one scan pairs the phone.
+     * A fragment is never sent in a request, so the code is never in a request line or a log.
+     * [path] is the page on the TV: "/" for the phone remote, "/setup" for Home settings on the phone
+     * (Server.kt, /api/phone-link). The six digit check lives only here.
+     */
+    fun qrLink(phoneUrl: String?, pin: String?, path: String = "/"): String? = when {
+        phoneUrl == null -> null
+        pin != null && pin.length == 6 && pin.all { it.isDigit() } -> "$phoneUrl$path#pin=$pin"
+        path == "/" -> phoneUrl
+        else -> "$phoneUrl$path"
+    }
+
     /** The line under it: what to do next. */
     fun nextLine(pin: String?, phones: Int, homeOpensUs: Boolean): String = when {
-        pin != null -> "On your phone, scan the code on the left (or type the address under it), then type this code."
+        pin != null -> "On your phone, scan the code on the left. That pairs it, no typing. Or type the address under it, then this code."
         phones > 0 && homeOpensUs -> "Next: press Home on the TV remote. Your couch-tv home is there."
         phones > 0 -> "Next: press Open the home. From now on, open your home from Couch TV in the TV's apps row."
         else -> "Press New phone code, then scan the code on the left with your phone's camera."

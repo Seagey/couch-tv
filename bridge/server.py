@@ -2146,6 +2146,8 @@ async def h_ask(request):
 
 # ---------- Ask AI on the TV, and messages and designs from the person's own AI agent (say.py) ----------
 async def h_say(request):
+    if request.query.get("home") == "1":   # the TV home itself (ask.js), not an agent reading it
+        say.heard(_current.get())
     return ok(**say.snapshot(_current.get(), claude._last.get(_current.get() or "default")))
 
 
@@ -2157,7 +2159,10 @@ async def h_say_message(request):
 async def h_say_design(request):
     data = await body(request)
     # the TV fetches it and always asks "Use this design?" first: someone at the TV says yes
-    return ok(design=say.design(_current.get(), data.get("code")), asks_first=True)
+    # listening: the TV home asked in the last 30 s; false means it shows the design when it next opens
+    # (within 10 minutes, ask.js), and the phone remote says so instead of "Sent"
+    return ok(design=say.design(_current.get(), data.get("code"), data.get("from")), asks_first=True,
+              listening=say.listening(_current.get()))
 
 
 async def h_recs(request):

@@ -33,6 +33,19 @@ class SayTest {
 
     @Test(expected = IllegalArgumentException::class) fun aLinkIsNotACode() { Say.design("http://evil.example/design.json") }
 
+    @Test fun aDesignSaysOnlyPhoneOrAi() {
+        assertEquals("phone", Say.design("abcde-fghjk", from = "phone").getString("from"))
+        assertEquals("ai", Say.design("abcde-fghjk").getString("from"))
+        assertEquals("ai", Say.design("abcde-fghjk", from = "<b>Mum's phone</b>").getString("from"))
+    }
+
+    @Test fun listeningOnlyWhileTheHomeAsks() {
+        assertFalse(Say.listening(1_000_000))
+        Say.heard(1_000_000)
+        assertTrue(Say.listening(1_000_000 + 29_000))
+        assertFalse(Say.listening(1_000_000 + 31_000))
+    }
+
     @Test fun snapshotHoldsTheLatestOfEach() {
         assertTrue(Say.snapshot().isNull("message"))
         Say.design("abcde-fghjk")

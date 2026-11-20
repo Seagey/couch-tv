@@ -5,6 +5,7 @@ import { tick } from './haptics.js';
 import { api } from './api.js';
 import { logoFor } from './appLogos.js';
 import { t, tBridge, LANGS, choice, setChoice, locale } from './i18n.js';
+import { readDesignCode, studioLink, newNonce, NONCE_KEY, WORDS as DW } from './designSend.js';
 
 export const Sheet = forwardRef(function Sheet({ open, onClose, title, children, className = '', fromTop = false, closeDrag, extra = null }, ref) {
   return (
@@ -450,7 +451,49 @@ function GuestName({ open }) {
   );
 }
 
-export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnds, onSleep, onKey, onText, sleepError, tvs, tvId, onTv, canMove, onMove, picture, pictureInfo, onPicture, onArrange, onPeople, onKids }, ref) {
+// Send a design (designSend.js): a code from couch-tv Studio, pasted or typed here instead of on the
+// TV, and a link to Studio that brings the code back here by itself. English only for now, like the
+// TV home's couch-tv Studio rows.
+function DesignSend({ onDesign, can = true }) {
+  const [code, setCode] = useState('');
+  const [msg, setMsg] = useState('');
+  const submit = async (e) => {
+    e.preventDefault();
+    const c = readDesignCode(code);
+    if (!c) { setMsg(DW.notCode); return; }
+    tick();
+    const r = await onDesign(c);
+    setMsg(r.words);
+    if (r.ok) setCode('');   // on a failure the code stays in the box, to try again
+  };
+  // the link to Studio carries a fresh one time nonce, kept here, so the code Studio hands back is sent
+  // with no tap (designSend.js); a link made anywhere else asks first
+  const toStudio = (e) => {
+    const n = newNonce();
+    try { localStorage.setItem(NONCE_KEY, n); } catch { /* private mode: Studio's link then asks first */ }
+    e.currentTarget.href = studioLink(typeof location !== 'undefined' ? location.host : '', n);
+  };
+  if (!can) return (
+    <section className="more-block design-send">
+      <h3><Ic.Sparkle size={16} /> {DW.title}</h3>
+      <p className="note">{DW.cannot}</p>
+    </section>
+  );
+  return (
+    <section className="more-block design-send">
+      <h3><Ic.Sparkle size={16} /> {DW.title}</h3>
+      <form className="ask-field glass" onSubmit={submit}>
+        <input value={code} onChange={(e) => { setCode(e.target.value); setMsg(''); }} placeholder={DW.placeholder} enterKeyHint="send"
+          autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false} aria-label="Design code" />
+        <button type="submit" className="round solid small" aria-label={DW.send} disabled={!code.trim()}><Ic.Send size={18} /></button>
+      </form>
+      <p className="note" role="status">{msg || DW.note}</p>
+      <a className="pill glass arrange-open" href={studioLink(typeof location !== 'undefined' ? location.host : '')} onClick={toStudio}>{DW.choose}</a>
+    </section>
+  );
+}
+
+export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnds, onSleep, onKey, onText, sleepError, tvs, tvId, onTv, canMove, onMove, picture, pictureInfo, onPicture, onArrange, onPeople, onKids, onDesign, canSendDesign = true }, ref) {
   const [typed, setTyped] = useState('');
   const sheetEl = useRef(null);
   const setRefs = (el) => { sheetEl.current = el; if (typeof ref === 'function') ref(el); else if (ref) ref.current = el; };
@@ -516,6 +559,8 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
         </form>
         <p className="note">{t('type_note')}</p>
       </section>
+
+      <DesignSend onDesign={onDesign} can={canSendDesign} />
 
       <div className="more-grid">
         <button className="tile glass" onClick={() => { tick(); onKey('captions'); }}><Ic.Captions /> {t('subtitles')}</button>

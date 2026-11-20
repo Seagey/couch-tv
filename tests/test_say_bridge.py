@@ -53,6 +53,22 @@ class SayHttp(AioHTTPTestCase):
         return app
 
     @unittest_run_loop
+    async def test_listening_only_while_the_home_asks(self):
+        # Fable review: the phone remote said "Sent" for a TV whose home never reads /api/say
+        with patch.object(config, "PAIRING_KEY", ""):
+            j = await (await self.client.post("/api/say/design", json={"code": "abcde-fghjk", "from": "phone"})).json()
+            self.assertFalse(j["listening"], "no home has asked: not listening")
+            await self.client.get("/api/say")   # an agent reading it is not the home
+            j = await (await self.client.post("/api/say/design", json={"code": "abcde-fghjk"})).json()
+            self.assertFalse(j["listening"])
+            await self.client.get("/api/say?home=1")
+            j = await (await self.client.post("/api/say/design", json={"code": "abcde-fghjk"})).json()
+            self.assertTrue(j["listening"], "the home asked just now")
+        now = int(time.time() * 1000)
+        say.heard("tv", now - 31_000)
+        self.assertFalse(say.listening("tv", now), "30 s of silence: the home is not open")
+
+    @unittest_run_loop
     async def test_message_design_and_last_ask(self):
         with patch.object(config, "PAIRING_KEY", ""):
             r = await self.client.post("/api/say/message", json={"text": "Dinner is ready", "from": "Claude", "seconds": 20})
@@ -60,7 +76,13 @@ class SayHttp(AioHTTPTestCase):
             r = await self.client.post("/api/say/design", json={"code": "abcde-fghjk"})
             j = await r.json()
             self.assertEqual(j["design"]["code"], "ABCDE-FGHJK")
+            self.assertEqual(j["design"]["from"], "ai")
             self.assertTrue(j["asks_first"])
+            # the phone remote's Send a design: the TV says "from your phone"; any other word is "ai"
+            j = await (await self.client.post("/api/say/design", json={"code": "abcde-fghjk", "from": "phone"})).json()
+            self.assertEqual(j["design"]["from"], "phone")
+            j = await (await self.client.post("/api/say/design", json={"code": "abcde-fghjk", "from": "<script>"})).json()
+            self.assertEqual(j["design"]["from"], "ai")
             r = await self.client.post("/api/say/design", json={"code": "javascript:alert(1)"})
             self.assertEqual(r.status, 400)
             claude._last[server.DEFAULT_TV] = {"text": "what's on", "reply": "Bluey at 7", "ts": time.time()}

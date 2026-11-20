@@ -664,16 +664,19 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .set-type-check { margin: 0.25rem 0 0; min-height: 0; font-size: 1.5rem; line-height: 2rem; font-weight: 600; letter-spacing: 0.08em; color: #8fd3ff; }
 .set-type-check:empty { display: none; }
 .scode { padding: 1.25rem 1.75rem 1.5rem; }
-/* the update steps on a phone: a QR code with one line beside it (the on-TV app's Update couch-tv page) */
-.sqr { display: flex; align-items: center; gap: 1.75rem; padding: 1.25rem 1.75rem; }
-.sqr-code { flex: none; width: 15rem; height: 15rem; padding: 0.75rem; border-radius: 0.75rem; background: #fff; box-sizing: border-box; }
-.sqr-code svg { display: block; width: 100%; height: 100%; }
-.sqr small { font-size: 1.625rem; line-height: 2.25rem; color: rgba(255, 255, 255, 0.85); }
+/* the update steps on a phone: the same QR box as below (.sqr), with one line beside it (the on-TV app's Update couch-tv page) */
+.sqr > small { font-size: 1.625rem; line-height: 2.25rem; color: rgba(255, 255, 255, 0.85); }
 .scode-big { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .scode-big i { font-style: normal; display: inline-flex; align-items: center; justify-content: center; width: 4.25rem; height: 5.5rem; border-radius: 0.75rem;
   background: rgba(255, 255, 255, 0.12); color: #fff; font-size: 3.25rem; font-weight: 700; font-family: ui-monospace, Menlo, Consolas, monospace; }
 .scode-big i.dash { width: 2rem; background: none; color: rgba(255, 255, 255, 0.6); }
 .scode small { display: block; margin-top: 1rem; font-size: 1.4375rem; line-height: 2rem; color: rgba(255, 255, 255, 0.8); }
+/* Get a design from your phone: the QR, black on white with room around it so any phone reads it */
+.sqr { display: flex; align-items: center; gap: 2rem; padding: 1.25rem 1.75rem 1.5rem; }
+.sqr-code { flex: none; padding: 1rem; border-radius: 1rem; background: #fff; line-height: 0; }
+.sqr-code svg { width: 15rem; height: 15rem; display: block; }
+.sqr .sl b { display: block; font-size: 1.75rem; line-height: 2.25rem; }
+.sqr .sl small { display: block; margin-top: 0.75rem; font-size: 1.4375rem; line-height: 2rem; color: rgba(255, 255, 255, 0.8); }
 .set-msg { flex: none; min-height: 2rem; margin: 1.5rem 0 0 1.75rem; font-size: 1.4375rem; line-height: 2rem; font-weight: 550; color: #8fd3ff; }
 .set-hint { flex: none; margin: 0.25rem 0 0 1.75rem; font-size: 1.25rem; line-height: 1.75rem; color: rgba(255, 255, 255, 0.5); }
 @media (prefers-reduced-motion: reduce) {

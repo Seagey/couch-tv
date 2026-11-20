@@ -224,14 +224,17 @@ class SetupActivity : Activity() {
     private fun refresh() {
         val ip = App.lanAddress()
         val phoneUrl = if (ip != null) "http://$ip:${Store.port}" else null
-        if (phoneUrl != shownUrl) {
-            shownUrl = phoneUrl
-            qr.setImageBitmap(phoneUrl?.let { qrBitmap(it) })
-            qr.visibility = if (phoneUrl != null) View.VISIBLE else View.GONE
+        val p = Auth.currentPin()
+        // one scan pairs: while a code is live it rides in the QR's #fragment (never sent to the TV in
+        // a request line, so never in a log); the phone page pairs with it at once (shim.js)
+        val qrText = SetupWords.qrLink(phoneUrl, p)
+        if (qrText != shownUrl) {
+            shownUrl = qrText
+            qr.setImageBitmap(qrText?.let { qrBitmap(it) })
+            qr.visibility = if (qrText != null) View.VISIBLE else View.GONE
         }
         address.text = if (phoneUrl != null) "Or type  $phoneUrl" else "This TV is not on a network yet. Connect it to Wi-Fi first."
         setup.text = if (phoneUrl != null) "Home settings on your phone:  $phoneUrl/setup" else ""
-        val p = Auth.currentPin()
         val ago = Auth.lastPairedAt.takeIf { it > 0 }?.let { System.currentTimeMillis() - it }
         code.text = SetupWords.pairLine(p, Auth.phoneCount(), ago)
         next.text = SetupWords.nextLine(p, Auth.phoneCount(), homeOpensUs())

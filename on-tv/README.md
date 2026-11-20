@@ -117,9 +117,16 @@ type 8180170 again.
 
 ## Pair a phone
 
-1. On the phone, open the address the TV shows, for example `http://192.0.2.10:5400`.
-2. Type the 6 digit code from the TV. (Tap "Show a code on the TV" if it has gone.)
+1. Scan the QR code on the TV with the phone's camera. While a code is showing, the QR holds it
+   too (after a `#`, so it is never sent in a request line or kept in a log), and the phone pairs
+   with no typing. The page takes the code out of its address at once.
+2. Or open the address the TV shows, for example `http://192.0.2.10:5400`, and type the 6 digit code
+   from the TV. (Tap "Show a code on the TV" if it has gone.)
 3. That phone now has its own token, stored in the browser. Add the page to the home screen.
+
+To send a design from the phone: in the phone remote, pull down the TV menu, **Send a design**, and
+paste the code from couch-tv Studio (or tap **Choose a design in couch-tv Studio**, which brings the
+code back by itself). The TV asks "Use this design?": pick **Use this design**, then press OK.
 
 A code lasts 3 minutes, works once, and is thrown away after 5 wrong tries. **Forget phones** on
 the TV, or on the setup page, signs every phone out.

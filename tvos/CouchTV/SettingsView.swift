@@ -1,6 +1,7 @@
 // Couch TV's own settings: which couch-tv bridge to use (found on the network, or typed in), the code
 // that swaps for its pairing key, and the clock. Back (Menu) on the Siri remote closes it.
 import SwiftUI
+import CoreImage
 
 struct SettingsView: View {
     @EnvironmentObject var model: HomeModel
@@ -13,6 +14,7 @@ struct SettingsView: View {
     @State private var code = ""
     @State private var fetching = false
     @State private var designNote = ""
+    @State private var showPhone = false
     @Environment(\.flatGlass) private var flat
 
     var body: some View {
@@ -72,7 +74,11 @@ struct SettingsView: View {
                         }
                     }
                     field("Get a design: type its code", text: $code, prompt: "ABCDE-FGHJK", width: 760)
-                    pill(tag: "get-design", title: fetching ? "Getting it…" : "Get a design") { getDesign() }
+                    HStack(spacing: 20) {
+                        pill(tag: "get-design", title: fetching ? "Getting it…" : "Get a design") { getDesign() }
+                        // no typing on the Apple TV: a QR, then choose and send on the phone
+                        pill(tag: "phone-design", title: "Get a design from your phone") { showPhone = true }
+                    }
                     if !designNote.isEmpty { note(designNote) }
                     section("Good to know").padding(.top, 28)
                     note("Apple's Home button still opens Apple's home: tvOS lets no app replace it. With the bridge running, Couch TV opens by itself when the Apple TV wakes.")
@@ -92,6 +98,13 @@ struct SettingsView: View {
         .ignoresSafeArea()
         .onAppear {
             address = model.bridge.link?.url ?? model.found.first?.url ?? ""
+        }
+        .fullScreenCover(isPresented: $showPhone) {
+            PhoneDesignView { arrived in
+                showPhone = false
+                if arrived { model.showSettings = false; dismiss() }
+            }
+            .environmentObject(model)
         }
     }
 
@@ -214,6 +227,85 @@ struct SettingsView: View {
             }
         }
         .buttonStyle(BareButton())
+    }
+}
+
+/// Get a design from your phone (DesignStore.swift, DesignInbox): a QR of couch-tv Studio with a one time
+/// inbox in it. While this screen is open, and only then, the Apple TV asks the store every few seconds
+/// whether the phone put a design code in it. Back closes it and the asking stops with it (.task).
+struct PhoneDesignView: View {
+    @EnvironmentObject var model: HomeModel
+    let close: (Bool) -> Void
+    @State private var box: DesignInbox?
+    @State private var words = "Making a code for your phone…"
+    @State private var round = 0
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.92).ignoresSafeArea()
+            HStack(alignment: .center, spacing: 90) {
+                if let box, let img = PhoneDesignView.qr(box.link) {
+                    Image(decorative: img, scale: 1)
+                        .interpolation(.none)
+                        .resizable()
+                        .frame(width: 420, height: 420)
+                        .padding(28)
+                        .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Color.white))
+                }
+                VStack(alignment: .leading, spacing: 26) {
+                    Text("Get a design from your phone").font(HomeFont.inter(52, .semibold)).foregroundStyle(.white)
+                    Text("Scan this with your phone's camera. Choose a design in couch-tv Studio and press Send to my TV. This Apple TV then asks you before it changes anything.")
+                        .font(HomeFont.inter(29)).foregroundStyle(.white.opacity(0.85)).fixedSize(horizontal: false, vertical: true)
+                    Text(words).font(HomeFont.inter(27, .medium)).foregroundStyle(.white.opacity(0.7)).fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 24) {
+                        if box == nil {   // ran out or never opened: a run out QR is taken off the screen
+                            Button("Show a new code") { round += 1 }
+                        }
+                        Button("Type the code instead") { close(false) }
+                    }
+                    .font(HomeFont.inter(27, .semibold))
+                }
+                .frame(width: 900, alignment: .leading)
+            }
+        }
+        .task(id: round) { await run() }
+    }
+
+    private func run() async {
+        box = nil
+        words = "Making a code for your phone…"
+        switch await model.openInbox() {
+        case .failure(let p): words = p.words; return
+        case .success(let b): box = b; words = "Waiting for your phone. This code works once, for 10 minutes, while this screen is open."
+        }
+        guard let b = box else { return }
+        var misses = 0
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: UInt64(b.every * 1_000_000_000))
+            if Task.isCancelled { return }
+            if Date() > b.expires { box = nil; words = "That code ran out. Press Show a new code."; return }
+            switch await model.takeInbox(b) {
+            case .waiting: misses = 0
+            case .gone: box = nil; words = "That code ran out. Press Show a new code."; return
+            case .problem(let why):
+                misses += 1
+                if misses >= 5 { words = why; box = nil; return }
+            case .code(let code):
+                words = "Getting the design…"
+                if let why = await model.getDesign(code: code) { words = why; return }
+                close(true)
+                return
+            }
+        }
+    }
+
+    /// The link as a QR code, drawn on the Apple TV itself (Core Image): it never leaves to be drawn.
+    static func qr(_ text: String) -> CGImage? {
+        guard let f = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        f.setValue(Data(text.utf8), forKey: "inputMessage")
+        f.setValue("M", forKey: "inputCorrectionLevel")
+        guard let out = f.outputImage?.transformed(by: CGAffineTransform(scaleX: 12, y: 12)) else { return nil }
+        return CIContext().createCGImage(out, from: out.extent)
     }
 }
 

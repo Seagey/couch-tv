@@ -83,23 +83,41 @@
     });
   }
 
-  window.couchTv = { token: function () { return token; }, pair: showPairing };
-  // A QR on the TV can carry the code: http://<tv>:5400/#pin=123456 (or /setup#pin=...). The code is
-  // taken off the address straight away, so it is not kept in the phone's history or a bookmark. A
-  // phone that is already paired just ignores it.
-  var hashPin = (/(?:^#|&)pin=(\d{6})(?:&|$)/.exec(location.hash || '') || [])[1];
-  if (hashPin) {
-    // only the code comes off: anything else in the hash (#sheet=..., #design=...) stays for the page
-    var rest = location.hash.replace(/^#/, '').split('&').filter(function (p) { return p && !/^pin=/.test(p); }).join('&');
-    try { history.replaceState(null, '', location.pathname + location.search + (rest ? '#' + rest : '')); } catch (e) { }
-    if (!token) {
-      autoPairing = true;
-      realFetch('/api/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: hashPin, name: (navigator.platform || 'Phone') }) })
-        .then(function (r) { return r.json(); })
-        .then(function (j) { if (j.ok && j.token) { save(j.token); location.reload(); } else showPairing('That code from the TV has run out. Scan the code on the TV again, or type the 6 digit code shown there.'); })
-        .catch(function () { showPairing('Can’t reach the TV. Check the phone is on the same Wi-Fi as the TV.'); });
-      return;
+  // One scan pairs: the TV's QR is http://<tv>:5400/#pin=123456 (SetupWords.qrLink). The code is
+  // taken out of the address at once (so it is not kept in the history or a bookmark), then used
+  // once, exactly as if it had been typed. It only ever travels in the request body of /api/pair.
+  // The rest of the fragment (a #design=<code> from couch-tv Studio) is left for the remote.
+  var pinFromQr = null;
+  try {
+    var hm = /(^|[#&])pin=(\d{6})(?=&|$)/.exec(location.hash || '');
+    if (hm) {
+      pinFromQr = hm[2];
+      var rest = (location.hash || '').replace(/^#/, '').split('&').filter(function (p) { return p && p.indexOf('pin=') !== 0; }).join('&');
+      history.replaceState(history.state, '', location.pathname + location.search + (rest ? '#' + rest : ''));
     }
+  } catch (e) { pinFromQr = null; }
+  function pairWith(code, then) {
+    return realFetch('/api/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: code, name: (navigator.platform || 'Phone') }) })
+      .then(function (r) { return r.json(); }).then(then);
   }
-  if (!token) showPairing();
+  // while the scanned code is on its way, the page's own calls may answer 401: no "pair again" box
+  // over it (the 401 guard above); cleared before any box this shows
+  function pairFromQr() {
+    autoPairing = true;
+    pairWith(pinFromQr, function (j) {
+      if (j.ok && j.token) { save(j.token); location.reload(); }
+      else { autoPairing = false; showPairing(j.error || 'That code from the TV has run out. Scan the code on the TV again, or type the 6 digit code shown there.'); }
+    }).catch(function () { autoPairing = false; showPairing('Can’t reach the TV. Check this phone is on the same Wi-Fi as the TV.'); });
+  }
+
+  window.couchTv = { token: function () { return token; }, pair: showPairing };
+  if (pinFromQr) {
+    // already paired with a token the TV still knows: nothing to do. Otherwise pair with the scanned code.
+    if (!token) pairFromQr();
+    else {
+      autoPairing = true;   // a stale token: the page's first calls may 401 before the check below says so
+      realFetch('/api/health', { headers: { Authorization: 'Bearer ' + token } }).then(function (r) { return r.json(); })
+        .then(function (j) { if (!j || j.auth !== 'ok') pairFromQr(); else autoPairing = false; }).catch(function () { pairFromQr(); });
+    }
+  } else if (!token) showPairing();
 })();

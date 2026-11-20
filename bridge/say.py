@@ -63,11 +63,13 @@ def message(tv, text, sender=None, seconds=None):
     return m
 
 
-def design(tv, code):
+def design(tv, code, sender=None):
+    """sender: "phone" when the phone remote's Send a design sent it (the TV then says "from your
+    phone"); anything else is an AI agent. Only these two words ever reach the TV."""
     c = read_code(code)
     if not c:
         raise ValueError("code must be a couch-tv Studio design code, like ABCDE-FGHJK or CTV1-...")
-    d = {"id": next(_ids), "code": c, "at": int(time.time() * 1000)}
+    d = {"id": next(_ids), "code": c, "at": int(time.time() * 1000), "from": "phone" if sender == "phone" else "ai"}
     _tv(tv)["design"] = d
     return d
 
@@ -81,6 +83,20 @@ def snapshot(tv, last_ask=None):
                       "at": int(float(last_ask.get("ts") or 0) * 1000), "pending": bool(last_ask.get("pending")),
                       "by": "Claude on the home computer"}
     return out
+
+
+HEARD_MS = 30_000   # the TV home asks every 6 s while it is open; 30 s of silence means it is not
+
+
+def heard(tv, now=None):
+    """The TV home itself asked (GET /api/say?home=1): it is open and will see a design sent now."""
+    _tv(tv)["heard"] = int(now if now is not None else time.time() * 1000)
+
+
+def listening(tv, now=None):
+    """Whether the TV home asked in the last 30 seconds, so a design sent now shows at once."""
+    at = _tv(tv).get("heard") or 0
+    return (int(now if now is not None else time.time() * 1000)) - at < HEARD_MS
 
 
 def clear():

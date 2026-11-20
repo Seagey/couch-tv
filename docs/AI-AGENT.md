@@ -72,9 +72,14 @@ Every call carries `Authorization: Bearer <pairing key>` when the TV app or brid
 
 ```
 POST /api/say/message   {"text": "Dinner is ready", "from": "Claude", "seconds": 30}
-POST /api/say/design    {"code": "ABCDE-FGHJK"}
+POST /api/say/design    {"code": "ABCDE-FGHJK", "from"?: "phone"}   -> {"design": {...}, "asks_first": true, "listening": true}
 GET  /api/say           {"ask": {...}, "message": {...}, "design": {...}}
 ```
+
+`from` is optional: `"phone"` is what the phone remote's Send a design sends, and the TV then says the
+design came from your phone. Anything else, or nothing, is an AI agent ("from your AI"). Only those two
+words reach the TV. `listening` is false when the TV home has not asked in the last 30 seconds (it is not
+open): it shows the design when it next opens, within 10 minutes.
 
 A message is plain text: no link is made clickable and nothing in it is run. A design code is only a code:
 the TV fetches the design from couch-tv Studio's store itself and puts it through the same gate as a typed
