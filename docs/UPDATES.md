@@ -6,6 +6,15 @@ The newest release is **0.13.8**. The TV apps come from [the Releases page](http
 
 ## November 2026
 
+### 20 November 2026: Hisense Google TV comes back on couch-tv after a restart (option C, next release)
+
+On a Hisense Google TV ("SmartTV 4K", Android 11), Hisense's framework stops every outside app at standby and refuses to start one in the background until the TV wakes. The only exception is a list the TV empties about 25 seconds after each boot. So the TV woke on the Google home, and Home from inside an app showed the Google home for a few seconds first (#202). Checked on one real TV, three restarts in a row. [TROUBLESHOOTING.md](TROUBLESHOOTING.md#hisense-google-tv-the-google-home-after-every-restart-or-wake) explains how it works.
+
+- **Back on couch-tv after a restart or wake:** the on-TV app writes itself back into Hisense's list (`allowed_self_launch_3rd_packages`) whenever it runs, so the name is there at the next boot. When the Home button watch connects and the Google home is already in front, it opens couch-tv.
+- **Home goes straight to couch-tv:** on a Hisense the Home button watch catches the remote's Home key, in the on-TV app and the TV home app, with no flash of the Google home. When Hisense left the watch marked as crashed, the app binds it again.
+- **No error page at start:** after a cold start the home waits for its own server before it loads, instead of showing Chrome's `ERR_CONNECTION_REFUSED` page for about 10 seconds. This helps every TV.
+- **Also:** the TV home app wakes the on-TV app each time it comes forward, for a TV that has both.
+
 ### 20 November 2026: release 0.13.8, Home settings pages open at the top
 
 0.13.8 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). One fix from testing 0.13.7 on a real TCL Android TV. Option C: install the new on-TV APK over the old one. Samsung: run the new `couch-tv-samsung-setup.zip` installer again. Option B: `git pull` and restart the bridge.
