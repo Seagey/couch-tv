@@ -47,5 +47,32 @@ Brief: scratchpad swarm2-common.md. Kinds: sports, news, stocks, commute, word, 
   test_widget_sports 72, test_widget_pause 36).
 - Nothing red, no code changed. Work is finished: final commit is not WIP.
 
+## Checker NO-GO at 7728259 (21 Nov), fixed
+Real sizes (grid.js: tile 160x160, wtile 360x160, small 360x360, tall 360x560, medium 760x360, wide 1160x360).
+New test tests/test_ws2_live_sizes.mjs (from the checker's probe): every live kind at every size it allows,
+every setting value against the default; nothing cut, nothing spills; plus node checks for the ladder.
+1 news count: options now auto, 1, 2; a picked number is never dropped (its words shrink, its time goes
+  first). One row tall (wtile) has room for one whole headline only: the help says so. Counted at every size.
+2 stocks Show the price: tile shows the price under the name (left out first if no room); wtile with the
+  price shows one row with its price, off two rows with their move.
+3 commute tile: "Mon, leave 7:53am" (day when not today; Weekdays only off gives "Tomorrow"). wtile: short
+  leave line that fits one line.
+4 scores: "not in the X" only when the competition's own ladder was read; else "No X game right now";
+  "the cricket" lowercase. 11 wtile: "Not in the Premier League" as the status line.
+5 word wtile: meaning on shows the meaning (other languages: how to say it. meaning), wrapping. Help fixed.
+6 "Word of the day, in Japanese", wrapping (in its own span: one() wraps bare text in cw-ell).
+8 ladder races an 8 s wait (h.ladderWait), app.js json() gives up after 15 s (AbortController, or a race).
+9 help and comments: "Cricket has no list". 10 detail page B.agent honours who and keep.
+12 TEAMS seeded from the saved record (v.teamsAt), asked again only when a week old.
+14 Ask: the question wraps to two lines (askRow), the answer gets the room left.
+Checker's probe after: 11 lines it marks SAME, all expected: news count equal to what As many as fit already
+shows (wtile 1; medium 2), and agent keep day against a 2 hour old message (the size test uses a 30 hour one).
+
+## Results after the fix (21 Nov 2026)
+- test_ws2_live_sizes 654 (215 drawings, 167 changed from default, 8 headline counts equal to As many as fit)
+- test_ws2_live 203, test_widget_fit_all 8 (1640 boxes, 0 problems), test_design_settings_browser 107,
+  test_web_widgets_browser 48, test_ws_tv 1115, test_widget_detail_browser 296, test_phone_settings_browser 129
+- node: 61 of 61 tests/test_*.js (test_ws_schema now 3877: two fewer news count options)
+
 ## Next steps
-None. Branch is ready to merge. Nothing runs on the MacBook or an emulator.
+None. Ready to merge.

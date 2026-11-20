@@ -2440,7 +2440,8 @@
     var x = V.quotes[0];
     if (b.w < 300) {
       return webBody(root, a, [line(WW ? WW.change(x) || "0%" : "", 44, "font-weight:740;color:" + upDown(x.change), a), line(x.name, 25, "font-weight:650;margin-top:4px", a),
-        V.price ? line(WW ? WW.price(x) : String(x.price), 23, "color:var(--sub);margin-top:2px", a) : null]);
+        // the price under the name, left out first when a long name or a big price leaves no room
+        V.price ? line(WW ? WW.price(x) : String(x.price), 23, "color:var(--sub);margin-top:2px", a, 3) : null]);
     }
     // Show the price: the first one with its price; off, the first two with only their move
     if (V.price) return webBody(root, a, [quoteRow(x, a, true, true)]);
