@@ -43,7 +43,8 @@ class MatterCodeTest {
         assertEquals("thread", MatterCode.failureKey("FindOperationalForCommissioningComplete", MatterCode.ERR_TIMEOUT, thread = true))
         assertEquals("thread", MatterCode.failureKey("SendNOC", 3, thread = true, threadRoute = false))
         assertEquals("unreachable", MatterCode.failureKey("SendNOC", 3))
-        assertEquals(4, MatterCode.NOTES.size)
+        assertEquals("already", MatterCode.failureKey("SendNOC", MatterCode.ERR_FABRIC_EXISTS))
+        assertEquals(5, MatterCode.NOTES.size)
         MatterCode.NOTES.values.forEach { assertTrue(it, !it.contains('—') && !it.contains('–') && !it.contains(" - ")) }
     }
 }

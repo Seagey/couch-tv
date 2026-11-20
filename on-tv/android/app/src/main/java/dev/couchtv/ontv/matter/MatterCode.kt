@@ -3,7 +3,7 @@ package dev.couchtv.ontv.matter
 /**
  * Plain Kotlin: checks a Matter pairing code before the controller tries it, and turns what went
  * wrong into the four keys the phone page shows in plain words (matter-contract.md, Changes):
- * "expired", "wrong_code", "unreachable", "thread".
+ * "expired", "wrong_code", "unreachable", "thread", and "already" (the device is on the TV already).
  */
 object MatterCode {
     sealed class Parsed {
@@ -60,12 +60,14 @@ object MatterCode {
     const val ERR_TIMEOUT = 0x32L
     const val ERR_INVALID_PASE_PARAMETER = 0x38L
     const val ERR_NOT_FOUND = 0xD8L
+    const val ERR_FABRIC_EXISTS = 0x7EL
 
     val NOTES = mapOf(
         "expired" to "The code has run out or the device is not sharing any more. Get a new code in your home app and try again within a few minutes.",
         "wrong_code" to "That code is not right. Check the code in your home app and type it again.",
         "unreachable" to "The TV can't reach the device. Check it is switched on and on the same home network as the TV, then try again.",
         "thread" to "This device uses Thread, and the TV can't reach your Thread network. Your Google or Apple hub must be on the same network as the TV.",
+        "already" to "That device is already on the TV.",
     )
 
     /**
@@ -76,6 +78,7 @@ object MatterCode {
      */
     fun failureKey(stage: String?, error: Long, thread: Boolean = false, threadRoute: Boolean = true): String {
         val core = error and 0xFFFFFFL
+        if (core == ERR_FABRIC_EXISTS) return "already"   // shared again to the TV it is already on
         if (thread && !threadRoute) return "thread"
         return when {
             core == ERR_INVALID_PASE_PARAMETER -> "wrong_code"

@@ -130,7 +130,8 @@ object Matter {
             // added. A device whose maker is missing from the bundled list still joins; the log says so.
             c.setDeviceAttestationDelegate(600, DeviceAttestationDelegate { ptr, _: AttestationInfo?, err ->
                 if (err != 0L) Log.w(TAG, "attestation not verified (0x${err.toString(16)}); continuing, the device is already in the person's home")
-                c.continueCommissioning(ptr, true)
+                // never from inside the callback: it runs on the Matter thread, which then waits forever
+                io.execute { c.continueCommissioning(ptr, true) }
             })
             controller = c
             ready = true; note = null
@@ -218,6 +219,9 @@ object Matter {
         fun fail(stage: String?, code: Long) { if (error == null) { errorStage = lastErrorStage ?: stage; error = code }; done.countDown() }
     }
     @Volatile private var pending: Pending? = null
+    private val primedWaits = ConcurrentHashMap<Long, CountDownLatch>()
+    /** While commissioning with an address: (node, address) for [lastAddress]. */
+    @Volatile private var hint: Pair<Long, Pair<String, Int>>? = null
     private val commissionLock = Any()
 
     /**
@@ -239,6 +243,7 @@ object Matter {
                     if (parsed is MatterCode.Parsed.Qr) OnboardingPayloadParser().parseQrCode(text) else OnboardingPayloadParser().parseManualPairingCode(text)
                 }.getOrElse { return fail("wrong_code", MatterCode.NOTES["wrong_code"]!!) }
                 val (host, port) = splitHostPort(address.trim())
+                hint = node to (host to port)   // the device keeps this address once it joins: find it there too
                 val disc = if (payload.hasShortDiscriminator) payload.getShortDiscriminatorValue() else payload.getLongDiscriminatorValue()
                 c.pairDeviceWithAddress(node, host, port, disc, payload.setupPinCode, params)
             } else {
@@ -256,25 +261,30 @@ object Matter {
                 return fail(key, MatterCode.NOTES[key]!!)
             }
             val loc = runCatching { c.getNetworkLocation(node) }.getOrNull()
-            val saved = MatterStore.Saved(node, System.currentTimeMillis(), address = loc?.ipAddress, port = loc?.port ?: 0)
+            val saved = MatterStore.Saved(node, System.currentTimeMillis(), address = loc?.ipAddress?.takeIf { it.isNotEmpty() } ?: hint?.second?.first,
+                port = loc?.port?.takeIf { it > 0 } ?: hint?.second?.second ?: 0)
             nodes[node] = saved; live[node] = HashMap(); reachable[node] = true
             persist()
             backupFabric()
             // the first report names the device and says what it is (a few seconds)
+            // the subscription is set up once every value has been reported once (a few seconds)
             val first = CountDownLatch(1)
-            val fn: (Long) -> Unit = { if (live[node]?.isNotEmpty() == true) first.countDown() }
-            listen(fn)
+            primedWaits[node] = first
             subscribe(node, 0)
-            first.await(20, TimeUnit.SECONDS)
-            unlisten(fn)
+            first.await(30, TimeUnit.SECONDS)
+            primedWaits.remove(node)
             val ids = JSONArray()
             MatterModel.devices(node, snapshot(node), true, saved.names).forEach { ids.put(it.getString("id")) }
-            changed()
             Log.i(TAG, "commissioned node $node: $ids")
-            JSONObject().put("ok", true).put("device_ids", ids).apply {
-                if (ids.length() == 0) put("note", "The device joined, but it is not something the TV shows (locks, alarms and garage doors never show).")
+            if (ids.length() == 0 && snapshot(node).isNotEmpty()) {
+                // a lock, an alarm or a garage door (or nothing the TV can show): the TV leaves it again
+                leave(node)
+                return JSONObject().put("ok", true).put("device_ids", ids)
+                    .put("note", "That device is not something the TV shows (locks, alarms and garage doors never show), so the TV did not keep it.")
             }
-        } finally { pending = null }
+            changed()
+            JSONObject().put("ok", true).put("device_ids", ids)
+        } finally { pending = null; hint = null }
     }
 
     private fun fail(key: String, note: String) = JSONObject().put("ok", false).put("error", key).put("note", note).put("device_ids", JSONArray())
@@ -292,21 +302,26 @@ object Matter {
         retries.remove(node)?.cancel(false)
         c.getConnectedDevicePointer(node, object : GetConnectedDeviceCallback {
             override fun onDeviceConnected(ptr: Long) {
-                val paths = listOf(ChipAttributePath.newInstance(ChipPathId.forWildcard(), ChipPathId.forWildcard(), ChipPathId.forWildcard()))
-                c.subscribeToPath(SubscriptionEstablishedCallback { id -> Log.i(TAG, "node $node subscribed ($id)"); setReachable(node, true) },
-                    ResubscriptionAttemptCallback { cause, next -> Log.i(TAG, "node $node resubscribing in $next ms (0x${cause.toString(16)})"); setReachable(node, false) },
-                    object : ReportCallback {
-                        override fun onError(attributePath: ChipAttributePath?, eventPath: ChipEventPath?, e: Exception) {
-                            if (attributePath == null && eventPath == null) { Log.w(TAG, "node $node subscription failed", e); setReachable(node, false); retry(node, attempt + 1) }
-                        }
-                        override fun onReport(nodeState: NodeState) { merge(node, nodeState) }
-                    }, ptr, paths, emptyList(), 1, 60, true, false, 0)
+                io.execute { subscribeOn(c, node, ptr, attempt) }
             }
             override fun onConnectionFailure(nodeId: Long, error: Exception) {
                 Log.w(TAG, "node $node not reachable: ${error.message}")
                 setReachable(node, false); retry(node, attempt + 1)
             }
         })
+    }
+
+    // off the Matter thread: calling the controller from its own callback waits forever
+    private fun subscribeOn(c: ChipDeviceController, node: Long, ptr: Long, attempt: Int) {
+        val paths = listOf(ChipAttributePath.newInstance(ChipPathId.forWildcard(), ChipPathId.forWildcard(), ChipPathId.forWildcard()))
+        c.subscribeToPath(SubscriptionEstablishedCallback { id -> Log.i(TAG, "node $node subscribed ($id)"); setReachable(node, true); primedWaits[node]?.countDown() },
+            ResubscriptionAttemptCallback { cause, next -> Log.i(TAG, "node $node resubscribing in $next ms (0x${cause.toString(16)})"); setReachable(node, false) },
+            object : ReportCallback {
+                override fun onError(attributePath: ChipAttributePath?, eventPath: ChipEventPath?, e: Exception) {
+                    if (attributePath == null && eventPath == null) { Log.w(TAG, "node $node subscription failed", e); setReachable(node, false); retry(node, attempt + 1) }
+                }
+                override fun onReport(nodeState: NodeState) { merge(node, nodeState) }
+            }, ptr, paths, emptyList(), 1, 60, true, false, 0)
     }
 
     private fun retry(node: Long, attempt: Int) {
@@ -357,6 +372,7 @@ object Matter {
     /** For [MatterResolver]: "<fabric>-<node>" (hex) to the node's last address. */
     private fun lastAddress(instance: String): Pair<String, Int>? {
         val node = runCatching { java.lang.Long.parseUnsignedLong(instance.substringAfter('-'), 16) }.getOrNull() ?: return null
+        hint?.let { (n, a) -> if (n == node) return a }
         val s = nodes[node] ?: return null
         val a = s.address?.takeIf { it.isNotEmpty() } ?: return null
         return a to (if (s.port > 0) s.port else 5540)
@@ -448,6 +464,14 @@ object Matter {
         val (node, _) = MatterModel.parseId(id) ?: throw Refused(404, "No Matter device with that id.")
         if (!nodes.containsKey(node)) throw Refused(404, "No Matter device with that id.")
         val ids = JSONArray(); MatterModel.devices(node, snapshot(node), true, nodes[node]!!.names).forEach { ids.put(it.getString("id")) }
+        val left = leave(node)
+        return JSONObject().put("ok", true).put("removed", ids).apply {
+            if (!left) put("note", "The device did not answer, so the TV forgot it. It may still list the TV as a connected service; you can remove that in your home app.")
+        }
+    }
+
+    /** Takes the TV off the device's fabric and forgets it. True if the device confirmed. */
+    private fun leave(node: Long): Boolean {
         var left = false
         if (start()) {
             val latch = CountDownLatch(1)
@@ -461,9 +485,7 @@ object Matter {
         retries.remove(node)?.cancel(false)
         nodes.remove(node); live.remove(node); reachable.remove(node)
         persist(); backupFabric(); changed()
-        return JSONObject().put("ok", true).put("removed", ids).apply {
-            if (!left) put("note", "The device did not answer, so the TV forgot it. It may still list the TV as a connected service; you can remove that in your home app.")
-        }
+        return left
     }
 
     @Suppress("UNCHECKED_CAST")

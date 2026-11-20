@@ -139,6 +139,9 @@ class MatterModelTest {
         assertEquals(5L, cover.command); assertEquals(7000, cover.fields.getInt("0:UINT"))
         val fan = MatterModel.plan("fan", "level", 60, ep(dt(0x002B), MatterModel.FAN to emptyMap())).single() as Step.Write
         assertEquals(2L, fan.attribute); assertEquals(60, fan.json.getInt("2:UINT"))
+        val fanOnOff = MatterModel.plan("fan", "level", 30, ep(dt(0x002B), MatterModel.FAN to emptyMap(), MatterModel.ON_OFF to emptyMap()))
+        assertEquals(Step.Invoke(MatterModel.ON_OFF, 1), fanOnOff[0]); assertEquals(30, (fanOnOff[1] as Step.Write).json.getInt("2:UINT"))
+        assertEquals(listOf(Step.Write(MatterModel.FAN, 0, """{"0:UINT":0}""")), MatterModel.plan("fan", "level", 0, ep(dt(0x002B), MatterModel.FAN to emptyMap())))
         val th = ep(dt(0x0301), MatterModel.THERMOSTAT to mapOf(0x1CL to 4L, 0xFFFCL to 3L))
         val heat = MatterModel.plan("climate", "target", 22.5, th).single() as Step.Write
         assertEquals(0x12L, heat.attribute); assertEquals(2250, heat.json.getInt("18:INT"))

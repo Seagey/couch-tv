@@ -30,7 +30,8 @@ class MatterResolver(
         fun fromCache(why: String): Boolean {
             if (cached == null || !done.compareAndSet(false, true)) return false
             Log.i(TAG, "resolve $instanceName: $why, using the last address ${cached.first}")
-            chipMdnsCallback.handleServiceResolve(instanceName, serviceType, null, cached.first, cached.second, null, callbackHandle, contextHandle)
+            // the library copies the host name and reads the text entries: neither may be null
+            chipMdnsCallback.handleServiceResolve(instanceName, serviceType, cached.first, cached.first, cached.second, HashMap(), callbackHandle, contextHandle)
             return true
         }
         val wrapped = object : ChipMdnsCallback {

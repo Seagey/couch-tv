@@ -8,5 +8,7 @@ class App : Application() {
         super.onCreate()
         CrashGuard.install(this)
         TclPlaceholderInput.enableIfTcl(this)   // TCL only, issue #94
+        // Matter devices added before: start their live state (nothing loads if there are none)
+        runCatching { dev.couchtv.ontv.matter.Matter.init(this) }
     }
 }

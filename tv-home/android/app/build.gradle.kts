@@ -64,6 +64,11 @@ android {
     // One APK for every TV (couch-tv-home.apk), native libraries compressed, the same as the on-TV app:
     // nothing native here today, so this changes nothing until one comes (scripts/check-release-apks.py).
     packaging { jniLibs { useLegacyPackaging = true } }
+    // Matter (MatterPage.kt): the on-TV app's controller code and library, shared, not copied
+    // (on-tv/android/matter/README.md)
+    sourceSets["main"].java.srcDir("../../../on-tv/android/app/src/main/java/dev/couchtv/ontv/matter")
+    sourceSets["main"].jniLibs.srcDir("../../../on-tv/android/matter/jni")
+    sourceSets["main"].assets.srcDir("../../../on-tv/android/matter/assets")
     lint {
         checkReleaseBuilds = false
         abortOnError = false
@@ -144,6 +149,8 @@ abstract class BundleTvWeb : DefaultTask() {
 }
 
 dependencies {
+    // Matter controller jars (Apache 2.0), the same build as the native library
+    implementation(fileTree(mapOf("dir" to "../../../on-tv/android/matter/libs", "include" to listOf("*.jar"))))
     // Unit tests for the plain Kotlin rules (FireWatchTest), run with testDebugUnitTest (EPL 1.0).
     testImplementation("junit:junit:4.13.2")
     // The real org.json for the smart home tests (HaReadingsTest, HomeAssistantTest): android.jar only

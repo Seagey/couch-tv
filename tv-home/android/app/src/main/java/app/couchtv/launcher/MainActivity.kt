@@ -423,6 +423,7 @@ class MainActivity : Activity() {
         settings.textZoom = 100
         addJavascriptInterface(Native(), "TVOS")
         addJavascriptInterface(HomeAssistant.Page(this@MainActivity, this), "TVHA")   // smart home, see HomeAssistant.kt
+        addJavascriptInterface(MatterPage(this@MainActivity, this), "TVMATTER")   // Matter devices, see MatterPage.kt
         addJavascriptInterface(Updater.Page(this@MainActivity, this), "TVUP")   // updates from GitHub releases, see Updater.kt
         webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {

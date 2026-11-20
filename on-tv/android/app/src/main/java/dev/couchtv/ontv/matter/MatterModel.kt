@@ -368,7 +368,16 @@ object MatterModel {
                     val on = (ep.attr(ON_OFF, 0L) as? Boolean) ?: ((long(ep.attr(FAN, 0L)) ?: 0L) != 0L)
                     plan("fan", if (on) "off" else "on", null, ep)
                 }
-                "level" -> listOf(Step.Write(FAN, 2, writeU(2, numberOf(value).coerceIn(0.0, 100.0).roundToInt().toLong())))
+                "level" -> {
+                    val pct = numberOf(value).coerceIn(0.0, 100.0).roundToInt().toLong()
+                    // a fan with its own on and off ignores the speed while off: a speed above 0 switches it on first
+                    val onOff = ep.isNotEmpty() && ON_OFF in servers(ep)
+                    when {
+                        pct == 0L -> plan("fan", "off", null, ep)
+                        onOff -> listOf(Step.Invoke(ON_OFF, 1), Step.Write(FAN, 2, writeU(2, pct)))
+                        else -> listOf(Step.Write(FAN, 2, writeU(2, pct)))
+                    }
+                }
                 else -> throw BadCommand("A fan can't do that.")
             }
             "cover" -> when (action) {

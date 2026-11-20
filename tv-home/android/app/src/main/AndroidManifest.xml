@@ -4,6 +4,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Matter (MatterPage.kt): finding devices on the home network with mDNS needs the multicast lock -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <!-- Android's Watch Next list: what each app says you are in the middle of (keep watching, no computer needed). -->
     <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
     <!-- couch-tv Studio's Screen time widget: Android's usage numbers. Not granted on install: apply.sh
