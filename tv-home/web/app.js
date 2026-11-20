@@ -897,7 +897,7 @@
     clock();
   }
   function clock() {
-    clockShown();   // a design that has just come on or gone shows its own clock
+    if (typeof clockShown === "function") clockShown();   // a design that has just come on or gone shows its own clock
     var d = new Date(), h = d.getHours(), m = d.getMinutes();
     clockMinute = h + ":" + m;
     var mm = (m < 10 ? "0" : "") + m;

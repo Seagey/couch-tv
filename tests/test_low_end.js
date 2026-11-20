@@ -22,8 +22,18 @@ assert.deepStrictEqual(d({ setting: false, memory: 1 }), { low: false, why: 'set
 // memory decides where it is clear
 assert.deepStrictEqual(d({ setting: 'auto', memory: 1 }), { low: true, why: 'memory' });
 assert.deepStrictEqual(d({ setting: 'auto', memory: 0.5 }), { low: true, why: 'memory' });
-assert.deepStrictEqual(d({ setting: 'auto', memory: 4 }), { low: false, why: 'memory' });
 assert.deepStrictEqual(d({ setting: 'auto', memory: 8 }), { low: false, why: 'memory' });
+// 4 GB is measured, not trusted (g01, #197, #213: a 4 GB Google TV Streamer, Homatics and TCL stuttered)
+assert.strictEqual(d({ setting: 'auto', memory: 4 }), null, '4 GB is measured');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, medianMs: 30 }), { low: true, why: 'measured' }, '4 GB at 30 ms frames is low end');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, medianMs: 14 }), { low: false, why: 'measured' }, '4 GB at 14 ms frames is not');
+assert.deepStrictEqual(d({ setting: false, memory: 4, medianMs: 30 }), { low: false, why: 'setting' }, 'a chosen setting always wins');
+assert.deepStrictEqual(d({ setting: true, memory: 8, medianMs: 10 }), { low: true, why: 'setting' }, 'a chosen setting always wins');
+// the frames while the focus moves along a row: a stutter there wins over a smooth still measurement
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, medianMs: 15, navMs: 33 }), { low: true, why: 'moving' });
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, cached: { low: false, t: now - day }, navMs: 33 }), { low: true, why: 'moving' }, 'a kept "not low end" gives way to a stutter while moving');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, cached: { low: false, t: now - day }, navMs: 17 }), { low: false, why: 'measured' });
+assert.deepStrictEqual(d({ setting: 'auto', memory: 8, navMs: 40 }), { low: false, why: 'memory' }, '8 GB is not measured');
 // 2 GB (the measured TV) or no figure: a measurement, unless one from this week is kept
 assert.strictEqual(d({ setting: 'auto', memory: 2 }), null, '2 GB is measured');
 assert.strictEqual(d({ setting: 'auto' }), null, 'no deviceMemory is measured');

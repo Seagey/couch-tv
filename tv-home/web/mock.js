@@ -21,6 +21,7 @@
 //   dock=mac            home.dock: the Mac-style dock (mac, or classic)
 //   ambient=1           home.ambient_music: the full screen music view (needs music=1; ambient=off: off)
 //   lighter=1           home.lighter: Lighter home for a slow box (no blur, no soft shadows, a still photo)
+//   showclock=off       home.show_clock: no clock on the home   hires=always|off   home.hi_res (the 4K pictures)
 //   icons=glass         home.glass_icons: Apple style clear app icons on glass
 //   amount=1..5         home.glass_amount, how clear the glass is (1 frosted, 3 the default, 5 very clear)
 //   clockstyle=liquid   home.clock_style: the Night clock as liquid glass
@@ -138,6 +139,8 @@
   if (arg("moving")) cfg.home.moving_tiles = arg("moving") !== "off";
   if (arg("dock")) cfg.home.dock = arg("dock");
   if (arg("lighter")) cfg.home.lighter = arg("lighter") !== "off";
+  if (arg("showclock")) cfg.home.show_clock = arg("showclock") !== "off";   // home.show_clock
+  if (arg("hires")) cfg.home.hi_res = arg("hires") === "always" ? "always" : arg("hires") === "off" ? false : true;   // home.hi_res
   if (arg("ambient")) cfg.home.ambient_music = arg("ambient") !== "off";   // the full screen music view (off unless set)
   if (arg("icons") === "glass") cfg.home.glass_icons = true;
   if (arg("gfocus")) cfg.home.glass_focus = arg("gfocus");   // glass: the focused app stays glass (#32)
