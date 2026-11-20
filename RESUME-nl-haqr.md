@@ -54,10 +54,11 @@ House name filter lines left alone (ws2-smarthome owns the new rule).
 5 HaServer: one request (line, headers, body) must arrive within requestMs (10 s, System.nanoTime, soTimeout never past
   it, 5 s per read); ThreadPoolExecutor(8, 8, 0 ms, ArrayBlockingQueue(16)), a connection beyond that is closed at once
   (hand()). HaServerTest 5: whole request, slow drip headers, slow drip body, silent 5 s, full pool closes 6 of 30.
-6 PhoneServer binds the home network address (PhoneServer(..., bind)); MainActivity starts it again on a new address
-  (phoneFresh from phonePagePort/phoneLink), keeps the same PhoneAuth, waits while there is no Wi-Fi.
-  PhoneServerTest 22 (new: listens on the one address given). Emulator: /proc shows only the emulator home network address; phone reached with
-  `adb emu redir add tcp:15402:<port>` (adb forward to 127.0.0.1 no longer reaches it, as intended).
+6 Tried binding the phone page to one LAN address (36571a5); the checker said NO-GO (a picked address can differ
+  from the QR's with Ethernet and Wi-Fi, Wi-Fi Direct or a VPN, and a Wi-Fi change only moved it on the next QR ask).
+  Undone: PhoneServer listens on every interface again, as at 22c01be, with a comment saying why (Host check, key and
+  pairing guard it). The restart logic (phoneFresh) went with it. PhoneServerTest 22: the case is now "listens on
+  every interface, and /ha still refuses a foreign Host (403)".
 7 bridge/haphone.py: /ha* answers 403 unless the Host is a number address or a .local name with a port (HOST_OK, as
   Kotlin; port not compared, so a mapped port still works). test_ha_phone_bridge 13 (new Host test: 6 bad hosts x 4 calls).
 Pillow: test_phone_page_bridge 36 tests, 0 skipped, in a venv with bridge/requirements.txt (scratchpad haqr/venv-pillow;
@@ -70,6 +71,9 @@ Reruns after the lows: gradle launcher 95 tests 0 fail 0 skipped (HaServerTest 5
   HaPhoneTest 5, HaRealTest 1 against real HA); on-TV 172 0 fail 0 skipped; emulator (new APK) one server 5401: 27 checks,
   5400: 27 checks (each incl. "listens on the home network address only"), HaServer path 16; browser phone_browser.mjs 18,
   test_integrations_browser.mjs 40; node 26/31/18 and test_remote_phone_page.mjs 42.
+After undoing low 6: gradle launcher 95 tests 0 fail 0 skipped (PhoneServerTest 22, HaServerTest 5, HaRealTest 1 against
+  real HA); new APK on the emulator, /proc shows the phone page on every interface: one server 5401 (on-TV app holds 5400)
+  26 checks, 5400 26 checks (haqr/e2e_launcher_oneserver.py, adb forward works again).
 
 ## Left
 Nothing.
