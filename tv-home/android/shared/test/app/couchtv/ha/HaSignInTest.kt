@@ -162,14 +162,17 @@ class HaSignInTest {
     }
 
     @Test fun clientIdIsTheTvOnTheHomeNetwork() {
-        assertEquals("http://${lan(1, 50)}:5400/", HaPhone.clientFor("${lan(1, 50)}:5400", null, 5400))
-        assertEquals("http://${ip(10, 0, 0, 7)}:5401/", HaPhone.clientFor("${ip(10, 0, 0, 7)}:5401", "${lan(1, 50)}", 5401))
-        // a name, another port or a public address in Host: the TV's own address instead
-        assertEquals("http://${lan(1, 50)}:5400/", HaPhone.clientFor("evil.example:5400", "${lan(1, 50)}", 5400))
-        assertEquals("http://${lan(1, 50)}:5400/", HaPhone.clientFor("${lan(1, 50)}:80", "${lan(1, 50)}", 5400))
-        assertEquals("http://${ip(172, 20, 1, 2)}:5400/", HaPhone.clientFor("8.8.8.8:5400", "${ip(172, 20, 1, 2)}", 5400))
-        assertNull(HaPhone.clientFor(null, null, 5400))
-        assertNull(HaPhone.clientFor("8.8.8.8:5400", "8.8.4.4", 5400))
+        val own = setOf(lan(1, 50), ip(10, 0, 0, 7))
+        assertEquals("http://${lan(1, 50)}:5400/", HaPhone.clientFor("${lan(1, 50)}:5400", null, 5400, own))
+        assertEquals("http://${ip(10, 0, 0, 7)}:5401/", HaPhone.clientFor("${ip(10, 0, 0, 7)}:5401", "${lan(1, 50)}", 5401, own))
+        // a Host address that is not one of this TV's own is never the client id: the TV's own instead
+        assertEquals("http://${lan(1, 50)}:5400/", HaPhone.clientFor("${lan(1, 99)}:5400", "${lan(1, 50)}", 5400, own))
+        assertNull(HaPhone.clientFor("${lan(1, 99)}:5400", null, 5400, own))
+        assertEquals("http://${lan(1, 50)}:5400/", HaPhone.clientFor("evil.example:5400", "${lan(1, 50)}", 5400, own))
+        assertEquals("http://${lan(1, 50)}:5400/", HaPhone.clientFor("${lan(1, 50)}:80", "${lan(1, 50)}", 5400, own))
+        assertEquals("http://${ip(172, 20, 1, 2)}:5400/", HaPhone.clientFor("8.8.8.8:5400", "${ip(172, 20, 1, 2)}", 5400, own))
+        assertNull(HaPhone.clientFor(null, null, 5400, own))
+        assertNull(HaPhone.clientFor("8.8.8.8:5400", "8.8.4.4", 5400, setOf("8.8.8.8")))
     }
 
     @Test fun homeAssistantsAnnouncementGivesAnAddressTheTvCanReach() {

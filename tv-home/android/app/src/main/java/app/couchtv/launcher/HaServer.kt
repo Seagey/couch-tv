@@ -25,7 +25,8 @@ object HaServer {
     private const val IDLE_MS = 30 * 60_000L
     @Volatile private var socket: ServerSocket? = null
     @Volatile private var lastAsked = 0L
-    private val pool = Executors.newFixedThreadPool(3)
+    // enough for a phone page and its few files at once; a slow or silent client gives up after 5 s
+    private val pool = Executors.newFixedThreadPool(8)
 
     /** Starts it if it is not running; the port it listens on, or null when none was free. */
     @Synchronized
@@ -33,8 +34,10 @@ object HaServer {
         lastAsked = System.currentTimeMillis()
         socket?.takeIf { !it.isClosed }?.let { return it.localPort }
         val app = ctx.applicationContext
+        // only on the home network address the QR code names, never every interface
+        val lan = HaPhone.lanAddress(app) ?: return null
         for (port in 5401..5409) {
-            val ss = try { ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(port)) } } catch (e: Exception) { continue }
+            val ss = try { ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(java.net.InetAddress.getByName(lan), port)) } } catch (e: Exception) { continue }
             socket = ss
             Thread({ loop(app, ss) }, "ha-server").apply { isDaemon = true }.start()
             Log.i(TAG, "smart home set up page on port $port")
@@ -53,10 +56,10 @@ object HaServer {
     private fun loop(app: Context, ss: ServerSocket) {
         ss.soTimeout = 60_000
         while (!ss.isClosed) {
-            val c = try { ss.accept() } catch (e: java.net.SocketTimeoutException) {
-                if (System.currentTimeMillis() - lastAsked > IDLE_MS) { stop(); return }
-                continue
-            } catch (e: Exception) { return }
+            val c = try { ss.accept() } catch (e: java.net.SocketTimeoutException) { null } catch (e: Exception) { return }
+            // idle for 30 minutes since the TV screen last asked: stop, whether or not phones keep asking
+            if (System.currentTimeMillis() - lastAsked > IDLE_MS) { try { c?.close() } catch (e: Exception) {}; stop(); return }
+            if (c == null) continue
             pool.execute { try { serve(app, c) } catch (e: Exception) {} finally { try { c.close() } catch (e: Exception) {} } }
         }
     }
@@ -78,7 +81,7 @@ object HaServer {
     }
 
     private fun serve(app: Context, c: Socket) {
-        c.soTimeout = 15_000
+        c.soTimeout = 5_000
         val inp = BufferedInputStream(c.getInputStream())
         val first = line(inp) ?: return
         val parts = first.split(' ')
@@ -99,7 +102,7 @@ object HaServer {
         var read = 0
         while (read < len) { val n = inp.read(buf, read, len - read); if (n < 0) break; read += n }
         val path = target.substringBefore('?')
-        val reply = HaPhone.handle(app, method, path, query(target.substringAfter('?', "")), String(buf, 0, read, Charsets.UTF_8), headers["host"]) {
+        val reply = HaPhone.handle(app, method, path, query(target.substringAfter('?', "")), String(buf, 0, read, Charsets.UTF_8), headers["host"], c.localPort) {
             name -> try { app.assets.open("www/tv/$name").use { it.readBytes() } } catch (e: Exception) { null }
         } ?: HaPhone.Reply(404, "text/plain", "Not found".toByteArray())
         write(c, reply)

@@ -130,7 +130,7 @@ object HomeAssistant {
             if (!SENSOR.matches(ent) || (bat != null && !SENSOR.matches(bat))) null
             else Energy(ent, e.optString("name").trim().take(40), bat)
         }
-        return Settings(base, token, list("climate", CLIMATE, 8), list("scenes", SCENE, 10), bell,
+        return Settings(base, token, list("climate", CLIMATE, 8), list("scenes", SCENE, 10).filter { !OPENS_HOUSE.matches(it.entity) }, bell,
             list("controls", CONTROL, 16).filter { !OPENS_HOUSE.matches(it.entity) }, list("cameras", CAMERA, 4), list("sensors", SENSOR, 8), energy, list("speakers", SPEAKER, 6),
             if (token.isEmpty()) refresh else null, if (token.isEmpty()) client else null)
     }
@@ -175,6 +175,13 @@ object HomeAssistant {
     private class Access(val token: String, val until: Long)
     private val access = ConcurrentHashMap<String, Access>()
     private val refreshing = Any()
+    // A refresh token Home Assistant refused, and when: it is not tried again for a minute, and the TV
+    // and the phone say "Sign in again" (status signin_again) until a new sign in.
+    private val refused = ConcurrentHashMap<String, Long>()
+    private const val REFUSED_WAIT_MS = 60_000L
+
+    /** Home Assistant refused this set up's refresh token: the TV and the phone say "Sign in again". */
+    internal fun signInAgain(s: Settings) = s.refresh != null && refused.containsKey(s.refresh)
 
     /** Keeps an access token just made (signing in), so the first calls need no refresh. */
     internal fun remember(refresh: String, t: HaAuth.Tokens) { access[refresh] = Access(t.access, clock() + t.expiresIn * 1000) }
@@ -187,10 +194,13 @@ object HomeAssistant {
     private fun bearer(s: Settings, fresh: Boolean): Pair<Int, String?> {
         val r = s.refresh ?: return 200 to s.token
         if (!fresh) access[r]?.takeIf { it.until > clock() + 60_000 }?.let { return 200 to it.token }
+        refused[r]?.let { if (clock() - it < REFUSED_WAIT_MS) return 401 to null }
         synchronized(refreshing) {
             if (!fresh) access[r]?.takeIf { it.until > clock() + 60_000 }?.let { return 200 to it.token }
+            refused[r]?.let { if (clock() - it < REFUSED_WAIT_MS) return 401 to null }
             val (code, t) = HaAuth.refresh(s.base, r, s.client ?: "")
-            if (t == null) { if (code == 401) access.remove(r); return code to null }
+            if (t == null) { if (code == 401) { access.remove(r); refused[r] = clock() }; return code to null }
+            refused.remove(r)
             remember(r, t)
             return 200 to t.access
         }
@@ -470,8 +480,9 @@ object HomeAssistant {
     // hands the token over once; it is never handed back, and a later change of ticks reuses the kept one.
 
     private val PICKABLE = Regex("(climate|scene|script|light|switch|fan|cover|camera|sensor|media_player|event|binary_sensor|input_boolean)\\.[a-z0-9_]{1,64}")
-    // the same ids config.json refuses (docs/CONFIG.md): nothing that opens the house
-    private val OPENS_HOUSE = Regex("(cover|switch)\\.[a-z0-9_]*(garage|gate|door|lock)[a-z0-9_]*")
+    // nothing that opens the house: a cover, switch, script or scene named for a garage, gate, door,
+    // lock or alarm is never listed, kept or switched (bridge/smarthome.py OPENS_HOUSE, the same)
+    private val OPENS_HOUSE = Regex("(cover|switch|script|scene)\\.[a-z0-9_]*(garage|gate|door|lock|alarm)[a-z0-9_]*")
     private const val MOST_LISTED = 400
 
     /** Home Assistant's /api/states, cut to what couch-tv can show: entity, name, and for a sensor its unit. */
@@ -513,13 +524,13 @@ object HomeAssistant {
         val (c2, all) = call(s, "GET", "/api/states", null, 12 * 1024 * 1024)
         if (c2 != 200 || all == null) return JSONObject().put("ok", false).put("error", "unreachable")
         val list = try { pickable(JSONArray(String(all, Charsets.UTF_8))) } catch (e: Exception) { return JSONObject().put("ok", false).put("error", "not_ha") }
+        listed = (0 until list.length()).associate { list.getJSONObject(it).let { e -> e.getString("entity") to e.optString("name") } }
         return JSONObject().put("ok", true).put("entities", list)
     }
 
     /** Keeps a section made on the TV, with the address and token it was checked with. False when it does not check out. */
     fun keep(ctx: Context, picks: JSONObject, base: String, token: String): Boolean {
-        val o = JSONObject(picks.toString()).put("url", base).put("token", token)
-        if (parse(o) == null) return false
+        val o = rebuilt(picksOf(picks.toString()).put("url", base).put("token", token), settings(ctx)) ?: return false
         store(ctx).edit().putString(KEY, o.toString()).putBoolean("made_on_tv", true).commit()
         cached = null; cachedFrom = null
         changed?.invoke(ctx)
@@ -530,7 +541,7 @@ object HomeAssistant {
     fun forget(ctx: Context) {
         store(ctx).edit().remove(KEY).remove("made_on_tv").commit()
         cached = null; cachedFrom = null
-        access.clear()
+        access.clear(); refused.clear(); listed = null
         changed?.invoke(ctx)
     }
 
@@ -572,11 +583,42 @@ object HomeAssistant {
         val keys = try { JSONObject(raw) } catch (e: Exception) { return false }
         val o = picksOf(picks.toString())
         listOf("url", "token", "refresh_token", "client_id").forEach { k -> keys.optString(k).takeIf { it.isNotEmpty() }?.let { o.put(k, it) } }
-        if (parse(o) == null) return false
-        store(ctx).edit().putString(KEY, o.toString()).putBoolean("made_on_tv", true).commit()
+        val section = rebuilt(o, settings(ctx)) ?: return false
+        store(ctx).edit().putString(KEY, section.toString()).putBoolean("made_on_tv", true).commit()
         cached = null; cachedFrom = null
         changed?.invoke(ctx)
         return true
+    }
+
+    // What Home Assistant listed last (listFor), entity to its name: a save may only keep these, so a
+    // garage door under a plain id (left out of the list by its device class) can never be kept.
+    @Volatile private var listed: Map<String, String>? = null
+
+    /** Tests: as if Home Assistant had just listed these. */
+    internal fun listedForTest(m: Map<String, String>?) { listed = m }
+
+    /**
+     * The section to keep, made from what parsed (never the raw JSON from a page): only ids Home
+     * Assistant listed last, each with the name kept before, else Home Assistant's own name. Null when
+     * nothing was listed yet or it does not check out. Pure but for [listed], for tests.
+     */
+    internal fun rebuilt(o: JSONObject, old: Settings?): JSONObject? {
+        val ok = listed ?: return null
+        val s = parse(o) ?: return null
+        val oldNames = old?.let { (it.climate + it.scenes + it.controls + it.cameras + it.sensors + it.speakers).associate { n -> n.entity to n.name } } ?: emptyMap()
+        fun name(e: String, given: String) = given.ifEmpty { oldNames[e].orEmpty().ifEmpty { ok[e].orEmpty() } }.take(40)
+        fun arr(l: List<Named>) = JSONArray(l.filter { it.entity in ok }.map { JSONObject().put("entity", it.entity).put("name", name(it.entity, it.name)) })
+        val out = JSONObject().put("url", s.base)
+        if (s.refresh != null) out.put("refresh_token", s.refresh).put("client_id", s.client) else out.put("token", s.token)
+        out.put("climate", arr(s.climate)).put("scenes", arr(s.scenes)).put("controls", arr(s.controls))
+            .put("cameras", arr(s.cameras)).put("sensors", arr(s.sensors)).put("speakers", arr(s.speakers))
+        s.doorbell?.takeIf { it.entity in ok && (it.camera == null || it.camera in ok) }?.let { b ->
+            out.put("doorbell", JSONObject().put("entity", b.entity).put("name", name(b.entity, b.name)).apply { b.camera?.let { put("camera", it) } })
+        }
+        s.energy?.takeIf { it.entity in ok && (it.battery == null || it.battery in ok) }?.let { e ->
+            out.put("energy", JSONObject().put("entity", e.entity).put("name", name(e.entity, e.name)).apply { e.battery?.let { put("battery", it) } })
+        }
+        return if (parse(out) != null) out else null
     }
 
     /** Disconnect: Home Assistant forgets this TV's refresh token (when it is one), then this TV forgets everything. */
@@ -605,6 +647,7 @@ object HomeAssistant {
         return JSONObject().put("set", true).put("host", try { URL(s.base).host } catch (e: Exception) { "" })
             .put("made_on_tv", store(ctx).getBoolean("made_on_tv", false))
             .put("signed_in", s.refresh != null).put("count", count)
+            .put("signin_again", signInAgain(s))
             .put("climate", ids(s.climate)).put("scenes", ids(s.scenes)).put("controls", ids(s.controls)).put("cameras", ids(s.cameras))
             .put("sensors", ids(s.sensors)).put("speakers", ids(s.speakers)).put("energy", s.energy?.entity ?: "").put("battery", s.energy?.battery ?: "")
             .put("doorbell", s.doorbell?.entity ?: "").put("doorbell_camera", s.doorbell?.camera ?: "")

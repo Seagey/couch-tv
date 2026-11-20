@@ -29,6 +29,7 @@ import json
 import os
 import re
 import secrets
+import socket
 import time
 import urllib.parse
 
@@ -57,11 +58,22 @@ def private(ip):
     return a.version == 4 and a.is_private and not a.is_loopback
 
 
-def client_for(host, own_ip, port):
-    """The client id: this computer's address as the phone reached it, when that is a home network
-    number address on this port; else this computer's own home network address."""
+def own_addresses(own_ip=None):
+    """This computer's own IPv4 addresses: the home network one, and every one its name resolves to."""
+    out = {own_ip} if own_ip else set()
+    try:
+        out.update(a for a in socket.gethostbyname_ex(socket.gethostname())[2] if ":" not in a)
+    except OSError:
+        pass
+    return out
+
+
+def client_for(host, own_ip, port, own=None):
+    """The client id: this computer's address as the phone reached it, only when that is one of this
+    computer's own home network addresses on this port; else its own home network address."""
     m = HOST.fullmatch((host or "").strip())
-    if m and private(m.group(1)) and int(m.group(2)) == port:
+    own = own_addresses(own_ip) if own is None else own
+    if m and private(m.group(1)) and m.group(1) in own and int(m.group(2)) == port:
         return "http://%s:%d/" % (m.group(1), port)
     return "http://%s:%d/" % (own_ip, port) if own_ip and private(own_ip) else None
 
@@ -201,13 +213,16 @@ class Phone:
     def routes(self, r):
         r.add_get("/ha", self.h_page)
         r.add_get("/ha/", self.h_page)
-        r.add_get("/ha/ha-picks.js", lambda req: self._file("ha-picks.js", "application/javascript"))
+        r.add_get("/ha/ha-picks.js", self.h_picks)
         r.add_get("/ha/done", self.h_done)
         r.add_get("/ha/api/state", self.h_state)
         r.add_post("/ha/api/signin", self.h_signin)
         r.add_get("/ha/api/devices", self.h_devices)
         r.add_post("/ha/api/save", self.h_save)
         r.add_post("/ha/api/forget", self.h_forget)
+
+    async def h_picks(self, request):
+        return self._file("ha-picks.js", "application/javascript")
 
     async def h_page(self, request):
         return self._file("ha-phone.html", "text/html")
@@ -227,7 +242,7 @@ class Phone:
             s["seen"] = True
             self.on_change()
         st = self.home.status()
-        return self._json({"ok": True, "signed_in": bool(st.get("set")), "host": st.get("host", ""), "scanning": s["scanning"], "found": s["found"]})
+        return self._json({"ok": True, "signed_in": bool(st.get("set")), "host": st.get("host", ""), "signin_again": bool(st.get("signin_again")), "scanning": s["scanning"], "found": s["found"]})
 
     async def h_signin(self, request):
         b = await self._body(request)
@@ -244,19 +259,24 @@ class Phone:
         p = await probe(self.home, base)
         if p != "ok":
             return self._fail(p)
-        verifier = secrets.token_urlsafe(32) if await pkce(self.home, base) else None
+        # PKCE S256 always: a Home Assistant too old to say it takes it ignores it, so it is never dropped
+        verifier = secrets.token_urlsafe(32)
         state = secrets.token_urlsafe(16)
         s["pending"] = {"state": state, "verifier": verifier, "base": base, "client": client, "at": time.time()}
         return self._json({"ok": True, "go": authorize_url(base, client, state, challenge(verifier) if verifier else None)})
 
     async def h_done(self, request):
+        # every failure before the state checks out goes to /ha/?e=expired with no key: only the phone that
+        # asked for this sign in (it holds the state) is sent back with the set up key
         s = self.session
-        if not s:
+        p = s and s.get("pending")
+        state = request.query.get("state", "")
+        if not p or not hmac.compare_digest(state.encode(), p["state"].encode()):
+            raise web.HTTPFound("/ha/?e=expired")
+        if s["until"] < time.time() or time.time() - p["at"] > SIGN_IN:
+            s["pending"] = None
             raise web.HTTPFound("/ha/?e=expired")
         back = "/ha/?k=" + urllib.parse.quote(s["key"])
-        p, state = s.get("pending"), request.query.get("state", "")
-        if not p or s["until"] < time.time() or time.time() - p["at"] > SIGN_IN or not hmac.compare_digest(state.encode(), p["state"].encode()):
-            raise web.HTTPFound(back + "&e=expired")
         s["pending"] = None   # a code is used once
         code = request.query.get("code", "")
         if not code or len(code) > 512:

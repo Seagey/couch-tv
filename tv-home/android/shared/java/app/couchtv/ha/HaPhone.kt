@@ -39,6 +39,21 @@ object HaPhone {
     // tests swap these
     internal var scanner: (Context) -> List<HaFind.Found> = { HaFind.scan(it) }
     internal var now: () -> Long = { System.currentTimeMillis() }
+    internal var ownAddresses: () -> Set<String> = { own() }
+    internal var keepSignIn: (Context?, String, HaAuth.Tokens, String) -> Boolean = { c, b, t, cl -> c != null && HomeAssistant.keepSignIn(c, b, t, cl) }
+
+    /** Tests: a set up session as start() makes it, with no Wi-Fi look; its key. */
+    internal fun startForTest(tvIp: String?, port: Int): String {
+        val s = Session(HaAuth.randomKey(16), port, tvIp, now() + LIFE_MS).apply { scanning = false }
+        cur = s
+        return s.key
+    }
+
+    /** This device's own IPv4 addresses, on every interface that is up. */
+    private fun own(): Set<String> = try {
+        java.net.NetworkInterface.getNetworkInterfaces().toList().filter { it.isUp }
+            .flatMap { it.inetAddresses.toList() }.filterIsInstance<java.net.Inet4Address>().mapNotNull { it.hostAddress }.toSet()
+    } catch (e: Exception) { emptySet() }
 
     /**
      * Opens (or keeps) the set up for a phone: { ok, url, seen } plus what is kept now (status).
@@ -72,14 +87,27 @@ object HaPhone {
 
     private val PRIVATE = Regex("(10\\.\\d{1,3}|172\\.(1[6-9]|2\\d|3[01])|192\\.168)\\.\\d{1,3}\\.\\d{1,3}")
     private val HOST = Regex("(\\d{1,3}(\\.\\d{1,3}){3}):(\\d{1,5})")
+    // a Host header this server answers: a number address or a .local name, with the port
+    private val HOST_OK = Regex("(\\d{1,3}(\\.\\d{1,3}){3}|[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.local):(\\d{1,5})", RegexOption.IGNORE_CASE)
 
     /**
-     * The client id: the TV's own address as the phone reached it (the Host header), when that is a
-     * home network number address on this server's port; else the TV's own address. Pure, for tests.
+     * Only a request made to this TV by its number address or a .local name, on this server's port, is
+     * answered (a web page elsewhere cannot point a name of its own at the TV and use the set up).
      */
-    internal fun clientFor(host: String?, tvIp: String?, port: Int): String? {
+    internal fun hostOk(host: String?, port: Int?): Boolean {
+        val m = HOST_OK.matchEntire(host?.trim() ?: "") ?: return false
+        return port == null || m.groupValues.last().toIntOrNull() == port
+    }
+
+    /**
+     * The client id: the TV's own address as the phone reached it (the Host header), only when that is
+     * one of this device's own home network addresses on this server's port; else the TV's address.
+     * Pure but for [own], for tests.
+     */
+    internal fun clientFor(host: String?, tvIp: String?, port: Int, own: Set<String> = ownAddresses()): String? {
         HOST.matchEntire(host?.trim() ?: "")?.let { m ->
-            if (PRIVATE.matches(m.groupValues[1]) && m.groupValues[3].toIntOrNull() == port) return "http://${m.groupValues[1]}:$port/"
+            val ip = m.groupValues[1]
+            if (PRIVATE.matches(ip) && ip in own && m.groupValues[3].toIntOrNull() == port) return "http://$ip:$port/"
         }
         return tvIp?.takeIf { PRIVATE.matches(it) }?.let { "http://$it:$port/" }
     }
@@ -93,10 +121,14 @@ object HaPhone {
      * One request under /ha. [query] is the decoded query string, [body] the raw request body (JSON),
      * [host] the Host header, [file] reads a file of tv-home/web from the app (ha-phone.html, ha-picks.js). Null: not ours.
      */
-    fun handle(ctx: Context, method: String, path: String, query: Map<String, String>, body: String, host: String?, file: (String) -> ByteArray?): Reply? {
-        val app = ctx.applicationContext
+    fun handle(ctx: Context, method: String, path: String, query: Map<String, String>, body: String, host: String?, port: Int?, file: (String) -> ByteArray?): Reply? =
+        handleFor(ctx.applicationContext, method, path, query, body, host, port, file)
+
+    /** handle() with the app's context, null in tests (then only what needs no store is asked). */
+    internal fun handleFor(app: Context?, method: String, path: String, query: Map<String, String>, body: String, host: String?, port: Int?, file: (String) -> ByteArray?): Reply? {
         val p = path.trimEnd('/').ifEmpty { "/" }
         if (p != "/ha" && !p.startsWith("/ha/")) return null
+        if (!hostOk(host, port)) return Reply(403, "text/plain", "Forbidden".toByteArray())
         val b = try { if (body.isBlank()) JSONObject() else JSONObject(body) } catch (e: Exception) { JSONObject() }
         val k = query["k"] ?: b.optString("k").ifEmpty { null }
         when ("$method $p") {
@@ -111,11 +143,12 @@ object HaPhone {
             "GET /ha/done" -> return done(app, query)
         }
         val s = live(k) ?: return fail("expired", 403)
+        if (app == null && "$method $p" != "POST /ha/api/signin") return fail("unknown", 404)
         return when ("$method $p") {
             "GET /ha/api/state" -> {
                 if (!s.seen) { s.seen = true; onChange?.invoke() }
-                val st = HomeAssistant.status(app)
-                json(JSONObject().put("ok", true).put("signed_in", st.optBoolean("set")).put("host", st.optString("host"))
+                val st = HomeAssistant.status(app!!)
+                json(JSONObject().put("ok", true).put("signed_in", st.optBoolean("set")).put("host", st.optString("host")).put("signin_again", st.optBoolean("signin_again"))
                     .put("scanning", s.scanning).put("found", JSONArray(s.found.map { JSONObject().put("name", it.name).put("url", it.url) })))
             }
             "POST /ha/api/signin" -> {
@@ -123,26 +156,27 @@ object HaPhone {
                     ?: return fail("address")
                 val client = clientFor(host, s.tvIp, s.port) ?: return fail("network")
                 when (val ok = HaAuth.probe(base)) { "ok" -> {}; else -> return fail(ok) }
-                val verifier = if (HaAuth.pkce(base)) HaAuth.verifier() else null
+                // PKCE S256 always: a Home Assistant too old to say it takes it ignores it, so it is never dropped
+                val verifier = HaAuth.verifier()
                 val state = HaAuth.randomKey(16)
                 s.pending = Pending(state, verifier, base, client, now())
-                json(JSONObject().put("ok", true).put("go", HaAuth.authorizeUrl(base, client, client + "ha/done", state, verifier?.let { HaAuth.challenge(it) })))
+                json(JSONObject().put("ok", true).put("go", HaAuth.authorizeUrl(base, client, client + "ha/done", state, HaAuth.challenge(verifier))))
             }
             "GET /ha/api/devices" -> {
-                val set = HomeAssistant.settings(app) ?: return fail("signin")
+                val set = HomeAssistant.settings(app!!) ?: return fail("signin")
                 val r = HomeAssistant.listFor(set)
                 // a key Home Assistant no longer takes: the phone signs in again
                 if (!r.optBoolean("ok")) return if (r.optString("error") == "token") fail("signin") else json(r)
-                json(r.put("picked", HomeAssistant.status(app)))
+                json(r.put("picked", HomeAssistant.status(app!!)))
             }
             "POST /ha/api/save" -> {
                 val picks = b.optJSONObject("picks") ?: return fail("picks")
-                if (!HomeAssistant.keepPicks(app, picks)) return fail(if (HomeAssistant.settings(app) == null) "signin" else "picks")
+                if (!HomeAssistant.keepPicks(app!!, picks)) return fail(if (HomeAssistant.settings(app) == null) "signin" else "picks")
                 onChange?.invoke()
                 json(JSONObject().put("ok", true).put("count", HomeAssistant.status(app).optInt("count")))
             }
             "POST /ha/api/forget" -> {
-                HomeAssistant.disconnect(app)
+                HomeAssistant.disconnect(app!!)
                 onChange?.invoke()
                 json(JSONObject().put("ok", true))
             }
@@ -151,18 +185,20 @@ object HaPhone {
     }
 
     /** Home Assistant sent the phone back here with a one time code: swap it for the tokens, here on the TV. */
-    private fun done(app: Context, q: Map<String, String>): Reply {
+    // Every failure before the state checks out goes to /ha/?e=expired with no key: only the phone that
+    // asked for this sign in (it holds the state) is sent back with the set up key.
+    private fun done(app: Context?, q: Map<String, String>): Reply {
         val s = cur ?: return go("/ha/?e=expired")
-        val back = "/ha/?k=" + enc(s.key)
-        val pend = s.pending
+        val pend = s.pending ?: return go("/ha/?e=expired")
         val state = q["state"] ?: ""
-        if (pend == null || s.until < now() || now() - pend.at > SIGN_IN_MS ||
-            !MessageDigest.isEqual(state.toByteArray(), pend.state.toByteArray())) return go("$back&e=expired")
+        if (!MessageDigest.isEqual(state.toByteArray(), pend.state.toByteArray())) return go("/ha/?e=expired")
+        if (s.until < now() || now() - pend.at > SIGN_IN_MS) { s.pending = null; return go("/ha/?e=expired") }
+        val back = "/ha/?k=" + enc(s.key)
         s.pending = null   // a code is used once
         val code = q["code"]?.takeIf { it.isNotEmpty() && it.length < 512 } ?: return go("$back&e=denied")
         val (status, t) = HaAuth.exchange(pend.base, code, pend.client, pend.verifier)
         if (t == null) return go("$back&e=" + if (status == -1) "unreachable" else "signin")
-        if (!HomeAssistant.keepSignIn(app, pend.base, t, pend.client)) return go("$back&e=signin")
+        if (!keepSignIn(app, pend.base, t, pend.client)) return go("$back&e=signin")
         onChange?.invoke()
         return go("$back#devices")
     }

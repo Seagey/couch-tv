@@ -94,10 +94,12 @@ class PhoneBridgeTest(unittest.TestCase):
         self.assertEqual([c["entity"] for c in self.home.settings()["climate"]], ["climate.lounge"])
         self.assertTrue(self.home.keep_sign_in("http://other.example:8123", {"access_token": "a" * 30, "refresh_token": "s" * 30, "expires_in": 1800}, CLIENT))
         self.assertEqual(self.home.settings()["climate"], [])
+        self.home.listed = {"scene.movie": "Movie night"}
         self.assertTrue(self.home.keep_picks({"scenes": [{"entity": "scene.movie"}], "token": "sneaky-token-not-kept-000000"}))
         kept = json.load(open(os.path.join(self.dir, "home-assistant.json")))
         self.assertNotIn("token", kept)
         self.assertEqual(kept["refresh_token"], "s" * 30)
+        self.assertEqual(kept["scenes"], [{"entity": "scene.movie", "name": "Movie night"}])   # Home Assistant's name kept
 
     def test_disconnect_revokes(self):
         seen = []
@@ -111,7 +113,10 @@ class PhoneBridgeTest(unittest.TestCase):
         self.assertIsNone(self.home.settings())
 
     def test_client_id_and_pkce_and_announcement(self):
-        self.assertEqual(haphone.client_for(lan(1, 50) + ":5400", None, 5400), "http://" + lan(1, 50) + ":5400/")
+        self.assertEqual(haphone.client_for(lan(1, 50) + ":5400", None, 5400, own={lan(1, 50)}), "http://" + lan(1, 50) + ":5400/")
+        # a Host address that is not this computer's own is never the client id
+        self.assertIsNone(haphone.client_for(lan(1, 99) + ":5400", None, 5400, own={lan(1, 50)}))
+        self.assertEqual(haphone.client_for(lan(1, 99) + ":5400", lan(1, 50), 5400, own={lan(1, 50)}), "http://" + lan(1, 50) + ":5400/")
         self.assertEqual(haphone.client_for("evil.example:5400", lan(1, 50), 5400), "http://" + lan(1, 50) + ":5400/")
         self.assertEqual(haphone.client_for(lan(1, 50) + ":80", ip(10, 0, 0, 2), 5400), "http://" + ip(10, 0, 0, 2) + ":5400/")
         self.assertIsNone(haphone.client_for("8.8.8.8:5400", "8.8.4.4", 5400))
@@ -122,6 +127,97 @@ class PhoneBridgeTest(unittest.TestCase):
         self.assertEqual(haphone.url_from({"internal_url": "http://homeassistant.local:8123"}, lan(1, 20), 8123), "http://" + lan(1, 20) + ":8123")
         self.assertEqual(haphone.url_from({"internal_url": "https://ha.example.com"}, lan(1, 20), 8123), "https://ha.example.com")
         self.assertEqual(haphone.url_from({}, lan(1, 20), 8123), "http://" + lan(1, 20) + ":8123")
+
+
+    def test_scenes_and_scripts_that_open_the_house_are_dropped(self):
+        s = smarthome.parse({"url": "http://ha.example:8123", "token": "t" * 30, "scenes": [
+            {"entity": "scene.movie"}, {"entity": "script.open_garage"}, {"entity": "scene.alarm_off"}, {"entity": "script.front_door_unlock"}],
+            "controls": [{"entity": "switch.gate"}, {"entity": "light.lamp"}]})
+        self.assertEqual([x["entity"] for x in s["scenes"]], ["scene.movie"])
+        self.assertEqual([x["entity"] for x in s["controls"]], ["light.lamp"])
+        self.assertEqual([e["entity_id"] for e in [{"entity_id": "script.garage_open"}] if smarthome.pickable([e])], [])
+
+    def test_a_save_keeps_only_what_home_assistant_listed(self):
+        self.home.listed = {"climate.lounge": "Lounge aircon", "light.lamp": "Lamp"}
+        ok = self.home.keep_picks({"climate": [{"entity": "climate.lounge"}], "controls": [{"entity": "light.lamp", "name": "Reading"}, {"entity": "cover.main"}],
+                                   "doorbell": {"entity": "event.not_listed"}, "url": "http://evil.example", "extra": "x"})
+        self.assertTrue(ok)
+        kept = json.load(open(os.path.join(self.dir, "home-assistant.json")))
+        self.assertEqual(kept["controls"], [{"entity": "light.lamp", "name": "Reading"}])   # cover.main was not listed (a garage by its class)
+        self.assertEqual(kept["climate"], [{"entity": "climate.lounge", "name": "Lounge aircon"}])
+        self.assertNotIn("doorbell", kept); self.assertNotIn("extra", kept)
+        self.assertEqual(kept["url"], "http://ha.example:8123")
+        self.home.listed = None
+        self.assertFalse(self.home.keep_picks({"climate": [{"entity": "climate.lounge"}]}))   # nothing listed yet: nothing kept
+
+    def test_bridge_save_delegates_for_a_phone_sign_in(self):
+        self.home.listed = {"climate.lounge": "Lounge"}
+        self.assertEqual(self.home.save({"climate": [{"entity": "climate.lounge"}], "token": "x" * 30}), {"ok": True})
+        kept = json.load(open(os.path.join(self.dir, "home-assistant.json")))
+        self.assertEqual(kept["refresh_token"], REFRESH)
+        self.assertNotIn("token", kept)
+
+    def test_a_refused_refresh_waits_a_minute_and_says_sign_in_again(self):
+        self.refuse = True
+        s = self.home.settings()
+        self.run_(self.home.state(s, "climate.lounge"))
+        self.assertEqual(self.refreshes, 1)
+        self.assertTrue(self.home.status()["signin_again"])
+        self.now += 30
+        self.run_(self.home.state(s, "climate.lounge"))
+        self.assertEqual(self.refreshes, 1)   # not asked again within the minute
+        self.now += 31
+        self.refuse = False
+        self.assertIsNotNone(self.run_(self.home.state(s, "climate.lounge")))
+        self.assertEqual(self.refreshes, 2)
+        self.assertFalse(self.home.status()["signin_again"])
+
+    def test_done_never_puts_the_key_in_a_failed_redirect(self):
+        from aiohttp import web
+        from aiohttp.test_utils import TestClient, TestServer
+
+        async def go():
+            async def call(base, token, method, path, body=None, limit=0):
+                if path == "/auth/providers":
+                    return 200, b'{"providers":[{"type":"homeassistant"}]}'
+                return 404, None   # no metadata: PKCE is still sent
+            self.home.call = call
+
+            async def form(url, data):
+                if data.get("code") == "good-code" and data.get("code_verifier"):
+                    return 200, {"access_token": "a" * 30, "refresh_token": "n" * 40, "expires_in": 1800}
+                return 400, {"error": "invalid_grant"}
+            self.home.form = form
+            phone = haphone.Phone(self.home, "/nonexistent", 5400, lambda: lan(1, 50))
+
+            async def none():
+                return []
+            phone.scanner = none
+            app = web.Application()
+            phone.routes(app.router)
+            c = TestClient(TestServer(app))
+            await c.start_server()
+            try:
+                key = phone.start()["url"].split("k=")[1]
+                locs = []
+                for q in ("", "?code=x", "?state=forged&code=x"):
+                    r = await c.get("/ha/done" + q, allow_redirects=False)
+                    locs.append(r.headers["Location"])
+                r = await c.post("/ha/api/signin", json={"k": key, "url": "http://ha.example:8123"}, headers={"Host": lan(1, 50) + ":5400"})
+                go_url = (await r.json())["go"]
+                self.assertIn("code_challenge_method=S256", go_url)
+                state = dict(x.split("=", 1) for x in go_url.split("?", 1)[1].split("&"))["state"]
+                for q in ("?code=x", "?state=forged&code=x", "?state=&code=x"):
+                    r = await c.get("/ha/done" + q, allow_redirects=False)
+                    locs.append(r.headers["Location"])
+                for loc in locs:
+                    self.assertEqual(loc, "/ha/?e=expired")
+                    self.assertNotIn(key, loc)
+                r = await c.get("/ha/done?code=good-code&state=" + state, allow_redirects=False)
+                self.assertEqual(r.headers["Location"], "/ha/?k=" + key + "#devices")
+            finally:
+                await c.close()
+        self.run_(go())
 
 
 if __name__ == "__main__":

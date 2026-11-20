@@ -5082,7 +5082,7 @@
       widgetRows(rows);   // each widget on the design with settings of its own
     }
     if (window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) rows.push({ kind: "nav", key: "dz-smart", label: "Smart home",
-      sub: window.smartHome.setup.status().set ? "Connected" : window.smartHome.setup.canPhone && window.smartHome.setup.canPhone() ? "Connect Home Assistant from your phone" : "Connect Home Assistant: your aircon, lights, cameras, speakers and more", act: openSmartSetup });
+      sub: window.smartHome.setup.status().signin_again ? "Sign in again" : window.smartHome.setup.status().set ? "Connected" : window.smartHome.setup.canPhone && window.smartHome.setup.canPhone() ? "Connect Home Assistant from your phone" : "Connect Home Assistant: your aircon, lights, cameras, speakers and more", act: openSmartSetup });
     if (on && AH) rows.push({ kind: "nav", key: "dz-athome", label: "At home", sub: "A note, lists, guest Wi-Fi, a house guide, your calendar and screen time, for your widgets", act: openAtHome });
     designCodeRows(rows);
     rows.push({ kind: "action", key: "dz-share", label: "Open this home in couch-tv Studio", sub: "Change it on your phone or computer. Names, photos, places, keys and calendar links stay on this TV.", act: shareHome });
@@ -7123,7 +7123,7 @@
     var S = window.smartHome.setup;
     if (!S.canPhone || !S.canPhone()) return;
     S.phone().then(function (r) {
-      var was = JSON.stringify([SHP.url, SHP.err, SHP.seen, SHP.st && SHP.st.set, SHP.st && SHP.st.host, SHP.st && SHP.st.count]);
+      var was = JSON.stringify([SHP.url, SHP.err, SHP.seen, SHP.st && SHP.st.set, SHP.st && SHP.st.host, SHP.st && SHP.st.count, SHP.st && SHP.st.signin_again]);
       if (r && r.ok && r.url) {
         SHP.url = r.url;
         // the phone signed in or saved: the home's smart home tile and widgets read it again too
@@ -7131,7 +7131,7 @@
         if (SHP.st && kept !== [r.set, r.host, r.count].join("|") && window.smartHome.phoneChanged) window.smartHome.phoneChanged();
         SHP.err = ""; SHP.seen = !!r.seen; SHP.st = r;
       } else SHP.err = r && r.error === "network" ? "Connect this TV to your Wi-Fi first." : "That did not work. Open Smart home again.";
-      var now = JSON.stringify([SHP.url, SHP.err, SHP.seen, SHP.st && SHP.st.set, SHP.st && SHP.st.host, SHP.st && SHP.st.count]);
+      var now = JSON.stringify([SHP.url, SHP.err, SHP.seen, SHP.st && SHP.st.set, SHP.st && SHP.st.host, SHP.st && SHP.st.count, SHP.st && SHP.st.signin_again]);
       if (now !== was && shOnScreen()) renderSettings();
     });
     clearTimeout(SHP.timer);
@@ -7142,7 +7142,8 @@
     // one QR code and one short line; the rest (which Home Assistant, signing in, what shows, the
     // brands we don't list) is on the phone
     if (SHP.url && window.TVQR) rows.push({ kind: "qr", key: "sh-qr", link: SHP.url,
-      label: st.set ? "Connected to " + (st.host || "Home Assistant") + ". Scan to change what shows." : SHP.seen ? "Carry on with your phone." : "Scan with your phone to connect your home." });
+      label: st.signin_again ? "Sign in again. Home Assistant signed this TV out: scan with your phone."
+        : st.set ? "Connected to " + (st.host || "Home Assistant") + ". Scan to change what shows." : SHP.seen ? "Carry on with your phone." : "Scan with your phone to connect your home." });
     else rows.push(info("sh-wait", "", "", SHP.err || "Getting ready..."));
     if (st.set) rows.push({ kind: "action", key: "sh-forget", label: "Disconnect", danger: true, confirmText: "Press OK again to disconnect", act: function () {
       S.forget().then(function () { SET.msg = "Smart home is off on this TV."; SHP.st = null; if (zone === "settings") { shPhone(); renderSettings(); } });
@@ -7160,8 +7161,8 @@
   function smartRows() {
     var S = window.smartHome.setup, st = S.status(), rows = [];
     if (S.canPhone && S.canPhone()) return phoneRows(S);
-    // a TV whose home a computer runs (Samsung, LG and the other web TVs): its bridge has no phone
-    // page, so the address and a token are typed here
+    // only where no phone page is served (an older bridge, or the preview): the address and a token
+    // are typed here
     rows.push(info("sh-intro", "", "", "Shows your air conditioning, lights, cameras, speakers, solar and more through Home Assistant, the free smart home app that talks to over 2,000 brands. Everything stays on this TV" + (TV ? "." : " and the home computer.")));
     if (st.set) rows.push(info("sh-on", "Connected", st.host || "", "Pick Change what shows to add or take away things."));
     rows.push(head("1. Home Assistant at home"));

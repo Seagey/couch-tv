@@ -85,7 +85,12 @@
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
+  // the set up key: from the QR code's address, or kept in this tab while Home Assistant's sign in page
+  // was open (a failed sign in comes back with no key, so a stranger's link never carries it)
   var K = new URLSearchParams(location.search).get("k") || "";
+  function keep(k) { try { sessionStorage.setItem("ha-k", k); } catch (e) {} }
+  function kept() { try { return sessionStorage.getItem("ha-k") || ""; } catch (e) { return ""; } }
+  if (K) keep(K); else K = kept();
   var E = new URLSearchParams(location.search).get("e") || "";
   var ERR = {
     address: "That is not an address. It looks like http://homeassistant.local:8123 or http://192.168.1.20:8123.",
@@ -96,6 +101,7 @@
     expired: "That took too long. Try again.",
     denied: "Sign in was cancelled.",
     signin: "Home Assistant did not let the TV in. Sign in again.",
+    again: "Home Assistant signed the TV out. Sign in again.",
     picks: "That could not be saved. Try again.",
     net: "The TV did not answer. Check the phone is on the same Wi-Fi as the TV."
   };
@@ -157,7 +163,7 @@
     $("go").disabled = true; say("Asking Home Assistant...");
     call("POST", "signin", { url: url }).then(function (r) {
       $("go").disabled = false;
-      if (r.ok && r.go) { say("Opening Home Assistant..."); location.href = r.go; return; }
+      if (r.ok && r.go) { say("Opening Home Assistant..."); keep(K); location.href = r.go; return; }
       if (r.error === "expired") { show("gone"); say(""); return; }
       say(ERR[r.error] || ERR.unreachable, true);
     });
@@ -232,6 +238,7 @@
   if (E && ERR[E]) say(ERR[E], true);
   call("GET", "state").then(function (st) {
     if (!st.ok) { show("gone"); return; }
+    if (st.signin_again) { say(ERR.again, true); startSignIn(st); return; }
     if (st.signed_in && (location.hash === "#devices" || !E)) { if (location.hash === "#devices") say(""); loadDevices(st.host); }
     else startSignIn(st);
   });

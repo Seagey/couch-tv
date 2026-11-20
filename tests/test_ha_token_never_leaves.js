@@ -35,14 +35,17 @@ const LETTERS = Array.from({ length: 48 }, (_, i) => "aB3cD7eF1gH9iJ5kLmN2oP8qR4
 const HEX = Array.from({ length: 64 }, (_, i) => "0123456789abcdef"[(i * 11 + 3) % 16]).join("");
 const BEARER = "Bearer " + JWT;
 const URL = ["http:/", "", ["homeassistant", "local"].join(".") + ":" + (8000 + 123)].join("/");
-const SECRETS = [JWT, LETTERS, HEX, BEARER, URL];
-const ALL = [JWT, LETTERS, HEX, BEARER, URL];
+// a refresh token from signing in on a phone (Home Assistant makes 128 hex characters) and the client id it
+// was made for: the TV keeps them; they must never leave either
+const REFRESH = Array.from({ length: 128 }, (_, i) => "0123456789abcdef"[(i * 5 + 7) % 16]).join("");
+const SECRETS = [JWT, LETTERS, HEX, BEARER, URL, REFRESH];
+const ALL = [JWT, LETTERS, HEX, BEARER, URL, REFRESH];
 // a design leaks a secret if any 16 characters in a row of it turn up (a token cut to fit is still a leak)
 function leaks(value) {
   const text = JSON.stringify(value || {});
   const out = [];
   SECRETS.forEach((s) => { for (let i = 0; i + 16 <= s.length; i++) if (text.indexOf(s.slice(i, i + 16)) >= 0) { out.push(s.slice(0, 12) + "... at " + i); break; } });
-  if (/HOME_ASSISTANT_TOKEN|home_assistant|long.?lived/i.test(text)) out.push("the token's name");
+  if (/HOME_ASSISTANT_TOKEN|home_assistant|long.?lived|refresh_token/i.test(text)) out.push("the token's name");
   return out;
 }
 
@@ -54,7 +57,7 @@ kinds.forEach((kind, k) => {
   ALL.forEach((s, j) => {
     const opts = {};
     keys.forEach((key) => { opts[key] = key === "controls" || key === "cities" || key === "apps" || key === "quick" || key === "switches" || key === "players" || key === "tickers" || key === "shows" ? [s, { name: s, entity: s, icon: s }] : s; });
-    objects.push({ id: "w" + k + "_" + j, type: "widget", kind, x: 80, y: 60, w: 360, h: 160, name: s, opts, style: { font: s, colour: s, accent: s, label: s }, token: s, home_assistant: { url: URL, token: s } });
+    objects.push({ id: "w" + k + "_" + j, type: "widget", kind, x: 80, y: 60, w: 360, h: 160, name: s, opts, style: { font: s, colour: s, accent: s, label: s }, token: s, refresh_token: s, home_assistant: { url: URL, token: s, refresh_token: REFRESH } });
   });
 });
 // the other objects: words, a clock, weather, a smart control, a group, a stack of widgets
@@ -68,7 +71,8 @@ ALL.forEach((s, j) => {
   objects.push({ id: "st" + j, type: "widget", kind: "stack", w: 360, h: 360, x: 80, y: 60, items: [{ kind: "card", opts: { label: s, text: s } }, { kind: "note", opts: { text: s } }] });
 });
 const design = {
-  v: 1, name: JWT, author: JWT, token: JWT, home_assistant: { url: URL, token: JWT, climate: [{ entity: "climate.lounge", name: "Lounge" }] }, HOME_ASSISTANT_TOKEN: JWT,
+  v: 1, name: JWT, author: JWT, token: JWT, home_assistant: { url: URL, token: JWT, refresh_token: REFRESH, client_id: URL + "/", climate: [{ entity: "climate.lounge", name: "Lounge" }] }, HOME_ASSISTANT_TOKEN: JWT,
+  refresh_token: REFRESH, smart_home: { refresh_token: REFRESH },
   background: { colour: "#26303f", image: URL + "/local/" + JWT + ".jpg", video: "store:" + JWT.slice(0, 40), token: JWT },
   home: { scenes: [JWT, "night"], clock_style: JWT, glass: LETTERS, token: JWT, home_assistant: { token: JWT } },
   elements: { clock: { format: "12h", text: JWT, token: JWT }, weather: { place: JWT, name: LETTERS } },
@@ -96,7 +100,7 @@ const built = plain(S.build(plain(snapDesign)));
 const prepared = S.prepare(plain(snapDesign), ["Alex"], CD);
 ok(!prepared.error || /private/.test(prepared.error), "Share this home either shares or says something private stopped it (" + (prepared.error || "shared") + ")");
 if (prepared.design) ok(leaks(prepared.design).length === 0, "a shared home with a design carries no token: " + leaks(prepared.design).join("; "));
-const snapHome = { design: null, scenes: [JWT, "night"], builtIn: ["night", JWT.slice(0, 20)], scene_seconds: 20, clock24: true, clock_style: JWT, glass: JWT, dock: [JWT, LETTERS, "com.netflix.ninja"], token: JWT, home_assistant: { url: URL, token: JWT } };
+const snapHome = { design: null, scenes: [JWT, "night"], builtIn: ["night", JWT.slice(0, 20)], scene_seconds: 20, clock24: true, clock_style: JWT, glass: JWT, dock: [JWT, LETTERS, REFRESH, "com.netflix.ninja"], token: JWT, home_assistant: { url: URL, token: JWT, refresh_token: REFRESH } };
 const preparedHome = S.prepare(plain(snapHome), ["Alex"], CD);
 ok(preparedHome.design || preparedHome.error, "a home without a design: shared or stopped");
 if (preparedHome.design) ok(leaks(preparedHome.design).length === 0, "a shared home without a design carries no token: " + leaks(preparedHome.design).join("; "));
@@ -107,6 +111,7 @@ const homeNoGate = S.prepare(plain(snapHome), ["Alex"], null);
 ok(homeNoGate.error || leaks(homeNoGate.design).length === 0, "a home without a design and without the gate: a token never goes either: " + (homeNoGate.design ? leaks(homeNoGate.design).join("; ") : homeNoGate.error));
 ok(/private/.test(S.prepare({ design: { v: 1, home: { glass: JWT } } }, [], null).error || ""), "the share check itself stops a token (says something private is in it)");
 ok(/private/.test(S.prepare({ design: { v: 1, home: { glass: HEX } } }, [], null).error || ""), "and a long run of letters and digits (a key)");
+ok(/private/.test(S.prepare({ design: { v: 1, home: { glass: REFRESH } } }, [], null).error || ""), "and a phone sign in's refresh token");
 void built;
 
 // 3. what the TV sends to the store: POST /v1/shares with {design} only, no cookies, no token

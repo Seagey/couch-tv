@@ -407,10 +407,12 @@
 
   // ---------------- a TV whose home a computer runs ----------------
   // No launcher there, so the bridge on the home computer talks to Home Assistant for the TV
-  // (bridge/smarthome.py, /api/ha): the same asks, the same allow lists, and the token stays on that
-  // computer (bridge/data/), never in the page. app.js calls useBridge(api) when it runs from a bridge.
+  // (bridge/smarthome.py, /api/ha): the same asks, the same allow lists, and the keys stay on that
+  // computer (bridge/data/), never in the page. The on-TV app's own server answers the same /api/ha.
+  // app.js calls useBridge(api) when it runs from either.
   var BRIDGE = null, BINFO = "{}", BSTATUS = '{"set":false}';
-  // the on-TV app's server says it serves the phone page (status.phone); a computer's bridge does not
+  // the server says it serves the phone page for the QR code (status.phone): the on-TV app and the
+  // bridge both do; an older bridge does not, and then the TV keeps its typed set up screen
   var BRIDGE_PHONE = false;
   // a Google TV or Android TV with a computer at home: only the computer's own Hue and AirTouch
   function useDirect(api) {

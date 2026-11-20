@@ -148,7 +148,7 @@ console.log("Running integrations browser tests...");
   ok(s1.qr === 1 && s1.svg, "one QR code, drawn in the page");
   ok(s1.line === "Scan with your phone to connect your home.", "one short line: " + s1.line);
   ok(s1.rows <= 1 && !/token|key|Tuya|Paste/i.test(s1.text), "nothing else to do on the TV (" + s1.rows + " row: Hue or AirTouch)");
-  await page.screenshot({ path: path.join(process.env.SHOTS || "/tmp", "tv-smart-home-qr.png") });
+  if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, "tv-smart-home-qr.png") });
   await page.evaluate(() => window.MOCK_HA_PHONE_SIGN_IN());
   await page.waitForTimeout(3600);
   s1 = await shot();
