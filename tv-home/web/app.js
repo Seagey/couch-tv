@@ -955,7 +955,11 @@
 
   // The household's own photos (Home settings, "Your photos") are scenes too, with no cut-out and
   // no glass copy: the clock's fill is the photo itself, frosted in app.css (.s-own).
-  function photoSrc(p) { return p.file ? "http://tvos.invalid/photo/" + encodeURIComponent(p.file) : p.url; }
+  function photoSrc(p) {
+    // a photo the phone's Home settings page sent to the home computer (bridge/phonepage.py): from there
+    if (p.file && /^bridge[a-z0-9]+\.jpg$/.test(p.file) && !OFFLINE) return API + "/api/photo/" + encodeURIComponent(p.file) + (KEY ? "?key=" + encodeURIComponent(KEY) : "");
+    return p.file ? "http://tvos.invalid/photo/" + encodeURIComponent(p.file) : p.url;
+  }
   function ownScenes() {
     return (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && p.id && (p.file || p.url); })
       .map(function (p, i) { return { id: "p-" + p.id, src: photoSrc(p), own: true, n: i + 1, fg: false, glass: false }; });
@@ -4531,6 +4535,13 @@
         if (j && j.updated) SEEN = j.updated;
         var back = j && j.settings && typeof j.settings === "object" && !Array.isArray(j.settings) ? j.settings : null;
         if (ON_TV && back && canon(back) !== canon(ST)) takeServerSettings(back);   // the on-TV app may keep the phone's town or photos; a bridge answers with what it was sent
+        // a home computer keeps the phone's town or photos the same way, and names them (kept): only those
+        // keys are taken, so a key this TV knows and the computer does not is never lost
+        else if (!ON_TV && back && j.kept && j.kept.length) {
+          var mine = Object.assign({}, ST);
+          j.kept.forEach(function (k) { if (back[k] === undefined) delete mine[k]; else mine[k] = back[k]; });
+          if (canon(mine) !== canon(ST)) takeServerSettings(mine);
+        }
       }, function () {});
   }
   // the server's copy is newer: use it. Under Home settings the screen is drawn again and the home
@@ -4559,6 +4570,7 @@
   // bridge; otherwise the bridge's copy comes back (this TV's storage was cleared, say).
   function syncSettings() {
     return api("GET", "/api/settings").then(function (j) {
+      if (j && j.mode === "bridge") BRIDGE_PHONE = true;   // this computer serves the phone's Home settings page
       var rec = kept(ST_KEY), remote = j.settings && typeof j.settings === "object" && !Array.isArray(j.settings) ? j.settings : null;
       if (SEEN === null || !rec || !rec.pending) SEEN = j.updated || "";   // a pending copy keeps the older SEEN it was made from
       if (rec && rec.pending) return pushSettings(rec);   // SEEN is still the older one: the server keeps any newer phone change
@@ -4579,21 +4591,44 @@
     $("settings").setAttribute("aria-label", t("set_title"));
   }
 
-  // Change this on your phone: only where this TV itself serves the phone's Home settings page (the
-  // on-TV app, /setup). The QR holds the page's address and, so a phone that has never paired goes
-  // straight in, the pairing code (#pin=, the phone remote's pairing QR format). A code lasts three
-  // minutes, so the QR is made again before it runs out. Not focusable: it costs no presses, and every
-  // setting stays here on the TV too. The computer bridge serves no such page, so a TV it drives
-  // (Samsung, LG, VIDAA, Roku...) and the couch-tv home app never show it.
+  // Change this on your phone: wherever a phone's Home settings page exists for this TV: the on-TV app
+  // (/setup on the TV), the home computer for every TV it runs (bridge/phonepage.py: Samsung, LG, VIDAA,
+  // Roku, an Android TV with a computer...), and the Couch TV home app with no computer (its own small
+  // server, PhoneServer.kt, asked through TV.phoneLink). The QR holds the page's address and, so a phone
+  // that has never paired goes straight in, the pairing code (#pin=, the phone remote's pairing QR
+  // format). A code lasts three minutes, so the QR is made again before it runs out. Not focusable: it
+  // costs no presses, and every setting stays here on the TV too. Where none answers, nothing shows.
   var PHONE_QR = { timer: 0, url: "" };
+  var PHONE_URL = /^http:\/\/([^\/#?]+)(\/setup(?:\?tv=[A-Za-z0-9_-]+)?)#pin=(\d{6})$/;
+  var BRIDGE_PHONE = false;   // the home computer serves the page: its /api/settings says mode "bridge" (an older one does not)
+  function phoneLinkFn() {
+    if (PREVIEW || STANDALONE) return null;   // (a mock home asks mock.js, which answers for ?ontv=1 and ?phonepage=)
+    if (!OFFLINE) return function () {
+      var known = ON_TV || BRIDGE_PHONE ? Promise.resolve() : api("GET", "/api/settings").then(function (j) { if (j && j.mode === "bridge") BRIDGE_PHONE = true; });
+      return known.then(function () { if (!ON_TV && !BRIDGE_PHONE) throw new Error("no phone page"); return api("GET", "/api/phone-link"); });
+    };
+    if (TV && TV.phoneLink) return function () {
+      var j = null;
+      try { j = JSON.parse(TV.phoneLink() || "null"); } catch (e) { j = null; }
+      return j && j.url ? Promise.resolve(j) : Promise.reject(new Error("no phone page"));
+    };
+    return null;
+  }
+  // known now, without asking (Hold OK's menu is drawn at once): the on-TV app, a home computer that said so, the home app's own page
+  function phoneLinkKnown() {
+    if (!phoneLinkFn()) return false;
+    if (!OFFLINE) return ON_TV || BRIDGE_PHONE;
+    try { return !!JSON.parse(TV.phoneLink() || "null"); } catch (e) { return false; }   // the home app's page is running
+  }
   function phoneQr() {
     var box = $("set-phone");
     clearTimeout(PHONE_QR.timer);
     if (!box) return;
     var off = function () { box.classList.remove("on"); PHONE_QR.url = ""; };
-    if (!ON_TV || OFFLINE || !window.TVQR || zone !== "settings") { off(); return; }
-    api("GET", "/api/phone-link").then(function (j) {
-      if (zone !== "settings" || !j || !/^http:\/\/[^\/]+\/setup/.test(j.url || "")) { off(); return; }
+    var link = phoneLinkFn();
+    if (!link || !window.TVQR || zone !== "settings") { off(); return; }
+    link().then(function (j) {
+      if (zone !== "settings" || !j || !PHONE_URL.test(j.url || "")) { off(); return; }
       if (j.url !== PHONE_QR.url) {
         var qr = $("set-phone-qr");
         qr.innerHTML = "";
@@ -4603,12 +4638,16 @@
       $("set-phone-head").textContent = t("set_phone");
       $("set-phone-sub").textContent = t("set_phone_sub");
       // a computer has no camera: the plain address and the code to type on its pairing screen
-      var m = /^http:\/\/([^\/]+)(\/setup)#pin=(\d{6})$/.exec(j.url);
+      var m = PHONE_URL.exec(j.url);
       $("set-phone-pc").textContent = m ? t("set_phone_pc", { addr: m[1] + m[2], code: m[3].slice(0, 3) + " " + m[3].slice(3) }) : "";
       box.classList.add("on");
       var left = +j.pin_expires_in > 0 ? +j.pin_expires_in * 1000 - 20000 : 60000;
       PHONE_QR.timer = setTimeout(phoneQr, Math.max(15000, left));
-    }, off);
+    }, function () {
+      // no answer (the app busy, a code locked after wrong tries): hide it, never a dead code, and ask again
+      off();
+      if (zone === "settings") PHONE_QR.timer = setTimeout(phoneQr, 10000);
+    });
   }
 
   function openSettings() {
@@ -7293,6 +7332,8 @@
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
+    // the phone code changed (HomeActivity, Auth.onPin): the QR and computer line draw the new one
+    phoneLink: function () { PHONE_QR.url = ""; phoneQr(); if (typeof CouchDesign !== "undefined" && CouchDesign.nav && CouchDesign.nav.phoneAgain) CouchDesign.nav.phoneAgain(); },
     resume: function () { PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
     // (and a design's video background lets go of the TV's decoder, which the app may need)
@@ -7310,7 +7351,40 @@
     typeText: function (s) { return typeIn(s); },
     // At home from the phone's Home settings page (the on-TV app's /setup), handed in by the app
     atHomeRead: function () { return atHomeView(); },
-    atHomeEdit: function (e) { return atHomeEdit(e); } };
+    atHomeEdit: function (e) { return atHomeEdit(e); },
+    // the Couch TV home app's own phone page with no computer (PhoneServer.kt): Home settings, the
+    // phone's town and photos, the guest's name, and a code to show
+    phonePage: function (op, arg) { return phonePageOp(op, arg); } };
+  function phonePageOp(op, arg) {
+    var later = function () { setTimeout(function () { if (zone !== "settings") restart(); else { SET.dirty = true; renderSettings(); } }, 300); };
+    if (op === "read") return { ok: true, settings: ST, people: NOBODY ? [] : PEOPLE.map(function (p) { return { id: p.id, name: p.name }; }),
+      weather: WXCFG && WXCFG.place ? { place: WXCFG.place } : null };
+    if (op === "patch") {
+      var pl = arg && arg.place;
+      if (pl === null) delete ST.place;
+      else if (pl && isFinite(pl.lat) && isFinite(pl.lon) && String(pl.name || "").trim()) {
+        ST.place = { name: String(pl.name).slice(0, 80), area: String(pl.area || "").slice(0, 80), lat: Math.round(pl.lat * 100) / 100, lon: Math.round(pl.lon * 100) / 100, timezone: String(pl.timezone || "auto").slice(0, 64) };
+      } else return { ok: false, error: "place needs a name, and lat and lon as numbers" };
+      keepSettings(false); later();
+      return { ok: true, settings: ST };
+    }
+    if (op === "photo") {
+      var photos = Array.isArray(ST.photos) ? ST.photos.slice() : [];
+      if (photos.length >= MAX_PHOTOS) return { ok: false, error: "The TV holds " + MAX_PHOTOS + " photos. Remove one first." };
+      var ph = { id: uid(), file: String(arg || "") };
+      photos.push(ph); ST.photos = photos; keepSettings(false); later();
+      return { ok: true, photo: ph, count: photos.length };
+    }
+    if (op === "unphoto") {
+      var all = Array.isArray(ST.photos) ? ST.photos : [], gone = all.filter(function (x) { return x && x.id === arg; })[0];
+      if (!gone) return { ok: false, error: "That photo is not on the TV any more." };
+      ST.photos = all.filter(function (x) { return x !== gone; }); keepSettings(false); later();
+      return { ok: true, file: gone.file || "", count: ST.photos.length };
+    }
+    if (op === "guest") { guestSet(String(arg || "")); return { ok: true, guest: { name: CouchAtHome.guestFull(String(arg || "")) } }; }
+    if (op === "code") { if (window.CouchPhonePage) window.CouchPhonePage.showCode(String(arg || ""), 180); return { ok: true }; }
+    return { ok: false, error: "unknown" };
+  }
 
   // ---------------- the web widgets (widget-web.js): headlines, scores, markets, the commute ----------------
   // Asked only while such a widget is on the home, each source at most once per refresh, the last
@@ -7883,6 +7957,12 @@
     if (designOn && LOOP) { designOn = false; console.log("design: not started in the Loop look; it shows in the other looks"); }
     // (videos only from this page, memory, the design store and this TV's own video link)
     if (designOn && typeof CouchDesigner !== "undefined") CouchDesigner.lockPage(document, typeof CouchDesignCode !== "undefined" && CouchDesignCode.mediaSources ? { media: CouchDesignCode.mediaSources(VIDEO_URL) } : null);
+    // the phone's Home settings page through the home computer (phone-page.js, bridge/phonepage.py)
+    if (window.CouchPhonePage) {
+      window.CouchPhonePage.words = function (code) { return t("phone_code", { code: code }); };
+      if (!OFFLINE && !MOCK && !PREVIEW && !STANDALONE && !ON_TV) window.CouchPhonePage.start({ api: api, read: atHomeView, edit: atHomeEdit,
+        sync: function () { syncSettings().catch(function () {}); }, words: window.CouchPhonePage.words });
+    }
     if (designOn) CouchDesign.start(CFG.design, {
       // a design's video background keeps its still picture with Lighter home or in power save
       videoEnv: function () { var ps = false; try { ps = !!(TV && TV.powerSave && TV.powerSave()); } catch (e) {} return { lighter: LIGHTER, powerSave: ps }; },
@@ -7890,9 +7970,9 @@
       apps: function () { renderGrid(); },
       clock24: function () { return CLOCK24; },
       night: NIGHT,
-      // Hold OK on a widget, Edit on your phone: the phone's Home settings page with a pairing code, only
-      // where this TV serves that page (the on-TV app, as Change this on your phone in Home settings)
-      phoneLink: ON_TV && !OFFLINE ? function () { return api("GET", "/api/phone-link").then(function (j) { return j && j.url; }); } : null,
+      // Hold OK on a widget, Edit on your phone: the phone's Home settings page with a pairing code,
+      // wherever that page exists (as Change this on your phone in Home settings: phoneLinkFn)
+      get phoneLink() { return phoneLinkKnown() ? function () { return phoneLinkFn()().then(function (j) { return j && j.url; }); } : null; },
       // widget mode: whether the home itself has the remote (no menu, settings or pop up open)
       free: function () { return !screenOffActive && !idleAmbientActive && !kidsOn() && !expanded && !lift && ["grid", "shelf", "np", "people", "quick"].indexOf(zone) >= 0; },
       // what the widgets show: only what this TV already has

@@ -44,9 +44,14 @@ class HomeActivity : Activity() {
     private val icons = ConcurrentHashMap<String, ByteArray>()
     private val base get() = "http://127.0.0.1:${Store.port}"
 
+    // The phone code changed (used, 5 wrong tries, a new one): the QR and computer line in Home settings,
+    // and Edit on your phone, draw it again so they never show a dead code (tv.phoneLink in app.js).
+    private val pinListener: (String?) -> Unit = { main.post { js("window.tv && tv.phoneLink && tv.phoneLink()") } }
+
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         App.startService(this)
+        Auth.onPin(pinListener)
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
         CookieManager.getInstance().setCookie(base, "couchtv_token=${Auth.internalToken}; path=/")
         val w = makeWeb()
@@ -318,6 +323,7 @@ class HomeActivity : Activity() {
     }
 
     override fun onDestroy() {
+        Auth.offPin(pinListener)
         if (shown?.get() === this) shown = null
         web?.let { web = null; it.stopLoading(); it.destroy() }
         super.onDestroy()

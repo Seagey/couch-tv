@@ -781,6 +781,45 @@ Unknown keys and wrong shapes are dropped. Larger than 32 KB answers `413`. With
 A) the TV keeps them alone. The on-TV app (option C) keeps them in its own `/api/settings` under
 the same `settings` key, next to its setup settings.
 
+### The phone's Home settings page: `/setup` and the calls it makes
+The same page the on-TV app serves from the TV (`on-tv/web/setup.html`), served here for every TV this
+bridge runs (Samsung, LG, VIDAA, Titan, Saphi, Panasonic, TiVo, Vega, Roku, Apple TV, an Android TV with a
+computer). The TV home's Home settings shows its QR (Change this on your phone, with the address and a
+code for a computer), and Hold OK on a widget offers Edit on your phone. Code: `bridge/phonepage.py`.
+
+- `GET /api/phone-link` (the TV home asks, with the key): `{"url": "http://<this computer>:5400/setup#pin=NNNNNN", "pin_expires_in": 170}`.
+  The address is the one the TV reached the bridge by; `?tv=<id>` is added for a TV that is not the default.
+- `POST /api/pair` `{"pin": "123456"}`: the code shown on the TV, for the pairing key (`{"token": "<key>"}`,
+  the key the phone remote pairs with). A code lasts 3 minutes, is used once, and 5 wrong tries throw it
+  away; wrong codes count towards the 5 wrong keys a minute per address. `POST /api/pair/start` (no key, no
+  body): a new code, shown as a line on that TV's home ("Show a code on the TV"); the answer never holds it.
+- `POST /api/settings` `{"settings_patch": {"place": {...} or null}}`: the phone changes only the town
+  (`name`, `area`, `lat`, `lon`, `timezone`; other keys answer `400`). When the TV home then sends its whole
+  copy with an older `"seen"` (the `updated` it last read), the phone's `place` and `photos` stay as they
+  are here and the answer names them in `"kept"`, so the TV home takes them. `GET` also answers `"mode":
+  "bridge"`, `people`, `weather` and `tv_name` for the page.
+- `POST /api/photos` (the picture itself as the body, any image type, up to 25 MB, the key checked before it
+  is read): turned the right way up, made no bigger than the screen (1920 by 1080; a portrait photo fits
+  the screen turned) with Pillow, kept as `data/photos/bridge<random>.jpg` and listed in that TV's
+  `photos` as `{"id", "file"}`. Up to 50, 100 megapixels at most, `415` for anything that is not a picture.
+  `GET /api/photo/<file>` (the key, or for the page's own pictures its `couchtv_token` cookie) and
+  `POST /api/photos/remove` `{"id"}`.
+- `GET /api/athome` and `POST /api/athome` `{"edit": {...}}`: At home (`note`, `lists`, `wifi`, `guide`,
+  `cal_url`, `stay_url`, `checkin`, `checkout`) and a design's widget settings (`widget_set`, `design_apps`)
+  stay in the TV home's own store on the TV. A change waits here until the TV home asks for it, it applies
+  it exactly as on the on-TV app (app.js `atHomeEdit`) and answers back, and the phone gets that answer
+  (up to 12 seconds). With the TV home not open (it has not asked in 30 seconds) the answer is
+  `{"live": false, "queued": true}` and the change waits (up to 20); lists, the guide and widget changes are
+  refused with `409` instead, as they are sent whole. Up to 64 KB per change.
+- The TV home's side, with the key: `GET /api/phone/inbox?home=1` (every 10 seconds, every second while a
+  phone page is in use or a code is showing: `{"edits": [{"id", "edit"}], "fast", "pin", "settings_at",
+  "want_view"}`), `POST /api/phone/done` `{"id", "result"}`, and `POST /api/phone/view` `{"athome": {...}}`
+  (its At home view, a calendar link as its host only; up to 256 KB, kept in memory only, never on disk).
+
+The page leaves out what is set up on this computer instead (the TV's name, Ask AI, the TV's keys,
+updates, phones, Use as home screen). With no computer at all (option A), the Couch TV home app serves the
+same page itself (`tv-home/android`, `PhoneServer.kt`, port 5400) with the on-TV app's own pairing.
+
 ### Calendar: `POST /api/calendar`
 For couch-tv Studio's Agenda widget on a TV whose home this computer runs (a Samsung, LG, Philips,
 TiVo OS or Panasonic TV, or a Hisense with a computer): a web page cannot read a Google, Apple or

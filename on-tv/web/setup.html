@@ -74,10 +74,10 @@
 <body>
 <main>
   <h1>Home settings</h1>
-  <p>This page comes from your TV, over your home Wi-Fi. What you change here shows on the TV in a moment, and everything here can still be changed on the TV too. Nothing typed here goes to Couch TV or anyone else. <a href="/">Back to the remote</a></p>
+  <p><span id="intro-from">This page comes from your TV, over your home Wi-Fi.</span> What you change here shows on the TV in a moment, and everything here can still be changed on the TV too. Nothing typed here goes to Couch TV or anyone else. <a href="/" id="to-remote">Back to the remote</a></p>
 
   <nav class="jump" aria-label="Sections">
-    <a href="#widgets" id="jump-widgets" style="display:none">Widgets</a><a href="#dapps" id="jump-dapps" style="display:none">Apps</a><a href="#town">Town</a><a href="#people">People</a><a href="#photos">Photos</a><a href="#athome">At home</a><a href="#ask">Ask AI</a><a href="#home">Home screen</a><a href="#smart" id="jump-smart" style="display:none">Smart home</a><a href="#tv">This TV</a>
+    <a href="#widgets" id="jump-widgets" style="display:none">Widgets</a><a href="#dapps" id="jump-dapps" style="display:none">Apps</a><a href="#town">Town</a><a href="#people">People</a><a href="#photos">Photos</a><a href="#athome">At home</a><a href="#ask">Ask AI</a><a href="#home">Home button</a><a href="#smart" id="jump-smart" style="display:none">Smart home</a><a href="#tv">This TV</a>
   </nav>
 
   <div class="card" id="design-line" style="display:none" role="status">
@@ -113,8 +113,8 @@
   <section class="card" id="people">
     <h2>People</h2>
     <p class="names" id="people-now">Checking…</p>
-    <p>Add, rename, remove and reorder people in the phone remote. Each person gets their own Keep watching.</p>
-    <div class="links">
+    <p id="people-how">Add, rename, remove and reorder people in the phone remote. Each person gets their own Keep watching.</p>
+    <div class="links" id="people-links">
       <a class="btn go" href="/#sheet=people">Change people</a>
       <a class="btn" href="/#sheet=arrange">Arrange apps</a>
       <a class="btn" href="/#sheet=kids">Kids mode</a>
@@ -123,7 +123,7 @@
 
   <section class="card" id="photos">
     <h2>Your photos</h2>
-    <p>Photos you add take turns with the scenes behind the clock. They go straight from this phone to the TV, which makes them screen size and keeps them. They never go to Couch TV or any other server.</p>
+    <p>Photos you add take turns with the scenes behind the clock. <span id="photos-where">They go straight from this phone to the TV, which makes them screen size and keeps them.</span> They never go to Couch TV or any other server.</p>
     <p class="drop-hint">On a computer you can also drag photos from a folder onto this box.</p>
     <p id="photo-count"></p>
     <div class="photos" id="photo-list"></div>
@@ -212,11 +212,11 @@
   </section>
 
   <section class="card" id="home">
-    <h2>Use as home screen</h2>
+    <h2>Home button</h2>
     <p class="status" id="home-state">Checking…</p>
     <p id="home-note"></p>
-    <button class="go" id="home-on">Use Couch TV as the home screen</button>
-    <button class="quiet" id="home-off" style="display:none">Stop using it as the home screen</button>
+    <button class="go" id="home-on">Make the Home button open Couch TV</button>
+    <button class="quiet" id="home-off" style="display:none">Make the Home button open the TV's own home again</button>
     <div class="msg" id="home-msg" role="status"></div>
   </section>
 
@@ -229,7 +229,7 @@
 
   <h2 id="tv" style="margin-top:28px">This TV</h2>
 
-  <section class="card">
+  <section class="card" id="tvname">
     <h2>Name and country</h2>
     <label for="tv-name">TV name</label><input id="tv-name" maxlength="30">
     <label for="country">Country, for where shows stream (2 letters, like AU, US or GB)</label><input id="country" maxlength="2" autocapitalize="characters">
@@ -237,7 +237,7 @@
     <div class="msg" id="save-msg" role="status"></div>
   </section>
 
-  <section class="card">
+  <section class="card" id="keys">
     <h2>Let the phone press keys</h2>
     <p>The arrow keys, typing, turning the TV off and showing what's playing need one TV setting switched on, once. Opening apps and the volume work without it.</p>
     <p class="status" id="adb-status">Checking…</p>
@@ -303,7 +303,7 @@
     <ol id="upd-steps" style="display:none"></ol>
   </section>
 
-  <section class="card">
+  <section class="card" id="phones-card">
     <h2>Phones</h2>
     <p id="phones"></p>
     <button id="forget">Forget every phone</button>
@@ -315,8 +315,11 @@
   var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   // an id the page looks up again with a selector (data-id, data-name): no quotes, markup characters or spaces
   var idOf = function (s) { return String(s).replace(/[&<>"'\\\s]/g, ''); };   // as before: TV input ids (com.maker.tvinput/.HdmiService/HW2) keep everything else
+  // the TV this page is for, where a home computer runs more than one (its QR adds ?tv=)
+  var TVQ = (/[?&]tv=([A-Za-z0-9_-]{1,40})(?:&|$)/.exec(location.search) || [])[1] || '';
+  function withTv(path) { return TVQ ? path + (path.indexOf('?') < 0 ? '?' : '&') + 'tv=' + TVQ : path; }
   function api(method, path, body) {
-    return fetch(path, { method: method, headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
+    return fetch(withTv(path), { method: method, headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
       .then(function (r) { return r.json().then(function (j) { if (!r.ok || j.ok === false) { var e = new Error(j.error || ('error ' + r.status)); e.status = r.status; throw e; } return j; }); });
   }
   function say(id, text) { $(id).textContent = text || ''; }
@@ -407,7 +410,7 @@
       }
       var f = files[i++];
       say('photo-msg', 'Sending photo ' + i + ' of ' + files.length + '…');
-      fetch('/api/photos', { method: 'POST', headers: { 'content-type': f.type || 'application/octet-stream' }, body: f })
+      fetch(withTv('/api/photos'), { method: 'POST', headers: { 'content-type': f.type || 'application/octet-stream' }, body: f })
         .then(function (r) { return r.json().then(function (j) { if (!r.ok || j.ok === false) throw new Error(j.error || ('error ' + r.status)); return j; }); })
         .then(function () { done++; }, function (e) { bad++; lastErr = e.message; })
         .then(next);
@@ -761,13 +764,13 @@
   function showHome(h) {
     var on = !!h.on, held = !!h.held;
     $('home-state').className = 'status ' + (on && (held || h.fire_tv) ? 'ok' : '');
-    $('home-state').textContent = !on ? 'Home opens the TV\'s own home.' : held ? 'Couch TV is the home screen.' : h.fire_tv ? (h.watch ? 'Couch TV is the home screen.' : 'The Home button opens Couch TV, but Keep Couch TV on Home is off.') : 'Switched on. One step left on the TV.';
+    $('home-state').textContent = !on ? 'Home opens the TV\'s own home.' : held ? 'The Home button opens Couch TV.' : h.fire_tv ? (h.watch ? 'The Home button opens Couch TV.' : 'The Home button opens Couch TV, but Keep Couch TV on Home is off.') : 'Switched on. One step left on the TV.';
     $('home-note').textContent = !on ? 'The TV keeps its own home until you choose. Everything else on this page works either way.'
       : held || (h.fire_tv && h.watch) ? 'Press Home on the TV remote to check.'
       : h.fire_tv ? 'On a Fire TV, Keep Couch TV on Home brings it back. It is in the Home button version of Couch TV: switch on Couch TV home watch in the TV\'s Settings, Accessibility.'
       : 'Press Home on the TV remote. If the TV asks which app to use, pick Couch TV with the TV remote, then Always (or Set as default). The TV asks that itself; a phone cannot answer it.';
     $('home-on').style.display = on ? 'none' : '';
-    $('home-off').style.display = on ? '' : 'none';
+    $('home-off').style.display = on && MODE !== 'launcher' ? '' : 'none';
   }
   function loadHome() { return api('GET', '/api/home').then(showHome).catch(function (e) { say('home-state', e.message); }); }
   function setHome(on) {
@@ -801,10 +804,42 @@
     else if (a.unanswered) { s.className = 'status bad'; s.textContent = 'No answer from the TV. If it did not show its Allow debugging question, restart the TV, then try again.'; }
     else { s.className = 'status bad'; s.textContent = 'The phone can\'t press keys yet.' + (a.error ? ' ' + a.error : ''); }
   }
+  // Who serves this page. The on-TV app (no mode): everything. A home computer ("bridge", for a Samsung,
+  // LG, Roku or any TV it runs): the TV's own name, Ask AI, the TV's keys, updates and phones are set up on
+  // that computer, so they are left out. The Couch TV home app with no computer ("launcher"): there is no
+  // phone remote, so people are changed on the TV.
+  var MODE = 'on-tv';
+  var NO_ATHOME = false;
+  function applyMode(m, home) {
+    MODE = m === 'bridge' || m === 'launcher' ? m : 'on-tv';
+    if (MODE === 'on-tv') return;
+    var gone = ['ask', 'smart', 'tvname', 'keys', 'xiaomi', 'upd', 'phones-card'].concat(MODE === 'bridge' ? ['home'] : ['kids-first']);
+    gone.forEach(function (id) { var el = $(id); if (el) el.style.display = 'none'; var c = document.querySelector('.jump a[href="#' + id + '"]'); if (c) c.style.display = 'none'; });
+    clearInterval(updPoll);
+    if (MODE === 'bridge') {
+      $('intro-from').textContent = 'This page comes from your home computer, over your home Wi-Fi.';
+      // a Roku, an Apple TV or a VIZIO: their Couch TV takes the town and the people from here; At home, your
+      // photos and a design's widgets are parts of the couch-tv home on a TV that shows web pages
+      if (home && home !== 'web') {
+        ['photos', 'athome', 'widgets', 'dapps'].forEach(function (id) { $(id).style.display = 'none'; var c = document.querySelector('.jump a[href="#' + id + '"]'); if (c) c.style.display = 'none'; });
+        $('jump-widgets').style.display = 'none'; $('jump-dapps').style.display = 'none'; NO_ATHOME = true;
+        $('intro-from').textContent = 'This page comes from your home computer, over your home Wi-Fi. ' + (home === 'none' ? 'This TV shows its own home, so only the town and the people are here.' : 'Couch TV on this TV takes the town and the people from here.');
+      }
+      $('photos-where').textContent = 'They go straight from this phone to your home computer, which makes them screen size and keeps them for the TV.';
+    } else {
+      $('to-remote').style.display = 'none';
+      $('people-how').textContent = 'Add, rename, remove and reorder people on the TV: Home settings, People. Each person gets their own Keep watching.';
+      $('people-links').style.display = 'none';
+      $('home-off').style.display = 'none';
+      $('tv').style.display = 'none';
+    }
+  }
   function loadSettings() {
     return api('GET', '/api/settings').then(function (j) {
       SETTINGS = j;
+      applyMode(j.mode, j.home);
       showTown(); showPeople(); showPhotos();
+      if (MODE !== 'on-tv') return;
       $('tv-name').value = j.tv_name || ''; $('country').value = j.country || '';
       $('ask-on').checked = !!j.ask.enabled;
       if (j.xiaomi) {
@@ -823,7 +858,8 @@
       $('adb-advice').textContent = j.adb.sdk >= 33 ? 'This TV is Android 13 or newer: use the newer TVs steps.' : '';
     }).catch(function (e) { $('town-now').textContent = e.message; });
   }
-  function load() { loadSettings(); loadInputs(); loadAtHome(); loadHome(); loadSmart(); }
+  // the settings first: they say who serves the page (applyMode), so a part it leaves out never flashes up
+  function load() { loadSettings().then(function () { loadInputs(); if (!NO_ATHOME) loadAtHome(); if (MODE !== 'bridge') loadHome(); if (MODE === 'on-tv') loadSmart(); }); }
   var poll = null;
   $('adb-connect').onclick = function () {
     $('adb-msg').textContent = 'Connecting. Look at the TV.';

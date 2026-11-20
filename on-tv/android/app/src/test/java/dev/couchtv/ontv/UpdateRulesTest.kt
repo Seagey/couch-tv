@@ -115,7 +115,11 @@ class UpdateRulesTest {
         assertTrue(phone.contains("If it says App not installed, the TV is usually short of space"))   // a real TCL, 20 Nov 2026
         assertTrue(UpdateRules.steps(watch = false).size <= 8)   // the page shows 8 steps at most
         val computer = UpdateRules.steps(watch = true).joinToString(" ")
-        assertTrue(computer.contains("adb install -r couch-tv-ontv-watch.apk"))
+        // plain words (WORDING-PROPOSAL-0139 3c): the commands stay behind More help on the TV, not here
+        assertTrue(computer.contains("couch-tv-ontv-watch.apk"))
+        assertTrue(computer.contains("More help, Home button from a computer"))
+        assertFalse(computer.contains("adb "))
+        assertTrue(UpdateRules.how(true).startsWith("This is the Home button version of Couch TV."))
         assertFalse(computer.contains("8180170"))   // the code gives the phone only APK, which has no watch
         for (s in UpdateRules.steps(false) + UpdateRules.steps(true) + UpdateRules.how(false) + UpdateRules.how(true)) {
             assertFalse("no long dashes: $s", s.contains('–') || s.contains('—'))

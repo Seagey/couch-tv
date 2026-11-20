@@ -83,6 +83,10 @@ abstract class BundleTvWeb : DefaultTask() {
     @get:InputFile
     abstract val configJson: RegularFileProperty
 
+    /** on-tv/web: the phone's Home settings page (setup.html, shim.js), served by PhoneServer.kt with no computer. */
+    @get:InputDirectory
+    abstract val phonePage: DirectoryProperty
+
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
@@ -102,6 +106,7 @@ abstract class BundleTvWeb : DefaultTask() {
             if (rel.startsWith("loop/") && (!rel.endsWith(".jpg") || rel.contains("/."))) return@forEach   // and never a run's .staging-<pid>/
             f.copyTo(File(dest, rel), overwrite = true)
         }
+        for (n in listOf("setup.html", "shim.js")) File(phonePage.get().asFile, n).copyTo(File(out, "www/ontv/" + n), overwrite = true)
         File(dest, "config.js").writeText("window.COUCH_CONFIG = " + JsonOutput.toJson(publicConfig(configJson.get().asFile)) + ";\n")
     }
 
@@ -143,6 +148,9 @@ abstract class BundleTvWeb : DefaultTask() {
 }
 
 dependencies {
+    // The phone's Home settings page with no computer at home (PhoneServer.kt): the same small web server
+    // as the on-TV app (BSD 3-clause)
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
     // Unit tests for the plain Kotlin rules (FireWatchTest), run with testDebugUnitTest (EPL 1.0).
     testImplementation("junit:junit:4.13.2")
     // The real org.json for the smart home tests (HaReadingsTest, HomeAssistantTest): android.jar only
@@ -158,6 +166,7 @@ val configFile: File = (project.findProperty("configJson") as String?)?.let { fi
 val bundleTvWeb = tasks.register<BundleTvWeb>("bundleTvWeb") {
     web.set(rootProject.layout.projectDirectory.dir("../web"))
     configJson.set(configFile)
+    phonePage.set(rootProject.layout.projectDirectory.dir("../../on-tv/web"))
     outputDir.set(layout.buildDirectory.dir("generated/tvweb"))
 }
 

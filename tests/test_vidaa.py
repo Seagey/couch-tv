@@ -586,6 +586,7 @@ class Endpoints(Base):
         self._key = patch.object(config, "PAIRING_KEY", "couchpass123")
         self._key.start()
         server._failed_attempts.clear()
+        server.pair_lock_reset()   # the lock across addresses (test_pair_lock_bridge.py)
         app = web.Application(middlewares=[server.middleware])
         app.router.add_post("/api/vidaa/pair", server.h_vidaa_pair)
         app.router.add_post("/api/vidaa/tile", server.h_vidaa_tile)
