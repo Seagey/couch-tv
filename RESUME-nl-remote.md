@@ -1,57 +1,53 @@
 # RESUME nl-remote
 
-Branch nl-remote (worktree wt-nl-remote), from integrate-0.13.9, with nl-haqr merged in (87fca2b).
-B1 (/ha/done key leak) is fixed on nl-haqr by another builder: do NOT fix it here, do not re-merge nl-haqr.
+Branch nl-remote (worktree wt-nl-remote), from integrate-0.13.9, with nl-haqr merged in at 87fca2b.
 Commits take about 5 min (privacy-scan pre-commit hook). Delete on-tv/android/.kotlin/errors/*.log and
-on-tv/android/.gradle/kotlin/errors/*.log first (Kotlin daemon logs; the hook refuses *.log files).
+on-tv/android/.gradle/kotlin/errors/*.log first (Kotlin daemon logs; the hook refuses *.log files). The hook
+also refuses private 192.168 addresses in any file: tests use 192.0.2.x.
 
-## Done and committed
+## Commits
 - 4d7b3e0 pairing lock, 69fa688 phone remote, 472eddf plain words (earlier builder)
-- 7de4aef WIP: phone pages in every language (phone-words.js, caps-words.js, Smart home rows)
-- next WIP commit (21 Nov): the Fable NO-GO fixes below
+- 7de4aef WIP: phone pages in every language (coord 0747 and 0748: phone-words.js for on-tv/web/setup.html and
+  ha-phone.html, caps-words.js as the shared widget settings word table, Smart home rows in tv i18n)
+- 6ce5e20 WIP: the Fable NO-GO fixes (coord 0814), previous builder's work
+- c473fce WIP: Auth.lastPairedAt back on the wall clock (SetupActivity subtracts it from currentTimeMillis;
+  the lock clock is elapsedRealtime), setup-app test for the TV's 429 words (3 tests), design settings browser
+  test for the Edit on your phone QR asking again every 20 s (3 checks)
+- final commit: this file
 
-## Fable NO-GO (coord/msgs-1120/0814_*), status
-- B2 bridge lock DoS: DONE. bridge/server.py: no lock on /api/pair or VIDAA/Panasonic claim; Apple TV claim
-  counts only while a code is live; comment updated. tests/test_pair_lock_bridge.py: 6 tests OK
-  (`../repo/.venv/bin/python -m unittest discover -s tests -p "test_pair_lock*.py"`).
-- M1 Auth.kt: DONE in code (`currentPin() ?: return null` before counting; PairLockTest.triesWithNoLiveCodeDoNotCount).
-  NOT YET RUN: gradle on-tv testDebugUnitTest (gradle lock). CHECK: Auth.clock is now
-  SystemClock.elapsedRealtime(); PairLockTest.tearDown no longer resets it (left as `{ now }`). In plain JVM
-  tests elapsedRealtime is "not mocked" unless returnDefaultValues; build.gradle.kts has no such option, so
-  any other test calling Auth without a fake clock may fail: run the suite; if so, reset Auth.clock in
-  tearDown to a plain JVM clock ({ System.nanoTime() / 1_000_000 }). Also check Auth.kt:75 lastPairedAt =
-  clock() is not compared with wall clock time anywhere (grep lastPairedAt).
-- M2 bridge 429 retry_after + Retry-After header: DONE (ApiError retry_after; tested in test_pair_lock_bridge).
-- M3 Server.kt /api/phone-link pairLocked() first: DONE. design.js Edit on your phone sheet asks
-  hooks.phoneLink() every 20 s and redraws on change: DONE in code, no browser test yet.
-- M4 err_adb_not_on new words (tv i18n en/zh-CN/pl, remote en/zh-CN/pl): DONE (test_wording_leftovers).
-- Lows: "Wait {minutes} min" (bridge, Server.kt, tv+remote i18n, phone-words line + mock.js): DONE;
-  monotonic clock (bridge time.monotonic, Auth elapsedRealtime): DONE; /api/pair/start pinForQr(minLeft=90): DONE;
-  setup-app server.py passes the TV's 429 message (HTTPError branch): DONE, no test yet; err_invalid_pairing_key
-  / err_pairing_key_required without "this phone" on the TV (en, zh-CN, pl): DONE (tested).
-- tv-words.js scoped to #settings, .cw-sheet, .cw-tip, .cd-ask, .cd-escaped; never .cd-o or a typed .sv value
-  (OWN_VALUES incl. Kept on this TV): DONE. 58 new tw_* keys in all 15 languages (Smart home paste key rows,
-  Hue, At home intro, screen time, calendar errors, Updates (UPD_ONTV), design-code inbox messages,
-  switched off banner, Hold OK menu note, Up to {n}, Where to: {place}, Updated to {v}): DONE
-  (scratchpad of this session: nlr/tw_new.json + nlr/add_tw.py).
-  New tests/test_tv_words_cover.mjs: every English line added since v0.13.8 in app.js/design.js/design-code.js
-  has a tw_ line or is a phone error in phone-words.js (9 checks pass). Phone errors (designEdit, setApps,
-  At home) added to phone-words.js (15 lines). tests/test_tv_words_browser.mjs extended (whole lines with
-  gaps and tails, banner, .cd-o, isolates): NOT YET RUN (browser lock).
-- Translations: de tw_keep_home/tw_check_first "Meinen Startbildschirm behalten": DONE; tw_type_code_phone
-  fixed in de, pl, ar, he, nl, cs, sr, pt, tr, ro (es, it, fr, zh were right): DONE; ar/he isolates
-  U+2066..U+2069 in tw_scan_widget, set_phone_pc, tw_ha_connected (and phone-words {host}): DONE
-  (test_wording_leftovers 139 checks pass). Fable's checker chk-nlremote-bidi.mjs: NOT YET RUN (browser lock).
+## Fable NO-GO (coord/msgs-1120/0814), all done
+- B1 /ha/done key leak: belongs to nl-haqr (fixed there). NOT merged here: see "Left".
+- B2 bridge lock DoS: no lock on /api/pair or the VIDAA/Panasonic claim; Apple TV claim counts only while a
+  code is live. tests/test_pair_lock_bridge.py.
+- M1 Auth.pair: no live code returns null before counting (PairLockTest.triesWithNoLiveCodeDoNotCount).
+- M2 bridge 429: retry_after field and Retry-After header.
+- M3 Server.kt /api/phone-link: pairLocked() first; design.js Edit on your phone sheet asks again every 20 s
+  (test_design_settings_browser.mjs: new code drawn, locked hides the QR).
+- M4 err_adb_not_on words (tv and remote i18n). Lows: "Wait {minutes} min", monotonic lock clocks,
+  /api/pair/start pinForQr(minLeft = 90), setup-app passes the TV's 429 message (setup-app/tests/test_server.py
+  RemoteCode), err_invalid_pairing_key / err_pairing_key_required without "this phone" on the TV.
+- tv-words.js scoped (#settings, .cw-sheet, .cw-tip, .cd-ask, .cd-escaped), 58 new tw_* keys in 15 languages,
+  tests/test_tv_words_cover.mjs, translations fixed (de, tw_type_code_phone, ar/he isolates).
 
-## Left, exact next steps
-1. Run with the browser lock (mkdir .../b061a7d7-.../scratchpad/browser.lock, rmdir after):
-   COUCHTV_PLAYWRIGHT=".../tools/reel-machine" node tests/test_tv_words_browser.mjs, test_phone_words_browser.mjs,
-   test_phone_link_fresh_browser.mjs, and node .../scratchpad/chk-nlremote-bidi.mjs <worktree> <png>
-   (both ar and he lines should say "address in order" and "code groups in order").
-2. Gradle with the gradle lock: on-tv testDebugUnitTest (128 passed before), see the clock CHECK above.
-3. Full node tests (all tests/test_*.js and non-browser .mjs; 67 passed before) and
-   `../repo/.venv/bin/python -m unittest discover -s tests` (1355 OK before).
-4. Not in scope, report to coordinator: widgets.js / widget-detail.js English lines (owned by ws2-* agents,
-   about 80 lines); "Clear {label}" / "Use the design's {label}" and "{widget} now shows {place}." need the
-   caps label words (caps-words.js); legacy English-only At home rows (pre 0.13.8).
-5. Final commit (not WIP) and report with counts.
+## Test counts, 21 Nov (HEAD c473fce plus this file)
+- python `../repo/.venv/bin/python -m unittest discover -s tests`: 1365 run, 58 skipped, 1 error =
+  tests/test_ha_real_bridge.py (nl-haqr's file) calls sys.exit(0) at import when HA_E2E_URL is not set, which
+  discover counts as an import error. Every other test passes. Not changed here (nl-haqr owns it).
+- setup-app (`setupvenv314/bin/python -m unittest discover -s tests` in setup-app, the scratchpad venv): 103 OK.
+- node, every tests/test_*.js and .mjs without Playwright: 67 files pass, 0 fail.
+- browser, all 26 Playwright files (scratchpad nlr-run-browser.sh, under the browser lock): 26 pass, 0 fail
+  (tv words 32, phone words 21, phone link fresh 9, design settings 110, ws_tv 1115, widget detail 295, ...).
+- gradle on-tv testDebugUnitTest (scratchpad chk-nlremote-gradle.sh, gradle lock): 167 tests, 0 failures, 1 skipped.
+- Fable's bidi checker (scratchpad nlr-bidi-run.sh, browser lock): ar and he, sheet line and computer line, 4 of 4 "address in order; code groups in order 482 913".
+
+## Left
+1. Re-merge nl-haqr when it lands (coordinator's word). On 21 Nov its tip was a0d4474, still WIP. A trial
+   `git merge-tree --write-tree HEAD nl-haqr` shows 16 conflicting files, because nl-haqr merged nl-phonepage,
+   which carries older cherry-picked copies of this branch's commits (95a4432, 1457050, 73fac94): bridge/server.py,
+   haphone.py, Auth.kt, Server.kt, PairLockTest.kt, setup.html, remote i18n, test_pair_lock_bridge.py,
+   test_tv_words_browser.mjs, test_wording_leftovers.mjs, app.js, design.js, i18n.js, index.html, mock.js,
+   tv-words.js. For the lock files take this branch's side (it has the Fable fixes); merge setup.html, app.js,
+   haphone.py by hand (nl-phonepage's launcher server). Then rerun every count above.
+2. Outside this branch's scope, for the coordinator: widgets.js / widget-detail.js English lines (ws2-* agents,
+   about 80); "Clear {label}", "Use the design's {label}", "{widget} now shows {place}." wait for caps-words.js
+   lines once widget-caps.js labels settle (node scripts/caps-words-todo.mjs lists them).
