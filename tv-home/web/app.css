@@ -280,6 +280,11 @@ html.lighter:not(.theme-night):not(.theme-loop) .apps { transition: none; }
   display: flex; align-items: center; justify-content: center;
 }
 .app .face.tool svg { width: 2.75rem; height: 2.75rem; stroke: var(--text); stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+/* g24: a tile drawn from an icon set carries its own strokes and fills; the whole tile styles bring their own backing */
+.app .face.tool.iset { color: var(--text); }
+.app .face.tool.iset svg { stroke: none; width: 3rem; height: 3rem; }
+.app .face.tool.iset-full { background: none !important; box-shadow: none; }
+.app .face.tool.iset-full svg { width: 100%; height: 100%; }
 .app.busy .face { animation: none; opacity: 0.6; }
 
 /* Home settings, Look, Moving tiles: off (#52). The 3D sway gets its own layer, which flickers black on some slow GPUs. */

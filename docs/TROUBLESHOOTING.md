@@ -140,6 +140,25 @@ If the rows turn smooth, the GPU is the limit. Keep it for couch-tv only, withou
 
 To undo it, remove the key or set it to `0`. Text and pictures are a little softer than at full size. If it helps, or does not, please say which TV and Android version on [#197](https://github.com/Seagey/couch-tv/issues/197).
 
+## A green screen, or a black background after an app
+
+A TV whose video decoder fails without saying so draws a clip as flat green (seen on a TCL QM8K). The
+home looks at every background clip it plays (a scene's own clip, the video link, a design's video):
+one that shows only green goes, the still picture stays, and the home tries no background video on that
+TV for a week. Home settings, Look says so under the video link. A clip from another site cannot be
+looked at, so if the green comes from your own video link, remove the link (Look, Remove the video).
+If the whole screen is green, also inside apps, it is the TV itself: check for a TV update.
+
+Coming back from an app opened from a video link, a Fire TV could show the home black. The background
+clip now lets go of the video decoder while an app is in front, and the photo shows until the clip
+really plays again.
+
+## An air mouse or a USB mouse
+
+On a TV with an air mouse remote (or a USB mouse), the home turns its pointer on the first time the
+pointer moves over it: pointing at a tile moves the focus there and a click opens it, as OK does, on
+the dock, Keep watching and in Home settings. A TV that never sends a moving pointer stays arrows only.
+
 ## Something else stuck
 
 If the TV no longer asks "Allow USB debugging?", or the home will not go away, see "If something is stuck" in [UNINSTALL.md](UNINSTALL.md). Each TV guide in [the docs index](README.md) has its own limits and fixes, and the open issues often have a fix for your model.

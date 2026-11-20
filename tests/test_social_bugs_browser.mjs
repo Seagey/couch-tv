@@ -10,6 +10,7 @@
 //        settings section and row, on a TV that never said it had a pointer.
 //   g31  quick buttons picked in Home settings are the same after a restart.
 //   g33  a clip that shows only green (a TCL QM8K) or will not play goes, and the still picture stays.
+//   g24  home.icon_set or Look, Icon style draws Settings and More apps from one of couch-tv's icon sets.
 //   g34  Next scene and Previous scene from the phone remote change the scene (Night) or photo (Classic).
 // Needs Playwright (Chromium). Without it the test says so and passes:
 //   COUCHTV_PLAYWRIGHT=<a folder whose node_modules has playwright> node tests/test_social_bugs_browser.mjs
@@ -430,6 +431,38 @@ try {
     await p2.evaluate(() => { const now = Date.now(); window.CouchAsk._test.took({ scene: { pick: "next", at: now } }, now); });
     await p2.waitForTimeout(800);
     ok(await place() !== before && (await place()).length > 0, "Classic: Next scene shows the next photo (" + before + " -> " + (await place()) + ")");
+    await p2.close();
+  }
+  // ------------------------------------------------------------------ g24
+  if (want("g24")) {
+    current = "g24";
+    const page = await fresh();
+    await open(page, "&look=night&iconset=solid");
+    await page.waitForTimeout(800);
+    const tool = (kind) => page.evaluate((k) => { const t = document.querySelector('#grid [data-pkg="' + k + '"] .face'); return t ? { cls: t.className, svg: !!t.querySelector("svg"), w: t.querySelector("svg") ? t.querySelector("svg").getBoundingClientRect().width : 0 } : null; }, kind);
+    const gear = await tool("gear"), more = await tool("more");
+    ok(gear && /iset-solid/.test(gear.cls) && gear.svg && gear.w > 10, "home.icon_set solid draws Settings from the icon set (" + JSON.stringify(gear) + ")");
+    ok(more && /iset-solid/.test(more.cls) && more.svg, "and More apps (" + JSON.stringify(more) + ")");
+    const app = await page.evaluate(() => { const i = document.querySelector('#grid [data-pkg="com.netflix.ninja"] .face img'); return i ? i.getAttribute("src") : null; });
+    ok(!app || /app-logos/.test(app), "the apps keep their own icons (" + app + ")");
+    // Home settings, Look, Icon style: steps through the styles and is kept
+    await openSection(page, /^Look/);
+    ok(await toRow(page, /^Icon style/), "a Look row Icon style");
+    ok(/Solid/.test(await rowText(page, /^Icon style/)), "it says Solid, the style in use");
+    await keys(page).press("Enter", 300);
+    ok(/Two tone/.test(await rowText(page, /^Icon style/)), "OK moves to the next style (" + (await rowText(page, /^Icon style/)) + ")");
+    const st = await page.evaluate(() => (JSON.parse(localStorage.getItem("mock:tvhome.settings") || "{}").s || {}).icon_set);
+    ok(st === "duotone", "and it is saved (" + st + ")");
+    ok(/iset-duotone/.test((await tool("gear")).cls), "the Settings tile is drawn again at once");
+    for (let i = 0; i < 5; i++) await keys(page).press("Enter", 200);
+    ok(/Standard/.test(await rowText(page, /^Icon style/)), "round to Standard");
+    ok(!/iset/.test((await tool("gear")).cls), "Standard is the usual drawing");
+    ok(page.errors.length === 0, "no page errors (" + page.errors.join(" | ") + ")");
+    await page.close();
+    // without anything set, the home is exactly as before
+    const p2 = await fresh();
+    await open(p2, "&look=night");
+    ok(await p2.evaluate(() => !document.querySelector("#grid .iset")), "nothing set: the usual drawing, exactly as before");
     await p2.close();
   }
 } finally {

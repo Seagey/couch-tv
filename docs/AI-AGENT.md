@@ -73,8 +73,13 @@ Every call carries `Authorization: Bearer <pairing key>` when the TV app or brid
 ```
 POST /api/say/message   {"text": "Dinner is ready", "from": "Claude", "seconds": 30}
 POST /api/say/design    {"code": "ABCDE-FGHJK", "from"?: "phone"}   -> {"design": {...}, "asks_first": true, "listening": true}
-GET  /api/say           {"ask": {...}, "message": {...}, "design": {...}}
+POST /api/say/scene     {"pick": "next" | "prev"}                     -> {"scene": {...}, "listening": true}
+GET  /api/say           {"ask": {...}, "message": {...}, "design": {...}, "scene": {...}}
 ```
+
+`/api/say/scene` is what the phone remote's Next scene and Previous scene buttons send (in its TV sheet):
+the home shows the next or the previous scene (Night) or photo (Classic) within a few seconds, if it was
+pressed in the last minute. Only `next` and `prev` are taken.
 
 `from` is optional: `"phone"` is what the phone remote's Send a design sends, and the TV then says the
 design came from your phone. Anything else, or nothing, is an AI agent ("from your AI"). Only those two

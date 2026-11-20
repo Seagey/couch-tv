@@ -2686,6 +2686,8 @@ def clean_settings(s):
         out["glass"] = s["glass"]
     if isinstance(s.get("glass_icons"), bool):
         out["glass_icons"] = s["glass_icons"]
+    if s.get("icon_set") in config.ICON_SETS:   # Home settings, Look, Icon style (g24)
+        out["icon_set"] = s["icon_set"]
     if isinstance(s.get("moving_tiles"), bool):   # the focused tile's slow sway (#52)
         out["moving_tiles"] = s["moving_tiles"]
     if s.get("dock") in ("mac", "classic"):   # the Mac-style dock

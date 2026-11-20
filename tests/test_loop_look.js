@@ -793,9 +793,10 @@ const tick = () => new Promise((r) => setImmediate(r));
 console.log('Loop look version tests passed.');
 
 // a Loop card's picture that never loads (kwArtRetry gives up after six tries): the plate with the app's icon,
-// like a card that had no picture; a Night card's picture is left as it was
+// like a card that had no picture; any other card's picture gives way to the show's title (g03: it was left
+// as an empty tile; with an app it first tries the app's banner, see tests/test_social_bugs_browser.mjs)
 {
-  const w = {}, ctx = { window: w, setTimeout: () => 0, document: { documentElement: { contains: () => true } } };
+  const w = {}, ctx = { window: w, setTimeout: () => 0, iconUrl: () => null, document: { documentElement: { contains: () => true }, createElement: (t) => el(t) } };
   vm.createContext(ctx);
   vm.runInContext(part('  var ART_RETRY_MS', '  function glassSetting()'), ctx);
   const card = (cls) => {
@@ -804,6 +805,7 @@ console.log('Loop look version tests passed.');
     badge.className = 'lbadge';
     box.appendChild(img); box.appendChild(badge);
     box.querySelector = (q) => (q === '.lbadge' ? badge : null);
+    box.replaceChild = (nw, old) => { const i = box.children.indexOf(old); box.children[i] = nw; nw.parentNode = box; old.parentNode = null; };
     img.setAttribute('src', 'http://x/a.jpg');
     return { box, img, badge };
   };
@@ -816,7 +818,7 @@ console.log('Loop look version tests passed.');
   assert.strictEqual(c.badge.className, 'picon', 'the badge is the plate\'s icon');
   const n = card('');
   for (let i = 0; i < 7; i++) w.kwArtRetry(n.img);
-  assert(n.box.children.includes(n.img) && n.badge.className === 'lbadge', 'a picture outside a Loop card stays');
+  assert(!n.box.children.includes(n.img) && n.box.children[0].className === 'no-art' && n.badge.className === 'lbadge', 'a picture outside a Loop card gives way to the title');
   console.log('Loop card picture fallback tests passed.');
 }
 

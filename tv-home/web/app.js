@@ -549,6 +549,7 @@
     // a link set in Home settings wins over home.video_url; one from config.json alone means on
     VIDEO_URL = typeof ST.video_url === "string" ? ST.video_url : typeof HOME.video_url === "string" ? HOME.video_url : "";
     VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true) && !LOOP;   // the Loop look has its own clip
+    ICON_SET = ICON_SETS.indexOf(ST.icon_set) >= 0 ? ST.icon_set : ICON_SETS.indexOf(HOME.icon_set) >= 0 ? HOME.icon_set : "builtin";
     GRID_COLS = NIGHT ? 12 : 8;
     DOCK_APPS = Math.max(1, Math.min(10, parseInt(HOME.dock_size, 10) || 10));
     DOCK_BANNERS = NIGHT && !LOOP && (typeof ST.dock_banners === "boolean" ? ST.dock_banners : HOME.dock_banners === true);
@@ -679,8 +680,8 @@
     if (zone === "shelf") paintFocus();
   }
   window.kwArtGone = kwArtGone;
-  window.addEventListener("online", kwArtAgain);
-  document.addEventListener("visibilitychange", function () { if (!document.hidden) kwArtAgain(); });
+  if (window.addEventListener) window.addEventListener("online", kwArtAgain);
+  if (document.addEventListener) document.addEventListener("visibilitychange", function () { if (!document.hidden) kwArtAgain(); });
   function glassSetting() { var g = ST.glass || HOME.glass; return g === "on" || g === "lite" ? g : "off"; }
   // no clock in Home settings or config.json: the TV's own setting, else the one usual for the language (24 hour in Italian, German, Turkish, French, Serbian, Polish and Brazilian Portuguese)
   // On the Android home the TV's own 12 or 24 hour setting (System, Date and time) comes before the language's usual clock (#221)
@@ -3773,13 +3774,25 @@
     return '<div class="face tool input-ic ic-' + esc(it.icon || "hdmi") + '">' + drawn + "</div>";
   }
 
+  // g24 (icon packs, asked for by two people): the home's own tiles (Settings, More apps, Inputs,
+  // Screens) drawn in one of couch-tv's icon sets (icon-sets.js), from home.icon_set or Home settings,
+  // Look, Icon style. Your own app icons are tv-home/tools/app-icons.sh (since 0.13, docs/TV-HOME.md).
+  var ICON_SETS = ["builtin", "line", "solid", "duotone", "tile", "glass", "playful"], ICON_SET = "builtin";
+  var SET_CONCEPT = { gear: "settings", more: "apps", input: "input", screen: "tv" };
+  function toolFace(name) {
+    var T = window.TVIcons, svg = ICON_SET !== "builtin" && T && T.svg ? T.svg(ICON_SET, SET_CONCEPT[name], 0) : "";
+    if (!svg) return '<div class="face tool">' + ICONS[name] + "</div>";
+    var full = ICON_SET === "tile" || ICON_SET === "glass" || ICON_SET === "playful";
+    return '<div class="face tool iset iset-' + ICON_SET + (full ? " iset-full" : "") + '">' + svg + "</div>";
+  }
+
   function dockHTML(it) {
     var face;
-    if (it.kind === "screen") face = '<div class="face tool">' + ICONS.screen + "</div>";
+    if (it.kind === "screen") face = toolFace("screen");
     else if (it.kind === "input") face = inputFace(it);
-    else if (it.kind === "inputs") face = '<div class="face tool">' + ICONS.input + "</div>";
-    else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
-    else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
+    else if (it.kind === "inputs") face = toolFace("input");
+    else if (it.kind === "more") face = toolFace("more");
+    else if (it.kind === "gear") face = toolFace("gear");
     else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
     else if (it.kind === "smart") face = '<div class="face tool">' + window.smartHome.icon + "</div>";
     else if (DOCK_BANNERS && it.banner) face = '<div class="face banner"><img src="' + esc(it.banner) + '" alt="" decoding="async" data-err="word" data-name="' + esc(it.name) + '"></div>';
@@ -3827,11 +3840,11 @@
   function appHTML(it) {
     if (NIGHT) return dockHTML(it);
     var face;
-    if (it.kind === "screen") face = '<div class="face tool">' + ICONS.screen + "</div>";
+    if (it.kind === "screen") face = toolFace("screen");
     else if (it.kind === "input") face = inputFace(it);
-    else if (it.kind === "inputs") face = '<div class="face tool">' + ICONS.input + "</div>";
-    else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
-    else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
+    else if (it.kind === "inputs") face = toolFace("input");
+    else if (it.kind === "more") face = toolFace("more");
+    else if (it.kind === "gear") face = toolFace("gear");
     else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
     else if (it.kind === "smart") face = '<div class="face tool">' + window.smartHome.icon + "</div>";
     else if (it.banner) face = '<div class="face"><img src="' + esc(it.banner) + '" alt="" decoding="async"></div>';
@@ -5359,6 +5372,9 @@
     rows.push({ kind: "toggle", key: "lighter", label: t("lighter"), value: LIGHTER ? t("on") : t("off"), act: function () {
       LIGHTER = !LIGHTER; ST.lighter = LIGHTER; saveSettings();
       document.documentElement.classList.toggle("lighter", LIGHTER); if (LOOP) loopLighter(); ambientSync(); movingTiles(); renderShelf(); paintFocus();
+    } });
+    rows.push({ kind: "toggle", key: "icon-style", label: t("icon_style"), value: t("icon_style_" + ICON_SET), sub: t("icon_style_sub"), act: function () {
+      ICON_SET = ICON_SETS[(ICON_SETS.indexOf(ICON_SET) + 1) % ICON_SETS.length]; ST.icon_set = ICON_SET; saveSettings(); renderGrid();
     } });
     rows.push({ kind: "toggle", key: "glass-icons", label: t("glass_icons"), value: GLASS_ICONS ? t("on") : t("off"), act: function () {
       GLASS_ICONS = !GLASS_ICONS; ST.glass_icons = GLASS_ICONS; saveSettings();
