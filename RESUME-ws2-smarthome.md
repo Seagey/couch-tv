@@ -12,9 +12,10 @@ Brief: scratchpad swarm2-common.md. Kinds: aircon, controls, camera, doorbell, s
 ## Tests
 - node tests/test_ws_schema.js (3760), tests/test_widget_caps.js (4548), test_ha_token_never_leaves.js (28), test_design_widgets.js (221); pytest tests/test_smarthome_bridge.py tests/test_ha_widgets_config.py (12).
 - tests/test_ws2_smarthome.mjs: 181 checks passed (Playwright, COUCHTV_PLAYWRIGHT=".../tools/tv-designer/market").
-- Browser suite (ws_tv, design_settings, widget_detail, widget_fit_all, phone_settings, smart_widgets): see the latest commit message / report for results.
+- Browser suite, all green at 348f99c: test_ws_tv 1115, test_design_settings_browser 107, test_widget_detail_browser 296, test_widget_fit_all 8, test_phone_settings_browser 129, test_smart_widgets_browser 54.
 - Browser runs must hold scratchpad/browser.lock: use scratchpad/smarthome-run.sh <test files> (waits for the lock, logs to scratchpad/smarthome-results/).
 - In browser tests press Back slowly: five Back presses within 4 s switch a design off (design.js escapeDesign).
 
 ## Left
+- Done. Only the merge note above (HomeAssistant.kt path on nl-haqr).
 - Nothing running on the MacBook or an emulator. No real Home Assistant was used (mock.js ?ha=1 and the bridge test fakes).
