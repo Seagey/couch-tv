@@ -114,7 +114,11 @@ try {
   CHECK = { code: "debugging_off", fire_tv: true }; await checkNow(page); s = await state(page);
   ok(s.head === W.debugging_off_h.en && s.fix === W.debugging_off_fire_f.en && /My Fire TV, About/.test(s.fix) && /ADB debugging/.test(s.fix) && !/Wireless/.test(s.fix), "Fire TV, debugging off: " + s.fix);
   CHECK = { code: "no_wireless", fire_tv: true }; await checkNow(page); s = await state(page);
-  ok(s.fix === W.no_wireless_f.en, "Fire TV, other answers keep their own words");
+  ok(s.head === W.no_wireless_h.en && s.fix === W.no_wireless_fire_f.en && /My Fire TV, Developer options/.test(s.fix) && !/Android 10|Network debugging/.test(s.fix), "Fire TV, port shut: ADB debugging off and on: " + s.fix);
+  CHECK = { code: "port_closed", fire_tv: true }; await checkNow(page); s = await state(page);
+  ok(s.fix === W.port_closed_fire_f.en && /then press Let the phone press keys\.$/.test(s.fix) && !/Wireless|Network debugging/.test(s.fix), "Fire TV, port closed: its own words");
+  CHECK = { code: "allow_unanswered", fire_tv: true }; await checkNow(page); s = await state(page);
+  ok(s.fix === W.allow_unanswered_f.en, "Fire TV, answers with no Fire words keep their own");
   CHECK = { code: "port_closed" }; await checkNow(page); s = await state(page);
   ok(/off and on again, then press Let the phone press keys\.$/.test(s.fix), "port closed: ends with the button the page has: " + s.fix);
   ok(!("other_network_h" in W) && !KT_CODES.includes("other_network"), "no answer blames the phone's network");
