@@ -1,10 +1,13 @@
-"""scripts/release.sh: the release steps in order (Fable review of nl-matter-packaging, items 4a to 4f).
+"""scripts/release.sh: the release steps in order (Fable review of nl-matter-packaging, items 4a to 4f,
+and the hardening review after it, M1 to M4 and L1 to L3).
 
 Each test copies release.sh into a fresh folder with a stand-in check-release-apks.py (it logs its
-arguments and exits with STUB_RC) and stand-in git and gh on PATH (they log every call and push
-nothing). So these tests prove the order and the stops: SHA256SUMS.txt has exactly the 6 release
-files, the check always gets --release --matter --signer and an absolute --previous, and publish
-runs every check before the first git push, and stops before it on any failure.
+arguments and exits with STUB_RC), stand-in git and gh on PATH (they log every call and push nothing),
+a stand-in gradlew (writes fake APKs) and a stand-in Samsung build. So these tests prove the order and
+the stops: SHA256SUMS.txt has exactly the 6 release files, the check always gets --release --matter
+--signer and an absolute --previous (and --version when given), build runs only from a clean tree and
+writes BUILT-FROM, and publish runs every check before the first git push, and stops before it on any
+failure.
 
 Run: python3 tests/test_release_script.py"""
 import hashlib
@@ -17,6 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 CERT = "5b5ef39266a1b5bb2425ca8a0023003e895753630fffd4831efcf8c112372116"
+HEAD = "0123456789abcdef0123456789abcdef01234567"
 FILES = ["couch-tv-home.apk", "couch-tv-ontv.apk", "couch-tv-ontv-watch.apk", "couch-tv-sync.apk",
          "couch-tv-samsung-setup.zip", "couch-tv-samsung.wgt"]
 
@@ -24,11 +28,45 @@ STUB_CHECK = """import os, sys
 open(os.environ["CALLS"], "a").write("check " + " ".join(sys.argv[1:]) + "\\n")
 sys.exit(int(os.environ.get("STUB_RC", "0")))
 """
-FAKE = """#!/bin/bash
-echo "{name} $*" >> "$CALLS"
-if [ "{name}" = git ] && [ "$3" = status ]; then printf "%s" "${{FAKE_STATUS:-}}"; fi
+FAKE_GIT = """#!/bin/bash
+echo "git $*" >> "$CALLS"
+case "$3" in
+  status) printf "%s" "${FAKE_STATUS:-}" ;;
+  rev-parse) if [ "$4" = HEAD ]; then echo "${FAKE_HEAD}"; elif [ -n "${FAKE_LOCAL_TAG:-}" ]; then exit 0; else exit 1; fi ;;
+  ls-remote) printf "%s" "${FAKE_REMOTE_TAG:-}" ;;
+esac
 exit 0
 """
+FAKE_GH = """#!/bin/bash
+echo "gh $*" >> "$CALLS"
+[ "$1" = auth ] && exit "${FAKE_GH_AUTH:-0}"
+exit 0
+"""
+# called as: gradlew -p <dir> --no-daemon -q <tasks...>  or  gradlew -p <dir> --stop
+FAKE_GRADLEW = """#!/bin/bash
+[ "$3" = --stop ] && exit 0
+echo "gradle $*" >> "$CALLS"
+[ -n "${GRADLE_LOCK:-}" ] && [ -d "$GRADLE_LOCK" ] && echo "gradle lock held" >> "$CALLS"
+[ -n "${FAKE_GRADLE_KILL:-}" ] && kill -TERM $PPID
+d=$2
+mkdir -p "$d/app/build/outputs/apk/release" "$d/app/build/outputs/apk/watch"
+echo "$d release" > "$d/app/build/outputs/apk/release/app-release.apk"
+echo "$d watch" > "$d/app/build/outputs/apk/watch/app-watch.apk"
+exit "${FAKE_GRADLE_RC:-0}"
+"""
+FAKE_SAMSUNG = """#!/bin/bash
+echo "samsung $*" >> "$CALLS"
+r=$(dirname "$(dirname "$1")")
+mkdir -p "$r/build/samsung"
+echo wgt > "$r/build/samsung/couch-tv-samsung.wgt"
+echo zip > "$r/build/samsung/couch-tv-samsung-setup.zip"
+"""
+
+
+def exe(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    path.chmod(0o755)
 
 
 class ReleaseScript(unittest.TestCase):
@@ -47,19 +85,25 @@ class ReleaseScript(unittest.TestCase):
         self.prev = self.r / "old-ontv.apk"
         self.prev.write_bytes(b"old")
         b = self.r / "bin"
-        b.mkdir()
-        for name in ("git", "gh"):
-            (b / name).write_text(FAKE.format(name=name))
-            (b / name).chmod(0o755)
+        exe(b / "git", FAKE_GIT)
+        exe(b / "gh", FAKE_GH)
+        exe(self.r / "tv-home/android/gradlew", FAKE_GRADLEW)
+        exe(self.r / "fake-samsung", FAKE_SAMSUNG)
+        (self.r / "remote/dist").mkdir(parents=True)
+        (self.r / "remote/dist/index.html").write_text("x")
         self.calls = self.r / "calls.log"
-        self.env = dict(os.environ, PATH=f"{b}:{os.environ['PATH']}", CALLS=str(self.calls), ANDROID_HOME="/nonexistent")
+        self.lock = self.r / "gradle.lock"
+        self.env = dict(os.environ, PATH=f"{b}:{os.environ['PATH']}", CALLS=str(self.calls), ANDROID_HOME="/nonexistent",
+                        FAKE_HEAD=HEAD, JAVA_HOME=str(self.r), SAMSUNG_PYTHON=str(self.r / "fake-samsung"))
+        for k in ("REPO", "REMOTE", "GRADLE_LOCK", "CONFIG", "STUB_RC"):
+            self.env.pop(k, None)
 
     def tearDown(self):
         self.t.cleanup()
 
     def run_step(self, *args, **env):
         e = dict(self.env, **env)
-        p = subprocess.run(["bash", str(self.r / "scripts/release.sh"), *args], capture_output=True, text=True, env=e)
+        p = subprocess.run(["bash", str(self.r / "scripts/release.sh"), *args], capture_output=True, text=True, env=e, timeout=30)
         return p.returncode, p.stdout + p.stderr
 
     def log(self):
@@ -68,7 +112,13 @@ class ReleaseScript(unittest.TestCase):
     def sums(self):
         return (self.dist / "SHA256SUMS.txt").read_text().splitlines()
 
-    # --- arguments (4e, 4f)
+    def built(self, head=HEAD):
+        """sums as build leaves them: SHA256SUMS.txt and BUILT-FROM, then a fresh call log."""
+        self.assertEqual(self.run_step("sums", "--previous", str(self.prev))[0], 0)
+        (self.dist / "BUILT-FROM").write_text(head + "\n")
+        self.calls.unlink()
+
+    # --- arguments (4e, 4f, L1, L2)
     def test_previous_is_required(self):
         rc, out = self.run_step("sums")
         self.assertEqual(rc, 2, out)
@@ -90,6 +140,28 @@ class ReleaseScript(unittest.TestCase):
         self.assertEqual(rc, 2, out)
         self.assertEqual(self.log(), [])
 
+    def test_a_flag_without_a_value_stops_at_once(self):
+        # L1: this looped forever (shift 2 with one argument left fails and shifts nothing)
+        for flag in ("--previous", "--signer", "--version"):
+            rc, out = self.run_step("sums", "--previous", str(self.prev), flag)
+            self.assertEqual(rc, 2, f"{flag}: {out}")
+        self.assertEqual(self.log(), [])
+
+    def test_couch_tv_takes_only_its_own_certificate(self):
+        # L2: for Seagey/couch-tv another --signer is refused, even a well formed one
+        rc, out = self.run_step("sums", "--previous", str(self.prev), "--signer", "a" * 64)
+        self.assertEqual(rc, 2, out)
+        self.assertIn("couch-tv's own certificate", out)
+        rc, out = self.run_step("sums", "--previous", str(self.prev), "--signer", "a" * 64, REPO="Seagey/couch-tv")
+        self.assertEqual(rc, 2, out)
+        self.assertEqual(self.log(), [])
+
+    def test_a_fork_passes_its_own_signer(self):
+        other = "a" * 64
+        rc, out = self.run_step("sums", "--previous", str(self.prev), "--signer", other, REPO="someone/couch-tv")
+        self.assertEqual(rc, 0, out)
+        self.assertIn(f"--signer {other} ", self.log()[0])
+
     # --- sums (4b, 4c)
     def test_sums_are_exactly_the_six_release_files(self):
         rc, out = self.run_step("sums", "--previous", str(self.prev))
@@ -101,11 +173,10 @@ class ReleaseScript(unittest.TestCase):
             self.assertEqual(h, hashlib.sha256((self.dist / n).read_bytes()).hexdigest())
         self.assertEqual(self.log(), [f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev}"])
 
-    def test_sums_passes_another_signer(self):
-        other = "a" * 64
-        rc, out = self.run_step("sums", "--previous", str(self.prev), "--signer", other)
+    def test_sums_passes_the_version_when_given(self):
+        rc, out = self.run_step("sums", "--previous", str(self.prev), "--version", "0.13.9")
         self.assertEqual(rc, 0, out)
-        self.assertIn(f"--signer {other} ", self.log()[0])
+        self.assertEqual(self.log(), [f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev} --version 0.13.9"])
 
     def test_sums_stops_when_a_samsung_file_is_missing(self):
         (self.dist / "couch-tv-samsung.wgt").unlink()
@@ -119,23 +190,78 @@ class ReleaseScript(unittest.TestCase):
         self.assertEqual(rc, 5, out)
         self.assertIn("RELEASE CHECK FAILED", out)
 
-    # --- publish (4d): every check before anything leaves the computer
-    def publish(self, **env):
-        return self.run_step("publish", "--previous", str(self.prev), "--version", "9.9.9", **env)
+    # --- build (4a, M3, M4, L3)
+    def build(self, **env):
+        return self.run_step("build", "--previous", str(self.prev), **env)
+
+    def test_build_writes_the_commit_and_the_six_sums(self):
+        (self.dist / "BUILT-FROM").write_text("an older commit\n")
+        rc, out = self.build(GRADLE_LOCK=str(self.lock))
+        self.assertEqual(rc, 0, out)
+        self.assertEqual((self.dist / "BUILT-FROM").read_text().strip(), HEAD)
+        self.assertEqual([l.split()[1] for l in self.sums()], FILES)
+        self.assertEqual((self.dist / "couch-tv-ontv-watch.apk").read_text().strip(), f"{self.r}/on-tv/android watch")
+        log = self.log()
+        self.assertEqual(sum(1 for l in log if l.startswith("gradle -p")), 3)
+        self.assertEqual(log.count("gradle lock held"), 3)      # each gradle run under the lock
+        self.assertFalse(self.lock.exists())                   # and the lock given back
+        self.assertTrue(log[-1].startswith("check "))
+
+    def test_build_always_carries_the_example_config(self):
+        # M4: a CONFIG in the environment (this computer's own settings) is never built in
+        rc, out = self.build(CONFIG=str(self.r / "config.json"))
+        self.assertEqual(rc, 0, out)
+        home = [l for l in self.log() if l.startswith("gradle -p") and "tv-home/android" in l]
+        self.assertEqual(len(home), 1)
+        self.assertTrue(home[0].endswith(f"-PconfigJson={self.r}/config.example.json"), home[0])
+
+    def test_build_only_from_a_clean_tree(self):
+        for status in (" M scripts/release.sh", "?? new-file.txt"):
+            rc, out = self.build(FAKE_STATUS=status)
+            self.assertEqual(rc, 1, out)
+            self.assertFalse(any(l.startswith("gradle -p") for l in self.log()), status)
+
+    def test_a_failed_gradle_run_gives_the_lock_back(self):
+        rc, out = self.build(GRADLE_LOCK=str(self.lock), FAKE_GRADLE_RC="7")
+        self.assertEqual(rc, 7, out)
+        self.assertFalse(self.lock.exists())
+        self.assertFalse((self.dist / "BUILT-FROM").exists())
+
+    def test_a_killed_build_gives_the_lock_back(self):
+        # L3: killed in the middle of a gradle run, the EXIT trap still removes the lock it holds
+        rc, out = self.build(GRADLE_LOCK=str(self.lock), FAKE_GRADLE_KILL="1")
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("gradle lock held", self.log())
+        self.assertFalse(self.lock.exists())
+
+    def test_never_removes_a_lock_it_does_not_hold(self):
+        self.lock.mkdir()     # another agent's gradle run
+        rc, out = self.run_step("sums", "--previous", str(self.prev), GRADLE_LOCK=str(self.lock))
+        self.assertEqual(rc, 0, out)
+        self.assertTrue(self.lock.is_dir())
+        rc, out = self.run_step("sums", "--previous", str(self.prev), GRADLE_LOCK=str(self.lock), STUB_RC="1")
+        self.assertEqual(rc, 5, out)
+        self.assertTrue(self.lock.is_dir())
+
+    # --- publish (4d, M1, M2, M3): every check before anything leaves the computer
+    def publish(self, version="9.9.9", **env):
+        return self.run_step("publish", "--previous", str(self.prev), "--version", version, **env)
 
     def pushes(self):
-        return [l for l in self.log() if l.startswith("git ") and " push " in l or l.startswith("gh release create")]
+        return [l for l in self.log() if (l.startswith("git ") and " push " in l) or l.startswith("gh release create")]
 
     def test_publish_runs_every_check_before_the_push(self):
-        self.assertEqual(self.run_step("sums", "--previous", str(self.prev))[0], 0)
-        self.calls.unlink()
+        self.built()
         rc, out = self.publish()
         self.assertEqual(rc, 0, out)
         log = self.log()
         first_push = next(i for i, l in enumerate(log) if " push " in l)
         check = next(i for i, l in enumerate(log) if l.startswith("check "))
-        self.assertLess(check, first_push)
-        self.assertIn("--release --matter --signer " + CERT, log[check])
+        local_tag = next(i for i, l in enumerate(log) if "rev-parse -q --verify refs/tags/v9.9.9" in l)
+        remote_tag = next(i for i, l in enumerate(log) if "ls-remote --tags origin refs/tags/v9.9.9" in l)
+        auth = next(i for i, l in enumerate(log) if l == "gh auth status")
+        self.assertLess(max(check, local_tag, remote_tag, auth), first_push)
+        self.assertEqual(log[check], f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev} --version 9.9.9")
         self.assertTrue(any(l.startswith("git -C") and "push origin HEAD:main" in l for l in log))
         self.assertTrue(any("tag -a v9.9.9" in l for l in log))
         create = [l for l in log if l.startswith("gh release create v9.9.9")]
@@ -143,16 +269,57 @@ class ReleaseScript(unittest.TestCase):
         self.assertTrue(create[0].endswith(" ".join(FILES) + " SHA256SUMS.txt"), create[0])
         self.assertNotIn("stray.apk", create[0])
 
+    def test_publish_stops_on_a_badly_formed_version(self):
+        self.built()
+        for v in ("v0.13.9", "0.13.9-rc1", "0.13.9.1", "13", "0.13.x"):
+            (self.r / f"RELEASE-NOTES-{v}.md").write_text("notes\n")
+            rc, out = self.publish(version=v)
+            self.assertEqual(rc, 2, f"{v}: {out}")
+        self.assertEqual(self.log(), [])
+        for v in ("0.13", "0.13.9", "1.0.10"):
+            (self.r / f"RELEASE-NOTES-{v}.md").write_text("notes\n")
+            self.assertEqual(self.publish(version=v)[0], 0, v)
+
+    def test_publish_stops_when_the_tag_is_here(self):
+        self.built()
+        rc, out = self.publish(FAKE_LOCAL_TAG="1")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("already exists here", out)
+        self.assertEqual(self.pushes(), [])
+
+    def test_publish_stops_when_the_tag_is_on_github(self):
+        self.built()
+        rc, out = self.publish(FAKE_REMOTE_TAG="deadbeef\trefs/tags/v9.9.9\n")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("already on origin", out)
+        self.assertEqual(self.pushes(), [])
+
+    def test_publish_stops_when_gh_is_not_signed_in(self):
+        self.built()
+        rc, out = self.publish(FAKE_GH_AUTH="1")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("gh is not signed in", out)
+        self.assertEqual(self.pushes(), [])
+
+    def test_publish_stops_when_dist_is_from_another_commit(self):
+        self.built(head="f" * 40)
+        rc, out = self.publish()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("dist was not built from this commit: run build again", out)
+        self.assertEqual(self.pushes(), [])
+        (self.dist / "BUILT-FROM").unlink()
+        rc, out = self.publish()
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(self.pushes(), [])
+
     def test_publish_stops_when_the_check_fails(self):
-        self.assertEqual(self.run_step("sums", "--previous", str(self.prev))[0], 0)
-        self.calls.unlink()
+        self.built()
         rc, out = self.publish(STUB_RC="1")
         self.assertEqual(rc, 5, out)
         self.assertEqual(self.pushes(), [])
 
     def test_publish_stops_when_a_file_changed_after_the_sums(self):
-        self.assertEqual(self.run_step("sums", "--previous", str(self.prev))[0], 0)
-        self.calls.unlink()
+        self.built()
         (self.dist / "couch-tv-samsung-setup.zip").write_bytes(b"built again")
         rc, out = self.publish()
         self.assertEqual(rc, 5, out)
@@ -163,6 +330,7 @@ class ReleaseScript(unittest.TestCase):
         # what release-checksums.sh wrote before Samsung was added: 4 APK lines
         lines = [f"{hashlib.sha256((self.dist / n).read_bytes()).hexdigest()}  {n}" for n in FILES[:4]]
         (self.dist / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n")
+        (self.dist / "BUILT-FROM").write_text(HEAD + "\n")
         rc, out = self.publish()
         self.assertEqual(rc, 5, out)
         self.assertIn("6 lines", out)
@@ -172,20 +340,21 @@ class ReleaseScript(unittest.TestCase):
         names = FILES[:5] + ["stray.apk"]
         lines = [f"{hashlib.sha256((self.dist / n).read_bytes()).hexdigest()}  {n}" for n in names]
         (self.dist / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n")
+        (self.dist / "BUILT-FROM").write_text(HEAD + "\n")
         rc, out = self.publish()
         self.assertEqual(rc, 5, out)
         self.assertEqual(self.pushes(), [])
 
-    def test_publish_stops_with_uncommitted_changes(self):
-        self.assertEqual(self.run_step("sums", "--previous", str(self.prev))[0], 0)
-        self.calls.unlink()
-        rc, out = self.publish(FAKE_STATUS=" M scripts/release.sh")
-        self.assertEqual(rc, 1, out)
+    def test_publish_stops_with_uncommitted_or_untracked_files(self):
+        self.built()
+        for status in (" M scripts/release.sh", "?? new-file.txt"):
+            rc, out = self.publish(FAKE_STATUS=status)
+            self.assertEqual(rc, 1, f"{status}: {out}")
         self.assertEqual(self.pushes(), [])
+        self.assertFalse(any("--untracked-files" in l for l in self.log()))
 
     def test_publish_needs_a_version_and_notes(self):
-        self.assertEqual(self.run_step("sums", "--previous", str(self.prev))[0], 0)
-        self.calls.unlink()
+        self.built()
         rc, out = self.run_step("publish", "--previous", str(self.prev))
         self.assertEqual(rc, 2, out)
         rc, out = self.run_step("publish", "--previous", str(self.prev), "--version", "9.9.8")

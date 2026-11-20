@@ -29,10 +29,12 @@ The rules:
     Every processor folder has the same native libraries, or a TV of the other kind would start
     without one and stop the moment it is needed (Android installs only one folder). Intel folders
     may lack Matter alone (the app must say Matter is not available there, not crash), and may hold
-    a tiny placeholder library (16 KB or less, any name) that only keeps the folder there.
+    a tiny placeholder library (4 KB or less, any name) that only keeps the folder there.
  4. Where Matter is in an APK, it is there for both armeabi-v7a and arm64-v8a, with libc++_shared.so
     (--matter: it must be in both on-TV APKs).
- 5. Native libraries are compressed in every APK, and each APK is under its size limit.
+ 5. Native libraries are compressed in every APK, named lib*.so (Android unpacks nothing else), each
+    APK is under its size limit, and each on-TV processor folder unpacks to no more than the TV's free
+    space check counts (UNPACKED_MAX, the figures in on-tv UpdateRules.unpacked).
  6. couch-tv-ontv.apk and couch-tv-ontv-watch.apk are the same app, version name and versionCode (Make
     Home open Couch TV installs the watch copy of the very version the TV has). And each is the right
     one: couch-tv-ontv.apk asks for no accessibility service, couch-tv-ontv-watch.apk for exactly one
@@ -41,7 +43,9 @@ The rules:
     the key the TVs already have: Update now, the launcher's Updater and Android itself refuse another.
 
 Usage: python3 scripts/check-release-apks.py [dist] [--release] [--matter] [--signer SHA256]
-                                             [--previous OLD.apk] [--skip-signer]
+                                             [--previous OLD.apk] [--skip-signer] [--version X.Y.Z]
+--version: versionName of the home and on-TV APKs must be X.Y.Z; with --previous, the on-TV APK's
+versionCode must be higher than that one's.
 Needs the Android SDK's build tools (aapt2 and apksigner, ANDROID_HOME) for rules 6 and 7.
 """
 import argparse
@@ -78,13 +82,16 @@ def native(apk):
     return out
 
 
-PLACEHOLDER_MAX = 16 * 1024   # nl-matter-android's libmatternone.so: 1,300 (x86) and 1,880 (x86_64) bytes
+PLACEHOLDER_MAX = 4096   # nl-matter-android's libmatternone.so: 1,300 (x86) and 1,880 (x86_64) bytes
+# What Android unpacks per processor from an on-TV APK, the same figures as on-tv UpdateRules.unpacked():
+# the free space check on the TV counts these, so a release with more would fill a TV it said had room.
+UNPACKED_MAX = {"arm64-v8a": 15_700_000, "armeabi-v7a": 8_600_000, "x86_64": 2_600_000, "x86": 2_400_000}
 
 
 def placeholder(info):
     """A tiny library that only keeps a processor folder in the APK (the launcher's Intel folders):
-    decided by its size, not its name, so any name the build gives it works and a real library
-    (Conscrypt's smallest is about 10x this) never passes as one."""
+    decided by its size, not its name, so any name the build gives it works. Every real library in
+    these APKs is far bigger (the smallest, libspake2.so, is tens of KB)."""
     return info.file_size <= PLACEHOLDER_MAX
 
 
@@ -137,6 +144,16 @@ def check_libs(apk, need_matter=False, compressed=False):
     libs = native(apk)
     n = apk.name
     sets = {abi: set(v) for abi, v in libs.items()}
+    # Android only unpacks lib/<abi>/lib*.so: any other name stays in the APK and is never loaded
+    for abi, v in sorted(libs.items()):
+        for lib in sorted(v):
+            if not lib.startswith("lib"):
+                errs.append(f"{n}: lib/{abi}/{lib} does not start with \"lib\": Android never unpacks it")
+    if n in ONTV:
+        for abi, most in UNPACKED_MAX.items():
+            size = sum(i.file_size for i in libs.get(abi, {}).values())
+            if size > most:
+                errs.append(f"{n}: lib/{abi} unpacks to {size:,} bytes, over the {most:,} the TV's free space check counts (UpdateRules.unpacked)")
     if sets:
         for abi in ARM + INTEL:
             if abi not in sets:
@@ -239,7 +256,14 @@ def check_signer(dist, expect=None, previous=None):
     if not tool("apksigner"):
         return ["apksigner not found (set ANDROID_HOME), or pass --skip-signer"]
     errs = []
-    got = {p.name: signers(p) for p in sorted(dist.glob("*.apk"))}
+    got = {}
+    for p in sorted(dist.glob("*.apk")):
+        try:
+            got[p.name] = signers(p)
+        except RuntimeError as x:
+            errs.append(str(x))
+    if errs:
+        return errs
     keys = {tuple(v) for v in got.values()}
     if len(keys) > 1:
         errs.append("the APKs are signed with different keys: " + "; ".join(f"{k} {v[0][:12]}" for k, v in got.items()))
@@ -247,11 +271,44 @@ def check_signer(dist, expect=None, previous=None):
     if expect:
         want.append(expect.lower())
     if previous:
-        want += signers(Path(previous))
+        try:
+            want += signers(Path(previous))
+        except RuntimeError as x:
+            errs.append(f"--previous: {x}")
     for w in want:
         for n, v in got.items():
             if w not in v:
                 errs.append(f"{n} is not signed with the key TVs already have ({w[:12]}...): they would refuse it")
+    return errs
+
+
+def check_version(dist, version, previous=None, badge=None):
+    """The release's version is the one inside: versionName of couch-tv-home.apk and couch-tv-ontv.apk
+    equal --version, and couch-tv-ontv.apk's versionCode is higher than last release's (--previous), or
+    Update now and Android would not take it as an update."""
+    badge = badge or badging
+    if badge is badging and not tool("aapt2"):
+        return ["aapt2 not found (set ANDROID_HOME): cannot check the version inside the APKs"]
+    errs = []
+    for n in ["couch-tv-home.apk", "couch-tv-ontv.apk"]:
+        p = dist / n
+        if not p.is_file():
+            continue
+        try:
+            _, code, name = badge(p)
+        except (RuntimeError, subprocess.CalledProcessError) as x:
+            errs.append(f"{n}: cannot read its version ({x})")
+            continue
+        if name != version:
+            errs.append(f"{n} is version {name}, not {version}: built from the wrong commit?")
+        if n == "couch-tv-ontv.apk" and previous:
+            try:
+                _, old, oldname = badge(Path(previous))
+            except (RuntimeError, subprocess.CalledProcessError) as x:
+                errs.append(f"--previous: cannot read its version ({x})")
+                continue
+            if code <= old:
+                errs.append(f"{n} has versionCode {code}, not higher than last release's {old} ({oldname}): TVs would not update")
     return errs
 
 
@@ -263,6 +320,7 @@ def main(argv=None):
     ap.add_argument("--signer", help="SHA-256 of the signing certificate TVs already have")
     ap.add_argument("--previous", help="last release's APK: the same signer")
     ap.add_argument("--skip-signer", action="store_true")
+    ap.add_argument("--version", help="the release's version: versionName of the home and on-TV APKs")
     a = ap.parse_args(argv)
     dist = Path(a.dist)
     errs = check_names(dist) + check_sums(dist, a.release)
@@ -273,6 +331,8 @@ def main(argv=None):
     errs += check_plain_and_watch(dist)
     if not a.skip_signer:
         errs += check_signer(dist, a.signer, a.previous)
+    if a.version:
+        errs += check_version(dist, a.version, a.previous)
     for p in sorted(dist.glob("*.apk")):
         libs = native(p)
         m = "Matter " + "+".join(abi for abi in ARM if "libCHIPController.so" in libs.get(abi, {})) if any(
