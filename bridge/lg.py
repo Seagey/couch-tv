@@ -868,9 +868,9 @@ class LGTV:
     # (devmode_* in tv-home/web/i18n.js and remote/src/i18n.js). The English text below is also sent,
     # for a TV home or phone that is older than these keys.
     DEVMODE_WARNINGS = {
-        "devmode_gone": "couch-tv is no longer installed on the TV. Developer Mode probably ran out. "
-                        "Switch Developer Mode on again and ask Claude to reinstall couch-tv.",
-        "devmode_runs_out": "Developer Mode runs out in {days} days, and then LG removes couch-tv. "
+        "devmode_gone": "Couch TV is no longer installed on the TV. Developer Mode probably ran out. "
+                        "Switch Developer Mode on again, then ask whoever set up Couch TV to put it back.",
+        "devmode_runs_out": "Developer Mode runs out in {days} days, and then LG removes Couch TV. "
                             "Turn the TV on for a minute so it can be renewed, or press Extend in the "
                             "Developer Mode app on the TV.",
         "devmode_not_renewed_left": "Developer Mode has not been renewed for {days} days ({left} days left). "

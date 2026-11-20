@@ -203,12 +203,12 @@ async function about(page) {
   const rows = await about(page);
   ok(!/With a home computer/.test(rows) && /On its own, no computer/.test(rows), "on-TV app: Running says no computer (" + rows.slice(0, 200) + ")");
   ok(!/On this TV and the home computer/.test(rows) && /On this TV/.test(rows), "on-TV app: settings are kept on this TV");
-  ok(/Update couch-tv/.test(rows) && /Version 0\.4 is out \(this TV has 0\.3\)/.test(rows), "About: Update couch-tv with the version line");
+  ok(/Update Couch TV/.test(rows) && /Version 0\.4 is out \(this TV has 0\.3\)/.test(rows), "About: Update Couch TV with the version line");
   await page.keyboard.press("ArrowRight"); await page.waitForTimeout(200);
-  for (let i = 0; i < 12 && !/^Update couch-tv/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "")); i++) { await page.keyboard.press("ArrowDown"); await page.waitForTimeout(120); }
+  for (let i = 0; i < 12 && !/^Update Couch TV/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "")); i++) { await page.keyboard.press("ArrowDown"); await page.waitForTimeout(120); }
   await page.keyboard.press("Enter"); await page.waitForTimeout(400);
   const up = await page.evaluate(() => document.getElementById("set-rows").textContent);
-  ok(await page.evaluate(() => document.getElementById("set-head").textContent) === "Update couch-tv", "OK opens the Update couch-tv page");
+  ok(await page.evaluate(() => document.getElementById("set-head").textContent) === "Update Couch TV", "OK opens the Update couch-tv page");
   ok(/Downloader/.test(up) && /8180170/.test(up) && /cannot install an update by itself/.test(up), "it gives the Downloader steps and code (" + up.slice(0, 240) + ")");
   ok(!/Update to 0\.4/.test(up), "and no Update to button that could not work");
   // a TCL, 20 Nov 2026: the page opened scrolled to its first button and step 1 was off the top,
@@ -234,7 +234,7 @@ async function about(page) {
   const page = await home(null, "&update=1");
   await page.keyboard.press("Escape"); await page.waitForTimeout(300);
   const rows = await about(page);
-  ok(/Update couch-tv/.test(rows) && /With the computer|Computer/.test(rows), "launcher: About has Update couch-tv, and the computer line is unchanged");
+  ok(/Update Couch TV/.test(rows) && /With a home computer|Home computer/.test(rows), "launcher: About has Update Couch TV, and the computer line is unchanged");
   await page.close();
 }
 

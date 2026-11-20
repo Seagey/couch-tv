@@ -125,7 +125,7 @@ for (const c of CASES) {
     for (let i = 0; i < 20 && !/^Commute, /.test(await page.evaluate(() => (document.querySelector("#set-rows .srow.focus") || {}).textContent || "")); i++) await press(page, "ArrowDown", 100);
     await press(page, "Enter", 400);
     const txt = await page.evaluate(() => document.getElementById("settings").innerText);
-    ok(/Where to/.test(txt) && /Parramatta/.test(txt) && /Never in a design, never sent to couch-tv/.test(txt) && /Forget where you drive to/.test(txt), "commute: its page has Where to, the place, kept on the TV, and Forget (" + txt.replace(/\s+/g, " ").slice(0, 400) + ")");
+    ok(/Where to/.test(txt) && /Parramatta/.test(txt) && /Never in a design, never sent to Couch TV/.test(txt) && /Forget where you drive to/.test(txt), "commute: its page has Where to, the place, kept on the TV, and Forget (" + txt.replace(/\s+/g, " ").slice(0, 400) + ")");
     await page.screenshot({ path: path.join(SHOTS, "commute-settings.png") });
     ok(!/Parramatta/.test(await page.evaluate(() => localStorage.getItem("tvdesigner.design") + localStorage.getItem("mock:tvhome.settings"))), "commute: the place is in neither the design nor the settings the bridge keeps");
   }

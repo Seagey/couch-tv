@@ -369,11 +369,11 @@ class HomeActivity : Activity() {
             ask(code)?.let { return it }
             if (live() != null) return JSONObject().put("ok", false).put("error", "The TV home did not answer. Try again.")
             if (edit.has("lists") || edit.has("guide"))
-                return JSONObject().put("ok", false).put("refused", true).put("error", "Open the couch-tv home on the TV first, then save again.")
+                return JSONObject().put("ok", false).put("refused", true).put("error", "Open the Couch TV home on the TV first, then save again.")
             synchronized(waitLock) {
                 val list = waiting()
                 if (list.length() >= WAIT_MAX) return JSONObject().put("ok", false).put("refused", true)
-                    .put("error", "The TV is holding $WAIT_MAX changes already. Open the couch-tv home on the TV, then save again.")
+                    .put("error", "The TV is holding $WAIT_MAX changes already. Open the Couch TV home on the TV, then save again.")
                 Store.putStr(WAIT_KEY, list.put(edit).toString())
             }
             return null

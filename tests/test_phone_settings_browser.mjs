@@ -71,7 +71,7 @@ const server = http.createServer((req, res) => {
       if (route === "POST /api/athome") {
         const e = body().edit; got.athome.push(e);
         if ("note" in e) AH.note = e.note;
-        if (!AH_LIVE) return ("lists" in e || "guide" in e) ? send(res, 409, { ok: false, error: "Open the couch-tv home on the TV first, then save again." }) : send(res, 200, { ok: true, live: false, queued: true });
+        if (!AH_LIVE) return ("lists" in e || "guide" in e) ? send(res, 409, { ok: false, error: "Open the Couch TV home on the TV first, then save again." }) : send(res, 200, { ok: true, live: false, queued: true });
         if ("lists" in e) AH.lists = e.lists;
         if ("guide" in e) AH.guide = e.guide;
         if ("cal_url" in e) AH.cal = e.cal_url ? { host: new URL(e.cal_url).hostname } : null;
@@ -244,10 +244,10 @@ for (const [q, what] of [["", "a TV the computer bridge drives"], ["&offline=1",
   await page.waitForFunction(() => document.getElementById("ah-lists-save").disabled);
   ok(await page.evaluate(() => ["ah-list-add", "ah-lists-save", "ah-guide-add", "ah-guide-save"].every((id) => document.getElementById(id).disabled)),
     "with the TV's home not open, Add and Save for the lists and the guide are off");
-  ok(/once the couch-tv home is open/.test(await page.textContent("#ah-lists-msg")), "and the page says why");
+  ok(/once the Couch TV home is open/.test(await page.textContent("#ah-lists-msg")), "and the page says why");
   ok(!(await page.isDisabled("#ah-note-save")), "a note can still be sent, to wait on the TV");
   await page.fill("#ah-note", "Gone to the beach"); await page.click("#ah-note-save");
-  await page.waitForFunction(() => /as soon as the couch-tv home is open/.test(document.getElementById("ah-note-msg").textContent));
+  await page.waitForFunction(() => /as soon as the Couch TV home is open/.test(document.getElementById("ah-note-msg").textContent));
   ok(true, "a waiting note says it reaches the TV once its home opens");
   AH_LIVE = true;
   // use as home screen
