@@ -276,6 +276,7 @@ release opens the app rather than the show.
   "clock": "12h",
   "dock_size": 10,
   "hide_packages": [],
+  "show_packages": [],
   "language": "en"
 }
 ```
@@ -291,6 +292,7 @@ release opens the app rather than the show.
 | `idle_photo_seconds` [`0`] | `0` leaves rows on. `5`, `10`, `15`, `30` or `60` fades out the app dock, Keep watching and profile controls after that many seconds without input. The clock, weather and background scenes stay visible. Any remote button wakes the rows without opening the focused app. Home settings, Look, Hide rows when idle wins over it. |
 | `keep_photo` [`false`] | Classic look only. `true` stops the background changing and holds one photo, the one showing when it was switched on. In Home settings, Look, Keep one photo you can then pick which photo it holds, and the TV remembers it after a restart (if that photo is later removed it goes back to the usual photo for the time of day). Night and OLED are unaffected. Home settings wins over it. |
 | `hide_packages` [none] | Android package names never shown on the home or in More apps, for a maker's own clutter (help apps, file browsers, screen sharing tools). `survey-tv.py` lists every TV app with its package name. For example `["com.example.tvhelp"]`. |
+| `show_packages` [none] | Android package names to show even though the home hides them by default (the Google TV app, `com.google.android.videos`, for example: `["com.google.android.videos"]`). Use it for apps you actually want back. |
 | `updates` [none: the TV asks once] | The answer to "tell you when a new couch-tv version is out?", asked at setup: `notify` (the TV home looks on GitHub once a week and puts a dot on the gear tile) or `manual` (nothing by itself; Home settings, Updates, Check for updates now). Used only until the TV has an answer; after that the switch in Home settings, Updates wins. Option C has no updates. |
 | `glass` [`off`] | Glass panels behind the clock, Keep watching and the apps: `on` (clear, softly blurred, with a light edge), `lite` (the same panels with no blur, for older or slower TVs) or `off`. Home settings, Look, Glass panels wins over it. |
 | `glass_icons` [`false`] | `true`: Apple style clear app icons. Each app's symbol is cut from its own background and drawn in light glass on a glass tile, and the app you are on shows its own colours. An icon that will not cut cleanly (a photo) is shown grey and half see-through instead. Works with `glass` on or off, and the phone remote's app grid follows it. Home settings, Look, Glass app icons wins over it. |

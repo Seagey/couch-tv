@@ -555,6 +555,11 @@
     (Array.isArray(HOME.hide_packages) ? HOME.hide_packages : []).forEach(function (p) {
       if (typeof p === "string" && HIDDEN.indexOf(p) < 0) HIDDEN.push(p);
     });
+    // home.show_packages: bring an app back that the built-in list hides (the Google TV app, say). Never this app itself.
+    (Array.isArray(HOME.show_packages) ? HOME.show_packages : []).forEach(function (p) {
+      var i = typeof p === "string" && p !== "app.couchtv.launcher" ? HIDDEN.indexOf(p) : -1;
+      if (i >= 0) HIDDEN.splice(i, 1);
+    });
     HIDDEN_TV = (Array.isArray(ST.hidden_apps) ? ST.hidden_apps : []).filter(function (p) { return typeof p === "string"; });
     SCENE_LIB = BUILT_IN.concat(myScenes(HOME.my_scenes));
     var st = sceneState();
