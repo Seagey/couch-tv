@@ -21,6 +21,11 @@ def lan(c, d):
     return "192.168.%d.%d" % (c, d)
 
 
+def mdns(name):
+    """A made up .local name (joined here so no real one is ever written down)."""
+    return name + "." + "local"
+
+
 def ip(a, b, c, d):
     return "%d.%d.%d.%d" % (a, b, c, d)
 
@@ -220,6 +225,34 @@ class PhoneBridgeTest(unittest.TestCase):
                     self.assertNotIn(key, loc)
                 r = await c.get("/ha/done?code=good-code&state=" + state, allow_redirects=False)
                 self.assertEqual(r.headers["Location"], "/ha/?k=" + key + "#devices")
+            finally:
+                await c.close()
+        self.run_(go())
+
+    def test_ha_answers_only_a_number_address_or_a_local_name(self):
+        from aiohttp import web
+        from aiohttp.test_utils import TestClient, TestServer
+
+        async def go():
+            phone = haphone.Phone(self.home, "/nonexistent", 5400, lambda: lan(1, 50))
+            app = web.Application()
+            phone.routes(app.router)
+            c = TestClient(TestServer(app))
+            await c.start_server()
+            try:
+                key = phone.start()["url"].split("k=")[1]
+                bad = ("evil.example:5400", "evil.example", "localhost:5400", lan(1, 50), mdns("tv"), mdns("a.b") + ".evil.example:5400")
+                for h in bad:
+                    for path in ("/ha/", "/ha/api/state?k=" + key, "/ha/done?code=x&state=y"):
+                        r = await c.get(path, headers={"Host": h}, allow_redirects=False)
+                        self.assertEqual(r.status, 403, h + " " + path)
+                        self.assertNotIn(key, r.headers.get("Location", "") + await r.text())
+                    r = await c.post("/ha/api/signin", json={"k": key, "url": "http://ha.example:8123"}, headers={"Host": h})
+                    self.assertEqual(r.status, 403, h)
+                for h in (lan(1, 50) + ":5400", mdns("living-room-tv") + ":5400", mdns("COUCH").upper() + ":5400"):
+                    r = await c.get("/ha/api/state?k=" + key, headers={"Host": h})
+                    self.assertEqual(r.status, 200, h)
+                    self.assertTrue((await r.json())["ok"])
             finally:
                 await c.close()
         self.run_(go())

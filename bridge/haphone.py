@@ -25,7 +25,6 @@ import base64
 import hashlib
 import hmac
 import ipaddress
-import json
 import os
 import re
 import secrets
@@ -40,6 +39,13 @@ import smarthome
 LIFE = 30 * 60
 SIGN_IN = 10 * 60
 HOST = re.compile(r"(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})")
+# a Host header /ha answers (HaPhone.kt HOST_OK): a number address or a .local name, with the port. A web page
+# elsewhere cannot point a name of its own at this computer and use the set up.
+HOST_OK = re.compile(r"(\d{1,3}(?:\.\d{1,3}){3}|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.local):(\d{1,5})", re.I)
+
+
+def host_ok(host):
+    return bool(HOST_OK.fullmatch((host or "").strip()))
 
 
 def b64url(b):
@@ -79,9 +85,8 @@ def client_for(host, own_ip, port, own=None):
 
 
 def authorize_url(base, client, state, chal):
-    q = {"response_type": "code", "client_id": client, "redirect_uri": client + "ha/done", "state": state}
-    if chal:
-        q.update(code_challenge=chal, code_challenge_method="S256")
+    q = {"response_type": "code", "client_id": client, "redirect_uri": client + "ha/done", "state": state,
+         "code_challenge": chal, "code_challenge_method": "S256"}
     return base + "/auth/authorize?" + urllib.parse.urlencode(q)
 
 
@@ -148,14 +153,6 @@ async def probe(home, base):
     return "not_ha"
 
 
-async def pkce(home, base):
-    code, data = await home.call(base, "", "GET", "/.well-known/oauth-authorization-server", None, 64 * 1024)
-    try:
-        return code == 200 and "S256" in json.loads(data.decode()).get("code_challenge_methods_supported", [])
-    except Exception:
-        return False
-
-
 class Phone:
     def __init__(self, home, web_dir, port, own_ip, on_change=None):
         self.home, self.web_dir, self.port, self.own_ip = home, web_dir, port, own_ip
@@ -211,15 +208,21 @@ class Phone:
                             headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff"})
 
     def routes(self, r):
-        r.add_get("/ha", self.h_page)
-        r.add_get("/ha/", self.h_page)
-        r.add_get("/ha/ha-picks.js", self.h_picks)
-        r.add_get("/ha/done", self.h_done)
-        r.add_get("/ha/api/state", self.h_state)
-        r.add_post("/ha/api/signin", self.h_signin)
-        r.add_get("/ha/api/devices", self.h_devices)
-        r.add_post("/ha/api/save", self.h_save)
-        r.add_post("/ha/api/forget", self.h_forget)
+        def guard(h):
+            async def g(request):
+                if not host_ok(request.host):
+                    return web.Response(status=403, text="Forbidden", headers={"Cache-Control": "no-store"})
+                return await h(request)
+            return g
+        r.add_get("/ha", guard(self.h_page))
+        r.add_get("/ha/", guard(self.h_page))
+        r.add_get("/ha/ha-picks.js", guard(self.h_picks))
+        r.add_get("/ha/done", guard(self.h_done))
+        r.add_get("/ha/api/state", guard(self.h_state))
+        r.add_post("/ha/api/signin", guard(self.h_signin))
+        r.add_get("/ha/api/devices", guard(self.h_devices))
+        r.add_post("/ha/api/save", guard(self.h_save))
+        r.add_post("/ha/api/forget", guard(self.h_forget))
 
     async def h_picks(self, request):
         return self._file("ha-picks.js", "application/javascript")
@@ -263,7 +266,7 @@ class Phone:
         verifier = secrets.token_urlsafe(32)
         state = secrets.token_urlsafe(16)
         s["pending"] = {"state": state, "verifier": verifier, "base": base, "client": client, "at": time.time()}
-        return self._json({"ok": True, "go": authorize_url(base, client, state, challenge(verifier) if verifier else None)})
+        return self._json({"ok": True, "go": authorize_url(base, client, state, challenge(verifier))})
 
     async def h_done(self, request):
         # every failure before the state checks out goes to /ha/?e=expired with no key: only the phone that
@@ -281,9 +284,7 @@ class Phone:
         code = request.query.get("code", "")
         if not code or len(code) > 512:
             raise web.HTTPFound(back + "&e=denied")
-        form = {"grant_type": "authorization_code", "code": code, "client_id": p["client"]}
-        if p["verifier"]:
-            form["code_verifier"] = p["verifier"]
+        form = {"grant_type": "authorization_code", "code": code, "client_id": p["client"], "code_verifier": p["verifier"]}
         status, t = await self.home.form(p["base"] + "/auth/token", form)
         if status != 200 or not isinstance(t, dict) or not smarthome.TOKEN.fullmatch(str(t.get("access_token") or "")):
             raise web.HTTPFound(back + "&e=" + ("unreachable" if status == -1 else "signin"))

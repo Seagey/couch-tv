@@ -347,20 +347,30 @@ class MainActivity : Activity() {
     /**
      * With no computer at home (option A), this TV serves the phone's Home settings page itself
      * (PhoneServer.kt) on the home Wi-Fi, port 5400 (5401 if that is taken). With a computer, the computer
-     * serves it (bridge/phonepage.py), so nothing listens here. One server for the life of the app. It also
-     * answers smart home set up from a phone (/ha, PhoneHost.ha), so HaServer.kt does not start beside it.
+     * serves it (bridge/phonepage.py), so nothing listens here. One server at a time. It also answers smart
+     * home set up from a phone (/ha, PhoneHost.ha), so HaServer.kt does not start beside it. It listens on
+     * the home network address only, never every interface: with no Wi-Fi yet it waits, and when the address
+     * changes it starts again on the new one (phoneFresh, when the QR or the port is next asked for).
      */
     private fun startPhonePage() {
-        if (!alone() || phone != null) return
-        val store = object : PhoneAuth.Store {
-            private val sp = applicationContext.getSharedPreferences("phonepage", MODE_PRIVATE)
-            override fun get(key: String): String? = sp.getString(key, null)
-            override fun put(key: String, value: String?) { sp.edit().apply { if (value == null) remove(key) else putString(key, value) }.apply() }
-        }
-        val auth = PhoneAuth(store)
-        for (port in listOf(PhoneServer.PORT, PhoneServer.PORT + 1)) {
-            val srv = PhoneServer(PhoneHost(applicationContext), auth, port)
-            if (runCatching { srv.start(fi.iki.elonen.NanoHTTPD.SOCKET_READ_TIMEOUT, true) }.isSuccess) { phone = srv; return }
+        if (!alone()) return
+        phoneStart = { startPhonePage() }
+        synchronized(Companion) {
+            val lan = PhoneServer.lanAddress() ?: return
+            val old = phone
+            if (old != null && old.isAlive && lan == phoneAt) return
+            val store = object : PhoneAuth.Store {
+                private val sp = applicationContext.getSharedPreferences("phonepage", MODE_PRIVATE)
+                override fun get(key: String): String? = sp.getString(key, null)
+                override fun put(key: String, value: String?) { sp.edit().apply { if (value == null) remove(key) else putString(key, value) }.apply() }
+            }
+            val auth = old?.auth ?: PhoneAuth(store)   // the same pairing state and lock across a new address
+            old?.let { runCatching { it.stop() } }
+            phone = null; phoneAt = null
+            for (port in listOf(PhoneServer.PORT, PhoneServer.PORT + 1)) {
+                val srv = PhoneServer(PhoneHost(applicationContext), auth, port, lan)
+                if (runCatching { srv.start(fi.iki.elonen.NanoHTTPD.SOCKET_READ_TIMEOUT, true) }.isSuccess) { phone = srv; phoneAt = lan; return }
+            }
         }
     }
 
@@ -736,7 +746,7 @@ class MainActivity : Activity() {
         /** The phone's Home settings page on this TV with no computer (PhoneServer.kt): its address with a
          *  pairing code, for Home settings' QR and Hold OK, Edit on your phone. "null": no page here. */
         @JavascriptInterface
-        fun phoneLink(): String = phone?.link(PhoneServer.lanAddress())?.toString() ?: "null"
+        fun phoneLink(): String { phoneFresh(); return phone?.link(PhoneServer.lanAddress())?.toString() ?: "null" }
 
         /** Opens an http(s) web link in the TV's browser (used by custom cards with a url). */
         @JavascriptInterface
@@ -1908,11 +1918,20 @@ class MainActivity : Activity() {
 
     companion object {
         @Volatile private var shown: java.lang.ref.WeakReference<MainActivity>? = null
-        /** The phone's Home settings page with no computer (option A), started once for the app's life. */
+        /** The phone's Home settings page with no computer (option A), on the home network address [phoneAt]. */
         @Volatile private var phone: PhoneServer? = null
+        @Volatile private var phoneAt: String? = null
+        /** Starts it again (MainActivity.startPhonePage): set while a home with no computer is open. */
+        @Volatile private var phoneStart: (() -> Unit)? = null
+
+        /** Not started yet (no Wi-Fi when the home opened) or the TV's home network address changed: start it on the new one. */
+        private fun phoneFresh() {
+            val lan = PhoneServer.lanAddress() ?: return
+            if (phone?.isAlive != true || lan != phoneAt) phoneStart?.invoke()
+        }
 
         /** The port of the phone's Home settings page server while it runs (it serves /ha too), else null. */
-        fun phonePagePort(): Int? = phone?.takeIf { it.isAlive }?.listeningPort?.takeIf { it > 0 }
+        fun phonePagePort(): Int? { phoneFresh(); return phone?.takeIf { it.isAlive }?.listeningPort?.takeIf { it > 0 } }
 
         /** True while the home is resumed (in front). FireWatch checks this after a move to front on Android 10 (issue #202). */
         fun isInFront(): Boolean = shown?.get()?.resumed == true

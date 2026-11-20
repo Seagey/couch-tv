@@ -15,7 +15,7 @@ import java.security.SecureRandom
  * swaps that code for an access token (30 minutes) and a refresh token, and keeps the refresh
  * token in its own private store. The phone never sees either token.
  *
- * PKCE (S256) is used when Home Assistant says it supports it (/.well-known/oauth-authorization-server).
+ * PKCE S256 always (a Home Assistant too old to say it takes it ignores it, so it is never dropped).
  * Every call goes to the one address the person picked, never follows a redirect, and gives up after
  * a few seconds. No token is ever logged.
  */
@@ -61,10 +61,10 @@ object HaAuth {
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
     /** Where the phone goes to sign in. */
-    fun authorizeUrl(base: String, client: String, redirect: String, state: String, challenge: String?): String {
+    fun authorizeUrl(base: String, client: String, redirect: String, state: String, challenge: String): String {
         val q = StringBuilder("response_type=code&client_id=").append(enc(client)).append("&redirect_uri=").append(enc(redirect))
             .append("&state=").append(enc(state))
-        if (challenge != null) q.append("&code_challenge=").append(enc(challenge)).append("&code_challenge_method=S256")
+        q.append("&code_challenge=").append(enc(challenge)).append("&code_challenge_method=S256")
         return "$base/auth/authorize?$q"
     }
 
@@ -122,7 +122,7 @@ object HaAuth {
         }
     }
 
-    /** Does this Home Assistant take PKCE (S256)? Older ones do not say, and then none is sent. */
+    /** Does this Home Assistant say it takes PKCE (S256)? Only the tests ask (HaRealTest checks a real one does); the sign in always sends S256. */
     fun pkce(base: String): Boolean {
         val (code, body) = http("GET", "$base/.well-known/oauth-authorization-server", null)
         if (code != 200 || body == null) return false
@@ -141,9 +141,9 @@ object HaAuth {
     }
 
     /** The one time code from the phone, swapped for the tokens. 401: the code or the verifier was refused. */
-    fun exchange(base: String, code: String, client: String, verifier: String?): Pair<Int, Tokens?> {
+    fun exchange(base: String, code: String, client: String, verifier: String): Pair<Int, Tokens?> {
         val form = linkedMapOf("grant_type" to "authorization_code", "code" to code, "client_id" to client)
-        if (verifier != null) form["code_verifier"] = verifier
+        form["code_verifier"] = verifier
         val (c, b) = http("POST", "$base/auth/token", form)
         return tokens(c, b)
     }

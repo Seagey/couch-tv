@@ -25,7 +25,7 @@ import java.net.NetworkInterface
  *
  * Plain NanoHTTPD and org.json: the Android parts are behind Host, so this is unit tested off a TV.
  */
-class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : NanoHTTPD(port) {
+class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int, bind: String? = null) : NanoHTTPD(bind, port) {
     interface Host {
         /** A file bundled in the app (www/ontv/setup.html, www/ontv/shim.js), or null. */
         fun asset(path: String): InputStream?

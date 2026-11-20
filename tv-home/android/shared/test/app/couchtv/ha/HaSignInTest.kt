@@ -44,7 +44,6 @@ class HaSignInTest {
         assertTrue(u.startsWith("http://${lan(1, 20)}:8123/auth/authorize?response_type=code&client_id=http%3A%2F%2F${lan(1, 50)}%3A5400%2F"))
         assertTrue(u.contains("&redirect_uri=http%3A%2F%2F${lan(1, 50)}%3A5400%2Fha%2Fdone&state=st4te"))
         assertTrue(u.endsWith("&code_challenge=chal&code_challenge_method=S256"))
-        assertFalse(HaAuth.authorizeUrl("http://h:8123", "http://c:1/", "http://c:1/ha/done", "s", null).contains("code_challenge"))
     }
 
     private val access1 = "access-one-made-up-for-a-test-000001"
@@ -82,9 +81,9 @@ class HaSignInTest {
         assertEquals(1800L, t.expiresIn)
         assertEquals("the-verifier", posts.last()["code_verifier"])
         assertEquals("http://${lan(1, 50)}:5400/", posts.last()["client_id"])
-        val (bad, none) = HaAuth.exchange("http://ha.example:8123", "used-code", "http://${lan(1, 50)}:5400/", null)
+        val (bad, none) = HaAuth.exchange("http://ha.example:8123", "used-code", "http://${lan(1, 50)}:5400/", "another-verifier")
         assertEquals(401, bad); assertNull(none)
-        assertFalse(posts.last().containsKey("code_verifier"))
+        assertEquals("another-verifier", posts.last()["code_verifier"])   // PKCE is always sent
     }
 
     @Test fun notHomeAssistantOrNotReady() {

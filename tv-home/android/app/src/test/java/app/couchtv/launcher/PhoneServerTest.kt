@@ -330,6 +330,22 @@ class PhoneServerTest {
         assertEquals(200, call("GET", "/setup").status)
     }
 
+    @Test fun itListensOnTheOneAddressItIsGivenOnly() {
+        // the Couch TV home binds the home network address (MainActivity.startPhonePage); here loopback stands in
+        val other = java.net.NetworkInterface.getNetworkInterfaces().toList().filter { it.isUp && !it.isLoopback }
+            .flatMap { it.inetAddresses.toList() }.filterIsInstance<java.net.Inet4Address>().firstOrNull()?.hostAddress
+        val one = PhoneServer(host, PhoneAuth(store), 0, "127.0.0.1")
+        one.start(5000, true)
+        try {
+            val p = one.listeningPort
+            Socket("127.0.0.1", p).close()   // reached on the address it was given
+            if (other != null) {
+                val refused = runCatching { Socket().use { it.connect(java.net.InetSocketAddress(other, p), 1000) } }.isFailure
+                assertTrue("not reachable on $other:$p", refused)
+            }
+        } finally { one.stop() }
+    }
+
     @Test fun aFailedReturnFromHomeAssistantNeverCarriesTheKeyHereEither() {
         val key = app.couchtv.ha.HaPhone.startForTest("203.0.113.50", port)
         for (q in listOf("", "?code=x", "?code=x&state=forged", "?code=x&state=")) {

@@ -46,5 +46,22 @@ Green on 21 Nov (real Home Assistant = MacBook ha-haqr through the tunnel on 181
   Home Assistant's real sign in page (4 forged /ha/done with no key, "That took too long. Try again.").
 - MacBook ha-haqr and colima stopped again, tunnel closed, emulator killed.
 
+## Checker GO on 22c01be, then lows 4 to 7 (21 Nov)
+House name filter lines left alone (ws2-smarthome owns the new rule).
+4 PKCE S256 always: HaAuth.authorizeUrl/exchange and HaPhone.Pending take a non null challenge/verifier; HaAuth.pkce()
+  kept for the tests only (HaRealTest asserts a real HA takes S256); haphone.py: authorize_url always sends it, the
+  `if verifier` branches and the unused pkce() probe gone. HaSignInTest updated (11 tests).
+5 HaServer: one request (line, headers, body) must arrive within requestMs (10 s, System.nanoTime, soTimeout never past
+  it, 5 s per read); ThreadPoolExecutor(8, 8, 0 ms, ArrayBlockingQueue(16)), a connection beyond that is closed at once
+  (hand()). HaServerTest 5: whole request, slow drip headers, slow drip body, silent 5 s, full pool closes 6 of 30.
+6 PhoneServer binds the home network address (PhoneServer(..., bind)); MainActivity starts it again on a new address
+  (phoneFresh from phonePagePort/phoneLink), keeps the same PhoneAuth, waits while there is no Wi-Fi.
+  PhoneServerTest 22 (new: listens on the one address given). Emulator: /proc shows only the emulator home network address; phone reached with
+  `adb emu redir add tcp:15402:<port>` (adb forward to 127.0.0.1 no longer reaches it, as intended).
+7 bridge/haphone.py: /ha* answers 403 unless the Host is a number address or a .local name with a port (HOST_OK, as
+  Kotlin; port not compared, so a mapped port still works). test_ha_phone_bridge 13 (new Host test: 6 bad hosts x 4 calls).
+Pillow: test_phone_page_bridge 36 tests, 0 skipped, in a venv with bridge/requirements.txt (scratchpad haqr/venv-pillow;
+  the system python3 also has Pillow 12.2, so the earlier 36 included the 4 photo tests).
+
 ## Left
-Nothing. Done 21 Nov.
+Nothing.

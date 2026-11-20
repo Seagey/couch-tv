@@ -21,7 +21,7 @@ import java.security.MessageDigest
 object HaPhone {
     class Reply(val status: Int, val type: String, val body: ByteArray, val location: String? = null)
 
-    private class Pending(val state: String, val verifier: String?, val base: String, val client: String, val at: Long)
+    private class Pending(val state: String, val verifier: String, val base: String, val client: String, val at: Long)
     private class Session(val key: String, val port: Int, val tvIp: String?, val until: Long) {
         @Volatile var found: List<HaFind.Found> = emptyList()
         @Volatile var scanning = true

@@ -10,7 +10,10 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLDecoder
-import java.util.concurrent.Executors
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 /**
  * Smart home set up from a phone when the launcher runs no other server. With no computer at home
@@ -30,8 +33,17 @@ object HaServer {
     internal val PORTS = 5402..5409
     @Volatile private var socket: ServerSocket? = null
     @Volatile private var lastAsked = 0L
-    // enough for a phone page and its few files at once; a slow or silent client gives up after 5 s
-    private val pool = Executors.newFixedThreadPool(8)
+    // enough for a phone page and its few files at once: 8 at work and 16 waiting; more than that and the
+    // connection is closed at once. A silent client is dropped after 5 s, a slow one after 10 s in all.
+    private val pool = ThreadPoolExecutor(8, 8, 0, TimeUnit.MILLISECONDS, ArrayBlockingQueue(16))
+    /** The most one request (its first line, headers and body) may take to arrive. Tests make it shorter. */
+    @Volatile internal var requestMs = 10_000L
+
+    /** Hands [c] to the pool, or closes it when the pool is full. False when it was closed. */
+    internal fun hand(c: Socket, work: () -> Unit): Boolean = try {
+        pool.execute { try { work() } catch (e: Exception) {} finally { try { c.close() } catch (e: Exception) {} } }
+        true
+    } catch (e: RejectedExecutionException) { try { c.close() } catch (x: Exception) {}; false }
 
     /** Starts it if it is not running; the port it listens on, or null when none was free. */
     @Synchronized
@@ -65,13 +77,22 @@ object HaServer {
             // idle for 30 minutes since the TV screen last asked: stop, whether or not phones keep asking
             if (System.currentTimeMillis() - lastAsked > IDLE_MS) { try { c?.close() } catch (e: Exception) {}; stop(); return }
             if (c == null) continue
-            pool.execute { try { serve(app, c) } catch (e: Exception) {} finally { try { c.close() } catch (e: Exception) {} } }
+            hand(c) { serve(app, c) }
         }
     }
 
-    private fun line(inp: InputStream): String? {
+    /** Before each read: wait at most 5 s, and never past the request's deadline (System.nanoTime). */
+    private fun left(c: Socket, until: Long): Boolean {
+        val ms = (until - System.nanoTime()) / 1_000_000
+        if (ms <= 0) return false
+        c.soTimeout = minOf(5_000L, ms).toInt().coerceAtLeast(1)
+        return true
+    }
+
+    private fun line(c: Socket, inp: InputStream, until: Long): String? {
         val out = ByteArrayOutputStream()
         while (true) {
+            if (!left(c, until)) return null
             val b = inp.read()
             if (b < 0) return if (out.size() == 0) null else out.toString("ISO-8859-1")
             if (b == '\n'.code) return out.toString("ISO-8859-1").trimEnd('\r')
@@ -85,29 +106,42 @@ object HaServer {
         (try { URLDecoder.decode(k, "UTF-8") } catch (e: Exception) { k }) to (try { URLDecoder.decode(v, "UTF-8") } catch (e: Exception) { v })
     }
 
-    private fun serve(app: Context, c: Socket) {
-        c.soTimeout = 5_000
+    internal class Request(val method: String, val target: String, val headers: Map<String, String>, val body: String)
+    internal class TooLarge : Exception()
+
+    /** One request off [c]: null when it is broken, silent for 5 s or not all there within [requestMs]. */
+    internal fun read(c: Socket): Request? {
+        val until = System.nanoTime() + requestMs * 1_000_000
         val inp = BufferedInputStream(c.getInputStream())
-        val first = line(inp) ?: return
-        val parts = first.split(' ')
-        if (parts.size < 3) return
-        val method = parts[0]
-        val target = parts[1]
-        val headers = HashMap<String, String>()
-        var count = 0
-        while (true) {
-            val h = line(inp) ?: return
-            if (h.isEmpty()) break
-            if (++count > 64) return
-            headers[h.substringBefore(':').trim().lowercase()] = h.substringAfter(':', "").trim()
-        }
-        val len = headers["content-length"]?.toIntOrNull() ?: 0
-        if (len < 0 || len > 64 * 1024) { write(c, HaPhone.Reply(413, "text/plain", "Too large".toByteArray())); return }
-        val buf = ByteArray(len)
-        var read = 0
-        while (read < len) { val n = inp.read(buf, read, len - read); if (n < 0) break; read += n }
+        try {
+            val first = line(c, inp, until) ?: return null
+            val parts = first.split(' ')
+            if (parts.size < 3) return null
+            val headers = HashMap<String, String>()
+            var count = 0
+            while (true) {
+                val h = line(c, inp, until) ?: return null
+                if (h.isEmpty()) break
+                if (++count > 64) return null
+                headers[h.substringBefore(':').trim().lowercase()] = h.substringAfter(':', "").trim()
+            }
+            val len = headers["content-length"]?.toIntOrNull() ?: 0
+            if (len < 0 || len > 64 * 1024) throw TooLarge()
+            val buf = ByteArray(len)
+            var read = 0
+            while (read < len) {
+                if (!left(c, until)) return null
+                val n = inp.read(buf, read, len - read); if (n < 0) break; read += n
+            }
+            return Request(parts[0], parts[1], headers, String(buf, 0, read, Charsets.UTF_8))
+        } catch (e: java.net.SocketTimeoutException) { return null }
+    }
+
+    private fun serve(app: Context, c: Socket) {
+        val req = try { read(c) } catch (e: TooLarge) { write(c, HaPhone.Reply(413, "text/plain", "Too large".toByteArray())); return } ?: return
+        val target = req.target
         val path = target.substringBefore('?')
-        val reply = HaPhone.handle(app, method, path, query(target.substringAfter('?', "")), String(buf, 0, read, Charsets.UTF_8), headers["host"], c.localPort) {
+        val reply = HaPhone.handle(app, req.method, path, query(target.substringAfter('?', "")), req.body, req.headers["host"], c.localPort) {
             name -> try { app.assets.open("www/tv/$name").use { it.readBytes() } } catch (e: Exception) { null }
         } ?: HaPhone.Reply(404, "text/plain", "Not found".toByteArray())
         write(c, reply)
