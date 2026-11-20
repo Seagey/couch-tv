@@ -233,11 +233,23 @@ const WATCH = { who: "sam", shows: MINE, apps: INSTALLED, bridge: true,
   ok(b.appRows >= 4 && a.appRows < b.appRows, "folder, Apps across 1: one app in each row: " + a.appRows + " then " + b.appRows); tested("folder", "cols");
   const fe = await draw(fo, WATCH, null, { edits: { "fo|folder": ["iview"] } });
   ok(fe.apps.join() === "au.net.abc.iview", "folder, apps: Hold OK's changes"); tested("folder", "apps");
+  // a folder tile shows four small apps; its name, set on this TV, shows when it is opened (OK)
+  const opened = await page.evaluate(([d]) => {
+    const o = { id: "ft", kind: "folder", w: 160, h: 160, opts: { label: "Kids", apps: ["netflix", "stan", "youtube", "iview"] } };
+    const env = { data: Object.assign({}, d, { wset: { ft: { label: "Shows" } } }) };
+    const host = document.createElement("div"); host.className = "cw-o"; host.setAttribute("data-obj", "ft"); document.body.appendChild(host);
+    const r = window.CouchWidgets.render(o, env); host.appendChild(r);
+    const tile = r.textContent;
+    window.CouchDetail.open(r, env, {});
+    const t = (document.querySelector(".cwd-panel") || {}).textContent || "";
+    window.CouchDetail.close(true); host.remove(); return { tile, t };
+  }, [WATCH]);
+  ok(!/Shows/.test(opened.tile) && /Shows/.test(opened.t) && !/Kids/.test(opened.t), "folder tile: the name set on this TV shows when it is opened: " + opened.t.slice(0, 60));
   const dk = { id: "dk", kind: "dock", w: 1600, h: 160, opts: { apps: ["netflix", "stan"] } };
   a = await draw(dk, WATCH); b = await draw(dk, WATCH, { more: false }); c = await draw(Object.assign({}, dk, { opts: { apps: ["netflix"], more: false } }), WATCH, { more: true });
   ok(a.more === 1 && b.more === 0 && c.more === 1, "dock, All apps at the end: on, off, and on over the design's off"); tested("dock", "more");
   ok(a.apps.join() === "com.netflix.ninja,au.com.stan.and" && (await draw(dk, WATCH, null, { edits: { "dk|dock": ["youtube"] } })).apps.join() === "com.google.android.youtube.tv", "dock, apps"); tested("dock", "apps");
-  const ag = { id: "ag", kind: "appgrid", w: 1200, h: 700, opts: { apps: ["netflix", "stan", "youtube", "iview"] } };
+  const ag = { id: "ag", kind: "appgrid", w: 1200, h: 800, opts: { apps: ["netflix", "stan", "youtube", "iview"] } };
   a = await draw(ag, WATCH); b = await draw(ag, WATCH, { cols: 1 }); c = await draw(ag, WATCH, { names: false });
   ok(a.appRows < b.appRows, "appgrid, Apps across 1: " + a.appRows + " then " + b.appRows); tested("appgrid", "cols");
   ok(/ninja|netflix|Netflix/i.test(a.text) && !/Netflix/.test(c.text) && c.text.length < a.text.length, "appgrid, Show app names off: " + a.text.slice(0, 60) + " / " + c.text.slice(0, 60)); tested("appgrid", "names");

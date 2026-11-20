@@ -1065,7 +1065,7 @@
       E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.05) 35%,rgba(0,0,0,.8))"),
       E("div", "", "position:absolute;left:24px;right:24px;bottom:22px;color:#fff", [
         b.h >= 300 ? E("div", "cw-row", "", [s.app ? appIcon(s.app, logoA, env) : null, E("span", "cw-t23", "color:rgba(255,255,255,.88);margin-left:10px", [s.owner ? s.owner + " is watching" : "Keep watching"])]) : null,
-        E("div", b.h >= 300 ? "cw-t38 cw-ell" : "cw-t29 cw-ell", "margin-top:10px;font-weight:720", [s.title]), b.h >= 220 && s.sub ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.82)", [s.sub]) : null,
+        b.h >= 300 ? E("div", "cw-t38 cw-ell", "margin-top:10px;font-weight:720", [s.title]) : fitT(E("div", "", WRAP + "font-size:25px;line-height:1.15;font-weight:720;margin-top:10px", [s.title])), b.h >= 220 && s.sub ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.82)", [s.sub]) : null,
         s.progress ? E("div", "cw-bar", "margin-top:14px", [E("b", "", "width:" + Math.round(s.progress * 100) + "%;background:#fff")]) : null])]);
     stop(card, s.act || "show", s.arg !== undefined ? s.arg : i, s.title);
     void n;
@@ -1087,6 +1087,7 @@
     if (list.length > 1) root.appendChild(dots);
     // OK opens Keep watching (widget-detail.js) on the show that is showing
     stop(root, "detail", "keep", list[at].title); root.setAttribute("data-at", String(at));
+    if (b.h < 300) fitLater(root);
     root.setAttribute("data-turns", "1");
     live(root, 1000, function () {
       if (root.classList.contains("cw-focus")) return;   // stops turning while focused
@@ -1100,14 +1101,15 @@
   R.keeprow = function (root, o, b, env) {
     var list = showsFor(o, env);
     if (!list.length) return noShows(root, b, env);
-    var q = op(o), labelH = q.label === "" || b.h < 220 ? 0 : 50, gap = 28, n = clamp(q.shows || Math.floor((b.w + gap) / 380), 1, Math.min(5, list.length)), cw = (b.w - (n - 1) * gap) / n;
+    var q = op(o), labelH = q.label === "" || b.h < 220 ? 0 : 50, gap = 28, n = clamp(q.shows || Math.floor((b.w + gap) / 380), 1, Math.min(5, list.length, Math.max(1, Math.floor((b.w + gap) / 260)))), cw = Math.floor((b.w - 48 - (n - 1) * gap) / n);   // inside the padding
     add(root, [labelH ? E("div", "cw-lab", "color:var(--ink);margin-bottom:16px;text-shadow:0 2px 12px rgba(0,0,0,.3)", [q.label || (list[0].owner ? list[0].owner + " is watching" : "Keep watching")]) : null,
       E("div", "cw-row", "flex:1;align-items:stretch;min-height:0", list.slice(0, n).map(function (s, i) {
         var p = E("div", "cw-poster", "width:" + px(cw) + ";flex:none;" + (i ? "margin-left:" + gap + "px;" : "") + (s.art ? "background-image:" + cssImg(s.art) : ""), [E("div", "cap", "", [
-          E("div", "cw-row", "", [s.app ? appIcon(s.app, 34, env) : null, E("span", "cw-t29 cw-ell", "color:#fff;font-weight:700;margin-left:10px", [s.title])]),
+          E("div", "cw-row", "", [s.app ? appIcon(s.app, 34, env) : null, E("div", "", "min-width:0;flex:1;margin-left:10px", [fitT(E("div", "", WRAP + "font-size:25px;line-height:1.2;color:#fff;font-weight:700", [s.title]))])]),
           s.progress ? E("div", "cw-bar", "margin-top:12px", [E("b", "", "width:" + Math.round(s.progress * 100) + "%;background:#fff")]) : null])]);
         return stop(p, s.act || "show", s.arg !== undefined ? s.arg : i, s.title);
       }))]);
+    fitLater(root);
   };
   // the sport apps a game comes from (the Game Day hero): Kayo, Foxtel, 9Now, 7plus, 10, DAZN
   var SPORT_APPS = ["au.com.kayosports.tv", "au.com.foxtel.atv", "au.com.ninenow.ctv", "com.swm.live", "au.com.tenplay", "com.dazn", "dazn"];
@@ -1153,7 +1155,7 @@
       E("div", "", "position:absolute;left:44px;bottom:40px;max-width:60%;color:#fff", [
         E("div", "cw-row", "", [s.app ? appIcon(s.app, 44, env) : null, E("span", "cw-t25", "color:rgba(255,255,255,.88);font-weight:650;margin-left:12px", ["Up next"])]),
         // a long title takes two lines at most and ends in "...", so it never climbs out of the box
-        E("div", "", "font-size:" + px(fs) + ";font-weight:780;letter-spacing:-.03em;line-height:1.08;margin-top:16px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere", [s.title]),
+        E("div", "", "font-size:" + px(fs) + ";font-weight:780;letter-spacing:-.03em;line-height:1.22;margin-top:16px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere", [s.title]),
         s.sub ? E("div", "cw-t29 cw-ell", "color:rgba(255,255,255,.86);margin-top:14px", [s.sub]) : null,
         b.h >= 420 ? E("div", "cw-row", "margin-top:26px", [resume, stop(E("div", "cw-chip", "height:64px;font-size:27px;padding:0 30px;margin-left:16px;background:rgba(255,255,255,.2)", ["Start over"]), "show", s.i, s.title)]) : null])]);
     if (b.h < 420) stop(root, "show", s.i, s.title);
@@ -1253,12 +1255,18 @@
     var small = b.w < 500 && b.h < 500, q = op(o), list = appsFor(o, env, small ? 4 : 16);
     if (canAdd(env) && list.length < (small ? 4 : 16)) list.push("add:");
     if (!list.length) return noApps(root, b, (q.apps || []).length);
-    var cols = small ? 2 : colsOf(o, env) || clamp(Math.round(Math.sqrt(list.length * b.w / b.h)), 1, 8), rows = Math.ceil(list.length / cols), names = !small && setting(o, env, "names") !== false;
-    var gx = 40, gy = 40, nameH = names ? 52 : 0, a = Math.floor(Math.min((b.w - cols * gx) / cols, (b.h - rows * gy - rows * nameH) / rows));
+    // sized in the box inside the padding; Apps across, then as many rows as fit (at least 72 px an app),
+    // more across when the rows would not fit
+    var W0 = Math.max(1, b.w - 48), H0 = Math.max(1, b.h - 48), names = !small && setting(o, env, "names") !== false;
+    var cols = small ? colsOf(o, env) || 2 : colsOf(o, env) || clamp(Math.round(Math.sqrt(list.length * W0 / H0)), 1, 8);
+    var gx = 40, gy = 40, nameH = names ? 52 : 0, maxRows = Math.max(1, Math.floor(H0 / (72 + gy + nameH)));
+    cols = Math.min(list.length, Math.max(cols, Math.ceil(list.length / maxRows)));
+    var rows = Math.ceil(list.length / cols), a = Math.floor(Math.min((W0 - cols * gx) / cols, (H0 - rows * gy - rows * nameH) / rows));
     add(root, E("div", "", "display:flex;flex-wrap:wrap;justify-content:center;align-content:center;height:100%", rowBreaks(list.map(function (p, i) {
       var n = appNode(p, a, env);
-      return E("div", "cw-col", "align-items:center;width:" + px(a) + ";margin:" + px(gy / 2) + " " + px(gx / 2), [n, names ? E("span", "cw-t25 cw-ell", "color:var(--ink);margin-top:12px;max-width:" + px(a + 30) + ";text-align:center;font-weight:650" + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 10px rgba(0,0,0,.3)" : ""), [p === "add:" ? "Add app" : appName(String(p).replace(/^missing:/, ""), env)]) : null]);
+      return E("div", "cw-col", "align-items:center;width:" + px(a) + ";margin:" + px(gy / 2) + " " + px(gx / 2), [n, names ? fitT(E("div", "", WRAP + "font-size:25px;line-height:1.2;color:var(--ink);margin-top:12px;max-width:" + px(a + gx) + ";text-align:center;font-weight:650" + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 10px rgba(0,0,0,.3)" : ""), [p === "add:" ? "Add app" : appName(String(p).replace(/^missing:/, ""), env)])) : null]);
     }), cols)));
+    if (names) fitLater(root);
   };
   var GAMES = { "com.microsoft.xcloud": ["#107c10", "#0b4f0b", "Xbox Cloud", "cloud", "Last played: Forza"], "com.nvidia.geforcenow": ["#76b900", "#3f6400", "GeForce NOW", "bolt", "Fortnite, 2h ago"],
     "com.valvesoftware.steamlink": ["#2a475e", "#13202c", "Steam Link", "tv", "From the study PC"], "com.retroarch": ["#e60012", "#7a0009", "RetroArch", "games", "Mario Kart 64"] };
@@ -1269,9 +1277,10 @@
     add(root, [lab("games", op(o).label || "Play"), E("div", "cw-row cw-grow", "margin-top:16px;align-items:stretch", list.slice(0, n).map(function (p, i) {
       var miss = String(p).indexOf("missing:") === 0, key = miss ? p.slice(8) : p, gp = GAMES[key] || (cat() && cat().get(key) ? GAMES[cat().get(key).packages.android[0]] : null), g = gp || ["#3a3a46", "#1d1d24", appName(key, env), "games"];
       var t = E("div", "cw-col", "flex:1;position:relative;overflow:hidden;border-radius:28px;background:linear-gradient(165deg," + g[0] + "," + g[1] + ");padding:24px;justify-content:space-between;" + (i ? "margin-left:20px" : ""), [
-        ic(g[3], clamp(b.h / 5, 56, 96), "#fff", "solid"), E("div", "", "min-width:0", [E("div", "cw-t29 cw-ell", "color:#fff;font-weight:740", [g[2]]), env.demo && g[4] && b.h >= 400 ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.86)", [g[4]]) : null])]);
+        ic(g[3], clamp(b.h / 5, 56, 96), "#fff", "solid"), E("div", "", "min-width:0", [fitT(E("div", "", WRAP + "font-size:25px;line-height:1.15;color:#fff;font-weight:740", [g[2]])), env.demo && g[4] && b.h >= 400 ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.86)", [g[4]]) : null])]);
       if (miss) { t.style.opacity = "0.42"; t.appendChild(E("div", "cw-t23", "color:#fff", ["Not on this TV"])); } return stop(t, miss ? "missing" : "app", key, g[2]);
     }))]);
+    fitLater(root);
   };
 
   // music
@@ -1302,7 +1311,9 @@
     // the cover and its words as one group in the middle (the design's align does not apply here)
     if (m.noCover) { info.style.marginLeft = "0"; info.style.width = "auto"; info.style.flex = "1"; }
     if (wide) add(root, E("div", "cw-row", "height:100%;align-items:stretch;justify-content:center", m.noCover ? [info] : [art, info]));
-    else { art.style.alignSelf = "center"; add(root, [m.noCover ? null : art, E("div", "cw-t29 cw-ell", "margin-top:16px;font-weight:680", [m.title]), E("div", "cw-t25 cw-ell", "", [m.artist]), E("div", "cw-grow"), E("div", "cw-bar", "", [E("b", "", "width:" + Math.round(pct * 100) + "%")])]); }
+    else { art.style.alignSelf = "center"; add(root, [m.noCover ? null : art, E("div", "cw-t29 cw-ell", "margin-top:16px;font-weight:680", [m.title]), E("div", "cw-t25 cw-ell", "", [m.artist]), E("div", "cw-grow"), E("div", "cw-bar", "", [E("b", "", "width:" + Math.round(pct * 100) + "%")]),
+      // Previous, play and next under the song where there is room (a tall or large widget)
+      buttons && b.h >= 560 ? E("div", "cw-row cw-np-buttons", "justify-content:center;margin-top:12px", [btn("previous", 40), E("div", "", "width:40px"), btn(m.state === "playing" ? "pause" : "play", 52), E("div", "", "width:40px"), btn("next", 40)]) : null]); }
     // OK opens the player (widget-detail.js), which has every control
     stop(root, "detail", "player", m.title);
   };
@@ -1312,7 +1323,7 @@
     vol = isFinite(vol) ? clamp(Math.round(vol), 10, 100) : 50;
     // OK plays this widget's own sound at its own volume (app.js widgetSound), and stops it when it plays
     var on = !env.demo && !env.designer && !!window.Soundscape && window.Soundscape.current && window.Soundscape.current() === snd;
-    add(root, [ic(icons[snd], b.h < 200 ? 44 : 56, "currentColor"), E("div", "cw-grow"), E("div", b.w < 300 ? "cw-t25" : "cw-t29", "font-weight:680;color:var(--ink)", [names[snd]]), b.w >= 300 ? E("div", "cw-t23", "", [on ? "Playing. OK stops it" : "Soundscape, volume " + vol + "%"]) : null]);
+    add(root, [ic(icons[snd], b.h < 200 ? 44 : 56, "currentColor"), E("div", "cw-grow"), E("div", b.w < 300 ? "cw-t25" : "cw-t29", "font-weight:680;color:var(--ink)", [names[snd]]), b.w >= 300 ? E("div", "cw-t23", "", [on ? "Playing. OK stops it" : b.h < 200 ? "Volume " + vol + "%" : "Soundscape, volume " + vol + "%"]) : null]);
     root.setAttribute("data-sound", snd + "|" + vol);
     stop(root, "sound", snd + "|" + vol, names[snd]);
   };

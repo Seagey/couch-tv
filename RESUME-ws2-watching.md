@@ -64,6 +64,30 @@ These screens' words are English only (design.js notes, widget-detail, setup.htm
 Tests: test_ws2_watching 230 pass; test_ws_tv 1115 OK; test_widget_detail_browser 296 OK; test_ws_schema 4430;
 test_widget_caps 4548; all 61 node files pass.
 
+## Gate 3 (checker's size probe): settings that did nothing where there was room, and cut words (21 Nov)
+New test tests/test_ws2_watching_visible.mjs (from the checker's gate3 probe, shaped like wt-ws2-weather's
+test_ws2_weather_visible.mjs): 14 kinds, every listed size, every setting vs default, 10:00 and 19:30, visible
+characters; SAME holds 50 cases, each with its reason. WS2_SOFT=1 lists every failure; scratchpad/watching-vis.sh
+runs it soft under the lock (log in scratchpad/watching-out/visible.log).
+Fixes in widgets.js:
+- nowplaying: Previous, play, next under the song in the upright layout when b.h >= 560.
+- appgrid: sized in the inner box (b.w-48, b.h-48); small takes Apps across (default 2); rows only while an app
+  keeps 72 px and its name (maxRows = floor(H0/(72+gy+nameH)), the margins are gy a row), more across otherwise;
+  names fitted (fitT, a cell wide) instead of cut.
+- keeprow: at most what fits (260 px a show), posters sized inside the padding (they spilled 24 px each side,
+  which made the fitting pass clamp titles), titles fitted like Picks.
+- keep tile (b.h < 300) and games: titles fitted (fitT) and fitLater called (fitT does nothing without it).
+- soundscape wide tile: "Volume N%".  upnext title line-height 1.22 (a glyph is 1.2 em tall).
+Help words (widget-caps.js): keeprow shows "At most what fits in the widget."; nowplaying buttons "... A tile or small
+widget has no room for them."; queue count "At most this many."; appgrid names "Not shown on a small grid.";
+folder name "... On a tile it shows when the folder is opened. ..."; folder Apps across "... A tile always shows
+four small apps." (ACROSS takes an extra sentence; App grid keeps "How many apps in each row.").
+Tests: test_ws2_watching_visible 1727 pass (592 cases, 154 same by design, 50 named); test_ws2_watching 231
+(new: folder tile name shows when opened; the App grid check is 800 high, room for 4 rows of names);
+test_widget_fit_all OK 8 (1640 boxes, 0 problems); test_ws_tv 1115; test_widget_detail_browser 295 (296 before:
+its only conditional checks are the Right/Left or Down/Up moves inside a layer); test_design_settings_browser 108;
+test_ws_schema 4445; test_widget_caps 4548; 61 node files pass.
+
 ## Next steps
 None in scope. Branch is ready to merge.
 Nothing runs on the MacBook or an emulator.

@@ -652,7 +652,7 @@
     { from: "people", options: [["auto", "Whoever is watching"]], "private": true }); };
   // Hold OK on an app (Change app, Move, Remove, Add app) and the phone's Apps on this design change these
   var APPS_IN = function (label, help) { return st("apps", label, "apps", [], help, "design", ALL, true); };
-  var ACROSS = function () { return st("cols", "Apps across", "choice", "auto", "How many apps in each row.", "design", ALL, true,
+  var ACROSS = function (more) { return st("cols", "Apps across", "choice", "auto", "How many apps in each row." + (more ? " " + more : ""), "design", ALL, true,
     { options: [["auto", "As many as fit"], [1, "1"], [2, "2"], [3, "3"], [4, "4"], [5, "5"], [6, "6"]] }); };
   // the streaming apps Up next can take its show from (catalogue ids, app-catalogue.js)
   var SHOW_APPS = [["netflix", "Netflix"], ["youtube", "YouTube"], ["prime", "Prime Video"], ["disney", "Disney+"], ["stan", "Stan"], ["binge", "Binge"], ["iview", "ABC iview"],
@@ -663,28 +663,28 @@
   var WATCHING = {
     keep: [WHOSE()],
     keeprow: [HEADING("Empty shows Keep watching."),
-      st("shows", "How many shows", "choice", "auto", "", "design", ALL, true, { options: [["auto", "As many as fit"], [2, "2"], [3, "3"], [4, "4"], [5, "5"]] }), WHOSE()],
+      st("shows", "How many shows", "choice", "auto", "At most what fits in the widget.", "design", ALL, true, { options: [["auto", "As many as fit"], [2, "2"], [3, "3"], [4, "4"], [5, "5"]] }), WHOSE()],
     upnext: [st("sport", "Game mode", "choice", "auto", "On shows the last game watched in a sport app on this TV. Automatic turns it on when the home also shows scores.", "design", ALL, true,
       { options: [["auto", "Automatic"], [true, "On"], [false, "Off"]], needs: { apps: SPORT_APP_PKGS.slice() } }),
       st("apps", "Only from these apps", "choice", [], "None picked takes shows from any app.", "design", ALL, true, { options: SHOW_APPS, many: true, max: 6 })],
     picks: [HEADING("Empty shows Picks for you."),
       st("mix", "Picks from", "choice", "all", "Your own shows are the ones you left part way.", "design", ALL, true,
         { options: [["all", "Others at home and your own"], ["others", "Only what others are watching"], ["mine", "Only your own shows"]] })],
-    nowplaying: [st("buttons", "Show the buttons", "toggle", true, "Previous, play and next under the song.", "design", ALL, true),
+    nowplaying: [st("buttons", "Show the buttons", "toggle", true, "Previous, play and next under the song. A tile or small widget has no room for them.", "design", ALL, true),
       st("cover", "Show the cover", "toggle", true, "Off shows the song and artist only.", "design", ALL, true)],
     soundscape: [st("sound", "Sound", "choice", "rain", "OK on the widget plays it, and OK again stops it.", "design", ALL, true,
       { options: [["rain", "Rain"], ["fire", "Fire"], ["waves", "Waves"], ["brown", "Brown noise"]] }),
       st("volume", "Volume", "number", 50, "How loud this widget plays its sound.", "tv", ON_TV, true, { min: 10, max: 100, step: 10 })],
     queue: [HEADING("Empty shows Up next."),
-      st("count", "How many songs", "choice", "auto", "", "design", ALL, true, { options: [["auto", "As many as fit"], [3, "3"], [5, "5"], [8, "8"]] })],
+      st("count", "How many songs", "choice", "auto", "At most this many.", "design", ALL, true, { options: [["auto", "As many as fit"], [3, "3"], [5, "5"], [8, "8"]] })],
     games: [APPS_IN("Games", "Hold OK on a game to change, move or remove it."), HEADING("Empty shows Play.")],
     app: [APPS_IN("App", "Hold OK on it and pick Change app.")],
-    folder: [st("label", "Folder name", "text", "", "Shown above the apps. Empty shows no name.", "design", ALL, true, { max: 40 }),
-      APPS_IN("Apps in the folder", "Hold OK on an app to change, move or remove it."), ACROSS()],
+    folder: [st("label", "Folder name", "text", "", "Shown above the apps. On a tile it shows when the folder is opened. Empty shows no name.", "design", ALL, true, { max: 40 }),
+      APPS_IN("Apps in the folder", "Hold OK on an app to change, move or remove it."), ACROSS("A tile always shows four small apps.")],
     dock: [APPS_IN("Apps", "None picked shows this TV's own apps. Hold OK on an app to change, move or remove it."),
       st("more", "All apps at the end", "toggle", true, "A tile at the end that opens every app.", "design", ALL, true)],
     appgrid: [APPS_IN("Apps", "None picked shows this TV's own apps. Hold OK on an app to change, move or remove it."), ACROSS(),
-      st("names", "Show app names", "toggle", true, "", "design", ALL, true)],
+      st("names", "Show app names", "toggle", true, "Not shown on a small grid.", "design", ALL, true)],
     quick: [st("quick", "Buttons", "choice", [], "Up to six. None picked shows the home's own quick buttons. Buttons this TV cannot do are left out.", "design", ALL, true,
       { options: QUICK_OPTS, many: true, max: 6 })],
     stack: [st("turn", "Next widget", "choice", 20, "When the stack moves on to its next widget.", "design", ALL, true,
