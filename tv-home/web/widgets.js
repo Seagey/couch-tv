@@ -1055,12 +1055,13 @@
       add(root, E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("wind", place, "rgba(255,255,255,.88)"), E("div", "cw-t25 cw-ell", "color:#fff;margin-top:6px", [swell])]), big]));
       return;
     }
-    var hs = (m.hourly || []).slice(0, 12), top = Math.max.apply(null, hs.concat([0.5]));
+    // too narrow for the wind beside the swell: the wind goes under it (shorter bars make the room)
+    var hs = (m.hourly || []).slice(0, 12), top = Math.max.apply(null, hs.concat([0.5])), under = b.w < 460 && wind;
     add(root, [lab("wind", place, "rgba(255,255,255,.88)"),
-      E("div", "cw-row", "margin-top:10px;align-items:flex-end", [E("div", "", "margin-right:28px", [big, E("div", "cw-t25", "color:#fff", [swell])]),
+      E("div", "cw-row", "margin-top:10px;align-items:flex-end;min-width:0", [E("div", "", "margin-right:28px;min-width:0", [big, E("div", "cw-t25", "color:#fff", [swell]), under ? E("div", "cw-t25 cw-ell", "color:#fff;margin-top:2px", ["Wind " + wind]) : null]),
         b.w >= 460 && wind ? E("div", "", "", [E("div", "cw-t38", "", ["Wind"]), E("div", "cw-t25", "color:#fff", [wind])]) : null]),
       E("div", "cw-grow"),
-      hs.length ? E("div", "cw-row", "align-items:flex-end;height:70px;flex:none", hs.map(function (v) { return E("i", "", "display:block;flex:1;margin:0 3px;border-radius:5px;background:rgba(255,255,255,.7);height:" + Math.round(clamp(v / top, 0.08, 1) * 100) + "%"); })) : null,
+      hs.length ? E("div", "cw-row", "align-items:flex-end;flex:none;height:" + (under ? 44 : 70) + "px", hs.map(function (v) { return E("i", "", "display:block;flex:1;margin:0 3px;border-radius:5px;background:rgba(255,255,255,.7);height:" + Math.round(clamp(v / top, 0.08, 1) * 100) + "%"); })) : null,
       hs.length ? E("div", "cw-row cw-sp cw-t23", "color:#fff;margin-top:6px", [E("span", "", "", ["Now"]), E("span", "", "", ["+12h"])]) : null]);
   };
 

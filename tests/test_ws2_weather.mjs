@@ -216,7 +216,12 @@ const mark = (k, name) => { tested[k] = name; };
   const d0 = await draw(o, env2());
   has(d0.text, "UV index", "uv: the heading"); has(d0.text, "5", "uv: the home's UV");
   const sameDay = hourAt(3).slice(0, 10) === hourAt(0).slice(0, 10) && hourAt(9).slice(0, 10) === hourAt(0).slice(0, 10);
+  // (the same count at any time of day: late in the evening, a day that starts high, "until")
   if (sameDay) ok(/Sun protection \d{1,2}:\d{2}[ap]m to \d{1,2}:\d{2}[ap]m/.test(d0.text), "uv: sun protection times worked out from the real hourly UV: " + d0.text);
+  else {
+    const late = await draw(o, { data: Object.assign({}, base, { weather: wx(24, { uv: 5 }, [8, 2]) }) });
+    ok(/Sun protection until \d{1,2}:\d{2}[ap]m/.test(late.text), "uv: sun protection until, worked out from the real hourly UV: " + late.text);
+  }
   const r = await draw(o, env2({ u: { town: BEACH } }));
   has(r.text, "UV index, Long Beach", "uv, Place: the heading says where"); has(r.text, "11", "uv, Place: its own UV"); has(r.text, "Extreme", "uv, Place: its own band");
   ok((await draw(o, env2({ u: {} }))).text === d0.text, "uv: cleared, the default again");
@@ -310,10 +315,12 @@ const VARY = {
 const SAME = {
   "weather.place tile": "a tile shows no town name to hide (only a widget's own place, checked below)",
   "bigtemp.place tile": "a tile shows no town name to hide (only a widget's own place, checked below)",
+  "weather.hilo tile": "a tile shows only the sky and the temperature, no high and low",
   "surf.wind wtile": "the wide tile shows only the swell, no wind"
 };
 const drawnSig = (r) => r.text + " | " + r.svgs.join(";");
 let matrix = 0;
+const wrong = [];
 for (const kind of Object.keys(VARY)) {
   for (const sz of sizesOf(kind)) {
     const [w, h] = PX[sz], o = { id: "x", kind, opts: {}, w, h };
@@ -322,15 +329,19 @@ for (const kind of Object.keys(VARY)) {
     for (const key of Object.keys(VARY[kind])) {
       const r = await draw(o, env({ x: { [key]: VARY[kind][key] } }));
       const why = SAME[kind + "." + key + " " + sz];
-      if (why) ok(drawnSig(r) === drawnSig(d0), kind + "." + key + " at " + sz + " (" + w + " x " + h + ") draws the same, as it should: " + why);
-      else ok(drawnSig(r) !== drawnSig(d0), kind + "." + key + " at " + sz + " (" + w + " x " + h + ") changes the drawing: " + d0.text + " / " + r.text);
+      if (why ? drawnSig(r) !== drawnSig(d0) : drawnSig(r) === drawnSig(d0)) wrong.push(kind + "." + key + " at " + sz + " (" + w + " x " + h + ") " + (why ? "changed, but should not: " : "did not change: ") + d0.text + " / " + r.text);
+      else n++;
       const back = await draw(o, env({ x: { [key]: null } }));
       ok(drawnSig(back) === drawnSig(d0), kind + "." + key + " at " + sz + ": cleared, the default again");
       matrix++;
     }
   }
 }
-ok(matrix >= 70, "the size matrix covers every setting at every size: " + matrix + " cases");
+ok(!wrong.length, "every setting changes the drawing at every size, but:\n  " + wrong.join("\n  "));
+// every setting of every kind is in the matrix, at every size the kind comes in
+Object.keys(VARY).forEach((k) => ok(CAPS0.settings(k).map((x) => x.key).sort().join() === Object.keys(VARY[k]).sort().join(), k + ": the matrix varies every one of its settings"));
+const want = Object.keys(VARY).reduce((t, k) => t + sizesOf(k).length * Object.keys(VARY[k]).length, 0);
+ok(matrix === want && want === 67, "the size matrix: " + matrix + " setting x size cases of " + want);
 // the wide tile of the weather (Fable finding 1), exactly
 {
   const o = { id: "x", kind: "weather", opts: {}, w: 360, h: 160 };
