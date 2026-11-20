@@ -8,6 +8,7 @@ Fewer presses with the TV remote. The on-TV app now updates itself with one butt
 - **Every other Android TV:** Home settings, Updates, check now, or install `couch-tv-home.apk` over the old one. All four APKs are signed with the same key as every earlier release.
 - **Samsung:** download `couch-tv-samsung-setup.zip` below and run its installer again (step 4 in `START HERE.txt`). Your settings stay.
 - **Option B (a computer at home):** `git pull` and restart the bridge.
+- **Apple TV:** build Couch TV again with Xcode ([docs/APPLE-TV.md](docs/APPLE-TV.md)).
 
 ### What each TV gets
 
@@ -47,7 +48,7 @@ The TV always asks Use this design? before it changes anything. Pick Use this de
 
 ### Get a design from your phone
 
-For TVs where typing a code with the remote is slow, such as Samsung, LG and Apple TV: Home settings, couch-tv Studio, Get a design, Get a design from your phone. The TV shows a QR code. Scan it, choose a design in couch-tv Studio and press Send to my TV. The TV asks before it changes anything. The code works once, for 10 minutes, while that screen is open.
+For TVs where typing a code with the remote is slow, such as Samsung, LG and Apple TV: Home settings, couch-tv Studio, Get a design from your phone (on an Apple TV: Couch TV's Settings, Home design). The TV shows a QR code. Scan it, choose a design in couch-tv Studio and press Send to my TV. The TV asks before it changes anything. The code works once, for 10 minutes, while that screen is open.
 
 ### When the TV never asks "Allow debugging?"
 

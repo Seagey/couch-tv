@@ -5624,9 +5624,10 @@
     if (u.latest) rows.push(info("upd-newest", t("upd_newest"), u.latest));   // both numbers side by side
     if (u.available && u.manual) {
       rows.push(info("upd-how", UPD_ROW, "", t("upd_gear", { v: u.latest, c: u.current || "" }) + ". " + (u.how || "")));
-      // the same steps on a phone, so nobody has to remember them (a TCL, 20 Nov 2026): first, before the steps
-      if (u.help_url && window.TVQR) rows.push({ kind: "qr", key: "upd-qr", url: u.help_url, label: tUpd("upd_qr") });
       rows = rows.concat(manualRows(u));
+      // the same steps on a phone, so nobody has to remember them (a TCL, 20 Nov 2026): under the steps,
+      // so it is on screen when the page opens
+      if (u.help_url && window.TVQR) rows.push({ kind: "qr", key: "upd-qr", url: u.help_url, label: tUpd("upd_qr") });
     } else if (u.available) {
       // u.self: the on-TV app installs it by itself (no Android question), then opens again
       rows.push({ kind: "action", key: "upd-install", label: t("upd_install", { v: u.latest }),
@@ -5868,6 +5869,9 @@
     else if (SET.peeked !== listId + "|" + SET.ri) SET.peeked = null;
     box.setAttribute("data-list", listId);
     box.innerHTML = rows.map(rowHTML).join("");
+    // one QR code on screen at a time: a page with its own (Get a design from your phone, the update
+    // steps) hides the side "Change this on your phone" one
+    var sp = $("set-phone"); if (sp) sp.style.visibility = rows.some(function (r) { return r.kind === "qr"; }) ? "hidden" : "";
     Array.prototype.forEach.call(box.querySelectorAll("[data-qr]"), function (n) {
       try { n.appendChild(window.TVQR.svg(n.getAttribute("data-qr"), 240)); } catch (e) { n.parentNode.style.display = "none"; }
     });
