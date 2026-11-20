@@ -26,6 +26,9 @@ MATTER = {abi: ["libCHIPController.so", "libc++_shared.so"] for abi in ["armeabi
 
 INTEL = {abi: ["libcouchtv_placeholder.so"] for abi in ["x86", "x86_64"]}
 WATCH_MARK = "assets/fake-watch-service"   # stands for the watch APK's accessibility service in these fakes
+# placeholders are tiny (1 KB, like nl-matter-android's libmatternone.so); every other fake library is
+# 20 KB, over the check's 16 KB placeholder limit, like any real library
+TINY = {"libcouchtv_placeholder.so", "libmatternone.so", "libtiny.so"}
 
 
 def apk(path, libs, stored=False, watch=False):
@@ -35,7 +38,7 @@ def apk(path, libs, stored=False, watch=False):
             z.writestr(WATCH_MARK, b"1")
         for abi, names in libs.items():
             for n in names:
-                z.writestr(zipfile.ZipInfo(f"lib/{abi}/{n}"), b"\0" * 1000,
+                z.writestr(zipfile.ZipInfo(f"lib/{abi}/{n}"), b"\0" * (1000 if n in TINY else 20_000),
                            compress_type=zipfile.ZIP_STORED if stored else zipfile.ZIP_DEFLATED)
 
 
@@ -178,6 +181,21 @@ class ReleaseApkRules(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertEqual(sorted(errs), ["couch-tv-home.apk: lib/arm64-v8a lacks libreal.so (a TV of that kind would miss it)",
                                         "couch-tv-home.apk: lib/armeabi-v7a lacks libreal.so (a TV of that kind would miss it)"])
+
+    def test_placeholder_is_known_by_size_not_name(self):
+        # nl-matter-android's real launcher (21 Nov, 05:43): lib/x86/libmatternone.so 1,300 bytes,
+        # lib/x86_64 1,880 bytes, Matter in both ARM folders
+        rc, errs = Dist(home_libs=merge(MATTER, {a: ["libmatternone.so"] for a in ["x86", "x86_64"]})).errs("--release", "--matter")
+        self.assertEqual((rc, errs), (0, []))
+        # a full size library only in the Intel folders, even named like a placeholder: ARM would miss it
+        big = {a: ["libbig_placeholder.so"] for a in ["x86", "x86_64"]}
+        rc, errs = Dist(home_libs=merge(MATTER, big)).errs()
+        self.assertEqual(sorted(errs), ["couch-tv-home.apk: lib/arm64-v8a lacks libbig_placeholder.so (a TV of that kind would miss it)",
+                                        "couch-tv-home.apk: lib/armeabi-v7a lacks libbig_placeholder.so (a TV of that kind would miss it)"])
+        # the limit itself
+        self.assertTrue(crc.placeholder(zipfile.ZipInfo("x")) is True)   # 0 bytes
+        zi = zipfile.ZipInfo("x"); zi.file_size = crc.PLACEHOLDER_MAX + 1
+        self.assertFalse(crc.placeholder(zi))
 
     def test_launcher_without_native_libraries_still_passes(self):
         # 0.13.8's launcher had none: an APK with no lib/ at all installs on every processor

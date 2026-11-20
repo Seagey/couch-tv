@@ -29,7 +29,7 @@ The rules:
     Every processor folder has the same native libraries, or a TV of the other kind would start
     without one and stop the moment it is needed (Android installs only one folder). Intel folders
     may lack Matter alone (the app must say Matter is not available there, not crash), and may hold
-    a tiny placeholder library (a name with "placeholder" in it) that only keeps the folder there.
+    a tiny placeholder library (16 KB or less, any name) that only keeps the folder there.
  4. Where Matter is in an APK, it is there for both armeabi-v7a and arm64-v8a, with libc++_shared.so
     (--matter: it must be in both on-TV APKs).
  5. Native libraries are compressed in every APK, and each APK is under its size limit.
@@ -78,9 +78,14 @@ def native(apk):
     return out
 
 
-def placeholder(lib):
-    """A tiny library that only keeps a processor folder in the APK (the launcher's Intel folders)."""
-    return "placeholder" in lib
+PLACEHOLDER_MAX = 16 * 1024   # nl-matter-android's libmatternone.so: 1,300 (x86) and 1,880 (x86_64) bytes
+
+
+def placeholder(info):
+    """A tiny library that only keeps a processor folder in the APK (the launcher's Intel folders):
+    decided by its size, not its name, so any name the build gives it works and a real library
+    (Conscrypt's smallest is about 10x this) never passes as one."""
+    return info.file_size <= PLACEHOLDER_MAX
 
 
 def sha256(path):
@@ -138,7 +143,8 @@ def check_libs(apk, need_matter=False, compressed=False):
                 errs.append(f"{n}: native libraries inside but no lib/{abi} folder: Android refuses to install it on a TV with that processor")
         every = set().union(*sets.values())
         # a placeholder that only keeps the Intel folders there is never loaded: ARM folders need not have it
-        intel_only = {x for x in every if placeholder(x) and not any(x in sets.get(a, set()) for a in ARM)}
+        intel_only = {x for x in every if not any(x in sets.get(a, set()) for a in ARM)
+                      and all(placeholder(libs[a][x]) for a in INTEL if x in libs.get(a, {}))}
         for abi, s in sorted(sets.items()):
             # Intel TVs (x86, x86_64: Conscrypt brings them) may lack only Matter: the app still installs
             # and runs there, and the Matter screens say it is not available on this TV. Dropping those

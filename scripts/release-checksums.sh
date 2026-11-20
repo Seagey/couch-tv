@@ -3,6 +3,8 @@
 # couch-tv Setup checks every APK it downloads against this file AND against the SHA-256 GitHub
 # itself records for each release file; if either is missing or they disagree, it installs nothing.
 #
+# For a real release use scripts/release.sh (build, sums, publish): it hashes exactly the 6 release
+# files, always checks with --matter and the TVs' key, and checks again before anything is pushed.
 # In the release steps, after scripts/build-apk.sh and before `gh release create`:
 #   sh scripts/release-checksums.sh
 #   gh release create vX.Y dist/couch-tv-home.apk dist/couch-tv-ontv.apk dist/couch-tv-ontv-watch.apk dist/couch-tv-sync.apk dist/SHA256SUMS.txt ...
