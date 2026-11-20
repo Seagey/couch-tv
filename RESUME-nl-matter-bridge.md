@@ -32,6 +32,13 @@ Read first: coord/nolater-common.md and coord/matter-contract.md (changes 1 to 1
   against the lock (tampered copy: exit 1, tried on the MacBook); zero width and text direction
   controls stripped from names. Item 5 waits on the owner: do not try it.
 
+- Contract changes 14 and 15 (harness nl-matter-fixtures 09be187): every refusal carries a reason
+  (commission wrong_code, expired, thread, unreachable, already, not_certified, failed, not_ready,
+  busy, blocked/unsupported, address/port/link_local; command not_found, bad_request, not_ready,
+  device_refused, failed; rename not_found, bad_name, opens_house; remove not_found); a second
+  commission while one runs answers busy at once (HTTP 400); hvac_action also without
+  ThermostatRunningState (heating or cooling demand, else mode against the set point).
+
 ## Test results (21 Nov)
 - `<repo>/.venv/bin/python -m unittest discover -s tests -p "test_matter_bridge.py"`: 36/36 OK (after the checker round).
 - Full suite `-p "test_*.py"`: Ran 1384, OK (skipped 58) after the checker round (1379 at 50ac34c, 1363 before this branch).
@@ -46,6 +53,8 @@ Read first: coord/nolater-common.md and coord/matter-contract.md (changes 1 to 1
   file with fabrics() accepting fx's newer {name: {...}} answer (fx.py on the MacBook changed 05:51).
 - SIGTERM to the bridge (what `launchctl bootout` sends): the Matter service ended, pid file removed.
 
+- Harness 09be187 (343 checks) against the working tree before the busy/reason commit: 342 passed,
+  1 failed (thermostat hvac_action, fixed after). The final run is in the report and the commit after.
 - After the checker round, a217c13 on ~/mf-bridge with the committed harness (nl-matter-fixtures
   6b82489, with the fixtures lock): **261 passed, 0 failed, 0 warnings, 261 checks, 248 s**; all eight
   fixtures back to 1 fabric, lock released, bridge stopped.

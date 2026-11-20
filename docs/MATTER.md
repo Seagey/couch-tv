@@ -144,6 +144,15 @@ caller with `bridge.pairing_key`.
 | `POST /api/matter/remove {id}` | `{ ok, removed, reason?, note? }`. A device is one Matter node: every id of it goes, also one the name rule hides. Couch TV leaves the device's fabric: it asks the device itself to drop Couch TV (RemoveFabric), checks it can no longer reach it, tries twice more if it still can, then lets the service forget it. The device stays in the person's own home app. A device that is `unavailable` is forgotten anyway (`reason` `offline`, a note to remove Couch TV in the other app too if it is listed there), and one that does not answer the leave is forgotten here and left properly the next time it answers (`reason` `not_answering`). |
 | `POST /api/matter/rename {id, name}` | `{ ok, name }`. 1 to 40 characters, no control characters, no `<` or `>`, kept on this computer only. A name the name rule would hide is refused: `{ ok: false, error: "refused", reason: "opens_house", note }`. |
 
+**Every refusal has a `reason`** (contract changes 14 and 15), a key the TV screens word in every
+language. Commission: `wrong_code`, `expired`, `thread`, `unreachable`, `already`, `not_certified`,
+`failed`, `not_ready`, `busy` (another device is still being added: answered at once, never queued),
+`blocked` or `unsupported` (with error `not_allowed`), `address`, `port` or `link_local`, and while
+Matter is not ready the reason it is not. Command: `not_found` (no such device), `bad_request` (an
+action or value this device does not take), `not_ready` (the device is not answering),
+`device_refused` (the device said no), `failed`. Rename: `not_found`, `bad_name`, `opens_house`.
+Remove: `not_found`.
+
 **Address rules** (`address` on commission, contract change 5): `host`, `host:5540`, `[v6]` or
 `[v6]:5540`. The Matter service only ever tries port 5540 (the port every Matter device uses), so
 another port is refused with reason `port` and a plain note rather than silently tried on 5540. An
@@ -180,7 +189,7 @@ point, °C, in half degrees). A cover's `on` opens it and `off` closes it. Senso
 
 ## What was tested, and how
 
-- `tests/test_matter_bridge.py` (31 tests, all pass): every domain mapped from Matter attributes, including a
+- `tests/test_matter_bridge.py` (39 tests, all pass): every domain mapped from Matter attributes, including a
   real node (the SDK's virtual light, `tests/fixtures/matter-light-node.json`, read by the service
   after a share); locks, alarms, garage doors and a lock behind a Matter bridge never shown, never
   switched, never renamed or removed; what each action sends; the error keys; adding by address;

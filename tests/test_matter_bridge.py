@@ -147,6 +147,22 @@ class ModelTest(unittest.TestCase):
         self.assertEqual(matter.devices_of(node(32, {1: ([257], {"6/0": True, "8/0": 100})}, basic={"0/40/5": "Garage"}))[0]["name"], "Garage")
         self.assertEqual(matter.devices_of(node(33, {1: ([43], {"514/0": 0})}, basic={"0/40/5": "Garage fan"}))[0]["domain"], "fan")
 
+    def test_hvac_action_without_running_state(self):
+        """Harness 09be187 (contract change 1): every climate device has hvac_action, also when the
+        thermostat does not serve ThermostatRunningState (the fixture thermostat does not)."""
+        def act(attrs):
+            base = {"513/65532": 0b100011, "513/0": 2350, "513/17": 2400, "513/18": 2000}
+            base.update(attrs)
+            return one(node(70, {1: ([769], base)}))[0]["attributes"]["hvac_action"]
+        self.assertEqual(act({"513/28": 3, "513/0": 2600}), "cooling")      # cool, room 26, set point 24
+        self.assertEqual(act({"513/28": 3, "513/0": 2300}), "idle")
+        self.assertEqual(act({"513/28": 4, "513/0": 1800}), "heating")      # heat, room 18, set point 20
+        self.assertEqual(act({"513/28": 4, "513/0": 2100}), "idle")
+        self.assertEqual(act({"513/28": 0}), "off")
+        self.assertEqual(act({"513/28": 4, "513/8": 40}), "heating")         # heating demand 40 %
+        self.assertEqual(act({"513/28": 3, "513/7": 0, "513/8": 0}), "idle")
+        self.assertEqual(act({"513/28": 3, "513/41": 2}), "cooling")         # running state wins
+
     def test_joined_names(self):
         """Checker 21 Nov (A): names written as one word or with a number still say garage door, gate or door."""
         def cover(nm):
@@ -294,6 +310,9 @@ class FakeService:
                 continue   # no answer at all, like a device that is off
             if callable(a):
                 a = a(d["args"])
+            if isinstance(a, dict) and "_delay" in a:   # a slow answer, like adding a device takes
+                a = dict(a)
+                await asyncio.sleep(a.pop("_delay"))
             if a is None:
                 a = {"result": list(self.nodes.values())} if d["command"] == "start_listening" else {"result": None}
             await ws.send_json(dict(a, message_id=d["message_id"]))
@@ -547,6 +566,93 @@ class ServiceTest(unittest.TestCase):
                 await server.cleanup()
         run(go())
 
+    def test_a_second_add_while_one_runs_is_busy(self):
+        """Contract change 15: a second commission while one runs answers at once, error and reason busy."""
+        async def go():
+            fake = FakeService([])
+            m, server = await self.started(fake)
+            try:
+                fake.answers["commission_with_code"] = {"result": PLUG, "_delay": 1.0}
+                first = asyncio.ensure_future(m.commission("06409137006"))
+                await asyncio.sleep(0.2)
+                t = time.monotonic()
+                r = await m.commission("06409137006")
+                self.assertLess(time.monotonic() - t, 0.5)
+                self.assertEqual((r["ok"], r["error"], r["reason"], r["device_ids"]), (False, "busy", "busy", []))
+                self.assertTrue(r["note"])
+                self.assertEqual((await first)["ok"], True)
+                # once the first has finished, the next one is taken again
+                fake.answers["commission_with_code"] = {"error_code": 1, "reason": "not-discovered", "details": "x"}
+                r = await m.commission("06409137006")
+                self.assertEqual(r["error"], "expired")
+                # an add that fails with an exception never leaves Couch TV stuck on busy
+                with patch.object(m, "_commission", side_effect=RuntimeError("boom")):
+                    with self.assertRaises(RuntimeError):
+                        await m.commission("06409137006")
+                self.assertFalse(m._adding)
+            finally:
+                await m.stop()
+                await server.cleanup()
+        run(go())
+
+    def test_every_refusal_has_a_reason(self):
+        """Contract change 15: every answer that is not ok carries a non empty reason key."""
+        async def go():
+            fake = FakeService([PLUG, THERMO])
+            m, server = await self.started(fake)
+            try:
+                answers = []
+
+                async def add(answer, code="06409137006", address=None):
+                    fake.answers["commission_with_code"] = answer
+                    fake.answers["commission_on_network"] = answer
+                    answers.append(("commission", await m.commission(code, address)))
+                await add({"result": PLUG}, code="123")
+                for a in ({"error_code": 1, "reason": "passcode-mismatch", "details": ""},
+                          {"error_code": 1, "reason": "not-discovered", "details": ""},
+                          {"error_code": 1, "reason": "other", "details": "already commissioned"},
+                          {"error_code": 1, "reason": "attestation-rejected", "details": ""},
+                          {"error_code": 1, "reason": "other", "details": "boom"},
+                          {"result": None}):
+                    await add(a)
+                with patch.object(matter, "thread_route", return_value=False):
+                    await add({"error_code": 1, "reason": "timeout", "details": ""})
+                with patch.object(matter, "thread_route", return_value=True):
+                    await add({"error_code": 1, "reason": "timeout", "details": ""})
+                fake.answers["parse_onboarding_payload"] = {"result": {}}
+                await add({"result": None}, address="192.0.2.9")
+                await add({"result": None}, address="192.0.2.9:80")
+                await add({"result": SMOKE})
+                answers.append(("command", await m.command("matter:99:1", "on")))
+                answers.append(("command", await m.command("matter:10:1", "dance")))
+                answers.append(("command", await m.command("matter:10:1", "level", 50)))   # a plug has no level
+                answers.append(("command", await m.command("matter:16:1", "mode", "party")))
+                fake.answers["device_command"] = {"error_code": 7, "details": "boom"}
+                answers.append(("command", await m.command("matter:10:1", "off")))
+                fake.answers["device_command"] = {"error_code": 3, "details": "not ready"}
+                answers.append(("command", await m.command("matter:10:1", "off")))
+                fake.answers["write_attribute"] = {"result": [{"Status": 135}]}
+                answers.append(("command", await m.command("matter:16:1", "mode", "cool")))
+                answers.append(("rename", m.rename("matter:99:1", "Lamp")))
+                answers.append(("rename", m.rename("matter:10:1", "")))
+                answers.append(("rename", m.rename("matter:10:1", "x" * 41)))
+                answers.append(("rename", m.rename("matter:10:1", "Garage door")))
+                answers.append(("remove", await m.remove("matter:99:1")))
+                self.assertEqual(len(answers), 24)
+                for kind, r in answers:
+                    self.assertIs(r["ok"], False, (kind, r))
+                    self.assertTrue(isinstance(r.get("reason"), str) and r["reason"], (kind, r))
+                reasons = [r["reason"] for _, r in answers]
+                self.assertEqual(reasons, ["wrong_code", "wrong_code", "expired", "already", "not_certified", "failed",
+                                           "unreachable", "thread", "unreachable", "wrong_code", "port", "blocked",
+                                           "not_found", "bad_request", "bad_request", "bad_request", "failed", "not_ready",
+                                           "device_refused", "not_found", "bad_name", "bad_name", "opens_house",
+                                           "not_found"])
+            finally:
+                await m.stop()
+                await server.cleanup()
+        run(go())
+
     def test_already_added(self):
         """Live run 21 Nov: the same device shared a second time answers error already, not unreachable."""
         async def go():
@@ -623,7 +729,7 @@ class ServiceTest(unittest.TestCase):
                 self.assertEqual(await m.remove("matter:13:1"), {"ok": True, "removed": []})
                 self.assertEqual(fake.calls[-1], ("remove_node", {"node_id": 13}))
                 for bad in ("matter:12:9", "matter:99:1", "light.x", None):
-                    self.assertEqual(await m.remove(bad), {"ok": False, "error": "refused"}, bad)
+                    self.assertEqual(await m.remove(bad), {"ok": False, "error": "refused", "reason": "not_found"}, bad)
                 self.assertEqual([d["id"] for d in m.devices()], ["matter:12:1"])
                 self.assertEqual(json.load(open(path)), {"matter:12:1": "Outdoor blind"})
             finally:

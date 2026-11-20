@@ -296,6 +296,26 @@ def _climate(node, ep, clusters, types):
         attrs["hvac_action"] = "off"
     elif isinstance(run, int):
         attrs["hvac_action"] = "heating" if run & 1 else "cooling" if run & 2 else "fan" if run & 4 else "idle"
+    else:
+        # no ThermostatRunningState (many thermostats leave it out): the heating or cooling demand, else
+        # the mode and how far the room is from the set point
+        hd, cd = _a(node, ep, THERMOSTAT, 8), _a(node, ep, THERMOSTAT, 7)
+        cur, tgt = attrs.get("current_temperature"), attrs.get("temperature")
+        lo, hi = attrs.get("target_temp_low", tgt), attrs.get("target_temp_high", tgt)
+        if isinstance(hd, int) or isinstance(cd, int):
+            attrs["hvac_action"] = "heating" if (hd or 0) > 0 else "cooling" if (cd or 0) > 0 else "idle"
+        elif cur is None or tgt is None:
+            attrs["hvac_action"] = "idle"
+        elif mode in ("heat", "heat_cool") and lo is not None and cur < lo:
+            attrs["hvac_action"] = "heating"
+        elif mode in ("cool", "heat_cool") and hi is not None and cur > hi:
+            attrs["hvac_action"] = "cooling"
+        elif mode == "fan_only":
+            attrs["hvac_action"] = "fan"
+        elif mode == "dry":
+            attrs["hvac_action"] = "drying"
+        else:
+            attrs["hvac_action"] = "idle"
     if FAN in clusters:
         fm = _a(node, ep, FAN, 0)
         attrs["fan_modes"] = ["low", "medium", "high", "auto"]
@@ -693,6 +713,7 @@ def short_private_dir(key):
 
 
 STARTING = "Matter is starting. Try again in a minute."
+BUSY_NOTE = "Couch TV is still adding another device. Try again when it has finished."
 LOCK_NOTE = "Couch TV does not add locks, alarms or garage doors. It is still in your other home app."
 UNSUPPORTED_NOTE = ("Couch TV cannot show or work this kind of device (it shows lights, plugs, fans, blinds, air "
                     "conditioners and sensors), so it left it again. It is still in your other home app.")
@@ -772,6 +793,7 @@ class Matter:
         self._down = set()   # nodes that stopped answering a check (shown unavailable until they answer)
         self.version = 0
         self._atexit = False
+        self._adding = False   # a commission is running
 
     # ---------------- names kept here, and devices left that did not answer
     def _names_path(self):
@@ -1259,9 +1281,20 @@ class Matter:
             return False
 
     async def commission(self, code, address=None):
+        """Adds a shared device. One at a time: a second one while the first is still being added answers
+        at once with error and reason "busy" (contract change 15), never waits behind it."""
+        if self._adding:
+            return {"ok": False, "device_ids": [], "error": "busy", "reason": "busy", "note": BUSY_NOTE}
+        self._adding = True
+        try:
+            return await self._commission(code, address)
+        finally:
+            self._adding = False
+
+    async def _commission(self, code, address=None):
         c = clean_code(code)
         if not c:
-            return {"ok": False, "device_ids": [], "error": "wrong_code",
+            return {"ok": False, "device_ids": [], "error": "wrong_code", "reason": "wrong_code",
                     "note": "That code does not look right. Check the 11 digits, or make a new code in the other app."}
         ip = None
         if address not in (None, ""):
@@ -1278,7 +1311,8 @@ class Matter:
                 pin = (await self.request("parse_onboarding_payload", {"code": c}, timeout=15)) or {}
                 pin = pin.get("setup_pin_code") or next((x.get("setup_pin_code") for x in pin.get("payloads") or []), None)
                 if not pin:
-                    return {"ok": False, "device_ids": [], "error": "wrong_code", "note": "That code did not work."}
+                    return {"ok": False, "device_ids": [], "error": "wrong_code", "reason": "wrong_code",
+                            "note": "That code did not work."}
                 node = await self.request("commission_on_network", {"setup_pin_code": pin, "ip_addr": ip,
                                                                      "discovery_timeout_s": DISCOVERY_S}, timeout=COMMISSION_WAIT)
             else:
@@ -1287,7 +1321,8 @@ class Matter:
         except MatterError as e:
             return await self._commission_error(e)
         if not isinstance(node, dict) or node.get("node_id") is None:
-            return {"ok": False, "device_ids": [], "error": "unreachable", "note": "The device did not answer."}
+            return {"ok": False, "device_ids": [], "error": "unreachable", "reason": "unreachable",
+                    "note": "The device did not answer."}
         nid = str(node["node_id"])
         self.nodes[nid] = node
         if not devices_of(node, self._names):
@@ -1304,6 +1339,7 @@ class Matter:
 
     async def _commission_error(self, e):
         details = e.details.lower()
+        reason = None   # the error key itself unless a branch says more
         if e.reason in ("passcode-mismatch", "invalid-payload") or "passcode" in details or "invalid" in details and "code" in details:
             key, note = "wrong_code", "That code did not work. Make a new code in the other app and type it in again."
         elif "already commissioned" in details or "already-commissioned" in details:
@@ -1319,25 +1355,27 @@ class Matter:
                 key, note = "unreachable", "The device stopped answering. Check it is switched on and try again."
         elif e.reason == "attestation-rejected":
             key, note = "unreachable", "This device is not a certified Matter device, so it cannot be added."
+            reason = "not_certified"
         elif e.reason == "not_ready":
-            key, note = "unreachable", STARTING
+            key, note, reason = "unreachable", STARTING, "not_ready"
         else:
             key, note = "unreachable", "The device could not be added. Make a new code and try again."
+            reason = "failed"
         log.info("matter: adding a device failed (%s, %s)", e.reason, e.code)
-        return {"ok": False, "device_ids": [], "error": key, "note": note}
+        return {"ok": False, "device_ids": [], "error": key, "reason": reason or key, "note": note}
 
     async def command(self, did, action, value=None):
         action = str(action or "")
         if action not in ACTIONS:
-            return {"ok": False, "error": "refused"}
+            return {"ok": False, "error": "refused", "reason": "bad_request"}
         dev, node, ep = self._find(did)
         if not dev:
-            return {"ok": False, "error": "refused"}
+            return {"ok": False, "error": "refused", "reason": "not_found"}
         if dev["state"] == "unavailable":
-            return {"ok": False, "error": "unavailable", "state": "unavailable"}
+            return {"ok": False, "error": "unavailable", "reason": "not_ready", "state": "unavailable"}
         steps = plan(dev, node, ep, action, value, self._last_mode.get(did))
-        if not steps:
-            return {"ok": False, "error": "refused", "state": dev["state"]}
+        if not steps:   # this device cannot do that action, or the value is not one it takes
+            return {"ok": False, "error": "refused", "reason": "bad_request", "state": dev["state"]}
         if dev["domain"] == "climate" and dev["state"] != "off":
             self._last_mode[did] = dev["state"]
         nid = str(node["node_id"])
@@ -1360,7 +1398,10 @@ class Matter:
                 await asyncio.sleep(0.05)
         except MatterError as e:
             log.info("matter: %s on %s failed (%s %s)", action, did, e.reason, e.code)
-            return {"ok": False, "error": "unavailable" if e.code in (3, 4) else "failed", "state": dev["state"]}
+            if e.code in (3, 4):
+                return {"ok": False, "error": "unavailable", "reason": "not_ready", "state": dev["state"]}
+            return {"ok": False, "error": "failed", "reason": "device_refused" if e.reason == "status" else "failed",
+                    "state": dev["state"]}
         now, _, _ = self._find(did)
         now = now or dev
         return {"ok": True, "state": now["state"], "device": now}
@@ -1370,7 +1411,7 @@ class Matter:
         does not answer is forgotten here anyway (contract change 7), with a note saying so."""
         nid, node, _ = self._node_of(did)
         if not node:
-            return {"ok": False, "error": "refused"}
+            return {"ok": False, "error": "refused", "reason": "not_found"}
         removed = [d["id"] for d in devices_of(node, self._names)]
         offline = node.get("available") is False
         left = await self._leave(nid, tell=not offline)
@@ -1391,8 +1432,11 @@ class Matter:
     def rename(self, did, name):
         dev, node, ep = self._find(did)
         name = re.sub(r"\s+", " ", str(name or "")).strip()
-        if not dev or not NAME.fullmatch(name):
-            return {"ok": False, "error": "refused"}
+        if not dev:
+            return {"ok": False, "error": "refused", "reason": "not_found"}
+        if not NAME.fullmatch(name):
+            return {"ok": False, "error": "refused", "reason": "bad_name",
+                    "note": "A name is 1 to 40 letters, numbers or spaces."}
         if hidden_by_name(dev["domain"], endpoints(node).get(ep, set()), name):
             return {"ok": False, "error": "refused", "reason": "opens_house", "note": NAME_HIDES_NOTE}
         self._names[did] = name
