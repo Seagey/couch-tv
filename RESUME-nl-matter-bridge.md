@@ -46,6 +46,10 @@ Read first: coord/nolater-common.md and coord/matter-contract.md (changes 1 to 1
   file with fabrics() accepting fx's newer {name: {...}} answer (fx.py on the MacBook changed 05:51).
 - SIGTERM to the bridge (what `launchctl bootout` sends): the Matter service ended, pid file removed.
 
+- After the checker round, a217c13 on ~/mf-bridge with the committed harness (nl-matter-fixtures
+  6b82489, with the fixtures lock): **261 passed, 0 failed, 0 warnings, 261 checks, 248 s**; all eight
+  fixtures back to 1 fabric, lock released, bridge stopped.
+
 ## Not done, and why
 - Item 5, the bridge as a launchd job adding a device: `launchctl bootstrap` on the MacBook was refused
   by this session's permission classifier (twice: once with the plist in ~/Library/LaunchAgents, once
