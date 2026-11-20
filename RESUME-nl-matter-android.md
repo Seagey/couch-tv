@@ -32,23 +32,22 @@ Worktree: tools/couch-tv/wt-nl-matter-android, branch nl-matter-android (base in
 - on-TV release APK 45.26 MB: lib/ has all four ABIs (x86 + x86_64 libmatternone.so).
 - Emulator matter34 (Android 14 arm64) with this APK: ready true (lib found); remove of the stale unreachable matter:5:1 -> ok + note (forgot); commission while light window closed -> "expired"; light restarted (kvs6), commission -> matter:26:1 in 4 s; e2e control 15/15.
 
-## Done 21 Nov (session 3)
-- Placeholder renamed to libcouchtv_placeholder.so (nl-matter-packaging's check-release-apks.py only lets an Intel-only library through if its name has "placeholder"). Rebuilt with `remote-finish macbook` twice: same hashes (x86 8736261540..., x86_64 ba2ce6fbcd...), verify 90 files.
-- devices JSON has `reason` ("android_old" / "processor") when Matter can't run, so the screens can word it in their own language (MatterSupportTest 5).
-- Commission answers within 100 s (was 240 s): the contract wants 120 s for a code no device answers to (discovery never ends by itself on the emulator).
-- Unit: on-tv testDebugUnitTest 174 run, 0 failed, 1 skipped.
-- Launcher debug + release built with the merge (release 36.5 MB); both have lib/ for all four ABIs.
-- Contract run 1 (tests/matter_contract.py from nl-matter-fixtures 91def35, on the MacBook, --address fec0::2): 29 pass, 5 fail: the no-device code took 180 s (fixed above), and fx share light was refused "busy" because the bridge builder (mb-nlb bridge/server.py) was running its own contract run on the same fixtures at that moment. Rerun when the fixtures are free: scratchpad ma-fxfree.sh (copied to /tmp/ma-light/fxfree.sh) waits for that.
+## Done 21 Nov (session 3) - branch finished
+- c0c8672: Fable fixes committed; placeholder renamed libcouchtv_placeholder.so (remote-finish macbook run twice: same hashes, x86 87362615..., x86_64 ba2ce6fb...; verify 90 files; import check 241 imports per ARM ABI, API 24 missing none, API 23 missing freeifaddrs getifaddrs). devices JSON has `reason` (android_old / processor) when Matter can't run. Commission answers within 100 s (was 240 s: the contract wants 120 s).
+- f06a036: merged nl-matter-packaging e3bebc1 (release check, release.sh).
+- Unit: on-tv testDebugUnitTest 175 run, 0 failed, 1 skipped (MatterSupportTest 5).
+- Release check (packaging's scripts/check-release-apks.py --matter --skip-signer) on this branch's couch-tv-home.apk 36.5 MB, couch-tv-ontv.apk 45.3 MB, couch-tv-ontv-watch.apk 45.3 MB: "release check ok". All three have lib/ for armeabi-v7a, arm64-v8a, x86, x86_64.
+- CONTRACT (tests/matter_contract.py, nl-matter-fixtures 7ed915d) against the on-TV app on emulator matter34 (Android 14 arm64), --address fec0::2: **262 passed, 0 failed, 0 warnings, 262 checks, 300 s.** By group: auth 4, errors 25, commission 34, list 52, light 22, plug 13, thermostat 19, cover 13, fan 9, sensors 2, live 13, events 3, rename 6, forbidden 14, offline 2, remove 31. Every device back to 1 fabric after.
+  - Ran on a private copy of the fixtures (~/ma-fixtures on the MacBook, made by scratchpad ma-mkfx.py: ports 5741-5748, other discriminators, own home controller), because the bridge builder's runs on the shared fixtures (5541-5548) overlapped mine twice (light "busy", 3 fabrics). Earlier runs 1-4 on the shared set are void for that reason.
+  - Local one-line patch in the harness copy (scratchpad ma-matter_contract.py, Fixtures.fabrics): fx 7ed915d answers `fx fabrics <name>` as {name: {...}}, the harness reads ["fabrics"] and stops with KeyError at start. Tell the fixtures builder.
+- Launcher (debug build) on matter34 through window.TVMATTER / CouchMatter.reply (scratchpad ma-cdp2.py): 9 passed, 0 failed (devices, commission a fresh own light, on, level 30, rename, list, unknown id 404, remove).
+- Android 6 (AVD matter23, API 23 arm64, MacBook): release APK installs; devices = ready false, note "Matter needs Android 7 or newer on this TV.", reason android_old; commission = 400 error "unsupported"; events stream sends the same at once; libCHIPController.so is in the app's lib folder but not in the process maps (0): never loaded. 5 checks.
+- Intel TV install: no Intel emulator on Apple silicon; proof is the APK listing above and the release check.
 
-## Left (next steps)
-1. Commit (the pre-commit privacy scan takes 10+ min; no private addresses and no system image folder names in committed text).
-2. Install the newest on-TV release APK on matter34, run the contract when ma-fxfree.sh says FREE:
-   `ssh macbook 'cd /tmp/ma-light; python3 matter_contract.py --api http://127.0.0.1:5400 --token "$(cat token)" --address fec0::2 --fx "$HOME/matter-fixtures/fx" --report contract2.json > contract2.log 2>&1'`
-3. Launcher on matter34: install debug, start it, forward devtools, `python3 scratchpad/ma-cdp2.py <port> <code> <address>` (code from `fx share plug`, address [fec0::2]:5542).
-4. Android 6 runtime check (API 23 arm64 image in the matter-spike SDK): stop matter34, make an AVD, install the on-TV APK, devices says ready false + reason android_old, commission says unsupported. Then stop it.
-5. Merge nl-matter-packaging (cb75398 or newer) and run scripts/check-release-apks.py on the APKs.
-6. Tell matter-ui (via the report): setup.html MT_ERR has no "unsupported", and MT_WHY has no "android_old"/"processor".
-7. Stop the MacBook emulator and own light. Final report.
+## Left
+Nothing in this branch. For others (in the final report):
+- matter-ui: setup.html MT_ERR has no "unsupported"; MT_WHY has no "android_old" / "processor" (the note is English only).
+- nl-matter-fixtures: harness Fixtures.fabrics vs fx fabrics output (above); shared fixtures have no lock between builders.
 
 ## Commands
 - Gradle (shared lock): `bash scratchpad/ma-gradle.sh testDebugUnitTest assembleRelease` (launcher: scratchpad/ma-gradle-home.sh)
@@ -56,7 +55,5 @@ Worktree: tools/couch-tv/wt-nl-matter-android, branch nl-matter-android (base in
 - Test client token: /tmp/ma-light/token on the MacBook.
 - Tests (copies in scratchpad ma-*.py): `ssh macbook python3 /tmp/ma-light/e2e.py control|restart|remove`, `/tmp/ma-light/thermo.py`, `/tmp/ma-light/fixtures.py [names]` (revoke an open window first: `~/matter-fixtures/fx revoke <name>`).
 
-## Running on the MacBook (stop when done)
-- Emulator: avd matter34 (pid /tmp/ma-light/emu.pid). Stop: `adb -s emulator-5554 emu kill`.
-- Own light: pid /tmp/ma-light/pid (now 41161; KVS /tmp/ma-light/kvs6, port 5671, discriminator 3301, passcode 20202021, code 30054912331), on the on-TV app as matter:26:1 (named "Lounge lamp"). kvs5 is no longer used.
-- Never touch other agents' devices except through fx share/revoke (fixtures 5541-5548, others 5641, 5651).
+## Running on the MacBook
+Nothing: emulator matter34 stopped, own light (kvs6) stopped, private fixtures stopped (`~/ma-fixtures/fx up` starts them again, same storage; `~/matter-fixtures/fx` is the shared set). AVDs matter34 and matter23 kept.
