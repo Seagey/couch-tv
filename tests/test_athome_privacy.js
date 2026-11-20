@@ -46,7 +46,8 @@ const listW = clean.objects.filter((o) => o.kind === "list")[0];
 ok(listW.opts && listW.opts.label === "Shopping" && Object.keys(listW.opts).every((k) => ["label", "icon", "align"].indexOf(k) >= 0), "a List keeps only which list (a name, words only), its icon and where it sits");
 ok(!/4471/.test(JSON.stringify(CD.sanitize({ v: 1, objects: [{ id: "a", type: "widget", kind: "list", x: 0, y: 0, w: 360, h: 360, opts: { label: "Code 4471" } }] }))), "a list name with digits is refused (a design never carries numbers typed as words)");
 const WOPT = CD.wopts();
-KINDS.forEach((k) => ok(String(WOPT[k] || "").split(" ").filter(Boolean).every((o) => ["label", "icon", "align"].indexOf(o) >= 0), k + ": the gate allows no option that could hold its data (" + (WOPT[k] || "none") + ")"));
+// (days: the Agenda's Today, Today and tomorrow or This week, a fixed choice, never its data)
+KINDS.forEach((k) => ok(String(WOPT[k] || "").split(" ").filter(Boolean).every((o) => ["label", "icon", "align", "days"].indexOf(o) >= 0), k + ": the gate allows no option that could hold its data (" + (WOPT[k] || "none") + ")"));
 
 // 2. Share this home
 const snap = { scenes: ["night"], builtIn: ["night"], clock24: false, dock: ["com.netflix.ninja"], design: { v: 1, objects: widgets } };

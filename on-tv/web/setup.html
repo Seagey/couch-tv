@@ -86,8 +86,8 @@
   </div>
 
   <section class="card" id="widgets" style="display:none">
-    <h2>Widgets on this design</h2>
-    <p>Each widget on the TV with something to set. What you choose stays on the TV.</p>
+    <h2>Widgets on this TV</h2>
+    <p>Each widget on the TV's design with something to set, named by where it sits on the screen. What you choose stays on the TV, never in a design.</p>
     <div id="w-list"></div>
     <div class="msg" id="w-msg" role="status"></div>
   </section>
@@ -612,59 +612,86 @@
       else say(msgId, 'Sent. The TV takes it as soon as the couch-tv home is open on it.');
     }).catch(function (e) { say(msgId, e.message); });
   }
-  // each setting a widget offers, on the phone (the ids are widget-caps.js SETTINGS)
-  var AH_WORDS = { note: 'the family note', lists: 'the lists', wifi: 'the guest Wi-Fi', guide: 'the house guide', cal: 'the calendar link', guest: 'the guest\'s name and bookings' };
-  var WSET_PHONE = {
-    place: function (w) {
-      var town = (DESIGN.town || '').split(',')[0];
-      return '<p>Place now: <span class="now">' + esc(w.place ? w.place.name : town ? town + ' (the town for the weather)' : 'Not set') + '</span></p>' +
-        '<label for="wq-' + idOf(w.key) + '">Search for a town, suburb or beach</label><input id="wq-' + idOf(w.key) + '" type="search" autocomplete="off" enterkeyhint="search" data-wq="' + esc(w.key) + '" placeholder="Type at least 2 letters">' +
-        '<div class="places" data-wl="' + esc(w.key) + '" role="list"></div>' +
-        (w.place ? '<button type="button" class="quiet" data-wtown="' + esc(w.key) + '">Use the town for the weather instead</button>' : '') +
+  // Widgets on this TV: each widget on the design with settings of its own, drawn from its settings
+  // records (widget-caps.js, handed over by the TV in atHomeView design.widgets), one box each, named
+  // like the TV names it ("Surf, top right"). What is changed here goes to the TV the same way the TV's
+  // own Widgets on this home page saves it (Home settings, ST.widgets): never into a design, never to
+  // couch-tv. A private setting (a calendar link) only ever says "Set" here.
+  function optHtml(o, cur) { return '<option value="' + esc(String(o[0])) + '"' + (String(o[0]) === String(cur) ? ' selected' : '') + '>' + esc(String(o[1])) + '</option>'; }
+  function wsHtml(w, s) {
+    var id = 'ws-' + idOf(w.key) + '-' + idOf(s.key), data = ' data-wk="' + esc(w.key) + '" data-ws="' + esc(s.key) + '"';
+    var help = s.help ? '<p>' + esc(s.help) + '</p>' : '';
+    var back = s.own ? '<button type="button" class="quiet" data-wclear="1"' + data + '>' + (s.type === 'place' ? 'Use your home\'s town instead' : s.store === 'design' ? 'Use the design\'s own' : 'Clear it') + '</button>' : '';
+    if (s.type === 'place') {
+      return '<p>' + esc(s.label) + ': <span class="now">' + esc(s.words) + '</span></p>' +
+        '<label for="' + id + '">Search for ' + (s.coast ? 'a beach, or the town by it' : 'a town or suburb') + '</label><input id="' + id + '" type="search" autocomplete="off" enterkeyhint="search" data-wq="1"' + data + ' placeholder="Type at least 2 letters">' +
+        '<div class="places" data-wl="' + esc(w.key) + '" role="list"></div>' + back +
         '<p>Only the name you type goes to Open-Meteo, the free weather service the TV already uses. The TV keeps the place, never a street.</p>';
-    },
-    town: function () { return '<p>Uses the town for the weather: <span class="now">' + esc(DESIGN.town || 'Not set') + '</span></p><button type="button" data-open="town">Change the town</button>'; },
-    units: function (w) { return '<label for="wu-' + idOf(w.key) + '">Temperature</label><select id="wu-' + idOf(w.key) + '" data-ws="wx_unit"><option value="c"' + (DESIGN.wx_unit !== 'f' ? ' selected' : '') + '>°C (Celsius)</option><option value="f"' + (DESIGN.wx_unit === 'f' ? ' selected' : '') + '>°F (Fahrenheit)</option></select>'; },
-    clock: function (w) { return '<label for="wc-' + idOf(w.key) + '">Clock</label><select id="wc-' + idOf(w.key) + '" data-ws="clock"><option value="12h"' + (!DESIGN.clock24 ? ' selected' : '') + '>12 hour</option><option value="24h"' + (DESIGN.clock24 ? ' selected' : '') + '>24 hour</option></select>'; },
-    photos: function () { return '<p>It shows your photos.</p><button type="button" data-open="photos">Your photos</button>'; },
-    apps: function () { return '<p>Change its apps under Apps on this design.</p><button type="button" data-open="dapps">Apps on this design</button>'; },
-    smart: function () { return $('smart').style.display === 'none' ? '<p>It shows things from Home Assistant, picked on the TV: Home settings, couch-tv Studio, Smart home.</p>' : '<button type="button" data-open="smart">Smart home</button>'; },
-    keep: function () { return '<p>It shows Keep watching for the person on the couch.</p><button type="button" data-open="people">People</button>'; },
-    people: function () { return '<button type="button" data-open="people">People</button>'; },
-    music: function () { return '<p>It shows the song playing on the TV. Switch it on or off on the TV: Home settings, Look, Now playing.</p>'; },
-    commute: function () { return '<p>Where you drive to is set on the TV: Home settings, couch-tv Studio, Commute.</p>'; },
-    goal: function () { return '<p>The daily goal is set on the TV: Home settings, couch-tv Studio, At home, Screen time.</p>'; }
-  };
-  function wsetHtml(w, id) {
-    if (WSET_PHONE[id]) return WSET_PHONE[id](w);
-    if (AH_WORDS[id]) return '<p>Change ' + AH_WORDS[id] + ' under At home.</p><button type="button" data-open="athome">At home</button>';
-    return '';
+    }
+    if ((s.type === 'choice' || s.type === 'tvlist') && s.many) {
+      var picked = (Array.isArray(s.value) ? s.value : []).map(String);
+      return '<fieldset style="border:0;padding:0;margin:12px 0 0"><legend class="now">' + esc(s.label) + '</legend>' + (s.options.length ? s.options.map(function (o, i) {
+        return '<label class="check"><input type="checkbox" data-wmany="' + i + '"' + data + (picked.indexOf(String(o[0])) >= 0 ? ' checked' : '') + '> ' + esc(String(o[1])) + '</label>';
+      }).join('') : '<p>Nothing to pick on this TV yet.</p>') + '</fieldset>' + help + back;
+    }
+    if (s.type === 'choice' || s.type === 'tvlist') {
+      if (!s.options.length) return '<p>' + esc(s.label) + ': nothing to pick on this TV yet.</p>' + help;
+      return '<label for="' + id + '">' + esc(s.label) + '</label><select id="' + id + '" data-wpick="1"' + data + '>' +
+        (s.value === null || s.value === undefined ? '<option value="" selected disabled>Pick one</option>' : '') + s.options.map(function (o) { return optHtml(o, s.value); }).join('') + '</select>' + help + back;
+    }
+    if (s.type === 'toggle') return '<label class="check"><input type="checkbox" id="' + id + '" data-wtog="1"' + data + (s.value ? ' checked' : '') + '> ' + esc(s.label) + '</label>' + help + back;
+    if (s.type === 'device' || s.type === 'apps') {
+      return '<p>' + esc(s.label) + ': <span class="now">' + esc(s.words) + '</span></p><p>' + (s.type === 'apps' ? 'Change its apps under Apps on this design, or on the TV: hold OK on an app in it.' : 'Pick it on the TV: hold OK on the widget, then Settings for this widget.') + '</p>';
+    }
+    // text, a number, a team, a calendar link and anything newer: a box and Save
+    var val = s.value === true || s.value === null || s.value === undefined ? '' : Array.isArray(s.value) ? s.value.join(', ') : String(s.value);
+    var kind = s.type === 'number' ? ' type="number" inputmode="numeric"' + (isFinite(s.min) ? ' min="' + s.min + '"' : '') + (isFinite(s.max) ? ' max="' + s.max + '"' : '') + (isFinite(s.step) ? ' step="' + s.step + '"' : '')
+      : s.type === 'calendar' ? ' type="url" autocomplete="off" autocapitalize="off" spellcheck="false"' : ' maxlength="' + (s.many ? 200 : 80) + '"';
+    return '<label for="' + id + '">' + esc(s.label) + (s.many ? ', with commas between' : '') + '</label><div class="row"><input id="' + id + '"' + kind + data + ' value="' + esc(s.type === 'calendar' ? '' : val) + '"' +
+      (s.type === 'calendar' && s.value ? ' placeholder="Set. Paste a new link to change it"' : '') + '><button type="button" class="go" data-wsave="1"' + data + ' style="flex:none">Save</button></div>' + help + back;
   }
   function showWidgets() {
     var open = {};
     Array.prototype.forEach.call(document.querySelectorAll('#w-list details[open]'), function (x) { open[x.getAttribute('data-key')] = 1; });
     $('w-list').innerHTML = DESIGN.widgets.map(function (w) {
-      var body = (w.settings || []).map(function (id) { return wsetHtml(w, id); }).join('');
+      var body = (w.settings || []).filter(function (s) { return s.shown !== false; }).map(function (s) { return '<div class="sub">' + wsHtml(w, s) + '</div>'; }).join('');
       if (!body) return '';
-      var title = w.name + (w.label && w.label !== w.name ? ': ' + w.label : '');
-      return '<details class="wbox" data-key="' + esc(w.key) + '"' + (open[w.key] ? ' open' : '') + '><summary>' + esc(title) + '</summary><div>' + body + '</div></details>';
+      return '<details class="wbox" data-key="' + esc(w.key) + '"' + (open[w.key] ? ' open' : '') + '><summary>' + esc(w.title || w.name) + '</summary><div>' + body + '</div></details>';
     }).join('');
   }
+  function wsSend(key, k, v, words) { var vals = {}; vals[k] = v; return designSend({ widget_set: { key: key, values: vals } }, 'w-msg', words || 'Saved. The TV shows it now.'); }
+  function wsSetting(key, k) { var w = (DESIGN.widgets || []).filter(function (x) { return x.key === key; })[0]; return w && (w.settings || []).filter(function (s) { return s.key === k; })[0]; }
   $('w-list').addEventListener('click', function (e) {
-    var o = e.target.closest('[data-open]'); if (o) { goTo(o.getAttribute('data-open')); return; }
-    var t = e.target.closest('[data-wtown]'); if (t) { designSend({ design_place: { key: t.getAttribute('data-wtown'), place: null } }, 'w-msg', 'It uses the town for the weather again.'); return; }
-    var b = e.target.closest('button[data-wp]'); if (!b) return;
-    var key = b.getAttribute('data-wk'), p = (WPLACES[key] || [])[+b.getAttribute('data-wp')]; if (!p) return;
-    designSend({ design_place: { key: key, place: p } }, 'w-msg', 'Saved. The TV shows ' + p.name + ' now.');
+    var b = e.target.closest('button[data-wk]'); if (!b) return;
+    var key = b.getAttribute('data-wk'), k = b.getAttribute('data-ws');
+    if (b.hasAttribute('data-wclear')) { wsSend(key, k, null, 'Changed back.'); return; }
+    if (b.hasAttribute('data-wsave')) {
+      var s = wsSetting(key, k), box = b.parentNode.querySelector('input'), v = box.value.trim();
+      if (s && s.type === 'number') v = v === '' ? null : +v;
+      else if (s && s.many) v = v ? v.split(',').map(function (x) { return x.trim(); }).filter(Boolean) : null;
+      else if (!v) v = null;
+      wsSend(key, k, v);
+      return;
+    }
+    if (b.hasAttribute('data-wp')) { var p = (WPLACES[key + '|' + k] || [])[+b.getAttribute('data-wp')]; if (p) wsSend(key, k, p, 'Saved. The TV shows ' + p.name + ' now.'); }
   });
   $('w-list').addEventListener('change', function (e) {
-    var s = e.target.closest('select[data-ws]'); if (!s) return;
-    var set = {}; set[s.getAttribute('data-ws')] = s.value;
-    designSend({ design_setting: set }, 'w-msg', 'Saved.');
+    var t = e.target, key = t.getAttribute('data-wk'), k = t.getAttribute('data-ws'); if (!key) return;
+    if (t.hasAttribute('data-wpick')) { var s = wsSetting(key, k), o = s && s.options.filter(function (x) { return String(x[0]) === t.value; })[0]; if (o) wsSend(key, k, o[0]); }
+    else if (t.hasAttribute('data-wtog')) wsSend(key, k, t.checked);
+    else if (t.hasAttribute('data-wmany')) {
+      var sm = wsSetting(key, k), list = Array.prototype.filter.call(t.closest('fieldset').querySelectorAll('input[data-wmany]'), function (c) { return c.checked; })
+        .map(function (c) { return sm.options[+c.getAttribute('data-wmany')][0]; });
+      wsSend(key, k, list.length ? list : null);
+    }
+  });
+  $('w-list').addEventListener('keydown', function (e) {
+    var t = e.target; if (e.key !== 'Enter' || e.isComposing || !t.matches('input[data-ws]:not([type=checkbox])') || t.hasAttribute('data-wq')) return;
+    e.preventDefault(); var b = t.parentNode.querySelector('button[data-wsave]'); if (b) b.click();
   });
   $('w-list').addEventListener('input', function (e) {
     var q = e.target.closest('input[data-wq]'); if (!q) return;
-    var key = q.getAttribute('data-wq'), list = document.querySelector('#w-list [data-wl="' + key.replace(/["\\]/g, '') + '"]'), text = q.value.trim();
+    var key = q.getAttribute('data-wk'), k = q.getAttribute('data-ws'), list = q.parentNode.querySelector('[data-wl]'), text = q.value.trim();
     clearTimeout(wTimer);
     if (text.length < 2) { list.innerHTML = ''; return; }
     wTimer = setTimeout(function () {
@@ -674,11 +701,12 @@
         .then(function (r) { if (!r.ok) throw new Error('search'); return r.json(); })
         .then(function (j) {
           if (ticket !== wTicket) return;
-          WPLACES[key] = (j.results || []).filter(function (r) { return isFinite(r.latitude) && isFinite(r.longitude); }).slice(0, 8).map(function (r) {
+          // two decimals is about a kilometre: the town, never the house (the same as the Town search)
+          var found = WPLACES[key + '|' + k] = (j.results || []).filter(function (r) { return isFinite(r.latitude) && isFinite(r.longitude); }).slice(0, 8).map(function (r) {
             return { name: r.name, area: placeArea(r), lat: Math.round(r.latitude * 100) / 100, lon: Math.round(r.longitude * 100) / 100, timezone: r.timezone || 'auto' };
           });
-          list.innerHTML = WPLACES[key].map(function (p, i) { return '<button type="button" data-wk="' + esc(key) + '" data-wp="' + i + '" role="listitem"><span>' + esc(p.name) + '</span><small>' + esc(p.area) + '</small></button>'; }).join('');
-          say('w-msg', WPLACES[key].length ? 'Tap the place.' : 'Nothing found for "' + text + '". Try the nearest bigger town.');
+          list.innerHTML = found.map(function (p, i) { return '<button type="button" data-wk="' + esc(key) + '" data-ws="' + esc(k) + '" data-wp="' + i + '" role="listitem"><span>' + esc(p.name) + '</span><small>' + esc(p.area) + '</small></button>'; }).join('');
+          say('w-msg', found.length ? 'Tap the place.' : 'Nothing found for "' + text + '". Try the nearest bigger town.');
         })
         .catch(function () { if (ticket === wTicket) say('w-msg', 'The place search did not answer. Check this phone has internet, then try again.'); });
     }, 400);

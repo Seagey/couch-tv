@@ -387,7 +387,7 @@
   var OPT = {
     label: function (v) { return SAN.w(v, 40); }, text: function (v) { return SAN.w(v, 120); }, sub: function (v) { return SAN.w(v, 80); },
     kicker: function (v) { return SAN.w(v, 60); }, caption: function (v) { return SAN.w(v, 60); },
-    format: function (v) { return SAN.pick(v, ["12h", "24h"]); }, ampm: SAN.b, seconds: SAN.b, date: SAN.b,
+    format: function (v) { return SAN.pick(v, ["auto", "12h", "24h"]); }, ampm: SAN.b, seconds: SAN.b, date: SAN.b,
     align: function (v) { return SAN.pick(v, ["left", "center", "right"]); },
     show: function (v) { return SAN.pick(v, ["date", "weather", "both"]); }, dfmt: function (v) { return SAN.pick(v, DATE_KEYS); },
     cities: function (v) { return SAN.list(v, 4, tzOk); },
@@ -406,7 +406,7 @@
     },
     cols: function (v) { return SAN.n(v, 1, 6, true); }, names: SAN.b, more: SAN.b,
     image: function (v) { return imgOk(v) || undefined; }, fit: function (v) { return SAN.pick(v, ["cover", "contain"]); },
-    seconds_each: function (v) { return SAN.n(v, 5, 600, true); }, count: function (v) { return SAN.n(v, 1, 8, true); },
+    seconds_each: function (v) { return SAN.n(v, 5, 600, true); }, count: function (v) { return v === "auto" ? "auto" : SAN.n(v, 1, 8, true); },
     mat: SAN.c, weekday: function (v) { return SAN.n(v, 0, 6, true); }, alt: SAN.b, anchor: function (v) { return SAN.n(v, 0, 100000, true); },
     lid_a: SAN.c, lid_b: SAN.c, bin_a: function (v) { return SAN.w(v, 20); }, bin_b: function (v) { return SAN.w(v, 20); },
     quick: function (v) { return SAN.list(v, 6, function (q) { return SAN.pick(q, QUICK_IDS); }); },
@@ -416,7 +416,13 @@
     controls: function (v) { return SAN.list(v, 8, function (c) { c = obj(c); var o = {}; put(o, "icon", SAN.pick(c.icon, CTL_ICONS)); put(o, "name", SAN.w(c.name, 24)); return o.icon ? o : undefined; }); },
     shows: function (v) { return SAN.n(v, 1, 5, true); },
     // the web widgets (widget-web.js): a source picked from a fixed list, never a link
-    feed: function (v) { return SAN.pick(v, WEB_FEEDS); },
+    feed: function (v) { return SAN.pick(v, ["auto"].concat(WEB_FEEDS)); },
+    // the widget settings Studio can set (widget-caps.js settings, store "design"): a year or "every" (a
+    // countdown that comes round each year), a timer's quick start, how many hours, shuffle, the price, the
+    // agenda's days and which games
+    year: function (v) { return v === "every" ? "every" : SAN.n(v, 2026, 2040, true); }, minutes: function (v) { return SAN.n(v, 0, 240, true); },
+    hours: function (v) { return v === "auto" ? "auto" : SAN.n(v, 1, 24, true); }, shuffle: SAN.b, price: SAN.b,
+    days: function (v) { return SAN.pick(v, ["today", "two", "week"]); }, games: function (v) { return SAN.pick(v, ["all", "live", "mine"]); },
     league: function (v) { return SAN.pick(v, WEB_LEAGUES); }, team: function (v) { return SAN.w(v, 24); },
     // share symbols as Yahoo writes them (BHP.AX, ^AXJO, AUDUSD=X, BTC-AUD): never a link or a word
     tickers: function (v) { return SAN.list(v, 6, function (s) { s = typeof s === "string" ? s.trim().toUpperCase() : ""; return /^\^?[A-Z0-9]{1,8}([.=-][A-Z0-9]{1,4})?$/.test(s) ? s : undefined; }); },
@@ -428,15 +434,15 @@
   var WEB_FEEDS = ["abc", "abc-justin", "abc-sport", "abc-business", "sbs", "guardian", "bbc", "rnz"];
   var WOPT = {
     clock: "format ampm seconds date align", tallclock: "format align", glassclock: "format scene", analog: "seconds", flipclock: "format",
-    wordclock: "", solar: "", worldclock: "label cities", countdown: "label month day unit icon", date: "show dfmt align place", month: "", timer: "label",
-    weather: "place hilo night", bigtemp: "place", hourly: "place", week: "place", rain: "label", uv: "label", sun: "label", moon: "", air: "label", surf: "label",
-    photo: "image fit caption sub", slideshow: "seconds_each caption sub", mosaic: "count", artframe: "image mat caption sub", memory: "align",
+    wordclock: "", solar: "", worldclock: "label cities", countdown: "label month day year unit icon", date: "show dfmt align place", month: "", timer: "label minutes",
+    weather: "place hilo night", bigtemp: "place", hourly: "place hours", week: "place", rain: "label", uv: "label", sun: "label", moon: "", air: "label", surf: "label",
+    photo: "image fit caption sub", slideshow: "seconds_each caption sub shuffle", mosaic: "count", artframe: "image mat caption sub", memory: "align",
     keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",
     app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "label apps",
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "",
-    bins: "label weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label align", note: "align", list: "label icon align",
-    card: "label text icon", quote: "text sub", word: "", news: "feed label align", sports: "label league team align", stocks: "label tickers align", commute: "label arrive_h arrive_m buffer weekdays align",
+    bins: "label weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label align days", note: "align", list: "label icon align",
+    card: "label text icon", quote: "text sub", word: "", news: "feed label align count", sports: "label league team align games", stocks: "label tickers align price", commute: "label arrive_h arrive_m buffer weekdays align",
     welcome: "kicker text sub align source times", quick: "quick align", wifi: "align", guide: "align", screentime: "align", ask: "label align", agent: "label align", stack: ""
   };
   // The smart home and music widgets: which of the TV's own Home Assistant things a widget shows,
@@ -1479,7 +1485,7 @@
         var key = e.id + "|" + e.it.kind;
         if (!e.it.kind || seen[key]) return;
         seen[key] = 1;
-        out.push({ key: key, id: e.id, kind: e.it.kind, label: obj(e.it.opts).label || "", x: +o.x || 0, y: +o.y || 0, w: +o.w || 0, h: +o.h || 0 });
+        out.push({ key: key, id: e.id, kind: e.it.kind, label: obj(e.it.opts).label || "", opts: JSON.parse(JSON.stringify(obj(e.it.opts))), x: +o.x || 0, y: +o.y || 0, w: +o.w || 0, h: +o.h || 0 });
       });
     });
     return out;

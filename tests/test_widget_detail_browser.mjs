@@ -139,9 +139,12 @@ for (const [layer, w, q] of CASES) {
   // tests, 19 Nov 2026), then All apps, then Open for the widget's own page
   const page = await home([["scenes", 0, 0, 8, 4]], "&ha=1");
   await page.keyboard.down("Enter"); await page.waitForTimeout(900); await page.keyboard.up("Enter"); await page.waitForTimeout(300);
-  const items = await page.evaluate(() => [...document.querySelectorAll(".cw-menu .cw-mi")].map((n) => n.textContent));
+  // (Settings for this widget, the widget's own settings page, sits right after Settings when its kind has any:
+  // tests/test_design_settings_browser.mjs tests it; this test is about the rest of the order)
+  const items = await page.evaluate(() => [...document.querySelectorAll(".cw-menu .cw-mi")].map((n) => n.textContent).filter((t) => t !== "Settings for this widget"));
   ok(items[0] === "Settings" && items[1] === "All apps" && items[2] === "Open Scenes", "hold OK: Settings, All apps, then Open Scenes (" + items.join(", ") + ")");
-  await press(page, "ArrowDown", 200); await press(page, "ArrowDown", 200);
+  const openAt = await page.evaluate(() => [...document.querySelectorAll(".cw-menu .cw-mi")].map((n) => n.textContent).indexOf("Open Scenes"));
+  for (let k = 0; k < openAt; k++) await press(page, "ArrowDown", 200);
   await press(page, "Enter", 800);
   ok((await cur(page) || {}).name === "scenes", "hold OK: Open opens the layer");
   await page.close();

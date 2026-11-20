@@ -7382,6 +7382,10 @@
     var pl = ST.place && isFinite(ST.place.lat) && isFinite(ST.place.lon) ? { name: ST.place.name, lat: ST.place.lat, lon: ST.place.lon }
       : CFG.weather && isFinite(CFG.weather.lat) && isFinite(CFG.weather.lon) ? { name: String(CFG.weather.place || "").split(",")[0], lat: CFG.weather.lat, lon: CFG.weather.lon } : null;
     var to = kept("tvhome.commute");
+    // the Commute widget's own settings (Widgets on this home: Where to, and From when it is not the
+    // home's town) win over the older Commute rows' place
+    var cw = typeof CouchDesign !== "undefined" && CouchDesign.widgetList && CouchDesign.on() ? CouchDesign.widgetList().filter(function (w) { return w.kind === "commute"; })[0] : null;
+    if (cw) { var wt = cleanPlace(wsOf(cw.key).to), wf = cleanPlace(wsOf(cw.key).from); if (wt) to = wt; if (wf) pl = { name: wf.name, lat: wf.lat, lon: wf.lon }; }
     return { from: pl, to: to && isFinite(to.lat) && isFinite(to.lon) ? { name: String(to.name || ""), lat: +to.lat, lon: +to.lon } : null };
   }
   // Picks for you: each person's Keep watching (no kids or guest profiles' shows are picked for others)
@@ -7482,8 +7486,44 @@
       .map(function (s) {
         return { key: s.key, label: String(s.label || s.key), type: WS_TYPES[s.type] || s.type || "text", help: String(s.help || s.sub || ""), options: Array.isArray(s.options) ? s.options : [],
           def: s["default"] !== undefined ? s["default"] : s.def, private: !!s["private"], min: s.min, max: s.max, step: s.step, domain: s.domain || "", coast: !!s.coast,
+          pre: s.pre === true, many: !!s.many, from: s.from || "", when: s.when && typeof s.when === "object" ? s.when : null, sets: s.sets || "", store: s.store || "tv",
           where: Array.isArray(s.where) ? s.where : ["tv", "phone"] };
-      });
+      // only the settings a widget really reads now (pre: true); the rest wait for their renderers
+      }).filter(function (s) { return s.pre && (s.where.indexOf("tv") >= 0 || s.where.indexOf("phone") >= 0); });
+  }
+  // a setting's value now: set on this TV, else what the design says (o.opts), else its default
+  function wsCur(w, s) {
+    var v = wsOf(w.key)[s.key];
+    if (v !== undefined && v !== null && v !== "") return v;
+    v = (w.opts || {})[s.key];
+    return v !== undefined && v !== null && v !== "" ? v : s.def;
+  }
+  // "when": a setting that only means something once another one is set ({ alt: true }; "set": any
+  // value but "off" or none)
+  function wsShown(w, s) {
+    if (!s.when) return true;
+    return Object.keys(s.when).every(function (k) {
+      var o = w.settings.filter(function (x) { return x.key === k; })[0], v = o ? wsCur(w, o) : (w.opts || {})[k], want = s.when[k];
+      return want === "set" ? v !== undefined && v !== null && v !== "" && v !== "off" && v !== false : String(v) === String(want);
+    });
+  }
+  // a list from this TV itself (type tvlist): its photos, people, lists or calendars, as [value, words]
+  function tvlistOptions(from) {
+    if (from === "photos") return (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && p.id; }).map(function (p, i) { return [p.id, "Photo " + (i + 1)]; });
+    if (from === "people") return NOBODY ? [] : PEOPLE.map(function (p) { return [p.id, p.name]; });
+    if (from === "lists") return AH ? (AH.store.get().lists || []).map(function (l) { return [l.name, l.name]; }) : [];
+    if (from === "calendars") return AH && AH.store.get().cal ? [["main", "Your calendar"]] : [];
+    return [];
+  }
+  function wsOptions(s) { return s.type === "tvlist" ? tvlistOptions(s.from) : s.options; }
+  // "sets": bins, Which bin goes out this week, also sets the count the widget keeps from (anchor):
+  // the coming bin night is week 0 for the first bin, week 1 for the second
+  function wsSets(w, s, v) {
+    if (s.sets !== "anchor") return;
+    var o = w.settings.filter(function (x) { return x.key === "weekday"; })[0], wd = +(o ? wsCur(w, o) : (w.opts || {}).weekday);
+    if (!isFinite(wd)) wd = 3;
+    var d = new Date(), night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + (wd - d.getDay() + 7) % 7);
+    wsSet(w.key, "anchor", Math.floor(night.getTime() / 86400000) - (v === "b" ? 7 : 0));
   }
   function wsAll() { var w = ST.widgets; return w && typeof w === "object" && !Array.isArray(w) ? w : {}; }
   function wsOf(key) { var v = wsAll()[key]; return v && typeof v === "object" && !Array.isArray(v) ? v : {}; }
@@ -7492,7 +7532,9 @@
     if (v === null || v === undefined || v === "") delete rec[k]; else rec[k] = v;
     if (!Object.keys(rec).length) delete all[key];
     saveSettings();
-    if (k === "place") refreshWeather();
+    // a place changed: read the weather for it now (the Commute reads its own route)
+    if (/\|commute$/.test(key)) { if (WEB) WEB.tick(); webChanged(); }
+    else if (wsRecords(String(key).split("|")[1] || "").some(function (s) { return s.key === k && s.type === "place"; })) refreshWeather();
     if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("wset", JSON.stringify(wsAll()));
   }
   // a place as the place search gives it (two decimals: the town, never a house)
@@ -7506,7 +7548,14 @@
     return out;
   }
   function placeKey(p) { return Math.round(+p.lat * 100) / 100 + "," + Math.round(+p.lon * 100) / 100; }
-  function wsPlace(key) { return cleanPlace(wsOf(key).place); }
+  // the place a widget's reading is for: its place setting (surf "place", the weather widgets' "town"),
+  // never the Commute's two ends (they are its route, read by the commute itself)
+  function wsPlace(key) {
+    var kind = String(key).split("|")[1] || "", vals = wsOf(key);
+    if (kind === "commute") return null;
+    var s = wsRecords(kind).filter(function (x) { return x.type === "place" && cleanPlace(vals[x.key]); })[0];
+    return s ? cleanPlace(vals[s.key]) : null;
+  }
   // the widgets on the design now with a place of their own: [{ key, id, kind, place }]
   function wsPlaces() {
     if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CouchDesign.widgetList) return [];
@@ -7529,12 +7578,13 @@
     var C = window.CouchWidgetCaps, r = C && C.get ? C.get(kind) : null;
     return (r && r.name) || kind;
   }
-  // where a widget sits, in words: "top right", "bottom left", "in the middle"
+  // where a widget sits, in words: "top right", "middle left", "bottom", "in the middle" (a stack's
+  // widget: "top right, in a stack")
   function whereWords(w) {
     var cx = w.x + w.w / 2, cy = w.y + w.h / 2;
-    var col = cx < 640 ? "left" : cx < 1280 ? "" : "right", row = cy < 360 ? "top" : cy < 720 ? "" : "bottom";
-    if (/\//.test(w.id)) return (row || col ? [row, col].filter(Boolean).join(" ") : "in the middle") + ", in a stack";
-    return row || col ? [row, col].filter(Boolean).join(" ") : "in the middle";
+    var col = cx < 640 ? "left" : cx < 1280 ? "" : "right", row = cy < 360 ? "top" : cy < 720 ? "middle" : "bottom";
+    var words = row === "middle" && !col ? "in the middle" : [row, col].filter(Boolean).join(" ");
+    return /\//.test(w.id) ? words + ", in a stack" : words;
   }
   // the widgets on screen with settings of their own: [{ key, id, kind, label, settings, name, title }]
   function widgetsWithSettings() {
@@ -7551,14 +7601,14 @@
   function townName() { return String((WXCFG && WXCFG.place) || "").split(",")[0]; }
   // a setting's value now, in words (a private one never shows itself)
   function wsWords(s, v) {
-    if (v === undefined || v === null || v === "") v = s.def;
     if (s.type === "place") { var p = cleanPlace(v); return p ? p.name : townName() ? townName() + " (your home's town)" : "Not set"; }
-    if (v === undefined || v === null || v === "") return "Not set";
+    if (v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length)) return s.many ? "None picked" : "Not set";
     if (s.private) return "Set";
     if (s.type === "toggle") return v ? t("on") : t("off");
-    if (s.type === "choice") { var o = s.options.filter(function (x) { return String(x[0]) === String(v); })[0]; return o ? String(o[1]) : String(v); }
+    var opts = wsOptions(s), name = function (x) { var o = opts.filter(function (y) { return String(y[0]) === String(x); })[0]; return o ? String(o[1]) : String(x); };
+    if (Array.isArray(v)) return v.map(s.type === "choice" || s.type === "tvlist" ? name : String).join(", ");
+    if (s.type === "choice" || s.type === "tvlist") return name(v);
     if (s.type === "app") { var it = arrangeItems().items.filter(function (x) { return x.package === v || (window.CouchApps && window.CouchApps.idOf(x.package) === v); })[0]; return it ? it.name : String(v); }
-    if (Array.isArray(v)) return v.length + (v.length === 1 ? " item" : " items");
     return String(v);
   }
   function widgetRows(rows) {
@@ -7567,7 +7617,7 @@
     rows.push(head("Widgets on this home"));
     list.forEach(function (w) {
       var s = w.settings[0];
-      rows.push({ kind: "nav", key: "wset:" + w.key, label: w.title, sub: s.label + ": " + wsWords(s, wsOf(w.key)[s.key]), act: function () { openWidget(w.key); } });
+      rows.push({ kind: "nav", key: "wset:" + w.key, label: w.title, sub: s.label + ": " + wsWords(s, wsCur(w, s)), act: function () { openWidget(w.key); } });
     });
   }
   function widgetByKey(key) { return widgetsWithSettings().filter(function (x) { return x.key === key; })[0] || null; }
@@ -7589,28 +7639,43 @@
   }
   // each setting's rows on the TV, by its type
   function oneWidgetRows(w) {
-    var rows = [], vals = wsOf(w.key);
-    w.settings.forEach(function (s) {
-      var id = w.key + ":" + s.key, v = vals[s.key], set = function (x) { wsSet(w.key, s.key, x); };
-      var cur = v !== undefined ? v : s.def;
-      if (w.settings.length > 1) rows.push(head(s.label));
+    var rows = [], vals = wsOf(w.key), shown = w.settings.filter(function (s) { return wsShown(w, s); });
+    shown.forEach(function (s) {
+      var id = w.key + ":" + s.key, v = vals[s.key], cur = wsCur(w, s), set = function (x) { wsSet(w.key, s.key, x); wsSets(w, s, x); };
+      var opts = wsOptions(s);
+      if (shown.length > 1 && (s.type === "place" || s.many)) rows.push(head(s.label));
       if (s.type === "place") { placeRows(w, s, rows); return; }
-      if (s.type === "choice" && s.options.length) {
-        rows.push({ kind: "cycle", key: id, label: s.label, sub: s.help, value: wsWords(s, v), act: function () {
-          var i = s.options.map(function (o) { return String(o[0]); }).indexOf(String(cur)), o = s.options[(i + 1) % s.options.length];
+      if ((s.type === "choice" || s.type === "tvlist") && s.many) {
+        // a list: one tick per choice (up to the setting's max, 4 when it says none)
+        var picked = Array.isArray(cur) ? cur.map(String) : [], most = isFinite(s.max) ? +s.max : 4;
+        if (!opts.length) rows.push(info(id, s.label, "Nothing to pick on this TV yet", s.help));
+        opts.forEach(function (o, i) {
+          var on = picked.indexOf(String(o[0])) >= 0;
+          rows.push({ kind: "check", key: id + ":" + i, label: String(o[1]), checked: on, act: function () {
+            var now = (Array.isArray(wsCur(w, s)) ? wsCur(w, s) : []).filter(function (x) { return String(x) !== String(o[0]); });
+            if (!on) { if (now.length >= most) { SET.msg = "Up to " + most + ". Untick one first."; return; } now.push(o[0]); }
+            set(now.length ? now : null);
+          } });
+        });
+        if (s.help) rows.push(info(id + ":help", "", "", s.help));
+      } else if ((s.type === "choice" || s.type === "tvlist") && opts.length) {
+        rows.push({ kind: "cycle", key: id, label: s.label, sub: s.help, value: wsWords(s, cur), act: function () {
+          var i = opts.map(function (o) { return String(o[0]); }).indexOf(String(cur)), o = opts[(i + 1) % opts.length];
           set(o[0]);
         } });
+      } else if (s.type === "tvlist") {
+        rows.push(info(id, s.label, "Nothing to pick on this TV yet", s.from === "photos" ? "Add photos in Look and scenes, Your photos" : s.from === "lists" ? "Add a list in couch-tv Studio, At home" : s.help));
       } else if (s.type === "toggle") {
         rows.push({ kind: "toggle", key: id, label: s.label, sub: s.help, value: cur ? t("on") : t("off"), act: function () { set(!cur); } });
       } else if (s.type === "number") {
         var lo = isFinite(s.min) ? +s.min : 0, hi = isFinite(s.max) ? +s.max : 100, st = isFinite(s.step) && +s.step > 0 ? +s.step : 1;
-        rows.push({ kind: "slider" === "x" ? "slider" : "cycle", key: id, label: s.label, sub: s.help, value: cur === undefined || cur === null || cur === "" ? "Not set" : String(cur), act: function () {
+        rows.push({ kind: "cycle", key: id, label: s.label, sub: s.help, value: cur === undefined || cur === null || cur === "" ? "Not set" : String(cur), act: function () {
           var n = isFinite(+cur) && cur !== null && cur !== "" ? +cur + st : lo;
           set(n > hi ? lo : Math.round(n * 1000) / 1000);
         } });
       } else if (s.type === "app") {
         var apps = arrangeItems().items.filter(function (x) { return (!x.kind || x.kind === "app") && x.package && !/^(screen|input):/.test(x.package); });
-        rows.push({ kind: "cycle", key: id, label: s.label, sub: s.help, value: wsWords(s, v), act: function () {
+        rows.push({ kind: "cycle", key: id, label: s.label, sub: s.help, value: wsWords(s, cur), act: function () {
           var keys = apps.map(function (x) { return (window.CouchApps && window.CouchApps.idOf(x.package)) || x.package; }), i = keys.indexOf(cur);
           if (keys.length) set(keys[(i + 1) % keys.length]);
         } });
@@ -7618,21 +7683,28 @@
         rows.push(info(id, s.label, "", "On the home, hold OK on an app in it: Change app, Move, Remove or Add app. Or use Home settings on your phone."));
       } else if (s.type === "device") {
         var sh = window.smartHome && window.smartHome.setup && window.smartHome.setup.can();
-        rows.push(info(id, s.label, wsWords(s, v), s.help));
+        rows.push(info(id, s.label, wsWords(s, cur), s.help || "Picked from what this TV shows from Home Assistant"));
         if (sh) rows.push({ kind: "nav", key: id + ":smart", label: "Smart home", sub: "Pick the devices this TV shows", act: openSmartSetup });
+      } else if (s.type === "image") {
+        return;   // a picture is put in the widget in couch-tv Studio
       } else {
-        // text, team, calendar and anything newer: typed (a calendar link or anything private shows only "Set")
-        rows.push({ kind: "input", key: id, label: s.label, sub: s.help || (s.private ? "Kept on this TV and your home Wi-Fi only" : ""), value: wsWords(s, v), act: function () {
-          startTyping({ label: s.label, value: s.private ? "" : (typeof v === "string" ? v : ""), url: s.type === "calendar", submit: function (x) {
-            x = String(x || "").trim().slice(0, s.type === "calendar" ? 600 : 80);
-            if (s.type === "calendar" && x && !(window.CouchAtHome && CouchAtHome.calUrl(x))) { SET.msg = "That is not a calendar link. It starts with https://."; return; }
-            set(x); SET.msg = x ? "Saved." : "Cleared.";
+        // text, a team, a calendar link and anything newer: typed. A list of words (many) is typed with
+        // commas between. A calendar link or anything private shows only "Set".
+        rows.push({ kind: "input", key: id, label: s.label, sub: s.help || (s.private ? "Kept on this TV and your home Wi-Fi only" : ""), value: wsWords(s, cur), act: function () {
+          var was = s.private ? "" : Array.isArray(cur) ? cur.join(", ") : typeof cur === "string" ? cur : "";
+          startTyping({ label: s.label + (s.many ? ", with commas between" : ""), value: was, url: s.type === "calendar", submit: function (x) {
+            x = String(x || "").trim().slice(0, s.type === "calendar" ? 600 : s.many ? 200 : 80);
+            if (s.type === "calendar" && x) { x = window.CouchAtHome ? CouchAtHome.calUrl(x) : ""; if (!x) { SET.msg = "That is not a calendar link. It starts with https://."; return; } }
+            if (s.many) { var parts = x.split(",").map(function (y) { return y.trim(); }).filter(Boolean).slice(0, isFinite(s.max) ? +s.max : 6); set(parts.length ? parts : null); }
+            else set(x);
+            SET.msg = x ? "Saved." : "Cleared.";
           } });
         } });
-        if (v !== undefined && v !== "") rows.push({ kind: "action", key: id + ":clear", label: "Clear " + s.label.toLowerCase(), danger: true, act: function () { set(null); } });
       }
+      // a value set on this TV over the design's own: one press back to the design's
+      if (v !== undefined && v !== "" && s.type !== "place") rows.push({ kind: "action", key: id + ":clear", label: s.store === "design" ? "Use the design's " + s.label.toLowerCase() : "Clear " + s.label.toLowerCase(), act: function () { wsSet(w.key, s.key, null); if (s.sets) wsSet(w.key, s.sets, null); } });
     });
-    rows.push(info("w-kept", "Kept on this TV only, never in a design."));
+    rows.push(info("w-kept", "Changed here, kept on this TV only, never in a design."));
     return rows;
   }
   // a place setting: the town search (the same one as Location), kept on this TV only
@@ -7696,10 +7768,17 @@
     var installed = [];
     try { installed = arrangeItems().items.filter(function (it) { return (!it.kind || it.kind === "app") && it.package && !/^(screen|input):/.test(it.package); }).map(function (it) { return { key: (window.CouchApps && window.CouchApps.idOf(it.package)) || it.package, name: String(it.name || it.package) }; }); } catch (e) {}
     return { on: true, hide: hide, inputs: !!r.inputs, town: townName(),
+      // each setting as the phone draws it: its record, the choices (a TV list resolved here), the value
+      // now (a private one only says it is set), whether it was changed on this TV, and whether it shows
       widgets: widgetsWithSettings().map(function (w) {
-        var vals = wsOf(w.key), shown = {};
-        w.settings.forEach(function (s) { var v = vals[s.key]; if (v === undefined) return; shown[s.key] = s.private ? true : v; });
-        return { key: w.key, kind: w.kind, name: w.name, title: w.title, settings: w.settings.filter(function (s) { return s.where.indexOf("phone") >= 0; }), values: shown };
+        var vals = wsOf(w.key);
+        return { key: w.key, kind: w.kind, name: w.name, title: w.title,
+          settings: w.settings.filter(function (s) { return s.where.indexOf("phone") >= 0 && s.type !== "image"; }).map(function (s) {
+            var cur = wsCur(w, s), o = { key: s.key, label: s.label, type: s.type, help: s.help, many: s.many, coast: s.coast, store: s.store, min: s.min, max: s.max, step: s.step,
+              options: wsOptions(s), shown: wsShown(w, s), own: vals[s.key] !== undefined, words: wsWords(s, cur) };
+            o.value = s.private ? (cur ? true : null) : cur === undefined ? null : cur;
+            return o;
+          }) };
       }),
       apps: CouchDesign.appWidgets ? CouchDesign.appWidgets().map(function (a) { a.name = widgetName(a.kind); return a; }) : [], installed: installed };
   }
@@ -7721,14 +7800,22 @@
         var s = w.settings.filter(function (x) { return x.key === k; })[0], v = vals[k];
         if (!s || s.where.indexOf("phone") < 0) { bad = bad || "That setting is not on this widget."; return; }
         if (v === null) { wsSet(w.key, k, null); return; }
+        var opts = wsOptions(s), one = function (x) { var o = opts.filter(function (y) { return String(y[0]) === String(x); })[0]; return o ? o[0] : undefined; };
         if (s.type === "place") { v = cleanPlace(v); if (!v) { bad = "That place could not be used. Search for it again."; return; } }
-        else if (s.type === "choice") { if (!s.options.some(function (o) { return String(o[0]) === String(v); })) { bad = "That choice is not one of the choices."; return; } v = s.options.filter(function (o) { return String(o[0]) === String(v); })[0][0]; }
+        else if ((s.type === "choice" || s.type === "tvlist") && s.many) {
+          if (!Array.isArray(v)) { bad = "That choice is not one of the choices."; return; }
+          v = v.map(one).filter(function (x, i, a) { return x !== undefined && a.indexOf(x) === i; }).slice(0, isFinite(s.max) ? +s.max : 4);
+          if (!v.length) v = null;
+        }
+        else if (s.type === "choice" || s.type === "tvlist") { v = one(v); if (v === undefined) { bad = "That choice is not one of the choices."; return; } }
+        else if (s.many) { v = (Array.isArray(v) ? v : String(v).split(",")).map(function (x) { return String(x).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 30); }).filter(Boolean).slice(0, isFinite(s.max) ? +s.max : 6); if (!v.length) v = null; }
         else if (s.type === "toggle") v = !!v;
         else if (s.type === "number") { v = +v; if (!isFinite(v) || (isFinite(s.min) && v < +s.min) || (isFinite(s.max) && v > +s.max)) { bad = "That number is out of range."; return; } }
         else if (s.type === "calendar") { v = String(v).trim().slice(0, 600); v = window.CouchAtHome ? CouchAtHome.calUrl(v) : ""; if (!v) { bad = "That is not a calendar link. It starts with https://."; return; } }
         else if (s.type === "apps" || s.type === "device") { bad = "Change that on the TV."; return; }
-        else v = String(v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 80);
+        else if (s.type !== "choice" && s.type !== "tvlist") v = String(v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 80);
         wsSet(w.key, k, v);
+        wsSets(w, s, v);
       });
       if (bad) return { ok: false, error: bad };
     } else return { ok: false, error: "Nothing to change." };

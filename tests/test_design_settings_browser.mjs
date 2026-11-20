@@ -38,6 +38,7 @@ const design = { v: 1, background: { colour: "#1d3a4f" },
     { id: "s", type: "widget", kind: "surf", x: 80, y: 300, w: 460, h: 300, opts: { label: "North Point" } },
     { id: "f", type: "widget", kind: "wifi", x: 600, y: 300, w: 460, h: 300 },
     { id: "g", type: "widget", kind: "guide", x: 1120, y: 300, w: 460, h: 300 },
+    { id: "n", type: "widget", kind: "news", x: 1300, y: 40, w: 560, h: 220, opts: { feed: "abc" } },
     { id: "a", type: "widget", kind: "appgrid", x: 80, y: 650, w: 1160, h: 320, opts: { apps: ["netflix", "stan"] } }
   ] };
 // the same, but the design shows the home's own dock (input tiles belong there)
@@ -187,33 +188,42 @@ TV = tv;
   await openSettings(tv);
   ok(!(await secs(tv)).includes("Apps"), "closing Home settings goes back to only what the design uses");
 
-  // ---- 3. each widget's own settings ----
+  // ---- 3. each widget's own settings, drawn from widget-caps.js settings (pre: true only) ----
   await goSec(tv, "couch-tv Studio");
   const studio = (await rowsText(tv)).join(" | ");
-  ok(/Surf report: North Point/.test(studio) && /Guest Wi-Fi/.test(studio) && /House guide/.test(studio), "couch-tv Studio lists the design widgets with settings: " + studio);
-  ok(/Welcome words/.test(studio) && /Add the network name and password/.test(studio) && !/Surf report: North Point.*Surf report/.test(studio), "the Welcome widget is listed for its guest, the Wi-Fi with what to add, each widget once");
+  ok(/Surf, middle left/.test(studio) && /Beach: Sydney \(your home's town\)/.test(studio), "couch-tv Studio, Widgets on this home: the surf widget by kind and place, with its beach now: " + studio);
+  ok(/Headlines, top right/.test(studio) && /News source: ABC News/.test(studio), "and the headlines with the design's source");
+  ok(!/Welcome words|Guest Wi-Fi|House guide|App grid,/.test(studio), "widgets with no settings of their own are not listed");
   await closeSettings(tv);
 }
-// the label with no place of its own: the design's words beside the town the reading is for
-await tv.waitForFunction(() => /North Point · Sydney/.test((document.querySelector('.cw-o[data-obj="s"]') || {}).textContent || ""), null, { timeout: 8000 });
-ok(true, "no place of its own: the surf widget says North Point · Sydney, the town its reading is for");
-ok(asked.some((a) => /^marine.* -33\.86/.test(a)), "and the swell is asked for the home's town: " + asked.filter((a) => /^marine/.test(a)).join("; "));
-// Hold OK on the surf widget: Change place opens its page
+// Hold OK on the surf widget: Settings for this widget, right after Settings, opens its page
 {
   await tv.evaluate(() => window.CouchDesign.nav.focus("s", 0)); await tv.waitForTimeout(200);
   await tv.keyboard.down("Enter"); await tv.waitForTimeout(900); await tv.keyboard.up("Enter"); await tv.waitForTimeout(300);
   const menu = await tv.evaluate(() => [...document.querySelectorAll(".cw-sheet .cw-mi")].map((e) => e.textContent));
-  ok(menu[0] === "Settings" && menu.includes("Change place"), "Hold OK on the surf widget: Settings first, then Change place (" + menu.join(", ") + ")");
-  const i = menu.indexOf("Change place");
-  for (let k = 0; k < i; k++) await press(tv, "ArrowDown", 80);
+  ok(menu[0] === "Settings" && menu[1] === "Settings for this widget", "Hold OK on the surf widget: Settings, then Settings for this widget (" + menu.join(", ") + ")");
+  await press(tv, "ArrowDown", 120);
   await press(tv, "Enter", 600);
-  ok(await tv.evaluate(() => document.getElementById("settings").classList.contains("on")), "Change place opens Home settings");
-  ok(/Surf report: North Point/.test(await tv.textContent("#set-head")), "at the surf report's own page: " + await tv.textContent("#set-head"));
+  ok(await tv.evaluate(() => document.getElementById("settings").classList.contains("on")), "it opens Home settings");
+  ok(/Surf, middle left/.test(await tv.textContent("#set-head")), "at the surf widget's own page: " + await tv.textContent("#set-head"));
   const pg = (await rowsText(tv)).join(" | ");
-  ok(/Place now/.test(pg) && /Sydney \(the town for the weather\)/.test(pg) && /Search for a place/.test(pg), "its place now is the town for the weather, with a search: " + pg.slice(0, 200));
-  if (SHOTS) await tv.screenshot({ path: path.join(SHOTS, "tv-surf-place.png") });
+  ok(/Beach/.test(pg) && /Sydney \(your home's town\)/.test(pg) && /Search for a place/.test(pg) && /beach, or the town by it/.test(pg), "its beach now is the home's town, with a beach search: " + pg.slice(0, 240));
+  if (SHOTS) await tv.screenshot({ path: path.join(SHOTS, "tv-surf-settings.png") });
+  await closeSettings(tv);
+  // the headlines widget: the news source, a choice, changed on the TV over the design's own
+  await tv.evaluate(() => window.CouchDesign.nav.focus("n", 0)); await tv.waitForTimeout(200);
+  await tv.keyboard.down("Enter"); await tv.waitForTimeout(900); await tv.keyboard.up("Enter"); await tv.waitForTimeout(300);
+  await press(tv, "ArrowDown", 120); await press(tv, "Enter", 600);
+  await press(tv, "Enter", 300);   // the News source row: the next choice
+  const wsv = await tv.evaluate(() => window.tv.atHomeRead().design.widgets.filter((w) => w.key === "n|news")[0].settings.filter((s) => s.key === "feed")[0]);
+  ok(wsv.own && wsv.value === "abc-justin", "OK on News source steps to the next choice, kept on this TV: " + JSON.stringify(wsv.value));
+  const st = await tv.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || localStorage.getItem("tvhome.settings") || "{}"); return (r.s || r).widgets; });
+  ok(st && st["n|news"] && st["n|news"].feed === "abc-justin", "in Home settings (widgets), which rides /api/settings: " + JSON.stringify(st));
+  const rows2 = (await rowsText(tv)).join(" | ");
+  ok(/Use the design's news source/.test(rows2), "with one row back to the design's own");
   await closeSettings(tv);
 }
+ok(asked.some((a) => /^marine.* -33\.86/.test(a)), "the swell is asked for the home's town while no beach is set: " + asked.filter((a) => /^marine/.test(a)).join("; "));
 
 // ---- 4. input tiles ----
 {
@@ -237,7 +247,7 @@ ok(asked.some((a) => /^marine.* -33\.86/.test(a)), "and the swell is asked for t
   const v = await tv.evaluate(() => window.tv.atHomeRead().design);
   ok(v.on && v.inputs === false && v.hide.includes("inputs") && v.hide.includes("people") && v.hide.includes("photos") && !v.hide.includes("athome") && !v.hide.includes("town"),
     "the hidden dock design: the phone hides input tiles, people and photos, keeps the town and At home: " + JSON.stringify(v.hide));
-  ok(!JSON.stringify(v).includes("salt") && v.widgets.some((w) => w.key === "s|surf" && w.settings.includes("place")), "the widgets go with their settings, nothing private");
+  ok(!JSON.stringify(v).includes("salt") && v.widgets.some((w) => w.key === "s|surf" && w.settings.some((s) => s.key === "place" && s.type === "place")), "the widgets go with their settings, nothing private");
 }
 
 // ---- 5. the phone page ----
@@ -281,27 +291,42 @@ await phone.waitForFunction(() => document.getElementById("design-line").style.d
   await phone.click("#design-all"); await phone.waitForTimeout(150);
   ok(await phone.evaluate(() => document.getElementById("people").classList.contains("hidden-by-design")), "Show only what this design uses hides them again");
 }
-// the surf report's place, from the phone
+// Widgets on this TV: the surf widget's beach and the headlines' source, from the phone
 {
+  ok(/Widgets on this TV/.test(await phone.textContent("#widgets .fold-btn")), "the phone's section is Widgets on this TV");
+  const titles = await phone.evaluate(() => [...document.querySelectorAll("#w-list summary")].map((e) => e.textContent));
+  ok(titles.join(",") === "Surf, middle left,Headlines, top right", "one box per widget with settings, named like the TV names it: " + titles.join(" / "));
   await phone.click('#w-list details[data-key="s|surf"] summary');
   const words = await phone.textContent('#w-list details[data-key="s|surf"]');
-  ok(/Place now: Sydney \(the town for the weather\)/.test(words), "the surf report's place on the phone: " + words.slice(0, 80));
-  await phone.fill('#w-list input[data-wq="s|surf"]', "Bells");
+  ok(/Beach: Sydney \(your home's town\)/.test(words), "the surf widget's beach on the phone: " + words.slice(0, 80));
+  await phone.fill('#w-list input[data-wq][data-wk="s|surf"]', "Bells");
   await phone.waitForSelector('#w-list button[data-wp="0"]');
   await phone.click('#w-list button[data-wp="0"]');
   await phone.waitForFunction(() => /Saved\. The TV shows Bells Beach now\./.test(document.getElementById("w-msg").textContent));
-  const pl = await tv.evaluate(() => window.CouchDesign.placeWidgets().filter((p) => p.key === "s|surf")[0].place);
-  ok(pl && pl.name === "Bells Beach" && pl.lat === -38.37 && pl.lon === 144.28, "the TV keeps the surf report's own place, rounded to the town: " + JSON.stringify(pl));
-  const kept = await tv.evaluate(() => JSON.parse(localStorage.getItem("couchtv.design.places") || "{}"));
-  ok(kept["s|surf"] && kept["s|surf"].name === "Bells Beach", "on the TV's own storage, like the app changes");
-  await tv.waitForFunction(() => /Bells Beach/.test((document.querySelector('.cw-o[data-obj="s"]') || {}).textContent || "") && /2\.3/.test((document.querySelector('.cw-o[data-obj="s"]') || {}).textContent || ""), null, { timeout: 8000 });
-  ok(true, "the surf widget names Bells Beach and shows its own swell (2.3 m)");
+  const st = await tv.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || localStorage.getItem("tvhome.settings") || "{}"); return (r.s || r).widgets; });
+  const pl = st && st["s|surf"] && st["s|surf"].place;
+  ok(pl && pl.name === "Bells Beach" && pl.lat === -38.37 && pl.lon === 144.28, "the TV keeps the beach in Home settings, rounded to the town: " + JSON.stringify(pl));
+  await tv.waitForTimeout(1500);
   ok(asked.some((a) => /^marine.* -38\.37,144\.28/.test(a)), "the swell is asked for Bells Beach: " + asked.filter((a) => /^marine/.test(a)).join("; "));
-  ok(/Place now: Bells Beach/.test(await phone.textContent('#w-list details[data-key="s|surf"]')), "the phone shows the new place, its box still open");
+  ok(asked.some((a) => /^api\.open-meteo.* -38\.37,144\.28/.test(a)), "with Bells Beach's own forecast");
+  ok(/Beach: Bells Beach/.test(await phone.textContent('#w-list details[data-key="s|surf"]')), "the phone shows the new beach, its box still open");
   if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, "phone-surf-place.png"), fullPage: true });
-  await phone.click('#w-list button[data-wtown="s|surf"]');
-  await phone.waitForFunction(() => /town for the weather again/.test(document.getElementById("w-msg").textContent));
-  ok(await tv.evaluate(() => !window.CouchDesign.placeWidgets()[0].place), "Use the town for the weather instead takes the place off");
+  await phone.click('#w-list details[data-key="s|surf"] button[data-wclear]');
+  await phone.waitForFunction(() => /Changed back/.test(document.getElementById("w-msg").textContent));
+  const st2 = await tv.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || localStorage.getItem("tvhome.settings") || "{}"); return (r.s || r).widgets || {}; });
+  ok(!st2["s|surf"], "Use your home's town instead takes the beach off");
+  // a choice: the headlines' source
+  await phone.click('#w-list details[data-key="n|news"] summary');
+  await phone.selectOption('#w-list select[data-wk="n|news"][data-ws="feed"]', "bbc");
+  await phone.waitForFunction(() => /Saved/.test(document.getElementById("w-msg").textContent));
+  const st3 = await tv.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || localStorage.getItem("tvhome.settings") || "{}"); return (r.s || r).widgets || {}; });
+  ok(st3["n|news"] && st3["n|news"].feed === "bbc", "the phone picks BBC World for the headlines: " + JSON.stringify(st3["n|news"]));
+  const bad = await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "n|news", values: { feed: "made-up" } } }));
+  ok(bad.ok === false, "a choice that is not one of the choices is refused: " + bad.error);
+  const notHere = await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "zz|news", values: { feed: "bbc" } } }));
+  ok(notHere.ok === false, "a widget that is not on the home is refused");
+  const data = await tv.evaluate(() => window.tv.atHomeRead().design.widgets.filter((w) => w.key === "n|news")[0]);
+  ok(data.settings.every((s) => s.key !== "count"), "only the settings a widget reads now (pre) are offered");
 }
 // the design's apps, from the phone
 {
