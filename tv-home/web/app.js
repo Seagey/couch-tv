@@ -7077,6 +7077,88 @@
     SET.keyFocus = null; SET.ri = 0;
   }
 
+  // ---- Home settings, Smart home, Matter devices (matter.js) ----
+  // The lights, plugs, fans, blinds, thermostats and sensors already in Google Home, Apple Home,
+  // SmartThings or Alexa, shared to this TV with a pairing code. They show under the Home Assistant
+  // rows of the Smart home screen, each with Rename and Remove, and Add a Matter device says where each
+  // app keeps the code. Only where a Matter controller answers (this TV's app or the home computer).
+  // English only, like the rest of this section.
+  var MT_ERR = { short: "That code is too short. A Matter code has 11 numbers.", typo: "One of those numbers is wrong. Check the code and type it again.",
+    code: "That is not a Matter code. It has 11 numbers, like 3497 011 2332.", expired: "That code ran out. Make a new one in the app and type it in straight away.",
+    wrong_code: "The device did not take that code. Make a new one in the app and try again.", unreachable: "The TV could not reach the device. Check it is on and near the TV's Wi-Fi.",
+    thread: "The device uses Thread, and the TV cannot reach your Thread network. A Google or Apple hub (Nest Hub, HomePod mini, Apple TV) must be on at home.",
+    refused: "That could not be done.", timeout: "That took too long. Try again.", off: "Matter is not on for this TV yet.", failed: "That did not work. Try again." };
+  function mtSay(r) { return MT_ERR[r && r.error] || (r && r.note) || MT_ERR.failed; }
+  var MT_APPS = [
+    ["Google Home", "Touch and hold the device, then Settings, Linked Matter apps and services, Link apps and services, Use pairing code."],
+    ["Apple Home", "Open the device, then its settings. Near the bottom pick Turn On Pairing Mode, then Copy Code. The code lasts 5 minutes."],
+    ["SmartThings", "Open the device, then the settings button at the top right, Share with other services, Share device. Keep that page open until the TV says it is added."],
+    ["Alexa", "Devices, the device, Other Assistants and Apps, Add another. The 11 number code lasts 15 minutes."]
+  ];
+  function matterRows(rows) {
+    var M = window.CouchMatter;
+    if (!M || !M.on()) return rows;
+    rows.push(head("Matter devices"));
+    if (!M.ready()) rows.push(info("mt-wait", "", "", M.note() || "Matter is getting ready on this TV. Try again in a minute."));
+    M.list().forEach(function (d) {
+      rows.push({ kind: "nav", key: "mt-d:" + d.entity, label: d.name, value: d.words, act: function () { openMatterDevice(d.entity); } });
+    });
+    rows.push({ kind: "nav", key: "mt-add", label: "Add a Matter device", sub: "From Google Home, Apple Home, SmartThings or Alexa. It stays in that app too.", act: openMatterAdd });
+    return rows;
+  }
+  function openMatterAdd() {
+    var up = SET.sub;
+    MT_ADD.link = "";
+    if (ON_TV && !OFFLINE) api("GET", "/api/phone-link").then(function (j) { if (j && /^http:\/\/[^\/]+\/setup/.test(j.url || "")) { MT_ADD.link = j.url; if (zone === "settings") renderSettings(); } }, function () {});
+    SET.sub = { up: up, back: "mt-add", crumb: "Smart home", title: function () { return "Add a Matter device"; }, rows: function () {
+      var rows = [info("mt-how", "", "", "Your app makes a share code. Type it here or on your phone, and this TV becomes one more way to use the device.")];
+      if (MT_ADD.link && window.TVQR) rows.push({ kind: "qr", key: "mt-qr", link: MT_ADD.link, label: "Easier on your phone", sub: "Scan, then go to Matter devices and paste the code." });
+      rows.push({ kind: "input", key: "mt-code", label: "Type the code", value: MT_ADD.busy ? "Adding..." : "", sub: "11 numbers. Typing is quicker with Type on the TV in the phone remote.", act: function () {
+        if (MT_ADD.busy) return;
+        ahType("The Matter code (11 numbers)", "", function (v) { matterAdd(v); });
+      } });
+      rows.push(head("Where to find the code"));
+      MT_APPS.forEach(function (a, i) { rows.push(info("mt-app:" + i, a[0], "", a[1])); });
+      return rows;
+    } };
+    SET.keyFocus = null; SET.ri = 0;
+  }
+  var MT_ADD = { busy: false, link: "" };
+  function matterAdd(text) {
+    var M = window.CouchMatter, c = M.checkCode(text);
+    if (!c.ok) { SET.msg = mtSay(c); if (zone === "settings") renderSettings(); return; }
+    MT_ADD.busy = true; SET.msg = "Adding the device. This can take a minute...";
+    if (zone === "settings") renderSettings();
+    M.commission(c.code).then(function (r) {
+      MT_ADD.busy = false;
+      SET.msg = r.ok ? (r.added && r.added.length ? "Added: " + r.added.join(", ") + "." : "Added.") + " It shows in your smart home widgets now." : mtSay(r);
+      if (zone === "settings") renderSettings();
+    });
+  }
+  function openMatterDevice(entity) {
+    var up = SET.sub, M = window.CouchMatter;
+    var dev = function () { return M.list().filter(function (d) { return d.entity === entity; })[0]; };
+    SET.sub = { up: up, back: "mt-d:" + entity, crumb: "Smart home", title: function () { var d = dev(); return d ? d.name : "Matter device"; }, rows: function () {
+      var d = dev();
+      if (!d) return [info("mt-gone", "", "", "This device is not on this TV any more.")];
+      return [info("mt-now", d.words, "", ""),
+        { kind: "input", key: "mt-rename", label: "Rename", value: d.name, sub: "The name your widgets show", act: function () {
+          ahType("A name for " + d.name, d.name, function (v) {
+            v = String(v || "").trim();
+            if (!v) return;
+            SET.msg = "Saving...";
+            M.rename(entity, v).then(function (r) { SET.msg = r.ok ? "Renamed." : mtSay(r); if (zone === "settings") renderSettings(); });
+          });
+        } },
+        { kind: "action", key: "mt-remove", label: "Remove from this TV", danger: true, confirmText: "Press OK again to remove it", sub: "It stays in your Google, Apple, SmartThings or Alexa app.", act: function () {
+          SET.msg = "Removing...";
+          M.remove(entity).then(function (r) { SET.msg = r.ok ? "Removed from this TV." : mtSay(r); if (r.ok) SET.sub = up; if (zone === "settings") renderSettings(); });
+        } }];
+    } };
+    SET.keyFocus = null; SET.ri = 0;
+  }
+  if (window.CouchMatter) window.CouchMatter.onChange(function () { if (zone === "settings") renderSettings(); });
+
   // ---- Home settings, couch-tv Studio, Smart home: Home Assistant set up on the TV, no computer ----
   // The launcher (HomeAssistant.kt) or, on a TV whose home a computer runs, that computer's bridge
   // checks the address and token and lists what Home Assistant has; the person ticks what shows. The
@@ -7128,7 +7210,8 @@
   }
   function openSmartSetup() {
     SH.list = null; SH.err = ""; SH.picks = null;
-    SET.sub = { back: "dz-smart", crumb: "Designs", title: function () { return "Smart home"; }, rows: smartRows };
+    SET.sub = { back: "dz-smart", crumb: "Designs", title: function () { return "Smart home"; }, rows: function () { return matterRows(smartRows()); } };
+    if (window.CouchMatter && window.CouchMatter.on()) window.CouchMatter.refresh();
     SET.keyFocus = null; SET.ri = 0;
   }
   function smartRows() {

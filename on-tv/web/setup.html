@@ -77,7 +77,7 @@
   <p>This page comes from your TV, over your home Wi-Fi. What you change here shows on the TV in a moment, and everything here can still be changed on the TV too. Nothing typed here goes to Couch TV or anyone else. <a href="/">Back to the remote</a></p>
 
   <nav class="jump" aria-label="Sections">
-    <a href="#widgets" id="jump-widgets" style="display:none">Widgets</a><a href="#dapps" id="jump-dapps" style="display:none">Apps</a><a href="#town">Town</a><a href="#people">People</a><a href="#photos">Photos</a><a href="#athome">At home</a><a href="#ask">Ask AI</a><a href="#home">Home screen</a><a href="#smart" id="jump-smart" style="display:none">Smart home</a><a href="#tv">This TV</a>
+    <a href="#widgets" id="jump-widgets" style="display:none">Widgets</a><a href="#dapps" id="jump-dapps" style="display:none">Apps</a><a href="#town">Town</a><a href="#people">People</a><a href="#photos">Photos</a><a href="#athome">At home</a><a href="#ask">Ask AI</a><a href="#home">Home screen</a><a href="#smart" id="jump-smart" style="display:none">Smart home</a><a href="#matter" id="jump-matter" style="display:none">Matter</a><a href="#tv">This TV</a>
   </nav>
 
   <div class="card" id="design-line" style="display:none" role="status">
@@ -225,6 +225,24 @@
     <p>Show your air conditioning, lights and doorbell camera from Home Assistant on the TV. You sign in to your own Home Assistant on this phone; the TV keeps the sign in.</p>
     <button class="go" id="smart-go">Set up smart home</button>
     <div class="msg" id="smart-msg" role="status"></div>
+  </section>
+
+  <section class="card" id="matter" style="display:none">
+    <h2>Matter devices</h2>
+    <p>Add the lights, plugs, fans, blinds and thermostats you already have in Google Home, Apple Home, SmartThings or Alexa. The app makes a share code, you paste it here, and the TV becomes one more way to use the device. It stays in your app too. Locks, alarms and garage doors never show on the TV.</p>
+    <p class="now" id="matter-note" style="display:none"></p>
+    <ul class="alist" id="matter-list" aria-label="Matter devices on this TV"></ul>
+    <h3>Add a Matter device</h3>
+    <p>1. Get the share code from your app:</p>
+    <details class="wbox"><summary>Google Home</summary><div><p>Touch and hold the device, then Settings, Linked Matter apps and services, Link apps and services, then Use pairing code. Copy the code.</p></div></details>
+    <details class="wbox"><summary>Apple Home</summary><div><p>Open the device, then its settings. Near the bottom, tap Turn On Pairing Mode, then Copy Code. The code lasts 5 minutes.</p></div></details>
+    <details class="wbox"><summary>SmartThings</summary><div><p>Open the device, tap the settings button at the top right, then Share with other services, then Share device. Copy the number code, and keep that page open until this page says it is added.</p></div></details>
+    <details class="wbox"><summary>Alexa</summary><div><p>Devices, tap the device, then Other Assistants and Apps, then Add another. Copy the 11 number code. It lasts 15 minutes.</p></div></details>
+    <label for="matter-code">2. Paste the code here</label>
+    <input id="matter-code" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="11 numbers, like 3497 011 2332">
+    <button class="go" id="matter-add" type="button">Add to the TV</button>
+    <label class="btn quiet pick" id="matter-scan" style="display:none">Or take a photo of its QR code<input type="file" accept="image/*" capture="environment" id="matter-photo"></label>
+    <div class="msg" id="matter-msg" role="status"></div>
   </section>
 
   <h2 id="tv" style="margin-top:28px">This TV</h2>
@@ -790,6 +808,94 @@
     }).catch(function (e) { say('smart-msg', e.message); });
   };
 
+  // ---------------- Matter devices: shared from Google Home, Apple Home, SmartThings or Alexa ----------------
+  // The TV (or the home computer) is one more Matter controller (/api/matter/*, the Matter contract).
+  // Shown only where one answers. The code is checked here first (11 or 21 numbers, the last one
+  // checks the rest), so a typo is caught before the app's code runs out.
+  var MT_ERR = { short: 'That code is too short. A Matter code has 11 numbers.', typo: 'One of those numbers is wrong. Check the code and paste it again.',
+    code: 'That is not a Matter code. It has 11 numbers, like 3497 011 2332.', expired: 'That code ran out. Make a new one in the app and paste it in straight away.',
+    wrong_code: 'The device did not take that code. Make a new one in the app and try again.', unreachable: 'The TV could not reach the device. Check it is on and near the TV\'s Wi-Fi.',
+    thread: 'The device uses Thread, and the TV cannot reach your Thread network. A Google or Apple hub (Nest Hub, HomePod mini, Apple TV) must be on at home.',
+    refused: 'That could not be done.', failed: 'That did not work. Try again.' };
+  var MT_KIND = { light: 'Light', switch: 'Plug or switch', fan: 'Fan', cover: 'Blind', climate: 'Thermostat', sensor: 'Sensor' };
+  var VD = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]];
+  var VP = [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]];
+  function matterCode(text) {
+    text = String(text == null ? '' : text).trim();
+    var qr = /MT:[0-9A-Z.\-]{19,512}/.exec(text.toUpperCase());
+    if (qr) return { ok: true, code: qr[0] };
+    var d = text.replace(/[\s\-.]/g, '');
+    if (!/^\d+$/.test(d)) return { ok: false, error: 'code' };
+    if (d.length !== 11 && d.length !== 21) return { ok: false, error: d.length < 11 ? 'short' : 'code' };
+    var c = 0; for (var i = 0; i < d.length; i++) c = VD[c][VP[i % 8][+d.charAt(d.length - 1 - i)]];
+    if (+d.charAt(0) > 7 || c !== 0) return { ok: false, error: 'typo' };
+    return { ok: true, code: d };
+  }
+  // the server's answer, bare or wrapped in { result } (the bridge wraps some answers)
+  function mtOf(j) { return j && !Array.isArray(j.devices) && j.result && typeof j.result === 'object' ? j.result : j || {}; }
+  function mtErr(e) { var k = e && e.message; return MT_ERR[k] || (k && !/^[a-z_]+$/.test(k) ? k : MT_ERR.failed); }
+  var MT_OK = ['light', 'switch', 'fan', 'cover', 'climate', 'sensor'];
+  function showMatter(j) {
+    j = mtOf(j);
+    $('matter').style.display = ''; $('jump-matter').style.display = '';
+    var note = j.ready === false ? (j.note || 'Matter is getting ready on the TV. Try again in a minute.') : (j.note || '');
+    $('matter-note').style.display = note ? '' : 'none'; $('matter-note').textContent = note;
+    var list = (Array.isArray(j.devices) ? j.devices : []).filter(function (d) {
+      return d && typeof d.id === 'string' && MT_OK.indexOf(d.domain) >= 0 && !(d.domain === 'cover' && /^(garage|gate|door)$/.test((d.attributes || {}).device_class || ''));
+    });
+    $('matter-list').innerHTML = list.length ? list.map(function (d) {
+      var down = d.state === 'unavailable' || d.state === 'unknown';
+      return '<li data-id="' + esc(d.id) + '"><span>' + esc(d.name || MT_KIND[d.domain]) + ' <small class="miss">' + esc(MT_KIND[d.domain] + (down ? ', not answering' : '')) + '</small></span>' +
+        '<button class="quiet" type="button" data-mt="rename">Rename</button><button class="danger" type="button" data-mt="remove">Remove</button></li>';
+    }).join('') : '<li class="miss">None on this TV yet.</li>';
+  }
+  function loadMatter() { return api('GET', '/api/matter/devices').then(showMatter, function () {}); }
+  $('matter-add').onclick = function () {
+    var c = matterCode($('matter-code').value);
+    if (!c.ok) { say('matter-msg', MT_ERR[c.error]); return; }
+    $('matter-add').disabled = true;
+    say('matter-msg', 'Adding the device. This can take a minute…');
+    api('POST', '/api/matter/commission', { code: c.code }).then(function (j) {
+      j = mtOf(j);
+      if (j.ok === false) throw new Error(j.error || 'failed');
+      $('matter-code').value = '';
+      say('matter-msg', 'Added. It shows on the TV now, in your smart home widgets and Home settings, Smart home.');
+      return loadMatter();
+    }).catch(function (e) { say('matter-msg', mtErr(e)); }).then(function () { $('matter-add').disabled = false; });
+  };
+  $('matter-list').onclick = function (ev) {
+    var b = ev.target.closest && ev.target.closest('button[data-mt]'), li = b && b.closest('li');
+    if (!li) return;
+    var id = li.getAttribute('data-id'), name = li.querySelector('span').firstChild.textContent.trim();
+    if (b.getAttribute('data-mt') === 'remove') {
+      if (!confirm('Remove ' + name + ' from the TV? It stays in your Google, Apple, SmartThings or Alexa app.')) return;
+      say('matter-msg', 'Removing…');
+      api('POST', '/api/matter/remove', { id: id }).then(function () { say('matter-msg', name + ' is off the TV.'); return loadMatter(); }).catch(function (e) { say('matter-msg', mtErr(e)); });
+    } else {
+      var v = prompt('A name for ' + name, name);
+      v = String(v == null ? '' : v).trim().slice(0, 40);
+      if (!v || v === name) return;
+      say('matter-msg', 'Saving…');
+      api('POST', '/api/matter/rename', { id: id, name: v }).then(function () { say('matter-msg', 'Renamed.'); return loadMatter(); }).catch(function (e) { say('matter-msg', mtErr(e)); });
+    }
+  };
+  // a photo of a QR code, read on this phone where the browser can (Chrome on Android); the code is
+  // only put in the box, nothing is sent until Add
+  if ('BarcodeDetector' in window) {
+    $('matter-scan').style.display = '';
+    $('matter-photo').onchange = function () {
+      var f = this.files && this.files[0];
+      if (!f) return;
+      say('matter-msg', 'Reading the code…');
+      createImageBitmap(f).then(function (img) { return new window.BarcodeDetector({ formats: ['qr_code'] }).detect(img); }).then(function (found) {
+        var t = (found || []).map(function (x) { return x.rawValue; }).filter(function (v) { return /^MT:/.test(v); })[0];
+        if (t) { $('matter-code').value = t; say('matter-msg', 'Got the code. Tap Add to the TV.'); }
+        else say('matter-msg', 'No Matter QR code in that photo. Paste the 11 number code instead.');
+      }).catch(function () { say('matter-msg', 'That photo could not be read. Paste the 11 number code instead.'); });
+      this.value = '';
+    };
+  }
+
   // ---------------- this TV ----------------
   function showAdb(a) {
     var s = $('adb-status');
@@ -820,7 +926,7 @@
       $('adb-advice').textContent = j.adb.sdk >= 33 ? 'This TV is Android 13 or newer: use the newer TVs steps.' : '';
     }).catch(function (e) { $('town-now').textContent = e.message; });
   }
-  function load() { loadSettings(); loadInputs(); loadAtHome(); loadHome(); loadSmart(); }
+  function load() { loadSettings(); loadInputs(); loadAtHome(); loadHome(); loadSmart(); loadMatter(); }
   var poll = null;
   $('adb-connect').onclick = function () {
     $('adb-msg').textContent = 'Connecting. Look at the TV.';

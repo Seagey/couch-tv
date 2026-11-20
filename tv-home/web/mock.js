@@ -378,8 +378,64 @@
     };
   }
 
+  // ---------- a pretend Matter controller (matter.js, the Matter contract's /api/matter/*) ----------
+  // ?matter=1: a light, a plug, a fan, a blind, a thermostat and two sensors already shared, plus a lock
+  // and a garage door the page must never show. The code 34970112332 (the test code of Matter's
+  // example light) adds one more light; any other right code answers "expired". ?matter=empty: nothing
+  // shared yet. ?matter=down: the controller does not answer.
+  var mt = arg("matter");
+  if (mt) {
+    var MD = mt === "empty" ? [] : [
+      { id: "matter:1:1", name: "Lounge lamp", domain: "light", state: "on", attributes: { brightness: 204 } },
+      { id: "matter:2:1", name: "Heater plug", domain: "switch", state: "off", attributes: {} },
+      { id: "matter:3:1", name: "Ceiling fan", domain: "fan", state: "on", attributes: { percentage: 50 } },
+      { id: "matter:4:1", name: "Study blind", domain: "cover", state: "closed", attributes: { current_position: 0 } },
+      { id: "matter:5:1", name: "Hallway", domain: "climate", state: "heat", attributes: { current_temperature: 18.5, temperature: 21, min_temp: 7, max_temp: 30, target_temp_step: 0.5, hvac_modes: ["off", "heat", "cool", "auto"], hvac_action: "heating" } },
+      { id: "matter:6:1", name: "Nursery temperature", domain: "sensor", state: "22.4", attributes: { unit_of_measurement: "°C", device_class: "temperature" } },
+      { id: "matter:6:2", name: "Nursery humidity", domain: "sensor", state: "48", attributes: { unit_of_measurement: "%", device_class: "humidity" } },
+      { id: "matter:7:1", name: "Front door lock", domain: "lock", state: "locked", attributes: {} },
+      { id: "matter:8:1", name: "Garage", domain: "cover", state: "closed", attributes: { device_class: "garage" } }
+    ];
+    window.MOCK_MATTER_LOG = [];
+    window.MOCK_MATTER = function (method, path, body) {
+      window.MOCK_MATTER_LOG.push(method + " " + path + (body ? " " + JSON.stringify(body) : ""));
+      var dev = function (id) { return MD.filter(function (d) { return d.id === id; })[0]; };
+      return new Promise(function (resolve, reject) {
+        setTimeout(function () {
+          if (mt === "down") return reject(new Error("bridge_down"));
+          if (path.indexOf("/api/matter/devices") === 0) return resolve({ devices: JSON.parse(JSON.stringify(MD)), ready: true });
+          if (path === "/api/matter/commission") {
+            var code = String(body && body.code || "");
+            if (code === "34970112332" || /^MT:/.test(code)) {
+              var node = 20 + MD.length;
+              MD.push({ id: "matter:" + node + ":1", name: "Matter light", domain: "light", state: "off", attributes: {} });
+              return resolve({ ok: true, device_ids: ["matter:" + node + ":1"] });
+            }
+            return reject(new Error("expired"));
+          }
+          var d = dev(body && body.id);
+          if (!d) return reject(new Error("refused"));
+          if (path === "/api/matter/remove") { MD.splice(MD.indexOf(d), 1); return resolve({ ok: true }); }
+          if (path === "/api/matter/rename") { d.name = String(body.name); return resolve({ ok: true }); }
+          if (path === "/api/matter/command") {
+            var a = body.action, v = body.value;
+            if (a === "on" || a === "off") d.state = d.domain === "climate" && a === "on" ? "heat" : a;
+            else if (a === "toggle") d.state = d.state === "on" ? "off" : "on";
+            else if (a === "position") { d.attributes.current_position = v; d.state = v > 0 ? "open" : "closed"; }
+            else if (a === "target") d.attributes.temperature = v;
+            else if (a === "mode") d.state = v;
+            else return reject(new Error("refused"));
+            return resolve({ ok: true, state: d.state });
+          }
+          reject(new Error("refused"));
+        }, 80);
+      });
+    };
+    if (window.CouchMatter) window.CouchMatter.use(window.MOCK_MATTER);
+  }
+
   // ---------- a pretend bridge ----------
-  var jw = function (p) { return localArt(p) || "https://images.justwatch.com/" + p + ".webp"; };
+  var jw =function (p) { return localArt(p) || "https://images.justwatch.com/" + p + ".webp"; };
   var app = function (id, name, pkg) { return { id: id, name: name, package: pkg }; };
   var shows = [
     { id: "m2", title: "The Bear", season: 3, episode: 2, app: app("disney-plus", "Disney+", "com.disney.disneyplus"), backdrop: jw("backdrop/346664278/s1440/the-bear-2022"), progress: 0.7 },
