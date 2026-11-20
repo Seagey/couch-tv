@@ -97,3 +97,61 @@ window.CouchWords = {
     ["Moonglade", "noun", "The bright path of moonlight on water."], ["Starlit", "adjective", "Lit by the stars."]
   ]
 };
+
+// The Quote widget's "Kind of line" (widget-caps.js quote, mood): the lines above that suit each kind.
+// A kind with no line falls back to every line.
+window.CouchWords.moods = {
+  calm: /slow|rest|breathe|calm|gentle|quiet|nothing at all|nap|wonder|sky|stars|sea |sea always|notice|beautiful|evening|bed|patience|small stuff|reading|read |barefoot|wander|long way|candle|let the|carry on/i,
+  go: /start|try |done|step|finish|fix|learn|keep going|hard things|expert|practise|new|fresh|tidy|stairs|stretch|plant|write it|change your mind|question|curious|make the bed|one thing/i,
+  home: /home|family|kids|nan|dog|dinner|kitchen|neighbour|friend|hug|pancakes|biscuit|live here|together|house|washing|bake|cook|china|toast|picnic|ring |someone|their day|share/i
+};
+window.CouchWords.quotesFor = function (mood) {
+  var all = window.CouchWords.quotes, re = window.CouchWords.moods[mood];
+  if (!re) return all;
+  var l = all.filter(function (q) { return re.test(q); });
+  return l.length ? l : all;
+};
+// The Word of the day widget's "Words in" (widget-caps.js word, lang): an everyday word in another
+// language, how it sounds, and what it means in English. [word, how you say it, what it means]
+window.CouchWords.wordsIn = {
+  es: [["Hola", "OH-la", "Hello."], ["Gracias", "GRAH-see-as", "Thank you."], ["Por favor", "por fa-VOR", "Please."], ["Buenos días", "BWEH-nos DEE-as", "Good morning."],
+    ["Buenas noches", "BWEH-nas NO-ches", "Good night."], ["Agua", "AH-gwa", "Water."], ["Casa", "KAH-sa", "House, or home."], ["Playa", "PLAH-ya", "Beach."],
+    ["Sol", "sol", "Sun."], ["Luna", "LOO-na", "Moon."], ["Lluvia", "YOO-vee-a", "Rain."], ["Amigo", "a-MEE-go", "Friend."],
+    ["Familia", "fa-MEE-lee-a", "Family."], ["Perro", "PEH-rro", "Dog."], ["Gato", "GAH-to", "Cat."], ["Libro", "LEE-bro", "Book."],
+    ["Mañana", "ma-NYA-na", "Tomorrow, or morning."], ["Hoy", "oy", "Today."], ["Comida", "ko-MEE-da", "Food, or lunch."], ["Pan", "pan", "Bread."],
+    ["Café", "ka-FEH", "Coffee."], ["Feliz", "feh-LEES", "Happy."], ["Grande", "GRAN-deh", "Big."], ["Pequeño", "peh-KEH-nyo", "Small."],
+    ["Mar", "mar", "Sea."], ["Árbol", "AR-bol", "Tree."], ["Flor", "flor", "Flower."], ["Música", "MOO-see-ka", "Music."],
+    ["Escuela", "es-KWEH-la", "School."], ["Cocina", "ko-SEE-na", "Kitchen, or cooking."], ["Hasta luego", "AS-ta LWEH-go", "See you later."]],
+  fr: [["Bonjour", "bon-ZHOOR", "Hello, or good day."], ["Merci", "mair-SEE", "Thank you."], ["S'il vous plaît", "seel voo PLAY", "Please."], ["Bonsoir", "bon-SWAHR", "Good evening."],
+    ["Bonne nuit", "bon NWEE", "Good night."], ["Eau", "oh", "Water."], ["Maison", "may-ZON", "House, or home."], ["Plage", "plahzh", "Beach."],
+    ["Soleil", "so-LAY", "Sun."], ["Lune", "loon", "Moon."], ["Pluie", "plwee", "Rain."], ["Ami", "ah-MEE", "Friend."],
+    ["Famille", "fa-MEE", "Family."], ["Chien", "shee-AN", "Dog."], ["Chat", "shah", "Cat."], ["Livre", "LEEV-ruh", "Book."],
+    ["Demain", "duh-MAN", "Tomorrow."], ["Aujourd'hui", "oh-zhoor-DWEE", "Today."], ["Pain", "pan", "Bread."], ["Fromage", "fro-MAHZH", "Cheese."],
+    ["Café", "ka-FAY", "Coffee."], ["Heureux", "uh-RUH", "Happy."], ["Grand", "gron", "Big, or tall."], ["Petit", "puh-TEE", "Small."],
+    ["Mer", "mair", "Sea."], ["Arbre", "AR-bruh", "Tree."], ["Fleur", "flur", "Flower."], ["Musique", "mew-ZEEK", "Music."],
+    ["École", "ay-KOL", "School."], ["Cuisine", "kwee-ZEEN", "Kitchen, or cooking."], ["À bientôt", "ah bee-an-TOH", "See you soon."]],
+  it: [["Ciao", "chow", "Hello, or goodbye."], ["Grazie", "GRAHT-see-eh", "Thank you."], ["Per favore", "pair fa-VOH-reh", "Please."], ["Buongiorno", "bwon-JOR-no", "Good morning."],
+    ["Buonanotte", "bwo-na-NOT-teh", "Good night."], ["Acqua", "AHK-wa", "Water."], ["Casa", "KAH-za", "House, or home."], ["Spiaggia", "SPYAH-ja", "Beach."],
+    ["Sole", "SO-leh", "Sun."], ["Luna", "LOO-na", "Moon."], ["Pioggia", "PYOH-ja", "Rain."], ["Amico", "a-MEE-ko", "Friend."],
+    ["Famiglia", "fa-MEEL-ya", "Family."], ["Cane", "KAH-neh", "Dog."], ["Gatto", "GAHT-to", "Cat."], ["Libro", "LEE-bro", "Book."],
+    ["Domani", "do-MAH-nee", "Tomorrow."], ["Oggi", "OD-jee", "Today."], ["Pane", "PAH-neh", "Bread."], ["Formaggio", "for-MAHD-jo", "Cheese."],
+    ["Caffè", "kaf-FEH", "Coffee."], ["Felice", "feh-LEE-cheh", "Happy."], ["Grande", "GRAN-deh", "Big."], ["Piccolo", "PEEK-ko-lo", "Small."],
+    ["Mare", "MAH-reh", "Sea."], ["Albero", "AHL-beh-ro", "Tree."], ["Fiore", "FYOH-reh", "Flower."], ["Musica", "MOO-zee-ka", "Music."],
+    ["Scuola", "SKWOH-la", "School."], ["Cucina", "koo-CHEE-na", "Kitchen, or cooking."], ["A presto", "ah PRES-to", "See you soon."]],
+  de: [["Hallo", "HA-lo", "Hello."], ["Danke", "DAHN-keh", "Thank you."], ["Bitte", "BIT-teh", "Please, or you're welcome."], ["Guten Morgen", "GOO-ten MOR-gen", "Good morning."],
+    ["Gute Nacht", "GOO-teh nahkt", "Good night."], ["Wasser", "VAS-ser", "Water."], ["Haus", "hows", "House."], ["Strand", "shtrahnt", "Beach."],
+    ["Sonne", "ZON-neh", "Sun."], ["Mond", "mohnt", "Moon."], ["Regen", "RAY-gen", "Rain."], ["Freund", "froynt", "Friend."],
+    ["Familie", "fa-MEE-lee-eh", "Family."], ["Hund", "hoont", "Dog."], ["Katze", "KAT-seh", "Cat."], ["Buch", "bookh", "Book."],
+    ["Morgen", "MOR-gen", "Tomorrow, or morning."], ["Heute", "HOY-teh", "Today."], ["Brot", "broht", "Bread."], ["Käse", "KAY-zeh", "Cheese."],
+    ["Kaffee", "KAF-fay", "Coffee."], ["Glücklich", "GLUEK-likh", "Happy."], ["Groß", "grohs", "Big, or tall."], ["Klein", "kline", "Small."],
+    ["Meer", "mair", "Sea."], ["Baum", "bowm", "Tree."], ["Blume", "BLOO-meh", "Flower."], ["Musik", "moo-ZEEK", "Music."],
+    ["Schule", "SHOO-leh", "School."], ["Küche", "KUE-kheh", "Kitchen."], ["Bis bald", "bis bahlt", "See you soon."]],
+  ja: [["Konnichiwa", "kon-NEE-chee-wa", "Hello."], ["Arigatou", "a-ree-GA-toh", "Thank you."], ["Onegaishimasu", "o-neh-gai-shee-mas", "Please."], ["Ohayou", "o-HA-yoh", "Good morning."],
+    ["Oyasumi", "o-ya-SOO-mee", "Good night."], ["Mizu", "MEE-zoo", "Water."], ["Ie", "EE-eh", "House, or home."], ["Umi", "OO-mee", "Sea."],
+    ["Taiyou", "TIE-yoh", "Sun."], ["Tsuki", "TSOO-kee", "Moon."], ["Ame", "AH-meh", "Rain."], ["Tomodachi", "to-mo-DA-chee", "Friend."],
+    ["Kazoku", "ka-ZO-koo", "Family."], ["Inu", "EE-noo", "Dog."], ["Neko", "NEH-ko", "Cat."], ["Hon", "hon", "Book."],
+    ["Ashita", "ah-SHTA", "Tomorrow."], ["Kyou", "kyoh", "Today."], ["Gohan", "GO-han", "Rice, or a meal."], ["Pan", "pan", "Bread."],
+    ["Ocha", "O-cha", "Green tea."], ["Ureshii", "oo-REH-shee", "Happy, glad."], ["Ookii", "oh-KEE", "Big."], ["Chiisai", "CHEE-sigh", "Small."],
+    ["Yama", "YA-ma", "Mountain."], ["Ki", "kee", "Tree."], ["Hana", "HA-na", "Flower."], ["Ongaku", "on-GA-koo", "Music."],
+    ["Gakkou", "GAK-koh", "School."], ["Daidokoro", "die-DO-ko-ro", "Kitchen."], ["Mata ne", "MA-ta neh", "See you later."]]
+};

@@ -1842,18 +1842,31 @@
     var c = cards[dayIndex(cards.length, 20)];
     add(root, [E("div", "cw-lab", "", [String(c.title || "")]), E("div", "cw-grow"), E("div", "cw-big", "overflow-wrap:anywhere;font-size:" + px(Math.min(clamp(b.h / 3.2, 44, 96), fitPx(String(c.value || "").split(/\s+/).sort(function (x, y) { return y.length - x.length; })[0], b.w - 48, 96))), [String(c.value || "")])]);
   };
-  R.quote = function (root, o, b) {
-    var q = op(o), words = window.CouchWords || { quotes: ["Slow mornings are the good ones."] };
-    var text = q.text || words.quotes[dayOfYear() % words.quotes.length];
+  // the line for today: your own words (setting text), else one of the kind picked (setting mood)
+  function quoteOf(o, env) {
+    var words = window.CouchWords || { quotes: ["Slow mornings are the good ones."] }, own = String(setting(o, env, "text") || "").trim();
+    var list = words.quotesFor ? words.quotesFor(setting(o, env, "mood")) : words.quotes;
+    return { text: own || list[dayOfYear() % list.length], sub: own ? String(setting(o, env, "sub") || "").trim() : "" };
+  }
+  R.quote = function (root, o, b, env) {
+    var q = quoteOf(o, env || {});
+    var text = q.text;
     var fs = clamp(Math.sqrt((b.w - 48) * (b.h - 48) / Math.max(20, text.length) / 1.6), 28, 64);
     add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "", "font-size:" + px(fs) + ";font-weight:600;line-height:1.24;letter-spacing:-.01em;color:var(--ink)" + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 16px rgba(0,0,0,.3)" : ""), [text]),
       q.sub ? E("div", "cw-t25", "margin-top:14px;color:var(--ink);opacity:.75;font-weight:600", [q.sub]) : null]));
   };
   function dayOfYear() { var d = now(); return Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000); }
-  R.word = function (root, o, b) {
-    var words = (window.CouchWords || {}).words || [["Petrichor", "noun", "The smell of rain on dry ground."]], w = words[dayOfYear() % words.length];
-    add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-lab", "", ["Word of the day"]), E("div", "cw-t48", "margin-top:10px;font-size:" + px(clamp(b.w / 7, 40, 64)), [w[0]]),
-      E("div", "cw-t25", "font-style:italic;margin-top:4px", [w[1]]), b.h >= 300 ? E("div", "cw-t25", "color:var(--ink);margin-top:14px", [w[2]]) : null]));
+  // today's word in the language picked (setting lang: English unless another), and whether its meaning shows
+  var WORD_LANG = { es: "Spanish", fr: "French", it: "Italian", de: "German", ja: "Japanese" };
+  function wordOf(o, env) {
+    var W0 = window.CouchWords || {}, lang = String(setting(o, env, "lang") || "en"), list = (W0.wordsIn && W0.wordsIn[lang]) || null;
+    if (!list) { lang = "en"; list = W0.words || [["Petrichor", "noun", "The smell of rain on dry ground."]]; }
+    return { w: list[dayOfYear() % list.length], head: lang === "en" ? "Word of the day" : WORD_LANG[lang] + " word of the day", meaning: setting(o, env, "meaning") !== false };
+  }
+  R.word = function (root, o, b, env) {
+    var x = wordOf(o, env || {}), w = x.w;
+    add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-lab", "", [x.head]), E("div", "cw-t48", "margin-top:10px;font-size:" + px(clamp(b.w / 7, 40, 64)), [w[0]]),
+      E("div", "cw-t25", "font-style:italic;margin-top:4px", [w[1]]), b.h >= 300 && x.meaning ? E("div", "cw-t25", "color:var(--ink);margin-top:14px", [w[2]]) : null]));
   };
   // ---------------- the web widgets: news, scores, markets, the commute (widget-web.js) ----------------
   // app.js hands in what widget-web.js got (data.web[source][id]); before that, or when it failed, the
@@ -2020,7 +2033,8 @@
     var N = newsOf(root, o, b, env), a = alignOf(o);
     if (!N) return;
     if (!N.items.length) return webEmpty(root, b, "info", WEB_WORDS.news[2], "", WEB_SHORT.news[2]);
-    var n = clamp(Math.floor((b.h - 70) / 110), 1, 5);
+    var n = clamp(Math.floor((b.h - 70) / 110), 1, 5), want = setting(o, env, "count");
+    if (want !== "auto" && isFinite(+want) && +want >= 1) n = Math.min(n, Math.round(+want));
     webBody(root, a, [webHead("info", N.name, a), N.stale ? line("Not updated lately", 24, "color:var(--sub)", a, 3) : N.from && b.h >= 300 ? line("From " + N.from, 24, "color:var(--sub)", a, 3) : null, E("div", "", "height:14px;flex:none")].concat(N.items.slice(0, n).map(function (x, i) { return headline(x, a, i === 0); })));
   };
 
@@ -2039,8 +2053,25 @@
     if (env.demo) v = demoScores();
     else { var rec = webOf(env, "sports", id); if (!webReady(root, b, "tv", "sports", rec)) return null; v = rec.v || { games: [] }; v.stale = !!rec.stale; }
     var real = WW && WW.LEAGUES && WW.LEAGUES[id] ? WW.LEAGUES[id].name : v.league, name = webName(q.label, real, WW && WW.LEAGUES) || real || v.league || "Scores";
-    if (!v.games || !v.games.length) { webEmpty(root, b, "tv", "No " + (v.league || "") + " games this week", "Scores show here when the next round starts", "No games"); return null; }
-    return { name: name, round: v.round || "", stale: v.stale, games: WW ? WW.scoreOrder(v.games, setting(o, env, "team"), now().getTime()) : v.games };
+    var t = now().getTime(), team = String(setting(o, env, "team") || "").trim(), mode = setting(o, env, "games") || "all";
+    // the team, checked against the competition's own teams: a team from another competition says so
+    var known = team && WW && !env.demo ? WW.teamOf(team, v) : null, wrong = !!team && !!WW && !env.demo && !known && WW.teamList(v).length >= 4;
+    var tname = known ? known.short || known.name : team;
+    if (mode !== "all" && !team) mode = mode === "mine" ? "nomine" : mode;
+    if (mode === "nomine") { webEmpty(root, b, "tv", "Pick your team", "This widget shows only your team's games: pick it in this widget's settings, hold OK on the widget", "Pick a team"); root.setAttribute("data-setup", "sports"); return null; }
+    if (wrong && mode === "mine") { webEmpty(root, b, "tv", team + " is not in the " + real, "Pick your team again in this widget's settings: hold OK on the widget", "Not in the " + real); return null; }
+    var season = WW ? WW.seasonOf(v.games || [], t) : { off: "" };
+    var offWords = season.off === "over" ? "The " + real + " season is over" : season.off === "soon" ? "The " + real + " season starts " + WW.kickoff(season.at, t, env.clock24) : "";
+    if (!v.games || !v.games.length) { webEmpty(root, b, "tv", "No " + real + " games right now", "Scores show here when the next round starts", "No games"); return null; }
+    var games = WW ? WW.scoreFilter(v.games, known ? known.name : team, mode, t) : v.games;
+    if (!games.length) {
+      var next = WW ? WW.scoreFilter(v.games, known ? known.name : team, "all", t).filter(function (g) { return g.state === "pre"; }).sort(function (x, y) { return x.at - y.at; })[0] : null;
+      if (mode === "mine") webEmpty(root, b, "tv", offWords || "No " + tname + " game right now", offWords ? tname + "'s games show here when they play again" : "Their next game shows here once it is on the draw", "No game");
+      else webEmpty(root, b, "tv", offWords || "No live games right now", next ? "Next: " + gameStatus(next, env).text : "Live games show here when they start", "None live");
+      return null;
+    }
+    return { name: name, round: season.off ? "" : v.round || "", stale: v.stale, games: games, off: season.off === "over" ? "Season over" : season.off === "soon" ? "Starts " + WW.kickoff(season.at, t, env.clock24) : "",
+      warn: wrong ? team + " is not in the " + real : "" };
   }
   // a result in plain words: "Full time", "Full time, extra time", "Full time, penalties"
   var FULL = { ot: "extra time", aet: "extra time", pens: "penalties", so: "a shoot out" };
@@ -2073,8 +2104,8 @@
     var V = scoresOf(root, o, b, env), a = alignOf(o);
     if (!V) return;
     var cols = b.w >= 700 ? 2 : 1, rows = clamp(Math.floor((b.h - 56) / 150), 1, 6), n = Math.min(V.games.length, cols * rows), cw = (b.w - 48 - (cols - 1) * 16) / cols;
-    var live = V.games.some(function (g) { return g.state === "in"; }), right = V.stale ? { text: "Not updated lately" } : live ? { text: "Live now", colour: "#ff453a" } : V.round ? { text: V.round } : null;
-    var blocks = [];
+    var live = V.games.some(function (g) { return g.state === "in"; }), right = V.stale ? { text: "Not updated lately" } : live ? { text: "Live now", colour: "#ff453a" } : V.off ? { text: V.off } : V.round ? { text: V.round } : null;
+    var blocks = V.warn ? [line(V.warn, 24, "color:var(--sub);margin-top:6px", a, 3)] : [];
     for (var r = 0; r * cols < n; r++) {
       var row = V.games.slice(r * cols, Math.min(n, r * cols + cols)).map(function (g, i) { var el = gameBlock(g, env, a); el.style.width = px(cw); if (i) el.style.marginLeft = "16px"; return el; });
       blocks.push(dropT(E("div", "cw-row", "align-items:stretch;justify-content:" + jc(a) + ";flex:none;margin-top:" + (r ? 12 : 14) + "px", row), r === 0 ? 1 : 2));
@@ -2091,7 +2122,14 @@
     return { symbol: sym, name: d[0], kind: d[1], currency: d[2], price: d[3], prev: d[4], change: Math.round((d[3] - d[4]) / d[4] * 10000) / 100, points: pts };
   }
   function stocksOf(root, o, b, env) {
-    var WW = window.CouchWidgetWeb, q = op(o), list = WW ? WW.tickersOf(setting(o, env, "tickers")) : ["^AXJO"], quotes, stale = false;
+    var WW = window.CouchWidgetWeb, q = op(o), raw = setting(o, env, "tickers"), list = WW ? WW.tickersOf(raw) : ["^AXJO"], quotes, stale = false;
+    // typed codes that can never be a share code: said, never swapped silently for the defaults
+    raw = Object.prototype.toString.call(raw) === "[object Array]" ? raw : typeof raw === "string" && raw ? raw.split(",") : [];
+    var bad = WW ? raw.map(function (x) { return String(x || "").trim(); }).filter(function (x) { return x && !WW.SYMBOL.test(x.toUpperCase()); }) : [];
+    if (bad.length && bad.length === raw.filter(function (x) { return String(x || "").trim(); }).length) {
+      webEmpty(root, b, "info", "Not a share code: " + bad.slice(0, 3).join(", "), "Type codes like BHP.AX in this widget's settings: hold OK on the widget", "Check the codes");
+      root.setAttribute("data-setup", "stocks"); return null;
+    }
     if (env.demo) quotes = list.map(demoQuote);
     else {
       var rec = webOf(env, "stocks", list.join(","));
@@ -2099,7 +2137,8 @@
       quotes = list.map(function (s) { return ((rec.v || {}).quotes || {})[s]; }).filter(Boolean); stale = !!rec.stale;
     }
     if (!quotes.length) { webEmpty(root, b, "info", "None of these has a price right now", "Check the share codes in this widget's settings", "No prices"); return null; }
-    return { name: q.label || "Markets", quotes: quotes, stale: stale };
+    var none = env.demo ? [] : list.filter(function (s) { return !quotes.some(function (x) { return x.symbol === s; }); }).concat(bad);
+    return { name: q.label || "Markets", quotes: quotes, stale: stale, price: setting(o, env, "price") !== false, none: none.length ? "No price for " + none.slice(0, 3).join(", ") : "" };
   }
   function upDown(c) { return c > 0 ? "#30d158" : c < 0 ? "#ff453a" : "rgba(255,255,255,.3)"; }
   function moveChip(x) {
@@ -2116,7 +2155,7 @@
     var V = stocksOf(root, o, b, env), a = alignOf(o);
     if (!V) return;
     var n = clamp(Math.floor((b.h - 70) / 92), 1, 6);
-    webBody(root, a, [webHead(null, V.name, a), V.stale ? line("Not updated lately", 24, "color:var(--sub)", a, 3) : null, E("div", "", "height:12px;flex:none")].concat(V.quotes.slice(0, n).map(function (x, i) { return quoteRow(x, a, true, i === 0); })));
+    webBody(root, a, [webHead(null, V.name, a), V.stale ? line("Not updated lately", 24, "color:var(--sub)", a, 3) : V.none ? line(V.none, 24, "color:var(--sub)", a, 3) : null, E("div", "", "height:12px;flex:none")].concat(V.quotes.slice(0, n).map(function (x, i) { return quoteRow(x, a, V.price, i === 0); })));
   };
 
   // Commute: the usual drive between the two places kept on this TV (Home settings: Location, and
@@ -2350,9 +2389,9 @@
     if (b.w < 300) { root.style.padding = "18px"; add(root, [E("div", "cw-t23", "font-weight:700;color:var(--sub)", [op(o).label || "Bins"]), E("div", "cw-grow"), E("div", "cw-row", "margin-left:-8px", lids.map(bin)), E("div", "cw-t25 cw-ell", "font-weight:720;color:var(--ink);margin-top:6px", [when])]); return; }
     add(root, E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("calendar", op(o).label || "Bin night"), E("div", "cw-t29", "font-weight:720;margin-top:6px", [when])]), E("div", "cw-row", "", lids.map(bin))]));
   };
-  CR.word = function (root, o, b) {
-    var words = (window.CouchWords || {}).words || [["Petrichor", "noun", "The smell of rain on dry ground."]], w = words[dayOfYear() % words.length];
-    add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-t48 cw-ell", "font-size:" + px(clamp((b.w - 48) / (w[0].length * 0.6), 30, 56)), [w[0]]), E("div", "cw-t25 cw-ell", "font-style:italic;margin-top:4px", [w[1] + (b.w >= 600 ? ". " + w[2] : "")])]));
+  CR.word = function (root, o, b, env) {
+    var x = wordOf(o, env || {}), w = x.w;
+    add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-t48 cw-ell", "font-size:" + px(clamp((b.w - 48) / (w[0].length * 0.6), 30, 56)), [w[0]]), E("div", "cw-t25 cw-ell", "font-style:italic;margin-top:4px", [w[1] + (b.w >= 600 && x.meaning ? ". " + w[2] : "")])]));
   };
   CR.battery = function (root, o, b, env) {
     var bt = batteriesOf(env), x = bt && bt.devices && bt.devices[0];

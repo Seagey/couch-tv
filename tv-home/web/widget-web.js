@@ -86,22 +86,35 @@
   // Unofficial and undocumented: ESPN publishes no terms for them and may change them. Each TV asks for
   // its own household's viewing, one league per request, and shows only teams and scores.
   var ESPN = "https://site.api.espn.com/apis/site/v2/sports/";
+  // teams: the competition's ladder, which names every team (asked at most once a week, for the Your
+  // team picker). ESPN's /teams list would do too, but it sends no CORS header, so a TV page cannot
+  // read it; the ladder can. Cricket has no ladder: its teams are the ones seen in its games.
+  var LADDER = "https://site.api.espn.com/apis/v2/sports/";
   var LEAGUES = {
-    afl: { name: "AFL", url: ESPN + "australian-football/afl/scoreboard" },
-    nrl: { name: "NRL", url: ESPN + "rugby-league/3/scoreboard" },
-    aleague: { name: "A-League", url: ESPN + "soccer/aus.1/scoreboard" },
-    epl: { name: "Premier League", url: ESPN + "soccer/eng.1/scoreboard" },
-    nba: { name: "NBA", url: ESPN + "basketball/nba/scoreboard" },
-    bbl: { name: "Big Bash", url: ESPN + "cricket/8044/scoreboard" },
+    afl: { name: "AFL", url: ESPN + "australian-football/afl/scoreboard", teams: LADDER + "australian-football/afl/standings" },
+    nrl: { name: "NRL", url: ESPN + "rugby-league/3/scoreboard", teams: LADDER + "rugby-league/3/standings" },
+    aleague: { name: "A-League", url: ESPN + "soccer/aus.1/scoreboard", teams: LADDER + "soccer/aus.1/standings" },
+    epl: { name: "Premier League", url: ESPN + "soccer/eng.1/scoreboard", teams: LADDER + "soccer/eng.1/standings" },
+    nba: { name: "NBA", url: ESPN + "basketball/nba/scoreboard", teams: LADDER + "basketball/nba/standings" },
+    bbl: { name: "Big Bash", url: ESPN + "cricket/8044/scoreboard", teams: LADDER + "cricket/8044/standings" },
     cricket: { name: "Cricket", url: "https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=cricket&lang=en&region=au", header: true }
   };
   var LEAGUE_DEFAULT = "nrl";
+  var TEAMS = {};   // ESPN's team lists asked this session: { id: { at, list } }
   function leagueOf(id) { return LEAGUES[id] ? id : LEAGUE_DEFAULT; }
   function hex(c) { return /^#?[0-9a-f]{6}$/i.test(String(c || "")) ? "#" + String(c).replace("#", "").toLowerCase() : ""; }
   function cut(s, n) { s = plain(s); return s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, "") : s; }
   function stateOf(s) { return s === "in" || s === "post" ? s : "pre"; }
-  function side(name, abbr, colour, score, win, home) {
-    return { name: cut(name, 22), abbr: cut(abbr, 5).toUpperCase(), colour: hex(colour), score: plain(score === undefined || score === null ? "" : String(score)).slice(0, 40), win: win === true, home: !!home };
+  // full: the team's whole name ("Melbourne Renegades"), kept to match the household's team by
+  function side(name, abbr, colour, score, win, home, full) {
+    return { name: cut(name, 22), abbr: cut(abbr, 5).toUpperCase(), colour: hex(colour), score: plain(score === undefined || score === null ? "" : String(score)).slice(0, 40), win: win === true, home: !!home,
+      full: cut(full || name, 40) };
+  }
+  // the name a game shows: ESPN's short name, unless that is only the letters (Big Bash: "MR" for the
+  // Melbourne Renegades), then the whole name
+  function shortName(t) {
+    var s = String(t.shortDisplayName || ""), a = String(t.abbreviation || "");
+    return s && s.length > 3 && s.toUpperCase() !== a.toUpperCase() ? s : t.displayName || t.name || s || a;
   }
   // one league's games: { league, round, games: [{ id, at, state, detail, teams: [home, away] }] }
   // detail: ESPN's own short line ("Final", "Q3 4:12", "62'", "Australia need 224 runs")
@@ -118,7 +131,7 @@
         (lg.events || []).forEach(function (e) {
           var fs = e.fullStatus || {}, ty = fs.type || {}, cs = e.competitors || [];
           if (cs.length < 2) return;
-          var teams = cs.slice(0, 2).map(function (c) { return side(c.displayName, c.abbreviation, c.color, c.score, c.winner, c.homeAway === "home"); });
+          var teams = cs.slice(0, 2).map(function (c) { return side(c.displayName, c.abbreviation, c.color, c.score, c.winner, c.homeAway === "home", c.displayName); });
           var intl = e["class"] && e["class"].internationalClassId && e["class"].internationalClassId !== "0";
           var aus = teams.some(function (t) { return /^australia/i.test(t.name); });
           if (!intl && !local) return;
@@ -134,7 +147,7 @@
         // home first, the way Australian codes say a game ("Roosters v Knights")
         cs = cs.slice(0, 2).sort(function (a, b) { return (a.homeAway === "home" ? 0 : 1) - (b.homeAway === "home" ? 0 : 1); });
         games.push({ id: String(e.id || ""), at: Date.parse(e.date) || 0, state: stateOf(st.state), detail: cut(st.shortDetail || st.detail || "", 40),
-          teams: cs.map(function (x) { var t = x.team || {}; return side(t.shortDisplayName || t.displayName, t.abbreviation, t.color, x.score, x.winner, x.homeAway === "home"); }) });
+          teams: cs.map(function (x) { var t = x.team || {}; return side(shortName(t), t.abbreviation, t.color, x.score, x.winner, x.homeAway === "home", t.displayName); }) });
       });
       games.sort(function (a, b) { return a.at - b.at; });
     }
@@ -142,11 +155,74 @@
     var wk = j.week && isFinite(j.week.number) ? +j.week.number : 0;
     return { league: L.name, round: wk && (id === "afl" || id === "nrl") ? "Round " + wk : "", games: games.slice(0, 16) };
   }
+  // every team in a competition: [{ name, short, abbr }], by name, each once. From its ladder
+  // (children[].standings.entries[].team, conferences nested) or ESPN's team list (sports[].leagues[].teams[])
+  function parseTeams(j) {
+    var out = [], seen = {};
+    var put = function (t) {
+      t = t || {};
+      var name = cut(t.displayName || t.name || "", 40);
+      if (!name || seen[name.toLowerCase()]) return;
+      seen[name.toLowerCase()] = 1;
+      out.push({ name: name, short: cut(shortName(t), 22), abbr: cut(t.abbreviation || "", 5).toUpperCase() });
+    };
+    var walk = function (o, depth) {
+      if (!o || typeof o !== "object" || depth > 4) return;
+      ((o.standings && o.standings.entries) || []).forEach(function (e) { put(e && e.team); });
+      (o.children || []).forEach(function (c) { walk(c, depth + 1); });
+    };
+    walk(j, 0);
+    ((((j && j.sports) || [])[0] || {}).leagues || []).forEach(function (lg) { (lg.teams || []).forEach(function (x) { put(x && x.team); }); });
+    return out.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  }
+  // every team a widget can pick for one competition's answer (v from parseScores, with v.teams from
+  // ESPN's team list when it has one): the list, then any team seen in the games, by name
+  function teamList(v) {
+    var out = [], seen = {};
+    var put = function (name, short, abbr) { var k = String(name || "").toLowerCase(); if (!k || seen[k]) return; seen[k] = 1; out.push({ name: name, short: short || name, abbr: abbr || "" }); };
+    ((v && v.teams) || []).forEach(function (t) { put(t.name, t.short, t.abbr); });
+    ((v && v.games) || []).forEach(function (g) { (g.teams || []).forEach(function (t) { put(t.full || t.name, t.name, t.abbr); }); });
+    return out.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  }
+  // the household's team is this side of a game: its whole name, short name or letters, or a part of
+  // the whole name of four letters or more ("Broncos", "Brisbane Broncos", "BRI")
+  // exact: only the whole name, short name or letters (so "North Melbourne" is never "Melbourne")
+  function isTeam(team, t, exact) {
+    team = String(team || "").toLowerCase().replace(/\s+/g, " ").trim();
+    if (!team || !t) return false;
+    var full = String(t.full || t.name || "").toLowerCase(), short = String(t.name || t.short || "").toLowerCase(), abbr = String(t.abbr || "").toLowerCase();
+    if (team === full || team === short || team === abbr) return true;
+    return !exact && team.length >= 4 && (full.indexOf(team) >= 0 || short.indexOf(team) >= 0 || (short.length >= 4 && team.indexOf(short) >= 0));
+  }
+  // the team from v's list that a typed or picked team means, or null when the competition has no such team
+  function teamOf(team, v) {
+    var l = teamList(v);
+    for (var pass = 0; pass < 2; pass++) for (var i = 0; i < l.length; i++) if (isTeam(team, { full: l[i].name, name: l[i].short, abbr: l[i].abbr }, pass === 0)) return l[i];
+    return null;
+  }
+  // the season around these games: { off: "over" } when every game is a result more than 10 days old,
+  // { off: "soon", at } when every game is more than 10 days away, else { off: "" }
+  function seasonOf(games, now) {
+    now = now || Date.now();
+    var gs = games || [], day = 86400000;
+    if (!gs.length) return { off: "" };
+    if (gs.every(function (g) { return g.state === "post" && g.at && now - g.at > 10 * day; })) return { off: "over" };
+    if (gs.every(function (g) { return g.state === "pre" && g.at && g.at - now > 10 * day; })) return { off: "soon", at: Math.min.apply(null, gs.map(function (g) { return g.at; })) };
+    return { off: "" };
+  }
+  // the games one widget shows: "all", "live" (live games and the household's team) or "mine" (only
+  // the household's team), in the widget's order
+  function scoreFilter(games, team, mode, now) {
+    var g = scoreOrder(games, team, now);
+    if (mode === "mine") return g.filter(function (x) { return x.mine; });
+    if (mode === "live") return g.filter(function (x) { return x.state === "in" || x.mine; });
+    return g;
+  }
   // the games in the order a widget shows them: live first, then the household's team, then the
   // latest results, then what is next
   function scoreOrder(games, team, now) {
-    team = String(team || "").toLowerCase();
-    var mine = function (g) { return !!team && g.teams.some(function (t) { return t.name.toLowerCase().indexOf(team) >= 0 || t.abbr.toLowerCase() === team; }); };
+    var exact = !!team && (games || []).some(function (g) { return g.teams.some(function (t) { return isTeam(team, t, true); }); });
+    var mine = function (g) { return !!team && g.teams.some(function (t) { return isTeam(team, t, exact); }); };
     var rank = function (g) { return g.state === "in" ? 0 : mine(g) ? 1 : g.state === "post" ? 2 : 3; };
     return games.slice().sort(function (a, b) {
       var d = rank(a) - rank(b);
@@ -322,7 +398,14 @@
         var soon = (v && v.games || []).some(function (g) { return g.state === "in" || (g.state === "pre" && g.at - t < 20 * MIN && g.at - t > -3 * 60 * MIN); });
         return (soon ? 2 : 15) * MIN;
       },
-      get: function (h, id) { return h.json(LEAGUES[id].url).then(function (j) { return parseScores(j, id); }); }
+      // the round, and ESPN's team list for the Your team picker once a week (a list that cannot be read
+      // leaves the round as it is: the picker then offers the teams seen in the games)
+      get: function (h, id) {
+        var L = LEAGUES[id], t = h.now ? h.now() : Date.now(), kept = TEAMS[id];
+        var teams = !L.teams || (kept && t - kept.at < 7 * 24 * 60 * MIN) ? Promise.resolve(kept ? kept.list : null)
+          : h.json(L.teams).then(function (j) { var l = parseTeams(j); if (l.length) TEAMS[id] = { at: t, list: l }; return l.length ? l : kept ? kept.list : null; }, function () { return kept ? kept.list : null; });
+        return Promise.all([h.json(L.url), teams]).then(function (r) { var v = parseScores(r[0], id); if (r[1] && r[1].length) v.teams = r[1]; return v; });
+      }
     },
     stocks: {
       // one request for every symbol on the widget (the id is the symbols, in the widget's order)
@@ -428,6 +511,7 @@
     FEEDS: FEEDS, FEED_DEFAULT: FEED_DEFAULT, SOURCES: SOURCES,
     feedOf: feedOf, plain: plain, parseRss: parseRss, ago: ago,
     LEAGUES: LEAGUES, LEAGUE_DEFAULT: LEAGUE_DEFAULT, leagueOf: leagueOf, parseScores: parseScores, scoreOrder: scoreOrder, kickoff: kickoff,
+    parseTeams: parseTeams, teamList: teamList, isTeam: isTeam, teamOf: teamOf, seasonOf: seasonOf, scoreFilter: scoreFilter,
     SYMBOL: SYMBOL, TICKERS_DEFAULT: TICKERS_DEFAULT, TICKER_NAMES: TICKER_NAMES, tickersOf: tickersOf, parseSpark: parseSpark, price: price, change: change,
     routeKey: routeKey, routeUrl: routeUrl, parseRoute: parseRoute, leaveBy: leaveBy, picks: picks, PAUSABLE: PAUSABLE, pausedOf: pausedOf,
     loader: function (h) { return Loader(h); }

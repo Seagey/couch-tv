@@ -7544,7 +7544,26 @@
     if (from === "calendars") return AH && AH.store.get().cal ? [["main", "Your calendar"]] : [];
     return [];
   }
-  function wsOptions(s) { return s.type === "tvlist" ? tvlistOptions(s.from) : s.options; }
+  function wsOptions(s, w) { return s.type === "tvlist" ? tvlistOptions(s.from) : s.type === "team" ? teamOptions(w).map(function (t) { return [t.name, t.name]; }) : s.options; }
+  // Scores, Your team: the competition this widget shows now (its Competition setting), and ESPN's own
+  // team list for it, read with the scores (widget-web.js; Big Bash and cricket have none: [] means typed)
+  function teamLeague(w) {
+    var r = w && (w.settings || []).filter(function (x) { return x.key === "league"; })[0], W0 = window.CouchWidgetWeb;
+    return W0 ? W0.leagueOf(r ? wsCur(w, r) : (w && w.opts || {}).league) : "nrl";
+  }
+  function teamAnswer(w) {
+    var d = WEB && WEB.data ? WEB.data() : null, rec = d && d.sports ? d.sports[teamLeague(w)] : null;
+    return rec && rec.ok ? rec.v : null;
+  }
+  function teamOptions(w) {
+    var v = teamAnswer(w), W0 = window.CouchWidgetWeb;
+    return v && v.teams && v.teams.length && W0 ? W0.teamList({ teams: v.teams }) : [];
+  }
+  // a typed team checked against the teams in the competition's games: { name } when it is one of them
+  function teamCheck(w, x) {
+    var v = teamAnswer(w), W0 = window.CouchWidgetWeb, t = W0 && x ? W0.teamOf(x, v) : null;
+    return { team: t, league: W0 ? W0.LEAGUES[teamLeague(w)].name : "", seen: W0 ? W0.teamList(v).length : 0 };
+  }
   // "sets": bins, Which bin goes out this week, also sets the count the widget keeps from (anchor):
   // the coming bin night is week 0 for the first bin, week 1 for the second
   function wsSets(w, s, v) {
@@ -7562,7 +7581,8 @@
     if (!Object.keys(rec).length) delete all[key];
     saveSettings();
     // a place changed: read the weather for it now (the Commute reads its own route)
-    if (/\|commute$/.test(key)) { if (WEB) WEB.tick(); webChanged(); }
+    // the web widgets: a new source, competition, watchlist or place is asked for now, not in 30 seconds
+    if (/\|(commute|news|sports|stocks)$/.test(key)) { if (WEB) WEB.tick(); webChanged(); }
     else if (wsRecords(String(key).split("|")[1] || "").some(function (s) { return s.key === k && s.type === "place"; })) refreshWeather();
     if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("wset", JSON.stringify(wsAll()));
   }
@@ -7673,7 +7693,7 @@
     var rows = [], vals = wsOf(w.key), shown = w.settings.filter(function (s) { return wsShown(w, s); });
     shown.forEach(function (s) {
       var id = w.key + ":" + s.key, v = vals[s.key], cur = wsCur(w, s), set = function (x) { wsSave(w, s, x); };
-      var opts = wsOptions(s);
+      var opts = wsOptions(s, w);
       if (shown.length > 1 && (s.type === "place" || s.many)) rows.push(head(s.label));
       if (s.type === "place") { placeRows(w, s, rows); return; }
       if ((s.type === "choice" || s.type === "tvlist") && s.many) {
@@ -7689,7 +7709,7 @@
           } });
         });
         if (s.help) rows.push(info(id + ":help", "", "", s.help));
-      } else if ((s.type === "choice" || s.type === "tvlist") && opts.length) {
+      } else if ((s.type === "choice" || s.type === "tvlist" || s.type === "team") && opts.length) {
         rows.push({ kind: "cycle", key: id, label: s.label, sub: s.help, value: wsWords(s, cur), act: function () {
           var i = opts.map(function (o) { return String(o[0]); }).indexOf(String(cur)), o = opts[(i + 1) % opts.length];
           set(o[0]);
@@ -7727,6 +7747,13 @@
             x = String(x || "").trim().slice(0, s.type === "calendar" ? 600 : s.many ? 200 : 80);
             if (s.type === "calendar" && x) { x = window.CouchAtHome ? CouchAtHome.calUrl(x) : ""; if (!x) { SET.msg = "That is not a calendar link. It starts with https://."; return; } }
             if (s.many) { var parts = x.split(",").map(function (y) { return y.trim(); }).filter(Boolean).slice(0, isFinite(s.max) ? +s.max : 6); set(parts.length ? parts : null); }
+            else if (s.type === "team" && x) {
+              // no list for this competition (Big Bash, cricket): checked against the teams in its games
+              var tc = teamCheck(w, x);
+              set(tc.team ? tc.team.name : x);
+              SET.msg = tc.team ? "Saved: " + tc.team.name + "." : "Saved. No " + x + " in the " + tc.league + " games Couch TV can see now: it shows once they play.";
+              return;
+            }
             else set(x);
             SET.msg = x ? "Saved." : "Cleared.";
           } });
@@ -7805,8 +7832,8 @@
         var vals = wsOf(w.key);
         return { key: w.key, kind: w.kind, name: w.name, title: w.title,
           settings: w.settings.filter(function (s) { return s.where.indexOf("phone") >= 0 && s.type !== "image"; }).map(function (s) {
-            var cur = wsCur(w, s), o = { key: s.key, label: s.label, type: s.type, help: s.help, many: s.many, coast: s.coast, store: s.store, min: s.min, max: s.max, step: s.step,
-              options: wsOptions(s), shown: wsShown(w, s), own: vals[s.key] !== undefined, words: wsWords(s, cur) };
+            var cur = wsCur(w, s), opts = wsOptions(s, w), o = { key: s.key, label: s.label, type: s.type === "team" && opts.length ? "choice" : s.type, help: s.help, many: s.many, coast: s.coast, store: s.store, min: s.min, max: s.max, step: s.step,
+              options: opts, shown: wsShown(w, s), own: vals[s.key] !== undefined, words: wsWords(s, cur) };
             o.value = s.private && s.type !== "tvlist" && s.type !== "choice" ? (cur ? true : null) : cur === undefined ? null : cur;
             return o;
           }) };
@@ -7831,8 +7858,15 @@
         var s = w.settings.filter(function (x) { return x.key === k; })[0], v = vals[k];
         if (!s || s.where.indexOf("phone") < 0) { bad = bad || "That setting is not on this widget."; return; }
         if (v === null) { wsSet(w.key, k, null); if (s.sets) wsSet(w.key, s.sets, null); return; }
-        var opts = wsOptions(s), one = function (x) { var o = opts.filter(function (y) { return String(y[0]) === String(x); })[0]; return o ? o[0] : undefined; };
+        var opts = wsOptions(s, w), one = function (x) { var o = opts.filter(function (y) { return String(y[0]) === String(x); })[0]; return o ? o[0] : undefined; };
         if (s.type === "place") { v = cleanPlace(v); if (!v) { bad = "That place could not be used. Search for it again."; return; } }
+        else if (s.type === "team") {
+          // from the competition's list when it has one; typed, then checked against its games, when not
+          var tc = teamCheck(w, String(v).trim().slice(0, 40));
+          if (opts.length && !tc.team) { bad = String(v).slice(0, 40) + " is not a team in the " + tc.league + ". Pick one from the list."; return; }
+          v = tc.team ? tc.team.name : String(v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 40);
+          if (!v) v = null;
+        }
         else if ((s.type === "choice" || s.type === "tvlist") && s.many) {
           if (!Array.isArray(v)) { bad = "That choice is not one of the choices."; return; }
           v = v.map(one).filter(function (x, i, a) { return x !== undefined && a.indexOf(x) === i; }).slice(0, isFinite(s.max) ? +s.max : 4);

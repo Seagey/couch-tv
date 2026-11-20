@@ -374,8 +374,8 @@ await phone.waitForFunction(() => document.getElementById("design-line").style.d
   ok(bad.ok === false, "a choice that is not one of the choices is refused: " + bad.error);
   const notHere = await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "zz|news", values: { feed: "bbc" } } }));
   ok(notHere.ok === false, "a widget that is not on the home is refused");
-  const data = await tv.evaluate(() => window.tv.atHomeRead().design.widgets.filter((w) => w.key === "n|news")[0]);
-  ok(data.settings.every((s) => s.key !== "count"), "only the settings a widget reads now (pre) are offered");
+  const data = await tv.evaluate(() => { const w = window.tv.atHomeRead().design.widgets.filter((x) => x.key === "n|news")[0], caps = window.CouchWidgetCaps.settings("news"); return { keys: w.settings.map((s) => s.key), pre: w.settings.every((s) => caps.filter((c) => c.key === s.key)[0].pre === true) }; });
+  ok(data.pre && data.keys.join() === "feed,count", "only the settings a widget reads now (pre) are offered: " + data.keys.join());
 }
 // the design's apps, from the phone
 {
