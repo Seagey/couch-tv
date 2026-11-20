@@ -294,6 +294,108 @@ const mark = (k, name) => { tested[k] = name; };
   ok(r.text === d0.text && r.layer === d0.layer, "surf: cleared, the default again");
   mark("surf.place", "1. surf"); mark("surf.units", "1. surf"); mark("surf.wind", "1. surf");
 }
+// ---------------- every setting at every size the widget comes in ----------------
+// (Fable 21 Nov: "Show the town name" and "Show the high and low" did nothing on the wide tile; a widget
+// with a place of its own drew that place's reading with no name on the small sizes)
+const CAPS0 = createRequire(import.meta.url)(path.join(ROOT, "tv-home/web/widget-caps.js"));
+const PX = { tile: [160, 160], wtile: [360, 160], small: [360, 360], tall: [360, 560], medium: [760, 360], wide: [1160, 360], large: [760, 760] };
+const sizesOf = (k) => CAPS0.get(k).sizes.s.filter((id) => PX[id]);
+// each setting changed one way (on the home in Australia, south of the equator)
+const VARY = {
+  weather: { place: false, hilo: false, town: BEACH, degrees: "f" }, bigtemp: { place: false, town: BEACH, degrees: "f" },
+  hourly: { hours: 2, town: BEACH, degrees: "f" }, rain: { town: BEACH }, uv: { town: BEACH }, sun: { town: PERTH },
+  moon: { hemi: "north" }, air: { town: BEACH, scale: "us" }, surf: { place: BEACH, units: "ft", wind: "kn" }
+};
+// the only setting x size cases where nothing changes, each with why (checked: no others)
+const SAME = {
+  "weather.place tile": "a tile shows no town name to hide (only a widget's own place, checked below)",
+  "bigtemp.place tile": "a tile shows no town name to hide (only a widget's own place, checked below)",
+  "surf.wind wtile": "the wide tile shows only the swell, no wind"
+};
+const drawnSig = (r) => r.text + " | " + r.svgs.join(";");
+let matrix = 0;
+for (const kind of Object.keys(VARY)) {
+  for (const sz of sizesOf(kind)) {
+    const [w, h] = PX[sz], o = { id: "x", kind, opts: {}, w, h };
+    const d0 = await draw(o, env());
+    ok(!d0.empty, kind + " " + sz + ": draws a reading by default: " + d0.text);
+    for (const key of Object.keys(VARY[kind])) {
+      const r = await draw(o, env({ x: { [key]: VARY[kind][key] } }));
+      const why = SAME[kind + "." + key + " " + sz];
+      if (why) ok(drawnSig(r) === drawnSig(d0), kind + "." + key + " at " + sz + " (" + w + " x " + h + ") draws the same, as it should: " + why);
+      else ok(drawnSig(r) !== drawnSig(d0), kind + "." + key + " at " + sz + " (" + w + " x " + h + ") changes the drawing: " + d0.text + " / " + r.text);
+      const back = await draw(o, env({ x: { [key]: null } }));
+      ok(drawnSig(back) === drawnSig(d0), kind + "." + key + " at " + sz + ": cleared, the default again");
+      matrix++;
+    }
+  }
+}
+ok(matrix >= 70, "the size matrix covers every setting at every size: " + matrix + " cases");
+// the wide tile of the weather (Fable finding 1), exactly
+{
+  const o = { id: "x", kind: "weather", opts: {}, w: 360, h: 160 };
+  const d0 = await draw(o, env());
+  has(d0.text, "Hillside", "weather wide tile: the town by default"); has(d0.text, "28°", "weather wide tile: the high by default");
+  let r = await draw(o, env({ x: { place: false } }));
+  hasNot(r.text, "Hillside", "weather wide tile, Show the town name off"); has(r.text, "24°", "weather wide tile: the temperature stays"); has(r.text, "28°", "weather wide tile: the high stays");
+  r = await draw(o, env({ x: { hilo: false } }));
+  hasNot(r.text, "28°", "weather wide tile, Show the high and low off"); has(r.text, "Hillside", "weather wide tile: the town stays");
+  r = await draw(o, env({ x: { place: false, hilo: false } }));
+  ok(r.text.replace(/\s/g, "") === (await draw(o, env({ x: { place: false, hilo: false } }))).text.replace(/\s/g, "") && !/Hillside|28°/.test(r.text) && /24°/.test(r.text), "weather wide tile, both off: the sky and the temperature only: " + r.text);
+}
+// a widget with a place of its own names it at every size (Fable finding 2)
+{
+  const OWN = { weather: ["town", BEACH], bigtemp: ["town", BEACH], hourly: ["town", BEACH], rain: ["town", BEACH], uv: ["town", BEACH], sun: ["town", PERTH], air: ["town", BEACH], surf: ["place", BEACH] };
+  const uvRamp = [0, 1, 2, 4, 6, 8, 6, 4, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  for (const kind of Object.keys(OWN)) for (const sz of sizesOf(kind)) {
+    const [w, h] = PX[sz], [key, pl] = OWN[kind];
+    const r = await draw({ id: "x", kind, opts: {}, w, h }, env({ x: { [key]: pl } }));
+    has(r.text, pl.name, kind + " " + sz + " (" + w + " x " + h + ") with a place of its own names it");
+  }
+  // "Show the town name" off hides a widget's own place on the tiles too
+  for (const kind of ["weather", "bigtemp"]) {
+    const r = await draw({ id: "x", kind, opts: {}, w: 160, h: 160 }, env({ x: { town: BEACH, place: false } }));
+    hasNot(r.text, "Long Beach", kind + " tile: its own place, with Show the town name off");
+    has(r.text, "31°", kind + " tile: still that place's own temperature");
+  }
+  // long place names stay inside the widget at every size
+  const LONGP = { name: "Port Macquarie Hastings Lighthouse Beach North", lat: -33.5, lon: 151.4, timezone: "Australia/Sydney" };
+  const LP = { [KEY(LONGP)]: base.wxAt[KEY(BEACH)] };
+  for (const kind of Object.keys(OWN)) for (const sz of sizesOf(kind)) {
+    const [w, h] = PX[sz], key = OWN[kind][0];
+    const out = await page.evaluate(([o, e]) => {
+      document.querySelectorAll(".ws-host").forEach((x) => x.remove());
+      const host = document.createElement("div"); host.className = "ws-host cw-o"; host.style.cssText = "position:absolute;left:80px;top:60px";
+      document.body.appendChild(host);
+      const root = window.CouchWidgets.render(o, e); host.appendChild(root);
+      const R = root.getBoundingClientRect(), bad = [];
+      root.querySelectorAll("*").forEach((n) => {
+        if (n.closest("svg") && n.tagName.toLowerCase() !== "svg") return;
+        const r = n.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        if (r.left < R.left - 1 || r.top < R.top - 1 || r.right > R.right + 1 || r.bottom > R.bottom + 1) bad.push(n.tagName + "." + n.className + " " + JSON.stringify((n.textContent || "").slice(0, 30)) + " " + Math.round(r.left - R.left) + "," + Math.round(r.top - R.top) + " " + Math.round(r.width) + "x" + Math.round(r.height));
+      });
+      return bad;
+    }, [{ id: "x", kind, opts: {}, w, h }, env({ x: { [key]: LONGP } }, { wxAt: LP })]);
+    ok(!out.length, kind + " " + sz + " (" + w + " x " + h + ") with a long place name: everything inside the widget: " + out.join("; "));
+  }
+  void uvRamp;
+}
+// a place whose time zone is not known: its sun times are by this TV's clock, and it says so (finding 5)
+{
+  const PERTH_NO_ZONE = Object.assign({}, PERTH, { timezone: "auto" });
+  for (const sz of sizesOf("sun")) {
+    const [w, h] = PX[sz];
+    const r = await draw({ id: "x", kind: "sun", opts: {}, w, h }, env({ x: { town: PERTH_NO_ZONE } }));
+    if (sz !== "tile") has(r.text, "by this TV's clock", "sun " + sz + ", a place with no time zone: says the times are by this TV's clock");
+    has(r.text, "Perth", "sun " + sz + ": still names the place");
+    const own = await draw({ id: "x", kind: "sun", opts: {}, w, h }, env({ x: { town: PERTH } }));
+    hasNot(own.text, "by this TV's clock", "sun " + sz + ", a place with its own time zone: its own clock, nothing to say");
+  }
+  const t = await draw({ id: "x", kind: "sun", opts: {}, w: 160, h: 160 }, env({ x: { town: PERTH_NO_ZONE } }));
+  has(t.text, "TV's clock", "sun tile, a place with no time zone: says so too");
+}
+
 // a real TV never draws demo numbers: no reading, no numbers
 {
   for (const kind of ["weather", "bigtemp", "hourly", "rain", "uv", "air", "surf", "sun"]) {

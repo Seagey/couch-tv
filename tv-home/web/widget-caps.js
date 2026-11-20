@@ -549,7 +549,7 @@
 
   // a weather widget's own place (kept on this TV: Hold OK, Home settings or the phone) and its own
   // temperature unit (kept on this TV: Roku and Apple TV draw designs in the home's own unit)
-  var WX_TOWN = function (what) { return st("town", "Place", "place", "", "Where " + what + " is for. Empty uses this home's town.", "tv", ON_TV, true, { "private": true }); };
+  var WX_TOWN = function (what, are) { return st("town", "Place", "place", "", "Where " + what + (are ? " are" : " is") + " for. Empty uses this home's town.", "tv", ON_TV, true, { "private": true }); };
   var DEGREES = function () { return st("degrees", "Temperature in", "choice", "auto", "Follow this TV uses Home settings, Weather, Units.", "tv", ON_TV, true,
     { options: [["auto", "Follow this TV"], ["c", "Celsius (°C)"], ["f", "Fahrenheit (°F)"]] }); };
 
@@ -572,11 +572,11 @@
       { options: [["auto", "As many as fit"], [4, "4"], [6, "6"], [8, "8"]] }), DEGREES()],
     rain: [WX_TOWN("the rain")],
     uv: [WX_TOWN("the UV")],
-    sun: [WX_TOWN("sunrise and sunset")],
+    sun: [WX_TOWN("sunrise and sunset", true)],
     moon: [st("hemi", "Moon seen from", "choice", "auto", "The moon looks the other way round south of the equator.", "tv", ON_TV, true,
       { options: [["auto", "This home's town"], ["south", "The south"], ["north", "The north"]] })],
     air: [WX_TOWN("the air quality"), st("scale", "Scale", "choice", "auto", "Best for your country uses the American scale in the United States and the European one elsewhere.", "tv", ON_TV, true,
-      { options: [["auto", "Best for your country"], ["eu", "European (0 to 100)"], ["us", "American (0 to 500)"]] })],
+      { options: [["auto", "Best for your country"], ["eu", "European"], ["us", "American"]] })],
     surf: [st("place", "Beach", "place", "", "Where the swell is read. Empty uses this home's town.", "tv", ON_TV, true, { coast: true, "private": true }),
       st("units", "Wave height in", "choice", "auto", "Best for your country uses feet in the United States and metres elsewhere.", "tv", ON_TV, true,
         { options: [["auto", "Best for your country"], ["m", "Metres"], ["ft", "Feet"]] }),
@@ -688,6 +688,9 @@
         note: need === "no" ? (c.status === "not-built" ? DEFAULT_NOTE.no : NOT_NATIVE) : NATIVE_PHOTO[k] ? NATIVE_PHOTO_NOTE : "Couch TV draws this on your " + NATIVE_NAME[p] + ", opened by the home computer." };
     });
   });
+
+  // a Roku draws the moon as a plain disc with its name and how much is lit, the same way round everywhere
+  C.moon.platforms["Roku OS"].note += " On a Roku the moon is a plain disc with its name and how much is lit, the same way round everywhere, and no next full moon.";
 
   // the setup card a TV shows for a widget that has nothing real to show yet: the first line says what
   // is missing, the second where to go. Built only from this file, never from a design.

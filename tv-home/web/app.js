@@ -7584,7 +7584,7 @@
     if (!name || p.lat === null || p.lon === null || p.lat === "" || p.lon === "" || !isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
     var out = { name: name, lat: lat, lon: lon }, area = String(p.area || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 80);
     if (area) out.area = area;
-    out.timezone = typeof p.timezone === "string" && /^([A-Z][A-Za-z_]{1,30}(\/[A-Z][A-Za-z_-]{1,30}){1,2}|auto|UTC|GMT)$/.test(p.timezone) ? p.timezone : "auto";
+    out.timezone = typeof p.timezone === "string" && /^([A-Z][A-Za-z_]{1,30}(\/[A-Z][A-Za-z_-]{1,30}){1,2}|Etc\/GMT[+-]\d{1,2}|auto|UTC|GMT)$/.test(p.timezone) ? p.timezone : "auto";
     return out;
   }
   // the same key the widgets look a place up by (widgets.js placeKey): two decimals each

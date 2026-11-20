@@ -351,6 +351,9 @@
     var l = op(o).label || dflt, p = pickedPlace(o, env);
     return p && p.name && String(l).toLowerCase() !== p.name.toLowerCase() ? l + ", " + p.name : l;
   }
+  // the name of a widget's own place, for the small sizes (a tile, a wide tile): "" when it reads the
+  // home's town, or its "Show the town name" is off
+  function ownName(o, env) { var p = pickedPlace(o, env); return p && p.name && op(o).place !== false ? p.name : ""; }
   // how many hours an Hourly widget shows: its "How many hours", never more than fit (at least `min`
   // pixels a column), else as many as fit
   function hoursN(o, env, fit, roomPx, have) {
@@ -485,8 +488,10 @@
     if (p && isFinite(p.lat) && isFinite(p.lon)) {
       var s = sunTimes(t, +p.lat, +p.lon);
       // a place of its own in another time zone: its sunrise by its own clock, as that town sees it
-      var f = function (d) { return src.picked && p.timezone && p.timezone !== "auto" ? tzFmt(d, p.timezone) || fmt12(d) : fmt12(d); };
-      if (s) return { rise: f(s.rise), set: f(s.set), frac: clamp((t - s.rise) / (s.set - s.rise), -0.1, 1.1) };
+      // (a place with no zone of its own: its times by this TV's clock, and the widget says so: tvClock)
+      var own = src.picked && p.timezone && p.timezone !== "auto" && !!tzFmt(t, p.timezone);
+      var f = function (d) { return own ? tzFmt(d, p.timezone) : fmt12(d); };
+      if (s) return { rise: f(s.rise), set: f(s.set), frac: clamp((t - s.rise) / (s.set - s.rise), -0.1, 1.1), tvClock: src.picked && !own };
     }
     if (w && w.sunrise) return { rise: w.sunrise, set: w.sunset, frac: 0.5 };
     return null;
@@ -897,8 +902,9 @@
     if (!w) return noWx(root, b, env, o);
     var q = op(o), large = b.w > 300, tiny = b.h < 300;
     if (b.h < 200) {
-      // a Tile: the temperature and the sky, nothing else
-      add(root, [ic(wxIcon(w.code, w.is_day), 44, rgba(sh.ink, 1), "solid"), E("div", "cw-grow"), E("div", "cw-big", "white-space:nowrap;font-size:" + px(fitPx(w.temp + "°", b.w - 48, 64)), [w.temp + "°"])]);
+      // a Tile: the temperature and the sky, and the widget's own place when it has one
+      var wn = ownName(o, env);
+      add(root, [wn ? E("div", "cw-row", "min-width:0", [ic(wxIcon(w.code, w.is_day), 44, rgba(sh.ink, 1), "solid"), E("div", "cw-t23 cw-ell", "font-weight:680;margin-left:10px;min-width:0", [wn])]) : ic(wxIcon(w.code, w.is_day), 44, rgba(sh.ink, 1), "solid"), E("div", "cw-grow"), E("div", "cw-big", "white-space:nowrap;font-size:" + px(fitPx(w.temp + "°", b.w - 48, 64)), [w.temp + "°"])]);
       return;
     }
     add(root, [q.place === false ? null : E("div", "cw-t29 cw-ell", "font-weight:640", [w.place || "Here"]),
@@ -920,8 +926,9 @@
       root.style.setProperty("--ink", rgba(ink, 1)); root.style.setProperty("--sub", rgba(ink, 0.78)); root.style.color = rgba(ink, 1); sh.ink = ink;
     }
     if (b.h < 200) {
-      // a tile: the sky and the number
-      add(root, [ic(wxIcon(w.code, w.is_day), 40, rgba(sh.ink, 1), "solid"), E("div", "cw-grow"), E("div", "cw-big", "white-space:nowrap;font-size:" + px(Math.min(clamp(b.w * 0.4, 56, 80), fitPx(w.temp + "°", b.w - 48, 80))) + ";letter-spacing:-.05em", [w.temp + "°"])]);
+      // a tile: the sky and the number, and the widget's own place when it has one
+      var bn = ownName(o, env);
+      add(root, [bn ? E("div", "cw-row", "min-width:0", [ic(wxIcon(w.code, w.is_day), 40, rgba(sh.ink, 1), "solid"), E("div", "cw-t23 cw-ell", "font-weight:680;margin-left:10px;min-width:0", [bn])]) : ic(wxIcon(w.code, w.is_day), 40, rgba(sh.ink, 1), "solid"), E("div", "cw-grow"), E("div", "cw-big", "white-space:nowrap;font-size:" + px(Math.min(clamp(b.w * 0.4, 56, 80), fitPx(w.temp + "°", b.w - 48, 80))) + ";letter-spacing:-.05em", [w.temp + "°"])]);
       return;
     }
     var fs = Math.min(b.h * 0.52, b.w * 0.44), ah = w.ahead;
@@ -984,7 +991,7 @@
     var s = sunToday(env, o);
     if (!s) return empty(root, b, "sun", "Set your town for the sun", "Settings (hold OK), Home settings, Location");
     var at = arc(s.frac);
-    add(root, [lab("sun", o.kind === "sun" ? wxHead(o, env, "Sun") : op(o).label || "Sun"), svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.3)", "stroke-width": 4, "stroke-dasharray": "2 10", "stroke-linecap": "round" }),
+    add(root, [lab("sun", o.kind === "sun" ? wxHead(o, env, "Sun") + (s.tvClock ? ", by this TV's clock" : "") : op(o).label || "Sun"), svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.3)", "stroke-width": 4, "stroke-dasharray": "2 10", "stroke-linecap": "round" }),
       s.frac > 0 && s.frac < 1 ? S("circle", { cx: at.x, cy: at.y, r: 14, fill: "#ffd60a" }) : null], "flex:1;min-height:0;margin:6px 0"),
       E("div", "cw-row cw-sp", "", [E("div", "cw-t29", "", ["↑ " + s.rise]), b.w >= 300 ? E("div", "cw-t29", "", ["↓ " + s.set]) : null])]);
   };
@@ -2348,9 +2355,20 @@
   CR.solar = CR.sun = function (root, o, b, env) {
     var s = sunToday(env, o);
     if (!s) return empty(root, b, "sun", "Set your town for the sun", "");
-    if (b.w < 300) return mini(root, b, "sun", (s.frac > 0.5 ? s.set : s.rise).replace(/[ap]m$/, ""), s.frac > 0.5 ? "Sunset" : "Sunrise");
+    // a place of its own is named (and, with no time zone of its own, its times are by this TV's clock)
+    var sp = pickedPlace(o, env), sn = sp && sp.name ? sp.name + (s.tvClock ? ", by this TV's clock" : "") : "";
+    var tv = (s.frac > 0.5 ? s.set : s.rise).replace(/[ap]m$/, ""), tw = s.frac > 0.5 ? "Sunset" : "Sunrise";
+    if (b.w < 300 && !sn) return mini(root, b, "sun", tv, tw);
+    if (b.w < 300) {
+      // a tile with a place of its own: the time, sunrise or sunset, and the place (two lines at most)
+      root.style.padding = "18px"; root.style.justifyContent = "center";
+      add(root, [E("div", "cw-big", "white-space:nowrap;font-size:" + px(Math.min(40, fitPx(tv, b.w - 36, 40))), [tv]), E("div", "cw-t23 cw-ell", "font-weight:650;color:var(--ink);margin-top:2px", [tw]),
+        E("div", "cw-t23", "color:var(--ink);margin-top:2px;overflow:hidden;overflow-wrap:anywhere;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical", [sn])]);
+      return;
+    }
     var col = function (word, t) { return E("div", "cw-col", "", [E("div", "cw-t23", "", [word]), E("div", "cw-t29", "font-weight:700", [t])]); };
-    add(root, E("div", "cw-row", "height:100%;justify-content:space-around", [ic("sun", 48, "#ffd60a", "solid"), col("Sunrise", s.rise), col("Sunset", s.set)]));
+    var row = E("div", "cw-row", (sn ? "flex:1;min-height:0" : "height:100%") + ";justify-content:space-around", [ic("sun", sn ? 40 : 48, "#ffd60a", "solid"), col("Sunrise", s.rise), col("Sunset", s.set)]);
+    add(root, sn ? [E("div", "cw-t23 cw-ell", "font-weight:680", ["Sun, " + sn]), row] : row);
   };
   CR.worldclock = function (root, o, b, env) {
     var here = ""; try { here = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
@@ -2374,17 +2392,24 @@
     if (b.w < 300) return R.weather(root, o, b, env, sh);
     var w = weather(env, o);
     if (!w) return noWx(root, b, env, o);
-    add(root, E("div", "cw-row", "height:100%", [ic(wxIcon(w.code, w.is_day), 48, rgba(sh.ink, 1), "solid"), E("div", "cw-col", "flex:1;min-width:0;margin-left:14px", [E("div", "cw-t29 cw-ell", "font-weight:680", [w.place || "Here"]),
-      E("div", "cw-t23 cw-ell", "color:var(--ink)", [w.ahead ? w.ahead.label + ", " + w.ahead.hi + "°" : wxWords(w.code) + (w.hi !== undefined ? ", " + w.hi + "°" : "")])]), E("div", "cw-big", "font-size:72px;margin-left:10px", [w.temp + "°"])]));
+    // "Show the town name" off: the sky's words lead; "Show the high and low" off: no high
+    var q = op(o), hl = q.hilo !== false, sky = w.ahead ? w.ahead.label + (hl ? ", " + w.ahead.hi + "°" : "") : wxWords(w.code) + (hl && w.hi !== undefined ? ", " + w.hi + "°" : "");
+    var lines = q.place === false ? [E("div", "cw-t29 cw-ell", "font-weight:680", [sky])] : [E("div", "cw-t29 cw-ell", "font-weight:680", [w.place || "Here"]), E("div", "cw-t23 cw-ell", "color:var(--ink)", [sky])];
+    add(root, E("div", "cw-row", "height:100%", [ic(wxIcon(w.code, w.is_day), 48, rgba(sh.ink, 1), "solid"), E("div", "cw-col", "flex:1;min-width:0;margin-left:14px", lines), E("div", "cw-big", "font-size:72px;margin-left:10px", [w.temp + "°"])]));
   };
   CR.hourly = function (root, o, b, env, sh) {
     var w = weather(env, o);
     if (!w) return noWx(root, b, env, o);
     if (!w.hourly) return empty(root, b, "clock", "The hourly forecast is on its way", "");
-    var n = hoursN(o, env, clamp(Math.floor((b.w - 48) / 76), 2, 5), Math.floor((b.w - 48) / 64), w.hourly.length), ink = rgba(sh.ink, 1);
-    add(root, E("div", "cw-row cw-sp", "height:100%", w.hourly.slice(0, n).map(function (h) {
+    // a place of its own: its name first, in the room of one hour or so
+    var hn = ownName(o, env), room = b.w - 48 - (hn ? 120 : 0);
+    var n = hoursN(o, env, clamp(Math.floor(room / 76), 2, 5), Math.floor(room / 64), w.hourly.length), ink = rgba(sh.ink, 1);
+    var hrs = w.hourly.slice(0, n).map(function (h) {
       return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink)", [h[0]]), E("div", "", "margin:4px 0", [ic(wxIcon(h[1], !h[3]), 34, ink, "solid")]), E("div", "", "font-size:27px;font-weight:650", [h[2] + "°"])]);
-    })));
+    });
+    if (!hn) return add(root, E("div", "cw-row cw-sp", "height:100%", hrs));
+    add(root, E("div", "cw-row", "height:100%", [E("div", "cw-t23", "font-weight:680;width:108px;flex:none;margin-right:12px;overflow:hidden;overflow-wrap:anywhere;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical", [hn]),
+      E("div", "cw-row cw-sp", "flex:1;min-width:0;height:100%", hrs)]));
   };
   CR.week = function (root, o, b, env, sh) {
     var w = weather(env, o);
@@ -2408,8 +2433,13 @@
     var w = weather(env, o);
     if (!w || w.uv === undefined) return w ? empty(root, b, "sun", "UV is on its way", "") : noWx(root, b, env, o);
     var band = w.uv < 3 ? "Low" : w.uv < 6 ? "Moderate" : w.uv < 8 ? "High" : w.uv < 11 ? "Very high" : "Extreme";
-    if (b.w < 300) return mini(root, b, "sun", String(w.uv), band);
     var pu = pickedPlace(o, env);
+    if (b.w < 300) {
+      // a place of its own: its name under the band (no icon, to make room)
+      mini(root, b, pu && pu.name ? null : "sun", String(w.uv), band);
+      if (pu && pu.name) add(root, E("div", "cw-t23 cw-ell", "color:var(--ink);margin-top:2px;max-width:100%", [pu.name]));
+      return;
+    }
     mini(root, b, "sun", String(w.uv), pu && pu.name ? "UV, " + pu.name : "UV index", band + (w.uvFrom && w.uvTo ? ", " + w.uvFrom + " to " + w.uvTo : w.uvTo ? ", until " + w.uvTo : ""));
   };
   CR.moon = function (root, o, b, env) {
