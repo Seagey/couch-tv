@@ -208,6 +208,83 @@ class SmartHomeTest(unittest.TestCase):
             self.assertEqual(run(h.answer("set", "cover.blinds", v))["error"], "refused", v)
         self.assertFalse([x for x in self.calls if x[1] == "POST"])
 
+    def test_the_house_test_agrees_with_every_other_copy(self):
+        t = json.load(open(os.path.join(HERE, "fixtures", "opens_house_ids.json")))
+        self.assertGreaterEqual((len(t["refuse"]), len(t["pass"])), (50, 30))
+        for e in t["refuse"]:
+            self.assertTrue(smarthome.OPENS_HOUSE.fullmatch(e), "refuses " + e)
+            self.assertTrue(smarthome.opens_house(e), "refuses " + e)
+        for e in t["pass"]:
+            self.assertFalse(smarthome.OPENS_HOUSE.fullmatch(e), "lets through " + e)
+        s = smarthome.parse({"url": "http://ha:8123", "token": TOKEN, "controls": [{"entity": e} for e in (
+            "switch.outdoor_lights", "switch.wall_clock", "switch.doorbell_mute", "switch.backdoor", "cover.frontgate", "switch.smartlock")]})
+        self.assertEqual([n["entity"] for n in s["controls"]], ["switch.outdoor_lights", "switch.wall_clock", "switch.doorbell_mute"])
+
+    def test_a_garage_door_named_so_only_in_home_assistant_never_shows_nor_opens(self):
+        more = {
+            "switch.shellyplus1_a8032ab1": {"entity_id": "switch.shellyplus1_a8032ab1", "state": "off", "attributes": {"friendly_name": "Garage Door"}},
+            "switch.sonoff_1000ab": {"entity_id": "switch.sonoff_1000ab", "state": "off", "attributes": {"friendly_name": "Front gate"}},
+            "cover.tuya_bf12": {"entity_id": "cover.tuya_bf12", "state": "unavailable", "attributes": {"friendly_name": "Garage door"}},
+            "script.arrive": {"entity_id": "script.arrive", "state": "off", "attributes": {"friendly_name": "Open the garage"}},
+            "scene.new_scene_2": {"entity_id": "scene.new_scene_2", "state": "x", "attributes": {"friendly_name": "Unlock front door", "entity_id": ["light.lamp"]}},
+            "switch.porch": {"entity_id": "switch.porch", "state": "off", "attributes": {"friendly_name": "Outdoor lights"}},
+        }
+        STATES.update(more)
+        try:
+            ids = [e["entity"] for e in smarthome.pickable(list(STATES.values()))]
+            for bad in ("switch.shellyplus1_a8032ab1", "switch.sonoff_1000ab", "cover.tuya_bf12", "script.arrive", "scene.new_scene_2"):
+                self.assertNotIn(bad, ids, bad + " is never offered")
+            self.assertIn("switch.porch", ids, "Outdoor lights is harmless")
+            h = smarthome.Home(self.dir, {"url": "http://homeassistant.local:8123",
+                                          "controls": [{"entity": e} for e in ("switch.shellyplus1_a8032ab1", "cover.tuya_bf12", "switch.porch")],
+                                          "scenes": [{"entity": "script.arrive"}, {"entity": "scene.new_scene_2"}]}, TOKEN)
+            h.call = self.home.call
+            c = {x["entity"]: x for x in run(h.answer("controls"))["controls"]}
+            self.assertTrue(c["switch.shellyplus1_a8032ab1"].get("blocked"))
+            self.assertTrue(c["cover.tuya_bf12"].get("blocked"), "not answering, still a garage door")
+            self.assertFalse(c["switch.porch"].get("blocked"))
+            # the page is no longer told about them once read
+            self.assertEqual([n["entity"] for n in h.info()["controls"]], ["switch.porch"])
+            for v in ("on", "off", "open", "close"):
+                self.assertEqual(run(h.answer("set", "switch.shellyplus1_a8032ab1", v))["error"], "refused")
+                self.assertEqual(run(h.answer("set", "cover.tuya_bf12", v))["error"], "refused")
+            self.assertEqual(run(h.answer("scene", "script.arrive"))["error"], "refused")
+            self.assertEqual(run(h.answer("scene", "scene.new_scene_2"))["error"], "refused")
+            self.assertFalse([x for x in self.calls if x[1] == "POST"], "nothing was switched or run")
+            self.assertTrue(run(h.answer("set", "switch.porch", "on"))["ok"])
+        finally:
+            for k in more:
+                STATES.pop(k, None)
+
+    def test_a_scene_runs_nothing_when_what_it_sets_cannot_be_read(self):
+        more = {"scene.movie2": {"entity_id": "scene.movie2", "state": "x", "attributes": {"entity_id": ["light.lamp", "cover.roller"]}},
+                "scene.grouped": {"entity_id": "scene.grouped", "state": "x", "attributes": {"entity_id": ["group.all_locks"]}}}
+        STATES.update(more)
+        try:
+            h = smarthome.Home(self.dir, {"url": "http://homeassistant.local:8123", "scenes": [{"entity": "scene.movie2"}, {"entity": "scene.grouped"}]}, TOKEN)
+            h.call = self.home.call
+            self.assertEqual(run(h.answer("scene", "scene.movie2"))["error"], "failed", "cover.roller cannot be read: nothing runs")
+            self.assertEqual(run(h.answer("scene", "scene.grouped"))["error"], "refused", "a group may hold locks")
+            self.assertFalse([x for x in self.calls if x[1] == "POST"])
+            STATES["cover.roller"] = {"entity_id": "cover.roller", "state": "closed", "attributes": {"device_class": "blind"}}
+            self.assertTrue(run(h.answer("scene", "scene.movie2"))["ok"])
+            STATES["cover.roller"]["attributes"] = {"friendly_name": "Garage roller door"}
+            self.assertEqual(run(h.answer("scene", "scene.movie2"))["error"], "refused")
+            ids = [e["entity"] for e in smarthome.pickable(list(STATES.values()))]
+            self.assertNotIn("scene.grouped", ids)
+            self.assertNotIn("scene.movie2", ids)
+        finally:
+            for k in list(more) + ["cover.roller"]:
+                STATES.pop(k, None)
+
+    def test_door_and_lock_readings_are_never_listed_but_doorbells_are(self):
+        states = [{"entity_id": e, "state": "off", "attributes": a} for e, a in (
+            ("binary_sensor.front_gate", {"device_class": "door"}), ("binary_sensor.garage_door", {"device_class": "garage_door"}),
+            ("binary_sensor.back", {"device_class": "lock"}), ("binary_sensor.hall_window", {"device_class": "window"}),
+            ("binary_sensor.front_doorbell", {}), ("event.front_door_ding", {"device_class": "doorbell"}),
+            ("sensor.front_door_lock", {}), ("sensor.alarm_state", {}), ("sensor.garage_temp", {"unit_of_measurement": "°C"}))]
+        self.assertEqual([e["entity"] for e in smarthome.pickable(states)], ["binary_sensor.front_doorbell", "event.front_door_ding", "sensor.garage_temp"])
+
     def test_config_section_with_env_token(self):
         h = smarthome.Home(self.dir, {"url": "http://ha:8123", "scenes": [{"entity": "scene.movie"}]}, TOKEN)
         self.assertEqual(h.info()["scenes"], [{"entity": "scene.movie", "name": "Movie"}])

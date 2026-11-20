@@ -617,7 +617,7 @@
   // shows their setup record (widgets.js draws them empty there, which opens B.setup)
   // Control Centre: every switch big. OK switches one through the launcher (HomeAssistant.kt "set"),
   // which only switches what config.json names. A lock, alarm, garage door, gate or door never shows at
-// all (widgets.js houseSafe); one that somehow reached this list is still never switched.
+  // all (widgets.js houseSafe); one that somehow reached this list is still never switched.
   B.controls = function (o, env) {
     var H = kit().ha, demo = !!env.demo, info = H.haOf(env).info || {};
     if (!demo && !(info.controls && info.controls.length)) return B.setup(o, env);

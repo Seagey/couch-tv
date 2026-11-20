@@ -40,7 +40,9 @@ ENTITY = {
 # a garage door, gate, front door, lock or alarm as a switch, blind, script or scene: refused by its name
 # too, the same test as the TV's (HomeAssistant.kt and bridge/smarthome.py OPENS_HOUSE); the TV also
 # refuses a blind Home Assistant calls a garage door, gate or door, whatever its name
-OPENS_THE_HOUSE = re.compile(r"^(cover|switch|script|scene)\.[a-z0-9_]*(garage|gate|door|lock|alarm)[a-z0-9_]*$")
+# joined words count (frontgate, backdoor, smartlock, unlock), harmless ones do not (gateway, doorbell,
+# indoor, outdoor, clock, block); tests/fixtures/opens_house_ids.json holds the ids every copy is tested with
+OPENS_THE_HOUSE = re.compile(r"^(cover|switch|script|scene)\.[a-z0-9_]*(garage|gate(?!way)|(?<![._]in)(?<![._]out)door(?!bell)|(?<![._]c)(?<![._]b)lock|alarm|disarm)[a-z0-9_]*$")
 
 
 def smart_home():

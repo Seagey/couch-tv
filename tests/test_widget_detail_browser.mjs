@@ -77,8 +77,11 @@ for (const [layer, w, q] of CASES) {
   if (c.stops > 1 && layer !== "photos") {
     const before = c.focusName;
     await press(page, "ArrowRight"); const r1 = await cur(page);
-    if (r1.focusName !== before) { await press(page, "ArrowLeft"); ok((await cur(page)).focusName === before, label + ": Right then Left comes back"); }
-    else { await press(page, "ArrowDown"); const d1 = await cur(page); if (d1.focusName !== before) { await press(page, "ArrowUp"); ok((await cur(page)).focusName === before, label + ": Down then Up comes back"); } }
+    // one check on every path: a move and its opposite come back (or nothing moved, so nothing to undo)
+    let back = true, how = "nothing moved";
+    if (r1.focusName !== before) { await press(page, "ArrowLeft"); back = (await cur(page)).focusName === before; how = "Right then Left"; }
+    else { await press(page, "ArrowDown"); const d1 = await cur(page); if (d1.focusName !== before) { await press(page, "ArrowUp"); back = (await cur(page)).focusName === before; how = "Down then Up"; } }
+    ok(back, label + ": " + how + " comes back");
     ok(await page.evaluate(() => document.querySelectorAll(".cwd-f").length === 1), label + ": one focus ring");
   }
   // the home never moves under an open layer

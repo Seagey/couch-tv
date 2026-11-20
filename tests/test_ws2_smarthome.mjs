@@ -123,6 +123,8 @@ const HA = {
   info: { controls: [1], cameras: [{ entity: "camera.backyard", name: "Backyard" }, { entity: "camera.driveway", name: "Driveway" }],
     sensors: [{ entity: "sensor.pool", name: "Pool" }, { entity: "sensor.rain_today", name: "Rain gauge" }], speakers: [1], energy: true, doorbell: true, doorbell_camera: true },
   controls: [{ entity: "light.lounge", name: "Lounge", ok: true, kind: "light", on: true }, { entity: "light.lamp", name: "Lamp", ok: true, kind: "light", on: false },
+    { entity: "switch.outdoor_lights", name: "Outdoor lights", ok: true, kind: "switch", on: false }, { entity: "switch.wall_clock", name: "Wall clock", ok: true, kind: "switch", on: true },
+    { entity: "switch.shellyplus1_a8032ab1", name: "Shellyplus1", ok: true, kind: "switch", on: false, blocked: true },
     { entity: "cover.garage", name: "Garage", ok: true, kind: "cover", on: false, blocked: true }, { entity: "cover.big_roller", name: "Big roller", ok: true, kind: "cover", on: false, blocked: true }],
   sensors: [{ entity: "sensor.pool", name: "Pool", ok: true, value: "26.4", num: 26.4, unit: "°C", cls: "temperature" }, { entity: "sensor.rain_today", name: "Rain gauge", ok: true, value: "12", num: 12, unit: "mm" }],
   hist: {}, energy: { ok: true, name: "Solar", total: 18.4, power: 2.4, power_unit: "kW", hours: [0, 0, 0, 0, 0, 0, 0.2, 0.9, 1.8, 2.6, 3.1, 3.2] },
@@ -162,6 +164,7 @@ group = "controls";
   r = await draw(W("controls"), env({}));
   ok(/Lounge/.test(r.text) && /Lamp/.test(r.text), "controls cleared: every one again");
   r = await draw(W("controls"), env(), { layer: true });
+  ok(/Outdoor lights/.test(r.layer) && /Wall clock/.test(r.layer) && !/Shellyplus1/.test(r.layer), "controls: outdoor lights and a wall clock show, a switch Home Assistant names a garage door does not: " + r.layer);
   ok(!OPENERS.test(r.text) && !OPENERS.test(r.layer) && /Lounge/.test(r.layer), "controls: a garage door never shows, by its name or by what Home Assistant calls it, on the widget or OK's layer (owner's rule): " + r.text + " / " + r.layer);
   r = await draw(W("controls"), env({ switches: ["cover.big_roller", "cover.garage"] }), { layer: true });
   ok(!OPENERS.test(r.text) && !OPENERS.test(r.layer) && /Lounge/.test(r.text), "controls: even picked, a garage door never shows (every safe one instead): " + r.text);
@@ -371,6 +374,20 @@ const onScreen = (p, id) => p.evaluate((x) => { const e = document.querySelector
 group = "on the TV";
 const tv = await tvPage(design(KINDS));
 TV = tv;
+group = "nothing that opens the house";
+{
+  // the one house test, as the TV page runs it (smarthome.js and widgets.js), with the ids every copy is
+  // tested with (tests/fixtures/opens_house_ids.json: bridge, Android, home-config.py run the same)
+  const T = JSON.parse(fs.readFileSync(path.join(ROOT, "tests/fixtures/opens_house_ids.json"), "utf8"));
+  const r = await tv.evaluate((t) => {
+    const a = window.smartHome.opensHouse, b = window.CouchWidgets.kit.ha.opensHouse, wrong = [];
+    t.refuse.forEach((e) => { if (!a(e)) wrong.push("smarthome.js shows " + e); if (!b(e)) wrong.push("widgets.js shows " + e); });
+    t.pass.forEach((e) => { if (a(e)) wrong.push("smarthome.js hides " + e); if (b(e)) wrong.push("widgets.js hides " + e); });
+    return { wrong, n: t.refuse.length + t.pass.length };
+  }, T);
+  ok(r.n >= 80 && !r.wrong.length, "the TV page's house test agrees on all " + r.n + " ids: " + r.wrong.join(", "));
+}
+group = "on the TV";
 {
   // real data only: a real TV page never draws the designer's demo readings
   const all = await tv.evaluate(() => document.querySelector(".cd-layer") ? document.querySelector(".cd-layer").textContent : document.body.textContent);

@@ -81,9 +81,27 @@
   // nor a scene or script named for one (HomeAssistant.kt and bridge/smarthome.py OPENS_HOUSE, the same
   // words). A blind Home Assistant itself calls a garage door, gate or door comes back "blocked" when it
   // is read: from then on it is left out of every list too (Control Centre, its pick list, the phone).
-  var OPENS_HOUSE = /^(cover|switch|script|scene)\.[a-z0-9_]*(garage|gate|door|lock|alarm)[a-z0-9_]*$|^(lock|alarm_control_panel)\./;
+  // the same test as bridge/smarthome.py OPENS_HOUSE (and HaReadings.kt, home-config.py), written without
+  // lookbehind for older TV browsers: garage, gate, door, lock, alarm or disarm anywhere in a blind's,
+  // switch's, script's or scene's id, joined words too (frontgate, backdoor, smartlock, unlock), but not
+  // gateway, doorbell, indoor, outdoor, clock or block; and every lock and alarm panel
+  // (tests/fixtures/opens_house_ids.json holds the ids every copy is tested with)
+  function opensHouse(e) {
+    e = String(e || "");
+    if (/^(lock|alarm_control_panel)\./.test(e)) return true;
+    if (!/^(cover|switch|script|scene)\.[a-z0-9_]*$/.test(e)) return false;
+    var re = /garage|gate|door|lock|alarm|disarm/g, m, w, i, after;
+    while ((m = re.exec(e))) {
+      w = m[0]; i = m.index; after = e.slice(i + w.length); re.lastIndex = i + 1;
+      if (w === "gate" && after.slice(0, 3) === "way") continue;
+      if (w === "door" && (after.slice(0, 4) === "bell" || /[._](in|out)$/.test(e.slice(0, i)))) continue;
+      if (w === "lock" && /[._][cb]$/.test(e.slice(0, i))) continue;
+      return true;
+    }
+    return false;
+  }
   var OPENERS = {};
-  function houseSafe(x) { var e = x && typeof x.entity === "string" ? x.entity : ""; return !!e && !x.blocked && !OPENERS[e] && !OPENS_HOUSE.test(e); }
+  function houseSafe(x) { var e = x && typeof x.entity === "string" ? x.entity : ""; return !!e && !x.blocked && !OPENERS[e] && !opensHouse(e); }
   function safeControls(r) {
     if (!r || !r.ok || !Array.isArray(r.controls)) return r;
     r.controls.forEach(function (c) { if (c && c.blocked && typeof c.entity === "string") OPENERS[c.entity] = true; });
@@ -537,4 +555,6 @@
       return out;
     }
   };
+  // the house test, for the tests (tests/test_ws2_smarthome.mjs runs every id in tests/fixtures/opens_house_ids.json)
+  window.smartHome.opensHouse = opensHouse;
 })();

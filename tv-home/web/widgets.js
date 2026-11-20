@@ -1411,8 +1411,26 @@
   // nothing that opens the house ever shows on the TV: a lock, an alarm, a garage door, gate or door
   // (by its id, or a blind Home Assistant calls one: "blocked"), nor a scene or script named for one
   // (HomeAssistant.kt and bridge/smarthome.py OPENS_HOUSE, the same words)
-  var OPENS_HOUSE = /^(cover|switch|script|scene)\.[a-z0-9_]*(garage|gate|door|lock|alarm)[a-z0-9_]*$|^(lock|alarm_control_panel)\./;
-  function houseSafe(l) { return Array.isArray(l) ? l.filter(function (x) { return x && !x.blocked && !OPENS_HOUSE.test(String(x.entity || (Array.isArray(x) ? x[2] : "") || "")); }) : l; }
+  // the same test as bridge/smarthome.py OPENS_HOUSE (and HaReadings.kt, home-config.py), written without
+  // lookbehind for older TV browsers: garage, gate, door, lock, alarm or disarm anywhere in a blind's,
+  // switch's, script's or scene's id, joined words too (frontgate, backdoor, smartlock, unlock), but not
+  // gateway, doorbell, indoor, outdoor, clock or block; and every lock and alarm panel
+  // (tests/fixtures/opens_house_ids.json holds the ids every copy is tested with)
+  function opensHouse(e) {
+    e = String(e || "");
+    if (/^(lock|alarm_control_panel)\./.test(e)) return true;
+    if (!/^(cover|switch|script|scene)\.[a-z0-9_]*$/.test(e)) return false;
+    var re = /garage|gate|door|lock|alarm|disarm/g, m, w, i, after;
+    while ((m = re.exec(e))) {
+      w = m[0]; i = m.index; after = e.slice(i + w.length); re.lastIndex = i + 1;
+      if (w === "gate" && after.slice(0, 3) === "way") continue;
+      if (w === "door" && (after.slice(0, 4) === "bell" || /[._](in|out)$/.test(e.slice(0, i)))) continue;
+      if (w === "lock" && /[._][cb]$/.test(e.slice(0, i))) continue;
+      return true;
+    }
+    return false;
+  }
+  function houseSafe(l) { return Array.isArray(l) ? l.filter(function (x) { return x && !x.blocked && !opensHouse(x.entity || (Array.isArray(x) ? x[2] : "")); }) : l; }
   function spkWord(s) { return s.ok === false ? "Not answering" : s.state === "off" || s.state === "standby" ? "Off" : s.muted ? "Muted" : s.volume != null ? s.volume + "%" : s.state === "playing" ? "Playing" : "On"; }
   function spkSong(s) { return s.ok === false ? "" : s.title ? s.title + (s.artist ? ", " + s.artist : "") : s.state === "playing" ? "Playing" : s.state === "paused" ? "Paused" : s.state === "off" ? "" : "Not playing"; }
   R.speakers = function (root, o, b, env) {
@@ -2773,7 +2791,7 @@
       athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
   };
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
-  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, pickedOf: pickedOf, houseSafe: houseSafe, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, queueOf: queueOf, coverOk: coverOk, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
+  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, pickedOf: pickedOf, houseSafe: houseSafe, opensHouse: opensHouse, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, queueOf: queueOf, coverOk: coverOk, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
   // what the web widgets' detail layers share with them (widget-detail.js)
   window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS, demoScores: demoScores, gameStatus: gameStatus, shortScore: shortScore, demoQuote: demoQuote, upDown: upDown, commuteOf: commuteOf, picksOf: picksOf };
 })();
