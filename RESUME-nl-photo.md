@@ -35,6 +35,12 @@ Roku (round 3, commit 34d2fdf):
 - cd TD/server; node cloud/test-local.mjs  -> 117/117 pass (local Supabase, includes the 3 widget-photo cloud tests)
 - Browser, 20 Nov 19:29 (previous builder): widget-photo-checks.mjs 26/26 (log scratchpad wp-run.log). Rerun pending below.
 
+## Round 3 session (21 Nov 05:10 to 05:37), stopped by the coordinator
+- No TD file changed this round (so td-backup-nl-photo-r3/ was not needed; round 1 to 2 backups are in scratchpad td-backup-nl-photo/).
+- Stopped the previous builder's designer (pid 20647) and store (20648) left running since 20 Nov 18:19.
+- Browser checks NOT rerun: browser.lock was held by other branches from 05:16 to at least 05:37. No lock of ours left behind, no server of ours running.
+- `npm ci --prefix roku` was run in this worktree (roku/node_modules, git ignored) for brs and bsc.
+
 ## Left
 1. Browser check under browser.lock: designer PORT=5591 node TD/app/server.mjs; store DATA_DIR=<scratch>/wp-store DESIGNER_ORIGINS=http://127.0.0.1:5591 PORT=5490 node TD/server/store.mjs; node TD/scripts/widget-photo-checks.mjs 5591; stop both servers; rmdir lock.
 2. node TD/scripts/ws-studio-panel-checks.mjs (starts and stops its own designer) under the same lock.
