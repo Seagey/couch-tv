@@ -88,13 +88,16 @@ async function goRow(page, label) {
 }
 async function closeSettings(page) {
   for (let k = 0; k < 6 && await page.evaluate(() => document.getElementById("settings").classList.contains("on")); k++) await press(page, "Escape", 250);
+  // a change in Home settings reloads the home when they close (restart())
   await page.waitForTimeout(900);
+  await page.waitForFunction(() => window.tv && document.getElementById("date") && document.getElementById("date").textContent.length > 0);
+  await page.waitForTimeout(600);
 }
 const box = (page, sel) => page.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { top: r.top, h: r.height, shown: getComputedStyle(e).display !== "none" }; }, sel);
 
 // ---- g17 Show the clock ----
 {
-  const page = await home("&theme=classic");
+  const page = await home("&look=classic");
   const before = { time: await box(page, "#time"), date: await box(page, "#date") };
   ok(before.time.shown && before.time.h > 50, "Classic: the clock shows by default (" + Math.round(before.time.h) + " px high)");
   ok(!(await cls(page, "no-clock")), "on by default: no no-clock class");
@@ -114,15 +117,15 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
   ok(await cls(page, "no-clock") && !(await box(page, "#time")).shown, "still off after a reload");
   await page.close();
   // Night: the big scene clock goes too; the default keeps it
-  const night = await home("&theme=night");
+  const night = await home("&look=night");
   await night.waitForFunction(() => document.querySelector(".scene .gclock"));
   ok(await night.evaluate(() => [...document.querySelectorAll(".scene .gclock")].some((e) => getComputedStyle(e).display !== "none")), "Night: the scene clock shows by default");
   await night.close();
-  const nightOff = await home("&theme=night&showclock=off");
+  const nightOff = await home("&look=night&showclock=off");
   await nightOff.waitForFunction(() => document.querySelector(".scene .gclock"));
   ok(await nightOff.evaluate(() => [...document.querySelectorAll(".scene .gclock")].every((e) => getComputedStyle(e).display === "none")), "Night with home.show_clock false: no scene clock");
   await nightOff.close();
-  const oled = await home("&theme=oled&showclock=off");
+  const oled = await home("&look=oled&showclock=off");
   ok(!(await box(oled, "#time")).shown, "OLED with home.show_clock false: no time");
   await oled.close();
 }
@@ -130,7 +133,7 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
 // ---- g30 Sharp pictures on a 4K TV (a 1080 page) ----
 {
   const bgSrc = (page) => page.evaluate(() => { const i = document.querySelector("#bg img.on"); return i ? i.getAttribute("src") : ""; });
-  const page = await home("&theme=classic");
+  const page = await home("&look=classic");
   await page.waitForFunction(() => document.querySelector("#bg img.on"));
   ok(!/@2x/.test(await bgSrc(page)), "Auto on a 1080 page: the 1080 picture (" + await bgSrc(page) + ")");
   await openLook(page);
@@ -150,7 +153,7 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
   ok(!/@2x/.test(await bgSrc(page)), "Off: the 1080 picture again: " + await bgSrc(page));
   await page.close();
   // Night scenes too, from home.hi_res "always"
-  const night = await home("&theme=night&hires=always");
+  const night = await home("&look=night&hires=always");
   await night.waitForFunction(() => document.querySelector(".scene .sbg"));
   await night.waitForTimeout(800);
   ok(await night.evaluate(() => [...document.querySelectorAll(".scene .sbg")].some((e) => /@2x/.test(e.getAttribute("src") || ""))), "Night with home.hi_res always: the 4K scene pictures");
@@ -159,7 +162,7 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
 
 // ---- g23 Moving tiles and the Mac-style dock under Lighter home ----
 {
-  const page = await home("&theme=night&lighter=1");
+  const page = await home("&look=night&lighter=1");
   ok(await cls(page, "lighter") && !(await cls(page, "dock-mac")), "Lighter home on, plain dock");
   await openLook(page);
   let r = await goRow(page, "Mac-style dock");
@@ -199,7 +202,7 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
 {
   const NOTE = "This TV is a bit slow, so Lighter home is on. Home settings, Look and scenes to change it.";
   // 4 GB, 30 ms frames: measured (4 s after the home opens, for 1.5 s), Lighter home on, the note once
-  let page = await home("&theme=night", { memory: 4, slowMs: 30 });
+  let page = await home("&look=night", { memory: 4, slowMs: 30 });
   ok(!(await cls(page, "lighter")), "4 GB: not decided by memory any more");
   await page.waitForFunction(() => document.documentElement.classList.contains("lighter"), null, { timeout: 12000 });
   ok(true, "4 GB with 30 ms frames: Lighter home turned itself on");
@@ -214,13 +217,13 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
   ok(!(await page.evaluate(() => document.getElementById("toast").classList.contains("on"))), "the note is not shown a second time");
   await page.close();
   // 4 GB, smooth: stays off
-  page = await home("&theme=night", { memory: 4 });
+  page = await home("&look=night", { memory: 4 });
   await page.waitForTimeout(6500);
   ok(!(await cls(page, "lighter")), "4 GB with smooth frames: Lighter home stays off");
   ok((await page.evaluate(() => JSON.parse(localStorage.getItem("tvhome.lowend")))).low === false, "and that is kept");
   await page.close();
   // smooth while still, 33 ms frames only while the focus moves along a row
-  page = await home("&theme=night", { memory: 4, slowNav: 33 });
+  page = await home("&look=night", { memory: 4, slowNav: 33 });
   await page.waitForTimeout(6500);
   ok(!(await cls(page, "lighter")), "smooth when still: off");
   for (let k = 0; k < 6 && !(await cls(page, "lighter")); k++) { await press(page, k % 2 ? "ArrowLeft" : "ArrowRight", 650); }
@@ -231,12 +234,12 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
   ok(true, "with the note");
   await page.close();
   // 8 GB, slow frames: never measured, never on
-  page = await home("&theme=night", { memory: 8, slowMs: 30 });
+  page = await home("&look=night", { memory: 8, slowMs: 30 });
   await page.waitForTimeout(6500);
   ok(!(await cls(page, "lighter")) && !(await page.evaluate(() => localStorage.getItem("tvhome.lowend"))), "8 GB: not measured, stays off");
   await page.close();
   // a choice wins: Lighter home chosen off in Home settings is never overridden
-  page = await home("&theme=night&lighter=off", { memory: 4, slowMs: 30 });
+  page = await home("&look=night&lighter=off", { memory: 4, slowMs: 30 });
   await page.waitForTimeout(6500);
   ok(!(await cls(page, "lighter")), "home.lighter false: never turned on");
   await page.close();
@@ -256,7 +259,7 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
 
 // ---- the new words in all 16 languages ----
 {
-  const page = await home("&theme=classic");
+  const page = await home("&look=classic");
   const res = await page.evaluate(() => {
     const keys = ["lighter_auto", "lighter_holds", "lighter_off_ask", "show_clock", "hi_res", "hi_res_sub", "hi_res_auto", "hi_res_always", "hi_res_off"];
     const S = window.I18N.strings;
@@ -268,7 +271,7 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
   await page.close();
   // and drawn: the held row in German and Hebrew
   for (const [lang, word] of [["de", "Aus, solange die leichte Startseite an ist"], ["he", "כבוי כל עוד הממשק הקל והמהיר מופעל"]]) {
-    const p = await home("&theme=night&lighter=1&lang=" + lang);
+    const p = await home("&look=night&lighter=1&lang=" + lang);
     await p.evaluate(() => window.tv.settingsKey()); await p.waitForTimeout(250); await press(p, "Enter", 400);
     const txt = await p.evaluate(() => { const secs = [...document.querySelectorAll("#set-secs .ssec")]; return secs.length; });
     // open the Look section (the second section) and look for the line
