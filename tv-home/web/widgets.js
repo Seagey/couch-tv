@@ -341,6 +341,10 @@
     if (env.demo) return ["beach", "birthday", "camp", "dog", "nan", "surf", "hike"].map(demoImg);
     var all = (dataOf(env).photos || []).slice(0, 50), pick = o && (o.kind === "photo" || o.kind === "artframe") ? tvSet(o, env, "photo") : undefined;
     if (pick !== undefined && pick !== "first") {
+      // picked on this TV by the photo's id (Home settings, Your photos): its picture is the one at the
+      // same place in the photos this TV hands over (app.js homeView photoIds)
+      var ids = ((dataOf(env).home || {}).photoIds) || [], at = ids.indexOf(pick);
+      if (at >= 0 && all[at]) return [all[at]];
       if (isFinite(pick) && all[+pick]) return [all[+pick]];
       if (all.indexOf(pick) >= 0) return [pick];
     }
@@ -1002,10 +1006,19 @@
     add(root, photoLayer(ps[q.image ? 0 : dayIndex(ps.length, 86400)], q.fit));
     caption(root, q);
   };
+  // a list in an order mixed by a seed (the day): the same order all day, every photo once
+  function mixed(list, seed) {
+    var out = list.slice(), x = (seed * 2654435761) % 4294967296;
+    for (var k = out.length - 1; k > 0; k--) { x = (x * 1103515245 + 12345) % 2147483648; var j = x % (k + 1), t = out[k]; out[k] = out[j]; out[j] = t; }
+    return out;
+  }
   R.slideshow = function (root, o, b, env) {
     var ps = photos(env, o);
     if (!ps.length) return noPhotos(root, b);
-    var q = op(o), secs = q.seconds_each || 20, i = dayIndex(ps.length, secs);
+    var q = op(o), se = +setting(o, env, "seconds_each", 20), secs = isFinite(se) && se >= 5 && se <= 600 ? Math.round(se) : 20;
+    // shuffle: the same photos in a mixed order, a new order each day (the TV's own count, no memory)
+    if (setting(o, env, "shuffle") === true) ps = mixed(ps, Math.floor(Date.now() / 86400000));
+    var i = dayIndex(ps.length, secs);
     var a = photoLayer(ps[i]), c = photoLayer(ps[(i + 1) % ps.length]);
     a.classList.add("cw-layer"); c.classList.add("cw-layer"); c.style.opacity = "0";
     var n = Math.min(ps.length, 8), dots = E("div", "cw-hdots", q.caption ? "top:24px" : "bottom:22px", []);
@@ -1023,7 +1036,7 @@
   R.mosaic = function (root, o, b, env) {
     var ps = photos(env, o);
     if (!ps.length) return noPhotos(root, b);
-    var n = clamp(op(o).count || (b.w > 1000 ? 5 : 3), 1, Math.min(5, ps.length)), start = dayIndex(ps.length, 30), gap = 16;
+    var cn = +setting(o, env, "count", "auto"), n = clamp(isFinite(cn) && cn >= 1 ? Math.round(cn) : (b.w > 1000 ? 5 : 3), 1, Math.min(5, ps.length)), start = dayIndex(ps.length, 30), gap = 16;
     var pick = []; for (var i = 0; i < n; i++) pick.push(ps[(start + i) % ps.length]);
     var cols = n > 3 ? 3 : n > 1 ? 2 : 1, rows = n > 1 ? 2 : 1, wBig = cols === 1 ? b.w : (b.w - gap * (cols - 1)) * (cols === 3 ? 0.42 : 0.58);
     var smallW = cols === 1 ? 0 : (b.w - wBig - gap * (cols - 1)) / (cols - 1), smallH = (b.h - gap) / 2;
@@ -1034,10 +1047,13 @@
     }
     add(root, tiles);
   };
+  var MATS = ["#fbf8f1", "#ffffff", "#1d1b18", "#8e8e93"];
   R.artframe = function (root, o, b, env) {
     var q = op(o), ps = q.image ? [q.image] : env.demo ? [demoImg("art")] : photos(env, o);
     if (!ps.length) return noPhotos(root, b);
-    var mat = q.mat || "#fbf8f1", lh = q.caption ? 92 : 0, pad = Math.max(10, Math.min(b.w, b.h) * 0.014);
+    // a frame colour picked on this TV is one of the four; else the design's own (checked by design.js)
+    var tvMat = String((wsetOf(o, env) || {}).mat || "").toLowerCase(), mat = MATS.indexOf(tvMat) >= 0 ? tvMat : q.mat || "#fbf8f1";
+    var lh = q.caption ? 92 : 0, pad = Math.max(10, Math.min(b.w, b.h) * 0.014);
     add(root, [E("div", "", "position:absolute;left:0;top:0;right:0;bottom:" + px(lh) + ";background:" + mat + ";border-radius:4px;box-shadow:0 0 0 1px #d8d0c2,0 24px 40px rgba(60,40,20,.14);padding:" + px(pad), [
       E("div", "", "width:100%;height:100%;background:#222 center/cover;background-image:" + cssImg(ps[dayIndex(ps.length, 3600)]) + ";box-shadow:inset 0 2px 8px rgba(0,0,0,.25)")]),
       q.caption ? E("div", "", "position:absolute;left:0;right:0;bottom:0;height:" + px(lh - 16) + ";display:flex;flex-direction:column;justify-content:center", [E("div", "cw-t29", "font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:600", [q.caption]), q.sub ? E("div", "cw-t23", "", [q.sub]) : null]) : null]);
@@ -1813,14 +1829,21 @@
         return E("div", "cw-col", "align-items:center;" + (i ? "margin-left:16px" : ""), [svg("0 0 62 72", bs, bs * 72 / 62, [S("rect", { x: 6, y: 14, width: 50, height: 56, rx: 8, fill: "#3a3a40" }), S("rect", { x: 2, y: 6, width: 58, height: 12, rx: 5, fill: x[0] })]), b.w >= 300 ? E("span", "cw-t23", "margin-top:8px", [x[1]]) : null]);
       }))]);
   };
+  // a list of words set on this TV (ids, titles): strings only, never anything else
+  function ownList(o, env, key) {
+    var v = (wsetOf(o, env) || {})[key];
+    return Object.prototype.toString.call(v) === "[object Array]" ? v.filter(function (x) { return typeof x === "string" && x.length <= 120; }).slice(0, 16) : [];
+  }
   R.people = function (root, o, b, env) {
-    var ps = people(env);
+    var ps = people(env), who = env.demo ? [] : ownList(o, env, "who"), names = setting(o, env, "names") !== false;
     if (!ps.length) return empty(root, b, "people", "Add people in Home settings", "");
+    // Who shows, picked on this TV: only those (in the home's order); someone since removed is skipped
+    if (who.length) { var some = ps.filter(function (x) { return who.indexOf(String(x[3])) >= 0; }); if (some.length) ps = some; }
     var av = clamp(b.h - 20, 40, 62);
     root.style.padding = b.h < 100 ? "0 20px" : "14px 20px";
-    add(root, E("div", "cw-row", "height:100%;max-width:100%", ps.slice(0, Math.max(1, Math.floor(b.w / 150))).map(function (x, i) {
+    add(root, E("div", "cw-row", "height:100%;max-width:100%", ps.slice(0, Math.max(1, Math.floor(b.w / (names ? 150 : av + 24)))).map(function (x, i) {
       var p = E("div", "cw-row", "min-width:0;flex:0 1 auto;opacity:" + (x[2] ? 1 : 0.68) + ";" + (i ? "margin-left:20px" : "") + ";border-radius:40px;padding:4px", [E("div", "", "width:" + px(av) + ";height:" + px(av) + ";border-radius:50%;overflow:hidden;flex:none;" + (x[2] ? "box-shadow:0 0 0 4px #fff" : ""), [avatar(x[0], av)]),
-        E("span", "cw-t25 cw-ell", "color:var(--ink);margin-left:12px;font-weight:" + (x[2] ? 700 : 560), [x[1]])]);
+        names ? E("span", "cw-t25 cw-ell", "color:var(--ink);margin-left:12px;font-weight:" + (x[2] ? 700 : 560), [x[1]]) : null]);
       return stop(p, "person", x[3], x[1]);
     })));
   };
@@ -1828,7 +1851,9 @@
   // info
   R.card = function (root, o, b, env) {
     // a card written in couch-tv Studio: a title, a line of words and an icon (words only, like every design)
-    var q = op(o);
+    // the title and words: changed on this TV (Home settings) over the design's own
+    var q = op(o), tvText = String((wsetOf(o, env) || {}).text || "").replace(/[\u0000-\u0009\u000b-\u001f]/g, " ").trim().slice(0, 120);
+    if (tvText) { var q0 = {}; for (var k0 in q) if (Object.prototype.hasOwnProperty.call(q, k0)) q0[k0] = q[k0]; q0.text = tvText; q = q0; }
     if (q.label || q.text) {
       // the words fill what is left under the title, wrapping, as big as they fit (the quote's rule)
       var room = Math.max(40, b.h - 48 - (q.label ? 52 : 0)), len = Math.max(6, (q.text || "").length);
@@ -1839,6 +1864,9 @@
     }
     var cards = env.demo ? [{ title: "Solar today", value: "18.4 kWh" }] : (dataOf(env).cards || []);
     if (!cards.length) return soon(root, b, "info", "card");
+    // Live number, picked on this TV by its title: only that card; each in turn otherwise
+    var live = env.demo ? "turns" : String(setting(o, env, "live", "turns")), one = cards.filter(function (x) { return String(x.title || "") === live; });
+    if (one.length) cards = one;
     var c = cards[dayIndex(cards.length, 20)];
     add(root, [E("div", "cw-lab", "", [String(c.title || "")]), E("div", "cw-grow"), E("div", "cw-big", "overflow-wrap:anywhere;font-size:" + px(Math.min(clamp(b.h / 3.2, 44, 96), fitPx(String(c.value || "").split(/\s+/).sort(function (x, y) { return y.length - x.length; })[0], b.w - 48, 96))), [String(c.value || "")])]);
   };
@@ -2193,6 +2221,15 @@
   function greetingOf(text) { var lines = text.split("\n"), i = lines[0].indexOf(", "); if (i > 0) lines[0] = lines[0].slice(0, i) + (/[.!]+$/.exec(lines[0]) || [""])[0]; return lines.join("\n"); }
   R.welcome = function (root, o, b, env) {
     var q = op(o), align = q.align || "center", text = q.text || "Welcome";
+    // the greeting, the line under, where the name comes from and the times: changed on this TV (Home
+    // settings, the phone) over the design's own. Words typed on this TV are this home's own, so they are
+    // never taken for a starter's sample words.
+    var ws = wsetOf(o, env) || {}, tvWord = function (k) { return typeof ws[k] === "string" ? ws[k].replace(/[\u0000-\u0009\u000b-\u001f]/g, " ").trim().slice(0, 120) : ""; };
+    var tvText = tvWord("text"), tvSub = tvWord("sub"), q1w = {}, kw;
+    for (kw in q) if (Object.prototype.hasOwnProperty.call(q, kw)) q1w[kw] = q[kw];
+    q1w.source = setting(o, env, "source") === "calendar" ? "calendar" : "typed";
+    q1w.times = setting(o, env, "times") !== false;
+    q = q1w;
     // on a TV: never the starter design's sample words; the guest's name typed on the TV or the phone
     // remote (At home, Guests) goes after the greeting
     var real = realTv(env), typed = real ? String((athome(env) || {}).guest || "") : "";
@@ -2204,6 +2241,10 @@
       if (isSampleLine(q1.kicker)) delete q1.kicker;
       if (isSampleLine(q1.sub)) delete q1.sub;
       q = q1;
+    }
+    if (tvText) text = tvText;
+    if (tvSub) q.sub = tvSub;
+    if (real) {
       if (typed && q.source !== "calendar") text = withName(greetingOf(text), typed);
     }
     if (q.source === "calendar") {
@@ -2424,12 +2465,32 @@
     var s = dayStart(now()), h = 3600000;
     return [["School drop off", 8.5, 9], ["Swimming lessons, Ruby", 16, 17], ["Bins out, recycling", 19, 19.25], ["Movie night", 19.5, 22]].map(function (x) { return { title: x[0], start: s + x[1] * h, end: s + x[2] * h, allDay: false }; });
   }
-  function agendaOf(root, b, env) {
-    if (env.demo) { var de = demoEvents(); return { today: de.map(function (x, i) { return { title: x.title, when: hhmm(x.start, env), col: EV_COL[i], start: x.start, end: x.end }; }), tomorrow: [] }; }
-    var c = (athome(env) || {}).cal;
-    if (!c || !c.set) { soon(root, b, "calendar", "agenda"); return null; }
-    if (!c.events) { empty(root, b, "calendar", c.err ? (b.w < 300 ? "Calendar not read" : c.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), c.err ? "Settings (hold OK), Home settings, Designs, At home" : ""); return null; }
-    return { today: evDay(c.events, 0, env), tomorrow: evDay(c.events, 1, env) };
+  // the calendars this widget shows (Calendars, picked on this TV): "main" the calendar link in At home,
+  // "bookings" the bookings calendar (At home, Guests: each stay's check in and check out day), "all"
+  // both. { events } when read, { wait, err } while not, null when none of them is set on this TV.
+  function agendaEvents(o, env) {
+    var h = athome(env) || {}, pick = String(setting(o, env, "calendars", "all")), c = h.cal || {}, k = h.books || {};
+    var useMain = pick !== "bookings" && !!c.set, useBooks = pick !== "main" && !!k.set;
+    if (!useMain && !useBooks) return null;
+    if ((useMain && !c.events) || (useBooks && !k.events && !useMain)) return { wait: true, err: (useMain ? c.err : k.err) || "" };
+    var evs = (useMain ? c.events : []).concat(useBooks && k.events ? k.events : []);
+    evs.sort(function (a, z) { return a.start - z.start; });
+    return { events: evs };
+  }
+  // Days: today, today and tomorrow (tomorrow once today is clear), or the next seven days
+  function agendaOf(root, b, env, o) {
+    var days = String(setting(o, env, "days", "two"));
+    if (env.demo) { var de = demoEvents(); return { days: days, today: de.map(function (x, i) { return { title: x.title, when: hhmm(x.start, env), col: EV_COL[i], start: x.start, end: x.end }; }), tomorrow: [], week: [] }; }
+    var a = agendaEvents(o, env);
+    if (!a) {
+      var pick = String(setting(o, env, "calendars", "all"));
+      if (pick === "bookings") { empty(root, b, "calendar", b.w < 300 ? "Add bookings" : "Add your bookings calendar", "Settings (hold OK), Home settings, Designs, At home"); return null; }
+      soon(root, b, "calendar", "agenda"); return null;
+    }
+    if (a.wait) { empty(root, b, "calendar", a.err ? (b.w < 300 ? "Calendar not read" : a.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), a.err ? "Settings (hold OK), Home settings, Designs, At home" : ""); return null; }
+    var out = { days: days, today: evDay(a.events, 0, env), tomorrow: days === "today" ? [] : evDay(a.events, 1, env), week: [] };
+    if (days === "week") for (var k = 0; k < 7; k++) evDay(a.events, k, env).forEach(function (x) { if (k && out.week.some(function (y) { return y.start === x.start && y.title === x.title; })) return; x.when = (k ? DAYS[new Date(dayStart(now()) + k * 86400000 + 43200000).getDay()].slice(0, 3) + " " : "") + x.when; x.col = EV_COL[out.week.length % EV_COL.length]; out.week.push(x); });
+    return out;
   }
   // never a fixed word for a day over the wrong day (a starter's "Tomorrow" over today's events): the
   // day is the TV's own, a heading typed in the design only goes before it ("Family, today")
@@ -2440,29 +2501,31 @@
     if (/\b(today|tonight|tomorrow)\b/i.test(l)) return day;
     return l + ", " + day.toLowerCase();
   }
+  function agendaWeek(label) { var l = String(label || "").trim(); return !l || DAY_WORDS.test(l) || /\b(today|tonight|tomorrow)\b/i.test(l) ? "This week" : l + ", this week"; }
   R.agenda = function (root, o, b, env) {
-    var a = ahAlign(root, o), ag = agendaOf(root, b, env);
+    var a = ahAlign(root, o), ag = agendaOf(root, b, env, o);
     if (!ag) return;
-    var d = now(), list = ag.today.length ? ag.today : ag.tomorrow, nx = list[0], day = DAYS[d.getDay()].slice(0, 3).toUpperCase() + " " + d.getDate();
-    var heading = agendaHeading(op(o).label, !ag.today.length && ag.tomorrow.length);
+    var wk = ag.days === "week", d = now(), list = wk ? ag.week : ag.today.length ? ag.today : ag.tomorrow, nx = list[0], day = DAYS[d.getDay()].slice(0, 3).toUpperCase() + " " + d.getDate();
+    var heading = wk ? agendaWeek(op(o).label) : agendaHeading(op(o).label, !ag.today.length && ag.tomorrow.length);
+    var none = wk ? "this week" : ag.days === "today" ? "today" : "today or tomorrow";
     if (b.h < 200) {
       // a tile or a wide tile: the day, what is next and when
-      add(root, ahCol(a, [one1("cw-t23", "font-weight:750;color:#ff453a", b.w < 300 ? (ag.today.length || !nx ? day : "TOMORROW") : day + (ag.today.length || !nx ? "" : ", tomorrow")),
-        one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", nx ? nx.title : "Nothing on"), one1("cw-t23", "", nx ? nx.when : "today or tomorrow")]));
+      add(root, ahCol(a, [one1("cw-t23", "font-weight:750;color:#ff453a", b.w < 300 ? (ag.today.length || !nx || wk ? day : "TOMORROW") : day + (ag.today.length || !nx || wk ? "" : ", tomorrow")),
+        one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", nx ? nx.title : "Nothing on"), one1("cw-t23", "", nx ? nx.when : none)]));
       return;
     }
     if (b.w < 600 && b.h < 500) {
       // a square: the day and the date, then what is next
       add(root, ahCol(a, [one1("cw-t23", "font-weight:700;text-transform:uppercase;letter-spacing:.06em", DAYS[d.getDay()]), E("div", "cw-big", "flex:none;font-size:" + px(clamp(b.w / 3.4, 64, 110)), [String(d.getDate())]),
         one1("cw-t29", "font-weight:680;margin-top:16px", nx ? nx.title : "Nothing on"),
-        one1("cw-t23", "", nx ? (ag.today.length ? "" : "Tomorrow, ") + nx.when + (ag.today.length > 1 ? ", then " + (ag.today.length - 1) + " more" : "") : "today or tomorrow")]));
+        one1("cw-t23", "", nx ? (ag.today.length || wk ? "" : "Tomorrow, ") + nx.when + (list.length > 1 ? ", then " + (list.length - 1) + " more" : "") : none)]));
       return;
     }
     var n = clamp(Math.floor((b.h - 48 - 50) / 72), 1, 8), more = list.length > n ? list.length - (n - 1) : 0, shown = more ? list.slice(0, n - 1) : list;
     add(root, ahCol(a, [ahLab("calendar", heading + (list.length ? " · " + list.length + (list.length === 1 ? " event" : " events") : "")),
       list.length ? E("div", "cw-col", "max-width:100%;margin-top:14px;flex:none;align-items:" + (a === "right" ? "flex-end" : "flex-start"), shown.map(function (e) {
         return E("div", "cw-ev", "max-width:100%;margin-top:14px", [E("i", "", "background:" + e.col), E("div", "cw-t29 cw-ell", "flex:0 1 auto;min-width:0", [e.title]), E("div", "cw-t25", "flex:none;margin-left:16px", [e.when])]);
-      }).concat(more ? [one1("cw-t23", "margin-top:14px", "and " + more + " more")] : [])) : one1("cw-t29", "font-weight:680;margin-top:16px", "Nothing on today or tomorrow")]));
+      }).concat(more ? [one1("cw-t23", "margin-top:14px", "and " + more + " more")] : [])) : one1("cw-t29", "font-weight:680;margin-top:16px", "Nothing on " + none)]));
   };
   CR.agenda = R.agenda;
 
@@ -2472,7 +2535,7 @@
     var a = ahAlign(root, o), n = noteOf(env);
     if (!n) return soon(root, b, "edit", "note");
     // the words as big as they fit (the quote's rule), wrapping, and "..." on the last line that fits
-    var fromH = n.from && b.h >= 200 ? 40 : 0, room = Math.max(30, b.h - 48 - fromH), len = Math.max(8, n.text.length);
+    var fromH = n.from && b.h >= 200 && setting(o, env, "byline") !== false ? 40 : 0, room = Math.max(30, b.h - 48 - fromH), len = Math.max(8, n.text.length);
     var fs = clamp(Math.min(Math.sqrt((b.w - 48) * room / len / 1.7), room / 1.2, 64), 25, 64), max = Math.max(1, Math.floor(room / (fs * 1.18)));
     add(root, ahCol(a, [fromH ? one1("cw-t23", "font-weight:700;color:var(--sub)", "From " + n.from) : null,
       E("div", "", "flex:none;max-width:100%;font-size:" + px(fs) + ";font-weight:680;line-height:1.18;margin-top:" + (fromH ? 8 : 0) + "px;letter-spacing:-.01em;white-space:pre-line;" + lines(max), [n.text])]));
@@ -2501,7 +2564,7 @@
     var a = ahAlign(root, o), l = listOf(o, env);
     if (!l) return soon(root, b, "check", "list");
     // what is still to do first, then what is ticked
-    var items = l.items.filter(function (x) { return !x.done; }).concat(l.items.filter(function (x) { return x.done; }));
+    var items = l.items.filter(function (x) { return !x.done; }).concat(setting(o, env, "done") === false ? [] : l.items.filter(function (x) { return x.done; }));
     var left = items.filter(function (x) { return !x.done; }), lc = l.todo ? "#0a84ff" : root.classList.contains("cw-paper") ? "#1f9d55" : "#30d158", icon = op(o).icon || "check";
     var count = left.length ? left.length + (l.todo ? " to do" : " left") : l.items.length ? "All done" : "Nothing on it yet";
     if (b.h < 200) {
@@ -2532,10 +2595,11 @@
     var narrow = b.w < 600, qs = Math.max(80, narrow ? Math.min(b.h - 48 - 46, b.w - 48) : b.h - 48), code = qrNode(w.qr, qs - 24);
     var box = E("div", "", "width:" + px(qs) + ";height:" + px(qs) + ";border-radius:22px;background:#fff;padding:12px;flex:none;overflow:hidden", [code || E("div", "cw-t23", "color:#1d1b18;padding:8px;" + lines(4), ["The name and password are too long for a code"])]);
     if (narrow) { add(root, ahCol(a, [box, one1("cw-t25", "margin-top:10px;font-weight:650;color:var(--ink)", w.ssid)])); return; }
-    var nopass = w.sec === "nopass" || !w.pass;
+    // Hide the password (set on this TV): the code still joins, the words never show
+    var nopass = w.sec === "nopass" || !w.pass, hide = !nopass && setting(o, env, "hidepass") === true;
     add(root, E("div", "cw-row", "width:100%;height:100%;justify-content:" + FLEX[a], [box,
       E("div", "cw-col", "margin-left:30px;min-width:0;flex:0 1 auto;max-width:" + px(b.w - 48 - qs - 30), [ahLab("wifi", "Guest Wi-Fi"), one1("cw-t48", "margin-top:10px", w.ssid),
-        one1("cw-t29 cw-dim", "margin-top:6px", nopass ? "No password" : "Password"), nopass ? null : one1("cw-t38", "", w.pass),
+        one1("cw-t29 cw-dim", "margin-top:6px", nopass ? "No password" : hide ? "The password is in the code" : "Password"), nopass || hide ? null : one1("cw-t38", "", w.pass),
         one1("cw-t23", "margin-top:10px", "Point your phone camera at the code")])]));
   };
   CR.wifi = R.wifi;
@@ -2543,9 +2607,16 @@
   // ---- House guide: headings and their words, typed in Home settings ----
   var GUIDE_IC = [[/check ?out|leav/i, "clock"], [/wi-?fi|internet/i, "wifi"], [/around|near|beach|shop|cafe|eat|walk/i, "location"], [/bin|rubbish|recycl/i, "calendar"], [/tv|remote|netflix/i, "tv"]];
   function guideIcon(t) { for (var i = 0; i < GUIDE_IC.length; i++) if (GUIDE_IC[i][0].test(t)) return GUIDE_IC[i][1]; return "info"; }
+  // Parts of the guide, picked on this TV by their headings: only those; none picked (or none left), all
+  function guidePart(o, env) {
+    var g = guideOf(env), want = o && !env.demo ? ownList(o, env, "sections") : [];
+    if (!want.length) return g;
+    var some = g.filter(function (x) { return want.indexOf(x.title) >= 0; });
+    return some.length ? some : g;
+  }
   function guideOf(env) { return env.demo ? [{ title: "Check out", text: "Sunday by 10am. Leave the keys on the bench." }, { title: "Bins", text: "Red Tuesday night, yellow every second week." }, { title: "Around here", text: "The beach is a 5 minute walk down the lane." }] : (athome(env) || {}).guide || []; }
   R.guide = function (root, o, b, env) {
-    var a = ahAlign(root, o), g = guideOf(env);
+    var a = ahAlign(root, o), g = guidePart(o, env);
     if (!g.length) return soon(root, b, "info", "guide");
     if (b.h < 200) { add(root, ahCol(a, [ahLab("info", "House guide"), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", g[0].title), g.length > 1 ? one1("cw-t23", "", g.slice(1).map(function (x) { return x.title; }).join(", ")) : null])); return; }
     var withText = b.h >= 500, rowH = withText ? 128 : 74, n = clamp(Math.floor((b.h - 48 + 16) / (rowH + 16)), 1, g.length);
@@ -2560,24 +2631,29 @@
   // ---- On this day: the household's own photos taken on this date in other years (athome.js reads
   // each photo's date). Nothing from today: it says so, never another day's photo ----
   function yearsAgo(n) { return n === 1 ? "A year ago" : n + " years ago"; }
-  function memoryOf(root, b, env) {
+  // Photos from (this widget's setting): this day only, or this week (three days either side), in other years
+  function memoryWeek(o, env) { return String(setting(o, env, "range", "day")) === "week"; }
+  function memoryList(o, env) { var m = (athome(env) || {}).memory || {}; return (memoryWeek(o, env) ? m.week : m.today) || []; }
+  function memoryOf(root, b, env, o) {
     if (env.demo) return [{ src: demoImg("camp"), years: 2 }];
-    var m = (athome(env) || {}).memory;
+    var m0 = (athome(env) || {}).memory, wk = memoryWeek(o, env), m = m0 ? { photos: m0.photos, dated: m0.dated, today: memoryList(o, env) } : m0;
     // no photo to show: the words get the glass panel a picture would have covered
     if ((!m || !m.today || !m.today.length) && root.classList.contains("cw-photo")) { root.classList.remove("cw-photo"); root.classList.add("cw-glass"); if (!root.querySelector(".cw-bg")) root.insertBefore(E("div", "cw-bg"), root.firstChild); }
     if (!m || !m.photos) { soon(root, b, "picture", "memory"); return null; }
     if (!m.dated) { empty(root, b, "picture", b.w < 300 ? "No dates yet" : "Your photos have no dates yet", "Add them again in Home settings, Your photos"); return null; }
-    if (!m.today || !m.today.length) { empty(root, b, "picture", b.w < 300 ? "None today" : "No photos from this day", m.dated === 1 ? "One of your photos has a date" : m.dated + " of your photos have dates"); return null; }
+    if (!m.today || !m.today.length) { empty(root, b, "picture", b.w < 300 ? (wk ? "None this week" : "None today") : wk ? "No photos from this week" : "No photos from this day", m.dated === 1 ? "One of your photos has a date" : m.dated + " of your photos have dates"); return null; }
     return m.today;
   }
   R.memory = function (root, o, b, env) {
-    var a = ahAlign(root, o), list = memoryOf(root, b, env);
+    var a = ahAlign(root, o), list = memoryOf(root, b, env, o);
     if (!list) return;
+    // Show how long ago: "3 years ago", or off, the year it was taken
+    var ago = setting(o, env, "ago") !== false, wk = memoryWeek(o, env), say = function (q) { return tiny || !ago ? String(now().getFullYear() - q.years) : yearsAgo(q.years); };
     var p = list[dayIndex(list.length, 20)], tiny = b.w < 300 || b.h < 200, img = photoLayer(p.src);
-    var big = one1("cw-t48", "color:#fff;font-size:" + px(tiny ? 34 : b.h < 300 ? 38 : 48) + ";text-shadow:0 2px 18px rgba(0,0,0,.5)", tiny ? String(now().getFullYear() - p.years) : yearsAgo(p.years));
+    var big = one1("cw-t48", "color:#fff;font-size:" + px(tiny ? 34 : b.h < 300 ? 38 : 48) + ";text-shadow:0 2px 18px rgba(0,0,0,.5)", say(p));
     add(root, [img, E("div", "cw-fill", "background:radial-gradient(ellipse at center,rgba(0,0,0,.5),rgba(0,0,0,.18) 70%)"),
-      E("div", "cw-fill", "z-index:2;padding:18px;display:flex", [ahCol(a, [b.h >= 200 && b.w >= 300 ? one1("cw-t23", "color:rgba(255,255,255,.92);text-transform:uppercase;letter-spacing:.08em;font-weight:700;text-shadow:0 2px 12px rgba(0,0,0,.5)", "On this day") : null, big])])]);
-    if (list.length > 1) live(root, 20000, function () { var q = list[dayIndex(list.length, 20)]; img.style.backgroundImage = cssImg(q.src); big.textContent = tiny ? String(now().getFullYear() - q.years) : yearsAgo(q.years); });
+      E("div", "cw-fill", "z-index:2;padding:18px;display:flex", [ahCol(a, [b.h >= 200 && b.w >= 300 ? one1("cw-t23", "color:rgba(255,255,255,.92);text-transform:uppercase;letter-spacing:.08em;font-weight:700;text-shadow:0 2px 12px rgba(0,0,0,.5)", wk ? "This week" : "On this day") : null, big])])]);
+    if (list.length > 1) live(root, 20000, function () { var q = list[dayIndex(list.length, 20)]; img.style.backgroundImage = cssImg(q.src); big.textContent = say(q); });
   };
   CR.memory = R.memory;
 
@@ -2595,7 +2671,9 @@
     var a = ahAlign(root, o), s = screenOf(root, b, env);
     if (!s) return;
     var CA = window.CouchAtHome, hm = CA ? CA.hm : function (m) { return m + "m"; }, gl = CA && s.goal ? CA.goalLine(s.minutes, s.goal) : "", total = hm(s.minutes);
-    var apps = b.w >= 700 && b.h >= 200 ? s.apps.slice(0, Math.max(0, Math.floor((b.h - 48) / 52))) : [];
+    // Apps shown: as many as fit, none (only the total), or up to 3 or 5
+    var ac = setting(o, env, "appcount", "auto"), most = ac === "auto" || !isFinite(+ac) ? 99 : clamp(Math.round(+ac), 0, 8);
+    var apps = b.w >= 700 && b.h >= 200 ? s.apps.slice(0, Math.min(most, Math.max(0, Math.floor((b.h - 48) / 52)))) : [];
     // the total as big as fits the room it has (beside the apps, half the box)
     var appsW = Math.min(340, (b.w - 48) * 0.45), room = apps.length ? b.w - 48 - appsW - 40 : b.w - 48, fs = clamp(Math.min((b.h - 48 - (b.h < 200 ? 64 : 110)) / 0.92, room / (total.length * 0.6)), 24, 140);
     var main = ahCol(apps.length ? "center" : a, [b.h >= 200 || b.w >= 300 ? ahLab("timer", "Screen time") : ic("timer", 30, "currentColor"), E("div", "cw-big", "flex:none;max-width:100%;white-space:nowrap;font-size:" + px(fs) + ";margin-top:" + (b.h < 200 ? 2 : 12) + "px", [total]),
@@ -2737,7 +2815,7 @@
       // this widget's own settings and honest headings (WIDGET-SETTINGS-CONTRACT.md)
       setting: setting, tvSet: tvSet, devName: devName, webName: webName, feedFor: feedFor, unitF: unitF, roomUnit: roomUnit, tconv: tconv, sensorConv: sensorConv, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
       // things typed at home (athome.js through app.js)
-      athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
+      athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guidePart: guidePart, agendaEvents: agendaEvents, memoryList: memoryList, memoryWeek: memoryWeek, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
   };
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
   window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, queueOf: queueOf, coverOk: coverOk, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };

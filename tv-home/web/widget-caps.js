@@ -361,12 +361,12 @@
       setup: setup("tv", [OPEN, "Go down to People and press OK.", "Pick Add a person, type a name, then press OK. Do it for everyone who watches.", "OK on a name in the widget switches whose shows you see. It does not sign anyone in or out of Netflix."]),
       until: "\"Add people in Home settings\"", build: "",
       ok: "OK on a name makes them the one watching", platforms: plat("setup", "computer", "setup"), sizes: sz(["line", "wline", "wtile"], [4, 1]) },
-    agenda: { name: "Agenda", status: "setup", what: "Today's events with times and colours, from your own calendar", needs: [CAL_NEED, "Something to read the calendar: the Couch TV app on this TV, or a home computer"],
+    agenda: { name: "Agenda", status: "setup", what: "Today's events with times and colours (or tomorrow's, or the week's), from your own calendar and your bookings calendar", needs: [CAL_NEED, "Something to read the calendar: the Couch TV app on this TV, or a home computer"],
       setup: setup("tv", {
         android: ["Find your calendar's private address on a phone or computer. Google Calendar: the calendar's Settings, Secret address.", OPEN, "Go down to Designs, pick At home, then Add a calendar link.", "Type the address, or paste it with Type on the TV in the phone remote. Today's events show within a minute."],
         web: ["Find your calendar's private address on a phone or computer. Google Calendar: the calendar's Settings, Secret address.", OPEN, "Go down to Designs, pick At home, then Add a calendar link.", "Type the address with the TV remote's keyboard. The home computer reads the calendar for this TV, so keep it on."],
         vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot read a calendar.", "Find your calendar's private address. Google Calendar: the calendar's Settings, Secret address.", OPEN, "Go down to Designs, pick At home, then Add a calendar link, and type the address."] }),
-      until: "\"Add your calendar\"; then \"Nothing on today or tomorrow\" when the calendar is clear", build: "",
+      until: "\"Add your calendar\"; then \"Nothing on today or tomorrow\" (or today, or this week, as picked) when the calendar is clear", build: "",
       ok: "Opens the day: every event on a timeline, then the rest of the week", platforms: plat("setup", "computer", "computer", { android: "The TV reads the calendar itself. The address stays on this TV, never in a design.", web: "The home computer reads the calendar for this TV.", vidaa: "Needs a home computer: the website home cannot read a calendar." }),
       sizes: sz(["tile", "wtile", "small", "tall", "medium", "large"], [2, 2]) },
     note: { name: "Family note", status: "setup", what: "A sticky note typed at home, with who it is from", needs: [NOTE_NEED],
@@ -557,8 +557,6 @@
     weather: [st("place", "Show the town name", "toggle", true, "Turn off to show only the weather.", "design", ALL, true)],
     bigtemp: [st("place", "Show the town name", "toggle", true, "Turn off to show only the temperature.", "design", ALL, true)],
     surf: [st("place", "Beach", "place", "", "Where the swell is read. Empty uses this home's town.", "tv", ON_TV, true, { coast: true, "private": true })],
-    photo: [PHOTO(), IMAGE()],
-    artframe: [PHOTO(), IMAGE()],
     upnext: [st("sport", "Game mode", "choice", "auto", "On shows the last game watched in a sport app on this TV. Automatic turns it on when the home also shows scores.", "design", ALL, true,
       { options: [["auto", "Automatic"], [true, "On"], [false, "Off"]], needs: { apps: SPORT_APP_PKGS.slice() } })],
     aircon: [st("entity", "Room", "device", "", "Which aircon shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "climate", needs: HA, "private": true })],
@@ -570,8 +568,6 @@
       HEADING("Shows once the sensor is picked on this TV. Empty shows the sensor's own name.")],
     doorbell: [HEADING_TV("Type a heading for this TV. Empty shows the doorbell's own name.")],
     energy: [HEADING_TV("Type a heading for this TV. Empty shows the name from your smart home.")],
-    // the list always draws its own name, so it has no heading of its own
-    list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Home settings, Designs, At home.", "tv", ON_TV, true, { from: "lists", "private": true })],
     news: [st("feed", "News source", "choice", "auto", "Where the headlines come from. Best for your country picks ABC News in Australia, BBC World in the UK and RNZ in New Zealand.", "design", ALL, true,
       { options: FEED_OPTS })],
     sports: [
@@ -622,11 +618,6 @@
       st("units", "Wave height in", "choice", "auto", "", "tv", ON_TV, false, { options: [["auto", "Best for your country"], ["m", "Metres"], ["ft", "Feet"]] }),
       st("wind", "Wind in", "choice", "auto", "", "tv", ON_TV, false, { options: [["auto", "Best for your country"], ["kmh", "Kilometres an hour"], ["kn", "Knots"]] })
     ],
-    photo: [st("fit", "Fill or fit", "choice", "cover", "Fit shows the whole photo with a border.", "design", ALL, false, { options: [["cover", "Fill the box"], ["contain", "Fit the whole photo"]] })],
-    slideshow: [st("shuffle", "Shuffle", "toggle", false, "", "design", ALL, false)],
-    mosaic: [st("count", "How many photos", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [3, "3"], [4, "4"], [5, "5"]] })],
-    artframe: [st("mat", "Frame colour", "choice", "#fbf8f1", "", "design", ALL, false,
-      { options: [["#fbf8f1", "Cream"], ["#ffffff", "White"], ["#1d1b18", "Black"], ["#8e8e93", "Grey"]] })],
     keep: [st("person", "Whose shows", "tvlist", "auto", "Whoever is watching follows the person picked on the home.", "tv", ON_TV, false, { from: "people", "private": true })],
     keeprow: [st("shows", "How many shows", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [2, "2"], [3, "3"], [4, "4"], [5, "5"]] })],
     upnext: [st("apps", "Only from these apps", "apps", [], "None picked takes shows from any app.", "design", ALL, false)],
@@ -636,10 +627,6 @@
       { domain: "media_player", many: true, max: 6, needs: HA, "private": true })],
     scenes: [st("scenes", "Scenes", "device", [], "Which scenes show here. None picked shows every one picked in Smart home.", "tv", ON_TV, false,
       { domain: ["scene", "script"], many: true, max: 10, needs: HA, "private": true })],
-    agenda: [
-      st("calendars", "Calendars", "tvlist", "all", "Which of this TV's calendars show here.", "tv", ON_TV, false, { from: "calendars", "private": true }),
-      st("days", "Days", "choice", "two", "", "design", ALL, false, { options: [["today", "Today"], ["two", "Today and tomorrow"], ["week", "This week"]] })
-    ],
     bins: [
       st("lid_a", "First bin's lid", "choice", "#ffd60a", "", "design", ALL, false, { options: LIDS }),
       st("lid_b", "Second bin's lid", "choice", "#30d158", "", "design", ALL, false, { options: LIDS })
@@ -651,10 +638,54 @@
       st("buffer", "Minutes to spare", "number", 10, "", "design", ALL, false, { min: 0, max: 60, step: 5 }),
       st("weekdays", "Weekdays only", "toggle", true, "Off works out the drive for weekends too.", "design", ALL, false),
       st("from", "Leave from", "place", "", "Empty leaves from this home's town. Kept in this TV's Home settings, never in a design.", "tv", ON_TV, false, { "private": true })
-    ],
-    wifi: [st("hidepass", "Hide the password", "toggle", false, "On shows only the code to scan.", "tv", ON_TV, false)]
+    ]
   };
   Object.keys(LATER).forEach(function (k) { SETTINGS[k] = (SETTINGS[k] || []).concat(LATER[k]); });
+  // The family, guest and photo widgets (At home, kept on this TV: athome.js; this TV's photos and
+  // people; the home computer's live cards). Every setting here is read by its renderer in widgets.js,
+  // so all are before launch. Which list, note, calendars, people and photos point at what is really on
+  // this TV (type tvlist), and stay on it.
+  var HOME_SET = {
+    photo: [PHOTO(), IMAGE(),
+      st("fit", "Fill or fit", "choice", "cover", "Fit shows the whole photo with a border.", "design", ALL, true, { options: [["cover", "Fill the box"], ["contain", "Fit the whole photo"]] })],
+    slideshow: [
+      st("seconds_each", "Next photo every", "choice", 20, "How long each photo stays.", "design", ALL, true, { options: [[10, "10 seconds"], [20, "20 seconds"], [60, "1 minute"], [300, "5 minutes"]] }),
+      st("shuffle", "Shuffle", "toggle", false, "On mixes up the order each day.", "design", ALL, true)],
+    mosaic: [st("count", "How many photos", "choice", "auto", "Fewer photos show each one bigger.", "design", ALL, true, { options: [["auto", "As many as fit"], [3, "3"], [4, "4"], [5, "5"]] })],
+    artframe: [PHOTO(), IMAGE(),
+      st("mat", "Frame colour", "choice", "#fbf8f1", "The colour around the photo.", "design", ALL, true,
+        { options: [["#fbf8f1", "Cream"], ["#ffffff", "White"], ["#1d1b18", "Black"], ["#8e8e93", "Grey"]] })],
+    memory: [
+      st("range", "Photos from", "choice", "day", "This week also shows photos taken up to three days either side of today, in other years.", "design", ALL, true,
+        { options: [["day", "This day only"], ["week", "This week"]] }),
+      st("ago", "Show how long ago", "toggle", true, "Off shows the year the photo was taken.", "design", ALL, true)],
+    agenda: [
+      st("calendars", "Calendars", "tvlist", "all", "Which of this TV's calendars show here. Add them in Home settings, Designs, At home.", "tv", ON_TV, true, { from: "calendars", "private": true }),
+      st("days", "Days", "choice", "two", "Today and tomorrow shows tomorrow once today is clear.", "design", ALL, true, { options: [["today", "Today"], ["two", "Today and tomorrow"], ["week", "This week"]] })],
+    people: [
+      st("who", "Who shows", "tvlist", [], "None picked shows everyone. Add people in Home settings, People.", "tv", ON_TV, true, { from: "people", many: true, max: 8, "private": true }),
+      st("names", "Show names", "toggle", true, "Off shows only each person's picture.", "design", ALL, true)],
+    note: [st("byline", "Show who it is from", "toggle", true, "The name typed under From with the note.", "design", ALL, true)],
+    // the list always draws its own name, so it has no heading of its own
+    list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Home settings, Designs, At home.", "tv", ON_TV, true, { from: "lists", "private": true }),
+      st("done", "Show ticked items", "toggle", true, "Off hides what is already ticked.", "design", ALL, true)],
+    guide: [st("sections", "Parts of the guide", "tvlist", [], "Which parts show here. None picked shows them all. Write the guide in Home settings, Designs, At home.", "tv", ON_TV, true,
+      { from: "guide", many: true, max: 8, "private": true })],
+    wifi: [st("hidepass", "Hide the password", "toggle", false, "On shows only the code to scan.", "tv", ON_TV, true)],
+    screentime: [st("appcount", "Apps shown", "choice", "auto", "Apps show beside the total on a wide widget.", "design", ALL, true,
+      { options: [["auto", "As many as fit"], [0, "None, only the total"], [3, "3"], [5, "5"]] })],
+    welcome: [
+      st("text", "Greeting", "text", "Welcome", "The big words, like Welcome or Hi there.", "design", ALL, true, { max: 80 }),
+      st("sub", "Line under", "text", "", "A short line under the greeting. Empty shows none.", "design", ALL, true, { max: 80 }),
+      st("source", "Guest name from", "choice", "typed", "Typed is the name set in At home, Guests, or on the phone remote.", "design", ALL, true,
+        { options: [["typed", "Typed on the TV"], ["calendar", "Your bookings calendar"]] }),
+      st("times", "Check in and out times", "toggle", true, "The line under says when the guest checks in or out.", "design", ALL, true, { when: { source: "calendar" } })],
+    card: [
+      st("label", "Title", "text", "", "The small heading. A card with no title and no words shows a live number.", "design", ALL, true, { max: 40 }),
+      st("text", "Words", "text", "", "The big words on the card.", "design", ALL, true, { max: 80 }),
+      st("live", "Live number", "tvlist", "turns", "For a card with no words: which live number from the home computer shows.", "tv", ON_TV, true, { from: "cards", "private": true })]
+  };
+  Object.keys(HOME_SET).forEach(function (k) { SETTINGS[k] = HOME_SET[k]; });
   Object.keys(SETTINGS).forEach(function (k) { if (C[k]) C[k].settings = SETTINGS[k]; });
 
   // A widget couch-tv cannot fill yet always shows the same card on a TV (widgets.js soon()), so its

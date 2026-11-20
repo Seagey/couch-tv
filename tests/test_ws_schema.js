@@ -19,7 +19,7 @@ console.log("Running widget settings schema tests...");
 // put in the widget in couch-tv Studio)
 const TYPES = ["place", "choice", "toggle", "text", "number", "app", "apps", "team", "device", "calendar", "tvlist", "image"];
 const HA_DOMAINS = ["climate", "camera", "sensor", "light", "switch", "fan", "cover", "media_player", "scene", "script", "event", "binary_sensor"];
-const TVLISTS = ["lists", "photos", "people", "calendars"];
+const TVLISTS = ["lists", "photos", "people", "calendars", "guide", "cards"];
 const BANNED = /\b(beta|experimental|coming soon|adb|token|entity|entities|url|package|api)\b/i;
 const DASH = /[–—]| - /;
 
@@ -107,7 +107,7 @@ CAPS.kinds().forEach((kind) => {
         if (s.many) ok(isArr(d) && typeof s.max === "number", at + ": many devices");
         else ok(d === "", at + ": one device, empty is the first");
         break;
-      case "tvlist": ok(TVLISTS.indexOf(s.from) >= 0 && typeof d === "string", at + ": tvlist from " + s.from); break;
+      case "tvlist": ok(TVLISTS.indexOf(s.from) >= 0 && (s.many ? isArr(d) && typeof s.max === "number" : typeof d === "string"), at + ": tvlist from " + s.from + (s.many ? ", several picked: a list" : "")); break;
       case "image": ok(d === "" && s.store === "design", at + ": a photo in the widget lives in the design"); break;
       case "team":
         ok(typeof d === "string", at + ": team default");
@@ -152,7 +152,7 @@ const WW = fs.readFileSync(path.join(web, "widget-web.js"), "utf8");
 CAPS.settings("news")[0].options.forEach((o) => { if (o[0] !== "auto") ok(WW.indexOf("\"" + o[0] + "\": {") >= 0 || WW.indexOf(" " + o[0] + ": {") >= 0, "news source " + o[0] + " is a feed the TV reads"); });
 CAPS.settings("sports")[0].options.forEach((o) => ok(new RegExp("\\b" + o[0] + ": \\{ name: \"" + o[1] + "\"").test(WW), "competition " + o[0] + " is " + o[1] + " on the TV"));
 // the later settings (L items) are there too, after the before launch ones
-const LATER = { surf: ["units", "wind"], commute: ["buffer", "weekdays", "from"], weather: ["town"], speakers: ["players"], agenda: ["calendars", "days"], sports: ["games"] };
+const LATER = { surf: ["units", "wind"], commute: ["buffer", "weekdays", "from"], weather: ["town"], speakers: ["players"], sports: ["games"] };
 Object.keys(LATER).forEach((kind) => {
   const list = CAPS.settings(kind), firstLater = list.findIndex((s) => !s.pre);
   ok(list.slice(firstLater).every((s) => !s.pre), kind + ": before launch settings come first");

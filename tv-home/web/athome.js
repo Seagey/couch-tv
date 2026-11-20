@@ -415,6 +415,21 @@
       .sort(function (a, b) { return b.years - a.years; });
   }
 
+  // the photos taken within `days` days either side of this date in other years (On this day's This
+  // week), the most years ago first, the nearest day first within a year: [{ src, years }]
+  function nearDay(photos, today, days) {
+    today = today || new Date();
+    var y = today.getFullYear(), t0 = new Date(y, today.getMonth(), today.getDate()).getTime(), out = [];
+    arr(photos).forEach(function (p) {
+      if (!p || !p.date || p.date.y >= y) return;
+      // that month and day this year, last year and next year (the week can cross New Year)
+      var best = Infinity;
+      [y - 1, y, y + 1].forEach(function (yy) { var t = new Date(yy, p.date.m - 1, p.date.d).getTime(); best = Math.min(best, Math.abs(Math.round((t - t0) / 86400000))); });
+      if (best <= (days || 0)) out.push({ src: p.src, years: y - p.date.y, off: best });
+    });
+    return out.sort(function (a, b) { return b.years - a.years || a.off - b.off; }).map(function (x) { return { src: x.src, years: x.years }; });
+  }
+
   // ---------------- screen time ----------------
   function hm(min) {
     min = Math.max(0, Math.round(min || 0));
@@ -459,7 +474,7 @@
 
   var API = { KEY: KEY, LIM: LIM, SEC: SEC, GOALS: GOALS, clean: clean, calUrl: calUrl, calHost: calHost, wifiQr: wifiQr, parseIcs: parseIcs, isIcs: isIcs,
     TIMES_IN: TIMES_IN, TIMES_OUT: TIMES_OUT, guestName: guestName, guestWord: guestWord, guestFull: guestFull, staysOf: staysOf, stayNow: stayNow, dayKey: dayKey,
-    exifDate: exifDate, nameDate: nameDate, onThisDay: onThisDay, hm: hm, goalLine: goalLine, store: store };
+    exifDate: exifDate, nameDate: nameDate, onThisDay: onThisDay, nearDay: nearDay, hm: hm, goalLine: goalLine, store: store };
   root.CouchAtHome = API;
   if (typeof module !== "undefined" && module.exports) module.exports = API;
 })(typeof window !== "undefined" ? window : this);

@@ -193,7 +193,9 @@ TV = tv;
   const studio = (await rowsText(tv)).join(" | ");
   ok(/Surf, middle left/.test(studio) && /Beach: Sydney \(your home's town\)/.test(studio), "couch-tv Studio, Widgets on this home: the surf widget by kind and place, with its beach now: " + studio);
   ok(/Headlines, top right/.test(studio) && /News source: ABC News/.test(studio), "and the headlines with the design's source");
-  ok(!/Welcome words|Guest Wi-Fi|House guide|App grid,/.test(studio), "widgets with no settings of their own are not listed");
+  // round 2: the Welcome words, Guest Wi-Fi and House guide have settings of their own now (tests/test_ws2_home.mjs)
+  ok(/Welcome words, /.test(studio) && /Guest Wi-Fi, /.test(studio) && /House guide, /.test(studio), "the Welcome words, Guest Wi-Fi and House guide are listed with their own settings");
+  if (!(await tv.evaluate(() => window.CouchWidgetCaps.settings("appgrid").some((x) => x.pre && x.where.indexOf("tv") >= 0)))) ok(!/App grid,/.test(studio), "a widget with no settings of its own is not listed");
   await closeSettings(tv);
 }
 // Hold OK on the surf widget: Edit on the TV, right after Settings, opens its page (a TV the computer runs: no phone item)
@@ -233,10 +235,9 @@ async function holdOn(page, id) {
     note: (document.querySelector(".cw-sheet .cw-note") || {}).textContent || "" }));
 }
 {
-  // a widget with nothing to set on the TV (Guest Wi-Fi): a line says so, and no item that does nothing
+  // Guest Wi-Fi has its own setting now (Hide the password): Edit on the TV, every item does something
   const m = await holdOn(tv, "f");
-  ok(m.items[0] === "Settings" && m.items.indexOf("Edit on the TV") < 0 && m.items.indexOf("Edit on your phone") < 0, "Guest Wi-Fi: no Edit items (" + m.items.join(", ") + ")");
-  ok(m.note === "Nothing to set for this widget on the TV. Change how it looks in couch-tv Studio.", "and the sheet says so in a line: " + m.note);
+  ok(m.items[0] === "Settings" && m.items[1] === "Edit on the TV" && !m.note, "Guest Wi-Fi: Edit on the TV (" + m.items.join(", ") + ")");
   ok(await tv.evaluate(() => [...document.querySelectorAll(".cw-sheet .cw-mi")].every((e) => e.getAttribute("data-act"))), "every item in the menu does something");
   await press(tv, "Escape", 300);
   ok(!(await tv.evaluate(() => window.CouchDesign.nav.sheetOpen())), "Back closes it");
@@ -259,9 +260,9 @@ async function holdOn(page, id) {
   ok(q && !/[–—]/.test(q.hint + q.title), "no dashes");
   await press(ontv, "Escape", 300);
   ok(!(await ontv.evaluate(() => window.CouchDesign.nav.sheetOpen())), "Back closes the QR");
-  // a widget with nothing to set: still no QR item on the on-TV app
+  // the House guide (Parts of the guide, kept on this TV): both Edit items on the on-TV app too
   const m3 = await holdOn(ontv, "g");
-  ok(m3.items.indexOf("Edit on your phone") < 0 && m3.items.indexOf("Edit on the TV") < 0 && /Nothing to set for this widget/.test(m3.note), "House guide on the on-TV app: the line, no Edit items");
+  ok(m3.items[1] === "Edit on the TV" && m3.items[2] === "Edit on your phone", "House guide on the on-TV app: Edit on the TV and Edit on your phone (" + m3.items.join(", ") + ")");
   await press(ontv, "Escape", 300);
   // Edit on the TV opens the widget's own page there too
   await holdOn(ontv, "n"); await press(ontv, "ArrowDown", 120); await press(ontv, "Enter", 600);

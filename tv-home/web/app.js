@@ -6783,10 +6783,25 @@
     return SCR.v || { ok: false, why: "error" };
   }
 
+  // a bookings calendar of its own (At home, Guests), not the Agenda's own link read again
+  function booksSet(r) { r = r || (AH ? AH.store.get() : {}); return !!(r.stay && r.stay.url && r.stay.url !== (r.cal || {}).url); }
+  // the stays in it as the Agenda's events: "Check in, Sarah" on the first day, "Check out" on the last
+  function booksEvents(r) {
+    if (!STAY.events) return null;
+    var s = r.stay || {}, out = [];
+    CouchAtHome.staysOf(STAY.events, { names: s.names, mail: STAY.mail, host: CouchAtHome.calHost(s.url) }).forEach(function (x) {
+      var who = x.guest ? ", " + x.guest : "";
+      out.push({ title: "Check in" + who, start: x.from, end: x.from + 86400000, allDay: true });
+      out.push({ title: "Check out" + who, start: x.to, end: x.to + 86400000, allDay: true });
+    });
+    return out;
+  }
   // what the widgets get (design.js hooks.data): only what is set, never a pretend value
   function homeView() {
     if (!AH) return null;
     var r = AH.store.get(), out = { note: r.note || null, lists: r.lists || [], wifi: null, guide: r.guide || [], goal: (r.screen || {}).goal || 0, guest: (r.guest && r.guest.name) || "" };
+    // each photo's id, at the same place as data().photos, for a Photo or Art frame picked on this TV
+    out.photoIds = (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && (p.file || p.url); }).map(function (p) { return p.id || ""; });
     if (r.wifi) out.wifi = { ssid: r.wifi.ssid, pass: r.wifi.pass, sec: r.wifi.sec, hidden: r.wifi.hidden, qr: CouchAtHome.wifiQr(r.wifi) };
     // a calendar link with nothing read yet: read it now, not at the next minute
     if (r.cal && !CAL.events && !CAL.busy && !CAL.err && ahWants("agenda")) setTimeout(function () { calRefresh(false); }, 0);
@@ -6794,15 +6809,18 @@
     // the Welcome widget's guest (name source "calendar" in a design): the stay now, from this TV's link
     if (stayLink(r) && !STAY.events && !STAY.busy && !STAY.err && ahWants("welcome")) setTimeout(function () { stayRefresh(false); }, 0);
     out.stay = { set: !!stayLink(r), view: stayView(r), err: STAY.err, at: STAY.at, can: calCan() };
+    // the bookings calendar as the Agenda shows it: each stay's check in and check out day
+    if (booksSet(r) && !STAY.events && !STAY.busy && !STAY.err && ahWants("agenda")) setTimeout(function () { stayRefresh(false); }, 0);
+    out.books = { set: booksSet(r), events: booksSet(r) ? booksEvents(r) : null, err: STAY.err };
     var ps = photoDates();
-    out.memory = { photos: ps.length, dated: ps.filter(function (p) { return p.date; }).length, today: CouchAtHome.onThisDay(ps, new Date()) };
+    out.memory = { photos: ps.length, dated: ps.filter(function (p) { return p.date; }).length, today: CouchAtHome.onThisDay(ps, new Date()), week: CouchAtHome.nearDay(ps, new Date(), 3) };
     out.screen = ahWants("screentime") ? screenNow() : { ok: false, why: "off" };
     return out;
   }
   // every minute: a new day, a new calendar read, today's screen time
   function ahTick() {
     if (!AH || typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on()) return;
-    if (ahWants("agenda")) calRefresh(false);
+    if (ahWants("agenda")) { calRefresh(false); if (booksSet()) stayRefresh(false); }
     if (ahWants("welcome")) { stayRefresh(false); var sv = stayView(); CouchDesign.dataChanged("stay", sv ? [sv.phase, sv.guest, sv.checkout] : null); }
     if (ahWants("memory")) photoDatesRead();
     if (ahWants("screentime")) { var s = screenNow(); CouchDesign.dataChanged("screentime", [s.ok, s.minutes]); }
@@ -7541,7 +7559,13 @@
     if (from === "photos") return (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && p.id; }).map(function (p, i) { return [p.id, "Photo " + (i + 1)]; });
     if (from === "people") return NOBODY ? [] : PEOPLE.map(function (p) { return [p.id, p.name]; });
     if (from === "lists") return AH ? (AH.store.get().lists || []).map(function (l) { return [l.name, l.name]; }) : [];
-    if (from === "calendars") return AH && AH.store.get().cal ? [["main", "Your calendar"]] : [];
+    // the Agenda's calendars: the calendar link in At home, and the bookings calendar (At home, Guests)
+    // when it is a link of its own; "all" first, the Agenda's default
+    if (from === "calendars") { var cs = (AH && AH.store.get().cal ? [["main", "Your calendar"]] : []).concat(booksSet() ? [["bookings", "Bookings calendar"]] : []); return cs.length ? [["all", "Every calendar"]].concat(cs) : []; }
+    // the House guide's parts, by their headings (At home)
+    if (from === "guide") return AH ? (AH.store.get().guide || []).map(function (g) { return [g.title, g.title]; }) : [];
+    // the home computer's live numbers (Custom cards), by their titles; each in turn first
+    if (from === "cards") return CARDS.length ? [["turns", "Each in turn"]].concat(CARDS.slice(0, 8).map(function (c) { return [String(c.title || ""), String(c.title || "")]; }).filter(function (c) { return c[0]; })) : [];
     return [];
   }
   function wsOptions(s) { return s.type === "tvlist" ? tvlistOptions(s.from) : s.options; }
