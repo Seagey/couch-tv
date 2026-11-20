@@ -72,7 +72,7 @@ object Auth {
             return null
         }
         pin = null
-        lastPairedAt = clock()
+        lastPairedAt = System.currentTimeMillis()   // wall clock: the setup screen says how long ago (not the lock clock)
         notifyPin()
         val token = hex(32)
         val list = tokens()
