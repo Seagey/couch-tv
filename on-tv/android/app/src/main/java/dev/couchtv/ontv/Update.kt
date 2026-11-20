@@ -170,9 +170,11 @@ object Update {
         io.execute {
             val dir = File(app.cacheDir, "update").apply { mkdirs() }
             val file = File(dir, UpdateRules.asset(watch()))
-            // room for the download, the copy on the TV and Android's own staged copy, or a full TV is
-            // told plainly instead of "Can't reach GitHub" (review, F1)
-            var why = if (dir.usableSpace < size * 5 / 2) "space" else try {
+            // room for the download, the copy on the TV, Android's own staged copy and the native libraries
+            // it unpacks (UpdateRules.spaceNeeded), or a full TV is told plainly instead of "Can't reach
+            // GitHub" (review, F1)
+            val needed = UpdateRules.spaceNeeded(size, Build.SUPPORTED_ABIS.firstOrNull())
+            var why = if (dir.usableSpace < needed) "space" else try {
                 download(app, url, file, size)
                 verify(app, file, digest, size)
             } catch (x: Exception) {
