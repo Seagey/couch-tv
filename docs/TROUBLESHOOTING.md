@@ -142,11 +142,14 @@ To undo it, remove the key or set it to `0`. Text and pictures are a little soft
 
 ## A green screen, or a black background after an app
 
-A TV whose video decoder fails without saying so draws a clip as flat green (seen on a TCL QM8K). The
-home looks at every background clip it plays (a scene's own clip, the video link, a design's video):
-one that shows only green goes, the still picture stays, and the home tries no background video on that
-TV for a week. Home settings, Look says so under the video link. A clip from another site cannot be
-looked at, so if the green comes from your own video link, remove the link (Look, Remove the video).
+A TV whose video decoder fails without saying so draws a clip as one flat green (seen on a TCL QM8K).
+The home looks at a scene's own clip, the video link and a design's video twice, 1.5 s and 5 s after it
+starts. When both looks are the same flat green, that clip goes and the still picture stays. Real
+footage, leaves and grass included, is never judged green: it has red and blue in it and is not flat.
+After a green scene clip or video link the home tries neither on that TV for a week; Home settings, Look
+says why and has **Try the video again**, and a new video link gets its own try. A design's video only
+goes for that time. The Loop look's clips are not looked at. A clip from another site cannot be looked at
+either, so if the green comes from your own video link, remove the link (Look, Remove the video).
 If the whole screen is green, also inside apps, it is the TV itself: check for a TV update.
 
 Coming back from an app opened from a video link, a Fire TV could show the home black. The background

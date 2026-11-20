@@ -570,7 +570,7 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
       <DesignSend onDesign={onDesign} can={canSendDesign} />
 
       {/* g34: change the scene behind the clock from the sofa; the sheet stays open for the next press */}
-      {onScene && (
+      {onScene && canSendDesign && (
         <section className="more-block scene-block">
           <h3><Ic.Sparkle size={16} /> {t('scene_head')}</h3>
           <div className="chips-row">

@@ -5421,7 +5421,12 @@
       ST.video_url = ""; VIDEO_URL = ""; ST.video = false; saveSettings();
     } });
     rows.push(info("video-note", t("video_note")));
-    if (greenTv()) rows.push(info("video-green", t("video_green")));   // g33: why the photo is back
+    // g33: why the photo is back, and the way to try the clips again (a TV update may have fixed the decoder)
+    if (greenTv()) rows.push({ kind: "action", key: "video-green", label: t("video_try_again"), sub: t("video_green"), act: function () {
+      try { localStorage.removeItem("couchtv.video.green"); localStorage.removeItem("couchtv.video.slow"); } catch (e) {}
+      VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true) && !LOOP;
+      startVideo(); sceneVideos(true);
+    } });
     // Now playing (#31): the card with the song and its buttons; it needs the computer or the on-TV app
     rows.push(head(t("np_head")));
     rows.push({ kind: "toggle", key: "now-playing", label: t("np_show"), value: NP_ON ? t("on") : t("off"), act: function () {
@@ -5496,6 +5501,7 @@
       v.removeAttribute("src");
       if (good) {
         ST.video_url = u; ST.video = true; VIDEO_URL = u;
+        if (window.CouchVideo && CouchVideo.clearGreen) CouchVideo.clearGreen();   // a new link gets its own chance (g33)
         saveSettings();
         SET.msg = t("video_added");
       // Apple's own server (the tvOS aerials) uses a certificate from Apple's private CA, which
@@ -6446,9 +6452,15 @@
   // g29 (an Android 14 MediaTek TV with an air mouse remote): any other TV turns the pointer on the first
   // time a real pointer moves over the home (an air mouse, a USB mouse), so a click opens a tile, a dock
   // app or a Home settings row as OK does. A TV that never sends a moving pointer stays arrows only.
+  // It takes 8 px of movement within half a second, so a stray nudge (or a TV that sends a lone mousemove) does not.
+  var wake = { at: 0, px: 0 };
   function pointerWakes(e) {
     if (HAS_POINTER) return true;
-    if (!(Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0) > 0)) return false;
+    var now = Date.now(), d = Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0);
+    if (!(d > 0)) return false;
+    if (now - wake.at > 500) { wake.at = now; wake.px = 0; }   // a new half second starts at the first move
+    wake.px += d;
+    if (wake.px < 8) return false;
     HAS_POINTER = true;
     document.documentElement.classList.add("has-pointer");
     return true;

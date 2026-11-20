@@ -88,9 +88,9 @@ class FireLauncherAppsTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             old_data = store.DATA
+            tok = server._current.set("test_tv")   # reset below, so later tests see the default TV again
             try:
                 store.DATA = td
-                server._current.set("test_tv")
                 apps_path = os.path.join(td, "home-apps.test_tv.json")
                 order_path = os.path.join(td, "app-order.test_tv.json")
 
@@ -126,6 +126,7 @@ class FireLauncherAppsTests(unittest.TestCase):
                 audible_entry = next(a for a in listed if a["package"] == "com.audible.application.firetv")
                 self.assertEqual(audible_entry["name"], "Audible")
             finally:
+                server._current.reset(tok)
                 store.DATA = old_data
 
 

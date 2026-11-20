@@ -301,6 +301,11 @@ try {
     await p2.evaluate(() => { const e = document.querySelectorAll("#grid > *")[1]; e.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 })); });
     await p2.waitForTimeout(300);
     ok(await p2.evaluate(() => !window.__calls.some((c) => c[1] === "/api/launch") && !document.documentElement.classList.contains("has-pointer")), "no pointer moved: a click alone opens nothing");
+    const nudge = (px) => p2.evaluate((d) => document.body.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, movementX: d, clientX: 500, clientY: 500 })), px);
+    await nudge(3); await p2.waitForTimeout(700); await nudge(3); await p2.waitForTimeout(100);
+    ok(await p2.evaluate(() => !document.documentElement.classList.contains("has-pointer")), "two 3 px nudges a second apart do not turn the pointer on");
+    await nudge(4); await nudge(4); await nudge(4); await p2.waitForTimeout(100);
+    ok(await p2.evaluate(() => document.documentElement.classList.contains("has-pointer")), "a real move (more than 8 px in half a second) does");
     await p2.close();
   });
 
@@ -328,7 +333,8 @@ try {
     current = "g33";
     const page = await fresh();
     await open(page, "&look=night&lighter=off");
-    // the detector itself, on real frames: flat decoder green, a blue sky, a green garden
+    // the detector itself, on real frames: decoder green (BT.601 and BT.709), a flat dark green, foliage,
+    // a blue sky and a green garden
     const judge = await page.evaluate(async () => {
       const make = async (paint) => {
         const c = document.createElement("canvas"); c.width = 320; c.height = 180;
@@ -339,14 +345,41 @@ try {
         await new Promise((r) => setTimeout(r, 500)); clearInterval(tick);
         const g = window.CouchVideo.greenFrame(v); v.remove(); return g;
       };
+      const flat = (c) => (x) => { x.fillStyle = c; x.fillRect(0, 0, 320, 180); };
       return {
-        green: await make((x) => { x.fillStyle = "rgb(0,135,0)"; x.fillRect(0, 0, 320, 180); }),
-        sky: await make((x) => { x.fillStyle = "rgb(90,150,220)"; x.fillRect(0, 0, 320, 180); }),
-        garden: await make((x) => { x.fillStyle = "rgb(40,120,30)"; x.fillRect(0, 0, 320, 120); x.fillStyle = "rgb(150,110,80)"; x.fillRect(0, 120, 320, 60); x.fillStyle = "rgb(200,220,240)"; x.fillRect(0, 0, 320, 40); })
+        bt601: await make(flat("rgb(0,135,0)")),
+        bt709: await make(flat("rgb(0,80,0)")),
+        dark: await make(flat("rgb(0,100,0)")),
+        foliage: await make(flat("rgb(40,120,30)")),
+        sky: await make(flat("rgb(90,150,220)")),
+        garden: await make((x) => { x.fillStyle = "rgb(40,120,30)"; x.fillRect(0, 0, 320, 120); x.fillStyle = "rgb(150,110,80)"; x.fillRect(0, 120, 320, 60); x.fillStyle = "rgb(200,220,240)"; x.fillRect(0, 0, 320, 40); }),
+        leaves: await make((x) => { for (let i = 0; i < 320; i += 8) for (let k = 0; k < 180; k += 8) { x.fillStyle = "rgb(0," + (60 + ((i * 7 + k * 3) % 90)) + ",0)"; x.fillRect(i, k, 8, 8); } })
       };
     }).catch((e) => ({ err: String(e) }));
-    ok(judge.green === true, "a flat green frame (a failed decoder) is seen as green (" + JSON.stringify(judge) + ")");
+    ok(judge.bt601 === true && judge.bt709 === true, "a failed decoder's flat green is seen, BT.601 (0,135,0) and BT.709 (0,80,0) (" + JSON.stringify(judge) + ")");
+    ok(judge.dark === true, "a flat dark green (0,100,0) frame is the same flat green");
+    ok(judge.foliage === false, "foliage (40,120,30) is not green to the detector");
     ok(judge.sky === false && judge.garden === false, "a blue sky and a green garden are not");
+    ok(judge.leaves === false, "green leaves of many shades (no red, no blue) are not, they are not flat");
+    // watchGreen: two looks, 1.5 s and 5 s, must both be the same flat green
+    const watched = await page.evaluate(async () => {
+      const run = async (first, then) => {
+        const c = document.createElement("canvas"); c.width = 320; c.height = 180;
+        const x = c.getContext("2d"); let colour = first;
+        const tick = setInterval(() => { x.fillStyle = colour; x.fillRect(0, 0, 320, 180); }, 50);
+        const v = document.createElement("video"); v.muted = true; v.srcObject = c.captureStream(10);
+        v.setAttribute("src", "stream:" + first);   // watchGreen follows the clip by its src
+        document.body.appendChild(v); await v.play();
+        let called = 0;
+        window.CouchVideo.watchGreen(v, () => { called++; }, { noMark: true });
+        setTimeout(() => { colour = then; }, 2500);
+        await new Promise((r) => setTimeout(r, 5800)); clearInterval(tick); v.remove();
+        return called;
+      };
+      return { steady: await run("rgb(0,135,0)", "rgb(0,135,0)"), once: await run("rgb(0,135,0)", "rgb(90,150,220)") };
+    });
+    ok(watched.steady === 1, "a clip that stays flat green at both looks is judged green (" + JSON.stringify(watched) + ")");
+    ok(watched.once === 0, "one green frame, then real picture: not judged green");
     // a real green clip, recorded here, as the scene's own clip and as the video link
     const b64 = await page.evaluate(async () => {
       const c = document.createElement("canvas"); c.width = 320; c.height = 180;
@@ -377,12 +410,13 @@ try {
       const v = document.querySelector(".scene .svid"), img = document.querySelector(".scene .sbg");
       return { played: window.__clipPlayed, playing: v ? v.classList.contains("playing") : null, src: v ? v.getAttribute("src") : null,
         photo: img ? img.complete && img.naturalWidth > 0 && getComputedStyle(img).display !== "none" : false,
-        mark: localStorage.getItem("couchtv.video.green") };
+        mark: localStorage.getItem("couchtv.video.green"), slow: localStorage.getItem("couchtv.video.slow") };
     });
     ok(s1.played === true, "the scene's clip really started (" + JSON.stringify(s1) + ")");
     ok(s1.playing === false && !s1.src, "a clip that shows only green goes (" + JSON.stringify(s1) + ")");
     ok(s1.photo, "and the scene's still photo shows");
     ok(!!s1.mark, "this TV remembers it for a week");
+    ok(s1.slow === null, "and only for the home's own clips: a design's video is not stopped for a week");
     await p1.reload();
     await p1.waitForFunction(() => window.tv && document.querySelector("#shelf"));
     await p1.waitForTimeout(2500);
@@ -400,6 +434,12 @@ try {
     await openSection(p2, /^Look/);
     await toRow(p2, /^Video link/);
     ok(/green screen, so the photo is back/.test(await p2.evaluate(() => document.getElementById("set-rows").textContent)), "Look says why in plain words");
+    await p2.evaluate(() => localStorage.setItem("couchtv.video.slow", String(Date.now())));
+    ok(await toRow(p2, /^Try the video again/), "a Try the video again row");
+    await keys(p2).press("Enter", 400);
+    const s2b = await p2.evaluate(() => ({ green: localStorage.getItem("couchtv.video.green"), slow: localStorage.getItem("couchtv.video.slow"), src: document.getElementById("bgvid").getAttribute("src") }));
+    ok(!s2b.green && !s2b.slow, "it forgets both marks (" + JSON.stringify(s2b) + ")");
+    ok(/green\.webm$/.test(s2b.src || ""), "and asks for the video again at once");
     await p2.close();
 
     // (3) a broken clip (bytes that are no video): the photo stays

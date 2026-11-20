@@ -98,6 +98,13 @@ try {
     ok(await page.evaluate(() => !!document.querySelector(".topbar")), "the remote is still there under it");
     ok(page.errors.length === 0, "no page errors (" + page.errors.join(" | ") + ")");
     await page.close();
+    // a Roku or Apple TV draws its own home (no couch-tv scenes to pick): no Scene buttons there
+    for (const kind of ["roku", "appletv"]) {
+      const p2 = await remote(kind);
+      await openSheet(p2);
+      ok(await p2.getByRole("button", { name: "Next scene" }).count() === 0, kind + ": no Scene buttons");
+      await p2.close();
+    }
   }
   // ------------------------------------------------------------------ g32
   current = "g32";

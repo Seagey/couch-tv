@@ -19,3 +19,17 @@ Scratch: <scratchpad>/nlsb/ (run-browser.sh both|new|base, gradle.sh, node-suite
 ## Done (21 Nov)
 - tests/test_social_bugs_browser.mjs 82/82 (base integrate-0.13.9: 43 fail), test_social_bugs_remote.mjs 36/36 (base: g34 fails, g32 times out),
   test_ws_tv.mjs OK 1115, node 64/64 files, python 1301 passed / 7 failed (same 7 fail on base), SayTest 8/8.
+
+## Checker NO-GO fixes (21 Nov, after d10600f)
+- g33: detector now needs r,b <= 24, g 60..160, flat (max-min <= 16) on 95% of pixels, at both looks (1.5 s, 5 s) with means within 4.
+  Writes only couchtv.video.green (never SLOW_KEY); a design's video goes for now with no week mark. Look row is now the action
+  Try the video again (clears green and slow, restarts the clips); a new video link clears the green mark. Loop clips: not looked at (docs).
+- g34 cause: STILL UNKNOWN. Checked: picking a scene in Home settings reloads the TV home when Home settings closes (restart()), and
+  accepting a design reloads it (design.js:2217, ask.js after a phone design). Neither drops a phone remote by code: the phone talks to
+  the bridge or to the on-TV app's own server (Server.kt, /api/events), which do not depend on the TV page; /api/phone-link only gives the
+  pairing PIN and does not forget paired phones; the phone pages have no scene picker. The comment came from a phone remote app maker and
+  most likely means the TV's own clicker goes missing when you want a scene, so the phone remote now has Previous/Next scene.
+- Scene buttons only where the TV runs Couch TV's own home (not Roku, Apple TV); ask.js looks at /api/say every 30 s even with no design
+  store or Ask AI (still every 6 s when it has them), so the buttons work everywhere within half a minute.
+- Pointer wakes only after 8 px of movement within half a second.
+- tests/test_fire_launcher_apps.py resets server._current: full python suite 1308 passed, 0 failed.
