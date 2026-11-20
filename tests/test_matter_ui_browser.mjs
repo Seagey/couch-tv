@@ -1,0 +1,225 @@
+// Matter devices in a real browser at 1920x1080 (the TV home's ?mock preview, mock.js ?matter=1, a
+// pretend Matter controller) and the phone's Home settings page at 390x844 against a pretend TV:
+//  1. a design's Control Centre, Aircon and Sensor widgets take Matter devices by id (design.js keeps
+//     them), show them, and OK switches one: only its Matter id reaches /api/matter/command;
+//  2. Home settings, Designs, Smart home lists every Matter device (never the lock or the garage),
+//     adds one by code (a typo caught on the TV), renames it and removes it;
+//  3. the phone page: the Matter section shows, says where each app keeps the code, catches a typo,
+//     says plainly when a code ran out, adds, renames and removes.
+// Needs Playwright (Chromium). Without it the test says so and passes:
+//   COUCHTV_PLAYWRIGHT=<a folder whose node_modules has playwright> node tests/test_matter_ui_browser.mjs
+// SHOTS=<folder> also saves pictures for a person to look at.
+import { createRequire } from "node:module";
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import assert from "node:assert";
+import { fileURLToPath } from "node:url";
+
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+let chromium;
+try { chromium = createRequire(path.join(process.env.COUCHTV_PLAYWRIGHT || process.cwd(), "package.json"))("playwright").chromium; }
+catch (e) { console.log("SKIP: Playwright is not installed (set COUCHTV_PLAYWRIGHT to a folder that has it)"); process.exit(0); }
+const SHOTS = process.env.SHOTS || "";
+if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
+
+// the pretend TV for the phone page: its /api/matter/* as the contract says, everything else empty
+const MD = [
+  { id: "matter:1:1", name: "Lounge lamp", domain: "light", state: "on", attributes: { brightness: 204 } },
+  { id: "matter:5:1", name: "Hallway", domain: "climate", state: "heat", attributes: { temperature: 21 } },
+  { id: "matter:7:1", name: "Front door lock", domain: "lock", state: "locked", attributes: {} },
+  { id: "matter:8:1", name: "Garage", domain: "cover", state: "closed", attributes: { device_class: "garage" } }
+];
+const phoneAsked = [];
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".ttf": "font/ttf" };
+const server = http.createServer((req, res) => {
+  const url = req.url.split("?")[0];
+  const json = (code, o) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(o)); };
+  if (url.indexOf("/api/") === 0) {
+    let b = ""; req.on("data", (d) => (b += d)); req.on("end", () => {
+      const body = b ? JSON.parse(b) : null;
+      if (url.indexOf("/api/matter/") === 0) phoneAsked.push(url + " " + (b || ""));
+      if (url === "/api/matter/devices") return json(200, { devices: MD, ready: true });
+      if (url === "/api/matter/commission") {
+        if (body.code === "34970112332") { MD.push({ id: "matter:9:1", name: "Matter light", domain: "light", state: "off", attributes: {} }); return json(200, { ok: true, device_ids: ["matter:9:1"] }); }
+        return json(400, { ok: false, error: "expired" });
+      }
+      const d = MD.find((x) => body && x.id === body.id);
+      if (url === "/api/matter/rename" && d) { d.name = body.name; return json(200, { ok: true }); }
+      if (url === "/api/matter/remove" && d) { MD.splice(MD.indexOf(d), 1); return json(200, { ok: true }); }
+      if (url.indexOf("/api/matter/") === 0) return json(400, { ok: false, error: "refused" });
+      return json(404, { ok: false, error: "no such endpoint" });
+    });
+    return;
+  }
+  const map = url === "/setup" ? "/on-tv/web/setup.html" : url.indexOf("/ontv/") === 0 ? "/on-tv/web/" + url.slice(6) : url;
+  const p = path.normalize(decodeURIComponent(map)).replace(/^(\.\.[/\\])+/, "");
+  const f = path.join(ROOT, p);
+  if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); res.end(); return; }
+  res.writeHead(200, { "content-type": TYPES[path.extname(f)] || "application/octet-stream" });
+  fs.createReadStream(f).pipe(res);
+});
+await new Promise((r) => server.listen(0, "127.0.0.1", r));
+const ORIGIN = "http://127.0.0.1:" + server.address().port;
+const BASE = ORIGIN + "/tv-home/web/index.html";
+let n = 0;
+const ok = (c, m) => { assert.ok(c, m); n++; };
+const press = async (page, k, wait) => { await page.keyboard.press(k); await page.waitForTimeout(wait || 220); };
+
+const browser = await chromium.launch();
+async function home(qs, widgets) {
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  page.errors = [];
+  page.on("pageerror", (e) => page.errors.push(String(e)));
+  const design = { v: 1, background: { colour: "#26303f" }, objects: widgets.map((x, i) => ({ id: "w" + i, type: "widget", kind: x[0], x: 80 + (i % 3) * 600, y: 60 + Math.floor(i / 3) * 420, w: 560, h: 380, opts: x[1] })) };
+  await page.goto(BASE + "?mock=1&reset=1");
+  await page.evaluate((d) => { localStorage.clear(); localStorage.setItem("tvdesigner.design", JSON.stringify(d)); }, design);
+  await page.goto(BASE + "?mock=1&design=local" + qs);
+  await page.waitForFunction(() => document.querySelector(".cw-o .cw") && window.CouchDetail && window.CouchMatter && window.CouchMatter.on(), null, { timeout: 10000 });
+  await page.waitForTimeout(900);
+  return page;
+}
+const text = (page, id) => page.evaluate((i) => (document.querySelector('.cw-o[data-obj="' + i + '"] .cw') || {}).textContent || "", id || "w0");
+const cur = (page) => page.evaluate(() => window.CouchDetail.current());
+
+console.log("Running Matter UI browser tests...");
+
+// 1. the widgets
+{
+  const page = await home("&matter=1", [["controls", { switches: ["light.matter_1_1", "switch.matter_2_1", "cover.matter_4_1"] }], ["aircon", { entity: "climate.matter_5_1" }], ["sensor", { reading: "sensor.matter_6_1" }]]);
+  const kept = await page.evaluate(() => {
+    const W = (kind, opts) => ({ v: 1, objects: [{ id: "a", type: "widget", kind, x: 80, y: 60, w: 360, h: 360, opts }] });
+    const opts = (kind, o) => ((window.CouchDesign.check(W(kind, o)).clean.objects || [])[0] || {}).opts || {};
+    return [opts("controls", { switches: ["light.matter_1_1", "matter:1:1", "switch.matter_a1b2_3"] }), opts("aircon", { entity: "climate.matter_5_1" }), opts("sensor", { reading: "sensor.matter_6_1" })];
+  });
+  ok(JSON.stringify(kept[0]) === '{"switches":["light.matter_1_1","switch.matter_a1b2_3"]}', "design.js keeps a Matter device's page id and drops the raw contract id: " + JSON.stringify(kept[0]));
+  ok(kept[1].entity === "climate.matter_5_1" && kept[2].reading === "sensor.matter_6_1", "an aircon and a sensor keep their Matter ids");
+  const picks = await page.evaluate(() => [window.smartHome.live().info.controls.map((c) => c.entity), window.smartHome.live().info.sensors.map((c) => c.entity)]);
+  ok(picks[0].join() === "light.matter_1_1,switch.matter_2_1,fan.matter_3_1,cover.matter_4_1" && picks[1].join() === "sensor.matter_6_1,sensor.matter_6_2", "the lists the pick-lists read: " + JSON.stringify(picks));
+  ok(!JSON.stringify(picks).match(/matter_7|matter_8/), "the lock and the garage door are not in them");
+  await page.waitForFunction(() => /Lounge lamp/.test(document.querySelector('.cw-o[data-obj="w0"] .cw').textContent), null, { timeout: 8000 });
+  ok(/Lounge lamp/.test(await text(page, "w0")) && /Heater plug/.test(await text(page, "w0")), "Control Centre shows the Matter switches: " + (await text(page, "w0")).slice(0, 120));
+  await page.waitForFunction(() => /Hallway/.test(document.querySelector('.cw-o[data-obj="w1"] .cw').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/Hallway/.test(await text(page, "w1")) && /21/.test(await text(page, "w1")), "the aircon widget shows the Matter thermostat at 21: " + (await text(page, "w1")).slice(0, 120));
+  await page.waitForFunction(() => /22/.test(document.querySelector('.cw-o[data-obj="w2"] .cw').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/22/.test(await text(page, "w2")), "the sensor widget reads 22.4: " + (await text(page, "w2")).slice(0, 120));
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "matter-widgets.png") });
+  await page.evaluate(() => { const s = window.CouchDesign.nav; for (let k = 0; k < 6 && s.current().id !== "w0"; k++) s.move(-1, 0); });
+  await press(page, "Enter", 800);
+  ok((await cur(page)).name === "controls", "OK opens Control Centre");
+  await page.waitForFunction(() => document.querySelectorAll(".cwd-toggle").length >= 3, null, { timeout: 5000 });
+  ok((await cur(page)).focusName === "Lounge lamp", "lands on the Matter lamp");
+  await page.evaluate(() => { window.MOCK_MATTER_LOG.length = 0; });
+  await press(page, "Enter", 900);
+  const log = await page.evaluate(() => window.MOCK_MATTER_LOG.filter((l) => /command/.test(l)));
+  ok(log.length === 1 && log[0] === 'POST /api/matter/command {"id":"matter:1:1","action":"off"}', "OK switched the lamp off by its Matter id: " + JSON.stringify(log));
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "matter-controls-detail.png") });
+  await press(page, "Escape", 500);
+  ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
+  await page.close();
+}
+
+// 2. Home settings, Designs, Smart home
+{
+  const page = await home("&matter=1&hasetup=1", [["controls", {}]]);
+  await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await press(page, "Enter", 400);
+  for (let i = 0; i < 14 && !(await page.evaluate(() => /Designs/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press(page, "ArrowDown");
+  await press(page, "ArrowRight");
+  const toRow = async (re) => { for (let i = 0; i < 80; i++) { const t = await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || ""); if (re.test(t)) return true; await press(page, "ArrowDown", 90); } return false; };
+  const rows = () => page.evaluate(() => Array.prototype.map.call(document.querySelectorAll("#settings .srow, #settings .shead"), (e) => e.textContent.trim()));
+  const type = async (words) => { await press(page, "Enter", 300); await page.fill("#set-input", words); await press(page, "Enter", 900); };
+  const said = () => page.evaluate(() => { const e = document.querySelector("#settings .smsg, #set-msg, .set-msg"); return e ? e.textContent : document.querySelector("#settings").textContent; });
+  ok(await toRow(/^Smart home/), "Home settings, Designs has Smart home");
+  await press(page, "Enter", 400);
+  let all = (await rows()).join(" | ");
+  ok(/Matter devices/.test(all), "a Matter devices heading");
+  ok(["Lounge lamp", "Heater plug", "Ceiling fan", "Study blind", "Hallway", "Nursery temperature", "Nursery humidity"].every((x) => all.indexOf(x) >= 0), "every Matter device is listed: " + all);
+  ok(!/Front door lock|Garage/.test(all), "never the lock or the garage door");
+  ok(/Lounge lampLight, on/.test(all.replace(/\s+/g, " ").replace(/ (?=Light)/, "")) || /Light, on/.test(all), "each says what it is and how it is now");
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "matter-settings.png") });
+  ok(await toRow(/^Add a Matter device/), "Add a Matter device");
+  await press(page, "Enter", 400);
+  all = (await rows()).join(" | ") + (await page.evaluate(() => document.querySelector("#settings").textContent));
+  ok(["Google Home", "Apple Home", "SmartThings", "Alexa", "Linked Matter apps and services", "Turn On Pairing Mode", "Share with other services", "Other Assistants and Apps"].every((x) => all.indexOf(x) >= 0), "where each app keeps the code");
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "matter-add-tv.png") });
+  ok(await toRow(/^Type the code/), "Type the code");
+  await page.evaluate(() => { window.MOCK_MATTER_LOG.length = 0; });
+  await type("3497 011 2333");
+  ok(/One of those numbers is wrong/.test(await said()), "a typo is caught on the TV");
+  ok(!(await page.evaluate(() => window.MOCK_MATTER_LOG.some((l) => /commission/.test(l)))), "and nothing was sent");
+  await type("749701123365521327694");
+  await page.waitForTimeout(400);
+  ok(/That code ran out/.test(await said()), "a code that ran out says so plainly");
+  await type("3497 011 2332");
+  await page.waitForFunction(() => /Added: Matter light/.test(document.querySelector("#settings").textContent), null, { timeout: 6000 }).catch(() => {});
+  ok(/Added: Matter light/.test(await said()), "added, by name");
+  await press(page, "Escape", 400);
+  all = (await rows()).join(" | ");
+  ok(/Matter light/.test(all), "the new light is listed: " + all);
+  ok(await page.evaluate(() => window.smartHome.live().info.controls.some((c) => c.entity === "light.matter_27_1" || /matter_\d+_1/.test(c.entity) && c.name === "Matter light")), "and the widgets' list has it");
+  ok(await toRow(/^Matter light/), "the new light's row"); await press(page, "Enter", 400);
+  ok(await toRow(/^Rename/), "Rename"); await type("Porch light");
+  ok(/Renamed/.test(await said()), "renamed");
+  ok(await toRow(/^Remove from this TV/), "Remove"); await press(page, "Enter", 300);
+  ok(/Press OK again to remove it/.test(await page.evaluate(() => document.querySelector(".srow.focus").textContent)), "asks once more first");
+  await press(page, "Enter", 900);
+  ok(/Removed from this TV/.test(await said()), "removed");
+  all = (await rows()).join(" | ");
+  ok(!/Porch light|Matter light/.test(all), "and it is gone from the list");
+  ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
+  await page.close();
+}
+
+// 2b. no Matter controller (an older bridge): nothing about Matter shows
+{
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  page.errors = []; page.on("pageerror", (e) => page.errors.push(String(e)));
+  await page.goto(BASE + "?mock=1&hasetup=1&matter=down");
+  await page.waitForFunction(() => window.CouchMatter, null, { timeout: 8000 });
+  await page.waitForTimeout(800);
+  ok(!(await page.evaluate(() => window.CouchMatter.on())), "a controller that does not answer: Matter is off");
+  ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
+  await page.close();
+}
+
+// 3. the phone page
+{
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  page.errors = []; page.on("pageerror", (e) => page.errors.push(String(e)));
+  await page.addInitScript(() => { try { localStorage.setItem("couchtv.token", "test-token"); } catch (e) {} });
+  page.on("dialog", (d) => d.accept(d.type() === "prompt" ? "Desk lamp" : undefined));
+  await page.goto(ORIGIN + "/setup#matter");
+  await page.waitForFunction(() => document.getElementById("matter").style.display !== "none", null, { timeout: 8000 });
+  ok(await page.evaluate(() => document.getElementById("jump-matter").style.display !== "none"), "the Matter chip shows");
+  await page.evaluate(() => { const b = document.querySelector("#matter .fold-btn"); if (b && document.getElementById("matter").classList.contains("shut")) b.click(); });
+  const listed = await page.evaluate(() => document.getElementById("matter-list").textContent);
+  ok(/Lounge lamp/.test(listed) && /Hallway/.test(listed) && !/lock|Garage/.test(listed), "the devices, never the lock or the garage: " + listed);
+  const words = await page.evaluate(() => document.getElementById("matter").textContent);
+  ok(["Linked Matter apps and services", "Use pairing code", "Turn On Pairing Mode", "Copy Code", "Share with other services", "Other Assistants and Apps", "Add another"].every((x) => words.indexOf(x) >= 0), "where each app keeps the code");
+  ok(!/[–—]/.test(words), "no dashes in the words");
+  const noScroll = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+  ok(noScroll, "nothing wider than the phone");
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "matter-phone.png"), fullPage: false });
+  const msg = () => page.evaluate(() => document.getElementById("matter-msg").textContent);
+  phoneAsked.length = 0;
+  await page.fill("#matter-code", "3497-011-2333"); await page.click("#matter-add"); await page.waitForTimeout(300);
+  ok(/One of those numbers is wrong/.test(await msg()) && !phoneAsked.some((x) => /commission/.test(x)), "a typo is caught on the phone, nothing sent");
+  await page.fill("#matter-code", "749701123365521327694"); await page.click("#matter-add"); await page.waitForTimeout(600);
+  ok(/That code ran out/.test(await msg()), "a code that ran out: " + await msg());
+  await page.fill("#matter-code", "3497-011-2332"); await page.click("#matter-add"); await page.waitForTimeout(800);
+  ok(/Added/.test(await msg()) && /Matter light/.test(await page.evaluate(() => document.getElementById("matter-list").textContent)), "added and listed: " + await msg());
+  ok(phoneAsked.some((x) => x === '/api/matter/commission {"code":"34970112332"}'), "the code is sent as plain numbers");
+  await page.click('#matter-list li[data-id="matter:9:1"] button[data-mt="rename"]'); await page.waitForTimeout(700);
+  ok(/Desk lamp/.test(await page.evaluate(() => document.getElementById("matter-list").textContent)), "renamed");
+  await page.click('#matter-list li[data-id="matter:9:1"] button[data-mt="remove"]'); await page.waitForTimeout(700);
+  ok(!/Desk lamp/.test(await page.evaluate(() => document.getElementById("matter-list").textContent)) && /off the TV/.test(await msg()), "removed");
+  const small = await page.evaluate(() => Array.prototype.filter.call(document.querySelectorAll("#matter button, #matter input"), (e) => e.offsetParent && e.getBoundingClientRect().height < 40).length);
+  ok(small === 0, "every button and box at least 40 px tall");
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "matter-phone-after.png") });
+  ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
+  await page.close();
+}
+
+await browser.close();
+server.close();
+console.log("ok " + n + " Matter UI browser checks");
