@@ -236,7 +236,7 @@
     <p>1. Get the share code from your app:</p>
     <details class="wbox"><summary>Google Home</summary><div><p>Touch and hold the device, then Settings, Linked Matter apps and services, Link apps and services, then Use pairing code. Copy the code.</p></div></details>
     <details class="wbox"><summary>Apple Home</summary><div><p>Open the device, then its settings. Near the bottom, tap Turn On Pairing Mode, then Copy Code. The code lasts 5 minutes.</p></div></details>
-    <details class="wbox"><summary>SmartThings</summary><div><p>Open the device, tap the settings button at the top right, then Share with other services, then Share device. Copy the number code, and keep that page open until this page says it is added.</p></div></details>
+    <details class="wbox"><summary>SmartThings</summary><div><p>Open the device, tap the settings button at the top right, then Share with other services, then Share device. Copy the number code, and keep that page open until Couch TV says it is added.</p></div></details>
     <details class="wbox"><summary>Alexa</summary><div><p>Devices, tap the device, then Other Assistants and Apps, then Add another. Copy the 11 number code. It lasts 15 minutes.</p></div></details>
     <label for="matter-code">2. Paste the code here</label>
     <input id="matter-code" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="11 numbers, like 3497 011 2332">
@@ -327,6 +327,8 @@
     <button id="forget">Forget every phone</button>
   </section>
 </main>
+<!-- the Matter card's words in the TV's language (tv-home/web/matter-words.js) -->
+<script src="/tv/matter-words.js"></script>
 <script>
   var $ = function (id) { return document.getElementById(id); };
   // words shown in the page: escaped, so "Fish & chips" stays "Fish & chips"
@@ -335,7 +337,7 @@
   var idOf = function (s) { return String(s).replace(/[&<>"'\\\s]/g, ''); };   // as before: TV input ids (com.maker.tvinput/.HdmiService/HW2) keep everything else
   function api(method, path, body) {
     return fetch(path, { method: method, headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
-      .then(function (r) { return r.json().then(function (j) { if (!r.ok || j.ok === false) { var e = new Error(j.error || ('error ' + r.status)); e.status = r.status; throw e; } return j; }); });
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok || j.ok === false) { var e = new Error(j.error || ('error ' + r.status)); e.status = r.status; e.reply = j; throw e; } return j; }); });
   }
   function say(id, text) { $(id).textContent = text || ''; }
   var SETTINGS = null;
@@ -812,24 +814,13 @@
   // The TV (or the home computer) is one more Matter controller (/api/matter/*, the Matter contract).
   // Shown only where one answers. The code is checked here first (11 or 21 numbers, the last one
   // checks the rest), so a typo is caught before the app's code runs out.
-  var MT_ERR = { short: 'That code is too short. A Matter code has 11 numbers.', typo: 'One of those numbers is wrong. Check the code and paste it again.',
-    code: 'That is not a Matter code. It has 11 numbers, like 3497 011 2332.', expired: 'That code ran out. Make a new one in the app and paste it in straight away.',
-    wrong_code: 'The device did not take that code. Make a new one in the app and try again.', unreachable: 'The TV could not reach the device. Check it is on and near the TV\'s Wi-Fi.',
-    thread: 'The device uses Thread, and the TV cannot reach your Thread network. A Google or Apple hub (Nest Hub, HomePod mini, Apple TV) must be on at home.',
-    already: 'That device is on this TV already.',
-    not_allowed: 'That device is not one Couch TV shows, so it was not added. Couch TV shows lights, plugs, fans, blinds, thermostats and sensors, never locks, alarms or garage doors. It stays in your other app.',
-    unavailable: 'The device is not answering. Check it is switched on.',
-    name_hides: 'Pick another name. Couch TV hides anything called a garage, gate, door or lock, so this device would disappear.',
-    refused: 'That could not be done.', failed: 'That did not work. Try again.' };
-  // why Matter is not ready (a reason key from the controller), in plain words
-  var MT_WHY = { off: 'Matter is switched off on the home computer. Whoever set up Couch TV there can switch it on.',
-    not_installed: 'Matter is not set up on the home computer yet. Whoever set up Couch TV there can add it.',
-    node_missing: 'The home computer needs Node.js for Matter, and it is not there yet. Whoever set up Couch TV there can add it.',
-    node_old: 'The home computer\'s Node.js is too old for Matter. Whoever set up Couch TV there can update it.',
-    starting: 'Matter is starting on the home computer. Try again in a minute.',
-    stopped: 'Matter stopped on the home computer. It starts again by itself; if it does not, restart the home computer.' };
+  // every line in the TV's language: mw(key) reads tv-home/web/matter-words.js (the TV uses the same table)
+  function mw(key, vars) { var W = window.CouchMatterWords; return W ? W.t(key, vars) : key; }
+  var MT_ERR = { short: 1, typo: 1, code: 1, expired: 1, wrong_code: 1, unreachable: 1, thread: 1, already: 1, not_allowed: 1, unavailable: 1, name_hides: 1, refused: 1, failed: 1 };
+  // why Matter is not ready (a reason key from the controller)
+  var MT_WHY = { off: 1, not_installed: 1, node_missing: 1, node_old: 1, starting: 1, stopped: 1 };
   var MT_HIDES = /\b(garages?|gates?|doors?|locks?)\b/i;
-  var MT_KIND = { light: 'Light', switch: 'Plug or switch', fan: 'Fan', cover: 'Blind', climate: 'Thermostat', sensor: 'Sensor' };
+  var MT_KIND = { light: 1, switch: 1, fan: 1, cover: 1, climate: 1, sensor: 1 };
   var VD = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]];
   var VP = [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]];
   function matterCode(text) {
@@ -845,59 +836,69 @@
   }
   // the server's answer, bare or wrapped in { result } (the bridge wraps some answers)
   function mtOf(j) { return j && !Array.isArray(j.devices) && j.result && typeof j.result === 'object' ? j.result : j || {}; }
-  function mtErr(e) { var k = e && e.message; return MT_ERR[k] || (k && !/^[a-z_]+$/.test(k) ? k : MT_ERR.failed); }
+  // an error in words: the home computer's reason first (Matter not running there), then the key, then
+  // the controller's own sentence
+  function mtErr(e) {
+    var k = e && e.message, rep = (e && e.reply) || {};
+    if (typeof rep.reason === 'string' && MT_WHY.hasOwnProperty(rep.reason)) return mw('why_' + rep.reason);
+    if (k && k !== 'failed' && MT_ERR.hasOwnProperty(k)) return mw('err_' + k);
+    if (typeof rep.note === 'string' && rep.note) return rep.note;
+    return k && !/^[a-z_]+$/.test(k) ? k : mw('err_failed');
+  }
   var MT_OK = ['light', 'switch', 'fan', 'cover', 'climate', 'sensor'];
   function showMatter(j) {
     j = mtOf(j);
     $('matter').style.display = ''; $('jump-matter').style.display = '';
-    var why = typeof j.reason === 'string' && MT_WHY.hasOwnProperty(j.reason) ? MT_WHY[j.reason] : '';
-    var note = j.ready === false ? (why || j.note || 'Matter is getting ready on the TV. Try again in a minute.') : (j.note || '');
+    var why = typeof j.reason === 'string' && MT_WHY.hasOwnProperty(j.reason) ? mw('why_' + j.reason) : '';
+    var note = j.ready === false ? (why || j.note || mw('getting_ready')) : (j.note || '');
     $('matter-note').style.display = note ? '' : 'none'; $('matter-note').textContent = note;
     var list = (Array.isArray(j.devices) ? j.devices : []).filter(function (d) {
       return d && typeof d.id === 'string' && MT_OK.indexOf(d.domain) >= 0 && !(d.domain === 'cover' && /^(garage|gate|door)$/.test((d.attributes || {}).device_class || ''));
     });
+    // the name and kind ride on the row (data-name, data-domain), so a name in another language never
+    // changes what Rename and Remove send
     $('matter-list').innerHTML = list.length ? list.map(function (d) {
-      var down = d.state === 'unavailable' || d.state === 'unknown';
-      return '<li data-id="' + esc(d.id) + '"><span>' + esc(d.name || MT_KIND[d.domain]) + ' <small class="miss">' + esc(MT_KIND[d.domain] + (down ? ', not answering' : '')) + '</small></span>' +
-        '<button class="quiet" type="button" data-mt="rename">Rename</button><button class="danger" type="button" data-mt="remove">Remove</button></li>';
-    }).join('') : '<li class="miss">None on this TV yet.</li>';
+      var down = d.state === 'unavailable' || d.state === 'unknown', kind = mw('kind_' + d.domain), name = String(d.name || kind);
+      return '<li data-id="' + esc(d.id) + '" data-name="' + esc(name) + '" data-domain="' + esc(d.domain) + '"><span><bdi>' + esc(name) + '</bdi> <small class="miss">' + esc(kind + (down ? ', ' + mw('st_down') : '')) + '</small></span>' +
+        '<button class="quiet" type="button" data-mt="rename">' + esc(mw('rename')) + '</button><button class="danger" type="button" data-mt="remove">' + esc(mw('remove')) + '</button></li>';
+    }).join('') : '<li class="miss">' + esc(mw('none')) + '</li>';
   }
   function loadMatter() { return api('GET', '/api/matter/devices').then(showMatter, function () {}); }
   $('matter-add').onclick = function () {
     var c = matterCode($('matter-code').value);
-    if (!c.ok) { say('matter-msg', MT_ERR[c.error]); return; }
+    if (!c.ok) { say('matter-msg', mw('err_' + c.error)); return; }
     $('matter-add').disabled = true;
-    say('matter-msg', 'Adding the device. This can take a minute…');
+    say('matter-msg', mw('adding'));
     api('POST', '/api/matter/commission', { code: c.code }).then(function (j) {
       j = mtOf(j);
-      if (j.ok === false) throw new Error(j.error || 'failed');
+      if (j.ok === false) { var x = new Error(j.error || 'failed'); x.reply = j; throw x; }
       $('matter-code').value = '';
       // the TV joined a lock, an alarm or a garage door and left it again (ok, no ids, a note)
-      if (!(j.device_ids || []).length && j.note) { say('matter-msg', MT_ERR.not_allowed); return loadMatter(); }
-      say('matter-msg', (j.device_ids || []).length ? 'Added. It shows on the TV now, in your smart home widgets and Home settings, Smart home.' : 'Added. It shows here once the device answers.');
+      if (!(j.device_ids || []).length && j.note) { say('matter-msg', mw('err_not_allowed')); return loadMatter(); }
+      say('matter-msg', (j.device_ids || []).length ? mw('added_phone') : mw('added_later'));
       return loadMatter();
     }).catch(function (e) { say('matter-msg', mtErr(e)); }).then(function () { $('matter-add').disabled = false; });
   };
   $('matter-list').onclick = function (ev) {
     var b = ev.target.closest && ev.target.closest('button[data-mt]'), li = b && b.closest('li');
     if (!li) return;
-    var id = li.getAttribute('data-id'), name = li.querySelector('span').firstChild.textContent.trim();
+    var id = li.getAttribute('data-id'), name = li.getAttribute('data-name') || '', domain = li.getAttribute('data-domain') || '';
     if (b.getAttribute('data-mt') === 'remove') {
-      if (!confirm('Remove ' + name + ' from the TV? It stays in your Google, Apple, SmartThings or Alexa app.')) return;
-      say('matter-msg', 'Removing…');
+      if (!confirm(mw('confirm_remove', { name: name }))) return;
+      say('matter-msg', mw('removing'));
       api('POST', '/api/matter/remove', { id: id }).then(function (j) {
-        say('matter-msg', name + ' is off the TV.' + (mtOf(j).note ? ' The device did not answer, so your other app may still list the TV. You can take it off there.' : ''));
+        say('matter-msg', mw('off_tv', { name: name }) + (mtOf(j).note ? ' ' + mw('no_answer') : ''));
         return loadMatter();
       }).catch(function (e) { say('matter-msg', mtErr(e)); });
     } else {
-      var v = prompt('A name for ' + name, name);
+      var v = prompt(mw('name_for', { name: name }), name);
       v = String(v == null ? '' : v).trim().slice(0, 40);
       if (!v || v === name) return;
       // a light, plug or blind named as a garage door, gate, door or lock is hidden by the TV
-      if (MT_HIDES.test(v) && !/(Thermostat|Sensor)/.test(li.querySelector('small').textContent)) { say('matter-msg', MT_ERR.name_hides); return; }
-      say('matter-msg', 'Saving…');
-      api('POST', '/api/matter/rename', { id: id, name: v }).then(function () { say('matter-msg', 'Renamed.'); return loadMatter(); })
-        .catch(function (e) { say('matter-msg', e && (e.message === 'refused' || e.message === 'not_allowed') ? MT_ERR.name_hides : mtErr(e)); });
+      if (MT_HIDES.test(v) && domain !== 'climate' && domain !== 'sensor') { say('matter-msg', mw('err_name_hides')); return; }
+      say('matter-msg', mw('saving'));
+      api('POST', '/api/matter/rename', { id: id, name: v }).then(function () { say('matter-msg', mw('renamed')); return loadMatter(); })
+        .catch(function (e) { say('matter-msg', e && (e.message === 'refused' || e.message === 'not_allowed') ? mw('err_name_hides') : mtErr(e)); });
     }
   };
   // a photo of a QR code, read on this phone where the browser can (Chrome on Android); the code is
@@ -907,12 +908,12 @@
     $('matter-photo').onchange = function () {
       var f = this.files && this.files[0];
       if (!f) return;
-      say('matter-msg', 'Reading the code…');
+      say('matter-msg', mw('reading'));
       createImageBitmap(f).then(function (img) { return new window.BarcodeDetector({ formats: ['qr_code'] }).detect(img); }).then(function (found) {
         var t = (found || []).map(function (x) { return x.rawValue; }).filter(function (v) { return /^MT:/.test(v); })[0];
-        if (t) { $('matter-code').value = t; say('matter-msg', 'Got the code. Tap Add to the TV.'); }
-        else say('matter-msg', 'No Matter QR code in that photo. Paste the 11 number code instead.');
-      }).catch(function () { say('matter-msg', 'That photo could not be read. Paste the 11 number code instead.'); });
+        if (t) { $('matter-code').value = t; say('matter-msg', mw('got')); }
+        else say('matter-msg', mw('no_qr'));
+      }).catch(function () { say('matter-msg', mw('bad_photo')); });
       this.value = '';
     };
   }

@@ -1,0 +1,157 @@
+// The Matter screens' words in every language (tv-home/web/matter-words.js):
+//  1. every key has every language Couch TV has (es-MX may fall back to es), with the same {gaps},
+//     plain words (no dashes, no "Beta", "Experimental" or "coming soon");
+//  2. every key the screens ask for exists: app.js (Home settings, Smart home), setup.html (the phone's
+//     Matter card), matter.js (a device's description), including the error, reason and kind keys;
+//  3. every English line in the phone card's own HTML is a line of the table, so the phone page's word
+//     swapper (phone-words.js, branch nl-remote) shows it in the TV's language;
+//  4. a device is described in the TV's language (German, Chinese), a door sensor says open or closed
+//     and a motion sensor someone or no one there;
+//  5. app.js's Matter section has no English line left in it (all come from the table), so the TV words
+//     check on nl-remote (test_tv_words_cover.mjs) has nothing of it to flag;
+//  6. with nl-remote's phone-words.js (read from git when the branch is there): the card's lines in French.
+const fs = require("fs");
+const path = require("path");
+const vm = require("vm");
+const assert = require("assert");
+const { execFileSync } = require("child_process");
+
+const ROOT = path.join(__dirname, "..");
+const WEB = path.join(ROOT, "tv-home/web");
+let n = 0;
+const ok = (c, m) => { assert.ok(c, m); n++; };
+
+function load(extra, files) {
+  const win = Object.assign({}, extra || {});
+  const ctx = vm.createContext({ window: win, setTimeout, clearTimeout, Promise, console, JSON, Date, Math });
+  (files || ["matter-words.js"]).forEach((f) => vm.runInContext(typeof f === "string" ? fs.readFileSync(path.join(WEB, f), "utf8") : f.src, ctx));
+  return win;
+}
+
+// 1. every language
+const W = load().CouchMatterWords;
+const LANGS = W.langs;
+ok(LANGS.length === 15 && LANGS.indexOf("zh-CN") >= 0 && LANGS.indexOf("sr-Latn-RS") >= 0, "15 languages besides English");
+const keys = W.keys();
+ok(keys.length >= 80, "lines in the table: " + keys.length);
+const missing = [], gaps = [], dashes = [];
+keys.forEach((k) => {
+  const en = W.en(k), row = W.row(k), want = (en.match(/\{\w+\}/g) || []).sort().join();
+  if (/[–—]|\bBeta\b|Experimental|coming soon/i.test(en)) dashes.push(k + " en");
+  LANGS.forEach((l) => {
+    const v = row[l] != null ? row[l] : l === "es-MX" ? row.es : null;
+    if (v == null || !String(v).trim()) { missing.push(k + " " + l); return; }
+    if ((v.match(/\{\w+\}/g) || []).sort().join() !== want) gaps.push(k + " " + l);
+    if (/[–—]/.test(v)) dashes.push(k + " " + l);
+  });
+  Object.keys(row).forEach((l) => { if (LANGS.indexOf(l) < 0) missing.push(k + " unknown language " + l); });
+});
+ok(missing.length === 0, "every line in every language: " + missing.join(", "));
+ok(gaps.length === 0, "the same gaps in every language: " + gaps.join(", "));
+ok(dashes.length === 0, "no dashes or hedges: " + dashes.join(", "));
+ok(W.t("added_names", { names: "Lamp" }, "de") === "Hinzugefügt: Lamp. Es erscheint jetzt in deinen Smart-Home-Widgets.", "a gap is filled");
+ok(W.t("add", null, "es-MX") === "Agregar un dispositivo Matter" && W.t("rename", null, "es-MX") === "Cambiar nombre", "Mexico's own words, else Spain's");
+ok(W.t("add", null, "en") === "Add a Matter device" && W.t("nope") === "nope", "English, and an unknown key as itself");
+
+// 2. every key the screens ask for
+const app = fs.readFileSync(path.join(WEB, "app.js"), "utf8");
+const a0 = app.indexOf("// ---- Home settings, Smart home, Matter devices (matter.js) ----"), a1 = app.indexOf("window.CouchMatter.onChange(", a0);
+ok(a0 > 0 && a1 > a0, "app.js has the Matter section");
+const appSec = app.slice(a0, a1);
+const setup = fs.readFileSync(path.join(ROOT, "on-tv/web/setup.html"), "utf8");
+const s0 = setup.indexOf("// ---------------- Matter devices"), s1 = setup.indexOf("// ---------------- this TV ----------------", s0);
+const setupSec = setup.slice(s0, s1);
+const matterJs = fs.readFileSync(path.join(WEB, "matter.js"), "utf8");
+const asked = new Set();
+[appSec, setupSec].forEach((src) => { for (const m of src.matchAll(/mw\(\s*["']([a-z_]*[a-z])["']/g)) asked.add(m[1]); });   // "why_" + key: read below
+for (const m of appSec.matchAll(/\["(brand_[a-z]+|app_[a-z]+)"/g)) asked.add(m[1]);
+for (const m of appSec.matchAll(/, "(app_[a-z]+)"\]/g)) asked.add(m[1]);
+const objKeys = (src, name) => { const m = new RegExp("var " + name + " = \\{([^}]*)\\}").exec(src); return m ? [...m[1].matchAll(/([a-z_]+): 1/g)].map((x) => x[1]) : []; };
+[appSec, setupSec].forEach((src) => {
+  objKeys(src, "MT_ERR").forEach((k) => asked.add("err_" + k));
+  objKeys(src, "MT_WHY").forEach((k) => asked.add("why_" + k));
+});
+["light", "switch", "fan", "cover", "climate", "sensor"].forEach((d) => asked.add("kind_" + d));
+for (const m of matterJs.matchAll(/\b(st_[a-z]+|kind_[a-z]+)\b/g)) asked.add(m[1]);
+const unknown = [...asked].filter((k) => keys.indexOf(k) < 0);
+ok(asked.size >= 75, "keys the screens ask for: " + asked.size);
+ok(unknown.length === 0, "every key asked for is in the table: " + unknown.join(", "));
+ok(objKeys(appSec, "MT_ERR").length >= 15 && objKeys(setupSec, "MT_ERR").length >= 13 && objKeys(appSec, "MT_WHY").length === 6 && objKeys(setupSec, "MT_WHY").length === 6, "the error and reason keys are read from both screens");
+// matter.js's English stand ins are the table's English
+const en = /var EN = \{([\s\S]*?)\};/.exec(matterJs)[1];
+const enPairs = [...en.matchAll(/([a-z_]+): "([^"]*)"/g)];
+ok(enPairs.length === 13 && enPairs.every((p) => W.en(p[1]) === p[2]), "matter.js's English stand ins match the table");
+
+// 3. the phone card's own HTML lines are in the table
+const h0 = setup.indexOf('<section class="card" id="matter"'), h1 = setup.indexOf("</section>", h0);
+const card = setup.slice(h0, h1);
+const lines = [];
+for (const m of card.matchAll(/>([^<>]+)</g)) { const t = m[1].trim(); if (t && /[A-Za-z]/.test(t)) lines.push(t); }
+for (const m of card.matchAll(/(?:placeholder|aria-label)="([^"]+)"/g)) lines.push(m[1]);
+const ENS = keys.map((k) => W.en(k));
+const brands = ["Google Home", "Apple Home", "SmartThings", "Alexa"];
+const notIn = lines.filter((t) => brands.indexOf(t) < 0 && ENS.indexOf(t) < 0);
+ok(lines.length >= 15, "lines in the phone card: " + lines.length);
+ok(notIn.length === 0, "every line of the phone card is in the table: " + notIn.join(" | "));
+// and they are handed to the shared table the phone page's swapper reads
+const caps = load().CouchCapsWords.words;
+ok(lines.filter((t) => brands.indexOf(t) < 0).every((t) => caps[t] && caps[t].fr), "every card line is in window.CouchCapsWords (with French)");
+ok(!caps.on && !caps.Light && !caps["Google Home"], "never a bare word (on, Light) or an app's name");
+// a table made earlier (caps-words.js) is added to, never replaced
+const kept = load({ CouchCapsWords: { words: { Units: { fr: "Unités" } } } }).CouchCapsWords.words;
+ok(kept.Units && kept.Units.fr === "Unités" && kept["Add to the TV"].de === "Zum Fernseher hinzufügen", "the widget settings words stay, Matter's are added");
+
+// 4. a device described in the TV's language
+function described(lang) {
+  const win = load({ I18N: { lang: () => lang } }, ["matter-words.js", "matter.js"]);
+  const devices = [
+    { id: "matter:1:1", name: "Lounge lamp", domain: "light", state: "on", attributes: {} },
+    { id: "matter:2:1", name: "Blind", domain: "cover", state: "closed", attributes: { current_position: 0 } },
+    { id: "matter:3:1", name: "Door", domain: "sensor", state: "on", attributes: { device_class: "contact", reading: "open" } },
+    { id: "matter:3:2", name: "Window", domain: "sensor", state: "off", attributes: { device_class: "contact" } },
+    { id: "matter:4:1", name: "Hall", domain: "sensor", state: "on", attributes: { device_class: "occupancy" } },
+    { id: "matter:5:1", name: "Temp", domain: "sensor", state: "22.4", attributes: { device_class: "temperature", unit_of_measurement: "°C" } },
+    { id: "matter:6:1", name: "Heat", domain: "climate", state: "off", attributes: { current_temperature: 19 } },
+    { id: "matter:7:1", name: "Fan", domain: "fan", state: "unavailable", attributes: {} }
+  ];
+  win.CouchMatter.use(() => Promise.resolve({ devices, ready: true }));
+  return new Promise((r) => setTimeout(() => r(win.CouchMatter.list().map((d) => d.words)), 20));
+}
+(async () => {
+  const de = await described("de");
+  ok(JSON.stringify(de) === JSON.stringify(["Lampe, an", "Rollo, zu", "Sensor, offen", "Sensor, zu", "Sensor, jemand da", "Sensor, 22.4 °C", "Thermostat, 19°, aus", "Ventilator, antwortet nicht"]), "German: " + JSON.stringify(de));
+  const enW = await described("en");
+  ok(JSON.stringify(enW) === JSON.stringify(["Light, on", "Blind, closed", "Sensor, open", "Sensor, closed", "Sensor, someone there", "Sensor, 22.4 °C", "Thermostat, 19°, off", "Fan, not answering"]), "English: " + JSON.stringify(enW));
+  const zh = await described("zh-CN");
+  ok(zh[0] === "灯，开" && zh[7] === "风扇，无响应", "Chinese, with its own comma: " + JSON.stringify(zh.slice(0, 2)));
+
+  // 5. no English line left in app.js's Matter section (nl-remote's test_tv_words_cover.mjs pattern)
+  const flagged = [];
+  for (const m of appSec.split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n").matchAll(/"((?:[^"\\]|\\.)*)"/g)) {
+    const s = m[1];
+    if (!/^(couch-tv Studio|[A-Z])[\w']*[ ,.:]/.test(s) || s.split(" ").length < 2 || /[<>{}=]|\.js|\.png|https?:/.test(s)) continue;
+    if (s === "Smart home") continue;   // the crumb: the Smart home screen's own name, already a tw_ line on nl-remote
+    flagged.push(s);
+  }
+  ok(flagged.length === 0, "no English line in app.js's Matter section: " + flagged.join(" | "));
+
+  // 6. with nl-remote's phone-words.js: the card's lines swapped to French
+  let pw = null, cw = null;
+  try {
+    pw = execFileSync("git", ["-C", ROOT, "show", "nl-remote:tv-home/web/phone-words.js"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    cw = execFileSync("git", ["-C", ROOT, "show", "nl-remote:tv-home/web/caps-words.js"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  } catch (e) { /* no such branch here */ }
+  if (!pw) console.log("SKIP 6: no nl-remote branch");
+  else {
+    const store = { "couchtv.phone.lang": "fr" };
+    const doc = { documentElement: { getAttribute() { return null; }, setAttribute() {} }, addEventListener() {}, body: null, title: "" };
+    const win = load({ localStorage: { getItem: (k) => store[k] || null, setItem: (k, v) => { store[k] = v; } }, navigator: { language: "en", languages: ["en"] }, location: { search: "", hash: "" }, document: doc },
+      [{ src: "var localStorage = window.localStorage, navigator = window.navigator, location = window.location, document = window.document;" + cw }, { src: "var localStorage = window.localStorage, navigator = window.navigator, location = window.location, document = window.document;" + pw }, "matter-words.js"]);
+    ok(win.PhoneWords && win.PhoneWords.lang() === "fr", "phone-words.js runs, in French");
+    const fr = lines.filter((t) => brands.indexOf(t) < 0).map((t) => [t, win.PhoneWords.words(t)]);
+    const notSwapped = fr.filter((p) => !p[1] || p[1] === p[0]);
+    ok(notSwapped.length === 0, "every card line swapped by phone-words.js: " + notSwapped.map((p) => p[0]).join(" | "));
+    ok(win.PhoneWords.words("2. Paste the code here") === "2. Collez le code ici" && win.CouchMatterWords.t("rename") === "Renommer", "the page's own HTML and the card's messages both in French");
+  }
+  console.log("ok " + n + " Matter words checks");
+})().catch((e) => { console.error(e); process.exit(1); });

@@ -695,6 +695,7 @@
         else {
           var err = new Error((j && j.error) || t("bridge_no", { status: x.status }));
           if (j && j.error_key) { err.key = j.error_key; err.vars = j.error_vars; }
+          if (j && typeof j === "object") err.reply = j;   // the whole answer (matter.js reads its reason and note)
           reject(err);
         }
       };
@@ -7082,55 +7083,44 @@
   // SmartThings or Alexa, shared to this TV with a pairing code. They show under the Home Assistant
   // rows of the Smart home screen, each with Rename and Remove, and Add a Matter device says where each
   // app keeps the code. Only where a Matter controller answers (this TV's app or the home computer).
-  // English only, like the rest of this section.
-  var MT_ERR = { short: "That code is too short. A Matter code has 11 numbers.", typo: "One of those numbers is wrong. Check the code and type it again.",
-    code: "That is not a Matter code. It has 11 numbers, like 3497 011 2332.", expired: "That code ran out. Make a new one in the app and type it in straight away.",
-    wrong_code: "The device did not take that code. Make a new one in the app and try again.", unreachable: "The TV could not reach the device. Check it is on and near the TV's Wi-Fi.",
-    thread: "The device uses Thread, and the TV cannot reach your Thread network. A Google or Apple hub (Nest Hub, HomePod mini, Apple TV) must be on at home.",
-    already: "That device is on this TV already.",
-    not_allowed: "That device is not one Couch TV shows, so it was not added. Couch TV shows lights, plugs, fans, blinds, thermostats and sensors, never locks, alarms or garage doors. It stays in your other app.",
-    unavailable: "The device is not answering. Check it is switched on.",
-    name_hides: "Pick another name. Couch TV hides anything called a garage, gate, door or lock, so this device would disappear.",
-    refused: "That could not be done.", timeout: "That took too long. Try again.", off: "Matter is not on for this TV yet.", failed: "That did not work. Try again." };
-  // why Matter is not ready on the home computer (bridge/matter.py's reason key), in plain words
-  var MT_WHY = { off: "Matter is switched off on the home computer. Whoever set up Couch TV there can switch it on.",
-    not_installed: "Matter is not set up on the home computer yet. Whoever set up Couch TV there can add it.",
-    node_missing: "The home computer needs Node.js for Matter, and it is not there yet. Whoever set up Couch TV there can add it.",
-    node_old: "The home computer's Node.js is too old for Matter. Whoever set up Couch TV there can update it.",
-    starting: "Matter is starting on the home computer. Try again in a minute.",
-    stopped: "Matter stopped on the home computer. It starts again by itself; if it does not, restart the home computer." };
+  // Every line is in the TV's language: mw(key) reads matter-words.js (one table for the TV and the phone).
+  function mw(key, vars) { var W = window.CouchMatterWords; return W ? W.t(key, vars) : key; }
+  // the error keys the screens put in words (matter.js's checks, the controllers' answers)
+  var MT_ERR = { short: 1, typo: 1, code: 1, expired: 1, wrong_code: 1, unreachable: 1, thread: 1, already: 1, not_allowed: 1, unavailable: 1, name_hides: 1, refused: 1, timeout: 1, off: 1, failed: 1 };
+  // why Matter is not ready on the home computer (bridge/matter.py's reason key)
+  var MT_WHY = { off: 1, not_installed: 1, node_missing: 1, node_old: 1, starting: 1, stopped: 1 };
   // a key in plain words; a controller's own sentence only when there is no key for it
-  function mtSay(r) { return (r && r.error !== "failed" && MT_ERR[r.error]) || (r && r.note) || MT_ERR[r && r.error] || MT_ERR.failed; }
-  var MT_APPS = [
-    ["Google Home", "Touch and hold the device, then Settings, Linked Matter apps and services, Link apps and services, Use pairing code."],
-    ["Apple Home", "Open the device, then its settings. Near the bottom pick Turn On Pairing Mode, then Copy Code. The code lasts 5 minutes."],
-    ["SmartThings", "Open the device, then the settings button at the top right, Share with other services, Share device. Keep that page open until the TV says it is added."],
-    ["Alexa", "Devices, the device, Other Assistants and Apps, Add another. The 11 number code lasts 15 minutes."]
-  ];
+  function mtSay(r) {
+    r = r || {};
+    if (r.reason && MT_WHY[r.reason]) return mw("why_" + r.reason);   // the home computer's Matter is not running
+    if (r.error && r.error !== "failed" && MT_ERR[r.error]) return mw("err_" + r.error);
+    return r.note || mw("err_failed");
+  }
+  var MT_APPS = [["brand_google", "app_google"], ["brand_apple", "app_apple"], ["SmartThings", "app_smartthings"], ["Alexa", "app_alexa"]];
   function matterRows(rows) {
     var M = window.CouchMatter;
     if (!M || !M.on()) return rows;
-    rows.push(head("Matter devices"));
-    if (!M.ready()) rows.push(info("mt-wait", "", "", MT_WHY[M.reason()] || M.note() || "Matter is getting ready on this TV. Try again in a minute."));
+    rows.push(head(mw("title")));
+    if (!M.ready()) rows.push(info("mt-wait", "", "", MT_WHY[M.reason()] ? mw("why_" + M.reason()) : M.note() || mw("getting_ready")));
     M.list().forEach(function (d) {
       rows.push({ kind: "nav", key: "mt-d:" + d.entity, label: d.name, value: d.words, act: function () { openMatterDevice(d.entity); } });
     });
-    rows.push({ kind: "nav", key: "mt-add", label: "Add a Matter device", sub: "From Google Home, Apple Home, SmartThings or Alexa. It stays in that app too.", act: openMatterAdd });
+    rows.push({ kind: "nav", key: "mt-add", label: mw("add"), sub: mw("add_sub"), act: openMatterAdd });
     return rows;
   }
   function openMatterAdd() {
     var up = SET.sub;
     MT_ADD.link = "";
     if (ON_TV && !OFFLINE) api("GET", "/api/phone-link").then(function (j) { if (j && /^http:\/\/[^\/]+\/setup/.test(j.url || "")) { MT_ADD.link = j.url; if (zone === "settings") renderSettings(); } }, function () {});
-    SET.sub = { up: up, back: "mt-add", crumb: "Smart home", title: function () { return "Add a Matter device"; }, rows: function () {
-      var rows = [info("mt-how", "", "", "Your app makes a share code. Type it here or on your phone, and this TV becomes one more way to use the device.")];
-      if (MT_ADD.link && window.TVQR) rows.push({ kind: "qr", key: "mt-qr", link: MT_ADD.link, label: "Easier on your phone", sub: "Scan, then go to Matter devices and paste the code." });
-      rows.push({ kind: "input", key: "mt-code", label: "Type the code", value: MT_ADD.busy ? "Adding..." : "", sub: "11 numbers. Typing is quicker with Type on the TV in the phone remote.", act: function () {
+    SET.sub = { up: up, back: "mt-add", crumb: "Smart home", title: function () { return mw("add"); }, rows: function () {
+      var rows = [info("mt-how", "", "", mw("how"))];
+      if (MT_ADD.link && window.TVQR) rows.push({ kind: "qr", key: "mt-qr", link: MT_ADD.link, label: mw("easier"), sub: mw("easier_sub") });
+      rows.push({ kind: "input", key: "mt-code", label: mw("type"), value: MT_ADD.busy ? mw("adding_short") : "", sub: mw("type_sub"), act: function () {
         if (MT_ADD.busy) return;
-        ahType("The Matter code (11 numbers)", "", function (v) { matterAdd(v); });
+        ahType(mw("type_label"), "", function (v) { matterAdd(v); });
       } });
-      rows.push(head("Where to find the code"));
-      MT_APPS.forEach(function (a, i) { rows.push(info("mt-app:" + i, a[0], "", a[1])); });
+      rows.push(head(mw("where")));
+      MT_APPS.forEach(function (a, i) { rows.push(info("mt-app:" + i, /^brand_/.test(a[0]) ? mw(a[0]) : a[0], "", mw(a[1]))); });
       return rows;
     } };
     SET.keyFocus = null; SET.ri = 0;
@@ -7139,33 +7129,33 @@
   function matterAdd(text) {
     var M = window.CouchMatter, c = M.checkCode(text);
     if (!c.ok) { SET.msg = mtSay(c); if (zone === "settings") renderSettings(); return; }
-    MT_ADD.busy = true; SET.msg = "Adding the device. This can take a minute...";
+    MT_ADD.busy = true; SET.msg = mw("adding");
     if (zone === "settings") renderSettings();
     M.commission(c.code).then(function (r) {
       MT_ADD.busy = false;
-      SET.msg = r.ok ? (r.added && r.added.length ? "Added: " + r.added.join(", ") + ". It shows in your smart home widgets now." : "Added. It shows here once the device answers.") : mtSay(r);
+      SET.msg = r.ok ? (r.added && r.added.length ? mw("added_names", { names: r.added.join(", ") }) : mw("added_later")) : mtSay(r);
       if (zone === "settings") renderSettings();
     });
   }
   function openMatterDevice(entity) {
     var up = SET.sub, M = window.CouchMatter;
     var dev = function () { return M.list().filter(function (d) { return d.entity === entity; })[0]; };
-    SET.sub = { up: up, back: "mt-d:" + entity, crumb: "Smart home", title: function () { var d = dev(); return d ? d.name : "Matter device"; }, rows: function () {
+    SET.sub = { up: up, back: "mt-d:" + entity, crumb: "Smart home", title: function () { var d = dev(); return d ? d.name : mw("device"); }, rows: function () {
       var d = dev();
-      if (!d) return [info("mt-gone", "", "", "This device is not on this TV any more.")];
+      if (!d) return [info("mt-gone", "", "", mw("gone"))];
       return [info("mt-now", d.words, "", ""),
-        { kind: "input", key: "mt-rename", label: "Rename", value: d.name, sub: "The name your widgets show", act: function () {
-          ahType("A name for " + d.name, d.name, function (v) {
+        { kind: "input", key: "mt-rename", label: mw("rename"), value: d.name, sub: mw("rename_sub"), act: function () {
+          ahType(mw("name_for", { name: d.name }), d.name, function (v) {
             v = String(v || "").trim();
             if (!v) return;
-            SET.msg = "Saving...";
+            SET.msg = mw("saving");
             // a name the controller turns down is one that would hide the device (bridge/matter.py)
-            M.rename(entity, v).then(function (r) { SET.msg = r.ok ? "Renamed." : mtSay(r.error === "refused" || r.error === "not_allowed" ? { error: "name_hides" } : r); if (zone === "settings") renderSettings(); });
+            M.rename(entity, v).then(function (r) { SET.msg = r.ok ? mw("renamed") : mtSay(r.error === "refused" || r.error === "not_allowed" ? { error: "name_hides" } : r); if (zone === "settings") renderSettings(); });
           });
         } },
-        { kind: "action", key: "mt-remove", label: "Remove from this TV", danger: true, confirmText: "Press OK again to remove it", sub: "It stays in your Google, Apple, SmartThings or Alexa app.", act: function () {
-          SET.msg = "Removing...";
-          M.remove(entity).then(function (r) { SET.msg = r.ok ? "Removed from this TV." + (r.unanswered ? " The device did not answer, so your other app may still list the TV. You can take it off there." : "") : mtSay(r); if (r.ok) SET.sub = up; if (zone === "settings") renderSettings(); });
+        { kind: "action", key: "mt-remove", label: mw("remove_tv"), danger: true, confirmText: mw("press_ok"), sub: mw("stays"), act: function () {
+          SET.msg = mw("removing");
+          M.remove(entity).then(function (r) { SET.msg = r.ok ? mw("removed") + (r.unanswered ? " " + mw("no_answer") : "") : mtSay(r); if (r.ok) SET.sub = up; if (zone === "settings") renderSettings(); });
         } }];
     } };
     SET.keyFocus = null; SET.ri = 0;

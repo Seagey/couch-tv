@@ -9,8 +9,9 @@
 //   POST /api/matter/command    { id, action, value } -> { ok, state, device }  (error: refused, unavailable, failed)
 //   POST /api/matter/remove     { id }              -> { ok, removed, note? }
 //   POST /api/matter/rename     { id, name }        -> { ok, name }
-// Checked against nl-matter-android ea574c2 (Server.kt, Matter.kt, MatterPage.kt) and nl-matter-bridge
-// 8254a5a (bridge/matter.py, server.py).
+// Checked against nl-matter-android 99c0f86 (Server.kt, Matter.kt, MatterModel.kt, MatterPage.kt) and
+// nl-matter-bridge 8254a5a plus its fixer's work in progress (bridge/matter.py: reason keys, rename
+// refused with reason opens_house, commission unreachable with a reason).
 // Nothing here talks to a device itself, and nothing is kept in the page.
 //
 // Every screen reads Matter devices exactly as it reads Home Assistant ones (smarthome.js merges them):
@@ -59,6 +60,9 @@
     if (r && typeof r === "object" && !Array.isArray(r.devices) && r.result && typeof r.result === "object") return r.result;
     return r && typeof r === "object" ? r : {};
   }
+  // a controller's reason key (bridge: off, not_installed, node_missing, node_old, starting, stopped,
+  // opens_house, address, port, link_local, blocked, unsupported, offline, not_answering), or ""
+  function why(r) { return typeof r === "string" && /^[a-z_]{2,24}$/.test(r) ? r : ""; }
   function signature() { return MT.devices.map(function (d) { return d.entity + "=" + d.name; }).join("|") + "#" + MT.ready + "#" + MT.reason + "#" + MT.note; }
   function put(r) {
     r = unwrap(r);
@@ -67,7 +71,7 @@
     MT.note = typeof r.note === "string" ? r.note.slice(0, 200) : "";
     // why it is not ready, as a key the screens put in their own words (the bridge: off, not_installed,
     // node_missing, node_old, starting, stopped); the English note only where there is no key
-    MT.reason = typeof r.reason === "string" && /^[a-z_]{2,24}$/.test(r.reason) ? r.reason : "";
+    MT.reason = why(r.reason);
     MT.devices = clean(r.devices);
     MT.by = {};
     MT.devices.forEach(function (d) { MT.by[d.entity] = d; });
@@ -95,7 +99,7 @@
         // { ok: false, error: key or plain sentence, note? })
         waiting[id] = function (r) {
           clearTimeout(timer);
-          if (r && r.ok === false) { var e = new Error(String(r.error || "failed")); e.note = typeof r.note === "string" ? r.note : ""; reject(e); }
+          if (r && r.ok === false) { var e = new Error(String(r.error || "failed")); e.note = typeof r.note === "string" ? r.note : ""; e.reply = r; reject(e); }
           else resolve(r);
         };
         try { nat.request(id, method, path, body ? JSON.stringify(body) : ""); }
@@ -117,7 +121,9 @@
   function failed(e) {
     var m = e && e.message ? String(e.message) : "failed";
     var key = /^[a-z_]{2,24}$/.test(m);
-    return { ok: false, error: key ? m : "failed", note: (key ? (e && typeof e.note === "string" ? e.note : "") : m).slice(0, 200) };
+    var rep = e && e.reply && typeof e.reply === "object" ? e.reply : {};
+    var note = key ? (e && typeof e.note === "string" ? e.note : typeof rep.note === "string" ? rep.note : "") : m;
+    return { ok: false, error: key ? m : "failed", note: note.slice(0, 200), reason: why(rep.reason) };
   }
 
   function refresh(maxAge) {
@@ -297,7 +303,7 @@
     if (!c.ok) return Promise.resolve(c);
     return call("POST", "/api/matter/commission", { code: c.code }, COMMISSION_MS).then(function (r) {
       r = unwrap(r);
-      if (r.ok === false) return { ok: false, error: r.error || "failed", note: typeof r.note === "string" ? r.note : "" };
+      if (r.ok === false) return { ok: false, error: r.error || "failed", note: typeof r.note === "string" ? r.note : "", reason: why(r.reason) };
       MT.at = 0;
       var ids = Array.isArray(r.device_ids) ? r.device_ids : [];
       // the on-TV app joins a lock, an alarm or a garage door, sees what it is and leaves it again:
@@ -334,14 +340,25 @@
       return refresh().then(function () { return { ok: true }; });
     }, failed);
   }
-  // the device as Home settings lists it: name, what it is and how it is now
-  var KIND = { light: "Light", switch: "Plug or switch", fan: "Fan", cover: "Blind", climate: "Thermostat", sensor: "Sensor" };
+  // the device as Home settings lists it: what it is and how it is now ("Light, on"), in the TV's
+  // language (matter-words.js; English when that is not loaded)
+  var EN = { kind_light: "Light", kind_switch: "Plug or switch", kind_fan: "Fan", kind_cover: "Blind", kind_climate: "Thermostat", kind_sensor: "Sensor",
+    st_down: "not answering", st_on: "on", st_off: "off", st_open: "open", st_closed: "closed", st_someone: "someone there", st_nobody: "no one there" };
+  function w(key) { var W = root.CouchMatterWords; return W && typeof W.t === "function" ? W.t(key) : EN[key]; }
   function describe(d) {
-    if (down(d)) return KIND[d.domain] + ", not answering";
-    if (d.domain === "climate") { var r = room(d); return KIND.climate + (r.current != null ? ", " + r.current + "°" : "") + (d.state === "off" ? ", off" : ""); }
-    if (d.domain === "sensor") { var s = sensor(d); return KIND.sensor + ", " + s.value + (s.unit ? " " + s.unit : ""); }
+    var kind = w("kind_" + d.domain), sep = root.CouchMatterWords && root.CouchMatterWords.lang() === "zh-CN" ? "，" : ", ";
+    if (down(d)) return kind + sep + w("st_down");
+    if (d.domain === "climate") { var r = room(d); return kind + (r.current != null ? sep + r.current + "°" : "") + (d.state === "off" ? sep + w("st_off") : ""); }
+    if (d.domain === "sensor") {
+      var s = sensor(d), a = d.attributes;
+      // a door or window sensor and a motion sensor say it in words, not "on" and "off"
+      if (s.cls === "contact" && (a.reading === "open" || a.reading === "closed" || s.value === "on" || s.value === "off"))
+        return kind + sep + w(a.reading === "closed" || (a.reading !== "open" && s.value === "off") ? "st_closed" : "st_open");
+      if (s.cls === "occupancy" && (s.value === "on" || s.value === "off")) return kind + sep + w(s.value === "on" ? "st_someone" : "st_nobody");
+      return kind + sep + s.value + (s.unit ? " " + s.unit : "");
+    }
     var c = control(d);
-    return KIND[d.domain] + ", " + (d.domain === "cover" ? (c.on ? "open" : "closed") : c.on ? "on" : "off");
+    return kind + sep + w(d.domain === "cover" ? (c.on ? "st_open" : "st_closed") : c.on ? "st_on" : "st_off");
   }
 
   root.CouchMatter = {

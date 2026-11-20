@@ -55,7 +55,7 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
-  const map = url === "/setup" ? "/on-tv/web/setup.html" : url.indexOf("/ontv/") === 0 ? "/on-tv/web/" + url.slice(6) : url;
+  const map = url === "/setup" ? "/on-tv/web/setup.html" : url.indexOf("/ontv/") === 0 ? "/on-tv/web/" + url.slice(6) : url.indexOf("/tv/") === 0 ? "/tv-home/web/" + url.slice(4) : url;
   const p = path.normalize(decodeURIComponent(map)).replace(/^(\.\.[/\\])+/, "");
   const f = path.join(ROOT, p);
   if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); res.end(); return; }
@@ -190,6 +190,45 @@ console.log("Running Matter UI browser tests...");
   await press(page, "Enter", 500);
   const t = await page.evaluate(() => document.querySelector("#settings").textContent);
   ok(/Matter devices/.test(t) && /Node\.js is too old for Matter/.test(t) && !/found 16/.test(t), "not ready: the reason in plain words, never the English note");
+  ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
+  await page.close();
+}
+
+// 2c. the TV in German: the Matter rows, the device's words and the add screen in German
+{
+  const page = await home("&matter=1&hasetup=1", [["controls", {}]]);
+  await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await press(page, "Enter", 400);
+  for (let i = 0; i < 14 && !(await page.evaluate(() => /Designs/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press(page, "ArrowDown");
+  await press(page, "ArrowRight");
+  for (let i = 0; i < 80 && !/^Smart home/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "")); i++) await press(page, "ArrowDown", 90);
+  await press(page, "Enter", 500);
+  // the TV's language changes (Home settings, Language) and the screen draws again
+  await page.evaluate(() => window.I18N.set("de"));
+  await press(page, "ArrowDown", 200); await press(page, "ArrowUp", 300);
+  const t = await page.evaluate(() => document.querySelector("#settings").textContent);
+  ok(/Matter-Geräte/.test(t) && /Ein Matter-Gerät hinzufügen/.test(t) && /Lampe, an/.test(t) && !/Add a Matter device/.test(t), "German: heading, device words and Add: " + (t.match(/Matter-Ger[^|]{0,80}/) || [""])[0]);
+  for (let i = 0; i < 80 && !/^Ein Matter-Gerät hinzufügen/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "")); i++) await press(page, "ArrowDown", 90);
+  await press(page, "Enter", 400);
+  const add = await page.evaluate(() => document.querySelector("#settings").textContent);
+  ok(/Wo du den Code findest/.test(add) && /Verknüpfte Matter-Apps und -Dienste/.test(add) && /Code eingeben/.test(add), "German: where each app keeps the code");
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "matter-add-tv-de.png") });
+  await page.evaluate(() => window.I18N.set("en"));
+  ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
+  await page.close();
+}
+
+// 2d. the phone page in French (the TV's language, as phone-words.js on nl-remote hands it over): the
+// card's list and messages from the same table
+{
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  page.errors = []; page.on("pageerror", (e) => page.errors.push(String(e)));
+  await page.addInitScript(() => { window.PhoneWords = { lang: () => "fr" }; });
+  await page.goto(ORIGIN + "/setup#matter");
+  await page.waitForFunction(() => document.getElementById("matter").style.display !== "none" && /Lounge|Hallway/.test(document.getElementById("matter-list").textContent), null, { timeout: 8000 });
+  const list = await page.evaluate(() => document.getElementById("matter-list").textContent);
+  ok(/Lampe/.test(list) && /Thermostat/.test(list) && /Renommer/.test(list) && /Retirer/.test(list) && !/Rename/.test(list), "French: kinds and buttons: " + list.slice(0, 120));
+  await page.fill("#matter-code", "3497-011-2333"); await page.click("#matter-add"); await page.waitForTimeout(300);
+  ok(/Un des chiffres est faux/.test(await page.evaluate(() => document.getElementById("matter-msg").textContent)), "French: a typo");
   ok(page.errors.length === 0, "no page errors: " + page.errors.join(" | "));
   await page.close();
 }
