@@ -148,10 +148,19 @@ async function goSec(page, name) {
   for (let k = 0; k < Math.abs(i - at); k++) await press(page, i > at ? "ArrowDown" : "ArrowUp", 80);
   await page.waitForTimeout(150);
 }
-async function holdOn(page, id) {
+async function holdOn(page, id, again) {
+  await page.waitForFunction((x) => window.CouchDesign && window.CouchDesign.on() && document.querySelector('.cw-o[data-obj="' + x + '"] .cw') && !document.getElementById("settings").classList.contains("on"), id, { timeout: 10000 })
+    .catch(async () => { assert.fail("the home is not ready for a hold on " + id + ": " + JSON.stringify(await page.evaluate((x) => ({ on: !!(window.CouchDesign && window.CouchDesign.on()), w: !!document.querySelector('.cw-o[data-obj="' + x + '"] .cw'),
+      settings: document.getElementById("settings").className, head: document.getElementById("set-head").textContent, rows: [...document.querySelectorAll("#set-rows .srow")].map((e) => e.textContent.trim()).slice(0, 6), url: location.href }), id))); });
   await page.evaluate((x) => window.CouchDesign.nav.focus(x, 0), id); await page.waitForTimeout(200);
   await page.keyboard.down("Enter"); await page.waitForTimeout(900); await page.keyboard.up("Enter"); await page.waitForTimeout(300);
-  return page.evaluate(() => [...document.querySelectorAll(".cw-sheet .cw-mi")].map((e) => e.textContent));
+  const items = await page.evaluate(() => [...document.querySelectorAll(".cw-sheet .cw-mi")].map((e) => e.textContent));
+  if (!items.length && !again) {
+    console.log("note: no menu on the first hold on " + id + ", state: " + JSON.stringify(await page.evaluate(() => ({ sheet: !!document.querySelector(".cw-sheet"), detail: !!(window.CouchDetail && window.CouchDetail.isOpen()), focus: (document.querySelector(".cw-o.cd-focus, .cd-focus") || {}).className || "" }))));
+    await page.waitForTimeout(1000);
+    return holdOn(page, id, true);
+  }
+  return items;
 }
 
 // the settings each kind must have, all wired (pre: true) and offered on the TV and the phone
@@ -188,7 +197,11 @@ for (const [id, kind] of W12) {
   const items = await holdOn(tvp, id);
   ok(items[0] === "Settings" && items[1] === "Edit on the TV", kind + ": Hold OK offers Edit on the TV (" + items.join(", ") + ")", kind);
   await press(tvp, "ArrowDown", 120);
+  // the fixed clock: design.js takes an OK within 260 ms of the held OK (by Date.now) as the same held
+  // press, so with time frozen every OK on the menu would be swallowed; a real TV's clock moves. Step it.
+  await tvp.clock.setFixedTime(new Date(FIXED.getTime() + 1000));
   await press(tvp, "Enter", 600);
+  await tvp.clock.setFixedTime(FIXED);
   ok(await tvp.evaluate(() => document.getElementById("settings").classList.contains("on")), kind + ": Edit on the TV opens Home settings", kind);
   const head = await tvp.textContent("#set-head"), rows = (await rowsText(tvp)).join(" | ");
   ok(head.includes(NAMES[kind]), kind + ": Edit on the TV opens its own page: " + head, kind);
