@@ -176,4 +176,24 @@ class UpdateRulesTest {
         assertTrue(phone.contains("github.com/Seagey/couch-tv/releases/latest/download/couch-tv-ontv.apk"))
         assertTrue(UpdateRules.steps(watch = true).joinToString(" ").contains("couch-tv-ontv-watch.apk"))
     }
+
+    @Test fun spaceCountsTheLibrariesAndroidUnpacks() {
+        // fable NO-GO 21 Nov, 10: the libraries are compressed in the APK, so Android also writes them out
+        // on install: 15.7 MB on a 64 bit ARM TV, 8.6 MB on a 32 bit one, on top of 2.5 times the file
+        val apk = 45_792_606L   // couch-tv-ontv.apk with Matter, measured
+        assertEquals(apk * 5 / 2 + 15_700_000L, UpdateRules.spaceNeeded(apk, "arm64-v8a"))
+        assertEquals(apk * 5 / 2 + 8_600_000L, UpdateRules.spaceNeeded(apk, "armeabi-v7a"))
+        assertEquals(apk * 5 / 2 + 2_600_000L, UpdateRules.spaceNeeded(apk, "x86_64"))
+        assertEquals(apk * 5 / 2 + 2_400_000L, UpdateRules.spaceNeeded(apk, "x86"))
+        // a processor we do not know, or none reported: the largest, never too little
+        assertEquals(apk * 5 / 2 + 15_700_000L, UpdateRules.spaceNeeded(apk, null))
+        assertEquals(apk * 5 / 2 + 15_700_000L, UpdateRules.spaceNeeded(apk, "riscv64"))
+        // what the old rule let through now says "space": 120 MB free on a 64 bit TV is 4.2 MB short
+        val free = 120_000_000L
+        assertTrue(free >= apk * 5 / 2)
+        assertTrue(free < UpdateRules.spaceNeeded(apk, "arm64-v8a"))
+        // each figure covers what was measured in the real APK (lib/<abi> uncompressed, bytes)
+        val measured = mapOf("arm64-v8a" to 15_646_680L, "armeabi-v7a" to 8_586_668L, "x86_64" to 2_536_560L, "x86" to 2_309_184L)
+        for ((abi, bytes) in measured) assertTrue(abi, UpdateRules.unpacked(abi) >= bytes)
+    }
 }

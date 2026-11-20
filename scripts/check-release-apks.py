@@ -21,16 +21,22 @@ with every processor inside, and the native libraries compressed (build.gradle.k
 The rules:
  1. The names: couch-tv-home.apk, couch-tv-ontv.apk, couch-tv-ontv-watch.apk (couch-tv-sync.apk if
     built). Nothing else ending in .apk: no per-processor files that a link could point at by mistake.
- 2. SHA256SUMS.txt (scripts/release-checksums.sh) lists every APK with its real SHA-256 (--release).
- 3. Every processor folder in an APK has the same native libraries, or a TV of the other kind would
-    start without one and stop the moment it is needed (Android installs only one folder). Intel
-    folders (x86, x86_64, from Conscrypt) may lack Matter alone: the app must say Matter is not
-    available there, not crash.
+ 2. SHA256SUMS.txt (scripts/release-checksums.sh) lists every APK, and every file it lists (the two
+    Samsung files too) is in dist with that very SHA-256 (--release).
+ 3. An APK with any native library has a folder for all four processors (armeabi-v7a, arm64-v8a, x86,
+    x86_64): Android refuses to install an APK with native libraries but none for the TV's processor
+    (INSTALL_FAILED_NO_MATCHING_ABIS), so an ARM only launcher would never install on an Intel TV.
+    Every processor folder has the same native libraries, or a TV of the other kind would start
+    without one and stop the moment it is needed (Android installs only one folder). Intel folders
+    may lack Matter alone (the app must say Matter is not available there, not crash), and may hold
+    a tiny placeholder library (16 KB or less, any name) that only keeps the folder there.
  4. Where Matter is in an APK, it is there for both armeabi-v7a and arm64-v8a, with libc++_shared.so
     (--matter: it must be in both on-TV APKs).
  5. Native libraries are compressed in every APK, and each APK is under its size limit.
  6. couch-tv-ontv.apk and couch-tv-ontv-watch.apk are the same app, version name and versionCode (Make
-    Home open Couch TV installs the watch copy of the very version the TV has).
+    Home open Couch TV installs the watch copy of the very version the TV has). And each is the right
+    one: couch-tv-ontv.apk asks for no accessibility service, couch-tv-ontv-watch.apk for exactly one
+    (BIND_ACCESSIBILITY_SERVICE in the manifest), so the two files can never be swapped.
  7. Every APK is signed with one and the same key, and with --signer (or --previous, last release's APK)
     the key the TVs already have: Update now, the launcher's Updater and Android itself refuse another.
 
@@ -53,6 +59,7 @@ REQUIRED = ["couch-tv-home.apk", "couch-tv-ontv.apk", "couch-tv-ontv-watch.apk"]
 OPTIONAL = ["couch-tv-sync.apk"]
 ONTV = ["couch-tv-ontv.apk", "couch-tv-ontv-watch.apk"]
 ARM = ["armeabi-v7a", "arm64-v8a"]
+INTEL = ["x86", "x86_64"]
 MATTER_LIBS = ["libCHIPController.so", "libc++_shared.so"]
 MB = 1_000_000
 # A little over what was measured, so a stored library or a second copy of Matter fails the release.
@@ -69,6 +76,16 @@ def native(apk):
             if m:
                 out.setdefault(m.group(1), {})[m.group(2)] = i
     return out
+
+
+PLACEHOLDER_MAX = 16 * 1024   # nl-matter-android's libmatternone.so: 1,300 (x86) and 1,880 (x86_64) bytes
+
+
+def placeholder(info):
+    """A tiny library that only keeps a processor folder in the APK (the launcher's Intel folders):
+    decided by its size, not its name, so any name the build gives it works and a real library
+    (Conscrypt's smallest is about 10x this) never passes as one."""
+    return info.file_size <= PLACEHOLDER_MAX
 
 
 def sha256(path):
@@ -106,9 +123,12 @@ def check_sums(dist, required):
             errs.append(f"SHA256SUMS.txt does not list {p.name}")
         elif listed[p.name] != sha256(p):
             errs.append(f"SHA256SUMS.txt has another SHA-256 for {p.name} (built again after the sums?)")
-    for n in listed:
+    for n, want in sorted(listed.items()):
         if not (dist / n).is_file():
             errs.append(f"SHA256SUMS.txt lists {n}, which is not in dist")
+        elif not n.endswith(".apk") and want != sha256(dist / n):
+            # the Samsung files: couch-tv Setup checks them against this file too
+            errs.append(f"SHA256SUMS.txt has another SHA-256 for {n} (built again after the sums?)")
     return errs
 
 
@@ -118,12 +138,18 @@ def check_libs(apk, need_matter=False, compressed=False):
     n = apk.name
     sets = {abi: set(v) for abi, v in libs.items()}
     if sets:
+        for abi in ARM + INTEL:
+            if abi not in sets:
+                errs.append(f"{n}: native libraries inside but no lib/{abi} folder: Android refuses to install it on a TV with that processor")
         every = set().union(*sets.values())
+        # a placeholder that only keeps the Intel folders there is never loaded: ARM folders need not have it
+        intel_only = {x for x in every if not any(x in sets.get(a, set()) for a in ARM)
+                      and all(placeholder(libs[a][x]) for a in INTEL if x in libs.get(a, {}))}
         for abi, s in sorted(sets.items()):
             # Intel TVs (x86, x86_64: Conscrypt brings them) may lack only Matter: the app still installs
             # and runs there, and the Matter screens say it is not available on this TV. Dropping those
             # folders instead would stop the app installing on an Intel TV at all.
-            want = every if abi in ARM else every - set(MATTER_LIBS)
+            want = every - set(MATTER_LIBS) if abi in INTEL else every - intel_only
             if not want <= s:
                 errs.append(f"{n}: lib/{abi} lacks {', '.join(sorted(want - s))} (a TV of that kind would miss it)")
     has_matter = any("libCHIPController.so" in s for s in sets.values())
@@ -178,6 +204,37 @@ def check_same_app(dist):
     return [] if x == y else [f"{a.name} is {x} but {b.name} is {y}: they must be the same app and version"]
 
 
+def accessibility_services(apk):
+    """How many services in the APK's manifest ask for android.permission.BIND_ACCESSIBILITY_SERVICE."""
+    out = subprocess.run([tool("aapt2"), "dump", "xmltree", "--file", "AndroidManifest.xml", str(apk)],
+                         capture_output=True, text=True, check=True).stdout
+    return count_accessibility(out)
+
+
+def count_accessibility(xmltree):
+    """In aapt2's xmltree text: android:permission="...BIND_ACCESSIBILITY_SERVICE" on a service. A
+    <uses-permission> line names it with android:name instead, so it is not counted."""
+    return sum(1 for line in xmltree.splitlines()
+               if ":permission(" in line and '="android.permission.BIND_ACCESSIBILITY_SERVICE"' in line)
+
+
+def check_plain_and_watch(dist):
+    """couch-tv-ontv.apk has no accessibility service; couch-tv-ontv-watch.apk has exactly one."""
+    want = {"couch-tv-ontv.apk": 0, "couch-tv-ontv-watch.apk": 1}
+    errs = []
+    for n, w in want.items():
+        p = dist / n
+        if not p.is_file():
+            continue
+        if not tool("aapt2"):
+            return ["aapt2 not found (set ANDROID_HOME): cannot tell the plain on-TV APK from the watch one"]
+        got = accessibility_services(p)
+        if got != w:
+            kind = "the plain app (no accessibility service)" if w == 0 else "the watch app (one accessibility service)"
+            errs.append(f"{n} has {got} accessibility services but must be {kind}: are the two on-TV files swapped?")
+    return errs
+
+
 def check_signer(dist, expect=None, previous=None):
     if not tool("apksigner"):
         return ["apksigner not found (set ANDROID_HOME), or pass --skip-signer"]
@@ -213,6 +270,7 @@ def main(argv=None):
         on = p.name in ONTV
         errs += check_libs(p, need_matter=a.matter and on, compressed=True)
     errs += check_same_app(dist)
+    errs += check_plain_and_watch(dist)
     if not a.skip_signer:
         errs += check_signer(dist, a.signer, a.previous)
     for p in sorted(dist.glob("*.apk")):

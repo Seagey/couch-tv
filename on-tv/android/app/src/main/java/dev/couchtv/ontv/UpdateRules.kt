@@ -100,6 +100,28 @@ object UpdateRules {
         return Found(tag.removePrefix("v"), j.optString("name").trim().take(120), has, url, digest, size)
     }
 
+    /**
+     * What Android unpacks from the APK on install, for the TV's own processor (abi: Build.SUPPORTED_ABIS[0],
+     * the folder Android picks when the APK has all four). The native libraries are compressed inside
+     * (build.gradle.kts, useLegacyPackaging), so Android writes them out uncompressed next to the app.
+     * Measured on a real 0.13.9 build with Matter (nl-matter-packaging, 20 Nov 2026): lib/arm64-v8a
+     * 15.65 MB, lib/armeabi-v7a 8.59 MB, lib/x86_64 2.54 MB, lib/x86 2.31 MB; rounded up. A processor
+     * not listed counts as the largest, so a TV is never told there is room when there is not.
+     */
+    fun unpacked(abi: String?): Long = when (abi) {
+        "arm64-v8a" -> 15_700_000L
+        "armeabi-v7a" -> 8_600_000L
+        "x86_64" -> 2_600_000L
+        "x86" -> 2_400_000L
+        else -> 15_700_000L
+    }
+
+    /**
+     * Free space the update needs before it starts: room for the download, the copy on the TV and
+     * Android's own staged copy (2.5 times the file), and the native libraries Android unpacks.
+     */
+    fun spaceNeeded(size: Long, abi: String?): Long = size * 5 / 2 + unpacked(abi)
+
     /** GitHub's download hosts and nowhere else, for every hop of a download (the launcher's rule). */
     fun gitHubHost(host: String) = host == "github.com" || host == "api.github.com" || host.endsWith(".githubusercontent.com")
 
