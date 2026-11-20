@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import math
 import logging
 import mimetypes
 import os
@@ -2761,11 +2762,11 @@ def _ws_value(v):
     if isinstance(v, bool):
         return v
     if isinstance(v, (int, float)):
-        return v if v == v and v not in (float("inf"), float("-inf")) else None
+        return v if math.isfinite(v) else None
     if isinstance(v, str):
         return v if len(v) <= 600 else None
     if isinstance(v, list):
-        if len(v) > 16 or not all((isinstance(x, str) and len(x) <= 600) or (isinstance(x, (int, float)) and not isinstance(x, bool) and x == x) for x in v):
+        if len(v) > 16 or not all((isinstance(x, str) and len(x) <= 600) or (isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x)) for x in v):
             return None
         return list(v)
     if isinstance(v, dict) and _num(v.get("lat"), -90, 90) and _num(v.get("lon"), -180, 180):
