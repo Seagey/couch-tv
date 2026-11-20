@@ -51,6 +51,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import app.couchtv.ha.HaPhone
+import app.couchtv.ha.HomeAssistant
 
 /**
  * The TV home screen. Shows the page the bridge serves at /tv/ full screen. If the bridge cannot be
@@ -131,6 +133,10 @@ class MainActivity : Activity() {
             root.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         } else setContentView(root)
         hideSystemBars()
+        // smart home (app.couchtv.ha): a new or removed doorbell restarts its watch; a phone that signed
+        // in or saved (HaPhone.kt) makes the page read what is set up again, at once
+        HomeAssistant.changed = { c -> Doorbell.start(c) }
+        HaPhone.onChange = { main.post { js("window.smartHome && smartHome.reload && smartHome.reload(); window.smartHome && smartHome.phoneChanged && smartHome.phoneChanged()") } }
         intent?.let { readExtras(it) }
         startPhonePage()   // option A only: the phone's Home settings page, from this TV (PhoneServer.kt)
         io.execute { warmApps() }
@@ -342,7 +348,11 @@ class MainActivity : Activity() {
     /**
      * With no computer at home (option A), this TV serves the phone's Home settings page itself
      * (PhoneServer.kt) on the home Wi-Fi, port 5400 (5401 if that is taken). With a computer, the computer
-     * serves it (bridge/phonepage.py), so nothing listens here. One server for the life of the app.
+     * serves it (bridge/phonepage.py), so nothing listens here. One server for the life of the app. It also
+     * answers smart home set up from a phone (/ha, PhoneHost.ha), so HaServer.kt does not start beside it.
+     * It listens on every interface on purpose: with Ethernet and Wi-Fi, Wi-Fi Direct while casting or a VPN,
+     * one picked address can differ from the one the QR names, and the Wi-Fi can change under it. The Host
+     * check, the key and the pairing guard it instead.
      */
     private fun startPhonePage() {
         // a computer was added (apply.sh with BRIDGE_URL): the computer serves the page now, nothing listens here
@@ -392,6 +402,11 @@ class MainActivity : Activity() {
             a.main.post { a.js("window.tv && tv.phonePage && tv.phonePage('code', " + JSONObject.quote(code) + ")") }
         }
         override fun tmpDir(): java.io.File = app.cacheDir
+        // smart home set up from a phone on this same server (HaPhone.kt): no second server, no second port
+        override fun ha(method: String, path: String, query: Map<String, String>, body: String, hostHeader: String?, port: Int) =
+            HaPhone.handle(app, method, path, query, body, hostHeader, port) { name ->
+                runCatching { app.assets.open("www/tv/" + name).use { it.readBytes() } }.getOrNull()
+            }
     }
 
     private fun connect() {
@@ -481,7 +496,7 @@ class MainActivity : Activity() {
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.textZoom = 100
         addJavascriptInterface(Native(), "TVOS")
-        addJavascriptInterface(HomeAssistant.Page(this@MainActivity, this), "TVHA")   // smart home, see HomeAssistant.kt
+        addJavascriptInterface(HaPage(this@MainActivity, this), "TVHA")   // smart home, see HaPage.kt
         addJavascriptInterface(MatterPage(this@MainActivity, this), "TVMATTER")   // Matter devices, see MatterPage.kt
         addJavascriptInterface(Updater.Page(this@MainActivity, this), "TVUP")   // updates from GitHub releases, see Updater.kt
         webViewClient = object : WebViewClient() {
@@ -1907,6 +1922,9 @@ class MainActivity : Activity() {
         @Volatile private var shown: java.lang.ref.WeakReference<MainActivity>? = null
         /** The phone's Home settings page with no computer (option A), started once for the app's life. */
         @Volatile private var phone: PhoneServer? = null
+
+        /** The port of the phone's Home settings page server while it runs (it serves /ha too), else null. */
+        fun phonePagePort(): Int? = phone?.takeIf { it.isAlive }?.listeningPort?.takeIf { it > 0 }
 
         /** True while the home is resumed (in front). FireWatch checks this after a move to front on Android 10 (issue #202). */
         fun isInFront(): Boolean = shown?.get()?.resumed == true

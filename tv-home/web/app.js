@@ -5122,7 +5122,7 @@
       widgetRows(rows);   // each widget on the design with settings of its own
     }
     if (window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) rows.push({ kind: "nav", key: "dz-smart", label: "Smart home",
-      sub: window.smartHome.setup.status().set ? "Connected. Change what shows, or add a device" : "Connect Home Assistant: your aircon, lights, cameras, speakers and more", act: openSmartSetup });
+      sub: window.smartHome.setup.status().signin_again ? "Sign in again" : window.smartHome.setup.status().set ? "Connected" : window.smartHome.setup.canPhone && window.smartHome.setup.canPhone() ? "Connect Home Assistant from your phone" : "Connect Home Assistant: your aircon, lights, cameras, speakers and more", act: openSmartSetup });
     if (on && AH) rows.push({ kind: "nav", key: "dz-athome", label: "At home", sub: "A note, lists, guest Wi-Fi, a house guide, your calendar and screen time, for your widgets", act: openAtHome });
     designCodeRows(rows);
     rows.push({ kind: "action", key: "dz-share", label: "Open this home in couch-tv Studio", sub: "Change it on your phone or computer. Names, photos, places, keys and calendar links stay on this TV.", act: shareHome });
@@ -7210,38 +7210,16 @@
   // token is handed over once and never comes back to this page. English only, like the rest of the
   // couch-tv Studio section (needs i18n).
   var SH = { addr: "http://homeassistant.local:8123", list: null, picks: null, busy: false, err: "" };
-  var SH_GROUPS = [
-    ["climate", "Air conditioning and heating", /^climate\./, 8],
-    ["scenes", "Scenes and scripts", /^(scene|script)\./, 10],
-    ["controls", "Lights, switches, fans and blinds", /^(light|switch|fan|cover)\./, 16],
-    ["cameras", "Cameras (a still picture, never video)", /^camera\./, 4],
-    ["sensors", "Sensors (the pool, rain, humidity)", /^sensor\./, 8],
-    ["speakers", "Speakers", /^media_player\./, 6],
-    ["doorbell", "Doorbell", /^(event|binary_sensor|input_boolean)\./, 1],
-    ["doorbell_camera", "The doorbell's camera", /^camera\./, 1],
-    ["energy", "Solar or power meter", /^sensor\./, 1],
-    ["battery", "Home battery (%)", /^sensor\./, 1]
-  ];
+  // the groups, their limits and how ticks are kept: ha-picks.js, shared with the phone page
+  function HP() { return window.HaPicks; }
   var SH_ERR = { address: "That is not an address. It looks like http://homeassistant.local:8123 or http://192.168.1.20:8123.",
     token: "Home Assistant did not accept that key. Make a new one and paste all of it.",
     unreachable: "The TV could not reach Home Assistant at that address. Check it is on and on the same Wi-Fi. If homeassistant.local does not work, use its number address from Home Assistant: Settings, System, Network.",
     not_ha: "Something answered at that address, but it is not Home Assistant. Check the address and the port (usually 8123).",
     refused: "This copy of the home cannot set up smart home.", bridge: "The home computer did not answer. Check Couch TV is running on it.",
     timeout: "That took too long. Try again.", check: "Connect first, then pick what shows.", picks: "That could not be kept. Pick again." };
-  function shPicksFrom(st) {
-    var p = {}; ["climate", "scenes", "controls", "cameras", "sensors", "speakers"].forEach(function (k) { p[k] = Array.isArray(st[k]) ? st[k].slice() : []; });
-    ["doorbell", "doorbell_camera", "energy"].forEach(function (k) { p[k] = st[k] ? [st[k]] : []; });
-    p.battery = st.battery ? [st.battery] : [];
-    return p;
-  }
-  // the ticks as HomeAssistant.kt reads a section (docs/CONFIG.md, Smart home)
-  function shSection(p) {
-    var named = function (l) { return (l || []).map(function (e) { return { entity: e }; }); };
-    var out = { climate: named(p.climate), scenes: named(p.scenes), controls: named(p.controls), cameras: named(p.cameras), sensors: named(p.sensors), speakers: named(p.speakers) };
-    if (p.doorbell && p.doorbell[0]) out.doorbell = p.doorbell_camera && p.doorbell_camera[0] ? { entity: p.doorbell[0], camera: p.doorbell_camera[0] } : { entity: p.doorbell[0] };
-    if (p.energy && p.energy[0]) out.energy = p.battery && p.battery[0] ? { entity: p.energy[0], battery: p.battery[0] } : { entity: p.energy[0] };
-    return out;
-  }
+  function shPicksFrom(st) { return HP().fromStatus(st); }
+  function shSection(p) { return HP().section(p); }
   function shCheck(token) {
     SH.busy = true; SH.err = ""; SET.msg = "Asking Home Assistant...";
     // no token: the one kept, with only the address kept with it (an empty address); the kept token
@@ -7255,12 +7233,64 @@
   }
   function openSmartSetup() {
     SH.list = null; SH.err = ""; SH.picks = null;
-    SET.sub = { back: "dz-smart", crumb: "Designs", title: function () { return "Smart home"; }, rows: function () { return matterRows(smartRows()); } };
+    SHP.url = ""; SHP.err = ""; SHP.st = null; SHP.seen = false;
+    SET.sub = { back: "dz-smart", crumb: "Designs", title: function () { return "Smart home"; }, rows: function () { return matterRows(smartRows()); }, smart: true };
     if (window.CouchMatter && window.CouchMatter.on()) window.CouchMatter.refresh();
     SET.keyFocus = null; SET.ri = 0;
+    var S = window.smartHome.setup;
+    if (S.canPhone && S.canPhone()) shPhone();
   }
+
+  // ---- set up from a phone (HaPhone.kt): one QR code on the TV, everything else on the phone ----
+  // The phone page signs in to Home Assistant itself (the TV keeps the tokens, never the phone) and
+  // ticks what shows. While this screen is open the TV asks every few seconds, so it shows the moment
+  // the phone is done; the phone's save also makes the TV redraw by itself (smartHome.phoneChanged).
+  var SHP = { url: "", err: "", st: null, seen: false, timer: 0 };
+  function shOnScreen() { return zone === "settings" && SET.sub && SET.sub.smart; }
+  function shPhone() {
+    var S = window.smartHome.setup;
+    if (!S.canPhone || !S.canPhone()) return;
+    S.phone().then(function (r) {
+      var was = JSON.stringify([SHP.url, SHP.err, SHP.seen, SHP.st && SHP.st.set, SHP.st && SHP.st.host, SHP.st && SHP.st.count, SHP.st && SHP.st.signin_again]);
+      if (r && r.ok && r.url) {
+        SHP.url = r.url;
+        // the phone signed in or saved: the home's smart home tile and widgets read it again too
+        var kept = SHP.st && [SHP.st.set, SHP.st.host, SHP.st.count].join("|");
+        if (SHP.st && kept !== [r.set, r.host, r.count].join("|") && window.smartHome.phoneChanged) window.smartHome.phoneChanged();
+        SHP.err = ""; SHP.seen = !!r.seen; SHP.st = r;
+      } else SHP.err = r && r.error === "network" ? "Connect this TV to your Wi-Fi first." : "That did not work. Open Smart home again.";
+      var now = JSON.stringify([SHP.url, SHP.err, SHP.seen, SHP.st && SHP.st.set, SHP.st && SHP.st.host, SHP.st && SHP.st.count, SHP.st && SHP.st.signin_again]);
+      if (now !== was && shOnScreen()) renderSettings();
+    });
+    clearTimeout(SHP.timer);
+    SHP.timer = setTimeout(function () { if (shOnScreen()) shPhone(); }, 3000);
+  }
+  function phoneRows(S) {
+    var st = SHP.st || S.status(), rows = [];
+    // one QR code and one short line; the rest (which Home Assistant, signing in, what shows, the
+    // brands we don't list) is on the phone
+    if (SHP.url && window.TVQR) rows.push({ kind: "qr", key: "sh-qr", link: SHP.url,
+      label: st.signin_again ? "Sign in again. Home Assistant signed this TV out: scan with your phone."
+        : st.set ? "Connected to " + (st.host || "Home Assistant") + ". Scan to change what shows." : SHP.seen ? "Carry on with your phone." : "Scan with your phone to connect your home." });
+    else rows.push(info("sh-wait", "", "", SHP.err || "Getting ready..."));
+    if (st.set) rows.push({ kind: "action", key: "sh-forget", label: "Disconnect", danger: true, confirmText: "Press OK again to disconnect", act: function () {
+      S.forget().then(function () { SET.msg = "Smart home is off on this TV."; SHP.st = null; if (zone === "settings") { shPhone(); renderSettings(); } });
+    } });
+    // a computer at home also does Philips Hue and AirTouch 5 with no Home Assistant (bridge/direct.py)
+    if (window.TVHA && !OFFLINE && !MOCK && !PREVIEW) rows.push({ kind: "nav", key: "sh-direct", label: "Hue or AirTouch without Home Assistant", act: function () {
+      var up = SET.sub;
+      SET.sub = { up: up, back: "sh-direct", crumb: "Smart home", title: function () { return "Hue and AirTouch"; }, rows: function () { var r = []; directRows(r); return r; } };
+      SET.keyFocus = null; SET.ri = 0;
+    } });
+    return rows;
+  }
+  if (window.smartHome && window.smartHome.onPhone) window.smartHome.onPhone(function () { if (shOnScreen()) shPhone(); });
+
   function smartRows() {
     var S = window.smartHome.setup, st = S.status(), rows = [];
+    if (S.canPhone && S.canPhone()) return phoneRows(S);
+    // only where no phone page is served (an older bridge, or the preview): the address and a token
+    // are typed here
     rows.push(info("sh-intro", "", "", "Shows your air conditioning, lights, cameras, speakers, solar and more through Home Assistant, the free smart home app that talks to over 2,000 brands. Everything stays on this TV" + (TV ? "." : " and the home computer.")));
     if (st.set) rows.push(info("sh-on", "Connected", st.host || "", "Pick Change what shows to add or take away things."));
     rows.push(head("1. Home Assistant at home"));
@@ -7276,8 +7306,8 @@
     if (st.set && !SH.list) rows.push({ kind: "action", key: "sh-change", label: "Change what shows", sub: "Reads what Home Assistant has now, with the saved key", act: function () { shCheck(""); } });
     if (SH.list) {
       rows.push(head("3. Pick what shows"));
-      SH_GROUPS.forEach(function (g) {
-        var have = SH.list.filter(function (e) { return g[2].test(e.entity) && (g[0] !== "energy" || /^(k|M)?Wh?$/.test(e.unit || "")) && (g[0] !== "battery" || e.unit === "%"); });
+      HP().GROUPS.forEach(function (g) {
+        var have = HP().have(SH.list, g);
         if (!have.length) return;
         var picked = (SH.picks[g[0]] || []).filter(function (id) { return have.some(function (e) { return e.entity === id; }); });
         rows.push({ kind: "nav", key: "sh-g:" + g[0], label: g[1], value: picked.length ? picked.length + " picked" : "None", act: function () { openSmartGroup(g, have); } });
@@ -7288,8 +7318,8 @@
       } });
     }
     if (!OFFLINE && !MOCK && !PREVIEW) directRows(rows);
-    rows.push(head("A device we don't list"));
-    rows.push({ kind: "nav", key: "sh-more", label: "Add a device we don't list", sub: "Tuya and Smart Life, Google Nest, Alexa, Apple Home, Matter, Hue, aircon and solar brands, and anything with a web address", act: openSmartMore });
+    // the guide for brands we don't list lives on the phone page (ha-phone.html), not on the TV
+    rows.push(info("sh-more", "A device we don't list", "", "Add it to Home Assistant first. Search the brand at home-assistant.io/integrations on your phone."));
     if (st.set) rows.push({ kind: "action", key: "sh-forget", label: "Disconnect smart home", danger: true, sub: "Removes the address and key from this TV. Also delete the key in Home Assistant (Security, Long-lived access tokens).", act: function () {
       S.forget().then(function () { SH.list = null; SH.picks = null; SET.msg = "Smart home is off on this TV."; if (zone === "settings") renderSettings(); });
     } });
@@ -7381,31 +7411,6 @@
     } };
     SET.keyFocus = null; SET.ri = 0;
   }
-  // the brands people ask about, each with the way into Home Assistant (then it shows in step 3)
-  var SH_MORE = [
-    ["How it works", "Add the device to Home Assistant first, then come back here and pick Change what shows: it is in the list. In Home Assistant: Settings, Devices and services, Add integration, then search for the brand."],
-    ["Tuya, Smart Life, Arlec Grid Connect, Deta", "Add integration, Tuya. Home Assistant shows a QR code: scan it with the Smart Life or Tuya app."],
-    ["Google Home and Nest", "Nest thermostats, cameras and doorbells: Add integration, Google Nest. Other Google Home devices: share them to Home Assistant with Matter (below)."],
-    ["Amazon Alexa", "Alexa itself has no way in, but the plugs and lights in it do: add each by its own brand (often Tuya, TP-Link, Hue or Matter)."],
-    ["Apple Home", "In the Home app, open the device, Turn On Pairing Mode, and copy the code. Then in the Home Assistant phone app: Add device, Matter."],
-    ["Matter or Thread devices", "In the Home Assistant phone app: Settings, Devices and services, Add device, Add Matter device, then scan the code on the device."],
-    ["Philips Hue", "With a home computer: Philips Hue, straight from the Hue bridge, on the Smart home page (no Home Assistant). Or in Home Assistant: Add integration, Philips Hue, then press the round button on the Hue bridge."],
-    ["Aircon", "Add integration and search for the brand: Daikin, Mitsubishi (MELCloud), Fujitsu, Panasonic, LG, Sensibo, AirTouch 5 (it finds the console by itself). With a home computer, AirTouch 5 also works with no Home Assistant: on the Smart home page."],
-    ["Solar and batteries", "Add integration: Fronius, Enphase, SolarEdge, SMA, GoodWe or Tesla Powerwall. Then pick its today total under Solar or power meter."],
-    ["Plugs, cameras and speakers", "TP-Link Kasa and Tapo, Shelly, LIFX, Reolink, Ring, Eufy, Sonos, Google Cast: Add integration and search for the brand."],
-    ["Anything with a web address or MQTT", "A home made sensor, a Raspberry Pi or a router: Home Assistant's RESTful, MQTT or Webhook integrations make it a sensor or a switch, which then shows here."],
-    ["Still not there?", "Search the brand at home-assistant.io/integrations on your phone. If it is listed there, it works here."]
-  ];
-  function openSmartMore() {
-    var up = SET.sub;
-    SET.sub = { up: up, back: "sh-more", crumb: "Smart home", title: function () { return "Add a device we don't list"; }, rows: function () {
-      var rows = SH_MORE.map(function (m, i) { return info("sh-m:" + i, m[0], "", m[1]); });
-      if (window.smartHome.setup.status().set) rows.push({ kind: "action", key: "sh-again", label: "Check again", sub: "Reads what Home Assistant has now", act: function () { SET.sub = up; shCheck(""); } });
-      return rows;
-    } };
-    SET.keyFocus = null; SET.ri = 0;
-  }
-
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
   window.tv = { back: function () { if (typeof CouchShare !== "undefined" && CouchShare.close()) return; if (typeof CouchDesign !== "undefined" && CouchDesign.back && CouchDesign.back()) return; if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); resetSmartIdle(); },

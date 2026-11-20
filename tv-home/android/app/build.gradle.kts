@@ -69,6 +69,8 @@ android {
     sourceSets["main"].java.srcDir("../../../on-tv/android/app/src/main/java/dev/couchtv/ontv/matter")
     sourceSets["main"].jniLibs.srcDir("../../../on-tv/android/matter/jni")
     sourceSets["main"].assets.srcDir("../../../on-tv/android/matter/assets")
+    // Smart home (Home Assistant, signing in from a phone): shared with the on-TV app (on-tv/android)
+    sourceSets { getByName("main") { java.srcDir("../shared/java") }; getByName("test") { java.srcDir("../shared/test") } }
     lint {
         checkReleaseBuilds = false
         abortOnError = false

@@ -36,6 +36,8 @@
 
   S.en = {
     tw_back_keeps: "Back keeps your home too.",
+    tw_ha_signin_again: "Sign in again",
+    tw_ha_signed_out: "Sign in again. Home Assistant signed this TV out: scan with your phone.",
     tw_use_own_apps: "Use this design with its own apps",
     tw_use_keep_apps: "Use this design, keep my app changes",
     tw_use_btn: "Use this design",
@@ -950,6 +952,8 @@
 
   S["zh-CN"] = {
     tw_back_keeps: "按返回也会保留你的主页。",
+    tw_ha_signin_again: "重新登录",
+    tw_ha_signed_out: "请重新登录。Home Assistant 已让这台电视退出登录：请用手机扫码。",
     tw_use_own_apps: "使用这个设计及其自带的应用",
     tw_use_keep_apps: "使用这个设计，保留我对应用的更改",
     tw_use_btn: "使用这个设计",
@@ -1864,6 +1868,8 @@
 
   S.cs = {
     tw_back_keeps: "Zpět také ponechá vaši obrazovku.",
+    tw_ha_signin_again: "Přihlaste se znovu",
+    tw_ha_signed_out: "Přihlaste se znovu. Home Assistant tuto televizi odhlásil: naskenujte kód telefonem.",
     tw_use_own_apps: "Použít tento návrh s jeho vlastními aplikacemi",
     tw_use_keep_apps: "Použít tento návrh a ponechat moje změny aplikací",
     tw_use_btn: "Použít tento návrh",
@@ -2395,6 +2401,8 @@
 
   S.es = {
     tw_back_keeps: "Atrás también mantiene tu inicio.",
+    tw_ha_signin_again: "Inicia sesión de nuevo",
+    tw_ha_signed_out: "Inicia sesión de nuevo. Home Assistant cerró la sesión de este televisor: escanea con el móvil.",
     tw_use_own_apps: "Usar este diseño con sus propias apps",
     tw_use_keep_apps: "Usar este diseño y conservar mis cambios de apps",
     tw_use_btn: "Usar este diseño",
@@ -2899,6 +2907,8 @@
   // Only what Mexico says differently; everything else comes from es.
   S["es-MX"] = {
     tw_back_keeps: "Atrás también mantiene tu inicio.",
+    tw_ha_signin_again: "Inicia sesión de nuevo",
+    tw_ha_signed_out: "Inicia sesión de nuevo. Home Assistant cerró la sesión de esta TV: escanea con el celular.",
     tw_check_first: "Revisa primero que se vea bien: sus textos e imágenes los eligió quien lo hizo. Mantener mi inicio deja tu TV tal como está.",
     tw_nothing_to_set: "Este widget no tiene nada que configurar en la TV. Cambia su aspecto en couch-tv Studio.",
     tw_nothing_pick: "Todavía no hay nada para elegir en esta TV",
@@ -3113,6 +3123,8 @@
 
   S.it = {
     tw_back_keeps: "Anche Indietro tiene la tua home.",
+    tw_ha_signin_again: "Accedi di nuovo",
+    tw_ha_signed_out: "Accedi di nuovo. Home Assistant ha disconnesso questa TV: inquadra con il telefono.",
     tw_use_own_apps: "Usa questo design con le sue app",
     tw_use_keep_apps: "Usa questo design, tieni le mie modifiche alle app",
     tw_use_btn: "Usa questo design",
@@ -3617,6 +3629,8 @@
   // German. The air conditioning words are the ones Home Assistant's German interface uses.
   S.de = {
     tw_back_keeps: "Zurück behält deinen Startbildschirm auch.",
+    tw_ha_signin_again: "Erneut anmelden",
+    tw_ha_signed_out: "Erneut anmelden. Home Assistant hat diesen Fernseher abgemeldet: scanne mit deinem Handy.",
     tw_use_own_apps: "Dieses Design mit seinen eigenen Apps verwenden",
     tw_use_keep_apps: "Dieses Design verwenden, meine App-Änderungen behalten",
     tw_use_btn: "Dieses Design verwenden",
@@ -4125,6 +4139,8 @@
 
   S.tr = {
     tw_back_keeps: "Geri de ana ekranını korur.",
+    tw_ha_signin_again: "Yeniden giriş yap",
+    tw_ha_signed_out: "Yeniden giriş yap. Home Assistant bu TV'nin oturumunu kapattı: telefonunla tara.",
     tw_use_own_apps: "Bu tasarımı kendi uygulamalarıyla kullan",
     tw_use_keep_apps: "Bu tasarımı kullan, uygulama değişikliklerimi koru",
     tw_use_btn: "Bu tasarımı kullan",
@@ -4628,6 +4644,8 @@
   // French. Not in the upstream repo yet; added here so the home speaks French.
   S.fr = {
     tw_back_keeps: "Retour garde aussi votre accueil.",
+    tw_ha_signin_again: "Reconnectez-vous",
+    tw_ha_signed_out: "Reconnectez-vous. Home Assistant a déconnecté cette télé : scannez avec votre téléphone.",
     tw_use_own_apps: "Utiliser ce design avec ses propres apps",
     tw_use_keep_apps: "Utiliser ce design, garder mes changements d'apps",
     tw_use_btn: "Utiliser ce design",
@@ -5135,6 +5153,8 @@
   };
   S.nl = {
     tw_back_keeps: "Terug houdt je startscherm ook.",
+    tw_ha_signin_again: "Opnieuw aanmelden",
+    tw_ha_signed_out: "Opnieuw aanmelden. Home Assistant heeft deze tv afgemeld: scan met je telefoon.",
     tw_use_own_apps: "Dit ontwerp gebruiken met de eigen apps",
     tw_use_keep_apps: "Dit ontwerp gebruiken, mijn app-wijzigingen houden",
     tw_use_btn: "Dit ontwerp gebruiken",
@@ -5667,6 +5687,8 @@
   // Anything this translation does not have yet speaks English rather than showing a key.
   S["sr-Latn-RS"] = {
     tw_back_keeps: "Nazad takođe zadržava vaš početni ekran.",
+    tw_ha_signin_again: "Prijavite se ponovo",
+    tw_ha_signed_out: "Prijavite se ponovo. Home Assistant je odjavio ovaj TV: skenirajte telefonom.",
     tw_use_own_apps: "Koristi ovaj dizajn sa njegovim aplikacijama",
     tw_use_keep_apps: "Koristi ovaj dizajn, zadrži moje izmene aplikacija",
     tw_use_btn: "Koristi ovaj dizajn",
@@ -6174,6 +6196,8 @@
   // "{n} s", "{n} min", "Zdjęcia: {n}".
   S.pl = {
     tw_back_keeps: "Wstecz też zostawia twój ekran główny.",
+    tw_ha_signin_again: "Zaloguj się ponownie",
+    tw_ha_signed_out: "Zaloguj się ponownie. Home Assistant wylogował ten telewizor: zeskanuj telefonem.",
     tw_use_own_apps: "Użyj tego projektu z jego własnymi aplikacjami",
     tw_use_keep_apps: "Użyj tego projektu i zachowaj moje zmiany aplikacji",
     tw_use_btn: "Użyj tego projektu",
@@ -7090,6 +7114,8 @@
 
     S.he = {
     tw_back_keeps: "גם חזרה משאירה את מסך הבית שלכם.",
+    tw_ha_signin_again: "התחברו שוב",
+    tw_ha_signed_out: "התחברו שוב. Home Assistant ניתק את הטלוויזיה הזו: סרקו עם הטלפון.",
     tw_use_own_apps: "להשתמש בעיצוב הזה עם האפליקציות שלו",
     tw_use_keep_apps: "להשתמש בעיצוב הזה ולשמור את שינויי האפליקציות שלי",
     tw_use_btn: "להשתמש בעיצוב הזה",
@@ -7604,6 +7630,8 @@
   // Portuguese (Brazil), translated locally from en.
   S.pt = {
     tw_back_keeps: "Voltar também mantém sua tela.",
+    tw_ha_signin_again: "Entre de novo",
+    tw_ha_signed_out: "Entre de novo. O Home Assistant desconectou esta TV: escaneie com o celular.",
     tw_use_own_apps: "Usar este design com os apps dele",
     tw_use_keep_apps: "Usar este design e manter minhas mudanças de apps",
     tw_use_btn: "Usar este design",
@@ -8118,6 +8146,8 @@
   // Arabic (ar). Right to left, like Hebrew. Messages from the bridge stay in English for now.
   S.ar = {
     tw_back_keeps: "زر الرجوع يُبقي شاشتك أيضًا.",
+    tw_ha_signin_again: "سجّل الدخول مرة أخرى",
+    tw_ha_signed_out: "سجّل الدخول مرة أخرى. أخرج Home Assistant هذا التلفاز: امسح الرمز بهاتفك.",
     tw_use_own_apps: "استخدم هذا التصميم مع تطبيقاته",
     tw_use_keep_apps: "استخدم هذا التصميم مع الإبقاء على تغييرات تطبيقاتي",
     tw_use_btn: "استخدم هذا التصميم",
@@ -8644,6 +8674,8 @@
   // Romanian. Bridge error and note keys are still shown in their supplied fallback language.
   S.ro = {
     tw_back_keeps: "Și Înapoi îți păstrează ecranul.",
+    tw_ha_signin_again: "Conectează-te din nou",
+    tw_ha_signed_out: "Conectează-te din nou. Home Assistant a deconectat acest televizor: scanează cu telefonul.",
     tw_use_own_apps: "Folosește acest design cu aplicațiile lui",
     tw_use_keep_apps: "Folosește acest design și păstrează schimbările mele de aplicații",
     tw_use_btn: "Folosește acest design",

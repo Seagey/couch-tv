@@ -1,4 +1,4 @@
-package app.couchtv.launcher
+package app.couchtv.ha
 
 import org.json.JSONArray
 import org.json.JSONObject

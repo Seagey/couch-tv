@@ -465,8 +465,8 @@ If they say yes to the air conditioning or the doorbell card:
    - Locks, alarms, garage doors: **not supported, on purpose** (nothing that opens the house from
      a TV remote). Say so.
    - Anything that is not in Home Assistant yet (Tuya or Smart Life, Google Nest, Alexa devices, a
-     brand's own app): it shows once it is added to Home Assistant. The TV walks them through it: Home
-     settings, couch-tv Studio, Smart home, Add a device we don't list.
+     brand's own app): it shows once it is added to Home Assistant. The phone page from the TV's Smart
+     home QR code walks them through it (A device we don't list).
    - **Matter devices need no Home Assistant.** A light, plug, fan, blind, air conditioner or sensor
      they already have in Google Home, Apple Home, SmartThings or Alexa can be shared to couch-tv by
      Matter: the other app gives an 11 digit code, they type it on the phone page. On option C the TV
@@ -475,9 +475,10 @@ If they say yes to the air conditioning or the doorbell card:
      refused, the same rule. A Thread device also needs a Thread hub at home (a Nest hub, an Apple TV
      or HomePod, a SmartThings hub). Say plainly that sharing from the real Google Home and Apple Home
      apps has not been tried yet: it was tested with virtual devices shared the same way.
-   - They can also do all of this on the TV with no computer and no `config.json`: Home settings,
-     couch-tv Studio, Smart home (address, a pasted token, then tick what shows). On Samsung, LG and
-     the other web TVs the same screen works through the bridge. Tell them both ways exist.
+   - They can also do all of this with no computer, no `config.json` and no token: Home settings,
+     Designs, Smart home shows a QR code; their phone signs in on Home Assistant's own page and ticks
+     what shows. On Samsung, LG and the other web TVs the bridge serves the same phone page. Tell them
+     both ways exist.
 5. Write it down for the plan. In step 3, read it back as one line ("Smart home: the living room
    and bedroom air conditioning, the Movie night and Good night tiles, and the front door doorbell
    card, which needs 'display over other apps' switched on"), along with everything else, and

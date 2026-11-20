@@ -101,3 +101,8 @@ val copyWeb by tasks.registering(Copy::class) {
     }
 }
 tasks.named("preBuild") { dependsOn(copyWeb) }
+
+// Smart home (Home Assistant, signed in from a phone): the same code as the launcher's,
+// tv-home/android/shared/java (package app.couchtv.ha), served here by Server.kt (/ha, /api/ha).
+android.sourceSets.getByName("main").java.srcDir(File(repoRoot, "tv-home/android/shared/java"))
+android.sourceSets.getByName("test").java.srcDir(File(repoRoot, "tv-home/android/shared/test"))

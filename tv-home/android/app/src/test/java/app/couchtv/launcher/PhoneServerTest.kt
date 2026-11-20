@@ -52,6 +52,11 @@ class PhoneServerTest {
         override fun codeChanged() { changed++ }
         override fun showCode(code: String) { shown += code }
         override fun tmpDir() = dir
+        // smart home set up from a phone on this same server: HaPhone's own rules, with no Android context
+        override fun ha(method: String, path: String, query: Map<String, String>, body: String, hostHeader: String?, port: Int) =
+            app.couchtv.ha.HaPhone.handleFor(null, method, path, query, body, hostHeader, port) { name ->
+                if (name == "ha-phone.html") "<title>Smart home</title>".toByteArray() else null
+            }
     }
 
     private class MapStore : PhoneAuth.Store {
@@ -72,7 +77,7 @@ class PhoneServerTest {
         port = srv.listeningPort
     }
 
-    @After fun down() { srv.stop() }
+    @After fun down() { srv.stop(); app.couchtv.ha.HaPhone.stop() }
 
     private class Answer(val status: Int, val body: String) { val json get() = JSONObject(body) }
 
@@ -467,5 +472,60 @@ class PhoneServerTest {
         assertEquals(200, call("GET", "/ontv/shim.js").status)
         assertEquals(404, call("GET", "/ontv/other.js").status)
         assertNotNull(call("GET", "/api/home", token = paired()).json.optBoolean("on"))
+    }
+
+    // ---- smart home set up from a phone (/ha) on this same server: one launcher server, not two
+
+    /** One raw request with the Host header given (HttpURLConnection will not send another): status line and headers. */
+    private fun rawGet(path: String, hostHeader: String?): Pair<Int, Map<String, String>> =
+        Socket("127.0.0.1", port).use { s ->
+            s.soTimeout = 5000
+            s.getOutputStream().write(("GET $path HTTP/1.1\r\n" + (hostHeader?.let { "Host: $it\r\n" } ?: "") + "Connection: close\r\n\r\n").toByteArray())
+            val lines = s.getInputStream().bufferedReader().readLines()
+            val status = lines.first().split(' ')[1].toInt()
+            status to lines.drop(1).takeWhile { it.isNotEmpty() }.associate { it.substringBefore(':').lowercase() to it.substringAfter(':').trim() }
+        }
+
+    @Test fun smartHomeSetUpIsServedHereWithItsHostCheck() {
+        val (ok, h) = rawGet("/ha/", "127.0.0.1:$port")
+        assertEquals(200, ok)
+        assertEquals("no-store", h["cache-control"]); assertEquals("no-referrer", h["referrer-policy"]); assertEquals("nosniff", h["x-content-type-options"])
+        assertEquals("<title>Smart home</title>", call("GET", "/ha/").body)
+        assertEquals(200, rawGet("/ha", "example.local:$port").first)
+        assertEquals(403, rawGet("/ha/", "evil.example:$port").first)      // a name a web page points at the TV
+        assertEquals(403, rawGet("/ha/", "127.0.0.1:" + (port + 1)).first)  // another port
+        assertEquals(403, rawGet("/ha/", null).first)
+        assertEquals(403, rawGet("/ha/api/state?k=x", "evil.example:$port").first)
+        // the phone page's own pages are not touched by it
+        assertEquals(200, call("GET", "/setup").status)
+    }
+
+    @Test fun itListensOnEveryInterfaceAndTheHostCheckGuardsIt() {
+        // every interface on purpose (MainActivity.startPhonePage): the QR's address is reached whichever network it is
+        val other = java.net.NetworkInterface.getNetworkInterfaces().toList().filter { it.isUp && !it.isLoopback }
+            .flatMap { it.inetAddresses.toList() }.filterIsInstance<java.net.Inet4Address>().firstOrNull()?.hostAddress
+        Socket("127.0.0.1", port).close()
+        if (other != null) Socket().use { it.connect(java.net.InetSocketAddress(other, port), 1000) }
+        // and a name a web page points at the TV is still refused on /ha
+        val key = app.couchtv.ha.HaPhone.startForTest("203.0.113.50", port)
+        assertEquals(403, rawGet("/ha/?k=$key", "evil.example:$port").first)
+    }
+
+    @Test fun aFailedReturnFromHomeAssistantNeverCarriesTheKeyHereEither() {
+        val key = app.couchtv.ha.HaPhone.startForTest("203.0.113.50", port)
+        for (q in listOf("", "?code=x", "?code=x&state=forged", "?code=x&state=")) {
+            val (status, h) = rawGet("/ha/done$q", "127.0.0.1:$port")
+            assertEquals(302, status)
+            assertEquals("/ha/?e=expired", h["location"])
+            assertFalse(h.values.joinToString().contains(key))
+        }
+        assertEquals(403, call("GET", "/ha/api/state?k=wrong").status)
+        assertTrue(call("GET", "/ha/api/devices?k=$key").status in 400..499)   // no Android here: refused, never served
+    }
+
+    @Test fun theSmallSetUpServerNeverTakesThePhonePagesPort() {
+        assertFalse(PhoneServer.PORT in HaServer.PORTS)
+        assertFalse(PhoneServer.PORT + 1 in HaServer.PORTS)
+        assertEquals(8, HaServer.PORTS.count())
     }
 }

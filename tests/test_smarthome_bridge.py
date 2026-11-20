@@ -91,6 +91,7 @@ class SmartHomeTest(unittest.TestCase):
 
     def test_only_ticked_things_and_read_first(self):
         self.home.pending = ("http://homeassistant.local:8123", TOKEN)
+        self.home.listed = dict({k: "" for k in STATES}, **{"camera.door": "Door"})   # as a check would have listed them (a save keeps only what was listed)
         self.home.save({"climate": [{"entity": "climate.lounge"}], "controls": [{"entity": "light.lamp"}], "sensors": [{"entity": "sensor.pool"}],
                         "speakers": [{"entity": "media_player.kitchen"}], "cameras": [{"entity": "camera.door"}]})
         self.assertEqual(run(self.home.answer("set", "light.lamp", "off"))["error"], "refused", "read first")

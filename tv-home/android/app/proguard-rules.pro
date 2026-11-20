@@ -3,8 +3,8 @@
     @android.webkit.JavascriptInterface <methods>;
 }
 
-# Smart home: the page calls these through window.TVHA (HomeAssistant.kt).
--keepclassmembers class app.couchtv.launcher.HomeAssistant$Page {
+# Smart home: the page calls these through window.TVHA (HaPage.kt).
+-keepclassmembers class app.couchtv.launcher.HaPage {
     @android.webkit.JavascriptInterface <methods>;
 }
 

@@ -177,6 +177,8 @@ class BridgeService : Service() {
 
     private fun startServer() {
         if (server != null) return
+        // smart home set up from a phone (/ha, app.couchtv.ha.HaPhone): the home redraws at once
+        app.couchtv.ha.HaPhone.onChange = { HomeActivity.smartChanged() }
         try {
             server = Server(this, Store.port).also { it.start(fi.iki.elonen.NanoHTTPD.SOCKET_READ_TIMEOUT, false) }
             Log.i("couchtv", "server on port ${Store.port}")

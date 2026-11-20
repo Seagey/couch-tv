@@ -3,6 +3,8 @@ package dev.couchtv.ontv
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import app.couchtv.ha.HaPhone
+import app.couchtv.ha.HomeAssistant
 import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.NanoWSD
 import org.json.JSONArray
@@ -37,6 +39,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         val uri = s.uri
         when {
             uri.startsWith("/api/") -> api(s)
+            uri == "/ha" || uri.startsWith("/ha/") -> haPhone(s)
             uri == "/setup" || uri == "/setup/" -> asset("www/ontv/setup.html")
             uri.startsWith("/ontv/") -> asset("www/ontv/" + uri.removePrefix("/ontv/"))
             uri == "/tv" -> redirect("/tv/")
@@ -390,6 +393,19 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                     else -> json(200, ok().put("live", true).put("athome", r.optJSONObject("athome") ?: JSONObject()))
                 }
             }
+            // Smart home through Home Assistant (app.couchtv.ha, shared with the launcher): the same shapes as
+            // the computer bridge's /api/ha (bridge/smarthome.py), plus /api/ha/phone for the set up from a phone.
+            // The page never sees the address or a token.
+            "GET /api/ha/info" -> json(200, ok().put("info", HomeAssistant.info(ctx)).put("status", HomeAssistant.status(ctx).put("phone", true)))
+            "POST /api/ha" -> {
+                val b = body(s)
+                json(200, ok().put("result", try { HomeAssistant.answer(HomeAssistant.settings(ctx), b.optString("action"), b.optString("entity"), b.optString("value")) }
+                    catch (e: Exception) { JSONObject().put("ok", false).put("error", "failed") }))
+            }
+            "POST /api/ha/phone" -> json(200, ok().put("result", HaPhone.start(ctx, App.lanAddress(), Store.port)))
+            "POST /api/ha/save" -> json(200, ok().put("result", body(s).optJSONObject("picks")?.let { p -> JSONObject().put("ok", HomeAssistant.keepPicks(ctx, p)) }
+                ?: JSONObject().put("ok", false).put("error", "picks")))
+            "POST /api/ha/forget" -> { HomeAssistant.disconnect(ctx); HaPhone.stop(); json(200, ok().put("result", JSONObject().put("ok", true))) }
             else -> json(404, err("no such endpoint: $m $path"))
         }
     }
@@ -729,6 +745,29 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         }
     }
 
+    // ---------------------------------------------------------------- smart home from a phone
+
+    /**
+     * /ha: the phone page that signs this TV in to Home Assistant and ticks what shows (HaPhone.kt).
+     * Open, like /api/pair: every call needs the key from the QR code on the TV instead of a paired phone.
+     */
+    private fun haPhone(s: IHTTPSession): Response {
+        val len = s.headers["content-length"]?.toIntOrNull() ?: 0
+        if (len > 64 * 1024) return json(413, err("request too large"))
+        val buf = ByteArray(maxOf(0, len))
+        var read = 0
+        while (read < len) { val n = s.inputStream.read(buf, read, len - read); if (n < 0) break; read += n }
+        val q = s.parameters.mapValues { it.value.firstOrNull() ?: "" }
+        val r = HaPhone.handle(ctx, s.method.name, s.uri, q, String(buf, 0, read, Charsets.UTF_8), s.headers["host"], Store.port) {
+            name -> try { assets.open("www/tv/$name").use { it.readBytes() } } catch (e: IOException) { null }
+        } ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
+        return newFixedLengthResponse(Status(r.status), r.type, java.io.ByteArrayInputStream(r.body), r.body.size.toLong()).noStore().apply {
+            r.location?.let { addHeader("Location", it) }
+            addHeader("Referrer-Policy", "no-referrer")
+            addHeader("X-Content-Type-Options", "nosniff")
+        }
+    }
+
     // ---------------------------------------------------------------- static files
 
     private fun staticOrIndex(root: String, rel: String, inject: Boolean): Response {
@@ -801,7 +840,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
 
     private class Status(private val code: Int) : Response.IStatus {
         override fun getRequestStatus() = code
-        override fun getDescription() = "$code " + when (code) { 200 -> "OK"; 400 -> "Bad Request"; 401 -> "Unauthorized"; 404 -> "Not Found"
+        override fun getDescription() = "$code " + when (code) { 200 -> "OK"; 302 -> "Found"; 403 -> "Forbidden"; 400 -> "Bad Request"; 401 -> "Unauthorized"; 404 -> "Not Found"
             409 -> "Conflict"; 413 -> "Payload Too Large"; 415 -> "Unsupported Media Type"; 429 -> "Too Many Requests";501 -> "Not Implemented"; 502 -> "Bad Gateway"; 503 -> "Service Unavailable"; 504 -> "Gateway Timeout"; else -> "Status" }
     }
 

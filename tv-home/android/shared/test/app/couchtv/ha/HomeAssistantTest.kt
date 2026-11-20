@@ -1,4 +1,4 @@
-package app.couchtv.launcher
+package app.couchtv.ha
 
 import org.json.JSONArray
 import org.json.JSONObject
@@ -55,7 +55,7 @@ class HomeAssistantTest {
     }
 
     @Test fun onlyAllowedEntitiesAreKept() {
-        assertEquals(listOf("light.lounge", "cover.garage", "fan.bed"), s.controls.map { it.entity })   // no lock
+        assertEquals(listOf("light.lounge", "fan.bed"), s.controls.map { it.entity })   // no lock, and a garage door never shows (as the bridge)
         assertEquals(listOf("camera.backyard"), s.cameras.map { it.entity })
         assertEquals("sensor.battery", s.energy!!.battery)
         val bad = JSONObject(section.toString()).put("energy", JSONObject().put("entity", "lock.x"))
@@ -67,7 +67,7 @@ class HomeAssistantTest {
         assertEquals("refused", ask("set", "light.lounge", "on").getString("error"))   // not read yet
         assertTrue(calls.none { it.startsWith("POST") })
         val r = ask("controls")
-        assertEquals(3, r.getJSONArray("controls").length())
+        assertEquals(2, r.getJSONArray("controls").length())
         assertTrue(ask("set", "light.lounge", "on").getBoolean("ok"))
         assertTrue(calls.last().startsWith("POST /api/services/light/turn_on {\"entity_id\":\"light.lounge\"}"))
     }

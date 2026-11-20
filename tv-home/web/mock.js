@@ -376,6 +376,17 @@
       setupSave: function (id, picks) { kept = JSON.parse(picks); window.MOCK_HA_SAVED = kept; sreply(id, { ok: true }); },
       setupForget: function (id) { kept = null; sreply(id, { ok: true }); }
     };
+    // ?hasetup=phone: the launcher with its phone set up (HaPage.kt phone(), HaPhone.kt): the QR address,
+    // and MOCK_HA_PHONE_SIGN_IN() plays a phone that signed in and saved the lamp
+    if (arg("hasetup") === "phone") {
+      var seen = false, again = false;
+      window.TVHA.phone = function (id) {
+        sreply(id, { ok: true, url: "http://192.168.1.50:5401/ha/?k=preview-key-only", seen: seen, set: !!kept, host: kept ? "homeassistant.local" : "", count: kept ? 1 : 0, signin_again: again });
+      };
+      window.MOCK_HA_PHONE_SIGN_IN = function () { seen = true; again = false; kept = { controls: [{ entity: "light.lounge", name: "Lounge lamp" }] }; if (window.smartHome) window.smartHome.phoneChanged(); };
+      // MOCK_HA_SIGNED_OUT(): Home Assistant refused the TV's refresh token (HomeAssistant.kt signin_again)
+      window.MOCK_HA_SIGNED_OUT = function () { again = true; };
+    }
   }
 
   // ---------- a pretend Matter controller (matter.js, the Matter contract's /api/matter/*) ----------

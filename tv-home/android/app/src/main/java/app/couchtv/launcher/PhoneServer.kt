@@ -1,5 +1,6 @@
 package app.couchtv.launcher
 
+import app.couchtv.ha.HaPhone
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONObject
 import java.io.File
@@ -41,6 +42,13 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
         /** Shows a code on the home ("Show a code on the TV"); "" takes it off. */
         fun showCode(code: String)
         fun tmpDir(): File
+        /**
+         * Smart home set up from a phone (/ha, app.couchtv.ha.HaPhone): one request and its reply, or null
+         * when it is not one. This server answers it while it runs, so the launcher has one server, not two
+         * (HaServer.kt only starts when this one is not running). The Host check and the /ha/done rules are
+         * HaPhone's own, the same on every server.
+         */
+        fun ha(method: String, path: String, query: Map<String, String>, body: String, hostHeader: String?, port: Int): HaPhone.Reply? = null
     }
 
     class Refused(val status: Int, message: String) : Exception(message)
@@ -56,6 +64,7 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
             WORDS.matches(uri) -> asset("www" + uri, "application/javascript")
             uri == "/setup" || uri == "/setup/" -> asset("www/ontv/setup.html", "text/html; charset=utf-8")
             uri == "/ontv/shim.js" -> asset("www/ontv/shim.js", "application/javascript")
+            uri == "/ha" || uri.startsWith("/ha/") -> ha(s)
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
         }
     } catch (e: Refused) {
@@ -236,6 +245,26 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
         val a = when { arg == null -> "null"; raw -> arg.toString(); else -> arg.toString() }
         return host.page("window.tv && tv.phonePage ? tv.phonePage('" + op + "', " + a + ") : null")
             ?: throw Refused(503, "Open the Couch TV home on the TV first, then try again.")
+    }
+
+    // ---------------------------------------------------------------- smart home from a phone
+
+    /** /ha: open like /api/pair (the key from the TV's Smart home QR code is the pass), at most 64 KB a body. */
+    private fun ha(s: IHTTPSession): Response {
+        val len = s.headers["content-length"]?.toIntOrNull() ?: 0
+        if (len > 64 * 1024) throw Refused(413, "request too large")
+        val buf = ByteArray(maxOf(0, len))
+        var read = 0
+        while (read < len) { val n = s.inputStream.read(buf, read, len - read); if (n < 0) break; read += n }
+        val q = s.parameters.mapValues { it.value.firstOrNull() ?: "" }
+        val r = host.ha(s.method.name, s.uri, q, String(buf, 0, read, Charsets.UTF_8), s.headers["host"], listeningPort)
+            ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
+        return newFixedLengthResponse(Code(r.status), r.type, r.body.inputStream(), r.body.size.toLong()).apply {
+            r.location?.let { addHeader("Location", it) }
+            addHeader("Cache-Control", "no-store")
+            addHeader("Referrer-Policy", "no-referrer")
+            addHeader("X-Content-Type-Options", "nosniff")
+        }
     }
 
     // ---------------------------------------------------------------- helpers

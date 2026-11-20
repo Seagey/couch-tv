@@ -533,21 +533,26 @@ Off unless you add it. With no `home_assistant` section (or `"enabled": false`, 
 to anything, no extra permission. It works with option A (no computer) and option B (bridge), because
 the TV app talks to Home Assistant itself.
 
-**Set up on the TV, no computer and no file.** Home settings, couch-tv Studio, **Smart home**: type
-Home Assistant's address (usually `http://homeassistant.local:8123`), paste a long-lived access token
-with the phone remote's Type on the TV, and the TV lists everything Home Assistant has that couch-tv
-can show (never locks, alarms, garage doors or gates). Tick what you want and pick **Save and show on
-the home**. The TV keeps the address and token in the app's own private store, exactly as if
-`apply.sh` had sent this section; the page never gets the token back. **Change what shows** reads Home
-Assistant again with the kept token, and **Disconnect smart home** removes both. A later `apply.sh`
-with no `home_assistant` section leaves a set up made on the TV alone; one with a section replaces it.
-**Add a device we don't list** walks through getting a device into Home Assistant first (Tuya and
-Smart Life, Google Nest, Alexa devices, Apple Home and Matter, Hue, aircon, solar, and anything with a
-web address or MQTT through Home Assistant's RESTful, MQTT or Webhook integrations).
+**Set up from a phone, no computer and no file.** Home settings, Designs, **Smart home** shows one QR
+code: "Scan with your phone to connect your home." The phone page it opens (served by the TV itself at
+`/ha`, or from the Smart home row on the phone's Home settings page) finds Home Assistant on the Wi-Fi
+(it announces `_home-assistant._tcp`) or takes a typed address, then sends the phone to Home
+Assistant's own sign in page. Nobody pastes a token: the TV is the sign in's client (its client id is
+`http://<tv address>:<port>/`, Home Assistant sends the phone back to `/ha/done`, with PKCE S256), the
+TV swaps the one time code itself and keeps only the refresh token, in the app's private store, making
+a fresh 30 minute access token in memory when it needs one. Then the phone ticks what shows (never
+locks, alarms, garage doors or gates) and saves; the TV redraws at once, and the smart home widgets'
+device settings pick from those ticks. **Disconnect** (on the TV or the phone) signs the TV out of Home
+Assistant (the refresh token is revoked) and removes everything. A set up from before, with a
+long-lived token, keeps working. The help for devices we don't list (Tuya and Smart Life, Google Nest,
+Alexa devices, Apple Home and Matter, Hue, aircon, solar, and anything with a web address or MQTT) is
+on the phone page. Best: a Home Assistant user just for the TV, not an administrator. A later
+`apply.sh` with no `home_assistant` section leaves a set up made from a phone alone; one with a
+section replaces it.
 
 **Samsung, LG, Hisense, Philips, TiVo OS and Panasonic** (a computer runs the home): the same Smart
 home screen works, and the bridge talks to Home Assistant for the TV (`bridge/smarthome.py`, `/api/ha`).
-The address, token and ticks are kept in `bridge/data/home-assistant.json` (mode 600, git ignores it);
+The bridge serves the same phone page at `/ha` (`bridge/haphone.py`). The address, the refresh token (or a typed token on an older set up) and the ticks are kept in `bridge/data/home-assistant.json` (mode 600, git ignores it);
 without one the bridge uses this section and `HOME_ASSISTANT_TOKEN`. The website home on a VIDAA with
 no computer cannot reach Home Assistant.
 
@@ -582,9 +587,9 @@ HOME_ASSISTANT_TOKEN=<the long-lived token>
 | token (needed) | `HOME_ASSISTANT_TOKEN` in `.env`. A `"token"` key in this section also works, but `.env` keeps secrets out of `config.json`. |
 | `enabled` [true] | `false` switches smart home off and keeps the rest of the section for later. |
 | `climate` | Up to 8 air conditioners or heaters (`climate.*` entities), in the order shown. `name` is optional (else Home Assistant's own name). |
-| `scenes` | Up to 10 scenes or scripts (`scene.*`, `script.*`), shown as tiles that run on OK. This is also the way to put lights, blinds or anything else on the TV: make a scene or script for it in Home Assistant. |
+| `scenes` | Up to 10 scenes or scripts (`scene.*`, `script.*`), shown as tiles that run on OK. This is also the way to put lights, blinds or anything else on the TV: make a scene or script for it in Home Assistant. A scene or script whose id says garage, gate, door, lock or alarm is refused (nothing that opens the house). |
 | `doorbell` | `entity`: what rings, one of `event.*` (most doorbells, a new event per press), `binary_sensor.*` or `input_boolean.*` (on while ringing). `camera` (optional): a `camera.*` for the still picture. `name` (optional): the card's title. |
-| `controls` | Up to 16 lights, switches, fans and blinds (`light.*`, `switch.*`, `fan.*`, `cover.*`) for a design's **Control Centre** widget. Never a lock, an alarm, a garage door or a gate: `lock.*` and `alarm_control_panel.*` are refused, so is a `cover.*` or `switch.*` whose id says garage, gate, door or lock, and on the TV a blind Home Assistant calls a garage door, gate or door is shown but never switched. |
+| `controls` | Up to 16 lights, switches, fans and blinds (`light.*`, `switch.*`, `fan.*`, `cover.*`) for a design's **Control Centre** widget. Never a lock, an alarm, a garage door or a gate: `lock.*` and `alarm_control_panel.*` are refused, so is a `cover.*` or `switch.*` whose id says garage, gate, door, lock or alarm, and on the TV a blind Home Assistant calls a garage door, gate or door is shown but never switched. |
 | `cameras` | Up to 4 cameras (`camera.*`) for the **Camera** widget: a still picture, new every 2 seconds, never video. |
 | `sensors` | Up to 8 sensors (`sensor.*`, the pool, a rain gauge, humidity) for the **Sensor** widget: the reading and its last 24 hours. |
 | `energy` | One sensor for the **Solar and energy** widget: `entity`, either today's energy total (kWh or Wh, the kind that counts up through the day) or power (W or kW); `name` (optional); `battery` (optional): a home battery's charge in %. |
