@@ -13,6 +13,7 @@ export class ApiError extends Error {
 // nothing is added to any call, exactly as before more than one TV existed.
 let tvId = null;
 export const setTvId = (id) => { tvId = id || null; };
+export const getTvId = () => tvId;
 const withTv = (path) => (tvId ? `${path}${path.includes('?') ? '&' : '?'}tv=${encodeURIComponent(tvId)}` : path);
 
 let apiKey = null;

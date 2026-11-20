@@ -75,6 +75,22 @@ function load() {
     P.showCode("");
     ok(body.kids.length === 0, "taken off");
   }
+  // ---- a used or thrown away code: the QR asks again at once (Fable 7)
+  {
+    const { P } = load();
+    let qr = 0;
+    P.start({ api: () => Promise.resolve({ ok: true }), read: () => null, edit: () => ({ ok: true }), sync() {}, qr: () => { qr++; } });
+    for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+    await P.took({ edits: [], pin_gen: 4 });
+    ok(qr === 0, "the first answer only notes the code's number");
+    await P.took({ edits: [], pin_gen: 4 });
+    ok(qr === 0, "the same code: the QR is left alone");
+    await P.took({ edits: [], pin_gen: 5 });
+    ok(qr === 1, "a phone used the code (or 5 wrong tries threw it away): the QR is drawn again");
+    await P.took({ edits: [] });
+    ok(qr === 1, "an older computer that sends no number: nothing");
+    P.stop();
+  }
   // ---- every language has the line's words
   {
     const src = fs.readFileSync(path.join(__dirname, "../tv-home/web/i18n.js"), "utf8");

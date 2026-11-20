@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Android 11 and older. The smart home settings hold a Home Assistant token, and athome.xml the
-     things typed at home (guest Wi-Fi password, calendar link, notes): never in a backup. -->
+     things typed at home (guest Wi-Fi password, calendar link, notes), and phonepage.xml the paired phones (PhoneAuth.kt): never in a backup. -->
 <full-backup-content>
     <exclude domain="sharedpref" path="ha.xml" />
     <exclude domain="sharedpref" path="athome.xml" />
+    <exclude domain="sharedpref" path="phonepage.xml" />
 </full-backup-content>

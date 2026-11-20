@@ -14,7 +14,8 @@
   var SLOW = 10000, FAST = 1000;
   var S = null;
 
-  // o: { api(method, path, body, timeout) -> promise, read() -> view, edit(e) -> answer, sync(), words(code) -> text }
+  // o: { api(method, path, body, timeout) -> promise, read() -> view, edit(e) -> answer, sync(), words(code) -> text,
+  //      qr() (the pairing code changed: draw the QR again) }
   function start(o) {
     if (S) return;
     S = { o: o, sent: null, settingsAt: undefined, timer: 0, busy: false, code: "" };
@@ -63,6 +64,12 @@
         post = o.api("POST", "/api/phone/view", { athome: v }).then(function () { me.sent = c; }, function () {});
       }
       showCode(box.pin && box.pin.code ? box.pin.code : "", box.pin && box.pin.seconds);
+      // the code changed on the computer (a phone used it, 5 wrong tries threw it away, a new one): the QR and
+      // the computer line ask again at once, so a used code never stays on the screen
+      if (box.pin_gen !== undefined) {
+        if (me.gen !== undefined && box.pin_gen !== me.gen && o.qr) { try { o.qr(); } catch (e) {} }
+        me.gen = box.pin_gen;
+      }
       // a town or a photo from the phone: the computer's copy of Home settings, now
       if (me.settingsAt === undefined) me.settingsAt = box.settings_at || null;
       else if ((box.settings_at || null) !== me.settingsAt) { me.settingsAt = box.settings_at || null; try { o.sync(); } catch (e) {} }

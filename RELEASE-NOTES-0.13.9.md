@@ -7,7 +7,7 @@ Fewer presses with the TV remote. The on-TV app now updates itself with one butt
 - **Option C (the on-TV app):** this one update still goes the old way, because the one button arrives with it. On the TV: Home settings, About, Update couch-tv, and follow the steps (in Downloader, type 8180170, press Go, then Install). Or install the new `couch-tv-ontv.apk` (or `couch-tv-ontv-watch.apk`) over the old one from a computer. Your settings stay. From 0.13.9 on, the next update is one button.
 - **Every other Android TV:** Home settings, Updates, check now, or install `couch-tv-home.apk` over the old one. All four APKs are signed with the same key as every earlier release.
 - **Samsung:** download `couch-tv-samsung-setup.zip` below and run its installer again (step 4 in `START HERE.txt`). Your settings stay.
-- **Option B (a computer at home):** `git pull` and restart the bridge.
+- **Option B (a computer at home):** `git pull`, then install the bridge's one new part (Pillow, for photos sent from the phone). In the couch-tv folder run `.venv/bin/pip install -r bridge/requirements.txt` on a Mac or Linux, or `.venv\Scripts\pip install -r bridge\requirements.txt` on Windows, then restart the bridge. In Docker, build the image again: `docker compose -f examples/docker/compose.yaml up -d --build` ([docs/DOCKER.md](docs/DOCKER.md)).
 - **Apple TV:** build Couch TV again with Xcode ([docs/APPLE-TV.md](docs/APPLE-TV.md)).
 - **Roku:** build the channel and put it on again the way you did before ([docs/ROKU.md](docs/ROKU.md)).
 
@@ -32,9 +32,11 @@ The update button was tried on a real TCL, from 0.13.7 to 0.13.8.
 
 On a real TCL, 0.13.8 crashed about ten seconds after an update opened Couch TV again: two starts of its background service landed at the same moment and Android stopped the app. Each start is now answered, so Couch TV stays open.
 
-### Home settings on your phone or a computer (on-TV app)
+### Home settings on your phone or a computer (every TV with a Couch TV home)
 
-Home settings on the TV shows a Change this on your phone QR code. Scan it and the phone opens the TV's own settings page, already paired. Under it is the address and a code to type for a computer. The app's setup screen also shows the address, as Home settings on your phone.
+Home settings on the TV shows a Change this on your phone QR code. Scan it and the phone opens the TV's own settings page, already paired. Under it is the address and a code to type for a computer. The on-TV app's setup screen also shows the address, as Home settings on your phone.
+
+On the on-TV app the TV serves the page. With a computer at home, the computer serves it for every TV it runs (Samsung, LG, VIDAA, Roku, Apple TV, an Android TV with the Couch TV home app and the rest), and the phone pairs with the code from the TV's QR. The Couch TV home app with no computer serves it itself. On a Roku or an Apple TV the page sets the town and the people; on a VIZIO, which shows its own home, the people.
 
 From there you can set the town for the weather (search by name, as on the TV), the people and their order, kids mode, your own photos (sent from the phone straight to the TV), At home (the family note, lists, guest Wi-Fi, the house guide and calendar links), and the Ask AI key. Everything stays changeable on the TV too, and a change made on the phone while the TV's Home settings is open is kept.
 
@@ -62,7 +64,7 @@ Each widget on a design now has its own settings, so two weather widgets can sho
 
 - **Hold OK on any widget:** pick Edit on the TV to open its settings there. On the on-TV app, Edit on your phone shows a QR code: scan it and your phone opens that widget's settings, already paired (a computer can type the address and code under it). A widget with nothing to set on the TV says so, and a widget that only shows something but has settings, like a Countdown, can now be reached with the remote.
 - **In Home settings on the TV:** Designs, Widgets on this home. Each widget is named by what it is and where it sits, like "Surf, middle left".
-- **On your phone:** Home settings on your phone, Widgets on this TV (on-TV app).
+- **On your phone:** Home settings on your phone, Widgets on this TV (the phone remote's More, on the on-TV app and with a computer at home).
 
 What you choose is kept in the TV's Home settings, never in a design, so getting a new design or sharing this home never carries your town, your calendar or your drive. On a TV with a computer at home, the computer now keeps the widget settings and the Inputs tile switch with the rest of its copy of Home settings, so they are not lost.
 

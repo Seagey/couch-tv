@@ -187,6 +187,7 @@ class MainActivity : Activity() {
         super.onNewIntent(intent)
         if (intent.hasExtra("bridge") || intent.hasExtra("config_b64")) {
             readExtras(intent)
+            startPhonePage()   // a computer added: its own page from now on, this one stops (none: it starts)
             pageReady = false
             offline = false
             connect()
@@ -344,7 +345,9 @@ class MainActivity : Activity() {
      * serves it (bridge/phonepage.py), so nothing listens here. One server for the life of the app.
      */
     private fun startPhonePage() {
-        if (!alone() || phone != null) return
+        // a computer was added (apply.sh with BRIDGE_URL): the computer serves the page now, nothing listens here
+        if (!alone()) { phone?.let { runCatching { it.stop() } }; phone = null; return }
+        if (phone != null) return
         val store = object : PhoneAuth.Store {
             private val sp = applicationContext.getSharedPreferences("phonepage", MODE_PRIVATE)
             override fun get(key: String): String? = sp.getString(key, null)
@@ -379,6 +382,11 @@ class MainActivity : Activity() {
         }
         override fun deletePhoto(name: String) { photo(name)?.delete() }
         override fun homeState(): JSONObject = JSONObject().put("on", true).put("held", HomeRole.held(app))
+        // the code was used or thrown away: Home settings' QR (and Edit on your phone) ask for the new one at once
+        override fun codeChanged() {
+            val a = shown?.get() ?: return
+            a.main.post { a.js("window.tv && tv.phoneLink && tv.phoneLink()") }
+        }
         override fun showCode(code: String) {
             val a = shown?.get() ?: return
             a.main.post { a.js("window.tv && tv.phonePage && tv.phonePage('code', " + JSONObject.quote(code) + ")") }

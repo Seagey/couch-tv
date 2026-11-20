@@ -36,6 +36,8 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
         fun deletePhoto(name: String)
         /** Use as home screen: {on, held}. */
         fun homeState(): JSONObject
+        /** The pairing code changed (a phone used it, 5 wrong tries threw it away, a new one): the home draws its QR again. */
+        fun codeChanged() {}
         /** Shows a code on the home ("Show a code on the TV"); "" takes it off. */
         fun showCode(code: String)
         fun tmpDir(): File
@@ -50,6 +52,8 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
         when {
             uri.startsWith("/api/") -> api(s, uri.removeSuffix("/"))
             uri == "/" -> newFixedLengthResponse(Response.Status.REDIRECT, "text/plain", "").apply { addHeader("Location", "/setup") }
+            // the page's words in the phone's language, from the home's own files (bundled at www/tv), when this build has them
+            WORDS.matches(uri) -> asset("www" + uri, "application/javascript")
             uri == "/setup" || uri == "/setup/" -> asset("www/ontv/setup.html", "text/html; charset=utf-8")
             uri == "/ontv/shim.js" -> asset("www/ontv/shim.js", "application/javascript")
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
@@ -62,11 +66,11 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
 
     // ---------------------------------------------------------------- auth
 
+    // only the header: the page fetches its pictures with it too (setup.html), so the token is never in a cookie,
+    // which would go to every other web service on this TV
+    @Suppress("UNUSED_PARAMETER")
     private fun tokenOf(s: IHTTPSession, cookieToo: Boolean): String? {
         s.headers["authorization"]?.let { if (it.startsWith("Bearer ", true)) return it.substring(7).trim() }
-        // the page's pictures (<img src="/api/photo/...">) carry no header, only the cookie the page keeps the token in
-        if (cookieToo) s.headers["cookie"]?.split(';')?.map { it.trim() }?.firstOrNull { it.startsWith("couchtv_token=") }
-            ?.let { return java.net.URLDecoder.decode(it.substringAfter('='), "UTF-8") }
         return null
     }
 
@@ -78,18 +82,28 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
         when ("$m $path") {
             "GET /api/health" -> return json(200, ok().put("mode", "launcher").put("auth", if (auth.valid(tokenOf(s, false))) "ok" else "required"))
             "POST /api/pair/start" -> {
+                sameSiteOnly(s)
                 checkLock()
                 val now = System.currentTimeMillis()
                 if (now - lastPinStart < 5_000) throw Refused(429, "A code is on the TV already. Wait a moment, then ask again.")
                 lastPinStart = now
-                host.showCode(auth.newPin())
-                return json(200, ok().put("digits", 6).put("expires_in", 180).put("note", "The code is on the TV now."))
+                // the QR's own code when it has more than 90 s left: asking again and again never kills it
+                val before = auth.currentPin()
+                val code = auth.pinForQr(90)
+                host.showCode(code)
+                if (code != before) host.codeChanged()
+                return json(200, ok().put("digits", 6).put("expires_in", auth.pinSecondsLeft()).put("note", "The code is on the TV now."))
             }
             "POST /api/pair" -> {
+                sameSiteOnly(s)
                 val b = readJson(s, 4 * 1024)
                 checkLock()
+                val addr = s.headers["remote-addr"]
+                if (auth.addressLimited(addr)) throw Refused(429, "Too many wrong codes. Wait a minute, then try again.")
                 Thread.sleep(400)   // slows guessing a little more
-                val token = auth.pair(b.optString("pin"), b.optString("name").ifEmpty { null })
+                val before = auth.currentPin()
+                val token = auth.pair(b.optString("pin"), b.optString("name").ifEmpty { null }, addr)
+                if (auth.currentPin() != before) host.codeChanged()   // used, or thrown away: the QR never keeps a dead code
                 if (token == null) {
                     checkLock()   // this wrong try was the one that locked it
                     throw Refused(401, if (auth.currentPin() == null) "That code has expired. Ask the TV for a new one." else "That code is not right. Check the TV.")
@@ -142,6 +156,9 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
                 json(200, ok().put("count", r.optInt("count")))
             }
             "GET /api/home" -> json(200, ok(host.homeState()).put("fire_tv", false).put("watch", false))
+            // the phones paired with this TV, and forgetting them all (each then needs the code from the TV again)
+            "GET /api/phones" -> json(200, ok().put("phones", auth.phoneCount()))
+            "POST /api/phones/forget" -> { auth.forgetAll(); json(200, ok().put("phones", 0)) }
             else -> json(404, err("no such endpoint: $m $path"))
         }
     }
@@ -151,7 +168,7 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
         val len = s.headers["content-length"]?.toLongOrNull() ?: 0L
         if (len <= 0) throw Refused(400, "No photo came through. Try again.")
         if (len > MAX_UPLOAD) throw Refused(413, "That photo is too big. Pick one under 25 MB.")
-        val tmp = File(host.tmpDir(), "phone-upload.tmp")
+        val tmp = File.createTempFile("phone-upload", ".tmp", host.tmpDir())   // its own file: two uploads at once never share one
         try {
             tmp.outputStream().use { out ->
                 val buf = ByteArray(64 * 1024); var left = len
@@ -174,7 +191,14 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
     /** 15 wrong codes in 10 minutes: every way to pair answers 429 for 10 minutes (the on-TV app's rule). */
     private fun checkLock() {
         val left = auth.lockedFor()
-        if (left > 0) throw Refused(429, "Too many wrong codes. Wait ${maxOf(1, (left + 59) / 60)} minutes, then try again.")
+        if (left > 0) throw Refused(429, "Too many wrong codes. Wait ${maxOf(1, (left + 59) / 60)} min, then try again.")
+    }
+
+    /** The code calls answer the page itself (its own http address) or a client with no Origin, never Origin null or
+     *  file:, which any web page can send from a sandboxed frame (nothing on a TV pairs here by code). */
+    private fun sameSiteOnly(s: IHTTPSession) {
+        val o = s.headers["origin"]?.trim()?.lowercase() ?: return
+        if (o.isNotEmpty() && !o.startsWith("http://") && !o.startsWith("https://")) throw Refused(403, "forbidden origin")
     }
 
     /** The phone may change only the town (Server.kt PATCH_KEYS), checked the same way. */
@@ -228,7 +252,7 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
 
     private class Code(private val code: Int) : Response.IStatus {
         override fun getRequestStatus() = code
-        override fun getDescription() = "$code " + when (code) { 200 -> "OK"; 400 -> "Bad Request"; 401 -> "Unauthorized"; 404 -> "Not Found"
+        override fun getDescription() = "$code " + when (code) { 200 -> "OK"; 302 -> "Found"; 403 -> "Forbidden"; 400 -> "Bad Request"; 401 -> "Unauthorized"; 404 -> "Not Found"
             409 -> "Conflict"; 413 -> "Payload Too Large"; 415 -> "Unsupported Media Type"; 429 -> "Too Many Requests"; 503 -> "Service Unavailable"; else -> "Status" }
     }
 
@@ -242,6 +266,7 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
         const val PORT = 5400
         const val MAX_UPLOAD = 25L * 1024 * 1024
         private val PATCH_KEYS = setOf("place")
+        private val WORDS = Regex("/tv/(phone-words|caps-words)\\.js")
         private val EDIT_KEYS = setOf("note", "lists", "wifi", "guide", "cal_url", "stay_url", "checkin", "checkout", "widget_set", "design_apps")
 
         /** This TV's address on the home network (IPv4, not the TV itself), or null when it has none. */

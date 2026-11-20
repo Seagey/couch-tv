@@ -2,12 +2,12 @@ import { forwardRef, useEffect, useRef, useState } from 'react';
 import * as Ic from './icons.jsx';
 import { usePushUp } from './gestures.js';
 import { tick } from './haptics.js';
-import { api } from './api.js';
+import { api, getTvId } from './api.js';
 import { logoFor } from './appLogos.js';
 import { t, tBridge, LANGS, choice, setChoice, locale } from './i18n.js';
 import { readDesignCode, studioLink, newNonce, NONCE_KEY, dsw, setTranslate } from './designSend.js';
 setTranslate(t);
-import { hasPhonePage, widgetsOf, phonePageLink } from './phonePage.js';
+import { hasPhonePage, widgetsOf, phonePageLink, setupLink } from './phonePage.js';
 
 export const Sheet = forwardRef(function Sheet({ open, onClose, title, children, className = '', fromTop = false, closeDrag, extra = null }, ref) {
   return (
@@ -477,13 +477,13 @@ function PhonePage({ open }) {
   if (!has) return null;
   return (
     <>
-      <a className="pill glass arrange-open kids-open" href="/setup" onClick={() => tick()}><Ic.Gear size={18} /> {t('home_settings_phone')}</a>
+      <a className="pill glass arrange-open kids-open" href={setupLink(getTvId())} onClick={() => tick()}><Ic.Gear size={18} /> {t('home_settings_phone')}</a>
       {widgets.length > 0 && (
         <section className="more-block phone-widgets">
           <h3><Ic.Grid size={16} /> {t('widgets_on_tv')}</h3>
           <div className="widget-links">
             {widgets.map((w) => (
-              <a key={w.key} className="pill glass arrange-open" href={phonePageLink(w)} onClick={() => tick()}>{w.title || w.name}</a>
+              <a key={w.key} className="pill glass arrange-open" href={phonePageLink(w, getTvId())} onClick={() => tick()}>{w.title || w.name}</a>
             ))}
           </div>
           <p className="note">{t('widgets_on_tv_note')}</p>

@@ -386,11 +386,20 @@
     var list = photoList();
     $('photo-count').textContent = list.length ? list.length + ' of ' + MAX_PHOTOS + ' photos on the TV.' : 'No photos yet.';
     $('photo-list').innerHTML = list.map(function (p) {
-      var src = p.file ? '/api/photo/' + encodeURIComponent(p.file) : /^https:\/\//.test(p.url) ? p.url : '';
-      return '<div class="photo">' + (src ? '<img alt="" loading="lazy" referrerpolicy="no-referrer" src="' + esc(src) + '">' : '') +
+      var src = p.file ? '' : /^https:\/\//.test(p.url) ? p.url : '';
+      return '<div class="photo">' + (src || p.file ? '<img alt="" loading="lazy" referrerpolicy="no-referrer"' + (src ? ' src="' + esc(src) + '"' : ' data-file="' + esc(p.file) + '"') + '>' : '') +
         '<button type="button" aria-label="Remove this photo" data-id="' + idOf(p.id) + '">×</button></div>';
     }).join('');
+    // a photo kept on the TV or the home computer: fetched with the pairing token in the header (shim.js), never
+    // through a cookie, and shown from this phone's memory
+    Array.prototype.forEach.call($('photo-list').querySelectorAll('img[data-file]'), function (img) {
+      var f = img.getAttribute('data-file');
+      if (PHOTO_URLS[f]) { img.src = PHOTO_URLS[f]; return; }
+      fetch(withTv('/api/photo/' + encodeURIComponent(f))).then(function (r) { if (!r.ok) throw new Error(); return r.blob(); })
+        .then(function (b) { PHOTO_URLS[f] = URL.createObjectURL(b); img.src = PHOTO_URLS[f]; }, function () {});
+    });
   }
+  var PHOTO_URLS = {};
   $('photo-list').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-id]'); if (!b) return;
     if (!confirm('Take this photo off the TV?')) return;
@@ -810,17 +819,20 @@
   function applyMode(m, home) {
     MODE = m === 'bridge' || m === 'launcher' ? m : 'on-tv';
     if (MODE === 'on-tv') return;
-    var gone = ['ask', 'smart', 'tvname', 'keys', 'xiaomi', 'upd', 'phones-card'].concat(MODE === 'bridge' ? ['home'] : ['kids-first']);
+    // phones: the home computer's phones pair with its key (set up on that computer); the Couch TV home app
+    // with no computer keeps its own list of paired phones, which can be forgotten here
+    var gone = ['ask', 'smart', 'tvname', 'keys', 'xiaomi', 'upd'].concat(MODE === 'bridge' ? ['home', 'phones-card'] : ['kids-first']);
     gone.forEach(function (id) { var el = $(id); if (el) el.style.display = 'none'; var c = document.querySelector('.jump a[href="#' + id + '"]'); if (c) c.style.display = 'none'; });
     clearInterval(updPoll);
     if (MODE === 'bridge') {
       $('intro-from').textContent = 'This page comes from your home computer, over your home Wi-Fi.';
       // a Roku, an Apple TV or a VIZIO: their Couch TV takes the town and the people from here; At home, your
-      // photos and a design's widgets are parts of the couch-tv home on a TV that shows web pages
+      // photos and a design's widgets are parts of the couch-tv home on a TV that shows web pages. A VIZIO shows
+      // its own home and nothing of couch-tv's asks for the weather there, so only the people
       if (home && home !== 'web') {
-        ['photos', 'athome', 'widgets', 'dapps'].forEach(function (id) { $(id).style.display = 'none'; var c = document.querySelector('.jump a[href="#' + id + '"]'); if (c) c.style.display = 'none'; });
+        ['photos', 'athome', 'widgets', 'dapps'].concat(home === 'none' ? ['town'] : []).forEach(function (id) { $(id).style.display = 'none'; var c = document.querySelector('.jump a[href="#' + id + '"]'); if (c) c.style.display = 'none'; });
         $('jump-widgets').style.display = 'none'; $('jump-dapps').style.display = 'none'; NO_ATHOME = true;
-        $('intro-from').textContent = 'This page comes from your home computer, over your home Wi-Fi. ' + (home === 'none' ? 'This TV shows its own home, so only the town and the people are here.' : 'Couch TV on this TV takes the town and the people from here.');
+        $('intro-from').textContent = 'This page comes from your home computer, over your home Wi-Fi. ' + (home === 'none' ? 'This TV shows its own home, so only the people are here.' : 'Couch TV on this TV takes the town and the people from here.');
       }
       $('photos-where').textContent = 'They go straight from this phone to your home computer, which makes them screen size and keeps them for the TV.';
     } else {
@@ -831,11 +843,16 @@
       $('tv').style.display = 'none';
     }
   }
+  function showPhones(j) {
+    var n = +(j && j.phones) || 0;
+    $('phones').textContent = n + (n === 1 ? ' phone is' : ' phones are') + ' paired with this TV.';
+  }
   function loadSettings() {
     return api('GET', '/api/settings').then(function (j) {
       SETTINGS = j;
       applyMode(j.mode, j.home);
       showTown(); showPeople(); showPhotos();
+      if (MODE === 'launcher') api('GET', '/api/phones').then(showPhones, function () {});
       if (MODE !== 'on-tv') return;
       $('tv-name').value = j.tv_name || ''; $('country').value = j.country || '';
       $('ask-on').checked = !!j.ask.enabled;
@@ -847,7 +864,7 @@
           : 'This version of Couch TV can\'t keep the Home button: Google Play Protect blocks that part in apps put on from a phone. To get it, put the Home button version (couch-tv-ontv-watch.apk) on from a computer (Couch TV on the TV, More, Home button from a computer), then switch on Couch TV home watch in the TV\'s Settings, Accessibility.';
       }
       showAsk(j.ask);
-      $('phones').textContent = j.phones + (j.phones === 1 ? ' phone is' : ' phones are') + ' paired with this TV.';
+      showPhones(j);
       showAdb(j.adb);
       // Android 13+ (most Google TVs): pairing first, 5555 second. Older TVs: the other way round.
       if (j.adb.sdk < 30) { $('route-wd').style.display = 'none'; }

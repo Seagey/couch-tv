@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { hasPhonePage, widgetsOf, phonePageLink } from "../remote/src/phonePage.js";
+import { hasPhonePage, widgetsOf, phonePageLink, setupLink } from "../remote/src/phonePage.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 let n = 0;
@@ -39,6 +39,21 @@ eq(widgetsOf({ live: true, athome: { design: { on: true, widgets: [null, { setti
 // ---- the link, and that the page opens the same widget from it ----
 eq(phonePageLink(view.athome.design.widgets[0]), "/setup#widget=w1");
 eq(phonePageLink(view.athome.design.widgets[3]), "/setup#widget=stack%201%2F2", "a smart stack's widget id, escaped");
+// ---- the TV this remote drives (Fable 4): a second TV on the same computer gets its own page ----
+eq(setupLink(null), "/setup", "no TV chosen: the default TV's page");
+eq(setupLink("bedroom"), "/setup?tv=bedroom");
+eq(setupLink("bad id/../x"), "/setup", "an id the page would not read is never added");
+eq(phonePageLink(view.athome.design.widgets[0], "bedroom"), "/setup?tv=bedroom#widget=w1");
+const pageSrc = fs.readFileSync(path.join(root, "on-tv/web/setup.html"), "utf8");
+const tvq = /var TVQ = (.*);\n/.exec(pageSrc)[1];
+for (const tv of ["bedroom", "tv_2", "Lounge-TV"]) {
+  const c = { location: { search: new URL("http://x" + phonePageLink(view.athome.design.widgets[0], tv)).search } };
+  vm.runInNewContext("var got = " + tvq + ";", c);
+  eq(c.got, tv, "setup.html reads the TV from the remote's link: " + tv);
+}
+const shimSrc = fs.readFileSync(path.join(root, "on-tv/web/shim.js"), "utf8");
+ok(/realFetch\('\/api\/pair\/start' \+ \(TVQ \? '\?tv=' \+ TVQ : ''\)/.test(shimSrc), "Show a code on the TV asks for the page's own TV (shim.js)");
+ok(/href=\{setupLink\(getTvId\(\)\)\}/.test(fs.readFileSync(path.join(root, "remote/src/Sheets.jsx"), "utf8")), "Home settings on this phone links to the driven TV's page");
 const page = fs.readFileSync(path.join(root, "on-tv/web/setup.html"), "utf8");
 const hw = page.slice(page.indexOf("function hashWidget()"), page.indexOf("\n", page.indexOf("function hashWidget()")));
 for (const w of widgetsOf(view)) {
@@ -53,7 +68,7 @@ const sheets = fs.readFileSync(path.join(root, "remote/src/Sheets.jsx"), "utf8")
 ok(/<PhonePage open=\{open\} \/>/.test(sheets), "More draws PhonePage");
 ok(!/window\.couchTv && \(\s*<a/.test(sheets), "Home settings on this phone is no longer for the on-TV app alone");
 ok(/api\.health\(\)\.then\(\(h\) => hasPhonePage\(false, h\)/.test(sheets), "a bridge TV: gated on /api/health phone_page");
-ok(/href=\{phonePageLink\(w\)\}/.test(sheets) && /t\('widgets_on_tv'\)/.test(sheets), "one link per widget, under Widgets on this TV");
+ok(/href=\{phonePageLink\(w, getTvId\(\)\)\}/.test(sheets) && /t\('widgets_on_tv'\)/.test(sheets), "one link per widget, under Widgets on this TV");
 const api = fs.readFileSync(path.join(root, "remote/src/api.js"), "utf8");
 ok(/athome: \(\) => call\('GET', '\/api\/athome'/.test(api), "the widgets come from GET /api/athome, the endpoint the page reads");
 

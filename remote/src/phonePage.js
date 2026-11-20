@@ -19,8 +19,15 @@ export function widgetsOf(j) {
 
 // The page at one widget: #widget=<id>, the id the TV's Hold OK, Edit on your phone QR carries (the
 // widget's key is "<id>|<kind>"; the page opens the box whose key starts with that id).
-export function phonePageLink(w) {
+export function phonePageLink(w, tv) {
   const k = String((w && w.key) || '');
   const id = k.lastIndexOf('|') > 0 ? k.slice(0, k.lastIndexOf('|')) : k;
-  return '/setup#widget=' + encodeURIComponent(id);
+  return setupLink(tv) + '#widget=' + encodeURIComponent(id);
+}
+
+// The page for the TV this remote drives: a home computer with more than one TV serves each TV's page at
+// /setup?tv=<id> (the id the remote sends with every call, api.js tvId). No TV chosen: the default one.
+// Only an id the page itself reads (setup.html TVQ: letters, digits, _ and -) is added.
+export function setupLink(tv) {
+  return '/setup' + (tv && /^[A-Za-z0-9_-]{1,40}$/.test(String(tv)) ? '?tv=' + tv : '');
 }

@@ -7956,7 +7956,8 @@
     if (window.CouchPhonePage) {
       window.CouchPhonePage.words = function (code) { return t("phone_code", { code: code }); };
       if (!OFFLINE && !MOCK && !PREVIEW && !STANDALONE && !ON_TV) window.CouchPhonePage.start({ api: api, read: atHomeView, edit: atHomeEdit,
-        sync: function () { syncSettings().catch(function () {}); }, words: window.CouchPhonePage.words });
+        sync: function () { syncSettings().catch(function () {}); }, words: window.CouchPhonePage.words,
+        qr: function () { window.tv.phoneLink(); } });
     }
     if (designOn) CouchDesign.start(CFG.design, {
       // a design's video background keeps its still picture with Lighter home or in power save
