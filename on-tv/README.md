@@ -153,6 +153,24 @@ and More, Home button from a computer, gives the steps: `adb connect <tv-ip>:555
 `adb install -r couch-tv-ontv-watch.apk` (settings stay), then Couch TV home watch on in Settings, Accessibility,
 then **Use as home screen** on the Couch TV setup screen: the watch only acts while that is on. With the watch APK
 the button shows on Google TV too (with the plain APK it is hidden there while off).
+**Make Home open Couch TV, no computer (0.13.9 or newer).** Once Couch TV can press keys on the TV (its own link to the
+TV, More, Let the phone press keys: the same link Update to ... uses), the setup screen, the phone's Home settings
+page and Home settings, About on the TV show **Make Home open Couch TV** on Google TV, on a TV with Google's
+Android TV Home, and on a Fire TV whose Fire OS still allows the link. One press (HomeKey.kt, rules in
+HomeKeyRules.kt): it downloads `couch-tv-ontv-watch.apk` from GitHub's latest release with Update's checks (https
+on GitHub's hosts only, the size and SHA-256 GitHub lists, this app's package and signer, not older than this
+app; the same version is fine), copies it to the TV and installs it over this app as ADB's shell user (`pm install
+-r`, settings stay), then switches **Use as home screen** on and the watch on: `enabled_accessibility_services`
+gets the watch added after whatever is there (never replaced), `accessibility_enabled 1`, and `cmd package
+set-home-activity` again (installing anything made a TCL drop the home). On a TCL it also allows the AUTO_START
+app op first. Android restarts the app as the watch version, which checks the watch actually connected; if not,
+it writes the list without the watch and then with it again (what rebound it on a second TCL). If it still does
+not connect, the screen says to switch on Couch TV home watch in Settings, Accessibility. With the watch version
+already on, the press only switches the watch on. Without the link (or on a Fire TV that blocks it) the screens
+show the computer steps below and a QR code for them on the help page (couchtv.joshuaseage.com/help/home-button/).
+GitHub's release must be the same version or newer: a TV with a newer build than the latest release is told so
+and nothing is installed.
+
 **Use as home screen** waits a moment after switching the home on before asking Android (a first press
 showed a black screen on that TCL), and if the question is cancelled it switches the home off again.
 If an older guide had you switch it off, switch it back on before the next restart:

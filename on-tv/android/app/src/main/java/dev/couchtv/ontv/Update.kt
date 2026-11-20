@@ -41,6 +41,8 @@ object Update {
     private val io = Executors.newSingleThreadExecutor()
     // What is happening now (not kept): "" (nothing), "checking", "downloading", "installing".
     @Volatile private var busy = ""
+    /** Something is downloading or installing (HomeKey waits for it, and Update waits for HomeKey). */
+    val working: Boolean get() = busy.isNotEmpty()
     @Volatile private var progress = 0
     // Why the last try stopped: "" (it did not), "net", "bad", "other_key", "space", "adb", "failed".
     @Volatile private var error = ""
@@ -159,7 +161,7 @@ object Update {
         val s = store(app)
         val latest = s.getString("latest", "") ?: ""
         val available = UpdateRules.offered(latest, BuildConfig.VERSION_NAME, s.getBoolean("has_asset", false))
-        if (busy.isNotEmpty() || !canInstall(app, available)) return
+        if (busy.isNotEmpty() || HomeKey.working || !canInstall(app, available)) return
         val url = s.getString("url", "") ?: ""
         val digest = s.getString("digest", "") ?: ""
         val size = s.getLong("size", 0L)
@@ -175,7 +177,7 @@ object Update {
             // GitHub" (review, F1)
             val needed = UpdateRules.spaceNeeded(size, Build.SUPPORTED_ABIS.firstOrNull())
             var why = if (dir.usableSpace < needed) "space" else try {
-                download(app, url, file, size)
+                download(url, file, size) { p -> progress = p; changed(app) }
                 verify(app, file, digest, size)
             } catch (x: Exception) {
                 Log.w(TAG, "download: ${x.message}")
@@ -231,7 +233,7 @@ object Update {
 
     // ---------------------------------------------------------------- GitHub (the launcher's rules)
 
-    private fun fetch(url: String): String {
+    internal fun fetch(url: String): String {
         val con = connect(url, true)
         try {
             return con.inputStream.bufferedReader().use { it.readText().take(2_000_000) }
@@ -261,7 +263,8 @@ object Update {
         throw IOException("too many redirects")
     }
 
-    private fun download(c: Context, url: String, file: File, size: Long) {
+    /** Downloads a GitHub file, never more than size bytes; onProgress gets the percentage every 5 points. */
+    internal fun download(url: String, file: File, size: Long, onProgress: (Int) -> Unit) {
         val con = connect(url, false)
         try {
             var done = 0L
@@ -276,7 +279,7 @@ object Update {
                         done += n
                         if (done > size) throw IOException("bigger than GitHub said")
                         val p = (done * 100 / size).toInt()
-                        if (p >= shown + 5) { shown = p; progress = p; changed(c) }
+                        if (p >= shown + 5) { shown = p; onProgress(p) }
                     }
                 }
             }
@@ -285,8 +288,11 @@ object Update {
 
     // ---------------------------------------------------------------- the checks (the launcher's)
 
-    /** "" when the file may be installed, else why not ("bad", "other_key", "not_newer"). */
-    private fun verify(c: Context, file: File, digest: String, size: Long): String {
+    /**
+     * "" when the file may be installed, else why not ("bad", "other_key", "not_newer"). sameOk: the same
+     * version may go on too (HomeKey: the watch APK of this very version only adds the Home button watch).
+     */
+    internal fun verify(c: Context, file: File, digest: String, size: Long, sameOk: Boolean = false): String {
         if (size <= 0 || file.length() != size) return "bad"
         if (digest.isEmpty() || sha256(file) != digest) return "bad"
         val pm = c.packageManager
@@ -294,7 +300,7 @@ object Update {
         val mine = pm.getPackageInfo(c.packageName, flag)
         val theirs = pm.getPackageArchiveInfo(file.path, flag) ?: return "bad"
         if (theirs.packageName != c.packageName) return "bad"
-        if (versionCode(theirs) <= versionCode(mine)) return "not_newer"
+        if (if (sameOk) !HomeKeyRules.versionOk(versionCode(theirs), versionCode(mine)) else versionCode(theirs) <= versionCode(mine)) return "not_newer"
         val a = signers(mine) { pm.getPackageInfo(c.packageName, it) }
         val b = signers(theirs) { pm.getPackageArchiveInfo(file.path, it) }
         // Some Android 9 builds read no signer from a file that is not installed yet: then Android's

@@ -41,6 +41,11 @@ class SetupActivity : Activity() {
     private val tick = object : Runnable { override fun run() { refresh(); main.postDelayed(this, 1500) } }
     private val pinListener: (String?) -> Unit = { main.post { refresh() } }
     private lateinit var watchNote: TextView
+    // Make Home open Couch TV (HomeKey.kt): the button, its line, and the help page's QR code when it needs a computer
+    private lateinit var hkBtn: Button
+    private lateinit var hkLine: TextView
+    private lateinit var hkQr: ImageView
+    private var hkQrShown = false
 
     // Use as home screen (HomeAsk.kt): askSince is when the home alias went on and Android is still to be
     // asked; awaitingRole is true while Android's own request is on screen; declined after it was closed
@@ -93,11 +98,15 @@ class SetupActivity : Activity() {
         val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, px(14), 0, 0); gravity = Gravity.CENTER_VERTICAL }
         qr = ImageView(this).apply { layoutParams = LinearLayout.LayoutParams(px(150), px(150)).apply { rightMargin = px(28) } }
         top.addView(qr)
-        val words = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val words = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) }
         code = text("", 40f, CREAM, true); words.addView(code)
         next = text("", 17f, CREAM); words.addView(next)
         address = text("", 17f, AMBER, true); words.addView(address)
         top.addView(words)
+        // the help page QR for "Make Home open Couch TV" (only while it needs a computer): at the right of this row,
+        // no taller than the phone's QR, so the steps line under the buttons stays on screen
+        hkQr = ImageView(this).apply { layoutParams = LinearLayout.LayoutParams(px(150), px(150)).apply { leftMargin = px(28) }; visibility = View.GONE }
+        top.addView(hkQr)
         col.addView(top)
         adb = text("", 15f, CREAM_2); col.addView(adb)
 
@@ -135,6 +144,14 @@ class SetupActivity : Activity() {
         main1.addView(moreBtn)
         col.addView(main1)
         homeNote = text("", 15f, CREAM_2); col.addView(homeNote)
+        // one row under homeNote: the button (only while one press can do it) and the words beside it, so the words
+        // never run off the bottom of a 1080 high screen (the help page QR sits at the top right, see hkQr)
+        val hkRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, px(14), 0, 0) }
+        hkBtn = button(HomeKeyRules.BUTTON) { HomeKey.start(this); refresh() }.apply { visibility = View.GONE }
+        hkRow.addView(hkBtn)
+        hkLine = text("", 15f, AMBER).apply { layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) }
+        hkRow.addView(hkLine)
+        col.addView(hkRow)
 
         // More: the tools for the arrow keys and typing from the phone, in plain words, out of a beginner's way
         more = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
@@ -255,6 +272,25 @@ class SetupActivity : Activity() {
         homeNote.text = SetupWords.homeNote(App.homeEnabled(this), held, google, watchApk = watchApk,
             googleHome = HomeRole.googleHome(this), asking = asking, declined = declined && !App.homeEnabled(this), opensUs = opensUs)
         if (!watchApk) watchNote.text = SetupWords.watchSteps(ip)
+        showHomeKey()
+    }
+
+    /** Make Home open Couch TV: the button while one press can do it, the words, and the help page's QR when it needs a computer. */
+    private fun showHomeKey() {
+        val s = org.json.JSONObject(HomeKey.state(this))
+        val v = s.optString("view")
+        val hadFocus = hkBtn.hasFocus()
+        hkBtn.visibility = if (v == "ready" || v == "busy") View.VISIBLE else View.GONE
+        // never disabled: a disabled button loses the D pad focus. Dimmed while busy; HomeKey.start ignores a second press.
+        hkBtn.alpha = if (v == "ready") 1f else 0.5f
+        if (hadFocus && hkBtn.visibility != View.VISIBLE) moreBtn.requestFocus()
+        val err = s.optString("error_words")
+        // a failed press on the ready view: the reason alone (with the ready words too it runs to four lines)
+        hkLine.text = if (err.isNotEmpty() && v == "ready") err else listOf(err, s.optString("words")).filter { it.isNotEmpty() }.joinToString(" ")
+        hkLine.visibility = if (hkLine.text.isEmpty()) View.GONE else View.VISIBLE
+        val wantQr = v == "steps"
+        if (wantQr && !hkQrShown) qrBitmap(HomeKeyRules.HELP_URL)?.let { hkQr.setImageBitmap(it); hkQrShown = true }
+        hkQr.visibility = if (wantQr && hkQrShown) View.VISIBLE else View.GONE
     }
 
     /** The phone address as a QR code (Qr.kt, the same code as the home page draws), black on white with a quiet zone. */

@@ -111,6 +111,8 @@ class HomeActivity : Activity() {
             // Home settings, About, Update couch-tv: looks at GitHub's releases; with the app's own ADB link,
             // Update to installs one itself after the launcher's checks, else it shows the steps (Update.kt)
             addJavascriptInterface(Update.Page(this@HomeActivity, this, base), "TVUP")
+            // Home settings, About, Make Home open Couch TV (HomeKey.kt)
+            addJavascriptInterface(HomeKey.Page(this@HomeActivity, this, base), "TVHK")
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) { ready = true; view.requestFocus(); sendWaitingAtHome() }
                 override fun onReceivedError(view: WebView, req: WebResourceRequest, err: WebResourceError) {

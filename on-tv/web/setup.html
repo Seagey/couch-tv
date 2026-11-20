@@ -221,6 +221,13 @@
     <button class="go" id="home-on">Make the Home button open Couch TV</button>
     <button class="quiet" id="home-off" style="display:none">Make the Home button open the TV's own home again</button>
     <div class="msg" id="home-msg" role="status"></div>
+    <div id="hk" style="display:none">
+      <h3>Home button</h3>
+      <p class="status" id="hk-line"></p>
+      <button class="go" id="hk-go" style="display:none">Make Home open Couch TV</button>
+      <div class="msg" id="hk-msg" role="status"></div>
+      <ol id="hk-steps" style="display:none"></ol>
+    </div>
   </section>
 
   <section class="card" id="smart" style="display:none">
@@ -1043,8 +1050,42 @@
       $('adb-advice').textContent = j.adb.sdk >= 33 ? 'This TV is Android 13 or newer: use the newer TVs steps.' : '';
     }).catch(function (e) { $('town-now').textContent = e.message; });
   }
+  // ---------------- Make Home open Couch TV (/api/homekey, HomeKey.kt) ----------------
+  // One press: the Home button version from GitHub, checked and put on over its own link to the TV, then its
+  // Home button watch switched on. Without that link: the computer steps, and the help page for them.
+  var hkPoll = null, hkWaiting = false;
+  function showHk(h) {
+    var v = h.view;
+    $('hk').style.display = v === 'hidden' ? 'none' : '';
+    $('hk-line').className = 'status' + (v === 'done' ? ' ok' : '');
+    $('hk-line').textContent = h.words_phone || h.words || '';
+    var b = $('hk-go');
+    b.style.display = v === 'ready' || v === 'busy' ? '' : 'none';
+    b.textContent = h.button || 'Make Home open Couch TV';
+    b.disabled = v !== 'ready';
+    $('hk-msg').textContent = h.error_words || '';
+    var st = $('hk-steps');
+    st.style.display = v === 'steps' ? '' : 'none';
+    st.innerHTML = v === 'steps' ? (h.steps || []).map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') +
+      (h.help_url ? '<li style="list-style:none"><a href="' + esc(h.help_url) + '" target="_blank" rel="noopener">The same steps on the help page</a></li>' : '') : '';
+    if (h.phase === 'installing') hkWaiting = true;
+    clearInterval(hkPoll);
+    if (v === 'busy' || hkWaiting) hkPoll = setInterval(loadHk, 1500);
+    if (v !== 'busy') { hkWaiting = false; loadHome(); }
+  }
+  function loadHk() {
+    return api('GET', '/api/homekey').then(showHk).catch(function (e) {
+      // Android stops the app while it puts the new version on: keep asking until it answers again
+      if (hkWaiting) $('hk-msg').textContent = 'Installing. Couch TV closes and opens again by itself, then this page comes back.';
+      else if (e.status !== 404) $('hk-msg').textContent = e.message;
+    });
+  }
+  $('hk-go').onclick = function () {
+    $('hk-go').disabled = true;
+    api('POST', '/api/homekey/start', {}).then(showHk).catch(function (e) { $('hk-msg').textContent = e.message; });
+  };
   // the settings first: they say who serves the page (applyMode), so a part it leaves out never flashes up
-  function load() { loadSettings().then(function () { loadInputs(); if (!NO_ATHOME) loadAtHome(); if (MODE !== 'bridge') loadHome(); if (MODE === 'on-tv') loadSmart(); loadMatter(); }); }
+  function load() { loadSettings().then(function () { loadInputs(); if (!NO_ATHOME) loadAtHome(); if (MODE !== 'bridge') loadHome(); if (MODE === 'on-tv') { loadHk(); loadSmart(); } loadMatter(); }); }
   var poll = null;
   $('adb-connect').onclick = function () {
     $('adb-msg').textContent = 'Connecting. Look at the TV.';

@@ -34,6 +34,8 @@ class App : Application() {
         // Matter devices added before: start the controller and their live state (no library load if none)
         runCatching { dev.couchtv.ontv.matter.Matter.init(this) }.onFailure { Log.w("couchtv", "matter init: ${it.message}") }
         instance = this
+        // after "Make Home open Couch TV" put the watch APK on over this one: switch its watch on and check it (HomeKey)
+        HomeKey.resume(this)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityResumed(a: Activity) { resumed++ }
             override fun onActivityPaused(a: Activity) { resumed-- }
