@@ -4570,6 +4570,7 @@
   // bridge; otherwise the bridge's copy comes back (this TV's storage was cleared, say).
   function syncSettings() {
     return api("GET", "/api/settings").then(function (j) {
+      if (j && j.mode === "bridge") BRIDGE_PHONE = true;   // this computer serves the phone's Home settings page
       var rec = kept(ST_KEY), remote = j.settings && typeof j.settings === "object" && !Array.isArray(j.settings) ? j.settings : null;
       if (SEEN === null || !rec || !rec.pending) SEEN = j.updated || "";   // a pending copy keeps the older SEEN it was made from
       if (rec && rec.pending) return pushSettings(rec);   // SEEN is still the older one: the server keeps any newer phone change
@@ -4599,15 +4600,25 @@
   // costs no presses, and every setting stays here on the TV too. Where none answers, nothing shows.
   var PHONE_QR = { timer: 0, url: "" };
   var PHONE_URL = /^http:\/\/([^\/#?]+)(\/setup(?:\?tv=[A-Za-z0-9_-]+)?)#pin=(\d{6})$/;
+  var BRIDGE_PHONE = false;   // the home computer serves the page: its /api/settings says mode "bridge" (an older one does not)
   function phoneLinkFn() {
     if (PREVIEW || STANDALONE) return null;   // (a mock home asks mock.js, which answers for ?ontv=1 and ?phonepage=)
-    if (!OFFLINE) return function () { return api("GET", "/api/phone-link"); };
+    if (!OFFLINE) return function () {
+      var known = ON_TV || BRIDGE_PHONE ? Promise.resolve() : api("GET", "/api/settings").then(function (j) { if (j && j.mode === "bridge") BRIDGE_PHONE = true; });
+      return known.then(function () { if (!ON_TV && !BRIDGE_PHONE) throw new Error("no phone page"); return api("GET", "/api/phone-link"); });
+    };
     if (TV && TV.phoneLink) return function () {
       var j = null;
       try { j = JSON.parse(TV.phoneLink() || "null"); } catch (e) { j = null; }
       return j && j.url ? Promise.resolve(j) : Promise.reject(new Error("no phone page"));
     };
     return null;
+  }
+  // known now, without asking (Hold OK's menu is drawn at once): the on-TV app, a home computer that said so, the home app's own page
+  function phoneLinkKnown() {
+    if (!phoneLinkFn()) return false;
+    if (!OFFLINE) return ON_TV || BRIDGE_PHONE;
+    try { return !!JSON.parse(TV.phoneLink() || "null"); } catch (e) { return false; }   // the home app's page is running
   }
   function phoneQr() {
     var box = $("set-phone");
@@ -7950,7 +7961,7 @@
       night: NIGHT,
       // Hold OK on a widget, Edit on your phone: the phone's Home settings page with a pairing code,
       // wherever that page exists (as Change this on your phone in Home settings: phoneLinkFn)
-      phoneLink: phoneLinkFn() ? function () { return phoneLinkFn()().then(function (j) { return j && j.url; }); } : null,
+      get phoneLink() { return phoneLinkKnown() ? function () { return phoneLinkFn()().then(function (j) { return j && j.url; }); } : null; },
       // widget mode: whether the home itself has the remote (no menu, settings or pop up open)
       free: function () { return !screenOffActive && !idleAmbientActive && !kidsOn() && !expanded && !lift && ["grid", "shelf", "np", "people", "quick"].indexOf(zone) >= 0; },
       // what the widgets show: only what this TV already has

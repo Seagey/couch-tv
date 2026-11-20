@@ -127,12 +127,44 @@ try {
     await ctxL.close();
   }
 
+  // a Roku or an Apple TV: their Couch TV takes the town and people; At home, photos and widgets are left out
+  {
+    const ctxR = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
+    const pg = await ctxR.newPage();
+    pg.errors = []; pg.on("pageerror", (e) => pg.errors.push(String(e)));
+    // a phone that paired the computer's phone remote (couchtv.key on the same address) needs no code here
+    await pg.addInitScript((k) => { if (!sessionStorage.getItem("seen")) { localStorage.setItem("couchtv.key", k); sessionStorage.setItem("seen", "1"); } }, KEY);
+    await pg.route(ORIGIN + "/api/settings*", async (rt) => { const r = await rt.fetch(); const j = await r.json(); j.home = "roku"; rt.fulfill({ contentType: "application/json", body: JSON.stringify(j) }); });
+    let athomeAsked = false;
+    pg.on("request", (r) => { if (/\/api\/athome/.test(r.url())) athomeAsked = true; });
+    await pg.goto(ORIGIN + "/setup");
+    await pg.waitForFunction(() => document.getElementById("people-now").textContent !== "Checking…");
+    ok(!(await pg.$("#ctv-pair")), "a phone with the computer's phone remote paired opens it with no code");
+    for (const id of ["photos", "athome", "widgets", "dapps"]) ok(await pg.isHidden("#" + id), "Roku: left out #" + id);
+    ok(await pg.isVisible("#town") && await pg.isVisible("#people"), "Roku: the town and people are there");
+    ok(/takes the town and the people from here/.test(await pg.textContent("#intro-from")), "Roku: it says what reaches the TV");
+    ok(!athomeAsked, "Roku: At home is not asked for");
+    ok(!pg.errors.length, "Roku: no page errors: " + pg.errors.join("; "));
+    await ctxR.close();
+  }
+  // a home computer with no pairing key (the default): nothing to pair, the page opens straight away
+  {
+    const ctxO = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
+    const pg = await ctxO.newPage();
+    await pg.route(ORIGIN + "/api/health*", (rt) => rt.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, auth: "ok", paired: true }) }));
+    await pg.goto(ORIGIN + "/setup");
+    await pg.waitForFunction(() => localStorage.getItem("couchtv.token") === "open", null, { timeout: 8000 });
+    ok(true, "no pairing key on the computer: the page needs no code");
+    await ctxO.close();
+  }
+
   // ---- 2. the real TV home, opened from the computer ----
   const tvPage = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   tvPage.errors = []; tvPage.on("pageerror", (e) => tvPage.errors.push(String(e)));
   const TVHOME = ORIGIN + "/tv/index.html?api=" + encodeURIComponent(ORIGIN) + "&key=" + KEY;
   await tvPage.goto(TVHOME);
-  await tvPage.waitForFunction(() => window.tv && window.CouchPhonePage);
+  await until(() => tvPage.evaluate(() => !!(window.tv && window.CouchPhonePage) && document.readyState === "complete").catch(() => false), "the TV home is back");
+  await tvPage.waitForTimeout(1500);
   await until(() => get("/api/athome").then((j) => j.live), "the TV home hands its view to the computer");
   ok(true, "the TV home hands its At home view to the computer (live)");
   // Home settings on the real home: the QR from the computer
@@ -152,10 +184,10 @@ try {
   await phone.route("https://geocoding-api.open-meteo.com/**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ results: [
     { id: 1, name: "Hobart", latitude: -42.87936, longitude: 147.32941, timezone: "Australia/Hobart", admin1: "Tasmania", country: "Australia", country_code: "AU" }] }) }));
   await phone.goto(ORIGIN + "/setup#pin=" + code);
-  await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
+  // the page pairs, then loads again: wait for the second load's settings
+  await until(() => phone.evaluate(() => !!(window.couchTv && window.couchTv.token()) && document.getElementById("people-now").textContent !== "Checking…").catch(() => false), "the phone pairs and loads");
   ok(await phone.evaluate((k) => window.couchTv.token() === k, KEY), "the code from the TV's QR pairs the phone (it gets the computer's pairing key)");
   ok(!/pin=/.test(phone.url()), "and is taken off the address");
-  await phone.waitForFunction(() => document.getElementById("people-now").textContent !== "Checking…");
   await phone.evaluate(() => document.querySelectorAll("main > section.fold.shut").forEach((s) => s.classList.remove("shut")));
   ok(/home computer/.test(await phone.textContent("#intro-from")), "the page says it comes from the home computer");
   for (const id of ["ask", "tvname", "keys", "upd", "phones-card", "home"]) ok(await phone.isHidden("#" + id), "left out (set up on the computer or only on the on-TV app): #" + id);
@@ -168,7 +200,8 @@ try {
   ok((await get("/api/settings")).settings.place.name === "Hobart", "the computer keeps the town");
   await until(() => tvPage.evaluate(() => { try { return (JSON.parse(localStorage.getItem("tvhome.settings")).s.place || {}).name === "Hobart"; } catch (e) { return false; } }).catch(() => false), "the TV home takes the town");
   ok(true, "the TV home takes the phone's town (it starts again with it)");
-  await tvPage.waitForFunction(() => window.tv && window.CouchPhonePage);
+  await until(() => tvPage.evaluate(() => !!(window.tv && window.CouchPhonePage) && document.readyState === "complete").catch(() => false), "the TV home is back");
+  await tvPage.waitForTimeout(1500);
   // At home: the note goes into the TV home's own store
   await until(() => get("/api/athome").then((j) => j.live), "the TV home is back");
   await phone.fill("#ah-note", "Dinner at 6"); await phone.fill("#ah-from", "Mum");
@@ -195,7 +228,8 @@ try {
   ok(await phone.evaluate(() => { const i = document.querySelector("#photo-list .photo img"); return new Promise((r) => { if (i.complete) r(i.naturalWidth); else { i.onload = () => r(i.naturalWidth); i.onerror = () => r(0); } }); }) === 1620,
     "the phone page shows it (with its cookie), 1620 wide");
   await until(() => tvPage.evaluate(() => { try { return (JSON.parse(localStorage.getItem("tvhome.settings")).s.photos || []).length === 1; } catch (e) { return false; } }).catch(() => false), "the TV home takes the photo");
-  await tvPage.waitForFunction(() => window.tv && window.CouchPhonePage);
+  await until(() => tvPage.evaluate(() => !!(window.tv && window.CouchPhonePage) && document.readyState === "complete").catch(() => false), "the TV home is back");
+  await tvPage.waitForTimeout(1500);
   const want = await tvPage.evaluate((f) => { const s = location.search; const m = /[?&]api=([^&]+)/.exec(s); return decodeURIComponent(m[1]) + "/api/photo/" + f; }, photos[0].file);
   const direct = await tvPage.evaluate((u) => new Promise((r) => { const i = new Image(); i.onload = () => r(i.naturalWidth); i.onerror = () => r(0); i.src = u; }), want + "?key=" + KEY);
   ok(direct === 1620, "the TV home's address for it (photoSrc, with the key) loads it: " + direct );
@@ -223,7 +257,7 @@ try {
   ok(/^Code for your phone: \d{3} \d{3}$/.test(line), "the TV home shows the code as a line: " + line);
   await phone2.fill("#ctv-pin", line.replace(/\D/g, ""));
   await phone2.click("#ctv-go");
-  await phone2.waitForFunction(() => window.couchTv && window.couchTv.token());
+  await until(() => phone2.evaluate(() => !!(window.couchTv && window.couchTv.token())).catch(() => false), "typing the code pairs");
   ok(true, "typing the code from the TV pairs the phone");
   await tvPage.waitForFunction(() => !document.querySelector(".phone-code"), null, { timeout: 15000 });
   ok(true, "the line goes once the code is used");

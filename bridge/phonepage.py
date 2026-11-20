@@ -158,9 +158,10 @@ def read(tv, now=None):
 
 
 class Refused(Exception):
-    def __init__(self, status, message):
+    def __init__(self, status, message, key="err_something_wrong"):
         super().__init__(message)
         self.status = status
+        self.key = key   # the words' key for a home in another language (bridge/messages.py)
 
 
 async def edit(tv, change, wait=EDIT_WAIT_S):
@@ -171,7 +172,7 @@ async def edit(tv, change, wait=EDIT_WAIT_S):
     s = _tv(tv)
     if not live(tv):
         if "lists" in change or "guide" in change or "widget_set" in change or "design_apps" in change:
-            raise Refused(409, "Open the Couch TV home on the TV first, then save again.")
+            raise Refused(409, "Open the Couch TV home on the TV first, then save again.", "err_tv_home_closed")
         if len(s["inbox"]) >= WAIT_MAX:
             raise Refused(409, f"The TV is holding {WAIT_MAX} changes already. Open the Couch TV home on the TV, then save again.")
         s["inbox"].append({"id": next(_ids), "edit": change})

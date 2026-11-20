@@ -247,6 +247,14 @@ class PhonePageApp(AioHTTPTestCase):
         st, w = await self.j("GET", "/api/weather")
         self.assertEqual((w["place"], w["temp"]), ("Torquay", 19))
 
+    async def test_what_draws_the_home(self):
+        st, j = await self.j("GET", "/api/settings")
+        self.assertEqual(j["home"], "web")
+        for kind, home in (("roku", "roku"), ("appletv", "appletv"), ("vizio", "none"), ("samsung", "web"), ("lg", "web"), ("vidaa", "web")):
+            with patch.dict(server.TV_CONFIG, {"tvs": [{"id": server.DEFAULT_TV, "kind": kind, "name": "Lounge"}]}):
+                st, j = await self.j("GET", "/api/settings")
+            self.assertEqual((j["home"], j["tv_name"]), (home, "Lounge"), kind)
+
     async def test_settings_patch_checked(self):
         for patch_ in ({"look": "night"}, {"place": "Torquay"}, {"place": {"name": "x", "lat": 95, "lon": 0}},
                        {"place": {"name": "", "lat": 1, "lon": 1}}, {}):

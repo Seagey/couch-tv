@@ -806,7 +806,8 @@
   // that computer, so they are left out. The Couch TV home app with no computer ("launcher"): there is no
   // phone remote, so people are changed on the TV.
   var MODE = 'on-tv';
-  function applyMode(m) {
+  var NO_ATHOME = false;
+  function applyMode(m, home) {
     MODE = m === 'bridge' || m === 'launcher' ? m : 'on-tv';
     if (MODE === 'on-tv') return;
     var gone = ['ask', 'smart', 'tvname', 'keys', 'xiaomi', 'upd', 'phones-card'].concat(MODE === 'bridge' ? ['home'] : ['kids-first']);
@@ -814,6 +815,13 @@
     clearInterval(updPoll);
     if (MODE === 'bridge') {
       $('intro-from').textContent = 'This page comes from your home computer, over your home Wi-Fi.';
+      // a Roku, an Apple TV or a VIZIO: their Couch TV takes the town and the people from here; At home, your
+      // photos and a design's widgets are parts of the couch-tv home on a TV that shows web pages
+      if (home && home !== 'web') {
+        ['photos', 'athome', 'widgets', 'dapps'].forEach(function (id) { $(id).style.display = 'none'; var c = document.querySelector('.jump a[href="#' + id + '"]'); if (c) c.style.display = 'none'; });
+        $('jump-widgets').style.display = 'none'; $('jump-dapps').style.display = 'none'; NO_ATHOME = true;
+        $('intro-from').textContent = 'This page comes from your home computer, over your home Wi-Fi. ' + (home === 'none' ? 'This TV shows its own home, so only the town and the people are here.' : 'Couch TV on this TV takes the town and the people from here.');
+      }
       $('photos-where').textContent = 'They go straight from this phone to your home computer, which makes them screen size and keeps them for the TV.';
     } else {
       $('to-remote').style.display = 'none';
@@ -826,7 +834,7 @@
   function loadSettings() {
     return api('GET', '/api/settings').then(function (j) {
       SETTINGS = j;
-      applyMode(j.mode);
+      applyMode(j.mode, j.home);
       showTown(); showPeople(); showPhotos();
       if (MODE !== 'on-tv') return;
       $('tv-name').value = j.tv_name || ''; $('country').value = j.country || '';
@@ -848,7 +856,7 @@
     }).catch(function (e) { $('town-now').textContent = e.message; });
   }
   // the settings first: they say who serves the page (applyMode), so a part it leaves out never flashes up
-  function load() { loadSettings().then(function () { loadInputs(); loadAtHome(); if (MODE !== 'bridge') loadHome(); if (MODE === 'on-tv') loadSmart(); }); }
+  function load() { loadSettings().then(function () { loadInputs(); if (!NO_ATHOME) loadAtHome(); if (MODE !== 'bridge') loadHome(); if (MODE === 'on-tv') loadSmart(); }); }
   var poll = null;
   $('adb-connect').onclick = function () {
     $('adb-msg').textContent = 'Connecting. Look at the TV.';

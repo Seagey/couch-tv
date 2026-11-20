@@ -504,7 +504,7 @@
             store.set("api.settings", { settings: next, updated: new Date(Math.max(Date.now(), was && was.updated ? Date.parse(was.updated) + 1 : 0)).toISOString() });
           }
           var st = store.get("api.settings") || { settings: {}, updated: null };
-          return resolve({ ok: true, settings: st.settings, updated: st.updated });
+          return resolve({ ok: true, settings: st.settings, updated: st.updated, mode: arg("phonepage") ? "bridge" : undefined });
         }
         if (path.indexOf("/api/sleep") === 0) {
           if (method === "POST") sleepEnds = body.minutes ? new Date(Date.now() + body.minutes * 60000).toISOString() : null;

@@ -5,7 +5,9 @@
   'use strict';
   var KEY = 'couchtv.token';
   var token = null, autoPairing = false;
-  try { token = localStorage.getItem(KEY); } catch (e) { /* private mode: the cookie still works */ }
+  // the home computer's own phone remote keeps its pairing key as couchtv.key: a phone that paired the remote
+  // there opens the Home settings page (/setup on the same computer) already paired
+  try { token = localStorage.getItem(KEY) || localStorage.getItem('couchtv.key'); } catch (e) { /* private mode: the cookie still works */ }
   if (!token) { var m = document.cookie.match(/(?:^|; )couchtv_token=([^;]+)/); if (m) token = decodeURIComponent(m[1]); }
   // pictures the page shows from the TV (/api/photo/...) carry no header, only the cookie: keep it set
   else if (!/(?:^|; )couchtv_token=/.test(document.cookie)) document.cookie = 'couchtv_token=' + encodeURIComponent(token) + '; path=/; max-age=31536000; SameSite=Strict';
@@ -119,5 +121,11 @@
       realFetch('/api/health', { headers: { Authorization: 'Bearer ' + token } }).then(function (r) { return r.json(); })
         .then(function (j) { if (!j || j.auth !== 'ok') pairFromQr(); else autoPairing = false; }).catch(function () { pairFromQr(); });
     }
-  } else if (!token) showPairing();
+  } else if (!token) {
+    // a home computer with no pairing key set answers every call already (auth "ok"): nothing to pair.
+    // Anything else (the on-TV app, a computer with a key) shows the pairing screen as before.
+    realFetch('/api/health').then(function (r) { return r.json(); })
+      .then(function (j) { if (j && j.auth === 'ok' && j.mode !== 'on-tv') { save('open'); location.reload(); } else showPairing(); })
+      .catch(function () { showPairing(); });
+  }
 })();
