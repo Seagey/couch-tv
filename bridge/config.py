@@ -428,6 +428,8 @@ def _home(h):
     clock = str(h.get("clock") or "").lower()
     if clock in ("12h", "24h"):
         out["clock"] = clock
+    if isinstance(h.get("clock_seconds"), bool):
+        out["clock_seconds"] = h["clock_seconds"]
     if h.get("language") in LANGUAGES:
         out["language"] = h["language"]
     # The setup's answer to "tell you when a new version is out?": notify (the TV looks once a week)
@@ -478,6 +480,10 @@ def _home(h):
     # Now playing on or off (#31), and the navigation sound: the TV's own, soft or off (#32)
     if isinstance(h.get("now_playing"), bool):
         out["now_playing"] = h["now_playing"]
+    if h.get("spotify_player") is True:
+        out["spotify_player"] = True
+    if h.get("football_scores") is True:
+        out["football_scores"] = True
     # false hides the whole Keep watching row and stops the home asking for it. Home settings win over it.
     if isinstance(h.get("keep_watching"), bool):
         out["keep_watching"] = h["keep_watching"]

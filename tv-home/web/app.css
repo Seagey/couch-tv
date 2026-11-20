@@ -101,6 +101,7 @@ body {
 .clock { text-align: right; }
 .time { font-size: 7rem; line-height: 7rem; font-weight: 250; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
 .time small { font-size: 2.25rem; font-weight: 400; letter-spacing: 0; margin-left: 0.5rem; }
+.clock-seconds { font-size: 0.45em; font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .date { margin-top: 0.75rem; font-size: 1.875rem; line-height: 2.25rem; font-weight: 550; }
 .place { margin-top: 0.625rem; font-size: 1.4375rem; line-height: 1.875rem; color: rgba(255, 255, 255, 0.66); }
 /* quick buttons under the clock, like Apple TV's Control Centre */
@@ -1074,6 +1075,48 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .theme-night:not(.no-flex-gap) .np-slot.on + .shelf-clip { padding-left: 1.25rem; margin-left: -1.25rem; }
 .theme-night .np { width: 34rem; margin: 0; padding: 1rem; border-radius: 1.875rem; }
 .theme-night .np-art { width: 5.9375rem; height: 5.9375rem; border-radius: 1rem; }
+html.spotify-row.theme-night .gclock { font-size: 19rem; top: 7rem; }
+html.spotify-row.theme-night .np-slot.on { position: absolute; left: 0; top: -23rem; z-index: 2; }
+html.spotify-row.theme-night .np { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 1rem; width: 19rem; height: 19rem; box-sizing: border-box; padding: 1.25rem; isolation: isolate; }
+html.spotify-row.theme-night .np:not(.on) { display: none; }
+html.spotify-row.theme-night .np-art { opacity: .72; position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; z-index: -2; object-fit: cover; }
+html.spotify-row.theme-night .np::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.62)); }
+html.spotify-row.theme-night .np-t { flex: none; width: 100%; text-align: left; text-shadow: 0 1px 4px #000; }
+html.spotify-row.theme-night .np-ctl { justify-content: center; gap: .5rem; }
+html.spotify-row.theme-night .nb { width: 3.75rem; height: 3.75rem; background: rgba(255, 255, 255, 0.22); }
+html.spotify-row.theme-night .nb svg { width: 1.75rem; height: 1.75rem; }
+html.spotify-row.theme-night .np-slot.on + .shelf-clip { padding-left: 1.5rem; margin-left: -1.5rem; }
+html.spotify-row.theme-night .shelf { top: 40.25rem; left: 39.75rem; right: 3.1rem; }
+html.spotify-row.theme-night .gclock { font-size: 13.6rem; top: 5rem; left: 23rem; right: 1.16rem; }
+html.cd.spotify-row.theme-night #scenes .gclock { font-size: 21.25rem; }
+html.spotify-row.theme-night .np-slot.on { top: 3.25rem; left: -36.65rem; }
+html.spotify-row.theme-night .np { width: 13.95rem; height: 13.95rem; padding: .6rem; gap: .4rem; border-radius: 1.5rem; }
+html.spotify-row.theme-night .np-t b { font-size: 1.2rem; line-height: 1.45rem; margin-top: .1rem; }
+html.spotify-row.theme-night .np-t small { font-size: 1rem; line-height: 1.25rem; }
+html.spotify-row.theme-night .ncard { background: transparent !important; -webkit-backdrop-filter: none; backdrop-filter: none; position: relative; overflow: hidden; display: block; box-sizing: border-box; width: 24.8rem; height: 13.95rem; padding: 0; border-radius: 1.5rem; }
+html.spotify-row.theme-night .ncard .thumb { opacity: .72; position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; }
+html.spotify-row.theme-night .ncard .t { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 1rem; background: linear-gradient(transparent 28%, rgba(0,0,0,.72)); text-shadow: 0 1px 4px rgba(0,0,0,.9); }
+html.spotify-row.theme-night .ncard .nap { color: rgba(255,255,255,.9); }
+html.spotify-row.theme-night:not(.expanded) .apps { left: 3.1rem; right: 3.1rem; bottom: 1.16rem; width: calc(100% - 6.2rem); transform: none; }
+html.spotify-row.theme-night:not(.expanded) .grid { display: flex; justify-content: space-evenly; width: 100%; box-sizing: border-box; gap: 0.75rem; padding: 0.9rem 1rem; border-radius: 1.5rem; }
+html.spotify-row.theme-night:not(.expanded) .app { width: 5.05rem; height: 5.05rem; flex: none; }
+html.spotify-row.theme-night .shelf-clip { max-width: none; }
+#football-scores { display: none; }
+html.theme-night #football-scores.focus { outline: .3rem solid white; outline-offset: .2rem; }
+html.theme-night #football-scores.on { display: flex; position: fixed; z-index: 5; top: 43.5rem; left: 18.425rem; right: auto; width: 19.95rem; height: 13.95rem; box-sizing: border-box; flex-direction: column; overflow: hidden; padding: 1rem; border-radius: 1.5rem; background: rgba(14,18,24,.65); color: white; text-shadow: 0 1px 3px rgba(0,0,0,.8); box-shadow: 0 0.5rem 2rem rgba(0,0,0,.22); }
+.football-heading { display: flex; justify-content: space-between; align-items: center; gap: .5rem; font-size: 1.4rem; }
+.football-heading b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.football-heading span { flex: none; }
+.football-heading span, .football-count { font-size: 1rem; opacity: .7; }
+.football-match { flex: 0 0 auto; padding-top: .25rem; line-height: 1.2; }
+.football-teams { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: .35rem; font-size: 1.1rem; }
+.football-teams span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.football-teams span:last-child { text-align: right; }
+.football-teams b { font-size: 1.3rem; }
+.football-match small { display: block; text-align: center; font-size: .9rem; opacity: .8; }
+.football-empty { margin: auto 0; text-align: center; font-size: 1.2rem; opacity: .8; }
+.football-count { margin-top: auto; text-align: right; }
+html.gearing #football-scores, html.apping #football-scores, html.expanded #football-scores { visibility: hidden; }
 .theme-night .np-app { font-size: 1.1875rem; line-height: 1.5rem; }
 .theme-night .np-t b { margin-top: 0.375rem; font-size: 1.5625rem; line-height: 2rem; }
 .theme-night .np-t small { font-size: 1.25rem; line-height: 1.625rem; }

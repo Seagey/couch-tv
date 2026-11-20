@@ -81,6 +81,7 @@
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
   // LOOP: the Loop look, laid out like Night (NIGHT stays true in it), see setLook()
   var THEME = "night", NIGHT = true, OLED = false, LOOP = false, CLOCK24 = false;
+  var CLOCK_SECONDS = false, clockSecondsTimer = null;
   // OLED burn-in protection: micro-shift (±2px) every 60 seconds in the OLED look. The Smart Idle
   // ambient clock uses wider steps (±4px) while it is on screen.
   var OLED_SHIFT_STEPS = [[0,0], [1,1], [-1,1], [2,-1], [-1,-1], [1,-2], [-2,0], [0,1]];
@@ -527,6 +528,8 @@
     // glass app icons (#25): set in Home settings, else home.glass_icons; off unless switched on
     GLASS_ICONS = typeof ST.glass_icons === "boolean" ? ST.glass_icons : HOME.glass_icons === true;
     NP_ON = typeof ST.now_playing === "boolean" ? ST.now_playing : HOME.now_playing !== false;
+    LOCAL_SPOTIFY = !!(OFFLINE && !STANDALONE && HOME.spotify_player === true && TV && TV.spotifyMusic);
+    document.documentElement.classList.toggle("spotify-row", LOCAL_SPOTIFY);
     // the Keep watching row: Home settings win over home.keep_watching; off hides it and stops fetching it
     KW_ON = typeof ST.keep_watching === "boolean" ? ST.keep_watching : HOME.keep_watching !== false;
     // an Inputs tile first in the dock (#154): Home settings win over home.input_tile; off unless switched on
@@ -555,6 +558,7 @@
     initSoundscape();
     if (smartOn()) DOCK_APPS = Math.min(DOCK_APPS, 9);   // the Smart home tile takes one place in the dock
     CLOCK24 = clock24();
+    CLOCK_SECONDS = typeof ST.clock_seconds === "boolean" ? ST.clock_seconds : HOME.clock_seconds === true;
     (Array.isArray(HOME.hide_packages) ? HOME.hide_packages : []).forEach(function (p) {
       if (typeof p === "string" && HIDDEN.indexOf(p) < 0) HIDDEN.push(p);
     });
@@ -837,6 +841,26 @@
   // two innerHTMLs and forces a few layouts (fitDate, the glass clock), which a 2 GB box felt four
   // times a minute for a display that changes once. tv.resume() redraws straight away.
   var clockMinute = "";
+  function secondsText(d) {
+    var s = d.getSeconds();
+    return ":" + (s < 10 ? "0" : "") + s;
+  }
+  function secondsMarkup(d) {
+    return CLOCK_SECONDS ? '<span class="clock-seconds">' + secondsText(d) + "</span>" : "";
+  }
+  function updateClockSeconds() {
+    if (!active()) return;
+    var d = new Date();
+    if (d.getHours() + ":" + d.getMinutes() !== clockMinute) { clock(); return; }
+    var text = secondsText(d);
+    Array.prototype.forEach.call(document.querySelectorAll(".clock-seconds"), function (el) {
+      if (el.textContent !== text) el.textContent = text;
+    });
+  }
+  function syncClockSeconds() {
+    clearInterval(clockSecondsTimer);
+    clockSecondsTimer = CLOCK_SECONDS ? setInterval(updateClockSeconds, 1000) : null;
+  }
   function clockTick() {
     if (!active()) return;
     refreshBingScene();
@@ -851,7 +875,8 @@
     var CD = typeof CouchDesign !== "undefined" && CouchDesign.on() ? CouchDesign : null;
     var c24 = CD ? CD.clock24(CLOCK24) : CLOCK24;   // a design's clock format wins (design.js)
     var hm = c24 ? (h < 10 ? "0" : "") + h + ":" + mm : (h % 12 || 12) + ":" + mm;
-    $("time").innerHTML = hm + (c24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
+    var clockText = hm + secondsMarkup(d) + (c24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
+    $("time").innerHTML = clockText;
     var loc = window.I18N ? window.I18N.locale() : "en-AU";
     var lang = window.I18N ? window.I18N.lang() : "en";
     var day = d.toLocaleDateString(loc, { weekday: "long", day: "numeric", month: "long" });
@@ -876,7 +901,7 @@
         (!w && NIGHT && WX_SHOW && !CD && !wxPlaceSet() ? '<span class="wx wx-ask">' + bar + (DATE_BARS ? "" : " · ") + esc(t("wx_ask", { home: t("gear_home"), loc: t("sec_location") })) + "</span>" : "") + "</span>";
     }
     var ic = $("idle-clock"), idate = $("idle-date"), iwx = $("idle-wx");
-    if (ic) ic.innerHTML = hm + (c24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
+    if (ic) ic.innerHTML = clockText;
     if (idate) idate.textContent = day;
     if (iwx) {
       var wIdle = WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
@@ -1138,9 +1163,10 @@
     if (!hm) return;
     el.dataset.hm = hm;
     var cs = el.querySelectorAll(".gclock");
+    var digits = hm + secondsMarkup(new Date());
     for (var k = 0; k < cs.length; k++) {
       var c = cs[k];
-      c.innerHTML = '<span class="edge">' + hm + '</span><span class="fill">' + hm + '</span><span class="sheen">' + hm + '</span><span class="rim">' + hm + "</span>";
+      c.innerHTML = '<span class="edge">' + digits + '</span><span class="fill">' + digits + '</span><span class="sheen">' + digits + '</span><span class="rim">' + digits + "</span>";
       var f = c.querySelector(".fill"), ex = c.offsetLeft + f.offsetLeft, ey = c.offsetTop + f.offsetTop;
       if (CLOCK_LIQUID) {
         // Liquid glass (#25): the sharp photo seen through the digits, magnified LENS times about
@@ -1966,13 +1992,69 @@
   // The song any app is playing behind the home (Spotify, YouTube Music, ...): its title, artist and
   // cover, with previous, play or pause and next. The bridge or the on-TV app reads it from the TV's
   // media sessions (/api/music) every 5 s while the home is on screen; the buttons are the remote's
-  // media keys. A paused song stays for ten minutes so play can start it again. No computer and no
-  // on-TV app (option A): Android lets no ordinary app read other apps' sessions, so no card.
+  // media keys. A paused song stays available to resume. The local Spotify option uses only the
+  // session exposed by the Spotify TV app, with no bridge.
   var music = null, npI = 1, npSrc = "";   // npSrc: where the song comes from, to reset npI when it changes
+  var LOCAL_SPOTIFY = false, SPOTIFY_TV = "com.spotify.tv.android";
+  var FOOTBALL_LEAGUES = [
+    { id: "47", name: "Premier League" }, { id: "55", name: "Serie A" },
+    { id: "42", name: "Champions League" }, { id: "73", name: "Europa League" },
+    { id: "77", name: "World Cup" }, { id: "nations", name: "UEFA Nations League", ids: [9806, 9807, 9808, 9809] },
+    { id: "54", name: "Bundesliga" }, { id: "87", name: "La Liga" },
+    { id: "53", name: "Ligue 1" }, { id: "523", name: "Persian Gulf Pro League" },
+    { id: "141", name: "Coppa Italia" }, { id: "138", name: "Copa del Rey" },
+    { id: "132", name: "FA Cup" }, { id: "209", name: "DFB-Pokal" }
+  ];
+  var footballPage = 0, footballMatchPage = 0, footballMatchPages = 1, footballData = null, footballEnabled = false;
+  function selectedFootball() {
+    var chosen = Array.isArray(ST.football_leagues) ? ST.football_leagues : FOOTBALL_LEAGUES.map(function (x) { return x.id; });
+    return FOOTBALL_LEAGUES.filter(function (league) { return chosen.indexOf(league.id) >= 0; });
+  }
+  function footballRender() {
+    var box = $("football-scores"), chosen = selectedFootball();
+    if (!box) return;
+    if (!footballEnabled || !NIGHT || LOOP) { box.classList.remove("on"); return; }
+    box.classList.add("on");
+    if (!chosen.length) { box.innerHTML = '<div class="football-heading"><b>Football scores</b><span>FotMob</span></div><div class="football-empty">Choose leagues</div>'; return; }
+    var league = chosen[footballPage % chosen.length], ids = league.ids || [Number(league.id)];
+    var matches = [];
+    ((footballData && footballData.leagues) || []).forEach(function (item) {
+      if (ids.indexOf(Number(item.id)) >= 0 || ids.indexOf(Number(item.primaryId)) >= 0)
+        matches = matches.concat(item.matches || []);
+    });
+    matches.sort(function (a, b) {
+      var live = function (m) { return m.status && m.status.started && !m.status.finished ? 0 : 1; };
+      return live(a) - live(b);
+    });
+    footballMatchPages = Math.max(1, Math.ceil(matches.length / 3));
+    footballMatchPage = Math.min(footballMatchPage, footballMatchPages - 1);
+    var rows = matches.slice(footballMatchPage * 3, footballMatchPage * 3 + 3).map(function (m) {
+      var status = m.status || {}, home = m.home || {}, away = m.away || {};
+      var score = status.started ? String(home.score == null ? "-" : home.score) + "–" + String(away.score == null ? "-" : away.score) : "vs";
+      var note = status.cancelled ? "Cancelled" : status.finished ? "Full time" : status.started ? "LIVE" :
+        (m.timeTS ? new Date(m.timeTS).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: !CLOCK24 }) : "Upcoming");
+      return '<div class="football-match"><div class="football-teams"><span>' + esc(home.name || "") + '</span><b>' + esc(score) +
+        '</b><span>' + esc(away.name || "") + '</span></div><small>' + esc(note) + '</small></div>';
+    });
+    var empty = !footballData || footballData.state === "loading" ? "Loading scores…" :
+      footballData.state === "error" ? "Scores unavailable. Trying again." : "No matches today";
+    box.innerHTML = '<div class="football-heading"><b>' + esc(league.name) + '</b><span>FotMob</span></div>' +
+      (rows.length ? rows.join("") : '<div class="football-empty">' + esc(empty) + '</div>') +
+      '<div class="football-count">' + (footballMatchPages > 1 ? 'Matches ' + (footballMatchPage + 1) + ' / ' + footballMatchPages + ' &nbsp;·&nbsp; ' : '') + (footballPage % chosen.length + 1) + ' / ' + chosen.length + '</div>';
+  }
+  function footballTick(advance) {
+    if (!footballEnabled || covered()) return;
+    try { footballData = JSON.parse(TV.fotmobScores()); } catch (e) { footballData = { state: "error" }; }
+    if (advance) {
+      if (footballMatchPage + 1 < footballMatchPages) footballMatchPage++;
+      else { footballMatchPage = 0; footballPage++; }
+    }
+    footballRender();
+  }
   var AMBIENT_MUSIC = false, ambientOpen = false, ambientDismissed = false, ambI = 1;
   var lastTrackKey = "", paletteCache = {}, curProgress = 0, curDuration = 0;
 
-  function npVisible() { return NP_ON && !!music && (!OFFLINE || STANDALONE); }
+  function npVisible() { return NP_ON && !!music && (!OFFLINE || STANDALONE || LOCAL_SPOTIFY); }
   // reachable with the remote: in the Night look it steps aside with the cards while More apps is open
   function npReach() { return npVisible() && !(NIGHT && expanded) && npButtons().length > 0; }
   // The card's buttons: the TV's media keys for a song the TV itself plays. A song from Spotify's Web
@@ -1980,6 +2062,7 @@
   // do not reach: the standalone home offers "Play on TV" instead (spotify-player.js), the bridge none.
   function npButtons() {
     if (!music) return [];
+    if (music.state === "idle") return [["play", t("spotify_open"), "spotify-open"]];
     var b;
     if (music.source === "spotify") b = STANDALONE && window.CouchSpotify ? [["play", t("np_play_here"), "here"]] : [];
     else {
@@ -1988,6 +2071,15 @@
     }
     if (AMBIENT_MUSIC) b.push(["expand", t("np_expand")]);
     return b;
+  }
+
+  function sendMusicKey(key) {
+    if (music && music.source === "spotify-tv") {
+      try { if (TV.spotifyKey(key)) return; } catch (e) {}
+      note(t("spotify_control_unavailable"));
+      return;
+    }
+    api("POST", "/api/key", { key: key }).catch(function (e) { note(tBridge(e.key, e.vars, e.message)); });
   }
 
   function formatTime(sec) {
@@ -2162,7 +2254,7 @@
       renderAmbientMusic();
       renderNp();
     }
-    api("POST", "/api/key", { key: key }).catch(function (e) { note(tBridge(e.key, e.vars, e.message)); });
+    sendMusicKey(key);
     setTimeout(refreshMusic, key === "play_pause" ? 1500 : 900);
   }
 
@@ -2181,9 +2273,9 @@
       $("np-slot").classList.toggle("on", on);
     }
     if (!on) { el.innerHTML = ""; npFit(""); return; }
-    var playing = music.state === "playing";
     // the cover from the bridge (Apple's music search); none yet, or none found: a music note
-    var art = music.art ? '<img class="np-art" src="' + esc(music.art) + '" alt="" decoding="async" data-err="np">' :
+    var cover = music.art || (music.source === "spotify-tv" ? iconUrl(SPOTIFY_TV) : "");
+    var art = cover ? '<img class="np-art" src="' + esc(cover) + '" alt="" decoding="async" data-err="np">' :
       '<span class="np-art">' + ICONS.note + "</span>";
     var btns = npButtons();
     if (npI >= btns.length) npI = Math.max(0, btns.length - 1);   // a Spotify song may have one button
@@ -2215,21 +2307,29 @@
   setInterval(function () { var age = Date.now() - queueAt; if ((QUEUE === undefined && age > 6000) || age > 20000) refreshQueue(); }, 2000);
 
   function refreshMusic() {
-    if (!NP_ON || (OFFLINE && !STANDALONE) || covered()) {
+    if (!NP_ON || (OFFLINE && !STANDALONE && !LOCAL_SPOTIFY) || covered()) {
       if (music) { music = null; ambientOpen = false; renderNp(); renderAmbientMusic(); }
       return;
     }
     // standalone: the site's own function (standalone/api/now.js), same origin, no bridge
-    var ask = STANDALONE ? fetch(window.CouchSpotify ? window.CouchSpotify.url("api/now") : "api/now", { cache: "no-store" })
-      .then(function (r) { return r.json(); })
-      : api("GET", "/api/music", null, 5000);
+    var ask;
+    if (LOCAL_SPOTIFY) {
+      var local = null;
+      try { local = JSON.parse(TV.spotifyMusic()); } catch (e) {}
+      ask = Promise.resolve({ music: local && local.title ? local : {
+        title: t("spotify_open"), state: "idle", source: "spotify-tv", app: { name: "Spotify", package: SPOTIFY_TV }
+      } });
+    } else if (STANDALONE) {
+      ask = fetch(window.CouchSpotify ? window.CouchSpotify.url("api/now") : "api/now", { cache: "no-store" })
+        .then(function (r) { return r.json(); });
+    } else ask = api("GET", "/api/music", null, 5000);
     ask.then(function (j) {
       if (STANDALONE && j && j.music && window.CouchSpotify) window.CouchSpotify.warm();
       var had = !!music;
       music = j.music || null;
       var src = (music && music.source) || "";
       if (src !== npSrc) { npSrc = src; npI = Math.min(1, Math.max(0, npButtons().length - 1)); }
-      if (music && AMBIENT_MUSIC) {
+      if (music && music.state !== "idle" && AMBIENT_MUSIC) {
         var trackKey = (music.title || "") + " - " + (music.artist || "");
         if (trackKey !== lastTrackKey) {
           lastTrackKey = trackKey;
@@ -2241,7 +2341,7 @@
             ambI = 1;
           }
         }
-      } else if (!music) {
+      } else if (!music || music.state === "idle") {
         ambientOpen = false;
         lastTrackKey = "";
         if (zone === "ambient") { zone = "grid"; paintFocus(); }
@@ -2265,6 +2365,7 @@
     if (!music) return;
     var btn = npButtons()[npI];
     if (!btn) return;
+    if (btn[2] === "spotify-open") { TV.launch(SPOTIFY_TV); return; }
     if (btn[2] === "here") { window.CouchSpotify.playHere(note); return; }   // Play on TV (standalone)
     if (btn[0] === "expand") {
       ambientOpen = true;
@@ -2281,7 +2382,7 @@
       renderNp();
       renderAmbientMusic();
     }
-    api("POST", "/api/key", { key: key }).catch(function (e) { note(tBridge(e.key, e.vars, e.message)); });
+    sendMusicKey(key);
     setTimeout(refreshMusic, key === "play_pause" ? 1500 : 900);
   }
 
@@ -3836,6 +3937,7 @@
   function clearFocus() {
     shelfEls.concat(gridEls, quickEls).forEach(function (el) { if (el) el.classList.remove("focus"); });
     $("people").classList.remove("focus");
+    if ($("football-scores")) $("football-scores").classList.remove("focus");
     Array.prototype.forEach.call($("people").children, function (el) { el.classList.remove("focus"); });
   }
 
@@ -3947,6 +4049,7 @@
       showPhoto();
       return;
     }
+    if (zone === "football" && $("football-scores")) { $("football-scores").classList.add("focus"); return; }
     if (zone === "quick" && quickEls[qi]) {
       quickEls[qi].classList.add("focus");
       hero(null);
@@ -4028,6 +4131,13 @@
     }
     // Night with More apps open: the cards step aside, so up and down skip them
     var cards = (NIGHT && expanded) || designHides("keep_watching") ? [] : shelfEls;
+    if (zone === "football") {
+      if (dx < 0 && npReach()) { zone = "np"; npI = Math.max(0, npButtons().length - 1); }
+      else if (dx > 0 && cards.length) { zone = "shelf"; s = 0; }
+      else if (dy > 0 && gridEls.length) { var fb = $("football-scores").getBoundingClientRect(); g = nearestInRow(0, fb.left + fb.width / 2); zone = "grid"; }
+      else if (dy < 0 && npReach()) zone = "np";
+      paintFocus(); return;
+    }
     if (zone === "menu") {
       if (dx || dy) menuI = Math.max(0, Math.min(SLEEP_CHOICES.length - 1, menuI + (dy || dx)));
       paintFocus();
@@ -4061,7 +4171,7 @@
         }
       } else if (NIGHT) {
         // the first card of the row: right past the last button goes on to the shows
-        if (dx > 0 && npI === maxNp) { if (cards.length) { zone = "shelf"; s = 0; } }
+        if (dx > 0 && npI === maxNp) { if (footballEnabled && !LOOP) zone = "football"; else if (cards.length) { zone = "shelf"; s = 0; } }
         else if (dx) npI = Math.max(0, Math.min(maxNp, npI + dx));
         else if (dy < 0) { if (peopleOn()) toPeople(); else if (hasQuick()) { zone = "quick"; qi = 0; } }
         else if (dy > 0 && gridEls.length) {
@@ -4102,11 +4212,12 @@
         pi = Math.max(0, Math.min(PEOPLE.length - 1, pi + dx));
       } else if (dy > 0) zone = NIGHT && npReach() ? "np" : cards.length ? "shelf" : "grid";
     } else if (zone === "shelf") {
-      if (dx < 0 && s === 0 && NIGHT && !LOOP && npReach()) { zone = "np"; npI = Math.max(0, npButtons().length - 1); }
+      if (dx < 0 && s === 0 && footballEnabled && NIGHT && !LOOP) zone = "football";
+      else if (dx < 0 && s === 0 && NIGHT && !LOOP && npReach() && !LOCAL_SPOTIFY) { zone = "np"; npI = Math.max(0, npButtons().length - 1); }
       else if (dx < 0 && s === 0 && !expanded && GRID_COLS === 1 && gridEls.length > 1) { zone = "grid"; g = 0; }   // back onto a side rail
       else if (dx) s = Math.max(0, Math.min(shelfEls.length - 1, s + dx));
       // Loop: Now playing sits straight above the row, under the people
-      else if (dy < 0) { if (LOOP && npReach()) zone = "np"; else if (peopleOn()) toPeople(); else if (!NIGHT && npReach()) zone = "np"; else if (hasQuick()) { zone = "quick"; qi = 0; } }
+      else if (dy < 0) { if ((LOOP || LOCAL_SPOTIFY) && npReach()) zone = "np"; else if (peopleOn()) toPeople(); else if (!NIGHT && npReach()) zone = "np"; else if (hasQuick()) { zone = "quick"; qi = 0; } }
       else if (dy > 0 && gridEls.length) {
         // land on the app under the show
         var b = shelfEls[s].getBoundingClientRect();
@@ -4132,7 +4243,9 @@
           g = nx > last ? first : nx < first ? last : nx;
         }
       } else if (dy < 0 && row === 0) {
-        if (cards.length) zone = "shelf";
+        if (footballEnabled && NIGHT && !LOOP && npReach() && gridEls[g] && gridEls[g].getBoundingClientRect().left < $("np").getBoundingClientRect().right) zone = "np";
+        else if (footballEnabled && NIGHT && !LOOP && (!cards.length || (gridEls[g] && gridEls[g].getBoundingClientRect().left < $("football-scores").getBoundingClientRect().right))) zone = "football";
+        else if (cards.length) zone = "shelf";
         else if (npReach()) {
           if (AMBIENT_MUSIC && music) {
             ambientOpen = true;
@@ -4362,6 +4475,11 @@
     if (zone === "inputs") { doInputMenu(); paintFocus(); return; }
     if (zone === "ambient") { ambPress(); return; }
     if (zone === "np") { npPress(); return; }
+    if (zone === "football") {
+      openSettings();
+      for (var fi = 0; fi < SECS.length; fi++) if (SECS[fi][0] === "football") { SET.sec = fi; break; }
+      SET.col = "rows"; SET.ri = firstRow(footballRows()); renderSettings(); return;
+    }
     if (zone === "pmenu") {
       if (plift) { dropPeople(); return; }
       pickWho(PEOPLE[pmi].id);
@@ -4606,6 +4724,7 @@
   function info(key, label, value, sub) { return { kind: "info", key: key, label: label, value: value, sub: sub }; }
 
   function sectionRows(id) {
+    if (id === "football") return footballRows();
     if (id === "updates") return updateRows();
     if (id === "language") return languageRows();
     if (id === "location") return locationRows();
@@ -4616,6 +4735,19 @@
     if (id === "people") return peopleRows();
     if (id === "quick") return quickRows();
     return aboutRows();
+  }
+  function footballRows() {
+    var rows = [info("football-help", "Choose the competitions to show", "", "The scores card cycles through your selections.")];
+    FOOTBALL_LEAGUES.forEach(function (league) {
+      var selected = selectedFootball().some(function (x) { return x.id === league.id; });
+      rows.push({ kind: "toggle", key: "football:" + league.id, label: league.name, value: selected ? t("on") : t("off"), act: function () {
+        var chosen = selectedFootball().map(function (x) { return x.id; });
+        var at = chosen.indexOf(league.id);
+        if (at >= 0) chosen.splice(at, 1); else chosen.push(league.id);
+        ST.football_leagues = chosen; footballPage = 0; footballMatchPage = 0; footballMatchPages = 1; saveSettings(); footballRender();
+      } });
+    });
+    return rows;
   }
 
   function languageRows() {
@@ -4938,6 +5070,10 @@
     } });
     rows.push({ kind: "cycle", key: "clock", label: t("clock"), value: CLOCK24 ? t("clock_24") : t("clock_12"), act: function () {
       CLOCK24 = !CLOCK24; ST.clock = CLOCK24 ? "24h" : "12h"; saveSettings(); glassShown = ""; clock();
+    } });
+    rows.push({ kind: "toggle", key: "clock-seconds", label: t("clock_seconds"), value: CLOCK_SECONDS ? t("on") : t("off"), act: function () {
+      CLOCK_SECONDS = !CLOCK_SECONDS; ST.clock_seconds = CLOCK_SECONDS; saveSettings();
+      glassShown = ""; clock(); syncClockSeconds();
     } });
     rows.push({ kind: "cycle", key: "idle-photo-seconds", label: t("idle_photo"), sub: t("idle_photo_sub"),
       value: IDLE_PHOTO_SECONDS ? t("n_secs", { n: IDLE_PHOTO_SECONDS }) : t("off"), act: function () {
@@ -7152,6 +7288,15 @@
 
   function start() {
     readConfig();
+    footballEnabled = HOME.football_scores === true && !!(TV && TV.fotmobScores);
+    if (footballEnabled) {
+      var scores = document.createElement("aside"); scores.id = "football-scores";
+      scores.setAttribute("aria-label", "Football scores"); document.body.appendChild(scores);
+      SECS.splice(SECS.length - 1, 0, ["football", "info"]);
+      footballTick(false);
+      setInterval(function () { footballTick(false); }, 5000);
+      setInterval(function () { footballTick(true); }, 10000);
+    }
     // a TV whose home a computer runs (no launcher): smart home goes through that computer's bridge
     // (on a Google TV or Android TV with a computer at home, only its Hue lights and AirTouch zones)
     if (!OFFLINE && !MOCK && !PREVIEW && window.smartHome && window.smartHome.useBridge) window.smartHome.useBridge(api);
@@ -7256,6 +7401,7 @@
     if (updRead() && UPD.supported) SECS.splice(SECS.length - 1, 0, ["updates", "download"]);
     mark("app-start");
     clock();
+    syncClockSeconds();
     setInterval(clockTick, 15000);
     if (LOOP) loopInit();
     if (NIGHT && !LOOP) {   // the scenes, their clocks and the weather canvas: Night only
