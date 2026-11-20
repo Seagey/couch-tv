@@ -956,6 +956,8 @@
       // the weather stays in the date line, as on the home with no design (hidden with the weather part)
       out.push(H + " #cd-weather{display:none !important}");
       if (obj(E.weather).hidden === true) out.push(H + " #date .wx{display:none}");
+      if (obj(E.weather).place === false) out.push(H + " #date .wx .wx-place{display:none}");
+      if (obj(E.weather).words === false) out.push(H + " #date .wx .ww{display:none}");
     }
     out.push(H + " #cd-weather{position:fixed;left:0;right:0;top:9rem;z-index:2;text-align:center;white-space:nowrap;pointer-events:none;" +
       "font-size:1.75rem;line-height:2.25rem;font-weight:450;color:rgba(255, 255, 255, 0.84);text-shadow:0 0.125rem 1.125rem rgba(0, 0, 0, 0.25)}");
@@ -990,6 +992,8 @@
       out.push(clockSel + " .fill{background-image:none !important;color:" + cc + " !important;opacity:1 !important;filter:none !important}");
       out.push(clockSel + " .sheen, " + clockSel + " .rim, " + clockSel + " .edge{display:none !important}");
       out.push(clockSel + ".under{display:none}");
+      // solid digits have no reflection: the Waterline scene's cut at the waterline comes off too
+      if (atScene) out.push(clockSel + "{clip-path:none !important;-webkit-clip-path:none !important}");
     }
     // the Classic and OLED clock, top right
     if (moved(cm)) out.push(H + ":not(.theme-night) #time{transform:translate(" + vw(cm.x) + "," + vh(cm.y) + ") scale(" + cm.s + ");transform-origin:100% 0}");
@@ -1016,7 +1020,8 @@
     out.push(panel(H + " .ncard:not(.focus)", obj(E.keep_watching).panel));
 
     // the clock's shade: a dark pool under the digits, in each scene's own shade layer
-    if (ce.shade === "panel") {
+    // (not for a clock in each scene's own place: the pool is drawn for the one place, and each scene has its own shade)
+    if (ce.shade === "panel" && !atScene) {
       out.push(H + ".theme-night #scenes .scene .shade{background:radial-gradient(ellipse " + vw(900 * cm.s) + " " + vh(420 * cm.s) + " at " +
         vw(960 + cm.x) + " " + vh(184 + cm.y + 170 * cm.s) + ", rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0) 72%)}");
     }
