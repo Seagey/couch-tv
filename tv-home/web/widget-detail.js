@@ -147,7 +147,7 @@
 
   // the forecast: 24 hours and 7 days (Open-Meteo, the same answer the widgets read)
   B.forecast = function (o, env) {
-    var w = kit().weather(env);
+    var w = kit().weather(env, o);
     if (!w) return B.setup(o, env);
     S.body.appendChild(head(kit().wxIcon(w.code, w.is_day), w.place || "Forecast", w.temp + "° now, " + kit().wxWords(w.code).toLowerCase() + (w.hi !== undefined ? ". High " + w.hi + "°, low " + w.lo + "°" : ""), "#1b64b5"));
     var hours = w.hours || [], days = w.days || [];
@@ -386,7 +386,7 @@
 
   // air quality and surf
   B.air = function (o, env) {
-    var a = kit().airOf(env);
+    var a = kit().airOf(env, o);
     if (!a) return B.setup(o, env);
     var v = Math.round(a.aqi), band = kit().aqiBand(v);
     var SAY = { Good: "A good day to open the windows.", Fair: "Fine for nearly everyone.", Moderate: "Sensitive people may want to take it easy outside.", Poor: "Keep windows shut if anyone has asthma.", "Very poor": "Best to stay inside and keep windows shut.", "Extremely poor": "Stay inside. Smoke or dust is likely." };
@@ -397,9 +397,9 @@
         E("div", "cwd-row cwd-small", "justify-content:space-between;margin-top:10px", [E("span", "", "", ["Now"]), E("span", "", "", ["+6h"]), E("span", "", "", ["+12h"])])]) : null]));
   };
   B.surf = function (o, env) {
-    var m = kit().surfOf(env);
+    var m = kit().surfOf(env, o);
     if (!m || !isFinite(m.wave)) return B.setup(o, env);
-    var place = op(o).label || (env.demo ? "The point" : (kit().dataOf(env).place || {}).name || "Surf");
+    var place = kit().surfPlace(o, env);
     S.body.appendChild(head("wind", place, kit().compass(m.dir) + " swell, " + Math.round(m.period || 0) + " seconds" + (isFinite(m.wind) ? ". Wind " + kit().compass(m.windDir) + " " + Math.round(m.wind) + " km/h" : ""), "#0a6e8a"));
     var hs = m.hourly || [], top = Math.max.apply(null, hs.concat([0.5]));
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "", [String(Math.round(m.wave * 10) / 10), E("span", "", "font-size:.36em", [" m"])]), E("div", "cwd-big", "", ["Swell now"])]),
@@ -517,7 +517,7 @@
   B.aircon = function (o, env) {
     var demo = !!env.demo, rooms = JSON.parse(JSON.stringify(kit().roomsOf(env)));
     if (!rooms.length) return B.setup(o, env);
-    var ent = op(o).entity, sel = Math.max(0, rooms.map(function (r) { return r.entity; }).indexOf(ent)), joinT = null;
+    var ent = kit().setting(o, env, "entity"), sel = Math.max(0, rooms.map(function (r) { return r.entity; }).indexOf(ent)), joinT = null;
     S.body.appendChild(head("aircon", "Aircon", "", "#0a84ff"));
     var main = E("div", "cwd-col", "width:780px"), side = E("div", "cwd-col cwd-grow", "margin-left:40px;min-width:0");
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:stretch;margin-top:26px", [main, side]));
@@ -544,7 +544,7 @@
       var nOn = rooms.filter(kit().roomOn).length;
       S.subEl.textContent = nOn + " of " + rooms.length + (rooms.length === 1 ? " room on" : " rooms on");
       var canSet = r.ok !== false && r.target != null;
-      var dialBox = kit().dial(400, canSet ? r.target : 22, r.current != null ? Math.round(r.current * 10) / 10 : null);
+      var dialBox = kit().dial(400, canSet ? r.target : (kit().roomUnit(r) === "f" ? 72 : 22), r.current != null ? Math.round(r.current * 10) / 10 : null, r, env);
       if (!on) dialBox.style.opacity = "0.5";
       main.appendChild(E("div", "cwd-row", "", [E("div", "cwd-col cwd-grow", "min-width:0", [E("div", "cwd-big cwd-ell", "", [r.name]), E("div", "cwd-mid", "color:" + (on ? col : "rgba(255,255,255,.6)"), [r.ok === false ? "Not answering" : on ? kit().roomMode(r) + (r.action === "cooling" ? ", cooling" : r.action === "heating" ? ", heating" : "") : "Off"])]),
         F(btn("power", on ? "On" : "Off", on ? "cwd-on" : ""), function () {
@@ -557,7 +557,7 @@
           if (!canSet) return msg(r.ok === false ? r.name + " is not answering" : "This room has no set temperature");
           r.target = clamp(Math.round((r.target + d * (r.step || 0.5)) * 10) / 10, r.min || 16, r.max || 30); draw();
           clearTimeout(joinT);
-          joinT = setTimeout(function () { joinT = null; sendHa("temp", r, r.target, r.name + " to " + r.target + "°"); }, 700);
+          joinT = setTimeout(function () { joinT = null; sendHa("temp", r, r.target, r.name + " to " + kit().tdeg(r.target, r, env)); }, 700);
         };
       };
       main.appendChild(E("div", "cwd-row cwd-grow", "align-items:center;justify-content:center", [F(btn("minus", "", "cwd-round"), nudge(-1), "Cooler"), E("div", "cwd-dial", "margin:0 40px", [dialBox]), F(btn("plus", "", "cwd-round"), nudge(1), "Warmer")]));
@@ -566,8 +566,8 @@
       side.appendChild(label("Rooms"));
       side.appendChild(E("div", "cwd-grid", "", rooms.slice(0, 9).map(function (z, i) {
         var zo = kit().roomOn(z);
-        return F(E("div", "cwd-room" + (i === sel ? " sel" : "") + (zo ? " on" : ""), "width:" + rw + "px;height:" + (big ? 116 : 136) + "px", [E("div", "cwd-row", "justify-content:space-between", [E("span", "cwd-mid cwd-ell", "min-width:0", [z.name]), E("span", "cwd-big", "font-size:" + (big ? 40 : 48) + "px;margin-left:10px", [kit().tdeg(z.current)])]),
-          E("div", "cwd-small cwd-ell", "color:" + (zo ? kit().MODE_COL[z.state] || "#64d2ff" : "rgba(255,255,255,.6)"), [z.ok === false ? "Not answering" : zo ? kit().roomMode(z) + " to " + kit().tdeg(z.target) : "Off"])]), function () { sel = i; draw(); }, "Room " + z.name);
+        return F(E("div", "cwd-room" + (i === sel ? " sel" : "") + (zo ? " on" : ""), "width:" + rw + "px;height:" + (big ? 116 : 136) + "px", [E("div", "cwd-row", "justify-content:space-between", [E("span", "cwd-mid cwd-ell", "min-width:0", [z.name]), E("span", "cwd-big", "font-size:" + (big ? 40 : 48) + "px;margin-left:10px", [kit().tdeg(z.current, z, env)])]),
+          E("div", "cwd-small cwd-ell", "color:" + (zo ? kit().MODE_COL[z.state] || "#64d2ff" : "rgba(255,255,255,.6)"), [z.ok === false ? "Not answering" : zo ? kit().roomMode(z) + " to " + kit().tdeg(z.target, z, env) : "Off"])]), function () { sel = i; draw(); }, "Room " + z.name);
       })));
       var modes = (r.modes || []).filter(function (x) { return x !== "off"; });
       if (modes.length) {
@@ -627,7 +627,7 @@
       S.readAt = Date.now();
       S.api.ha("controls").then(function (r) {
         if (!S || !r || !r.ok) { if (S && !items) { items = []; draw(); msg("Home Assistant is not answering"); } return; }
-        var want = op(o).switches, l = r.controls || [];
+        var want = kit().setting(o, env, "switches"), l = r.controls || [];
         if (want && want.length) l = want.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
         items = l; draw();
       });
@@ -674,8 +674,11 @@
     S.full = true;
     S.panel.classList.add("cwd-photos");
     var bell = ha.bell, ring = !demo && door && ha.ring && bell && bell.kept ? ha.ring : null;
-    var cams = door ? [{ entity: "doorbell", name: op(o).label || (bell && bell.name) || "Front door" }] : (demo ? [{ entity: "camera.backyard", name: op(o).label || "Backyard" }, { entity: "camera.driveway", name: "Driveway" }] : info.cameras);
-    var sel = Math.max(0, cams.map(function (c) { return c.entity; }).indexOf(op(o).cam)), showRing = !!(ring || (demo && door));
+    var cams = door ? [{ entity: "doorbell", name: kit().devName(o, env, null, bell && bell.name, "Doorbell") }] : (demo ? [{ entity: "camera.backyard", name: op(o).label || "Backyard" }, { entity: "camera.driveway", name: "Driveway" }] : info.cameras);
+    var want = kit().setting(o, env, "cam"), sel = Math.max(0, cams.map(function (c) { return c.entity; }).indexOf(want));
+    // the camera this widget shows goes by its own heading (the same as the widget's); the rest by their names
+    if (!door && !demo && cams[sel]) { cams = cams.slice(); var c0 = {}; for (var ck in cams[sel]) c0[ck] = cams[sel][ck]; c0.name = kit().devName(o, env, "cam", c0.name, "Camera"); cams[sel] = c0; }
+    var showRing = !!(ring || (demo && door));
     var img = E("div", "cwd-pimg", "background-size:contain;background-color:#000"), nameEl = E("b", "", "font-weight:680"), subEl = E("span");
     var stage = E("div", "cwd-pstage", "", [E("div", "cwd-photo", "", [img]), E("div", "cwd-live", "", [E("i"), nameEl, subEl])]);
     S.body.appendChild(stage);
@@ -718,7 +721,7 @@
   B.energy = function (o, env) {
     var H = kit().ha, ha = H.haOf(env), demo = !!env.demo, e = ha.energy;
     if (!demo && !(ha.info || {}).energy) return B.setup(o, env);
-    var name = op(o).label || (e && e.name) || "Energy";
+    var name = kit().devName(o, env, null, e && e.name, "Energy");
     S.body.appendChild(head("bolt", name + " today", "", "#ff9f0a"));
     var body = E("div", "cwd-col cwd-grow", "margin-top:30px");
     S.body.appendChild(body);
@@ -761,11 +764,11 @@
     var draw = function () {
       while (body.firstChild) body.removeChild(body.firstChild);
       var s = (sensors || []).filter(function (x) { return x.entity === sel; })[0], n = names.filter(function (x) { return x.entity === sel; })[0] || {};
-      var label = (sel === first.entity && op(o).label) || (s && s.name) || n.name || "Sensor";
+      var label = (sel === first.entity && first.name) || (s && s.name) || n.name || "Sensor";
       S.panel.querySelector(".cwd-title").textContent = label;
       if (!sensors) { S.subEl.textContent = "Checking Home Assistant"; return; }
       if (!s || s.ok === false) { S.subEl.textContent = "Home Assistant is not answering"; return; }
-      var t = H.sensorText(s), h = hist[sel], pts = h && h.points, got = (pts || []).filter(function (v) { return v != null; });
+      var t = H.sensorText(s, env), h = hist[sel], pts = h && h.points && h.points.map(function (v) { return v == null ? v : kit().sensorConv(v, s, env); }), got = (pts || []).filter(function (v) { return v != null; });
       S.subEl.textContent = got.length >= 2 ? "Last 24 hours: low " + Math.round(Math.min.apply(null, got) * 10) / 10 + ", high " + Math.round(Math.max.apply(null, got) * 10) / 10 : "Last 24 hours";
       body.appendChild(E("div", "cwd-row", "align-items:baseline", [E("div", "cwd-huge", "", [t[0]]), t[1] ? E("div", "cwd-big", "margin-left:16px;opacity:.75", [t[1]]) : null]));
       body.appendChild(E("div", "cwd-grow", "margin-top:24px;display:flex;align-items:flex-end", [h ? H.spark(pts, 1630, 300, "#64d2ff") : E("div", "cwd-mid", "opacity:.7", ["Reading the last 24 hours"])]));
@@ -819,7 +822,7 @@
       S.api.ha("speakers").then(function (r) {
         if (!S || joinT) return;
         if (!r || !r.ok) { if (!list) { list = []; draw(); msg("Home Assistant is not answering"); } return; }
-        var want = op(o).players, l = r.speakers || [];
+        var want = kit().setting(o, env, "players"), l = r.speakers || [];
         if (want && want.length) l = want.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
         list = l; draw();
       });
@@ -891,10 +894,10 @@
   function webRec(env, src, id) { var f = wk().webOf; return f ? f(env, src, id) : null; }
   function updated(rec) { if (!rec || !rec.at) return ""; var d = new Date(rec.at), h = d.getHours(), m = d.getMinutes(); return "Updated " + ((h % 12) || 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? "am" : "pm") + (rec.stale ? ", not lately" : ""); }
   B.news = function (o, env) {
-    var WW = window.CouchWidgetWeb, q = op(o), feed = WW ? WW.feedOf(q.feed) : "abc", name = q.label || (WW ? WW.FEEDS[feed].name : "Headlines"), rec = null, items;
+    var WW = window.CouchWidgetWeb, q = op(o), feed = WW ? WW.feedOf(kit().feedFor(kit().setting(o, env, "feed"), env)) : "abc", src = WW ? WW.FEEDS[feed].name : "", name = kit().webName(q.label, src, WW ? WW.FEEDS : null) || src || "Headlines", rec = null, items;
     if (env.demo) items = (wk().DEMO_NEWS || []).map(function (x) { return { title: x[0], at: Date.now() - x[1] * 3600000 }; });
     else { rec = webRec(env, "news", feed); if (!rec || !rec.ok || !rec.v || !rec.v.length) return B.setup(o, env); items = rec.v; }
-    S.body.appendChild(head("info", name, rec ? updated(rec) : "The latest headlines", "#ff453a"));
+    S.body.appendChild(head("info", name, [name !== src && src ? "From " + src : "", rec ? updated(rec) : ""].filter(Boolean).join(". ") || "The latest headlines", "#ff453a"));
     // two columns of three: six headlines, each on three lines at most
     S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:30px", items.slice(0, 6).map(function (x) {
       return F(E("div", "cwd-news", "width:780px", [x.at ? E("div", "cwd-small", "color:#ff453a;font-weight:700", [wk().agoOf ? wk().agoOf(x.at) : ""]) : null,
@@ -903,12 +906,13 @@
   };
   // the round: every game with its score, in the order it is played (up to 12; a line says how many more)
   B.sports = function (o, env) {
-    var WW = window.CouchWidgetWeb, q = op(o), id = WW ? WW.leagueOf(q.league) : "nrl", rec = null, v;
+    var WW = window.CouchWidgetWeb, q = op(o), id = WW ? WW.leagueOf(kit().setting(o, env, "league")) : "nrl", rec = null, v;
     if (env.demo) v = wk().demoScores ? wk().demoScores() : { games: [] };
     else { rec = webRec(env, "sports", id); if (!rec || !rec.ok || !rec.v || !rec.v.games || !rec.v.games.length) return B.setup(o, env); v = rec.v; }
     var games = v.games.slice().sort(function (a, b) { return a.at - b.at; }), shown = games.slice(0, 12), n = shown.length;
     var cols = n <= 6 ? 2 : n <= 9 ? 3 : 4, w = Math.floor((1600 - (cols - 1) * 24) / cols), big = cols <= 2 ? 56 : cols === 3 ? 48 : 40, mid = cols <= 3 ? 34 : 29;
-    S.body.appendChild(head("tv", q.label || v.league || "Scores", [v.round, rec ? updated(rec) : ""].filter(Boolean).join(". ") || "This round", "#0a6e8a"));
+    var real = WW && WW.LEAGUES && WW.LEAGUES[id] ? WW.LEAGUES[id].name : v.league;
+    S.body.appendChild(head("tv", kit().webName(q.label, real, WW && WW.LEAGUES) || real || "Scores", [v.round, rec ? updated(rec) : ""].filter(Boolean).join(". ") || "This round", "#0a6e8a"));
     var team = function (t, g) {
       var dim = g.state === "post" && !t.win;
       return E("div", "cwd-row", "justify-content:space-between;min-width:0", [E("div", "cwd-row", "min-width:0", [E("i", "cwd-dot", "flex:none;background:" + (t.colour || "rgba(255,255,255,.35)")), E("span", "cwd-mid cwd-ell", "font-size:" + mid + "px;font-weight:" + (g.state === "post" && t.win ? 760 : 560) + ";opacity:" + (dim ? 0.7 : 1), [t.name || t.abbr])]),
@@ -944,13 +948,13 @@
     var tile = function (name, big, sub) { return F(E("div", "cwd-game", "width:520px", [E("div", "cwd-small", "", [name]), E("div", "cwd-big", "font-size:72px;margin-top:8px", [big]), sub ? E("div", "cwd-small", "margin-top:6px", [sub]) : null]), null, name); };
     var lb = V.leave ? V.leave.replace(/^(.*?)(leave by|Leave by) /, "") : "";
     S.body.appendChild(E("div", "cwd-grid", "align-content:flex-start;margin-top:30px", [tile("Drive", V.minutes + " min", "Without traffic"), tile("Distance", V.km + " km", "By road"),
-      tile(V.leave ? (/^Leave/.test(V.leave) ? "Leave by" : V.leave.replace(/, leave by .*/, "") + ", leave by") : "Leave by", lb || "Not set", V.leave ? (V.arrive ? "To arrive by " + V.arrive : "") : "Set an arrive by time in couch-tv Studio")]));
+      tile(V.leave ? (/^Leave/.test(V.leave) ? "Leave by" : V.leave.replace(/, leave by .*/, "") + ", leave by") : "Leave by", lb || "Not set", V.leave ? (V.arrive ? "To arrive by " + V.arrive : "") : "Set an arrive by time in this widget's settings")]));
     S.body.appendChild(E("div", "cwd-grow"));
     S.body.appendChild(E("div", "cwd-small", "", ["Route by OSRM from OpenStreetMap. Map data © OpenStreetMap contributors."]));
   };
   // the watchlist with today's line for each (the day's prices, from the first trade to now)
   B.stocks = function (o, env) {
-    var WW = window.CouchWidgetWeb, q = op(o), list = WW ? WW.tickersOf(q.tickers) : [], rec = null, quotes;
+    var WW = window.CouchWidgetWeb, q = op(o), list = WW ? WW.tickersOf(kit().setting(o, env, "tickers")) : [], rec = null, quotes;
     if (env.demo) quotes = list.map(function (s, i) { return wk().demoQuote(s, i); });
     else {
       rec = webRec(env, "stocks", list.join(","));

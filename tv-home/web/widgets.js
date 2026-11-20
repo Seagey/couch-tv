@@ -240,15 +240,44 @@
     for (var i = 0; i < days.length; i++) if (days[i].date ? days[i].date === want : i === 1) return { label: "Tomorrow", code: days[i].code, hi: days[i].hi, lo: days[i].lo };
     return null;
   }
-  function weather(env) {
+  // °F: Home settings, Weather, Units (app.js data().unit, "f" or "c"). The forecast is always Celsius;
+  // every temperature a widget draws is turned into the home's unit here, once
+  function unitF(env) { var d = dataOf(env); return d.unit === "f" || d.wx_unit === "f" || (env && env.unit === "f"); }
+  function fOf(c) { return c === undefined || c === null || !isFinite(c) ? c : Math.round(c * 9 / 5 + 32); }
+  function inUnit(w, env) {
+    if (!w || !unitF(env)) return w;
+    var x = {}, k;
+    for (k in w) if (Object.prototype.hasOwnProperty.call(w, k)) x[k] = w[k];
+    x.unit = "f"; x.tempC = w.temp; x.temp = fOf(w.temp); x.hi = fOf(w.hi); x.lo = fOf(w.lo);
+    var cp = function (a) { var y = {}; for (var j in a) if (Object.prototype.hasOwnProperty.call(a, j)) y[j] = a[j]; return y; };
+    if (w.hourly) x.hourly = w.hourly.map(function (h) { return [h[0], h[1], fOf(h[2]), h[3]]; });
+    if (w.hours) x.hours = w.hours.map(function (h) { var y = cp(h); y.temp = fOf(h.temp); return y; });
+    if (w.daily) x.daily = w.daily.map(function (d) { return [d[0], d[1], fOf(d[2]), fOf(d[3])]; });
+    if (w.days) x.days = w.days.map(function (d) { var y = cp(d); y.lo = fOf(d.lo); y.hi = fOf(d.hi); return y; });
+    if (w.ahead) { x.ahead = cp(w.ahead); x.ahead.hi = fOf(w.ahead.hi); x.ahead.lo = fOf(w.ahead.lo); }
+    return x;
+  }
+  // the temperature in Celsius, whatever unit it is drawn in (the colour of the day goes by it)
+  function tempC(w) { return w && w.tempC !== undefined ? w.tempC : w ? w.temp : null; }
+  // where a weather, sun, air or surf widget reads: a place picked for this widget on this TV
+  // (its own forecast, app.js data().wxAt["<lat>,<lon>"] or data().wxBy["<object id>"]), else the home's town
+  // the surf's beach is its "place"; every other weather widget's place is its "town" (widget-caps.js)
+  function pickedPlace(o, env) { return o ? placeVal(tvSet(o, env, o.kind === "surf" ? "place" : "town")) : null; }
+  function placeKey(p) { return (+p.lat).toFixed(2) + "," + (+p.lon).toFixed(2); }
+  function wxSrc(o, env) {
+    var d = dataOf(env), p = pickedPlace(o, env);
+    if (p) { var at = d.wxAt && d.wxAt[placeKey(p)], by = d.wxBy && o && o.id !== undefined ? d.wxBy[o.id] : null; return { w: at || by || null, place: p, picked: true }; }
+    return { w: d.weather, place: d.place || {}, picked: false };
+  }
+  function weather(env, o) {
     if (env.demo) {
       var hr = now().getHours(); DEMO_WX.is_day = hr >= 6 && hr < 19; demoFull();
       DEMO_WX.ahead = dayAhead(DEMO_WX, DEMO_WX.days);
-      return DEMO_WX;
+      return inUnit(DEMO_WX, env);
     }
-    var d = dataOf(env), w = d.weather;
-    if (!w || w.temp === undefined || w.temp === null) return null;
-    var out = { place: (d.place && d.place.name) || "", temp: Math.round(w.temp), code: w.code, is_day: dayNow(w, d), hi: w.hi, lo: w.lo, uv: w.uv, aqi: w.aqi };
+    var src = wxSrc(o, env), w = src.w, d = { place: src.place };
+    if (dataOf(env).wxOff || !w || w.temp === undefined || w.temp === null) return null;
+    var out = { place: (src.place && src.place.name) || "", picked: src.picked, temp: Math.round(w.temp), code: w.code, is_day: dayNow(w, d), hi: w.hi, lo: w.lo, uv: w.uv, aqi: w.aqi };
     // each hour is night or day by that day's own sunrise and sunset when the forecast has them
     var sunOf = {};
     (w.daily || []).forEach(function (x) { if (x && x.date) sunOf[x.date] = [new Date(x.sunrise), new Date(x.sunset)]; });
@@ -274,7 +303,7 @@
       out.rainFrom = first < 0 ? "" : hm(Date.now() + first * 900000);
       out.rainMax = Math.max.apply(null, w.rain15);
     }
-    return out;
+    return inUnit(out, env);
   }
 
   var SHOWS = [["Bluey", "S3 E4, Hammerbarn", "au.net.abc.iview", "scene-golden", 0.6], ["Fisk", "S2 E1", "au.net.abc.iview", "albury-storm", 0.3],
@@ -296,7 +325,12 @@
     var own = (o && o.opts && o.opts.image) ? [o.opts.image] : [];
     if (own.length) return own;
     if (env.demo) return ["beach", "birthday", "camp", "dog", "nan", "surf", "hike"].map(demoImg);
-    return (dataOf(env).photos || []).slice(0, 50);
+    var all = (dataOf(env).photos || []).slice(0, 50), pick = o && (o.kind === "photo" || o.kind === "artframe") ? tvSet(o, env, "photo") : undefined;
+    if (pick !== undefined && pick !== "first") {
+      if (isFinite(pick) && all[+pick]) return [all[+pick]];
+      if (all.indexOf(pick) >= 0) return [pick];
+    }
+    return all;
   }
   function people(env) {
     if (env.demo) return [["character-curly", "Alex", 1, "a"], ["character-bun", "Sam", 0, "b"], ["character-pigtails", "Ruby", 0, "c"]];
@@ -350,10 +384,10 @@
     return { rise: rise, set: set };
   }
   function fmt12(d) { var h = d.getHours(), m = d.getMinutes(); return (h % 12 || 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? "am" : "pm"); }
-  function sunToday(env) {
-    var d = dataOf(env), w = weather(env);
+  function sunToday(env, o) {
+    var w = weather(env, o);
     if (env.demo) return { rise: "5:41am", set: "7:22pm", frac: 0.42 };
-    var p = d.place, t = now();
+    var p = wxSrc(o, env).place, t = now();
     if (p && isFinite(p.lat) && isFinite(p.lon)) {
       var s = sunTimes(t, +p.lat, +p.lon);
       if (s) return { rise: fmt12(s.rise), set: fmt12(s.set), frac: clamp((t - s.rise) / (s.set - s.rise), -0.1, 1.1) };
@@ -453,13 +487,77 @@
   // (env.wset, kept on the TV only, keyed by the design object's id), else what couch-tv Studio set
   // (o.opts), else the default in its widget-caps.js `settings` record, else dflt.
   function setting(o, env, key, dflt) {
-    var id = o && o.id, ws = env && env.wset && id && env.wset[id];
+    var ws = wsetOf(o, env);
     if (ws && ws[key] !== undefined && ws[key] !== null && ws[key] !== "") return ws[key];
     var v = op(o || {})[key];
     if (v !== undefined && v !== null && v !== "") return v;
     var caps = window.CouchWidgetCaps && window.CouchWidgetCaps.settings ? window.CouchWidgetCaps.settings(o && o.kind) : [];
     for (var i = 0; i < caps.length; i++) if (caps[i].key === key && caps[i].default !== undefined) return caps[i].default;
     return dflt;
+  }
+  // this widget's own settings set on this TV: env.wset (or app.js data().wset) keyed by the design
+  // object's id; a stack item's id is "<stack id>/<index>"
+  function wsetOf(o, env) {
+    var all = env && (env.wset || (env.data && env.data.wset)), id = o && o.id;
+    var ws = all && typeof all === "object" && id !== undefined && id !== null ? all[id] : null;
+    return ws && typeof ws === "object" ? ws : null;
+  }
+  // a value set on this TV only (never the design's): an honest heading may only follow the TV's pick
+  function tvSet(o, env, key) {
+    var t = (o && o.__tv) || wsetOf(o, env);
+    var v = t ? t[key] : undefined;
+    return v === undefined || v === null || v === "" ? undefined : v;
+  }
+  // which TV settings a renderer reads in place of the design's opts, and the shape each must have
+  // (they come from Home settings on this TV, still checked: a css value is never taken from them)
+  var TV_KEYS = { entity: "id", cam: "id", reading: "id", feed: "id", league: "id", sport: "id", format: "id", unit: "id", dfmt: "id", fit: "id",
+    label: "word", team: "word", list: "word", image: "url",
+    players: "ids", switches: "ids", tickers: "ids", cities: "ids", apps: "ids",
+    arrive_h: "num", arrive_m: "num", buffer: "num", day: "num", month: "num", year: "num", count: "num", shows: "num", seconds_each: "num", anchor: "num", weekday: "day",
+    weekdays: "bool", hilo: "bool", seconds: "bool", date: "bool", ampm: "bool", place: "bool", alt: "bool", thisweek: "id", bin_a: "word", bin_b: "word", photo: "url" };
+  var PLACE_KEYS = ["place", "town", "to", "from"];
+  function tvVal(type, v) {
+    if (type === "num") { v = +v; return isFinite(v) ? v : undefined; }
+    if (type === "bool") return typeof v === "boolean" ? v : undefined;
+    if (type === "day") return v === "none" ? v : isFinite(v) && +v >= 0 && +v <= 6 ? +v : undefined;
+    if (type === "ids") return Object.prototype.toString.call(v) === "[object Array]" ? v.filter(function (x) { return typeof x === "string" && x.length <= 120; }).slice(0, 16) : undefined;
+    if (type === "id") return typeof v === "string" && v.length <= 120 ? v : typeof v === "boolean" ? v : undefined;
+    if (type === "word") return typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 60) || undefined : typeof v === "number" && isFinite(v) ? v : undefined;
+    if (type === "url") return typeof v === "string" && v.length <= 4000 ? v : undefined;
+    return undefined;
+  }
+  // a place picked on this TV ({ name, lat, lon, timezone }), never one from a design
+  function placeVal(p) { return p && typeof p === "object" && isFinite(p.lat) && isFinite(p.lon) && p.lat !== null && p.lon !== null ? { name: String(p.name || "").slice(0, 60), lat: +p.lat, lon: +p.lon, timezone: typeof p.timezone === "string" ? p.timezone : "" } : null; }
+  // the widget as it is on this TV: its design, with what was set for it on this TV over its opts.
+  // o.__tv keeps what came from the TV (checked), o.__design the design's own opts
+  function withSettings(o, env) {
+    var ws = wsetOf(o, env);
+    if (!ws || !o) return o;
+    var x = {}, k;
+    for (k in o) if (Object.prototype.hasOwnProperty.call(o, k)) x[k] = o[k];
+    var opts = {}, src = o.opts || {}, tv = {};
+    for (k in src) if (Object.prototype.hasOwnProperty.call(src, k)) opts[k] = src[k];
+    for (k in ws) {
+      if (!Object.prototype.hasOwnProperty.call(ws, k)) continue;
+      if (PLACE_KEYS.indexOf(k) >= 0 && placeVal(ws[k])) { tv[k] = placeVal(ws[k]); continue; }
+      if (!TV_KEYS[k] || (k === "apps" && APP_KINDS.indexOf(o.kind) >= 0)) continue;   // an app container's apps: Hold OK's own edits (env.edits)
+      var v = tvVal(TV_KEYS[k], ws[k]);
+      if (v === undefined) continue;
+      tv[k] = v; opts[k] = v;
+    }
+    x.opts = opts; x.__tv = tv; x.__design = src;
+    return x;
+  }
+  // a heading for a smart home device: its own name from Home Assistant; a heading typed on this TV
+  // wins; the design's words only when this TV picked the device itself (pickKey), never over the
+  // first device a design happened to get (a "Backyard" over the front door camera)
+  function devName(o, env, pickKey, own, fallback) {
+    var typed = tvSet(o, env, "label");
+    if (typed) return String(typed);
+    var design = ((o && o.__design) || op(o || {})).label;
+    if (env && env.demo) return design || own || fallback;
+    if (pickKey && design && tvSet(o, env, pickKey)) return design;
+    return own || fallback;
   }
 
   // clocks
@@ -529,7 +627,7 @@
     return { x: x, y: y };
   }
   R.solar = function (root, o, b, env) {
-    var s = sunToday(env);
+    var s = sunToday(env, o);
     if (!s) return empty(root, b, "sun", "Set your town for the sun", "Settings (hold OK), Home settings, Location");
     var at = arc(s.frac);
     add(root, [lab("sun", op(o).label || "Sun"),
@@ -547,19 +645,25 @@
       return m ? { h: +m[1] % 12 + (/p/i.test(m[3]) ? 12 : 0), m: +m[2], t: m[1] + ":" + m[2] + m[3].toLowerCase() } : null;
     } catch (e) { return null; }
   }
+  // the cities a world clock shows when its design picked none: here first, then London, New York, Tokyo
+  function homeCities(here, n) {
+    var l = here ? [here] : [];
+    ["Europe/London", "America/New_York", "Asia/Tokyo", "Australia/Sydney"].forEach(function (z) { if (l.indexOf(z) < 0) l.push(z); });
+    return l.slice(0, n);
+  }
   R.worldclock = function (root, o, b) {
-    var cities = (op(o).cities && op(o).cities.length ? op(o).cities : ["Australia/Brisbane", "Europe/London", "America/New_York", "Asia/Tokyo"]).slice(0, b.w > b.h * 1.6 ? 4 : Math.max(2, Math.floor((b.h - 90) / 90)));
     // the TV's own time zone is called by its own town (the place set for the weather), not the zone's city
     var here = ""; try { here = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+    var cities = (op(o).cities && op(o).cities.length ? op(o).cities : homeCities(here, 4)).slice(0, b.w > b.h * 1.6 ? 4 : Math.max(2, Math.floor((b.h - 90) / 90)));
     var town = (dataOf(arguments[3] || {}).place || {}).name || "";
     var name = function (tz) { return tz === here && town ? town : CITY[tz] || tz.split("/").pop().replace(/_/g, " "); };
     if (b.w > b.h * 1.6) {
       var faces = cities.map(function (tz) {
-        var t = tzTime(tz) || { h: 0, m: 0 }, s = Math.min(b.h - 110, 170), night = t.h >= 18 || t.h < 6, fg = night ? "#fff" : "#111";
-        return E("div", "cw-col", "align-items:center", [svg("0 0 100 100", s, s, [S("circle", { cx: 50, cy: 50, r: 48, fill: night ? "#1c1c1f" : "#f4f4f2" }),
+        var t = tzTime(tz) || { h: 0, m: 0 }, s = Math.min(b.h - 110, 170, (b.w - 48) / cities.length - 16), night = t.h >= 18 || t.h < 6, fg = night ? "#fff" : "#111";
+        return E("div", "cw-col", "align-items:center;min-width:0;flex:0 1 " + px((b.w - 48) / cities.length), [svg("0 0 100 100", s, s, [S("circle", { cx: 50, cy: 50, r: 48, fill: night ? "#1c1c1f" : "#f4f4f2" }),
           S("line", { x1: 50, y1: 50, x2: 50, y2: 27, stroke: fg, "stroke-width": 5, "stroke-linecap": "round", transform: "rotate(" + ((t.h % 12) * 30 + t.m / 2) + " 50 50)" }),
           S("line", { x1: 50, y1: 50, x2: 50, y2: 13, stroke: fg, "stroke-width": 3.4, "stroke-linecap": "round", transform: "rotate(" + t.m * 6 + " 50 50)" }),
-          S("circle", { cx: 50, cy: 50, r: 3.5, fill: "#ff9f0a" })]), E("div", "cw-t25", "color:var(--ink);font-weight:650;margin-top:10px", [name(tz)])]);
+          S("circle", { cx: 50, cy: 50, r: 3.5, fill: "#ff9f0a" })]), E("div", "cw-t25 cw-ell", "color:var(--ink);font-weight:650;margin-top:10px;max-width:100%;text-align:center", [name(tz)])]);
       });
       add(root, E("div", "cw-row", "justify-content:space-around;height:100%", faces));
       live(root, 30000, function () { while (root.lastChild && root.lastChild.className !== "cw-bg") root.removeChild(root.lastChild); R.worldclock(root, o, b); });
@@ -571,22 +675,28 @@
       return E("div", "cw-row cw-sp", "", [E("div", "cw-t29 cw-ell", "min-width:0", [name(tz)]), E("div", "cw-t38", "flex:none;margin-left:12px", [t ? t.t : ""])]);
     }))]);
   };
-  function daysTo(month, day) {
+  function daysTo(month, day, year) {
     var t = now(), y = t.getFullYear(), today = new Date(y, t.getMonth(), t.getDate()), target = new Date(y, month - 1, day);
+    if (isFinite(year) && year > 1999) return Math.round((new Date(+year, month - 1, day) - today) / 86400000);   // a one off day (may have passed)
     if (target < today) target = new Date(y + 1, month - 1, day);
     return Math.round((target - today) / 86400000);
   }
+  var STARTER_DAYS = { christmas: "12/25", "christmas day": "12/25", "new year": "1/1", "new year's day": "1/1", "new years day": "1/1", "australia day": "1/26", halloween: "10/31", "valentine's day": "2/14" };
   R.countdown = function (root, o, b) {
-    var q = op(o), month = q.month || 12, day = q.day || 25, n = daysTo(month, day), unit = q.unit || "sleeps";
+    var q = op(o), month = +q.month || 12, day = +q.day || 25, yr = q.year === undefined || q.year === "every" ? NaN : +q.year, n = daysTo(month, day, yr), unit = q.unit || "sleeps";
     var label = q.label || (month === 12 && day === 25 ? "Christmas" : "The big day");
+    // a starter name kept after the date changed: the date itself, never "Christmas" over 3 March
+    if (STARTER_DAYS[String(label).toLowerCase()] && STARTER_DAYS[String(label).toLowerCase()] !== month + "/" + day) label = day + " " + MONTHS[month - 1];
     var num = unit === "weeks" ? Math.round(n / 7) : n;
-    var u = n === 0 ? "It's today!" : unit === "weeks" ? (num === 1 ? "week to go" : "weeks to go") : unit === "days" ? (n === 1 ? "day to go" : "days to go") : (n === 1 ? "sleep to go" : "sleeps to go");
+    var gone = n < 0;
+    if (gone) n = -n;
+    var u = gone ? "It has been and gone" : n === 0 ? "It's today!" : unit === "weeks" ? (num === 1 ? "week to go" : "weeks to go") : unit === "days" ? (n === 1 ? "day to go" : "days to go") : (n === 1 ? "sleep to go" : "sleeps to go");
     var tiny = b.h < 200, fs = clamp(Math.min((b.h - (tiny ? 84 : 110)) * 0.95, (b.w - 48) / (String(num).length * 0.62)), 44, 200);
-    add(root, [b.w < 300 ? E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--sub)", [label]) : lab(q.icon || "calendar", label, "rgba(255,255,255,.9)"), E("div", "cw-grow"), n === 0 ? null : E("div", "cw-big", "font-size:" + px(fs), [String(num)]), tiny && n ? null : E("div", "cw-t29 cw-ell", "font-weight:650", [u])]);
+    add(root, [b.w < 300 ? E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--sub)", [label]) : lab(q.icon || "calendar", label, "rgba(255,255,255,.9)"), E("div", "cw-grow"), n === 0 || gone ? null : E("div", "cw-big", "font-size:" + px(fs), [String(num)]), tiny && n && !gone ? null : E("div", "cw-t29 cw-ell", "font-weight:650", [u])]);
     var lb = root.querySelector(".cw-lab"); if (lb && root.classList.contains("cw-tint")) lb.style.color = "var(--sub)";
   };
   R.date = function (root, o, b, env) {
-    var q = op(o), show = q.show || "date", d = now(), w = weather(env), short = b.w < 560 || q.dfmt === "short";
+    var q = op(o), show = q.show || "date", d = now(), w = weather(env, o), short = b.w < 560 || q.dfmt === "short";
     var dText = short ? shortDate(d) : longDate(d);
     var wText = w ? w.temp + "°" + (show === "both" && b.h >= 120 ? (w.code !== undefined ? " and " + wxWords(w.code).toLowerCase() : "") : (b.w >= 600 && q.place !== false && w.place ? " " + w.place : "") + (b.w >= 760 && w.code !== undefined ? ", " + wxWords(w.code).toLowerCase() : "")) : "";
     var big = b.h >= 160, fs = big ? clamp(b.h / 3.4, 34, 72) : clamp(b.h * 0.6, 26, 40), align = q.align || "center";
@@ -661,10 +771,16 @@
   };
 
   // weather
-  function noWx(root, b, env) { return empty(root, b, "partly-cloudy", dataOf(env).wxOff ? "Weather is off on this TV" : "Set your town for the weather", dataOf(env).wxOff ? "Turn it on in Home settings, Weather" : "Settings (hold OK), Home settings, Location"); }
+  function noWx(root, b, env, o) {
+    var d = dataOf(env), p = pickedPlace(o, env);
+    if (d.wxOff) return empty(root, b, "partly-cloudy", "Weather is off on this TV", "Turn it on in Home settings, Weather");
+    // a place picked for this widget: its own forecast is on its way, never the home's under its name
+    if (p) return empty(root, b, "partly-cloudy", b.w < 300 ? "Getting the weather" : "Getting the weather for " + (p.name || "this place"), "It shows here in a moment");
+    return empty(root, b, "partly-cloudy", "Set your town for the weather", "Settings (hold OK), Home settings, Location");
+  }
   R.weather = function (root, o, b, env, sh) {
-    var w = weather(env);
-    if (!w) return noWx(root, b, env);
+    var w = weather(env, o);
+    if (!w) return noWx(root, b, env, o);
     var q = op(o), large = b.w > 300, tiny = b.h < 300;
     if (b.h < 200) {
       // a Tile: the temperature and the sky, nothing else
@@ -678,12 +794,12 @@
       q.hilo === false || w.hi === undefined ? null : E("div", "cw-t23", "", [w.ahead ? w.ahead.label + " H:" + w.ahead.hi + "° L:" + w.ahead.lo + "°" : "H:" + w.hi + "° L:" + w.lo + "°"])]);
   };
   R.bigtemp = function (root, o, b, env, sh) {
-    var w = weather(env);
-    if (!w) return noWx(root, b, env);
+    var w = weather(env, o);
+    if (!w) return noWx(root, b, env, o);
     var st = o.style || {};
     // the colour of the day: warm when hot, blue when cool (unless the style picked one)
     if (!st.colour && sh.panel === "colour") {
-      var hot = w.temp >= 26, cold = w.temp < 15, c = hot ? "linear-gradient(160deg,#ffb340,#ff7a45)" : cold ? "linear-gradient(160deg,#64d2ff,#0a84ff)" : "linear-gradient(160deg,#ffd60a,#ff9f0a)";
+      var hot = tempC(w) >= 26, cold = tempC(w) < 15, c = hot ? "linear-gradient(160deg,#ffb340,#ff7a45)" : cold ? "linear-gradient(160deg,#64d2ff,#0a84ff)" : "linear-gradient(160deg,#ffd60a,#ff9f0a)";
       if (!w.is_day) c = "linear-gradient(160deg,#1c2a52,#0b1430)";
       root.style.setProperty("--tile", c);
       var ink = !w.is_day ? WHITE : cold ? WHITE : [42, 20, 5];
@@ -705,8 +821,8 @@
       E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(fs) + ";letter-spacing:-.06em", [w.temp + "°"]), words]);
   };
   R.hourly = function (root, o, b, env, sh) {
-    var w = weather(env);
-    if (!w) return noWx(root, b, env);
+    var w = weather(env, o);
+    if (!w) return noWx(root, b, env, o);
     if (!w.hourly) return empty(root, b, "clock", "The hourly forecast is on its way", "");
     var n = clamp(Math.floor((b.w - 48) / 110), 3, w.hourly.length), ink = rgba(sh.ink, 1);
     var next = w.hourly.slice(1).filter(function (h) { return h[1] >= 51; })[0];
@@ -718,8 +834,8 @@
       }))]);
   };
   R.week = function (root, o, b, env, sh) {
-    var w = weather(env);
-    if (!w) return noWx(root, b, env);
+    var w = weather(env, o);
+    if (!w) return noWx(root, b, env, o);
     if (!w.daily) return empty(root, b, "calendar", "The week's forecast is on its way", "");
     var rows = clamp(Math.floor((b.h - 170) / 62), 3, w.daily.length), ink = rgba(sh.ink, 1), lo = 99, hi = -99;
     w.daily.forEach(function (d) { lo = Math.min(lo, d[2]); hi = Math.max(hi, d[3]); });
@@ -734,8 +850,8 @@
       }))]);
   };
   R.rain = function (root, o, b, env) {
-    var w = weather(env);
-    if (!w) return noWx(root, b, env);
+    var w = weather(env, o);
+    if (!w) return noWx(root, b, env, o);
     if (!w.rain) return empty(root, b, "rain", "Rain soon is on its way", "");
     var heavy = (w.rainMax || 3) >= 2.5;
     add(root, [lab("rain", op(o).label || "Rain soon"), E("div", "cw-t38", "margin-top:10px", [w.rainFrom ? (heavy ? "Heavy rain from " : "Rain from ") + w.rainFrom : "No rain coming"]),
@@ -743,15 +859,15 @@
       E("div", "cw-row cw-sp cw-t23", "margin-top:8px", [E("span", "", "", ["Now"]), E("span", "", "", ["+1h"]), E("span", "", "", ["+2h"]), E("span", "", "", ["+3h"])])]);
   };
   R.uv = function (root, o, b, env) {
-    var w = weather(env);
-    if (!w || w.uv === undefined) return w ? empty(root, b, "sun", "UV is on its way", "") : noWx(root, b, env);
+    var w = weather(env, o);
+    if (!w || w.uv === undefined) return w ? empty(root, b, "sun", "UV is on its way", "") : noWx(root, b, env, o);
     var band = w.uv < 3 ? "Low" : w.uv < 6 ? "Moderate" : w.uv < 8 ? "High" : w.uv < 11 ? "Very high" : "Extreme";
     add(root, [lab("sun", op(o).label || "UV index"), E("div", "cw-big", "font-size:" + px(b.h < 300 ? 64 : 96) + ";margin-top:8px", [String(w.uv)]), E("div", "cw-t29", "font-weight:680", [band]), E("div", "cw-grow"),
       E("div", "cw-bar", "background:linear-gradient(90deg,#34c759,#ffd60a,#ff9f0a,#ff3b30,#af52de);overflow:visible", [E("i", "", "position:absolute;left:" + clamp(w.uv / 12 * 100, 2, 96) + "%;top:-6px;width:20px;height:20px;border-radius:10px;background:#fff;border:3px solid #ff6a3d;display:block")]),
       b.h >= 300 && w.uvFrom ? E("div", "cw-t23", "color:var(--ink);margin-top:12px", ["Sun protection " + w.uvFrom + " to " + w.uvTo]) : null]);
   };
   R.sun = function (root, o, b, env) {
-    var s = sunToday(env);
+    var s = sunToday(env, o);
     if (!s) return empty(root, b, "sun", "Set your town for the sun", "Settings (hold OK), Home settings, Location");
     var at = arc(s.frac);
     add(root, [lab("sun", op(o).label || "Sun"), svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.3)", "stroke-width": 4, "stroke-dasharray": "2 10", "stroke-linecap": "round" }),
@@ -769,14 +885,14 @@
   // air quality: the European AQI from Open-Meteo's free air quality service (app.js asks for it only
   // while an air widget is on the home); its bands are the EEA's
   function aqiBand(v) { return v < 20 ? ["Good", "#30d158"] : v < 40 ? ["Fair", "#a4e05a"] : v < 60 ? ["Moderate", "#ffd60a"] : v < 80 ? ["Poor", "#ff9f0a"] : v < 100 ? ["Very poor", "#ff453a"] : ["Extremely poor", "#bf5af2"]; }
-  function airOf(env) {
+  function airOf(env, o) {
     if (env.demo) return { aqi: 18, hourly: [18, 17, 16, 18, 21, 24, 26, 25, 22, 20, 19, 18] };
-    var w = dataOf(env).weather;
+    var w = wxSrc(o, env).w;
     return w && w.air && isFinite(w.air.aqi) ? w.air : null;
   }
   R.air = function (root, o, b, env) {
-    var a = airOf(env);
-    if (!a) return weather(env) ? empty(root, b, "wind", "Waiting for the air quality", "From Open-Meteo, every refresh") : noWx(root, b, env);
+    var a = airOf(env, o);
+    if (!a) return weather(env, o) ? empty(root, b, "wind", "Waiting for the air quality", "From Open-Meteo, every refresh") : noWx(root, b, env, o);
     var v = Math.round(a.aqi), band = aqiBand(v);
     if (b.h < 200) {
       add(root, b.w < 300 ? [lab("wind", op(o).label || "Air"), E("div", "cw-grow"), E("div", "cw-big", "font-size:56px;color:" + band[1], [String(v)]), E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--ink)", [band[0]])]
@@ -790,16 +906,26 @@
   // the forecast (app.js asks only while a surf widget is on the home)
   var COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
   function compass(deg) { return isFinite(deg) ? COMPASS[Math.round(((+deg % 360) + 360) % 360 / 45) % 8] : ""; }
-  function surfOf(env) {
+  function surfOf(env, o) {
     if (env.demo) return { wave: 1.4, period: 11, dir: 135, wind: 9, windDir: 250, hourly: [1.2, 1.3, 1.4, 1.4, 1.5, 1.5, 1.4, 1.3, 1.3, 1.2, 1.2, 1.1] };
-    var w = dataOf(env).weather;
+    var w = wxSrc(o, env).w;
     return w && w.marine ? w.marine : null;
   }
+  // the surf's heading always says where the swell is read: the beach picked for this widget on this
+  // TV, else the home's own town. A design's words ("North Point") show only beside a beach picked
+  // here, never in place of the real one (seagey's TCL, 20 Nov 2026)
+  function surfPlace(o, env) {
+    var lbl = tvSet(o, env, "label") || ((o.__design || op(o)).label || "");
+    if (env.demo) return op(o).label || "The point";
+    var p = pickedPlace(o, env), real = p ? p.name : (dataOf(env).place || {}).name || "";
+    if (!real) return "Surf";
+    return p && lbl && String(lbl).toLowerCase() !== real.toLowerCase() ? lbl + ", " + real : real;
+  }
   R.surf = function (root, o, b, env) {
-    var m = surfOf(env);
-    if (!m) return weather(env) ? empty(root, b, "wind", "Waiting for the swell", "From Open-Meteo's marine service") : noWx(root, b, env);
-    if (!isFinite(m.wave)) return empty(root, b, "wind", "No surf reading here", "The sea is too far from your town");
-    var place = op(o).label || (env.demo ? "The point" : (dataOf(env).place || {}).name || "Surf");
+    var m = surfOf(env, o), pk = pickedPlace(o, env);
+    if (!m) return weather(env, o) || pk ? empty(root, b, "wind", "Waiting for the swell", pk && pk.name ? "At " + pk.name + ", from Open-Meteo's marine service" : "From Open-Meteo's marine service") : noWx(root, b, env, o);
+    if (!isFinite(m.wave)) return empty(root, b, "wind", "No surf reading here", "The sea is too far from " + (pk && pk.name ? pk.name : "your town"));
+    var place = surfPlace(o, env);
     var swell = compass(m.dir) + " swell" + (isFinite(m.period) ? ", " + Math.round(m.period) + "s" : "");
     var wind = isFinite(m.wind) ? compass(m.windDir) + " " + Math.round(m.wind) + " km/h" : "";
     var big = E("div", "cw-big", "font-size:" + px(b.h < 200 ? 64 : 92), [String(Math.round(m.wave * 10) / 10), E("span", "", "font-size:.4em", ["m"])]);
@@ -941,7 +1067,14 @@
   var SPORT_APPS = ["au.com.kayosports.tv", "au.com.foxtel.atv", "au.com.ninenow.ctv", "com.swm.live", "au.com.tenplay", "dazn"];
   // an Up next is a game hero when it says so (opts.sport), or, when it does not say, when the design
   // also has a Scores widget (the Game Day preset); opts.apps narrows it to those apps
-  function upnextSport(o, env) { var q = op(o); return q.sport === true || (q.sport !== false && !!env.sport); }
+  // game mode: On, Off, or Automatic (on when the design also has a Scores widget)
+  function upnextSport(o, env) { var v = setting(o, env, "sport"); return v === true || v === "on" || (v !== false && v !== "off" && !!env.sport); }
+  // the sport apps this TV has, by name ("Kayo or 9Now"), for the empty words
+  function sportAppsHere(env) {
+    var have = installed(env).map(function (a) { return a.package; }), names = [];
+    SPORT_APPS.forEach(function (p) { if (have.indexOf(p) >= 0 && names.length < 3) names.push(APPS[p] || p); });
+    return names.length ? names.slice(0, -1).join(", ") + (names.length > 1 ? " or " : "") + names[names.length - 1] : "";
+  }
   R.upnext = function (root, o, b, env) {
     var q = op(o), sport = upnextSport(o, env), want = q.apps && q.apps.length ? q.apps : sport ? SPORT_APPS : null;
     // each show keeps its place in Keep watching: Resume opens that one (app.js "show" is its index)
@@ -949,7 +1082,7 @@
     if (want && !env.demo) list = list.filter(function (x) { return want.indexOf(x.app) >= 0; });
     if (!list.length) {
       // on a TV, never a demo and never an unrelated show: say plainly there is no game to pick up
-      if (sport && !(env && dataOf(env).bridge === false)) return empty(root, b, "tv", "No game to pick up", "Start a game in Kayo, Foxtel or 9Now and it shows here");
+      if (sport && !(env && dataOf(env).bridge === false)) { var sa = sportAppsHere(env); return empty(root, b, "tv", "No game to pick up", sa ? "Start a game in " + sa + " and it shows here" : "Start a game in a sport app and it shows here"); }
       return noShows(root, b, env);
     }
     var s = env.demo ? (sport ? { title: "Titans v Broncos", sub: "NRL, round 3. Kick off 7:50pm", app: "au.com.kayosports.tv", art: bgImg("scene-golden"), i: 0 }
@@ -1216,7 +1349,7 @@
 
   // Speakers: each Home Assistant speaker (media_player.* named in config.json) and its volume
   function speakersOf(env, o) {
-    var ha = haOf(env), want = op(o).players;
+    var ha = haOf(env), want = setting(o, env, "players");
     if (!ha.speakers) return ha.speakers;
     var l = ha.speakers.filter(function (s) { return s && s.entity; });
     if (want && want.length) l = want.map(function (e) { return l.filter(function (s) { return s.entity === e; })[0]; }).filter(Boolean);
@@ -1256,8 +1389,10 @@
 
   // smart home
   function noHa(root, b, iconName, kind) { return soon(root, b, iconName || "home", kind || "aircon"); }
-  function dial(s, set, cur) {
-    var frac = clamp((set - 16) / 14, 0, 1);
+  function dial(s, set, cur, r, env) {
+    // the arc goes by Celsius (16 to 30); the numbers are drawn in the home's unit
+    var setC = r && roomUnit(r) === "f" ? (set - 32) * 5 / 9 : set, frac = clamp((setC - 16) / 14, 0, 1);
+    if (r) { set = tconv(set, r, env); if (cur !== null && cur !== undefined) cur = Math.round(tconv(cur, r, env) * 10) / 10; }
     return E("div", "", "position:relative;width:" + px(s) + ";height:" + px(s) + ";flex:none", [svg("0 0 100 100", s, s, [
       S("circle", { cx: 50, cy: 50, r: 42, fill: "none", stroke: "rgba(255,255,255,.16)", "stroke-width": 8, "stroke-dasharray": "198 66", "stroke-linecap": "round", transform: "rotate(135 50 50)" }),
       S("circle", { cx: 50, cy: 50, r: 42, fill: "none", stroke: "#64d2ff", "stroke-width": 8, "stroke-dasharray": Math.round(198 * frac) + " 300", "stroke-linecap": "round", transform: "rotate(135 50 50)" })]),
@@ -1274,30 +1409,45 @@
   function roomsOf(env) { return env.demo ? DEMO_ROOMS : (env.rooms || []); }
   function roomOn(r) { return r.ok !== false && r.state !== "off"; }
   function roomMode(r) { return r.ok === false ? "Not answering" : MODE_WORD[r.state] || (r.state ? String(r.state) : "On"); }
-  function tdeg(v) { return v == null || !isFinite(v) ? "--" : (Math.round(v * 10) / 10) + "°"; }
+  // a room's temperatures are in Home Assistant's own unit (a room that says so, else one whose top
+  // setting is over 50 is Fahrenheit); drawn in the home's unit once Home settings has one
+  function roomUnit(r) {
+    var u = String((r && (r.unit || r.temperature_unit)) || "");
+    if (/f/i.test(u)) return "f";
+    if (/c/i.test(u)) return "c";
+    return r && isFinite(r.max) && r.max > 50 ? "f" : "c";
+  }
+  function tconv(v, r, env) {
+    if (v === null || v === undefined || !isFinite(v) || !r) return v;
+    var d = dataOf(env || {}), want = unitF(env || {}) ? "f" : d.unit === "c" || d.wx_unit === "c" ? "c" : null, have = roomUnit(r);
+    if (!want || want === have) return v;
+    return want === "f" ? v * 9 / 5 + 32 : (v - 32) * 5 / 9;
+  }
+  function tdeg(v, r, env) { return v == null || !isFinite(v) ? "--" : (Math.round(tconv(v, r, env) * 10) / 10) + "°"; }
   R.aircon = function (root, o, b, env) {
     var rooms = roomsOf(env);
     if (!rooms.length) return noHa(root, b, "aircon", "aircon");
-    var ent = op(o).entity, r = rooms.filter(function (x) { return ent && x.entity === ent; })[0] || rooms[0];
+    // the room picked for this widget on this TV (or in its design), else the first
+    var ent = setting(o, env, "entity"), r = rooms.filter(function (x) { return ent && x.entity === ent; })[0] || rooms[0];
     var on = roomOn(r), col = on ? MODE_COL[r.state] || "#64d2ff" : "rgba(255,255,255,.35)";
     var dot = E("i", "", "display:block;width:18px;height:18px;border-radius:9px;flex:none;background:" + col + ";box-shadow:0 0 0 4px rgba(255,255,255,.12)");
     if (b.w < 300 && b.h < 300) {
       // a tile: the room, its temperature now, and whether it is on
       add(root, [E("div", "cw-row cw-sp", "", [E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--ink);min-width:0", [r.name || "Aircon"]), dot]), E("div", "cw-grow"),
-        E("div", "cw-big", "font-size:" + px(clamp(b.w * 0.36, 44, 64)), [r.current != null ? Math.round(r.current) + "°" : tdeg(r.target)]), E("div", "cw-t23 cw-ell", "", [on ? roomMode(r) + " " + tdeg(r.target) : "Off"])]);
+        E("div", "cw-big", "font-size:" + px(clamp(b.w * 0.36, 44, 64)), [r.current != null ? Math.round(tconv(r.current, r, env)) + "°" : tdeg(r.target, r, env)]), E("div", "cw-t23 cw-ell", "", [on ? roomMode(r) + " " + tdeg(r.target, r, env) : "Off"])]);
     } else if (b.h < 200) {
       // a wide tile: the room and its mode beside the set temperature
       add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:1;min-width:0", [lab("aircon", r.name || "Aircon"), E("div", "cw-row", "margin-top:8px", [dot, E("span", "cw-t25 cw-ell", "margin-left:12px;color:var(--ink);font-weight:650", [on ? roomMode(r) : "Off"])]),
-        E("div", "cw-t23 cw-ell", "margin-top:2px", ["Now " + tdeg(r.current)])]),
-        E("div", "cw-big", "font-size:84px;margin-left:16px;opacity:" + (on ? 1 : 0.55), [tdeg(r.target)])]));
+        E("div", "cw-t23 cw-ell", "margin-top:2px", ["Now " + tdeg(r.current, r, env)])]),
+        E("div", "cw-big", "font-size:84px;margin-left:16px;opacity:" + (on ? 1 : 0.55), [tdeg(r.target, r, env)])]));
     } else {
       // the room, its mode and the dial as one group in the middle (a tall box: not the dial alone)
       var wideA = b.w > b.h * 1.3, s = Math.min(b.h - 130, wideA ? b.w * 0.5 : b.w - 48), others = rooms.filter(function (x) { return x !== r; }).slice(0, 4);
       if (!wideA) root.style.justifyContent = "center";
       add(root, [E("div", "cw-row cw-sp", "", [lab("aircon", r.name || "Aircon"), E("div", "cw-chip on", "height:44px;font-size:23px;background:" + col + ";color:#1a1406", [on ? roomMode(r) : "Off"])]),
-        E("div", (wideA ? "cw-grow " : "") + "cw-row cw-center", wideA ? "" : "margin-top:20px", [dial(s, r.target != null ? r.target : 22, r.current != null ? Math.round(r.current * 10) / 10 : null), wideA && b.w >= 700 ? E("div", "cw-col", "margin-left:30px", others.map(function (z) {
+        E("div", (wideA ? "cw-grow " : "") + "cw-row cw-center", wideA ? "" : "margin-top:20px", [dial(s, r.target != null ? r.target : (roomUnit(r) === "f" ? 72 : 22), r.current != null ? Math.round(r.current * 10) / 10 : null, r, env), wideA && b.w >= 700 ? E("div", "cw-col", "margin-left:30px", others.map(function (z) {
           var zo = roomOn(z);
-          return E("div", "cw-chip" + (zo ? " on" : ""), "margin:7px 0;" + (zo ? "background:" + (MODE_COL[z.state] || "#64d2ff") : ""), [z.name + (zo ? " " + tdeg(z.target) : " off")]);
+          return E("div", "cw-chip" + (zo ? " on" : ""), "margin:7px 0;" + (zo ? "background:" + (MODE_COL[z.state] || "#64d2ff") : ""), [z.name + (zo ? " " + tdeg(z.target, z, env) : " off")]);
         })) : null])]);
     }
     stop(root, "detail", "aircon", r.name || "Aircon");
@@ -1368,7 +1518,8 @@
     }
     if (!ha.controls) return ha.controls;
     var l = ha.controls.filter(function (c) { return c && c.entity; });
-    if (q.switches && q.switches.length) l = q.switches.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
+    var sw = setting(o, env, "switches");
+    if (sw && sw.length) l = sw.map(function (e) { return l.filter(function (c) { return c.entity === e; })[0]; }).filter(Boolean);
     return l;
   }
   // one switch in its own box: icon over name over state in a tall box, icon beside them in a short one;
@@ -1432,7 +1583,7 @@
   R.camera = function (root, o, b, env) {
     var ha = haOf(env), info = ha.info || {}, q = op(o), cams = info.cameras || [], al = alignOf(o), W = b.w - 48;
     if (!env.demo && !cams.length) return soonFit(root, b, "camera", "camera");
-    var cam = cams.filter(function (c) { return c.entity === q.cam; })[0] || cams[0], name = q.label || cam.name || "Camera";
+    var want = setting(o, env, "cam"), cam = cams.filter(function (c) { return c.entity === want; })[0] || cams[0], name = devName(o, env, "cam", cam.name, "Camera");
     var src = env.demo ? demoImg("dog") : (ha.stills || {})[cam.entity];
     var pic = E("div", "cw-fill", "background:#1c1f24 center/cover;" + (src ? "background-image:" + cssImg(src) : ""));
     var EVERY2 = "A still every 2 seconds", say = function (t) { return fitWords(root, t, W, 24, 1, 560, "color:rgba(255,255,255,.86)"); };
@@ -1456,7 +1607,7 @@
   R.doorbell = function (root, o, b, env) {
     var ha = haOf(env), info = ha.info || {}, al = alignOf(o), W = b.w - 48, H = b.h - 48;
     if (!env.demo && !info.doorbell) return soonFit(root, b, "doorbell", "doorbell");
-    var bell = ha.bell, name = op(o).label || (bell && bell.name) || "Front door";
+    var bell = ha.bell, name = devName(o, env, null, bell && bell.name, "Doorbell");
     var words = !bell ? ["Checking", "Home Assistant", "Checking"] : !bell.ok ? ["Not answering", "Home Assistant", "Home Assistant"] : bell.ringing ? ["Ringing now", name, "At the door"] : bell.at ? ringWords(bell.at) : ["No ring", "Not this week", "This week"];
     var ring = !env.demo && ha.ring && bell && bell.kept && ha.ring.at ? ha.ring : null;
     var src = env.demo ? bgImg("grose-valley") : ring ? ring.src : (ha.stills || {}).doorbell, cam = env.demo || info.doorbell_camera;
@@ -1493,7 +1644,7 @@
   R.energy = function (root, o, b, env) {
     var ha = haOf(env), info = ha.info || {}, e = ha.energy, al = alignOf(o), W = b.w - 48, H = b.h - 48;
     if (!env.demo && !info.energy) return soonFit(root, b, "bolt", "energy");
-    var name = op(o).label || (e && e.name) || "Energy";
+    var name = devName(o, env, null, e && e.name, "Energy");
     if (!e) return haWait(root, b, o, "bolt", name, "Checking Home Assistant");
     if (!e.ok) return haWait(root, b, o, "bolt", name, e.error === "unit" ? "This sensor is not energy or power" : NOT_ANSWERING);
     alignRoot(root, al);
@@ -1520,9 +1671,17 @@
 
   // Sensor: one reading, with its last 24 hours
   var SENSOR_ICON = { temperature: "temperature", humidity: "humidity", precipitation: "rain", precipitation_intensity: "rain", wind_speed: "wind", power: "bolt", energy: "bolt", battery: "bolt", illuminance: "sun" };
-  function sensorText(s) {
+  // a temperature sensor's reading in the home's unit (Home settings, Weather, Units)
+  function sensorConv(n, s, env) {
+    var u = String((s && s.unit) || ""), d = dataOf(env || {});
+    if (n === null || n === undefined || !isFinite(n)) return n;
+    if (u === "°C" && unitF(env || {})) return n * 9 / 5 + 32;
+    if (u === "°F" && (d.unit === "c" || d.wx_unit === "c")) return (n - 32) * 5 / 9;
+    return n;
+  }
+  function sensorText(s, env) {
     if (!s || s.ok === false) return ["--", ""];
-    var v = s.num != null && isFinite(s.num) ? String(Math.round(s.num * 10) / 10) : String(s.value || "--").slice(0, 12), u = String(s.unit || "");
+    var v = s.num != null && isFinite(s.num) ? String(Math.round(sensorConv(s.num, s, env) * 10) / 10) : String(s.value || "--").slice(0, 12), u = String(s.unit || "");
     return u === "°C" || u === "°F" ? [v + "°", ""] : [v, u];
   }
   function spark(points, w, h, colour) {
@@ -1535,11 +1694,11 @@
     return g;
   }
   function sensorPick(env, o) {
-    var ha = haOf(env), names = (ha.info && ha.info.sensors) || [], want = op(o).reading;
+    var ha = haOf(env), names = (ha.info && ha.info.sensors) || [], want = setting(o, env, "reading");
     var n = names.filter(function (s) { return s.entity === want; })[0] || names[0];
     if (!n) return null;
     var s = (ha.sensors || []).filter(function (x) { return x.entity === n.entity; })[0];
-    return { entity: n.entity, name: op(o).label || (s && s.name) || n.name || "Sensor", s: s, read: !!ha.sensors, hist: (ha.hist || {})[n.entity] };
+    return { entity: n.entity, name: devName(o, env, "reading", (s && s.name) || n.name, "Sensor"), s: s, read: !!ha.sensors, hist: (ha.hist || {})[n.entity] };
   }
   // the reading and its unit on one line, as big as fits
   function sensorValue(root, t, width, max) {
@@ -1554,7 +1713,7 @@
     if (!p.read) return haWait(root, b, o, iconName, p.name, "Checking Home Assistant");
     if (!p.s || p.s.ok === false) return haWait(root, b, o, iconName, p.name, NOT_ANSWERING);
     alignRoot(root, al);
-    var t = sensorText(p.s), pts = p.hist && p.hist.points, got = (pts || []).filter(function (v) { return v != null; });
+    var t = sensorText(p.s, env), pts = p.hist && p.hist.points && p.hist.points.map(function (v) { return v == null ? v : sensorConv(v, p.s, env); }), got = (pts || []).filter(function (v) { return v != null; });
     if (b.w < 300 && b.h < 300) {
       add(root, [fitLab(root, iconName, p.name, W), E("div", "cw-grow"), sensorValue(root, t, W, 64)]);
     } else {
@@ -1601,14 +1760,16 @@
   };
 
   // lists and the family
+  // the bin night: 0 (Sunday) to 6, or null when not set yet (nothing, or "none")
+  function binDay(q) { var v = q.weekday; if (v === undefined || v === null || v === "" || v === "none") return null; v = +v; return isFinite(v) && v >= 0 && v <= 6 ? Math.round(v) : null; }
   R.bins = function (root, o, b, env) {
     var q = op(o), d = now();
-    var wd = q.weekday === undefined ? 3 : q.weekday, ahead = (wd - d.getDay() + 7) % 7;
+    var wd = binDay(q) === null ? 3 : binDay(q), ahead = (wd - d.getDay() + 7) % 7;
     var when = ahead === 0 ? "Tonight" : ahead === 1 ? "Tomorrow night" : DAYS[wd] + " night";
     var night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + ahead), week = Math.floor((night.getTime() / 86400000 - (q.anchor || 0)) / 7);
     var a = [q.lid_a || "#ffd60a", q.bin_a || "Recycling"], c = [q.lid_b || "#30d158", q.bin_b || "Garden"];
     var bins = q.alt ? [["#ff453a", "Rubbish"], week % 2 === 0 ? a : c] : [a, c];
-    if (!env.demo && q.weekday === undefined) return empty(root, b, "calendar", "Set your bin night in couch-tv Studio", "Pick the night and the bins");
+    if (!env.demo && binDay(q) === null) return empty(root, b, "calendar", "Set your bin night in this widget's settings", "Pick the night and the bins");
     var bs = b.h < 300 ? 48 : 62;
     add(root, [lab("calendar", op(o).label || "Bin night"), E("div", b.h < 300 ? "cw-t29" : "cw-t38", "margin-top:12px;font-weight:700", [when]), E("div", "cw-grow"),
       E("div", "cw-row", "", bins.map(function (x, i) {
@@ -1786,11 +1947,32 @@
   }
   var DEMO_NEWS = [["Coastal highway upgrade finishes a month early", 1], ["Storm season outlook: a wetter summer than usual", 2], ["Matildas name squad for December friendlies", 3], ["Petrol prices ease ahead of the holidays", 4],
     ["Library extends weekend hours over summer", 5], ["New ferry timetable starts on Monday", 6]];
+  // a heading typed in a design, unless it names another source than the one shown (a starter's
+  // "NRL" over the AFL, "The Guardian" over ABC News): then the real source's own name
+  function webName(label, real, all) {
+    var l = String(label || "").trim();
+    if (!l) return "";
+    var low = l.toLowerCase().replace(/\s+/g, " "), r = String(real || "").toLowerCase();
+    if (r && (r.indexOf(low) >= 0 || low.indexOf(r) >= 0)) return l;   // it names the real one
+    var word = function (n) { var i = low.indexOf(n); return i >= 0 && (i === 0 || /\W/.test(low.charAt(i - 1))) && (i + n.length === low.length || /\W/.test(low.charAt(i + n.length))); };
+    if (all) for (var k in all) if (Object.prototype.hasOwnProperty.call(all, k)) {
+      var n = String(all[k].name || "").toLowerCase(), id = String(k).toLowerCase();
+      if (n === r) continue;
+      if (low === n || low === id || word(n) || word(id) || (low.length >= 3 && n.indexOf(low) === 0)) return "";
+    }
+    return l;
+  }
+  // "auto" (Best for your country): BBC World in the UK, RNZ in New Zealand, else ABC News
+  function feedFor(v, env) {
+    if (v && v !== "auto") return v;
+    var c = String(dataOf(env).country || "").toUpperCase();
+    return c === "GB" || c === "UK" ? "bbc" : c === "NZ" ? "rnz" : "abc";
+  }
   function newsOf(root, o, b, env) {
-    var WW = window.CouchWidgetWeb, q = op(o), feed = WW ? WW.feedOf(q.feed) : "abc", name = q.label || (WW ? WW.FEEDS[feed].name : "Headlines");
-    if (env.demo) return { name: name, items: DEMO_NEWS.map(function (x) { return { title: x[0], at: Date.now() - x[1] * 3600000 }; }) };
+    var WW = window.CouchWidgetWeb, q = op(o), feed = WW ? WW.feedOf(feedFor(setting(o, env, "feed"), env)) : "abc", src = WW ? WW.FEEDS[feed].name : "", name = webName(q.label, src, WW ? WW.FEEDS : null) || src || "Headlines";
+    if (env.demo) return { name: name, from: name !== src ? src : "", items: DEMO_NEWS.map(function (x) { return { title: x[0], at: Date.now() - x[1] * 3600000 }; }) };
     var rec = webOf(env, "news", feed);
-    return webReady(root, b, "info", "news", rec) ? { name: name, items: rec.v || [], stale: !!rec.stale, at: rec.at } : null;
+    return webReady(root, b, "info", "news", rec) ? { name: name, from: name !== src ? src : "", items: rec.v || [], stale: !!rec.stale, at: rec.at } : null;
   }
   function agoOf(at) { var WW = window.CouchWidgetWeb; return WW && at ? WW.ago(at, now().getTime()) : ""; }
   function headline(x, a, first, size) {
@@ -1802,7 +1984,7 @@
     if (!N) return;
     if (!N.items.length) return webEmpty(root, b, "info", WEB_WORDS.news[2], "", WEB_SHORT.news[2]);
     var n = clamp(Math.floor((b.h - 70) / 110), 1, 5);
-    webBody(root, a, [webHead("info", N.name, a), N.stale ? line("Not updated lately", 24, "color:var(--sub)", a, 3) : null, E("div", "", "height:14px;flex:none")].concat(N.items.slice(0, n).map(function (x, i) { return headline(x, a, i === 0); })));
+    webBody(root, a, [webHead("info", N.name, a), N.stale ? line("Not updated lately", 24, "color:var(--sub)", a, 3) : N.from && b.h >= 300 ? line("From " + N.from, 24, "color:var(--sub)", a, 3) : null, E("div", "", "height:14px;flex:none")].concat(N.items.slice(0, n).map(function (x, i) { return headline(x, a, i === 0); })));
   };
 
   // Scores: one league's round from ESPN's public scoreboard (widget-web.js), live games first, then
@@ -1816,12 +1998,12 @@
     }) };
   }
   function scoresOf(root, o, b, env) {
-    var WW = window.CouchWidgetWeb, q = op(o), id = WW ? WW.leagueOf(q.league) : "nrl", v;
+    var WW = window.CouchWidgetWeb, q = op(o), id = WW ? WW.leagueOf(setting(o, env, "league")) : "nrl", v;
     if (env.demo) v = demoScores();
     else { var rec = webOf(env, "sports", id); if (!webReady(root, b, "tv", "sports", rec)) return null; v = rec.v || { games: [] }; v.stale = !!rec.stale; }
-    var name = q.label || v.league || "Scores";
+    var real = WW && WW.LEAGUES && WW.LEAGUES[id] ? WW.LEAGUES[id].name : v.league, name = webName(q.label, real, WW && WW.LEAGUES) || real || v.league || "Scores";
     if (!v.games || !v.games.length) { webEmpty(root, b, "tv", "No " + (v.league || "") + " games this week", "Scores show here when the next round starts", "No games"); return null; }
-    return { name: name, round: v.round || "", stale: v.stale, games: WW ? WW.scoreOrder(v.games, q.team, now().getTime()) : v.games };
+    return { name: name, round: v.round || "", stale: v.stale, games: WW ? WW.scoreOrder(v.games, setting(o, env, "team"), now().getTime()) : v.games };
   }
   // a result in plain words: "Full time", "Full time, extra time", "Full time, penalties"
   var FULL = { ot: "extra time", aet: "extra time", pens: "penalties", so: "a shoot out" };
@@ -1872,14 +2054,14 @@
     return { symbol: sym, name: d[0], kind: d[1], currency: d[2], price: d[3], prev: d[4], change: Math.round((d[3] - d[4]) / d[4] * 10000) / 100, points: pts };
   }
   function stocksOf(root, o, b, env) {
-    var WW = window.CouchWidgetWeb, q = op(o), list = WW ? WW.tickersOf(q.tickers) : ["^AXJO"], quotes, stale = false;
+    var WW = window.CouchWidgetWeb, q = op(o), list = WW ? WW.tickersOf(setting(o, env, "tickers")) : ["^AXJO"], quotes, stale = false;
     if (env.demo) quotes = list.map(demoQuote);
     else {
       var rec = webOf(env, "stocks", list.join(","));
       if (!webReady(root, b, "info", "stocks", rec)) return null;
       quotes = list.map(function (s) { return ((rec.v || {}).quotes || {})[s]; }).filter(Boolean); stale = !!rec.stale;
     }
-    if (!quotes.length) { webEmpty(root, b, "info", "None of these has a price right now", "Check the symbols in couch-tv Studio", "No prices"); return null; }
+    if (!quotes.length) { webEmpty(root, b, "info", "None of these has a price right now", "Check the share codes in this widget's settings", "No prices"); return null; }
     return { name: q.label || "Markets", quotes: quotes, stale: stale };
   }
   function upDown(c) { return c > 0 ? "#30d158" : c < 0 ? "#ff453a" : "rgba(255,255,255,.3)"; }
@@ -1905,7 +2087,10 @@
   // traffic. The design only says when to arrive (opts.arrive_h, arrive_m), the minutes to spare and
   // its label: never a place.
   function commuteOf(root, o, b, env) {
-    var q = op(o), c = dataOf(env).commute || {}, v;
+    // the drive for this widget's own Where to (app.js data().commuteBy["<object id>"]), else the home's
+    var q = op(o), cb = dataOf(env).commuteBy, c = (cb && o.id !== undefined && cb[o.id]) || dataOf(env).commute || {}, v;
+    var toTv = placeVal(tvSet(o, env, "to"));
+    if (toTv && !(cb && cb[o.id]) && !env.demo) c = { from: c.from, to: toTv, key: null };
     if (env.demo) { v = { minutes: 16, km: 12.4 }; c = { to: { name: "work" } }; }
     else {
       if (!c.from) { webEmpty(root, b, "location", "Set your town for the commute", "Settings (hold OK), Home settings, Location", "Set your town"); root.setAttribute("data-setup", "commute"); return null; }
@@ -1916,10 +2101,12 @@
       v = rec.v;
     }
     // in couch-tv Studio a design with no arrive by time shows 8:30 as its example
-    var WW = window.CouchWidgetWeb, spare = q.buffer === undefined ? 10 : q.buffer, ah = q.arrive_h !== undefined ? q.arrive_h : env.demo ? 8 : undefined, am = q.arrive_h !== undefined ? q.arrive_m || 0 : 30;
-    var lb = WW && ah !== undefined ? WW.leaveBy(v.minutes, ah, am, spare, now().getTime(), q.weekdays) : null;
+    var bufS = setting(o, env, "buffer"), ahS = setting(o, env, "arrive_h"), amS = setting(o, env, "arrive_m"), wdS = setting(o, env, "weekdays");
+    var hasAh = ahS !== undefined && ahS !== null && ahS !== "" && ahS !== "off" && isFinite(+ahS);
+    var WW = window.CouchWidgetWeb, spare = bufS === undefined || !isFinite(+bufS) ? 10 : +bufS, ah = hasAh ? +ahS : env.demo ? 8 : undefined, am = hasAh ? +amS || 0 : 30;
+    var lb = WW && ah !== undefined ? WW.leaveBy(v.minutes, ah, am, spare, now().getTime(), wdS) : null;
     var arrive = ah !== undefined ? fmt12(new Date(2000, 0, 1, ah, am)) : "";
-    return { minutes: v.minutes, km: v.km, label: q.label || "To " + (c.to.name || "work"), leave: lb ? (lb.day ? lb.day + ", leave by " : "Leave by ") + fmt12(lb.at) : "", arrive: arrive, stale: !env.demo && !!(webOf(env, "commute", c.key) || {}).stale };
+    return { minutes: v.minutes, km: v.km, label: (tvSet(o, env, "label") || (o.__design || q).label) || "To " + (c.to.name || "work"), leave: lb ? (lb.day ? lb.day + ", leave by " : "Leave by ") + fmt12(lb.at) : "", arrive: arrive, stale: !env.demo && !!(webOf(env, "commute", c.key) || {}).stale };
   }
   function line(text, size, extra, a, drop) { var e = fitT(E("div", "", WRAP + "font-size:" + size + "px;line-height:1.22;flex:none;text-align:" + a + ";" + (extra || ""), [text])); return drop ? dropT(e, drop) : e; }
   R.commute = function (root, o, b, env) {
@@ -1930,7 +2117,7 @@
       E("div", "cw-row", "justify-content:" + jc(a) + ";align-items:baseline;flex-wrap:wrap;margin-top:8px;flex:none", [fitT(E("span", "cw-big", "font-size:" + px(big) + ";line-height:1", [String(V.minutes)]), 40), E("span", "cw-t29", "margin-left:12px", ["min"]),
         wide ? E("span", "cw-t25", "margin-left:24px;color:var(--sub)", [V.km + " km by road"]) : null]),
       line(V.stale ? "Not updated lately" : "The usual drive, no live traffic", 24, "color:var(--sub);margin-top:6px", a, 3),
-      line(V.leave ? V.leave + (V.arrive ? " for " + V.arrive : "") : "Set an arrive by time in couch-tv Studio", 25, "font-weight:680;margin-top:12px", a)]);
+      line(V.leave ? V.leave + (V.arrive ? " for " + V.arrive : "") : "Set an arrive by time in this widget's settings", 25, "font-weight:680;margin-top:12px", a)]);
   };
 
   // guests and the room
@@ -1958,6 +2145,11 @@
   // stranger's name and a made up house, so they never show there. The greeting stays.
   var WELCOME_SAMPLE = { "Welcome, Ella and friends": "Welcome", "Hi Ruby!": "Hi!" };
   var WELCOME_SAMPLE_LINES = ["Headland House, North Point", "Tuesday to Sunday. Night two of five", "Three sleeps till the beach"];
+  // compared loosely (case, spaces, end stops, curly quotes), so a starter line copied with a small
+  // change in couch-tv Studio still never reaches a real TV
+  function sampleKey(t) { return String(t || "").replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, " ").replace(/[.!\s]+$/, "").trim().toLowerCase(); }
+  function isSampleLine(t) { var k = sampleKey(t); if (!k) return false; for (var i = 0; i < WELCOME_SAMPLE_LINES.length; i++) if (sampleKey(WELCOME_SAMPLE_LINES[i]) === k) return true; return false; }
+  function sampleGreeting(t) { var k = sampleKey(t); for (var g in WELCOME_SAMPLE) if (Object.prototype.hasOwnProperty.call(WELCOME_SAMPLE, g) && sampleKey(g) === k) return WELCOME_SAMPLE[g]; return null; }
   function realTv(env) { return !!env && !env.demo && !env.designer && !env.preview; }
   // the greeting with the name taken off: "Welcome, Smith family" -> "Welcome", "Hi Ruby!" stays
   function greetingOf(text) { var lines = text.split("\n"), i = lines[0].indexOf(", "); if (i > 0) lines[0] = lines[0].slice(0, i) + (/[.!]+$/.exec(lines[0]) || [""])[0]; return lines.join("\n"); }
@@ -1969,9 +2161,10 @@
     if (real) {
       var q1 = {}, k1;
       for (k1 in q) if (Object.prototype.hasOwnProperty.call(q, k1)) q1[k1] = q[k1];
-      if (Object.prototype.hasOwnProperty.call(WELCOME_SAMPLE, text)) text = WELCOME_SAMPLE[text];
-      if (WELCOME_SAMPLE_LINES.indexOf(q1.kicker) >= 0) delete q1.kicker;
-      if (WELCOME_SAMPLE_LINES.indexOf(q1.sub) >= 0) delete q1.sub;
+      if (sampleGreeting(text) !== null) text = sampleGreeting(text);
+      else if (isSampleLine(text)) text = "Welcome";
+      if (isSampleLine(q1.kicker)) delete q1.kicker;
+      if (isSampleLine(q1.sub)) delete q1.sub;
       q = q1;
       if (typed && q.source !== "calendar") text = withName(greetingOf(text), typed);
     }
@@ -2032,15 +2225,16 @@
     live(root, 15000, function () { w.textContent = timeWords(now()); });
   };
   CR.solar = CR.sun = function (root, o, b, env) {
-    var s = sunToday(env);
+    var s = sunToday(env, o);
     if (!s) return empty(root, b, "sun", "Set your town for the sun", "");
     if (b.w < 300) return mini(root, b, "sun", (s.frac > 0.5 ? s.set : s.rise).replace(/[ap]m$/, ""), s.frac > 0.5 ? "Sunset" : "Sunrise");
     var col = function (word, t) { return E("div", "cw-col", "", [E("div", "cw-t23", "", [word]), E("div", "cw-t29", "font-weight:700", [t])]); };
     add(root, E("div", "cw-row", "height:100%;justify-content:space-around", [ic("sun", 48, "#ffd60a", "solid"), col("Sunrise", s.rise), col("Sunset", s.set)]));
   };
   CR.worldclock = function (root, o, b, env) {
-    var cities = (op(o).cities && op(o).cities.length ? op(o).cities : ["Europe/London", "America/New_York"]);
-    var name = function (tz) { return CITY[tz] || tz.split("/").pop().replace(/_/g, " "); };
+    var here = ""; try { here = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+    var cities = (op(o).cities && op(o).cities.length ? op(o).cities : homeCities(here, 2)), town = (dataOf(env || {}).place || {}).name || "";
+    var name = function (tz) { return tz === here && town ? town : CITY[tz] || tz.split("/").pop().replace(/_/g, " "); };
     if (b.w < 300) { var t = tzTime(cities[0]); return mini(root, b, null, t ? t.t.replace(/[ap]m$/, "") : "", name(cities[0])); }
     add(root, E("div", "cw-col", "height:100%;justify-content:space-around", cities.slice(0, 2).map(function (tz) {
       var t = tzTime(tz);
@@ -2056,14 +2250,14 @@
   };
   CR.weather = function (root, o, b, env, sh) {
     if (b.w < 300) return R.weather(root, o, b, env, sh);
-    var w = weather(env);
-    if (!w) return noWx(root, b, env);
+    var w = weather(env, o);
+    if (!w) return noWx(root, b, env, o);
     add(root, E("div", "cw-row", "height:100%", [ic(wxIcon(w.code, w.is_day), 48, rgba(sh.ink, 1), "solid"), E("div", "cw-col", "flex:1;min-width:0;margin-left:14px", [E("div", "cw-t29 cw-ell", "font-weight:680", [w.place || "Here"]),
       E("div", "cw-t23 cw-ell", "color:var(--ink)", [w.ahead ? w.ahead.label + ", " + w.ahead.hi + "°" : wxWords(w.code) + (w.hi !== undefined ? ", " + w.hi + "°" : "")])]), E("div", "cw-big", "font-size:72px;margin-left:10px", [w.temp + "°"])]));
   };
   CR.hourly = function (root, o, b, env, sh) {
-    var w = weather(env);
-    if (!w) return noWx(root, b, env);
+    var w = weather(env, o);
+    if (!w) return noWx(root, b, env, o);
     if (!w.hourly) return empty(root, b, "clock", "The hourly forecast is on its way", "");
     var n = clamp(Math.floor((b.w - 48) / 76), 2, 5), ink = rgba(sh.ink, 1);
     add(root, E("div", "cw-row cw-sp", "height:100%", w.hourly.slice(0, n).map(function (h) {
@@ -2071,8 +2265,8 @@
     })));
   };
   CR.week = function (root, o, b, env, sh) {
-    var w = weather(env);
-    if (!w) return noWx(root, b, env);
+    var w = weather(env, o);
+    if (!w) return noWx(root, b, env, o);
     if (!w.daily) return empty(root, b, "calendar", "The week's forecast is on its way", "");
     var n = clamp(Math.floor((b.w - 48) / 96), 2, 4), ink = rgba(sh.ink, 1);
     add(root, E("div", "cw-row cw-sp", "height:100%", w.daily.slice(0, n).map(function (d) {
@@ -2080,16 +2274,16 @@
     })));
   };
   CR.rain = function (root, o, b, env) {
-    var w = weather(env);
-    if (!w) return noWx(root, b, env);
+    var w = weather(env, o);
+    if (!w) return noWx(root, b, env, o);
     if (!w.rain) return empty(root, b, "rain", "Rain soon is on its way", "");
     var heavy = (w.rainMax || 3) >= 2.5;
     add(root, [E("div", "cw-t29 cw-ell", "font-weight:700", [w.rainFrom ? (heavy ? "Heavy rain from " : "Rain from ") + w.rainFrom : "No rain coming"]),
       E("div", "cw-grow cw-row", "align-items:flex-end;margin-top:10px", w.rain.map(function (v) { return E("i", "", "display:block;flex:1;margin:0 3px;height:" + v + "%;border-radius:5px;background:#64d2ff"); }))]);
   };
   CR.uv = function (root, o, b, env) {
-    var w = weather(env);
-    if (!w || w.uv === undefined) return w ? empty(root, b, "sun", "UV is on its way", "") : noWx(root, b, env);
+    var w = weather(env, o);
+    if (!w || w.uv === undefined) return w ? empty(root, b, "sun", "UV is on its way", "") : noWx(root, b, env, o);
     var band = w.uv < 3 ? "Low" : w.uv < 6 ? "Moderate" : w.uv < 8 ? "High" : w.uv < 11 ? "Very high" : "Extreme";
     if (b.w < 300) return mini(root, b, "sun", String(w.uv), band);
     mini(root, b, "sun", String(w.uv), "UV index", band + (w.uvFrom ? ", " + w.uvFrom + " to " + w.uvTo : ""));
@@ -2108,8 +2302,8 @@
       E("div", "cw-col", "margin-left:20px;min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:680", [m.name]), E("div", "cw-t23 cw-ell", "", [m.full])])]));
   };
   CR.bins = function (root, o, b, env) {
-    var q = op(o), d = now(), wd = q.weekday === undefined ? 3 : q.weekday, ahead = (wd - d.getDay() + 7) % 7;
-    if (!env.demo && q.weekday === undefined) return empty(root, b, "calendar", "Set your bin night in couch-tv Studio", "");
+    var q = op(o), d = now(), wd = binDay(q) === null ? 3 : binDay(q), ahead = (wd - d.getDay() + 7) % 7;
+    if (!env.demo && binDay(q) === null) return empty(root, b, "calendar", "Set your bin night in this widget's settings", "");
     var when = ahead === 0 ? "Tonight" : ahead === 1 ? "Tomorrow" : DAYS[wd].slice(0, 3) + " night";
     var night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + ahead), week = Math.floor((night.getTime() / 86400000 - (q.anchor || 0)) / 7);
     var A = q.lid_a || "#ffd60a", B = q.lid_b || "#30d158", lids = q.alt ? ["#ff453a", week % 2 === 0 ? A : B] : [A, B];
@@ -2198,10 +2392,19 @@
     if (!c.events) { empty(root, b, "calendar", c.err ? (b.w < 300 ? "Calendar not read" : c.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), c.err ? "Settings (hold OK), Home settings, couch-tv Studio, At home" : ""); return null; }
     return { today: evDay(c.events, 0, env), tomorrow: evDay(c.events, 1, env) };
   }
+  // never a fixed word for a day over the wrong day (a starter's "Tomorrow" over today's events): the
+  // day is the TV's own, a heading typed in the design only goes before it ("Family, today")
+  var DAY_WORDS = /^(today|tonight|tomorrow|tomorrow night|yesterday|this week|next week|this weekend|(mon|tues|wednes|thurs|fri|satur|sun)day)$/i;
+  function agendaHeading(label, tomorrow) {
+    var day = tomorrow ? "Tomorrow" : "Today", l = String(label || "").trim();
+    if (!l || DAY_WORDS.test(l) || l.toLowerCase() === day.toLowerCase()) return day;
+    return l + ", " + day.toLowerCase();
+  }
   R.agenda = function (root, o, b, env) {
     var a = ahAlign(root, o), ag = agendaOf(root, b, env);
     if (!ag) return;
-    var d = now(), list = ag.today.length ? ag.today : ag.tomorrow, nx = list[0], heading = ag.today.length ? op(o).label || "Today" : "Tomorrow", day = DAYS[d.getDay()].slice(0, 3).toUpperCase() + " " + d.getDate();
+    var d = now(), list = ag.today.length ? ag.today : ag.tomorrow, nx = list[0], day = DAYS[d.getDay()].slice(0, 3).toUpperCase() + " " + d.getDate();
+    var heading = agendaHeading(op(o).label, !ag.today.length && ag.tomorrow.length);
     if (b.h < 200) {
       // a tile or a wide tile: the day, what is next and when
       add(root, ahCol(a, [one1("cw-t23", "font-weight:750;color:#ff453a", b.w < 300 ? (ag.today.length || !nx ? day : "TOMORROW") : day + (ag.today.length || !nx ? "" : ", tomorrow")),
@@ -2244,9 +2447,11 @@
         : [["Milk", 0], ["Bread", 1], ["Avocados", 0], ["Sunscreen", 0], ["Dog food", 0], ["Lemons", 1], ["Coffee", 0], ["Bin bags", 0]];
       return { at: 0, name: op(o).label || "Shopping", todo: todo, items: items.map(function (x) { return { t: x[0], done: !!x[1] }; }) };
     }
-    var ls = (athome(env) || {}).lists || [], want = String(op(o).label || "").toLowerCase(), at = 0;
+    var ls = (athome(env) || {}).lists || [], pick = setting(o, env, "list", "first"), at = 0, i;
     if (!ls.length) return null;
-    for (var i = 0; i < ls.length; i++) if (want && ls[i].name.toLowerCase() === want) { at = i; break; }
+    // picked on this TV: its name, or its place in the list (0, 1, 2); "first" (the default) is the first
+    if (typeof pick === "number" && isFinite(pick) && ls[pick]) at = pick;
+    else if (pick !== "first" && pick !== undefined && pick !== null && pick !== "") for (i = 0; i < ls.length; i++) if (ls[i].name.toLowerCase() === String(pick).toLowerCase()) { at = i; break; }
     return { at: at, name: ls[at].name, todo: /to ?do|task|work/i.test(ls[at].name), items: ls[at].items };
   }
   R.list = function (root, o, b, env) {
@@ -2363,6 +2568,8 @@
 
   // ---------------- one widget, a stack, the API ----------------
   function one(o, b, env) {
+    // what was set for this widget on this TV goes over the design's opts (the detail layer gets the same)
+    o = withSettings(o, env);
     var sh = shell(o, b, env), root = sh.root, st = o.style || {};
     CTX = { icons: st.icons || (env.look && env.look.icons) || "line" };
     var draw = (b.h < 200 && CR[o.kind]) || R[o.kind];
@@ -2413,7 +2620,8 @@
   function stack(o, b, env) {
     var items = o.items || [], root = E("div", "cw cw-bare cw-stack", "width:" + px(b.w) + ";height:" + px(b.h) + ";position:relative");
     root.setAttribute("data-kind", "stack"); root.setAttribute("data-stack", String(items.length));
-    var slots = items.map(function (it) { var s = E("div", "cw-slot", "", [one({ kind: it.kind, opts: it.opts, style: it.style, w: b.w, h: b.h }, b, env)]); return s; });
+    // each item keeps an id of its own ("<stack id>/<index>"), so its settings on this TV are its own
+    var slots = items.map(function (it, i) { var s = E("div", "cw-slot", "", [one({ id: o.id !== undefined ? o.id + "/" + i : undefined, kind: it.kind, opts: it.opts, style: it.style, w: b.w, h: b.h }, b, env)]); return s; });
     // the designer can hold a stack on the item being edited (CW.stackAt[id]); on the TV it turns by time
     var held = env.designer && CW.stackAt && CW.stackAt[o.id] != null ? CW.stackAt[o.id] : null;
     var at = held != null ? held % Math.max(1, items.length) : stackIndex(o, items.length), manual = held != null ? 1e15 : 0;
@@ -2440,6 +2648,13 @@
     config: CW,
     kinds: function () { return Object.keys(R); },
     setting: setting,
+    // the widget with what was set for it on this TV over its design opts (for app.js's web loader:
+    // CouchWidgets.withSettings(w, env).opts tells which feed, league or watchlist to fetch)
+    withSettings: function (o, env) { return withSettings(o, env || {}); },
+    // "f" or "c": the unit the widgets draw temperatures in (Home settings, Weather, Units)
+    unitOf: function (env) { return unitF(env || {}) ? "f" : "c"; },
+    // a Headlines widget's feed id: its own setting, "auto" picked by the home's country (data().country)
+    feedFor: function (v, env) { return feedFor(v, env || {}); },
     // a widget drawn by its own file (ask.js: Ask AI and From your AI): draw(root, o, b, env), and
     // optionally its own drawing for a box under 200 px tall
     define: function (kind, draw, small) { if (typeof draw === "function" && /^[a-z]{2,16}$/.test(kind)) { R[kind] = draw; if (typeof small === "function") CR[kind] = small; } },
@@ -2475,7 +2690,9 @@
       appNode: appNode, appsFor: appsFor, appName: appName, appIcon: appIcon, demoImg: demoImg, bgImg: bgImg,
       sunToday: sunToday, sunTimes: sunTimes, moon: moon, tzTime: tzTime, CITY: CITY, DAYS: DAYS, MONTHS: MONTHS, longDate: longDate, clockParts: clockParts,
       roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
-      airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, compass: compass, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
+      airOf: airOf, aqiBand: aqiBand, surfOf: surfOf, surfPlace: surfPlace, pickedPlace: pickedPlace, compass: compass,
+      // this widget's own settings and honest headings (WIDGET-SETTINGS-CONTRACT.md)
+      setting: setting, tvSet: tvSet, devName: devName, webName: webName, feedFor: feedFor, unitF: unitF, roomUnit: roomUnit, tconv: tconv, sensorConv: sensorConv, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
       // things typed at home (athome.js through app.js)
       athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
   };

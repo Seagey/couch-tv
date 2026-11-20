@@ -65,6 +65,10 @@
   var NO_HOME = "couch-tv Studio designs do not show on this TV yet.";
   var NOT_HERE = ["Not possible on this TV: couch-tv Studio designs show on Google TV, Android TV, Fire TV, Samsung, LG, Hisense, Philips (older), TiVo OS, Panasonic, Roku and Apple TV."];
   var NOT_NATIVE = "Shows on Google TV, Android TV and Fire TV.";
+  var NATIVE_PHOTO = { photo: true, artframe: true };
+  var NATIVE_PHOTO_NOTE = "Shows the photo put in the widget in couch-tv Studio. This TV's own photos do not show here.";
+  var NATIVE_SEND = { "Roku OS": "Tap Send to my TV, then on the Roku: press the star button, pick Get a design by code, and type the code.",
+    tvOS: "Tap Send to my TV, then on the Apple TV: Settings, Home design, Get a design, and type the code." };
 
   function groupOf(p) { return ANDROID.indexOf(p) >= 0 ? "android" : WEB.indexOf(p) >= 0 ? "web" : VIDAA.indexOf(p) >= 0 ? "vidaa" : NATIVE[p] ? "native" : "none"; }
   // the older "on" from the honest need: on a Samsung or LG the home itself runs from the computer, so
@@ -500,7 +504,8 @@
   // and, by type: options [[value, label], ...] (choice), min max step (number), domain and many and
   // max (device), many and max (text: a list of words), from (tvlist: "lists", "photos", "people",
   // "calendars"), coast (place: beaches only), league (team: the key of the setting naming the
-  // competition), when (only shown while another setting has this value, { key: value }), sets (the
+  // competition), when (only shown while another setting has this value, { key: value }; the value
+  // "set" means while that setting differs from its own default), sets (the
   // design key a screen writes from this choice, worked out when it is saved), suggest (text: ready made
   // values to pick), private (never leaves the TV and the home Wi-Fi), needs ({ apps, bridge, ha }).
   // Two types beyond the contract's list: "tvlist" (one of the things kept on this TV: its lists, its
@@ -513,7 +518,7 @@
   }
   var MONTHS = [[1, "January"], [2, "February"], [3, "March"], [4, "April"], [5, "May"], [6, "June"], [7, "July"], [8, "August"], [9, "September"], [10, "October"], [11, "November"], [12, "December"]];
   var YEARS = [["every", "Every year"]];
-  for (var yr = 2026; yr <= 2040; yr++) YEARS.push([String(yr), String(yr)]);
+  for (var yr = 2026; yr <= 2040; yr++) YEARS.push([yr, String(yr)]);
   var HOURS = [["off", "No time set"]];
   for (var hr = 0; hr < 24; hr++) HOURS.push([hr, (hr % 12 || 12) + (hr < 12 ? "am" : "pm")]);
   var MINUTES = [];
@@ -532,8 +537,9 @@
   var CLOCK_FMT = function () { return st("format", "12 or 24 hour", "choice", "auto", "Follow this TV uses the clock set in Home settings, Look and scenes.", "design", ALL, true,
     { options: [["auto", "Follow this TV"], ["12h", "12 hour"], ["24h", "24 hour"]] }); };
   var HEADING = function (help, pre) { return st("label", "Heading", "text", "", help, "design", ALL, pre !== false, { max: 40 }); };
-  var PHOTO = function () { return st("photo", "Photo", "tvlist", "first", "Which of this TV's photos shows here. Add photos in Home settings, Look and scenes, Your photos.", "tv", ON_TV, true, { from: "photos" }); };
-  var IMAGE = function () { return st("image", "Photo in the widget", "image", "", "Or put one photo in the widget itself. It shows on every TV this design goes to.", "design", STUDIO, true); };
+  var PHOTO = function () { return st("photo", "Photo", "tvlist", "first", "Which of this TV's photos shows here. Add photos in Home settings, Look and scenes, Your photos.", "tv", ON_TV, true, { from: "photos", "private": true }); };
+  var IMAGE = function () { return st("image", "Photo in the widget", "image", "", "Put one photo in the widget itself. It shows on every TV this design goes to.", "design", STUDIO, true); };
+  var HEADING_TV = function (help) { return st("label", "Heading", "text", "", help, "tv", ON_TV, true, { max: 40 }); };
   var HA = { ha: true };
 
   // before launch (WIDGET-SETTINGS-SPEC.md section 2, the P items)
@@ -542,28 +548,28 @@
     countdown: [
       st("label", "Name", "text", "", "What you are counting down to, like Ella's birthday.", "design", ALL, true, { max: 40 }),
       st("day", "Day", "number", 25, "The day of the month.", "design", ALL, true, { min: 1, max: 31, step: 1 }),
-      st("month", "Month", "choice", 12, "", "design", ALL, true, { options: MONTHS }),
+      st("month", "Month", "choice", 12, "The month of the day you are counting to.", "design", ALL, true, { options: MONTHS }),
       st("year", "Year", "choice", "every", "Pick a year for a one off day, like a wedding. Every year counts to the same day each year.", "design", ALL, true, { options: YEARS }),
-      st("unit", "Count in", "choice", "sleeps", "", "design", ALL, true, { options: [["sleeps", "Sleeps"], ["days", "Days"], ["weeks", "Weeks"]] })
+      st("unit", "Count in", "choice", "sleeps", "Sleeps suit children. Weeks suit a day far away.", "design", ALL, true, { options: [["sleeps", "Sleeps"], ["days", "Days"], ["weeks", "Weeks"]] })
     ],
     weather: [st("place", "Show the town name", "toggle", true, "Turn off to show only the weather.", "design", ALL, true)],
     bigtemp: [st("place", "Show the town name", "toggle", true, "Turn off to show only the temperature.", "design", ALL, true)],
     surf: [st("place", "Beach", "place", "", "Where the swell is read. Empty uses this home's town.", "tv", ON_TV, true, { coast: true, "private": true })],
     photo: [PHOTO(), IMAGE()],
     artframe: [PHOTO(), IMAGE()],
-    upnext: [st("sport", "Game mode", "choice", "auto", "On shows the last game watched in Kayo, Foxtel, 9Now, 7plus, 10 or DAZN. Automatic turns it on when the home also shows scores.", "design", ALL, true,
+    upnext: [st("sport", "Game mode", "choice", "auto", "On shows the last game watched in a sport app on this TV. Automatic turns it on when the home also shows scores.", "design", ALL, true,
       { options: [["auto", "Automatic"], [true, "On"], [false, "Off"]], needs: { apps: SPORT_APP_PKGS.slice() } })],
-    aircon: [st("entity", "Room", "device", "", "Which aircon shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "climate", needs: HA })],
+    aircon: [st("entity", "Room", "device", "", "Which aircon shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "climate", needs: HA, "private": true })],
     controls: [st("switches", "Lights and switches", "device", [], "Which ones show here. None picked shows every one picked in Smart home. Locks, alarms and garage doors never show.", "tv", ON_TV, true,
-      { domain: ["light", "switch", "fan", "cover"], many: true, max: 16, needs: HA })],
-    camera: [st("cam", "Camera", "device", "", "Which camera shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "camera", needs: HA }),
-      HEADING("Empty shows the camera's own name.")],
-    sensor: [st("reading", "Sensor", "device", "", "Which sensor shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "sensor", needs: HA }),
-      HEADING("Empty shows the sensor's own name.")],
-    doorbell: [HEADING("Empty shows the doorbell's own name.")],
-    energy: [HEADING("Empty shows the name from your smart home.")],
-    list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Home settings, couch-tv Studio, At home.", "tv", ON_TV, true, { from: "lists" }),
-      HEADING("Empty shows the list's own name.")],
+      { domain: ["light", "switch", "fan", "cover"], many: true, max: 16, needs: HA, "private": true })],
+    camera: [st("cam", "Camera", "device", "", "Which camera shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "camera", needs: HA, "private": true }),
+      HEADING("Shows once the camera is picked on this TV. Empty shows the camera's own name.")],
+    sensor: [st("reading", "Sensor", "device", "", "Which sensor shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "sensor", needs: HA, "private": true }),
+      HEADING("Shows once the sensor is picked on this TV. Empty shows the sensor's own name.")],
+    doorbell: [HEADING_TV("Type a heading for this TV. Empty shows the doorbell's own name.")],
+    energy: [HEADING_TV("Type a heading for this TV. Empty shows the name from your smart home.")],
+    // the list always draws its own name, so it has no heading of its own
+    list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Home settings, couch-tv Studio, At home.", "tv", ON_TV, true, { from: "lists", "private": true })],
     news: [st("feed", "News source", "choice", "auto", "Where the headlines come from. Best for your country picks ABC News in Australia, BBC World in the UK and RNZ in New Zealand.", "design", ALL, true,
       { options: FEED_OPTS })],
     sports: [
@@ -575,15 +581,15 @@
     commute: [
       st("to", "Where to", "place", "", "The town or suburb you drive to. Kept on this TV only.", "tv", ON_TV, true, { "private": true }),
       st("arrive_h", "Arrive by", "choice", "off", "Couch TV says when to leave to get there by then.", "design", ALL, true, { options: HOURS }),
-      st("arrive_m", "Minutes past the hour", "choice", 0, "", "design", ALL, true, { options: MINUTES, when: { arrive_h: "set" } })
+      st("arrive_m", "Minutes past the hour", "choice", 0, "For 8:30am, pick 8am above and 30 past the hour here.", "design", ALL, true, { options: MINUTES, when: { arrive_h: "set" } })
     ],
     bins: [
-      st("weekday", "Bin night", "choice", 0, "The night the bins go out.", "design", ALL, true, { options: DAYS }),
+      st("weekday", "Bin night", "choice", "none", "The night the bins go out.", "design", ALL, true, { options: [["none", "Not set yet"]].concat(DAYS) }),
       st("alt", "Taking turns", "toggle", false, "On when the two bins go out on alternate weeks.", "design", ALL, true),
       st("thisweek", "Which bin goes out this week", "choice", "a", "Pick the one going out this week and Couch TV keeps count from there.", "design", ALL, true,
         { options: [["a", "First bin"], ["b", "Second bin"]], when: { alt: true }, sets: "anchor" }),
-      st("bin_a", "First bin", "text", "Recycling", "", "design", ALL, true, { max: 20 }),
-      st("bin_b", "Second bin", "text", "Garden", "", "design", ALL, true, { max: 20 })
+      st("bin_a", "First bin", "text", "Recycling", "The name of the bin, like Recycling.", "design", ALL, true, { max: 20 }),
+      st("bin_b", "Second bin", "text", "Garden", "The name of the other bin, like Garden.", "design", ALL, true, { max: 20 })
     ]
   };
   // after launch (the L items in section 2): added to the end of each list, so a screen showing only
@@ -619,17 +625,17 @@
     mosaic: [st("count", "How many photos", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [3, "3"], [4, "4"], [5, "5"]] })],
     artframe: [st("mat", "Frame colour", "choice", "#fbf8f1", "", "design", ALL, false,
       { options: [["#fbf8f1", "Cream"], ["#ffffff", "White"], ["#1d1b18", "Black"], ["#8e8e93", "Grey"]] })],
-    keep: [st("person", "Whose shows", "tvlist", "auto", "Whoever is watching follows the person picked on the home.", "tv", ON_TV, false, { from: "people" })],
+    keep: [st("person", "Whose shows", "tvlist", "auto", "Whoever is watching follows the person picked on the home.", "tv", ON_TV, false, { from: "people", "private": true })],
     keeprow: [st("shows", "How many shows", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [2, "2"], [3, "3"], [4, "4"], [5, "5"]] })],
     upnext: [st("apps", "Only from these apps", "apps", [], "None picked takes shows from any app.", "design", ALL, false)],
     dock: [st("more", "All apps at the end", "toggle", true, "", "design", ALL, false)],
     soundscape: [st("volume", "Volume", "number", 50, "", "tv", ON_TV, false, { min: 0, max: 100, step: 10 })],
     speakers: [st("players", "Speakers", "device", [], "Which speakers show here. None picked shows every one picked in Smart home.", "tv", ON_TV, false,
-      { domain: "media_player", many: true, max: 6, needs: HA })],
+      { domain: "media_player", many: true, max: 6, needs: HA, "private": true })],
     scenes: [st("scenes", "Scenes", "device", [], "Which scenes show here. None picked shows every one picked in Smart home.", "tv", ON_TV, false,
-      { domain: ["scene", "script"], many: true, max: 10, needs: HA })],
+      { domain: ["scene", "script"], many: true, max: 10, needs: HA, "private": true })],
     agenda: [
-      st("calendars", "Calendars", "tvlist", "all", "Which of this TV's calendars show here.", "tv", ON_TV, false, { from: "calendars" }),
+      st("calendars", "Calendars", "tvlist", "all", "Which of this TV's calendars show here.", "tv", ON_TV, false, { from: "calendars", "private": true }),
       st("days", "Days", "choice", "two", "", "design", ALL, false, { options: [["today", "Today"], ["two", "Today and tomorrow"], ["week", "This week"]] })
     ],
     bins: [
@@ -657,10 +663,11 @@
     C[k].setup.steps.none = NOT_HERE.slice();
     // Roku and Apple TV: works (or set up first, as on a Samsung) for a kind Couch TV draws there, not
     // possible for the rest, with the honest line
+    // A photo or art frame there shows only the photo put in the widget in Studio, never the TV's own.
     Object.keys(NATIVE).forEach(function (p) {
-      var c = C[k], web = c.platforms.Tizen.need, need = c.status === "not-built" || !drawnOn(k, p) ? "no" : web === "computer" || web === "works" ? "works" : web;
+      var c = C[k], web = c.platforms.Tizen.need, need = c.status === "not-built" || !drawnOn(k, p) ? "no" : NATIVE_PHOTO[k] ? "setup" : web === "computer" || web === "works" ? "works" : web;
       c.platforms[p] = { on: onOf(need, "native"), need: need,
-        note: need === "no" ? (c.status === "not-built" ? DEFAULT_NOTE.no : NOT_NATIVE) : "Couch TV draws this on your " + NATIVE_NAME[p] + ", opened by the computer at home." };
+        note: need === "no" ? (c.status === "not-built" ? DEFAULT_NOTE.no : NOT_NATIVE) : NATIVE_PHOTO[k] ? NATIVE_PHOTO_NOTE : "Couch TV draws this on your " + NATIVE_NAME[p] + ", opened by the computer at home." };
     });
   });
 
@@ -702,9 +709,30 @@
     var c = C[kind];
     if (!c) return [];
     var g = ["android", "web", "vidaa", "none"].indexOf(platform) >= 0 ? platform : groupOf(platform);
-    // Roku and Apple TV: the kinds Couch TV draws there are set up as on a TV a computer runs
-    if (g === "native") return c.status === "not-built" ? (c.setup.steps.web || c.setup.steps.android).slice() : drawnOn(kind, platform) ? c.setup.steps.web.slice() : [NOT_NATIVE];
+    if (g === "native") return nativeSteps(kind, NATIVE[platform] ? platform : "Roku OS");
     return (c.setup.steps[g] || c.setup.steps.android).slice();
+  }
+  // Roku and Apple TV have no Home settings and no Hold OK menu: a kind drawn there is set up on the
+  // computer at home that opens Couch TV, and a design arrives by its own code screen
+  function nativeSteps(kind, p) {
+    var c = C[kind];
+    if (c.status === "not-built" || !drawnOn(kind, p)) return [NOT_NATIVE];
+    if (NATIVE_PHOTO[kind]) return ["Open your design in couch-tv Studio on your phone.", "Tap the widget, then put one photo in it.", NATIVE_SEND[p]];
+    // the steps up to the first one on the TV's own menus (a Studio send becomes this TV's own), then
+    // one line for the rest; a leading "Nothing to set up" stays
+    var web = c.setup.steps.web || c.setup.steps.android, out = [], onTv = false;
+    web.forEach(function (s) {
+      if (onTv) return;
+      if (s === SEND) { out.push(NATIVE_SEND[p]); return; }
+      if (/hold OK|Home settings|^Go down to /i.test(s)) {
+        onTv = true;
+        if (/^Nothing to set up/.test(s) && !out.length) out.push("Nothing to set up.");
+        return;
+      }
+      out.push(s);
+    });
+    if (onTv) out.push("Set on the computer at home that opens Couch TV on your " + NATIVE_NAME[p] + ".");
+    return out;
   }
 
   var API = {
