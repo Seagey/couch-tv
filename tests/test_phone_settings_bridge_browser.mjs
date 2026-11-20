@@ -116,7 +116,7 @@ try {
     await pg.route(ORIGIN + "/api/athome*", (rt) => rt.fulfill(J({ ok: true, live: true, athome: { note: null, lists: [], guide: [], stay: {} } })));
     await pg.route(ORIGIN + "/api/home*", (rt) => rt.fulfill(J({ ok: true, on: true, held: false, fire_tv: false, watch: false })));
     let forgot = 0;
-    await pg.route(ORIGIN + "/api/phones*", (rt) => { if (rt.request().method() === "POST") { forgot++; rt.fulfill(J({ ok: true, phones: 0 })); } else rt.fulfill(J({ ok: true, phones: 2 })); });
+    await pg.route(ORIGIN + "/api/phones**", (rt) => { if (rt.request().method() === "POST") { forgot++; rt.fulfill(J({ ok: true, phones: 0 })); } else rt.fulfill(J({ ok: true, phones: 2 })); });
     await pg.goto(ORIGIN + "/setup");
     await pg.waitForFunction(() => document.getElementById("people-now").textContent === "Sam");
     await pg.evaluate(() => document.querySelectorAll("main > section.fold.shut").forEach((s) => s.classList.remove("shut")));
@@ -129,7 +129,7 @@ try {
     await pg.waitForFunction(() => /2 phones are paired/.test(document.getElementById("phones").textContent), null, { timeout: 8000 });
     ok(await pg.isVisible("#phones-card") && await pg.isVisible("#forget"), "launcher: the Phones card shows its paired phones and Forget every phone");
     pg.once("dialog", (d) => d.accept());
-    await Promise.all([pg.waitForRequest((r) => r.url().endsWith("/api/phones/forget") && r.method() === "POST"), pg.click("#forget")]);
+    await Promise.all([pg.waitForResponse((r) => r.url().endsWith("/api/phones/forget") && r.request().method() === "POST"), pg.click("#forget")]);
     ok(forgot === 1, "launcher: Forget every phone asks the TV to forget them");
     ok(!pg.errors.length, "launcher: no page errors: " + pg.errors.join("; "));
     await ctxL.close();
@@ -294,8 +294,9 @@ try {
   await tvPage.waitForFunction(() => document.getElementById("set-phone").classList.contains("on"), null, { timeout: 8000 });
   const qrCode = () => tvPage.evaluate(() => document.getElementById("set-phone-pc").textContent.replace(/\D/g, "").slice(-6));
   const a1 = await qrCode();
+  await new Promise((r) => setTimeout(r, 5500));   // one ask every 5 s at most: the phone above asked a moment ago
   const st = await fetch(ORIGIN + "/api/pair/start", { method: "POST" });
-  ok(st.status === 200, "Show a code on the TV answers");
+  ok(st.status === 200, "Show a code on the TV answers: " + st.status);
   const shown = await tvPage.waitForFunction(() => { const e = document.querySelector(".phone-code"); return e && e.textContent; }, null, { timeout: 15000 }).then((h) => h.jsonValue());
   ok(shown.replace(/\D/g, "") === a1 && await qrCode() === a1, "Show a code on the TV shows the QR's own code, and the QR keeps it: " + a1);
   const used = await fetch(ORIGIN + "/api/pair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pin: a1 }) });
