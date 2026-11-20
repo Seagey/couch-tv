@@ -25,10 +25,24 @@
 
   var DOMAINS = ["light", "switch", "fan", "cover", "climate", "sensor"];
   var OPENERS = ["garage", "gate", "door"];
-  var HIDES = /\b(garages?|gates?|doors?|locks?)\b/i;
+  // a name that would open the house: the same token test as ws2-smarthome's opensHouse (and the
+  // controllers' house rule), on the name lowercased with spaces as "_": garage, gate (not gateway), door
+  // (not doorbell, indoor, outdoor), lock (not clock, block), alarm, disarm, also joined (Backdoor, Smartlock)
+  function hides(name) {
+    var e = "." + String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+    var re = /garage|gate|door|lock|alarm|disarm/g, m, w, i, after;
+    while ((m = re.exec(e))) {
+      w = m[0]; i = m.index; after = e.slice(i + w.length); re.lastIndex = i + 1;
+      if (w === "gate" && after.slice(0, 3) === "way") continue;
+      if (w === "door" && (after.slice(0, 4) === "bell" || /[._](in|out)$/.test(e.slice(0, i)))) continue;
+      if (w === "lock" && /[._][cb]$/.test(e.slice(0, i))) continue;
+      return true;
+    }
+    return false;
+  }
   var MODES = ["off", "heat", "cool", "heat_cool", "auto", "dry", "fan_only"];
   var DOWN = ["unavailable", "unknown", ""];
-  var FRESH_MS = 2000, ANSWER_MS = 20000, COMMISSION_MS = 120000;
+  var FRESH_MS = 2000, ANSWER_MS = 20000, COMMISSION_MS = 150000;   // a lock shared by mistake: joined, read and left again, about 130 s at worst
 
   var MT = { api: null, devices: [], by: {}, ready: false, note: "", reason: "", reached: false, at: 0, pending: null, sig: "", watchers: [] };
 
@@ -50,7 +64,7 @@
       if (domain === "cover" && OPENERS.indexOf(String(a.device_class || "")) >= 0) return;
       // a blind or a plug named as a garage door, gate, door or lock is hidden too (the controllers do the
       // same; this page never relies on them): nothing that opens the house is ever listed or moved here
-      if ((domain === "cover" || domain === "switch") && HIDES.test(String(d.name || ""))) return;
+      if ((domain === "cover" || domain === "switch") && hides(d.name)) return;
       var entity = entityOf(d.id, domain);
       if (!entity || seen[entity]) return;
       seen[entity] = true;
@@ -153,7 +167,10 @@
   function listen() {
     if (ES !== null || MT.api == null || root.TVMATTER || typeof root.EventSource !== "function" || !/^https?:$/.test((root.location || {}).protocol || "")) return;
     var opened = false;
-    try { ES = new root.EventSource("/api/matter/events"); } catch (e) { ES = false; return; }
+    // the bridge's own address with the pairing key in the address (an EventSource sends no header):
+    // app.js gives the api an events(path) that builds it; else this page's own server
+    var url = typeof MT.api.events === "function" ? MT.api.events("/api/matter/events") : "/api/matter/events";
+    try { ES = new root.EventSource(url); } catch (e) { ES = false; return; }
     ES.onopen = function () { opened = true; MT.live = true; };
     ES.addEventListener("matter", function (e) { try { put(JSON.parse(e.data)); } catch (x) {} });
     // never opened (an older server, or one that wants the key in a header): stop, never retried
@@ -332,10 +349,11 @@
   function rename(entity, name) {
     var d = MT.by[entity];
     name = String(name == null ? "" : name).replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 40);
-    if (!d || !name) return Promise.resolve({ ok: false, error: "refused" });
+    if (!d) return Promise.resolve({ ok: false, error: "refused", reason: "not_found" });
+    if (!name) return Promise.resolve({ ok: false, error: "refused", reason: "bad_name" });
     // the controllers hide a light, plug or blind named as a garage door, gate, door or lock (so it is
     // never opened from the TV), and the bridge refuses such a name: caught here first, in plain words
-    if (d.domain !== "climate" && d.domain !== "sensor" && HIDES.test(name)) return Promise.resolve({ ok: false, error: "name_hides" });
+    if (d.domain !== "climate" && d.domain !== "sensor" && hides(name)) return Promise.resolve({ ok: false, error: "name_hides" });
     return call("POST", "/api/matter/rename", { id: d.id, name: name }, ANSWER_MS).then(function (r) {
       r = unwrap(r);
       if (r.ok === false) return { ok: false, error: r.error || "failed", reason: why(r.reason) };

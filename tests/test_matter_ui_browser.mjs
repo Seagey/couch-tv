@@ -351,6 +351,10 @@ console.log("Running Matter UI browser tests...");
     const m = await msg(), w = await en("why_" + k);
     ok(m.indexOf(w) >= 0 && !/Raw English note/.test(m), "phone, " + what + " " + (err || "ok") + ", reason " + k + ": " + m);
   }
+  // a refused rename with no reason is not called a hiding name (only opens_house or the page's own check is)
+  nextReply = { url: "/api/matter/rename", code: 400, body: { ok: false, error: "refused" } };
+  answer = "Garden lamp"; await page.click('#matter-list li[data-id="matter:5:1"] button[data-mt="rename"]'); await page.waitForTimeout(600);
+  ok(await msg() === await en("err_refused"), "phone, rename refused with no reason: " + await msg());
   // the on-TV app: a second commission while one runs (error busy)
   nextReply = { url: "/api/matter/commission", code: 409, body: { ok: false, error: "busy", note: "Raw English note." } };
   await page.fill("#matter-code", "3497-011-2332"); await page.click("#matter-add"); await page.waitForTimeout(600);

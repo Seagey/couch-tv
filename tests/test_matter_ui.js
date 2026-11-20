@@ -12,6 +12,7 @@ const WEB = path.join(__dirname, "../tv-home/web");
 const noop = () => {};
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
+const execSync = (cmd, args) => { try { return require("child_process").execFileSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch (e) { return ""; } };
 const flush = () => new Promise((r) => setTimeout(r, 20));
 
 function page(opts) {
@@ -100,17 +101,22 @@ const SHARED = () => [
       { id: "matter:25:1", name: "Garage door", domain: "cover", state: "closed", attributes: { current_position: 0 } },
       { id: "matter:26:1", name: "Front gate opener", domain: "switch", state: "off", attributes: {} },
       { id: "matter:27:1", name: "Back door lock", domain: "switch", state: "off", attributes: {} },
-      { id: "matter:28:1", name: "Doorbell chime", domain: "binary_sensor", state: "off", attributes: {} }
+      { id: "matter:28:1", name: "Doorbell chime", domain: "binary_sensor", state: "off", attributes: {} },
+      { id: "matter:2a:1", name: "Backdoor", domain: "cover", state: "closed", attributes: {} },
+      { id: "matter:2b:1", name: "Smartlock", domain: "switch", state: "off", attributes: {} },
+      { id: "matter:2c:1", name: "Frontgate", domain: "switch", state: "off", attributes: {} }
     ];
-    const KEEP = [{ id: "matter:29:1", name: "Garage light", domain: "light", state: "on", attributes: { brightness: 255 } }, { id: "matter:30:1", name: "Front door", domain: "sensor", state: "on", attributes: { device_class: "contact" } }];
+    const KEEP = [{ id: "matter:29:1", name: "Garage light", domain: "light", state: "on", attributes: { brightness: 255 } }, { id: "matter:30:1", name: "Front door", domain: "sensor", state: "on", attributes: { device_class: "contact" } },
+      { id: "matter:31:1", name: "Gateway lamp", domain: "switch", state: "off", attributes: {} }, { id: "matter:32:1", name: "Clock plug", domain: "switch", state: "off", attributes: {} }];
     const T = page({ tvha: true, devices: OPENS.concat(KEEP) });
     T.H.useBridge(T.api);
     await flush();
     const ents = T.M.list().map((d) => d.entity);
-    ok(ents.join() === "light.matter_29_1,sensor.matter_30_1", "only the light and the door sensor are listed: " + ents);
+    ok(ents.join() === "light.matter_29_1,sensor.matter_30_1,switch.matter_31_1,switch.matter_32_1", "only the light, the door sensor, the gateway lamp and the clock plug are listed: " + ents);
+    ok(!/matter_2[abc]_/.test(ents.join()), "Backdoor, Smartlock and Frontgate (joined names) are not");
     T.H.reload();
     const info = T.H.live().info, all = JSON.stringify(info);
-    ok(!/matter_2[0-8]_/.test(all), "none is in the lists the widgets and pick lists read");
+    ok(!/matter_2[0-8a-c]_/.test(all), "none is in the lists the widgets and pick lists read");
     const ctl = await T.H.request("controls");
     ok(ctl.ok && !ctl.controls.some((c) => /matter_2[0-8]_/.test(c.entity)), "none is in Control Centre's readings");
     T.asked.length = 0;
@@ -121,7 +127,7 @@ const SHARED = () => [
     ok(!T.asked.some((a) => a[2] === "/api/matter/command"), "and none is ever sent a command");
     // the phone card lists by the same rule
     const html = fs.readFileSync(path.join(__dirname, "../on-tv/web/setup.html"), "utf8");
-    const src = /var MT_HIDES = [^\n]*\n/.exec(html)[0] + /var MT_OK = [^\n]*\n/.exec(html)[0] + /function mtShows\(d\) \{[\s\S]*?\n  \}\n/.exec(html)[0];
+    const src = /function mtHides\(name\) \{[\s\S]*?\n  \}\n/.exec(html)[0] + /var MT_OK = [^\n]*\n/.exec(html)[0] + /function mtShows\(d\) \{[\s\S]*?\n  \}\n/.exec(html)[0];
     const shows = vm.runInNewContext(src + "; mtShows", {});
     ok(OPENS.every((d) => !shows(d)) && KEEP.every((d) => shows(d)), "the phone card lists by the same rule: " + OPENS.filter(shows).map((d) => d.name).join(", "));
   }
@@ -252,6 +258,28 @@ const SHARED = () => [
     T.asked.length = 0;
     const c = await T.H.request("controls");
     ok(c.controls.find((x) => x.entity === "switch.matter_2_1").on === true && !T.asked.some((a) => a[2] === "/api/matter/devices"), "readings come from the pushed list, nothing asked again");
+    // a bridge with a pairing key: an EventSource sends no header, so the address carries the key
+    // (app.js gives the api an events(path); server.py reads ?token= on every /api/ route)
+    {
+      const K = page({ tvha: true, devices: SHARED() });
+      const madeK = [];
+      K.sb.location.protocol = "http:";
+      K.sb.EventSource = function (url) { this.url = url; madeK.push(this); };
+      K.sb.EventSource.prototype.addEventListener = function () {};
+      K.sb.EventSource.prototype.close = function () {};
+      const api = function () { return K.api.apply(null, arguments); };
+      // the same function app.js puts on its api (copied from app.js, run here)
+      const appSrc = fs.readFileSync(path.join(WEB, "app.js"), "utf8");
+      const ev = /api\.events = function \(p\) \{[^\n]*\};/.exec(appSrc);
+      ok(!!ev && appSrc.indexOf(ev[0]) < appSrc.indexOf("window.smartHome.useBridge(api)"), "app.js sets api.events before it hands the api over");
+      vm.runInNewContext(ev[0], { api, KEY: "pa ir/key", TV_ID: "living-room", API: "http://bridge.example:5400" });
+      K.H.useBridge(api); await flush();
+      ok(madeK.length === 1 && madeK[0].url === "http://bridge.example:5400/api/matter/events?token=pa%20ir%2Fkey&tv=living-room", "the stream is asked with the key: " + (madeK[0] || {}).url);
+      const noKey = {}; vm.runInNewContext(ev[0], { api: noKey, KEY: "", TV_ID: "", API: "" });
+      ok(noKey.events("/api/matter/events") === "/api/matter/events", "with no key and no bridge address: the page's own server, as before");
+      const server = execSync("git", ["-C", path.join(__dirname, ".."), "show", "nl-matter-bridge:bridge/server.py"]);
+      if (server) ok(/request\.query\.get\("key"\) or request\.query\.get\("token"\)/.test(server) && /access_log=None/.test(server), "the bridge reads ?token= and logs no addresses (nl-matter-bridge server.py)");
+    }
     // a server without the stream: closed after the first error, never retried
     const U = page({ tvha: true, devices: SHARED() });
     const made2 = [];
@@ -359,11 +387,25 @@ const SHARED = () => [
     const r5 = await V.M.rename("switch.matter_2_1", "Block out lamp");
     const r6 = await V.M.rename("sensor.matter_6_1", "Back door temperature");
     ok(r4.ok && r5.ok && r6.ok, "Outdoor, Block out and a sensor by the back door are fine: " + JSON.stringify([r4, r5, r6]));
+    // the token house test (ws2-smarthome's opensHouse): joined names count, gateway, doorbell, indoor,
+    // outdoor, clock and block do not
+    V.asked.length = 0;
+    const joined = [];
+    for (const n of ["Backdoor", "Frontgate", "Smartlock", "Alarm siren plug", "Disarm button", "GarageLight"]) joined.push(await V.M.rename("switch.matter_2_1", n));
+    ok(joined.every((r) => r.error === "name_hides") && !V.asked.some((a) => a[2] === "/api/matter/rename"), "Backdoor, Frontgate, Smartlock, alarm, disarm and GarageLight are caught: " + JSON.stringify(joined));
+    const fine = [];
+    for (const n of ["Gateway lamp", "Doorbell chime", "Indoor fan plug", "Clock plug", "Block heater"]) fine.push(await V.M.rename("switch.matter_2_1", n));
+    ok(fine.every((r) => r.ok), "Gateway, Doorbell, Indoor, Clock and Block are fine: " + JSON.stringify(fine));
+    // an id this page does not have: refused with the reason not_found, never sent
+    V.asked.length = 0;
+    const gone = await V.M.rename("switch.matter_99_1", "Lamp");
+    ok(gone.ok === false && gone.error === "refused" && gone.reason === "not_found" && !V.asked.length, "an unknown device: refused, reason not_found: " + JSON.stringify(gone));
     const W2 = page({ tvha: true, devices: SHARED() });
     W2.H.useBridge((m, p, b) => p === "/api/matter/rename" ? Promise.reject(new Error("refused")) : W2.api(m, p, b)); await flush();
     const r7 = await W2.M.rename("cover.matter_4_1", "Portail");
     ok(r7.ok === false && r7.error === "refused", "a name the bridge turns down (another language) comes back refused for the screen to explain");
   }
 
+  ok(/COMMISSION_MS = 150000/.test(fs.readFileSync(path.join(WEB, "matter.js"), "utf8")), "a commission waits 150 s (a lock joined and left again takes about 130 s)");
   console.log("ok " + n + " Matter UI checks");
 })().catch((e) => { console.error(e); process.exit(1); });

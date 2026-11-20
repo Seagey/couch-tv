@@ -77,6 +77,11 @@ const unknown = [...asked].filter((k) => keys.indexOf(k) < 0);
 ok(asked.size >= 75, "keys the screens ask for: " + asked.size);
 ok(unknown.length === 0, "every key asked for is in the table: " + unknown.join(", "));
 ok(objKeys(appSec, "MT_ERR").length >= 16 && objKeys(setupSec, "MT_ERR").length >= 14 && objKeys(appSec, "MT_WHY").length === 27 && objKeys(setupSec, "MT_WHY").length === 27, "the error and reason keys are read from both screens");
+// coordinator's wording (21 Nov): the port is "usually" 5540; a device the home computer adds is not
+// "the TV's"; the phone names the whole path to Smart home
+ok(W.en("why_port") === "Matter devices usually answer on port 5540. Leave the port out, and the TV finds the device by itself.", "why_port: usually 5540");
+ok(["err_unreachable", "err_thread"].every((k) => !/\bTV\b/.test(W.en(k).replace(/Couch TV|Apple TV/g, ""))), "unreachable and Thread say Couch TV, never the TV (the home computer may be the one adding)");
+ok(/Home settings, Designs, Smart home\.$/.test(W.en("added_phone")) && W.t("added_phone", null, "de").indexOf("Designs, Smart Home") >= 0 && W.t("added_phone", null, "nl").indexOf("Ontwerpen, Smart home") >= 0, "added on the phone: Home settings, Designs, Smart home, in each language's own words for them");
 // the on-TV app's own reasons and error (nl-matter-android ae3e6c1): an Android 6 TV, an Intel TV
 const NEWER = { err_busy: ["busy", "MT_ERR", "The TV is busy adding another device. Try again in a minute."], why_android_old: ["android_old", "MT_WHY", "Matter needs Android 7 or newer on this TV."], why_processor: ["processor", "MT_WHY", "This TV's processor can't run Matter."], err_unsupported: ["unsupported", "MT_ERR", "This TV can't add Matter devices."] };
 Object.keys(NEWER).forEach((k) => {

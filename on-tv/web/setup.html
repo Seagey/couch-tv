@@ -823,7 +823,19 @@
   var MT_WHY = { off: 1, not_installed: 1, node_missing: 1, node_old: 1, starting: 1, stopped: 1, android_old: 1, processor: 1, not_started: 1, busy: 1,
     blocked: 1, unsupported: 1, address: 1, port: 1, link_local: 1, offline: 1, not_answering: 1, opens_house: 1,
     not_found: 1, not_allowed: 1, bad_request: 1, bad_name: 1, not_ready: 1, device_refused: 1, failed: 1, not_certified: 1, local_network: 1 };
-  var MT_HIDES = /\b(garages?|gates?|doors?|locks?)\b/i;
+  // a name that would open the house (the same token test as tv-home/web/matter.js and ws2-smarthome's opensHouse)
+  function mtHides(name) {
+    var e = '.' + String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    var re = /garage|gate|door|lock|alarm|disarm/g, m, w, i, after;
+    while ((m = re.exec(e))) {
+      w = m[0]; i = m.index; after = e.slice(i + w.length); re.lastIndex = i + 1;
+      if (w === 'gate' && after.slice(0, 3) === 'way') continue;
+      if (w === 'door' && (after.slice(0, 4) === 'bell' || /[._](in|out)$/.test(e.slice(0, i)))) continue;
+      if (w === 'lock' && /[._][cb]$/.test(e.slice(0, i))) continue;
+      return true;
+    }
+    return false;
+  }
   var MT_KIND = { light: 1, switch: 1, fan: 1, cover: 1, climate: 1, sensor: 1 };
   var VD = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]];
   var VP = [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]];
@@ -854,7 +866,7 @@
   // blind or plug named as one (the same rule as matter.js)
   function mtShows(d) {
     return !!d && typeof d.id === 'string' && MT_OK.indexOf(d.domain) >= 0 && !(d.domain === 'cover' && /^(garage|gate|door)$/.test((d.attributes || {}).device_class || '')) &&
-      !((d.domain === 'cover' || d.domain === 'switch') && MT_HIDES.test(String(d.name || '')));
+      !((d.domain === 'cover' || d.domain === 'switch') && mtHides(d.name));
   }
   // the card's own lines (data-mw keys) in the language, drawn again when the language changes
   var mtLang = null;
@@ -919,10 +931,10 @@
       v = String(v == null ? '' : v).trim().slice(0, 40);
       if (!v || v === name) return;
       // a light, plug or blind named as a garage door, gate, door or lock is hidden by the TV
-      if (MT_HIDES.test(v) && domain !== 'climate' && domain !== 'sensor') { say('matter-msg', mw('err_name_hides')); return; }
+      if (mtHides(v) && domain !== 'climate' && domain !== 'sensor') { say('matter-msg', mw('err_name_hides')); return; }
       say('matter-msg', mw('saving'));
       api('POST', '/api/matter/rename', { id: id, name: v }).then(function () { say('matter-msg', mw('renamed')); return loadMatter(); })
-        .catch(function (e) { var why = e && e.reply && MT_WHY.hasOwnProperty(e.reply.reason); say('matter-msg', !why && e && (e.message === 'refused' || e.message === 'not_allowed') ? mw('err_name_hides') : mtErr(e)); });
+        .catch(function (e) { say('matter-msg', mtErr(e)); });   // a name that would hide it: the reason opens_house
     }
   };
   // a photo of a QR code, read on this phone where the browser can (Chrome on Android); the code is

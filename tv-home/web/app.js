@@ -7152,8 +7152,8 @@
             v = String(v || "").trim();
             if (!v) return;
             SET.msg = mw("saving");
-            // a name the controller turns down is one that would hide the device (bridge/matter.py)
-            M.rename(entity, v).then(function (r) { SET.msg = r.ok ? mw("renamed") : mtSay(!MT_WHY[r.reason] && (r.error === "refused" || r.error === "not_allowed") ? { error: "name_hides" } : r); if (zone === "settings") renderSettings(); });
+            // a name that would hide it: matter.js's own check (name_hides) or the controller's reason opens_house
+            M.rename(entity, v).then(function (r) { SET.msg = r.ok ? mw("renamed") : mtSay(r); if (zone === "settings") renderSettings(); });
           });
         } },
         { kind: "action", key: "mt-remove", label: mw("remove_tv"), danger: true, confirmText: mw("press_ok"), sub: mw("stays"), act: function () {
@@ -7953,6 +7953,9 @@
     readConfig();
     // a TV whose home a computer runs (no launcher): smart home goes through that computer's bridge
     // (on a Google TV or Android TV with a computer at home, only its Hue lights and AirTouch zones)
+    // Matter's live push (matter.js): an EventSource sends no header, so the bridge's address carries the
+    // pairing key (?token=; the bridge reads it there and logs no addresses, access_log=None) and the TV
+    api.events = function (p) { var q = [KEY ? "token=" + encodeURIComponent(KEY) : "", TV_ID ? "tv=" + TV_ID : ""].filter(Boolean).join("&"); return API + p + (q ? "?" + q : ""); };
     if (!OFFLINE && !MOCK && !PREVIEW && window.smartHome && window.smartHome.useBridge) window.smartHome.useBridge(api);
     // a design got by code: pictures only from here, the store and the hosts this TV already uses
     if (DESIGN_FROM_CODE && CouchDesignCode.lockImages) CouchDesignCode.lockImages((ST.photos || []).map(function (p) { return p && p.url; }), VIDEO_URL);
