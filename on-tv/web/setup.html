@@ -6,6 +6,7 @@
 <meta name="referrer" content="no-referrer">
 <title>Home settings</title>
 <script src="/ontv/shim.js"></script>
+<script src="/ontv/connect-check.js"></script>
 <style>
   :root { color-scheme: dark; --bg:#0b0b0d; --card:#16161a; --line:#2c2c33; --ink:#f2ead8; --dim:#bdb6a7; --amber:#ffb52e; --bad:#ff7a6b; --good:#7ddc8a; }
   * { box-sizing: border-box; }
@@ -263,6 +264,7 @@
     </div>
     </div>
     <div class="msg" id="adb-msg" role="status"></div>
+    <div id="cc" class="cc"></div>
   </section>
 
   <section class="card" id="kids-first">
@@ -993,6 +995,8 @@
     var b = $('town-list').querySelector('button[data-i]');
     if (b) b.click(); else findTown(this.value);
   });
+  // Can't connect? (connect-check.js): what is in the way of pressing keys, and Copy a report
+  if (window.ConnectCheck) ConnectCheck.mount($('cc'), { api: api, auto: !!(window.couchTv && window.couchTv.token()) });
   // only once paired: the pairing screen (shim.js) covers the page until then
   if (window.couchTv && window.couchTv.token()) load();
 </script>

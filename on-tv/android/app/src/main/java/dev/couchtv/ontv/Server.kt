@@ -303,6 +303,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             }
             // ---- on-TV extras ----
             "GET /api/adb" -> json(200, ok(JSONObject(Adb.status())))
+            // "Can't connect?" on the phone page: the one thing in the way, and a private report (ConnectCheck)
+            "GET /api/adb/check" -> json(200, ok(JSONObject(ConnectCheck.run(ctx, s.remoteIpAddress))))
             "POST /api/adb/connect" -> { val tls = body(s).optString("route") == "tls"; if (tls) Adb.disconnect(); Thread { runCatching { Adb.ensure(interactive = true, preferTls = tls) }.onFailure { Log.w(TAG, "adb connect", it) }; Now.push() }.start(); json(200, ok(JSONObject(Adb.status()))) }
             "POST /api/adb/pair" -> {
                 val b = body(s)

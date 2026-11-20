@@ -295,7 +295,7 @@ object Adb {
         } catch (e: Exception) { null } finally { runCatching { mdns.stop() } }
     }
 
-    private fun portOpen(port: Int, host: String = "127.0.0.1") = try {
+    fun portOpen(port: Int, host: String = "127.0.0.1") = try {
         java.net.Socket().use { it.connect(java.net.InetSocketAddress(host, port), 400); true }
     } catch (e: Exception) { false }
 
