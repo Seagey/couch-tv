@@ -81,7 +81,9 @@ try {
   current = "g34";
   {
     const page = await remote("android");
-    let navigated = 0; page.on("framenavigated", (f) => { if (f === page.mainFrame()) navigated++; });
+    // a page that reloads loses this mark; one that stays keeps it
+    await page.evaluate(() => { window.__stayed = "yes"; });
+    let loads = 0; page.on("load", () => loads++);
     await openSheet(page);
     const next = page.getByRole("button", { name: "Next scene" });
     ok(await next.count() === 1, "the TV sheet has a Next scene button");
@@ -91,7 +93,7 @@ try {
     await next.click(); await page.waitForTimeout(300);
     const picks = page.sent.filter((s) => s[0] === "/api/say/scene").map((s) => s[1].pick);
     ok(JSON.stringify(picks) === JSON.stringify(["next", "prev", "next"]), "each press sends the pick to the TV (" + JSON.stringify(picks) + ")");
-    ok(navigated === 0, "the remote page did not reload or go anywhere (" + navigated + ")");
+    ok(loads === 0 && await page.evaluate(() => window.__stayed) === "yes", "the remote page did not reload (" + loads + " loads)");
     ok(await next.isVisible(), "the sheet is still open after three presses: the remote stays");
     ok(await page.evaluate(() => !!document.querySelector(".topbar")), "the remote is still there under it");
     ok(page.errors.length === 0, "no page errors (" + page.errors.join(" | ") + ")");

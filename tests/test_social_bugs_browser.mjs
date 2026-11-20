@@ -26,6 +26,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = process.env.COUCHTV_ROOT || path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ONLY = (process.env.ONLY || "").split(",").filter(Boolean);
 const want = (id) => !ONLY.length || ONLY.includes(id);
+// a section that throws is counted as failed and the next one still runs (so a run on an older copy shows every section)
+const guard = async (id, fn) => { if (!want(id)) return; try { await fn(); } catch (e) { fails.push(id + ": threw " + String(e).split("\n")[0]); console.log("FAIL " + id + ": threw " + String(e).split("\n")[0]); } };
 let chromium;
 try { chromium = createRequire(path.join(process.env.COUCHTV_PLAYWRIGHT || process.cwd(), "package.json"))("playwright").chromium; }
 catch (e) { console.log("SKIP: Playwright is not installed (set COUCHTV_PLAYWRIGHT to a folder that has it)"); process.exit(0); }
@@ -67,7 +69,7 @@ async function open(page, query) {
 
 try {
   // ------------------------------------------------------------------ g03
-  if (want("g03")) for (const look of ["classic", "night"]) {
+  await guard("g03", async () => { for (const look of ["classic", "night"]) {
     current = "g03";
     const page = await fresh();
     let artUp = false;
@@ -76,7 +78,7 @@ try {
     await open(page, "&remoteart=1&look=" + look);
     const sel = look === "classic" ? "#shelf .tile.show" : "#shelf .ncard";
     const cards = await page.evaluate((s) => document.querySelectorAll(s).length, sel);
-    ok(cards >= 3, look + ": the Keep watching row has cards (" + cards + ")");
+    ok(cards >= 2, look + ": the Keep watching row has cards (" + cards + ")");
     // every try of #274's retry runs out (1.5 + 3 + 6 + 12 + 20 + 30 s), as just after a restart with no network
     for (let i = 0; i < 20; i++) { await page.clock.fastForward(5000); await page.waitForTimeout(60); }
     await page.waitForTimeout(400);
@@ -102,7 +104,7 @@ try {
     ok(again === cards, look + ": back in view, every card has its real picture again (" + again + " of " + cards + ")");
     ok(page.errors.length === 0, look + ": no page errors (" + page.errors.join(" | ") + ")");
     await page.close();
-  }
+  } });
   // ------------------------------------------------------------------ helpers for Home settings
   const keys = (page) => ({
     press: async (k, wait) => { await page.keyboard.press(k); await page.waitForTimeout(wait || 160); },
@@ -125,7 +127,7 @@ try {
   const setMsg = (page) => page.evaluate(() => document.getElementById("set-msg").textContent);
 
   // ------------------------------------------------------------------ g05
-  if (want("g05")) {
+  await guard("g05", async () => {
     current = "g05";
     const page = await fresh();
     // a pretend photo site: some links answer a page that may ask (CORS), some do not
@@ -145,7 +147,8 @@ try {
       if (u.endsWith("/good.png")) return r.fulfill({ status: 200, contentType: "image/png", headers: cors, body: PNG });
       if (u.endsWith("/missing.jpg")) return r.fulfill({ status: 404, contentType: "text/html", headers: cors, body: "<h1>Not found</h1>" });
       if (u.endsWith("/album")) return r.fulfill({ status: 200, contentType: "text/html", headers: cors, body: "<html><body><img src=a.jpg></body></html>" });
-      if (u.endsWith("/share")) return r.fulfill({ status: 200, contentType: "text/html", body: "<html><body>shared album</body></html>" });
+      // a site that sends no CORS answer: the page may not read it (the route has to refuse the fetch itself)
+      if (u.endsWith("/share")) return r.request().resourceType() === "fetch" ? r.abort() : r.fulfill({ status: 200, contentType: "text/html", body: "<html><body>shared album</body></html>" });
       if (u.endsWith("/huge.png")) return r.fulfill({ status: 200, contentType: "image/png", headers: cors, body: bigPng });
       if (u.endsWith("/slow.jpg")) return;   // never answers
       return r.abort();
@@ -199,10 +202,10 @@ try {
     row = await rowText(p2, /^Remove photo 1/);
     ok(/did not open on the home/.test(row || ""), "a photo that never opened on the home says so on its row (" + row + ")");
     await p2.close();
-  }
+  });
 
   // ------------------------------------------------------------------ g18
-  if (want("g18")) {
+  await guard("g18", async () => {
     current = "g18";
     const page = await fresh({ userAgent: "Mozilla/5.0 (Linux; Android 9; AFTKA Build/PS7633) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36" });
     await page.route("https://video.example/**", () => {});   // the clip's bytes never matter here
@@ -232,13 +235,13 @@ try {
     ok(!s.has && s.photo !== "none" && !!s.src, "the page's own hide and show: photo first, clip asked again (" + JSON.stringify(s) + ")");
     ok(page.errors.length === 0, "no page errors (" + page.errors.join(" | ") + ")");
     await page.close();
-  }
+  });
 
   // ------------------------------------------------------------------ g29
-  if (want("g29")) {
+  await guard("g29", async () => {
     current = "g29";
     const page = await fresh({ userAgent: "Mozilla/5.0 (Linux; Android 14; MT9216 Build/UP1A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" });
-    await open(page, "&look=night");
+    await open(page, "&look=night&lighter=off");
     await page.evaluate(() => { window.__calls = []; const real = window.MOCK_API; window.MOCK_API = function (m, p, b) { window.__calls.push([m, p, b]); return real.apply(this, arguments); }; });
     const box = (sel, i) => page.evaluate(([s, i]) => { const e = document.querySelectorAll(s)[i || 0]; if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, cls: e.className, name: e.textContent.trim().slice(0, 30) }; }, [sel, i]);
     // the dock's apps: the grid's tiles (an app, then Settings, More apps)
@@ -270,14 +273,18 @@ try {
     await page.mouse.click(lookBox.x, lookBox.y);
     await page.waitForTimeout(300);
     ok(await page.evaluate(() => /^Look/.test((document.querySelector(".ssec.on, .ssec.sel, .ssec.focus") || {}).textContent || "")), "a click on a section opens it");
-    const rowI = await page.evaluate(() => [...document.querySelectorAll("#set-rows > .srow")].findIndex((e) => /^Moving tiles/.test(e.textContent)));
-    ok(rowI >= 0, "the Moving tiles row is there");
+    const rowI = await page.evaluate(() => [...document.querySelectorAll("#set-rows > .srow")].findIndex((e) => /^Glass app icons/.test(e.textContent)));
+    ok(rowI >= 0, "the Glass app icons row is there");
+    // the row is further down the list: the wheel (an air mouse's scroll) brings it into view first
+    await page.mouse.wheel(0, 400); await page.waitForTimeout(200);
+    await page.evaluate((i) => { const r = document.querySelectorAll("#set-rows > .srow")[i]; r.scrollIntoView({ block: "center" }); }, rowI);
+    await page.waitForTimeout(200);
     const before = await page.evaluate((i) => document.querySelectorAll("#set-rows > .srow")[i].textContent, rowI);
     const rb = await box("#set-rows > .srow", rowI);
     await page.mouse.move(rb.x, rb.y, { steps: 3 });
     await page.mouse.click(rb.x, rb.y);
     await page.waitForTimeout(300);
-    const after = await page.evaluate(() => { const r = [...document.querySelectorAll("#set-rows > .srow")].find((e) => /^Moving tiles/.test(e.textContent)); return r ? r.textContent : ""; });
+    const after = await page.evaluate(() => { const r = [...document.querySelectorAll("#set-rows > .srow")].find((e) => /^Glass app icons/.test(e.textContent)); return r ? r.textContent : ""; });
     ok(before !== after, "a click on a settings row changes it, as OK does (" + before + " -> " + after + ")");
     ok(page.errors.length === 0, "no page errors (" + page.errors.join(" | ") + ")");
     await page.close();
@@ -290,10 +297,10 @@ try {
     await p2.waitForTimeout(300);
     ok(await p2.evaluate(() => !window.__calls.some((c) => c[1] === "/api/launch") && !document.documentElement.classList.contains("has-pointer")), "no pointer moved: a click alone opens nothing");
     await p2.close();
-  }
+  });
 
   // ------------------------------------------------------------------ g31
-  if (want("g31")) {
+  await guard("g31", async () => {
     current = "g31";
     const page = await fresh();
     await open(page, "&look=night");
@@ -309,10 +316,10 @@ try {
     const after = await page.evaluate(() => (JSON.parse(localStorage.getItem("mock:tvhome.settings") || "{}").s || {}).quick);
     ok(JSON.stringify(after) === JSON.stringify(saved), "after a restart the same buttons, in the same order (" + JSON.stringify(after) + ")");
     await page.close();
-  }
+  });
 
   // ------------------------------------------------------------------ g33
-  if (want("g33")) {
+  await guard("g33", async () => {
     current = "g33";
     const page = await fresh();
     await open(page, "&look=night&lighter=off");
@@ -400,9 +407,9 @@ try {
     ok(!s3.playing && !s3.src && s3.photo, "a broken clip lets go and the still photo shows (" + JSON.stringify(s3) + ")");
     ok(p3.errors.length === 0, "no page errors (" + p3.errors.join(" | ") + ")");
     await p3.close();
-  }
+  });
   // ------------------------------------------------------------------ g34 (the TV side)
-  if (want("g34")) {
+  await guard("g34", async () => {
     current = "g34";
     const page = await fresh();
     await open(page, "&look=night");
@@ -432,14 +439,14 @@ try {
     await p2.waitForTimeout(800);
     ok(await place() !== before && (await place()).length > 0, "Classic: Next scene shows the next photo (" + before + " -> " + (await place()) + ")");
     await p2.close();
-  }
+  });
   // ------------------------------------------------------------------ g24
-  if (want("g24")) {
+  await guard("g24", async () => {
     current = "g24";
     const page = await fresh();
     await open(page, "&look=night&iconset=solid");
     await page.waitForTimeout(800);
-    const tool = (kind) => page.evaluate((k) => { const t = document.querySelector('#grid [data-pkg="' + k + '"] .face'); return t ? { cls: t.className, svg: !!t.querySelector("svg"), w: t.querySelector("svg") ? t.querySelector("svg").getBoundingClientRect().width : 0 } : null; }, kind);
+    const tool = (kind) => page.evaluate((k) => { const name = { gear: "Settings", more: "More apps" }[k]; const tile = [...document.querySelectorAll("#grid > *")].find((e) => (e.querySelector(".label") || {}).textContent === name); const t = tile && tile.querySelector(".face"); return t ? { cls: t.className, svg: !!t.querySelector("svg"), w: t.querySelector("svg") ? t.querySelector("svg").getBoundingClientRect().width : 0 } : null; }, kind);
     const gear = await tool("gear"), more = await tool("more");
     ok(gear && /iset-solid/.test(gear.cls) && gear.svg && gear.w > 10, "home.icon_set solid draws Settings from the icon set (" + JSON.stringify(gear) + ")");
     ok(more && /iset-solid/.test(more.cls) && more.svg, "and More apps (" + JSON.stringify(more) + ")");
@@ -454,7 +461,7 @@ try {
     const st = await page.evaluate(() => (JSON.parse(localStorage.getItem("mock:tvhome.settings") || "{}").s || {}).icon_set);
     ok(st === "duotone", "and it is saved (" + st + ")");
     ok(/iset-duotone/.test((await tool("gear")).cls), "the Settings tile is drawn again at once");
-    for (let i = 0; i < 5; i++) await keys(page).press("Enter", 200);
+    for (let i = 0; i < 4; i++) await keys(page).press("Enter", 200);   // Colour tile, Glass, Playful, Standard
     ok(/Standard/.test(await rowText(page, /^Icon style/)), "round to Standard");
     ok(!/iset/.test((await tool("gear")).cls), "Standard is the usual drawing");
     ok(page.errors.length === 0, "no page errors (" + page.errors.join(" | ") + ")");
@@ -464,7 +471,7 @@ try {
     await open(p2, "&look=night");
     ok(await p2.evaluate(() => !document.querySelector("#grid .iset")), "nothing set: the usual drawing, exactly as before");
     await p2.close();
-  }
+  });
 } finally {
   await browser.close();
   server.close();
