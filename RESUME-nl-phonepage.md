@@ -33,7 +33,7 @@ Also: launcher serves /tv/phone-words.js and /tv/caps-words.js from www/tv when 
 
 ## Tests (21 Nov run)
 - Python: test_phone_page_bridge 52 (after N1 to N4), test_pair_lock_bridge 6 (nl-remote's file), test_bridge_phone_page_flag 3. Whole suite one file at a time (scratchpad nlpp/run_py_all.sh): 88 of 88 files, 1405 tests.
-- Browser, all rc=0: phone_settings_bridge 93, phone_settings (on-TV) 129, phone_link_fresh 9, remote_phone_page_browser 15, design_settings 107, widget_detail 295, tv_words 12.
+- Browser, all rc=0: phone_settings_bridge 93 (rerun after N1 to N4), phone_settings (on-TV) 129, phone_link_fresh 9, remote_phone_page_browser 15, design_settings 107, widget_detail 295, tv_words 12.
 - JS: node tests/test_phone_page.js 22, tests/test_remote_phone_page.mjs 51; all JS unit files: scratchpad nlpp/run_js_units.sh, 71 of 71 (the two emulator sims, keep-watching-sim and now-playing-sim, need adb emulators and are not unit tests).
 - Gradle tv-home (gradle.lock, scratchpad nlpp/gradle_tvhome.sh): testDebugUnitTest 81 tests, 0 failures (PhoneServerTest 30, after N1 to N4), assembleDebug ok.
 - Browser (browser.lock, scratchpad nlpp/run_browser.sh; needs remote/dist: remote/node_modules is a symlink to ../../repo/remote/node_modules, excluded in .git/info/exclude, then npm run build in remote/).
