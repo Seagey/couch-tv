@@ -1,5 +1,5 @@
 // Home settings, Look, in a real browser (the TV home in its ?mock preview at 1920x1080), for the reports on the
-// owner's socials (coord/SOCIAL-BUILDLIST-0139.md):
+// owner's socials (the 0.13.9 social build list, rows g01, g17, g23, g30):
 //  g17 Show the clock: off hides the time (and the big scene clock in Night), the date moves up into its place,
 //      and it stays off after Home settings close and after a reload. On (the default) changes nothing.
 //  g30 Sharp pictures on a 4K TV: on a 1080 page, Always loads the @2x picture, Auto and Off the 1080 one.
