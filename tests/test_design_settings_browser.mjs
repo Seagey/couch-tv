@@ -342,7 +342,9 @@ await phone.waitForFunction(() => document.getElementById("design-line").style.d
 {
   ok(/Widgets on this TV/.test(await phone.textContent("#widgets .fold-btn")), "the phone's section is Widgets on this TV");
   const titles = await phone.evaluate(() => [...document.querySelectorAll("#w-list summary")].map((e) => e.textContent));
-  ok(titles.join(",") === "Surf, middle left,Headlines, top right", "one box per widget with settings, named like the TV names it: " + titles.join(" / "));
+  // round 2: the Welcome words, Guest Wi-Fi and House guide have settings of their own too (tests/test_ws2_home.mjs)
+  ok(titles.join(" / ") === "Welcome words, top left / Surf, middle left / Guest Wi-Fi, in the middle / House guide, middle right / Headlines, top right",
+    "one box per widget with settings, named like the TV names it: " + titles.join(" / "));
   await phone.click('#w-list details[data-key="s|surf"] summary');
   const words = await phone.textContent('#w-list details[data-key="s|surf"]');
   ok(/Beach: Sydney \(your home's town\)/.test(words), "the surf widget's beach on the phone: " + words.slice(0, 80));
@@ -423,12 +425,21 @@ await ctx.close();
   ok(st.open.length === 1 && st.open[0] === "widgets", "Widgets on this TV is the section open: " + st.open.join(","));
   ok(st.news && st.hi && st.his === 1 && !st.surf, "the headlines' box is open and marked, the others shut");
   ok(st.top >= -2 && st.top < 844, "and scrolled into view: " + Math.round(st.top));
-  // a widget the TV has nothing to set for: the section opens and says so
+  // round 2: Guest Wi-Fi has a setting of its own now (Hide the password): #widget=f opens its box
   await p3.evaluate(() => { location.hash = "widget=f"; });
   await p3.reload();
   await p3.waitForFunction(() => window.couchTv && window.couchTv.token());
-  await p3.waitForFunction(() => /nothing to set here/.test(document.getElementById("w-msg").textContent), null, { timeout: 8000 });
-  ok(await p3.evaluate(() => !document.getElementById("widgets").classList.contains("shut") && !document.querySelector("#w-list .hi")), "#widget=f (Guest Wi-Fi): Widgets on this TV opens and says there is nothing to set");
+  await p3.waitForFunction(() => document.querySelector('#w-list details[data-key="f|wifi"].hi'), null, { timeout: 8000 });
+  ok(await p3.evaluate(() => { const d = document.querySelector('#w-list details[data-key="f|wifi"]'); return d.open && /Hide the password/.test(d.textContent) && document.querySelectorAll("#w-list .hi").length === 1; }),
+    "#widget=f (Guest Wi-Fi): its box opens, marked, with Hide the password");
+  // a widget the TV has nothing to set for (the App grid, while it has no TV setting): the section opens and says so
+  if (!(await p3.evaluate(() => /App grid/.test(document.getElementById("w-list").textContent)))) {
+    await p3.evaluate(() => { location.hash = "widget=a"; });
+    await p3.reload();
+    await p3.waitForFunction(() => window.couchTv && window.couchTv.token());
+    await p3.waitForFunction(() => /nothing to set here/.test(document.getElementById("w-msg").textContent), null, { timeout: 8000 });
+    ok(await p3.evaluate(() => !document.getElementById("widgets").classList.contains("shut") && !document.querySelector("#w-list .hi")), "#widget=a (App grid): Widgets on this TV opens and says there is nothing to set");
+  }
   ok(!p3.errors.length, "no page errors: " + p3.errors.join("; "));
   await c3.close();
 }

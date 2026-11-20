@@ -539,7 +539,7 @@
   var CLOCK_FMT = function () { return st("format", "12 or 24 hour", "choice", "auto", "Follow this TV uses the clock set in Home settings, Look and scenes.", "design", ALL, true,
     { options: [["auto", "Follow this TV"], ["12h", "12 hour"], ["24h", "24 hour"]] }); };
   var HEADING = function (help, pre) { return st("label", "Heading", "text", "", help, "design", ALL, pre !== false, { max: 40 }); };
-  var PHOTO = function () { return st("photo", "Photo", "tvlist", "first", "Which of this TV's photos shows here. Add photos in Home settings, Look and scenes, Your photos.", "tv", ON_TV, true, { from: "photos", "private": true }); };
+  var PHOTO = function () { return st("photo", "Photo", "tvlist", "first", "Which of this TV's photos shows here. A photo put in the widget in couch-tv Studio shows instead. Add photos in Home settings, Look and scenes, Your photos.", "tv", ON_TV, true, { from: "photos", "private": true }); };
   var IMAGE = function () { return st("image", "Photo in the widget", "image", "", "Put one photo in the widget itself. It shows on every TV this design goes to.", "design", STUDIO, true); };
   var HEADING_TV = function (help) { return st("label", "Heading", "text", "", help, "tv", ON_TV, true, { max: 40 }); };
   var HA = { ha: true };

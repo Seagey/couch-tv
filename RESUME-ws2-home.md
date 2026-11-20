@@ -1,31 +1,38 @@
 # RESUME ws2-home (widget swarm round 2, group "home")
 
-Brief: scratchpad swarm2-common.md (also summarised here). Kinds: agenda, people, note, list, guide, welcome,
+Brief: coord/swarm2-common.md and coord/resume-builder-brief.md. Kinds: agenda, people, note, list, guide, welcome,
 memory, screentime, wifi, card, photo, slideshow, mosaic, artframe. Every setting wired and pre: true.
 
-## Done (committed as WIP)
-- widget-caps.js: HOME_SET block (all 14 kinds, 27 settings, all pre: true). Old pre:false entries for these kinds removed.
+## Done (committed)
+- widget-caps.js: HOME_SET block (all 14 kinds, 27 settings, all pre: true). No pre:false left for these kinds.
   New tvlist sources "guide" and "cards"; many tvlists (people.who, guide.sections) default [].
-- design.js: OPT byline, done, ago, range, appcount; WOPT people "names", note "align byline", list "+done", memory "align range ago", screentime "align appcount".
-- widgets.js: renderers read settings (setting()/wsetOf, validated): photo id fix (photoIds), slideshow seconds_each + shuffle (mixed()),
-  mosaic count ("auto" bug fixed), artframe mat (TV value only from the four), people who/names, card label/text/live,
-  agenda calendars (main/bookings/all, agendaEvents) + days (today/two/week), note byline, list done, guide sections (guidePart),
-  wifi hidepass, welcome text/sub/source/times, memory range/ago, screentime appcount. kit exports guidePart, agendaEvents, memoryList, memoryWeek.
-- widget-detail.js: agenda layer uses agendaEvents; wifi layer hidepass; guide layer guidePart; photos layer memoryList + ago.
-- app.js: tvlistOptions calendars (all/main/bookings), guide, cards; homeView photoIds, books (stays as Check in / Check out events), memory.week; ahTick reads bookings for the agenda; booksSet/booksEvents.
-- athome.js: nearDay(photos, today, days).
-- tests: test_ws_schema.js (TVLISTS + guide, cards; many tvlist default list; agenda left LATER), test_design_settings_browser.mjs
-  (Welcome, Wi-Fi, Guide now have settings: expectations updated), new tests/test_ws2_home.mjs.
-- Real data checked: public Google holiday .ics fetched with curl and parsed by CouchAtHome.parseIcs (5 events, all day); bridge custom_cards.clean gives titles.
+- design.js: OPT byline, done, ago, range, appcount; WOPT people "names", note "align byline", list "+done", memory "align range ago",
+  screentime "align appcount" (agenda "days" and slideshow "shuffle" already in WOPT).
+- widgets.js renderers read every setting; widget-detail.js layers follow them; app.js tvlistOptions (calendars, guide, cards),
+  homeView photoIds, books (bookings stays as Check in / Check out), memory.week; athome.js nearDay.
+- "agenda left LATER" is gone: agenda.calendars and agenda.days are pre: true and wired (renderer agendaEvents/agendaOf, tested).
+  test_ws_schema.js now has a HOME block: each of the 14 kinds has exactly its keys, every one pre: true, every design key
+  in design.js WOPT itself; slideshow.shuffle and agenda.days removed from PENDING_WOPT.
+- tests/test_ws2_home.mjs fixed and GREEN: 263 checks (A 105, B 76, C 82). Fixes were in the test only: headings are .shead
+  (not .srow); phone page reloaded via about:blank (same URL with # did not reload); mock people ids are alex/sam/jordan;
+  mosaic tiles counted by DOM; card "each in turn" rotates every 20 s so its cleared check reads the stored setting; the
+  mock gives both calendar links the same ICS, so the bookings check asserts only stays (Check in/out), no Late swim.
+  Debug print removed.
+- test_design_settings_browser.mjs: expectations updated for my kinds (Welcome words, Guest Wi-Fi, House guide now have settings;
+  #widget=f opens Guest Wi-Fi's box; the "nothing to set" path now uses the App grid "a"). GREEN: 108 checks.
 
-## Status of tests
-- node tests/test_ws_schema.js: All 4053 passed. test_widget_caps.js: 4548. test_athome.js: 72. test_design_widgets.js: 221.
-- tests/test_ws2_home.mjs: part A (every setting drawn) passes; part B was failing at "agenda in Home settings, Widgets on this home"
-  (debug print added: "(Designs rows: ...)"). Fix that, then run to green.
+- Studio photo (branch nl-photo): Photo and Art frame draw a photo put in the widget in couch-tv Studio (opts.image, a JPEG
+  data: URL from the store) over the photo picked on this TV, with Fill or fit and the frame colour still applied; without
+  one, the picked photo shows. New tests/test_ws2_home_photo.js: 94 checks. nl-photo's own tests/test_widget_own_photo.js
+  run against this branch: 116 pass (not copied in, it comes with nl-photo). The Photo pick's help now says a Studio photo
+  shows instead.
 
-## Next steps
-1. Run test_ws2_home.mjs (take the browser lock first: mkdir scratchpad/browser.lock, wait 30 s if it exists, rmdir after):
-   COUCHTV_PLAYWRIGHT=<the tools/tv-designer/market folder beside couch-tv> node tests/test_ws2_home.mjs
-2. Then test_ws_tv.mjs, test_design_settings_browser.mjs, test_widget_detail_browser.mjs, test_widget_fit_all.mjs (same lock), fix what my kinds broke.
-3. Commit (no push/tag/bump), report table to the coordinator.
-Nothing runs on the MacBook or an emulator.
+## Test counts (21 Nov, final, all from this worktree via scratchpad ws2home-browser-run.sh, own results folder ws2home-results)
+- node tests/test_ws_schema.js: 4130 passed. test_widget_caps.js: 4548. test_athome.js: 72. test_design_widgets.js: 221.
+  test_ws2_home_photo.js: 94.
+- Browser: test_widget_detail_browser.mjs 296. test_widget_fit_all.mjs 8. test_ws2_home.mjs 263 (second green run).
+  test_ws_tv.mjs 1115. test_design_settings_browser.mjs 108.
+
+## Left
+Nothing in scope. Branch finished (no push, tag or bump). Merge note: no file in common with nl-photo, so the two merge cleanly (checked with git diff --name-only
+against integrate-0.13.9).
