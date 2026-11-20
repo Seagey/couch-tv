@@ -128,6 +128,8 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         }
         if (!authed(s)) return json(401, err("pair this phone first: open this page on your phone and type the code from the TV"))
 
+        if (path.startsWith("/api/matter/")) return matter("$m $path", s)
+
         val q = { k: String -> s.parameters[k]?.firstOrNull() }
         return when ("$m $path") {
             "GET /api/now" -> json(200, Now.payload())
@@ -618,6 +620,52 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             Store.putStr("skip_watch_next", clean.toString())
         }
         if (b.has("watch_next_per_app")) Store.putStr("watch_next_per_app", b.optInt("watch_next_per_app", 5).coerceIn(1, 20).toString())
+    }
+
+    // ---------------------------------------------------------------- Matter (matter/Matter.kt, matter-contract.md)
+
+    private fun matter(route: String, s: IHTTPSession): Response = try {
+        val b = body(s)
+        when (route) {
+            "GET /api/matter/devices" -> json(200, dev.couchtv.ontv.matter.Matter.devicesJson())
+            "POST /api/matter/commission" -> {
+                val r = dev.couchtv.ontv.matter.Matter.commission(b.optString("code"), b.optString("address").ifEmpty { null })
+                json(if (r.optBoolean("ok")) 200 else 400, r)
+            }
+            "POST /api/matter/command" -> json(200, dev.couchtv.ontv.matter.Matter.command(b.optString("id"), b.optString("action"), b.opt("value")))
+            "POST /api/matter/rename" -> json(200, dev.couchtv.ontv.matter.Matter.rename(b.optString("id"), b.optString("name")))
+            "POST /api/matter/remove" -> json(200, dev.couchtv.ontv.matter.Matter.remove(b.optString("id")))
+            // live state: "event: matter" with the device list whenever a device reports a change
+            "GET /api/matter/events" -> {
+                val q = LinkedBlockingQueue<String>(20)
+                val fn: (Long) -> Unit = { q.clear(); q.offer("event: matter\ndata: ${dev.couchtv.ontv.matter.Matter.devicesJson()}\n\n") }
+                q.offer("event: matter\ndata: ${dev.couchtv.ontv.matter.Matter.devicesJson()}\n\n")
+                dev.couchtv.ontv.matter.Matter.listen(fn)
+                stream(q) { dev.couchtv.ontv.matter.Matter.unlisten(fn) }
+            }
+            else -> json(404, err("no such Matter call"))
+        }
+    } catch (e: dev.couchtv.ontv.matter.Matter.Refused) { json(e.status, err(e.message ?: "error")) }
+
+    private fun stream(q: LinkedBlockingQueue<String>, onClose: () -> Unit): Response {
+        val input = object : InputStream() {
+            private var buf = ByteArray(0); private var pos = 0; private var closed = false
+            override fun read(): Int { val b = ByteArray(1); return if (read(b, 0, 1) < 0) -1 else b[0].toInt() and 0xff }
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (closed) return -1
+                if (pos >= buf.size) {
+                    val msg = try { q.poll(20, TimeUnit.SECONDS) } catch (e: InterruptedException) { null } ?: ": keepalive\n\n"
+                    buf = msg.toByteArray(); pos = 0
+                }
+                val n = minOf(len, buf.size - pos)
+                System.arraycopy(buf, pos, b, off, n); pos += n
+                return n
+            }
+            override fun close() { closed = true; onClose() }
+        }
+        return newChunkedResponse(Response.Status.OK, "text/event-stream", input).apply {
+            addHeader("Cache-Control", "no-cache"); addHeader("X-Accel-Buffering", "no")
+        }
     }
 
     // ---------------------------------------------------------------- server-sent events

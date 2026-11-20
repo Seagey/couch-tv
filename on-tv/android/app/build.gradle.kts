@@ -46,6 +46,12 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     packaging { resources { excludes += setOf("META-INF/versions/9/OSGI-INF/MANIFEST.MF", "META-INF/*.kotlin_module") } }
+    // Matter controller (connectedhomeip v1.6.1.0, built by scripts/matter/build-controller.sh, on-tv/android/matter/README.md):
+    // the native library per processor, and the PAA roots that check a device was certified.
+    sourceSets["main"].jniLibs.srcDir("../matter/jni")
+    sourceSets["main"].assets.srcDir("../matter/assets")
+    // compressed in the APK (about 8 MB instead of 20 MB for both processors); Android unpacks it at install
+    packaging { jniLibs { useLegacyPackaging = true } }
 }
 
 dependencies {
@@ -58,6 +64,8 @@ dependencies {
     implementation("org.conscrypt:conscrypt-android:2.5.3")
     // Makes the self-signed certificate the ADB TLS handshake needs.
     implementation("org.bouncycastle:bcpkix-jdk15to18:1.81")
+    // Matter controller jars (Apache 2.0), from the same build as the native library (on-tv/android/matter/)
+    implementation(fileTree(mapOf("dir" to "../matter/libs", "include" to listOf("*.jar"))))
     // Unit tests for the plain Kotlin rules (KeepMergeTest), run with testDebugUnitTest (EPL 1.0).
     testImplementation("junit:junit:4.13.2")
     // A real org.json for the tests that read and build JSON (AskWireTest): Android's own copy is only a stub on a computer (JSON licence).
