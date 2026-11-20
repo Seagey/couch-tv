@@ -82,17 +82,21 @@ const en = /var EN = \{([\s\S]*?)\};/.exec(matterJs)[1];
 const enPairs = [...en.matchAll(/([a-z_]+): "([^"]*)"/g)];
 ok(enPairs.length === 13 && enPairs.every((p) => W.en(p[1]) === p[2]), "matter.js's English stand ins match the table");
 
-// 3. the phone card's own HTML lines are in the table
+// 3. the phone card has no English of its own: every line is a data-mw key of the table (filled in the
+//    language by fillMatterWords), so the phone page check on nl-remote (test_phone_words.mjs) finds no
+//    line missing from phone-words.js, and the card follows the TV's language with or without phone-words.js
 const h0 = setup.indexOf('<section class="card" id="matter"'), h1 = setup.indexOf("</section>", h0);
-const card = setup.slice(h0, h1);
-const lines = [];
-for (const m of card.matchAll(/>([^<>]+)</g)) { const t = m[1].trim(); if (t && /[A-Za-z]/.test(t)) lines.push(t); }
-for (const m of card.matchAll(/(?:placeholder|aria-label)="([^"]+)"/g)) lines.push(m[1]);
-const ENS = keys.map((k) => W.en(k));
-const brands = ["Google Home", "Apple Home", "SmartThings", "Alexa"];
-const notIn = lines.filter((t) => brands.indexOf(t) < 0 && ENS.indexOf(t) < 0);
-ok(lines.length >= 15, "lines in the phone card: " + lines.length);
-ok(notIn.length === 0, "every line of the phone card is in the table: " + notIn.join(" | "));
+const card = setup.slice(h0, h1).replace(/<!--[\s\S]*?-->/g, "");
+const leftEn = [];
+for (const m of card.matchAll(/>([^<>]+)</g)) { const t = m[1].trim(); if (t && /[A-Za-z]{2}/.test(t)) leftEn.push(t); }
+for (const m of card.matchAll(/\s(?:placeholder|aria-label|title)="([^"]+)"/g)) leftEn.push(m[1]);
+ok(leftEn.length === 0, "no English written in the phone card: " + leftEn.join(" | "));
+const jump = /<a href="#matter"[^>]*>([^<]*)<\/a>/.exec(setup);
+ok(jump && jump[1] === "" && /data-mw="brand_matter"/.test(jump[0]), "the Matter jump link is filled too");
+const cardKeys = [...card.matchAll(/data-mw(?:-placeholder|-aria)?="([a-z0-9_]+)"/g)].map((m) => m[1]).concat(["brand_matter"]);
+ok(cardKeys.length === 18 && cardKeys.every((k) => keys.indexOf(k) >= 0), "the card's 18 keys are in the table: " + cardKeys.length + " " + cardKeys.filter((k) => keys.indexOf(k) < 0).join(", "));
+const brands = ["Google Home", "Apple Home", "SmartThings", "Alexa", "Matter"];
+const lines = cardKeys.map((k) => W.en(k));
 // and they are handed to the shared table the phone page's swapper reads
 const caps = load().CouchCapsWords.words;
 ok(lines.filter((t) => brands.indexOf(t) < 0).every((t) => caps[t] && caps[t].fr), "every card line is in window.CouchCapsWords (with French)");

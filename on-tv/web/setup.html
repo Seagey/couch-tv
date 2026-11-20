@@ -77,7 +77,7 @@
   <p>This page comes from your TV, over your home Wi-Fi. What you change here shows on the TV in a moment, and everything here can still be changed on the TV too. Nothing typed here goes to Couch TV or anyone else. <a href="/">Back to the remote</a></p>
 
   <nav class="jump" aria-label="Sections">
-    <a href="#widgets" id="jump-widgets" style="display:none">Widgets</a><a href="#dapps" id="jump-dapps" style="display:none">Apps</a><a href="#town">Town</a><a href="#people">People</a><a href="#photos">Photos</a><a href="#athome">At home</a><a href="#ask">Ask AI</a><a href="#home">Home screen</a><a href="#smart" id="jump-smart" style="display:none">Smart home</a><a href="#matter" id="jump-matter" style="display:none">Matter</a><a href="#tv">This TV</a>
+    <a href="#widgets" id="jump-widgets" style="display:none">Widgets</a><a href="#dapps" id="jump-dapps" style="display:none">Apps</a><a href="#town">Town</a><a href="#people">People</a><a href="#photos">Photos</a><a href="#athome">At home</a><a href="#ask">Ask AI</a><a href="#home">Home screen</a><a href="#smart" id="jump-smart" style="display:none">Smart home</a><a href="#matter" id="jump-matter" style="display:none" data-mw="brand_matter"></a><a href="#tv">This TV</a>
   </nav>
 
   <div class="card" id="design-line" style="display:none" role="status">
@@ -228,20 +228,21 @@
   </section>
 
   <section class="card" id="matter" style="display:none">
-    <h2>Matter devices</h2>
-    <p>Add the lights, plugs, fans, blinds and thermostats you already have in Google Home, Apple Home, SmartThings or Alexa. The app makes a share code, you paste it here, and the TV becomes one more way to use the device. It stays in your app too. Locks, alarms and garage doors never show on the TV.</p>
+    <!-- every line from tv-home/web/matter-words.js in the TV's language (data-mw: the key), filled by fillMatterWords() -->
+    <h2 data-mw="title"></h2>
+    <p data-mw="intro"></p>
     <p class="now" id="matter-note" style="display:none"></p>
-    <ul class="alist" id="matter-list" aria-label="Matter devices on this TV"></ul>
-    <h3>Add a Matter device</h3>
-    <p>1. Get the share code from your app:</p>
-    <details class="wbox"><summary>Google Home</summary><div><p>Touch and hold the device, then Settings, Linked Matter apps and services, Link apps and services, then Use pairing code. Copy the code.</p></div></details>
-    <details class="wbox"><summary>Apple Home</summary><div><p>Open the device, then its settings. Near the bottom, tap Turn On Pairing Mode, then Copy Code. The code lasts 5 minutes.</p></div></details>
-    <details class="wbox"><summary>SmartThings</summary><div><p>Open the device, tap the settings button at the top right, then Share with other services, then Share device. Copy the number code, and keep that page open until Couch TV says it is added.</p></div></details>
-    <details class="wbox"><summary>Alexa</summary><div><p>Devices, tap the device, then Other Assistants and Apps, then Add another. Copy the 11 number code. It lasts 15 minutes.</p></div></details>
-    <label for="matter-code">2. Paste the code here</label>
-    <input id="matter-code" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="11 numbers, like 3497 011 2332">
-    <button class="go" id="matter-add" type="button">Add to the TV</button>
-    <label class="btn quiet pick" id="matter-scan" style="display:none">Or take a photo of its QR code<input type="file" accept="image/*" capture="environment" id="matter-photo"></label>
+    <ul class="alist" id="matter-list" data-mw-aria="list_label"></ul>
+    <h3 data-mw="add"></h3>
+    <p data-mw="step1"></p>
+    <details class="wbox"><summary data-mw="brand_google"></summary><div><p data-mw="app_google"></p></div></details>
+    <details class="wbox"><summary data-mw="brand_apple"></summary><div><p data-mw="app_apple"></p></div></details>
+    <details class="wbox"><summary data-mw="brand_smartthings"></summary><div><p data-mw="app_smartthings"></p></div></details>
+    <details class="wbox"><summary data-mw="brand_alexa"></summary><div><p data-mw="app_alexa"></p></div></details>
+    <label for="matter-code" data-mw="step2"></label>
+    <input id="matter-code" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" data-mw-placeholder="placeholder">
+    <button class="go" id="matter-add" type="button" data-mw="add_btn"></button>
+    <label class="btn quiet pick" id="matter-scan" style="display:none"><span data-mw="photo"></span><input type="file" accept="image/*" capture="environment" id="matter-photo"></label>
     <div class="msg" id="matter-msg" role="status"></div>
   </section>
 
@@ -846,8 +847,20 @@
     return k && !/^[a-z_]+$/.test(k) ? k : mw('err_failed');
   }
   var MT_OK = ['light', 'switch', 'fan', 'cover', 'climate', 'sensor'];
+  // the card's own lines (data-mw keys) in the language, drawn again when the language changes
+  var mtLang = null;
+  function fillMatterWords() {
+    var l = window.CouchMatterWords ? window.CouchMatterWords.lang() : 'en';
+    if (l === mtLang) return;
+    mtLang = l;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mw]'), function (e) { e.textContent = mw(e.getAttribute('data-mw')); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mw-placeholder]'), function (e) { e.setAttribute('placeholder', mw(e.getAttribute('data-mw-placeholder'))); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mw-aria]'), function (e) { e.setAttribute('aria-label', mw(e.getAttribute('data-mw-aria'))); });
+  }
+  fillMatterWords();
   function showMatter(j) {
     j = mtOf(j);
+    fillMatterWords();
     $('matter').style.display = ''; $('jump-matter').style.display = '';
     var why = typeof j.reason === 'string' && MT_WHY.hasOwnProperty(j.reason) ? mw('why_' + j.reason) : '';
     var note = j.ready === false ? (why || j.note || mw('getting_ready')) : (j.note || '');
