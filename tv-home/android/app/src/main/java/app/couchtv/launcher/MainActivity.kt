@@ -47,6 +47,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
@@ -77,6 +78,9 @@ class MainActivity : Activity() {
     private val retry = Runnable { if (!pageReady || offline) connect() }
 
     private val prefs by lazy { getSharedPreferences("home", MODE_PRIVATE) }
+    private val bingDailyPhoto by lazy { BingDailyPhoto(File(filesDir, "bing-daily-photo"), io) }
+    private val spotifyPlayer by lazy { SpotifyPlayer(applicationContext) }
+    private val fotMobScores by lazy { FotMobScores(io) }
 
     /**
      * `home.render_height` (config.json): draw the home this many pixels high in its own hardware layer and
@@ -475,6 +479,12 @@ class MainActivity : Activity() {
                         responseHeaders = mapOf("Cache-Control" to "max-age=86400")
                     }
                 }
+                if (u.pathSegments.firstOrNull() == "bing-daily-photo") {
+                    val image = bingDailyPhoto.open(u.lastPathSegment.orEmpty()) ?: return null
+                    return WebResourceResponse("image/jpeg", null, image).apply {
+                        responseHeaders = mapOf("Cache-Control" to "max-age=86400")
+                    }
+                }
                 if (u.pathSegments.firstOrNull() == "art") {
                     val b = watchNextArt(u.lastPathSegment ?: "") ?: return null
                     return WebResourceResponse("image/jpeg", null, ByteArrayInputStream(b)).apply {
@@ -655,6 +665,16 @@ class MainActivity : Activity() {
     // ---------------------------------------------------------------- what the page can ask for
 
     inner class Native {
+        @JavascriptInterface
+        fun fotmobScores(): String = fotMobScores.current()
+        @JavascriptInterface
+        fun spotifyMusic(): String = spotifyPlayer.current()
+
+        @JavascriptInterface
+        fun spotifyKey(command: String): Boolean = spotifyPlayer.key(command)
+
+        @JavascriptInterface
+        fun dailyBingPhoto(): String = bingDailyPhoto.current()
         @JavascriptInterface
         fun apps(): String {
             val out = JSONArray()
@@ -1230,17 +1250,17 @@ class MainActivity : Activity() {
     /** Reads the installed apps and their labels: slow (30 apps on a Fire TV take a while), so never on the page's thread while a copy exists. */
     private fun buildAppList(): List<Pair<ResolveInfo, String>> = run {
             val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-            // Fire TV apps that declare only LAUNCHER: the Appstore and Audible (#238), plus saved order packages.
+            // Some apps declare only LAUNCHER: add the Fire TV defaults and the user's explicit choices.
             val launcherPkgs = mutableSetOf("com.amazon.venezia", "com.audible.application.firetv")
             val savedOrder = runCatching {
                 val raw = getSharedPreferences("page", MODE_PRIVATE).getString("tvhome.order.tv", null)
                 raw?.let { org.json.JSONObject(it).optJSONArray("packages") }
             }.getOrNull()
-            savedOrder?.let { order ->
-                for (i in 0 until order.length()) {
-                    val pkg = order.optString(i)
-                    if (pkg.isNotEmpty()) launcherPkgs.add(pkg)
-                }
+            val shown = runCatching {
+                prefs.getString("config", null)?.let { JSONObject(it).optJSONObject("home")?.optJSONArray("show_packages") }
+            }.getOrNull()
+            listOfNotNull(savedOrder, shown).forEach { packages ->
+                for (i in 0 until packages.length()) packages.optString(i).takeIf { it.isNotEmpty() }?.let(launcherPkgs::add)
             }
             val extra = launcherPkgs.flatMap {
                 packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(it), 0)

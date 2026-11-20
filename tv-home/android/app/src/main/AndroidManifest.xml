@@ -41,6 +41,11 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent>
+        <!-- Explicitly shown apps can have a regular launcher activity instead of a TV entry. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <!-- The TV's own homes: the Home button watch looks for them (FireWatch.kt), and the crash
              guard hands the screen to one if couch-tv keeps crashing (CrashGuard.kt). -->
         <package android:name="com.amazon.tv.launcher" />
@@ -172,6 +177,18 @@
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/key_watch" />
+        </service>
+        <service
+            android:name=".SpotifySessionAccess"
+            android:exported="false"
+            android:label="@string/spotify_session_access"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+            <meta-data android:name="android.service.notification.default_filter_types" android:value="" />
+            <meta-data android:name="android.service.notification.disabled_filter_types"
+                android:value="conversations|alerting|ongoing|silent" />
         </service>
         <!-- TCL only (issue #94, TclPlaceholderInput.kt): an empty TV input that TCL's boot manager
              counts as a reason to let this app start and bind its services at boot. Off here and
