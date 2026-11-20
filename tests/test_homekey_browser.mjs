@@ -38,7 +38,7 @@ const READY = "One press: Couch TV gets the Home button version from GitHub, che
 let HK = null, hkGets = 0, hkDown = 0, starts = 0;
 const hkState = (view, extra) => Object.assign({ view, phase: "", progress: 0, error: "", error_words: "", button: "Make Home open Couch TV",
   words: view === "ready" ? READY : view === "done" ? DONE_K : view === "steps"
-    ? "This needs Couch TV to press keys on this TV first: open More, then Let the phone press keys. Or do it once from a computer: scan the code for the steps." : "",
+    ? "This needs Couch TV to press keys on this TV first: open More, then Let the phone press keys. Or do it once from a computer: scan the code on the right for the steps." : "",
   words_phone: view === "ready" ? READY : view === "done" ? DONE_K : view === "steps" ? STEPS_PHONE : "",
   help_url: HELP, steps: ["On a computer, download couch-tv-ontv-watch.apk from github.com/Seagey/couch-tv/releases/latest.", "Install it over this app with Google's adb tool: adb connect, then adb install -r couch-tv-ontv-watch.apk. Your settings stay.",
     "On the TV: Settings, Accessibility (on some TVs inside System or Device Preferences), Couch TV home watch, On.", "Open Couch TV and press Use as home screen."] }, extra || {});
@@ -168,6 +168,10 @@ async function focusRow(page, re) {
   const ub = await about("updbusy");
   ok(/busy with an update right now\. Press again in a moment\./.test(await rows(ub)), "an update in the way is said on screen");
   await ub.close();
+  const sl = await about("slow");
+  ok(/still installing the Home button version\. Leave it on/.test(await rows(sl)), "a slow install says to leave the TV on, not that nothing changed");
+  ok(!/nothing changed/.test(await rows(sl)), "a slow install never says nothing changed");
+  await sl.close();
   const h = await about("hidden");
   ok(!/Make Home open Couch TV/.test(await rows(h)), "a TV where Home already works shows nothing");
   await h.close();
@@ -179,7 +183,7 @@ async function focusRow(page, re) {
   await page.waitForFunction(() => window.I18N);
   const res = await page.evaluate(() => {
     const keys = ["hk_row", "hk_sub", "hk_sub_watch", "hk_done", "hk_working", "hk_steps", "hk_qr", "hk_err", "hk_err_not_bound",
-      "hk_steps_fire", "hk_err_not_bound_fire", "hk_err_other_key", "hk_err_not_newer", "hk_err_space", "hk_err_adb", "hk_wait_update"];
+      "hk_steps_fire", "hk_err_not_bound_fire", "hk_err_other_key", "hk_err_not_newer", "hk_err_space", "hk_err_adb", "hk_wait_update", "hk_err_slow"];
     const out = {};
     const L = typeof window.I18N.langs === "function" ? window.I18N.langs() : window.I18N.langs; const langs = (L || []).map((l) => l.id || l);
     for (const id of langs) { window.I18N.set(id); out[id] = keys.map((k) => window.I18N.t(k)); }

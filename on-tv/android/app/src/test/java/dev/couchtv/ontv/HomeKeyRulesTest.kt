@@ -173,12 +173,39 @@ class HomeKeyRulesTest {
         assertEquals("", HomeKeyRules.resumeStep(false, 0L, t0, turnedOn = false))
     }
 
+    @Test fun aSlowInstallKeepsTheMarksAndHomeOn() {
+        assertEquals("done", HomeKeyRules.afterInstall(""))
+        assertEquals("wait", HomeKeyRules.afterInstall("slow"))
+        for (r in listOf("failed", "adb", "space", "not_newer", "other_key", "bad")) assertEquals(r, "fail", HomeKeyRules.afterInstall(r))
+        // while it waits: a restart of the phone version waits too, the watch APK finishing means it did install
+        val t0 = 5_000_000L
+        assertEquals("wait", HomeKeyRules.resumeStep(false, t0, t0 + 5 * 60_000L + 1, turnedOn = true))
+        assertFalse(HomeKeyRules.homeOffOnResume("wait", true))
+        assertEquals("finish", HomeKeyRules.resumeStep(true, t0, t0 + 6 * 60_000L, turnedOn = true))
+        // only once the window is over: Home off again
+        assertEquals("undo", HomeKeyRules.resumeStep(false, t0, t0 + HomeKeyRules.INSTALL_WINDOW + 1, turnedOn = true))
+        // the words: leave the TV on, never "nothing changed"
+        val w = HomeKeyRules.errorWords("slow")
+        assertTrue(w.contains("still installing") && w.contains("Leave it on"))
+        assertFalse(w.contains("nothing changed"))
+        // the code: the timeout answers "slow" (the copy stays), the press waits on it, a second press is held back
+        val hk = java.io.File("src/main/java/dev/couchtv/ontv/HomeKey.kt").readText()
+        val put = hk.substring(hk.indexOf("private fun put("), hk.indexOf("private fun slow("))
+        assertTrue(put.contains("return \"slow\""))
+        assertFalse(put.contains("return \"failed\""))
+        assertTrue(hk.contains("\"wait\" -> slow(app)"))
+        assertTrue(hk.contains("main.postDelayed({ resume(app) }, maxOf(0L, at + HomeKeyRules.INSTALL_WINDOW"))
+        assertTrue(hk.contains("store(app).getLong(\"installing\", 0L), System.currentTimeMillis(), false) == \"wait\") {\n                error = \"slow\""))
+        assertTrue(hk.contains("if (error == \"slow\") error = \"failed\""))
+    }
+
     @Test fun theCodeKeepsTheFlagAndTheWordsTrue() {
         // HomeKey and SetupActivity are Android code, so read them
         val hk = java.io.File("src/main/java/dev/couchtv/ontv/HomeKey.kt").readText()
         // the flag is in the store before Use as home screen goes on, and gone after a Success
         assertTrue(hk.contains("store(app).edit().putBoolean(TURNED_ON, true).commit(); App.setHomeEnabled(app, true)"))
-        assertTrue(hk.contains("if (r.isNotEmpty()) fail(app, r) else store(app).edit().remove(TURNED_ON).commit()"))
+        assertTrue(hk.contains("\"done\" -> store(app).edit().remove(TURNED_ON).commit()"))
+        assertTrue(hk.contains("else -> fail(app, r)"))
         assertFalse(hk.contains("homeTurnedOn"))
         assertTrue(hk.contains("HomeKeyRules.resumeStep(watchApk(), at, now, turnedOn(app))"))
         // the busy words go once the update is over; a blocked Fire TV gets its steps, not a second "could not connect"
@@ -187,7 +214,12 @@ class HomeKeyRulesTest {
         // the setup screen: one row (QR, button, words beside it), the button hidden by default, the reason alone after a failed press
         val sa = java.io.File("src/main/java/dev/couchtv/ontv/SetupActivity.kt").readText()
         assertFalse(sa.contains("hkBtnRow"))
-        assertTrue(sa.contains("hkRow.addView(hkQr)\n") && sa.indexOf("hkRow.addView(hkQr)") < sa.indexOf("hkRow.addView(hkBtn)") && sa.indexOf("hkRow.addView(hkBtn)") < sa.indexOf("hkRow.addView(hkLine)"))
+        assertTrue(sa.indexOf("hkRow.addView(hkBtn)") in 0 until sa.indexOf("hkRow.addView(hkLine)"))
+        // the help page QR sits at the top right (beside the phone's QR, no taller), never in the row under the buttons
+        assertTrue(sa.contains("top.addView(hkQr)"))
+        assertFalse(sa.contains("hkRow.addView(hkQr)"))
+        assertTrue(HomeKeyRules.STEPS.endsWith("scan the code on the right for the steps."))
+        assertTrue(HomeKeyRules.STEPS_FIRE.endsWith("scan the code on the right for the steps."))
         assertTrue(sa.contains("button(HomeKeyRules.BUTTON) { HomeKey.start(this); refresh() }.apply { visibility = View.GONE }"))
         assertTrue(sa.contains("hkLine.text = if (err.isNotEmpty() && v == \"ready\") err else"))
     }

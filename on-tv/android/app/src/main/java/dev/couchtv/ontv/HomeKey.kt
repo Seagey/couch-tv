@@ -96,6 +96,10 @@ object HomeKey {
         synchronized(Update) {
             if (working) return
             if (Update.working) { error = "update_busy"; changed(app); return }
+            // a slow install may still finish: no second one on top of it until resume() has decided
+            if (HomeKeyRules.resumeStep(watchApk(), store(app).getLong("installing", 0L), System.currentTimeMillis(), false) == "wait") {
+                error = "slow"; changed(app); return
+            }
             if (viewNow(app, false) != "ready") return
             error = ""
             if (watchApk()) {
@@ -157,8 +161,13 @@ object HomeKey {
                 Log.w(TAG, "install: ${x.message}")
                 if (x.message?.startsWith("push failed") == true) UpdateRules.failure(x.message ?: "") else "adb"
             }
-            // "" means Android said Success: it is about to stop this app, and resume() carries on
-            if (r.isNotEmpty()) fail(app, r) else store(app).edit().remove(TURNED_ON).commit()
+            when (HomeKeyRules.afterInstall(r)) {
+                // Android said Success: it is about to stop this app, and resume() carries on
+                "done" -> store(app).edit().remove(TURNED_ON).commit()
+                // pm install has not answered in 5 minutes but may still finish: keep the marks, resume() decides
+                "wait" -> slow(app)
+                else -> fail(app, r)
+            }
         } finally { file.delete() }
     }
 
@@ -180,8 +189,21 @@ object HomeKey {
             if (r.isNotEmpty()) Log.w(TAG, "pm install: ${out.trim().take(300)}")
             return r
         }
-        runCatching { Adb.shell("rm -f ${HomeKeyRules.TMP_APK}", 8000) }
-        return "failed"
+        // no answer yet: the install may still be going, so the copy stays (the shell line removes it after pm install)
+        return "slow"
+    }
+
+    /**
+     * The install is slow: "installing" and the turned on flag stay, the screen says to leave the TV on. If it
+     * finishes, Android restarts the app as the watch APK and resume() finishes the job; if not, resume() runs
+     * again when the window is over and switches Home off again.
+     */
+    private fun slow(app: Context) {
+        Log.w(TAG, "pm install has not answered yet: waiting")
+        error = "slow"; phase = ""; progress = 0
+        changed(app)
+        val at = store(app).getLong("installing", System.currentTimeMillis())
+        main.postDelayed({ resume(app) }, maxOf(0L, at + HomeKeyRules.INSTALL_WINDOW - System.currentTimeMillis()) + 1000)
     }
 
     /** App.onCreate: carry on after the install restarted the app as the watch APK. */
@@ -205,6 +227,8 @@ object HomeKey {
                 if (HomeKeyRules.homeOffOnResume(step, turnedOn(app))) Log.w(TAG, "an unfinished try: Use as home screen off again")
                 undoHome(app)
                 st.edit().remove("installing").apply()
+                // a slow install this process was waiting for never finished: now nothing changed is true
+                if (error == "slow") error = "failed"
                 changed(app)
             }
         }

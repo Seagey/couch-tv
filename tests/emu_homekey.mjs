@@ -7,7 +7,8 @@
 // C: plain build 22 against GitHub's older 0.13.8: refused as not_newer, nothing installed.
 // D: plain build 21, the copy to the TV made to fail after every check passed (a folder where the APK goes):
 //    an error, and Use as home screen off again (this try switched it on just before the copy).
-// A, C and D also check the words under the button end above the bottom of the 1080 high screen.
+// S: plain build 22 with no link yet: the steps line (and its QR code) shows instead of the button.
+// S, A, C and D also check the words under the button end above the bottom of the 1080 high screen.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -15,6 +16,8 @@ import path from "node:path";
 const [SERIAL, APKS, OUT] = process.argv.slice(2);
 if (!/^emulator-\d+$/.test(SERIAL || "")) { console.error("emulator only"); process.exit(2); }
 fs.mkdirSync(OUT, { recursive: true });
+// every picture and result in the folder is from this run
+for (const f of fs.readdirSync(OUT)) if (/\.(png|json)$/.test(f)) fs.unlinkSync(path.join(OUT, f));
 const ADB = process.env.HOME + "/Library/Android/sdk/platform-tools/adb";
 const PKG = "dev.couchtv.ontv", ME = PKG + "/" + PKG + ".WatchService", OTHER = "com.example.other/com.example.other.Svc";
 const PORT = 15491;
@@ -46,23 +49,49 @@ function bottomOf(prefix) {
   return -1;
 }
 const homeListed = () => /dev\.couchtv\.ontv/.test(sh("cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME"));
-const shot = (name) => { try { fs.writeFileSync(path.join(OUT, name + ".png"), execFileSync(ADB, ["-s", SERIAL, "exec-out", "screencap", "-p"], { timeout: 30000 })); } catch (e) {} };
+// a picture that cannot be taken is a failed check, never a silent gap (or an old picture left in its place)
+const shot = (name) => {
+  let png = null, good = false;
+  // up to five tries: a screencap right after the Home key can fail once while the screen changes
+  for (let i = 0; i < 5 && !good; i++) {
+    if (i) execFileSync("sleep", ["2"]);
+    try { png = execFileSync(ADB, ["-s", SERIAL, "exec-out", "screencap", "-p"], { timeout: 30000, maxBuffer: 64 * 1024 * 1024 }); } catch (e) { png = null; }
+    good = !!png && png.length > 1000 && png.subarray(1, 4).toString() === "PNG";
+  }
+  if (good) fs.writeFileSync(path.join(OUT, name + ".png"), png);
+  else rec("picture " + name + " taken", false, png ? png.length + " bytes" : "screencap failed");
+};
 const front = () => (sh("dumpsys activity activities | grep -m1 topResumedActivity").match(/u0 ([^\s}]+)/) || [])[1] || "";
 const bound = () => /dev\.couchtv\.ontv\/\.?(dev\.couchtv\.ontv\.)?WatchService/.test(sh("dumpsys accessibility | grep -i -A3 'Bound services'"));
 
+// The setup screen after a fresh install. On the emulator, Android's removal of the old copy's task can kill the new
+// process as it starts ("Destroy timeout of remove-task", then a black screen): start it again until it is up and drawn.
+async function startSetup() {
+  for (let i = 0; i < 4; i++) {
+    if (i) { sh("am force-stop " + PKG); await sleep(1500); }
+    sh("am start -n " + PKG + "/.SetupActivity");
+    await sleep(3500);
+    const pid = (() => { try { return sh("pidof " + PKG); } catch (e) { return ""; } })();
+    if (pid && /Couch TV/.test(ui())) return true;
+  }
+  rec("the setup screen came up after the install", false);
+  return false;
+}
 async function fresh(apk) {
   try { adb("uninstall", PKG); } catch (e) {}
   adb("install", "-r", path.join(APKS, apk));
   sh("settings put secure enabled_accessibility_services " + OTHER);
   sh("settings put secure accessibility_enabled 0");
   adb("forward", "tcp:" + PORT, "tcp:5400");
-  sh("am start -n " + PKG + "/.SetupActivity");
-  await sleep(3500);
+  await sleep(2000);
+  await startSetup();
   // pair: the code is on the setup screen
   TOKEN = "";
   await call("POST", "/api/pair/start");
   await sleep(1500);
-  const pin = (ui().match(/Phone code\s+(\d{3}) (\d{3})/) || []).slice(1).join("");
+  // the screen dump can come back empty right after an install: read the code again a few times
+  let pin = "";
+  for (let i = 0; i < 6 && !pin; i++) { if (i) await sleep(1500); pin = (ui().match(/Phone code\s+(\d{3}) (\d{3})/) || []).slice(1).join(""); }
   const r = await call("POST", "/api/pair", { pin, name: "hk-test" });
   TOKEN = (r.json && r.json.token) || "";
   rec(apk + ": paired with the code on screen", !!TOKEN, pin);
@@ -98,6 +127,25 @@ async function waitHk(pred, ms, log) {
 console.log("homekey emulator check on " + SERIAL + ", Android " + sh("getprop ro.build.version.release") + ", " + sh("getprop ro.product.model"));
 const gtv = sh("pm list packages com.google.android.apps.tv.launcherx");
 rec("the emulator is a Google TV (launcherx installed)", /launcherx/.test(gtv), gtv);
+
+// ---------- S: plain build 22 with no link yet: the steps line and its QR code ----------
+{
+  try { adb("uninstall", PKG); } catch (e) {}
+  adb("install", "-r", path.join(APKS, "plain22.apk"));
+  await sleep(2000);
+  await startSetup();
+  tap(/^Not now$/i);
+  sh("am start -n " + PKG + "/.SetupActivity"); await sleep(1500);
+  const dump = ui();
+  rec("S: no link yet: the setup screen shows the steps line, not the button", /This needs Couch TV to press keys/.test(dump) && !/text="Make Home open Couch TV"/.test(dump));
+  shot("S-setup-steps");
+  const bS = bottomOf("This needs");
+  rec("S: the steps words are all on screen (bottom at most 1053)", bS > 0 && bS <= 1053, bS);
+  // "the code on the right": an image at the right of the top block, square, all on screen
+  const qrs = [...dump.matchAll(/class="android\.widget\.ImageView"[^>]*?bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g)].map((m) => m.slice(1).map(Number));
+  const right = qrs.find(([x1, y1, x2, y2]) => x1 > 1200 && y2 <= 1053 && x2 - x1 > 100 && Math.abs((x2 - x1) - (y2 - y1)) < 4);
+  rec("S: the help page code is on screen at the right, as the words say", !!right, JSON.stringify(qrs));
+}
 
 // ---------- B: watch build, the watch off ----------
 await fresh("watch22.apk");
@@ -144,7 +192,7 @@ await fresh("plain21.apk");
     if (r.json) { lastJson = r.json; seen.add(r.json.phase || r.json.view); if (r.json.error) break; }
     else { seen.add("down(" + r.status + ")"); down++; }
     if (down > 0 && r.json) break;   // the new version answers again
-    await sleep(1000);
+    await sleep(250);   // often: the installing phase can last under a second
   }
   rec("A: it went through checking, downloading and installing", seen.has("downloading") && seen.has("installing"), [...seen].join(","));
   rec("A: no error", !(lastJson && lastJson.error), lastJson && lastJson.error);

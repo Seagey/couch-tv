@@ -98,11 +98,15 @@ class SetupActivity : Activity() {
         val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, px(14), 0, 0); gravity = Gravity.CENTER_VERTICAL }
         qr = ImageView(this).apply { layoutParams = LinearLayout.LayoutParams(px(150), px(150)).apply { rightMargin = px(28) } }
         top.addView(qr)
-        val words = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val words = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) }
         code = text("", 40f, CREAM, true); words.addView(code)
         next = text("", 17f, CREAM); words.addView(next)
         address = text("", 17f, AMBER, true); words.addView(address)
         top.addView(words)
+        // the help page QR for "Make Home open Couch TV" (only while it needs a computer): at the right of this row,
+        // no taller than the phone's QR, so the steps line under the buttons stays on screen
+        hkQr = ImageView(this).apply { layoutParams = LinearLayout.LayoutParams(px(150), px(150)).apply { leftMargin = px(28) }; visibility = View.GONE }
+        top.addView(hkQr)
         col.addView(top)
         adb = text("", 15f, CREAM_2); col.addView(adb)
 
@@ -139,11 +143,9 @@ class SetupActivity : Activity() {
         main1.addView(moreBtn)
         col.addView(main1)
         homeNote = text("", 15f, CREAM_2); col.addView(homeNote)
-        // one row under homeNote: the help page QR, the button (only while one press can do it), and the words beside it,
-        // so the words never run off the bottom of a 1080 high screen
+        // one row under homeNote: the button (only while one press can do it) and the words beside it, so the words
+        // never run off the bottom of a 1080 high screen (the help page QR sits at the top right, see hkQr)
         val hkRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, px(14), 0, 0) }
-        hkQr = ImageView(this).apply { layoutParams = LinearLayout.LayoutParams(px(120), px(120)).apply { rightMargin = px(20) }; visibility = View.GONE }
-        hkRow.addView(hkQr)
         hkBtn = button(HomeKeyRules.BUTTON) { HomeKey.start(this); refresh() }.apply { visibility = View.GONE }
         hkRow.addView(hkBtn)
         hkLine = text("", 15f, AMBER).apply { layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) }

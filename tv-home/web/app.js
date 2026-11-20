@@ -5873,7 +5873,7 @@
     if (e === "bad") return t("upd_err_bad");
     if (e === "not_bound") return t(h.fire_tv ? "hk_err_not_bound_fire" : "hk_err_not_bound");
     if (e === "update_busy") return t("hk_wait_update");
-    if (e === "other_key" || e === "not_newer" || e === "space" || e === "adb") return t("hk_err_" + e);
+    if (e === "other_key" || e === "not_newer" || e === "space" || e === "adb" || e === "slow") return t("hk_err_" + e);
     return t("hk_err");
   }
   function hkRows() {

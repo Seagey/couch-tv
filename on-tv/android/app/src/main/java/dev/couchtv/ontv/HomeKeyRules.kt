@@ -143,6 +143,19 @@ object HomeKeyRules {
     /** After resumeStep: switch Use as home screen off again (only what this try switched on, only when it did not finish). */
     fun homeOffOnResume(step: String, turnedOn: Boolean) = step == "undo" && turnedOn
 
+    /**
+     * What the press does with put()'s answer:
+     *  "done"  "" (Android said Success): forget turnedOn, Android is about to restart the app as the watch APK
+     *  "wait"  "slow" (no answer from pm install in 5 minutes, it may still finish): keep "installing" and turnedOn,
+     *          resume() decides (finish if the watch APK starts, undo once INSTALL_WINDOW is over)
+     *  "fail"  anything else: Home off again if this try switched it on, nothing changed
+     */
+    fun afterInstall(result: String): String = when (result) {
+        "" -> "done"
+        "slow" -> "wait"
+        else -> "fail"
+    }
+
     /** Whether this TV needs the watch for the Home button: Google TV, a Google home by name, or a Fire TV. */
     fun needed(googleHome: Boolean, fireTv: Boolean) = googleHome || fireTv
 
@@ -151,8 +164,8 @@ object HomeKeyRules {
     const val READY = "One press: Couch TV gets the Home button version from GitHub, checks it and puts it on over this one, then switches its Home button watch on. Your settings stay."
     const val READY_WATCH = "One press switches on the Couch TV home watch, so the Home button brings Couch TV back."
     const val DONE = "The Home button watch is on, so Home should bring Couch TV back. Press Home on the remote to check."
-    const val STEPS = "This needs Couch TV to press keys on this TV first: open More, then Let the phone press keys. Or do it once from a computer: scan the code for the steps."
-    const val STEPS_FIRE = "This Fire TV does not let Couch TV press keys by itself. Do it once from a computer: scan the code for the steps."
+    const val STEPS = "This needs Couch TV to press keys on this TV first: open More, then Let the phone press keys. Or do it once from a computer: scan the code on the right for the steps."
+    const val STEPS_FIRE = "This Fire TV does not let Couch TV press keys by itself. Do it once from a computer: scan the code on the right for the steps."
     /** The phone page: it has its own Let the phone press keys section, and the steps are on the page. */
     const val STEPS_PHONE = "This needs Couch TV to press keys on this TV first: use Let the phone press keys on this page, then come back here. Or do it once from a computer: the steps below."
     const val STEPS_FIRE_PHONE = "This Fire TV does not let Couch TV press keys by itself. Do it once from a computer: the steps below."
@@ -182,6 +195,7 @@ object HomeKeyRules {
         "space" -> "Not installed: the TV is short of space. Free some space, then try again."
         "adb" -> "Couch TV lost its link to the TV, so nothing changed. Press Let the phone press keys, then try again."
         "update_busy" -> "Couch TV is busy with an update right now. Press again in a moment."
+        "slow" -> "The TV is still installing the Home button version. Leave it on: Couch TV finishes the job by itself when the TV is done."
         "not_bound" -> if (fireTv) "Couch TV is on, but the TV did not switch its Home button watch on. The help page has the steps for a Fire TV: couchtv.joshuaseage.com/help/home-button"
             else "Couch TV is on, but the TV did not switch its Home button watch on. Open the TV's $ACCESSIBILITY, and switch it on."
         else -> "That did not work, and nothing changed. Try again, or use the computer steps."
