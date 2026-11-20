@@ -63,5 +63,13 @@ House name filter lines left alone (ws2-smarthome owns the new rule).
 Pillow: test_phone_page_bridge 36 tests, 0 skipped, in a venv with bridge/requirements.txt (scratchpad haqr/venv-pillow;
   the system python3 also has Pillow 12.2, so the earlier 36 included the 4 photo tests).
 
+tests/test_ha_real_bridge.py: no sys.exit at import; a unittest class skipped unless HA_E2E_URL and HA_E2E_CREDS.
+  `python -m unittest discover -s tests` (venv-pillow, no HA_E2E_URL): Ran 1405, OK (skipped=59), 0 errors, 0 failures.
+  With HA set: 45 checks against the real Home Assistant.
+Reruns after the lows: gradle launcher 95 tests 0 fail 0 skipped (HaServerTest 5, PhoneServerTest 22, HaSignInTest 11,
+  HaPhoneTest 5, HaRealTest 1 against real HA); on-TV 172 0 fail 0 skipped; emulator (new APK) one server 5401: 27 checks,
+  5400: 27 checks (each incl. "listens on the home network address only"), HaServer path 16; browser phone_browser.mjs 18,
+  test_integrations_browser.mjs 40; node 26/31/18 and test_remote_phone_page.mjs 42.
+
 ## Left
 Nothing.

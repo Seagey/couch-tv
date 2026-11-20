@@ -6,7 +6,7 @@ Assistant's login flow with the PKCE challenge from it, follows the redirect bac
 devices and saves. Also: refresh on expiry and on a refused access token, the revoke on disconnect,
 and that a long-lived token set up before still works.
 Run: HA_E2E_URL=http://127.0.0.1:8123 HA_E2E_CREDS=creds.json python3 tests/test_ha_real_bridge.py"""
-import asyncio, json, os, socket, sys, tempfile, time, urllib.parse
+import asyncio, json, os, socket, sys, tempfile, time, unittest, urllib.parse
 import aiohttp
 from aiohttp import web
 
@@ -15,10 +15,11 @@ sys.path.insert(0, os.path.join(REPO, "bridge"))
 import smarthome, haphone  # noqa: E402
 
 HA = os.environ.get("HA_E2E_URL", "")
-if not HA or not os.path.isfile(os.environ.get("HA_E2E_CREDS", "")):
-    print("SKIP: set HA_E2E_URL and HA_E2E_CREDS to run against a real Home Assistant")
-    sys.exit(0)
-CREDS = json.load(open(os.environ["HA_E2E_CREDS"]))
+READY = bool(HA) and os.path.isfile(os.environ.get("HA_E2E_CREDS", ""))
+CREDS = {}
+if READY:
+    with open(os.environ["HA_E2E_CREDS"]) as f:
+        CREDS = json.load(f)
 PORT = int(os.environ.get("PORT", "18731"))
 
 
@@ -194,4 +195,12 @@ async def main():
         await runner.cleanup()
     print("%d checks passed against Home Assistant %s." % (n, HA))
 
-asyncio.run(main())
+
+@unittest.skipUnless(READY, "set HA_E2E_URL and HA_E2E_CREDS to run against a real Home Assistant")
+class RealHomeAssistant(unittest.TestCase):
+    def test_phone_sign_in_end_to_end(self):
+        asyncio.run(main())
+
+
+if __name__ == "__main__":
+    unittest.main()
