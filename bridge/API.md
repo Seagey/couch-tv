@@ -259,7 +259,16 @@ entry). The home itself hides a button that cannot work at the moment. A kids pr
 Server-sent events (`text/event-stream`). Open it with `new EventSource('/api/events')`.
 Each message is `event: now` with the same JSON as `GET /api/now`. Sent once on connect, then
 on every change (app, power, volume, connection). A comment line is sent every 20 s to keep it
-open. Use this instead of polling.
+open. Use this instead of polling. Matter devices are not on it: they come on
+`/api/matter/events` (below), which is behind the pairing rule.
+
+### Matter devices: `/api/matter/...`
+Devices shared from Google Home, Apple Home, SmartThings or Alexa, with this computer as one more
+Matter controller (bridge/matter.py). `GET /api/matter/devices`, `GET /api/matter/events` (server-sent
+`event: matter`, the same JSON as `/devices`, at once and on every change),
+`POST /api/matter/commission {code, address?}`, `POST /api/matter/command {id, action, value?}`,
+`POST /api/matter/remove {id}` and `POST /api/matter/rename {id, name}`, behind the same rule as
+`/api/ha`. Shapes, error keys and set up: [docs/MATTER.md](../docs/MATTER.md).
 
 ### `POST /api/pointer`
 LG only: the TV's pointer (the Magic Remote's cursor), as the phone's touchpad drives it.

@@ -42,6 +42,24 @@ After you change `config.json` or the bridge's code, restart the container:
 Everything in [HOW-IT-WORKS.md](HOW-IT-WORKS.md#privacy-and-safety) about who can reach the bridge still applies: it has no password, so keep
 it on your home network and never forward a port to it.
 
+## Matter devices in Docker
+
+The bridge can join Matter devices shared from Google Home, Apple Home, SmartThings or Alexa
+([MATTER.md](MATTER.md)). The image already has Node.js 22. Install the Matter service once into the
+mounted repo, from inside the container, then restart it:
+
+```sh
+docker compose -f examples/docker/compose.yaml exec couch-tv sh scripts/matter-setup.sh
+docker compose -f examples/docker/compose.yaml restart
+```
+
+It needs the host networking the compose file already sets (Matter finds devices by multicast). On a
+Linux host with Thread devices, the host needs the IPv6 route settings in MATTER.md (`accept_ra`):
+the container uses the host's network. Docker Desktop on a Mac has no real host networking, so
+Matter in Docker on a Mac cannot reach devices at home: run the bridge directly on a Mac instead. Tried
+on Linux (Debian 12, `node:22-bookworm`) under colima on a Mac: set up, tests and the service ready;
+adding a real device in Docker was not tried, because Docker on a Mac cannot reach the home network.
+
 ## Synology note
 
 In Container Manager you can make a project from `examples/docker/compose.yaml` instead of using
