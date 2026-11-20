@@ -565,6 +565,7 @@
     });
     HIDDEN_TV = (Array.isArray(ST.hidden_apps) ? ST.hidden_apps : []).filter(function (p) { return typeof p === "string"; });
     SCENE_LIB = BUILT_IN.concat(myScenes(HOME.my_scenes));
+    if (HOME.bing_daily_background === true && TV && TV.dailyBingPhoto) SCENE_LIB.push(BING_SCENE);
     var st = sceneState();
     SCENES = st.order.filter(function (id) { return st.off.indexOf(id) < 0; }).map(sceneById).filter(Boolean);
     if (!SCENES.length) SCENES = [SCENE_LIB[0]];
@@ -838,6 +839,7 @@
   var clockMinute = "";
   function clockTick() {
     if (!active()) return;
+    refreshBingScene();
     var d = new Date(), minute = d.getHours() + ":" + d.getMinutes();
     if (minute === clockMinute && !(NIGHT && !glassShown)) return;   // glassShown blank: a glass setting changed
     clock();
@@ -914,6 +916,7 @@
     { id: "dawn", photo: "scene-dawn", fg: true, glass: true }
   ];
   var BUILT_IN = SCENE_LIB.slice();   // readConfig() adds your own scenes to SCENE_LIB
+  var BING_SCENE = { id: "bing-daily", photo: "scene-night", own: true, dailyBing: true };
   var SCENES = SCENE_LIB.slice(), SCENE_MS = 20000, SUN_SYNC = false;
   var scene = 0, sceneEls = [], glassShown = "", lastKeyAt = 0;
 
@@ -971,6 +974,9 @@
       order = ST.scene_order.filter(uniq);
       order = order.concat(ids.filter(function (id) { return order.indexOf(id) < 0; }));
       off = (Array.isArray(ST.scenes_off) ? ST.scenes_off : []).filter(function (id) { return ids.indexOf(id) >= 0; });
+    } else if (ids.indexOf(BING_SCENE.id) >= 0) {
+      order = ids;
+      off = ids.filter(function (id) { return id !== BING_SCENE.id; });
     } else {
       // your own scenes (home.my_scenes) are always on: listed in home.scenes they go where they
       // are listed, otherwise after the built-in ones
@@ -1085,6 +1091,7 @@
     var s = SCENES[i], el = sceneEls[i];
     if (!el.classList.contains("ready")) {
       var sbg = el.querySelector(".sbg");
+      if (s.dailyBing) s.src = bingPhotoUrl() || s.src;
       if (s.src) sbg.src = s.src;
       else if (s.mine) {
         // an own scene may carry a 4K copy, scene-<id>@2x.jpg (make-scene.py --4k). On a 4K screen it is
@@ -1099,6 +1106,32 @@
       Array.prototype.forEach.call(el.querySelectorAll("img"), function (img) { if (img.decode && img.src) img.decode().catch(function () {}); });
       drawClocks(el, s, glassShown);
     } else if (el.dataset.hm !== glassShown) drawClocks(el, s, glassShown);   // already drawn with this time: nothing to do
+  }
+
+  function bingPhotoUrl() {
+    var version = TV.dailyBingPhoto();
+    return /^[0-9]{8}$/.test(version) ? "http://tvos.invalid/bing-daily-photo/" + version : "";
+  }
+
+  // The native cache keeps the last photo until Bing sends a valid replacement. Preload that
+  // replacement before changing the visible photo or the fill of the glass clock.
+  var pendingBingPhoto = "";
+  function refreshBingScene() {
+    var s = SCENES[scene], el = sceneEls[scene];
+    if (!s || !s.dailyBing || !el || pendingBingPhoto) return;
+    var url = bingPhotoUrl();
+    if (!url || url === s.src) return;
+    pendingBingPhoto = url;
+    var image = new Image();
+    image.onload = function () {
+      pendingBingPhoto = "";
+      s.src = url;
+      if (!el.classList.contains("ready")) return;
+      el.querySelector(".sbg").src = url;
+      drawClocks(el, s, glassShown);
+    };
+    image.onerror = function () { pendingBingPhoto = ""; };
+    image.src = url;
   }
 
   function drawClocks(el, s, hm) {
@@ -4890,9 +4923,9 @@
     st.order.forEach(function (id) {
       var sc = sceneById(id);
       if (!sc) return;
-      var label = sc.own ? t("scene_photo", { n: sc.n }) : sc.mine ? sc.name || t("scene_mine", { n: sc.n }) : t("scene_" + id);
+      var label = sc.dailyBing ? t("scene_bing_daily") : sc.own ? t("scene_photo", { n: sc.n }) : sc.mine ? sc.name || t("scene_mine", { n: sc.n }) : t("scene_" + id);
       rows.push({ kind: "check", key: "scene:" + id, label: label,
-        thumb: sc.own ? sc.src : "backgrounds/" + sc.photo + ".jpg", checked: st.off.indexOf(id) < 0,
+        thumb: sc.src || (sc.photo ? "backgrounds/" + sc.photo + ".jpg" : ""), checked: st.off.indexOf(id) < 0,
         act: function () { toggleScene(id); }, move: function (d) { moveScene(id, d); } });
     });
     rows.push({ kind: "toggle", key: "sun-sync", label: t("sun_sync"), sub: t("sun_sync_sub"), value: SUN_SYNC ? t("on") : t("off"), act: function () {

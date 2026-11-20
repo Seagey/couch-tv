@@ -505,6 +505,8 @@ def _home(h):
     vid = h.get("video_url")
     if isinstance(vid, str) and re.match(r"https?://", vid) and len(vid) <= 2000:
         out["video_url"] = vid
+    if h.get("bing_daily_background") is True:
+        out["bing_daily_background"] = True
     skip_wn = h.get("skip_watch_next") if isinstance(h.get("skip_watch_next"), list) else []
     out["skip_watch_next"] = [p for p in dict.fromkeys(skip_wn) if isinstance(p, str) and re.fullmatch(r"[A-Za-z0-9_.]{1,200}", p)]
     out["bedtime_dim"] = h.get("bedtime_dim") is True

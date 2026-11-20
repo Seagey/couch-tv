@@ -47,6 +47,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
@@ -77,6 +78,7 @@ class MainActivity : Activity() {
     private val retry = Runnable { if (!pageReady || offline) connect() }
 
     private val prefs by lazy { getSharedPreferences("home", MODE_PRIVATE) }
+    private val bingDailyPhoto by lazy { BingDailyPhoto(File(filesDir, "bing-daily-photo"), io) }
 
     /**
      * `home.render_height` (config.json): draw the home this many pixels high in its own hardware layer and
@@ -475,6 +477,12 @@ class MainActivity : Activity() {
                         responseHeaders = mapOf("Cache-Control" to "max-age=86400")
                     }
                 }
+                if (u.pathSegments.firstOrNull() == "bing-daily-photo") {
+                    val image = bingDailyPhoto.open(u.lastPathSegment.orEmpty()) ?: return null
+                    return WebResourceResponse("image/jpeg", null, image).apply {
+                        responseHeaders = mapOf("Cache-Control" to "max-age=86400")
+                    }
+                }
                 if (u.pathSegments.firstOrNull() == "art") {
                     val b = watchNextArt(u.lastPathSegment ?: "") ?: return null
                     return WebResourceResponse("image/jpeg", null, ByteArrayInputStream(b)).apply {
@@ -655,6 +663,8 @@ class MainActivity : Activity() {
     // ---------------------------------------------------------------- what the page can ask for
 
     inner class Native {
+        @JavascriptInterface
+        fun dailyBingPhoto(): String = bingDailyPhoto.current()
         @JavascriptInterface
         fun apps(): String {
             val out = JSONArray()

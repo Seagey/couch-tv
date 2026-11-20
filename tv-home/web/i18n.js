@@ -232,6 +232,7 @@
     scene_water: "Waterline",
     scene_fog: "Fog",
     scene_dawn: "Rainforest dawn",
+    scene_bing_daily: "Bing Picture of the Day",
     scene_photo: "Your photo {n}",
     scene_mine: "Your scene {n}",
     sun_sync: "Follow the sun",
