@@ -9,6 +9,7 @@ import hashlib
 import importlib.util
 import io
 import os
+import shlex
 import tempfile
 import unittest
 import zipfile
@@ -27,8 +28,9 @@ MATTER = {abi: ["libCHIPController.so", "libc++_shared.so"] for abi in ["armeabi
 INTEL = {abi: ["libcouchtv_placeholder.so"] for abi in ["x86", "x86_64"]}
 WATCH_MARK = "assets/fake-watch-service"   # stands for the watch APK's accessibility service in these fakes
 # placeholders are tiny (1 KB, like nl-matter-android's libmatternone.so); every other fake library is
-# 20 KB, over the check's 16 KB placeholder limit, like any real library
+# 20 KB, over the check's 4 KB placeholder limit, like any real library; SIZES sets any other size
 TINY = {"libcouchtv_placeholder.so", "libmatternone.so", "libtiny.so"}
+SIZES = {"libhuge.so": 2_500_000, "lib4096.so": 4096, "lib4097.so": 4097}
 
 
 def apk(path, libs, stored=False, watch=False):
@@ -38,7 +40,7 @@ def apk(path, libs, stored=False, watch=False):
             z.writestr(WATCH_MARK, b"1")
         for abi, names in libs.items():
             for n in names:
-                z.writestr(zipfile.ZipInfo(f"lib/{abi}/{n}"), b"\0" * (1000 if n in TINY else 20_000),
+                z.writestr(zipfile.ZipInfo(f"lib/{abi}/{n}"), b"\0" * SIZES.get(n, 1000 if n in TINY else 20_000),
                            compress_type=zipfile.ZIP_STORED if stored else zipfile.ZIP_DEFLATED)
 
 
@@ -77,6 +79,13 @@ class Dist:
             rc = crc.main([str(self.d), "--skip-signer", *args])
         crc_errs = [l[4:] for l in buf.getvalue().splitlines() if l.startswith("  - ")]
         return rc, crc_errs
+
+    def errs_signed(self, *args):
+        """The same, with the signer rule on (tests stand in for apksigner)."""
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = crc.main([str(self.d), *args])
+        return rc, [l[4:] for l in buf.getvalue().splitlines() if l.startswith("  - ")]
 
 
 class ReleaseApkRules(unittest.TestCase):
@@ -278,12 +287,118 @@ class ReleaseApkRules(unittest.TestCase):
         rc, errs = d.errs("--release")
         self.assertEqual((rc, errs), (1, ["SHA256SUMS.txt has another SHA-256 for couch-tv-samsung.wgt (built again after the sums?)"]))
 
+    # hardening review 21 Nov, L4: only lib*.so is unpacked; the placeholder limit is 4096 bytes
+    def test_a_library_not_named_lib_fails(self):
+        libs = merge(CONSCRYPT, MATTER, {a: ["matter.so"] for a in ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]})
+        rc, errs = Dist(ontv_libs=libs).errs("--release", "--matter")
+        self.assertEqual(rc, 1)
+        self.assertEqual(sorted(e for e in errs if "does not start" in e and e.startswith("couch-tv-ontv.apk")), [
+            f'couch-tv-ontv.apk: lib/{a}/matter.so does not start with "lib": Android never unpacks it'
+            for a in ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"]])
+        self.assertEqual(len(errs), 8, errs)   # 4 folders x 2 on-TV APKs, nothing else
+
+    def test_placeholder_limit_is_4096_bytes(self):
+        self.assertEqual(crc.PLACEHOLDER_MAX, 4096)
+        ok = merge(MATTER, {a: ["lib4096.so"] for a in crc.INTEL})
+        self.assertEqual(Dist(home_libs=ok).errs(), (0, []))
+        over = merge(MATTER, {a: ["lib4097.so"] for a in crc.INTEL})
+        rc, errs = Dist(home_libs=over).errs()
+        self.assertEqual(sorted(errs), ["couch-tv-home.apk: lib/arm64-v8a lacks lib4097.so (a TV of that kind would miss it)",
+                                        "couch-tv-home.apk: lib/armeabi-v7a lacks lib4097.so (a TV of that kind would miss it)"])
+
+    # L6: each on-TV processor folder unpacks to no more than the TV's free space check counts
+    def test_unpacked_limits_match_update_rules(self):
+        self.assertEqual(crc.UNPACKED_MAX, {"arm64-v8a": 15_700_000, "armeabi-v7a": 8_600_000, "x86_64": 2_600_000, "x86": 2_400_000})
+        # the same figures as on-tv UpdateRules.unpacked(), read from the Kotlin source
+        kt = (ROOT / "on-tv/android/app/src/main/java/dev/couchtv/ontv/UpdateRules.kt").read_text()
+        for abi, most in crc.UNPACKED_MAX.items():
+            self.assertIn(f'"{abi}" -> {most:_}L', kt)
+
+    def test_an_on_tv_folder_over_its_unpacked_limit_fails(self):
+        libs = merge(CONSCRYPT, MATTER, {"x86": ["libhuge.so"], "x86_64": ["libhuge.so"]})
+        rc, errs = Dist(ontv_libs=libs).errs("--release", "--matter")
+        self.assertEqual(rc, 1)
+        want = 2_500_000 + 2 * 20_000
+        for n in crc.ONTV:
+            self.assertIn(f"{n}: lib/x86 unpacks to {want:,} bytes, over the 2,400,000 the TV's free space check counts (UpdateRules.unpacked)", errs)
+        self.assertFalse(any("lib/x86_64 unpacks" in e for e in errs), errs)   # 2.54 MB is under x86_64's 2.6 MB
+        # the launcher is not an on-TV APK: no such limit there
+        rc, errs = Dist(home_libs={a: ["libhuge.so"] for a in ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]}).errs()
+        self.assertEqual((rc, errs), (0, []))
+
+    # L5: an APK that does not verify is a release error, not a traceback
+    def test_an_unsigned_apk_is_an_error_not_a_crash(self):
+        crc.tool = lambda name: "/fake/" + name
+
+        def bad(p):
+            raise RuntimeError(f"{Path(p).name} does not verify: DOES NOT VERIFY")
+        old = crc.signers
+        crc.signers = bad
+        try:
+            rc, errs = Dist().errs_signed("--previous", "/abs/old.apk")
+        finally:
+            crc.signers = old
+        self.assertEqual(rc, 1)
+        self.assertEqual(errs, [f"{n} does not verify: DOES NOT VERIFY" for n in sorted(["couch-tv-home.apk", *crc.ONTV])])
+
+    def test_a_previous_apk_that_does_not_verify_is_an_error(self):
+        crc.tool = lambda name: "/fake/" + name
+        old = crc.signers
+
+        def sig(p):
+            if Path(p).name == "old.apk":
+                raise RuntimeError("old.apk does not verify: broken")
+            return ["a" * 64]
+        crc.signers = sig
+        try:
+            keep = Dist()
+            errs = crc.check_signer(keep.d, None, "/abs/old.apk")
+        finally:
+            crc.signers = old
+        self.assertEqual(errs, ["--previous: old.apk does not verify: broken"])
+
+    # M2: the version inside the APKs is the release's version, and the on-TV versionCode goes up
+    def test_version_must_match_and_go_up(self):
+        info = {"couch-tv-home.apk": ("app.couchtv.launcher", 1309, "0.13.9"),
+                "couch-tv-ontv.apk": ("dev.couchtv.ontv", 1309, "0.13.9"),
+                "old.apk": ("dev.couchtv.ontv", 1308, "0.13.8")}
+        badge = lambda p: info[Path(p).name]
+        keep = Dist()   # keep the object: its folder goes when it does
+        d = keep.d
+        self.assertEqual(crc.check_version(d, "0.13.9", "/abs/old.apk", badge), [])
+        self.assertEqual(crc.check_version(d, "0.13.10", "/abs/old.apk", badge), [
+            "couch-tv-home.apk is version 0.13.9, not 0.13.10: built from the wrong commit?",
+            "couch-tv-ontv.apk is version 0.13.9, not 0.13.10: built from the wrong commit?"])
+        info["couch-tv-home.apk"] = ("app.couchtv.launcher", 1309, "0.13.8")
+        self.assertEqual(crc.check_version(d, "0.13.9", None, badge),
+                         ["couch-tv-home.apk is version 0.13.8, not 0.13.9: built from the wrong commit?"])
+        info["couch-tv-home.apk"] = ("app.couchtv.launcher", 1309, "0.13.9")
+        for code in (1308, 1307):
+            info["couch-tv-ontv.apk"] = ("dev.couchtv.ontv", code, "0.13.9")
+            self.assertEqual(crc.check_version(d, "0.13.9", "/abs/old.apk", badge), [
+                f"couch-tv-ontv.apk has versionCode {code}, not higher than last release's 1308 (0.13.8): TVs would not update"])
+        # without --previous the versionCode is not compared
+        self.assertEqual(crc.check_version(d, "0.13.9", None, badge), [])
+
+    def test_version_is_checked_from_the_command_line(self):
+        calls = []
+        old = crc.check_version
+        crc.check_version = lambda dist, v, prev: calls.append((v, prev)) or ["stub version error"]
+        try:
+            rc, errs = Dist().errs("--version", "0.13.9", "--previous", "/abs/old.apk")
+            self.assertEqual((rc, errs, calls), (1, ["stub version error"], [("0.13.9", "/abs/old.apk")]))
+            calls.clear()
+            self.assertEqual(Dist().errs(), (0, []))
+            self.assertEqual(calls, [])
+        finally:
+            crc.check_version = old
+
 
 @unittest.skipUnless(os.environ.get("COUCHTV_RELEASE_DIST"), "set COUCHTV_RELEASE_DIST to a folder of real built APKs")
 class RealBuild(unittest.TestCase):
     def test_real_apks(self):
         d = os.environ["COUCHTV_RELEASE_DIST"]
-        args = [d] + os.environ.get("COUCHTV_RELEASE_ARGS", "").split()
+        args = [d] + shlex.split(os.environ.get("COUCHTV_RELEASE_ARGS", ""))   # quote a path with spaces
         buf = io.StringIO()
         with redirect_stdout(buf):
             rc = crc.main([a for a in args if a])
