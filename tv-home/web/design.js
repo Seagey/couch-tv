@@ -1465,6 +1465,66 @@
   }
   function saveEdits() { try { if (Object.keys(EDITS).length) localStorage.setItem(EDITS_KEY, JSON.stringify(EDITS)); else localStorage.removeItem(EDITS_KEY); } catch (e) {} }
   function editsOf(id, kind) { var e = EDITS[id + "|" + kind]; return Array.isArray(e) ? e.slice() : null; }
+  // A widget's own place (the surf report's beach, the air quality's town), changed on this TV or from
+  // the phone's Home settings page: { "<object id>|<kind>": { name, area, lat, lon, timezone } }. Kept on
+  // this TV only, like the app changes above, never in a design. Two decimals: the town, never a house.
+  // A widget with no place of its own reads the home's town (Home settings, Location), as before.
+  var PLACE_NAME = { surf: "Surf report", air: "Air quality" };
+  var PLACE_KINDS = ["surf", "air"], PLACES_KEY = "couchtv.design.places", PLACES = readPlaces();
+  function cleanPlace(p) {
+    p = obj(p);
+    var lat = Math.round(+p.lat * 100) / 100, lon = Math.round(+p.lon * 100) / 100, name = String(p.name || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 60);
+    if (!name || !isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180 || p.lat === null || p.lon === null || p.lat === "" || p.lon === "") return null;
+    var out = { name: name, lat: lat, lon: lon };
+    var area = String(p.area || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 80); if (area) out.area = area;
+    out.timezone = typeof p.timezone === "string" && /^([A-Z][A-Za-z_]{1,30}(\/[A-Z][A-Za-z_-]{1,30}){1,2}|auto|UTC|GMT)$/.test(p.timezone) ? p.timezone : "auto";
+    return out;
+  }
+  function readPlaces() {
+    var out = {}, raw = null;
+    try { raw = JSON.parse(localStorage.getItem(PLACES_KEY) || "null"); } catch (e) { raw = null; }
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) Object.keys(raw).slice(0, 30).forEach(function (k) {
+      var m = /^[A-Za-z0-9_-]{1,60}\|([a-z]{1,20})$/.exec(k), p = m && PLACE_KINDS.indexOf(m[1]) >= 0 ? cleanPlace(raw[k]) : null;
+      if (p) out[k] = p;
+    });
+    return out;
+  }
+  function savePlaces() { try { if (Object.keys(PLACES).length) localStorage.setItem(PLACES_KEY, JSON.stringify(PLACES)); else localStorage.removeItem(PLACES_KEY); } catch (e) {} }
+  // the widget's own place: a top level widget by its id, a widget in a smart stack by its stack's (pid)
+  function placeOf(o) { o = obj(o); var p = PLACES[(o.id || o.pid) + "|" + o.kind]; return p ? JSON.parse(JSON.stringify(p)) : null; }
+  // every widget on the home with a place of its own to set: [{ key, kind, label, place }]
+  function placeWidgets() {
+    var out = [], seen = {};
+    if (D && ON) list(D.objects).forEach(function (o) {
+      o = obj(o);
+      if (o.type !== "widget") return;
+      [o].concat(list(o.items)).forEach(function (it) {
+        it = obj(it);
+        var key = o.id + "|" + it.kind;
+        if (PLACE_KINDS.indexOf(it.kind) < 0 || seen[key]) return;
+        seen[key] = 1;
+        out.push({ key: key, kind: it.kind, label: obj(it.opts).label || "", place: PLACES[key] ? JSON.parse(JSON.stringify(PLACES[key])) : null });
+      });
+    });
+    return out;
+  }
+  // every container of apps on the home a person may change (the same ones Hold OK changes)
+  function appWidgets() {
+    var W = window.CouchWidgets, A = window.CouchApps, out = [];
+    if (!(D && ON) || !W || !W.appKinds) return out;
+    var env = wenv(), have = W.installedApps(env);
+    list(D.objects).forEach(function (o) {
+      o = obj(o);
+      if (o.type !== "widget" || W.appKinds().indexOf(o.kind) < 0) return;
+      var keys = W.appKeys(o, env);
+      out.push({ key: o.id + "|" + o.kind, kind: o.kind, label: obj(o.opts).label || "", max: W.appMax(o.kind), edited: !!EDITS[o.id + "|" + o.kind],
+        apps: keys.map(function (k) {
+          var c = A && A.get(k), hit = c ? A.resolve(k, have) : have.filter(function (a) { return a.package === k; })[0];
+          return { key: k, name: c ? c.name : hit ? String(hit.name || k) : String(k).split(".").pop(), missing: !hit };
+        }) });
+    });
+    return out;
+  }
   // what a widget may know: demo data in the designer, else what this TV really has (app.js hooks)
   var DATA_V = 0, DATA_KEYS = {};
   function wenv() {
@@ -1474,6 +1534,7 @@
     var sport = !!(D && list(D.objects).some(function (o) { o = obj(o); return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return obj(it).kind === "sports"; }); }));
     return { demo: !!(FORCE_DEMO || DEMO_ON), preview: PREVIEW, card: IN_CARD, designer: DESIGNER, data: data, look: obj(D && D.look), sport: sport,
       edits: DESIGNER || PREVIEW ? null : editsOf,
+      placeOf: DESIGNER || PREVIEW || FORCE_DEMO || DEMO_ON ? null : placeOf,
       clock24: hooks.clock24 ? hooks.clock24() : false, ha: !!(window.smartHome && window.smartHome.enabled && window.smartHome.enabled()), rooms: LIVE.rooms,
       icon: function (name, size, set) { return icon(name, size, set); }, colour: colour, imgOk: imgOk };
   }
@@ -2436,6 +2497,20 @@
       var nodes = [mk("Settings", "gear"), mk("All apps", "more"), mk("Smart home", "smart")];
       var layer = w && w.getAttribute("data-detail");
       if (layer && window.CouchDetail) { var op = mk("Open " + (window.CouchDetail.title(layer) || "this widget"), "detail"); op.__root = w; nodes.splice(2, 0, op); }
+      // the widget's own settings (widget-caps.js settingsOf), on a page of Home settings: Change place on
+      // a surf or air widget, else "<widget> settings". Apps have their own items below.
+      var pw = w, pid = null, Caps = window.CouchWidgetCaps;
+      while (pw && !(pw.getAttribute && pw.getAttribute("data-obj"))) pw = pw.parentNode;
+      pid = pw && pw.getAttribute("data-obj");
+      if (pid && !DESIGNER && Caps && Caps.settingsOf) {
+        var mine = window.CouchDesign.widgetList().filter(function (x) { return x.key.split("|")[0] === pid; });
+        mine.forEach(function (x) {
+          var s = Caps.settingsOf(x.kind).filter(function (id) { return id !== "apps"; });
+          if (!s.length) return;
+          var nm = PLACE_NAME[x.kind] || (Caps.get(x.kind) || {}).name || "Widget";
+          nodes.splice(1, 0, mk(s.indexOf("place") >= 0 ? (mine.length > 1 ? "Change place: " + nm : "Change place") : nm + " settings", "wset", x.key));
+        });
+      }
       // an app in a dock, row, folder or app tile: change, move or remove it, or add one (kept on this TV)
       var ctx = EDIT = appCtx();
       if (ctx) {
@@ -2676,6 +2751,69 @@
     fontOf: function (name) { return fontOf(name); }, fontsOf: function (d) { return fontsOf(sanitize(d)); },
     // the apps changed on this TV with the remote (Hold OK), by "<object id>|<kind>"
     appEdits: function () { return JSON.parse(JSON.stringify(EDITS)); },
+    // What the design on screen uses, for Home settings (app.js) and the phone's Home settings page: the
+    // home's own parts it shows, whether it has its own background, and its widget kinds. { on: false }
+    // with no design on screen. Names and kinds only, nothing private.
+    uses: function () {
+      if (!(D && ON)) return { on: false };
+      var el = obj(D.elements), kinds = {}, glass = false, bg = obj(D.background);
+      var shown = function (k) { if (obj(el[k]).hidden === true) return false; try { return !this.hides(k); } catch (e) { return true; } }.bind(this);
+      list(D.objects).forEach(function (o) {
+        o = obj(o);
+        if (o.type !== "widget") { kinds["obj:" + o.type] = 1; return; }
+        [o].concat(list(o.items)).forEach(function (it) { kinds[obj(it).kind] = 1; if (wpanel(obj(it)) === "glass") glass = true; });
+      });
+      return { on: true, parts: { clock: obj(el.clock).hidden !== true, date: shown("date"), weather: shown("weather"), people: shown("people"),
+        quick: shown("quick"), keep_watching: shown("keep_watching"), dock: obj(el.dock).hidden !== true },
+        background: !!(bg.image || bg.colour || bg.video), kinds: Object.keys(kinds).filter(function (k) { return k.indexOf("obj:") < 0; }),
+        objects: Object.keys(kinds).filter(function (k) { return k.indexOf("obj:") === 0; }).map(function (k) { return k.slice(4); }), glass: glass };
+    },
+    // every widget on the home, a widget in a smart stack too: [{ key: "<object id>|<kind>", kind, label }]
+    widgetList: function () {
+      var out = [], seen = {};
+      if (D && ON) list(D.objects).forEach(function (o) {
+        o = obj(o);
+        if (o.type !== "widget") return;
+        (o.kind === "stack" ? list(o.items) : [o]).forEach(function (it) {
+          it = obj(it);
+          var key = o.id + "|" + it.kind;
+          if (seen[key] || !it.kind) return;
+          seen[key] = 1;
+          out.push({ key: key, kind: it.kind, label: obj(it.opts).label || "" });
+        });
+      });
+      return out;
+    },
+    // the widgets with a place of their own, and changing one (null: back to the home's town)
+    placeWidgets: function () { return placeWidgets(); },
+    placeOf: function (o) { return placeOf(o); },
+    setPlace: function (key, place) {
+      var w = placeWidgets().filter(function (p) { return p.key === key; })[0];
+      if (!w) return { ok: false, error: "That widget is not on this design any more." };
+      if (place === null) delete PLACES[key];
+      else { var p = cleanPlace(place); if (!p) return { ok: false, error: "That place could not be used. Search for it again." }; PLACES[key] = p; }
+      savePlaces();
+      if (hooks.placeChanged) { try { hooks.placeChanged(); } catch (e) {} }
+      if (D && ON) objects(D);
+      return { ok: true };
+    },
+    // the design's containers of apps, and changing one's apps the way Hold OK does (null: its own apps again)
+    appWidgets: function () { return appWidgets(); },
+    setApps: function (key, keys) {
+      var w = appWidgets().filter(function (a) { return a.key === key; })[0];
+      if (!w) return { ok: false, error: "That app row is not on this design any more." };
+      if (keys === null) delete EDITS[key];
+      else {
+        if (!Array.isArray(keys)) return { ok: false, error: "No apps were sent." };
+        var A = window.CouchApps, seen = {}, clean = [];
+        keys.forEach(function (k) { if (pkgOk(k) && KEEP.indexOf(k) < 0) { var id = (A && !A.get(k) && A.idOf(k)) || k; if (!seen[id]) { seen[id] = 1; clean.push(id); } } });
+        if (clean.length > w.max) return { ok: false, error: "That holds " + w.max + (w.max === 1 ? " app." : " apps.") };
+        EDITS[key] = clean;
+      }
+      saveEdits();
+      if (D && ON) objects(D);
+      return { ok: true };
+    },
     wact: function () { return WACT.slice(); },
     wopts: function () { return JSON.parse(JSON.stringify(WOPT)); },
     wstyle: function () { return JSON.parse(JSON.stringify(WSTYLE)); },
@@ -2857,7 +2995,12 @@
         .filter(function (it) { return hidden.indexOf(it.package) < 0; });
       var lim = D && D.elements && D.elements.dock && D.elements.dock.max_apps;
       if (lim) max = Math.min(max || 10, lim);
-      return out.filter(function (it) { return !free(it); }).slice(0, Math.max(1, max || 10)).concat(out.filter(free));
+      // the input tiles pinned on this TV (an HDMI port as its own tile, set on the TV or the phone) stay
+      // in a design's dock as they do in the standard one: after its apps, taking dock places, never
+      // pushed out by the design's own order (they are this TV's, so no design names them)
+      var pin = function (it) { return /^input:/.test(it.package || ""); }, pins = shown.filter(pin);
+      var apps = out.filter(function (it) { return !free(it) && !pin(it); });
+      return apps.slice(0, Math.max(1, (max || 10) - pins.length)).concat(pins, out.filter(free));
     }
   };
 })();

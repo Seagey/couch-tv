@@ -194,6 +194,8 @@ for (const [q, what] of [["", "a TV the computer bridge drives"], ["&offline=1",
   await page.goto(ORIGIN + "/setup#pin=482913");
   await page.waitForFunction(() => window.couchTv && window.couchTv.token());
   await page.waitForFunction(() => document.getElementById("people-now").textContent !== "Checking…");
+  // every section open (they start shut, one open: tests/test_design_settings_browser.mjs tests that)
+  await page.evaluate(() => document.querySelectorAll("main > section.fold.shut").forEach((s) => s.classList.remove("shut")));
   ok(got.pair.length === 1 && got.pair[0].pin === "482913", "the code in the address pairs the phone by itself");
   ok(!/pin=/.test(page.url()), "and is taken off the address");
   ok(/Sam, Alex/.test(await page.textContent("#people-now")), "the people show");
@@ -290,6 +292,8 @@ for (const [w, h, kind] of [[1280, 800, "computer"], [1920, 1080, "computer"], [
   ok(true, at + ": opened without a code, the page asks for the code shown on the TV");
   await page.click("#ctv-pin"); await page.keyboard.type("482 913"); await page.keyboard.press("Enter");
   await page.waitForFunction(() => window.couchTv && window.couchTv.token() && document.getElementById("people-now").textContent !== "Checking…");
+  // every section open (they start shut; tests/test_design_settings_browser.mjs tests opening them)
+  await page.evaluate(() => document.querySelectorAll("main > section.fold.shut").forEach((s) => s.classList.remove("shut")));
   ok(got.pair.length === pairs + 1 && got.pair[pairs].pin === "482913", at + ": the code typed with the keyboard (Enter) pairs it");
   // a readable width, never stretched across a wide screen
   const lay = await page.evaluate(() => {

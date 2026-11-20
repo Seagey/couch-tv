@@ -50,6 +50,24 @@
   .drop-hint { display: none; }
   @media (hover: hover) and (pointer: fine) { .drop-hint { display: block; } }
   @media (min-width: 720px) { body { padding-top: 32px; } h1 { font-size: 32px; } .jump { margin: 0; padding-left: 0; padding-right: 0; flex-wrap: wrap; } }
+  /* each section a titled box: tap the title to open it */
+  .card.fold { padding: 0; }
+  .fold-head { margin: 0; }
+  .fold-btn { display: flex; width: 100%; margin: 0; min-height: 56px; padding: 14px 16px; justify-content: space-between; align-items: center; gap: 12px; background: transparent; border-radius: 16px; color: var(--ink); font-size: 20px; font-weight: 700; text-align: left; }
+  .fold-btn::after { content: ""; flex: none; width: 10px; height: 10px; border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim); transform: rotate(45deg); margin-top: -4px; transition: transform .15s; }
+  .fold-btn[aria-expanded="true"]::after { transform: rotate(-135deg); margin-top: 4px; }
+  .fold-body { padding: 0 16px 16px; }
+  .card.fold.shut .fold-body { display: none; }
+  .hidden-by-design { display: none !important; }
+  #design-line { border-color: #4a3d1c; background: #1c1810; }
+  .wbox { background: #111115; border: 1px solid var(--line); border-radius: 12px; margin-top: 10px; }
+  .wbox > summary { cursor: pointer; padding: 12px; font-weight: 600; color: var(--ink); min-height: 46px; }
+  .wbox > div { padding: 0 12px 12px; }
+  .alist { list-style: none; padding: 0; margin: 8px 0 0; }
+  .alist li { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--line); color: var(--ink); }
+  .alist li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .alist li button { margin: 0; min-height: 40px; padding: 8px 10px; }
+  .miss { color: var(--dim); font-size: 14px; }
 </style>
 </head>
 <body>
@@ -58,8 +76,28 @@
   <p>This page comes from your TV, over your home Wi-Fi. What you change here shows on the TV in a moment, and everything here can still be changed on the TV too. Nothing typed here goes to couch-tv or anyone else. <a href="/">Back to the remote</a></p>
 
   <nav class="jump" aria-label="Sections">
-    <a href="#town">Town</a><a href="#people">People</a><a href="#photos">Photos</a><a href="#athome">At home</a><a href="#ask">Ask AI</a><a href="#home">Home screen</a><a href="#smart" id="jump-smart" style="display:none">Smart home</a><a href="#tv">This TV</a>
+    <a href="#widgets" id="jump-widgets" style="display:none">Widgets</a><a href="#dapps" id="jump-dapps" style="display:none">Apps</a><a href="#town">Town</a><a href="#people">People</a><a href="#photos">Photos</a><a href="#athome">At home</a><a href="#ask">Ask AI</a><a href="#home">Home screen</a><a href="#smart" id="jump-smart" style="display:none">Smart home</a><a href="#tv">This TV</a>
   </nav>
+
+  <div class="card" id="design-line" style="display:none" role="status">
+    <p class="now" id="design-line-text">This home uses a couch-tv Studio design. Settings for parts it doesn't show are hidden.</p>
+    <button class="quiet" id="design-all" type="button">Show all settings</button>
+    <p>To go back to the standard home: on the TV, Home settings, couch-tv Studio, Back to my classic home.</p>
+  </div>
+
+  <section class="card" id="widgets" style="display:none">
+    <h2>Widgets on this design</h2>
+    <p>Each widget on the TV with something to set. What you choose stays on the TV.</p>
+    <div id="w-list"></div>
+    <div class="msg" id="w-msg" role="status"></div>
+  </section>
+
+  <section class="card" id="dapps" style="display:none">
+    <h2>Apps on this design</h2>
+    <p>The apps in each app row or folder on the design. The same as holding OK on an app on the TV.</p>
+    <div id="da-list"></div>
+    <div class="msg" id="da-msg" role="status"></div>
+  </section>
 
   <section class="card" id="town">
     <h2>Town for the weather</h2>
@@ -390,7 +428,7 @@
   function ahSend(edit, msgId, okText) {
     say(msgId, 'Saving…');
     return api('POST', '/api/athome', { edit: edit }).then(function (j) {
-      if (j.live) { AH = j.athome; showAtHome(); say(msgId, okText); }
+      if (j.live) { AH = j.athome; showAtHome(); say(msgId, okText); takeDesign(AH && AH.design); }
       else say(msgId, 'Sent. The TV takes it as soon as the couch-tv home is open on it.');
     }).catch(function (e) { say(msgId, e.message); });
   }
@@ -429,7 +467,7 @@
   }
   function loadAtHome() {
     return api('GET', '/api/athome').then(function (j) {
-      if (j.live) { AH = j.athome; showAtHome(); wholeLists(true); $('ah-state').className = 'status'; say('ah-state', ''); }
+      if (j.live) { AH = j.athome; showAtHome(); wholeLists(true); $('ah-state').className = 'status'; say('ah-state', ''); takeDesign(AH && AH.design); }
       else { wholeLists(false); $('ah-state').className = 'status bad'; say('ah-state', 'Open the couch-tv home on the TV, then reload this page, to see what is saved there. A note, the Wi-Fi, calendar links and the guest\'s name saved here wait on the TV until its home opens.'); }
     }).catch(function (e) { say('ah-state', e.status === 404 ? 'This TV app needs an update for At home from the phone.' : e.message); });
   }
@@ -495,6 +533,186 @@
       say('ah-guest-msg', n ? 'The Welcome widget greets ' + n + ' now.' : 'The Welcome widget says just Welcome now.');
     }).catch(function (e) { say('ah-guest-msg', e.message); });
   };
+
+  // ---------------- each section a titled box: tap the title to open it ----------------
+  // Collapsed by default, so the whole page can be scrolled quickly. The first section shown is open,
+  // or the one the address names (#photos, or #section=photos). A chip at the top opens its section.
+  var TOUCHED = false;
+  function openFold(sec, open) {
+    if (!sec || !sec.classList.contains('fold')) return;
+    sec.classList.toggle('shut', !open);
+    var b = sec.querySelector('.fold-btn'); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function shownSec(sec) { return sec.style.display !== 'none' && !sec.classList.contains('hidden-by-design'); }
+  function hashSection() { var m = /^#(?:section=)?([a-z][a-z0-9-]*)$/.exec(location.hash || ''); return m && $(m[1]) && $(m[1]).classList.contains('fold') ? m[1] : ''; }
+  function openFirst() {
+    var want = hashSection(), target = want && $(want);
+    if (target && shownSec(target)) { openFold(target, true); return; }
+    var first = Array.prototype.filter.call(document.querySelectorAll('main > section.fold'), shownSec)[0];
+    if (first) openFold(first, true);
+  }
+  (function foldSetup() {
+    Array.prototype.forEach.call(document.querySelectorAll('main > section.card'), function (sec, i) {
+      var h = sec.querySelector('h2');
+      if (!h || h.parentNode !== sec) return;
+      if (!sec.id) sec.id = 'sec-' + i;
+      var body = document.createElement('div'); body.className = 'fold-body'; body.id = sec.id + '-body';
+      while (h.nextSibling) body.appendChild(h.nextSibling);
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'fold-btn'; b.setAttribute('aria-controls', body.id); b.setAttribute('aria-expanded', 'false');
+      b.textContent = h.textContent; h.textContent = ''; h.className = 'fold-head'; h.appendChild(b);
+      sec.appendChild(body); sec.classList.add('fold', 'shut');
+      b.addEventListener('click', function () { TOUCHED = true; openFold(sec, sec.classList.contains('shut')); });
+    });
+    // a chip opens its section, then the page goes to it as before
+    document.querySelector('.jump').addEventListener('click', function (e) {
+      var a = e.target.closest('a[href^="#"]'); if (!a) return;
+      TOUCHED = true; openFold($(a.getAttribute('href').slice(1)), true);
+    });
+    openFirst();
+    // someone already typing or ticking somewhere: never shut that box under them
+    document.addEventListener('focusin', function (e) { if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) TOUCHED = true; });
+  })();
+  function goTo(id) { var s = $(id); if (!s) return; TOUCHED = true; openFold(s, true); s.scrollIntoView({ block: 'start' }); }
+
+  // ---------------- a couch-tv Studio design on the TV: only what it uses ----------------
+  // The TV home says which sections its design leaves out, and which widgets it has with something to
+  // set (atHomeView design, from app.js useRules and widget-caps.js SETTINGS). Without that (no design,
+  // or the TV home not open), everything shows as before. Show all settings brings the rest back.
+  var DESIGN = null, SHOW_ALL = false, INPUTS_OK = false, WPLACES = {}, wTimer = 0, wTicket = 0;
+  function takeDesign(d) { DESIGN = d && d.on ? d : null; applyDesign(); }
+  function applyDesign() {
+    var d = DESIGN, hide = d && !SHOW_ALL ? d.hide || [] : [];
+    ['town', 'people', 'photos', 'athome'].forEach(function (id) {
+      var off = hide.indexOf(id) >= 0;
+      $(id).classList.toggle('hidden-by-design', off);
+      var chip = document.querySelector('.jump a[href="#' + id + '"]'); if (chip) chip.classList.toggle('hidden-by-design', off);
+    });
+    // input tiles: only where the TV lists inputs, and only when the design has an app row for them
+    var inOk = INPUTS_OK && (!d || d.inputs || SHOW_ALL);
+    $('inputs').style.display = inOk ? '' : 'none';
+    var note = $('in-design');
+    if (!note) { note = document.createElement('p'); note.id = 'in-design'; $('in-list').parentNode.insertBefore(note, $('in-list')); }
+    note.textContent = d && !d.inputs ? 'This design has no app row, so input tiles show only on the standard home.' : '';
+    $('design-line').style.display = d ? '' : 'none';
+    $('design-line-text').textContent = SHOW_ALL ? 'Every setting is showing. Some are for parts this couch-tv Studio design doesn\'t show.' : 'This home uses a couch-tv Studio design. Settings for parts it doesn\'t show are hidden.';
+    $('design-all').textContent = SHOW_ALL ? 'Show only what this design uses' : 'Show all settings';
+    var ws = d && d.widgets && d.widgets.length, as = d && d.apps && d.apps.length;
+    $('widgets').style.display = ws ? '' : 'none'; $('jump-widgets').style.display = ws ? '' : 'none';
+    $('dapps').style.display = as ? '' : 'none'; $('jump-dapps').style.display = as ? '' : 'none';
+    if (ws) showWidgets(); if (as) showDesignApps();
+    // the first section shown may have changed: open it, unless someone has opened or shut one already
+    if (!TOUCHED) { Array.prototype.forEach.call(document.querySelectorAll('main > section.fold'), function (s) { openFold(s, false); }); openFirst(); }
+  }
+  $('design-all').onclick = function () { SHOW_ALL = !SHOW_ALL; TOUCHED = true; applyDesign(); };
+  function designSend(edit, msgId, okText) {
+    say(msgId, 'Saving…');
+    return api('POST', '/api/athome', { edit: edit }).then(function (j) {
+      if (j.live) { AH = j.athome; takeDesign(AH && AH.design); say(msgId, okText); }
+      else say(msgId, 'Sent. The TV takes it as soon as the couch-tv home is open on it.');
+    }).catch(function (e) { say(msgId, e.message); });
+  }
+  // each setting a widget offers, on the phone (the ids are widget-caps.js SETTINGS)
+  var AH_WORDS = { note: 'the family note', lists: 'the lists', wifi: 'the guest Wi-Fi', guide: 'the house guide', cal: 'the calendar link', guest: 'the guest\'s name and bookings' };
+  var WSET_PHONE = {
+    place: function (w) {
+      var town = (DESIGN.town || '').split(',')[0];
+      return '<p>Place now: <span class="now">' + esc(w.place ? w.place.name : town ? town + ' (the town for the weather)' : 'Not set') + '</span></p>' +
+        '<label for="wq-' + idOf(w.key) + '">Search for a town, suburb or beach</label><input id="wq-' + idOf(w.key) + '" type="search" autocomplete="off" enterkeyhint="search" data-wq="' + esc(w.key) + '" placeholder="Type at least 2 letters">' +
+        '<div class="places" data-wl="' + esc(w.key) + '" role="list"></div>' +
+        (w.place ? '<button type="button" class="quiet" data-wtown="' + esc(w.key) + '">Use the town for the weather instead</button>' : '') +
+        '<p>Only the name you type goes to Open-Meteo, the free weather service the TV already uses. The TV keeps the place, never a street.</p>';
+    },
+    town: function () { return '<p>Uses the town for the weather: <span class="now">' + esc(DESIGN.town || 'Not set') + '</span></p><button type="button" data-open="town">Change the town</button>'; },
+    units: function (w) { return '<label for="wu-' + idOf(w.key) + '">Temperature</label><select id="wu-' + idOf(w.key) + '" data-ws="wx_unit"><option value="c"' + (DESIGN.wx_unit !== 'f' ? ' selected' : '') + '>°C (Celsius)</option><option value="f"' + (DESIGN.wx_unit === 'f' ? ' selected' : '') + '>°F (Fahrenheit)</option></select>'; },
+    clock: function (w) { return '<label for="wc-' + idOf(w.key) + '">Clock</label><select id="wc-' + idOf(w.key) + '" data-ws="clock"><option value="12h"' + (!DESIGN.clock24 ? ' selected' : '') + '>12 hour</option><option value="24h"' + (DESIGN.clock24 ? ' selected' : '') + '>24 hour</option></select>'; },
+    photos: function () { return '<p>It shows your photos.</p><button type="button" data-open="photos">Your photos</button>'; },
+    apps: function () { return '<p>Change its apps under Apps on this design.</p><button type="button" data-open="dapps">Apps on this design</button>'; },
+    smart: function () { return $('smart').style.display === 'none' ? '<p>It shows things from Home Assistant, picked on the TV: Home settings, couch-tv Studio, Smart home.</p>' : '<button type="button" data-open="smart">Smart home</button>'; },
+    keep: function () { return '<p>It shows Keep watching for the person on the couch.</p><button type="button" data-open="people">People</button>'; },
+    people: function () { return '<button type="button" data-open="people">People</button>'; },
+    music: function () { return '<p>It shows the song playing on the TV. Switch it on or off on the TV: Home settings, Look, Now playing.</p>'; },
+    commute: function () { return '<p>Where you drive to is set on the TV: Home settings, couch-tv Studio, Commute.</p>'; },
+    goal: function () { return '<p>The daily goal is set on the TV: Home settings, couch-tv Studio, At home, Screen time.</p>'; }
+  };
+  function wsetHtml(w, id) {
+    if (WSET_PHONE[id]) return WSET_PHONE[id](w);
+    if (AH_WORDS[id]) return '<p>Change ' + AH_WORDS[id] + ' under At home.</p><button type="button" data-open="athome">At home</button>';
+    return '';
+  }
+  function showWidgets() {
+    var open = {};
+    Array.prototype.forEach.call(document.querySelectorAll('#w-list details[open]'), function (x) { open[x.getAttribute('data-key')] = 1; });
+    $('w-list').innerHTML = DESIGN.widgets.map(function (w) {
+      var body = (w.settings || []).map(function (id) { return wsetHtml(w, id); }).join('');
+      if (!body) return '';
+      var title = w.name + (w.label && w.label !== w.name ? ': ' + w.label : '');
+      return '<details class="wbox" data-key="' + esc(w.key) + '"' + (open[w.key] ? ' open' : '') + '><summary>' + esc(title) + '</summary><div>' + body + '</div></details>';
+    }).join('');
+  }
+  $('w-list').addEventListener('click', function (e) {
+    var o = e.target.closest('[data-open]'); if (o) { goTo(o.getAttribute('data-open')); return; }
+    var t = e.target.closest('[data-wtown]'); if (t) { designSend({ design_place: { key: t.getAttribute('data-wtown'), place: null } }, 'w-msg', 'It uses the town for the weather again.'); return; }
+    var b = e.target.closest('button[data-wp]'); if (!b) return;
+    var key = b.getAttribute('data-wk'), p = (WPLACES[key] || [])[+b.getAttribute('data-wp')]; if (!p) return;
+    designSend({ design_place: { key: key, place: p } }, 'w-msg', 'Saved. The TV shows ' + p.name + ' now.');
+  });
+  $('w-list').addEventListener('change', function (e) {
+    var s = e.target.closest('select[data-ws]'); if (!s) return;
+    var set = {}; set[s.getAttribute('data-ws')] = s.value;
+    designSend({ design_setting: set }, 'w-msg', 'Saved.');
+  });
+  $('w-list').addEventListener('input', function (e) {
+    var q = e.target.closest('input[data-wq]'); if (!q) return;
+    var key = q.getAttribute('data-wq'), list = document.querySelector('#w-list [data-wl="' + key.replace(/["\\]/g, '') + '"]'), text = q.value.trim();
+    clearTimeout(wTimer);
+    if (text.length < 2) { list.innerHTML = ''; return; }
+    wTimer = setTimeout(function () {
+      var ticket = ++wTicket, lang = ((SETTINGS && SETTINGS.settings && SETTINGS.settings.lang) || navigator.language || 'en').slice(0, 2);
+      say('w-msg', 'Searching…');
+      fetch('https://geocoding-api.open-meteo.com/v1/search?count=8&format=json&language=' + encodeURIComponent(lang) + '&name=' + encodeURIComponent(text), { referrerPolicy: 'no-referrer' })
+        .then(function (r) { if (!r.ok) throw new Error('search'); return r.json(); })
+        .then(function (j) {
+          if (ticket !== wTicket) return;
+          WPLACES[key] = (j.results || []).filter(function (r) { return isFinite(r.latitude) && isFinite(r.longitude); }).slice(0, 8).map(function (r) {
+            return { name: r.name, area: placeArea(r), lat: Math.round(r.latitude * 100) / 100, lon: Math.round(r.longitude * 100) / 100, timezone: r.timezone || 'auto' };
+          });
+          list.innerHTML = WPLACES[key].map(function (p, i) { return '<button type="button" data-wk="' + esc(key) + '" data-wp="' + i + '" role="listitem"><span>' + esc(p.name) + '</span><small>' + esc(p.area) + '</small></button>'; }).join('');
+          say('w-msg', WPLACES[key].length ? 'Tap the place.' : 'Nothing found for "' + text + '". Try the nearest bigger town.');
+        })
+        .catch(function () { if (ticket === wTicket) say('w-msg', 'The place search did not answer. Check this phone has internet, then try again.'); });
+    }, 400);
+  });
+  // the design's app rows: the same changes Hold OK makes on the TV (design.js setApps)
+  function showDesignApps() {
+    $('da-list').innerHTML = DESIGN.apps.map(function (a, ai) {
+      var title = a.name + (a.label ? ': ' + a.label : ''), have = a.apps.map(function (x) { return x.key; });
+      var add = (DESIGN.installed || []).filter(function (x) { return have.indexOf(x.key) < 0; });
+      return '<div class="entry" data-ai="' + ai + '"><h3>' + esc(title) + '</h3>' +
+        (a.apps.length ? '<ul class="alist">' + a.apps.map(function (x, i) {
+          return '<li><span>' + esc(x.name) + (x.missing ? ' <span class="miss">(not on this TV)</span>' : '') + '</span>' +
+            '<button type="button" class="quiet" data-op="up" data-i="' + i + '" aria-label="Move ' + esc(x.name) + ' up"' + (i ? '' : ' disabled') + '>Up</button>' +
+            '<button type="button" class="quiet" data-op="down" data-i="' + i + '" aria-label="Move ' + esc(x.name) + ' down"' + (i < a.apps.length - 1 ? '' : ' disabled') + '>Down</button>' +
+            '<button type="button" class="danger" data-op="remove" data-i="' + i + '" aria-label="Remove ' + esc(x.name) + '">Remove</button></li>';
+        }).join('') + '</ul>' : '<p>No apps in it.</p>') +
+        (a.apps.length < a.max && add.length ? '<label for="da-add-' + ai + '">Add an app</label><div class="row"><select id="da-add-' + ai + '">' +
+          add.map(function (x) { return '<option value="' + esc(x.key) + '">' + esc(x.name) + '</option>'; }).join('') + '</select><button type="button" class="go" data-op="add">Add</button></div>'
+          : a.apps.length >= a.max ? '<p>It holds ' + a.max + (a.max === 1 ? ' app' : ' apps') + '. Remove one to add another.</p>' : '') +
+        (a.edited ? '<button type="button" class="quiet" data-op="reset">Use the design\'s own apps</button>' : '') + '</div>';
+    }).join('');
+  }
+  $('da-list').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-op]'); if (!b || b.disabled) return;
+    var ai = +b.closest('[data-ai]').getAttribute('data-ai'), a = DESIGN.apps[ai]; if (!a) return;
+    var keys = a.apps.map(function (x) { return x.key; }), i = +b.getAttribute('data-i'), op = b.getAttribute('data-op'), msg = 'Saved. The TV shows it now.';
+    if (op === 'up' && i > 0) { keys.splice(i - 1, 0, keys.splice(i, 1)[0]); msg = 'Moved up.'; }
+    else if (op === 'down' && i < keys.length - 1) { keys.splice(i + 1, 0, keys.splice(i, 1)[0]); msg = 'Moved down.'; }
+    else if (op === 'remove') { var gone = a.apps[i] && a.apps[i].name; keys.splice(i, 1); msg = (gone || 'The app') + ' is off it.'; }
+    else if (op === 'add') { var sel = $('da-add-' + ai), v = sel && sel.value; if (!v) return; keys.push(v); msg = (sel.options[sel.selectedIndex].text) + ' is on it now.'; }
+    else if (op === 'reset') { designSend({ design_apps: { key: a.key, apps: null } }, 'da-msg', 'It has the design\'s own apps again.'); return; }
+    else return;
+    designSend({ design_apps: { key: a.key, apps: keys } }, 'da-msg', msg);
+  });
 
   // ---------------- use as home screen (/api/home) ----------------
   function showHome(h) {
@@ -645,7 +863,8 @@
           (x.devices.length ? ' (' + esc(x.devices.join(', ')) + ')' : '') + '</label>' +
           '<input maxlength="30" placeholder="Name on the tile, for example Set-top box" data-name="' + idOf(x.id) + '" value="' + esc(on ? pinned[x.id] : '') + '">';
       }).join('');
-      $('inputs').style.display = '';
+      INPUTS_OK = true;
+      applyDesign();
     }).catch(function () {});
   }
   $('in-save').onclick = function () {
@@ -655,7 +874,12 @@
       var n = document.querySelector('#in-list input[data-name="' + c.getAttribute('data-id') + '"]');
       list.push({ id: c.getAttribute('data-id'), label: n.value.trim() || c.parentNode.textContent.trim() });
     });
-    api('POST', '/api/settings', { inputs: list }).then(function () { $('in-msg').textContent = list.length ? 'Saved. The home shows them now.' : 'Saved. No input tiles.'; loadSettings(); })
+    // honest about a design with no row for them: never "the home shows them" when it will not
+    var noRow = DESIGN && DESIGN.on && !DESIGN.inputs;
+    api('POST', '/api/settings', { inputs: list }).then(function () {
+      $('in-msg').textContent = !list.length ? 'Saved. No input tiles.' : noRow ? 'Saved. This design has no app row for them, so they show only on the standard home.' : 'Saved. The home shows them now.';
+      loadSettings();
+    })
       .catch(function (e) { $('in-msg').textContent = e.message; });
   };
   $('ask-clear').onclick = function () {
