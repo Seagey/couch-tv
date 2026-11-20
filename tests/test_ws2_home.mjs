@@ -292,7 +292,6 @@ const names = await tv.evaluate((ks) => ks.map((k) => window.CouchWidgetCaps.get
 W14.forEach((x, i) => { NAMES[x[0]] = names[i]; });
 
 const press = async (p, k, wait) => { await p.keyboard.press(k); await p.waitForTimeout(wait || 160); };
-const rowsText = () => tv.evaluate(() => [...document.querySelectorAll("#set-rows .srow")].map((e) => e.textContent.trim()));
 async function closeSettings() { for (let k = 0; k < 6 && await tv.evaluate(() => document.getElementById("settings").classList.contains("on")); k++) await press(tv, "Escape", 250); await tv.waitForTimeout(700); }
 async function homeSettingsWidgets() {
   await tv.evaluate(() => window.tv.settingsKey()); await tv.waitForTimeout(250); await press(tv, "Enter", 500);
@@ -301,11 +300,14 @@ async function homeSettingsWidgets() {
   const at = await tv.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].findIndex((e) => e.classList.contains("focus")));
   for (let k = 0; k < Math.abs(i - at); k++) await press(tv, i > at ? "ArrowDown" : "ArrowUp", 80);
   await tv.waitForTimeout(200);
-  const rows = await rowsText();
+  // the rows and their headings (a heading is .shead, a row .srow), in order: the widgets are the rows
+  // under the "Widgets on this home" heading, up to the next heading
+  const rows = await tv.evaluate(() => [...document.querySelectorAll("#set-rows .srow, #set-rows .shead")].map((e) => (e.classList.contains("shead") ? "#" : "") + e.textContent.trim()));
   await closeSettings();
-  const hi = rows.indexOf("Widgets on this home");
-  if (hi < 0) console.log("  (Designs rows: " + secs.join(",") + " / " + rows.join(" | ").slice(0, 600) + ")");
-  return hi < 0 ? [] : rows.slice(hi + 1);
+  const hi = rows.indexOf("#Widgets on this home");
+  if (hi < 0) return [];
+  const next = rows.findIndex((r, i) => i > hi && r.charAt(0) === "#");
+  return rows.slice(hi + 1, next < 0 ? rows.length : next);
 }
 async function holdOn(id) {
   await tv.evaluate((x) => window.CouchDesign.nav.focus(x, 0), id); await tv.waitForTimeout(200);
@@ -333,6 +335,8 @@ const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, is
 const phone = await ctx.newPage();
 phone.on("pageerror", (e) => errors.push("phone: " + e));
 async function phoneKeys() {
+  // a fresh page each time (the same address with only a # would not load it again)
+  await phone.goto("about:blank");
   await phone.goto(ORIGIN + "/setup#pin=482913");
   await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
   await phone.waitForFunction(() => document.querySelectorAll("#w-list details").length > 0 || document.getElementById("design-line").style.display === "", null, { timeout: 8000 });
@@ -351,7 +355,7 @@ async function phoneKeys() {
 group = "C. each setting on the real home";
 {
   const before = await tv.evaluate(() => document.querySelector('.cw-o[data-obj="peo1"] .cw').textContent);
-  const cb = await phone.$$('#w-list details[data-key="peo1|people"] input[type=checkbox]');
+  const cb = await phone.$$('#w-list details[data-key="peo1|people"] input[type=checkbox][data-wmany]');   // Who shows, not the Show names toggle
   ok(cb.length === 3, "the phone offers the TV's three people to tick: " + cb.length);
   await cb[1].check();
   await phone.waitForFunction(() => /Saved/.test(document.getElementById("w-msg").textContent), null, { timeout: 5000 });
@@ -362,13 +366,15 @@ group = "C. each setting on the real home";
 
 // every setting through the TV's own store (the phone's widget_set): the widget on the home changes, and
 // cleared it is back
-const shot = (id) => tv.evaluate((i) => { const e = document.querySelector('.cw-o[data-obj="' + i + '"] .cw'); return e ? { text: e.textContent.replace(/\s+/g, " ").trim(), html: e.innerHTML } : null; }, id);
+const shot = (id) => tv.evaluate((i) => { const e = document.querySelector('.cw-o[data-obj="' + i + '"] .cw'); return e ? { text: e.textContent.replace(/\s+/g, " ").trim(), html: e.innerHTML, tiles: [...e.querySelectorAll("div")].filter((d) => /url\(/.test(d.style.backgroundImage)).length } : null; }, id);
 async function setOn(kind, values) {
   const r = await tv.evaluate(([k, v]) => window.tv.atHomeEdit({ widget_set: { key: k, values: v } }), [idOf(kind) + "|" + kind, values]);
   await tv.waitForTimeout(900);
   return r;
 }
-async function e2e(kind, values, check) {
+// same(d, c): the cleared widget is the default again (a widget that changes by itself over time, like a
+// card showing each live number in turn, says so with its own test)
+async function e2e(kind, values, check, same) {
   const clear = {}; Object.keys(values).forEach((k) => { clear[k] = null; });
   await setOn(kind, clear);
   const d = await shot(idOf(kind));
@@ -378,12 +384,15 @@ async function e2e(kind, values, check) {
   check(d, s);
   await setOn(kind, clear);
   const c = await shot(idOf(kind));
-  ok(c.text === d.text, kind + " " + Object.keys(values).join(",") + ": cleared, the widget is as before (" + c.text.slice(0, 60) + ")");
+  ok(same ? await same(d, c) : c.text === d.text, kind + " " + Object.keys(values).join(",") + ": cleared, the widget is as before (" + d.text.slice(0, 60) + " / " + c.text.slice(0, 60) + ")");
 }
 await setOn("people", { who: null });
 await tv.waitForTimeout(1500);   // the calendars read
-await e2e("agenda", { calendars: "main" }, (d, s) => ok(/Late swim/.test(s.text) && d.text !== s.text || /Late swim/.test(s.text), "agenda.calendars Your calendar: " + s.text));
-await e2e("agenda", { calendars: "bookings", days: "week" }, (d, s) => ok(/Check out, Sarah/.test(s.text) && !/Late swim/.test(s.text), "agenda.calendars Bookings calendar, days This week: the stay's check out from the bookings link: " + s.text));
+await e2e("agenda", { calendars: "main" }, (d, s) => ok(/Late swim/.test(s.text) && !/Check (in|out)/.test(s.text), "agenda.calendars Your calendar: its own events, no stays: " + s.text));
+// (the mock home hands both links the same calendar, so each of its events is also a stay here; the
+// widget lists the first and counts the rest, so the check is: only stays, from the bookings link)
+await e2e("agenda", { calendars: "bookings", days: "week" }, (d, s) => ok(/^This week/.test(s.text) && /Check (in|out), /.test(s.text) && /\d+ events/.test(s.text) && !/Late swim/.test(s.text) && s.text !== d.text,
+  "agenda.calendars Bookings calendar, days This week: only check in and check out days from the bookings link: " + d.text + " -> " + s.text));
 await e2e("agenda", { days: "week" }, (d, s) => ok(s.text !== d.text && /more/.test(s.text), "agenda.days This week: more events counted: " + d.text + " -> " + s.text));
 await e2e("wifi", { hidepass: true }, (d, s) => ok(/summer-swell/.test(d.text) && !/summer-swell/.test(s.text), "wifi.hidepass: " + s.text));
 await e2e("welcome", { text: "Hi there", sub: "Make yourself at home" }, (d, s) => ok(/Hi there/.test(s.text) && /Make yourself at home/.test(s.text), "welcome.text and sub: " + s.text));
@@ -396,9 +405,14 @@ await e2e("list", { done: false }, (d, s) => ok(/Bread/.test(d.text) && !/Bread/
 await e2e("guide", { sections: ["Bins"] }, (d, s) => ok(/Check out/.test(d.text) && !/Check out/.test(s.text) && /Bins/.test(s.text), "guide.sections Bins: " + s.text));
 await e2e("note", { byline: false }, (d, s) => ok(/From Mum/.test(d.text) && !/From Mum/.test(s.text), "note.byline off: " + s.text));
 await e2e("people", { names: false }, (d, s) => ok(/Sam/.test(d.text) && s.text === "", "people.names off: " + JSON.stringify(s.text)));
-await e2e("people", { who: ["person2"] }, (d, s) => ok(s.text !== d.text && s.text.length > 0 && s.text.split(" ").length === 1, "people.who one person: " + s.text));
+// (the mock TV's people are Alex, Sam and Jordan, with ids alex, sam and jordan)
+await e2e("people", { who: ["jordan"] }, (d, s) => ok(/Alex/.test(d.text) && s.text === "Jordan", "people.who Jordan only: " + d.text + " -> " + s.text));
+await e2e("people", { who: ["alex", "jordan"] }, (d, s) => ok(/Sam/.test(d.text) && /Alex/.test(s.text) && /Jordan/.test(s.text) && !/Sam/.test(s.text), "people.who Alex and Jordan: " + s.text));
 await e2e("card", { label: "Bins", text: "Tuesday" }, (d, s) => ok(/Bins/.test(s.text) && /Tuesday/.test(s.text), "card.label and text: " + s.text));
-await e2e("card", { live: "Bin night" }, (d, s) => ok(/Bin night/.test(s.text) && /Recycling/.test(s.text), "card.live Bin night: " + s.text));
+// cleared, the card is back to each live number in turn (it moves on every 20 seconds): no live kept on
+// this TV, and it shows one of the live numbers
+await e2e("card", { live: "Bin night" }, (d, s) => ok(/Bin night/.test(s.text) && /Recycling/.test(s.text), "card.live Bin night: " + s.text),
+  async (d, c) => { const st = await tv.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || "{}"); return ((r.s || r).widgets || {})["car1|card"] || {}; }); return !("live" in st) && c.text.length > 0 && /cw-lab/.test(c.html); });
 await e2e("memory", { range: "week" }, (d, s) => ok(/No photos from this day/.test(d.text) && /years ago/.test(s.text) && /This week/.test(s.text), "memory.range This week: the photo from two days off: " + s.text));
 await setOn("memory", { range: "week" });
 await e2e("memory", { ago: false }, (d, s) => ok(/years ago/.test(d.text) && !/years ago/.test(s.text), "memory.ago off: " + s.text));
@@ -409,7 +423,7 @@ await e2e("artframe", { photo: "pd" }, (d, s) => ok(/surf\.jpg/.test(s.html), "a
 await e2e("artframe", { mat: "#1d1b18" }, (d, s) => ok(/rgb\(29, 27, 24\)/.test(s.html), "artframe.mat Black"));
 await e2e("slideshow", { seconds_each: 300 }, (d, s) => { const i = Math.floor(Date.now() / 300000) % 6; const f = /url\(&quot;([^&]*)&quot;\)|url\("([^"]*)"\)/.exec(s.html) || []; ok(String(f[1] || f[2]).endsWith(PHOTOS[i].url.split("/").pop()), "slideshow.seconds_each 5 minutes: the photo the count says (" + (f[1] || f[2]) + ")"); });
 await e2e("slideshow", { shuffle: true }, (d, s) => ok(/url\(/.test(s.html), "slideshow.shuffle on: still this TV's photos"));
-await e2e("mosaic", { count: 3 }, (d, s) => { const c = (x) => (x.html.match(/background-image: url/g) || []).length; ok(c(s) === 3 && c(d) >= 3, "mosaic.count 3: " + c(s) + " (default " + c(d) + ")"); });
+await e2e("mosaic", { count: 3 }, (d, s) => { const c = (x) => x.tiles; ok(c(s) === 3 && c(d) >= 3, "mosaic.count 3: " + c(s) + " (default " + c(d) + ")"); });
 {
   // screen time on a TV without it says so; its setting is still there, and taken
   const r = await setOn("screentime", { appcount: 3 });
