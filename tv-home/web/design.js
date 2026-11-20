@@ -315,7 +315,7 @@
     // picture over the words, for a square of the grid)
     if (key === "keep_watching") put(out, "compact", SAN.pick(src.compact, ["one", "square"]));
     if (key === "clock" || key === "date" || key === "weather" || key === "keep_watching") sanType(src, out);
-    if (key === "clock") { put(out, "format", SAN.pick(src.format, ["12h", "24h"])); put(out, "style", SAN.pick(src.style, ["glass", "solid"])); put(out, "behind", SAN.b(src.behind)); }
+    if (key === "clock") { put(out, "format", SAN.pick(src.format, ["12h", "24h"])); put(out, "style", SAN.pick(src.style, ["glass", "solid"])); put(out, "behind", SAN.b(src.behind)); put(out, "at", SAN.pick(src.at, ["scene"])); }
     if (key === "date") put(out, "format", SAN.pick(src.format, DATE_KEYS));
     if (key === "weather") { put(out, "place", SAN.b(src.place)); put(out, "words", SAN.b(src.words)); }
     if (key === "people" || key === "quick" || key === "keep_watching" || key === "dock") put(out, "panel", SAN.pick(src.panel, PANELS));
@@ -943,10 +943,22 @@
 
   function css(d) {
     var E = obj(d.elements), out = [], H = "html.cd";
+    // clock.at "scene" (couch-tv Studio's Couch Original): the clock and the date stay where each built in
+    // scene puts them, as on the home with no design: behind the hills, and on the Waterline scene on the
+    // water with its reflection under it. Only over the scenes: a design's own background keeps one place.
+    var atScene = obj(E.clock).at === "scene" && !d.background;
     // the base: in a design every part keeps one place, whichever scene is showing
-    out.push(H + ".theme-night #scenes .gclock{left:0;right:0;top:11.5rem;font-size:25rem;text-align:center}");
-    out.push(H + ".theme-night #date{left:0 !important;right:0 !important;top:6rem;text-align:center}");
-    out.push(H + " #date .wx{display:none}");
+    if (!atScene) {
+      out.push(H + ".theme-night #scenes .gclock{left:0;right:0;top:11.5rem;font-size:25rem;text-align:center}");
+      out.push(H + ".theme-night #date{left:0 !important;right:0 !important;top:6rem;text-align:center}");
+      out.push(H + " #date .wx{display:none}");
+    } else {
+      // the weather stays in the date line, as on the home with no design (hidden with the weather part)
+      out.push(H + " #cd-weather{display:none !important}");
+      if (obj(E.weather).hidden === true) out.push(H + " #date .wx{display:none}");
+      if (obj(E.weather).place === false) out.push(H + " #date .wx .wx-place{display:none}");
+      if (obj(E.weather).words === false) out.push(H + " #date .wx .ww{display:none}");
+    }
     out.push(H + " #cd-weather{position:fixed;left:0;right:0;top:9rem;z-index:2;text-align:center;white-space:nowrap;pointer-events:none;" +
       "font-size:1.75rem;line-height:2.25rem;font-weight:450;color:rgba(255, 255, 255, 0.84);text-shadow:0 0.125rem 1.125rem rgba(0, 0, 0, 0.25)}");
     out.push(H + ":not(.theme-night) #cd-weather{display:none}");
@@ -961,6 +973,8 @@
     // (a photo that would not load takes the clock's own styling with it: the scene's clock comes back)
     var clockSel = H + ":not(.cd-bg-missing).theme-night #scenes .gclock";
     var cr = [];
+    // a clock in each scene's own place is not moved or sized: the reflection and the hills are lined up with it there
+    if (atScene) cm = { x: 0, y: 0, s: 1, r: 0 };
     if (cm.x || cm.y) cr.push("transform:translate(" + vw(cm.x) + "," + vh(cm.y) + ")");
     if (cm.s !== 1) cr.push("font-size:" + +(25 * cm.s).toFixed(3) + "rem");
     if (fontOf(ce.font)) cr.push("font-family:" + fontOf(ce.font) + (ce.font === "antonio" ? "" : ";letter-spacing:-0.045em;line-height:0.86"));
@@ -972,12 +986,14 @@
     out.push(common(clockSel, ce));
     // a scene's hills stand in front of its clock where it normally sits; a clock moved anywhere
     // else would vanish behind them, so in a design it is in front unless clock.behind is true
-    if (ce.behind !== true) out.push(H + ":not(.cd-bg-missing).theme-night #scenes .scene .fg{z-index:0}" + clockSel + "{z-index:1}");
+    if (ce.behind !== true && !atScene) out.push(H + ":not(.cd-bg-missing).theme-night #scenes .scene .fg{z-index:0}" + clockSel + "{z-index:1}");
     if (ce.style === "solid") {
       var cc = colour(ce.colour) || "#ffffff";
       out.push(clockSel + " .fill{background-image:none !important;color:" + cc + " !important;opacity:1 !important;filter:none !important}");
       out.push(clockSel + " .sheen, " + clockSel + " .rim, " + clockSel + " .edge{display:none !important}");
       out.push(clockSel + ".under{display:none}");
+      // solid digits have no reflection: the Waterline scene's cut at the waterline comes off too
+      if (atScene) out.push(clockSel + "{clip-path:none !important;-webkit-clip-path:none !important}");
     }
     // the Classic and OLED clock, top right
     if (moved(cm)) out.push(H + ":not(.theme-night) #time{transform:translate(" + vw(cm.x) + "," + vh(cm.y) + ") scale(" + cm.s + ");transform-origin:100% 0}");
@@ -1004,7 +1020,8 @@
     out.push(panel(H + " .ncard:not(.focus)", obj(E.keep_watching).panel));
 
     // the clock's shade: a dark pool under the digits, in each scene's own shade layer
-    if (ce.shade === "panel") {
+    // (not for a clock in each scene's own place: the pool is drawn for the one place, and each scene has its own shade)
+    if (ce.shade === "panel" && !atScene) {
       out.push(H + ".theme-night #scenes .scene .shade{background:radial-gradient(ellipse " + vw(900 * cm.s) + " " + vh(420 * cm.s) + " at " +
         vw(960 + cm.x) + " " + vh(184 + cm.y + 170 * cm.s) + ", rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0) 72%)}");
     }
@@ -2784,6 +2801,8 @@
     iconSets: function () { return ICON_SET_LABELS.map(function (l) { return { id: l[0], label: l[1], full: !!ICON_FULL[l[0]] }; }); },
     // the gate itself, for tests and for the designer to show what a TV will accept
     sanitize: sanitize,
+    // the style rules a clean design gives the home (for tests: nothing is drawn)
+    css: function (clean) { return css(obj(clean)); },
     // flags are found in the design as written (the gate takes those words out of the clean copy)
     check: function (design) { var clean = sanitize(design); return { clean: clean, notes: NOTES.slice(), flags: flags(obj(design)) }; },
     // what each part of a design asks of the TV: [what, weight, key], the speed meter's list

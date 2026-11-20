@@ -178,4 +178,26 @@ assert.ok(heavy.clean.objects.filter((o) => o.shade).length <= L.glow, "glows ar
 const keys = sandbox.window.CouchDesign.cost({ home: { ambient_weather: true, clock_style: "liquid", glass_amount: 4 }, objects: [{ id: "a", type: "text", text: "x", shade: "glow" }] }).map((i) => i[2]);
 for (const k of ["weatherfx", "liquid", "glassamount", "glow"]) assert.ok(keys.includes(k), "cost counts " + k);
 
+// ---- clock.at "scene" (couch-tv Studio's Couch Original): each scene's own clock place, behind its hills
+assert.strictEqual(plain(S({ elements: { clock: { at: "scene", behind: true } } })).elements.clock.at, "scene");
+assert.strictEqual(plain(S({ elements: { clock: { at: "anywhere" } } })).elements, undefined, "only at: scene is kept");
+const cssOf = (d) => sandbox.window.CouchDesign.css(S(d));
+assert.strictEqual(typeof sandbox.window.CouchDesign.css, "function");
+{
+  const one = cssOf({ elements: { clock: { behind: true } } }), own = cssOf({ elements: { clock: { at: "scene", x: 300, y: 200, scale: 2 } } });
+  assert.ok(/#scenes \.gclock\{left:0;right:0;top:11\.5rem/.test(one), "a design keeps the clock in one place");
+  assert.ok(!/top:11\.5rem/.test(own) && !/#date\{left:0/.test(own), "at scene: no one place for the clock or the date");
+  assert.ok(!/gclock\{[^}]*translate/.test(own) && !/gclock\{[^}]*font-size/.test(own), "at scene: the clock is not moved or sized");
+  assert.ok(!/\.fg\{z-index:0\}/.test(own), "at scene: the hills stay in front of the clock");
+  assert.ok(/#cd-weather\{display:none !important\}/.test(own) && !/#date \.wx\{display:none\}/.test(own), "at scene: the weather stays in the date line");
+  assert.ok(/#date \.wx\{display:none\}/.test(cssOf({ elements: { clock: { at: "scene" }, weather: { hidden: true } } })), "at scene: a hidden weather part hides the date line's weather");
+  const wxOpts = cssOf({ elements: { clock: { at: "scene" }, weather: { place: false, words: false } } });
+  assert.ok(/#date \.wx \.wx-place\{display:none\}/.test(wxOpts), "at scene: weather place: false hides the town in the date line");
+  assert.ok(/#date \.wx \.ww\{display:none\}/.test(wxOpts), "at scene: weather words: false hides the words in the date line");
+  const solid = cssOf({ elements: { clock: { at: "scene", style: "solid" } } });
+  assert.ok(/#scenes \.gclock\{clip-path:none !important/.test(solid), "at scene: solid digits are not cut at the waterline");
+  assert.ok(!/\.scene \.shade\{background:radial/.test(cssOf({ elements: { clock: { at: "scene", shade: "panel" } } })), "at scene: no one place pool of shade");
+  assert.ok(/top:11\.5rem/.test(cssOf({ background: { colour: "#112233" }, elements: { clock: { at: "scene" } } })), "a design's own background keeps the one place");
+}
+
 console.log("design gate tests passed");
