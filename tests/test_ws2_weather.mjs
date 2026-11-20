@@ -86,8 +86,10 @@ page.on("pageerror", (e) => errors.push(String(e)));
 await page.goto(ORIGIN + "/tv-home/web/ws2.html");
 await page.waitForFunction(() => window.CouchWidgets && window.CouchDetail && window.CouchWidgetCaps);
 
-async function draw(o, env, opts) {
-  return page.evaluate(([o, env, opts]) => {
+// what a person can see, not just what is in the page: each element with words of its own ("leaf"),
+// its words, and how many of them show (inside its own box and the widget's, before any "…")
+async function draw(o, env, opts, pg) {
+  return (pg || page).evaluate(([o, env, opts]) => {
     if (window.CouchDetail.isOpen()) window.CouchDetail.close(true);
     document.querySelectorAll(".ws-host").forEach((h) => h.remove());
     const host = document.createElement("div");
@@ -97,6 +99,29 @@ async function draw(o, env, opts) {
     host.appendChild(root);
     const svgs = [...root.querySelectorAll("svg")].map((s) => s.getAttribute("style") || "");
     const out = { text: root.textContent.replace(/\s+/g, " ").trim(), empty: root.getAttribute("data-empty") === "1", svgs, deg: (root.textContent.match(/°/g) || []).length };
+    const R = root.getBoundingClientRect(), leaves = [];
+    [root].concat([...root.querySelectorAll("*")]).forEach((el) => {
+      if (el.closest("svg")) return;
+      const nodes = [...el.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim());
+      if (!nodes.length) return;
+      const E = el.getBoundingClientRect(), cs = getComputedStyle(el);
+      // up and down: inside the widget (a big number's glyphs go past its own tight line), and inside its
+      // own box only when it is cut to a number of lines
+      const clamp = cs.webkitLineClamp && cs.webkitLineClamp !== "none";
+      const cut = cs.textOverflow === "ellipsis" && el.scrollWidth > el.clientWidth + 1 ? 18 : 0;
+      let t = "", vis = 0, gone = false;
+      for (const nd of nodes) for (let i = 0; i < nd.textContent.length; i++) {
+        const ch = nd.textContent[i]; t += ch;
+        const rg = document.createRange(); rg.setStart(nd, i); rg.setEnd(nd, i + 1);
+        const r = rg.getBoundingClientRect();
+        const inside = r.width === 0 || (r.left >= Math.max(E.left, R.left) - 1 && r.right <= Math.min(E.right - cut, R.right) + 1 && r.top >= R.top - 1 && r.bottom <= (clamp ? Math.min(E.bottom, R.bottom) : R.bottom) + 1);
+        if (!inside) gone = true;
+        if (!gone) vis++;
+      }
+      leaves.push({ t: t.replace(/\s+/g, " ").trim(), raw: t, vis, fit: !gone });
+    });
+    out.leaves = leaves;
+    out.seen = leaves.map((l) => l.raw.slice(0, l.vis).replace(/\s+/g, " ").trim()).join(" | ");
     if (opts && opts.layer) {
       const from = root.hasAttribute("data-act") ? root : root.querySelector("[data-act]") || root;
       window.CouchDetail.open(from, env, { designer: false });
@@ -308,7 +333,7 @@ const sizesOf = (k) => CAPS0.get(k).sizes.s.filter((id) => PX[id]);
 // each setting changed one way (on the home in Australia, south of the equator)
 const VARY = {
   weather: { place: false, hilo: false, town: BEACH, degrees: "f" }, bigtemp: { place: false, town: BEACH, degrees: "f" },
-  hourly: { hours: 2, town: BEACH, degrees: "f" }, rain: { town: BEACH }, uv: { town: BEACH }, sun: { town: PERTH },
+  hourly: { hours: 4, town: BEACH, degrees: "f" }, rain: { town: BEACH }, uv: { town: BEACH }, sun: { town: PERTH },
   moon: { hemi: "north" }, air: { town: BEACH, scale: "us" }, surf: { place: BEACH, units: "ft", wind: "kn" }
 };
 // the only setting x size cases where nothing changes, each with why (checked: no others)
@@ -316,9 +341,15 @@ const SAME = {
   "weather.place tile": "a tile shows no town name to hide (only a widget's own place, checked below)",
   "bigtemp.place tile": "a tile shows no town name to hide (only a widget's own place, checked below)",
   "weather.hilo tile": "a tile shows only the sky and the temperature, no high and low",
-  "surf.wind wtile": "the wide tile shows only the swell, no wind"
+  "surf.wind wtile": "the wide tile shows only the swell, no wind",
+  "hourly.hours wtile": "a wide tile fits 4 hours, so 4 is what it already shows"
 };
-const drawnSig = (r) => r.text + " | " + r.svgs.join(";");
+// what a person sees: the words that show (not the ones cut off) and the pictures
+const drawnSig = (r) => r.seen + " || " + r.svgs.join(";");
+// how much of a name shows (at least 4 letters, or all of a short one, counts as named)
+const shown = (r, name) => Math.max(0, ...r.leaves.filter((l) => l.raw.indexOf(name) >= 0).map((l) => Math.min(name.length, l.vis - l.raw.indexOf(name))));
+const named = (r, name, m) => ok(shown(r, name) >= Math.min(4, name.length), m + ": wanted at least " + Math.min(4, name.length) + " letters of \"" + name + "\" to show, " + shown(r, name) + " do: " + r.seen);
+const fits = (r, want, m) => { const l = r.leaves.filter((x) => x.t.indexOf(want) >= 0); ok(l.length && l.every((x) => x.fit), m + ": \"" + want + "\" shows in full: " + JSON.stringify(l.map((x) => [x.t, x.vis]))); };
 let matrix = 0;
 const wrong = [];
 for (const kind of Object.keys(VARY)) {
@@ -341,6 +372,7 @@ ok(!wrong.length, "every setting changes the drawing at every size, but:\n  " + 
 // every setting of every kind is in the matrix, at every size the kind comes in
 Object.keys(VARY).forEach((k) => ok(CAPS0.settings(k).map((x) => x.key).sort().join() === Object.keys(VARY[k]).sort().join(), k + ": the matrix varies every one of its settings"));
 const want = Object.keys(VARY).reduce((t, k) => t + sizesOf(k).length * Object.keys(VARY[k]).length, 0);
+ok(Object.keys(SAME).length === 5, "5 setting x size cases draw the same, each with its reason: " + Object.keys(SAME).join(", "));
 ok(matrix === want && want === 67, "the size matrix: " + matrix + " setting x size cases of " + want);
 // the wide tile of the weather (Fable finding 1), exactly
 {
@@ -352,7 +384,27 @@ ok(matrix === want && want === 67, "the size matrix: " + matrix + " setting x si
   r = await draw(o, env({ x: { hilo: false } }));
   hasNot(r.text, "28°", "weather wide tile, Show the high and low off"); has(r.text, "Hillside", "weather wide tile: the town stays");
   r = await draw(o, env({ x: { place: false, hilo: false } }));
-  ok(r.text.replace(/\s/g, "") === (await draw(o, env({ x: { place: false, hilo: false } }))).text.replace(/\s/g, "") && !/Hillside|28°/.test(r.text) && /24°/.test(r.text), "weather wide tile, both off: the sky and the temperature only: " + r.text);
+  ok(!/Hillside|28°/.test(r.text) && /24°/.test(r.text), "weather wide tile, both off: the sky and the temperature only: " + r.text);
+  // the high shows in full on the wide tile (360 x 160), whatever the sky, and in the evening (tomorrow's)
+  for (const code of [1, 2, 82]) {
+    const c = await draw(o, { data: Object.assign({}, base, { weather: wx(24, { code }) }) });
+    fits(c, "28°", "weather wide tile, sky " + code + ", the high");
+    const c2 = await draw(o, { data: Object.assign({}, base, { weather: wx(24, { code }), wset: { x: { place: false } } }) });
+    fits(c2, "28°", "weather wide tile, sky " + code + ", no town name, the high");
+  }
+  const eve = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const at7 = new Date(); at7.setHours(19, 30, 0, 0);
+  await eve.clock.setFixedTime(at7);
+  await eve.goto(ORIGIN + "/tv-home/web/ws2.html");
+  await eve.waitForFunction(() => window.CouchWidgets && window.CouchWidgetCaps);
+  const e1 = await draw(o, env(), null, eve);
+  has(e1.text, "Tomorrow", "weather wide tile at 7:30pm: looks ahead to tomorrow"); fits(e1, "28°", "weather wide tile at 7:30pm, tomorrow's high");
+  fits(e1, "Tomorrow", "weather wide tile at 7:30pm, the word tomorrow");
+  const e3 = await draw(o, env({ x: { place: false } }), null, eve);
+  fits(e3, "28°", "weather wide tile at 7:30pm, no town name, tomorrow's high"); fits(e3, "Tomorrow", "and the word tomorrow");
+  const e2 = await draw(o, env({ x: { hilo: false } }), null, eve);
+  hasNot(e2.text, "28°", "weather wide tile at 7:30pm, Show the high and low off");
+  await eve.close();
 }
 // a widget with a place of its own names it at every size (Fable finding 2)
 {
@@ -361,7 +413,7 @@ ok(matrix === want && want === 67, "the size matrix: " + matrix + " setting x si
   for (const kind of Object.keys(OWN)) for (const sz of sizesOf(kind)) {
     const [w, h] = PX[sz], [key, pl] = OWN[kind];
     const r = await draw({ id: "x", kind, opts: {}, w, h }, env({ x: { [key]: pl } }));
-    has(r.text, pl.name, kind + " " + sz + " (" + w + " x " + h + ") with a place of its own names it");
+    named(r, pl.name, kind + " " + sz + " (" + w + " x " + h + ") with a place of its own names it");
   }
   // "Show the town name" off hides a widget's own place on the tiles too
   for (const kind of ["weather", "bigtemp"]) {
@@ -389,6 +441,7 @@ ok(matrix === want && want === 67, "the size matrix: " + matrix + " setting x si
       return bad;
     }, [{ id: "x", kind, opts: {}, w, h }, env({ x: { [key]: LONGP } }, { wxAt: LP })]);
     ok(!out.length, kind + " " + sz + " (" + w + " x " + h + ") with a long place name: everything inside the widget: " + out.join("; "));
+    named(await draw({ id: "x", kind, opts: {}, w, h }, env({ x: { [key]: LONGP } }, { wxAt: LP })), LONGP.name, kind + " " + sz + " with a long place name: the start of it shows");
   }
   void uvRamp;
 }
@@ -398,13 +451,12 @@ ok(matrix === want && want === 67, "the size matrix: " + matrix + " setting x si
   for (const sz of sizesOf("sun")) {
     const [w, h] = PX[sz];
     const r = await draw({ id: "x", kind: "sun", opts: {}, w, h }, env({ x: { town: PERTH_NO_ZONE } }));
-    if (sz !== "tile") has(r.text, "by this TV's clock", "sun " + sz + ", a place with no time zone: says the times are by this TV's clock");
-    has(r.text, "Perth", "sun " + sz + ": still names the place");
+    fits(r, "TV", "sun " + sz + ", a place with no time zone: says the times are by this TV's clock");
+    ok(/TV('s)? clock/.test(r.text), "sun " + sz + ": the words say clock: " + r.text);
+    named(r, "Perth", "sun " + sz + ": still names the place");
     const own = await draw({ id: "x", kind: "sun", opts: {}, w, h }, env({ x: { town: PERTH } }));
-    hasNot(own.text, "by this TV's clock", "sun " + sz + ", a place with its own time zone: its own clock, nothing to say");
+    hasNot(own.text, "TV clock", "sun " + sz + ", a place with its own time zone: its own clock, nothing to say"); hasNot(own.text, "TV's clock", "sun " + sz);
   }
-  const t = await draw({ id: "x", kind: "sun", opts: {}, w: 160, h: 160 }, env({ x: { town: PERTH_NO_ZONE } }));
-  has(t.text, "TV's clock", "sun tile, a place with no time zone: says so too");
 }
 
 // a real TV never draws demo numbers: no reading, no numbers

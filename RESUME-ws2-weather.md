@@ -22,6 +22,21 @@ Kinds: weather, bigtemp, hourly, rain, uv, sun, moon, air, surf (week stays with
      then cleared), own place named at every size, long place names stay inside, sun by this TV's clock.
   8. English only, as every caps label on the base: the tv-words.js pass is the coordinator's step 3.
 
+- Re-check NO-GO at c61392f (real tile sizes, tools/tv-designer/app/grid.js: tile 160 x 160, wide tile
+  360 x 160; words were cut by "…" though textContent had them), fixed:
+  A. Weather wide tile under 460 wide: "High 28°" in place of "Mostly clear, 28°" (the icon says the
+     sky); in the evening "Tomorrow" and "High 28°" on two lines; the temperature 60 px there.
+  B. Weather and Big number tiles: the own place name on its own line in place of the icon. Air tile:
+     the place name alone as the label; Air wide tile: "Air, <place>".
+  C. Test: hours 4 (a real option); "hourly.hours wtile" added to the same list (5 cases now).
+  D. Sun "by this TV's clock": R.sun a line of its own; wide tile "Sun, <place>" shrinks, "by TV
+     clock" never does; tile "TV clock" on its own line.
+  E. CR.hourly: one divisor (64) with or without a place of its own.
+  F. Test: the always true clause of "both off" removed.
+  The test now measures what shows: each element's words, character by character, inside its own box
+  and the widget's and before any "…" (draw().leaves, .seen). The size matrix compares what shows;
+  every own place name must show at least 4 letters; the high and the clock words must show in full.
+
 ## Merge (Fable finding 3)
 
 In widget-caps.js LATER keep none of the nine weather kinds (this branch moved them all to SETTINGS);
@@ -29,7 +44,7 @@ take this branch's weather lines in the before launch block whole; in tests/test
 branch's weather entries in PRE and its LATER without surf and weather. "Keep both sides" duplicates
 keys (LATER is concatenated onto SETTINGS).
 
-## Tests, 21 Nov 2026 (all pass)
+## Tests, 21 Nov 2026 after the re-check fixes (all pass)
 
     node tests/test_ws_schema.js                 3809 checks (84 settings on 45 kinds)
     node tests/test_widget_caps.js               4548 checks
@@ -37,10 +52,10 @@ keys (LATER is concatenated onto SETTINGS).
     python3 tests/test_ws_native.py              OK (12 skipped); test_widget_settings_bridge.py OK
     browser (take <scratchpad>/browser.lock with mkdir first, rmdir after), via
     zsh <scratchpad>/ws2-weather-run.sh (logs in <scratchpad>/ws2-weather-logs/):
-      tests/test_ws2_weather.mjs                 551 checks (same count at any time of day)
+      tests/test_ws2_weather.mjs                 597 checks (same count at any time of day)
       tests/test_ws_tv.mjs                       1115 checks
       tests/test_design_settings_browser.mjs     107 checks
-      tests/test_widget_detail_browser.mjs       295 checks
+      tests/test_widget_detail_browser.mjs       296 checks
       tests/test_widget_fit_all.mjs              1640 boxes, 0 problems, 8 checks
     Fable's read only probe (<scratchpad>/fable-ws2-weather/probe.mjs <worktree>): 71 size cases, no
     spill; the only no change cases are a tile with nothing to hide, the surf wide tile (no wind
