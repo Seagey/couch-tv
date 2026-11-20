@@ -168,6 +168,31 @@ Object.keys(LATER).forEach((kind) => {
     else ok(need !== "no" && steps.length >= 1 && !/^Shows on Google TV/.test(steps[0]), k + " shows on " + p);
   });
 });
+// no Home settings and no Hold OK menu there: no step sends the person to them
+["Roku OS", "tvOS"].forEach((p) => CAPS.kinds().forEach((k) => CAPS.steps(k, p).forEach((s) => {
+  ok(!/hold OK/i.test(s) && s.indexOf("Home settings, couch-tv Studio") < 0 && s.indexOf("Home settings") < 0, k + " on " + p + ": no TV menu it lacks: " + s);
+})));
+ok(/star button/.test(CAPS.steps("countdown", "Roku OS").join(" ")) && /Settings, Home design/.test(CAPS.steps("countdown", "tvOS").join(" ")), "a design reaches a Roku and an Apple TV by their own code screens");
+["photo", "artframe"].forEach((k) => ["Roku OS", "tvOS"].forEach((p) => {
+  ok(CAPS.need(k, p) === "setup" && /photo put in the widget/.test(CAPS.get(k).platforms[p].note), k + " on " + p + ": only the photo put in the widget");
+  ok(/put one photo in it/.test(CAPS.steps(k, p).join(" ")), k + " on " + p + ": the steps put a photo in the widget");
+}));
+// `when: { key: "set" }` means while that setting differs from its own default
+CAPS.kinds().forEach((k) => CAPS.settings(k).forEach((s) => {
+  if (!s.when) return;
+  Object.keys(s.when).forEach((wk) => {
+    const other = CAPS.settings(k).find((x) => x.key === wk);
+    if (s.when[wk] === "set") ok(other && other["default"] !== undefined && other["default"] !== "set", k + "." + s.key + ": shown once " + wk + " is changed from its default");
+    else ok(other && (other.type !== "choice" || other.options.some((o) => o[0] === s.when[wk])) && (other.type !== "toggle" || typeof s.when[wk] === "boolean"), k + "." + s.key + ": when value is one " + wk + " can have");
+  });
+}));
+// anything about this house is private: the devices, lists, photos, people, calendars and places
+CAPS.kinds().forEach((k) => CAPS.settings(k).forEach((s) => {
+  if (["device", "tvlist", "place", "calendar"].indexOf(s.type) >= 0) ok(s.private === true, k + "." + s.key + " is private");
+}));
+ok(CAPS.settings("bins").find((s) => s.key === "weekday")["default"] === "none", "bins: no bin night until one is picked");
+ok(CAPS.settings("countdown").find((s) => s.key === "year").options.slice(1).every((o) => typeof o[0] === "number"), "countdown: years are numbers");
+ok(!CAPS.settings("list").some((s) => s.key === "label"), "list: draws its own name, no heading");
 // the kinds each native TV draws (DesignLib.brs dlWNative, DesignModel.swift DesignWidgets.native)
 const ROOT = path.join(__dirname, "..");
 const brs = fs.readFileSync(path.join(ROOT, "roku/channel/components/DesignLib.brs"), "utf8").match(/function dlWNative[\s\S]*?\[([^\]]*)\]/)[1];
