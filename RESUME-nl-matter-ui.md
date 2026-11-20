@@ -8,10 +8,11 @@ Rules: scratchpad nolater-common.md and matter-contract.md. Base integrate-0.13.
 - index.html: matter.js script line. mock.js: ?matter=1 / empty / down pretend controller.
 - app.js: Smart home screen Matter rows (matterRows, openMatterAdd, openMatterDevice: rename, remove, add by code, where each app keeps the code); openSmartSetup rows wrapper.
 - on-tv/web/setup.html: "Matter devices" section (list, rename, remove, per-app steps, paste code, photo of QR where BarcodeDetector exists), loadMatter() in load().
-- tests/test_matter_ui.js: `node tests/test_matter_ui.js` -> ok 59 checks. All 65 node tests in tests/*.js pass.
+- tests/test_matter_ui.js: `node tests/test_matter_ui.js` -> ok 63 checks (incl. live push on /api/matter/events). All 65 node tests in tests/*.js pass.
 - TD help: new article matter-devices, widgets-smart note, TREE entry, glossary "Matter". Backup in scratchpad td-backup-nl-matter-ui/help. help-build ran: 10 TD files changed (help/src/articles.mjs, help/src/paths.txt, help/all.txt, help/glossary.json, help/index.html, help/index.json, help/widget.js, help/widgets-smart/index.html, help/words/index.html, new help/matter-devices/).
 - Trial merges: nl-haqr conflicts only on the openSmartSetup line (resolution: keep haqr's SHP line and `smart: true`, use `rows: function () { return matterRows(smartRows()); }`, keep the CouchMatter.refresh line); 66/66 node tests pass merged. ws2-smarthome working files merge with 0 conflicts and its devices() lists Matter devices (scratchpad ws2_check.js, 4 checks).
 
 ## Left
 1. Run tests/test_matter_ui_browser.mjs under the browser lock: `sh <scratchpad>/matter-ui-browser.sh <worktree>/tests/test_matter_ui_browser.mjs` (takes the lock, uses Playwright from tv-designer/market). Fix what fails, commit.
 2. Wire to the real endpoints once nl-matter-android / nl-matter-bridge commit: check their /api/matter/devices shape and attribute names against scratchpad matter-ui-needs.md (mode action, rename endpoint, error keys), adjust matter.js converters, rerun tests.
+- Checked against nl-matter-android (d4d98ef, Server.kt + MatterModel.kt): same paths, HA attribute names, actions on/off/target/mode/position, rename, error keys expired/wrong_code/unreachable/thread with a 400. TV page reaches it by the internal cookie. matter.js listens on /api/matter/events (both siblings push "event: matter").

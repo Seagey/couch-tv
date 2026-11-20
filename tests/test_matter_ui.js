@@ -196,5 +196,36 @@ const SHARED = () => [
     ok(T.M.on() && !T.M.ready() && T.M.note() === "Matter is starting.", "not ready, with its note");
   }
 
+  // ---- live state: the server's "event: matter" push (Server.kt and server.py /api/matter/events) ----
+  {
+    const T = page({ tvha: true, devices: SHARED() });
+    const made = [];
+    T.sb.location.protocol = "http:";
+    T.sb.EventSource = function (url) { this.url = url; this.on = {}; made.push(this); };
+    T.sb.EventSource.prototype.addEventListener = function (k, f) { this.on[k] = f; };
+    T.sb.EventSource.prototype.close = function () { this.closed = true; };
+    T.H.useBridge(T.api); await flush();
+    ok(made.length === 1 && made[0].url === "/api/matter/events", "the page listens on /api/matter/events");
+    made[0].onopen();
+    let told = 0; T.M.onChange(() => told++);
+    const now = SHARED(); now[0].name = "Lounge lamp 2"; now[1].state = "on";
+    made[0].on.matter({ data: JSON.stringify({ ok: true, devices: now, ready: true }) });
+    ok(told === 1 && T.M.list()[0].name === "Lounge lamp 2", "a pushed list replaces the old one at once");
+    T.asked.length = 0;
+    const c = await T.H.request("controls");
+    ok(c.controls.find((x) => x.entity === "switch.matter_2_1").on === true && !T.asked.some((a) => a[2] === "/api/matter/devices"), "readings come from the pushed list, nothing asked again");
+    // a server without the stream: closed after the first error, never retried
+    const U = page({ tvha: true, devices: SHARED() });
+    const made2 = [];
+    U.sb.location.protocol = "http:";
+    U.sb.EventSource = function (url) { made2.push(this); };
+    U.sb.EventSource.prototype.addEventListener = function () {};
+    U.sb.EventSource.prototype.close = function () { this.closed = true; };
+    U.H.useBridge(U.api); await flush();
+    made2[0].onerror();
+    await U.M.refresh();
+    ok(made2.length === 1 && made2[0].closed, "no stream: closed once, and the page keeps asking instead");
+  }
+
   console.log("ok " + n + " Matter UI checks");
 })().catch((e) => { console.error(e); process.exit(1); });

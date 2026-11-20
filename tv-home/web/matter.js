@@ -108,7 +108,7 @@
   function refresh(maxAge) {
     if (MT.pending) return MT.pending;
     if (maxAge && MT.reached && Date.now() - MT.at < maxAge) return Promise.resolve(true);
-    MT.pending = call("GET", "/api/matter/devices", null, 15000).then(function (r) { MT.pending = null; put(r); return true; },
+    MT.pending = call("GET", "/api/matter/devices", null, 15000).then(function (r) { MT.pending = null; put(r); listen(); return true; },
       function () {
         MT.pending = null;
         // never there (an older bridge, or no Matter on this TV): nothing shows. There before (the
@@ -120,6 +120,20 @@
         return false;
       });
     return MT.pending;
+  }
+
+  // Live state: the server pushes the whole list ("event: matter") the moment a device reports a
+  // change, on the page's own server (the on-TV app's, or the bridge that serves this page). Where
+  // that stream is not there or not allowed, the screens keep asking as they do for Home Assistant.
+  var ES = null;
+  function listen() {
+    if (ES !== null || MT.api == null || root.TVMATTER || typeof root.EventSource !== "function" || !/^https?:$/.test((root.location || {}).protocol || "")) return;
+    var opened = false;
+    try { ES = new root.EventSource("/api/matter/events"); } catch (e) { ES = false; return; }
+    ES.onopen = function () { opened = true; MT.live = true; };
+    ES.addEventListener("matter", function (e) { try { put(JSON.parse(e.data)); } catch (x) {} });
+    // never opened (an older server, or one that wants the key in a header): stop, never retried
+    ES.onerror = function () { MT.live = false; if (!opened && ES) { ES.close(); ES = false; } };
   }
 
   // ---------------- as the screens read Home Assistant ----------------
@@ -191,7 +205,7 @@
   function read(action) {
     var L = LISTS[action];
     if (!L) return Promise.resolve({ ok: false, error: "refused" });
-    return refresh(FRESH_MS).then(function () {
+    return refresh(MT.live ? 30000 : FRESH_MS).then(function () {
       if (!MT.reached) return { ok: false, error: "off" };
       var o = { ok: true };
       o[L[0]] = of(L[1]).map(L[2]);
