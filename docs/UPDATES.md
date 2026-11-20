@@ -2,9 +2,22 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.8**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.9**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 20 November 2026: release 0.13.9, one button updates, Home settings on your phone, and designs sent from the phone
+
+0.13.9 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Fewer presses with the TV remote. A classic home looks exactly as it did. Option C: this one update still goes the old way (Home settings, About, Update couch-tv, then Downloader, or install the new on-TV APK over the old one); the next one is one button. Samsung: run the new `couch-tv-samsung-setup.zip` installer again. Option B: `git pull` and restart the bridge.
+
+- **Update to, with one button (on-TV app):** with the app's own link to the TV (Let the phone press keys, once), Home settings, Updates has one Update to button that downloads, checks and installs the update and opens couch-tv again, settings kept. The phone's setup page has it too. Without the link, or after a failed try, the steps show with a QR code that opens them on your phone. Tried on a real TCL.
+- **No crash after an update reopens couch-tv (on-TV app):** on a real TCL, 0.13.8 crashed about ten seconds after an update opened it again. Fixed.
+- **Home settings on your phone or a computer (on-TV app):** a Change this on your phone QR code in Home settings, with the address and a code to type for a computer. The town, people, kids mode, your photos, At home and the Ask AI key can all be set there. Everything stays changeable on the TV.
+- **Pair the phone in one scan (on-TV app):** the QR on the app's setup screen carries the pairing code. Typing the code still works.
+- **Send a design from the phone:** the phone remote's TV menu has Send a design, and a link to couch-tv Studio that sends the design you pick. The TV asks Use this design? first. Not on a Roku or an Apple TV: type the code on the TV there.
+- **Get a design from your phone:** Home settings, couch-tv Studio, Get a design from your phone shows a QR code; choose a design on the phone and press Send to my TV. On every couch-tv home, including Samsung and LG, and in Couch TV's settings on an Apple TV.
+- **When the TV never asks "Allow debugging?":** after the whole wait, the setup screen and the phone page say "No answer from the TV. If it did not show its Allow debugging question, restart the TV, then try again."
+- **Samsung:** Home settings, About shows a QR code under the update steps that opens them on your phone.
 
 ### 20 November 2026: release 0.13.8, Home settings pages open at the top
 
