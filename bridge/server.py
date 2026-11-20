@@ -336,47 +336,95 @@ RATE_LIMIT_WINDOW = 60.0
 RATE_LIMIT_ADDRESSES = 1000   # memory bound: at most this many addresses are remembered
 
 
-# The Apple TV's six digit codes, across every address (20 Nov 2026, as the on-TV app's PairLock): 15
-# wrong codes at /api/appletv/claim within 10 minutes, while a code is live, lock that claim for 10
-# minutes (429). Per address limits alone let many addresses keep guessing six digits. Only while a code
-# is live, so nobody can keep it locked when no Apple TV is pairing. The pairing key (/api/pair) and the
-# VIDAA and Panasonic claim codes are long, so they keep only the per address limit above: a lock there
-# would let one caller shut the owner out. The clock is monotonic, so a clock change can't open it.
-PAIR_LOCK_MAX = 15
+# The Apple TV's six digit codes (21 Nov 2026), the same rules as the on-TV app's Auth.kt and the phone
+# page (phonepage.py, PhoneAuth.kt): at /api/appletv/claim, while a code is live, one address may make 5
+# different wrong tries in 10 minutes, then it waits (429, Wait N min) and nobody else does; the same wrong
+# code again from that address is not a new try. 15 wrong tries in 10 minutes across every address (so 3
+# addresses or more) lock the claim for everyone for 10 minutes. An IPv6 caller counts by its /64. Only
+# while a code is live, so nobody can keep it locked when no Apple TV is pairing. The pairing key
+# (/api/pair) and the VIDAA and Panasonic claim codes are long, so they keep only the per address limit
+# above: a lock there would let one caller shut the owner out. The clock is monotonic, so a clock change
+# can't open it.
+PAIR_LOCK_MAX = 15            # across every address
+PAIR_ADDRESS_MAX = 5          # different wrong codes from one address in the window
 PAIR_LOCK_WINDOW = 600.0
 PAIR_LOCK_SECS = 600.0
-_pair_wrong = []          # times of wrong tries, oldest first
-_pair_locked_until = [0.0]
+PAIR_LOCK_ADDRESSES = 1000    # memory bound (as RATE_LIMIT_ADDRESSES): the oldest address goes first
 
 
-def pair_locked_for(now=None):
-    """Seconds pairing stays locked (0: open)."""
+class _PairLock:
+    def __init__(self, most):
+        self.most, self.tries, self.until = most, [], 0.0
+
+    def left(self, now):
+        left = self.until - now
+        return int(-(-left // 1)) if left > 0 else 0
+
+    def wrong(self, now):
+        cutoff = now - PAIR_LOCK_WINDOW
+        while self.tries and self.tries[0] <= cutoff:
+            self.tries.pop(0)
+        self.tries.append(now)
+        if len(self.tries) >= self.most:
+            self.until, self.tries = now + PAIR_LOCK_SECS, []
+            return True
+        return False
+
+
+_pair_all = _PairLock(PAIR_LOCK_MAX)
+_pair_by_address = {}     # address key -> [(time, guess)] in the window, oldest address first
+
+
+def pair_address_key(ip):
+    """What a caller's wrong tries count under: its IPv4 address, or the /64 of an IPv6 one."""
+    s = (ip or "").strip()
+    try:
+        a = ipaddress.ip_address(s.split("%")[0])
+    except ValueError:
+        return s
+    if a.version == 6 and a.ipv4_mapped:
+        return str(a.ipv4_mapped)
+    if a.version == 6:
+        return str(ipaddress.ip_network(f"{a}/64", strict=False))
+    return str(a)
+
+
+def _address_tries(k, now):
+    return [t for t in _pair_by_address.get(k, []) if now - t[0] < PAIR_LOCK_WINDOW]
+
+
+def pair_locked_for(now=None, ip=None):
+    """Seconds pairing stays locked for this caller (0: open): its own wait or the lock for everyone."""
     now = time.monotonic() if now is None else now
-    left = _pair_locked_until[0] - now
-    return int(-(-left // 1)) if left > 0 else 0
+    mine = _address_tries(pair_address_key(ip), now)
+    wait = 0
+    if len(mine) >= PAIR_ADDRESS_MAX:
+        wait = max(1, int(-(-(mine[0][0] + PAIR_LOCK_WINDOW - now) // 1)))
+    return max(_pair_all.left(now), wait)
 
 
-def pair_wrong(now=None):
-    """Counts one wrong pairing try; True when it has just locked pairing."""
+def pair_wrong(now=None, ip=None, guess=None):
+    """Counts one wrong pairing try from this caller (the same wrong guess again from it is not counted);
+    True when it has just locked pairing for everyone."""
     now = time.monotonic() if now is None else now
-    cutoff = now - PAIR_LOCK_WINDOW
-    while _pair_wrong and _pair_wrong[0] <= cutoff:
-        _pair_wrong.pop(0)
-    _pair_wrong.append(now)
-    if len(_pair_wrong) >= PAIR_LOCK_MAX:
-        _pair_locked_until[0] = now + PAIR_LOCK_SECS
-        _pair_wrong.clear()
-        return True
-    return False
+    k = pair_address_key(ip)
+    mine = _address_tries(k, now)
+    if guess is not None and any(g == guess for _, g in mine):
+        return False
+    _pair_by_address.pop(k, None)
+    _pair_by_address[k] = mine + [(now, guess if guess is not None else object())]   # newest last
+    while len(_pair_by_address) > PAIR_LOCK_ADDRESSES:
+        _pair_by_address.pop(next(iter(_pair_by_address)))
+    return _pair_all.wrong(now)
 
 
 def pair_lock_reset():
-    _pair_wrong.clear()
-    _pair_locked_until[0] = 0.0
+    _pair_all.tries, _pair_all.until = [], 0.0
+    _pair_by_address.clear()
 
 
-def check_pair_lock():
-    left = pair_locked_for()
+def check_pair_lock(ip=None):
+    left = pair_locked_for(ip=ip)
     if left > 0:
         mins = max(1, -(-left // 60))
         raise ApiError(429, f"Too many wrong codes. Wait {mins} min, then try again.",
@@ -1233,14 +1281,14 @@ async def h_appletv_claim(request):
     data = await body(request)
     code = str(data.get("code") or "").strip()
     ip = client_ip(request)
-    check_pair_lock()
+    check_pair_lock(ip)
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong codes. Please wait a minute.", key="err_too_many_codes")
     found = appletv_codes.pop(code, None) if re.fullmatch(r"\d{6}", code) else None
     if not found or found[0] <= time.monotonic() or found[1] not in TVS:
         record_failed_attempt(ip, code)
         if any(exp > time.monotonic() for exp, _ in appletv_codes.values()):
-            pair_wrong()   # only while a code is live: nobody can keep the claim locked
+            pair_wrong(ip=ip, guess=code[:12])   # only while a code is live: nobody can keep the claim locked
         await asyncio.sleep(0.3)
         raise ApiError(401, "that code is not valid (a code works once, for ten minutes)", key="err_invalid_code_10m")
     t = TVS[found[1]]

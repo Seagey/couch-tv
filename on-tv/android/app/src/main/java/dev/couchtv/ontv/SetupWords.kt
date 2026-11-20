@@ -7,7 +7,8 @@ package dev.couchtv.ontv
  */
 object SetupWords {
     /** The big line: the code to type on the phone, or that a phone is paired. */
-    fun pairLine(pin: String?, phones: Int, pairedAgoMs: Long?): String = when {
+    fun pairLine(pin: String?, phones: Int, pairedAgoMs: Long?, lockedSecs: Int = 0): String = when {
+        lockedSecs > 0 -> "Too many wrong codes. Pairing opens again in ${(lockedSecs + 59) / 60} min"
         pin != null -> "Phone code  ${pin.take(3)} ${pin.drop(3)}"
         pairedAgoMs != null && pairedAgoMs in 0..10 * 60_000L -> "Your phone is paired"
         phones > 0 -> if (phones == 1) "1 phone is paired" else "$phones phones are paired"
@@ -28,7 +29,8 @@ object SetupWords {
     }
 
     /** The line under it: what to do next. */
-    fun nextLine(pin: String?, phones: Int, homeOpensUs: Boolean): String = when {
+    fun nextLine(pin: String?, phones: Int, homeOpensUs: Boolean, lockedSecs: Int = 0): String = when {
+        lockedSecs > 0 -> "Someone typed too many wrong codes. To pair your phone now, press New phone code."
         pin != null -> "On your phone, scan the code on the left. That pairs it, no typing. Or type the address under it, then this code."
         phones > 0 && homeOpensUs -> "Next: press Home on the TV remote. Your Couch TV home is there."
         phones > 0 -> "Next: press Open the home. From now on, open your home from Couch TV in the TV's apps row."

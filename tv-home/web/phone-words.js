@@ -14,6 +14,9 @@
   var LANGS = ["en", "es", "es-MX", "it", "de", "fr", "tr", "sr-Latn-RS", "pl", "nl", "cs", "he", "ar", "pt", "ro", "zh-CN"];
   var RTL = { he: 1, ar: 1 };
   var KEY = "couchtv.phone.lang";
+  // data-manual on the script tag: a page with its own words (the phone remote, where Server.kt adds this
+  // next to shim.js) gets the table only, never the page swapped on screen; shim.js asks PhoneWords.inLang
+  var MANUAL = !!(document.currentScript && document.currentScript.hasAttribute("data-manual"));
   // English line: { language: words }. es-MX only where Mexico says it differently (else es).
   var WORDS = {
     "Home settings": {"es": "Ajustes de inicio", "es-MX": "Configuración de inicio", "it": "Impostazioni della home", "de": "Startbildschirm-Einstellungen", "fr": "Réglages de l'accueil", "tr": "Ana ekran ayarları", "sr-Latn-RS": "Podešavanja početnog ekrana", "pl": "Ustawienia ekranu głównego", "nl": "Startinstellingen", "cs": "Nastavení domovské obrazovky", "he": "הגדרות מסך הבית", "ar": "إعدادات الرئيسية", "pt": "Ajustes da tela inicial", "ro": "Setările ecranului principal", "zh-CN": "主页设置"},
@@ -317,6 +320,7 @@
     "Pair": {"es": "Vincular", "it": "Accoppia", "de": "Koppeln", "fr": "Associer", "tr": "Eşle", "sr-Latn-RS": "Upari", "pl": "Sparuj", "nl": "Koppelen", "cs": "Spárovat", "he": "התאמה", "ar": "إقران", "pt": "Parear", "ro": "Asociază", "zh-CN": "配对"},
     "Show a code on the TV": {"es": "Mostrar un código en el televisor", "es-MX": "Mostrar un código en la TV", "it": "Mostra un codice sulla TV", "de": "Code am Fernseher zeigen", "fr": "Afficher un code sur la TV", "tr": "TV'de bir kod göster", "sr-Latn-RS": "Prikaži kod na televizoru", "pl": "Pokaż kod na telewizorze", "nl": "Toon een code op de tv", "cs": "Ukázat kód na televizi", "he": "הצגת קוד בטלוויזיה", "ar": "عرض رمز على التلفزيون", "pt": "Mostrar um código na TV", "ro": "Afișează un cod pe televizor", "zh-CN": "在电视上显示代码"},
     "Asking the TV…": {"es": "Preguntando al televisor…", "es-MX": "Preguntando a la TV…", "it": "Richiesta alla TV…", "de": "Fernseher wird gefragt…", "fr": "Demande à la TV…", "tr": "TV'ye soruluyor…", "sr-Latn-RS": "Pitam televizor…", "pl": "Pytanie telewizora…", "nl": "De tv vragen…", "cs": "Ptám se televize…", "he": "פונים לטלוויזיה…", "ar": "جارٍ سؤال التلفزيون…", "pt": "Perguntando à TV…", "ro": "Se întreabă televizorul…", "zh-CN": "正在询问电视…"},
+    "Pairing…": {"es": "Vinculando…", "it": "Accoppiamento…", "de": "Wird gekoppelt…", "fr": "Association…", "tr": "Eşleştiriliyor…", "sr-Latn-RS": "Uparivanje…", "pl": "Parowanie…", "nl": "Koppelen…", "cs": "Párování…", "he": "מתבצעת התאמה…", "ar": "جارٍ الإقران…", "pt": "Pareando…", "ro": "Se asociază…", "zh-CN": "正在配对…"},
     "The code is on the TV now.": {"es": "El código ya está en el televisor.", "es-MX": "El código ya está en la TV.", "it": "Ora il codice è sulla TV.", "de": "Der Code ist jetzt am Fernseher.", "fr": "Le code est maintenant sur la TV.", "tr": "Kod şimdi TV'de.", "sr-Latn-RS": "Kod je sada na televizoru.", "pl": "Kod jest teraz na telewizorze.", "nl": "De code staat nu op de tv.", "cs": "Kód je teď na televizi.", "he": "הקוד מוצג עכשיו בטלוויזיה.", "ar": "الرمز ظاهر على التلفزيون الآن.", "pt": "O código está na TV agora.", "ro": "Codul e acum pe televizor.", "zh-CN": "代码现在显示在电视上。"},
     "The TV did not answer.": {"es": "El televisor no respondió.", "es-MX": "La TV no respondió.", "it": "La TV non ha risposto.", "de": "Der Fernseher hat nicht geantwortet.", "fr": "La TV n'a pas répondu.", "tr": "TV yanıt vermedi.", "sr-Latn-RS": "Televizor nije odgovorio.", "pl": "Telewizor nie odpowiedział.", "nl": "De tv gaf geen antwoord.", "cs": "Televize neodpověděla.", "he": "הטלוויזיה לא ענתה.", "ar": "لم يستجب التلفزيون.", "pt": "A TV não respondeu.", "ro": "Televizorul nu a răspuns.", "zh-CN": "电视没有响应。"},
     "Can’t reach the TV.": {"es": "No se puede llegar al televisor.", "es-MX": "No se puede llegar a la TV.", "it": "Impossibile raggiungere la TV.", "de": "Fernseher nicht erreichbar.", "fr": "Impossible de joindre la TV.", "tr": "TV'ye ulaşılamıyor.", "sr-Latn-RS": "Televizor nije dostupan.", "pl": "Nie można połączyć się z telewizorem.", "nl": "Kan de tv niet bereiken.", "cs": "Televize není dostupná.", "he": "אין גישה לטלוויזיה.", "ar": "تعذّر الوصول إلى التلفزيون.", "pt": "Não foi possível chegar à TV.", "ro": "Televizorul nu poate fi accesat.", "zh-CN": "无法连接到电视。"},
@@ -516,6 +520,13 @@
     langs: LANGS.slice(),
     lang: function () { return lang; },
     words: words,
+    manual: MANUAL,
+    // one line in a language the caller picks (the phone remote's own choice), or null to keep it as it is
+    inLang: function (l, text) {
+      var was = lang;
+      lang = pick([l || "en"]);
+      try { return words(text); } finally { lang = was; }
+    },
     // the TV's language (Home settings), when it has one: the page follows it and keeps it for next time.
     // Back from another language to English needs a reload, so the page draws itself again.
     set: function (l) {
@@ -527,6 +538,7 @@
       lang = next; page(); fix(document.body);
     }
   };
+  if (MANUAL) return;
   if (document.documentElement && !document.documentElement.getAttribute("data-lang-en")) document.documentElement.setAttribute("data-lang-en", document.documentElement.getAttribute("lang") || "en");
   if (document.body) start(); else document.addEventListener("DOMContentLoaded", start);
 })();

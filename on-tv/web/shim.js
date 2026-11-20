@@ -46,6 +46,23 @@
     document.cookie = 'couchtv_token=' + encodeURIComponent(t) + '; path=/; max-age=31536000; SameSite=Strict';
   }
 
+  // The pairing box's words and the TV's answers in this phone's language (tv-home/web/phone-words.js).
+  // On the phone remote, Server.kt adds phone-words.js with data-manual: the language is the remote's own
+  // choice (its menu, Language: tv.lang, or the TV's, tv.lang.tv), else this phone's. On Home settings on
+  // the phone (setup.html) phone-words.js follows the TV and swaps the box itself.
+  function remoteLang() {
+    var l = null;
+    try { l = localStorage.getItem('tv.lang'); if (!l || l === 'auto') l = localStorage.getItem('tv.lang.tv'); } catch (e) { l = null; }
+    return l || (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
+  }
+  function w(s) {
+    var P = window.PhoneWords;
+    if (!P || s == null) return s;
+    var t = P.manual && P.inLang ? P.inLang(remoteLang(), s) : P.words(s);
+    return t == null ? s : t;
+  }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
   var shown = false;
   function showPairing(why) {
     if (shown) return; shown = true;
@@ -58,26 +75,26 @@
     document.head.appendChild(css);
     var d = document.createElement('div');
     d.id = 'ctv-pair';
-    d.innerHTML = '<div class="box"><h1>Pair this phone</h1><p>' + (why || 'Type the 6 digit code shown on the TV.') + '</p>' +
-      '<input id="ctv-pin" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" aria-label="Code from the TV">' +
-      '<button class="go" id="ctv-go">Pair</button><button class="ask" id="ctv-ask">Show a code on the TV</button><div class="msg" id="ctv-msg" role="status"></div></div>';
+    d.innerHTML = '<div class="box"><h1>' + esc(w('Pair this phone')) + '</h1><p>' + esc(w(why || 'Type the 6 digit code shown on the TV.')) + '</p>' +
+      '<input id="ctv-pin" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" aria-label="' + esc(w('Code from the TV')) + '">' +
+      '<button class="go" id="ctv-go">' + esc(w('Pair')) + '</button><button class="ask" id="ctv-ask">' + esc(w('Show a code on the TV')) + '</button><div class="msg" id="ctv-msg" role="status"></div></div>';
     (document.body ? Promise.resolve() : new Promise(function (r) { document.addEventListener('DOMContentLoaded', r); })).then(function () {
       document.body.appendChild(d);
       var pin = document.getElementById('ctv-pin'), msg = document.getElementById('ctv-msg');
       document.getElementById('ctv-ask').onclick = function () {
-        msg.textContent = 'Asking the TV…';
+        msg.textContent = w('Asking the TV…');
         realFetch('/api/pair/start', { method: 'POST' }).then(function (r) { return r.json(); })
-          .then(function (j) { msg.textContent = j.ok ? 'The code is on the TV now.' : (j.error || 'The TV did not answer.'); })
-          .catch(function () { msg.textContent = 'Can’t reach the TV.'; });
+          .then(function (j) { msg.textContent = w(j.ok ? 'The code is on the TV now.' : (j.error || 'The TV did not answer.')); })
+          .catch(function () { msg.textContent = w('Can’t reach the TV.'); });
       };
       document.getElementById('ctv-go').onclick = function () {
         var code = (pin.value || '').replace(/\D/g, '');
-        if (code.length !== 6) { msg.textContent = 'The code has 6 digits.'; return; }
-        msg.textContent = 'Pairing…';
+        if (code.length !== 6) { msg.textContent = w('The code has 6 digits.'); return; }
+        msg.textContent = w('Pairing…');
         realFetch('/api/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: code, name: (navigator.platform || 'Phone') }) })
           .then(function (r) { return r.json(); })
-          .then(function (j) { if (j.ok && j.token) { save(j.token); msg.textContent = 'Paired.'; location.reload(); } else msg.textContent = j.error || 'That did not work.'; })
-          .catch(function () { msg.textContent = 'Can’t reach the TV.'; });
+          .then(function (j) { if (j.ok && j.token) { save(j.token); msg.textContent = w('Paired.'); location.reload(); } else msg.textContent = w(j.error || 'That did not work.'); })
+          .catch(function () { msg.textContent = w('Can’t reach the TV.'); });
       };
       pin.addEventListener('keydown', function (e) { if (e.key === 'Enter') document.getElementById('ctv-go').click(); });
     });

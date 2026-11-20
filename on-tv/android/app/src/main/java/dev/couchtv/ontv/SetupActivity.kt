@@ -116,7 +116,8 @@ class SetupActivity : Activity() {
         // HomeActivity is in this app, and it applies Kids mode itself, so this is no route around it.
         openHome = button("Open the home") { startActivity(Intent(this, HomeActivity::class.java)) }
         main1.addView(openHome)
-        main1.addView(button("New phone code") { Auth.newPin(); refresh() })
+        // someone with the TV remote is here: every pairing lock opens (Auth.resetLocks), then a new code
+        main1.addView(button("New phone code") { Auth.resetLocks(); Auth.newPin(); refresh() })
         homeBtn = button("") {
             if (askSince > 0) return@button   // already asking
             // what Android reports now decides (HomeAsk.isOn): a switch left on while the TV's own home is the
@@ -225,7 +226,9 @@ class SetupActivity : Activity() {
     private fun refresh() {
         val ip = App.lanAddress()
         val phoneUrl = if (ip != null) "http://$ip:${Store.port}" else null
-        val p = Auth.currentPin()
+        // locked for every phone (Auth.lockedEverywhere): no code that would be refused, the lock and its time instead
+        val locked = Auth.lockedEverywhere()
+        val p = if (locked > 0) null else Auth.currentPin()
         // one scan pairs: while a code is live it rides in the QR's #fragment (never sent to the TV in
         // a request line, so never in a log); the phone page pairs with it at once (shim.js)
         val qrText = SetupWords.qrLink(phoneUrl, p)
@@ -237,8 +240,8 @@ class SetupActivity : Activity() {
         address.text = if (phoneUrl != null) "Or type  $phoneUrl" else "This TV is not on a network yet. Connect it to Wi-Fi first."
         setup.text = if (phoneUrl != null) "Home settings on your phone:  $phoneUrl/setup" else ""
         val ago = Auth.lastPairedAt.takeIf { it > 0 }?.let { System.currentTimeMillis() - it }
-        code.text = SetupWords.pairLine(p, Auth.phoneCount(), ago)
-        next.text = SetupWords.nextLine(p, Auth.phoneCount(), homeOpensUs())
+        code.text = SetupWords.pairLine(p, Auth.phoneCount(), ago, locked)
+        next.text = SetupWords.nextLine(p, Auth.phoneCount(), homeOpensUs(), locked)
         val s = Adb.status()
         adb.text = SetupWords.keysLine(Adb.connected, s["state"] == "waiting_for_allow" || s["state"] == "connecting", s["state"] == "needs_pairing", Adb.unanswered)
         val google = HomeRole.googleTv(this)

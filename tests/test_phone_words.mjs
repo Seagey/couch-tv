@@ -71,5 +71,22 @@ ok(lines.size > 50, "widget settings words found: " + lines.size);
 ok(typeof capsTable() === "object", "caps-words.js holds a table");
 ok(/window\.CouchCapsWords/.test(read("tv-home/web/tv-words.js")) && /window\.CouchCapsWords/.test(src), "the TV and the phone both read caps-words.js");
 ok(/<script src="caps-words\.js"><\/script>\s*<script src="tv-words\.js"><\/script>/.test(read("tv-home/web/index.html")), "the TV home loads caps-words.js");
+// Fable 0814 item 3: every widget settings word has its line, in all 14 languages (es-MX may follow es)
+const table = capsTable(), CAPS_LANGS = ["es", "it", "de", "fr", "tr", "sr-Latn-RS", "pl", "nl", "cs", "he", "ar", "pt", "ro", "zh-CN"];
+const missing = [...lines.keys()].filter((en) => !table[en]);
+ok(missing.length === 0, "every widget settings word has a line in caps-words.js (" + lines.size + "), missing: " + missing.slice(0, 5).join(" | "));
+const wrongLines = [];
+for (const [en, row] of Object.entries(table)) {
+  if (row.same) continue;
+  for (const l of CAPS_LANGS) if (typeof row[l] !== "string" || !row[l].trim()) wrongLines.push(en + " has no " + l);
+  for (const [l, v] of Object.entries(row)) {
+    if (/[–—]/.test(v)) wrongLines.push(en + " " + l + " has a dash");
+    if (/[<>]/.test(v)) wrongLines.push(en + " " + l + " has markup");
+    if (v[0] !== v[0].toUpperCase() && /^[A-Z]/.test(en)) wrongLines.push(en + " " + l + " starts lower case");
+    const gaps = (s) => (s.match(/\{\w+\}/g) || []).sort().join();
+    if (gaps(v) !== gaps(en)) wrongLines.push(en + " " + l + " gaps differ");
+  }
+}
+ok(wrongLines.length === 0, "every line in every language, no dashes, no markup, sentence case, same gaps: " + wrongLines.slice(0, 6).join(" | "));
 
 console.log("phone words: " + n + " checks passed");

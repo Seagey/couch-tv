@@ -1207,6 +1207,8 @@ S['zh-CN'] = {
 };
 
 S.es = {
+  err_pairing_locked: "Demasiados códigos incorrectos. Espera {minutes} min y vuelve a intentarlo.",
+  err_adb_not_on: "En la TV, activa Depuración por USB en Opciones para desarrolladores y luego pulsa Permitir.",
   ds_askLater: "Ahora no",
   ds_askSend: "Enviar",
   ds_ask: "¿Enviar este diseño al televisor?",
@@ -1473,6 +1475,8 @@ S['es-MX'] = {
 };
 
 S.it = {
+  err_pairing_locked: "Troppi codici sbagliati. Aspetta {minutes} min, poi riprova.",
+  err_adb_not_on: "Sulla TV, attiva Debug USB in Opzioni sviluppatore, poi premi Consenti.",
   ds_askLater: "Non ora",
   ds_askSend: "Invia",
   ds_ask: "Inviare questo design alla TV?",
@@ -1659,6 +1663,8 @@ S.it = {
 };
 
 S.de = {
+  err_pairing_locked: "Zu viele falsche Codes. Warte {minutes} Min. und versuche es dann noch einmal.",
+  err_adb_not_on: "Schalte am Fernseher in den Entwickleroptionen USB-Debugging ein und drücke dann Zulassen.",
   ds_askLater: "Nicht jetzt",
   ds_askSend: "Senden",
   ds_ask: "Dieses Design an den Fernseher senden?",
@@ -1850,6 +1856,8 @@ S.de = {
 
 // Turkish. The words for the same things match the TV home's Turkish (tv-home/web/i18n.js).
 S.tr = {
+  err_pairing_locked: "Çok fazla yanlış kod. {minutes} dk bekle, sonra yeniden dene.",
+  err_adb_not_on: "Televizyonda Geliştirici seçenekleri içinde USB hata ayıklamayı aç, sonra İzin ver'e bas.",
   ds_askLater: "Şimdi değil",
   ds_askSend: "Gönder",
   ds_ask: "Bu tasarım TV'ye gönderilsin mi?",
@@ -2040,6 +2048,8 @@ S.tr = {
 };
 
 S['sr-Latn-RS'] = {
+  err_pairing_locked: "Previše pogrešnih kodova. Sačekajte {minutes} min, pa pokušajte ponovo.",
+  err_adb_not_on: "Na televizoru uključite Otklanjanje grešaka sa USB-a u Opcijama za programere, pa pritisnite Dozvoli.",
   ds_askLater: "Ne sada",
   ds_askSend: "Pošalji",
   ds_ask: "Poslati ovaj dizajn na TV?",
@@ -2230,6 +2240,8 @@ S['sr-Latn-RS'] = {
 };
 
 S.cs = {
+  err_pairing_locked: "Příliš mnoho špatných kódů. Počkejte {minutes} min a zkuste to znovu.",
+  err_adb_not_on: "Na televizi zapněte Ladění přes USB v Možnostech pro vývojáře a pak stiskněte Povolit.",
   ds_askLater: "Teď ne",
   ds_askSend: "Poslat",
   ds_ask: "Poslat tento návrh do televize?",
@@ -3018,6 +3030,8 @@ S.pl = {
 
 // Portuguese (Brazil), translated locally from en.
 S.pt = {
+  err_pairing_locked: "Muitos códigos errados. Espere {minutes} min e tente de novo.",
+  err_adb_not_on: "Na TV, ative a Depuração USB nas Opções do desenvolvedor e depois aperte Permitir.",
   ds_askLater: "Agora não",
   ds_askSend: "Enviar",
   ds_ask: "Enviar este design para a TV?",

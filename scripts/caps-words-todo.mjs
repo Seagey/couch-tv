@@ -23,7 +23,9 @@ export function capsLines(CAPS) {
 export function capsTable() {
   const ctx = { window: {} };
   vm.runInNewContext(fs.readFileSync(path.join(web, "caps-words.js"), "utf8"), ctx);
-  return ctx.window.CouchCapsWords.words;
+  const c = ctx.window.CouchCapsWords, out = Object.assign({}, c.words);
+  for (const en of c.same || []) out[en] = out[en] || { same: true };   // reads the same in every language
+  return out;
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const CAPS = createRequire(import.meta.url)(path.join(web, "widget-caps.js"));
