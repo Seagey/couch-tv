@@ -401,6 +401,16 @@ ok(matrix === want && want === 67, "the size matrix: " + matrix + " setting x si
   const e1 = await draw(o, env(), null, eve);
   has(e1.text, "Tomorrow", "weather wide tile at 7:30pm: looks ahead to tomorrow"); fits(e1, "28°", "weather wide tile at 7:30pm, tomorrow's high");
   fits(e1, "Tomorrow", "weather wide tile at 7:30pm, the word tomorrow");
+  // tomorrow's sky in words, in full, with the town name on and off, for a clear and a rainy tomorrow
+  for (const [code, words] of [[1, "Mostly clear"], [61, "Light rain"], [82, "Heavy showers"]]) {
+    const tw = wx(24); tw.daily = tw.daily.map((d, i) => Object.assign({}, d, { code: i === 1 ? code : 1 }));
+    for (const set of [{}, { place: false }]) {
+      const r = await draw(o, { data: Object.assign({}, base, { weather: tw, wset: { x: set } }) }, null, eve);
+      fits(r, words, "weather wide tile at 7:30pm, tomorrow's sky in words (" + code + (set.place === false ? ", no town name" : "") + ")");
+      fits(r, "Tomorrow", "and the word tomorrow"); fits(r, "28°", "and tomorrow's high");
+      if (set.place !== false) fits(r, "Hillside", "and the town");
+    }
+  }
   const e3 = await draw(o, env({ x: { place: false } }), null, eve);
   fits(e3, "28°", "weather wide tile at 7:30pm, no town name, tomorrow's high"); fits(e3, "Tomorrow", "and the word tomorrow");
   const e2 = await draw(o, env({ x: { hilo: false } }), null, eve);

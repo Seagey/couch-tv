@@ -2434,6 +2434,11 @@
       sky = w.ahead ? w.ahead.label : wxWords(w.code);
       var hiL = hl && (w.ahead ? w.ahead.hi : w.hi) !== undefined ? E("div", "cw-t23 cw-ell", "color:var(--ink)", ["High " + (w.ahead ? w.ahead.hi : w.hi) + "°"]) : null;
       lines = [q.place === false ? null : E("div", "cw-t25 cw-ell", "font-weight:680", [w.place || "Here"]), E("div", "cw-t23 cw-ell", "color:var(--ink)" + (q.place === false ? ";font-weight:680" : ""), [sky]), hiL];
+      // in the evening, tomorrow's sky in words too (the icon is gone): four tighter lines
+      if (w.ahead) {
+        lines.splice(2, 0, E("div", "cw-t23 cw-ell", "color:var(--ink)", [wxWords(w.ahead.code)]));
+        lines.forEach(function (l) { if (l) l.style.lineHeight = "1.1"; });
+      }
     }
     add(root, E("div", narrow ? "cw-row cw-sp" : "cw-row", "height:100%", [narrow ? null : ic(wxIcon(w.code, w.is_day), 48, rgba(sh.ink, 1), "solid"), E("div", "cw-col", (narrow ? "flex:0 1 auto;align-items:stretch;text-align:left" : "flex:1") + ";min-width:0;margin-left:" + (narrow ? 0 : 14) + "px", lines), E("div", "cw-big", "font-size:" + (narrow ? 60 : 72) + "px;margin-left:10px", [w.temp + "°"])]));
   };

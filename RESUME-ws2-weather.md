@@ -50,6 +50,7 @@ Kinds: weather, bigtemp, hourly, rain, uv, sun, moon, air, surf (week stays with
     fit (room / 60), so 4 changes it; with a place's name 2 fit.
   - Surf wide tile: the wind under the swell (Wind in works there now), no icon beside its own place.
   - Moon wide tile: the phase over two lines.
+  - Weather wide tile in the evening: place / Tomorrow / tomorrow's sky in words / High N° (line height 1.1).
   - Weather and surf wide tiles: columns spread edge to edge (the fit audit's centring), surf unit 23 px.
   - Help lines: Show the town name (weather, Big number) and Show the high and low say what a tile shows.
   - Main test: names fit in full (Long Beach at every size, Port Macquarie from the wide tile up),
@@ -70,7 +71,7 @@ keys (LATER is concatenated onto SETTINGS).
     python3 tests/test_ws_native.py              OK (12 skipped); test_widget_settings_bridge.py OK
     browser (take <scratchpad>/browser.lock with mkdir first, rmdir after), via
     zsh <scratchpad>/ws2-weather-run.sh (logs in <scratchpad>/ws2-weather-logs/):
-      tests/test_ws2_weather.mjs                 623 checks (same count at any time of day)
+      tests/test_ws2_weather.mjs                 644 checks (same count at any time of day)
       tests/test_ws2_weather_visible.mjs         1116 checks (386 cases, 70 the same by design)
       tests/test_ws_tv.mjs                       1115 checks
       tests/test_design_settings_browser.mjs     107 checks
