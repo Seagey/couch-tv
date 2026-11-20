@@ -1465,45 +1465,21 @@
   }
   function saveEdits() { try { if (Object.keys(EDITS).length) localStorage.setItem(EDITS_KEY, JSON.stringify(EDITS)); else localStorage.removeItem(EDITS_KEY); } catch (e) {} }
   function editsOf(id, kind) { var e = EDITS[id + "|" + kind]; return Array.isArray(e) ? e.slice() : null; }
-  // A widget's own place (the surf report's beach, the air quality's town), changed on this TV or from
-  // the phone's Home settings page: { "<object id>|<kind>": { name, area, lat, lon, timezone } }. Kept on
-  // this TV only, like the app changes above, never in a design. Two decimals: the town, never a house.
-  // A widget with no place of its own reads the home's town (Home settings, Location), as before.
-  var PLACE_NAME = { surf: "Surf report", air: "Air quality" };
-  var PLACE_KINDS = ["surf", "air"], PLACES_KEY = "couchtv.design.places", PLACES = readPlaces();
-  function cleanPlace(p) {
-    p = obj(p);
-    var lat = Math.round(+p.lat * 100) / 100, lon = Math.round(+p.lon * 100) / 100, name = String(p.name || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 60);
-    if (!name || !isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180 || p.lat === null || p.lon === null || p.lat === "" || p.lon === "") return null;
-    var out = { name: name, lat: lat, lon: lon };
-    var area = String(p.area || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 80); if (area) out.area = area;
-    out.timezone = typeof p.timezone === "string" && /^([A-Z][A-Za-z_]{1,30}(\/[A-Z][A-Za-z_-]{1,30}){1,2}|auto|UTC|GMT)$/.test(p.timezone) ? p.timezone : "auto";
-    return out;
-  }
-  function readPlaces() {
-    var out = {}, raw = null;
-    try { raw = JSON.parse(localStorage.getItem(PLACES_KEY) || "null"); } catch (e) { raw = null; }
-    if (raw && typeof raw === "object" && !Array.isArray(raw)) Object.keys(raw).slice(0, 30).forEach(function (k) {
-      var m = /^[A-Za-z0-9_-]{1,60}\|([a-z]{1,20})$/.exec(k), p = m && PLACE_KINDS.indexOf(m[1]) >= 0 ? cleanPlace(raw[k]) : null;
-      if (p) out[k] = p;
-    });
-    return out;
-  }
-  function savePlaces() { try { if (Object.keys(PLACES).length) localStorage.setItem(PLACES_KEY, JSON.stringify(PLACES)); else localStorage.removeItem(PLACES_KEY); } catch (e) {} }
-  // the widget's own place: a top level widget by its id, a widget in a smart stack by its stack's (pid)
-  function placeOf(o) { o = obj(o); var p = PLACES[(o.id || o.pid) + "|" + o.kind]; return p ? JSON.parse(JSON.stringify(p)) : null; }
-  // every widget on the home with a place of its own to set: [{ key, kind, label, place }]
-  function placeWidgets() {
+  // Each widget's own settings (docs/WIDGET-SETTINGS-CONTRACT.md) are kept by app.js in Home settings
+  // (ST.widgets["<id>|<kind>"]), never here and never in a design; widgets read them as env.wset, by the
+  // widget's id. A widget in a smart stack has the id "<stack id>/<its place in the stack>".
+  // Every widget on the home now, a stack's widgets too: [{ key, id, kind, label, x, y, w, h }].
+  function widgetList() {
     var out = [], seen = {};
     if (D && ON) list(D.objects).forEach(function (o) {
       o = obj(o);
       if (o.type !== "widget") return;
-      [o].concat(list(o.items)).forEach(function (it) {
-        it = obj(it);
-        var key = o.id + "|" + it.kind;
-        if (PLACE_KINDS.indexOf(it.kind) < 0 || seen[key]) return;
+      var each = o.kind === "stack" ? list(o.items).map(function (it, i) { return { id: o.id + "/" + i, it: obj(it) }; }) : [{ id: o.id, it: o }];
+      each.forEach(function (e) {
+        var key = e.id + "|" + e.it.kind;
+        if (!e.it.kind || seen[key]) return;
         seen[key] = 1;
-        out.push({ key: key, kind: it.kind, label: obj(it.opts).label || "", place: PLACES[key] ? JSON.parse(JSON.stringify(PLACES[key])) : null });
+        out.push({ key: key, id: e.id, kind: e.it.kind, label: obj(e.it.opts).label || "", x: +o.x || 0, y: +o.y || 0, w: +o.w || 0, h: +o.h || 0 });
       });
     });
     return out;
@@ -1534,7 +1510,8 @@
     var sport = !!(D && list(D.objects).some(function (o) { o = obj(o); return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return obj(it).kind === "sports"; }); }));
     return { demo: !!(FORCE_DEMO || DEMO_ON), preview: PREVIEW, card: IN_CARD, designer: DESIGNER, data: data, look: obj(D && D.look), sport: sport,
       edits: DESIGNER || PREVIEW ? null : editsOf,
-      placeOf: DESIGNER || PREVIEW || FORCE_DEMO || DEMO_ON ? null : placeOf,
+      // each widget's own settings on this TV, by its id (app.js data().wset); none in the designer or a preview
+      wset: DESIGNER || PREVIEW || FORCE_DEMO || DEMO_ON ? null : (data && data.wset) || null,
       clock24: hooks.clock24 ? hooks.clock24() : false, ha: !!(window.smartHome && window.smartHome.enabled && window.smartHome.enabled()), rooms: LIVE.rooms,
       icon: function (name, size, set) { return icon(name, size, set); }, colour: colour, imgOk: imgOk };
   }
@@ -2508,20 +2485,6 @@
       var nodes = [mk("Settings", "gear"), mk("All apps", "more"), mk("Smart home", "smart")];
       var layer = w && w.getAttribute("data-detail");
       if (layer && window.CouchDetail) { var op = mk("Open " + (window.CouchDetail.title(layer) || "this widget"), "detail"); op.__root = w; nodes.splice(2, 0, op); }
-      // the widget's own settings (widget-caps.js settingsOf), on a page of Home settings: Change place on
-      // a surf or air widget, else "<widget> settings". Apps have their own items below.
-      var pw = w, pid = null, Caps = window.CouchWidgetCaps;
-      while (pw && !(pw.getAttribute && pw.getAttribute("data-obj"))) pw = pw.parentNode;
-      pid = pw && pw.getAttribute("data-obj");
-      if (pid && !DESIGNER && Caps && Caps.settingsOf) {
-        var mine = window.CouchDesign.widgetList().filter(function (x) { return x.key.split("|")[0] === pid; });
-        mine.forEach(function (x) {
-          var s = Caps.settingsOf(x.kind).filter(function (id) { return id !== "apps"; });
-          if (!s.length) return;
-          var nm = PLACE_NAME[x.kind] || (Caps.get(x.kind) || {}).name || "Widget";
-          nodes.splice(1, 0, mk(s.indexOf("place") >= 0 ? (mine.length > 1 ? "Change place: " + nm : "Change place") : nm + " settings", "wset", x.key));
-        });
-      }
       // an app in a dock, row, folder or app tile: change, move or remove it, or add one (kept on this TV)
       var ctx = EDIT = appCtx();
       if (ctx) {
@@ -2534,6 +2497,17 @@
         if (room && (ctx.slot !== 0 || ctx.max > 1)) eds.push(mk(folder ? "Add app to folder" : "Add app", "edit", "add"));
         // Settings stays first on an app too: one more OK from the hold lands on Settings, never on Change app
         nodes = [nodes[0]].concat(eds, nodes.slice(1));
+      }
+      // the widget's own settings (widget-caps.js settings, docs/WIDGET-SETTINGS-CONTRACT.md): "Settings
+      // for this widget", right after Settings, opens its page in Home settings (app.js). A smart stack:
+      // the widget showing in it now.
+      var pw = w, Caps = window.CouchWidgetCaps;
+      while (pw && !(pw.getAttribute && pw.getAttribute("data-obj"))) pw = pw.parentNode;
+      var pid = pw && pw.getAttribute("data-obj");
+      if (pid && !DESIGNER && Caps && Caps.settings) {
+        var wid = w && typeof w.__at === "function" && w.getAttribute("data-kind") === "stack" ? pid + "/" + w.__at() : pid;
+        var mine = widgetList().filter(function (x) { return x.id === wid && Caps.settings(x.kind).length > 0; })[0];
+        if (mine) nodes.splice(1, 0, mk("Settings for this widget", "wset", mine.key));
       }
       openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes }, "Back to close. Settings here is couch-tv's own: the remote's Settings button opens the TV's menu.");
     }
@@ -2779,35 +2753,8 @@
         background: !!(bg.image || bg.colour || bg.video), kinds: Object.keys(kinds).filter(function (k) { return k.indexOf("obj:") < 0; }),
         objects: Object.keys(kinds).filter(function (k) { return k.indexOf("obj:") === 0; }).map(function (k) { return k.slice(4); }), glass: glass };
     },
-    // every widget on the home, a widget in a smart stack too: [{ key: "<object id>|<kind>", kind, label }]
-    widgetList: function () {
-      var out = [], seen = {};
-      if (D && ON) list(D.objects).forEach(function (o) {
-        o = obj(o);
-        if (o.type !== "widget") return;
-        (o.kind === "stack" ? list(o.items) : [o]).forEach(function (it) {
-          it = obj(it);
-          var key = o.id + "|" + it.kind;
-          if (seen[key] || !it.kind) return;
-          seen[key] = 1;
-          out.push({ key: key, kind: it.kind, label: obj(it.opts).label || "" });
-        });
-      });
-      return out;
-    },
-    // the widgets with a place of their own, and changing one (null: back to the home's town)
-    placeWidgets: function () { return placeWidgets(); },
-    placeOf: function (o) { return placeOf(o); },
-    setPlace: function (key, place) {
-      var w = placeWidgets().filter(function (p) { return p.key === key; })[0];
-      if (!w) return { ok: false, error: "That widget is not on this design any more." };
-      if (place === null) delete PLACES[key];
-      else { var p = cleanPlace(place); if (!p) return { ok: false, error: "That place could not be used. Search for it again." }; PLACES[key] = p; }
-      savePlaces();
-      if (hooks.placeChanged) { try { hooks.placeChanged(); } catch (e) {} }
-      if (D && ON) objects(D);
-      return { ok: true };
-    },
+    // every widget on the home now, a stack's widgets too: [{ key: "<id>|<kind>", id, kind, label, x, y, w, h }]
+    widgetList: function () { return widgetList(); },
     // the design's containers of apps, and changing one's apps the way Hold OK does (null: its own apps again)
     appWidgets: function () { return appWidgets(); },
     setApps: function (key, keys) {
