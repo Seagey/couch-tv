@@ -282,7 +282,7 @@ await phone.waitForFunction(() => document.getElementById("design-line").style.d
   // Show all
   await phone.click("#design-all"); await phone.waitForTimeout(150);
   ok(await phone.evaluate(() => !document.getElementById("people").classList.contains("hidden-by-design") && document.getElementById("inputs").style.display === ""), "Show all settings brings People and Input tiles back");
-  ok(/no app row/.test(await phone.textContent("#in-design")), "Input tiles say this design has no app row for them");
+  ok(/hides the dock/.test(await phone.textContent("#in-design")), "Input tiles say this design has no app row for them");
   await phone.click("#inputs .fold-btn");
   await phone.check('#in-list input[type=checkbox]');
   await phone.click("#in-save"); await phone.waitForTimeout(300);
@@ -382,6 +382,54 @@ await ctx.close();
   ok(!p2.errors.length, "no page errors: " + p2.errors.join("; "));
   await c2.close();
   await plain.close();
+}
+
+// ---- 6. review fixes: the bridge keeps the values, a new design starts clean, bins, the commute ----
+{
+  // a computer at home keeps only the keys it knows (mock.js copies bridge/server.py): the widgets' own
+  // settings are one of them, so the copy handed back never wipes them
+  await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "n|news", values: { feed: "rnz" } } }));
+  await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "s|surf", values: { place: { name: "Bells Beach", lat: -38.37, lon: 144.28, timezone: "Australia/Melbourne" } } } }));
+  await tv.waitForTimeout(900);
+  const copy = await tv.evaluate(() => (JSON.parse(localStorage.getItem("mock:api.settings") || "{}").settings || {}).widgets);
+  ok(copy && copy["n|news"] && copy["n|news"].feed === "rnz" && copy["s|surf"] && copy["s|surf"].place.name === "Bells Beach", "the bridge's copy keeps each widget's settings: " + JSON.stringify(copy));
+  // a new design: the news source (a design choice) is dropped, the beach (kept on the TV) stays
+  const next = JSON.parse(JSON.stringify(design));
+  next.objects = next.objects.concat([
+    { id: "b", type: "widget", kind: "bins", x: 1300, y: 700, w: 460, h: 300, opts: { weekday: 2, alt: true } },
+    { id: "c", type: "widget", kind: "commute", x: 1300, y: 340, w: 560, h: 300 }]);
+  await tv.evaluate((d) => localStorage.setItem("tvdesigner.design", JSON.stringify(d)), next);
+  await tv.goto(HOME + "?mock=1&wxlive=1&design=local");
+  await tv.waitForFunction(() => window.CouchDesign && window.CouchDesign.on() && document.querySelector('.cw-o[data-obj="b"] .cw'));
+  await tv.waitForTimeout(700);
+  const after = await tv.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || localStorage.getItem("tvhome.settings") || "{}"); return (r.s || r).widgets || {}; });
+  ok(!(after["n|news"] && after["n|news"].feed) && after["s|surf"] && after["s|surf"].place.name === "Bells Beach", "a new design drops the old design choices and keeps what is kept on the TV: " + JSON.stringify(after));
+  // bins: Which bin goes out this week sets the count; a new bin night keeps the same bin this week
+  const binsOf = () => tv.evaluate(() => window.tv.atHomeRead().design.widgets.filter((w) => w.key === "b|bins")[0].settings);
+  let b = await binsOf();
+  ok(b.some((s) => s.key === "thisweek" && s.shown), "with Taking turns on, Which bin goes out this week shows");
+  ok((await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "b|bins", values: { thisweek: "b" } } }))).ok, "the phone picks the second bin for this week");
+  b = await binsOf();
+  ok(b.filter((s) => s.key === "thisweek")[0].value === "b", "and it reads back as the second bin");
+  const anchor = await tv.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || localStorage.getItem("tvhome.settings") || "{}"); return ((r.s || r).widgets || {})["b|bins"].anchor; });
+  ok(Number.isInteger(anchor), "the count is kept as whole days: " + anchor);
+  ok((await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "b|bins", values: { weekday: 4 } } }))).ok, "a new bin night");
+  b = await binsOf();
+  ok(b.filter((s) => s.key === "thisweek")[0].value === "b", "keeps the second bin going out this week");
+  ok((await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "b|bins", values: { alt: "yes" } } }))).ok === false, "an on or off setting takes only on or off");
+  ok((await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "b|bins", values: { thisweek: null } } }))).ok, "clearing it");
+  const cleared = await tv.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || localStorage.getItem("tvhome.settings") || "{}"); return ((r.s || r).widgets || {})["b|bins"] || {}; });
+  ok(cleared.anchor === undefined, "takes its count off too");
+  // the commute: Where to says Not set (never the home's town), and its clear row says what it does
+  const cm = await tv.evaluate(() => window.tv.atHomeRead().design.widgets.filter((w) => w.key === "c|commute")[0]);
+  const to = cm.settings.filter((s) => s.key === "to")[0];
+  ok(to && to.words === "Not set", "Commute, Where to: Not set until it is picked (" + (to && to.words) + ")");
+  ok((await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "c|commute", values: { to: { name: "Geelong", lat: -38.15, lon: 144.36, timezone: "Australia/Melbourne" } } } }))).ok, "Where to from the phone");
+  await openSettings(tv); await goSec(tv, "couch-tv Studio");
+  const studio = (await rowsText(tv)).join(" | ");
+  ok(/Commute, middle right/.test(studio) && !/Where to\b.*Type the town or suburb you drive to/.test(studio), "the Commute is one row in Widgets on this home, the old Commute rows are gone: " + studio.slice(0, 500));
+  await closeSettings(tv);
+  ok(!tv.errors.length, "no page errors: " + tv.errors.join("; "));
 }
 
 await tv.close();

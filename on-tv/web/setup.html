@@ -82,7 +82,7 @@
   <div class="card" id="design-line" style="display:none" role="status">
     <p class="now" id="design-line-text">This home uses a couch-tv Studio design. Settings for parts it doesn't show are hidden.</p>
     <button class="quiet" id="design-all" type="button">Show all settings</button>
-    <p>To go back to the standard home: on the TV, Home settings, couch-tv Studio, Back to my classic home.</p>
+    <p>To go back to the standard home: on the TV, Home settings, couch-tv Studio, then the row that turns couch-tv Studio off.</p>
   </div>
 
   <section class="card" id="widgets" style="display:none">
@@ -593,7 +593,7 @@
     $('inputs').style.display = inOk ? '' : 'none';
     var note = $('in-design');
     if (!note) { note = document.createElement('p'); note.id = 'in-design'; $('in-list').parentNode.insertBefore(note, $('in-list')); }
-    note.textContent = d && !d.inputs ? 'This design has no app row, so input tiles show only on the standard home.' : '';
+    note.textContent = d && !d.inputs ? 'This design hides the dock, so input tiles show only on the standard home.' : '';
     $('design-line').style.display = d ? '' : 'none';
     $('design-line-text').textContent = SHOW_ALL ? 'Every setting is showing. Some are for parts this couch-tv Studio design doesn\'t show.' : 'This home uses a couch-tv Studio design. Settings for parts it doesn\'t show are hidden.';
     $('design-all').textContent = SHOW_ALL ? 'Show only what this design uses' : 'Show all settings';
@@ -609,7 +609,7 @@
     say(msgId, 'Saving…');
     return api('POST', '/api/athome', { edit: edit }).then(function (j) {
       if (j.live) { AH = j.athome; takeDesign(AH && AH.design); say(msgId, okText); }
-      else say(msgId, 'Sent. The TV takes it as soon as the couch-tv home is open on it.');
+      else say(msgId, 'Sent. The TV takes it as soon as the Couch TV home is open on it.');
     }).catch(function (e) { say(msgId, e.message); });
   }
   // Widgets on this TV: each widget on the design with settings of its own, drawn from its settings
@@ -621,7 +621,7 @@
   function wsHtml(w, s) {
     var id = 'ws-' + idOf(w.key) + '-' + idOf(s.key), data = ' data-wk="' + esc(w.key) + '" data-ws="' + esc(s.key) + '"';
     var help = s.help ? '<p>' + esc(s.help) + '</p>' : '';
-    var back = s.own ? '<button type="button" class="quiet" data-wclear="1"' + data + '>' + (s.type === 'place' ? 'Use your home\'s town instead' : s.store === 'design' ? 'Use the design\'s own' : 'Clear it') + '</button>' : '';
+    var back = s.own ? '<button type="button" class="quiet" data-wclear="1"' + data + '>' + (s.type === 'place' ? (s.key === 'to' ? 'Forget where you drive to' : 'Use your home\'s town instead') : s.store === 'design' ? 'Use the design\'s own' : 'Clear it') + '</button>' : '';
     if (s.type === 'place') {
       return '<p>' + esc(s.label) + ': <span class="now">' + esc(s.words) + '</span></p>' +
         '<label for="' + id + '">Search for ' + (s.coast ? 'a beach, or the town by it' : 'a town or suburb') + '</label><input id="' + id + '" type="search" autocomplete="off" enterkeyhint="search" data-wq="1"' + data + ' placeholder="Type at least 2 letters">' +
@@ -641,7 +641,7 @@
     }
     if (s.type === 'toggle') return '<label class="check"><input type="checkbox" id="' + id + '" data-wtog="1"' + data + (s.value ? ' checked' : '') + '> ' + esc(s.label) + '</label>' + help + back;
     if (s.type === 'device' || s.type === 'apps') {
-      return '<p>' + esc(s.label) + ': <span class="now">' + esc(s.words) + '</span></p><p>' + (s.type === 'apps' ? 'Change its apps under Apps on this design, or on the TV: hold OK on an app in it.' : 'Pick it on the TV: hold OK on the widget, then Settings for this widget.') + '</p>';
+      return '<p>' + esc(s.label) + ': <span class="now">' + esc(s.words) + '</span></p><p>' + (s.type === 'apps' ? 'Change its apps under Apps on this design, or on the TV: hold OK on an app in it.' : 'Pick the devices this TV shows in Home settings, Smart home.') + '</p>';
     }
     // text, a number, a team, a calendar link and anything newer: a box and Save
     var val = s.value === true || s.value === null || s.value === undefined ? '' : Array.isArray(s.value) ? s.value.join(', ') : String(s.value);
@@ -905,7 +905,7 @@
     // honest about a design with no row for them: never "the home shows them" when it will not
     var noRow = DESIGN && DESIGN.on && !DESIGN.inputs;
     api('POST', '/api/settings', { inputs: list }).then(function () {
-      $('in-msg').textContent = !list.length ? 'Saved. No input tiles.' : noRow ? 'Saved. This design has no app row for them, so they show only on the standard home.' : 'Saved. The home shows them now.';
+      $('in-msg').textContent = !list.length ? 'Saved. No input tiles.' : noRow ? 'Saved. This design hides the dock, so they show only on the standard home.' : 'Saved. The home shows them now.';
       loadSettings();
     })
       .catch(function (e) { $('in-msg').textContent = e.message; });

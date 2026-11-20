@@ -7660,7 +7660,7 @@
   function whereWords(w) {
     var cx = w.x + w.w / 2, cy = w.y + w.h / 2;
     var col = cx < 640 ? "left" : cx < 1280 ? "" : "right", row = cy < 360 ? "top" : cy < 720 ? "middle" : "bottom";
-    var words = row === "middle" && !col ? "in the middle" : [row, col].filter(Boolean).join(" ");
+    var words = row === "middle" && !col ? "in the middle" : row + " " + (col || "middle");
     return /\//.test(w.id) ? words + ", in a stack" : words;
   }
   // the widgets on screen with settings of their own: [{ key, id, kind, label, settings, name, title }]
@@ -7886,7 +7886,7 @@
         }
         else if (s.type === "choice" || s.type === "tvlist") { v = one(v); if (v === undefined) { bad = "That choice is not one of the choices."; return; } }
         else if (s.many) { v = (Array.isArray(v) ? v : String(v).split(",")).map(function (x) { return String(x).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 30); }).filter(Boolean).slice(0, isFinite(s.max) ? +s.max : 6); if (!v.length) v = null; }
-        else if (s.type === "toggle") v = !!v;
+        else if (s.type === "toggle") { if (typeof v !== "boolean") { bad = "That needs on or off."; return; } }
         else if (s.type === "number") { v = +v; if (!isFinite(v) || (isFinite(s.min) && v < +s.min) || (isFinite(s.max) && v > +s.max)) { bad = "That number is out of range."; return; } }
         else if (s.type === "calendar") { v = String(v).trim().slice(0, 600); v = window.CouchAtHome ? CouchAtHome.calUrl(v) : ""; if (!v) { bad = "That is not a calendar link. It starts with https://."; return; } }
         else if (s.type === "apps" || s.type === "device") { bad = "Change that on the TV."; return; }
