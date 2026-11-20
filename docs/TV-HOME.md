@@ -227,10 +227,10 @@ Since 0.13:
 
 Since 0.13.9:
 
-- **Lighter home checks 4 GB TVs too**, and the frames while the focus moves along a row, not only at rest. When it turns itself on the home says so once: "This TV is a bit slow, so Lighter home is on. Home settings, Look and scenes to change it."
+- **Lighter home checks 4 GB TVs too**, and the frames while the focus moves along a row, not only at rest. Slow means slow for that screen (a smooth 30 Hz screen is fine), the first 30 s after the home opens do not count, and a stutter while moving needs a second start within a week before Lighter home goes on. When it turns itself on the home says so once: "This TV is a bit slow, so Lighter home is on. Home settings, Look and scenes to change it."
 - **Moving tiles** and **Mac-style dock** say "Off while Lighter home is on" when Lighter home holds them off. OK asks "Turn off Lighter home?", and a second OK turns Lighter home off and the switch on.
 - **Show the clock**: off hides the clock in every look (the big scene clock in Night too), and the date moves up into its place. Not there with a couch-tv Studio design, which shows its own clock (`home.show_clock`).
-- **Sharp pictures on a 4K TV**: Auto (the 4K copies of the built-in pictures when the screen is drawn at 4K), Always (also on a 4K TV that draws its interface at 1080, where the scenes looked soft) or Off (the 1080 copies, for a 4K TV that stutters). Always uses more memory: about 65 MB more on a TCL 75C6K (`home.hi_res`).
+- **Sharp pictures on a 4K TV**: Auto (the 4K copies of the built-in pictures when the screen is drawn at 4K), Off (the 1080 copies, for a 4K TV that stutters) or Always (also on a 4K TV that draws its interface at 1080, where the scenes looked soft). Always uses more memory: about 65 MB more on a TCL 75C6K (`home.hi_res`).
 
 Look also holds **Now playing**, **Show Keep watching** and **Sound**: see [Now playing](#now-playing).
 

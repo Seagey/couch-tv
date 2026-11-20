@@ -58,9 +58,14 @@ async function home(q, opt = {}) {
     window.addEventListener("keydown", (e) => { if (/^Arrow/.test(e.key)) nav = true; }, true);
     const an = Element.prototype.animate;
     Element.prototype.animate = function () { const a = an.apply(this, arguments); anim++; const c = a.cancel.bind(a); let done = false; const end = () => { if (!done) { done = true; anim--; } }; a.cancel = () => { end(); c(); }; a.addEventListener("finish", end); return a; };
-    window.requestAnimationFrame = (cb) => raf(() => {
-      const slow = o.slowMs || (o.slowVeil && anim > 0 && o.slowVeil) || (o.slowNav && nav && o.slowNav) || (o.slowUntil && performance.now() < o.slowUntil && 40);
-      t += slow || o.refreshMs || 16.7; cb(t);
+    let native = -1;   // the time moves on once per real frame, however many callbacks that frame has
+    window.requestAnimationFrame = (cb) => raf((ts) => {
+      if (ts !== native) {
+        native = ts;
+        const slow = o.slowMs || (o.slowVeil && anim > 0 && o.slowVeil) || (o.slowNav && nav && o.slowNav) || (o.slowUntil && performance.now() < o.slowUntil && 40);
+        t += slow || o.refreshMs || 16.7;
+      }
+      cb(t);
     });
   }, opt);
   if (!opt.keep) { await page.goto(BASE + "?mock=1&reset=1"); await page.evaluate((s) => { localStorage.clear(); for (const k in s) localStorage.setItem(k, s[k]); }, opt.storage || {}); }

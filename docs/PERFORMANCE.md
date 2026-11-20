@@ -43,9 +43,12 @@ screen stuck at 30 frames a second (#197).
 TCL, Sony, Fire TV; #197, #213). Lighter home turned itself on only at 1 GB, and a TV reporting 4 GB or more was
 never measured, so it never got it. Since 0.13.9:
 
-- Only 8 GB or more skips the check. Anything else, 4 GB included, measures its frames for 1.5 s a few seconds
-  after the home opens (kept for a week), and also times the frames while the focus really moves along a row (the
-  first arrow presses, 90 frames, nothing runs between presses). A median frame over 22 ms turns Lighter home on.
+- Only 8 GB or more skips the check. Anything else, 4 GB included, measures its frames for 1.5 s, 20 s after the
+  home opens and only while it is showing (kept for a week), and also times the frames while the focus really
+  moves along a row (arrow presses from 30 s on, 90 frames, nothing runs between presses).
+- Slow means a median frame over 22 ms or over 1.3 times the screen's own frame time, measured at rest first, so a
+  smooth 30, 25 or 24 Hz screen is not a slow TV. A stutter while moving is a strike; a second start within a week
+  that stutters too turns Lighter home on, and that answer is kept for 30 days.
 - The home then says once: "This TV is a bit slow, so Lighter home is on. Home settings, Look and scenes to change it."
 - A choice in Home settings or `home.lighter` always wins.
 

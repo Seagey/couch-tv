@@ -29,3 +29,11 @@ Branch nl-social-look off integrate-0.13.9 (4a705fe). Rules: scratchpad nolater-
   test_design_settings_browser 107 checks.
 - python: test_look_switches_bridge 5; test_hi_res 4; test_start_focus 4; test_production_features 16; others touching clean_settings pass.
 - Run browser tests with scratchpad/look-browser.sh <tests...> (takes the browser lock).
+
+## Review round (checker NO-GO at eeee4f5), fixed
+- Limit is max(22, min(idle, 42) x 1.3), idle = 20 rest frames before the veil; still check at 20 s (only while shown);
+  presses count from 30 s; two strikes (tvhome.lowend_nav, 7 days) before a moving stutter turns it on; moving answer kept 30 days;
+  apply() also respects HOME.lighter; Sharp pictures cycles Auto, Off, Always. 12/24 h row kept: CLOCK24 also drives the idle
+  screen clock and design clocks.
+- Counts: node suite 61/0; test_look_switches_browser 76; test_lag_perf_browser 9; test_ws_tv 1115; test_design_settings_browser 107;
+  test_look_switches_bridge 5; test_hi_res 4.
