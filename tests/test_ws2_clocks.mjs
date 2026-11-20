@@ -90,6 +90,11 @@ const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, timezoneId: "Australia/Sydney", locale: "en-AU" });
 const FIXED = new Date("2026-11-20T19:42:07+11:00");
 const press = async (page, k, wait) => { await page.keyboard.press(k); await page.waitForTimeout(wait || 160); };
+// The page's clock is fixed, so Date.now() never moves by itself. design.js times two things with it: an OK
+// within 260 ms of a held OK is the same press, and five Back presses within 4 s switch the design off.
+// A real TV's clock moves, so step this one 5 s forward (never back) before each such key.
+const tick = async (page) => { page.at = (page.at || FIXED.getTime()) + 5000; await page.clock.setFixedTime(new Date(page.at)); };
+const back = async (page, wait) => { await tick(page); await press(page, "Escape", wait); };
 
 // Open-Meteo stand in: a full forecast, 22° for the home (Sydney), 31° anywhere else
 const asked = [];
@@ -137,9 +142,9 @@ async function settle(page, id, before) {
   for (let i = 0; i < 30; i++) { await page.waitForTimeout(100); const p = await probe(page, id); if (p && JSON.stringify(p) !== JSON.stringify(before)) return p; }
   return probe(page, id);
 }
-const rowsText = (page) => page.evaluate(() => [...document.querySelectorAll("#set-rows .srow")].map((e) => e.textContent.trim()));
+const rowsText = (page) => page.evaluate(() => [...document.querySelectorAll("#set-rows .srow, #set-rows .shead")].map((e) => e.textContent.trim()));
 const secs = (page) => page.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()));
-async function closeSettings(page) { for (let k = 0; k < 6 && await page.evaluate(() => document.getElementById("settings").classList.contains("on")); k++) await press(page, "Escape", 250); await page.waitForTimeout(700); }
+async function closeSettings(page) { for (let k = 0; k < 6 && await page.evaluate(() => document.getElementById("settings").classList.contains("on")); k++) await back(page, 250); await page.waitForTimeout(700); }
 async function goSec(page, name) {
   const list = await secs(page), i = list.indexOf(name);
   assert.ok(i >= 0, "section " + name + " in " + list.join(", "));
@@ -168,7 +173,7 @@ const WANT = { clock: ["format", "seconds", "date", "ampm"], tallclock: ["format
   wordclock: ["precise", "dayline"], worldclock: ["cities", "format", "label"], date: ["show", "dfmt", "place"], month: ["wstart"], week: ["town", "place"],
   countdown: ["label", "day", "month", "year", "unit"], timer: ["minutes", "label"] };
 
-const tvp = await tvPage(designOf());
+let tvp = await tvPage(designOf());
 TV = tvp;
 
 // ================= 1. listed only while on the design: the TV's own list =================
@@ -199,9 +204,8 @@ for (const [id, kind] of W12) {
   await press(tvp, "ArrowDown", 120);
   // the fixed clock: design.js takes an OK within 260 ms of the held OK (by Date.now) as the same held
   // press, so with time frozen every OK on the menu would be swallowed; a real TV's clock moves. Step it.
-  await tvp.clock.setFixedTime(new Date(FIXED.getTime() + 1000));
+  await tick(tvp);
   await press(tvp, "Enter", 600);
-  await tvp.clock.setFixedTime(FIXED);
   ok(await tvp.evaluate(() => document.getElementById("settings").classList.contains("on")), kind + ": Edit on the TV opens Home settings", kind);
   const head = await tvp.textContent("#set-head"), rows = (await rowsText(tvp)).join(" | ");
   ok(head.includes(NAMES[kind]), kind + ": Edit on the TV opens its own page: " + head, kind);
@@ -210,9 +214,18 @@ for (const [id, kind] of W12) {
   await closeSettings(tvp);
 }
 
+// the clock was stepped on above: the same home again, at 7:42:07pm
+ok(!tvp.errors.length, "no page errors in the Hold OK run: " + tvp.errors.join("; "));
+await tvp.close();
+tvp = await tvPage(designOf(), true);
+TV = tvp;
+ok(await tvp.evaluate(() => window.CouchDesign.on()), "the design is still on after the Hold OK run (Back was never held)");
+
 // ================= 2. every setting changes the drawn widget; clearing brings the default back =================
 // [id, kind, setting(s) tested, values set first (kept for the case), values tested, check(after, before)]
 const sydney = { name: "Byron Bay", lat: -28.64, lon: 153.61, timezone: "Australia/Sydney" };
+// a number on its own (the widget draws its parts with no space between them)
+const num = (t, n) => new RegExp("(^|\\D)" + n + "(\\D|$)").test(t);
 const CASES = [
   ["c", "format=24h", null, { format: "24h" }, (a) => /19:42/.test(a.text)],
   ["c", "format=12h", null, { format: "12h" }, (a) => /7:42\s*pm/.test(a.text) && !/19:42/.test(a.text)],
@@ -233,10 +246,10 @@ const CASES = [
   ["wo", "format=24h", { cities: ["Asia/Tokyo"] }, { format: "24h" }, (a, b) => /17:42/.test(a.text) && /5:42\s*pm/.test(b.text)],
   ["wo", "label", null, { label: "Family" }, (a, b) => /Family/.test(a.text) && /World clock/.test(b.text) && !/World clock/.test(a.text)],
   ["cd", "label", null, { label: "Ella's party" }, (a, b) => /Ella's party/.test(a.text) && /Christmas/.test(b.text)],
-  ["cd", "day", null, { day: 1 }, (a, b) => /^\D*\b(\d+)\b/.test(a.text) && /\b35\b/.test(b.text) && /\b11\b/.test(a.text) && !/Christmas/.test(a.text)],
-  ["cd", "month", null, { month: 1 }, (a) => /\b66\b/.test(a.text) && /25 January/.test(a.text)],
-  ["cd", "year", null, { year: 2027 }, (a) => /\b400\b/.test(a.text)],
-  ["cd", "unit", null, { unit: "weeks" }, (a) => /\b5\b/.test(a.text) && /weeks to go/.test(a.text)],
+  ["cd", "day", null, { day: 1 }, (a, b) => num(b.text, 35) && num(a.text, 11) && /1 December/.test(a.text) && !/Christmas/.test(a.text)],
+  ["cd", "month", null, { month: 1 }, (a) => num(a.text, 66) && /25 January/.test(a.text)],
+  ["cd", "year", null, { year: 2027 }, (a) => num(a.text, 400)],
+  ["cd", "unit", null, { unit: "weeks" }, (a) => num(a.text, 5) && /weeks to go/.test(a.text)],
   ["d", "show=weather", null, { show: "weather" }, (a, b) => /22°/.test(a.text) && !/22°/.test(b.text)],
   ["d", "show=both", null, { show: "both" }, (a) => /22° and/.test(a.text) && /20/.test(a.text)],
   ["d", "dfmt=numeric", null, { dfmt: "numeric" }, (a) => /20\/11\/2026/.test(a.text)],
@@ -303,15 +316,17 @@ for (const kind of Object.keys(WANT)) for (const k of WANT[kind]) ok(tested[kind
   ok(t && t.total === 600000 && t.label === "Pizza", "timer: OK with Quick start 10 minutes starts a 10 minute Pizza timer: " + JSON.stringify(t), "timer");
   const layer = await tvp.evaluate(() => (document.querySelector(".cwd-stage") || {}).textContent || "");
   ok(/Pizza/.test(layer) && /10:00|9:5\d/.test(layer), "timer: the Timers layer shows it counting down: " + layer.slice(0, 120), "timer");
-  await press(tvp, "Escape", 500);
-  const w = await probe(tvp, "ti");
+  await back(tvp, 500);
+  // the widgets redraw once a second when the time has moved (the fixed clock moved with Back): wait for it
+  let w = await probe(tvp, "ti");
+  for (let i = 0; i < 15 && !/9:5\d/.test(w.text); i++) { await tvp.waitForTimeout(200); w = await probe(tvp, "ti"); }
   ok(/Pizza/.test(w.text) && /10:00|9:5\d/.test(w.text), "timer: the widget counts it down: " + w.text, "timer");
   await tvp.evaluate(() => window.CouchWidgets.timer.cancel());
   await edit(tvp, "ti|timer", { minutes: null, label: null });
   // a second OK with no Quick start: nothing starts by itself
   await tvp.evaluate(() => window.CouchDesign.nav.focus("ti", 0)); await press(tvp, "Enter", 800);
   ok(await tvp.evaluate(() => localStorage.getItem("couchtv.timer") === null), "timer: without Quick start, OK only opens Timers", "timer");
-  await press(tvp, "Escape", 500);
+  await back(tvp, 500);
 }
 {
   // World clocks: the widget's own cities and 24 hour
@@ -320,12 +335,12 @@ for (const kind of Object.keys(WANT)) for (const k of WANT[kind]) ok(tested[kind
   await tvp.evaluate(() => window.CouchDesign.nav.focus("wo", 0)); await press(tvp, "Enter", 800);
   const layer = await tvp.evaluate(() => (document.querySelector(".cwd-stage") || {}).textContent || "");
   ok(/Tokyo/.test(layer) && /17:42/.test(layer) && !/London/.test(layer) && !/Brisbane/.test(layer), "worldclock: World clocks shows the widget's own city, 24 hour: " + layer.slice(0, 160), "worldclock");
-  await press(tvp, "Escape", 500);
+  await back(tvp, 500);
   await edit(tvp, "wo|worldclock", { cities: null, format: null });
   await tvp.evaluate(() => window.CouchDesign.nav.focus("wo", 0)); await press(tvp, "Enter", 800);
   const l2 = await tvp.evaluate(() => (document.querySelector(".cwd-stage") || {}).textContent || "");
   ok(/London/.test(l2) && /New York/.test(l2) && /Tokyo/.test(l2) && !/Brisbane/.test(l2), "worldclock: none picked, the layer shows the same cities as the widget: " + l2.slice(0, 160), "worldclock");
-  await press(tvp, "Escape", 500);
+  await back(tvp, 500);
 }
 {
   // Calendar from the Month widget: its Week starts on
@@ -334,7 +349,7 @@ for (const kind of Object.keys(WANT)) for (const k of WANT[kind]) ok(tested[kind
   await tvp.evaluate(() => window.CouchDesign.nav.focus("m", 0)); await press(tvp, "Enter", 800);
   const h = await tvp.evaluate(() => [...document.querySelectorAll(".cwd-mgrid span.h")].slice(0, 7).map((e) => e.textContent).join(""));
   ok(h === "SMTWTFS", "month: the Calendar layer starts on Sunday too: " + h, "month");
-  await press(tvp, "Escape", 500);
+  await back(tvp, 500);
   await edit(tvp, "m|month", { wstart: null });
 }
 // a real TV never shows the timer's demo
@@ -345,6 +360,7 @@ const pctx = await browser.newContext({ viewport: { width: 390, height: 844 }, i
 const phone = await pctx.newPage();
 phone.errors = []; phone.on("pageerror", (e) => phone.errors.push(String(e)));
 async function phoneTitles() {
+  await phone.goto("about:blank");   // the same address with only the # changed would not load the page again
   await phone.goto(ORIGIN + "/setup#pin=482913");
   await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
   await phone.waitForFunction(() => document.querySelectorAll("#w-list summary").length > 0, null, { timeout: 10000 });
@@ -362,7 +378,7 @@ async function phoneTitles() {
   const r = await phone.evaluate(() => window.fetch("/api/athome", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer t0k3n" }, body: JSON.stringify({ edit: { widget_set: { key: "c|clock", values: { format: "24h", seconds: true } } } }) }).then((x) => x.json()));
   ok(r.ok, "phone: the clock's settings saved through the phone's own endpoint");
   const a = await settle(tvp, "c", before);
-  ok(/19:42:07/.test(a.text), "phone: the TV's clock shows 24 hour with seconds: " + a.text, "clock");
+  ok(/19:42:\d\d/.test(a.text), "phone: the TV's clock shows 24 hour with seconds: " + a.text, "clock");
   await edit(tvp, "c|clock", { format: null, seconds: null });
 }
 
