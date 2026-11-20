@@ -884,7 +884,7 @@ class MoveSiblingTitle(unittest.IsolatedAsyncioTestCase):
                 raise RuntimeError("could not read the screen")
             return outer.screens.pop(0)
 
-        async def wait_until_playing(pkg, timeout=30):
+        async def wait_until_playing(pkg, timeout=30, seen=None):
             outer.log.append((server._current.get(), "wait"))
             outer.media[server._current.get()] = outer.then_plays
             return outer.starts
@@ -1012,6 +1012,94 @@ class MoveSiblingTitle(unittest.IsolatedAsyncioTestCase):
         r = await server.move_playing(A, B)
         self.assertEqual(len(self.did(B, "screen")), 3)
         self.assertEqual(r["note_key"], "note_moved")
+
+    async def _moved_reading(self, *names):
+        """Run a move where TV B, once Play is pressed, names these titles read by read (the last
+        one from then on). Returns the result and how many reads the move made after the press."""
+        real, reads = server.media_read, []
+
+        async def media_read(pkg, app):
+            if server._current.get() == B and len(self.taps()) == 2:
+                name = names[min(len(reads), len(names) - 1)]
+                reads.append(name)
+                self.media[B] = self.then_plays if name == "Some Show" else playing(name, 5_000, title_from="app")
+            return await real(pkg, app)
+        with patch.object(server, "media_read", media_read):
+            r = await server.move_playing(A, B, power_off=True)
+        return r, len(reads)
+
+    async def test_the_other_title_s_name_a_moment_after_play_is_read_again(self):
+        # the app says it plays before it names the new title (Codex review on #285)
+        r, reads = await self._moved_reading("Some Show Sing-Along", "Some Show")
+        self.assertEqual(reads, 2)
+        self.assertIsNone(r["wrong_title"])
+        self.assertTrue(r["started"])
+        self.assertEqual(r["note_key"], "note_moved")
+        self.assertEqual([e[2] for e in self.did(B, "key")], ["pause"])     # the right film is not paused
+
+    async def test_the_other_title_s_name_on_every_read_is_paused_after_four(self):
+        r, reads = await self._moved_reading("Some Show Sing-Along")
+        self.assertEqual(reads, 4)
+        self.assertEqual(r["wrong_title"], "Some Show Sing-Along")
+        self.assertFalse(r["started"])
+        self.assertEqual([e[2] for e in self.did(B, "key")], ["pause", "pause"])
+
+    async def test_a_third_title_after_play_is_paused_at_the_first_read(self):
+        # only the name B was on before the press may linger: any other name is B's word already
+        r, reads = await self._moved_reading("Some Show Ever After")
+        self.assertEqual(reads, 1)
+        self.assertEqual(r["wrong_title"], "Some Show Ever After")
+        self.assertFalse(r["started"])
+
+    def _clock(self, buffered, played, in_the_wait=True):
+        """Patches for a move on a clock the test moves: after Play the app takes `buffered` s to
+        start, is seen playing, and plays `played` s more while the bridge confirms it. With
+        `in_the_wait` False the wait runs out first and it is playing only at the read after."""
+        clock = [1000.0]
+
+        async def wait_until_playing(pkg, timeout=30, seen=None):
+            clock[0] += buffered
+            if seen is not None and in_the_wait:
+                seen["at"] = clock[0]
+            clock[0] += played
+            self.media[server._current.get()] = self.then_plays
+            return in_the_wait
+
+        class Clock:   # the server's `time` with that clock; everything else is the real module
+            monotonic = staticmethod(lambda: clock[0])
+
+            def __getattr__(self, name):
+                return getattr(time, name)
+        return patch.object(server, "wait_until_playing", wait_until_playing), patch.object(server, "time", Clock())
+
+    async def test_the_time_b_played_while_it_was_confirmed_is_allowed_for(self):
+        # no sync helper: B resumed at A's spot and played 12 s while the bridge waited and read
+        # (Codex review on #285). That is not "another spot".
+        self.then_plays = playing("Some Show", 612_000, title_from="app")
+        wait, clock = self._clock(buffered=8, played=12)
+        with wait, clock:
+            r = await server.move_playing(A, B)
+        self.assertTrue(r["started"])
+        self.assertEqual(r["note_key"], "note_moved")
+
+    async def test_the_time_b_took_to_start_is_not_time_it_played(self):
+        # B resumed 25 s past A's spot, after 20 s of loading: that is another spot, and is said
+        self.then_plays = playing("Some Show", 625_000, title_from="app")
+        wait, clock = self._clock(buffered=20, played=3)
+        with wait, clock:
+            r = await server.move_playing(A, B)
+        self.assertTrue(r["started"])
+        self.assertEqual(r["note_key"], "note_move_other_spot")
+
+    async def test_a_film_that_starts_after_the_wait_has_played_only_from_then(self):
+        # Codex review on #295: the wait ran out after 16 s with nothing playing, and the film is
+        # read as playing only after it, 17 s past A's spot. None of that wait was time it played.
+        self.then_plays = playing("Some Show", 617_000, title_from="app")
+        wait, clock = self._clock(buffered=16, played=0, in_the_wait=False)
+        with wait, clock:
+            r = await server.move_playing(A, B)
+        self.assertTrue(r["started"])
+        self.assertEqual(r["note_key"], "note_move_other_spot")
 
     async def test_a_move_that_came_up_right_never_looks(self):
         self.media["after_play"] = playing("Some Show", 598_000, title_from="app")
@@ -1179,6 +1267,40 @@ class MoveWaitPlaying(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(await self.wait(self.PLAYING.replace("PLAYING(3)", "PAUSED(2)")))
         self.assertFalse(await self.wait(self.PLAYING.replace(YOUTUBE, NETFLIX)))
         self.assertFalse(await self.wait(""))
+
+
+class WaitUntilPlayingSeen(unittest.IsolatedAsyncioTestCase):
+    """`seen`: the moment wait_until_playing first read the app as playing, for move_sibling_title."""
+
+    @staticmethod
+    def out(state, position):
+        return f"package={NETFLIX}\nactive=true\nstate=PlaybackState {{state={state}, position={position}, speed=1.0}}"
+
+    async def wait(self, *outs):
+        t, seen, left = FakeTV(B, "Den", []), {}, list(outs)
+
+        async def adb(*args, **kw):
+            return left.pop(0) if len(left) > 1 else left[0]   # read by read, the last one from then on
+
+        async def no_sleep(_):
+            return None
+        t.adb = adb
+        token = server._current.set(B)
+        self.addCleanup(server._current.reset, token)
+        with patch.dict(server.TVS, {B: t}, clear=True), patch.object(server.asyncio, "sleep", no_sleep):
+            return await server.wait_until_playing(NETFLIX, timeout=0.2, seen=seen), seen
+
+    async def test_the_first_read_as_playing_is_kept(self):
+        before = time.monotonic()
+        started, seen = await self.wait(self.out("PLAYING(3)", 1000), self.out("PLAYING(3)", 2500))
+        self.assertTrue(started)
+        self.assertTrue(before <= seen["at"] <= time.monotonic())
+
+    async def test_playing_once_and_then_buffering_is_not_playing_since_then(self):
+        # Codex review on #295: the moment of that one read would count the buffering as time played
+        started, seen = await self.wait(self.out("PLAYING(3)", 1000), self.out("BUFFERING(6)", 1000))
+        self.assertFalse(started)
+        self.assertEqual(seen, {})
 
 
 class ProfileItem(unittest.TestCase):
