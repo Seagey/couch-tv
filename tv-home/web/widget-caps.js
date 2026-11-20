@@ -477,6 +477,105 @@
       ok: "OK opens what the widget showing opens. Left and Right flick through", platforms: EVERY(), sizes: sz([], [2, 2]) }
   };
 
+  // ---------------- each widget's own settings (docs/WIDGET-SETTINGS-CONTRACT.md) ----------------
+  // A setting: { key, label, type, default, help } as the contract says, plus (WIDGET-SETTINGS-SPEC.md
+  // section 5):
+  //   store  "design": a public choice kept in the design (widget.opts[key]), which the TV may still
+  //                     override for this widget (ST.widgets["<id>|<kind>"][key]);
+  //          "tv":     kept on this TV only (ST.widgets), never in a design
+  //   where  the screens that offer it: "studio", "tv" (Hold OK and Home settings), "phone"
+  //   pre    true when it is needed before launch
+  // and, by type: options [[value, label], ...] (choice), min max step (number), domain and many and
+  // max (device), many and max (text: a list of words), from (tvlist: "lists", "photos", "people",
+  // "calendars"), coast (place: beaches only), league (team: the key of the setting naming the
+  // competition), when (only shown while another setting has this value, { key: value }), sets (the
+  // design key a screen writes from this choice, worked out when it is saved), suggest (text: ready made
+  // values to pick), private (never leaves the TV and the home Wi-Fi), needs ({ apps, bridge, ha }).
+  // Two types beyond the contract's list: "tvlist" (one of the things kept on this TV: its lists, its
+  // photos) and "image" (one photo put in the widget in couch-tv Studio).
+  var ALL = ["studio", "tv", "phone"], ON_TV = ["tv", "phone"], STUDIO = ["studio"];
+  function st(key, label, type, dflt, help, store, where, pre, more) {
+    var s = { key: key, label: label, type: type, "default": dflt, help: help, store: store, where: where.slice(), pre: !!pre };
+    if (more) Object.keys(more).forEach(function (k) { s[k] = more[k]; });
+    return s;
+  }
+  var MONTHS = [[1, "January"], [2, "February"], [3, "March"], [4, "April"], [5, "May"], [6, "June"], [7, "July"], [8, "August"], [9, "September"], [10, "October"], [11, "November"], [12, "December"]];
+  var YEARS = [["every", "Every year"]];
+  for (var yr = 2026; yr <= 2040; yr++) YEARS.push([String(yr), String(yr)]);
+  var HOURS = [["off", "No time set"]];
+  for (var hr = 0; hr < 24; hr++) HOURS.push([hr, (hr % 12 || 12) + (hr < 12 ? "am" : "pm")]);
+  var MINUTES = [];
+  for (var mn = 0; mn < 60; mn += 5) MINUTES.push([mn, (mn < 10 ? "0" : "") + mn + " past the hour"]);
+  var DAYS = [[0, "Sunday"], [1, "Monday"], [2, "Tuesday"], [3, "Wednesday"], [4, "Thursday"], [5, "Friday"], [6, "Saturday"]];
+  // the fixed lists the TV reads from (widget-web.js FEEDS, LEAGUES, TICKER_NAMES): ids, never links
+  var FEED_OPTS = [["auto", "Best for your country"], ["abc", "ABC News"], ["abc-justin", "ABC News, just in"], ["abc-sport", "ABC Sport"], ["abc-business", "ABC Business"],
+    ["sbs", "SBS News"], ["guardian", "The Guardian Australia"], ["bbc", "BBC World"], ["rnz", "RNZ"]];
+  var LEAGUE_OPTS = [["afl", "AFL"], ["nrl", "NRL"], ["aleague", "A-League"], ["epl", "Premier League"], ["nba", "NBA"], ["bbl", "Big Bash"], ["cricket", "Cricket"]];
+  var TICKER_OPTS = [["^AXJO", "ASX 200"], ["^AORD", "All Ords"], ["AUDUSD=X", "Australian dollar in US dollars"], ["AUDNZD=X", "Australian dollar in NZ dollars"],
+    ["AUDEUR=X", "Australian dollar in euros"], ["AUDGBP=X", "Australian dollar in pounds"], ["AUDJPY=X", "Australian dollar in yen"], ["BTC-AUD", "Bitcoin"], ["ETH-AUD", "Ether"],
+    ["^GSPC", "S&P 500"], ["^IXIC", "Nasdaq"], ["^DJI", "Dow Jones"], ["^FTSE", "FTSE 100"], ["^NZ50", "NZX 50"], ["^N225", "Nikkei"], ["GC=F", "Gold"], ["CL=F", "Oil"]];
+  // the sport apps Up next's game mode looks in (widgets.js SPORT_APPS): any one of them will do
+  var SPORT_APP_PKGS = ["au.com.kayosports.tv", "au.com.foxtel.atv", "au.com.ninenow.ctv", "com.swm.live", "au.com.tenplay", "dazn"];
+
+  var CLOCK_FMT = function () { return st("format", "12 or 24 hour", "choice", "auto", "Follow this TV uses the clock set in Home settings, Look and scenes.", "design", ALL, true,
+    { options: [["auto", "Follow this TV"], ["12h", "12 hour"], ["24h", "24 hour"]] }); };
+  var HEADING = function (help, pre) { return st("label", "Heading", "text", "", help, "design", ALL, pre !== false, { max: 40 }); };
+  var PHOTO = function () { return st("photo", "Photo", "tvlist", "first", "Which of this TV's photos shows here. Add photos in Home settings, Look and scenes, Your photos.", "tv", ON_TV, true, { from: "photos" }); };
+  var IMAGE = function () { return st("image", "Photo in the widget", "image", "", "Or put one photo in the widget itself. It shows on every TV this design goes to.", "design", STUDIO, true); };
+  var HA = { ha: true };
+
+  // before launch (WIDGET-SETTINGS-SPEC.md section 2, the P items)
+  var SETTINGS = {
+    clock: [CLOCK_FMT()], tallclock: [CLOCK_FMT()], glassclock: [CLOCK_FMT()], flipclock: [CLOCK_FMT()],
+    countdown: [
+      st("label", "Name", "text", "", "What you are counting down to, like Ella's birthday.", "design", ALL, true, { max: 40 }),
+      st("day", "Day", "number", 25, "The day of the month.", "design", ALL, true, { min: 1, max: 31, step: 1 }),
+      st("month", "Month", "choice", 12, "", "design", ALL, true, { options: MONTHS }),
+      st("year", "Year", "choice", "every", "Pick a year for a one off day, like a wedding. Every year counts to the same day each year.", "design", ALL, true, { options: YEARS }),
+      st("unit", "Count in", "choice", "sleeps", "", "design", ALL, true, { options: [["sleeps", "Sleeps"], ["days", "Days"], ["weeks", "Weeks"]] })
+    ],
+    weather: [st("place", "Show the town name", "toggle", true, "Turn off to show only the weather.", "design", ALL, true)],
+    bigtemp: [st("place", "Show the town name", "toggle", true, "Turn off to show only the temperature.", "design", ALL, true)],
+    surf: [st("place", "Beach", "place", "", "Where the swell is read. Empty uses this home's town.", "tv", ON_TV, true, { coast: true, "private": true })],
+    photo: [PHOTO(), IMAGE()],
+    artframe: [PHOTO(), IMAGE()],
+    upnext: [st("sport", "Game mode", "choice", "auto", "On shows the last game watched in Kayo, Foxtel, 9Now, 7plus, 10 or DAZN. Automatic turns it on when the home also shows scores.", "design", ALL, true,
+      { options: [["auto", "Automatic"], [true, "On"], [false, "Off"]], needs: { apps: SPORT_APP_PKGS.slice() } })],
+    aircon: [st("entity", "Room", "device", "", "Which aircon shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "climate", needs: HA })],
+    controls: [st("switches", "Lights and switches", "device", [], "Which ones show here. None picked shows every one picked in Smart home. Locks, alarms and garage doors never show.", "tv", ON_TV, true,
+      { domain: ["light", "switch", "fan", "cover"], many: true, max: 16, needs: HA })],
+    camera: [st("cam", "Camera", "device", "", "Which camera shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "camera", needs: HA }),
+      HEADING("Empty shows the camera's own name.")],
+    sensor: [st("reading", "Sensor", "device", "", "Which sensor shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "sensor", needs: HA }),
+      HEADING("Empty shows the sensor's own name.")],
+    doorbell: [HEADING("Empty shows the doorbell's own name.")],
+    energy: [HEADING("Empty shows the name from your smart home.")],
+    list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Home settings, couch-tv Studio, At home.", "tv", ON_TV, true, { from: "lists" }),
+      HEADING("Empty shows the list's own name.")],
+    news: [st("feed", "News source", "choice", "auto", "Where the headlines come from. Best for your country picks ABC News in Australia, BBC World in the UK and RNZ in New Zealand.", "design", ALL, true,
+      { options: FEED_OPTS })],
+    sports: [
+      st("league", "Competition", "choice", "nrl", "Which games show here.", "design", ALL, true, { options: LEAGUE_OPTS }),
+      st("team", "Your team", "team", "", "Your team's game shows first. Pick from the teams in the competition.", "design", ALL, true, { league: "league" })
+    ],
+    stocks: [st("tickers", "Shares and prices", "text", ["^AXJO", "AUDUSD=X", "BTC-AUD"], "Up to six. Pick one here, or type a share's code, like BHP.AX.", "design", ALL, true,
+      { many: true, max: 6, suggest: TICKER_OPTS })],
+    commute: [
+      st("to", "Where to", "place", "", "The town or suburb you drive to. Kept on this TV only.", "tv", ON_TV, true, { "private": true }),
+      st("arrive_h", "Arrive by", "choice", "off", "Couch TV says when to leave to get there by then.", "design", ALL, true, { options: HOURS }),
+      st("arrive_m", "Minutes past the hour", "choice", 0, "", "design", ALL, true, { options: MINUTES, when: { arrive_h: "set" } })
+    ],
+    bins: [
+      st("weekday", "Bin night", "choice", 0, "The night the bins go out.", "design", ALL, true, { options: DAYS }),
+      st("alt", "Taking turns", "toggle", false, "On when the two bins go out on alternate weeks.", "design", ALL, true),
+      st("thisweek", "Which bin goes out this week", "choice", "a", "Pick the one going out this week and Couch TV keeps count from there.", "design", ALL, true,
+        { options: [["a", "First bin"], ["b", "Second bin"]], when: { alt: true }, sets: "anchor" }),
+      st("bin_a", "First bin", "text", "Recycling", "", "design", ALL, true, { max: 20 }),
+      st("bin_b", "Second bin", "text", "Garden", "", "design", ALL, true, { max: 20 })
+    ]
+  };
+  Object.keys(SETTINGS).forEach(function (k) { if (C[k]) C[k].settings = SETTINGS[k]; });
+
   // A widget couch-tv cannot fill yet always shows the same card on a TV (widgets.js soon()), so its
   // `until` says exactly that, rather than each record wording it its own way
   Object.keys(C).forEach(function (k) {

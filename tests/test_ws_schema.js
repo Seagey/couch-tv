@@ -1,0 +1,157 @@
+// Each widget's own settings (docs/WIDGET-SETTINGS-CONTRACT.md, WIDGET-SETTINGS-SPEC.md section 5): every
+// `settings` list in tv-home/web/widget-caps.js is well formed (keys, types, defaults, options, beginner
+// words), every widget with a before launch setting in the spec has one, and a design kept key is one the
+// TV's design sanitiser keeps (design.js WOPT).
+// Run: node tests/test_ws_schema.js
+const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
+
+const web = path.join(__dirname, "../tv-home/web");
+const CAPS = require(path.join(web, "widget-caps.js"));
+let n = 0;
+const ok = (c, m) => { assert.ok(c, m); n++; };
+const isArr = Array.isArray;
+
+console.log("Running widget settings schema tests...");
+
+// the contract's types, plus the two the spec needs (tvlist: something kept on this TV; image: a photo
+// put in the widget in couch-tv Studio)
+const TYPES = ["place", "choice", "toggle", "text", "number", "app", "apps", "team", "device", "calendar", "tvlist", "image"];
+const HA_DOMAINS = ["climate", "camera", "sensor", "light", "switch", "fan", "cover", "media_player", "scene", "script", "event", "binary_sensor"];
+const TVLISTS = ["lists", "photos", "people", "calendars"];
+const BANNED = /\b(beta|experimental|coming soon|adb|token|entity|entities|url|package|api)\b/i;
+const DASH = /[–—]| - /;
+
+// design.js WOPT: the keys a design may carry for each kind (anything else is dropped on the TV)
+const DJ = fs.readFileSync(path.join(web, "design.js"), "utf8");
+const WOPT = {};
+const block = DJ.match(/var WOPT = \{([\s\S]*?)\n  \};/);
+ok(!!block, "design.js has WOPT");
+block[1].replace(/(\w+): "([^"]*)"/g, (m, k, v) => { WOPT[k] = v.split(/\s+/).filter(Boolean); });
+DJ.replace(/WOPT\.(\w+) = "([^"]*)"/g, (m, k, v) => { WOPT[k] = v.split(/\s+/).filter(Boolean); });
+// design keys this branch adds before design.js learns them (asked of the design.js owner)
+const PENDING_WOPT = ["countdown.year"];
+
+// the renderers (widgets.js R.<kind>)
+const WJ = fs.readFileSync(path.join(web, "widgets.js"), "utf8");
+const drawn = (k) => new RegExp("R\\." + k + " = |R\\[\"" + k + "\"\\] = ").test(WJ);
+
+function wordsOk(s, where) {
+  ok(typeof s === "string", where + " is words");
+  ok(!DASH.test(s), where + " has no dash: " + s);
+  ok(!BANNED.test(s), where + " has no jargon: " + s);
+  ok(!/couch-tv (says|keeps|shows|looks)/.test(s), where + " names Couch TV as Couch TV: " + s);
+}
+const valOf = (o) => o[0];
+const sameVal = (a, b) => a === b;
+
+let total = 0;
+CAPS.kinds().forEach((kind) => {
+  const list = CAPS.settings(kind);
+  ok(isArr(list), kind + ": settings is a list");
+  const keys = {};
+  list.forEach((s) => {
+    total++;
+    const at = kind + "." + s.key;
+    ok(typeof s.key === "string" && /^[a-z][a-z0-9_]{0,23}$/.test(s.key), at + ": key is short letters and digits");
+    ok(!keys[s.key], at + ": key used once");
+    keys[s.key] = s;
+    ok(TYPES.indexOf(s.type) >= 0, at + ": type " + s.type);
+    ok(typeof s.label === "string" && s.label.trim().length > 0 && s.label.length <= 40, at + ": label");
+    ok(/^[A-Z0-9]/.test(s.label), at + ": label starts with a capital");
+    ok(s.label.split(" ").slice(1).every((w) => !/^[A-Z]/.test(w) || ["TV", "Couch", "Studio", "Home", "Assistant"].indexOf(w) >= 0), at + ": label in sentence case");
+    wordsOk(s.label, at + " label");
+    ok(typeof s.help === "string" && s.help.length <= 200, at + ": help is one line");
+    if (s.help) { wordsOk(s.help, at + " help"); ok(/[.?]$/.test(s.help), at + ": help ends with a full stop"); }
+    ok("default" in s, at + ": has a default");
+    ok(s.store === "design" || s.store === "tv", at + ": store");
+    ok(isArr(s.where) && s.where.length > 0 && s.where.every((w) => ["studio", "tv", "phone"].indexOf(w) >= 0), at + ": where");
+    ok(typeof s.pre === "boolean", at + ": pre");
+    // kept on the TV: never offered in Studio, never in a design
+    if (s.store === "tv") ok(s.where.indexOf("studio") < 0, at + ": a TV setting is not offered in Studio");
+    if (s.private) ok(s.store === "tv", at + ": a private setting stays on the TV");
+    // a design key is one the TV keeps
+    if (s.store === "design") {
+      const dk = s.sets || s.key;
+      ok((WOPT[kind] || []).indexOf(dk) >= 0 || PENDING_WOPT.indexOf(kind + "." + dk) >= 0, at + ": " + dk + " is a design key the TV keeps (design.js WOPT " + kind + ")");
+    }
+    const d = s["default"];
+    switch (s.type) {
+      case "choice":
+        ok(isArr(s.options) && s.options.length >= 2, at + ": options");
+        s.options.forEach((o) => {
+          ok(isArr(o) && o.length === 2 && ["string", "number", "boolean"].indexOf(typeof o[0]) >= 0, at + ": option is [value, label]");
+          ok(typeof o[1] === "string" && o[1].length > 0, at + ": option label");
+          wordsOk(o[1], at + " option");
+        });
+        ok(new Set(s.options.map(valOf)).size === s.options.length, at + ": option values differ");
+        ok(s.options.some((o) => sameVal(o[0], d)), at + ": default is one of the options");
+        break;
+      case "toggle": ok(typeof d === "boolean", at + ": toggle default is on or off"); break;
+      case "number":
+        ok(typeof s.min === "number" && typeof s.max === "number" && typeof s.step === "number" && s.min < s.max && s.step > 0, at + ": min max step");
+        ok(typeof d === "number" && d >= s.min && d <= s.max, at + ": default in range");
+        break;
+      case "text":
+        if (s.many) {
+          ok(isArr(d) && typeof s.max === "number" && d.length <= s.max, at + ": a list of words, up to max");
+          if (s.suggest) s.suggest.forEach((o) => { ok(isArr(o) && typeof o[0] === "string" && typeof o[1] === "string", at + ": suggestion"); wordsOk(o[1], at + " suggestion"); });
+        } else ok(typeof d === "string" && (!s.max || d.length <= s.max), at + ": text default");
+        break;
+      case "place": ok(d === "" || (d && typeof d.name === "string"), at + ": place default empty (this home's town or none)"); break;
+      case "device":
+        [].concat(s.domain).forEach((dm) => ok(HA_DOMAINS.indexOf(dm) >= 0, at + ": domain " + dm));
+        ok(s.needs && s.needs.ha === true, at + ": needs Home Assistant");
+        if (s.many) ok(isArr(d) && typeof s.max === "number", at + ": many devices");
+        else ok(d === "", at + ": one device, empty is the first");
+        break;
+      case "tvlist": ok(TVLISTS.indexOf(s.from) >= 0 && typeof d === "string", at + ": tvlist from " + s.from); break;
+      case "image": ok(d === "" && s.store === "design", at + ": a photo in the widget lives in the design"); break;
+      case "team":
+        ok(typeof d === "string", at + ": team default");
+        ok(keys[s.league] && keys[s.league].type === "choice", at + ": team names its competition setting");
+        break;
+      case "apps": ok(isArr(d), at + ": apps default is a list"); break;
+      case "app": case "calendar": ok(typeof d === "string", at + ": default"); break;
+    }
+    if (s.needs) {
+      ok(typeof s.needs === "object", at + ": needs");
+      if (s.needs.apps) ok(isArr(s.needs.apps) && s.needs.apps.length > 0, at + ": needs apps");
+    }
+  });
+  // `when` names a sibling setting
+  list.forEach((s) => { if (s.when) Object.keys(s.when).forEach((k) => ok(!!keys[k], kind + "." + s.key + ": when names " + k)); });
+});
+
+// every kind with a before launch setting in WIDGET-SETTINGS-SPEC.md section 2 (the P items) has it,
+// marked pre, and is a kind the TV draws
+const PRE = {
+  clock: ["format"], tallclock: ["format"], glassclock: ["format"], flipclock: ["format"],
+  countdown: ["label", "day", "month", "year"], weather: ["place"], bigtemp: ["place"],
+  surf: ["place"], photo: ["photo", "image"], artframe: ["photo", "image"], upnext: ["sport"],
+  aircon: ["entity"], controls: ["switches"], camera: ["cam", "label"], sensor: ["reading", "label"],
+  doorbell: ["label"], energy: ["label"], list: ["list"], news: ["feed"], sports: ["league", "team"],
+  stocks: ["tickers"], commute: ["to", "arrive_h"], bins: ["thisweek"]
+};
+Object.keys(PRE).forEach((kind) => {
+  ok(!!CAPS.get(kind), kind + " has a caps record");
+  ok(drawn(kind), kind + " is drawn by widgets.js");
+  PRE[kind].forEach((key) => {
+    const s = CAPS.settings(kind).find((x) => x.key === key);
+    ok(!!s, kind + " has the setting " + key);
+    ok(s.pre === true, kind + "." + key + " is marked before launch");
+  });
+});
+// the spec's own example: the surf beach is a coast place kept on the TV
+const beach = CAPS.settings("surf")[0];
+ok(beach.key === "place" && beach.type === "place" && beach.coast === true && beach.store === "tv", "surf: the beach is picked on the TV");
+// the TV and the design agree on the web widgets' fixed lists (widget-web.js)
+const WW = fs.readFileSync(path.join(web, "widget-web.js"), "utf8");
+CAPS.settings("news")[0].options.forEach((o) => { if (o[0] !== "auto") ok(WW.indexOf("\"" + o[0] + "\": {") >= 0 || WW.indexOf(" " + o[0] + ": {") >= 0, "news source " + o[0] + " is a feed the TV reads"); });
+CAPS.settings("sports")[0].options.forEach((o) => ok(new RegExp("\\b" + o[0] + ": \\{ name: \"" + o[1] + "\"").test(WW), "competition " + o[0] + " is " + o[1] + " on the TV"));
+// a kind with no settings says so with an empty list
+ok(isArr(CAPS.settings("stack")) && CAPS.settings("nope").length === 0, "no settings is an empty list");
+
+console.log("  " + total + " settings on " + CAPS.kinds().filter((k) => CAPS.settings(k).length).length + " kinds");
+console.log("All " + n + " checks passed.");
