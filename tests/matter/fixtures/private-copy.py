@@ -23,8 +23,8 @@ ap.add_argument("--port", type=int, default=5741, help="first of 8 device ports 
 ap.add_argument("--nibbles", default="9,10,11,12,13,14,0,8",
                 help="8 short discriminators, one per device (default 9,10,11,12,13,14,0,8)")
 args = ap.parse_args()
-if args.name in ("", "matter-fixtures") or "/" in args.name:
-    raise SystemExit("pick another plain folder name, e.g. ma-fixtures")
+if args.name == "matter-fixtures" or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,40}", args.name):
+    raise SystemExit("pick another plain folder name (letters, digits, _ or -, up to 41), e.g. ma-fixtures")
 nibbles = [int(x) for x in args.nibbles.split(",")]
 if len(nibbles) != 8 or any(not 0 <= n <= 14 for n in nibbles):
     raise SystemExit("--nibbles needs 8 numbers from 0 to 14")

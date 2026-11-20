@@ -211,24 +211,47 @@ class Locked:
         while True:
             try:
                 os.mkdir(LOCK)
+                with open(os.path.join(LOCK, "pid"), "w") as f:
+                    f.write(str(os.getpid()))
                 return self
             except FileExistsError:
-                # a lock left by a dead run is stale after 120 s
-                try:
-                    if time.time() - os.stat(LOCK).st_mtime > 120:
-                        os.rmdir(LOCK)
-                        continue
-                except FileNotFoundError:
+                if self.stale():
+                    self.free()
                     continue
-                if time.time() - t0 > 180:
-                    raise SystemExit("chip-tool lock busy for 180 s")
+                if time.time() - t0 > 400:
+                    raise SystemExit("chip-tool lock busy for 400 s")
                 time.sleep(0.2)
 
-    def __exit__(self, *a):
+    @staticmethod
+    def stale():
+        """Left by a dead fx: its pid is gone, or (no pid yet or unreadable) it is older than the
+        longest a holder can take (3 tries of the 120 s home pairing, plus room: 400 s)."""
         try:
-            os.rmdir(LOCK)
+            with open(os.path.join(LOCK, "pid")) as f:
+                pid = int(f.read().strip())
+            os.kill(pid, 0)
+            return False
+        except ProcessLookupError:
+            return True
+        except (FileNotFoundError, ValueError, PermissionError):
+            try:
+                return time.time() - os.stat(LOCK).st_mtime > 400
+            except FileNotFoundError:
+                return False
+
+    @staticmethod
+    def free():
+        try:
+            os.remove(os.path.join(LOCK, "pid"))
         except FileNotFoundError:
             pass
+        try:
+            os.rmdir(LOCK)
+        except (FileNotFoundError, OSError):
+            pass
+
+    def __exit__(self, *a):
+        self.free()
 
 
 def chip_tool(args, timeout=90):
@@ -425,11 +448,23 @@ def manualcode(disc, pin=PASSCODE):
 
 def status():
     paired = home_paired()
-    return {"devices": [{"name": n, "running": bool(pid_of(n)), "pid": pid_of(n), "port": d["port"],
+    return {"host": lan_address(), "devices": [{"name": n, "running": bool(pid_of(n)), "pid": pid_of(n), "port": d["port"],
                          "discriminator": d["disc"], "home_node": d["node"], "in_home": n in paired,
                          "share_discriminator": SHARE_DISC[n], "expect": d["expect"],
                          "forbidden": bool(d.get("forbidden")), "about": d["about"]}
                         for n, d in DEVICES.items()]}
+
+
+def lan_address():
+    """This Mac's address on the home network (the harness sends <host>:1 to test address errors)."""
+    for ifc in ("en0", "en1"):
+        try:
+            r = subprocess.run(["ipconfig", "getifaddr", ifc], capture_output=True, text=True, timeout=5)
+            if r.returncode == 0 and r.stdout.strip():
+                return r.stdout.strip()
+        except Exception:
+            pass
+    return None
 
 
 def names_from(args):

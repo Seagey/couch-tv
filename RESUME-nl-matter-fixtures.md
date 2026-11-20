@@ -14,6 +14,14 @@ tests/test_matter_fixtures.py 10/10 OK; reference run 7 with the lock 261/0/0 (2
 refused with exit 3. fx.py, private-copy.py and reference_server.py are deployed to ~/matter-fixtures.
 A trial private copy sits in ~/mf-copy-check on the MacBook (not started; harmless).
 
+Checker NO-GO at 6b82489 fixed (contract changes 13 and 14): light attributes may be missing only while off
+and are checked while on; `already` only; reason keys (ready, not_allowed, address with <host>:1 and [fe80::1],
+remove while offline with --remove-offline, rename of the plug to "Garage door" -> opens_house); device, removed,
+version required; kept lock/alarm fabric FAIL; friendly_name, colour range, supported_color_modes, switch on/off,
+rename name, device_ids [] and note on errors, contact on/off + reading, failed commission over 35 s WARN;
+lock gap closed; fx chip-tool.lock stale by pid or 400 s; fx status "host"; private-copy name rule.
+Reference server updated to match. Proof: unit tests 15/15; reference run 10 315/0/0; run 8 (--remove-offline) 314/0/0.
+
 Left: run the harness against nl-matter-bridge once that branch has a final (non WIP) commit.
 How: `git -C <bridge worktree> archive <commit> bridge scripts config.example.json | ssh macbook 'tar -x -C ~/mf-bridge'`
 (~/mf-bridge already has .venv with bridge/requirements.txt, matter-server 1.6.0 installed by

@@ -22,7 +22,7 @@ short discriminator, so no two codes can reach the same device.
 
 | Name | Program | Port | Discriminator | Factory code | Home node | Should appear as |
 |---|---|---|---|---|---|---|
-| light | chip-lighting-app (extended colour light) | 5541 | 321 | 0169-331-2333 | 101 | `light` |
+| light | on, off, toggle; after the toggle the entity shows on with `brightness` or `level` and `color_temp_kelvin`; level 50 (%) = CurrentLevel 120 to 134; temp 2700 (K) = 370 mireds; colour `#0000ff` = hue 240° (or xy blue) and `"120,100"`; every answer carries `device`, the model entry; the entity shows about 50% |
 | plug | all-devices-app `on-off-plug-in-unit` | 5542 | 578 | 0333-171-2331 | 102 | `switch` |
 | thermostat | thermostat-app | 5543 | 835 | 0497-011-2335 | 103 | `climate` |
 | cover | chef `rootnode_windowcovering` | 5544 | 1092 | 1005-491-2339 | 104 | `cover` |
@@ -85,6 +85,7 @@ python3 tests/matter_contract.py --api http://127.0.0.1:8765 --token <key>   # b
   network discovery. Use it for the Android emulator (no multicast there).
 - `--slow` also waits out a real 3 minute window to test "expired" honestly.
 - `--report out.json` writes every check; `-v` prints every request and answer.
+- `--remove-offline` also removes the plug while it is stopped (contract change 14, reasons `offline` or `not_answering`).
 - `--fx "<command>"` if the devices run somewhere else (default `ssh macbook matter-fixtures/fx`).
 
 It prints `PASS`/`FAIL`/`WARN` per check, then the counts, and exits 1 on any FAIL. A full run takes
@@ -128,22 +129,22 @@ own answer.
 
 | Group | Checks |
 |---|---|
-| auth | devices and command refuse a call without the token (401/403); devices answers `{devices, ready}` |
-| errors | malformed code, bad check digit, bad QR text: `wrong_code` in under 15 s. A code no device answers to, and a shared code whose window was closed: `expired` or `unreachable`. The right device with the wrong passcode: `wrong_code`. Every `note` is plain words (no "CHIP", hex, stack traces, under 240 characters). The light is not joined after any of them |
-| commission | each device by its shared 11 digit code (sensors by the QR text): `ok`, `device_ids` like `matter:<node>:<ep>`, one node, new, under 120 s, and the device now really has 2 fabrics. The light shared a second time: error `already` (or its same ids), no new entry, still 2 fabrics |
-| list | exactly the expected endpoints per device, domain, not unavailable, `device_class` and `unit_of_measurement` (°C, %) for sensors, sensor readings match the device, climate has `current_temperature temperature min_temp max_temp hvac_modes` and its state is one of `hvac_modes`, cover `current_position`, fan `percentage`, light `brightness` or `level` and `color_temp_kelvin` |
+| auth | devices and command refuse a call without the token (401/403); devices answers `{devices, ready}`; when `ready` is false it carries a `reason` (`off`, `not_installed`, `node_missing`, `node_old`, `starting`, `stopped`, `android_old`, `processor`, `not_started`) |
+| errors | malformed code, bad check digit, bad QR text: `wrong_code` in under 15 s. A code no device answers to, and a shared code whose window was closed: `expired` or `unreachable`. The right device with the wrong passcode: `wrong_code`. The light's open code with address `<host>:1`: `unreachable`, reason `address`, `port` or `link_local`; with `[fe80::1]` (no port, so only the link local rule applies): `unreachable`, reason `link_local` (change 14). Every failure: `device_ids: []`, a `note` in plain words (no "CHIP", hex, stack traces, under 240 characters), WARN if it took over 35 s (change 10). The light is not joined after any of them |
+| commission | each device by its shared 11 digit code (sensors by the QR text): `ok`, `device_ids` like `matter:<node>:<ep>`, one node, new, under 120 s, and the device now really has 2 fabrics. The light shared a second time: `ok: false`, error `already` (change 13), no new entry, still 2 fabrics |
+| list | every entry has `attributes.friendly_name`; exactly the expected endpoints per device, domain, not unavailable, `device_class` and `unit_of_measurement` (°C, %) for sensors, sensor readings match the device, contact sensor state `on`/`off` with `reading` `open`/`closed` that agrees, plug state exactly `on`/`off`, climate has `current_temperature temperature min_temp max_temp hvac_modes` and its state is one of `hvac_modes`, cover `current_position`, fan `percentage`, light `min_color_temp_kelvin`, `max_color_temp_kelvin`, `supported_color_modes`, and `brightness` or `level` and `color_temp_kelvin` when on (a light that is off may leave those three out, change 13) |
 | light | on, off, toggle; level 50 (%) = CurrentLevel 120 to 134; temp 2700 (K) = 370 mireds; colour `#0000ff` = hue 240° (or xy blue) and `"120,100"`; the entity shows about 50% |
 | plug | on, off, toggle, toggle; `level` refused |
 | thermostat | mode heat = SystemMode 4; target 22.5 = heating setpoint 2250; mode cool = 3 and target 24 = cooling setpoint 2400 (if `cool` is offered); mode off = 0; an unknown mode refused; the state follows |
 | cover | position 30 (% open) = target 7000 (Matter counts % closed, in hundredths); position 100 = 0; off closes (10000), on opens (0); the entity shows 100 and open |
 | fan | on + level 60 = PercentSetting 60 and PercentCurrent 60; off = PercentCurrent 0 |
 | sensors | a command on a sensor is refused; an unknown id is refused |
-| live | changes made elsewhere (the home controller, like Google Home or a wall switch) show in the list within 10 s: light off, on, 25%; plug on; blind closed; setpoint 19 °C; fan 30%; occupancy 1 and 0; contact closed and open |
-| events | `version` goes up after a change; `GET /api/matter/events` sends `event: matter` with the device list at once and again after a change (WARN, not FAIL, if there is no stream) |
-| rename | to "Lounge lamp" and the list shows it; empty, 41 characters and unknown ids refused |
-| forbidden | the lock and the smoke alarm: no `device_ids` (an `ok: false` answer must carry error `not_allowed`), a plain `note`, never listed, no domain outside the six, their state untouched; WARN if the implementation keeps its keys to them (it should leave their fabric) |
-| offline | the plug stopped: `unavailable` within 90 s; started again: on/off within 90 s |
-| remove | `ok`, `removed` lists every id of the node, every endpoint leaves the list, the device is back to 1 fabric, and it still answers the home controller (it stays in the person's Google or Apple home) |
+| live | changes made elsewhere (the home controller, like Google Home or a wall switch) show in the list within 10 s: light off, on, 25%; plug on; blind closed; setpoint 19 °C; fan 30%; occupancy 1 and 0; contact closed and open (open shows `on`, closed `off`) |
+| events | devices carries `version`, and it goes up after a change; `GET /api/matter/events` sends `event: matter` with the device list at once and again after a change (WARN, not FAIL, if there is no stream) |
+| rename | to "Lounge lamp": ok, the answer carries `name`, the list shows it; empty, 41 characters and unknown ids refused. The plug renamed to "Garage door" (a name that would hide a switch) is refused with reason `opens_house` (change 14; WARN if an implementation takes it, and the old name is put back) and the plug stays listed. The light cannot show this rule: a dimmable light is never hidden by its name |
+| forbidden | the lock and the smoke alarm: no `device_ids` (an `ok: false` answer must carry error `not_allowed` with reason `blocked` or `unsupported`), a plain `note`, never listed, no domain outside the six, their state untouched, and the implementation keeps no keys to them: the device is back to 1 fabric within 30 s (FAIL, not WARN) |
+| offline | the plug stopped: `unavailable` within 90 s (change 13); started again: on/off within 90 s. With `--remove-offline` the plug is removed while it does not answer: `ok`, reason `offline` or `not_answering`, a note, it leaves the list, and once it answers again it is back to 1 fabric (WARN; `fx evict` cleans up if not) |
+| remove | `ok`, `removed` (required) lists every id of the node, every endpoint leaves the list, the device is back to 1 fabric, and it still answers the home controller (it stays in the person's Google or Apple home) |
 
 ## Proven on 21 Nov 2026
 
@@ -157,6 +158,13 @@ Again after the lock was added (run 7, the only controller on the devices, lock 
 end and gone afterwards, every device back on 1 fabric): **261 passed, 0 failed, 0 warnings, 231 s.**
 A second run started meanwhile with `--lock-wait 0` stopped at once with exit code 3 and the
 message naming the first run, and left its lock alone. `tests/test_matter_fixtures.py`: 10 tests OK.
+
+With the stricter checks for contract changes 13 and 14 (reason keys, `already` only, the light's
+attributes while on, friendly_name, contact reading, `device`, `removed` and `version` required, a
+kept lock or alarm fabric a FAIL): run 10, **315 passed, 0 failed, 0 warnings, 232 s**; run 8 with
+`--remove-offline`, **314 passed, 0 failed, 0 warnings, 226 s** (the plug forgotten while offline,
+back to 1 fabric once it answered). Run 9 waited for the lock while a bridge run held it, then ran.
+`tests/test_matter_fixtures.py`: 15 tests OK.
 
 ```sh
 ssh macbook ~/matter-spike/connectedhomeip/.environment/pigweed-venv/bin/python3 \

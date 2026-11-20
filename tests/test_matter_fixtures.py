@@ -92,6 +92,47 @@ class RunLock(LockBase):
         self.assertTrue(fx.take_lock("d")["ok"])
 
 
+class ChipToolLock(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        p = mock.patch.object(fx, "LOCK", os.path.join(self.tmp.name, "chip-tool.lock"))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_a_dead_holder_is_stale_a_live_one_is_not(self):
+        os.mkdir(fx.LOCK)
+        with open(os.path.join(fx.LOCK, "pid"), "w") as f:
+            f.write(str(os.getpid()))
+        self.assertFalse(fx.Locked.stale())
+        with open(os.path.join(fx.LOCK, "pid"), "w") as f:
+            f.write("999999")  # no such process
+        self.assertTrue(fx.Locked.stale())
+
+    def test_no_pid_is_stale_only_after_400_s(self):
+        os.mkdir(fx.LOCK)
+        self.assertFalse(fx.Locked.stale())
+        os.utime(fx.LOCK, (0, 0))
+        self.assertTrue(fx.Locked.stale())
+
+    def test_taken_and_given_back(self):
+        with fx.Locked():
+            self.assertTrue(os.path.isdir(fx.LOCK))
+        self.assertFalse(os.path.exists(fx.LOCK))
+
+
+class PrivateCopyName(unittest.TestCase):
+    def test_bad_names_are_refused(self):
+        import subprocess
+        script = os.path.join(HERE, "matter", "fixtures", "private-copy.py")
+        for bad in ("matter-fixtures", "../x", "-x", "a/b", "x" * 42, ""):
+            r = subprocess.run([sys.executable, script, bad], capture_output=True, text=True,
+                               env={**os.environ, "HOME": tempfile.gettempdir() + "/no-such-home"})
+            self.assertNotEqual(r.returncode, 0, bad)
+            if not bad.startswith("-"):  # "-x" is already refused by argparse as an unknown option
+                self.assertIn("pick another plain folder name", r.stderr, bad)
+
+
 class FakeFx:
     """Stands in for the fixtures: a lock folder in a temp dir through fx's own take_lock/drop_lock."""
     def __init__(self, cmd):
@@ -136,6 +177,20 @@ class HarnessLock(LockBase):
         code, f, _ = self.run_main(boom)
         self.assertIsInstance(code, RuntimeError)
         self.assertEqual(f.calls, ["lock", "unlock"])
+        self.assertFalse(os.path.exists(self.lockdir))
+
+    def test_signal_handlers_are_in_place_before_the_lock(self):
+        import signal
+        seen = []
+        real_lock = FakeFx.lock
+
+        def lock(self, token, about):
+            seen.append(signal.getsignal(signal.SIGTERM))
+            return real_lock(self, token, about)
+        with mock.patch.object(FakeFx, "lock", lock):
+            code, f, _ = self.run_main(lambda *a: 0)
+        self.assertEqual(code, 0)
+        self.assertTrue(callable(seen[0]) and seen[0] not in (signal.SIG_DFL, signal.SIG_IGN))
         self.assertFalse(os.path.exists(self.lockdir))
 
     def test_held_lock_stops_the_run_with_a_clear_message(self):

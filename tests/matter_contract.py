@@ -32,6 +32,13 @@ ERROR_KEYS = {"expired", "wrong_code", "unreachable", "thread"}
 # Added to the contract later (changes 10 and 11): a shared lock, alarm or garage door, and a device
 # that is already on this controller.
 EXTRA_ERROR_KEYS = {"not_allowed", "already"}
+# Contract change 14: `reason` keys the screens word in every language.
+READY_REASONS = {"off", "not_installed", "node_missing", "node_old", "starting", "stopped",  # bridge
+                 "android_old", "processor", "not_started"}                                  # on-TV
+NOT_ALLOWED_REASONS = {"blocked", "unsupported"}
+ADDRESS_REASONS = {"address", "port", "link_local"}
+REMOVE_OFFLINE_REASONS = {"offline", "not_answering"}
+FAILED_COMMISSION_S = 35  # change 10: a failed commission answers within about 30 s (WARN above this)
 GROUPS = ["auth", "errors", "commission", "list", "light", "plug", "thermostat", "cover", "fan", "sensors",
           "live", "events", "rename", "forbidden", "offline", "remove"]
 CONTROLLED = ["light", "plug", "thermostat", "cover", "fan", "sensors"]
@@ -155,10 +162,14 @@ def fabrics_of(answer, name):
     raise KeyError(f"fx fabrics answered no count for {name}: {json.dumps(answer)[:200]}")
 
 
-def take_fixture_lock(fx, about, wait_s, every=30):
+def lock_token():
+    return f"{socket.gethostname()}-{os.getpid()}-{int(time.time())}"
+
+
+def take_fixture_lock(fx, about, wait_s, every=30, token=None):
     """One contract run at a time on the shared fixtures (two at once corrupt each other: a busy
     light, 3 fabrics). Waits up to wait_s for the lock; answers the token, or None if still held."""
-    token = f"{socket.gethostname()}-{os.getpid()}-{int(time.time())}"
+    token = token or lock_token()
     end = time.time() + wait_s
     while True:
         r = fx.lock(token, about)
@@ -271,6 +282,9 @@ class Run:
             o.get("devices"), list) and isinstance(o.get("ready"), bool), f"answered {s} {json.dumps(o)[:200]}")
         if o.get("note") is not None:
             check("list: note is plain words", plain(o["note"]), repr(o["note"]))
+        if o.get("ready") is False:  # contract change 14: why it is not ready, as a key the screens word
+            check(f"list: not ready carries a reason key from {sorted(READY_REASONS)}", o.get("reason") in READY_REASONS,
+                  f"reason={o.get('reason')!r}")
         check("list: ready is true (the controller is up)", o.get("ready") is True, f"ready={o.get('ready')}")
 
     def expect_error(self, label, code, keys, max_s=120, address=None):
@@ -280,11 +294,14 @@ class Run:
         check(f"errors: {label}: ok is false", okflag is False and s != 0, f"answered {s} {json.dumps(o)[:200]}")
         check(f"errors: {label}: error key is one of {sorted(keys)}", err in keys,
               f"error={err!r} (keys allowed by the contract: {sorted(ERROR_KEYS)})")
-        if "note" in o and o["note"] is not None:
-            check(f"errors: {label}: note is plain words", plain(o["note"]), repr(o["note"]))
+        check(f"errors: {label}: device_ids is []", o.get("device_ids") == [], f"device_ids={o.get('device_ids')!r}")
+        check(f"errors: {label}: has a note in plain words", isinstance(o.get("note"), str) and o["note"].strip()
+              and plain(o["note"]), repr(o.get("note")))
         check(f"errors: {label}: answers within {max_s} s", dt <= max_s, f"took {dt:.0f} s")
-        info(f"{label}: error={err!r} note={o.get('note')!r} in {dt:.1f} s")
-        return err
+        check(f"errors: {label}: answers within about 30 s (change 10)", dt <= FAILED_COMMISSION_S,
+              f"took {dt:.0f} s", warn=True)
+        info(f"{label}: error={err!r} reason={o.get('reason')!r} note={o.get('note')!r} in {dt:.1f} s")
+        return o
 
     def g_errors(self):
         self.expect_error("malformed code '12345'", "12345", {"wrong_code"}, 15)
@@ -300,6 +317,15 @@ class Run:
         wrong = self.fx.run("wrongcode", "light")["manual"]
         self.expect_error("the right device with the wrong passcode", wrong, {"wrong_code"}, 120,
                           self.address("light"))
+        # contract change 14: an address that cannot work answers unreachable with a reason key
+        host = self.args.address or self.fx_host()
+        for addr, label, want in ((f"{host}:1", f"the light's code with address <host>:1", ADDRESS_REASONS),
+                                  # no port: a port other than 5540 is its own reason ("port") on the bridge
+                                  ("[fe80::1]", "the light's code with a link local address [fe80::1]",
+                                   {"link_local"})):
+            o = self.expect_error(label, sh["manual"], {"unreachable"}, 120, addr)
+            check(f"errors: {label}: reason is one of {sorted(want)}", o.get("reason") in want,
+                  f"reason={o.get('reason')!r}")
         # the shared window closed (Google Home's code timed out or was cancelled)
         self.fx.run("revoke", "light")
         time.sleep(2)
@@ -338,6 +364,11 @@ class Run:
         self.ids[name] = ids
         self.node[name] = nodes.pop()
 
+    def fx_host(self):
+        """The fixtures' own LAN address (fx status "host"), else the API's host."""
+        from urllib.parse import urlparse
+        return self.fx.run("status").get("host") or urlparse(self.api.base).hostname
+
     def address(self, name):
         if not self.args.address:
             return None
@@ -354,15 +385,14 @@ class Run:
             self.share_again("light")
 
     def share_again(self, name):
-        """Contract change 11: a device shared to the same controller twice answers error "already"
-        (or ok with the ids it already has). Either way no second entry and no third fabric."""
+        """Contract changes 11 and 13: a device shared to the same controller twice answers ok false,
+        error "already". No second entry and no third fabric."""
         before = by_id(self.api.devices()[2])
         sh = self.fx.share(name, 300)
         s, o, dt = self.api.commission(sh["manual"], self.address(name))
         info(f"{name} shared again: answered {s} {json.dumps(o)[:200]} in {dt:.1f} s")
-        same = o.get("ok") is True and sorted(o.get("device_ids") or []) == sorted(self.ids[name])
-        check(f"commission: {name} shared a second time answers error 'already' (or its same ids)",
-              (o.get("ok") is False and o.get("error") == "already") or same, f"answered {s} {json.dumps(o)[:200]}")
+        check(f"commission: {name} shared a second time answers ok false, error 'already'",
+              o.get("ok") is False and o.get("error") == "already", f"answered {s} {json.dumps(o)[:200]}")
         if o.get("note") is not None:
             check(f"commission: the note for a second share is plain words", plain(o["note"]), repr(o["note"]))
         after = by_id(self.api.devices()[2])
@@ -391,6 +421,9 @@ class Run:
                   isinstance(d.get("id"), str) and isinstance(d.get("name"), str) and d.get("name")
                   and d.get("domain") in ALLOWED_DOMAINS and "state" in d and isinstance(d.get("attributes"), dict),
                   json.dumps(d)[:240])
+            a = d.get("attributes") if isinstance(d.get("attributes"), dict) else {}
+            check(f"list: {d.get('id')} has attributes.friendly_name", isinstance(a.get("friendly_name"), str)
+                  and a.get("friendly_name"), f"attributes={a}")
         for n in self.args.devices:
             if n not in self.node:
                 continue
@@ -408,7 +441,17 @@ class Run:
                               self.args.live_timeout, 0.5)
                 check(f"list: {n} endpoint {e['ep']} is not unavailable", bool(ok),
                       f"state={(self.entity(n, e['ep']) or {}).get('state')}")
+                d = self.entity(n, e["ep"]) or d  # read again now that it has a state
                 a = d.get("attributes") or {}
+                if e["domain"] == "switch":
+                    check(f"list: {n} state is exactly on or off", d.get("state") in ("on", "off"),
+                          f"state={d.get('state')!r}")
+                if e["domain"] == "sensor" and e["device_class"] == "contact":
+                    check("list: contact sensor state is on or off (on = open, as Home Assistant)",
+                          d.get("state") in ("on", "off"), f"state={d.get('state')!r}")
+                    check("list: contact sensor reading is open or closed and agrees with the state",
+                          a.get("reading") == {"on": "open", "off": "closed"}.get(d.get("state")),
+                          f"state={d.get('state')!r} reading={a.get('reading')!r}")
                 if e["domain"] == "sensor":
                     check(f"list: {n} endpoint {e['ep']} device_class is {e['device_class']}",
                           a.get("device_class") == e["device_class"], f"attributes={a}")
@@ -436,8 +479,21 @@ class Run:
                 if e["domain"] == "fan":
                     check("list: fan has percentage", "percentage" in a, f"attributes={a}")
                 if e["domain"] == "light":
-                    check("list: light has brightness or level (also while off)", brightness_pct(a) is not None, f"state={e.get('state')!r} attributes={a}")
-                    check("list: light has color_temp_kelvin (also while off)", "color_temp_kelvin" in a, f"state={e.get('state')!r} attributes={a}")
+                    self.light_attrs("list", d)
+
+    def light_attrs(self, where, d):
+        """Contract change 13: an OFF light may leave out brightness, level and color_temp_kelvin
+        (as Home Assistant does); an ON light must carry them. The colour range is always there."""
+        a, st = d.get("attributes") or {}, d.get("state")
+        off = st == "off"
+        check(f"{where}: light has brightness or level{' (off: may be left out)' if off else ''}",
+              off or brightness_pct(a) is not None, f"state={st!r} attributes={a}")
+        check(f"{where}: light has color_temp_kelvin{' (off: may be left out)' if off else ''}",
+              off or num(a.get("color_temp_kelvin")) is not None, f"state={st!r} attributes={a}")
+        for k in ("min_color_temp_kelvin", "max_color_temp_kelvin"):
+            check(f"{where}: light has {k}", num(a.get(k)) is not None, f"attributes={a}")
+        check(f"{where}: light has supported_color_modes (a list)",
+              isinstance(a.get("supported_color_modes"), list) and a["supported_color_modes"], f"attributes={a}")
 
     # ---- commands
 
@@ -448,9 +504,10 @@ class Run:
         if expect_ok:
             check(f"{label} answers ok with state", s == 200 and o.get("ok") is True and "state" in o,
                   f"answered {s} {json.dumps(o)[:200]}")
-            if "device" in o:  # contract change 2: the full model entry after the change
-                check(f"{label}: 'device' is the model entry for {id_}",
-                      isinstance(o["device"], dict) and o["device"].get("id") == id_, json.dumps(o["device"])[:160])
+            # contract change 2: the full model entry after the change
+            check(f"{label}: 'device' is the model entry for {id_}",
+                  isinstance(o.get("device"), dict) and o["device"].get("id") == id_,
+                  json.dumps(o.get("device"))[:160])
         else:
             check(f"{label} is refused (ok false)", o.get("ok") is False, f"answered {s} {json.dumps(o)[:200]}")
         return o
@@ -474,6 +531,12 @@ class Run:
         self.device_is("command: light off reaches the bulb", "light", "onoff", "on-off", lambda v: v is False)
         self.cmd("light", "toggle")
         self.device_is("command: light toggle reaches the bulb", "light", "onoff", "on-off", lambda v: v is True)
+        on = wait_for(lambda: (lambda d: d if d and d.get("state") == "on" else None)(self.entity("light")),
+                      self.args.live_timeout, 0.5)
+        check("command: light entity shows on after the toggle", bool(on),
+              f"entity={json.dumps(self.entity('light'))[:200]}")
+        if on:
+            self.light_attrs("command: the light while on", on)
         self.cmd("light", "level", 50)
         self.device_is("command: light level 50 (%) reaches the bulb", "light", "level", "current-level",
                        lambda v: v is not None and 120 <= v <= 134)
@@ -650,6 +713,9 @@ class Run:
         check(f"live: {label} {a!r} -> {b!r} changes the state within {t} s", bool(got),
               f"still {s_b!r} (device {self.fx.read('sensors', cluster, attr, ep)!r})")
         info(f"{label}: {a!r} shows as {s_a!r}, {b!r} as {s_b!r} ({time.time() - t0:.1f} s)")
+        if label == "contact":  # Matter StateValue true = in contact = closed; Home Assistant "on" = open
+            check("live: contact open (StateValue false) shows on, closed (true) shows off",
+                  (s_a, s_b) == ("on", "off"), f"open={s_a!r} closed={s_b!r}")
         set_fn(a)
         got = wait_for(lambda: (self.entity("sensors", ep) or {}).get("state") == s_a, t, 0.5)
         check(f"live: {label} {b!r} -> {a!r} goes back to {s_a!r} within {t} s", bool(got),
@@ -660,6 +726,7 @@ class Run:
         /api/matter/devices JSON), sent at once and within 250 ms of a change. Optional for an
         implementation that has no stream (WARN, not FAIL), but the version counter must go up."""
         s, o, devs = self.api.devices()
+        check("events: devices carries 'version'", "version" in o, f"keys={sorted(o)}")
         if "version" in o:
             v0 = o["version"]
             if "light" in self.node:
@@ -736,6 +803,7 @@ class Run:
         id_ = f"matter:{self.node['light']}:1"
         s, o, _ = self.api.call("POST", "/api/matter/rename", {"id": id_, "name": "Lounge lamp"})
         check("rename: light to 'Lounge lamp' answers ok", o.get("ok") is True, f"answered {s} {json.dumps(o)[:160]}")
+        check("rename: the answer carries the new name", o.get("name") == "Lounge lamp", f"answered {json.dumps(o)[:160]}")
         check("rename: the list shows the new name", (self.entity("light") or {}).get("name") == "Lounge lamp",
               f"name={(self.entity('light') or {}).get('name')!r}")
         for bad, label in (("", "an empty name"), ("x" * 41, "a 41 character name")):
@@ -745,6 +813,20 @@ class Run:
         check("rename: an unknown id is refused", o.get("ok") is False, f"answered {s} {json.dumps(o)[:160]}")
         check("rename: the name is still 'Lounge lamp' after the refusals",
               (self.entity("light") or {}).get("name") == "Lounge lamp", "")
+        if "plug" in self.node:
+            # contract change 14: a name that would hide a switch (the house opening rule) is refused,
+            # reason opens_house. An implementation without the name rule may take it: WARN, then undo.
+            pid = f"matter:{self.node['plug']}:1"
+            old = (self.entity("plug") or {}).get("name") or "Plug"
+            s, o, _ = self.api.call("POST", "/api/matter/rename", {"id": pid, "name": "Garage door"})
+            if o.get("ok") is False:
+                check("rename: the plug to 'Garage door' is refused with reason opens_house",
+                      o.get("reason") == "opens_house", f"answered {s} {json.dumps(o)[:160]}")
+            else:
+                check("rename: the plug to 'Garage door' is refused (opens_house)", False,
+                      f"answered {s} {json.dumps(o)[:160]}", warn=True)
+                self.api.call("POST", "/api/matter/rename", {"id": pid, "name": old})
+            check("rename: the plug is still listed after that", bool(self.entity("plug")), "")
 
     def g_forbidden(self):
         for name, cluster, attr in (("lock", "doorlock", "lock-state"), ("alarm", "smokecoalarm", "expressed-state")):
@@ -761,6 +843,9 @@ class Run:
             if o.get("ok") is False:  # contract change 10/11: error "not_allowed" (ok true with no ids is also fine)
                 check(f"forbidden: the {name} is refused with error 'not_allowed'", o.get("error") == "not_allowed",
                       f"answered {s} {json.dumps(o)[:200]}")
+                if o.get("error") == "not_allowed":  # contract change 14
+                    check(f"forbidden: the {name}'s reason is one of {sorted(NOT_ALLOWED_REASONS)}",
+                          o.get("reason") in NOT_ALLOWED_REASONS, f"reason={o.get('reason')!r}")
             if o.get("note") is not None:
                 check(f"forbidden: the note for the {name} is plain words", plain(o["note"]), repr(o["note"]))
             after = by_id(self.api.devices()[2])
@@ -781,7 +866,7 @@ class Run:
                 check(f"forbidden: the {name} still answers the home controller", False, str(e))
             fab = self.fx.fabrics(name)
             check(f"forbidden: the implementation keeps no keys to the {name} (device back to 1 fabric)",
-                  wait_for(lambda: self.fx.fabrics(name) == 1, 30), f"the {name} reports {fab} fabrics", warn=True)
+                  wait_for(lambda: self.fx.fabrics(name) == 1, 30), f"the {name} reports {fab} fabrics")
             if self.fx.fabrics(name) > 1:
                 info(f"{name}: still on {self.fx.fabrics(name)} fabrics; `fx reset` clears it after the run")
             self.fx.run("revoke", name)
@@ -794,10 +879,33 @@ class Run:
         got = wait_for(lambda: (self.entity("plug") or {}).get("state") == "unavailable", t, 2)
         check(f"offline: a device that stops answering shows 'unavailable' within {t} s", bool(got),
               f"entity={json.dumps(self.entity('plug'))[:160]}")
+        if self.args.remove_offline and got:
+            self.remove_while_offline("plug")
         subprocess.run(self.fx.cmd + ["start", "plug"], capture_output=True)
+        if "plug" not in self.node:  # removed while offline: it must leave the fabric once it answers
+            left = wait_for(lambda: self.fx.fabrics("plug") == 1, t, 3)
+            check(f"offline: the plug removed while offline leaves the fabric within {t} s of answering again",
+                  bool(left), f"the plug reports {self.fx.fabrics('plug')} fabrics", warn=True)
+            if not left:
+                self.fx.run("evict", "plug")  # keep the fixtures clean for the next run
+            return
         got = wait_for(lambda: (self.entity("plug") or {}).get("state") in ("on", "off"), t, 2)
         check(f"offline: it comes back (on/off) within {t} s of answering again", bool(got),
               f"entity={json.dumps(self.entity('plug'))[:160]}")
+
+    def remove_while_offline(self, n):
+        """Contract changes 7 and 14 (opt in, --remove-offline): a device that does not answer is
+        forgotten anyway: ok true, every id gone, reason offline or not_answering, a note."""
+        s, o, dt = self.api.call("POST", "/api/matter/remove", {"id": self.ids[n][0]}, timeout=90)
+        check(f"offline: removing the {n} while it does not answer answers ok", o.get("ok") is True,
+              f"answered {s} {json.dumps(o)[:200]}")
+        check(f"offline: the reason is one of {sorted(REMOVE_OFFLINE_REASONS)}",
+              o.get("reason") in REMOVE_OFFLINE_REASONS, f"reason={o.get('reason')!r}")
+        check(f"offline: the answer has a note in plain words", isinstance(o.get("note"), str) and plain(o["note"]),
+              repr(o.get("note")))
+        gone = wait_for(lambda: all(parse_id(d.get("id"))[0] != self.node[n] for d in self.api.devices()[2]), 10)
+        check(f"offline: every endpoint of the {n} leaves the list", bool(gone), "")
+        del self.node[n]
 
     def g_remove(self):
         for n in list(self.node):
@@ -812,9 +920,10 @@ class Run:
         id_ = self.ids[n][0]
         s, o, dt = self.api.call("POST", "/api/matter/remove", {"id": id_}, timeout=90)
         check(f"remove: {n} answers ok", o.get("ok") is True, f"answered {s} {json.dumps(o)[:160]}")
-        if "removed" in o:  # contract change 7: every id of the node
-            check(f"remove: {n} 'removed' lists every id of the node", sorted(o["removed"]) == sorted(self.ids[n]),
-                  f"removed={o['removed']} ids={self.ids[n]}")
+        # contract change 7: every id of the node
+        check(f"remove: {n} 'removed' lists every id of the node",
+              isinstance(o.get("removed"), list) and sorted(o["removed"]) == sorted(self.ids[n]),
+              f"removed={o.get('removed')!r} ids={self.ids[n]}")
         gone = wait_for(lambda: all(parse_id(d.get("id"))[0] != self.node[n] for d in self.api.devices()[2]), 10)
         check(f"remove: every endpoint of {n} leaves the list", bool(gone), "")
         left = wait_for(lambda: self.fx.fabrics(n) == 1, 30, 2)
@@ -847,6 +956,8 @@ def main():
     ap.add_argument("--address", help="send `address` <host>:<device port> with every commission (skips "
                                       "discovery; for an emulator without multicast). host = the MacBook's IP")
     ap.add_argument("--report", help="write the results as JSON here")
+    ap.add_argument("--remove-offline", action="store_true",
+                    help="in the offline group, also remove the plug while it does not answer (change 14)")
     ap.add_argument("--lock-wait", type=float, default=900,
                     help="seconds to wait while another run holds the fixtures lock (default 900)")
     ap.add_argument("--no-lock", action="store_true",
@@ -868,17 +979,17 @@ def main():
     api, fx = Api(args.api, args.token, args.timeout), Fx(args.fx)
     if args.no_lock:
         return run_all(args, groups, api, fx)
-    token = take_fixture_lock(fx, f"contract run against {args.api}", args.lock_wait)
-    if not token:
-        return 3
+    token = lock_token()
 
     def stop(signum, frame):  # a kill still gives the lock back (finally below)
         raise SystemExit(128 + signum)
-    for s in (signal.SIGTERM, signal.SIGHUP):
+    for s in (signal.SIGTERM, signal.SIGHUP):  # before the lock, so there is no moment without them
         signal.signal(s, stop)
     try:
+        if not take_fixture_lock(fx, f"contract run against {args.api}", args.lock_wait, token=token):
+            return 3
         return run_all(args, groups, api, fx)
-    finally:
+    finally:  # unlock with our own token never frees someone else's lock (fx refuses other tokens)
         try:
             fx.unlock(token)
         except Exception as e:
