@@ -397,8 +397,8 @@ class Run:
                 if e["domain"] == "fan":
                     check("list: fan has percentage", "percentage" in a, f"attributes={a}")
                 if e["domain"] == "light":
-                    check("list: light has brightness or level", brightness_pct(a) is not None, f"attributes={a}")
-                    check("list: light has color_temp_kelvin", "color_temp_kelvin" in a, f"attributes={a}")
+                    check("list: light has brightness or level (also while off)", brightness_pct(a) is not None, f"state={e.get('state')!r} attributes={a}")
+                    check("list: light has color_temp_kelvin (also while off)", "color_temp_kelvin" in a, f"state={e.get('state')!r} attributes={a}")
 
     # ---- commands
 

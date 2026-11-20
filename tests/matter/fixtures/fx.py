@@ -468,7 +468,7 @@ def main(argv):
     elif cmd == "do":
         out(do(args[0], args[1:]))
     elif cmd == "fabrics":
-        out(fabrics(args[0]))
+        out({n: fabrics(n) for n in names_from(args)})
     elif cmd == "evict":
         out([evict(n) for n in names_from(args)])
     elif cmd == "pipe":
