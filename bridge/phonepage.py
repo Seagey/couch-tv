@@ -34,9 +34,14 @@ WAIT_MAX = 20           # changes held for a TV home that is not open (HomeActiv
 VIEW_MAX = 256 * 1024   # the TV home's At home view, at most
 EDIT_MAX = 64 * 1024    # one change from the phone, at most
 
+PIN_START_MIN_LEFT = 90 # "Show a code on the TV" keeps a live code with more than this left (Server.kt pinForQr(90))
+LOCK_PER_ADDRESS = 5    # one address adds at most this many wrong codes to the pairing lock in its window
+
 _ids = itertools.count(1)
-_pin = {"code": None, "until": 0.0, "wrong": 0, "tv": None, "shown_until": 0.0}
+# gen: changes whenever the code does (made, used, thrown away), so the TV home redraws its QR at once
+_pin = {"code": None, "until": 0.0, "wrong": 0, "tv": None, "shown_until": 0.0, "gen": 0}
 _tvs = {}
+_lock_tries = {}        # address -> [(time, guess fingerprint)], the wrong codes it added to the pairing lock
 
 
 def _now_ms():
@@ -51,7 +56,8 @@ def _tv(tv):
 def reset():
     """Forget everything (tests)."""
     _tvs.clear()
-    _pin.update(code=None, until=0.0, wrong=0, tv=None, shown_until=0.0)
+    _lock_tries.clear()
+    _pin.update(code=None, until=0.0, wrong=0, tv=None, shown_until=0.0, gen=0)
 
 
 # ---------------------------------------------------------------- pairing codes
@@ -59,8 +65,18 @@ def reset():
 def new_pin(tv=None, show=False, now=None):
     now = time.time() if now is None else now
     _pin.update(code="%06d" % secrets.randbelow(1_000_000), until=now + PIN_SECS, wrong=0, tv=tv,
-                shown_until=now + PIN_SECS if show else 0.0)
+                shown_until=now + PIN_SECS if show else 0.0, gen=_pin["gen"] + 1)
     return _pin["code"]
+
+
+def _drop_pin():
+    _pin.update(code=None, until=0.0, shown_until=0.0, gen=_pin["gen"] + 1)
+
+
+def pin_gen():
+    """Changes whenever the code does: the TV home asks for its QR again (phone-page.js), so a used or
+    thrown away code never stays in it."""
+    return _pin["gen"]
 
 
 def current_pin(now=None):
@@ -73,11 +89,21 @@ def pin_seconds_left(now=None):
     return max(0, int(_pin["until"] - now)) if current_pin(now) else 0
 
 
-def pin_for_qr(tv=None, now=None):
+def pin_for_qr(tv=None, now=None, min_left=PIN_QR_MIN_LEFT):
     """The live code if it has more than 30 s left (so a code someone is typing is not swapped), else a new one."""
-    if current_pin(now) and pin_seconds_left(now) > PIN_QR_MIN_LEFT:
+    if current_pin(now) and pin_seconds_left(now) > min_left:
         return _pin["code"]
     return new_pin(tv, now=now)
+
+
+def show_pin(tv, now=None):
+    """"Show a code on the TV": the live code (the one inside the TV's QR) when it has more than 90 s left,
+    else a new one, shown as a line on that TV's home. Never swaps a live code for a new one, so nobody on
+    the Wi-Fi can keep the QR's code dead by asking again and again."""
+    now = time.time() if now is None else now
+    code = pin_for_qr(tv, now, PIN_START_MIN_LEFT)
+    _pin.update(tv=tv, shown_until=_pin["until"])
+    return code
 
 
 def pair(code, now=None):
@@ -89,9 +115,30 @@ def pair(code, now=None):
     if not secrets.compare_digest(given.encode(), live.encode()):
         _pin["wrong"] += 1
         if _pin["wrong"] >= PIN_WRONG_MAX:
-            _pin.update(code=None, until=0.0, shown_until=0.0)
+            _drop_pin()
         return False
-    _pin.update(code=None, until=0.0, shown_until=0.0)
+    _drop_pin()
+    return True
+
+
+def counts_for_lock(ip, code, window, now=None):
+    """Whether a wrong code adds to the pairing lock (server.pair_wrong). Only called while a code was live.
+    The same wrong code again from one address is not a new guess, and one address adds at most 5 in the
+    lock's window: so one phone or script alone can never lock pairing for everyone (its own limit is the
+    per address one, server.is_rate_limited). It takes guesses from several addresses to lock it."""
+    now = time.time() if now is None else now
+    ip = ip or "this computer"
+    fp = "".join(ch for ch in str(code or "") if ch.isdigit())[:12]
+    for k in list(_lock_tries):
+        _lock_tries[k] = [t for t in _lock_tries[k] if now - t[0] < window]
+        if not _lock_tries[k]:
+            del _lock_tries[k]
+    mine = _lock_tries.setdefault(ip, [])
+    if any(t[1] == fp for t in mine) or len(mine) >= LOCK_PER_ADDRESS:
+        return False
+    mine.append((now, fp))
+    while len(_lock_tries) > 1000:   # memory bound, as server.RATE_LIMIT_ADDRESSES
+        _lock_tries.pop(next(iter(_lock_tries)))
     return True
 
 
@@ -130,7 +177,7 @@ def inbox(tv, now=None):
     pin = shown_pin(tv, now / 1000)
     return {"edits": [{"id": e["id"], "edit": e["edit"]} for e in edits],
             "fast": now - s["phone_at"] < FAST_MS or pin is not None,
-            "pin": pin, "settings_at": s["settings_at"], "want_view": s["view"] is None}
+            "pin": pin, "pin_gen": _pin["gen"], "settings_at": s["settings_at"], "want_view": s["view"] is None}
 
 
 def done(tv, edit_id, result):
@@ -204,10 +251,11 @@ def json_size(v):
 # 1080, a portrait photo fits the screen turned), saved as a JPEG in data/photos, and listed in that
 # TV's Home settings (photos) as {id, file}. The TV home shows a "bridge...jpg" file from this computer
 # (GET /api/photo/<file>, with the pairing key), never from anywhere else. Same limits as the on-TV app
-# (Photos.kt): 25 MB, 100 megapixels, JPEG or PNG (and anything else Pillow reads, such as WebP).
+# (Photos.kt): 25 MB, 100 megapixels, JPEG, PNG or WebP, one photo at a time (server.py).
 PHOTO_MAX_UPLOAD = 25 * 1024 * 1024
 PHOTO_W, PHOTO_H = 1920, 1080
 PHOTO_MAX_PIXELS = 100_000_000
+PHOTO_FORMATS = ["JPEG", "PNG", "WEBP"]   # what a phone sends as a photo (a JPEG with a second picture opens as MPO)
 PHOTO_NAME = re.compile(r"bridge[a-z0-9]{6,40}\.jpg")
 STRAY_AGE_S = 3600     # a file nobody lists is deleted only once it is an hour old (an upload in flight is never)
 
@@ -238,30 +286,54 @@ def fit(w, h, max_w=PHOTO_W, max_h=PHOTO_H):
 def make_photo(raw, data):
     """One picture from the phone, kept. Returns its file name, or raises Refused with words for the phone."""
     try:
-        from PIL import Image, ImageOps
+        from PIL import Image
     except ImportError:
-        raise Refused(501, "Photos from the phone need one more part on the home computer. On it, run: "
-                           ".venv/bin/pip install -r bridge/requirements.txt, then restart Couch TV there.")
+        raise Refused(501, "Photos from the phone need one more part on the home computer. In the couch-tv "
+                           "folder there, install what bridge/requirements.txt lists (docs/UPDATES.md says how), "
+                           "then restart Couch TV there.")
     import io
+    # one rule for size: Pillow itself refuses a picture over twice this (DecompressionBombError) before decoding
+    Image.MAX_IMAGE_PIXELS = PHOTO_MAX_PIXELS
+    too_big = Refused(413, "That photo is too big. Pick one under 100 megapixels.")
     try:
-        img = Image.open(io.BytesIO(raw))
+        # only photo formats: Pillow can also read PostScript (it runs Ghostscript), PSD, TIFF and many more,
+        # none of which a phone sends as a photo, and none of which should run on the home computer
+        img = Image.open(io.BytesIO(raw), formats=PHOTO_FORMATS)
         w, h = img.size
+    except Image.DecompressionBombError:
+        raise too_big
     except Exception:
         raise Refused(415, "That is not a photo the TV can read. Send a JPEG or PNG.")
     # a picture far bigger than any camera's (a crafted PNG of a few KB can claim this) is refused before decoding
     if w * h > PHOTO_MAX_PIXELS:
-        raise Refused(413, "That photo is too big. Pick one under 100 megapixels.")
+        raise too_big
     try:
-        taken = None
+        if img.format in ("JPEG", "MPO"):
+            # a JPEG is decoded at 1/2, 1/4 or 1/8 size when that is still at least screen size: a 50 megapixel
+            # photo then never takes 150 MB of memory on the home computer
+            img.draft(None, fit(w, h))
+        taken, turn = None, None
         try:
-            taken = img.getexif().get_ifd(0x8769).get(0x9003)   # the day it was taken, for On this day
+            ex0 = img.getexif()
+            turn = ex0.get(0x0112)                          # the camera's note of which way is up
+            taken = ex0.get_ifd(0x8769).get(0x9003)         # the day it was taken, for On this day
         except Exception:
             pass
-        img = ImageOps.exif_transpose(img)
-        img = img.convert("RGB")
+        # made screen size first, then turned and made RGB, so no second full size copy is ever made
+        # (fit gives the same size either way round)
+        if img.mode == "1":
+            img = img.convert("L")
+        elif img.mode not in ("RGB", "RGBA", "L", "LA"):
+            img = img.convert("RGBA" if "A" in img.mode or "transparency" in img.info else "RGB")
         tw, th = fit(*img.size)
         if (tw, th) != img.size:
-            img = img.resize((tw, th), Image.LANCZOS)
+            img = img.resize((tw, th), Image.LANCZOS, reducing_gap=3.0)
+        img = img.convert("RGB")
+        how = {2: Image.Transpose.FLIP_LEFT_RIGHT, 3: Image.Transpose.ROTATE_180, 4: Image.Transpose.FLIP_TOP_BOTTOM,
+               5: Image.Transpose.TRANSPOSE, 6: Image.Transpose.ROTATE_270, 7: Image.Transpose.TRANSVERSE,
+               8: Image.Transpose.ROTATE_90}.get(turn)
+        if how is not None:
+            img = img.transpose(how)
         name = "bridge" + secrets.token_hex(12) + ".jpg"
         out = os.path.join(photo_dir(data), name)
         kw = {"quality": 88}

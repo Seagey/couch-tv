@@ -185,10 +185,11 @@ def cur_who():
 
 
 class ApiError(Exception):
-    def __init__(self, status, message, key=None, vars=None):
+    def __init__(self, status, message, key=None, vars=None, retry_after=None):
         super().__init__(message)
         self.status, self.message = status, message
         self.key, self.vars = key, vars
+        self.retry_after = retry_after   # seconds, for a 429: the Retry-After header and retry_after field
 
 
 def ok(**fields):
@@ -315,12 +316,8 @@ def extract_auth_key(request):
     q_key = (request.query.get("key") or request.query.get("token") or "").strip()
     if q_key:
         return q_key
-    # the phone's Home settings page shows the TV's photos with plain <img> tags, which carry no header:
-    # only for those pictures, the cookie that page keeps the key in (shim.js, SameSite=Strict)
-    if request.method == "GET" and request.path.startswith("/api/photo/"):
-        c = (request.cookies.get("couchtv_token") or "").strip()
-        if c:
-            return urllib.parse.unquote(c)
+    # (no cookie: the phone's Home settings page fetches its photos with the header, so the key is never in
+    # a cookie, which every other web service on this computer would be sent too)
     return None
 
 
@@ -348,11 +345,12 @@ RATE_LIMIT_WINDOW = 60.0
 RATE_LIMIT_ADDRESSES = 1000   # memory bound: at most this many addresses are remembered
 
 
-# Pairing across every address (20 Nov 2026, as the on-TV app's PairLock): 15 wrong tries at
-# /api/pair, /api/appletv/claim or /api/vidaa/claim within 10 minutes, from anywhere, lock those three
-# for 10 minutes (429). Six digit codes are the weak spot: per address limits alone let many addresses
-# keep guessing. API calls that carry the key keep only the per address limit above, so a paired phone
-# is never locked out by someone else's guesses.
+# The Apple TV's six digit codes, across every address (20 Nov 2026, as the on-TV app's PairLock): 15
+# wrong codes at /api/appletv/claim within 10 minutes, while a code is live, lock that claim for 10
+# minutes (429). Per address limits alone let many addresses keep guessing six digits. Only while a code
+# is live, so nobody can keep it locked when no Apple TV is pairing. The pairing key (/api/pair) and the
+# VIDAA and Panasonic claim codes are long, so they keep only the per address limit above: a lock there
+# would let one caller shut the owner out. The clock is monotonic, so a clock change can't open it.
 PAIR_LOCK_MAX = 15
 PAIR_LOCK_WINDOW = 600.0
 PAIR_LOCK_SECS = 600.0
@@ -362,14 +360,14 @@ _pair_locked_until = [0.0]
 
 def pair_locked_for(now=None):
     """Seconds pairing stays locked (0: open)."""
-    now = time.time() if now is None else now
+    now = time.monotonic() if now is None else now
     left = _pair_locked_until[0] - now
     return int(-(-left // 1)) if left > 0 else 0
 
 
 def pair_wrong(now=None):
     """Counts one wrong pairing try; True when it has just locked pairing."""
-    now = time.time() if now is None else now
+    now = time.monotonic() if now is None else now
     cutoff = now - PAIR_LOCK_WINDOW
     while _pair_wrong and _pair_wrong[0] <= cutoff:
         _pair_wrong.pop(0)
@@ -390,8 +388,8 @@ def check_pair_lock():
     left = pair_locked_for()
     if left > 0:
         mins = max(1, -(-left // 60))
-        raise ApiError(429, f"Too many wrong codes. Wait {mins} minutes, then try again.",
-                       key="err_pairing_locked", vars={"minutes": mins})
+        raise ApiError(429, f"Too many wrong codes. Wait {mins} min, then try again.",
+                       key="err_pairing_locked", vars={"minutes": mins}, retry_after=left)
 
 
 def client_ip(request):
@@ -537,7 +535,10 @@ async def middleware(request, handler):
             _current.set(tv_id)
             resp = await handler(request)
         except ApiError as e:
-            resp = web.json_response({"ok": False, "error": e.message, **messages.err_fields(e)}, status=e.status)
+            extra = {"retry_after": e.retry_after} if e.retry_after else {}
+            resp = web.json_response({"ok": False, "error": e.message, **messages.err_fields(e), **extra}, status=e.status)
+            if e.retry_after:
+                resp.headers["Retry-After"] = str(e.retry_after)
         except TVUnavailable as e:
             resp = web.json_response({"ok": False, "error": str(e), **messages.err_fields(e)}, status=503)
         except ValueError as e:
@@ -701,14 +702,12 @@ async def h_pair(request):
     # Checked after the body is read, with no await before the key is compared and the miss is
     # recorded: checked before it, parallel requests could all pass while their bodies arrive.
     ip = client_ip(request)
-    check_pair_lock()
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong pairing keys. Please wait a minute.", key="err_too_many_pairing_keys")
     if not given:
         raise ApiError(400, "pairing key is required", key="err_pairing_key_required")
     if not key_matches(given):
         record_failed_attempt(ip, given)
-        pair_wrong()
         await asyncio.sleep(0.3)
         raise ApiError(401, "That pairing key is not right. Check config.json.", key="err_pairing_key_wrong")
     return ok(paired=True, token=config.PAIRING_KEY, note="paired",
@@ -1254,7 +1253,8 @@ async def h_appletv_claim(request):
     found = appletv_codes.pop(code, None) if re.fullmatch(r"\d{6}", code) else None
     if not found or found[0] <= time.monotonic() or found[1] not in TVS:
         record_failed_attempt(ip, code)
-        pair_wrong()
+        if any(exp > time.monotonic() for exp, _ in appletv_codes.values()):
+            pair_wrong()   # only while a code is live: nobody can keep the claim locked
         await asyncio.sleep(0.3)
         raise ApiError(401, "that code is not valid (a code works once, for ten minutes)", key="err_invalid_code_10m")
     t = TVS[found[1]]
@@ -1525,14 +1525,12 @@ async def h_vidaa_claim(request):
     data = await body(request)
     code = data.get("code")
     ip = client_ip(request)
-    check_pair_lock()
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong codes. Please wait a minute.", key="err_too_many_codes")
     for tv_id, t in TVS.items():
         if t.kind in ("vidaa", "panasonic") and t.claim(code):
             return ok(key=config.PAIRING_KEY, tv=tv_id)
     record_failed_attempt(ip, str(code))
-    pair_wrong()
     await asyncio.sleep(0.3)
     raise ApiError(401, "that code is not valid (codes work once, for two minutes)", key="err_invalid_code_2m")
 
@@ -2270,19 +2268,35 @@ PHONE_PATCH_KEYS = {"place"}              # what settings_patch may change (Serv
 ATHOME_EDIT_KEYS = {"note", "lists", "wifi", "guide", "cal_url", "stay_url", "checkin", "checkout", "widget_set", "design_apps"}
 _TV_ID_SAFE = re.compile(r"[A-Za-z0-9_-]{1,40}")
 _pair_start_at = [0.0]
+_photo_one = [None]   # (loop, asyncio.Semaphore(1)), made in the running loop: one phone photo decoded at a time
+
+
+def _same_site_only(request):
+    """The code calls answer only the phone's page itself (its own http address) or a client with no
+    Origin: never Origin null or file:, which any web page can send from a sandboxed frame (the TV apps
+    that send those never pair by code)."""
+    origin = (request.headers.get("Origin") or "").strip().lower()
+    if origin and not origin.startswith(("http://", "https://")):
+        raise ApiError(403, "forbidden origin", key="err_something_wrong")
 
 
 async def pair_with_code(request, pin):
     """POST /api/pair {"pin": "123456"}: the code shown on the TV, once, for the pairing key."""
-    check_pair_lock()   # 15 wrong codes or keys in 10 minutes lock pairing for 10 minutes (every way in)
+    _same_site_only(request)
+    check_pair_lock()   # 15 wrong codes in 10 minutes, while a code was live, lock code pairing for 10 minutes
     ip = client_ip(request)
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong codes. Wait a minute, then try again.", key="err_too_many_codes")
     await asyncio.sleep(0.4)   # slows guessing a little more (Server.kt)
     check_pair_lock()   # (a lock made while this one waited)
+    was_live = phonepage.current_pin() is not None
     if not phonepage.pair(pin):
-        record_failed_attempt(ip, "pin:" + str(pin))
-        pair_wrong()
+        if was_live:
+            # only a guess at a live code counts (with no code there is nothing to guess, so nobody can keep
+            # pairing locked that way), and the same wrong code again from one address is not a new guess
+            record_failed_attempt(ip, "pin:" + str(pin))
+            if phonepage.counts_for_lock(ip, pin, PAIR_LOCK_WINDOW, time.monotonic()):
+                pair_wrong()
         raise ApiError(401, "That code has expired. Ask the TV for a new one." if not phonepage.current_pin()
                        else "That code is not right. Check the TV.", key="err_code_expired" if not phonepage.current_pin() else "err_code_wrong")
     # no pairing key set: every call is open already, so there is nothing to hand over
@@ -2290,14 +2304,16 @@ async def pair_with_code(request, pin):
 
 
 async def h_pair_start(request):
-    """"Show a code on the TV" on the phone's pairing screen: a new code, shown on that TV's home."""
+    """"Show a code on the TV" on the phone's pairing screen: the TV's live code (the one in its QR), or a new
+    one when it has 90 s or less left, shown as a line on that TV's home. Never swaps a live code."""
+    _same_site_only(request)
     check_pair_lock()
     now = time.time()
     if now - _pair_start_at[0] < 5:
         raise ApiError(429, "A code is on the TV already. Wait a moment, then ask again.", key="err_code_on_tv")
     _pair_start_at[0] = now
-    phonepage.new_pin(_current.get(), show=True)
-    return ok(digits=6, expires_in=phonepage.PIN_SECS, note="The code is on the TV now.", **messages.note_fields("note_code_on_tv"))
+    phonepage.show_pin(_current.get())
+    return ok(digits=6, expires_in=phonepage.pin_seconds_left(), note="The code is on the TV now.", **messages.note_fields("note_code_on_tv"))
 
 
 def phone_extras():
@@ -2456,8 +2472,14 @@ async def h_photos_add(request):
         raw.extend(chunk)
         if len(raw) > phonepage.PHOTO_MAX_UPLOAD:
             return refuse(413, "That photo is too big. Pick one under 25 MB.")
+    loop = asyncio.get_running_loop()
+    if _photo_one[0] is None or _photo_one[0][0] is not loop:
+        _photo_one[0] = (loop, asyncio.Semaphore(1))
     try:
-        name = await asyncio.get_running_loop().run_in_executor(None, phonepage.make_photo, bytes(raw), store.DATA)
+        # one photo at a time: decoding a big picture takes a lot of memory, and a small home computer
+        # must never decode several at once
+        async with _photo_one[0][1]:
+            name = await asyncio.get_running_loop().run_in_executor(None, phonepage.make_photo, bytes(raw), store.DATA)
     except phonepage.Refused as x:
         return refuse(x.status, str(x))
     s = dict(home_settings()["settings"])
@@ -3175,10 +3197,34 @@ async def h_settings_set(request):
             else:
                 cleaned.pop(k, None)
             kept.append(k)
+    elif not isinstance(seen, str):
+        # an older TV home sends no "seen" and knows nothing of the phone's photos: they stay listed
+        mine = [p for p in (now["settings"].get("photos") or []) if isinstance(p, dict) and phonepage.PHOTO_NAME.fullmatch(str(p.get("file") or ""))]
+        have = {p.get("id") for p in (cleaned.get("photos") or []) if isinstance(p, dict)}
+        add = [p for p in mine if p.get("id") not in have]
+        if add:
+            cleaned["photos"] = (list(cleaned.get("photos") or []) + add)[:MAX_PHOTOS]
+            kept.append("photos")
+    before = _listed_photos()
     updated = settings_stamp()
     store._write(_settings_path(), {"settings": cleaned, "updated": updated})
+    _drop_unlisted_photos(before)
     record_action(request, "settings", {"keys": sorted(cleaned)}, True)
     return ok(settings=cleaned, updated=updated, kept=kept)
+
+
+def _drop_unlisted_photos(before):
+    """A phone photo taken off on the TV: its file goes now (it was listed, so no upload is in flight),
+    and any older file nobody lists goes too."""
+    after = _listed_photos()
+    if before == after:
+        return
+    for f in before - after:
+        path = phonepage.photo_path(store.DATA, f)
+        if path:
+            with contextlib.suppress(OSError):
+                os.remove(path)
+    phonepage.drop_strays(store.DATA, after)
 
 
 # ---------- the guest's name for the Welcome widget, typed on the TV or the phone remote ----------

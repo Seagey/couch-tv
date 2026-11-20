@@ -175,24 +175,140 @@ class PhonePageApp(AioHTTPTestCase):
         self.assertNotIn(KEY, json.dumps(j))
         self.assertIn("not right", j["error"])
 
-    async def test_wrong_codes_lock_pairing(self):
-        # 15 wrong codes in 10 minutes lock every way to pair (the code, the key, Show a code, the QR)
-        for i in range(server.PAIR_LOCK_MAX):
-            phonepage.new_pin()
+    def from_ip(self):
+        # each request names its address (X-Test-Ip), as if from that phone on the Wi-Fi
+        return patch.object(server, "client_ip", lambda r: r.headers.get("X-Test-Ip"))
+
+    async def guesses(self, ip, n, distinct=True, live=True):
+        """n wrong codes from one address; a new live code before each when live (5 wrong throw one away)."""
+        out = []
+        for i in range(n):
+            if live and not phonepage.current_pin():
+                phonepage.new_pin()
             pin = phonepage.current_pin()
-            st, j = await self.j("POST", "/api/pair", {"pin": "000000" if pin != "000000" else "111111"}, headers={})
-            self.assertEqual(st, 401)
-        pin = phonepage.new_pin()
-        st, j = await self.j("POST", "/api/pair", {"pin": pin}, headers={})
-        self.assertEqual((st, j.get("error_key")), (429, "err_pairing_locked"))
-        self.assertNotIn("token", j)
-        r = await self.client.post("/api/pair/start")
-        self.assertEqual(r.status, 429)
-        st, j = await self.j("GET", "/api/phone-link")
-        self.assertEqual(st, 429)
-        server.pair_lock_reset()
-        st, j = await self.j("POST", "/api/pair", {"pin": phonepage.current_pin()}, headers={})
+            g = "%06d" % (100000 + i if distinct else 100000)
+            if g == pin:
+                g = "%06d" % (200000 + i)
+            st, j = await self.j("POST", "/api/pair", {"pin": g}, headers={"X-Test-Ip": ip})
+            out.append(st)
+        return out
+
+    async def test_wrong_codes_from_several_phones_lock_pairing(self):
+        # 15 wrong guesses at a live code in 10 minutes, from 3 addresses (5 each), lock code pairing:
+        # the code, Show a code and the QR; a phone holding the key keeps working
+        with self.from_ip():
+            for ip in ("192.0.2.11", "192.0.2.12", "192.0.2.13"):
+                self.assertEqual(await self.guesses(ip, 5), [401] * 5)
+            self.assertGreater(server.pair_locked_for(), 590)
+            pin = phonepage.new_pin()
+            st, j = await self.j("POST", "/api/pair", {"pin": pin}, headers={"X-Test-Ip": "192.0.2.20"})
+            self.assertEqual((st, j.get("error_key")), (429, "err_pairing_locked"))
+            self.assertIn("Wait 10 min", j["error"])
+            self.assertGreater(j.get("retry_after", 0), 590)
+            self.assertNotIn("token", j)
+            r = await self.client.post("/api/pair/start")
+            self.assertEqual(r.status, 429)
+            st, j = await self.j("GET", "/api/phone-link")
+            self.assertEqual(st, 429)
+            st, j = await self.j("GET", "/api/settings")
+            self.assertEqual(st, 200)
+            server.pair_lock_reset()
+            st, j = await self.j("POST", "/api/pair", {"pin": phonepage.current_pin()}, headers={"X-Test-Ip": "192.0.2.20"})
+            self.assertEqual(st, 200)
+
+    async def test_one_address_alone_never_locks_pairing(self):
+        # Fable B2: one address, the same wrong code over and over, then many different ones: never a lock,
+        # and the owner's phone (another address) still pairs with the code in the QR
+        with self.from_ip():
+            same = await self.guesses("192.0.2.66", 40, distinct=False)
+            self.assertEqual(server.pair_locked_for(), 0)
+            self.assertTrue(set(same) <= {401, 429})
+            server._failed_attempts.clear()
+            many = await self.guesses("192.0.2.66", 40)
+            self.assertTrue(set(many) <= {401, 429})
+            self.assertEqual(server.pair_locked_for(), 0)
+            st, link = await self.j("GET", "/api/phone-link")
+            self.assertEqual(st, 200)
+            st, j = await self.j("POST", "/api/pair", {"pin": link["url"][-6:]}, headers={"X-Test-Ip": "192.0.2.7"})
+            self.assertEqual((st, j.get("token")), (200, KEY))
+
+    async def test_no_live_code_never_counts(self):
+        # with no code on the TV there is nothing to guess: 60 tries from 12 addresses lock nothing
+        with self.from_ip():
+            for k in range(12):
+                st = await self.guesses("192.0.2.%d" % (100 + k), 5, live=False)
+                self.assertEqual(st, [401] * 5)
+            self.assertEqual(server.pair_locked_for(), 0)
+            st, link = await self.j("GET", "/api/phone-link")
+            self.assertEqual(st, 200)
+
+    async def test_show_a_code_never_swaps_a_live_code(self):
+        # Fable 3: asking for a code again and again (anyone on the Wi-Fi can) never kills the QR's code
+        st, link = await self.j("GET", "/api/phone-link")
+        qr = link["url"][-6:]
+        for _ in range(5):
+            server._pair_start_at[0] = 0
+            r = await self.client.post("/api/pair/start")
+            self.assertEqual(r.status, 200)
+            self.assertGreater((await r.json())["expires_in"], 90)
+            self.assertEqual(phonepage.current_pin(), qr)
+        st, box = await self.j("GET", "/api/phone/inbox?home=1")
+        self.assertEqual(box["pin"]["code"], qr)   # the same code shows as the line on the TV
+        st, j = await self.j("POST", "/api/pair", {"pin": qr}, headers={})
         self.assertEqual(st, 200)
+        # with 90 s or less left, a new one (someone is about to type it)
+        c = phonepage.new_pin(now=time.time() - 100)
+        server._pair_start_at[0] = 0
+        r = await self.client.post("/api/pair/start")
+        self.assertNotEqual(phonepage.current_pin(), c)
+        self.assertGreater((await r.json())["expires_in"], 170)
+
+    async def test_show_a_code_on_another_tv(self):
+        with patch.object(server, "TVS", {"lounge": None, "bedroom": None}), patch.object(server, "DEFAULT_TV", "lounge"):
+            r = await self.client.post("/api/pair/start?tv=bedroom")
+            self.assertEqual(r.status, 200)
+            st, box = await self.j("GET", "/api/phone/inbox?home=1&tv=bedroom")
+            self.assertEqual(box["pin"]["code"], phonepage.current_pin())
+            st, box = await self.j("GET", "/api/phone/inbox?home=1&tv=lounge")
+            self.assertIsNone(box["pin"])
+
+    async def test_code_calls_refuse_a_blind_origin(self):
+        # Fable 6: Origin null (a sandboxed frame on any web page) or file: never asks for or swaps a code
+        st, link = await self.j("GET", "/api/phone-link")
+        pin = link["url"][-6:]
+        for o in ("null", "file://", "NULL"):
+            st, j = await self.j("POST", "/api/pair", {"pin": pin}, headers={"Origin": o})
+            self.assertEqual(st, 403, o)
+            self.assertNotIn(KEY, json.dumps(j))
+            r = await self.client.post("/api/pair/start", headers={"Origin": o})
+            self.assertEqual(r.status, 403, o)
+        self.assertEqual(phonepage.current_pin(), pin)   # not used up, not swapped
+        host = "127.0.0.1:%d" % self.server.port
+        st, j = await self.j("POST", "/api/pair", {"pin": pin}, headers={"Origin": "http://" + host, "Host": host})
+        self.assertEqual((st, j.get("token")), (200, KEY))   # the page itself: its own address
+
+    async def test_used_or_dead_code_tells_the_tv_home(self):
+        # Fable 7: pin_gen changes when the code is used or thrown away, so the TV home asks for its QR again
+        st, link = await self.j("GET", "/api/phone-link")
+        st, box = await self.j("GET", "/api/phone/inbox?home=1")
+        g0 = box["pin_gen"]
+        st, j = await self.j("POST", "/api/pair", {"pin": link["url"][-6:]}, headers={})
+        self.assertEqual(st, 200)
+        st, box = await self.j("GET", "/api/phone/inbox?home=1")
+        g1 = box["pin_gen"]
+        self.assertNotEqual(g1, g0)
+        st, link = await self.j("GET", "/api/phone-link")
+        st, box = await self.j("GET", "/api/phone/inbox?home=1")
+        g2 = box["pin_gen"]
+        self.assertNotEqual(g2, g1)   # the new QR code
+        st, again = await self.j("GET", "/api/phone-link")
+        st, box = await self.j("GET", "/api/phone/inbox?home=1")
+        self.assertEqual(box["pin_gen"], g2)   # asking again keeps it: no loop
+        pin = link["url"][-6:]
+        for i in range(5):
+            await self.j("POST", "/api/pair", {"pin": "%06d" % (100000 + i) if pin != "%06d" % (100000 + i) else "999999"}, headers={})
+        st, box = await self.j("GET", "/api/phone/inbox?home=1")
+        self.assertNotEqual(box["pin_gen"], g2)   # thrown away after 5 wrong
 
     async def test_phone_link_needs_the_key(self):
         st, j = await self.j("GET", "/api/phone-link", headers={})
@@ -404,18 +520,19 @@ class PhonePageApp(AioHTTPTestCase):
         self.assertEqual(Image.open(path).size, (1440, 1080))
         st, s = await self.j("GET", "/api/settings")
         self.assertEqual(s["settings"]["photos"], [j["photo"]])
-        # shown only with the key: the header, ?key= (the TV home's picture) or the page's cookie
+        # shown only with the key: the header (the phone page fetches it) or ?key= (the TV home's picture)
         r = await self.client.get("/api/photo/" + j["photo"]["file"])
         self.assertEqual(r.status, 401)
         r = await self.client.get("/api/photo/" + j["photo"]["file"] + "?key=" + KEY)
         self.assertEqual((r.status, r.headers["Content-Type"]), (200, "image/jpeg"))
-        r = await self.client.get("/api/photo/" + j["photo"]["file"], cookies={"couchtv_token": KEY})
+        r = await self.client.get("/api/photo/" + j["photo"]["file"], headers=self.H)
         self.assertEqual(r.status, 200)
         r = await self.client.get("/api/photo/..%2Fsettings.default.json?key=" + KEY)
         self.assertEqual(r.status, 404)
-        # the cookie works for nothing else
-        r = await self.client.get("/api/settings", cookies={"couchtv_token": KEY})
-        self.assertEqual(r.status, 401)
+        # never a cookie (Fable 11: a cookie goes to every web service on this computer)
+        for p in ("/api/photo/" + j["photo"]["file"], "/api/settings"):
+            r = await self.client.get(p, cookies={"couchtv_token": KEY})
+            self.assertEqual(r.status, 401, p)
         # removed: off the list, the file deleted
         st, k = await self.j("POST", "/api/photos/remove", {"id": j["photo"]["id"]})
         self.assertEqual((st, k["count"]), (200, 0))
@@ -446,6 +563,95 @@ class PhonePageApp(AioHTTPTestCase):
         r = await self.client.post("/api/photos", data=b.getvalue(), headers={**self.H, "Content-Type": "image/png"})
         self.assertEqual(r.status, 413)
         self.assertEqual(os.listdir(phonepage.photo_dir(self.data)), [])
+
+    @unittest.skipIf(Image is None, "Pillow is not installed")
+    async def test_only_photo_formats(self):
+        # Fable 1: PostScript (Pillow would run Ghostscript), PSD, TIFF, GIF, BMP are never opened
+        eps = (b"%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 10 10\n%%EndComments\n"
+               b"newpath 0 0 moveto 10 10 lineto stroke\nshowpage\n%%EOF\n")
+        def saved(fmt, mode="RGB"):
+            b = io.BytesIO()
+            Image.new(mode, (40, 30), (10, 20, 30)).save(b, fmt)
+            return b.getvalue()
+        psd = (b"8BPS\x00\x01" + b"\x00" * 6 + b"\x00\x03" + (30).to_bytes(4, "big") + (40).to_bytes(4, "big")
+               + b"\x00\x08\x00\x03" + b"\x00" * 12 + b"\x00" * 3600)
+        for name, raw in (("eps", eps), ("psd", psd), ("tiff", saved("TIFF")), ("gif", saved("GIF", "P")), ("bmp", saved("BMP"))):
+            r = await self.client.post("/api/photos", data=raw, headers={**self.H, "Content-Type": "image/jpeg"})
+            self.assertEqual(r.status, 415, name)
+        self.assertEqual(os.listdir(phonepage.photo_dir(self.data)), [])
+        for fmt in ("PNG", "WEBP", "JPEG"):
+            r = await self.client.post("/api/photos", data=saved(fmt), headers={**self.H, "Content-Type": "image/png"})
+            self.assertEqual(r.status, 200, fmt)
+
+    @unittest.skipIf(Image is None, "Pillow is not installed")
+    async def test_far_too_many_pixels_is_too_big_not_unreadable(self):
+        # Fable 8: over 200 megapixels Pillow refuses it itself; that is still "too big" (413), not 415
+        b = io.BytesIO()
+        Image.new("1", (20000, 20000)).save(b, "PNG")   # 400 megapixels in a small file
+        r = await self.client.post("/api/photos", data=b.getvalue(), headers={**self.H, "Content-Type": "image/png"})
+        self.assertEqual(r.status, 413)
+        self.assertIn("too big", (await r.json())["error"])
+
+    @unittest.skipIf(Image is None, "Pillow is not installed")
+    async def test_big_jpeg_decoded_small(self):
+        # Fable 8: a big JPEG is decoded at a fraction of its size (draft), and comes out screen size
+        b = io.BytesIO()
+        Image.new("RGB", (8000, 6000), (90, 120, 30)).save(b, "JPEG", quality=30)
+        seen = []
+        real = Image.Image.convert
+        def spy(img, *a, **k):
+            seen.append(img.size)
+            return real(img, *a, **k)
+        with patch.object(Image.Image, "convert", spy):
+            r = await self.client.post("/api/photos", data=b.getvalue(), headers={**self.H, "Content-Type": "image/jpeg"})
+        self.assertEqual(r.status, 200)
+        self.assertTrue(seen and max(w for w, h in seen) <= 2000, seen)   # 8000 wide decoded at 1/4: 2000
+        out = Image.open(os.path.join(self.data, "photos", (await r.json())["photo"]["file"]))
+        self.assertEqual(out.size, (1440, 1080))
+
+    @unittest.skipIf(Image is None, "Pillow is not installed")
+    async def test_one_photo_decoded_at_a_time(self):
+        # Fable 8: several uploads at once never decode together
+        busy, most = [0], [0]
+        real = phonepage.make_photo
+        def slow(raw, data):
+            busy[0] += 1
+            most[0] = max(most[0], busy[0])
+            try:
+                time.sleep(0.15)
+                return real(raw, data)
+            finally:
+                busy[0] -= 1
+        with patch.object(phonepage, "make_photo", slow):
+            rs = await asyncio.gather(*[self.client.post("/api/photos", data=jpeg(200, 100), headers={**self.H, "Content-Type": "image/jpeg"})
+                                        for _ in range(4)])
+        self.assertEqual([r.status for r in rs], [200] * 4)
+        self.assertEqual(most[0], 1)
+
+    @unittest.skipIf(Image is None, "Pillow is not installed")
+    async def test_photo_taken_off_on_the_tv_is_deleted(self):
+        # Fable 12: the TV home's push without a photo deletes its file at once (not only at the next upload)
+        r = await self.client.post("/api/photos", data=jpeg(300, 200), headers={**self.H, "Content-Type": "image/jpeg"})
+        ph = (await r.json())["photo"]
+        path = os.path.join(self.data, "photos", ph["file"])
+        self.assertTrue(os.path.exists(path))
+        st, s = await self.j("GET", "/api/settings")
+        st, a = await self.j("POST", "/api/settings", {"settings": {"clock": "12h", "photos": [ph]}, "seen": s["updated"]})
+        self.assertTrue(os.path.exists(path))   # still listed
+        st, b = await self.j("POST", "/api/settings", {"settings": {"clock": "12h", "photos": []}, "seen": a["updated"]})
+        self.assertEqual(b["settings"].get("photos") or [], [])
+        self.assertFalse(os.path.exists(path))
+
+    @unittest.skipIf(Image is None, "Pillow is not installed")
+    async def test_older_tv_home_keeps_the_phone_photos(self):
+        # Fable 12: a push with no "seen" (an older TV home) no longer empties the phone's photo list
+        r = await self.client.post("/api/photos", data=jpeg(300, 200), headers={**self.H, "Content-Type": "image/jpeg"})
+        ph = (await r.json())["photo"]
+        st, a = await self.j("POST", "/api/settings", {"settings": {"clock": "24h", "photos": [{"id": "u1", "url": "https://example.com/a.jpg"}]}})
+        self.assertEqual(st, 200)
+        self.assertEqual([p["id"] for p in a["settings"]["photos"]], ["u1", ph["id"]])
+        self.assertIn("photos", a["kept"])
+        self.assertTrue(os.path.exists(os.path.join(self.data, "photos", ph["file"])))
 
     @unittest.skipIf(Image is None, "Pillow is not installed")
     async def test_fifty_photos_at_most(self):
