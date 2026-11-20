@@ -11,6 +11,10 @@ Where the set up comes from, in order:
      never sent to the page: the page gets names and readings, never the address or the token.
   2. config.json's "home_assistant" section with HOME_ASSISTANT_TOKEN in .env (docs/CONFIG.md).
 
+A set up made from a phone (bridge/haphone.py, the QR code on the TV) keeps a refresh token and the
+client id it was made for instead of a long-lived token; the 30 minute access token made from it is
+held in memory only.
+
 Only what is ticked may be read or changed. Nothing that opens the house: locks and alarms are never
 allowed, and a cover or switch whose id or device class says garage, gate, door or lock is read but
 never switched. Every call goes to the set up address only, never follows a redirect, and gives up
@@ -75,7 +79,15 @@ def parse(o):
         return None
     base = clean_base(o.get("url"))
     token = str(o.get("token") or "").strip()
-    if not base or not TOKEN.fullmatch(token):
+    refresh, client = None, None
+    if not TOKEN.fullmatch(token):
+        # signed in from a phone: a refresh token and the client id it was made for
+        token = ""
+        refresh = str(o.get("refresh_token") or "").strip()
+        client = str(o.get("client_id") or "").strip()
+        if not TOKEN.fullmatch(refresh) or not clean_base(client):
+            return None
+    if not base:
         return None
 
     def lst(key, ok, most):
@@ -103,7 +115,7 @@ def parse(o):
         ent, bat = str(e.get("entity") or "").strip(), str(e.get("battery") or "").strip() or None
         if SENSOR.fullmatch(ent) and (bat is None or SENSOR.fullmatch(bat)):
             energy = {"entity": ent, "name": str(e.get("name") or "").strip()[:40], "battery": bat}
-    return {"base": base, "token": token, "climate": lst("climate", CLIMATE, 8), "scenes": lst("scenes", SCENE, 10), "doorbell": bell,
+    return {"base": base, "token": token, "refresh": refresh, "client": client, "climate": lst("climate", CLIMATE, 8), "scenes": lst("scenes", SCENE, 10), "doorbell": bell,
             "controls": [c for c in lst("controls", CONTROL, 16) if not OPENS_HOUSE.fullmatch(c["entity"])],
             "cameras": lst("cameras", CAMERA, 4), "sensors": lst("sensors", SENSOR, 8), "energy": energy, "speakers": lst("speakers", SPEAKER, 6)}
 
@@ -368,6 +380,9 @@ class Home:
         self.limits, self.read_controls, self.read_speakers = {}, {}, {}
         self.pending = None
         self.call = self._call
+        self.form = self._form   # a form POST to Home Assistant's /auth (signing in, refreshing): tests replace it
+        self.access = {}         # refresh token -> (access token, when it runs out), in memory only
+        self.clock = time.time
         self.direct = None   # Philips Hue and AirTouch 5 with no Home Assistant (bridge/direct.py)
 
     def _direct_on(self):
@@ -421,8 +436,54 @@ class Home:
         except Exception:
             return -1, None
 
+    async def _form(self, url, form):
+        """A form POST with no token (Home Assistant's /auth/token and /auth/revoke): (status, json or None)."""
+        import aiohttp
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8, connect=3), cookie_jar=aiohttp.DummyCookieJar()) as c:
+                async with c.post(url, data=form, allow_redirects=False) as r:
+                    data = await r.content.read(256 * 1024)
+                    try:
+                        return r.status, json.loads(data.decode("utf-8", "replace"))
+                    except ValueError:
+                        return r.status, None
+        except Exception:
+            return -1, None
+
+    def remember(self, refresh, tokens):
+        self.access[refresh] = (tokens["access_token"], self.clock() + int(tokens.get("expires_in") or 1800))
+
+    async def bearer(self, s, fresh=False):
+        """The token for the Authorization header: the long-lived one, or an access token made from the
+        refresh token a minute before it runs out. (status, token): 401 means sign in again."""
+        r = s.get("refresh")
+        if not r:
+            return 200, s["token"]
+        a = self.access.get(r)
+        if a and not fresh and a[1] > self.clock() + 60:
+            return 200, a[0]
+        code, t = await self.form(s["base"] + "/auth/token", {"grant_type": "refresh_token", "refresh_token": r, "client_id": s["client"]})
+        if code != 200 or not isinstance(t, dict) or not TOKEN.fullmatch(str(t.get("access_token") or "")):
+            if code in (400, 401, 403):
+                self.access.pop(r, None)
+                return 401, None
+            return -1, None
+        self.remember(r, t)
+        return 200, t["access_token"]
+
+    async def authed(self, s, method, path, body=None, limit=512 * 1024):
+        """One call with the kept key; an access token Home Assistant no longer takes is refreshed once."""
+        for fresh in (False, True):
+            code, tok = await self.bearer(s, fresh)
+            if tok is None:
+                return code, None
+            code, data = await self.call(s["base"], tok, method, path, body, limit)
+            if code != 401 or not s.get("refresh"):
+                return code, data
+        return code, data
+
     async def _json(self, s, path, limit=256 * 1024):
-        code, data = await self.call(s["base"], s["token"], "GET", path, None, limit)
+        code, data = await self.authed(s, "GET", path, None, limit)
         if code != 200 or data is None:
             return None
         try:
@@ -434,7 +495,7 @@ class Home:
         return await self._json(s, "/api/states/" + entity)
 
     async def service(self, s, domain, svc, data):
-        code, _ = await self.call(s["base"], s["token"], "POST", "/api/services/%s/%s" % (domain, svc), data, 512 * 1024)
+        code, _ = await self.authed(s, "POST", "/api/services/%s/%s" % (domain, svc), data, 512 * 1024)
         return 200 <= code < 300
 
     async def history(self, s, entity, frm, to, limit=6 * 1024 * 1024):
@@ -471,7 +532,9 @@ class Home:
         if not s:
             return {"set": False, "direct": d} if self.direct else {"set": False}
         ids = lambda lst: [n["entity"] for n in lst]  # noqa: E731
+        count = sum(len(s[k]) for k in ("climate", "scenes", "controls", "cameras", "sensors", "speakers")) + (1 if s["doorbell"] else 0) + (1 if s["energy"] else 0)
         return {"set": True, "direct": d, "host": urllib.parse.urlsplit(s["base"]).hostname or "", "made_on_tv": self.made_on_tv(),
+                "signed_in": bool(s.get("refresh")), "count": count,
                 "climate": ids(s["climate"]), "scenes": ids(s["scenes"]), "controls": ids(s["controls"]), "cameras": ids(s["cameras"]),
                 "sensors": ids(s["sensors"]), "speakers": ids(s["speakers"]), "energy": (s["energy"] or {}).get("entity", ""), "battery": (s["energy"] or {}).get("battery") or "",
                 "doorbell": (s["doorbell"] or {}).get("entity", ""), "doorbell_camera": (s["doorbell"] or {}).get("camera") or ""}
@@ -627,7 +690,7 @@ class Home:
             cam = (s["doorbell"] or {}).get("camera") if entity == "doorbell" else entity
             if not cam or (not any(c["entity"] == cam for c in s["cameras"]) and (s["doorbell"] or {}).get("camera") != cam):
                 return refused
-            code, data = await self.call(s["base"], s["token"], "GET", "/api/camera_proxy/" + cam, None, 3 * 1024 * 1024)
+            code, data = await self.authed(s, "GET", "/api/camera_proxy/" + cam, None, 3 * 1024 * 1024)
             if code != 200 or not data:
                 return failed
             kind = "png" if data[:4] == b"\x89PNG" else "jpeg" if data[:2] == b"\xff\xd8" else None
@@ -658,21 +721,27 @@ class Home:
                 return {"ok": False, "error": "address"}
         if not TOKEN.fullmatch(tok):
             return {"ok": False, "error": "token"}
-        code, data = await self.call(base, tok, "GET", "/api/", None, 64 * 1024)
+        r = await self.list_for({"base": base, "token": tok})
+        if r.get("ok"):
+            self.pending = (base, tok)
+        return r
+
+    async def list_for(self, s):
+        """What Home Assistant has that couch-tv can show, read with the given key: { ok, entities } or { ok: False, error }."""
+        code, data = await self.authed(s, "GET", "/api/", None, 64 * 1024)
         if code in (401, 403):
             return {"ok": False, "error": "token"}
         if code == -1:
             return {"ok": False, "error": "unreachable"}
         if code != 200 or not data or b"API running" not in data:
             return {"ok": False, "error": "not_ha"}
-        code, data = await self.call(base, tok, "GET", "/api/states", None, 12 * 1024 * 1024)
+        code, data = await self.authed(s, "GET", "/api/states", None, 12 * 1024 * 1024)
         if code != 200 or not data:
             return {"ok": False, "error": "unreachable"}
         try:
             lst = pickable(json.loads(data.decode("utf-8", "replace")))
         except ValueError:
             return {"ok": False, "error": "not_ha"}
-        self.pending = (base, tok)
         return {"ok": True, "entities": lst}
 
     def save(self, picks):
@@ -688,6 +757,51 @@ class Home:
         self._write(o)
         self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear()
         return {"ok": True}
+
+    # ---------------- signed in from a phone (bridge/haphone.py)
+    @staticmethod
+    def _picks_of(o):
+        return {k: v for k, v in (o or {}).items() if k not in ("url", "token", "refresh_token", "client_id")}
+
+    def keep_sign_in(self, base, tokens, client):
+        """Keeps a sign in made on a phone. The ticks stay when it is the same Home Assistant."""
+        r = str(tokens.get("refresh_token") or "")
+        if not TOKEN.fullmatch(r):
+            return False
+        old = self._kept() or {}
+        o = dict(self._picks_of(old) if clean_base(old.get("url")) == base else {}, url=base, refresh_token=r, client_id=client)
+        if not parse(o):
+            return False
+        self.remember(r, tokens)
+        self._write(o)
+        self.pending = None
+        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear()
+        return True
+
+    def keep_picks(self, picks):
+        """New ticks from the phone, with the address and key already in use (made on the TV, or config.json's)."""
+        s = self.settings()
+        if not s or not isinstance(picks, dict):
+            return False
+        keys = {"url": s["base"]}
+        if s.get("refresh"):
+            keys.update(refresh_token=s["refresh"], client_id=s["client"])
+        else:
+            keys["token"] = s["token"]
+        o = dict(self._picks_of(picks), **keys)
+        if not parse(o):
+            return False
+        self._write(o)
+        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear()
+        return True
+
+    async def disconnect(self):
+        """Home Assistant forgets this refresh token (when it is one), then this computer forgets the set up."""
+        s = self.settings()
+        if s and s.get("refresh"):
+            await self.form(s["base"] + "/auth/revoke", {"token": s["refresh"]})
+            self.access.pop(s["refresh"], None)
+        return self.forget()
 
     def forget(self):
         self.pending = None

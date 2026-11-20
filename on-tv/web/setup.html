@@ -785,7 +785,10 @@
     say('smart-msg', 'Opening…');
     api('POST', '/api/ha/phone', {}).then(function (j) {
       var u = j.result && j.result.url;
-      if (u && /^http:\/\/[^\/]+\/ha\//.test(u)) location.href = u.replace(/^http:\/\/[^\/]+/, '');
+      // the same server as this page: stay on the address the phone already uses (it is the TV's
+      // client id for Home Assistant); a launcher's own small set up server (another port): go there
+      var m = u && /^http:\/\/[^\/]+:(\d+)\/ha\//.exec(u);
+      if (m) location.href = m[1] === (location.port || '80') ? u.replace(/^http:\/\/[^\/]+/, '') : u;
       else say('smart-msg', 'This TV is not on a network yet.');
     }).catch(function (e) { say('smart-msg', e.message); });
   };

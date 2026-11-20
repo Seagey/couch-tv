@@ -23,6 +23,8 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import app.couchtv.ha.DoorbellKept
+import app.couchtv.ha.HomeAssistant
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
@@ -43,18 +45,7 @@ import java.util.concurrent.Executors
  * doorbell is set up (undo.sh takes it back). Without that grant there is no card, and nothing else
  * changes. Home Assistant not answering: no card, and it keeps quietly asking.
  */
-/**
- * The last ring this TV saw, for the Doorbell widget (HomeAssistant.kt "bell" and "ringstill"): its
- * time and the door camera's first still from it. Kept in memory only, never written anywhere, and
- * gone when the app restarts or the doorbell is taken out of config.json.
- */
-object DoorbellKept {
-    @Volatile var at = 0L
-    @Volatile var still: ByteArray? = null
-    @Volatile var stillAt = 0L
-    fun clear() { at = 0L; still = null; stillAt = 0L }
-}
-
+// DoorbellKept (the last ring, for the Doorbell widget) lives with HomeAssistant in app.couchtv.ha.
 object Doorbell {
     private const val CHECK_MS = 3_000L
     private const val PICTURE_MS = 2_000L

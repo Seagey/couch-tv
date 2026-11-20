@@ -61,6 +61,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    // Smart home (Home Assistant, signing in from a phone): shared with the on-TV app (on-tv/android)
+    sourceSets { getByName("main") { java.srcDir("../shared/java") }; getByName("test") { java.srcDir("../shared/test") } }
     lint {
         checkReleaseBuilds = false
         abortOnError = false
