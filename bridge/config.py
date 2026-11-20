@@ -454,6 +454,9 @@ def _home(h):
     # lighter home for a slow box (#58): no blur, no soft shadows, a still photo, smaller pictures
     if isinstance(h.get("lighter"), bool):
         out["lighter"] = h["lighter"]
+    # the clock on the home (g17): false hides it in the Night, Classic, OLED and Loop looks
+    if isinstance(h.get("show_clock"), bool):
+        out["show_clock"] = h["show_clock"]
     # draw the home at a lower resolution and let the TV scale it up (weak GPUs, MediaTek/Mali projectors):
     # the app reads it from the saved settings, so it only needs to get through here
     if isinstance(h.get("render_height"), int) and not isinstance(h.get("render_height"), bool) and 360 <= h["render_height"] <= 2160:

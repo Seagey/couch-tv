@@ -189,13 +189,16 @@
   // Lighter home by itself on a low end TV. On a 2 GB TV (Android 11, four A55 cores) anything
   // that moves makes every frosted panel be drawn again each frame: 60 frames a second at rest, 22 with a
   // focused tile's sway, 47 with the blur off. When nobody has chosen (Home settings, Look, Lighter home,
-  // or home.lighter), the TV decides: navigator.deviceMemory where it is clear (1 GB or less: low end, 4 or
-  // more: not), otherwise a 1.5 s measurement of frame times with something moving, kept for a week.
-  var LOW_END = false, LOW_END_WHY = "", LOW_END_KEY = "tvhome.lowend", LOW_END_DAYS = 7;
+  // or home.lighter), the TV decides: navigator.deviceMemory where it is clear (1 GB or less: low end, 8 or
+  // more: not), otherwise a 1.5 s measurement of frame times with something moving, kept for a week, and
+  // the frames while the focus really moves along a row (the first arrow presses after the home opens).
+  // 4 GB is measured too (#197, #213, g01): a 4 GB Google TV Streamer, Homatics or TCL stuttered and never got it.
+  var LOW_END = false, LOW_END_WHY = "", LOW_END_KEY = "tvhome.lowend", LOW_END_DAYS = 7, LOW_END_TOLD = "tvhome.lighter_told";
   function lowEndDecision(o) {
     if (o.setting === true || o.setting === false) return { low: o.setting, why: "setting" };
     if (typeof o.memory === "number" && o.memory > 0 && o.memory <= 1) return { low: true, why: "memory" };
-    if (typeof o.memory === "number" && o.memory >= 4) return { low: false, why: "memory" };
+    if (typeof o.memory === "number" && o.memory >= 8) return { low: false, why: "memory" };
+    if (typeof o.navMs === "number" && o.navMs > 22) return { low: true, why: "moving" };   // the focus moving along a row stuttered
     if (o.cached && typeof o.cached.low === "boolean" && o.now - o.cached.t < o.days * 86400000) return { low: o.cached.low, why: "measured" };
     if (typeof o.medianMs === "number") return { low: o.medianMs > 22, why: "measured" };
     return null;   // measure first
@@ -235,9 +238,10 @@
       document.documentElement.classList.toggle("lighter", LIGHTER);
       if (LOOP) loopLighter();
       if (late) { ambientSync(); movingTiles(); renderShelf(); paintFocus(); }   // else the settings code goes on to do these
+      if (LIGHTER) lighterTold();
     };
     var r = lowEndDecision(o);
-    if (r) { apply(r); return; }
+    if (r) { apply(r); if (!r.low && r.why !== "setting" && r.why !== "memory") lowEndNav(o, apply); return; }
     // measure once the home has drawn, when nothing else is starting up (once, however often settings apply)
     if (lowEnd.pending) return;
     lowEnd.pending = true;
@@ -247,8 +251,44 @@
         var m = lowEndDecision(o);
         try { localStorage.setItem(LOW_END_KEY, JSON.stringify({ low: m.low, t: Date.now(), ms: Math.round(ms * 10) / 10 })); } catch (e) {}
         apply(m, true);
+        if (!m.low) lowEndNav(o, apply);
       });
     }, 4000);
+  }
+  // The frames while the focus really moves (g01): for 600 ms after each arrow press on the home, until 90
+  // frames are in. A TV that passes the still measurement but stutters along a row gets Lighter home too.
+  // Nothing runs between presses, and it stops for good once it has its frames (once per start).
+  function lowEndNav(o, apply) {
+    if (lowEndNav.on) return;
+    lowEndNav.on = true;
+    var d = [], until = 0, last = 0, running = false;
+    var step = function (t) {
+      if (last) d.push(t - last);
+      last = t;
+      if (d.length >= 90) { finish(); return; }
+      if (t < until) requestAnimationFrame(step); else { running = false; last = 0; }
+    };
+    var onKey = function (e) {
+      if (!/^Arrow/.test(e.key || "") || zone === "settings" || LIGHTER || typeof ST.lighter === "boolean") return;
+      until = performance.now() + 600;
+      if (!running) { running = true; requestAnimationFrame(step); }
+    };
+    var finish = function () {
+      window.removeEventListener("keydown", onKey, true);
+      d.sort(function (x, y) { return x - y; });
+      o.navMs = d[d.length >> 1];
+      var m = lowEndDecision(o);
+      if (!m || !m.low) return;
+      try { localStorage.setItem(LOW_END_KEY, JSON.stringify({ low: true, t: Date.now(), ms: Math.round(o.navMs * 10) / 10, moving: true })); } catch (e) {}
+      apply(m, true);
+    };
+    window.addEventListener("keydown", onKey, true);
+  }
+  // Once, the first time Lighter home turns itself on: say so, and where to change it (g01, g23)
+  function lighterTold() {
+    if (kept(LOW_END_TOLD)) return;
+    keep(LOW_END_TOLD, 1);
+    setTimeout(function () { toast(t("lighter_auto", { home: t("gear_home"), look: t("sec_look") })); }, 1500);
   }
 
   // The focused tile's sway and glint play for a few seconds after the focus moves, then hold still: a
@@ -524,6 +564,8 @@
     lowEnd();
     ambientSync();
     movingTiles();
+    SHOW_CLOCK = typeof ST.show_clock === "boolean" ? ST.show_clock : HOME.show_clock !== false;   // g17
+    clockShown();
     // glass app icons (#25): set in Home settings, else home.glass_icons; off unless switched on
     GLASS_ICONS = typeof ST.glass_icons === "boolean" ? ST.glass_icons : HOME.glass_icons === true;
     NP_ON = typeof ST.now_playing === "boolean" ? ST.now_playing : HOME.now_playing !== false;
@@ -617,6 +659,13 @@
     if (typeof magnify === "function") magnify();
   }
   var DOCK_MAC = false;
+  // Home settings, Look, Show the clock (g17; home.show_clock): off hides the time in every look, the big
+  // scene clock in Night too, and the date moves up into its place. A design shows its own clock, so not there.
+  var SHOW_CLOCK = true;
+  function clockShown() {
+    var off = !SHOW_CLOCK && !(typeof CouchDesign !== "undefined" && CouchDesign.on());
+    if (document.documentElement.classList.contains("no-clock") !== off) document.documentElement.classList.toggle("no-clock", off);
+  }
   var DATE_BARS = false;   // home.date_bars: thin vertical bars between the day, the place and the weather
   // Lighter home: ask for the 640 px size of a Keep watching picture, not the 1440 px one (a card is about 500 px wide)
   function slim(u) { return LIGHTER && typeof u === "string" ? u.replace("/s1440/", "/s640/") : u; }
@@ -753,7 +802,12 @@
   // home.hi_res "always" uses the 4K copies even when the page is drawn at 1080 (a 4K panel with a 1080 interface, #191)
   // home.hi_res false keeps the 1080 copies on a 4K screen whose chip struggles with 3840x2160 photos
   // (an LG 43SQ700S monitor): they are four times the pixels to decode and keep in memory.
-  function bgPath(name, ext, builtIn) { return "backgrounds/" + name + ((HOME.hi_res === "always" || (HI_RES && HOME.hi_res !== false)) && builtIn !== false ? "@2x" : "") + ext; }
+  // Home settings, Look, Sharp pictures on a 4K TV (g30) wins: "auto", "always" or "off"; else home.hi_res
+  function hiResSetting() {
+    var v = ST.hi_res === "auto" || ST.hi_res === "always" || ST.hi_res === "off" ? ST.hi_res : HOME.hi_res;
+    return v === "always" ? "always" : v === false || v === "off" ? "off" : "auto";
+  }
+  function bgPath(name, ext, builtIn) { var h = hiResSetting(); return "backgrounds/" + name + ((h === "always" || (HI_RES && h !== "off")) && builtIn !== false ? "@2x" : "") + ext; }
   var KEEP_PHOTO = false;   // Home settings, Look, Keep one photo (Classic): no rotation, same picture after a reload
   var photo = 0, photoTimer = null, bgShown = null, bgLayer = 0, bgTicket = 0;
 
@@ -843,6 +897,7 @@
     clock();
   }
   function clock() {
+    clockShown();   // a design that has just come on or gone shows its own clock
     var d = new Date(), h = d.getHours(), m = d.getMinutes();
     clockMinute = h + ":" + m;
     var mm = (m < 10 ? "0" : "") + m;
@@ -5130,6 +5185,19 @@
     });
   }
   var SECS_STEPS = [10, 15, 20, 30, 45, 60, 120];
+  function setLighter(on) {
+    LIGHTER = on; ST.lighter = LIGHTER; saveSettings();
+    document.documentElement.classList.toggle("lighter", LIGHTER); if (LOOP) loopLighter(); ambientSync(); movingTiles(); renderShelf(); paintFocus();
+  }
+  // a Look row Lighter home holds off (g23, a MiTV 5X: the switch did nothing and said nothing): it says
+  // "Off while Lighter home is on", and OK asks "Turn off Lighter home?"; a second OK turns Lighter home off
+  // and this on (turnOn sets what the row would have)
+  function heldByLighter(row, turnOn) {
+    if (!LIGHTER) return row;
+    row.value = t("off"); row.sub = t("lighter_holds"); row.ask = true; row.confirmText = t("lighter_off_ask");
+    row.act = function () { turnOn(); setLighter(false); };
+    return row;
+  }
   function lookRows() {
     var look = lookSetting(), st = sceneState(), rows = [head(t("look_head"))];
     ["night", "oled", "classic", "loop"].forEach(function (id) {
@@ -5168,6 +5236,18 @@
     } });
     rows.push({ kind: "cycle", key: "clock", label: t("clock"), value: CLOCK24 ? t("clock_24") : t("clock_12"), act: function () {
       CLOCK24 = !CLOCK24; ST.clock = CLOCK24 ? "24h" : "12h"; saveSettings(); glassShown = ""; clock();
+    } });
+    // g17: the clock on or off (a design picks its own, so the row is not there with one on)
+    if (!(typeof CouchDesign !== "undefined" && CouchDesign.on())) rows.push({ kind: "toggle", key: "show-clock", label: t("show_clock"),
+      value: SHOW_CLOCK ? t("on") : t("off"), act: function () {
+        SHOW_CLOCK = !SHOW_CLOCK; ST.show_clock = SHOW_CLOCK; saveSettings(); clockShown(); fitDate();
+      } });
+    // g30: the 4K copies of the built-in pictures. Auto: on a screen drawn at 4K. Always: also on a 4K TV that
+    // draws its interface at 1080 (#191). Off: the 1080 copies, for a 4K TV that stutters (four times the memory)
+    var hr = hiResSetting();
+    rows.push({ kind: "cycle", key: "hi-res", label: t("hi_res"), sub: t("hi_res_sub"), value: t("hi_res_" + hr), act: function () {
+      ST.hi_res = hr === "auto" ? "always" : hr === "always" ? "off" : "auto"; saveSettings();
+      if (!NIGHT) showPhoto();   // Classic and OLED: the photo again at once; the Night scenes when settings close
     } });
     rows.push({ kind: "cycle", key: "idle-photo-seconds", label: t("idle_photo"), sub: t("idle_photo_sub"),
       value: IDLE_PHOTO_SECONDS ? t("n_secs", { n: IDLE_PHOTO_SECONDS }) : t("off"), act: function () {
@@ -5244,16 +5324,15 @@
       GLASS = GLASS === "off" ? "on" : GLASS === "on" ? "lite" : "off"; ST.glass = GLASS; saveSettings(); movingTiles();
     } });
     // the focused tile's slow sway: off by itself with glass "lite", and here for a TV that flickers (#52)
-    rows.push({ kind: "toggle", key: "moving-tiles", label: t("moving_tiles"), value: MOVING ? t("on") : t("off"), act: function () {
-      if (LIGHTER) return;   // held still while Lighter home is on
+    // Lighter home holds both off: the row says so, and OK asks to turn Lighter home off and this on (g23)
+    rows.push(heldByLighter({ kind: "toggle", key: "moving-tiles", label: t("moving_tiles"), value: MOVING ? t("on") : t("off"), act: function () {
       MOVING = !MOVING; ST.moving_tiles = MOVING; saveSettings(); movingTiles();
-    } });
+    } }, function () { ST.moving_tiles = true; }));
     // the Mac-style dock: the focused app and its neighbours grow in a wave, its name in a bubble above it
     // (not in the Loop look: its dock has no wave, movingTiles, and a press there would only save "mac" for Night)
-    if (NIGHT && !LOOP) rows.push({ kind: "toggle", key: "dock-mac", label: t("dock_mac"), value: DOCK_MAC ? t("on") : t("off"), act: function () {
-      if (LIGHTER) return;   // held off while Lighter home is on
+    if (NIGHT && !LOOP) rows.push(heldByLighter({ kind: "toggle", key: "dock-mac", label: t("dock_mac"), value: DOCK_MAC ? t("on") : t("off"), act: function () {
       ST.dock = DOCK_MAC ? "classic" : "mac"; saveSettings(); movingTiles();
-    } });
+    } }, function () { ST.dock = "mac"; }));
     // a slow box (#58): no blur, no soft shadows, a still photo and smaller pictures, all in one switch
     // the whole Keep watching row, heading and all (home.keep_watching): off closes the gap and stops fetching it
     rows.push({ kind: "toggle", key: "keep-watching", label: t("keep_show"), value: KW_ON ? t("on") : t("off"), act: function () {
@@ -5279,10 +5358,7 @@
         ST.start_focus = START_FOCUS;
         saveSettings();
       } });
-    rows.push({ kind: "toggle", key: "lighter", label: t("lighter"), value: LIGHTER ? t("on") : t("off"), act: function () {
-      LIGHTER = !LIGHTER; ST.lighter = LIGHTER; saveSettings();
-      document.documentElement.classList.toggle("lighter", LIGHTER); if (LOOP) loopLighter(); ambientSync(); movingTiles(); renderShelf(); paintFocus();
-    } });
+    rows.push({ kind: "toggle", key: "lighter", label: t("lighter"), value: LIGHTER ? t("on") : t("off"), act: function () { setLighter(!LIGHTER); } });
     rows.push({ kind: "toggle", key: "glass-icons", label: t("glass_icons"), value: GLASS_ICONS ? t("on") : t("off"), act: function () {
       GLASS_ICONS = !GLASS_ICONS; ST.glass_icons = GLASS_ICONS; saveSettings();
       document.documentElement.classList.toggle("glass-icons", GLASS_ICONS);   // seen straight away
@@ -5972,7 +6048,7 @@
     if (SET.col === "secs") { enterRows(); renderSettings(); return; }
     var rows = rowsNow(), r = rows[SET.ri];
     if (!focusable(r) || !r.act) return;
-    if (r.danger && SET.confirm !== r.key) { SET.confirm = r.key; renderSettings(); return; }
+    if ((r.danger || r.ask) && SET.confirm !== r.key) { SET.confirm = r.key; renderSettings(); return; }   // ask: a question first, not red
     SET.confirm = null;
     SET.keyFocus = r.key;
     r.act();

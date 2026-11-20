@@ -2685,6 +2685,10 @@ def clean_settings(s):
         out["dock"] = s["dock"]
     if isinstance(s.get("lighter"), bool):   # lighter home for a slow box (#58)
         out["lighter"] = s["lighter"]
+    if isinstance(s.get("show_clock"), bool):   # Look, Show the clock (g17)
+        out["show_clock"] = s["show_clock"]
+    if s.get("hi_res") in ("auto", "always", "off"):   # Look, Sharp pictures on a 4K TV (g30)
+        out["hi_res"] = s["hi_res"]
     if isinstance(s.get("glass_amount"), int) and not isinstance(s.get("glass_amount"), bool) and 1 <= s["glass_amount"] <= 5:
         out["glass_amount"] = s["glass_amount"]
     if s.get("clock_style") in ("frosted", "liquid"):

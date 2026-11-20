@@ -2315,3 +2315,7 @@ html.lighter.theme-loop .tile.focus, html.lighter.theme-loop .app.focus, html.li
   html.theme-loop .tile, html.theme-loop .app, html.theme-loop .qbtn, html.theme-loop .person, html.theme-loop .nb, html.theme-loop .shelf-track, html.theme-loop .grid, html.theme-loop .toast { transition: none; }
   html.theme-loop.expanded .grid, html.theme-loop.expanded .app.off-window { transition: none; }
 }
+
+/* Home settings, Look, Show the clock off (home.show_clock false, g17): no time in any look and no big scene
+   clock in Night; the date moves up into the clock's place (the time is out of the layout, not just clear) */
+html.no-clock .time, html.no-clock .scene .gclock { display: none; }
