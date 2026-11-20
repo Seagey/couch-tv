@@ -21,6 +21,9 @@ version required; kept lock/alarm fabric FAIL; friendly_name, colour range, supp
 rename name, device_ids [] and note on errors, contact on/off + reading, failed commission over 35 s WARN;
 lock gap closed; fx chip-tool.lock stale by pid or 400 s; fx status "host"; private-copy name rule.
 Reference server updated to match. Proof: unit tests 15/15; reference run 10 315/0/0; run 8 (--remove-offline) 314/0/0.
+Change 15 (checker GO on 2a95557, then): busy while a commission runs (409/400, under 5 s), reason on every refusal
+(commission errors, already, command, rename, remove), lock answer over 120 s = WARN, link local as [fe80::1]:5540,
+hs_color, cover level, target_temp_step, hvac_action. Reference updated. Unit tests 15/15; reference run 12 343/0/0.
 
 Left: run the harness against nl-matter-bridge once that branch has a final (non WIP) commit.
 How: `git -C <bridge worktree> archive <commit> bridge scripts config.example.json | ssh macbook 'tar -x -C ~/mf-bridge'`

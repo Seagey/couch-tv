@@ -150,6 +150,7 @@ class Ref:
         self.breaks = set(filter(None, args.breaks.split(",")))
         self.last_restart = 0
         self.busy = set()
+        self.commissioning = False
         self.db.setdefault("forgotten", [])  # removed while offline: leave their fabric once they answer
 
     def save(self):
@@ -181,8 +182,13 @@ class Ref:
                 lo = await r("colorcontrol", "color-temp-physical-min-mireds") or 153
                 hi = await r("colorcontrol", "color-temp-physical-max-mireds") or 500
                 e["range"] = (round(1000000 / hi), round(1000000 / lo))
+            hs = None
+            if on and await r("colorcontrol", "color-mode") == 0:
+                hs = [round((await r("colorcontrol", "current-hue")) * 360 / 254),
+                      round((await r("colorcontrol", "current-saturation")) * 100 / 254)]
             return ("on" if on else "off",
                     {"brightness": round((lvl or 0) * 255 / 254), "level": round((lvl or 0) * 100 / 254),
+                     "hs_color": hs,
                      "color_temp_kelvin": round(1000000 / mired) if mired else None,
                      "min_color_temp_kelvin": e["range"][0], "max_color_temp_kelvin": e["range"][1],
                      "supported_color_modes": ["color_temp", "hs"]})
@@ -295,15 +301,26 @@ class Ref:
     async def h_commission(self, req):
         if not self.authed(req):
             return web.json_response({"ok": False, "error": "not paired"}, status=401)
+        if self.commissioning:
+            return web.json_response({"ok": False, "error": "busy", "reason": "busy", "device_ids": [],
+                                      "note": "Couch TV is already adding a device. Wait a moment and try again."},
+                                     status=409)
+        self.commissioning = True
+        try:
+            return await self.commission(req)
+        finally:
+            self.commissioning = False
+
+    async def commission(self, req):
         body = await req.json()
         code = str(body.get("code", "")).strip()
         if not code.startswith("MT:"):
             code = re.sub(r"[\s-]", "", code)  # "3497-011-2332" style; never strip a QR's own dashes
         if code.startswith("MT:"):
             if not re.fullmatch(r"MT:[0-9A-Z.\-]{19,}", code):
-                return web.json_response({"ok": False, "error": "wrong_code", "device_ids": [], "note": "That code is not right."})
+                return web.json_response({"ok": False, "error": "wrong_code", "reason": "wrong_code", "device_ids": [], "note": "That code is not right."})
         elif not (re.fullmatch(r"\d{11}|\d{21}", code) and verhoeff_ok(code)):
-            return web.json_response({"ok": False, "error": "wrong_code", "device_ids": [], "note": "That code is not right."})
+            return web.json_response({"ok": False, "error": "wrong_code", "reason": "wrong_code", "device_ids": [], "note": "That code is not right."})
         problem = address_problem(body.get("address"))
         if problem:
             return web.json_response({"ok": False, "error": "unreachable", "reason": problem, "device_ids": [],
@@ -314,15 +331,16 @@ class Ref:
         ok, res, logs = await self.c.run(f"pairing code {node} {code} --timeout 60", timeout=120)
         if not ok:
             if "setup code is incorrect" in logs or "Integrity check failed" in logs or "Invalid argument" in logs:
-                return web.json_response({"ok": False, "error": "wrong_code", "device_ids": [], "note": "That code is not right."})
+                return web.json_response({"ok": False, "error": "wrong_code", "reason": "wrong_code", "device_ids": [], "note": "That code is not right."})
             if re.search(r"0x0+7E\b|FabricConflict|fabric already|Fabric exists", logs, re.I):
                 # contract change 11: the device is already on this controller (CHIP_ERROR_FABRIC_EXISTS)
-                return web.json_response({"ok": False, "error": "already", "device_ids": [],
+                return web.json_response({"ok": False, "error": "already", "reason": "already", "device_ids": [],
                                           "note": "This device is already on Couch TV."})
             note = "No device answered to that code. Get a new code and try again."
             if "raw-errors" in self.breaks:
                 note = "CHIP Error 0x00000032: Timeout"
-            return web.json_response({"ok": False, "error": "unreachable", "device_ids": [], "note": note})
+            return web.json_response({"ok": False, "error": "unreachable", "reason": "not_found", "device_ids": [],
+                                      "note": note})
         # what is on it
         parts = await self.c.read(node, 0, "descriptor", "parts-list")
         eps, forbidden = {}, []
@@ -367,7 +385,7 @@ class Ref:
         b = await req.json()
         node, ep, e = self.find(b.get("id"))
         if not e:
-            return web.json_response({"ok": False, "error": "unknown device"})
+            return web.json_response({"ok": False, "error": "unknown device", "reason": "not_found"})
         a, v, d = b.get("action"), b.get("value"), e["domain"]
         c = self.c
         line = None
@@ -398,7 +416,7 @@ class Ref:
             line = f"fancontrol write percent-setting {int(v)} {node} {ep}"
         elif d == "cover" and a in ("on", "off"):
             line = f"windowcovering {'up-or-open' if a == 'on' else 'down-or-close'} {node} {ep}"
-        elif d == "cover" and a == "position":
+        elif d == "cover" and a in ("position", "level"):
             pct = int(v) if "cover-percent" in self.breaks else 100 - int(v)
             line = f"windowcovering go-to-lift-percentage {pct * 100} {node} {ep}"
         elif d == "climate" and a == "mode" and v in MODE_IDS:
@@ -408,11 +426,11 @@ class Ref:
             attr = "occupied-cooling-setpoint" if mode == "cool" else "occupied-heating-setpoint"
             line = f"thermostat write {attr} {round(float(v) * 100)} {node} {ep}"
         if not line:
-            return web.json_response({"ok": False, "error": "not supported"})
+            return web.json_response({"ok": False, "error": "not supported", "reason": "bad_request"})
         id_ = f"matter:{node}:{ep}"
         ok = await c.cmd(line)
         if not ok:
-            return web.json_response({"ok": False, "error": "unreachable"})
+            return web.json_response({"ok": False, "error": "unreachable", "reason": "failed"})
         try:
             st, at = await self.poll_one(node, ep, e)
             self.set_state(id_, {"state": st, "attributes": at})
@@ -427,7 +445,7 @@ class Ref:
         b = await req.json()
         node, ep, e = self.find(b.get("id"))
         if not e:
-            return web.json_response({"ok": False, "error": "unknown device"})
+            return web.json_response({"ok": False, "error": "unknown device", "reason": "not_found"})
         offline = all(self.state.get(f"matter:{node}:{x}", {}).get("state") == "unavailable"
                       for x in self.db["nodes"][node]["eps"])
         left = False if offline else await self.c.cmd(f"pairing unpair {node}")
@@ -453,7 +471,8 @@ class Ref:
         node, ep, e = self.find(b.get("id"))
         name = str(b.get("name", "")).strip()
         if not e or not 1 <= len(name) <= 40:
-            return web.json_response({"ok": False, "error": "unknown device" if not e else "bad name"})
+            return web.json_response({"ok": False, "error": "unknown device" if not e else "bad name",
+                                      "reason": "not_found" if not e else "bad_name"})
         if e["domain"] in ("switch", "cover") and re.search(r"\b(garage|gate|door|lock)\b", name, re.I):
             # contract change 14: a name that would hide it (the house opening rule) is refused
             return web.json_response({"ok": False, "error": "refused", "reason": "opens_house",

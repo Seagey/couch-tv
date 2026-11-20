@@ -233,6 +233,14 @@ def near(a, b, tol):
     return a is not None and b is not None and abs(a - b) <= tol
 
 
+def refusal_reason(label, o):
+    """Change 15: every refusal carries a reason key. Commission errors FAIL without one (expect_error);
+    the other refusals (command, rename, remove) here."""
+    if o.get("ok") is False:
+        check(f"{label}: the refusal carries a reason key (change 15)", isinstance(o.get("reason"), str)
+              and o["reason"], f"answered {json.dumps(o)[:160]}")
+
+
 def brightness_pct(attrs):
     """light brightness as 0-100 from either brightness 0-255 or level 0-100."""
     if num(attrs.get("brightness")) is not None:
@@ -295,6 +303,8 @@ class Run:
         check(f"errors: {label}: error key is one of {sorted(keys)}", err in keys,
               f"error={err!r} (keys allowed by the contract: {sorted(ERROR_KEYS)})")
         check(f"errors: {label}: device_ids is []", o.get("device_ids") == [], f"device_ids={o.get('device_ids')!r}")
+        check(f"errors: {label}: carries a reason key (change 15)", isinstance(o.get("reason"), str) and o["reason"],
+              f"reason={o.get('reason')!r}")
         check(f"errors: {label}: has a note in plain words", isinstance(o.get("note"), str) and o["note"].strip()
               and plain(o["note"]), repr(o.get("note")))
         check(f"errors: {label}: answers within {max_s} s", dt <= max_s, f"took {dt:.0f} s")
@@ -310,8 +320,25 @@ class Run:
         self.expect_error("11 digits with a bad check digit", bad_check, {"wrong_code"}, 15)
         self.expect_error("QR text that is not a Matter QR", "MT:NOTAREALCODE", {"wrong_code"}, 15)
         # a well formed code no device answers to (short discriminator 15 is unused by the fixtures)
-        self.expect_error("a code no device on the network answers to", short_disc_code(0xF00, 20202021),
-                          {"unreachable", "expired"}, 120)
+        # ... and while that one is still looking, a second commission answers "busy" at once (change 15)
+        import threading
+        nobody = short_disc_code(0xF00, 20202021)
+        first = threading.Thread(target=self.expect_error, args=(
+            "a code no device on the network answers to", nobody, {"unreachable", "expired"}, 120))
+        first.start()
+        time.sleep(2)  # the first one is now looking for the device (it takes about 30 s to give up)
+        if first.is_alive():
+            s, o, dt = self.api.commission(nobody)
+            info(f"second commission while one runs: answered {s} {json.dumps(o)[:200]} in {dt:.1f} s")
+            check("errors: a second commission while one runs answers ok false, error 'busy', reason 'busy'",
+                  o.get("ok") is False and o.get("error") == "busy" and o.get("reason") == "busy",
+                  f"answered {s} {json.dumps(o)[:200]}")
+            check("errors: the 'busy' answer comes at once (under 5 s)", dt < 5, f"took {dt:.1f} s")
+            check("errors: the 'busy' answer is HTTP 409 or 400", s in (409, 400), f"answered {s}")
+        else:
+            check("errors: a second commission while one runs ('busy')", False,
+                  "the first commission ended within 2 s, so busy could not be tried", warn=True)
+        first.join()
         # right device, window open, wrong passcode
         sh = self.fx.share("light", 300)
         wrong = self.fx.run("wrongcode", "light")["manual"]
@@ -320,8 +347,8 @@ class Run:
         # contract change 14: an address that cannot work answers unreachable with a reason key
         host = self.args.address or self.fx_host()
         for addr, label, want in ((f"{host}:1", f"the light's code with address <host>:1", ADDRESS_REASONS),
-                                  # no port: a port other than 5540 is its own reason ("port") on the bridge
-                                  ("[fe80::1]", "the light's code with a link local address [fe80::1]",
+                                  # port 5540 passes the bridge's port rule: link_local is the only possible reason
+                                  ("[fe80::1]:5540", "the light's code with a link local address [fe80::1]:5540",
                                    {"link_local"})):
             o = self.expect_error(label, sh["manual"], {"unreachable"}, 120, addr)
             check(f"errors: {label}: reason is one of {sorted(want)}", o.get("reason") in want,
@@ -393,6 +420,8 @@ class Run:
         info(f"{name} shared again: answered {s} {json.dumps(o)[:200]} in {dt:.1f} s")
         check(f"commission: {name} shared a second time answers ok false, error 'already'",
               o.get("ok") is False and o.get("error") == "already", f"answered {s} {json.dumps(o)[:200]}")
+        check(f"commission: the 'already' answer carries a reason key (change 15)",
+              isinstance(o.get("reason"), str) and o["reason"], f"reason={o.get('reason')!r}")
         if o.get("note") is not None:
             check(f"commission: the note for a second share is plain words", plain(o["note"]), repr(o["note"]))
         after = by_id(self.api.devices()[2])
@@ -469,7 +498,8 @@ class Run:
                         check(f"list: {n} {cl} state matches the device ({r1:g} to {r2:g})",
                               st is not None and min(r1, r2) - room <= st <= max(r1, r2) + room, f"state={st!r}")
                 if e["domain"] == "climate":
-                    for k in ("current_temperature", "temperature", "min_temp", "max_temp", "hvac_modes"):
+                    for k in ("current_temperature", "temperature", "min_temp", "max_temp", "hvac_modes",
+                              "target_temp_step", "hvac_action"):
                         check(f"list: thermostat has attribute {k}", k in a, f"attributes={sorted(a)}")
                     check("list: thermostat state is one of its hvac_modes",
                           d.get("state") in (a.get("hvac_modes") or []), f"state={d.get('state')!r}")
@@ -510,6 +540,7 @@ class Run:
                   json.dumps(o.get("device"))[:160])
         else:
             check(f"{label} is refused (ok false)", o.get("ok") is False, f"answered {s} {json.dumps(o)[:200]}")
+            refusal_reason(label, o)
         return o
 
     def device_is(self, label, name, cluster, attr, pred, ep=1, timeout=8):
@@ -561,6 +592,11 @@ class Run:
         else:
             self.device_is("command: light colour '120,100' (h,s) changes the bulb's colour", "light", "color",
                            "current-x", lambda v: v != x_before)
+        hs = wait_for(lambda: (lambda a: a if isinstance(a, list) and len(a) == 2 and near(num(a[0]), 120, 8)
+                                          else None)((self.entity("light") or {}).get("attributes", {}).get("hs_color")),
+                      self.args.live_timeout, 0.5)
+        check("command: light entity shows hs_color about [120, 100] after colour '120,100'", bool(hs),
+              f"attributes={(self.entity('light') or {}).get('attributes')}")
         d = self.entity("light")
         if d:
             check("command: light entity shows the new brightness (about 50%)",
@@ -611,6 +647,9 @@ class Run:
         self.cmd("cover", "position", 30)
         self.device_is("command: cover position 30 (% open) sets the lift target to 70% closed", "cover", "cover",
                        "target-position-lift-percent100ths", lambda v: v == 7000)
+        self.cmd("cover", "level", 40)  # change 2: "level" is the cover's position too
+        self.device_is("command: cover level 40 (% open) sets the lift target to 60% closed", "cover", "cover",
+                       "target-position-lift-percent100ths", lambda v: v == 6000)
         self.cmd("cover", "position", 100)
         self.device_is("command: cover position 100 opens it fully", "cover", "cover",
                        "target-position-lift-percent100ths", lambda v: v == 0)
@@ -644,6 +683,7 @@ class Run:
         self.cmd("sensors", "on", expect_ok=False)
         s, o, _ = self.api.command("matter:999999:1", "on")
         check("command: an unknown id is refused (ok false)", o.get("ok") is False, f"answered {s} {json.dumps(o)[:160]}")
+        refusal_reason("command: an unknown id", o)
 
     # ---- live updates: someone changes the device elsewhere (Google Home, a wall switch)
 
@@ -809,8 +849,10 @@ class Run:
         for bad, label in (("", "an empty name"), ("x" * 41, "a 41 character name")):
             s, o, _ = self.api.call("POST", "/api/matter/rename", {"id": id_, "name": bad})
             check(f"rename: {label} is refused", o.get("ok") is False, f"answered {s} {json.dumps(o)[:160]}")
+            refusal_reason(f"rename: {label}", o)
         s, o, _ = self.api.call("POST", "/api/matter/rename", {"id": "matter:999999:1", "name": "Nope"})
         check("rename: an unknown id is refused", o.get("ok") is False, f"answered {s} {json.dumps(o)[:160]}")
+        refusal_reason("rename: an unknown id", o)
         check("rename: the name is still 'Lounge lamp' after the refusals",
               (self.entity("light") or {}).get("name") == "Lounge lamp", "")
         if "plug" in self.node:
@@ -839,6 +881,8 @@ class Run:
             s, o, dt = self.api.commission(sh["manual"], self.address(name))
             ids = o.get("device_ids") or []
             info(f"{name}: commission answered {s} {json.dumps(o)[:200]} in {dt:.1f} s")
+            # change 15: a commission that turns out to be a lock may take up to about 130 s (WARN over 120)
+            check(f"forbidden: the {name} is answered within 120 s", dt <= 120, f"took {dt:.0f} s", warn=True)
             check(f"forbidden: commissioning the {name} returns no device ids", not ids, f"device_ids={ids}")
             if o.get("ok") is False:  # contract change 10/11: error "not_allowed" (ok true with no ids is also fine)
                 check(f"forbidden: the {name} is refused with error 'not_allowed'", o.get("error") == "not_allowed",
@@ -915,6 +959,7 @@ class Run:
                 check(f"remove: {n} ran to the end", False, f"{type(e).__name__}: {e}")
         s, o, _ = self.api.call("POST", "/api/matter/remove", {"id": "matter:999999:1"})
         check("remove: an unknown id is refused", o.get("ok") is False, f"answered {s} {json.dumps(o)[:160]}")
+        refusal_reason("remove: an unknown id", o)
 
     def remove_one(self, n):
         id_ = self.ids[n][0]
