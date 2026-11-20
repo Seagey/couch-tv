@@ -66,6 +66,8 @@ class ModelTest(unittest.TestCase):
         self.assertEqual((d["id"], d["domain"], d["state"], d["name"]), ("matter:1:1", "light", "off", "TEST_PRODUCT"))
         self.assertEqual(d["attributes"]["supported_color_modes"], ["color_temp", "hs"])
         self.assertEqual((d["attributes"]["min_color_temp_kelvin"], d["attributes"]["max_color_temp_kelvin"]), (2203, 6494))
+        # live run 21 Nov (contract test, list group): an off light still says its level and colour temperature
+        self.assertTrue({"brightness", "level", "color_temp_kelvin"} <= set(d["attributes"]), d["attributes"])
         on = json.loads(json.dumps(LIGHT))
         on["attributes"].update({"1/6/0": True, "1/8/0": 127, "1/768/7": 370, "1/768/8": 2})
         a = one(on)[0]["attributes"]
@@ -239,6 +241,8 @@ class FakeService:
         self.answers = {}
         self.ws = None
         self.connections = 0
+        self.connect_after_add = True   # the real service sends node_updated, available, once it holds a connection
+        self.unanswered = set()         # node ids whose reads time out (switched off)
 
     async def handler(self, request):
         ws = web.WebSocketResponse()
@@ -250,6 +254,8 @@ class FakeService:
             d = json.loads(msg.data)
             self.calls.append((d["command"], d["args"]))
             a = self.answers.get(d["command"])
+            if d["command"] == "read_attribute" and d["args"]["node_id"] in self.unanswered:
+                continue   # no answer at all, like a device that is off
             if callable(a):
                 a = a(d["args"])
             if a is None:
@@ -258,6 +264,10 @@ class FakeService:
             if d["command"] == "device_command" and d["args"]["command_name"] in ("On", "Off"):
                 await ws.send_json({"event": "attribute_updated", "data": [d["args"]["node_id"], "%d/6/0" % d["args"]["endpoint_id"],
                                                                             d["args"]["command_name"] == "On"]})
+            res = a.get("result")
+            if d["command"].startswith("commission") and isinstance(res, dict) and self.connect_after_add:
+                await asyncio.sleep(0.3)
+                await ws.send_json({"event": "node_updated", "data": dict(res, available=True)})
             if d["command"] == "remove_node" and "error_code" not in a:
                 self.nodes.pop(d["args"]["node_id"], None)
                 await ws.send_json({"event": "node_removed", "data": d["args"]["node_id"]})
@@ -443,6 +453,89 @@ class ServiceTest(unittest.TestCase):
             finally:
                 await m.stop()
                 await server.cleanup()
+        run(go())
+
+    def test_leaves_only_once_connected(self):
+        """Live run 21 Nov: the service only tells a device to drop its fabric while it holds a live
+        connection; straight after adding it has none, so the lock kept Couch TV's keys. Couch TV now
+        waits for the connection (node_updated, available) before it leaves."""
+        async def go():
+            fake = FakeService([])
+            m, server = await self.started(fake)
+            try:
+                seen = []
+                orig = m._event
+
+                def spy(name, data):
+                    seen.append(name)
+                    orig(name, data)
+                m._event = spy
+                fake.answers["commission_with_code"] = {"result": LOCK}
+                r = await m.commission("06409137006")
+                self.assertEqual(r["error"], "not_allowed")
+                self.assertEqual(seen[:2], ["node_updated", "node_removed"])   # connected first, then left
+                # a device that never connects is still left after CONNECT_WAIT, never kept
+                fake.connect_after_add = False
+                fake.answers["commission_with_code"] = {"result": SMOKE}
+                with patch.object(matter, "CONNECT_WAIT", 0.6):
+                    t = time.monotonic()
+                    r = await m.commission("06409137006")
+                    self.assertGreaterEqual(time.monotonic() - t, 0.5)
+                self.assertEqual(r["error"], "not_allowed")
+                self.assertIn(("remove_node", {"node_id": SMOKE["node_id"]}), fake.calls)
+            finally:
+                await m.stop()
+                await server.cleanup()
+        run(go())
+
+    def test_already_added(self):
+        """Live run 21 Nov: the same device shared a second time answers error already, not unreachable."""
+        async def go():
+            fake = FakeService([PLUG])
+            m, server = await self.started(fake)
+            try:
+                fake.answers["commission_with_code"] = {"error_code": 1, "reason": "other", "details": "Commission failed: Commission "
+                                                      "error: This device is already commissioned into this fabric."}
+                r = await m.commission("06409137006")
+                self.assertEqual((r["ok"], r["error"], r["device_ids"]), (False, "already", []))
+                self.assertEqual([d["id"] for d in m.devices()], ["matter:10:1"])
+            finally:
+                await m.stop()
+                await server.cleanup()
+        run(go())
+
+    def test_a_device_that_stops_answering_shows_unavailable(self):
+        """Live run 21 Nov: the service noticed a stopped plug only when its subscription ran out (over
+        90 s). A device quiet for PROBE_QUIET seconds is asked for one value; no answer: unavailable;
+        an answer again: back, and read once in full. A sleepy battery device (ICD) is never asked."""
+        async def go():
+            sleepy = node(50, {1: ([266], {"6/0": True})})
+            sleepy["attributes"]["0/70/0"] = 300
+            fake = FakeService([PLUG, sleepy])
+            with patch.multiple(matter, PROBE_EVERY=0.1, PROBE_QUIET=0.3, PROBE_TIMEOUT=0.3):
+                m, server = await self.started(fake)
+                try:
+                    fake.answers["read_attribute"] = {"result": {"0/40/0": 17}}
+                    await asyncio.sleep(1.0)
+                    self.assertEqual(m.devices()[0]["state"], "on")   # it answers: nothing changes
+                    self.assertIn(("read_attribute", {"node_id": 10, "attribute_path": "0/40/0"}), fake.calls)
+                    self.assertNotIn(50, [c[1].get("node_id") for c in fake.calls if c[0] == "read_attribute"])
+                    fake.unanswered.add(10)
+                    self.assertTrue(await until(lambda: m.devices()[0]["state"] == "unavailable", 3))
+                    self.assertTrue(await until(lambda: self.pushed and self.pushed[-1][0]["state"] == "unavailable", 1))   # pushed to the TV
+                    r = await m.command("matter:10:1", "off")
+                    self.assertEqual(r["error"], "unavailable")
+                    fake.unanswered.discard(10)
+                    self.assertTrue(await until(lambda: m.devices()[0]["state"] == "on", 3))
+                    self.assertTrue(await until(lambda: ("interview_node", {"node_id": 10}) in fake.calls, 2))
+                    # a report from the device ends unavailable at once too
+                    fake.unanswered.add(10)
+                    self.assertTrue(await until(lambda: m.devices()[0]["state"] == "unavailable", 3))
+                    await fake.ws.send_json({"event": "attribute_updated", "data": [10, "1/6/0", False]})
+                    self.assertTrue(await until(lambda: m.devices()[0]["state"] == "off", 1))
+                finally:
+                    await m.stop()
+                    await server.cleanup()
         run(go())
 
     def test_rename_and_remove(self):
@@ -794,10 +887,11 @@ class EndpointTest(unittest.TestCase):
             d = json.loads(msg.split("data: ", 1)[1])
             self.assertEqual((d["devices"][0]["id"], d["devices"][0]["state"]), ("matter:10:1", "on"))
             self.assertIn("version", d)
-            # a page that stopped reading is dropped, not fed for ever
+            # a page that reads slowly keeps at most 20 lists, the newest last (it is never cut off)
             for _ in range(25):
                 server.push_matter()
-            self.assertNotIn(q2, server.matter_clients)
+            self.assertIn(q2, server.matter_clients)
+            self.assertEqual(q2.qsize(), 20)
         finally:
             server.events_clients.discard((q, "any-tv"))
             server.matter_clients.discard(q2)

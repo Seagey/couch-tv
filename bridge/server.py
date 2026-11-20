@@ -3013,10 +3013,9 @@ def push_matter(_devices=None):
     gets the new device list at once ("event: matter"). Never on /api/events, which has no such rule."""
     payload = _matter_event()
     for q in list(matter_clients):
-        if q.qsize() < 20:
-            q.put_nowait(payload)
-        else:
-            matter_clients.discard(q)   # a page that stopped reading
+        while q.qsize() >= 20:   # a slow page: drop the oldest lists, the newest one says it all
+            q.get_nowait()
+        q.put_nowait(payload)
 
 
 MATTER = matter.Matter(config.DATA, config.CONFIG.get("matter"), on_change=push_matter)

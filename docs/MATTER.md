@@ -11,16 +11,30 @@ Roku, Apple TV and a launcher with a bridge, **the home computer is** (the bridg
 page is about that one. Both answer the same API, so the phone page and the TV screens are the same.
 
 Never shown and never switched, the same rule as Home Assistant: **locks, alarms (smoke and CO),
-garage doors, gates and doors**. A blind or cover whose name says garage, gate, door or lock is left
-out too. If someone shares only a lock, the computer leaves it again at once and says so.
+garage doors, gates and doors**. A blind, a plug or an on/off only light (what a garage door opener
+usually is) whose name says garage, gate, door or lock is left out too. The name rule goes by whole
+words ("Outdoor blind" and "Margate blind" are blinds) in every language the home speaks: English,
+German, Dutch, French, Spanish, Italian, Portuguese, Turkish, Serbian, Polish, Czech, Hebrew and
+Arabic ("Garagentor", "Portail", "Puerta del garaje", "Cancello", "Brama garażowa"). A name typed on
+the TV that would hide the device is refused (reason `opens_house`), so nothing can be hidden for good.
+If someone shares a lock, an alarm, a garage door or a kind of device Couch TV cannot show (a speaker,
+a switch that only sends), the computer leaves it again at once and says so: nothing is kept that the
+TV cannot show or remove.
 
 ## What it uses, and why
 
 The controller is the **Open Home Foundation Matter Server** (npm package `matter-server`, Apache
 2.0), the Matter controller Home Assistant itself runs. It is written on matter.js, Matter in
 plain JavaScript, so the **same code runs on a Mac (Apple silicon or Intel), Linux and a Raspberry
-Pi, with nothing to compile**. The bridge starts it as its own service, listening on this computer
-only (`127.0.0.1`, port 5581), and talks to it over its WebSocket API (bridge/matter.py).
+Pi, with nothing to compile**. The bridge starts it as its own service and talks to it over its
+WebSocket API (bridge/matter.py). That API can do anything to the devices and has no login, so it
+**listens on no network port at all**: only on a unix socket, `bridge/data/matter/ws.sock`, in a
+folder only the bridge's user can open (mode 700). When that path is too long for a socket (104 bytes
+on macOS), the socket goes in a short folder of its own under the system's temporary folder, also
+mode 700 and owned by that user. No web page and no other user on the computer can reach it. The
+service runs with `--disable-dashboard --disable-ota --disable-thread-diagnostics`. It does open
+Matter's own port (UDP and TCP, a random number): that is the Matter protocol itself, where every
+message is encrypted and only devices that joined this fabric are answered.
 
 We looked at the two controllers the plan named first:
 
@@ -30,19 +44,26 @@ We looked at the two controllers the plan named first:
 | connectedhomeip's Python controller | build it yourself (the on-TV app builds the SDK on a Mac) | build it yourself | build it yourself | A full SDK build per computer: far too much for a beginner's bridge. |
 | **matter-server 1.6.0 (matter.js)** | **yes, native** | **yes** | **yes, 32 and 64 bit** (Node.js has both) | Released 14 Nov 2026, maintained by the Open Home Foundation. Same WebSocket API as python-matter-server. **This is what the bridge uses.** |
 
-Because the API is the same, `config.json` can point the bridge at a python-matter-server or
-matter-server someone already runs (in Docker on a Linux box, for example) instead of starting its
-own: `"matter": {"server": "ws://127.0.0.1:5580/ws"}`. Then that server's fabric is shared with
-whatever else uses it (Home Assistant), so the bridge's own service is the better default.
+The bridge always runs its own service. An earlier version could also use a Matter server someone
+already ran (`matter.server`), but then removing a device on the TV removed it from Home Assistant
+too, and that path was never tested, so it is gone: `server` and `port` in `config.json` are
+ignored now, with one line in the bridge's log saying so.
 
 ## Setting it up
 
 It needs **Node.js 22.13 or newer** on the home computer (option B already uses Node).
 
 ```sh
-scripts/matter-setup.sh            # installs it into bridge/matter/node_modules (about 200 MB, 10 seconds)
+scripts/matter-setup.sh            # installs it into bridge/matter/node_modules (about 170 MB, 4 seconds)
 scripts/matter-setup.sh --check    # says whether it is installed and Node.js is new enough
 ```
+
+It installs as little as it can: `--omit=optional` leaves out the Bluetooth and USB add ons (94
+packages in the lock, three of them with install scripts that compile code), which the bridge never
+uses, and `--ignore-scripts` runs nothing that was downloaded. matter.js marks its Node.js network
+layer (`@matter/nodejs`) optional too and cannot start without it, so the script puts that one back
+at the version and checksum in the lock file. Tried on an Apple silicon Mac (Node.js 26.13): 87
+packages, the service started and added the test devices.
 
 Then restart the bridge. It starts the Matter service by itself, and again if it ever stops. The
 exact versions are pinned in `bridge/matter/package-lock.json`; run the setup again after updating
@@ -55,6 +76,15 @@ Terminal and press **Allow** when it asks. Without it Matter finds nothing: on a
 started outside a logged in session got `EHOSTUNREACH` for every mDNS message, and the same service
 started inside the session added the light in 2.3 seconds. If it was refused: System Settings,
 Privacy and Security, Local Network, switch on Terminal (or node).
+
+**Mac: the bridge as a launchd service** (docs/SETUP.md step 5). The Matter service is a child of the
+bridge, so it runs inside the same launchd job, and stopping the job (`launchctl bootout`, which sends
+SIGTERM) stops the service too: tried on the MacBook by sending the bridge SIGTERM, the service ended
+and its pid file was removed. Adding a device with the bridge as a launchd job (rather than started
+from Terminal) has **not been tried yet**. If Matter finds nothing that way while it works when the
+bridge is started from Terminal, it is the Local Network permission above: macOS asks once for the
+program launchd starts (the Python in `.venv`), so start the job once while you are at the Mac and
+press Allow, or switch it on under System Settings, Privacy and Security, Local Network.
 
 **Linux and Raspberry Pi: Thread devices.** A Matter device on Thread (most Eve, Nanoleaf and
 IKEA ones) is reached through a Thread border router (a Google Nest hub, an Apple TV or HomePod, a
@@ -75,26 +105,28 @@ All optional; Matter is on when it is installed.
 ```json
 "matter": {
   "enabled": true,
-  "port": 5581,
-  "server": "ws://127.0.0.1:5580/ws",
   "node": "/opt/homebrew/bin/node",
   "test_devices": false
 }
 ```
 
 - `enabled`: false switches Matter off.
-- `port`: the port the bridge's own service listens on, on this computer only.
-- `server`: use a Matter server already running instead of starting one.
-- `node`: which Node.js to use, when the first `node` on the PATH is too old.
+- `node`: which Node.js to use, when the first `node` on the PATH is too old (a launchd job has a
+  bare PATH: the example plist adds Homebrew's).
+- `server` and `port` are no longer used (above): the bridge logs one line and carries on. A value of
+  the wrong type anywhere in this section never stops the bridge from starting.
 - `test_devices`: also accept development boards and the SDK's sample apps, whose certificates are
   test ones (`--enable-test-net-dcl`). Leave it off for real devices.
 
 ## Where the keys live
 
 The bridge's Matter fabric (its root key and the devices it joined) is in `bridge/data/matter/`
-(mode 700, git ignores it), names given on the TV in `bridge/data/matter-names.json` (mode 600).
-Back up `bridge/data/` with the rest of the bridge: without that folder the devices have to be shared
-again. `bridge/data/matter/service.log` is the service's log (kept under 5 MB).
+(mode 700, git ignores it), names given on the TV in `bridge/data/matter-names.json` (mode 600), and
+devices removed while they did not answer in `bridge/data/matter-forgotten.json` (mode 600: they are
+never shown again and are told to leave the next time the service reaches them). Back up
+`bridge/data/` with the rest of the bridge: without that folder the devices have to be shared again.
+`bridge/data/matter/service.log` is the service's log. It is looked at every minute while the service
+runs: over 5 MB, it is copied to `service.log.1` and starts again, so the two never pass 10 MB.
 
 ## The API
 
@@ -103,13 +135,26 @@ caller with `bridge.pairing_key`.
 
 | | |
 |---|---|
-| `GET /api/matter/devices` | `{ ok, devices, ready, version, note? }`. `note` says in plain words why it is not ready (not installed, Node.js too old, starting). |
-| `GET /api/matter/events` | Server sent events: `event: matter`, the same JSON as `/devices`, at once and within a quarter second of any change. `/api/events` carries the same event. |
-| `POST /api/matter/commission {code, address?}` | `{ ok, device_ids }`, or HTTP 400 with `{ ok: false, error, note, device_ids: [] }`. `error` is `wrong_code`, `expired`, `unreachable` or `thread` (or `not_allowed` for a lock). `address` (`host`, `host:port` or `[v6]:port`) skips looking for the device. |
-| `POST /api/matter/command {id, action, value?}` | `{ ok, state, device }`, answered once the device itself reported the change (at most about 2.5 seconds). |
-| `POST /api/matter/remove {id}` | `{ ok, removed }`. A device is one Matter node: every id of it goes. Couch TV leaves the device's fabric; the device stays in the person's own home app. |
-| `POST /api/matter/rename {id, name}` | `{ ok, name }`. 1 to 40 characters, kept on this computer only. |
+| `GET /api/matter/devices` | `{ ok, devices, ready, version, reason?, note? }`. While not ready, `reason` says why as a key the TV screens translate (`off`, `not_installed`, `node_missing`, `node_old`, `starting`, `stopped`) and `note` says it in plain English. |
+| `GET /api/matter/events` | Server sent events: `event: matter`, the same JSON as `/devices`, at once and within a quarter second of any change. Only here, behind the pairing rule: never on `/api/events`, which any device on the Wi-Fi may open. A page that reads slowly keeps at most the 20 newest lists. |
+| `POST /api/matter/commission {code, address?}` | `{ ok, device_ids }`, or HTTP 400 with `{ ok: false, error, reason?, note, device_ids: [] }`. `error` is `wrong_code`, `expired`, `unreachable`, `thread`, `already` (the device is on Couch TV already) or `not_allowed` (`reason` `blocked`: a lock, an alarm or a garage door; `unsupported`: a kind of device Couch TV cannot show). A failed add answers within about 30 seconds (the service looks for the device for 30 seconds). See the address rules below. |
+| `POST /api/matter/command {id, action, value?}` | `{ ok, state, device }`, answered once the device itself reported the change (at most about 2.5 seconds; at once when the action changes nothing). |
+| `POST /api/matter/remove {id}` | `{ ok, removed, reason?, note? }`. A device is one Matter node: every id of it goes, also one the name rule hides. Couch TV leaves the device's fabric; the device stays in the person's own home app. A device that is `unavailable` is forgotten anyway (`reason` `offline`, a note to remove Couch TV in the other app too if it is listed there), and one that does not answer the leave is forgotten here and left properly the next time it answers (`reason` `not_answering`). |
+| `POST /api/matter/rename {id, name}` | `{ ok, name }`. 1 to 40 characters, no control characters, no `<` or `>`, kept on this computer only. A name the name rule would hide is refused: `{ ok: false, error: "refused", reason: "opens_house", note }`. |
 
+**Address rules** (`address` on commission, contract change 5): `host`, `host:5540`, `[v6]` or
+`[v6]:5540`. The Matter service only ever tries port 5540 (the port every Matter device uses), so
+another port is refused with reason `port` and a plain note rather than silently tried on 5540. An
+`fe80` (link local) address is refused with reason `link_local`, because the service drops those and
+would look for the device instead. Anything else that is not an IP address: reason `address`. All
+three answer error `unreachable`, HTTP 400.
+
+**Unavailable** (contract change 13). The service itself only notices a device that went away when
+its subscription runs out, which can take many minutes. So a device the bridge has not heard from for
+45 seconds is asked for one value (every 15 seconds); no answer within 10 seconds and it shows
+`unavailable` (and pushes that to the TV) until it answers again, when it is read once in full. A
+sleepy battery device (one with Matter's ICD cluster) is never asked, so it is not woken up: the
+service's own timing applies to those.
 Each device is `{ id: "matter:<node>:<endpoint>", name, domain, state, attributes }` with Home
 Assistant's attribute names (the Matter contract):
 
@@ -133,12 +178,18 @@ point, °C, in half degrees). A cover's `on` opens it and `off` closes it. Senso
 
 ## What was tested, and how
 
-- `tests/test_matter_bridge.py` (15 tests): every domain mapped from Matter attributes, including a
+- `tests/test_matter_bridge.py` (31 tests, all pass): every domain mapped from Matter attributes, including a
   real node (the SDK's virtual light, `tests/fixtures/matter-light-node.json`, read by the service
   after a share); locks, alarms, garage doors and a lock behind a Matter bridge never shown, never
   switched, never renamed or removed; what each action sends; the error keys; adding by address;
-  names kept with mode 600; removing a whole node; the live event; the endpoints behind the
-  pairing rule; the service only ever listening on 127.0.0.1.
+  names kept with mode 600; removing a whole node; the live event, only on `/api/matter/events`;
+  the endpoints behind the pairing rule; the name rule in every language, whole words only; a device
+  Couch TV cannot show left again (only once the service is connected to it); `already`; the
+  address rules; a device that does not answer forgotten anyway and left later; a device that stops
+  answering shown `unavailable` and back again; xy colour as `hs_color`; the reason keys. Against a
+  pretend service on a unix socket, and the real start, restart and stop of a pretend service
+  process: the service on no network port, a leftover from a killed bridge ended without freezing
+  the bridge, the pid file, the atexit stop, the log kept under 5 MB, bad settings never crashing.
 - Live, on an Apple silicon Mac (macOS 27), against connectedhomeip's `chip-lighting-app`:
   a second matter-server played "Google Home" (commissioned the light, then shared it with Open
   Commissioning Window), and the bridge's own service added it by the share code in 2.3 to 2.5

@@ -1,63 +1,54 @@
 # RESUME: nl-matter-bridge (builder "matter-bridge")
 
-Read first: scratchpad nolater-common.md and matter-contract.md (the contract's Changes 1 to 9 are implemented here too).
+Read first: coord/nolater-common.md and coord/matter-contract.md (changes 1 to 13).
 
 ## Done
 - bridge/matter.py: the bridge's Matter controller. Starts the Open Home Foundation Matter Server
-  (npm matter-server 1.6.0, matter.js; pinned in bridge/matter/package-lock.json) as its own
-  service on 127.0.0.1:5581, storage bridge/data/matter (700), names bridge/data/matter-names.json (600),
-  ends a leftover service from a killed bridge (service.pid), atexit stop. Device model with HA attribute
-  names, locks/alarms/garage doors filtered (a lock shared alone is removed again: error not_allowed),
-  commands (on/off/toggle/level/colour/temp/target/mode/position), commission errors
-  wrong_code/expired/unreachable/thread, address commissioning, rename, remove (whole node), version.
-- bridge/server.py hunks (shared file): `import matter`; block after h_ha_forget (push_matter,
-  matter_clients, h_matter_events/devices/commission/command/remove/rename, all @tv_or_paired);
+  (npm matter-server 1.6.0, matter.js; pinned in bridge/matter/package-lock.json) as its own service,
+  on a unix socket only (bridge/data/matter/ws.sock, or a short private folder when that path is
+  over 100 bytes), never a network port; `--disable-dashboard --disable-ota --disable-thread-diagnostics`.
+  Device model with HA attribute names; locks, alarms, garage doors filtered; the name rule (whole
+  words, 13 languages) on blinds, plugs and on/off only lights; commands; commission errors
+  wrong_code/expired/unreachable/thread/already/not_allowed (+reason); address rules (port 5540 only,
+  no fe80); rename (refuses a name that would hide the device); remove (whole node, offline device
+  forgotten anyway, matter-forgotten.json, left again later); liveness probe (unavailable within
+  about 70 s, contract change 13); reason keys for not ready; log trimmed every minute.
+- bridge/server.py (shared file) hunks: `import matter`; block after h_ha_forget (push_matter only to
+  /api/matter/events listeners, never /api/events; matter_clients; 6 handlers, all @tv_or_paired);
   6 routes after /api/ha/direct; `await MATTER.start()` in on_startup; `await MATTER.stop()` in on_cleanup.
-- scripts/matter-setup.sh, docs/MATTER.md, bridge/API.md (short Matter section), tests/test_matter_bridge.py
-  (15 tests), tests/fixtures/matter-light-node.json.
+- scripts/matter-setup.sh (`--omit=optional` plus @matter/nodejs put back), docs/MATTER.md,
+  docs/CONFIG.md (Matter section), docs/DOCKER.md (Matter in Docker), AGENTS.md (Matter needs no HA),
+  bridge/API.md, tests/test_matter_bridge.py (31 tests), tests/fixtures/fake_matter_service.py,
+  tests/fixtures/matter-light-node.json.
+- Fable NO-GO (coord/fable-1121-nl-matter-bridge.md): items 1-4 and 6-15 fixed and tested. Item 5
+  (launchd) NOT done: see below.
 
-## Test results so far
-- Here: `<main checkout>/.venv/bin/python -m unittest discover -s tests -p "test_matter_bridge.py"` 15/15 OK;
-  full suite `-p "test_*.py"` Ran 1363, OK (skipped 58).
-- build Mac live (light): 9/9 commands through a tunnel; bridge-spawned service: setup 8 s, ready 2.7 s,
-  added by share code 2.5 s, 3/3 commands, clean stop, kill -9 leftover ended at restart.
-- Linux Docker on build Mac (colima): arm64 and x86_64 both: setup, 15/15, ready, `expired`, clean stop.
-- Thermostat live (thermostat-app on port 5781, other agents hold 5641-5671): 7/7 commands; lock (chip-lock-app) refused not_allowed and left.
+## Test results (21 Nov)
+- `<repo>/.venv/bin/python -m unittest discover -s tests -p "test_matter_bridge.py"`: 31/31 OK.
+- Full suite `-p "test_*.py"`: see the final report / commit message.
+- Contract harness (wt-nl-matter-fixtures tests/matter_contract.py) against this bridge on the
+  MacBook (~/mb-nlb, port 8796, test_devices on): run 1 (WIP 0001e84) 255 pass / 4 fail / 2 warn;
+  the four fails and two warns were fixed (already, light attrs, unavailable probe, leave only once
+  connected). Later runs: see the commit message and the final report.
+- SIGTERM to the bridge (what `launchctl bootout` sends): the Matter service ended, pid file removed.
 
-## 21 Nov: fixing the Fable NO-GO list (coord/fable-1121-nl-matter-bridge.md, 15 items). STATE: WIP, TESTS NOT RUN YET
-Code written (uncommitted work moved into the WIP commit), none of it run yet:
-- bridge/matter.py: new Matter class (spliced from scratchpad nl-matter-bridge-fix/class.py). Items 1-4, 6-13, 15 coded:
-  unix socket only (`--listen-address <sock>`, short private dir via short_private_dir(), aiohttp.UnixConnector,
-  `--disable-ota --disable-thread-diagnostics`, no TCP port, config "server"/"port" ignored with a warning: item 4, 7, 15);
-  OPENS_HOUSE whole words in 13 languages + hidden_by_name on cover/switch/on-off-only light, rename refuses
-  (reason opens_house), remove by node id even when hidden (_node_of) (items 3, 6); commission leaves anything
-  devices_of() shows nothing for -> not_allowed, reason blocked|unsupported (item 2); address_problem(): port other than
-  5540 -> reason port, fe80 -> link_local, discovery_timeout_s 30 on commission_on_network (item 8); remove of an
-  offline/unanswering device -> ok + reason offline|not_answering + note, matter-forgotten.json (600), left again on
-  next connect (item 9); xy_to_hs (item 10); tidy_name on device names (item 11); async _end_leftover (/proc or ps),
-  already() skips the 2.5 s wait, pid file removed on stop (item 12); answer() reason keys off/not_installed/
-  node_missing/node_old/starting/stopped (item 13); _trim_log + _log_loop every 60 s (item 14 part).
-- bridge/server.py: push_matter only to matter_clients (item 1). bridge/API.md updated (item 1).
-- tests/test_matter_bridge.py rewritten (fake service on a unix socket, ProcessTest with tests/fixtures/fake_matter_service.py).
+## Not done, and why
+- Item 5, the bridge as a launchd job adding a device: `launchctl bootstrap` on the MacBook was refused
+  by this session's permission classifier (twice: once with the plist in ~/Library/LaunchAgents, once
+  with it in ~/mb-nlb). Needs the owner to allow it, or to run it: copy
+  bridge/examples/couch-tv-bridge.plist.example with the REPLACE paths set, bootstrap, `fx share light`,
+  add it from the phone page or POST /api/matter/commission, write the result into docs/MATTER.md
+  ("Mac: the bridge as a launchd service"), then bootout and delete the plist.
+- A real share from the Google Home or Apple Home app, and a real Thread device: these need the
+  owner at home with his phone and his own devices. An agent cannot do them.
 
-## Next steps (exact)
-1. Run `<repo>/.venv/bin/python -m unittest discover -s tests -p "test_matter_bridge.py"` in the worktree; fix failures.
-   Then the full suite `-p "test_*.py"` (was 1363 OK, 58 skipped).
-2. Still left, not started: item 5 (launchd on the MacBook: bootstrap bridge/examples/couch-tv-bridge.plist.example
-   with this branch's bridge, share the light with `~/matter-fixtures/fx share light`, add it, write the real result
-   into docs/MATTER.md, boot it out, remove the plist); item 14 docs (CONFIG.md matter section, AGENTS.md ~line 468
-   "Matter ... shows once it is added to Home Assistant" is stale, docs/DOCKER.md Matter section, MATTER.md: socket,
-   no port/server options, address rules, reason keys, name rule languages, log trimming); item 13: tell the
-   coordinator `not_allowed` (+ reasons) for coord/matter-contract.md; the "Also" line: live fan, cover and sensors
-   against the fixtures (`fx share fan|cover|sensors`, never `fx evict`, `fx revoke` after), and try
-   `npm ci --omit=optional` (scripts/matter-setup.sh) on the MacBook.
-3. A real share from the Google Home or Apple Home app and a real Thread device need the owner at home: that is the
-   one thing that cannot be done in an agent run.
-Nothing is running: no launchd job was loaded, no lock held, nothing started on the MacBook in this session.
-
-## Nothing runs now. To test again on the build Mac (its ssh alias is in the brief)
-- chip-lighting-app (~/matter-bridge-test/light1, port 5641), thermostat-app (thermo/kvs3, 5781), chip-lock-app (lock/, 5661). Stop only ours: `pkill -f "KVS $HOME/matter-bridge-test/"` (other agents run their own lights: never pkill by app name).
-- Two matter-server instances (A "Google Home" port 5591, B port 5592) run by ~/matter-bridge-test/servers.sh
-  inside a live ssh session (macOS Local Network rule: a detached process gets EHOSTUNREACH). Stop: `touch ~/matter-bridge-test/STOP`.
-- Tunnel from this computer: `ssh -f -N -L 15592:127.0.0.1:5592 <build Mac alias from the brief>` (stop: pkill -f "15592:127.0.0.1").
-- colima VM (Docker): `colima stop` when done.
+## How to run it again (MacBook)
+- Copy: `rsync -a --exclude .git --exclude node_modules --exclude bridge/data <worktree>/ macbook:mb-nlb/`,
+  config.json there is a test one (port 8796, a random pairing key; the key is in the scratchpad
+  nl-matter-bridge-live/token, never commit it). `.venv` made with `uv venv --python 3.11`.
+- Start: `ssh macbook 'cd ~/mb-nlb; export PATH=/opt/homebrew/bin:/usr/bin:/bin; exec .venv/bin/python bridge/server.py'`
+  (in the background). Stop: find the pid with `lsof -tiTCP:8796 -sTCP:LISTEN` and `kill -TERM` it
+  (its command line is relative, so `pkill -f mb-nlb/` does not match it).
+- Check `fx fabrics <name>` is 1 for all eight first; never run at the same time as the fixtures
+  agent's run on ~/mf-bridge (port 5495).
+- Harness: `MATTER_TOKEN=<key> python3 tests/matter_contract.py --api http://<macbook ip>:8796`.

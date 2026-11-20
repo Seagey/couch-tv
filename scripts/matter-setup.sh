@@ -36,8 +36,13 @@ if [ "${1:-}" = "--check" ]; then
   exit 1
 fi
 
-# --ignore-scripts: only optional Bluetooth and USB add ons have install scripts, and the bridge
-# never uses them (a shared Matter device is always added over the home network).
-npm ci --prefix "$DIR" --omit=dev --ignore-scripts --no-audit --no-fund --loglevel=error
+# Less code from the internet: --omit=optional leaves out the Bluetooth and USB add ons (94 packages,
+# three with install scripts that compile code) the bridge never uses, because a shared Matter device
+# is always added over the home network. matter.js marks its Node.js network layer (@matter/nodejs)
+# optional too, and the service cannot start without it, so that one is put back, at the version and
+# checksum in package-lock.json. --ignore-scripts: nothing downloaded runs while it installs.
+npm ci --prefix "$DIR" --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund --loglevel=error
+NODEJS=$(node -p "require('$DIR/package-lock.json').packages['node_modules/@matter/nodejs'].version")
+npm install --prefix "$DIR" --no-save --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund --loglevel=error "@matter/nodejs@$NODEJS"
 node "$ENTRY" --version >/dev/null
 echo "matter: installed $(node -p "require('$DIR/node_modules/matter-server/package.json').version") in bridge/matter. Restart the bridge to start it."

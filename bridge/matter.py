@@ -65,6 +65,7 @@ BASIC, BRIDGED, DESCRIPTOR = 40, 57, 29
 TEMP, HUMID, LUX, PRESSURE, OCCUPANCY, BOOLEAN = 1026, 1029, 1024, 1027, 1030, 69
 AIR, PM25, CO2 = 91, 1066, 1037
 DOOR_LOCK, SMOKE_CO = 257, 92
+ICD = 70    # ICD management: a sleepy battery device
 
 # Matter device types (Device Library) to the contract's domains
 LIGHTS = {256, 257, 268, 269}                  # on/off, dimmable, colour temperature, extended colour light
@@ -94,7 +95,7 @@ OPENS_HOUSE_WORDS = [
     r"portas?", r"portone", r"portoni", r"cancell[oi]", r"serratur[ae]", r"basculante",          # it
     r"garage[mn]s?", r"port[ãa]o", r"port[õo]es", r"fechaduras?",                                # pt
     r"garaj\w*", r"kap[ıi]\w*", r"kilit\w*", r"kilid\w*",                                        # tr
-    r"gara[žz]\w*", r"kapij\w*", r"vrata", r"brav[au]",                                          # sr, pl, cs
+    r"gara[žżz]\w*", r"kapij\w*", r"vrata", r"brav[au]",                                          # sr, pl, cs
     r"bram(?:a|y|ę|ie|ą|ka|ki|kę)?", r"drzwi", r"zam(?:ek|ka|ku|ki|kiem)",
     r"gar[áa][žz]\w*", r"br[áa]n(?:a|y|u|ou|ě)", r"dve[řr]\w*", r"z[áa]m(?:ek|ku|ky|kem)",
     r"[הבלמו]?(?:מוסך|שער|דלת|מנעול)",                                                         # he
@@ -191,7 +192,7 @@ def _light(node, ep, clusters):
     lvl = _a(node, ep, LEVEL, 0)
     if LEVEL in clusters:
         attrs["supported_color_modes"] = ["brightness"]
-        if on and isinstance(lvl, (int, float)):
+        if isinstance(lvl, (int, float)):   # kept while off too: the screens show where it comes back on
             attrs["brightness"] = max(1, min(255, round(lvl * 255 / 254)))
             attrs["level"] = max(1, min(100, round(lvl * 100 / 254)))
     if COLOUR in clusters:
@@ -204,7 +205,7 @@ def _light(node, ep, clusters):
             if isinstance(lo, int) and lo > 0:
                 attrs["max_color_temp_kelvin"] = round(1e6 / lo)
             m = _a(node, ep, COLOUR, 7)
-            if on and isinstance(m, int) and m > 0:
+            if isinstance(m, int) and m > 0:
                 attrs["color_temp_kelvin"] = round(1e6 / m)
         if _feature(node, ep, COLOUR, 0) or _feature(node, ep, COLOUR, 3):   # hue and saturation, or xy
             modes.append("hs" if _feature(node, ep, COLOUR, 0) else "xy")
@@ -687,6 +688,10 @@ OFFLINE_NOTE = ("The device was not answering, so Couch TV forgot it without tel
 NOT_ANSWERING_NOTE = ("The device did not answer, so Couch TV forgot it here and leaves it properly the next time "
                       "it answers. It is still in your other home app.")
 NAME_HIDES_NOTE = "Couch TV never shows a garage door, gate, door or lock, so that name would hide this device. Pick another name."
+CONNECT_WAIT = 15      # after adding a device that is not kept: how long to wait for the live connection leaving needs
+PROBE_EVERY = 15       # seconds between looks for devices that went quiet
+PROBE_QUIET = 45       # a device not heard from for this long is asked for one value
+PROBE_TIMEOUT = 10     # and is shown unavailable when it does not answer within this
 DISCOVERY_S = 30       # how long the service looks for the device (left to itself it looks for minutes)
 COMMISSION_WAIT = 150  # the discovery time plus adding it, over Thread too
 
@@ -751,6 +756,8 @@ class Matter:
         self._names = self._load_names()
         self._forgotten = self._load_forgotten()
         self._heard = {}   # node id -> when it last reported a change
+        self._live = set()   # nodes the service has had a live connection to
+        self._down = set()   # nodes that stopped answering a check (shown unavailable until they answer)
         self.version = 0
         self._atexit = False
 
@@ -794,8 +801,13 @@ class Matter:
         out = []
         for nid in sorted(self.nodes, key=lambda n: int(n) if str(n).isdigit() else 0):
             if nid not in self._forgotten:
-                out += devices_of(self.nodes[nid], self._names)
+                out += devices_of(self._view(nid), self._names)
         return out
+
+    def _view(self, nid):
+        """The node as the TV sees it: one that stopped answering a check is unavailable."""
+        node = self.nodes.get(nid)
+        return dict(node, available=False) if node is not None and nid in self._down else node
 
     def answer(self):
         o = {"devices": self.devices(), "ready": self.ready, "version": self.version}
@@ -848,6 +860,7 @@ class Matter:
             self._tasks.append(asyncio.ensure_future(self._service_loop()))
             self._tasks.append(asyncio.ensure_future(self._log_loop()))
         self._tasks.append(asyncio.ensure_future(self._connect_loop()))
+        self._tasks.append(asyncio.ensure_future(self._probe_loop()))
 
     async def stop(self):
         self._stopping = True
@@ -1081,6 +1094,9 @@ class Matter:
     def _event(self, name, data):
         if name in ("node_added", "node_updated") and isinstance(data, dict):
             self.nodes[str(data.get("node_id"))] = data
+            if data.get("available") is True:
+                self._live.add(str(data.get("node_id")))
+                self._down.discard(str(data.get("node_id")))
         elif name == "node_removed":
             self.nodes.pop(str(data), None)
             if str(data) in self._forgotten:
@@ -1092,9 +1108,52 @@ class Matter:
                 return
             n.setdefault("attributes", {})[data[1]] = data[2]
             self._heard[str(data[0])] = time.monotonic()
+            self._down.discard(str(data[0]))
         else:
             return
         self._changed()
+
+    async def _probe_loop(self):
+        """The service notices a device that stopped answering only when its subscription runs out, which
+        can take many minutes. So a device not heard from for PROBE_QUIET seconds is asked for one value;
+        one that does not answer is shown unavailable until it answers again (contract: "unavailable").
+        A sleepy battery device (it has the ICD cluster) is left to the service, so no extra wake ups."""
+        probing = set()
+        while not self._stopping:
+            await asyncio.sleep(PROBE_EVERY)
+            if not self.ready:
+                continue
+            now = time.monotonic()
+            for nid, node in list(self.nodes.items()):
+                if nid in self._forgotten or nid in probing or ICD in endpoints(node).get(0, set()):
+                    continue
+                if nid not in self._down and now - self._heard.setdefault(nid, now) < PROBE_QUIET:
+                    continue
+                probing.add(nid)
+                fut = asyncio.ensure_future(self._probe(nid))
+                fut.add_done_callback(lambda _f, n=nid: probing.discard(n))
+
+    async def _probe(self, nid):
+        try:
+            r = await self.request("read_attribute", {"node_id": int(nid), "attribute_path": "0/40/0"}, timeout=PROBE_TIMEOUT)
+            answered = bool(r)
+        except MatterError:
+            answered = False
+        if nid not in self.nodes:
+            return
+        if answered:
+            self._heard[nid] = time.monotonic()
+            if nid in self._down:
+                self._down.discard(nid)
+                self._changed()
+                try:   # back again: read everything once, in case reports were missed while it was away
+                    await self.request("interview_node", {"node_id": int(nid)}, timeout=60)
+                except MatterError as e:
+                    log.info("matter: reading node %s again failed (%s)", nid, e.reason)
+        elif nid not in self._down:
+            log.info("matter: node %s stopped answering", nid)
+            self._down.add(nid)
+            self._changed()
 
     async def request(self, command, args, timeout=30):
         """One API command. Returns its result; raises MatterError with the service's answer."""
@@ -1122,7 +1181,7 @@ class Matter:
         m = re.fullmatch(r"matter:(\d{1,20}):(\d{1,5})", str(did or ""))
         if not m or m.group(1) in self._forgotten:
             return None, None, None
-        node = self.nodes.get(m.group(1))
+        node = self._view(m.group(1))
         if not node or int(m.group(2)) not in endpoints(node):
             return None, None, None
         return m.group(1), node, int(m.group(2))
@@ -1182,6 +1241,13 @@ class Matter:
             # a lock, an alarm, a garage door, or a kind of device Couch TV cannot show: never kept on
             # this computer's fabric, where it would be invisible and could not be removed from the TV
             blocked = blocked_only(node) or any(kind_of(node, ep, cl) for ep, cl in endpoints(node).items() if ep)
+            # The service only tells a device to drop its fabric once it holds a live connection to it;
+            # straight after adding it has none yet and would only forget it here, leaving the device
+            # with Couch TV's keys (seen with the fixture lock). So wait for the connection first.
+            for _ in range(max(1, round(CONNECT_WAIT / 0.2))):
+                if nid in self._live:
+                    break
+                await asyncio.sleep(0.2)
             await self._leave(nid)
             self.nodes.pop(nid, None)
             self._changed()
@@ -1194,6 +1260,8 @@ class Matter:
         details = e.details.lower()
         if e.reason in ("passcode-mismatch", "invalid-payload") or "passcode" in details or "invalid" in details and "code" in details:
             key, note = "wrong_code", "That code did not work. Make a new code in the other app and type it in again."
+        elif "already commissioned" in details or "already-commissioned" in details:
+            key, note = "already", "This device is already on Couch TV."
         elif e.reason == "not-discovered":
             key, note = "expired", ("The device did not answer to that code. A shared code works for a few minutes only: "
                                     "make a new one and try again, with the device switched on.")

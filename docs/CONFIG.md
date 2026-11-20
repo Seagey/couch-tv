@@ -686,6 +686,31 @@ goes to the page. The same can be written by hand:
 with the Hue key in `.env` as `HUE_USERNAME=` (made by pressing the button and sending
 `{"devicetype": "couch-tv#home"}` to `http://<hue bridge>/api`). `zones` left out shows every zone.
 
+## Matter devices with no Home Assistant (option B)
+
+With a computer at home, devices people already have in Google Home, Apple Home, SmartThings or
+Alexa can be shared to couch-tv by Matter (the other app gives an 11 digit code), and the home
+computer joins them as one more controller. Set it up once with `scripts/matter-setup.sh` (it needs
+Node.js 22.13 or newer), then add devices from the phone page. Everything, including what was tested,
+is in [MATTER.md](MATTER.md). The section is optional; Matter is on when it is installed:
+
+```json
+"matter": {
+  "enabled": true,
+  "node": "/opt/homebrew/bin/node",
+  "test_devices": false
+}
+```
+
+- `enabled`: false switches Matter off.
+- `node`: which Node.js to use, when the first `node` on the PATH is too old.
+- `test_devices`: also accept development boards and the Matter SDK's sample apps (test
+  certificates). Leave it off for real devices.
+
+The older `server` and `port` keys are ignored (the bridge's Matter service listens on a private
+socket, never a network port). Locks, alarms, garage doors, gates and doors never show, as with Home
+Assistant. The fabric keys live in `bridge/data/matter/` (mode 700): back up `bridge/data/`.
+
 ## Guests: names and times from a bookings calendar
 
 For a holiday let or a guest room. A couch-tv Studio design's **Welcome** widget can take the guest's
