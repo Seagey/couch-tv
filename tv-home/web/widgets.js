@@ -2120,7 +2120,7 @@
   };
 
   // Commute: the usual drive between the two places kept on this TV (Home settings: Location, and
-  // couch-tv Studio, Commute), by road from OpenStreetMap through OSRM (widget-web.js); no live
+  // the widget's own settings, Where to), by road from OpenStreetMap through OSRM (widget-web.js); no live
   // traffic. The design only says when to arrive (opts.arrive_h, arrive_m), the minutes to spare and
   // its label: never a place.
   function commuteOf(root, o, b, env) {
@@ -2132,9 +2132,9 @@
     if (env.demo) { v = { minutes: 16, km: 12.4 }; c = { to: { name: "work" } }; }
     else {
       if (!c.from) { webEmpty(root, b, "location", "Set your town for the commute", "Settings (hold OK), Home settings, Location", "Set your town"); root.setAttribute("data-setup", "commute"); return null; }
-      if (!c.to) { webEmpty(root, b, "location", "Set where you drive to", "Settings (hold OK), Home settings, couch-tv Studio, Commute", "Set where to"); root.setAttribute("data-setup", "commute"); return null; }
+      if (!c.to) { webEmpty(root, b, "location", "Set where you drive to", "Set where you drive to in this widget's settings: hold OK on the widget.", "Set where to"); root.setAttribute("data-setup", "commute"); return null; }
       var rec = webOf(env, "commute", c.key);
-      if (rec && !rec.ok && rec.err === "empty") { webEmpty(root, b, "location", "No road route between these places", "Check Commute in Home settings", "No route"); return null; }
+      if (rec && !rec.ok && rec.err === "empty") { webEmpty(root, b, "location", "No road route between these places", "Check where you drive to in this widget's settings: hold OK on the widget.", "No route"); return null; }
       if (!webReady(root, b, "location", "commute", rec)) return null;
       v = rec.v;
     }
