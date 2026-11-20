@@ -35,6 +35,38 @@ Fields:
 - `private`: `true` for anything personal (calendar links, a home address). Private values never
   leave the TV and the home Wi-Fi.
 
+Two more types:
+
+- `tvlist`: one of the things kept on this TV, named by `from`: `"lists"`, `"photos"`, `"people"` or
+  `"calendars"` (stored as that thing's id; `"first"`, `"all"` or `"auto"` as the default)
+- `image`: one photo put in the widget in couch-tv Studio (Studio only, kept in the design)
+
+Every record also says where it lives and who shows it (WIDGET-SETTINGS-SPEC.md section 5):
+
+- `store`: `"design"` (a public choice kept in `widget.opts[key]`, which the TV may still override
+  for this widget) or `"tv"` (kept on this TV only, in Home settings `ST.widgets["<id>|<kind>"]`,
+  never in a design). A `"tv"` setting is never offered in Studio.
+- `where`: the screens that offer it, any of `"studio"`, `"tv"` (Hold OK and Home settings),
+  `"phone"`. A setting without `"studio"` gets one line in Studio: "Set on the TV: hold OK on the
+  widget."
+- `pre`: `true` when it is needed before launch. Before launch settings come first in each list.
+
+And, where they apply:
+
+- `when`: `{ otherKey: value }`, shown only while that sibling setting has that value. The value
+  `"set"` means while the sibling differs from its own default (commute `arrive_m` once an arrive by
+  hour is picked).
+- `sets`: the design key a screen writes from this choice, worked out when it is saved (bins
+  `thisweek` sets `anchor`, so the bin picked goes out this week).
+- `many` with `max`: several values, as a list (a `choice`, `text` or `device` setting).
+- `suggest`: for a `text` list, ready made `[value, label]` pairs to pick from (the markets shortcuts).
+- `coast` (`place`, beaches only), `domain` (`device`, one Home Assistant domain or a list),
+  `league` (`team`, the key of the sibling setting naming the competition), `options`, `min`, `max`,
+  `step`.
+
+`CouchWidgetCaps.settings(kind)` returns a kind's list (`[]` for none). `tests/test_ws_schema.js`
+checks every record.
+
 ## How a widget reads its settings
 
 In `tv-home/web/widgets.js` a renderer reads a setting with
