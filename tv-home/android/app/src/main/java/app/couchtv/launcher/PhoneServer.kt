@@ -78,6 +78,7 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
         when ("$m $path") {
             "GET /api/health" -> return json(200, ok().put("mode", "launcher").put("auth", if (auth.valid(tokenOf(s, false))) "ok" else "required"))
             "POST /api/pair/start" -> {
+                checkLock()
                 val now = System.currentTimeMillis()
                 if (now - lastPinStart < 5_000) throw Refused(429, "A code is on the TV already. Wait a moment, then ask again.")
                 lastPinStart = now
@@ -86,9 +87,13 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
             }
             "POST /api/pair" -> {
                 val b = readJson(s, 4 * 1024)
+                checkLock()
                 Thread.sleep(400)   // slows guessing a little more
                 val token = auth.pair(b.optString("pin"), b.optString("name").ifEmpty { null })
-                    ?: throw Refused(401, if (auth.currentPin() == null) "That code has expired. Ask the TV for a new one." else "That code is not right. Check the TV.")
+                if (token == null) {
+                    checkLock()   // this wrong try was the one that locked it
+                    throw Refused(401, if (auth.currentPin() == null) "That code has expired. Ask the TV for a new one." else "That code is not right. Check the TV.")
+                }
                 host.showCode("")
                 return json(200, ok().put("token", token))
             }
@@ -166,6 +171,12 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
         } finally { tmp.delete() }
     }
 
+    /** 15 wrong codes in 10 minutes: every way to pair answers 429 for 10 minutes (the on-TV app's rule). */
+    private fun checkLock() {
+        val left = auth.lockedFor()
+        if (left > 0) throw Refused(429, "Too many wrong codes. Wait ${maxOf(1, (left + 59) / 60)} minutes, then try again.")
+    }
+
     /** The phone may change only the town (Server.kt PATCH_KEYS), checked the same way. */
     private fun checkPatch(p: JSONObject) {
         val keys = p.keys().asSequence().toList()
@@ -223,7 +234,7 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
 
     /** For the home's Home settings QR and Hold OK, Edit on your phone (MainActivity's TV.phoneLink). */
     fun link(address: String?): JSONObject? {
-        if (address == null || !wasStarted()) return null
+        if (address == null || !wasStarted() || auth.lockedFor() > 0) return null   // locked: no QR with a dead code
         return JSONObject().put("url", "http://$address:$listeningPort/setup#pin=" + auth.pinForQr()).put("pin_expires_in", auth.pinSecondsLeft())
     }
 

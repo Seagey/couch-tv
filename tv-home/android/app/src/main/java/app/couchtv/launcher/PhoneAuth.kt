@@ -21,6 +21,10 @@ class PhoneAuth(private val store: Store, private val clock: () -> Long = System
     @Volatile private var pin: String? = null
     @Volatile private var pinUntil = 0L
     @Volatile private var wrong = 0
+    /** 15 wrong tries in 10 minutes, across every code, lock pairing for 10 minutes (PairLock.kt). */
+    val lock = PairLock()
+
+    fun lockedFor(): Int = lock.lockedFor(clock())
 
     @Synchronized fun newPin(): String {
         val p = String.format("%06d", rnd.nextInt(1_000_000))
@@ -37,9 +41,11 @@ class PhoneAuth(private val store: Store, private val clock: () -> Long = System
 
     /** A new token for the right code, null for a wrong one. */
     @Synchronized fun pair(code: String?, name: String?): String? {
-        val live = currentPin() ?: return null
+        if (lockedFor() > 0) return null
         val given = code?.filter { it.isDigit() }.orEmpty()
+        val live = currentPin() ?: run { lock.wrong(clock()); return null }
         if (!MessageDigest.isEqual(given.toByteArray(), live.toByteArray())) {
+            lock.wrong(clock())
             wrong += 1
             if (wrong >= WRONG_MAX) pin = null
             return null

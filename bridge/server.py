@@ -2274,12 +2274,15 @@ _pair_start_at = [0.0]
 
 async def pair_with_code(request, pin):
     """POST /api/pair {"pin": "123456"}: the code shown on the TV, once, for the pairing key."""
+    check_pair_lock()   # 15 wrong codes or keys in 10 minutes lock pairing for 10 minutes (every way in)
     ip = client_ip(request)
     if is_rate_limited(ip):
         raise ApiError(429, "Too many wrong codes. Wait a minute, then try again.", key="err_too_many_codes")
     await asyncio.sleep(0.4)   # slows guessing a little more (Server.kt)
+    check_pair_lock()   # (a lock made while this one waited)
     if not phonepage.pair(pin):
         record_failed_attempt(ip, "pin:" + str(pin))
+        pair_wrong()
         raise ApiError(401, "That code has expired. Ask the TV for a new one." if not phonepage.current_pin()
                        else "That code is not right. Check the TV.", key="err_code_expired" if not phonepage.current_pin() else "err_code_wrong")
     # no pairing key set: every call is open already, so there is nothing to hand over
@@ -2288,6 +2291,7 @@ async def pair_with_code(request, pin):
 
 async def h_pair_start(request):
     """"Show a code on the TV" on the phone's pairing screen: a new code, shown on that TV's home."""
+    check_pair_lock()
     now = time.time()
     if now - _pair_start_at[0] < 5:
         raise ApiError(429, "A code is on the TV already. Wait a moment, then ask again.", key="err_code_on_tv")
@@ -2353,6 +2357,7 @@ async def h_phone_link(request):
         if not ip:
             raise ApiError(503, "This computer is not on a network yet.", key="err_something_wrong")
         host = f"{ip}:{PORT}"
+    check_pair_lock()   # locked: no QR with a code that cannot work (the TV home hides it and asks again)
     tv = _current.get()
     q = f"?tv={tv}" if tv != DEFAULT_TV and _TV_ID_SAFE.fullmatch(tv) else ""
     pin = phonepage.pin_for_qr(tv)

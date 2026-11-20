@@ -94,6 +94,7 @@ class PhonePageApp(AioHTTPTestCase):
         phonepage.reset()
         server._pair_start_at[0] = 0
         server._failed_attempts.clear()
+        server.pair_lock_reset()
         self.data = tempfile.mkdtemp(prefix="couchtv-pp-")
         self._patches = [patch.object(config, "PAIRING_KEY", KEY), patch.object(store, "DATA", self.data),
                          patch.object(phonepage, "EDIT_WAIT_S", 3.0)]
@@ -173,6 +174,25 @@ class PhonePageApp(AioHTTPTestCase):
         self.assertEqual(st, 401)
         self.assertNotIn(KEY, json.dumps(j))
         self.assertIn("not right", j["error"])
+
+    async def test_wrong_codes_lock_pairing(self):
+        # 15 wrong codes in 10 minutes lock every way to pair (the code, the key, Show a code, the QR)
+        for i in range(server.PAIR_LOCK_MAX):
+            phonepage.new_pin()
+            pin = phonepage.current_pin()
+            st, j = await self.j("POST", "/api/pair", {"pin": "000000" if pin != "000000" else "111111"}, headers={})
+            self.assertEqual(st, 401)
+        pin = phonepage.new_pin()
+        st, j = await self.j("POST", "/api/pair", {"pin": pin}, headers={})
+        self.assertEqual((st, j.get("error_key")), (429, "err_pairing_locked"))
+        self.assertNotIn("token", j)
+        r = await self.client.post("/api/pair/start")
+        self.assertEqual(r.status, 429)
+        st, j = await self.j("GET", "/api/phone-link")
+        self.assertEqual(st, 429)
+        server.pair_lock_reset()
+        st, j = await self.j("POST", "/api/pair", {"pin": phonepage.current_pin()}, headers={})
+        self.assertEqual(st, 200)
 
     async def test_phone_link_needs_the_key(self):
         st, j = await self.j("GET", "/api/phone-link", headers={})

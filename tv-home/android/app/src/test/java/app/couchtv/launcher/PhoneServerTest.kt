@@ -122,6 +122,19 @@ class PhoneServerTest {
         assertNull(a.pair(p2, null))   // run out after 3 minutes
     }
 
+    @Test fun fifteenWrongLockPairing() {
+        repeat(14) { srv.auth.newPin(); assertEquals(401, call("POST", "/api/pair", "{\"pin\":\"abc\"}").status) }
+        assertEquals(429, call("POST", "/api/pair", "{\"pin\":\"abc\"}").status)   // the 15th locks it
+        val pin = srv.auth.newPin()
+        val a = call("POST", "/api/pair", "{\"pin\":\"$pin\"}")
+        assertEquals(429, a.status)
+        assertFalse(a.json.has("token"))
+        assertEquals(429, call("POST", "/api/pair/start").status)
+        assertNull(srv.link("192.0.2.7"))   // no QR with a code that cannot work
+        srv.auth.lock.reset()
+        assertEquals(200, call("POST", "/api/pair", "{\"pin\":\"$pin\"}").status)
+    }
+
     @Test fun qrReusesALiveCode() {
         var now = 1_000L
         val a = PhoneAuth(MapStore()) { now }
