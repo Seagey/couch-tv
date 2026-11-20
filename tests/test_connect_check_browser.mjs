@@ -70,6 +70,9 @@ async function openPage(host, langs) {
   page.on("pageerror", (e) => { if (/connect-check|ConnectCheck/.test(String(e.stack))) errors.push(String(e)); });
   await page.goto("http://" + host + ":" + PORT + "/setup");
   await page.waitForFunction(() => document.querySelector("#cc .cc-head") && document.querySelector("#cc").getAttribute("data-code"));
+  // the sections start shut: open Let the phone press keys by its title, as a person does
+  await page.locator("section", { has: page.locator("#cc") }).locator(".fold-btn").click();
+  await page.locator("#cc .cc-check").waitFor({ state: "visible" });
   return { ctx, page };
 }
 const state = (page) => page.evaluate(() => {
