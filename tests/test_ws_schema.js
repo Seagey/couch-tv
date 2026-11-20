@@ -31,7 +31,7 @@ ok(!!block, "design.js has WOPT");
 block[1].replace(/(\w+): "([^"]*)"/g, (m, k, v) => { WOPT[k] = v.split(/\s+/).filter(Boolean); });
 DJ.replace(/WOPT\.(\w+) = "([^"]*)"/g, (m, k, v) => { WOPT[k] = v.split(/\s+/).filter(Boolean); });
 // design keys this branch adds before design.js learns them (asked of the design.js owner)
-const PENDING_WOPT = ["countdown.year", "timer.minutes", "hourly.hours", "slideshow.shuffle", "agenda.days", "news.count", "sports.games", "stocks.price"];
+const PENDING_WOPT = ["countdown.year", "timer.minutes", "hourly.hours", "news.count", "sports.games", "stocks.price"];
 
 // the renderers (widgets.js R.<kind>)
 const WJ = fs.readFileSync(path.join(web, "widgets.js"), "utf8");
@@ -151,6 +151,23 @@ ok(beach.key === "place" && beach.type === "place" && beach.coast === true && be
 const WW = fs.readFileSync(path.join(web, "widget-web.js"), "utf8");
 CAPS.settings("news")[0].options.forEach((o) => { if (o[0] !== "auto") ok(WW.indexOf("\"" + o[0] + "\": {") >= 0 || WW.indexOf(" " + o[0] + ": {") >= 0, "news source " + o[0] + " is a feed the TV reads"); });
 CAPS.settings("sports")[0].options.forEach((o) => ok(new RegExp("\\b" + o[0] + ": \\{ name: \"" + o[1] + "\"").test(WW), "competition " + o[0] + " is " + o[1] + " on the TV"));
+// the family, guest and photo widgets (ws2 home): every setting wired, so every one before launch, none
+// left for later (agenda's calendars and days included), each a design key design.js keeps or a TV one
+const HOME = {
+  agenda: ["calendars", "days"], people: ["who", "names"], note: ["byline"], list: ["list", "done"], guide: ["sections"],
+  welcome: ["text", "sub", "source", "times"], memory: ["range", "ago"], screentime: ["appcount"], wifi: ["hidepass"],
+  card: ["label", "text", "live"], photo: ["photo", "image", "fit"], slideshow: ["seconds_each", "shuffle"], mosaic: ["count"], artframe: ["photo", "image", "mat"]
+};
+Object.keys(HOME).forEach((kind) => {
+  const list = CAPS.settings(kind);
+  ok(drawn(kind), kind + " is drawn by widgets.js");
+  ok(JSON.stringify(list.map((s) => s.key)) === JSON.stringify(HOME[kind]), kind + ": settings are " + HOME[kind].join(", ") + " (" + list.map((s) => s.key).join(", ") + ")");
+  list.forEach((s) => {
+    ok(s.pre === true, kind + "." + s.key + " is on before launch (no later)");
+    if (s.store === "design") ok((WOPT[kind] || []).indexOf(s.sets || s.key) >= 0, kind + "." + s.key + " is in design.js WOPT itself, not pending");
+  });
+});
+ok(!Object.keys(HOME).some((k) => ["surf", "commute", "weather", "speakers", "sports"].indexOf(k) >= 0), "no home kind in the later list");
 // the later settings (L items) are there too, after the before launch ones
 const LATER = { surf: ["units", "wind"], commute: ["buffer", "weekdays", "from"], weather: ["town"], speakers: ["players"], sports: ["games"] };
 Object.keys(LATER).forEach((kind) => {
