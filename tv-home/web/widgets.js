@@ -765,8 +765,16 @@
     var tiny = b.h < 200, small = b.w < 300, inW = b.w - (small ? 28 : 48);
     if (small) root.style.padding = "14px";
     // the name whole: one line, else two, else left out (the number still says it all)
-    var one = fitPxText(label, small ? inW : inW - 40, 25, 1, 700, famOf(root)), nm = small ? (fitWords(root, label, inW, 25, 1, 700, "color:var(--sub)") || fitWords(root, label, inW, 24, 2, 700, "color:var(--sub)")) : fitLab(root, q.icon || "calendar", label, inW);
-    var nameH = !nm ? 0 : one ? 32 : 60, uH = tiny && n && !gone ? 0 : 36;
+    var one = fitPxText(label, small ? inW : inW - 40, 25, 1, 700, famOf(root)), nameH = 32, nm;
+    if (small) {
+      // one line, else two, else three; a name that still cannot fit gives way to the date (25 Dec)
+      nm = fitWords(root, label, inW, 25, 1, 700, "color:var(--sub)");
+      if (!nm) { nm = fitWords(root, label, inW, 24, 2, 700, "color:var(--sub)"); nameH = 60; }
+      if (!nm) { nm = fitWords(root, label, inW, 23, 3, 700, "color:var(--sub)"); nameH = 86; }
+      if (!nm) { nm = fitWords(root, day + " " + MONTHS[month - 1].slice(0, 3), inW, 25, 1, 700, "color:var(--sub)"); nameH = 32; }
+    } else { nm = fitLab(root, q.icon || "calendar", label, inW); nameH = one ? 32 : 60; }
+    if (!nm) nameH = 0;
+    var uH = tiny && n && !gone ? 0 : 36;
     var fs = clamp(Math.min((b.h - (small ? 28 : 48) - nameH - uH - 8) * 0.95, inW / (String(num).length * 0.62)), 30, 200);
     var uEl = tiny && n && !gone ? null : fitWords(root, u, inW, 29, 1, 650) || fitWords(root, u, inW, 23, 2, 650);
     add(root, [nm, E("div", "cw-grow"), n === 0 || gone ? null : E("div", "cw-big", "font-size:" + px(fs), [String(num)]), uEl]);
@@ -786,7 +794,7 @@
     var q = op(o), show = setting(o, env, "show"), d = now(), w = weather(env, o), place = setting(o, env, "place") !== false;
     if (["date", "weather", "both"].indexOf(show) < 0) show = "date";
     var dText = dateWords(d, setting(o, env, "dfmt"), b.w < 560);
-    var wText = w ? w.temp + "°" + (show === "both" && b.h >= 120 ? (w.code !== undefined ? " and " + wxWords(w.code).toLowerCase() : "") : (b.w >= 600 && place && w.place ? " " + w.place : "") + (b.w >= 760 && w.code !== undefined ? ", " + wxWords(w.code).toLowerCase() : "")) : "";
+    var wText = w ? w.temp + "°" + (show === "both" && b.h >= 120 ? (w.code !== undefined ? " and " + wxWords(w.code).toLowerCase() : "") : ((b.w >= 600 || b.h >= 300) && place && w.place ? " " + w.place : "") + ((b.w >= 760 || b.h >= 300) && w.code !== undefined ? ", " + wxWords(w.code).toLowerCase() : "")) : "";
     var big = b.h >= 160, fs = big ? clamp(b.h / 3.4, 34, 72) : clamp(b.h * 0.6, 26, 40), align = q.align || "center";
     var lines = [];
     if (show === "both" && w && b.h < 120) lines.push(dText + ". " + wText);
@@ -794,6 +802,7 @@
       if (show !== "weather") lines.push(dText);
       if (show !== "date" && w) lines.push(wText);
       if (show === "weather" && !w) lines.push("Set your town for the weather");
+      else if (show === "both" && !w && b.h >= 120) lines.push(b.w < 300 ? "Set your town" : "Set your town for the weather");
     }
     var bare = root.classList.contains("cw-bare");
     add(root, E("div", "cw-col", "height:100%;justify-content:center;text-align:" + align + (bare ? ";text-shadow:0 2px 18px rgba(0,0,0,.35)" : ""), lines.map(function (l, i) {
@@ -2335,10 +2344,12 @@
   CR.wordclock = function (root, o, b, env) {
     var precise = setting(o, env, "precise") === true;
     var tl = (precise ? "Twenty seven minutes past\neleven" : timeWords(now())).split("\n"), longest = Math.max.apply(null, tl.map(function (l) { return l.length; }));
-    var fs = clamp(Math.min((b.w - 48) / (longest * 0.56), (b.h - 48) / (tl.length * 1.08)), 26, 70);
+    var dayline = setting(o, env, "dayline") !== false;
+    var fs = clamp(Math.min((b.w - 48) / (longest * 0.56), (b.h - 48 - (dayline ? 36 : 0)) / (tl.length * 1.08)), 26, 70);
     var w = E("div", "", "font-size:" + px(fs) + ";font-weight:780;line-height:1.04;letter-spacing:-.02em;white-space:pre-line", [timeWords(now(), precise)]);
-    add(root, E("div", "cw-col", "height:100%;justify-content:center", [w]));
-    live(root, precise ? 5000 : 15000, function () { w.textContent = timeWords(now(), precise); });
+    var s = dayline ? E("div", "cw-t23 cw-dim", "margin-top:6px;white-space:nowrap", [DAYS[now().getDay()] + " " + partOfDay(now())]) : null;
+    add(root, E("div", "cw-col", "height:100%;justify-content:center", [w, s]));
+    live(root, precise ? 5000 : 15000, function () { w.textContent = timeWords(now(), precise); if (s) s.textContent = DAYS[now().getDay()] + " " + partOfDay(now()); });
   };
   CR.solar = CR.sun = function (root, o, b, env) {
     var s = sunToday(env, o);
@@ -2389,9 +2400,12 @@
     if (!w) return noWx(root, b, env, o);
     if (!w.daily) return empty(root, b, "calendar", "The week's forecast is on its way", "");
     var n = clamp(Math.floor((b.w - 48) / 96), 2, 4), ink = rgba(sh.ink, 1);
-    add(root, E("div", "cw-row cw-sp", "height:100%", w.daily.slice(0, n).map(function (d) {
-      return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink);font-weight:650", [d[0]]), E("div", "", "margin:4px 0", [ic(wxIcon(d[1], true), 32, ink, "solid")]), E("div", "", "font-size:25px;font-weight:650", [d[3] + "°", E("span", "", "opacity:.6", [" " + d[2] + "°"])])]);
-    })));
+    // a place picked for this widget is named above the days (Show the town name); the home's town is not
+    var nm = w.picked && setting(o, env, "place") !== false ? fitWords(root, w.place, b.w - 48, 23, 1, 650, "color:var(--ink);text-align:center") : null;
+    var days = E("div", "cw-row cw-sp", nm ? "flex:1" : "height:100%", w.daily.slice(0, n).map(function (d) {
+      return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink);font-weight:650", [d[0]]), E("div", "", "margin:4px 0", [ic(wxIcon(d[1], true), nm ? 26 : 32, ink, "solid")]), E("div", "", "font-size:25px;font-weight:650", [d[3] + "°", E("span", "", "opacity:.6", [" " + d[2] + "°"])])]);
+    }));
+    add(root, nm ? E("div", "cw-col", "height:100%", [nm, days]) : days);
   };
   CR.rain = function (root, o, b, env) {
     var w = weather(env, o);

@@ -165,7 +165,7 @@
   var C = {
     // ---------- time ----------
     clock: { name: "Digital clock", status: "works", what: "The time, with the date if you like", needs: ["Nothing: it uses the TV's own clock"],
-      setup: setup("nothing", ["Nothing to set up.", EDIT_TV, "Follow this TV for 12 or 24 hour uses Home settings, Look and scenes, Clock."]),
+      setup: setup("nothing", ["Nothing to set up.", EDIT_TV, "With Follow this TV, set 12 or 24 hour in Home settings, Look and scenes, Clock."]),
       until: "Always shows the time", build: "",
       ok: "Opens Timers: start a kitchen timer from the remote", platforms: EVERY(), sizes: sz(["tile", "wtile", "small", "medium", "wide", "xl", "hero", "full"], [2, 2]) },
     tallclock: { name: "Tall clock", status: "works", what: "Tall thin digits that fill the space", needs: ["Nothing: it uses the TV's own clock"],
@@ -555,7 +555,7 @@
       st("day", "Day", "number", 25, "The day of the month.", "design", ALL, true, { min: 1, max: 31, step: 1 }),
       st("month", "Month", "choice", 12, "The month of the day you are counting to.", "design", ALL, true, { options: MONTHS }),
       st("year", "Year", "choice", "every", "Pick a year for a one off day, like a wedding. Every year counts to the same day each year.", "design", ALL, true, { options: YEARS }),
-      st("unit", "Count in", "choice", "sleeps", "Sleeps suit children. Weeks suit a day far away.", "design", ALL, true, { options: [["sleeps", "Sleeps"], ["days", "Days"], ["weeks", "Weeks"]] })
+      st("unit", "Count in", "choice", "sleeps", "Sleeps suit children. Weeks suit a day far away. The two smallest sizes show only the number.", "design", ALL, true, { options: [["sleeps", "Sleeps"], ["days", "Days"], ["weeks", "Weeks"]] })
     ],
     weather: [st("place", "Show the town name", "toggle", true, "Turn off to show only the weather.", "design", ALL, true)],
     bigtemp: [st("place", "Show the town name", "toggle", true, "Turn off to show only the temperature.", "design", ALL, true)],
@@ -626,16 +626,16 @@
     worldclock: [
       st("cities", "Cities", "choice", [], "Up to four. None picked shows this TV's own town first, then London, New York and Tokyo.", "design", ALL, true, { options: CITY_OPTS, many: true, max: 4 }),
       CLOCK_FMT(),
-      HEADING("Shows over the list of cities. Empty says World clock.")
+      HEADING("Shows over the cities on the bigger sizes. Empty says World clock.")
     ],
     date: [
       st("show", "Shows", "choice", "date", "The weather needs your town, set in Home settings, Location.", "design", ALL, true,
         { options: [["date", "The date"], ["weather", "The weather"], ["both", "The date and the weather"]] }),
       st("dfmt", "Date style", "choice", "auto", "Day and date gets shorter when the widget is narrow.", "design", ALL, true,
         { options: [["auto", "Day and date"], ["short", "Short"], ["numeric", "Numbers only"], ["weekday", "Day of the week"], ["day_month", "Day and month"], ["full", "Day and date in full"]] }),
-      st("place", "Show the town name", "toggle", true, "Beside the weather, when the widget is wide enough.", "design", ALL, true, { when: { show: "weather" } })
+      st("place", "Show the town name", "toggle", true, "Beside the weather. Not on the two smallest sizes.", "design", ALL, true, { when: { show: "weather" } })
     ],
-    month: [st("wstart", "Week starts on", "choice", "mon", "", "design", ALL, true, { options: [["mon", "Monday"], ["sun", "Sunday"]] })],
+    month: [st("wstart", "Week starts on", "choice", "mon", "The smallest size shows only today.", "design", ALL, true, { options: [["mon", "Monday"], ["sun", "Sunday"]] })],
     timer: [
       st("minutes", "Quick start", "choice", 0, "OK on the widget starts a timer this long.", "design", ALL, true,
         { options: [[0, "Ask each time"], [5, "5 minutes"], [10, "10 minutes"], [15, "15 minutes"], [20, "20 minutes"], [30, "30 minutes"], [45, "45 minutes"], [60, "1 hour"]] }),
@@ -643,7 +643,7 @@
     ],
     week: [
       st("town", "Place", "place", "", "Where the forecast is for. Empty uses this home's town.", "tv", ON_TV, true, { "private": true }),
-      st("place", "Show the town name", "toggle", true, "Turn off to show only the forecast.", "design", ALL, true)
+      st("place", "Show the town name", "toggle", true, "Turn off to show only the forecast. The wide tile names only a place picked for it.", "design", ALL, true)
     ],
     weather: [TOWN("the weather")], bigtemp: [TOWN("the temperature")],
     hourly: [TOWN("the forecast"), st("hours", "How many hours", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [4, "4"], [6, "6"], [8, "8"]] })],

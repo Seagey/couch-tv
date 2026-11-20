@@ -29,16 +29,13 @@ const SAME = {
   "clock tile date off": "a tile has no room for the date, so it shows none either way",
   "clock tile ampm off (12 hour)": "a tile shows no am or pm either way",
   "clock wtile date off": "a wide tile has no room for the date, so it shows none either way",
-  "wordclock wtile dayline off": "a wide tile has no room for the day line, so it shows none either way",
   "date line dfmt short": "a narrow date already uses the short style (Fri 20 Nov)",
   "date tile dfmt short": "a narrow date already uses the short style (Fri 20 Nov)",
   "date small dfmt short": "a narrow date already uses the short style (Fri 20 Nov)",
-  "date line place off (weather)": "the town's name shows only on a date 600 px wide or more",
-  "date tile place off (weather)": "the town's name shows only on a date 600 px wide or more",
-  "date small place off (weather)": "the town's name shows only on a date 600 px wide or more",
+  "date line place off (weather)": "the town's name is not on the two smallest sizes (the help says so)",
+  "date tile place off (weather)": "the town's name is not on the two smallest sizes (the help says so)",
   "month tile wstart sun": "a tile shows the day and the date, no week grid",
-  "week wtile place off": "a wide tile has no room for the town's name, so it shows none either way",
-  "week wtile town Byron Bay + place off": "a wide tile has no room for the town's name, so it shows none either way",
+  "week wtile place off": "the wide tile names only a place picked for it, never the home's town (the help says so)",
   "countdown tile unit days": "a tile has room for the number alone: days and sleeps are the same number",
   "countdown wtile unit days": "a wide tile has room for the number alone: days and sleeps are the same number",
   "worldclock tile format 24h @ 10:07:07": "a tile shows the home's time with no am or pm, and 10:07 reads the same in 12 and 24 hour",
@@ -101,7 +98,8 @@ try {
       const BYRON = { name: "Byron Bay", lat: -28.64, lon: 153.61, timezone: "Australia/Sydney" };
       const KEY = (p) => (+p.lat).toFixed(2) + "," + (+p.lon).toFixed(2);
       const base = { weather: wx(22), place: HOME, country: "AU", unit: "c", wxAt: { [KEY(BYRON)]: wx(31) } };
-      const env = (set) => ({ data: Object.assign({}, base, { wset: { x: set || {} } }) });
+      // __noWx: a TV with no town set yet (no weather at all)
+      const env = (set) => ({ data: Object.assign({}, base, { wset: { x: set || {} } }, set && set.__noWx ? { weather: null, place: null } : {}) });
       // the sizes on the 1920 x 1080 grid (60 px cells, 40 px gaps), as tests/test_widget_fit_all.mjs names them
       const NAMED = { line: [4, 1], wline: [8, 1], tile: [2, 2], wtile: [4, 2], small: [4, 4], tall: [4, 6], medium: [8, 4], wide: [12, 4], large: [8, 8], xl: [12, 6], hero: [18, 7], full: [18, 10] };
       const PX = Object.fromEntries(Object.entries(NAMED).map(([k, [c, r]]) => [k, [c * 100 - 40, r * 100 - 40]]));
@@ -167,11 +165,11 @@ try {
         wordclock: [["default", {}], ["precise on", { precise: true }], ["dayline off", { dayline: false }], ["precise + dayline off", { precise: true, dayline: false }, false, "dayline off"]],
         worldclock: [["default", {}], ["cities Tokyo London", { cities: ["Asia/Tokyo", "Europe/London"] }], ["cities Paris", { cities: ["Europe/Paris"] }], ["cities four", { cities: ["Asia/Tokyo", "Europe/London", "America/Los_Angeles", "Pacific/Auckland"] }],
           ["format 24h", { format: "24h" }], ["label Family", { label: "Family" }], ["label long", { label: "Our family far away" }]],
-        date: [["default", {}], ["show weather", { show: "weather" }], ["show both", { show: "both" }], ["dfmt short", { dfmt: "short" }], ["dfmt numeric", { dfmt: "numeric" }], ["dfmt weekday", { dfmt: "weekday" }],
+        date: [["default", {}], ["show weather", { show: "weather" }], ["show both", { show: "both" }], ["show both, no town yet", { show: "both", __noWx: true }, false, "show both"], ["dfmt short", { dfmt: "short" }], ["dfmt numeric", { dfmt: "numeric" }], ["dfmt weekday", { dfmt: "weekday" }],
           ["dfmt day_month", { dfmt: "day_month" }], ["dfmt full", { dfmt: "full" }], ["place off (weather)", { show: "weather", place: false }, false, "show weather"], ["show date (same)", { show: "date" }, true]],
         month: [["default", {}], ["wstart sun", { wstart: "sun" }], ["wstart mon (same)", { wstart: "mon" }, true]],
         week: [["default", {}], ["town Byron Bay", { town: BYRON }], ["place off", { place: false }], ["town Byron Bay + place off", { town: BYRON, place: false }, false, "town Byron Bay"]],
-        countdown: [["default", {}], ["label Ella's party", { label: "Ella's party" }], ["label long", { label: "Grandma and Grandpa's visit" }], ["day 1", { day: 1 }], ["month 1", { month: 1 }],
+        countdown: [["default", {}], ["label Ella's party", { label: "Ella's party" }], ["label long", { label: "Grandma and Grandpa's visit" }], ["label birthday", { label: "Ella's 7th birthday party" }], ["day 1", { day: 1 }], ["month 1", { month: 1 }],
           ["year 2027", { year: 2027 }], ["unit days", { unit: "days" }], ["unit weeks", { unit: "weeks" }], ["unit sleeps (same)", { unit: "sleeps" }, true]],
         timer: [["default", {}], ["minutes 10", { minutes: 10 }], ["minutes 60", { minutes: 60 }], ["label Pizza", { label: "Pizza" }], ["label long", { label: "Roast in the oven now" }], ["minutes 0 (same)", { minutes: 0 }, true]]
       };
@@ -205,7 +203,7 @@ try {
       if (r.pmOnly && r.morning) { cases.morning = (cases.morning || 0) + 1; continue; }   // 10:07 reads the same in 12 and 24 hour
       const sk = SAME[r.kind + " " + r.s + " " + r.label + " @ " + hhmm] ? r.kind + " " + r.s + " " + r.label + " @ " + hhmm : r.kind + " " + r.s + " " + r.label;
       const why = SAME[sk];
-      if (r.expSame || why) { ok(r.same, where + ": draws the same as " + r.vs + (why ? " (" + why + ")" : " (that value is the default here)") + ": " + r.seen); cases.same++; if (why) usedSame[sk] = 1; }
+      if (r.expSame || why) { cases[why ? "noRoom" : "isDefault"] = (cases[why ? "noRoom" : "isDefault"] || 0) + 1; ok(r.same, where + ": draws the same as " + r.vs + (why ? " (" + why + ")" : " (that value is the default here)") + ": " + r.seen); cases.same++; if (why) usedSame[sk] = 1; }
       else ok(!r.same, where + ": changes what shows against " + r.vs + ": " + r.seen);
     }
     await ctx.close();
@@ -217,6 +215,6 @@ try {
 }
 Object.keys(SAME).forEach((k) => ok(usedSame[k], "SAME names a real case: " + k));
 ok(Object.keys(cases.kinds).length === 12, "all twelve kinds measured: " + Object.keys(cases.kinds).join(", "));
-console.log("  " + cases.all + " kind x size x setting x time cases (" + Object.entries(cases.kinds).map(([k, v]) => k + " " + v).join(", ") + "), " + cases.same + " of them the same by design");
+console.log("  " + cases.all + " kind x size x setting x time cases (" + Object.entries(cases.kinds).map(([k, v]) => k + " " + v).join(", ") + "), " + cases.same + " of them the same: " + (cases.isDefault || 0) + " where the value IS the default here, " + (cases.noRoom || 0) + " where the setting does not show at that size (" + Object.keys(SAME).length + " reasons in SAME, each said in its help), " + (cases.morning || 0) + " 24 hour cases at 10:07 not compared");
 if (soft.length) { console.log(soft.length + " FAILED:\n" + soft.join("\n")); process.exit(1); }
 console.log("All " + n + " checks passed.");

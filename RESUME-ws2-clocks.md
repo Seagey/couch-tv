@@ -26,12 +26,16 @@ Worktree: tools/couch-tv/wt-ws2-clocks, branch ws2-clocks off integrate-0.13.9 (
   changed and cleared, layers, phone list, off the design and back).
   The page clock is fixed: the test steps it 5 s before each Back and the menu OK (design.js times a held OK and five
   Backs by Date.now), and opens a fresh page after the Hold OK part. These were test artifacts, not product bugs.
-- tests/test_ws2_clocks_visible.mjs: 2089 checks, 742 kind x size x setting x time cases, 181 same by design
-  (each reason in SAME). WS2_SOFT=1 lists all failures; WS2_VISIBLE_LOG=<file> logs what each case shows;
+- tests/test_ws2_clocks_visible.mjs: 2128 checks, 756 kind x size x setting x time cases; 175 draw the same:
+  142 where the value IS the default here, 33 where the setting does not show at that size (17 reasons in SAME,
+  each said in the setting's help); 50 24 hour cases at 10:07 not compared (10:07 reads the same).
+- Checker NO-GO fixes (21 Nov): date town and sky on a tall date too; date both with no town says so; week wide
+  tile names a place picked for it; countdown tile name on three lines, else its date (25 Dec); word clock wide
+  tile has its day line; help words for unit, heading, place, week start, week place, Follow this TV. WS2_SOFT=1 lists all failures; WS2_VISIBLE_LOG=<file> logs what each case shows;
   WS2_SHOT=kind,w,h WS2_SHOT_FILE=x.png takes one picture.
 - test_ws_tv.mjs 1115, test_design_settings_browser.mjs 107, test_widget_detail_browser.mjs 296,
   test_widget_fit_all.mjs 1640 boxes 0 problems (8 checks).
-- Node: test_ws_schema.js 4019, test_widget_caps.js 4545, test_design_widgets.js 221, test_design_code.js,
+- Node: test_ws_schema.js 4024, test_widget_caps.js 4545, test_design_widgets.js 221, test_design_code.js,
   test_widget_pause.js 36, test_design_words.js: all pass.
 
 ## How to run
