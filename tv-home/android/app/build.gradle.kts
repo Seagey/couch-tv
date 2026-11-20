@@ -61,6 +61,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    // One APK for every TV (couch-tv-home.apk), native libraries compressed, the same as the on-TV app:
+    // nothing native here today, so this changes nothing until one comes (scripts/check-release-apks.py).
+    packaging { jniLibs { useLegacyPackaging = true } }
     lint {
         checkReleaseBuilds = false
         abortOnError = false

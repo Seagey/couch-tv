@@ -45,7 +45,15 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    packaging { resources { excludes += setOf("META-INF/versions/9/OSGI-INF/MANIFEST.MF", "META-INF/*.kotlin_module") } }
+    packaging {
+        resources { excludes += setOf("META-INF/versions/9/OSGI-INF/MANIFEST.MF", "META-INF/*.kotlin_module") }
+        // One APK for every TV, never one per processor: Downloader's code 8180170, the
+        // latest/download/couch-tv-ontv.apk link, couch-tv Setup and Studio cannot ask a TV which it has.
+        // The native libraries (Matter's controller, Conscrypt) go in compressed, so the download is
+        // much smaller than with stored ones; Android unpacks only this TV's own set when it installs.
+        // The measured sizes and every rule a release must keep: scripts/check-release-apks.py.
+        jniLibs { useLegacyPackaging = true }
+    }
 }
 
 dependencies {

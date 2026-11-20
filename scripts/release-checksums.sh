@@ -7,8 +7,13 @@
 #   sh scripts/release-checksums.sh
 #   gh release create vX.Y dist/couch-tv-home.apk dist/couch-tv-ontv.apk dist/couch-tv-ontv-watch.apk dist/couch-tv-sync.apk dist/SHA256SUMS.txt ...
 # For a release that is already out: gh release upload vX.Y dist/SHA256SUMS.txt
+#
+# Then it runs scripts/check-release-apks.py --release (the same names, one APK per app with every
+# processor inside, compressed native libraries, one signer) and fails if any rule is broken. Extra
+# arguments go to that check, for example: sh scripts/release-checksums.sh --matter --previous old.apk
 set -e
-cd "$(dirname "$0")/../dist"
+HERE=$(cd "$(dirname "$0")" && pwd)
+cd "$HERE/../dist"
 ls ./*.apk > /dev/null 2>&1 || { echo "No APKs in dist/. Build or download them first."; exit 1; }
 if command -v sha256sum > /dev/null 2>&1; then
   sha256sum ./*.apk | sed 's|  \./|  |' > SHA256SUMS.txt
@@ -16,3 +21,4 @@ else
   shasum -a 256 ./*.apk | sed 's|  \./|  |' > SHA256SUMS.txt
 fi
 cat SHA256SUMS.txt
+python3 "$HERE/check-release-apks.py" . --release "$@"
