@@ -70,9 +70,16 @@ async function fresh(apk) {
   await call("POST", "/api/adb/connect", {});
   for (let i = 0; i < 40; i++) {
     await sleep(1500);
+    // Google TV's "Set up Device Lock" prompt, or an earlier "Allow USB debugging?" left behind it, can hide the
+    // dialog: answer Not now, and bring the dialog's task to the front (emulator only; a person sees it on the TV)
+    tap(/^Not now$/i);
+    const dlg = (sh("am stack list").match(/taskId=(\d+): com\.android\.systemui\/com\.android\.systemui\.usb\.UsbDebuggingActivity[^\n]*visible=false/) || [])[1];
+    if (dlg) { sh("am task lock " + dlg); sh("am task lock stop"); await sleep(800); }
     if (tap(/Always allow/i)) { await sleep(400); tap(/^(Allow|OK)$/i); }
     const a = await call("GET", "/api/adb");
     if (a.json && a.json.connected) break;
+    // right after a cold boot the first ask can go unanswered (the dialog came up under Google TV's own prompts): ask again
+    if (a.json && a.json.state === "failed") await call("POST", "/api/adb/connect", {});
   }
   const a = await call("GET", "/api/adb");
   rec(apk + ": the app's own ADB link is connected", !!(a.json && a.json.connected), JSON.stringify(a.json && { state: a.json.state, error: a.json.error }));
@@ -182,10 +189,20 @@ await fresh("plain21.apk");
   rec("D: before the press Use as home screen is off", s0.json && s0.json.home_on === false && !homeListed(), JSON.stringify(s0.json && { view: s0.json.view, home_on: s0.json.home_on }));
   // a folder where the APK copy goes: rm -f cannot take it away, so the copy fails
   sh("mkdir /data/local/tmp/couch-tv-homekey.apk");
+  adb("logcat", "-c");
   const st = await call("POST", "/api/homekey/start", {});
   rec("D: start answers busy", st.json && st.json.view === "busy", JSON.stringify(st.json && { view: st.json.view, phase: st.json.phase }));
   const w = await waitHk((h) => h.view !== "busy", 240000);
-  rec("D: it got past the checks to installing, then stopped with an error", w.last && !!w.last.error && w.seen.has("busy:installing"), JSON.stringify(w.last && { view: w.last.view, error: w.last.error }) + " seen " + [...w.seen].join(","));
+  rec("D: it stopped with an error", w.last && !!w.last.error, JSON.stringify(w.last && { view: w.last.view, error: w.last.error }) + " seen " + [...w.seen].join(","));
+  // the app's own log, in order: Home on once every check passed, the copy failed, Home off again
+  const log = adb("logcat", "-d", "-s", "couchtv.homekey").split("\n")
+    .filter((l) => /home on for the install|install: |stopped:|home off again/.test(l))
+    .map((l) => l.replace(/^.*couchtv\.homekey: /, "").trim());
+  const iOn = log.findIndex((l) => l === "home on for the install");
+  // the copy step fails either way, run to run: the push is refused (a folder there) or the rm -f before it times out
+  const iPush = log.findIndex((l) => l.startsWith("install: "));
+  const iOff = log.findIndex((l) => l === "home off again");
+  rec("D: Home went on after every check passed, the copy failed, then Home went off again (the app's log, in that order)", iOn >= 0 && iPush > iOn && iOff > iPush, log.join(" | "));
   rec("D: Use as home screen is off again (home_on false)", w.last && w.last.home_on === false, w.last && w.last.home_on);
   rec("D: Android does not list Couch TV as a home", !homeListed(), sh("cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME"));
   rec("D: nothing was installed (still the phone version, 21)", /versionCode=21/.test(sh("dumpsys package " + PKG + " | grep versionCode")));

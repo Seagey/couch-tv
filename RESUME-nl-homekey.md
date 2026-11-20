@@ -30,5 +30,14 @@ plain22.apk (assembleRelease, 22/0.13.9), watch22.apk (assembleWatch), plain21.a
 - Node: the 15 regression tests listed above all pass (widget_caps 4548 checks).
 - Emulator proof 33 of 33 (05:29) on APKs built 05:27, after the last Kotlin edit. No emulator running now.
 
+## Round 5 (21 Nov, 06:00 to 07:00): Fable NO-GO at ac9f9a0, all fixed
+- Words cut off at the bottom of the TV: SetupActivity has one row under homeNote (hkQr, hkBtn GONE by default, hkLine weight 1 beside it, padding 14 on top); hkBtnRow gone; visibility on hkBtn itself; a failed press on the ready view shows the reason alone.
+- Failed install proof: emulator scenario D (plain21, a folder at /data/local/tmp/couch-tv-homekey.apk so the copy fails after every check). HomeKey logs "home on for the install" and "home off again"; D checks the app's log runs in that order, home_on false, no Couch TV in Android's HOME list, still 21.
+- Sticky busy words cleared in state() once Update is done; a blocked Fire TV gets no "adb" error in fail().
+- The flag is in the "homekey" store (home_turned_on), not in memory; resume() uses HomeKeyRules.resumeStep (finish / clear / wait / undo). On the phone version it waits out the install window (INSTALL_WINDOW, 10 min), then switches Home off if that try switched it on. Unit tests: aRestartNeverLosesWhatThisTrySwitchedOn, theCodeKeepsTheFlagAndTheWordsTrue.
+- AGENTS.md and on-tv/README.md: "0.13.9 or newer".
+- The emulator proof now answers Google TV's "Set up Device Lock" prompt with Not now, brings a hidden "Allow USB debugging?" to the front (am task lock), and asks for the link again if the first ask goes unanswered (all of this happened on a cold boot).
+- Counts: Kotlin 137 tests, 0 failures (HomeKeyRulesTest 17, SetupWordsTest 14); browser homekey 327, one button update 29, phone settings 129, TCL fixes 26 (scratchpad/hk-r5-browser.log); emulator 45 of 45, A to D (scratchpad/hk-emu-r5.log, shots in scratchpad/hk-emu-out-r5), on APKs built by scratchpad/hk-r5-apks.sh after the last Kotlin edit. Emulator stopped.
+
 ## Left
 Nothing in scope. Release gate owned by the coordinator: the help page https://couchtv.joshuaseage.com/help/home-button/ must be deployed (Fable item 2).

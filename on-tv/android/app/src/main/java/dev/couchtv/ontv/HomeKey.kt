@@ -118,7 +118,7 @@ object HomeKey {
     private const val TURNED_ON = "home_turned_on"
     private fun turnedOn(app: Context) = store(app).getBoolean(TURNED_ON, false)
     private fun undoHome(app: Context) {
-        if (turnedOn(app)) runCatching { App.setHomeEnabled(app, false) }
+        if (turnedOn(app)) { runCatching { App.setHomeEnabled(app, false) }; Log.i(TAG, "home off again") }
         store(app).edit().remove(TURNED_ON).commit()
     }
 
@@ -152,7 +152,7 @@ object HomeKey {
             if (why.isNotEmpty()) return fail(app, why)
             phase = "installing"; progress = 100; changed(app)
             // the watch only acts while Use as home screen is on: switched on now, once everything has checked out
-            if (!App.homeEnabled(app)) { store(app).edit().putBoolean(TURNED_ON, true).commit(); App.setHomeEnabled(app, true) }
+            if (!App.homeEnabled(app)) { store(app).edit().putBoolean(TURNED_ON, true).commit(); App.setHomeEnabled(app, true); Log.i(TAG, "home on for the install") }
             val r = try { put(app, file) } catch (x: Exception) {
                 Log.w(TAG, "install: ${x.message}")
                 if (x.message?.startsWith("push failed") == true) UpdateRules.failure(x.message ?: "") else "adb"
