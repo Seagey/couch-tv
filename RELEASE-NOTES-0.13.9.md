@@ -13,7 +13,7 @@ Fewer presses with the TV remote. The on-TV app now updates itself with one butt
 
 ### What each TV gets
 
-- **The on-TV app (option C, Android TV and Google TV):** Update to with one button, Home settings from your phone or a computer (with Widgets on this TV and the design's apps), pairing in one scan, Send a design from the phone remote, Get a design from your phone, settings for each widget, Home settings that follow your design, the Couch Original design, and the clearer line when the TV never asks "Allow debugging?".
+- **The on-TV app (option C, Android TV and Google TV):** Update to with one button, Home settings from your phone or a computer (with Widgets on this TV and the design's apps), pairing in one scan, Send a design from the phone remote, Get a design from your phone, settings for each widget (Hold OK, Edit on the TV or Edit on your phone), Home settings that follow your design, the Couch Original design, and the clearer line when the TV never asks "Allow debugging?".
 - **The Couch TV home app with a computer at home (option B):** Send a design from the phone remote, Get a design from your phone, settings for each widget (the computer keeps them too), Home settings that follow your design, and the Couch Original design.
 - **The Couch TV home app on its own (option A):** Get a design from your phone, settings for each widget, Home settings that follow your design, and the Couch Original design.
 - **Samsung, LG and the other TVs a computer at home runs:** Get a design from your phone, Send a design from the phone remote, settings for each widget (kept by the computer at home), Home settings that follow your design, and the Couch Original design. On a Samsung, Home settings, About also shows a QR code that opens the update steps on your phone.
@@ -60,7 +60,7 @@ On a real TCL the TV kept an earlier question it thought was still open and neve
 
 Each widget on a design now has its own settings, so two weather widgets can show two towns and two Commute widgets two drives. There are three ways in, and all three change the same settings:
 
-- **On the TV:** hold OK on a widget and pick Settings for this widget.
+- **Hold OK on any widget:** pick Edit on the TV to open its settings there. On the on-TV app, Edit on your phone shows a QR code: scan it and your phone opens that widget's settings, already paired (a computer can type the address and code under it). A widget with nothing to set on the TV says so, and a widget that only shows something but has settings, like a Countdown, can now be reached with the remote.
 - **In Home settings on the TV:** Designs, Widgets on this home. Each widget is named by what it is and where it sits, like "Surf, middle left".
 - **On your phone:** Home settings on your phone, Widgets on this TV (on-TV app).
 

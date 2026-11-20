@@ -196,12 +196,12 @@ TV = tv;
   ok(!/Welcome words|Guest Wi-Fi|House guide|App grid,/.test(studio), "widgets with no settings of their own are not listed");
   await closeSettings(tv);
 }
-// Hold OK on the surf widget: Settings for this widget, right after Settings, opens its page
+// Hold OK on the surf widget: Edit on the TV, right after Settings, opens its page (a TV the computer runs: no phone item)
 {
   await tv.evaluate(() => window.CouchDesign.nav.focus("s", 0)); await tv.waitForTimeout(200);
   await tv.keyboard.down("Enter"); await tv.waitForTimeout(900); await tv.keyboard.up("Enter"); await tv.waitForTimeout(300);
   const menu = await tv.evaluate(() => [...document.querySelectorAll(".cw-sheet .cw-mi")].map((e) => e.textContent));
-  ok(menu[0] === "Settings" && menu[1] === "Settings for this widget", "Hold OK on the surf widget: Settings, then Settings for this widget (" + menu.join(", ") + ")");
+  ok(menu[0] === "Settings" && menu[1] === "Edit on the TV" && menu.indexOf("Edit on your phone") < 0, "Hold OK on the surf widget: Settings, then Edit on the TV, and no Edit on your phone where the TV serves no phone page (" + menu.join(", ") + ")");
   await press(tv, "ArrowDown", 120);
   await press(tv, "Enter", 600);
   ok(await tv.evaluate(() => document.getElementById("settings").classList.contains("on")), "it opens Home settings");
@@ -224,6 +224,52 @@ TV = tv;
   await closeSettings(tv);
 }
 ok(asked.some((a) => /^marine.* -33\.86/.test(a)), "the swell is asked for the home's town while no beach is set: " + asked.filter((a) => /^marine/.test(a)).join("; "));
+
+// ---- 3b. Hold OK, Edit on the TV or Edit on your phone (0.13.9): every widget kind ----
+async function holdOn(page, id) {
+  await page.evaluate((x) => window.CouchDesign.nav.focus(x, 0), id); await page.waitForTimeout(200);
+  await page.keyboard.down("Enter"); await page.waitForTimeout(900); await page.keyboard.up("Enter"); await page.waitForTimeout(300);
+  return page.evaluate(() => ({ items: [...document.querySelectorAll(".cw-sheet .cw-mi")].map((e) => e.textContent),
+    note: (document.querySelector(".cw-sheet .cw-note") || {}).textContent || "" }));
+}
+{
+  // a widget with nothing to set on the TV (Guest Wi-Fi): a line says so, and no item that does nothing
+  const m = await holdOn(tv, "f");
+  ok(m.items[0] === "Settings" && m.items.indexOf("Edit on the TV") < 0 && m.items.indexOf("Edit on your phone") < 0, "Guest Wi-Fi: no Edit items (" + m.items.join(", ") + ")");
+  ok(m.note === "Nothing to set for this widget on the TV. Change how it looks in couch-tv Studio.", "and the sheet says so in a line: " + m.note);
+  ok(await tv.evaluate(() => [...document.querySelectorAll(".cw-sheet .cw-mi")].every((e) => e.getAttribute("data-act"))), "every item in the menu does something");
+  await press(tv, "Escape", 300);
+  ok(!(await tv.evaluate(() => window.CouchDesign.nav.sheetOpen())), "Back closes it");
+  // the headlines (settings) on a TV the computer runs: Edit on the TV alone, no line
+  const m2 = await holdOn(tv, "n");
+  ok(m2.items[1] === "Edit on the TV" && m2.items.indexOf("Edit on your phone") < 0 && !m2.note, "Headlines on a TV the computer runs: Edit on the TV, no QR item (" + m2.items.join(", ") + ")");
+  await press(tv, "Escape", 300);
+}
+{
+  // the on-TV app (it serves the phone page): Edit on the TV, then Edit on your phone with the QR code
+  const ontv = await tvPage(design, "&ontv=1");
+  const m = await holdOn(ontv, "s");
+  ok(m.items[0] === "Settings" && m.items[1] === "Edit on the TV" && m.items[2] === "Edit on your phone", "on the on-TV app, surf: Settings, Edit on the TV, Edit on your phone (" + m.items.join(", ") + ")");
+  await press(ontv, "ArrowDown", 120); await press(ontv, "ArrowDown", 120); await press(ontv, "Enter", 800);
+  const q = await ontv.evaluate(() => { const s = document.querySelector(".cw-sheet"); return s && { title: s.querySelector("h2").textContent, link: (s.querySelector(".cw-qr") || {}).getAttribute && s.querySelector(".cw-qr").getAttribute("data-link"),
+    svg: !!s.querySelector(".cw-qr svg"), hint: (s.querySelector(".cw-hint") || {}).textContent || "", items: s.querySelectorAll(".cw-mi").length }; });
+  ok(q && q.title === "Edit on your phone" && q.svg, "Edit on your phone shows a QR code: " + JSON.stringify(q));
+  ok(q && q.link === "http://tv.example:5400/setup#pin=482913&widget=s", "the QR opens the phone page at this widget, already paired: " + (q && q.link));
+  ok(q && /Or on a computer: tv\.example:5400\/setup, code 482 913\./.test(q.hint), "with the computer line under it: " + (q && q.hint));
+  ok(q && !/[–—]/.test(q.hint + q.title), "no dashes");
+  await press(ontv, "Escape", 300);
+  ok(!(await ontv.evaluate(() => window.CouchDesign.nav.sheetOpen())), "Back closes the QR");
+  // a widget with nothing to set: still no QR item on the on-TV app
+  const m3 = await holdOn(ontv, "g");
+  ok(m3.items.indexOf("Edit on your phone") < 0 && m3.items.indexOf("Edit on the TV") < 0 && /Nothing to set for this widget/.test(m3.note), "House guide on the on-TV app: the line, no Edit items");
+  await press(ontv, "Escape", 300);
+  // Edit on the TV opens the widget's own page there too
+  await holdOn(ontv, "n"); await press(ontv, "ArrowDown", 120); await press(ontv, "Enter", 600);
+  ok(/Headlines, top right/.test(await ontv.textContent("#set-head")), "Edit on the TV opens the headlines' own page: " + await ontv.textContent("#set-head"));
+  await closeSettings(ontv);
+  ok(!ontv.errors.length, "no page errors on the on-TV app: " + ontv.errors.join("; "));
+  await ontv.close();
+}
 
 // ---- 4. input tiles ----
 {
@@ -357,6 +403,34 @@ await phone.waitForFunction(() => document.getElementById("design-line").style.d
   ok(!phone.errors.length && !tv.errors.length, "no page errors: " + phone.errors.concat(tv.errors).join("; "));
 }
 await ctx.close();
+
+// ---- 5a. the TV's Edit on your phone QR: /setup#pin=...&widget=<id> opens that widget, paired ----
+{
+  const c3 = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const p3 = await c3.newPage();
+  p3.errors = []; p3.on("pageerror", (e) => p3.errors.push(String(e)));
+  await meteo(p3);
+  await p3.goto(ORIGIN + "/setup#pin=482913&widget=n");
+  await p3.waitForFunction(() => window.couchTv && window.couchTv.token());
+  await p3.waitForFunction(() => document.querySelector('#w-list details[data-key="n|news"]'), null, { timeout: 8000 });
+  await p3.waitForTimeout(400);
+  const st = await p3.evaluate(() => ({ hash: location.hash, open: [...document.querySelectorAll("main > section.fold")].filter((s) => !s.classList.contains("shut")).map((s) => s.id),
+    news: document.querySelector('#w-list details[data-key="n|news"]').open, hi: document.querySelector('#w-list details[data-key="n|news"]').classList.contains("hi"),
+    surf: document.querySelector('#w-list details[data-key="s|surf"]').open, his: document.querySelectorAll("#w-list .hi").length,
+    top: document.querySelector('#w-list details[data-key="n|news"]').getBoundingClientRect().top }));
+  ok(st.hash === "#widget=n", "only the pairing code leaves the address: " + st.hash);
+  ok(st.open.length === 1 && st.open[0] === "widgets", "Widgets on this TV is the section open: " + st.open.join(","));
+  ok(st.news && st.hi && st.his === 1 && !st.surf, "the headlines' box is open and marked, the others shut");
+  ok(st.top >= -2 && st.top < 844, "and scrolled into view: " + Math.round(st.top));
+  // a widget the TV has nothing to set for: the section opens and says so
+  await p3.evaluate(() => { location.hash = "widget=f"; });
+  await p3.reload();
+  await p3.waitForFunction(() => window.couchTv && window.couchTv.token());
+  await p3.waitForFunction(() => /nothing to set here/.test(document.getElementById("w-msg").textContent), null, { timeout: 8000 });
+  ok(await p3.evaluate(() => !document.getElementById("widgets").classList.contains("shut") && !document.querySelector("#w-list .hi")), "#widget=f (Guest Wi-Fi): Widgets on this TV opens and says there is nothing to set");
+  ok(!p3.errors.length, "no page errors: " + p3.errors.join("; "));
+  await c3.close();
+}
 
 // ---- 5b. no design on the TV: the phone shows everything; #section= opens its section ----
 {

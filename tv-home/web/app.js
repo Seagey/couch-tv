@@ -7446,7 +7446,7 @@
 
   // ---------------- each widget's own settings (docs/WIDGET-SETTINGS-CONTRACT.md) ----------------
   // Every widget on the design now with a `settings` list in widget-caps.js gets its own page: Hold OK
-  // on it, "Settings for this widget" (design.js), or Home settings, couch-tv Studio, "Widgets on this
+  // on it, "Edit on the TV" (design.js), or Home settings, Designs, "Widgets on this
   // home", where each is named by kind and where it sits ("Surf, top right"). The phone's Home settings
   // page shows the same list ("Widgets on this TV", designView). Nothing here is written per widget: each
   // row is drawn from the setting's type. Values live in Home settings, ST.widgets["<id>|<kind>"] =
@@ -7658,7 +7658,7 @@
       rows: function () { var w = widgetByKey(key); return w ? oneWidgetRows(w) : [info("w-gone", "This widget is not on the home now")]; } };
     SET.col = "rows"; SET.keyFocus = null; SET.ri = 0;
   }
-  // Hold OK on a widget, Settings for this widget: Home settings straight at its page, on every TV the
+  // Hold OK on a widget, Edit on the TV: Home settings straight at its page, on every TV the
   // home runs on (the launcher, Samsung, LG and the other web TVs)
   function openWidgetPage(key) {
     if (!widgetByKey(key)) return;
@@ -7885,6 +7885,9 @@
       apps: function () { renderGrid(); },
       clock24: function () { return CLOCK24; },
       night: NIGHT,
+      // Hold OK on a widget, Edit on your phone: the phone's Home settings page with a pairing code, only
+      // where this TV serves that page (the on-TV app, as Change this on your phone in Home settings)
+      phoneLink: ON_TV && !OFFLINE ? function () { return api("GET", "/api/phone-link").then(function (j) { return j && j.url; }); } : null,
       // widget mode: whether the home itself has the remote (no menu, settings or pop up open)
       free: function () { return !screenOffActive && !idleAmbientActive && !kidsOn() && !expanded && !lift && ["grid", "shelf", "np", "people", "quick"].indexOf(zone) >= 0; },
       // what the widgets show: only what this TV already has

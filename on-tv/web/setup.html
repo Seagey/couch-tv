@@ -63,6 +63,7 @@
   .wbox { background: #111115; border: 1px solid var(--line); border-radius: 12px; margin-top: 10px; }
   .wbox > summary { cursor: pointer; padding: 12px; font-weight: 600; color: var(--ink); min-height: 46px; }
   .wbox > div { padding: 0 12px 12px; }
+  .wbox.hi { border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber); }
   .alist { list-style: none; padding: 0; margin: 8px 0 0; }
   .alist li { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--line); color: var(--ink); }
   .alist li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -545,7 +546,10 @@
     var b = sec.querySelector('.fold-btn'); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
   function shownSec(sec) { return sec.style.display !== 'none' && !sec.classList.contains('hidden-by-design'); }
-  function hashSection() { var m = /^#(?:section=)?([a-z][a-z0-9-]*)$/.exec(location.hash || ''); return m && $(m[1]) && $(m[1]).classList.contains('fold') ? m[1] : ''; }
+  // #widget=<id>: the TV's Hold OK, Edit on your phone. Opens Widgets on this TV at that widget (WANT_WIDGET).
+  function hashWidget() { var m = /(?:^#|&)widget=([^&]+)/.exec(location.hash || ''); try { return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; } }
+  var WANT_WIDGET = hashWidget();
+  function hashSection() { if (WANT_WIDGET) return 'widgets'; var m = /^#(?:section=)?([a-z][a-z0-9-]*)$/.exec(location.hash || ''); return m && $(m[1]) && $(m[1]).classList.contains('fold') ? m[1] : ''; }
   function openFirst() {
     var want = hashSection(), target = want && $(want);
     if (target && shownSec(target)) { openFold(target, true); return; }
@@ -602,6 +606,7 @@
     $('widgets').style.display = ws ? '' : 'none'; $('jump-widgets').style.display = ws ? '' : 'none';
     $('dapps').style.display = as ? '' : 'none'; $('jump-dapps').style.display = as ? '' : 'none';
     if (ws) showWidgets(); if (as) showDesignApps();
+    if (ws && WANT_WIDGET) openWanted();
     // the first section shown may have changed: open it, unless someone has opened or shut one already
     if (!TOUCHED) { Array.prototype.forEach.call(document.querySelectorAll('main > section.fold'), function (s) { openFold(s, false); }); openFirst(); }
   }
@@ -659,6 +664,15 @@
       if (!body) return '';
       return '<details class="wbox" data-key="' + esc(w.key) + '"' + (open[w.key] ? ' open' : '') + '><summary>' + esc(w.title || w.name) + '</summary><div>' + body + '</div></details>';
     }).join('');
+  }
+  // the widget the TV's QR named: its box open, scrolled to and marked, once (a later redraw leaves it be)
+  function openWanted() {
+    var id = WANT_WIDGET; WANT_WIDGET = '';
+    var box = Array.prototype.filter.call(document.querySelectorAll('#w-list details.wbox'), function (d) { var k = d.getAttribute('data-key') || ''; return k.slice(0, k.lastIndexOf('|')) === id; })[0];
+    Array.prototype.forEach.call(document.querySelectorAll('main > section.fold'), function (s) { openFold(s, s.id === 'widgets'); }); TOUCHED = true;
+    if (!box) { say('w-msg', 'That widget has nothing to set here.'); return; }
+    box.open = true; box.classList.add('hi');
+    setTimeout(function () { try { box.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) { box.scrollIntoView(); } }, 50);
   }
   function wsSend(key, k, v, words) { var vals = {}; vals[k] = v; return designSend({ widget_set: { key: key, values: vals } }, 'w-msg', words || 'Saved. The TV shows it now.'); }
   function wsSetting(key, k) { var w = (DESIGN.widgets || []).filter(function (x) { return x.key === key; })[0]; return w && (w.settings || []).filter(function (s) { return s.key === k; })[0]; }
