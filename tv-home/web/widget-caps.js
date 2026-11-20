@@ -54,7 +54,9 @@
   // kind is not on that TV. Both need a computer at home that stays on to open Couch TV.
   var NATIVE = {
     "Roku OS": ["clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "countdown", "date", "month", "weather", "bigtemp", "moon", "photo", "artframe",
-      "keep", "keeprow", "app", "folder", "dock", "appgrid", "games", "people", "card", "quote", "welcome", "note"],
+      "keep", "keeprow", "app", "folder", "dock", "appgrid", "games", "people", "card", "quote", "welcome", "note",
+      // a smart stack: Roku draws its first widget (DesignLib.brs, the top of dlWidget)
+      "stack"],
     tvOS: ["clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "worldclock", "countdown", "date", "month", "weather", "bigtemp", "photo", "artframe",
       "keep", "keeprow", "app", "folder", "dock", "appgrid", "games", "people", "quick", "card", "quote", "welcome", "stack"]
   };
