@@ -597,7 +597,7 @@
 
   // scenes: every scene as a big button
   B.scenes = function (o, env) {
-    var list = kit().scenesOf(env);
+    var list = kit().scenesOf(env, o);   // the scenes picked for this widget on this TV, else every one
     if (!list.length) return B.setup(o, env);
     S.body.appendChild(head("favourite", op(o).label || "Scenes", list.length + (list.length === 1 ? " scene" : " scenes") + ". OK runs one", "#bf5af2"));
     S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:36px", list.slice(0, 16).map(function (x) {

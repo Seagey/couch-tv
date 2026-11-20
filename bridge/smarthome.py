@@ -207,8 +207,17 @@ def speaker(n, st):
     return o
 
 
-def room(n, st, limits):
+def ha_unit(cfg):
+    """Home Assistant's own temperature unit from /api/config ("°C" or "°F"), or None if it does not say."""
+    u = ((cfg or {}).get("unit_system") or {}).get("temperature") if isinstance(cfg, dict) else None
+    return u if u in ("°C", "°F") else None
+
+
+def room(n, st, limits, unit=None):
     o = {"entity": n["entity"], "name": n["name"] or pretty(n["entity"])}
+    if unit:
+        # every climate temperature Home Assistant sends is in its own unit system (the widget converts)
+        o["unit"] = unit
     state = (st or {}).get("state")
     if st is None or _down(state):
         o["ok"] = False
@@ -366,6 +375,7 @@ class Home:
         self.config_section = config_section
         self.env_token = env_token
         self.limits, self.read_controls, self.read_speakers = {}, {}, {}
+        self.unit = None   # Home Assistant's temperature unit, read once from /api/config
         self.pending = None
         self.call = self._call
         self.direct = None   # Philips Hue and AirTouch 5 with no Home Assistant (bridge/direct.py)
@@ -512,7 +522,9 @@ class Home:
         now = now_ms or int(time.time() * 1000)
         climate = any(c["entity"] == entity for c in s["climate"])
         if action == "climate":
-            return {"ok": True, "rooms": [room(n, await self.state(s, n["entity"]), self.limits) for n in s["climate"]]}
+            if self.unit is None and s["climate"]:
+                self.unit = ha_unit(await self._json(s, "/api/config", 64 * 1024)) or ""
+            return {"ok": True, "rooms": [room(n, await self.state(s, n["entity"]), self.limits, self.unit) for n in s["climate"]]}
         if action == "temp":
             lim, want = self.limits.get(entity), _num(value)
             if not climate or not lim or want is None:
@@ -686,7 +698,7 @@ class Home:
         if not parse(o):
             return {"ok": False, "error": "picks"}
         self._write(o)
-        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear()
+        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear(); self.unit = None
         return {"ok": True}
 
     def forget(self):
@@ -695,7 +707,7 @@ class Home:
             os.remove(self._path())
         except OSError:
             pass
-        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear()
+        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear(); self.unit = None
         return {"ok": True}
 
 

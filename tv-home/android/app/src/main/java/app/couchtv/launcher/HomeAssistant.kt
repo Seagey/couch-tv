@@ -194,6 +194,21 @@ object HomeAssistant {
         }
     }
 
+    // Home Assistant's own temperature unit ("°C" or "°F", from /api/config), read once per Home
+    // Assistant address: every climate temperature it sends is in that unit, and the aircon widget
+    // converts to the home's unit only when a room says which it is (widgets.js roomUnit)
+    @Volatile private var unitFor: String? = null
+    @Volatile private var unit: String = ""
+    private fun haUnit(s: Settings): String {
+        if (unitFor == s.base) return unit
+        val (code, bytes) = call(s, "GET", "/api/config", null, 64 * 1024)
+        if (code != 200 || bytes == null) return ""   // asked again next time
+        val u = try { JSONObject(String(bytes, Charsets.UTF_8)).optJSONObject("unit_system")?.optString("temperature") ?: "" } catch (e: Exception) { "" }
+        unit = if (u == "°C" || u == "°F") u else ""
+        unitFor = s.base
+        return unit
+    }
+
     /** The state of one entity, as Home Assistant sends it, or null when it did not answer. */
     fun state(s: Settings, entity: String): JSONObject? {
         val (code, bytes) = call(s, "GET", "/api/states/$entity", null, 256 * 1024)
@@ -232,8 +247,9 @@ object HomeAssistant {
     private val FAN = Regex("[A-Za-z0-9 _-]{1,24}")
     private val limits = ConcurrentHashMap<String, Limits>()
 
-    private fun room(n: Named, st: JSONObject?): JSONObject {
+    private fun room(n: Named, st: JSONObject?, unit: String = ""): JSONObject {
         val o = JSONObject().put("entity", n.entity).put("name", n.name.ifEmpty { pretty(n.entity) })
+        if (unit.isNotEmpty()) o.put("unit", unit)
         val state = st?.optString("state")
         if (st == null || state == null || state == "unavailable" || state == "unknown") return o.put("ok", false)
         val a = st.optJSONObject("attributes") ?: JSONObject()
@@ -265,7 +281,7 @@ object HomeAssistant {
         val done = { ok: Boolean -> JSONObject().put("ok", ok).apply { if (!ok) put("error", "failed") } }
         val id = JSONObject().put("entity_id", entity)
         return when (action) {
-            "climate" -> JSONObject().put("ok", true).put("rooms", JSONArray(s.climate.map { room(it, state(s, it.entity)) }))
+            "climate" -> { val u = if (s.climate.isEmpty()) "" else haUnit(s); JSONObject().put("ok", true).put("rooms", JSONArray(s.climate.map { room(it, state(s, it.entity), u) })) }
             "temp" -> {
                 climate ?: return refused
                 val lim = limits[entity] ?: return refused   // read the room first

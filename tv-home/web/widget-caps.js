@@ -128,6 +128,8 @@
     };
   }
   var SMART_HOME = shSteps("rooms and scenes", ["Press Home: they show here."]);
+  // a widget that shows some of what Smart home has: which ones, picked on the widget itself
+  var PICK_HERE = " Hold OK on the widget, then Edit on the TV, to pick which show here.";
   var APPS_ORDER = [OPEN, "Go down to Apps and press OK.", "OK moves an app between the home, More apps and hidden. Hold OK on an app to move it along."];
 
   // things typed at home: Home settings, couch-tv Studio, At home (athome.js), kept on the TV only
@@ -181,7 +183,7 @@
       setup: setup("nothing", NOTHING), until: "Always shows the time", build: "",
       ok: "Opens Timers", platforms: EVERY(), sizes: sz(["wtile", "small", "medium", "large"], [4, 2]) },
     solar: { name: "Sun clock", status: "works", what: "The sun's path today, with sunrise and sunset", needs: [TOWN_NEED],
-      setup: setup("tv", TOWN), until: "\"Set your town for the sun\", and where", build: "",
+      setup: setup("tv", TOWN.concat(["Or a place for this widget alone: hold OK on it, then Edit on the TV, Place."])), until: "\"Set your town for the sun\", and where", build: "",
       ok: "Opens the forecast: sunrise and sunset for the week", platforms: plat("setup", "computer", "setup"), sizes: sz(["wtile", "small", "medium"], [4, 2]) },
     worldclock: { name: "World clocks", status: "works", what: "The time in two to four cities", needs: ["The cities, picked in couch-tv Studio"],
       setup: setup("designer", inStudio("pick the cities")), until: "Always shows the times", build: "",
@@ -310,23 +312,23 @@
       until: "\"Needs Spotify connected\", and where it is set up", build: "",
       ok: "Opens the next ten songs, big", platforms: plat("computer", "computer", "setup", { android: "Needs a home computer with Spotify connected. Only Spotify shares its queue.", web: "Works while the home computer is on, with Spotify connected on it.", vidaa: "Works with the home computer, or the website home with Spotify signed in." }), sizes: sz(["small", "tall", "large"], [4, 4]) },
     speakers: { name: "Speakers", status: "setup", what: "Each speaker, what it plays and its volume", needs: [HA_NEED, "Your speakers picked on the TV"],
-      setup: setup("tv", haSteps("speakers (up to 6, any Home Assistant knows)", "Press Home: each speaker and its volume show here. OK opens them: louder, quieter, play and pause.")),
+      setup: setup("tv", haSteps("speakers (up to 6, any Home Assistant knows)", "Press Home: each speaker and its volume show here." + PICK_HERE)),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens the speakers: louder, quieter, play and pause for each", platforms: HA_PLAT(), sizes: sz(["wtile", "small", "tall"], [4, 2]) },
 
     // ---------- smart home (Home Assistant, through the Android home) ----------
     aircon: { name: "Aircon", status: "setup", what: "A room's set temperature, what it is now, and the other rooms", needs: [HA_NEED, "Your aircon rooms picked on the TV"],
-      setup: setup("tv", SMART_HOME), until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      setup: setup("tv", shSteps("aircon rooms", ["Press Home: a room shows here. Hold OK on the widget, then Edit on the TV, to pick the room."])), until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens Aircon: every room, warmer and cooler, on and off, mode and fan", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "tall", "medium", "large"], [2, 2]) },
     scenes: { name: "Scenes", status: "setup", what: "Your Home Assistant scenes as big buttons (Movie night, Goodnight)", needs: [HA_NEED, "Your scenes picked on the TV"],
-      setup: setup("tv", SMART_HOME), until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      setup: setup("tv", shSteps("scenes", ["Press Home: they show here." + PICK_HERE])), until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "OK on a button runs it. On a tile, OK opens every button", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
     controls: { name: "Control Centre", status: "setup", what: "Lights, switches, fans and blinds as big switches", needs: [HA_NEED, "Your lights and switches picked on the TV"],
-      setup: setup("tv", haSteps("lights, switches, fans and blinds (up to 16)", "Press Home: your switches show here. OK opens them big, and OK on one switches it.", "Locks, alarms, garage doors and gates never show: nothing that opens the house from a TV remote.")),
+      setup: setup("tv", haSteps("lights, switches, fans and blinds (up to 16)", "Press Home: your switches show here." + PICK_HERE, "Locks, alarms, garage doors and gates never show: nothing that opens the house from a TV remote.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens Control Centre: every switch big, OK on one switches it", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "medium", "wide", "large"], [2, 2]) },
     camera: { name: "Camera", status: "setup", what: "A still picture from a camera, new every 2 seconds (no video)", needs: [HA_NEED, "Your cameras picked on the TV"],
-      setup: setup("tv", haSteps("cameras (up to 4)", "Press Home: a still from the camera shows here, new every 2 seconds while the home is on screen. There is no live video and no sound.")),
+      setup: setup("tv", haSteps("cameras (up to 4)", "Press Home: a still shows here, new every 2 seconds (no video, no sound). Hold OK on it, then Edit on the TV, to pick the camera.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens the camera full screen, a new still every 2 seconds; Left and Right reach your other cameras", platforms: HA_PLAT(), sizes: sz(["wtile", "small", "medium", "large"], [4, 2]) },
     doorbell: { name: "Doorbell", status: "setup", what: "When the doorbell last rang, with a picture", needs: [HA_NEED, "Your doorbell picked on the TV"],
@@ -338,7 +340,7 @@
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens Energy: today by the hour, power now and the battery", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small", "medium", "wide"], [2, 2]) },
     sensor: { name: "Sensor", status: "setup", what: "One reading (the pool, the rain gauge, humidity) and its last 24 hours", needs: [HA_NEED, "Your sensors picked on the TV"],
-      setup: setup("tv", haSteps("sensors (up to 8: the pool, a rain gauge, humidity)", "Press Home: the reading shows here, with its last 24 hours.")),
+      setup: setup("tv", haSteps("sensors (up to 8: the pool, a rain gauge, humidity)", "Press Home: the reading shows here. Hold OK on it, then Edit on the TV, to pick the sensor.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens the reading big with its last 24 hours; Left and Right reach your other sensors", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     // the launcher reads Android's own Bluetooth battery levels (tv-home/android Batteries.kt)
@@ -354,8 +356,10 @@
       sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- lists and the family ----------
-    bins: { name: "Bin night", status: "setup", what: "Tonight's bins with their lid colours", needs: ["Your bin night and bins, picked in couch-tv Studio"],
-      setup: setup("designer", inStudio("pick your bin night, the bins and whether they take turns. Nothing personal goes in the design")), until: "\"Set your bin night in couch-tv Studio\"", build: "",
+    bins: { name: "Bin night", status: "setup", what: "Tonight's bins with their lid colours", needs: ["Your bin night and bins, set on the widget on the TV or in couch-tv Studio"],
+      setup: setup("tv", ["Move to the Bin night widget, hold OK, then pick Edit on the TV.", "Pick the bin night, the names and lid colours of the bins, and whether they take turns.",
+        "Taking turns? Pick which bin goes out this week, and Couch TV keeps count from there.", "Or set the same in couch-tv Studio: tap the widget, then send the design to your TV."]),
+      until: "\"Set your bin night in this widget's settings\"", build: "",
       ok: "Nothing: it is to look at", platforms: plat("setup", "computer", "setup"), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     people: { name: "People", status: "works", what: "Who is watching. OK switches person", needs: ["The people who watch, added on the TV"],
       setup: setup("tv", [OPEN, "Go down to People and press OK.", "Pick Add a person, type a name, then press OK. Do it for everyone who watches.", "OK on a name in the widget switches whose shows you see. It does not sign anyone in or out of Netflix."]),
@@ -543,6 +547,7 @@
   var IMAGE = function () { return st("image", "Photo in the widget", "image", "", "Put one photo in the widget itself. It shows on every TV this design goes to.", "design", STUDIO, true); };
   var HEADING_TV = function (help) { return st("label", "Heading", "text", "", help, "tv", ON_TV, true, { max: 40 }); };
   var HA = { ha: true };
+  var LIDS = [["#ffd60a", "Yellow"], ["#30d158", "Green"], ["#ff453a", "Red"], ["#0a84ff", "Blue"], ["#8e8e93", "Grey"], ["#1d1b18", "Black"], ["#a2845e", "Brown"], ["#bf5af2", "Purple"]];
 
   // before launch (WIDGET-SETTINGS-SPEC.md section 2, the P items)
   var SETTINGS = {
@@ -561,15 +566,23 @@
     artframe: [PHOTO(), IMAGE()],
     upnext: [st("sport", "Game mode", "choice", "auto", "On shows the last game watched in a sport app on this TV. Automatic turns it on when the home also shows scores.", "design", ALL, true,
       { options: [["auto", "Automatic"], [true, "On"], [false, "Off"]], needs: { apps: SPORT_APP_PKGS.slice() } })],
-    aircon: [st("entity", "Room", "device", "", "Which aircon shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "climate", needs: HA, "private": true })],
-    controls: [st("switches", "Lights and switches", "device", [], "Which ones show here. None picked shows every one picked in Smart home. Locks, alarms and garage doors never show.", "tv", ON_TV, true,
+    aircon: [st("entity", "Room", "device", "", "Which aircon shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "climate", needs: HA, "private": true }),
+      st("others", "Show the other rooms", "toggle", true, "In a big widget, the other aircon rooms show beside this one.", "design", ALL, true)],
+    controls: [st("switches", "Lights and switches", "device", [], "Which ones show here. None picked shows every one picked in Smart home. Locks and alarms never show; a garage door or gate shows but never opens from the TV.", "tv", ON_TV, true,
       { domain: ["light", "switch", "fan", "cover"], many: true, max: 16, needs: HA, "private": true })],
     camera: [st("cam", "Camera", "device", "", "Which camera shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "camera", needs: HA, "private": true }),
       HEADING("Shows once the camera is picked on this TV. Empty shows the camera's own name.")],
     sensor: [st("reading", "Sensor", "device", "", "Which sensor shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "sensor", needs: HA, "private": true }),
       HEADING("Shows once the sensor is picked on this TV. Empty shows the sensor's own name.")],
-    doorbell: [HEADING_TV("Type a heading for this TV. Empty shows the doorbell's own name.")],
-    energy: [HEADING_TV("Type a heading for this TV. Empty shows the name from your smart home.")],
+    doorbell: [HEADING_TV("Type a heading for this TV. Empty shows the doorbell's own name."),
+      st("picture", "Show the door camera", "toggle", true, "Off shows only when the doorbell last rang.", "design", ALL, true)],
+    energy: [HEADING_TV("Type a heading for this TV. Empty shows the name from your smart home."),
+      st("now", "Show power now", "toggle", true, "The power being made or used right now, beside today's total, in a big widget.", "design", ALL, true)],
+    speakers: [st("players", "Speakers", "device", [], "Which speakers show here. None picked shows every one picked in Smart home.", "tv", ON_TV, true,
+      { domain: "media_player", many: true, max: 6, needs: HA, "private": true })],
+    scenes: [st("scenes", "Scenes", "device", [], "Which scenes show here. None picked shows every one picked in Smart home.", "tv", ON_TV, true,
+      { domain: ["scene", "script"], many: true, max: 10, needs: HA, "private": true })],
+    battery: [st("low", "Red below", "number", 20, "A charge under this shows in red, so you know to charge it.", "design", ALL, true, { min: 5, max: 50, step: 5 })],
     // the list always draws its own name, so it has no heading of its own
     list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Home settings, Designs, At home.", "tv", ON_TV, true, { from: "lists", "private": true })],
     news: [st("feed", "News source", "choice", "auto", "Where the headlines come from. Best for your country picks ABC News in Australia, BBC World in the UK and RNZ in New Zealand.", "design", ALL, true,
@@ -591,7 +604,9 @@
       st("thisweek", "Which bin goes out this week", "choice", "a", "Pick the one going out this week and Couch TV keeps count from there.", "design", ALL, true,
         { options: [["a", "First bin"], ["b", "Second bin"]], when: { alt: true }, sets: "anchor" }),
       st("bin_a", "First bin", "text", "Recycling", "The name of the bin, like Recycling.", "design", ALL, true, { max: 20 }),
-      st("bin_b", "Second bin", "text", "Garden", "The name of the other bin, like Garden.", "design", ALL, true, { max: 20 })
+      st("bin_b", "Second bin", "text", "Garden", "The name of the other bin, like Garden.", "design", ALL, true, { max: 20 }),
+      st("lid_a", "First bin's lid", "choice", "#ffd60a", "The colour of the first bin's lid.", "design", ALL, true, { options: LIDS }),
+      st("lid_b", "Second bin's lid", "choice", "#30d158", "The colour of the second bin's lid.", "design", ALL, true, { options: LIDS })
     ]
   };
   // after launch (the L items in section 2): added to the end of each list, so a screen showing only
@@ -599,11 +614,9 @@
   var TOWN = function (what) { return st("town", "Place", "place", "", "Where " + what + " is for. Empty uses this home's town.", "tv", ON_TV, false, { "private": true }); };
   var CITY_OPTS = [["Australia/Brisbane", "Brisbane"], ["Australia/Sydney", "Sydney"], ["Australia/Perth", "Perth"], ["Pacific/Auckland", "Auckland"], ["Asia/Tokyo", "Tokyo"],
     ["Asia/Singapore", "Singapore"], ["Europe/London", "London"], ["Europe/Paris", "Paris"], ["America/New_York", "New York"], ["America/Los_Angeles", "Los Angeles"]];
-  var LIDS = [["#ffd60a", "Yellow"], ["#30d158", "Green"], ["#ff453a", "Red"], ["#0a84ff", "Blue"], ["#8e8e93", "Grey"], ["#1d1b18", "Black"], ["#a2845e", "Brown"], ["#bf5af2", "Purple"]];
   var LATER = {
     clock: [st("seconds", "Show seconds", "toggle", false, "", "design", ALL, false)],
     analog: [st("seconds", "Second hand", "toggle", true, "", "design", ALL, false)],
-    solar: [TOWN("the sun")],
     worldclock: [st("cities", "Cities", "choice", [], "Up to four. None picked shows this TV's own town and London.", "design", ALL, false, { options: CITY_OPTS, many: true, max: 4 })],
     date: [
       st("dfmt", "Date style", "choice", "auto", "", "design", ALL, false,
@@ -632,17 +645,9 @@
     upnext: [st("apps", "Only from these apps", "apps", [], "None picked takes shows from any app.", "design", ALL, false)],
     dock: [st("more", "All apps at the end", "toggle", true, "", "design", ALL, false)],
     soundscape: [st("volume", "Volume", "number", 50, "", "tv", ON_TV, false, { min: 0, max: 100, step: 10 })],
-    speakers: [st("players", "Speakers", "device", [], "Which speakers show here. None picked shows every one picked in Smart home.", "tv", ON_TV, false,
-      { domain: "media_player", many: true, max: 6, needs: HA, "private": true })],
-    scenes: [st("scenes", "Scenes", "device", [], "Which scenes show here. None picked shows every one picked in Smart home.", "tv", ON_TV, false,
-      { domain: ["scene", "script"], many: true, max: 10, needs: HA, "private": true })],
     agenda: [
       st("calendars", "Calendars", "tvlist", "all", "Which of this TV's calendars show here.", "tv", ON_TV, false, { from: "calendars", "private": true }),
       st("days", "Days", "choice", "two", "", "design", ALL, false, { options: [["today", "Today"], ["two", "Today and tomorrow"], ["week", "This week"]] })
-    ],
-    bins: [
-      st("lid_a", "First bin's lid", "choice", "#ffd60a", "", "design", ALL, false, { options: LIDS }),
-      st("lid_b", "Second bin's lid", "choice", "#30d158", "", "design", ALL, false, { options: LIDS })
     ],
     news: [st("count", "How many headlines", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [1, "1"], [2, "2"], [3, "3"], [4, "4"]] })],
     sports: [st("games", "Which games", "choice", "all", "", "design", ALL, false, { options: [["all", "Every game"], ["live", "Live games and my team"], ["mine", "Only my team"]] })],
@@ -655,6 +660,8 @@
     wifi: [st("hidepass", "Hide the password", "toggle", false, "On shows only the code to scan.", "tv", ON_TV, false)]
   };
   Object.keys(LATER).forEach(function (k) { SETTINGS[k] = (SETTINGS[k] || []).concat(LATER[k]); });
+  // the sun clock: its own town, before launch (widgets.js R.solar names it and works the sun out for it)
+  SETTINGS.solar = [st("town", "Place", "place", "", "Where the sun is for. Empty uses this home's town.", "tv", ON_TV, true, { "private": true })];
   Object.keys(SETTINGS).forEach(function (k) { if (C[k]) C[k].settings = SETTINGS[k]; });
 
   // A widget couch-tv cannot fill yet always shows the same card on a TV (widgets.js soon()), so its

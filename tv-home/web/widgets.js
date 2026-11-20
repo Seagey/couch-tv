@@ -657,11 +657,26 @@
     var x = 10 + 280 * f, y = 110 - 4 * 75 * f * (1 - f) * 1.33;
     return { x: x, y: y };
   }
+  // a time in a picked town's own time zone ("5:41am"), else as this TV tells it
+  function sunAt(d, tz) {
+    if (tz && tz !== "auto") {
+      try {
+        var m = /(\d{1,2}):(\d{2})\s*([ap])\.?m/i.exec(d.toLocaleTimeString("en-AU", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }));
+        if (m) return (+m[1]) + ":" + m[2] + m[3].toLowerCase() + "m";
+      } catch (e) {}
+    }
+    return fmt12(d);
+  }
   R.solar = function (root, o, b, env) {
-    var s = sunToday(env, o);
-    if (!s) return empty(root, b, "sun", "Set your town for the sun", "Settings (hold OK), Home settings, Location");
+    var s = sunToday(env, o), own = env.demo ? null : pickedPlace(o, env);
+    if (own) {
+      // the town picked for this widget on this TV: its own sunrise and sunset, said in its own time
+      var st = sunTimes(now(), own.lat, own.lon);
+      s = st ? { rise: sunAt(st.rise, own.timezone), set: sunAt(st.set, own.timezone), frac: clamp((now() - st.rise) / (st.set - st.rise), -0.1, 1.1) } : null;
+    }
+    if (!s) return empty(root, b, "sun", own ? "No sunrise in " + own.name + " today" : "Set your town for the sun", own ? "" : "Settings (hold OK), Edit on the TV, Place");
     var at = arc(s.frac);
-    add(root, [lab("sun", op(o).label || "Sun"),
+    add(root, [lab("sun", own && own.name ? own.name : op(o).label || "Sun"),
       svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.28)", "stroke-width": 3, "stroke-dasharray": "2 9", "stroke-linecap": "round" }),
         S("line", { x1: 0, y1: 110, x2: 300, y2: 110, stroke: "rgba(255,255,255,.3)", "stroke-width": 2 }),
         s.frac > 0 && s.frac < 1 ? S("circle", { cx: at.x, cy: at.y, r: 13, fill: "#ffd60a" }) : null], "flex:1;min-height:0;margin-top:6px"),
@@ -1482,7 +1497,7 @@
       var wideA = b.w > b.h * 1.3, s = Math.min(b.h - 130, wideA ? b.w * 0.5 : b.w - 48), others = rooms.filter(function (x) { return x !== r; }).slice(0, 4);
       if (!wideA) root.style.justifyContent = "center";
       add(root, [E("div", "cw-row cw-sp", "", [lab("aircon", r.name || "Aircon"), E("div", "cw-chip on", "height:44px;font-size:23px;background:" + col + ";color:#1a1406", [on ? roomMode(r) : "Off"])]),
-        E("div", (wideA ? "cw-grow " : "") + "cw-row cw-center", wideA ? "" : "margin-top:20px", [dial(s, r.target != null ? r.target : (roomUnit(r) === "f" ? 72 : 22), r.current != null ? Math.round(r.current * 10) / 10 : null, r, env), wideA && b.w >= 700 ? E("div", "cw-col", "margin-left:30px", others.map(function (z) {
+        E("div", (wideA ? "cw-grow " : "") + "cw-row cw-center", wideA ? "" : "margin-top:20px", [dial(s, r.target != null ? r.target : (roomUnit(r) === "f" ? 72 : 22), r.current != null ? Math.round(r.current * 10) / 10 : null, r, env), wideA && b.w >= 700 && others.length && setting(o, env, "others") !== false ? E("div", "cw-col", "margin-left:30px", others.map(function (z) {
           var zo = roomOn(z);
           return E("div", "cw-chip" + (zo ? " on" : ""), "margin:7px 0;" + (zo ? "background:" + (MODE_COL[z.state] || "#64d2ff") : ""), [z.name + (zo ? " " + tdeg(z.target, z, env) : " off")]);
         })) : null])]);
@@ -1490,12 +1505,19 @@
     stop(root, "detail", "aircon", r.name || "Aircon");
   };
   var SCENE_DEMO = [["movie", "Movie night", "scene.movie_night"], ["bedtime", "Goodnight", "scene.goodnight"], ["morning", "Morning", "script.morning"], ["away", "Away", "scene.away"], ["party", "Party", "scene.party"], ["dinner", "Dinner", "scene.dinner"]];
-  function scenesOf(env) {
+  function scenesOf(env, o) {
     if (env.demo) return SCENE_DEMO;
-    return (dataOf(env).scenes || []).map(function (s) { return [/^script\./.test(s.entity || "") ? "play" : "favourite", String(s.name || s.entity || ""), String(s.entity || "")]; }).filter(function (s) { return s[2]; });
+    var l = (dataOf(env).scenes || []).map(function (s) { return [/^script\./.test(s.entity || "") ? "play" : "favourite", String(s.name || s.entity || ""), String(s.entity || "")]; }).filter(function (s) { return s[2]; });
+    // the scenes picked for this widget on this TV (none picked: every one set up in Smart home)
+    var want = o ? setting(o, env, "scenes") : null;
+    if (Object.prototype.toString.call(want) === "[object Array]" && want.length) {
+      var picked = want.map(function (e) { return l.filter(function (x) { return x[2] === e; })[0]; }).filter(Boolean);
+      if (picked.length) l = picked;
+    }
+    return l;
   }
   R.scenes = function (root, o, b, env) {
-    var list = scenesOf(env);
+    var list = scenesOf(env, o);
     if (!list.length) return noHa(root, b, "favourite", "scenes");
     if (b.w < 300 && b.h < 300) {
       // a tile: OK opens every scene
@@ -1647,7 +1669,7 @@
     var bell = ha.bell, name = devName(o, env, null, bell && bell.name, "Doorbell");
     var words = !bell ? ["Checking", "Home Assistant", "Checking"] : !bell.ok ? ["Not answering", "Home Assistant", "Home Assistant"] : bell.ringing ? ["Ringing now", name, "At the door"] : bell.at ? ringWords(bell.at) : ["No ring", "Not this week", "This week"];
     var ring = !env.demo && ha.ring && bell && bell.kept && ha.ring.at ? ha.ring : null;
-    var src = env.demo ? bgImg("grose-valley") : ring ? ring.src : (ha.stills || {}).doorbell, cam = env.demo || info.doorbell_camera;
+    var src = env.demo ? bgImg("grose-valley") : ring ? ring.src : (ha.stills || {}).doorbell, cam = (env.demo || info.doorbell_camera) && setting(o, env, "picture") !== false;
     var hot = bell && bell.ringing ? "color:#ff453a;" : "";
     alignRoot(root, al);
     if (b.w < 300 && b.h < 300) {
@@ -1694,12 +1716,13 @@
         fitNum(root, kwh(e.total), leftW, 60, "margin-top:6px"), fitWords(root, "kWh today", leftW, 24, 1, 560, "color:var(--sub)")]),
         E("div", "cw-col", "flex:1;min-width:0;margin-left:16px;justify-content:center", [hourBars(hours, H - 20, 1)])]));
     } else {
-      var wide = b.w >= 560, axis = b.h >= 300 && wide, half = wide && e.power != null ? (W - 36) / 2 : W;
+      var showNow = e.power != null && setting(o, env, "now") !== false;
+      var wide = b.w >= 560, axis = b.h >= 300 && wide, half = wide && showNow ? (W - 36) / 2 : W;
       var stat = function (v, unit, col) { return E("div", "cw-col", "flex:none;align-items:center", [fitNum(root, v, Math.min(half, 360), 84, col ? "color:" + col : ""), fitWords(root, unit, Math.min(half, 360), 25, 1, 560, "color:var(--sub)")]); };
       var bat = e.battery != null && wide ? fitWords(root, "Battery " + e.battery + "%", W * 0.4, 25, 1, 560, "color:var(--sub)") : null;
       add(root, [E("div", "cw-row", "width:100%;flex:none;" + (bat ? "justify-content:space-between" : justify(al)), [fitLab(root, "bolt", name + " today", bat ? W * 0.58 : W), bat]),
-        E("div", "cw-row", "width:100%;flex:none;margin-top:10px;align-items:flex-end;" + justify(al), [stat(kwh(e.total), "kWh today"), wide && e.power != null ? E("div", "", "width:36px;flex:none") : null,
-          wide && e.power != null ? stat(kwh(e.power), String(e.power_unit || "kW") + " now", "#30d158") : null]),
+        E("div", "cw-row", "width:100%;flex:none;margin-top:10px;align-items:flex-end;" + justify(al), [stat(kwh(e.total), "kWh today"), wide && showNow ? E("div", "", "width:36px;flex:none") : null,
+          wide && showNow ? stat(kwh(e.power), String(e.power_unit || "kW") + " now", "#30d158") : null]),
         E("div", "cw-col cw-grow", "width:100%;justify-content:flex-end;margin-top:14px;min-height:0", [hourBars(hours, Math.max(40, b.h - (axis ? 260 : 220)), wide ? 3 : 1),
           axis ? E("div", "cw-row cw-sp cw-t23", "width:100%;margin-top:6px", ["12am", "6am", "12pm", "6pm", "12am"].map(function (x) { return E("span", "", "", [x]); })) : null])]);
     }
@@ -1784,11 +1807,13 @@
     if (!bt) return empty(root, b, "bolt", "Batteries show on a Google TV, Android TV or Fire TV", "Only Android shares the charge of paired remotes");
     if (bt.need === "permission") return soon(root, b, "bolt", "battery");
     if (!bt.devices || !bt.devices.length) return empty(root, b, "bolt", "No charge to show", "Paired remotes and controllers that report their charge show here");
+    var low = +setting(o, env, "low", 20);
+    if (!isFinite(low) || low < 5 || low > 50) low = 20;
     var d = bt.devices.slice(0, b.w < 700 ? 3 : 4).map(function (x) { return [BAT_ICON[x.kind] || "bluetooth", x.name, x.level]; }), R2 = Math.max(96, Math.min((b.w - 48) / d.length - 40, b.h - 190));
     // the label and the rings as one group in the middle of the box
     root.style.justifyContent = "center";
     add(root, [lab("bolt", op(o).label || "Batteries"), E("div", "cw-row", "justify-content:space-around;margin-top:16px", d.map(function (x) {
-      var c = x[2] < 20 ? "#ff453a" : "#30d158";
+      var c = x[2] < low ? "#ff453a" : "#30d158";
       return E("div", "cw-col", "align-items:center", [E("div", "", "position:relative;width:" + px(R2) + ";height:" + px(R2), [svg("0 0 100 100", R2, R2, [S("circle", { cx: 50, cy: 50, r: 42, fill: "none", stroke: "rgba(255,255,255,.14)", "stroke-width": 9 }),
         S("circle", { cx: 50, cy: 50, r: 42, fill: "none", stroke: c, "stroke-width": 9, "stroke-linecap": "round", "stroke-dasharray": 264, "stroke-dashoffset": 264 * (1 - x[2] / 100), transform: "rotate(-90 50 50)" })]),
         E("div", "", "position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center", [ic(x[0], R2 * 0.36, "#fff")])]),
@@ -1804,7 +1829,8 @@
     var wd = binDay(q) === null ? 3 : binDay(q), ahead = (wd - d.getDay() + 7) % 7;
     var when = ahead === 0 ? "Tonight" : ahead === 1 ? "Tomorrow night" : DAYS[wd] + " night";
     var night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + ahead), week = Math.floor((night.getTime() / 86400000 - (q.anchor || 0)) / 7);
-    var a = [q.lid_a || "#ffd60a", q.bin_a || "Recycling"], c = [q.lid_b || "#30d158", q.bin_b || "Garden"];
+    var lid = function (k, dflt) { var v = setting(o, env, k, dflt); return typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : dflt; };
+    var a = [lid("lid_a", "#ffd60a"), q.bin_a || "Recycling"], c = [lid("lid_b", "#30d158"), q.bin_b || "Garden"];
     var bins = q.alt ? [["#ff453a", "Rubbish"], week % 2 === 0 ? a : c] : [a, c];
     if (!env.demo && binDay(q) === null) return empty(root, b, "calendar", "Set your bin night in this widget's settings", "Pick the night and the bins");
     var bs = b.h < 300 ? 48 : 62;
@@ -2263,7 +2289,8 @@
     live(root, 15000, function () { w.textContent = timeWords(now()); });
   };
   CR.solar = CR.sun = function (root, o, b, env) {
-    var s = sunToday(env, o);
+    var s = sunToday(env, o), own = o && o.kind === "solar" && !env.demo ? pickedPlace(o, env) : null;
+    if (own) { var st = sunTimes(now(), own.lat, own.lon); s = st ? { rise: sunAt(st.rise, own.timezone), set: sunAt(st.set, own.timezone), frac: clamp((now() - st.rise) / (st.set - st.rise), -0.1, 1.1) } : null; }
     if (!s) return empty(root, b, "sun", "Set your town for the sun", "");
     if (b.w < 300) return mini(root, b, "sun", (s.frac > 0.5 ? s.set : s.rise).replace(/[ap]m$/, ""), s.frac > 0.5 ? "Sunset" : "Sunrise");
     var col = function (word, t) { return E("div", "cw-col", "", [E("div", "cw-t23", "", [word]), E("div", "cw-t29", "font-weight:700", [t])]); };
@@ -2345,7 +2372,8 @@
     if (!env.demo && binDay(q) === null) return empty(root, b, "calendar", "Set your bin night in this widget's settings", "");
     var when = ahead === 0 ? "Tonight" : ahead === 1 ? "Tomorrow" : DAYS[wd].slice(0, 3) + " night";
     var night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + ahead), week = Math.floor((night.getTime() / 86400000 - (q.anchor || 0)) / 7);
-    var A = q.lid_a || "#ffd60a", B = q.lid_b || "#30d158", lids = q.alt ? ["#ff453a", week % 2 === 0 ? A : B] : [A, B];
+    var lid = function (k, dflt) { var v = setting(o, env, k, dflt); return typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : dflt; };
+    var A = lid("lid_a", "#ffd60a"), B = lid("lid_b", "#30d158"), lids = q.alt ? ["#ff453a", week % 2 === 0 ? A : B] : [A, B];
     var bin = function (c) { return svg("0 0 62 72", 40, 46, [S("rect", { x: 6, y: 14, width: 50, height: 56, rx: 8, fill: "#3a3a40" }), S("rect", { x: 2, y: 6, width: 58, height: 12, rx: 5, fill: c })], "margin-left:8px"); };
     if (b.w < 300) { root.style.padding = "18px"; add(root, [E("div", "cw-t23", "font-weight:700;color:var(--sub)", [op(o).label || "Bins"]), E("div", "cw-grow"), E("div", "cw-row", "margin-left:-8px", lids.map(bin)), E("div", "cw-t25 cw-ell", "font-weight:720;color:var(--ink);margin-top:6px", [when])]); return; }
     add(root, E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("calendar", op(o).label || "Bin night"), E("div", "cw-t29", "font-weight:720;margin-top:6px", [when])]), E("div", "cw-row", "", lids.map(bin))]));
@@ -2355,11 +2383,14 @@
     add(root, E("div", "cw-col", "height:100%;justify-content:center", [E("div", "cw-t48 cw-ell", "font-size:" + px(clamp((b.w - 48) / (w[0].length * 0.6), 30, 56)), [w[0]]), E("div", "cw-t25 cw-ell", "font-style:italic;margin-top:4px", [w[1] + (b.w >= 600 ? ". " + w[2] : "")])]));
   };
   CR.battery = function (root, o, b, env) {
-    var bt = batteriesOf(env), x = bt && bt.devices && bt.devices[0];
+    // the one with the least charge left (the line under it says "Lowest charge")
+    var bt = batteriesOf(env), x = bt && bt.devices && bt.devices.slice().sort(function (p, q) { return (+p.level) - (+q.level); })[0];
     if (!bt) return empty(root, b, "bolt", "Needs an Android TV", "");
     if (bt.need === "permission") return soon(root, b, "bolt", "battery");
     if (!x) return empty(root, b, "bolt", "No charge to show", "");
-    mini(root, b, BAT_ICON[x.kind] || "bluetooth", x.level + "%", x.name, x.level < 20 ? "Charge it soon" : "Lowest charge", x.level < 20 ? "#ff453a" : "#30d158");
+    var low = +setting(o, env, "low", 20);
+    if (!isFinite(low) || low < 5 || low > 50) low = 20;
+    mini(root, b, BAT_ICON[x.kind] || "bluetooth", x.level + "%", x.name, x.level < low ? "Charge it soon" : "Lowest charge", x.level < low ? "#ff453a" : "#30d158");
   };
   // the web widgets at a tile and a wide tile: centred unless the design says, nothing cut off
   // (a headline that would not fit whole gives way to a shorter one of the newest three)

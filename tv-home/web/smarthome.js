@@ -501,6 +501,22 @@
       }
       return Promise.resolve({ ok: false, error: "refused" });
     },
-    scenes: function () { return available() ? info().scenes.map(function (s) { return { entity: s.entity, name: s.name }; }) : []; }
+    scenes: function () { return available() ? info().scenes.map(function (s) { return { entity: s.entity, name: s.name }; }) : []; },
+    // what a widget's own device setting can pick from (app.js, Widgets on this home and the phone):
+    // only what this TV already shows from Home Assistant (Home settings, Smart home), as
+    // [[entity, name], ...] for one Home Assistant domain or a list of them ("climate", ["scene", "script"])
+    devices: function (domain) {
+      if (!native()) return [];
+      var want = Object.prototype.toString.call(domain) === "[object Array]" ? domain : [domain], i = info(), out = [], seen = {};
+      [i.climate, i.controls, i.cameras, i.sensors, i.speakers, i.scenes].forEach(function (l) {
+        (Array.isArray(l) ? l : []).forEach(function (d) {
+          var e = d && typeof d.entity === "string" ? d.entity : "", dom = e.split(".")[0];
+          if (!e || seen[e] || want.indexOf(dom) < 0) return;
+          seen[e] = true;
+          out.push([e, String(d.name || e.split(".").slice(1).join(".").replace(/_/g, " ")).slice(0, 40)]);
+        });
+      });
+      return out;
+    }
   };
 })();

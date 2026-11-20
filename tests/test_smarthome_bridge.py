@@ -32,6 +32,7 @@ class SmartHomeTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
         self.calls = []
+        self.unit = "°C"
         self.home = smarthome.Home(self.dir)
 
         async def fake(base, token, method, path, body=None, limit=0):
@@ -49,6 +50,8 @@ class SmartHomeTest(unittest.TestCase):
                 return 200, b"[]"
             if path.startswith("/api/camera_proxy/"):
                 return 200, b"\xff\xd8\xff\xe0jpeg"
+            if path == "/api/config":
+                return 200, json.dumps({"unit_system": {"temperature": self.unit}}).encode()
             return 404, None
         self.home.call = fake
 
@@ -111,6 +114,21 @@ class SmartHomeTest(unittest.TestCase):
         self.assertTrue(run(self.home.answer("still", "camera.door", "640"))["src"].startswith("data:image/jpeg;base64,"))
         self.assertEqual(run(self.home.answer("still", "camera.other", "640"))["error"], "refused")
         self.assertEqual(run(self.home.answer("unlock", "lock.front"))["error"], "refused")
+
+    def test_climate_rooms_carry_home_assistants_own_unit(self):
+        # the aircon widget draws a room in the home's unit only when the room says its own (widgets.js roomUnit)
+        self.home.pending = ("http://homeassistant.local:8123", TOKEN)
+        self.home.save({"climate": [{"entity": "climate.lounge"}]})
+        self.unit = "°F"
+        rooms = run(self.home.answer("climate"))["rooms"]
+        self.assertEqual(rooms[0]["unit"], "°F")
+        asked = [c[2] for c in self.calls if c[2] == "/api/config"]
+        run(self.home.answer("climate"))
+        self.assertEqual(len([c for c in self.calls if c[2] == "/api/config"]), len(asked), "the unit is read once, not every time")
+        # a Home Assistant that says nothing: no unit, never a guess
+        self.home.save({"climate": [{"entity": "climate.lounge"}]})
+        self.unit = "kelvin"
+        self.assertNotIn("unit", run(self.home.answer("climate"))["rooms"][0])
 
     def test_config_section_with_env_token(self):
         h = smarthome.Home(self.dir, {"url": "http://ha:8123", "scenes": [{"entity": "scene.movie"}]}, TOKEN)
