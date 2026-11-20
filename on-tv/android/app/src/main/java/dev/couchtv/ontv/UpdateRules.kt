@@ -88,8 +88,12 @@ object UpdateRules {
             val x = a!!.getJSONObject(i)
             if (x.optString("name") != want) continue
             has = true
-            // only a file of this release, on this repo's own release download address (the launcher's rule)
-            url = x.optString("browser_download_url").takeIf { it.startsWith("https://github.com/$REPO/releases/download/") && !it.contains("..") } ?: ""
+            // only a file of this release, on this repo's own release download address (the launcher's rule),
+            // and that very file: one APK per app with every processor inside (Matter, 20 Nov 2026), so a
+            // name that only starts the same (couch-tv-ontv-arm64-v8a.apk) is never this app's file
+            url = x.optString("browser_download_url").takeIf {
+                it.startsWith("https://github.com/$REPO/releases/download/") && !it.contains("..") && it.endsWith("/$want")
+            } ?: ""
             digest = x.optString("digest").removePrefix("sha256:").lowercase().takeIf { SHA256.matches(it) } ?: ""
             size = x.optLong("size", 0L).coerceAtLeast(0L)
         }
