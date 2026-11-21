@@ -120,11 +120,36 @@ class UpdateRulesTest {
         assertTrue(computer.contains("More help, Home button from a computer"))
         assertFalse(computer.contains("adb "))
         assertTrue(UpdateRules.how(true).startsWith("This is the Home button version of Couch TV."))
-        assertFalse(computer.contains("8180170"))   // the code gives the phone only APK, which has no watch
         for (s in UpdateRules.steps(false) + UpdateRules.steps(true) + UpdateRules.how(false) + UpdateRules.how(true)) {
             assertFalse("no long dashes: $s", s.contains('–') || s.contains('—'))
             assertFalse("no Beta: $s", s.contains("Beta") || s.contains("coming soon", ignoreCase = true))
         }
+    }
+
+    @Test fun watchVersionIsNotSaidToComeFromAComputer() {
+        // audit 0.13.9 path 12: Make Home open Couch TV puts the watch version on with one press, no computer,
+        // so the update page never says it was put on from a computer; it points at Update to first
+        val how = UpdateRules.how(true)
+        assertFalse(how.contains("put on from a computer"))
+        assertTrue(how.contains("Update to"))
+        assertTrue(how.contains("Make Home open Couch TV again after a Downloader update"))
+        val w = UpdateRules.steps(watch = true)
+        assertTrue(w.first().startsWith("Easiest:"))
+        assertTrue(w.first().contains("Let the phone press keys") && w.first().contains("Update to"))
+        // Downloader's code gives the plain app (no Home button watch): its row warns and says what to press
+        val dl = w.first { it.contains("8180170") }
+        assertTrue(dl.contains("Home opens Google TV again") && dl.contains("Make Home open Couch TV"))
+        assertTrue(w.size <= 8)
+    }
+
+    @Test fun downloaderStepsUseUpAndHashNotBack() {
+        // the beginner tests: Back leaves Downloader; Up until the Downloader button lights, Right twice to #
+        val phone = UpdateRules.steps(watch = false).joinToString(" ")
+        assertFalse(phone.contains("press Back"))
+        assertTrue(phone.contains("press Up again and again until the Downloader button at the top left turns light"))
+        assertTrue(phone.contains("Right twice, to the # button"))
+        // and the way to one button updates next time
+        assertTrue(UpdateRules.steps(watch = false).last().contains("Let the phone press keys"))
     }
 
     // ---------------------------------------------------------------- Matter: one APK, every processor inside

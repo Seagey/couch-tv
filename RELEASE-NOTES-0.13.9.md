@@ -4,12 +4,12 @@ Fewer presses with the TV remote. The on-TV app now updates itself with one butt
 
 ### Do this after updating
 
-- **Option C (the on-TV app):** this one update still goes the old way, because the one button arrives with it. On the TV: Home settings, About, Update couch-tv, and follow the steps (in Downloader, type 8180170, press Go, then Install). Or install the new `couch-tv-ontv.apk` (or `couch-tv-ontv-watch.apk`) over the old one from a computer. Your settings stay. From 0.13.9 on, the next update is one button.
+- **Option C (the on-TV app):** this one update still goes the old way, because the one button arrives with it. On the TV: Home settings, About, Update couch-tv, and follow the steps (in Downloader, type 8180170, press Go, then Install). If the steps say press Back in Downloader, press Up instead, again and again, until the Downloader button at the top left turns light, then Right twice to the # button. Or install the new `couch-tv-ontv.apk` (or `couch-tv-ontv-watch.apk`) over the old one from a computer. Your settings stay. Put the Home button version on from a computer before? Downloader gets the plain app, which has no Home button watch: after this update, press Make Home open Couch TV once (it needs Let the phone press keys), or install `couch-tv-ontv-watch.apk` from the computer again. From 0.13.9 on, the next update is one button.
 - **Every other Android TV:** Home settings, Updates, check now, or install `couch-tv-home.apk` over the old one. All four APKs are signed with the same key as every earlier release.
-- **Samsung:** download `couch-tv-samsung-setup.zip` below and run its installer again (step 4 in `START HERE.txt`). Your settings stay.
+- **Samsung:** download `couch-tv-samsung-setup.zip` below and run its installer again (steps 2 and 4 in `START HERE.txt`). Your settings stay.
 - **Option B (a computer at home):** `git pull`, then install the bridge's one new part (Pillow, for photos sent from the phone). In the couch-tv folder run `.venv/bin/pip install -r bridge/requirements.txt` on a Mac or Linux, or `.venv\Scripts\pip install -r bridge\requirements.txt` on Windows, then restart the bridge. In Docker, build the image again: `docker compose -f examples/docker/compose.yaml up -d --build` ([docs/DOCKER.md](docs/DOCKER.md)).
 - **Option B and Matter devices (only if you want them):** the home computer needs Node.js 22.13 or newer. In the couch-tv folder run `scripts/matter-setup.sh` once, then restart the bridge ([docs/MATTER.md](docs/MATTER.md)). On a Mac, Matter needs the Local Network permission: start the bridge once from Terminal and press Allow. If the bridge runs as a background service (launchd), macOS never asks, so switch it on yourself in System Settings, Privacy and Security, Local Network, or adding a device fails and the phone page says so.
-- **Apple TV:** build Couch TV again with Xcode ([docs/APPLE-TV.md](docs/APPLE-TV.md)).
+- **Apple TV:** build Couch TV again with Xcode ([docs/APPLE-TV.md](docs/APPLE-TV.md)). It needs a Mac with Xcode, and a Mac left on at home: Apple's free signing runs out every 7 days.
 - **Roku:** build the channel and put it on again the way you did before ([docs/ROKU.md](docs/ROKU.md)).
 
 ### What each TV gets
@@ -28,7 +28,9 @@ When a new version is out and the app can install it itself, Home settings, Upda
 
 It needs the app's own link to the TV, the one you switch on once with Let the phone press keys on the app's setup screen. Without that link, or if a try fails (for example the TV is short of space), the page says why in one line, then shows the steps, with a QR code under them that opens the same steps on your phone, so you can follow them there.
 
-The update button was tried on a real TCL, from 0.13.7 to 0.13.8.
+The update button was tried on a real TCL, from 0.13.7 to 0.13.8. The update from 0.13.8 to 0.13.9 has not yet been tried on a real TV.
+
+The Home button version (put on from a computer, or by Make Home open Couch TV) keeps its Home button through Update to. Downloader's code gives the plain app, which has no Home button watch, so after an update with Downloader, Home opens Google's home again: press Make Home open Couch TV once more. The update page says so.
 
 ### No crash after an update reopens Couch TV
 
@@ -94,7 +96,7 @@ A new couch-tv Studio template. The clock sits behind the mountains in each scen
 
 ### Designs on Apple TV and Roku
 
-An Apple TV and a Roku now show couch-tv Studio designs, drawn by Couch TV itself. A widget it can't draw there is left out and says so by name, like "Surf: not on this TV", so nothing pretends to work.
+An Apple TV and a Roku now show couch-tv Studio designs, drawn by Couch TV itself. A widget it can't draw there is left out and says so by name, like "Surf: not on this TV", so nothing pretends to work. On a Roku you type the design's code on the Roku (the star button, Get a design by code). Apple TV: designs have run in Apple's simulator; not yet tried on a real Apple TV.
 
 ### The app list scrolls
 
@@ -104,7 +106,7 @@ Add app (the "+" in an app row) and Change app now scroll with the remote, so ev
 
 The words in settings and setup are written for someone who has never set up a TV app:
 
-- The app is called **Couch TV** everywhere on the TV and the phone.
+- The app is called **Couch TV** on the TV's screens and the phone. In Android's own list of apps, the Couch TV home app (options A and B) is still listed as **Home**, with the Couch TV picture.
 - The Home settings section that was called couch-tv Studio is now **Designs**: Turn on designs, Back to the standard home. The design website is still couch-tv Studio.
 - **Let the phone press keys** replaces ADB on the TV, with steps for **Newer TVs** and **Older TVs**. Android's own menu names (Developer options, USB debugging, Wireless debugging, Allow debugging?, Always allow) stay exact so you can find them, with a plain line beside them saying why.
 - Widgets say **the Couch TV app on this TV** or **a home computer**, never setup option B or C. The phone remote says the home computer, not the bridge.
@@ -130,7 +132,7 @@ On the on-TV app and the Couch TV home app on its own the TV itself joins the de
 
 ### Make Home open Couch TV, with one press (on-TV app)
 
-On Google TV and other TVs with Google's home, Home settings, About, the setup screen and the phone page have Make Home open Couch TV. With the app's own link to the TV (Let the phone press keys), one press puts on the Home button version, switches its watch on and makes Couch TV the home. No computer needed. On a Fire TV whose Fire OS blocks the link, the page shows the steps instead.
+On Google TV and other TVs with Google's home, Home settings, About, the setup screen and the phone page have Make Home open Couch TV. With the app's own link to the TV (Let the phone press keys), one press puts on the Home button version, switches its watch on and makes Couch TV the home. No computer needed. On a Fire TV whose Fire OS blocks the link, the page shows the steps instead. This is new in 0.13.9 and has not yet been tried on a real Google TV; the computer way (the Setup app, or `couch-tv-ontv-watch.apk`) still works. Let the phone press keys needs Wireless debugging, which is on Android 11 or newer; Android 10 or older has none and uses Network debugging (on some TVs, USB debugging).
 
 ### Home Assistant signs in with a QR code
 

@@ -328,6 +328,19 @@ class ReleaseBuildTests(unittest.TestCase):
             start = f.read()
         self.assertIn("Apps2Samsung keeps that signing certificate on this computer", start)
 
+    def test_start_here_uses_the_0139_words_and_the_setup_shows_the_address(self):
+        # launch audit 0.13.9: the section is Designs from 0.13.9, and the installer prints the computer's
+        # address, so the setup starts before Developer mode and nobody hunts through the menus for it
+        with open(os.path.join(ROOT, "samsung", "setup", "START HERE.txt")) as f:
+            start = f.read()
+        self.assertIn("Home settings), then Designs, then Get a design from your phone", start)
+        self.assertNotIn("open couch-tv Studio", start)
+        self.assertNotIn("Find your computer's address", start)
+        self.assertLess(start.index("This computer's address is"), start.index("STEP 3. Developer mode on the TV"))
+        self.assertIn("press Return (Windows: Enter)", start)
+        with open(os.path.join(ROOT, "samsung", "setup", "Install on Mac.command")) as f:
+            self.assertIn("This computer's address is", f.read())   # what step 2 promises
+
 
 class ServerHookTests(unittest.TestCase):
     """server.py makes every "kind": "samsung" TV from samsung_frame, not plain samsung (the shared hook)."""

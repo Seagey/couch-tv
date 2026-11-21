@@ -108,7 +108,7 @@ try {
   CHECK = { code: "ethernet" }; await checkNow(page); s = await state(page);
   ok(/Wi-Fi/.test(s.fix) && /Network debugging/.test(s.fix), "Ethernet: Wireless debugging needs Wi-Fi, or Network debugging");
   CHECK = { code: "debugging_off" }; await checkNow(page); s = await state(page);
-  ok(/Build seven times/.test(s.fix) && /USB debugging/.test(s.fix) && /Network debugging/.test(s.fix), "debugging off: Build seven times, USB or Network debugging");
+  ok(/Android TV OS build \(on some TVs, Build\) seven times/.test(s.fix) && /USB debugging/.test(s.fix) && /Network debugging/.test(s.fix), "debugging off: Android TV OS build (on some TVs, Build) seven times, USB or Network debugging");
   ok(/older Android TV: Settings, Device Preferences, About/.test(s.fix), "debugging off: the older Android TV path too");
   // a Fire TV (the TV says fire_tv): its own menus, ADB debugging, never Wireless debugging
   CHECK = { code: "debugging_off", fire_tv: true }; await checkNow(page); s = await state(page);

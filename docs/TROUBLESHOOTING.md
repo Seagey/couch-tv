@@ -6,6 +6,7 @@ Fixes for problems seen on real TVs, starting with a TV that goes round in a res
 - [TCL: Home goes back to Google TV after every restart](#tcl-home-goes-back-to-google-tv-after-every-restart)
 - [If Disney+ (or another app) signs you out after the TV turns off](#if-disney-or-another-app-signs-you-out-after-the-tv-turns-off)
 - [Moving along the rows feels slow](#moving-along-the-rows-feels-slow)
+- [Home opens Google TV again after an update with Downloader](#home-opens-google-tv-again-after-an-update-with-downloader)
 - [The phone can't press keys (ADB or Wireless debugging won't connect)](#the-phone-cant-press-keys-adb-or-wireless-debugging-wont-connect)
 - [LG: the TV refuses couch-tv, or Developer Mode won't start](#lg-the-tv-refuses-couch-tv-or-developer-mode-wont-start)
 - [Something else stuck](#something-else-stuck)
@@ -175,6 +176,19 @@ If the rows turn smooth, the GPU is the limit. Keep it for couch-tv only, withou
 
 To undo it, remove the key or set it to `0`. Text and pictures are a little softer than at full size. If it helps, or does not, please say which TV and Android version on [#197](https://github.com/Seagey/couch-tv/issues/197).
 
+## Home opens Google TV again after an update with Downloader
+
+On the on-TV app (option C), the Home button version (put on from a computer, or by **Make Home open
+Couch TV** from 0.13.9) has the Home button watch. Downloader's code 8180170 always gets the plain
+app, `couch-tv-ontv.apk`, which has no watch, so after an update with Downloader Home opens Google's
+home again. Your settings stay.
+
+- Open **Couch TV** and press **Make Home open Couch TV** once more. It needs **Let the phone press
+  keys** (Couch TV, More).
+- Next time, update with **Home settings**, **Updates**, **Update to**: it gets the Home button version
+  again, so the Home button stays.
+- Or put `couch-tv-ontv-watch.apk` on from a computer, as before.
+
 ## The phone can't press keys (ADB or Wireless debugging won't connect)
 
 On the on-TV app (option C), open Home settings on your phone, This TV, **Let the phone press keys**,
@@ -184,11 +198,11 @@ with the fix:
 | What it says | What to do |
 |---|---|
 | The phone can't reach the TV | Phone and TV on the same Wi-Fi: not a guest network, not mobile data. Check the TV is on, then load the page again. |
-| The TV is on a network cable | Wireless debugging (Android 11 and newer) only works on Wi-Fi. Join the Wi-Fi on the TV, or use the older TVs steps with Network debugging, which works on a cable. |
-| Debugging is off on the TV | Settings, System, About (older Android TV: Settings, Device Preferences, About): press OK on Build seven times. Then Developer options, USB debugging on (some TVs call it Network debugging or ADB debugging). On a Fire TV: Settings, My Fire TV, About, press OK on the device name seven times, then My Fire TV, Developer options, ADB debugging on. |
+| The TV is on a network cable | Wireless debugging (Android 11 or newer) only works on Wi-Fi. Join the Wi-Fi on the TV, or use the older TVs steps with Network debugging, which works on a cable. |
+| Debugging is off on the TV | Settings, System, About (older Android TV: Settings, Device Preferences, About): press OK on Android TV OS build (on some TVs, Build) seven times. Then Developer options, USB debugging on (some TVs call it Network debugging or ADB debugging). On a Fire TV: Settings, My Fire TV, About, press OK on the device name seven times, then My Fire TV, Developer options, ADB debugging on. |
 | Wireless debugging is off | Developer options, Wireless debugging on, tick Always allow on this network, then the newer TVs steps. |
 | Wireless debugging is on, but Couch TV is not paired yet | Wireless debugging, Pair device with pairing code, and type the 6 digit code on the phone. |
-| This TV has no Wireless debugging | Android 10 or older: Network debugging (on some TVs USB debugging), then Let the phone press keys. |
+| This TV has no Wireless debugging | Wireless debugging is on Android 11 or newer; Android 10 or older has none. Switch on Network debugging (on some TVs, USB debugging), then press Let the phone press keys. |
 | The TV is waiting for you, or nobody answered the TV's Allow question | Press Let the phone press keys and look at the TV straight away: tick Always allow and press Allow. If no question shows, restart the TV and try again. |
 | The TV's debugging connection is closed | Some TVs close it after a restart: switch Wireless debugging (or Network debugging) off and on again, then press Let the phone press keys. |
 | This Fire TV stops Couch TV pressing keys by itself | Amazon switched it off in a Fire TV update. Keys and typing from the phone need a home computer running couch-tv (option B). |
