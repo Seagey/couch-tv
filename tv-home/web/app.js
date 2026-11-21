@@ -7164,8 +7164,10 @@
     var dayAfter = function (ms) { var d = new Date(ms); return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(); };
     CouchAtHome.staysOf(STAY.events, { names: s.names, mail: STAY.mail, host: CouchAtHome.calHost(s.url) }).forEach(function (x) {
       var who = x.guest ? ", " + x.guest : "";
-      out.push({ title: "Check in" + who, start: x.from, end: dayAfter(x.from), allDay: true });
-      out.push({ title: "Check out" + who, start: x.to, end: dayAfter(x.to), allDay: true });
+      // the titles in the TV language (widget-lines.js), the guest name kept as it is
+      var WL = typeof window !== "undefined" ? window.CouchWidgetLines : null, ln = function (en) { return WL ? (x.guest ? WL.t(en + ", {name}", { name: x.guest }) : WL.t(en)) : en + who; };
+      out.push({ title: ln("Check in"), start: x.from, end: dayAfter(x.from), allDay: true });
+      out.push({ title: ln("Check out"), start: x.to, end: dayAfter(x.to), allDay: true });
     });
     return out;
   }
